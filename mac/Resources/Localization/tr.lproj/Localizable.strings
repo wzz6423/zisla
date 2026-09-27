@@ -460,7 +460,7 @@
 "颜色值" = "Renk değeri";
 "算式" = "Hesaplama";
 "日期时间" = "Tarih ve saat";
-"非当前系统语言文本" = "Sistem dilinden farklı metin";
+"非 Zisla 全局语言文本" = "Zisla’nın genel dilinden farklı metin";
 "代码" = "Kod";
 "翻译" = "Çevir";
 "写邮件" = "E-posta yaz";
@@ -2507,3 +2507,15 @@
 
 "窗口预览" = "Pencere Önizlemeleri";
 "悬停 Dock 或使用 Command-Tab 时预览窗口；需要辅助功能和屏幕录制权限" = "Dock üzerine gelince veya Command-Tab kullanırken pencereleri önizleyin; Erişilebilirlik ve Ekran Kaydı izinleri gerekir";
+
+"自动翻译" = "Otomatik çeviri";
+
+"正在翻译…" = "Çevriliyor…";
+
+"翻译失败，请重试或使用浏览器翻译" = "Çeviri başarısız oldu. Yeniden deneyin veya tarayıcıda çevirin.";
+
+"关闭弹窗快捷键" = "Açılır Pencereyi Kapatma Kısayolu";
+"弹窗可见时连按 %@ 关闭当前弹窗" = "Açılır pencere görünürken kapatmak için %@ tuşuna iki kez basın";
+"弹窗可见时按下 %@ 关闭当前弹窗" = "Açılır pencere görünürken kapatmak için %@ tuşuna basın";
+"关闭弹窗快捷键未能启用，请检查快捷键冲突或输入监控权限" = "Kapatma kısayolu etkinleştirilemedi. Kısayol çakışmalarını veya Giriş İzleme iznini kontrol edin.";
+"关闭弹窗快捷键与动作快捷键相同，当前优先关闭弹窗" = "Kapatma kısayolu bir eylem kısayoluyla aynı. Açılır pencereyi kapatma önceliklidir.";

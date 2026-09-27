@@ -24,8 +24,10 @@ public enum ClipboardHistoryPasteboard {
     @discardableResult
     public static func write(
         _ content: ClipboardHistoryContent,
-        to pasteboard: NSPasteboard = .general
+        to pasteboard: NSPasteboard = .general,
+        onlyIfChangeCount expectedChangeCount: Int? = nil
     ) -> Bool {
+        if let expectedChangeCount, pasteboard.changeCount != expectedChangeCount { return false }
         switch content {
         case .text(let value):
             pasteboard.clearContents()

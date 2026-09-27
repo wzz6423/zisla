@@ -460,7 +460,7 @@
 "颜色值" = "Giá trị màu";
 "算式" = "Phép tính";
 "日期时间" = "Ngày và giờ";
-"非当前系统语言文本" = "Văn bản không phải ngôn ngữ hệ thống";
+"非 Zisla 全局语言文本" = "Văn bản không phải ngôn ngữ chung của Zisla";
 "代码" = "Mã";
 "翻译" = "Dịch";
 "写邮件" = "Soạn email";
@@ -2507,3 +2507,15 @@
 
 "窗口预览" = "Xem trước cửa sổ";
 "悬停 Dock 或使用 Command-Tab 时预览窗口；需要辅助功能和屏幕录制权限" = "Xem trước cửa sổ khi trỏ vào Dock hoặc dùng Command-Tab; cần quyền Trợ năng và Ghi màn hình";
+
+"自动翻译" = "Dịch tự động";
+
+"正在翻译…" = "Đang dịch…";
+
+"翻译失败，请重试或使用浏览器翻译" = "Dịch thất bại. Hãy thử lại hoặc dịch trong trình duyệt.";
+
+"关闭弹窗快捷键" = "Phím tắt đóng cửa sổ bật lên";
+"弹窗可见时连按 %@ 关闭当前弹窗" = "Nhấn %@ hai lần khi cửa sổ bật lên đang hiển thị để đóng";
+"弹窗可见时按下 %@ 关闭当前弹窗" = "Nhấn %@ khi cửa sổ bật lên đang hiển thị để đóng";
+"关闭弹窗快捷键未能启用，请检查快捷键冲突或输入监控权限" = "Không thể bật phím tắt đóng. Hãy kiểm tra xung đột phím tắt hoặc quyền Giám sát đầu vào.";
+"关闭弹窗快捷键与动作快捷键相同，当前优先关闭弹窗" = "Phím tắt đóng trùng với phím tắt của một thao tác. Việc đóng cửa sổ bật lên được ưu tiên.";

@@ -157,6 +157,30 @@ struct ClipboardAssistantLocalizationTests {
         #expect(english[detail] == "Show an Open Folder quick action when a file finishes")
     }
 
+    @Test
+    func foreignTextSettingNamesZislaGlobalLanguageInEveryLanguage() throws {
+        let key = "非 Zisla 全局语言文本"
+        let englishValue = "Text Not in Zisla’s Global Language"
+        #expect(AppLanguage.allCases.count == 17)
+
+        for language in AppLanguage.allCases {
+            let table = try #require(Self.stringsTable(for: language))
+            let value = try #require(table[key], "\(language.rawValue) is missing the app-language recognition title")
+            #expect(value.contains("Zisla"))
+            #expect(AppLocalization.string(key, language: language) == value)
+            #expect(table["非当前系统语言文本"] == nil)
+            if language != .simplifiedChinese {
+                #expect(value != key, "\(language.rawValue) must translate the app-language recognition title")
+            }
+            if language != .english {
+                #expect(value != englishValue, "\(language.rawValue) must not use the English fallback")
+            }
+        }
+
+        #expect(AppLocalization.string(key, language: .english) == englishValue)
+        #expect(AppLocalization.string(key, language: .traditionalChinese) == "非 Zisla 全域語言文字")
+    }
+
     private static func stringsTable(for language: AppLanguage) -> [String: String]? {
         let url = localizationURL
             .appendingPathComponent("\(language.rawValue).lproj", isDirectory: true)

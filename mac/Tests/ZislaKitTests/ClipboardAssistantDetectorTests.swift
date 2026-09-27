@@ -383,11 +383,31 @@ struct ClipboardAssistantDetectorTests {
         } else {
             Issue.record("translate action expected")
         }
+        #expect(detection?.actions.contains(.autoTranslate("这是一段中文内容，用于验证语言识别。")) == true)
         if case .characterCount(let count)? = detection?.detail {
             #expect(count == 18)
         } else {
             Issue.record("character count detail expected")
         }
+    }
+
+    @Test
+    func automaticTranslationCanBeTheDefaultWithoutTruncatingTheForeignText() throws {
+        let text = String(repeating: "这是一段用于验证完整翻译的中文内容。\n", count: 80)
+        let detection = try #require(ClipboardAssistantDetector.detect(
+            text: text,
+            enabledKinds: [.nonSystemLanguageText],
+            systemLanguageIdentifier: "en"
+        ))
+        let ordered = ClipboardAssistantActionOrder.ordered(
+            detection.actions,
+            for: .nonSystemLanguageText,
+            using: [.nonSystemLanguageText: [.autoTranslate, .translate]]
+        )
+        let fullText = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        #expect(ordered.first == .autoTranslate(fullText))
+        #expect(ordered.contains(.translate(fullText)))
+        #expect(detection.title.count < fullText.count)
     }
 
     @Test
@@ -435,6 +455,72 @@ struct ClipboardAssistantDetectorTests {
             systemLanguageIdentifier: "zh-Hans"
         )
         #expect(detection?.kind == .nonSystemLanguageText)
+    }
+
+    @Test(arguments: AppLanguage.allCases)
+    func textLanguageClassificationUsesAppLocale(language: AppLanguage) {
+        let text = "This is an ordinary English paragraph with enough context for language detection."
+        let detection = ClipboardAssistantDetector.detect(
+            text: text,
+            enabledKinds: [.text, .nonSystemLanguageText],
+            locale: language.locale
+        )
+        let expectedKind: ClipboardAssistantKind = language == .english ? .text : .nonSystemLanguageText
+        #expect(detection?.kind == expectedKind, "Classification must follow the selected app language: \(language.rawValue)")
+        #expect(detection?.actions.contains(.autoTranslate(text)) == (language != .english))
+    }
+
+    @Test(arguments: [AppLanguage.simplifiedChinese, .traditionalChinese])
+    func chineseScriptsRemainTextInBothChineseAppLanguages(language: AppLanguage) {
+        for text in ["这是一段中文内容，用于验证语言识别。", "這是一段中文內容，用於驗證語言識別。"] {
+            let detection = ClipboardAssistantDetector.detect(
+                text: text,
+                enabledKinds: [.text, .nonSystemLanguageText],
+                locale: language.locale
+            )
+            #expect(detection?.kind == .text, "Chinese scripts must share the same primary language")
+            #expect(detection?.actions.contains(.autoTranslate(text)) == false)
+        }
+    }
+
+    @Test @MainActor
+    func appLanguageChangesAffectTheNextContentDetection() throws {
+        let suiteName = "Zisla.ClipboardAssistantDetectorTests.\(UUID().uuidString)"
+        let defaults = try #require(UserDefaults(suiteName: suiteName))
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+        let languageStore = AppLanguageStore(defaults: defaults)
+        let text = "This is an ordinary English paragraph with enough context for language detection."
+
+        for language in [AppLanguage.english, .simplifiedChinese, .english] {
+            languageStore.language = language
+            let detection = ClipboardAssistantDetector.detect(
+                content: .text(text),
+                enabledKinds: [.text, .nonSystemLanguageText],
+                locale: languageStore.language.locale
+            )
+            let expectedKind: ClipboardAssistantKind = language == .english ? .text : .nonSystemLanguageText
+            #expect(detection?.kind == expectedKind, "Changing the app language must affect the next detection")
+        }
+    }
+
+    @Test
+    func appLanguageDetectionPreservesEmptyInputAndDisabledKinds() {
+        for text in ["", " \n\t ", "12345", "💫"] {
+            #expect(ClipboardAssistantDetector.detect(
+                text: text,
+                enabledKinds: [.nonSystemLanguageText],
+                locale: AppLanguage.english.locale
+            ) == nil)
+        }
+
+        let text = "这是一段中文内容，用于验证语言识别。"
+        let detection = ClipboardAssistantDetector.detect(
+            text: text,
+            enabledKinds: [.text],
+            locale: AppLanguage.english.locale
+        )
+        #expect(detection?.kind == .text)
+        #expect(detection?.actions.contains(.autoTranslate(text)) == false)
     }
 
     // MARK: - Code

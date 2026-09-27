@@ -460,7 +460,7 @@
 "颜色值" = "Nilai warna";
 "算式" = "Perhitungan";
 "日期时间" = "Tanggal dan waktu";
-"非当前系统语言文本" = "Teks dalam bahasa selain bahasa sistem";
+"非 Zisla 全局语言文本" = "Teks dalam bahasa selain bahasa global Zisla";
 "代码" = "Kode";
 "翻译" = "Terjemahkan";
 "写邮件" = "Tulis email";
@@ -2507,3 +2507,15 @@
 
 "窗口预览" = "Pratinjau Jendela";
 "悬停 Dock 或使用 Command-Tab 时预览窗口；需要辅助功能和屏幕录制权限" = "Pratinjau jendela saat mengarahkan kursor ke Dock atau memakai Command-Tab; perlu izin Aksesibilitas dan Perekaman Layar";
+
+"自动翻译" = "Terjemahan otomatis";
+
+"正在翻译…" = "Sedang menerjemahkan…";
+
+"翻译失败，请重试或使用浏览器翻译" = "Terjemahan gagal. Coba lagi atau terjemahkan di browser.";
+
+"关闭弹窗快捷键" = "Pintasan Tutup Popup";
+"弹窗可见时连按 %@ 关闭当前弹窗" = "Tekan %@ dua kali saat popup terlihat untuk menutupnya";
+"弹窗可见时按下 %@ 关闭当前弹窗" = "Tekan %@ saat popup terlihat untuk menutupnya";
+"关闭弹窗快捷键未能启用，请检查快捷键冲突或输入监控权限" = "Pintasan untuk menutup tidak dapat diaktifkan. Periksa konflik pintasan atau izin Pemantauan Input.";
+"关闭弹窗快捷键与动作快捷键相同，当前优先关闭弹窗" = "Pintasan untuk menutup sama dengan pintasan tindakan. Menutup popup diprioritaskan.";

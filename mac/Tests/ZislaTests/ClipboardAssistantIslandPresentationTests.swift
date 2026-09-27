@@ -62,11 +62,12 @@ struct ClipboardAssistantIslandPresentationTests {
         host.sizingOptions = []
         host.wantsLayer = true
         host.layer?.backgroundColor = NSColor.clear.cgColor
-        let panel = ClipboardAssistantWindow(
+        let panel = ClipboardAssistantController.makeWindow(
             contentView: host,
             frame: CGRect(x: -100_000, y: -100_000, width: 533, height: 37)
         )
         defer { panel.orderOut(nil) }
+        #expect(!panel.hasShadow)
         #expect(NSScreen.screens.allSatisfy { !$0.frame.intersects(panel.frame) })
         // SwiftUI installs its event graph only after the window is ordered in.
         panel.orderFrontRegardless()
@@ -289,7 +290,7 @@ struct ClipboardAssistantIslandPresentationTests {
         // Hide only when the selection overlay renders the frozen capture.
         #expect(phaseSource.contains("let hidesLiveWindow = screenshotPhase == .selecting || isSystemScreenshotActive"))
         #expect(phaseSource.contains("window.ignoresMouseEvents = hidesLiveWindow"))
-        #expect(phaseSource.contains("window.level = ClipboardAssistantWindow.defaultWindowLevel"))
+        #expect(phaseSource.contains("window.level = Self.windowLevel"))
         #expect(phaseSource.contains("if hidesLiveWindow {"))
         #expect(phaseSource.contains("window.orderOut(nil)"))
         #expect(phaseSource.contains("screenshotPhase == .restored || screenshotPhase == .inactive"))
@@ -590,7 +591,6 @@ struct ClipboardAssistantIslandPresentationTests {
         let headerContentSource = toastSource[headerContentStart.lowerBound..<headerContentEnd.lowerBound]
         #expect(headerContentSource.contains("guard controller.isLightweightMode else { return }"))
         #expect(!headerContentSource.contains("toggleExpansion(detection)"))
-        #expect(source.contains("hasShadow = false"))
         #expect(source.contains("hostingView.layer?.backgroundColor = NSColor.clear.cgColor"))
         #expect(source.contains("let layout = screenSnapshot.map { ScreenLayoutEngine().layout(for: $0) }"))
         #expect(source.contains("let collapsedFrame = layout?.collapsedFrame"))
@@ -598,7 +598,7 @@ struct ClipboardAssistantIslandPresentationTests {
         #expect(source.contains("rowHeight = SideNoticeLayoutEngine().compactWingHeight("))
         #expect(source.contains("progressGlowEnabled: presentation.progressGlowEnabled"))
         #expect(source.contains("presentation.islandTopHeight = layout.rowHeight"))
-        #expect(source.contains("y: collapsedFrame.maxY - rowHeight"))
+        #expect(source.contains("y: collapsedFrame.maxY - height"))
         #expect(source.contains("height: rowHeight"))
         #expect(source.contains("ClipboardAssistantToastView.requiredRowWidth("))
         #expect(toastSource.contains(".fixedSize(horizontal: true, vertical: false)"))
