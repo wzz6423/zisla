@@ -93,7 +93,7 @@ export const es = createCatalog({
       aiMonitor: {
         name: 'Monitor de IA',
         caption:
-          'Detecta automáticamente actividad de CLI, apps de escritorio e IDE compatibles, incluidos los hilos de Zed Agent, y muestra tareas, estado, tendencias de tokens y un mapa de contribuciones. Solo analiza eventos estructurados y nunca lee conversaciones.',
+          'Detecta automáticamente actividad de CLI, apps de escritorio e IDE compatibles y muestra tareas, estado, tendencias de tokens y un mapa de contribuciones. Solo analiza eventos estructurados y nunca lee conversaciones.',
         points: ['Tareas agrupadas entre herramientas', 'Tendencias de consumo de tokens', 'Nunca lee prompts ni respuestas'],
       },
       keyboardSound: {
