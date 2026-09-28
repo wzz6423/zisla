@@ -2519,3 +2519,5 @@
 "弹窗可见时按下 %@ 关闭当前弹窗" = "Druk op %@ terwijl de pop-up zichtbaar is om deze te sluiten";
 "关闭弹窗快捷键未能启用，请检查快捷键冲突或输入监控权限" = "De sneltoets voor sluiten kon niet worden ingeschakeld. Controleer op conflicterende sneltoetsen of toestemming voor invoercontrole.";
 "关闭弹窗快捷键与动作快捷键相同，当前优先关闭弹窗" = "De sneltoets voor sluiten is gelijk aan een actiesneltoets. Het sluiten van de pop-up krijgt voorrang.";
+"AI 任务结果扫光" = "Lichteffect voor AI-taakresultaten";
+"任务成功时绿色、失败时红色渐变光带从左向右扫过一次" = "Een kleurverloop beweegt één keer van links naar rechts: groen bij succes, rood bij een fout";

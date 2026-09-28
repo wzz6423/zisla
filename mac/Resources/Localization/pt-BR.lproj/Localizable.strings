@@ -2519,3 +2519,5 @@
 "弹窗可见时按下 %@ 关闭当前弹窗" = "Pressione %@ enquanto a janela estiver visível para fechá-la";
 "关闭弹窗快捷键未能启用，请检查快捷键冲突或输入监控权限" = "Não foi possível ativar o atalho para fechar. Verifique conflitos de atalhos ou a permissão de Monitoramento de Entrada.";
 "关闭弹窗快捷键与动作快捷键相同，当前优先关闭弹窗" = "O atalho para fechar coincide com um atalho de ação. Fechar a janela tem prioridade.";
+"AI 任务结果扫光" = "Faixa de luz do resultado de IA";
+"任务成功时绿色、失败时红色渐变光带从左向右扫过一次" = "Um degradê passa uma vez da esquerda para a direita: verde em caso de sucesso, vermelho em caso de falha";

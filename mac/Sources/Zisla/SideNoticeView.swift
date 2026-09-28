@@ -173,6 +173,7 @@ struct CompactStatusBarView: View {
     @ObservedObject var media: NowPlayingService
     @ObservedObject var browserDownloads: BrowserDownloadMonitor
     @ObservedObject var settingsStore: FeatureSettingsStore
+    var resultSweep: AIResultSweepController
     var onStatusHidden: () -> Void
 
     @Environment(\.accessibilityReduceTransparency) private var reduceTransparency
@@ -195,6 +196,7 @@ struct CompactStatusBarView: View {
             }
             .frame(width: geometry.size.width, height: geometry.size.height)
             .background(compactStatusBackground)
+            .overlay { AIResultSweepOverlay(controller: resultSweep) }
             .overlay {
                 if settingsStore.settings.collapsedProgressGlowEnabled,
                    let progress = compactProgress(at: date) {

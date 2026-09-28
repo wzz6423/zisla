@@ -2518,3 +2518,5 @@
 "弹窗可见时按下 %@ 关闭当前弹窗" = "Press %@ while the popup is visible to dismiss it";
 "关闭弹窗快捷键未能启用，请检查快捷键冲突或输入监控权限" = "The dismiss shortcut could not be enabled. Check for shortcut conflicts or Input Monitoring access.";
 "关闭弹窗快捷键与动作快捷键相同，当前优先关闭弹窗" = "The dismiss shortcut matches an action shortcut. Dismissing the popup takes priority.";
+"AI 任务结果扫光" = "AI Task Result Sweep";
+"任务成功时绿色、失败时红色渐变光带从左向右扫过一次" = "A gradient sweeps left to right once: green for success, red for failure";
