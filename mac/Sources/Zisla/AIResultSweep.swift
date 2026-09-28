@@ -21,16 +21,18 @@ final class AIResultSweepController: ObservableObject {
     private var pending: [AIProgressStatus] = []
     private var playbackTask: Task<Void, Never>?
 
-    func receive(previous: AIProgressStatus?, status: AIProgressStatus, settings: FeatureSettings) {
+    func receive(previous: AIProgressStatus?, task: AIProgressTask, observedSince: Date, settings: FeatureSettings) {
         guard settings.aiProgressEnabled, settings.aiTaskResultSweepEnabled else {
             cancel()
             return
         }
-        guard previous?.isActive == true, status == .succeeded || status == .failed else { return }
+        let startedSinceObservation = previous == nil && task.startedAt.map { $0 >= observedSince } == true
+        guard previous?.isActive == true || startedSinceObservation,
+              task.status == .succeeded || task.status == .failed else { return }
         if current == nil {
-            start(status)
+            start(task.status)
         } else {
-            pending.append(status)
+            pending.append(task.status)
         }
     }
 

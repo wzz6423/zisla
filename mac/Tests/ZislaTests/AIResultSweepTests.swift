@@ -6,6 +6,18 @@ import ZislaKit
 
 @testable import Zisla
 
+@MainActor
+private extension AIResultSweepController {
+    func receive(previous: AIProgressStatus?, status: AIProgressStatus, settings: FeatureSettings) {
+        receive(
+            previous: previous,
+            task: AIProgressTask(id: "test", provider: .codex, title: "Test", progress: nil, status: status, updatedAt: .now),
+            observedSince: .distantFuture,
+            settings: settings
+        )
+    }
+}
+
 struct AIResultSweepTests {
     @Test @MainActor
     func playbackAutomaticallyEndsWithoutAnotherMonitorUpdate() async {

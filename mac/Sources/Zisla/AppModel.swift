@@ -3472,7 +3472,7 @@ final class AppModel: ObservableObject {
     for task in state.tasks {
       let previous = taskStatuses[task.id]
       taskStatuses[task.id] = task.status
-      aiResultSweep.receive(previous: previous, status: task.status, settings: settings)
+      aiResultSweep.receive(previous: previous, task: task, observedSince: launchDate, settings: settings)
       guard previous != nil, previous != task.status else { continue }
       guard task.status == .succeeded || task.status == .failed else { continue }
       if settings.sideNoticesEnabled {
