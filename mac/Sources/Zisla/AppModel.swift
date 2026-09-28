@@ -3473,19 +3473,6 @@ final class AppModel: ObservableObject {
       let previous = taskStatuses[task.id]
       taskStatuses[task.id] = task.status
       aiResultSweep.receive(previous: previous, task: task, observedSince: launchDate, settings: settings)
-      guard previous != nil, previous != task.status else { continue }
-      guard task.status == .succeeded || task.status == .failed else { continue }
-      if settings.sideNoticesEnabled {
-        notices.enqueue(
-          IslandNotice(
-            id: "task-\(task.id)-\(task.updatedAt.timeIntervalSince1970)",
-            title: task.title,
-            detail: task.status == .succeeded ? AppLocalization.text("任务已完成") : AppLocalization.text("任务执行失败"),
-            kind: task.status == .succeeded ? .success : .error,
-            side: task.status == .succeeded ? .right : .left,
-            createdAt: task.updatedAt
-          ))
-      }
     }
   }
 

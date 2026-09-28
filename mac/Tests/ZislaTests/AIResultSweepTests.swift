@@ -105,7 +105,8 @@ struct AIResultSweepTests {
         let start = Date(timeIntervalSince1970: 100)
         let sweep = AIResultSweep(status: .succeeded, startedAt: start)
         #expect(sweep.progress(at: start.addingTimeInterval(-1)) == 0)
-        #expect(abs(sweep.progress(at: start.addingTimeInterval(0.6)) - 0.5) < 0.001)
+        #expect(abs(sweep.progress(at: start.addingTimeInterval(1)) - 0.5) < 0.001)
+        #expect(sweep.progress(at: start.addingTimeInterval(1.9)) < 1)
         #expect(sweep.progress(at: start.addingTimeInterval(2)) == 1)
     }
 

@@ -1959,7 +1959,6 @@
 "重新选择" = "Erneut auswählen";
 "需要处理" = "Aktion erforderlich";
 "默认端点" = "Standard-Endpunkt";
-"任务已完成" = "Aufgabe abgeschlossen";
 "休息倒计时" = "Pausen-Countdown";
 "关闭背景音" = "Hintergrundton aus";
 "刷新收件箱" = "Postfach aktualisieren";
@@ -1976,7 +1975,6 @@
 "未命名日程" = "Unbenannter Termin";
 "未配置凭据" = "Keine Zugangsdaten konfiguriert";
 "邮件已发送" = "E-Mail gesendet";
-"任务执行失败" = "Aufgabe fehlgeschlagen";
 "农历日期未知" = "Mondkalenderdatum unbekannt";
 "切换播放模式" = "Wiedergabemodus wechseln";
 "压缩操作超时" = "Komprimierung überschritt die Zeit";

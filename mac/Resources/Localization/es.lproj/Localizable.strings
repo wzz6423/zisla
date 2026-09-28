@@ -1958,7 +1958,6 @@
 "重新选择" = "Seleccionar de nuevo";
 "需要处理" = "Requiere revisión";
 "默认端点" = "Endpoint predeterminado";
-"任务已完成" = "Tarea completada";
 "休息倒计时" = "Cuenta atrás del descanso";
 "关闭背景音" = "Desactivar el sonido de fondo";
 "刷新收件箱" = "Actualizar la bandeja de entrada";
@@ -1975,7 +1974,6 @@
 "未命名日程" = "Evento sin nombre";
 "未配置凭据" = "Sin credenciales configuradas";
 "邮件已发送" = "Correo enviado";
-"任务执行失败" = "Error al ejecutar la tarea";
 "农历日期未知" = "Fecha lunar desconocida";
 "切换播放模式" = "Cambiar el modo de reproducción";
 "压缩操作超时" = "Tiempo de compresión agotado";

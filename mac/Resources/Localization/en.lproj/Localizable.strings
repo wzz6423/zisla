@@ -1957,7 +1957,6 @@
 "重新选择" = "Select again";
 "需要处理" = "Needs attention";
 "默认端点" = "Default endpoint";
-"任务已完成" = "Task completed";
 "休息倒计时" = "Break countdown";
 "关闭背景音" = "Turn off ambient sound";
 "刷新收件箱" = "Refresh inbox";
@@ -1974,7 +1973,6 @@
 "未命名日程" = "Unnamed event";
 "未配置凭据" = "No credentials configured";
 "邮件已发送" = "Mail sent";
-"任务执行失败" = "Task failed";
 "农历日期未知" = "Lunar date unknown";
 "切换播放模式" = "Switch repeat mode";
 "压缩操作超时" = "Compression timed out";

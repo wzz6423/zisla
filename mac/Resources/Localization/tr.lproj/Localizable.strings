@@ -1958,7 +1958,6 @@
 "重新选择" = "Yeniden seç";
 "需要处理" = "İşlem gerekiyor";
 "默认端点" = "Varsayılan uç nokta";
-"任务已完成" = "Görev tamamlandı";
 "休息倒计时" = "Mola geri sayımı";
 "关闭背景音" = "Arka plan sesini kapat";
 "刷新收件箱" = "Gelen kutusunu yenile";
@@ -1975,7 +1974,6 @@
 "未命名日程" = "Adsız etkinlik";
 "未配置凭据" = "Kimlik bilgileri yapılandırılmadı";
 "邮件已发送" = "E-posta gönderildi";
-"任务执行失败" = "Görev yürütülemedi";
 "农历日期未知" = "Ay takvimi tarihi bilinmiyor";
 "切换播放模式" = "Çalma modunu değiştir";
 "压缩操作超时" = "Sıkıştırma zaman aşımı";

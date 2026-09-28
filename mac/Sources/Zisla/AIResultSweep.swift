@@ -4,7 +4,7 @@ import SwiftUI
 import ZislaCore
 
 struct AIResultSweep: Identifiable {
-    static let duration: TimeInterval = 1.2
+    static let duration: TimeInterval = 2
 
     let id = UUID()
     let status: AIProgressStatus
@@ -97,23 +97,58 @@ struct AIResultSweepBand: View {
             let width = size.width * 0.42
             let position = reduceMotion ? 0.5 : progress
             let x = -width + (size.width + width) * position
-            let tint: Color = status == .succeeded ? .zislaSuccess : .zislaError
+            let tint = status == .succeeded
+                ? Color(red: 0.015, green: 0.30, blue: 0.20)
+                : Color(red: 0.34, green: 0.025, blue: 0.085)
+            let highlight = status == .succeeded
+                ? Color(red: 0.10, green: 0.62, blue: 0.42)
+                : Color(red: 0.68, green: 0.10, blue: 0.21)
             context.opacity = sin(.pi * progress)
             context.fill(
                 Path(CGRect(x: x, y: 0, width: width, height: size.height)),
                 with: .linearGradient(
                     Gradient(stops: [
                         .init(color: .clear, location: 0),
-                        .init(color: tint.opacity(0.12), location: 0.18),
-                        .init(color: tint.opacity(0.45), location: 0.42),
-                        .init(color: tint.opacity(0.85), location: 0.68),
-                        .init(color: tint.opacity(0.25), location: 0.86),
+                        .init(color: tint.opacity(0.30), location: 0.18),
+                        .init(color: tint.opacity(0.82), location: 0.42),
+                        .init(color: tint.opacity(0.90), location: 0.60),
+                        .init(color: tint.opacity(0.62), location: 0.74),
+                        .init(color: tint.opacity(0.18), location: 0.88),
                         .init(color: .clear, location: 1),
                     ]),
                     startPoint: CGPoint(x: x, y: 0),
                     endPoint: CGPoint(x: x + width, y: 0)
                 )
             )
+            if !reduceMotion {
+                for side in 0..<2 {
+                    for index in 0..<9 {
+                        let seed = Double((index * 7 + side * 3) % 11) / 11
+                        let phase = (progress * 2 + seed).truncatingRemainder(dividingBy: 1)
+                        let life = sin(.pi * phase)
+                        let edge = side == 0 ? -1.0 : 1.0
+                        let center = CGPoint(
+                            x: x + width * Double(side) + edge * (2 + phase * 6),
+                            y: 0.9 + Double((index * 5) % 9) / 8 * (size.height - 1.8)
+                        )
+                        let radius = 1.8
+                        context.fill(
+                            Path(ellipseIn: CGRect(
+                                x: center.x - radius, y: center.y - radius,
+                                width: radius * 2, height: radius * 2
+                            )),
+                            with: .radialGradient(
+                                Gradient(stops: [
+                                    .init(color: highlight.opacity(0.9 * life), location: 0),
+                                    .init(color: highlight.opacity(0.65 * life), location: 0.3),
+                                    .init(color: .clear, location: 1),
+                                ]),
+                                center: center, startRadius: 0, endRadius: radius
+                            )
+                        )
+                    }
+                }
+            }
         }
         .blendMode(.screen)
     }

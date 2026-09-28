@@ -1958,7 +1958,6 @@
 "重新选择" = "Chọn lại";
 "需要处理" = "Cần xử lý";
 "默认端点" = "Điểm cuối mặc định";
-"任务已完成" = "Đã hoàn tất nhiệm vụ";
 "休息倒计时" = "Đếm ngược nghỉ";
 "关闭背景音" = "Tắt âm thanh nền";
 "刷新收件箱" = "Làm mới hộp thư đến";
@@ -1975,7 +1974,6 @@
 "未命名日程" = "Sự kiện chưa đặt tên";
 "未配置凭据" = "Chưa cấu hình thông tin đăng nhập";
 "邮件已发送" = "Đã gửi email";
-"任务执行失败" = "Chạy nhiệm vụ thất bại";
 "农历日期未知" = "Không rõ ngày âm lịch";
 "切换播放模式" = "Đổi chế độ phát";
 "压缩操作超时" = "Nén quá thời gian";

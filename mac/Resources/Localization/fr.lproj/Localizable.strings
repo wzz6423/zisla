@@ -1954,7 +1954,6 @@
 "重新选择" = "Sélectionner à nouveau";
 "需要处理" = "Action requise";
 "默认端点" = "Point de terminaison par défaut";
-"任务已完成" = "Tâche terminée";
 "休息倒计时" = "Décompte de la pause";
 "关闭背景音" = "Désactiver le fond sonore";
 "刷新收件箱" = "Actualiser la boîte de réception";
@@ -1971,7 +1970,6 @@
 "未命名日程" = "Événement sans nom";
 "未配置凭据" = "Aucun identifiant configuré";
 "邮件已发送" = "E-mail envoyé";
-"任务执行失败" = "Échec de la tâche";
 "农历日期未知" = "Date lunaire inconnue";
 "切换播放模式" = "Changer de mode de lecture";
 "压缩操作超时" = "Délai de compression dépassé";
