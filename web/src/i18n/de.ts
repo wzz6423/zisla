@@ -91,7 +91,7 @@ export const de: SiteContent = {
       aiMonitor: {
         name: 'KI-Überblick',
         caption:
-          'Erkennt automatisch Aktivität unterstützter KI-CLIs, Desktop-Apps und IDEs – Zed-Agent-Threads eingeschlossen – und zeigt Aufgaben, Status, den Verlauf verbrauchter Tokens und eine Beitrags-Heatmap. Ausgewertet werden nur strukturierte Ereignisse, niemals Gesprächstext.',
+          'Erkennt automatisch Aktivität unterstützter KI-CLIs, Desktop-Apps und IDEs und zeigt Aufgaben, Status, den Verlauf verbrauchter Tokens und eine Beitrags-Heatmap. Ausgewertet werden nur strukturierte Ereignisse, niemals Gesprächstext.',
         points: [
           'Aufgaben aus mehreren Werkzeugen',
           'Verlauf des Token-Verbrauchs',

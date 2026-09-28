@@ -96,7 +96,7 @@ export const fr: SiteContent = {
       aiMonitor: {
         name: 'Suivi IA',
         caption:
-          'Détecte automatiquement l’activité des CLI IA, apps de bureau et IDE pris en charge, y compris les fils Zed Agent, et affiche les tâches, l’état, l’évolution cumulée des tokens et une carte thermique des contributions. Seuls les événements structurés sont analysés, jamais le texte des conversations.',
+          'Détecte automatiquement l’activité des CLI IA, apps de bureau et IDE pris en charge et affiche les tâches, l’état, l’évolution cumulée des tokens et une carte thermique des contributions. Seuls les événements structurés sont analysés, jamais le texte des conversations.',
         points: [
           'Tâches agrégées entre outils',
           'Évolution de la consommation de tokens',
