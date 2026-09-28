@@ -32,19 +32,75 @@ struct AIResultSweepTests {
     }
 
     @Test @MainActor
-    func onlyActiveTasksEnteringATerminalStateTriggerASweep() {
+    func activeTasksEnteringAnErrorOrTerminalStateTriggerASweep() {
         let controller = AIResultSweepController()
         defer { controller.cancel() }
         let statuses: [AIProgressStatus] = [.queued, .running, .blocked, .error, .succeeded, .failed]
-        for previous in [nil] + statuses.map(Optional.some) {
+        let transitions: [(previous: AIProgressStatus?, results: [AIProgressStatus])] = [
+            (nil, []),
+            (.queued, [.error, .succeeded, .failed]),
+            (.running, [.error, .succeeded, .failed]),
+            (.blocked, [.error, .succeeded, .failed]),
+            (.error, [.succeeded, .failed]),
+            (.succeeded, []),
+            (.failed, []),
+        ]
+        for (previous, results) in transitions {
             for status in statuses {
                 controller.receive(previous: previous, status: status, settings: .default)
-                let shouldSweep = previous?.isActive == true && !status.isActive
-                #expect((controller.current != nil) == shouldSweep)
-                if shouldSweep { #expect(controller.current?.status == status) }
+                let expected = results.contains(status) ? status : nil
+                #expect(controller.current?.status == expected, "从 \(String(describing: previous)) 到 \(status) 的扫光结果错误")
                 controller.cancel()
             }
         }
+    }
+
+    @Test @MainActor
+    func newlyObservedErrorsRequireATurnStartedSinceObservation() {
+        let controller = AIResultSweepController()
+        defer { controller.cancel() }
+        let observedSince = Date(timeIntervalSince1970: 100)
+        let cases: [(Date?, Bool)] = [
+            (nil, false), (Date(timeIntervalSince1970: 99), false),
+            (Date(timeIntervalSince1970: 100), true), (Date(timeIntervalSince1970: 101), true),
+        ]
+        for (startedAt, shouldSweep) in cases {
+            let task = AIProgressTask(
+                id: "error", provider: .codex, title: "Test", progress: nil, status: .error,
+                updatedAt: observedSince.addingTimeInterval(10), startedAt: startedAt
+            )
+            controller.receive(previous: nil, task: task, observedSince: observedSince, settings: .default)
+            #expect((controller.current != nil) == shouldSweep)
+            controller.cancel()
+        }
+    }
+
+    @Test @MainActor
+    func toolErrorsQueueOnceAndAllowANewErrorAfterRecovery() throws {
+        let controller = AIResultSweepController()
+        defer { controller.cancel() }
+        controller.receive(previous: .running, status: .succeeded, settings: .default)
+        let success = try #require(controller.current)
+        controller.receive(previous: .running, status: .error, settings: .default)
+        controller.receive(previous: .error, status: .error, settings: .default)
+        controller.receive(previous: .error, status: .failed, settings: .default)
+        #expect(controller.current?.id == success.id)
+        controller.finish(id: success.id)
+        let error = try #require(controller.current)
+        #expect(error.status == .error)
+        controller.finish(id: error.id)
+        let failure = try #require(controller.current)
+        #expect(failure.status == .failed)
+        controller.finish(id: failure.id)
+        #expect(controller.current == nil)
+        controller.receive(previous: .error, status: .error, settings: .default)
+        #expect(controller.current == nil)
+        controller.receive(previous: .error, status: .running, settings: .default)
+        #expect(controller.current == nil)
+        controller.receive(previous: .running, status: .error, settings: .default)
+        let recoveredError = try #require(controller.current)
+        #expect(recoveredError.status == .error)
+        #expect(recoveredError.id != error.id)
     }
 
     @Test @MainActor
@@ -71,22 +127,24 @@ struct AIResultSweepTests {
     @Test @MainActor
     func disablingEitherSettingClearsCurrentAndQueuedResultsWithoutReplay() throws {
         for keyPath in [\FeatureSettings.aiProgressEnabled, \.aiTaskResultSweepEnabled] {
-            let controller = AIResultSweepController()
-            defer { controller.cancel() }
-            controller.receive(previous: .running, status: .succeeded, settings: .default)
-            let first = try #require(controller.current)
-            controller.receive(previous: .running, status: .failed, settings: .default)
-            var disabled = FeatureSettings.default
-            disabled[keyPath: keyPath] = false
-            controller.receive(previous: .running, status: .failed, settings: disabled)
-            #expect(controller.current == nil)
-            controller.finish(id: first.id)
-            controller.receive(previous: .failed, status: .failed, settings: .default)
-            #expect(controller.current == nil)
-            controller.receive(previous: .running, status: .failed, settings: .default)
-            let fresh = try #require(controller.current)
-            controller.finish(id: fresh.id)
-            #expect(controller.current == nil)
+            for status: AIProgressStatus in [.error, .failed] {
+                let controller = AIResultSweepController()
+                defer { controller.cancel() }
+                controller.receive(previous: .running, status: .succeeded, settings: .default)
+                let first = try #require(controller.current)
+                controller.receive(previous: .running, status: status, settings: .default)
+                var disabled = FeatureSettings.default
+                disabled[keyPath: keyPath] = false
+                controller.receive(previous: .running, status: status, settings: disabled)
+                #expect(controller.current == nil)
+                controller.finish(id: first.id)
+                controller.receive(previous: status, status: status, settings: .default)
+                #expect(controller.current == nil)
+                controller.receive(previous: .running, status: status, settings: .default)
+                let fresh = try #require(controller.current)
+                controller.finish(id: fresh.id)
+                #expect(controller.current == nil)
+            }
         }
     }
 
@@ -105,9 +163,9 @@ struct AIResultSweepTests {
         let start = Date(timeIntervalSince1970: 100)
         let sweep = AIResultSweep(status: .succeeded, startedAt: start)
         #expect(sweep.progress(at: start.addingTimeInterval(-1)) == 0)
-        #expect(abs(sweep.progress(at: start.addingTimeInterval(1)) - 0.5) < 0.001)
-        #expect(sweep.progress(at: start.addingTimeInterval(1.9)) < 1)
-        #expect(sweep.progress(at: start.addingTimeInterval(2)) == 1)
+        #expect(abs(sweep.progress(at: start.addingTimeInterval(2)) - 0.5) < 0.001)
+        #expect(sweep.progress(at: start.addingTimeInterval(3.9)) < 1)
+        #expect(sweep.progress(at: start.addingTimeInterval(4)) == 1)
     }
 
     @Test @MainActor
@@ -136,7 +194,7 @@ struct AIResultSweepTests {
 
     @Test @MainActor
     func renderedBandMovesLeftToRightWithGradientAndReturnsToBlack() throws {
-        for status: AIProgressStatus in [.succeeded, .failed] {
+        for status: AIProgressStatus in [.succeeded, .failed, .error] {
             for width in [240, 748] {
                 var previousCenter = -1.0
                 for progress in [0.0, 0.25, 0.5, 0.75, 1.0] {

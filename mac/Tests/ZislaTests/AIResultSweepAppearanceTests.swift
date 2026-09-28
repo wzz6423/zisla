@@ -20,7 +20,7 @@ struct AIResultSweepAppearanceTests {
     }
 
     @Test @MainActor
-    func sparseParticlesRenderAtBothBandEdgesInCompactAndExpandedSizes() throws {
+    func particlesScatterAcrossTheBandInsteadOfFormingTwoEdgeLines() throws {
         for status: AIProgressStatus in [.succeeded, .failed] {
             for (width, height) in [(240, 34), (748, 324)] {
                 let moving = try dominantPixels(renderedBand(
@@ -29,11 +29,12 @@ struct AIResultSweepAppearanceTests {
                 let still = try dominantPixels(renderedBand(
                     status: status, progress: 0.5, width: width, height: height, reduceMotion: true
                 ), status: status)
-                let particlePixels = moving.indices.filter { moving[$0] - still[$0] > 0.04 }
-                #expect(particlePixels.contains { $0 % width < width / 3 }, "光带左缘必须有粒子输出")
-                #expect(particlePixels.contains { $0 % width > width * 2 / 3 }, "光带右缘必须有粒子输出")
-                #expect(!particlePixels.contains { (width / 3...width * 2 / 3).contains($0 % width) },
-                        "粒子应集中在两缘，不能铺满文字区域")
+                let particlePixels = moving.indices.filter { moving[$0] - still[$0] > 0.015 }
+                let occupiedBands = Set(particlePixels.map {
+                    Int((Double($0 % width) / Double(width) - 0.29) / 0.42 * 6)
+                })
+                #expect(occupiedBands.count >= 4, "粒子必须散布在光带内，不能集中成两条竖线")
+                #expect(occupiedBands.allSatisfy { (0..<6).contains($0) }, "两侧不能出现脱离光带的亮线")
                 #expect(particlePixels.count < width * height / 25, "粒子面积必须稀疏")
                 #expect(particlePixels.contains { $0 / width >= height - 2 }, "窄收起条底部也要保留粒子")
             }
@@ -61,19 +62,48 @@ struct AIResultSweepAppearanceTests {
     }
 
     @Test @MainActor
-    func individualEdgeParticlesFadeOutAndReappearDuringTheSweep() throws {
-        var peaks: [Double] = []
-        for progress in [0.5, 0.6] {
+    func particlesBrightenAndDimOnceWithoutReigniting() throws {
+        let width = 500
+        let height = 100
+        let midpoint = try dominantPixels(renderedBand(
+            status: .succeeded, progress: 0.5, width: width, height: height
+        ), status: .succeeded)
+        let background = try dominantPixels(renderedBand(
+            status: .succeeded, progress: 0.5, width: width, height: height, reduceMotion: true
+        ), status: .succeeded)
+        let particle = try #require(midpoint.indices.max { midpoint[$0] - background[$0] < midpoint[$1] - background[$1] })
+        #expect(midpoint[particle] - background[particle] > 0.04)
+        var brightness: [Double] = []
+        for progress in [0.3, 0.4, 0.5, 0.6, 0.7] {
             let pixels = try dominantPixels(renderedBand(
-                status: .succeeded, progress: progress, width: 250, height: 100
+                status: .succeeded, progress: progress, width: width, height: height
             ), status: .succeeded)
-            let topLeft = (0..<125).flatMap { x in
-                (0..<3).map { y in pixels[y * 250 + x] - pixels[6 * 250 + x] }
-            }
-            peaks.append(try #require(topLeft.max()))
+            let translation = Int(((progress - 0.5) * 710).rounded())
+            brightness.append(pixels[particle + translation])
         }
-        #expect(peaks[0] < 0.01, "粒子寿命边界需要完全淡出")
-        #expect(peaks[1] > 0.08, "同一侧粒子随后应重新亮起")
+        #expect(brightness[0] < brightness[1] && brightness[1] < brightness[2])
+        #expect(brightness[2] > brightness[3] && brightness[3] > brightness[4])
+        #expect(abs(brightness[0] - brightness[4]) < 0.01)
+        #expect(abs(brightness[1] - brightness[3]) < 0.01)
+    }
+
+    @Test @MainActor
+    func glowHasABrightCenterAndDarkSymmetricShoulders() throws {
+        for status: AIProgressStatus in [.succeeded, .failed] {
+            for reduceMotion in [false, true] {
+                let width = 240
+                let pixels = try dominantPixels(renderedBand(
+                    status: status, progress: 0.5, width: width, height: 34, reduceMotion: reduceMotion
+                ), status: status)
+                let center = pixels.indices.filter { (108..<132).contains($0 % width) }.map { pixels[$0] }.max()!
+                let sides = pixels.indices.filter { !(84..<156).contains($0 % width) }.map { pixels[$0] }.max()!
+                #expect(center > sides * 1.5, "中心应最亮，不能出现两缘亮、中间暗的双峰")
+                if reduceMotion {
+                    let row = Array(pixels[17 * width..<18 * width])
+                    #expect(zip(row, row.reversed()).allSatisfy { abs($0 - $1) < 0.015 }, "渐变应以中间为峰值对称衰减")
+                }
+            }
+        }
     }
 
     @Test @MainActor

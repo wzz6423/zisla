@@ -8,6 +8,89 @@ import ZislaKit
 
 struct AIResultSweepIntegrationTests {
     @Test @MainActor
+    func codexToolErrorsFlowThroughMonitorOnceAndRearmAfterRecovery() throws {
+        for payloadType in ["function_call_output", "custom_tool_call_output"] {
+            let directory = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+            defer { try? FileManager.default.removeItem(at: directory) }
+            let sessions = directory.appendingPathComponent("sessions")
+            try FileManager.default.createDirectory(at: sessions, withIntermediateDirectories: true)
+            let rollout = sessions.appendingPathComponent("rollout-tool-error.jsonl")
+            let now = Date(timeIntervalSince1970: 1_800_000_100)
+            let startedAt = now.addingTimeInterval(-10)
+            let started = "{\"timestamp\":\"\(startedAt.ISO8601Format())\",\"type\":\"event_msg\",\"payload\":{\"type\":\"task_started\",\"turn_id\":\"tool-turn\"}}\n"
+            try Data(started.utf8).write(to: rollout)
+            try FileManager.default.setAttributes([.modificationDate: now], ofItemAtPath: rollout.path)
+            func appendOutput(exitCode: Int, sequence: Int) throws {
+                let timestamp = now.addingTimeInterval(Double(sequence))
+                let record: [String: Any] = [
+                    "timestamp": timestamp.ISO8601Format(),
+                    "type": "response_item",
+                    "payload": [
+                        "type": payloadType, "call_id": "call-\(sequence)",
+                        "internal_chat_message_metadata_passthrough": ["turn_id": "tool-turn"],
+                        "output": [["type": "input_text", "text": "{\"exit_code\":\(exitCode),\"output\":\"fixture\"}"]],
+                    ],
+                ]
+                let handle = try FileHandle(forWritingTo: rollout)
+                defer { try? handle.close() }
+                try handle.seekToEnd()
+                try handle.write(contentsOf: JSONSerialization.data(withJSONObject: record) + Data([0x0A]))
+                try FileManager.default.setAttributes([.modificationDate: timestamp], ofItemAtPath: rollout.path)
+            }
+            let detector = CodexSessionActivityDetector(
+                sessionsDirectory: sessions, processIdentifiersForOpenFiles: { _ in [:] }, now: { now }
+            )
+            let monitor = AIStateMonitor(
+                directoryURL: directory.appendingPathComponent("state"), activityDetectors: [detector], now: { now }
+            )
+            let sweep = AIResultSweepController()
+            var statuses: [String: AIProgressStatus] = [:]
+            let subscription = monitor.$state.sink { state in
+                for task in state.tasks {
+                    sweep.receive(previous: statuses[task.id], task: task, observedSince: now, settings: .default)
+                    statuses[task.id] = task.status
+                }
+            }
+            defer { subscription.cancel(); sweep.cancel(); monitor.stop() }
+            monitor.reload(includeUsageSamples: false)
+            #expect(monitor.state.tasks.first?.status == .running)
+            #expect(sweep.current == nil)
+
+            try appendOutput(exitCode: 1, sequence: 1)
+            monitor.reload(includeUsageSamples: false)
+            let errorTask = try #require(monitor.state.tasks.first)
+            #expect(errorTask.status == .error)
+            #expect(errorTask.failureReason == AppLocalization.text("工具执行失败"))
+            let first = try #require(sweep.current, "工具失败已经到达监视器，必须触发红色扫光")
+            #expect(first.status == .error)
+            monitor.reload(includeUsageSamples: false)
+            #expect(sweep.current?.id == first.id)
+            sweep.finish(id: first.id)
+            #expect(sweep.current == nil, "重复错误快照不能排入下一次扫光")
+            monitor.reload(includeUsageSamples: false)
+            #expect(sweep.current == nil)
+
+            let historicalSweep = AIResultSweepController()
+            defer { historicalSweep.cancel() }
+            historicalSweep.receive(previous: nil, task: errorTask, observedSince: now, settings: .default)
+            #expect(historicalSweep.current == nil, "观察开始前的错误不能补播")
+
+            try appendOutput(exitCode: 0, sequence: 2)
+            monitor.reload(includeUsageSamples: false)
+            #expect(monitor.state.tasks.first?.status == .running)
+            #expect(monitor.state.tasks.first?.failureReason == nil)
+            #expect(sweep.current == nil)
+            try appendOutput(exitCode: 1, sequence: 3)
+            monitor.reload(includeUsageSamples: false)
+            let second = try #require(sweep.current)
+            #expect(second.status == .error)
+            #expect(second.id != first.id)
+            sweep.finish(id: second.id)
+            #expect(sweep.current == nil)
+        }
+    }
+
+    @Test @MainActor
     func shortTurnsCompleteBetweenScansWithoutReplayingHistoryOrInventingSuccess() throws {
         let directory = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
         defer { try? FileManager.default.removeItem(at: directory) }

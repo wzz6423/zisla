@@ -4,7 +4,7 @@ import SwiftUI
 import ZislaCore
 
 struct AIResultSweep: Identifiable {
-    static let duration: TimeInterval = 2
+    static let duration: TimeInterval = 4
 
     let id = UUID()
     let status: AIProgressStatus
@@ -28,7 +28,8 @@ final class AIResultSweepController: ObservableObject {
         }
         let startedSinceObservation = previous == nil && task.startedAt.map { $0 >= observedSince } == true
         guard previous?.isActive == true || startedSinceObservation,
-              task.status == .succeeded || task.status == .failed else { return }
+              previous != task.status,
+              task.status == .succeeded || task.status == .failed || task.status == .error else { return }
         if current == nil {
             start(task.status)
         } else {
@@ -109,11 +110,11 @@ struct AIResultSweepBand: View {
                 with: .linearGradient(
                     Gradient(stops: [
                         .init(color: .clear, location: 0),
-                        .init(color: tint.opacity(0.30), location: 0.18),
-                        .init(color: tint.opacity(0.82), location: 0.42),
-                        .init(color: tint.opacity(0.90), location: 0.60),
-                        .init(color: tint.opacity(0.62), location: 0.74),
-                        .init(color: tint.opacity(0.18), location: 0.88),
+                        .init(color: tint.opacity(0.15), location: 0.18),
+                        .init(color: tint.opacity(0.55), location: 0.35),
+                        .init(color: tint.opacity(0.95), location: 0.50),
+                        .init(color: tint.opacity(0.55), location: 0.65),
+                        .init(color: tint.opacity(0.15), location: 0.82),
                         .init(color: .clear, location: 1),
                     ]),
                     startPoint: CGPoint(x: x, y: 0),
@@ -121,32 +122,28 @@ struct AIResultSweepBand: View {
                 )
             )
             if !reduceMotion {
-                for side in 0..<2 {
-                    for index in 0..<9 {
-                        let seed = Double((index * 7 + side * 3) % 11) / 11
-                        let phase = (progress * 2 + seed).truncatingRemainder(dividingBy: 1)
-                        let life = sin(.pi * phase)
-                        let edge = side == 0 ? -1.0 : 1.0
-                        let center = CGPoint(
-                            x: x + width * Double(side) + edge * (2 + phase * 6),
-                            y: 0.9 + Double((index * 5) % 9) / 8 * (size.height - 1.8)
+                for index in 0..<18 {
+                    let horizontal = Double((index * 7) % 19 + 1) / 20
+                    let brightness = pow(sin(.pi * horizontal), 2)
+                    let center = CGPoint(
+                        x: x + width * horizontal,
+                        y: 0.9 + Double((index * 11) % 19) / 18 * (size.height - 1.8)
+                    )
+                    let radius = 1.8
+                    context.fill(
+                        Path(ellipseIn: CGRect(
+                            x: center.x - radius, y: center.y - radius,
+                            width: radius * 2, height: radius * 2
+                        )),
+                        with: .radialGradient(
+                            Gradient(stops: [
+                                .init(color: highlight.opacity(0.65 * brightness), location: 0),
+                                .init(color: highlight.opacity(0.40 * brightness), location: 0.3),
+                                .init(color: .clear, location: 1),
+                            ]),
+                            center: center, startRadius: 0, endRadius: radius
                         )
-                        let radius = 1.8
-                        context.fill(
-                            Path(ellipseIn: CGRect(
-                                x: center.x - radius, y: center.y - radius,
-                                width: radius * 2, height: radius * 2
-                            )),
-                            with: .radialGradient(
-                                Gradient(stops: [
-                                    .init(color: highlight.opacity(0.9 * life), location: 0),
-                                    .init(color: highlight.opacity(0.65 * life), location: 0.3),
-                                    .init(color: .clear, location: 1),
-                                ]),
-                                center: center, startRadius: 0, endRadius: radius
-                            )
-                        )
-                    }
+                    )
                 }
             }
         }
