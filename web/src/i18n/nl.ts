@@ -93,7 +93,7 @@ export const nl = createCatalog({
       aiMonitor: {
         name: 'AI-monitor',
         caption:
-          'Detecteert activiteit van ondersteunde AI-CLI’s, desktopapps en IDE’s, waaronder Zed Agent-threads, en toont taken, status, tokentrends en een bijdrageheatmap. Alleen gestructureerde gebeurtenissen worden gelezen; gesprekken nooit.',
+          'Detecteert activiteit van ondersteunde AI-CLI’s, desktopapps en IDE’s en toont taken, status, tokentrends en een bijdrageheatmap. Alleen gestructureerde gebeurtenissen worden gelezen; gesprekken nooit.',
         points: ['Taken uit tools samengevoegd', 'Trends in tokenverbruik', 'Leest geen prompts of antwoorden'],
       },
       keyboardSound: {

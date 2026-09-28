@@ -90,7 +90,7 @@ export const zhHans: SiteContent = {
       aiMonitor: {
         name: 'AI 监控',
         caption:
-          '自动识别受支持的 AI CLI、桌面端与 IDE 活动，包括 Zed Agent 线程，展示任务、状态、累计 Token 趋势和贡献热力图；只解析结构化事件，不读取对话正文。',
+          '自动识别受支持的 AI CLI、桌面端与 IDE 活动，展示任务、状态、累计 Token 趋势和贡献热力图；只解析结构化事件，不读取对话正文。',
         points: ['多工具任务聚合', 'Token 消耗趋势', '不读取提示词与回答'],
       },
       keyboardSound: {

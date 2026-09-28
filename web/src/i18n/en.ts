@@ -92,7 +92,7 @@ export const en: SiteContent = {
       aiMonitor: {
         name: 'AI monitor',
         caption:
-          'Automatically detects activity from supported AI CLIs, desktop apps and IDEs, including Zed Agent threads, and shows tasks, status, cumulative token trends and a contribution heatmap. It parses structured events only and never reads conversation text.',
+          'Automatically detects activity from supported AI CLIs, desktop apps and IDEs and shows tasks, status, cumulative token trends and a contribution heatmap. It parses structured events only and never reads conversation text.',
         points: [
           'Tasks aggregated across tools',
           'Token consumption trends',
