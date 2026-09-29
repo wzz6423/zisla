@@ -952,6 +952,12 @@ public final class BrowserDownloadMonitor: ObservableObject {
                     fileURL: currentFileURL,
                     fileName: BrowserDownloadAgentResolver.displayFileName(for: currentFileURL)
                 )
+                for (identity, observed) in observedDownloads
+                where observed.temporaryURL == currentFileURL && progressBoxes[observed.token] == nil {
+                    _ = tracker.finish(token: observed.token, succeeded: false)
+                    observedDownloads[identity]?.token = token
+                    tracker.updateIdentity(token: token, identity: identity)
+                }
             }
             if tracker.entries[token]?.fileIdentity == nil,
                 let fileURL = tracker.entries[token]?.fileURL {

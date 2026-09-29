@@ -531,6 +531,75 @@ struct BrowserDownloadMonitorLifecycleTests {
         #expect(transfers.isEmpty)
     }
 
+    @Test(arguments: [false, true], [false, true])
+    @MainActor
+    func lateProgressURLMergesTemporaryDownload(hasOtherDownload: Bool, initiallyLinked: Bool) async throws {
+        let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString, isDirectory: true)
+        try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: root) }
+
+        let monitor = BrowserDownloadMonitor(directories: [root], eventPaths: [], pollInterval: 0.01)
+        var transfers: [BrowserCompletedTransfer] = []
+        monitor.onCompletedTransfer = { transfers.append($0) }
+        monitor.start()
+        defer { monitor.stop() }
+
+        let temporary = root.appendingPathComponent("未确认 737931.crdownload")
+        let initial = initiallyLinked ? temporary.deletingPathExtension() : root.appendingPathComponent("initial.pdf")
+        try Data().write(to: initial)
+        let progress = Progress(totalUnitCount: 100)
+        progress.kind = .file
+        progress.fileOperationKind = .downloading
+        progress.fileURL = initial
+        progress.completedUnitCount = 11
+        progress.publish()
+        var isPublished = true
+        defer { if isPublished { progress.unpublish() } }
+        let publicationDeadline = ContinuousClock.now + .seconds(3)
+        while !monitor.snapshots.contains(where: { $0.progressText == "11%" })
+            && ContinuousClock.now < publicationDeadline {
+            try await Task.sleep(for: .milliseconds(20))
+        }
+        #expect(monitor.snapshots.map(\.progressText) == ["11%"])
+
+        let files = hasOtherDownload ? [temporary, root.appendingPathComponent("other.crdownload")] : [temporary]
+        for url in files {
+            try Data("partial".utf8).write(to: url)
+            let identity = try #require(BrowserDownloadFileIdentity(url: url))
+            monitor.handleFileEvent(at: url, fileID: identity.inode, renamed: false,
+                runningBundleIdentifiers: ["com.google.Chrome"])
+        }
+        progress.fileURL = temporary
+        progress.completedUnitCount = 27
+        let updateDeadline = ContinuousClock.now + .seconds(3)
+        while !monitor.snapshots.contains(where: { $0.fileName == "未确认 737931" && $0.progressText == "27%" })
+            && ContinuousClock.now < updateDeadline {
+            try await Task.sleep(for: .milliseconds(20))
+        }
+        #expect(monitor.snapshots.filter { $0.fileName == "未确认 737931" }.map(\.progressText) == ["27%"])
+        #expect(monitor.snapshots.count == (hasOtherDownload ? 2 : 1))
+        if hasOtherDownload {
+            #expect(monitor.snapshots.filter { $0.fileName == "other" }.map(\.progressText) == ["…"])
+        }
+        let completed = root.appendingPathComponent("report.pdf")
+        let identity = try #require(BrowserDownloadFileIdentity(url: temporary))
+        try FileManager.default.moveItem(at: temporary, to: completed)
+        if hasOtherDownload {
+            monitor.handleFileEvent(at: completed, fileID: identity.inode, renamed: true)
+            #expect(monitor.snapshots.map(\.fileName) == ["other"])
+        }
+        progress.completedUnitCount = 100
+        progress.unpublish()
+        isPublished = false
+        let completionDeadline = ContinuousClock.now + .seconds(3)
+        while transfers.isEmpty && ContinuousClock.now < completionDeadline {
+            try await Task.sleep(for: .milliseconds(20))
+        }
+        #expect(transfers.map(\.fileName) == ["report.pdf"])
+        monitor.stop()
+        #expect(monitor.snapshots.isEmpty)
+    }
+
     @Test
     @MainActor
     func defaultFolderResolvesRenamedFileWhenFinalEventIsMissing() async throws {
