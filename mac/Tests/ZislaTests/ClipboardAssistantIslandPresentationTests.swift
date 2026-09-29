@@ -38,21 +38,30 @@ struct ClipboardAssistantIslandPresentationTests {
     }
 
     @MainActor
-    @Test(.serialized, arguments: [false, true])
-    func physicalNotchButtonsDismissThePromptWithoutTakingFocus(performsPrimaryAction: Bool) throws {
+    @Test(.serialized, arguments: [false, true], [
+        (hasPhysicalNotch: false, progressGlowEnabled: false),
+        (hasPhysicalNotch: false, progressGlowEnabled: true),
+        (hasPhysicalNotch: true, progressGlowEnabled: false),
+        (hasPhysicalNotch: true, progressGlowEnabled: true),
+    ])
+    func buttonsDismissThePromptWithoutTakingFocus(
+        performsPrimaryAction: Bool,
+        configuration: (hasPhysicalNotch: Bool, progressGlowEnabled: Bool)
+    ) throws {
         _ = NSApplication.shared
         let wasActive = NSApp.isActive
         let controller = ClipboardAssistantController(windowPresenter: { _, _ in })
-        controller.displayDuration = .never
+        defer { controller.dismiss(animated: false) }
+        controller.displayDuration = configuration.progressGlowEnabled ? .fiveSeconds : .never
         controller.presentation.islandTopHeight = 37
-        controller.presentation.physicalNotchWidth = 185
-        controller.presentation.progressGlowEnabled = false
-        controller.presentation.detection = ClipboardAssistantDetection(
+        controller.presentation.physicalNotchWidth = configuration.hasPhysicalNotch ? 185 : 0
+        controller.presentation.progressGlowEnabled = configuration.progressGlowEnabled
+        controller.present(ClipboardAssistantDetection(
             kind: .nonSystemLanguageText,
             title: "copied text",
             detail: .characterAndWordCount(characters: 1726, words: 27),
             actions: [.translate("copied text")]
-        )
+        ), visualStyle: .transparent)
         var actions: [ClipboardAssistantAction] = []
         controller.onPerformAction = { actions.append($0) }
         let host = NSHostingView(rootView: ClipboardAssistantToastView(
@@ -66,7 +75,7 @@ struct ClipboardAssistantIslandPresentationTests {
             contentView: host,
             frame: CGRect(x: -100_000, y: -100_000, width: 533, height: 37)
         )
-        defer { panel.orderOut(nil) }
+        defer { panel.close() }
         #expect(!panel.hasShadow)
         #expect(NSScreen.screens.allSatisfy { !$0.frame.intersects(panel.frame) })
         // SwiftUI installs its event graph only after the window is ordered in.
