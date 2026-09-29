@@ -99,8 +99,15 @@ extension ClipboardAssistantDetector {
         } else if lastSeparator != ";" && lastSeparator != "&" {
             return false
         }
-        return commands.allSatisfy { hasShellCommandPrefix($0, allowsUnknownCommand: true) }
-            && commands.contains { hasShellCommandPrefix($0, allowsUnknownCommand: false) }
+        guard commands.allSatisfy({ hasShellCommandPrefix($0, allowsUnknownCommand: true) }) else { return false }
+        // Aliases are user-defined, so a chain can also use bare commands, options or paths as evidence.
+        return commands.contains { hasShellCommandPrefix($0, allowsUnknownCommand: false) }
+            || commands.count > 1 && commands.contains {
+                $0.range(
+                    of: #"^[A-Za-z_][A-Za-z0-9_.+-]*(?:$|\h+(?:--?[A-Za-z0-9]|/|\.\.?/|~/))"#,
+                    options: .regularExpression
+                ) != nil
+            }
     }
 
     private static func hasShellCommandPrefix(_ line: String, allowsUnknownCommand: Bool) -> Bool {

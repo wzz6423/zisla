@@ -35,6 +35,12 @@ struct ClipboardAssistantShellCommandTests {
         "z \"code | docs\" && ls -l", "z code\\&docs && ls -l",
         "z code && ls -l;", "z code && ls -l &", "z code & ls -l",
         "z code && ls -l # show files", "z code#docs && ls -l", "z '\\' && ls -l",
+        "z code && ll", "z code&&ll", "z code && ll -lah", "jump projects || showfiles",
+        "repo work | listfiles -a", "croot; ll", "deploy staging && healthcheck --wait",
+        "repo current && inspect /tmp", "repo current && inspect ./src",
+        "repo current && inspect ../src", "repo current && inspect ~/Projects",
+        "TOOLS_MODE=dev z code && ll", "z 'code && docs' && ll",
+        "z code && ll # list files", "z code && ll &", "z code & ll",
     ])
     func recognizesAliasCommandChainsWithoutChangingTheirContents(command: String) throws {
         let detection = try #require(ClipboardAssistantDetector.detect(text: command, enabledKinds: allKinds))
@@ -52,6 +58,11 @@ struct ClipboardAssistantShellCommandTests {
         "message && ls -l &&",
         "message && ls -l |", "message && ls -l '", "message && ls -l\\",
         "message && 123", "123 && ls -l", "message", "message ;; ls -l",
+        "hello world || welcome back", "hello world | welcome back", "hello world; welcome back",
+        "hello world && welcome - back", "hello world && welcome ...",
+        "message '&& ll'", "message \"| ll\"", "message # && ll", "message \\&\\& ll",
+        "message --help", "message ./path", "myalias", "myalias;", "myalias &",
+        "z code && ll &&", "z code && ll |", "z code && ll '", "z code && ll\\",
     ])
     func shellLikePunctuationInTextDoesNotOfferExecution(text: String) {
         let detection = ClipboardAssistantDetector.detect(text: text, enabledKinds: allKinds)
@@ -68,8 +79,10 @@ struct ClipboardAssistantShellCommandTests {
                 return alphabet[Int(seed % UInt64(alphabet.count))]
             }) + " && ls -l"
             let quoted = "'" + argument.replacingOccurrences(of: "'", with: "'\\''") + "'"
-            let command = "z \(quoted) && ls -l"
-            #expect(ClipboardAssistantDetector.shellCommand(from: command) == command)
+            for suffix in ["ls -l", "ll", "custom-list --all"] {
+                let command = "z \(quoted) && \(suffix)"
+                #expect(ClipboardAssistantDetector.shellCommand(from: command) == command)
+            }
             #expect(ClipboardAssistantDetector.shellCommand(from: "message \(quoted)") == nil)
         }
     }
