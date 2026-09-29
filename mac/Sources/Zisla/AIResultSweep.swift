@@ -95,7 +95,7 @@ struct AIResultSweepBand: View {
 
     var body: some View {
         Canvas { context, size in
-            let width = size.width * 0.42
+            let width = size.width * 0.72
             let position = reduceMotion ? 0.5 : progress
             let x = -width + (size.width + width) * position
             let tint = status == .succeeded
@@ -104,7 +104,8 @@ struct AIResultSweepBand: View {
             let highlight = status == .succeeded
                 ? Color(red: 0.10, green: 0.62, blue: 0.42)
                 : Color(red: 0.68, green: 0.10, blue: 0.21)
-            context.opacity = sin(.pi * progress)
+            let breathing = reduceMotion ? 1 : 0.86 - 0.14 * cos(.pi * 4 * progress)
+            context.opacity = sin(.pi * progress) * breathing
             context.fill(
                 Path(CGRect(x: x, y: 0, width: width, height: size.height)),
                 with: .linearGradient(
@@ -122,14 +123,17 @@ struct AIResultSweepBand: View {
                 )
             )
             if !reduceMotion {
-                for index in 0..<18 {
-                    let horizontal = Double((index * 7) % 19 + 1) / 20
+                for index in 0..<30 {
+                    let phase = Double(index) * 2.4
+                        + progress * AIResultSweep.duration * (1.1 + Double(index % 4) * 0.2)
+                    let horizontal = Double((index * 7) % 31 + 1) / 32
                     let brightness = pow(sin(.pi * horizontal), 2)
                     let center = CGPoint(
                         x: x + width * horizontal,
-                        y: 0.9 + Double((index * 11) % 19) / 18 * (size.height - 1.8)
+                        y: 0.9 + Double((index * 11) % 31) / 30 * (size.height - 1.8)
+                            + cos(phase * 1.3) * min(6, size.height * 0.14)
                     )
-                    let radius = 1.8
+                    let radius = 0.65 + Double(index % 4) * 0.1
                     context.fill(
                         Path(ellipseIn: CGRect(
                             x: center.x - radius, y: center.y - radius,

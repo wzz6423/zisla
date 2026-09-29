@@ -205,7 +205,10 @@ struct AIResultSweepTests {
                     } else {
                         let lit = values.indices.filter { values[$0] > 0.02 }
                         #expect(!lit.isEmpty)
-                        #expect(lit.count < width / 2, "整片背景不能一起变色")
+                        #expect(lit.count < width * 4 / 5, "加长的光带仍须保留暗区")
+                        if progress == 0.5 {
+                            #expect(lit.count > width / 2, "光带经过中间时应覆盖岛宽的一半以上")
+                        }
                         #expect(Set(values.map { Int($0 * 255) }).count > 20, "光带必须有明暗渐变")
                         let center = Double(lit.reduce(0, +)) / Double(lit.count)
                         #expect(center > previousCenter)
@@ -233,14 +236,15 @@ struct AIResultSweepTests {
 
     @Test @MainActor
     func reducedMotionKeepsTheGradientStationaryAndFadesItsBrightness() throws {
-        let rows = try [0.25, 0.5, 0.75].map {
+        let rows = try [0.25, 0.4, 0.5, 0.6, 0.75].map {
             try renderedRow(status: .succeeded, progress: $0, width: 240, reduceMotion: true)
                 .map(\.greenComponent)
         }
-        let peaks = rows.map { row in row.indices.max { row[$0] < row[$1] }! }
+        let peaks = [rows[0], rows[2], rows[4]].map { row in row.indices.max { row[$0] < row[$1] }! }
         #expect(peaks[0] == peaks[1] && peaks[1] == peaks[2])
-        #expect(rows[1].max()! > rows[0].max()!)
-        #expect(abs(rows[0].max()! - rows[2].max()!) < 0.01)
+        #expect(rows[2].max()! > rows[1].max()! && rows[1].max()! > rows[0].max()!)
+        #expect(rows[2].max()! > rows[3].max()! && rows[3].max()! > rows[4].max()!)
+        #expect(abs(rows[0].max()! - rows[4].max()!) < 0.01)
     }
 
     @MainActor
