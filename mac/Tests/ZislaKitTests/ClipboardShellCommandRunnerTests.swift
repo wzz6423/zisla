@@ -122,156 +122,123 @@ struct ClipboardShellCommandRunnerTests {
         }
     }
 
-    @Test
-    func handsOffAPrivateExecutableCommandFileWithoutDeletingItEarly() throws {
-        try withTemporaryDirectory { directory in
-            var launchedURL: URL?
-            try ClipboardShellCommandRunner.runInTerminal("git status", temporaryDirectory: directory) {
-                launchedURL = $0
-                return true
-            }
-            let url = try #require(launchedURL)
-            #expect(url.pathExtension == "command")
-            #expect(FileManager.default.isExecutableFile(atPath: url.path))
-            #expect(try permissions(at: url) == 0o700)
-            #expect(try permissions(at: url.deletingLastPathComponent()) == 0o700)
-            #expect(try String(contentsOf: url, encoding: .utf8).hasPrefix("#!/bin/sh\n"))
+    @Test(arguments: [nil, "com.apple.Terminal"] as [String?])
+    func foregroundCreatesAnInteractiveSessionWithTheOriginalCommand(terminal: String?) throws {
+        let command = "z code && ls -l"
+        var result: NSAppleEventDescriptor?
+        try ClipboardShellCommandRunner.runInTerminal(command, terminalBundleIdentifier: terminal) { source, argument in
+            result = try executeWithTerminalFixture(source, command: argument)
         }
+        let commands = try #require(result?.atIndex(1))
+        #expect(commands.numberOfItems == 1)
+        #expect(commands.atIndex(1)?.stringValue == command)
+        #expect(result?.atIndex(2)?.booleanValue == true)
     }
 
     @Test
-    func launchFailureRemovesTheScriptAndAllowsAnotherAttempt() throws {
-        try withTemporaryDirectory { directory in
-            #expect(throws: CocoaError.self) {
-                try ClipboardShellCommandRunner.runInTerminal("git status", temporaryDirectory: directory) { _ in false }
-            }
-            #expect(try FileManager.default.contentsOfDirectory(atPath: directory.path).isEmpty)
-            var launchedURL: URL?
-            try ClipboardShellCommandRunner.runInTerminal("pwd", temporaryDirectory: directory) {
-                launchedURL = $0
-                return true
-            }
-            #expect(try FileManager.default.contentsOfDirectory(atPath: directory.path).count == 1)
-            #expect(launchedURL != nil)
+    func foregroundPassesStateChangingCommandsWithoutASubshellWrapper() throws {
+        var commands = [
+            "cd ~/Documents", "export ZISLA_TEST_VALUE=ready", "printf '%s\\n' '你好'",
+            "echo \"$(touch must-not-execute)\"", "printf one\nprintf two",
+            "printf '%s' '$HOME' \"a\\\\b\"", "exit 7", "",
+            "\"\nend tell\ndo shell script \"exit 17\"\n--",
+        ]
+        var seed: UInt64 = 0xC0FFEE
+        let alphabet = Array("abXY019 '\"$`\\;&|<>()[]{}\n\t中文")
+        for _ in 0..<32 {
+            commands.append(String((0..<80).map { _ in
+                seed = seed &* 1_664_525 &+ 1_013_904_223
+                return alphabet[Int(seed % UInt64(alphabet.count))]
+            }))
         }
-    }
-
-    @Test
-    func unavailableTemporaryDirectoryDoesNotLaunchOrChangeExistingFiles() throws {
-        try withTemporaryDirectory { directory in
-            let file = directory.appendingPathComponent("existing.txt")
-            try Data("unchanged".utf8).write(to: file)
-            var didLaunch = false
-            #expect(throws: CocoaError.self) {
-                try ClipboardShellCommandRunner.runInTerminal("pwd", temporaryDirectory: file) { _ in
-                    didLaunch = true
-                    return true
-                }
-            }
-            #expect(!didLaunch)
-            #expect(try String(contentsOf: file, encoding: .utf8) == "unchanged")
-            #expect(try FileManager.default.contentsOfDirectory(atPath: directory.path) == ["existing.txt"])
-        }
-    }
-
-    @Test
-    func shellReceivesTheExactCommandAfterTheTemporaryScriptCleansItself() throws {
-        try withTemporaryDirectory { directory in
-            let shell = directory.appendingPathComponent("fake shell")
-            let argumentsURL = directory.appendingPathComponent("arguments")
-            let workingDirectoryURL = directory.appendingPathComponent("working-directory")
-            let marker = directory.appendingPathComponent("must-not-execute")
-            try Data("""
-                #!/bin/sh
-                /usr/bin/printf '%s\\0' "$@" > "$ZISLA_TEST_ARGUMENTS"
-                /bin/pwd > "$ZISLA_TEST_DIRECTORY"
-
-                """.utf8).write(to: shell)
-            try FileManager.default.setAttributes([.posixPermissions: 0o700], ofItemAtPath: shell.path)
-            let launchDirectory = directory.appendingPathComponent("launch 'with quotes'", isDirectory: true)
-            try FileManager.default.createDirectory(at: launchDirectory, withIntermediateDirectories: false)
-            var commands = [
-                "printf '%s\\n' '你好'",
-                "echo \"$(/usr/bin/touch '\(marker.path)')\"",
-                "echo '; /usr/bin/touch \"\(marker.path)\"; #",
-                "printf one\nprintf two",
-                "printf '%s' '$HOME' \"a\\\\b\"",
-                "exit 7",
-            ]
-            var seed: UInt64 = 0xC0FFEE
-            let alphabet = Array("abXY019 '\"$`\\;&|<>()[]{}\n\t中文")
-            for _ in 0..<32 {
-                commands.append(String((0..<80).map { _ in
-                    seed = seed &* 1_664_525 &+ 1_013_904_223
-                    return alphabet[Int(seed % UInt64(alphabet.count))]
-                }))
-            }
-            for command in commands {
-                var launchedURL: URL?
-                try ClipboardShellCommandRunner.runInTerminal(command, temporaryDirectory: launchDirectory) {
-                    launchedURL = $0
-                    return true
-                }
-                let url = try #require(launchedURL)
-                let process = Process()
-                process.executableURL = URL(fileURLWithPath: "/bin/sh")
-                process.arguments = [url.path]
-                process.currentDirectoryURL = url.deletingLastPathComponent()
-                process.environment = ProcessInfo.processInfo.environment.merging([
-                    "SHELL": shell.path,
-                    "ZISLA_TEST_ARGUMENTS": argumentsURL.path,
-                    "ZISLA_TEST_DIRECTORY": workingDirectoryURL.path,
-                ]) { _, value in value }
-                let errors = Pipe()
-                process.standardError = errors
-                try process.run()
-                process.waitUntilExit()
-                #expect(process.terminationStatus == 0, "\(String(decoding: errors.fileHandleForReading.readDataToEndOfFile(), as: UTF8.self))")
-                let arguments = try String(contentsOf: argumentsURL, encoding: .utf8)
-                    .split(separator: "\0", omittingEmptySubsequences: false).dropLast().map(String.init)
-                #expect(arguments == ["-ilc", command])
-                #expect(try String(contentsOf: workingDirectoryURL, encoding: .utf8)
-                    .trimmingCharacters(in: .newlines) == FileManager.default.homeDirectoryForCurrentUser.path)
-                #expect(try FileManager.default.contentsOfDirectory(atPath: launchDirectory.path).isEmpty)
-                #expect(!FileManager.default.fileExists(atPath: marker.path))
+        for command in commands {
+            try ClipboardShellCommandRunner.runInTerminal(command, terminalBundleIdentifier: "com.apple.Terminal") { source, argument in
+                let result = try executeWithTerminalFixture(source, command: argument)
+                let receivedCommands = try #require(result.atIndex(1))
+                #expect(receivedCommands.numberOfItems == 1)
+                #expect(receivedCommands.atIndex(1)?.stringValue == command)
+                #expect(result.atIndex(2)?.booleanValue == true)
             }
         }
     }
 
     @Test
-    func emptyShellEnvironmentUsesZshWithoutReadingUserStartupFiles() throws {
-        try withTemporaryDirectory { directory in
-            let versionURL = directory.appendingPathComponent("shell-version")
-            try Data("""
-                /usr/bin/printf '%s' "$ZSH_VERSION" > "$ZISLA_TEST_VERSION"
-                exit 0
+    func itermReceivesANewDefaultProfileSessionAndTheOriginalCommand() throws {
+        let command = "cd ~/Documents && pwd"
+        var request: (String, String)?
+        try ClipboardShellCommandRunner.runInTerminal(command, terminalBundleIdentifier: "com.googlecode.iterm2") {
+            request = ($0, $1)
+        }
+        let (source, argument) = try #require(request)
+        #expect(argument == command)
+        #expect(source.contains("tell application id \"com.googlecode.iterm2\""))
+        #expect(source.contains("create window with default profile"))
+        #expect(source.contains("tell current session of terminalWindow to write text (item 1 of argv)"))
+        #expect(source.contains("\n        activate\n"))
+    }
 
-                """.utf8).write(to: directory.appendingPathComponent(".zshenv"))
-            var launchedURL: URL?
-            try ClipboardShellCommandRunner.runInTerminal("printf unused", temporaryDirectory: directory) {
-                launchedURL = $0
-                return true
+    @Test(arguments: ["", "dev.example.unsupported-terminal"])
+    func unsupportedTerminalDoesNotLaunchADifferentAppOrScript(terminal: String) {
+        var didExecute = false
+        #expect(throws: CocoaError(.featureUnsupported)) {
+            try ClipboardShellCommandRunner.runInTerminal("pwd", terminalBundleIdentifier: terminal) { _, _ in
+                didExecute = true
             }
-            let url = try #require(launchedURL)
-            let process = Process()
-            process.executableURL = URL(fileURLWithPath: "/bin/sh")
-            process.arguments = [url.path]
-            var environment = ProcessInfo.processInfo.environment
-            // sh can synthesize an unset SHELL from the account's login shell.
-            environment["SHELL"] = ""
-            environment["ZDOTDIR"] = directory.path
-            environment["ZISLA_TEST_VERSION"] = versionURL.path
-            process.environment = environment
-            try process.run()
-            process.waitUntilExit()
-            #expect(process.terminationStatus == 0)
-            #expect(try !String(contentsOf: versionURL, encoding: .utf8).isEmpty)
-            #expect(!FileManager.default.fileExists(atPath: url.deletingLastPathComponent().path))
+        }
+        #expect(!didExecute)
+    }
+
+    @Test
+    func terminalPermissionFailureIsReportedOnceAndCanRecover() throws {
+        let denied = NSError(domain: NSOSStatusErrorDomain, code: -1743)
+        var attempts = 0
+        #expect(throws: denied) {
+            try ClipboardShellCommandRunner.runInTerminal("pwd", terminalBundleIdentifier: "com.apple.Terminal") { _, _ in
+                attempts += 1
+                throw denied
+            }
+        }
+        #expect(attempts == 1)
+        try ClipboardShellCommandRunner.runInTerminal("pwd", terminalBundleIdentifier: "com.apple.Terminal") { source, command in
+            attempts += 1
+            let result = try executeWithTerminalFixture(source, command: command)
+            #expect(result.atIndex(1)?.atIndex(1)?.stringValue == "pwd")
+        }
+        #expect(attempts == 2)
+    }
+
+    @Test(arguments: [
+        "on run argv\nerror \"Denied\" number -1743\nend run",
+        "on run argv\nerror \"Timed out\" number -1712\nend run",
+        "on run argv\nthis is not valid AppleScript !!!\nend run",
+    ])
+    func appleScriptFailuresAreNotReportedAsSuccessfulLaunches(source: String) {
+        #expect(throws: CocoaError(.executableLoad)) {
+            try ClipboardShellCommandRunner.executeTerminalScript(source, command: "pwd")
         }
     }
 
-    private func permissions(at url: URL) throws -> Int {
-        try #require(FileManager.default.attributesOfItem(atPath: url.path)[.posixPermissions] as? Int)
+    private func executeWithTerminalFixture(_ source: String, command: String) throws -> NSAppleEventDescriptor {
+        // Replace only the application boundary; execute the production AppleScript and Apple Event payload.
+        let fixture = """
+        script terminalFixture
+            property commands : {}
+            property activated : false
+            on «event coredosc» commandText
+                set end of commands to commandText
+            end «event coredosc»
+            on activate
+                set activated to true
+            end activate
+        end script
+        """
+        let body = source
+            .replacingOccurrences(of: "tell application id \"com.apple.Terminal\"", with: "tell terminalFixture")
+            .replacingOccurrences(of: "end run", with: "return {commands of terminalFixture, activated of terminalFixture}\nend run")
+        return try ClipboardShellCommandRunner.executeTerminalScript(
+            fixture + "\nusing terms from application id \"com.apple.Terminal\"\n" + body + "\nend using terms from",
+            command: command
+        )
     }
 
     private func withTemporaryDirectory(_ body: (URL) throws -> Void) throws {

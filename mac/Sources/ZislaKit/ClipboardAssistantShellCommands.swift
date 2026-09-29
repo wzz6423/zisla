@@ -142,36 +142,64 @@ extension ClipboardAssistantDetector {
 
 @MainActor
 public enum ClipboardShellCommandRunner {
-    public static func runInTerminal(
-        _ command: String,
-        temporaryDirectory: URL = FileManager.default.temporaryDirectory,
-        open: (URL) -> Bool = { NSWorkspace.shared.open($0) }
-    ) throws {
-        let directory = temporaryDirectory.appendingPathComponent("zisla-shell-\(UUID().uuidString)", isDirectory: true)
-        let fileManager = FileManager.default
-        try fileManager.createDirectory(
-            at: directory, withIntermediateDirectories: false, attributes: [.posixPermissions: 0o700]
-        )
-        do {
-            let url = directory.appendingPathComponent("Run.command")
-            let quotedCommand = "'" + command.replacingOccurrences(of: "'", with: "'\\''") + "'"
-            // Launch Services honors the user's .command handler. The script cleans itself only
-            // after the terminal reads it; deleting it when open returns would race that read.
-            let script = """
-            #!/bin/sh
-            cd "$HOME" || exit
-            /bin/rm -f -- "$0" || exit
-            /bin/rmdir -- "${0%/*}" || exit
-            exec "${SHELL:-/bin/zsh}" -ilc \(quotedCommand)
+    public static func runInTerminal(_ command: String) async throws {
+        let terminalBundleIdentifier = LSCopyDefaultRoleHandlerForContentType(
+            "com.apple.terminal.shell-script" as CFString, .all
+        )?.takeRetainedValue() as String?
+        try await Task.detached(priority: .userInitiated) {
+            try runInTerminal(command, terminalBundleIdentifier: terminalBundleIdentifier) { source, command in
+                _ = try executeTerminalScript(source, command: command)
+            }
+        }.value
+    }
 
+    nonisolated static func runInTerminal(
+        _ command: String,
+        terminalBundleIdentifier: String?,
+        execute: (String, String) throws -> Void
+    ) throws {
+        let source: String
+        switch terminalBundleIdentifier {
+        case nil, "com.apple.Terminal":
+            source = """
+            on run argv
+                tell application id "com.apple.Terminal"
+                    do script (item 1 of argv)
+                    activate
+                end tell
+            end run
             """
-            try Data(script.utf8).write(to: url)
-            try fileManager.setAttributes([.posixPermissions: 0o700], ofItemAtPath: url.path)
-            guard open(url) else { throw CocoaError(.executableLoad) }
-        } catch {
-            try fileManager.removeItem(at: directory)
-            throw error
+        case "com.googlecode.iterm2":
+            source = """
+            on run argv
+                tell application id "com.googlecode.iterm2"
+                    set terminalWindow to (create window with default profile)
+                    tell current session of terminalWindow to write text (item 1 of argv)
+                    activate
+                end tell
+            end run
+            """
+        default:
+            throw CocoaError(.featureUnsupported)
         }
+        try execute(source, command)
+    }
+
+    nonisolated static func executeTerminalScript(_ source: String, command: String) throws -> NSAppleEventDescriptor {
+        guard let script = NSAppleScript(source: source) else { throw CocoaError(.executableLoad) }
+        // Pass clipboard contents as Apple Event data, never as AppleScript source.
+        let arguments = NSAppleEventDescriptor.list()
+        arguments.insert(NSAppleEventDescriptor(string: command), at: 1)
+        let event = NSAppleEventDescriptor(
+            eventClass: AEEventClass(kCoreEventClass), eventID: AEEventID(kAEOpenApplication),
+            targetDescriptor: nil, returnID: AEReturnID(kAutoGenerateReturnID),
+            transactionID: AETransactionID(kAnyTransactionID)
+        )
+        event.setParam(arguments, forKeyword: AEKeyword(keyDirectObject))
+        var error: NSDictionary?
+        let result = script.executeAppleEvent(event, error: &error)
+        if error != nil { throw CocoaError(.executableLoad) }
+        return result
     }
 
     @discardableResult

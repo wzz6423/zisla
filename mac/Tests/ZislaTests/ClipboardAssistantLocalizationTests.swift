@@ -217,6 +217,29 @@ struct ClipboardAssistantLocalizationTests {
         #expect(AppLocalization.string(backgroundKey, language: .english) == "Run in Background")
     }
 
+    @Test
+    func automationPermissionExplainsTerminalCommandsInEveryLanguage() throws {
+        let key = "NSAppleEventsUsageDescription"
+        var descriptions: [AppLanguage: String] = [:]
+        for language in AppLanguage.allCases {
+            let url = Self.localizationURL
+                .appendingPathComponent("\(language.rawValue).lproj/InfoPlist.strings")
+            let table = try #require(NSDictionary(contentsOf: url) as? [String: String])
+            let value = try #require(table[key], "\(language.rawValue) is missing the automation permission purpose")
+            #expect(value.contains("Mail.app"))
+            #expect(value.contains("Terminal"))
+            #expect(value.contains("iTerm"))
+            descriptions[language] = value
+        }
+        #expect(descriptions.count == 17)
+        #expect(Set(descriptions.values).count == 17)
+        #expect(descriptions[.english]?.hasSuffix("It also runs commands you choose in Terminal or iTerm.") == true)
+        #expect(descriptions[.simplifiedChinese]?.hasSuffix("还可在 Terminal 或 iTerm 中运行你选择的命令。") == true)
+        let infoURL = Self.packageRootURL.appendingPathComponent("Resources/Info.plist")
+        let info = try #require(NSDictionary(contentsOf: infoURL))
+        #expect(info[key] as? String == descriptions[.simplifiedChinese])
+    }
+
     private static func stringsTable(for language: AppLanguage) -> [String: String]? {
         let url = localizationURL
             .appendingPathComponent("\(language.rawValue).lproj", isDirectory: true)

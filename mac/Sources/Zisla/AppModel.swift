@@ -1976,10 +1976,12 @@ final class AppModel: ObservableObject {
     case .saveText(let text):
       saveAssistantText(text)
     case .runShellCommand(let command):
-      do {
-        try ClipboardShellCommandRunner.runInTerminal(command)
-      } catch {
-        transientMessage = clipboardAssistantMessage("无法在终端运行命令")
+      Task { [weak self] in
+        do {
+          try await ClipboardShellCommandRunner.runInTerminal(command)
+        } catch {
+          self?.transientMessage = self?.clipboardAssistantMessage("无法在终端运行命令")
+        }
       }
     case .runShellCommandInBackground(let command):
       do {
