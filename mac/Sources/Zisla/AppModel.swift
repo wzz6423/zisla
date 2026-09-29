@@ -473,6 +473,7 @@ final class AppModel: ObservableObject {
   let languageStore = AppLanguageStore()
   let aiMonitor = AIStateMonitor()
   let notices = SideNoticeQueue()
+  let aiResultSweep = AIResultSweepController()
   let media = NowPlayingService()
   let audioOutput = AudioOutputDeviceService()
   let calendar = CalendarService()
@@ -1031,6 +1032,7 @@ final class AppModel: ObservableObject {
   }
 
   func stop() {
+    aiResultSweep.cancel()
     windowPreview.stop()
     settingsStore.flushPendingChanges()
     islandClipboardHandoff.cancel()
@@ -2718,6 +2720,9 @@ final class AppModel: ObservableObject {
   }
 
   private func apply(settings: FeatureSettings, requestWindowPreviewPermissions: Bool = false) {
+    if !settings.aiProgressEnabled || !settings.aiTaskResultSweepEnabled {
+      aiResultSweep.cancel()
+    }
     windowPreview.setVisualStyle(settings.islandVisualStyle)
     windowPreview.configure(
       enabled: settings.windowPreviewsEnabled,
@@ -3467,19 +3472,7 @@ final class AppModel: ObservableObject {
     for task in state.tasks {
       let previous = taskStatuses[task.id]
       taskStatuses[task.id] = task.status
-      guard previous != nil, previous != task.status else { continue }
-      guard task.status == .succeeded || task.status == .failed else { continue }
-      if settings.sideNoticesEnabled {
-        notices.enqueue(
-          IslandNotice(
-            id: "task-\(task.id)-\(task.updatedAt.timeIntervalSince1970)",
-            title: task.title,
-            detail: task.status == .succeeded ? AppLocalization.text("任务已完成") : AppLocalization.text("任务执行失败"),
-            kind: task.status == .succeeded ? .success : .error,
-            side: task.status == .succeeded ? .right : .left,
-            createdAt: task.updatedAt
-          ))
-      }
+      aiResultSweep.receive(previous: previous, task: task, observedSince: launchDate, settings: settings)
     }
   }
 

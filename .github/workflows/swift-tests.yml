@@ -72,7 +72,8 @@ jobs:
           # AppKit-heavy app tests can starve service timers in SwiftPM's shared test process.
           zsh Scripts/swift-test.sh --filter '^ZislaCoreTests\.'
           zsh Scripts/swift-test-suites.sh ZislaKitTests
-          zsh Scripts/swift-test.sh --filter '^ZislaTests\.' --skip '^ZislaTests\.(Mail(HTMLView|PaginationView)|BrowserDownloadQuickAction|ClipboardAssistant(Calendar|Currency)Presentation|ClipboardAssistantShortcut|ClipboardTranslationPresentation|ClipboardSystemTranslationBridge|ThinScrollChrome)Tests'
+          zsh Scripts/swift-test.sh --filter '^ZislaTests\.' --skip '^ZislaTests\.(AIResultSweepIntegration|Mail(HTMLView|PaginationView)|BrowserDownloadQuickAction|ClipboardAssistant(Calendar|Currency)Presentation|ClipboardAssistantShortcut|ClipboardTranslationPresentation|ClipboardSystemTranslationBridge|ThinScrollChrome)Tests'
+          zsh Scripts/swift-test.sh --filter '^ZislaTests\.AIResultSweepIntegrationTests'
           zsh Scripts/swift-test.sh --filter '^ZislaTests\.BrowserDownloadQuickActionTests'
           zsh Scripts/swift-test.sh --filter '^ZislaTests\.ClipboardAssistantCalendarPresentationTests'
           zsh Scripts/swift-test.sh --filter '^ZislaTests\.ClipboardAssistantCurrencyPresentationTests'

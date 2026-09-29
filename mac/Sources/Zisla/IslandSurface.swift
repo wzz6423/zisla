@@ -78,6 +78,7 @@ struct IslandSurface<Content: View>: View {
     private let collapsedTopCornerRadius: CGFloat
     private let bottomCornerRadius: CGFloat?
     private let collapsedCenterOffsetX: CGFloat
+    private let resultSweep: AIResultSweepController?
 
     init(
         isCollapsed: Bool = false,
@@ -89,6 +90,7 @@ struct IslandSurface<Content: View>: View {
         collapsedTopCornerRadius: CGFloat = 5,
         bottomCornerRadius: CGFloat? = nil,
         collapsedCenterOffsetX: CGFloat = 0,
+        resultSweep: AIResultSweepController? = nil,
         @ViewBuilder content: @escaping () -> Content
     ) {
         self.isCollapsed = isCollapsed
@@ -100,6 +102,7 @@ struct IslandSurface<Content: View>: View {
         self.collapsedTopCornerRadius = collapsedTopCornerRadius
         self.bottomCornerRadius = bottomCornerRadius
         self.collapsedCenterOffsetX = collapsedCenterOffsetX
+        self.resultSweep = resultSweep
         self.content = content
     }
 
@@ -127,6 +130,9 @@ struct IslandSurface<Content: View>: View {
             unifiedSurface
                 .allowsHitTesting(false)
             content()
+            if let resultSweep {
+                AIResultSweepOverlay(controller: resultSweep)
+            }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         // Keeps the mask's layout size fixed, redrawing only the outline within its canvas — if the

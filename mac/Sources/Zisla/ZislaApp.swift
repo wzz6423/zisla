@@ -584,6 +584,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
         }
         noticePresenter = SideNoticePresenter(
             queue: model.notices,
+            resultSweep: model.aiResultSweep,
             media: model.media,
             browserDownloads: model.browserDownloads,
             settingsStore: model.settingsStore,
