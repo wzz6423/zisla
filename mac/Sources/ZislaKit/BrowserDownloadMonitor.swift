@@ -771,6 +771,9 @@ public final class BrowserDownloadMonitor: ObservableObject {
                 releaseUnusedSubscription(for: directory)
                 return
             }
+            if let currentIdentity = BrowserDownloadFileIdentity(url: fileURL), currentIdentity != identity {
+                return
+            }
             if var observed = observedDownloads[identity] {
                 if fileManager.fileExists(atPath: fileURL.path) {
                     let previousDirectory = observed.temporaryURL.deletingLastPathComponent()

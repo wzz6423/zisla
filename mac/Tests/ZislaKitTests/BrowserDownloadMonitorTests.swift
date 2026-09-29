@@ -531,6 +531,45 @@ struct BrowserDownloadMonitorLifecycleTests {
         #expect(transfers.isEmpty)
     }
 
+    @Test(arguments: [false, true])
+    @MainActor
+    func staleFileIdentityAtSamePathDoesNotDuplicateDownload(staleEventFirst: Bool) async throws {
+        let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString, isDirectory: true)
+        try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: root) }
+        let temporary = root.appendingPathComponent("未确认 119006.crdownload")
+        let old = root.appendingPathComponent("old")
+        try Data("old".utf8).write(to: temporary)
+        let staleIdentity = try #require(BrowserDownloadFileIdentity(url: temporary))
+        try FileManager.default.moveItem(at: temporary, to: old)
+        try Data("current".utf8).write(to: temporary)
+        let identity = try #require(BrowserDownloadFileIdentity(url: temporary))
+        #expect(identity != staleIdentity)
+        let monitor = BrowserDownloadMonitor(directories: [root], eventPaths: [])
+        monitor.start()
+        defer { monitor.stop() }
+        let progress = Progress(totalUnitCount: 100)
+        progress.kind = .file
+        progress.fileOperationKind = .downloading
+        progress.fileURL = temporary
+        progress.completedUnitCount = 20
+        progress.publish()
+        defer { progress.unpublish() }
+        let deadline = ContinuousClock.now + .seconds(3)
+        while monitor.snapshots.first?.progressText != "20%" && ContinuousClock.now < deadline {
+            try await Task.sleep(for: .milliseconds(20))
+        }
+        let identities = staleEventFirst ? [staleIdentity, identity] : [identity, staleIdentity]
+        for eventIdentity in identities {
+            monitor.handleFileEvent(at: temporary, fileID: eventIdentity.inode, renamed: true,
+                runningBundleIdentifiers: ["com.google.Chrome"])
+        }
+        #expect(monitor.snapshots.map(\.progressText) == ["20%"])
+        #expect(monitor.snapshots.map(\.fileName) == ["未确认 119006"])
+        monitor.stop()
+        #expect(monitor.snapshots.isEmpty)
+    }
+
     @Test(arguments: [false, true], [false, true])
     @MainActor
     func lateProgressURLMergesTemporaryDownload(hasOtherDownload: Bool, initiallyLinked: Bool) async throws {
