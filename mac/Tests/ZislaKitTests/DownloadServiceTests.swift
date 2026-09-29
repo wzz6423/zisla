@@ -1096,7 +1096,8 @@ struct DownloadServiceTests {
         #expect(source.stringReadCount == 1)
         let text = try #require(detectedText)
         let detection = try #require(ClipboardAssistantDetector.detect(
-            text: text, enabledKinds: Set(ClipboardAssistantKind.allCases)
+            text: text, enabledKinds: Set(ClipboardAssistantKind.allCases),
+            shellCommandExists: { $0 == "curl" }
         ))
         #expect(detection.action == .runShellCommand(command))
     }
