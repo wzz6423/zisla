@@ -2,8 +2,8 @@ import AppKit
 import ZislaCore
 
 extension ClipboardAssistantDetector {
-    static func shellCommandDetection(_ text: String) -> ClipboardAssistantDetection? {
-        guard let command = shellCommand(from: text) else { return nil }
+    static func shellCommandDetection(_ text: String, commandExists: (String) -> Bool) -> ClipboardAssistantDetection? {
+        guard let command = shellCommand(from: text, commandExists: commandExists) else { return nil }
         return ClipboardAssistantDetection(
             kind: .shellCommand,
             title: previewText(command),
@@ -13,7 +13,7 @@ extension ClipboardAssistantDetector {
         )
     }
 
-    static func shellCommand(from text: String) -> String? {
+    static func shellCommand(from text: String, commandExists: (String) -> Bool) -> String? {
         guard text.utf8.count <= 20_000 else { return nil }
         var command = text.replacingOccurrences(of: "\r\n", with: "\n")
         guard !command.unicodeScalars.contains(where: {
@@ -49,102 +49,62 @@ extension ClipboardAssistantDetector {
         // A declared shell block can contain loops and here-documents. Unlabelled text needs
         // command evidence on every line so copied explanations and terminal output stay inert.
         guard explicitlyShell || lines.allSatisfy({
-            hasShellCommandPrefix($0, allowsUnknownCommand: hasPrompt && lines.count == 1)
-                || hasShellCommandChain($0)
+            guard let name = shellCommandName($0) else { return false }
+            return commandExists(name)
         }) else { return nil }
         return command
     }
 
-    private static func hasShellCommandChain(_ line: String) -> Bool {
-        var commands: [String] = []
-        var current = ""
-        var quote: Character?
-        var escaped = false
-        var lastSeparator = ""
-        var index = line.startIndex
-        while index < line.endIndex {
-            let character = line[index]
-            index = line.index(after: index)
-            if escaped {
-                current.append(character)
-                escaped = false
-            } else if character == "\\", quote != "'" {
-                current.append(character)
-                escaped = true
-            } else if let activeQuote = quote {
-                current.append(character)
-                if character == activeQuote { quote = nil }
-            } else if character == "'" || character == "\"" || character == "`" {
-                current.append(character)
-                quote = character
-            } else if character == "#", current.isEmpty || current.last?.isWhitespace == true {
-                break
-            } else if character == "&" || character == "|" || character == ";" {
-                let command = current.trimmingCharacters(in: .whitespaces)
-                commands.append(command)
-                current = ""
-                lastSeparator = String(character)
-                if character != ";", index < line.endIndex, line[index] == character {
-                    lastSeparator.append(character)
-                    index = line.index(after: index)
-                }
-            } else {
-                current.append(character)
-            }
-        }
-        guard quote == nil, !escaped else { return false }
-        let command = current.trimmingCharacters(in: .whitespaces)
-        if !command.isEmpty {
-            commands.append(command)
-        } else if lastSeparator != ";" && lastSeparator != "&" {
-            return false
-        }
-        guard commands.allSatisfy({ hasShellCommandPrefix($0, allowsUnknownCommand: true) }) else { return false }
-        // Aliases are user-defined, so a chain can also use bare commands, options or paths as evidence.
-        return commands.contains { hasShellCommandPrefix($0, allowsUnknownCommand: false) }
-            || commands.count > 1 && commands.contains {
-                $0.range(
-                    of: #"^[A-Za-z_][A-Za-z0-9_.+-]*(?:$|\h+(?:--?[A-Za-z0-9]|/|\.\.?/|~/))"#,
-                    options: .regularExpression
-                ) != nil
-            }
-    }
-
-    private static func hasShellCommandPrefix(_ line: String, allowsUnknownCommand: Bool) -> Bool {
+    private static func shellCommandName(_ line: String) -> String? {
         let assignments = #"^(?:[A-Za-z_][A-Za-z0-9_]*=(?:'[^']*'|"[^"]*"|[^\s]+)\h+)*"#
         let invocation = line.replacingOccurrences(of: assignments, with: "", options: .regularExpression)
         guard let range = invocation.range(
-            of: #"^(?:[A-Za-z_][A-Za-z0-9_.+-]*|(?:/|\./|\.\./|~/)[^\s'";&|<>]+)(?=$|[\s;&|])"#,
+            of: #"^(?:[A-Za-z_][A-Za-z0-9_.+-]*|(?:/|\./|\.\./|~/)[^\s'";&|<>]+)(?=$|[\s;&|<>])"#,
             options: .regularExpression
-        ) else { return false }
-        let name = String(invocation[range])
-        let arguments = invocation[range.upperBound...].trimmingCharacters(in: .whitespaces)
-        if name.contains("/") { return !arguments.isEmpty }
-        if shellCommandNames.contains(name) { return true }
-        if ["open", "find", "make"].contains(name) {
-            if arguments.hasPrefix("-") || arguments.hasPrefix("/") || arguments.hasPrefix(".")
-                || arguments.hasPrefix("~") { return true }
-            return name == "make"
-                && ["all", "build", "clean", "install", "test", "check", "run", "update", "stop", "dev", "lint", "release", "help"]
-                    .contains(arguments)
-        }
-        return allowsUnknownCommand
+        ) else { return nil }
+        return String(invocation[range])
     }
+}
 
-    private static let shellCommandNames: Set<String> = [
-        "ls", "cd", "pwd", "cat", "head", "tail", "less", "grep", "rg", "fd", "sed", "awk",
-        "sort", "uniq", "wc", "cut", "tr", "tee", "xargs", "echo", "printf", "touch", "mkdir",
-        "cp", "mv", "rm", "ln", "chmod", "chown", "tar", "zip", "unzip", "gzip", "gunzip",
-        "git", "hg", "svn", "curl", "wget", "ssh", "scp", "sftp", "rsync", "ping", "dig",
-        "nslookup", "lsof", "ps", "top", "htop", "kill", "killall", "pkill", "df", "du",
-        "uname", "whoami", "which", "env", "printenv", "export", "unset", "sudo", "command",
-        "nohup", "bash", "zsh", "sh", "fish", "ksh", "dash", "brew", "port", "apt", "apt-get",
-        "yum", "dnf", "pacman", "npm", "npx", "pnpm", "yarn", "bun", "node", "deno",
-        "python", "python3", "pip", "pip3", "uv", "poetry", "ruby", "gem", "bundle",
-        "go", "cargo", "rustc", "cmake", "ninja", "swift", "xcodebuild", "xcrun",
-        "docker", "podman", "kubectl", "helm", "terraform", "ansible", "defaults",
-        "launchctl", "osascript", "plutil", "mdfind", "mdls", "pbcopy", "pbpaste",
-    ]
+public enum ClipboardShellCommandResolver {
+    public static func resolve(
+        _ text: String,
+        environment: [String: String] = ProcessInfo.processInfo.environment,
+        workingDirectory: URL = FileManager.default.homeDirectoryForCurrentUser,
+        timeout: TimeInterval = 2
+    ) async -> String? {
+        var names: [String] = []
+        guard let command = ClipboardAssistantDetector.shellCommand(from: text, commandExists: {
+            names.append($0)
+            return true
+        }) else { return nil }
+        guard !names.isEmpty else { return command }
+
+        var environment = environment
+        var checks: [String] = []
+        for (index, name) in names.enumerated() {
+            let key = "ZISLA_SHELL_COMMAND_\(index)"
+            environment[key] = name.hasPrefix("~/")
+                ? (environment["HOME"] ?? FileManager.default.homeDirectoryForCurrentUser.path) + name.dropFirst()
+                : name
+            checks.append("type \"$\(key)\" >/dev/null 2>&1")
+        }
+        // Only variable references enter shell source; clipboard text stays inert environment data.
+        let marker = "\u{001E}zisla-command-found\u{001F}"
+        checks.append("printf '\\036zisla-command-found\\037'")
+        guard let result = try? await AIAgentProcessRunner.run(
+            executableURL: URL(fileURLWithPath: environment["SHELL"] ?? "/bin/zsh"),
+            arguments: ["-ilc", checks.joined(separator: " && ")],
+            standardInput: Data(),
+            environment: environment,
+            workingDirectoryURL: workingDirectory,
+            timeout: timeout,
+            maximumOutputBytes: 4096,
+            maximumErrorBytes: 1
+        ), !result.didTimeout, result.status == 0,
+           result.standardOutput.suffix(marker.utf8.count) == Data(marker.utf8) else { return nil }
+        return command
+    }
 }
 
 @MainActor

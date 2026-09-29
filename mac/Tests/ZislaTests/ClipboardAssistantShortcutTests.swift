@@ -14,7 +14,7 @@ struct ClipboardAssistantShortcutTests {
         let registry = Registry()
         let controller = makeController(registry)
         defer { controller.dismiss(animated: false) }
-        let detection = try #require(ClipboardAssistantDetector.detect(text: "git status", enabledKinds: [.shellCommand]))
+        let detection = try #require(ClipboardAssistantDetector.detect(text: "git status", enabledKinds: [.shellCommand], shellCommandExists: { $0 == "git" }))
         let actions: [ClipboardAssistantAction] = [.runShellCommand("git status"), .runShellCommandInBackground("git status"), .search("git status")]
         var performed: [ClipboardAssistantAction] = []
         controller.onPerformAction = { performed.append($0) }

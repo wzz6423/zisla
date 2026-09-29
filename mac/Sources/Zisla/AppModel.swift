@@ -1501,6 +1501,7 @@ final class AppModel: ObservableObject {
   /// Live exchange-rate fetching for the assistant's currency conversion; quotes are fetched
   /// fresh on every conversion and never cached.
   private let exchangeRateService = ExchangeRateService.live()
+  private var clipboardAssistantDetectionTask: Task<Void, Never>?
   private var currencyConversionTask: Task<Void, Never>?
   private var clipboardServiceOpenTask: Task<Void, Never>?
 
@@ -1573,6 +1574,7 @@ final class AppModel: ObservableObject {
     let changeCount = NSPasteboard.general.changeCount
     guard lastClipboardAssistantRoutingChangeCount != changeCount else { return }
     lastClipboardAssistantRoutingChangeCount = changeCount
+    clipboardAssistantDetectionTask?.cancel()
     if clipboardAssistant.presentation.translation != nil, suppressedAssistantChangeCount != changeCount {
       clipboardAssistant.dismiss(animated: false)
     }
@@ -1599,21 +1601,26 @@ final class AppModel: ObservableObject {
     downloadableURL: URL?,
     sourceApplication: NSRunningApplication?
   ) {
-    switch presentClipboardAssistant(for: content, sourceApplication: sourceApplication) {
-    case .presented, .ignored:
-      guard downloadableURL != nil else { return }
-      detectedLinkTask?.cancel()
-      detectedLink = nil
-    case .unavailable:
-      guard clipboardMonitor.isEnabled, let downloadableURL else { return }
-      presentDetectedLink(downloadableURL)
+    clipboardAssistantDetectionTask = Task { [weak self] in
+      guard let self else { return }
+      let result = await presentClipboardAssistant(for: content, sourceApplication: sourceApplication)
+      guard !Task.isCancelled else { return }
+      switch result {
+      case .presented, .ignored:
+        guard downloadableURL != nil else { return }
+        detectedLinkTask?.cancel()
+        detectedLink = nil
+      case .unavailable:
+        guard clipboardMonitor.isEnabled, let downloadableURL else { return }
+        presentDetectedLink(downloadableURL)
+      }
     }
   }
 
   private func presentClipboardAssistant(
     for content: ClipboardHistoryContent,
     sourceApplication: NSRunningApplication?
-  ) -> ClipboardAssistantPresentationResult {
+  ) async -> ClipboardAssistantPresentationResult {
     let settings = settingsStore.settings
     guard settings.clipboardAssistantEnabled else { return .unavailable }
     guard !voiceInput.isRecording, !voiceInput.isPreparing, !isIslandVisible else {
@@ -1629,17 +1636,27 @@ final class AppModel: ObservableObject {
        settings.clipboardAssistantBlacklist.contains(bundleIdentifier) {
       return .unavailable
     }
+    let enabledKinds = settings.clipboardAssistantEnabledKinds.isEmpty
+      ? Set(ClipboardAssistantKind.allCases)
+      : settings.clipboardAssistantEnabledKinds
+    let changeCount = NSPasteboard.general.changeCount
+    var shellCommand: String?
+    if enabledKinds.contains(.shellCommand), case .text(let text) = content {
+      shellCommand = await ClipboardShellCommandResolver.resolve(text)
+    }
+    guard !Task.isCancelled, changeCount == NSPasteboard.general.changeCount,
+          settings == settingsStore.settings,
+          !voiceInput.isRecording, !voiceInput.isPreparing, !isIslandVisible else { return .ignored }
     guard var detection = ClipboardAssistantDetector.detect(
       content: content,
-      enabledKinds: settings.clipboardAssistantEnabledKinds.isEmpty
-        ? Set(ClipboardAssistantKind.allCases)
-        : settings.clipboardAssistantEnabledKinds,
+      enabledKinds: enabledKinds,
       offersDownload: settings.downloaderEnabled,
       preferredCurrencyCode: ClipboardAssistantDetector.currentPreferredCurrencyCode(
         language: languageStore.language
       ),
       locale: languageStore.language.locale,
-      installedApplications: installedApplications
+      installedApplications: installedApplications,
+      shellCommandExists: { _ in shellCommand != nil }
     ) else { return .unavailable }
     detection = augmentedClipboardAssistantDetection(
       detection,
