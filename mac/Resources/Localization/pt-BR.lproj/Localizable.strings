@@ -1958,7 +1958,6 @@
 "重新选择" = "Selecionar de novo";
 "需要处理" = "Requer atenção";
 "默认端点" = "Endpoint padrão";
-"任务已完成" = "Tarefa concluída";
 "休息倒计时" = "Contagem regressiva da pausa";
 "关闭背景音" = "Desativar o som de fundo";
 "刷新收件箱" = "Atualizar a caixa de entrada";
@@ -1975,7 +1974,6 @@
 "未命名日程" = "Evento sem nome";
 "未配置凭据" = "Nenhuma credencial configurada";
 "邮件已发送" = "E-mail enviado";
-"任务执行失败" = "Falha ao executar a tarefa";
 "农历日期未知" = "Data lunar desconhecida";
 "切换播放模式" = "Alternar o modo de reprodução";
 "压缩操作超时" = "Tempo de compactação esgotado";
@@ -2524,3 +2522,5 @@
 "弹窗可见时按下 %@ 关闭当前弹窗" = "Pressione %@ enquanto a janela estiver visível para fechá-la";
 "关闭弹窗快捷键未能启用，请检查快捷键冲突或输入监控权限" = "Não foi possível ativar o atalho para fechar. Verifique conflitos de atalhos ou a permissão de Monitoramento de Entrada.";
 "关闭弹窗快捷键与动作快捷键相同，当前优先关闭弹窗" = "O atalho para fechar coincide com um atalho de ação. Fechar a janela tem prioridade.";
+"AI 任务结果扫光" = "Faixa de luz do resultado de IA";
+"任务成功时绿色、失败时红色渐变光带从左向右扫过一次" = "Um degradê passa uma vez da esquerda para a direita: verde em caso de sucesso, vermelho em caso de falha";

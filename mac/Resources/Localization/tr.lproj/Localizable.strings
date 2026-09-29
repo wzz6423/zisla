@@ -1958,7 +1958,6 @@
 "重新选择" = "Yeniden seç";
 "需要处理" = "İşlem gerekiyor";
 "默认端点" = "Varsayılan uç nokta";
-"任务已完成" = "Görev tamamlandı";
 "休息倒计时" = "Mola geri sayımı";
 "关闭背景音" = "Arka plan sesini kapat";
 "刷新收件箱" = "Gelen kutusunu yenile";
@@ -1975,7 +1974,6 @@
 "未命名日程" = "Adsız etkinlik";
 "未配置凭据" = "Kimlik bilgileri yapılandırılmadı";
 "邮件已发送" = "E-posta gönderildi";
-"任务执行失败" = "Görev yürütülemedi";
 "农历日期未知" = "Ay takvimi tarihi bilinmiyor";
 "切换播放模式" = "Çalma modunu değiştir";
 "压缩操作超时" = "Sıkıştırma zaman aşımı";
@@ -2524,3 +2522,5 @@
 "弹窗可见时按下 %@ 关闭当前弹窗" = "Açılır pencere görünürken kapatmak için %@ tuşuna basın";
 "关闭弹窗快捷键未能启用，请检查快捷键冲突或输入监控权限" = "Kapatma kısayolu etkinleştirilemedi. Kısayol çakışmalarını veya Giriş İzleme iznini kontrol edin.";
 "关闭弹窗快捷键与动作快捷键相同，当前优先关闭弹窗" = "Kapatma kısayolu bir eylem kısayoluyla aynı. Açılır pencereyi kapatma önceliklidir.";
+"AI 任务结果扫光" = "Yapay zekâ görev sonucu ışığı";
+"任务成功时绿色、失败时红色渐变光带从左向右扫过一次" = "Bir renk geçişi soldan sağa bir kez ilerler: başarıda yeşil, hatada kırmızı";

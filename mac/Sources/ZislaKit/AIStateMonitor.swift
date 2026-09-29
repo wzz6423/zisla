@@ -51,8 +51,8 @@ public final class AIStateMonitor: ObservableObject {
     }
 
     private enum DetectorRefreshResult: Sendable {
-        case tasks([AIProgressTask], usageChanged: Bool)
-        case state(AIState)
+        case tasks([AIProgressTask], usageChanged: Bool, activityFileURLs: [URL])
+        case state(AIState, activityFileURLs: [URL])
         case corruptedState
         case failure(String)
     }
@@ -79,6 +79,8 @@ public final class AIStateMonitor: ObservableObject {
     private var databaseSource: DispatchSourceFileSystemObject?
     private var walSource: DispatchSourceFileSystemObject?
     private var stateFileReloadTask: Task<Void, Never>?
+    private var activityFileSources: [URL: DispatchSourceFileSystemObject] = [:]
+    private var activityFileReloadTask: Task<Void, Never>?
     private var usageHistoryLoadInFlight = false
     private var usageHistoryLoadPending = false
     private var usageHistoryGeneration: UInt64 = 0
@@ -267,6 +269,10 @@ public final class AIStateMonitor: ObservableObject {
         persistedReloadPendingRefreshDetectorsWhenUnchanged = false
         stateFileReloadTask?.cancel()
         stateFileReloadTask = nil
+        activityFileReloadTask?.cancel()
+        activityFileReloadTask = nil
+        activityFileSources.values.forEach { $0.cancel() }
+        activityFileSources.removeAll()
         detectorRefreshInFlight = false
         detectorRefreshPending = false
         detectorRefreshPendingAllowsUsageScan = false
@@ -488,6 +494,42 @@ public final class AIStateMonitor: ObservableObject {
         )
     }
 
+    private func refreshActivityFileWatchers(_ urls: [URL]) {
+        guard source != nil else { return }
+        let paths = Set(urls.map(\.standardizedFileURL))
+        for url in Array(activityFileSources.keys) where !paths.contains(url) {
+            activityFileSources.removeValue(forKey: url)?.cancel()
+        }
+        let generation = refreshGeneration
+        for url in paths where activityFileSources[url] == nil {
+            let descriptor = open(url.path, O_EVTONLY)
+            guard descriptor >= 0 else { continue }
+            let watcher = DispatchSource.makeFileSystemObjectSource(
+                fileDescriptor: descriptor, eventMask: [.write, .rename, .delete], queue: .main
+            )
+            watcher.setEventHandler { [weak self] in
+                guard let self, self.refreshGeneration == generation else { return }
+                if let events = self.activityFileSources[url]?.data, !events.intersection([.rename, .delete]).isEmpty {
+                    self.activityFileSources.removeValue(forKey: url)?.cancel()
+                }
+                self.activityFileReloadTask?.cancel()
+                self.activityFileReloadTask = Task { [weak self] in
+                    do {
+                        try await Task.sleep(for: .milliseconds(250))
+                    } catch {
+                        return
+                    }
+                    guard let self, self.refreshGeneration == generation else { return }
+                    self.activityFileReloadTask = nil
+                    self.scheduleDetectorRefresh(allowUsageScan: false)
+                }
+            }
+            watcher.setCancelHandler { close(descriptor) }
+            activityFileSources[url] = watcher
+            watcher.resume()
+        }
+    }
+
     private func scheduleStateFileReload() {
         stateFileReloadTask?.cancel()
         let generation = refreshGeneration
@@ -681,6 +723,7 @@ public final class AIStateMonitor: ObservableObject {
                 persistedTasks,
                 using: dependencies
             )
+            let activityFileURLs = dependencies.activityDetectors.flatMap(\.activityFileURLs)
             var usageChanged = false
             if detectsUsage, usageScanComplete {
                 usageChanged = try dependencies.repository.recordDetectedUsage(automaticUsage) > 0
@@ -688,11 +731,11 @@ public final class AIStateMonitor: ObservableObject {
                     if usageChanged {
                         var next = try dependencies.repository.load(includeUsageSamples: true)
                         next.tasks = tasks
-                        return .state(next)
+                        return .state(next, activityFileURLs: activityFileURLs)
                     }
                 }
             }
-            return .tasks(tasks, usageChanged: usageChanged)
+            return .tasks(tasks, usageChanged: usageChanged, activityFileURLs: activityFileURLs)
         } catch AIStateRepositoryError.corruptedState {
             return .corruptedState
         } catch {
@@ -708,7 +751,7 @@ public final class AIStateMonitor: ObservableObject {
         var detectedTaskIDs: Set<String> = []
 
         for detector in dependencies.activityDetectors {
-            guard let automaticTasks = try? detector.activeTasks() else { continue }
+            guard let automaticTasks = try? detector.taskUpdates() else { continue }
             for task in automaticTasks {
                 detectedTaskIDs.insert(task.id)
                 if let index = tasks.firstIndex(where: { $0.id == task.id }) {
@@ -769,13 +812,15 @@ public final class AIStateMonitor: ObservableObject {
 
     private func applyDetector(_ result: DetectorRefreshResult) {
         switch result {
-        case let .tasks(tasks, usageChanged):
+        case let .tasks(tasks, usageChanged, activityFileURLs):
+            refreshActivityFileWatchers(activityFileURLs)
             if tasks != state.tasks { state.tasks = tasks }
             errorDescription = nil
             if usageChanged, usageHistoryRequested {
                 requestUsageHistoryLoad(force: true)
             }
-        case let .state(next):
+        case let .state(next, activityFileURLs):
+            refreshActivityFileWatchers(activityFileURLs)
             applyPersisted(
                 .success(next, repository.storageChangeToken()),
                 includesUsageSamples: true,

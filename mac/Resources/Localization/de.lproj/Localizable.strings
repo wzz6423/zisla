@@ -1959,7 +1959,6 @@
 "重新选择" = "Erneut auswählen";
 "需要处理" = "Aktion erforderlich";
 "默认端点" = "Standard-Endpunkt";
-"任务已完成" = "Aufgabe abgeschlossen";
 "休息倒计时" = "Pausen-Countdown";
 "关闭背景音" = "Hintergrundton aus";
 "刷新收件箱" = "Postfach aktualisieren";
@@ -1976,7 +1975,6 @@
 "未命名日程" = "Unbenannter Termin";
 "未配置凭据" = "Keine Zugangsdaten konfiguriert";
 "邮件已发送" = "E-Mail gesendet";
-"任务执行失败" = "Aufgabe fehlgeschlagen";
 "农历日期未知" = "Mondkalenderdatum unbekannt";
 "切换播放模式" = "Wiedergabemodus wechseln";
 "压缩操作超时" = "Komprimierung überschritt die Zeit";
@@ -2525,3 +2523,5 @@
 "弹窗可见时按下 %@ 关闭当前弹窗" = "Bei sichtbarem Pop-up %@ drücken, um es zu schließen";
 "关闭弹窗快捷键未能启用，请检查快捷键冲突或输入监控权限" = "Der Kurzbefehl zum Schließen konnte nicht aktiviert werden. Prüfe auf Kurzbefehlkonflikte oder die Berechtigung zur Eingabeüberwachung.";
 "关闭弹窗快捷键与动作快捷键相同，当前优先关闭弹窗" = "Der Kurzbefehl zum Schließen entspricht einem Aktionskurzbefehl. Das Schließen des Pop-ups hat Vorrang.";
+"AI 任务结果扫光" = "Lichteffekt für KI-Aufgabenergebnisse";
+"任务成功时绿色、失败时红色渐变光带从左向右扫过一次" = "Ein Farbverlauf wandert einmal von links nach rechts: Grün bei Erfolg, Rot bei Fehlern";

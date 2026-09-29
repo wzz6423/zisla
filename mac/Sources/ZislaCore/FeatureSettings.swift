@@ -617,6 +617,7 @@ public struct FeatureSettings: Codable, Equatable, Sendable {
     public var sideNoticesEnabled: Bool
     /// Whether collapsed notice bars show their playback, download, or dismissal progress glow.
     public var collapsedProgressGlowEnabled: Bool
+    public var aiTaskResultSweepEnabled: Bool
     public var compactStatusPriority: [CompactStatusPriority]
     public var moduleOrder: [IslandModuleOrder]
     /// Temporarily suppresses system notifications pushed by Zisla itself (Pomodoro, etc.).
@@ -735,6 +736,7 @@ public struct FeatureSettings: Codable, Equatable, Sendable {
         clipboardAssistantMouseGestureEnabled: Bool = false,
         sideNoticesEnabled: Bool = true,
         collapsedProgressGlowEnabled: Bool = true,
+        aiTaskResultSweepEnabled: Bool = true,
         compactStatusPriority: [CompactStatusPriority] = CompactStatusPriority.defaultOrder,
         moduleOrder: [IslandModuleOrder] = IslandModuleOrder.defaultOrder,
         notificationsMuted: Bool = false,
@@ -846,6 +848,7 @@ public struct FeatureSettings: Codable, Equatable, Sendable {
         self.clipboardAssistantMouseGestureEnabled = clipboardAssistantMouseGestureEnabled
         self.sideNoticesEnabled = sideNoticesEnabled
         self.collapsedProgressGlowEnabled = collapsedProgressGlowEnabled
+        self.aiTaskResultSweepEnabled = aiTaskResultSweepEnabled
         self.compactStatusPriority = CompactStatusPriority.normalized(compactStatusPriority)
         self.moduleOrder = IslandModuleOrder.normalized(moduleOrder)
         self.notificationsMuted = notificationsMuted
@@ -973,6 +976,7 @@ public struct FeatureSettings: Codable, Equatable, Sendable {
         case clipboardAssistantMouseGestureEnabled
         case sideNoticesEnabled
         case collapsedProgressGlowEnabled
+        case aiTaskResultSweepEnabled
         case compactStatusPriority
         case moduleOrder
         case notificationsMuted
@@ -1201,6 +1205,7 @@ public struct FeatureSettings: Codable, Equatable, Sendable {
             Bool.self,
             forKey: .collapsedProgressGlowEnabled
         ) ?? defaults.collapsedProgressGlowEnabled
+        aiTaskResultSweepEnabled = try container.decodeIfPresent(Bool.self, forKey: .aiTaskResultSweepEnabled) ?? defaults.aiTaskResultSweepEnabled
         compactStatusPriority = CompactStatusPriority.normalized(
             try container.decodeIfPresent([CompactStatusPriority].self, forKey: .compactStatusPriority)
                 ?? defaults.compactStatusPriority

@@ -8,6 +8,7 @@ import SwiftUI
 @MainActor
 final class SideNoticePresenter {
     private let queue: SideNoticeQueue
+    private let resultSweep: AIResultSweepController
     private let media: NowPlayingService
     private let browserDownloads: BrowserDownloadMonitor
     private let settingsStore: FeatureSettingsStore
@@ -23,6 +24,7 @@ final class SideNoticePresenter {
 
     init(
         queue: SideNoticeQueue,
+        resultSweep: AIResultSweepController,
         media: NowPlayingService,
         browserDownloads: BrowserDownloadMonitor,
         settingsStore: FeatureSettingsStore,
@@ -31,6 +33,7 @@ final class SideNoticePresenter {
         isScreenLocked: Bool = false
     ) {
         self.queue = queue
+        self.resultSweep = resultSweep
         self.media = media
         self.browserDownloads = browserDownloads
         self.settingsStore = settingsStore
@@ -40,6 +43,11 @@ final class SideNoticePresenter {
         queue.$left
             .combineLatest(queue.$right)
             .sink { [weak self] _, _ in
+                Task { @MainActor [weak self] in self?.updatePanels() }
+            }
+            .store(in: &cancellables)
+        resultSweep.$current
+            .sink { [weak self] _ in
                 Task { @MainActor [weak self] in self?.updatePanels() }
             }
             .store(in: &cancellables)
@@ -176,13 +184,8 @@ final class SideNoticePresenter {
             if displayState.hidesVoiceProcessingIndicator {
                 compactNotices = Self.noticesWithoutVoiceProcessing(compactNotices)
             }
-            let compactBarFrame = layoutEngine.compactBarFrame(
-                for: snapshot,
-                notices: compactNotices,
-                settings: settingsStore.settings,
-                browserDownloadCount: settingsStore.settings.showsBrowserDownloadProgress
-                    ? browserDownloads.snapshots.count : 0
-            ) ?? layoutEngine.compactBarFrame(for: snapshot)
+            let compactBarFrame = compactFrame(for: snapshot, notices: compactNotices)
+                ?? layoutEngine.compactBarFrame(for: snapshot)
             displayState.compactWingsEnabled = false
             displayState.compactWingHeight = compactBarFrame.height
             displayState.reserveCompactWing = false
@@ -240,6 +243,35 @@ final class SideNoticePresenter {
         notices.filter { !$0.id.hasPrefix("voice-processing-") }
     }
 
+    private func compactFrame(for snapshot: ScreenSnapshot, notices: [IslandNotice]) -> CGRect? {
+        let frame = layoutEngine.compactBarFrame(
+            for: snapshot,
+            notices: notices,
+            settings: settingsStore.settings,
+            browserDownloadCount: settingsStore.settings.showsBrowserDownloadProgress
+                ? browserDownloads.snapshots.count : 0
+        )
+        return Self.resultSweepFrame(
+            statusFrame: frame,
+            idleFrame: layoutEngine.compactBarFrame(for: snapshot),
+            hasPhysicalNotch: ScreenLayoutEngine().layout(for: snapshot).topology.hasPhysicalNotch,
+            isSweeping: resultSweep.current != nil
+        )
+    }
+
+    static func resultSweepFrame(
+        statusFrame: CGRect?,
+        idleFrame: CGRect,
+        hasPhysicalNotch: Bool,
+        isSweeping: Bool
+    ) -> CGRect? {
+        guard isSweeping else { return statusFrame }
+        let frame = statusFrame ?? idleFrame
+        // Leave a visible strip beneath the hardware notch so the sweep crosses the center too.
+        let height = hasPhysicalNotch ? max(frame.height, idleFrame.height + 2) : frame.height
+        return CGRect(x: frame.minX, y: frame.maxY - height, width: frame.width, height: height)
+    }
+
     private func updateCompactBar(
         screen snapshot: ScreenSnapshot,
         panels: DisplayPanels,
@@ -263,8 +295,9 @@ final class SideNoticePresenter {
         ) {
             displayState.compactStatusHidden = false
         }
-        guard !displayState.compactStatusHidden,
-            compactNotices.contains(where: Self.isCompactNotice)
+        guard resultSweep.current != nil || (
+            !displayState.compactStatusHidden && compactNotices.contains(where: Self.isCompactNotice)
+        )
         else {
             if compactStatusIDs.isEmpty {
                 displayState.compactStatusHidden = false
@@ -272,13 +305,7 @@ final class SideNoticePresenter {
             panels.compactBar?.orderOut(nil)
             return presentsNewCompactStatus
         }
-        guard let currentFrame = layoutEngine.compactBarFrame(
-            for: snapshot,
-            notices: compactNotices,
-            settings: settingsStore.settings,
-            browserDownloadCount: settingsStore.settings.showsBrowserDownloadProgress
-                ? browserDownloads.snapshots.count : 0
-        ) else {
+        guard let currentFrame = compactFrame(for: snapshot, notices: compactNotices) else {
             panels.compactBar?.orderOut(nil)
             return presentsNewCompactStatus
         }
@@ -370,6 +397,7 @@ final class SideNoticePresenter {
             media: media,
             browserDownloads: browserDownloads,
             settingsStore: settingsStore,
+            resultSweep: resultSweep,
             onStatusHidden: { [weak self] in self?.updatePanels() }
         )
         let hostingView = NSHostingView(

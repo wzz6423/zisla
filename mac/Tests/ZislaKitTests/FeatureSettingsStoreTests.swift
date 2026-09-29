@@ -6,6 +6,22 @@ import Testing
 
 struct FeatureSettingsStoreTests {
     @Test @MainActor
+    func aiResultSweepOptOutSurvivesStoreRecreationAndResetRestoresDefault() throws {
+        let suiteName = "Zisla.FeatureSettingsStoreTests.\(UUID().uuidString)"
+        let defaults = try #require(UserDefaults(suiteName: suiteName))
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+        let store = FeatureSettingsStore(defaults: defaults)
+        store.settings.aiTaskResultSweepEnabled = false
+        store.flushPendingChanges()
+        let restored = FeatureSettingsStore(defaults: defaults)
+        #expect(!restored.settings.aiTaskResultSweepEnabled)
+        restored.reset()
+        #expect(restored.settings.aiTaskResultSweepEnabled)
+        restored.flushPendingChanges()
+        #expect(FeatureSettingsStore(defaults: defaults).settings.aiTaskResultSweepEnabled)
+    }
+
+    @Test @MainActor
     func persistsOnlyTheLatestCoalescedSettingsSnapshot() throws {
         let suiteName = "Zisla.FeatureSettingsStoreTests.\(UUID().uuidString)"
         let defaults = try #require(UserDefaults(suiteName: suiteName))
