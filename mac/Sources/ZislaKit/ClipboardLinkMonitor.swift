@@ -11,7 +11,7 @@ extension NSPasteboard: ClipboardStringReading {}
 
 @MainActor
 public final class ClipboardLinkMonitor {
-    public typealias DetectionHandler = @MainActor @Sendable (URL) -> Void
+    public typealias DetectionHandler = @MainActor @Sendable (URL, String) -> Void
 
     public private(set) var isEnabled = false
     public var onLinkDetected: DetectionHandler?
@@ -72,12 +72,10 @@ public final class ClipboardLinkMonitor {
         guard changeCount != lastPasteboardChangeCount else { return }
         lastPasteboardChangeCount = changeCount
 
-        guard let url = detector.detect(
-            changeCount: changeCount,
-            string: source.string(forType: .string)
-        ) else {
+        guard let text = source.string(forType: .string),
+              let url = detector.detect(changeCount: changeCount, string: text) else {
             return
         }
-        onLinkDetected?(url)
+        onLinkDetected?(url, text)
     }
 }

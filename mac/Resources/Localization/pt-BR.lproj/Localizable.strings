@@ -2462,6 +2462,11 @@
 "应用程序" = "Aplicativos";
 "打开应用" = "Abrir app";
 "无法打开应用" = "Não foi possível abrir o app";
+"Shell 命令" = "Comandos de shell";
+"前台执行" = "Executar em primeiro plano";
+"后台执行" = "Executar em segundo plano";
+"无法在后台运行命令" = "Não foi possível executar o comando em segundo plano";
+"无法在终端运行命令" = "Não foi possível executar o comando no terminal";
 "Emoji 名称" = "Nome do emoji";
 "复制 Emoji" = "Copiar emoji";
 "电池电量低" = "Bateria fraca";

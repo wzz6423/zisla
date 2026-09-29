@@ -95,7 +95,7 @@
 	<key>SUVerifyUpdateBeforeExtraction</key>
 	<true/>
 	<key>NSAppleEventsUsageDescription</key>
-	<string>zisla 需要通过 Mail.app 读取和管理你的邮件，包括收件箱列表、标记已读、删除和回复。</string>
+	<string>zisla 需要通过 Mail.app 读取和管理你的邮件，包括收件箱列表、标记已读、删除和回复。还可在 Terminal 或 iTerm 中运行你选择的命令。</string>
     <key>ZislaDefaultUpdateChannel</key>
     <string>@UPDATE_CHANNEL@</string>
     <key>ZislaApplicationSupportDirectory</key>

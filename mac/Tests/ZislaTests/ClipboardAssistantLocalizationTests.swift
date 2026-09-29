@@ -181,6 +181,65 @@ struct ClipboardAssistantLocalizationTests {
         #expect(AppLocalization.string(key, language: .traditionalChinese) == "非 Zisla 全域語言文字")
     }
 
+    @Test
+    func shellCommandActionAndLaunchFailureTranslateInEveryLanguage() throws {
+        let actionKey = ClipboardAssistantToastView.actionLabel(.runShellCommand("pwd"))
+        #expect(actionKey == "前台执行")
+        let backgroundKey = ClipboardAssistantToastView.actionLabel(.runShellCommandInBackground("pwd"))
+        #expect(backgroundKey == "后台执行")
+        let appModel = try String(contentsOf: Self.sourceURL("Zisla/AppModel.swift"), encoding: .utf8)
+        let settings = try String(contentsOf: Self.sourceURL("Zisla/SettingsView.swift"), encoding: .utf8)
+        let failureKey = "无法在终端运行命令"
+        let backgroundFailureKey = "无法在后台运行命令"
+        #expect(appModel.contains("clipboardAssistantMessage(\"\(failureKey)\")"))
+        #expect(appModel.contains("clipboardAssistantMessage(\"\(backgroundFailureKey)\")"))
+        #expect(settings.contains("case .runShellCommand: \"\(actionKey)\""))
+        #expect(settings.contains("case .runShellCommandInBackground: \"\(backgroundKey)\""))
+        #expect(settings.contains("case .shellCommand: \"Shell 命令\""))
+        #expect(AppLanguage.allCases.count == 17)
+        for language in AppLanguage.allCases {
+            let table = try #require(Self.stringsTable(for: language))
+            for key in [actionKey, backgroundKey, failureKey, backgroundFailureKey, "Shell 命令"] {
+                let value = try #require(table[key], "\(language.rawValue) is missing \(key)")
+                #expect(!value.isEmpty)
+                #expect(AppLocalization.string(key, language: language) == value)
+                if language != .simplifiedChinese {
+                    #expect(value != key)
+                }
+                if language != .english {
+                    #expect(value != AppLocalization.string(key, language: .english))
+                }
+            }
+        }
+        #expect(AppLocalization.string(actionKey, language: .english) == "Run in Foreground")
+        #expect(AppLocalization.string(actionKey, language: .traditionalChinese) == "前景執行")
+        #expect(AppLocalization.string(actionKey, language: .arabic) == "تشغيل في المقدمة")
+        #expect(AppLocalization.string(backgroundKey, language: .english) == "Run in Background")
+    }
+
+    @Test
+    func automationPermissionExplainsTerminalCommandsInEveryLanguage() throws {
+        let key = "NSAppleEventsUsageDescription"
+        var descriptions: [AppLanguage: String] = [:]
+        for language in AppLanguage.allCases {
+            let url = Self.localizationURL
+                .appendingPathComponent("\(language.rawValue).lproj/InfoPlist.strings")
+            let table = try #require(NSDictionary(contentsOf: url) as? [String: String])
+            let value = try #require(table[key], "\(language.rawValue) is missing the automation permission purpose")
+            #expect(value.contains("Mail.app"))
+            #expect(value.contains("Terminal"))
+            #expect(value.contains("iTerm"))
+            descriptions[language] = value
+        }
+        #expect(descriptions.count == 17)
+        #expect(Set(descriptions.values).count == 17)
+        #expect(descriptions[.english]?.hasSuffix("It also runs commands you choose in Terminal or iTerm.") == true)
+        #expect(descriptions[.simplifiedChinese]?.hasSuffix("还可在 Terminal 或 iTerm 中运行你选择的命令。") == true)
+        let infoURL = Self.packageRootURL.appendingPathComponent("Resources/Info.plist")
+        let info = try #require(NSDictionary(contentsOf: infoURL))
+        #expect(info[key] as? String == descriptions[.simplifiedChinese])
+    }
+
     private static func stringsTable(for language: AppLanguage) -> [String: String]? {
         let url = localizationURL
             .appendingPathComponent("\(language.rawValue).lproj", isDirectory: true)
