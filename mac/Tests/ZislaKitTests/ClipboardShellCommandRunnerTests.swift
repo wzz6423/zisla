@@ -239,7 +239,7 @@ struct ClipboardShellCommandRunnerTests {
     }
 
     @Test
-    func missingShellEnvironmentUsesZshWithoutReadingUserStartupFiles() throws {
+    func emptyShellEnvironmentUsesZshWithoutReadingUserStartupFiles() throws {
         try withTemporaryDirectory { directory in
             let versionURL = directory.appendingPathComponent("shell-version")
             try Data("""
@@ -257,7 +257,8 @@ struct ClipboardShellCommandRunnerTests {
             process.executableURL = URL(fileURLWithPath: "/bin/sh")
             process.arguments = [url.path]
             var environment = ProcessInfo.processInfo.environment
-            environment.removeValue(forKey: "SHELL")
+            // sh can synthesize an unset SHELL from the account's login shell.
+            environment["SHELL"] = ""
             environment["ZDOTDIR"] = directory.path
             environment["ZISLA_TEST_VERSION"] = versionURL.path
             process.environment = environment
