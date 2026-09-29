@@ -138,7 +138,8 @@ struct IslandRootView: View {
                 visualStyle: settingsStore.settings.islandVisualStyle,
                 notchBackground: settingsStore.settings.islandNotchBackground,
                 usesCompactGlassSurface: usesCompactSurface,
-                collapsedCenterOffsetX: collapsedCenterOffsetX
+                collapsedCenterOffsetX: collapsedCenterOffsetX,
+                resultSweep: model.aiResultSweep
             ) {
                 if model.isMirrorPresented {
                     DeferredMount {

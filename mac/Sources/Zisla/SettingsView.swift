@@ -880,6 +880,9 @@ struct SettingsView: View {
                 settingsGroup("AI 与语音") {
                     featureToggle("AI 进度与用量", detail: "汇总桌面端与 CLI 工具的运行状态", symbol: "sparkles", keyPath: \.aiProgressEnabled)
                     rowDivider
+                    featureToggle("AI 任务结果扫光", detail: "任务成功时绿色、失败时红色渐变光带从左向右扫过一次", symbol: "arrow.right", keyPath: \.aiTaskResultSweepEnabled)
+                        .disabled(!model.settingsStore.settings.aiProgressEnabled)
+                    rowDivider
                     featureToggle("语音输入", detail: "开启后可通过全局快捷键触发语音输入", symbol: "mic.fill", keyPath: \.voiceInputEnabled)
                 }
 

@@ -149,6 +149,10 @@ public final class CodexSessionActivityDetector {
     private var confirmedActiveTurnIDs = Set<String>()
     private var retiredTurnIDs = Set<String>()
     private var firstUnverifiedActivityAtByTurnID: [String: Date] = [:]
+    private var previouslyActiveTasks: [String: AIProgressTask] = [:]
+    private var completedTasks: [AIProgressTask] = []
+    private var lastScanAt: Date?
+    public private(set) var activityFileURLs: [URL] = []
 
     static let incrementalVerificationBytes = 4 * 1_024
 
@@ -386,8 +390,48 @@ public final class CodexSessionActivityDetector {
                 if $0.updatedAt != $1.updatedAt { return $0.updatedAt > $1.updatedAt }
                 return $0.id < $1.id
             }
+        let starts = Dictionary(allEvents.filter { $0.event.kind == .started }.map {
+            ($0.event.turnID, $0)
+        }, uniquingKeysWith: { _, latest in latest })
+        completedTasks = allEvents.compactMap { record in
+            guard record.event.kind != .started else { return nil }
+            let id = Self.taskID(forTurnID: record.event.turnID)
+            var task: AIProgressTask
+            if let previous = previouslyActiveTasks.removeValue(forKey: id) {
+                task = previous
+            } else {
+                // A short turn can start and finish between scans; old or replayed logs must stay silent.
+                guard let lastScanAt, let start = starts[record.event.turnID],
+                      start.event.timestamp > lastScanAt, start.event.timestamp <= observedAt else { return nil }
+                task = AIProgressTask(
+                    id: id, provider: .codex,
+                    title: start.sessionID.flatMap { titlesBySessionID[$0] } ?? "Codex",
+                    detail: start.model, progress: nil, updatedAt: record.event.timestamp,
+                    sessionURL: start.sessionID.flatMap(Self.sessionURL(for:)),
+                    effort: start.effort, startedAt: start.event.timestamp
+                )
+            }
+            task.status = record.event.kind == .completed ? .succeeded : .failed
+            task.progress = task.status == .succeeded ? 1 : nil
+            if task.status == .succeeded { task.failureReason = nil }
+            task.updatedAt = record.event.timestamp
+            return task
+        }
+        lastScanAt = observedAt
+        previouslyActiveTasks = Dictionary(uniqueKeysWithValues: tasks.map { ($0.id, $0) })
+        let recentURLs = candidates.prefix(32).map(\.url)
+        activityFileURLs = Array(Set(
+            recentURLs + recentURLs.map { $0.deletingLastPathComponent() }
+                + active.values.filter { activeTurnIDs.contains($0.event.turnID) }.map(\.rolloutURL)
+                + [sessionsDirectory]
+        ))
         retainOnlyActiveActivity(for: activeTurnIDs)
         return tasks
+    }
+
+    public func taskUpdates() throws -> [AIProgressTask] {
+        let active = try activeTasks()
+        return active + completedTasks
     }
 
     public static func taskID(forTurnID turnID: String) -> String {

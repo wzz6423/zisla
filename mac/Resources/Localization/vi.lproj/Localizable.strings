@@ -1958,7 +1958,6 @@
 "重新选择" = "Chọn lại";
 "需要处理" = "Cần xử lý";
 "默认端点" = "Điểm cuối mặc định";
-"任务已完成" = "Đã hoàn tất nhiệm vụ";
 "休息倒计时" = "Đếm ngược nghỉ";
 "关闭背景音" = "Tắt âm thanh nền";
 "刷新收件箱" = "Làm mới hộp thư đến";
@@ -1975,7 +1974,6 @@
 "未命名日程" = "Sự kiện chưa đặt tên";
 "未配置凭据" = "Chưa cấu hình thông tin đăng nhập";
 "邮件已发送" = "Đã gửi email";
-"任务执行失败" = "Chạy nhiệm vụ thất bại";
 "农历日期未知" = "Không rõ ngày âm lịch";
 "切换播放模式" = "Đổi chế độ phát";
 "压缩操作超时" = "Nén quá thời gian";
@@ -2519,3 +2517,5 @@
 "弹窗可见时按下 %@ 关闭当前弹窗" = "Nhấn %@ khi cửa sổ bật lên đang hiển thị để đóng";
 "关闭弹窗快捷键未能启用，请检查快捷键冲突或输入监控权限" = "Không thể bật phím tắt đóng. Hãy kiểm tra xung đột phím tắt hoặc quyền Giám sát đầu vào.";
 "关闭弹窗快捷键与动作快捷键相同，当前优先关闭弹窗" = "Phím tắt đóng trùng với phím tắt của một thao tác. Việc đóng cửa sổ bật lên được ưu tiên.";
+"AI 任务结果扫光" = "Vệt sáng kết quả tác vụ AI";
+"任务成功时绿色、失败时红色渐变光带从左向右扫过一次" = "Dải màu chuyển sắc quét một lần từ trái sang phải: xanh lá khi thành công, đỏ khi thất bại";

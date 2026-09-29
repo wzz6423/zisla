@@ -41,7 +41,7 @@ struct AIStateMonitorCodexTests {
     }
 
     @Test @MainActor
-    func completedCodexTurnDisappearsWithoutRemovingPersistedTask() throws {
+    func completedCodexTurnPublishesItsResultOnceWithoutRemovingPersistedTask() throws {
         let stateDirectory = temporaryDirectory(named: "state")
         let sessionsDirectory = temporaryDirectory(named: "sessions")
         defer {
@@ -77,6 +77,12 @@ struct AIStateMonitorCodexTests {
         try handle.close()
         monitor.reload()
 
+        let completed = try #require(monitor.state.tasks.first {
+            $0.id == CodexSessionActivityDetector.taskID(forTurnID: "turn-finished")
+        })
+        #expect(completed.status == .succeeded)
+        #expect(monitor.state.tasks.filter(\.status.isActive).map(\.id) == ["grok-manual"])
+        monitor.reload()
         #expect(monitor.state.tasks.map(\.id) == ["grok-manual"])
     }
 

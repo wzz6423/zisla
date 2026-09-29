@@ -14,6 +14,22 @@ struct FeatureSettingsCompatibilityTests {
     ]
 
     @Test
+    func aiResultSweepDefaultsOnForNewAndLegacySettingsAndPreservesOptOut() throws {
+        #expect(FeatureSettings.default.aiTaskResultSweepEnabled)
+        let legacy = try JSONDecoder().decode(FeatureSettings.self, from: Data("{}".utf8))
+        #expect(legacy.aiTaskResultSweepEnabled)
+        for enabled in [false, true] {
+            var configured = legacy
+            configured.aiTaskResultSweepEnabled = enabled
+            let restored = try JSONDecoder().decode(FeatureSettings.self, from: JSONEncoder().encode(configured))
+            #expect(restored.aiTaskResultSweepEnabled == enabled)
+        }
+        #expect(throws: DecodingError.self) {
+            try JSONDecoder().decode(FeatureSettings.self, from: Data(#"{"aiTaskResultSweepEnabled":"true"}"#.utf8))
+        }
+    }
+
+    @Test
     func downloadFolderActionDefaultsOnAndOptOutSurvivesRestart() throws {
         let legacy = try JSONDecoder().decode(FeatureSettings.self, from: Data("{}".utf8))
         #expect(legacy.downloadCompletionFolderActionEnabled)
