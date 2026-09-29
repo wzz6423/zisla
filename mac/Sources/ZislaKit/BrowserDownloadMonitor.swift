@@ -702,6 +702,7 @@ public final class BrowserDownloadMonitor: ObservableObject {
         )
         let matchingDownloads = observedDownloads.filter { identity, observed in
             identity == entry.fileIdentity
+                || entry.fileURL == observed.temporaryURL.deletingPathExtension()
                 || (entry.fileIdentity == nil
                     && observed.temporaryURL.deletingLastPathComponent()
                         .standardizedFileURL.resolvingSymlinksInPath() == directory)
@@ -796,8 +797,8 @@ public final class BrowserDownloadMonitor: ObservableObject {
                     let entry = tracker.entries[token], entry.agent != .airDrop,
                     !observedDownloads.values.contains(where: { $0.token == token }),
                     entry.fileIdentity == identity
-                        || (entry.fileIdentity == nil
-                            && (entry.fileURL == fileURL || entry.fileURL == fileURL.deletingPathExtension()))
+                        || entry.fileURL == fileURL.deletingPathExtension()
+                        || (entry.fileIdentity == nil && entry.fileURL == fileURL)
                 else { return nil }
                 return token
             }
