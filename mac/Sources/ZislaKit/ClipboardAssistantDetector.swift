@@ -13,7 +13,8 @@ public enum ClipboardAssistantDetector {
         preferredCurrencyCode: String? = nil,
         locale: Locale = AppLocalization.currentLanguage.locale,
         countryCode: String? = Locale.current.region?.identifier,
-        installedApplications: [InstalledApplication] = []
+        installedApplications: [InstalledApplication] = [],
+        shellCommandExists: (String) -> Bool = { _ in false }
     ) -> ClipboardAssistantDetection? {
         switch content {
         case .image(let data):
@@ -30,7 +31,8 @@ public enum ClipboardAssistantDetector {
                 preferredCurrencyCode: preferredCurrencyCode,
                 locale: locale,
                 countryCode: countryCode,
-                installedApplications: installedApplications
+                installedApplications: installedApplications,
+                shellCommandExists: shellCommandExists
             )
         }
     }
@@ -45,11 +47,15 @@ public enum ClipboardAssistantDetector {
         timeZone: TimeZone = .current,
         locale: Locale = AppLocalization.currentLanguage.locale,
         countryCode: String? = Locale.current.region?.identifier,
-        installedApplications: [InstalledApplication] = []
+        installedApplications: [InstalledApplication] = [],
+        shellCommandExists: (String) -> Bool = { _ in false }
     ) -> ClipboardAssistantDetection? {
         let text = rawText.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !text.isEmpty else { return nil }
 
+        if enabledKinds.contains(.shellCommand), let command = shellCommandDetection(rawText, commandExists: shellCommandExists) {
+            return command
+        }
         if let detection = smartActionDetection(
             text, enabledKinds: enabledKinds, countryCode: countryCode, now: now, timeZone: timeZone
         ) {

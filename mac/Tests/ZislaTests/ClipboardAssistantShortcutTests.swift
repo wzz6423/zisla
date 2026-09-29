@@ -9,6 +9,23 @@ import ZislaKit
 
 @MainActor
 struct ClipboardAssistantShortcutTests {
+    @Test(arguments: [0, 1, 2])
+    func shellCommandsWaitForAnExplicitActionAndCannotRunTwiceFromTheSamePrompt(index: Int) throws {
+        let registry = Registry()
+        let controller = makeController(registry)
+        defer { controller.dismiss(animated: false) }
+        let detection = try #require(ClipboardAssistantDetector.detect(text: "git status", enabledKinds: [.shellCommand], shellCommandExists: { $0 == "git" }))
+        let actions: [ClipboardAssistantAction] = [.runShellCommand("git status"), .runShellCommandInBackground("git status"), .search("git status")]
+        var performed: [ClipboardAssistantAction] = []
+        controller.onPerformAction = { performed.append($0) }
+        controller.present(detection, visualStyle: .transparent)
+        #expect(performed.isEmpty)
+        try registry.callback(keyCode: Self.keyCodes[index])()
+        #expect(performed == [actions[index]])
+        controller.performCurrentAction()
+        #expect(performed == [actions[index]])
+    }
+
     @Test(arguments: [0, 1, 10, 11])
     func numberKeysFollowTheDisplayedActionsAndStopAtTen(count: Int) throws {
         let registry = Registry()

@@ -2984,6 +2984,7 @@ struct SettingsView: View {
         case .meeting: "会议日程"
         case .emojiName: "Emoji 名称"
         case .code: "代码"
+        case .shellCommand: "Shell 命令"
         case .app: "应用程序"
         case .nonSystemLanguageText: "非 Zisla 全局语言文本"
         case .text: "文本"
@@ -3407,6 +3408,8 @@ struct SettingsView: View {
         case .sendToTeleprompter: "发送到提词器"
         case .saveImage: "保存图片"
         case .saveText: "保存文本"
+        case .runShellCommand: "前台执行"
+        case .runShellCommandInBackground: "后台执行"
         case .createCalendarEvent: "新建日程"
         case .openApp: "打开应用"
         }
