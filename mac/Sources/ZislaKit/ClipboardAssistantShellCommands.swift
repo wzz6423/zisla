@@ -50,8 +50,57 @@ extension ClipboardAssistantDetector {
         // command evidence on every line so copied explanations and terminal output stay inert.
         guard explicitlyShell || lines.allSatisfy({
             hasShellCommandPrefix($0, allowsUnknownCommand: hasPrompt && lines.count == 1)
+                || hasShellCommandChain($0)
         }) else { return nil }
         return command
+    }
+
+    private static func hasShellCommandChain(_ line: String) -> Bool {
+        var commands: [String] = []
+        var current = ""
+        var quote: Character?
+        var escaped = false
+        var lastSeparator = ""
+        var index = line.startIndex
+        while index < line.endIndex {
+            let character = line[index]
+            index = line.index(after: index)
+            if escaped {
+                current.append(character)
+                escaped = false
+            } else if character == "\\", quote != "'" {
+                current.append(character)
+                escaped = true
+            } else if let activeQuote = quote {
+                current.append(character)
+                if character == activeQuote { quote = nil }
+            } else if character == "'" || character == "\"" || character == "`" {
+                current.append(character)
+                quote = character
+            } else if character == "#", current.isEmpty || current.last?.isWhitespace == true {
+                break
+            } else if character == "&" || character == "|" || character == ";" {
+                let command = current.trimmingCharacters(in: .whitespaces)
+                commands.append(command)
+                current = ""
+                lastSeparator = String(character)
+                if character != ";", index < line.endIndex, line[index] == character {
+                    lastSeparator.append(character)
+                    index = line.index(after: index)
+                }
+            } else {
+                current.append(character)
+            }
+        }
+        guard quote == nil, !escaped else { return false }
+        let command = current.trimmingCharacters(in: .whitespaces)
+        if !command.isEmpty {
+            commands.append(command)
+        } else if lastSeparator != ";" && lastSeparator != "&" {
+            return false
+        }
+        return commands.allSatisfy { hasShellCommandPrefix($0, allowsUnknownCommand: true) }
+            && commands.contains { hasShellCommandPrefix($0, allowsUnknownCommand: false) }
     }
 
     private static func hasShellCommandPrefix(_ line: String, allowsUnknownCommand: Bool) -> Bool {

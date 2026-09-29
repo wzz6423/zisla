@@ -28,6 +28,52 @@ struct ClipboardAssistantShellCommandTests {
         #expect(detection.actions.map(\.identifier).contains("runShellCommandInBackground"))
     }
 
+    @Test(arguments: [
+        "z code && ls -l", "z code&&ls -l", "z code || pwd", "z code; git status",
+        "my-tool status | grep ready", "my-tool start && other-tool status && ls -l",
+        "TOOLS_MODE=dev z code && ls -l", "z 'code && docs' && ls -l",
+        "z \"code | docs\" && ls -l", "z code\\&docs && ls -l",
+        "z code && ls -l;", "z code && ls -l &", "z code & ls -l",
+        "z code && ls -l # show files", "z code#docs && ls -l", "z '\\' && ls -l",
+    ])
+    func recognizesAliasCommandChainsWithoutChangingTheirContents(command: String) throws {
+        let detection = try #require(ClipboardAssistantDetector.detect(text: command, enabledKinds: allKinds))
+        #expect(detection.kind == .shellCommand)
+        #expect(detection.fullContent == command)
+        #expect(detection.actions == [
+            .runShellCommand(command), .runShellCommandInBackground(command), .search(command), .saveText(command),
+        ])
+    }
+
+    @Test(arguments: [
+        "hello world && welcome back", "message '&& ls -l'", "message \"| ls -l\"",
+        "message \\&\\& ls -l", "message # && ls -l", "message &&", "&& ls -l",
+        "message ||| ls -l", "message `echo '&& ls -l'`", "message `echo && ls -l`",
+        "message && ls -l &&",
+        "message && ls -l |", "message && ls -l '", "message && ls -l\\",
+        "message && 123", "123 && ls -l", "message", "message ;; ls -l",
+    ])
+    func shellLikePunctuationInTextDoesNotOfferExecution(text: String) {
+        let detection = ClipboardAssistantDetector.detect(text: text, enabledKinds: allKinds)
+        #expect(detection?.kind != .shellCommand)
+    }
+
+    @Test
+    func quotedChainArgumentsRemainOpaqueAcrossBoundedInputs() {
+        var seed: UInt64 = 0xA11A5
+        let alphabet = Array("abXY019 '\"`\\;&|<>()[]{}#中文")
+        for _ in 0..<64 {
+            let argument = String((0..<48).map { _ in
+                seed = seed &* 1_664_525 &+ 1_013_904_223
+                return alphabet[Int(seed % UInt64(alphabet.count))]
+            }) + " && ls -l"
+            let quoted = "'" + argument.replacingOccurrences(of: "'", with: "'\\''") + "'"
+            let command = "z \(quoted) && ls -l"
+            #expect(ClipboardAssistantDetector.shellCommand(from: command) == command)
+            #expect(ClipboardAssistantDetector.shellCommand(from: "message \(quoted)") == nil)
+        }
+    }
+
     @Test(arguments: ["$ git status", "% git status"])
     func removesASingleCopiedPrompt(input: String) throws {
         let detection = try #require(ClipboardAssistantDetector.detect(text: input, enabledKinds: allKinds))
