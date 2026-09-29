@@ -1013,7 +1013,7 @@ struct ClipboardAssistantToastView: View {
     }
 
     private func dragText(for detection: ClipboardAssistantDetection) -> String? {
-        guard [.text, .nonSystemLanguageText, .code, .math].contains(detection.kind),
+        guard [.text, .nonSystemLanguageText, .code, .shellCommand, .math].contains(detection.kind),
               let content = detection.fullContent,
               !content.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
             return nil
@@ -1204,7 +1204,7 @@ struct ClipboardAssistantToastView: View {
     // MARK: Expanded content
 
     private func canExpand(_ detection: ClipboardAssistantDetection) -> Bool {
-        guard ![.url, .text, .nonSystemLanguageText, .code, .math, .conversion].contains(detection.kind) else {
+        guard ![.url, .text, .nonSystemLanguageText, .code, .shellCommand, .math, .conversion].contains(detection.kind) else {
             return false
         }
         guard !controller.isLightweightMode, let content = detection.fullContent else { return false }
@@ -1324,6 +1324,8 @@ struct ClipboardAssistantToastView: View {
         case .sendToTeleprompter: "发送到提词器"
         case .saveImage: "保存图片"
         case .saveText: "保存文本"
+        case .runShellCommand: "前台执行"
+        case .runShellCommandInBackground: "后台执行"
         case .createCalendarEvent, .editCalendarEvent: "新建日程"
         case .openApp: "打开应用"
         }

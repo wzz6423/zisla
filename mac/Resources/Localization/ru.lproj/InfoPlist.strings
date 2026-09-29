@@ -5,5 +5,5 @@
 "NSLocationWhenInUseUsageDescription" = "zisla использует ваше местоположение для отображения местной погоды и названий мест.";
 "NSMicrophoneUsageDescription" = "zisla использует микрофон только при запуске голосового ввода для преобразования речи в текст AI-разговора.";
 "NSSpeechRecognitionUsageDescription" = "zisla транскрибирует вашу активную речевую запись в текст AI-разговора.";
-"NSAppleEventsUsageDescription" = "zisla использует Mail.app для чтения и управления почтой, включая входящие, статус прочтения, удаление и ответы.";
+"NSAppleEventsUsageDescription" = "zisla использует Mail.app для чтения и управления почтой, включая входящие, статус прочтения, удаление и ответы. Также zisla выполняет выбранные вами команды в Terminal или iTerm.";
 "NSBluetoothAlwaysUsageDescription" = "zisla считывает общедоступные сведения о батарее подключённых или сопряжённых устройств Bluetooth только при открытии страницы батареи.";

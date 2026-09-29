@@ -2458,6 +2458,11 @@
 "应用程序" = "Applications";
 "打开应用" = "Ouvrir l'app";
 "无法打开应用" = "Impossible d'ouvrir l'app";
+"Shell 命令" = "Commandes shell";
+"前台执行" = "Exécuter au premier plan";
+"后台执行" = "Exécuter en arrière-plan";
+"无法在后台运行命令" = "Impossible d’exécuter la commande en arrière-plan";
+"无法在终端运行命令" = "Impossible d’exécuter la commande dans le terminal";
 "Emoji 名称" = "Nom d'emoji";
 "复制 Emoji" = "Copier l'emoji";
 "电池电量低" = "Batterie faible";

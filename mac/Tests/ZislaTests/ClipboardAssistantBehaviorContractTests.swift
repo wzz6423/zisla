@@ -5,6 +5,20 @@ import Testing
 
 struct ClipboardAssistantBehaviorContractTests {
     @Test
+    func shellActionsUseSeparateExecutorsAndKeepUniversalActions() throws {
+        let source = try String(contentsOf: appModelSourceURL, encoding: .utf8)
+        let foreground = try sourceSlice(in: source, from: "case .runShellCommand(let command):", to: "case .runShellCommandInBackground")
+        let background = try sourceSlice(in: source, from: "case .runShellCommandInBackground(let command):", to: "case .createCalendarEvent")
+        #expect(foreground.contains("try await ClipboardShellCommandRunner.runInTerminal(command)"))
+        #expect(background.contains("try ClipboardShellCommandRunner.runInBackground(command)"))
+        let universal = try sourceSlice(in: source, from: "private func augmentedClipboardAssistantDetection(", to: "private func scheduleCurrencyConversionUpdate(")
+        #expect(universal.contains("detection.actions.append(.addToQuickNote)"))
+        #expect(universal.contains("detection.actions.append(.share)"))
+        #expect(universal.contains(".shellCommand"))
+        #expect(universal.contains("detection.actions.append(.sendToTeleprompter)"))
+    }
+
+    @Test
     func linksAreRoutedOncePerPasteboardChange() throws {
         let source = try String(contentsOf: appModelSourceURL, encoding: .utf8)
         let linkHandler = try sourceSlice(
@@ -22,7 +36,7 @@ struct ClipboardAssistantBehaviorContractTests {
             "let downloadableURL = DownloadURLClassifier.isLikelyDownloadable(url.absoluteString) ? url : nil"
         ))
         #expect(linkHandler.contains(
-            "routeCapturedClipboardContent(.text(url.absoluteString), downloadableURL: downloadableURL)"
+            "routeCapturedClipboardContent(.text(text), downloadableURL: downloadableURL)"
         ))
         #expect(router.contains("lastClipboardAssistantRoutingChangeCount != changeCount"))
         #expect(router.contains("lastClipboardAssistantRoutingChangeCount = changeCount"))

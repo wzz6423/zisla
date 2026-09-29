@@ -2462,6 +2462,11 @@
 "应用程序" = "Applicazioni";
 "打开应用" = "Apri app";
 "无法打开应用" = "Impossibile aprire l'app";
+"Shell 命令" = "Comandi shell";
+"前台执行" = "Esegui in primo piano";
+"后台执行" = "Esegui in background";
+"无法在后台运行命令" = "Impossibile eseguire il comando in background";
+"无法在终端运行命令" = "Impossibile eseguire il comando nel terminale";
 "Emoji 名称" = "Nome dell'emoji";
 "复制 Emoji" = "Copia emoji";
 "电池电量低" = "Batteria scarica";

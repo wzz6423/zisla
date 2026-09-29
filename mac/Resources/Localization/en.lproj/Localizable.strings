@@ -2461,6 +2461,11 @@
 "应用程序" = "Applications";
 "打开应用" = "Open App";
 "无法打开应用" = "Could not open the app";
+"Shell 命令" = "Shell Commands";
+"前台执行" = "Run in Foreground";
+"后台执行" = "Run in Background";
+"无法在后台运行命令" = "Unable to run command in background";
+"无法在终端运行命令" = "Could not run the command in the terminal";
 "Emoji 名称" = "Emoji Name";
 "复制 Emoji" = "Copy Emoji";
 "电池电量低" = "Low Battery";
