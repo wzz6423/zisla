@@ -662,10 +662,10 @@ final class AppModel: ObservableObject {
     browserDownloads.onCompletedTransfer = { [weak self] transfer in
       self?.presentCompletedTransfer(transfer)
     }
-    clipboardMonitor.onLinkDetected = { [weak self] url in
+    clipboardMonitor.onLinkDetected = { [weak self] url, text in
       guard let self else { return }
       let downloadableURL = DownloadURLClassifier.isLikelyDownloadable(url.absoluteString) ? url : nil
-      routeCapturedClipboardContent(.text(url.absoluteString), downloadableURL: downloadableURL)
+      routeCapturedClipboardContent(.text(text), downloadableURL: downloadableURL)
     }
     voiceInput.onRecordingWillStart = { [weak self] in
       guard let self else { return }
@@ -1686,7 +1686,7 @@ final class AppModel: ObservableObject {
     detection.actions.append(.addToQuickNote)
     detection.actions.append(.share)
     if case .text = content,
-       [.text, .nonSystemLanguageText, .code, .math, .conversion].contains(detection.kind) {
+       [.text, .nonSystemLanguageText, .code, .shellCommand, .math, .conversion].contains(detection.kind) {
       detection.actions.append(.sendToTeleprompter)
     }
     if let bundleIdentifier = sourceApplication?.bundleIdentifier,
@@ -1975,6 +1975,18 @@ final class AppModel: ObservableObject {
       saveClipboardImage(data)
     case .saveText(let text):
       saveAssistantText(text)
+    case .runShellCommand(let command):
+      do {
+        try ClipboardShellCommandRunner.runInTerminal(command)
+      } catch {
+        transientMessage = clipboardAssistantMessage("无法在终端运行命令")
+      }
+    case .runShellCommandInBackground(let command):
+      do {
+        try ClipboardShellCommandRunner.runInBackground(command)
+      } catch {
+        transientMessage = clipboardAssistantMessage("无法在后台运行命令")
+      }
     case .createCalendarEvent(let title, let date, let isAllDay):
       var calendar = Calendar(identifier: .gregorian)
       calendar.timeZone = .current

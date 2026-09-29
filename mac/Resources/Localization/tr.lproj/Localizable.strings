@@ -2464,6 +2464,11 @@
 "应用程序" = "Uygulamalar";
 "打开应用" = "Uygulamayı aç";
 "无法打开应用" = "Uygulama açılamadı";
+"Shell 命令" = "Kabuk komutları";
+"前台执行" = "Ön planda çalıştır";
+"后台执行" = "Arka planda çalıştır";
+"无法在后台运行命令" = "Komut arka planda çalıştırılamadı";
+"无法在终端运行命令" = "Komut terminalde çalıştırılamadı";
 "Emoji 名称" = "Emoji adı";
 "复制 Emoji" = "Emoji'yi kopyala";
 "电池电量低" = "Düşük Pil";

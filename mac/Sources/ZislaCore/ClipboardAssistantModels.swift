@@ -19,6 +19,7 @@ public enum ClipboardAssistantKind: String, Codable, CaseIterable, Sendable, Equ
     case meeting
     case emojiName
     case code
+    case shellCommand
     case nonSystemLanguageText = "chineseText"
     case app
     case text
@@ -42,6 +43,7 @@ public enum ClipboardAssistantKind: String, Codable, CaseIterable, Sendable, Equ
         .meeting,
         .emojiName,
         .code,
+        .shellCommand,
         .nonSystemLanguageText,
         .app,
         .text,
@@ -70,6 +72,7 @@ public enum ClipboardAssistantKind: String, Codable, CaseIterable, Sendable, Equ
         case .nonSystemLanguageText: "character.book.closed"
         case .app: "app"
         case .code: "chevron.left.forwardslash.chevron.right"
+        case .shellCommand: "terminal"
         case .text: "text.quote"
         case .image: "photo"
         case .file: "doc"
@@ -272,6 +275,8 @@ public enum ClipboardAssistantActionKind: String, Codable, CaseIterable, Sendabl
     case sendToTeleprompter
     case saveImage
     case saveText
+    case runShellCommand
+    case runShellCommandInBackground
     case createCalendarEvent
     case openApp
 
@@ -294,6 +299,8 @@ public enum ClipboardAssistantActionKind: String, Codable, CaseIterable, Sendabl
         case .sendToTeleprompter: "text.viewfinder"
         case .saveImage: "photo.badge.arrow.down"
         case .saveText: "square.and.arrow.down"
+        case .runShellCommand: "terminal"
+        case .runShellCommandInBackground: "gearshape"
         case .createCalendarEvent: "calendar.badge.plus"
         case .openApp: "arrow.up.forward.app"
         }
@@ -318,6 +325,7 @@ public enum ClipboardAssistantActionOrder {
         case .emojiName: [.copyEmoji, .addToQuickNote, .share]
         case .nonSystemLanguageText: [.translate, .autoTranslate, .search, .saveText, .addToQuickNote, .sendToTeleprompter, .share]
         case .code: [.saveText, .addToQuickNote, .sendToTeleprompter, .share]
+        case .shellCommand: [.runShellCommand, .runShellCommandInBackground, .search, .saveText, .addToQuickNote, .sendToTeleprompter, .share]
         case .app: [.openApp, .search, .addToQuickNote, .share]
         case .text: [.search, .saveText, .translate, .addToQuickNote, .sendToTeleprompter, .share]
         case .image: [.saveImage, .addToQuickNote, .share]
@@ -405,6 +413,8 @@ public enum ClipboardAssistantAction: Equatable, Sendable {
     case sendToTeleprompter
     case saveImage(Data)
     case saveText(String)
+    case runShellCommand(String)
+    case runShellCommandInBackground(String)
     case createCalendarEvent(title: String, date: Date, isAllDay: Bool)
     case editCalendarEvent(ClipboardCalendarDraft)
     case openApp(bundleIdentifier: String, appName: String)
@@ -432,6 +442,8 @@ public enum ClipboardAssistantAction: Equatable, Sendable {
         case .sendToTeleprompter: "sendToTeleprompter"
         case .saveImage: "saveImage"
         case .saveText: "saveText"
+        case .runShellCommand: "runShellCommand"
+        case .runShellCommandInBackground: "runShellCommandInBackground"
         case .createCalendarEvent: "createCalendarEvent"
         case .editCalendarEvent: "editCalendarEvent"
         case .openApp: "openApp"
@@ -460,6 +472,8 @@ public enum ClipboardAssistantAction: Equatable, Sendable {
         case .sendToTeleprompter: .sendToTeleprompter
         case .saveImage: .saveImage
         case .saveText: .saveText
+        case .runShellCommand: .runShellCommand
+        case .runShellCommandInBackground: .runShellCommandInBackground
         case .createCalendarEvent: .createCalendarEvent
         case .editCalendarEvent: .createCalendarEvent
         case .openApp: .openApp

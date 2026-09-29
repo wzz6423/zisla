@@ -2464,6 +2464,11 @@
 "应用程序" = "Ứng dụng";
 "打开应用" = "Mở ứng dụng";
 "无法打开应用" = "Không thể mở ứng dụng";
+"Shell 命令" = "Lệnh shell";
+"前台执行" = "Chạy ở tiền cảnh";
+"后台执行" = "Chạy trong nền";
+"无法在后台运行命令" = "Không thể chạy lệnh trong nền";
+"无法在终端运行命令" = "Không thể chạy lệnh trong terminal";
 "Emoji 名称" = "Tên emoji";
 "复制 Emoji" = "Sao chép emoji";
 "电池电量低" = "Pin yếu";

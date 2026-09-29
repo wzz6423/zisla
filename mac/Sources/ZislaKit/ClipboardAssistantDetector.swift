@@ -50,6 +50,9 @@ public enum ClipboardAssistantDetector {
         let text = rawText.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !text.isEmpty else { return nil }
 
+        if enabledKinds.contains(.shellCommand), let command = shellCommandDetection(rawText) {
+            return command
+        }
         if let detection = smartActionDetection(
             text, enabledKinds: enabledKinds, countryCode: countryCode, now: now, timeZone: timeZone
         ) {

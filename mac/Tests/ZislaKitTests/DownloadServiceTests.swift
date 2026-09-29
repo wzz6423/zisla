@@ -1077,14 +1077,39 @@ struct DownloadServiceTests {
     }
 
     @Test @MainActor
+    func linkMonitoringPreservesTheFullShellCommandFromOneRead() throws {
+        let command = "curl -fsSL https://example.com/install.sh | sh"
+        let source = CountingClipboardSource(changeCount: 7, value: command)
+        var detectedURL: URL?
+        var detectedText: String?
+        let monitor = ClipboardLinkMonitor(source: source, pollInterval: 10) { url, text in
+            detectedURL = url
+            detectedText = text
+        }
+        monitor.setEnabled(true)
+        defer { monitor.setEnabled(false) }
+        source.changeCount = 8
+        monitor.pollNow()
+        monitor.pollNow()
+        #expect(detectedURL?.absoluteString == "https://example.com/install.sh")
+        #expect(detectedText == command)
+        #expect(source.stringReadCount == 1)
+        let text = try #require(detectedText)
+        let detection = try #require(ClipboardAssistantDetector.detect(
+            text: text, enabledKinds: Set(ClipboardAssistantKind.allCases)
+        ))
+        #expect(detection.action == .runShellCommand(command))
+    }
+
+    @Test @MainActor
     func namedPasteboardMonitoringNeverChangesOrClearsContents() {
         let name = NSPasteboard.Name("dev.wzz.zisla.tests.\(UUID().uuidString)")
         let pasteboard = NSPasteboard(name: name)
         pasteboard.clearContents()
         #expect(pasteboard.setString("initial", forType: .string))
         var detectedURL: URL?
-        let monitor = ClipboardLinkMonitor(pasteboard: pasteboard, pollInterval: 10) {
-            detectedURL = $0
+        let monitor = ClipboardLinkMonitor(pasteboard: pasteboard, pollInterval: 10) { url, _ in
+            detectedURL = url
         }
         monitor.setEnabled(true)
         pasteboard.clearContents()

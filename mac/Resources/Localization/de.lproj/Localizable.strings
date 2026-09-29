@@ -2465,6 +2465,11 @@
 "应用程序" = "Programme";
 "打开应用" = "App öffnen";
 "无法打开应用" = "App konnte nicht geöffnet werden";
+"Shell 命令" = "Shell-Befehle";
+"前台执行" = "Im Vordergrund ausführen";
+"后台执行" = "Im Hintergrund ausführen";
+"无法在后台运行命令" = "Befehl kann nicht im Hintergrund ausgeführt werden";
+"无法在终端运行命令" = "Der Befehl konnte im Terminal nicht ausgeführt werden";
 "Emoji 名称" = "Emoji-Name";
 "复制 Emoji" = "Emoji kopieren";
 "电池电量低" = "Niedriger Batteriestand";

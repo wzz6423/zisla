@@ -2464,6 +2464,11 @@
 "应用程序" = "Aplikasi";
 "打开应用" = "Buka aplikasi";
 "无法打开应用" = "Tidak dapat membuka aplikasi";
+"Shell 命令" = "Perintah shell";
+"前台执行" = "Jalankan di latar depan";
+"后台执行" = "Jalankan di latar belakang";
+"无法在后台运行命令" = "Tidak dapat menjalankan perintah di latar belakang";
+"无法在终端运行命令" = "Tidak dapat menjalankan perintah di terminal";
 "Emoji 名称" = "Nama emoji";
 "复制 Emoji" = "Salin emoji";
 "电池电量低" = "Baterai lemah";
