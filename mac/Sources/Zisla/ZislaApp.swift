@@ -622,6 +622,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
             }
             .store(in: &cancellables)
 
+        Publishers.CombineLatest(model.audioOutput.$selectedDevice, model.audioOutput.$headphoneStatuses)
+            .sink { [weak self] _, _ in
+                Task { @MainActor [weak self] in self?.syncMonitorStatusItems(force: true) }
+            }
+            .store(in: &cancellables)
+
         model.settingsStore.$settings
             .map(\.hoverActivationEnabled)
             .removeDuplicates()
@@ -1099,7 +1105,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
         guard force || now.timeIntervalSince(lastMonitorStatusRefreshAt) >= 2 else { return }
         lastMonitorStatusRefreshAt = now
         let settings = AppModel.shared.settingsStore.settings
-        let selected = settings.systemMonitorEnabled && settings.systemMonitorMenuBarLayout == .individual
+        let selected = settings.systemMonitorEnabled && settings.systemMonitorMenuBarLayout.individualEnabled
             ? settings.systemMonitorMenuBarMetrics : []
         syncMergedMonitorStatusItem(settings: settings)
         syncCombinedMonitorStatusItem(settings: settings)
@@ -1153,7 +1159,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
     }
 
     private func syncMergedMonitorStatusItem(settings: FeatureSettings) {
-        guard settings.systemMonitorEnabled, settings.systemMonitorMenuBarLayout == .stacked else {
+        guard settings.systemMonitorEnabled, settings.systemMonitorMenuBarLayout.stackedEnabled else {
             if let item = mergedMonitorStatusItem {
                 NSStatusBar.system.removeStatusItem(item)
                 mergedMonitorStatusItem = nil
@@ -1224,14 +1230,26 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
 
     private func updateCombinedMonitorStatusImage(metric: SystemMonitorCombinedIconMetric) {
         guard let button = combinedMonitorStatusItem?.button else { return }
+        let settings = AppModel.shared.settingsStore.settings
+        combinedMonitorStatusItem?.length = settings.systemMonitorMenuBarCombinedIconAppearance.normalized.iconSize + 4
         let battery = AppModel.shared.battery.snapshot
+        let audioOutput = AppModel.shared.audioOutput
+        let headphones = audioOutput.selectedDevice.flatMap { device -> MenuBarIconHeadphoneStatus? in
+            guard device.isHeadphones, device.isBluetoothAudio else { return nil }
+            return MenuBarIconHeadphoneStatus(
+                device: device,
+                productID: audioOutput.headphoneStatuses.first { $0.device.id == device.id }?.productID,
+                isVolumeMetric: metric == .volume
+            )
+        }
         let level = SystemMonitorCombinedMenuBarPresentation.level(
             metric: metric, snapshot: AppModel.shared.systemMonitor.snapshot, levels: combinedIconLevels
         )
-        let isDark = button.effectiveAppearance.bestMatch(from: [.darkAqua, .aqua]) == .darkAqua
         button.image = SystemMonitorMenuBarImageRenderer.combinedIcon(
             battery: battery, wifi: combinedIconLevels.wifi, level: level,
-            foreground: isDark ? .white : .black
+            configuration: settings.systemMonitorMenuBarCombinedIconAppearance,
+            headphones: headphones,
+            headphoneOptions: settings.systemMonitorMenuBarHeadphoneOptions
         )
         let wifiValue: String
         switch combinedIconLevels.wifi {
@@ -1240,7 +1258,15 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
         case .disconnected: wifiValue = localized("未连接")
         case let .connected(strength): wifiValue = SystemMonitorCombinedMenuBarPresentation.percent(strength)
         }
-        let tooltip = "\(localized("本机电池")): \(SystemMonitorCombinedMenuBarPresentation.percent(battery?.level))\nWi-Fi: \(wifiValue)\n\(localized(metric.menuTitle)): \(SystemMonitorCombinedMenuBarPresentation.percent(level))\n\(localized("点击打开系统监控"))"
+        let headphoneSummary = SystemMonitorHeadphonePresentation.rows(
+            statuses: audioOutput.headphoneStatuses,
+            showsBatteryLevels: settings.systemMonitorMenuBarHeadphoneOptions.showsBatteryLevels
+        ).map { $0.summary(locale: AppModel.shared.languageStore.language.locale) }
+        let tooltip = ([
+            "\(localized("本机电池")): \(SystemMonitorCombinedMenuBarPresentation.percent(battery?.level))",
+            "Wi-Fi: \(wifiValue)",
+            "\(localized(metric.menuTitle)): \(SystemMonitorCombinedMenuBarPresentation.percent(level))"
+        ] + headphoneSummary + [localized("点击打开系统监控")]).joined(separator: "\n")
         button.toolTip = tooltip
         button.image?.accessibilityDescription = tooltip
     }
@@ -1411,7 +1437,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
         representation.size = size
 
         let paragraph = NSMutableParagraphStyle()
-        paragraph.alignment = .center
+        paragraph.alignment = .left
         paragraph.lineBreakMode = .byClipping
 
         NSGraphicsContext.saveGraphicsState()

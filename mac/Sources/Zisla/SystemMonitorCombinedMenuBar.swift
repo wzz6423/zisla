@@ -88,13 +88,6 @@ enum SystemMonitorCombinedMenuBarPresentation {
         return min(1, max(0, value))
     }
 
-    static func batteryColor(_ battery: BatterySnapshot?, foreground: NSColor) -> NSColor {
-        guard let battery else { return foreground.withAlphaComponent(0.35) }
-        if battery.isLowPowerMode { return .systemYellow }
-        if battery.level <= 0.2 { return .systemRed }
-        if battery.isCharging || battery.isCharged { return .systemGreen }
-        return foreground
-    }
 }
 
 enum SystemMonitorMenuBarImageRenderer {
@@ -103,7 +96,7 @@ enum SystemMonitorMenuBarImageRenderer {
         let width = ceil(rows.map { ($0 as NSString).size(withAttributes: [.font: font]).width }.max() ?? 0) + 4
         let image = bitmap(size: NSSize(width: max(24, width), height: 22)) { size in
             let paragraph = NSMutableParagraphStyle()
-            paragraph.alignment = .center
+            paragraph.alignment = .left
             for (index, row) in rows.prefix(2).enumerated() {
                 (row as NSString).draw(
                     in: NSRect(x: 0, y: index == 0 ? 11 : 0, width: size.width, height: 12),
@@ -120,60 +113,19 @@ enum SystemMonitorMenuBarImageRenderer {
         battery: BatterySnapshot?,
         wifi: MenuBarWiFiState,
         level: Double?,
-        foreground: NSColor
+        foreground: NSColor? = nil,
+        configuration: SystemMonitorCombinedIconAppearance = SystemMonitorCombinedIconAppearance(),
+        headphones: MenuBarIconHeadphoneStatus? = nil,
+        headphoneOptions: SystemMonitorHeadphoneOptions = SystemMonitorHeadphoneOptions()
     ) -> NSImage? {
-        bitmap(size: NSSize(width: 22, height: 22)) { _ in
-            let center = NSPoint(x: 11, y: 12)
-            let track = NSBezierPath(ovalIn: NSRect(x: 3, y: 4, width: 16, height: 16))
-            track.lineWidth = 1.5
-            foreground.withAlphaComponent(0.25).setStroke()
-            track.stroke()
-            if let battery, battery.level.isFinite {
-                let progress = NSBezierPath()
-                progress.lineWidth = 1.6
-                progress.lineCapStyle = .round
-                progress.appendArc(
-                    withCenter: center, radius: 8, startAngle: 90,
-                    endAngle: 90 - 360 * min(1, max(0, battery.level)), clockwise: true
-                )
-                SystemMonitorCombinedMenuBarPresentation.batteryColor(battery, foreground: foreground).setStroke()
-                progress.stroke()
-            }
-
-            let strength: Double?
-            if case let .connected(value) = wifi { strength = value } else { strength = nil }
-            foreground.setFill()
-            NSBezierPath(ovalIn: NSRect(x: 10.3, y: 8.1, width: 1.4, height: 1.4)).fill()
-            for (index, radius) in [CGFloat(2.7), 4.4].enumerated() {
-                let arc = NSBezierPath()
-                arc.lineWidth = 1.25
-                arc.lineCapStyle = .round
-                arc.appendArc(withCenter: NSPoint(x: 11, y: 8.8), radius: radius, startAngle: 40, endAngle: 140)
-                (strength.map { $0 > Double(index) * 0.5 } == true ? foreground : foreground.withAlphaComponent(0.25)).setStroke()
-                arc.stroke()
-            }
-            if strength == nil {
-                let slash = NSBezierPath()
-                slash.lineWidth = 1.2
-                slash.move(to: NSPoint(x: 7, y: 14))
-                slash.line(to: NSPoint(x: 15, y: 7.5))
-                foreground.setStroke()
-                slash.stroke()
-            }
-
-            let bar = NSRect(x: 2, y: 0.5, width: 18, height: 2)
-            foreground.withAlphaComponent(0.25).setFill()
-            NSBezierPath(roundedRect: bar, xRadius: 1, yRadius: 1).fill()
-            if let level, level.isFinite {
-                foreground.setFill()
-                NSBezierPath(roundedRect: NSRect(x: bar.minX, y: bar.minY, width: bar.width * min(1, max(0, level)), height: bar.height), xRadius: 1, yRadius: 1).fill()
-            } else {
-                foreground.setFill()
-                for position in [CGFloat(4), 10, 16] {
-                    NSBezierPath(ovalIn: NSRect(x: position, y: bar.minY, width: 2, height: 2)).fill()
-                }
-            }
-        }
+        SystemMonitorMenuBarIconRenderer.image(
+            status: MenuBarIconStatus(
+                battery: battery, wifi: wifi, level: level,
+                headphones: headphones, headphoneOptions: headphoneOptions
+            ),
+            configuration: configuration,
+            foreground: foreground
+        )
     }
 
     private static func bitmap(size: NSSize, draw: (NSSize) -> Void) -> NSImage? {

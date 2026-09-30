@@ -2757,6 +2757,18 @@ final class AppModel: ObservableObject {
     }
   }
 
+  nonisolated static func headphoneMonitoringPolicy(
+    sideNoticesEnabled: Bool,
+    systemMonitorEnabled: Bool,
+    options: SystemMonitorHeadphoneOptions
+  ) -> (audioOutputEnabled: Bool, batteryMonitoringEnabled: Bool) {
+    let needsHeadphones = options.showsBatteryLevels || options.replacesNetworkIcon || options.usesVolumeColor
+    return (
+      audioOutputEnabled: sideNoticesEnabled || (systemMonitorEnabled && needsHeadphones),
+      batteryMonitoringEnabled: systemMonitorEnabled && (options.showsBatteryLevels || options.replacesNetworkIcon)
+    )
+  }
+
   private func apply(settings: FeatureSettings, requestWindowPreviewPermissions: Bool = false) {
     if !settings.aiProgressEnabled || !settings.aiTaskResultSweepEnabled {
       aiResultSweep.cancel()
@@ -2829,9 +2841,18 @@ final class AppModel: ObservableObject {
     consumeBackgroundSoundPlayback()
     if settings.sideNoticesEnabled {
       focusMode.start()
-      audioOutput.start()
     } else {
       focusMode.stop()
+    }
+    let headphonePolicy = Self.headphoneMonitoringPolicy(
+      sideNoticesEnabled: settings.sideNoticesEnabled,
+      systemMonitorEnabled: settings.systemMonitorEnabled,
+      options: settings.systemMonitorMenuBarHeadphoneOptions
+    )
+    audioOutput.setHeadphoneBatteryMonitoringEnabled(headphonePolicy.batteryMonitoringEnabled)
+    if headphonePolicy.audioOutputEnabled {
+      audioOutput.start()
+    } else {
       audioOutput.stop()
     }
     if settings.calendarEnabled {

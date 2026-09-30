@@ -215,6 +215,8 @@ struct IslandRootView: View {
                                         case .system:
                                             SystemMonitorView(
                                                 service: model.systemMonitor,
+                                                audioOutput: model.audioOutput,
+                                                headphoneOptions: settingsStore.settings.systemMonitorMenuBarHeadphoneOptions,
                                                 onCleanupRequested: cleanupPanelPresentation.present
                                             )
                                         case .battery:

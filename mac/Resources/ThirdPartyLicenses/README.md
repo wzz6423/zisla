@@ -16,6 +16,33 @@ https://github.com/ggbond268/MacTools
 Copyright 2026 MacTools contributors. Licensed under the Apache License 2.0.
 See `MacTools-LICENSE.txt` in this directory.
 
+The combined menu bar icon geometry, drawing paths, status mappings, and
+appearance options and Bluetooth audio drawing are adapted from:
+
+https://github.com/lingyired/status-trio
+
+Pinned revision: `79c03914b910991b552a33c4f4009c49a52ec837`.
+The original files are `UI/Icon/StatusIconGeometry.swift`,
+`UI/Icon/StatusIconRenderer.swift`, `Models/StatusMappings.swift`,
+`Models/RingStrokeStyle.swift`, `Models/BatteryIconOptions.swift`,
+`Models/VolumeIconOptions.swift`, `Models/ConnectionIconOptions.swift`,
+`Models/StatusSnapshot.swift`, `Models/MenuBarStatus.swift`, and
+`Models/BluetoothAudioIconOptions.swift` under
+`Sources/StatusTrioCore`.
+
+The local snapshot renames types, connects Zisla's battery and telemetry
+snapshots, gives Low Power Mode color precedence, treats missing readings as
+unavailable, and retains the battery, Wi-Fi, Bluetooth audio replacement,
+and bottom-level menu bar paths. Bluetooth device identity and battery data
+come from Zisla's existing audio-output service; the battery ring still reports
+the computer, while accessory battery levels appear in the monitoring page
+and tooltip. Dock rendering, charging animations, network management,
+arbitrary Bluetooth-device pinning, and the upstream application's UI are
+not included. No remote dependency is needed to build or render these icons.
+
+Copyright 2026 lingyired. Licensed under the Apache License 2.0. See
+`MenuBarIcon-LICENSE.txt` and `MenuBarIcon-NOTICE.txt` in this directory.
+
 The lid angle reader and the lid-close depth effect are adapted from Mac Duo at
 commit `88cb939b6f286487887b32e7c8f529604d340c6c`:
 

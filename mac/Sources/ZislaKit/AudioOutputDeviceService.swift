@@ -5,10 +5,12 @@ import ZislaCore
 public struct AudioOutputDevice: Identifiable, Equatable, Sendable {
     public let id: UInt32
     public let name: String
+    public let isBluetoothAudio: Bool
 
-    public init(id: UInt32, name: String) {
+    public init(id: UInt32, name: String, isBluetoothAudio: Bool = false) {
         self.id = id
         self.name = name
+        self.isBluetoothAudio = isBluetoothAudio
     }
 
     public var symbolName: String {
@@ -100,7 +102,11 @@ struct HeadphoneBluetoothProfile: Equatable, Sendable {
     let battery: HeadphoneBatterySnapshot?
     let productID: UInt32?
 
-    static func fromBluetoothProfile(_ data: Data, deviceName: String) -> HeadphoneBluetoothProfile? {
+    static func fromBluetoothProfile(
+        _ data: Data,
+        deviceName: String,
+        allowsSingleHeadphoneFallback: Bool = true
+    ) -> HeadphoneBluetoothProfile? {
         guard let root = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
               let reports = root["SPBluetoothDataType"] as? [[String: Any]]
         else {
@@ -123,7 +129,8 @@ struct HeadphoneBluetoothProfile: Equatable, Sendable {
         let connectedHeadphones = connectedDevices.filter { _, details in
             details["device_minorType"] as? String == "Headphones"
         }
-        let matchedDevice = namedDevice ?? (connectedHeadphones.count == 1 ? connectedHeadphones.first : nil)
+        let matchedDevice = namedDevice
+            ?? (allowsSingleHeadphoneFallback && connectedHeadphones.count == 1 ? connectedHeadphones.first : nil)
         guard let (_, details) = matchedDevice else { return nil }
 
         let snapshot = HeadphoneBatterySnapshot(
@@ -181,6 +188,7 @@ public final class AudioOutputDeviceService: ObservableObject {
     @Published public private(set) var selectedDeviceID: UInt32?
     @Published public private(set) var selectedDevice: AudioOutputDevice?
     @Published public private(set) var headphoneConnection: HeadphoneConnection?
+    @Published public private(set) var headphoneStatuses: [HeadphoneConnection] = []
 
     private var isMonitoring = false
     private var defaultOutputListenerInstalled = false
@@ -189,8 +197,44 @@ public final class AudioOutputDeviceService: ObservableObject {
     private var devicesListener: AudioObjectPropertyListenerBlock?
     private var knownHeadphoneDeviceIDs: Set<UInt32> = []
     private var batteryTask: Task<Void, Never>?
+    private var batteryRefreshTask: Task<Void, Never>?
+    private var headphoneBatteryMonitoringEnabled = false
+    private var headphoneStatusesGeneration: UInt64 = 0
+    private var connectionGeneration: UInt64 = 0
+    private var headphoneStatusesReadRequested = false
+    private var pendingConnectionDevice: AudioOutputDevice?
+    private var hasActiveConnectionRead = false
+    private var outputSnapshot: (() -> (devices: [AudioOutputDevice], selectedID: UInt32?))?
+    private var bluetoothConnectionReader: @Sendable ([String]) async -> [String: HeadphoneBluetoothProfile] = {
+        await AudioOutputDeviceService.readBluetoothConnection(for: $0)
+    }
+    private var batteryRefreshDelay: @Sendable () async throws -> Void = {
+        try await Task.sleep(for: .seconds(60))
+    }
 
     public init() {}
+
+    init(
+        outputSnapshot: @escaping () -> (devices: [AudioOutputDevice], selectedID: UInt32?),
+        bluetoothConnectionReader: @escaping @Sendable ([String]) async -> [String: HeadphoneBluetoothProfile],
+        batteryRefreshDelay: @escaping @Sendable () async throws -> Void = {
+            try await Task.sleep(for: .seconds(60))
+        }
+    ) {
+        self.outputSnapshot = outputSnapshot
+        self.bluetoothConnectionReader = bluetoothConnectionReader
+        self.batteryRefreshDelay = batteryRefreshDelay
+    }
+
+    public func setHeadphoneBatteryMonitoringEnabled(_ enabled: Bool) {
+        guard headphoneBatteryMonitoringEnabled != enabled else { return }
+        headphoneBatteryMonitoringEnabled = enabled
+        if enabled, isMonitoring {
+            startHeadphoneBatteryMonitoring()
+        } else if !enabled {
+            stopHeadphoneBatteryMonitoring()
+        }
+    }
 
     public func refresh() {
         updateCurrentOutput(publishConnection: isMonitoring)
@@ -199,6 +243,11 @@ public final class AudioOutputDeviceService: ObservableObject {
     public func start() {
         guard !isMonitoring else { return }
         updateCurrentOutput(publishConnection: false)
+        if outputSnapshot != nil {
+            isMonitoring = true
+            if headphoneBatteryMonitoringEnabled { startHeadphoneBatteryMonitoring() }
+            return
+        }
         var address = Self.systemAddress(kAudioHardwarePropertyDefaultOutputDevice)
         let listener: AudioObjectPropertyListenerBlock = { [weak self] _, _ in
             Task { @MainActor in self?.refresh() }
@@ -226,12 +275,15 @@ public final class AudioOutputDeviceService: ObservableObject {
             self.devicesListener = devicesListener
         }
         isMonitoring = true
+        if headphoneBatteryMonitoringEnabled { startHeadphoneBatteryMonitoring() }
     }
 
     public func stop() {
         guard isMonitoring || defaultOutputListenerInstalled || devicesListenerInstalled else { return }
+        stopHeadphoneBatteryMonitoring()
+        connectionGeneration &+= 1
+        pendingConnectionDevice = nil
         batteryTask?.cancel()
-        batteryTask = nil
         if defaultOutputListenerInstalled, let defaultOutputListener {
             var address = Self.systemAddress(kAudioHardwarePropertyDefaultOutputDevice)
             AudioObjectRemovePropertyListenerBlock(
@@ -279,8 +331,9 @@ public final class AudioOutputDeviceService: ObservableObject {
     private func updateCurrentOutput(publishConnection: Bool) {
         let previousDevice = selectedDevice
         let previousHeadphoneDeviceIDs = knownHeadphoneDeviceIDs
-        let deviceID = Self.defaultOutputDeviceID()
-        let updatedDevices = Self.outputDevices(defaultID: deviceID)
+        let snapshot = outputSnapshot?() ?? Self.currentOutputSnapshot()
+        let deviceID = snapshot.selectedID
+        let updatedDevices = snapshot.devices
         let currentDevice = updatedDevices.first { $0.id == deviceID }
         selectedDeviceID = deviceID
         devices = updatedDevices
@@ -289,17 +342,18 @@ public final class AudioOutputDeviceService: ObservableObject {
             updatedDevices.lazy.filter(\.isHeadphones).map(\.id)
         )
 
-        guard publishConnection,
-              let connectionDevice = Self.connectionCandidate(
+        if publishConnection,
+           let connectionDevice = Self.connectionCandidate(
                 previousDevice: previousDevice,
                 currentDevice: currentDevice,
                 previousHeadphoneDeviceIDs: previousHeadphoneDeviceIDs,
                 updatedDevices: updatedDevices
-              )
-        else {
-            return
+           ) {
+            connectionGeneration &+= 1
+            pendingConnectionDevice = connectionDevice
         }
-        publishHeadphoneConnection(for: connectionDevice)
+        requestHeadphoneStatusesRefresh()
+        readPendingHeadphoneDetails()
     }
 
     nonisolated static func connectionCandidate(
@@ -322,54 +376,141 @@ public final class AudioOutputDeviceService: ObservableObject {
         return currentDevice
     }
 
-    private func publishHeadphoneConnection(for device: AudioOutputDevice) {
-        batteryTask?.cancel()
+    private func startHeadphoneBatteryMonitoring() {
+        requestHeadphoneStatusesRefresh()
+        guard batteryRefreshTask == nil else { return }
+        let delay = batteryRefreshDelay
+        batteryRefreshTask = Task { [weak self] in
+            while !Task.isCancelled {
+                do {
+                    try await delay()
+                } catch {
+                    return
+                }
+                guard !Task.isCancelled, let self else { return }
+                self.requestHeadphoneStatusesRefresh()
+            }
+        }
+    }
+
+    private func stopHeadphoneBatteryMonitoring() {
+        batteryRefreshTask?.cancel()
+        batteryRefreshTask = nil
+        headphoneStatusesGeneration &+= 1
+        headphoneStatusesReadRequested = false
+        headphoneStatuses = []
+        if !hasActiveConnectionRead { batteryTask?.cancel() }
+    }
+
+    private func requestHeadphoneStatusesRefresh() {
+        guard isMonitoring, headphoneBatteryMonitoringEnabled else { return }
+        let headphones = devices.filter(\.isHeadphones)
+        if headphones.count != headphoneStatuses.count
+            || headphones.contains(where: { device in
+                !headphoneStatuses.contains(where: { $0.device == device })
+            }) {
+            headphoneStatusesGeneration &+= 1
+        }
+        let statuses = headphones.map { device in
+            headphoneStatuses.first { $0.device == device }
+                ?? HeadphoneConnection(device: device, battery: nil)
+        }
+        if headphoneStatuses != statuses { headphoneStatuses = statuses }
+        headphoneStatusesReadRequested = headphones.contains(where: \.isBluetoothAudio)
+        readPendingHeadphoneDetails()
+    }
+
+    private func readPendingHeadphoneDetails() {
+        guard isMonitoring, batteryTask == nil,
+              headphoneStatusesReadRequested || pendingConnectionDevice != nil
+        else { return }
+        let readsStatuses = headphoneStatusesReadRequested
+        let statusesGeneration = headphoneStatusesGeneration
+        let eventGeneration = connectionGeneration
+        let connectionDevice = pendingConnectionDevice
+        headphoneStatusesReadRequested = false
+        pendingConnectionDevice = nil
+        hasActiveConnectionRead = connectionDevice != nil
+        var deviceNames = readsStatuses
+            ? devices.filter { $0.isHeadphones && $0.isBluetoothAudio }.map(\.name)
+            : []
+        if let connectionDevice, !deviceNames.contains(connectionDevice.name) {
+            deviceNames.append(connectionDevice.name)
+        }
+        let reader = bluetoothConnectionReader
         batteryTask = Task { [weak self] in
-            let details = await Self.readBluetoothConnection(for: device.name)
-            guard !Task.isCancelled,
-                  let self,
-                  self.devices.contains(where: { $0.id == device.id })
-            else { return }
-            self.headphoneConnection = HeadphoneConnection(
-                device: device,
-                battery: details.battery,
-                productID: details.productID
-            )
+            let profiles = Task.isCancelled ? [:] : await reader(deviceNames)
+            guard let self else { return }
+            if !Task.isCancelled, self.isMonitoring {
+                if readsStatuses, self.headphoneBatteryMonitoringEnabled,
+                   self.headphoneStatusesGeneration == statusesGeneration {
+                    let statuses = self.headphoneStatuses.map { status in
+                        let profile = status.device.isBluetoothAudio ? profiles[status.device.name] : nil
+                        return HeadphoneConnection(
+                            id: status.id,
+                            device: status.device,
+                            battery: profile?.battery,
+                            productID: profile?.productID
+                        )
+                    }
+                    if self.headphoneStatuses != statuses { self.headphoneStatuses = statuses }
+                }
+                if let connectionDevice, self.connectionGeneration == eventGeneration,
+                   self.devices.contains(connectionDevice) {
+                    let profile = profiles[connectionDevice.name]
+                    self.headphoneConnection = HeadphoneConnection(
+                        device: connectionDevice,
+                        battery: profile?.battery,
+                        productID: profile?.productID
+                    )
+                }
+            }
+            self.hasActiveConnectionRead = false
+            self.batteryTask = nil
+            self.readPendingHeadphoneDetails()
         }
     }
 
     nonisolated private static func readBluetoothConnection(
-        for deviceName: String
-    ) async -> (battery: HeadphoneBatterySnapshot?, productID: UInt32?) {
+        for deviceNames: [String]
+    ) async -> [String: HeadphoneBluetoothProfile] {
         do {
             let output = try await AIAgentProcessRunner.run(
                 executableURL: URL(fileURLWithPath: "/usr/sbin/system_profiler"),
                 arguments: ["SPBluetoothDataType", "-json"],
                 timeout: 15
             )
-            guard output.status == 0, !output.didTimeout else { return (nil, nil) }
-            let profile = HeadphoneBluetoothProfile.fromBluetoothProfile(
-                output.standardOutput,
-                deviceName: deviceName
-            )
-            if let battery = profile?.battery {
-                return (battery, profile?.productID)
-            }
-
+            guard output.status == 0, !output.didTimeout, !Task.isCancelled else { return [:] }
+            var profiles: [String: HeadphoneBluetoothProfile] = [:]
             let discovery = NetworkBatteryMonitor.bluetoothDiscovery(from: output.standardOutput)
-            let normalizedDeviceName = Self.normalizedName(deviceName)
-            let target = discovery.targets.first { target in
-                target.isConnected && Self.normalizedName(target.name) == normalizedDeviceName
-            } ?? discovery.targets.first { target in
-                Self.normalizedName(target.name) == normalizedDeviceName
+            for deviceName in deviceNames {
+                guard !Task.isCancelled else { return [:] }
+                let profile = HeadphoneBluetoothProfile.fromBluetoothProfile(
+                    output.standardOutput,
+                    deviceName: deviceName,
+                    allowsSingleHeadphoneFallback: deviceNames.count == 1
+                )
+                if let profile, profile.battery != nil {
+                    profiles[deviceName] = profile
+                    continue
+                }
+                let normalizedDeviceName = Self.normalizedName(deviceName)
+                let target = discovery.targets.first { target in
+                    target.isConnected && Self.normalizedName(target.name) == normalizedDeviceName
+                } ?? discovery.targets.first { target in
+                    Self.normalizedName(target.name) == normalizedDeviceName
+                }
+                var battery: HeadphoneBatterySnapshot?
+                if let target {
+                    let scannedDevices = await BluetoothBatteryScanner.collectBatteryDevices(targets: [target])
+                    battery = scannedDevices.first { Self.normalizedName($0.name) == normalizedDeviceName }
+                        .flatMap(HeadphoneBatterySnapshot.fromNetworkBatteryDevice)
+                }
+                profiles[deviceName] = HeadphoneBluetoothProfile(battery: battery, productID: profile?.productID)
             }
-            guard let target else { return (nil, profile?.productID) }
-            let scannedDevices = await BluetoothBatteryScanner.collectBatteryDevices(targets: [target])
-            let battery = scannedDevices.first { Self.normalizedName($0.name) == normalizedDeviceName }
-                .flatMap(HeadphoneBatterySnapshot.fromNetworkBatteryDevice)
-            return (battery, profile?.productID)
+            return profiles
         } catch {
-            return (nil, nil)
+            return [:]
         }
     }
 
@@ -408,13 +549,33 @@ public final class AudioOutputDeviceService: ObservableObject {
 
         return deviceIDs.compactMap { id in
             guard hasOutputStream(id), let name = deviceName(id) else { return nil }
-            return AudioOutputDevice(id: id, name: name)
+            return AudioOutputDevice(id: id, name: name, isBluetoothAudio: deviceIsBluetoothAudio(id))
         }
         .sorted {
             if $0.id == defaultID { return true }
             if $1.id == defaultID { return false }
             return $0.name.localizedStandardCompare($1.name) == .orderedAscending
         }
+    }
+
+    private static func currentOutputSnapshot() -> (devices: [AudioOutputDevice], selectedID: UInt32?) {
+        let selectedID = defaultOutputDeviceID()
+        return (outputDevices(defaultID: selectedID), selectedID)
+    }
+
+    nonisolated static func isBluetoothTransport(_ transportType: UInt32) -> Bool {
+        transportType == kAudioDeviceTransportTypeBluetooth
+            || transportType == kAudioDeviceTransportTypeBluetoothLE
+    }
+
+    private static func deviceIsBluetoothAudio(_ deviceID: AudioDeviceID) -> Bool {
+        var address = systemAddress(kAudioDevicePropertyTransportType)
+        var transportType: UInt32 = 0
+        var size = UInt32(MemoryLayout<UInt32>.size)
+        guard AudioObjectGetPropertyData(deviceID, &address, 0, nil, &size, &transportType) == noErr else {
+            return false
+        }
+        return isBluetoothTransport(transportType)
     }
 
     private static func defaultOutputDeviceID() -> UInt32? {

@@ -14,6 +14,8 @@ struct SystemMonitorCombinedMenuBarTests {
         #expect(Self.rows(top: [.cpu], bottom: [.memory], snapshot: snapshot) == ["C 90%", "M 80%"])
         #expect(Self.rows(top: [.memory], bottom: [.cpu], snapshot: snapshot) == ["M 80%", "C 90%"])
         #expect(Self.rows(top: [.cpu, .gpu], bottom: [.fan], snapshot: snapshot) == ["C 90%  G 80%", "F 2014 5277"])
+        #expect(Self.rows(top: [.cpu, .gpu], bottom: [.memory, .disk], snapshot: snapshot) == ["C 90%  G 80%", "M 80%  D 80%"])
+        #expect(Self.rows(top: [.fan], bottom: [.memory, .cpu], snapshot: snapshot) == ["F 2014 5277", "M 80%  C 90%"])
     }
 
     @Test
@@ -69,15 +71,16 @@ struct SystemMonitorCombinedMenuBarTests {
         var battery = Self.battery()
         battery.isLowPowerMode = true
         battery.isCharged = true
-        #expect(SystemMonitorCombinedMenuBarPresentation.batteryColor(battery, foreground: .black) == .systemYellow)
+        #expect(MenuBarIconMappings.batteryColorRole(MenuBarIconStatus(battery: battery, wifi: .off, level: nil).battery) == .lowPower)
         battery.level = 0.1
-        #expect(SystemMonitorCombinedMenuBarPresentation.batteryColor(battery, foreground: .white) == .systemYellow)
+        #expect(MenuBarIconMappings.batteryColorRole(MenuBarIconStatus(battery: battery, wifi: .off, level: nil).battery) == .lowPower)
         battery.isLowPowerMode = false
-        #expect(SystemMonitorCombinedMenuBarPresentation.batteryColor(battery, foreground: .white) == .systemRed)
+        #expect(MenuBarIconMappings.batteryColorRole(MenuBarIconStatus(battery: battery, wifi: .off, level: nil).battery) == .critical)
         battery.level = 1
-        #expect(SystemMonitorCombinedMenuBarPresentation.batteryColor(battery, foreground: .black) == .systemGreen)
+        #expect(MenuBarIconMappings.batteryColorRole(MenuBarIconStatus(battery: battery, wifi: .off, level: nil).battery) == .charging)
         battery.isCharged = false
-        #expect(SystemMonitorCombinedMenuBarPresentation.batteryColor(battery, foreground: .white) == .white)
+        battery.isPluggedIn = false
+        #expect(MenuBarIconMappings.batteryColorRole(MenuBarIconStatus(battery: battery, wifi: .off, level: nil).battery) == .foreground)
     }
 
     @Test @MainActor
@@ -105,6 +108,130 @@ struct SystemMonitorCombinedMenuBarTests {
     }
 
     @Test @MainActor
+    func unequalStackedRowsStartAtTheSameLeftEdge() throws {
+        for style in SystemMonitorMenuBarDisplayStyle.allCases {
+            for rows in [["C 90%", "C 90%  M 80%"], ["C 90%  G 80%", "C 90%"]] {
+                let image = try #require(SystemMonitorMenuBarImageRenderer.stacked(rows: rows, style: style))
+                let representation = try #require(image.representations.first as? NSBitmapImageRep)
+                let leftEdges = [1..<20, 24..<43].map { verticalRange in
+                    (0..<representation.pixelsWide).first { horizontal in
+                        verticalRange.contains { vertical in
+                            (representation.colorAt(x: horizontal, y: vertical)?.alphaComponent ?? 0) > 0.1
+                        }
+                    }
+                }
+                let firstEdge = try #require(leftEdges[0])
+                let secondEdge = try #require(leftEdges[1])
+                #expect(abs(firstEdge - secondEdge) <= 1)
+                #expect(firstEdge < 4)
+                #expect(secondEdge < 4)
+            }
+        }
+    }
+
+    @Test @MainActor
+    func combinedIconLeavesTheLowerRingOpenWithoutAFlatIndicator() throws {
+        let image = try #require(SystemMonitorMenuBarImageRenderer.combinedIcon(
+            battery: Self.battery(), wifi: .connected(strength: 1), level: 1, foreground: .black,
+            configuration: SystemMonitorCombinedIconAppearance(
+                ringStrokeStyle: .regular, showsBatteryPercentage: false,
+                showsChargingIndicator: false, showsPercentageWhenConnected: false
+            )
+        ))
+        let representation = try Self.bitmap(image)
+        #expect((representation.colorAt(x: 22, y: 4)?.alphaComponent ?? 0) > 0.8)
+        #expect((representation.colorAt(x: 22, y: 35)?.alphaComponent ?? 0) < 0.1)
+        for point in SystemMonitorMenuBarIconGeometry.volumeDots() {
+            let horizontal = Int(point.x / 120 * 44)
+            let vertical = Int(point.y / 120 * 44)
+            #expect((representation.colorAt(x: horizontal, y: vertical)?.alphaComponent ?? 0) > 0.8)
+        }
+    }
+
+    @Test @MainActor
+    func bottomDotsShowOriginalFourStepsAndMissingLevelsStayInactive() throws {
+        var images: [Data] = []
+        for level in [Double?.some(0), 0.25, 0.5, 0.75, 1, nil] {
+            let image = try #require(SystemMonitorMenuBarImageRenderer.combinedIcon(
+                battery: nil, wifi: .off, level: level, foreground: .black
+            ))
+            images.append(try #require(image.tiffRepresentation))
+        }
+        #expect(Set(images.prefix(5)).count == 5)
+        #expect(images.last == images.first)
+        let step = try #require(SystemMonitorMenuBarImageRenderer.combinedIcon(
+            battery: nil, wifi: .off, level: 0.25, foreground: .black
+        ))
+        let partial = try #require(SystemMonitorMenuBarImageRenderer.combinedIcon(
+            battery: nil, wifi: .off, level: 0.1, foreground: .black
+        ))
+        #expect(step.tiffRepresentation == partial.tiffRepresentation)
+    }
+
+    @Test @MainActor
+    func invalidIndicatorLevelsUseUnavailableAndFiniteLevelsClamp() throws {
+        func image(_ level: Double?) throws -> Data {
+            let result = try #require(SystemMonitorMenuBarImageRenderer.combinedIcon(
+                battery: nil, wifi: .off, level: level, foreground: .black
+            ))
+            return try #require(result.tiffRepresentation)
+        }
+        #expect(try image(.nan) == image(nil))
+        #expect(try image(.infinity) == image(nil))
+        #expect(try image(-1) == image(0))
+        #expect(try image(2) == image(1))
+    }
+
+    @Test @MainActor
+    func zeroAndInvalidBatteryLevelsDoNotDrawProgress() throws {
+        let appearance = SystemMonitorCombinedIconAppearance(
+            showsBatteryPercentage: false, showsChargingIndicator: false,
+            showsPercentageWhenConnected: false
+        )
+        let unavailable = try #require(SystemMonitorMenuBarImageRenderer.combinedIcon(
+            battery: nil, wifi: .connected(strength: 1), level: 0, foreground: .black, configuration: appearance
+        ))
+        var battery = Self.battery()
+        for level in [0, -1, Double.nan, .infinity] {
+            battery.level = level
+            let image = try #require(SystemMonitorMenuBarImageRenderer.combinedIcon(
+                battery: battery, wifi: .connected(strength: 1), level: 0, foreground: .black, configuration: appearance
+            ))
+            #expect(image.tiffRepresentation == unavailable.tiffRepresentation)
+        }
+        battery.level = 2
+        let clamped = try #require(SystemMonitorMenuBarImageRenderer.combinedIcon(
+            battery: battery, wifi: .connected(strength: 1), level: 0, foreground: .black, configuration: appearance
+        ))
+        battery.level = 1
+        let full = try #require(SystemMonitorMenuBarImageRenderer.combinedIcon(
+            battery: battery, wifi: .connected(strength: 1), level: 0, foreground: .black, configuration: appearance
+        ))
+        #expect(clamped.tiffRepresentation == full.tiffRepresentation)
+    }
+
+    @Test @MainActor
+    func wifiConnectionStatesUseOriginalSymbols() throws {
+        for foreground in [NSColor.black, .white] {
+            let connected = try #require(SystemMonitorMenuBarImageRenderer.combinedIcon(
+                battery: nil, wifi: .connected(strength: 1), level: 0, foreground: foreground
+            ))
+            let disconnected = try #require(SystemMonitorMenuBarImageRenderer.combinedIcon(
+                battery: nil, wifi: .disconnected, level: 0, foreground: foreground
+            ))
+            let off = try #require(SystemMonitorMenuBarImageRenderer.combinedIcon(
+                battery: nil, wifi: .off, level: 0, foreground: foreground
+            ))
+            let unavailable = try #require(SystemMonitorMenuBarImageRenderer.combinedIcon(
+                battery: nil, wifi: .unavailable, level: 0, foreground: foreground
+            ))
+            #expect(connected.tiffRepresentation != disconnected.tiffRepresentation)
+            #expect(disconnected.tiffRepresentation != off.tiffRepresentation)
+            #expect(off.tiffRepresentation == unavailable.tiffRepresentation)
+        }
+    }
+
+    @Test @MainActor
     func combinedIconPreservesYellowPixelsAtRetinaResolution() throws {
         var battery = Self.battery()
         battery.isLowPowerMode = true
@@ -114,7 +241,7 @@ struct SystemMonitorCombinedMenuBarTests {
             ))
             #expect(image.size == NSSize(width: 22, height: 22))
             #expect(!image.isTemplate)
-            let representation = try #require(image.representations.first as? NSBitmapImageRep)
+            let representation = try Self.bitmap(image)
             #expect(representation.pixelsWide == 44)
             #expect(representation.pixelsHigh == 44)
             let yellowPixels = (0..<44).reduce(0) { count, horizontal in
@@ -128,7 +255,7 @@ struct SystemMonitorCombinedMenuBarTests {
     }
 
     @Test @MainActor
-    func disconnectedAndUnavailableLevelsHaveDistinctImages() throws {
+    func disconnectedWiFiDiffersButUnavailableBottomLevelsUseOriginalInactiveDots() throws {
         let connected = try #require(SystemMonitorMenuBarImageRenderer.combinedIcon(
             battery: nil, wifi: .connected(strength: 1), level: 0, foreground: .black
         ))
@@ -139,7 +266,7 @@ struct SystemMonitorCombinedMenuBarTests {
             battery: nil, wifi: .disconnected, level: nil, foreground: .black
         ))
         #expect(connected.tiffRepresentation != disconnected.tiffRepresentation)
-        #expect(disconnected.tiffRepresentation != unavailable.tiffRepresentation)
+        #expect(disconnected.tiffRepresentation == unavailable.tiffRepresentation)
     }
 
     @Test @MainActor
@@ -154,7 +281,6 @@ struct SystemMonitorCombinedMenuBarTests {
             battery: battery, wifi: .off, level: 1, foreground: .black
         ))
         #expect(empty.tiffRepresentation != full.tiffRepresentation)
-        #expect(SystemMonitorCombinedMenuBarPresentation.batteryColor(nil, foreground: .black).alphaComponent == 0.35)
     }
 
     @Test
@@ -162,8 +288,8 @@ struct SystemMonitorCombinedMenuBarTests {
         let packageRoot = URL(fileURLWithPath: #filePath).deletingLastPathComponent()
             .deletingLastPathComponent().deletingLastPathComponent()
         let keys = [
-            "菜单栏布局", "独立", "合并", "上行", "下行", "无", "合并状态图标", "底部指标", "音量", "屏幕亮度", "未连接",
-            "上下两行显示自选指标，最多三个；上行可放两个",
+            "菜单栏布局", "独立", "合并", "独立与合并", "上行", "下行", "无", "合并状态图标", "底部指标", "音量", "屏幕亮度", "未连接",
+            "显示数量", "%ld项", "上下两行自选2或4个指标；选中风扇时可显示3个",
             "电量环、Wi-Fi 与实时指标合并显示；点击打开系统监控",
         ]
         for language in AppLanguage.allCases {
@@ -173,6 +299,14 @@ struct SystemMonitorCombinedMenuBarTests {
                 let value = try #require(table[key], "\(language.rawValue) is missing \(key)")
                 #expect(!value.isEmpty)
                 #expect(AppLocalization.string(key, language: language) == value)
+                if key == "%ld项" {
+                    #expect(value.components(separatedBy: "%ld").count == 2)
+                    for count in [2, 3, 4] {
+                        let formatted = AppLocalization.format(key, locale: language.locale, [count])
+                        #expect(formatted == String(format: value, locale: language.locale, arguments: [count]))
+                        #expect(!formatted.contains("%ld"))
+                    }
+                }
                 if language != .simplifiedChinese && language != .traditionalChinese
                     && !(language == .japanese && key == "音量") {
                     #expect(value != key)
@@ -183,6 +317,12 @@ struct SystemMonitorCombinedMenuBarTests {
 
     private static func rows(top: [SystemMonitorMenuBarMetric], bottom: [SystemMonitorMenuBarMetric], snapshot: SystemMetricsSnapshot?) -> [String] {
         SystemMonitorCombinedMenuBarPresentation.rows(top: top, bottom: bottom, snapshot: snapshot, style: .compact)
+    }
+
+    @MainActor
+    private static func bitmap(_ image: NSImage) throws -> NSBitmapImageRep {
+        let data = try #require(image.tiffRepresentation)
+        return try #require(NSBitmapImageRep(data: data))
     }
 
     private static func battery() -> BatterySnapshot {

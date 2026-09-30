@@ -363,11 +363,29 @@ public enum SystemMonitorMenuBarDisplayStyle: String, Codable, CaseIterable, Sen
 public enum SystemMonitorMenuBarLayout: String, Codable, CaseIterable, Sendable, Equatable {
     case individual
     case stacked
+    case both
+    case none
+
+    public var individualEnabled: Bool {
+        get { self == .individual || self == .both }
+        set {
+            self = newValue ? (stackedEnabled ? .both : .individual) : (stackedEnabled ? .stacked : .none)
+        }
+    }
+
+    public var stackedEnabled: Bool {
+        get { self == .stacked || self == .both }
+        set {
+            self = newValue ? (individualEnabled ? .both : .stacked) : (individualEnabled ? .individual : .none)
+        }
+    }
 
     public var menuTitle: String {
         switch self {
         case .individual: "独立"
         case .stacked: "合并"
+        case .both: "独立与合并"
+        case .none: "无"
         }
     }
 }
@@ -396,15 +414,54 @@ public enum SystemMonitorMenuBarRows {
         bottom: [SystemMonitorMenuBarMetric]
     ) -> [[SystemMonitorMenuBarMetric]] {
         var seen: Set<SystemMonitorMenuBarMetric> = []
-        var topRow = Array(top.filter { seen.insert($0).inserted }.prefix(2))
-        if topRow.isEmpty {
-            topRow = [.cpu]
+        let topRow = Array(top.filter { seen.insert($0).inserted }.prefix(2))
+        seen = Set(topRow)
+        let bottomRow = Array(bottom.filter { seen.insert($0).inserted }.prefix(2))
+        let rows = [topRow, bottomRow]
+        var counts = rows.map { max(1, $0.count) }
+        if counts.reduce(0, +) == 3 && !rows.joined().contains(.fan) {
+            counts = [2, 2]
         }
-        var bottomRow = Array(bottom.filter { !topRow.contains($0) }.prefix(1))
-        if bottomRow.isEmpty {
-            bottomRow = Array(SystemMonitorMenuBarMetric.allCases.filter { !topRow.contains($0) }.prefix(1))
+        return resized(rows, counts: counts)
+    }
+
+    public static func availableCounts(
+        top: [SystemMonitorMenuBarMetric],
+        bottom: [SystemMonitorMenuBarMetric]
+    ) -> [Int] {
+        normalized(top: top, bottom: bottom).joined().contains(.fan) ? [2, 3, 4] : [2, 4]
+    }
+
+    public static func adjusted(
+        top: [SystemMonitorMenuBarMetric],
+        bottom: [SystemMonitorMenuBarMetric],
+        count: Int
+    ) -> [[SystemMonitorMenuBarMetric]] {
+        var rows = normalized(top: top, bottom: bottom)
+        if rows.joined().count == count {
+            return rows
         }
-        return [topRow, bottomRow]
+        if count == 3 && rows.joined().contains(.fan) {
+            let fanRow = rows[0].contains(.fan) ? 0 : 1
+            rows[fanRow] = [.fan]
+            return resized(rows, counts: fanRow == 0 ? [1, 2] : [2, 1])
+        }
+        let rowCount = count <= 2 ? 1 : 2
+        return resized(rows, counts: [rowCount, rowCount])
+    }
+
+    private static func resized(
+        _ rows: [[SystemMonitorMenuBarMetric]],
+        counts: [Int]
+    ) -> [[SystemMonitorMenuBarMetric]] {
+        var result = zip(rows, counts).map { row, count in Array(row.prefix(count)) }
+        for rowIndex in result.indices {
+            let available = SystemMonitorMenuBarMetric.allCases.filter {
+                !result.joined().contains($0)
+            }
+            result[rowIndex].append(contentsOf: available.prefix(counts[rowIndex] - result[rowIndex].count))
+        }
+        return result
     }
 }
 
@@ -603,6 +660,8 @@ public struct FeatureSettings: Codable, Equatable, Sendable {
     public var systemMonitorMenuBarBottomRow: [SystemMonitorMenuBarMetric]
     public var systemMonitorMenuBarCombinedIconEnabled: Bool
     public var systemMonitorMenuBarCombinedIconMetric: SystemMonitorCombinedIconMetric
+    public var systemMonitorMenuBarCombinedIconAppearance: SystemMonitorCombinedIconAppearance
+    public var systemMonitorMenuBarHeadphoneOptions: SystemMonitorHeadphoneOptions
     /// Whether to show Zisla's menu bar icon separately; does not affect monitor status items.
     public var menuBarAppIconEnabled: Bool
     public var weatherEnabled: Bool
@@ -758,7 +817,9 @@ public struct FeatureSettings: Codable, Equatable, Sendable {
         systemMonitorMenuBarTopRow: [SystemMonitorMenuBarMetric] = [.cpu],
         systemMonitorMenuBarBottomRow: [SystemMonitorMenuBarMetric] = [.gpu],
         systemMonitorMenuBarCombinedIconEnabled: Bool = false,
-        systemMonitorMenuBarCombinedIconMetric: SystemMonitorCombinedIconMetric = .cpu,
+        systemMonitorMenuBarCombinedIconMetric: SystemMonitorCombinedIconMetric = .memory,
+        systemMonitorMenuBarCombinedIconAppearance: SystemMonitorCombinedIconAppearance = SystemMonitorCombinedIconAppearance(),
+        systemMonitorMenuBarHeadphoneOptions: SystemMonitorHeadphoneOptions = SystemMonitorHeadphoneOptions(),
         menuBarAppIconEnabled: Bool = false,
         weatherEnabled: Bool = true,
         lockScreenInfoEnabled: Bool = true,
@@ -860,6 +921,8 @@ public struct FeatureSettings: Codable, Equatable, Sendable {
         self.systemMonitorMenuBarBottomRow = systemMonitorMenuBarBottomRow
         self.systemMonitorMenuBarCombinedIconEnabled = systemMonitorMenuBarCombinedIconEnabled
         self.systemMonitorMenuBarCombinedIconMetric = systemMonitorMenuBarCombinedIconMetric
+        self.systemMonitorMenuBarCombinedIconAppearance = systemMonitorMenuBarCombinedIconAppearance
+        self.systemMonitorMenuBarHeadphoneOptions = systemMonitorMenuBarHeadphoneOptions
         self.menuBarAppIconEnabled = menuBarAppIconEnabled
         self.weatherEnabled = weatherEnabled
         self.lockScreenInfoEnabled = lockScreenInfoEnabled
@@ -1006,6 +1069,8 @@ public struct FeatureSettings: Codable, Equatable, Sendable {
         case systemMonitorMenuBarBottomRow
         case systemMonitorMenuBarCombinedIconEnabled
         case systemMonitorMenuBarCombinedIconMetric
+        case systemMonitorMenuBarCombinedIconAppearance
+        case systemMonitorMenuBarHeadphoneOptions
         case menuBarAppIconEnabled
         case weatherEnabled
         case lockScreenInfoEnabled
@@ -1160,6 +1225,14 @@ public struct FeatureSettings: Codable, Equatable, Sendable {
             SystemMonitorCombinedIconMetric.self,
             forKey: .systemMonitorMenuBarCombinedIconMetric
         ) ?? defaults.systemMonitorMenuBarCombinedIconMetric
+        systemMonitorMenuBarCombinedIconAppearance = try container.decodeIfPresent(
+            SystemMonitorCombinedIconAppearance.self,
+            forKey: .systemMonitorMenuBarCombinedIconAppearance
+        ) ?? defaults.systemMonitorMenuBarCombinedIconAppearance
+        systemMonitorMenuBarHeadphoneOptions = try container.decodeIfPresent(
+            SystemMonitorHeadphoneOptions.self,
+            forKey: .systemMonitorMenuBarHeadphoneOptions
+        ) ?? defaults.systemMonitorMenuBarHeadphoneOptions
         menuBarAppIconEnabled = try container.decodeIfPresent(
             Bool.self,
             forKey: .menuBarAppIconEnabled

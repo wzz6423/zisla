@@ -1,9 +1,49 @@
+import AppKit
 import Foundation
+import SwiftUI
 import Testing
+import ZislaCore
+import ZislaKit
 
 @testable import Zisla
 
 struct HeadphoneConnectionNoticeTests {
+    @Test @MainActor
+    func externalCompactHeadphoneRingsRemainInsideThePanel() throws {
+        let notice = Self.headphoneNotice()
+        let engine = SideNoticeLayoutEngine()
+        for menuHeight in [CGFloat(18), 22, 24, 25, 28, 32, 34, 48] {
+            let screen = ScreenSnapshot(displayID: 7,
+                frame: CGRect(x: 1_512, y: -120, width: 1_440, height: 900),
+                visibleFrame: CGRect(x: 1_512, y: -120, width: 1_440, height: 900),
+                menuBarHeightFallback: menuHeight)
+            let frame = try #require(engine.compactBarFrame(for: screen, notices: [notice], settings: FeatureSettings()))
+            for scale in [CGFloat(1), 1.5, 2, 3] {
+                let bitmap = try Self.compactHeadphoneBitmap(notice: notice, size: frame.size, centerInset: 0, scale: scale,
+                    locale: Locale(identifier: "zh_Hans"))
+                let bounds = Self.batteryRingBounds(bitmap)
+                #expect(bounds.count == 3)
+                for ring in bounds {
+                    #expect(ring.minY >= 1, "Menu height \(menuHeight), scale \(scale): top stroke must not touch the panel clip")
+                    #expect(ring.maxY < CGFloat(bitmap.pixelsHigh))
+                    #expect(abs(ring.width - ring.height) <= 1, "Menu height \(menuHeight), scale \(scale): full battery rings must stay circular")
+                }
+            }
+        }
+    }
+
+    @Test @MainActor
+    func defaultCompactWingHeightProvidesCompleteHeadphoneRings() throws {
+        let bitmap = try Self.compactHeadphoneBitmap(notice: Self.headphoneNotice(),
+            size: CGSize(width: 240, height: 34), centerInset: 0, scale: 2)
+        let bounds = Self.batteryRingBounds(bitmap)
+        #expect(bounds.count == 3)
+        for ring in bounds {
+            #expect(ring.minY >= 1)
+            #expect(abs(ring.width - ring.height) <= 1)
+        }
+    }
+
     @Test
     func headphoneGlyphPrefersSystemAssetsAndRestoresFallbackSymbolEffect() throws {
         let source = try String(contentsOf: Self.sideNoticeViewSourceURL, encoding: .utf8)
@@ -80,7 +120,7 @@ struct HeadphoneConnectionNoticeTests {
         )
         let compact = try Self.sourceSlice(
             in: source,
-            from: "private struct CompactHeadphoneConnectionBar: View",
+            from: "struct CompactHeadphoneConnectionBar: View",
             to: "private struct CompactFocusTransitionBar: View"
         )
 
@@ -111,6 +151,55 @@ struct HeadphoneConnectionNoticeTests {
             .deletingLastPathComponent()
             .deletingLastPathComponent()
             .appendingPathComponent("Sources/Zisla/SideNoticeView.swift")
+    }
+
+    private static func headphoneNotice() -> IslandNotice {
+        IslandNotice(id: "headphone-connection", title: "AirPods Pro", detail: "已连接", side: .left,
+            style: .headphone, batteryLevels: [
+                NoticeBatteryLevel(label: "左", level: 100),
+                NoticeBatteryLevel(label: "右", level: 100),
+                NoticeBatteryLevel(label: "盒", level: 100),
+            ])
+    }
+
+    @MainActor
+    private static func compactHeadphoneBitmap(notice: IslandNotice, size: CGSize, centerInset: CGFloat,
+        scale: CGFloat, locale: Locale = Locale(identifier: "en_US_POSIX")) throws -> NSBitmapImageRep {
+        let renderer = ImageRenderer(content: CompactHeadphoneConnectionBar(
+            notice: notice, height: size.height, centerInset: centerInset
+        )
+            .frame(width: size.width, height: size.height)
+            .background(.black)
+            .clipped()
+            .transaction { $0.disablesAnimations = true }
+            .environment(\.colorScheme, .dark)
+            .environment(\.locale, locale))
+        renderer.scale = scale
+        return NSBitmapImageRep(cgImage: try #require(renderer.cgImage))
+    }
+
+    private static func batteryRingBounds(_ bitmap: NSBitmapImageRep) -> [CGRect] {
+        var rings: [CGRect] = []
+        var current: CGRect?
+        for horizontal in 0..<bitmap.pixelsWide {
+            var column: CGRect?
+            for vertical in 0..<bitmap.pixelsHigh {
+                guard let color = bitmap.colorAt(x: horizontal, y: vertical)?.usingColorSpace(.deviceRGB),
+                      color.alphaComponent > 0.5, color.greenComponent > 0.4,
+                      color.greenComponent > color.redComponent * 1.5,
+                      color.greenComponent > color.blueComponent * 1.5 else { continue }
+                let pixel = CGRect(x: horizontal, y: vertical, width: 1, height: 1)
+                column = column.map { $0.union(pixel) } ?? pixel
+            }
+            if let column {
+                current = current.map { $0.union(column) } ?? column
+            } else if let completed = current {
+                rings.append(completed)
+                current = nil
+            }
+        }
+        if let completed = current { rings.append(completed) }
+        return rings
     }
 
     private static var appModelSourceURL: URL {

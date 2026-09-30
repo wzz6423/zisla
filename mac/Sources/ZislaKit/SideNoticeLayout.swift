@@ -330,7 +330,8 @@ public struct SideNoticeLayoutEngine: Equatable, Sendable {
         sideExtension: CGFloat,
         expandsForDetailedMedia: Bool,
         progressGlowEnabled: Bool,
-        compactWingWidth: CGFloat = Layout.compactWingWidth
+        compactWingWidth: CGFloat = Layout.compactWingWidth,
+        minimumSimulatedHeight: CGFloat = 0
     ) -> CGRect {
         let topology = ScreenLayoutEngine().layout(for: screen).topology
         let anchor = topology.anchorFrame
@@ -355,7 +356,7 @@ public struct SideNoticeLayoutEngine: Equatable, Sendable {
             baseWidth = expandsForDetailedMedia
                 ? Layout.compactBarMediaDetailSimulatedWidth
                 : anchor.width
-            height = anchor.height
+            height = min(screen.frame.height, max(anchor.height, minimumSimulatedHeight))
         }
         let width = min(screen.frame.width, baseWidth)
         let idealX = anchor.midX - width / 2
@@ -385,7 +386,8 @@ public struct SideNoticeLayoutEngine: Equatable, Sendable {
             sideExtension: sizing.sideExtension,
             expandsForDetailedMedia: sizing.expandsForDetailedStatus,
             progressGlowEnabled: sizing.progressGlowEnabled,
-            compactWingWidth: sizing.compactWingWidth
+            compactWingWidth: sizing.compactWingWidth,
+            minimumSimulatedHeight: sizing.minimumSimulatedHeight
         )
     }
 
@@ -408,7 +410,8 @@ public struct SideNoticeLayoutEngine: Equatable, Sendable {
         sideExtension: CGFloat,
         expandsForDetailedMedia: Bool,
         progressGlowEnabled: Bool,
-        compactWingWidth: CGFloat = Layout.compactWingWidth
+        compactWingWidth: CGFloat = Layout.compactWingWidth,
+        minimumSimulatedHeight: CGFloat = 0
     ) -> CGRect {
         let anchor = layout.topology.anchorFrame
         let baseWidth: CGFloat
@@ -437,7 +440,7 @@ public struct SideNoticeLayoutEngine: Equatable, Sendable {
                 screenHeight: layout.screenFrame.height,
                 progressGlowEnabled: progressGlowEnabled
             )
-            : anchor.height
+            : min(layout.screenFrame.height, max(anchor.height, minimumSimulatedHeight))
         return CGRect(
             x: x,
             y: topEdge - height,
@@ -462,7 +465,8 @@ public struct SideNoticeLayoutEngine: Equatable, Sendable {
             sideExtension: sizing.sideExtension,
             expandsForDetailedMedia: sizing.expandsForDetailedStatus,
             progressGlowEnabled: sizing.progressGlowEnabled,
-            compactWingWidth: sizing.compactWingWidth
+            compactWingWidth: sizing.compactWingWidth,
+            minimumSimulatedHeight: sizing.minimumSimulatedHeight
         )
     }
 
@@ -474,10 +478,11 @@ public struct SideNoticeLayoutEngine: Equatable, Sendable {
         sideExtension: CGFloat,
         expandsForDetailedStatus: Bool,
         progressGlowEnabled: Bool,
-        compactWingWidth: CGFloat
+        compactWingWidth: CGFloat,
+        minimumSimulatedHeight: CGFloat
     )? {
         if notices.contains(where: { $0.id.hasPrefix("voice-processing-") }) {
-            return (0, false, false, Layout.compactWingWidth)
+            return (0, false, false, Layout.compactWingWidth, 0)
         }
         let selectedPriority = Self.selectedCompactStatusPriority(for: notices, settings: settings)
         guard let selectedPriority else { return nil }
@@ -496,11 +501,12 @@ public struct SideNoticeLayoutEngine: Equatable, Sendable {
                     || $0.id == LowBatteryNoticeController.noticeID
             }
             .max { $0.createdAt < $1.createdAt }
+        let displaysHeadphone = selectedPriority == .transient
+            && displayedTransientNotice?.style == .headphone
         let sideExtension: CGFloat
         if expandsForDetailedStatus {
             sideExtension = 0
-        } else if selectedPriority == .transient,
-                  displayedTransientNotice?.style == .headphone {
+        } else if displaysHeadphone {
             sideExtension = Layout.compactBarSideExtension
                 + Layout.compactBarHeadphoneAdditionalSideExtension
         } else if selectedPriority == .transient || selectedPriority == .focusCountdown {
@@ -530,7 +536,8 @@ public struct SideNoticeLayoutEngine: Equatable, Sendable {
             sideExtension,
             expandsForDetailedStatus,
             progressGlowEnabled,
-            compactWingWidth
+            compactWingWidth,
+            displaysHeadphone ? Layout.defaultCompactWingHeight + 2 : 0
         )
     }
 

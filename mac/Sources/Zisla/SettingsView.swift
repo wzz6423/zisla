@@ -361,7 +361,7 @@ struct SettingsView: View {
                     }
                     rowDivider
                     SystemMonitorMenuBarSettingsView(settingsStore: model.settingsStore)
-                    if model.settingsStore.settings.systemMonitorMenuBarLayout == .individual {
+                    if model.settingsStore.settings.systemMonitorMenuBarLayout.individualEnabled {
                         ForEach(SystemMonitorMenuBarMetric.allCases, id: \.self) { metric in
                             rowDivider
                             settingRow(
