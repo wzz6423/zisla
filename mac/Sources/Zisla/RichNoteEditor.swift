@@ -5,6 +5,13 @@ import WebKit
 import ZislaCore
 import ZislaKit
 
+protocol RichNotePasteboard {
+    func clearContents() -> Int
+    func writeObjects(_ objects: [any NSPasteboardWriting]) -> Bool
+}
+
+extension NSPasteboard: RichNotePasteboard {}
+
 private final class TransparentWKWebView: WKWebView {
     override var isOpaque: Bool { false }
     override func acceptsFirstMouse(for event: NSEvent?) -> Bool { true }
@@ -61,6 +68,7 @@ struct RichNoteEditor: NSViewRepresentable {
     let command: RichNoteEditorCommand?
     let isEditable: Bool
     let onCopy: (() -> Void)?
+    let pasteboard: any RichNotePasteboard
     let onChange: (String?, String, String) -> Void
 
     static var newNoteHTML: String { "<h1>\(AppLocalization.text("新随记"))</h1><div><span style=\"font-size: 11px\"><br></span></div>" }
@@ -71,6 +79,7 @@ struct RichNoteEditor: NSViewRepresentable {
         command: RichNoteEditorCommand?,
         isEditable: Bool,
         onCopy: (() -> Void)? = nil,
+        pasteboard: any RichNotePasteboard = NSPasteboard.general,
         onChange: @escaping (String?, String, String) -> Void
     ) {
         self.html = html
@@ -78,6 +87,7 @@ struct RichNoteEditor: NSViewRepresentable {
         self.command = command
         self.isEditable = isEditable
         self.onCopy = onCopy
+        self.pasteboard = pasteboard
         self.onChange = onChange
     }
 
@@ -192,7 +202,7 @@ struct RichNoteEditor: NSViewRepresentable {
     }
 
     func makeCoordinator() -> Coordinator {
-        Coordinator(onChange: onChange, onCopy: onCopy, isEditable: isEditable)
+        Coordinator(onChange: onChange, onCopy: onCopy, pasteboard: pasteboard, isEditable: isEditable)
     }
 
     func makeNSView(context: Context) -> WKWebView {
@@ -243,6 +253,7 @@ struct RichNoteEditor: NSViewRepresentable {
 
         private let onChange: (String?, String, String) -> Void
         private let onCopy: (() -> Void)?
+        private let pasteboard: any RichNotePasteboard
         private weak var webView: WKWebView?
         private var desiredDocument: Document?
         private var appliedDocument: Document?
@@ -261,10 +272,12 @@ struct RichNoteEditor: NSViewRepresentable {
         init(
             onChange: @escaping (String?, String, String) -> Void,
             onCopy: (() -> Void)?,
+            pasteboard: any RichNotePasteboard,
             isEditable: Bool
         ) {
             self.onChange = onChange
             self.onCopy = onCopy
+            self.pasteboard = pasteboard
             self.isEditable = isEditable
         }
 
@@ -389,7 +402,17 @@ struct RichNoteEditor: NSViewRepresentable {
 
         func userContentController(_ userContentController: WKUserContentController, didReceive message: WKScriptMessage) {
             if message.name == "richNoteCopied" {
-                onCopy?()
+                guard let payload = message.body as? [String: Any],
+                      let plainText = payload["plainText"] as? String,
+                      let html = payload["html"] as? String,
+                      !plainText.isEmpty || !html.isEmpty else { return }
+                let item = NSPasteboardItem()
+                item.setString(plainText, forType: .string)
+                item.setString("<meta charset=\"utf-8\">\(html)", forType: .html)
+                _ = pasteboard.clearContents()
+                if pasteboard.writeObjects([item]) {
+                    onCopy?()
+                }
                 return
             }
             guard message.name == "richNoteChanged",
@@ -818,8 +841,29 @@ struct RichNoteEditor: NSViewRepresentable {
           editor.addEventListener('focus', scheduleCaretUpdate);
           editor.addEventListener('blur', hideCaret);
           editor.addEventListener('keydown', scheduleCaretUpdate);
-          editor.addEventListener('copy', () => {
-            setTimeout(() => window.webkit.messageHandlers.richNoteCopied.postMessage(null), 0);
+          editor.addEventListener('copy', event => {
+            const selection = window.getSelection();
+            if (!selection || selection.isCollapsed) return;
+            const range = selection.getRangeAt(0);
+            if (!editor.contains(range.commonAncestorContainer)) return;
+            let fragment = range.cloneContents();
+            let ancestor = range.commonAncestorContainer;
+            while (ancestor !== editor) {
+              if (ancestor.nodeType === Node.ELEMENT_NODE) {
+                const wrapper = ancestor.cloneNode(false);
+                wrapper.append(fragment);
+                fragment = wrapper;
+              }
+              ancestor = ancestor.parentNode;
+            }
+            const container = document.createElement('div');
+            container.append(fragment);
+            // Keep WebKit's rich-text export and timer scheduling off the copy path.
+            event.preventDefault();
+            window.webkit.messageHandlers.richNoteCopied.postMessage({
+              plainText: selection.toString(),
+              html: container.innerHTML
+            });
           });
           document.addEventListener('selectionchange', () => {
             saveSelection();
