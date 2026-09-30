@@ -149,6 +149,7 @@ public final class CodexSessionActivityDetector {
     private var confirmedActiveTurnIDs = Set<String>()
     private var retiredTurnIDs = Set<String>()
     private var firstUnverifiedActivityAtByTurnID: [String: Date] = [:]
+    private var confirmedProvidersByActivityKey: [String: AIProvider] = [:]
     private var previouslyActiveTasks: [String: AIProgressTask] = [:]
     private var completedTasks: [AIProgressTask] = []
     private var lastScanAt: Date?
@@ -312,6 +313,12 @@ public final class CodexSessionActivityDetector {
         firstUnverifiedActivityAtByTurnID = firstUnverifiedActivityAtByTurnID.filter {
             candidateTurnIDs.contains($0.key)
         }
+        let selectedProviderKeys = Set(activities.map {
+            Self.providerCacheKey(sessionID: $0.activity.sessionID, rolloutURL: $0.candidate.url)
+        })
+        confirmedProvidersByActivityKey = confirmedProvidersByActivityKey.filter {
+            selectedProviderKeys.contains($0.key)
+        }
         var activeTurnIDs = Set<String>()
 
         func permitsUnverifiedActivity(for turnID: String) -> Bool {
@@ -361,9 +368,19 @@ public final class CodexSessionActivityDetector {
             .map { record in
                 let event = record.event
                 let processIdentifier = processIdentifiersByURL[record.rolloutURL]
-                let provider = processIdentifier.flatMap {
+                let observedProvider = processIdentifier.flatMap {
                     clientProvidersByProcessIdentifier[$0]
-                } ?? .codex
+                }
+                let providerCacheKey = Self.providerCacheKey(
+                    sessionID: record.sessionID,
+                    rolloutURL: record.rolloutURL
+                )
+                if let observedProvider {
+                    confirmedProvidersByActivityKey[providerCacheKey] = observedProvider
+                }
+                let provider = observedProvider
+                    ?? confirmedProvidersByActivityKey[providerCacheKey]
+                    ?? .codex
                 let fallbackTitle = provider == .gpt ? "ChatGPT" : "Codex"
                 let threadTitle = record.sessionID.flatMap { titlesBySessionID[$0] }
                 let displayTitle = threadTitle ?? fallbackTitle
@@ -638,6 +655,16 @@ public final class CodexSessionActivityDetector {
         case .started: 0
         case .completed, .aborted: 1
         }
+    }
+
+    private static func providerCacheKey(
+        sessionID: String?,
+        rolloutURL: URL
+    ) -> String {
+        if let sessionID {
+            return "session:\(sessionID)"
+        }
+        return "rollout:\(rolloutURL.standardizedFileURL.path)"
     }
 
     private static func isOrderedBefore(_ lhs: Event, _ rhs: Event) -> Bool {

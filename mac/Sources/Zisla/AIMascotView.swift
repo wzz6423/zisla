@@ -4,55 +4,60 @@ import ZislaKit
 import SwiftUI
 
 @MainActor
-final class AIMascotImageCache {
+final class AIMascotImageCache: ObservableObject {
     static let shared = AIMascotImageCache()
 
-    private struct FileSignature: Equatable {
-        var modificationDate: Date
-        var size: Int
-    }
-
-    // Resource and application lookups can be transient; never turn a failed first read into a permanent miss.
     private var values: [String: NSImage] = [:]
-    // Dev builds re-copy resource bundles while the app runs, which invalidates already
-    // decoded NSImage objects behind their file paths. Track the backing asset so a
-    // changed file reloads and a vanished file keeps serving the last good image.
-    private var signatures: [String: FileSignature] = [:]
+    private var retries: [String: Task<Void, Never>] = [:]
+    private let waitForRetry: @MainActor () async throws -> Void
 
-    func image(for key: String, load: () -> NSImage?) -> NSImage? {
-        if let image = values[key] { return image }
-        guard let image = load() ?? load() else { return nil }
-        values[key] = image
-        return image
+    init(waitForRetry: @escaping @MainActor () async throws -> Void = {
+        try await Task.sleep(for: .seconds(1))
+    }) {
+        self.waitForRetry = waitForRetry
     }
 
-    func image(for key: String, url: URL) -> NSImage? {
-        let signature = fileSignature(at: url)
-        if let signature, signatures[key] != signature, let image = load(from: url) {
+    deinit {
+        for retry in retries.values { retry.cancel() }
+    }
+
+    func image(for key: String, load: @escaping @MainActor () -> NSImage?) -> NSImage? {
+        if let image = values[key] { return image }
+        guard retries[key] == nil else { return nil }
+        if let image = snapshot(load()) {
             values[key] = image
-            signatures[key] = signature
+            return image
         }
-        if let image = values[key] { return image }
-        guard let signature, let image = load(from: url) else { return nil }
-        values[key] = image
-        signatures[key] = signature
-        return image
+        let waitForRetry = waitForRetry
+        retries[key] = Task { [weak self] in
+            defer { self?.retries[key] = nil }
+            while true {
+                do {
+                    try await waitForRetry()
+                } catch {
+                    return
+                }
+                guard let self else { return }
+                if let image = self.snapshot(load()) {
+                    self.objectWillChange.send()
+                    self.values[key] = image
+                    return
+                }
+            }
+        }
+        return nil
     }
 
-    private func load(from url: URL) -> NSImage? {
-        NSImage(contentsOf: url) ?? NSImage(contentsOf: url)
+    func image(for key: String, url: @escaping @MainActor () -> URL?) -> NSImage? {
+        image(for: key) {
+            url().flatMap { NSImage(contentsOf: $0) }
+        }
     }
 
-    private func fileSignature(at url: URL) -> FileSignature? {
-        // A fresh URL object bypasses the per-URL resource-value cache, which would
-        // otherwise keep serving the pre-rebuild modification date and file size.
-        let values = try? URL(fileURLWithPath: url.path)
-            .resourceValues(forKeys: [.contentModificationDateKey, .fileSizeKey])
-        guard let modificationDate = values?.contentModificationDate,
-              let size = values?.fileSize else {
-            return nil
-        }
-        return FileSignature(modificationDate: modificationDate, size: size)
+    private func snapshot(_ image: NSImage?) -> NSImage? {
+        guard let image,
+              let bitmap = image.cgImage(forProposedRect: nil, context: nil, hints: nil) else { return nil }
+        return NSImage(cgImage: bitmap, size: image.size)
     }
 }
 
@@ -194,6 +199,7 @@ enum AIMascotIdentity: String, CaseIterable, Identifiable {
 struct AIMascotView: View {
     var identity: AIMascotIdentity
     var size: CGFloat
+    @ObservedObject private var imageCache = AIMascotImageCache.shared
 
     init(
         identity: AIMascotIdentity,
@@ -227,15 +233,13 @@ struct AIMascotView: View {
     }
 
     private var providerImage: NSImage? {
-        guard let assetName = identity.assetName,
-              let url = AIMascotLibrary.providerAssetURL(
-                  named: assetName,
-                  resourceRoots: providerResourceRoots
-              )
-        else { return nil }
-        return AIMascotImageCache.shared.image(
+        guard let assetName = identity.assetName else { return nil }
+        let resourceRoots = providerResourceRoots
+        return imageCache.image(
             for: "provider|\(assetName)",
-            url: url
+            url: {
+                AIMascotLibrary.providerAssetURL(named: assetName, resourceRoots: resourceRoots)
+            }
         )
     }
 
@@ -243,31 +247,31 @@ struct AIMascotView: View {
     private var installedProviderImage: NSImage? {
         switch identity {
         case .geminiDesktop:
-            return AIMascotImageCache.shared.image(for: "installed|gemini") {
+            return imageCache.image(for: "installed|gemini") {
                 AIMascotLibrary.installedGeminiApplicationURL().map {
                     NSWorkspace.shared.icon(forFile: $0.path)
                 }
             }
         case .coder:
-            return AIMascotImageCache.shared.image(for: "installed|coder") {
+            return imageCache.image(for: "installed|coder") {
                 AIMascotLibrary.installedCoderApplicationURL().map {
                     NSWorkspace.shared.icon(forFile: $0.path)
                 }
             }
         case .trae:
-            return AIMascotImageCache.shared.image(for: "installed|trae") {
+            return imageCache.image(for: "installed|trae") {
                 AIMascotLibrary.installedTraeApplicationURL().map {
                     NSWorkspace.shared.icon(forFile: $0.path)
                 }
             }
         case .zed:
-            return AIMascotImageCache.shared.image(for: "installed|zed") {
+            return imageCache.image(for: "installed|zed") {
                 AIMascotLibrary.installedZedApplicationURL().map {
                     NSWorkspace.shared.icon(forFile: $0.path)
                 }
             }
         case .harness:
-            return AIMascotImageCache.shared.image(for: "installed|workbuddy") {
+            return imageCache.image(for: "installed|workbuddy") {
                 AIMascotLibrary.installedWorkBuddyApplicationURL().map {
                     NSWorkspace.shared.icon(forFile: $0.path)
                 }
