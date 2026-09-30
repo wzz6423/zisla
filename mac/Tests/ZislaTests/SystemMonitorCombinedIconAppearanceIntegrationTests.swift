@@ -59,15 +59,15 @@ struct SystemMonitorCombinedIconAppearanceIntegrationTests {
     }
 
     @Test
-    func independentCompactRowsRemainLeftAligned() throws {
+    func independentCompactRowsRemainCentered() throws {
         let source = try Self.source("ZislaApp.swift")
         let section = try Self.section(
             source,
             from: "    private func compactMonitorStatusImage(",
             to: "    private func "
         )
-        #expect(section.contains("paragraph.alignment = .left"))
-        #expect(!section.contains("paragraph.alignment = .center"))
+        #expect(section.contains("paragraph.alignment = .center"))
+        #expect(!section.contains("paragraph.alignment = .left"))
         #expect(section.contains("let size = NSSize(width: itemWidth - 4, height: 22)"))
         #expect(section.contains("NSFont.monospacedDigitSystemFont(ofSize: 9, weight: .medium)"))
         #expect(section.contains("NSFont.monospacedDigitSystemFont(ofSize: 10, weight: .medium)"))
@@ -174,9 +174,9 @@ struct SystemMonitorCombinedIconAppearanceIntegrationTests {
         #expect(binding.systemMonitorMenuBarCombinedIconAppearance.showsBatteryPercentage.wrappedValue)
         #expect(binding.systemMonitorMenuBarCombinedIconAppearance.showsChargingIndicator.wrappedValue)
         #expect(binding.systemMonitorMenuBarCombinedIconAppearance.showsPercentageWhenConnected.wrappedValue)
-        #expect(binding.systemMonitorMenuBarCombinedIconAppearance.iconSize.wrappedValue == 22)
-        #expect(binding.systemMonitorMenuBarCombinedIconAppearance.wifiScale.wrappedValue == 1)
-        #expect(binding.systemMonitorMenuBarCombinedIconAppearance.batteryTextScale.wrappedValue == 1.8)
+        #expect(binding.systemMonitorMenuBarCombinedIconAppearance.iconSize.wrappedValue == 24)
+        #expect(binding.systemMonitorMenuBarCombinedIconAppearance.wifiScale.wrappedValue == 1.4)
+        #expect(binding.systemMonitorMenuBarCombinedIconAppearance.batteryTextScale.wrappedValue == 1.78)
         binding.systemMonitorMenuBarCombinedIconAppearance.indicatorStyle.wrappedValue = .arc
         binding.systemMonitorMenuBarCombinedIconAppearance.ringStrokeStyle.wrappedValue = .regular
         binding.systemMonitorMenuBarCombinedIconAppearance.showsBatteryPercentage.wrappedValue = false

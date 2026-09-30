@@ -2552,13 +2552,10 @@
 "未连接" = "Disconnected";
 "显示数量" = "Display Count";
 "%ld项" = "%ld metrics";
-"上下两行自选2或4个指标；选中风扇时可显示3个" = "Choose 2 or 4 metrics across two rows; 3 is available when a fan is selected";
+"普通指标可选2或4项；网络或风扇可选2或3项；两者同时显示时仅可选2项" = "Choose 2 or 4 standard metrics; 2 or 3 with Network or Fan; only 2 with both";
 "电量环、Wi-Fi 与实时指标合并显示；点击打开系统监控" = "Combine the battery ring, Wi-Fi and a live indicator; click to open System Monitor";
-"用耳机图标替换 Wi-Fi" = "Replace Wi-Fi with Headphone Icon";
+"连接时短暂显示耳机图标" = "Briefly Show Headphone Icon on Connection";
 "优先显示网络错误" = "Prioritize Network Errors";
 "蓝牙音量颜色" = "Bluetooth Volume Color";
-"显示耳机电量" = "Show Headphone Battery Levels";
 "耳机图标大小" = "Headphone Icon Size";
 "仅底部指标选择音量时生效" = "Only applies when Volume is selected as the bottom indicator";
-"点击图标后在系统监控页查看耳机电量" = "Click the icon to view headphone battery levels in System Monitor";
-"耳机电量" = "Headphone Battery";

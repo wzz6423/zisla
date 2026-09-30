@@ -51,7 +51,7 @@ struct SystemMonitorMenuBarSettingsView: View {
                     .labelsHidden()
                     .fixedSize()
                 }
-                AppLocalizedText("上下两行自选2或4个指标；选中风扇时可显示3个")
+                AppLocalizedText("普通指标可选2或4项；网络或风扇可选2或3项；两者同时显示时仅可选2项")
                     .font(.system(size: 9))
                     .foregroundStyle(.secondary)
                 ForEach(selection.indices, id: \.self) { rowIndex in
@@ -159,7 +159,7 @@ struct SystemMonitorMenuBarSettingsView: View {
                 }
                 Divider()
                 Toggle(isOn: $settingsStore.settings.systemMonitorMenuBarHeadphoneOptions.replacesNetworkIcon) {
-                    AppLocalizedText("用耳机图标替换 Wi-Fi")
+                    AppLocalizedText("连接时短暂显示耳机图标")
                 }
                 .toggleStyle(.switch)
                 if settingsStore.settings.systemMonitorMenuBarHeadphoneOptions.replacesNetworkIcon {
@@ -181,13 +181,6 @@ struct SystemMonitorMenuBarSettingsView: View {
                 }
                 .toggleStyle(.switch)
                 AppLocalizedText("仅底部指标选择音量时生效")
-                    .font(.system(size: 9))
-                    .foregroundStyle(.secondary)
-                Toggle(isOn: $settingsStore.settings.systemMonitorMenuBarHeadphoneOptions.showsBatteryLevels) {
-                    AppLocalizedText("显示耳机电量")
-                }
-                .toggleStyle(.switch)
-                AppLocalizedText("点击图标后在系统监控页查看耳机电量")
                     .font(.system(size: 9))
                     .foregroundStyle(.secondary)
             }

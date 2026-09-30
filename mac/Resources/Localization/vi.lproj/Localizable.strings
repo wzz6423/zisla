@@ -2553,13 +2553,10 @@
 "未连接" = "Chưa kết nối";
 "显示数量" = "Số chỉ số hiển thị";
 "%ld项" = "%ld chỉ số";
-"上下两行自选2或4个指标；选中风扇时可显示3个" = "Chọn 2 hoặc 4 chỉ số trên hai hàng; có thể hiển thị 3 khi chọn quạt";
+"普通指标可选2或4项；网络或风扇可选2或3项；两者同时显示时仅可选2项" = "Chọn 2 hoặc 4 chỉ số thường; 2 hoặc 3 khi có Mạng hoặc Quạt; chỉ 2 khi có cả hai";
 "电量环、Wi-Fi 与实时指标合并显示；点击打开系统监控" = "Gộp vòng pin, Wi-Fi và một chỉ báo thời gian thực; nhấp để mở trình giám sát hệ thống";
-"用耳机图标替换 Wi-Fi" = "Thay Wi-Fi bằng biểu tượng tai nghe";
+"连接时短暂显示耳机图标" = "Hiển thị nhanh biểu tượng tai nghe khi kết nối";
 "优先显示网络错误" = "Ưu tiên hiển thị lỗi mạng";
 "蓝牙音量颜色" = "Màu âm lượng Bluetooth";
-"显示耳机电量" = "Hiển thị mức pin tai nghe";
 "耳机图标大小" = "Kích thước biểu tượng tai nghe";
 "仅底部指标选择音量时生效" = "Chỉ áp dụng khi chọn âm lượng làm chỉ báo phía dưới";
-"点击图标后在系统监控页查看耳机电量" = "Nhấp vào biểu tượng để xem mức pin tai nghe trong trình giám sát hệ thống";
-"耳机电量" = "Pin tai nghe";

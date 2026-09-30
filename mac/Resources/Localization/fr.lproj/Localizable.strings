@@ -2549,13 +2549,10 @@
 "未连接" = "Déconnecté";
 "显示数量" = "Nombre affiché";
 "%ld项" = "%ld indicateurs";
-"上下两行自选2或4个指标；选中风扇时可显示3个" = "Choisissez 2 ou 4 indicateurs sur deux lignes ; 3 sont possibles si le ventilateur est sélectionné";
+"普通指标可选2或4项；网络或风扇可选2或3项；两者同时显示时仅可选2项" = "2 ou 4 indicateurs standard ; 2 ou 3 avec Réseau ou Ventilateur ; seulement 2 avec les deux";
 "电量环、Wi-Fi 与实时指标合并显示；点击打开系统监控" = "Regroupez l’anneau de batterie, le Wi-Fi et un indicateur en direct ; cliquez pour ouvrir le moniteur système";
-"用耳机图标替换 Wi-Fi" = "Remplacer Wi-Fi par une icône de casque";
+"连接时短暂显示耳机图标" = "Afficher brièvement l’icône du casque à la connexion";
 "优先显示网络错误" = "Afficher les erreurs réseau en priorité";
 "蓝牙音量颜色" = "Couleur du volume Bluetooth";
-"显示耳机电量" = "Afficher la batterie du casque";
 "耳机图标大小" = "Taille de l’icône du casque";
 "仅底部指标选择音量时生效" = "S’applique uniquement si le volume est sélectionné comme indicateur inférieur";
-"点击图标后在系统监控页查看耳机电量" = "Cliquez sur l’icône pour voir la batterie du casque dans le moniteur système";
-"耳机电量" = "Batterie du casque";

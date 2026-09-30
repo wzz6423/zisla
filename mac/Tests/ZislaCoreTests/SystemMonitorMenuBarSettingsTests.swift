@@ -97,7 +97,7 @@ struct SystemMonitorMenuBarSettingsTests {
             top: restored.systemMonitorMenuBarTopRow,
             bottom: restored.systemMonitorMenuBarBottomRow
         )
-        #expect(rows == [[.fan, .cpu], [.gpu, .memory]])
+        #expect(rows == [[.fan], [.gpu, .memory]])
         #expect(restored == settings)
         #expect(restored.systemMonitorMenuBarMetrics == [.cpu])
         #expect(restored.systemMonitorMenuBarDisplayStyle == .compact)
@@ -128,168 +128,62 @@ struct SystemMonitorMenuBarSettingsTests {
     }
 
     @Test
-    func threeMetricCombinationUsesCpuAndGpuAboveFan() {
-        #expect(SystemMonitorMenuBarRows.normalized(top: [.cpu, .gpu], bottom: [.fan]) == [[.cpu, .gpu], [.fan]])
+    func ordinaryMetricsKeepTwoOrFourSlotsAndUserOrder() {
+        #expect(SystemMonitorMenuBarRows.normalized(top: [.cpu], bottom: [.gpu]) == [[.cpu], [.gpu]])
+        #expect(SystemMonitorMenuBarRows.normalized(top: [.disk, .memory], bottom: [.gpu]) == [[.disk, .memory], [.gpu, .cpu]])
+        #expect(SystemMonitorMenuBarRows.adjusted(top: [.cpu], bottom: [.gpu], count: 3) == [[.cpu, .memory], [.gpu, .disk]])
+        #expect(SystemMonitorMenuBarRows.availableCounts(top: [], bottom: []) == [2, 4])
     }
 
     @Test
-    func threeNonFanMetricsFillToFourWithoutDiscardingSelections() {
-        #expect(SystemMonitorMenuBarRows.normalized(
-            top: [.network, .memory],
-            bottom: [.disk]
-        ) == [[.network, .memory], [.disk, .cpu]])
-        #expect(SystemMonitorMenuBarRows.normalized(
-            top: [.disk],
-            bottom: [.network, .memory]
-        ) == [[.disk, .cpu], [.network, .memory]])
+    func eitherWideMetricOccupiesOneRowAndAllowsTwoOrThreeItems() {
+        for wide: SystemMonitorMenuBarMetric in [.network, .fan] {
+            #expect(SystemMonitorMenuBarRows.normalized(top: [.cpu, .gpu], bottom: [wide]) == [[.cpu, .gpu], [wide]])
+            #expect(SystemMonitorMenuBarRows.normalized(top: [wide, .memory], bottom: [.gpu]) == [[wide], [.gpu, .memory]])
+            #expect(SystemMonitorMenuBarRows.normalized(top: [.cpu], bottom: [.gpu, wide]) == [[.cpu, .gpu], [wide]])
+            #expect(SystemMonitorMenuBarRows.normalized(top: [.cpu, .memory], bottom: [.gpu, wide]) == [[.cpu, .memory], [wide]])
+            #expect(SystemMonitorMenuBarRows.availableCounts(top: [wide], bottom: [.cpu]) == [2, 3])
+            #expect(SystemMonitorMenuBarRows.adjusted(top: [wide], bottom: [.cpu], count: 3) == [[wide], [.cpu, .gpu]])
+            #expect(SystemMonitorMenuBarRows.adjusted(top: [.cpu], bottom: [wide], count: 4) == [[.cpu, .gpu], [wide]])
+            #expect(SystemMonitorMenuBarRows.adjusted(top: [wide], bottom: [.cpu, .gpu], count: 2) == [[wide], [.cpu]])
+        }
     }
 
     @Test
-    func normalizationPreservesAnyUserOrder() {
-        for first in SystemMonitorMenuBarMetric.allCases {
-            for second in SystemMonitorMenuBarMetric.allCases where second != first {
-                for third in SystemMonitorMenuBarMetric.allCases where third != first && third != second {
-                    if [first, second, third].contains(.fan) {
-                        #expect(SystemMonitorMenuBarRows.normalized(top: [first, second], bottom: [third]) == [[first, second], [third]])
-                        #expect(SystemMonitorMenuBarRows.normalized(top: [first], bottom: [second, third]) == [[first], [second, third]])
-                    }
-                    for fourth in SystemMonitorMenuBarMetric.allCases where ![first, second, third].contains(fourth) {
-                        #expect(SystemMonitorMenuBarRows.normalized(
-                            top: [first, second],
-                            bottom: [third, fourth]
-                        ) == [[first, second], [third, fourth]])
-                    }
+    func bothWideMetricsUseOnlyTwoRowsEvenWhenPreviouslyGrouped() {
+        for first: SystemMonitorMenuBarMetric in [.network, .fan] {
+            let second: SystemMonitorMenuBarMetric = first == .network ? .fan : .network
+            for (top, bottom): ([SystemMonitorMenuBarMetric], [SystemMonitorMenuBarMetric]) in [
+                ([first], [second]), ([.cpu, first], [.gpu, second]),
+                ([first, second], [.cpu, .gpu]), ([.cpu, .gpu], [first, second]),
+            ] {
+                #expect(SystemMonitorMenuBarRows.normalized(top: top, bottom: bottom) == [[first], [second]])
+                #expect(SystemMonitorMenuBarRows.availableCounts(top: top, bottom: bottom) == [2])
+                for count in [2, 3, 4, Int.max] {
+                    #expect(SystemMonitorMenuBarRows.adjusted(top: top, bottom: bottom, count: count) == [[first], [second]])
                 }
             }
         }
     }
 
     @Test
-    func topDuplicatesAreRemovedBeforeTruncation() {
-        #expect(SystemMonitorMenuBarRows.normalized(
-            top: [.gpu, .gpu, .cpu, .cpu, .memory],
-            bottom: [.fan]
-        ) == [[.gpu, .cpu], [.fan]])
-    }
-
-    @Test
-    func bottomSkipsTopMetricsAndDuplicatesBeforeTruncation() {
-        #expect(SystemMonitorMenuBarRows.normalized(
-            top: [.fan, .memory],
-            bottom: [.fan, .memory, .network, .disk, .gpu, .network]
-        ) == [[.fan, .memory], [.network, .disk]])
-        #expect(SystemMonitorMenuBarRows.normalized(
-            top: [.cpu],
-            bottom: [.fan, .fan, .memory]
-        ) == [[.cpu], [.fan, .memory]])
-    }
-
-    @Test
-    func overfullRowsAreLimitedToTwoMetricsEach() {
-        #expect(SystemMonitorMenuBarRows.normalized(
-            top: SystemMonitorMenuBarMetric.allCases,
-            bottom: Array(SystemMonitorMenuBarMetric.allCases.reversed())
-        ) == [[.cpu, .gpu], [.fan, .network]])
-        #expect(SystemMonitorMenuBarRows.normalized(
-            top: [.fan, .gpu, .memory],
-            bottom: [.memory, .cpu, .disk]
-        ) == [[.fan, .gpu], [.memory, .cpu]])
-    }
-
-    @Test
-    func emptyRowsUseDefaultTopAndFirstAvailableBottom() {
+    func normalizationDeduplicatesTruncatesAndFillsEmptyRows() {
         #expect(SystemMonitorMenuBarRows.normalized(top: [], bottom: []) == [[.cpu], [.gpu]])
-        #expect(SystemMonitorMenuBarRows.normalized(top: [], bottom: [.cpu, .fan]) == [[.gpu], [.cpu, .fan]])
-    }
-
-    @Test
-    func fullyRepeatedBottomUsesFirstMetricAbsentFromTop() {
+        #expect(SystemMonitorMenuBarRows.normalized(top: [], bottom: [.cpu, .fan]) == [[.cpu, .gpu], [.fan]])
+        #expect(SystemMonitorMenuBarRows.normalized(top: [.gpu, .gpu, .cpu, .memory], bottom: [.fan]) == [[.gpu, .cpu], [.fan]])
         #expect(SystemMonitorMenuBarRows.normalized(top: [.cpu, .gpu], bottom: [.cpu, .gpu, .cpu]) == [[.cpu, .gpu], [.memory, .disk]])
         #expect(SystemMonitorMenuBarRows.normalized(top: [.cpu], bottom: [.cpu]) == [[.cpu], [.gpu]])
-        #expect(SystemMonitorMenuBarRows.normalized(top: [.gpu, .memory], bottom: [.gpu, .memory]) == [[.gpu, .memory], [.cpu, .disk]])
-    }
-
-    @Test
-    func normalizationKeepsRowsNonemptyUniqueAndIdempotent() {
-        let metrics = SystemMonitorMenuBarMetric.allCases
-        let inputs: [[SystemMonitorMenuBarMetric]] = [[], metrics, Array(metrics.reversed())]
-            + metrics.map { [$0] }
-            + metrics.map { [$0, $0, $0] }
-        for top in inputs {
-            for bottom in inputs {
-                let rows = SystemMonitorMenuBarRows.normalized(top: top, bottom: bottom)
-                #expect(rows.count == 2)
-                #expect((1...2).contains(rows[0].count))
-                #expect((1...2).contains(rows[1].count))
-                let flattened = rows.flatMap { $0 }
-                #expect(Set(flattened).count == flattened.count)
-                #expect([2, 4].contains(flattened.count) || (flattened.count == 3 && flattened.contains(.fan)))
-                #expect(!flattened.contains(.fan) || (top + bottom).contains(.fan))
-                #expect(SystemMonitorMenuBarRows.normalized(top: rows[0], bottom: rows[1]) == rows)
-            }
-        }
-    }
-
-    @Test
-    func displayCountOptionsOnlyOfferThreeWhenFanIsSelected() {
-        #expect(SystemMonitorMenuBarRows.availableCounts(top: [], bottom: []) == [2, 4])
-        #expect(SystemMonitorMenuBarRows.availableCounts(top: [.cpu, .gpu], bottom: [.memory]) == [2, 4])
-        #expect(SystemMonitorMenuBarRows.availableCounts(top: [.fan], bottom: [.gpu]) == [2, 3, 4])
-        #expect(SystemMonitorMenuBarRows.availableCounts(top: [.cpu, .gpu], bottom: [.memory, .fan]) == [2, 3, 4])
-    }
-
-    @Test
-    func changingCountKeepsRowLeadersAndFillsWithoutFan() {
-        let expanded = SystemMonitorMenuBarRows.adjusted(top: [.cpu], bottom: [.gpu], count: 4)
-        #expect(expanded == [[.cpu, .memory], [.gpu, .disk]])
-        #expect(SystemMonitorMenuBarRows.adjusted(top: expanded[0], bottom: expanded[1], count: 2) == [[.cpu], [.gpu]])
-        #expect(SystemMonitorMenuBarRows.adjusted(top: [.fan], bottom: [.network], count: 4) == [[.fan, .cpu], [.network, .gpu]])
-        #expect(SystemMonitorMenuBarRows.adjusted(top: [.network], bottom: [.fan], count: 2) == [[.network], [.fan]])
-    }
-
-    @Test
-    func changingCountToThreePreservesFanInItsSelectedRow() {
-        for top: [SystemMonitorMenuBarMetric] in [[.cpu, .fan], [.fan, .cpu]] {
-            #expect(SystemMonitorMenuBarRows.adjusted(
-                top: top,
-                bottom: [.memory, .network],
-                count: 3
-            ) == [[.fan], [.memory, .network]])
-        }
-        for bottom: [SystemMonitorMenuBarMetric] in [[.cpu, .fan], [.fan, .cpu]] {
-            #expect(SystemMonitorMenuBarRows.adjusted(
-                top: [.memory, .network],
-                bottom: bottom,
-                count: 3
-            ) == [[.memory, .network], [.fan]])
-        }
-        #expect(SystemMonitorMenuBarRows.adjusted(top: [.fan], bottom: [.network], count: 3) == [[.fan], [.network, .cpu]])
-        #expect(SystemMonitorMenuBarRows.adjusted(top: [.network], bottom: [.fan], count: 3) == [[.network, .cpu], [.fan]])
-        #expect(SystemMonitorMenuBarRows.adjusted(top: [.fan, .memory], bottom: [.network], count: 3) == [[.fan, .memory], [.network]])
-        #expect(SystemMonitorMenuBarRows.adjusted(top: [.network], bottom: [.memory, .fan], count: 3) == [[.network], [.memory, .fan]])
-    }
-
-    @Test
-    func requestingThreeWithoutFanFillsToFourInstead() {
-        #expect(SystemMonitorMenuBarRows.adjusted(
-            top: [.network, .memory],
-            bottom: [.disk],
-            count: 3
-        ) == [[.network, .memory], [.disk, .cpu]])
-        #expect(SystemMonitorMenuBarRows.adjusted(top: [.cpu], bottom: [.gpu], count: 3) == [[.cpu, .memory], [.gpu, .disk]])
+        #expect(SystemMonitorMenuBarRows.normalized(top: SystemMonitorMenuBarMetric.allCases, bottom: []) == [[.cpu, .gpu], [.memory, .disk]])
     }
 
     @Test
     func invalidDisplayCountsClampToSupportedBounds() {
         for count in [Int.min, -1, 0, 1] {
-            #expect(SystemMonitorMenuBarRows.adjusted(
-                top: [.cpu, .memory],
-                bottom: [.gpu, .disk],
-                count: count
-            ) == [[.cpu], [.gpu]])
+            #expect(SystemMonitorMenuBarRows.adjusted(top: [.cpu, .memory], bottom: [.gpu, .disk], count: count) == [[.cpu], [.gpu]])
         }
         for count in [5, Int.max] {
             #expect(SystemMonitorMenuBarRows.adjusted(top: [.cpu], bottom: [.gpu], count: count) == [[.cpu, .memory], [.gpu, .disk]])
+            #expect(SystemMonitorMenuBarRows.adjusted(top: [.network], bottom: [.gpu], count: count) == [[.network], [.gpu, .cpu]])
         }
     }
 
@@ -305,26 +199,26 @@ struct SystemMonitorMenuBarSettingsTests {
         for top in inputs {
             for bottom in inputs {
                 let source = SystemMonitorMenuBarRows.normalized(top: top, bottom: bottom)
-                let hasFan = source.joined().contains(.fan)
-                #expect(SystemMonitorMenuBarRows.availableCounts(top: top, bottom: bottom) == (hasFan ? [2, 3, 4] : [2, 4]))
+                let wideMetrics = Set(source.joined().filter { $0 == .network || $0 == .fan })
+                let expectedCounts = wideMetrics.count == 2 ? [2] : wideMetrics.isEmpty ? [2, 4] : [2, 3]
+                #expect(SystemMonitorMenuBarRows.availableCounts(top: top, bottom: bottom) == expectedCounts)
                 for count in [2, 3, 4] {
                     combinations += 1
                     let adjusted = SystemMonitorMenuBarRows.adjusted(top: top, bottom: bottom, count: count)
                     let flattened = adjusted.flatMap { $0 }
+                    let expectedCount = count == 2 || wideMetrics.count == 2 ? 2 : wideMetrics.isEmpty ? 4 : 3
                     #expect(adjusted.count == 2)
                     #expect(adjusted.allSatisfy { (1...2).contains($0.count) })
-                    #expect(flattened.count == (count == 3 && !hasFan ? 4 : count))
+                    #expect(flattened.count == expectedCount)
                     #expect(Set(flattened).count == flattened.count)
-                    #expect(!flattened.contains(.fan) || hasFan)
+                    #expect(Set(flattened.filter { $0 == .network || $0 == .fan }) == wideMetrics)
+                    for row in adjusted where row.contains(.network) || row.contains(.fan) {
+                        #expect(row.count == 1)
+                    }
                     #expect(SystemMonitorMenuBarRows.normalized(top: adjusted[0], bottom: adjusted[1]) == adjusted)
                     #expect(SystemMonitorMenuBarRows.adjusted(top: adjusted[0], bottom: adjusted[1], count: count) == adjusted)
-                    if count == 3 && hasFan {
-                        #expect(adjusted[0].contains(.fan) == source[0].contains(.fan))
-                        #expect(adjusted[1].contains(.fan) == source[1].contains(.fan))
-                    } else if count != 3 {
-                        #expect(adjusted[0].first == source[0].first)
-                        #expect(adjusted[1].first == source[1].first)
-                    }
+                    #expect(adjusted[0].first == source[0].first)
+                    #expect(adjusted[1].first == source[1].first)
                 }
             }
         }

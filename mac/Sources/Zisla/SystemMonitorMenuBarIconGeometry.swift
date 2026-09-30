@@ -23,6 +23,11 @@ enum SystemMonitorMenuBarIconGeometry {
     static let batteryValueTopGapWidth: CGFloat = 64
     static let batteryChargingBoltTopGapWidth: CGFloat = 50
 
+    static func batteryHeaderGapWidth(contentWidth: CGFloat, strokeWidth: CGFloat) -> CGFloat {
+        let halfWidth = contentWidth / 2 + strokeWidth / 2 + 6
+        return 2 * batteryRadius * asin(halfWidth / batteryRadius)
+    }
+
     static let batteryValueBaseFontSize: CGFloat = 20
     static let batteryChargingBoltCalibration: CGFloat = 220.0 / 180.0
 

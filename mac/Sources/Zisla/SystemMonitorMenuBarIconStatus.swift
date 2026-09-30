@@ -165,6 +165,8 @@ enum MenuBarIconBatteryGapContent: Equatable, Sendable {
     case bolt
     case plug
     case percentage
+    case boltAndPercentage
+    case plugAndPercentage
     case empty
 }
 
@@ -209,9 +211,9 @@ enum MenuBarIconMappings {
     static func batteryGapContent(_ battery: MenuBarIconBatteryStatus, options: MenuBarIconBatteryOptions) -> MenuBarIconBatteryGapContent {
         guard battery.isPresent, battery.rawPercentage != nil else { return .empty }
         if options.showsChargingIndicator {
-            if battery.isCharging { return .bolt }
+            if battery.isCharging { return options.showsPercentage ? .boltAndPercentage : .bolt }
             let showsPercentageForPower = options.showsPercentageWhenConnected && options.showsPercentage
-            if battery.isConnectedToPower, !showsPercentageForPower { return .plug }
+            if battery.isConnectedToPower { return showsPercentageForPower ? .plugAndPercentage : .plug }
         }
         return options.showsPercentage ? .percentage : .empty
     }

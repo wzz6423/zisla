@@ -11,9 +11,9 @@ struct SystemMonitorHeadphoneOptionsSettingsTests {
         #expect(!options.replacesNetworkIcon)
         #expect(options.prioritizesNetworkErrors)
         #expect(!options.usesVolumeColor)
-        #expect(options.showsBatteryLevels)
-        #expect(options.symbolScale == 1.6)
-        #expect(payload.count == 5)
+        #expect(options.symbolScale == 1.4)
+        #expect(payload.count == 4)
+        #expect(payload["showsBatteryLevels"] == nil)
         #expect(object["replacesNetworkIcon"] == nil)
         #expect(object["showsBatteryLevels"] == nil)
     }
@@ -22,7 +22,7 @@ struct SystemMonitorHeadphoneOptionsSettingsTests {
     func explicitHeadphoneOptionsRoundTripWithoutChangingExistingSelections() throws {
         let options = SystemMonitorHeadphoneOptions(
             replacesNetworkIcon: true, prioritizesNetworkErrors: false,
-            usesVolumeColor: true, showsBatteryLevels: false, symbolScale: 1.75
+            usesVolumeColor: true, symbolScale: 1.75
         )
         let input: [String: Any] = [
             Self.optionsKey: try Self.object(options),
@@ -61,13 +61,22 @@ struct SystemMonitorHeadphoneOptionsSettingsTests {
     }
 
     @Test
+    func removedBatteryPreferenceIsIgnoredWithoutChangingSavedSize() throws {
+        let options = try JSONDecoder().decode(SystemMonitorHeadphoneOptions.self,
+            from: Data(#"{"showsBatteryLevels":true,"symbolScale":1.6,"replacesNetworkIcon":true}"#.utf8))
+        #expect(options.symbolScale == 1.6)
+        #expect(options.replacesNetworkIcon)
+        #expect(try Self.object(options)["showsBatteryLevels"] == nil)
+    }
+
+    @Test
     func invalidTypesAreRejectedAndScaleIsBounded() throws {
         for payload in [#"{"replacesNetworkIcon":1}"#, #"{"symbolScale":"large"}"#] {
             #expect(throws: DecodingError.self) {
                 try JSONDecoder().decode(SystemMonitorHeadphoneOptions.self, from: Data(payload.utf8))
             }
         }
-        for (input, expected) in [(0.0, 1.0), (100, 1.8), (.nan, 1.6), (.infinity, 1.6)] {
+        for (input, expected) in [(0.0, 1.0), (100, 1.8), (.nan, 1.4), (.infinity, 1.4)] {
             var options = SystemMonitorHeadphoneOptions()
             options.symbolScale = input
             #expect(options.normalized.symbolScale == expected)

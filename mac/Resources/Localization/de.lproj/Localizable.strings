@@ -2554,13 +2554,10 @@
 "未连接" = "Nicht verbunden";
 "显示数量" = "Anzeigeanzahl";
 "%ld项" = "%ld Messwerte";
-"上下两行自选2或4个指标；选中风扇时可显示3个" = "Wählen Sie 2 oder 4 Messwerte in zwei Zeilen; mit ausgewähltem Lüfter sind auch 3 möglich";
+"普通指标可选2或4项；网络或风扇可选2或3项；两者同时显示时仅可选2项" = "2 oder 4 normale Messwerte; 2 oder 3 mit Netzwerk oder Lüfter; nur 2 mit beiden";
 "电量环、Wi-Fi 与实时指标合并显示；点击打开系统监控" = "Batteriering, WLAN und einen Echtzeitindikator kombinieren; ein Klick öffnet die Systemüberwachung";
-"用耳机图标替换 Wi-Fi" = "Wi-Fi durch Kopfhörersymbol ersetzen";
+"连接时短暂显示耳机图标" = "Kopfhörersymbol beim Verbinden kurz anzeigen";
 "优先显示网络错误" = "Netzwerkfehler bevorzugt anzeigen";
 "蓝牙音量颜色" = "Farbe für Bluetooth-Lautstärke";
-"显示耳机电量" = "Kopfhörer-Akkustände anzeigen";
 "耳机图标大小" = "Größe des Kopfhörersymbols";
 "仅底部指标选择音量时生效" = "Gilt nur, wenn Lautstärke als unterer Indikator ausgewählt ist";
-"点击图标后在系统监控页查看耳机电量" = "Auf das Symbol klicken, um die Kopfhörer-Akkustände im Systemmonitor anzuzeigen";
-"耳机电量" = "Kopfhörer-Akku";

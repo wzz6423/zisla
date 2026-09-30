@@ -124,7 +124,7 @@ struct SystemMonitorCombinedIconAppearanceSettingsTests {
             let input = Data("{\"\(Self.appearanceKey)\":{\"ringStrokeStyle\":\"\(raw)\",\"futureOption\":{\"enabled\":true}},\"futureSettings\":42}".utf8)
             let settings = try JSONDecoder().decode(FeatureSettings.self, from: input)
             #expect(settings.systemMonitorMenuBarCombinedIconAppearance.ringStrokeStyle == expected)
-            #expect(settings.systemMonitorMenuBarCombinedIconAppearance.iconSize == 22)
+            #expect(settings.systemMonitorMenuBarCombinedIconAppearance.iconSize == 24)
             #expect(settings.systemMonitorMenuBarLayout == .individual)
         }
     }
@@ -205,15 +205,19 @@ struct SystemMonitorCombinedIconAppearanceSettingsTests {
     @Test
     func requestedAppearanceDefaultsApplyToFreshMissingAndNullSettings() throws {
         let appearance = SystemMonitorCombinedIconAppearance()
-        #expect(appearance.iconSize == 22)
+        #expect(appearance.iconSize == 24)
         #expect(appearance.ringStrokeStyle == .bold)
         #expect(appearance.indicatorStyle == .dots)
         #expect(appearance.showsBatteryPercentage)
         #expect(appearance.showsChargingIndicator)
         #expect(appearance.showsPercentageWhenConnected)
         #expect(appearance.usesStatusColors)
-        #expect(appearance.wifiScale == 1)
-        #expect(appearance.batteryTextScale == 1.8)
+        #expect(appearance.wifiScale == 1.4)
+        #expect(appearance.batteryTextScale == 1.78)
+        #expect((appearance.iconSize - SystemMonitorCombinedIconAppearance.iconSizeRange.lowerBound) == 8)
+        #expect(abs((appearance.wifiScale - SystemMonitorCombinedIconAppearance.wifiScaleRange.lowerBound) / 0.05 - 8) < 1e-9)
+        #expect(abs((appearance.batteryTextScale - SystemMonitorCombinedIconAppearance.batteryTextScaleRange.lowerBound) / 0.02 - 8) < 1e-9)
+        #expect(abs((SystemMonitorHeadphoneOptions().symbolScale - SystemMonitorHeadphoneOptions.symbolScaleRange.lowerBound) / 0.05 - 8) < 1e-9)
         let expected = SystemMonitorCombinedIconAppearance(
             ringStrokeStyle: .bold,
             showsBatteryPercentage: true,

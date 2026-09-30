@@ -622,8 +622,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
             }
             .store(in: &cancellables)
 
-        Publishers.CombineLatest(model.audioOutput.$selectedDevice, model.audioOutput.$headphoneStatuses)
-            .sink { [weak self] _, _ in
+        model.audioOutput.$selectedDevice
+            .sink { [weak self] _ in
+                Task { @MainActor [weak self] in self?.syncMonitorStatusItems(force: true) }
+            }
+            .store(in: &cancellables)
+
+        model.$systemMonitorHeadphoneTransient
+            .sink { [weak self] _ in
                 Task { @MainActor [weak self] in self?.syncMonitorStatusItems(force: true) }
             }
             .store(in: &cancellables)
@@ -1234,12 +1240,15 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
         combinedMonitorStatusItem?.length = settings.systemMonitorMenuBarCombinedIconAppearance.normalized.iconSize + 4
         let battery = AppModel.shared.battery.snapshot
         let audioOutput = AppModel.shared.audioOutput
-        let headphones = audioOutput.selectedDevice.flatMap { device -> MenuBarIconHeadphoneStatus? in
+        let connection = AppModel.shared.systemMonitorHeadphoneTransient.connection
+        var headphoneOptions = settings.systemMonitorMenuBarHeadphoneOptions
+        headphoneOptions.replacesNetworkIcon = headphoneOptions.replacesNetworkIcon && connection != nil
+        let headphones = (connection?.device ?? audioOutput.selectedDevice).flatMap { device -> MenuBarIconHeadphoneStatus? in
             guard device.isHeadphones, device.isBluetoothAudio else { return nil }
             return MenuBarIconHeadphoneStatus(
                 device: device,
-                productID: audioOutput.headphoneStatuses.first { $0.device.id == device.id }?.productID,
-                isVolumeMetric: metric == .volume
+                productID: connection?.productID,
+                isVolumeMetric: metric == .volume && audioOutput.selectedDevice?.isBluetoothAudio == true
             )
         }
         let level = SystemMonitorCombinedMenuBarPresentation.level(
@@ -1249,7 +1258,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
             battery: battery, wifi: combinedIconLevels.wifi, level: level,
             configuration: settings.systemMonitorMenuBarCombinedIconAppearance,
             headphones: headphones,
-            headphoneOptions: settings.systemMonitorMenuBarHeadphoneOptions
+            headphoneOptions: headphoneOptions
         )
         let wifiValue: String
         switch combinedIconLevels.wifi {
@@ -1258,15 +1267,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
         case .disconnected: wifiValue = localized("未连接")
         case let .connected(strength): wifiValue = SystemMonitorCombinedMenuBarPresentation.percent(strength)
         }
-        let headphoneSummary = SystemMonitorHeadphonePresentation.rows(
-            statuses: audioOutput.headphoneStatuses,
-            showsBatteryLevels: settings.systemMonitorMenuBarHeadphoneOptions.showsBatteryLevels
-        ).map { $0.summary(locale: AppModel.shared.languageStore.language.locale) }
-        let tooltip = ([
+        let tooltip = [
             "\(localized("本机电池")): \(SystemMonitorCombinedMenuBarPresentation.percent(battery?.level))",
             "Wi-Fi: \(wifiValue)",
-            "\(localized(metric.menuTitle)): \(SystemMonitorCombinedMenuBarPresentation.percent(level))"
-        ] + headphoneSummary + [localized("点击打开系统监控")]).joined(separator: "\n")
+            "\(localized(metric.menuTitle)): \(SystemMonitorCombinedMenuBarPresentation.percent(level))",
+            localized("点击打开系统监控")
+        ].joined(separator: "\n")
         button.toolTip = tooltip
         button.image?.accessibilityDescription = tooltip
     }
@@ -1437,7 +1443,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
         representation.size = size
 
         let paragraph = NSMutableParagraphStyle()
-        paragraph.alignment = .left
+        paragraph.alignment = .center
         paragraph.lineBreakMode = .byClipping
 
         NSGraphicsContext.saveGraphicsState()

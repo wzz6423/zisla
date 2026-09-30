@@ -2553,13 +2553,10 @@
 "未连接" = "Disconnesso";
 "显示数量" = "Numero di indicatori";
 "%ld项" = "%ld indicatori";
-"上下两行自选2或4个指标；选中风扇时可显示3个" = "Scegli 2 o 4 indicatori su due righe; puoi mostrarne 3 se selezioni la ventola";
+"普通指标可选2或4项；网络或风扇可选2或3项；两者同时显示时仅可选2项" = "2 o 4 metriche standard; 2 o 3 con Rete o Ventola; solo 2 con entrambe";
 "电量环、Wi-Fi 与实时指标合并显示；点击打开系统监控" = "Combina anello della batteria, Wi-Fi e un indicatore in tempo reale; fai clic per aprire il monitor di sistema";
-"用耳机图标替换 Wi-Fi" = "Sostituisci Wi-Fi con l’icona delle cuffie";
+"连接时短暂显示耳机图标" = "Mostra brevemente l’icona delle cuffie alla connessione";
 "优先显示网络错误" = "Dai priorità agli errori di rete";
 "蓝牙音量颜色" = "Colore del volume Bluetooth";
-"显示耳机电量" = "Mostra la batteria delle cuffie";
 "耳机图标大小" = "Dimensione dell’icona delle cuffie";
 "仅底部指标选择音量时生效" = "Si applica solo se Volume è selezionato come indicatore inferiore";
-"点击图标后在系统监控页查看耳机电量" = "Fai clic sull’icona per vedere la batteria delle cuffie nel monitor di sistema";
-"耳机电量" = "Batteria delle cuffie";

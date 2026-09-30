@@ -64,25 +64,25 @@ public struct SystemMonitorCombinedIconAppearance: Equatable, Codable, Sendable 
     public static let wifiScaleRange: ClosedRange<Double> = 1...1.8
 
     public init(
-        iconSize: Double = 22,
+        iconSize: Double = 24,
         ringStrokeStyle: SystemMonitorMenuBarRingStrokeStyle = .bold,
         indicatorStyle: SystemMonitorMenuBarIndicatorStyle = .dots,
         showsBatteryPercentage: Bool = true,
         showsChargingIndicator: Bool = true,
         showsPercentageWhenConnected: Bool = true,
         usesStatusColors: Bool = true,
-        batteryTextScale: Double = 1.8,
-        wifiScale: Double = 1
+        batteryTextScale: Double = 1.78,
+        wifiScale: Double = 1.4
     ) {
-        self.iconSize = Self.clamped(iconSize, range: Self.iconSizeRange, fallback: 22)
+        self.iconSize = Self.clamped(iconSize, range: Self.iconSizeRange, fallback: 24)
         self.ringStrokeStyle = ringStrokeStyle
         self.indicatorStyle = indicatorStyle
         self.showsBatteryPercentage = showsBatteryPercentage
         self.showsChargingIndicator = showsChargingIndicator
         self.showsPercentageWhenConnected = showsPercentageWhenConnected
         self.usesStatusColors = usesStatusColors
-        self.batteryTextScale = Self.clamped(batteryTextScale, range: Self.batteryTextScaleRange, fallback: 1.8)
-        self.wifiScale = Self.clamped(wifiScale, range: Self.wifiScaleRange, fallback: 1)
+        self.batteryTextScale = Self.clamped(batteryTextScale, range: Self.batteryTextScaleRange, fallback: 1.78)
+        self.wifiScale = Self.clamped(wifiScale, range: Self.wifiScaleRange, fallback: 1.4)
     }
 
     public var normalized: Self {

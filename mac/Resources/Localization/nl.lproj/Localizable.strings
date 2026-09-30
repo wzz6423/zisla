@@ -2553,13 +2553,10 @@
 "未连接" = "Niet verbonden";
 "显示数量" = "Aantal indicatoren";
 "%ld项" = "%ld indicatoren";
-"上下两行自选2或4个指标；选中风扇时可显示3个" = "Kies 2 of 4 meetwaarden in twee rijen; met de ventilator geselecteerd kun je er 3 tonen";
+"普通指标可选2或4项；网络或风扇可选2或3项；两者同时显示时仅可选2项" = "2 of 4 gewone metingen; 2 of 3 met Netwerk of Ventilator; alleen 2 met beide";
 "电量环、Wi-Fi 与实时指标合并显示；点击打开系统监控" = "Combineer de batterijring, wifi en een actuele indicator; klik om de systeemmonitor te openen";
-"用耳机图标替换 Wi-Fi" = "Wi-Fi vervangen door koptelefoonpictogram";
+"连接时短暂显示耳机图标" = "Koptelefoonpictogram kort tonen bij verbinding";
 "优先显示网络错误" = "Netwerkfouten voorrang geven";
 "蓝牙音量颜色" = "Kleur voor Bluetooth-volume";
-"显示耳机电量" = "Batterijniveau van koptelefoon tonen";
 "耳机图标大小" = "Grootte van koptelefoonpictogram";
 "仅底部指标选择音量时生效" = "Alleen van toepassing als Volume is gekozen als onderste indicator";
-"点击图标后在系统监控页查看耳机电量" = "Klik op het pictogram om het batterijniveau van de koptelefoon in de systeemmonitor te bekijken";
-"耳机电量" = "Koptelefoonbatterij";

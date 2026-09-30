@@ -119,7 +119,7 @@ struct SystemMonitorMenuBarIconReferenceTests {
                         let appearance = SystemMonitorCombinedIconAppearance(
                             ringStrokeStyle: strokeStyle, indicatorStyle: style,
                             showsBatteryPercentage: false, showsChargingIndicator: false,
-                            showsPercentageWhenConnected: false, usesStatusColors: false
+                            showsPercentageWhenConnected: false, usesStatusColors: false, wifiScale: 1
                         )
                         let actual = try Self.render(Self.status(batteryLevel: progress, wifi: .connected(strength: 1), level: level),
                             appearance: appearance, size: 22, scale: 2)

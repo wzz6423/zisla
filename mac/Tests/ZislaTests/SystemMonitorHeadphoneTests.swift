@@ -65,7 +65,7 @@ struct SystemMonitorHeadphoneTests {
     }
 
     @Test
-    func bluetoothSymbolMatchesOriginalCenterScaleAndPalette() throws {
+    func headphoneSymbolUsesWhiteAtEveryScaleAndAppearance() throws {
         let headphones = headphone()
         let source = try #require({ () -> String? in
             guard case let .symbol(name) = headphones.source else { return nil }
@@ -78,7 +78,7 @@ struct SystemMonitorHeadphoneTests {
                     battery: nil, wifi: .connected(strength: 1), level: 0,
                     headphones: headphones, headphoneOptions: options
                 ), foreground: foreground, size: 120)
-                let reference = try referenceSymbol(name: source, scale: symbolScale, foreground: foreground)
+                let reference = try referenceSymbol(name: source, scale: symbolScale)
                 for horizontal in 35..<84 {
                     for vertical in 36..<88 {
                         #expect(actual.colorAt(x: horizontal, y: vertical) == reference.colorAt(x: horizontal, y: vertical),
@@ -120,42 +120,6 @@ struct SystemMonitorHeadphoneTests {
         }
     }
 
-    @Test
-    func batteryRowsPreserveSeparateBudAndCaseReadingsAndUnknownLevels() {
-        let airPods = HeadphoneConnection(
-            device: AudioOutputDevice(id: 1, name: "AirPods Pro"),
-            battery: HeadphoneBatterySnapshot(leftLevel: 91, rightLevel: 83, caseLevel: 62)
-        )
-        let max = HeadphoneConnection(device: AudioOutputDevice(id: 2, name: "AirPods Max"), battery: nil)
-        let rows = SystemMonitorHeadphonePresentation.rows(statuses: [airPods, max], showsBatteryLevels: true)
-        #expect(rows.map(\.id) == [1, 2])
-        #expect(rows[0].levels.map(\.level) == [91, 83, 62])
-        #expect(rows[1].levels == [NoticeBatteryLevel(label: "耳机", level: nil)])
-        #expect(rows[0].summary(locale: Locale(identifier: "en")) == "AirPods Pro: Left 91% · Right 83% · Case 62%")
-        #expect(rows[1].summary(locale: Locale(identifier: "en")) == "AirPods Max: Headphones --")
-        #expect(SystemMonitorHeadphonePresentation.rows(statuses: [airPods], showsBatteryLevels: false).isEmpty)
-        #expect(SystemMonitorHeadphonePresentation.rows(statuses: [], showsBatteryLevels: true).isEmpty)
-        let repeated = SystemMonitorHeadphonePresentation.rows(statuses: [airPods, airPods], showsBatteryLevels: true)
-        #expect(repeated.count == 1)
-        #expect(repeated[0] == rows[0])
-    }
-
-    @Test
-    func batteryRowsLocalizeAcrossEverySupportedLanguageWithoutInventingCharge() throws {
-        let status = HeadphoneConnection(
-            device: AudioOutputDevice(id: 1, name: "AirPods Pro"),
-            battery: HeadphoneBatterySnapshot(leftLevel: 0, rightLevel: nil, caseLevel: 100)
-        )
-        let row = try #require(SystemMonitorHeadphonePresentation.rows(statuses: [status], showsBatteryLevels: true).first)
-        for language in AppLanguage.allCases {
-            let summary = row.summary(locale: language.locale)
-            #expect(summary.contains("0%") && summary.contains("--") && summary.contains("100%"))
-            #expect(summary.contains(BatteryLocalization.metadataText("左", locale: language.locale)))
-            #expect(summary.contains(BatteryLocalization.metadataText("右", locale: language.locale)))
-            #expect(summary.contains(BatteryLocalization.metadataText("盒", locale: language.locale)))
-        }
-    }
-
     private func headphone(isVolumeMetric: Bool = false) -> MenuBarIconHeadphoneStatus {
         MenuBarIconHeadphoneStatus(
             device: AudioOutputDevice(id: 1, name: "AirPods Pro", isBluetoothAudio: true),
@@ -189,7 +153,7 @@ struct SystemMonitorHeadphoneTests {
         return NSBitmapImageRep(cgImage: image)
     }
 
-    private func referenceSymbol(name: String, scale: Double, foreground: NSColor) throws -> NSBitmapImageRep {
+    private func referenceSymbol(name: String, scale: Double) throws -> NSBitmapImageRep {
         let image = try #require(NSBitmapImageRep(
             bitmapDataPlanes: nil, pixelsWide: 120, pixelsHigh: 120,
             bitsPerSample: 8, samplesPerPixel: 4, hasAlpha: true, isPlanar: false,
@@ -199,11 +163,7 @@ struct SystemMonitorHeadphoneTests {
         NSGraphicsContext.saveGraphicsState()
         defer { NSGraphicsContext.restoreGraphicsState() }
         NSGraphicsContext.current = context
-        // Match the upstream CGColor palette before AppKit converts it into the bitmap color space.
-        let referenceColor = foreground == .black
-            ? CGColor(red: 0, green: 102.0 / 255.0, blue: 204.0 / 255.0, alpha: 1)
-            : CGColor(red: 77.0 / 255.0, green: 163.0 / 255.0, blue: 1, alpha: 1)
-        let tint = try #require(NSColor(cgColor: referenceColor))
+        let tint = NSColor.white
         let configuration = NSImage.SymbolConfiguration(pointSize: 38 * scale, weight: .semibold)
             .applying(.init(hierarchicalColor: tint))
         let baseSymbol = NSImage(systemSymbolName: name, variableValue: 1, accessibilityDescription: nil)

@@ -34,9 +34,10 @@ The local snapshot renames types, connects Zisla's battery and telemetry
 snapshots, gives Low Power Mode color precedence, treats missing readings as
 unavailable, and retains the battery, Wi-Fi, Bluetooth audio replacement,
 and bottom-level menu bar paths. Bluetooth device identity and battery data
-come from Zisla's existing audio-output service; the battery ring still reports
-the computer, while accessory battery levels appear in the monitoring page
-and tooltip. Dock rendering, charging animations, network management,
+come from Zisla's existing audio-output service. The battery ring reports the
+computer; the white headphone symbol appears briefly on connection. The local
+header lays out charging and percentage together with additional ring spacing.
+Accessory battery levels remain limited to the existing connection notice. Dock rendering, charging animations, network management,
 arbitrary Bluetooth-device pinning, and the upstream application's UI are
 not included. No remote dependency is needed to build or render these icons.
 

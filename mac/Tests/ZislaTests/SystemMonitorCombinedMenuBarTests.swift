@@ -134,8 +134,8 @@ struct SystemMonitorCombinedMenuBarTests {
         let image = try #require(SystemMonitorMenuBarImageRenderer.combinedIcon(
             battery: Self.battery(), wifi: .connected(strength: 1), level: 1, foreground: .black,
             configuration: SystemMonitorCombinedIconAppearance(
-                ringStrokeStyle: .regular, showsBatteryPercentage: false,
-                showsChargingIndicator: false, showsPercentageWhenConnected: false
+                iconSize: 22, ringStrokeStyle: .regular, showsBatteryPercentage: false,
+                showsChargingIndicator: false, showsPercentageWhenConnected: false, wifiScale: 1
             )
         ))
         let representation = try Self.bitmap(image)
@@ -239,13 +239,13 @@ struct SystemMonitorCombinedMenuBarTests {
             let image = try #require(SystemMonitorMenuBarImageRenderer.combinedIcon(
                 battery: battery, wifi: .connected(strength: 0.8), level: 0.5, foreground: foreground
             ))
-            #expect(image.size == NSSize(width: 22, height: 22))
+            #expect(image.size == NSSize(width: 24, height: 24))
             #expect(!image.isTemplate)
             let representation = try Self.bitmap(image)
-            #expect(representation.pixelsWide == 44)
-            #expect(representation.pixelsHigh == 44)
-            let yellowPixels = (0..<44).reduce(0) { count, horizontal in
-                count + (0..<44).filter { vertical in
+            #expect(representation.pixelsWide == 48)
+            #expect(representation.pixelsHigh == 48)
+            let yellowPixels = (0..<48).reduce(0) { count, horizontal in
+                count + (0..<48).filter { vertical in
                     guard let color = representation.colorAt(x: horizontal, y: vertical)?.usingColorSpace(.deviceRGB) else { return false }
                     return color.alphaComponent > 0.5 && color.redComponent > 0.6 && color.greenComponent > 0.5 && color.blueComponent < 0.4
                 }.count
@@ -289,7 +289,7 @@ struct SystemMonitorCombinedMenuBarTests {
             .deletingLastPathComponent().deletingLastPathComponent()
         let keys = [
             "菜单栏布局", "独立", "合并", "独立与合并", "上行", "下行", "无", "合并状态图标", "底部指标", "音量", "屏幕亮度", "未连接",
-            "显示数量", "%ld项", "上下两行自选2或4个指标；选中风扇时可显示3个",
+            "显示数量", "%ld项", "普通指标可选2或4项；网络或风扇可选2或3项；两者同时显示时仅可选2项",
             "电量环、Wi-Fi 与实时指标合并显示；点击打开系统监控",
         ]
         for language in AppLanguage.allCases {

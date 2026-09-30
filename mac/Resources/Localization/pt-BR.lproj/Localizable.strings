@@ -2553,13 +2553,10 @@
 "未连接" = "Desconectado";
 "显示数量" = "Quantidade exibida";
 "%ld项" = "%ld indicadores";
-"上下两行自选2或4个指标；选中风扇时可显示3个" = "Escolha 2 ou 4 indicadores em duas linhas; 3 ficam disponíveis quando o ventilador está selecionado";
+"普通指标可选2或4项；网络或风扇可选2或3项；两者同时显示时仅可选2项" = "2 ou 4 métricas comuns; 2 ou 3 com Rede ou Ventoinha; apenas 2 com ambas";
 "电量环、Wi-Fi 与实时指标合并显示；点击打开系统监控" = "Combine o anel da bateria, o Wi-Fi e um indicador em tempo real; clique para abrir o monitor do sistema";
-"用耳机图标替换 Wi-Fi" = "Substituir Wi-Fi pelo ícone de fones de ouvido";
+"连接时短暂显示耳机图标" = "Mostrar brevemente o ícone de fones ao conectar";
 "优先显示网络错误" = "Priorizar erros de rede";
 "蓝牙音量颜色" = "Cor do volume Bluetooth";
-"显示耳机电量" = "Mostrar bateria dos fones de ouvido";
 "耳机图标大小" = "Tamanho do ícone de fones de ouvido";
 "仅底部指标选择音量时生效" = "Aplica-se apenas quando Volume está selecionado como indicador inferior";
-"点击图标后在系统监控页查看耳机电量" = "Clique no ícone para ver a bateria dos fones de ouvido no monitor do sistema";
-"耳机电量" = "Bateria dos fones de ouvido";

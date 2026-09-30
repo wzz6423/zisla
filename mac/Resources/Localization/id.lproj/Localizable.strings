@@ -2553,13 +2553,10 @@
 "未连接" = "Terputus";
 "显示数量" = "Jumlah tampilan";
 "%ld项" = "%ld indikator";
-"上下两行自选2或4个指标；选中风扇时可显示3个" = "Pilih 2 atau 4 indikator dalam dua baris; 3 tersedia saat kipas dipilih";
+"普通指标可选2或4项；网络或风扇可选2或3项；两者同时显示时仅可选2项" = "Pilih 2 atau 4 metrik biasa; 2 atau 3 dengan Jaringan atau Kipas; hanya 2 jika keduanya dipilih";
 "电量环、Wi-Fi 与实时指标合并显示；点击打开系统监控" = "Gabungkan cincin baterai, Wi-Fi, dan indikator langsung; klik untuk membuka monitor sistem";
-"用耳机图标替换 Wi-Fi" = "Ganti Wi-Fi dengan Ikon Headphone";
+"连接时短暂显示耳机图标" = "Tampilkan Ikon Headphone Sesaat Saat Terhubung";
 "优先显示网络错误" = "Prioritaskan Kesalahan Jaringan";
 "蓝牙音量颜色" = "Warna Volume Bluetooth";
-"显示耳机电量" = "Tampilkan Baterai Headphone";
 "耳机图标大小" = "Ukuran Ikon Headphone";
 "仅底部指标选择音量时生效" = "Hanya berlaku jika Volume dipilih sebagai indikator bawah";
-"点击图标后在系统监控页查看耳机电量" = "Klik ikon untuk melihat baterai headphone di Monitor Sistem";
-"耳机电量" = "Baterai Headphone";

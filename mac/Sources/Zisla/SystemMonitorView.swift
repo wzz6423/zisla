@@ -24,8 +24,6 @@ final class SystemCleanupPanelPresentationState: ObservableObject {
 /// a dashboard-like dissonance.
 struct SystemMonitorView: View {
     @ObservedObject var service: SystemMonitorService
-    @ObservedObject var audioOutput: AudioOutputDeviceService
-    let headphoneOptions: SystemMonitorHeadphoneOptions
     let onCleanupRequested: () -> Void
     @State private var releasedMemoryBytes: UInt64?
     @State private var systemColumnHeight: CGFloat = 0
@@ -33,13 +31,9 @@ struct SystemMonitorView: View {
 
     init(
         service: SystemMonitorService,
-        audioOutput: AudioOutputDeviceService = AudioOutputDeviceService(),
-        headphoneOptions: SystemMonitorHeadphoneOptions = SystemMonitorHeadphoneOptions(),
         onCleanupRequested: @escaping () -> Void
     ) {
         self.service = service
-        self.audioOutput = audioOutput
-        self.headphoneOptions = headphoneOptions
         self.onCleanupRequested = onCleanupRequested
     }
 
@@ -86,9 +80,6 @@ struct SystemMonitorView: View {
             diskCard
             fanCard
             networkCard
-            if !headphoneRows.isEmpty {
-                headphoneCard
-            }
         }
         .background {
             GeometryReader { proxy in
@@ -262,36 +253,6 @@ struct SystemMonitorView: View {
                     value: service.snapshot?.networkIdentity.publicIPAddress ?? service.publicIPAddress,
                     placeholder: service.isRefreshingPublicIPAddress ? "正在获取" : "暂不可用"
                 )
-            }
-        }
-    }
-
-    private var headphoneRows: [SystemMonitorHeadphoneRow] {
-        SystemMonitorHeadphonePresentation.rows(
-            statuses: audioOutput.headphoneStatuses,
-            showsBatteryLevels: headphoneOptions.showsBatteryLevels
-        )
-    }
-
-    private var headphoneCard: some View {
-        MonitorCard {
-            VStack(alignment: .leading, spacing: 8) {
-                CardHeader(symbol: "headphones", title: AppLocalization.string("耳机电量", locale: locale))
-                ForEach(headphoneRows) { row in
-                    HStack(spacing: 8) {
-                        Text(row.name)
-                            .font(.system(size: 11, weight: .medium))
-                            .lineLimit(1)
-                            .frame(maxWidth: .infinity, alignment: .leading)
-                        HStack(spacing: 4) {
-                            ForEach(row.levels) { level in
-                                HeadphoneBatteryRing(level: level)
-                            }
-                        }
-                    }
-                    .accessibilityElement(children: .ignore)
-                    .accessibilityLabel(row.summary(locale: locale))
-                }
             }
         }
     }

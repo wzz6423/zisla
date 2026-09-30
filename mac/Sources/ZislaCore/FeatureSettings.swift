@@ -335,6 +335,10 @@ public enum SystemMonitorMenuBarMetric: String, Codable, CaseIterable, Sendable,
         }
     }
 
+    public var requiresFullMenuBarRow: Bool {
+        self == .network || self == .fan
+    }
+
     public var symbolName: String {
         switch self {
         case .cpu: "cpu"
@@ -417,9 +421,20 @@ public enum SystemMonitorMenuBarRows {
         let topRow = Array(top.filter { seen.insert($0).inserted }.prefix(2))
         seen = Set(topRow)
         let bottomRow = Array(bottom.filter { seen.insert($0).inserted }.prefix(2))
-        let rows = [topRow, bottomRow]
+        var rows = [topRow, bottomRow]
+        let wideMetrics = rows.flatMap { $0 }.filter(\.requiresFullMenuBarRow)
+        if wideMetrics.count == 2 {
+            return wideMetrics.map { [$0] }
+        }
         var counts = rows.map { max(1, $0.count) }
-        if counts.reduce(0, +) == 3 && !rows.joined().contains(.fan) {
+        if let wide = wideMetrics.first {
+            let wideRow = rows[0].contains(wide) ? 0 : 1
+            let otherRow = 1 - wideRow
+            rows[otherRow] += rows[wideRow].filter { $0 != wide }
+            rows[wideRow] = [wide]
+            counts[otherRow] = min(2, counts.reduce(0, +) - 1)
+            counts[wideRow] = 1
+        } else if counts.reduce(0, +) == 3 {
             counts = [2, 2]
         }
         return resized(rows, counts: counts)
@@ -429,7 +444,8 @@ public enum SystemMonitorMenuBarRows {
         top: [SystemMonitorMenuBarMetric],
         bottom: [SystemMonitorMenuBarMetric]
     ) -> [Int] {
-        normalized(top: top, bottom: bottom).joined().contains(.fan) ? [2, 3, 4] : [2, 4]
+        let wideCount = normalized(top: top, bottom: bottom).joined().filter(\.requiresFullMenuBarRow).count
+        return wideCount == 2 ? [2] : wideCount == 1 ? [2, 3] : [2, 4]
     }
 
     public static func adjusted(
@@ -437,17 +453,11 @@ public enum SystemMonitorMenuBarRows {
         bottom: [SystemMonitorMenuBarMetric],
         count: Int
     ) -> [[SystemMonitorMenuBarMetric]] {
-        var rows = normalized(top: top, bottom: bottom)
-        if rows.joined().count == count {
-            return rows
+        let rows = normalized(top: top, bottom: bottom)
+        let counts = rows.map { row in
+            count <= 2 || row.contains(where: \.requiresFullMenuBarRow) ? 1 : 2
         }
-        if count == 3 && rows.joined().contains(.fan) {
-            let fanRow = rows[0].contains(.fan) ? 0 : 1
-            rows[fanRow] = [.fan]
-            return resized(rows, counts: fanRow == 0 ? [1, 2] : [2, 1])
-        }
-        let rowCount = count <= 2 ? 1 : 2
-        return resized(rows, counts: [rowCount, rowCount])
+        return resized(rows, counts: counts)
     }
 
     private static func resized(

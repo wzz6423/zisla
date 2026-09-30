@@ -2553,13 +2553,10 @@
 "未连接" = "Bağlantı Yok";
 "显示数量" = "Gösterge sayısı";
 "%ld项" = "%ld gösterge";
-"上下两行自选2或4个指标；选中风扇时可显示3个" = "İki satırda 2 veya 4 gösterge seçin; fan seçiliyken 3 gösterge de kullanılabilir";
+"普通指标可选2或4项；网络或风扇可选2或3项；两者同时显示时仅可选2项" = "Normal ölçümler için 2 veya 4; Ağ veya Fan ile 2 veya 3; ikisi birlikteyse yalnızca 2";
 "电量环、Wi-Fi 与实时指标合并显示；点击打开系统监控" = "Pil halkasını, Wi-Fi ve canlı bir göstergeyi birleştirir; sistem monitörünü açmak için tıklayın";
-"用耳机图标替换 Wi-Fi" = "Wi-Fi yerine kulaklık simgesini göster";
+"连接时短暂显示耳机图标" = "Bağlanınca kulaklık simgesini kısa süre göster";
 "优先显示网络错误" = "Ağ hatalarına öncelik ver";
 "蓝牙音量颜色" = "Bluetooth ses düzeyi rengi";
-"显示耳机电量" = "Kulaklık pil düzeylerini göster";
 "耳机图标大小" = "Kulaklık simgesi boyutu";
 "仅底部指标选择音量时生效" = "Yalnızca alt gösterge olarak Ses Düzeyi seçildiğinde geçerlidir";
-"点击图标后在系统监控页查看耳机电量" = "Sistem izleyicisinde kulaklık pil düzeylerini görmek için simgeye tıklayın";
-"耳机电量" = "Kulaklık pili";

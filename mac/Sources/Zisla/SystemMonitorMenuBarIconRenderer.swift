@@ -164,8 +164,7 @@ enum SystemMonitorMenuBarIconRenderer {
             drawBluetoothAudioDevice(
                 headphones.source,
                 options: menuBarStatus.headphoneOptions,
-                in: context,
-                foreground: foreground
+                in: context
             )
         } else {
             drawWiFi(
@@ -195,10 +194,27 @@ enum SystemMonitorMenuBarIconRenderer {
     ) {
         let gapContent = MenuBarIconMappings.batteryGapContent(battery, options: options)
         let hasTopGap = gapContent != .empty
-        let topGapWidth = switch gapContent {
-        case .bolt, .plug: SystemMonitorMenuBarIconGeometry.batteryChargingBoltTopGapWidth
-        case .percentage, .empty: SystemMonitorMenuBarIconGeometry.batteryValueTopGapWidth
-        }
+        let showsValue = [.percentage, .boltAndPercentage, .plugAndPercentage].contains(gapContent)
+        let showsBolt = [.bolt, .boltAndPercentage].contains(gapContent)
+        let showsPlug = [.plug, .plugAndPercentage].contains(gapContent)
+        let fontSize = batteryValueFontSize(scale: options.textScale)
+        let valueLine = batteryPercentageLine(battery.percentage, fontSize: fontSize, color: foreground)
+        let valueWidth = showsValue ? CGFloat(CTLineGetTypographicBounds(valueLine, nil, nil, nil)) : 0
+        let indicatorScale = batteryChargingBoltScale(textScale: options.textScale)
+        let boltBounds = SystemMonitorMenuBarIconGeometry.batteryChargingBolt(scale: indicatorScale).boundingBoxOfPath
+        let plugHeight = boltBounds.height * SystemMonitorMenuBarIconGeometry.batteryPlugHeightScale
+        let plug = showsPlug ? configuredSymbol(
+            name: SystemMonitorMenuBarIconGeometry.batteryPlugSymbolName,
+            pointSize: batteryPlugPointSize(targetHeight: plugHeight),
+            foreground: NSColor(cgColor: foreground) ?? .white
+        ) : nil
+        let indicatorWidth = showsBolt ? boltBounds.width : (plug?.size.width ?? 0)
+        let headerWidth = valueWidth + indicatorWidth + (showsValue && indicatorWidth > 0 ? 6 : 0)
+        // Fit the entire header together so neither glyph can hide the other.
+        let headerScale: CGFloat = headerWidth > 70 ? 70 / headerWidth : 1
+        let topGapWidth = SystemMonitorMenuBarIconGeometry.batteryHeaderGapWidth(
+            contentWidth: headerWidth * headerScale, strokeWidth: 8 * CGFloat(options.ringStrokeScale)
+        )
 
         context.setLineWidth(8 * CGFloat(options.ringStrokeScale))
         context.setStrokeColor(foreground.copy(alpha: inactiveTrackAlpha) ?? foreground)
@@ -236,50 +252,34 @@ enum SystemMonitorMenuBarIconRenderer {
         )
         defer { context.restoreGState() }
 
-        let indicatorScale = batteryChargingBoltScale(textScale: options.textScale)
-
-        switch gapContent {
-        case .bolt:
-            let baseBolt = SystemMonitorMenuBarIconGeometry.batteryChargingBolt(scale: indicatorScale)
+        let centerX = SystemMonitorMenuBarIconGeometry.artworkCenterX
+        context.translateBy(x: centerX, y: 2.1)
+        context.scaleBy(x: headerScale, y: headerScale)
+        context.translateBy(x: -centerX, y: -2.1)
+        let left = centerX - headerWidth / 2
+        if showsBolt {
+            context.saveGState()
+            context.translateBy(x: left - boltBounds.minX, y: 0)
             context.setFillColor(foreground)
-            context.addPath(baseBolt)
+            context.addPath(SystemMonitorMenuBarIconGeometry.batteryChargingBolt(scale: indicatorScale))
             context.fillPath()
-        case .plug:
-            drawBatteryPlug(
-                boltScale: indicatorScale,
+            context.restoreGState()
+        }
+        if showsPlug {
+            drawOfficialSymbol(
+                name: SystemMonitorMenuBarIconGeometry.batteryPlugSymbolName,
+                pointSize: batteryPlugPointSize(targetHeight: plugHeight),
+                center: CGPoint(x: left + indicatorWidth / 2, y: boltBounds.midY),
                 foreground: foreground,
                 in: context
             )
-        case .percentage:
-            drawBatteryPercentage(
-                battery.percentage,
-                color: foreground,
-                fontSize: batteryValueFontSize(scale: options.textScale),
-                in: context
-            )
-        case .empty:
-            break
         }
-    }
-
-    /// Draws the plug at the bolt's optical size and center, so the arc's top
-    /// gap reads the same whichever indicator is showing.
-    private static func drawBatteryPlug(
-        boltScale: CGFloat,
-        foreground: CGColor,
-        in context: CGContext
-    ) {
-        let boltHeight = SystemMonitorMenuBarIconGeometry.batteryChargingBolt().boundingBoxOfPath.height
-        let targetHeight = boltHeight * boltScale * SystemMonitorMenuBarIconGeometry.batteryPlugHeightScale
-        guard targetHeight.isFinite, targetHeight > 0 else { return }
-
-        drawOfficialSymbol(
-            name: SystemMonitorMenuBarIconGeometry.batteryPlugSymbolName,
-            pointSize: batteryPlugPointSize(targetHeight: targetHeight),
-            center: SystemMonitorMenuBarIconGeometry.batteryTopIndicatorCenter(boltScale: boltScale),
-            foreground: foreground,
-            in: context
-        )
+        if showsValue {
+            let baseline = SystemMonitorMenuBarIconGeometry.batteryValueBaseline(fontSize: fontSize)
+            context.textMatrix = CGAffineTransform(scaleX: 1, y: -1)
+            context.textPosition = CGPoint(x: left + headerWidth - valueWidth, y: baseline.y)
+            CTLineDraw(valueLine, context)
+        }
     }
 
     private static func color(
@@ -323,10 +323,9 @@ enum SystemMonitorMenuBarIconRenderer {
     private static func drawBluetoothAudioDevice(
         _ source: MenuBarIconHeadphoneSource,
         options: SystemMonitorHeadphoneOptions,
-        in context: CGContext,
-        foreground: CGColor
+        in context: CGContext
     ) {
-        let tint = bluetoothColor(foreground: foreground)
+        let tint = CGColor(gray: 1, alpha: 1)
         let pointSize = centerSymbolPointSize(for: options.symbolScale)
         let scale = pointSize / centerSymbolBasePointSize
         let maxDimension = 42 * scale
@@ -372,31 +371,15 @@ enum SystemMonitorMenuBarIconRenderer {
         context.fill(targetRect)
         context.endTransparencyLayer()
     }
-    private static func drawBatteryPercentage(
-        _ percentage: Int,
-        color: CGColor,
-        fontSize: CGFloat,
-        in context: CGContext
-    ) {
-        let font = batteryValueFont(size: fontSize)
-        let attributes: [NSAttributedString.Key: Any] = [
-            .font: font,
-            .kern: -fontSize * 0.04,
-            .foregroundColor: NSColor(cgColor: color) ?? .white
-        ]
-        let line = CTLineCreateWithAttributedString(
-            NSAttributedString(string: String(percentage), attributes: attributes)
-        )
-        var ascent: CGFloat = 0
-        var descent: CGFloat = 0
-        var leading: CGFloat = 0
-        let width = CGFloat(CTLineGetTypographicBounds(line, &ascent, &descent, &leading))
-        let baseline = SystemMonitorMenuBarIconGeometry.batteryValueBaseline(fontSize: fontSize)
-
-        context.setFillColor(color)
-        context.textMatrix = CGAffineTransform(scaleX: 1, y: -1)
-        context.textPosition = CGPoint(x: baseline.x - width / 2, y: baseline.y)
-        CTLineDraw(line, context)
+    private static func batteryPercentageLine(_ percentage: Int, fontSize: CGFloat, color: CGColor) -> CTLine {
+        CTLineCreateWithAttributedString(NSAttributedString(
+            string: String(percentage),
+            attributes: [
+                .font: batteryValueFont(size: fontSize),
+                .kern: -fontSize * 0.04,
+                .foregroundColor: NSColor(cgColor: color) ?? .white
+            ]
+        ))
     }
     private static func batteryValueFontSize(scale: Double) -> CGFloat {
         SystemMonitorMenuBarIconGeometry.batteryValueBaseFontSize * CGFloat(scale)

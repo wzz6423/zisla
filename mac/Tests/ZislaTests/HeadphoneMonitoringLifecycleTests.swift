@@ -5,40 +5,34 @@ import ZislaCore
 
 struct HeadphoneMonitoringLifecycleTests {
     @Test
-    func defaultMonitorReadsBatteryWithoutSideNotices() {
+    func defaultMonitorDoesNotStartAudioOrBatteryMonitoring() {
         let options = SystemMonitorHeadphoneOptions()
-        #expect(options.showsBatteryLevels)
         #expect(!options.replacesNetworkIcon)
         #expect(!options.usesVolumeColor)
         let policy = AppModel.headphoneMonitoringPolicy(
             sideNoticesEnabled: false, systemMonitorEnabled: true, options: options
         )
-        #expect(policy.audioOutputEnabled)
-        #expect(policy.batteryMonitoringEnabled)
+        #expect(!policy)
     }
 
     @Test
-    func allSettingCombinationsKeepAudioAndBatteryGatesIndependent() {
+    func allSettingCombinationsEnableOnlyRequiredAudioMonitoring() {
         for sideNotices in [false, true] {
             for monitor in [false, true] {
-                for battery in [false, true] {
-                    for replacement in [false, true] {
-                        for volumeColor in [false, true] {
-                            for networkPriority in [false, true] {
-                                let options = SystemMonitorHeadphoneOptions(
-                                    replacesNetworkIcon: replacement,
-                                    prioritizesNetworkErrors: networkPriority,
-                                    usesVolumeColor: volumeColor,
-                                    showsBatteryLevels: battery
-                                )
-                                let policy = AppModel.headphoneMonitoringPolicy(
-                                    sideNoticesEnabled: sideNotices,
-                                    systemMonitorEnabled: monitor,
-                                    options: options
-                                )
-                                #expect(policy.audioOutputEnabled == (sideNotices || (monitor && (battery || replacement || volumeColor))))
-                                #expect(policy.batteryMonitoringEnabled == (monitor && (battery || replacement)))
-                            }
+                for replacement in [false, true] {
+                    for volumeColor in [false, true] {
+                        for networkPriority in [false, true] {
+                            let options = SystemMonitorHeadphoneOptions(
+                                replacesNetworkIcon: replacement,
+                                prioritizesNetworkErrors: networkPriority,
+                                usesVolumeColor: volumeColor
+                            )
+                            let policy = AppModel.headphoneMonitoringPolicy(
+                                sideNoticesEnabled: sideNotices,
+                                systemMonitorEnabled: monitor,
+                                options: options
+                            )
+                            #expect(policy == (sideNotices || (monitor && (replacement || volumeColor))))
                         }
                     }
                 }
@@ -53,9 +47,9 @@ struct HeadphoneMonitoringLifecycleTests {
             .appendingPathComponent("Sources/Zisla/AppModel.swift")
         let source = try String(contentsOf: sourceURL, encoding: .utf8)
         #expect(source.contains("options: settings.systemMonitorMenuBarHeadphoneOptions"))
-        #expect(source.contains("audioOutput.setHeadphoneBatteryMonitoringEnabled(headphonePolicy.batteryMonitoringEnabled)"))
-        #expect(source.contains("if headphonePolicy.audioOutputEnabled {\n      audioOutput.start()\n    } else {\n      audioOutput.stop()"))
+        #expect(!source.contains("setHeadphoneBatteryMonitoringEnabled"))
+        #expect(source.contains("if headphonePolicy {\n      audioOutput.start()\n    } else {\n      audioOutput.stop()"))
         #expect(source.contains("if settings.sideNoticesEnabled {\n      focusMode.start()\n    } else {\n      focusMode.stop()"))
-        #expect(source.contains("media.stop()\n    audioOutput.stop()\n    calendar.stop()"))
+        #expect(source.contains("media.stop()\n    clearHeadphoneTransient()\n    audioOutput.stop()\n    calendar.stop()"))
     }
 }
