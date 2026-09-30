@@ -197,6 +197,228 @@ struct CodexSessionActivityDetectorTests {
     }
 
     @Test
+    func retainsConfirmedClientProviderWhenProcessTreeIsUnavailable() throws {
+        let root = makeSessionsRoot()
+        defer { try? FileManager.default.removeItem(at: root) }
+        let relativePath = "2026/07/19/rollout-provider-tree.jsonl"
+        let rolloutURL = root.appendingPathComponent(relativePath).standardizedFileURL
+        let startedAt = iso8601Date("2026-07-19T01:00:00.000Z")
+        try writeRollout(
+            under: root,
+            relativePath: relativePath,
+            lines: [
+                sessionMetadataLine(sessionID: "session-provider-tree"),
+                eventLine(timestamp: "2026-07-19T01:00:00.000Z", payloadType: "task_started", turnID: "turn-provider-tree"),
+            ],
+            modifiedAt: startedAt
+        )
+        var processIdentifier: Int32 = 2468
+        var providers: [Int32: AIProvider] = [2468: .gpt]
+        let detector = CodexSessionActivityDetector(
+            sessionsDirectory: root,
+            processIdentifiersForOpenFiles: { _ in [rolloutURL: processIdentifier] },
+            processStartDatesForProcessIdentifiers: { _ in
+                [processIdentifier: startedAt.addingTimeInterval(-1)]
+            },
+            clientProvidersForProcessIdentifiers: { _ in providers },
+            now: { startedAt.addingTimeInterval(1) }
+        )
+
+        #expect(try detector.activeTasks().first?.provider == .gpt)
+        processIdentifier = 9753
+        providers = [:]
+
+        let task = try #require(detector.activeTasks().first)
+        #expect(task.provider == .gpt)
+        #expect(task.title == "ChatGPT")
+        #expect(task.processIdentifier == 9753)
+    }
+
+    @Test
+    func confirmedClientProviderDoesNotCrossSessions() throws {
+        let root = makeSessionsRoot()
+        defer { try? FileManager.default.removeItem(at: root) }
+        let firstRelativePath = "2026/07/19/rollout-provider-first.jsonl"
+        let secondRelativePath = "2026/07/19/rollout-provider-second.jsonl"
+        let firstURL = root.appendingPathComponent(firstRelativePath).standardizedFileURL
+        let secondURL = root.appendingPathComponent(secondRelativePath).standardizedFileURL
+        let startedAt = iso8601Date("2026-07-19T01:00:00.000Z")
+        try writeRollout(
+            under: root,
+            relativePath: firstRelativePath,
+            lines: [
+                sessionMetadataLine(sessionID: "session-provider-first"),
+                eventLine(timestamp: "2026-07-19T01:00:00.000Z", payloadType: "task_started", turnID: "turn-provider-first"),
+            ],
+            modifiedAt: startedAt
+        )
+        try writeRollout(
+            under: root,
+            relativePath: secondRelativePath,
+            lines: [
+                sessionMetadataLine(sessionID: "session-provider-second"),
+                eventLine(timestamp: "2026-07-19T01:00:01.000Z", payloadType: "task_started", turnID: "turn-provider-second"),
+            ],
+            modifiedAt: startedAt.addingTimeInterval(1)
+        )
+        var providers: [Int32: AIProvider] = [101: .gpt, 202: .codex]
+        let detector = CodexSessionActivityDetector(
+            sessionsDirectory: root,
+            processIdentifiersForOpenFiles: { _ in [firstURL: 101, secondURL: 202] },
+            processStartDatesForProcessIdentifiers: { _ in
+                [101: startedAt.addingTimeInterval(-1), 202: startedAt.addingTimeInterval(-1)]
+            },
+            clientProvidersForProcessIdentifiers: { _ in providers },
+            now: { startedAt.addingTimeInterval(2) }
+        )
+
+        let firstScan = try detector.activeTasks()
+        let firstTask = try #require(firstScan.first { $0.id == CodexSessionActivityDetector.taskID(forTurnID: "turn-provider-first") })
+        let secondTask = try #require(firstScan.first { $0.id == CodexSessionActivityDetector.taskID(forTurnID: "turn-provider-second") })
+        #expect(firstTask.provider == .gpt)
+        #expect(secondTask.provider == .codex)
+
+        providers = [:]
+        let secondScan = try detector.activeTasks()
+        #expect(secondScan.first { $0.id == firstTask.id }?.provider == .gpt)
+        #expect(secondScan.first { $0.id == secondTask.id }?.provider == .codex)
+    }
+
+    @Test
+    func sameSessionUsesNewClientEvidenceForItsNextTurn() throws {
+        let root = makeSessionsRoot()
+        defer { try? FileManager.default.removeItem(at: root) }
+        let relativePath = "2026/07/19/rollout-provider-switch.jsonl"
+        let rolloutURL = root.appendingPathComponent(relativePath).standardizedFileURL
+        let startedAt = iso8601Date("2026-07-19T01:00:00.000Z")
+        try writeRollout(
+            under: root,
+            relativePath: relativePath,
+            lines: [
+                sessionMetadataLine(sessionID: "session-provider-switch"),
+                eventLine(timestamp: "2026-07-19T01:00:00.000Z", payloadType: "task_started", turnID: "turn-provider-before-switch"),
+            ],
+            modifiedAt: startedAt
+        )
+        var processIdentifier: Int32 = 2468
+        var providers: [Int32: AIProvider] = [2468: .gpt]
+        let detector = CodexSessionActivityDetector(
+            sessionsDirectory: root,
+            processIdentifiersForOpenFiles: { _ in [rolloutURL: processIdentifier] },
+            processStartDatesForProcessIdentifiers: { _ in
+                [processIdentifier: startedAt.addingTimeInterval(-1)]
+            },
+            clientProvidersForProcessIdentifiers: { _ in providers },
+            now: { startedAt.addingTimeInterval(1) }
+        )
+
+        #expect(try detector.activeTasks().first?.provider == .gpt)
+
+        try appendLine(
+            eventLine(
+                timestamp: "2026-07-19T01:00:02.000Z",
+                payloadType: "task_started",
+                turnID: "turn-provider-after-switch"
+            ),
+            to: rolloutURL
+        )
+        processIdentifier = 9753
+        providers = [9753: .codex]
+
+        let task = try #require(detector.activeTasks().first)
+        #expect(task.id == CodexSessionActivityDetector.taskID(forTurnID: "turn-provider-after-switch"))
+        #expect(task.provider == .codex)
+        #expect(task.title == "Codex")
+        providers = [:]
+        #expect(try detector.activeTasks().first?.provider == .codex)
+    }
+
+    @Test(arguments: [false, true])
+    func keepsConfirmedProviderAcrossIdleSessionAndClientRestart(hasSessionMetadata: Bool) throws {
+        let root = makeSessionsRoot()
+        defer { try? FileManager.default.removeItem(at: root) }
+        let relativePath = "2026/07/19/rollout-provider-resumed.jsonl"
+        let rolloutURL = root.appendingPathComponent(relativePath).standardizedFileURL
+        let startedAt = iso8601Date("2026-07-19T01:00:00.000Z")
+        var lines = [String]()
+        if hasSessionMetadata {
+            lines.append(sessionMetadataLine(sessionID: "session-provider-resumed"))
+        }
+        lines.append(eventLine(
+            timestamp: "2026-07-19T01:00:00.000Z",
+            payloadType: "task_started",
+            turnID: "turn-provider-before-restart"
+        ))
+        try writeRollout(under: root, relativePath: relativePath, lines: lines, modifiedAt: startedAt)
+        var processIdentifier: Int32 = 2468
+        var processStartedAt = startedAt.addingTimeInterval(-1)
+        var providers: [Int32: AIProvider] = [2468: .gpt]
+        let detector = CodexSessionActivityDetector(
+            sessionsDirectory: root,
+            processIdentifiersForOpenFiles: { _ in [rolloutURL: processIdentifier] },
+            processStartDatesForProcessIdentifiers: { _ in [processIdentifier: processStartedAt] },
+            clientProvidersForProcessIdentifiers: { _ in providers },
+            now: { startedAt.addingTimeInterval(5) }
+        )
+
+        #expect(try detector.activeTasks().first?.provider == .gpt)
+        try appendLine(eventLine(
+            timestamp: "2026-07-19T01:00:01.000Z",
+            payloadType: "task_complete",
+            turnID: "turn-provider-before-restart"
+        ), to: rolloutURL)
+        #expect(try detector.activeTasks().isEmpty)
+
+        processIdentifier = 9753
+        processStartedAt = startedAt.addingTimeInterval(3)
+        providers = [:]
+        try appendLine(eventLine(
+            timestamp: "2026-07-19T01:00:04.000Z",
+            payloadType: "task_started",
+            turnID: "turn-provider-after-restart"
+        ), to: rolloutURL)
+        let task = try #require(detector.activeTasks().first)
+
+        #expect(task.provider == .gpt)
+        #expect(task.title == "ChatGPT")
+        #expect(task.processIdentifier == 9753)
+    }
+
+    @Test
+    func removesConfirmedProviderWhenItsRolloutIsNoLongerSelected() throws {
+        let root = makeSessionsRoot()
+        defer { try? FileManager.default.removeItem(at: root) }
+        let relativePath = "2026/07/19/rollout-provider-removed.jsonl"
+        let rolloutURL = root.appendingPathComponent(relativePath).standardizedFileURL
+        let startedAt = iso8601Date("2026-07-19T01:00:00.000Z")
+        let lines = [
+            sessionMetadataLine(sessionID: "session-provider-removed"),
+            eventLine(
+                timestamp: "2026-07-19T01:00:00.000Z",
+                payloadType: "task_started",
+                turnID: "turn-provider-removed"
+            ),
+        ]
+        try writeRollout(under: root, relativePath: relativePath, lines: lines, modifiedAt: startedAt)
+        var providers: [Int32: AIProvider] = [2468: .gpt]
+        let detector = CodexSessionActivityDetector(
+            sessionsDirectory: root,
+            processIdentifiersForOpenFiles: { _ in [rolloutURL: 2468] },
+            processStartDatesForProcessIdentifiers: { _ in [2468: startedAt.addingTimeInterval(-1)] },
+            clientProvidersForProcessIdentifiers: { _ in providers },
+            now: { startedAt.addingTimeInterval(1) }
+        )
+
+        #expect(try detector.activeTasks().first?.provider == .gpt)
+        try FileManager.default.removeItem(at: rolloutURL)
+        #expect(try detector.activeTasks().isEmpty)
+        providers = [:]
+        try writeRollout(under: root, relativePath: relativePath, lines: lines, modifiedAt: startedAt)
+
+        #expect(try detector.activeTasks().first?.provider == .codex)
+    }
+
+    @Test
     func removesPreviouslyVerifiedTurnWhenItsRolloutCloses() throws {
         let root = makeSessionsRoot()
         defer { try? FileManager.default.removeItem(at: root) }

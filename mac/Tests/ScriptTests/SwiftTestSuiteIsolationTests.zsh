@@ -80,3 +80,31 @@ for mode in success empty list-failure test-failure; do
 done
 
 print -- 'PASS: Swift suite isolation preserves nested and top-level tests, filters exact targets, and propagates discovery and test failures'
+
+python3 - "$ROOT/../.github/workflows/swift-tests.yml" <<'PYTHON'
+from pathlib import Path
+import re
+import shlex
+import sys
+
+commands = [
+    shlex.split(line.strip())
+    for line in Path(sys.argv[1]).read_text().splitlines()
+    if line.strip().startswith("zsh Scripts/swift-test.sh ")
+]
+cache_test = "ZislaTests.AIMascotImageCacheTests/recoversFromTransientLoadFailureAfterRetry()"
+selected = [
+    command for command in commands
+    if "--filter" in command
+    and re.search(command[command.index("--filter") + 1], cache_test)
+    and ("--skip" not in command
+         or not re.search(command[command.index("--skip") + 1], cache_test))
+]
+if len(selected) != 1 or "--skip" in selected[0]:
+    sys.exit("CI must run the image cache suite exactly once in its own test process")
+selector = selected[0][selected[0].index("--filter") + 1]
+for other_suite in ["AIMascotIdentityTests", "RichNoteEditorTests", "AIMascotImageCacheTestsExtra"]:
+    if re.search(selector, f"ZislaTests.{other_suite}/test()"):
+        sys.exit(f"CI image cache isolation also selected {other_suite}")
+print("PASS: CI runs the image cache suite exactly once without unrelated AppKit tests")
+PYTHON
