@@ -11,6 +11,40 @@ import ZislaCore
 @MainActor
 struct ClipboardTranslationPresentationTests {
     @Test
+    func assistantWindowCoversTransparentPixelsAfterResizingWithoutTakingFocus() throws {
+        let content = NSView()
+        let panel = ClipboardAssistantController.makeWindow(
+            contentView: content,
+            frame: CGRect(x: -100_000, y: -100_000, width: 533, height: 37)
+        )
+        defer { panel.close() }
+        let container = try #require(panel.contentView)
+
+        for size in [CGSize(width: 533, height: 37), CGSize(width: 240, height: 54),
+                     CGSize(width: 533, height: 257)] {
+            panel.setContentSize(size)
+            container.layoutSubtreeIfNeeded()
+            let bitmap = try #require(container.bitmapImageRepForCachingDisplay(in: container.bounds))
+            container.cacheDisplay(in: container.bounds, to: bitmap)
+
+            for point in [CGPoint(x: 1, y: 1), CGPoint(x: size.width - 24, y: 18),
+                          CGPoint(x: size.width - 2, y: size.height - 2)] {
+                let pixel = try #require(bitmap.colorAt(
+                    x: Int(point.x * CGFloat(bitmap.pixelsWide) / size.width),
+                    y: Int(point.y * CGFloat(bitmap.pixelsHigh) / size.height)
+                ))
+                #expect(pixel.alphaComponent > 0, "透明区域必须保留窗口像素，防止点击透传")
+                #expect(container.hitTest(point) === content, "拦截底层仍须保留内容的点击目标")
+            }
+            #expect(content.frame.size == size)
+            #expect(container.hitTest(CGPoint(x: size.width + 1, y: 18)) == nil)
+        }
+        #expect(!panel.ignoresMouseEvents)
+        #expect(!panel.canBecomeKey)
+        #expect(!panel.canBecomeMain)
+    }
+
+    @Test
     func translationWindowUsesTheVoiceIslandsActiveGlassWithoutTakingFocus() throws {
         let panel: NSPanel = ClipboardAssistantController.makeWindow(
             contentView: NSView(),

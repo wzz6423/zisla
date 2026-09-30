@@ -61,7 +61,11 @@ final class ClipboardAssistantController: ObservableObject {
     static let windowLevel = NSWindow.Level(rawValue: IslandPanel.onTopLevel.rawValue + 1)
 
     static func makeWindow(contentView: NSView, frame: CGRect) -> IslandPanel {
-        let panel = IslandPanel(contentView: contentView, frame: frame)
+        let panel = IslandPanel(
+            contentView: contentView,
+            frame: frame,
+            blocksClicksInTransparentAreas: true
+        )
         panel.level = windowLevel
         // Clipboard actions must leave the source application's caret in place.
         panel.avoidsAppActivation = true
