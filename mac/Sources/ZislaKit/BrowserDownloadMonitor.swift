@@ -702,6 +702,7 @@ public final class BrowserDownloadMonitor: ObservableObject {
         )
         let matchingDownloads = observedDownloads.filter { identity, observed in
             identity == entry.fileIdentity
+                || entry.fileURL == observed.temporaryURL.deletingPathExtension()
                 || (entry.fileIdentity == nil
                     && observed.temporaryURL.deletingLastPathComponent()
                         .standardizedFileURL.resolvingSymlinksInPath() == directory)
@@ -770,6 +771,9 @@ public final class BrowserDownloadMonitor: ObservableObject {
                 releaseUnusedSubscription(for: directory)
                 return
             }
+            if let currentIdentity = BrowserDownloadFileIdentity(url: fileURL), currentIdentity != identity {
+                return
+            }
             if var observed = observedDownloads[identity] {
                 if fileManager.fileExists(atPath: fileURL.path) {
                     let previousDirectory = observed.temporaryURL.deletingLastPathComponent()
@@ -796,8 +800,8 @@ public final class BrowserDownloadMonitor: ObservableObject {
                     let entry = tracker.entries[token], entry.agent != .airDrop,
                     !observedDownloads.values.contains(where: { $0.token == token }),
                     entry.fileIdentity == identity
-                        || (entry.fileIdentity == nil
-                            && (entry.fileURL == fileURL || entry.fileURL == fileURL.deletingPathExtension()))
+                        || entry.fileURL == fileURL.deletingPathExtension()
+                        || (entry.fileIdentity == nil && entry.fileURL == fileURL)
                 else { return nil }
                 return token
             }
@@ -951,6 +955,12 @@ public final class BrowserDownloadMonitor: ObservableObject {
                     fileURL: currentFileURL,
                     fileName: BrowserDownloadAgentResolver.displayFileName(for: currentFileURL)
                 )
+                for (identity, observed) in observedDownloads
+                where observed.temporaryURL == currentFileURL && progressBoxes[observed.token] == nil {
+                    _ = tracker.finish(token: observed.token, succeeded: false)
+                    observedDownloads[identity]?.token = token
+                    tracker.updateIdentity(token: token, identity: identity)
+                }
             }
             if tracker.entries[token]?.fileIdentity == nil,
                 let fileURL = tracker.entries[token]?.fileURL {
