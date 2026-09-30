@@ -1,4 +1,5 @@
 import Foundation
+import SwiftUI
 import Testing
 import ZislaCore
 import ZislaKit
@@ -54,6 +55,61 @@ struct BatteryModuleTests {
         #expect(IslandModuleLayout.ai.islandSize.height < IslandModuleLayout.system.islandSize.height)
         #expect(IslandModuleLayout.system.islandSize.height == 546)
         #expect(IslandModuleLayout.system.panelSize.height == 550)
+    }
+
+    @Test(arguments: [false, true]) @MainActor
+    func lowPowerModeOverridesFullBatteryIconTint(isCharging: Bool) {
+        let snapshot = BatterySnapshot(
+            level: 1,
+            isCharging: isCharging,
+            isPluggedIn: true,
+            isCharged: !isCharging,
+            timeRemainingMinutes: nil,
+            isLowPowerMode: true
+        )
+
+        #expect(BatteryDetailView.batteryLevelTint(
+            snapshot.level, isLowPowerMode: snapshot.isLowPowerMode
+        ) == .yellow)
+    }
+
+    @Test(arguments: [0.0, 0.149, 0.15, 0.299], [false, true]) @MainActor
+    func lowPowerModeOverridesLowBatteryIconTint(level: Double, isCharging: Bool) {
+        let snapshot = BatterySnapshot(
+            level: level,
+            isCharging: isCharging,
+            isPluggedIn: isCharging,
+            isCharged: false,
+            timeRemainingMinutes: nil,
+            isLowPowerMode: true
+        )
+
+        #expect(BatteryDetailView.batteryLevelTint(
+            snapshot.level, isLowPowerMode: snapshot.isLowPowerMode
+        ) == .yellow)
+    }
+
+    @Test(arguments: [
+        (level: 0.0, tint: Color.zislaError),
+        (level: 0.149, tint: Color.zislaError),
+        (level: 0.15, tint: Color.zislaWarning),
+        (level: 0.299, tint: Color.zislaWarning),
+        (level: 0.30, tint: Color.zislaSuccess),
+        (level: 1.0, tint: Color.zislaSuccess),
+    ], [false, true]) @MainActor
+    func nonLowPowerModePreservesBatteryLevelTint(sample: (level: Double, tint: Color), isCharging: Bool) {
+        let snapshot = BatterySnapshot(
+            level: sample.level,
+            isCharging: isCharging,
+            isPluggedIn: isCharging,
+            isCharged: sample.level == 1 && !isCharging,
+            timeRemainingMinutes: nil
+        )
+
+        #expect(BatteryDetailView.batteryLevelTint(
+            snapshot.level, isLowPowerMode: snapshot.isLowPowerMode
+        ) == sample.tint)
+        #expect(BatteryDetailView.batteryLevelTint(snapshot.level) == sample.tint)
     }
 
     @Test

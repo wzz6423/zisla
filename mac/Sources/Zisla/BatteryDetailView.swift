@@ -611,7 +611,7 @@ struct BatteryDetailView: View {
                     .foregroundStyle(.secondary)
                 HStack(spacing: 4) {
                     Image(systemName: battery.symbolName)
-                        .foregroundStyle(batteryLevelTint(battery.level))
+                        .foregroundStyle(Self.batteryLevelTint(battery.level, isLowPowerMode: battery.isLowPowerMode))
                     Text("\(battery.percentInt)%")
                         .monospacedDigit()
                 }
@@ -879,7 +879,7 @@ struct BatteryDetailView: View {
             HStack(spacing: 5) {
                 Image(systemName: device.batterySymbolName)
                     .font(.system(size: 15, weight: .medium))
-                    .foregroundStyle(batteryLevelTint(device.batteryLevel))
+                    .foregroundStyle(Self.batteryLevelTint(device.batteryLevel))
                 Text("\(device.batteryPercentInt)%")
                     .font(.system(size: 12, weight: .semibold, design: .rounded))
                     .monospacedDigit()
@@ -931,7 +931,7 @@ struct BatteryDetailView: View {
             VStack(spacing: 3) {
                 Image(systemName: device.batterySymbolName)
                     .font(.system(size: 13, weight: .medium))
-                    .foregroundStyle(batteryLevelTint(device.batteryLevel))
+                    .foregroundStyle(Self.batteryLevelTint(device.batteryLevel))
                 Text("\(device.batteryPercentInt)%")
                     .font(.system(size: 11, weight: .semibold, design: .rounded))
                     .monospacedDigit()
@@ -1031,7 +1031,8 @@ struct BatteryDetailView: View {
         BatteryLocalization.string(key, locale: locale)
     }
 
-    private func batteryLevelTint(_ level: Double) -> Color {
+    static func batteryLevelTint(_ level: Double, isLowPowerMode: Bool = false) -> Color {
+        if isLowPowerMode { return .yellow }
         if level < 0.15 { return .zislaError }
         if level < 0.30 { return .zislaWarning }
         return .zislaSuccess

@@ -2850,7 +2850,8 @@ final class AppModel: ObservableObject {
       browserDownloads.stop()
       clearBrowserDownloadNotices()
     }
-    if settings.lockScreenInfoEnabled || settings.batteryMonitorEnabled {
+    if settings.lockScreenInfoEnabled || settings.batteryMonitorEnabled
+      || (settings.systemMonitorEnabled && settings.systemMonitorMenuBarCombinedIconEnabled) {
       battery.start()
     } else {
       battery.stop()

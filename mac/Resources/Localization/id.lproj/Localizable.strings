@@ -78,6 +78,7 @@
 
 /* Settings - Info */
 "配置日历、邮件、锁屏与通知显示。" = "Konfigurasi kalender, email, layar kunci, dan notifikasi.";
+"配置媒体、系统监控、锁屏与通知显示。" = "Atur media, pemantauan sistem, layar kunci, dan tampilan notifikasi.";
 "信息与通知" = "Info dan Notifikasi";
 "日历日程" = "Acara Kalender";
 "显示接下来的日程与会议" = "Tampilkan acara dan rapat mendatang";
@@ -2524,3 +2525,16 @@
 "关闭弹窗快捷键与动作快捷键相同，当前优先关闭弹窗" = "Pintasan untuk menutup sama dengan pintasan tindakan. Menutup popup diprioritaskan.";
 "AI 任务结果扫光" = "Sapuan cahaya hasil tugas AI";
 "任务成功时绿色、失败时红色渐变光带从左向右扫过一次" = "Gradasi menyapu sekali dari kiri ke kanan: hijau saat berhasil, merah saat gagal";
+"菜单栏布局" = "Tata Letak Bar Menu";
+"独立" = "Terpisah";
+"合并" = "Gabungan";
+"上行" = "Baris Atas";
+"下行" = "Baris Bawah";
+"无" = "Tidak Ada";
+"合并状态图标" = "Ikon Status Gabungan";
+"底部指标" = "Indikator Bawah";
+"音量" = "Volume";
+"屏幕亮度" = "Kecerahan Layar";
+"未连接" = "Terputus";
+"上下两行显示自选指标，最多三个；上行可放两个" = "Pilih hingga tiga indikator dalam dua baris; baris atas dapat memuat dua";
+"电量环、Wi-Fi 与实时指标合并显示；点击打开系统监控" = "Gabungkan cincin baterai, Wi-Fi, dan indikator langsung; klik untuk membuka monitor sistem";

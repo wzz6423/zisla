@@ -77,6 +77,7 @@
 
 /* Settings - Info */
 "配置日历、邮件、锁屏与通知显示。" = "Configurer le calendrier, mail, écran de verrouillage et notifications.";
+"配置媒体、系统监控、锁屏与通知显示。" = "Configurer les médias, la surveillance du système, l'écran de verrouillage et les notifications.";
 "信息与通知" = "Infos et notifications";
 "日历日程" = "Événements du calendrier";
 "显示接下来的日程与会议" = "Afficher les événements et réunions à venir";
@@ -2520,3 +2521,16 @@
 "关闭弹窗快捷键与动作快捷键相同，当前优先关闭弹窗" = "Le raccourci de fermeture correspond à celui d’une action. La fermeture de la fenêtre contextuelle est prioritaire.";
 "AI 任务结果扫光" = "Balayage lumineux du résultat IA";
 "任务成功时绿色、失败时红色渐变光带从左向右扫过一次" = "Un dégradé balaie une fois de gauche à droite : vert en cas de réussite, rouge en cas d’échec";
+"菜单栏布局" = "Disposition de la barre des menus";
+"独立" = "Séparée";
+"合并" = "Fusionnée";
+"上行" = "Ligne du haut";
+"下行" = "Ligne du bas";
+"无" = "Aucun";
+"合并状态图标" = "Icône d’état combinée";
+"底部指标" = "Indicateur inférieur";
+"音量" = "Volume";
+"屏幕亮度" = "Luminosité de l’écran";
+"未连接" = "Déconnecté";
+"上下两行显示自选指标，最多三个；上行可放两个" = "Choisissez jusqu’à trois indicateurs sur deux lignes ; la ligne du haut peut en contenir deux";
+"电量环、Wi-Fi 与实时指标合并显示；点击打开系统监控" = "Regroupez l’anneau de batterie, le Wi-Fi et un indicateur en direct ; cliquez pour ouvrir le moniteur système";

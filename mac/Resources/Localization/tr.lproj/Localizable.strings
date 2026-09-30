@@ -78,6 +78,7 @@
 
 /* Settings - Info */
 "配置日历、邮件、锁屏与通知显示。" = "Takvim, e-posta, kilit ekranı ve bildirimleri yapılandırın.";
+"配置媒体、系统监控、锁屏与通知显示。" = "Medya, sistem izleme, kilit ekranı ve bildirim görünümünü yapılandırın.";
 "信息与通知" = "Bilgi ve Bildirimler";
 "日历日程" = "Takvim Etkinlikleri";
 "显示接下来的日程与会议" = "Yaklaşan etkinlikleri ve toplantıları göster";
@@ -2524,3 +2525,16 @@
 "关闭弹窗快捷键与动作快捷键相同，当前优先关闭弹窗" = "Kapatma kısayolu bir eylem kısayoluyla aynı. Açılır pencereyi kapatma önceliklidir.";
 "AI 任务结果扫光" = "Yapay zekâ görev sonucu ışığı";
 "任务成功时绿色、失败时红色渐变光带从左向右扫过一次" = "Bir renk geçişi soldan sağa bir kez ilerler: başarıda yeşil, hatada kırmızı";
+"菜单栏布局" = "Menü Çubuğu Düzeni";
+"独立" = "Ayrı";
+"合并" = "Birleştirilmiş";
+"上行" = "Üst Satır";
+"下行" = "Alt Satır";
+"无" = "Yok";
+"合并状态图标" = "Birleşik Durum Simgesi";
+"底部指标" = "Alt Gösterge";
+"音量" = "Ses Düzeyi";
+"屏幕亮度" = "Ekran Parlaklığı";
+"未连接" = "Bağlantı Yok";
+"上下两行显示自选指标，最多三个；上行可放两个" = "İki satırda en fazla üç gösterge seçin; üst satır iki gösterge alabilir";
+"电量环、Wi-Fi 与实时指标合并显示；点击打开系统监控" = "Pil halkasını, Wi-Fi ve canlı bir göstergeyi birleştirir; sistem monitörünü açmak için tıklayın";

@@ -79,6 +79,7 @@
 
 /* Settings - Info */
 "配置日历、邮件、锁屏与通知显示。" = "Kalender, E-Mail, Sperrbildschirm und Benachrichtigungsanzeige konfigurieren.";
+"配置媒体、系统监控、锁屏与通知显示。" = "Medien, Systemüberwachung, Sperrbildschirm und Benachrichtigungsanzeige konfigurieren.";
 "信息与通知" = "Info und Benachrichtigungen";
 "日历日程" = "Kalenderereignisse";
 "显示接下来的日程与会议" = "Anstehende Termine und Meetings anzeigen";
@@ -2525,3 +2526,16 @@
 "关闭弹窗快捷键与动作快捷键相同，当前优先关闭弹窗" = "Der Kurzbefehl zum Schließen entspricht einem Aktionskurzbefehl. Das Schließen des Pop-ups hat Vorrang.";
 "AI 任务结果扫光" = "Lichteffekt für KI-Aufgabenergebnisse";
 "任务成功时绿色、失败时红色渐变光带从左向右扫过一次" = "Ein Farbverlauf wandert einmal von links nach rechts: Grün bei Erfolg, Rot bei Fehlern";
+"菜单栏布局" = "Menüleistenlayout";
+"独立" = "Einzeln";
+"合并" = "Zusammengeführt";
+"上行" = "Obere Zeile";
+"下行" = "Untere Zeile";
+"无" = "Keine";
+"合并状态图标" = "Kombiniertes Statussymbol";
+"底部指标" = "Unterer Indikator";
+"音量" = "Lautstärke";
+"屏幕亮度" = "Bildschirmhelligkeit";
+"未连接" = "Nicht verbunden";
+"上下两行显示自选指标，最多三个；上行可放两个" = "Bis zu drei Messwerte in zwei Zeilen wählen; die obere Zeile bietet Platz für zwei";
+"电量环、Wi-Fi 与实时指标合并显示；点击打开系统监控" = "Batteriering, WLAN und einen Echtzeitindikator kombinieren; ein Klick öffnet die Systemüberwachung";

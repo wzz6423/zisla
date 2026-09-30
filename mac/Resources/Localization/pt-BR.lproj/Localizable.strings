@@ -78,6 +78,7 @@
 
 /* Settings - Info */
 "配置日历、邮件、锁屏与通知显示。" = "Configurar calendário, e-mail, tela de bloqueio e notificações.";
+"配置媒体、系统监控、锁屏与通知显示。" = "Configurar mídia, monitoramento do sistema, tela de bloqueio e notificações.";
 "信息与通知" = "Informações e Notificações";
 "日历日程" = "Eventos do Calendário";
 "显示接下来的日程与会议" = "Exibir próximos eventos e reuniões";
@@ -2524,3 +2525,16 @@
 "关闭弹窗快捷键与动作快捷键相同，当前优先关闭弹窗" = "O atalho para fechar coincide com um atalho de ação. Fechar a janela tem prioridade.";
 "AI 任务结果扫光" = "Faixa de luz do resultado de IA";
 "任务成功时绿色、失败时红色渐变光带从左向右扫过一次" = "Um degradê passa uma vez da esquerda para a direita: verde em caso de sucesso, vermelho em caso de falha";
+"菜单栏布局" = "Layout da barra de menus";
+"独立" = "Separado";
+"合并" = "Combinado";
+"上行" = "Linha superior";
+"下行" = "Linha inferior";
+"无" = "Nenhum";
+"合并状态图标" = "Ícone de status combinado";
+"底部指标" = "Indicador inferior";
+"音量" = "Volume";
+"屏幕亮度" = "Brilho da tela";
+"未连接" = "Desconectado";
+"上下两行显示自选指标，最多三个；上行可放两个" = "Escolha até três indicadores em duas linhas; a linha superior comporta dois";
+"电量环、Wi-Fi 与实时指标合并显示；点击打开系统监控" = "Combine o anel da bateria, o Wi-Fi e um indicador em tempo real; clique para abrir o monitor do sistema";

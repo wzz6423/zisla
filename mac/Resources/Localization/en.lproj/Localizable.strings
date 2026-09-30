@@ -82,6 +82,7 @@
 
 /* Settings - Info */
 "配置日历、邮件、锁屏与通知显示。" = "Configure calendar, mail, lock screen, and notifications.";
+"配置媒体、系统监控、锁屏与通知显示。" = "Configure media, system monitoring, lock screen, and notifications.";
 "信息与通知" = "Info and Notifications";
 "日历日程" = "Calendar Events";
 "显示接下来的日程与会议" = "Show upcoming events and meetings";
@@ -2523,3 +2524,16 @@
 "关闭弹窗快捷键与动作快捷键相同，当前优先关闭弹窗" = "The dismiss shortcut matches an action shortcut. Dismissing the popup takes priority.";
 "AI 任务结果扫光" = "AI Task Result Sweep";
 "任务成功时绿色、失败时红色渐变光带从左向右扫过一次" = "A gradient sweeps left to right once: green for success, red for failure";
+"菜单栏布局" = "Menu Bar Layout";
+"独立" = "Separate";
+"合并" = "Merged";
+"上行" = "Top Row";
+"下行" = "Bottom Row";
+"无" = "None";
+"合并状态图标" = "Combined Status Icon";
+"底部指标" = "Bottom Indicator";
+"音量" = "Volume";
+"屏幕亮度" = "Screen Brightness";
+"未连接" = "Disconnected";
+"上下两行显示自选指标，最多三个；上行可放两个" = "Choose up to three metrics across two rows; the top row holds two";
+"电量环、Wi-Fi 与实时指标合并显示；点击打开系统监控" = "Combine the battery ring, Wi-Fi and a live indicator; click to open System Monitor";

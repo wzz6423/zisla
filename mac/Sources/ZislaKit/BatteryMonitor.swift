@@ -102,6 +102,11 @@ public final class BatteryMonitor: ObservableObject {
     @Published public private(set) var lastUnpluggedAt: Date?
 
     private var runLoopSource: CFRunLoopSource?
+    private var powerStateObserver: NSObjectProtocol?
+    private var powerStateObservationID: UUID?
+    private let notificationCenter: NotificationCenter
+    private let snapshotProvider: () -> BatterySnapshot?
+    private let runLoopSourceFactory: (UnsafeMutableRawPointer) -> CFRunLoopSource?
     private let defaults: UserDefaults
     private let now: () -> Date
     private var lastObservedIsPluggedIn: Bool?
@@ -111,32 +116,75 @@ public final class BatteryMonitor: ObservableObject {
         static let lastObservedIsPluggedIn = "zisla.battery.last-observed-is-plugged-in"
     }
 
-    public init(
+    public convenience init(
         defaults: UserDefaults = .standard,
         now: @escaping () -> Date = Date.init
     ) {
+        self.init(
+            defaults: defaults,
+            now: now,
+            notificationCenter: .default,
+            snapshotProvider: BatteryMonitor.currentSnapshot,
+            runLoopSourceFactory: { context in
+                IOPSNotificationCreateRunLoopSource({ rawContext in
+                    guard let rawContext else { return }
+                    let monitor = Unmanaged<BatteryMonitor>.fromOpaque(rawContext)
+                        .takeUnretainedValue()
+                    Task { @MainActor in monitor.refresh() }
+                }, context)?.takeRetainedValue()
+            }
+        )
+    }
+
+    init(
+        defaults: UserDefaults = .standard,
+        now: @escaping () -> Date = Date.init,
+        notificationCenter: NotificationCenter,
+        snapshotProvider: @escaping () -> BatterySnapshot?,
+        runLoopSourceFactory: @escaping (UnsafeMutableRawPointer) -> CFRunLoopSource?
+    ) {
         self.defaults = defaults
         self.now = now
+        self.notificationCenter = notificationCenter
+        self.snapshotProvider = snapshotProvider
+        self.runLoopSourceFactory = runLoopSourceFactory
         self.lastUnpluggedAt = Self.loadDate(defaults, forKey: HistoryKey.lastUnpluggedAt)
         self.lastObservedIsPluggedIn = defaults.object(forKey: HistoryKey.lastObservedIsPluggedIn) as? Bool
     }
 
+    isolated deinit {
+        stop()
+    }
+
     public func start() {
         refresh()
+        if powerStateObserver == nil {
+            let observationID = UUID()
+            powerStateObservationID = observationID
+            powerStateObserver = notificationCenter.addObserver(
+                forName: .NSProcessInfoPowerStateDidChange,
+                object: nil,
+                queue: .main
+            ) { [weak self] _ in
+                MainActor.assumeIsolated {
+                    guard let self, self.powerStateObservationID == observationID else { return }
+                    self.refresh()
+                }
+            }
+        }
         guard runLoopSource == nil else { return }
         let context = Unmanaged.passUnretained(self).toOpaque()
-        guard let unmanaged = IOPSNotificationCreateRunLoopSource({ rawContext in
-            guard let rawContext else { return }
-            let monitor = Unmanaged<BatteryMonitor>.fromOpaque(rawContext)
-                .takeUnretainedValue()
-            Task { @MainActor in monitor.refresh() }
-        }, context) else { return }
-        let source = unmanaged.takeRetainedValue()
+        guard let source = runLoopSourceFactory(context) else { return }
         runLoopSource = source
         CFRunLoopAddSource(CFRunLoopGetMain(), source, .commonModes)
     }
 
     public func stop() {
+        powerStateObservationID = nil
+        if let powerStateObserver {
+            notificationCenter.removeObserver(powerStateObserver)
+            self.powerStateObserver = nil
+        }
         if let runLoopSource {
             CFRunLoopRemoveSource(CFRunLoopGetMain(), runLoopSource, .commonModes)
         }
@@ -145,7 +193,7 @@ public final class BatteryMonitor: ObservableObject {
 
     public func refresh() {
         let previous = snapshot
-        let current = Self.currentSnapshot()
+        let current = snapshotProvider()
         detectStateTransitions(from: previous, to: current)
         snapshot = current
     }

@@ -1,3 +1,4 @@
+import CoreFoundation
 import Foundation
 import IOKit.ps
 import Testing
@@ -357,6 +358,212 @@ struct BatteryMonitorTests {
         #expect(monitor.lastUnpluggedAt == nil)
     }
 
+    @Test @MainActor
+    func refreshesLowPowerSnapshotOnPowerStateNotification() throws {
+        let suiteName = "Zisla.BatteryMonitorTests.\(UUID().uuidString)"
+        let defaults = try #require(UserDefaults(suiteName: suiteName))
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+        let center = NotificationCenter()
+        var current = try #require(BatteryMonitor.snapshot(from: powerSource(level: 100)))
+        let monitor = BatteryMonitor(
+            defaults: defaults,
+            notificationCenter: center,
+            snapshotProvider: { current },
+            runLoopSourceFactory: { _ in nil }
+        )
+        defer { monitor.stop() }
+
+        monitor.start()
+        #expect(monitor.snapshot?.isLowPowerMode == false)
+
+        current.isLowPowerMode = true
+        center.post(name: .NSProcessInfoPowerStateDidChange, object: nil)
+        #expect(monitor.snapshot?.isLowPowerMode == true)
+
+        current.isLowPowerMode = false
+        center.post(name: .NSProcessInfoPowerStateDidChange, object: nil)
+        #expect(monitor.snapshot?.isLowPowerMode == false)
+        #expect(monitor.lastUnpluggedAt == nil)
+    }
+
+    @Test @MainActor
+    func powerStateObservationSurvivesPowerSourceAndSnapshotFailures() throws {
+        let suiteName = "Zisla.BatteryMonitorTests.\(UUID().uuidString)"
+        let defaults = try #require(UserDefaults(suiteName: suiteName))
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+        let center = NotificationCenter()
+        let lowPowerSnapshot = try #require(BatteryMonitor.snapshot(
+            from: powerSource(level: 10), isLowPowerMode: true
+        ))
+        let recoveredSnapshot = try #require(BatteryMonitor.snapshot(from: powerSource(level: 50)))
+        var current: BatterySnapshot?
+        let monitor = BatteryMonitor(
+            defaults: defaults,
+            notificationCenter: center,
+            snapshotProvider: { current },
+            runLoopSourceFactory: { _ in nil }
+        )
+        defer { monitor.stop() }
+
+        monitor.start()
+        #expect(monitor.snapshot == nil)
+
+        current = lowPowerSnapshot
+        center.post(name: .NSProcessInfoPowerStateDidChange, object: nil)
+        #expect(monitor.snapshot == current)
+
+        current = nil
+        center.post(name: .NSProcessInfoPowerStateDidChange, object: nil)
+        #expect(monitor.snapshot == nil)
+
+        current = recoveredSnapshot
+        center.post(name: .NSProcessInfoPowerStateDidChange, object: nil)
+        #expect(monitor.snapshot == current)
+        #expect(monitor.lastUnpluggedAt == nil)
+    }
+
+    @Test(arguments: [false, true]) @MainActor
+    func startingTwiceDoesNotDuplicatePowerStateObservation(initialSourceCreationFails: Bool) throws {
+        let suiteName = "Zisla.BatteryMonitorTests.\(UUID().uuidString)"
+        let defaults = try #require(UserDefaults(suiteName: suiteName))
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+        let center = BatteryTestNotificationCenter()
+        var context = CFRunLoopSourceContext()
+        let source = try #require(CFRunLoopSourceCreate(kCFAllocatorDefault, 0, &context))
+        var current = try #require(BatteryMonitor.snapshot(from: powerSource(level: 100)))
+        var readCount = 0
+        var sourceCreationCount = 0
+        let monitor = BatteryMonitor(
+            defaults: defaults,
+            notificationCenter: center,
+            snapshotProvider: { readCount += 1; return current },
+            runLoopSourceFactory: { _ in
+                sourceCreationCount += 1
+                return initialSourceCreationFails && sourceCreationCount == 1 ? nil : source
+            }
+        )
+        defer { monitor.stop() }
+
+        monitor.start()
+        #expect(CFRunLoopContainsSource(CFRunLoopGetMain(), source, .commonModes) == !initialSourceCreationFails)
+        current.isLowPowerMode = true
+        monitor.start()
+        #expect(center.notificationHandlers.count == 1)
+        #expect(readCount == 2)
+        #expect(sourceCreationCount == (initialSourceCreationFails ? 2 : 1))
+        #expect(CFRunLoopContainsSource(CFRunLoopGetMain(), source, .commonModes))
+        #expect(monitor.snapshot?.isLowPowerMode == true)
+
+        current.isLowPowerMode = false
+        center.post(name: .NSProcessInfoPowerStateDidChange, object: nil)
+        #expect(readCount == 3)
+        #expect(monitor.snapshot?.isLowPowerMode == false)
+    }
+
+    @Test(arguments: [false, true]) @MainActor
+    func stopAndRestartCleanUpPowerStateObservationAndRunLoopSource(initialSourceCreationFails: Bool) throws {
+        let suiteName = "Zisla.BatteryMonitorTests.\(UUID().uuidString)"
+        let defaults = try #require(UserDefaults(suiteName: suiteName))
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+        let center = BatteryTestNotificationCenter()
+        var context = CFRunLoopSourceContext()
+        let source = try #require(CFRunLoopSourceCreate(kCFAllocatorDefault, 0, &context))
+        var current = try #require(BatteryMonitor.snapshot(from: powerSource(level: 100)))
+        var readCount = 0
+        var sourceCreationCount = 0
+        let monitor = BatteryMonitor(
+            defaults: defaults,
+            notificationCenter: center,
+            snapshotProvider: { readCount += 1; return current },
+            runLoopSourceFactory: { _ in
+                sourceCreationCount += 1
+                return initialSourceCreationFails && sourceCreationCount == 1 ? nil : source
+            }
+        )
+        defer { monitor.stop() }
+
+        monitor.start()
+        #expect(CFRunLoopContainsSource(CFRunLoopGetMain(), source, .commonModes) == !initialSourceCreationFails)
+        monitor.stop()
+        monitor.stop()
+        #expect(center.removedObserverCount == 1)
+        #expect(!CFRunLoopContainsSource(CFRunLoopGetMain(), source, .commonModes))
+
+        current.isLowPowerMode = true
+        center.post(name: .NSProcessInfoPowerStateDidChange, object: nil)
+        #expect(readCount == 1)
+        #expect(monitor.snapshot?.isLowPowerMode == false)
+
+        monitor.start()
+        #expect(sourceCreationCount == 2)
+        #expect(center.notificationHandlers.count == 2)
+        #expect(CFRunLoopContainsSource(CFRunLoopGetMain(), source, .commonModes))
+        #expect(monitor.snapshot?.isLowPowerMode == true)
+        current.isLowPowerMode = false
+        center.post(name: .NSProcessInfoPowerStateDidChange, object: nil)
+        #expect(readCount == 3)
+        #expect(monitor.snapshot?.isLowPowerMode == false)
+    }
+
+    @Test @MainActor
+    func ignoresPowerStateDeliveryFromStoppedObservation() throws {
+        let suiteName = "Zisla.BatteryMonitorTests.\(UUID().uuidString)"
+        let defaults = try #require(UserDefaults(suiteName: suiteName))
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+        let center = BatteryTestNotificationCenter()
+        var current = try #require(BatteryMonitor.snapshot(from: powerSource(level: 100)))
+        var readCount = 0
+        let monitor = BatteryMonitor(
+            defaults: defaults,
+            notificationCenter: center,
+            snapshotProvider: { readCount += 1; return current },
+            runLoopSourceFactory: { _ in nil }
+        )
+        defer { monitor.stop() }
+
+        monitor.start()
+        let delayedDelivery = try #require(center.notificationHandlers.first)
+        monitor.stop()
+        current.isLowPowerMode = true
+        delayedDelivery(Notification(name: .NSProcessInfoPowerStateDidChange))
+        #expect(readCount == 1)
+        #expect(monitor.snapshot?.isLowPowerMode == false)
+
+        monitor.start()
+        current.isLowPowerMode = false
+        delayedDelivery(Notification(name: .NSProcessInfoPowerStateDidChange))
+        #expect(readCount == 2)
+        #expect(monitor.snapshot?.isLowPowerMode == true)
+
+        center.post(name: .NSProcessInfoPowerStateDidChange, object: nil)
+        #expect(readCount == 3)
+        #expect(monitor.snapshot?.isLowPowerMode == false)
+    }
+
+    @Test @MainActor
+    func deinitializingMonitorRemovesPowerStateObserverAndRunLoopSource() throws {
+        let suiteName = "Zisla.BatteryMonitorTests.\(UUID().uuidString)"
+        let defaults = try #require(UserDefaults(suiteName: suiteName))
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+        let center = BatteryTestNotificationCenter()
+        var context = CFRunLoopSourceContext()
+        let source = try #require(CFRunLoopSourceCreate(kCFAllocatorDefault, 0, &context))
+        var monitor: BatteryMonitor? = BatteryMonitor(
+            defaults: defaults,
+            notificationCenter: center,
+            snapshotProvider: { nil },
+            runLoopSourceFactory: { _ in source }
+        )
+        weak var retainedMonitor = monitor
+        monitor?.start()
+        #expect(CFRunLoopContainsSource(CFRunLoopGetMain(), source, .commonModes))
+
+        monitor = nil
+        #expect(retainedMonitor == nil)
+        #expect(center.removedObserverCount == 1)
+        #expect(!CFRunLoopContainsSource(CFRunLoopGetMain(), source, .commonModes))
+    }
+
     @Test
     func registersPowerSourceNotificationsInCommonRunLoopModes() throws {
         let sourceURL = URL(fileURLWithPath: #filePath)
@@ -392,5 +599,25 @@ struct BatteryMonitorTests {
             description[kIOPSTimeToFullChargeKey as String] = timeToFull
         }
         return description
+    }
+}
+
+private final class BatteryTestNotificationCenter: NotificationCenter, @unchecked Sendable {
+    private(set) var notificationHandlers: [@Sendable (Notification) -> Void] = []
+    private(set) var removedObserverCount = 0
+
+    override func addObserver(
+        forName name: Notification.Name?,
+        object: Any?,
+        queue: OperationQueue?,
+        using block: @escaping @Sendable (Notification) -> Void
+    ) -> NSObjectProtocol {
+        notificationHandlers.append(block)
+        return super.addObserver(forName: name, object: object, queue: queue, using: block)
+    }
+
+    override func removeObserver(_ observer: Any) {
+        removedObserverCount += 1
+        super.removeObserver(observer)
     }
 }

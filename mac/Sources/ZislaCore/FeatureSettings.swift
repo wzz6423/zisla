@@ -360,6 +360,54 @@ public enum SystemMonitorMenuBarDisplayStyle: String, Codable, CaseIterable, Sen
     }
 }
 
+public enum SystemMonitorMenuBarLayout: String, Codable, CaseIterable, Sendable, Equatable {
+    case individual
+    case stacked
+
+    public var menuTitle: String {
+        switch self {
+        case .individual: "独立"
+        case .stacked: "合并"
+        }
+    }
+}
+
+public enum SystemMonitorCombinedIconMetric: String, Codable, CaseIterable, Sendable, Equatable {
+    case cpu
+    case gpu
+    case memory
+    case volume
+    case brightness
+
+    public var menuTitle: String {
+        switch self {
+        case .cpu: "CPU"
+        case .gpu: "GPU"
+        case .memory: "内存"
+        case .volume: "音量"
+        case .brightness: "屏幕亮度"
+        }
+    }
+}
+
+public enum SystemMonitorMenuBarRows {
+    public static func normalized(
+        top: [SystemMonitorMenuBarMetric],
+        bottom: [SystemMonitorMenuBarMetric]
+    ) -> [[SystemMonitorMenuBarMetric]] {
+        var seen: Set<SystemMonitorMenuBarMetric> = []
+        var topRow = Array(top.filter { seen.insert($0).inserted }.prefix(2))
+        if topRow.isEmpty {
+            topRow = [.cpu]
+        }
+        var bottomRow = Array(bottom.filter { !topRow.contains($0) }.prefix(1))
+        if bottomRow.isEmpty {
+            bottomRow = Array(SystemMonitorMenuBarMetric.allCases.filter { !topRow.contains($0) }.prefix(1))
+        }
+        return [topRow, bottomRow]
+    }
+}
+
 public enum VoiceRecordingCleanupPolicy: String, Codable, CaseIterable, Sendable, Equatable, Hashable {
     case sevenDays
     case fifteenDays
@@ -550,6 +598,11 @@ public struct FeatureSettings: Codable, Equatable, Sendable {
     public var systemMonitorMenuBarMetrics: Set<SystemMonitorMenuBarMetric>
     /// Detailed mode retains the existing icon and horizontal readings; compact mode hides the icon and reduces font size.
     public var systemMonitorMenuBarDisplayStyle: SystemMonitorMenuBarDisplayStyle
+    public var systemMonitorMenuBarLayout: SystemMonitorMenuBarLayout
+    public var systemMonitorMenuBarTopRow: [SystemMonitorMenuBarMetric]
+    public var systemMonitorMenuBarBottomRow: [SystemMonitorMenuBarMetric]
+    public var systemMonitorMenuBarCombinedIconEnabled: Bool
+    public var systemMonitorMenuBarCombinedIconMetric: SystemMonitorCombinedIconMetric
     /// Whether to show Zisla's menu bar icon separately; does not affect monitor status items.
     public var menuBarAppIconEnabled: Bool
     public var weatherEnabled: Bool
@@ -701,6 +754,11 @@ public struct FeatureSettings: Codable, Equatable, Sendable {
         batteryMonitorEnabled: Bool = true,
         systemMonitorMenuBarMetrics: Set<SystemMonitorMenuBarMetric> = [.cpu],
         systemMonitorMenuBarDisplayStyle: SystemMonitorMenuBarDisplayStyle = .compact,
+        systemMonitorMenuBarLayout: SystemMonitorMenuBarLayout = .individual,
+        systemMonitorMenuBarTopRow: [SystemMonitorMenuBarMetric] = [.cpu],
+        systemMonitorMenuBarBottomRow: [SystemMonitorMenuBarMetric] = [.gpu],
+        systemMonitorMenuBarCombinedIconEnabled: Bool = false,
+        systemMonitorMenuBarCombinedIconMetric: SystemMonitorCombinedIconMetric = .cpu,
         menuBarAppIconEnabled: Bool = false,
         weatherEnabled: Bool = true,
         lockScreenInfoEnabled: Bool = true,
@@ -797,6 +855,11 @@ public struct FeatureSettings: Codable, Equatable, Sendable {
         self.batteryMonitorEnabled = batteryMonitorEnabled
         self.systemMonitorMenuBarMetrics = systemMonitorMenuBarMetrics
         self.systemMonitorMenuBarDisplayStyle = systemMonitorMenuBarDisplayStyle
+        self.systemMonitorMenuBarLayout = systemMonitorMenuBarLayout
+        self.systemMonitorMenuBarTopRow = systemMonitorMenuBarTopRow
+        self.systemMonitorMenuBarBottomRow = systemMonitorMenuBarBottomRow
+        self.systemMonitorMenuBarCombinedIconEnabled = systemMonitorMenuBarCombinedIconEnabled
+        self.systemMonitorMenuBarCombinedIconMetric = systemMonitorMenuBarCombinedIconMetric
         self.menuBarAppIconEnabled = menuBarAppIconEnabled
         self.weatherEnabled = weatherEnabled
         self.lockScreenInfoEnabled = lockScreenInfoEnabled
@@ -938,6 +1001,11 @@ public struct FeatureSettings: Codable, Equatable, Sendable {
         case batteryMonitorEnabled
         case systemMonitorMenuBarMetrics
         case systemMonitorMenuBarDisplayStyle
+        case systemMonitorMenuBarLayout
+        case systemMonitorMenuBarTopRow
+        case systemMonitorMenuBarBottomRow
+        case systemMonitorMenuBarCombinedIconEnabled
+        case systemMonitorMenuBarCombinedIconMetric
         case menuBarAppIconEnabled
         case weatherEnabled
         case lockScreenInfoEnabled
@@ -1072,6 +1140,26 @@ public struct FeatureSettings: Codable, Equatable, Sendable {
             SystemMonitorMenuBarDisplayStyle.self,
             forKey: .systemMonitorMenuBarDisplayStyle
         ) ?? defaults.systemMonitorMenuBarDisplayStyle
+        systemMonitorMenuBarLayout = try container.decodeIfPresent(
+            SystemMonitorMenuBarLayout.self,
+            forKey: .systemMonitorMenuBarLayout
+        ) ?? defaults.systemMonitorMenuBarLayout
+        systemMonitorMenuBarTopRow = try container.decodeIfPresent(
+            [SystemMonitorMenuBarMetric].self,
+            forKey: .systemMonitorMenuBarTopRow
+        ) ?? defaults.systemMonitorMenuBarTopRow
+        systemMonitorMenuBarBottomRow = try container.decodeIfPresent(
+            [SystemMonitorMenuBarMetric].self,
+            forKey: .systemMonitorMenuBarBottomRow
+        ) ?? defaults.systemMonitorMenuBarBottomRow
+        systemMonitorMenuBarCombinedIconEnabled = try container.decodeIfPresent(
+            Bool.self,
+            forKey: .systemMonitorMenuBarCombinedIconEnabled
+        ) ?? defaults.systemMonitorMenuBarCombinedIconEnabled
+        systemMonitorMenuBarCombinedIconMetric = try container.decodeIfPresent(
+            SystemMonitorCombinedIconMetric.self,
+            forKey: .systemMonitorMenuBarCombinedIconMetric
+        ) ?? defaults.systemMonitorMenuBarCombinedIconMetric
         menuBarAppIconEnabled = try container.decodeIfPresent(
             Bool.self,
             forKey: .menuBarAppIconEnabled

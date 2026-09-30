@@ -78,6 +78,7 @@
 
 /* Settings - Info */
 "配置日历、邮件、锁屏与通知显示。" = "Cấu hình lịch, thư, màn hình khóa và thông báo.";
+"配置媒体、系统监控、锁屏与通知显示。" = "Cấu hình nội dung đa phương tiện, giám sát hệ thống, màn hình khóa và thông báo.";
 "信息与通知" = "Thông tin và Thông báo";
 "日历日程" = "Sự kiện Lịch";
 "显示接下来的日程与会议" = "Hiển thị các sự kiện và cuộc họp sắp tới";
@@ -2524,3 +2525,16 @@
 "关闭弹窗快捷键与动作快捷键相同，当前优先关闭弹窗" = "Phím tắt đóng trùng với phím tắt của một thao tác. Việc đóng cửa sổ bật lên được ưu tiên.";
 "AI 任务结果扫光" = "Vệt sáng kết quả tác vụ AI";
 "任务成功时绿色、失败时红色渐变光带从左向右扫过一次" = "Dải màu chuyển sắc quét một lần từ trái sang phải: xanh lá khi thành công, đỏ khi thất bại";
+"菜单栏布局" = "Bố cục thanh menu";
+"独立" = "Riêng biệt";
+"合并" = "Gộp";
+"上行" = "Hàng trên";
+"下行" = "Hàng dưới";
+"无" = "Không có";
+"合并状态图标" = "Biểu tượng trạng thái gộp";
+"底部指标" = "Chỉ báo phía dưới";
+"音量" = "Âm lượng";
+"屏幕亮度" = "Độ sáng màn hình";
+"未连接" = "Chưa kết nối";
+"上下两行显示自选指标，最多三个；上行可放两个" = "Chọn tối đa ba chỉ số trên hai hàng; hàng trên chứa được hai chỉ số";
+"电量环、Wi-Fi 与实时指标合并显示；点击打开系统监控" = "Gộp vòng pin, Wi-Fi và một chỉ báo thời gian thực; nhấp để mở trình giám sát hệ thống";

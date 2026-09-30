@@ -78,6 +78,7 @@
 
 /* Settings - Info */
 "配置日历、邮件、锁屏与通知显示。" = "Configureer agenda, e-mail, vergrendelscherm en meldingweergave.";
+"配置媒体、系统监控、锁屏与通知显示。" = "Configureer media, systeemmonitoring, vergrendelscherm en meldingen.";
 "信息与通知" = "Info en meldingen";
 "日历日程" = "Agenda-evenementen";
 "显示接下来的日程与会议" = "Toon aankomende evenementen en vergaderingen";
@@ -2524,3 +2525,16 @@
 "关闭弹窗快捷键与动作快捷键相同，当前优先关闭弹窗" = "De sneltoets voor sluiten is gelijk aan een actiesneltoets. Het sluiten van de pop-up krijgt voorrang.";
 "AI 任务结果扫光" = "Lichteffect voor AI-taakresultaten";
 "任务成功时绿色、失败时红色渐变光带从左向右扫过一次" = "Een kleurverloop beweegt één keer van links naar rechts: groen bij succes, rood bij een fout";
+"菜单栏布局" = "Indeling menubalk";
+"独立" = "Afzonderlijk";
+"合并" = "Samengevoegd";
+"上行" = "Bovenste rij";
+"下行" = "Onderste rij";
+"无" = "Geen";
+"合并状态图标" = "Gecombineerd statuspictogram";
+"底部指标" = "Onderste indicator";
+"音量" = "Volume";
+"屏幕亮度" = "Schermhelderheid";
+"未连接" = "Niet verbonden";
+"上下两行显示自选指标，最多三个；上行可放两个" = "Kies maximaal drie meetwaarden in twee rijen; de bovenste rij biedt plaats aan twee";
+"电量环、Wi-Fi 与实时指标合并显示；点击打开系统监控" = "Combineer de batterijring, wifi en een actuele indicator; klik om de systeemmonitor te openen";
