@@ -88,6 +88,10 @@ struct ClipboardHistoryPasteboardTests {
 
         #expect(captured == [.text("new value")])
         monitor.setEnabled(false)
+        #expect(ClipboardHistoryPasteboard.write(.text("copy while disabled"), to: pasteboard))
+        monitor.pollNow()
+        #expect(captured == [.text("new value")])
+        #expect(ClipboardHistoryPasteboard.readContent(from: pasteboard) == .text("copy while disabled"))
     }
 
     @Test

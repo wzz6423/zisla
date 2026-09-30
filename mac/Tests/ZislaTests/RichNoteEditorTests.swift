@@ -82,41 +82,181 @@ struct RichNoteEditorTests {
         #expect(inputClient.windowLevel?() == NSWindow.Level.normal.rawValue)
     }
 
-    @Test
-    func copyEventReachesTheIslandHandoff() async throws {
-        var copyCount = 0
-        let hostingView = NSHostingView(rootView:
-            RichNoteEditor(
-                html: "<div>copy me</div>",
-                command: nil,
-                isEditable: true,
-                onCopy: { copyCount += 1 },
-                onChange: { _, _, _ in }
-            )
-            .frame(width: 320, height: 240)
-        )
-        let window = NSWindow(
-            contentRect: CGRect(x: 0, y: 0, width: 320, height: 240),
-            styleMask: [.borderless],
-            backing: .buffered,
-            defer: false
-        )
-        window.alphaValue = 0
-        window.contentView = hostingView
-        window.orderFrontRegardless()
-        defer { window.orderOut(nil) }
-
-        let webView = try await waitForWebView(in: hostingView)
-        try await waitUntilEditorIsReady(in: webView)
-        _ = try await webView.evaluateJavaScript(
-            "document.getElementById('editor').dispatchEvent(new Event('copy', { bubbles: true }))"
-        )
-        for _ in 0..<50 {
-            if copyCount != 0 { break }
-            try await Task.sleep(for: .milliseconds(10))
+    @Test(arguments: [true, false])
+    func copyCommitsSelectionBeforeIslandHandoff(isEditable: Bool) async throws {
+        let pasteboard = NSPasteboard(name: .init("dev.wzz.zisla.tests.rich-note.\(UUID().uuidString)"))
+        defer { pasteboard.releaseGlobally() }
+        #expect(pasteboard.setString("previous clipboard", forType: .string))
+        var copiedValues: [String?] = []
+        var copiedWindow: NSWindow?
+        try await withCopyEditor(
+            html: "<div>copy me</div>",
+            isEditable: isEditable,
+            pasteboard: pasteboard,
+            onCopy: {
+                copiedValues.append(pasteboard.string(forType: .string))
+                copiedWindow?.orderOut(nil)
+            }
+        ) { webView, changes in
+            copiedWindow = webView.window
+            let result = try await dispatchCopy(in: webView, selection: "range.selectNodeContents(editor); selection.addRange(range);")
+            _ = try await waitForChange(in: changes) { _ in true }
+            #expect(result["prevented"] as? Bool == true)
+            #expect(result["timerCount"] as? Int == 0, "Copy must not wait for a WebKit timer")
+            #expect(result["unchanged"] as? Bool == true)
+            #expect(pasteboard.string(forType: .html)?.contains("copy me") == true)
         }
 
-        #expect(copyCount == 1)
+        #expect(copiedValues == ["copy me"], "Copied content must be available before the island starts collapsing")
+    }
+
+    @Test(arguments: [
+        ("<div><b><i>left 复制😀 right</i></b></div>", "const text = editor.querySelector('i').firstChild; range.setStart(text, 5); range.setEnd(text, 9); selection.addRange(range);", "复制😀", "b i"),
+        ("<div><a href='https://example.com' style='color: red'>link</a></div>", "range.selectNodeContents(editor.querySelector('a')); selection.addRange(range);", "link", "a[href='https://example.com'][style='color: red']"),
+        ("<pre>第一行\n  second\tline 👩‍💻 &amp; &lt;x&gt;</pre>", "range.selectNodeContents(editor); selection.addRange(range);", "第一行\n  second\tline 👩‍💻 & <x>", "pre"),
+        ("<figure><img src='data:image/png;base64,AAAA' alt='测试图片'></figure>", "range.selectNode(editor.querySelector('img')); selection.addRange(range);", "", "figure img[src='data:image/png;base64,AAAA']")
+    ])
+    func copyPreservesSelectedRichContent(html: String, selection: String, plainText: String, selector: String) async throws {
+        let pasteboard = NSPasteboard(name: .init("dev.wzz.zisla.tests.rich-note.\(UUID().uuidString)"))
+        defer { pasteboard.releaseGlobally() }
+        var copyCount = 0
+        try await withCopyEditor(html: html, pasteboard: pasteboard, onCopy: { copyCount += 1 }) { webView, changes in
+            let result = try await dispatchCopy(in: webView, selection: selection)
+            _ = try await waitForChange(in: changes) { _ in true }
+            #expect(result["prevented"] as? Bool == true)
+            #expect(result["unchanged"] as? Bool == true)
+            #expect(pasteboard.string(forType: .string) == plainText)
+            let copiedHTML = try #require(pasteboard.string(forType: .html))
+            let arguments = String(decoding: try JSONSerialization.data(withJSONObject: [copiedHTML, selector]), as: UTF8.self)
+            let formattedText = try await webView.evaluateJavaScript("""
+                (() => {
+                  const [html, selector] = \(arguments);
+                  const template = document.createElement('template');
+                  template.innerHTML = html;
+                  return template.content.querySelector(selector)?.textContent ?? null;
+                })();
+                """)
+            #expect(formattedText as? String == plainText)
+            #expect(copyCount == 1)
+        }
+    }
+
+    @Test(arguments: [
+        "",
+        "window.getSelection = () => null;",
+        "range.selectNodeContents(editor); range.collapse(true); selection.addRange(range);",
+        "range.selectNodeContents(document.head); selection.addRange(range);",
+        "range.setStartBefore(editor); range.setEndAfter(editor); selection.addRange(range);"
+    ])
+    func copyWithoutAnEditorSelectionKeepsClipboard(selection: String) async throws {
+        let pasteboard = NSPasteboard(name: .init("dev.wzz.zisla.tests.rich-note.\(UUID().uuidString)"))
+        defer { pasteboard.releaseGlobally() }
+        #expect(pasteboard.setString("previous clipboard", forType: .string))
+        let version = pasteboard.changeCount
+        var copyCount = 0
+        try await withCopyEditor(html: "<div>copy me</div>", pasteboard: pasteboard, onCopy: { copyCount += 1 }) { webView, changes in
+            let result = try await dispatchCopy(in: webView, selection: selection)
+            _ = try await waitForChange(in: changes) { _ in true }
+            #expect(result["prevented"] as? Bool == false)
+            #expect(result["errors"] as? [String] == [])
+            #expect(copyCount == 0)
+            #expect(pasteboard.changeCount == version)
+            #expect(pasteboard.string(forType: .string) == "previous clipboard")
+        }
+    }
+
+    @Test
+    func copyRejectsInvalidMessagesWithoutClearingClipboard() async throws {
+        let pasteboard = NSPasteboard(name: .init("dev.wzz.zisla.tests.rich-note.\(UUID().uuidString)"))
+        defer { pasteboard.releaseGlobally() }
+        #expect(pasteboard.setString("previous clipboard", forType: .string))
+        let version = pasteboard.changeCount
+        var copyCount = 0
+        try await withCopyEditor(html: "<div>copy me</div>", pasteboard: pasteboard, onCopy: { copyCount += 1 }) { webView, changes in
+            _ = try await webView.evaluateJavaScript(
+                """
+                [null, {}, {plainText: 42, html: '<b>text</b>'}, {plainText: 'text'}, {plainText: '', html: ''}]
+                  .forEach(payload => window.webkit.messageHandlers.richNoteCopied.postMessage(payload));
+                """
+            )
+            _ = try await dispatchCopy(in: webView, selection: "")
+            _ = try await waitForChange(in: changes) { _ in true }
+            #expect(copyCount == 0)
+            #expect(pasteboard.changeCount == version)
+            #expect(pasteboard.string(forType: .string) == "previous clipboard")
+        }
+    }
+
+    @Test
+    func consecutiveCopiesKeepOnlyTheLatestSelection() async throws {
+        let pasteboard = NSPasteboard(name: .init("dev.wzz.zisla.tests.rich-note.\(UUID().uuidString)"))
+        defer { pasteboard.releaseGlobally() }
+        var copiedValues: [String?] = []
+        try await withCopyEditor(
+            html: "<div id='first'>first</div><div id='second'>second</div>",
+            pasteboard: pasteboard,
+            onCopy: { copiedValues.append(pasteboard.string(forType: .string)) }
+        ) { webView, changes in
+            _ = try await dispatchCopy(in: webView, selection: """
+                range.selectNodeContents(editor.querySelector('#first')); selection.addRange(range);
+                editor.dispatchEvent(new ClipboardEvent('copy', { bubbles: true, cancelable: true }));
+                selection.removeAllRanges();
+                range.selectNodeContents(editor.querySelector('#second')); selection.addRange(range);
+                """)
+            _ = try await waitForChange(in: changes) { _ in true }
+            #expect(copiedValues == ["first", "second"])
+            #expect(pasteboard.string(forType: .string) == "second")
+            #expect(pasteboard.pasteboardItems?.count == 1)
+        }
+    }
+
+    @Test
+    func failedClipboardWriteDoesNotStartIslandHandoff() async throws {
+        let pasteboard = RejectingRichNotePasteboard()
+        var copyCount = 0
+        try await withCopyEditor(html: "<div>copy me</div>", pasteboard: pasteboard, onCopy: { copyCount += 1 }) { webView, changes in
+            let result = try await dispatchCopy(in: webView, selection: "range.selectNodeContents(editor); selection.addRange(range);")
+            _ = try await waitForChange(in: changes) { _ in true }
+            #expect(result["unchanged"] as? Bool == true)
+            #expect(copyCount == 0)
+        }
+    }
+
+    @Test
+    func copyPreservesUnicodeWhenPastedIntoNativeTextView() async throws {
+        let pasteboard = NSPasteboard(name: .init("dev.wzz.zisla.tests.rich-note.\(UUID().uuidString)"))
+        defer { pasteboard.releaseGlobally() }
+        try await withCopyEditor(html: "<div><b><i>复制 👩‍💻 text</i></b></div>", pasteboard: pasteboard, onCopy: {}) { webView, changes in
+            _ = try await dispatchCopy(in: webView, selection: "range.selectNodeContents(editor); selection.addRange(range);")
+            _ = try await waitForChange(in: changes) { _ in true }
+            let target = NSTextView()
+            target.isRichText = true
+            try #require(target.readSelection(from: pasteboard))
+            #expect(target.string.trimmingCharacters(in: .newlines) == "复制 👩‍💻 text")
+            let font = try #require(target.textStorage?.attribute(.font, at: 0, effectiveRange: nil) as? NSFont)
+            let traits = NSFontManager.shared.traits(of: font)
+            #expect(traits.contains(.boldFontMask))
+            #expect(traits.contains(.italicFontMask))
+        }
+    }
+
+    @Test
+    func copyHandlesLongNotesWithoutDeferringTheWrite() async throws {
+        let text = String(repeating: "随记 & <code> 👩‍💻\n", count: 10_000)
+        let html = "<pre>\(text.replacingOccurrences(of: "&", with: "&amp;").replacingOccurrences(of: "<", with: "&lt;"))</pre>"
+        let pasteboard = NSPasteboard(name: .init("dev.wzz.zisla.tests.rich-note.\(UUID().uuidString)"))
+        defer { pasteboard.releaseGlobally() }
+        var copiedText: String?
+        try await withCopyEditor(
+            html: html,
+            pasteboard: pasteboard,
+            onCopy: { copiedText = pasteboard.string(forType: .string) }
+        ) { webView, changes in
+            let result = try await dispatchCopy(in: webView, selection: "range.selectNodeContents(editor); selection.addRange(range);")
+            _ = try await waitForChange(in: changes) { _ in true }
+            #expect(result["timerCount"] as? Int == 0)
+            #expect(copiedText == text)
+        }
     }
 
     @Test
@@ -967,6 +1107,69 @@ struct RichNoteEditorTests {
         #expect(try await editorText(in: webView) == "初始内容变更")
     }
 
+    private func withCopyEditor(
+        html: String,
+        isEditable: Bool = true,
+        pasteboard: any RichNotePasteboard,
+        onCopy: @escaping () -> Void,
+        body: (WKWebView, RichNoteEditorChangeCapture) async throws -> Void
+    ) async throws {
+        let changes = RichNoteEditorChangeCapture()
+        let hostingView = NSHostingView(rootView:
+            RichNoteEditor(
+                html: html,
+                command: nil,
+                isEditable: isEditable,
+                onCopy: onCopy,
+                pasteboard: pasteboard,
+                onChange: { changes.changes.append(($0, $1, $2)) }
+            )
+            .frame(width: 320, height: 240)
+        )
+        let window = NSWindow(contentRect: CGRect(x: 0, y: 0, width: 320, height: 240), styleMask: [.borderless], backing: .buffered, defer: false)
+        window.alphaValue = 0
+        window.contentView = hostingView
+        window.orderFrontRegardless()
+        defer {
+            window.orderOut(nil)
+            window.contentView = nil
+        }
+        let webView = try await waitForWebView(in: hostingView)
+        try await waitUntilEditorIsReady(in: webView)
+        try await body(webView, changes)
+    }
+
+    private func dispatchCopy(in webView: WKWebView, selection selectionScript: String) async throws -> [String: Any] {
+        try #require(await webView.evaluateJavaScript(
+            """
+            (() => {
+              const editor = document.getElementById('editor');
+              const originalHTML = editor.innerHTML;
+              const range = document.createRange();
+              const selection = window.getSelection();
+              selection.removeAllRanges();
+              \(selectionScript)
+              const event = new ClipboardEvent('copy', { bubbles: true, cancelable: true });
+              const schedule = window.setTimeout;
+              let timerCount = 0;
+              const errors = [];
+              const onError = event => errors.push(event.message);
+              window.addEventListener('error', onError);
+              window.setTimeout = (...args) => { timerCount += 1; return schedule(...args); };
+              try { editor.dispatchEvent(event); } finally {
+                window.setTimeout = schedule;
+                window.removeEventListener('error', onError);
+              }
+              // This message is a barrier for preceding native copy messages, without a timing assumption.
+              window.webkit.messageHandlers.richNoteChanged.postMessage({
+                html: editor.innerHTML, plainText: editor.innerText, token: window.zisla.documentToken()
+              });
+              return { prevented: event.defaultPrevented, timerCount, errors, unchanged: editor.innerHTML === originalHTML };
+            })();
+            """
+        ) as? [String: Any])
+    }
+
     private func waitForWebView(in view: NSView) async throws -> WKWebView {
         for _ in 0..<100 {
             view.layoutSubtreeIfNeeded()
@@ -1086,6 +1289,11 @@ private final class HTMLChangeCapture {
 
 private final class RichNoteEditorChangeCapture {
     var changes: [(String?, String, String)] = []
+}
+
+private final class RejectingRichNotePasteboard: RichNotePasteboard {
+    func clearContents() -> Int { 0 }
+    func writeObjects(_ objects: [any NSPasteboardWriting]) -> Bool { false }
 }
 
 @MainActor

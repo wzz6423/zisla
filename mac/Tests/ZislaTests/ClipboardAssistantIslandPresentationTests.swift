@@ -3,10 +3,41 @@ import Foundation
 import SwiftUI
 import Testing
 import ZislaCore
+import ZislaKit
 
 @testable import Zisla
 
 struct ClipboardAssistantIslandPresentationTests {
+    @MainActor
+    @Test(arguments: [false, true])
+    func quickNoteCopyIsCapturedBeforeTheFoldFinishes(alreadyCollapsing: Bool) throws {
+        let pasteboard = NSPasteboard(name: .init("dev.wzz.zisla.tests.quick-note-handoff.\(UUID().uuidString)"))
+        defer { pasteboard.releaseGlobally() }
+        var handoff = IslandClipboardHandoff()
+        var captures = 0
+        let monitor = ClipboardHistoryMonitor(pasteboard: pasteboard, pollInterval: 3600) { content in
+            #expect(handoff.shouldDefer, "The capture must stay queued until the island finishes folding")
+            captures += 1
+            handoff.hold(.init(content: content, downloadableURL: nil, changeCount: pasteboard.changeCount))
+        }
+        monitor.setEnabled(true)
+        defer { monitor.setEnabled(false) }
+        if alreadyCollapsing {
+            handoff.beginRecycle()
+        } else {
+            handoff.noteDidCopy()
+        }
+        #expect(ClipboardHistoryPasteboard.write(.text("copied note"), to: pasteboard))
+
+        monitor.pollNow()
+
+        let result = handoff.finishRecycle(currentChangeCount: pasteboard.changeCount)
+        let pending = try #require(result)
+        #expect(pending.content == .text("copied note"), "The fold must not finish waiting for the next periodic clipboard poll")
+        monitor.pollNow()
+        #expect(captures == 1, "The next periodic poll must not present the same copy again")
+    }
+
     @Test
     func quickNoteCopyWaitsForTheFoldAndKeepsTheNewestCapture() {
         var handoff = IslandClipboardHandoff()

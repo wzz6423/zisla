@@ -6,6 +6,32 @@ import ZislaCore
 /// to least specific so overlapping patterns resolve predictably. Detections carry structured
 /// payloads only; the presentation layer renders user-facing strings with locale-aware formatters.
 public enum ClipboardAssistantDetector {
+    /// Cold language and format detectors must not block input handling or pasteboard delivery.
+    @MainActor
+    public static func detectInBackground(
+        content: ClipboardHistoryContent,
+        enabledKinds: Set<ClipboardAssistantKind>,
+        offersDownload: Bool = false,
+        preferredCurrencyCode: String? = nil,
+        locale: Locale = AppLocalization.currentLanguage.locale,
+        countryCode: String? = Locale.current.region?.identifier,
+        installedApplications: [InstalledApplication] = [],
+        shellCommandExists: @Sendable @escaping (String) -> Bool = { _ in false }
+    ) async -> ClipboardAssistantDetection? {
+        await Task.detached(priority: .userInitiated) {
+            detect(
+                content: content,
+                enabledKinds: enabledKinds,
+                offersDownload: offersDownload,
+                preferredCurrencyCode: preferredCurrencyCode,
+                locale: locale,
+                countryCode: countryCode,
+                installedApplications: installedApplications,
+                shellCommandExists: shellCommandExists
+            )
+        }.value
+    }
+
     public static func detect(
         content: ClipboardHistoryContent,
         enabledKinds: Set<ClipboardAssistantKind>,
