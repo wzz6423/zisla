@@ -35,6 +35,21 @@ struct MailHTMLViewTests {
         #expect(result["imageWidth"] as? Int == 1)
     }
 
+    @Test(arguments: [
+        "",
+        "<meta charset=\"iso-8859-1\">",
+        "<meta http-equiv=\"Content-Type\" content=\"text/html; charset=gb2312\">",
+    ])
+    func preservesDecodedUnicodeRegardlessOfSenderCharsetMetadata(metadata: String) async throws {
+        let webView = makeWebView()
+        defer { webView.stopLoading() }
+        let text = "您好，系统发现您的账号有异常登录。café 🪷"
+        try await load("<html><head>\(metadata)</head><body><p>\(text)</p></body></html>", in: webView)
+
+        #expect(try await webView.evaluateJavaScript("document.querySelector('p').textContent") as? String == text)
+        #expect(try await webView.evaluateJavaScript("document.characterSet") as? String == "UTF-8")
+    }
+
     @Test
     func exposesTheNativeGlassAndAdaptsNeutralMailColorsWithoutChangingAccents() async throws {
         let webView = makeWebView()

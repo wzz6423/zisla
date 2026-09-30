@@ -788,8 +788,8 @@ struct MailServiceTests {
             .replacingOccurrences(of: "every account", with: "fixtureAccounts")
             .replacingOccurrences(of: "messages of mailbox \"INBOX\" of mailAccount", with: "fixtureInbox of mailAccount")
             .replacingOccurrences(of: "properties of mailMessage", with: "mailMessage")
-        let html = "<html><body><h1>Workflow</h1><a href=\"https://example.com\">View run</a></body></html>"
-        let rawSource = "Content-Type: text/html; charset=utf-8\n\n" + html
+        let html = "<html><body><h1>邮件提醒 🪷</h1><a href=\"https://example.com\">查看详情</a></body></html>"
+        let rawSource = try #require(String(data: Data(("Content-Type: text/html; charset=utf-8\n\n" + html).utf8), encoding: .isoLatin1))
         let sourceProperty = sourceAvailable ? ", source:\(MailService.appleScriptString(rawSource))" : ""
         let script = try #require(NSAppleScript(source: """
             using terms from application "Mail"

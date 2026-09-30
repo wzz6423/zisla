@@ -75,15 +75,13 @@ enum MailHTMLBody {
         let transfer = headers["content-transfer-encoding"]?.lowercased() ?? "7bit"
         guard let data = decoded(body, transfer: transfer) else { return Content() }
         if type == "text/html" {
+            let charset = parameters["charset"] ?? "utf-8"
             let html: String?
             if transfer == "7bit" || transfer == "8bit" || transfer == "binary" {
-                // AppleScript has already converted unencoded source into Unicode text.
-                html = body
+                // Mail can expose MIME octets as Latin-1 code points; preserve text already decoded to Unicode.
+                html = body.data(using: .isoLatin1).flatMap { decodedText($0, charset: charset) } ?? body
             } else {
-                let charset = parameters["charset"] ?? "utf-8"
-                let encoding = CFStringConvertIANACharSetNameToEncoding(charset as CFString)
-                guard encoding != kCFStringEncodingInvalidId else { return Content() }
-                html = String(data: data, encoding: String.Encoding(rawValue: CFStringConvertEncodingToNSStringEncoding(encoding)))
+                html = decodedText(data, charset: charset)
             }
             return Content(html: html)
         }
@@ -91,6 +89,12 @@ enum MailHTMLBody {
               let identifier = headers["content-id"] else { return Content() }
         let cid = identifier.trimmingCharacters(in: CharacterSet(charactersIn: "<> \t"))
         return Content(images: [cid: "data:\(type);base64,\(data.base64EncodedString())"])
+    }
+
+    private static func decodedText(_ data: Data, charset: String) -> String? {
+        let encoding = CFStringConvertIANACharSetNameToEncoding(charset as CFString)
+        guard encoding != kCFStringEncodingInvalidId else { return nil }
+        return String(data: data, encoding: String.Encoding(rawValue: CFStringConvertEncodingToNSStringEncoding(encoding)))
     }
 
     private static func headerValue(_ value: String) -> (String, [String: String]) {

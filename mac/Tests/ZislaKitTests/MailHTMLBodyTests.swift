@@ -57,6 +57,66 @@ struct MailHTMLBodyTests {
         #expect(MailHTMLBody.html(from: source) == "<p>café</p>")
     }
 
+    @Test(arguments: ["", "7bit", "8bit", "binary"])
+    func decodesUnencodedUTF8BytesFromMailSource(transfer: String) throws {
+        let html = "<h1>Hi</h1><p>您好，系统发现您的账号有异常登录。café 🪷</p>"
+        let body = try #require(String(data: Data(html.utf8), encoding: .isoLatin1))
+        let transferHeader = transfer.isEmpty ? "" : "Content-Transfer-Encoding: \(transfer)\n"
+        let source = "Content-Type: text/html; charset=utf-8\n" + transferHeader + "\n" + body
+
+        #expect(MailHTMLBody.html(from: source) == html)
+    }
+
+    @Test(arguments: [
+        ("gb18030", Data([0xD6, 0xD0, 0xCE, 0xC4]), "中文"),
+        ("windows-1252", Data([0x80]), "€"),
+        ("iso-8859-1", Data([0x63, 0x61, 0x66, 0xE9]), "café"),
+    ])
+    func decodesUnencodedBytesUsingTheDeclaredCharacterSet(charset: String, data: Data, text: String) throws {
+        let body = try #require(String(data: data, encoding: .isoLatin1))
+        let source = "Content-Type: text/html; charset=\(charset)\nContent-Transfer-Encoding: 8bit\n\n<p>\(body)</p>"
+
+        #expect(MailHTMLBody.html(from: source) == "<p>\(text)</p>")
+    }
+
+    @Test(arguments: ["", "7bit", "8bit", "binary"], [
+        "<p>您好，café 🪷</p>",
+        "<p>café naïve</p>",
+        "<p>Plain ASCII</p>",
+    ])
+    func preservesAlreadyDecodedUnencodedHTML(transfer: String, html: String) {
+        let transferHeader = transfer.isEmpty ? "" : "Content-Transfer-Encoding: \(transfer)\n"
+        let source = "Content-Type: text/html; charset=utf-8\n" + transferHeader + "\n" + html
+
+        #expect(MailHTMLBody.html(from: source) == html)
+    }
+
+    @Test
+    func preservesUnencodedHTMLWithAnUnknownCharacterSet() {
+        let html = "<p>café</p>"
+        let source = "Content-Type: text/html; charset=unknown-charset\nContent-Transfer-Encoding: 8bit\n\n" + html
+
+        #expect(MailHTMLBody.html(from: source) == html)
+    }
+
+    @Test
+    func roundTripsUnencodedUnicodeWithABoundedDeterministicCorpus() throws {
+        let characters = Array("Aé€您好한국語العربية🪷 \t")
+        var seed: UInt64 = 0xC0DE
+        for length in 0..<64 {
+            var text = ""
+            for _ in 0..<length {
+                seed = seed &* 6_364_136_223_846_793_005 &+ 1
+                text.append(characters[Int(seed % UInt64(characters.count))])
+            }
+            let html = "<p>\(text)</p>"
+            let body = try #require(String(data: Data(html.utf8), encoding: .isoLatin1))
+            let source = "Content-Type: text/html\nContent-Transfer-Encoding: 8bit\n\n" + body
+
+            #expect(MailHTMLBody.html(from: source) == html)
+        }
+    }
+
     @Test
     func resolvesRelatedImagesInAttributesAndCSSWithoutReadingFiles() {
         let source = """
