@@ -1542,6 +1542,8 @@ final class AppModel: ObservableObject {
   }
 
   func quickNoteDidCopy() {
+    // WebKit can finish copying after the pointer has already collapsed the island.
+    defer { clipboardHistoryMonitor.pollNow() }
     guard settingsStore.settings.clipboardAssistantEnabled,
       isIslandVisible, !isExternalDragging,
       !voiceInput.isRecording, !voiceInput.isPreparing else { return }
@@ -1649,7 +1651,8 @@ final class AppModel: ObservableObject {
     guard !Task.isCancelled, changeCount == NSPasteboard.general.changeCount,
           settings == settingsStore.settings,
           !voiceInput.isRecording, !voiceInput.isPreparing, !isIslandVisible else { return .ignored }
-    guard var detection = ClipboardAssistantDetector.detect(
+    let shellCommandWasResolved = shellCommand != nil
+    let result = await ClipboardAssistantDetector.detectInBackground(
       content: content,
       enabledKinds: enabledKinds,
       offersDownload: settings.downloaderEnabled,
@@ -1658,8 +1661,12 @@ final class AppModel: ObservableObject {
       ),
       locale: languageStore.language.locale,
       installedApplications: installedApplications,
-      shellCommandExists: { _ in shellCommand != nil }
-    ) else { return .unavailable }
+      shellCommandExists: { _ in shellCommandWasResolved }
+    )
+    guard !Task.isCancelled, changeCount == NSPasteboard.general.changeCount,
+          settings == settingsStore.settings,
+          !voiceInput.isRecording, !voiceInput.isPreparing, !isIslandVisible else { return .ignored }
+    guard var detection = result else { return .unavailable }
     detection = augmentedClipboardAssistantDetection(
       detection,
       content: content,

@@ -6,6 +6,37 @@ import ZislaCore
 struct ClipboardAssistantDetectorTests {
     private let allKinds = Set(ClipboardAssistantKind.allCases)
 
+    @MainActor
+    @Test
+    func backgroundDetectionLetsTheMainActorHandleInputBeforeItFinishes() async {
+        let detection = await ClipboardAssistantDetector.detectInBackground(
+            content: .text("echo hello"),
+            enabledKinds: [.shellCommand],
+            shellCommandExists: { _ in
+                let inputHandled = DispatchSemaphore(value: 0)
+                Task { @MainActor in inputHandled.signal() }
+                return inputHandled.wait(timeout: .now() + 2) == .success
+            }
+        )
+        #expect(detection?.kind == .shellCommand, "The main actor must remain responsive while classification is still running")
+    }
+
+    @MainActor
+    @Test(arguments: ["", "普通随记内容", "https://example.com/file.zip", "echo hello"])
+    func backgroundDetectionPreservesTheSynchronousResult(text: String) async {
+        let content = ClipboardHistoryContent.text(text)
+        let kinds: Set<ClipboardAssistantKind> = [.text, .url, .shellCommand]
+        let expected = ClipboardAssistantDetector.detect(
+            content: content, enabledKinds: kinds, offersDownload: true,
+            locale: Locale(identifier: "zh-Hans"), shellCommandExists: { _ in false }
+        )
+        let actual = await ClipboardAssistantDetector.detectInBackground(
+            content: content, enabledKinds: kinds, offersDownload: true,
+            locale: Locale(identifier: "zh-Hans"), shellCommandExists: { _ in false }
+        )
+        #expect(actual == expected)
+    }
+
     @Test
     func convertsUnitsAndRejectsMismatchedDimensions() throws {
         let detection = try #require(ClipboardAssistantDetector.detect(
@@ -709,14 +740,14 @@ struct ClipboardAssistantDetectorTests {
     }
 
     @Test
-    func detectsFileReferenceContentSize() throws {
+    func detectsFileReferenceContentSize() async throws {
         let temporaryDirectory = FileManager.default.temporaryDirectory
         let fileURL = temporaryDirectory.appendingPathComponent("zisla-assistant-\(UUID().uuidString).bin")
         try Data(repeating: 7, count: 2048).write(to: fileURL)
         defer { try? FileManager.default.removeItem(at: fileURL) }
 
         let content = try ClipboardHistoryContent.file(at: fileURL)
-        let detection = ClipboardAssistantDetector.detect(content: content, enabledKinds: allKinds)
+        let detection = await ClipboardAssistantDetector.detectInBackground(content: content, enabledKinds: allKinds)
         #expect(detection?.kind == .file)
         #expect(detection?.title == fileURL.lastPathComponent)
         if case .fileSize(let bytes)? = detection?.detail {
@@ -728,14 +759,14 @@ struct ClipboardAssistantDetectorTests {
     }
 
     @Test
-    func imageDetectionReportsDimensionsOrReturnsNilForGarbage() {
+    func imageDetectionReportsDimensionsOrReturnsNilForGarbage() async {
         // 1×1 red PNG
         let base64PNG = "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg=="
         guard let pngData = Data(base64Encoded: base64PNG) else {
             Issue.record("fixture decode failed")
             return
         }
-        let detection = ClipboardAssistantDetector.detect(content: .image(pngData), enabledKinds: allKinds)
+        let detection = await ClipboardAssistantDetector.detectInBackground(content: .image(pngData), enabledKinds: allKinds)
         #expect(detection?.kind == .image)
         #expect(detection?.title.contains("1 × 1") == true)
         if case .imageSize(let wide, let high, _)? = detection?.detail {
@@ -745,7 +776,7 @@ struct ClipboardAssistantDetectorTests {
             Issue.record("image size detail expected")
         }
 
-        let garbage = ClipboardAssistantDetector.detect(content: .image(Data([0x00, 0x01])), enabledKinds: allKinds)
+        let garbage = await ClipboardAssistantDetector.detectInBackground(content: .image(Data([0x00, 0x01])), enabledKinds: allKinds)
         #expect(garbage == nil)
     }
 
