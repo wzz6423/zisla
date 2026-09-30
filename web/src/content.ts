@@ -172,17 +172,17 @@ export const downloadLinks: readonly DownloadLink[] = [
 ];
 
 export const latestRelease = {
-  version: 'v0.1.13',
-  date: '2026-09-27',
+  version: 'v0.1.14',
+  date: '2026-09-30',
   channel: 'Release',
-  releasePage: 'https://github.com/wzz6423/zisla/releases/tag/v0.1.13',
-  dmg: 'https://github.com/wzz6423/zisla/releases/download/v0.1.13/zisla-v0.1.13-macOS-arm64.dmg',
-  zip: 'https://github.com/wzz6423/zisla/releases/download/v0.1.13/zisla-v0.1.13-macOS-arm64.zip',
-  checksum: 'https://github.com/wzz6423/zisla/releases/download/v0.1.13/zisla-v0.1.13-macOS-arm64.zip.sha256',
-  universalDmg: 'https://github.com/wzz6423/zisla/releases/download/v0.1.13/zisla-v0.1.13-macOS-universal.dmg',
-  universalZip: 'https://github.com/wzz6423/zisla/releases/download/v0.1.13/zisla-v0.1.13-macOS-universal.zip',
-  intelDmg: 'https://github.com/wzz6423/zisla/releases/download/v0.1.13/zisla-v0.1.13-macOS-x86_64.dmg',
-  intelZip: 'https://github.com/wzz6423/zisla/releases/download/v0.1.13/zisla-v0.1.13-macOS-x86_64.zip',
+  releasePage: 'https://github.com/wzz6423/zisla/releases/tag/v0.1.14',
+  dmg: 'https://github.com/wzz6423/zisla/releases/download/v0.1.14/zisla-v0.1.14-macOS-arm64.dmg',
+  zip: 'https://github.com/wzz6423/zisla/releases/download/v0.1.14/zisla-v0.1.14-macOS-arm64.zip',
+  checksum: 'https://github.com/wzz6423/zisla/releases/download/v0.1.14/zisla-v0.1.14-macOS-arm64.zip.sha256',
+  universalDmg: 'https://github.com/wzz6423/zisla/releases/download/v0.1.14/zisla-v0.1.14-macOS-universal.dmg',
+  universalZip: 'https://github.com/wzz6423/zisla/releases/download/v0.1.14/zisla-v0.1.14-macOS-universal.zip',
+  intelDmg: 'https://github.com/wzz6423/zisla/releases/download/v0.1.14/zisla-v0.1.14-macOS-x86_64.dmg',
+  intelZip: 'https://github.com/wzz6423/zisla/releases/download/v0.1.14/zisla-v0.1.14-macOS-x86_64.zip',
   previewPage: 'https://github.com/wzz6423/zisla/releases/tag/v0.1.3-preview.1',
 };
 
@@ -198,6 +198,16 @@ export interface ChangelogEntry {
  * 统一以英文原文展示（11 版 × 17 语翻译不可维护）；v0.1.8/v0.1.0 无 Highlights 段，取其正文概述。
  */
 export const changelogEntries: readonly ChangelogEntry[] = [
+  {
+    version: 'v0.1.14',
+    date: '2026-09-30',
+    notes: [
+      "Copied shell commands gain dedicated Quick Actions for foreground execution in Terminal or iTerm, silent background execution, search, and save. Recognition follows your shell's executables, builtins, aliases, and functions; execution requires an explicit action.",
+      'AI task results now play a configurable four-second light sweep across the island: emerald for completion and red for failures or tool errors. The effect supports collapsed and expanded views, all 17 languages, and Reduce Motion.',
+      'Browser downloads no longer produce duplicate progress indicators, and closing a Quick Action no longer lets the click pass through to the window underneath.',
+      'Refined website AI monitor captions and updated web and GitHub Actions dependencies.',
+    ],
+  },
   {
     version: 'v0.1.13',
     date: '2026-09-27',
