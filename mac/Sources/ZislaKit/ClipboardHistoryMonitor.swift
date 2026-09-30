@@ -44,7 +44,7 @@ public final class ClipboardHistoryMonitor {
         }
     }
 
-    func pollNow() {
+    public func pollNow() {
         guard isEnabled else { return }
         let changeCount = pasteboard.changeCount
         guard changeCount != lastPasteboardChangeCount else { return }
