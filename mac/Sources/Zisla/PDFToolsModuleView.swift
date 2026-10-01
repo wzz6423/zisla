@@ -172,7 +172,7 @@ struct PDFToolsModuleView: View {
             )
         case .textWatermark:
             TextField(AppLocalization.text("水印文字"), text: $watermarkText)
-                .textFieldStyle(.roundedBorder)
+                .islandGlassField()
         case .imageWatermark:
             HStack(spacing: 8) {
                 Button(watermarkImageURL == nil ? AppLocalization.text("选择水印图片") : AppLocalization.text("更换水印图片")) {
@@ -188,9 +188,9 @@ struct PDFToolsModuleView: View {
         case .pageNumbers:
             HStack(spacing: 8) {
                 TextField(AppLocalization.text("前缀"), text: $pagePrefix)
-                    .textFieldStyle(.roundedBorder)
+                    .islandGlassField()
                 TextField(AppLocalization.text("后缀"), text: $pageSuffix)
-                    .textFieldStyle(.roundedBorder)
+                    .islandGlassField()
             }
         case .crop:
             HStack(spacing: 6) {
@@ -202,19 +202,19 @@ struct PDFToolsModuleView: View {
         case .protect:
             HStack(spacing: 8) {
                 SecureField(AppLocalization.text("打开密码"), text: $password)
-                    .textFieldStyle(.roundedBorder)
+                    .islandGlassField()
                 SecureField(AppLocalization.text("所有者密码（可选）"), text: $ownerPassword)
-                    .textFieldStyle(.roundedBorder)
+                    .islandGlassField()
             }
         case .unlock:
             SecureField(AppLocalization.text("当前密码"), text: $password)
-                .textFieldStyle(.roundedBorder)
+                .islandGlassField()
         case .metadata:
             HStack(spacing: 8) {
                 TextField(AppLocalization.text("标题"), text: $metadataTitle)
-                    .textFieldStyle(.roundedBorder)
+                    .islandGlassField()
                 TextField(AppLocalization.text("作者"), text: $metadataAuthor)
-                    .textFieldStyle(.roundedBorder)
+                    .islandGlassField()
             }
         default:
             EmptyView()
@@ -223,7 +223,7 @@ struct PDFToolsModuleView: View {
 
     private var pageRangeField: some View {
         TextField(AppLocalization.text("页码范围：留空表示全部，例如 1-3,5"), text: $pageSelection)
-            .textFieldStyle(.roundedBorder)
+            .islandGlassField()
     }
 
     private var footer: some View {
@@ -274,7 +274,7 @@ struct PDFToolsModuleView: View {
 
     private func cropField(_ title: String, value: Binding<String>) -> some View {
         TextField(title, text: value)
-            .textFieldStyle(.roundedBorder)
+            .islandGlassField()
             .frame(width: 72)
     }
 
