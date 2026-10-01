@@ -210,8 +210,9 @@ enum SystemMonitorMenuBarIconRenderer {
         ) : nil
         let indicatorWidth = showsBolt ? boltBounds.width : (plug?.size.width ?? 0)
         let headerWidth = valueWidth + indicatorWidth + (showsValue && indicatorWidth > 0 ? 6 : 0)
-        // Fit the entire header together so neither glyph can hide the other.
-        let headerScale: CGFloat = headerWidth > 70 ? 70 / headerWidth : 1
+        // Scale the fitting budget with the slider so fitting cannot cancel glyph growth.
+        let headerWidthLimit = 70 * CGFloat(options.textScale / SystemMonitorCombinedIconAppearance.batteryTextScaleRange.upperBound)
+        let headerScale: CGFloat = headerWidth > headerWidthLimit ? headerWidthLimit / headerWidth : 1
         let topGapWidth = SystemMonitorMenuBarIconGeometry.batteryHeaderGapWidth(
             contentWidth: headerWidth * headerScale, strokeWidth: 8 * CGFloat(options.ringStrokeScale)
         )

@@ -11,7 +11,7 @@ struct SystemMonitorHeadphoneOptionsSettingsTests {
         #expect(!options.replacesNetworkIcon)
         #expect(options.prioritizesNetworkErrors)
         #expect(!options.usesVolumeColor)
-        #expect(options.symbolScale == 1.4)
+        #expect(options.symbolScale == 1.45)
         #expect(payload.count == 4)
         #expect(payload["showsBatteryLevels"] == nil)
         #expect(object["replacesNetworkIcon"] == nil)
@@ -63,8 +63,8 @@ struct SystemMonitorHeadphoneOptionsSettingsTests {
     @Test
     func removedBatteryPreferenceIsIgnoredWithoutChangingSavedSize() throws {
         let options = try JSONDecoder().decode(SystemMonitorHeadphoneOptions.self,
-            from: Data(#"{"showsBatteryLevels":true,"symbolScale":1.6,"replacesNetworkIcon":true}"#.utf8))
-        #expect(options.symbolScale == 1.6)
+            from: Data(#"{"showsBatteryLevels":true,"symbolScale":1.4,"replacesNetworkIcon":true}"#.utf8))
+        #expect(options.symbolScale == 1.4)
         #expect(options.replacesNetworkIcon)
         #expect(try Self.object(options)["showsBatteryLevels"] == nil)
     }
@@ -76,7 +76,7 @@ struct SystemMonitorHeadphoneOptionsSettingsTests {
                 try JSONDecoder().decode(SystemMonitorHeadphoneOptions.self, from: Data(payload.utf8))
             }
         }
-        for (input, expected) in [(0.0, 1.0), (100, 1.8), (.nan, 1.4), (.infinity, 1.4)] {
+        for (input, expected) in [(0.0, 1.0), (100, 1.8), (.nan, 1.45), (.infinity, 1.45)] {
             var options = SystemMonitorHeadphoneOptions()
             options.symbolScale = input
             #expect(options.normalized.symbolScale == expected)

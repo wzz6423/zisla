@@ -1237,7 +1237,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
     private func updateCombinedMonitorStatusImage(metric: SystemMonitorCombinedIconMetric) {
         guard let button = combinedMonitorStatusItem?.button else { return }
         let settings = AppModel.shared.settingsStore.settings
-        combinedMonitorStatusItem?.length = settings.systemMonitorMenuBarCombinedIconAppearance.normalized.iconSize + 4
+        combinedMonitorStatusItem?.length = settings.systemMonitorMenuBarCombinedIconAppearance.normalized.iconSize
         let battery = AppModel.shared.battery.snapshot
         let audioOutput = AppModel.shared.audioOutput
         let connection = AppModel.shared.systemMonitorHeadphoneTransient.connection

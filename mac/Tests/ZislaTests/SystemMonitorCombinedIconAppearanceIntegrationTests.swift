@@ -39,7 +39,14 @@ struct SystemMonitorCombinedIconAppearanceIntegrationTests {
         )
         #expect(section.contains("let settings = AppModel.shared.settingsStore.settings"))
         #expect(section.contains("configuration: settings.systemMonitorMenuBarCombinedIconAppearance"))
-        #expect(section.contains("combinedMonitorStatusItem?.length = settings.systemMonitorMenuBarCombinedIconAppearance.normalized.iconSize + 4"))
+        #expect(section.split(separator: "\n").contains(
+            "        combinedMonitorStatusItem?.length = settings.systemMonitorMenuBarCombinedIconAppearance.normalized.iconSize"
+        ))
+        let controller = try Self.section(source,
+            from: "    private func syncCombinedMonitorStatusItem(",
+            to: "    private func updateCombinedMonitorStatusImage(")
+        #expect(controller.contains("item.button?.imagePosition = .imageOnly"))
+        #expect(controller.contains("item.button?.imageScaling = .scaleNone"))
     }
 
     @Test
@@ -157,6 +164,14 @@ struct SystemMonitorCombinedIconAppearanceIntegrationTests {
             let expected = CGFloat(settings.systemMonitorMenuBarCombinedIconAppearance.normalized.iconSize)
             #expect(image.size.width == expected)
             #expect(image.size.height == expected)
+            let cell = NSButtonCell(imageCell: image)
+            cell.isBordered = false
+            cell.imagePosition = .imageOnly
+            cell.imageScaling = .scaleNone
+            let imageRect = cell.imageRect(forBounds: NSRect(x: 0, y: 0, width: expected, height: 22))
+            #expect(imageRect.width == expected)
+            #expect(imageRect.minX >= 0)
+            #expect(imageRect.maxX <= expected)
         }
     }
 
@@ -174,9 +189,9 @@ struct SystemMonitorCombinedIconAppearanceIntegrationTests {
         #expect(binding.systemMonitorMenuBarCombinedIconAppearance.showsBatteryPercentage.wrappedValue)
         #expect(binding.systemMonitorMenuBarCombinedIconAppearance.showsChargingIndicator.wrappedValue)
         #expect(binding.systemMonitorMenuBarCombinedIconAppearance.showsPercentageWhenConnected.wrappedValue)
-        #expect(binding.systemMonitorMenuBarCombinedIconAppearance.iconSize.wrappedValue == 24)
-        #expect(binding.systemMonitorMenuBarCombinedIconAppearance.wifiScale.wrappedValue == 1.4)
-        #expect(binding.systemMonitorMenuBarCombinedIconAppearance.batteryTextScale.wrappedValue == 1.78)
+        #expect(binding.systemMonitorMenuBarCombinedIconAppearance.iconSize.wrappedValue == 26)
+        #expect(binding.systemMonitorMenuBarCombinedIconAppearance.wifiScale.wrappedValue == 1.55)
+        #expect(binding.systemMonitorMenuBarCombinedIconAppearance.batteryTextScale.wrappedValue == 1.88)
         binding.systemMonitorMenuBarCombinedIconAppearance.indicatorStyle.wrappedValue = .arc
         binding.systemMonitorMenuBarCombinedIconAppearance.ringStrokeStyle.wrappedValue = .regular
         binding.systemMonitorMenuBarCombinedIconAppearance.showsBatteryPercentage.wrappedValue = false

@@ -109,6 +109,63 @@ struct SystemMonitorMenuBarIconBehaviorTests {
     }
 
     @Test
+    func chargingGlyphAndPercentageGrowTogetherWithTextSlider() throws {
+        for charging in [false, true] {
+            for percentage in [70, 100] {
+                var bounds: [(glyph: CGRect, value: CGRect)] = []
+                for textScale in [1.62, 1.88, 1.98] {
+                    var snapshot = battery(charging: charging, pluggedIn: true)
+                    snapshot.level = Double(percentage) / 100
+                    let appearance = SystemMonitorCombinedIconAppearance(
+                        showsBatteryPercentage: true, showsChargingIndicator: true,
+                        showsPercentageWhenConnected: true, usesStatusColors: true,
+                        batteryTextScale: textScale
+                    )
+                    let image = try #require(SystemMonitorMenuBarIconRenderer.render(
+                        menuBarStatus: MenuBarIconStatus(battery: snapshot, wifi: .off, level: nil),
+                        size: 120, scale: 2, foreground: NSColor.white.cgColor,
+                        options: MenuBarIconBatteryOptions(appearance: appearance),
+                        connectionOptions: MenuBarIconConnectionOptions(appearance: appearance),
+                        volumeOptions: MenuBarIconVolumeOptions(appearance: appearance)
+                    ))
+                    let rep = NSBitmapImageRep(cgImage: image)
+                    var columns: [Int: [Int]] = [:]
+                    for y in 0..<72 {
+                        for x in 0..<240 {
+                            let color = try #require(rep.colorAt(x: x, y: y)?.usingColorSpace(.deviceRGB))
+                            if color.alphaComponent > 0.8 && color.redComponent > 0.9
+                                && color.greenComponent > 0.9 && color.blueComponent > 0.9 {
+                                columns[x, default: []].append(y)
+                            }
+                        }
+                    }
+                    let first = try #require(columns.keys.min())
+                    let separator = try #require((first..<240).first { columns[$0] == nil })
+                    func inkBounds(_ selected: [Int]) throws -> CGRect {
+                        let xs = selected.filter { columns[$0] != nil }
+                        let ys = xs.flatMap { columns[$0] ?? [] }
+                        let minX = try #require(xs.min())
+                        let minY = try #require(ys.min())
+                        let maxX = try #require(xs.max())
+                        let maxY = try #require(ys.max())
+                        return CGRect(x: minX, y: minY, width: maxX - minX + 1, height: maxY - minY + 1)
+                    }
+                    let glyph = try inkBounds(Array(first..<separator))
+                    let value = try inkBounds(Array(separator..<240))
+                    #expect(glyph.maxX < value.minX, "Charging glyph and percentage must have separate ink bounds")
+                    bounds.append((glyph, value))
+                }
+                #expect(bounds[1].glyph.height > bounds[0].glyph.height * 1.1,
+                    "Charging glyph must grow when the slider moves from 1.62 to 1.88")
+                #expect(bounds[1].value.height > bounds[0].value.height * 1.1,
+                    "Percentage must grow together with its charging glyph")
+                #expect(bounds[2].glyph.height > bounds[1].glyph.height)
+                #expect(bounds[2].value.height > bounds[1].value.height)
+            }
+        }
+    }
+
+    @Test
     func disablingIndicatorsKeepsContinuousBatteryTrack() throws {
         var appearance = SystemMonitorCombinedIconAppearance(
             showsBatteryPercentage: false, showsChargingIndicator: false,
@@ -173,7 +230,7 @@ struct SystemMonitorMenuBarIconBehaviorTests {
 
     @Test
     func normalizedSizeProducesBoundedRetinaBitmaps() throws {
-        for (requested, expected) in [(0.0, 16), (36.0, 36), (10000.0, 36), (Double.nan, 24)] {
+        for (requested, expected) in [(0.0, 16), (36.0, 36), (10000.0, 36), (Double.nan, 26)] {
             var appearance = SystemMonitorCombinedIconAppearance()
             appearance.iconSize = requested
             let image = try #require(SystemMonitorMenuBarImageRenderer.combinedIcon(

@@ -12,14 +12,14 @@ public struct SystemMonitorHeadphoneOptions: Equatable, Codable, Sendable {
         replacesNetworkIcon: Bool = false,
         prioritizesNetworkErrors: Bool = true,
         usesVolumeColor: Bool = false,
-        symbolScale: Double = 1.4
+        symbolScale: Double = 1.45
     ) {
         self.replacesNetworkIcon = replacesNetworkIcon
         self.prioritizesNetworkErrors = prioritizesNetworkErrors
         self.usesVolumeColor = usesVolumeColor
         self.symbolScale = symbolScale.isFinite
             ? min(Self.symbolScaleRange.upperBound, max(Self.symbolScaleRange.lowerBound, symbolScale))
-            : 1.4
+            : 1.45
     }
 
     public var normalized: Self {

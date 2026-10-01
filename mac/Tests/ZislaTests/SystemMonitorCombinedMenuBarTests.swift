@@ -239,13 +239,13 @@ struct SystemMonitorCombinedMenuBarTests {
             let image = try #require(SystemMonitorMenuBarImageRenderer.combinedIcon(
                 battery: battery, wifi: .connected(strength: 0.8), level: 0.5, foreground: foreground
             ))
-            #expect(image.size == NSSize(width: 24, height: 24))
+            #expect(image.size == NSSize(width: 26, height: 26))
             #expect(!image.isTemplate)
             let representation = try Self.bitmap(image)
-            #expect(representation.pixelsWide == 48)
-            #expect(representation.pixelsHigh == 48)
-            let yellowPixels = (0..<48).reduce(0) { count, horizontal in
-                count + (0..<48).filter { vertical in
+            #expect(representation.pixelsWide == 52)
+            #expect(representation.pixelsHigh == 52)
+            let yellowPixels = (0..<52).reduce(0) { count, horizontal in
+                count + (0..<52).filter { vertical in
                     guard let color = representation.colorAt(x: horizontal, y: vertical)?.usingColorSpace(.deviceRGB) else { return false }
                     return color.alphaComponent > 0.5 && color.redComponent > 0.6 && color.greenComponent > 0.5 && color.blueComponent < 0.4
                 }.count
