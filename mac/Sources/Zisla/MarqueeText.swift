@@ -5,7 +5,7 @@ enum MarqueeScrollDirection: Hashable {
     case right
 }
 
-/// Scrolls text horizontally (marquee) when it overflows the container; otherwise keeps it static with the requested alignment.
+/// Scrolls text horizontally (marquee) when it overflows the container; otherwise keeps it static and left-aligned.
 /// Automatic marquees degrade to static text when the system "Reduce Motion" setting is on.
 ///
 /// Usage:
@@ -28,7 +28,6 @@ struct MarqueeText: View {
     var repeats = true
     var scrollProgress: Double?
     var clipsOverflowWhenStatic = false
-    var staticAlignment: Alignment
 
     init(
         _ text: String,
@@ -40,8 +39,7 @@ struct MarqueeText: View {
         scrollDirection: MarqueeScrollDirection = .left,
         repeats: Bool = true,
         scrollProgress: Double? = nil,
-        clipsOverflowWhenStatic: Bool = false,
-        staticAlignment: Alignment = .leading
+        clipsOverflowWhenStatic: Bool = false
     ) {
         self.text = text
         self.font = font
@@ -53,7 +51,6 @@ struct MarqueeText: View {
         self.repeats = repeats
         self.scrollProgress = scrollProgress
         self.clipsOverflowWhenStatic = clipsOverflowWhenStatic
-        self.staticAlignment = staticAlignment
     }
 
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
@@ -90,10 +87,7 @@ struct MarqueeText: View {
                 if clipsOverflowWhenStatic {
                     marqueeLabel
                         .fixedSize(horizontal: true, vertical: false)
-                        .frame(
-                            width: max(0, containerWidth),
-                            alignment: textWidth > containerWidth ? .leading : staticAlignment
-                        )
+                        .frame(width: max(0, containerWidth), alignment: .leading)
                         .clipped()
                 } else {
                     marqueeLabel
@@ -149,7 +143,7 @@ struct MarqueeText: View {
             && textWidth > containerWidth + 1
     }
 
-    private var marqueeLabel: some View {
+    var marqueeLabel: some View {
         Text(text)
             .font(font)
             .fontWeight(fontWeight)
