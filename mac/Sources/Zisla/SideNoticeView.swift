@@ -1800,7 +1800,8 @@ private struct DetailedMediaBar: View {
             scrollDirection: .left,
             repeats: false,
             scrollProgress: scrollProgress,
-            clipsOverflowWhenStatic: true
+            clipsOverflowWhenStatic: true,
+            staticAlignment: centerInset > 0 ? .leading : .trailing
         )
     }
 
