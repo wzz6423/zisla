@@ -1677,7 +1677,7 @@ private struct CompactBackgroundSoundWing: View {
 }
 
 /// Compact music detail bar: split around a physical notch, or rendered as one continuous row on other displays.
-private struct DetailedMediaBar: View {
+struct DetailedMediaBar: View {
     private static let maximumContentWidth: CGFloat = 160
     private static let inlineTrackWidth: CGFloat = 130
 
@@ -1731,7 +1731,6 @@ private struct DetailedMediaBar: View {
             artwork
             trackText
                 .frame(width: Self.inlineTrackWidth, alignment: .leading)
-            waveform
             lyricLine
                 .frame(maxWidth: .infinity, alignment: .leading)
         }
@@ -1786,15 +1785,17 @@ private struct DetailedMediaBar: View {
         }
     }
 
+    @ViewBuilder
     private func lyricMarquee(at date: Date) -> some View {
         let elapsedTime = item.elapsedTime(at: date) ?? 0
         let scrollProgress = item.isVideo
             ? nil
             : lyrics?.currentLineProgress(at: elapsedTime, duration: item.duration)
-        return MarqueeText(
-            item.isVideo
-                ? MediaTextFormatting.videoSecondaryText(item)
-                : MediaTextFormatting.lyricLine(item, lyrics: lyrics, date: date),
+        let text = item.isVideo
+            ? MediaTextFormatting.videoSecondaryText(item)
+            : MediaTextFormatting.lyricLine(item, lyrics: lyrics, date: date)
+        let marquee = MarqueeText(
+            text,
             font: .system(size: min(14, max(13, height * 0.42)), weight: .medium),
             textColor: .white.opacity(0.72),
             scrollDirection: .left,
@@ -1802,6 +1803,21 @@ private struct DetailedMediaBar: View {
             scrollProgress: scrollProgress,
             clipsOverflowWhenStatic: true
         )
+        if centerInset > 0 {
+            marquee
+        } else {
+            ViewThatFits(in: .horizontal) {
+                HStack(spacing: 7) {
+                    waveform
+                    marquee.marqueeLabel
+                }
+                HStack(spacing: 7) {
+                    waveform
+                    marquee
+                }
+            }
+            .frame(maxWidth: .infinity, alignment: .trailing)
+        }
     }
 
     private var artist: String {
