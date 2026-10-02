@@ -9,6 +9,28 @@ import ZislaCore
 
 @MainActor
 struct AIResultSweepPresentationTests {
+    @Test(arguments: [ColorScheme.light, .dark])
+    func monochromeIconContrastsWithItsColorScheme(colorScheme: ColorScheme) throws {
+        let renderer = ImageRenderer(content: AIMascotView(identity: .gpt, size: 24)
+            .environment(\.colorScheme, colorScheme))
+        let bitmap = NSBitmapImageRep(cgImage: try #require(renderer.cgImage))
+        var opaquePixels = 0
+        var contrastingPixels = 0
+        for y in 0..<bitmap.pixelsHigh {
+            for x in 0..<bitmap.pixelsWide {
+                guard let color = bitmap.colorAt(x: x, y: y)?.usingColorSpace(.deviceRGB),
+                      color.alphaComponent > 0.5 else { continue }
+                opaquePixels += 1
+                let brightness = max(color.redComponent, color.greenComponent, color.blueComponent)
+                if colorScheme == .dark ? brightness > 0.75 : brightness < 0.25 {
+                    contrastingPixels += 1
+                }
+            }
+        }
+        #expect(opaquePixels > 10, "The bundled icon must render visible pixels")
+        #expect(contrastingPixels > 10, "The monochrome icon must contrast with its requested color scheme")
+    }
+
     @Test(arguments: [AIProvider.codex, .gpt], [AIProgressStatus.succeeded, .failed])
     func retainsIconAndCountAfterClientNoticesDisappear(provider: AIProvider, status: AIProgressStatus) throws {
         let fixture = try Fixture()
