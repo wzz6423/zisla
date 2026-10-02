@@ -1,6 +1,7 @@
 import AppKit
 import Combine
 import Testing
+import ZislaKit
 
 @testable import Zisla
 @testable import ZislaCore
@@ -225,20 +226,27 @@ struct AIMascotImageCacheTests {
         #expect(cache.image(for: "delayed", url: { nil })?.size.width == 12)
     }
 
-    @Test(.timeLimit(.minutes(1)))
-    func corruptResourceCanRecoverWithoutPoisoningCache() async throws {
+    @Test(.timeLimit(.minutes(1)), arguments: [false, true])
+    func invalidResourceCanRecoverWithoutPoisoningCache(isTransparent: Bool) async throws {
         let clock = AIMascotRetryClock()
         let cache = AIMascotImageCache(waitForRetry: { try await clock.wait() })
         let url = FileManager.default.temporaryDirectory
             .appendingPathComponent("Zisla-mascot-corrupt-\(UUID().uuidString).png")
         defer { try? FileManager.default.removeItem(at: url) }
-        try Data("invalid image".utf8).write(to: url)
+        if isTransparent {
+            let bitmap = try makeBitmap(hasAlpha: true)
+            let data = try #require(bitmap.representation(using: .png, properties: [:]))
+            try data.write(to: url)
+        } else {
+            try Data("invalid image".utf8).write(to: url)
+        }
         let (changes, continuation) = AsyncStream<Void>.makeStream()
         let observer = cache.objectWillChange.sink { continuation.yield(()) }
         defer { observer.cancel(); continuation.finish() }
         var iterator = changes.makeAsyncIterator()
 
-        #expect(cache.image(for: "corrupt", url: { url }) == nil)
+        let invalidImage = cache.image(for: "corrupt", url: { url })
+        try #require(invalidImage == nil)
         await clock.scheduled()
         try writePNG(size: 12, to: url)
         await clock.advance()
@@ -264,6 +272,70 @@ struct AIMascotImageCacheTests {
         await iterator.next()
 
         #expect(cache.image(for: "undrawable", load: { nil })?.size.width == 12)
+    }
+
+    @Test(.timeLimit(.minutes(1)))
+    func retriesTransparentImageUntilVisiblePixelsBecomeAvailable() async throws {
+        let clock = AIMascotRetryClock()
+        let cache = AIMascotImageCache(waitForRetry: { try await clock.wait() })
+        let bitmap = try makeBitmap(hasAlpha: true)
+        let blank = NSImage(size: bitmap.size)
+        blank.addRepresentation(bitmap)
+        let state = AIMascotImageState(image: blank)
+        let (changes, continuation) = AsyncStream<Void>.makeStream()
+        let observer = cache.objectWillChange.sink { continuation.yield(()) }
+        defer { observer.cancel(); continuation.finish() }
+        var iterator = changes.makeAsyncIterator()
+
+        let first = cache.image(for: "transparent", load: { state.image })
+        try #require(first == nil, "A transparent bitmap must remain retryable instead of being cached")
+        await clock.advance()
+        await clock.scheduled()
+        #expect(cache.image(for: "transparent", load: { state.image }) == nil)
+
+        state.image = makeImage(size: 12)
+        await clock.advance()
+        await iterator.next()
+        let recoveredImage = cache.image(for: "transparent", load: { nil })
+        let recovered = try #require(recoveredImage)
+        let cgImage = try #require(recovered.cgImage(forProposedRect: nil, context: nil, hints: nil))
+        let color = try #require(NSBitmapImageRep(cgImage: cgImage).colorAt(x: 6, y: 6))
+        #expect(color.alphaComponent > 0.9)
+        #expect(cache.image(for: "transparent", load: { blank }) === recovered)
+    }
+
+    @Test(arguments: [false, true])
+    func acceptsBlackPixelsWithAndWithoutAlpha(hasAlpha: Bool) throws {
+        let cache = AIMascotImageCache()
+        let bitmap = try makeBitmap(hasAlpha: hasAlpha)
+        bitmap.setColor(
+            NSColor(deviceRed: 0, green: 0, blue: 0, alpha: hasAlpha ? 1.0 / 128.0 : 1),
+            atX: 12,
+            y: 8
+        )
+        let source = NSImage(size: bitmap.size)
+        source.addRepresentation(bitmap)
+
+        let loadedImage = cache.image(for: "black", load: { source })
+        let loaded = try #require(loadedImage)
+        let cgImage = try #require(loaded.cgImage(forProposedRect: nil, context: nil, hints: nil))
+        let color = try #require(NSBitmapImageRep(cgImage: cgImage).colorAt(x: 12, y: 8))
+        #expect(color.alphaComponent > 0)
+        #expect(color.usingColorSpace(.deviceRGB)?.redComponent == 0)
+        #expect(loaded.size == source.size)
+    }
+
+    @Test(arguments: AIProvider.allCases)
+    func loadsBundledProviderAssets(provider: AIProvider) throws {
+        let resources = URL(fileURLWithPath: #filePath)
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+            .appendingPathComponent("Resources", isDirectory: true)
+        let url = try #require(AIMascotLibrary.providerAssetURL(for: provider, resourceRoots: [resources]))
+        let cache = AIMascotImageCache()
+        let image = cache.image(for: provider.rawValue, url: { url })
+        #expect(image != nil)
     }
 
     @Test(.timeLimit(.minutes(1)))
@@ -404,6 +476,25 @@ private func writePNG(size: CGFloat, to url: URL) throws {
         throw AIMascotFixtureError.encodingFailed
     }
     try data.write(to: url)
+}
+
+@MainActor
+private func makeBitmap(hasAlpha: Bool) throws -> NSBitmapImageRep {
+    let bitmap = try #require(NSBitmapImageRep(
+        bitmapDataPlanes: nil,
+        pixelsWide: 13,
+        pixelsHigh: 9,
+        bitsPerSample: 8,
+        samplesPerPixel: hasAlpha ? 4 : 3,
+        hasAlpha: hasAlpha,
+        isPlanar: false,
+        colorSpaceName: .deviceRGB,
+        bytesPerRow: 0,
+        bitsPerPixel: 0
+    ))
+    let data = try #require(bitmap.bitmapData)
+    data.initialize(repeating: 0, count: bitmap.bytesPerRow * bitmap.pixelsHigh)
+    return bitmap
 }
 
 private enum AIMascotFixtureError: Error {
