@@ -235,7 +235,6 @@ export const es = createCatalog({
     toolsHeading: 'Herramientas de IA compatibles',
     toolsLede: 'Detecta actividad de CLI, apps de escritorio e IDE compatibles y agrupa el estado de las tareas.',
     toolsAriaLabel: 'Herramientas de IA compatibles',
-    doubaoName: 'Doubao',
     boundariesHeading: 'Solo se registra el estado',
     privacyPoints: [
       'Analiza únicamente tipo de evento, estado, hora, modelo e ID de sesión de eventos estructurados',

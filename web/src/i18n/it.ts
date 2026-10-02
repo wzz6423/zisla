@@ -235,7 +235,6 @@ export const it = createCatalog({
     toolsHeading: 'Strumenti IA supportati',
     toolsLede: 'Rileva attività da CLI, app desktop e IDE supportati e aggrega lo stato delle attività.',
     toolsAriaLabel: 'Strumenti IA supportati',
-    doubaoName: 'Doubao',
     boundariesHeading: 'Viene registrato solo lo stato',
     privacyPoints: [
       'Analizza solo tipo di evento, stato, ora, modello e ID sessione degli eventi strutturati',

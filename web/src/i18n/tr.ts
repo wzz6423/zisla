@@ -127,7 +127,6 @@ export const tr = createCatalog({
     toolsHeading: 'Desteklenen AI araçları',
     toolsLede: 'Desteklenen CLI\'ların, masaüstü uygulamalarının ve IDE\'lerin etkinliğini algılar ve görev durumunu toplar.',
     toolsAriaLabel: 'Desteklenen AI araçları',
-    doubaoName: 'Doubao',
     boundariesHeading: 'Yalnızca durum sınırları kaydedilir',
     privacyPoints: [
       'Yapılandırılmış olaylardan yalnızca olay türünü, durumu, zaman damgasını, modeli ve oturum kimliğini ayrıştırır',

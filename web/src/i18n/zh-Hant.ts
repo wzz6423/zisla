@@ -229,7 +229,6 @@ export const zhHant: SiteContent = {
     toolsHeading: '支援的 AI 工具',
     toolsLede: '自動辨識受支援的 CLI、桌面版與 IDE 活動，並彙總任務狀態。',
     toolsAriaLabel: '支援的 AI 工具',
-    doubaoName: '豆包',
     boundariesHeading: '只記錄狀態邊界',
     privacyPoints: [
       '只解析結構化事件中的事件類型、狀態、時間、模型與工作階段 ID',

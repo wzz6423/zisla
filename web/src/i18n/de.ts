@@ -255,7 +255,6 @@ export const de: SiteContent = {
     toolsLede:
       'Erkennt Aktivität unterstützter CLIs, Desktop-Apps und IDEs und bündelt den Aufgabenstatus.',
     toolsAriaLabel: 'Unterstützte KI-Werkzeuge',
-    doubaoName: 'Doubao',
     boundariesHeading: 'Aufgezeichnet werden nur Statusgrenzen',
     privacyPoints: [
       'Wertet aus strukturierten Ereignissen nur Ereignistyp, Status, Zeit, Modell und Sitzungs-ID aus',

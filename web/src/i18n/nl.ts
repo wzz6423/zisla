@@ -235,7 +235,6 @@ export const nl = createCatalog({
     toolsHeading: 'Ondersteunde AI-tools',
     toolsLede: 'Detecteert activiteit van ondersteunde CLI’s, desktopapps en IDE’s en bundelt de taakstatus.',
     toolsAriaLabel: 'Ondersteunde AI-tools',
-    doubaoName: 'Doubao',
     boundariesHeading: 'Alleen statusgrenzen worden vastgelegd',
     privacyPoints: [
       'Leest uit gestructureerde gebeurtenissen alleen type, status, tijd, model en sessie-ID',

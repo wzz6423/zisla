@@ -23,33 +23,6 @@ struct AIUsageLogDetectorTests {
     }
 
     @Test
-    func ignoresHiddenDoubaoAgentModeArtifacts() throws {
-        let root = temporaryDirectory(named: "usage-log-doubao-agent-mode")
-        defer { try? FileManager.default.removeItem(at: root) }
-        let empty = root.appendingPathComponent("empty", isDirectory: true)
-        let artifact = root.appendingPathComponent(
-            "Default/.doubao/agent_mode/workspace/.sessions/test/agents/agent/system/trajectory.jsonl"
-        )
-        try writeJSONL([
-            "{\"timestamp\":\"2026-09-08T00:00:00.000Z\",\"usage\":{\"input_tokens\":10,\"output_tokens\":2}}",
-        ], to: artifact)
-
-        let detector = AIUsageLogDetector(
-            codexSessionsDirectory: empty,
-            claudeProjectsDirectory: empty,
-            geminiSessionsDirectory: empty,
-            grokSessionsDirectory: empty,
-            qwenProjectsDirectory: empty,
-            piSessionsDirectory: empty,
-            qoderRoots: [],
-            doubaoRoots: [root],
-            copilotUsageLogRoots: []
-        )
-
-        #expect(try detector.usageSamples().isEmpty)
-    }
-
-    @Test
     func defaultScanReadsStructuredJSONLargerThanFormerLimit() throws {
         let root = temporaryDirectory(named: "usage-log-large-json")
         defer { try? FileManager.default.removeItem(at: root) }
@@ -71,7 +44,6 @@ struct AIUsageLogDetectorTests {
             qwenProjectsDirectory: empty,
             piSessionsDirectory: empty,
             qoderRoots: [],
-            doubaoRoots: [],
             copilotUsageLogRoots: []
         )
 
@@ -104,7 +76,6 @@ struct AIUsageLogDetectorTests {
             qwenProjectsDirectory: qwen,
             piSessionsDirectory: empty,
             qoderRoots: [],
-            doubaoRoots: [],
             copilotUsageLogRoots: []
         )
 
@@ -133,7 +104,6 @@ struct AIUsageLogDetectorTests {
             qwenProjectsDirectory: empty,
             piSessionsDirectory: empty,
             qoderRoots: [],
-            doubaoRoots: [],
             copilotUsageLogRoots: []
         )
 
@@ -164,7 +134,6 @@ struct AIUsageLogDetectorTests {
             qwenProjectsDirectory: empty,
             piSessionsDirectory: empty,
             qoderRoots: [],
-            doubaoRoots: [],
             copilotUsageLogRoots: []
         )
 
@@ -185,7 +154,6 @@ struct AIUsageLogDetectorTests {
         let qwen = root.appendingPathComponent("qwen", isDirectory: true)
         let empty = root.appendingPathComponent("empty", isDirectory: true)
         let qoder = root.appendingPathComponent("qoder", isDirectory: true)
-        let doubao = root.appendingPathComponent("doubao", isDirectory: true)
         let ignoredPayload = String(repeating: "x", count: 6_000)
 
         try writeJSONL([
@@ -221,13 +189,6 @@ struct AIUsageLogDetectorTests {
             {"timestamp":"2026-07-26T00:05:00.000Z","model":"qoder-max","usage":{"input_tokens":6,"output_tokens":4,"cache_creation_input_tokens":7,"cache_read_input_tokens":8}}
             """,
         ], to: qoder.appendingPathComponent("logs/sessions/session-one/segments/one.jsonl"))
-        try writeJSONL([
-            "{\"type\":\"ignored\",\"payload\":\"\(ignoredPayload)\"}",
-            """
-            {"timestamp":"2026-07-26T00:06:00.000Z","model":"doubao-seed","usage":{"input_tokens":11,"output_tokens":2}}
-            """,
-        ], to: doubao.appendingPathComponent("history/session.jsonl"))
-
         let detector = AIUsageLogDetector(
             codexSessionsDirectory: codex,
             claudeProjectsDirectory: claude,
@@ -236,7 +197,6 @@ struct AIUsageLogDetectorTests {
             qwenProjectsDirectory: qwen,
             piSessionsDirectory: empty,
             qoderRoots: [qoder],
-            doubaoRoots: [doubao],
             maxBytesPerFile: 4_096
         )
 
@@ -249,7 +209,6 @@ struct AIUsageLogDetectorTests {
         #expect(samples.filter { $0.provider == .qwen }.map(\.inputTokens) == [15])
         #expect(samples.filter { $0.provider == .coder }.map(\.inputTokens) == [21])
         #expect(samples.filter { $0.provider == .coder }.map(\.outputTokens) == [4])
-        #expect(samples.filter { $0.provider == .doubao }.map(\.inputTokens) == [11])
     }
 
     @Test
@@ -274,7 +233,6 @@ struct AIUsageLogDetectorTests {
             qwenProjectsDirectory: empty,
             piSessionsDirectory: empty,
             qoderRoots: [],
-            doubaoRoots: [],
             scanInterval: 0
         )
         #expect(try detector.usageSamples().map(\.inputTokens) == [100])
@@ -314,7 +272,6 @@ struct AIUsageLogDetectorTests {
                 qwenProjectsDirectory: empty,
                 piSessionsDirectory: empty,
                 qoderRoots: [],
-                doubaoRoots: [],
                 copilotUsageLogRoots: [],
                 scanInterval: 0
             )
@@ -369,7 +326,6 @@ struct AIUsageLogDetectorTests {
             qwenProjectsDirectory: empty,
             piSessionsDirectory: empty,
             qoderRoots: [],
-            doubaoRoots: [],
             copilotUsageLogRoots: [copilot]
         )
 
@@ -406,7 +362,6 @@ struct AIUsageLogDetectorTests {
             qwenProjectsDirectory: empty,
             piSessionsDirectory: empty,
             qoderRoots: [],
-            doubaoRoots: [],
             copilotUsageLogRoots: [copilot]
         )
 
@@ -439,7 +394,6 @@ struct AIUsageLogDetectorTests {
             qwenProjectsDirectory: empty,
             piSessionsDirectory: empty,
             qoderRoots: [],
-            doubaoRoots: [],
             copilotUsageLogRoots: [copilot]
         )
 
@@ -470,7 +424,6 @@ struct AIUsageLogDetectorTests {
             qwenProjectsDirectory: empty,
             piSessionsDirectory: empty,
             qoderRoots: [],
-            doubaoRoots: [],
             copilotUsageLogRoots: [copilot],
             scanInterval: 0
         )
@@ -639,7 +592,6 @@ struct AIUsageLogDetectorTests {
             qwenProjectsDirectory: empty,
             piSessionsDirectory: empty,
             qoderRoots: [],
-            doubaoRoots: [],
             copilotUsageLogRoots: []
         )
 
@@ -786,7 +738,6 @@ struct AIUsageLogDetectorTests {
                 qwenProjectsDirectory: empty,
                 piSessionsDirectory: empty,
                 qoderRoots: [],
-                doubaoRoots: [],
                 copilotUsageLogRoots: [],
                 scanInterval: 0
             )

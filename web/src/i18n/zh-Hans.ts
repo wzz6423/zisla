@@ -228,7 +228,6 @@ export const zhHans: SiteContent = {
     toolsHeading: '支持的 AI 工具',
     toolsLede: '自动识别受支持的 CLI、桌面端与 IDE 活动，并聚合任务状态。',
     toolsAriaLabel: '支持的 AI 工具',
-    doubaoName: '豆包',
     boundariesHeading: '只记录状态边界',
     privacyPoints: [
       '只解析结构化事件中的事件类型、状态、时间、模型和会话 ID',

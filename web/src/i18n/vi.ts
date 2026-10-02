@@ -126,7 +126,6 @@ export const vi = createCatalog({
     toolsHeading: 'Công cụ AI được hỗ trợ',
     toolsLede: 'Phát hiện hoạt động từ CLI, ứng dụng desktop và IDE được hỗ trợ rồi tổng hợp trạng thái tác vụ.',
     toolsAriaLabel: 'Công cụ AI được hỗ trợ',
-    doubaoName: 'Doubao',
     boundariesHeading: 'Chỉ ghi lại ranh giới trạng thái',
     privacyPoints: ['Chỉ phân tích loại sự kiện, trạng thái, thời gian, mô hình và ID phiên từ sự kiện có cấu trúc', 'Không đọc văn bản prompt hay câu trả lời', 'Giao thức và trạng thái được lưu trên Mac'],
     bridgeHeading: 'Kết nối tác vụ của bạn',

@@ -240,7 +240,6 @@ export const en: SiteContent = {
     toolsLede:
       'Detects activity from supported CLIs, desktop apps and IDEs, and aggregates task status.',
     toolsAriaLabel: 'Supported AI tools',
-    doubaoName: 'Doubao',
     boundariesHeading: 'Only status boundaries are recorded',
     privacyPoints: [
       'Parses only the event type, status, timestamp, model and session ID from structured events',
