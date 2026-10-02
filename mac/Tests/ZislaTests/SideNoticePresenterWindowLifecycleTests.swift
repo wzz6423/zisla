@@ -7,6 +7,26 @@ import ZislaKit
 
 struct SideNoticePresenterWindowLifecycleTests {
     @Test @MainActor
+    func resultSweepPreservesExternalHeadphoneContentClearance() throws {
+        let screen = ScreenSnapshot(displayID: 7,
+            frame: CGRect(x: 1_512, y: -120, width: 1_440, height: 900),
+            visibleFrame: CGRect(x: 1_512, y: -120, width: 1_440, height: 900),
+            menuBarHeightFallback: 24)
+        let layout = SideNoticeLayoutEngine()
+        let notice = IslandNotice(id: "headphone-connection", title: "AirPods Pro", side: .left, style: .headphone)
+        let idle = layout.compactBarFrame(for: screen)
+        let frame = try #require(layout.compactBarFrame(for: screen, notices: [notice], settings: FeatureSettings()))
+        for isSweeping in [false, true] {
+            let presented = try #require(SideNoticePresenter.resultSweepFrame(statusFrame: frame,
+                idleFrame: idle, hasPhysicalNotch: false, isSweeping: isSweeping))
+            #expect(presented == frame)
+            #expect(presented.height == 36)
+            #expect(presented.maxY == screen.frame.maxY)
+        }
+        #expect(idle.height == 24)
+    }
+
+    @Test @MainActor
     func contentRefreshDoesNotRefrontVisibleNoticePanels() {
         #expect(!SideNoticePresenter.shouldOrderPanelFront(
             isVisible: true,

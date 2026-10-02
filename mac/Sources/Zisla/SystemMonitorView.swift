@@ -24,22 +24,49 @@ final class SystemCleanupPanelPresentationState: ObservableObject {
 /// a dashboard-like dissonance.
 struct SystemMonitorView: View {
     @ObservedObject var service: SystemMonitorService
+    var batteryMonitor: BatteryMonitor?
+    var networkMonitor: NetworkBatteryMonitor?
+    var showsSystemMonitor: Bool
+    var showsBatteryMonitor: Bool
     let onCleanupRequested: () -> Void
     @State private var releasedMemoryBytes: UInt64?
     @State private var systemColumnHeight: CGFloat = 0
     @Environment(\.locale) private var locale
 
+    init(
+        service: SystemMonitorService,
+        batteryMonitor: BatteryMonitor? = nil,
+        networkMonitor: NetworkBatteryMonitor? = nil,
+        showsSystemMonitor: Bool = true,
+        showsBatteryMonitor: Bool = false,
+        onCleanupRequested: @escaping () -> Void
+    ) {
+        self.service = service
+        self.batteryMonitor = batteryMonitor
+        self.networkMonitor = networkMonitor
+        self.showsSystemMonitor = showsSystemMonitor
+        self.showsBatteryMonitor = showsBatteryMonitor
+        self.onCleanupRequested = onCleanupRequested
+    }
+
     var body: some View {
         ScrollView {
-            HStack(alignment: .top, spacing: 12) {
-                computeColumn
-                    .frame(
-                        height: systemColumnHeight > 0 ? systemColumnHeight : nil,
-                        alignment: .top
-                )
-                Hairline()
-                systemColumn
-                    .frame(width: 250)
+            VStack(spacing: 12) {
+                if showsSystemMonitor {
+                    HStack(alignment: .top, spacing: 12) {
+                        computeColumn
+                            .frame(
+                                height: systemColumnHeight > 0 ? systemColumnHeight : nil,
+                                alignment: .top
+                            )
+                        Hairline()
+                        systemColumn
+                            .frame(width: 250)
+                    }
+                }
+                if showsBatteryMonitor, let batteryMonitor, let networkMonitor {
+                    BatteryDetailView(batteryMonitor: batteryMonitor, networkMonitor: networkMonitor)
+                }
             }
             .padding(12)
         }
@@ -48,7 +75,8 @@ struct SystemMonitorView: View {
             guard systemColumnHeight != height else { return }
             systemColumnHeight = height
         }
-        .task {
+        .task(id: showsSystemMonitor) {
+            guard showsSystemMonitor else { return }
             await service.sampleOnce()
             await service.loadHistoryStats()
         }
@@ -231,8 +259,17 @@ struct SystemMonitorView: View {
         MonitorCard {
             VStack(alignment: .leading, spacing: 7) {
                 CardHeader(symbol: "globe", title: AppLocalization.text("网络")) {
-                    IconButton(symbol: "arrow.clockwise", help: AppLocalization.text("通过 ipify 查询公网地址"), size: .compact) {
-                        Task { await service.refreshPublicIPAddress() }
+                    HStack(spacing: 6) {
+                        NetworkSwitchButton { action in
+                            miniActionButton(
+                                AppLocalization.text("切换网络"),
+                                help: AppLocalization.text("打开 Wi-Fi 面板以切换网络"),
+                                action: action
+                            )
+                        }
+                        IconButton(symbol: "arrow.clockwise", help: AppLocalization.text("通过 ipify 查询公网地址"), size: .compact) {
+                            Task { await service.refreshPublicIPAddress() }
+                        }
                     }
                 }
                 HStack(spacing: 14) {
@@ -809,31 +846,40 @@ enum WaveformPalette {
     static var palette: [Color] { [blue, red, teal, purple, amber] }
 }
 
-private struct WaveSeries {
+struct WaveSeries {
     var samples: [Double]
     var color: Color
     var dash: [CGFloat] = []
 }
 
-private struct MultiLineWaveform: View {
+struct MultiLineWaveform: View {
+    enum Style {
+        case filled
+        case line
+    }
+
     var series: [WaveSeries]
     var height: CGFloat = 54
+    var style: Style = .filled
 
     var body: some View {
         Canvas { context, size in
-            for item in series where item.samples.count > 1 {
-                let baseline = Array(repeating: 0.0, count: item.samples.count)
-                let area = waveArea(top: item.samples, bottom: baseline, size: size)
-                context.fill(area, with: .color(item.color.opacity(0.32)))
+            if style == .filled {
+                for item in series where item.samples.count > 1 {
+                    let baseline = Array(repeating: 0.0, count: item.samples.count)
+                    let area = waveArea(top: item.samples, bottom: baseline, size: size)
+                    context.fill(area, with: .color(item.color.opacity(0.32)))
+                }
             }
             for item in series where item.samples.count > 1 {
                 context.stroke(
-                    waveLine(item.samples, size: size),
+                    waveLine(item.samples, size: size, smooth: style == .filled),
                     with: .color(item.color),
                     style: StrokeStyle(lineWidth: 1.3, dash: item.dash)
                 )
             }
         }
+        .padding(style == .line ? 3 : 0)
         .frame(height: height)
         .background(Color.fillControl)
         .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
@@ -852,7 +898,7 @@ private func waveArea(top: [Double], bottom: [Double], size: CGSize) -> Path {
     return path
 }
 
-private func waveLine(_ values: [Double], size: CGSize) -> Path {
+private func waveLine(_ values: [Double], size: CGSize, smooth: Bool = true) -> Path {
     guard values.count > 1 else { return Path() }
     let points: [CGPoint] = values.enumerated().map { index, value in
         let x = size.width * CGFloat(index) / CGFloat(values.count - 1)
@@ -861,7 +907,7 @@ private func waveLine(_ values: [Double], size: CGSize) -> Path {
     }
     var path = Path()
     path.move(to: points[0])
-    guard points.count > 2 else {
+    guard smooth, points.count > 2 else {
         for point in points.dropFirst() { path.addLine(to: point) }
         return path
     }

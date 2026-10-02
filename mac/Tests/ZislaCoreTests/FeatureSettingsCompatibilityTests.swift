@@ -1277,7 +1277,6 @@ struct FeatureSettingsCompatibilityTests {
             .aiMonitor,
             .keyboardSound,
             .system,
-            .battery,
             .pdf,
         ])
         #expect(FeatureSettings.default.moduleOrder == IslandModuleOrder.defaultOrder)
@@ -1305,9 +1304,27 @@ struct FeatureSettingsCompatibilityTests {
             .keyboardSound,
             .mail,
             .system,
-            .battery,
         ])
         #expect(!decoded.moduleOrder.contains { $0.rawValue == "lockScreen" })
+    }
+
+    @Test(arguments: [
+        ["battery", "mail", "system", "battery"],
+        ["system", "mail", "battery", "system"],
+        ["battery", "mail"],
+    ])
+    func legacyBatteryModuleOrderMergesAtFirstMonitorPosition(rawValues: [String]) throws {
+        let payload = try JSONSerialization.data(withJSONObject: ["moduleOrder": rawValues])
+        let decoded = try JSONDecoder().decode(FeatureSettings.self, from: payload)
+
+        #expect(Array(decoded.moduleOrder.prefix(2)) == [.system, .mail])
+        #expect(decoded.moduleOrder.filter { $0 == .system }.count == 1)
+        #expect(!decoded.moduleOrder.contains(.battery))
+        #expect(Set(decoded.moduleOrder) == Set(IslandModuleOrder.defaultOrder))
+        let roundTripped = try JSONDecoder().decode(
+            FeatureSettings.self, from: JSONEncoder().encode(decoded)
+        )
+        #expect(roundTripped.moduleOrder == decoded.moduleOrder)
     }
 
     @Test

@@ -1036,7 +1036,7 @@ private struct HeadphoneBatteryLevels: View {
     }
 }
 
-private struct HeadphoneBatteryRing: View {
+struct HeadphoneBatteryRing: View {
     var level: NoticeBatteryLevel
 
     @Environment(\.locale) private var locale
@@ -1073,7 +1073,7 @@ private struct HeadphoneBatteryRing: View {
     }
 }
 
-private struct CompactHeadphoneConnectionBar: View {
+struct CompactHeadphoneConnectionBar: View {
     var notice: IslandNotice
     var height: CGFloat
     var centerInset: CGFloat

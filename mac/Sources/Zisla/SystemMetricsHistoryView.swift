@@ -518,13 +518,20 @@ private struct SystemMetricsChartCard: View {
     private var chart: some View {
         Chart {
             ForEach(section.series) { series in
+                let segmentCounts = Dictionary(grouping: series.points, by: \.segment).mapValues(\.count)
                 ForEach(series.points, id: \.date) { point in
                     LineMark(
                         x: .value("Time", point.date),
-                        y: .value("Value", point.value)
+                        y: .value("Value", point.value),
+                        series: .value("Segment", "\(series.id).\(point.segment)")
                     )
                     .foregroundStyle(by: .value("Series", label(for: series)))
                     .interpolationMethod(.monotone)
+                    if segmentCounts[point.segment] == 1 {
+                        PointMark(x: .value("Time", point.date), y: .value("Value", point.value))
+                            .foregroundStyle(by: .value("Series", label(for: series)))
+                            .symbolSize(16)
+                    }
                 }
             }
         }
@@ -537,6 +544,8 @@ private struct SystemMetricsChartCard: View {
         case "memory": "memorychip"
         case "disk": "internaldrive"
         case "fans": "fan"
+        case "battery": "battery.100percent"
+        case "power": "bolt.fill"
         default: "globe"
         }
     }
@@ -550,7 +559,7 @@ private struct SystemMetricsChartCard: View {
         switch section.unit {
         case .ratio:
             return 1
-        case .bytesPerSecond, .rpm:
+        case .bytesPerSecond, .rpm, .watts:
             return max(1, peak * 1.1)
         }
     }
@@ -563,6 +572,8 @@ private struct SystemMetricsChartCard: View {
             return SystemMetricsHistoryPresentation.rateText(value)
         case .rpm:
             return "\(Int(value.rounded()))"
+        case .watts:
+            return "\(value.formatted(.number.precision(.fractionLength(0...1)))) W"
         }
     }
 

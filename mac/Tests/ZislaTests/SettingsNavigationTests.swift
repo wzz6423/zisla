@@ -5,6 +5,33 @@ import ZislaCore
 @testable import Zisla
 
 struct SettingsNavigationTests {
+    @Test(arguments: [false, true], [false, true])
+    func combinedMonitorNavigationPreservesIndependentFeatureToggles(systemEnabled: Bool, batteryEnabled: Bool) {
+        var settings = FeatureSettings.default
+        settings.systemMonitorEnabled = systemEnabled
+        settings.batteryMonitorEnabled = batteryEnabled
+        settings.moduleOrder = [.battery, .mail, .system]
+
+        let modules = IslandModule.enabledOrder(settings)
+        #expect(modules.contains(.system) == (systemEnabled || batteryEnabled))
+        #expect(IslandModule.battery.isEnabled(in: settings) == (systemEnabled || batteryEnabled))
+        #expect(!modules.contains(.battery))
+        #expect(modules.filter { $0 == .system }.count <= 1)
+        if systemEnabled || batteryEnabled {
+            #expect(modules.first == .system)
+        }
+        #expect(settings.systemMonitorEnabled == systemEnabled)
+        #expect(settings.batteryMonitorEnabled == batteryEnabled)
+    }
+
+    @Test
+    func legacyBatteryNavigationTargetsTheCombinedMonitor() {
+        #expect(IslandModule.battery.navigationTarget == .system)
+        for module in IslandModule.allCases where module != .battery {
+            #expect(module.navigationTarget == module)
+        }
+    }
+
     @Test
     func windowPreviewSettingIsLocalizedInEveryLanguage() throws {
         let keys = [
@@ -144,8 +171,8 @@ struct SettingsNavigationTests {
             "功能",
             "快捷操作",
             "截图",
-            "工作流",
             "信息",
+            "邮件",
             "AI",
             "语音",
             "键盘音效",
@@ -237,20 +264,155 @@ struct SettingsNavigationTests {
     }
 
     @Test
-    func workflowVisibilityDependsOnMediaOrSystemMonitor() {
-        var settings = FeatureSettings(mediaEnabled: false, systemMonitorEnabled: false)
-        #expect(!SettingsSection.workflow.isVisible(settings: settings))
+    func infoVisibilityIncludesMediaAndSystemMonitor() {
+        var settings = FeatureSettings(
+            mediaEnabled: false,
+            systemMonitorEnabled: false,
+            lockScreenInfoEnabled: false,
+            mailEnabled: false,
+            sideNoticesEnabled: false
+        )
+        #expect(!SettingsSection.info.isVisible(settings: settings))
 
         settings.mediaEnabled = true
-        #expect(SettingsSection.workflow.isVisible(settings: settings))
+        #expect(SettingsSection.info.isVisible(settings: settings))
 
         settings.mediaEnabled = false
         settings.systemMonitorEnabled = true
-        #expect(SettingsSection.workflow.isVisible(settings: settings))
+        #expect(SettingsSection.info.isVisible(settings: settings))
 
         settings.mediaEnabled = true
         settings.systemMonitorEnabled = true
-        #expect(SettingsSection.workflow.isVisible(settings: settings))
+        #expect(SettingsSection.info.isVisible(settings: settings))
+    }
+
+    @Test(arguments: [false, true])
+    func mailVisibilityOnlyDependsOnMailToggle(otherInfoFeaturesEnabled: Bool) throws {
+        let mailSection = try #require(SettingsSection(rawValue: "mail"))
+        var settings = FeatureSettings(
+            mediaEnabled: otherInfoFeaturesEnabled,
+            systemMonitorEnabled: otherInfoFeaturesEnabled,
+            lockScreenInfoEnabled: otherInfoFeaturesEnabled,
+            mailEnabled: false,
+            sideNoticesEnabled: otherInfoFeaturesEnabled
+        )
+        #expect(!mailSection.isVisible(settings: settings))
+        #expect(SettingsSection.info.isVisible(settings: settings) == otherInfoFeaturesEnabled)
+
+        settings.mailEnabled = true
+        #expect(mailSection.isVisible(settings: settings))
+        #expect(SettingsSection.info.isVisible(settings: settings) == otherInfoFeaturesEnabled)
+
+        settings.mailEnabled = false
+        #expect(!mailSection.isVisible(settings: settings))
+        #expect(SettingsSection.info.isVisible(settings: settings) == otherInfoFeaturesEnabled)
+    }
+
+    @Test
+    func defaultSettingsShowInfoAndMailWithoutWorkflowNavigation() {
+        let settings = FeatureSettings()
+        let visibleSections = SettingsSection.allCases.filter { $0.isVisible(settings: settings) }
+
+        #expect(visibleSections == SettingsSection.allCases)
+        #expect(visibleSections.map(\.rawValue).contains("info"))
+        #expect(visibleSections.map(\.rawValue).contains("mail"))
+        #expect(!visibleSections.map(\.rawValue).contains("workflow"))
+        #expect(settings.mediaEnabled)
+        #expect(settings.systemMonitorEnabled)
+        #expect(settings.mailEnabled)
+        #expect(settings.lockScreenInfoEnabled)
+        #expect(settings.sideNoticesEnabled)
+        #expect(settings.mailAccountNames.isEmpty)
+    }
+
+    @Test
+    func infoAndMailNavigationAreLocalizedInEveryLanguage() throws {
+        let mailSection = try #require(SettingsSection(rawValue: "mail"))
+        #expect(SettingsSection.info.subtitle == "配置媒体、系统监控、锁屏与通知显示。")
+        #expect(mailSection.title == "邮件")
+        #expect(mailSection.subtitle == "读取已配置的 Mail.app 账户并提醒新邮件")
+        #expect(mailSection.symbol == "envelope.fill")
+        let englishSubtitle = "Configure media, system monitoring, lock screen, and notifications."
+        #expect(AppLocalization.string(SettingsSection.info.subtitle, language: .english) == englishSubtitle)
+        let keys = [SettingsSection.info.title, SettingsSection.info.subtitle, mailSection.title, mailSection.subtitle]
+        let packageRoot = Self.settingsViewSourceURL.deletingLastPathComponent()
+            .deletingLastPathComponent().deletingLastPathComponent()
+        #expect(AppLanguage.allCases.count == 17)
+
+        for language in AppLanguage.allCases {
+            let tableURL = packageRoot.appendingPathComponent("Resources/Localization/\(language.rawValue).lproj/Localizable.strings")
+            let table = try #require(NSDictionary(contentsOf: tableURL) as? [String: String])
+            for key in keys {
+                let value = try #require(table[key], "\(language.rawValue) is missing \(key)")
+                #expect(!value.isEmpty)
+                #expect(AppLocalization.string(key, language: language) == value)
+                if language != .simplifiedChinese { #expect(value != key) }
+            }
+            if language != .english {
+                #expect(table[SettingsSection.info.subtitle] != englishSubtitle)
+            }
+        }
+    }
+
+    @Test
+    func mailControlsOnlyAppearOnTheDedicatedMailPage() throws {
+        let source = try String(contentsOf: Self.settingsViewSourceURL, encoding: .utf8)
+        let infoStart = try #require(source.range(of: "    private var infoContent: some View {"))
+        let mailStart = try #require(source.range(of: "\n    private var mailContent: some View {", range: infoStart.upperBound..<source.endIndex))
+        let mailEnd = try #require(source.range(of: "\n    private var aiContent: some View {", range: mailStart.upperBound..<source.endIndex))
+        let infoContent = source[infoStart.lowerBound..<mailStart.lowerBound]
+        let mailContent = source[mailStart.lowerBound..<mailEnd.lowerBound]
+
+        #expect(source.contains("case .mail:\n            mailContent"))
+        #expect(mailContent.contains("settingsGroup(\"邮件\")"))
+        #expect(mailContent.contains("mailAccountSettings"))
+        #expect(!infoContent.contains("mailAccountSettings"))
+        #expect(!infoContent.contains("mailEnabled"))
+        #expect(source.components(separatedBy: "mailAccountSettings").count == 3)
+
+        let accountsStart = try #require(source.range(of: "    private var mailAccountSettings: some View {"))
+        let accountsEnd = try #require(source.range(of: "\n    private func mailAccountBinding", range: accountsStart.upperBound..<source.endIndex))
+        let accountsContent = source[accountsStart.lowerBound..<accountsEnd.lowerBound]
+        #expect(accountsContent.contains("model.settingsStore.settings.mailCompactStyle"))
+        #expect(accountsContent.contains("mailAppAccountSettings"))
+        #expect(accountsContent.contains("model.refreshMail()"))
+        #expect(accountsContent.contains("mailAccountBinding(for: account.id, availableAccounts: accounts)"))
+        #expect(accountsContent.contains("isOnlySelectedMailAccount(account.id)"))
+    }
+
+    @Test
+    func infoPageKeepsWorkflowAndNonMailControls() throws {
+        let source = try String(contentsOf: Self.settingsViewSourceURL, encoding: .utf8)
+        let infoStart = try #require(source.range(of: "    private var infoContent: some View {"))
+        let infoEnd = try #require(source.range(of: "\n    private var mailContent: some View {", range: infoStart.upperBound..<source.endIndex))
+        let infoContent = source[infoStart.lowerBound..<infoEnd.lowerBound]
+        #expect(infoContent.contains("workflowContent"))
+        for control in [
+            "lockScreenMessage", "lockScreenShowsLunar", "activityNoticeDisplayDuration",
+            "focusModeNoticeDisplayDuration", "compactStatusPriority", "activityNoticeDisplayBinding",
+        ] {
+            #expect(infoContent.contains(control), "Info page lost \(control)")
+        }
+
+        let workflowStart = try #require(source.range(of: "    private var workflowContent: some View {"))
+        let workflowEnd = try #require(source.range(of: "\n    private var featuresContent: some View {", range: workflowStart.upperBound..<source.endIndex))
+        let workflowContent = source[workflowStart.lowerBound..<workflowEnd.lowerBound]
+        for control in ["mediaSource", "mediaShowLyricsAndInfo", "mediaCompactStyle", "systemMetricsHistoryEnabled"] {
+            #expect(workflowContent.contains(control), "Workflow controls lost \(control)")
+        }
+    }
+
+    @Test
+    func disablingMailUsesTheExistingVisibleSelectionFallback() throws {
+        let source = try String(contentsOf: Self.settingsViewSourceURL, encoding: .utf8)
+        let selectionStart = try #require(source.range(of: "    private func ensureSelectionIsVisible() {"))
+        let selectionEnd = try #require(source.range(of: "\n    @ViewBuilder", range: selectionStart.upperBound..<source.endIndex))
+        let selection = source[selectionStart.lowerBound..<selectionEnd.lowerBound]
+        #expect(selection.contains("guard !input.selection.isVisible(settings: settingsStore.settings) else { return }"))
+        #expect(selection.contains("selectSettingsSection(.features)"))
+        let compactSource = source.components(separatedBy: .whitespacesAndNewlines).joined()
+        #expect(compactSource.contains(".onChange(of:settingsStore.settings){_,_inensureSelectionIsVisible()}"))
+        #expect(SettingsSection.features.isVisible(settings: FeatureSettings(mailEnabled: false)))
     }
 
     @Test
@@ -300,12 +462,18 @@ struct SettingsNavigationTests {
     }
 
     @Test
-    func infoVisibilityDependsOnMailOrLockScreenOrSideNotices() {
-        var settings = FeatureSettings(lockScreenInfoEnabled: false, mailEnabled: false, sideNoticesEnabled: false)
+    func infoVisibilityRetainsLockScreenAndSideNoticesButExcludesMail() {
+        var settings = FeatureSettings(
+            mediaEnabled: false,
+            systemMonitorEnabled: false,
+            lockScreenInfoEnabled: false,
+            mailEnabled: false,
+            sideNoticesEnabled: false
+        )
         #expect(!SettingsSection.info.isVisible(settings: settings))
 
         settings.mailEnabled = true
-        #expect(SettingsSection.info.isVisible(settings: settings))
+        #expect(!SettingsSection.info.isVisible(settings: settings))
 
         settings.mailEnabled = false
         settings.lockScreenInfoEnabled = true
