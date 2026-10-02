@@ -93,7 +93,7 @@ final class FileShelfShakeController: NSObject {
         super.init()
 
         settingsSubscription = settingsStore.$settings
-            .map(\.fileShelfEnabled)
+            .map { $0.fileShelfEnabled && $0.fileShelfShakeEnabled }
             .removeDuplicates()
             .sink { [weak self] enabled in
                 self?.isEnabled = enabled

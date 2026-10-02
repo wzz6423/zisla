@@ -2527,3 +2527,5 @@
 
 "拖入文件，暂存到中转站" = "Arrastra archivos para guardarlos aquí";
 "松开以添加到中转站" = "Suelta para añadir los archivos";
+"晃动唤出中转窗口" = "Agitar para mostrar el estante";
+"拖拽文件时晃动鼠标，在旁边显示中转窗口" = "Agita el ratón al arrastrar archivos para mostrar una ventana del estante junto al puntero";

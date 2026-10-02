@@ -130,6 +130,70 @@ struct FileShelfShakeViewTests {
 @Suite(.serialized)
 @MainActor
 struct FileShelfShakeControllerTests {
+    @Test(arguments: [false, true], [false, true])
+    func shakeRequiresBothSwitchesWhileShelfOnlyRequiresItsParent(shelfEnabled: Bool, shakeEnabled: Bool) throws {
+        let fixture = try Fixture(settings: FeatureSettings(fileShelfEnabled: shelfEnabled, fileShelfShakeEnabled: shakeEnabled))
+        defer { fixture.close() }
+        #expect(IslandModule.shelf.isEnabled(in: fixture.settings.settings) == shelfEnabled)
+        #expect(fixture.controller.isMonitoring == (shelfEnabled && shakeEnabled))
+        fixture.files()
+        fixture.shake()
+        #expect(fixture.controller.isPresented == (shelfEnabled && shakeEnabled))
+        #expect(fixture.presentedPoints.count == (shelfEnabled && shakeEnabled ? 1 : 0))
+    }
+
+    @Test
+    func disablingShakeClosesTheTargetCancelsResourcesAndRejectsLateDrops() async throws {
+        let fixture = try Fixture()
+        defer { fixture.close() }
+        fixture.files()
+        fixture.shake()
+        let releaseTimer = try #require(fixture.controller.releaseTimer)
+        fixture.controller.handlePointer(at: .zero, interaction: .dragEnded)
+        let dismissal = try #require(fixture.controller.dismissTask)
+        try await fixture.waitForDismissalSleep()
+        fixture.settings.settings.fileShelfShakeEnabled = false
+        #expect(fixture.settings.settings.fileShelfEnabled)
+        #expect(IslandModule.shelf.isEnabled(in: fixture.settings.settings))
+        #expect(!fixture.controller.isMonitoring)
+        #expect(!fixture.controller.isPresented)
+        #expect(!releaseTimer.isValid)
+        #expect(fixture.controller.releaseTimer == nil)
+        #expect(dismissal.isCancelled)
+        #expect(fixture.controller.dismissTask == nil)
+        fixture.controller.receive([.content(.text("late callback"))], forChangeCount: fixture.pasteboard.changeCount)
+        #expect(fixture.receivedCount == 0)
+        fixture.settings.settings.fileShelfShakeEnabled = true
+        #expect(fixture.controller.isMonitoring)
+        fixture.shake(start: 2)
+        #expect(fixture.controller.isPresented)
+        await fixture.gate.release()
+        await dismissal.value
+        #expect(fixture.controller.isPresented)
+    }
+
+    @Test
+    func reEnablingShelfPreservesTheShakeOptOut() throws {
+        let fixture = try Fixture()
+        defer { fixture.close() }
+        fixture.settings.settings.fileShelfShakeEnabled = false
+        fixture.settings.settings.fileShelfEnabled = false
+        fixture.settings.settings.fileShelfEnabled = true
+        #expect(!fixture.settings.settings.fileShelfShakeEnabled)
+        #expect(IslandModule.shelf.isEnabled(in: fixture.settings.settings))
+        #expect(!fixture.controller.isMonitoring)
+        fixture.files()
+        fixture.shake()
+        #expect(!fixture.controller.isPresented)
+        fixture.settings.settings.fileShelfEnabled = false
+        fixture.settings.settings.fileShelfShakeEnabled = true
+        #expect(!fixture.controller.isMonitoring)
+        fixture.settings.settings.fileShelfEnabled = true
+        #expect(fixture.controller.isMonitoring)
+        fixture.shake(start: 2)
+        #expect(fixture.controller.isPresented)
+    }
+
     @Test
     func onlyFileDragsOpenOneStationaryWindow() throws {
         let fixture = try Fixture()
@@ -329,9 +393,10 @@ struct FileShelfShakeControllerTests {
         var buttons = 1
         var onItems: (([FileShelfDropItem]) -> Void)?
 
-        init() throws {
+        init(settings initialSettings: FeatureSettings = .default) throws {
             defaults = try #require(UserDefaults(suiteName: name))
             settings = FeatureSettingsStore(defaults: defaults)
+            settings.settings = initialSettings
             pasteboard = NSPasteboard(name: NSPasteboard.Name(name))
             controller = FileShelfShakeController(
                 settingsStore: settings,

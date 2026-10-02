@@ -2527,3 +2527,5 @@
 
 "拖入文件，暂存到中转站" = "Trascina i file qui per conservarli";
 "松开以添加到中转站" = "Rilascia per aggiungere i file";
+"晃动唤出中转窗口" = "Scuoti per mostrare il ripiano";
+"拖拽文件时晃动鼠标，在旁边显示中转窗口" = "Scuoti il mouse mentre trascini i file per mostrare una finestra del ripiano accanto al puntatore";

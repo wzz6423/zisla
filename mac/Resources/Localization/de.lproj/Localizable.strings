@@ -2528,3 +2528,5 @@
 
 "拖入文件，暂存到中转站" = "Dateien hier vorübergehend ablegen";
 "松开以添加到中转站" = "Loslassen, um Dateien hinzuzufügen";
+"晃动唤出中转窗口" = "Ablagefenster durch Schütteln öffnen";
+"拖拽文件时晃动鼠标，在旁边显示中转窗口" = "Beim Ziehen von Dateien die Maus schütteln, um ein Ablagefenster neben dem Zeiger anzuzeigen";

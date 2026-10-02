@@ -2527,3 +2527,5 @@
 
 "拖入文件，暂存到中转站" = "Dosyaları geçici olarak saklamak için buraya sürükleyin";
 "松开以添加到中转站" = "Dosyaları eklemek için bırakın";
+"晃动唤出中转窗口" = "Raf penceresini göstermek için sallayın";
+"拖拽文件时晃动鼠标，在旁边显示中转窗口" = "İşaretçinin yanında raf penceresini göstermek için dosyaları sürüklerken fareyi sallayın";

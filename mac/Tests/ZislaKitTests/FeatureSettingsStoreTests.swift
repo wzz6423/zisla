@@ -6,6 +6,32 @@ import Testing
 
 struct FeatureSettingsStoreTests {
     @Test @MainActor
+    func fileShelfShakeOptOutSurvivesParentChangesAndStoreRecreation() throws {
+        let suiteName = "Zisla.FeatureSettingsStoreTests.\(UUID().uuidString)"
+        let defaults = try #require(UserDefaults(suiteName: suiteName))
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+        let store = FeatureSettingsStore(defaults: defaults)
+        store.settings.fileShelfShakeEnabled = false
+        #expect(store.settings.fileShelfEnabled)
+        store.settings.fileShelfEnabled = false
+        store.flushPendingChanges()
+        let restored = FeatureSettingsStore(defaults: defaults)
+        #expect(!restored.settings.fileShelfEnabled)
+        #expect(!restored.settings.fileShelfShakeEnabled)
+        restored.settings.fileShelfEnabled = true
+        #expect(!restored.settings.fileShelfShakeEnabled)
+        restored.flushPendingChanges()
+        let restarted = FeatureSettingsStore(defaults: defaults)
+        #expect(restarted.settings.fileShelfEnabled)
+        #expect(!restarted.settings.fileShelfShakeEnabled)
+        restarted.reset()
+        #expect(restarted.settings.fileShelfEnabled)
+        #expect(restarted.settings.fileShelfShakeEnabled)
+        restarted.flushPendingChanges()
+        #expect(FeatureSettingsStore(defaults: defaults).settings.fileShelfShakeEnabled)
+    }
+
+    @Test @MainActor
     func aiResultSweepOptOutSurvivesStoreRecreationAndResetRestoresDefault() throws {
         let suiteName = "Zisla.FeatureSettingsStoreTests.\(UUID().uuidString)"
         let defaults = try #require(UserDefaults(suiteName: suiteName))
