@@ -1,6 +1,5 @@
 import AppKit
 import Combine
-import SkyLightWindow
 import SwiftUI
 import ZislaCore
 import ZislaKit
@@ -232,13 +231,11 @@ final class FileShelfShakeController: NSObject {
         hostingView.sizingOptions = []
         let panel = Self.makeWindow(contentView: hostingView, frame: FileShelfShakeLayout.frame(near: point, in: screen.visibleFrame))
         window = panel
-        SkyLightOperator.shared.delegateWindow(panel)
         panel.orderFrontRegardless()
     }
 
     static func makeWindow(contentView: NSView, frame: CGRect) -> IslandPanel {
         let panel = IslandPanel(contentView: contentView, frame: frame, blocksClicksInTransparentAreas: true)
-        panel.level = NSWindow.Level(rawValue: IslandPanel.onTopLevel.rawValue + 1)
         panel.avoidsAppActivation = true
         panel.hasShadow = true
         return panel

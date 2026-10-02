@@ -85,8 +85,10 @@ struct FileShelfShakeLayoutTests {
         #expect(!panel.ignoresMouseEvents)
         #expect(!panel.hidesOnDeactivate)
         #expect(panel.collectionBehavior.contains(.fullScreenAuxiliary))
+        #expect(panel.collectionBehavior.contains(.canJoinAllSpaces))
         #expect(panel.styleMask.contains(.nonactivatingPanel))
-        #expect(panel.level.rawValue > IslandPanel.onTopLevel.rawValue)
+        #expect(panel.level.rawValue > NSWindow.Level.normal.rawValue)
+        #expect(panel.level.rawValue < CGWindowLevelForKey(.draggingWindow))
     }
 }
 
