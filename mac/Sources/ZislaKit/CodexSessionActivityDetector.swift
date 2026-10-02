@@ -461,7 +461,7 @@ public final class CodexSessionActivityDetector {
 
         guard let data = runProcessOutput(
             executableURL: URL(fileURLWithPath: "/usr/sbin/lsof"),
-            arguments: ["-F", "pn", "--"] + standardizedURLs.map(\.path).sorted(),
+            arguments: ["-F", "pan", "--"] + standardizedURLs.map(\.path).sorted(),
             timeout: 2
         ) else { return [:] }
         return parseOpenFileProcessIdentifiers(data, matching: standardizedURLs)
@@ -558,6 +558,7 @@ public final class CodexSessionActivityDetector {
     ) -> [URL: Int32] {
         guard let output = String(data: data, encoding: .utf8) else { return [:] }
         var currentProcessIdentifier: Int32?
+        var currentFileIsWritable = false
         var result: [URL: Int32] = [:]
         for line in output.split(whereSeparator: \.isNewline) {
             guard let field = line.first else { continue }
@@ -565,7 +566,14 @@ public final class CodexSessionActivityDetector {
             switch field {
             case "p":
                 currentProcessIdentifier = Int32(value)
+                currentFileIsWritable = false
+            case "f":
+                currentFileIsWritable = false
+            case "a":
+                currentFileIsWritable = value == "w" || value == "u"
             case "n":
+                // Read-only handles include Zisla's own watchers, not the session writer.
+                guard currentFileIsWritable else { continue }
                 guard let currentProcessIdentifier, currentProcessIdentifier > 0 else { continue }
                 let url = URL(fileURLWithPath: String(value)).standardizedFileURL
                 guard urls.contains(url), result[url] == nil else { continue }

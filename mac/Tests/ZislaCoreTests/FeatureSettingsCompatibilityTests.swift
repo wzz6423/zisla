@@ -14,6 +14,38 @@ struct FeatureSettingsCompatibilityTests {
     ]
 
     @Test
+    func fileShelfShakeDefaultsOnForNewAndLegacySettings() throws {
+        #expect(FeatureSettings.default.fileShelfEnabled)
+        #expect(FeatureSettings.default.fileShelfShakeEnabled)
+        for json in ["{}", #"{"fileShelfEnabled":false}"#, #"{"fileShelfShakeEnabled":null}"#] {
+            let legacy = try JSONDecoder().decode(FeatureSettings.self, from: Data(json.utf8))
+            #expect(legacy.fileShelfShakeEnabled)
+        }
+        let disabledShelf = try JSONDecoder().decode(
+            FeatureSettings.self, from: Data(#"{"fileShelfEnabled":false}"#.utf8)
+        )
+        #expect(!disabledShelf.fileShelfEnabled)
+    }
+
+    @Test(arguments: [false, true], [false, true])
+    func fileShelfSwitchesRoundTripIndependently(shelfEnabled: Bool, shakeEnabled: Bool) throws {
+        let configured = FeatureSettings(fileShelfEnabled: shelfEnabled, fileShelfShakeEnabled: shakeEnabled)
+        #expect(configured.fileShelfEnabled == shelfEnabled)
+        #expect(configured.fileShelfShakeEnabled == shakeEnabled)
+        let restored = try JSONDecoder().decode(FeatureSettings.self, from: JSONEncoder().encode(configured))
+        #expect(restored.fileShelfEnabled == shelfEnabled)
+        #expect(restored.fileShelfShakeEnabled == shakeEnabled)
+    }
+
+    @Test(arguments: [#""true""#, "1", "[]", "{}"])
+    func fileShelfShakeRejectsInvalidValues(value: String) {
+        let json = "{\"fileShelfShakeEnabled\":\(value)}"
+        #expect(throws: DecodingError.self) {
+            try JSONDecoder().decode(FeatureSettings.self, from: Data(json.utf8))
+        }
+    }
+
+    @Test
     func aiResultSweepDefaultsOnForNewAndLegacySettingsAndPreservesOptOut() throws {
         #expect(FeatureSettings.default.aiTaskResultSweepEnabled)
         let legacy = try JSONDecoder().decode(FeatureSettings.self, from: Data("{}".utf8))

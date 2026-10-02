@@ -126,7 +126,6 @@ export const id = createCatalog({
     toolsHeading: 'Alat AI yang didukung',
     toolsLede: 'Mendeteksi aktivitas CLI, aplikasi desktop, dan IDE yang didukung, lalu menggabungkan status tugas.',
     toolsAriaLabel: 'Alat AI yang didukung',
-    doubaoName: 'Doubao',
     boundariesHeading: 'Hanya batas status yang dicatat',
     privacyPoints: ['Hanya menganalisis jenis peristiwa, status, waktu, model, dan ID sesi dari peristiwa terstruktur', 'Tidak pernah membaca teks prompt atau balasan', 'Protokol dan status disimpan di Mac'],
     bridgeHeading: 'Hubungkan tugas Anda sendiri',

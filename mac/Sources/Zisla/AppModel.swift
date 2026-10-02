@@ -300,6 +300,7 @@ enum BrowserDownloadQuickActionPresenter {
     )
     controller.displayDuration = settings.clipboardAssistantDisplayDuration
     controller.presentation.progressGlowEnabled = settings.collapsedProgressGlowEnabled
+    controller.presentation.notchBackground = settings.islandNotchBackground
     return controller.present(detection, visualStyle: settings.islandVisualStyle) != nil
   }
 }
@@ -1693,6 +1694,7 @@ final class AppModel: ObservableObject {
       orders: settings.clipboardAssistantActionOrders
     )
     clipboardAssistant.presentation.progressGlowEnabled = settings.collapsedProgressGlowEnabled
+    clipboardAssistant.presentation.notchBackground = settings.islandNotchBackground
     guard let presentationGeneration = clipboardAssistant.present(detection, visualStyle: settings.islandVisualStyle),
           clipboardAssistant.presentation.detection == detection else { return .unavailable }
     clipboardAssistantContent = content
@@ -2929,6 +2931,7 @@ final class AppModel: ObservableObject {
       clipboardAssistant.isLightweightMode = settings.clipboardAssistantLightweightMode
       clipboardAssistant.displayDuration = settings.clipboardAssistantDisplayDuration
       clipboardAssistant.presentation.visualStyle = settings.islandVisualStyle
+      clipboardAssistant.presentation.notchBackground = settings.islandNotchBackground
       clipboardAssistant.presentation.progressGlowEnabled = settings.collapsedProgressGlowEnabled
     } else {
       clipboardAssistant.setTriggers(hotkey: nil, mouseButton: nil, dismissHotkey: nil)

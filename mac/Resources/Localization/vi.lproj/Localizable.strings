@@ -2613,3 +2613,8 @@
 "低能耗模式" = "Chế độ nguồn điện thấp";
 "高能耗模式" = "Chế độ nguồn điện cao";
 "个人热点" = "Điểm truy cập cá nhân";
+
+"拖入文件，暂存到中转站" = "Kéo tệp vào đây để lưu tạm";
+"松开以添加到中转站" = "Thả để thêm tệp";
+"晃动唤出中转窗口" = "Lắc để mở cửa sổ kệ tạm";
+"拖拽文件时晃动鼠标，在旁边显示中转窗口" = "Lắc chuột khi kéo tệp để hiển thị cửa sổ kệ tạm bên cạnh con trỏ";

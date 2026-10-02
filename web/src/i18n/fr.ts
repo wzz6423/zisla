@@ -268,7 +268,6 @@ export const fr: SiteContent = {
     toolsLede:
       'Détecte l’activité des CLI, apps de bureau et IDE pris en charge, et agrège l’état des tâches.',
     toolsAriaLabel: 'Outils IA pris en charge',
-    doubaoName: 'Doubao',
     boundariesHeading: 'Seules les limites d’état sont enregistrées',
     privacyPoints: [
       'Analyse uniquement le type d’événement, l’état, l’horodatage, le modèle et l’identifiant de session des événements structurés',

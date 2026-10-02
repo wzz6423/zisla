@@ -143,7 +143,7 @@ struct MarqueeText: View {
             && textWidth > containerWidth + 1
     }
 
-    private var marqueeLabel: some View {
+    var marqueeLabel: some View {
         Text(text)
             .font(font)
             .fontWeight(fontWeight)

@@ -2609,3 +2609,8 @@
 "低能耗模式" = "Mode économie d’énergie";
 "高能耗模式" = "Mode haute puissance";
 "个人热点" = "Partage de connexion";
+
+"拖入文件，暂存到中转站" = "Déposez les fichiers pour les garder ici";
+"松开以添加到中转站" = "Relâchez pour ajouter les fichiers";
+"晃动唤出中转窗口" = "Secouer pour afficher l’étagère";
+"拖拽文件时晃动鼠标，在旁边显示中转窗口" = "Secouez la souris en faisant glisser des fichiers pour afficher une fenêtre d’étagère à côté du pointeur";

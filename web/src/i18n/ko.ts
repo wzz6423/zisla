@@ -232,7 +232,6 @@ export const ko: SiteContent = {
     toolsHeading: '지원하는 AI 도구',
     toolsLede: '지원되는 CLI, 데스크탑 앱, IDE의 활동을 인식하고 작업 상태를 모아 줍니다.',
     toolsAriaLabel: '지원하는 AI 도구',
-    doubaoName: '더우바오(Doubao)',
     boundariesHeading: '상태의 경계만 기록합니다',
     privacyPoints: [
       '구조화된 이벤트에서 이벤트 종류, 상태, 시간, 모델, 세션 ID만 해석',
