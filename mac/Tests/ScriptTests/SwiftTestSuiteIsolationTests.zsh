@@ -95,6 +95,10 @@ commands = [
 for suite, test in [
     ("AIMascotImageCacheTests", "recoversFromTransientLoadFailureAfterRetry()"),
     ("AIResultSweepPresentationTests", "renderedViewUpdatesWithPlaybackWithoutAnotherQueueEvent()"),
+    ("FileShelfShakeControllerTests", "newDragAndOrdinaryMovementClearThePreviousTarget()"),
+    ("FileShelfShakeControllerTests", "mouseUpLeavesTimeForTheNativeDropCallback()"),
+    ("FileShelfShakeControllerTests", "aMissedMouseUpStillDismissesTheTarget()"),
+    ("FileShelfShakeControllerTests", "cancelledDismissalCannotCloseANewDrag()"),
 ]:
     test_id = f"ZislaTests.{suite}/{test}"
     selected = [

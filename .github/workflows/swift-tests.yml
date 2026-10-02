@@ -72,7 +72,7 @@ jobs:
           # AppKit-heavy app tests can starve service timers in SwiftPM's shared test process.
           zsh Scripts/swift-test.sh --filter '^ZislaCoreTests\.'
           zsh Scripts/swift-test-suites.sh ZislaKitTests
-          zsh Scripts/swift-test.sh --filter '^ZislaTests\.' --skip '^ZislaTests\.(AIMascotImageCache|AIResultSweep(Integration|Presentation)|Mail(HTMLView|PaginationView)|BrowserDownloadQuickAction|ClipboardAssistant(Calendar|Currency)Presentation|ClipboardAssistantShortcut|ClipboardTranslationPresentation|ClipboardSystemTranslationBridge|ThinScrollChrome)Tests'
+          zsh Scripts/swift-test.sh --filter '^ZislaTests\.' --skip '^ZislaTests\.(AIMascotImageCache|AIResultSweep(Integration|Presentation)|Mail(HTMLView|PaginationView)|BrowserDownloadQuickAction|ClipboardAssistant(Calendar|Currency)Presentation|ClipboardAssistantShortcut|ClipboardTranslationPresentation|ClipboardSystemTranslationBridge|FileShelfShakeController|ThinScrollChrome)Tests'
           zsh Scripts/swift-test.sh --filter '^ZislaTests\.AIMascotImageCacheTests/'
           zsh Scripts/swift-test.sh --filter '^ZislaTests\.AIResultSweepIntegrationTests'
           zsh Scripts/swift-test.sh --filter '^ZislaTests\.AIResultSweepPresentationTests/'
@@ -82,6 +82,7 @@ jobs:
           zsh Scripts/swift-test.sh --filter '^ZislaTests\.ClipboardAssistantShortcutTests'
           zsh Scripts/swift-test.sh --filter '^ZislaTests\.ClipboardTranslationPresentationTests'
           zsh Scripts/swift-test.sh --filter '^ZislaTests\.ClipboardSystemTranslationBridgeTests'
+          zsh Scripts/swift-test.sh --filter '^ZislaTests\.FileShelfShakeControllerTests/'
           zsh Scripts/swift-test.sh --filter '^ZislaTests\.ThinScrollChromeTests'
           # Run mail UI tests in their own process so unrelated modal UI cannot starve WebKit.
           zsh Scripts/swift-test.sh --filter '^ZislaTests\.Mail(HTMLView|PaginationView)Tests'
