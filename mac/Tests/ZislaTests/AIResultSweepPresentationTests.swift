@@ -141,7 +141,8 @@ struct AIResultSweepPresentationTests {
     func renderedViewUpdatesWithPlaybackWithoutAnotherQueueEvent() async throws {
         let fixture = try Fixture()
         defer { fixture.cleanUp() }
-        let renderer = ImageRenderer(content: fixture.view.frame(width: 320, height: 34))
+        let renderer = ImageRenderer(content: fixture.view.frame(width: 320, height: 34)
+            .environment(\.colorScheme, .dark))
         #expect(wingPixelCounts(in: try #require(renderer.cgImage)) == [0, 0])
         let (changes, continuation) = AsyncStream<Void>.makeStream()
         let subscription = renderer.objectWillChange.sink { continuation.yield(()) }
@@ -170,7 +171,8 @@ struct AIResultSweepPresentationTests {
 
     private func wingPixelCounts(in view: CompactStatusBarView) throws -> [Int] {
         let renderer = ImageRenderer(content: view.statusBarContent(at: .now)
-            .frame(width: 320, height: 34))
+            .frame(width: 320, height: 34)
+            .environment(\.colorScheme, .dark))
         return wingPixelCounts(in: try #require(renderer.cgImage))
     }
 
