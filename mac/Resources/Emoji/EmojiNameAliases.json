@@ -201179,7 +201179,7 @@
       ]
     }
   },
-  "cldrRevision": "26a79cb42bfcc90def764102aa2af126d9ef3108",
+  "cldrRevision": "91c267402229a59e3ef2774544f001bf959e8809",
   "cldrVersion": "48.2",
   "emojiTestRevision": "c0bada0f0e1e05eda345652bd01af16750a54297",
   "emojiVersion": "17.0",
@@ -822936,7 +822936,7 @@
     }
   },
   "sources": {
-    "annotations": "https://github.com/unicode-org/cldr-json/tree/26a79cb42bfcc90def764102aa2af126d9ef3108/cldr-json",
+    "annotations": "https://github.com/unicode-org/cldr-json/tree/91c267402229a59e3ef2774544f001bf959e8809/cldr-json",
     "emojiTest": "https://github.com/unicode-org/cldr/blob/11299982335beb974c1c63c45265184e759c0f41/tools/cldr-code/src/main/resources/org/unicode/cldr/util/data/emoji/emoji-test.txt"
   }
 }
