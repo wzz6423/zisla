@@ -239,6 +239,17 @@ struct AIResultSweepIntegrationTests {
             }
             #expect(sweep.current?.status == status, "明确的 Codex 结束事件必须触发扫光")
             #expect(!monitor.state.tasks.contains { $0.status.isActive })
+            let playback = try #require(sweep.current)
+
+            try FileManager.default.removeItem(at: rollout)
+            monitor.reload(includeUsageSamples: false)
+            #expect(monitor.state.tasks.isEmpty)
+            let retained = sweep.presentationNotices(from: [])
+            #expect(retained.count == 1, "客户端日志和活动状态消失后，结果动画仍须持有图标与计数")
+            #expect(retained.first?.id == "ai-active-codex-\(running.id)")
+            #expect(retained.first?.kind == status.noticeKind)
+            sweep.finish(id: playback.id)
+            #expect(sweep.presentationNotices(from: []).isEmpty)
         }
     }
 }

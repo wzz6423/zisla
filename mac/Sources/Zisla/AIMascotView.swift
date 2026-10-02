@@ -57,6 +57,21 @@ final class AIMascotImageCache: ObservableObject {
     private func snapshot(_ image: NSImage?) -> NSImage? {
         guard let image,
               let bitmap = image.cgImage(forProposedRect: nil, context: nil, hints: nil) else { return nil }
+        // AppKit can provide a drawable but empty bitmap; caching it would suppress all future retries.
+        guard let alpha = CGContext(
+            data: nil,
+            width: bitmap.width,
+            height: bitmap.height,
+            bitsPerComponent: 8,
+            bytesPerRow: bitmap.width,
+            space: CGColorSpaceCreateDeviceGray(),
+            bitmapInfo: CGImageAlphaInfo.alphaOnly.rawValue
+        ), let data = alpha.data else { return nil }
+        // Source-over can round a single alpha level down to zero, hiding a valid faint pixel.
+        alpha.setBlendMode(.copy)
+        alpha.draw(bitmap, in: CGRect(x: 0, y: 0, width: bitmap.width, height: bitmap.height))
+        let pixels = UnsafeRawBufferPointer(start: data, count: alpha.bytesPerRow * alpha.height)
+        guard pixels.contains(where: { $0 != 0 }) else { return nil }
         return NSImage(cgImage: bitmap, size: image.size)
     }
 }

@@ -1,3 +1,4 @@
+import Darwin
 import Foundation
 import Testing
 @testable import ZislaCore
@@ -530,7 +531,7 @@ struct CodexSessionActivityDetectorTests {
     func parsesLsofFieldOutputForRequestedRollouts() {
         let first = URL(fileURLWithPath: "/tmp/codex/first.jsonl").standardizedFileURL
         let second = URL(fileURLWithPath: "/tmp/codex/second.jsonl").standardizedFileURL
-        let output = Data("p2468\nf12\nn\(first.path)\np9753\nf19\nn/other.jsonl\n".utf8)
+        let output = Data("p2468\nf12\naw\nn\(first.path)\np9753\nf19\nau\nn/other.jsonl\n".utf8)
 
         let result = CodexSessionActivityDetector.parseOpenFileProcessIdentifiers(
             output,
@@ -540,14 +541,118 @@ struct CodexSessionActivityDetectorTests {
         #expect(result == [first: 2468])
     }
 
-    @Test
-    func resolvesCurrentProcessForActuallyOpenRollout() throws {
+    @Test(arguments: ["w", "u"])
+    func prefersRolloutWriterOverReadOnlyWatcher(access: String) {
+        let rollout = URL(fileURLWithPath: "/tmp/codex/shared.jsonl").standardizedFileURL
+        let output = Data("p100\nf12\nar\nn\(rollout.path)\np200\nf19\na\(access)\nn\(rollout.path)\n".utf8)
+
+        let result = CodexSessionActivityDetector.parseOpenFileProcessIdentifiers(output, matching: [rollout])
+
+        #expect(result == [rollout: 200])
+    }
+
+    @Test(arguments: ["f13", "p9753", "p0", "pinvalid"])
+    func doesNotInheritWriteAccessAcrossFileOrProcessBoundaries(boundary: String) {
+        let rollout = URL(fileURLWithPath: "/tmp/codex/read-only.jsonl").standardizedFileURL
+        let output = Data("p2468\nf12\nau\nn/other.jsonl\n\(boundary)\nn\(rollout.path)\n".utf8)
+
+        let result = CodexSessionActivityDetector.parseOpenFileProcessIdentifiers(output, matching: [rollout])
+
+        #expect(result.isEmpty)
+    }
+
+    @Test(arguments: [false, true], [false, true]) @MainActor
+    func detectsChatGPTSessionWithReadOnlyWatcher(sessionPredatesMonitor: Bool, watcherAlreadyOpen: Bool) throws {
+        let root = makeSessionsRoot()
+        defer { try? FileManager.default.removeItem(at: root) }
+        let relativePath = "2026/07/19/rollout-startup.jsonl"
+        let startedAt = iso8601Date("2026-07-19T01:00:00.000Z")
+        try writeRollout(
+            under: root,
+            relativePath: relativePath,
+            lines: [
+                sessionMetadataLine(sessionID: "startup-session"),
+                eventLine(timestamp: "2026-07-19T01:00:00.000Z", payloadType: "task_started", turnID: "startup-turn"),
+            ],
+            modifiedAt: startedAt
+        )
+        let rollout = root.appendingPathComponent(relativePath).standardizedFileURL
+        var includesWatcher = watcherAlreadyOpen
+        let watcherFields = "p100\nf12\nar\nn\(rollout.path)\n"
+        let writerFields = "p200\nf19\nau\nn\(rollout.path)\n"
+        let processes = Data("""
+        100 1 /Applications/zisla.app/Contents/MacOS/zisla
+        200 1 /Applications/ChatGPT.app/Contents/Resources/codex-cli/CodexCLI.app/Contents/MacOS/codex
+        """.utf8)
+        let detector = CodexSessionActivityDetector(
+            sessionsDirectory: root,
+            processIdentifiersForOpenFiles: { urls in
+                let fields = (includesWatcher ? watcherFields : "") + writerFields
+                return CodexSessionActivityDetector.parseOpenFileProcessIdentifiers(Data(fields.utf8), matching: Set(urls))
+            },
+            processStartDatesForProcessIdentifiers: { _ in [
+                100: startedAt.addingTimeInterval(sessionPredatesMonitor ? 60 : -60),
+                200: startedAt.addingTimeInterval(-120),
+            ] },
+            clientProvidersForProcessIdentifiers: { identifiers in
+                CodexSessionActivityDetector.parseClientProviders(fromProcessList: processes, matching: identifiers)
+            },
+            now: { startedAt.addingTimeInterval(90) }
+        )
+        let monitor = AIStateMonitor(
+            directoryURL: root.appendingPathComponent("state", isDirectory: true),
+            activityDetectors: [detector],
+            now: { startedAt.addingTimeInterval(90) }
+        )
+
+        for _ in 0..<2 {
+            monitor.reload()
+            let task = try #require(monitor.state.tasks.first)
+            #expect(monitor.state.tasks.count == 1)
+            #expect(task.provider == .gpt)
+            #expect(task.processIdentifier == 200)
+            #expect(task.startedAt == startedAt)
+            #expect(task.status == .running)
+            includesWatcher = true
+        }
+
+        try appendLine(eventLine(
+            timestamp: "2026-07-19T01:02:00.000Z",
+            payloadType: "task_complete",
+            turnID: "startup-turn"
+        ), to: rollout)
+        monitor.reload()
+        let completed = try #require(monitor.state.tasks.first)
+        #expect(completed.status == .succeeded)
+        #expect(completed.provider == .gpt)
+        monitor.reload()
+        #expect(monitor.state.tasks.isEmpty)
+    }
+
+    @Test(arguments: [O_RDONLY, O_EVTONLY])
+    func excludesReadOnlyAndEventOnlyRolloutHandles(mode: Int32) throws {
+        let root = makeSessionsRoot()
+        defer { try? FileManager.default.removeItem(at: root) }
+        try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+        let rollout = root.appendingPathComponent("read-only-rollout.jsonl").standardizedFileURL
+        try Data().write(to: rollout)
+        let descriptor = open(rollout.path, mode)
+        try #require(descriptor >= 0)
+        defer { close(descriptor) }
+
+        let result = CodexSessionActivityDetector.defaultProcessIdentifiersForOpenFiles([rollout])
+
+        #expect(result.isEmpty)
+    }
+
+    @Test(arguments: [false, true])
+    func resolvesCurrentProcessForActuallyOpenRollout(readWrite: Bool) throws {
         let root = makeSessionsRoot()
         defer { try? FileManager.default.removeItem(at: root) }
         try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
         let rolloutURL = root.appendingPathComponent("open-rollout.jsonl").standardizedFileURL
         try Data().write(to: rolloutURL)
-        let handle = try FileHandle(forWritingTo: rolloutURL)
+        let handle = try readWrite ? FileHandle(forUpdating: rolloutURL) : FileHandle(forWritingTo: rolloutURL)
         defer { try? handle.close() }
 
         let result = CodexSessionActivityDetector.defaultProcessIdentifiersForOpenFiles([rolloutURL])

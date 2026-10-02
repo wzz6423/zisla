@@ -7,8 +7,10 @@ struct AIResultSweep: Identifiable {
     static let duration: TimeInterval = 4
 
     let id = UUID()
-    let status: AIProgressStatus
+    let task: AIProgressTask
     let startedAt: Date
+
+    var status: AIProgressStatus { task.status }
 
     func progress(at date: Date) -> Double {
         min(1, max(0, date.timeIntervalSince(startedAt) / Self.duration))
@@ -18,7 +20,7 @@ struct AIResultSweep: Identifiable {
 @MainActor
 final class AIResultSweepController: ObservableObject {
     @Published private(set) var current: AIResultSweep?
-    private var pending: [AIProgressStatus] = []
+    private var pending: [AIProgressTask] = []
     private var playbackTask: Task<Void, Never>?
 
     func receive(previous: AIProgressStatus?, task: AIProgressTask, observedSince: Date, settings: FeatureSettings) {
@@ -31,10 +33,27 @@ final class AIResultSweepController: ObservableObject {
               previous != task.status,
               task.status == .succeeded || task.status == .failed || task.status == .error else { return }
         if current == nil {
-            start(task.status)
+            start(task)
         } else {
-            pending.append(task.status)
+            pending.append(task)
         }
+    }
+
+    func presentationNotices(from notices: [IslandNotice]) -> [IslandNotice] {
+        guard let task = current?.task else { return notices }
+        let activityNotices = notices.filter { $0.id.hasPrefix("ai-active-") }
+        let id = "ai-active-\(task.provider.rawValue)-\(task.id)"
+        guard !activityNotices.contains(where: { $0.id == id }) else { return activityNotices }
+        // The client may have exited, but its result still owns the bar until playback finishes.
+        return activityNotices + [IslandNotice(
+            id: id,
+            title: task.title,
+            detail: task.detail,
+            kind: task.status.noticeKind,
+            side: .right,
+            createdAt: task.updatedAt,
+            progress: task.progress
+        )]
     }
 
     func cancel() {
@@ -55,8 +74,8 @@ final class AIResultSweepController: ObservableObject {
         }
     }
 
-    private func start(_ status: AIProgressStatus) {
-        let sweep = AIResultSweep(status: status, startedAt: .now)
+    private func start(_ task: AIProgressTask) {
+        let sweep = AIResultSweep(task: task, startedAt: .now)
         current = sweep
         playbackTask = Task { [weak self] in
             do {

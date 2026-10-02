@@ -454,7 +454,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
             },
             persistentPanelFrameProvider: { [weak self] layout in
                 let notices = PersistentPetNoticePolicy.notices(
-                    model.notices.left + model.notices.right,
+                    model.aiResultSweep.presentationNotices(from: model.notices.left + model.notices.right),
                     isVoiceRecording: model.voiceInput.isCapturingInput,
                     voiceDisplayID: self?.voiceRecordingDisplayID,
                     displayID: layout.displayID
@@ -703,6 +703,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
             model.settingsStore.$settings.map { _ in () }.eraseToAnyPublisher(),
             model.notices.$left.map { _ in () }.eraseToAnyPublisher(),
             model.notices.$right.map { _ in () }.eraseToAnyPublisher(),
+            model.aiResultSweep.$current.map { _ in () }.eraseToAnyPublisher(),
             model.browserDownloads.$snapshots
                 .map(\.count)
                 .removeDuplicates()

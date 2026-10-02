@@ -180,7 +180,7 @@ final class SideNoticePresenter {
             displayState.hidesVoiceProcessingIndicator = hidesVoiceProcessingIndicator(
                 on: snapshot.displayID
             )
-            var compactNotices = queue.left + queue.right
+            var compactNotices = resultSweep.presentationNotices(from: queue.left + queue.right)
             if displayState.hidesVoiceProcessingIndicator {
                 compactNotices = Self.noticesWithoutVoiceProcessing(compactNotices)
             }
@@ -278,7 +278,7 @@ final class SideNoticePresenter {
         rejoiningActiveSpace: Bool
     ) -> Bool {
         let displayState = panels.displayState
-        var compactNotices = queue.left + queue.right
+        var compactNotices = resultSweep.presentationNotices(from: queue.left + queue.right)
         if displayState.hidesVoiceProcessingIndicator {
             compactNotices = Self.noticesWithoutVoiceProcessing(compactNotices)
         }

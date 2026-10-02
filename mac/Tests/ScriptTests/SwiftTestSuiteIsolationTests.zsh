@@ -92,19 +92,23 @@ commands = [
     for line in Path(sys.argv[1]).read_text().splitlines()
     if line.strip().startswith("zsh Scripts/swift-test.sh ")
 ]
-cache_test = "ZislaTests.AIMascotImageCacheTests/recoversFromTransientLoadFailureAfterRetry()"
-selected = [
-    command for command in commands
-    if "--filter" in command
-    and re.search(command[command.index("--filter") + 1], cache_test)
-    and ("--skip" not in command
-         or not re.search(command[command.index("--skip") + 1], cache_test))
-]
-if len(selected) != 1 or "--skip" in selected[0]:
-    sys.exit("CI must run the image cache suite exactly once in its own test process")
-selector = selected[0][selected[0].index("--filter") + 1]
-for other_suite in ["AIMascotIdentityTests", "RichNoteEditorTests", "AIMascotImageCacheTestsExtra"]:
-    if re.search(selector, f"ZislaTests.{other_suite}/test()"):
-        sys.exit(f"CI image cache isolation also selected {other_suite}")
-print("PASS: CI runs the image cache suite exactly once without unrelated AppKit tests")
+for suite, test in [
+    ("AIMascotImageCacheTests", "recoversFromTransientLoadFailureAfterRetry()"),
+    ("AIResultSweepPresentationTests", "renderedViewUpdatesWithPlaybackWithoutAnotherQueueEvent()"),
+]:
+    test_id = f"ZislaTests.{suite}/{test}"
+    selected = [
+        command for command in commands
+        if "--filter" in command
+        and re.search(command[command.index("--filter") + 1], test_id)
+        and ("--skip" not in command
+             or not re.search(command[command.index("--skip") + 1], test_id))
+    ]
+    if len(selected) != 1 or "--skip" in selected[0]:
+        sys.exit(f"CI must run {suite} exactly once in its own test process")
+    selector = selected[0][selected[0].index("--filter") + 1]
+    for other_suite in ["AIMascotIdentityTests", "RichNoteEditorTests", suite + "Extra"]:
+        if re.search(selector, f"ZislaTests.{other_suite}/test()"):
+            sys.exit(f"CI {suite} isolation also selected {other_suite}")
+    print(f"PASS: CI runs {suite} exactly once without unrelated AppKit tests")
 PYTHON
