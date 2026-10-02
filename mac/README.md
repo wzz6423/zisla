@@ -90,7 +90,7 @@ zisla reads public or stable local session state from supported tools and extrac
 | --- | --- |
 | OpenAI / Anthropic | Codex CLI and Desktop, Claude Code, and their host environments |
 | GitHub / Google / xAI | GitHub Copilot CLI and VS Code, Gemini CLI and Desktop, and Grok CLI |
-| Independent and regional tools | Kimi Code, Qwen Code, Qoder, ZCode Desktop and CLI, TRAE, OpenCode, Harnext/Harness, WorkBuddy, and Doubao |
+| Independent and regional tools | Kimi Code, Qwen Code, Qoder, ZCode Desktop and CLI, TRAE, OpenCode, Harnext/Harness, and WorkBuddy |
 
 Waiting for approval or a user answer is yellow, tool or command errors are red, and normal execution is green; simultaneous sources are grouped in red, yellow, green order. The Qwen runtime sidecar is considered active only while its PID is alive, avoiding stale reports after exit.
 

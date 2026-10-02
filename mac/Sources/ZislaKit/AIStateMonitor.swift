@@ -187,7 +187,6 @@ public final class AIStateMonitor: ObservableObject {
                 maxFiles: 4
             ),
             WorkBuddySessionActivityDetector(),
-            DoubaoSessionActivityDetector(maxFiles: 4),
         ]
     }
 

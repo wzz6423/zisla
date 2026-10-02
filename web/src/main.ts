@@ -398,7 +398,7 @@ const renderSite = (locale: SiteLocale, preserveScroll = false) => {
     })
     .join('');
 
-  const toolMarkup = supportedAITools(content.ai.doubaoName)
+  const toolMarkup = supportedAITools()
     .map((tool) => '<span class="tool-chip"><span class="tool-chip-dot"></span>' + escapeHtml(tool) + '</span>')
     .join('');
 
@@ -703,7 +703,7 @@ const renderSite = (locale: SiteLocale, preserveScroll = false) => {
     escapeHtml(content.extensions.summaryNote) +
     '</span></aside><div class="extension-list reveal-sequence">' +
     crossModuleMarkup +
-    '</div></div></div></section>' + renderMarquee(supportedAITools(content.ai.doubaoName), 'tools') + '<section class="section ai-section" id="ai"><div class="section-wrap"><div class="section-heading reveal"><div><p class="eyebrow">' +
+    '</div></div></div></section>' + renderMarquee(supportedAITools(), 'tools') + '<section class="section ai-section" id="ai"><div class="section-wrap"><div class="section-heading reveal"><div><p class="eyebrow">' +
     escapeHtml(content.ai.eyebrow) +
     '</p><h2 class="section-title">' +
     content.ai.title +
