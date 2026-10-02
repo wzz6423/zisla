@@ -923,4 +923,71 @@ struct SideNoticeLayoutTests {
         #expect(latestFocusFrame == focusTransitionFrame)
         #expect(simulatedHeadphoneFrame.width == engine.compactBarFrame(for: simulated).width)
     }
+
+    @Test
+    func externalHeadphoneNoticeFitsTheBatteryRowAndKeepsItsTopAnchor() throws {
+        let notice = IslandNotice(id: "headphone-connection", title: "AirPods Pro", side: .left, style: .headphone)
+        for menuHeight in [CGFloat(18), 22, 24, 25, 28, 32, 34, 48] {
+            for reservesMenuBar in [false, true] {
+                let screenFrame = CGRect(x: 1_512, y: -120, width: 1_440, height: 900)
+                let screen = ScreenSnapshot(displayID: 7, frame: screenFrame,
+                    visibleFrame: CGRect(x: screenFrame.minX, y: screenFrame.minY, width: screenFrame.width,
+                        height: screenFrame.height - (reservesMenuBar ? menuHeight : 0)),
+                    menuBarHeightFallback: menuHeight)
+                let idle = engine.compactBarFrame(for: screen)
+                let actual = try #require(engine.compactBarFrame(for: screen, notices: [notice], settings: FeatureSettings()))
+                let overlay = try #require(engine.compactBarFrame(for: ScreenLayoutEngine().layout(for: screen),
+                    notices: [notice], settings: FeatureSettings()))
+                #expect(actual.height == max(36, menuHeight))
+                #expect(actual.maxY == screenFrame.maxY)
+                #expect(actual.midX == idle.midX)
+                #expect(actual.width == idle.width)
+                #expect(actual == overlay)
+                #expect(idle.height == menuHeight)
+            }
+        }
+    }
+
+    @Test
+    func headphoneRowHeightAppliesOnlyWhileItWinsOnANotchlessDisplay() throws {
+        let referenceDate = Date(timeIntervalSinceReferenceDate: 0)
+        let headphone = IslandNotice(id: "headphone-connection", title: "AirPods Pro", side: .left,
+            createdAt: referenceDate, style: .headphone)
+        let laterFocus = IslandNotice(id: "focus-transition", title: "Work", side: .left,
+            createdAt: referenceDate.addingTimeInterval(1), style: .status)
+        let voice = IslandNotice(id: "voice-processing-left", title: "Processing", side: .left)
+        let external = ScreenSnapshot(displayID: 7,
+            frame: CGRect(x: 0, y: 0, width: 1_440, height: 900),
+            visibleFrame: CGRect(x: 0, y: 0, width: 1_440, height: 876))
+        let idle = engine.compactBarFrame(for: external)
+        for notices in [[laterFocus], [headphone, laterFocus], [headphone, voice]] {
+            let frame = try #require(engine.compactBarFrame(for: external, notices: notices, settings: FeatureSettings()))
+            #expect(frame.height == idle.height)
+            #expect(frame.maxY == idle.maxY)
+        }
+        let physical = physicalNotchScreen()
+        let physicalIdle = engine.compactBarFrame(for: physical)
+        let physicalHeadphone = try #require(engine.compactBarFrame(for: physical, notices: [headphone], settings: FeatureSettings()))
+        #expect(physicalHeadphone.height == physicalIdle.height)
+        #expect(physicalHeadphone.maxY == physicalIdle.maxY)
+        #expect(physicalHeadphone.width == 380)
+    }
+
+    @Test
+    func headphoneMinimumHeightNeverExtendsOutsideItsDisplay() throws {
+        let notice = IslandNotice(id: "headphone-connection", title: "AirPods Pro", side: .left, style: .headphone)
+        for screenHeight in [CGFloat(18), 24, 30, 34, 900] {
+            let screen = ScreenSnapshot(displayID: 7,
+                frame: CGRect(x: -1_440, y: -screenHeight, width: 1_440, height: screenHeight),
+                visibleFrame: CGRect(x: -1_440, y: -screenHeight, width: 1_440, height: screenHeight),
+                menuBarHeightFallback: 24)
+            let actual = try #require(engine.compactBarFrame(for: screen, notices: [notice], settings: FeatureSettings()))
+            let overlay = try #require(engine.compactBarFrame(for: ScreenLayoutEngine().layout(for: screen),
+                notices: [notice], settings: FeatureSettings()))
+            #expect(actual.height == min(36, screenHeight))
+            #expect(actual.minY >= screen.frame.minY)
+            #expect(actual.maxY == screen.frame.maxY)
+            #expect(actual == overlay)
+        }
+    }
 }

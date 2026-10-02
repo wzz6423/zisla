@@ -347,6 +347,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
     private var monitorStatusItems: [SystemMonitorMenuBarMetric: NSStatusItem] = [:]
     private var monitorStatusItemStyles: [SystemMonitorMenuBarMetric: SystemMonitorMenuBarDisplayStyle] = [:]
     private var monitorStatusTitles: [SystemMonitorMenuBarMetric: String] = [:]
+    private var mergedMonitorStatusItem: NSStatusItem?
+    private var combinedMonitorStatusItem: NSStatusItem?
+    private var combinedIconLevels = MenuBarSystemLevels()
+    private var combinedIconReadTask: Task<Void, Never>?
     private var lastMonitorStatusRefreshAt = Date.distantPast
     private var settingsWindowController: NSWindowController?
     private var settingsWindowScreen: NSScreen?
@@ -419,6 +423,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
                 self?.showSettings()
             }
         )
+        .environment(\.islandTransientWindowChanged) { [weak self] id, window, anchor in
+            self?.overlayCoordinator?.setTransientInteractionWindow(window, anchor: anchor, id: id)
+        }
         let hostingView = NSHostingView(
             rootView: AppLanguageEnvironment(languageStore: model.languageStore, content: rootView)
         )
@@ -616,6 +623,24 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
         model.systemMonitor.$snapshot
             .sink { [weak self] _ in
                 Task { @MainActor [weak self] in self?.syncMonitorStatusItems() }
+            }
+            .store(in: &cancellables)
+
+        model.battery.$snapshot
+            .sink { [weak self] _ in
+                Task { @MainActor [weak self] in self?.syncMonitorStatusItems(force: true) }
+            }
+            .store(in: &cancellables)
+
+        model.audioOutput.$selectedDevice
+            .sink { [weak self] _ in
+                Task { @MainActor [weak self] in self?.syncMonitorStatusItems(force: true) }
+            }
+            .store(in: &cancellables)
+
+        model.$systemMonitorHeadphoneTransient
+            .sink { [weak self] _ in
+                Task { @MainActor [weak self] in self?.syncMonitorStatusItems(force: true) }
             }
             .store(in: &cancellables)
 
@@ -868,6 +893,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
     }
 
     func applicationWillTerminate(_ notification: Notification) {
+        combinedIconReadTask?.cancel()
         expandedSizeUpdateTask?.cancel()
         fileShelfShakeController?.stop()
         lockScreenOverlayController?.stop()
@@ -1043,6 +1069,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
             Task { @MainActor [weak self, weak model] in
                 guard let model else { return }
                 self?.syncApplicationIcon(mode: model.settingsStore.settings.appearanceMode)
+                self?.syncMonitorStatusItems(force: true)
             }
         }
     }
@@ -1096,7 +1123,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
         guard force || now.timeIntervalSince(lastMonitorStatusRefreshAt) >= 2 else { return }
         lastMonitorStatusRefreshAt = now
         let settings = AppModel.shared.settingsStore.settings
-        let selected = settings.systemMonitorEnabled ? settings.systemMonitorMenuBarMetrics : []
+        let selected = settings.systemMonitorEnabled && settings.systemMonitorMenuBarLayout.individualEnabled
+            ? settings.systemMonitorMenuBarMetrics : []
+        syncMergedMonitorStatusItem(settings: settings)
+        syncCombinedMonitorStatusItem(settings: settings)
         for metric in monitorStatusItems.keys.filter({ !selected.contains($0) }) {
             if let item = monitorStatusItems.removeValue(forKey: metric) {
                 NSStatusBar.system.removeStatusItem(item)
@@ -1144,6 +1174,118 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
             }
             monitorStatusTitles[metric] = title
         }
+    }
+
+    private func syncMergedMonitorStatusItem(settings: FeatureSettings) {
+        guard settings.systemMonitorEnabled, settings.systemMonitorMenuBarLayout.stackedEnabled else {
+            if let item = mergedMonitorStatusItem {
+                NSStatusBar.system.removeStatusItem(item)
+                mergedMonitorStatusItem = nil
+            }
+            return
+        }
+        if mergedMonitorStatusItem == nil {
+            let item = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
+            item.button?.target = self
+            item.button?.action = #selector(showSystemMonitor)
+            item.button?.imagePosition = .imageOnly
+            item.button?.imageScaling = .scaleNone
+            mergedMonitorStatusItem = item
+        }
+        let rows = SystemMonitorCombinedMenuBarPresentation.rows(
+            top: settings.systemMonitorMenuBarTopRow,
+            bottom: settings.systemMonitorMenuBarBottomRow,
+            snapshot: AppModel.shared.systemMonitor.snapshot,
+            style: settings.systemMonitorMenuBarDisplayStyle
+        )
+        let image = SystemMonitorMenuBarImageRenderer.stacked(rows: rows, style: settings.systemMonitorMenuBarDisplayStyle)
+        mergedMonitorStatusItem?.length = (image?.size.width ?? 24) + 2
+        mergedMonitorStatusItem?.button?.image = image
+        let detailedRows = SystemMonitorCombinedMenuBarPresentation.rows(
+            top: settings.systemMonitorMenuBarTopRow,
+            bottom: settings.systemMonitorMenuBarBottomRow,
+            snapshot: AppModel.shared.systemMonitor.snapshot,
+            style: .detailed
+        )
+        mergedMonitorStatusItem?.button?.toolTip = detailedRows.joined(separator: "\n") + "\n" + localized("点击打开系统监控")
+    }
+
+    private func syncCombinedMonitorStatusItem(settings: FeatureSettings) {
+        guard settings.systemMonitorEnabled, settings.systemMonitorMenuBarCombinedIconEnabled else {
+            if let item = combinedMonitorStatusItem {
+                NSStatusBar.system.removeStatusItem(item)
+                combinedMonitorStatusItem = nil
+            }
+            combinedIconReadTask?.cancel()
+            combinedIconReadTask = nil
+            combinedIconLevels = MenuBarSystemLevels()
+            return
+        }
+        if combinedMonitorStatusItem == nil {
+            let item = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
+            item.button?.target = self
+            item.button?.action = #selector(showSystemMonitor)
+            item.button?.imagePosition = .imageOnly
+            combinedMonitorStatusItem = item
+        }
+        updateCombinedMonitorStatusImage(metric: settings.systemMonitorMenuBarCombinedIconMetric)
+        guard combinedIconReadTask == nil else { return }
+        let metric = settings.systemMonitorMenuBarCombinedIconMetric
+        combinedIconReadTask = Task { [weak self] in
+            let levels = await Task.detached(priority: .utility) {
+                MenuBarSystemLevelReader.read(includeVolume: metric == .volume, includeBrightness: metric == .brightness)
+            }.value
+            guard !Task.isCancelled, let self else { return }
+            self.combinedIconReadTask = nil
+            let current = AppModel.shared.settingsStore.settings
+            guard current.systemMonitorEnabled, current.systemMonitorMenuBarCombinedIconEnabled,
+                  current.systemMonitorMenuBarCombinedIconMetric == metric else { return }
+            self.combinedIconLevels = levels
+            self.updateCombinedMonitorStatusImage(metric: metric)
+        }
+    }
+
+    private func updateCombinedMonitorStatusImage(metric: SystemMonitorCombinedIconMetric) {
+        guard let button = combinedMonitorStatusItem?.button else { return }
+        let settings = AppModel.shared.settingsStore.settings
+        let battery = AppModel.shared.battery.snapshot
+        let audioOutput = AppModel.shared.audioOutput
+        let connection = AppModel.shared.systemMonitorHeadphoneTransient.connection
+        var headphoneOptions = settings.systemMonitorMenuBarHeadphoneOptions
+        headphoneOptions.replacesNetworkIcon = headphoneOptions.replacesNetworkIcon && connection != nil
+        let headphones = (connection?.device ?? audioOutput.selectedDevice).flatMap { device -> MenuBarIconHeadphoneStatus? in
+            guard device.isHeadphones, device.isBluetoothAudio else { return nil }
+            return MenuBarIconHeadphoneStatus(
+                device: device,
+                productID: connection?.productID,
+                isVolumeMetric: metric == .volume && audioOutput.selectedDevice?.isBluetoothAudio == true
+            )
+        }
+        let level = SystemMonitorCombinedMenuBarPresentation.level(
+            metric: metric, snapshot: AppModel.shared.systemMonitor.snapshot, levels: combinedIconLevels
+        )
+        button.image = SystemMonitorMenuBarImageRenderer.combinedIcon(
+            battery: battery, wifi: combinedIconLevels.wifi, level: level,
+            configuration: settings.systemMonitorMenuBarCombinedIconAppearance,
+            headphones: headphones,
+            headphoneOptions: headphoneOptions
+        )
+        let wifiValue: String
+        switch combinedIconLevels.wifi {
+        case .unavailable: wifiValue = localized("不可用")
+        case .off: wifiValue = localized("关闭")
+        case .disconnected: wifiValue = localized("未连接")
+        case .personalHotspot: wifiValue = localized("个人热点")
+        case let .connected(strength): wifiValue = SystemMonitorCombinedMenuBarPresentation.percent(strength)
+        }
+        let tooltip = [
+            "\(localized("本机电池")): \(SystemMonitorCombinedMenuBarPresentation.percent(battery?.level))",
+            "Wi-Fi: \(wifiValue)",
+            "\(localized(metric.menuTitle)): \(SystemMonitorCombinedMenuBarPresentation.percent(level))",
+            localized("点击打开系统监控")
+        ].joined(separator: "\n")
+        button.toolTip = tooltip
+        button.image?.accessibilityDescription = tooltip
     }
 
     private func configureMonitorStatusItem(
@@ -1270,7 +1412,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
             .max() ?? 0
 
         if metric == .fan {
-            return max(40, ceil(valueWidth) + 8)
+            return max(32, ceil(valueWidth) + 6)
         }
 
         let labelWidth = (compactMonitorStatusLabel(for: metric) as NSString).size(
@@ -1279,13 +1421,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
         let minimumWidth: CGFloat
         switch metric {
         case .cpu, .gpu, .memory, .disk:
-            minimumWidth = 32
+            minimumWidth = 28
         case .network:
-            minimumWidth = 60
+            minimumWidth = 52
         case .fan:
             minimumWidth = 40
         }
-        return max(minimumWidth, ceil(max(valueWidth, labelWidth)) + 8)
+        return max(minimumWidth, ceil(max(valueWidth, labelWidth)) + 6)
     }
 
     private func compactMonitorStatusImage(

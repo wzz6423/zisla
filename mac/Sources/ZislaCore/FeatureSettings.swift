@@ -335,6 +335,10 @@ public enum SystemMonitorMenuBarMetric: String, Codable, CaseIterable, Sendable,
         }
     }
 
+    public var requiresFullMenuBarRow: Bool {
+        self == .network || self == .fan
+    }
+
     public var symbolName: String {
         switch self {
         case .cpu: "cpu"
@@ -357,6 +361,138 @@ public enum SystemMonitorMenuBarDisplayStyle: String, Codable, CaseIterable, Sen
         case .detailed: "详细"
         case .compact: "紧凑"
         }
+    }
+}
+
+public enum SystemMonitorMenuBarLayout: String, Codable, CaseIterable, Sendable, Equatable {
+    case individual
+    case stacked
+    case both
+    case none
+
+    public var individualEnabled: Bool {
+        get { self == .individual || self == .both }
+        set {
+            self = newValue ? (stackedEnabled ? .both : .individual) : (stackedEnabled ? .stacked : .none)
+        }
+    }
+
+    public var stackedEnabled: Bool {
+        get { self == .stacked || self == .both }
+        set {
+            self = newValue ? (individualEnabled ? .both : .stacked) : (individualEnabled ? .individual : .none)
+        }
+    }
+
+    public var menuTitle: String {
+        switch self {
+        case .individual: "独立"
+        case .stacked: "合并"
+        case .both: "独立与合并"
+        case .none: "无"
+        }
+    }
+}
+
+public enum SystemMonitorCombinedIconMetric: String, Codable, CaseIterable, Sendable, Equatable {
+    case cpu
+    case gpu
+    case memory
+    case volume
+    case brightness
+
+    public var menuTitle: String {
+        switch self {
+        case .cpu: "CPU"
+        case .gpu: "GPU"
+        case .memory: "内存"
+        case .volume: "音量"
+        case .brightness: "屏幕亮度"
+        }
+    }
+}
+
+public enum SystemMonitorMenuBarRows {
+    public static func selecting(
+        _ metric: SystemMonitorMenuBarMetric,
+        atRow rowIndex: Int,
+        slot metricIndex: Int,
+        in rows: [[SystemMonitorMenuBarMetric]]
+    ) -> [[SystemMonitorMenuBarMetric]] {
+        guard rows.count == 2,
+              rows.indices.contains(rowIndex),
+              rows[rowIndex].indices.contains(metricIndex)
+        else { return rows }
+
+        var updated = rows
+        let current = updated[rowIndex][metricIndex]
+        if let sourceRow = updated.indices.first(where: { updated[$0].contains(metric) }),
+           let sourceIndex = updated[sourceRow].firstIndex(of: metric) {
+            updated[sourceRow][sourceIndex] = current
+        }
+        updated[rowIndex][metricIndex] = metric
+        return normalized(top: updated[0], bottom: updated[1])
+    }
+
+    public static func normalized(
+        top: [SystemMonitorMenuBarMetric],
+        bottom: [SystemMonitorMenuBarMetric]
+    ) -> [[SystemMonitorMenuBarMetric]] {
+        var seen: Set<SystemMonitorMenuBarMetric> = []
+        let topRow = Array(top.filter { seen.insert($0).inserted }.prefix(2))
+        seen = Set(topRow)
+        let bottomRow = Array(bottom.filter { seen.insert($0).inserted }.prefix(2))
+        var rows = [topRow, bottomRow]
+        let wideMetrics = rows.flatMap { $0 }.filter(\.requiresFullMenuBarRow)
+        if wideMetrics.count == 2 {
+            return wideMetrics.map { [$0] }
+        }
+        var counts = rows.map { max(1, $0.count) }
+        if let wide = wideMetrics.first {
+            let wideRow = rows[0].contains(wide) ? 0 : 1
+            let otherRow = 1 - wideRow
+            rows[otherRow] += rows[wideRow].filter { $0 != wide }
+            rows[wideRow] = [wide]
+            counts[otherRow] = min(2, counts.reduce(0, +) - 1)
+            counts[wideRow] = 1
+        } else if counts.reduce(0, +) == 3 {
+            counts = [2, 2]
+        }
+        return resized(rows, counts: counts)
+    }
+
+    public static func availableCounts(
+        top: [SystemMonitorMenuBarMetric],
+        bottom: [SystemMonitorMenuBarMetric]
+    ) -> [Int] {
+        let wideCount = normalized(top: top, bottom: bottom).joined().filter(\.requiresFullMenuBarRow).count
+        return wideCount == 2 ? [2] : wideCount == 1 ? [2, 3] : [2, 4]
+    }
+
+    public static func adjusted(
+        top: [SystemMonitorMenuBarMetric],
+        bottom: [SystemMonitorMenuBarMetric],
+        count: Int
+    ) -> [[SystemMonitorMenuBarMetric]] {
+        let rows = normalized(top: top, bottom: bottom)
+        let counts = rows.map { row in
+            count <= 2 || row.contains(where: \.requiresFullMenuBarRow) ? 1 : 2
+        }
+        return resized(rows, counts: counts)
+    }
+
+    private static func resized(
+        _ rows: [[SystemMonitorMenuBarMetric]],
+        counts: [Int]
+    ) -> [[SystemMonitorMenuBarMetric]] {
+        var result = zip(rows, counts).map { row, count in Array(row.prefix(count)) }
+        for rowIndex in result.indices {
+            let available = SystemMonitorMenuBarMetric.allCases.filter {
+                !result.joined().contains($0)
+            }
+            result[rowIndex].append(contentsOf: available.prefix(counts[rowIndex] - result[rowIndex].count))
+        }
+        return result
     }
 }
 
@@ -486,12 +622,12 @@ public enum IslandModuleOrder: String, Codable, CaseIterable, Sendable, Equatabl
 
     public static let defaultOrder: [Self] = [
         .dashboard, .shelf, .clipboard, .download, .agenda, .toolbox,
-        .quickNotes, .aiMonitor, .keyboardSound, .mail, .system, .battery, .pdf,
+        .quickNotes, .aiMonitor, .keyboardSound, .mail, .system, .pdf,
     ]
 
     public static func normalized(_ order: [Self]) -> [Self] {
         var seen: Set<Self> = []
-        return order.filter { seen.insert($0).inserted }
+        return order.map { $0 == .battery ? .system : $0 }.filter { seen.insert($0).inserted }
             + defaultOrder.filter { !seen.contains($0) }
     }
 
@@ -551,6 +687,13 @@ public struct FeatureSettings: Codable, Equatable, Sendable {
     public var systemMonitorMenuBarMetrics: Set<SystemMonitorMenuBarMetric>
     /// Detailed mode retains the existing icon and horizontal readings; compact mode hides the icon and reduces font size.
     public var systemMonitorMenuBarDisplayStyle: SystemMonitorMenuBarDisplayStyle
+    public var systemMonitorMenuBarLayout: SystemMonitorMenuBarLayout
+    public var systemMonitorMenuBarTopRow: [SystemMonitorMenuBarMetric]
+    public var systemMonitorMenuBarBottomRow: [SystemMonitorMenuBarMetric]
+    public var systemMonitorMenuBarCombinedIconEnabled: Bool
+    public var systemMonitorMenuBarCombinedIconMetric: SystemMonitorCombinedIconMetric
+    public var systemMonitorMenuBarCombinedIconAppearance: SystemMonitorCombinedIconAppearance
+    public var systemMonitorMenuBarHeadphoneOptions: SystemMonitorHeadphoneOptions
     /// Whether to show Zisla's menu bar icon separately; does not affect monitor status items.
     public var menuBarAppIconEnabled: Bool
     public var weatherEnabled: Bool
@@ -703,6 +846,13 @@ public struct FeatureSettings: Codable, Equatable, Sendable {
         batteryMonitorEnabled: Bool = true,
         systemMonitorMenuBarMetrics: Set<SystemMonitorMenuBarMetric> = [.cpu],
         systemMonitorMenuBarDisplayStyle: SystemMonitorMenuBarDisplayStyle = .compact,
+        systemMonitorMenuBarLayout: SystemMonitorMenuBarLayout = .individual,
+        systemMonitorMenuBarTopRow: [SystemMonitorMenuBarMetric] = [.cpu],
+        systemMonitorMenuBarBottomRow: [SystemMonitorMenuBarMetric] = [.gpu],
+        systemMonitorMenuBarCombinedIconEnabled: Bool = false,
+        systemMonitorMenuBarCombinedIconMetric: SystemMonitorCombinedIconMetric = .memory,
+        systemMonitorMenuBarCombinedIconAppearance: SystemMonitorCombinedIconAppearance = SystemMonitorCombinedIconAppearance(),
+        systemMonitorMenuBarHeadphoneOptions: SystemMonitorHeadphoneOptions = SystemMonitorHeadphoneOptions(),
         menuBarAppIconEnabled: Bool = false,
         weatherEnabled: Bool = true,
         lockScreenInfoEnabled: Bool = true,
@@ -800,6 +950,13 @@ public struct FeatureSettings: Codable, Equatable, Sendable {
         self.batteryMonitorEnabled = batteryMonitorEnabled
         self.systemMonitorMenuBarMetrics = systemMonitorMenuBarMetrics
         self.systemMonitorMenuBarDisplayStyle = systemMonitorMenuBarDisplayStyle
+        self.systemMonitorMenuBarLayout = systemMonitorMenuBarLayout
+        self.systemMonitorMenuBarTopRow = systemMonitorMenuBarTopRow
+        self.systemMonitorMenuBarBottomRow = systemMonitorMenuBarBottomRow
+        self.systemMonitorMenuBarCombinedIconEnabled = systemMonitorMenuBarCombinedIconEnabled
+        self.systemMonitorMenuBarCombinedIconMetric = systemMonitorMenuBarCombinedIconMetric
+        self.systemMonitorMenuBarCombinedIconAppearance = systemMonitorMenuBarCombinedIconAppearance
+        self.systemMonitorMenuBarHeadphoneOptions = systemMonitorMenuBarHeadphoneOptions
         self.menuBarAppIconEnabled = menuBarAppIconEnabled
         self.weatherEnabled = weatherEnabled
         self.lockScreenInfoEnabled = lockScreenInfoEnabled
@@ -942,6 +1099,13 @@ public struct FeatureSettings: Codable, Equatable, Sendable {
         case batteryMonitorEnabled
         case systemMonitorMenuBarMetrics
         case systemMonitorMenuBarDisplayStyle
+        case systemMonitorMenuBarLayout
+        case systemMonitorMenuBarTopRow
+        case systemMonitorMenuBarBottomRow
+        case systemMonitorMenuBarCombinedIconEnabled
+        case systemMonitorMenuBarCombinedIconMetric
+        case systemMonitorMenuBarCombinedIconAppearance
+        case systemMonitorMenuBarHeadphoneOptions
         case menuBarAppIconEnabled
         case weatherEnabled
         case lockScreenInfoEnabled
@@ -1077,6 +1241,34 @@ public struct FeatureSettings: Codable, Equatable, Sendable {
             SystemMonitorMenuBarDisplayStyle.self,
             forKey: .systemMonitorMenuBarDisplayStyle
         ) ?? defaults.systemMonitorMenuBarDisplayStyle
+        systemMonitorMenuBarLayout = try container.decodeIfPresent(
+            SystemMonitorMenuBarLayout.self,
+            forKey: .systemMonitorMenuBarLayout
+        ) ?? defaults.systemMonitorMenuBarLayout
+        systemMonitorMenuBarTopRow = try container.decodeIfPresent(
+            [SystemMonitorMenuBarMetric].self,
+            forKey: .systemMonitorMenuBarTopRow
+        ) ?? defaults.systemMonitorMenuBarTopRow
+        systemMonitorMenuBarBottomRow = try container.decodeIfPresent(
+            [SystemMonitorMenuBarMetric].self,
+            forKey: .systemMonitorMenuBarBottomRow
+        ) ?? defaults.systemMonitorMenuBarBottomRow
+        systemMonitorMenuBarCombinedIconEnabled = try container.decodeIfPresent(
+            Bool.self,
+            forKey: .systemMonitorMenuBarCombinedIconEnabled
+        ) ?? defaults.systemMonitorMenuBarCombinedIconEnabled
+        systemMonitorMenuBarCombinedIconMetric = try container.decodeIfPresent(
+            SystemMonitorCombinedIconMetric.self,
+            forKey: .systemMonitorMenuBarCombinedIconMetric
+        ) ?? defaults.systemMonitorMenuBarCombinedIconMetric
+        systemMonitorMenuBarCombinedIconAppearance = try container.decodeIfPresent(
+            SystemMonitorCombinedIconAppearance.self,
+            forKey: .systemMonitorMenuBarCombinedIconAppearance
+        ) ?? defaults.systemMonitorMenuBarCombinedIconAppearance
+        systemMonitorMenuBarHeadphoneOptions = try container.decodeIfPresent(
+            SystemMonitorHeadphoneOptions.self,
+            forKey: .systemMonitorMenuBarHeadphoneOptions
+        ) ?? defaults.systemMonitorMenuBarHeadphoneOptions
         menuBarAppIconEnabled = try container.decodeIfPresent(
             Bool.self,
             forKey: .menuBarAppIconEnabled

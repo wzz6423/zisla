@@ -1,10 +1,11 @@
 import Foundation
+import SQLite3
 import Testing
 
 @testable import ZislaKit
 
 /// In-memory stand-in for the history archive so the store logic can be exercised without touching disk.
-private final class MemoryHistoryPersistence: SystemMetricsHistoryPersisting, @unchecked Sendable {
+final class MemoryHistoryPersistence: SystemMetricsHistoryPersisting, @unchecked Sendable {
     private let lock = NSLock()
     private var stored: [SystemMetricsRecord] = []
     private(set) var appendCount = 0
@@ -92,7 +93,9 @@ private func record(
     gpuUsage: Double? = nil,
     fanRPMs: [Double] = [],
     memoryUsed: UInt64 = 8_000,
-    memoryTotal: UInt64 = 16_000
+    memoryTotal: UInt64 = 16_000,
+    batteryLevel: Double? = nil,
+    systemPowerWatts: Double? = nil
 ) -> SystemMetricsRecord {
     SystemMetricsRecord(
         timestamp: Date(timeIntervalSince1970: seconds),
@@ -110,7 +113,9 @@ private func record(
         diskWriteBytesPerSecond: 2_048,
         fanRPMs: fanRPMs,
         networkReceiveBytesPerSecond: 10,
-        networkSendBytesPerSecond: 20
+        networkSendBytesPerSecond: 20,
+        batteryLevel: batteryLevel,
+        systemPowerWatts: systemPowerWatts
     )
 }
 
@@ -205,6 +210,54 @@ struct SystemMetricsHistoryRecorderTests {
 
 struct SystemMetricsHistorySeriesBuilderTests {
     private let now = Date(timeIntervalSince1970: 1_000_000)
+
+    @Test
+    func batteryAndSystemPowerKeepUnitsZerosAndMissingSegments() throws {
+        let records = [
+            record(at: 100, batteryLevel: 0.8, systemPowerWatts: 24),
+            record(at: 160),
+            record(at: 220, batteryLevel: 0, systemPowerWatts: 0),
+        ]
+        let sections = SystemMetricsHistorySeriesBuilder.sections(records: records, range: .all, now: now)
+        let battery = try #require(sections.first { $0.id == "battery" })
+        let power = try #require(sections.first { $0.id == "power" })
+        #expect(battery.unit == .ratio)
+        #expect(power.unit == .watts)
+        #expect(battery.series[0].points.map(\.value) == [0.8, 0])
+        #expect(power.series[0].points.map(\.value) == [24, 0])
+        #expect(power.series[0].points.map(\.segment) == [0, 1])
+        #expect(power.series[0].points.map(\.date.timeIntervalSince1970) == [100, 220])
+
+        let unavailable = SystemMetricsHistorySeriesBuilder.sections(
+            records: [record(at: 100)], range: .all, now: now
+        )
+        #expect(!unavailable.contains { $0.id == "battery" || $0.id == "power" })
+    }
+
+    @Test
+    func powerHistoryBucketsWithinContinuousSegmentsAndBoundsFragmentedHistory() throws {
+        let records = (0..<100).map { index in
+            record(at: Double(index) * 60, batteryLevel: 0.5, systemPowerWatts: Double(index))
+        }
+        let sections = SystemMetricsHistorySeriesBuilder.sections(
+            records: records, range: .all, now: now, maximumPoints: 10
+        )
+        let points = try #require(sections.first { $0.id == "power" }?.series.first?.points)
+        #expect(points.count == 10)
+        #expect(points.first?.value == 4.5)
+        #expect(points.last?.value == 94.5)
+
+        let fragmented = (0..<100).map { index in
+            record(at: Double(index) * 60, systemPowerWatts: index.isMultiple(of: 2) ? 10 : nil)
+        }
+        let fragmentedSections = SystemMetricsHistorySeriesBuilder.sections(
+            records: fragmented, range: .all, now: now, maximumPoints: 8
+        )
+        let fragmentedPoints = try #require(fragmentedSections.first { $0.id == "power" }?.series.first?.points)
+        #expect(fragmentedPoints.count == 8)
+        #expect(Set(fragmentedPoints.map(\.segment)).count == 8)
+        #expect(fragmentedPoints.last?.date == fragmented[98].timestamp)
+    }
 
     @Test
     func sectionsCoverEveryCategoryAndSkipUnavailableOnes() throws {
@@ -325,6 +378,36 @@ struct SystemMetricsHistoryExportTests {
     private let now = Date(timeIntervalSince1970: 1_789_000_000)
 
     @Test
+    func workbookExportsMeasuredPowerAndLeavesMissingBatteryValuesBlank() throws {
+        let workbook = SystemMetricsHistoryExport.workbookData(records: [
+            record(at: 100, batteryLevel: 0.8, systemPowerWatts: 24),
+            record(at: 160),
+            record(at: 220, batteryLevel: 0, systemPowerWatts: 0),
+        ])
+        let sheet = try #require(try Self.extract(workbook)["xl/worksheets/sheet1.xml"])
+        let header = try #require(sheet.components(separatedBy: "<row r=\"1\">").last?.components(separatedBy: "</row>").first)
+        let cells = header.components(separatedBy: "<c ").dropFirst()
+        func column(_ key: String) throws -> String {
+            let cell = try #require(cells.first { $0.contains(">\(key)<") })
+            let reference = try #require(cell.components(separatedBy: "r=\"").last?.components(separatedBy: "\"").first)
+            return String(reference.dropLast())
+        }
+        let batteryColumn = try column("battery_level")
+        let powerColumn = try column("system_power_watts")
+        #expect(sheet.contains("r=\"\(batteryColumn)2\" s=\"0\"><v>0.8</v>"))
+        #expect(sheet.contains("r=\"\(powerColumn)2\" s=\"0\"><v>24</v>"))
+        #expect(!sheet.contains("r=\"\(batteryColumn)3\""))
+        #expect(!sheet.contains("r=\"\(powerColumn)3\""))
+        #expect(sheet.contains("r=\"\(powerColumn)4\" s=\"0\"><v>0</v>"))
+
+        let unavailable = try #require(try Self.extract(SystemMetricsHistoryExport.workbookData(
+            records: [record(at: 100)]
+        ))["xl/worksheets/sheet1.xml"])
+        #expect(!unavailable.contains("battery_level"))
+        #expect(!unavailable.contains("system_power_watts"))
+    }
+
+    @Test
     func excelSerialMatchesTheSpreadsheetEpoch() {
         // 1900-01-01T00:00:00Z is serial 2 in the workbook date system.
         let newYear = Date(timeIntervalSince1970: -2_208_988_800)
@@ -431,7 +514,7 @@ struct SystemMetricsHistoryExportTests {
         #expect(!sheet.contains("gpu_"))
     }
 
-    private static func extract(_ workbook: Data) throws -> [String: String] {
+    fileprivate static func extract(_ workbook: Data) throws -> [String: String] {
         let directory = URL(fileURLWithPath: NSTemporaryDirectory())
             .appendingPathComponent("zisla-history-\(UUID().uuidString)", isDirectory: true)
         try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
@@ -461,6 +544,73 @@ struct SystemMetricsHistoryExportTests {
 }
 
 struct SystemMetricsHistoryDatabaseTests {
+    @Test
+    func oldRecordsDecodeWithMissingBatteryFields() throws {
+        let encoded = try JSONEncoder().encode(record(at: 100))
+        var object = try #require(JSONSerialization.jsonObject(with: encoded) as? [String: Any])
+        object.removeValue(forKey: "batteryLevel")
+        object.removeValue(forKey: "systemPowerWatts")
+        let decoded = try JSONDecoder().decode(SystemMetricsRecord.self, from: JSONSerialization.data(withJSONObject: object))
+        #expect(decoded.batteryLevel == nil)
+        #expect(decoded.systemPowerWatts == nil)
+        #expect(decoded.cpuUsage == 0.25)
+    }
+
+    @Test(arguments: [false, true])
+    func legacyDatabaseAddsNullableBatteryColumnsWithoutLosingOldRecords(hasBatteryColumn: Bool) throws {
+        let url = try temporaryDatabaseURL()
+        defer { removeDatabase(at: url) }
+        try createLegacyDatabase(at: url, additionalColumns: hasBatteryColumn ? ["battery_level REAL"] : [])
+        let database = SystemMetricsHistoryDatabase(databaseURL: url)
+        let migrated = try #require(database.loadRecords().first)
+        #expect(migrated.timestamp == Date(timeIntervalSince1970: 1_000))
+        #expect(migrated.cpuUsage == 0.25)
+        #expect(migrated.memoryUsedBytes == 8_000)
+        #expect(migrated.batteryLevel == nil && migrated.systemPowerWatts == nil)
+        database.appendRecord(record(at: 1_060, batteryLevel: 0.8, systemPowerWatts: 24), capacity: 10)
+        database.appendRecord(record(at: 1_120, batteryLevel: 0, systemPowerWatts: 0), capacity: 10)
+        database.appendRecord(record(at: 1_180), capacity: 10)
+        let reloaded = SystemMetricsHistoryDatabase(databaseURL: url).loadRecords()
+        #expect(reloaded.count == 4)
+        #expect(reloaded.map(\.batteryLevel) == [nil, 0.8, 0, nil])
+        #expect(reloaded.map(\.systemPowerWatts) == [nil, 24, 0, nil])
+        let workbook = SystemMetricsHistoryExport.workbookData(records: reloaded)
+        let sheet = try #require(try SystemMetricsHistoryExportTests.extract(workbook)["xl/worksheets/sheet1.xml"])
+        #expect(sheet.contains(">battery_level<"))
+        #expect(sheet.contains(">system_power_watts<"))
+        #expect(sheet.components(separatedBy: "<row ").count - 1 == 5)
+    }
+
+    @Test
+    func failedBatteryMigrationRollsBackBothColumnsAndCanRecover() throws {
+        let url = try temporaryDatabaseURL()
+        defer { removeDatabase(at: url) }
+        var connection: OpaquePointer?
+        #expect(sqlite3_open(url.path, &connection) == SQLITE_OK)
+        let inspection = try #require(connection)
+        defer { sqlite3_close(inspection) }
+        let columnLimit = Int(sqlite3_limit(inspection, SQLITE_LIMIT_COLUMN, -1))
+        // Leave room for one column so the second ALTER fails after the first has run.
+        let additionalColumns = (0..<(columnLimit - 23)).map { "reserved_\($0) REAL" }
+        try createLegacyDatabase(at: url, additionalColumns: additionalColumns)
+        #expect(SystemMetricsHistoryDatabase(databaseURL: url).loadRecords().isEmpty)
+        var statement: OpaquePointer?
+        #expect(sqlite3_prepare_v2(inspection, "SELECT name FROM pragma_table_info('metrics')", -1, &statement, nil) == SQLITE_OK)
+        let columnsQuery = try #require(statement)
+        defer { sqlite3_finalize(columnsQuery) }
+        var columns: [String] = []
+        while sqlite3_step(columnsQuery) == SQLITE_ROW {
+            if let name = sqlite3_column_text(columnsQuery, 0) { columns.append(String(cString: name)) }
+        }
+        #expect(columns.count == columnLimit - 1)
+        #expect(!columns.contains("battery_level"))
+        #expect(!columns.contains("system_power_watts"))
+        #expect(sqlite3_exec(inspection, "ALTER TABLE metrics DROP COLUMN reserved_0", nil, nil, nil) == SQLITE_OK)
+        let recovered = try #require(SystemMetricsHistoryDatabase(databaseURL: url).loadRecords().first)
+        #expect(recovered.cpuUsage == 0.25)
+        #expect(recovered.batteryLevel == nil && recovered.systemPowerWatts == nil)
+    }
+
     @Test
     func samplesRoundTripThroughSQLite() throws {
         let url = try temporaryDatabaseURL()
@@ -601,6 +751,33 @@ struct SystemMetricsHistoryDatabaseTests {
         let attributes = try FileManager.default.attributesOfItem(atPath: url.path)
         let permissions = (attributes[.posixPermissions] as? NSNumber)?.intValue ?? 0
         #expect(permissions & 0o777 == 0o600)
+    }
+
+    private func createLegacyDatabase(at url: URL, additionalColumns: [String] = []) throws {
+        var connection: OpaquePointer?
+        #expect(sqlite3_open(url.path, &connection) == SQLITE_OK)
+        let legacy = try #require(connection)
+        defer { sqlite3_close(legacy) }
+        let schema = """
+        CREATE TABLE metrics (
+            timestamp REAL PRIMARY KEY, cpu_usage REAL NOT NULL, cpu_user REAL NOT NULL,
+            cpu_system REAL NOT NULL, cpu_idle REAL NOT NULL, cpu_temperature REAL,
+            gpu_usage REAL, gpu_renderer REAL, gpu_tiler REAL, gpu_temperature REAL,
+            memory_used_bytes INTEGER NOT NULL, memory_total_bytes INTEGER NOT NULL,
+            memory_pressure_ratio REAL NOT NULL, disk_used_bytes INTEGER NOT NULL,
+            disk_total_bytes INTEGER NOT NULL, disk_read_bytes_per_second REAL,
+            disk_write_bytes_per_second REAL, disk_temperature REAL,
+            network_receive_bytes_per_second REAL NOT NULL, network_send_bytes_per_second REAL NOT NULL,
+            network_received_bytes INTEGER NOT NULL, network_sent_bytes INTEGER NOT NULL
+            \(additionalColumns.map { ", " + $0 }.joined())
+        );
+        INSERT INTO metrics (
+            timestamp, cpu_usage, cpu_user, cpu_system, cpu_idle,
+            memory_used_bytes, memory_total_bytes, memory_pressure_ratio, disk_used_bytes, disk_total_bytes,
+            network_receive_bytes_per_second, network_send_bytes_per_second, network_received_bytes, network_sent_bytes
+        ) VALUES (1000, 0.25, 0.2, 0.05, 0.75, 8000, 16000, 0.1, 100, 200, 10, 20, 0, 0);
+        """
+        #expect(sqlite3_exec(legacy, schema, nil, nil, nil) == SQLITE_OK)
     }
 
     private func temporaryDatabaseURL() throws -> URL {

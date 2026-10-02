@@ -1,4 +1,5 @@
 import Foundation
+import SwiftUI
 import Testing
 import ZislaCore
 import ZislaKit
@@ -7,16 +8,41 @@ import ZislaKit
 
 struct BatteryModuleTests {
     @Test
-    func batteryModuleIsImmediatelyRightOfSystemMonitor() throws {
-        let systemIndex = try #require(IslandModule.allCases.firstIndex(of: .system))
-        let batteryIndex = IslandModule.allCases.index(after: systemIndex)
-        let batteryModule = try #require(
-            batteryIndex < IslandModule.allCases.endIndex
-                ? IslandModule.allCases[batteryIndex]
-                : nil
-        )
-        #expect(batteryModule == .battery)
-        #expect(IslandModule.battery.layout == IslandModuleLayout.battery)
+    func batteryTrendKeepsOnlyContinuousPowerReadingsWithoutFillingMissingValues() {
+        let start = Date(timeIntervalSince1970: 1_000)
+        let samples = [12.0, nil, 4.0, 8.0].enumerated().map { index, watts in
+            BatteryTrendSample(date: start.addingTimeInterval(Double(index) * 5), level: 0.6, systemPowerWatts: watts)
+        }
+        let trend = BatteryTrendPresentation(samples: samples)
+        #expect(trend.levels == [0.6, 0.6, 0.6, 0.6])
+        #expect(trend.powerSamples == Array(samples.suffix(2)))
+        #expect(trend.powerScale == 8)
+        #expect(trend.powerLevels == [0.5, 1])
+        let unavailable = BatteryTrendPresentation(samples: Array(samples.prefix(2)))
+        #expect(unavailable.powerSamples.isEmpty)
+        #expect(unavailable.powerLevels.isEmpty)
+    }
+
+    @Test
+    func emptyAndZeroPowerTrendsStayFinite() {
+        let empty = BatteryTrendPresentation(samples: [])
+        #expect(empty.levels.isEmpty)
+        #expect(empty.powerLevels.isEmpty)
+        let idle = BatteryTrendPresentation(samples: [
+            BatteryTrendSample(date: .distantPast, level: 1, systemPowerWatts: 0),
+        ])
+        #expect(idle.powerLevels == [0])
+        #expect(idle.powerScale == 1)
+    }
+
+    @Test
+    func batteryIsReachableThroughSystemMonitorWithoutSeparateNavigation() {
+        var settings = FeatureSettings.default
+        settings.systemMonitorEnabled = false
+        settings.batteryMonitorEnabled = true
+        let modules = IslandModule.enabledOrder(settings)
+        #expect(modules.contains(.system))
+        #expect(!modules.contains(.battery))
     }
 
     @Test
@@ -27,7 +53,7 @@ struct BatteryModuleTests {
         #expect(Array(IslandModule.enabledOrder(settings).prefix(3)) == [
             .mail,
             .dashboard,
-            .battery,
+            .system,
         ])
     }
 
@@ -56,6 +82,61 @@ struct BatteryModuleTests {
         #expect(IslandModuleLayout.system.panelSize.height == 550)
     }
 
+    @Test(arguments: [false, true]) @MainActor
+    func lowPowerModeOverridesFullBatteryIconTint(isCharging: Bool) {
+        let snapshot = BatterySnapshot(
+            level: 1,
+            isCharging: isCharging,
+            isPluggedIn: true,
+            isCharged: !isCharging,
+            timeRemainingMinutes: nil,
+            isLowPowerMode: true
+        )
+
+        #expect(BatteryDetailView.batteryLevelTint(
+            snapshot.level, isLowPowerMode: snapshot.isLowPowerMode
+        ) == .yellow)
+    }
+
+    @Test(arguments: [0.0, 0.149, 0.15, 0.299], [false, true]) @MainActor
+    func lowPowerModeOverridesLowBatteryIconTint(level: Double, isCharging: Bool) {
+        let snapshot = BatterySnapshot(
+            level: level,
+            isCharging: isCharging,
+            isPluggedIn: isCharging,
+            isCharged: false,
+            timeRemainingMinutes: nil,
+            isLowPowerMode: true
+        )
+
+        #expect(BatteryDetailView.batteryLevelTint(
+            snapshot.level, isLowPowerMode: snapshot.isLowPowerMode
+        ) == .yellow)
+    }
+
+    @Test(arguments: [
+        (level: 0.0, tint: Color.zislaError),
+        (level: 0.149, tint: Color.zislaError),
+        (level: 0.15, tint: Color.zislaWarning),
+        (level: 0.299, tint: Color.zislaWarning),
+        (level: 0.30, tint: Color.zislaSuccess),
+        (level: 1.0, tint: Color.zislaSuccess),
+    ], [false, true]) @MainActor
+    func nonLowPowerModePreservesBatteryLevelTint(sample: (level: Double, tint: Color), isCharging: Bool) {
+        let snapshot = BatterySnapshot(
+            level: sample.level,
+            isCharging: isCharging,
+            isPluggedIn: isCharging,
+            isCharged: sample.level == 1 && !isCharging,
+            timeRemainingMinutes: nil
+        )
+
+        #expect(BatteryDetailView.batteryLevelTint(
+            snapshot.level, isLowPowerMode: snapshot.isLowPowerMode
+        ) == sample.tint)
+        #expect(BatteryDetailView.batteryLevelTint(snapshot.level) == sample.tint)
+    }
+
     @Test
     func onBatteryPowerFlowsFromBatteryToMac() {
         let snapshot = BatterySnapshot(
@@ -65,6 +146,7 @@ struct BatteryModuleTests {
             isCharged: false,
             timeRemainingMinutes: 180,
             powerWatts: 5.62,
+            systemLoadWatts: 5.62,
             batteryFlowWatts: -5.62
         )
 
@@ -99,6 +181,7 @@ struct BatteryModuleTests {
         #expect(presentation.inputWatts == 84.9)
         #expect(presentation.batteryWatts == 61.2)
         #expect(presentation.systemWatts == 23.7)
+        #expect(presentation.systemWatts == snapshot.systemPowerWatts)
         #expect(presentation.batteryRoute == .charging)
         #expect(!presentation.inputIsRated)
     }
@@ -118,6 +201,7 @@ struct BatteryModuleTests {
 
         #expect(presentation.inputWatts == 85)
         #expect(presentation.inputIsRated)
+        #expect(presentation.systemWatts == nil)
         #expect(presentation.batteryWatts == nil)
         #expect(presentation.batteryRoute == .unavailable)
         #expect(presentation.topology == .adapterToMac)

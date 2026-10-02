@@ -89,6 +89,15 @@ struct SystemCleanupPanelTests {
         #expect(source.contains("panel.collectionBehavior = [.moveToActiveSpace, .ignoresCycle]"))
     }
 
+    @Test
+    func systemMonitorDoesNotDisplayHeadphoneBattery() throws {
+        let source = try String(contentsOf: Self.panelPresenterSourceURL, encoding: .utf8)
+
+        #expect(!source.contains("headphoneCard"))
+        #expect(!source.contains("HeadphoneBatteryRing"))
+        #expect(!source.contains("AudioOutputDeviceService"))
+    }
+
     private static let panelPresenterSourceURL = URL(fileURLWithPath: #filePath)
         .deletingLastPathComponent()
         .deletingLastPathComponent()

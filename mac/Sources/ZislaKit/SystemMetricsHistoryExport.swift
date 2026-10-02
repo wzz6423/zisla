@@ -130,6 +130,12 @@ public enum SystemMetricsHistoryExport {
                     Column(header: "network_sent_bytes") { .number(Double($0.networkSentBytes)) },
                 ]
             )
+            if reported({ $0.batteryLevel }) {
+                columns.append(Column(header: "battery_level") { .optionalNumber($0.batteryLevel) })
+            }
+            if reported({ $0.systemPowerWatts }) {
+                columns.append(Column(header: "system_power_watts") { .optionalNumber($0.systemPowerWatts) })
+            }
             self.columns = columns
         }
     }

@@ -8,15 +8,17 @@ import ZislaKit
 
 struct VoiceRecordingIslandLayoutTests {
     @Test
-    func modulePagesUseTheFormerAIMonitorWidth() {
+    func modulePagesShareTheCompactWidthWithAndWithoutThePet() {
         for module in IslandModule.allCases {
             let layout = IslandModuleLayout.resolved(
                 for: module,
                 dashboardCardCount: 0
             )
 
-            #expect(layout.islandSize.width == 820)
-            #expect(layout.panelSize.width == 820)
+            #expect(layout.islandSize.width == 776)
+            #expect(layout.panelSize.width == 776)
+            #expect(ExpandedPetLayout.panelSize(for: layout.panelSize, includesPet: false).width == 776)
+            #expect(ExpandedPetLayout.panelSize(for: layout.panelSize, includesPet: true).width == 820)
         }
     }
 

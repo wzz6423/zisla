@@ -323,6 +323,7 @@ public struct SystemMetricsSnapshot: Equatable, Sendable {
     public var networkIdentity: NetworkIdentity
     public var gpu: GPUMetrics
     public var fan: FanMetrics
+    public var battery: BatterySnapshot?
 
     public init(
         sampledAt: Date,
@@ -333,7 +334,8 @@ public struct SystemMetricsSnapshot: Equatable, Sendable {
         network: NetworkMetrics,
         networkIdentity: NetworkIdentity = NetworkIdentity(),
         gpu: GPUMetrics,
-        fan: FanMetrics
+        fan: FanMetrics,
+        battery: BatterySnapshot? = nil
     ) {
         self.sampledAt = sampledAt
         self.hardware = hardware
@@ -344,6 +346,7 @@ public struct SystemMetricsSnapshot: Equatable, Sendable {
         self.networkIdentity = networkIdentity
         self.gpu = gpu
         self.fan = fan
+        self.battery = battery
     }
 }
 
@@ -3508,6 +3511,7 @@ public final class SystemMonitorService: ObservableObject {
     private let dateProvider: @Sendable () -> Date
     private let publicIPProvider: any PublicIPProviding
     private let hardwareInfoProvider: @Sendable () -> SystemHardwareInfo
+    private let batterySnapshotProvider: () -> BatterySnapshot?
     private let volumeURL: URL
     private var timer: AnyCancellable?
     private var diskCapacityTimer: AnyCancellable?
@@ -3530,6 +3534,7 @@ public final class SystemMonitorService: ObservableObject {
     private var cachedSensorSample: AppleSMCSensorSample?
     private let historyStore: SystemMetricsHistoryStore
     private var historyRecorder: SystemMetricsHistoryRecorder
+    private var historyGeneration: UInt = 0
 
     public init(
         samplingInterval: TimeInterval = 1.5,
@@ -3543,7 +3548,8 @@ public final class SystemMonitorService: ObservableObject {
         historyPersistence: (any SystemMetricsHistoryPersisting)? = nil,
         historyCapacity: Int = SystemMonitorService.defaultHistoryCapacity,
         historyRecordingInterval: TimeInterval = 60,
-        isRecordingHistory: Bool = false
+        isRecordingHistory: Bool = false,
+        batterySnapshotProvider: @escaping () -> BatterySnapshot? = { nil }
     ) {
         let fileManager = fileManager ?? DefaultSystemMonitorFileManager()
         self.samplingInterval = max(0.2, samplingInterval)
@@ -3551,6 +3557,7 @@ public final class SystemMonitorService: ObservableObject {
         self.dateProvider = dateProvider
         self.publicIPProvider = publicIPProvider ?? DefaultPublicIPProvider()
         self.hardwareInfoProvider = hardwareInfoProvider ?? { SystemHardwareInfoReader.read() }
+        self.batterySnapshotProvider = batterySnapshotProvider
         self.postCleanupDiskRefreshDelay = max(.zero, postCleanupDiskRefreshDelay)
         self.diskCapacityRefreshInterval = max(0.01, diskCapacityRefreshInterval)
         self.volumeURL = volumeURL
@@ -3571,18 +3578,27 @@ public final class SystemMonitorService: ObservableObject {
             Task { await loadHistoryStats() }
         }
         // Sample immediately, then continue at the configured interval.
-        Task { await self.sampleOnce() }
+        Task {
+            guard self.isSampling else { return }
+            await self.sampleOnce()
+        }
         timer = Timer.publish(every: samplingInterval, tolerance: samplingInterval * 0.1, on: .main, in: .common)
             .autoconnect()
             .sink { [weak self] _ in
                 guard let self else { return }
-                Task { await self.sampleOnce() }
+                Task {
+                    guard self.isSampling else { return }
+                    await self.sampleOnce()
+                }
             }
         diskCapacityTimer = Timer.publish(every: diskCapacityRefreshInterval, tolerance: diskCapacityRefreshInterval * 0.1, on: .main, in: .common)
             .autoconnect()
             .sink { [weak self] _ in
                 guard let self else { return }
-                Task { await self.refresh() }
+                Task {
+                    guard self.isSampling else { return }
+                    await self.refresh()
+                }
             }
     }
 
@@ -3593,6 +3609,8 @@ public final class SystemMonitorService: ObservableObject {
         diskCapacityTimer = nil
         postCleanupDiskRefreshTask?.cancel()
         postCleanupDiskRefreshTask = nil
+        sampleTask?.cancel()
+        historyGeneration &+= 1
         isSampling = false
     }
 
@@ -3679,7 +3697,11 @@ public final class SystemMonitorService: ObservableObject {
     @discardableResult
     public func sampleOnce() async -> SystemMetricsSnapshot {
         if let sampleTask {
-            return await sampleTask.value
+            return await withTaskCancellationHandler {
+                await sampleTask.value
+            } onCancel: {
+                sampleTask.cancel()
+            }
         }
 
         let task = Task { @MainActor in
@@ -3688,7 +3710,11 @@ public final class SystemMonitorService: ObservableObject {
             return snapshot
         }
         sampleTask = task
-        return await task.value
+        return await withTaskCancellationHandler {
+            await task.value
+        } onCancel: {
+            task.cancel()
+        }
     }
 
     /// Resamples after an in-progress sample finishes for operations, such as cleanup, that change disk state.
@@ -3713,6 +3739,8 @@ public final class SystemMonitorService: ObservableObject {
     /// CPU and network calculations run on a cooperative worker thread to avoid blocking the main thread.
     private func performSampleOnce() async -> SystemMetricsSnapshot {
         let now = dateProvider()
+        let battery = batterySnapshotProvider()
+        let recordingGeneration = historyGeneration
         let fm = fileManager
         let volume = volumeURL
         let prevCPU = previousCPU
@@ -3868,11 +3896,15 @@ public final class SystemMonitorService: ObservableObject {
             network: payload.network,
             networkIdentity: networkIdentity,
             gpu: finalGPU,
-            fan: sensors.fan
+            fan: sensors.fan,
+            battery: battery
         )
+        guard !Task.isCancelled else { return snap }
         snapshot = snap
         history.append(cpu: cpu, gpu: gpu, network: payload.network)
-        recordHistoryIfNeeded(snapshot: snap, now: now)
+        if recordingGeneration == historyGeneration {
+            recordHistoryIfNeeded(snapshot: snap, now: now)
+        }
         Task { [weak self] in
             await Task.yield()
             await self?.refreshPublicIPAddressIfNeeded()
@@ -3894,6 +3926,7 @@ public final class SystemMonitorService: ObservableObject {
     public func setHistoryRecordingEnabled(_ enabled: Bool) {
         guard enabled != isRecordingHistory else { return }
         isRecordingHistory = enabled
+        historyGeneration &+= 1
         // Reset the gate so the next sample is recorded immediately after enabling.
         historyRecorder.reset()
         Task { await loadHistoryStats() }
@@ -3934,6 +3967,7 @@ public final class SystemMonitorService: ObservableObject {
     }
 
     public func clearHistory() {
+        historyGeneration &+= 1
         historyStore.removeAll()
         historyRecorder.reset()
         historyStats = .empty

@@ -24,6 +24,8 @@ enum IslandModule: String, CaseIterable, Identifiable {
 
   var id: Self { self }
 
+  var navigationTarget: Self { self == .battery ? .system : self }
+
   var allowsIslandKeyboardFocus: Bool {
     switch self {
     case .shelf, .clipboard, .download, .mail, .quickNotes:
@@ -113,8 +115,7 @@ extension IslandModule {
     case .quickNotes: settings.quickNotesEnabled
     case .pdf: settings.pdfToolsEnabled
     case .toolbox: settings.toolboxEnabled
-    case .system: settings.systemMonitorEnabled
-    case .battery: settings.batteryMonitorEnabled
+    case .system, .battery: settings.systemMonitorEnabled || settings.batteryMonitorEnabled
     case .lockScreen: settings.lockScreenInfoEnabled
     case .keyboardSound: settings.keyboardEnabled
     }
@@ -134,10 +135,10 @@ struct IslandModuleLayout: Equatable {
     )
   }
 
-  private static let unifiedIslandWidth: CGFloat = 820
-  private static let unifiedPanelWidth: CGFloat = 820
+  private static let unifiedIslandWidth: CGFloat = 776
+  private static let unifiedPanelWidth: CGFloat = 776
 
-  /// All module pages use the former AI monitor panel width.
+  /// All module pages share the width of the combined monitor navigation.
   static let standard = IslandModuleLayout(
     islandSize: CGSize(width: unifiedIslandWidth, height: 340),
     panelSize: CGSize(width: unifiedPanelWidth, height: 344)
@@ -388,6 +389,7 @@ final class AppModel: ObservableObject {
   /// Preferred entry point for switching modules: records the navigation direction for
   /// the directional transition, then applies the switch on the next run-loop turn.
   func selectModule(_ module: IslandModule) {
+    let module = module.navigationTarget
     let current = pendingModuleSelection ?? selectedModule
     guard module != current else { return }
     let order = IslandModule.configuredOrder(settingsStore.settings)
@@ -490,7 +492,9 @@ final class AppModel: ObservableObject {
   let managedTools = ManagedToolService()
   let powerAssertions = PowerAssertionController()
   let screenCleaning = ScreenCleaningController()
-  let systemMonitor = SystemMonitorService()
+  private(set) lazy var systemMonitor = SystemMonitorService(batterySnapshotProvider: { [weak self] in
+    self?.battery.snapshot
+  })
   let backgroundSounds = SystemBackgroundSoundService()
   let battery = BatteryMonitor()
   private lazy var lowBatteryNotice = LowBatteryNoticeController(queue: notices)
@@ -557,6 +561,9 @@ final class AppModel: ObservableObject {
   private var voiceProcessingOperationCount = 0
   private let voiceTranscriptDelivery = VoiceTranscriptDelivery()
   private let voiceRecordingPlayer = VoiceRecordingPlayer()
+  @Published private(set) var systemMonitorHeadphoneTransient = SystemMonitorHeadphoneTransient()
+  private var headphoneTransientLifecycleActive = false
+  private var headphoneTransientTask: Task<Void, Never>?
   private var cancellables: Set<AnyCancellable> = []
   private var weatherTask: Task<Void, Never>?
   private var updatePollingTask: Task<Void, Never>?
@@ -830,6 +837,15 @@ final class AppModel: ObservableObject {
       }
       .store(in: &cancellables)
 
+    audioOutput.$devices
+      .sink { [weak self] _ in
+        Task { @MainActor [weak self] in
+          guard let self else { return }
+          self.reconcileHeadphoneTransient(devices: self.audioOutput.devices)
+        }
+      }
+      .store(in: &cancellables)
+
     browserDownloads.$snapshot
       .sink { [weak self] snapshot in
         Task { @MainActor [weak self] in self?.consumeBrowserDownloadSnapshot(snapshot) }
@@ -909,6 +925,7 @@ final class AppModel: ObservableObject {
   }
 
   func start() {
+    headphoneTransientLifecycleActive = true
     backgroundSounds.startLifecycleMonitoring()
     apply(settings: settingsStore.settings)
     LegacyAlarmNotificationCleanup.removeScheduledNotifications()
@@ -1033,6 +1050,7 @@ final class AppModel: ObservableObject {
   }
 
   func stop() {
+    headphoneTransientLifecycleActive = false
     aiResultSweep.cancel()
     windowPreview.stop()
     settingsStore.flushPendingChanges()
@@ -1076,6 +1094,7 @@ final class AppModel: ObservableObject {
     aiMonitor.stop()
     aiAgent.stop()
     media.stop()
+    clearHeadphoneTransient()
     audioOutput.stop()
     calendar.stop()
     pomodoro.stop()
@@ -2759,6 +2778,15 @@ final class AppModel: ObservableObject {
     }
   }
 
+  nonisolated static func headphoneMonitoringPolicy(
+    sideNoticesEnabled: Bool,
+    systemMonitorEnabled: Bool,
+    options: SystemMonitorHeadphoneOptions
+  ) -> Bool {
+    let needsHeadphones = options.replacesNetworkIcon || options.usesVolumeColor
+    return sideNoticesEnabled || (systemMonitorEnabled && needsHeadphones)
+  }
+
   private func apply(settings: FeatureSettings, requestWindowPreviewPermissions: Bool = false) {
     if !settings.aiProgressEnabled || !settings.aiTaskResultSweepEnabled {
       aiResultSweep.cancel()
@@ -2816,9 +2844,9 @@ final class AppModel: ObservableObject {
       weatherSnapshotsByLocationID = [:]
     }
     systemMonitor.setHistoryRecordingEnabled(
-      settings.systemMonitorEnabled && settings.systemMetricsHistoryEnabled
+      (settings.systemMonitorEnabled || settings.batteryMonitorEnabled) && settings.systemMetricsHistoryEnabled
     )
-    if settings.systemMonitorEnabled {
+    if settings.systemMonitorEnabled || settings.batteryMonitorEnabled {
       systemMonitor.start()
     } else {
       systemMonitor.stop()
@@ -2831,9 +2859,18 @@ final class AppModel: ObservableObject {
     consumeBackgroundSoundPlayback()
     if settings.sideNoticesEnabled {
       focusMode.start()
-      audioOutput.start()
     } else {
       focusMode.stop()
+    }
+    let headphonePolicy = Self.headphoneMonitoringPolicy(
+      sideNoticesEnabled: settings.sideNoticesEnabled,
+      systemMonitorEnabled: settings.systemMonitorEnabled,
+      options: settings.systemMonitorMenuBarHeadphoneOptions
+    )
+    reconcileHeadphoneTransient(devices: audioOutput.devices)
+    if headphonePolicy {
+      audioOutput.start()
+    } else {
       audioOutput.stop()
     }
     if settings.calendarEnabled {
@@ -2852,7 +2889,7 @@ final class AppModel: ObservableObject {
       browserDownloads.stop()
       clearBrowserDownloadNotices()
     }
-    if settings.lockScreenInfoEnabled || settings.batteryMonitorEnabled {
+    if settings.lockScreenInfoEnabled || settings.batteryMonitorEnabled || settings.systemMonitorEnabled {
       battery.start()
     } else {
       battery.stop()
@@ -3717,7 +3754,38 @@ final class AppModel: ObservableObject {
     for id in backgroundSoundNoticeIDs { notices.remove(id: id) }
   }
 
+  private var headphoneTransientEnabled: Bool {
+    let settings = settingsStore.settings
+    return headphoneTransientLifecycleActive && settings.systemMonitorEnabled && settings.systemMonitorMenuBarCombinedIconEnabled
+      && settings.systemMonitorMenuBarHeadphoneOptions.replacesNetworkIcon
+  }
+
+  private func clearHeadphoneTransient() {
+    headphoneTransientTask?.cancel()
+    headphoneTransientTask = nil
+    systemMonitorHeadphoneTransient = SystemMonitorHeadphoneTransient()
+  }
+
+  private func reconcileHeadphoneTransient(devices: [AudioOutputDevice]) {
+    systemMonitorHeadphoneTransient.reconcile(enabled: headphoneTransientEnabled, devices: devices)
+    if systemMonitorHeadphoneTransient.connection == nil {
+      clearHeadphoneTransient()
+    }
+  }
+
   private func consumeHeadphoneConnection(_ connection: HeadphoneConnection) {
+    systemMonitorHeadphoneTransient.receive(connection, enabled: headphoneTransientEnabled)
+    if systemMonitorHeadphoneTransient.connection?.id == connection.id {
+      headphoneTransientTask?.cancel()
+      headphoneTransientTask = Task { @MainActor [weak self] in
+        do {
+          try await Task.sleep(for: .seconds(SystemMonitorHeadphoneTransient.duration))
+        } catch { return }
+        guard !Task.isCancelled, let self else { return }
+        self.systemMonitorHeadphoneTransient.expire(connectionID: connection.id)
+        self.headphoneTransientTask = nil
+      }
+    }
     guard settingsStore.settings.sideNoticesEnabled else { return }
     notices.enqueue(
       IslandNotice(
@@ -3733,7 +3801,7 @@ final class AppModel: ObservableObject {
           [HeadphoneConnection.productIDMetadataKey: String($0)]
         }
       ),
-      expiresAfter: 3
+      expiresAfter: SystemMonitorHeadphoneTransient.duration
     )
   }
 

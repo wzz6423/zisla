@@ -241,10 +241,10 @@ struct SettingsView: View {
             keyboardSoundContent
         case .clipboardAssistant, .screenshot:
             featuresContent
-        case .workflow:
-            workflowContent
         case .info:
             infoContent
+        case .mail:
+            mailContent
         case .ai:
             aiContent
         case .voice:
@@ -340,39 +340,53 @@ struct SettingsView: View {
                         EmptyView()
                     }
                     rowDivider
-                    settingRow(
-                        symbol: "rectangle.compress.vertical",
-                        title: "监控样式",
-                        detail: "紧凑模式隐藏图标并减小字号，减少菜单栏占用",
-                        isNested: true
-                    ) {
-                        IslandOutlinedPicker(
-                            selection: Binding(
-                                get: { model.settingsStore.settings.systemMonitorMenuBarDisplayStyle },
-                                set: { model.settingsStore.settings.systemMonitorMenuBarDisplayStyle = $0 }
-                            ),
-                            options: Array(SystemMonitorMenuBarDisplayStyle.allCases),
-                            title: { $0.menuTitle },
-                            selectionID: "system-monitor-menu-bar-display-style-selection",
-                            fontSize: 9,
-                            width: 128,
-                            height: 28
-                        )
+                    Toggle(isOn: $settingsStore.settings.systemMonitorMenuBarLayout.individualEnabled) {
+                        AppLocalizedText("独立")
                     }
-                    ForEach(SystemMonitorMenuBarMetric.allCases, id: \.self) { metric in
-                        rowDivider
+                    .toggleStyle(.switch)
+                    .font(.system(size: 10))
+                    .controlSize(.small)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(.leading, 4)
+                    .padding(.vertical, 6)
+                    if model.settingsStore.settings.systemMonitorMenuBarLayout.individualEnabled {
+                        rowDivider.padding(.leading, 20)
                         settingRow(
-                            symbol: metric.symbolName,
-                            title: metric.menuTitle,
-                            detail: "显示实时监控摘要",
+                            symbol: "rectangle.compress.vertical",
+                            title: "监控样式",
+                            detail: "紧凑模式隐藏图标并减小字号，减少菜单栏占用",
                             isNested: true
                         ) {
-                            Toggle("", isOn: systemMonitorMenuBarBinding(for: metric))
-                                .labelsHidden()
-                                .toggleStyle(.switch)
-                                .controlSize(.small)
+                            IslandOutlinedPicker(
+                                selection: Binding(
+                                    get: { model.settingsStore.settings.systemMonitorMenuBarDisplayStyle },
+                                    set: { model.settingsStore.settings.systemMonitorMenuBarDisplayStyle = $0 }
+                                ),
+                                options: Array(SystemMonitorMenuBarDisplayStyle.allCases),
+                                title: { $0.menuTitle },
+                                selectionID: "system-monitor-menu-bar-display-style-selection",
+                                fontSize: 9,
+                                width: 128,
+                                height: 28
+                            )
+                        }
+                        ForEach(SystemMonitorMenuBarMetric.allCases, id: \.self) { metric in
+                            rowDivider.padding(.leading, 20)
+                            settingRow(
+                                symbol: metric.symbolName,
+                                title: metric.menuTitle,
+                                detail: "显示实时监控摘要",
+                                isNested: true
+                            ) {
+                                Toggle("", isOn: systemMonitorMenuBarBinding(for: metric))
+                                    .labelsHidden()
+                                    .toggleStyle(.switch)
+                                    .controlSize(.small)
+                            }
                         }
                     }
+                    rowDivider
+                    SystemMonitorMenuBarSettingsView(settingsStore: model.settingsStore)
                     rowDivider
                     settingRow(
                         symbol: "chart.xyaxis.line",
@@ -1198,13 +1212,10 @@ struct SettingsView: View {
 
     private var infoContent: some View {
         VStack(alignment: .leading, spacing: 20) {
+            workflowContent
+
             settingsGroup("信息与通知") {
-                if model.settingsStore.settings.mailEnabled {
-                    mailAccountSettings
-                }
-                rowDivider
                 if model.settingsStore.settings.lockScreenInfoEnabled {
-                    rowDivider
                     settingRow(
                         symbol: "text.quote",
                         title: "锁屏文字",
@@ -1361,6 +1372,14 @@ struct SettingsView: View {
                         }
                     }
                 }
+            }
+        }
+    }
+
+    private var mailContent: some View {
+        VStack(alignment: .leading, spacing: 20) {
+            settingsGroup("邮件") {
+                mailAccountSettings
             }
         }
     }
@@ -4005,8 +4024,8 @@ enum SettingsSection: String, CaseIterable, Identifiable {
     case features
     case clipboardAssistant
     case screenshot
-    case workflow
     case info
+    case mail
     case ai
     case voice
     case keyboardSound
@@ -4031,8 +4050,8 @@ enum SettingsSection: String, CaseIterable, Identifiable {
         case .keyboardSound: "键盘音效"
         case .clipboardAssistant: "快捷操作"
         case .screenshot: "截图"
-        case .workflow: "工作流"
         case .info: "信息"
+        case .mail: "邮件"
         case .ai: "AI"
         case .voice: "语音"
         case .pet: "宠物"
@@ -4051,8 +4070,8 @@ enum SettingsSection: String, CaseIterable, Identifiable {
         case .keyboardSound: "keyboard.badge.ellipsis"
         case .clipboardAssistant: "sparkles.rectangle.stack"
         case .screenshot: "camera.viewfinder"
-        case .workflow: "square.grid.2x2.fill"
         case .info: "info.circle.fill"
+        case .mail: "envelope.fill"
         case .ai: "sparkles"
         case .voice: "mic.fill"
         case .pet: "pawprint.fill"
@@ -4071,8 +4090,8 @@ enum SettingsSection: String, CaseIterable, Identifiable {
         case .keyboardSound: "键盘音效与输入统计。"
         case .clipboardAssistant: "复制、浏览器下载或 AirDrop 接收完成后显示下一步操作"
         case .screenshot: "启用截图、钉图与全局快捷键"
-        case .workflow: "管理灵动岛中的工作流模块。"
-        case .info: "配置日历、邮件、锁屏与通知显示。"
+        case .info: "配置媒体、系统监控、锁屏与通知显示。"
+        case .mail: "读取已配置的 Mail.app 账户并提醒新邮件"
         case .ai: "管理 AI CLI 与 Skills。"
         case .voice: "配置语音输入、整理模型与本机记录。"
         case .pet: "设置灵动岛内部的宠物形象。"
@@ -4096,10 +4115,11 @@ enum SettingsSection: String, CaseIterable, Identifiable {
             return settings.clipboardAssistantEnabled
         case .screenshot:
             return settings.screenshotEnabled
-        case .workflow:
-            return settings.mediaEnabled || settings.systemMonitorEnabled
         case .info:
-            return settings.mailEnabled || settings.lockScreenInfoEnabled || settings.sideNoticesEnabled
+            return settings.mediaEnabled || settings.systemMonitorEnabled
+                || settings.lockScreenInfoEnabled || settings.sideNoticesEnabled
+        case .mail:
+            return settings.mailEnabled
         case .ai:
             return settings.aiProgressEnabled
         case .voice:

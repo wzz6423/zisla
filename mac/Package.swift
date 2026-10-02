@@ -87,6 +87,7 @@ let package = Package(
                 .linkedFramework("AVFoundation"),
                 .linkedFramework("IOKit"),
                 .linkedFramework("CoreBluetooth"),
+                .linkedFramework("Security"),
                 .linkedLibrary("sqlite3"),
             ]
         ),

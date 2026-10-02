@@ -212,15 +212,14 @@ struct IslandRootView: View {
                                             PDFToolsModuleView(model: model)
                                         case .toolbox:
                                             ToolboxModuleView(model: model)
-                                        case .system:
+                                        case .system, .battery:
                                             SystemMonitorView(
                                                 service: model.systemMonitor,
-                                                onCleanupRequested: cleanupPanelPresentation.present
-                                            )
-                                        case .battery:
-                                            BatteryDetailView(
                                                 batteryMonitor: model.battery,
-                                                networkMonitor: model.networkBattery
+                                                networkMonitor: model.networkBattery,
+                                                showsSystemMonitor: settingsStore.settings.systemMonitorEnabled,
+                                                showsBatteryMonitor: settingsStore.settings.batteryMonitorEnabled,
+                                                onCleanupRequested: cleanupPanelPresentation.present
                                             )
                                         case .lockScreen:
                                             LockScreenModuleView(model: model)
@@ -361,33 +360,35 @@ struct IslandRootView: View {
     }
 
     private var toolRail: some View {
-        HStack(spacing: 8) {
+        HStack(spacing: 0) {
             ModuleSelector(model: model)
-            Spacer(minLength: 8)
-            if activeModule == .system {
-                historyButton
-            }
-            if settingsStore.settings.systemMonitorEnabled {
-                NavMonitorStrip(monitor: model.systemMonitor) {
-                    model.selectModule(.system)
+            Spacer(minLength: 12)
+            HStack(spacing: 8) {
+                if activeModule == .system, settingsStore.settings.systemMonitorEnabled {
+                    historyButton
                 }
-            }
-            BackgroundSoundControl(
-                service: backgroundSounds,
-                selectedSound: settingsStore.settings.systemBackgroundSound,
-                onToggle: model.toggleBackgroundSound,
-                onSelect: model.selectBackgroundSound
-            )
-            IconButton(
-                symbol: model.isPinned ? "pin.fill" : "pin",
-                help: model.isPinned ? AppLocalization.text("取消固定") : AppLocalization.text("固定灵动岛"),
-                isActive: model.isPinned
-            ) {
-                model.isPinned.toggle()
-                onPinChanged(model.isPinned)
-            }
-            IconButton(symbol: "gearshape.fill", help: AppLocalization.text("设置")) {
-                onSettingsRequested()
+                if settingsStore.settings.systemMonitorEnabled {
+                    NavMonitorStrip(monitor: model.systemMonitor) {
+                        model.selectModule(.system)
+                    }
+                }
+                BackgroundSoundControl(
+                    service: backgroundSounds,
+                    selectedSound: settingsStore.settings.systemBackgroundSound,
+                    onToggle: model.toggleBackgroundSound,
+                    onSelect: model.selectBackgroundSound
+                )
+                IconButton(
+                    symbol: model.isPinned ? "pin.fill" : "pin",
+                    help: model.isPinned ? AppLocalization.text("取消固定") : AppLocalization.text("固定灵动岛"),
+                    isActive: model.isPinned
+                ) {
+                    model.isPinned.toggle()
+                    onPinChanged(model.isPinned)
+                }
+                IconButton(symbol: "gearshape.fill", help: AppLocalization.text("设置")) {
+                    onSettingsRequested()
+                }
             }
         }
         .frame(height: 30)
@@ -507,7 +508,7 @@ struct IslandRootView: View {
     }
 
     private var activeModule: IslandModule? {
-        enabledModules.first(where: { $0 == model.selectedModule }) ?? enabledModules.first
+        enabledModules.first(where: { $0 == model.selectedModule.navigationTarget }) ?? enabledModules.first
     }
 
     private var layout: IslandModuleLayout {
@@ -907,8 +908,8 @@ private struct NavMonitorStrip: View {
                 metricCell(label: "RAM", ratio: memRatio)
                 metricCell(label: "Disk", ratio: diskRatio)
             }
-            .padding(.horizontal, 5)
-            .padding(.vertical, 3)
+            .padding(.horizontal, 6)
+            .padding(.vertical, 4)
             .background(Color.fillControl)
             .clipShape(Capsule())
         }
@@ -919,7 +920,7 @@ private struct NavMonitorStrip: View {
     private func metricCell(label: String, ratio: Double?) -> some View {
         VStack(spacing: 0) {
             Text(percent(ratio))
-                .font(.system(size: 10, weight: .semibold, design: .rounded))
+                .font(.system(size: 9, weight: .semibold, design: .rounded))
                 .foregroundStyle(tint(ratio))
                 .monospacedDigit()
                 .lineLimit(1)
@@ -978,7 +979,7 @@ private struct ModuleSelector: View {
     var body: some View {
         HStack(spacing: 2) {
             ForEach(visibleModules) { module in
-                let isSelected = model.selectedModule == module
+                let isSelected = model.selectedModule.navigationTarget == module
                 Button {
                     model.selectModule(module)
                 } label: {

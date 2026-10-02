@@ -17,7 +17,11 @@ struct CollapseGenerationTracker: Equatable, Sendable {
 @MainActor
 public final class OverlayCoordinator: NSObject {
     public private(set) var layouts: [ScreenOverlayLayout] = []
-    public private(set) var activeDisplayID: CGDirectDisplayID?
+    public private(set) var activeDisplayID: CGDirectDisplayID? {
+        didSet {
+            if oldValue != activeDisplayID { transientWindows.removeAll() }
+        }
+    }
     public private(set) var isRunning = false
     public var onVisibilityChanged: (@MainActor (Bool) -> Void)?
     public var onDraggingChanged: (@MainActor (Bool) -> Void)?
@@ -47,6 +51,12 @@ public final class OverlayCoordinator: NSObject {
     private var panelCollapseGeneration = CollapseGenerationTracker()
     private var pointerEntryGraceGeneration = CollapseGenerationTracker()
     private var isPointerInside = false
+    private var lastPointerLocation: CGPoint?
+    private struct TransientWindow {
+        weak var window: NSWindow?
+        weak var anchor: NSView?
+    }
+    private var transientWindows: [UUID: TransientWindow] = [:]
     private var awaitsPointerEntry = false
     private var stopsAfterTransientReveal = false
     private var isPinned = false
@@ -145,6 +155,8 @@ public final class OverlayCoordinator: NSObject {
         reducer = IslandPresentationReducer()
         activeDisplayID = nil
         isPointerInside = false
+        lastPointerLocation = nil
+        transientWindows.removeAll()
         stopsAfterTransientReveal = false
         isPinned = false
         if isExternalDragging { onDraggingChanged?(false) }
@@ -190,6 +202,7 @@ public final class OverlayCoordinator: NSObject {
     ) {
         layouts = layoutEngine.layouts(for: snapshots)
         guard !layouts.isEmpty else {
+            transientWindows.removeAll()
             cancelScheduledCollapse()
             cancelPendingPanelCollapse()
             panel?.orderOut(nil)
@@ -255,6 +268,7 @@ public final class OverlayCoordinator: NSObject {
               !isHoverActivationSuspended,
               !isScreenshotCaptureInProgress
         else { return }
+        lastPointerLocation = point
         if let triggerLayout = layoutEngine.layout(containing: point, in: layouts) {
             let changedDisplay = activeDisplayID != triggerLayout.displayID
             activeDisplayID = triggerLayout.displayID
@@ -276,7 +290,10 @@ public final class OverlayCoordinator: NSObject {
         // only hovering over the notch/island trigger area (triggerFrame) does.
         let isExpanded = reducer.state.visibility == .expanded
             || reducer.state.visibility == .pinned
-        let isInside = isExpanded && contains(point, in: activeLayout.expandedFrame)
+        let isInside = isExpanded && (
+            contains(point, in: activeLayout.expandedFrame)
+                || containsTransientWindow(point, in: activeLayout)
+        )
         if isInside {
             endPointerEntryGrace()
         } else if awaitsPointerEntry {
@@ -343,6 +360,39 @@ public final class OverlayCoordinator: NSObject {
         guard visible != isTransientInteractionVisible else { return }
         isTransientInteractionVisible = visible
         updateInteractionHold()
+    }
+
+    public func setTransientInteractionWindow(_ window: NSWindow?, anchor: NSView?, id: UUID) {
+        if let window, let anchor,
+           reducer.state.visibility == .expanded || reducer.state.visibility == .pinned {
+            transientWindows[id] = TransientWindow(window: window, anchor: anchor)
+        } else {
+            transientWindows.removeValue(forKey: id)
+        }
+        if let lastPointerLocation { handlePointer(at: lastPointerLocation) }
+    }
+
+    private func containsTransientWindow(_ point: CGPoint, in layout: ScreenOverlayLayout) -> Bool {
+        guard layout.screenFrame.contains(point) else { return false }
+        return transientWindows.values.contains { region in
+            guard let window = region.window, window.isVisible,
+                  let anchor = region.anchor, anchor.window === panel,
+                  let host = anchor.window else { return false }
+            let anchorFrame = host.convertToScreen(anchor.convert(anchor.bounds, to: nil))
+            guard layout.expandedFrame.intersects(anchorFrame) else { return false }
+            return window.frame.contains(point)
+                || Self.containsPopoverAttachment(point, island: layout.expandedFrame,
+                                                  popover: window.frame, anchor: anchorFrame)
+        }
+    }
+
+    static func containsPopoverAttachment(_ point: CGPoint, island: CGRect, popover: CGRect, anchor: CGRect) -> Bool {
+        // Bridge only the arrow's short gap, never the bounding box between two windows.
+        let gap = island.minY - popover.maxY
+        guard (0...16).contains(gap) else { return false }
+        let left = max(anchor.minX, popover.minX)
+        let right = min(anchor.maxX, popover.maxX)
+        return right > left && CGRect(x: left, y: popover.maxY, width: right - left, height: gap).contains(point)
     }
 
     /// Pauses hover expansion while another top-level prompt occupies the island trigger area.
@@ -626,6 +676,7 @@ public final class OverlayCoordinator: NSObject {
                 presentCurrentLayout()
                 onVisibilityChanged?(true)
             case .collapse:
+                transientWindows.removeAll()
                 // The host view completes the center-mask animation within the fixed expanded size; on collapse
                 // only the hit-testing is disabled — avoids touching the visible NSPanel's frame, which would
                 // trigger window-server compositing layer rebuilds.

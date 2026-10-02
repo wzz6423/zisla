@@ -70,7 +70,9 @@ struct SystemMetricsHistoryLocalizationTests {
             SystemMetricsRecord(
                 timestamp: Date(timeIntervalSince1970: 1_000),
                 gpuUsage: 0.5,
-                fanRPMs: [1_000, 1_100, 1_200]
+                fanRPMs: [1_000, 1_100, 1_200],
+                batteryLevel: 0.8,
+                systemPowerWatts: 24
             ),
             SystemMetricsRecord(
                 timestamp: Date(timeIntervalSince1970: 1_060),
