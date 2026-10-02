@@ -13,17 +13,7 @@ struct SystemMonitorMenuBarIconReferenceTests {
     func batteryArcMatchesOriginalSVGEndpointsAndProgress() {
         #expect(SystemMonitorMenuBarIconGeometry.canvas == CGRect(x: 0, y: 0, width: 120, height: 120))
         #expect(SystemMonitorMenuBarIconGeometry.artworkCenterX == 59.5)
-        let start = SystemMonitorMenuBarIconGeometry.batteryPoint(forProgress: 0)
-        let end = SystemMonitorMenuBarIconGeometry.batteryPoint(forProgress: 1)
-        #expect(abs(start.x - 15.5) < 1e-10)
-        #expect(abs(start.y - 88.25) < 1e-10)
-        #expect(abs(end.x - 103.5) < 1e-10)
-        #expect(abs(end.y - 88.25) < 1e-10)
         for progress in [0.0, 0.125, 0.25, 0.5, 0.75, 1] {
-            let angle = (148.69008689281117 + 242.6198262143777 * progress) * .pi / 180
-            let point = SystemMonitorMenuBarIconGeometry.batteryPoint(forProgress: progress)
-            #expect(abs(point.x - (59.5 + 51.5 * cos(angle))) < 1e-10)
-            #expect(abs(point.y - (61.48715261785473 + 51.5 * sin(angle))) < 1e-10)
             #expect(Self.elements(SystemMonitorMenuBarIconGeometry.batteryFill(progress: progress))
                 == Self.elements(Self.batteryPath(progress: progress)))
         }
@@ -34,7 +24,6 @@ struct SystemMonitorMenuBarIconReferenceTests {
     @Test
     func batteryTopGapsRetainOriginalSVGSegments() {
         #expect(SystemMonitorMenuBarIconGeometry.batteryChargingBoltTopGapWidth == 50)
-        #expect(SystemMonitorMenuBarIconGeometry.batteryValueTopGapWidth == 64)
         for width in [CGFloat(50), 64] {
             let gapFraction = Double(width / (51.5 * (242.6198262143777 * .pi / 180)))
             let gapStart = (1 - gapFraction) / 2

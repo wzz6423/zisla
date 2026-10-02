@@ -49,8 +49,6 @@ extension Color {
     static let strokeCard = Color.primary.opacity(0.14)
     /// Subtle divider.
     static let dividerSubtle = Color.primary.opacity(0.08)
-    /// Active-state accent background tint.
-    static let accentTint = Color.accentColor.opacity(0.16)
 
     // Semantic colors: error=red, warning=orange, success=green, info=cyan. Consistent globally; do not mix.
     static let zislaError = Color.red

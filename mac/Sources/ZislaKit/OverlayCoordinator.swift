@@ -75,6 +75,9 @@ public final class OverlayCoordinator: NSObject {
     internal var applicationActivationHandler: () -> Void = {
         NSApp.activate(ignoringOtherApps: true)
     }
+    internal var screenSnapshotProvider: @MainActor () -> [ScreenSnapshot] = {
+        NSScreen.screens.compactMap(ScreenSnapshot.init(screen:))
+    }
 
     /// - Parameters:
     ///   - collapseDelay: Grace period between the pointer leaving the island and the fold. Zero by
@@ -170,7 +173,7 @@ public final class OverlayCoordinator: NSObject {
     }
 
     public func refreshScreens() {
-        updateScreens(NSScreen.screens.compactMap(ScreenSnapshot.init(screen:)))
+        updateScreens(screenSnapshotProvider())
     }
 
     /// Builds the island panel and lays out its content ahead of the first presentation.
@@ -238,7 +241,7 @@ public final class OverlayCoordinator: NSObject {
         guard layoutEngine.configuration.expandedSize != size else { return }
         layoutEngine.configuration.expandedSize = size
         updateScreens(
-            NSScreen.screens.compactMap(ScreenSnapshot.init(screen:)),
+            screenSnapshotProvider(),
             repositionVisiblePanel: false,
             refreshPersistentPanels: false
         )

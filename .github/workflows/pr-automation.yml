@@ -94,7 +94,6 @@ jobs:
           echo "::notice::Applied $(jq -r '.labels | join(", ")' "$metadata")"
 
       - name: Ensure the pull request has an assignee
-        if: ${{ !endsWith(github.event.pull_request.user.login, '[bot]') }}
         env:
           GH_TOKEN: ${{ github.token }}
           PR_AUTHOR: ${{ github.event.pull_request.user.login }}
@@ -106,10 +105,15 @@ jobs:
             exit 0
           fi
 
-          jq -n --arg login "$PR_AUTHOR" '{assignees: [$login]}' \
+          assignee="$PR_AUTHOR"
+          if [[ "$assignee" == *"[bot]" ]]; then
+            assignee="$(jq -er '.project.owner | select(type == "string" and length > 0)' .github/project-automation.json)"
+          fi
+
+          jq -n --arg login "$assignee" '{assignees: [$login]}' \
             | gh api --method POST "repos/$GITHUB_REPOSITORY/issues/$PR_NUMBER/assignees" \
               --input - >/dev/null
-          echo "::notice::Assigned $PR_AUTHOR"
+          echo "::notice::Assigned $assignee"
 
       - name: Verify AI co-authorship
         env:

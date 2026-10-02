@@ -14,7 +14,23 @@ set -euo pipefail
 print -r -- "$5" > "$SWIFT_TEST_CAPTURE"
 completed='{"version":0,"kind":"event","payload":{"kind":"testEnded"}}
 {"version":0,"kind":"event","payload":{"kind":"runEnded"}}'
+skipped='{"version":0,"kind":"test","payload":{"id":"FixtureTests.Suite/test()","kind":"function"}}
+{"version":0,"kind":"event","payload":{"kind":"testSkipped","testID":"FixtureTests.Suite/test()"}}'
 case "$SWIFT_TEST_FIXTURE" in
+  skipped)
+    print -r -- "$skipped" > "$5"
+    print -r -- '{"version":0,"kind":"event","payload":{"kind":"runEnded"}}' >> "$5"
+    ;;
+  skipped-unfinished) print -r -- "$skipped" > "$5" ;;
+  suite-skipped)
+    print -r -- '{"version":0,"kind":"test","payload":{"id":"FixtureTests.Suite","kind":"suite"}}
+{"version":0,"kind":"event","payload":{"kind":"testSkipped","testID":"FixtureTests.Suite"}}
+{"version":0,"kind":"event","payload":{"kind":"runEnded"}}' > "$5"
+    ;;
+  unknown-skipped)
+    print -r -- '{"version":0,"kind":"event","payload":{"kind":"testSkipped","testID":"FixtureTests.Unknown/test()"}}
+{"version":0,"kind":"event","payload":{"kind":"runEnded"}}' > "$5"
+    ;;
   success) print -r -- "$completed" > "$5" ;;
   missing) exit 0 ;;
   truncated) print -r -- '{"version":0,"kind":' > "$5" ;;
@@ -28,13 +44,13 @@ esac
 SCRIPT
 chmod +x "$TEST_ROOT/bin/swift"
 
-for fixture in success missing truncated empty unfinished nonzero; do
+for fixture in success skipped skipped-unfinished suite-skipped unknown-skipped missing truncated empty unfinished nonzero; do
   result=0
   PATH="$TEST_ROOT/bin:$PATH" TMPDIR="$TEST_ROOT/results" \
     SWIFT_TEST_FIXTURE="$fixture" SWIFT_TEST_CAPTURE="$TEST_ROOT/result-path" \
     zsh "$ROOT/Scripts/swift-test.sh" --filter '^FixtureTests\.' \
     > "$TEST_ROOT/$fixture.log" 2>&1 || result=$?
-  if [[ "$fixture" == success ]]; then
+  if [[ "$fixture" == success || "$fixture" == skipped ]]; then
     [[ "$result" == 0 ]] || { cat "$TEST_ROOT/$fixture.log"; exit 1; }
   elif [[ "$fixture" == nonzero ]]; then
     [[ "$result" == 7 ]] || { print -u2 -- "Lost Swift's failure status: $result"; exit 1; }
@@ -44,4 +60,4 @@ for fixture in success missing truncated empty unfinished nonzero; do
   [[ ! -e "$(<"$TEST_ROOT/result-path")" ]] || { print -u2 -- "Leaked test results: $fixture"; exit 1; }
 done
 
-print -- 'PASS: Swift test results reject missing, truncated, empty, unfinished, and nonzero runs; temporary results are removed'
+print -- 'PASS: Swift test results accept completed explicit function skips and reject suite-only, unknown, missing, truncated, empty, unfinished, and nonzero runs; temporary results are removed'
