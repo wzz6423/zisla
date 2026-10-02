@@ -128,20 +128,22 @@ struct BrowserDownloadQuickActionTests {
         #expect(performed.isEmpty)
     }
 
-    @Test
-    func neverDismissAndProgressAppearanceFollowQuickActionSettings() {
+    @Test(arguments: [IslandNotchBackground.black, .frosted])
+    func neverDismissAndProgressAppearanceFollowQuickActionSettings(background: IslandNotchBackground) {
         let controller = ClipboardAssistantController(windowPresenter: { _, _ in })
         defer { controller.dismiss(animated: false) }
         var settings = FeatureSettings.default
         settings.clipboardAssistantDisplayDuration = .never
         settings.collapsedProgressGlowEnabled = false
         settings.islandVisualStyle = .frosted
+        settings.islandNotchBackground = background
         settings.sideNoticesEnabled = false
         settings.browserDownloadIslandEnabled = false
         #expect(present(transfer, on: controller, settings: settings))
         #expect(controller.dismissalProgress(at: .distantFuture) == nil)
         #expect(!controller.presentation.progressGlowEnabled)
         #expect(controller.presentation.visualStyle == .frosted)
+        #expect(controller.presentation.notchBackground == background)
     }
 
     private func present(
