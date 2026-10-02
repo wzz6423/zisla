@@ -87,6 +87,27 @@ class AutomationWorkflowsTest < Minitest::Test
     assert_equal 7, status.exitstatus
   end
 
+  def test_web_codeql_excludes_only_generated_sparkle_relocation_maps
+    workflow = YAML.load_file(File.join(ROOT, '.github/workflows/web-ci.yml'))
+    initialization = workflow.fetch('jobs').fetch('codeql').fetch('steps').find do |entry|
+      entry.fetch('uses', '').start_with?('github/codeql-action/init@')
+    end
+    config = YAML.load_file(File.join(ROOT, initialization.fetch('with').fetch('config-file')))
+    assert_equal ['name', 'paths-ignore'], config.keys.sort
+    patterns = config.fetch('paths-ignore')
+    excluded = lambda { |path| patterns.any? { |pattern| File.fnmatch?(pattern, path, File::FNM_PATHNAME) } }
+    maps = Dir.glob('mac/Vendor/Sparkle.xcframework/**/Relocations/**/*.yml', base: ROOT)
+    refute_empty maps
+    maps.each { |path| assert excluded.call(path), path }
+    [
+      'web/src/app.ts', '.github/workflows/web-ci.yml',
+      'mac/Sources/ZislaKit/UpdateService.swift',
+      'mac/Vendor/Sparkle.xcframework/macos-arm64_x86_64/config.yml',
+      'mac/Vendor/Sparkle.xcframework/macos-arm64_x86_64/dSYMs/Sparkle.framework.dSYM/Contents/Resources/config.yml',
+      'mac/Vendor/Other/Contents/Resources/Relocations/aarch64/config.yml'
+    ].each { |path| refute excluded.call(path), path }
+  end
+
   private
 
   def step(workflow, name)
