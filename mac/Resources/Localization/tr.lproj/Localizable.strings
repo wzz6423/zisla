@@ -2524,3 +2524,6 @@
 "关闭弹窗快捷键与动作快捷键相同，当前优先关闭弹窗" = "Kapatma kısayolu bir eylem kısayoluyla aynı. Açılır pencereyi kapatma önceliklidir.";
 "AI 任务结果扫光" = "Yapay zekâ görev sonucu ışığı";
 "任务成功时绿色、失败时红色渐变光带从左向右扫过一次" = "Bir renk geçişi soldan sağa bir kez ilerler: başarıda yeşil, hatada kırmızı";
+
+"拖入文件，暂存到中转站" = "Dosyaları geçici olarak saklamak için buraya sürükleyin";
+"松开以添加到中转站" = "Dosyaları eklemek için bırakın";
