@@ -523,6 +523,7 @@ public struct FeatureSettings: Codable, Equatable, Sendable {
     public var mediaEnabled: Bool
     public var mediaSource: MediaSourcePreference
     public var fileShelfEnabled: Bool
+    public var fileShelfShakeEnabled: Bool
     public var aiProgressEnabled: Bool
     public var downloaderEnabled: Bool
     public var calendarEnabled: Bool
@@ -684,6 +685,7 @@ public struct FeatureSettings: Codable, Equatable, Sendable {
         mediaEnabled: Bool = true,
         mediaSource: MediaSourcePreference = .automatic,
         fileShelfEnabled: Bool = true,
+        fileShelfShakeEnabled: Bool = true,
         aiProgressEnabled: Bool = true,
         downloaderEnabled: Bool = true,
         calendarEnabled: Bool = true,
@@ -780,6 +782,7 @@ public struct FeatureSettings: Codable, Equatable, Sendable {
         self.mediaEnabled = mediaEnabled
         self.mediaSource = mediaSource
         self.fileShelfEnabled = fileShelfEnabled
+        self.fileShelfShakeEnabled = fileShelfShakeEnabled
         self.aiProgressEnabled = aiProgressEnabled
         self.downloaderEnabled = downloaderEnabled
         self.calendarEnabled = calendarEnabled
@@ -921,6 +924,7 @@ public struct FeatureSettings: Codable, Equatable, Sendable {
         case mediaEnabled
         case mediaSource
         case fileShelfEnabled
+        case fileShelfShakeEnabled
         case aiProgressEnabled
         case downloaderEnabled
         case calendarEnabled
@@ -1028,6 +1032,7 @@ public struct FeatureSettings: Codable, Equatable, Sendable {
         mediaEnabled = try container.decodeIfPresent(Bool.self, forKey: .mediaEnabled) ?? defaults.mediaEnabled
         mediaSource = try container.decodeIfPresent(MediaSourcePreference.self, forKey: .mediaSource) ?? defaults.mediaSource
         fileShelfEnabled = try container.decodeIfPresent(Bool.self, forKey: .fileShelfEnabled) ?? defaults.fileShelfEnabled
+        fileShelfShakeEnabled = try container.decodeIfPresent(Bool.self, forKey: .fileShelfShakeEnabled) ?? defaults.fileShelfShakeEnabled
         aiProgressEnabled = try container.decodeIfPresent(Bool.self, forKey: .aiProgressEnabled) ?? defaults.aiProgressEnabled
         downloaderEnabled = try container.decodeIfPresent(Bool.self, forKey: .downloaderEnabled) ?? defaults.downloaderEnabled
         calendarEnabled = try container.decodeIfPresent(Bool.self, forKey: .calendarEnabled) ?? defaults.calendarEnabled

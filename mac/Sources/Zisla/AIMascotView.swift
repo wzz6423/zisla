@@ -215,6 +215,7 @@ struct AIMascotView: View {
     var identity: AIMascotIdentity
     var size: CGFloat
     @ObservedObject private var imageCache = AIMascotImageCache.shared
+    @Environment(\.colorScheme) private var colorScheme
 
     init(
         identity: AIMascotIdentity,
@@ -237,7 +238,8 @@ struct AIMascotView: View {
                     .resizable()
                     .interpolation(.high)
                     .scaledToFit()
-                    .foregroundStyle(.primary)
+                    // Semantic primary is translucent and dims thin logo strokes against the notch.
+                    .foregroundStyle(colorScheme == .dark ? Color.white : Color.black)
             } else {
                 Color.clear
             }
