@@ -93,7 +93,7 @@ enum SystemMonitorCombinedMenuBarPresentation {
 enum SystemMonitorMenuBarImageRenderer {
     static func stacked(rows: [String], style: SystemMonitorMenuBarDisplayStyle) -> NSImage? {
         let font = NSFont.monospacedDigitSystemFont(ofSize: style == .compact ? 9 : 10, weight: .medium)
-        let width = ceil(rows.map { ($0 as NSString).size(withAttributes: [.font: font]).width }.max() ?? 0) + 4
+        let width = ceil(rows.map { ($0 as NSString).size(withAttributes: [.font: font]).width }.max() ?? 0) + 2
         let image = bitmap(size: NSSize(width: max(24, width), height: 22)) { size in
             let paragraph = NSMutableParagraphStyle()
             paragraph.alignment = .left

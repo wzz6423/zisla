@@ -340,30 +340,38 @@ struct SettingsView: View {
                         EmptyView()
                     }
                     rowDivider
-                    settingRow(
-                        symbol: "rectangle.compress.vertical",
-                        title: "监控样式",
-                        detail: "紧凑模式隐藏图标并减小字号，减少菜单栏占用",
-                        isNested: true
-                    ) {
-                        IslandOutlinedPicker(
-                            selection: Binding(
-                                get: { model.settingsStore.settings.systemMonitorMenuBarDisplayStyle },
-                                set: { model.settingsStore.settings.systemMonitorMenuBarDisplayStyle = $0 }
-                            ),
-                            options: Array(SystemMonitorMenuBarDisplayStyle.allCases),
-                            title: { $0.menuTitle },
-                            selectionID: "system-monitor-menu-bar-display-style-selection",
-                            fontSize: 9,
-                            width: 128,
-                            height: 28
-                        )
+                    Toggle(isOn: $settingsStore.settings.systemMonitorMenuBarLayout.individualEnabled) {
+                        AppLocalizedText("独立")
                     }
-                    rowDivider
-                    SystemMonitorMenuBarSettingsView(settingsStore: model.settingsStore)
+                    .toggleStyle(.switch)
+                    .font(.system(size: 10))
+                    .controlSize(.small)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(.leading, 4)
+                    .padding(.vertical, 6)
                     if model.settingsStore.settings.systemMonitorMenuBarLayout.individualEnabled {
+                        rowDivider.padding(.leading, 20)
+                        settingRow(
+                            symbol: "rectangle.compress.vertical",
+                            title: "监控样式",
+                            detail: "紧凑模式隐藏图标并减小字号，减少菜单栏占用",
+                            isNested: true
+                        ) {
+                            IslandOutlinedPicker(
+                                selection: Binding(
+                                    get: { model.settingsStore.settings.systemMonitorMenuBarDisplayStyle },
+                                    set: { model.settingsStore.settings.systemMonitorMenuBarDisplayStyle = $0 }
+                                ),
+                                options: Array(SystemMonitorMenuBarDisplayStyle.allCases),
+                                title: { $0.menuTitle },
+                                selectionID: "system-monitor-menu-bar-display-style-selection",
+                                fontSize: 9,
+                                width: 128,
+                                height: 28
+                            )
+                        }
                         ForEach(SystemMonitorMenuBarMetric.allCases, id: \.self) { metric in
-                            rowDivider
+                            rowDivider.padding(.leading, 20)
                             settingRow(
                                 symbol: metric.symbolName,
                                 title: metric.menuTitle,
@@ -377,6 +385,8 @@ struct SettingsView: View {
                             }
                         }
                     }
+                    rowDivider
+                    SystemMonitorMenuBarSettingsView(settingsStore: model.settingsStore)
                     rowDivider
                     settingRow(
                         symbol: "chart.xyaxis.line",

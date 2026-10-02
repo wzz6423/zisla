@@ -34,6 +34,8 @@ public struct SystemMetricsRecord: Codable, Equatable, Sendable {
     public var networkSendBytesPerSecond: Double
     public var networkReceivedBytes: UInt64
     public var networkSentBytes: UInt64
+    public var batteryLevel: Double?
+    public var systemPowerWatts: Double?
 
     public init(
         timestamp: Date,
@@ -58,7 +60,9 @@ public struct SystemMetricsRecord: Codable, Equatable, Sendable {
         networkReceiveBytesPerSecond: Double = 0,
         networkSendBytesPerSecond: Double = 0,
         networkReceivedBytes: UInt64 = 0,
-        networkSentBytes: UInt64 = 0
+        networkSentBytes: UInt64 = 0,
+        batteryLevel: Double? = nil,
+        systemPowerWatts: Double? = nil
     ) {
         self.timestamp = timestamp
         self.cpuUsage = cpuUsage
@@ -83,6 +87,8 @@ public struct SystemMetricsRecord: Codable, Equatable, Sendable {
         self.networkSendBytesPerSecond = networkSendBytesPerSecond
         self.networkReceivedBytes = networkReceivedBytes
         self.networkSentBytes = networkSentBytes
+        self.batteryLevel = batteryLevel
+        self.systemPowerWatts = systemPowerWatts
     }
 
     public init(snapshot: SystemMetricsSnapshot) {
@@ -126,7 +132,9 @@ public struct SystemMetricsRecord: Codable, Equatable, Sendable {
             networkReceiveBytesPerSecond: snapshot.network.receiveBytesPerSecond,
             networkSendBytesPerSecond: snapshot.network.sendBytesPerSecond,
             networkReceivedBytes: snapshot.network.bytesReceived,
-            networkSentBytes: snapshot.network.bytesSent
+            networkSentBytes: snapshot.network.bytesSent,
+            batteryLevel: snapshot.battery?.level,
+            systemPowerWatts: snapshot.battery?.systemPowerWatts
         )
     }
 
@@ -347,7 +355,9 @@ public final class SystemMetricsHistoryDatabase: SystemMetricsHistoryPersisting,
                 network_receive_bytes_per_second REAL NOT NULL,
                 network_send_bytes_per_second REAL NOT NULL,
                 network_received_bytes INTEGER NOT NULL,
-                network_sent_bytes INTEGER NOT NULL
+                network_sent_bytes INTEGER NOT NULL,
+                battery_level REAL,
+                system_power_watts REAL
             )
             """,
             on: database
@@ -364,6 +374,31 @@ public final class SystemMetricsHistoryDatabase: SystemMetricsHistoryPersisting,
             """,
             on: database
         )
+        try migrateBatteryColumns(on: database)
+    }
+
+    private func migrateBatteryColumns(on database: OpaquePointer) throws {
+        try execute("BEGIN IMMEDIATE TRANSACTION", on: database)
+        do {
+            let statement = try prepare("PRAGMA table_info(metrics)", on: database)
+            defer { sqlite3_finalize(statement) }
+            var columns: Set<String> = []
+            var result = sqlite3_step(statement)
+            while result == SQLITE_ROW {
+                if let name = sqlite3_column_text(statement, 1) {
+                    columns.insert(String(cString: name))
+                }
+                result = sqlite3_step(statement)
+            }
+            try check(result, expected: SQLITE_DONE, database: database)
+            for name in ["battery_level", "system_power_watts"] where !columns.contains(name) {
+                try execute("ALTER TABLE metrics ADD COLUMN \(name) REAL", on: database)
+            }
+            try execute("COMMIT", on: database)
+        } catch {
+            try? execute("ROLLBACK", on: database)
+            throw error
+        }
     }
 
     private func discardDatabaseFiles() {
@@ -398,7 +433,7 @@ public final class SystemMetricsHistoryDatabase: SystemMetricsHistoryPersisting,
                    disk_used_bytes, disk_total_bytes, disk_read_bytes_per_second,
                    disk_write_bytes_per_second, disk_temperature,
                    network_receive_bytes_per_second, network_send_bytes_per_second,
-                   network_received_bytes, network_sent_bytes
+                   network_received_bytes, network_sent_bytes, battery_level, system_power_watts
             FROM metrics
             ORDER BY timestamp ASC
             """,
@@ -435,7 +470,9 @@ public final class SystemMetricsHistoryDatabase: SystemMetricsHistoryPersisting,
                         networkReceiveBytesPerSecond: sqlite3_column_double(statement, 18),
                         networkSendBytesPerSecond: sqlite3_column_double(statement, 19),
                         networkReceivedBytes: unsignedValue(statement, index: 20),
-                        networkSentBytes: unsignedValue(statement, index: 21)
+                        networkSentBytes: unsignedValue(statement, index: 21),
+                        batteryLevel: optionalDouble(statement, index: 22),
+                        systemPowerWatts: optionalDouble(statement, index: 23)
                     )
                 )
             case SQLITE_DONE:
@@ -506,8 +543,8 @@ public final class SystemMetricsHistoryDatabase: SystemMetricsHistoryPersisting,
                 disk_used_bytes, disk_total_bytes, disk_read_bytes_per_second,
                 disk_write_bytes_per_second, disk_temperature,
                 network_receive_bytes_per_second, network_send_bytes_per_second,
-                network_received_bytes, network_sent_bytes
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                network_received_bytes, network_sent_bytes, battery_level, system_power_watts
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
             on: database
         )
@@ -535,6 +572,8 @@ public final class SystemMetricsHistoryDatabase: SystemMetricsHistoryPersisting,
         try bind(record.networkSendBytesPerSecond, to: statement, index: 20, database: database)
         try bind(record.networkReceivedBytes, to: statement, index: 21, database: database)
         try bind(record.networkSentBytes, to: statement, index: 22, database: database)
+        try bind(record.batteryLevel, to: statement, index: 23, database: database)
+        try bind(record.systemPowerWatts, to: statement, index: 24, database: database)
         try check(sqlite3_step(statement), expected: SQLITE_DONE, database: database)
 
         try replaceFans(record, in: database)
@@ -844,15 +883,18 @@ public enum SystemMetricsChartUnit: String, Sendable, Equatable {
     case ratio
     case bytesPerSecond
     case rpm
+    case watts
 }
 
 public struct SystemMetricsChartPoint: Equatable, Sendable {
     public var date: Date
     public var value: Double
+    public var segment: Int
 
-    public init(date: Date, value: Double) {
+    public init(date: Date, value: Double, segment: Int = 0) {
         self.date = date
         self.value = value
+        self.segment = segment
     }
 }
 
@@ -994,7 +1036,54 @@ public enum SystemMetricsHistorySeriesBuilder {
                 ]
             )
         )
+        sections.append(SystemMetricsChartSection(
+            id: "battery", titleKey: "电量", unit: .ratio,
+            series: [segmentedSeries(
+                id: "battery.level", titleKey: "电量", records: relevant,
+                maximumPoints: max(2, maximumPoints), value: { $0.batteryLevel }
+            )]
+        ))
+        sections.append(SystemMetricsChartSection(
+            id: "power", titleKey: "本机功率", unit: .watts,
+            series: [segmentedSeries(
+                id: "system.power", titleKey: "本机功率", records: relevant,
+                maximumPoints: max(2, maximumPoints), value: { $0.systemPowerWatts }
+            )]
+        ))
         return sections.filter { !$0.isEmpty }
+    }
+
+    private static func segmentedSeries(
+        id: String,
+        titleKey: String,
+        records: [SystemMetricsRecord],
+        maximumPoints: Int,
+        value: (SystemMetricsRecord) -> Double?
+    ) -> SystemMetricsChartSeries {
+        let segments = records.split { record in
+            guard let sample = value(record) else { return true }
+            return !sample.isFinite
+        }.suffix(maximumPoints)
+        var remainingPoints = maximumPoints
+        var remainingRecords = segments.reduce(0) { $0 + $1.count }
+        var points: [SystemMetricsChartPoint] = []
+        for (index, segment) in segments.enumerated() {
+            let reservedPoints = segments.count - index - 1
+            let budget = min(
+                remainingPoints - reservedPoints,
+                max(1, remainingPoints * segment.count / remainingRecords)
+            )
+            let result = series(
+                id: id, titleKey: titleKey,
+                buckets: makeBuckets(Array(segment), maximumPoints: budget), value: value
+            )
+            points.append(contentsOf: result.points.map {
+                SystemMetricsChartPoint(date: $0.date, value: $0.value, segment: index)
+            })
+            remainingPoints -= result.points.count
+            remainingRecords -= segment.count
+        }
+        return SystemMetricsChartSeries(id: id, titleKey: titleKey, points: points)
     }
 
     public static func fanTitleKey(for index: Int) -> String {

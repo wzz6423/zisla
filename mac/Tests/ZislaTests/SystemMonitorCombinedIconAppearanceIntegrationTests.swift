@@ -30,7 +30,7 @@ struct SystemMonitorCombinedIconAppearanceIntegrationTests {
     }
 
     @Test
-    func imageRefreshReadsCurrentSettingsAndAppliesNormalizedItemWidth() throws {
+    func imageRefreshReadsCurrentSettingsAndUsesUpstreamSystemItemSizing() throws {
         let source = try Self.source("ZislaApp.swift")
         let section = try Self.section(
             source,
@@ -39,14 +39,13 @@ struct SystemMonitorCombinedIconAppearanceIntegrationTests {
         )
         #expect(section.contains("let settings = AppModel.shared.settingsStore.settings"))
         #expect(section.contains("configuration: settings.systemMonitorMenuBarCombinedIconAppearance"))
-        #expect(section.split(separator: "\n").contains(
-            "        combinedMonitorStatusItem?.length = settings.systemMonitorMenuBarCombinedIconAppearance.normalized.iconSize"
-        ))
+        #expect(!section.contains("combinedMonitorStatusItem?.length ="))
         let controller = try Self.section(source,
             from: "    private func syncCombinedMonitorStatusItem(",
             to: "    private func updateCombinedMonitorStatusImage(")
         #expect(controller.contains("item.button?.imagePosition = .imageOnly"))
-        #expect(controller.contains("item.button?.imageScaling = .scaleNone"))
+        #expect(controller.contains("statusItem(withLength: NSStatusItem.variableLength)"))
+        #expect(!controller.contains("item.button?.imageScaling = .scaleNone"))
     }
 
     @Test
@@ -167,9 +166,8 @@ struct SystemMonitorCombinedIconAppearanceIntegrationTests {
             let cell = NSButtonCell(imageCell: image)
             cell.isBordered = false
             cell.imagePosition = .imageOnly
-            cell.imageScaling = .scaleNone
             let imageRect = cell.imageRect(forBounds: NSRect(x: 0, y: 0, width: expected, height: 22))
-            #expect(imageRect.width == expected)
+            #expect(imageRect.width > 0 && imageRect.width <= expected)
             #expect(imageRect.minX >= 0)
             #expect(imageRect.maxX <= expected)
         }
@@ -191,7 +189,7 @@ struct SystemMonitorCombinedIconAppearanceIntegrationTests {
         #expect(binding.systemMonitorMenuBarCombinedIconAppearance.showsPercentageWhenConnected.wrappedValue)
         #expect(binding.systemMonitorMenuBarCombinedIconAppearance.iconSize.wrappedValue == 26)
         #expect(binding.systemMonitorMenuBarCombinedIconAppearance.wifiScale.wrappedValue == 1.55)
-        #expect(binding.systemMonitorMenuBarCombinedIconAppearance.batteryTextScale.wrappedValue == 1.88)
+        #expect(binding.systemMonitorMenuBarCombinedIconAppearance.batteryTextScale.wrappedValue == SystemMonitorCombinedIconAppearance.batteryTextScaleRange.upperBound)
         binding.systemMonitorMenuBarCombinedIconAppearance.indicatorStyle.wrappedValue = .arc
         binding.systemMonitorMenuBarCombinedIconAppearance.ringStrokeStyle.wrappedValue = .regular
         binding.systemMonitorMenuBarCombinedIconAppearance.showsBatteryPercentage.wrappedValue = false

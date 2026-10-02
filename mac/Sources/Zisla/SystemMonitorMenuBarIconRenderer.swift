@@ -194,21 +194,16 @@ enum SystemMonitorMenuBarIconRenderer {
     ) {
         let gapContent = MenuBarIconMappings.batteryGapContent(battery, options: options)
         let hasTopGap = gapContent != .empty
-        let showsValue = [.percentage, .boltAndPercentage, .plugAndPercentage].contains(gapContent)
+        let showsValue = [.percentage, .boltAndPercentage].contains(gapContent)
         let showsBolt = [.bolt, .boltAndPercentage].contains(gapContent)
-        let showsPlug = [.plug, .plugAndPercentage].contains(gapContent)
+        let percentageScale: CGFloat = 1.2
         let fontSize = batteryValueFontSize(scale: options.textScale)
         let valueLine = batteryPercentageLine(battery.percentage, fontSize: fontSize, color: foreground)
         let valueWidth = showsValue ? CGFloat(CTLineGetTypographicBounds(valueLine, nil, nil, nil)) : 0
+        let valueBounds = showsValue ? CTLineGetBoundsWithOptions(valueLine, .useGlyphPathBounds) : .zero
         let indicatorScale = batteryChargingBoltScale(textScale: options.textScale)
         let boltBounds = SystemMonitorMenuBarIconGeometry.batteryChargingBolt(scale: indicatorScale).boundingBoxOfPath
-        let plugHeight = boltBounds.height * SystemMonitorMenuBarIconGeometry.batteryPlugHeightScale
-        let plug = showsPlug ? configuredSymbol(
-            name: SystemMonitorMenuBarIconGeometry.batteryPlugSymbolName,
-            pointSize: batteryPlugPointSize(targetHeight: plugHeight),
-            foreground: NSColor(cgColor: foreground) ?? .white
-        ) : nil
-        let indicatorWidth = showsBolt ? boltBounds.width : (plug?.size.width ?? 0)
+        let indicatorWidth = showsBolt ? boltBounds.width : 0
         let headerWidth = valueWidth + indicatorWidth + (showsValue && indicatorWidth > 0 ? 6 : 0)
         // Scale the fitting budget with the slider so fitting cannot cancel glyph growth.
         let headerWidthLimit = 70 * CGFloat(options.textScale / SystemMonitorCombinedIconAppearance.batteryTextScaleRange.upperBound)
@@ -257,7 +252,8 @@ enum SystemMonitorMenuBarIconRenderer {
         context.translateBy(x: centerX, y: 2.1)
         context.scaleBy(x: headerScale, y: headerScale)
         context.translateBy(x: -centerX, y: -2.1)
-        let left = centerX - headerWidth / 2
+        let inkExpansion = showsBolt ? valueBounds.maxX * percentageScale - valueWidth : 0
+        let left = centerX - (headerWidth + inkExpansion) / 2
         if showsBolt {
             context.saveGState()
             context.translateBy(x: left - boltBounds.minX, y: 0)
@@ -266,19 +262,18 @@ enum SystemMonitorMenuBarIconRenderer {
             context.fillPath()
             context.restoreGState()
         }
-        if showsPlug {
-            drawOfficialSymbol(
-                name: SystemMonitorMenuBarIconGeometry.batteryPlugSymbolName,
-                pointSize: batteryPlugPointSize(targetHeight: plugHeight),
-                center: CGPoint(x: left + indicatorWidth / 2, y: boltBounds.midY),
-                foreground: foreground,
-                in: context
-            )
-        }
         if showsValue {
             let baseline = SystemMonitorMenuBarIconGeometry.batteryValueBaseline(fontSize: fontSize)
+            let valueX = left + headerWidth - valueWidth
+            if showsBolt {
+                // Enlarge only the digits into the existing gap; the indicator and battery arc stay fixed.
+                let inkTop = baseline.y - valueBounds.maxY
+                context.translateBy(x: valueX, y: inkTop)
+                context.scaleBy(x: percentageScale, y: percentageScale)
+                context.translateBy(x: -valueX, y: -inkTop)
+            }
             context.textMatrix = CGAffineTransform(scaleX: 1, y: -1)
-            context.textPosition = CGPoint(x: left + headerWidth - valueWidth, y: baseline.y)
+            context.textPosition = CGPoint(x: valueX, y: baseline.y)
             CTLineDraw(valueLine, context)
         }
     }
@@ -396,8 +391,7 @@ enum SystemMonitorMenuBarIconRenderer {
         return targetHeight / boltHeight
     }
 
-    /// Height shared by every top-gap glyph. The bolt is calibrated to match the
-    /// percentage numerals, and the plug matches the bolt.
+    /// Calibrate the bolt height to match the percentage numerals.
     private static func batteryTopIndicatorHeight(textScale: Double) -> CGFloat {
         let fontSize = batteryValueFontSize(scale: textScale)
         let line = CTLineCreateWithAttributedString(
@@ -413,27 +407,6 @@ enum SystemMonitorMenuBarIconRenderer {
                 * SystemMonitorMenuBarIconGeometry.batteryChargingBoltCalibration
         }
         return CGFloat(glyphHeight) * SystemMonitorMenuBarIconGeometry.batteryChargingBoltCalibration
-    }
-
-    /// Glyph height per point of symbol size, measured once. SF Symbols report
-    /// sizes rounded to whole points, so this reference size stays large enough
-    /// for the rounding to be negligible.
-    private static let batteryPlugHeightPerPoint: CGFloat = {
-        let referencePointSize: CGFloat = 200
-        guard let height = configuredSymbol(
-            name: SystemMonitorMenuBarIconGeometry.batteryPlugSymbolName,
-            pointSize: referencePointSize,
-            foreground: .labelColor
-        )?.size.height, height.isFinite, height > 0 else {
-            return 1.34
-        }
-        return height / referencePointSize
-    }()
-
-    private static func batteryPlugPointSize(targetHeight: CGFloat) -> CGFloat {
-        let fallbackPointSize: CGFloat = 38
-        let pointSize = targetHeight / batteryPlugHeightPerPoint
-        return pointSize.isFinite && pointSize > 0 ? pointSize : fallbackPointSize
     }
 
     private static var defaultCriticalColor: CGColor {
@@ -458,6 +431,13 @@ enum SystemMonitorMenuBarIconRenderer {
         switch wifi.state {
         case .connected:
             drawStandardWiFi(wifi, wifiScale: options.wifiScale, in: context, foreground: foreground)
+        case .personalHotspot:
+            drawOfficialSymbol(
+                name: "personalhotspot",
+                pointSize: symbolPointSize,
+                foreground: foreground,
+                in: context
+            )
         case .notAssociated:
             drawOfficialSymbol(
                 name: "wifi",

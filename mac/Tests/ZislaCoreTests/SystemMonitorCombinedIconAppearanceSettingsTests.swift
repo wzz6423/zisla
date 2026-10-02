@@ -213,10 +213,10 @@ struct SystemMonitorCombinedIconAppearanceSettingsTests {
         #expect(appearance.showsPercentageWhenConnected)
         #expect(appearance.usesStatusColors)
         #expect(appearance.wifiScale == 1.55)
-        #expect(appearance.batteryTextScale == 1.88)
+        #expect(appearance.batteryTextScale == SystemMonitorCombinedIconAppearance.batteryTextScaleRange.upperBound)
         #expect((appearance.iconSize - SystemMonitorCombinedIconAppearance.iconSizeRange.lowerBound) == 10)
         #expect(abs((appearance.wifiScale - SystemMonitorCombinedIconAppearance.wifiScaleRange.lowerBound) / 0.05 - 11) < 1e-9)
-        #expect(abs((appearance.batteryTextScale - SystemMonitorCombinedIconAppearance.batteryTextScaleRange.lowerBound) / 0.02 - 13) < 1e-9)
+        #expect(abs((appearance.batteryTextScale - SystemMonitorCombinedIconAppearance.batteryTextScaleRange.lowerBound) / 0.02 - 18) < 1e-9)
         #expect(abs((SystemMonitorHeadphoneOptions().symbolScale - SystemMonitorHeadphoneOptions.symbolScaleRange.lowerBound) / 0.05 - 9) < 1e-9)
         let expected = SystemMonitorCombinedIconAppearance(
             ringStrokeStyle: .bold,
@@ -228,7 +228,7 @@ struct SystemMonitorCombinedIconAppearanceSettingsTests {
             "{}",
             #"{"systemMonitorMenuBarCombinedIconMetric":null,"systemMonitorMenuBarCombinedIconAppearance":null}"#,
             #"{"systemMonitorMenuBarCombinedIconAppearance":{}}"#,
-            #"{"systemMonitorMenuBarCombinedIconAppearance":{"ringStrokeStyle":null,"indicatorStyle":null,"showsBatteryPercentage":null,"showsChargingIndicator":null,"showsPercentageWhenConnected":null}}"#,
+            #"{"systemMonitorMenuBarCombinedIconAppearance":{"ringStrokeStyle":null,"indicatorStyle":null,"showsBatteryPercentage":null,"showsChargingIndicator":null,"showsPercentageWhenConnected":null,"batteryTextScale":null}}"#,
         ] {
             let settings = try JSONDecoder().decode(FeatureSettings.self, from: Data(payload.utf8))
             #expect(settings.systemMonitorMenuBarCombinedIconMetric == .memory)

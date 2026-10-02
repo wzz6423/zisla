@@ -1,3 +1,4 @@
+import AppKit
 import Combine
 import CoreFoundation
 import Foundation
@@ -79,6 +80,10 @@ public struct BatterySnapshot: Equatable, Sendable {
         Int((level * 100).rounded())
     }
 
+    public var systemPowerWatts: Double? {
+        systemLoadWatts
+    }
+
     public var symbolName: String {
         if isCharging {
             return "battery.100percent.bolt"
@@ -93,22 +98,42 @@ public struct BatterySnapshot: Equatable, Sendable {
     }
 }
 
+public struct BatteryTrendSample: Equatable, Sendable {
+    public let date: Date
+    public let level: Double
+    public let systemPowerWatts: Double?
+
+    public init(date: Date, level: Double, systemPowerWatts: Double?) {
+        self.date = date
+        self.level = level
+        self.systemPowerWatts = systemPowerWatts
+    }
+}
+
 /// Combines IOPowerSources status with AppleSmartBattery registry metrics.
 @MainActor
 public final class BatteryMonitor: ObservableObject {
     @Published public private(set) var snapshot: BatterySnapshot?
+    @Published public private(set) var trendSamples: [BatteryTrendSample] = []
+
+    static let trendSamplingInterval: TimeInterval = 5
+    static let maximumTrendSamples = 60
 
     /// Timestamp when external power was last disconnected.
     @Published public private(set) var lastUnpluggedAt: Date?
 
     private var runLoopSource: CFRunLoopSource?
     private var powerStateObserver: NSObjectProtocol?
+    private var wakeObserver: NSObjectProtocol?
     private var powerStateObservationID: UUID?
+    private var refreshTimer: Timer?
     private let notificationCenter: NotificationCenter
+    private let workspaceNotificationCenter: NotificationCenter
     private let snapshotProvider: () -> BatterySnapshot?
     private let runLoopSourceFactory: (UnsafeMutableRawPointer) -> CFRunLoopSource?
     private let defaults: UserDefaults
     private let now: () -> Date
+    private let timerFactory: (TimeInterval, @escaping @Sendable (Timer) -> Void) -> Timer
     private var lastObservedIsPluggedIn: Bool?
 
     private enum HistoryKey {
@@ -141,13 +166,19 @@ public final class BatteryMonitor: ObservableObject {
         now: @escaping () -> Date = Date.init,
         notificationCenter: NotificationCenter,
         snapshotProvider: @escaping () -> BatterySnapshot?,
-        runLoopSourceFactory: @escaping (UnsafeMutableRawPointer) -> CFRunLoopSource?
+        runLoopSourceFactory: @escaping (UnsafeMutableRawPointer) -> CFRunLoopSource?,
+        workspaceNotificationCenter: NotificationCenter = NSWorkspace.shared.notificationCenter,
+        timerFactory: @escaping (TimeInterval, @escaping @Sendable (Timer) -> Void) -> Timer = {
+            Timer(timeInterval: $0, repeats: true, block: $1)
+        }
     ) {
         self.defaults = defaults
         self.now = now
         self.notificationCenter = notificationCenter
+        self.workspaceNotificationCenter = workspaceNotificationCenter
         self.snapshotProvider = snapshotProvider
         self.runLoopSourceFactory = runLoopSourceFactory
+        self.timerFactory = timerFactory
         self.lastUnpluggedAt = Self.loadDate(defaults, forKey: HistoryKey.lastUnpluggedAt)
         self.lastObservedIsPluggedIn = defaults.object(forKey: HistoryKey.lastObservedIsPluggedIn) as? Bool
     }
@@ -158,6 +189,13 @@ public final class BatteryMonitor: ObservableObject {
 
     public func start() {
         refresh()
+        if refreshTimer == nil {
+            let timer = timerFactory(Self.trendSamplingInterval) { [weak self] _ in
+                MainActor.assumeIsolated { self?.refresh() }
+            }
+            refreshTimer = timer
+            RunLoop.main.add(timer, forMode: .common)
+        }
         if powerStateObserver == nil {
             let observationID = UUID()
             powerStateObservationID = observationID
@@ -171,6 +209,17 @@ public final class BatteryMonitor: ObservableObject {
                     self.refresh()
                 }
             }
+            wakeObserver = workspaceNotificationCenter.addObserver(
+                forName: NSWorkspace.didWakeNotification,
+                object: nil,
+                queue: .main
+            ) { [weak self] _ in
+                MainActor.assumeIsolated {
+                    guard let self, self.powerStateObservationID == observationID else { return }
+                    self.trendSamples = []
+                    self.refresh()
+                }
+            }
         }
         guard runLoopSource == nil else { return }
         let context = Unmanaged.passUnretained(self).toOpaque()
@@ -180,10 +229,17 @@ public final class BatteryMonitor: ObservableObject {
     }
 
     public func stop() {
+        refreshTimer?.invalidate()
+        refreshTimer = nil
+        trendSamples = []
         powerStateObservationID = nil
         if let powerStateObserver {
             notificationCenter.removeObserver(powerStateObserver)
             self.powerStateObserver = nil
+        }
+        if let wakeObserver {
+            workspaceNotificationCenter.removeObserver(wakeObserver)
+            self.wakeObserver = nil
         }
         if let runLoopSource {
             CFRunLoopRemoveSource(CFRunLoopGetMain(), runLoopSource, .commonModes)
@@ -196,6 +252,28 @@ public final class BatteryMonitor: ObservableObject {
         let current = snapshotProvider()
         detectStateTransitions(from: previous, to: current)
         snapshot = current
+        recordTrend(current, at: now())
+    }
+
+    private func recordTrend(_ battery: BatterySnapshot?, at date: Date) {
+        guard let battery else {
+            trendSamples = []
+            return
+        }
+        let sample = BatteryTrendSample(date: date, level: battery.level, systemPowerWatts: battery.systemPowerWatts)
+        if let last = trendSamples.last {
+            let interval = date.timeIntervalSince(last.date)
+            if interval < 0 || interval > Self.trendSamplingInterval * 3 {
+                trendSamples = []
+            } else if interval < Self.trendSamplingInterval,
+                      !(last.systemPowerWatts != nil && sample.systemPowerWatts == nil) {
+                return
+            }
+        }
+        trendSamples.append(sample)
+        if trendSamples.count > Self.maximumTrendSamples {
+            trendSamples.removeFirst(trendSamples.count - Self.maximumTrendSamples)
+        }
     }
 
     func detectStateTransitions(from previous: BatterySnapshot?, to current: BatterySnapshot?) {

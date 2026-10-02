@@ -413,6 +413,27 @@ public enum SystemMonitorCombinedIconMetric: String, Codable, CaseIterable, Send
 }
 
 public enum SystemMonitorMenuBarRows {
+    public static func selecting(
+        _ metric: SystemMonitorMenuBarMetric,
+        atRow rowIndex: Int,
+        slot metricIndex: Int,
+        in rows: [[SystemMonitorMenuBarMetric]]
+    ) -> [[SystemMonitorMenuBarMetric]] {
+        guard rows.count == 2,
+              rows.indices.contains(rowIndex),
+              rows[rowIndex].indices.contains(metricIndex)
+        else { return rows }
+
+        var updated = rows
+        let current = updated[rowIndex][metricIndex]
+        if let sourceRow = updated.indices.first(where: { updated[$0].contains(metric) }),
+           let sourceIndex = updated[sourceRow].firstIndex(of: metric) {
+            updated[sourceRow][sourceIndex] = current
+        }
+        updated[rowIndex][metricIndex] = metric
+        return normalized(top: updated[0], bottom: updated[1])
+    }
+
     public static func normalized(
         top: [SystemMonitorMenuBarMetric],
         bottom: [SystemMonitorMenuBarMetric]
@@ -601,12 +622,12 @@ public enum IslandModuleOrder: String, Codable, CaseIterable, Sendable, Equatabl
 
     public static let defaultOrder: [Self] = [
         .dashboard, .shelf, .clipboard, .download, .agenda, .toolbox,
-        .quickNotes, .aiMonitor, .keyboardSound, .mail, .system, .battery, .pdf,
+        .quickNotes, .aiMonitor, .keyboardSound, .mail, .system, .pdf,
     ]
 
     public static func normalized(_ order: [Self]) -> [Self] {
         var seen: Set<Self> = []
-        return order.filter { seen.insert($0).inserted }
+        return order.map { $0 == .battery ? .system : $0 }.filter { seen.insert($0).inserted }
             + defaultOrder.filter { !seen.contains($0) }
     }
 

@@ -8,8 +8,101 @@ import ZislaKit
 
 @MainActor
 struct SystemMonitorMenuBarIconBehaviorTests {
+    @Test(arguments: [false, true])
+    func connectedHeaderRemainsCenteredAfterEnlargingPercentage(showsPercentage: Bool) throws {
+        for percentage in showsPercentage ? [0, 1, 9, 70, 100] : [100] {
+            for textScale in [1.62, 1.88, 1.98] {
+                var snapshot = battery(charging: true, pluggedIn: true)
+                snapshot.level = Double(percentage) / 100
+                let appearance = SystemMonitorCombinedIconAppearance(
+                    showsBatteryPercentage: showsPercentage,
+                    usesStatusColors: true, batteryTextScale: textScale
+                )
+                let image = try #require(SystemMonitorMenuBarIconRenderer.render(
+                    menuBarStatus: MenuBarIconStatus(battery: snapshot, wifi: .off, level: nil),
+                    size: 120, scale: 2, foreground: NSColor.white.cgColor,
+                    options: MenuBarIconBatteryOptions(appearance: appearance),
+                    connectionOptions: MenuBarIconConnectionOptions(appearance: appearance),
+                    volumeOptions: MenuBarIconVolumeOptions(appearance: appearance)
+                ))
+                let bitmap = NSBitmapImageRep(cgImage: image)
+                var columns: [Int] = []
+                for y in 0..<64 {
+                    for x in 0..<bitmap.pixelsWide {
+                        let color = try #require(bitmap.colorAt(x: x, y: y)?.usingColorSpace(.deviceRGB))
+                        if color.alphaComponent > 0.8, color.redComponent > 0.9,
+                           color.greenComponent > 0.9, color.blueComponent > 0.9 {
+                            columns.append(x)
+                        }
+                    }
+                }
+                let center = Double(try #require(columns.min()) + #require(columns.max())) / 2
+                #expect(abs(center - 119) <= 3,
+                    "Header is off center: \(percentage), \(textScale), pixel center \(center)")
+            }
+        }
+    }
+
     @Test
-    func topIndicatorUsesPercentageBoltAndPlugStates() throws {
+    func largerConnectedNumbersPreserveTheOriginalBatteryArc() throws {
+        for charging in [false, true] {
+            for textScale in [1.62, 1.88, 1.98] {
+                for stroke in SystemMonitorMenuBarRingStrokeStyle.allCases {
+                    var snapshot = battery(charging: charging, pluggedIn: true)
+                    snapshot.level = 1
+                    let appearance = SystemMonitorCombinedIconAppearance(
+                        ringStrokeStyle: stroke, usesStatusColors: true, batteryTextScale: textScale
+                    )
+                    let actual = try #require(SystemMonitorMenuBarIconRenderer.render(
+                        menuBarStatus: MenuBarIconStatus(battery: snapshot, wifi: .off, level: nil),
+                        size: 120, scale: 2, foreground: NSColor.white.cgColor,
+                        options: MenuBarIconBatteryOptions(appearance: appearance),
+                        connectionOptions: MenuBarIconConnectionOptions(appearance: appearance),
+                        volumeOptions: MenuBarIconVolumeOptions(appearance: appearance)
+                    ))
+                    let expected = try #require(CGContext(
+                        data: nil, width: 240, height: 240, bitsPerComponent: 8, bytesPerRow: 960,
+                        space: CGColorSpaceCreateDeviceRGB(),
+                        bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue
+                    ))
+                    expected.translateBy(x: 0, y: 240)
+                    expected.scaleBy(x: 2, y: -2)
+                    expected.setLineWidth(8 * stroke.scale)
+                    expected.setLineCap(.round)
+                    let gap = 103 * asin((35 * textScale / 1.98 + 4 * stroke.scale + 6) / 51.5)
+                    expected.setStrokeColor(CGColor(gray: 1, alpha: 0.22))
+                    expected.addPath(SystemMonitorMenuBarIconGeometry.batteryTrack(hasTopGap: true, topGapWidth: gap))
+                    expected.strokePath()
+                    expected.setStrokeColor(CGColor(red: 52.0 / 255, green: 199.0 / 255, blue: 89.0 / 255, alpha: 1))
+                    expected.addPath(SystemMonitorMenuBarIconGeometry.batteryFill(
+                        progress: 1, hasTopGap: true, topGapWidth: gap
+                    ))
+                    expected.strokePath()
+                    func coloredPixels(_ image: CGImage) throws -> Set<Int> {
+                        let bitmap = NSBitmapImageRep(cgImage: image)
+                        var result = Set<Int>()
+                        for y in 0..<240 {
+                            for x in 0..<bitmap.pixelsWide {
+                                let color = try #require(bitmap.colorAt(x: x, y: y)?.usingColorSpace(.deviceRGB))
+                                if color.alphaComponent > 0.5,
+                                   color.greenComponent > color.redComponent + 0.2,
+                                   color.greenComponent > color.blueComponent + 0.2 {
+                                    result.insert(y * bitmap.pixelsWide + x)
+                                }
+                            }
+                        }
+                        return result
+                    }
+                    let actualPixels = try coloredPixels(actual)
+                    let expectedPixels = try coloredPixels(#require(expected.makeImage()))
+                    #expect(actualPixels.count > expectedPixels.count, "The shoulders must recover previously unused space")
+                }
+            }
+        }
+    }
+
+    @Test
+    func topIndicatorUsesPercentageAndBoltStates() throws {
         var appearance = SystemMonitorCombinedIconAppearance(
             showsBatteryPercentage: true, showsChargingIndicator: true,
             showsPercentageWhenConnected: false, usesStatusColors: false
@@ -21,8 +114,25 @@ struct SystemMonitorMenuBarIconBehaviorTests {
         #expect(charging != plugged)
         #expect(percentage != plugged)
         appearance.showsPercentageWhenConnected = true
-        #expect(try bitmap(battery: battery(pluggedIn: true), appearance: appearance) != percentage)
+        #expect(try bitmap(battery: battery(pluggedIn: true), appearance: appearance) == charging)
         #expect(try bitmap(battery: battery(charging: true, pluggedIn: true), appearance: appearance) == charging)
+    }
+
+    @Test(arguments: [0.7, 1.0], [false, true])
+    func connectedBatteryUsesTheSameLightningAsCharging(level: Double, showsPercentage: Bool) throws {
+        let appearance = SystemMonitorCombinedIconAppearance(
+            showsBatteryPercentage: showsPercentage, showsChargingIndicator: true,
+            showsPercentageWhenConnected: true, usesStatusColors: true
+        )
+        var connected = battery(pluggedIn: true)
+        connected.level = level
+        connected.isCharged = level == 1
+        var charging = connected
+        charging.isCharging = true
+        charging.isCharged = false
+        #expect(try bitmap(battery: connected, appearance: appearance)
+            == bitmap(battery: charging, appearance: appearance),
+            "External power must retain the lightning glyph after charging finishes")
     }
 
     @Test
@@ -40,7 +150,7 @@ struct SystemMonitorMenuBarIconBehaviorTests {
                         if indicator {
                             expected = charging
                                 ? (value ? .boltAndPercentage : .bolt)
-                                : (value && connectedValue ? .plugAndPercentage : .plug)
+                                : (value && connectedValue ? .boltAndPercentage : .bolt)
                         } else {
                             expected = value ? .percentage : .empty
                         }
@@ -55,8 +165,9 @@ struct SystemMonitorMenuBarIconBehaviorTests {
     @Test
     func batteryHeaderPixelsStaySeparatedFromRingAcrossSizes() throws {
         for charging in [false, true] {
-            for (percentage, indicator) in [0, 9, 70, 100].flatMap({ value in [false, true].map { (value, $0) } }) {
-                for textScale in [1.62, 1.8, 1.98] {
+            for (percentage, indicator) in [0, 1, 9, 70, 100].flatMap({ value in [false, true].map { (value, $0) } }) {
+                for step in 0...18 {
+                    let textScale = 1.62 + Double(step) * 0.02
                     for stroke in SystemMonitorMenuBarRingStrokeStyle.allCases {
                         var snapshot = battery(charging: charging, pluggedIn: true)
                         snapshot.level = Double(percentage) / 100
@@ -77,7 +188,7 @@ struct SystemMonitorMenuBarIconBehaviorTests {
                         var header: [CGPoint] = []
                         var ring: [CGPoint] = []
                         for y in 0..<18 {
-                            for x in 0..<44 {
+                            for x in 0..<rep.pixelsWide {
                                 let color = try #require(rep.colorAt(x: x, y: y)?.usingColorSpace(.deviceRGB))
                                 if color.alphaComponent > 0.5 {
                                     if color.redComponent > 0.9 && color.greenComponent > 0.9 && color.blueComponent > 0.9 && y < 13 {
@@ -90,16 +201,16 @@ struct SystemMonitorMenuBarIconBehaviorTests {
                         }
                         #expect(header.count > 8)
                         let headerWidth = (header.map(\.x).max() ?? 0) - (header.map(\.x).min() ?? 0)
-                        #expect(headerWidth <= 26, "Header must fit inside the ring rather than erase its upper half")
+                        #expect(headerWidth <= 29, "Header must fit inside the ring rather than erase its upper half")
                         if indicator && percentage == 100 {
                             #expect(header.filter { $0.x < 16 }.count > 3, "Power glyph must remain visible left of 100")
                             #expect(header.filter { $0.x > 22 }.count > 5, "Percentage must remain visible right of the power glyph")
                         }
                         for glyph in header {
-                            #expect(glyph.x > 0 && glyph.x < 43)
+                            #expect(glyph.x > 0 && glyph.x < CGFloat(rep.pixelsWide - 1))
                             for arc in ring {
-                                #expect(hypot(glyph.x - arc.x, glyph.y - arc.y) >= 2,
-                                    "Header touches ring: \(percentage), \(charging), \(textScale), \(stroke)")
+                                #expect(hypot(glyph.x - arc.x, glyph.y - arc.y) >= sqrt(2),
+                                    "Header touches ring: \(percentage), charging \(charging), indicator \(indicator), \(textScale), \(stroke), glyph \(glyph), arc \(arc)")
                             }
                         }
                     }
@@ -111,7 +222,7 @@ struct SystemMonitorMenuBarIconBehaviorTests {
     @Test
     func chargingGlyphAndPercentageGrowTogetherWithTextSlider() throws {
         for charging in [false, true] {
-            for percentage in [70, 100] {
+            for percentage in [9, 70, 100] {
                 var bounds: [(glyph: CGRect, value: CGRect)] = []
                 for textScale in [1.62, 1.88, 1.98] {
                     var snapshot = battery(charging: charging, pluggedIn: true)
@@ -119,7 +230,7 @@ struct SystemMonitorMenuBarIconBehaviorTests {
                     let appearance = SystemMonitorCombinedIconAppearance(
                         showsBatteryPercentage: true, showsChargingIndicator: true,
                         showsPercentageWhenConnected: true, usesStatusColors: true,
-                        batteryTextScale: textScale
+                        batteryTextScale: textScale, wifiScale: 1
                     )
                     let image = try #require(SystemMonitorMenuBarIconRenderer.render(
                         menuBarStatus: MenuBarIconStatus(battery: snapshot, wifi: .off, level: nil),
@@ -130,8 +241,8 @@ struct SystemMonitorMenuBarIconBehaviorTests {
                     ))
                     let rep = NSBitmapImageRep(cgImage: image)
                     var columns: [Int: [Int]] = [:]
-                    for y in 0..<72 {
-                        for x in 0..<240 {
+                    for y in 0..<92 {
+                        for x in 0..<rep.pixelsWide {
                             let color = try #require(rep.colorAt(x: x, y: y)?.usingColorSpace(.deviceRGB))
                             if color.alphaComponent > 0.8 && color.redComponent > 0.9
                                 && color.greenComponent > 0.9 && color.blueComponent > 0.9 {
@@ -140,7 +251,7 @@ struct SystemMonitorMenuBarIconBehaviorTests {
                         }
                     }
                     let first = try #require(columns.keys.min())
-                    let separator = try #require((first..<240).first { columns[$0] == nil })
+                    let separator = try #require((first..<rep.pixelsWide).first { columns[$0] == nil })
                     func inkBounds(_ selected: [Int]) throws -> CGRect {
                         let xs = selected.filter { columns[$0] != nil }
                         let ys = xs.flatMap { columns[$0] ?? [] }
@@ -151,8 +262,11 @@ struct SystemMonitorMenuBarIconBehaviorTests {
                         return CGRect(x: minX, y: minY, width: maxX - minX + 1, height: maxY - minY + 1)
                     }
                     let glyph = try inkBounds(Array(first..<separator))
-                    let value = try inkBounds(Array(separator..<240))
+                    let value = try inkBounds(Array(separator..<rep.pixelsWide))
                     #expect(glyph.maxX < value.minX, "Charging glyph and percentage must have separate ink bounds")
+                    #expect(value.height >= 42 * textScale / 1.98,
+                        "Connected percentage is too small: \(percentage), \(charging), \(textScale), height \(value.height)")
+                    #expect(glyph.minY > 0, "Power glyph must not clip against the top of the icon")
                     bounds.append((glyph, value))
                 }
                 #expect(bounds[1].glyph.height > bounds[0].glyph.height * 1.1,
@@ -229,6 +343,35 @@ struct SystemMonitorMenuBarIconBehaviorTests {
     }
 
     @Test
+    func personalHotspotUsesDistinctChainArtworkAtEveryNetworkScale() throws {
+        let status = MenuBarIconStatus(battery: nil, wifi: .personalHotspot, level: nil)
+        #expect(status.wifi.state == .personalHotspot)
+        #expect(status.wifi.rssi == nil)
+        for scale in [1.0, 1.3, 1.8] {
+            let appearance = SystemMonitorCombinedIconAppearance(wifiScale: scale)
+            let hotspot = try bitmap(wifi: .personalHotspot, appearance: appearance)
+            for wifi in [MenuBarWiFiState.connected(strength: 1), .disconnected, .off, .unavailable] {
+                #expect(hotspot != (try bitmap(wifi: wifi, appearance: appearance)))
+            }
+        }
+    }
+
+    @Test
+    func personalHotspotRetainsConnectedHeadphoneReplacementPriority() {
+        let status = MenuBarIconStatus(
+            battery: nil, wifi: .personalHotspot, level: nil,
+            headphones: MenuBarIconHeadphoneStatus(
+                device: AudioOutputDevice(id: 1, name: "AirPods Pro", isBluetoothAudio: true),
+                productID: nil, isVolumeMetric: false
+            ),
+            headphoneOptions: SystemMonitorHeadphoneOptions(
+                replacesNetworkIcon: true, prioritizesNetworkErrors: true
+            )
+        )
+        #expect(MenuBarIconMappings.shouldReplaceNetworkIcon(status: status))
+    }
+
+    @Test
     func normalizedSizeProducesBoundedRetinaBitmaps() throws {
         for (requested, expected) in [(0.0, 16), (36.0, 36), (10000.0, 36), (Double.nan, 26)] {
             var appearance = SystemMonitorCombinedIconAppearance()
@@ -284,11 +427,12 @@ struct SystemMonitorMenuBarIconBehaviorTests {
 
     private func bitmap(
         battery: BatterySnapshot? = nil,
+        wifi: MenuBarWiFiState = .connected(strength: 1),
         level: Double? = 0.5,
         appearance: SystemMonitorCombinedIconAppearance
     ) throws -> Data {
         let image = try #require(SystemMonitorMenuBarImageRenderer.combinedIcon(
-            battery: battery, wifi: .connected(strength: 1), level: level,
+            battery: battery, wifi: wifi, level: level,
             foreground: .black, configuration: appearance
         ))
         return try #require(image.tiffRepresentation)

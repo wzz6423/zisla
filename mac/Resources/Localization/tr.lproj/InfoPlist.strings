@@ -2,7 +2,7 @@
 "NSAudioCaptureUsageDescription" = "zisla, canlı dalga formu oluşturmak için mevcut ses spektrumunu okur.";
 "NSCameraUsageDescription" = "zisla kamerayı yalnızca ayna açıkken kullanır.";
 "NSRemindersFullAccessUsageDescription" = "zisla, takvim etkinlikleriyle birlikte göstermek için tarihli hatırlatıcıları okur.";
-"NSLocationWhenInUseUsageDescription" = "zisla, yerel hava durumunu ve yer adlarını göstermek için konumunuzu kullanır.";
+"NSLocationWhenInUseUsageDescription" = "zisla, yerel hava durumunu, yer adlarını ve yakındaki Wi-Fi ağlarını göstermek için konum erişimine ihtiyaç duyar.";
 "NSMicrophoneUsageDescription" = "zisla mikrofonu yalnızca sesli giriş başlattığınızda, konuşmayı mevcut AI sohbet metnine dönüştürmek için kullanır.";
 "NSSpeechRecognitionUsageDescription" = "zisla, aktif olarak kaydettiğiniz konuşmayı AI sohbet metnine dönüştürür.";
 "NSAppleEventsUsageDescription" = "zisla, gelen kutuları, okundu durumu, silme ve yanıtlar dahil olmak üzere e-postaları okumak ve yönetmek için Mail.app'i kullanır. Ayrıca seçtiğiniz komutları Terminal veya iTerm içinde çalıştırır.";

@@ -5,6 +5,33 @@ import ZislaCore
 @testable import Zisla
 
 struct SettingsNavigationTests {
+    @Test(arguments: [false, true], [false, true])
+    func combinedMonitorNavigationPreservesIndependentFeatureToggles(systemEnabled: Bool, batteryEnabled: Bool) {
+        var settings = FeatureSettings.default
+        settings.systemMonitorEnabled = systemEnabled
+        settings.batteryMonitorEnabled = batteryEnabled
+        settings.moduleOrder = [.battery, .mail, .system]
+
+        let modules = IslandModule.enabledOrder(settings)
+        #expect(modules.contains(.system) == (systemEnabled || batteryEnabled))
+        #expect(IslandModule.battery.isEnabled(in: settings) == (systemEnabled || batteryEnabled))
+        #expect(!modules.contains(.battery))
+        #expect(modules.filter { $0 == .system }.count <= 1)
+        if systemEnabled || batteryEnabled {
+            #expect(modules.first == .system)
+        }
+        #expect(settings.systemMonitorEnabled == systemEnabled)
+        #expect(settings.batteryMonitorEnabled == batteryEnabled)
+    }
+
+    @Test
+    func legacyBatteryNavigationTargetsTheCombinedMonitor() {
+        #expect(IslandModule.battery.navigationTarget == .system)
+        for module in IslandModule.allCases where module != .battery {
+            #expect(module.navigationTarget == module)
+        }
+    }
+
     @Test
     func windowPreviewSettingIsLocalizedInEveryLanguage() throws {
         let keys = [

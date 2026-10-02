@@ -111,7 +111,7 @@ struct SystemMonitorHeadphoneTests {
                     battery: battery, wifi: .connected(strength: 1), level: 0.5,
                     headphones: headphone(), headphoneOptions: SystemMonitorHeadphoneOptions(replacesNetworkIcon: true)
                 ))
-                for horizontal in 0..<44 {
+                for horizontal in 0..<plain.pixelsWide {
                     for vertical in 0..<8 {
                         #expect(plain.colorAt(x: horizontal, y: vertical) == combined.colorAt(x: horizontal, y: vertical))
                     }

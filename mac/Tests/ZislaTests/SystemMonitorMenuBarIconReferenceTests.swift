@@ -7,7 +7,7 @@ import ZislaKit
 
 @testable import Zisla
 
-@Suite("Menu bar icon reference: 79c03914b910991b552a33c4f4009c49a52ec837")
+@Suite("Menu bar icon reference: 2b0571a51c70fab0f1176db1eb0c32a8d7f2b4ad")
 struct SystemMonitorMenuBarIconReferenceTests {
     @Test
     func batteryArcMatchesOriginalSVGEndpointsAndProgress() {
@@ -87,6 +87,7 @@ struct SystemMonitorMenuBarIconReferenceTests {
             (.connected(strength: 0.24), ReferenceSymbol(name: "wifi", value: 0.33)),
             (.connected(strength: 0.44), ReferenceSymbol(name: "wifi", value: 0.66)),
             (.connected(strength: 1), ReferenceSymbol(name: "wifi", value: 1)),
+            (.personalHotspot, ReferenceSymbol(name: "personalhotspot", value: 1)),
             (.disconnected, ReferenceSymbol(name: "wifi", value: 0)),
             (.off, ReferenceSymbol(name: "wifi.slash", value: 1)),
             (.unavailable, ReferenceSymbol(name: "wifi.slash", value: 1)),

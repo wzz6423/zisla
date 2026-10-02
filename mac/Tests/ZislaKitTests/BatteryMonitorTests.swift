@@ -1,3 +1,4 @@
+import AppKit
 import CoreFoundation
 import Foundation
 import IOKit.ps
@@ -6,6 +7,199 @@ import Testing
 @testable import ZislaKit
 
 struct BatteryMonitorTests {
+    @Test(arguments: [true, false])
+    func systemPowerUsesSystemLoadInsteadOfBatteryFlow(isPluggedIn: Bool) {
+        let battery = BatterySnapshot(
+            level: 0.8, isCharging: isPluggedIn, isPluggedIn: isPluggedIn,
+            isCharged: false, timeRemainingMinutes: nil, powerWatts: 60,
+            adapterRatedWatts: 100, systemLoadWatts: 24, batteryFlowWatts: -12
+        )
+        #expect(battery.systemPowerWatts == 24)
+    }
+
+    @Test
+    func unknownSystemPowerNeverUsesAdapterRatingOrChargingPower() {
+        var battery = BatterySnapshot(
+            level: 1, isCharging: false, isPluggedIn: true, isCharged: true,
+            timeRemainingMinutes: nil, powerWatts: 0, adapterRatedWatts: 96, batteryFlowWatts: 0
+        )
+        #expect(battery.systemPowerWatts == nil)
+        battery.systemLoadWatts = 0
+        #expect(battery.systemPowerWatts == 0)
+        battery.isPluggedIn = false
+        battery.systemLoadWatts = nil
+        battery.powerWatts = nil
+        battery.batteryFlowWatts = -12
+        #expect(battery.systemPowerWatts == nil)
+        battery.batteryFlowWatts = nil
+        #expect(battery.systemPowerWatts == nil)
+    }
+
+    @Test @MainActor
+    func fullyChargedBatteryTrendStillRecordsTheMachinesLoad() throws {
+        let suiteName = "Zisla.BatteryMonitorTests.\(UUID().uuidString)"
+        let defaults = try #require(UserDefaults(suiteName: suiteName))
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+        var date = Date(timeIntervalSince1970: 1_000)
+        var battery = BatterySnapshot(
+            level: 1, isCharging: false, isPluggedIn: true, isCharged: true,
+            timeRemainingMinutes: nil, powerWatts: 0, adapterRatedWatts: 96,
+            systemLoadWatts: 24, batteryFlowWatts: 0
+        )
+        let monitor = BatteryMonitor(
+            defaults: defaults, now: { date }, notificationCenter: NotificationCenter(),
+            snapshotProvider: { battery }, runLoopSourceFactory: { _ in nil }
+        )
+        monitor.refresh()
+        #expect(monitor.trendSamples.first?.systemPowerWatts == 24)
+        battery.systemLoadWatts = nil
+        date.addTimeInterval(5)
+        monitor.refresh()
+        #expect(monitor.trendSamples.count == 2)
+        #expect(monitor.trendSamples.last?.systemPowerWatts == nil)
+    }
+
+    @Test @MainActor
+    func recordsBoundedTrendAtSamplingCadence() throws {
+        let suiteName = "Zisla.BatteryMonitorTests.\(UUID().uuidString)"
+        let defaults = try #require(UserDefaults(suiteName: suiteName))
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+        var date = Date(timeIntervalSince1970: 1_000)
+        let battery = try #require(BatteryMonitor.snapshot(
+            from: powerSource(level: 60), registry: [
+                "InstantAmperage": -1_000,
+                "Voltage": 12_000,
+                "PowerTelemetryData": ["SystemPowerIn": 0, "SystemLoad": 12_000],
+            ]
+        ))
+        let monitor = BatteryMonitor(
+            defaults: defaults, now: { date }, notificationCenter: NotificationCenter(),
+            snapshotProvider: { battery }, runLoopSourceFactory: { _ in nil }
+        )
+        monitor.refresh()
+        date.addTimeInterval(1)
+        monitor.refresh()
+        #expect(monitor.trendSamples.count == 1)
+        for _ in 0..<65 {
+            date.addTimeInterval(5)
+            monitor.refresh()
+        }
+        #expect(monitor.trendSamples.count == 60)
+        #expect(monitor.trendSamples.first?.date == Date(timeIntervalSince1970: 1_031))
+        #expect(monitor.trendSamples.last?.date == date)
+        #expect(monitor.trendSamples.allSatisfy { $0.level == 0.6 && $0.systemPowerWatts == 12 })
+    }
+
+    @Test(arguments: [-1.0, 16.0, 3_600.0]) @MainActor
+    func trendRestartsAcrossTimeDiscontinuities(interval: TimeInterval) throws {
+        let suiteName = "Zisla.BatteryMonitorTests.\(UUID().uuidString)"
+        let defaults = try #require(UserDefaults(suiteName: suiteName))
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+        var date = Date(timeIntervalSince1970: 1_000)
+        let battery = try #require(BatteryMonitor.snapshot(from: powerSource(level: 60)))
+        let monitor = BatteryMonitor(
+            defaults: defaults, now: { date }, notificationCenter: NotificationCenter(),
+            snapshotProvider: { battery }, runLoopSourceFactory: { _ in nil }
+        )
+        monitor.refresh()
+        date.addTimeInterval(5)
+        monitor.refresh()
+        #expect(monitor.trendSamples.count == 2)
+        date.addTimeInterval(interval)
+        monitor.refresh()
+        #expect(monitor.trendSamples.count == 1)
+        #expect(monitor.trendSamples.first?.date == date)
+    }
+
+    @Test @MainActor
+    func missingBatteryAndPowerPreserveGaps() throws {
+        let suiteName = "Zisla.BatteryMonitorTests.\(UUID().uuidString)"
+        let defaults = try #require(UserDefaults(suiteName: suiteName))
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+        var date = Date(timeIntervalSince1970: 1_000)
+        let available = try #require(BatteryMonitor.snapshot(
+            from: powerSource(level: 60), registry: [
+                "InstantAmperage": -1_000,
+                "Voltage": 12_000,
+                "PowerTelemetryData": ["SystemPowerIn": 0, "SystemLoad": 12_000],
+            ]
+        ))
+        var current: BatterySnapshot? = available
+        let monitor = BatteryMonitor(
+            defaults: defaults, now: { date }, notificationCenter: NotificationCenter(),
+            snapshotProvider: { current }, runLoopSourceFactory: { _ in nil }
+        )
+        monitor.refresh()
+        current?.systemLoadWatts = nil
+        current?.powerWatts = nil
+        current?.batteryFlowWatts = nil
+        date.addTimeInterval(1)
+        monitor.refresh()
+        #expect(monitor.trendSamples.count == 2)
+        #expect(monitor.trendSamples.last?.systemPowerWatts == nil)
+        current = nil
+        monitor.refresh()
+        #expect(monitor.trendSamples.isEmpty)
+        current = available
+        monitor.refresh()
+        #expect(monitor.trendSamples.count == 1)
+        #expect(monitor.trendSamples.first?.date == date)
+    }
+
+    @Test @MainActor
+    func trendTimerAndWakeObservationFollowMonitorLifecycle() throws {
+        let suiteName = "Zisla.BatteryMonitorTests.\(UUID().uuidString)"
+        let defaults = try #require(UserDefaults(suiteName: suiteName))
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+        let workspaceCenter = BatteryTestNotificationCenter()
+        var date = Date(timeIntervalSince1970: 1_000)
+        let battery = try #require(BatteryMonitor.snapshot(from: powerSource(level: 60)))
+        var timers: [Timer] = []
+        var readCount = 0
+        var monitor: BatteryMonitor? = BatteryMonitor(
+            defaults: defaults, now: { date }, notificationCenter: NotificationCenter(),
+            snapshotProvider: { readCount += 1; return battery }, runLoopSourceFactory: { _ in nil },
+            workspaceNotificationCenter: workspaceCenter,
+            timerFactory: { interval, block in
+                let timer = Timer(timeInterval: interval, repeats: true, block: block)
+                timers.append(timer)
+                return timer
+            }
+        )
+        monitor?.start()
+        monitor?.start()
+        #expect(timers.count == 1)
+        #expect(timers.first?.timeInterval == 5)
+        #expect(workspaceCenter.notificationHandlers.count == 1)
+        date.addTimeInterval(5)
+        timers.first?.fireDate = .distantPast
+        RunLoop.main.run(until: Date().addingTimeInterval(0.02))
+        #expect(monitor?.trendSamples.count == 2)
+        #expect(readCount == 3)
+        date.addTimeInterval(1)
+        workspaceCenter.post(name: NSWorkspace.didWakeNotification, object: nil)
+        #expect(monitor?.trendSamples.count == 1)
+        #expect(monitor?.trendSamples.first?.date == date)
+        let delayedWake = try #require(workspaceCenter.notificationHandlers.first)
+        monitor?.stop()
+        #expect(timers.first?.isValid == false)
+        #expect(monitor?.trendSamples.isEmpty == true)
+        #expect(workspaceCenter.removedObserverCount == 1)
+        delayedWake(Notification(name: NSWorkspace.didWakeNotification))
+        #expect(readCount == 4)
+        #expect(monitor?.trendSamples.isEmpty == true)
+        monitor?.start()
+        #expect(timers.count == 2)
+        #expect(workspaceCenter.notificationHandlers.count == 2)
+        delayedWake(Notification(name: NSWorkspace.didWakeNotification))
+        #expect(readCount == 5)
+        weak var retainedMonitor = monitor
+        monitor = nil
+        #expect(retainedMonitor == nil)
+        #expect(timers.last?.isValid == false)
+        #expect(workspaceCenter.removedObserverCount == 2)
+    }
+
     @Test
     func parsesPowerSourceStatusAndTime() throws {
         let snapshot = try #require(BatteryMonitor.snapshot(from: powerSource(
@@ -429,6 +623,7 @@ struct BatteryMonitorTests {
         defer { defaults.removePersistentDomain(forName: suiteName) }
         let center = BatteryTestNotificationCenter()
         var context = CFRunLoopSourceContext()
+        context.info = Unmanaged.passUnretained(center).toOpaque()
         let source = try #require(CFRunLoopSourceCreate(kCFAllocatorDefault, 0, &context))
         var current = try #require(BatteryMonitor.snapshot(from: powerSource(level: 100)))
         var readCount = 0
@@ -467,6 +662,7 @@ struct BatteryMonitorTests {
         defer { defaults.removePersistentDomain(forName: suiteName) }
         let center = BatteryTestNotificationCenter()
         var context = CFRunLoopSourceContext()
+        context.info = Unmanaged.passUnretained(center).toOpaque()
         let source = try #require(CFRunLoopSourceCreate(kCFAllocatorDefault, 0, &context))
         var current = try #require(BatteryMonitor.snapshot(from: powerSource(level: 100)))
         var readCount = 0
@@ -547,6 +743,7 @@ struct BatteryMonitorTests {
         defer { defaults.removePersistentDomain(forName: suiteName) }
         let center = BatteryTestNotificationCenter()
         var context = CFRunLoopSourceContext()
+        context.info = Unmanaged.passUnretained(center).toOpaque()
         let source = try #require(CFRunLoopSourceCreate(kCFAllocatorDefault, 0, &context))
         var monitor: BatteryMonitor? = BatteryMonitor(
             defaults: defaults,

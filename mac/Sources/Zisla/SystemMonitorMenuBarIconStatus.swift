@@ -19,6 +19,7 @@ struct MenuBarIconBatteryStatus: Equatable, Sendable {
 
 enum MenuBarIconWiFiState: Equatable, Sendable {
     case connected
+    case personalHotspot
     case notAssociated
     case off
     case unavailable
@@ -97,6 +98,8 @@ struct MenuBarIconStatus: Equatable, Sendable {
             )
         case .disconnected:
             self.wifi = MenuBarIconWiFiStatus(state: .notAssociated, rssi: nil)
+        case .personalHotspot:
+            self.wifi = MenuBarIconWiFiStatus(state: .personalHotspot, rssi: nil)
         case .off:
             self.wifi = MenuBarIconWiFiStatus(state: .off, rssi: nil)
         case .unavailable, .connected:
@@ -163,10 +166,8 @@ enum MenuBarIconBatteryColorRole: Equatable, Sendable {
 
 enum MenuBarIconBatteryGapContent: Equatable, Sendable {
     case bolt
-    case plug
     case percentage
     case boltAndPercentage
-    case plugAndPercentage
     case empty
 }
 
@@ -177,7 +178,7 @@ enum MenuBarIconMappings {
               headphones.device.isHeadphones,
               headphones.device.isBluetoothAudio else { return false }
         guard status.headphoneOptions.prioritizesNetworkErrors else { return true }
-        return status.wifi.state == .connected
+        return status.wifi.state == .connected || status.wifi.state == .personalHotspot
     }
 
     static func wifiBars(rssi: Int?) -> Int {
@@ -213,7 +214,7 @@ enum MenuBarIconMappings {
         if options.showsChargingIndicator {
             if battery.isCharging { return options.showsPercentage ? .boltAndPercentage : .bolt }
             let showsPercentageForPower = options.showsPercentageWhenConnected && options.showsPercentage
-            if battery.isConnectedToPower { return showsPercentageForPower ? .plugAndPercentage : .plug }
+            if battery.isConnectedToPower { return showsPercentageForPower ? .boltAndPercentage : .bolt }
         }
         return options.showsPercentage ? .percentage : .empty
     }

@@ -34,7 +34,7 @@ struct LocalPowerFlowPresentation: Equatable {
             mode = .pluggedIn
             inputWatts = battery.adapterWatts ?? battery.adapterRatedWatts
             inputIsRated = battery.adapterWatts == nil && battery.adapterRatedWatts != nil
-            systemWatts = battery.systemLoadWatts
+            systemWatts = battery.systemPowerWatts
 
             if let flow = battery.batteryFlowWatts {
                 batteryWatts = abs(flow)
@@ -57,7 +57,7 @@ struct LocalPowerFlowPresentation: Equatable {
         } else {
             mode = .onBattery
             topology = .batteryToMac
-            let power = battery.powerWatts ?? battery.batteryFlowWatts.map { abs($0) }
+            let power = battery.systemPowerWatts
             inputWatts = power
             inputIsRated = false
             batteryWatts = nil
@@ -561,6 +561,21 @@ private struct PowerBranchLaneShape: Shape {
     }
 }
 
+struct BatteryTrendPresentation {
+    let samples: [BatteryTrendSample]
+    let powerSamples: [BatteryTrendSample]
+    let powerScale: Double
+
+    init(samples: [BatteryTrendSample]) {
+        self.samples = samples
+        powerSamples = Array(samples.reversed().prefix { $0.systemPowerWatts != nil }.reversed())
+        powerScale = max(1, powerSamples.compactMap(\.systemPowerWatts).max() ?? 0)
+    }
+
+    var levels: [Double] { samples.map(\.level) }
+    var powerLevels: [Double] { powerSamples.compactMap(\.systemPowerWatts).map { $0 / powerScale } }
+}
+
 struct BatteryDetailView: View {
     @ObservedObject var batteryMonitor: BatteryMonitor
     @ObservedObject var networkMonitor: NetworkBatteryMonitor
@@ -576,20 +591,15 @@ struct BatteryDetailView: View {
     }
 
     var body: some View {
-        ScrollView {
-            VStack(spacing: 12) {
-                if let battery = batteryMonitor.snapshot {
-                    localBatterySection(battery)
-                } else {
-                    noLocalBatterySection
-                }
-                deviceSection
+        VStack(spacing: 12) {
+            if let battery = batteryMonitor.snapshot {
+                localBatterySection(battery)
+            } else {
+                noLocalBatterySection
             }
-            .padding(.top, 12)
-            .padding(.horizontal, 12)
+            SignificantEnergyView()
+            deviceSection
         }
-        .scrollIndicators(.hidden)
-        .frame(maxHeight: .infinity)
         .onAppear {
             batteryMonitor.refresh()
             networkMonitor.start()
@@ -599,7 +609,7 @@ struct BatteryDetailView: View {
         }
     }
 
-    private func localBatterySection(_ battery: BatterySnapshot) -> some View {
+    func localBatterySection(_ battery: BatterySnapshot) -> some View {
         VStack(alignment: .leading, spacing: 8) {
             HStack {
                 Label(localized("本机电池"), systemImage: "laptopcomputer")
@@ -624,8 +634,18 @@ struct BatteryDetailView: View {
                 }
             }
 
+            BatteryPowerModeButton(
+                isPluggedIn: battery.isPluggedIn,
+                isLowPowerMode: battery.isLowPowerMode
+            )
             LocalPowerFlowView(battery: battery)
-            metricGrid(battery)
+            HStack(alignment: .top, spacing: 12) {
+                trendColumn(battery)
+                    .frame(maxWidth: .infinity, alignment: .top)
+                metricGrid(battery)
+                    .frame(width: 250)
+            }
+            .fixedSize(horizontal: false, vertical: true)
 
             if let minutes = battery.timeRemainingMinutes {
                 overviewRow(
@@ -635,6 +655,54 @@ struct BatteryDetailView: View {
                 )
                 .padding(.horizontal, 2)
             }
+        }
+    }
+
+    private func trendColumn(_ battery: BatterySnapshot) -> some View {
+        let trend = BatteryTrendPresentation(samples: batteryMonitor.trendSamples)
+        return VStack(spacing: 10) {
+            trendChart(
+                title: localized("电量"),
+                value: "\(battery.percentInt)%",
+                values: trend.levels,
+                tint: Self.batteryLevelTint(battery.level, isLowPowerMode: battery.isLowPowerMode)
+            )
+            trendChart(
+                title: localized("本机功率"),
+                value: battery.systemPowerWatts.map { BatteryLocalization.number("%.1f W", locale: locale, $0) } ?? "--",
+                values: trend.powerLevels,
+                tint: .zislaWarning
+            )
+        }
+    }
+
+    func trendChart(
+        title: String,
+        value: String,
+        values: [Double],
+        tint: Color
+    ) -> some View {
+        VStack(alignment: .leading, spacing: 8) {
+            HStack(spacing: 6) {
+                Text(title)
+                    .font(.system(size: 12, weight: .semibold))
+                    .fitsSingleLine()
+                Spacer(minLength: 4)
+                Text(value)
+                    .font(.system(size: 11, weight: .semibold, design: .rounded))
+                    .foregroundStyle(tint)
+                    .monospacedDigit()
+                    .fitsSingleLine()
+            }
+            MultiLineWaveform(series: [WaveSeries(samples: values, color: tint)], height: 40)
+        }
+        .padding(10)
+        .frame(maxHeight: .infinity, alignment: .top)
+        .background(Color.fillCard)
+        .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+        .overlay {
+            RoundedRectangle(cornerRadius: 10, style: .continuous)
+                .strokeBorder(Color.strokeCard, lineWidth: 0.5)
         }
     }
 
@@ -664,10 +732,7 @@ struct BatteryDetailView: View {
     }
 
     private func metricGrid(_ battery: BatterySnapshot) -> some View {
-        LazyVGrid(
-            columns: Array(repeating: GridItem(.flexible(), spacing: 8), count: 3),
-            spacing: 8
-        ) {
+        VStack(spacing: 8) {
             metricTile(
                 title: localized("健康度"),
                 value: battery.healthPercent.map { "\($0)%" } ?? "--",
@@ -723,6 +788,13 @@ struct BatteryDetailView: View {
                 symbol: "powerplug.fill"
             )
         }
+        .padding(8)
+        .background(Color.fillCard.opacity(0.5))
+        .clipShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
+        .overlay {
+            RoundedRectangle(cornerRadius: 6, style: .continuous)
+                .strokeBorder(Color.strokeCard.opacity(0.5), lineWidth: 0.5)
+        }
     }
 
     private func metricTile(
@@ -731,26 +803,18 @@ struct BatteryDetailView: View {
         symbol: String,
         tint: Color = .primary
     ) -> some View {
-        VStack(alignment: .leading, spacing: 4) {
+        HStack(spacing: 4) {
             Label(title, systemImage: symbol)
                 .font(.system(size: 9, weight: .medium))
                 .foregroundStyle(.secondary)
                 .fitsSingleLine()
+            Spacer(minLength: 4)
             Text(value)
-                .font(.system(size: 11, weight: .semibold, design: .rounded))
+                .font(.system(size: 9, weight: .semibold, design: .rounded))
                 .foregroundStyle(tint)
                 .monospacedDigit()
                 .lineLimit(1)
                 .minimumScaleFactor(0.78)
-        }
-        .padding(.horizontal, 8)
-        .padding(.vertical, 7)
-        .frame(maxWidth: .infinity, minHeight: 48, alignment: .leading)
-        .background(Color.fillCard.opacity(0.5))
-        .clipShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
-        .overlay {
-            RoundedRectangle(cornerRadius: 6, style: .continuous)
-                .strokeBorder(Color.strokeCard.opacity(0.5), lineWidth: 0.5)
         }
         .accessibilityElement(children: .ignore)
         .accessibilityLabel("\(title)，\(value)")
@@ -789,21 +853,14 @@ struct BatteryDetailView: View {
                     Text(localized("当前没有 macOS 可读取的蓝牙设备或已信任的 Apple 移动设备"))
                 }
                 .frame(maxWidth: .infinity, minHeight: 112)
-            } else if devices.count <= 2 {
-                VStack(spacing: 0) {
-                    ForEach(Array(devices.enumerated()), id: \.element.id) { index, device in
-                        deviceRow(device)
-                        if index < devices.count - 1 {
-                            Divider().padding(.leading, 50)
-                        }
+            } else if devices.count == 1 {
+                deviceRow(devices[0])
+                    .background(Color.fillCard)
+                    .clipShape(deviceCardShape)
+                    .overlay {
+                        deviceCardShape
+                            .strokeBorder(Color.strokeCard, lineWidth: 0.5)
                     }
-                }
-                .background(Color.fillCard)
-                .clipShape(deviceCardShape)
-                .overlay {
-                    deviceCardShape
-                        .strokeBorder(Color.strokeCard, lineWidth: 0.5)
-                }
             } else {
                 VStack(spacing: 8) {
                     LazyVGrid(

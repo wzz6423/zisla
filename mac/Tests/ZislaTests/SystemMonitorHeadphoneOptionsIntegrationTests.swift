@@ -1,8 +1,11 @@
+import AppKit
 import Foundation
 import SwiftUI
 import Testing
 import ZislaCore
 import ZislaKit
+
+@testable import Zisla
 
 struct SystemMonitorHeadphoneOptionsIntegrationTests {
     @Test
@@ -23,13 +26,53 @@ struct SystemMonitorHeadphoneOptionsIntegrationTests {
         #expect(!source.contains("点击图标后在系统监控页查看耳机电量"))
         let replacement = try Self.section(
             source,
-            from: "                if settingsStore.settings.systemMonitorMenuBarHeadphoneOptions.replacesNetworkIcon {",
-            to: "                Toggle(isOn: $settingsStore.settings.systemMonitorMenuBarHeadphoneOptions.usesVolumeColor)"
+            from: "                    if settingsStore.settings.systemMonitorMenuBarHeadphoneOptions.replacesNetworkIcon {",
+            to: "                    if settingsStore.settings.systemMonitorMenuBarCombinedIconMetric == .volume {"
         )
         #expect(replacement.contains("$settingsStore.settings.systemMonitorMenuBarHeadphoneOptions.prioritizesNetworkErrors"))
         #expect(replacement.contains("$settingsStore.settings.systemMonitorMenuBarHeadphoneOptions.symbolScale"))
         #expect(!replacement.contains("showsBatteryLevels"))
         #expect(!source.contains("外环显示耳机电量"))
+        let volume = try Self.section(
+            source,
+            from: "                    if settingsStore.settings.systemMonitorMenuBarCombinedIconMetric == .volume {",
+            to: "\n                    }"
+        )
+        #expect(volume.contains("$settingsStore.settings.systemMonitorMenuBarHeadphoneOptions.usesVolumeColor"))
+        #expect(volume.contains("AppLocalizedText(\"仅底部指标选择音量时生效\")"))
+    }
+
+    @Test(arguments: [false, true]) @MainActor
+    func volumeControlsHideAndReturnWithoutChangingTheirStoredChoice(usesVolumeColor: Bool) throws {
+        let suite = "SystemMonitorHeadphoneOptionsIntegrationTests.\(UUID().uuidString)"
+        let defaults = try #require(UserDefaults(suiteName: suite))
+        defer { defaults.removePersistentDomain(forName: suite) }
+        let store = FeatureSettingsStore(defaults: defaults, persistenceDelay: .seconds(60), defaultUpdateChannel: .release)
+        defer { store.flushPendingChanges() }
+        store.settings.systemMonitorMenuBarCombinedIconEnabled = true
+        store.settings.systemMonitorMenuBarCombinedIconMetric = .volume
+        store.settings.systemMonitorMenuBarHeadphoneOptions.usesVolumeColor = usesVolumeColor
+        let original = store.settings.systemMonitorMenuBarHeadphoneOptions
+
+        _ = NSApplication.shared
+        func renderedHeight() -> CGFloat {
+            let host = NSHostingView(rootView: SystemMonitorMenuBarSettingsView(settingsStore: store)
+                .environment(\.locale, AppLanguage.english.locale)
+                .frame(width: 560)
+                .fixedSize(horizontal: false, vertical: true))
+            return host.fittingSize.height
+        }
+        let visibleHeight = renderedHeight()
+        for metric in SystemMonitorCombinedIconMetric.allCases where metric != .volume {
+            store.settings.systemMonitorMenuBarCombinedIconMetric = metric
+            #expect(renderedHeight() < visibleHeight, "Volume controls must be hidden for \(metric)")
+            store.flushPendingChanges()
+            let restored = FeatureSettingsStore(defaults: defaults, defaultUpdateChannel: .release)
+            #expect(restored.settings.systemMonitorMenuBarHeadphoneOptions == original)
+            store.settings.systemMonitorMenuBarCombinedIconMetric = .volume
+            #expect(renderedHeight() == visibleHeight)
+            #expect(store.settings.systemMonitorMenuBarHeadphoneOptions == original)
+        }
     }
 
     @Test

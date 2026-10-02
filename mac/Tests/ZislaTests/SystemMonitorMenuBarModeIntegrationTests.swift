@@ -1,15 +1,32 @@
+import AppKit
 import Foundation
 import SwiftUI
 import Testing
 import ZislaCore
+import ZislaKit
+
+@testable import Zisla
 
 struct SystemMonitorMenuBarModeIntegrationTests {
     @Test
     func configurationExposesTwoIndependentSwitches() throws {
-        let source = try Self.source("SystemMonitorMenuBarSettingsView.swift")
-        #expect(source.contains("Toggle(isOn: $settingsStore.settings.systemMonitorMenuBarLayout.individualEnabled)"))
-        #expect(source.contains("Toggle(isOn: $settingsStore.settings.systemMonitorMenuBarLayout.stackedEnabled)"))
-        #expect(!source.contains("Picker(AppLocalization.text(\"菜单栏布局\")"))
+        let settings = try Self.source("SettingsView.swift")
+        let merged = try Self.source("SystemMonitorMenuBarSettingsView.swift")
+        let individualOrder = try [
+            "Toggle(isOn: $settingsStore.settings.systemMonitorMenuBarLayout.individualEnabled)",
+            "if model.settingsStore.settings.systemMonitorMenuBarLayout.individualEnabled {",
+            "title: \"监控样式\"",
+            "ForEach(SystemMonitorMenuBarMetric.allCases, id: \\.self)",
+            "SystemMonitorMenuBarSettingsView(settingsStore: model.settingsStore)",
+        ].map { try #require(settings.range(of: $0), "Missing settings control: \($0)").lowerBound }
+        #expect(individualOrder == individualOrder.sorted())
+        let mergedOrder = try [
+            "Toggle(isOn: $settingsStore.settings.systemMonitorMenuBarLayout.stackedEnabled)",
+            "if settingsStore.settings.systemMonitorMenuBarLayout.stackedEnabled {",
+            "Toggle(isOn: $settingsStore.settings.systemMonitorMenuBarCombinedIconEnabled)",
+        ].map { try #require(merged.range(of: $0), "Missing settings control: \($0)").lowerBound }
+        #expect(mergedOrder == mergedOrder.sorted())
+        #expect(!merged.contains("Picker(AppLocalization.text(\"菜单栏布局\")"))
     }
 
     @Test
@@ -86,6 +103,60 @@ struct SystemMonitorMenuBarModeIntegrationTests {
         binding.systemMonitorMenuBarLayout.individualEnabled.wrappedValue = true
         #expect(settings.systemMonitorMenuBarLayout == .individual)
         #expect(settings == original)
+    }
+
+    @Test(.serialized, arguments: AppLanguage.allCases) @MainActor
+    func metricPickerColumnsAlignAcrossLanguages(language: AppLanguage) async throws {
+        let suite = "SystemMonitorMenuBarModeIntegrationTests.\(UUID().uuidString)"
+        let defaults = try #require(UserDefaults(suiteName: suite))
+        defer { defaults.removePersistentDomain(forName: suite) }
+        let store = FeatureSettingsStore(defaults: defaults, persistenceDelay: .seconds(60), defaultUpdateChannel: .release)
+        defer { store.flushPendingChanges() }
+        store.settings.systemMonitorMenuBarLayout = .stacked
+        store.settings.systemMonitorMenuBarTopRow = [.cpu, .gpu]
+        store.settings.systemMonitorMenuBarBottomRow = [.disk, .memory]
+
+        let releaseAccessibility = EnhancedAccessibilityTestScope.acquire()
+        defer { releaseAccessibility() }
+        let host = NSHostingView(rootView: SystemMonitorMenuBarSettingsView(settingsStore: store)
+            .environment(\.locale, language.locale)
+            .environment(\.layoutDirection, language.isRightToLeft ? .rightToLeft : .leftToRight)
+        )
+        host.sizingOptions = []
+        let window = NSWindow(
+            contentRect: NSRect(x: 0, y: 0, width: 560, height: 360),
+            styleMask: .borderless,
+            backing: .buffered,
+            defer: false
+        )
+        window.isReleasedWhenClosed = false
+        window.alphaValue = 0
+        window.contentView = host
+        window.orderFrontRegardless()
+        defer { window.close() }
+        host.layoutSubtreeIfNeeded()
+        host.displayIfNeeded()
+        await withCheckedContinuation { continuation in
+            DispatchQueue.main.async { continuation.resume() }
+        }
+
+        var frames = [String: NSRect]()
+        for child in host.accessibilityChildren() ?? [] {
+            guard let element = child as? any NSAccessibilityElementProtocol,
+                  let identifier = element.accessibilityIdentifier?(),
+                  identifier.hasPrefix("system-monitor-row-") else { continue }
+            frames[identifier] = element.accessibilityFrame()
+        }
+        try #require(frames.count == 4)
+        for slot in 0..<2 {
+            let top = try #require(frames["system-monitor-row-0-metric-\(slot)"])
+            let bottom = try #require(frames["system-monitor-row-1-metric-\(slot)"])
+            #expect(top.width > 0)
+            #expect(abs(top.minX - bottom.minX) < 0.5)
+            #expect(abs(top.maxX - bottom.maxX) < 0.5)
+            #expect(top.midY != bottom.midY)
+        }
+        #expect(window.alphaValue == 0)
     }
 
     private static func section(_ source: String, from startMarker: String, to endMarker: String) throws -> String {

@@ -59,7 +59,7 @@
     <key>NSHighResolutionCapable</key>
     <true/>
     <key>NSLocationWhenInUseUsageDescription</key>
-    <string>zisla 需要使用当前位置显示本地天气和地区名称。</string>
+    <string>zisla 需要定位权限来显示本地天气、地区名称和附近的 Wi-Fi 网络。</string>
     <key>NSMicrophoneUsageDescription</key>
     <string>zisla 仅在你点击语音输入时使用麦克风，将语音转换为当前 AI 对话的文字。</string>
     <key>NSHumanReadableCopyright</key>

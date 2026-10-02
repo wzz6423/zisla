@@ -24,6 +24,8 @@ enum IslandModule: String, CaseIterable, Identifiable {
 
   var id: Self { self }
 
+  var navigationTarget: Self { self == .battery ? .system : self }
+
   var allowsIslandKeyboardFocus: Bool {
     switch self {
     case .shelf, .clipboard, .download, .mail, .quickNotes:
@@ -113,8 +115,7 @@ extension IslandModule {
     case .quickNotes: settings.quickNotesEnabled
     case .pdf: settings.pdfToolsEnabled
     case .toolbox: settings.toolboxEnabled
-    case .system: settings.systemMonitorEnabled
-    case .battery: settings.batteryMonitorEnabled
+    case .system, .battery: settings.systemMonitorEnabled || settings.batteryMonitorEnabled
     case .lockScreen: settings.lockScreenInfoEnabled
     case .keyboardSound: settings.keyboardEnabled
     }
@@ -134,10 +135,10 @@ struct IslandModuleLayout: Equatable {
     )
   }
 
-  private static let unifiedIslandWidth: CGFloat = 820
-  private static let unifiedPanelWidth: CGFloat = 820
+  private static let unifiedIslandWidth: CGFloat = 776
+  private static let unifiedPanelWidth: CGFloat = 776
 
-  /// All module pages use the former AI monitor panel width.
+  /// All module pages share the width of the combined monitor navigation.
   static let standard = IslandModuleLayout(
     islandSize: CGSize(width: unifiedIslandWidth, height: 340),
     panelSize: CGSize(width: unifiedPanelWidth, height: 344)
@@ -387,6 +388,7 @@ final class AppModel: ObservableObject {
   /// Preferred entry point for switching modules: records the navigation direction for
   /// the directional transition, then applies the switch on the next run-loop turn.
   func selectModule(_ module: IslandModule) {
+    let module = module.navigationTarget
     let current = pendingModuleSelection ?? selectedModule
     guard module != current else { return }
     let order = IslandModule.configuredOrder(settingsStore.settings)
@@ -489,7 +491,9 @@ final class AppModel: ObservableObject {
   let managedTools = ManagedToolService()
   let powerAssertions = PowerAssertionController()
   let screenCleaning = ScreenCleaningController()
-  let systemMonitor = SystemMonitorService()
+  private(set) lazy var systemMonitor = SystemMonitorService(batterySnapshotProvider: { [weak self] in
+    self?.battery.snapshot
+  })
   let backgroundSounds = SystemBackgroundSoundService()
   let battery = BatteryMonitor()
   private lazy var lowBatteryNotice = LowBatteryNoticeController(queue: notices)
@@ -2838,9 +2842,9 @@ final class AppModel: ObservableObject {
       weatherSnapshotsByLocationID = [:]
     }
     systemMonitor.setHistoryRecordingEnabled(
-      settings.systemMonitorEnabled && settings.systemMetricsHistoryEnabled
+      (settings.systemMonitorEnabled || settings.batteryMonitorEnabled) && settings.systemMetricsHistoryEnabled
     )
-    if settings.systemMonitorEnabled {
+    if settings.systemMonitorEnabled || settings.batteryMonitorEnabled {
       systemMonitor.start()
     } else {
       systemMonitor.stop()
@@ -2883,8 +2887,7 @@ final class AppModel: ObservableObject {
       browserDownloads.stop()
       clearBrowserDownloadNotices()
     }
-    if settings.lockScreenInfoEnabled || settings.batteryMonitorEnabled
-      || (settings.systemMonitorEnabled && settings.systemMonitorMenuBarCombinedIconEnabled) {
+    if settings.lockScreenInfoEnabled || settings.batteryMonitorEnabled || settings.systemMonitorEnabled {
       battery.start()
     } else {
       battery.stop()

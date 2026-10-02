@@ -2,12 +2,14 @@ import CoreAudio
 import CoreGraphics
 import CoreWLAN
 import Darwin
+import ObjectiveC.runtime
 
 public enum MenuBarWiFiState: Equatable, Sendable {
     case unavailable
     case off
     case disconnected
     case connected(strength: Double)
+    case personalHotspot
 }
 
 public struct MenuBarSystemLevels: Equatable, Sendable {
@@ -31,7 +33,7 @@ public enum MenuBarSystemLevelReader {
         read(
             includeVolume: includeVolume,
             includeBrightness: includeBrightness,
-            wifi: readWiFi,
+            wifi: { readWiFi(CWWiFiClient.shared().interface()) },
             volume: readVolume,
             brightness: readBrightness
         )
@@ -51,12 +53,35 @@ public enum MenuBarSystemLevelReader {
         )
     }
 
-    static func wifiState(powerOn: Bool?, rssi: Int) -> MenuBarWiFiState {
+    static func wifiState(
+        powerOn: Bool?, rssi: Int, personalHotspot: () -> Bool? = { nil }
+    ) -> MenuBarWiFiState {
         guard let powerOn else { return .unavailable }
         guard powerOn else { return .off }
         guard rssi != 0 else { return .disconnected }
         guard rssi < 0 else { return .unavailable }
+        if personalHotspot() == true { return .personalHotspot }
         return .connected(strength: min(max((Double(rssi) + 100) / 50, 0), 1))
+    }
+
+    static func currentPersonalHotspot(ssidData: Data?, bssid: String?, networks: [CWNetwork]) -> Bool? {
+        guard let ssidData, !ssidData.isEmpty, let bssid, !bssid.isEmpty,
+              let network = networks.first(where: {
+                  $0.ssidData == ssidData && $0.bssid?.caseInsensitiveCompare(bssid) == .orderedSame
+              }) else { return nil }
+        return isPersonalHotspot(network)
+    }
+
+    public static func isPersonalHotspot(_ network: CWNetwork) -> Bool? {
+        // CoreWLAN exposes this flag only through Objective-C; reject unavailable or changed ABIs.
+        let selector = NSSelectorFromString("isPersonalHotspot")
+        guard network.responds(to: selector),
+              let method = class_getInstanceMethod(type(of: network), selector),
+              let encoding = method_getTypeEncoding(method),
+              ["B16@0:8", "c16@0:8"].contains(String(cString: encoding)) else { return nil }
+        typealias Getter = @convention(c) (AnyObject, Selector) -> ObjCBool
+        let getter = unsafeBitCast(method_getImplementation(method), to: Getter.self)
+        return getter(network, selector).boolValue
     }
 
     static func normalizedLevel(_ value: Double) -> Double? {
@@ -151,10 +176,15 @@ public enum MenuBarSystemLevelReader {
         return normalizedLevel(Double(value))
     }
 
-    private static func readWiFi() -> MenuBarWiFiState {
-        guard let interface = CWWiFiClient.shared().interface() else { return .unavailable }
+    static func readWiFi(_ interface: CWInterface?) -> MenuBarWiFiState {
+        guard let interface else { return .unavailable }
         let powerOn = interface.powerOn()
-        return wifiState(powerOn: powerOn, rssi: powerOn ? interface.rssiValue() : 0)
+        return wifiState(powerOn: powerOn, rssi: powerOn ? interface.rssiValue() : 0, personalHotspot: {
+            currentPersonalHotspot(
+                ssidData: interface.ssidData(), bssid: interface.bssid(),
+                networks: Array(interface.cachedScanResults() ?? [])
+            )
+        })
     }
 
     private static func readVolume() -> Double? {

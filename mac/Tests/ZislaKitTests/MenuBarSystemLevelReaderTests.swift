@@ -1,5 +1,7 @@
 import CoreAudio
 import CoreGraphics
+import CoreWLAN
+import Foundation
 import Testing
 
 @testable import ZislaKit
@@ -63,6 +65,94 @@ struct MenuBarSystemLevelReaderTests {
     func rssiClampsToUnitInterval(rssi: Int) {
         let expected: Double = rssi <= -100 ? 0 : rssi >= -50 ? 1 : 0.5
         #expect(MenuBarSystemLevelReader.wifiState(powerOn: true, rssi: rssi) == .connected(strength: expected))
+    }
+
+    @Test
+    func personalHotspotRequiresConfirmedMetadataAndAnAssociatedInterface() {
+        for flag: Bool? in [true, false, nil] {
+            let state = MenuBarSystemLevelReader.wifiState(powerOn: true, rssi: -75, personalHotspot: { flag })
+            #expect(state == (flag == true ? .personalHotspot : .connected(strength: 0.5)))
+        }
+        for (powerOn, rssi, expected): (Bool?, Int, MenuBarWiFiState) in [
+            (nil, -75, .unavailable), (false, -75, .off),
+            (true, 0, .disconnected), (true, 1, .unavailable), (true, Int.max, .unavailable)
+        ] {
+            let state = MenuBarSystemLevelReader.wifiState(powerOn: powerOn, rssi: rssi, personalHotspot: {
+                Issue.record("Unassociated Wi-Fi must not read cached hotspot metadata")
+                return true
+            })
+            #expect(state == expected)
+        }
+    }
+
+    @Test
+    func currentHotspotMatchesBothPublicNetworkIdentities() {
+        let network = HotspotNetworkFixture()
+        for hotspot in [false, true] {
+            network.hotspot = hotspot
+            #expect(MenuBarSystemLevelReader.currentPersonalHotspot(
+                ssidData: network.ssidData, bssid: network.bssid?.uppercased(), networks: [network]
+            ) == hotspot)
+        }
+        for (ssid, bssid): (Data?, String?) in [
+            (nil, network.bssid), (Data(), network.bssid),
+            (network.ssidData, nil), (network.ssidData, ""),
+            (Data("Another network".utf8), network.bssid),
+            (network.ssidData, "00:11:22:33:44:56")
+        ] {
+            #expect(MenuBarSystemLevelReader.currentPersonalHotspot(
+                ssidData: ssid, bssid: bssid, networks: [network]
+            ) == nil, "Missing identity or a stale cached network must not confirm a hotspot")
+        }
+        #expect(MenuBarSystemLevelReader.currentPersonalHotspot(
+            ssidData: network.ssidData, bssid: network.bssid, networks: []
+        ) == nil)
+        network.networkSSID = Data()
+        #expect(MenuBarSystemLevelReader.currentPersonalHotspot(
+            ssidData: network.ssidData, bssid: network.bssid, networks: [network]
+        ) == nil)
+        network.networkSSID = Data("Example network".utf8)
+        network.networkBSSID = ""
+        #expect(MenuBarSystemLevelReader.currentPersonalHotspot(
+            ssidData: network.ssidData, bssid: network.bssid, networks: [network]
+        ) == nil)
+    }
+
+    @Test
+    func personalHotspotMetadataRejectsUnavailableOrIncompatibleGetters() {
+        let network = HotspotNetworkFixture()
+        #expect(MenuBarSystemLevelReader.isPersonalHotspot(network) == true)
+        network.hotspot = false
+        #expect(MenuBarSystemLevelReader.isPersonalHotspot(network) == false)
+        #expect(MenuBarSystemLevelReader.isPersonalHotspot(SignedCharHotspotNetworkFixture()) == true)
+        #expect(MenuBarSystemLevelReader.isPersonalHotspot(MissingHotspotNetworkFixture()) == nil)
+        #expect(MenuBarSystemLevelReader.isPersonalHotspot(IncompatibleHotspotNetworkFixture()) == nil)
+    }
+
+    @Test
+    func wifiReaderClearsHotspotWhenTheCurrentIdentityOrMetadataIsUnavailable() {
+        let network = HotspotNetworkFixture()
+        let interface = WiFiInterfaceFixture()
+        interface.networks = [network]
+        #expect(MenuBarSystemLevelReader.readWiFi(interface) == .personalHotspot)
+        network.hotspot = false
+        #expect(MenuBarSystemLevelReader.readWiFi(interface) == .connected(strength: 0.5))
+        network.hotspot = true
+        interface.currentBSSID = "00:11:22:33:44:56"
+        #expect(MenuBarSystemLevelReader.readWiFi(interface) == .connected(strength: 0.5))
+        interface.currentBSSID = nil
+        #expect(MenuBarSystemLevelReader.readWiFi(interface) == .connected(strength: 0.5))
+        interface.currentBSSID = network.bssid
+        interface.currentSSID = nil
+        #expect(MenuBarSystemLevelReader.readWiFi(interface) == .connected(strength: 0.5))
+        interface.currentSSID = network.ssidData
+        interface.networks = nil
+        #expect(MenuBarSystemLevelReader.readWiFi(interface) == .connected(strength: 0.5))
+        interface.networks = [MissingHotspotNetworkFixture()]
+        #expect(MenuBarSystemLevelReader.readWiFi(interface) == .connected(strength: 0.5))
+        interface.poweredOn = false
+        #expect(MenuBarSystemLevelReader.readWiFi(interface) == .off)
+        #expect(MenuBarSystemLevelReader.readWiFi(nil) == .unavailable)
     }
 
     @Test(arguments: [0.0, 0.5, 1.0])
@@ -305,4 +395,44 @@ struct MenuBarSystemLevelReaderTests {
             }
         )
     }
+}
+
+private class HotspotNetworkFixture: CWNetwork {
+    var hotspot = true
+    var networkSSID: Data? = Data("Example network".utf8)
+    var networkBSSID: String? = "aa:bb:cc:dd:ee:ff"
+    override var ssidData: Data? { networkSSID }
+    override var bssid: String? { networkBSSID }
+
+    @objc(isPersonalHotspot)
+    func hotspotFlag() -> Bool { hotspot }
+}
+
+private final class SignedCharHotspotNetworkFixture: CWNetwork {
+    @objc(isPersonalHotspot)
+    func hotspotFlag() -> Int8 { 1 }
+}
+
+private final class MissingHotspotNetworkFixture: HotspotNetworkFixture {
+    override func responds(to selector: Selector!) -> Bool {
+        selector == NSSelectorFromString("isPersonalHotspot") ? false : super.responds(to: selector)
+    }
+}
+
+private final class IncompatibleHotspotNetworkFixture: CWNetwork {
+    @objc(isPersonalHotspot)
+    func hotspotFlag() -> Int32 { 1 }
+}
+
+private final class WiFiInterfaceFixture: CWInterface {
+    var poweredOn = true
+    var currentSSID: Data? = Data("Example network".utf8)
+    var currentBSSID: String? = "aa:bb:cc:dd:ee:ff"
+    var networks: Set<CWNetwork>?
+
+    override func powerOn() -> Bool { poweredOn }
+    override func rssiValue() -> Int { -75 }
+    override func ssidData() -> Data? { currentSSID }
+    override func bssid() -> String? { currentBSSID }
+    override func cachedScanResults() -> Set<CWNetwork>? { networks }
 }

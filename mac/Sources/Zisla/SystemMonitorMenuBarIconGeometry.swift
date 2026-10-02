@@ -24,21 +24,12 @@ enum SystemMonitorMenuBarIconGeometry {
     static let batteryChargingBoltTopGapWidth: CGFloat = 50
 
     static func batteryHeaderGapWidth(contentWidth: CGFloat, strokeWidth: CGFloat) -> CGFloat {
-        let halfWidth = contentWidth / 2 + strokeWidth / 2 + 6
+        let halfWidth = contentWidth / 2 + strokeWidth / 2 + 5.5
         return 2 * batteryRadius * asin(halfWidth / batteryRadius)
     }
 
     static let batteryValueBaseFontSize: CGFloat = 20
     static let batteryChargingBoltCalibration: CGFloat = 220.0 / 180.0
-
-    /// SF Symbol drawn in the top gap when the battery is connected to power
-    /// without charging.
-    static let batteryPlugSymbolName = "powerplug.portrait.fill"
-
-    /// Optical size of the plug relative to the bolt. The plug's strokes are
-    /// thinner than the bolt's solid body, so it is drawn slightly taller to
-    /// carry the same visual weight in the gap.
-    static let batteryPlugHeightScale: CGFloat = 1.2
 
     /// The bolt scales away from its tip, so any other glyph in the top gap
     /// shares the scaled bolt's center to stay optically aligned with it.

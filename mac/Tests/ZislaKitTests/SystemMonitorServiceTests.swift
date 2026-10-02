@@ -264,6 +264,88 @@ private final class ControllableDateProvider: @unchecked Sendable {
 
 @MainActor
 struct SystemMonitorServiceTests {
+    @Test
+    func batteryHistoryUsesTheInjectedLiveSnapshotAndExistingRecordingSwitch() async throws {
+        let persistence = MemoryHistoryPersistence()
+        let clock = ControllableDateProvider(Date(timeIntervalSince1970: 1_000))
+        var battery: BatterySnapshot? = BatterySnapshot(
+            level: 0.8, isCharging: true, isPluggedIn: true, isCharged: false,
+            timeRemainingMinutes: nil, powerWatts: 60, adapterRatedWatts: 100, systemLoadWatts: 24
+        )
+        let service = SystemMonitorService(
+            fileManager: MockFileManager(), dateProvider: { clock.now() },
+            publicIPProvider: StubPublicIPProvider(address: nil), hardwareInfoProvider: { .unavailable },
+            historyPersistence: persistence, isRecordingHistory: true,
+            batterySnapshotProvider: { battery }
+        )
+        let sampled = await service.sampleOnce()
+        #expect(sampled.battery == battery)
+        let stored = try #require(persistence.loadRecords().first)
+        #expect(stored.batteryLevel == 0.8)
+        #expect(stored.systemPowerWatts == 24)
+        #expect(stored.systemPowerWatts == sampled.battery?.systemPowerWatts)
+        let sections = await service.historySections(range: .all)
+        #expect(sections.first { $0.id == "power" }?.series.first?.points.first?.value == 24)
+
+        clock.advance(by: 5)
+        battery?.systemLoadWatts = 12
+        await service.sampleOnce()
+        #expect(persistence.loadRecords().count == 1)
+        #expect(persistence.loadRecords().first?.systemPowerWatts == 24)
+        #expect(service.snapshot?.battery?.systemPowerWatts == 12)
+
+        service.setHistoryRecordingEnabled(false)
+        clock.advance(by: 60)
+        await service.sampleOnce()
+        #expect(persistence.loadRecords().count == 1)
+        #expect(service.snapshot?.battery?.systemPowerWatts == 12)
+
+        service.setHistoryRecordingEnabled(true)
+        clock.advance(by: 60)
+        battery = nil
+        await service.sampleOnce()
+        let missing = try #require(persistence.loadRecords().last)
+        #expect(persistence.loadRecords().count == 2)
+        #expect(missing.batteryLevel == nil && missing.systemPowerWatts == nil)
+    }
+
+    @Test(arguments: ["stop", "cancel", "disable", "reenable", "clear"])
+    func inFlightSamplesCannotWriteAcrossHistoryLifecycleChanges(action: String) async {
+        let persistence = MemoryHistoryPersistence()
+        let gate = GatedHardwareInfoProvider()
+        let service = SystemMonitorService(
+            fileManager: MockFileManager(), publicIPProvider: StubPublicIPProvider(address: nil),
+            hardwareInfoProvider: { gate.read() }, historyPersistence: persistence,
+            isRecordingHistory: true,
+            batterySnapshotProvider: {
+                BatterySnapshot(level: 0.5, isCharging: false, isPluggedIn: false,
+                                isCharged: false, timeRemainingMinutes: nil, powerWatts: 12,
+                                systemLoadWatts: 12)
+            }
+        )
+        let pending = Task { @MainActor in await service.sampleOnce() }
+        for await _ in gate.readStarted { break }
+        switch action {
+        case "stop": service.stop()
+        case "cancel": pending.cancel()
+        case "disable": service.setHistoryRecordingEnabled(false)
+        case "reenable":
+            service.setHistoryRecordingEnabled(false)
+            service.setHistoryRecordingEnabled(true)
+        default: service.clearHistory()
+        }
+        gate.release()
+        await pending.value
+        #expect(persistence.loadRecords().isEmpty)
+        if action == "stop" || action == "cancel" {
+            #expect(service.snapshot == nil)
+        }
+        service.setHistoryRecordingEnabled(true)
+        await service.sampleOnce()
+        #expect(persistence.loadRecords().count == 1)
+        #expect(persistence.loadRecords().first?.systemPowerWatts == 12)
+    }
+
     // MARK: SystemMonitorMath
 
     @Test

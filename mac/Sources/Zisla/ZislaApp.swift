@@ -422,6 +422,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
                 self?.showSettings()
             }
         )
+        .environment(\.islandTransientWindowChanged) { [weak self] id, window, anchor in
+            self?.overlayCoordinator?.setTransientInteractionWindow(window, anchor: anchor, id: id)
+        }
         let hostingView = NSHostingView(
             rootView: AppLanguageEnvironment(languageStore: model.languageStore, content: rootView)
         )
@@ -1187,7 +1190,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
             style: settings.systemMonitorMenuBarDisplayStyle
         )
         let image = SystemMonitorMenuBarImageRenderer.stacked(rows: rows, style: settings.systemMonitorMenuBarDisplayStyle)
-        mergedMonitorStatusItem?.length = (image?.size.width ?? 24) + 4
+        mergedMonitorStatusItem?.length = (image?.size.width ?? 24) + 2
         mergedMonitorStatusItem?.button?.image = image
         let detailedRows = SystemMonitorCombinedMenuBarPresentation.rows(
             top: settings.systemMonitorMenuBarTopRow,
@@ -1210,11 +1213,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
             return
         }
         if combinedMonitorStatusItem == nil {
-            let item = NSStatusBar.system.statusItem(withLength: NSStatusItem.squareLength)
+            let item = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
             item.button?.target = self
             item.button?.action = #selector(showSystemMonitor)
             item.button?.imagePosition = .imageOnly
-            item.button?.imageScaling = .scaleNone
             combinedMonitorStatusItem = item
         }
         updateCombinedMonitorStatusImage(metric: settings.systemMonitorMenuBarCombinedIconMetric)
@@ -1237,7 +1239,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
     private func updateCombinedMonitorStatusImage(metric: SystemMonitorCombinedIconMetric) {
         guard let button = combinedMonitorStatusItem?.button else { return }
         let settings = AppModel.shared.settingsStore.settings
-        combinedMonitorStatusItem?.length = settings.systemMonitorMenuBarCombinedIconAppearance.normalized.iconSize
         let battery = AppModel.shared.battery.snapshot
         let audioOutput = AppModel.shared.audioOutput
         let connection = AppModel.shared.systemMonitorHeadphoneTransient.connection
@@ -1265,6 +1266,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
         case .unavailable: wifiValue = localized("不可用")
         case .off: wifiValue = localized("关闭")
         case .disconnected: wifiValue = localized("未连接")
+        case .personalHotspot: wifiValue = localized("个人热点")
         case let .connected(strength): wifiValue = SystemMonitorCombinedMenuBarPresentation.percent(strength)
         }
         let tooltip = [
@@ -1401,7 +1403,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
             .max() ?? 0
 
         if metric == .fan {
-            return max(40, ceil(valueWidth) + 8)
+            return max(32, ceil(valueWidth) + 6)
         }
 
         let labelWidth = (compactMonitorStatusLabel(for: metric) as NSString).size(
@@ -1410,13 +1412,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
         let minimumWidth: CGFloat
         switch metric {
         case .cpu, .gpu, .memory, .disk:
-            minimumWidth = 32
+            minimumWidth = 28
         case .network:
-            minimumWidth = 60
+            minimumWidth = 52
         case .fan:
             minimumWidth = 40
         }
-        return max(minimumWidth, ceil(max(valueWidth, labelWidth)) + 8)
+        return max(minimumWidth, ceil(max(valueWidth, labelWidth)) + 6)
     }
 
     private func compactMonitorStatusImage(

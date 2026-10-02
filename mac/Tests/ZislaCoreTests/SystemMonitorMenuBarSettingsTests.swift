@@ -136,6 +136,57 @@ struct SystemMonitorMenuBarSettingsTests {
     }
 
     @Test
+    func selectingExistingMetricSwapsBothDirectionsAndAcrossRows() {
+        let rows = [[SystemMonitorMenuBarMetric.cpu, .gpu], [.disk, .memory]]
+        #expect(SystemMonitorMenuBarRows.selecting(.memory, atRow: 1, slot: 0, in: rows) == [[.cpu, .gpu], [.memory, .disk]])
+        #expect(SystemMonitorMenuBarRows.selecting(.disk, atRow: 1, slot: 1, in: rows) == [[.cpu, .gpu], [.memory, .disk]])
+        #expect(SystemMonitorMenuBarRows.selecting(.memory, atRow: 0, slot: 0, in: rows) == [[.memory, .gpu], [.disk, .cpu]])
+    }
+
+    @Test
+    func selectingNewOrSameMetricReplacesOrPreservesItsSlot() {
+        let rows = [[SystemMonitorMenuBarMetric.cpu], [.gpu]]
+        #expect(SystemMonitorMenuBarRows.selecting(.disk, atRow: 0, slot: 0, in: rows) == [[.disk], [.gpu]])
+        #expect(SystemMonitorMenuBarRows.selecting(.cpu, atRow: 0, slot: 0, in: rows) == rows)
+    }
+
+    @Test
+    func selectingWideMetricsKeepsEachWideMetricInItsOwnRow() {
+        let rows = [[SystemMonitorMenuBarMetric.cpu, .gpu], [.disk, .memory]]
+        for wide in [SystemMonitorMenuBarMetric.network, .fan] {
+            let selected = SystemMonitorMenuBarRows.selecting(wide, atRow: 1, slot: 0, in: rows)
+            #expect(selected == [[.cpu, .gpu], [wide]])
+        }
+
+        #expect(SystemMonitorMenuBarRows.selecting(.fan, atRow: 0, slot: 0, in: [[.network], [.fan]]) == [[.fan], [.network]])
+    }
+
+    @Test
+    func selectingWithInvalidIndicesLeavesRowsUnchanged() {
+        let rows = [[SystemMonitorMenuBarMetric.cpu, .gpu], [.disk, .memory]]
+        for rowIndex in [Int.min, -1, 2, Int.max] {
+            #expect(SystemMonitorMenuBarRows.selecting(.memory, atRow: rowIndex, slot: 0, in: rows) == rows)
+        }
+        for metricIndex in [Int.min, -1, 2, Int.max] {
+            #expect(SystemMonitorMenuBarRows.selecting(.memory, atRow: 0, slot: metricIndex, in: rows) == rows)
+        }
+        #expect(SystemMonitorMenuBarRows.selecting(.memory, atRow: 0, slot: 0, in: [[.cpu]]) == [[.cpu]])
+    }
+
+    @Test
+    func selectedRowsRoundTripThroughFeatureSettingsEncoding() throws {
+        let rows = [[SystemMonitorMenuBarMetric.cpu, .gpu], [.disk, .memory]]
+        let selected = SystemMonitorMenuBarRows.selecting(.memory, atRow: 1, slot: 0, in: rows)
+        var settings = FeatureSettings.default
+        settings.systemMonitorMenuBarTopRow = selected[0]
+        settings.systemMonitorMenuBarBottomRow = selected[1]
+
+        let restored = try JSONDecoder().decode(FeatureSettings.self, from: JSONEncoder().encode(settings))
+        #expect(restored.systemMonitorMenuBarTopRow == selected[0])
+        #expect(restored.systemMonitorMenuBarBottomRow == selected[1])
+    }
+
+    @Test
     func eitherWideMetricOccupiesOneRowAndAllowsTwoOrThreeItems() {
         for wide: SystemMonitorMenuBarMetric in [.network, .fan] {
             #expect(SystemMonitorMenuBarRows.normalized(top: [.cpu, .gpu], bottom: [wide]) == [[.cpu, .gpu], [wide]])

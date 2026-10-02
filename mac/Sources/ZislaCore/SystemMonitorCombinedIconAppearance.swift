@@ -71,7 +71,7 @@ public struct SystemMonitorCombinedIconAppearance: Equatable, Codable, Sendable 
         showsChargingIndicator: Bool = true,
         showsPercentageWhenConnected: Bool = true,
         usesStatusColors: Bool = true,
-        batteryTextScale: Double = 1.88,
+        batteryTextScale: Double = SystemMonitorCombinedIconAppearance.batteryTextScaleRange.upperBound,
         wifiScale: Double = 1.55
     ) {
         self.iconSize = Self.clamped(iconSize, range: Self.iconSizeRange, fallback: 26)
@@ -81,7 +81,7 @@ public struct SystemMonitorCombinedIconAppearance: Equatable, Codable, Sendable 
         self.showsChargingIndicator = showsChargingIndicator
         self.showsPercentageWhenConnected = showsPercentageWhenConnected
         self.usesStatusColors = usesStatusColors
-        self.batteryTextScale = Self.clamped(batteryTextScale, range: Self.batteryTextScaleRange, fallback: 1.88)
+        self.batteryTextScale = Self.clamped(batteryTextScale, range: Self.batteryTextScaleRange, fallback: Self.batteryTextScaleRange.upperBound)
         self.wifiScale = Self.clamped(wifiScale, range: Self.wifiScaleRange, fallback: 1.55)
     }
 

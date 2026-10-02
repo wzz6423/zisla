@@ -244,7 +244,7 @@ struct SystemMonitorCombinedMenuBarTests {
             let representation = try Self.bitmap(image)
             #expect(representation.pixelsWide == 52)
             #expect(representation.pixelsHigh == 52)
-            let yellowPixels = (0..<52).reduce(0) { count, horizontal in
+            let yellowPixels = (0..<representation.pixelsWide).reduce(0) { count, horizontal in
                 count + (0..<52).filter { vertical in
                     guard let color = representation.colorAt(x: horizontal, y: vertical)?.usingColorSpace(.deviceRGB) else { return false }
                     return color.alphaComponent > 0.5 && color.redComponent > 0.6 && color.greenComponent > 0.5 && color.blueComponent < 0.4
