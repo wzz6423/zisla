@@ -77,7 +77,6 @@ struct PiSessionActivityDetectorTests {
             qwenProjectsDirectory: empty,
             piSessionsDirectory: root,
             qoderRoots: [],
-            doubaoRoots: [],
             copilotUsageLogRoots: [],
             scanInterval: 0
         )

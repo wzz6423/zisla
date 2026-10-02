@@ -132,11 +132,8 @@ export const documentationUrls: Record<DocumentationId, string> = {
 /** The four docs cards rendered in the developers grid, in order. */
 export const documentationCardIds = documentationIds.slice(0, 4) as readonly DocumentationId[];
 
-/**
- * Brand names stay in their original script in every locale; Doubao is the one
- * product with a widely used native name, so the label comes from the catalog.
- */
-export const supportedAITools = (doubaoName: string): readonly string[] => [
+/** Brand names stay in their original script in every locale. */
+export const supportedAITools = (): readonly string[] => [
   'Claude Code',
   'Codex',
   'ChatGPT',
@@ -151,7 +148,6 @@ export const supportedAITools = (doubaoName: string): readonly string[] => [
   'OpenCode',
   'Harnext',
   'WorkBuddy',
-  doubaoName,
   'Pi',
   'Zed Agent',
 ];
@@ -449,7 +445,6 @@ export interface SiteContent {
     toolsHeading: string;
     toolsLede: string;
     toolsAriaLabel: string;
-    doubaoName: string;
     boundariesHeading: string;
     privacyPoints: readonly [string, string, string];
     bridgeHeading: string;

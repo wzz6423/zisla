@@ -235,7 +235,6 @@ export const ptBR = createCatalog({
     toolsHeading: 'Ferramentas de IA compatíveis',
     toolsLede: 'Detecta atividade de CLIs, apps e IDEs compatíveis e agrega o estado das tarefas.',
     toolsAriaLabel: 'Ferramentas de IA compatíveis',
-    doubaoName: 'Doubao',
     boundariesHeading: 'Somente o estado é registrado',
     privacyPoints: [
       'Analisa apenas tipo de evento, estado, horário, modelo e ID da sessão em eventos estruturados',

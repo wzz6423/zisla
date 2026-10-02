@@ -233,7 +233,6 @@ export const ja: SiteContent = {
     toolsHeading: '対応する AI ツール',
     toolsLede: '対応する CLI、デスクトップアプリ、IDE の動きを検出し、タスクの状態を集約します。',
     toolsAriaLabel: '対応する AI ツール',
-    doubaoName: '豆包（Doubao）',
     boundariesHeading: '記録するのは状態の境界だけ',
     privacyPoints: [
       '構造化イベントのイベント種別、状態、時刻、モデル、セッション ID のみを解析',
