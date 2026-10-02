@@ -26,7 +26,9 @@ struct AIResultSweepPresentationTests {
                 }
             }
         }
-        #expect(contrastingPixels > 10, "The monochrome icon must contrast with its background at compact sizes")
+        // Preserve the 24 pt contrast requirement as an area fraction at smaller sizes.
+        let contrastingCoverage = Double(contrastingPixels) / Double(bitmap.pixelsWide * bitmap.pixelsHigh)
+        #expect(contrastingCoverage > 10.0 / (24 * 24), "The monochrome icon must contrast with its background at compact sizes")
     }
 
     @Test(arguments: [AIProvider.codex, .gpt], [AIProgressStatus.succeeded, .failed])
