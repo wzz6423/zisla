@@ -141,6 +141,7 @@ struct ShelfModuleView: View {
                                 ForEach(filteredItems) { item in
                                     ShelfItemView(
                                         item: item,
+                                        onOpen: { NSWorkspace.shared.open(item.linkURL ?? item.url) },
                                         onCopy: { model.copyShelfItems([item]) },
                                         onSendToQuickNote: {
                                             model.receiveQuickNoteTransferItems([TransferDropItem(payload: item.payload)])
@@ -324,8 +325,9 @@ struct ShelfModuleView: View {
     }
 }
 
-private struct ShelfItemView: View {
+struct ShelfItemView: View {
     var item: FileShelfItem
+    var onOpen: () -> Void
     var onCopy: () -> Void
     var onSendToQuickNote: () -> Void
     var onRemove: () -> Void
@@ -336,7 +338,7 @@ private struct ShelfItemView: View {
                 FileShelfDragSourceView(
                     payload: item.payload,
                     image: FileIconCache.shared.icon(for: item.url.path),
-                    onOpen: { NSWorkspace.shared.open(item.linkURL ?? item.url) },
+                    onOpen: onOpen,
                     onReveal: {
                         NSWorkspace.shared.activateFileViewerSelecting([item.url])
                     },
@@ -344,13 +346,15 @@ private struct ShelfItemView: View {
                     onRemove: onRemove
                 )
                     .frame(width: 42, height: 42)
+                    .frame(width: 66, height: 50)
                 Button(action: onRemove) {
                     Image(systemName: "xmark.circle.fill")
                         .symbolRenderingMode(.palette)
                         .foregroundStyle(.white, .black.opacity(0.72))
+                        .frame(width: 24, height: 24)
+                        .contentShape(Rectangle())
                 }
                 .buttonStyle(.plain)
-                .offset(x: 5, y: -5)
                 .help(AppLocalization.text("移除"))
             }
             Text(item.displayName)
@@ -358,14 +362,12 @@ private struct ShelfItemView: View {
                 .lineLimit(2)
                 .multilineTextAlignment(.center)
                 .frame(width: 64, height: 24, alignment: .top)
+                .contentShape(Rectangle())
+                .onTapGesture(count: 2, perform: onOpen)
         }
         .frame(width: 66, height: 84)
-        .contentShape(Rectangle())
-        .onTapGesture(count: 2) {
-            NSWorkspace.shared.open(item.linkURL ?? item.url)
-        }
         .contextMenu {
-            Button(AppLocalization.text("打开")) { NSWorkspace.shared.open(item.linkURL ?? item.url) }
+            Button(AppLocalization.text("打开"), action: onOpen)
             if item.text == nil {
                 Button(AppLocalization.text("在 Finder 中显示")) {
                     NSWorkspace.shared.activateFileViewerSelecting([item.url])

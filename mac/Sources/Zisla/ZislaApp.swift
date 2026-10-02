@@ -334,6 +334,7 @@ enum PersistentPetNoticePolicy {
 @MainActor
 final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
     private var overlayCoordinator: OverlayCoordinator?
+    private var fileShelfShakeController: FileShelfShakeController?
     private var lockScreenOverlayController: LockScreenOverlayController?
     private var noticePresenter: SideNoticePresenter?
     private var petController: IslandPetController?
@@ -550,8 +551,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
             }
             .store(in: &cancellables)
         overlayCoordinator = coordinator
+        fileShelfShakeController = FileShelfShakeController(
+            settingsStore: model.settingsStore,
+            languageStore: model.languageStore,
+            onItems: { model.receiveShelfDropItems($0) }
+        )
         lockScreenOverlayController.onScreenLockedChanged = { [weak self, weak coordinator] locked in
             coordinator?.setScreenLocked(locked)
+            self?.fileShelfShakeController?.setScreenLocked(locked)
             self?.noticePresenter?.setScreenLocked(locked)
             model.clipboardAssistant.setScreenLocked(locked)
             if locked {
@@ -862,6 +869,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
 
     func applicationWillTerminate(_ notification: Notification) {
         expandedSizeUpdateTask?.cancel()
+        fileShelfShakeController?.stop()
         lockScreenOverlayController?.stop()
         lidCloseController?.stop()
         systemScreenshotMonitor?.stop()
@@ -1516,6 +1524,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
 
     private func setScreenshotSessionActive(_ active: Bool) {
         AppModel.shared.clipboardAssistant.setScreenshotActive(active)
+        fileShelfShakeController?.setScreenshotActive(active)
         guard isScreenshotSessionActive != active else { return }
         isScreenshotSessionActive = active
         if !active {

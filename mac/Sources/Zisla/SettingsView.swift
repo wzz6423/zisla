@@ -427,7 +427,16 @@ struct SettingsView: View {
                         keyPath: \.systemBackgroundSoundStopsWhenUnused
                     )
                     rowDivider
-                    featureToggle("文件中转与分享", detail: "暂存文件并调用 AirDrop 或系统分享", symbol: "tray.full.fill", keyPath: \.fileShelfEnabled)
+                    featureToggle("中转站", detail: "暂存文件并调用 AirDrop 或系统分享", symbol: "tray.full.fill", keyPath: \.fileShelfEnabled)
+                    rowDivider
+                    featureToggle(
+                        "晃动唤出中转窗口",
+                        detail: "拖拽文件时晃动鼠标，在旁边显示中转窗口",
+                        symbol: "cursorarrow.motionlines",
+                        keyPath: \.fileShelfShakeEnabled,
+                        isNested: true
+                    )
+                    .disabled(!model.settingsStore.settings.fileShelfEnabled)
                     rowDivider
                     featureToggle("链接下载", detail: "下载视频或音频", symbol: "arrow.down.circle.fill", keyPath: \.downloaderEnabled)
                     rowDivider
