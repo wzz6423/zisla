@@ -46,6 +46,7 @@ final class ClipboardAssistantPresentation: ObservableObject {
     @Published var imageThumbnail: NSImage?
     /// Matches the surface to the Dynamic Island appearance selected in Settings.
     @Published var visualStyle: IslandVisualStyle = .transparent
+    @Published var notchBackground: IslandNotchBackground = .black
     /// The crown remains the same height as the notch the prompt expands from.
     @Published var islandTopHeight: CGFloat = ScreenLayoutConfiguration().simulatedIslandSize.height
     @Published var physicalNotchWidth: CGFloat = 0
@@ -846,6 +847,7 @@ struct ClipboardAssistantToastView: View {
                     ),
                     expandedSize: geometry.size,
                     visualStyle: presentation.visualStyle,
+                    notchBackground: presentation.notchBackground,
                     collapsedTopCornerRadius: 0,
                     bottomCornerRadius: VoiceRecordingIslandGeometry.bottomCornerRadius
                 ) {

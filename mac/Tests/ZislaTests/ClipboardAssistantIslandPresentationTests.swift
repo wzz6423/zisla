@@ -9,6 +9,55 @@ import ZislaKit
 
 struct ClipboardAssistantIslandPresentationTests {
     @MainActor
+    @Test(arguments: [IslandVisualStyle.transparent, .frosted])
+    func quickActionBackgroundUpdatesWithoutReplacingThePrompt(
+        visualStyle: IslandVisualStyle
+    ) async throws {
+        let controller = ClipboardAssistantController(windowPresenter: { _, _ in })
+        defer { controller.dismiss(animated: false) }
+        controller.displayDuration = .never
+        let detection = ClipboardAssistantDetection(kind: .text, title: "copied text")
+        controller.present(detection, visualStyle: visualStyle)
+        let host = NSHostingView(rootView: ClipboardAssistantToastView(
+            presentation: controller.presentation,
+            controller: controller
+        ).transaction { $0.disablesAnimations = true })
+        host.sizingOptions = []
+        let panel = ClipboardAssistantController.makeWindow(
+            contentView: host,
+            frame: CGRect(x: -100_000, y: -100_000, width: 533, height: 37)
+        )
+        defer { panel.close() }
+
+        let reduceTransparency = NSWorkspace.shared.accessibilityDisplayShouldReduceTransparency
+        for background in [IslandNotchBackground.black, .frosted, .black, .frosted] {
+            controller.presentation.notchBackground = background
+            await withCheckedContinuation { continuation in
+                DispatchQueue.main.async { continuation.resume() }
+            }
+            host.layoutSubtreeIfNeeded()
+            host.displayIfNeeded()
+            var effects: [NSVisualEffectView] = []
+            var pending = [host as NSView]
+            while let view = pending.popLast() {
+                if let effect = view as? NSVisualEffectView { effects.append(effect) }
+                pending.append(contentsOf: view.subviews)
+            }
+            if background == .frosted && !reduceTransparency {
+                let effect = try #require(effects.first, "磨砂背景应随设置切换立即出现")
+                #expect(effect.material == .popover)
+                #expect(effect.blendingMode == .behindWindow)
+                #expect(effect.alphaValue == 0.92)
+            } else {
+                #expect(effects.isEmpty, "刘海纯色或降低透明度时不应使用磨砂材质")
+            }
+            #expect(controller.presentation.detection == detection)
+            #expect(controller.presentation.visualStyle == visualStyle)
+            #expect(!panel.isVisible)
+        }
+    }
+
+    @MainActor
     @Test(arguments: [false, true])
     func quickNoteCopyIsCapturedBeforeTheFoldFinishes(alreadyCollapsing: Bool) throws {
         let pasteboard = NSPasteboard(name: .init("dev.wzz.zisla.tests.quick-note-handoff.\(UUID().uuidString)"))
