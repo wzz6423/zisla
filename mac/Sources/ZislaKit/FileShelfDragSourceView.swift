@@ -40,6 +40,10 @@ public struct FileShelfDragSourceView: NSViewRepresentable {
         configure(view)
     }
 
+    public func sizeThatFits(_ proposal: ProposedViewSize, nsView: NSView, context: Context) -> CGSize? {
+        proposal.replacingUnspecifiedDimensions()
+    }
+
     private func configure(_ view: FileShelfDraggingView) {
         view.payload = payload
         view.image = image
