@@ -9,26 +9,24 @@ import ZislaCore
 
 @MainActor
 struct AIResultSweepPresentationTests {
-    @Test(arguments: [ColorScheme.light, .dark])
-    func monochromeIconContrastsWithItsColorScheme(colorScheme: ColorScheme) throws {
-        let renderer = ImageRenderer(content: AIMascotView(identity: .gpt, size: 24)
+    @Test(arguments: [ColorScheme.light, .dark], [CGFloat(16), 22, 24])
+    func monochromeIconContrastsWithItsColorScheme(colorScheme: ColorScheme, size: CGFloat) throws {
+        let renderer = ImageRenderer(content: AIMascotView(identity: .gpt, size: size)
+            .background(colorScheme == .dark ? Color.black : Color.white)
             .environment(\.colorScheme, colorScheme))
         let bitmap = NSBitmapImageRep(cgImage: try #require(renderer.cgImage))
-        var opaquePixels = 0
         var contrastingPixels = 0
         for y in 0..<bitmap.pixelsHigh {
             for x in 0..<bitmap.pixelsWide {
                 guard let color = bitmap.colorAt(x: x, y: y)?.usingColorSpace(.deviceRGB),
                       color.alphaComponent > 0.5 else { continue }
-                opaquePixels += 1
                 let brightness = max(color.redComponent, color.greenComponent, color.blueComponent)
                 if colorScheme == .dark ? brightness > 0.75 : brightness < 0.25 {
                     contrastingPixels += 1
                 }
             }
         }
-        #expect(opaquePixels > 10, "The bundled icon must render visible pixels")
-        #expect(contrastingPixels > 10, "The monochrome icon must contrast with its requested color scheme")
+        #expect(contrastingPixels > 10, "The monochrome icon must contrast with its background at compact sizes")
     }
 
     @Test(arguments: [AIProvider.codex, .gpt], [AIProgressStatus.succeeded, .failed])
@@ -141,8 +139,7 @@ struct AIResultSweepPresentationTests {
     func renderedViewUpdatesWithPlaybackWithoutAnotherQueueEvent() async throws {
         let fixture = try Fixture()
         defer { fixture.cleanUp() }
-        let renderer = ImageRenderer(content: fixture.view.frame(width: 320, height: 34)
-            .environment(\.colorScheme, .dark))
+        let renderer = ImageRenderer(content: fixture.view.frame(width: 320, height: 34))
         #expect(wingPixelCounts(in: try #require(renderer.cgImage)) == [0, 0])
         let (changes, continuation) = AsyncStream<Void>.makeStream()
         let subscription = renderer.objectWillChange.sink { continuation.yield(()) }
@@ -171,8 +168,7 @@ struct AIResultSweepPresentationTests {
 
     private func wingPixelCounts(in view: CompactStatusBarView) throws -> [Int] {
         let renderer = ImageRenderer(content: view.statusBarContent(at: .now)
-            .frame(width: 320, height: 34)
-            .environment(\.colorScheme, .dark))
+            .frame(width: 320, height: 34))
         return wingPixelCounts(in: try #require(renderer.cgImage))
     }
 
