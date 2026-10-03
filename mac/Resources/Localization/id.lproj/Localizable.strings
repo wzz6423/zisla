@@ -2618,3 +2618,23 @@
 "松开以添加到中转站" = "Lepaskan untuk menambahkan file";
 "晃动唤出中转窗口" = "Goyangkan untuk menampilkan jendela rak";
 "拖拽文件时晃动鼠标，在旁边显示中转窗口" = "Goyangkan mouse saat menyeret file untuk menampilkan jendela rak di samping penunjuk";
+
+"位置便签" = "Catatan lokasi";
+"摇动鼠标记便签" = "Goyangkan mouse untuk mencatat";
+"按住快捷键并左右摇动鼠标，在当前位置记录，返回时提醒" = "Tahan pintasan dan goyangkan mouse ke kiri dan kanan untuk meninggalkan catatan di sini dan menerima pengingat saat kembali";
+"便签快捷键" = "Pintasan catatan";
+"默认按住 Command；可录制修饰键或组合键" = "Secara default, tahan Command; rekam tombol pengubah atau kombinasi tombol";
+"需要辅助功能权限来识别窗口和网页" = "Izin Aksesibilitas diperlukan untuk mengenali jendela dan halaman web";
+"无法识别当前位置，请检查辅助功能权限" = "Lokasi ini tidak dapat dikenali. Periksa izin Aksesibilitas.";
+"在这里记点什么…" = "Tulis catatan di sini…";
+"记录位置" = "Lokasi tersimpan";
+"记录时间" = "Waktu penyimpanan";
+"记录内容" = "Isi catatan";
+"保存便签（Enter）" = "Simpan catatan (Enter)";
+"放弃便签（Esc / ⌘⌫）" = "Buang catatan (Esc / ⌘⌫)";
+"查看便签" = "Lihat catatan";
+"桌面" = "Desktop";
+"前往记录位置" = "Buka lokasi tersimpan";
+"无法前往记录位置，窗口或显示器可能已关闭" = "Tidak dapat membuka lokasi tersimpan. Jendela atau layar mungkin sudah tidak tersedia.";
+"记录便签" = "Catat";
+"已保存便签" = "Catatan tersimpan";

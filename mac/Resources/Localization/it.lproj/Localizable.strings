@@ -2618,3 +2618,23 @@
 "松开以添加到中转站" = "Rilascia per aggiungere i file";
 "晃动唤出中转窗口" = "Scuoti per mostrare il ripiano";
 "拖拽文件时晃动鼠标，在旁边显示中转窗口" = "Scuoti il mouse mentre trascini i file per mostrare una finestra del ripiano accanto al puntatore";
+
+"位置便签" = "Nota del luogo";
+"摇动鼠标记便签" = "Scuoti il mouse per annotare";
+"按住快捷键并左右摇动鼠标，在当前位置记录，返回时提醒" = "Tieni premuta la scorciatoia e scuoti il mouse a sinistra e a destra per lasciare una nota qui e ricevere un promemoria al ritorno";
+"便签快捷键" = "Scorciatoia per le note";
+"默认按住 Command；可录制修饰键或组合键" = "Per impostazione predefinita, tieni premuto Command; puoi registrare un modificatore o una combinazione di tasti";
+"需要辅助功能权限来识别窗口和网页" = "È necessario l’accesso ad Accessibilità per identificare finestre e pagine web";
+"无法识别当前位置，请检查辅助功能权限" = "Impossibile identificare questo luogo. Controlla l’accesso ad Accessibilità.";
+"在这里记点什么…" = "Lascia una nota qui…";
+"记录位置" = "Luogo salvato";
+"记录时间" = "Data di salvataggio";
+"记录内容" = "Contenuto della nota";
+"保存便签（Enter）" = "Salva nota (Invio)";
+"放弃便签（Esc / ⌘⌫）" = "Scarta nota (Esc / ⌘⌫)";
+"查看便签" = "Visualizza nota";
+"桌面" = "Scrivania";
+"前往记录位置" = "Vai alla posizione salvata";
+"无法前往记录位置，窗口或显示器可能已关闭" = "Impossibile raggiungere la posizione salvata. La finestra o lo schermo potrebbero non essere più disponibili.";
+"记录便签" = "Crea nota";
+"已保存便签" = "Nota salvata";

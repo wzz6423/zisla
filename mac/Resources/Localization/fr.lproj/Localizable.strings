@@ -2614,3 +2614,23 @@
 "松开以添加到中转站" = "Relâchez pour ajouter les fichiers";
 "晃动唤出中转窗口" = "Secouer pour afficher l’étagère";
 "拖拽文件时晃动鼠标，在旁边显示中转窗口" = "Secouez la souris en faisant glisser des fichiers pour afficher une fenêtre d’étagère à côté du pointeur";
+
+"位置便签" = "Note de contexte";
+"摇动鼠标记便签" = "Secouer la souris pour noter";
+"按住快捷键并左右摇动鼠标，在当前位置记录，返回时提醒" = "Maintenez le raccourci et secouez la souris de gauche à droite pour laisser une note ici et recevoir un rappel à votre retour";
+"便签快捷键" = "Raccourci des notes";
+"默认按住 Command；可录制修饰键或组合键" = "Maintenez Command par défaut ; enregistrez une touche de modification ou une combinaison";
+"需要辅助功能权限来识别窗口和网页" = "L’accès à Accessibilité est nécessaire pour identifier les fenêtres et les pages web";
+"无法识别当前位置，请检查辅助功能权限" = "Impossible d’identifier cet emplacement. Vérifiez l’accès à Accessibilité.";
+"在这里记点什么…" = "Laisser une note ici…";
+"记录位置" = "Emplacement enregistré";
+"记录时间" = "Date d’enregistrement";
+"记录内容" = "Contenu de la note";
+"保存便签（Enter）" = "Enregistrer la note (Entrée)";
+"放弃便签（Esc / ⌘⌫）" = "Abandonner la note (Esc / ⌘⌫)";
+"查看便签" = "Voir la note";
+"桌面" = "Bureau";
+"前往记录位置" = "Accéder à l’emplacement enregistré";
+"无法前往记录位置，窗口或显示器可能已关闭" = "Impossible d’accéder à l’emplacement enregistré. La fenêtre ou l’écran n’est peut-être plus disponible.";
+"记录便签" = "Prendre une note";
+"已保存便签" = "Note enregistrée";

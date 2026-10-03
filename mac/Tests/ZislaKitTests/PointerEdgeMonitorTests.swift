@@ -20,4 +20,24 @@ struct PointerEdgeMonitorTests {
         #expect(moveAfterInteraction)
         #expect(laterMove)
     }
+
+    @Test @MainActor
+    func keyboardTransitionsReachTheHandlerWithoutBecomingPointerMoves() throws {
+        let pasteboard = NSPasteboard.withUniqueName()
+        defer { pasteboard.releaseGlobally() }
+        var keyboardEvents: [NSEvent.EventType] = []
+        var pointerEvents = 0
+        let monitor = PointerEdgeMonitor(dragPasteboard: pasteboard, onKeyboardEvent: { type, _ in
+            keyboardEvents.append(type)
+        }) { _, _ in pointerEvents += 1 }
+        for type in [NSEvent.EventType.flagsChanged, .keyDown, .keyUp] {
+            let event = try #require(NSEvent.keyEvent(with: type, location: .zero, modifierFlags: [],
+                                                    timestamp: 0, windowNumber: 0, context: nil, characters: "",
+                                                    charactersIgnoringModifiers: "", isARepeat: false, keyCode: 55))
+            monitor.emit(event)
+        }
+        #expect(keyboardEvents == [.flagsChanged, .keyDown, .keyUp])
+        #expect(pointerEvents == 0)
+        #expect(!monitor.isRunning)
+    }
 }

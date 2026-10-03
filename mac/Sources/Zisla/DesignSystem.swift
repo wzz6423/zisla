@@ -117,6 +117,16 @@ enum IslandGlassSurfaceKind {
     case input
 }
 
+struct IslandGlassStandaloneBacking: View {
+    let shape: UnevenRoundedRectangle
+    let visualStyle: IslandVisualStyle
+    let reduceTransparency: Bool
+
+    var body: some View {
+        shape.fill(.black.opacity(reduceTransparency ? 1 : visualStyle == .frosted ? 0.90 : 0))
+    }
+}
+
 private struct IslandGlassSurface: ViewModifier {
     @Environment(\.islandVisualStyle) private var visualStyle
     @Environment(\.accessibilityReduceTransparency) private var reduceTransparency
@@ -124,10 +134,16 @@ private struct IslandGlassSurface: ViewModifier {
     let cornerRadius: CGFloat
     let bottomLeadingRadius: CGFloat?
     let bottomTrailingRadius: CGFloat?
+    let isStandalone: Bool
 
     func body(content: Content) -> some View {
         content
             .background { surfaceBackground }
+            .background {
+                if isStandalone {
+                    IslandGlassStandaloneBacking(shape: shape, visualStyle: visualStyle, reduceTransparency: reduceTransparency)
+                }
+            }
             .clipShape(shape)
             .overlay {
                 // Native liquid glass draws its own specular rim; a hand-drawn edge would double it.
@@ -153,10 +169,10 @@ private struct IslandGlassSurface: ViewModifier {
                         stops: [
                             // An opaque leading band intentionally covers the native glass rim.
                             .init(color: .black, location: 0),
-                            .init(color: .black, location: 0.10),
-                            .init(color: .black.opacity(0.76), location: 0.26),
-                            .init(color: .black.opacity(0.34), location: 0.52),
-                            .init(color: .clear, location: 0.82),
+                            .init(color: .black, location: isStandalone ? 0.18 : 0.10),
+                            .init(color: .black.opacity(0.76), location: isStandalone ? 0.36 : 0.26),
+                            .init(color: .black.opacity(0.34), location: isStandalone ? 0.64 : 0.52),
+                            .init(color: .clear, location: isStandalone ? 0.92 : 0.82),
                         ],
                         startPoint: .top,
                         endPoint: .bottom
@@ -169,7 +185,7 @@ private struct IslandGlassSurface: ViewModifier {
                 VisualEffectBackground(
                     alphaValue: materialAlpha,
                     material: kind == .input ? .sidebar : .hudWindow,
-                    blendingMode: kind == .input ? .withinWindow : .behindWindow
+                    blendingMode: kind == .input && !isStandalone ? .withinWindow : .behindWindow
                 )
                 shape.fill(tint)
             }
@@ -241,14 +257,16 @@ extension View {
         _ kind: IslandGlassSurfaceKind,
         cornerRadius: CGFloat,
         bottomLeadingRadius: CGFloat? = nil,
-        bottomTrailingRadius: CGFloat? = nil
+        bottomTrailingRadius: CGFloat? = nil,
+        isStandalone: Bool = false
     ) -> some View {
         modifier(
             IslandGlassSurface(
                 kind: kind,
                 cornerRadius: cornerRadius,
                 bottomLeadingRadius: bottomLeadingRadius,
-                bottomTrailingRadius: bottomTrailingRadius
+                bottomTrailingRadius: bottomTrailingRadius,
+                isStandalone: isStandalone
             )
         )
     }

@@ -2618,3 +2618,23 @@
 "松开以添加到中转站" = "Thả để thêm tệp";
 "晃动唤出中转窗口" = "Lắc để mở cửa sổ kệ tạm";
 "拖拽文件时晃动鼠标，在旁边显示中转窗口" = "Lắc chuột khi kéo tệp để hiển thị cửa sổ kệ tạm bên cạnh con trỏ";
+
+"位置便签" = "Ghi chú theo vị trí";
+"摇动鼠标记便签" = "Lắc chuột để ghi chú";
+"按住快捷键并左右摇动鼠标，在当前位置记录，返回时提醒" = "Giữ phím tắt và lắc chuột sang trái, sang phải để ghi chú tại đây và nhận nhắc nhở khi quay lại";
+"便签快捷键" = "Phím tắt ghi chú";
+"默认按住 Command；可录制修饰键或组合键" = "Mặc định giữ Command; có thể ghi lại phím bổ trợ hoặc tổ hợp phím";
+"需要辅助功能权限来识别窗口和网页" = "Cần quyền Trợ năng để nhận diện cửa sổ và trang web";
+"无法识别当前位置，请检查辅助功能权限" = "Không thể nhận diện vị trí hiện tại. Hãy kiểm tra quyền Trợ năng.";
+"在这里记点什么…" = "Ghi chú tại đây…";
+"记录位置" = "Vị trí đã lưu";
+"记录时间" = "Thời gian lưu";
+"记录内容" = "Nội dung ghi chú";
+"保存便签（Enter）" = "Lưu ghi chú (Enter)";
+"放弃便签（Esc / ⌘⌫）" = "Bỏ ghi chú (Esc / ⌘⌫)";
+"查看便签" = "Xem ghi chú";
+"桌面" = "Màn hình nền";
+"前往记录位置" = "Đi đến vị trí đã lưu";
+"无法前往记录位置，窗口或显示器可能已关闭" = "Không thể đi đến vị trí đã lưu. Cửa sổ có thể đã đóng hoặc màn hình không còn kết nối.";
+"记录便签" = "Ghi chú";
+"已保存便签" = "Đã lưu ghi chú";
