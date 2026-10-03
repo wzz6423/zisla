@@ -206,6 +206,80 @@ extension ContextNoteLocationReaderTests {
         #expect(result == .location(.window(bundleIdentifier: "test.chat", applicationName: "Chat", title: "Conversation")))
     }
 
+    private struct CaptureWindow {
+        let title: String
+        let frame: CGRect?
+    }
+
+    private func captureWindow(surface: ContextNoteLocationReader.WindowSnapshot?,
+                               hit: (processIdentifier: pid_t, window: CaptureWindow?)?,
+                               windows: [CaptureWindow]?) -> ContextNoteObservation {
+        ContextNoteLocationReader.captureWindow(surface: surface, hit: hit, candidates: { pid in
+            pid == 42 ? windows : []
+        }, frame: { $0.frame }) { _, window in
+            guard let window else { return .unavailable }
+            return ContextNoteLocationReader.resolve(bundleIdentifier: "test.chat", applicationName: "Chat",
+                windowTitle: window.title, isBrowser: false, pageAddress: nil)
+        }
+    }
+
+    @Test(arguments: [nil, 43] as [pid_t?])
+    func unavailableOrForeignAccessibilityHitUsesTheVisibleWindowOwner(hitProcessIdentifier: pid_t?) {
+        let bounds = CGRect(x: 100, y: 100, width: 800, height: 600)
+        let surface = ContextNoteLocationReader.WindowSnapshot(frame: bounds, layer: 0, ownerProcessIdentifier: 42)
+        let hit = hitProcessIdentifier.map { (processIdentifier: $0, window: Optional(CaptureWindow(title: "Foreign", frame: bounds))) }
+        let windows = [CaptureWindow(title: "Other", frame: bounds.offsetBy(dx: 1000, dy: 0)),
+                       CaptureWindow(title: "Conversation", frame: bounds)]
+        #expect(captureWindow(surface: surface, hit: hit, windows: windows)
+                == .location(.window(bundleIdentifier: "test.chat", applicationName: "Chat", title: "Conversation")))
+    }
+
+    @Test
+    func visibleWindowFallbackRejectsMissingAmbiguousAndDifferentFrames() {
+        let bounds = CGRect(x: 100, y: 100, width: 800, height: 600)
+        let surface = ContextNoteLocationReader.WindowSnapshot(frame: bounds, layer: 0, ownerProcessIdentifier: 42)
+        let window = CaptureWindow(title: "Conversation", frame: bounds)
+        for windows in [nil, [], [window, window], [CaptureWindow(title: "Other", frame: bounds.offsetBy(dx: 1, dy: 0))],
+                        [CaptureWindow(title: "Unknown", frame: nil)]] as [[CaptureWindow]?] {
+            #expect(captureWindow(surface: surface, hit: nil, windows: windows) == .unavailable)
+        }
+        #expect(captureWindow(surface: surface, hit: nil, windows: [window])
+                == .location(.window(bundleIdentifier: "test.chat", applicationName: "Chat", title: "Conversation")))
+    }
+
+    @Test(arguments: [Int(CGWindowLevelForKey(.floatingWindow)), Int(CGWindowLevelForKey(.popUpMenuWindow))])
+    func inaccessibleFloatingSurfacesCannotCaptureAWindowBehindThem(layer: Int) {
+        let bounds = CGRect(x: 100, y: 100, width: 800, height: 600)
+        let surface = ContextNoteLocationReader.WindowSnapshot(frame: bounds, layer: layer, ownerProcessIdentifier: 42)
+        let window = CaptureWindow(title: "Conversation", frame: bounds)
+        #expect(captureWindow(surface: surface, hit: nil, windows: [window]) == .unavailable)
+        #expect(captureWindow(surface: surface, hit: (43, window), windows: [window]) == .unavailable)
+    }
+
+    @Test
+    func capturePreservesDirectAccessibilityWindowsWhenWindowServerMetadataIsUnavailable() {
+        let bounds = CGRect(x: 100, y: 100, width: 800, height: 600)
+        let window = CaptureWindow(title: "Conversation", frame: bounds)
+        #expect(captureWindow(surface: nil, hit: (42, window), windows: nil)
+                == .location(.window(bundleIdentifier: "test.chat", applicationName: "Chat", title: "Conversation")))
+        #expect(captureWindow(surface: nil, hit: nil, windows: [window]) == .unavailable)
+    }
+
+    @Test
+    func ownVisibleWindowIsIgnoredEvenWhenAccessibilityHitsAnotherApplication() {
+        let bounds = CGRect(x: 100, y: 100, width: 800, height: 600)
+        let surface = ContextNoteLocationReader.WindowSnapshot(frame: bounds, layer: 0,
+            ownerProcessIdentifier: ProcessInfo.processInfo.processIdentifier)
+        let result = ContextNoteLocationReader.captureWindow(surface: surface, hit: (42, Optional(bounds)), candidates: { _ in
+            Issue.record("An own visible surface must not inspect application windows")
+            return [bounds]
+        }, frame: { $0 }) { _, _ in
+            Issue.record("An own visible surface must not read a note location")
+            return .unavailable
+        }
+        #expect(result == .ignored)
+    }
+
     @Test
     func missingFocusedWindowUsesOnlyAnUnambiguousApplicationWindow() {
         #expect(ContextNoteLocationReader.findWindow(direct: nil, candidates: { [1] }, matches: { _ in true }) == 1)

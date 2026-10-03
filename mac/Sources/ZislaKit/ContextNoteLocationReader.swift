@@ -43,20 +43,35 @@ public enum ContextNoteLocationReader {
         let system = AXUIElementCreateSystemWide()
         AXUIElementSetMessagingTimeout(system, 0.1)
         var element: AXUIElement?
-        guard AXUIElementCopyElementAtPosition(system, Float(point.x), Float(point.y), &element) == .success,
-              let element else { return .unavailable }
         var pid: pid_t = 0
-        guard AXUIElementGetPid(element, &pid) == .success,
-              let app = NSRunningApplication(processIdentifier: pid) else { return .unavailable }
-        guard pid != ProcessInfo.processInfo.processIdentifier else { return .ignored }
-        let direct = attribute(kAXRoleAttribute, from: element) as? String == kAXWindowRole
-            ? element : attribute(kAXWindowAttribute, from: element).flatMap(asElement)
-        let window = findWindow(direct: direct, candidates: {
+        let hit: (processIdentifier: pid_t, window: AXUIElement?)?
+        if AXUIElementCopyElementAtPosition(system, Float(point.x), Float(point.y), &element) == .success,
+           let element, AXUIElementGetPid(element, &pid) == .success {
+            let direct = attribute(kAXRoleAttribute, from: element) as? String == kAXWindowRole
+                ? element : attribute(kAXWindowAttribute, from: element).flatMap(asElement)
+            hit = (pid, direct)
+        } else {
+            hit = nil
+        }
+        return captureWindow(surface: surface, hit: hit, candidates: { pid in
             let application = AXUIElementCreateApplication(pid)
             AXUIElementSetMessagingTimeout(application, 0.1)
             return attribute(kAXWindowsAttribute, from: application) as? [AXUIElement]
-        }, matches: { surface?.matches(windowFrame($0), processIdentifier: pid) == true })
-        return read(app: app, window: window)
+        }, frame: windowFrame) { pid, window in
+            guard let app = NSRunningApplication(processIdentifier: pid) else { return .unavailable }
+            return read(app: app, window: window)
+        }
+    }
+
+    static func captureWindow<Window>(surface: WindowSnapshot?, hit: (processIdentifier: pid_t, window: Window?)?,
+                                      candidates: (pid_t) -> [Window]?, frame: (Window) -> CGRect?,
+                                      read: (pid_t, Window?) -> ContextNoteObservation) -> ContextNoteObservation {
+        guard let pid = surface?.ownerProcessIdentifier ?? hit?.processIdentifier else { return .unavailable }
+        guard pid != ProcessInfo.processInfo.processIdentifier else { return .ignored }
+        let direct = hit?.processIdentifier == pid ? hit?.window : nil
+        let window = findWindow(direct: direct, candidates: { candidates(pid) },
+                                matches: { surface?.matches(frame($0), processIdentifier: pid) == true })
+        return read(pid, window)
     }
 
     public static func current(at point: CGPoint) -> ContextNoteObservation {

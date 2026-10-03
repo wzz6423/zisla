@@ -7,6 +7,7 @@ public struct ContextNoteNavigator {
     struct Window {
         let title: String
         let isMinimized: Bool?
+        var requiresExactTitle = false
         var restore: @MainActor () -> Bool
         var activate: @MainActor () -> Bool
         var raise: @MainActor () -> Bool
@@ -40,12 +41,14 @@ public struct ContextNoteNavigator {
                     for app in NSRunningApplication.runningApplications(withBundleIdentifier: bundle) {
                         let application = AXUIElementCreateApplication(app.processIdentifier)
                         AXUIElementSetMessagingTimeout(application, 0.2)
-                        guard let elements = attribute(kAXWindowsAttribute, from: application) as? [AXUIElement] else { return nil }
-                        windows += elements.map { element in
+                        guard let elements = windowElements(readAttribute: { attribute($0, from: application) }) else { return nil }
+                        windows += elements.map { candidate in
+                            let element = candidate.element
                             AXUIElementSetMessagingTimeout(element, 0.2)
                             return Window(
                                 title: attribute(kAXTitleAttribute, from: element) as? String ?? "",
                                 isMinimized: attribute(kAXMinimizedAttribute, from: element) as? Bool,
+                                requiresExactTitle: candidate.requiresExactTitle,
                                 restore: { AXUIElementSetAttributeValue(element, kAXMinimizedAttribute as CFString, kCFBooleanFalse) == .success },
                                 activate: { app.activate() },
                                 raise: { AXUIElementPerformAction(element, kAXRaiseAction as CFString) == .success }
@@ -83,7 +86,7 @@ public struct ContextNoteNavigator {
         case let .window(bundleIdentifier, _, title):
             guard dependencies.isTrusted(), !title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
                   let windows = dependencies.windows(bundleIdentifier) else { return false }
-            let matches = windows.count == 1 ? windows : windows.filter { $0.title == title }
+            let matches = windows.filter { $0.title == title || (windows.count == 1 && !$0.requiresExactTitle) }
             guard matches.count == 1, let window = matches.first, let minimized = window.isMinimized else { return false }
             if minimized, !window.restore() { return false }
             return window.activate() && window.raise()
@@ -101,5 +104,18 @@ public struct ContextNoteNavigator {
         var value: CFTypeRef?
         guard AXUIElementCopyAttributeValue(element, name as CFString, &value) == .success else { return nil }
         return value
+    }
+
+    static func windowElements(readAttribute: (String) -> CFTypeRef?) -> [(element: AXUIElement, requiresExactTitle: Bool)]? {
+        let listed = readAttribute(kAXWindowsAttribute) as? [AXUIElement]
+        var elements = (listed ?? []).map { (element: $0, requiresExactTitle: false) }
+        for name in [kAXFocusedWindowAttribute, kAXMainWindowAttribute] {
+            guard let value = readAttribute(name), CFGetTypeID(value) == AXUIElementGetTypeID() else { continue }
+            let element = value as! AXUIElement
+            guard !elements.contains(where: { CFEqual($0.element, element) }) else { continue }
+            // A window omitted from AXWindows does not prove this is the application's only window.
+            elements.append((element, true))
+        }
+        return listed == nil && elements.isEmpty ? nil : elements
     }
 }

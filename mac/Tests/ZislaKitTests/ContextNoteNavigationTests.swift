@@ -1,4 +1,5 @@
 import AppKit
+import ApplicationServices
 import Testing
 import ZislaCore
 @testable import ZislaKit
@@ -68,6 +69,97 @@ struct ContextNoteNavigationTests {
         fixture.windows = [fixture.window(title: title, minimized: minimized)]
         #expect(fixture.navigator.navigate(to: window))
         #expect(fixture.events == ["test.editor"] + (minimized ? ["restore"] : []) + ["activate", "raise"])
+        #expect(fixture.opened.isEmpty)
+    }
+
+    @Test(arguments: [kAXFocusedWindowAttribute, kAXMainWindowAttribute], [false, true])
+    func windowReferencesRecoverOmittedFullScreenWindows(attribute: String, listUnavailable: Bool) throws {
+        let element = AXUIElementCreateApplication(100001)
+        let discovered = try #require(ContextNoteNavigator.windowElements { name in
+            if name == kAXWindowsAttribute { return listUnavailable ? nil : [] as CFArray }
+            return name == attribute ? element : nil
+        })
+        #expect(discovered.count == 1)
+        let candidate = try #require(discovered.first)
+        #expect(CFEqual(candidate.element, element))
+        #expect(candidate.requiresExactTitle)
+        let fixture = Fixture()
+        var target = fixture.window()
+        target.requiresExactTitle = candidate.requiresExactTitle
+        fixture.windows = [target]
+        #expect(fixture.navigator.navigate(to: window))
+        #expect(fixture.events == ["test.editor", "activate", "raise"])
+        #expect(fixture.opened.isEmpty)
+    }
+
+    @Test
+    func discoveredWindowReferencesAreDeduplicatedWithoutHidingOtherWindows() throws {
+        let listed = AXUIElementCreateApplication(100001)
+        let fullScreen = AXUIElementCreateApplication(100002)
+        let discovered = try #require(ContextNoteNavigator.windowElements { name in
+            switch name {
+            case kAXWindowsAttribute: return [listed] as CFArray
+            case kAXFocusedWindowAttribute: return fullScreen
+            case kAXMainWindowAttribute: return AXUIElementCreateApplication(100002)
+            default: return nil
+            }
+        })
+        #expect(discovered.count == 2)
+        #expect(discovered.filter { CFEqual($0.element, listed) }.map(\.requiresExactTitle) == [false])
+        #expect(discovered.filter { CFEqual($0.element, fullScreen) }.map(\.requiresExactTitle) == [true])
+
+        let repeated = try #require(ContextNoteNavigator.windowElements { name in
+            if name == kAXWindowsAttribute { return [listed] as CFArray }
+            return AXUIElementCreateApplication(100001)
+        })
+        #expect(repeated.count == 1)
+        #expect(repeated.first?.requiresExactTitle == false)
+    }
+
+    @Test(arguments: [false, true], [false, true])
+    func missingOrInvalidWindowReferencesDoNotInventCandidates(listUnavailable: Bool, invalidReference: Bool) {
+        let discovered = ContextNoteNavigator.windowElements { name in
+            if name == kAXWindowsAttribute { return listUnavailable ? nil : [] as CFArray }
+            return invalidReference ? "invalid" as CFString : nil
+        }
+        if listUnavailable {
+            #expect(discovered == nil)
+        } else {
+            #expect(discovered?.isEmpty == true)
+        }
+    }
+
+    @Test(arguments: ["Renamed", ""])
+    func incompleteWindowEnumerationDoesNotAuthorizeNavigatingToADifferentTitle(title: String) {
+        let fixture = Fixture()
+        var target = fixture.window(title: title)
+        target.requiresExactTitle = true
+        fixture.windows = [target]
+        #expect(!fixture.navigator.navigate(to: window))
+        #expect(fixture.events == ["test.editor"])
+        #expect(fixture.opened.isEmpty)
+    }
+
+    @Test(arguments: ["Doc", "Other", "Missing"])
+    func supplementalWindowsParticipateInExactAndAmbiguousTargetSelection(supplementalTitle: String) throws {
+        let listed = AXUIElementCreateApplication(100001)
+        let supplemental = AXUIElementCreateApplication(100002)
+        let discovered = try #require(ContextNoteNavigator.windowElements { name in
+            if name == kAXWindowsAttribute { return [listed] as CFArray }
+            return supplemental
+        })
+        let fixture = Fixture()
+        fixture.windows = discovered.map { candidate in
+            let isSupplemental = CFEqual(candidate.element, supplemental)
+            var target = fixture.window(title: isSupplemental ? supplementalTitle : "Other")
+            target.requiresExactTitle = candidate.requiresExactTitle
+            target.raise = { fixture.events.append(isSupplemental ? "target" : "wrong"); return true }
+            return target
+        }
+        let destination = ContextNoteLocation.window(bundleIdentifier: "test.editor", applicationName: "Editor",
+                                                     title: supplementalTitle == "Other" ? "Other" : "Doc")
+        #expect(fixture.navigator.navigate(to: destination) == (supplementalTitle == "Doc"))
+        #expect(fixture.events == (supplementalTitle == "Doc" ? ["test.editor", "activate", "target"] : ["test.editor"]))
         #expect(fixture.opened.isEmpty)
     }
 
