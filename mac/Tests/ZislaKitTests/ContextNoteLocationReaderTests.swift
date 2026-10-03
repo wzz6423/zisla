@@ -1,4 +1,5 @@
 import AppKit
+import ApplicationServices
 import Testing
 import ZislaCore
 @testable import ZislaKit
@@ -213,11 +214,30 @@ extension ContextNoteLocationReaderTests {
 
     private func captureWindow(surface: ContextNoteLocationReader.WindowSnapshot?,
                                hit: (processIdentifier: pid_t, window: CaptureWindow?)?,
-                               windows: [CaptureWindow]?) -> ContextNoteObservation {
-        ContextNoteLocationReader.captureWindow(surface: surface, hit: hit, candidates: { pid in
-            pid == 42 ? windows : []
-        }, frame: { $0.frame }) { _, window in
-            guard let window else { return .unavailable }
+                               windows: [CaptureWindow]?, focused: CaptureWindow? = nil,
+                               main: CaptureWindow? = nil) -> ContextNoteObservation {
+        var fixtures: [(element: AXUIElement, window: CaptureWindow)] = []
+        func element(for window: CaptureWindow) -> AXUIElement {
+            let element = AXUIElementCreateApplication(pid_t(1000 + fixtures.count))
+            fixtures.append((element, window))
+            return element
+        }
+        let listed = windows?.map { element(for: $0) }
+        let focusedElement = focused.map { element(for: $0) }
+        let mainElement = main.map { element(for: $0) }
+        let hitElement = hit.map { (processIdentifier: $0.processIdentifier, window: $0.window.map { element(for: $0) }) }
+        return ContextNoteLocationReader.captureWindow(surface: surface, hit: hitElement, readAttribute: { pid, name in
+            guard pid == 42 else { return nil }
+            switch name {
+            case kAXWindowsAttribute: return listed as CFArray?
+            case kAXFocusedWindowAttribute: return focusedElement
+            case kAXMainWindowAttribute: return mainElement
+            default: return nil
+            }
+        }, frame: { element in
+            fixtures.first { CFEqual($0.element, element) }?.window.frame
+        }) { _, element in
+            guard let element, let window = fixtures.first(where: { CFEqual($0.element, element) })?.window else { return .unavailable }
             return ContextNoteLocationReader.resolve(bundleIdentifier: "test.chat", applicationName: "Chat",
                 windowTitle: window.title, isBrowser: false, pageAddress: nil)
         }
@@ -270,14 +290,81 @@ extension ContextNoteLocationReaderTests {
         let bounds = CGRect(x: 100, y: 100, width: 800, height: 600)
         let surface = ContextNoteLocationReader.WindowSnapshot(frame: bounds, layer: 0,
             ownerProcessIdentifier: ProcessInfo.processInfo.processIdentifier)
-        let result = ContextNoteLocationReader.captureWindow(surface: surface, hit: (42, Optional(bounds)), candidates: { _ in
+        let result = ContextNoteLocationReader.captureWindow(surface: surface, hit: (42, AXUIElementCreateApplication(1000)), readAttribute: { _, _ in
             Issue.record("An own visible surface must not inspect application windows")
-            return [bounds]
-        }, frame: { $0 }) { _, _ in
+            return nil
+        }, frame: { _ in bounds }) { _, _ in
             Issue.record("An own visible surface must not read a note location")
             return .unavailable
         }
         #expect(result == .ignored)
+    }
+
+    @Test(arguments: [kAXFocusedWindowAttribute, kAXMainWindowAttribute])
+    func omittedApplicationWindowCanBeRecoveredOnlyAtItsVisibleSurface(attribute: String) {
+        let bounds = CGRect(x: 100, y: 100, width: 800, height: 600)
+        let surface = ContextNoteLocationReader.WindowSnapshot(frame: bounds, layer: 0, ownerProcessIdentifier: 42)
+        let window = CaptureWindow(title: "Conversation", frame: bounds)
+        for listed in [nil, []] as [[CaptureWindow]?] {
+            #expect(captureWindow(surface: surface, hit: nil, windows: listed,
+                focused: attribute == kAXFocusedWindowAttribute ? window : nil,
+                main: attribute == kAXMainWindowAttribute ? window : nil)
+                == .location(.window(bundleIdentifier: "test.chat", applicationName: "Chat", title: "Conversation")))
+        }
+    }
+
+    @Test(arguments: ["", " \n"])
+    func unreadableDirectWindowDoesNotPreventAnExactCanonicalWindowMatch(title: String) {
+        let bounds = CGRect(x: 100, y: 100, width: 800, height: 600)
+        let surface = ContextNoteLocationReader.WindowSnapshot(frame: bounds, layer: 0, ownerProcessIdentifier: 42)
+        let direct = CaptureWindow(title: title, frame: bounds)
+        let canonical = CaptureWindow(title: "Conversation", frame: bounds)
+        #expect(captureWindow(surface: surface, hit: (42, direct), windows: [canonical])
+                == .location(.window(bundleIdentifier: "test.chat", applicationName: "Chat", title: "Conversation")))
+        #expect(captureWindow(surface: surface, hit: (42, direct), windows: nil, focused: canonical)
+                == .location(.window(bundleIdentifier: "test.chat", applicationName: "Chat", title: "Conversation")))
+    }
+
+    @Test
+    func directWindowFromTheSameProcessMustMatchTheVisibleSurface() {
+        let bounds = CGRect(x: 100, y: 100, width: 800, height: 600)
+        let surface = ContextNoteLocationReader.WindowSnapshot(frame: bounds, layer: 0, ownerProcessIdentifier: 42)
+        let canonical = CaptureWindow(title: "Conversation", frame: bounds)
+        let direct = CaptureWindow(title: "Other", frame: bounds.offsetBy(dx: 1000, dy: 0))
+        #expect(captureWindow(surface: surface, hit: (42, direct), windows: [canonical])
+                == .location(.window(bundleIdentifier: "test.chat", applicationName: "Chat", title: "Conversation")))
+    }
+
+    @Test
+    func unreadableDirectWindowCannotFallBackToAnUnrelatedOrAmbiguousFocusedWindow() {
+        let bounds = CGRect(x: 100, y: 100, width: 800, height: 600)
+        let surface = ContextNoteLocationReader.WindowSnapshot(frame: bounds, layer: 0, ownerProcessIdentifier: 42)
+        let direct = CaptureWindow(title: "", frame: bounds)
+        let canonical = CaptureWindow(title: "Conversation", frame: bounds)
+        for candidate in [CaptureWindow(title: "Other", frame: bounds.offsetBy(dx: 1, dy: 0)),
+                          CaptureWindow(title: "Unknown", frame: nil)] {
+            #expect(captureWindow(surface: surface, hit: (42, direct), windows: [], focused: candidate) == .unavailable)
+        }
+        #expect(captureWindow(surface: surface, hit: (42, direct), windows: [], focused: canonical, main: canonical) == .unavailable)
+        #expect(captureWindow(surface: nil, hit: (42, direct), windows: nil, focused: canonical) == .unavailable)
+        let floating = ContextNoteLocationReader.WindowSnapshot(frame: bounds, layer: Int(CGWindowLevelForKey(.floatingWindow)),
+            ownerProcessIdentifier: 42)
+        #expect(captureWindow(surface: floating, hit: nil, windows: [], focused: canonical) == .unavailable)
+    }
+
+    @Test
+    func duplicatedReferencesToTheSameAccessibilityWindowRemainUnambiguous() {
+        let bounds = CGRect(x: 100, y: 100, width: 800, height: 600)
+        let surface = ContextNoteLocationReader.WindowSnapshot(frame: bounds, layer: 0, ownerProcessIdentifier: 42)
+        let window = AXUIElementCreateApplication(1000)
+        let result = ContextNoteLocationReader.captureWindow(surface: surface, hit: nil, readAttribute: { _, name in
+            if name == kAXWindowsAttribute { return [window] as CFArray }
+            return window
+        }, frame: { _ in bounds }) { _, element in
+            guard let element, CFEqual(element, window) else { return .unavailable }
+            return .location(.window(bundleIdentifier: "test.chat", applicationName: "Chat", title: "Conversation"))
+        }
+        #expect(result == .location(.window(bundleIdentifier: "test.chat", applicationName: "Chat", title: "Conversation")))
     }
 
     @Test

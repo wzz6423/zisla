@@ -318,6 +318,24 @@ struct ContextNoteTests {
     }
 
     @Test
+    func repeatedSaveAndDiscardAlwaysAllowAnotherDraftAfterCooldown() throws {
+        let fixture = try Fixture()
+        defer { fixture.close() }
+        for index in 0..<20 {
+            fixture.shake()
+            let draft = try #require(fixture.controller.draft, "Gesture \(index) must open a draft")
+            draft.text = "Note \(index)"
+            if index.isMultiple(of: 2) { fixture.controller.save() }
+            else { fixture.controller.discard() }
+            #expect(fixture.controller.draft == nil)
+            fixture.controller.handleKeyboardEvent(type: .flagsChanged, isRepeat: false)
+        }
+        #expect(fixture.presented == 20)
+        #expect(fixture.saved.count == 10)
+        #expect(fixture.shelf.items.count == 10)
+    }
+
+    @Test
     func emptySaveAndFailedWriteKeepDraftUntilRetryOrExplicitDiscard() throws {
         let fixture = try Fixture()
         defer { fixture.close() }

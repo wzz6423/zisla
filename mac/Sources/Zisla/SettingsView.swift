@@ -785,6 +785,7 @@ struct SettingsView: View {
                                 }
                                 .controlSize(.small)
                             }
+                            .keepsIntrinsicWidth()
                         }
                         .padding(.leading, 20)
                     }
