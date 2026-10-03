@@ -322,7 +322,7 @@ enum ContextNoteReminderPresenter {
               let location = item.noteLocation, controller.presentation.detection == nil else { return false }
         let detection = ClipboardAssistantDetection(kind: .text, title: text,
             detail: .path(ContextNoteDetailView.locationDescription(location)),
-            actions: [.showContextNote(item.id)], fullContent: text)
+            actions: [.showContextNote(item.id), .copyContextNote(item.id), .deleteContextNote(item.id)], fullContent: text)
         controller.displayDuration = settings.clipboardAssistantDisplayDuration
         controller.isLightweightMode = settings.clipboardAssistantLightweightMode
         controller.presentation.progressGlowEnabled = settings.collapsedProgressGlowEnabled

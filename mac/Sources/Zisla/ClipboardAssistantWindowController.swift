@@ -1320,6 +1320,8 @@ struct ClipboardAssistantToastView: View {
         case .revealInFinder: "在 Finder 中显示"
         case .openFolder: "打开文件夹"
         case .showContextNote: "查看便签"
+        case .copyContextNote: "复制"
+        case .deleteContextNote: "删除"
         case .search: "搜索"
         case .translate: "翻译"
         case .autoTranslate: "自动翻译"

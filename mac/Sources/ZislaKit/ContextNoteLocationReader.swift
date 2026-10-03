@@ -35,23 +35,18 @@ public enum ContextNoteLocationReader {
             desktopLocation(at: point, screens: screens, windowInfo: windows)
         }) {
             let quartzPoint = CGPoint(x: point.x, y: (screens.first?.frame.maxY ?? 0) - point.y)
-            return captureWindow(at: quartzPoint, windowInfo: windows, screenFrames: screens.map(\.frame))
+            return captureWindow(at: quartzPoint, windowInfo: windows, screenFrames: screens.map(\.frame)) { surface in
+                desktopLocation(at: point, screens: screens, windowInfo: windows, capturedSurface: surface)
+            }
         }
     }
 
-    private static func captureWindow(at point: CGPoint, windowInfo: [[String: Any]]?, screenFrames: [CGRect]) -> ContextNoteObservation {
-        let system = AXUIElementCreateSystemWide()
-        AXUIElementSetMessagingTimeout(system, 0.1)
-        var element: AXUIElement?
-        var pid: pid_t = 0
-        let hit: (processIdentifier: pid_t, window: AXUIElement?)?
-        if AXUIElementCopyElementAtPosition(system, Float(point.x), Float(point.y), &element) == .success,
-           let element, AXUIElementGetPid(element, &pid) == .success {
-            let direct = attribute(kAXRoleAttribute, from: element) as? String == kAXWindowRole
-                ? element : attribute(kAXWindowAttribute, from: element).flatMap(asElement)
-            hit = (pid, direct)
-        } else {
-            hit = nil
+    private static func captureWindow(at point: CGPoint, windowInfo: [[String: Any]]?, screenFrames: [CGRect],
+                                      desktopLocation: (WindowSnapshot) -> ContextNoteLocation?) -> ContextNoteObservation {
+        let hit = hitElement(at: point).map { hit in
+            let direct = attribute(kAXRoleAttribute, from: hit.element) as? String == kAXWindowRole
+                ? hit.element : attribute(kAXWindowAttribute, from: hit.element).flatMap(asElement)
+            return (processIdentifier: hit.processIdentifier, window: direct)
         }
         let surface = captureSurface(at: point, windowInfo: windowInfo, screenFrames: screenFrames,
             hitProcessIdentifier: hit?.processIdentifier,
@@ -60,17 +55,31 @@ public enum ContextNoteLocationReader {
             let application = AXUIElementCreateApplication(pid)
             AXUIElementSetMessagingTimeout(application, 0.1)
             return attribute(name, from: application)
-        }, frame: windowFrame) { pid, window in
+        }, frame: windowFrame, desktopLocation: desktopLocation) { pid, window in
             guard let app = NSRunningApplication(processIdentifier: pid) else { return .unavailable }
             return read(app: app, window: window)
         }
     }
 
+    private static func hitElement(at point: CGPoint) -> (processIdentifier: pid_t, element: AXUIElement)? {
+        let system = AXUIElementCreateSystemWide()
+        AXUIElementSetMessagingTimeout(system, 0.1)
+        var element: AXUIElement?
+        var pid: pid_t = 0
+        guard AXUIElementCopyElementAtPosition(system, Float(point.x), Float(point.y), &element) == .success,
+              let element, AXUIElementGetPid(element, &pid) == .success else { return nil }
+        return (pid, element)
+    }
+
     static func captureWindow(surface: WindowSnapshot?, hit: (processIdentifier: pid_t, window: AXUIElement?)?,
                               readAttribute: (pid_t, String) -> CFTypeRef?, frame: (AXUIElement) -> CGRect?,
+                              desktopLocation: (WindowSnapshot) -> ContextNoteLocation?,
                               read: (pid_t, AXUIElement?) -> ContextNoteObservation) -> ContextNoteObservation {
         guard let pid = surface?.ownerProcessIdentifier ?? hit?.processIdentifier else { return .unavailable }
         guard pid != ProcessInfo.processInfo.processIdentifier else { return .ignored }
+        if let surface, surface.isDesktop {
+            return desktopLocation(surface).map(ContextNoteObservation.location) ?? .unavailable
+        }
         let direct = hit?.processIdentifier == pid ? hit?.window : nil
         if let direct, surface == nil || surface?.matches(frame(direct), processIdentifier: pid) == true {
             let observation = read(pid, direct)
@@ -83,8 +92,10 @@ public enum ContextNoteLocationReader {
     }
 
     static func captureSurface(at point: CGPoint, windowInfo: [[String: Any]]?, screenFrames: [CGRect],
-                               hitProcessIdentifier: pid_t?, bundleIdentifier: (pid_t) -> String?) -> WindowSnapshot? {
-        guard let surface = topWindow(at: point, windowInfo: windowInfo) else { return nil }
+                               hitProcessIdentifier: pid_t?, bundleIdentifier: (pid_t) -> String?,
+                               excludingProcessIdentifier: pid_t? = nil, skippingMenuBar: Bool = false) -> WindowSnapshot? {
+        guard let surface = topWindow(at: point, windowInfo: windowInfo, excludingProcessIdentifier: excludingProcessIdentifier,
+                                      skippingMenuBar: skippingMenuBar) else { return nil }
         // Dock can publish a full-screen surface while passing pointer input to another app.
         guard let hitProcessIdentifier, hitProcessIdentifier != surface.ownerProcessIdentifier,
               surface.layer == CGWindowLevelForKey(.dockWindow),
@@ -92,9 +103,12 @@ public enum ContextNoteLocationReader {
               screenFrames.contains(where: {
                   CGRect(x: $0.minX, y: screenFrames[0].maxY - $0.maxY, width: $0.width, height: $0.height) == surface.frame
               }) else { return surface }
-        guard let underlying = topWindow(at: point, windowInfo: windowInfo, excludingSurface: surface),
-              underlying.layer == CGWindowLevelForKey(.normalWindow),
-              underlying.ownerProcessIdentifier == hitProcessIdentifier else { return surface }
+        guard let underlying = topWindow(at: point, windowInfo: windowInfo, excludingProcessIdentifier: excludingProcessIdentifier,
+                                         skippingMenuBar: skippingMenuBar, excludingSurface: surface),
+              underlying.layer == CGWindowLevelForKey(.normalWindow) || underlying.isDesktop,
+              underlying.ownerProcessIdentifier == hitProcessIdentifier
+                || (underlying.isDesktop && underlying.ownerName == "Window Server"
+                    && bundleIdentifier(hitProcessIdentifier) == "com.apple.finder") else { return surface }
         return underlying
     }
 
@@ -104,6 +118,7 @@ public enum ContextNoteLocationReader {
         let trusted = AccessibilityPermission.isTrusted
         if app.bundleIdentifier == "com.apple.finder" {
             let windows = CGWindowListCopyWindowInfo(.optionOnScreenOnly, kCGNullWindowID) as? [[String: Any]]
+            let screens = NSScreen.screens
             return observeFinder(isTrusted: trusted, focusedWindowLocation: {
                 let application = AXUIElementCreateApplication(app.processIdentifier)
                 AXUIElementSetMessagingTimeout(application, 0.1)
@@ -113,7 +128,10 @@ public enum ContextNoteLocationReader {
                 return read(app: app, window: window)
             }) { skippingMenuBar in
                 // The island opens over the menu bar before capturing the underlying Finder context.
-                desktopLocation(at: point, screens: NSScreen.screens, windowInfo: windows,
+                desktopLocation(at: point, screens: screens, windowInfo: windows,
+                                hitProcessIdentifier: skippingMenuBar ? {
+                                    hitElement(at: CGPoint(x: point.x, y: (screens.first?.frame.maxY ?? 0) - point.y))?.processIdentifier
+                                } : nil,
                                 excludingProcessIdentifier: ProcessInfo.processInfo.processIdentifier,
                                 skippingMenuBar: skippingMenuBar)
             }
@@ -186,18 +204,30 @@ public enum ContextNoteLocationReader {
     }
 
     static func desktopDisplay(at point: CGPoint, screens: [ScreenSnapshot], windowInfo: [[String: Any]]?,
+                               capturedSurface: WindowSnapshot? = nil,
+                               hitProcessIdentifier: (() -> pid_t?)? = nil,
+                               bundleIdentifier: (pid_t) -> String? = { NSRunningApplication(processIdentifier: $0)?.bundleIdentifier },
                                excludingProcessIdentifier: pid_t? = nil, skippingMenuBar: Bool = false) -> CGDirectDisplayID? {
-        guard let main = screens.first, let screen = screens.first(where: { $0.frame.contains(point) }),
-              let surface = topWindow(at: CGPoint(x: point.x, y: main.frame.maxY - point.y), windowInfo: windowInfo,
-                                      excludingProcessIdentifier: excludingProcessIdentifier, skippingMenuBar: skippingMenuBar),
-              surface.isDesktop else { return nil }
+        guard let main = screens.first, let screen = screens.first(where: { $0.frame.contains(point) }) else { return nil }
+        let quartzPoint = CGPoint(x: point.x, y: main.frame.maxY - point.y)
+        var surface = capturedSurface ?? topWindow(at: quartzPoint, windowInfo: windowInfo,
+                                                   excludingProcessIdentifier: excludingProcessIdentifier, skippingMenuBar: skippingMenuBar)
+        if surface?.isDesktop != true, let hitProcessIdentifier {
+            surface = captureSurface(at: quartzPoint, windowInfo: windowInfo, screenFrames: screens.map(\.frame),
+                hitProcessIdentifier: hitProcessIdentifier(), bundleIdentifier: bundleIdentifier,
+                excludingProcessIdentifier: excludingProcessIdentifier, skippingMenuBar: skippingMenuBar)
+        }
+        guard surface?.isDesktop == true else { return nil }
         return screen.displayID
     }
 
     private static func desktopLocation(at point: CGPoint, screens: [NSScreen], windowInfo: [[String: Any]]?,
+                                        capturedSurface: WindowSnapshot? = nil,
+                                        hitProcessIdentifier: (() -> pid_t?)? = nil,
                                         excludingProcessIdentifier: pid_t? = nil, skippingMenuBar: Bool = false) -> ContextNoteLocation? {
         let snapshots = screens.compactMap { ScreenSnapshot(screen: $0) }
         guard let display = desktopDisplay(at: point, screens: snapshots, windowInfo: windowInfo,
+                                          capturedSurface: capturedSurface, hitProcessIdentifier: hitProcessIdentifier,
                                           excludingProcessIdentifier: excludingProcessIdentifier, skippingMenuBar: skippingMenuBar),
               let screen = screens.first(where: { ScreenSnapshot(screen: $0)?.displayID == display }),
               let uuid = CGDisplayCreateUUIDFromDisplayID(display)?.takeRetainedValue() else { return nil }
