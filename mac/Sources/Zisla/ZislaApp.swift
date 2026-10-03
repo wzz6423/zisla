@@ -570,16 +570,17 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
         contextNoteController = ContextNoteController(
             settingsStore: model.settingsStore, languageStore: model.languageStore, shelf: model.shelf,
             canInteract: { !model.isIslandVisible && !model.voiceInput.isRecording && !model.voiceInput.isPreparing },
-            onReminder: { model.presentContextNoteReminder($0) },
-            onCaptureFailure: {
+            onReminder: { model.presentContextNoteReminder($0, at: $1) },
+            onCaptureFailure: { point in
                 let message = AppLocalization.text("无法识别当前位置，请检查辅助功能权限")
                 model.clipboardAssistant.presentation.notchBackground = model.settingsStore.settings.islandNotchBackground
                 model.clipboardAssistant.present(ClipboardAssistantDetection(kind: .text, title: message, fullContent: message),
-                                                 visualStyle: model.settingsStore.settings.islandVisualStyle)
+                                                 visualStyle: model.settingsStore.settings.islandVisualStyle, at: point)
             },
-            onSaved: { _ in
+            onSaved: { [weak coordinator] _, point in
                 model.contextNoteEditor.hide()
                 model.transientMessage = AppLocalization.text("已加入 %ld 个项目", 1)
+                coordinator?.setTransientNoticePresented(true, at: point)
                 model.selectModule(.shelf)
             }
         )

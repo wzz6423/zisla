@@ -19,9 +19,13 @@ struct ContextNoteTests {
         var observation: ContextNoteObservation
         var controller: ContextNoteController!
         var presented = 0
+        var presentedPoints: [CGPoint] = []
         var failedCaptures = 0
+        var failurePoints: [CGPoint] = []
         var saved: [FileShelfItem] = []
+        var savedPoints: [CGPoint] = []
         var reminders: [UUID] = []
+        var reminderPoints: [CGPoint] = []
         var acceptsReminder = true
         var busy = false
         var buttons = 0
@@ -43,20 +47,21 @@ struct ContextNoteTests {
                 captureLocation: { [unowned self] _ in observation },
                 currentLocation: { [unowned self] _ in observation },
                 canInteract: { [unowned self] in !busy },
-                onReminder: { [unowned self] item in
-                    if acceptsReminder { reminders.append(item.id) }
+                onReminder: { [unowned self] item, point in
+                    if acceptsReminder { reminders.append(item.id); reminderPoints.append(point) }
                     return acceptsReminder
                 },
-                onCaptureFailure: { [unowned self] in failedCaptures += 1 },
-                onSaved: { [unowned self] item in
+                onCaptureFailure: { [unowned self] point in failedCaptures += 1; failurePoints.append(point) },
+                onSaved: { [unowned self] item, point in
                     #expect(shelf.items.contains(item))
                     #expect(controller.draft == nil)
                     saved.append(item)
+                    savedPoints.append(point)
                 },
                 pressedMouseButtons: { [unowned self] in buttons },
                 modifierFlags: { [unowned self] in modifiers },
                 keyIsPressed: { [unowned self] in pressedKeys.contains($0) },
-                windowPresenter: { [unowned self] _, _, _ in presented += 1 }
+                windowPresenter: { [unowned self] _, point, _ in presented += 1; presentedPoints.append(point) }
             )
         }
 
@@ -285,12 +290,14 @@ struct ContextNoteTests {
         defer { fixture.close() }
         fixture.shake()
         fixture.controller.draft?.text = "Remember"
+        fixture.controller.handlePointer(at: CGPoint(x: -5000, y: 2000), interaction: .moved, timestamp: 1)
         let date = Date(timeIntervalSince1970: 1234)
         fixture.controller.save(at: date)
         fixture.controller.save(at: date)
         #expect(fixture.saved.count == 1)
         #expect(fixture.saved.first?.addedAt == date)
         #expect(fixture.saved.first?.noteLocation == fixture.location)
+        #expect(fixture.savedPoints == fixture.presentedPoints)
         fixture.controller.checkForReturn(at: .zero)
         #expect(fixture.reminders.isEmpty)
         fixture.observation = .ignored
@@ -303,9 +310,29 @@ struct ContextNoteTests {
         fixture.observation = .location(.desktop(displayID: "other", displayName: "Other"))
         fixture.controller.checkForReturn(at: .zero)
         fixture.observation = .location(fixture.location)
-        fixture.controller.checkForReturn(at: .zero)
+        let returnPoint = CGPoint(x: -1800, y: 400)
+        fixture.controller.checkForReturn(at: returnPoint)
         fixture.controller.checkForReturn(at: .zero)
         #expect(fixture.reminders == fixture.saved.map(\.id))
+        #expect(fixture.reminderPoints == [returnPoint])
+    }
+
+    @Test
+    func repeatedSaveAndDiscardAlwaysAllowAnotherDraftAfterCooldown() throws {
+        let fixture = try Fixture()
+        defer { fixture.close() }
+        for index in 0..<20 {
+            fixture.shake()
+            let draft = try #require(fixture.controller.draft, "Gesture \(index) must open a draft")
+            draft.text = "Note \(index)"
+            if index.isMultiple(of: 2) { fixture.controller.save() }
+            else { fixture.controller.discard() }
+            #expect(fixture.controller.draft == nil)
+            fixture.controller.handleKeyboardEvent(type: .flagsChanged, isRepeat: false)
+        }
+        #expect(fixture.presented == 20)
+        #expect(fixture.saved.count == 10)
+        #expect(fixture.shelf.items.count == 10)
     }
 
     @Test
@@ -343,6 +370,7 @@ struct ContextNoteTests {
         fixture.observation = .unavailable
         fixture.shake()
         #expect(fixture.failedCaptures == 1)
+        #expect(fixture.failurePoints == [CGPoint(x: 100, y: 100)])
         #expect(fixture.controller.draft == nil)
         fixture.observation = .ignored
         fixture.shake()
@@ -458,7 +486,7 @@ struct ContextNoteTests {
 @MainActor
 struct ContextNotePresentationTests {
     @Test(arguments: IslandVisualStyle.allCases, IslandNotchBackground.allCases)
-    func remindersUseExistingQuickActionAppearanceAndOpenTheirOwnNote(style: IslandVisualStyle, background: IslandNotchBackground) {
+    func remindersUseExistingQuickActionAppearanceAndOpenTheirOwnNote(style: IslandVisualStyle, background: IslandNotchBackground) throws {
         let controller = ClipboardAssistantController(windowPresenter: { _, _ in })
         defer { controller.dismiss(animated: false) }
         var settings = FeatureSettings.default
@@ -468,13 +496,18 @@ struct ContextNotePresentationTests {
         settings.clipboardAssistantDisplayDuration = .never
         settings.clipboardAssistantLightweightMode = true
         let item = FileShelfItem(id: UUID(), url: URL(fileURLWithPath: "/fixture/note"), addedAt: Date(), bookmarkData: Data(), text: "Remember", noteLocation: .desktop(displayID: "display", displayName: "Screen"))
-        #expect(ContextNoteReminderPresenter.present(item, on: controller, settings: settings))
+        let point = CGPoint(x: -1200, y: 500)
+        var screenRequests: [CGPoint] = []
+        controller.screenAtPoint = { screenRequests.append($0); return nil }
+        #expect(ContextNoteReminderPresenter.present(item, at: point, on: controller, settings: settings))
+        _ = controller.rowLayout(for: try #require(controller.presentation.detection))
+        #expect(screenRequests == [point])
         #expect(controller.presentation.visualStyle == style)
         #expect(controller.presentation.notchBackground == background)
         #expect(controller.isLightweightMode)
         #expect(controller.dismissalProgress(at: .distantFuture) == nil)
         #expect(controller.presentation.detection?.fullContent == "Remember")
-        #expect(!ContextNoteReminderPresenter.present(item, on: controller, settings: settings))
+        #expect(!ContextNoteReminderPresenter.present(item, at: .zero, on: controller, settings: settings))
         var performed: [ClipboardAssistantAction] = []
         controller.onPerformAction = { performed.append($0) }
         controller.performCurrentAction()

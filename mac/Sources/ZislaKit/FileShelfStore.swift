@@ -8,6 +8,7 @@ import ZislaCore
 
 public enum FileShelfCategory: String, CaseIterable, Hashable, Identifiable, Sendable {
     case all = "全部"
+    case note = "便签"
     case folder = "文件夹"
     case image = "图片"
     case url = "URL"
@@ -28,6 +29,7 @@ public enum FileShelfCategory: String, CaseIterable, Hashable, Identifiable, Sen
     public var symbol: String {
         switch self {
         case .all: return "square.grid.2x2"
+        case .note: return "note.text"
         case .folder: return "folder"
         case .image: return "photo"
         case .url: return "link"
@@ -43,7 +45,7 @@ public enum FileShelfCategory: String, CaseIterable, Hashable, Identifiable, Sen
     }
 
     public static let fileShelfCases = allCases.filter { $0 != .path }
-    public static let clipboardCases = allCases
+    public static let clipboardCases = allCases.filter { $0 != .note }
 }
 
 public struct FileShelfItem: Identifiable, Equatable {
@@ -77,6 +79,7 @@ public struct FileShelfItem: Identifiable, Equatable {
     }
 
     public var category: FileShelfCategory {
+        if noteLocation != nil { return .note }
         if text != nil { return linkURL == nil ? .text : .url }
         var isDirectory: ObjCBool = false
         if FileManager.default.fileExists(atPath: url.path, isDirectory: &isDirectory),

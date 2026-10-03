@@ -2618,6 +2618,7 @@
 "晃动唤出中转窗口" = "Shake to Show Shelf Window";
 "拖拽文件时晃动鼠标，在旁边显示中转窗口" = "Shake the mouse while dragging files to show a shelf window beside the pointer";
 
+"便签" = "Notes";
 "位置便签" = "Location Note";
 "摇动鼠标记便签" = "Shake to take a note";
 "按住快捷键并左右摇动鼠标，在当前位置记录，返回时提醒" = "Hold the shortcut and shake the mouse left and right to leave a note here and get reminded when you return";

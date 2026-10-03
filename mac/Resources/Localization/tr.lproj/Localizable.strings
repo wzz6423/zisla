@@ -2619,6 +2619,7 @@
 "晃动唤出中转窗口" = "Raf penceresini göstermek için sallayın";
 "拖拽文件时晃动鼠标，在旁边显示中转窗口" = "İşaretçinin yanında raf penceresini göstermek için dosyaları sürüklerken fareyi sallayın";
 
+"便签" = "Notlar";
 "位置便签" = "Konum notu";
 "摇动鼠标记便签" = "Not almak için fareyi sallayın";
 "按住快捷键并左右摇动鼠标，在当前位置记录，返回时提醒" = "Buraya not bırakmak ve geri döndüğünüzde hatırlatılmak için kısayolu basılı tutup fareyi sağa sola sallayın";

@@ -785,7 +785,9 @@ struct SettingsView: View {
                                 }
                                 .controlSize(.small)
                             }
+                            .keepsIntrinsicWidth()
                         }
+                        .padding(.leading, 20)
                     }
                     if model.settingsStore.settings.contextNotesEnabled && !model.assistantAccessibilityGranted {
                         rowDivider
@@ -4068,17 +4070,17 @@ private final class HotkeyRecorderButton: NSButton {
 enum SettingsSection: String, CaseIterable, Identifiable {
     case general
     case features
+    case info
     case clipboardAssistant
     case screenshot
-    case info
-    case mail
     case ai
     case voice
+    case mail
     case keyboardSound
-    case pet
     case download
     case weather
     case networkProxy
+    case pet
     case recommendations
     case updates
 

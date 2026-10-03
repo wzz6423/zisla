@@ -2619,6 +2619,7 @@
 "晃动唤出中转窗口" = "Agitar para mostrar a prateleira";
 "拖拽文件时晃动鼠标，在旁边显示中转窗口" = "Agite o mouse ao arrastar arquivos para mostrar uma janela da prateleira ao lado do ponteiro";
 
+"便签" = "Notas";
 "位置便签" = "Nota de local";
 "摇动鼠标记便签" = "Agitar o mouse para anotar";
 "按住快捷键并左右摇动鼠标，在当前位置记录，返回时提醒" = "Segure o atalho e mova o mouse rapidamente para os lados para deixar uma nota aqui e receber um lembrete ao voltar";

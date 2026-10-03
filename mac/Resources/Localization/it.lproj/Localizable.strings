@@ -2619,6 +2619,7 @@
 "晃动唤出中转窗口" = "Scuoti per mostrare il ripiano";
 "拖拽文件时晃动鼠标，在旁边显示中转窗口" = "Scuoti il mouse mentre trascini i file per mostrare una finestra del ripiano accanto al puntatore";
 
+"便签" = "Note";
 "位置便签" = "Nota del luogo";
 "摇动鼠标记便签" = "Scuoti il mouse per annotare";
 "按住快捷键并左右摇动鼠标，在当前位置记录，返回时提醒" = "Tieni premuta la scorciatoia e scuoti il mouse a sinistra e a destra per lasciare una nota qui e ricevere un promemoria al ritorno";

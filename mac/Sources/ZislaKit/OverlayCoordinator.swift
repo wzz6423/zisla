@@ -522,10 +522,14 @@ public final class OverlayCoordinator: NSObject {
     /// The collapsed transient notice takes over the pill's row, so the pet panel folds away for
     /// it exactly as it does for recording — otherwise the sprite keeps sitting beside a row it is
     /// no longer part of.
-    public func setTransientNoticePresented(_ presented: Bool) {
-        guard presented != isTransientNoticePresented else { return }
+    public func setTransientNoticePresented(_ presented: Bool, at point: CGPoint? = nil) {
         isTransientNoticePresented = presented
-        updatePersistentPanels()
+        if presented {
+            if let point { selectActiveDisplay(at: point) }
+            presentCurrentLayout()
+        } else {
+            updatePersistentPanels()
+        }
     }
 
     public func setAllowsKeyWindow(_ allows: Bool) {

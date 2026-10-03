@@ -2619,6 +2619,7 @@
 "晃动唤出中转窗口" = "Schudden om het plankvenster te tonen";
 "拖拽文件时晃动鼠标，在旁边显示中转窗口" = "Schud de muis tijdens het slepen van bestanden om een plankvenster naast de aanwijzer te tonen";
 
+"便签" = "Notities";
 "位置便签" = "Locatienotitie";
 "摇动鼠标记便签" = "Schud de muis voor een notitie";
 "按住快捷键并左右摇动鼠标，在当前位置记录，返回时提醒" = "Houd de sneltoets ingedrukt en schud de muis heen en weer om hier een notitie achter te laten en bij terugkomst een herinnering te krijgen";

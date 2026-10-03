@@ -10,6 +10,32 @@ import ZislaKit
 @MainActor
 struct ClipboardAssistantShortcutTests {
     @Test(arguments: [0, 1, 2])
+    func noteShortcutsReachViewCopyAndDeleteInTheDisplayedOrder(index: Int) throws {
+        let registry = Registry()
+        let controller = makeController(registry)
+        defer { controller.dismiss(animated: false) }
+        var settings = FeatureSettings.default
+        settings.contextNotesEnabled = true
+        settings.clipboardAssistantDisplayDuration = .never
+        let item = FileShelfItem(
+            id: UUID(), url: URL(fileURLWithPath: "/synthetic-context-note/note"),
+            addedAt: Date(timeIntervalSince1970: 0), bookmarkData: Data(), text: "Remember",
+            noteLocation: .desktop(displayID: "fixture", displayName: "Screen")
+        )
+        let actions: [ClipboardAssistantAction] = [.showContextNote(item.id), .copyContextNote(item.id), .deleteContextNote(item.id)]
+        var performed: [ClipboardAssistantAction] = []
+        controller.onPerformAction = { performed.append($0) }
+        #expect(ContextNoteReminderPresenter.present(item, at: .zero, on: controller, settings: settings))
+        #expect(performed.isEmpty)
+        #expect(controller.shortcutHint(for: actions[index]) == "⌘ \(index + 1)")
+        try registry.callback(keyCode: Self.keyCodes[index])()
+        #expect(performed == [actions[index]])
+        #expect(registry.bindings.isEmpty)
+        controller.performCurrentAction()
+        #expect(performed == [actions[index]])
+    }
+
+    @Test(arguments: [0, 1, 2])
     func shellCommandsWaitForAnExplicitActionAndCannotRunTwiceFromTheSamePrompt(index: Int) throws {
         let registry = Registry()
         let controller = makeController(registry)

@@ -9,6 +9,35 @@ import ZislaKit
 
 struct ClipboardAssistantIslandPresentationTests {
     @MainActor
+    @Test
+    func promptLayoutKeepsItsOriginUntilTheNextPresentation() throws {
+        let controller = ClipboardAssistantController(windowPresenter: { _, _ in })
+        defer { controller.dismiss(animated: false) }
+        controller.displayDuration = .never
+        let screen = try #require(NSScreen.screens.first)
+        var requests: [CGPoint] = []
+        controller.screenAtPoint = { requests.append($0); return screen }
+        let detection = ClipboardAssistantDetection(kind: .text, title: "saved note")
+        let first = CGPoint(x: -100_000, y: -100_000)
+        let second = CGPoint(x: -102_000, y: -101_000)
+        controller.present(detection, visualStyle: .frosted, at: first)
+        let initial = try #require(controller.rowLayout(for: detection))
+        #expect(initial.frame.maxY == screen.frame.maxY)
+        #expect(controller.rowLayout(for: detection)?.frame == initial.frame)
+        #expect(requests == [first, first])
+        controller.setScreenLocked(true)
+        #expect(controller.present(detection, visualStyle: .frosted, at: second) == nil)
+        #expect(controller.rowLayout(for: detection)?.frame == initial.frame)
+        #expect(requests.last == first)
+        controller.setScreenLocked(false)
+        controller.present(detection, visualStyle: .frosted, at: second)
+        _ = controller.rowLayout(for: detection)
+        #expect(requests.last == second)
+        controller.screenAtPoint = { _ in nil }
+        #expect(controller.rowLayout(for: detection) == nil)
+    }
+
+    @MainActor
     @Test(arguments: [IslandVisualStyle.transparent, .frosted])
     func quickActionBackgroundUpdatesWithoutReplacingThePrompt(
         visualStyle: IslandVisualStyle
