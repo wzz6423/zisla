@@ -106,7 +106,7 @@ extension IslandModule {
   func isEnabled(in settings: FeatureSettings) -> Bool {
     switch self {
     case .dashboard: true
-    case .shelf: settings.fileShelfEnabled
+    case .shelf: settings.fileShelfEnabled || settings.contextNotesEnabled
     case .clipboard: settings.clipboardHistoryEnabled
     case .aiMonitor: settings.aiProgressEnabled
     case .download: settings.downloaderEnabled
@@ -362,6 +362,7 @@ final class AppModel: ObservableObject {
 
   @Published var selectedModule: IslandModule = .dashboard {
     didSet {
+      if selectedModule != .shelf { contextNoteEditor.hide() }
       // Do not put teardown in default: named cases such as agenda and mail would skip it, leaving usage history resident in memory.
       if oldValue == .aiMonitor, selectedModule != .aiMonitor {
         aiMonitor.unloadUsageHistory()
@@ -458,6 +459,7 @@ final class AppModel: ObservableObject {
   @Published var isIslandVisible = false {
     didSet {
       guard oldValue != isIslandVisible else { return }
+      if !isIslandVisible { contextNoteEditor.hide() }
       updateSpectrumMonitoring()
     }
   }
@@ -482,6 +484,9 @@ final class AppModel: ObservableObject {
   let calendar = CalendarService()
   let shelf = FileShelfStore()
   @Published var selectedShelfCategory: FileShelfCategory = .all
+  let contextNoteEditor = ContextNoteShelfEditor()
+  var onBeginContextNote: (() -> Void)?
+  var onContextNoteSaved: ((FileShelfItem) -> Void)?
   let weatherLocations = WeatherLocationStore()
   let clipboardMonitor = ClipboardLinkMonitor()
   let clipboardHistory = ClipboardHistoryStore()
@@ -1503,6 +1508,28 @@ final class AppModel: ObservableObject {
     transientMessage = AppLocalization.text("已复制到剪贴板")
   }
 
+  func saveShelfContextNote() {
+    let isNew = contextNoteEditor.itemID == nil
+    guard let item = contextNoteEditor.save(in: shelf) else { return }
+    onContextNoteSaved?(item)
+    transientMessage = isNew ? AppLocalization.text("已加入 %ld 个项目", 1) : AppLocalization.text("已保存便签")
+  }
+
+  func copyContextNoteText(_ text: String) {
+    let pasteboard = NSPasteboard.general
+    pasteboard.clearContents()
+    let success = pasteboard.writeObjects([FileShelfPasteboard.pasteboardWriter(for: .text(text))])
+    transientMessage = success ? AppLocalization.text("已复制到剪贴板") : AppLocalization.text("无法写入剪贴板")
+  }
+
+  func navigateToContextNote(_ location: ContextNoteLocation) {
+    guard ContextNoteNavigator().navigate(to: location) else {
+      transientMessage = AppLocalization.text("无法前往记录位置，窗口或显示器可能已关闭")
+      return
+    }
+    islandCollapseRequested = true
+  }
+
   func copyClipboardHistoryItem(_ item: ClipboardHistoryItem) {
     guard ClipboardHistoryPasteboard.write(item.content) else {
       transientMessage = AppLocalization.text("无法写入剪贴板")
@@ -1706,6 +1733,12 @@ final class AppModel: ObservableObject {
       presentationGeneration: presentationGeneration
     )
     return .presented
+  }
+
+  func presentContextNoteReminder(_ item: FileShelfItem) -> Bool {
+    guard ContextNoteReminderPresenter.present(item, on: clipboardAssistant, settings: settingsStore.settings) else { return false }
+    clipboardAssistantContent = nil
+    return true
   }
 
   private func presentCompletedTransfer(_ transfer: BrowserCompletedTransfer) {
@@ -1912,6 +1945,11 @@ final class AppModel: ObservableObject {
       selectModule(.download)
     case .revealInFinder(let url):
       NSWorkspace.shared.activateFileViewerSelecting([url])
+    case .showContextNote(let id):
+      guard let item = shelf.items.first(where: { $0.id == id && $0.noteLocation != nil }) else { return }
+      contextNoteEditor.open(item)
+      selectModule(.shelf)
+      islandExpansionRequested = true
     case .openFolder(let url):
       if !NSWorkspace.shared.open(url) {
         transientMessage = clipboardAssistantMessage("无法完成操作")

@@ -398,6 +398,7 @@ public enum ClipboardAssistantAction: Equatable, Sendable {
     case openDownload(URL)
     case revealInFinder(URL)
     case openFolder(URL)
+    case showContextNote(UUID)
     case search(String)
     case translate(String)
     case autoTranslate(String)
@@ -427,6 +428,7 @@ public enum ClipboardAssistantAction: Equatable, Sendable {
         case .openDownload: "openDownload"
         case .revealInFinder: "revealInFinder"
         case .openFolder: "openFolder"
+        case .showContextNote: "showContextNote"
         case .search: "search"
         case .translate: "translate"
         case .autoTranslate: "autoTranslate"
@@ -456,7 +458,7 @@ public enum ClipboardAssistantAction: Equatable, Sendable {
         case .openService: .openURL
         case .openDownload: .openDownload
         case .revealInFinder: .revealInFinder
-        case .openFolder: nil
+        case .openFolder, .showContextNote: nil
         case .search: .search
         case .translate: .translate
         case .autoTranslate: .autoTranslate

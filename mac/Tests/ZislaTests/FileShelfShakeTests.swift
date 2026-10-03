@@ -114,16 +114,167 @@ struct FileShelfShakeViewTests {
                 #expect(!views.contains { $0 is NSVisualEffectView })
                 if #available(macOS 26.0, *) { #expect(!views.contains { $0 is NSGlassEffectView }) }
             } else if #available(macOS 26.0, *), style == .transparent {
-                #expect(views.contains { $0 is NSGlassEffectView })
+                let glass = try #require(views.compactMap { $0 as? NSGlassEffectView }.first)
+                #expect(glass.style == .clear)
+                #expect(glass.tintColor == nil)
             } else {
                 #expect(views.contains { $0 is NSVisualEffectView })
             }
         }
     }
 
+    @Test @MainActor
+    func frostedFloatingTargetKeepsTheDesktopShielded() throws {
+        let reduceTransparency = NSWorkspace.shared.accessibilityDisplayShouldReduceTransparency
+        let name = "zisla-shake-opacity-\(UUID().uuidString)"
+        let defaults = try #require(UserDefaults(suiteName: name))
+        let settings = FeatureSettingsStore(defaults: defaults)
+        defer {
+            settings.flushPendingChanges()
+            defaults.removePersistentDomain(forName: name)
+        }
+        settings.settings.islandVisualStyle = .frosted
+        let host = NSHostingView(rootView: FileShelfShakeView(settingsStore: settings, onItems: { _ in }))
+        let panel = FileShelfShakeController.makeWindow(contentView: host, frame: CGRect(origin: .zero, size: FileShelfShakeLayout.size))
+        defer { panel.close() }
+        host.layoutSubtreeIfNeeded()
+        let bitmap = try #require(host.bitmapImageRepForCachingDisplay(in: host.bounds))
+        host.cacheDisplay(in: host.bounds, to: bitmap)
+        let scale = CGFloat(bitmap.pixelsWide) / host.bounds.width
+        let pixel = try #require(bitmap.colorAt(x: Int(12 * scale), y: Int(72 * scale)))
+        if reduceTransparency {
+            #expect(pixel.alphaComponent > 0.99, "Reduced transparency must give the standalone target an opaque backing.")
+        } else {
+            #expect(pixel.alphaComponent > 0.9, "Frosted glass must strongly shield the desktop behind this standalone target.")
+        }
+        #expect(!panel.isVisible)
+    }
+
+    @Test(arguments: IslandVisualStyle.allCases, [false, true]) @MainActor
+    func standaloneBackingIsDenseOnlyWhenItsMaterialNeedsIt(style: IslandVisualStyle, reduceTransparency: Bool) throws {
+        let host = NSHostingView(rootView: FileShelfShakeView.standaloneBacking(style: style, reduceTransparency: reduceTransparency))
+        host.frame = CGRect(origin: .zero, size: FileShelfShakeLayout.size)
+        host.layoutSubtreeIfNeeded()
+        let bitmap = try #require(host.bitmapImageRepForCachingDisplay(in: host.bounds))
+        host.cacheDisplay(in: host.bounds, to: bitmap)
+        let scale = CGFloat(bitmap.pixelsWide) / host.bounds.width
+        let pixel = try #require(bitmap.colorAt(x: Int(12 * scale), y: Int(72 * scale)))
+        if reduceTransparency {
+            #expect(pixel.alphaComponent > 0.99, "Both styles must become opaque when transparency is reduced.")
+        } else if style == .frosted {
+            #expect(pixel.alphaComponent > 0.87, "The standalone frosted material needs a dense backing.")
+            #expect(pixel.alphaComponent < 0.9, "Frosted mode must retain some translucency.")
+        } else {
+            #expect(pixel.alphaComponent == 0, "Liquid glass must not gain a dark backing.")
+        }
+        let corner = try #require(bitmap.colorAt(x: 0, y: 0))
+        #expect(corner.alphaComponent == 0, "The backing must stay inside the rounded panel.")
+    }
+
     @MainActor
     private func descendants(of view: NSView) -> [NSView] {
         view.subviews.flatMap { [$0] + descendants(of: $0) }
+    }
+}
+
+@MainActor
+struct IslandGlassStandaloneSurfaceTests {
+    @Test(arguments: [false, true])
+    func frostedInputBlursTheCorrectBackdrop(isStandalone: Bool) throws {
+        let host = NSHostingView(rootView: Group {
+            if isStandalone {
+                Color.clear.islandGlassSurface(.input, cornerRadius: 14, isStandalone: true)
+            } else {
+                Color.clear.islandGlassSurface(.input, cornerRadius: 14)
+            }
+        }
+            .environment(\.islandVisualStyle, .frosted)
+            .environment(\.colorScheme, .dark))
+        let panel = FileShelfShakeController.makeWindow(contentView: host, frame: CGRect(x: 0, y: 0, width: 360, height: 44))
+        defer { panel.close() }
+        host.layoutSubtreeIfNeeded()
+        let effects = descendants(of: host).compactMap { $0 as? NSVisualEffectView }
+        if NSWorkspace.shared.accessibilityDisplayShouldReduceTransparency {
+            #expect(effects.isEmpty)
+        } else {
+            let effect = try #require(effects.first)
+            #expect(effect.material == .sidebar)
+            #expect(effect.blendingMode == (isStandalone ? .behindWindow : .withinWindow))
+        }
+        let bitmap = try render(host)
+        let alpha = try color(bitmap, at: CGPoint(x: 180, y: 22), in: host.bounds.size).alphaComponent
+        #expect(isStandalone ? alpha > 0.9 : alpha < 0.6)
+        #expect(!panel.isVisible)
+    }
+
+    @Test(arguments: [false, true])
+    func liquidInputPreservesNativeGlassAndAppliesTheStandaloneCrown(isStandalone: Bool) throws {
+        let host = NSHostingView(rootView: Color.clear
+            .islandGlassSurface(.input, cornerRadius: 14, isStandalone: isStandalone)
+            .environment(\.islandVisualStyle, .transparent))
+        host.frame = CGRect(x: 0, y: 0, width: 360, height: 44)
+        host.layoutSubtreeIfNeeded()
+        let views = descendants(of: host)
+        if #available(macOS 26.0, *), !NSWorkspace.shared.accessibilityDisplayShouldReduceTransparency {
+            let glass = try #require(views.compactMap { $0 as? NSGlassEffectView }.first)
+            #expect(glass.style == .clear)
+            #expect(glass.tintColor == nil)
+            #expect(glass.cornerRadius == 14)
+            // Hide only the native shell so its opaque offscreen cache cannot mask the crown.
+            glass.alphaValue = 0
+            let bitmap = try render(host)
+            let top = try color(bitmap, at: CGPoint(x: 180, y: 6), in: host.bounds.size).alphaComponent
+            let middle = try color(bitmap, at: CGPoint(x: 180, y: 15), in: host.bounds.size).alphaComponent
+            let lower = try color(bitmap, at: CGPoint(x: 180, y: 31), in: host.bounds.size).alphaComponent
+            let bottom = try color(bitmap, at: CGPoint(x: 180, y: 43), in: host.bounds.size).alphaComponent
+            #expect(isStandalone ? top > 0.99 : top < 0.97)
+            #expect(isStandalone ? middle > 0.75 : middle < 0.7)
+            #expect(isStandalone ? lower > 0.24 : lower < 0.18)
+            #expect(bottom == 0)
+        }
+        #expect(host.window == nil)
+    }
+
+    @Test(arguments: IslandVisualStyle.allCases, [false, true])
+    func standaloneInputBackingPreservesLiquidGlassAndAccessibility(style: IslandVisualStyle, reduceTransparency: Bool) throws {
+        let host = NSHostingView(rootView: IslandGlassStandaloneBacking(
+            shape: IslandSurfaceGeometry.moduleContentShape(cornerRadius: 14),
+            visualStyle: style,
+            reduceTransparency: reduceTransparency
+        ))
+        host.frame = CGRect(x: 0, y: 0, width: 360, height: 44)
+        let bitmap = try render(host)
+        let pixel = try color(bitmap, at: CGPoint(x: 180, y: 22), in: host.bounds.size)
+        let alpha = pixel.alphaComponent
+        if reduceTransparency {
+            #expect(alpha > 0.99)
+        } else if style == .frosted {
+            #expect(alpha > 0.89 && alpha < 0.91)
+        } else {
+            #expect(alpha == 0)
+        }
+        if reduceTransparency || style == .frosted {
+            let tint = try #require(pixel.usingColorSpace(.sRGB))
+            #expect(tint.redComponent < 0.01 && tint.greenComponent < 0.01 && tint.blueComponent < 0.01)
+        }
+        let corner = try color(bitmap, at: .zero, in: host.bounds.size)
+        #expect(corner.alphaComponent == 0)
+    }
+
+    private func descendants(of view: NSView) -> [NSView] {
+        view.subviews.flatMap { [$0] + descendants(of: $0) }
+    }
+
+    private func render(_ view: NSView) throws -> NSBitmapImageRep {
+        view.layoutSubtreeIfNeeded()
+        let bitmap = try #require(view.bitmapImageRepForCachingDisplay(in: view.bounds))
+        view.cacheDisplay(in: view.bounds, to: bitmap)
+        return bitmap
+    }
+
+    private func color(_ bitmap: NSBitmapImageRep, at point: CGPoint, in size: CGSize) throws -> NSColor {
+        let scale = CGFloat(bitmap.pixelsWide) / size.width
+        return try #require(bitmap.colorAt(x: Int(point.x * scale), y: Int(point.y * scale)))
     }
 }
 

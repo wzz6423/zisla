@@ -6,11 +6,10 @@ import SwiftUI
 
 struct ShelfModuleView: View {
     @ObservedObject var model: AppModel
+    @ObservedObject private var noteEditor: ContextNoteShelfEditor
+    @Environment(\.layoutDirection) private var layoutDirection
     @StateObject private var dropState = FileDropState()
     @State private var searchText = ""
-    private static let itemColumns = [
-        GridItem(.adaptive(minimum: 66, maximum: 66), spacing: 8),
-    ]
 
     private static let shelfShape = IslandSurfaceGeometry.moduleContentShape(
         bottomTrailingRadius: IslandSurfaceGeometry.moduleOuterBottomCornerRadius
@@ -19,6 +18,11 @@ struct ShelfModuleView: View {
     private static let shareShoulderShape = IslandSurfaceGeometry.moduleContentShape(
         bottomLeadingRadius: IslandSurfaceGeometry.moduleOuterBottomCornerRadius
     )
+
+    init(model: AppModel) {
+        self.model = model
+        noteEditor = model.contextNoteEditor
+    }
 
     var body: some View {
         HStack(spacing: 6) {
@@ -41,6 +45,14 @@ struct ShelfModuleView: View {
                         .foregroundStyle(.secondary)
 
                     Button {
+                        if !noteEditor.resumeNew() { model.onBeginContextNote?() }
+                    } label: {
+                        Label(AppLocalization.text("记录便签"), systemImage: "square.and.pencil")
+                            .font(.system(size: 10, weight: .medium))
+                    }
+                    .buttonStyle(.plain)
+
+                    Button {
                         model.pasteFilesToShelf()
                     } label: {
                         HStack(spacing: 4) {
@@ -52,7 +64,7 @@ struct ShelfModuleView: View {
                     }
                     .buttonStyle(.plain)
                     .help(AppLocalization.text("粘贴内容到中转站"))
-                    .keyboardShortcut("v", modifiers: .command)
+                    .keyboardShortcut(noteEditor.isPresented ? nil : KeyboardShortcut("v", modifiers: .command))
 
                     if !model.shelf.items.isEmpty {
                         Button {
@@ -121,7 +133,13 @@ struct ShelfModuleView: View {
                 Hairline()
 
                 Group {
-                    if model.shelf.items.isEmpty {
+                    if noteEditor.isPresented, let draft = noteEditor.draft {
+                        ContextNoteDetailView(draft: draft, onCopy: { model.copyContextNoteText(draft.text) },
+                                              onNavigate: { model.navigateToContextNote(draft.location) },
+                                              onSave: { model.saveShelfContextNote() },
+                                              onClose: { noteEditor.close() })
+                            .id(ObjectIdentifier(draft))
+                    } else if model.shelf.items.isEmpty {
                         EmptyState(
                             symbol: "tray.and.arrow.down",
                             title: AppLocalization.text("中转站为空"),
@@ -137,17 +155,24 @@ struct ShelfModuleView: View {
                         )
                     } else {
                         ScrollView(.vertical) {
-                            LazyVGrid(columns: Self.itemColumns, alignment: .leading, spacing: 8) {
+                            ShelfGridLayout(layoutDirection: layoutDirection) {
                                 ForEach(filteredItems) { item in
                                     ShelfItemView(
                                         item: item,
-                                        onOpen: { NSWorkspace.shared.open(item.linkURL ?? item.url) },
+                                        onOpen: {
+                                            if item.noteLocation != nil { noteEditor.open(item) }
+                                            else { NSWorkspace.shared.open(item.linkURL ?? item.url) }
+                                        },
                                         onCopy: { model.copyShelfItems([item]) },
                                         onSendToQuickNote: {
                                             model.receiveQuickNoteTransferItems([TransferDropItem(payload: item.payload)])
                                         },
-                                        onRemove: { model.shelf.remove(id: item.id) }
+                                        onRemove: {
+                                            model.shelf.remove(id: item.id)
+                                            if !model.shelf.items.contains(where: { $0.id == item.id }) { noteEditor.removed(item.id) }
+                                        }
                                     )
+                                    .layoutValue(key: ShelfColumnSpan.self, value: item.noteLocation == nil ? 1 : 2)
                                 }
                             }
                             .padding(.leading, 4)
@@ -325,6 +350,50 @@ struct ShelfModuleView: View {
     }
 }
 
+private struct ShelfColumnSpan: LayoutValueKey {
+    static let defaultValue = 1
+}
+
+struct ShelfGridLayout: Layout {
+    var layoutDirection: LayoutDirection = .leftToRight
+
+    static func frames(columnSpans: [Int], width: CGFloat, layoutDirection: LayoutDirection = .leftToRight) -> [CGRect] {
+        let columns = max(columnSpans.max() ?? 1, Int((width + 8) / 74))
+        var column = 0
+        var row = 0
+        return columnSpans.map { span in
+            if column + span > columns {
+                column = 0
+                row += 1
+            }
+            let itemWidth = CGFloat(span * 74 - 8)
+            let leading = CGFloat(column * 74)
+            let frame = CGRect(
+                x: layoutDirection == .rightToLeft ? width - leading - itemWidth : leading,
+                y: CGFloat(row * 92), width: itemWidth, height: 84
+            )
+            column += span
+            return frame
+        }
+    }
+
+    func sizeThatFits(proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) -> CGSize {
+        let spans = subviews.map { $0[ShelfColumnSpan.self] }
+        let width = max(proposal.width ?? 140, CGFloat((spans.max() ?? 1) * 74 - 8))
+        let frames = Self.frames(columnSpans: spans, width: width)
+        return CGSize(width: width, height: frames.last?.maxY ?? 0)
+    }
+
+    func placeSubviews(in bounds: CGRect, proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) {
+        let frames = Self.frames(columnSpans: subviews.map { $0[ShelfColumnSpan.self] }, width: bounds.width,
+                                 layoutDirection: layoutDirection)
+        for (subview, frame) in zip(subviews, frames) {
+            subview.place(at: CGPoint(x: bounds.minX + frame.minX, y: bounds.minY + frame.minY),
+                          anchor: .topLeading, proposal: ProposedViewSize(frame.size))
+        }
+    }
+}
+
 struct ShelfItemView: View {
     var item: FileShelfItem
     var onOpen: () -> Void
@@ -333,6 +402,58 @@ struct ShelfItemView: View {
     var onRemove: () -> Void
 
     var body: some View {
+        Group {
+            if let location = item.noteLocation {
+                contextNoteCard(location: location)
+            } else {
+                fileCard
+            }
+        }
+        .contextMenu {
+            Button(AppLocalization.text("打开"), action: onOpen)
+            if item.text == nil {
+                Button(AppLocalization.text("在 Finder 中显示")) {
+                    NSWorkspace.shared.activateFileViewerSelecting([item.url])
+                }
+            }
+            Button(AppLocalization.text("复制"), action: onCopy)
+            Button(AppLocalization.text("发送到随记"), action: onSendToQuickNote)
+            Divider()
+            Button(AppLocalization.text("移除"), role: .destructive, action: onRemove)
+        }
+    }
+
+    private func contextNoteCard(location: ContextNoteLocation) -> some View {
+        ZStack(alignment: .topTrailing) {
+            Button(action: onOpen) {
+                VStack(alignment: .leading, spacing: 4) {
+                    Label(AppLocalization.text("位置便签"), systemImage: "note.text")
+                        .font(.system(size: 9, weight: .medium))
+                        .foregroundStyle(.secondary)
+                        .padding(.trailing, 20)
+                    Text(item.text ?? "")
+                        .font(.system(size: 11, weight: .medium))
+                        .lineLimit(2)
+                        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+                    Text(ContextNoteDetailView.locationDescription(location))
+                        .font(.system(size: 9))
+                        .foregroundStyle(.secondary)
+                        .lineLimit(1)
+                }
+                .padding(8)
+                .frame(width: 140, height: 84, alignment: .topLeading)
+                .background(Color.yellow.opacity(0.08), in: RoundedRectangle(cornerRadius: 9))
+                .overlay(RoundedRectangle(cornerRadius: 9).strokeBorder(Color.strokeCard, lineWidth: 1))
+                .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            .help(AppLocalization.text("查看便签"))
+            .accessibilityLabel(item.displayName)
+            removeButton.padding(2)
+        }
+    }
+
+    private var fileCard: some View {
         VStack(spacing: 5) {
             ZStack(alignment: .topTrailing) {
                 FileShelfDragSourceView(
@@ -347,15 +468,7 @@ struct ShelfItemView: View {
                 )
                     .frame(width: 42, height: 42)
                     .frame(width: 66, height: 50)
-                Button(action: onRemove) {
-                    Image(systemName: "xmark.circle.fill")
-                        .symbolRenderingMode(.palette)
-                        .foregroundStyle(.white, .black.opacity(0.72))
-                        .frame(width: 24, height: 24)
-                        .contentShape(Rectangle())
-                }
-                .buttonStyle(.plain)
-                .help(AppLocalization.text("移除"))
+                removeButton
             }
             Text(item.displayName)
                 .font(.system(size: 9, weight: .medium))
@@ -366,18 +479,18 @@ struct ShelfItemView: View {
                 .onTapGesture(count: 2, perform: onOpen)
         }
         .frame(width: 66, height: 84)
-        .contextMenu {
-            Button(AppLocalization.text("打开"), action: onOpen)
-            if item.text == nil {
-                Button(AppLocalization.text("在 Finder 中显示")) {
-                    NSWorkspace.shared.activateFileViewerSelecting([item.url])
-                }
-            }
-            Button(AppLocalization.text("复制"), action: onCopy)
-            Button(AppLocalization.text("发送到随记"), action: onSendToQuickNote)
-            Divider()
-            Button(AppLocalization.text("移除"), role: .destructive, action: onRemove)
+    }
+
+    private var removeButton: some View {
+        Button(action: onRemove) {
+            Image(systemName: "xmark.circle.fill")
+                .symbolRenderingMode(.palette)
+                .foregroundStyle(.white, .black.opacity(0.72))
+                .frame(width: 24, height: 24)
+                .contentShape(Rectangle())
         }
+        .buttonStyle(.plain)
+        .help(AppLocalization.text("移除"))
     }
 }
 

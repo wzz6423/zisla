@@ -1,4 +1,5 @@
 import SwiftUI
+import ZislaCore
 import ZislaKit
 
 struct FileShelfShakeView: View {
@@ -6,6 +7,7 @@ struct FileShelfShakeView: View {
     let onItems: ([FileShelfDropItem]) -> Void
     @State private var isTargeted = false
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @Environment(\.accessibilityReduceTransparency) private var reduceTransparency
 
     var body: some View {
         VStack(spacing: 10) {
@@ -24,6 +26,9 @@ struct FileShelfShakeView: View {
         .padding(18)
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .islandGlassSurface(.card, cornerRadius: 18)
+        .background {
+            Self.standaloneBacking(style: settingsStore.settings.islandVisualStyle, reduceTransparency: reduceTransparency)
+        }
         .overlay {
             if isTargeted {
                 RoundedRectangle(cornerRadius: 18, style: .continuous)
@@ -36,5 +41,10 @@ struct FileShelfShakeView: View {
         .animation(reduceMotion ? nil : ZislaMotion.hover, value: isTargeted)
         .accessibilityElement(children: .combine)
         .shelfDropTarget(isTargeted: $isTargeted, onItems: onItems)
+    }
+
+    static func standaloneBacking(style: IslandVisualStyle, reduceTransparency: Bool) -> some View {
+        RoundedRectangle(cornerRadius: 18, style: .continuous)
+            .fill(.black.opacity(reduceTransparency ? 1 : style == .frosted ? 0.88 : 0))
     }
 }

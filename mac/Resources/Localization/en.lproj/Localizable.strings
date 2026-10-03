@@ -2617,3 +2617,23 @@
 "松开以添加到中转站" = "Release to add to the shelf";
 "晃动唤出中转窗口" = "Shake to Show Shelf Window";
 "拖拽文件时晃动鼠标，在旁边显示中转窗口" = "Shake the mouse while dragging files to show a shelf window beside the pointer";
+
+"位置便签" = "Location Note";
+"摇动鼠标记便签" = "Shake to take a note";
+"按住快捷键并左右摇动鼠标，在当前位置记录，返回时提醒" = "Hold the shortcut and shake the mouse left and right to leave a note here and get reminded when you return";
+"便签快捷键" = "Note Shortcut";
+"默认按住 Command；可录制修饰键或组合键" = "Hold Command by default; record a modifier key or key combination";
+"需要辅助功能权限来识别窗口和网页" = "Accessibility access is needed to identify windows and web pages";
+"无法识别当前位置，请检查辅助功能权限" = "Cannot identify this location. Check Accessibility access.";
+"在这里记点什么…" = "Leave a note here…";
+"记录位置" = "Saved location";
+"记录时间" = "Saved at";
+"记录内容" = "Note content";
+"保存便签（Enter）" = "Save note (Enter)";
+"放弃便签（Esc / ⌘⌫）" = "Discard note (Esc / ⌘⌫)";
+"查看便签" = "View note";
+"桌面" = "Desktop";
+"前往记录位置" = "Go to saved location";
+"无法前往记录位置，窗口或显示器可能已关闭" = "Cannot go to the saved location. The window or display may no longer be available.";
+"记录便签" = "Take a note";
+"已保存便签" = "Note saved";

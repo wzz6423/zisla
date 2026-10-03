@@ -33,7 +33,10 @@ public final class PointerEdgeMonitor {
 
     public typealias Handler = @MainActor @Sendable (CGPoint, Interaction) -> Void
 
+    public typealias KeyboardHandler = @MainActor @Sendable (NSEvent.EventType, Bool) -> Void
+
     private let handler: Handler
+    private let onKeyboardEvent: KeyboardHandler?
     private let dragPasteboard: NSPasteboard
     private var payloadClassifier: DragPayloadSessionClassifier
     private var cachedDragResult: (changeCount: Int, hasSupportedPayload: Bool)?
@@ -47,6 +50,7 @@ public final class PointerEdgeMonitor {
 
     public init(
         dragPasteboard: NSPasteboard = NSPasteboard(name: .drag),
+        onKeyboardEvent: KeyboardHandler? = nil,
         handler: @escaping Handler
     ) {
         self.dragPasteboard = dragPasteboard
@@ -54,12 +58,13 @@ public final class PointerEdgeMonitor {
             initialChangeCount: dragPasteboard.changeCount
         )
         self.handler = handler
+        self.onKeyboardEvent = onKeyboardEvent
     }
 
     public func start() {
         guard !isRunning else { return }
 
-        let mask: NSEvent.EventTypeMask = [
+        var mask: NSEvent.EventTypeMask = [
             .mouseMoved,
             .leftMouseDown,
             .rightMouseDown,
@@ -71,6 +76,9 @@ public final class PointerEdgeMonitor {
             .rightMouseUp,
             .otherMouseUp,
         ]
+        if onKeyboardEvent != nil {
+            mask.formUnion([.flagsChanged, .keyDown, .keyUp])
+        }
         payloadClassifier.reset(initialChangeCount: dragPasteboard.changeCount)
         cachedDragResult = nil
         eventThrottle = PointerEdgeEventThrottle()
@@ -103,11 +111,16 @@ public final class PointerEdgeMonitor {
         }
     }
 
-    private nonisolated func emit(_ event: NSEvent) {
+    nonisolated func emit(_ event: NSEvent) {
         let eventType = event.type
         let timestamp = event.timestamp
+        let isRepeat = eventType == .keyDown && event.isARepeat
         // AppKit guarantees event monitor callbacks run on the main thread, avoiding a Task per mouse event.
         MainActor.assumeIsolated {
+            if eventType == .flagsChanged || eventType == .keyDown || eventType == .keyUp {
+                onKeyboardEvent?(eventType, isRepeat)
+                return
+            }
             guard eventThrottle.shouldEmit(
                 eventType: eventType,
                 timestamp: timestamp
