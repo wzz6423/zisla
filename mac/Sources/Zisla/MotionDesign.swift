@@ -46,12 +46,6 @@ enum ZislaMotion {
     static let islandRecycleSettleDelay: Duration = .milliseconds(280)
 }
 
-enum ZislaMotionPalette {
-    /// A warm key light makes an activated control feel revealed rather than merely recolored.
-    static let illumination = Color(red: 1.00, green: 0.82, blue: 0.16)
-    static let refraction = Color(red: 0.48, green: 0.88, blue: 1.00)
-}
-
 // MARK: - Pressable button style
 
 /// Spring scale feedback for hover and press. Replaces `.plain` where motion is wanted;

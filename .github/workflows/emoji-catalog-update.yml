@@ -96,9 +96,15 @@ jobs:
         env:
           BRANCH: ${{ steps.changes.outputs.branch }}
           DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
-          GH_TOKEN: ${{ github.token }}
+          GH_TOKEN: ${{ secrets.PROJECT_AUTOMATION_TOKEN }}
         run: |
           set -euo pipefail
+
+          # A user token lets the created PR trigger label, assignee, and project workflows.
+          if [ -z "$GH_TOKEN" ]; then
+            echo "::error::PROJECT_AUTOMATION_TOKEN is required to create a pull request and trigger its automation."
+            exit 1
+          fi
 
           catalog="mac/Resources/Emoji/EmojiNameAliases.json"
           emoji_version="$(python3 - "$catalog" <<'PY'

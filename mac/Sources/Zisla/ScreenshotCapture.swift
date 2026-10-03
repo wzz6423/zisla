@@ -451,9 +451,6 @@ enum ScreenshotSelectionGeometry {
         }
     }
 
-    /// Spacing between the size badge and the selection border or resize handles.
-    static let badgeInset: CGFloat = 10
-
     /// Estimated badge size used to determine whether it fits outside the selection.
     static let badgeEstimatedSize = CGSize(width: 104, height: 27)
 

@@ -3381,16 +3381,6 @@ final class AppModel: ObservableObject {
     return application.processIdentifier
   }
 
-  /// Restores focus to the target app immediately after recording ends, while AI processing may still delay delivery.
-  /// The saved target PID remains available so delivery can verify frontmost status again before pasting.
-  func restoreVoiceInputTargetFocus() {
-    guard let pid = voiceInputTargetProcessIdentifier else { return }
-    VoiceTranscriptDelivery.reactivateTargetApplication(pid)
-    if let voiceInputTarget {
-      _ = VoiceTranscriptDelivery.focusTarget(voiceInputTarget)
-    }
-  }
-
   /// Tests the current model endpoint and discovers available models.
   func discoverModels() {
     voiceModelDiscoveryTask?.cancel()
