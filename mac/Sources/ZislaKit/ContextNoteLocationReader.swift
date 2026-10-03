@@ -10,44 +10,174 @@ public enum ContextNoteObservation: Equatable, Sendable {
 
 @MainActor
 public enum ContextNoteLocationReader {
+    struct WindowSnapshot {
+        let frame: CGRect
+        let layer: Int
+        let ownerProcessIdentifier: pid_t
+        var ownerName: String? = nil
+
+        var isDesktop: Bool {
+            layer <= CGWindowLevelForKey(.desktopIconWindow)
+                || (ownerName == "Window Server" && layer == CGWindowLevelForKey(.desktopIconWindow) + 1)
+        }
+
+        func matches(_ windowFrame: CGRect?, processIdentifier: pid_t) -> Bool {
+            ownerProcessIdentifier == processIdentifier
+                && layer == CGWindowLevelForKey(.normalWindow)
+                && frame == windowFrame
+        }
+    }
+
     public static func capture(at point: CGPoint) -> ContextNoteObservation {
-        guard AccessibilityPermission.isTrusted else { return .unavailable }
+        let screens = NSScreen.screens
+        let windows = CGWindowListCopyWindowInfo(.optionOnScreenOnly, kCGNullWindowID) as? [[String: Any]]
+        return observe(isTrusted: AccessibilityPermission.isTrusted, desktopLocation: {
+            desktopLocation(at: point, screens: screens, windowInfo: windows)
+        }) {
+            let quartzPoint = CGPoint(x: point.x, y: (screens.first?.frame.maxY ?? 0) - point.y)
+            return captureWindow(at: quartzPoint, surface: topWindow(at: quartzPoint, windowInfo: windows))
+        }
+    }
+
+    private static func captureWindow(at point: CGPoint, surface: WindowSnapshot?) -> ContextNoteObservation {
         let system = AXUIElementCreateSystemWide()
         AXUIElementSetMessagingTimeout(system, 0.1)
         var element: AXUIElement?
-        let quartzY = (NSScreen.screens.first?.frame.maxY ?? 0) - point.y
-        guard AXUIElementCopyElementAtPosition(system, Float(point.x), Float(quartzY), &element) == .success,
+        guard AXUIElementCopyElementAtPosition(system, Float(point.x), Float(point.y), &element) == .success,
               let element else { return .unavailable }
         var pid: pid_t = 0
         guard AXUIElementGetPid(element, &pid) == .success,
               let app = NSRunningApplication(processIdentifier: pid) else { return .unavailable }
-        let window = attribute(kAXRoleAttribute, from: element) as? String == kAXWindowRole
+        guard pid != ProcessInfo.processInfo.processIdentifier else { return .ignored }
+        let direct = attribute(kAXRoleAttribute, from: element) as? String == kAXWindowRole
             ? element : attribute(kAXWindowAttribute, from: element).flatMap(asElement)
-        return read(app: app, window: window, at: point)
+        let window = findWindow(direct: direct, candidates: {
+            let application = AXUIElementCreateApplication(pid)
+            AXUIElementSetMessagingTimeout(application, 0.1)
+            return attribute(kAXWindowsAttribute, from: application) as? [AXUIElement]
+        }, matches: { surface?.matches(windowFrame($0), processIdentifier: pid) == true })
+        return read(app: app, window: window)
     }
 
     public static func current(at point: CGPoint) -> ContextNoteObservation {
         guard let app = NSWorkspace.shared.frontmostApplication else { return .unavailable }
         guard app.processIdentifier != ProcessInfo.processInfo.processIdentifier else { return .ignored }
-        guard AccessibilityPermission.isTrusted else { return .unavailable }
-        let application = AXUIElementCreateApplication(app.processIdentifier)
-        AXUIElementSetMessagingTimeout(application, 0.1)
-        let window = attribute(kAXFocusedWindowAttribute, from: application).flatMap(asElement)
-        return read(app: app, window: window, at: point)
+        let trusted = AccessibilityPermission.isTrusted
+        if app.bundleIdentifier == "com.apple.finder" {
+            let windows = CGWindowListCopyWindowInfo(.optionOnScreenOnly, kCGNullWindowID) as? [[String: Any]]
+            return observeFinder(isTrusted: trusted, focusedWindowLocation: {
+                let application = AXUIElementCreateApplication(app.processIdentifier)
+                AXUIElementSetMessagingTimeout(application, 0.1)
+                guard let window = attribute(kAXFocusedWindowAttribute, from: application).flatMap(asElement),
+                      !focusedWindowIsDesktop(frame: windowFrame(window), processIdentifier: app.processIdentifier,
+                                              windowInfo: windows) else { return nil }
+                return read(app: app, window: window)
+            }) { skippingMenuBar in
+                // The island opens over the menu bar before capturing the underlying Finder context.
+                desktopLocation(at: point, screens: NSScreen.screens, windowInfo: windows,
+                                excludingProcessIdentifier: ProcessInfo.processInfo.processIdentifier,
+                                skippingMenuBar: skippingMenuBar)
+            }
+        }
+        return observe(isTrusted: trusted, desktopLocation: { nil }) {
+            let application = AXUIElementCreateApplication(app.processIdentifier)
+            AXUIElementSetMessagingTimeout(application, 0.1)
+            let direct = attribute(kAXFocusedWindowAttribute, from: application).flatMap(asElement)
+            let window = findWindow(direct: direct, candidates: {
+                attribute(kAXWindowsAttribute, from: application) as? [AXUIElement]
+            }, matches: { _ in true })
+            return read(app: app, window: window)
+        }
     }
 
-    private static func read(app: NSRunningApplication, window: AXUIElement?, at point: CGPoint) -> ContextNoteObservation {
+    static func observe(isTrusted: Bool, desktopLocation: () -> ContextNoteLocation?,
+                        windowLocation: () -> ContextNoteObservation) -> ContextNoteObservation {
+        if let desktop = desktopLocation() { return .location(desktop) }
+        guard isTrusted else { return .unavailable }
+        return windowLocation()
+    }
+
+    static func observeFinder(isTrusted: Bool, focusedWindowLocation: () -> ContextNoteObservation?,
+                              desktopLocation: (Bool) -> ContextNoteLocation?) -> ContextNoteObservation {
+        let focused = isTrusted ? focusedWindowLocation() : nil
+        if case let .location(location)? = focused { return .location(location) }
+        if let desktop = desktopLocation(isTrusted) { return .location(desktop) }
+        return focused ?? .unavailable
+    }
+
+    static func focusedWindowIsDesktop(frame: CGRect?, processIdentifier: pid_t, windowInfo: [[String: Any]]?) -> Bool {
+        guard let frame, let windowInfo else { return false }
+        for window in windowInfo {
+            guard let bounds = window[kCGWindowBounds as String] as? NSDictionary,
+                  let candidate = CGRect(dictionaryRepresentation: bounds as CFDictionary),
+                  let owner = window[kCGWindowOwnerPID as String] as? NSNumber,
+                  let layer = window[kCGWindowLayer as String] as? NSNumber else { return false }
+            guard owner.int32Value == processIdentifier, candidate == frame else { continue }
+            return WindowSnapshot(frame: candidate, layer: layer.intValue, ownerProcessIdentifier: owner.int32Value,
+                                  ownerName: window[kCGWindowOwnerName as String] as? String).isDesktop
+        }
+        return false
+    }
+
+    static func findWindow<Window>(direct: Window?, candidates: () -> [Window]?,
+                                   matches: (Window) -> Bool) -> Window? {
+        if let direct { return direct }
+        let matches = candidates()?.filter(matches) ?? []
+        return matches.count == 1 ? matches[0] : nil
+    }
+
+    static func topWindow(at point: CGPoint, windowInfo: [[String: Any]]?,
+                          excludingProcessIdentifier: pid_t? = nil, skippingMenuBar: Bool = false) -> WindowSnapshot? {
+        guard let windowInfo else { return nil }
+        for window in windowInfo {
+            guard let bounds = window[kCGWindowBounds as String] as? NSDictionary,
+                  let frame = CGRect(dictionaryRepresentation: bounds as CFDictionary),
+                  let alpha = window[kCGWindowAlpha as String] as? NSNumber,
+                  let layer = window[kCGWindowLayer as String] as? NSNumber,
+                  let owner = window[kCGWindowOwnerPID as String] as? NSNumber else { return nil }
+            guard alpha.doubleValue > 0, frame.contains(point), owner.int32Value != excludingProcessIdentifier else { continue }
+            let ownerName = window[kCGWindowOwnerName as String] as? String
+            if skippingMenuBar, layer.intValue == CGWindowLevelForKey(.mainMenuWindow), ownerName == "Window Server" { continue }
+            return WindowSnapshot(frame: frame, layer: layer.intValue, ownerProcessIdentifier: owner.int32Value, ownerName: ownerName)
+        }
+        return nil
+    }
+
+    static func desktopDisplay(at point: CGPoint, screens: [ScreenSnapshot], windowInfo: [[String: Any]]?,
+                               excludingProcessIdentifier: pid_t? = nil, skippingMenuBar: Bool = false) -> CGDirectDisplayID? {
+        guard let main = screens.first, let screen = screens.first(where: { $0.frame.contains(point) }),
+              let surface = topWindow(at: CGPoint(x: point.x, y: main.frame.maxY - point.y), windowInfo: windowInfo,
+                                      excludingProcessIdentifier: excludingProcessIdentifier, skippingMenuBar: skippingMenuBar),
+              surface.isDesktop else { return nil }
+        return screen.displayID
+    }
+
+    private static func desktopLocation(at point: CGPoint, screens: [NSScreen], windowInfo: [[String: Any]]?,
+                                        excludingProcessIdentifier: pid_t? = nil, skippingMenuBar: Bool = false) -> ContextNoteLocation? {
+        let snapshots = screens.compactMap { ScreenSnapshot(screen: $0) }
+        guard let display = desktopDisplay(at: point, screens: snapshots, windowInfo: windowInfo,
+                                          excludingProcessIdentifier: excludingProcessIdentifier, skippingMenuBar: skippingMenuBar),
+              let screen = screens.first(where: { ScreenSnapshot(screen: $0)?.displayID == display }),
+              let uuid = CGDisplayCreateUUIDFromDisplayID(display)?.takeRetainedValue() else { return nil }
+        return .desktop(displayID: CFUUIDCreateString(nil, uuid) as String, displayName: screen.localizedName)
+    }
+
+    private static func windowFrame(_ window: AXUIElement) -> CGRect? {
+        AXUIElementSetMessagingTimeout(window, 0.1)
+        guard let position = attribute(kAXPositionAttribute, from: window), CFGetTypeID(position) == AXValueGetTypeID(),
+              let size = attribute(kAXSizeAttribute, from: window), CFGetTypeID(size) == AXValueGetTypeID() else { return nil }
+        var point = CGPoint.zero
+        var dimensions = CGSize.zero
+        guard AXValueGetValue(position as! AXValue, .cgPoint, &point),
+              AXValueGetValue(size as! AXValue, .cgSize, &dimensions) else { return nil }
+        return CGRect(origin: point, size: dimensions)
+    }
+
+    private static func read(app: NSRunningApplication, window: AXUIElement?) -> ContextNoteObservation {
         guard app.processIdentifier != ProcessInfo.processInfo.processIdentifier else { return .ignored }
         guard let bundle = app.bundleIdentifier else { return .unavailable }
         let appName = app.localizedName ?? bundle
-        guard let window else {
-            guard bundle == "com.apple.finder",
-                  let screen = WindowPlacement.screenUnderMouse(point: point),
-                  let display = screen.deviceDescription[NSDeviceDescriptionKey("NSScreenNumber")] as? NSNumber,
-                  let uuid = CGDisplayCreateUUIDFromDisplayID(display.uint32Value)?.takeRetainedValue()
-            else { return .unavailable }
-            return .location(.desktop(displayID: CFUUIDCreateString(nil, uuid) as String, displayName: screen.localizedName))
-        }
+        guard let window else { return .unavailable }
         AXUIElementSetMessagingTimeout(window, 0.1)
         let title = attribute(kAXTitleAttribute, from: window) as? String ?? ""
         let browser = BrowserDownloadAgent.allCases.contains { $0 != .airDrop && $0.bundleIdentifiers.contains(bundle) }

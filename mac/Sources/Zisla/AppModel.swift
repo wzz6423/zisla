@@ -1735,8 +1735,8 @@ final class AppModel: ObservableObject {
     return .presented
   }
 
-  func presentContextNoteReminder(_ item: FileShelfItem) -> Bool {
-    guard ContextNoteReminderPresenter.present(item, on: clipboardAssistant, settings: settingsStore.settings) else { return false }
+  func presentContextNoteReminder(_ item: FileShelfItem, at point: CGPoint) -> Bool {
+    guard ContextNoteReminderPresenter.present(item, at: point, on: clipboardAssistant, settings: settingsStore.settings) else { return false }
     clipboardAssistantContent = nil
     return true
   }

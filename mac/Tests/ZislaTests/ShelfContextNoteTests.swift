@@ -20,7 +20,7 @@ struct ShelfContextNoteTests {
     @Test
     func savedNotesReturnToTheShelfHome() throws {
         let source = try Self.source("ZislaApp.swift")
-        let savedHandler = try #require(source.range(of: "onSaved: { _ in"))
+        let savedHandler = try #require(source.range(of: "onSaved: { [weak coordinator] _, point in"))
         let tail = source[savedHandler.upperBound...]
         let handler = try #require(tail.range(of: "\n            }"))
         #expect(tail[..<handler.lowerBound].contains("model.contextNoteEditor.hide()"))

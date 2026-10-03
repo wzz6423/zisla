@@ -83,7 +83,7 @@ public struct ContextNoteNavigator {
         case let .window(bundleIdentifier, _, title):
             guard dependencies.isTrusted(), !title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
                   let windows = dependencies.windows(bundleIdentifier) else { return false }
-            let matches = windows.filter { $0.title == title }
+            let matches = windows.count == 1 ? windows : windows.filter { $0.title == title }
             guard matches.count == 1, let window = matches.first, let minimized = window.isMinimized else { return false }
             if minimized, !window.restore() { return false }
             return window.activate() && window.raise()

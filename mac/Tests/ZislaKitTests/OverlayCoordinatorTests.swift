@@ -5,6 +5,57 @@ import Testing
 
 struct OverlayCoordinatorTests {
     @Test @MainActor
+    func compactNoticeMovesToItsOriginatingDisplayWithoutExpandingTheIsland() throws {
+        let content = NSView()
+        let coordinator = OverlayCoordinator(contentView: content)
+        let screens = [
+            ScreenSnapshot(displayID: 101, frame: CGRect(x: -100_000, y: -100_000, width: 1440, height: 900),
+                           visibleFrame: CGRect(x: -100_000, y: -100_000, width: 1440, height: 875)),
+            ScreenSnapshot(displayID: 102, frame: CGRect(x: -102_000, y: -101_000, width: 1920, height: 1080),
+                           visibleFrame: CGRect(x: -102_000, y: -101_000, width: 1920, height: 1056)),
+        ]
+        coordinator.screenSnapshotProvider = { screens }
+        coordinator.start()
+        defer { coordinator.stop() }
+        coordinator.selectActiveDisplay(at: CGPoint(x: screens[0].frame.midX, y: screens[0].frame.midY))
+        coordinator.prewarmPanel()
+        let panel = try #require(content.window)
+        for screen in [screens[1], screens[0]] {
+            coordinator.setTransientNoticePresented(true, at: CGPoint(x: screen.frame.midX, y: screen.frame.midY))
+            #expect(panel.frame == ScreenLayoutEngine().layout(for: screen).expandedFrame)
+            #expect(panel.isVisible)
+            #expect(coordinator.activeDisplayID == screen.displayID)
+            #expect(!coordinator.isVisible)
+            #expect(!panel.isKeyWindow)
+        }
+        coordinator.setTransientNoticePresented(false)
+        #expect(!coordinator.isVisible)
+    }
+
+    @Test @MainActor
+    func compactNoticeCannotRevealAnIslandDuringLockOrScreenshot() throws {
+        let content = NSView()
+        let coordinator = OverlayCoordinator(contentView: content)
+        let screen = ScreenSnapshot(displayID: 101, frame: CGRect(x: -100_000, y: -100_000, width: 1440, height: 900),
+                                    visibleFrame: CGRect(x: -100_000, y: -100_000, width: 1440, height: 875))
+        coordinator.screenSnapshotProvider = { [screen] }
+        coordinator.start()
+        defer { coordinator.stop() }
+        coordinator.prewarmPanel()
+        let panel = try #require(content.window)
+        let point = CGPoint(x: screen.frame.midX, y: screen.frame.midY)
+        coordinator.setScreenLocked(true)
+        coordinator.setTransientNoticePresented(true, at: point)
+        #expect(!panel.isVisible)
+        coordinator.setTransientNoticePresented(false)
+        coordinator.setScreenLocked(false)
+        coordinator.setScreenshotActive(true)
+        coordinator.setTransientNoticePresented(true, at: point)
+        #expect(!panel.isVisible)
+        #expect(!coordinator.isVisible)
+    }
+
+    @Test @MainActor
     func persistentContentRemainsOnEveryNonInteractiveDisplay() async {
         let coordinator = OverlayCoordinator(
             contentView: NSView(),

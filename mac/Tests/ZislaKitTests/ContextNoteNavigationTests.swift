@@ -62,25 +62,40 @@ struct ContextNoteNavigationTests {
         #expect(fixture.opened.isEmpty)
     }
 
+    @Test(arguments: [false, true], ["Renamed", ""])
+    func renamedSingleWindowIsRaisedAndRestoredWhenNeeded(minimized: Bool, title: String) {
+        let fixture = Fixture()
+        fixture.windows = [fixture.window(title: title, minimized: minimized)]
+        #expect(fixture.navigator.navigate(to: window))
+        #expect(fixture.events == ["test.editor"] + (minimized ? ["restore"] : []) + ["activate", "raise"])
+        #expect(fixture.opened.isEmpty)
+    }
+
     @Test
     func missingAmbiguousAndUntrustedWindowsNeverActivateAnArbitraryWindow() {
         let fixture = Fixture()
-        for candidates in [nil, [], [fixture.window(title: "Other")], [fixture.window(), fixture.window()], [fixture.window(minimized: nil)]] as [[ContextNoteNavigator.Window]?] {
+        for candidates in [nil, [], [fixture.window(title: "Other"), fixture.window(title: "Another")],
+                           [fixture.window(), fixture.window()], [fixture.window(minimized: nil)],
+                           [fixture.window(title: "Renamed", minimized: nil)]] as [[ContextNoteNavigator.Window]?] {
             fixture.windows = candidates
             fixture.events = []
             #expect(!fixture.navigator.navigate(to: window))
             #expect(fixture.events == ["test.editor"])
         }
+        fixture.windows = [fixture.window(title: "Renamed")]
+        fixture.events = []
+        #expect(!fixture.navigator.navigate(to: .window(bundleIdentifier: "test.editor", applicationName: "Editor", title: " \n")))
+        #expect(fixture.events.isEmpty)
         fixture.trusted = false
         fixture.events = []
         #expect(!fixture.navigator.navigate(to: window))
         #expect(fixture.events.isEmpty)
     }
 
-    @Test(arguments: ["restore", "activate", "raise"])
-    func failedWindowActionsStopAndReportFailure(action: String) {
+    @Test(arguments: ["restore", "activate", "raise"], ["Doc", "Renamed"])
+    func failedWindowActionsStopAndReportFailure(action: String, title: String) {
         let fixture = Fixture()
-        fixture.windows = [fixture.window(minimized: true, fails: action)]
+        fixture.windows = [fixture.window(title: title, minimized: true, fails: action)]
         #expect(!fixture.navigator.navigate(to: window))
         let actions = ["test.editor", "restore", "activate", "raise"]
         #expect(fixture.events == Array(actions.prefix(through: actions.firstIndex(of: action)!)))

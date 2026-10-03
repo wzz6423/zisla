@@ -786,6 +786,7 @@ struct SettingsView: View {
                                 .controlSize(.small)
                             }
                         }
+                        .padding(.leading, 20)
                     }
                     if model.settingsStore.settings.contextNotesEnabled && !model.assistantAccessibilityGranted {
                         rowDivider

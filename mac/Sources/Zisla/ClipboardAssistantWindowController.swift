@@ -136,6 +136,8 @@ final class ClipboardAssistantController: ObservableObject {
     private var isSharingAnchorHeld = false
 
     private var window: IslandPanel?
+    private var presentationPoint = CGPoint.zero
+    var screenAtPoint: @MainActor (CGPoint) -> NSScreen? = { WindowPlacement.screenUnderMouse(point: $0) }
     private var dismissTask: Task<Void, Never>?
     private var presentationGeneration = 0
     private var dismissalGeneration = 0
@@ -394,9 +396,11 @@ final class ClipboardAssistantController: ObservableObject {
     }
 
     @discardableResult
-    func present(_ detection: ClipboardAssistantDetection, visualStyle: IslandVisualStyle) -> Int? {
+    func present(_ detection: ClipboardAssistantDetection, visualStyle: IslandVisualStyle,
+                 at point: CGPoint = NSEvent.mouseLocation) -> Int? {
         setMoreActionsPresented(false)
         guard !isScreenshotActive, !isScreenLocked else { return nil }
+        presentationPoint = point
         isDismissing = false
         cancelTranslation()
         isSharingAnchorHeld = false
@@ -726,7 +730,7 @@ final class ClipboardAssistantController: ObservableObject {
         })
     }
 
-    private struct RowLayout {
+    struct RowLayout {
         let frame: CGRect
         let rowHeight: CGFloat
     }
@@ -734,8 +738,8 @@ final class ClipboardAssistantController: ObservableObject {
     /// Computes the row frame for a detection: centered on the screen's island anchor, sized
     /// to the content. Shared by the initial presentation and async refreshes so a refreshed
     /// detection (e.g. a currency result arriving after the live quote) keeps the same anchor.
-    private func rowLayout(for detection: ClipboardAssistantDetection) -> RowLayout? {
-        guard let screen = WindowPlacement.screenUnderMouse() ?? NSScreen.main else { return nil }
+    func rowLayout(for detection: ClipboardAssistantDetection) -> RowLayout? {
+        guard let screen = screenAtPoint(presentationPoint) else { return nil }
         let screenSnapshot = ScreenSnapshot(screen: screen)
         let layout = screenSnapshot.map { ScreenLayoutEngine().layout(for: $0) }
         let collapsedFrame = layout?.collapsedFrame

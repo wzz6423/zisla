@@ -78,9 +78,9 @@ final class ContextNoteController {
     private let captureLocation: @MainActor (CGPoint) -> ContextNoteObservation
     private let currentLocation: @MainActor (CGPoint) -> ContextNoteObservation
     private let canInteract: () -> Bool
-    private let onReminder: (FileShelfItem) -> Bool
-    private let onCaptureFailure: () -> Void
-    private let onSaved: (FileShelfItem) -> Void
+    private let onReminder: (FileShelfItem, CGPoint) -> Bool
+    private let onCaptureFailure: (CGPoint) -> Void
+    private let onSaved: (FileShelfItem, CGPoint) -> Void
     private let pressedMouseButtons: () -> Int
     private let modifierFlags: () -> NSEvent.ModifierFlags
     private let keyIsPressed: (CGKeyCode) -> Bool
@@ -111,9 +111,9 @@ final class ContextNoteController {
          captureLocation: @escaping @MainActor (CGPoint) -> ContextNoteObservation = ContextNoteLocationReader.capture,
          currentLocation: @escaping @MainActor (CGPoint) -> ContextNoteObservation = ContextNoteLocationReader.current,
          canInteract: @escaping () -> Bool,
-         onReminder: @escaping (FileShelfItem) -> Bool,
-         onCaptureFailure: @escaping () -> Void,
-         onSaved: @escaping (FileShelfItem) -> Void,
+         onReminder: @escaping (FileShelfItem, CGPoint) -> Bool,
+         onCaptureFailure: @escaping (CGPoint) -> Void,
+         onSaved: @escaping (FileShelfItem, CGPoint) -> Void,
          pressedMouseButtons: @escaping () -> Int = { NSEvent.pressedMouseButtons },
          modifierFlags: @escaping () -> NSEvent.ModifierFlags = { NSEvent.modifierFlags },
          keyIsPressed: @escaping (CGKeyCode) -> Bool = { CGEventSource.keyState(.combinedSessionState, key: $0) },
@@ -225,7 +225,7 @@ final class ContextNoteController {
         guard detector.record(point, at: timestamp) else { return }
         detector.reset()
         let observation = captureLocation(point)
-        if observation == .unavailable { onCaptureFailure() }
+        if observation == .unavailable { onCaptureFailure(point) }
         guard case .location(let location) = observation else { return }
         anchor = point
         draft = ContextNoteDraft(location: location)
@@ -246,7 +246,7 @@ final class ContextNoteController {
         }
         didSaveNote(item)
         discard()
-        onSaved(item)
+        onSaved(item, anchor)
     }
 
     func discard() {
@@ -263,7 +263,7 @@ final class ContextNoteController {
     func checkForReturn(at point: CGPoint) {
         guard enabled, !isSuspended, draft == nil, canInteract(), shelf.items.contains(where: { $0.noteLocation != nil }) else { return }
         let observation = currentLocation(point)
-        if let item = visits.candidate(for: observation, items: shelf.items), onReminder(item) {
+        if let item = visits.candidate(for: observation, items: shelf.items), onReminder(item, point) {
             visits.didPresent()
         }
     }
@@ -317,7 +317,7 @@ final class ContextNoteController {
 
 @MainActor
 enum ContextNoteReminderPresenter {
-    static func present(_ item: FileShelfItem, on controller: ClipboardAssistantController, settings: FeatureSettings) -> Bool {
+    static func present(_ item: FileShelfItem, at point: CGPoint, on controller: ClipboardAssistantController, settings: FeatureSettings) -> Bool {
         guard settings.clipboardAssistantEnabled, settings.contextNotesEnabled, let text = item.text,
               let location = item.noteLocation, controller.presentation.detection == nil else { return false }
         let detection = ClipboardAssistantDetection(kind: .text, title: text,
@@ -327,6 +327,6 @@ enum ContextNoteReminderPresenter {
         controller.isLightweightMode = settings.clipboardAssistantLightweightMode
         controller.presentation.progressGlowEnabled = settings.collapsedProgressGlowEnabled
         controller.presentation.notchBackground = settings.islandNotchBackground
-        return controller.present(detection, visualStyle: settings.islandVisualStyle) != nil
+        return controller.present(detection, visualStyle: settings.islandVisualStyle, at: point) != nil
     }
 }
