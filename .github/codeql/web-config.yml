@@ -1,0 +1,4 @@
+name: Web security analysis
+paths-ignore:
+  # Objective-C symbol names in generated dSYM relocation maps are not password configuration.
+  - mac/Vendor/Sparkle.xcframework/macos-arm64_x86_64/dSYMs/**/Contents/Resources/Relocations/**/*.yml

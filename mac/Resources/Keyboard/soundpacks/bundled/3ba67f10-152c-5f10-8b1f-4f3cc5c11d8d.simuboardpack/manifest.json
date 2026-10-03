@@ -1,0 +1,140 @@
+{
+  "schemaVersion": 1,
+  "id": "3ba67f10-152c-5f10-8b1f-4f3cc5c11d8d",
+  "name": "Apple M0118 ALPS SKCM Orange",
+  "author": "robni7",
+  "layoutID": "mac-ansi-tkl-v1",
+  "createdAt": "2026-10-02T00:00:00Z",
+  "modifiedAt": "2026-10-02T00:00:00Z",
+  "press": {
+    "generic": "df4687da1436fb9c1f78639a573c66f3ea420c132f0f0ce35a0bfb489fbe9854",
+    "rows": {
+      "R0": "df4687da1436fb9c1f78639a573c66f3ea420c132f0f0ce35a0bfb489fbe9854",
+      "R1": "b0395a57cccbc7f0343f42493b4026be743a6c3b3c1f7d704684895664269c37",
+      "R2": "a8485d370ecb6279fb71d9b86f2ec330df12cf420dc2c600bf14e39f7a4a1f50",
+      "R3": "df4687da1436fb9c1f78639a573c66f3ea420c132f0f0ce35a0bfb489fbe9854",
+      "R4": "b0395a57cccbc7f0343f42493b4026be743a6c3b3c1f7d704684895664269c37"
+    },
+    "specials": {},
+    "keyOverrides": {}
+  },
+  "release": {
+    "generic": "4346dd6d4347543e64e65d51dee8026725bc03f5bb09caefb2145924fdbdecdb",
+    "rows": {
+      "R0": "4346dd6d4347543e64e65d51dee8026725bc03f5bb09caefb2145924fdbdecdb",
+      "R1": "7a778e5d4ab4e7a2d946cb878144d106bb185c9fa81c8e86bc9d1c3b91cabfcc",
+      "R2": "32c6fd44ee032e5913902b01101acfb37a51998f39aa3b45478fb29c032d0822",
+      "R3": "4346dd6d4347543e64e65d51dee8026725bc03f5bb09caefb2145924fdbdecdb",
+      "R4": "7a778e5d4ab4e7a2d946cb878144d106bb185c9fa81c8e86bc9d1c3b91cabfcc"
+    },
+    "specials": {},
+    "keyOverrides": {}
+  },
+  "assets": {
+    "df4687da1436fb9c1f78639a573c66f3ea420c132f0f0ce35a0bfb489fbe9854": {
+      "id": "df4687da1436fb9c1f78639a573c66f3ea420c132f0f0ce35a0bfb489fbe9854",
+      "relativePath": "assets/df4687da1436fb9c1f78639a573c66f3ea420c132f0f0ce35a0bfb489fbe9854.wav",
+      "sha256": "df4687da1436fb9c1f78639a573c66f3ea420c132f0f0ce35a0bfb489fbe9854",
+      "originalFilename": "680714_3242494-lq.mp3 [4.085,4.130)",
+      "durationSeconds": 0.045,
+      "sampleRate": 48000,
+      "channelCount": 1,
+      "byteCount": 4364,
+      "license": {
+        "name": "CC0 1.0 Universal",
+        "sourceURL": "https://freesound.org/people/robni7/sounds/680714/",
+        "author": "robni7",
+        "notice": "https://creativecommons.org/publicdomain/zero/1.0/"
+      }
+    },
+    "4346dd6d4347543e64e65d51dee8026725bc03f5bb09caefb2145924fdbdecdb": {
+      "id": "4346dd6d4347543e64e65d51dee8026725bc03f5bb09caefb2145924fdbdecdb",
+      "relativePath": "assets/4346dd6d4347543e64e65d51dee8026725bc03f5bb09caefb2145924fdbdecdb.wav",
+      "sha256": "4346dd6d4347543e64e65d51dee8026725bc03f5bb09caefb2145924fdbdecdb",
+      "originalFilename": "680714_3242494-lq.mp3 [4.130,4.260)",
+      "durationSeconds": 0.13,
+      "sampleRate": 48000,
+      "channelCount": 1,
+      "byteCount": 12524,
+      "license": {
+        "name": "CC0 1.0 Universal",
+        "sourceURL": "https://freesound.org/people/robni7/sounds/680714/",
+        "author": "robni7",
+        "notice": "https://creativecommons.org/publicdomain/zero/1.0/"
+      }
+    },
+    "b0395a57cccbc7f0343f42493b4026be743a6c3b3c1f7d704684895664269c37": {
+      "id": "b0395a57cccbc7f0343f42493b4026be743a6c3b3c1f7d704684895664269c37",
+      "relativePath": "assets/b0395a57cccbc7f0343f42493b4026be743a6c3b3c1f7d704684895664269c37.wav",
+      "sha256": "b0395a57cccbc7f0343f42493b4026be743a6c3b3c1f7d704684895664269c37",
+      "originalFilename": "680714_3242494-lq.mp3 [5.210,5.290)",
+      "durationSeconds": 0.08,
+      "sampleRate": 48000,
+      "channelCount": 1,
+      "byteCount": 7724,
+      "license": {
+        "name": "CC0 1.0 Universal",
+        "sourceURL": "https://freesound.org/people/robni7/sounds/680714/",
+        "author": "robni7",
+        "notice": "https://creativecommons.org/publicdomain/zero/1.0/"
+      }
+    },
+    "7a778e5d4ab4e7a2d946cb878144d106bb185c9fa81c8e86bc9d1c3b91cabfcc": {
+      "id": "7a778e5d4ab4e7a2d946cb878144d106bb185c9fa81c8e86bc9d1c3b91cabfcc",
+      "relativePath": "assets/7a778e5d4ab4e7a2d946cb878144d106bb185c9fa81c8e86bc9d1c3b91cabfcc.wav",
+      "sha256": "7a778e5d4ab4e7a2d946cb878144d106bb185c9fa81c8e86bc9d1c3b91cabfcc",
+      "originalFilename": "680714_3242494-lq.mp3 [5.310,5.400)",
+      "durationSeconds": 0.09,
+      "sampleRate": 48000,
+      "channelCount": 1,
+      "byteCount": 8684,
+      "license": {
+        "name": "CC0 1.0 Universal",
+        "sourceURL": "https://freesound.org/people/robni7/sounds/680714/",
+        "author": "robni7",
+        "notice": "https://creativecommons.org/publicdomain/zero/1.0/"
+      }
+    },
+    "a8485d370ecb6279fb71d9b86f2ec330df12cf420dc2c600bf14e39f7a4a1f50": {
+      "id": "a8485d370ecb6279fb71d9b86f2ec330df12cf420dc2c600bf14e39f7a4a1f50",
+      "relativePath": "assets/a8485d370ecb6279fb71d9b86f2ec330df12cf420dc2c600bf14e39f7a4a1f50.wav",
+      "sha256": "a8485d370ecb6279fb71d9b86f2ec330df12cf420dc2c600bf14e39f7a4a1f50",
+      "originalFilename": "680714_3242494-lq.mp3 [5.895,5.960)",
+      "durationSeconds": 0.065,
+      "sampleRate": 48000,
+      "channelCount": 1,
+      "byteCount": 6284,
+      "license": {
+        "name": "CC0 1.0 Universal",
+        "sourceURL": "https://freesound.org/people/robni7/sounds/680714/",
+        "author": "robni7",
+        "notice": "https://creativecommons.org/publicdomain/zero/1.0/"
+      }
+    },
+    "32c6fd44ee032e5913902b01101acfb37a51998f39aa3b45478fb29c032d0822": {
+      "id": "32c6fd44ee032e5913902b01101acfb37a51998f39aa3b45478fb29c032d0822",
+      "relativePath": "assets/32c6fd44ee032e5913902b01101acfb37a51998f39aa3b45478fb29c032d0822.wav",
+      "sha256": "32c6fd44ee032e5913902b01101acfb37a51998f39aa3b45478fb29c032d0822",
+      "originalFilename": "680714_3242494-lq.mp3 [5.965,6.050)",
+      "durationSeconds": 0.085,
+      "sampleRate": 48000,
+      "channelCount": 1,
+      "byteCount": 8204,
+      "license": {
+        "name": "CC0 1.0 Universal",
+        "sourceURL": "https://freesound.org/people/robni7/sounds/680714/",
+        "author": "robni7",
+        "notice": "https://creativecommons.org/publicdomain/zero/1.0/"
+      }
+    }
+  },
+  "attributions": [
+    {
+      "title": "Apple M0118 ALPS SKCM Orange",
+      "author": "robni7",
+      "sourceURL": "https://freesound.org/people/robni7/sounds/680714/",
+      "licenseName": "CC0 1.0 Universal",
+      "notice": "Public preview 680714_3242494-lq.mp3; SHA-256 05916c8d7ad9ba2db29209f5e77b6230c3c73d2eb92bf3407d51d17ad5fc4e8d. Decoded with FFmpeg to 48000 Hz mono PCM s16le. Each [press start, press end, release start, release end] in seconds: [(4.085, 4.13, 4.13, 4.26), (5.21, 5.29, 5.31, 5.4), (5.895, 5.96, 5.965, 6.05)]. Linear gain 1.0; 48-frame fade-in and 192-frame fade-out. Three paired variations cycle across rows; special keys use their row sample, not separately identified source keys."
+    }
+  ]
+}

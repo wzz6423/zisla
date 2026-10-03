@@ -22,6 +22,8 @@ canonical copy. Permissioned packaged sound packs live separately under
 | Kailh Low-profile Blue | [Fast Typing on Mechanical Keyboard](https://freesound.org/people/HeinzBBQ/sounds/502653/) by HeinzBBQ | Freesound ID `502653` | CC0 1.0 | Five 220 ms excerpts selected from the public HQ preview, downmixed and resampled; click and bottom-out remain in press while the later release event is separated and neighboring keystrokes are excluded |
 | Cherry MX Clear | [Mechanical keyboard clicking. Different keys (4)](https://freesound.org/people/humi74/sounds/412926/) by humi74 | Freesound ID `412926` | CC0 1.0 | Five 220 ms excerpts selected from the public HQ preview, downmixed and resampled, then separated at the audited energy valley before release; one excerpt without a usable release reuses the closest clean release variation from the same recording |
 | BCP (Suit80) | `【打字声音】Suit80｜BCP轴｜GMK Ursa 大熊 - Original.mp4`, visible uploader `J_Eason001` | Maintainer-supplied source recording; redistribution permission confirmed 2026-08-25 and retained privately by the maintainer | Used with permission for distribution | Rendered with `SimuBoardMac/scripts/render-local-bcp-profile.sh`: stereo downmix, `-3 dB` headroom, `55 Hz` high-pass, conservative `afftdn` denoise with measured `25 ms` latency compensation, then 28 audited press/release cuts. Five base row pairs and five alternate small-key pairs use separated transients, a light `95 Hz` press high-pass, a light `108 Hz` release high-pass, and `1 ms` release fade-in. Three late secondary impacts are excluded to prevent cumulative desk resonance during rapid typing; dedicated Shift, Backspace, Enter, and Space pairs retain their audited cuts. The release package is stored as a read-only bundled `.simuboardpack`. |
+| WhiteFox Hako Violet | [Keyboard Typing 10 (WhiteFox, Mechanical)](https://freesound.org/people/grcekh/sounds/546167/) by grcekh | Freesound ID `546167`; public preview SHA-256 `c4d2a29c4b97535c4ed80e0a365920f65f5cc71ecfa128adb954e3f984349b5c` | CC0 1.0 | Three isolated press/release pairs from the public preview's individually typed keys; 48 kHz mono PCM, linear gain 2, 1 ms fade-in and 4 ms fade-out. |
+| Apple M0118 ALPS SKCM Orange | [Typing on Apple Standard Keyboard (ALPS SKCM Orange)](https://freesound.org/people/robni7/sounds/680714/) by robni7 | Freesound ID `680714`; public preview SHA-256 `05916c8d7ad9ba2db29209f5e77b6230c3c73d2eb92bf3407d51d17ad5fc4e8d` | CC0 1.0 | Three isolated press/release pairs from the public preview; 48 kHz mono PCM, unity gain, 1 ms fade-in and 4 ms fade-out. |
 | Pointer Classic, Silent, Crisp, Heavy, and Glass | [Kenney UI Audio](https://kenney.nl/assets/ui-audio) by Kenney Vleugels | Archive downloaded 2026-08-22; original files `mouseclick1.ogg` and `mouserelease1.ogg` | CC0 1.0 | The matched press/release recordings are downmixed and rendered as five generic simulated tonal treatments. Each phase is pitch-lowered with compensation for the associated tempo change, then receives profile-specific low-pass filtering, restrained midrange EQ and level adjustment; Crisp and Glass retain a gentle low cut for definition without the former high-frequency boost. Leading signal below −45 dBFS is removed while retaining up to 2 ms of pre-roll; all outputs have a 4 ms tail fade and are 48 kHz mono 16-bit PCM WAV. The profile names do not identify or claim to reproduce a particular mouse brand or switch. |
 
 The imported files can be reproduced with:
@@ -79,6 +81,31 @@ the underlying permission correspondence remains private with the maintainer.
 The ignored `SimuBoardMac/build/BCP-rendered-assets` directory remains only a
 deterministic re-rendering workspace and is not used directly by the runtime.
 
+## Additional CC0 recordings (2026-10-02)
+
+The Hako Violet and ALPS Orange packs above are shipped in this directory under
+`soundpacks/bundled/4ddc1cd5-f8bc-5665-a44b-bf2b9de3c28e.simuboardpack` and
+`soundpacks/bundled/3ba67f10-152c-5f10-8b1f-4f3cc5c11d8d.simuboardpack`.
+Each includes the CC0 legal text, source author and URL, and exact preview hash.
+These are derivatives of the publicly playable `-lq.mp3` previews, not the
+login-gated original recordings. They therefore retain the preview's compression.
+
+To reproduce, download the public preview named in the manifest attribution and
+verify its SHA-256. Decode with `ffmpeg -i INPUT -ac 1 -ar 48000 OUTPUT.wav`
+(FFmpeg 9.0.1 was used). Each asset's `originalFilename` records a half-open
+`[start, end)` interval in seconds. Slice decoded signed 16-bit samples at
+`round(time * 48000)`, multiply each sample by the manifest's linear gain and
+`min(1, i / 48, (frameCount - 1 - i) / 192)`, and round to signed 16-bit PCM.
+Write a mono 48 kHz WAV without metadata. The manifest attribution also records
+all paired intervals together. Three variations cycle across the five rows;
+special keys inherit their row recording because the source keys are unidentified.
+No recorded key is represented as a separately identified Space/Enter/Backspace.
+
+The brand/model names are preserved verbatim. No new localized UI strings are
+introduced: these packs use the existing translated built-in family/tone labels.
+Playback quality and subjective switch character remain subject to listening
+acceptance; waveform inspection and automated decoding do not establish that.
+
 ## Evaluated but not bundled
 
 | Source | Result |
@@ -88,7 +115,7 @@ deterministic re-rendering workspace and is not used directly by the runtime.
 | Wayvibes Banana Split, MX Speed Silver, and Razer Green packs | Pack-local GPL-3.0 text exists. Excluded to keep Keyboard's bundled audio set permissive and simple to redistribute. |
 | [Nesdood007/kde-plasma-ringtones](https://github.com/Nesdood007/kde-plasma-ringtones) | Author-recorded IBM Model M audio is CC BY-SA 4.0, but it overlaps the existing buckling-spring profile and adds ShareAlike obligations. |
 | [webdevcody/type-joy](https://github.com/webdevcody/type-joy) | MIT and technically usable, but the switch/keyboard model is not identified. Kept out of the axis-specific picker. |
-| Other Freesound CC0 candidates | Hako Violet, Alps Orange, lubricated Gateron Yellow, Cherry MX Red, Kailh White, and BOX Pale Blue were catalogued. Their original files require a Freesound account, so no original-file download endpoint was bypassed. |
+| Other Freesound CC0 candidates | Lubricated Gateron Yellow, Cherry MX Red, Kailh White, and BOX Pale Blue remain unbundled. Hako Violet and Alps Orange now use public previews as documented above; no original-file download endpoint was bypassed. |
 
 Repository-level software licenses do not automatically clear unrelated or
 uncredited community audio. Keyboard therefore does not bundle YouTube rips,

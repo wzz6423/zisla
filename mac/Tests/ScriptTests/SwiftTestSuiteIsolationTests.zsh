@@ -28,6 +28,16 @@ tests = [
     "FixtureTests.First/testThree()",
     "FixtureTests.topLevel()/FixtureTests.swift:1:1",
 ]
+if mode == "workflow":
+    tests = [
+        "ZislaCoreTests.ModelTests/test()",
+        "ZislaKitTests.ServiceTests/test()",
+        "ZislaTests.WiFiNetworkPanelViewTests/observedPowerKeepsItsColorAndToggleSemanticsInAnInactiveWindow()",
+        "ZislaTests.FutureAppKitTests/test()",
+        "ZislaTests.FutureAppKitTests/Nested/test()",
+        "ZislaTests.FutureAppKitTestsExtra/test()",
+        "ZislaTests.topLevel()/Tests.swift:1:1",
+    ]
 if args == ["test", "list"]:
     if mode == "list-failure":
         sys.exit(5)
@@ -35,10 +45,17 @@ if args == ["test", "list"]:
     print("\n".join(test.split("/FixtureTests.swift")[0] for test in listed))
     sys.exit(0)
 
-assert "--skip-build" in args
+if mode != "workflow":
+    assert "--skip-build" in args
 selector = args[args.index("--filter") + 1]
 selected = [test for test in tests if re.search(selector, test)]
 assert selected
+if mode == "workflow":
+    assert "--skip" not in args
+    appkit = [test for test in selected if test.startswith(("ZislaTests.", "ZislaKitTests."))]
+    if appkit:
+        assert "--skip-build" in args
+        assert len({test.split("/")[0] for test in selected}) == 1, "AppKit suites share a test process"
 with open(os.environ["SWIFT_TEST_CAPTURE"], "a") as capture:
     capture.write("\n".join(selected) + "\n")
 if mode == "test-failure" and "Second" in selector:
@@ -81,40 +98,34 @@ done
 
 print -- 'PASS: Swift suite isolation preserves nested and top-level tests, filters exact targets, and propagates discovery and test failures'
 
-python3 - "$ROOT/../.github/workflows/swift-tests.yml" <<'PYTHON'
+PATH="$TEST_ROOT/bin:$PATH" TMPDIR="$TEST_ROOT/results" \
+  SWIFT_TEST_MODE=workflow SWIFT_TEST_CAPTURE="$TEST_ROOT/workflow-calls" \
+  python3 - "$ROOT" <<'PYTHON'
 from pathlib import Path
-import re
+import os
 import shlex
+import subprocess
 import sys
 
+root = Path(sys.argv[1])
 commands = [
     shlex.split(line.strip())
-    for line in Path(sys.argv[1]).read_text().splitlines()
-    if line.strip().startswith("zsh Scripts/swift-test.sh ")
+    for line in (root.parent / ".github/workflows/swift-tests.yml").read_text().splitlines()
+    if line.strip().startswith(("zsh Scripts/swift-test.sh ", "zsh Scripts/swift-test-suites.sh "))
 ]
-for suite, test in [
-    ("AIMascotImageCacheTests", "recoversFromTransientLoadFailureAfterRetry()"),
-    ("AIResultSweepPresentationTests", "renderedViewUpdatesWithPlaybackWithoutAnotherQueueEvent()"),
-    ("ShelfItemInteractionTests", "removeTargetIncludesItsEdgesWithoutOpeningTheFile(point:)"),
-    ("IslandMaterialSelectionTests", "selectedMaterialReplacesThePreviousNativeSurface(floatingTarget:)"),
-    ("FileShelfShakeControllerTests", "newDragAndOrdinaryMovementClearThePreviousTarget()"),
-    ("FileShelfShakeControllerTests", "mouseUpLeavesTimeForTheNativeDropCallback()"),
-    ("FileShelfShakeControllerTests", "aMissedMouseUpStillDismissesTheTarget()"),
-    ("FileShelfShakeControllerTests", "cancelledDismissalCannotCloseANewDrag()"),
-]:
-    test_id = f"ZislaTests.{suite}/{test}"
-    selected = [
-        command for command in commands
-        if "--filter" in command
-        and re.search(command[command.index("--filter") + 1], test_id)
-        and ("--skip" not in command
-             or not re.search(command[command.index("--skip") + 1], test_id))
-    ]
-    if len(selected) != 1 or "--skip" in selected[0]:
-        sys.exit(f"CI must run {suite} exactly once in its own test process")
-    selector = selected[0][selected[0].index("--filter") + 1]
-    for other_suite in ["AIMascotIdentityTests", "RichNoteEditorTests", suite + "Extra"]:
-        if re.search(selector, f"ZislaTests.{other_suite}/test()"):
-            sys.exit(f"CI {suite} isolation also selected {other_suite}")
-    print(f"PASS: CI runs {suite} exactly once without unrelated AppKit tests")
+for command in commands:
+    subprocess.run(command, cwd=root, check=True)
+actual = Path(os.environ["SWIFT_TEST_CAPTURE"]).read_text().splitlines()
+expected = [
+    "ZislaCoreTests.ModelTests/test()",
+    "ZislaKitTests.ServiceTests/test()",
+    "ZislaTests.WiFiNetworkPanelViewTests/observedPowerKeepsItsColorAndToggleSemanticsInAnInactiveWindow()",
+    "ZislaTests.FutureAppKitTests/test()",
+    "ZislaTests.FutureAppKitTests/Nested/test()",
+    "ZislaTests.FutureAppKitTestsExtra/test()",
+    "ZislaTests.topLevel()/Tests.swift:1:1",
+]
+assert sorted(actual) == sorted(expected), f"Workflow missed or duplicated tests: {actual}"
+assert not list(Path(os.environ["TMPDIR"]).iterdir()), "Workflow leaked test results"
+print("PASS: workflow discovers every target and runs every AppKit suite exactly once in its own process")
 PYTHON

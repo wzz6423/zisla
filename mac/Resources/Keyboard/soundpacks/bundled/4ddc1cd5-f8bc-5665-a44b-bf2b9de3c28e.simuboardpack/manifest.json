@@ -1,0 +1,140 @@
+{
+  "schemaVersion": 1,
+  "id": "4ddc1cd5-f8bc-5665-a44b-bf2b9de3c28e",
+  "name": "WhiteFox Hako Violet",
+  "author": "grcekh",
+  "layoutID": "mac-ansi-tkl-v1",
+  "createdAt": "2026-10-02T00:00:00Z",
+  "modifiedAt": "2026-10-02T00:00:00Z",
+  "press": {
+    "generic": "01fe49efd8cd38a0baa9a2c0adf86a80633056ce80bf459989777e7570f77954",
+    "rows": {
+      "R0": "01fe49efd8cd38a0baa9a2c0adf86a80633056ce80bf459989777e7570f77954",
+      "R1": "3f9e451de629be0f9aada100abc10ac92b2ba6f31f39c89f9a163d731c9caf6c",
+      "R2": "ba9d4c76791e901cbe85109555536fdfa8730443d9dce61d3277ea2506110698",
+      "R3": "01fe49efd8cd38a0baa9a2c0adf86a80633056ce80bf459989777e7570f77954",
+      "R4": "3f9e451de629be0f9aada100abc10ac92b2ba6f31f39c89f9a163d731c9caf6c"
+    },
+    "specials": {},
+    "keyOverrides": {}
+  },
+  "release": {
+    "generic": "84cf55ec418219b176d41adf063ca3ac860ff3ceaae5eeaf55b65bb3f99b83d7",
+    "rows": {
+      "R0": "84cf55ec418219b176d41adf063ca3ac860ff3ceaae5eeaf55b65bb3f99b83d7",
+      "R1": "81a95c916a731e2d8d2198c616db1e9f71c18f1a1a368e1a2d73aa06edb01cf3",
+      "R2": "3352baf3cb62e5f065e37c24e308de398f058a89ad419b74db7bd096353418b0",
+      "R3": "84cf55ec418219b176d41adf063ca3ac860ff3ceaae5eeaf55b65bb3f99b83d7",
+      "R4": "81a95c916a731e2d8d2198c616db1e9f71c18f1a1a368e1a2d73aa06edb01cf3"
+    },
+    "specials": {},
+    "keyOverrides": {}
+  },
+  "assets": {
+    "01fe49efd8cd38a0baa9a2c0adf86a80633056ce80bf459989777e7570f77954": {
+      "id": "01fe49efd8cd38a0baa9a2c0adf86a80633056ce80bf459989777e7570f77954",
+      "relativePath": "assets/01fe49efd8cd38a0baa9a2c0adf86a80633056ce80bf459989777e7570f77954.wav",
+      "sha256": "01fe49efd8cd38a0baa9a2c0adf86a80633056ce80bf459989777e7570f77954",
+      "originalFilename": "546167_12206738-lq.mp3 [161.735,161.850)",
+      "durationSeconds": 0.115,
+      "sampleRate": 48000,
+      "channelCount": 1,
+      "byteCount": 11084,
+      "license": {
+        "name": "CC0 1.0 Universal",
+        "sourceURL": "https://freesound.org/people/grcekh/sounds/546167/",
+        "author": "grcekh",
+        "notice": "https://creativecommons.org/publicdomain/zero/1.0/"
+      }
+    },
+    "84cf55ec418219b176d41adf063ca3ac860ff3ceaae5eeaf55b65bb3f99b83d7": {
+      "id": "84cf55ec418219b176d41adf063ca3ac860ff3ceaae5eeaf55b65bb3f99b83d7",
+      "relativePath": "assets/84cf55ec418219b176d41adf063ca3ac860ff3ceaae5eeaf55b65bb3f99b83d7.wav",
+      "sha256": "84cf55ec418219b176d41adf063ca3ac860ff3ceaae5eeaf55b65bb3f99b83d7",
+      "originalFilename": "546167_12206738-lq.mp3 [161.975,162.060)",
+      "durationSeconds": 0.085,
+      "sampleRate": 48000,
+      "channelCount": 1,
+      "byteCount": 8204,
+      "license": {
+        "name": "CC0 1.0 Universal",
+        "sourceURL": "https://freesound.org/people/grcekh/sounds/546167/",
+        "author": "grcekh",
+        "notice": "https://creativecommons.org/publicdomain/zero/1.0/"
+      }
+    },
+    "3f9e451de629be0f9aada100abc10ac92b2ba6f31f39c89f9a163d731c9caf6c": {
+      "id": "3f9e451de629be0f9aada100abc10ac92b2ba6f31f39c89f9a163d731c9caf6c",
+      "relativePath": "assets/3f9e451de629be0f9aada100abc10ac92b2ba6f31f39c89f9a163d731c9caf6c.wav",
+      "sha256": "3f9e451de629be0f9aada100abc10ac92b2ba6f31f39c89f9a163d731c9caf6c",
+      "originalFilename": "546167_12206738-lq.mp3 [162.515,162.640)",
+      "durationSeconds": 0.125,
+      "sampleRate": 48000,
+      "channelCount": 1,
+      "byteCount": 12044,
+      "license": {
+        "name": "CC0 1.0 Universal",
+        "sourceURL": "https://freesound.org/people/grcekh/sounds/546167/",
+        "author": "grcekh",
+        "notice": "https://creativecommons.org/publicdomain/zero/1.0/"
+      }
+    },
+    "81a95c916a731e2d8d2198c616db1e9f71c18f1a1a368e1a2d73aa06edb01cf3": {
+      "id": "81a95c916a731e2d8d2198c616db1e9f71c18f1a1a368e1a2d73aa06edb01cf3",
+      "relativePath": "assets/81a95c916a731e2d8d2198c616db1e9f71c18f1a1a368e1a2d73aa06edb01cf3.wav",
+      "sha256": "81a95c916a731e2d8d2198c616db1e9f71c18f1a1a368e1a2d73aa06edb01cf3",
+      "originalFilename": "546167_12206738-lq.mp3 [162.715,162.810)",
+      "durationSeconds": 0.095,
+      "sampleRate": 48000,
+      "channelCount": 1,
+      "byteCount": 9164,
+      "license": {
+        "name": "CC0 1.0 Universal",
+        "sourceURL": "https://freesound.org/people/grcekh/sounds/546167/",
+        "author": "grcekh",
+        "notice": "https://creativecommons.org/publicdomain/zero/1.0/"
+      }
+    },
+    "ba9d4c76791e901cbe85109555536fdfa8730443d9dce61d3277ea2506110698": {
+      "id": "ba9d4c76791e901cbe85109555536fdfa8730443d9dce61d3277ea2506110698",
+      "relativePath": "assets/ba9d4c76791e901cbe85109555536fdfa8730443d9dce61d3277ea2506110698.wav",
+      "sha256": "ba9d4c76791e901cbe85109555536fdfa8730443d9dce61d3277ea2506110698",
+      "originalFilename": "546167_12206738-lq.mp3 [163.240,163.350)",
+      "durationSeconds": 0.11,
+      "sampleRate": 48000,
+      "channelCount": 1,
+      "byteCount": 10604,
+      "license": {
+        "name": "CC0 1.0 Universal",
+        "sourceURL": "https://freesound.org/people/grcekh/sounds/546167/",
+        "author": "grcekh",
+        "notice": "https://creativecommons.org/publicdomain/zero/1.0/"
+      }
+    },
+    "3352baf3cb62e5f065e37c24e308de398f058a89ad419b74db7bd096353418b0": {
+      "id": "3352baf3cb62e5f065e37c24e308de398f058a89ad419b74db7bd096353418b0",
+      "relativePath": "assets/3352baf3cb62e5f065e37c24e308de398f058a89ad419b74db7bd096353418b0.wav",
+      "sha256": "3352baf3cb62e5f065e37c24e308de398f058a89ad419b74db7bd096353418b0",
+      "originalFilename": "546167_12206738-lq.mp3 [163.440,163.530)",
+      "durationSeconds": 0.09,
+      "sampleRate": 48000,
+      "channelCount": 1,
+      "byteCount": 8684,
+      "license": {
+        "name": "CC0 1.0 Universal",
+        "sourceURL": "https://freesound.org/people/grcekh/sounds/546167/",
+        "author": "grcekh",
+        "notice": "https://creativecommons.org/publicdomain/zero/1.0/"
+      }
+    }
+  },
+  "attributions": [
+    {
+      "title": "WhiteFox Hako Violet",
+      "author": "grcekh",
+      "sourceURL": "https://freesound.org/people/grcekh/sounds/546167/",
+      "licenseName": "CC0 1.0 Universal",
+      "notice": "Public preview 546167_12206738-lq.mp3; SHA-256 c4d2a29c4b97535c4ed80e0a365920f65f5cc71ecfa128adb954e3f984349b5c. Decoded with FFmpeg to 48000 Hz mono PCM s16le. Each [press start, press end, release start, release end] in seconds: [(161.735, 161.85, 161.975, 162.06), (162.515, 162.64, 162.715, 162.81), (163.24, 163.35, 163.44, 163.53)]. Linear gain 2.0; 48-frame fade-in and 192-frame fade-out. Three paired variations cycle across rows; special keys use their row sample, not separately identified source keys."
+    }
+  ]
+}

@@ -166,7 +166,6 @@ enum ScreenshotLongCaptureMatcher {
     /// Coarse overlaps further apart than this belong to different alignments; closer ones describe the
     /// same shift and are collapsed together.
     private static let coarseRunGap = 3
-    private static let coarseRunTieTolerance = 0.5
     /// How many coarse proposals per placement are re-scored at native resolution. Pages that repeat —
     /// a list, a table, a chat feed — put a near-perfect score on several row boundaries, so the proposals
     /// are spread across the search range instead of crowding into whichever basin scores a hair better.

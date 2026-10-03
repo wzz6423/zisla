@@ -20,6 +20,7 @@ struct OverlayCoordinatorVoiceRecordingTests {
     func voiceRecordingBlocksExpansionAndClearsPointerHold() throws {
         let contentView = NSView()
         let coordinator = OverlayCoordinator(contentView: contentView, collapseDelay: .seconds(10))
+        coordinator.screenSnapshotProvider = { [Self.screen] }
         defer { coordinator.stop() }
         var visibilityEvents: [Bool] = []
         coordinator.onVisibilityChanged = { visibilityEvents.append($0) }
@@ -51,6 +52,7 @@ struct OverlayCoordinatorVoiceRecordingTests {
     func voiceRecordingReleaseCollapsesImmediately() throws {
         let contentView = NSView()
         let coordinator = OverlayCoordinator(contentView: contentView, collapseDelay: .seconds(10))
+        coordinator.screenSnapshotProvider = { [Self.screen] }
         defer { coordinator.stop() }
         var visibilityEvents: [Bool] = []
         coordinator.onVisibilityChanged = { visibilityEvents.append($0) }
@@ -69,6 +71,7 @@ struct OverlayCoordinatorVoiceRecordingTests {
     func voiceRecordingStaysNonInteractiveButKeepsGlassActive() throws {
         let contentView = NSView()
         let coordinator = OverlayCoordinator(contentView: contentView, collapseDelay: .zero)
+        coordinator.screenSnapshotProvider = { [Self.screen] }
         defer { coordinator.stop() }
         coordinator.updateScreens([Self.screen], repositionVisiblePanel: false)
         coordinator.selectActiveDisplay(at: CGPoint(x: 720, y: 450))
@@ -79,6 +82,8 @@ struct OverlayCoordinatorVoiceRecordingTests {
         coordinator.updateExpandedSize(CGSize(width: 280, height: 58))
 
         let panel = try #require(contentView.window as? IslandPanel)
+        #expect(coordinator.layouts.map(\.displayID) == [Self.screen.displayID])
+        #expect(panel.frame == (try #require(coordinator.layouts.first)).expandedFrame)
         #expect(panel.isVisible)
         // Recording remains noninteractive and does not take the key window for its content.
         #expect(panel.ignoresMouseEvents)
@@ -94,6 +99,7 @@ struct OverlayCoordinatorVoiceRecordingTests {
     func voiceRecordingStartsOnTheScreenContainingThePointer() throws {
         let contentView = NSView()
         let coordinator = OverlayCoordinator(contentView: contentView, collapseDelay: .zero)
+        coordinator.screenSnapshotProvider = { [Self.screen, Self.rightScreen] }
         defer { coordinator.stop() }
         coordinator.updateScreens([Self.screen, Self.rightScreen], repositionVisiblePanel: false)
         coordinator.selectActiveDisplay(at: CGPoint(x: 720, y: 450))
@@ -123,6 +129,7 @@ struct OverlayCoordinatorVoiceRecordingTests {
             },
             persistentPanelFrameProvider: { CollapsedPetLayout.frame(for: $0) }
         )
+        coordinator.screenSnapshotProvider = { [Self.screen, Self.rightScreen] }
         defer { coordinator.stop() }
         coordinator.updateScreens([Self.screen, Self.rightScreen], repositionVisiblePanel: false)
 
@@ -132,7 +139,8 @@ struct OverlayCoordinatorVoiceRecordingTests {
 
         coordinator.setVoiceRecording(true, at: CGPoint(x: 1_900, y: 450))
         coordinator.updateExpandedSize(CGSize(width: 280, height: 58))
-        coordinator.updateScreens([Self.screen, Self.rightScreen], repositionVisiblePanel: false)
+        #expect(coordinator.layouts.map(\.displayID) == [Self.screen.displayID, Self.rightScreen.displayID])
+        #expect(coordinator.activeDisplayID == Self.rightScreen.displayID)
 
         #expect(firstPetView.window === firstPetPanel)
         #expect(!firstPetPanel.isVisible)
@@ -158,6 +166,7 @@ struct OverlayCoordinatorVoiceRecordingTests {
             },
             persistentPanelFrameProvider: { CollapsedPetLayout.frame(for: $0) }
         )
+        coordinator.screenSnapshotProvider = { [Self.screen, Self.rightScreen] }
         defer { coordinator.stop() }
         coordinator.updateScreens([Self.screen, Self.rightScreen], repositionVisiblePanel: false)
 
@@ -203,6 +212,7 @@ struct OverlayCoordinatorVoiceRecordingTests {
     func prewarmingMountsTheIslandPanelWithoutShowingIt() throws {
         let contentView = NSView()
         let coordinator = OverlayCoordinator(contentView: contentView, collapseDelay: .zero)
+        coordinator.screenSnapshotProvider = { [Self.screen] }
         defer { coordinator.stop() }
         var collapsedSizes: [CGSize] = []
         coordinator.onCollapsedSizeChanged = { collapsedSizes.append($0) }
@@ -228,15 +238,17 @@ struct OverlayCoordinatorVoiceRecordingTests {
     func recordingReusesThePrewarmedPanelInsteadOfMountingANewOne() throws {
         let contentView = NSView()
         let coordinator = OverlayCoordinator(contentView: contentView, collapseDelay: .zero)
+        coordinator.screenSnapshotProvider = { [Self.screen] }
         defer { coordinator.stop() }
         coordinator.start()
-        coordinator.updateScreens([Self.screen], repositionVisiblePanel: false)
+        #expect(coordinator.layouts.map(\.displayID) == [Self.screen.displayID])
         coordinator.prewarmPanel()
         let prewarmed = try #require(contentView.window as? IslandPanel)
 
         coordinator.setVoiceRecording(true, at: CGPoint(x: 720, y: 450))
         coordinator.updateExpandedSize(CGSize(width: 280, height: 58))
 
+        #expect(coordinator.layouts.map(\.displayID) == [Self.screen.displayID])
         let recordingLayout = try #require(coordinator.layouts.first)
         #expect(contentView.window === prewarmed)
         #expect(prewarmed.isVisible)
@@ -246,6 +258,7 @@ struct OverlayCoordinatorVoiceRecordingTests {
     @Test @MainActor
     func selectingTheActiveDisplayReportsItsCollapsedMetrics() throws {
         let coordinator = OverlayCoordinator(contentView: NSView(), collapseDelay: .zero)
+        coordinator.screenSnapshotProvider = { [Self.screen, Self.rightScreen] }
         defer { coordinator.stop() }
         var collapsedSizes: [CGSize] = []
         var notchFlags: [Bool] = []

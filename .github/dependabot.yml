@@ -25,15 +25,3 @@ updates:
       npm-dependencies:
         patterns:
           - "*"
-
-  - package-ecosystem: swift
-    directory: /mac
-    schedule:
-      interval: monthly
-      time: "04:30"
-      timezone: Asia/Shanghai
-    open-pull-requests-limit: 2
-    groups:
-      swift-dependencies:
-        patterns:
-          - "*"

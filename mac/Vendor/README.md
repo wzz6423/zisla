@@ -1,10 +1,10 @@
 # Vendored dependencies
 
-`Sparkle.xcframework` is extracted without modification from the official Sparkle 2.9.4 binary artifact:
+`Sparkle.xcframework` is extracted without modification from the official Sparkle 2.10.0 binary artifact:
 
-- Source: `https://github.com/sparkle-project/Sparkle/releases/tag/2.9.4`
+- Source: `https://github.com/sparkle-project/Sparkle/releases/tag/2.10.0`
 - Asset: `Sparkle-for-Swift-Package-Manager.zip`
-- SHA-256: `cb6fdbdc8884f15d62a616e79face92b08322410fd2d425edc6596ccbf4ba3b0`
+- SHA-256: `17e28312b8e18ab7cdbbe09a6fb28cc55a5479ec6c371dbc07cdecd2a14fd959`
 - License: MIT
 
 The XCFramework is vendored because SwiftPM Git and artifact downloads are not reliable behind every macOS proxy configuration. Update it only after verifying the source archive checksum published in Sparkle's tagged `Package.swift`.

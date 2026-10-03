@@ -97,7 +97,6 @@ struct CollapsedProgressGlowTests {
 
     @Test
     func progressGlowUsesAContinuousTrackWithLightSurfaceContrast() {
-        #expect(CollapsedProgress.requiredGlowClearance == 2)
         #expect(CollapsedProgress.glowHeight == 2)
         #expect(CollapsedProgress.glowBottomInset == 0)
         #expect(CollapsedProgress.contrastBackdropOpacity >= 0.5)

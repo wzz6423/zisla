@@ -8,7 +8,6 @@ enum CollapsedProgress {
     static let leadingSegmentOpacity = 0.64
     static let filledSegmentOpacity = 0.98
     static let trailingSegmentOpacity = 0.70
-    static var requiredGlowClearance: CGFloat { glowHeight + glowBottomInset }
 
     static func playbackFraction(
         for snapshot: NowPlayingSnapshot,
