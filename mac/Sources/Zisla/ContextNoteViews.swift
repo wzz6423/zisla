@@ -91,7 +91,7 @@ struct ContextNoteInputView: View {
             .accessibilityLabel(AppLocalization.text("放弃便签（Esc / ⌘⌫）"))
             Button(action: onSave) {
                 Image(systemName: "checkmark.circle.fill")
-                    .foregroundStyle(Color(red: 0.20, green: 0.90, blue: 0.42))
+                    .foregroundStyle(Color(red: 0.32, green: 1.0, blue: 0.50))
                     .frame(width: 24, height: 28)
             }
             .buttonStyle(.plain)
@@ -206,7 +206,7 @@ struct ContextNoteDetailView: View {
                     .buttonStyle(.plain)
                 Button(AppLocalization.text("保存"), action: onSave)
                     .buttonStyle(.plain)
-                    .foregroundStyle(Color(red: 0.20, green: 0.90, blue: 0.42))
+                    .foregroundStyle(Color(red: 0.32, green: 1.0, blue: 0.50))
                     .disabled(draft.text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
                     .keyboardShortcut("s", modifiers: .command)
                 Button(action: onClose) { Image(systemName: "xmark.circle.fill") }

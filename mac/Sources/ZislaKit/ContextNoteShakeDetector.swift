@@ -58,13 +58,13 @@ public struct ContextNoteShakeDetector {
         let delta = point.x - extreme
         if direction != 0, delta * direction >= 0 {
             self.extreme = point.x
-        } else if abs(delta) >= 28 {
+        } else if abs(delta) >= 20 {
             if direction != 0 { reversals += 1 }
             direction = delta > 0 ? 1 : -1
             self.extreme = point.x
             lastTurnAt = timestamp
         }
-        guard reversals >= 3 else { return false }
+        guard reversals >= 2 else { return false }
         // Evaluate the whole gesture so the curved ends of a horizontal shake do not reset it.
         guard maximumY - minimumY <= (maximumX - minimumX) * 0.8 else { return false }
         lastTriggeredAt = timestamp
