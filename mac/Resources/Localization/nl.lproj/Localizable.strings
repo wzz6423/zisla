@@ -2618,3 +2618,21 @@
 "松开以添加到中转站" = "Laat los om bestanden toe te voegen";
 "晃动唤出中转窗口" = "Schudden om het plankvenster te tonen";
 "拖拽文件时晃动鼠标，在旁边显示中转窗口" = "Schud de muis tijdens het slepen van bestanden om een plankvenster naast de aanwijzer te tonen";
+
+"位置便签" = "Locatienotitie";
+"摇动鼠标记便签" = "Schud de muis voor een notitie";
+"快速左右摇动鼠标，在当前位置记录，返回时提醒" = "Schud de muis snel heen en weer om hier een notitie achter te laten en bij terugkeer een herinnering te krijgen";
+"需要辅助功能权限来识别窗口和网页" = "Toegang tot Toegankelijkheid is nodig om vensters en webpagina’s te herkennen";
+"无法识别当前位置，请检查辅助功能权限" = "Deze locatie kan niet worden herkend. Controleer de toegang tot Toegankelijkheid.";
+"在这里记点什么…" = "Laat hier een notitie achter…";
+"记录位置" = "Opgeslagen locatie";
+"记录时间" = "Opgeslagen op";
+"记录内容" = "Inhoud van notitie";
+"保存便签（Enter）" = "Notitie opslaan (Enter)";
+"放弃便签（Esc / ⌘⌫）" = "Notitie weggooien (Esc / ⌘⌫)";
+"查看便签" = "Notitie bekijken";
+"桌面" = "Bureaublad";
+"前往记录位置" = "Naar opgeslagen locatie";
+"无法前往记录位置，窗口或显示器可能已关闭" = "Kan niet naar de opgeslagen locatie gaan. Het venster of beeldscherm is mogelijk niet meer beschikbaar.";
+"记录便签" = "Notitie maken";
+"已保存便签" = "Notitie opgeslagen";

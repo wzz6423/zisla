@@ -758,6 +758,7 @@ public struct FeatureSettings: Codable, Equatable, Sendable {
     /// Hold left mouse button + right-click to copy the selection (simulated ⌘C); off by default.
     /// Requires input monitoring and accessibility permissions.
     public var clipboardAssistantMouseGestureEnabled: Bool
+    public var contextNotesEnabled: Bool
     public var sideNoticesEnabled: Bool
     /// Whether collapsed notice bars show their playback, download, or dismissal progress glow.
     public var collapsedProgressGlowEnabled: Bool
@@ -886,6 +887,7 @@ public struct FeatureSettings: Codable, Equatable, Sendable {
         clipboardAssistantDisplayDuration: ClipboardAssistantDisplayDuration = .fiveSeconds,
         clipboardAssistantPromptsForImageSaveLocation: Bool = false,
         clipboardAssistantMouseGestureEnabled: Bool = false,
+        contextNotesEnabled: Bool = false,
         sideNoticesEnabled: Bool = true,
         collapsedProgressGlowEnabled: Bool = true,
         aiTaskResultSweepEnabled: Bool = true,
@@ -1006,6 +1008,7 @@ public struct FeatureSettings: Codable, Equatable, Sendable {
         self.clipboardAssistantDisplayDuration = clipboardAssistantDisplayDuration
         self.clipboardAssistantPromptsForImageSaveLocation = clipboardAssistantPromptsForImageSaveLocation
         self.clipboardAssistantMouseGestureEnabled = clipboardAssistantMouseGestureEnabled
+        self.contextNotesEnabled = contextNotesEnabled
         self.sideNoticesEnabled = sideNoticesEnabled
         self.collapsedProgressGlowEnabled = collapsedProgressGlowEnabled
         self.aiTaskResultSweepEnabled = aiTaskResultSweepEnabled
@@ -1142,6 +1145,7 @@ public struct FeatureSettings: Codable, Equatable, Sendable {
         case clipboardAssistantDisplayDuration
         case clipboardAssistantPromptsForImageSaveLocation
         case clipboardAssistantMouseGestureEnabled
+        case contextNotesEnabled
         case sideNoticesEnabled
         case collapsedProgressGlowEnabled
         case aiTaskResultSweepEnabled
@@ -1397,6 +1401,7 @@ public struct FeatureSettings: Codable, Equatable, Sendable {
             Bool.self,
             forKey: .clipboardAssistantMouseGestureEnabled
         ) ?? defaults.clipboardAssistantMouseGestureEnabled
+        contextNotesEnabled = try container.decodeIfPresent(Bool.self, forKey: .contextNotesEnabled) ?? defaults.contextNotesEnabled
         sideNoticesEnabled = try container.decodeIfPresent(Bool.self, forKey: .sideNoticesEnabled) ?? defaults.sideNoticesEnabled
         collapsedProgressGlowEnabled = try container.decodeIfPresent(
             Bool.self,

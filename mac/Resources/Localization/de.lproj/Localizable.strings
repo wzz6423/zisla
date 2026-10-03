@@ -2619,3 +2619,21 @@
 "松开以添加到中转站" = "Loslassen, um Dateien hinzuzufügen";
 "晃动唤出中转窗口" = "Ablagefenster durch Schütteln öffnen";
 "拖拽文件时晃动鼠标，在旁边显示中转窗口" = "Beim Ziehen von Dateien die Maus schütteln, um ein Ablagefenster neben dem Zeiger anzuzeigen";
+
+"位置便签" = "Ortsnotiz";
+"摇动鼠标记便签" = "Maus schütteln für eine Notiz";
+"快速左右摇动鼠标，在当前位置记录，返回时提醒" = "Bewegen Sie die Maus schnell nach links und rechts, um hier eine Notiz zu hinterlassen und bei der Rückkehr erinnert zu werden";
+"需要辅助功能权限来识别窗口和网页" = "Zugriff auf Bedienungshilfen ist nötig, um Fenster und Webseiten zu erkennen";
+"无法识别当前位置，请检查辅助功能权限" = "Dieser Ort konnte nicht erkannt werden. Prüfen Sie den Zugriff auf Bedienungshilfen.";
+"在这里记点什么…" = "Hier eine Notiz hinterlassen…";
+"记录位置" = "Gespeicherter Ort";
+"记录时间" = "Gespeichert am";
+"记录内容" = "Notizinhalt";
+"保存便签（Enter）" = "Notiz speichern (Enter)";
+"放弃便签（Esc / ⌘⌫）" = "Notiz verwerfen (Esc / ⌘⌫)";
+"查看便签" = "Notiz ansehen";
+"桌面" = "Schreibtisch";
+"前往记录位置" = "Zum gespeicherten Ort";
+"无法前往记录位置，窗口或显示器可能已关闭" = "Der gespeicherte Ort ist nicht erreichbar. Das Fenster oder der Bildschirm ist möglicherweise nicht mehr verfügbar.";
+"记录便签" = "Notiz erstellen";
+"已保存便签" = "Notiz gespeichert";

@@ -53,14 +53,16 @@ public struct FileShelfItem: Identifiable, Equatable {
     public var bookmarkData: Data
     public var text: String?
     public var isManaged: Bool
+    public var noteLocation: ContextNoteLocation?
 
-    public init(id: UUID, url: URL, addedAt: Date, bookmarkData: Data, text: String? = nil, isManaged: Bool = false) {
+    public init(id: UUID, url: URL, addedAt: Date, bookmarkData: Data, text: String? = nil, isManaged: Bool = false, noteLocation: ContextNoteLocation? = nil) {
         self.id = id
         self.url = url
         self.addedAt = addedAt
         self.bookmarkData = bookmarkData
         self.text = text
         self.isManaged = isManaged
+        self.noteLocation = noteLocation
     }
 
     public var linkURL: URL? { text.flatMap(TransferPasteboard.webURL) }
@@ -117,6 +119,7 @@ public final class FileShelfStore: ObservableObject {
         var url: URL?
         var text: String?
         var isManaged: Bool?
+        var noteLocation: ContextNoteLocation?
     }
 
     private let storageURL: URL
@@ -147,7 +150,7 @@ public final class FileShelfStore: ObservableObject {
                     item = FileShelfItem(id: UUID(), url: normalized, addedAt: Date(), bookmarkData: try makeBookmark(for: normalized))
                 case .text(let text):
                     guard !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
-                          !(items + additions).contains(where: { $0.text == text }) else { continue }
+                          !(items + additions).contains(where: { $0.noteLocation == nil && $0.text == text }) else { continue }
                     let link = TransferPasteboard.webURL(from: text)
                     let data = try link.map {
                         try PropertyListSerialization.data(fromPropertyList: ["URL": $0.absoluteString], format: .xml, options: 0)
@@ -172,6 +175,70 @@ public final class FileShelfStore: ObservableObject {
         items += additions
         errorDescription = failure
         return additions.count
+    }
+
+    public func addContextNote(_ text: String, location: ContextNoteLocation, addedAt: Date = Date()) -> FileShelfItem? {
+        guard !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return nil }
+        do {
+            var item = try makeManagedItem(name: "note.txt", text: text) {
+                try Data(text.utf8).write(to: $0, options: .atomic)
+            }
+            item.noteLocation = location
+            item.addedAt = addedAt
+            guard persist(items + [item]) else {
+                removeManagedFile(item)
+                return nil
+            }
+            items.append(item)
+            return item
+        } catch {
+            errorDescription = error.localizedDescription
+            return nil
+        }
+    }
+
+    public func updateContextNote(id: UUID, text: String) -> FileShelfItem? {
+        guard !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return nil }
+        guard let index = items.firstIndex(where: { $0.id == id && $0.noteLocation != nil && $0.isManaged }) else {
+            errorDescription = CocoaError(.fileReadNoSuchFile).localizedDescription
+            return nil
+        }
+        let original = items[index]
+        let directory = managedDirectory.appendingPathComponent(id.uuidString, isDirectory: true)
+        guard original.url.deletingLastPathComponent().standardizedFileURL == directory.standardizedFileURL,
+              directory.resolvingSymlinksInPath().path.hasPrefix(managedDirectory.resolvingSymlinksInPath().path + "/") else {
+            errorDescription = CocoaError(.fileWriteNoPermission).localizedDescription
+            return nil
+        }
+        let replacementURL = directory.appendingPathComponent("note-\(UUID().uuidString).txt")
+        do {
+            // Commit a new file reference so a failed index write cannot alter the saved version.
+            try Data(text.utf8).write(to: replacementURL, options: .atomic)
+            var updated = original
+            updated.url = replacementURL
+            updated.bookmarkData = try makeBookmark(for: replacementURL)
+            updated.text = text
+            var candidates = items
+            candidates[index] = updated
+            guard persist(candidates) else {
+                try FileManager.default.removeItem(at: replacementURL)
+                return nil
+            }
+            items = candidates
+            do {
+                try FileManager.default.removeItem(at: original.url)
+            } catch {
+                errorDescription = error.localizedDescription
+            }
+            return updated
+        } catch {
+            errorDescription = error.localizedDescription
+            if FileManager.default.fileExists(atPath: replacementURL.path) {
+                do { try FileManager.default.removeItem(at: replacementURL) }
+                catch { errorDescription = error.localizedDescription }
+            }
+            return nil
+        }
     }
 
     public func remove(id: UUID) {
@@ -375,7 +442,8 @@ public final class FileShelfStore: ObservableObject {
                     addedAt: value.addedAt,
                     bookmarkData: bookmark,
                     text: value.text,
-                    isManaged: value.isManaged ?? false
+                    isManaged: value.isManaged ?? false,
+                    noteLocation: value.noteLocation
                 ))
             }
             items = loaded
@@ -399,7 +467,7 @@ public final class FileShelfStore: ObservableObject {
         do {
             try FileManager.default.createDirectory(at: storageURL.deletingLastPathComponent(), withIntermediateDirectories: true)
             let stored = items.map {
-                StoredItem(id: $0.id, bookmarkData: $0.bookmarkData, addedAt: $0.addedAt, url: $0.url, text: $0.text, isManaged: $0.isManaged ? true : nil)
+                StoredItem(id: $0.id, bookmarkData: $0.bookmarkData, addedAt: $0.addedAt, url: $0.url, text: $0.text, isManaged: $0.isManaged ? true : nil, noteLocation: $0.noteLocation)
             }
             let data = try JSONEncoder().encode(stored)
             try data.write(to: storageURL, options: .atomic)

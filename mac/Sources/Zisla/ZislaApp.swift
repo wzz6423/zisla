@@ -335,6 +335,7 @@ enum PersistentPetNoticePolicy {
 final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
     private var overlayCoordinator: OverlayCoordinator?
     private var fileShelfShakeController: FileShelfShakeController?
+    private var contextNoteController: ContextNoteController?
     private var lockScreenOverlayController: LockScreenOverlayController?
     private var noticePresenter: SideNoticePresenter?
     private var petController: IslandPetController?
@@ -481,6 +482,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
         )
         coordinator.onVisibilityChanged = { [weak self] visible in
             let wasVisible = model.isIslandVisible
+            if visible && !wasVisible {
+                self?.contextNoteController?.prepareShelfCapture(at: NSEvent.mouseLocation)
+            }
             model.isIslandVisible = visible
             if visible {
                 self?.islandClipboardHandoffTask?.cancel()
@@ -563,9 +567,39 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
             languageStore: model.languageStore,
             onItems: { model.receiveShelfDropItems($0) }
         )
+        contextNoteController = ContextNoteController(
+            settingsStore: model.settingsStore, languageStore: model.languageStore, shelf: model.shelf,
+            canInteract: { !model.isIslandVisible && !model.voiceInput.isRecording && !model.voiceInput.isPreparing },
+            onReminder: { model.presentContextNoteReminder($0) },
+            onCaptureFailure: {
+                let message = AppLocalization.text("无法识别当前位置，请检查辅助功能权限")
+                model.clipboardAssistant.presentation.notchBackground = model.settingsStore.settings.islandNotchBackground
+                model.clipboardAssistant.present(ClipboardAssistantDetection(kind: .text, title: message, fullContent: message),
+                                                 visualStyle: model.settingsStore.settings.islandVisualStyle)
+            },
+            onSaved: { _ in
+                model.contextNoteEditor.hide()
+                model.transientMessage = AppLocalization.text("已加入 %ld 个项目", 1)
+                model.selectModule(.shelf)
+            }
+        )
+        contextNoteController?.start()
+        model.onBeginContextNote = { [weak self] in
+            guard let draft = self?.contextNoteController?.makeShelfDraft(at: NSEvent.mouseLocation) else {
+                AccessibilityPermission.promptIfNeeded()
+                model.transientMessage = AppLocalization.text("无法识别当前位置，请检查辅助功能权限")
+                return
+            }
+            model.contextNoteEditor.hide()
+            model.selectedShelfCategory = .all
+            model.contextNoteEditor.begin(draft)
+            model.selectModule(.shelf)
+        }
+        model.onContextNoteSaved = { [weak self] item in self?.contextNoteController?.didSaveNote(item) }
         lockScreenOverlayController.onScreenLockedChanged = { [weak self, weak coordinator] locked in
             coordinator?.setScreenLocked(locked)
             self?.fileShelfShakeController?.setScreenLocked(locked)
+            self?.contextNoteController?.setScreenLocked(locked)
             self?.noticePresenter?.setScreenLocked(locked)
             model.clipboardAssistant.setScreenLocked(locked)
             if locked {
@@ -896,6 +930,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
         combinedIconReadTask?.cancel()
         expandedSizeUpdateTask?.cancel()
         fileShelfShakeController?.stop()
+        contextNoteController?.stop()
         lockScreenOverlayController?.stop()
         lidCloseController?.stop()
         systemScreenshotMonitor?.stop()
@@ -1667,6 +1702,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
     private func setScreenshotSessionActive(_ active: Bool) {
         AppModel.shared.clipboardAssistant.setScreenshotActive(active)
         fileShelfShakeController?.setScreenshotActive(active)
+        contextNoteController?.setScreenshotActive(active)
         guard isScreenshotSessionActive != active else { return }
         isScreenshotSessionActive = active
         if !active {
@@ -1748,8 +1784,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
 
     private func startSystemScreenshotMonitoring() {
         let monitor = SystemScreenshotMonitor()
-        monitor.onSystemScreenshotStateChanged = { isActive in
+        monitor.onSystemScreenshotStateChanged = { [weak self] isActive in
             AppModel.shared.clipboardAssistant.setSystemScreenshotActive(isActive)
+            self?.contextNoteController?.setSystemScreenshotActive(isActive)
         }
         monitor.start()
         systemScreenshotMonitor = monitor

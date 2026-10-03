@@ -749,6 +749,32 @@ struct SettingsView: View {
                         keyPath: \.downloadCompletionFolderActionEnabled,
                         isNested: true
                     )
+                    rowDivider
+                    settingRow(
+                        symbol: "note.text",
+                        title: "摇动鼠标记便签",
+                        detail: "快速左右摇动鼠标，在当前位置记录，返回时提醒",
+                        isNested: true
+                    ) {
+                        Toggle("", isOn: Binding(
+                            get: { model.settingsStore.settings.contextNotesEnabled },
+                            set: { enabled in
+                                model.settingsStore.settings.contextNotesEnabled = enabled
+                                if enabled { AccessibilityPermission.promptIfNeeded() }
+                            }
+                        ))
+                        .labelsHidden()
+                        .toggleStyle(.switch)
+                        .controlSize(.small)
+                    }
+                    if model.settingsStore.settings.contextNotesEnabled && !model.assistantAccessibilityGranted {
+                        rowDivider
+                        settingRow(symbol: "lock.shield", title: "辅助功能",
+                                   detail: "需要辅助功能权限来识别窗口和网页", isNested: true) {
+                            Button { model.openAssistantAccessibilitySettings() } label: { AppLocalizedText("去授权") }
+                                .controlSize(.small)
+                        }
+                    }
                     ForEach(ClipboardAssistantKind.allCases, id: \.self) { kind in
                         rowDivider
                         settingRow(
