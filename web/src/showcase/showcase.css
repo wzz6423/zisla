@@ -1,0 +1,355 @@
+/* Showcase animation page.
+ * Styles are scoped under .showcase-root so they cannot leak into the marketing
+ * site, and the tokens mirror src/styles.css so both pages read as one site.
+ */
+
+.showcase-body {
+  margin: 0;
+  background: #09090b;
+  color: #fafafa;
+  font-family: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Noto Sans SC",
+    sans-serif;
+  overflow: hidden;
+  overscroll-behavior: none;
+}
+
+.showcase-root {
+  position: fixed;
+  inset: 0;
+  display: block;
+  background: #09090b;
+}
+
+.showcase-canvas {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+.showcase-noscript {
+  position: fixed;
+  inset: auto 0 50% 0;
+  margin: 0;
+  padding: 0 24px;
+  text-align: center;
+  color: #a1a1aa;
+  font-size: 15px;
+  line-height: 1.6;
+}
+
+/* --- Overlay root ------------------------------------------------------- */
+
+.showcase-ui {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  grid-template-rows: 1fr auto;
+  padding: clamp(20px, 3.4vw, 52px);
+  gap: 24px;
+  /* The overlay must never eat canvas gestures, only its own controls. */
+  pointer-events: none;
+  transition: opacity 420ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.showcase-ui.is-idle {
+  opacity: 0;
+}
+
+.showcase-ui.is-idle * {
+  pointer-events: none;
+}
+
+.showcase-ui button,
+.showcase-ui input {
+  pointer-events: auto;
+}
+
+/* --- Chapter titles ----------------------------------------------------- */
+
+.showcase-caption {
+  align-self: start;
+  justify-self: start;
+  max-width: min(680px, 82vw);
+  opacity: 0;
+}
+
+.showcase-caption.is-visible {
+  animation: showcase-caption-in 900ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+@keyframes showcase-caption-in {
+  from {
+    opacity: 0;
+    transform: translateY(14px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.showcase-kicker {
+  margin: 0 0 12px;
+  font-size: clamp(11px, 1.1vw, 13px);
+  font-weight: 600;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  color: #c8cf3a;
+}
+
+.showcase-title {
+  margin: 0;
+  font-size: clamp(26px, 4.4vw, 60px);
+  font-weight: 600;
+  line-height: 1.12;
+  letter-spacing: -0.02em;
+  text-wrap: balance;
+}
+
+.showcase-caption-text {
+  margin: 16px 0 0;
+  max-width: 46ch;
+  font-size: clamp(14px, 1.4vw, 18px);
+  line-height: 1.55;
+  color: #a1a1aa;
+  text-wrap: pretty;
+}
+
+/* --- Transport bar ------------------------------------------------------ */
+
+.showcase-bar {
+  align-self: end;
+  display: flex;
+  align-items: center;
+  gap: clamp(10px, 1.4vw, 18px);
+  padding: 12px clamp(14px, 1.8vw, 22px);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 999px;
+  background: rgba(16, 17, 21, 0.72);
+  backdrop-filter: blur(18px) saturate(140%);
+  -webkit-backdrop-filter: blur(18px) saturate(140%);
+}
+
+.showcase-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 38px;
+  height: 38px;
+  padding: 0 14px;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.06);
+  color: #fafafa;
+  font-size: 13px;
+  font-weight: 500;
+  white-space: nowrap;
+  cursor: pointer;
+  transition: background 200ms ease, border-color 200ms ease, transform 200ms ease;
+}
+
+.showcase-button:hover {
+  background: rgba(255, 255, 255, 0.12);
+  border-color: rgba(255, 255, 255, 0.26);
+}
+
+.showcase-button:active {
+  transform: scale(0.96);
+}
+
+.showcase-button:focus-visible,
+.showcase-chapter:focus-visible,
+.showcase-scrubber:focus-visible {
+  outline: 2px solid #c8cf3a;
+  outline-offset: 2px;
+}
+
+/* Play/pause is a single button whose glyph swaps with the playing state. */
+.showcase-play {
+  min-width: 42px;
+  padding: 0;
+}
+
+.showcase-icon {
+  position: relative;
+  display: block;
+  width: 13px;
+  height: 14px;
+}
+
+/* Pause glyph: two bars. */
+.showcase-icon-pause::before,
+.showcase-icon-pause::after {
+  content: "";
+  position: absolute;
+  top: 0;
+  width: 4px;
+  height: 14px;
+  border-radius: 1px;
+  background: currentColor;
+}
+
+.showcase-icon-pause::before {
+  left: 0;
+}
+
+.showcase-icon-pause::after {
+  right: 0;
+}
+
+/* Play glyph: a triangle, drawn with borders so it needs no asset. */
+.showcase-icon-pause.is-playing {
+  width: 0;
+  height: 0;
+  border-top: 7px solid transparent;
+  border-bottom: 7px solid transparent;
+  border-left: 11px solid currentColor;
+  margin-left: 3px;
+}
+
+.showcase-icon-pause.is-playing::before,
+.showcase-icon-pause.is-playing::after {
+  display: none;
+}
+
+.showcase-time {
+  font-family: "SF Mono", ui-monospace, "Cascadia Code", monospace;
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+  color: #a1a1aa;
+  white-space: nowrap;
+}
+
+.showcase-scrubber {
+  flex: 1 1 240px;
+  min-width: 90px;
+  height: 20px;
+  appearance: none;
+  -webkit-appearance: none;
+  background: transparent;
+  cursor: pointer;
+}
+
+.showcase-scrubber::-webkit-slider-runnable-track {
+  height: 3px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.18);
+}
+
+.showcase-scrubber::-webkit-slider-thumb {
+  appearance: none;
+  -webkit-appearance: none;
+  width: 12px;
+  height: 12px;
+  margin-top: -4.5px;
+  border: none;
+  border-radius: 50%;
+  background: #c8cf3a;
+  box-shadow: 0 0 0 4px rgba(200, 207, 58, 0.16);
+}
+
+.showcase-scrubber::-moz-range-track {
+  height: 3px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.18);
+}
+
+.showcase-scrubber::-moz-range-thumb {
+  width: 12px;
+  height: 12px;
+  border: none;
+  border-radius: 50%;
+  background: #c8cf3a;
+  box-shadow: 0 0 0 4px rgba(200, 207, 58, 0.16);
+}
+
+/* --- Chapter list ------------------------------------------------------- */
+
+.showcase-chapters {
+  display: flex;
+  gap: 4px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.showcase-chapter {
+  padding: 7px 12px;
+  border: none;
+  border-radius: 999px;
+  background: transparent;
+  color: #8b8d98;
+  font-size: 12px;
+  font-weight: 500;
+  white-space: nowrap;
+  cursor: pointer;
+  transition: color 200ms ease, background 200ms ease;
+}
+
+.showcase-chapter:hover {
+  color: #fafafa;
+  background: rgba(255, 255, 255, 0.07);
+}
+
+.showcase-chapter.is-active {
+  color: #09090b;
+  background: #c8cf3a;
+}
+
+/* --- Reduced motion notice --------------------------------------------- */
+
+.showcase-notice {
+  position: absolute;
+  left: 50%;
+  bottom: 96px;
+  margin: 0;
+  padding: 10px 18px;
+  transform: translateX(-50%);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 999px;
+  background: rgba(16, 17, 21, 0.86);
+  color: #d4d4d8;
+  font-size: 12px;
+  text-align: center;
+  pointer-events: none;
+  opacity: 0;
+  visibility: hidden;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .showcase-notice {
+    opacity: 1;
+    visibility: visible;
+  }
+
+  .showcase-caption.is-visible {
+    animation-duration: 1ms;
+  }
+}
+
+/* --- Narrow windows ----------------------------------------------------- */
+
+@media (max-width: 760px) {
+  .showcase-ui {
+    gap: 16px;
+  }
+
+  .showcase-chapters {
+    display: none;
+  }
+
+  .showcase-time {
+    display: none;
+  }
+
+  .showcase-caption {
+    max-width: 100%;
+  }
+}
+
+@media (max-width: 460px) {
+  .showcase-button {
+    padding: 0 10px;
+    font-size: 12px;
+  }
+}
