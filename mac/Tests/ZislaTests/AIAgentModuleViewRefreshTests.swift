@@ -12,17 +12,28 @@ struct AIAgentModuleViewRefreshTests {
         let directory = FileManager.default.temporaryDirectory
             .appendingPathComponent("zisla-refresh-button-\(UUID().uuidString)", isDirectory: true)
         defer { try? FileManager.default.removeItem(at: directory) }
+        let refreshStarted = directory.appendingPathComponent("refresh-started")
+        let releaseRefresh = directory.appendingPathComponent("release-refresh")
+        let toolDirectory = directory.appendingPathComponent("bin", isDirectory: true)
+        try writeExecutable(
+            at: toolDirectory.appendingPathComponent("claude"),
+            contents: "#!/bin/sh\ntouch '\(refreshStarted.path)'\nwhile [ ! -f '\(releaseRefresh.path)' ]; do sleep 0.01; done\nprintf 'Claude Code 1.0.0\\n'\n"
+        )
         let workspace = AIAgentWorkspace(
             store: AIAgentStore(storageURL: directory.appendingPathComponent("state.json")),
-            cliService: AIAgentCLIService(environment: ["PATH": "/usr/bin:/bin"], homeDirectory: directory),
+            cliService: AIAgentCLIService(
+                environment: ["PATH": "\(toolDirectory.path):/usr/bin:/bin"],
+                homeDirectory: directory
+            ),
             cliUpdateService: AIAgentCLIUpdateService(loadLatestVersion: { _ in nil })
         )
 
         let refreshTask = Task { await workspace.refreshCLIs() }
-        try await Task.sleep(for: .milliseconds(10))
-
+        await waitForFile(at: refreshStarted)
+        #expect(FileManager.default.fileExists(atPath: refreshStarted.path))
         #expect(workspace.isCheckingCLIs)
 
+        try Data().write(to: releaseRefresh)
         await refreshTask.value
         #expect(!workspace.isCheckingCLIs)
     }

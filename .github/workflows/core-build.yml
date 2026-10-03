@@ -39,17 +39,15 @@ jobs:
           workflow-name: Core Tests
           github-token: ${{ github.token }}
 
-  core:
-    name: Windows Core (${{ matrix.configuration }})
+  core-debug:
+    name: Windows Core (Debug)
     needs: gate
     if: needs.gate.outputs.skip != 'true' && needs.gate.outputs.relevant != 'false'
     runs-on: windows-latest
     timeout-minutes: 30
-    strategy:
-      fail-fast: false
-      matrix:
-        configuration: [Debug, Release]
-    steps:
+    env:
+      CONFIGURATION: Debug
+    steps: &core-steps
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
@@ -62,7 +60,7 @@ jobs:
             Write-Host "Windows Core is not present in this revision."
             exit 0
           }
-          cmake -S windows -B "$buildDirectory" -G Ninja -DCMAKE_BUILD_TYPE=${{ matrix.configuration }} -DBUILD_TESTING=ON -DZISLA_ENABLE_QPDF_ADAPTER=OFF -DZISLA_ENABLE_PDFIUM_ADAPTER=OFF
+          cmake -S windows -B "$buildDirectory" -G Ninja -DCMAKE_BUILD_TYPE=$env:CONFIGURATION -DBUILD_TESTING=ON -DZISLA_ENABLE_QPDF_ADAPTER=OFF -DZISLA_ENABLE_PDFIUM_ADAPTER=OFF
           cmake --build "$buildDirectory" --parallel
           ctest --test-dir "$buildDirectory" --output-on-failure --no-tests=error
       - name: Remove test artifacts
@@ -70,17 +68,28 @@ jobs:
         shell: pwsh
         run: Remove-Item -LiteralPath (Join-Path $env:RUNNER_TEMP "zisla-windows-core") -Recurse -Force -ErrorAction SilentlyContinue
 
+  core-release:
+    name: Windows Core (Release)
+    needs: gate
+    if: needs.gate.outputs.skip != 'true' && needs.gate.outputs.relevant != 'false'
+    runs-on: windows-latest
+    timeout-minutes: 30
+    env:
+      CONFIGURATION: Release
+    steps: *core-steps
+
   core-result:
     name: Windows Core Tests
     runs-on: ubuntu-latest
     timeout-minutes: 5
-    needs: [gate, core]
+    needs: [gate, core-debug, core-release]
     if: always() && needs.gate.outputs.skip != 'true' && needs.gate.outputs.relevant != 'false'
     steps:
-      - name: Verify matrix result
+      - name: Verify configuration results
         env:
-          CORE_RESULT: ${{ needs.core.result }}
-        run: test "$CORE_RESULT" = "success"
+          DEBUG_RESULT: ${{ needs.core-debug.result }}
+          RELEASE_RESULT: ${{ needs.core-release.result }}
+        run: test "$DEBUG_RESULT" = "success" && test "$RELEASE_RESULT" = "success"
 
   application:
     name: Windows App Build
