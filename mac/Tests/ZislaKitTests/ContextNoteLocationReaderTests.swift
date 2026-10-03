@@ -14,12 +14,13 @@ extension ContextNoteLocationReaderTests {
     }
 
     private func windowInfo(frame: CGRect, layer: Int = 0, owner: pid_t = 42, alpha: Double = 1,
-                            ownerName: String? = nil) -> [String: Any] {
+                            ownerName: String? = nil, number: Int? = nil) -> [String: Any] {
         var info: [String: Any] = [kCGWindowBounds as String: frame.dictionaryRepresentation,
                                   kCGWindowLayer as String: layer,
                                   kCGWindowOwnerPID as String: owner,
                                   kCGWindowAlpha as String: alpha]
         if let ownerName { info[kCGWindowOwnerName as String] = ownerName }
+        if let number { info[kCGWindowNumber as String] = number }
         return info
     }
 
@@ -215,7 +216,9 @@ extension ContextNoteLocationReaderTests {
     private func captureWindow(surface: ContextNoteLocationReader.WindowSnapshot?,
                                hit: (processIdentifier: pid_t, window: CaptureWindow?)?,
                                windows: [CaptureWindow]?, focused: CaptureWindow? = nil,
-                               main: CaptureWindow? = nil) -> ContextNoteObservation {
+                               main: CaptureWindow? = nil, bundleIdentifier: String = "test.chat",
+                               applicationName: String = "Chat",
+                               desktopLocation: (ContextNoteLocationReader.WindowSnapshot) -> ContextNoteLocation? = { _ in nil }) -> ContextNoteObservation {
         var fixtures: [(element: AXUIElement, window: CaptureWindow)] = []
         func element(for window: CaptureWindow) -> AXUIElement {
             let element = AXUIElementCreateApplication(pid_t(1000 + fixtures.count))
@@ -236,11 +239,150 @@ extension ContextNoteLocationReaderTests {
             }
         }, frame: { element in
             fixtures.first { CFEqual($0.element, element) }?.window.frame
-        }, desktopLocation: { _ in nil }) { _, element in
+        }, desktopLocation: desktopLocation) { _, element in
             guard let element, let window = fixtures.first(where: { CFEqual($0.element, element) })?.window else { return .unavailable }
-            return ContextNoteLocationReader.resolve(bundleIdentifier: "test.chat", applicationName: "Chat",
+            return ContextNoteLocationReader.resolve(bundleIdentifier: bundleIdentifier, applicationName: applicationName,
                 windowTitle: window.title, isBrowser: false, pageAddress: nil)
         }
+    }
+
+    private func passThroughWindow() -> NSWindow {
+        _ = NSApplication.shared
+        let window = NSWindow(contentRect: CGRect(x: -20_000, y: -20_000, width: 100, height: 100),
+                              styleMask: .borderless, backing: .buffered, defer: false)
+        window.isReleasedWhenClosed = false
+        window.ignoresMouseEvents = true
+        return window
+    }
+
+    @Test(arguments: ["com.tencent.xinWeChat", "test.editor"], [0, 1])
+    func repeatedCapturesThroughOwnPassThroughWindowsKeepTheSameApplication(bundleIdentifier: String, screenIndex: Int) throws {
+        let overlays = [passThroughWindow(), passThroughWindow()]
+        defer { overlays.forEach { $0.close() } }
+        for overlay in overlays {
+            try #require(!overlay.isVisible && overlay.windowNumber > 0)
+            try #require(NSApp.window(withWindowNumber: overlay.windowNumber) === overlay)
+        }
+        let screen = dockScreenFrames[screenIndex]
+        let quartzFrame = CGRect(x: screen.minX, y: dockScreenFrames[0].maxY - screen.maxY,
+                                 width: screen.width, height: screen.height)
+        let bounds = CGRect(x: quartzFrame.minX + 204, y: quartzFrame.minY + 150, width: 1104, height: 650)
+        let overlayBounds = CGRect(x: quartzFrame.minX + 346, y: quartzFrame.minY, width: 820, height: 504)
+        let point = CGPoint(x: quartzFrame.minX + 700, y: quartzFrame.minY + 400)
+        let owner = ProcessInfo.processInfo.processIdentifier
+        let high = windowInfo(frame: overlayBounds, layer: Int(CGWindowLevelForKey(.statusWindow)),
+                              owner: owner, number: overlays[0].windowNumber)
+        let low = windowInfo(frame: bounds, layer: Int(CGWindowLevelForKey(.floatingWindow)),
+                             owner: owner, number: overlays[1].windowNumber)
+        let dock = windowInfo(frame: quartzFrame, layer: Int(CGWindowLevelForKey(.dockWindow)), owner: 84)
+        let application = windowInfo(frame: bounds)
+        let expected = ContextNoteObservation.location(.window(bundleIdentifier: bundleIdentifier,
+            applicationName: "Application", title: "Document"))
+        for windows in [[application], [application], [high, low, application],
+                        [high, dock, low, application], [high, low, application]] {
+            let surface = ContextNoteLocationReader.captureSurface(at: point, windowInfo: windows,
+                screenFrames: dockScreenFrames, hitProcessIdentifier: 42,
+                bundleIdentifier: { $0 == 84 ? "com.apple.dock" : bundleIdentifier })
+            #expect(captureWindow(surface: surface, hit: (42, nil), windows: [CaptureWindow(title: "Document", frame: bounds)],
+                bundleIdentifier: bundleIdentifier, applicationName: "Application") == expected)
+        }
+    }
+
+    @Test(arguments: [0, 1, 2], [false, true])
+    func repeatedCapturesThroughOwnPassThroughWindowsKeepTheSameDesktop(screenIndex: Int, windowServer: Bool) {
+        let overlays = [passThroughWindow(), passThroughWindow()]
+        defer { overlays.forEach { $0.close() } }
+        let screen = desktopScreens[screenIndex]
+        let bounds = CGRect(x: screen.frame.minX, y: desktopScreens[0].frame.maxY - screen.frame.maxY,
+                            width: screen.frame.width, height: screen.frame.height)
+        let point = CGPoint(x: screen.frame.midX, y: screen.frame.midY)
+        let quartzPoint = CGPoint(x: bounds.midX, y: bounds.midY)
+        let owner = ProcessInfo.processInfo.processIdentifier
+        let high = windowInfo(frame: bounds.insetBy(dx: 10, dy: 10), layer: Int(CGWindowLevelForKey(.popUpMenuWindow)),
+                              owner: owner, number: overlays[0].windowNumber)
+        let low = windowInfo(frame: bounds, layer: Int(CGWindowLevelForKey(.floatingWindow)),
+                             owner: owner, number: overlays[1].windowNumber)
+        let dock = windowInfo(frame: bounds, layer: Int(CGWindowLevelForKey(.dockWindow)), owner: 84)
+        let desktop = windowInfo(frame: bounds, layer: Int(CGWindowLevelForKey(.desktopIconWindow)) + (windowServer ? 1 : 0),
+                                 owner: windowServer ? 7 : 42, ownerName: windowServer ? "Window Server" : "Finder")
+        let captures = [(windows: [desktop], isTrusted: false),
+                        (windows: [high, low, desktop], isTrusted: false),
+                        (windows: [high, dock, low, desktop], isTrusted: true),
+                        (windows: [high, low, desktop], isTrusted: false)]
+        for capture in captures {
+            let desktopLocation: (ContextNoteLocationReader.WindowSnapshot?) -> ContextNoteLocation? = { surface in
+                guard let display = ContextNoteLocationReader.desktopDisplay(at: point, screens: desktopScreens,
+                    windowInfo: capture.windows, capturedSurface: surface) else { return nil }
+                return .desktop(displayID: String(display), displayName: "Screen")
+            }
+            let result = ContextNoteLocationReader.observe(isTrusted: capture.isTrusted, desktopLocation: { desktopLocation(nil) }) {
+                #expect(capture.isTrusted, "A visible desktop must not need accessibility after excluding pass-through windows")
+                let surface = ContextNoteLocationReader.captureSurface(at: quartzPoint, windowInfo: capture.windows,
+                    screenFrames: desktopScreens.map(\.frame), hitProcessIdentifier: 42,
+                    bundleIdentifier: { $0 == 84 ? "com.apple.dock" : "com.apple.finder" })
+                return captureWindow(surface: surface, hit: (42, nil), windows: nil, desktopLocation: { desktopLocation($0) })
+            }
+            #expect(result == .location(.desktop(displayID: String(screen.displayID), displayName: "Screen")))
+        }
+    }
+
+    @Test(arguments: [false, true])
+    func ownWindowInputPolicyChangesAffectEachCapture(isDesktop: Bool) {
+        let overlay = passThroughWindow()
+        defer { overlay.close() }
+        let bounds = desktopScreens[0].frame
+        let point = CGPoint(x: 700, y: 400)
+        let own = windowInfo(frame: bounds, layer: Int(CGWindowLevelForKey(.statusWindow)),
+                             owner: ProcessInfo.processInfo.processIdentifier, number: overlay.windowNumber)
+        let underlying = windowInfo(frame: bounds, layer: isDesktop ? Int(CGWindowLevelForKey(.desktopIconWindow)) : 0)
+        let windows = [own, underlying]
+        let location: ContextNoteLocation = isDesktop ? .desktop(displayID: "1", displayName: "Screen")
+            : .window(bundleIdentifier: "test.chat", applicationName: "Chat", title: "Document")
+        for passesInput in [true, true, false, true, false, true] {
+            overlay.ignoresMouseEvents = passesInput
+            let surface = ContextNoteLocationReader.captureSurface(at: point, windowInfo: windows,
+                screenFrames: desktopScreens.map(\.frame), hitProcessIdentifier: 42,
+                bundleIdentifier: { _ in isDesktop ? "com.apple.finder" : "test.chat" })
+            let result = captureWindow(surface: surface, hit: (42, nil), windows: [CaptureWindow(title: "Document", frame: bounds)],
+                desktopLocation: { _ in location })
+            #expect(result == (passesInput ? .location(location) : .ignored))
+            #expect(ContextNoteLocationReader.desktopDisplay(at: point, screens: desktopScreens, windowInfo: windows)
+                    == (isDesktop && passesInput ? 1 : nil))
+        }
+    }
+
+    @Test
+    func ownPassThroughFilteringKeepsUnknownAndInteractiveWindows() {
+        let passThrough = passThroughWindow()
+        let interactive = passThroughWindow()
+        interactive.ignoresMouseEvents = false
+        defer { passThrough.close(); interactive.close() }
+        let bounds = CGRect(x: 100, y: 100, width: 800, height: 600)
+        let owner = ProcessInfo.processInfo.processIdentifier
+        let high = windowInfo(frame: bounds, layer: Int(CGWindowLevelForKey(.popUpMenuWindow)),
+                              owner: owner, number: passThrough.windowNumber)
+        for number in [nil, "invalid", 0, Int.max, interactive.windowNumber] as [Any?] {
+            var blocker = windowInfo(frame: bounds, layer: Int(CGWindowLevelForKey(.statusWindow)), owner: owner)
+            blocker[kCGWindowNumber as String] = number
+            let surface = ContextNoteLocationReader.captureSurface(at: CGPoint(x: 500, y: 400),
+                windowInfo: [high, blocker, windowInfo(frame: bounds)], screenFrames: dockScreenFrames,
+                hitProcessIdentifier: 42, bundleIdentifier: { _ in "test.chat" })
+            #expect(captureWindow(surface: surface, hit: (42, nil), windows: [CaptureWindow(title: "Document", frame: bounds)]) == .ignored)
+        }
+    }
+
+    @Test
+    func foreignWindowsCannotBorrowAnOwnPassThroughWindowNumber() {
+        let overlay = passThroughWindow()
+        defer { overlay.close() }
+        let bounds = CGRect(x: 100, y: 100, width: 800, height: 600)
+        let foreign = windowInfo(frame: bounds, layer: Int(CGWindowLevelForKey(.floatingWindow)),
+                                 owner: 43, number: overlay.windowNumber)
+        let surface = ContextNoteLocationReader.captureSurface(at: CGPoint(x: 500, y: 400),
+            windowInfo: [foreign, windowInfo(frame: bounds)], screenFrames: dockScreenFrames,
+            hitProcessIdentifier: 42, bundleIdentifier: { _ in "test.chat" })
+        #expect(surface?.ownerProcessIdentifier == 43)
+        #expect(captureWindow(surface: surface, hit: (42, nil), windows: [CaptureWindow(title: "Document", frame: bounds)]) == .unavailable)
     }
 
     @Test(arguments: [nil, 43] as [pid_t?])

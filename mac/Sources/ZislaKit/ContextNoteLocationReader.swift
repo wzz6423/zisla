@@ -194,6 +194,10 @@ public enum ContextNoteLocationReader {
                   let layer = window[kCGWindowLayer as String] as? NSNumber,
                   let owner = window[kCGWindowOwnerPID as String] as? NSNumber else { return nil }
             guard alpha.doubleValue > 0, frame.contains(point), owner.int32Value != excludingProcessIdentifier else { continue }
+            // A pass-through overlay can retain its visible Window Server surface after collapsing.
+            if owner.int32Value == ProcessInfo.processInfo.processIdentifier,
+               let number = window[kCGWindowNumber as String] as? NSNumber,
+               NSApp.window(withWindowNumber: number.intValue)?.ignoresMouseEvents == true { continue }
             if let excludingSurface, owner.int32Value == excludingSurface.ownerProcessIdentifier,
                layer.intValue == excludingSurface.layer, frame == excludingSurface.frame { continue }
             let ownerName = window[kCGWindowOwnerName as String] as? String
