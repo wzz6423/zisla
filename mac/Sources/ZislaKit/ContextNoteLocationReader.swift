@@ -35,11 +35,11 @@ public enum ContextNoteLocationReader {
             desktopLocation(at: point, screens: screens, windowInfo: windows)
         }) {
             let quartzPoint = CGPoint(x: point.x, y: (screens.first?.frame.maxY ?? 0) - point.y)
-            return captureWindow(at: quartzPoint, surface: topWindow(at: quartzPoint, windowInfo: windows))
+            return captureWindow(at: quartzPoint, windowInfo: windows, screenFrames: screens.map(\.frame))
         }
     }
 
-    private static func captureWindow(at point: CGPoint, surface: WindowSnapshot?) -> ContextNoteObservation {
+    private static func captureWindow(at point: CGPoint, windowInfo: [[String: Any]]?, screenFrames: [CGRect]) -> ContextNoteObservation {
         let system = AXUIElementCreateSystemWide()
         AXUIElementSetMessagingTimeout(system, 0.1)
         var element: AXUIElement?
@@ -53,6 +53,9 @@ public enum ContextNoteLocationReader {
         } else {
             hit = nil
         }
+        let surface = captureSurface(at: point, windowInfo: windowInfo, screenFrames: screenFrames,
+            hitProcessIdentifier: hit?.processIdentifier,
+            bundleIdentifier: { NSRunningApplication(processIdentifier: $0)?.bundleIdentifier })
         return captureWindow(surface: surface, hit: hit, readAttribute: { pid, name in
             let application = AXUIElementCreateApplication(pid)
             AXUIElementSetMessagingTimeout(application, 0.1)
@@ -77,6 +80,22 @@ public enum ContextNoteLocationReader {
             ContextNoteNavigator.windowElements(readAttribute: { readAttribute(pid, $0) })?.map(\.element)
         }, matches: { surface?.matches(frame($0), processIdentifier: pid) == true })
         return read(pid, window)
+    }
+
+    static func captureSurface(at point: CGPoint, windowInfo: [[String: Any]]?, screenFrames: [CGRect],
+                               hitProcessIdentifier: pid_t?, bundleIdentifier: (pid_t) -> String?) -> WindowSnapshot? {
+        guard let surface = topWindow(at: point, windowInfo: windowInfo) else { return nil }
+        // Dock can publish a full-screen surface while passing pointer input to another app.
+        guard let hitProcessIdentifier, hitProcessIdentifier != surface.ownerProcessIdentifier,
+              surface.layer == CGWindowLevelForKey(.dockWindow),
+              bundleIdentifier(surface.ownerProcessIdentifier) == "com.apple.dock",
+              screenFrames.contains(where: {
+                  CGRect(x: $0.minX, y: screenFrames[0].maxY - $0.maxY, width: $0.width, height: $0.height) == surface.frame
+              }) else { return surface }
+        guard let underlying = topWindow(at: point, windowInfo: windowInfo, excludingSurface: surface),
+              underlying.layer == CGWindowLevelForKey(.normalWindow),
+              underlying.ownerProcessIdentifier == hitProcessIdentifier else { return surface }
+        return underlying
     }
 
     public static func current(at point: CGPoint) -> ContextNoteObservation {
@@ -147,7 +166,8 @@ public enum ContextNoteLocationReader {
     }
 
     static func topWindow(at point: CGPoint, windowInfo: [[String: Any]]?,
-                          excludingProcessIdentifier: pid_t? = nil, skippingMenuBar: Bool = false) -> WindowSnapshot? {
+                          excludingProcessIdentifier: pid_t? = nil, skippingMenuBar: Bool = false,
+                          excludingSurface: WindowSnapshot? = nil) -> WindowSnapshot? {
         guard let windowInfo else { return nil }
         for window in windowInfo {
             guard let bounds = window[kCGWindowBounds as String] as? NSDictionary,
@@ -156,6 +176,8 @@ public enum ContextNoteLocationReader {
                   let layer = window[kCGWindowLayer as String] as? NSNumber,
                   let owner = window[kCGWindowOwnerPID as String] as? NSNumber else { return nil }
             guard alpha.doubleValue > 0, frame.contains(point), owner.int32Value != excludingProcessIdentifier else { continue }
+            if let excludingSurface, owner.int32Value == excludingSurface.ownerProcessIdentifier,
+               layer.intValue == excludingSurface.layer, frame == excludingSurface.frame { continue }
             let ownerName = window[kCGWindowOwnerName as String] as? String
             if skippingMenuBar, layer.intValue == CGWindowLevelForKey(.mainMenuWindow), ownerName == "Window Server" { continue }
             return WindowSnapshot(frame: frame, layer: layer.intValue, ownerProcessIdentifier: owner.int32Value, ownerName: ownerName)

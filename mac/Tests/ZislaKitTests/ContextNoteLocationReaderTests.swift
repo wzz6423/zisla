@@ -280,8 +280,14 @@ extension ContextNoteLocationReaderTests {
     func capturePreservesDirectAccessibilityWindowsWhenWindowServerMetadataIsUnavailable() {
         let bounds = CGRect(x: 100, y: 100, width: 800, height: 600)
         let window = CaptureWindow(title: "Conversation", frame: bounds)
-        #expect(captureWindow(surface: nil, hit: (42, window), windows: nil)
-                == .location(.window(bundleIdentifier: "test.chat", applicationName: "Chat", title: "Conversation")))
+        for metadata in [nil, []] as [[[String: Any]]?] {
+            let surface = ContextNoteLocationReader.captureSurface(at: CGPoint(x: 500, y: 400),
+                windowInfo: metadata, screenFrames: dockScreenFrames, hitProcessIdentifier: 42,
+                bundleIdentifier: { _ in "test.chat" })
+            #expect(surface == nil)
+            #expect(captureWindow(surface: surface, hit: (42, window), windows: nil)
+                    == .location(.window(bundleIdentifier: "test.chat", applicationName: "Chat", title: "Conversation")))
+        }
         #expect(captureWindow(surface: nil, hit: nil, windows: [window]) == .unavailable)
     }
 
@@ -365,6 +371,115 @@ extension ContextNoteLocationReaderTests {
             return .location(.window(bundleIdentifier: "test.chat", applicationName: "Chat", title: "Conversation"))
         }
         #expect(result == .location(.window(bundleIdentifier: "test.chat", applicationName: "Chat", title: "Conversation")))
+    }
+
+    private var dockScreenFrames: [CGRect] {
+        [CGRect(x: 0, y: 0, width: 1512, height: 982), CGRect(x: 1512, y: -98, width: 1920, height: 1080)]
+    }
+
+    private func surfaceUnderDock(_ windows: [[String: Any]], hitProcessIdentifier: pid_t?,
+                                  dockBundle: String? = "com.apple.dock", screenFrames: [CGRect]? = nil) -> ContextNoteLocationReader.WindowSnapshot? {
+        ContextNoteLocationReader.captureSurface(at: CGPoint(x: 625.67578125, y: 523.05078125), windowInfo: windows,
+            screenFrames: screenFrames ?? dockScreenFrames, hitProcessIdentifier: hitProcessIdentifier,
+            bundleIdentifier: { $0 == 84 ? dockBundle : "test.chat" })
+    }
+
+    @Test
+    func fullScreenDockSurfaceDoesNotHideTheApplicationActuallyHitByAccessibility() {
+        let bounds = CGRect(x: 204, y: 150, width: 1104, height: 650)
+        let dock = windowInfo(frame: dockScreenFrames[0], layer: Int(CGWindowLevelForKey(.dockWindow)), owner: 84, ownerName: "程序坞")
+        let surface = surfaceUnderDock([dock, windowInfo(frame: bounds)], hitProcessIdentifier: 42)
+        let result = captureWindow(surface: surface, hit: (42, nil), windows: [CaptureWindow(title: "Conversation", frame: bounds)])
+        #expect(result == .location(.window(bundleIdentifier: "test.chat", applicationName: "Chat", title: "Conversation")))
+    }
+
+    @Test
+    func realDockAccessibilityHitsDoNotExposeWindowsBehindTheDockLayer() {
+        let bounds = CGRect(x: 204, y: 150, width: 1104, height: 650)
+        let dock = windowInfo(frame: dockScreenFrames[0], layer: Int(CGWindowLevelForKey(.dockWindow)), owner: 84)
+        for hit in [nil, 84] as [pid_t?] {
+            for next in [windowInfo(frame: bounds), windowInfo(frame: bounds, owner: 84)] {
+                let surface = surfaceUnderDock([dock, next], hitProcessIdentifier: hit)
+                #expect(surface?.ownerProcessIdentifier == 84)
+                #expect(surface?.frame == dockScreenFrames[0])
+            }
+        }
+    }
+
+    @Test
+    func onlyTheDockBundleAtItsFullScreenDockLevelMayBeBypassed() {
+        let bounds = CGRect(x: 204, y: 150, width: 1104, height: 650)
+        let app = windowInfo(frame: bounds)
+        let dock = windowInfo(frame: dockScreenFrames[0], layer: Int(CGWindowLevelForKey(.dockWindow)), owner: 84, ownerName: "Dock")
+        for bundle in [nil, "test.overlay"] as [String?] {
+            #expect(surfaceUnderDock([dock, app], hitProcessIdentifier: 42, dockBundle: bundle)?.ownerProcessIdentifier == 84)
+        }
+        for layer in [0, Int(CGWindowLevelForKey(.floatingWindow)), Int(CGWindowLevelForKey(.popUpMenuWindow))] {
+            let other = windowInfo(frame: dockScreenFrames[0], layer: layer, owner: 84)
+            #expect(surfaceUnderDock([other, app], hitProcessIdentifier: 42)?.ownerProcessIdentifier == 84)
+        }
+        let partial = windowInfo(frame: dockScreenFrames[0].insetBy(dx: 1, dy: 1),
+                                 layer: Int(CGWindowLevelForKey(.dockWindow)), owner: 84)
+        #expect(surfaceUnderDock([partial, app], hitProcessIdentifier: 42)?.ownerProcessIdentifier == 84)
+        #expect(surfaceUnderDock([dock, app], hitProcessIdentifier: 42, screenFrames: [])?.ownerProcessIdentifier == 84)
+    }
+
+    @Test
+    func bypassedDockSurfaceStillRequiresTheNextVisibleNormalWindowToOwnTheHit() {
+        let bounds = CGRect(x: 204, y: 150, width: 1104, height: 650)
+        let dock = windowInfo(frame: dockScreenFrames[0], layer: Int(CGWindowLevelForKey(.dockWindow)), owner: 84)
+        let app = windowInfo(frame: bounds)
+        let floating = windowInfo(frame: bounds, layer: Int(CGWindowLevelForKey(.floatingWindow)))
+        let foreign = windowInfo(frame: bounds, owner: 43)
+        for tail in [[], [floating, app], [foreign, app]] {
+            #expect(surfaceUnderDock([dock] + tail, hitProcessIdentifier: 42)?.ownerProcessIdentifier == 84)
+        }
+        #expect(surfaceUnderDock([dock, app], hitProcessIdentifier: 43)?.ownerProcessIdentifier == 84)
+    }
+
+    @Test
+    func bypassOnlyRemovesTheProvenDockSurfaceAndPreservesOtherDockOrApplicationLayers() {
+        let bounds = CGRect(x: 204, y: 150, width: 1104, height: 650)
+        let dock = windowInfo(frame: dockScreenFrames[0], layer: Int(CGWindowLevelForKey(.dockWindow)), owner: 84)
+        let app = windowInfo(frame: bounds)
+        let blockers = [
+            windowInfo(frame: bounds, layer: Int(CGWindowLevelForKey(.dockWindow)), owner: 84),
+            windowInfo(frame: dockScreenFrames[0], layer: Int(CGWindowLevelForKey(.floatingWindow)), owner: 84),
+            windowInfo(frame: dockScreenFrames[0], layer: Int(CGWindowLevelForKey(.dockWindow)), owner: 43),
+        ]
+        for blocker in blockers {
+            let surface = surfaceUnderDock([dock, blocker, app], hitProcessIdentifier: 42)
+            #expect(surface?.ownerProcessIdentifier == 84)
+            #expect(surface?.frame == dockScreenFrames[0])
+            #expect(surface?.layer == Int(CGWindowLevelForKey(.dockWindow)))
+        }
+    }
+
+    @Test
+    func dockBypassKeepsStrictAccessibilityGeometryAndAmbiguityChecks() {
+        let bounds = CGRect(x: 204, y: 150, width: 1104, height: 650)
+        let dock = windowInfo(frame: dockScreenFrames[0], layer: Int(CGWindowLevelForKey(.dockWindow)), owner: 84)
+        let surface = surfaceUnderDock([dock, windowInfo(frame: bounds)], hitProcessIdentifier: 42)
+        let window = CaptureWindow(title: "Conversation", frame: bounds)
+        for windows in [nil, [], [window, window], [CaptureWindow(title: "Other", frame: bounds.offsetBy(dx: 1, dy: 0))]] as [[CaptureWindow]?] {
+            #expect(captureWindow(surface: surface, hit: (42, nil), windows: windows) == .unavailable)
+        }
+    }
+
+    @Test
+    func fullScreenDockMatchingUsesQuartzCoordinatesForEveryDisplay() {
+        for screen in dockScreenFrames {
+            let quartzFrame = CGRect(x: screen.minX, y: dockScreenFrames[0].maxY - screen.maxY,
+                                     width: screen.width, height: screen.height)
+            let bounds = quartzFrame.insetBy(dx: 100, dy: 100)
+            let point = CGPoint(x: bounds.midX, y: bounds.midY)
+            let dock = windowInfo(frame: quartzFrame, layer: Int(CGWindowLevelForKey(.dockWindow)), owner: 84)
+            let surface = ContextNoteLocationReader.captureSurface(at: point,
+                windowInfo: [dock, windowInfo(frame: bounds)], screenFrames: dockScreenFrames,
+                hitProcessIdentifier: 42, bundleIdentifier: { $0 == 84 ? "com.apple.dock" : "test.chat" })
+            #expect(surface?.ownerProcessIdentifier == 42)
+            #expect(surface?.frame == bounds)
+        }
     }
 
     @Test
