@@ -2621,7 +2621,9 @@
 
 "位置便签" = "Catatan lokasi";
 "摇动鼠标记便签" = "Goyangkan mouse untuk mencatat";
-"快速左右摇动鼠标，在当前位置记录，返回时提醒" = "Goyangkan mouse ke kiri dan kanan dengan cepat untuk mencatat di sini dan diingatkan saat kembali";
+"按住快捷键并左右摇动鼠标，在当前位置记录，返回时提醒" = "Tahan pintasan dan goyangkan mouse ke kiri dan kanan untuk meninggalkan catatan di sini dan menerima pengingat saat kembali";
+"便签快捷键" = "Pintasan catatan";
+"默认按住 Command；可录制修饰键或组合键" = "Secara default, tahan Command; rekam tombol pengubah atau kombinasi tombol";
 "需要辅助功能权限来识别窗口和网页" = "Izin Aksesibilitas diperlukan untuk mengenali jendela dan halaman web";
 "无法识别当前位置，请检查辅助功能权限" = "Lokasi ini tidak dapat dikenali. Periksa izin Aksesibilitas.";
 "在这里记点什么…" = "Tulis catatan di sini…";

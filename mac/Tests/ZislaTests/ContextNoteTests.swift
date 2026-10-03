@@ -25,6 +25,8 @@ struct ContextNoteTests {
         var acceptsReminder = true
         var busy = false
         var buttons = 0
+        var modifiers: NSEvent.ModifierFlags = .command
+        var pressedKeys: Set<CGKeyCode> = [55]
         var nextShake = 0.0
 
         init(enabled: Bool = true, parentEnabled: Bool = true) throws {
@@ -52,6 +54,8 @@ struct ContextNoteTests {
                     saved.append(item)
                 },
                 pressedMouseButtons: { [unowned self] in buttons },
+                modifierFlags: { [unowned self] in modifiers },
+                keyIsPressed: { [unowned self] in pressedKeys.contains($0) },
                 windowPresenter: { [unowned self] _, _, _ in presented += 1 }
             )
         }
@@ -99,12 +103,12 @@ struct ContextNoteTests {
         let fixture = try Fixture()
         defer { fixture.close() }
         var throttle = PointerEdgeEventThrottle()
-        for index in 0...68 {
+        for index in 0...105 {
             let time = Double(index) / 125
             guard throttle.shouldEmit(eventType: .mouseMoved, timestamp: time) else { continue }
             let angle = Double.pi * time / 0.16
             fixture.controller.handlePointer(
-                at: CGPoint(x: 600 + 15 * cos(angle), y: 400 + 8 * sin(angle)),
+                at: CGPoint(x: 600 + 15 * cos(angle), y: 400 + 60 * sin(angle)),
                 interaction: .moved, timestamp: time
             )
         }
@@ -116,6 +120,141 @@ struct ContextNoteTests {
         fixture.controller.save()
         #expect(fixture.saved.first?.text == "Keep the current location")
         #expect(fixture.saved.first?.noteLocation == fixture.location)
+    }
+
+    @Test(arguments: [NSEvent.ModifierFlags(), .option, .control, .shift, [.command, .shift]])
+    func unmodifiedAndWrongShortcutShakesDoNotOpenNotes(modifiers: NSEvent.ModifierFlags) throws {
+        let fixture = try Fixture()
+        defer { fixture.close() }
+        fixture.modifiers = modifiers
+        fixture.shake()
+        #expect(fixture.presented == 0)
+        #expect(fixture.controller.draft == nil)
+        fixture.modifiers = .command
+        fixture.shake()
+        #expect(fixture.presented == 1)
+    }
+
+    @Test(arguments: [CGKeyCode(55), 54])
+    func defaultCommandAcceptsEitherSide(key: CGKeyCode) throws {
+        let fixture = try Fixture()
+        defer { fixture.close() }
+        fixture.pressedKeys = [key]
+        fixture.shake()
+        #expect(fixture.presented == 1)
+    }
+
+    @Test
+    func customShortcutRequiresItsKeyAndModifiersAndTakesEffectImmediately() throws {
+        let fixture = try Fixture()
+        defer { fixture.close() }
+        fixture.settings.settings.contextNoteHoldHotkey = .controlSpace
+        fixture.shake()
+        fixture.modifiers = .control
+        fixture.pressedKeys = [59]
+        fixture.shake()
+        #expect(fixture.presented == 0)
+        fixture.pressedKeys.insert(49)
+        fixture.shake()
+        #expect(fixture.presented == 1)
+    }
+
+    @Test
+    func customModifierRespectsTheRecordedSide() throws {
+        let fixture = try Fixture()
+        defer { fixture.close() }
+        fixture.settings.settings.contextNoteHoldHotkey = VoiceInputHotkeyPreset(
+            keyCode: 61, carbonModifiers: 0x0800, keyDisplayName: "R⌥", modifierSides: [.rightOption]
+        )
+        fixture.modifiers = .option
+        fixture.pressedKeys = [58]
+        fixture.shake()
+        #expect(fixture.presented == 0)
+        fixture.pressedKeys = [61]
+        fixture.shake()
+        #expect(fixture.presented == 1)
+    }
+
+    @Test
+    func customShortcutSurvivesSettingsReloadAndResetRestoresCommand() throws {
+        let fixture = try Fixture()
+        defer { fixture.close() }
+        fixture.settings.settings.contextNoteHoldHotkey = .controlSpace
+        fixture.settings.flushPendingChanges()
+        let restored = FeatureSettingsStore(defaults: fixture.defaults)
+        #expect(restored.settings.contextNoteHoldHotkey == .controlSpace)
+        restored.settings.contextNoteHoldHotkey = FeatureSettings.default.contextNoteHoldHotkey
+        restored.flushPendingChanges()
+        #expect(FeatureSettingsStore(defaults: fixture.defaults).settings.contextNoteHoldHotkey.carbonModifiers == 0x0100)
+    }
+
+    @Test(arguments: [NSEvent.EventType.flagsChanged, .keyUp, .keyDown])
+    func keyTransitionsWithoutMouseMovementDiscardIncompleteShakes(type: NSEvent.EventType) throws {
+        let fixture = try Fixture()
+        defer { fixture.close() }
+        for (index, x) in [0.0, 80, 0, 80].enumerated() {
+            fixture.controller.handlePointer(at: CGPoint(x: x, y: 0), interaction: .moved, timestamp: Double(index) * 0.1)
+        }
+        #expect(fixture.presented == 0)
+        fixture.controller.handleKeyboardEvent(type: type, isRepeat: false)
+        fixture.controller.handlePointer(at: .zero, interaction: .moved, timestamp: 0.4)
+        #expect(fixture.presented == 0)
+        fixture.nextShake = 1
+        fixture.shake()
+        #expect(fixture.presented == 1)
+    }
+
+    @Test
+    func releasingTheShortcutDuringMovementDiscardsProgressEvenWithoutAKeyEvent() throws {
+        let fixture = try Fixture()
+        defer { fixture.close() }
+        for (index, x) in [0.0, 80, 0, 80].enumerated() {
+            fixture.controller.handlePointer(at: CGPoint(x: x, y: 0), interaction: .moved, timestamp: Double(index) * 0.1)
+        }
+        fixture.modifiers = []
+        fixture.controller.handlePointer(at: .zero, interaction: .moved, timestamp: 0.35)
+        fixture.modifiers = .command
+        fixture.controller.handlePointer(at: .zero, interaction: .moved, timestamp: 0.4)
+        #expect(fixture.presented == 0)
+    }
+
+    @Test
+    func changingTheShortcutCannotCompleteThePreviousKeysGesture() throws {
+        let fixture = try Fixture()
+        defer { fixture.close() }
+        for (index, x) in [0.0, 80, 0, 80].enumerated() {
+            fixture.controller.handlePointer(at: CGPoint(x: x, y: 0), interaction: .moved, timestamp: Double(index) * 0.1)
+        }
+        fixture.settings.settings.contextNoteHoldHotkey = VoiceInputHotkeyPreset(
+            keyCode: 58, carbonModifiers: 0x0800, keyDisplayName: "Option"
+        )
+        fixture.modifiers = .option
+        fixture.pressedKeys = [58]
+        fixture.controller.handlePointer(at: .zero, interaction: .moved, timestamp: 0.4)
+        #expect(fixture.presented == 0)
+        fixture.nextShake = 1
+        fixture.shake()
+        #expect(fixture.presented == 1)
+    }
+
+    @Test
+    func holdingARepeatingCombinationStillAllowsShakingAndReleaseKeepsTheDraft() throws {
+        let fixture = try Fixture()
+        defer { fixture.close() }
+        fixture.settings.settings.contextNoteHoldHotkey = .controlSpace
+        fixture.modifiers = .control
+        fixture.pressedKeys = [49, 59]
+        for (index, x) in [0.0, 80, 0, 80, 0].enumerated() {
+            fixture.controller.handleKeyboardEvent(type: .keyDown, isRepeat: true)
+            fixture.controller.handlePointer(at: CGPoint(x: x, y: 0), interaction: .moved, timestamp: Double(index) * 0.1)
+        }
+        let draft = try #require(fixture.controller.draft)
+        draft.text = "Keep after releasing the shortcut"
+        fixture.modifiers = []
+        fixture.pressedKeys = []
+        fixture.controller.handlePointer(at: .zero, interaction: .moved, timestamp: 0.5)
+        #expect(fixture.controller.draft === draft)
+        #expect(draft.text == "Keep after releasing the shortcut")
     }
 
     @Test(arguments: [false, true], [false, true])
@@ -426,14 +565,42 @@ struct ContextNoteLocalizationTests {
             Range($0.range(at: 1), in: source).map { String(source[$0]) }
         }
         let reusedKeys: Set<String> = ["复制", "关闭", "保存"]
-        let indirectKeys: Set<String> = ["摇动鼠标记便签", "快速左右摇动鼠标，在当前位置记录，返回时提醒", "需要辅助功能权限来识别窗口和网页", "无法识别当前位置，请检查辅助功能权限", "查看便签", "前往记录位置", "无法前往记录位置，窗口或显示器可能已关闭", "记录便签", "已保存便签"]
+        let indirectKeys: Set<String> = ["摇动鼠标记便签", "按住快捷键并左右摇动鼠标，在当前位置记录，返回时提醒", "便签快捷键", "默认按住 Command；可录制修饰键或组合键", "需要辅助功能权限来识别窗口和网页", "无法识别当前位置，请检查辅助功能权限", "查看便签", "前往记录位置", "无法前往记录位置，窗口或显示器可能已关闭", "记录便签", "已保存便签"]
         let keys = Set(directKeys).subtracting(reusedKeys).union(indirectKeys)
-        #expect(keys.count == 17)
+        #expect(keys.count == 19)
         for key in keys {
             let value = try #require(table[key], "Missing \(language.rawValue): \(key)")
             #expect(!value.isEmpty)
             #expect(AppLocalization.string(key, language: language) == value)
             if language != .simplifiedChinese && language != .traditionalChinese { #expect(value != key) }
         }
+    }
+}
+
+struct ContextNoteHoldShortcutTests {
+    @Test
+    func recordedSidesAndPrimaryKeyMustAllBeHeld() {
+        let hotkey = VoiceInputHotkeyPreset(keyCode: 49, carbonModifiers: 0x1800, keyDisplayName: "Space",
+                                           modifierSides: [.leftControl, .rightOption])
+        for (keys, expected) in [([49, 59, 61], true), ([49, 62, 61], false), ([59, 61], false), ([49, 59, 61, 58], false)] {
+            #expect(ContextNoteHoldShortcut.isPressed(hotkey, modifiers: [.control, .option]) { keys.contains(Int($0)) } == expected)
+        }
+        #expect(!ContextNoteHoldShortcut.isPressed(hotkey, modifiers: .control) { [49, 59, 61].contains(Int($0)) })
+    }
+
+    @Test
+    func malformedKeyCodesAndUnheldBareKeysAreRejected() {
+        for code in [UInt32(65_536), UInt32.max] {
+            let hotkey = VoiceInputHotkeyPreset(keyCode: code, carbonModifiers: 0, keyDisplayName: "Invalid")
+            #expect(!ContextNoteHoldShortcut.isPressed(hotkey, modifiers: []) { _ in
+                Issue.record("An invalid key must never reach the system key-state query")
+                return true
+            })
+        }
+        let bareKey = VoiceInputHotkeyPreset(keyCode: 0, carbonModifiers: 0, keyDisplayName: "A")
+        #expect(!ContextNoteHoldShortcut.isPressed(bareKey, modifiers: []) { _ in false })
+        #expect(ContextNoteHoldShortcut.isPressed(bareKey, modifiers: []) { $0 == 0 })
+        let invalidModifier = VoiceInputHotkeyPreset(keyCode: 55, carbonModifiers: 0, keyDisplayName: "Command")
+        #expect(!ContextNoteHoldShortcut.isPressed(invalidModifier, modifiers: []) { _ in true })
     }
 }

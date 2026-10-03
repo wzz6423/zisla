@@ -54,6 +54,22 @@ enum ContextNoteLayout {
     }
 }
 
+enum ContextNoteHoldShortcut {
+    static func isPressed(_ hotkey: VoiceInputHotkeyPreset, modifiers: NSEvent.ModifierFlags,
+                          keyIsPressed: (CGKeyCode) -> Bool) -> Bool {
+        guard GlobalHotkeyManager.carbonModifiers(from: modifiers) == hotkey.carbonModifiers else { return false }
+        if let requiredSides = hotkey.modifierSides {
+            let pressedSides = Set(VoiceInputModifier.allCases.filter { keyIsPressed(CGKeyCode($0.keyCode)) })
+            guard pressedSides == requiredSides else { return false }
+        }
+        if let modifier = VoiceInputModifier(keyCode: hotkey.keyCode) {
+            return hotkey.carbonModifiers == modifier.carbonModifier
+        }
+        guard let keyCode = CGKeyCode(exactly: hotkey.keyCode) else { return false }
+        return keyIsPressed(keyCode)
+    }
+}
+
 @MainActor
 final class ContextNoteController {
     private let settingsStore: FeatureSettingsStore
@@ -66,12 +82,15 @@ final class ContextNoteController {
     private let onCaptureFailure: () -> Void
     private let onSaved: (FileShelfItem) -> Void
     private let pressedMouseButtons: () -> Int
+    private let modifierFlags: () -> NSEvent.ModifierFlags
+    private let keyIsPressed: (CGKeyCode) -> Bool
     private let windowPresenter: (ContextNoteController, CGPoint, Bool) -> Void
     private var subscription: AnyCancellable?
     private var pointerMonitor: PointerEdgeMonitor?
     private var timer: Timer?
     private var observers: [NSObjectProtocol] = []
     private var detector = ContextNoteShakeDetector()
+    private var holdHotkey: VoiceInputHotkeyPreset
     private var visits = ContextNoteVisitTracker()
     private var shelfLocation: ContextNoteObservation = .unavailable
     private var window: IslandPanel?
@@ -96,6 +115,8 @@ final class ContextNoteController {
          onCaptureFailure: @escaping () -> Void,
          onSaved: @escaping (FileShelfItem) -> Void,
          pressedMouseButtons: @escaping () -> Int = { NSEvent.pressedMouseButtons },
+         modifierFlags: @escaping () -> NSEvent.ModifierFlags = { NSEvent.modifierFlags },
+         keyIsPressed: @escaping (CGKeyCode) -> Bool = { CGEventSource.keyState(.combinedSessionState, key: $0) },
          windowPresenter: @escaping (ContextNoteController, CGPoint, Bool) -> Void = { $0.presentWindow(at: $1, focus: $2) }) {
         self.settingsStore = settingsStore
         self.languageStore = languageStore
@@ -107,6 +128,9 @@ final class ContextNoteController {
         self.onCaptureFailure = onCaptureFailure
         self.onSaved = onSaved
         self.pressedMouseButtons = pressedMouseButtons
+        self.modifierFlags = modifierFlags
+        self.keyIsPressed = keyIsPressed
+        holdHotkey = settingsStore.settings.contextNoteHoldHotkey
         self.windowPresenter = windowPresenter
         enabled = settingsStore.settings.clipboardAssistantEnabled && settingsStore.settings.contextNotesEnabled
     }
@@ -169,7 +193,9 @@ final class ContextNoteController {
             return
         }
         guard isStarted, pointerMonitor == nil else { return }
-        let monitor = PointerEdgeMonitor { [weak self] point, interaction in
+        let monitor = PointerEdgeMonitor(onKeyboardEvent: { [weak self] type, isRepeat in
+            self?.handleKeyboardEvent(type: type, isRepeat: isRepeat)
+        }) { [weak self] point, interaction in
             self?.handlePointer(at: point, interaction: interaction)
         }
         pointerMonitor = monitor
@@ -187,6 +213,15 @@ final class ContextNoteController {
                        timestamp: TimeInterval = ProcessInfo.processInfo.systemUptime) {
         guard enabled, !isSuspended, draft == nil, canInteract() else { detector.reset(); return }
         guard interaction == .moved, pressedMouseButtons() == 0 else { detector.reset(); return }
+        let configuredHotkey = settingsStore.settings.contextNoteHoldHotkey
+        if holdHotkey != configuredHotkey {
+            holdHotkey = configuredHotkey
+            detector.reset()
+        }
+        guard ContextNoteHoldShortcut.isPressed(holdHotkey, modifiers: modifierFlags(), keyIsPressed: keyIsPressed) else {
+            detector.reset()
+            return
+        }
         guard detector.record(point, at: timestamp) else { return }
         detector.reset()
         let observation = captureLocation(point)
@@ -195,6 +230,12 @@ final class ContextNoteController {
         anchor = point
         draft = ContextNoteDraft(location: location)
         windowPresenter(self, point, true)
+    }
+
+    func handleKeyboardEvent(type: NSEvent.EventType, isRepeat: Bool) {
+        // A release and repress without mouse movement must not join two separate gestures.
+        if type == .keyDown && isRepeat { return }
+        detector.reset()
     }
 
     func save(at date: Date = Date()) {

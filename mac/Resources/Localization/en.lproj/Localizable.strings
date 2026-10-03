@@ -2620,7 +2620,9 @@
 
 "位置便签" = "Location Note";
 "摇动鼠标记便签" = "Shake to take a note";
-"快速左右摇动鼠标，在当前位置记录，返回时提醒" = "Shake the pointer left and right to leave a note here and be reminded when you return";
+"按住快捷键并左右摇动鼠标，在当前位置记录，返回时提醒" = "Hold the shortcut and shake the mouse left and right to leave a note here and get reminded when you return";
+"便签快捷键" = "Note Shortcut";
+"默认按住 Command；可录制修饰键或组合键" = "Hold Command by default; record a modifier key or key combination";
 "需要辅助功能权限来识别窗口和网页" = "Accessibility access is needed to identify windows and web pages";
 "无法识别当前位置，请检查辅助功能权限" = "Cannot identify this location. Check Accessibility access.";
 "在这里记点什么…" = "Leave a note here…";

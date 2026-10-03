@@ -753,7 +753,7 @@ struct SettingsView: View {
                     settingRow(
                         symbol: "note.text",
                         title: "摇动鼠标记便签",
-                        detail: "快速左右摇动鼠标，在当前位置记录，返回时提醒",
+                        detail: "按住快捷键并左右摇动鼠标，在当前位置记录，返回时提醒",
                         isNested: true
                     ) {
                         Toggle("", isOn: Binding(
@@ -766,6 +766,26 @@ struct SettingsView: View {
                         .labelsHidden()
                         .toggleStyle(.switch)
                         .controlSize(.small)
+                    }
+                    if model.settingsStore.settings.contextNotesEnabled {
+                        rowDivider
+                        settingRow(symbol: "keyboard", title: "便签快捷键",
+                                   detail: "默认按住 Command；可录制修饰键或组合键", isNested: true) {
+                            HStack(spacing: 4) {
+                                HotkeyRecorder(hotkey: Binding(
+                                    get: { model.settingsStore.settings.contextNoteHoldHotkey },
+                                    set: { hotkey in
+                                        if let hotkey { model.settingsStore.settings.contextNoteHoldHotkey = hotkey }
+                                    }
+                                ))
+                                Button {
+                                    model.settingsStore.settings.contextNoteHoldHotkey = FeatureSettings.default.contextNoteHoldHotkey
+                                } label: {
+                                    AppLocalizedText("重置")
+                                }
+                                .controlSize(.small)
+                            }
+                        }
                     }
                     if model.settingsStore.settings.contextNotesEnabled && !model.assistantAccessibilityGranted {
                         rowDivider

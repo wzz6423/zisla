@@ -2621,7 +2621,9 @@
 
 "位置便签" = "Locatienotitie";
 "摇动鼠标记便签" = "Schud de muis voor een notitie";
-"快速左右摇动鼠标，在当前位置记录，返回时提醒" = "Schud de muis snel heen en weer om hier een notitie achter te laten en bij terugkeer een herinnering te krijgen";
+"按住快捷键并左右摇动鼠标，在当前位置记录，返回时提醒" = "Houd de sneltoets ingedrukt en schud de muis heen en weer om hier een notitie achter te laten en bij terugkomst een herinnering te krijgen";
+"便签快捷键" = "Sneltoets voor notities";
+"默认按住 Command；可录制修饰键或组合键" = "Houd standaard Command ingedrukt; leg een modificatietoets of toetsencombinatie vast";
 "需要辅助功能权限来识别窗口和网页" = "Toegang tot Toegankelijkheid is nodig om vensters en webpagina’s te herkennen";
 "无法识别当前位置，请检查辅助功能权限" = "Deze locatie kan niet worden herkend. Controleer de toegang tot Toegankelijkheid.";
 "在这里记点什么…" = "Laat hier een notitie achter…";

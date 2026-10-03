@@ -2617,7 +2617,9 @@
 
 "位置便签" = "Note de contexte";
 "摇动鼠标记便签" = "Secouer la souris pour noter";
-"快速左右摇动鼠标，在当前位置记录，返回时提醒" = "Secouez rapidement la souris de gauche à droite pour noter ici et recevoir un rappel à votre retour";
+"按住快捷键并左右摇动鼠标，在当前位置记录，返回时提醒" = "Maintenez le raccourci et secouez la souris de gauche à droite pour laisser une note ici et recevoir un rappel à votre retour";
+"便签快捷键" = "Raccourci des notes";
+"默认按住 Command；可录制修饰键或组合键" = "Maintenez Command par défaut ; enregistrez une touche de modification ou une combinaison";
 "需要辅助功能权限来识别窗口和网页" = "L’accès à Accessibilité est nécessaire pour identifier les fenêtres et les pages web";
 "无法识别当前位置，请检查辅助功能权限" = "Impossible d’identifier cet emplacement. Vérifiez l’accès à Accessibilité.";
 "在这里记点什么…" = "Laisser une note ici…";

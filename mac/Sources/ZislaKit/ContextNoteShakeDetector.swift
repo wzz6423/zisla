@@ -2,15 +2,7 @@ import CoreGraphics
 import Foundation
 
 public struct ContextNoteShakeDetector {
-    private var extreme: CGFloat?
-    private var direction: CGFloat = 0
-    private var reversals = 0
-    private var minimumX: CGFloat = 0
-    private var maximumX: CGFloat = 0
-    private var minimumY: CGFloat = 0
-    private var maximumY: CGFloat = 0
-    private var startedAt: TimeInterval?
-    private var lastTurnAt: TimeInterval?
+    private var detector = DragShakeDetector()
     private var lastTimestamp: TimeInterval?
     private var lastTriggeredAt: TimeInterval?
 
@@ -36,37 +28,9 @@ public struct ContextNoteShakeDetector {
             reset()
             return false
         }
-        if let startedAt, timestamp - startedAt > 1 { reset() }
-        if let lastTurnAt, timestamp - lastTurnAt > 0.35 { reset() }
         lastTimestamp = timestamp
-
-        guard let extreme else {
-            self.extreme = point.x
-            minimumX = point.x
-            maximumX = point.x
-            minimumY = point.y
-            maximumY = point.y
-            startedAt = timestamp
-            lastTurnAt = timestamp
-            return false
-        }
-        minimumX = min(minimumX, point.x)
-        maximumX = max(maximumX, point.x)
-        minimumY = min(minimumY, point.y)
-        maximumY = max(maximumY, point.y)
-
-        let delta = point.x - extreme
-        if direction != 0, delta * direction >= 0 {
-            self.extreme = point.x
-        } else if abs(delta) >= 20 {
-            if direction != 0 { reversals += 1 }
-            direction = delta > 0 ? 1 : -1
-            self.extreme = point.x
-            lastTurnAt = timestamp
-        }
-        guard reversals >= 2 else { return false }
-        // Evaluate the whole gesture so the curved ends of a horizontal shake do not reset it.
-        guard maximumY - minimumY <= (maximumX - minimumX) * 0.8 else { return false }
+        // Match the original horizontal gesture; the held shortcut prevents accidental activation.
+        guard detector.record(CGPoint(x: point.x, y: 0), at: timestamp) else { return false }
         lastTriggeredAt = timestamp
         reset()
         return true

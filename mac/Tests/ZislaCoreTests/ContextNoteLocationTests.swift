@@ -48,4 +48,23 @@ struct ContextNoteLocationTests {
             #expect(try JSONDecoder().decode(FeatureSettings.self, from: JSONEncoder().encode(settings)).contextNotesEnabled == enabled)
         }
     }
+
+    @Test(arguments: ["{}", "{\"contextNotesEnabled\":true}", "{\"contextNoteHoldHotkey\":null}"])
+    func oldPreferencesDefaultToHoldingCommand(json: String) throws {
+        let settings = try JSONDecoder().decode(FeatureSettings.self, from: Data(json.utf8))
+        #expect(settings.contextNoteHoldHotkey == FeatureSettings.default.contextNoteHoldHotkey)
+        #expect(settings.contextNoteHoldHotkey.carbonModifiers == 0x0100)
+        #expect(settings.contextNoteHoldHotkey.keyCode == 55)
+        #expect(settings.contextNoteHoldHotkey.modifierSides == nil)
+    }
+
+    @Test(arguments: [VoiceInputHotkeyPreset.controlSpace,
+                     VoiceInputHotkeyPreset(keyCode: 61, carbonModifiers: 0x0800, keyDisplayName: "R⌥", modifierSides: [.rightOption])])
+    func customNoteHotkeysRoundTrip(hotkey: VoiceInputHotkeyPreset) throws {
+        var settings = FeatureSettings(contextNoteHoldHotkey: hotkey)
+        settings.contextNotesEnabled = true
+        let restored = try JSONDecoder().decode(FeatureSettings.self, from: JSONEncoder().encode(settings))
+        #expect(restored.contextNoteHoldHotkey == hotkey)
+        #expect(restored.contextNotesEnabled)
+    }
 }

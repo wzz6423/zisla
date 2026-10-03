@@ -2621,7 +2621,9 @@
 
 "位置便签" = "Nota del luogo";
 "摇动鼠标记便签" = "Scuoti il mouse per annotare";
-"快速左右摇动鼠标，在当前位置记录，返回时提醒" = "Scuoti rapidamente il mouse a destra e sinistra per lasciare una nota qui e ricevere un promemoria al ritorno";
+"按住快捷键并左右摇动鼠标，在当前位置记录，返回时提醒" = "Tieni premuta la scorciatoia e scuoti il mouse a sinistra e a destra per lasciare una nota qui e ricevere un promemoria al ritorno";
+"便签快捷键" = "Scorciatoia per le note";
+"默认按住 Command；可录制修饰键或组合键" = "Per impostazione predefinita, tieni premuto Command; puoi registrare un modificatore o una combinazione di tasti";
 "需要辅助功能权限来识别窗口和网页" = "È necessario l’accesso ad Accessibilità per identificare finestre e pagine web";
 "无法识别当前位置，请检查辅助功能权限" = "Impossibile identificare questo luogo. Controlla l’accesso ad Accessibilità.";
 "在这里记点什么…" = "Lascia una nota qui…";

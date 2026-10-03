@@ -2621,7 +2621,9 @@
 
 "位置便签" = "Konum notu";
 "摇动鼠标记便签" = "Not almak için fareyi sallayın";
-"快速左右摇动鼠标，在当前位置记录，返回时提醒" = "Buraya not bırakmak ve geri döndüğünüzde hatırlatılmak için fareyi hızlıca sağa sola sallayın";
+"按住快捷键并左右摇动鼠标，在当前位置记录，返回时提醒" = "Buraya not bırakmak ve geri döndüğünüzde hatırlatılmak için kısayolu basılı tutup fareyi sağa sola sallayın";
+"便签快捷键" = "Not kısayolu";
+"默认按住 Command；可录制修饰键或组合键" = "Varsayılan olarak Command tuşunu basılı tutun; bir değiştirici tuş veya tuş birleşimi kaydedebilirsiniz";
 "需要辅助功能权限来识别窗口和网页" = "Pencereleri ve web sayfalarını tanımak için Erişilebilirlik izni gerekir";
 "无法识别当前位置，请检查辅助功能权限" = "Bu konum tanınamadı. Erişilebilirlik iznini kontrol edin.";
 "在这里记点什么…" = "Buraya bir not bırakın…";

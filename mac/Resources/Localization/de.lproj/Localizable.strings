@@ -2622,7 +2622,9 @@
 
 "位置便签" = "Ortsnotiz";
 "摇动鼠标记便签" = "Maus schütteln für eine Notiz";
-"快速左右摇动鼠标，在当前位置记录，返回时提醒" = "Bewegen Sie die Maus schnell nach links und rechts, um hier eine Notiz zu hinterlassen und bei der Rückkehr erinnert zu werden";
+"按住快捷键并左右摇动鼠标，在当前位置记录，返回时提醒" = "Kurzbefehl gedrückt halten und die Maus nach links und rechts schütteln, um hier eine Notiz zu hinterlassen und bei der Rückkehr erinnert zu werden";
+"便签快捷键" = "Notiz-Kurzbefehl";
+"默认按住 Command；可录制修饰键或组合键" = "Standardmäßig Command gedrückt halten; eine Modifikatortaste oder Tastenkombination aufzeichnen";
 "需要辅助功能权限来识别窗口和网页" = "Zugriff auf Bedienungshilfen ist nötig, um Fenster und Webseiten zu erkennen";
 "无法识别当前位置，请检查辅助功能权限" = "Dieser Ort konnte nicht erkannt werden. Prüfen Sie den Zugriff auf Bedienungshilfen.";
 "在这里记点什么…" = "Hier eine Notiz hinterlassen…";

@@ -5,11 +5,11 @@ import Testing
 @testable import ZislaKit
 
 struct ContextNoteShakeDetectorTests {
-    @Test(arguments: [20.0, 40.0, 80.0])
-    func requiresTwoClearReversals(width: Double) {
+    @Test(arguments: [22.0, 40.0, 80.0])
+    func requiresThreeOriginalReversals(width: Double) {
         var detector = ContextNoteShakeDetector()
         let results = Self.samples(width: width).map { detector.record($0.point, at: $0.time) }
-        #expect(results == [false, false, false, true])
+        #expect(results == [false, false, false, false, true])
     }
 
     @Test(arguments: [1, 3, 12, 48])
@@ -45,7 +45,7 @@ struct ContextNoteShakeDetectorTests {
             var detector = ContextNoteShakeDetector()
             var throttle = PointerEdgeEventThrottle()
             var triggers = 0
-            for index in 0...Int(sampleRate * 0.7) {
+            for index in 0...Int(sampleRate * 0.85) {
                 let time = Double(index) / sampleRate
                 guard throttle.shouldEmit(eventType: .mouseMoved, timestamp: time) else { continue }
                 let angle = Double.pi * (time / 0.16 + phase)
@@ -57,12 +57,12 @@ struct ContextNoteShakeDetectorTests {
     }
 
     @Test(arguments: [60.0, 125.0, 1_000.0], [30.0, 40.0])
-    func aBriefGentleShakeSurvivesPointerMoveCoalescing(sampleRate: Double, width: Double) {
+    func originalSmallShakeSurvivesPointerMoveCoalescing(sampleRate: Double, width: Double) {
         for phase in [0.0, 0.3, 0.7] {
             var detector = ContextNoteShakeDetector()
             var throttle = PointerEdgeEventThrottle()
             var triggers = 0
-            for index in 0...Int(sampleRate * 0.55) {
+            for index in 0...Int(sampleRate * 0.85) {
                 let time = Double(index) / sampleRate
                 guard throttle.shouldEmit(eventType: .mouseMoved, timestamp: time) else { continue }
                 let angle = Double.pi * (time / 0.16 + phase)
@@ -74,18 +74,32 @@ struct ContextNoteShakeDetectorTests {
     }
 
     @Test
-    func aRelaxedContinuousShakeDoesNotRequireRushedTurns() {
+    func originalSensitivityAllowsLargeVerticalDriftDuringHorizontalShaking() {
         var detector = ContextNoteShakeDetector()
         var throttle = PointerEdgeEventThrottle()
         var triggers = 0
-        for sample in Self.samples(legDuration: 0.28, samplesPerLeg: 12) {
-            guard throttle.shouldEmit(eventType: .mouseMoved, timestamp: sample.time) else { continue }
-            if detector.record(sample.point, at: sample.time) { triggers += 1 }
+        for index in 0...125 {
+            let time = Double(index) / 125
+            guard throttle.shouldEmit(eventType: .mouseMoved, timestamp: time) else { continue }
+            let angle = Double.pi * time / 0.14
+            let point = CGPoint(x: 600 + 30 * cos(angle), y: 400 + 90 * sin(angle))
+            if detector.record(point, at: time) { triggers += 1 }
         }
         #expect(triggers == 1)
     }
 
-    @Test(arguments: [8.0, 18.0, 19.0])
+    @Test
+    func onlyRecentReversalsCountAfterASlowApproach() {
+        var detector = ContextNoteShakeDetector()
+        for index in 0...12 {
+            #expect(detector.record(CGPoint(x: Double(index) * 10, y: 0), at: Double(index) * 0.1) == false)
+        }
+        #expect(detector.record(.zero, at: 1.3) == false)
+        #expect(detector.record(CGPoint(x: 80, y: 0), at: 1.4) == false)
+        #expect(detector.record(.zero, at: 1.5) == true)
+    }
+
+    @Test(arguments: [8.0, 18.0, 21.0])
     func smallJitterNeverAccumulates(width: Double) {
         var detector = ContextNoteShakeDetector()
         for sample in Self.samples(width: width, legs: 30, legDuration: 0.05, samplesPerLeg: 8) {
@@ -104,12 +118,11 @@ struct ContextNoteShakeDetectorTests {
         }
     }
 
-    @Test(arguments: [CGPoint(x: 0, y: 1), CGPoint(x: 1, y: 1), CGPoint(x: 1, y: 0.9)],
-          [CGPoint.zero, CGPoint(x: 600, y: 400), CGPoint(x: -1400, y: -200)])
-    func verticalAndSteepDiagonalShakesDoNotTrigger(axis: CGPoint, origin: CGPoint) {
+    @Test(arguments: [CGPoint.zero, CGPoint(x: 600, y: 400), CGPoint(x: -1400, y: -200)])
+    func verticalMovementAloneDoesNotTrigger(origin: CGPoint) {
         var detector = ContextNoteShakeDetector()
         for sample in Self.samples(legs: 16, samplesPerLeg: 8) {
-            let point = CGPoint(x: origin.x + sample.point.x * axis.x, y: origin.y + sample.point.x * axis.y)
+            let point = CGPoint(x: origin.x, y: origin.y + sample.point.x)
             #expect(detector.record(point, at: sample.time) == false)
         }
     }
@@ -128,7 +141,7 @@ struct ContextNoteShakeDetectorTests {
         let samples: [(Double, Double)] = [
             (0, 0), (0.08, 80), (0.16, 0),
             (0.22, 0), (0.28, 0), (0.34, 0), (0.40, 0),
-            (0.46, 0), (0.52, 0), (0.56, 80), (0.64, 0),
+            (0.60, 0), (0.80, 0), (0.90, 80), (1.0, 0),
         ]
         for (time, x) in samples {
             #expect(detector.record(CGPoint(x: x, y: 0), at: time) == false)
@@ -209,7 +222,7 @@ struct ContextNoteShakeDetectorTests {
     private static func samples(
         width: Double = 80,
         start: TimeInterval = 0,
-        legs: Int = 3,
+        legs: Int = 4,
         legDuration: TimeInterval = 0.1,
         samplesPerLeg: Int = 1
     ) -> [(point: CGPoint, time: TimeInterval)] {
