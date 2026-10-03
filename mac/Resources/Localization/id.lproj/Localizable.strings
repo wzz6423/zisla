@@ -2619,6 +2619,7 @@
 "晃动唤出中转窗口" = "Goyangkan untuk menampilkan jendela rak";
 "拖拽文件时晃动鼠标，在旁边显示中转窗口" = "Goyangkan mouse saat menyeret file untuk menampilkan jendela rak di samping penunjuk";
 
+"便签" = "Catatan";
 "位置便签" = "Catatan lokasi";
 "摇动鼠标记便签" = "Goyangkan mouse untuk mencatat";
 "按住快捷键并左右摇动鼠标，在当前位置记录，返回时提醒" = "Tahan pintasan dan goyangkan mouse ke kiri dan kanan untuk meninggalkan catatan di sini dan menerima pengingat saat kembali";

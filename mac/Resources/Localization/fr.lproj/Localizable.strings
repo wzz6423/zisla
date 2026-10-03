@@ -2615,6 +2615,7 @@
 "晃动唤出中转窗口" = "Secouer pour afficher l’étagère";
 "拖拽文件时晃动鼠标，在旁边显示中转窗口" = "Secouez la souris en faisant glisser des fichiers pour afficher une fenêtre d’étagère à côté du pointeur";
 
+"便签" = "Notes";
 "位置便签" = "Note de contexte";
 "摇动鼠标记便签" = "Secouer la souris pour noter";
 "按住快捷键并左右摇动鼠标，在当前位置记录，返回时提醒" = "Maintenez le raccourci et secouez la souris de gauche à droite pour laisser une note ici et recevoir un rappel à votre retour";

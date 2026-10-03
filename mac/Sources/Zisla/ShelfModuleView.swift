@@ -7,7 +7,6 @@ import SwiftUI
 struct ShelfModuleView: View {
     @ObservedObject var model: AppModel
     @ObservedObject private var noteEditor: ContextNoteShelfEditor
-    @Environment(\.layoutDirection) private var layoutDirection
     @StateObject private var dropState = FileDropState()
     @State private var searchText = ""
 
@@ -155,25 +154,22 @@ struct ShelfModuleView: View {
                         )
                     } else {
                         ScrollView(.vertical) {
-                            ShelfGridLayout(layoutDirection: layoutDirection) {
-                                ForEach(filteredItems) { item in
-                                    ShelfItemView(
-                                        item: item,
-                                        onOpen: {
-                                            if item.noteLocation != nil { noteEditor.open(item) }
-                                            else { NSWorkspace.shared.open(item.linkURL ?? item.url) }
-                                        },
-                                        onCopy: { model.copyShelfItems([item]) },
-                                        onSendToQuickNote: {
-                                            model.receiveQuickNoteTransferItems([TransferDropItem(payload: item.payload)])
-                                        },
-                                        onRemove: {
-                                            model.shelf.remove(id: item.id)
-                                            if !model.shelf.items.contains(where: { $0.id == item.id }) { noteEditor.removed(item.id) }
-                                        }
-                                    )
-                                    .layoutValue(key: ShelfColumnSpan.self, value: item.noteLocation == nil ? 1 : 2)
-                                }
+                            ShelfItemCollection(items: filteredItems, category: model.selectedShelfCategory) { item in
+                                ShelfItemView(
+                                    item: item,
+                                    onOpen: {
+                                        if item.noteLocation != nil { noteEditor.open(item) }
+                                        else { NSWorkspace.shared.open(item.linkURL ?? item.url) }
+                                    },
+                                    onCopy: { model.copyShelfItems([item]) },
+                                    onSendToQuickNote: {
+                                        model.receiveQuickNoteTransferItems([TransferDropItem(payload: item.payload)])
+                                    },
+                                    onRemove: {
+                                        model.shelf.remove(id: item.id)
+                                        if !model.shelf.items.contains(where: { $0.id == item.id }) { noteEditor.removed(item.id) }
+                                    }
+                                )
                             }
                             .padding(.leading, 4)
                             .padding(.trailing, 8)
@@ -266,11 +262,15 @@ struct ShelfModuleView: View {
     }
 
     private var filteredItems: [FileShelfItem] {
-        var items = model.shelf.items
+        Self.filteredItems(in: model.shelf.items, category: model.selectedShelfCategory, searchText: searchText)
+    }
+
+    static func filteredItems(in source: [FileShelfItem], category: FileShelfCategory, searchText: String) -> [FileShelfItem] {
+        var items = source
 
         // Apply the category filter.
-        if model.selectedShelfCategory != .all {
-            items = items.filter { $0.category == model.selectedShelfCategory }
+        if category != .all {
+            items = items.filter { $0.category == category }
         }
 
         // Apply the search filter.
@@ -347,6 +347,74 @@ struct ShelfModuleView: View {
 
     private func moduleStroke(targeted: Bool) -> Color {
         targeted ? .accentColor : .strokeCard
+    }
+}
+
+struct ShelfNoteApplicationGroup: Identifiable {
+    enum ID: Hashable {
+        case application(String)
+        case desktop
+    }
+
+    let id: ID
+    var items: [FileShelfItem]
+
+    var title: String {
+        switch id {
+        case .application(let name): name
+        case .desktop: AppLocalization.text("桌面")
+        }
+    }
+
+    static func groups(in items: [FileShelfItem]) -> [Self] {
+        var groups: [Self] = []
+        for item in items {
+            guard let location = item.noteLocation else { continue }
+            let id: ID
+            switch location {
+            case .webPage(_, _, let name), .window(_, let name, _): id = .application(name)
+            case .desktop: id = .desktop
+            }
+            if let index = groups.firstIndex(where: { $0.id == id }) {
+                groups[index].items.append(item)
+            } else {
+                groups.append(Self(id: id, items: [item]))
+            }
+        }
+        return groups
+    }
+}
+
+struct ShelfItemCollection<Content: View>: View {
+    let items: [FileShelfItem]
+    let category: FileShelfCategory
+    @ViewBuilder var content: (FileShelfItem) -> Content
+
+    var body: some View {
+        if category == .note {
+            VStack(alignment: .leading, spacing: 10) {
+                ForEach(ShelfNoteApplicationGroup.groups(in: items)) { group in
+                    VStack(alignment: .leading, spacing: 6) {
+                        Text(group.title)
+                            .font(.system(size: 10, weight: .medium))
+                            .foregroundStyle(.secondary)
+                            .lineLimit(1)
+                        grid(group.items)
+                    }
+                }
+            }
+        } else {
+            grid(items)
+        }
+    }
+
+    private func grid(_ items: [FileShelfItem]) -> some View {
+        ShelfGridLayout() {
+            ForEach(items) { item in
+                content(item)
+                    .layoutValue(key: ShelfColumnSpan.self, value: item.noteLocation == nil ? 1 : 2)
+            }
+        }
     }
 }
 

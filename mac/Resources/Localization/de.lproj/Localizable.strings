@@ -2620,6 +2620,7 @@
 "晃动唤出中转窗口" = "Ablagefenster durch Schütteln öffnen";
 "拖拽文件时晃动鼠标，在旁边显示中转窗口" = "Beim Ziehen von Dateien die Maus schütteln, um ein Ablagefenster neben dem Zeiger anzuzeigen";
 
+"便签" = "Notizen";
 "位置便签" = "Ortsnotiz";
 "摇动鼠标记便签" = "Maus schütteln für eine Notiz";
 "按住快捷键并左右摇动鼠标，在当前位置记录，返回时提醒" = "Kurzbefehl gedrückt halten und die Maus nach links und rechts schütteln, um hier eine Notiz zu hinterlassen und bei der Rückkehr erinnert zu werden";

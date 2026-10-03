@@ -2619,6 +2619,7 @@
 "晃动唤出中转窗口" = "Lắc để mở cửa sổ kệ tạm";
 "拖拽文件时晃动鼠标，在旁边显示中转窗口" = "Lắc chuột khi kéo tệp để hiển thị cửa sổ kệ tạm bên cạnh con trỏ";
 
+"便签" = "Ghi chú";
 "位置便签" = "Ghi chú theo vị trí";
 "摇动鼠标记便签" = "Lắc chuột để ghi chú";
 "按住快捷键并左右摇动鼠标，在当前位置记录，返回时提醒" = "Giữ phím tắt và lắc chuột sang trái, sang phải để ghi chú tại đây và nhận nhắc nhở khi quay lại";
