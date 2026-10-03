@@ -1522,6 +1522,19 @@ final class AppModel: ObservableObject {
     transientMessage = success ? AppLocalization.text("已复制到剪贴板") : AppLocalization.text("无法写入剪贴板")
   }
 
+  static func contextNoteCopyAction(id: UUID, in shelf: FileShelfStore) -> ClipboardAssistantAction? {
+    guard let text = shelf.items.first(where: { $0.id == id && $0.noteLocation != nil })?.text else { return nil }
+    return .copyText(text)
+  }
+
+  static func deleteContextNote(id: UUID, from shelf: FileShelfStore, editor: ContextNoteShelfEditor) -> Bool {
+    guard shelf.items.contains(where: { $0.id == id && $0.noteLocation != nil }) else { return false }
+    shelf.remove(id: id)
+    guard !shelf.items.contains(where: { $0.id == id }) else { return false }
+    editor.removed(id)
+    return true
+  }
+
   func navigateToContextNote(_ location: ContextNoteLocation) {
     guard ContextNoteNavigator().navigate(to: location) else {
       transientMessage = AppLocalization.text("无法前往记录位置，窗口或显示器可能已关闭")
@@ -1735,8 +1748,8 @@ final class AppModel: ObservableObject {
     return .presented
   }
 
-  func presentContextNoteReminder(_ item: FileShelfItem) -> Bool {
-    guard ContextNoteReminderPresenter.present(item, on: clipboardAssistant, settings: settingsStore.settings) else { return false }
+  func presentContextNoteReminder(_ item: FileShelfItem, at point: CGPoint) -> Bool {
+    guard ContextNoteReminderPresenter.present(item, at: point, on: clipboardAssistant, settings: settingsStore.settings) else { return false }
     clipboardAssistantContent = nil
     return true
   }
@@ -1950,6 +1963,13 @@ final class AppModel: ObservableObject {
       contextNoteEditor.open(item)
       selectModule(.shelf)
       islandExpansionRequested = true
+    case .copyContextNote(let id):
+      guard let copyAction = Self.contextNoteCopyAction(id: id, in: shelf) else { return }
+      performClipboardAssistantAction(copyAction)
+    case .deleteContextNote(let id):
+      if !Self.deleteContextNote(id: id, from: shelf, editor: contextNoteEditor) {
+        transientMessage = shelf.errorDescription ?? clipboardAssistantMessage("无法完成操作")
+      }
     case .openFolder(let url):
       if !NSWorkspace.shared.open(url) {
         transientMessage = clipboardAssistantMessage("无法完成操作")

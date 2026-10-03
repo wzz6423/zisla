@@ -4,11 +4,31 @@ import ImageIO
 import UniformTypeIdentifiers
 import zlib
 import Testing
+import ZislaCore
 
 @testable import ZislaKit
 
 @MainActor
 struct FileShelfContentTests {
+    @Test
+    func locationNotesHaveTheirOwnShelfCategoryWithoutChangingClipboardCategories() throws {
+        let directory = try temporaryDirectory()
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let storage = directory.appendingPathComponent("shelf.json")
+        let store = FileShelfStore(storageURL: storage)
+        #expect(store.add(payloads: [.text("ordinary text"), .text("https://example.invalid/plain")]) == 2)
+        let location = ContextNoteLocation.window(bundleIdentifier: "test.editor", applicationName: "Editor", title: "Document")
+        _ = try #require(store.addContextNote("location note", location: location))
+        _ = try #require(store.addContextNote("https://example.invalid/note", location: location))
+
+        #expect(store.items.map { $0.category.rawValue } == ["文本", "URL", "便签", "便签"])
+        #expect(FileShelfCategory.fileShelfCases.contains { $0.rawValue == "便签" })
+        #expect(!FileShelfCategory.clipboardCases.contains { $0.rawValue == "便签" })
+        #expect(FileShelfCategory.clipboardCases.contains(.path))
+        #expect(!FileShelfCategory.fileShelfCases.contains(.path))
+        #expect(FileShelfStore(storageURL: storage).items == store.items)
+    }
+
     @Test
     func mixedContentSurvivesRestartAndKeepsOriginalText() throws {
         let directory = try temporaryDirectory()
