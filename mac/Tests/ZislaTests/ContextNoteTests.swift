@@ -94,6 +94,30 @@ struct ContextNoteTests {
         #expect(fixture.presented == 1)
     }
 
+    @Test
+    func naturalShakeThroughPointerThrottlePresentsAnEditableDraft() throws {
+        let fixture = try Fixture()
+        defer { fixture.close() }
+        var throttle = PointerEdgeEventThrottle()
+        for index in 0...125 {
+            let time = Double(index) / 125
+            guard throttle.shouldEmit(eventType: .mouseMoved, timestamp: time) else { continue }
+            let angle = Double.pi * time / 0.18
+            fixture.controller.handlePointer(
+                at: CGPoint(x: 600 + 60 * cos(angle), y: 400 + 20 * sin(angle)),
+                interaction: .moved, timestamp: time
+            )
+        }
+        let draft = try #require(fixture.controller.draft)
+        #expect(fixture.presented == 1)
+        #expect(draft.location == fixture.location)
+        #expect(draft.text.isEmpty)
+        draft.text = "Keep the current location"
+        fixture.controller.save()
+        #expect(fixture.saved.first?.text == "Keep the current location")
+        #expect(fixture.saved.first?.noteLocation == fixture.location)
+    }
+
     @Test(arguments: [false, true], [false, true])
     func featureRequiresBothQuickActionAndNoteSwitches(enabled: Bool, parent: Bool) throws {
         let fixture = try Fixture(enabled: enabled, parentEnabled: parent)

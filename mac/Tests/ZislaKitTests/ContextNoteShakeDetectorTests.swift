@@ -22,6 +22,23 @@ struct ContextNoteShakeDetectorTests {
         #expect(results.filter { $0 }.count == 1)
     }
 
+    @Test(arguments: [60.0, 125.0, 1_000.0], [0.0, 0.3, 0.7])
+    func naturalHorizontalShakesSurvivePointerMoveCoalescing(sampleRate: Double, phase: Double) {
+        for (legDuration, verticalRadius) in [(0.16, 0.0), (0.1, 20.0), (0.16, 20.0), (0.18, 20.0)] {
+            var detector = ContextNoteShakeDetector()
+            var throttle = PointerEdgeEventThrottle()
+            var triggers = 0
+            for index in 0...Int(sampleRate) {
+                let time = Double(index) / sampleRate
+                guard throttle.shouldEmit(eventType: .mouseMoved, timestamp: time) else { continue }
+                let angle = Double.pi * (time / legDuration + phase)
+                let point = CGPoint(x: 600 + 60 * cos(angle), y: 400 + verticalRadius * sin(angle))
+                if detector.record(point, at: time) { triggers += 1 }
+            }
+            #expect(triggers == 1, "legDuration=\(legDuration), verticalRadius=\(verticalRadius)")
+        }
+    }
+
     @Test(arguments: [8.0, 30.0, 59.0])
     func smallAndMediumJitterNeverAccumulates(width: Double) {
         var detector = ContextNoteShakeDetector()
@@ -41,16 +58,17 @@ struct ContextNoteShakeDetectorTests {
         }
     }
 
-    @Test(arguments: [CGPoint(x: 0, y: 1), CGPoint(x: 1, y: 1), CGPoint(x: 1, y: 0.5)])
-    func verticalAndDiagonalShakesDoNotTrigger(axis: CGPoint) {
+    @Test(arguments: [CGPoint(x: 0, y: 1), CGPoint(x: 1, y: 1), CGPoint(x: 1, y: 0.5)],
+          [CGPoint.zero, CGPoint(x: 600, y: 400), CGPoint(x: -1400, y: -200)])
+    func verticalAndDiagonalShakesDoNotTrigger(axis: CGPoint, origin: CGPoint) {
         var detector = ContextNoteShakeDetector()
         for sample in Self.samples(legs: 16, samplesPerLeg: 8) {
-            let point = CGPoint(x: sample.point.x * axis.x, y: sample.point.x * axis.y)
+            let point = CGPoint(x: origin.x + sample.point.x * axis.x, y: origin.y + sample.point.x * axis.y)
             #expect(detector.record(point, at: sample.time) == false)
         }
     }
 
-    @Test(arguments: [0.16, 0.3, 0.6])
+    @Test(arguments: [0.25, 0.3, 0.6])
     func slowMovementDoesNotTrigger(legDuration: TimeInterval) {
         var detector = ContextNoteShakeDetector()
         for sample in Self.samples(legs: 20, legDuration: legDuration, samplesPerLeg: 12) {
