@@ -5,11 +5,11 @@ import Testing
 @testable import ZislaKit
 
 struct ContextNoteShakeDetectorTests {
-    @Test(arguments: [60.0, 80.0])
-    func requiresFourWideFastReversals(width: Double) {
+    @Test(arguments: [28.0, 40.0, 80.0])
+    func requiresThreeClearReversals(width: Double) {
         var detector = ContextNoteShakeDetector()
         let results = Self.samples(width: width).map { detector.record($0.point, at: $0.time) }
-        #expect(results == [false, false, false, false, false, true])
+        #expect(results == [false, false, false, false, true])
     }
 
     @Test(arguments: [1, 3, 12, 48])
@@ -39,8 +39,37 @@ struct ContextNoteShakeDetectorTests {
         }
     }
 
-    @Test(arguments: [8.0, 30.0, 59.0])
-    func smallAndMediumJitterNeverAccumulates(width: Double) {
+    @Test(arguments: [60.0, 125.0, 1_000.0], [40.0, 60.0])
+    func aShortLightShakeIsEnough(sampleRate: Double, width: Double) {
+        for phase in [0.0, 0.3, 0.7] {
+            var detector = ContextNoteShakeDetector()
+            var throttle = PointerEdgeEventThrottle()
+            var triggers = 0
+            for index in 0...Int(sampleRate * 0.7) {
+                let time = Double(index) / sampleRate
+                guard throttle.shouldEmit(eventType: .mouseMoved, timestamp: time) else { continue }
+                let angle = Double.pi * (time / 0.16 + phase)
+                let point = CGPoint(x: 600 + width / 2 * cos(angle), y: 400 + width / 4 * sin(angle))
+                if detector.record(point, at: time) { triggers += 1 }
+            }
+            #expect(triggers == 1, "phase=\(phase)")
+        }
+    }
+
+    @Test
+    func aRelaxedContinuousShakeDoesNotRequireRushedTurns() {
+        var detector = ContextNoteShakeDetector()
+        var throttle = PointerEdgeEventThrottle()
+        var triggers = 0
+        for sample in Self.samples(legDuration: 0.28, samplesPerLeg: 12) {
+            guard throttle.shouldEmit(eventType: .mouseMoved, timestamp: sample.time) else { continue }
+            if detector.record(sample.point, at: sample.time) { triggers += 1 }
+        }
+        #expect(triggers == 1)
+    }
+
+    @Test(arguments: [8.0, 18.0, 27.0])
+    func smallJitterNeverAccumulates(width: Double) {
         var detector = ContextNoteShakeDetector()
         for sample in Self.samples(width: width, legs: 30, legDuration: 0.05, samplesPerLeg: 8) {
             #expect(detector.record(sample.point, at: sample.time) == false)
@@ -58,9 +87,9 @@ struct ContextNoteShakeDetectorTests {
         }
     }
 
-    @Test(arguments: [CGPoint(x: 0, y: 1), CGPoint(x: 1, y: 1), CGPoint(x: 1, y: 0.5)],
+    @Test(arguments: [CGPoint(x: 0, y: 1), CGPoint(x: 1, y: 1), CGPoint(x: 1, y: 0.9)],
           [CGPoint.zero, CGPoint(x: 600, y: 400), CGPoint(x: -1400, y: -200)])
-    func verticalAndDiagonalShakesDoNotTrigger(axis: CGPoint, origin: CGPoint) {
+    func verticalAndSteepDiagonalShakesDoNotTrigger(axis: CGPoint, origin: CGPoint) {
         var detector = ContextNoteShakeDetector()
         for sample in Self.samples(legs: 16, samplesPerLeg: 8) {
             let point = CGPoint(x: origin.x + sample.point.x * axis.x, y: origin.y + sample.point.x * axis.y)
@@ -68,7 +97,7 @@ struct ContextNoteShakeDetectorTests {
         }
     }
 
-    @Test(arguments: [0.25, 0.3, 0.6])
+    @Test(arguments: [0.4, 0.6])
     func slowMovementDoesNotTrigger(legDuration: TimeInterval) {
         var detector = ContextNoteShakeDetector()
         for sample in Self.samples(legs: 20, legDuration: legDuration, samplesPerLeg: 12) {
@@ -82,7 +111,7 @@ struct ContextNoteShakeDetectorTests {
         let samples: [(Double, Double)] = [
             (0, 0), (0.08, 80), (0.16, 0), (0.24, 80),
             (0.30, 80), (0.36, 80), (0.42, 80), (0.48, 80),
-            (0.54, 80), (0.56, 0), (0.64, 80),
+            (0.54, 80), (0.60, 80), (0.64, 0), (0.72, 80),
         ]
         for (time, x) in samples {
             #expect(detector.record(CGPoint(x: x, y: 0), at: time) == false)
@@ -94,7 +123,7 @@ struct ContextNoteShakeDetectorTests {
     @Test
     func longGapsCannotCompleteAnEarlierGesture() {
         var detector = ContextNoteShakeDetector()
-        for sample in Self.samples(legs: 4) {
+        for sample in Self.samples(legs: 3) {
             #expect(detector.record(sample.point, at: sample.time) == false)
         }
         #expect(detector.record(CGPoint(x: 80, y: 0), at: 5) == false)
@@ -104,7 +133,7 @@ struct ContextNoteShakeDetectorTests {
     @Test
     func resetDiscardsIncompleteReversals() {
         var detector = ContextNoteShakeDetector()
-        for sample in Self.samples(legs: 4) {
+        for sample in Self.samples(legs: 3) {
             #expect(detector.record(sample.point, at: sample.time) == false)
         }
         detector.reset()
@@ -127,10 +156,10 @@ struct ContextNoteShakeDetectorTests {
         #expect(later.filter { $0 }.count == 1)
     }
 
-    @Test(arguments: [0.2, 0.4])
+    @Test(arguments: [0.2, 0.3])
     func reversedAndRepeatedTimestampsDiscardPendingReversals(timestamp: TimeInterval) {
         var detector = ContextNoteShakeDetector()
-        for sample in Self.samples(legs: 4) {
+        for sample in Self.samples(legs: 3) {
             #expect(detector.record(sample.point, at: sample.time) == false)
         }
         #expect(detector.record(CGPoint(x: 80, y: 0), at: timestamp) == false)
@@ -150,7 +179,7 @@ struct ContextNoteShakeDetectorTests {
         ]
         for (point, time) in invalidSamples {
             var detector = ContextNoteShakeDetector()
-            for sample in Self.samples(legs: 4) {
+            for sample in Self.samples(legs: 3) {
                 #expect(detector.record(sample.point, at: sample.time) == false)
             }
             #expect(detector.record(point, at: time) == false)
@@ -163,7 +192,7 @@ struct ContextNoteShakeDetectorTests {
     private static func samples(
         width: Double = 80,
         start: TimeInterval = 0,
-        legs: Int = 5,
+        legs: Int = 4,
         legDuration: TimeInterval = 0.1,
         samplesPerLeg: Int = 1
     ) -> [(point: CGPoint, time: TimeInterval)] {

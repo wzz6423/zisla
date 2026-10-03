@@ -99,12 +99,12 @@ struct ContextNoteTests {
         let fixture = try Fixture()
         defer { fixture.close() }
         var throttle = PointerEdgeEventThrottle()
-        for index in 0...125 {
+        for index in 0...87 {
             let time = Double(index) / 125
             guard throttle.shouldEmit(eventType: .mouseMoved, timestamp: time) else { continue }
-            let angle = Double.pi * time / 0.18
+            let angle = Double.pi * time / 0.16
             fixture.controller.handlePointer(
-                at: CGPoint(x: 600 + 60 * cos(angle), y: 400 + 20 * sin(angle)),
+                at: CGPoint(x: 600 + 20 * cos(angle), y: 400 + 10 * sin(angle)),
                 interaction: .moved, timestamp: time
             )
         }
