@@ -10,9 +10,9 @@ class IssueMetadataTest < Minitest::Test
   CONTRACT_PATH = File.expand_path('../issue-automation.json', __dir__)
   TEMPLATE_DIR = File.expand_path('../ISSUE_TEMPLATE', __dir__)
   BUG_EN = 'bug_report.yml'
-  BUG_ZH = 'bug_report.zh-CN.yml'
+  BUG_ZH = '../ISSUE_TEMPLATE_LEGACY/bug_report.zh-CN.yml'
   FEATURE_EN = 'feature_request.yml'
-  FEATURE_ZH = 'feature_request.zh-CN.yml'
+  FEATURE_ZH = '../ISSUE_TEMPLATE_LEGACY/feature_request.zh-CN.yml'
 
   # Renders an Issue Form the way GitHub renders a submitted issue, so every
   # fixture follows the shipped templates instead of restating their headings.
@@ -104,6 +104,16 @@ class IssueMetadataTest < Minitest::Test
     assert_empty IssueMetadata.verify(@contract)
   end
 
+  def test_new_issue_chooser_exposes_only_english_options
+    registered = Dir.children(TEMPLATE_DIR).select { |file| /\.(?:yml|yaml|md)\z/.match?(file) } - ['config.yml']
+    active = @contract.kinds.flat_map { |kind| kind['templates'] }
+    links = YAML.safe_load(File.read(File.join(TEMPLATE_DIR, 'config.yml'))).fetch('contact_links')
+
+    assert_equal %w[bug_report.yml feature_request.yml], active.sort
+    assert_equal active.sort, registered.sort
+    assert_equal ['Security vulnerability report', 'Usage and discussion'], links.map { |link| link['name'] }
+  end
+
   def test_english_bug_form_is_valid
     report = analyze(BUG_EN, 'Voice input is not written to the current text field',
                      values: { 'area' => option(BUG_EN, 1) })
@@ -119,7 +129,7 @@ class IssueMetadataTest < Minitest::Test
     report = analyze(BUG_ZH, '语音输入结束后未写入当前文本框', values: { 'area' => option(BUG_ZH, 1) })
 
     assert report['valid'], report['errors'].join("\n")
-    assert_equal BUG_ZH, report['form']
+    assert_equal File.basename(BUG_ZH), report['form']
     assert_equal 'Bug Fix', report['area']
     assert_equal %w[bug area:bug-fix], report['labels']
   end
@@ -137,7 +147,7 @@ class IssueMetadataTest < Minitest::Test
     report = analyze(FEATURE_ZH, '支持自定义语音整理提示词')
 
     assert report['valid'], report['errors'].join("\n")
-    assert_equal FEATURE_ZH, report['form']
+    assert_equal File.basename(FEATURE_ZH), report['form']
     assert_equal %w[enhancement area:feature], report['labels']
   end
 

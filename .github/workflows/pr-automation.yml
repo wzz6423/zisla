@@ -2,7 +2,7 @@ name: PR Automation
 
 on:
   pull_request_target: # zizmor: ignore[dangerous-triggers] Only the default branch is checked out.
-    types: [opened, edited, reopened, synchronize, ready_for_review]
+    types: [opened, edited, reopened, synchronize, ready_for_review, closed]
 
 permissions:
   contents: read
@@ -21,12 +21,14 @@ jobs:
       issues: write # Required to create the labels declared by the contract.
       pull-requests: write # Required to label and assign the pull request.
     steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - id: checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           ref: ${{ github.event.repository.default_branch }}
           persist-credentials: false
 
       - name: Read pull request metadata
+        if: github.event.action != 'closed'
         env:
           PR_BODY: ${{ github.event.pull_request.body }}
         run: |
@@ -38,6 +40,7 @@ jobs:
           cat "$RUNNER_TEMP/metadata.json"
 
       - name: Create missing labels
+        if: github.event.action != 'closed'
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
@@ -61,6 +64,7 @@ jobs:
           done < "$RUNNER_TEMP/missing-labels.tsv"
 
       - name: Apply contract labels
+        if: github.event.action != 'closed'
         env:
           GH_TOKEN: ${{ github.token }}
           PR_NUMBER: ${{ github.event.pull_request.number }}
@@ -94,6 +98,7 @@ jobs:
           echo "::notice::Applied $(jq -r '.labels | join(", ")' "$metadata")"
 
       - name: Ensure the pull request has an assignee
+        if: github.event.action != 'closed'
         env:
           GH_TOKEN: ${{ github.token }}
           PR_AUTHOR: ${{ github.event.pull_request.user.login }}
@@ -116,6 +121,7 @@ jobs:
           echo "::notice::Assigned $assignee"
 
       - name: Verify AI co-authorship
+        if: github.event.action != 'closed'
         env:
           GH_TOKEN: ${{ github.token }}
           PR_NUMBER: ${{ github.event.pull_request.number }}
@@ -150,10 +156,30 @@ jobs:
 
           echo "::notice::Verified co-authorship for $agent"
 
+      - name: Synchronize pull request timeline
+        if: ${{ !cancelled() && steps.checkout.outcome == 'success' }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+        run: |
+          set -euo pipefail
+
+          gh api "repos/$GITHUB_REPOSITORY/pulls/$PR_NUMBER" > "$RUNNER_TEMP/current-resource.json"
+          ruby .github/scripts/timeline-metadata.rb \
+            --event-file "$GITHUB_EVENT_PATH" \
+            --resource-file "$RUNNER_TEMP/current-resource.json" > "$RUNNER_TEMP/timeline.json"
+
+          if [ "$(jq -r '.changed' "$RUNNER_TEMP/timeline.json")" = 'true' ]; then
+            jq '{body: .body}' "$RUNNER_TEMP/timeline.json" > "$RUNNER_TEMP/timeline-payload.json"
+            gh api --method PATCH "repos/$GITHUB_REPOSITORY/pulls/$PR_NUMBER" \
+              --input "$RUNNER_TEMP/timeline-payload.json" >/dev/null
+          fi
+
       - name: Remove pull request metadata files
         if: always()
         run: |
           rm -f "$RUNNER_TEMP/pr-body.md" "$RUNNER_TEMP/metadata.json" \
             "$RUNNER_TEMP/contract-labels.json" "$RUNNER_TEMP/existing-labels.json" \
             "$RUNNER_TEMP/missing-labels.tsv" "$RUNNER_TEMP/stale-labels.txt" \
-            "$RUNNER_TEMP/commit-messages.json"
+            "$RUNNER_TEMP/commit-messages.json" "$RUNNER_TEMP/current-resource.json" \
+            "$RUNNER_TEMP/timeline.json" "$RUNNER_TEMP/timeline-payload.json"
