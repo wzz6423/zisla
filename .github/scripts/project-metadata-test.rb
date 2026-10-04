@@ -3,6 +3,8 @@
 
 require 'minitest/autorun'
 require 'json'
+require 'open3'
+require 'tmpdir'
 
 require_relative 'project-metadata'
 require_relative 'pr-metadata'
@@ -59,6 +61,82 @@ class ProjectMetadataTest < Minitest::Test
     assert_raises(ProjectMetadata::ContractError) { ProjectMetadata.labels_from('{"label":"bug"}') }
   end
 
+  def test_open_issue_and_pull_request_keep_their_submission_time
+    %w[issue pull_request].each do |kind|
+      event = event_for(kind, state: 'open')
+      assert_equal({ 'createdAt' => '2026-10-03T16:30:00Z', 'endedAt' => nil },
+                   ProjectMetadata.timestamps_for(event))
+    end
+  end
+
+  def test_closed_issue_uses_its_close_time
+    event = event_for('issue', state: 'closed', closed_at: '2026-10-04T02:30:00Z')
+
+    assert_equal '2026-10-04T02:30:00Z', ProjectMetadata.timestamps_for(event)['endedAt']
+  end
+
+  def test_merged_pull_request_uses_merge_time
+    event = event_for('pull_request', state: 'closed',
+                      closed_at: '2026-10-04T02:29:59Z', merged_at: '2026-10-04T02:30:00Z')
+
+    assert_equal '2026-10-04T02:30:00Z', ProjectMetadata.timestamps_for(event)['endedAt']
+  end
+
+  def test_closed_unmerged_pull_request_uses_close_time
+    event = event_for('pull_request', state: 'closed', closed_at: '2026-10-04T02:30:00Z')
+
+    assert_equal '2026-10-04T02:30:00Z', ProjectMetadata.timestamps_for(event)['endedAt']
+  end
+
+  def test_reopened_item_clears_end_time_and_repeated_events_are_stable
+    event = event_for('issue', state: 'open', closed_at: nil)
+    expected = { 'createdAt' => '2026-10-03T16:30:00Z', 'endedAt' => nil }
+
+    assert_equal expected, ProjectMetadata.timestamps_for(event)
+    assert_equal expected, ProjectMetadata.timestamps_for(event)
+  end
+
+  def test_missing_event_times_fail_before_project_writes
+    assert_raises(ProjectMetadata::ContractError) { ProjectMetadata.timestamps_for({}) }
+    assert_raises(KeyError) { ProjectMetadata.timestamps_for('issue' => { 'state' => 'open' }) }
+    assert_raises(ProjectMetadata::ContractError) do
+      ProjectMetadata.timestamps_for(event_for('issue', state: 'closed'))
+    end
+  end
+
+  def test_dates_command_reads_the_event_payload
+    Dir.mktmpdir('zisla-project-metadata-') do |directory|
+      event_path = File.join(directory, 'event.json')
+      File.write(event_path, JSON.generate(event_for('pull_request', state: 'closed',
+                                                   closed_at: '2026-10-05T02:30:00Z')))
+      output, error, status = Open3.capture3('ruby', File.expand_path('project-metadata.rb', __dir__),
+                                             'dates', '--event-file', event_path)
+
+      assert status.success?, error
+      assert_equal({ 'submittedDate' => '2026-10-04', 'endDate' => '2026-10-05' }, JSON.parse(output))
+    end
+  end
+
+  def test_project_dates_use_the_same_beijing_day_as_the_visible_timeline
+    event = event_for('pull_request', state: 'closed', closed_at: '2026-10-04T02:30:00Z')
+
+    assert_equal({ 'submittedDate' => '2026-10-04', 'endDate' => '2026-10-04' },
+                 ProjectMetadata.dates_for(event))
+    assert_equal '2026-10-04 00:30:00 +08:00',
+                 ProjectMetadata.local_time('2026-10-03T16:30:00Z').strftime('%F %T %:z')
+  end
+
+  def test_open_item_has_no_project_end_date
+    assert_nil ProjectMetadata.dates_for(event_for('issue', state: 'open'))['endDate']
+  end
+
+  def test_invalid_timestamp_fails_before_project_writes
+    event = event_for('issue', state: 'open')
+    event['issue']['created_at'] = 'yesterday'
+
+    assert_raises(ProjectMetadata::ContractError) { ProjectMetadata.dates_for(event) }
+  end
+
   private
 
   def status(state: 'open', labels:, type_label: nil)
@@ -67,5 +145,10 @@ class ProjectMetadataTest < Minitest::Test
 
   def configured_types
     JSON.parse(File.read(PR_CONTRACT_PATH)).fetch('types')
+  end
+
+  def event_for(kind, state:, closed_at: nil, merged_at: nil)
+    { kind => { 'state' => state, 'created_at' => '2026-10-03T16:30:00Z',
+                'closed_at' => closed_at, 'merged_at' => merged_at } }
   end
 end

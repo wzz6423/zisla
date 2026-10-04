@@ -8,9 +8,9 @@ require 'yaml'
 # Parses and validates the issue form contract.
 #
 # GitHub renders an Issue Form as one `### <field label>` section per field, and
-# that label is localized, so the field ids in .github/ISSUE_TEMPLATE are the
-# only identity shared by the English and the Simplified Chinese form. This
-# module reads the shipped forms to build the heading map for every locale, then
+# that label is localized, so the field ids are the only identity shared by the
+# English form and historical Simplified Chinese form. This module reads both
+# active and legacy forms to build the heading map for every supported issue, then
 # reports the labels the Issue Automation workflow applies and every reason the
 # issue is still incomplete. An incomplete issue is data, never an exception, so
 # the workflow can label it instead of failing.
@@ -148,7 +148,7 @@ module IssueMetadata
 
     def forms
       @forms ||= Forms.new(@kinds.flat_map do |kind|
-        Array(kind['templates']).map { |file| load_form(kind, file) }
+        (Array(kind['templates']) + Array(kind['legacyTemplates'])).map { |file| load_form(kind, file) }
       end)
     end
 
@@ -205,7 +205,7 @@ module IssueMetadata
 
     def load_form(kind, file)
       path = File.join(@template_dir, file)
-      Form.new(file: file, kind: kind['kind'], document: YAML.safe_load(File.read(path)))
+      Form.new(file: File.basename(file), kind: kind['kind'], document: YAML.safe_load(File.read(path)))
     rescue Errno::ENOENT
       raise ContractError, "#{file}: issue form not found in #{@template_dir}"
     rescue Psych::SyntaxError => error
