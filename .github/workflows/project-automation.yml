@@ -45,6 +45,13 @@ jobs:
           config=.github/project-automation.json
           event="$GITHUB_EVENT_PATH"
 
+          # Replayed or delayed events must not restore an obsolete end date.
+          resource_path="$(jq -r 'if .issue then "issues/\(.issue.number)" else "pulls/\(.pull_request.number)" end' "$event")"
+          gh api "repos/$GITHUB_REPOSITORY/$resource_path" \
+            | jq --slurpfile event "$event" 'if $event[0].issue then {issue: .} else {pull_request: .} end' \
+            > "$RUNNER_TEMP/project-event.json"
+          event="$RUNNER_TEMP/project-event.json"
+
           content_id="$(jq -r '.issue.node_id // .pull_request.node_id // empty' "$event")"
           state="$(jq -r '.issue.state // .pull_request.state // empty' "$event")"
           labels_json="$(jq -c '(.issue.labels // .pull_request.labels // []) | map(.name)' "$event")"
@@ -65,11 +72,17 @@ jobs:
           project_number="$(jq -r '.project.number' "$config")"
           expected_title="$(jq -r '.project.title' "$config")"
           status_field_name="$(jq -r '.statusField' "$config")"
+          submitted_field_name="$(jq -er '.dateFields.submitted' "$config")"
+          ended_field_name="$(jq -er '.dateFields.ended' "$config")"
           desired_status="$(ruby .github/scripts/project-metadata.rb status \
             --manifest "$config" \
             --state "$state" \
             --labels-json "$labels_json" \
             --type-label "$type_label")"
+          ruby .github/scripts/project-metadata.rb dates \
+            --manifest "$config" --event-file "$event" > "$RUNNER_TEMP/project-dates.json"
+          submitted_date="$(jq -r '.submittedDate' "$RUNNER_TEMP/project-dates.json")"
+          end_date="$(jq -r '.endDate // empty' "$RUNNER_TEMP/project-dates.json")"
 
           # shellcheck disable=SC2016 # The GraphQL variables must stay literal.
           project_query='
@@ -88,22 +101,31 @@ jobs:
                           name
                         }
                       }
+                      ... on ProjectV2Field {
+                        id
+                        name
+                        dataType
+                      }
                     }
                   }
                 }
               }
             }'
 
-          gh api graphql \
-            -f query="$project_query" \
-            -f login="$project_owner" \
-            -F number="$project_number" \
-            > "$RUNNER_TEMP/project.json"
+          load_project() {
+            gh api graphql \
+              -f query="$project_query" \
+              -f login="$project_owner" \
+              -F number="$project_number" \
+              > "$RUNNER_TEMP/project.json"
 
-          if jq -e '.errors? | length > 0' "$RUNNER_TEMP/project.json" >/dev/null; then
-            jq -r '.errors[]?.message' "$RUNNER_TEMP/project.json" >&2
-            exit 1
-          fi
+            if jq -e '.errors? | length > 0' "$RUNNER_TEMP/project.json" >/dev/null; then
+              jq -r '.errors[]?.message' "$RUNNER_TEMP/project.json" >&2
+              return 1
+            fi
+          }
+
+          load_project
 
           project_id="$(jq -r '.data.user.projectV2.id // empty' "$RUNNER_TEMP/project.json")"
           project_title="$(jq -r '.data.user.projectV2.title // empty' "$RUNNER_TEMP/project.json")"
@@ -141,6 +163,64 @@ jobs:
             echo "::error::The project has no Status option named $desired_status."
             exit 1
           }
+
+          # shellcheck disable=SC2016 # The GraphQL variables must stay literal.
+          create_date_field_query='
+            mutation($projectId: ID!, $name: String!) {
+              createProjectV2Field(input: {
+                projectId: $projectId
+                name: $name
+                dataType: DATE
+              }) {
+                projectV2Field {
+                  ... on ProjectV2Field {
+                    id
+                  }
+                }
+              }
+            }'
+
+          ensure_date_field() {
+            local name="$1" field_id
+            field_id="$(jq -r --arg field "$name" '
+              first(.data.user.projectV2.fields.nodes[]?
+                | select(.name == $field and .dataType == "DATE")
+                | .id) // empty' "$RUNNER_TEMP/project.json")"
+            if [ -n "$field_id" ]; then
+              printf '%s' "$field_id"
+              return
+            fi
+
+            if jq -e --arg field "$name" '
+              .data.user.projectV2.fields.nodes[]? | select(.name == $field)
+            ' "$RUNNER_TEMP/project.json" >/dev/null; then
+              echo "::error::Project field $name exists but is not a DATE field." >&2
+              return 1
+            fi
+
+            # Another item may create the field concurrently. The fresh query
+            # below accepts that race but still fails on a real permission error.
+            gh api graphql -f query="$create_date_field_query" \
+              -f projectId="$project_id" -f name="$name" \
+              > "$RUNNER_TEMP/project-create.json" \
+              2> "$RUNNER_TEMP/project-create-error.txt"
+            load_project
+            field_id="$(jq -r --arg field "$name" '
+              first(.data.user.projectV2.fields.nodes[]?
+                | select(.name == $field and .dataType == "DATE")
+                | .id) // empty' "$RUNNER_TEMP/project.json")"
+            if [ -z "$field_id" ]; then
+              echo "::error::Could not create the DATE field $name." >&2
+              if [ -s "$RUNNER_TEMP/project-create-error.txt" ]; then
+                sed -n '1,40p' "$RUNNER_TEMP/project-create-error.txt" >&2
+              fi
+              return 1
+            fi
+            printf '%s' "$field_id"
+          }
+
+          submitted_field_id="$(ensure_date_field "$submitted_field_name")"
+          ended_field_id="$(ensure_date_field "$ended_field_name")"
 
           # shellcheck disable=SC2016 # The GraphQL variables must stay literal.
           item_query='
@@ -253,10 +333,64 @@ jobs:
             exit 1
           fi
 
-          echo "::notice::Project item synchronized with status $desired_status."
+          # shellcheck disable=SC2016 # The GraphQL variables must stay literal.
+          update_date_query='
+            mutation($projectId: ID!, $itemId: ID!, $fieldId: ID!, $date: Date!) {
+              updateProjectV2ItemFieldValue(input: {
+                projectId: $projectId
+                itemId: $itemId
+                fieldId: $fieldId
+                value: { date: $date }
+              }) {
+                projectV2Item { id }
+              }
+            }'
+
+          # shellcheck disable=SC2016 # The GraphQL variables must stay literal.
+          clear_date_query='
+            mutation($projectId: ID!, $itemId: ID!, $fieldId: ID!) {
+              clearProjectV2ItemFieldValue(input: {
+                projectId: $projectId
+                itemId: $itemId
+                fieldId: $fieldId
+              }) {
+                projectV2Item { id }
+              }
+            }'
+
+          for date_field in submitted ended; do
+            if [ "$date_field" = submitted ]; then
+              field_id="$submitted_field_id"
+              date_value="$submitted_date"
+            else
+              field_id="$ended_field_id"
+              date_value="$end_date"
+            fi
+
+            if [ -n "$date_value" ]; then
+              gh api graphql -f query="$update_date_query" \
+                -f projectId="$project_id" -f itemId="$item_id" \
+                -f fieldId="$field_id" -f date="$date_value" \
+                > "$RUNNER_TEMP/project-date-update.json"
+            else
+              gh api graphql -f query="$clear_date_query" \
+                -f projectId="$project_id" -f itemId="$item_id" \
+                -f fieldId="$field_id" \
+                > "$RUNNER_TEMP/project-date-update.json"
+            fi
+
+            if jq -e '.errors? | length > 0' "$RUNNER_TEMP/project-date-update.json" >/dev/null; then
+              jq -r '.errors[]?.message' "$RUNNER_TEMP/project-date-update.json" >&2
+              exit 1
+            fi
+          done
+
+          echo "::notice::Project item synchronized with status $desired_status and timeline dates."
 
       - name: Remove project payloads
         if: always()
         run: |
           rm -f "$RUNNER_TEMP/pr-body.md" "$RUNNER_TEMP/project.json" "$RUNNER_TEMP/project-add-error.txt" \
-            "$RUNNER_TEMP/project-update.json"
+            "$RUNNER_TEMP/project-update.json" "$RUNNER_TEMP/project-dates.json" \
+            "$RUNNER_TEMP/project-create.json" "$RUNNER_TEMP/project-create-error.txt" \
+            "$RUNNER_TEMP/project-date-update.json" "$RUNNER_TEMP/project-event.json"
