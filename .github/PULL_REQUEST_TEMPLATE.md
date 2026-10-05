@@ -9,6 +9,7 @@
 - Start date: <!-- Optional YYYY-MM-DD; leave blank to preserve the Project value. -->
 - Target date: <!-- Optional YYYY-MM-DD; leave blank to preserve the Project value. -->
 <!-- Submitted date is set from PR creation; End date is set on close/merge and cleared on reopen. -->
+<!-- Status follows the configured label mapping, including PR type labels, and becomes Done on close/merge. -->
 
 ## PR Type
 
@@ -19,7 +20,8 @@
 
 ## Validation
 
-<!-- Use one Validation block for each relevant test or manual check. -->
+<!-- Repeat this block for each relevant test or manual check, starting with its own Status. -->
+<!-- Each block needs its own non-empty fields; fields from another block cannot satisfy it. -->
 - Status: <!-- passed | failed | not run -->
 - Command: <!-- required for passed or failed -->
 - Result: <!-- required for passed or failed -->

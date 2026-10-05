@@ -8,6 +8,8 @@ require 'open3'
 require 'tmpdir'
 require 'fileutils'
 
+require_relative 'pr-metadata'
+
 class ContributorWelcomeTest < Minitest::Test
   ROOT = File.expand_path('../..', __dir__)
   MARKER = '<!-- zisla-contributor-welcome -->'
@@ -49,8 +51,62 @@ class ContributorWelcomeTest < Minitest::Test
     assert_includes body, '`End date` is filled automatically when the pull request is merged'
     assert_includes body, MARKER
     refute_includes body, '## Skipping CI'
-    assert_includes File.read(File.join(ROOT, 'CONTRIBUTING.zh-CN.md')), '- Start date: 2026-10-05'
-    assert_includes File.read(File.join(ROOT, 'CONTRIBUTING.zh-CN.md')), '- Target date: 2026-10-12'
+    assert_includes body, '`Status` from the configured label mapping'
+    assert_includes body, '`Done` when the PR is closed or merged'
+  end
+
+  def test_documented_pr_examples_satisfy_the_complete_metadata_contract
+    contract = PullRequestMetadata::Contract.load(File.join(ROOT, '.github/pr-automation.json'))
+    examples = %w[CONTRIBUTING.md CONTRIBUTING.zh-CN.md].map do |filename|
+      title, body, = documented_example(filename)
+      assert body.ascii_only?, "#{filename}: PR examples must remain in English"
+      errors = PullRequestMetadata.validate(title: title, body: body, contract: contract)
+      assert_empty errors, "#{filename}: #{errors.join('; ')}"
+      sections = PullRequestMetadata.sections(body)
+      assert_equal PullRequestMetadata::REQUIRED_SECTIONS, sections.keys, filename
+      project_example = body.split("## GitHub Project\n", 2).last.split("\n## ", 2).first
+      assert_includes project_example, 'Automatic Project fields (illustration only; not PR body inputs):', filename
+      assert_includes project_example, '- Submitted date: 2026-10-05 (PR creation date in UTC+08:00)', filename
+      assert_includes project_example, '- End date: 2026-10-12 (assumed merge date in UTC+08:00; blank before merge)', filename
+      assert_includes project_example, 'Automation updates Project date fields and the PR Timeline; it does not fill these comment lines.', filename
+      document = File.read(File.join(ROOT, filename))
+      date_rows = document.scan(/^  \| `(Start date|Target date|Submitted date|End date)` \| ([^|]+) \| ([^|]+) \|/)
+                          .map { |row| row.map(&:strip) }
+      header = filename == 'CONTRIBUTING.md' ? '| At creation (2026-10-05) | After merge (2026-10-12) |' : '| 创建时（2026-10-05） | 合并后（2026-10-12） |'
+      assert_includes document, header, filename
+      blank = filename == 'CONTRIBUTING.md' ? 'Blank' : '空'
+      assert_equal [
+        ['Start date', '2026-10-05', '2026-10-05'],
+        ['Target date', '2026-10-12', '2026-10-12'],
+        ['Submitted date', '2026-10-05', '2026-10-05'],
+        ['End date', blank, '2026-10-12']
+      ], date_rows, filename
+      statuses = PullRequestMetadata.field_values(sections['Validation'], 'Status')
+      assert_operator statuses.count('passed'), :>=, 2, filename
+      assert_includes statuses, 'not run', filename
+      %w[pr-metadata-test.rb contributor-welcome-test.rb].each do |script|
+        assert_includes body, "- Command: ruby .github/scripts/#{script}", filename
+      end
+      assert_includes body, '- Command: actionlint .github/workflows/*.yml', filename
+      assert_equal 'Codex', PullRequestMetadata.field(sections['AI Attribution'], 'Agent'), filename
+      assert_equal ['Codex <noreply@openai.com>'], PullRequestMetadata.field_values(sections['AI Attribution'], 'Co-authored-by'), filename
+      ['Status', 'Submitted date', 'End date'].each do |field|
+        assert_empty PullRequestMetadata.field_values(sections['GitHub Project'], field), filename
+      end
+      [title, body]
+    end
+    assert_equal examples.first, examples.last, 'Both guides must provide the same complete English PR example'
+  end
+
+  def test_rendered_pr_guidance_preserves_the_complete_markdown_example
+    title, example, fenced_example = documented_example('CONTRIBUTING.md')
+    body = render('pr')
+    assert_includes body, "Example title: `#{title}`"
+    assert_includes body, fenced_example
+    date_table = File.readlines(File.join(ROOT, 'CONTRIBUTING.md')).grep(/^  \|/).join
+    assert_includes body, date_table
+    rendered_blocks = body.scan(/^  ```markdown\n(.*?)^  ```[ \t]*$/m)
+    assert_equal [example], rendered_blocks.map { |block| block.first.gsub(/^  /, '') }
   end
 
   def test_first_run_posts_the_rendered_message
@@ -172,6 +228,16 @@ class ContributorWelcomeTest < Minitest::Test
   end
 
   private
+
+  def documented_example(filename)
+    document = File.read(File.join(ROOT, filename))
+    titles = document.scan(/(?:Example title:|标题示例：)\s*`([^`]+)`/).flatten
+    assert_equal 1, titles.length, "#{filename}: must contain one example PR title"
+    blocks = document.enum_for(:scan, /^  ```markdown\n(.*?)^  ```[ \t]*$/m).map { Regexp.last_match }
+    assert_equal 1, blocks.length, "#{filename}: must contain one fenced Markdown PR example"
+    block = blocks.first
+    [titles.first, block[1].gsub(/^  /, ''), block[0]]
+  end
 
   def workflow
     YAML.load_file(File.join(ROOT, '.github/workflows/contributor-welcome.yml'))
