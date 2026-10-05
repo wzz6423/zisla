@@ -168,17 +168,17 @@ export const downloadLinks: readonly DownloadLink[] = [
 ];
 
 export const latestRelease = {
-  version: 'v0.1.14',
-  date: '2026-09-30',
+  version: 'v0.1.15',
+  date: '2026-10-04',
   channel: 'Release',
-  releasePage: 'https://github.com/wzz6423/zisla/releases/tag/v0.1.14',
-  dmg: 'https://github.com/wzz6423/zisla/releases/download/v0.1.14/zisla-v0.1.14-macOS-arm64.dmg',
-  zip: 'https://github.com/wzz6423/zisla/releases/download/v0.1.14/zisla-v0.1.14-macOS-arm64.zip',
-  checksum: 'https://github.com/wzz6423/zisla/releases/download/v0.1.14/zisla-v0.1.14-macOS-arm64.zip.sha256',
-  universalDmg: 'https://github.com/wzz6423/zisla/releases/download/v0.1.14/zisla-v0.1.14-macOS-universal.dmg',
-  universalZip: 'https://github.com/wzz6423/zisla/releases/download/v0.1.14/zisla-v0.1.14-macOS-universal.zip',
-  intelDmg: 'https://github.com/wzz6423/zisla/releases/download/v0.1.14/zisla-v0.1.14-macOS-x86_64.dmg',
-  intelZip: 'https://github.com/wzz6423/zisla/releases/download/v0.1.14/zisla-v0.1.14-macOS-x86_64.zip',
+  releasePage: 'https://github.com/wzz6423/zisla/releases/tag/v0.1.15',
+  dmg: 'https://github.com/wzz6423/zisla/releases/download/v0.1.15/zisla-v0.1.15-macOS-arm64.dmg',
+  zip: 'https://github.com/wzz6423/zisla/releases/download/v0.1.15/zisla-v0.1.15-macOS-arm64.zip',
+  checksum: 'https://github.com/wzz6423/zisla/releases/download/v0.1.15/zisla-v0.1.15-macOS-arm64.zip.sha256',
+  universalDmg: 'https://github.com/wzz6423/zisla/releases/download/v0.1.15/zisla-v0.1.15-macOS-universal.dmg',
+  universalZip: 'https://github.com/wzz6423/zisla/releases/download/v0.1.15/zisla-v0.1.15-macOS-universal.zip',
+  intelDmg: 'https://github.com/wzz6423/zisla/releases/download/v0.1.15/zisla-v0.1.15-macOS-x86_64.dmg',
+  intelZip: 'https://github.com/wzz6423/zisla/releases/download/v0.1.15/zisla-v0.1.15-macOS-x86_64.zip',
   previewPage: 'https://github.com/wzz6423/zisla/releases/tag/v0.1.3-preview.1',
 };
 
@@ -194,6 +194,17 @@ export interface ChangelogEntry {
  * 统一以英文原文展示（11 版 × 17 语翻译不可维护）；v0.1.8/v0.1.0 无 Highlights 段，取其正文概述。
  */
 export const changelogEntries: readonly ChangelogEntry[] = [
+  {
+    version: 'v0.1.15',
+    date: '2026-10-04',
+    notes: [
+      'Location notes now attach editable text to web pages, application windows, and desktops. Optional Command-and-shake capture opens a quick editor, returning to a location shows its saved note, and the shelf groups notes by application with View, Copy, and Delete actions.',
+      'Shaking an active file drag opens a drop target beside the pointer and adds dropped files to the shelf without moving the originals. Shelf thumbnails, removal targets, and double-click handling are refined.',
+      'Menu bar monitoring adds configurable separate, merged, and combined layouts, with expanded battery, energy, Wi-Fi, and power-mode controls.',
+      'Quick Note copy and paste stays responsive during clipboard classification, and unencoded email bodies now respect their declared character set.',
+      'AI session icons keep client branding through detection, restarts, and playback. This release also updates the emoji catalog to Emoji 17.0 and refines note popups, Quick Actions, settings navigation, and lyrics on displays without a notch.',
+    ],
+  },
   {
     version: 'v0.1.14',
     date: '2026-09-30',
