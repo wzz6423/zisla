@@ -286,7 +286,7 @@ struct SettingsView: View {
                                 .foregroundStyle(.secondary)
                         }
                         DeferredMount {
-                            selectedContent
+                            AnyView(selectedContent)
                                 .id(input.selection)
                                 .transition(
                                     reduceMotion
