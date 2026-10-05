@@ -168,17 +168,17 @@ export const downloadLinks: readonly DownloadLink[] = [
 ];
 
 export const latestRelease = {
-  version: 'v0.1.15',
-  date: '2026-10-04',
+  version: 'v0.1.16',
+  date: '2026-10-05',
   channel: 'Release',
-  releasePage: 'https://github.com/wzz6423/zisla/releases/tag/v0.1.15',
-  dmg: 'https://github.com/wzz6423/zisla/releases/download/v0.1.15/zisla-v0.1.15-macOS-arm64.dmg',
-  zip: 'https://github.com/wzz6423/zisla/releases/download/v0.1.15/zisla-v0.1.15-macOS-arm64.zip',
-  checksum: 'https://github.com/wzz6423/zisla/releases/download/v0.1.15/zisla-v0.1.15-macOS-arm64.zip.sha256',
-  universalDmg: 'https://github.com/wzz6423/zisla/releases/download/v0.1.15/zisla-v0.1.15-macOS-universal.dmg',
-  universalZip: 'https://github.com/wzz6423/zisla/releases/download/v0.1.15/zisla-v0.1.15-macOS-universal.zip',
-  intelDmg: 'https://github.com/wzz6423/zisla/releases/download/v0.1.15/zisla-v0.1.15-macOS-x86_64.dmg',
-  intelZip: 'https://github.com/wzz6423/zisla/releases/download/v0.1.15/zisla-v0.1.15-macOS-x86_64.zip',
+  releasePage: 'https://github.com/wzz6423/zisla/releases/tag/v0.1.16',
+  dmg: 'https://github.com/wzz6423/zisla/releases/download/v0.1.16/zisla-v0.1.16-macOS-arm64.dmg',
+  zip: 'https://github.com/wzz6423/zisla/releases/download/v0.1.16/zisla-v0.1.16-macOS-arm64.zip',
+  checksum: 'https://github.com/wzz6423/zisla/releases/download/v0.1.16/zisla-v0.1.16-macOS-arm64.zip.sha256',
+  universalDmg: 'https://github.com/wzz6423/zisla/releases/download/v0.1.16/zisla-v0.1.16-macOS-universal.dmg',
+  universalZip: 'https://github.com/wzz6423/zisla/releases/download/v0.1.16/zisla-v0.1.16-macOS-universal.zip',
+  intelDmg: 'https://github.com/wzz6423/zisla/releases/download/v0.1.16/zisla-v0.1.16-macOS-x86_64.dmg',
+  intelZip: 'https://github.com/wzz6423/zisla/releases/download/v0.1.16/zisla-v0.1.16-macOS-x86_64.zip',
   previewPage: 'https://github.com/wzz6423/zisla/releases/tag/v0.1.3-preview.1',
 };
 
@@ -194,6 +194,16 @@ export interface ChangelogEntry {
  * 统一以英文原文展示（11 版 × 17 语翻译不可维护）；v0.1.8/v0.1.0 无 Highlights 段，取其正文概述。
  */
 export const changelogEntries: readonly ChangelogEntry[] = [
+  {
+    version: 'v0.1.16',
+    date: '2026-10-05',
+    notes: [
+      'Search settings by name and keywords in all 17 supported languages, then jump directly to a matching control. Search results follow enabled features and the controls currently available.',
+      'Keyboard sound selection now reflects the installed sound-pack catalog and refreshes when that catalog changes.',
+      'A more compact Wi-Fi popover reduces the panel width, network-list height, spacing, and toggle size.',
+      'Contributor guidance and pull-request validation now cover complete validation records and project schedule dates.',
+    ],
+  },
   {
     version: 'v0.1.15',
     date: '2026-10-04',
