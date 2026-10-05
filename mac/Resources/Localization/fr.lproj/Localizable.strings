@@ -2635,3 +2635,7 @@
 "无法前往记录位置，窗口或显示器可能已关闭" = "Impossible d’accéder à l’emplacement enregistré. La fenêtre ou l’écran n’est peut-être plus disponible.";
 "记录便签" = "Prendre une note";
 "已保存便签" = "Note enregistrée";
+
+"搜索设置" = "Rechercher dans les réglages";
+"搜索结果" = "Résultats de recherche";
+"未找到设置项" = "Aucun réglage trouvé";

@@ -2639,3 +2639,7 @@
 "无法前往记录位置，窗口或显示器可能已关闭" = "Không thể đi đến vị trí đã lưu. Cửa sổ có thể đã đóng hoặc màn hình không còn kết nối.";
 "记录便签" = "Ghi chú";
 "已保存便签" = "Đã lưu ghi chú";
+
+"搜索设置" = "Tìm kiếm cài đặt";
+"搜索结果" = "Kết quả tìm kiếm";
+"未找到设置项" = "Không tìm thấy cài đặt";

@@ -2639,3 +2639,7 @@
 "无法前往记录位置，窗口或显示器可能已关闭" = "Tidak dapat membuka lokasi tersimpan. Jendela atau layar mungkin sudah tidak tersedia.";
 "记录便签" = "Catat";
 "已保存便签" = "Catatan tersimpan";
+
+"搜索设置" = "Cari pengaturan";
+"搜索结果" = "Hasil pencarian";
+"未找到设置项" = "Pengaturan tidak ditemukan";

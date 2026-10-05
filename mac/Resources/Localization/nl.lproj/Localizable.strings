@@ -2639,3 +2639,7 @@
 "无法前往记录位置，窗口或显示器可能已关闭" = "Kan niet naar de opgeslagen locatie gaan. Het venster of beeldscherm is mogelijk niet meer beschikbaar.";
 "记录便签" = "Notitie maken";
 "已保存便签" = "Notitie opgeslagen";
+
+"搜索设置" = "Instellingen zoeken";
+"搜索结果" = "Zoekresultaten";
+"未找到设置项" = "Geen instellingen gevonden";

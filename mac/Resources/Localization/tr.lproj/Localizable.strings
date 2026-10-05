@@ -2639,3 +2639,7 @@
 "无法前往记录位置，窗口或显示器可能已关闭" = "Kaydedilen konuma gidilemiyor. Pencere veya ekran artık kullanılamıyor olabilir.";
 "记录便签" = "Not al";
 "已保存便签" = "Not kaydedildi";
+
+"搜索设置" = "Ayarlarda ara";
+"搜索结果" = "Arama sonuçları";
+"未找到设置项" = "Ayar bulunamadı";

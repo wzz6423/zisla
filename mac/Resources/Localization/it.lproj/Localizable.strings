@@ -2639,3 +2639,7 @@
 "无法前往记录位置，窗口或显示器可能已关闭" = "Impossibile raggiungere la posizione salvata. La finestra o lo schermo potrebbero non essere più disponibili.";
 "记录便签" = "Crea nota";
 "已保存便签" = "Nota salvata";
+
+"搜索设置" = "Cerca nelle impostazioni";
+"搜索结果" = "Risultati di ricerca";
+"未找到设置项" = "Nessuna impostazione trovata";

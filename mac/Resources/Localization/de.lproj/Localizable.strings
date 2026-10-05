@@ -2640,3 +2640,7 @@
 "无法前往记录位置，窗口或显示器可能已关闭" = "Der gespeicherte Ort ist nicht erreichbar. Das Fenster oder der Bildschirm ist möglicherweise nicht mehr verfügbar.";
 "记录便签" = "Notiz erstellen";
 "已保存便签" = "Notiz gespeichert";
+
+"搜索设置" = "Einstellungen suchen";
+"搜索结果" = "Suchergebnisse";
+"未找到设置项" = "Keine Einstellungen gefunden";
