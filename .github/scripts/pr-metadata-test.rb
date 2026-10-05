@@ -24,6 +24,36 @@ class PullRequestMetadataTest < Minitest::Test
     assert_includes errors.join("\n"), '## AI Attribution'
   end
 
+  def test_requires_visible_summary_content
+    ['', '   ', '<!-- Describe the change. -->', '-', '*', '+', '1.', '1)', '- [ ]', '- [x]', '- [X]',
+     '- <!-- Describe the change. -->'].each do |summary|
+      body = build_body.sub('- Add pull request automation.', summary)
+      errors = PullRequestMetadata.validate(title: 'ci: add automation', body: body, contract: @contract)
+
+      assert_includes errors.join("\n"), 'Summary must include a non-empty description.', summary.inspect
+    end
+
+    ['Validate PR metadata.', '- [ ] Validate PR metadata.', '1. Validate PR metadata.'].each do |summary|
+      body = build_body.sub('- Add pull request automation.', summary)
+      assert_empty PullRequestMetadata.validate(title: 'ci: add automation', body: body, contract: @contract)
+    end
+  end
+
+  def test_requires_each_risk_and_rollback_field
+    { 'Risk' => 'Repository automation only.', 'Rollback' => 'Revert this pull request.' }.each do |field, value|
+      ['', '   ', '<!-- Describe this field. -->'].each do |replacement|
+        body = build_body.sub("- #{field}: #{value}", "- #{field}: #{replacement}")
+        errors = PullRequestMetadata.validate(title: 'ci: add automation', body: body, contract: @contract)
+
+        assert_includes errors.join("\n"), "Risk and Rollback must declare exactly one non-empty #{field} field."
+      end
+
+      body = build_body.sub("- #{field}: #{value}", "- #{field}: #{value}\n- #{field}: Conflicting value.")
+      errors = PullRequestMetadata.validate(title: 'ci: add automation', body: body, contract: @contract)
+      assert_includes errors.join("\n"), "Risk and Rollback must declare exactly one non-empty #{field} field."
+    end
+  end
+
   def test_rejects_a_non_conventional_title
     assert_includes validate('add automation').join("\n"), 'Conventional Commit'
   end
@@ -141,6 +171,75 @@ class PullRequestMetadataTest < Minitest::Test
     assert_includes validate('ci: add automation', validation: "- Status: passed\n- Command: <!-- required -->").join("\n"), 'non-empty Command'
   end
 
+  def test_accepts_multiple_complete_validation_entries
+    validation = "- Status: passed\n- Command: rake unit\n- Result: 10 passed.\n\n" \
+                 "- Status: failed\n- Command: rake integration\n- Result: 1 failed.\n\n" \
+                 "- Status: not run\n- Reason: UI was not changed."
+
+    assert_empty validate('ci: add automation', validation: validation)
+  end
+
+  def test_rejects_invalid_or_empty_status_in_later_validation_entries
+    ['skipped', '', '   ', '<!-- passed, failed, or not run -->'].each do |status|
+      validation = "- Status: passed\n- Command: rake\n- Result: 10 passed.\n- Status: #{status}"
+      errors = validate('ci: add automation', validation: validation)
+
+      assert_includes errors.join("\n"), 'Validation entry 2 must declare one exact status', status.inspect
+    end
+  end
+
+  def test_requires_fields_in_each_validation_entry
+    { 'passed' => %w[Command Result], 'failed' => %w[Command Result], 'not run' => ['Reason'] }.each do |status, fields|
+      validation = "- Status: passed\n- Command: rake\n- Result: 10 passed.\n- Reason: Earlier entry.\n- Status: #{status}"
+      errors = validate('ci: add automation', validation: validation)
+
+      fields.each do |field|
+        assert_includes errors.join("\n"), "Validation entry 2 must include a non-empty #{field}", status
+      end
+    end
+  end
+
+  def test_validation_entries_cannot_borrow_fields_from_a_later_entry
+    { 'passed' => %w[Command Result], 'failed' => %w[Command Result], 'not run' => ['Reason'] }.each do |status, fields|
+      validation = "- Status: #{status}\n- Status: passed\n- Command: rake\n- Result: 10 passed.\n- Reason: Later entry."
+      errors = validate('ci: add automation', validation: validation)
+
+      fields.each do |field|
+        assert_includes errors.join("\n"), "Validation entry 1 must include a non-empty #{field}", status
+      end
+    end
+  end
+
+  def test_rejects_duplicate_non_empty_fields_within_a_validation_entry
+    %w[Command Result Reason].each do |field|
+      validation = "- Status: passed\n- Command: rake\n- Result: 10 passed.\n- Reason: Context.\n- #{field}: Conflicting value."
+      errors = validate('ci: add automation', validation: validation)
+
+      assert_includes errors.join("\n"), "Validation entry 1 must declare at most one non-empty #{field}", field
+    end
+  end
+
+  def test_validation_ignores_commented_entries_and_empty_optional_fields_with_crlf
+    validation = "<!--\n- Status: skipped\n- Command: ignored\n-->\n" \
+                 "- Status: passed <!-- selected -->\n- Command: rake\n- Command: <!-- unused -->\n- Result: 10 passed.\n" \
+                 "- Status: not run\n- Command: <!-- unused -->\n- Result:\n- Reason: UI was not changed."
+    body = build_body(validation: validation).gsub("\n", "\r\n")
+
+    assert_empty PullRequestMetadata.validate(title: 'ci: add automation', body: body, contract: @contract)
+  end
+
+  def test_rejects_comment_placeholders_in_later_required_validation_fields
+    { 'passed' => %w[Command Result], 'failed' => %w[Command Result], 'not run' => ['Reason'] }.each do |status, fields|
+      validation = "- Status: passed\n- Command: rake\n- Result: 10 passed.\n- Status: #{status}\n" \
+                   "- Command: <!-- required -->\n- Result: <!-- required -->\n- Reason: <!-- required -->"
+      errors = validate('ci: add automation', validation: validation)
+
+      fields.each do |field|
+        assert_includes errors.join("\n"), "Validation entry 2 must include a non-empty #{field}", status
+      end
+    end
+  end
+
   def test_related_issue_accepts_a_closing_keyword
     metadata = parse(related: 'Closes #123')
 
@@ -163,6 +262,12 @@ class PullRequestMetadataTest < Minitest::Test
     errors = validate('ci: add automation', related: "None\nCloses #7")
 
     assert_includes errors.join("\n"), 'cannot be both'
+  end
+
+  def test_related_issue_none_must_be_the_entire_visible_section
+    ["None\nSee #123", "- None\n- None", "None\nUnrelated text."].each do |related|
+      assert_includes validate('ci: add automation', related: related).join("\n"), 'or exactly "None"'
+    end
   end
 
   def test_related_issue_without_an_issue_has_no_development_label
@@ -201,6 +306,14 @@ class PullRequestMetadataTest < Minitest::Test
     assert_includes validate('ci: add automation', attribution: '- Author: human').join("\n"), '- Agent:'
   end
 
+  def test_rejects_multiple_agent_fields_instead_of_reading_only_the_first
+    ['None', 'Codex'].each do |first|
+      errors = validate('ci: add automation', attribution: "- Agent: #{first}\n- Agent: Codex")
+
+      assert_includes errors.join("\n"), 'exactly one non-empty "- Agent:'
+    end
+  end
+
   def test_agent_none_needs_no_trailer
     assert_empty validate('ci: add automation', attribution: '- Agent: none')
     assert_nil parse(attribution: '- Agent: none')['agent']
@@ -208,9 +321,12 @@ class PullRequestMetadataTest < Minitest::Test
 
   def test_repository_template_needs_only_its_own_fields_filled_in
     template = File.read(File.expand_path('../PULL_REQUEST_TEMPLATE.md', __dir__))
+                   .sub('<!-- Describe the purpose and implementation in English. -->', '- Validate all PR fields.')
                    .sub(/^- Type:$/, '- Type: ci')
                    .sub(/^- Status:.*$/, '- Status: not run')
                    .sub(/^- Reason:.*$/, '- Reason: Automation only.')
+                   .sub(/^- Risk:.*$/, '- Risk: Repository automation only.')
+                   .sub(/^- Rollback:.*$/, '- Rollback: Revert this pull request.')
     metadata = PullRequestMetadata.parse(template, @contract)
 
     # The comment above the Related Issue placeholder documents `Closes #123`, so

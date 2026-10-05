@@ -191,9 +191,15 @@ module PullRequestMetadata
     missing = REQUIRED_SECTIONS.reject { |section| metadata['sections'].key?(section) }
     errors << "Missing required section(s): #{missing.map { |section| "## #{section}" }.join(', ')}." unless missing.empty?
 
+    summary = metadata['sections']['Summary']
+    if summary && summary.all? { |line| line.strip.match?(/\A(?:(?:[-*+]|\d+[.)])(?:[[:space:]]+\[[ xX]\])?)?\z/) }
+      errors << 'Summary must include a non-empty description.'
+    end
+
     errors.concat(validate_type(metadata, contract, title_match))
     errors.concat(validate_project(metadata, contract))
     errors.concat(validate_validation(metadata))
+    errors.concat(validate_risk_and_rollback(metadata))
     errors.concat(validate_related_issue(metadata))
     errors.concat(validate_attribution(metadata))
     errors
@@ -232,32 +238,58 @@ module PullRequestMetadata
     lines = metadata['sections']['Validation']
     return [] if lines.nil?
 
-    status = field(lines, 'Status')
-    unless ['passed', 'failed', 'not run'].include?(status)
-      return ['Validation must declare one exact status: passed, failed, or not run.']
+    entries = []
+    lines.each do |line|
+      entries << [] if line.match?(/\A[[:space:]]*-[[:space:]]*Status:/i)
+      entries.last << line unless entries.empty?
     end
+    return ['Validation must declare one exact status: passed, failed, or not run.'] if entries.empty?
 
-    required = status == 'not run' ? ['Reason'] : %w[Command Result]
-    required.filter_map do |key|
-      "Validation must include a non-empty #{key} field." if field(lines, key).nil?
+    entries.each_with_index.flat_map do |entry, index|
+      label = "Validation entry #{index + 1}"
+      status = field(entry, 'Status')
+      unless ['passed', 'failed', 'not run'].include?(status)
+        next ["#{label} must declare one exact status: passed, failed, or not run."]
+      end
+
+      required = status == 'not run' ? ['Reason'] : %w[Command Result]
+      %w[Command Result Reason].filter_map do |key|
+        values = field_values(entry, key)
+        if values.length > 1
+          "#{label} must declare at most one non-empty #{key} field."
+        elsif required.include?(key) && values.empty?
+          "#{label} must include a non-empty #{key} field."
+        end
+      end
     end
   end
 
   def self.validate_related_issue(metadata)
-    return [] if metadata['sections']['Related Issue'].nil?
+    lines = metadata['sections']['Related Issue']
+    return [] if lines.nil?
 
     has_issue = !Array(metadata['issues']).empty?
-    return ['Related Issue must use a closing keyword such as "Closes #123", or exactly "None".'] unless has_issue || metadata['relatedIsNone']
+    only_none = metadata['relatedIsNone'] && lines.count { |line| !line.strip.empty? } == 1
+    return ['Related Issue must use a closing keyword such as "Closes #123", or exactly "None".'] unless has_issue || only_none
     return ['Related Issue cannot be both "None" and a closing reference.'] if has_issue && metadata['relatedIsNone']
 
     []
   end
 
+  def self.validate_risk_and_rollback(metadata)
+    lines = metadata['sections']['Risk and Rollback']
+    return [] if lines.nil?
+
+    %w[Risk Rollback].filter_map do |key|
+      "Risk and Rollback must declare exactly one non-empty #{key} field." unless field_values(lines, key).length == 1
+    end
+  end
+
   def self.validate_attribution(metadata)
     return [] if metadata['sections']['AI Attribution'].nil?
 
-    if metadata['agentRaw'].nil?
-      return ['AI Attribution must declare "- Agent: <name>", or "- Agent: None" for a fully human-authored change.']
+    unless field_values(metadata['sections']['AI Attribution'], 'Agent').length == 1
+      return ['AI Attribution must declare exactly one non-empty "- Agent: <name>", or "- Agent: None" for a fully human-authored change.']
     end
 
     co_authors = Array(metadata['coAuthors'])

@@ -47,6 +47,35 @@ class AutomationWorkflowsTest < Minitest::Test
     assert_equal 1, calls.count { |call| call['args'][0, 2] == %w[pr create] }
   end
 
+  def test_pr_quality_runs_the_complete_validator_and_cleans_payloads
+    install_workflow_fixture
+    document = File.read(File.join(ROOT, 'CONTRIBUTING.md'))
+    title = document.match(/Example title: `([^`]+)`/)[1]
+    body = document.match(/^  ```markdown\n(.*?)^  ```[ \t]*$/m)[1].gsub(/^  /, '')
+    cases = {
+      'complete' => [body, nil],
+      'later validation entry' => [body.sub(/^- Reason:.*$/, '- Reason:'), 'Validation entry 4'],
+      'missing risk' => [body.sub(/^- Risk:.*$/, '- Risk:'), 'non-empty Risk'],
+      'invalid date' => [body.sub(/^- Target date:.*$/, '- Target date: 2026-02-30'), 'valid date']
+    }
+    cleanup = step('pr-quality-gates', 'Remove pull request metadata files')
+    assert_equal 'always()', cleanup.fetch('if')
+
+    cases.each do |name, (candidate, expected_error)|
+      output, status = run_step(step('pr-quality-gates', 'Validate title and body'),
+                               'PR_TITLE' => title, 'PR_BODY' => candidate)
+      assert_equal expected_error.nil?, status.success?, "#{name}: #{output}"
+      assert_includes output, expected_error if expected_error
+      assert_equal candidate, File.read(File.join(@directory, 'pr-body.md')), name
+
+      output, status = run_step(cleanup)
+      assert status.success?, output
+      %w[pr-title.txt pr-body.md].each do |filename|
+        refute File.exist?(File.join(@directory, filename)), "#{name}: #{filename} was not removed"
+      end
+    end
+  end
+
   def test_missing_token_fails_before_any_repository_mutation
     output, status = run_step(step('emoji-catalog-update', 'Create an update pull request'), 'GH_TOKEN' => '')
     refute status.success?

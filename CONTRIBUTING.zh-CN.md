@@ -47,40 +47,71 @@ swift test
   - `GitHub Project` 保留模板给出的 `- Project: zisla Development`。`Project Automation` 据此把 PR 放进共享看板。
   - `GitHub Project` 中可选填 `Start date` 和 `Target date`，格式为 `YYYY-MM-DD`；留空会保留 Project 中已有的值。`Submitted date` 自动取 UTC+08:00 的创建日期；`End date` 在 PR 合并时自动填写，两者都不需要手动输入。
   - `PR Type` 只写一条 `- Type:`，且必须能解析为标题中的类型。标题使用规范类型；正文同时接受类型标签名和已配置别名，因此 `fix`、`bug`、`bug fix`、`bugfix`、`hotfix` 都会解析为 `fix`。`PR Automation` 会根据解析后的类型打标签，例如 `fix` 对应 `bug`。
-  - `Validation` 中每项都必须声明 `passed`、`failed` 或 `not run`：前两者需要 `Command` 与 `Result`，后者需要 `Reason`。
+  - `Project Automation` 按配置的标签映射（包含 PR 类型标签）选择 `Status`，关闭或合并后设为 `Done`，不需要手动填写。
+  - `Summary` 必须说明改动；`Risk and Rollback` 必须各填写一条非空的 `Risk` 和 `Rollback`。
+  - 每项 `Validation` 都从自己的 `- Status:` 开始，精确声明 `passed`、`failed` 或 `not run`。每项 `passed` 或 `failed` 都需要自己的非空 `Command` 和 `Result`；每项 `not run` 都需要自己的非空 `Reason`，不能借用其他项的字段。测试失败时如实填写 `failed`。
   - `Related Issue` 要么用 `Closes #123` 之类的关键字关联 Issue（同时自动打上 `development`），要么写成 `None`。
-  - `AI Attribution` 必须声明 `- Agent:`。声明了具体 agent 时，必须补一条 `- Co-authored-by: Name <email>`，并且该 trailer 必须真实出现在至少一个 commit 上，同时会自动打上 `ai-assisted`。
+  - `AI Attribution` 必须声明且仅声明一条非空的 `- Agent:`。声明了具体 agent 时，必须补一条 `- Co-authored-by: Name <email>`，并且该 trailer 必须真实出现在至少一个 commit 上，同时会自动打上 `ai-assisted`。
 
-  正文示例：
+  标题示例：`fix(ci): validate every PR metadata entry`
+
+  正文示例（请填写实际验证结果）：
 
   ```markdown
   ## Summary
-  - Add a repository hygiene check.
+  - Validate every PR metadata field and each Validation entry independently.
+  - Keep contributor welcome replies aligned with the current PR template.
 
   ## GitHub Project
   - Project: zisla Development
   - Start date: 2026-10-05
   - Target date: 2026-10-12
+  <!--
+  Automatic Project fields (illustration only; not PR body inputs):
+  - Submitted date: 2026-10-05 (PR creation date in UTC+08:00)
+  - End date: 2026-10-12 (assumed merge date in UTC+08:00; blank before merge)
+  Automation updates Project date fields and the PR Timeline; it does not fill these comment lines.
+  -->
 
   ## PR Type
-  - Type: ci
+  - Type: fix
 
   ## Validation
   - Status: passed
-  - Command: shellcheck .github/scripts/check-repository-hygiene.sh
-  - Result: All checks passed.
+  - Command: ruby .github/scripts/pr-metadata-test.rb
+  - Result: All PR metadata contract tests passed.
+
+  - Status: passed
+  - Command: ruby .github/scripts/contributor-welcome-test.rb
+  - Result: Both documented examples pass PR validation and the welcome reply preserves the complete example.
+
+  - Status: passed
+  - Command: actionlint .github/workflows/*.yml
+  - Result: All workflow files passed actionlint.
+
+  - Status: not run
+  - Reason: Local macOS tests were not run because this change only affects PR metadata and contributor guidance. Platform checks still run in CI.
 
   ## Risk and Rollback
-  - Risk: Only repository automation is affected.
-  - Rollback: Revert this pull request.
+  - Risk: Stricter metadata checks may reject incomplete PR descriptions; no application behavior changes.
+  - Rollback: Revert this pull request to restore the previous metadata checks and guidance.
 
   ## Related Issue
-  Closes #123
+  None
 
   ## AI Attribution
-  - Agent: Claude Code
-  - Co-authored-by: Claude <noreply@anthropic.com>
+  - Agent: Codex
+  - Co-authored-by: Codex <noreply@openai.com>
   ```
+
+  日期示例：假设 PR 于 2026-10-05 创建、2026-10-12 合并（UTC+08:00）。代码注释中的自动字段只展示 Project 的示例值，不是输入项；自动化更新 GitHub Project 和 PR Timeline，不会填写这些示例注释行。
+
+  | 日期 | 创建时（2026-10-05） | 合并后（2026-10-12） | 来源 |
+  | --- | --- | --- | --- |
+  | `Start date` | 2026-10-05 | 2026-10-05 | 可选手填 |
+  | `Target date` | 2026-10-12 | 2026-10-12 | 可选手填 |
+  | `Submitted date` | 2026-10-05 | 2026-10-05 | 自动取创建日期 |
+  | `End date` | 空 | 2026-10-12 | 自动取合并日期 |
 
 - `PR Quality` 检查会自动验证上述格式；状态检查未通过时不能合并。随后 `PR Automation` 负责打标签与指派。
 - macOS 代码变更必须运行 `cd mac && swift test`；涉及界面时请用文字说明实际验证结果。
