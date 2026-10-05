@@ -1795,7 +1795,7 @@
 "帮助识别影视作品、音乐人与平台" = "Aide à reconnaître les films, musiciens et plateformes";
 "当前安装版本高于公开版本 %@" = "La version installée est plus récente que la version publique %@";
 "新建草稿并保存后会显示在这里。" = "Créez et enregistrez un brouillon pour le voir ici.";
-"选择 20 种内置机械键盘音色" = "Choisissez parmi 20 sons de clavier mécanique intégrés";
+"选择机械键盘音色" = "Choisir un son de clavier mécanique";
 "隔离安装 Python CLI" = "Installer les CLI Python de façon isolée";
 "定期检查当前安装包所属的更新通道" = "Vérifier régulièrement le canal de mise à jour de cette version";
 "将选定页面分别输出为独立 PDF" = "Exporter chaque page sélectionnée dans un PDF distinct";
@@ -2635,3 +2635,7 @@
 "无法前往记录位置，窗口或显示器可能已关闭" = "Impossible d’accéder à l’emplacement enregistré. La fenêtre ou l’écran n’est peut-être plus disponible.";
 "记录便签" = "Prendre une note";
 "已保存便签" = "Note enregistrée";
+
+"搜索设置" = "Rechercher dans les réglages";
+"搜索结果" = "Résultats de recherche";
+"未找到设置项" = "Aucun réglage trouvé";

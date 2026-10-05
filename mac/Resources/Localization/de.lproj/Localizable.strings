@@ -1800,7 +1800,7 @@
 "帮助识别影视作品、音乐人与平台" = "Hilft beim Erkennen von Filmen, Musikern und Plattformen";
 "当前安装版本高于公开版本 %@" = "Die installierte Version ist neuer als die öffentliche Version %@";
 "新建草稿并保存后会显示在这里。" = "Erstellen und speichern Sie einen Entwurf, um ihn hier zu sehen.";
-"选择 20 种内置机械键盘音色" = "Wählen Sie aus 20 integrierten mechanischen Tastatur-Sounds";
+"选择机械键盘音色" = "Mechanischen Tastatur-Sound auswählen";
 "隔离安装 Python CLI" = "Python-CLIs isoliert installieren";
 "定期检查当前安装包所属的更新通道" = "Regelmäßig den Update-Kanal dieses Builds prüfen";
 "将选定页面分别输出为独立 PDF" = "Jede ausgewählte Seite als eigenes PDF exportieren";
@@ -2640,3 +2640,7 @@
 "无法前往记录位置，窗口或显示器可能已关闭" = "Der gespeicherte Ort ist nicht erreichbar. Das Fenster oder der Bildschirm ist möglicherweise nicht mehr verfügbar.";
 "记录便签" = "Notiz erstellen";
 "已保存便签" = "Notiz gespeichert";
+
+"搜索设置" = "Einstellungen suchen";
+"搜索结果" = "Suchergebnisse";
+"未找到设置项" = "Keine Einstellungen gefunden";

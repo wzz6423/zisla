@@ -5,7 +5,7 @@ import Testing
 @testable import KeyboardKit
 
 struct KeyboardBundledSoundPackTests {
-    @Test(arguments: ["WhiteFox Hako Violet", "Apple M0118 ALPS SKCM Orange"])
+    @Test(arguments: ["WhiteFox Hako Violet", "Apple M0118 ALPS SKCM Orange", "BCP (Suit80)"])
     func bundledRecordingLoadsAndResolvesEveryAssignableKey(name: String) async throws {
         let temporary = FileManager.default.temporaryDirectory
             .appendingPathComponent("Zisla.SoundPacks.\(UUID().uuidString)")

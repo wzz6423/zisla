@@ -1799,7 +1799,7 @@
 "帮助识别影视作品、音乐人与平台" = "Giúp nhận dạng phim ảnh, nhạc sĩ và nền tảng";
 "当前安装版本高于公开版本 %@" = "Phiên bản đã cài mới hơn bản phát hành công khai %@";
 "新建草稿并保存后会显示在这里。" = "Tạo và lưu một bản nháp để thấy nó ở đây.";
-"选择 20 种内置机械键盘音色" = "Chọn trong 20 âm bàn phím cơ tích hợp";
+"选择机械键盘音色" = "Chọn âm bàn phím cơ";
 "隔离安装 Python CLI" = "Cài CLI Python trong môi trường tách biệt";
 "定期检查当前安装包所属的更新通道" = "Định kỳ kiểm tra kênh cập nhật của bản build này";
 "将选定页面分别输出为独立 PDF" = "Xuất từng trang đã chọn thành PDF riêng";
@@ -2639,3 +2639,7 @@
 "无法前往记录位置，窗口或显示器可能已关闭" = "Không thể đi đến vị trí đã lưu. Cửa sổ có thể đã đóng hoặc màn hình không còn kết nối.";
 "记录便签" = "Ghi chú";
 "已保存便签" = "Đã lưu ghi chú";
+
+"搜索设置" = "Tìm kiếm cài đặt";
+"搜索结果" = "Kết quả tìm kiếm";
+"未找到设置项" = "Không tìm thấy cài đặt";

@@ -12,8 +12,10 @@ struct SettingsView: View {
     @StateObject private var launchAtLogin = LaunchAtLoginController()
     @StateObject private var networkProxyMonitor = NetworkProxyAvailabilityMonitor()
     @Environment(\.colorScheme) private var colorScheme
+    @Environment(\.locale) private var locale
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @FocusState private var searchFieldFocused: Bool
+    @FocusState private var settingsSearchFieldFocused: Bool
     @State private var draggedWeatherLocationID: String?
     @State private var draggedModuleOrder: IslandModuleOrder?
     @State private var draggedCompactStatusPriority: CompactStatusPriority?
@@ -105,39 +107,45 @@ struct SettingsView: View {
                 .foregroundStyle(.secondary)
                 .padding(.top, 1)
 
-            VStack(spacing: 2) {
-                ForEach(visibleSections) { section in
-                    Button {
-                        selectSettingsSection(section)
-                    } label: {
-                        HStack(spacing: 8) {
-                            Image(systemName: section.symbol)
-                                .font(.system(size: 12, weight: .semibold))
-                                .frame(width: 17)
-                            AppLocalizedText(section.title)
-                                .font(.system(size: 11, weight: .medium))
-                                .fitsLines(2, minScale: 0.7)
-                            Spacer(minLength: 0)
+            settingsSearchField
+                .padding(.top, 14)
+
+            ScrollView {
+                VStack(spacing: 2) {
+                    ForEach(visibleSections) { section in
+                        Button {
+                            selectSettingsSection(section)
+                        } label: {
+                            HStack(spacing: 8) {
+                                Image(systemName: section.symbol)
+                                    .font(.system(size: 12, weight: .semibold))
+                                    .frame(width: 17)
+                                AppLocalizedText(section.title)
+                                    .font(.system(size: 11, weight: .medium))
+                                    .fitsLines(2, minScale: 0.7)
+                                Spacer(minLength: 0)
+                            }
+                            .padding(.horizontal, 8)
+                            .frame(height: 34)
+                            .contentShape(Rectangle())
                         }
-                        .padding(.horizontal, 8)
-                        .frame(height: 32)
-                        .contentShape(Rectangle())
-                    }
-                    .buttonStyle(PressableStyle(hoverScale: 1.018, pressedScale: 0.965))
-                    .foregroundStyle(input.selection == section ? Color.primary : Color.secondary)
-                    .background {
-                        if input.selection == section {
-                            SelectionGlassBackground(cornerRadius: 6)
-                                .matchedGeometryEffect(
-                                    id: "settings-section-selection",
-                                    in: sectionSelectionNamespace
-                                )
+                        .buttonStyle(PressableStyle(hoverScale: 1.018, pressedScale: 0.965))
+                        .foregroundStyle(input.selection == section ? Color.primary : Color.secondary)
+                        .background {
+                            if input.selection == section {
+                                SelectionGlassBackground(cornerRadius: 6)
+                                    .matchedGeometryEffect(
+                                        id: "settings-section-selection",
+                                        in: sectionSelectionNamespace
+                                    )
+                            }
                         }
+                        .accessibilityLabel(AppLocalization.text("%@设置", AppLocalization.text(section.title)))
                     }
-                    .accessibilityLabel(AppLocalization.text("%@设置", AppLocalization.text(section.title)))
                 }
             }
-            .padding(.top, 20)
+            .thinScrollChrome()
+            .padding(.top, 8)
             .animation(reduceMotion ? nil : ZislaMotion.selection, value: input.selection)
 
             Spacer(minLength: 12)
@@ -178,47 +186,142 @@ struct SettingsView: View {
         .background(Color.primary.opacity(colorScheme == .dark ? 0.035 : 0.025))
     }
 
-    private var detail: some View {
-        ScrollView {
-            VStack(alignment: .leading, spacing: 22) {
-                VStack(alignment: .leading, spacing: 3) {
-                    AppLocalizedText(input.selection.title)
-                        .font(.system(size: 20, weight: .semibold))
-                    AppLocalizedText(input.selection.subtitle)
-                        .font(.system(size: 10))
+    private var settingsSearchField: some View {
+        HStack(spacing: 5) {
+            Image(systemName: "magnifyingglass")
+                .foregroundStyle(.secondary)
+            TextField(AppLocalization.text("搜索设置"), text: $input.settingsQuery)
+                .textFieldStyle(.plain)
+                .focused($settingsSearchFieldFocused)
+                .accessibilityIdentifier("settings-search-field")
+                .accessibilityLabel(AppLocalization.text("搜索设置"))
+                .onSubmit {
+                    if let result = settingsSearchResults.first {
+                        openSettingsSearchResult(result)
+                    }
+                }
+                .onExitCommand { input.settingsQuery = "" }
+            if !input.settingsQuery.isEmpty {
+                Button {
+                    input.settingsQuery = ""
+                    settingsSearchFieldFocused = true
+                } label: {
+                    Image(systemName: "xmark.circle.fill")
                         .foregroundStyle(.secondary)
                 }
-                DeferredMount {
-                    selectedContent
-                        .id(input.selection)
-                        .transition(
-                            reduceMotion
-                                ? .opacity
-                                : .settingsPagePush(direction: sectionSwitchDirection)
-                        )
+                .buttonStyle(.plain)
+                .help(AppLocalization.text("清除"))
+                .accessibilityLabel(AppLocalization.text("清除"))
+            }
+        }
+        .font(.system(size: 11))
+        .padding(.horizontal, 7)
+        .frame(height: 28)
+        .background(Color.fillControl, in: RoundedRectangle(cornerRadius: 6, style: .continuous))
+        .overlay {
+            RoundedRectangle(cornerRadius: 6, style: .continuous)
+                .strokeBorder(Color.primary.opacity(0.12), lineWidth: 0.5)
+        }
+    }
+
+    private var settingsSearchResults: [SettingsSearchItem] {
+        SettingsSearchIndex.results(for: input.settingsQuery, settings: settingsStore.settings, locale: locale)
+    }
+
+    private var searchResultsContent: some View {
+        let results = settingsSearchResults
+        return VStack(alignment: .leading, spacing: 16) {
+            AppLocalizedText("搜索结果")
+                .font(.system(size: 20, weight: .semibold))
+            if results.isEmpty {
+                AppLocalizedText("未找到设置项")
+                    .font(.system(size: 11))
+                    .foregroundStyle(.secondary)
+            } else {
+                LazyVStack(spacing: 2) {
+                    ForEach(results) { result in
+                        Button {
+                            openSettingsSearchResult(result)
+                        } label: {
+                            HStack(spacing: 10) {
+                                Image(systemName: result.section.symbol)
+                                    .foregroundStyle(Color.accentColor)
+                                    .frame(width: 24)
+                                VStack(alignment: .leading, spacing: 3) {
+                                    AppLocalizedText(result.title)
+                                        .font(.system(size: 11, weight: .medium))
+                                    AppLocalizedText(result.section.title)
+                                        .font(.system(size: 10))
+                                        .foregroundStyle(.secondary)
+                                }
+                                Spacer(minLength: 8)
+                                Image(systemName: "chevron.forward")
+                                    .font(.system(size: 9, weight: .semibold))
+                                    .foregroundStyle(.tertiary)
+                            }
+                            .padding(.horizontal, 8)
+                            .padding(.vertical, 9)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .contentShape(Rectangle())
+                        }
+                        .buttonStyle(PressableStyle(hoverScale: 1.018, pressedScale: 0.965))
+                    }
+                }
+            }
+        }
+    }
+
+    private var detail: some View {
+        SettingsSearchScrollView(
+            target: input.searchTarget?.localized(locale: locale),
+            resetID: input.isSearching ? input.settingsQuery : ""
+        ) {
+            VStack(alignment: .leading, spacing: 22) {
+                if input.isSearching {
+                    searchResultsContent
+                } else {
+                    VStack(alignment: .leading, spacing: 3) {
+                        AppLocalizedText(input.selection.title)
+                            .font(.system(size: 20, weight: .semibold))
+                        AppLocalizedText(input.selection.subtitle)
+                            .font(.system(size: 10))
+                            .foregroundStyle(.secondary)
+                    }
+                    DeferredMount {
+                        AnyView(selectedContent)
+                            .id(input.selection)
+                            .transition(
+                                reduceMotion
+                                    ? .opacity
+                                    : .settingsPagePush(direction: sectionSwitchDirection)
+                            )
+                    }
                 }
             }
             .padding(.horizontal, 20)
             .padding(.vertical, 18)
             .frame(maxWidth: .infinity, alignment: .leading)
         }
-        .thinScrollChrome()
         .animation(reduceMotion ? nil : ZislaMotion.settingsPageSwitch, value: input.selection)
     }
 
-    private func selectSettingsSection(_ section: SettingsSection) {
-        guard section != input.selection else { return }
+    private func selectSettingsSection(_ section: SettingsSection, searchTarget: SettingsSearchAnchor? = nil) {
         if let currentIndex = SettingsSection.allCases.firstIndex(of: input.selection),
            let targetIndex = SettingsSection.allCases.firstIndex(of: section) {
             sectionSwitchDirection = targetIndex > currentIndex ? 1 : -1
         }
         if reduceMotion {
-            input.selection = section
+            input.select(section, searchTarget: searchTarget)
         } else {
             withAnimation(ZislaMotion.settingsPageSwitch) {
-                input.selection = section
+                input.select(section, searchTarget: searchTarget)
             }
         }
+    }
+
+    private func openSettingsSearchResult(_ result: SettingsSearchItem) {
+        selectSettingsSection(result.section, searchTarget: result.anchor)
+        settingsSearchFieldFocused = false
     }
 
     private var visibleSections: [SettingsSection] {
@@ -387,6 +490,7 @@ struct SettingsView: View {
                     }
                     rowDivider
                     SystemMonitorMenuBarSettingsView(settingsStore: model.settingsStore)
+                        .settingsSearchAnchor(SettingsSearchAnchor.group("settings-search-monitor-layout"))
                     rowDivider
                     settingRow(
                         symbol: "chart.xyaxis.line",
@@ -1198,7 +1302,7 @@ struct SettingsView: View {
     private var keyboardSoundContent: some View {
         VStack(alignment: .leading, spacing: 20) {
             settingsGroup("全局音效") {
-                settingRow(symbol: "waveform", title: "键盘音色", detail: "选择 20 种内置机械键盘音色") {
+                settingRow(symbol: "waveform", title: "键盘音色", detail: "选择机械键盘音色") {
                     HStack(spacing: 6) {
                         Picker("", selection: Binding(
                             get: { model.settingsStore.settings.keyboardSelectedProfileID },
@@ -2282,7 +2386,7 @@ struct SettingsView: View {
                         selectionID: "appearance-mode-selection",
                         fontSize: 9,
                         width: 216,
-                        height: 28
+                        height: 34
                     )
                 }
                 rowDivider
@@ -2799,6 +2903,7 @@ struct SettingsView: View {
                 tint: .secondary,
                 destination: ZislaKitInfo.newIssueURL
             )
+            .settingsSearchAnchor(SettingsSearchAnchor.row("settings-search-feedback"))
             .padding(.horizontal, 4)
 
             settingsGroup("更新策略") {
@@ -3556,6 +3661,7 @@ struct SettingsView: View {
         .padding(.leading, isNested ? 24 : 4)
         .padding(.trailing, 4)
         .frame(maxWidth: .infinity, minHeight: 48)
+        .settingsSearchAnchor(SettingsSearchAnchor.row(AppLocalization.string(title, locale: locale)))
     }
 
     private func reorderSettingRow(
@@ -3647,6 +3753,7 @@ struct SettingsView: View {
             .overlay(alignment: .top) { Divider() }
             .overlay(alignment: .bottom) { Divider() }
         }
+        .settingsSearchAnchor(SettingsSearchAnchor.group(AppLocalization.string(title, locale: locale)))
     }
 
     private var rowDivider: some View {
@@ -4185,13 +4292,33 @@ enum SettingsSection: String, CaseIterable, Identifiable {
 }
 
 @MainActor
-private final class SettingsInput: ObservableObject {
+final class SettingsInput: ObservableObject {
     @Published var selection: SettingsSection = .general
     @Published var voicePage: VoiceSettingsPage = .settings
     @Published var weatherQuery = ""
+    @Published var settingsQuery = "" {
+        didSet {
+            // The native field editor can write the cleared value again after selecting a result.
+            if settingsQuery != oldValue { searchTarget = nil }
+        }
+    }
+    @Published var searchTarget: SettingsSearchAnchor?
+
+    var isSearching: Bool {
+        !settingsQuery.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+    }
+
+    func select(_ section: SettingsSection, searchTarget: SettingsSearchAnchor? = nil) {
+        selection = section
+        settingsQuery = ""
+        self.searchTarget = searchTarget
+        if section == .voice && searchTarget != nil {
+            voicePage = .settings
+        }
+    }
 }
 
-private enum VoiceSettingsPage: String, CaseIterable, Identifiable {
+enum VoiceSettingsPage: String, CaseIterable, Identifiable {
     case settings
     case history
 
