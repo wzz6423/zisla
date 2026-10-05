@@ -1798,7 +1798,7 @@
 "帮助识别影视作品、音乐人与平台" = "Helps recognize films, musicians, and platforms";
 "当前安装版本高于公开版本 %@" = "Installed version is newer than the public release %@";
 "新建草稿并保存后会显示在这里。" = "Create and save a draft to see it here.";
-"选择 20 种内置机械键盘音色" = "Choose from 20 built-in mechanical keyboard sounds";
+"选择机械键盘音色" = "Choose a mechanical keyboard sound";
 "隔离安装 Python CLI" = "Install Python CLIs in isolation";
 "定期检查当前安装包所属的更新通道" = "Periodically check the update channel of this build";
 "将选定页面分别输出为独立 PDF" = "Export each selected page as a separate PDF";
@@ -2638,3 +2638,7 @@
 "无法前往记录位置，窗口或显示器可能已关闭" = "Cannot go to the saved location. The window or display may no longer be available.";
 "记录便签" = "Take a note";
 "已保存便签" = "Note saved";
+
+"搜索设置" = "Search Settings";
+"搜索结果" = "Search Results";
+"未找到设置项" = "No Settings Found";

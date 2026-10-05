@@ -1799,7 +1799,7 @@
 "帮助识别影视作品、音乐人与平台" = "Helpt bij het herkennen van films, series, muzikanten en platforms";
 "当前安装版本高于公开版本 %@" = "De geïnstalleerde versie is nieuwer dan de publieke versie %@";
 "新建草稿并保存后会显示在这里。" = "Maak een versie aan en sla die op om die hier te zien.";
-"选择 20 种内置机械键盘音色" = "Kies uit 20 ingebouwde mechanische toetsenbordgeluiden";
+"选择机械键盘音色" = "Kies een mechanisch toetsenbordgeluid";
 "隔离安装 Python CLI" = "Python-CLI’s geïsoleerd installeren";
 "定期检查当前安装包所属的更新通道" = "Regelmatig het updatekanaal van deze versie controleren";
 "将选定页面分别输出为独立 PDF" = "Elke gekozen pagina als afzonderlijke PDF exporteren";
@@ -2639,3 +2639,7 @@
 "无法前往记录位置，窗口或显示器可能已关闭" = "Kan niet naar de opgeslagen locatie gaan. Het venster of beeldscherm is mogelijk niet meer beschikbaar.";
 "记录便签" = "Notitie maken";
 "已保存便签" = "Notitie opgeslagen";
+
+"搜索设置" = "Instellingen zoeken";
+"搜索结果" = "Zoekresultaten";
+"未找到设置项" = "Geen instellingen gevonden";
