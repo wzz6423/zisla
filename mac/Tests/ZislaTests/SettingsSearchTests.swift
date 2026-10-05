@@ -161,6 +161,23 @@ struct SettingsSearchTests {
     }
 
     @Test @MainActor
+    func fieldEditorRepeatingClearedTextPreservesTheSelectedDestination() {
+        let input = SettingsInput()
+        input.settingsQuery = "键盘"
+        input.select(.features, searchTarget: .row("键盘音效"))
+
+        input.settingsQuery = ""
+        input.settingsQuery = ""
+
+        #expect(input.selection == .features)
+        #expect(!input.isSearching)
+        #expect(input.searchTarget == .row("键盘音效"))
+
+        input.settingsQuery = "天气"
+        #expect(input.searchTarget == nil)
+    }
+
+    @Test @MainActor
     func ordinaryNavigationClearsSearchWithoutResettingVoiceHistory() {
         let input = SettingsInput()
         input.selection = .voice

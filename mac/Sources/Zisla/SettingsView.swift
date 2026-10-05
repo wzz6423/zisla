@@ -4297,7 +4297,10 @@ final class SettingsInput: ObservableObject {
     @Published var voicePage: VoiceSettingsPage = .settings
     @Published var weatherQuery = ""
     @Published var settingsQuery = "" {
-        didSet { searchTarget = nil }
+        didSet {
+            // The native field editor can write the cleared value again after selecting a result.
+            if settingsQuery != oldValue { searchTarget = nil }
+        }
     }
     @Published var searchTarget: SettingsSearchAnchor?
 
