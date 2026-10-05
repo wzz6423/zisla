@@ -153,18 +153,22 @@ public final class KeyboardSoundController: ObservableObject {
     private let model: KeyboardAppModel
     private var cancellables: Set<AnyCancellable> = []
 
-    public let keyboardProfiles: [KeyboardSoundProfileOption]
-    public init() {
-        let model = KeyboardAppModel(startsServices: false)
+    @Published public private(set) var keyboardProfiles: [KeyboardSoundProfileOption] = []
+
+    public convenience init() {
+        self.init(model: KeyboardAppModel(startsServices: false))
+    }
+
+    init(model: KeyboardAppModel) {
         self.model = model
-        keyboardProfiles = SwitchProfile.allCases.map {
-            KeyboardSoundProfileOption(
-                id: $0.rawValue,
-                name: $0.displayName,
-                family: $0.family,
-                tone: $0.tone
-            )
-        }
+        model.$soundPacks
+            .map { descriptors in
+                descriptors.map {
+                    KeyboardSoundProfileOption(id: $0.id, name: $0.name, family: $0.family, tone: $0.tone)
+                }
+            }
+            .assign(to: &$keyboardProfiles)
+        model.refreshSoundPacks()
         refreshPublishedState()
         model.objectWillChange
             .sink { [weak self] in

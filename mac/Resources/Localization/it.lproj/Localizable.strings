@@ -1799,7 +1799,7 @@
 "帮助识别影视作品、音乐人与平台" = "Aiuta a riconoscere film, serie, musicisti e piattaforme";
 "当前安装版本高于公开版本 %@" = "La versione installata è più recente di quella pubblica %@";
 "新建草稿并保存后会显示在这里。" = "Crea e salva una bozza per vederla qui.";
-"选择 20 种内置机械键盘音色" = "Scegli tra 20 suoni di tastiera meccanica integrati";
+"选择机械键盘音色" = "Scegli un suono di tastiera meccanica";
 "隔离安装 Python CLI" = "Installa le CLI Python in isolamento";
 "定期检查当前安装包所属的更新通道" = "Controlla periodicamente il canale di aggiornamento di questa versione";
 "将选定页面分别输出为独立 PDF" = "Esporta ogni pagina selezionata come PDF separato";

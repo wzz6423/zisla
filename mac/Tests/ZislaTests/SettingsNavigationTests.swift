@@ -115,7 +115,7 @@ struct SettingsNavigationTests {
         let detail = String(source[detailRange.lowerBound..<detailEnd.lowerBound])
         let compactDetail = detail.components(separatedBy: .whitespacesAndNewlines).joined()
 
-        #expect(compactDetail.contains("DeferredMount{selectedContent.id(input.selection).transition("))
+        #expect(compactDetail.contains("DeferredMount{AnyView(selectedContent).id(input.selection).transition("))
         #expect(compactDetail.contains(".settingsPagePush(direction:sectionSwitchDirection)"))
     }
 

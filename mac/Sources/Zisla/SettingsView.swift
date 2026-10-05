@@ -272,52 +272,37 @@ struct SettingsView: View {
     }
 
     private var detail: some View {
-        ScrollViewReader { proxy in
-            ScrollView {
-                VStack(alignment: .leading, spacing: 22) {
-                    if input.isSearching {
-                        searchResultsContent
-                    } else {
-                        VStack(alignment: .leading, spacing: 3) {
-                            AppLocalizedText(input.selection.title)
-                                .font(.system(size: 20, weight: .semibold))
-                            AppLocalizedText(input.selection.subtitle)
-                                .font(.system(size: 10))
-                                .foregroundStyle(.secondary)
-                        }
-                        DeferredMount {
-                            AnyView(selectedContent)
-                                .id(input.selection)
-                                .transition(
-                                    reduceMotion
-                                        ? .opacity
-                                        : .settingsPagePush(direction: sectionSwitchDirection)
-                                )
-                                .onAppear {
-                                    scheduleSearchScroll(for: input.searchTarget, using: proxy)
-                                }
-                        }
-                        .onChange(of: input.searchTarget) { _, target in
-                            scheduleSearchScroll(for: target, using: proxy)
-                        }
+        SettingsSearchScrollView(
+            target: input.searchTarget?.localized(locale: locale),
+            resetID: input.isSearching ? input.settingsQuery : ""
+        ) {
+            VStack(alignment: .leading, spacing: 22) {
+                if input.isSearching {
+                    searchResultsContent
+                } else {
+                    VStack(alignment: .leading, spacing: 3) {
+                        AppLocalizedText(input.selection.title)
+                            .font(.system(size: 20, weight: .semibold))
+                        AppLocalizedText(input.selection.subtitle)
+                            .font(.system(size: 10))
+                            .foregroundStyle(.secondary)
+                    }
+                    DeferredMount {
+                        AnyView(selectedContent)
+                            .id(input.selection)
+                            .transition(
+                                reduceMotion
+                                    ? .opacity
+                                    : .settingsPagePush(direction: sectionSwitchDirection)
+                            )
                     }
                 }
-                .padding(.horizontal, 20)
-                .padding(.vertical, 18)
-                .frame(maxWidth: .infinity, alignment: .leading)
             }
-            .id(input.isSearching ? input.settingsQuery : "")
-            .thinScrollChrome()
-            .animation(reduceMotion ? nil : ZislaMotion.settingsPageSwitch, value: input.selection)
+            .padding(.horizontal, 20)
+            .padding(.vertical, 18)
+            .frame(maxWidth: .infinity, alignment: .leading)
         }
-    }
-
-    private func scheduleSearchScroll(for target: SettingsSearchAnchor?, using proxy: ScrollViewProxy) {
-        guard let target else { return }
-        DispatchQueue.main.async {
-            guard !input.isSearching, input.searchTarget == target else { return }
-            proxy.scrollTo(target.localized(locale: locale), anchor: .center)
-        }
+        .animation(reduceMotion ? nil : ZislaMotion.settingsPageSwitch, value: input.selection)
     }
 
     private func selectSettingsSection(_ section: SettingsSection, searchTarget: SettingsSearchAnchor? = nil) {
@@ -505,7 +490,7 @@ struct SettingsView: View {
                     }
                     rowDivider
                     SystemMonitorMenuBarSettingsView(settingsStore: model.settingsStore)
-                        .id(SettingsSearchAnchor.group("settings-search-monitor-layout"))
+                        .settingsSearchAnchor(SettingsSearchAnchor.group("settings-search-monitor-layout"))
                     rowDivider
                     settingRow(
                         symbol: "chart.xyaxis.line",
@@ -1317,7 +1302,7 @@ struct SettingsView: View {
     private var keyboardSoundContent: some View {
         VStack(alignment: .leading, spacing: 20) {
             settingsGroup("全局音效") {
-                settingRow(symbol: "waveform", title: "键盘音色", detail: "选择 20 种内置机械键盘音色") {
+                settingRow(symbol: "waveform", title: "键盘音色", detail: "选择机械键盘音色") {
                     HStack(spacing: 6) {
                         Picker("", selection: Binding(
                             get: { model.settingsStore.settings.keyboardSelectedProfileID },
@@ -2918,7 +2903,7 @@ struct SettingsView: View {
                 tint: .secondary,
                 destination: ZislaKitInfo.newIssueURL
             )
-            .id(SettingsSearchAnchor.row("settings-search-feedback"))
+            .settingsSearchAnchor(SettingsSearchAnchor.row("settings-search-feedback"))
             .padding(.horizontal, 4)
 
             settingsGroup("更新策略") {
@@ -3676,7 +3661,7 @@ struct SettingsView: View {
         .padding(.leading, isNested ? 24 : 4)
         .padding(.trailing, 4)
         .frame(maxWidth: .infinity, minHeight: 48)
-        .id(SettingsSearchAnchor.row(AppLocalization.string(title, locale: locale)))
+        .settingsSearchAnchor(SettingsSearchAnchor.row(AppLocalization.string(title, locale: locale)))
     }
 
     private func reorderSettingRow(
@@ -3768,7 +3753,7 @@ struct SettingsView: View {
             .overlay(alignment: .top) { Divider() }
             .overlay(alignment: .bottom) { Divider() }
         }
-        .id(SettingsSearchAnchor.group(AppLocalization.string(title, locale: locale)))
+        .settingsSearchAnchor(SettingsSearchAnchor.group(AppLocalization.string(title, locale: locale)))
     }
 
     private var rowDivider: some View {

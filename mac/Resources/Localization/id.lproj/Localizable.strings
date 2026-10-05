@@ -1799,7 +1799,7 @@
 "帮助识别影视作品、音乐人与平台" = "Membantu mengenali film, musisi, dan platform";
 "当前安装版本高于公开版本 %@" = "Versi terpasang lebih baru daripada rilis publik %@";
 "新建草稿并保存后会显示在这里。" = "Buat dan simpan draf untuk melihatnya di sini.";
-"选择 20 种内置机械键盘音色" = "Pilih dari 20 suara papan ketik mekanis bawaan";
+"选择机械键盘音色" = "Pilih suara papan ketik mekanis";
 "隔离安装 Python CLI" = "Pasang CLI Python secara terisolasi";
 "定期检查当前安装包所属的更新通道" = "Periksa saluran pembaruan build ini secara berkala";
 "将选定页面分别输出为独立 PDF" = "Ekspor setiap halaman terpilih sebagai PDF terpisah";
