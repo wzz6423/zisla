@@ -64,6 +64,23 @@ class ContributorWelcomeTest < Minitest::Test
       assert_empty errors, "#{filename}: #{errors.join('; ')}"
       sections = PullRequestMetadata.sections(body)
       assert_equal PullRequestMetadata::REQUIRED_SECTIONS, sections.keys, filename
+      project_example = body.split("## GitHub Project\n", 2).last.split("\n## ", 2).first
+      assert_includes project_example, 'Automatic Project fields (illustration only; not PR body inputs):', filename
+      assert_includes project_example, '- Submitted date: 2026-10-05 (PR creation date in UTC+08:00)', filename
+      assert_includes project_example, '- End date: 2026-10-12 (assumed merge date in UTC+08:00; blank before merge)', filename
+      assert_includes project_example, 'Automation updates Project date fields and the PR Timeline; it does not fill these comment lines.', filename
+      document = File.read(File.join(ROOT, filename))
+      date_rows = document.scan(/^  \| `(Start date|Target date|Submitted date|End date)` \| ([^|]+) \| ([^|]+) \|/)
+                          .map { |row| row.map(&:strip) }
+      header = filename == 'CONTRIBUTING.md' ? '| At creation (2026-10-05) | After merge (2026-10-12) |' : '| 创建时（2026-10-05） | 合并后（2026-10-12） |'
+      assert_includes document, header, filename
+      blank = filename == 'CONTRIBUTING.md' ? 'Blank' : '空'
+      assert_equal [
+        ['Start date', '2026-10-05', '2026-10-05'],
+        ['Target date', '2026-10-12', '2026-10-12'],
+        ['Submitted date', '2026-10-05', '2026-10-05'],
+        ['End date', blank, '2026-10-12']
+      ], date_rows, filename
       statuses = PullRequestMetadata.field_values(sections['Validation'], 'Status')
       assert_operator statuses.count('passed'), :>=, 2, filename
       assert_includes statuses, 'not run', filename
@@ -86,6 +103,8 @@ class ContributorWelcomeTest < Minitest::Test
     body = render('pr')
     assert_includes body, "Example title: `#{title}`"
     assert_includes body, fenced_example
+    date_table = File.readlines(File.join(ROOT, 'CONTRIBUTING.md')).grep(/^  \|/).join
+    assert_includes body, date_table
     rendered_blocks = body.scan(/^  ```markdown\n(.*?)^  ```[ \t]*$/m)
     assert_equal [example], rendered_blocks.map { |block| block.first.gsub(/^  /, '') }
   end

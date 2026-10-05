@@ -265,10 +265,12 @@ module PullRequestMetadata
   end
 
   def self.validate_related_issue(metadata)
-    return [] if metadata['sections']['Related Issue'].nil?
+    lines = metadata['sections']['Related Issue']
+    return [] if lines.nil?
 
     has_issue = !Array(metadata['issues']).empty?
-    return ['Related Issue must use a closing keyword such as "Closes #123", or exactly "None".'] unless has_issue || metadata['relatedIsNone']
+    only_none = metadata['relatedIsNone'] && lines.count { |line| !line.strip.empty? } == 1
+    return ['Related Issue must use a closing keyword such as "Closes #123", or exactly "None".'] unless has_issue || only_none
     return ['Related Issue cannot be both "None" and a closing reference.'] if has_issue && metadata['relatedIsNone']
 
     []

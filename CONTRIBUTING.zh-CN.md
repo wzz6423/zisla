@@ -66,6 +66,12 @@ swift test
   - Project: zisla Development
   - Start date: 2026-10-05
   - Target date: 2026-10-12
+  <!--
+  Automatic Project fields (illustration only; not PR body inputs):
+  - Submitted date: 2026-10-05 (PR creation date in UTC+08:00)
+  - End date: 2026-10-12 (assumed merge date in UTC+08:00; blank before merge)
+  Automation updates Project date fields and the PR Timeline; it does not fill these comment lines.
+  -->
 
   ## PR Type
   - Type: fix
@@ -97,6 +103,15 @@ swift test
   - Agent: Codex
   - Co-authored-by: Codex <noreply@openai.com>
   ```
+
+  日期示例：假设 PR 于 2026-10-05 创建、2026-10-12 合并（UTC+08:00）。代码注释中的自动字段只展示 Project 的示例值，不是输入项；自动化更新 GitHub Project 和 PR Timeline，不会填写这些示例注释行。
+
+  | 日期 | 创建时（2026-10-05） | 合并后（2026-10-12） | 来源 |
+  | --- | --- | --- | --- |
+  | `Start date` | 2026-10-05 | 2026-10-05 | 可选手填 |
+  | `Target date` | 2026-10-12 | 2026-10-12 | 可选手填 |
+  | `Submitted date` | 2026-10-05 | 2026-10-05 | 自动取创建日期 |
+  | `End date` | 空 | 2026-10-12 | 自动取合并日期 |
 
 - `PR Quality` 检查会自动验证上述格式；状态检查未通过时不能合并。随后 `PR Automation` 负责打标签与指派。
 - macOS 代码变更必须运行 `cd mac && swift test`；涉及界面时请用文字说明实际验证结果。

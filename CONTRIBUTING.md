@@ -66,6 +66,12 @@ Thank you for opening a pull request. Check these requirements while it is await
   - Project: zisla Development
   - Start date: 2026-10-05
   - Target date: 2026-10-12
+  <!--
+  Automatic Project fields (illustration only; not PR body inputs):
+  - Submitted date: 2026-10-05 (PR creation date in UTC+08:00)
+  - End date: 2026-10-12 (assumed merge date in UTC+08:00; blank before merge)
+  Automation updates Project date fields and the PR Timeline; it does not fill these comment lines.
+  -->
 
   ## PR Type
   - Type: fix
@@ -97,6 +103,15 @@ Thank you for opening a pull request. Check these requirements while it is await
   - Agent: Codex
   - Co-authored-by: Codex <noreply@openai.com>
   ```
+
+  Date example: assume the PR is created on 2026-10-05 and merged on 2026-10-12 (UTC+08:00). The automatic fields in the code comment illustrate Project values; they are not inputs. Automation updates GitHub Project and the PR Timeline, not these sample comment lines.
+
+  | Date | At creation (2026-10-05) | After merge (2026-10-12) | Source |
+  | --- | --- | --- | --- |
+  | `Start date` | 2026-10-05 | 2026-10-05 | Optional input |
+  | `Target date` | 2026-10-12 | 2026-10-12 | Optional input |
+  | `Submitted date` | 2026-10-05 | 2026-10-05 | Automatic creation date |
+  | `End date` | Blank | 2026-10-12 | Automatic merge date |
 
 - The `PR Quality` check validates this format; a pull request cannot be merged while the check is failing. `PR Automation` then applies the labels and assigns the pull request.
 - Run `cd mac && swift test` for macOS code changes; describe the manual verification results in text for UI changes.

@@ -264,6 +264,12 @@ class PullRequestMetadataTest < Minitest::Test
     assert_includes errors.join("\n"), 'cannot be both'
   end
 
+  def test_related_issue_none_must_be_the_entire_visible_section
+    ["None\nSee #123", "- None\n- None", "None\nUnrelated text."].each do |related|
+      assert_includes validate('ci: add automation', related: related).join("\n"), 'or exactly "None"'
+    end
+  end
+
   def test_related_issue_without_an_issue_has_no_development_label
     refute_includes PullRequestMetadata.labels(parse, @contract), 'development'
   end
