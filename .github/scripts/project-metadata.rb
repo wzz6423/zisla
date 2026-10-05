@@ -4,6 +4,7 @@
 require 'json'
 require 'optparse'
 require 'time'
+require_relative 'pr-metadata'
 
 module ProjectMetadata
   TIME_ZONE_OFFSET = '+08:00'
@@ -62,10 +63,17 @@ module ProjectMetadata
 
   def self.dates_for(event)
     timestamps = timestamps_for(event)
-    {
+    dates = {
       'submittedDate' => local_time(timestamps.fetch('createdAt')).strftime('%F'),
       'endDate' => timestamps['endedAt'] && local_time(timestamps['endedAt']).strftime('%F')
     }
+    if event['pull_request']
+      sections = PullRequestMetadata.sections(event['pull_request']['body'])
+      dates.merge!(PullRequestMetadata.project_dates(sections['GitHub Project']).compact)
+    end
+    dates
+  rescue PullRequestMetadata::ContractError => error
+    raise ContractError, error.message
   end
 end
 

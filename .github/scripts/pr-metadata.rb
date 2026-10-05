@@ -3,6 +3,7 @@
 
 require 'json'
 require 'optparse'
+require 'date'
 
 # Parses and validates the pull request body contract.
 #
@@ -129,6 +130,23 @@ module PullRequestMetadata
     field_values(lines, key).first
   end
 
+  def self.project_dates(lines)
+    { 'startDate' => 'Start date', 'targetDate' => 'Target date' }.to_h do |key, label|
+      values = field_values(lines, label)
+      raise ContractError, "GitHub Project must declare at most one non-empty #{label}." if values.length > 1
+
+      value = values.first
+      if value
+        raise Date::Error unless value.match?(/\A\d{4}-\d{2}-\d{2}\z/)
+
+        Date.iso8601(value)
+      end
+      [key, value]
+    rescue Date::Error
+      raise ContractError, "#{label} must be a valid date in YYYY-MM-DD format."
+    end
+  end
+
   def self.parse(body, contract)
     parsed = sections(body)
     type = contract.canonical_type(field(parsed['PR Type'], 'Type'))
@@ -202,9 +220,12 @@ module PullRequestMetadata
 
     values = field_values(lines, 'Project')
     return ['GitHub Project must declare exactly one "- Project: zisla Development" entry.'] unless values.length == 1
-    return [] if values.first == contract.project_name
+    return ["GitHub Project must be #{contract.project_name.inspect}."] unless values.first == contract.project_name
 
-    ["GitHub Project must be #{contract.project_name.inspect}."]
+    project_dates(lines)
+    []
+  rescue ContractError => error
+    [error.message]
   end
 
   def self.validate_validation(metadata)
