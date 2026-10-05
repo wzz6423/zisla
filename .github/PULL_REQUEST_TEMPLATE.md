@@ -6,6 +6,9 @@
 
 <!-- Keep the exact project name so CI can place this pull request on the shared board. -->
 - Project: zisla Development
+- Start date: <!-- Optional YYYY-MM-DD; leave blank to preserve the Project value. -->
+- Target date: <!-- Optional YYYY-MM-DD; leave blank to preserve the Project value. -->
+<!-- Submitted date is set from PR creation; End date is set on close/merge and cleared on reopen. -->
 
 ## PR Type
 

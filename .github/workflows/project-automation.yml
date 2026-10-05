@@ -72,6 +72,8 @@ jobs:
           project_number="$(jq -r '.project.number' "$config")"
           expected_title="$(jq -r '.project.title' "$config")"
           status_field_name="$(jq -r '.statusField' "$config")"
+          started_field_name="$(jq -er '.dateFields.started' "$config")"
+          target_field_name="$(jq -er '.dateFields.target' "$config")"
           submitted_field_name="$(jq -er '.dateFields.submitted' "$config")"
           ended_field_name="$(jq -er '.dateFields.ended' "$config")"
           desired_status="$(ruby .github/scripts/project-metadata.rb status \
@@ -83,6 +85,8 @@ jobs:
             --manifest "$config" --event-file "$event" > "$RUNNER_TEMP/project-dates.json"
           submitted_date="$(jq -r '.submittedDate' "$RUNNER_TEMP/project-dates.json")"
           end_date="$(jq -r '.endDate // empty' "$RUNNER_TEMP/project-dates.json")"
+          start_date="$(jq -r '.startDate // empty' "$RUNNER_TEMP/project-dates.json")"
+          target_date="$(jq -r '.targetDate // empty' "$RUNNER_TEMP/project-dates.json")"
 
           # shellcheck disable=SC2016 # The GraphQL variables must stay literal.
           project_query='
@@ -221,6 +225,12 @@ jobs:
 
           submitted_field_id="$(ensure_date_field "$submitted_field_name")"
           ended_field_id="$(ensure_date_field "$ended_field_name")"
+          if [ -n "$start_date" ]; then
+            started_field_id="$(ensure_date_field "$started_field_name")"
+          fi
+          if [ -n "$target_date" ]; then
+            target_field_id="$(ensure_date_field "$target_field_name")"
+          fi
 
           # shellcheck disable=SC2016 # The GraphQL variables must stay literal.
           item_query='
@@ -358,14 +368,27 @@ jobs:
               }
             }'
 
-          for date_field in submitted ended; do
-            if [ "$date_field" = submitted ]; then
-              field_id="$submitted_field_id"
-              date_value="$submitted_date"
-            else
-              field_id="$ended_field_id"
-              date_value="$end_date"
-            fi
+          for date_field in submitted ended started target; do
+            case "$date_field" in
+              submitted)
+                field_id="$submitted_field_id"
+                date_value="$submitted_date"
+                ;;
+              ended)
+                field_id="$ended_field_id"
+                date_value="$end_date"
+                ;;
+              started)
+                [ -n "$start_date" ] || continue
+                field_id="$started_field_id"
+                date_value="$start_date"
+                ;;
+              target)
+                [ -n "$target_date" ] || continue
+                field_id="$target_field_id"
+                date_value="$target_date"
+                ;;
+            esac
 
             if [ -n "$date_value" ]; then
               gh api graphql -f query="$update_date_query" \

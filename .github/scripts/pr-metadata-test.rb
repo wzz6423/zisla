@@ -90,6 +90,45 @@ class PullRequestMetadataTest < Minitest::Test
     assert_empty validate('ci: add automation')
   end
 
+  def test_project_dates_accept_calendar_dates_and_ignore_other_sections
+    body = build_body(project: "zisla Development\n- Start date: 2024-02-29\n- Target date: 2026-10-10")
+    body += "\n## Notes\n- Start date: invalid\n"
+    sections = PullRequestMetadata.sections(body)
+
+    assert_equal({ 'startDate' => '2024-02-29', 'targetDate' => '2026-10-10' },
+                 PullRequestMetadata.project_dates(sections['GitHub Project']))
+    assert_empty PullRequestMetadata.validate(title: 'ci: add automation', body: body, contract: @contract)
+  end
+
+  def test_project_dates_are_optional_and_ignore_template_comments
+    [nil, [], ['- Start date:', '- Target date:   ']].each do |lines|
+      assert_equal({ 'startDate' => nil, 'targetDate' => nil }, PullRequestMetadata.project_dates(lines))
+    end
+    body = "## GitHub Project\r\n- Start date: <!-- YYYY-MM-DD -->\r\n- Target date: 2026-10-10 <!-- plan -->\r\n<!--\r\n- Start date: invalid\r\n-->\r\n"
+
+    assert_equal({ 'startDate' => nil, 'targetDate' => '2026-10-10' },
+                 PullRequestMetadata.project_dates(PullRequestMetadata.sections(body)['GitHub Project']))
+  end
+
+  def test_project_dates_reject_invalid_calendar_dates_formats_and_untrusted_values
+    invalid = ['2026-02-29', '2026-02-30', '2026-13-01', '2026-00-01', '2026-10-00',
+               '2026-4-1', '20261005', '2026-W41-1', '2026-278', '2026-10-05T00:00:00Z',
+               'tomorrow', '2026-10-05; $(id)', '2026-10-05`id`', '2026-10-05\\nextra']
+    ['Start date', 'Target date'].product(invalid).each do |field, value|
+      errors = validate('ci: add automation', project: "zisla Development\n- #{field}: #{value}")
+
+      assert_includes errors.join("\n"), "#{field} must be a valid date in YYYY-MM-DD format.", value
+    end
+  end
+
+  def test_project_dates_reject_duplicate_values
+    ['Start date', 'Target date'].each do |field|
+      errors = validate('ci: add automation', project: "zisla Development\n- #{field}: 2026-10-01\n- #{field}: 2026-10-10")
+
+      assert_includes errors.join("\n"), "at most one non-empty #{field}"
+    end
+  end
+
   def test_requires_validation_status_and_fields
     assert_includes validate('ci: add automation', validation: '- Status: skipped').join("\n"), 'one exact status'
     assert_includes validate('ci: add automation', validation: '- Status: passed').join("\n"), 'non-empty Command'

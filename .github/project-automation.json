@@ -8,7 +8,7 @@
   "statusField": "Status",
   "defaultStatus": "Inbox",
   "closedStatus": "Done",
-  "dateFields": { "submitted": "Submitted date", "ended": "End date" },
+  "dateFields": { "started": "Start date", "target": "Target date", "submitted": "Submitted date", "ended": "End date" },
   "labelStatus": [
     { "label": "area:feature", "status": "Feature Development" },
     { "label": "area:bug-fix", "status": "Bug Fix" },

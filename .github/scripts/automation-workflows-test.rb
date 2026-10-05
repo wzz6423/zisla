@@ -252,6 +252,129 @@ class AutomationWorkflowsTest < Minitest::Test
     end
   end
 
+  def test_project_workflow_synchronizes_pull_request_schedule_from_the_current_body
+    install_workflow_fixture
+    install_project_fields
+    event = workflow_event('pull_request', 'open')
+    event['pull_request']['body'] = "## GitHub Project\n- Start date: 2026-10-01\n- Target date: 2026-10-10\n"
+    current = event['pull_request'].merge('body' => "## GitHub Project\n- Start date: 2026-10-02\n- Target date: 2026-10-12\n")
+    install_event(event, current_resource: current)
+
+    output, status = run_project_step
+    assert status.success?, output
+    updates = graphql_calls('updateProjectV2ItemFieldValue')
+    assert updates.any? { |call| call['args'].include?('fieldId=started-id') && call['args'].include?('date=2026-10-02') }
+    assert updates.any? { |call| call['args'].include?('fieldId=target-id') && call['args'].include?('date=2026-10-12') }
+    assert updates.any? { |call| call['args'].include?('fieldId=submitted-id') && call['args'].include?('date=2026-10-04') }
+    assert_equal ['ended-id'], graphql_calls('clearProjectV2ItemFieldValue').map { |call| call['args'].find { |arg| arg.start_with?('fieldId=') }.delete_prefix('fieldId=') }
+  end
+
+  def test_project_workflow_creates_missing_schedule_fields_for_a_pull_request
+    install_workflow_fixture
+    install_project_fields([])
+    event = workflow_event('pull_request', 'open')
+    event['pull_request']['body'] = "## GitHub Project\n- Start date: 2026-10-01\n- Target date: 2026-10-10\n"
+    install_event(event)
+
+    output, status = run_project_step
+    assert status.success?, output
+    assert_equal ['End date', 'Start date', 'Submitted date', 'Target date'],
+                 JSON.parse(File.read(File.join(@directory, 'fields.json'))).map { |field| field['name'] }.sort
+    updates = graphql_calls('updateProjectV2ItemFieldValue')
+    assert updates.any? { |call| call['args'].include?('fieldId=started-id') && call['args'].include?('date=2026-10-01') }
+    assert updates.any? { |call| call['args'].include?('fieldId=target-id') && call['args'].include?('date=2026-10-10') }
+  end
+
+  def test_invalid_pull_request_schedule_cannot_mutate_the_project
+    install_workflow_fixture
+    install_project_fields
+    event = workflow_event('pull_request', 'open')
+    event['pull_request']['body'] = "## GitHub Project\n- Target date: 2026-02-30\n"
+    install_event(event)
+
+    output, status = run_project_step
+    refute status.success?
+    assert_includes output, 'Target date'
+    assert_empty calls.select { |call| call['args'].include?('graphql') }
+  end
+
+  def test_blank_or_removed_schedule_preserves_project_values
+    install_workflow_fixture
+    bodies = ['', "## GitHub Project\n- Start date: <!-- YYYY-MM-DD -->\n- Target date: \n"]
+    bodies.each do |body|
+      install_project_fields
+      event = workflow_event('pull_request', 'open')
+      event['pull_request']['body'] = body
+      install_event(event)
+      File.write(File.join(@directory, 'calls.jsonl'), '')
+
+      output, status = run_project_step
+      assert status.success?, output
+      mutations = graphql_calls('updateProjectV2ItemFieldValue') + graphql_calls('clearProjectV2ItemFieldValue')
+      refute mutations.any? { |call| (call['args'] & %w[fieldId=started-id fieldId=target-id]).any? }
+      assert_empty graphql_calls('createProjectV2Field')
+    end
+  end
+
+  def test_each_schedule_date_can_be_supplied_independently
+    install_workflow_fixture
+    { 'Start date' => 'started-id', 'Target date' => 'target-id' }.each do |name, field_id|
+      install_project_fields
+      event = workflow_event('pull_request', 'open')
+      event['pull_request']['body'] = "## GitHub Project\n- #{name}: 2026-10-10\n"
+      install_event(event)
+      File.write(File.join(@directory, 'calls.jsonl'), '')
+
+      output, status = run_project_step
+      assert status.success?, output
+      updates = graphql_calls('updateProjectV2ItemFieldValue')
+      assert updates.any? { |call| call['args'].include?("fieldId=#{field_id}") && call['args'].include?('date=2026-10-10') }
+      other_id = field_id == 'started-id' ? 'target-id' : 'started-id'
+      mutations = updates + graphql_calls('clearProjectV2ItemFieldValue')
+      refute mutations.any? { |call| call['args'].include?("fieldId=#{other_id}") }
+    end
+  end
+
+  def test_schedule_is_preserved_across_merge_and_reopen
+    install_workflow_fixture
+    install_project_fields
+    %w[closed open].each do |state|
+      event = workflow_event('pull_request', state, merged_at: '2026-10-05T02:30:00Z')
+      event['pull_request']['body'] = "## GitHub Project\n- Start date: 2026-10-01\n- Target date: 2026-10-10\n"
+      install_event(event)
+      File.write(File.join(@directory, 'calls.jsonl'), '')
+
+      output, status = run_project_step
+      assert status.success?, output
+      updates = graphql_calls('updateProjectV2ItemFieldValue')
+      assert updates.any? { |call| call['args'].include?('fieldId=started-id') && call['args'].include?('date=2026-10-01') }
+      assert updates.any? { |call| call['args'].include?('fieldId=target-id') && call['args'].include?('date=2026-10-10') }
+      if state == 'closed'
+        assert updates.any? { |call| call['args'].include?('fieldId=ended-id') && call['args'].include?('date=2026-10-05') }
+        assert_empty graphql_calls('clearProjectV2ItemFieldValue')
+      else
+        assert_equal 1, graphql_calls('clearProjectV2ItemFieldValue').size
+        assert graphql_calls('clearProjectV2ItemFieldValue').first['args'].include?('fieldId=ended-id')
+      end
+    end
+  end
+
+  def test_wrong_schedule_field_type_fails_before_item_mutations
+    install_workflow_fixture
+    %w[Start Target].each do |name|
+      install_project_fields([{ 'id' => 'wrong-id', 'name' => "#{name} date", 'dataType' => 'TEXT' }])
+      event = workflow_event('pull_request', 'open')
+      event['pull_request']['body'] = "## GitHub Project\n- #{name} date: 2026-10-10\n"
+      install_event(event)
+      File.write(File.join(@directory, 'calls.jsonl'), '')
+
+      output, status = run_project_step
+      refute status.success?
+      assert_includes output, 'not a DATE field'
+      assert_empty graphql_calls('updateProjectV2ItemFieldValue')
+    end
+  end
+
   def test_project_resource_read_failure_cannot_mutate_the_project
     install_workflow_fixture
     install_project_fields
@@ -382,7 +505,9 @@ class AutomationWorkflowsTest < Minitest::Test
             exit 7
           end
           name = ARGV.find { |arg| arg.start_with?('name=') }.delete_prefix('name=')
-          fields << { 'id' => name == 'Submitted date' ? 'submitted-id' : 'ended-id',
+          ids = { 'Submitted date' => 'submitted-id', 'End date' => 'ended-id',
+                  'Start date' => 'started-id', 'Target date' => 'target-id' }
+          fields << { 'id' => ids.fetch(name),
                       'name' => name, 'dataType' => 'DATE' }
           File.write(ENV.fetch('FIELD_STATE'), JSON.generate(fields))
           if mode == 'race'
@@ -416,7 +541,9 @@ class AutomationWorkflowsTest < Minitest::Test
 
   def install_project_fields(fields = [
     { 'id' => 'submitted-id', 'name' => 'Submitted date', 'dataType' => 'DATE' },
-    { 'id' => 'ended-id', 'name' => 'End date', 'dataType' => 'DATE' }
+    { 'id' => 'ended-id', 'name' => 'End date', 'dataType' => 'DATE' },
+    { 'id' => 'started-id', 'name' => 'Start date', 'dataType' => 'DATE' },
+    { 'id' => 'target-id', 'name' => 'Target date', 'dataType' => 'DATE' }
   ])
     File.write(File.join(@directory, 'fields.json'), JSON.generate(fields))
   end
