@@ -126,7 +126,7 @@ struct SettingsView: View {
                                 Spacer(minLength: 0)
                             }
                             .padding(.horizontal, 8)
-                            .frame(height: 32)
+                            .frame(height: 34)
                             .contentShape(Rectangle())
                         }
                         .buttonStyle(PressableStyle(hoverScale: 1.018, pressedScale: 0.965))
@@ -217,10 +217,10 @@ struct SettingsView: View {
         .font(.system(size: 11))
         .padding(.horizontal, 7)
         .frame(height: 28)
-        .background(Color.fillControl, in: RoundedRectangle(cornerRadius: 6))
+        .background(Color.fillControl, in: RoundedRectangle(cornerRadius: 6, style: .continuous))
         .overlay {
-            RoundedRectangle(cornerRadius: 6)
-                .strokeBorder(settingsSearchFieldFocused ? Color.accentColor.opacity(0.6) : Color.primary.opacity(0.12), lineWidth: 0.5)
+            RoundedRectangle(cornerRadius: 6, style: .continuous)
+                .strokeBorder(Color.primary.opacity(0.12), lineWidth: 0.5)
         }
     }
 
@@ -294,10 +294,11 @@ struct SettingsView: View {
                                         : .settingsPagePush(direction: sectionSwitchDirection)
                                 )
                                 .onAppear {
-                                    if let target = input.searchTarget {
-                                        proxy.scrollTo(target.localized(locale: locale), anchor: .center)
-                                    }
+                                    scheduleSearchScroll(for: input.searchTarget, using: proxy)
                                 }
+                        }
+                        .onChange(of: input.searchTarget) { _, target in
+                            scheduleSearchScroll(for: target, using: proxy)
                         }
                     }
                 }
@@ -308,6 +309,14 @@ struct SettingsView: View {
             .id(input.isSearching ? input.settingsQuery : "")
             .thinScrollChrome()
             .animation(reduceMotion ? nil : ZislaMotion.settingsPageSwitch, value: input.selection)
+        }
+    }
+
+    private func scheduleSearchScroll(for target: SettingsSearchAnchor?, using proxy: ScrollViewProxy) {
+        guard let target else { return }
+        DispatchQueue.main.async {
+            guard !input.isSearching, input.searchTarget == target else { return }
+            proxy.scrollTo(target.localized(locale: locale), anchor: .center)
         }
     }
 
@@ -2392,7 +2401,7 @@ struct SettingsView: View {
                         selectionID: "appearance-mode-selection",
                         fontSize: 9,
                         width: 216,
-                        height: 28
+                        height: 34
                     )
                 }
                 rowDivider
