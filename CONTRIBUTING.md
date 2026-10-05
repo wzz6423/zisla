@@ -47,15 +47,20 @@ Thank you for opening a pull request. Check these requirements while it is await
   - `GitHub Project` keeps the template value `- Project: zisla Development`. `Project Automation` reads it to place the pull request on the shared board.
   - In `GitHub Project`, add optional `Start date` and `Target date` values in `YYYY-MM-DD` format, or leave them blank to preserve existing Project values. `Submitted date` automatically uses the creation date in UTC+08:00; `End date` is filled automatically when the pull request is merged. Neither needs to be entered manually.
   - `PR Type` declares exactly one `- Type:` value, and it must resolve to the type in the title. Titles use canonical types; the body also accepts type-label names and configured aliases, so `fix`, `bug`, `bug fix`, `bugfix`, and `hotfix` all resolve to `fix`. `PR Automation` turns the resolved type into a label, for example `fix` into `bug`.
-  - Every `Validation` block must declare `passed`, `failed`, or `not run`. `passed` and `failed` need `Command` and `Result`; `not run` needs `Reason`.
+  - `Project Automation` chooses `Status` from the configured label mapping, including the PR type label, and sets it to `Done` when the PR is closed or merged. Do not enter `Status` manually.
+  - `Summary` must describe the change; `Risk and Rollback` must contain exactly one non-empty `Risk` field and one non-empty `Rollback` field.
+  - Each `Validation` entry starts with its own `- Status:` declaring exactly `passed`, `failed`, or `not run`. Each `passed` or `failed` entry needs its own non-empty `Command` and `Result`; each `not run` entry needs its own non-empty `Reason`. Fields from another entry do not satisfy these requirements. Report failures honestly with `failed`.
   - `Related Issue` must either close an issue with a keyword such as `Closes #123`, which also applies the `development` label, or be exactly `None`.
-  - `AI Attribution` must declare `- Agent:`. Any agent other than `None` requires a matching `- Co-authored-by: Name <email>` line, which must also appear as a trailer on at least one commit, and applies the `ai-assisted` label.
+  - `AI Attribution` must declare exactly one non-empty `- Agent:` field. Any agent other than `None` requires a matching `- Co-authored-by: Name <email>` line, which must also appear as a trailer on at least one commit, and applies the `ai-assisted` label.
 
-  Example:
+  Example title: `fix(ci): validate every PR metadata entry`
+
+  Example body (record your actual validation results):
 
   ```markdown
   ## Summary
-  - Add a repository hygiene check.
+  - Validate every PR metadata field and each Validation entry independently.
+  - Keep contributor welcome replies aligned with the current PR template.
 
   ## GitHub Project
   - Project: zisla Development
@@ -63,23 +68,34 @@ Thank you for opening a pull request. Check these requirements while it is await
   - Target date: 2026-10-12
 
   ## PR Type
-  - Type: ci
+  - Type: fix
 
   ## Validation
   - Status: passed
-  - Command: shellcheck .github/scripts/check-repository-hygiene.sh
-  - Result: All checks passed.
+  - Command: ruby .github/scripts/pr-metadata-test.rb
+  - Result: All PR metadata contract tests passed.
+
+  - Status: passed
+  - Command: ruby .github/scripts/contributor-welcome-test.rb
+  - Result: Both documented examples pass PR validation and the welcome reply preserves the complete example.
+
+  - Status: passed
+  - Command: actionlint .github/workflows/*.yml
+  - Result: All workflow files passed actionlint.
+
+  - Status: not run
+  - Reason: Local macOS tests were not run because this change only affects PR metadata and contributor guidance. Platform checks still run in CI.
 
   ## Risk and Rollback
-  - Risk: Only repository automation is affected.
-  - Rollback: Revert this pull request.
+  - Risk: Stricter metadata checks may reject incomplete PR descriptions; no application behavior changes.
+  - Rollback: Revert this pull request to restore the previous metadata checks and guidance.
 
   ## Related Issue
-  Closes #123
+  None
 
   ## AI Attribution
-  - Agent: Claude Code
-  - Co-authored-by: Claude <noreply@anthropic.com>
+  - Agent: Codex
+  - Co-authored-by: Codex <noreply@openai.com>
   ```
 
 - The `PR Quality` check validates this format; a pull request cannot be merged while the check is failing. `PR Automation` then applies the labels and assigns the pull request.
