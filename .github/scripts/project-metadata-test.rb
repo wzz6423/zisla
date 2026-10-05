@@ -137,6 +137,38 @@ class ProjectMetadataTest < Minitest::Test
     assert_raises(ProjectMetadata::ContractError) { ProjectMetadata.dates_for(event) }
   end
 
+  def test_pull_request_dates_include_the_project_schedule
+    event = event_for('pull_request', state: 'open')
+    event['pull_request']['body'] = "## GitHub Project\n- Start date: 2026-10-01\n- Target date: 2026-10-10\n"
+
+    assert_equal({ 'submittedDate' => '2026-10-04', 'endDate' => nil,
+                   'startDate' => '2026-10-01', 'targetDate' => '2026-10-10' },
+                 ProjectMetadata.dates_for(event))
+  end
+
+  def test_issue_body_cannot_set_the_pull_request_schedule
+    event = event_for('issue', state: 'open')
+    event['issue']['body'] = "## GitHub Project\n- Start date: invalid\n- Target date: 2026-10-10\n"
+
+    assert_equal({ 'submittedDate' => '2026-10-04', 'endDate' => nil }, ProjectMetadata.dates_for(event))
+  end
+
+  def test_invalid_pull_request_schedule_exits_without_date_output
+    Dir.mktmpdir('zisla-project-metadata-') do |directory|
+      event = event_for('pull_request', state: 'open')
+      event['pull_request']['body'] = "## GitHub Project\n- Target date: 2026-02-30\n"
+      event_path = File.join(directory, 'event.json')
+      File.write(event_path, JSON.generate(event))
+      output, error, status = Open3.capture3('ruby', File.expand_path('project-metadata.rb', __dir__),
+                                           'dates', '--event-file', event_path)
+
+      refute status.success?
+      assert_empty output
+      assert_includes error, 'Target date'
+      refute_includes error, 'from '
+    end
+  end
+
   private
 
   def status(state: 'open', labels:, type_label: nil)
