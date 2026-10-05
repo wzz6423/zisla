@@ -9,7 +9,7 @@ struct WiFiNetworkPanelView: View {
     @FocusState private var passwordFocused: Bool
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 10) {
+        VStack(alignment: .leading, spacing: 8) {
             Toggle(AppLocalization.text("Wi-Fi"), isOn: Binding(
                 get: { controller.snapshot?.powerOn == true },
                 set: { controller.setPower($0) }
@@ -60,8 +60,8 @@ struct WiFiNetworkPanelView: View {
                 .disabled(controller.isBusy)
             }
         }
-        .padding(14)
-        .frame(width: 292)
+        .padding(12)
+        .frame(width: 264)
         .onChange(of: controller.passwordNetwork?.id) { _, selectedID in
             password = ""
             passwordFocused = selectedID != nil
@@ -109,7 +109,7 @@ struct WiFiNetworkPanelView: View {
                     .font(.callout.weight(.semibold))
                 }
             }
-            .frame(maxHeight: 280)
+            .frame(maxHeight: 240)
             .fixedSize(horizontal: false, vertical: true)
         }
     }
@@ -141,14 +141,14 @@ struct WiFiNetworkPanelView: View {
         Button {
             controller.selectNetwork(network)
         } label: {
-            HStack(spacing: 9) {
+            HStack(spacing: 8) {
                 Image(
                     systemName: network.isPersonalHotspot == true ? "personalhotspot" : "wifi",
                     variableValue: network.isPersonalHotspot == true ? nil : network.signalStrength
                 )
                     .font(.system(size: 14, weight: .semibold))
                     .foregroundStyle(network.isConnected ? Color.white : Color.primary)
-                    .frame(width: 28, height: 28)
+                    .frame(width: 24, height: 24)
                     .background(network.isConnected ? Color.accentColor : Color.primary.opacity(0.07), in: Circle())
                 Text(verbatim: network.name)
                     .font(.system(size: 13, weight: .regular))
@@ -224,11 +224,11 @@ private struct WiFiPowerToggleStyle: ToggleStyle {
                 configuration.label
                 Capsule()
                     .fill(configuration.isOn ? Color.accentColor : Color.primary.opacity(0.18))
-                    .frame(width: 54, height: 24)
+                    .frame(width: 44, height: 22)
                     .overlay(alignment: configuration.isOn ? .trailing : .leading) {
                         Capsule()
                             .fill(.white)
-                            .frame(width: 32, height: 20)
+                            .frame(width: 26, height: 18)
                             .padding(2)
                     }
             }
