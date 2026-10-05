@@ -162,16 +162,18 @@ class AutomationWorkflowsTest < Minitest::Test
     assert_equal 2, calls.count { |call| call['args'].include?('PATCH') }
   end
 
-  def test_pull_request_timeline_uses_merge_time
+  def test_pull_request_timeline_uses_current_merge_time_across_beijing_midnight
     install_workflow_fixture
     event = workflow_event('pull_request', 'closed',
-      closed_at: '2026-10-05T02:29:59Z', merged_at: '2026-10-05T02:30:00Z')
-    install_event(event, current_resource: event.fetch('pull_request').merge('body' => 'Review body'))
+      closed_at: '2026-10-04T02:29:59Z', merged_at: '2026-10-04T02:30:00Z')
+    current = workflow_event('pull_request', 'closed',
+      closed_at: '2026-10-05T15:59:59Z', merged_at: '2026-10-05T16:30:00Z').fetch('pull_request')
+    install_event(event, current_resource: current.merge('body' => 'Review body'))
 
     output, status = run_timeline_step('pr-automation', 'Synchronize pull request timeline')
     assert status.success?, output
     assert_includes JSON.parse(File.read(File.join(@directory, 'resource.json'))).fetch('body'),
-                    '- Ended: 2026-10-05 10:30:00 UTC+08:00'
+                    '- Ended: 2026-10-06 00:30:00 UTC+08:00'
     assert calls.any? { |call| call['args'].include?('repos/fixture/repository/pulls/153') }
   end
 
@@ -357,6 +359,29 @@ class AutomationWorkflowsTest < Minitest::Test
         assert graphql_calls('clearProjectV2ItemFieldValue').first['args'].include?('fieldId=ended-id')
       end
     end
+  end
+
+  def test_project_workflow_uses_current_merge_day_and_preserves_schedule
+    install_workflow_fixture
+    install_project_fields
+    event = workflow_event('pull_request', 'closed',
+      closed_at: '2026-10-04T02:29:59Z', merged_at: '2026-10-04T02:30:00Z')
+    current = workflow_event('pull_request', 'closed',
+      closed_at: '2026-10-05T15:59:59Z', merged_at: '2026-10-05T16:30:00Z').fetch('pull_request')
+    current['body'] = "## GitHub Project\n- Start date: 2026-10-01\n- Target date: 2026-10-10\n"
+    install_event(event, current_resource: current)
+
+    output, status = run_project_step
+    assert status.success?, output
+    dates = graphql_calls('updateProjectV2ItemFieldValue').filter_map do |call|
+      date = call['args'].find { |arg| arg.start_with?('date=') }
+      [call['args'].find { |arg| arg.start_with?('fieldId=') }, date] if date
+    end.to_h
+    assert_equal({ 'fieldId=submitted-id' => 'date=2026-10-04',
+                   'fieldId=ended-id' => 'date=2026-10-06',
+                   'fieldId=started-id' => 'date=2026-10-01',
+                   'fieldId=target-id' => 'date=2026-10-10' }, dates)
+    assert_empty graphql_calls('clearProjectV2ItemFieldValue')
   end
 
   def test_wrong_schedule_field_type_fails_before_item_mutations

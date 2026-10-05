@@ -45,6 +45,7 @@ swift test
 
 - **PR 正文**必须使用英文，并包含 `.github/PULL_REQUEST_TEMPLATE.md` 提供的 `Summary`、`GitHub Project`、`PR Type`、`Validation`、`Risk and Rollback`、`Related Issue`、`AI Attribution` 七节。
   - `GitHub Project` 保留模板给出的 `- Project: zisla Development`。`Project Automation` 据此把 PR 放进共享看板。
+  - `GitHub Project` 中可选填 `Start date` 和 `Target date`，格式为 `YYYY-MM-DD`；留空会保留 Project 中已有的值。`Submitted date` 自动取 UTC+08:00 的创建日期；`End date` 在 PR 合并时自动填写，两者都不需要手动输入。
   - `PR Type` 只写一条 `- Type:`，且必须能解析为标题中的类型。标题使用规范类型；正文同时接受类型标签名和已配置别名，因此 `fix`、`bug`、`bug fix`、`bugfix`、`hotfix` 都会解析为 `fix`。`PR Automation` 会根据解析后的类型打标签，例如 `fix` 对应 `bug`。
   - `Validation` 中每项都必须声明 `passed`、`failed` 或 `not run`：前两者需要 `Command` 与 `Result`，后者需要 `Reason`。
   - `Related Issue` 要么用 `Closes #123` 之类的关键字关联 Issue（同时自动打上 `development`），要么写成 `None`。
@@ -58,6 +59,8 @@ swift test
 
   ## GitHub Project
   - Project: zisla Development
+  - Start date: 2026-10-05
+  - Target date: 2026-10-12
 
   ## PR Type
   - Type: ci

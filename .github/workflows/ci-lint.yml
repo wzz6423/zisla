@@ -116,6 +116,9 @@ jobs:
       - name: Test automation workflow behavior
         run: ruby .github/scripts/automation-workflows-test.rb
 
+      - name: Test contributor welcome messages
+        run: ruby .github/scripts/contributor-welcome-test.rb
+
       - name: Test project metadata
         run: ruby .github/scripts/project-metadata-test.rb
 
