@@ -2,6 +2,7 @@ import AppKit
 import CoreAudio
 import Darwin
 import Foundation
+import UniformTypeIdentifiers
 
 public struct AudioPlaybackSource: Equatable, Identifiable, Sendable {
     public var id: String
@@ -29,25 +30,127 @@ public struct AudioPlaybackSource: Equatable, Identifiable, Sendable {
 }
 
 @MainActor
-enum ApplicationIconDataCache {
+final class ApplicationIconDataCache {
+    static let shared = ApplicationIconDataCache()
+    static let didCacheIconNotification = Notification.Name("ApplicationIconDataCacheDidCacheIcon")
+
     private static let pixelSize = 128
     private static let pointSize = 64
-    private static let cache: NSCache<NSString, NSData> = {
-        let cache = NSCache<NSString, NSData>()
+    private let cache = NSCache<NSString, NSData>()
+    private let genericIconData: [Data]
+    private let waitForRetry: @MainActor () async throws -> Void
+    private let applicationURL: @MainActor (String) -> URL?
+    private let fileIcon: @MainActor (URL) -> NSImage?
+    private let runningApplication: @MainActor (pid_t) -> (bundleIdentifier: String?, icon: NSImage?)?
+    private var retries: [String: Task<Void, Never>] = [:]
+    private var retryGeneration: UInt64 = 0
+
+    init(
+        genericIcons: [NSImage] = [
+            NSImage(contentsOfFile: "/System/Library/CoreServices/CoreTypes.bundle/Contents/Resources/GenericApplicationIcon.icns"),
+            NSWorkspace.shared.icon(for: .application),
+            NSWorkspace.shared.icon(for: .applicationBundle),
+        ].compactMap { $0 },
+        waitForRetry: @escaping @MainActor () async throws -> Void = {
+            try await Task.sleep(for: .seconds(1))
+        },
+        applicationURL: @escaping @MainActor (String) -> URL? = {
+            NSWorkspace.shared.urlForApplication(withBundleIdentifier: $0)
+        },
+        fileIcon: @escaping @MainActor (URL) -> NSImage? = {
+            NSWorkspace.shared.icon(forFile: $0.path)
+        },
+        runningApplication: @escaping @MainActor (pid_t) -> (bundleIdentifier: String?, icon: NSImage?)? = { pid in
+            guard let application = NSRunningApplication(processIdentifier: pid) else { return nil }
+            return (application.bundleIdentifier, application.icon)
+        }
+    ) {
+        genericIconData = genericIcons.compactMap { Self.renderPNG(from: $0) }
+        self.waitForRetry = waitForRetry
+        self.applicationURL = applicationURL
+        self.fileIcon = fileIcon
+        self.runningApplication = runningApplication
         cache.countLimit = 64
         cache.totalCostLimit = 2 * 1_024 * 1_024
-        return cache
-    }()
+    }
 
-    static func data(for image: NSImage?, cacheKey: String) -> Data? {
-        guard let image else { return nil }
+    deinit {
+        for retry in retries.values { retry.cancel() }
+    }
+
+    func data(for cacheKey: String, load: @escaping @MainActor () -> [NSImage]) -> Data? {
         let key = cacheKey as NSString
         if let cached = cache.object(forKey: key) {
             return cached as Data
         }
-        guard let data = renderPNG(from: image) else { return nil }
-        cache.setObject(data as NSData, forKey: key, cost: data.count)
-        return data
+        guard retries[cacheKey] == nil else { return nil }
+        if let data = validData(from: load()) {
+            cache.setObject(data as NSData, forKey: key, cost: data.count)
+            return data
+        }
+
+        let waitForRetry = waitForRetry
+        let generation = retryGeneration
+        retries[cacheKey] = Task { [weak self] in
+            defer {
+                if self?.retryGeneration == generation { self?.retries[cacheKey] = nil }
+            }
+            while true {
+                do {
+                    try await waitForRetry()
+                } catch {
+                    return
+                }
+                guard !Task.isCancelled, let self else { return }
+                if let data = self.validData(from: load()) {
+                    self.cache.setObject(data as NSData, forKey: key, cost: data.count)
+                    NotificationCenter.default.post(
+                        name: Self.didCacheIconNotification,
+                        object: self,
+                        userInfo: ["cacheKey": cacheKey]
+                    )
+                    return
+                }
+            }
+        }
+        return nil
+    }
+
+    func data(
+        forApplication cacheKey: String,
+        bundleIdentifier: String?,
+        processIdentifier: pid_t?,
+        applicationURL fallbackURL: URL? = nil
+    ) -> Data? {
+        let applicationURL = applicationURL
+        let fileIcon = fileIcon
+        let runningApplication = runningApplication
+        return data(for: cacheKey) {
+            var images: [NSImage] = []
+            if let url = bundleIdentifier.flatMap(applicationURL) ?? fallbackURL,
+               let icon = fileIcon(url) {
+                images.append(icon)
+            }
+            if let processIdentifier, let application = runningApplication(processIdentifier),
+               bundleIdentifier == nil || application.bundleIdentifier == bundleIdentifier,
+               let icon = application.icon {
+                images.append(icon)
+            }
+            return images
+        }
+    }
+
+    func cancelPendingRetries() {
+        retryGeneration &+= 1
+        for retry in retries.values { retry.cancel() }
+        retries.removeAll()
+    }
+
+    private func validData(from images: [NSImage]) -> Data? {
+        for image in images {
+            if let data = Self.renderPNG(from: image), !genericIconData.contains(data) { return data }
+        }
+        return nil
     }
 
     private static func renderPNG(from image: NSImage) -> Data? {
@@ -80,6 +183,9 @@ enum ApplicationIconDataCache {
             hints: nil
         )
         context.flushGraphics()
+        guard let pixels = bitmap.bitmapData,
+              stride(from: 3, to: bitmap.bytesPerRow * bitmap.pixelsHigh, by: 4)
+                .contains(where: { pixels[$0] != 0 }) else { return nil }
         return bitmap.representation(using: .png, properties: [:])
     }
 }
@@ -329,8 +435,6 @@ final class AudioPlaybackMonitor {
         guard let applicationName, !applicationName.isEmpty else { return nil }
 
         let id = bundleIdentifier ?? outerApplicationURL?.path ?? "pid:\(pid)"
-        let icon = running?.icon
-            ?? outerApplicationURL.map { NSWorkspace.shared.icon(forFile: $0.path) }
         let frontmost = NSWorkspace.shared.frontmostApplication.map {
             $0.processIdentifier == pid
                 || (bundleIdentifier != nil && $0.bundleIdentifier == bundleIdentifier)
@@ -340,7 +444,12 @@ final class AudioPlaybackMonitor {
             processIdentifiers: [pid],
             bundleIdentifier: bundleIdentifier,
             applicationName: applicationName,
-            iconData: ApplicationIconDataCache.data(for: icon, cacheKey: id),
+            iconData: ApplicationIconDataCache.shared.data(
+                forApplication: id,
+                bundleIdentifier: bundleIdentifier,
+                processIdentifier: pid,
+                applicationURL: outerApplicationURL
+            ),
             isFrontmost: frontmost
         )
     }

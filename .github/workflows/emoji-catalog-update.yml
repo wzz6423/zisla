@@ -137,6 +137,7 @@ jobs:
           git commit -m "chore(mac): update emoji catalog to Emoji $emoji_version"
           git push --set-upstream origin "$BRANCH"
 
+          schedule_date="$(TZ=Asia/Shanghai date +%F)"
           cat > "$RUNNER_TEMP/emoji-catalog-pr.md" <<EOF
           ## Summary
 
@@ -145,6 +146,8 @@ jobs:
           ## GitHub Project
 
           - Project: zisla Development
+          - Start date: $schedule_date
+          - Target date: $schedule_date
 
           ## PR Type
 

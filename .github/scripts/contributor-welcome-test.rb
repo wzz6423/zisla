@@ -44,9 +44,10 @@ class ContributorWelcomeTest < Minitest::Test
     body = render('pr')
     assert_includes body, '- Start date: 2026-10-05'
     assert_includes body, '- Target date: 2026-10-12'
-    assert_includes body, 'optional `Start date` and `Target date`'
+    assert_includes body, '`Start date` and `Target date` are required'
     assert_includes body, '`YYYY-MM-DD`'
-    assert_includes body, 'leave them blank to preserve existing Project values'
+    assert_includes body, '`Target date` must be on or after `Start date`'
+    refute_includes body, 'leave them blank'
     assert_includes body, '`Submitted date` automatically uses the creation date in UTC+08:00'
     assert_includes body, '`End date` is filled automatically when the pull request is merged'
     assert_includes body, MARKER
