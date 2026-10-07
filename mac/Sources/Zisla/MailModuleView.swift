@@ -48,7 +48,7 @@ struct MailModuleView: View {
         .onAppear {
             selectFirstMessageIfNeeded()
             consumeMailComposeRequest()
-            Task { await model.refreshMail() }
+            Task { await model.refreshMail(checkForNewMail: false) }
         }
         .onChange(of: model.mailComposeRequest) { _, _ in
             consumeMailComposeRequest()
@@ -113,66 +113,83 @@ struct MailModuleView: View {
                 IconButton(symbol: "square.and.pencil", help: AppLocalization.text("发邮件"), size: .compact) {
                     beginNewMessage()
                 }
-                IconButton(symbol: "arrow.clockwise", help: AppLocalization.text("刷新收件箱"), size: .compact) {
-                    Task { await model.refreshMail() }
+                if mail.isLoading {
+                    ProgressView()
+                        .controlSize(.small)
+                        .frame(width: 24, height: 24)
+                        .accessibilityLabel(AppLocalization.text("刷新收件箱"))
+                } else {
+                    IconButton(symbol: "arrow.clockwise", help: AppLocalization.text("刷新收件箱"), size: .compact) {
+                        Task { await model.refreshMail() }
+                    }
                 }
-                .disabled(mail.isLoading)
             }
             .frame(height: 28)
             .padding(.horizontal, 4)
 
+            if let error = mail.errorDescription, !visibleMessages.isEmpty {
+                Text(error)
+                    .font(.islandMicro())
+                    .foregroundStyle(Color.zislaWarning)
+                    .lineLimit(1)
+                    .help(error)
+                    .padding(.horizontal, 4)
+            }
+
             MailPaginationContainer(mail: mail, accountName: selectedAccountName) { loadMore in
-                if mail.isLoading && visibleMessages.isEmpty {
-                    ProgressView()
-                        .controlSize(.small)
-                        .frame(maxWidth: .infinity, maxHeight: .infinity)
-                } else if let error = mail.errorDescription, visibleMessages.isEmpty {
-                    VStack(spacing: 10) {
-                        Label(AppLocalization.text("无法读取邮件"), systemImage: "envelope.badge.shield.half.filled")
-                            .font(.system(size: 11, weight: .semibold))
-                            .foregroundStyle(Color.zislaWarning)
-                        Text(error)
-                            .font(.islandMicro())
-                            .foregroundStyle(.secondary)
-                            .lineLimit(5)
-                            .multilineTextAlignment(.center)
-                        HStack(spacing: 8) {
-                            Button(AppLocalization.text("重新读取")) { Task { await model.refreshMail() } }
-                                .buttonStyle(.bordered)
-                                .controlSize(.mini)
-                            Button {
-                                if mail.needsMailIndexAccess {
-                                    openFullDiskAccessSettings()
-                                } else {
-                                    openAutomationSettings()
-                                }
-                            } label: {
-                                Label(
-                                    mail.needsMailIndexAccess ? AppLocalization.text("授权磁盘访问") : AppLocalization.text("打开系统设置"),
-                                    systemImage: mail.needsMailIndexAccess ? "externaldrive.badge.checkmark" : "gear"
-                                )
-                            }
-                            .buttonStyle(.borderedProminent)
-                            .controlSize(.mini)
-                        }
-                    }
-                    .frame(maxWidth: .infinity, maxHeight: .infinity)
-                } else if visibleMessages.isEmpty {
-                    if selectedAccount != nil && mail.canLoadMore {
+                MailRefreshScrollView(isEnabled: !mail.isLoading, onRefresh: {
+                    Task { await model.refreshMail() }
+                }) {
+                    if mail.isLoading && visibleMessages.isEmpty {
                         ProgressView()
                             .controlSize(.small)
                             .frame(maxWidth: .infinity, maxHeight: .infinity)
-                            .task(id: mail.paginationGeneration) {
-                                await loadMore()
+                    } else if let error = mail.errorDescription, visibleMessages.isEmpty {
+                        VStack(spacing: 10) {
+                            Label(AppLocalization.text("无法读取邮件"), systemImage: "envelope.badge.shield.half.filled")
+                                .font(.system(size: 11, weight: .semibold))
+                                .foregroundStyle(Color.zislaWarning)
+                            Text(error)
+                                .font(.islandMicro())
+                                .foregroundStyle(.secondary)
+                                .lineLimit(5)
+                                .multilineTextAlignment(.center)
+                            HStack(spacing: 8) {
+                                Button(AppLocalization.text("重新读取")) { Task { await model.refreshMail() } }
+                                    .buttonStyle(.bordered)
+                                    .controlSize(.mini)
+                                Button {
+                                    if mail.needsMailIndexAccess {
+                                        openFullDiskAccessSettings()
+                                    } else {
+                                        openAutomationSettings()
+                                    }
+                                } label: {
+                                    Label(
+                                        mail.needsMailIndexAccess ? AppLocalization.text("授权磁盘访问") : AppLocalization.text("打开系统设置"),
+                                        systemImage: mail.needsMailIndexAccess ? "externaldrive.badge.checkmark" : "gear"
+                                    )
+                                }
+                                .buttonStyle(.borderedProminent)
+                                .controlSize(.mini)
                             }
+                        }
+                        .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    } else if visibleMessages.isEmpty {
+                        if selectedAccount != nil && mail.canLoadMore {
+                            ProgressView()
+                                .controlSize(.small)
+                                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                                .task(id: mail.paginationGeneration) {
+                                    await loadMore()
+                                }
+                        } else {
+                            EmptyState(
+                                symbol: selectedAccount == nil ? "tray" : "envelope.badge",
+                                title: selectedAccount == nil ? AppLocalization.text("收件箱为空") : AppLocalization.text("此账户没有邮件")
+                            )
+                        }
                     } else {
-                        EmptyState(
-                            symbol: selectedAccount == nil ? "tray" : "envelope.badge",
-                            title: selectedAccount == nil ? AppLocalization.text("收件箱为空") : AppLocalization.text("此账户没有邮件")
-                        )
-                    }
-                } else {
-                    ScrollView(.vertical) {
                         LazyVStack(spacing: 0) {
                             ForEach(visibleMessages) { message in
                                 messageRow(message)
@@ -189,8 +206,6 @@ struct MailModuleView: View {
                             }
                         }
                     }
-                    .scrollIndicators(.visible)
-                    .thinScrollChrome()
                 }
             }
         }

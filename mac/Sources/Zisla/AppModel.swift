@@ -373,7 +373,7 @@ final class AppModel: ObservableObject {
       case .agenda:
         refreshAgendaIfEnabled()
       case .mail:
-        Task { await mail.refresh() }
+        Task { await mail.refresh(checkForNewMail: false) }
       case .quickNotes:
         Task { await quickNotes.refresh() }
       case .aiMonitor:
@@ -1226,7 +1226,7 @@ final class AppModel: ObservableObject {
       if settings.lockScreenInfoEnabled || settings.batteryMonitorEnabled {
         self.battery.refresh()
       }
-      if settings.mailEnabled, module == .mail { await self.mail.refresh() }
+      if settings.mailEnabled, module == .mail { await self.mail.refresh(checkForNewMail: false) }
       if settings.quickNotesEnabled, module == .quickNotes {
         await self.quickNotes.refresh()
       }
@@ -1382,9 +1382,9 @@ final class AppModel: ObservableObject {
     weatherLocations.moveSaved(id: id, to: destinationID)
   }
 
-  func refreshMail() async {
+  func refreshMail(checkForNewMail: Bool = true) async {
     guard settingsStore.settings.mailEnabled else { return }
-    await mail.refresh()
+    await mail.refresh(checkForNewMail: checkForNewMail)
   }
 
   func markMailRead(_ message: MailMessage) async {

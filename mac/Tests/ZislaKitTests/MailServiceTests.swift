@@ -7,6 +7,167 @@ import Testing
 
 struct MailServiceTests {
     @Test @MainActor
+    func manualRefreshRequestsNewMailInsteadOfOnlyRereadingTheInbox() async {
+        let service = MailService(
+            commandRunner: { script, _ in
+                let requestedNewMail = script.contains("check for new mail for mailAccount")
+                return .success(.snapshot(makeMailServiceSnapshot(
+                    account: "work", messageID: requestedNewMail ? 2 : 1
+                )))
+            },
+            indexReader: MailIndexReader(databaseURL: URL(fileURLWithPath: "/does/not/exist")),
+            mailRunning: { true }
+        )
+
+        await service.refresh()
+
+        #expect(service.messages.map(\.messageID) == [2], "Manual refresh must request new mail, not just return cached inbox data")
+        #expect(!service.isLoading)
+        #expect(service.errorDescription == nil)
+    }
+
+    @Test @MainActor
+    func automaticRefreshAndPaginationDoNotRequestNewMail() async {
+        let pollingStarted = MailOperationQueueTestGate()
+        var scripts: [String] = []
+        let service = MailService(
+            commandRunner: { script, _ in
+                scripts.append(script)
+                if scripts.count == 3 { await pollingStarted.signal() }
+                return .success(.snapshot(makeMailServiceSnapshot(
+                    account: "work", messageID: scripts.count, hasMore: scripts.count == 1
+                )))
+            },
+            indexReader: MailIndexReader(databaseURL: URL(fileURLWithPath: "/does/not/exist")),
+            mailRunning: { true }
+        )
+
+        await service.refresh(checkForNewMail: false)
+        await service.loadMore()
+
+        #expect(service.messages.map(\.messageID).sorted() == [1, 2])
+        #expect(!service.canLoadMore)
+
+        service.start(accountNames: ["work"])
+        await pollingStarted.wait()
+        service.stop()
+
+        #expect(scripts.count == 3)
+        #expect(scripts.allSatisfy { !$0.contains("check for new mail") })
+    }
+
+    @Test(arguments: [false, true]) @MainActor
+    func mailOperationsOnlyReloadARunningMailAppWithoutCheckingForNewMail(isMailRunning: Bool) async throws {
+        var mailAvailable = true
+        var scripts: [String] = []
+        let service = MailService(
+            commandRunner: { script, _ in
+                scripts.append(script)
+                if script.contains("set read status") { return .success(.succeeded) }
+                return .success(.snapshot(makeMailServiceSnapshot(account: "work", messageID: 1)))
+            },
+            indexReader: MailIndexReader(databaseURL: URL(fileURLWithPath: "/does/not/exist")),
+            mailRunning: { mailAvailable }
+        )
+        await service.refresh(checkForNewMail: false)
+        let message = try #require(service.messages.first)
+        mailAvailable = isMailRunning
+
+        let result = await service.markRead(message)
+
+        #expect((result == .success) == isMailRunning)
+        #expect(service.messages.first?.isRead == isMailRunning)
+        #expect(scripts.count == (isMailRunning ? 3 : 1), "Only a running Mail.app may perform the write and reload the inbox")
+        #expect(scripts.allSatisfy { !$0.contains("check for new mail") })
+    }
+
+    @Test @MainActor
+    func manualRefreshFailureKeepsMessagesAndPaginationUntilRetrySucceeds() async {
+        var requests = 0
+        let service = MailService(
+            commandRunner: { _, _ in
+                requests += 1
+                if requests == 2 { return .failure(.failed("Injected mail check failure")) }
+                return .success(.snapshot(makeMailServiceSnapshot(
+                    account: "work", messageID: requests, hasMore: requests == 1
+                )))
+            },
+            indexReader: MailIndexReader(databaseURL: URL(fileURLWithPath: "/does/not/exist")),
+            mailRunning: { true }
+        )
+        await service.refresh(checkForNewMail: false)
+        let previousMessages = service.messages
+        let previousGeneration = service.paginationGeneration
+
+        await service.refresh()
+
+        #expect(service.messages == previousMessages)
+        #expect(service.paginationGeneration == previousGeneration)
+        #expect(service.canLoadMore)
+        #expect(service.errorDescription == "Injected mail check failure")
+        #expect(!service.isLoading)
+
+        await service.refresh()
+
+        #expect(service.messages.map(\.messageID) == [3])
+        #expect(service.errorDescription == nil)
+        #expect(!service.canLoadMore)
+        #expect(!service.isLoading)
+    }
+
+    @Test @MainActor
+    func manualRefreshReadsTheIndexWithoutLaunchingMailWhenItIsClosed() async throws {
+        let databaseURL = try makeMailServiceIndex()
+        defer { try? FileManager.default.removeItem(at: databaseURL) }
+        try executeMailServiceSQL("""
+            INSERT INTO mailboxes (ROWID, url) VALUES (1, 'imap://work%40example.com@mail.example.com/INBOX');
+            INSERT INTO messages (message_id, subject, mailbox) VALUES (7, 1, 1);
+            """, at: databaseURL)
+        let service = MailService(
+            commandRunner: { _, _ in
+                Issue.record("Refreshing the index must not launch Mail or request automation access")
+                return .failure(.failed("Unexpected Mail command"))
+            },
+            indexReader: MailIndexReader(databaseURL: databaseURL),
+            mailRunning: { false }
+        )
+
+        await service.refresh()
+
+        #expect(service.messages.map(\.messageID) == [7])
+        #expect(service.errorDescription == nil)
+        #expect(!service.isLoading)
+    }
+
+    @Test @MainActor
+    func repeatedManualRefreshDoesNotStartOverlappingMailChecks() async {
+        let started = MailOperationQueueTestGate()
+        let release = MailOperationQueueTestGate()
+        var requests = 0
+        let service = MailService(
+            commandRunner: { _, _ in
+                requests += 1
+                await started.signal()
+                await release.wait()
+                return .success(.snapshot(makeMailServiceSnapshot(account: "work", messageID: 1)))
+            },
+            indexReader: MailIndexReader(databaseURL: URL(fileURLWithPath: "/does/not/exist")),
+            mailRunning: { true }
+        )
+        let pending = Task { await service.refresh() }
+        await started.wait()
+
+        await service.refresh()
+
+        #expect(requests == 1)
+        #expect(service.isLoading)
+        await release.signal()
+        await pending.value
+        #expect(service.messages.map(\.messageID) == [1])
+        #expect(!service.isLoading)
+    }
+
+    @Test @MainActor
     func mailOperationsQueueInSubmissionOrderAndReturnIndividualResults() async {
         let queue = MailOperationQueue()
         let firstStarted = MailOperationQueueTestGate()
@@ -773,6 +934,53 @@ struct MailServiceTests {
         #expect(script.contains("if startIndex <= endIndex then"))
         #expect(script.contains("set hasMoreMessages to true"))
         #expect(script.contains("return {accountRows, messageRows, hasMoreMessages}"))
+    }
+
+    @Test(arguments: [false, true]) @MainActor
+    func inboxScriptCompilesAgainstTheMailDictionary(checkForNewMail: Bool) throws {
+        let script = try #require(NSAppleScript(source: MailService.inboxScript(
+            accountNames: ["work"], checkForNewMail: checkForNewMail
+        )))
+        var error: NSDictionary?
+
+        #expect(script.compileAndReturnError(&error))
+        #expect(error == nil)
+    }
+
+    @Test(arguments: [Set<String>(), ["work"], ["missing"]], [false, true]) @MainActor
+    func inboxChecksOnlySelectedAccountsBeforeReadingThem(accountNames: Set<String>, fails: Bool) throws {
+        let source = MailService.inboxScript(accountNames: accountNames, checkForNewMail: true)
+            .replacingOccurrences(of: "tell application \"Mail\"", with: "")
+            .replacingOccurrences(of: "end tell", with: "")
+            .replacingOccurrences(of: "every account", with: "fixtureAccounts")
+            .replacingOccurrences(of: "check for new mail for mailAccount", with: """
+                set end of requestEvents to "check:" & name of mailAccount
+                if \(fails ? "true" : "false") then error "Injected mail check failure"
+                """)
+            .replacingOccurrences(of: "set inboxMessages to messages of mailbox \"INBOX\" of mailAccount", with: """
+                set end of requestEvents to "read:" & name of mailAccount
+                set inboxMessages to {}
+                """)
+            .replacingOccurrences(of: "return {accountRows, messageRows, hasMoreMessages}", with: "return requestEvents")
+        let script = try #require(NSAppleScript(source: """
+            using terms from application "Mail"
+                set requestEvents to {}
+                set fixtureAccounts to {{name:"personal", email addresses:{"personal@example.com"}}, {name:"work", email addresses:{"work@example.com"}}}
+                \(source)
+            end using terms from
+            """))
+        var error: NSDictionary?
+        let result = script.executeAndReturnError(&error)
+        let selected = ["personal", "work"].filter { accountNames.isEmpty || accountNames.contains($0) }
+
+        if fails && !selected.isEmpty {
+            #expect((error?[NSAppleScript.errorMessage] as? String)?.contains("Injected mail check failure") == true,
+                    "A failed mail check must not be reported as a successful cache refresh")
+        } else {
+            #expect(error == nil)
+            let events = (0..<result.numberOfItems).compactMap { result.atIndex($0 + 1)?.stringValue }
+            #expect(events == selected.flatMap { ["check:\($0)", "read:\($0)"] })
+        }
     }
 
     @Test(arguments: [
