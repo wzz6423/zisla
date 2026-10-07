@@ -152,7 +152,7 @@ public final class MailService: ObservableObject {
         }
         pollingTask = Task { [weak self] in
             while !Task.isCancelled {
-                await self?.refresh()
+                await self?.refresh(checkForNewMail: false)
                 do {
                     try await Task.sleep(for: .seconds(60))
                 } catch {
@@ -169,9 +169,9 @@ public final class MailService: ObservableObject {
         isLoading = false
     }
 
-    public func refresh() async {
+    public func refresh(checkForNewMail: Bool = true) async {
         guard !isLoading else { return }
-        await fetchMessages(offset: 0, limit: max(pageSize, messageOffset), replacing: true)
+        await fetchMessages(offset: 0, limit: max(pageSize, messageOffset), replacing: true, checkForNewMail: checkForNewMail)
     }
 
     public func loadMore() async {
@@ -179,7 +179,7 @@ public final class MailService: ObservableObject {
         await fetchMessages(offset: messageOffset, limit: pageSize, replacing: false)
     }
 
-    private func fetchMessages(offset: Int, limit: Int, replacing: Bool) async {
+    private func fetchMessages(offset: Int, limit: Int, replacing: Bool, checkForNewMail: Bool = false) async {
         let generation = refreshGeneration
         isLoading = true
         defer {
@@ -190,7 +190,7 @@ public final class MailService: ObservableObject {
         guard generation == refreshGeneration, !Task.isCancelled else { return }
         if isMailRunning {
             let result = await commandRunner(
-                Self.inboxScript(accountNames: selectedAccountNames, pageSize: limit, offset: offset),
+                Self.inboxScript(accountNames: selectedAccountNames, pageSize: limit, offset: offset, checkForNewMail: checkForNewMail),
                 true
             )
             guard generation == refreshGeneration, !Task.isCancelled else { return }
@@ -340,7 +340,7 @@ public final class MailService: ObservableObject {
         "mailbox \"INBOX\" of \(accountExpression)"
     }
 
-    static func inboxScript(accountNames: Set<String>, pageSize: Int = 10, offset: Int = 0) -> String {
+    static func inboxScript(accountNames: Set<String>, pageSize: Int = 10, offset: Int = 0, checkForNewMail: Bool = false) -> String {
         let safePageSize = max(1, pageSize)
         let safeOffset = max(0, offset)
         let accountNames = accountNames
@@ -388,6 +388,7 @@ public final class MailService: ObservableObject {
                     set end of accountRows to {accountName, accountAddresses}
                 end if
                 if (count of selectedAccountNames) is 0 or accountName is in selectedAccountNames then
+                    \(checkForNewMail ? "check for new mail for mailAccount" : "")
                     try
                         set inboxMessages to messages of \(accountInbox("mailAccount"))
                         set messageCount to count of inboxMessages
@@ -507,13 +508,13 @@ public final class MailService: ObservableObject {
     }
 
     private func perform(_ script: String) async -> MailOperationResult {
-        guard Self.isMailRunning() else {
+        guard mailRunning() else {
             return .failed(Self.mailUnavailableMessage(isRunning: false) ?? AppLocalization.text("Mail.app 当前未运行"))
         }
         return await mutationQueue.enqueue { [self] in
             switch await self.commandRunner(script, false) {
             case .success:
-                await self.refresh()
+                await self.refresh(checkForNewMail: false)
                 return .success
             case let .failure(error):
                 return .failed(Self.message(for: error))
