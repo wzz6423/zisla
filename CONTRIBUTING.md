@@ -45,7 +45,7 @@ Thank you for opening a pull request. Check these requirements while it is await
 
 - The **PR body** must be in English and contain the `Summary`, `GitHub Project`, `PR Type`, `Validation`, `Risk and Rollback`, `Related Issue`, and `AI Attribution` sections that `.github/PULL_REQUEST_TEMPLATE.md` provides.
   - `GitHub Project` keeps the template value `- Project: zisla Development`. `Project Automation` reads it to place the pull request on the shared board.
-  - In `GitHub Project`, add optional `Start date` and `Target date` values in `YYYY-MM-DD` format, or leave them blank to preserve existing Project values. `Submitted date` automatically uses the creation date in UTC+08:00; `End date` is filled automatically when the pull request is merged. Neither needs to be entered manually.
+  - In `GitHub Project`, `Start date` and `Target date` are required. Declare each exactly once as a real calendar date in `YYYY-MM-DD` format; `Target date` must be on or after `Start date`. Missing, blank, commented-out, duplicate, or invalid dates fail `PR Quality`. `Submitted date` automatically uses the creation date in UTC+08:00; `End date` is filled automatically when the pull request is merged. Neither needs to be entered manually.
   - `PR Type` declares exactly one `- Type:` value, and it must resolve to the type in the title. Titles use canonical types; the body also accepts type-label names and configured aliases, so `fix`, `bug`, `bug fix`, `bugfix`, and `hotfix` all resolve to `fix`. `PR Automation` turns the resolved type into a label, for example `fix` into `bug`.
   - `Project Automation` chooses `Status` from the configured label mapping, including the PR type label, and sets it to `Done` when the PR is closed or merged. Do not enter `Status` manually.
   - `Summary` must describe the change; `Risk and Rollback` must contain exactly one non-empty `Risk` field and one non-empty `Rollback` field.
@@ -108,8 +108,8 @@ Thank you for opening a pull request. Check these requirements while it is await
 
   | Date | At creation (2026-10-05) | After merge (2026-10-12) | Source |
   | --- | --- | --- | --- |
-  | `Start date` | 2026-10-05 | 2026-10-05 | Optional input |
-  | `Target date` | 2026-10-12 | 2026-10-12 | Optional input |
+  | `Start date` | 2026-10-05 | 2026-10-05 | Required input |
+  | `Target date` | 2026-10-12 | 2026-10-12 | Required input |
   | `Submitted date` | 2026-10-05 | 2026-10-05 | Automatic creation date |
   | `End date` | Blank | 2026-10-12 | Automatic merge date |
 

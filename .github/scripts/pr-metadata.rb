@@ -228,7 +228,17 @@ module PullRequestMetadata
     return ['GitHub Project must declare exactly one "- Project: zisla Development" entry.'] unless values.length == 1
     return ["GitHub Project must be #{contract.project_name.inspect}."] unless values.first == contract.project_name
 
-    project_dates(lines)
+    errors = ['Start date', 'Target date'].filter_map do |label|
+      entries = lines.grep(/\A[[:space:]]*-[[:space:]]*#{Regexp.escape(label)}:/i)
+      if entries.length != 1 || field_values(entries, label).empty?
+        "GitHub Project must declare exactly one non-empty #{label} field."
+      end
+    end
+    return errors unless errors.empty?
+
+    dates = project_dates(lines)
+    return ['Target date must be on or after Start date.'] if dates['targetDate'] < dates['startDate']
+
     []
   rescue ContractError => error
     [error.message]
