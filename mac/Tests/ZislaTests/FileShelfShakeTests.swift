@@ -121,8 +121,8 @@ struct FileShelfShakeViewTests {
         try #require(targets.count == 2, "Sharing and the shelf need independent native drop targets.")
         let left = targets[0].convert(targets[0].bounds, to: host)
         let right = targets[1].convert(targets[1].bounds, to: host)
-        #expect(abs(left.width / right.width - 84.0 / 662.0) < 0.002,
-                "The floating Share and Shelf cards must keep the island's narrow-shoulder ratio.")
+        #expect(left.width == 50, "The Share target must stay narrow.")
+        #expect(right.width == 220, "The Shelf target must keep its original width.")
         #expect(right.minX - left.maxX == 6)
         #expect(left.height == 144 && right.height == 144)
         #expect(targets[0].registeredDraggedTypes == [.fileURL])

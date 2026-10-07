@@ -33,11 +33,8 @@ struct FileShelfShakeSession {
 }
 
 enum FileShelfShakeLayout {
-    static let size = CGSize(width: 448, height: 144)
-    static let shareWidth = (size.width - IslandModuleLayout.shelfColumnSpacing)
-        * IslandModuleLayout.shelfShareWidth
-        / (IslandModuleLayout.shelf.islandSize.width - IslandSurfaceGeometry.moduleInset * 2
-           - IslandModuleLayout.shelfColumnSpacing)
+    static let shareWidth: CGFloat = 50
+    static let size = CGSize(width: shareWidth + IslandModuleLayout.shelfColumnSpacing + 220, height: 144)
 
     static func frame(near point: CGPoint, in visibleFrame: CGRect) -> CGRect {
         let bounds = visibleFrame.insetBy(dx: 8, dy: 8)
