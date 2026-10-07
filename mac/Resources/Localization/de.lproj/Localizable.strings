@@ -2615,6 +2615,8 @@
 "高能耗模式" = "Hochleistungsmodus";
 "个人热点" = "Persönlicher Hotspot";
 
+"拖入文件以共享" = "Dateien zum Teilen hierher ziehen";
+"松开以共享文件" = "Zum Teilen der Dateien loslassen";
 "拖入文件，暂存到中转站" = "Dateien hier vorübergehend ablegen";
 "松开以添加到中转站" = "Loslassen, um Dateien hinzuzufügen";
 "晃动唤出中转窗口" = "Ablagefenster durch Schütteln öffnen";

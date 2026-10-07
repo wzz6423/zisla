@@ -565,7 +565,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
         fileShelfShakeController = FileShelfShakeController(
             settingsStore: model.settingsStore,
             languageStore: model.languageStore,
-            onItems: { model.receiveShelfDropItems($0) }
+            onItems: { model.receiveShelfDropItems($0) },
+            onShare: { model.share($0, from: $1) }
         )
         contextNoteController = ContextNoteController(
             settingsStore: model.settingsStore, languageStore: model.languageStore, shelf: model.shelf,
@@ -786,7 +787,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
 
         model.$isSharingPickerVisible
             .removeDuplicates()
-            .sink { [weak coordinator] visible in
+            .sink { [weak self, weak coordinator] visible in
+                if !visible { self?.fileShelfShakeController?.sharingDidEnd() }
                 Task { @MainActor in
                     coordinator?.setTransientInteractionVisible(visible)
                 }

@@ -149,11 +149,14 @@ final class TransferDropLoader: @unchecked Sendable {
 @MainActor
 struct ShelfDropTarget<Content: View>: NSViewRepresentable {
     @Binding var isTargeted: Bool
-    var onItems: ([FileShelfDropItem]) -> Void
+    var draggedTypes: [NSPasteboard.PasteboardType]
+    var onDrop: (NSPasteboard, NSView) -> Bool
     var content: Content
 
     func makeNSView(context: Context) -> ShelfDropHostingView {
         let view = ShelfDropHostingView(rootView: AnyView(content.environment(\.self, context.environment)))
+        view.unregisterDraggedTypes()
+        view.registerForDraggedTypes(draggedTypes)
         updateNSView(view, context: context)
         return view
     }
@@ -161,14 +164,14 @@ struct ShelfDropTarget<Content: View>: NSViewRepresentable {
     func updateNSView(_ view: ShelfDropHostingView, context: Context) {
         view.rootView = AnyView(content.environment(\.self, context.environment))
         view.onTargeted = { isTargeted = $0 }
-        view.onItems = onItems
+        view.onDrop = onDrop
     }
 }
 
 @MainActor
 final class ShelfDropHostingView: NSHostingView<AnyView> {
     var onTargeted: ((Bool) -> Void)?
-    var onItems: (([FileShelfDropItem]) -> Void)?
+    var onDrop: ((NSPasteboard, NSView) -> Bool)?
 
     required init(rootView: AnyView) {
         super.init(rootView: rootView)
@@ -179,7 +182,7 @@ final class ShelfDropHostingView: NSHostingView<AnyView> {
     required init?(coder: NSCoder) { fatalError("init(coder:) is unavailable") }
 
     override func draggingEntered(_ sender: any NSDraggingInfo) -> NSDragOperation {
-        let accepts = sender.draggingPasteboard.availableType(from: TransferPasteboard.shelfDropTypes) != nil
+        let accepts = sender.draggingPasteboard.availableType(from: registeredDraggedTypes) != nil
         onTargeted?(accepts)
         return accepts ? .copy : []
     }
@@ -192,10 +195,7 @@ final class ShelfDropHostingView: NSHostingView<AnyView> {
 
     override func performDragOperation(_ sender: any NSDraggingInfo) -> Bool {
         onTargeted?(false)
-        let items = TransferPasteboard.readShelfDropItems(from: sender.draggingPasteboard)
-        guard !items.isEmpty else { return false }
-        onItems?(items)
-        return true
+        return onDrop?(sender.draggingPasteboard, self) ?? false
     }
 }
 
@@ -204,6 +204,23 @@ extension View {
         isTargeted: Binding<Bool>,
         onItems: @escaping ([FileShelfDropItem]) -> Void
     ) -> some View {
-        ShelfDropTarget(isTargeted: isTargeted, onItems: onItems, content: self)
+        ShelfDropTarget(isTargeted: isTargeted, draggedTypes: TransferPasteboard.shelfDropTypes, onDrop: { pasteboard, _ in
+            let items = TransferPasteboard.readShelfDropItems(from: pasteboard)
+            guard !items.isEmpty else { return false }
+            onItems(items)
+            return true
+        }, content: self)
+    }
+
+    func shareDropTarget(
+        isTargeted: Binding<Bool>,
+        onItems: @escaping ([TransferDropItem], NSView) -> Void
+    ) -> some View {
+        ShelfDropTarget(isTargeted: isTargeted, draggedTypes: [.fileURL], onDrop: { pasteboard, anchor in
+            let files = FileShelfPasteboard.readFileURLs(from: pasteboard)
+            guard !files.isEmpty else { return false }
+            onItems(files.map(TransferDropItem.file), anchor)
+            return true
+        }, content: self)
     }
 }

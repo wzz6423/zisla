@@ -11,6 +11,7 @@ struct FileShelfShakeLocalizationTests {
         let table = try #require(try PropertyListSerialization.propertyList(from: Data(contentsOf: resource), format: nil) as? [String: String])
         for key in [
             "中转站", "拖入文件，暂存到中转站", "松开以添加到中转站",
+            "共享", "拖入文件以共享", "松开以共享文件",
             "晃动唤出中转窗口", "拖拽文件时晃动鼠标，在旁边显示中转窗口",
         ] {
             let value = try #require(table[key], "Missing \(language.rawValue) translation for \(key)")

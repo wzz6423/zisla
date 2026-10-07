@@ -2614,6 +2614,8 @@
 "高能耗模式" = "Chế độ nguồn điện cao";
 "个人热点" = "Điểm truy cập cá nhân";
 
+"拖入文件以共享" = "Kéo tệp vào đây để chia sẻ";
+"松开以共享文件" = "Thả để chia sẻ tệp";
 "拖入文件，暂存到中转站" = "Kéo tệp vào đây để lưu tạm";
 "松开以添加到中转站" = "Thả để thêm tệp";
 "晃动唤出中转窗口" = "Lắc để mở cửa sổ kệ tạm";

@@ -2613,6 +2613,8 @@
 "高能耗模式" = "High Power Mode";
 "个人热点" = "Personal Hotspot";
 
+"拖入文件以共享" = "Drop files here to share";
+"松开以共享文件" = "Release to share files";
 "拖入文件，暂存到中转站" = "Drop files here to keep them in the shelf";
 "松开以添加到中转站" = "Release to add to the shelf";
 "晃动唤出中转窗口" = "Shake to Show Shelf Window";

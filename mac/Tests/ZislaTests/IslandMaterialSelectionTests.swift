@@ -22,7 +22,7 @@ struct IslandMaterialSelectionTests {
         host.sizingOptions = []
         let panel = FileShelfShakeController.makeWindow(
             contentView: host,
-            frame: CGRect(x: -100_000, y: -100_000, width: 220, height: 144)
+            frame: CGRect(origin: CGPoint(x: -100_000, y: -100_000), size: FileShelfShakeLayout.size)
         )
         defer { panel.close() }
         for style in [IslandVisualStyle.transparent, .frosted, .transparent, .frosted] {
@@ -59,7 +59,7 @@ struct IslandMaterialSelectionTests {
 
         var body: some View {
             if floatingTarget {
-                FileShelfShakeView(settingsStore: settings, onItems: { _ in })
+                FileShelfShakeView(settingsStore: settings, onItems: { _ in }, onShare: { _, _ in })
             } else {
                 IslandSurface(visualStyle: settings.settings.islandVisualStyle) {
                     Color.clear.islandGlassSurface(.card, cornerRadius: 18)
