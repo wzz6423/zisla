@@ -2610,6 +2610,8 @@
 "高能耗模式" = "Mode haute puissance";
 "个人热点" = "Partage de connexion";
 
+"拖入文件以共享" = "Déposez des fichiers pour les partager";
+"松开以共享文件" = "Relâchez pour partager les fichiers";
 "拖入文件，暂存到中转站" = "Déposez les fichiers pour les garder ici";
 "松开以添加到中转站" = "Relâchez pour ajouter les fichiers";
 "晃动唤出中转窗口" = "Secouer pour afficher l’étagère";

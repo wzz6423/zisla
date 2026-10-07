@@ -93,6 +93,88 @@ struct FileShelfShakeLayoutTests {
 }
 
 struct FileShelfShakeViewTests {
+    @Test(arguments: AppLanguage.allCases) @MainActor
+    func floatingWindowProvidesTwoSeparateDropTargets(language: AppLanguage) throws {
+        let name = "zisla-shake-targets-\(UUID().uuidString)"
+        let defaults = try #require(UserDefaults(suiteName: name))
+        let settings = FeatureSettingsStore(defaults: defaults)
+        defer {
+            settings.flushPendingChanges()
+            defaults.removePersistentDomain(forName: name)
+        }
+        var shared: [TransferDropItem] = []
+        var received: [FileShelfDropItem] = []
+        var sharingAnchor: NSView?
+        let host = NSHostingView(rootView: FileShelfShakeView(settingsStore: settings, onItems: { received = $0 }, onShare: {
+            shared = $0
+            sharingAnchor = $1
+        })
+            .environment(\.locale, language.locale)
+            .environment(\.layoutDirection, language.isRightToLeft ? .rightToLeft : .leftToRight))
+        host.sizingOptions = []
+        let panel = FileShelfShakeController.makeWindow(contentView: host, frame: CGRect(origin: .zero, size: FileShelfShakeLayout.size))
+        defer { panel.close() }
+        host.layoutSubtreeIfNeeded()
+        let targets = descendants(of: host).compactMap { $0 as? ShelfDropHostingView }.sorted {
+            $0.convert($0.bounds, to: host).minX < $1.convert($1.bounds, to: host).minX
+        }
+        try #require(targets.count == 2, "Sharing and the shelf need independent native drop targets.")
+        let left = targets[0].convert(targets[0].bounds, to: host)
+        let right = targets[1].convert(targets[1].bounds, to: host)
+        #expect(left.width == 50, "The Share target must stay narrow.")
+        #expect(right.width == 220, "The Shelf target must keep its original width.")
+        #expect(right.minX - left.maxX == 6)
+        #expect(left.height == 144 && right.height == 144)
+        #expect(targets[0].registeredDraggedTypes == [.fileURL])
+        #expect(Set(targets[1].registeredDraggedTypes) == Set(TransferPasteboard.shelfDropTypes))
+
+        let directory = FileManager.default.temporaryDirectory.appendingPathComponent(name)
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: false)
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let files = try (0..<2).map { index in
+            let file = directory.appendingPathComponent("file-\(index).txt")
+            try Data("original \(index)".utf8).write(to: file)
+            return file.standardizedFileURL
+        }
+        let pasteboard = NSPasteboard(name: .init(name))
+        defer { pasteboard.releaseGlobally() }
+        pasteboard.writeObjects(files.map { $0 as NSURL })
+        let drag = DragInfo(pasteboard: pasteboard)
+        #expect(targets[0].draggingEntered(drag) == .copy)
+        #expect(targets[0].performDragOperation(drag))
+        #expect(shared == files.map(TransferDropItem.file))
+        #expect(sharingAnchor === targets[0])
+        #expect(sharingAnchor?.window === panel)
+        #expect(received.isEmpty)
+        shared = []
+        #expect(targets[1].draggingEntered(drag) == .copy)
+        #expect(targets[1].performDragOperation(drag))
+        #expect(shared.isEmpty)
+        #expect(received.compactMap { item -> TransferPasteboardPayload? in
+            if case .content(let payload) = item { return payload }
+            return nil
+        } == files.map(TransferPasteboardPayload.file))
+        for (index, file) in files.enumerated() {
+            #expect(try String(contentsOf: file, encoding: .utf8) == "original \(index)")
+        }
+
+        received = []
+        for value in [nil, "https://example.invalid/file", directory.appendingPathComponent("missing.txt").absoluteString] {
+            pasteboard.clearContents()
+            if let value { pasteboard.setString(value, forType: .fileURL) }
+            #expect(!targets[0].performDragOperation(drag))
+            #expect(!targets[1].performDragOperation(drag))
+            #expect(shared.isEmpty && received.isEmpty)
+        }
+        pasteboard.clearContents()
+        pasteboard.setString("plain text", forType: .string)
+        #expect(targets[0].draggingEntered(drag).isEmpty)
+        #expect(targets[1].draggingEntered(drag) == .copy)
+        #expect(!targets[0].performDragOperation(drag))
+        #expect(shared.isEmpty && received.isEmpty)
+        #expect(!panel.isVisible)
+    }
+
     @Test @MainActor
     func floatingTargetUsesTheSelectedIslandMaterial() throws {
         let reduceTransparency = NSWorkspace.shared.accessibilityDisplayShouldReduceTransparency
@@ -105,7 +187,7 @@ struct FileShelfShakeViewTests {
         }
         for style in IslandVisualStyle.allCases {
             settings.settings.islandVisualStyle = style
-            let host = NSHostingView(rootView: FileShelfShakeView(settingsStore: settings, onItems: { _ in }))
+            let host = NSHostingView(rootView: FileShelfShakeView(settingsStore: settings, onItems: { _ in }, onShare: { _, _ in }))
             let panel = FileShelfShakeController.makeWindow(contentView: host, frame: CGRect(origin: .zero, size: FileShelfShakeLayout.size))
             defer { panel.close() }
             host.layoutSubtreeIfNeeded()
@@ -134,7 +216,7 @@ struct FileShelfShakeViewTests {
             defaults.removePersistentDomain(forName: name)
         }
         settings.settings.islandVisualStyle = .frosted
-        let host = NSHostingView(rootView: FileShelfShakeView(settingsStore: settings, onItems: { _ in }))
+        let host = NSHostingView(rootView: FileShelfShakeView(settingsStore: settings, onItems: { _ in }, onShare: { _, _ in }))
         let panel = FileShelfShakeController.makeWindow(contentView: host, frame: CGRect(origin: .zero, size: FileShelfShakeLayout.size))
         defer { panel.close() }
         host.layoutSubtreeIfNeeded()
@@ -174,6 +256,30 @@ struct FileShelfShakeViewTests {
     @MainActor
     private func descendants(of view: NSView) -> [NSView] {
         view.subviews.flatMap { [$0] + descendants(of: $0) }
+    }
+
+    @MainActor
+    private final class DragInfo: NSObject, NSDraggingInfo {
+        let draggingPasteboard: NSPasteboard
+        var draggingDestinationWindow: NSWindow? { nil }
+        var draggingSourceOperationMask: NSDragOperation { .copy }
+        var draggingLocation: NSPoint { .zero }
+        var draggedImageLocation: NSPoint { .zero }
+        nonisolated var draggedImage: NSImage? { nil }
+        var draggingSource: Any? { nil }
+        var draggingSequenceNumber: Int { 1 }
+        var draggingFormation: NSDraggingFormation = .none
+        var animatesToDestination = false
+        var numberOfValidItemsForDrop = 0
+        var springLoadingHighlight: NSSpringLoadingHighlight { .none }
+
+        init(pasteboard: NSPasteboard) { draggingPasteboard = pasteboard }
+        func slideDraggedImage(to screenPoint: NSPoint) {}
+        nonisolated override func namesOfPromisedFilesDropped(atDestination dropDestination: URL) -> [String]? { nil }
+        func resetSpringLoading() {}
+        func enumerateDraggingItems(options: NSDraggingItemEnumerationOptions, for view: NSView?, classes: [AnyClass],
+                                    searchOptions: [NSPasteboard.ReadingOptionKey: Any],
+                                    using block: (NSDraggingItem, Int, UnsafeMutablePointer<ObjCBool>) -> Void) {}
     }
 }
 
@@ -281,6 +387,91 @@ struct IslandGlassStandaloneSurfaceTests {
 @Suite(.serialized)
 @MainActor
 struct FileShelfShakeControllerTests {
+    @Test
+    func sharingKeepsTheAnchorAliveUntilThePickerEnds() async throws {
+        let fixture = try Fixture()
+        defer { fixture.close() }
+        fixture.files()
+        fixture.shake()
+        let timer = try #require(fixture.controller.releaseTimer)
+        fixture.controller.handlePointer(at: .zero, interaction: .dragEnded)
+        let dismissal = try #require(fixture.controller.dismissTask)
+        try await fixture.waitForDismissalSleep()
+        let anchor = NSView()
+        let items: [TransferDropItem] = [.file(URL(fileURLWithPath: "/tmp/share.txt"))]
+        fixture.controller.share(items, from: anchor, forChangeCount: fixture.pasteboard.changeCount)
+        #expect(fixture.sharedItems == items)
+        #expect(fixture.sharingAnchor === anchor)
+        #expect(fixture.receivedCount == 0)
+        #expect(fixture.controller.isPresented && fixture.controller.isSharing)
+        #expect(!timer.isValid && fixture.controller.releaseTimer == nil)
+        #expect(dismissal.isCancelled && fixture.controller.dismissTask == nil)
+
+        fixture.controller.handlePointer(at: .zero, interaction: .moved)
+        fixture.controller.handlePointer(at: .zero, interaction: .dragEnded)
+        fixture.controller.share(items, from: NSView(), forChangeCount: fixture.pasteboard.changeCount)
+        fixture.controller.receive([.content(.text("duplicate"))], forChangeCount: fixture.pasteboard.changeCount)
+        #expect(fixture.controller.dismissTask == nil)
+        #expect(fixture.sharedItems == items && fixture.sharingAnchor === anchor)
+        #expect(fixture.receivedCount == 0)
+        await fixture.gate.release()
+        await dismissal.value
+        #expect(fixture.controller.isPresented)
+        fixture.controller.sharingDidEnd()
+        #expect(!fixture.controller.isPresented && !fixture.controller.isSharing)
+        #expect(fixture.controller.releaseTimer == nil && fixture.controller.dismissTask == nil)
+    }
+
+    @Test
+    func staleAndDisabledSharingCallbacksCannotAffectTheCurrentDrag() throws {
+        let fixture = try Fixture()
+        defer { fixture.close() }
+        fixture.files()
+        fixture.shake()
+        let oldChangeCount = fixture.pasteboard.changeCount
+        fixture.files()
+        fixture.shake(start: 2)
+        let items: [TransferDropItem] = [.file(URL(fileURLWithPath: "/tmp/share.txt"))]
+        fixture.controller.share(items, from: NSView(), forChangeCount: oldChangeCount)
+        fixture.controller.sharingDidEnd()
+        #expect(fixture.sharedItems.isEmpty)
+        #expect(fixture.controller.isPresented && !fixture.controller.isSharing)
+        fixture.settings.settings.fileShelfShakeEnabled = false
+        fixture.controller.share(items, from: NSView(), forChangeCount: fixture.pasteboard.changeCount)
+        #expect(fixture.sharedItems.isEmpty)
+        #expect(!fixture.controller.isPresented && !fixture.controller.isSharing)
+    }
+
+    @Test
+    func sharingRequiresTheCompletedShakePresentation() throws {
+        let fixture = try Fixture()
+        defer { fixture.close() }
+        fixture.files()
+        fixture.controller.handlePointer(at: .zero, interaction: .dragging(hasSupportedPayload: true), timestamp: 0)
+        fixture.controller.share([.file(URL(fileURLWithPath: "/tmp/share.txt"))], from: NSView(), forChangeCount: fixture.pasteboard.changeCount)
+        #expect(fixture.sharedItems.isEmpty)
+        #expect(!fixture.controller.isPresented && !fixture.controller.isSharing)
+    }
+
+    @Test(arguments: ["lock", "screenshot", "disable", "display", "stop"])
+    func sharingReleasesTheFloatingWindowWhenItsEnvironmentChanges(change: String) throws {
+        let fixture = try Fixture()
+        defer { fixture.close() }
+        fixture.files()
+        fixture.shake()
+        fixture.controller.share([.file(URL(fileURLWithPath: "/tmp/share.txt"))], from: NSView(), forChangeCount: fixture.pasteboard.changeCount)
+        switch change {
+        case "lock": fixture.controller.setScreenLocked(true)
+        case "screenshot": fixture.controller.setScreenshotActive(true)
+        case "disable": fixture.settings.settings.fileShelfEnabled = false
+        case "display": NotificationCenter.default.post(name: NSApplication.didChangeScreenParametersNotification, object: nil)
+        default: fixture.controller.stop()
+        }
+        #expect(!fixture.controller.isPresented && !fixture.controller.isSharing)
+        #expect(fixture.controller.releaseTimer == nil && fixture.controller.dismissTask == nil)
+        #expect(fixture.receivedCount == 0)
+    }
+
     @Test(arguments: [false, true], [false, true])
     func shakeRequiresBothSwitchesWhileShelfOnlyRequiresItsParent(shelfEnabled: Bool, shakeEnabled: Bool) throws {
         let fixture = try Fixture(settings: FeatureSettings(fileShelfEnabled: shelfEnabled, fileShelfShakeEnabled: shakeEnabled))
@@ -541,6 +732,8 @@ struct FileShelfShakeControllerTests {
         var controller: FileShelfShakeController!
         var presentedPoints: [CGPoint] = []
         var receivedCount = 0
+        var sharedItems: [TransferDropItem] = []
+        var sharingAnchor: NSView?
         var buttons = 1
         var onItems: (([FileShelfDropItem]) -> Void)?
 
@@ -559,6 +752,10 @@ struct FileShelfShakeControllerTests {
                 onItems: { [weak self] items in
                     self?.receivedCount += items.count
                     self?.onItems?(items)
+                },
+                onShare: { [weak self] items, anchor in
+                    self?.sharedItems += items
+                    self?.sharingAnchor = anchor
                 }
             )
         }

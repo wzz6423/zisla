@@ -2614,6 +2614,8 @@
 "高能耗模式" = "Modalità Prestazioni elevate";
 "个人热点" = "Hotspot personale";
 
+"拖入文件以共享" = "Trascina qui i file da condividere";
+"松开以共享文件" = "Rilascia per condividere i file";
 "拖入文件，暂存到中转站" = "Trascina i file qui per conservarli";
 "松开以添加到中转站" = "Rilascia per aggiungere i file";
 "晃动唤出中转窗口" = "Scuoti per mostrare il ripiano";

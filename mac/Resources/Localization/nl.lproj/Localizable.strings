@@ -2614,6 +2614,8 @@
 "高能耗模式" = "Hoogvermogensmodus";
 "个人热点" = "Persoonlijke hotspot";
 
+"拖入文件以共享" = "Sleep bestanden hierheen om te delen";
+"松开以共享文件" = "Laat los om bestanden te delen";
 "拖入文件，暂存到中转站" = "Sleep bestanden hierheen om ze te bewaren";
 "松开以添加到中转站" = "Laat los om bestanden toe te voegen";
 "晃动唤出中转窗口" = "Schudden om het plankvenster te tonen";
