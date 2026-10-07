@@ -2614,6 +2614,8 @@
 "高能耗模式" = "Modo de Alta Potência";
 "个人热点" = "Acesso Pessoal";
 
+"拖入文件以共享" = "Arraste arquivos para compartilhar";
+"松开以共享文件" = "Solte para compartilhar os arquivos";
 "拖入文件，暂存到中转站" = "Arraste arquivos para guardá-los aqui";
 "松开以添加到中转站" = "Solte para adicionar os arquivos";
 "晃动唤出中转窗口" = "Agitar para mostrar a prateleira";

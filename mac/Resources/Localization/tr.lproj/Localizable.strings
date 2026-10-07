@@ -2614,6 +2614,8 @@
 "高能耗模式" = "Yüksek Güç Modu";
 "个人热点" = "Kişisel Erişim Noktası";
 
+"拖入文件以共享" = "Paylaşmak için dosyaları buraya sürükleyin";
+"松开以共享文件" = "Dosyaları paylaşmak için bırakın";
 "拖入文件，暂存到中转站" = "Dosyaları geçici olarak saklamak için buraya sürükleyin";
 "松开以添加到中转站" = "Dosyaları eklemek için bırakın";
 "晃动唤出中转窗口" = "Raf penceresini göstermek için sallayın";

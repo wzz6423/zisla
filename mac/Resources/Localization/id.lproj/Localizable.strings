@@ -2614,6 +2614,8 @@
 "高能耗模式" = "Mode Daya Tinggi";
 "个人热点" = "Hotspot Pribadi";
 
+"拖入文件以共享" = "Seret file ke sini untuk dibagikan";
+"松开以共享文件" = "Lepaskan untuk membagikan file";
 "拖入文件，暂存到中转站" = "Seret file ke sini untuk disimpan sementara";
 "松开以添加到中转站" = "Lepaskan untuk menambahkan file";
 "晃动唤出中转窗口" = "Goyangkan untuk menampilkan jendela rak";

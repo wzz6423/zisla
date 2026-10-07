@@ -33,7 +33,8 @@ struct FileShelfShakeSession {
 }
 
 enum FileShelfShakeLayout {
-    static let size = CGSize(width: 220, height: 144)
+    static let shareWidth: CGFloat = 50
+    static let size = CGSize(width: shareWidth + IslandModuleLayout.shelfColumnSpacing + 220, height: 144)
 
     static func frame(near point: CGPoint, in visibleFrame: CGRect) -> CGRect {
         let bounds = visibleFrame.insetBy(dx: 8, dy: 8)
@@ -58,6 +59,7 @@ final class FileShelfShakeController: NSObject {
     private let languageStore: AppLanguageStore
     private let dragPasteboard: NSPasteboard
     private let onItems: ([FileShelfDropItem]) -> Void
+    private let onShare: ([TransferDropItem], NSView) -> Void
     private let windowPresenter: (FileShelfShakeController, CGPoint) -> Void
     private let dismissSleeper: @Sendable (Duration) async throws -> Void
     private let pressedMouseButtons: () -> Int
@@ -71,6 +73,7 @@ final class FileShelfShakeController: NSObject {
     private var isScreenLocked = false
     private var isScreenshotActive = false
     private(set) var isPresented = false
+    private(set) var isSharing = false
 
     var isMonitoring: Bool { pointerMonitor?.isRunning == true }
 
@@ -81,7 +84,8 @@ final class FileShelfShakeController: NSObject {
         windowPresenter: @escaping (FileShelfShakeController, CGPoint) -> Void = { $0.presentWindow(at: $1) },
         dismissSleeper: @escaping @Sendable (Duration) async throws -> Void = { try await Task.sleep(for: $0) },
         pressedMouseButtons: @escaping () -> Int = { NSEvent.pressedMouseButtons },
-        onItems: @escaping ([FileShelfDropItem]) -> Void
+        onItems: @escaping ([FileShelfDropItem]) -> Void,
+        onShare: @escaping ([TransferDropItem], NSView) -> Void
     ) {
         self.settingsStore = settingsStore
         self.languageStore = languageStore
@@ -90,6 +94,7 @@ final class FileShelfShakeController: NSObject {
         self.dismissSleeper = dismissSleeper
         self.pressedMouseButtons = pressedMouseButtons
         self.onItems = onItems
+        self.onShare = onShare
         super.init()
 
         settingsSubscription = settingsStore.$settings
@@ -157,7 +162,7 @@ final class FileShelfShakeController: NSObject {
         interaction: PointerEdgeMonitor.Interaction,
         timestamp: TimeInterval = ProcessInfo.processInfo.systemUptime
     ) {
-        guard isMonitoring else { return }
+        guard isMonitoring, !isSharing else { return }
         switch interaction {
         case .dragging(let supported):
             let changeCount = dragPasteboard.changeCount
@@ -191,9 +196,23 @@ final class FileShelfShakeController: NSObject {
     }
 
     func receive(_ items: [FileShelfDropItem], forChangeCount changeCount: Int) {
-        guard isPresented, session.changeCount == changeCount else { return }
+        guard isPresented, !isSharing, session.changeCount == changeCount else { return }
         dismiss()
         onItems(items)
+    }
+
+    func share(_ items: [TransferDropItem], from anchor: NSView, forChangeCount changeCount: Int) {
+        guard isPresented, !isSharing, session.changeCount == changeCount else { return }
+        isSharing = true
+        dismissTask?.cancel()
+        dismissTask = nil
+        releaseTimer?.invalidate()
+        releaseTimer = nil
+        onShare(items, anchor)
+    }
+
+    func sharingDidEnd() {
+        if isSharing { dismiss() }
     }
 
     private func scheduleDismiss() {
@@ -213,6 +232,7 @@ final class FileShelfShakeController: NSObject {
         releaseTimer?.invalidate()
         releaseTimer = nil
         isPresented = false
+        isSharing = false
         window?.close()
         window = nil
     }
@@ -224,9 +244,11 @@ final class FileShelfShakeController: NSObject {
     private func presentWindow(at point: CGPoint) {
         guard let screen = WindowPlacement.screenUnderMouse(point: point) else { return }
         let changeCount = dragPasteboard.changeCount
-        let content = FileShelfShakeView(settingsStore: settingsStore) { [weak self] in
+        let content = FileShelfShakeView(settingsStore: settingsStore, onItems: { [weak self] in
             self?.receive($0, forChangeCount: changeCount)
-        }
+        }, onShare: { [weak self] items, anchor in
+            self?.share(items, from: anchor, forChangeCount: changeCount)
+        })
         let hostingView = NSHostingView(rootView: AppLanguageEnvironment(languageStore: languageStore, content: content))
         hostingView.sizingOptions = []
         let panel = Self.makeWindow(contentView: hostingView, frame: FileShelfShakeLayout.frame(near: point, in: screen.visibleFrame))

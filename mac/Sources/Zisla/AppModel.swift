@@ -167,6 +167,8 @@ struct IslandModuleLayout: Equatable {
   static let pdf = system
   /// Shelf content fills the shared 500pt outer surface and scrolls internally when it contains more files.
   static let shelfContentHeight: CGFloat = 355
+  static let shelfShareWidth: CGFloat = 84
+  static let shelfColumnSpacing: CGFloat = 6
   static let shelf = compactModule(contentHeight: shelfContentHeight)
   /// Clipboard: taller than standard so more items are visible at once, reducing scrolling.
   /// Width matches standard; only the island body is taller.
