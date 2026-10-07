@@ -215,6 +215,7 @@ public final class NowPlayingService: ObservableObject {
   private typealias SetElapsedTimeFunction = @convention(c) (Double) -> Void
 
   private let audioMonitor = AudioPlaybackMonitor()
+  private let iconCache: ApplicationIconDataCache
   private let loadLyrics: @Sendable (String, String, Double?) async -> LyricsSearchResult
   private let adapterClient = MediaRemoteAdapterClient()
   private let specialist = MediaAppSpecialist.shared
@@ -273,14 +274,26 @@ public final class NowPlayingService: ObservableObject {
   private let controlOverrideLifetime: TimeInterval = 2
 
   public init() {
+    iconCache = .shared
     let lyricsService = LyricsService()
     loadLyrics = { title, artist, duration in
       await lyricsService.lyrics(title: title, artist: artist, duration: duration)
     }
   }
 
-  init(loadLyrics: @escaping @Sendable (String, String, Double?) async -> LyricsSearchResult) {
+  init(
+    loadLyrics: @escaping @Sendable (String, String, Double?) async -> LyricsSearchResult,
+    initialRemoteSnapshot: NowPlayingSnapshot? = nil,
+    initialRemotePID: pid_t? = nil,
+    systemAudioIsAudible: Bool = false,
+    iconCache: ApplicationIconDataCache = .shared
+  ) {
     self.loadLyrics = loadLyrics
+    self.iconCache = iconCache
+    remoteSnapshot = initialRemoteSnapshot
+    remotePlaybackState = initialRemoteSnapshot.map { $0.isPlaying ? .playing : .paused } ?? .unavailable
+    remotePID = initialRemotePID ?? initialRemoteSnapshot?.sourcePID
+    self.systemAudioIsAudible = systemAudioIsAudible
   }
 
   public func setPreferredSource(_ preference: MediaSourcePreference) {
@@ -359,6 +372,7 @@ public final class NowPlayingService: ObservableObject {
       registerNotifications?(DispatchQueue.main)
       registerMediaRemoteObservers()
     }
+    registerApplicationIconObserver()
 
     audioMonitor.onSourcesChanged = { [weak self] _ in
       guard let self,
@@ -372,9 +386,10 @@ public final class NowPlayingService: ObservableObject {
       onEvent: { [weak self] event in
         guard let self,
           self.isRunning,
+          self.usesAdapter,
           self.lifecycleGeneration == lifecycleGeneration
         else { return }
-        self.consumeAdapterEvent(event)
+        self.consumeAdapterPayload(event.payload)
       },
       onTermination: { [weak self] in
         guard let self,
@@ -444,6 +459,7 @@ public final class NowPlayingService: ObservableObject {
       NotificationCenter.default.removeObserver(observer)
     }
     observers.removeAll()
+    iconCache.cancelPendingRetries()
     audioMonitor.onSourcesChanged = nil
     audioMonitor.stop()
     spectrumCancellable?.cancel()
@@ -1025,7 +1041,13 @@ public final class NowPlayingService: ObservableObject {
     remoteBundleIdentifier: String? = nil
   ) -> AudioPlaybackSource? {
     if let remotePID,
-      let matched = sources.first(where: { $0.processIdentifiers.contains(remotePID) })
+      let matched = sources.first(where: { $0.processIdentifiers.contains(remotePID) }),
+      sourceIdentityMatches(
+        expectedBundleIdentifier: remoteBundleIdentifier,
+        expectedPID: remotePID,
+        actualBundleIdentifier: matched.bundleIdentifier,
+        actualPID: remotePID
+      )
     {
       return matched
     }
@@ -1034,7 +1056,7 @@ public final class NowPlayingService: ObservableObject {
     {
       return matched
     }
-    return sources.first(where: \.isFrontmost) ?? sources.first
+    return nil
   }
 
   /// Core Audio is authoritative for the app that is currently emitting sound when it reports one unambiguous source.
@@ -1161,6 +1183,30 @@ public final class NowPlayingService: ObservableObject {
     }
   }
 
+  func registerApplicationIconObserver(from sources: [AudioPlaybackSource]? = nil) {
+    observers.append(NotificationCenter.default.addObserver(
+      forName: ApplicationIconDataCache.didCacheIconNotification,
+      object: iconCache,
+      queue: .main
+    ) { [weak self] notification in
+      let cacheKey = notification.userInfo?["cacheKey"] as? String
+      MainActor.assumeIsolated {
+        guard let self, let current = self.snapshot, let cacheKey else { return }
+        let currentSource = Self.preferredSource(
+          from: sources ?? self.audioMonitor.sources,
+          remotePID: current.sourcePID,
+          remoteBundleIdentifier: current.sourceBundleIdentifier
+        )
+        let expectedKey = current.sourceBundleIdentifier
+          ?? currentSource?.id
+          ?? current.sourcePID.map { "pid:\($0)" }
+        guard cacheKey == expectedKey else { return }
+        if sources == nil { self.audioMonitor.refresh() }
+        self.resolveSnapshot(from: sources)
+      }
+    })
+  }
+
   private func refreshRemoteInfo() {
     guard isRunning, !usesAdapter else { return }
     refreshGeneration &+= 1
@@ -1230,14 +1276,16 @@ public final class NowPlayingService: ObservableObject {
     }
   }
 
-  private func consumeAdapterEvent(_ event: MediaRemoteAdapterEvent) {
-    guard isRunning, usesAdapter else { return }
+  func consumeAdapterPayload(
+    _ payload: MediaRemoteAdapterPayload,
+    from sources: [AudioPlaybackSource]? = nil
+  ) {
     playbackRefreshGeneration &+= 1
     remotePIDPending = false
     let fallbackIsPlaying = remoteSnapshot?.isPlaying
       ?? (remotePlaybackState == .playing ? true : nil)
     guard let value = Self.parseAdapter(
-      event.payload,
+      payload,
       fallbackIsPlaying: fallbackIsPlaying
     ) else {
       cancelArtworkRefresh()
@@ -1245,16 +1293,18 @@ public final class NowPlayingService: ObservableObject {
       remotePlaybackState = .paused
       remotePID = nil
       remoteSnapshot = nil
-      resolveSnapshot()
+      resolveSnapshot(from: sources)
       return
     }
 
-    consumeAdapterSnapshot(value)
+    consumeAdapterSnapshot(value, from: sources)
   }
 
-  private func consumeAdapterSnapshot(_ snapshot: NowPlayingSnapshot) {
-    guard isRunning, usesAdapter else { return }
-    audioMonitor.refresh()
+  private func consumeAdapterSnapshot(
+    _ snapshot: NowPlayingSnapshot,
+    from sources: [AudioPlaybackSource]? = nil
+  ) {
+    if sources == nil { audioMonitor.refresh() }
     var value = snapshot
 
     let identity = ControlIdentity(value)
@@ -1277,7 +1327,7 @@ public final class NowPlayingService: ObservableObject {
     remotePID = value.sourcePID
     remoteSnapshot = Self.mergingMetadata(value, previous: remoteSnapshot)
     scheduleArtworkRefreshIfNeeded()
-    resolveSnapshot()
+    resolveSnapshot(from: sources)
   }
 
   private func refreshPlaybackAfterAudioStops() {
@@ -1289,24 +1339,26 @@ public final class NowPlayingService: ObservableObject {
     playbackRefreshGeneration &+= 1
     let generation = playbackRefreshGeneration
     let lifecycleGeneration = self.lifecycleGeneration
-    let fallbackIsPlaying = remoteSnapshot?.isPlaying
-      ?? (remotePlaybackState == .playing ? true : nil)
     _ = adapterClient.fetchNowPlayingInfo { [weak self] payload in
       guard let self,
         self.playbackRefreshGeneration == generation,
         self.lifecycleGeneration == lifecycleGeneration,
         self.isRunning,
-        self.usesAdapter,
-        !self.systemAudioIsAudible,
-        self.snapshot?.isPlaying == true,
-        let payload,
-        let value = Self.parseAdapter(
-          payload,
-          fallbackIsPlaying: fallbackIsPlaying
-        )
+        self.usesAdapter
       else { return }
-      self.consumeAdapterSnapshot(value)
+      self.consumePlaybackRefresh(payload)
     }
+  }
+
+  func consumePlaybackRefresh(
+    _ payload: MediaRemoteAdapterPayload?,
+    from sources: [AudioPlaybackSource]? = nil
+  ) {
+    guard !systemAudioIsAudible,
+      snapshot?.isPlaying == true,
+      let payload
+    else { return }
+    consumeAdapterPayload(payload, from: sources)
   }
 
   private func adapterDidTerminate() {
@@ -1427,9 +1479,9 @@ public final class NowPlayingService: ObservableObject {
     }
   }
 
-  private func resolveSnapshot() {
+  func resolveSnapshot(from sources: [AudioPlaybackSource]? = nil) {
     defer { updateSpectrumMonitoring() }
-    let sources = audioMonitor.sources
+    let sources = sources ?? audioMonitor.sources
     let remoteSource = Self.preferredSource(
       from: sources,
       remotePID: remotePID,
@@ -1446,19 +1498,15 @@ public final class NowPlayingService: ObservableObject {
         snapshot: remote,
         playbackState: remotePlaybackState
       )
-      if let source = Self.audioSourceCorrectingRemoteAttribution(
+      if Self.audioSourceCorrectingRemoteAttribution(
         from: sources,
         remotePID: remotePID,
         remoteBundleIdentifier: remote.sourceBundleIdentifier
-      ) {
-        remote.sourceApplication = source.applicationName
-        remote.sourceBundleIdentifier = source.bundleIdentifier
-        remote.sourcePID = source.processIdentifiers.first
-        remote.sourceIconData = Self.applicationIconData(
-          source: source,
-          bundleIdentifier: source.bundleIdentifier,
-          processIdentifier: source.processIdentifiers.first
-        )
+      ) != nil {
+        remoteSnapshot = nil
+        activeProfile = nil
+        publishSnapshot(resolvedAudioFallbackSnapshot(from: preferredSources))
+        return
       } else {
         remote.sourceApplication = remote.sourceApplication ?? remoteSource?.applicationName
         remote.sourceBundleIdentifier =
@@ -1466,12 +1514,12 @@ public final class NowPlayingService: ObservableObject {
           ?? remoteSource?.bundleIdentifier
         remote.sourcePID = remote.sourcePID ?? remotePID ?? remoteSource?.processIdentifiers.first
         remote.sourceIconData =
-          remote.sourceIconData
-          ?? Self.applicationIconData(
+          applicationIconData(
             source: remoteSource,
             bundleIdentifier: remote.sourceBundleIdentifier,
             processIdentifier: remote.sourcePID
           )
+          ?? remote.sourceIconData
       }
       guard Self.matchesPreferredSource(
         remote.sourceBundleIdentifier,
@@ -1493,7 +1541,7 @@ public final class NowPlayingService: ObservableObject {
         )
       {
         activeProfile = nil
-        publishSnapshot(Self.audioFallbackSnapshot(for: activeSource))
+        publishSnapshot(audioFallbackSnapshot(for: activeSource))
         return
       }
       if var stored = remoteSnapshot {
@@ -1513,9 +1561,10 @@ public final class NowPlayingService: ObservableObject {
   }
 
   func publishSnapshot(_ value: NowPlayingSnapshot?) {
-    guard var current = value else {
+    guard var current = value, current.isPlaying else {
       clearLyrics()
       snapshot = nil
+      iconCache.cancelPendingRetries()
       return
     }
     applyLyrics(to: &current)
@@ -1533,31 +1582,24 @@ public final class NowPlayingService: ObservableObject {
         remotePIDPending: remotePIDPending
       )
     else { return nil }
-    return Self.audioFallbackSnapshot(for: source)
+    return audioFallbackSnapshot(for: source)
   }
 
-  private static func applicationIconData(
+  private func applicationIconData(
     source: AudioPlaybackSource?,
     bundleIdentifier: String?,
     processIdentifier: pid_t?
   ) -> Data? {
-    if let iconData = source?.iconData { return iconData }
-    if let processIdentifier,
-      let icon = NSRunningApplication(processIdentifier: processIdentifier)?.icon
-    {
-      let cacheKey = bundleIdentifier ?? "pid:\(processIdentifier)"
-      return ApplicationIconDataCache.data(for: icon, cacheKey: cacheKey)
-    }
-    guard let bundleIdentifier,
-      let applicationURL = NSWorkspace.shared.urlForApplication(
-        withBundleIdentifier: bundleIdentifier
-      )
+    guard let cacheKey = bundleIdentifier ?? source?.id ?? processIdentifier.map({ "pid:\($0)" })
     else { return nil }
-    let icon = NSWorkspace.shared.icon(forFile: applicationURL.path)
-    return ApplicationIconDataCache.data(for: icon, cacheKey: bundleIdentifier)
+    return iconCache.data(
+      forApplication: cacheKey,
+      bundleIdentifier: bundleIdentifier,
+      processIdentifier: processIdentifier
+    ) ?? source?.iconData
   }
 
-  nonisolated private static func audioFallbackSnapshot(
+  private func audioFallbackSnapshot(
     for source: AudioPlaybackSource
   ) -> NowPlayingSnapshot {
     // Core Audio can only confirm that the app is producing audio; do not fabricate a video identity from that alone.
@@ -1573,7 +1615,11 @@ public final class NowPlayingService: ObservableObject {
       sourceApplication: source.applicationName,
       sourceBundleIdentifier: source.bundleIdentifier,
       sourcePID: source.processIdentifiers.first,
-      sourceIconData: source.iconData,
+      sourceIconData: applicationIconData(
+        source: source,
+        bundleIdentifier: source.bundleIdentifier,
+        processIdentifier: source.processIdentifiers.first
+      ),
       supportsControls: false
     )
   }

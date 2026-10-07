@@ -1015,15 +1015,29 @@ struct NowPlayingServiceTests {
     }
 
     @Test
-    func frontmostSourceWinsWhenMediaRemoteHasNoPID() throws {
+    func remoteWithoutIdentityDoesNotSelectAnUnrelatedAudioSource() {
         let background = source(id: "background", pid: 10, isFrontmost: false)
         let frontmost = source(id: "front", pid: 20, isFrontmost: true)
 
+        #expect(
+            NowPlayingService.preferredSource(from: [background, frontmost], remotePID: nil) == nil
+        )
+    }
+
+    @Test
+    func conflictingPIDCannotOverrideTheRemoteBundleIdentity() throws {
+        let unrelated = source(id: "front", pid: 10, isFrontmost: true)
+        let remote = source(id: "remote", pid: 20, isFrontmost: false)
+
         let selected = try #require(
-            NowPlayingService.preferredSource(from: [background, frontmost], remotePID: nil)
+            NowPlayingService.preferredSource(
+                from: [unrelated, remote],
+                remotePID: 10,
+                remoteBundleIdentifier: "test.remote"
+            )
         )
 
-        #expect(selected.id == "front")
+        #expect(selected.id == "remote")
     }
 
     @Test
