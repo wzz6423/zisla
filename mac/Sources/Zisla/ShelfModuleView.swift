@@ -24,9 +24,9 @@ struct ShelfModuleView: View {
     }
 
     var body: some View {
-        HStack(spacing: 6) {
+        HStack(spacing: IslandModuleLayout.shelfColumnSpacing) {
             shareShoulder
-                .frame(width: 84)
+                .frame(width: IslandModuleLayout.shelfShareWidth)
                 .onDrop(
                     of: TransferDropDelegate.supportedTypes,
                     delegate: TransferDropDelegate(isTargeted: $dropState.shareTargeted) {
