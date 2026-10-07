@@ -45,7 +45,7 @@ swift test
 
 - **PR 正文**必须使用英文，并包含 `.github/PULL_REQUEST_TEMPLATE.md` 提供的 `Summary`、`GitHub Project`、`PR Type`、`Validation`、`Risk and Rollback`、`Related Issue`、`AI Attribution` 七节。
   - `GitHub Project` 保留模板给出的 `- Project: zisla Development`。`Project Automation` 据此把 PR 放进共享看板。
-  - `GitHub Project` 中可选填 `Start date` 和 `Target date`，格式为 `YYYY-MM-DD`；留空会保留 Project 中已有的值。`Submitted date` 自动取 UTC+08:00 的创建日期；`End date` 在 PR 合并时自动填写，两者都不需要手动输入。
+  - `GitHub Project` 中必须填写 `Start date` 和 `Target date`，各出现一次，使用 `YYYY-MM-DD` 格式的真实日期；`Target date` 不能早于 `Start date`。缺失、留空、仅写在注释中、重复或无效的日期都会导致 `PR Quality` 失败。`Submitted date` 自动取 UTC+08:00 的创建日期；`End date` 在 PR 合并时自动填写，两者都不需要手动输入。
   - `PR Type` 只写一条 `- Type:`，且必须能解析为标题中的类型。标题使用规范类型；正文同时接受类型标签名和已配置别名，因此 `fix`、`bug`、`bug fix`、`bugfix`、`hotfix` 都会解析为 `fix`。`PR Automation` 会根据解析后的类型打标签，例如 `fix` 对应 `bug`。
   - `Project Automation` 按配置的标签映射（包含 PR 类型标签）选择 `Status`，关闭或合并后设为 `Done`，不需要手动填写。
   - `Summary` 必须说明改动；`Risk and Rollback` 必须各填写一条非空的 `Risk` 和 `Rollback`。
@@ -108,8 +108,8 @@ swift test
 
   | 日期 | 创建时（2026-10-05） | 合并后（2026-10-12） | 来源 |
   | --- | --- | --- | --- |
-  | `Start date` | 2026-10-05 | 2026-10-05 | 可选手填 |
-  | `Target date` | 2026-10-12 | 2026-10-12 | 可选手填 |
+  | `Start date` | 2026-10-05 | 2026-10-05 | 必须手填 |
+  | `Target date` | 2026-10-12 | 2026-10-12 | 必须手填 |
   | `Submitted date` | 2026-10-05 | 2026-10-05 | 自动取创建日期 |
   | `End date` | 空 | 2026-10-12 | 自动取合并日期 |
 

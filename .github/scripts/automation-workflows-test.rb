@@ -7,6 +7,7 @@ require 'json'
 require 'open3'
 require 'tmpdir'
 require 'fileutils'
+require_relative 'pr-metadata'
 
 class AutomationWorkflowsTest < Minitest::Test
   ROOT = File.expand_path('../..', __dir__)
@@ -47,6 +48,25 @@ class AutomationWorkflowsTest < Minitest::Test
     assert_equal 1, calls.count { |call| call['args'][0, 2] == %w[pr create] }
   end
 
+  def test_emoji_creation_includes_a_valid_project_schedule_in_beijing_time
+    date = File.join(@directory, 'bin/date')
+    File.write(date, <<~'SCRIPT')
+      #!/usr/bin/env ruby
+      abort 'Schedule must use Beijing time' unless ENV['TZ'] == 'Asia/Shanghai'
+      abort 'Schedule must use ISO dates' unless ARGV == ['+%F']
+      puts '2026-10-04'
+    SCRIPT
+    File.chmod(0o755, date)
+    output, status = run_step(step('emoji-catalog-update', 'Create an update pull request'), 'TZ' => 'UTC')
+    assert status.success?, output
+    body = File.read(File.join(@directory, 'emoji-catalog-pr.md'))
+    contract = PullRequestMetadata::Contract.load(File.join(ROOT, '.github/pr-automation.json'))
+
+    assert_includes body, '- Start date: 2026-10-04'
+    assert_includes body, '- Target date: 2026-10-04'
+    assert_empty PullRequestMetadata.validate(title: 'chore(mac): update emoji catalog to Emoji 17.0', body: body, contract: contract)
+  end
+
   def test_pr_quality_runs_the_complete_validator_and_cleans_payloads
     install_workflow_fixture
     document = File.read(File.join(ROOT, 'CONTRIBUTING.md'))
@@ -56,7 +76,13 @@ class AutomationWorkflowsTest < Minitest::Test
       'complete' => [body, nil],
       'later validation entry' => [body.sub(/^- Reason:.*$/, '- Reason:'), 'Validation entry 4'],
       'missing risk' => [body.sub(/^- Risk:.*$/, '- Risk:'), 'non-empty Risk'],
-      'invalid date' => [body.sub(/^- Target date:.*$/, '- Target date: 2026-02-30'), 'valid date']
+      'invalid date' => [body.sub(/^- Target date:.*$/, '- Target date: 2026-02-30'), 'valid date'],
+      'missing start date' => [body.sub(/^- Start date:.*\n/, ''), 'non-empty Start date'],
+      'missing target date' => [body.sub(/^- Target date:.*\n/, ''), 'non-empty Target date'],
+      'blank date' => [body.sub(/^- Start date:.*$/, '- Start date:'), 'non-empty Start date'],
+      'comment placeholder' => [body.sub(/^- Target date:.*$/, '- Target date: <!-- YYYY-MM-DD -->'), 'non-empty Target date'],
+      'duplicate date' => [body.sub(/^- Start date:.*$/, "- Start date: 2026-10-05\n- Start date:"), 'non-empty Start date'],
+      'reversed dates' => [body.sub(/^- Target date:.*$/, '- Target date: 2026-10-04'), 'on or after Start date']
     }
     cleanup = step('pr-quality-gates', 'Remove pull request metadata files')
     assert_equal 'always()', cleanup.fetch('if')

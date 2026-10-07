@@ -121,7 +121,7 @@ class PullRequestMetadataTest < Minitest::Test
   end
 
   def test_project_dates_accept_calendar_dates_and_ignore_other_sections
-    body = build_body(project: "zisla Development\n- Start date: 2024-02-29\n- Target date: 2026-10-10")
+    body = build_body(start_date: '2024-02-29', target_date: '2026-10-10')
     body += "\n## Notes\n- Start date: invalid\n"
     sections = PullRequestMetadata.sections(body)
 
@@ -130,7 +130,7 @@ class PullRequestMetadataTest < Minitest::Test
     assert_empty PullRequestMetadata.validate(title: 'ci: add automation', body: body, contract: @contract)
   end
 
-  def test_project_dates_are_optional_and_ignore_template_comments
+  def test_project_date_parser_preserves_legacy_partial_schedules_and_ignores_comments
     [nil, [], ['- Start date:', '- Target date:   ']].each do |lines|
       assert_equal({ 'startDate' => nil, 'targetDate' => nil }, PullRequestMetadata.project_dates(lines))
     end
@@ -140,22 +140,59 @@ class PullRequestMetadataTest < Minitest::Test
                  PullRequestMetadata.project_dates(PullRequestMetadata.sections(body)['GitHub Project']))
   end
 
+  def test_pr_quality_requires_each_project_date
+    { start_date: 'Start date', target_date: 'Target date' }.each do |key, label|
+      [nil, '', '   ', '<!-- YYYY-MM-DD -->'].each do |value|
+        errors = validate('ci: add automation', **{ key => value })
+
+        assert_includes errors.join("\n"), "GitHub Project must declare exactly one non-empty #{label} field.", value.inspect
+      end
+    end
+    errors = validate('ci: add automation', start_date: nil, target_date: nil)
+    ['Start date', 'Target date'].each { |label| assert_includes errors.join("\n"), label }
+  end
+
+  def test_pr_quality_cannot_borrow_dates_from_other_sections_or_comments
+    ["## Notes\n- Start date: 2026-10-05\n- Target date: 2026-10-12",
+     "<!--\n- Start date: 2026-10-05\n- Target date: 2026-10-12\n-->"].each do |extra|
+      body = build_body(start_date: nil, target_date: nil).sub('## PR Type', "#{extra}\n\n## PR Type")
+      errors = PullRequestMetadata.validate(title: 'ci: add automation', body: body, contract: @contract)
+
+      ['Start date', 'Target date'].each { |label| assert_includes errors.join("\n"), "non-empty #{label}" }
+    end
+  end
+
+  def test_pr_quality_requires_target_date_on_or_after_start_date
+    assert_empty validate('ci: add automation', start_date: '2026-10-05', target_date: '2026-10-05')
+    assert_empty validate('ci: add automation', start_date: '2026-12-31', target_date: '2027-01-01')
+
+    [['2026-10-05', '2026-10-04'], ['2026-01-01', '2025-12-31']].each do |start_date, target_date|
+      errors = validate('ci: add automation', start_date: start_date, target_date: target_date)
+
+      assert_includes errors.join("\n"), 'Target date must be on or after Start date.'
+    end
+  end
+
   def test_project_dates_reject_invalid_calendar_dates_formats_and_untrusted_values
     invalid = ['2026-02-29', '2026-02-30', '2026-13-01', '2026-00-01', '2026-10-00',
                '2026-4-1', '20261005', '2026-W41-1', '2026-278', '2026-10-05T00:00:00Z',
-               'tomorrow', '2026-10-05; $(id)', '2026-10-05`id`', '2026-10-05\\nextra']
-    ['Start date', 'Target date'].product(invalid).each do |field, value|
-      errors = validate('ci: add automation', project: "zisla Development\n- #{field}: #{value}")
+               'YYYY-MM-DD', 'TBD', 'None', 'tomorrow', '2026-10-05; $(id)', '2026-10-05`id`', '2026-10-05\\nextra']
+    { start_date: 'Start date', target_date: 'Target date' }.each do |key, field|
+      invalid.each do |value|
+        errors = validate('ci: add automation', **{ key => value })
 
-      assert_includes errors.join("\n"), "#{field} must be a valid date in YYYY-MM-DD format.", value
+        assert_includes errors.join("\n"), "#{field} must be a valid date in YYYY-MM-DD format.", value
+      end
     end
   end
 
   def test_project_dates_reject_duplicate_values
-    ['Start date', 'Target date'].each do |field|
-      errors = validate('ci: add automation', project: "zisla Development\n- #{field}: 2026-10-01\n- #{field}: 2026-10-10")
+    { start_date: 'Start date', target_date: 'Target date' }.each do |key, field|
+      ['', '<!-- unused -->', '2026-10-05', '2026-10-10'].each do |duplicate|
+        errors = validate('ci: add automation', **{ key => "2026-10-05\n- #{field}: #{duplicate}" })
 
-      assert_includes errors.join("\n"), "at most one non-empty #{field}"
+        assert_includes errors.join("\n"), "GitHub Project must declare exactly one non-empty #{field} field."
+      end
     end
   end
 
@@ -322,6 +359,8 @@ class PullRequestMetadataTest < Minitest::Test
   def test_repository_template_needs_only_its_own_fields_filled_in
     template = File.read(File.expand_path('../PULL_REQUEST_TEMPLATE.md', __dir__))
                    .sub('<!-- Describe the purpose and implementation in English. -->', '- Validate all PR fields.')
+                   .sub(/^- Start date:.*$/, '- Start date: 2026-10-05')
+                   .sub(/^- Target date:.*$/, '- Target date: 2026-10-12')
                    .sub(/^- Type:$/, '- Type: ci')
                    .sub(/^- Status:.*$/, '- Status: not run')
                    .sub(/^- Reason:.*$/, '- Reason: Automation only.')
@@ -360,7 +399,8 @@ class PullRequestMetadataTest < Minitest::Test
     JSON.parse(File.read(CONTRACT_PATH)).fetch('types')
   end
 
-  def build_body(type: 'ci', project: 'zisla Development', validation: nil, related: 'None', attribution: '- Agent: None')
+  def build_body(type: 'ci', project: 'zisla Development', start_date: '2026-10-05', target_date: '2026-10-12',
+                 validation: nil, related: 'None', attribution: '- Agent: None')
     <<~BODY
       ## Summary
 
@@ -369,6 +409,8 @@ class PullRequestMetadataTest < Minitest::Test
       ## GitHub Project
 
       - Project: #{project}
+      #{"- Start date: #{start_date}" unless start_date.nil?}
+      #{"- Target date: #{target_date}" unless target_date.nil?}
 
       ## PR Type
 
