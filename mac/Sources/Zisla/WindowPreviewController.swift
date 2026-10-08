@@ -426,6 +426,7 @@ final class WindowPreviewController: ObservableObject {
     private var dismissTimer: Timer?
     private var captureTimer: Timer?
     private var prefetchTimer: Timer?
+    private var transitionTimers: [pid_t: Timer] = [:]
     private(set) var captureTask: Task<Void, Never>?
     private(set) var prefetchTask: Task<Void, Never>?
     private var generation = 0
@@ -488,13 +489,14 @@ final class WindowPreviewController: ObservableObject {
         }
         spaceChangeObserver = dependencies.addSpaceChangeObserver { [weak self] in
             self?.needsSpaceRefront = true
-            self?.scheduleForegroundCapture()
+            self?.scheduleForegroundCapture(afterTransition: true)
         }
         applicationActivationObserver = dependencies.addApplicationActivationObserver { [weak self] in
-            self?.scheduleForegroundCapture()
+            self?.scheduleForegroundCapture(afterTransition: true)
         }
         applicationTerminationObserver = dependencies.addApplicationTerminationObserver { [weak self] processIdentifier in
             guard let self else { return }
+            self.transitionTimers.removeValue(forKey: processIdentifier)?.invalidate()
             if self.prefetchProcessIdentifier == processIdentifier {
                 self.cancelForegroundCapture()
             }
@@ -518,6 +520,8 @@ final class WindowPreviewController: ObservableObject {
         needsSpaceRefront = false
         prefetchTimer?.invalidate()
         prefetchTimer = nil
+        transitionTimers.values.forEach { $0.invalidate() }
+        transitionTimers.removeAll()
         cancelForegroundCapture()
         imageCache.removeAll()
         switcherTimer?.invalidate()
@@ -555,6 +559,9 @@ final class WindowPreviewController: ObservableObject {
                 endSwitcher()
             }
         case .leftMouseDown, .rightMouseDown:
+            if event.type == .leftMouseDown, let clicked = dependencies.dockSelection() {
+                deferCaptures(for: clicked.processIdentifier)
+            }
             if switcherTimer == nil && panel?.frame.contains(NSEvent.mouseLocation) != true {
                 scheduleDismiss()
             }
@@ -666,12 +673,39 @@ final class WindowPreviewController: ObservableObject {
         dependencies.present(self, nil)
     }
 
-    private func scheduleForegroundCapture() {
+    private func scheduleForegroundCapture(afterTransition: Bool = false) {
         guard enabled, dependencies.hasPermissions() else { return }
+        if afterTransition, let processIdentifier = dependencies.frontmostProcessIdentifier() {
+            deferCaptures(for: processIdentifier)
+            return
+        }
         prefetchTimer?.invalidate()
         prefetchTimer = dependencies.timer(0.2, false) { [weak self] in
             self?.prefetchTimer = nil
             self?.captureForegroundApplication()
+        }
+    }
+
+    private func deferCaptures(for processIdentifier: pid_t) {
+        prefetchTimer?.invalidate()
+        cancelForegroundCapture()
+        transitionTimers[processIdentifier]?.invalidate()
+        if selection?.processIdentifier == processIdentifier {
+            generation &+= 1
+            captureTask?.cancel()
+            captureTask = nil
+            windows = []
+            dependencies.present(self, nil)
+        }
+        // Dock restoration outlasts the hover delay; both capture paths must wait for it.
+        transitionTimers[processIdentifier] = dependencies.timer(0.8, false) { [weak self] in
+            guard let self else { return }
+            self.transitionTimers.removeValue(forKey: processIdentifier)
+            if self.selection?.processIdentifier == processIdentifier {
+                self.refreshWindows()
+            } else {
+                self.captureForegroundApplication()
+            }
         }
     }
 
@@ -686,6 +720,7 @@ final class WindowPreviewController: ObservableObject {
         guard enabled, dependencies.hasPermissions(),
               let processIdentifier = dependencies.frontmostProcessIdentifier(),
               processIdentifier != getpid(),
+              transitionTimers[processIdentifier] == nil,
               selection?.processIdentifier != processIdentifier else { return }
         cancelForegroundCapture()
         let currentGeneration = prefetchGeneration
@@ -699,6 +734,7 @@ final class WindowPreviewController: ObservableObject {
                 }
             }
             do {
+                try Task.checkCancellation()
                 let snapshots = try await captureWindows(processIdentifier)
                 guard !Task.isCancelled, let self, self.prefetchGeneration == currentGeneration,
                       self.enabled, self.dependencies.hasPermissions() else { return }
@@ -717,7 +753,8 @@ final class WindowPreviewController: ObservableObject {
             stopMonitoring()
             return
         }
-        guard let selection, captureTask == nil else { return }
+        guard let selection, captureTask == nil,
+              transitionTimers[selection.processIdentifier] == nil else { return }
         let currentGeneration = generation
         let captureWindows = dependencies.captureWindows
         captureTask = Task { [weak self] in
@@ -923,6 +960,7 @@ final class WindowPreviewController: ObservableObject {
         guard let selection, let current = windows.first(where: { $0.id == snapshot.id }) else { return }
         let isOnlyPreview = windows.count == 1
         endSwitcher()
+        deferCaptures(for: selection.processIdentifier)
         dependencies.activate(selection.processIdentifier, current, isOnlyPreview)
     }
 

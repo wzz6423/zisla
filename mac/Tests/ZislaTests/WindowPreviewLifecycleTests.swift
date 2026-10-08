@@ -448,6 +448,301 @@ struct WindowPreviewLifecycleTests {
         #expect(captures == [1, 1])
     }
 
+    @Test(arguments: [WindowPreviewSource.dock, .switcher], [false, true])
+    func applicationActivationDefersSelectedAndForegroundCapturesUntilTheAnimationSettles(
+        source: WindowPreviewSource, spaceChange: Bool
+    ) async throws {
+        let system = PreviewSystem()
+        system.foregroundPID = 1
+        var captures: [pid_t] = []
+        var dependencies = system.dependencies()
+        dependencies.captureWindows = { pid in
+            captures.append(pid)
+            return [PreviewSystem.snapshot(pid)]
+        }
+        let controller = WindowPreviewController(dependencies: dependencies)
+        defer { controller.stop() }
+        controller.configure(enabled: true)
+
+        if spaceChange { system.spaceChanged?() } else { system.applicationActivated?() }
+        let settling = try #require(system.timers.last)
+        #expect(try #require(system.timerDelays.last) >= 0.8,
+                "The activation delay must cover the Dock restore animation")
+        controller.select(PreviewSystem.selection(1, source: source))
+        await controller.captureTask?.value
+        let refresh = try #require(system.timers.first { $0.timeInterval == 1 })
+        refresh.fire()
+        await controller.captureTask?.value
+        #expect(captures.isEmpty, "Hovering or polling must not capture an application that is restoring")
+        #expect(controller.windows.isEmpty)
+
+        settling.fire()
+        await controller.captureTask?.value
+        #expect(captures == [1])
+        #expect(controller.windows.map(\.id) == [1])
+    }
+
+    @Test(arguments: [false, true])
+    func aTransitionRejectsAnInFlightCaptureWithoutCachingItsIntermediateImage(
+        foreground: Bool
+    ) async throws {
+        let system = PreviewSystem()
+        system.foregroundPID = 1
+        let gate = PreviewCaptureGate()
+        var calls = 0
+        var dependencies = system.dependencies()
+        dependencies.captureWindows = { pid in
+            calls += 1
+            if calls == 1 { return try await gate.capture(pid) }
+            return [PreviewSystem.snapshot(11, alpha: nil)]
+        }
+        let controller = WindowPreviewController(dependencies: dependencies)
+        defer { controller.stop() }
+        controller.configure(enabled: true)
+        if foreground {
+            try #require(system.timers.last).fire()
+        } else {
+            controller.select(PreviewSystem.selection(1, source: .dock))
+        }
+        let old = try #require(foreground ? controller.prefetchTask : controller.captureTask)
+        await gate.waitForRequests(1)
+
+        system.applicationActivated?()
+        let settling = try #require(system.timers.last)
+        gate.finish(0, snapshots: [PreviewSystem.snapshot(11)])
+        await old.value
+        #expect(old.isCancelled)
+        #expect(controller.windows.isEmpty)
+        #expect(system.presentations.allSatisfy { $0.isEmpty })
+
+        controller.select(PreviewSystem.selection(1, source: .dock))
+        settling.fire()
+        await controller.captureTask?.value
+        #expect(controller.windows.map(\.id) == [11])
+        #expect(controller.windows.first?.image == nil, "A cancelled animation frame must never seed the cache")
+    }
+
+    @Test
+    func aQueuedForegroundCaptureCannotStartAfterARestoreBegins() async throws {
+        let system = PreviewSystem()
+        system.foregroundPID = 1
+        var captures = 0
+        var dependencies = system.dependencies()
+        dependencies.captureWindows = { pid in
+            captures += 1
+            return [PreviewSystem.snapshot(pid)]
+        }
+        let controller = WindowPreviewController(dependencies: dependencies)
+        defer { controller.stop() }
+        controller.configure(enabled: true)
+        try #require(system.timers.last).fire()
+        let queued = try #require(controller.prefetchTask)
+
+        system.applicationActivated?()
+        await queued.value
+        #expect(captures == 0, "Cancellation must prevent a queued task from even requesting an animation frame")
+        #expect(controller.prefetchTask == nil)
+        try #require(system.timers.last).fire()
+        await controller.prefetchTask?.value
+        #expect(captures == 1)
+    }
+
+    @Test
+    func anOldCaptureCannotClearTheTaskStartedAfterSettling() async throws {
+        let system = PreviewSystem()
+        system.foregroundPID = 1
+        let gate = PreviewCaptureGate()
+        var dependencies = system.dependencies()
+        dependencies.captureWindows = { try await gate.capture($0) }
+        let controller = WindowPreviewController(dependencies: dependencies)
+        defer { controller.stop() }
+        controller.configure(enabled: true)
+        controller.select(PreviewSystem.selection(1, source: .dock))
+        let old = try #require(controller.captureTask)
+        await gate.waitForRequests(1)
+
+        system.applicationActivated?()
+        try #require(system.timers.last).fire()
+        let pending = controller.captureTask
+        #expect(pending != nil && pending != old, "A restore must cancel the old capture before starting another one")
+        if pending == nil || pending == old {
+            gate.finish(0)
+            await old.value
+            return
+        }
+        let settled = try #require(pending)
+        await gate.waitForRequests(2)
+        gate.finish(0)
+        await old.value
+        #expect(controller.captureTask == settled, "A cancelled task must not clear a newer refresh")
+        try #require(system.timers.first { $0.timeInterval == 1 }).fire()
+        #expect(gate.requests.count == 2, "Polling must not duplicate the still-running stable capture")
+
+        gate.finish(1)
+        await settled.value
+        #expect(controller.windows.map(\.id) == [1])
+    }
+
+    @Test
+    func activatingAnAlreadyVisiblePreviewHidesItAndRestartsTheSettlingDelay() async throws {
+        let system = PreviewSystem()
+        system.foregroundPID = 1
+        var captures = 0
+        var dependencies = system.dependencies()
+        dependencies.captureWindows = { pid in
+            captures += 1
+            return [PreviewSystem.snapshot(pid)]
+        }
+        let controller = WindowPreviewController(dependencies: dependencies)
+        defer { controller.stop() }
+        controller.configure(enabled: true)
+        controller.select(PreviewSystem.selection(1, source: .dock))
+        await controller.captureTask?.value
+
+        system.applicationActivated?()
+        let first = try #require(system.timers.last)
+        #expect(controller.windows.isEmpty)
+        #expect((system.presentationAnchors.last ?? nil) == nil)
+        system.applicationActivated?()
+        let second = try #require(system.timers.last)
+        #expect(!first.isValid)
+        first.fire()
+        await controller.captureTask?.value
+        await controller.prefetchTask?.value
+        #expect(captures == 1)
+
+        second.fire()
+        await controller.captureTask?.value
+        #expect(captures == 2)
+        #expect(controller.windows.map(\.id) == [1])
+    }
+
+    @Test(arguments: [NSEvent.EventType.leftMouseDown, .rightMouseDown], [false, true])
+    func onlyADockLeftClickDefersCaptureWithoutAnActivationNotification(
+        type: NSEvent.EventType, onDock: Bool
+    ) async throws {
+        let system = PreviewSystem()
+        system.foregroundPID = 1
+        var captures = 0
+        var dependencies = system.dependencies()
+        dependencies.dockSelection = { onDock ? PreviewSystem.selection(1, source: .dock) : nil }
+        dependencies.captureWindows = { pid in
+            captures += 1
+            return [PreviewSystem.snapshot(pid)]
+        }
+        let controller = WindowPreviewController(dependencies: dependencies)
+        defer { controller.stop() }
+        controller.configure(enabled: true)
+        let click = try #require(NSEvent.mouseEvent(
+            with: type, location: .zero, modifierFlags: [], timestamp: 1,
+            windowNumber: 0, context: nil, eventNumber: 1, clickCount: 1, pressure: 1
+        ))
+
+        system.globalHandler?(click)
+        let settling = try #require(system.timers.last)
+        controller.select(PreviewSystem.selection(1, source: .dock))
+        await controller.captureTask?.value
+        #expect(captures == (type == .leftMouseDown && onDock ? 0 : 1))
+        settling.fire()
+        await controller.captureTask?.value
+        #expect(captures == 1)
+        #expect(controller.windows.map(\.id) == [1])
+    }
+
+    @Test
+    func restoringAWindowFromItsPreviewDefersCaptureEvenWhenTheAppIsAlreadyFrontmost() async throws {
+        let system = PreviewSystem()
+        system.foregroundPID = 1
+        var captures = 0
+        var dependencies = system.dependencies()
+        dependencies.captureWindows = { pid in
+            captures += 1
+            return [PreviewSystem.snapshot(pid)]
+        }
+        let controller = WindowPreviewController(dependencies: dependencies)
+        defer { controller.stop() }
+        controller.configure(enabled: true)
+        controller.select(PreviewSystem.selection(1, source: .dock))
+        await controller.captureTask?.value
+        controller.activate(try #require(controller.windows.first))
+        let settling = try #require(system.timers.last)
+
+        controller.select(PreviewSystem.selection(1, source: .dock))
+        await controller.captureTask?.value
+        #expect(captures == 1)
+        #expect(controller.windows.isEmpty)
+        settling.fire()
+        await controller.captureTask?.value
+        #expect(captures == 2)
+        #expect(system.activations == [1])
+    }
+
+    @Test(arguments: ["stop", "permission", "termination"])
+    func transitionTimersAreReleasedWhenMonitoringOrTheApplicationEnds(reason: String) async throws {
+        let system = PreviewSystem()
+        system.foregroundPID = 1
+        let controller = WindowPreviewController(dependencies: system.dependencies())
+        defer { controller.stop() }
+        controller.configure(enabled: true)
+        system.applicationActivated?()
+        let settling = try #require(system.timers.last)
+
+        switch reason {
+        case "permission":
+            system.authorized = false
+            controller.refreshPermissions()
+        case "termination":
+            system.applicationTerminated?(1)
+        default:
+            controller.stop()
+        }
+        #expect(!settling.isValid, "A pending transition must not outlive its application or monitoring")
+        #expect(controller.captureTask == nil)
+        #expect(controller.prefetchTask == nil)
+
+        system.authorized = true
+        controller.configure(enabled: true)
+        controller.select(PreviewSystem.selection(1, source: .dock))
+        await controller.captureTask?.value
+        #expect(controller.windows.map(\.id) == [1], "A stopped transition must not block later previews")
+    }
+
+    @Test
+    func aDifferentApplicationCanStillBePreviewedDuringARestoreAnimation() async throws {
+        let system = PreviewSystem()
+        system.foregroundPID = 1
+        var captures: [pid_t] = []
+        var dependencies = system.dependencies()
+        dependencies.captureWindows = { pid in
+            captures.append(pid)
+            return [PreviewSystem.snapshot(pid)]
+        }
+        let controller = WindowPreviewController(dependencies: dependencies)
+        defer { controller.stop() }
+        controller.configure(enabled: true)
+        system.applicationActivated?()
+        let first = try #require(system.timers.last)
+        controller.select(PreviewSystem.selection(3, source: .dock))
+        await controller.captureTask?.value
+        system.foregroundPID = 2
+        system.applicationActivated?()
+        let second = try #require(system.timers.last)
+        #expect(first.isValid, "A second application must not cancel the first application's waiting period")
+        #expect(controller.windows.map(\.id) == [3])
+        first.fire()
+        await controller.prefetchTask?.value
+        #expect(captures == [3], "Finishing one restore must not prefetch another application still restoring")
+        controller.select(PreviewSystem.selection(1, source: .dock))
+        await controller.captureTask?.value
+        #expect(controller.windows.map(\.id) == [1])
+        controller.select(PreviewSystem.selection(2, source: .dock))
+        await controller.captureTask?.value
+        #expect(controller.windows.isEmpty)
+        second.fire()
+        await controller.captureTask?.value
+        #expect(controller.windows.map(\.id) == [2])
+    }
+
     @Test
     func stoppingCancelsAnInFlightForegroundCaptureAndClearsItsImage() async throws {
         let system = PreviewSystem()
@@ -653,6 +948,7 @@ private final class PreviewSystem {
     var existingWindowIDs: Set<CGWindowID> = []
     var workspaceObservers: [NSObject] = []
     var timers: [Timer] = []
+    var timerDelays: [TimeInterval] = []
     var switcher: WindowPreviewSelection?
     var commandPressed = true
     var presentations: [[CGWindowID]] = []
@@ -707,6 +1003,7 @@ private final class PreviewSystem {
                 MainActor.assumeIsolated { action() }
             }
             self.timers.append(timer)
+            self.timerDelays.append(interval)
             return timer
         }
         value.captureWindows = { [Self.snapshot($0)] }
