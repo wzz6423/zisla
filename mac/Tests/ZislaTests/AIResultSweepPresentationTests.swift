@@ -9,6 +9,40 @@ import ZislaCore
 
 @MainActor
 struct AIResultSweepPresentationTests {
+    @Test(arguments: [AIProgressStatus.succeeded, .failed, .error])
+    func resultSweepOnlyTintsTheCollapsedSurface(status: AIProgressStatus) throws {
+        let fixture = try Fixture()
+        defer { fixture.cleanUp() }
+        for isCollapsed in [true, false] {
+            #expect(try surfaceTint(isCollapsed: isCollapsed, sweep: fixture.sweep) < 0.01)
+        }
+
+        fixture.receive(makeTask(id: "surface-visibility", provider: .codex, status: status))
+        let sweep = try #require(fixture.sweep.current)
+        let deadline = sweep.startedAt.addingTimeInterval(AIResultSweep.duration / 2)
+        var collapsedTint: CGFloat = 0
+        repeat {
+            collapsedTint = try surfaceTint(isCollapsed: true, sweep: fixture.sweep)
+            if collapsedTint > 0.02 { break }
+            RunLoop.main.run(mode: .default, before: min(deadline, Date().addingTimeInterval(1.0 / 120)))
+        } while Date() < deadline
+        try #require(collapsedTint > 0.02, "收起的小岛必须实际绘制结果扫光，才能检查展开后的隐藏行为")
+
+        #expect(try surfaceTint(isCollapsed: false, sweep: fixture.sweep) < 0.01,
+                "展开面板不能被成功或失败的扫光染色")
+        #expect(try surfaceTint(isCollapsed: true, sweep: fixture.sweep, usesCompactGlassSurface: true) < 0.01,
+                "录音或提示的展开小面板也不能显示结果扫光")
+        #expect(try surfaceTint(isCollapsed: true, sweep: fixture.sweep) > 0.02,
+                "重新收起后，仍在播放的扫光应继续显示")
+        #expect(fixture.sweep.current?.id == sweep.id, "展开和收起不能重启或取消结果播放")
+
+        fixture.sweep.finish(id: sweep.id)
+        for isCollapsed in [true, false] {
+            #expect(try surfaceTint(isCollapsed: isCollapsed, sweep: fixture.sweep) < 0.01,
+                    "播放结束后不能残留扫光")
+        }
+    }
+
     @Test(arguments: [ColorScheme.light, .dark], [CGFloat(16), 22, 24])
     func monochromeIconContrastsWithItsColorScheme(colorScheme: ColorScheme, size: CGFloat) throws {
         let renderer = ImageRenderer(content: AIMascotView(identity: .gpt, size: size)
@@ -162,6 +196,26 @@ struct AIResultSweepPresentationTests {
 
     private func makeTask(id: String, provider: AIProvider, status: AIProgressStatus) -> AIProgressTask {
         AIProgressTask(id: id, provider: provider, title: id, progress: nil, status: status, updatedAt: .now)
+    }
+
+    private func surfaceTint(
+        isCollapsed: Bool, sweep: AIResultSweepController, usesCompactGlassSurface: Bool = false
+    ) throws -> CGFloat {
+        let renderer = ImageRenderer(content: IslandSurface(
+            isCollapsed: isCollapsed,
+            expandedSize: CGSize(width: 320, height: 100),
+            usesCompactGlassSurface: usesCompactGlassSurface,
+            resultSweep: sweep
+        ) {
+            Color.black
+        }
+        .frame(width: 320, height: 100))
+        let bitmap = NSBitmapImageRep(cgImage: try #require(renderer.cgImage))
+        let tint = try (0..<bitmap.pixelsWide).map { x in
+            let color = try #require(bitmap.colorAt(x: x, y: 17)?.usingColorSpace(.deviceRGB))
+            return abs(color.redComponent - color.greenComponent)
+        }
+        return try #require(tint.max())
     }
 
     private func notice(for task: AIProgressTask) -> IslandNotice {
