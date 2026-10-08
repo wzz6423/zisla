@@ -350,24 +350,11 @@ struct SystemMonitorView: View {
     }
 
     private var gpuWaveSeries: [WaveSeries] {
-        let rendererOverlapsUsage = nearlyEqualSeries(
-            service.history.gpuUsage,
-            service.history.gpuRenderer
-        )
-        return [
+        [
             WaveSeries(samples: service.history.gpuUsage, color: WaveformPalette.blue),
-            WaveSeries(
-                samples: service.history.gpuRenderer,
-                color: WaveformPalette.red,
-                dash: rendererOverlapsUsage ? [3, 2] : []
-            ),
+            WaveSeries(samples: service.history.gpuRenderer, color: WaveformPalette.red),
             WaveSeries(samples: service.history.gpuTiler, color: WaveformPalette.teal),
         ]
-    }
-
-    private func nearlyEqualSeries(_ lhs: [Double], _ rhs: [Double]) -> Bool {
-        guard lhs.count > 1, lhs.count == rhs.count else { return false }
-        return zip(lhs, rhs).allSatisfy { abs($0 - $1) < 0.005 }
     }
 
     private var gpuUnavailableReason: String {
@@ -849,7 +836,6 @@ enum WaveformPalette {
 struct WaveSeries {
     var samples: [Double]
     var color: Color
-    var dash: [CGFloat] = []
 }
 
 struct MultiLineWaveform: View {
@@ -875,7 +861,7 @@ struct MultiLineWaveform: View {
                 context.stroke(
                     waveLine(item.samples, size: size, smooth: style == .filled),
                     with: .color(item.color),
-                    style: StrokeStyle(lineWidth: 1.3, dash: item.dash)
+                    style: StrokeStyle(lineWidth: 1.3)
                 )
             }
         }
