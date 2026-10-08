@@ -2644,3 +2644,22 @@
 "包括合盖时保持亮屏；需要管理员授权，关闭后恢复原有休眠设置。" = "Garde l’écran allumé même lorsque le capot est fermé. Nécessite l’autorisation d’un administrateur ; rétablit le réglage de veille précédent à la désactivation.";
 "无法开启合盖亮屏，请检查管理员授权后重试。" = "Impossible de garder l’écran allumé lorsque le capot est fermé. Vérifiez l’autorisation de l’administrateur et réessayez.";
 "无法恢复休眠设置，请重试关闭保持亮屏。" = "Impossible de rétablir le réglage de veille. Essayez à nouveau de désactiver le maintien de l’écran allumé.";
+
+"本地服务" = "Service local";
+"选择已发现的模型" = "Choisir un modèle détecté";
+"API Key（可选）" = "Clé API (facultative)";
+"获取模型" = "Récupérer les modèles";
+"默认无需 API Key；仅在本地服务启用认证时填写。" = "Aucune clé API n’est requise par défaut. Saisissez-en une uniquement si l’authentification est activée sur le service local.";
+"未发现模型，请先在本地服务中下载或加载模型。" = "Aucun modèle trouvé. Téléchargez ou chargez d’abord un modèle dans votre service local.";
+
+"本机模型建议" = "Modèle conseillé pour ce Mac";
+"LM Studio 暂不支持 Intel Mac。请改用 Ollama，或手动选择其他可用服务。" = "LM Studio ne prend pas encore en charge les Mac Intel. Utilisez Ollama ou choisissez manuellement un autre service disponible.";
+"%@ · %.1f GiB 内存" = "%@ · %.1f GiB de mémoire";
+"建议使用 %@" = "Modèle conseillé : %@";
+"根据整机内存估算；内存紧张时可选择更小模型。" = "Estimation basée sur la mémoire totale. Choisissez un modèle plus petit si la mémoire manque.";
+"模型下载：约 %.1f GB" = "Téléchargement du modèle : environ %.1f GB";
+"复制下载命令" = "Copier la commande de téléchargement";
+"模型说明" = "Détails du modèle";
+"在 LM Studio 中搜索此名称并选择对应量化版本。加载后，从服务模型列表选择实际模型 ID。" = "Recherchez ce nom dans LM Studio et choisissez la quantification correspondante. Après le chargement, sélectionnez l’ID réel du modèle dans la liste du service.";
+"请在 LM Studio 中关闭思考模式，以便快速整理转写文本。" = "Désactivez le mode de réflexion dans LM Studio pour corriger les transcriptions plus rapidement.";
+"硬件信息不可用或内存不足 8 GiB，暂不自动推荐。你仍可手动选择已安装的模型。" = "Les informations matérielles sont indisponibles ou la mémoire est inférieure à 8 GiB ; aucun modèle n’est donc conseillé automatiquement. Vous pouvez toujours choisir manuellement un modèle installé.";

@@ -2648,3 +2648,22 @@
 "包括合盖时保持亮屏；需要管理员授权，关闭后恢复原有休眠设置。" = "Kapak kapalıyken de ekranı açık tutar. Yönetici onayı gerekir; kapatıldığında önceki uyku ayarı geri yüklenir.";
 "无法开启合盖亮屏，请检查管理员授权后重试。" = "Kapak kapalıyken ekran açık tutulamadı. Yönetici onayını kontrol edip tekrar deneyin.";
 "无法恢复休眠设置，请重试关闭保持亮屏。" = "Uyku ayarı geri yüklenemedi. Ekranı açık tutma özelliğini tekrar kapatmayı deneyin.";
+
+"本地服务" = "Yerel hizmet";
+"选择已发现的模型" = "Bulunan bir modeli seç";
+"API Key（可选）" = "API anahtarı (isteğe bağlı)";
+"获取模型" = "Modelleri getir";
+"默认无需 API Key；仅在本地服务启用认证时填写。" = "Varsayılan olarak API anahtarı gerekmez. Yalnızca yerel hizmette kimlik doğrulama etkinse girin.";
+"未发现模型，请先在本地服务中下载或加载模型。" = "Model bulunamadı. Önce yerel hizmette bir model indirin veya yükleyin.";
+
+"本机模型建议" = "Bu Mac için model önerisi";
+"LM Studio 暂不支持 Intel Mac。请改用 Ollama，或手动选择其他可用服务。" = "LM Studio şu anda Intel Mac’leri desteklemiyor. Ollama kullanın veya başka bir kullanılabilir hizmeti elle seçin.";
+"%@ · %.1f GiB 内存" = "%@ · %.1f GiB bellek";
+"建议使用 %@" = "Önerilen model: %@";
+"根据整机内存估算；内存紧张时可选择更小模型。" = "Toplam belleğe göre tahmin edilir. Bellek yetersizse daha küçük bir model seçin.";
+"模型下载：约 %.1f GB" = "Model indirme: yaklaşık %.1f GB";
+"复制下载命令" = "İndirme komutunu kopyala";
+"模型说明" = "Model ayrıntıları";
+"在 LM Studio 中搜索此名称并选择对应量化版本。加载后，从服务模型列表选择实际模型 ID。" = "LM Studio’da bu adı arayın ve uygun kuantizasyon sürümünü seçin. Yükledikten sonra hizmetin model listesinden gerçek model kimliğini seçin.";
+"请在 LM Studio 中关闭思考模式，以便快速整理转写文本。" = "Döküm metnini daha hızlı düzenlemek için LM Studio’da düşünme modunu kapatın.";
+"硬件信息不可用或内存不足 8 GiB，暂不自动推荐。你仍可手动选择已安装的模型。" = "Donanım bilgileri kullanılamıyor veya bellek 8 GiB’nin altında olduğundan otomatik model önerilmiyor. Yüklü bir modeli yine de elle seçebilirsiniz.";

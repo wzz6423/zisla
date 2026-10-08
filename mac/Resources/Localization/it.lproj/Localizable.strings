@@ -2648,3 +2648,22 @@
 "包括合盖时保持亮屏；需要管理员授权，关闭后恢复原有休眠设置。" = "Mantiene lo schermo acceso anche con il coperchio chiuso. Richiede l’autorizzazione dell’amministratore; alla disattivazione ripristina l’impostazione di stop precedente.";
 "无法开启合盖亮屏，请检查管理员授权后重试。" = "Impossibile mantenere lo schermo acceso con il coperchio chiuso. Verifica l’autorizzazione dell’amministratore e riprova.";
 "无法恢复休眠设置，请重试关闭保持亮屏。" = "Impossibile ripristinare l’impostazione di stop. Prova di nuovo a disattivare il mantenimento dello schermo acceso.";
+
+"本地服务" = "Servizio locale";
+"选择已发现的模型" = "Scegli un modello rilevato";
+"API Key（可选）" = "Chiave API (facoltativa)";
+"获取模型" = "Recupera modelli";
+"默认无需 API Key；仅在本地服务启用认证时填写。" = "Per impostazione predefinita non è richiesta una chiave API. Inseriscila solo se l’autenticazione è attivata nel servizio locale.";
+"未发现模型，请先在本地服务中下载或加载模型。" = "Nessun modello trovato. Prima scarica o carica un modello nel servizio locale.";
+
+"本机模型建议" = "Modello consigliato per questo Mac";
+"LM Studio 暂不支持 Intel Mac。请改用 Ollama，或手动选择其他可用服务。" = "LM Studio non supporta attualmente i Mac Intel. Usa Ollama o scegli manualmente un altro servizio disponibile.";
+"%@ · %.1f GiB 内存" = "%@ · %.1f GiB di memoria";
+"建议使用 %@" = "Modello consigliato: %@";
+"根据整机内存估算；内存紧张时可选择更小模型。" = "Stima basata sulla memoria totale. Scegli un modello più piccolo se la memoria è limitata.";
+"模型下载：约 %.1f GB" = "Download del modello: circa %.1f GB";
+"复制下载命令" = "Copia comando di download";
+"模型说明" = "Dettagli del modello";
+"在 LM Studio 中搜索此名称并选择对应量化版本。加载后，从服务模型列表选择实际模型 ID。" = "Cerca questo nome in LM Studio e scegli la quantizzazione corrispondente. Dopo il caricamento, seleziona l’ID effettivo del modello dall’elenco del servizio.";
+"请在 LM Studio 中关闭思考模式，以便快速整理转写文本。" = "Disattiva la modalità di ragionamento in LM Studio per correggere più velocemente le trascrizioni.";
+"硬件信息不可用或内存不足 8 GiB，暂不自动推荐。你仍可手动选择已安装的模型。" = "Le informazioni hardware non sono disponibili o la memoria è inferiore a 8 GiB, quindi non viene consigliato automaticamente alcun modello. Puoi comunque scegliere manualmente un modello installato.";

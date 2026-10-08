@@ -5,6 +5,67 @@ import Testing
 
 @Suite(.serialized)
 struct AIModelDiscoveryServiceTests {
+    @Test(arguments: AIEndpointKind.allCases)
+    func localCatalogNeedsNoKeyAndNormalizesModelNames(kind: AIEndpointKind) async throws {
+        DiscoveryStubURLProtocol.reset()
+        DiscoveryStubURLProtocol.nextResponseBody = kind == .ollama
+            ? #"{"models":[{"name":" qwen3.5:4b "},{"name":"qwen3.5:4b"},{"name":""},{"name":"gemma4:e2b"}]}"#
+            : #"{"data":[{"id":" qwen3.5:4b "},{"id":"qwen3.5:4b"},{"id":""},{"id":"gemma4:e2b"}]}"#
+        let configuration = URLSessionConfiguration.ephemeral
+        configuration.protocolClasses = [DiscoveryStubURLProtocol.self]
+        let service = AIModelDiscoveryService(session: URLSession(configuration: configuration))
+        let models = try await service.models(for: AIEndpoint(name: kind.defaultEndpointName, baseURL: kind.defaultBaseURL, kind: kind))
+
+        #expect(models.map(\.name) == ["gemma4:e2b", "qwen3.5:4b"])
+        let request = try #require(DiscoveryStubURLProtocol.lastRequest)
+        #expect(request.url?.absoluteString == (kind == .ollama ? "http://127.0.0.1:11434/api/tags" : "http://127.0.0.1:1234/v1/models"))
+        #expect(request.value(forHTTPHeaderField: "Authorization") == nil)
+        #expect(request.httpBody == nil)
+    }
+
+    @Test
+    func authenticatedLMStudioCatalogUsesBearerKeyAndAcceptsAnEmptyCatalog() async throws {
+        DiscoveryStubURLProtocol.reset()
+        let configuration = URLSessionConfiguration.ephemeral
+        configuration.protocolClasses = [DiscoveryStubURLProtocol.self]
+        let service = AIModelDiscoveryService(session: URLSession(configuration: configuration))
+        let models = try await service.models(for: AIEndpoint(name: "LM Studio", baseURL: "http://localhost:1234"), apiKey: " lm-test-key \n")
+
+        #expect(models.isEmpty)
+        #expect(DiscoveryStubURLProtocol.lastRequest?.url?.absoluteString == "http://localhost:1234/v1/models")
+        #expect(DiscoveryStubURLProtocol.lastRequest?.value(forHTTPHeaderField: "Authorization") == "Bearer lm-test-key")
+    }
+
+    @Test(arguments: ["{}", "null", "{", #"{"data":[{"id":42}]}"#])
+    func malformedCatalogIsAnErrorRatherThanAnEmptySuccess(body: String) async throws {
+        DiscoveryStubURLProtocol.reset()
+        DiscoveryStubURLProtocol.nextResponseBody = body
+        let configuration = URLSessionConfiguration.ephemeral
+        configuration.protocolClasses = [DiscoveryStubURLProtocol.self]
+        let service = AIModelDiscoveryService(session: URLSession(configuration: configuration))
+
+        await #expect(throws: DecodingError.self) {
+            try await service.models(for: AIEndpoint(name: "LM Studio", baseURL: AIEndpointKind.openAICompatible.defaultBaseURL))
+        }
+    }
+
+    @Test
+    func unavailableLocalServiceCanRecoverWithoutChangingItsConfiguration() async throws {
+        DiscoveryStubURLProtocol.reset()
+        DiscoveryStubURLProtocol.nextError = URLError(.cannotConnectToHost)
+        let configuration = URLSessionConfiguration.ephemeral
+        configuration.protocolClasses = [DiscoveryStubURLProtocol.self]
+        let service = AIModelDiscoveryService(session: URLSession(configuration: configuration))
+        let endpoint = AIEndpoint(name: "LM Studio", baseURL: AIEndpointKind.openAICompatible.defaultBaseURL)
+        await #expect(throws: URLError.self) { try await service.models(for: endpoint) }
+
+        DiscoveryStubURLProtocol.nextError = nil
+        DiscoveryStubURLProtocol.nextResponseBody = #"{"data":[{"id":"available-model"}]}"#
+        let models = try await service.models(for: endpoint)
+        #expect(models.map(\.name) == ["available-model"])
+        #expect(endpoint.baseURL == AIEndpointKind.openAICompatible.defaultBaseURL)
+    }
+
     @Test
     func authorizationHeaderUsesNonEmptyTrimmedAPIKey() {
         #expect(AIModelDiscoveryService.authorizationHeader(for: nil) == nil)
@@ -64,6 +125,7 @@ private final class DiscoveryStubURLProtocol: URLProtocol, @unchecked Sendable {
     nonisolated(unsafe) static var lastRequest: URLRequest?
     nonisolated(unsafe) static var nextResponseBody: String?
     nonisolated(unsafe) static var statusCode = 200
+    nonisolated(unsafe) static var nextError: URLError?
 
     nonisolated static override func canInit(with request: URLRequest) -> Bool { true }
 
@@ -71,6 +133,10 @@ private final class DiscoveryStubURLProtocol: URLProtocol, @unchecked Sendable {
 
     override func startLoading() {
         Self.lastRequest = request
+        if let error = Self.nextError {
+            client?.urlProtocol(self, didFailWithError: error)
+            return
+        }
         let response = HTTPURLResponse(
             url: request.url!,
             statusCode: Self.statusCode,
@@ -89,5 +155,6 @@ private final class DiscoveryStubURLProtocol: URLProtocol, @unchecked Sendable {
         lastRequest = nil
         nextResponseBody = nil
         statusCode = 200
+        nextError = nil
     }
 }

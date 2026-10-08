@@ -7,6 +7,63 @@ import Testing
 @MainActor
 @Suite(.serialized)
 struct AIChatClientTests {
+    @Test(arguments: AIEndpointKind.allCases)
+    func localInferenceAllowsColdLoadingWithoutRequiringAKey(kind: AIEndpointKind) async throws {
+        StubURLProtocol.reset()
+        let configuration = URLSessionConfiguration.ephemeral
+        configuration.protocolClasses = [StubURLProtocol.self]
+        let client = AIChatClient(session: URLSession(configuration: configuration))
+        _ = try await client.complete(
+            endpoint: AIEndpoint(name: kind.defaultEndpointName, baseURL: kind.defaultBaseURL, kind: kind),
+            model: "qwen3.5:4b", systemPrompt: "", messages: [], localInference: true
+        )
+        let request = try #require(StubURLProtocol.lastRequest)
+        #expect(request.timeoutInterval == 120)
+        #expect(request.value(forHTTPHeaderField: "Authorization") == nil)
+        #expect(request.url?.absoluteString == "\(kind.defaultBaseURL)/chat/completions")
+        let body = try #require(requestBody(request))
+        let json = try #require(try JSONSerialization.jsonObject(with: body) as? [String: Any])
+        #expect(json["reasoning_effort"] as? String == (kind == .ollama ? "none" : nil))
+    }
+
+    @Test(arguments: ["gpt-oss:20b", "qwen3:8b", "custom-model", "qwen3.5-custom:4b"])
+    func localThinkingOverrideDoesNotChangeUnverifiedModels(model: String) async throws {
+        StubURLProtocol.reset()
+        let configuration = URLSessionConfiguration.ephemeral
+        configuration.protocolClasses = [StubURLProtocol.self]
+        let client = AIChatClient(session: URLSession(configuration: configuration))
+        _ = try await client.complete(endpoint: AIEndpoint(name: "Ollama", baseURL: AIEndpointKind.ollama.defaultBaseURL, kind: .ollama), model: model, systemPrompt: "", messages: [], localInference: true)
+        let request = try #require(StubURLProtocol.lastRequest)
+        let body = try #require(requestBody(request))
+        let json = try #require(try JSONSerialization.jsonObject(with: body) as? [String: Any])
+        #expect(json["reasoning_effort"] == nil)
+    }
+
+    @Test
+    func authenticatedLMStudioUsesBearerKeyAndOnlyReturnsFinalContent() async throws {
+        StubURLProtocol.reset()
+        StubURLProtocol.nextResponseBody = #"{"choices":[{"message":{"reasoning_content":"private reasoning","content":"Final text"}}]}"#
+        let configuration = URLSessionConfiguration.ephemeral
+        configuration.protocolClasses = [StubURLProtocol.self]
+        let client = AIChatClient(session: URLSession(configuration: configuration))
+        let response = try await client.complete(endpoint: AIEndpoint(name: "LM Studio", baseURL: AIEndpointKind.openAICompatible.defaultBaseURL), model: "local-model", systemPrompt: "", messages: [], apiKey: " lm-test-key ", localInference: true)
+        #expect(response.content == "Final text")
+        #expect(StubURLProtocol.lastRequest?.value(forHTTPHeaderField: "Authorization") == "Bearer lm-test-key")
+    }
+
+    @Test(arguments: ["<think>private reasoning</think>Final text", "private reasoning</think>Final text", "<THINK>private reasoning</THINK>"])
+    func localInferenceRejectsUnseparatedThinkingInsteadOfDeliveringIt(content: String) async throws {
+        StubURLProtocol.reset()
+        let body = try JSONSerialization.data(withJSONObject: ["choices": [["message": ["content": content]]]])
+        StubURLProtocol.nextResponseBody = String(decoding: body, as: UTF8.self)
+        let configuration = URLSessionConfiguration.ephemeral
+        configuration.protocolClasses = [StubURLProtocol.self]
+        let client = AIChatClient(session: URLSession(configuration: configuration))
+        await #expect(throws: AIChatClientError.invalidResponse) {
+            try await client.complete(endpoint: AIEndpoint(name: "LM Studio", baseURL: AIEndpointKind.openAICompatible.defaultBaseURL), model: "local-model", systemPrompt: "", messages: [], localInference: true)
+        }
+    }
+
     @Test
     func sendsConfiguredAuthorizationAndDualTranscriptMessages() async throws {
         StubURLProtocol.reset()
@@ -30,6 +87,7 @@ struct AIChatClientTests {
         #expect(response.content == "明天十点开会。")
         let request = try #require(StubURLProtocol.lastRequest)
         #expect(request.url?.absoluteString == "https://voice.example/v1/chat/completions")
+        #expect(request.timeoutInterval == 30)
         #expect(request.value(forHTTPHeaderField: "Authorization") == "Bearer test-key")
 
         let body = try #require(requestBody(request))

@@ -76,14 +76,14 @@ public struct AIChatClient: Sendable {
         systemPrompt: String,
         messages: [AIOutboundMessage],
         apiKey: String? = nil,
-        effort: AgentModelEffort? = nil
+        effort: AgentModelEffort? = nil,
+        localInference: Bool = false
     ) async throws -> AIChatResponse {
         let url = try completionURL(for: endpoint, protocolKind: protocolKind, model: model)
         var request = URLRequest(url: url)
         request.httpMethod = "POST"
-        // Callers are short utility completions the user is actively waiting on, so an unreachable
-        // endpoint must fail long before URLSession's one-minute default.
-        request.timeoutInterval = 30
+        // Local servers may need to load the model before returning the first token.
+        request.timeoutInterval = localInference ? 120 : 30
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
         request.setValue("application/json", forHTTPHeaderField: "Accept")
         let apiKey = apiKey?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
@@ -98,13 +98,17 @@ public struct AIChatClient: Sendable {
                 request.setValue(apiKey, forHTTPHeaderField: "x-goog-api-key")
             }
         }
-        let body = requestBody(
+        var body = requestBody(
             protocolKind: protocolKind,
             model: model,
             systemPrompt: systemPrompt,
             messages: messages,
             effort: effort
         )
+        if localInference, endpoint.kind == .ollama,
+           model.lowercased().split(separator: ":").first == "qwen3.5" {
+            body["reasoning_effort"] = "none"
+        }
         request.httpBody = try JSONSerialization.data(withJSONObject: body)
         let (data, response) = try await session.data(for: request)
         guard let http = response as? HTTPURLResponse else { throw AIChatClientError.invalidResponse }
@@ -114,6 +118,9 @@ public struct AIChatClient: Sendable {
         let content = try responseContent(data, protocolKind: protocolKind)
         let trimmed = content.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty else { throw AIChatClientError.invalidResponse }
+        if localInference, ["<think>", "</think>"].contains(where: { trimmed.localizedCaseInsensitiveContains($0) }) {
+            throw AIChatClientError.invalidResponse
+        }
         return AIChatResponse(content: trimmed)
     }
 

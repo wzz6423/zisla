@@ -2647,3 +2647,22 @@
 "包括合盖时保持亮屏；需要管理员授权，关闭后恢复原有休眠设置。" = "Keep the display on, including with the lid closed. Requires administrator approval; restores the previous sleep setting when turned off.";
 "无法开启合盖亮屏，请检查管理员授权后重试。" = "Could not keep the display on with the lid closed. Check administrator approval and try again.";
 "无法恢复休眠设置，请重试关闭保持亮屏。" = "Could not restore the sleep setting. Try turning off Keep Screen On again.";
+
+"本地服务" = "Local service";
+"选择已发现的模型" = "Choose a discovered model";
+"API Key（可选）" = "API key (optional)";
+"获取模型" = "Fetch models";
+"默认无需 API Key；仅在本地服务启用认证时填写。" = "No API key is required by default. Enter one only if authentication is enabled on the local service.";
+"未发现模型，请先在本地服务中下载或加载模型。" = "No models found. Download or load a model in your local service first.";
+
+"本机模型建议" = "Model suggestion for this Mac";
+"LM Studio 暂不支持 Intel Mac。请改用 Ollama，或手动选择其他可用服务。" = "LM Studio does not currently support Intel Macs. Use Ollama or manually choose another available service.";
+"%@ · %.1f GiB 内存" = "%@ · %.1f GiB memory";
+"建议使用 %@" = "Suggested model: %@";
+"根据整机内存估算；内存紧张时可选择更小模型。" = "Estimated from total memory. Choose a smaller model if memory is tight.";
+"模型下载：约 %.1f GB" = "Model download: about %.1f GB";
+"复制下载命令" = "Copy download command";
+"模型说明" = "Model details";
+"在 LM Studio 中搜索此名称并选择对应量化版本。加载后，从服务模型列表选择实际模型 ID。" = "Search for this name in LM Studio and choose the matching quantization. After loading it, select the actual model ID from the service model list.";
+"请在 LM Studio 中关闭思考模式，以便快速整理转写文本。" = "Turn off thinking mode in LM Studio for faster transcript cleanup.";
+"硬件信息不可用或内存不足 8 GiB，暂不自动推荐。你仍可手动选择已安装的模型。" = "Hardware information is unavailable or memory is below 8 GiB, so no model is suggested automatically. You can still choose an installed model manually.";

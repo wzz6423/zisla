@@ -2648,3 +2648,22 @@
 "包括合盖时保持亮屏；需要管理员授权，关闭后恢复原有休眠设置。" = "Houdt het scherm aan, ook met het deksel dicht. Vereist toestemming van een beheerder; herstelt bij uitschakelen de vorige sluimerinstelling.";
 "无法开启合盖亮屏，请检查管理员授权后重试。" = "Het scherm kon niet aan blijven met het deksel dicht. Controleer de beheerderstoestemming en probeer het opnieuw.";
 "无法恢复休眠设置，请重试关闭保持亮屏。" = "De sluimerinstelling kon niet worden hersteld. Probeer Scherm aanhouden opnieuw uit te schakelen.";
+
+"本地服务" = "Lokale service";
+"选择已发现的模型" = "Kies een gevonden model";
+"API Key（可选）" = "API-sleutel (optioneel)";
+"获取模型" = "Modellen ophalen";
+"默认无需 API Key；仅在本地服务启用认证时填写。" = "Standaard is geen API-sleutel nodig. Vul deze alleen in als authenticatie is ingeschakeld voor de lokale service.";
+"未发现模型，请先在本地服务中下载或加载模型。" = "Geen modellen gevonden. Download of laad eerst een model in de lokale service.";
+
+"本机模型建议" = "Modeladvies voor deze Mac";
+"LM Studio 暂不支持 Intel Mac。请改用 Ollama，或手动选择其他可用服务。" = "LM Studio ondersteunt momenteel geen Intel-Macs. Gebruik Ollama of kies handmatig een andere beschikbare dienst.";
+"%@ · %.1f GiB 内存" = "%@ · %.1f GiB geheugen";
+"建议使用 %@" = "Aanbevolen model: %@";
+"根据整机内存估算；内存紧张时可选择更小模型。" = "Schatting op basis van het totale geheugen. Kies een kleiner model als er weinig geheugen vrij is.";
+"模型下载：约 %.1f GB" = "Modeldownload: ongeveer %.1f GB";
+"复制下载命令" = "Downloadopdracht kopiëren";
+"模型说明" = "Modelinformatie";
+"在 LM Studio 中搜索此名称并选择对应量化版本。加载后，从服务模型列表选择实际模型 ID。" = "Zoek deze naam in LM Studio en kies de bijbehorende kwantisatie. Selecteer na het laden de werkelijke model-ID in de modellenlijst van de dienst.";
+"请在 LM Studio 中关闭思考模式，以便快速整理转写文本。" = "Schakel de denkmodus in LM Studio uit om transcripties sneller op te schonen.";
+"硬件信息不可用或内存不足 8 GiB，暂不自动推荐。你仍可手动选择已安装的模型。" = "Hardwaregegevens zijn niet beschikbaar of het geheugen is minder dan 8 GiB, dus er wordt niet automatisch een model aanbevolen. Je kunt nog steeds handmatig een geïnstalleerd model kiezen.";

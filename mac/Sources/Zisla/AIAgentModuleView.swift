@@ -156,7 +156,7 @@ struct AIAgentModuleView: View {
     private var localModelContent: some View {
         VStack(alignment: .leading, spacing: 8) {
             ForEach(agent.store.state.localModels) { localModel in
-                localModelRow(localModel)
+                AILocalModelConfigurationRow(store: agent.store, model: localModel)
             }
             emptyModelRow(
                 title: agent.store.state.localModels.isEmpty ? AppLocalization.text("尚未配置本地模型") : AppLocalization.text("添加本地模型"),
@@ -189,31 +189,6 @@ struct AIAgentModuleView: View {
             .buttonStyle(.borderless)
             .accessibilityLabel(help)
             .help(help)
-        }
-        .padding(7)
-        .background(Color.primary.opacity(0.05))
-        .clipShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
-    }
-
-    private func localModelRow(_ localModel: AIAgentLocalModel) -> some View {
-        HStack(spacing: 7) {
-            Toggle("", isOn: localModelEnabledBinding(localModel.id))
-                .labelsHidden()
-                .toggleStyle(.switch)
-                .controlSize(.mini)
-                .accessibilityLabel(AppLocalization.text("启用本地模型"))
-            TextField(AppLocalization.text("URL / IP:端口"), text: localModelURLBinding(localModel.id))
-                .textFieldStyle(.roundedBorder)
-                .font(.system(size: 10, design: .monospaced))
-                .frame(minWidth: 240)
-                .layoutPriority(1)
-            TextField(AppLocalization.text("模型名"), text: localModelIDBinding(localModel.id))
-                .textFieldStyle(.roundedBorder)
-                .frame(width: 180)
-            Button { agent.store.removeLocalModel(id: localModel.id) } label: { Image(systemName: "trash") }
-                .buttonStyle(.borderless)
-                .accessibilityLabel(AppLocalization.text("删除本地模型"))
-                .help(AppLocalization.text("删除本地模型"))
         }
         .padding(7)
         .background(Color.primary.opacity(0.05))
@@ -584,22 +559,16 @@ struct AIAgentModuleView: View {
         agent.store.upsertChannel(channel)
     }
 
-    private func updateLocalModel(_ id: UUID, _ update: (inout AIAgentLocalModel) -> Void) {
-        guard var localModel = agent.store.localModel(id: id) else { return }
-        update(&localModel)
-        agent.store.upsertLocalModel(localModel)
-    }
-
     private func addLocalModelConfiguration() {
         let endpoint = AIEndpoint(
-            name: "Ollama / LM Studio",
+            name: AIEndpointKind.ollama.defaultEndpointName,
             baseURL: AIEndpointKind.ollama.defaultBaseURL,
-            kind: .openAICompatible
+            kind: .ollama
         )
         agent.store.upsertLocalModel(AIAgentLocalModel(
-            name: "qwen3:8b",
+            name: endpoint.name,
             endpoint: endpoint,
-            modelName: "qwen3:8b"
+            modelName: ""
         ))
     }
 
@@ -670,18 +639,6 @@ struct AIAgentModuleView: View {
         )
     }
 
-    private func localModelIDBinding(_ id: UUID) -> Binding<String> {
-        Binding(get: { agent.store.localModel(id: id)?.modelName ?? "" }, set: { value in updateLocalModel(id) { $0.modelName = value } })
-    }
-
-    private func localModelURLBinding(_ id: UUID) -> Binding<String> {
-        Binding(get: { agent.store.localModel(id: id)?.endpoint.baseURL ?? "" }, set: { value in updateLocalModel(id) { $0.endpoint.baseURL = value } })
-    }
-
-    private func localModelEnabledBinding(_ id: UUID) -> Binding<Bool> {
-        Binding(get: { agent.store.localModel(id: id)?.isEnabled ?? false }, set: { value in updateLocalModel(id) { $0.isEnabled = value } })
-    }
-
     private func skillEnabledBinding(_ path: String) -> Binding<Bool> {
         Binding(
             get: { agent.store.state.skills.first { $0.path == path }?.isEnabled ?? false },
@@ -692,5 +649,158 @@ struct AIAgentModuleView: View {
                 agent.store.replaceSkills(skills)
             }
         )
+    }
+}
+
+private struct AILocalModelConfigurationRow: View {
+    @ObservedObject var store: AIAgentStore
+    let model: AIAgentLocalModel
+    @State private var apiKey = ""
+    @State private var credentialError: String?
+    @State private var discoveredModels: [AIDiscoveredModel]?
+    @State private var discoveryError: String?
+    @State private var discoveryTask: Task<Void, Never>?
+    @State private var discoveryGeneration = 0
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 7) {
+            HStack(spacing: 7) {
+                Toggle("", isOn: Binding(get: { model.isEnabled }, set: { value in update { $0.isEnabled = value } }))
+                    .labelsHidden()
+                    .toggleStyle(.switch)
+                    .controlSize(.mini)
+                    .accessibilityLabel(AppLocalization.text("启用本地模型"))
+                Picker(AppLocalization.text("本地服务"), selection: Binding(
+                    get: { model.endpoint.kind },
+                    set: { kind in update { $0.selectEndpointKind(kind) } }
+                )) {
+                    ForEach(AIEndpointKind.allCases, id: \.self) { kind in
+                        Text(kind.defaultEndpointName).tag(kind)
+                    }
+                }
+                .labelsHidden()
+                .pickerStyle(.menu)
+                .frame(width: 105)
+                .accessibilityLabel(AppLocalization.text("本地服务"))
+                TextField(AppLocalization.text("URL / IP:端口"), text: Binding(
+                    get: { model.endpoint.baseURL },
+                    set: { value in update { $0.endpoint.baseURL = value } }
+                ))
+                .textFieldStyle(.roundedBorder)
+                .font(.system(size: 10, design: .monospaced))
+                .accessibilityLabel(AppLocalization.text("URL / IP:端口"))
+                Button {
+                    do {
+                        try store.removeLocalModel(id: model.id)
+                    } catch {
+                        credentialError = AppLocalization.text("无法删除模型凭据")
+                    }
+                } label: { Image(systemName: "trash") }
+                .buttonStyle(.borderless)
+                .accessibilityLabel(AppLocalization.text("删除本地模型"))
+                .help(AppLocalization.text("删除本地模型"))
+            }
+            HStack(spacing: 7) {
+                TextField(AppLocalization.text("模型名"), text: Binding(
+                    get: { model.modelName },
+                    set: { value in update { $0.modelName = value } }
+                ))
+                .textFieldStyle(.roundedBorder)
+                .accessibilityLabel(AppLocalization.text("模型名"))
+                if let models = discoveredModels, !models.isEmpty {
+                    Menu {
+                        ForEach(models) { discovered in
+                            Button(discovered.name) { update { $0.modelName = discovered.name } }
+                        }
+                    } label: { Image(systemName: "list.bullet") }
+                    .menuStyle(.borderlessButton)
+                    .fixedSize()
+                    .accessibilityLabel(AppLocalization.text("选择已发现的模型"))
+                    .help(AppLocalization.text("选择已发现的模型"))
+                }
+                SecureField(AppLocalization.text("API Key（可选）"), text: Binding(
+                    get: { apiKey },
+                    set: { value in
+                        apiKey = value
+                        resetDiscovery()
+                        do {
+                            try store.replaceLocalModelSecret(value, for: model.id)
+                            credentialError = nil
+                        } catch {
+                            credentialError = AppLocalization.text("无法保存模型凭据")
+                        }
+                    }
+                ))
+                .textFieldStyle(.roundedBorder)
+                .frame(width: 135)
+                .accessibilityLabel(AppLocalization.text("API Key（可选）"))
+                Button(action: discoverModels) {
+                    if discoveryTask != nil {
+                        ProgressView().controlSize(.small)
+                    } else {
+                        Text(AppLocalization.text("获取模型"))
+                    }
+                }
+                .buttonStyle(.bordered)
+                .controlSize(.small)
+                .fixedSize()
+                .disabled(!model.isEnabled || discoveryTask != nil || credentialError != nil)
+            }
+            Text(AppLocalization.text("默认无需 API Key；仅在本地服务启用认证时填写。"))
+                .font(.system(size: 10))
+                .foregroundStyle(.secondary)
+            if let error = credentialError ?? discoveryError {
+                Text(error).font(.system(size: 10)).foregroundStyle(.red)
+            } else if discoveredModels?.isEmpty == true {
+                Text(AppLocalization.text("未发现模型，请先在本地服务中下载或加载模型。"))
+                    .font(.system(size: 10))
+                    .foregroundStyle(.secondary)
+            }
+        }
+        .padding(7)
+        .background(Color.primary.opacity(0.05))
+        .clipShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
+        .task(id: model.id) {
+            do {
+                apiKey = try store.secret(for: model) ?? ""
+            } catch {
+                credentialError = AppLocalization.text("无法读取模型凭据")
+            }
+        }
+        .onChange(of: model.endpoint) { resetDiscovery() }
+        .onChange(of: model.isEnabled) { resetDiscovery() }
+        .onDisappear { resetDiscovery() }
+    }
+
+    private func update(_ change: (inout AIAgentLocalModel) -> Void) {
+        guard var configuration = store.localModel(id: model.id) else { return }
+        change(&configuration)
+        store.upsertLocalModel(configuration)
+    }
+
+    private func discoverModels() {
+        resetDiscovery()
+        let generation = discoveryGeneration
+        discoveryTask = Task { @MainActor in
+            do {
+                let key = try store.secret(for: model)
+                let models = try await AIModelDiscoveryService().models(for: model.endpoint, apiKey: key)
+                guard !Task.isCancelled, discoveryGeneration == generation else { return }
+                discoveredModels = models
+                discoveryTask = nil
+            } catch {
+                guard !Task.isCancelled, discoveryGeneration == generation else { return }
+                discoveryError = error.localizedDescription
+                discoveryTask = nil
+            }
+        }
+    }
+
+    private func resetDiscovery() {
+        discoveryTask?.cancel()
+        discoveryTask = nil
+        discoveryGeneration &+= 1
+        discoveredModels = nil
+        discoveryError = nil
     }
 }

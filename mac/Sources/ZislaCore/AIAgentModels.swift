@@ -335,6 +335,8 @@ public struct AIAgentLocalModel: Identifiable, Codable, Equatable, Sendable {
     public var modelName: String
     public var isEnabled: Bool
 
+    public var secretReference: String { "local-model.\(id.uuidString)" }
+
     public init(
         id: UUID = UUID(),
         name: String,
@@ -347,6 +349,16 @@ public struct AIAgentLocalModel: Identifiable, Codable, Equatable, Sendable {
         self.endpoint = endpoint
         self.modelName = modelName
         self.isEnabled = isEnabled
+    }
+
+    public mutating func selectEndpointKind(_ kind: AIEndpointKind) {
+        let currentURL = endpoint.baseURL.trimmingCharacters(in: .whitespacesAndNewlines)
+        if currentURL.isEmpty || currentURL == endpoint.kind.defaultBaseURL {
+            endpoint.baseURL = kind.defaultBaseURL
+        }
+        endpoint.kind = kind
+        endpoint.name = kind.defaultEndpointName
+        name = kind.defaultEndpointName
     }
 }
 
