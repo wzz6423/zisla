@@ -6925,10 +6925,11 @@ final class ScreenshotEditorWindowController: NSWindowController, NSWindowDelega
         pinnedFocusState.isSelected = false
         pinnedFocusState.isPointerInside = false
         pinnedFocusState.windowIsKey = false
-        // This overlay is opaque black and covers the whole screen, so clearing the content view while the
-        // window is still on screen exposes a full-screen black frame (probed as #000000). Restoring the pet
-        // and the dismissed dialogs from onCloseHandler then composites it — the flash seen when exiting.
+        // AppKit can still composite the overlay while a tool popover finishes closing.
+        // Retire its black backdrop before releasing the hosting view.
         window?.orderOut(nil)
+        window?.isOpaque = false
+        window?.backgroundColor = .clear
         window?.contentView = nil
         onCloseHandler?()
         onCloseHandler = nil
