@@ -31,9 +31,17 @@
 | `doubao` | `豆包` |
 | `delta` | `delta-app`, `delta-desktop`, `zed-delta` |
 | `orca` | `orca-desktop`, `orca-ide` |
-| `workbuddy` | `workbuddy-ai`, `workbuddyai`, `workbuddy ai` |
+| `workbuddy` | `workbuddy-desktop` |
+| `workbuddy-ai` | `workbuddyai`, `workbuddy ai` |
 
-### Delta, Orca and WorkBuddy AI automatic detection
+WorkBuddy and WorkBuddy AI are separate products for domestic/international markets, not
+older/newer versions of one client. Their canonical providers, stores, icons and deep links
+must remain separate. Historical WorkBuddy records using `harness` remain readable; that
+provider is not globally renamed or migrated. WorkBuddy activity-notice IDs use an explicit
+provider/task boundary (`ai-active-workbuddy:<id>` or `ai-active-workbuddy-ai:<id>`), so a manual
+WorkBuddy task whose ID starts with `ai-` cannot be mistaken for WorkBuddy AI.
+
+### Delta, Orca, WorkBuddy and WorkBuddy AI automatic detection
 
 - Delta: reads indexed streaming-thread metadata from `Library/Application Support/Delta/user_*/data.sqlite`
   (and the legacy root database). Archived, idle and stale threads are excluded. Numeric usage comes
@@ -46,10 +54,12 @@
   account homes also contribute token usage. Those samples retain the underlying CLI provider and
   event identity, so the regular CLI detector cannot count them again. Orca's machine-wide usage
   caches are deliberately not imported as additional usage.
+- WorkBuddy: reads its own `~/.workbuddy/workbuddy.db` with provider `workbuddy`, the
+  WorkBuddy icon and `workbuddy://chat/<id>` links. It does not inspect WorkBuddy AI's store.
 - WorkBuddy AI: reads session status, titles, model and timestamps from
-  `~/.workbuddy-ai/workbuddy.db`, independently of legacy `~/.workbuddy/workbuddy.db`.
+  `~/.workbuddy-ai/workbuddy.db`, independently of WorkBuddy's `~/.workbuddy/workbuddy.db`.
   Finished, deleted and stale sessions are excluded; the fresher of `updated_at` and
-  `last_activity_at` keeps long-running sessions visible. Tasks use the `workbuddy` provider,
+  `last_activity_at` keeps long-running sessions visible. Tasks use the `workbuddy-ai` provider,
   the WorkBuddy AI icon and `workbuddy-ai://chat/<id>` links. This integration detects sessions
   only: `session_usage.used` is context occupancy and credits are not USD/token usage, so neither
   is imported as billed tokens. Manual numeric usage can be reported with `zislactl usage`.

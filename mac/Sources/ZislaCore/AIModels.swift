@@ -21,6 +21,7 @@ public enum AIProvider: String, Codable, CaseIterable, Sendable {
     case delta
     case orca
     case workbuddy
+    case workbuddyAI = "workbuddy-ai"
 
     /// Normalises case and common aliases; returns nil for unknown tokens, letting the caller report the error.
     public init?(token: String) {
@@ -62,8 +63,10 @@ public enum AIProvider: String, Codable, CaseIterable, Sendable {
             self = .delta
         case "orca", "orca-desktop", "orca-ide":
             self = .orca
-        case "workbuddy", "workbuddy-ai", "workbuddyai", "workbuddy ai":
+        case "workbuddy", "workbuddy-desktop":
             self = .workbuddy
+        case "workbuddy-ai", "workbuddyai", "workbuddy ai":
+            self = .workbuddyAI
         default: return nil
         }
     }

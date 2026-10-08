@@ -273,9 +273,11 @@ public enum VoiceLexicon: String, Codable, CaseIterable, Identifiable, Sendable,
         case .orca:
             ["Orca", "Orca IDE"]
         case .workbuddy:
+            ["WorkBuddy"]
+        case .workbuddyAI:
             ["WorkBuddy AI"]
         case .harness:
-            ["Harnext", "Harnext CLI", "WorkBuddy"]
+            ["Harnext", "Harnext CLI"]
         case .doubao:
             ["豆包", "Doubao"]
         }

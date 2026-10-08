@@ -8,6 +8,22 @@ import ZislaKit
 
 struct AIResultSweepIntegrationTests {
     @Test @MainActor
+    func workBuddyResultNoticesKeepTheExplicitProductBoundary() throws {
+        for provider in [AIProvider.workbuddy, .workbuddyAI] {
+            let now = Date()
+            let task = AIProgressTask(id: "ai-job", provider: provider, title: "task",
+                progress: nil, status: .succeeded, updatedAt: now)
+            let sweep = AIResultSweepController()
+            defer { sweep.cancel() }
+            sweep.receive(previous: .running, task: task, observedSince: now, settings: .default)
+            let notice = try #require(sweep.presentationNotices(from: []).first)
+            #expect(notice.id == AIMascotLibrary.activeNoticeID(for: task))
+            #expect(AIMascotLibrary.provider(fromNoticeID: notice.id) == provider)
+            #expect(sweep.presentationNotices(from: [notice]).count == 1)
+        }
+    }
+
+    @Test @MainActor
     func codexToolErrorsFlowThroughMonitorOnceAndRearmAfterRecovery() throws {
         for payloadType in ["function_call_output", "custom_tool_call_output"] {
             let directory = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)

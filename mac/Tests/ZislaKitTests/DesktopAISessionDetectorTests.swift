@@ -226,8 +226,10 @@ struct DesktopAISessionDetectorTests {
     @Test @MainActor func defaultMonitorAndBrandIdentityIncludeDesktopTools() {
         #expect(AIProvider(token: "zed-delta") == .delta)
         #expect(AIProvider(token: "Orca-IDE") == .orca)
-        #expect(AIProvider(token: "WorkBuddy-AI") == .workbuddy)
-        #expect(AIMascotLibrary.providerDisplayName(for: .workbuddy) == "WorkBuddy AI")
+        #expect(AIProvider(token: "WorkBuddy-AI") == .workbuddyAI)
+        #expect(AIProvider(token: "WorkBuddy") == .workbuddy)
+        #expect(AIMascotLibrary.providerDisplayName(for: .workbuddy) == "WorkBuddy")
+        #expect(AIMascotLibrary.providerDisplayName(for: .workbuddyAI) == "WorkBuddy AI")
         #expect(AIStateMonitor.defaultActivityDetectors().contains { $0 is WorkBuddyAISessionActivityDetector })
         #expect(AIMascotLibrary.providerDisplayName(for: .delta) == "Delta")
         #expect(AIMascotLibrary.providerDisplayName(for: .orca) == "Orca")

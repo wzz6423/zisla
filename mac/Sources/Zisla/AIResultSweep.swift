@@ -2,6 +2,7 @@ import Combine
 import Foundation
 import SwiftUI
 import ZislaCore
+import ZislaKit
 
 struct AIResultSweep: Identifiable {
     static let duration: TimeInterval = 4
@@ -42,7 +43,7 @@ final class AIResultSweepController: ObservableObject {
     func presentationNotices(from notices: [IslandNotice]) -> [IslandNotice] {
         guard let task = current?.task else { return notices }
         let activityNotices = notices.filter { $0.id.hasPrefix("ai-active-") }
-        let id = "ai-active-\(task.provider.rawValue)-\(task.id)"
+        let id = AIMascotLibrary.activeNoticeID(for: task)
         guard !activityNotices.contains(where: { $0.id == id }) else { return activityNotices }
         // The client may have exited, but its result still owns the bar until playback finishes.
         return activityNotices + [IslandNotice(

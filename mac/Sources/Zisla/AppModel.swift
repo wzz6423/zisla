@@ -4193,13 +4193,13 @@ final class AppModel: ObservableObject {
   private func noticeSide(for provider: AIProvider) -> NoticeSide {
     switch provider {
     case .claude, .gemini, .qwen, .trae, .doubao: .left
-    case .pi, .delta, .orca, .workbuddy: .right
+    case .pi, .delta, .orca, .workbuddy, .workbuddyAI: .right
     case .codex, .grok, .gpt, .copilot, .kimi, .coder, .zcode, .zed, .opencode, .harness: .right
     }
   }
 
   private func activeAINoticeID(for task: AIProgressTask) -> String {
-    "ai-active-\(task.provider.rawValue)-\(task.id)"
+    AIMascotLibrary.activeNoticeID(for: task)
   }
 
   private func refreshAgendaIfEnabled() {

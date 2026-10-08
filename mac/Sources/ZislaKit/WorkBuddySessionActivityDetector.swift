@@ -2,7 +2,7 @@ import Foundation
 import SQLite3
 import ZislaCore
 
-/// Infers active tasks from WorkBuddy Desktop's shared local session database.
+/// Infers active tasks from WorkBuddy's local session database, independently of WorkBuddy AI.
 ///
 /// WorkBuddy keeps every conversation in `~/.workbuddy/workbuddy.db`. The legacy
 /// `~/.workbuddy/app/sessions.json` index is no longer rewritten, so it cannot tell whether a
@@ -28,7 +28,7 @@ public final class WorkBuddySessionActivityDetector: AIActivityDetecting {
         recencyThreshold: TimeInterval = 30 * 60,
         now: @escaping () -> Date = Date.init,
         fileManager: FileManager = .default,
-        provider: AIProvider = .harness,
+        provider: AIProvider = .workbuddy,
         sourceName: String = "WorkBuddy",
         urlScheme: String = "workbuddy",
         taskIDPrefix: String = "workbuddy-session-"

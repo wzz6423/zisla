@@ -275,7 +275,7 @@ public final class AIUsageLogDetector: AIUsageDetecting {
             return true
         case .pi:
             return url.lastPathComponent.hasSuffix(".jsonl")
-        case .kimi, .zcode, .zed, .trae, .opencode, .harness, .doubao, .delta, .orca, .workbuddy:
+        case .kimi, .zcode, .zed, .trae, .opencode, .harness, .doubao, .delta, .orca, .workbuddy, .workbuddyAI:
             return false
         case .codex, .claude, .qwen, .gpt:
             return true
@@ -323,7 +323,7 @@ public final class AIUsageLogDetector: AIUsageDetecting {
             if parserState.copilotHasDetailedUsage {
                 samples.removeAll(where: isCopilotShutdownSummary)
             }
-        case .kimi, .zcode, .zed, .trae, .opencode, .harness, .doubao, .delta, .orca, .workbuddy:
+        case .kimi, .zcode, .zed, .trae, .opencode, .harness, .doubao, .delta, .orca, .workbuddy, .workbuddyAI:
             return []
         }
         return Array(samples.suffix(maxSamplesPerFile))
@@ -444,7 +444,7 @@ public final class AIUsageLogDetector: AIUsageDetecting {
             return parseCopilot(root, candidate: candidate, parserState: &parserState)
         case .pi:
             return parsePi(root, candidate: candidate).map { [$0] } ?? []
-        case .kimi, .zcode, .zed, .trae, .opencode, .harness, .doubao, .delta, .orca, .workbuddy:
+        case .kimi, .zcode, .zed, .trae, .opencode, .harness, .doubao, .delta, .orca, .workbuddy, .workbuddyAI:
             return []
         }
     }

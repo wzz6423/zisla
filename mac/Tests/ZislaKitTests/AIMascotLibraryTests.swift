@@ -10,7 +10,8 @@ struct AIMascotLibraryTests {
         let examples: [(AIProvider, String, String, String)] = [
             (.delta, "com.zed-industries.delta", "Delta", "delta.icns"),
             (.orca, "com.stablyai.orca", "Orca", "orca.icns"),
-            (.workbuddy, "com.workbuddy.workbuddy-ai", "WorkBuddy AI", "workbuddy-ai.icns"),
+            (.workbuddy, "com.workbuddy.workbuddy", "WorkBuddy", "workbuddy.icns"),
+            (.workbuddyAI, "com.workbuddy.workbuddy-ai", "WorkBuddy AI", "workbuddy-ai.icns"),
         ]
         for (provider, identifier, name, asset) in examples {
             let url = URL(fileURLWithPath: "/Applications/\(name).app")
@@ -21,6 +22,44 @@ struct AIMascotLibraryTests {
                 resolveBundleIdentifier: { _ in nil },
                 applicationDirectories: [URL(fileURLWithPath: "/Applications")], fileExists: { $0 == url }) == url)
             #expect(AIMascotLibrary.providerAssetName(for: provider) == asset)
+        }
+    }
+
+    @Test
+    func workBuddyProductsKeepBrandsAndNoticeProvidersSeparate() {
+        #expect(AIMascotLibrary.providerDisplayName(for: .workbuddy) == "WorkBuddy")
+        #expect(AIMascotLibrary.providerDisplayName(for: .workbuddyAI) == "WorkBuddy AI")
+        #expect(AIMascotLibrary.providerAssetName(for: .workbuddy) == "workbuddy.icns")
+        #expect(AIMascotLibrary.providerAssetName(for: .workbuddyAI) == "workbuddy-ai.icns")
+        #expect(AIMascotLibrary.provider(fromNoticeID: "ai-active-workbuddy-workbuddy-session-id") == .workbuddy)
+        #expect(AIMascotLibrary.provider(fromNoticeID: "ai-active-workbuddy-ai-workbuddy-ai-session-id") == .workbuddyAI)
+        #expect(AIMascotLibrary.uniqueProviders(fromNoticeIDs: [
+            "ai-active-workbuddy-workbuddy-session-id",
+            "ai-active-workbuddy-ai-workbuddy-ai-session-id",
+        ]) == [.workbuddy, .workbuddyAI])
+        let directory = URL(fileURLWithPath: "/Applications")
+        let onlyWorkBuddy = directory.appendingPathComponent("WorkBuddy.app")
+        let onlyAI = directory.appendingPathComponent("WorkBuddy AI.app")
+        #expect(AIMascotLibrary.installedDesktopAgentApplicationURL(for: .workbuddyAI,
+            resolveBundleIdentifier: { _ in nil }, applicationDirectories: [directory],
+            fileExists: { $0 == onlyWorkBuddy }) == nil)
+        #expect(AIMascotLibrary.installedDesktopAgentApplicationURL(for: .workbuddy,
+            resolveBundleIdentifier: { _ in nil }, applicationDirectories: [directory],
+            fileExists: { $0 == onlyAI }) == nil)
+    }
+
+    @Test
+    func workBuddyNoticeBoundaryDoesNotConfuseManualTaskIDs() {
+        for id in ["ai-job", "workbuddy-ai-session-example", "example:with:colon"] {
+            let workBuddy = AIProgressTask(id: id, provider: .workbuddy, title: "task",
+                progress: nil, updatedAt: .distantPast)
+            let ai = AIProgressTask(id: id, provider: .workbuddyAI, title: "task",
+                progress: nil, updatedAt: .distantPast)
+            let workBuddyID = AIMascotLibrary.activeNoticeID(for: workBuddy)
+            let aiID = AIMascotLibrary.activeNoticeID(for: ai)
+            #expect(workBuddyID != aiID)
+            #expect(AIMascotLibrary.provider(fromNoticeID: workBuddyID) == .workbuddy)
+            #expect(AIMascotLibrary.provider(fromNoticeID: aiID) == .workbuddyAI)
         }
     }
 
