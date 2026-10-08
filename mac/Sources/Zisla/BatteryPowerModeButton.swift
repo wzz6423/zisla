@@ -65,10 +65,15 @@ struct BatteryPowerModeButton: View {
                     AppLocalizedText(BatteryPowerModePresentation.titleKey(for: mode))
                         .font(.system(size: 10, weight: .medium))
                         .lineLimit(1)
+                        .foregroundStyle(currentMode == mode ? Color.white : Color.primary)
+                        .padding(.horizontal, 8)
+                        .padding(.vertical, 2)
+                        .background(
+                            currentMode == mode ? Color.blue : Color.fillControl,
+                            in: RoundedRectangle(cornerRadius: 5)
+                        )
                 }
-                .buttonStyle(.bordered)
-                .controlSize(.mini)
-                .tint(currentMode == mode ? Color.accentColor : Color.secondary)
+                .buttonStyle(.plain)
                 .disabled(!presentation.canSelect(mode))
                 .accessibilityAddTraits(currentMode == mode ? .isSelected : [])
             }
