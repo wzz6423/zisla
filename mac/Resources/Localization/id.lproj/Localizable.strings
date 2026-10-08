@@ -2645,3 +2645,6 @@
 "搜索设置" = "Cari pengaturan";
 "搜索结果" = "Hasil pencarian";
 "未找到设置项" = "Pengaturan tidak ditemukan";
+"包括合盖时保持亮屏；需要管理员授权，关闭后恢复原有休眠设置。" = "Menjaga layar tetap menyala meskipun penutup ditutup. Memerlukan persetujuan administrator; saat dimatikan, pengaturan tidur sebelumnya dipulihkan.";
+"无法开启合盖亮屏，请检查管理员授权后重试。" = "Tidak dapat menjaga layar tetap menyala saat penutup ditutup. Periksa persetujuan administrator lalu coba lagi.";
+"无法恢复休眠设置，请重试关闭保持亮屏。" = "Tidak dapat memulihkan pengaturan tidur. Coba matikan kembali fitur layar tetap menyala.";

@@ -2645,3 +2645,6 @@
 "搜索设置" = "Cerca nelle impostazioni";
 "搜索结果" = "Risultati di ricerca";
 "未找到设置项" = "Nessuna impostazione trovata";
+"包括合盖时保持亮屏；需要管理员授权，关闭后恢复原有休眠设置。" = "Mantiene lo schermo acceso anche con il coperchio chiuso. Richiede l’autorizzazione dell’amministratore; alla disattivazione ripristina l’impostazione di stop precedente.";
+"无法开启合盖亮屏，请检查管理员授权后重试。" = "Impossibile mantenere lo schermo acceso con il coperchio chiuso. Verifica l’autorizzazione dell’amministratore e riprova.";
+"无法恢复休眠设置，请重试关闭保持亮屏。" = "Impossibile ripristinare l’impostazione di stop. Prova di nuovo a disattivare il mantenimento dello schermo acceso.";

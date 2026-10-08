@@ -2645,3 +2645,6 @@
 "搜索设置" = "Tìm kiếm cài đặt";
 "搜索结果" = "Kết quả tìm kiếm";
 "未找到设置项" = "Không tìm thấy cài đặt";
+"包括合盖时保持亮屏；需要管理员授权，关闭后恢复原有休眠设置。" = "Giữ màn hình sáng ngay cả khi gập máy. Cần quyền quản trị viên; khi tắt sẽ khôi phục cài đặt ngủ trước đó.";
+"无法开启合盖亮屏，请检查管理员授权后重试。" = "Không thể giữ màn hình sáng khi gập máy. Hãy kiểm tra quyền quản trị viên rồi thử lại.";
+"无法恢复休眠设置，请重试关闭保持亮屏。" = "Không thể khôi phục cài đặt ngủ. Hãy thử tắt lại tính năng giữ màn hình sáng.";
