@@ -145,8 +145,8 @@ public struct SideNoticeLayoutEngine: Equatable, Sendable {
         /// Countdown expanded bar aligned to the simulated 240 pt island width for notch-less devices,
         /// ensuring `HH:MM:SS` is not squeezed by the notch's corner radii and masks.
         static let compactBarSideExtension: CGFloat = 40
-        /// Headphone connection status keeps its full identity and three battery readings outside the physical notch.
-        static let compactBarHeadphoneAdditionalSideExtension: CGFloat = 70
+        /// Accessory status keeps the device identity and battery readings outside the physical notch.
+        static let compactBarAccessoryAdditionalSideExtension: CGFloat = 70
         /// The music detail view needs to fit cover art + title/artist (left) or waveform + scrolling lyrics (right),
         /// requiring wider wings than the countdown expanded bar.
         static let compactBarMediaDetailSideWidth: CGFloat = 160
@@ -172,7 +172,7 @@ public struct SideNoticeLayoutEngine: Equatable, Sendable {
         settings: FeatureSettings
     ) -> CompactStatusPriority? {
         if notices.contains(where: {
-            $0.id.hasPrefix("focus-transition") || $0.id == LowBatteryNoticeController.noticeID
+            $0.id.hasPrefix("focus-transition") || LowBatteryNoticeController.isLowBatteryNotice($0)
         }) {
             return .transient
         }
@@ -234,7 +234,7 @@ public struct SideNoticeLayoutEngine: Equatable, Sendable {
                 && !$0.id.hasPrefix("focus-countdown-")
                 && !$0.id.hasPrefix("focus-mode-")
                 && !$0.id.hasPrefix("focus-transition")
-                && $0.id != LowBatteryNoticeController.noticeID
+                && !LowBatteryNoticeController.isLowBatteryNotice($0)
                 && !$0.id.hasPrefix("mail-notification-")
                 && !$0.id.hasPrefix("toolbox-reminder-")
                 && !$0.id.hasPrefix("browser-download-")
@@ -498,17 +498,20 @@ public struct SideNoticeLayoutEngine: Equatable, Sendable {
         let displayedTransientNotice = notices
             .filter {
                 $0.id.hasPrefix("focus-transition") || $0.style == .headphone
-                    || $0.id == LowBatteryNoticeController.noticeID
+                    || LowBatteryNoticeController.isLowBatteryNotice($0)
             }
             .max { $0.createdAt < $1.createdAt }
         let displaysHeadphone = selectedPriority == .transient
             && displayedTransientNotice?.style == .headphone
+        let displaysAccessoryBattery = displayedTransientNotice.map {
+            LowBatteryNoticeController.isLowBatteryNotice($0) && $0.batteryLevels != nil
+        } == true
         let sideExtension: CGFloat
         if expandsForDetailedStatus {
             sideExtension = 0
-        } else if displaysHeadphone {
+        } else if displaysHeadphone || displaysAccessoryBattery {
             sideExtension = Layout.compactBarSideExtension
-                + Layout.compactBarHeadphoneAdditionalSideExtension
+                + Layout.compactBarAccessoryAdditionalSideExtension
         } else if selectedPriority == .transient || selectedPriority == .focusCountdown {
             sideExtension = Layout.compactBarSideExtension
         } else {
