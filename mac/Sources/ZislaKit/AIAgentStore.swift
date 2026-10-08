@@ -337,8 +337,8 @@ public final class AIAgentStore: ObservableObject {
         state.cliStatuses = statuses
     }
 
-    public func setCLIAutoUpdateEnabled(_ enabled: Bool) {
-        state.cliAutoUpdateEnabled = enabled
+    public func setCLIAutoUpdateEnabled(_ enabled: Bool, for kind: AgentCLIKind) {
+        state.cliAutoUpdateOverrides[kind.rawValue] = enabled
     }
 
     public func replaceSkills(_ skills: [AgentSkill]) {
