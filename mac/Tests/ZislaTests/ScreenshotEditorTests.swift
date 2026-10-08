@@ -6,6 +6,50 @@ import Vision
 import ZislaCore
 
 @testable import Zisla
+@testable import ZislaKit
+
+@MainActor
+private final class ScreenshotHiddenPopoverView: NSView {
+    var onWindowChange: ((NSWindow?) -> Void)?
+
+    override func viewDidMoveToWindow() {
+        super.viewDidMoveToWindow()
+        window?.alphaValue = 0
+        onWindowChange?(window)
+    }
+}
+
+@MainActor
+private struct ScreenshotHiddenPopoverContent: NSViewRepresentable {
+    let onWindowChange: (NSWindow?) -> Void
+
+    func makeNSView(context: Context) -> ScreenshotHiddenPopoverView {
+        let view = ScreenshotHiddenPopoverView()
+        view.onWindowChange = onWindowChange
+        return view
+    }
+
+    func updateNSView(_ nsView: ScreenshotHiddenPopoverView, context: Context) {}
+}
+
+@MainActor
+private final class ScreenshotTestPopoverState: ObservableObject {
+    @Published var isPresented = false
+}
+
+@MainActor
+private struct ScreenshotTestPopover: View {
+    @ObservedObject var state: ScreenshotTestPopoverState
+    let onWindowChange: (NSWindow?) -> Void
+
+    var body: some View {
+        Color.clear
+            .popover(isPresented: $state.isPresented) {
+                ScreenshotHiddenPopoverContent(onWindowChange: onWindowChange)
+                    .frame(width: 180, height: 40)
+            }
+    }
+}
 
 @MainActor
 struct ScreenshotEditorTests {
@@ -1378,6 +1422,9 @@ struct ScreenshotEditorTests {
 
         #expect(window.performKeyEquivalent(with: escape))
         #expect(closeCount == 1)
+        #expect(window.contentView == nil)
+        #expect(!window.isOpaque)
+        #expect(window.backgroundColor.alphaComponent == 0)
 
         controller.close()
         #expect(closeCount == 1)
@@ -1433,6 +1480,98 @@ struct ScreenshotEditorTests {
         #expect(window.performKeyEquivalent(with: enter))
         #expect(writeCount == 1)
         #expect(closeCount == 1)
+    }
+
+    @Test(arguments: [true, false])
+    func editorCopyAfterChangingSelectedRectangleColorKeepsPopoverOwnerHidden(writeSucceeds: Bool) async throws {
+        let image = try #require(makeGradientImage(width: 900, height: 600))
+        let cgImage = try #require(image.cgImage(forProposedRect: nil, context: nil, hints: nil))
+        var copiedData: Data?
+        var closeCount = 0
+        let controller = ScreenshotEditorWindowController(
+            image: image,
+            screenImage: image,
+            screenCGImage: cgImage,
+            screen: nil,
+            captureRect: CGRect(x: 20, y: 20, width: 320, height: 200),
+            capturedApplication: nil,
+            writeImageToPasteboard: { data in
+                copiedData = data
+                return writeSucceeds
+            },
+            onClose: { closeCount += 1 }
+        )
+        let window = try #require(controller.window as? ScreenshotEditorWindow)
+        let hostingView = try #require(
+            window.contentView as? NSHostingView<AppLanguageEnvironment<ScreenshotEditorView>>
+        )
+        let editor = hostingView.rootView.content
+        let rectangle = ScreenshotAnnotation(
+            kind: .rectangle,
+            rect: CGRect(x: 50, y: 50, width: 100, height: 80)
+        )
+        editor.model.add(rectangle)
+        window.alphaValue = 0
+        window.orderFront(nil)
+        defer { controller.close() }
+        for _ in 0..<3 {
+            hostingView.layoutSubtreeIfNeeded()
+            await Task.yield()
+        }
+        editor.selectionState.selectedAnnotationID = rectangle.id
+        for _ in 0..<3 {
+            hostingView.layoutSubtreeIfNeeded()
+            await Task.yield()
+        }
+        editor.model.color = .white
+        for _ in 0..<3 {
+            hostingView.layoutSubtreeIfNeeded()
+            await Task.yield()
+        }
+        #expect(editor.model.annotations.first?.color == .white)
+
+        var popoverWindow: NSWindow?
+        let popoverState = ScreenshotTestPopoverState()
+        let anchor = NSHostingView(
+            rootView: ScreenshotTestPopover(state: popoverState) { popoverWindow = $0 }
+        )
+        anchor.frame = CGRect(x: 10, y: 10, width: 20, height: 20)
+        hostingView.addSubview(anchor)
+        popoverState.isPresented = true
+        for _ in 0..<3 {
+            hostingView.layoutSubtreeIfNeeded()
+            anchor.layoutSubtreeIfNeeded()
+            await Task.yield()
+        }
+        let presentedPopoverWindow = try #require(popoverWindow)
+        defer {
+            popoverState.isPresented = false
+            presentedPopoverWindow.close()
+        }
+
+        editor.onCopy()
+        for _ in 0..<3 { await Task.yield() }
+
+        let data = try #require(copiedData)
+        let bitmap = try #require(NSBitmapImageRep(data: data))
+        let strokeColor = try #require(bitmap.colorAt(x: 50, y: 70)?.usingColorSpace(.deviceRGB))
+        #expect(strokeColor.redComponent > 0.99)
+        #expect(strokeColor.greenComponent > 0.99)
+        #expect(strokeColor.blueComponent > 0.99)
+        if !writeSucceeds {
+            #expect(closeCount == 0)
+            #expect(window.isVisible)
+            #expect(window.contentView === hostingView)
+            #expect(window.isOpaque)
+            #expect(window.backgroundColor == .black)
+            return
+        }
+        #expect(closeCount == 1)
+        #expect(window.contentView == nil)
+        #expect(!window.isVisible, "Popover teardown must not expose the empty black editor overlay")
+        #expect(!window.isOpaque, "An empty editor must not retain an opaque surface during compositor teardown")
+        #expect(window.backgroundColor.alphaComponent == 0,
+                "An empty editor must not paint a black frame while the popover finishes closing")
     }
 
     @Test
