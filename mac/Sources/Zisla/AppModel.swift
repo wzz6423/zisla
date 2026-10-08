@@ -788,13 +788,17 @@ final class AppModel: ObservableObject {
       }
       .store(in: &cancellables)
 
-    battery.$snapshot
+    Publishers.CombineLatest(battery.$snapshot, networkBattery.$devices)
       .sink { [weak self] _ in
         Task { @MainActor [weak self] in
           guard let self else { return }
           let settings = self.settingsStore.settings
           self.lowBatteryNotice.update(
             snapshot: self.battery.snapshot,
+            enabled: settings.batteryMonitorEnabled && settings.sideNoticesEnabled
+          )
+          self.lowBatteryNotice.update(
+            devices: self.networkBattery.devices,
             enabled: settings.batteryMonitorEnabled && settings.sideNoticesEnabled
           )
         }
@@ -2958,7 +2962,13 @@ final class AppModel: ObservableObject {
       snapshot: battery.snapshot,
       enabled: settings.batteryMonitorEnabled && settings.sideNoticesEnabled
     )
-    if !settings.batteryMonitorEnabled {
+    lowBatteryNotice.update(
+      devices: networkBattery.devices,
+      enabled: settings.batteryMonitorEnabled && settings.sideNoticesEnabled
+    )
+    if settings.batteryMonitorEnabled {
+      networkBattery.start()
+    } else {
       networkBattery.stop()
     }
     if settings.mailEnabled {

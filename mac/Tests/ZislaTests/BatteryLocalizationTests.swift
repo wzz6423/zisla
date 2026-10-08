@@ -24,6 +24,7 @@ struct BatteryLocalizationTests {
             enabled: true
         )
         let notice = try #require(queue.left.first)
+        let bar = CompactLowBatteryBar(notice: notice, height: 34)
         #expect(SideNoticePresenter.isCompactNotice(notice))
         #expect(NSImage(systemSymbolName: CompactLowBatteryBar.symbolName, accessibilityDescription: nil) != nil)
         #expect(AppLanguage.allCases.count == 17)
@@ -32,9 +33,34 @@ struct BatteryLocalizationTests {
             let translated = try #require(table[notice.title], "Missing battery warning for \(language.rawValue)")
             #expect(!translated.isEmpty)
             #expect(AppLocalization.string(notice.title, locale: language.locale) == translated)
+            #expect(bar.accessibilityText(locale: language.locale) == "\(translated) 20%")
         }
         #expect(AppLocalization.string(notice.title, locale: Locale(identifier: "en")) == "Low Battery")
         #expect(AppLocalization.string(notice.title, locale: Locale(identifier: "ar")) == "البطارية منخفضة")
+    }
+
+    @Test @MainActor
+    func bluetoothWarningKeepsDeviceNamesVerbatimInEveryLanguage() throws {
+        let queue = SideNoticeQueue()
+        defer { queue.removeAll() }
+        let device = NetworkBatteryDevice(
+            identifier: "bluetooth:keyboard",
+            name: "电池电量低",
+            deviceType: .keyboard,
+            batteryLevel: 0.2,
+            isCharging: false
+        )
+        LowBatteryNoticeController(queue: queue).update(devices: [device], enabled: true)
+        let notice = try #require(queue.left.first)
+        let bar = CompactLowBatteryBar(notice: notice, height: 34, centerInset: 80)
+        #expect(SideNoticePresenter.isCompactNotice(notice))
+        #expect(notice.batteryLevels?.first?.label == device.name)
+
+        for language in AppLanguage.allCases {
+            let table = try #require(Self.stringsTable(for: language))
+            let translated = try #require(table[notice.title])
+            #expect(bar.accessibilityText(locale: language.locale) == "\(translated) \(device.name) 20%")
+        }
     }
 
     @Test

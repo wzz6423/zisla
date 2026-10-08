@@ -438,7 +438,7 @@ final class SideNoticePresenter {
 
     private static func isTransientCompactNotice(_ notice: IslandNotice) -> Bool {
         notice.id.hasPrefix("focus-transition") || notice.style == .headphone
-            || notice.id == LowBatteryNoticeController.noticeID
+            || LowBatteryNoticeController.isLowBatteryNotice(notice)
     }
 
     private func panel(for side: NoticeSide, in panels: DisplayPanels) -> IslandPanel? {

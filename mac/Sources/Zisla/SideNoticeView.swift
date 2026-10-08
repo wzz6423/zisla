@@ -294,7 +294,7 @@ struct CompactStatusBarView: View {
         presentationNotices
             .filter {
                 $0.id.hasPrefix("focus-transition") || $0.style == .headphone
-                    || $0.id == LowBatteryNoticeController.noticeID
+                    || LowBatteryNoticeController.isLowBatteryNotice($0)
             }
             .max { $0.createdAt < $1.createdAt }
     }
@@ -393,8 +393,12 @@ struct CompactStatusBarView: View {
         switch selectedCompactStatusPriority {
         case .transient:
             if let transientNotice {
-                if transientNotice.id == LowBatteryNoticeController.noticeID {
-                    CompactLowBatteryBar(notice: transientNotice, height: height)
+                if LowBatteryNoticeController.isLowBatteryNotice(transientNotice) {
+                    CompactLowBatteryBar(
+                        notice: transientNotice,
+                        height: height,
+                        centerInset: displayState.compactBarCenterInset
+                    )
                 } else if transientNotice.style == .headphone {
                     CompactHeadphoneConnectionBar(
                         notice: transientNotice,
