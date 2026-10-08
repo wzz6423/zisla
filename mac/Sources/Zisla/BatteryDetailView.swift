@@ -614,6 +614,10 @@ struct BatteryDetailView: View {
             HStack {
                 Label(localized("本机电池"), systemImage: "laptopcomputer")
                     .font(.system(size: 12, weight: .semibold))
+                BatteryPowerModeButton(
+                    isPluggedIn: battery.isPluggedIn,
+                    isLowPowerMode: battery.isLowPowerMode
+                )
                 Spacer(minLength: 8)
                 batteryHistoryView(for: battery)
                 Text(BatteryLocalization.summaryStatusText(battery, locale: locale))
@@ -634,10 +638,6 @@ struct BatteryDetailView: View {
                 }
             }
 
-            BatteryPowerModeButton(
-                isPluggedIn: battery.isPluggedIn,
-                isLowPowerMode: battery.isLowPowerMode
-            )
             LocalPowerFlowView(battery: battery)
             HStack(alignment: .top, spacing: 12) {
                 trendColumn(battery)
