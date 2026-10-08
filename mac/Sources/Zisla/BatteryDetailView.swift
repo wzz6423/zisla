@@ -602,10 +602,7 @@ struct BatteryDetailView: View {
         }
         .onAppear {
             batteryMonitor.refresh()
-            networkMonitor.start()
-        }
-        .onDisappear {
-            networkMonitor.stop()
+            networkMonitor.refresh()
         }
     }
 
