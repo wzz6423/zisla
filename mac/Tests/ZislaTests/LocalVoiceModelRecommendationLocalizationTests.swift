@@ -16,7 +16,8 @@ struct LocalVoiceModelRecommendationLocalizationTests {
         let keys = try Set(regex.matches(in: recommendation, range: NSRange(recommendation.startIndex..., in: recommendation)).map {
             String(recommendation[try #require(Range($0.range(at: 1), in: recommendation))])
         })
-        #expect(keys.count == 11)
+        #expect(keys.contains("本机模型建议"))
+        #expect(keys.contains("建议使用 %@"))
         #expect(AppLanguage.allCases.count == 17)
 
         for language in AppLanguage.allCases {

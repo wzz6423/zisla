@@ -1796,37 +1796,6 @@ struct SettingsView: View {
                     Text(AppLocalization.text("建议使用 %@", recommendation.displayName))
                         .foregroundStyle(.primary)
                         .textSelection(.enabled)
-                    Text(AppLocalization.text("根据整机内存估算；内存紧张时可选择更小模型。"))
-
-                    if endpointKind == .ollama {
-                        Text(AppLocalization.text(
-                            "模型下载：约 %.1f GB",
-                            recommendation.approximateOllamaDownloadGigabytes
-                        ))
-                        let command = "ollama pull \(recommendation.ollamaModelID)"
-                        Text(command)
-                            .font(.system(size: 10, design: .monospaced))
-                            .textSelection(.enabled)
-                            .environment(\.layoutDirection, .leftToRight)
-                        HStack(spacing: 12) {
-                            Button(AppLocalization.text("复制下载命令")) {
-                                copySettingsText(command)
-                            }
-                            .buttonStyle(.bordered)
-                            .controlSize(.small)
-                            Link(
-                                AppLocalization.text("模型说明"),
-                                destination: URL(string: "https://ollama.com/library/\(recommendation.ollamaModelID)")!
-                            )
-                        }
-                    } else {
-                        Text(AppLocalization.text("在 LM Studio 中搜索此名称并选择对应量化版本。加载后，从服务模型列表选择实际模型 ID。"))
-                        Text(AppLocalization.text("请在 LM Studio 中关闭思考模式，以便快速整理转写文本。"))
-                        Link(
-                            AppLocalization.text("模型说明"),
-                            destination: URL(string: "https://lmstudio.ai/models/qwen3.5")!
-                        )
-                    }
                 } else {
                     Text(AppLocalization.text("硬件信息不可用或内存不足 8 GiB，暂不自动推荐。你仍可手动选择已安装的模型。"))
                 }

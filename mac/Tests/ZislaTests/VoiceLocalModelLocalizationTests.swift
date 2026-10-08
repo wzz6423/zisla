@@ -34,14 +34,11 @@ struct VoiceLocalModelLocalizationTests {
                 }
             }
         }
-        #expect(AppLocalization.string("获取模型", locale: Locale(identifier: "en")) == "Fetch models")
-        #expect(AppLocalization.string("获取模型", locale: Locale(identifier: "ja")) == "モデルを取得")
-        #expect(AppLocalization.string("获取模型", locale: Locale(identifier: "ar")) == "جلب النماذج")
         #expect(AppLocalization.string("启动 LM Studio 服务", locale: Locale(identifier: "en")) == "Start LM Studio server")
     }
 
     private let newKeys: Set<String> = [
-        "本地服务", "选择已发现的模型", "API Key（可选）", "获取模型",
+        "本地服务", "选择已发现的模型", "API Key（可选）",
         "默认无需 API Key；仅在本地服务启用认证时填写。",
         "未发现模型，请先在本地服务中下载或加载模型。",
         "未找到 LM Studio CLI。请在 LM Studio 中启动 API 服务后重试。",

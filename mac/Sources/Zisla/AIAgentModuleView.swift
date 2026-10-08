@@ -685,44 +685,9 @@ private struct AILocalModelConfigurationRow: View {
                 ))
                 .textFieldStyle(.roundedBorder)
                 .font(.system(size: 10, design: .monospaced))
+                .frame(minWidth: 140)
+                .layoutPriority(1)
                 .accessibilityLabel(AppLocalization.text("URL / IP:端口"))
-                Button {
-                    do {
-                        try store.removeLocalModel(id: model.id)
-                    } catch {
-                        credentialError = AppLocalization.text("无法删除模型凭据")
-                    }
-                } label: { Image(systemName: "trash") }
-                .buttonStyle(.borderless)
-                .accessibilityLabel(AppLocalization.text("删除本地模型"))
-                .help(AppLocalization.text("删除本地模型"))
-            }
-            HStack(spacing: 7) {
-                if let models = discovery.catalog?.models, !models.isEmpty {
-                    Picker(AppLocalization.text("选择已发现的模型"), selection: Binding(
-                        get: { model.modelName },
-                        set: { value in update { $0.modelName = value } }
-                    )) {
-                        Text(AppLocalization.text("尚未选择模型")).tag("")
-                        if !model.modelName.isEmpty, !models.contains(where: { $0.name == model.modelName }) {
-                            Text(model.modelName).tag(model.modelName)
-                        }
-                        ForEach(models) { discovered in
-                            Text(discovered.name).tag(discovered.name)
-                        }
-                    }
-                    .labelsHidden()
-                    .pickerStyle(.menu)
-                    .frame(maxWidth: .infinity)
-                    .accessibilityLabel(AppLocalization.text("选择已发现的模型"))
-                } else {
-                    TextField(AppLocalization.text("模型名"), text: Binding(
-                        get: { model.modelName },
-                        set: { value in update { $0.modelName = value } }
-                    ))
-                    .textFieldStyle(.roundedBorder)
-                    .accessibilityLabel(AppLocalization.text("模型名"))
-                }
                 SecureField(AppLocalization.text("API Key（可选）"), text: Binding(
                     get: { apiKey },
                     set: { value in
@@ -738,23 +703,56 @@ private struct AILocalModelConfigurationRow: View {
                     }
                 ))
                 .textFieldStyle(.roundedBorder)
-                .frame(width: 135)
+                .frame(width: 125)
                 .accessibilityLabel(AppLocalization.text("API Key（可选）"))
-                Button { discoverModels() } label: {
+                .help(AppLocalization.text("默认无需 API Key；仅在本地服务启用认证时填写。"))
+                HStack(spacing: 4) {
                     if discovery.isLoading {
-                        ProgressView().controlSize(.small)
+                        ProgressView().controlSize(.mini)
+                    }
+                    if let models = discovery.catalog?.models, !models.isEmpty {
+                        Picker(AppLocalization.text("选择已发现的模型"), selection: Binding(
+                            get: { model.modelName },
+                            set: { value in update { $0.modelName = value } }
+                        )) {
+                            Text(AppLocalization.text("尚未选择模型")).tag("")
+                            if !model.modelName.isEmpty, !models.contains(where: { $0.name == model.modelName }) {
+                                Text(model.modelName).tag(model.modelName)
+                            }
+                            ForEach(models) { discovered in
+                                Text(discovered.name).tag(discovered.name)
+                            }
+                        }
+                        .labelsHidden()
+                        .pickerStyle(.menu)
+                        .frame(maxWidth: .infinity)
+                        .accessibilityLabel(AppLocalization.text("选择已发现的模型"))
                     } else {
-                        Text(AppLocalization.text("获取模型"))
+                        TextField(AppLocalization.text("模型名"), text: Binding(
+                            get: { model.modelName },
+                            set: { value in update { $0.modelName = value } }
+                        ))
+                        .textFieldStyle(.roundedBorder)
+                        .accessibilityLabel(AppLocalization.text("模型名"))
                     }
                 }
-                .buttonStyle(.bordered)
-                .controlSize(.small)
-                .fixedSize()
-                .disabled(!model.isEnabled || discovery.isLoading || credentialError != nil)
+                .frame(width: 200)
+                .help(model.modelName)
+                Button {
+                    do {
+                        try store.removeLocalModel(id: model.id)
+                    } catch {
+                        credentialError = AppLocalization.text("无法删除模型凭据")
+                    }
+                } label: {
+                    Image(systemName: "trash")
+                        .frame(width: 24, height: 24)
+                        .contentShape(Rectangle())
+                }
+                .buttonStyle(.borderless)
+                .accessibilityLabel(AppLocalization.text("删除本地模型"))
+                .help(AppLocalization.text("删除本地模型"))
             }
-            Text(AppLocalization.text("默认无需 API Key；仅在本地服务启用认证时填写。"))
-                .font(.system(size: 10))
-                .foregroundStyle(.secondary)
             if let error = credentialError ?? discovery.error {
                 Text(error).font(.system(size: 10)).foregroundStyle(.red)
             }
