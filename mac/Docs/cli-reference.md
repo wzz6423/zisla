@@ -29,6 +29,33 @@
 | `pi` | `pi-coding`, `pi-coding-agent`, `pi-cli`, `pi-agent` |
 | `harness` | `harnext`, `harnext-cli`, `harness-cli` |
 | `doubao` | `豆包` |
+| `delta` | `delta-app`, `delta-desktop`, `zed-delta` |
+| `orca` | `orca-desktop`, `orca-ide` |
+| `workbuddy` | `workbuddy-ai`, `workbuddyai`, `workbuddy ai` |
+
+### Delta, Orca and WorkBuddy AI automatic detection
+
+- Delta: reads indexed streaming-thread metadata from `Library/Application Support/Delta/user_*/data.sqlite`
+  (and the legacy root database). Archived, idle and stale threads are excluded. Numeric usage comes
+  from Delta's `app_model_usage_daily` ledger, including cache reads and writes. A release without
+  this ledger reports no automatic usage; it does not guess counts from conversation content.
+- Orca: reads local `agent-hooks/last-status.json` snapshots and current structured-chat turn state
+  from `agent-session-journal.db`, including profile directories and v1/v2/v3 turn records.
+  Highest revisions and original turn ordering are respected. Completed, expired, remote and
+  identity-only sessions are excluded. Authoritative transcript paths and pinned Claude/Codex
+  account homes also contribute token usage. Those samples retain the underlying CLI provider and
+  event identity, so the regular CLI detector cannot count them again. Orca's machine-wide usage
+  caches are deliberately not imported as additional usage.
+- WorkBuddy AI: reads session status, titles, model and timestamps from
+  `~/.workbuddy-ai/workbuddy.db`, independently of legacy `~/.workbuddy/workbuddy.db`.
+  Finished, deleted and stale sessions are excluded; the fresher of `updated_at` and
+  `last_activity_at` keeps long-running sessions visible. Tasks use the `workbuddy` provider,
+  the WorkBuddy AI icon and `workbuddy-ai://chat/<id>` links. This integration detects sessions
+  only: `session_usage.used` is context occupancy and credits are not USD/token usage, so neither
+  is imported as billed tokens. Manual numeric usage can be reported with `zislactl usage`.
+- All integrations are read-only and best effort; missing or incompatible stores return no data.
+  Neither queries replicated Delta thread bodies or Orca journal message bodies. Use `zislactl usage`
+  for tools or versions that do not expose recorded numeric usage.
 
 ## `update`
 

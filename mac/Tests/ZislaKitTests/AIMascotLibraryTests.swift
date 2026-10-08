@@ -6,6 +6,25 @@ import Testing
 
 struct AIMascotLibraryTests {
     @Test
+    func desktopAgentIconsResolveKnownBundlesAndOfflineAssets() {
+        let examples: [(AIProvider, String, String, String)] = [
+            (.delta, "com.zed-industries.delta", "Delta", "delta.icns"),
+            (.orca, "com.stablyai.orca", "Orca", "orca.icns"),
+            (.workbuddy, "com.workbuddy.workbuddy-ai", "WorkBuddy AI", "workbuddy-ai.icns"),
+        ]
+        for (provider, identifier, name, asset) in examples {
+            let url = URL(fileURLWithPath: "/Applications/\(name).app")
+            #expect(AIMascotLibrary.installedDesktopAgentApplicationURL(for: provider,
+                resolveBundleIdentifier: { $0 == identifier ? url : nil },
+                applicationDirectories: [], fileExists: { _ in false }) == url)
+            #expect(AIMascotLibrary.installedDesktopAgentApplicationURL(for: provider,
+                resolveBundleIdentifier: { _ in nil },
+                applicationDirectories: [URL(fileURLWithPath: "/Applications")], fileExists: { $0 == url }) == url)
+            #expect(AIMascotLibrary.providerAssetName(for: provider) == asset)
+        }
+    }
+
+    @Test
     func coderResolutionCandidatesCoverKnownQoderHosts() {
         #expect(AIMascotLibrary.coderBundleIdentifiers.first == "com.qoder.work.cn")
         #expect(

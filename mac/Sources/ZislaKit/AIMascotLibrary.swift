@@ -152,6 +152,28 @@ public enum AIMascotLibrary {
         )
     }
 
+    public static func installedDesktopAgentApplicationURL(
+        for provider: AIProvider,
+        resolveBundleIdentifier: (String) -> URL? = { NSWorkspace.shared.urlForApplication(withBundleIdentifier: $0) },
+        applicationDirectories: [URL] = FileManager.default.urls(for: .applicationDirectory, in: .allDomainsMask),
+        fileExists: (URL) -> Bool = { FileManager.default.fileExists(atPath: $0.path) }
+    ) -> URL? {
+        let identifier: String
+        let name: String
+        switch provider {
+        case .delta: identifier = "com.zed-industries.delta"; name = "Delta"
+        case .orca: identifier = "com.stablyai.orca"; name = "Orca"
+        case .workbuddy: identifier = "com.workbuddy.workbuddy-ai"; name = "WorkBuddy AI"
+        default: return nil
+        }
+        return installedApplicationURL(
+            bundleIdentifiers: [identifier], applicationNames: [name],
+            resolveBundleIdentifier: resolveBundleIdentifier,
+            applicationDirectories: applicationDirectories,
+            fileExists: fileExists
+        )
+    }
+
     private static func installedApplicationURL(
         bundleIdentifiers: [String],
         applicationNames: [String],
@@ -188,6 +210,9 @@ public enum AIMascotLibrary {
         case .coder: "qoder.icns"
         case .zcode: "zcode.icns"
         case .zed: "zed.icns"
+        case .delta: "delta.icns"
+        case .orca: "orca.icns"
+        case .workbuddy: "workbuddy-ai.icns"
         case .trae: "trae.icns"
         case .opencode: "opencode.svg"
         case .pi: "pi.svg"
@@ -229,6 +254,9 @@ public enum AIMascotLibrary {
         case .coder: "Qoder"
         case .zcode: "ZCode"
         case .zed: "Zed"
+        case .delta: "Delta"
+        case .orca: "Orca"
+        case .workbuddy: "WorkBuddy AI"
         case .trae: "TRAE"
         case .opencode: "opencode"
         case .pi: "Pi"

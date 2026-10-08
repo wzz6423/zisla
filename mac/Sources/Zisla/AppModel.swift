@@ -4193,7 +4193,7 @@ final class AppModel: ObservableObject {
   private func noticeSide(for provider: AIProvider) -> NoticeSide {
     switch provider {
     case .claude, .gemini, .qwen, .trae, .doubao: .left
-    case .pi: .right
+    case .pi, .delta, .orca, .workbuddy: .right
     case .codex, .grok, .gpt, .copilot, .kimi, .coder, .zcode, .zed, .opencode, .harness: .right
     }
   }

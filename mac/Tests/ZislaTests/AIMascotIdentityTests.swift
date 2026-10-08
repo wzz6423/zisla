@@ -34,6 +34,17 @@ struct AIMascotIdentityTests {
     }
 
     @Test
+    func mapsDesktopProvidersAndTheirActivityNotices() {
+        #expect(AIMascotIdentity(provider: .delta, taskID: "delta-thread-example") == .delta)
+        #expect(AIMascotIdentity(provider: .orca, taskID: "orca-pane-example") == .orca)
+        #expect(AIMascotIdentity(provider: .workbuddy, taskID: "workbuddy-ai-session-example") == .workbuddy)
+        #expect(AIMascotIdentity(noticeID: "ai-active-delta-delta-thread-example") == .delta)
+        #expect(AIMascotIdentity(noticeID: "ai-active-orca-orca-pane-example") == .orca)
+        #expect(AIMascotIdentity(noticeID: "ai-active-workbuddy-workbuddy-ai-session-example") == .workbuddy)
+        #expect(AIMascotIdentity.workbuddy.displayName == "WorkBuddy AI")
+    }
+
+    @Test
     func distinguishesGeminiDesktopChatsFromCLISessions() {
         #expect(AIMascotIdentity(
             provider: .gemini,

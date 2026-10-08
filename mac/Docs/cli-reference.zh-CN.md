@@ -29,6 +29,27 @@
 | `pi` | `pi-coding`、`pi-coding-agent`、`pi-cli`、`pi-agent` |
 | `harness` | `harnext`、`harnext-cli`、`harness-cli` |
 | `doubao` | `豆包` |
+| `delta` | `delta-app`、`delta-desktop`、`zed-delta` |
+| `orca` | `orca-desktop`、`orca-ide` |
+| `workbuddy` | `workbuddy-ai`、`workbuddyai`、`workbuddy ai` |
+
+### Delta、Orca 与 WorkBuddy AI 自动检测
+
+- Delta：只读 `Library/Application Support/Delta/user_*/data.sqlite` 及旧版根数据库中的
+  streaming 会话索引；忽略归档、空闲及过期会话。用量读取 `app_model_usage_daily` 数字账本，
+  包含缓存读写 token。没有该账本的版本不会自动生成用量，也不会从会话正文猜测计数。
+- Orca：读取本地 `agent-hooks/last-status.json` 和 `agent-session-journal.db` 的当前结构化
+  会话状态，支持 profile 目录及 v1/v2/v3 turn 记录，按最高 revision 和 turn 的创建顺序还原。
+  忽略结束、租约过期、远程及纯身份记录。由工具确认的 transcript
+  路径以及绑定的 Claude/Codex 账号目录提供用量，保留底层 CLI provider 和事件 ID，避免与
+  普通 CLI 检测器重复计数。不把 Orca 的全机器用量缓存再次作为额外用量导入。
+- WorkBuddy AI：读取 `~/.workbuddy-ai/workbuddy.db` 中的会话状态、标题、模型与时间戳，
+  与旧版 `~/.workbuddy/workbuddy.db` 独立。忽略结束、删除和过期会话，取 `updated_at` 与
+  `last_activity_at` 中较新时间以保留长任务。使用 `workbuddy` provider、WorkBuddy AI 图标
+  和 `workbuddy-ai://chat/<id>` 跳转。本集成仅检测会话；`session_usage.used` 是上下文占用，
+  credits 也不是美元或 token，因此不作为计费用量导入。数字用量可用 `zislactl usage` 上报。
+- 三种集成都只读、尽力兼容，缺失或不兼容的数据源不产生记录。不查询 Delta 复制树正文或
+  Orca journal 的消息正文。没有数字用量接口的工具版本可通过 `zislactl usage` 上报。
 
 ## `update`
 

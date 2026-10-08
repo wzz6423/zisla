@@ -89,6 +89,9 @@ enum AIMascotIdentity: String, CaseIterable, Identifiable {
     case coder
     case zcode
     case zed
+    case delta
+    case orca
+    case workbuddy
     case trae
     case opencode
     case pi
@@ -121,6 +124,9 @@ enum AIMascotIdentity: String, CaseIterable, Identifiable {
         case .coder: self = .coder
         case .zcode: self = .zcode
         case .zed: self = .zed
+        case .delta: self = .delta
+        case .orca: self = .orca
+        case .workbuddy: self = .workbuddy
         case .trae: self = .trae
         case .opencode: self = .opencode
         case .pi: self = .pi
@@ -191,6 +197,9 @@ enum AIMascotIdentity: String, CaseIterable, Identifiable {
         case .coder: .coder
         case .zcode: .zcode
         case .zed: .zed
+        case .delta: .delta
+        case .orca: .orca
+        case .workbuddy: .workbuddy
         case .trae: .trae
         case .opencode: .opencode
         case .pi: .pi
@@ -284,6 +293,13 @@ struct AIMascotView: View {
         case .zed:
             return imageCache.image(for: "installed|zed") {
                 AIMascotLibrary.installedZedApplicationURL().map {
+                    NSWorkspace.shared.icon(forFile: $0.path)
+                }
+            }
+        case .delta, .orca, .workbuddy:
+            guard let provider = identity.provider else { return nil }
+            return imageCache.image(for: "installed|desktop-\(provider.rawValue)") {
+                AIMascotLibrary.installedDesktopAgentApplicationURL(for: provider).map {
                     NSWorkspace.shared.icon(forFile: $0.path)
                 }
             }

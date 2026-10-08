@@ -41,6 +41,39 @@ struct WorkBuddySessionActivityDetectorTests {
     }
 
     @Test
+    func detectsWorkBuddyAIWithIndependentIdentityAndURLScheme() throws {
+        let databaseURL = try makeWorkBuddyDatabase()
+        defer { removeWorkBuddyDatabase(at: databaseURL) }
+        try insertWorkBuddySession(
+            at: databaseURL, id: Self.conversationID, title: "  ", status: "working",
+            createdAt: Self.milliseconds(Self.now.addingTimeInterval(-4 * 60 * 60)),
+            updatedAt: Self.milliseconds(Self.now.addingTimeInterval(-60)),
+            lastActivityAt: Self.milliseconds(Self.now.addingTimeInterval(-4 * 60 * 60))
+        )
+        let detector = WorkBuddyAISessionActivityDetector(databaseURL: databaseURL, now: { Self.now })
+        let task = try #require(detector.activeTasks().first)
+        #expect(task.provider == .workbuddy)
+        #expect(task.title == "WorkBuddy AI")
+        #expect(task.id == "workbuddy-ai-session-\(Self.conversationID)")
+        #expect(task.sessionURL?.absoluteString == "workbuddy-ai://chat/\(Self.conversationID)")
+        #expect(task.updatedAt == Self.now.addingTimeInterval(-60))
+        #expect(detector.activityFileURLs.contains(databaseURL))
+        let legacy = try #require(WorkBuddySessionActivityDetector(databaseURL: databaseURL, now: { Self.now }).activeTasks().first)
+        #expect(legacy.id != task.id)
+        #expect(legacy.provider == .harness)
+    }
+
+    @Test
+    func workBuddyAIUsesSeparateRootAndFailsClosed() throws {
+        let home = URL(fileURLWithPath: "/example/home")
+        #expect(WorkBuddyAISessionActivityDetector.defaultDatabaseURL(home: home).path == "/example/home/.workbuddy-ai/workbuddy.db")
+        #expect(WorkBuddySessionActivityDetector.defaultDatabaseURL(home: home).path == "/example/home/.workbuddy/workbuddy.db")
+        let url = try makeWorkBuddyDatabase(createSessionTable: false)
+        defer { removeWorkBuddyDatabase(at: url) }
+        #expect(try WorkBuddyAISessionActivityDetector(databaseURL: url).activeTasks().isEmpty)
+    }
+
+    @Test
     func prefersCustomTitleOverGeneratedTitle() throws {
         let databaseURL = try makeWorkBuddyDatabase()
         defer { removeWorkBuddyDatabase(at: databaseURL) }

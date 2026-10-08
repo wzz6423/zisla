@@ -17,6 +17,12 @@ offline fallbacks when their corresponding local clients are unavailable. Produc
 logos remain trademarks of their respective owners.
 
 `zcode.icns` is the official icon from the locally installed ZCode application.
+`delta.icns` and `orca.icns` are the official icons from the locally installed Delta and Orca
+applications, used only for product identification and as offline fallbacks. Their names and
+logos remain trademarks of Zed Industries and Stably AI respectively.
+`workbuddy-ai.icns` is the official icon from the locally installed WorkBuddy AI application,
+used for product identification and offline fallback. Its name and logo remain trademarks
+of Tencent.
 
 `pi.svg` is Pi Coding Agent's official logo from https://pi.dev/logo.svg. Its white paths are
 kept unchanged and rendered as a template to adapt to the compact island surface. Product names
