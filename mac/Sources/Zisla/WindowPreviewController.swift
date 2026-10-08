@@ -127,7 +127,7 @@ struct WindowPreviewImageCache {
         let windowID: CGWindowID
     }
 
-    private var images: [Key: NSImage] = [:]
+    private var cachedSnapshots: [Key: WindowPreviewSnapshot] = [:]
     private var order: [Key] = []
     private let limit: Int
 
@@ -140,42 +140,50 @@ struct WindowPreviewImageCache {
         presentWindowIDs: (pid_t) -> Set<CGWindowID>?
     ) -> [WindowPreviewSnapshot] {
         let currentIDs = Set(snapshots.map(\.id))
-        if order.contains(where: { $0.processIdentifier == processIdentifier && !currentIDs.contains($0.windowID) }),
-           let liveIDs = presentWindowIDs(processIdentifier) {
+        let liveIDs = order.contains(where: {
+            $0.processIdentifier == processIdentifier && !currentIDs.contains($0.windowID)
+        }) ? presentWindowIDs(processIdentifier) : nil
+        if let liveIDs {
             order.removeAll { key in
                 guard key.processIdentifier == processIdentifier && !currentIDs.contains(key.windowID)
                         && !liveIDs.contains(key.windowID) else { return false }
-                images.removeValue(forKey: key)
+                cachedSnapshots.removeValue(forKey: key)
                 return true
             }
         }
-        return snapshots.map { snapshot in
+        let current = snapshots.map { snapshot in
             let key = Key(processIdentifier: processIdentifier, windowID: snapshot.id)
-            if let image = snapshot.image {
-                images[key] = image
+            if snapshot.image != nil {
+                cachedSnapshots[key] = snapshot
                 order.removeAll { $0 == key }
                 order.append(key)
                 if order.count > limit {
-                    images.removeValue(forKey: order.removeFirst())
+                    cachedSnapshots.removeValue(forKey: order.removeFirst())
                 }
                 return snapshot
             }
             return WindowPreviewSnapshot(
-                id: snapshot.id, title: snapshot.title, frame: snapshot.frame, image: images[key]
+                id: snapshot.id, title: snapshot.title, frame: snapshot.frame, image: cachedSnapshots[key]?.image
             )
+        }
+        // ScreenCaptureKit can omit windows in inactive full-screen Spaces.
+        return current + order.compactMap { key in
+            guard key.processIdentifier == processIdentifier, !currentIDs.contains(key.windowID),
+                  liveIDs?.contains(key.windowID) == true else { return nil }
+            return cachedSnapshots[key]
         }
     }
 
     mutating func remove(processIdentifier: pid_t) {
         order.removeAll { key in
             guard key.processIdentifier == processIdentifier else { return false }
-            images.removeValue(forKey: key)
+            cachedSnapshots.removeValue(forKey: key)
             return true
         }
     }
 
     mutating func removeAll() {
-        images.removeAll()
+        cachedSnapshots.removeAll()
         order.removeAll()
     }
 }
@@ -518,8 +526,6 @@ final class WindowPreviewController: ObservableObject {
         applicationActivationObserver = nil
         applicationTerminationObserver = nil
         needsSpaceRefront = false
-        prefetchTimer?.invalidate()
-        prefetchTimer = nil
         transitionTimers.values.forEach { $0.invalidate() }
         transitionTimers.removeAll()
         cancelForegroundCapture()
@@ -679,7 +685,7 @@ final class WindowPreviewController: ObservableObject {
             deferCaptures(for: processIdentifier)
             return
         }
-        prefetchTimer?.invalidate()
+        cancelForegroundCapture()
         prefetchTimer = dependencies.timer(0.2, false) { [weak self] in
             self?.prefetchTimer = nil
             self?.captureForegroundApplication()
@@ -687,7 +693,6 @@ final class WindowPreviewController: ObservableObject {
     }
 
     private func deferCaptures(for processIdentifier: pid_t) {
-        prefetchTimer?.invalidate()
         cancelForegroundCapture()
         transitionTimers[processIdentifier]?.invalidate()
         if selection?.processIdentifier == processIdentifier {
@@ -710,13 +715,15 @@ final class WindowPreviewController: ObservableObject {
     }
 
     private func cancelForegroundCapture() {
+        prefetchTimer?.invalidate()
+        prefetchTimer = nil
         prefetchGeneration &+= 1
         prefetchTask?.cancel()
         prefetchTask = nil
         prefetchProcessIdentifier = nil
     }
 
-    private func captureForegroundApplication() {
+    private func captureForegroundApplication(retriesRemaining: Int = 3) {
         guard enabled, dependencies.hasPermissions(),
               let processIdentifier = dependencies.frontmostProcessIdentifier(),
               processIdentifier != getpid(),
@@ -727,23 +734,32 @@ final class WindowPreviewController: ObservableObject {
         prefetchProcessIdentifier = processIdentifier
         let captureWindows = dependencies.captureWindows
         prefetchTask = Task { [weak self] in
+            var retryScheduled = false
             defer {
                 if self?.prefetchGeneration == currentGeneration {
                     self?.prefetchTask = nil
-                    self?.prefetchProcessIdentifier = nil
+                    if !retryScheduled { self?.prefetchProcessIdentifier = nil }
                 }
             }
+            let snapshots: [WindowPreviewSnapshot]
             do {
                 try Task.checkCancellation()
-                let snapshots = try await captureWindows(processIdentifier)
-                guard !Task.isCancelled, let self, self.prefetchGeneration == currentGeneration,
-                      self.enabled, self.dependencies.hasPermissions() else { return }
-                _ = self.imageCache.reconcile(
-                    snapshots, processIdentifier: processIdentifier,
-                    presentWindowIDs: self.dependencies.presentWindowIDs
-                )
+                snapshots = try await captureWindows(processIdentifier)
             } catch {
-                return
+                snapshots = []
+            }
+            guard !Task.isCancelled, let self, self.prefetchGeneration == currentGeneration,
+                  self.enabled, self.dependencies.hasPermissions() else { return }
+            _ = self.imageCache.reconcile(
+                snapshots, processIdentifier: processIdentifier,
+                presentWindowIDs: self.dependencies.presentWindowIDs
+            )
+            if retriesRemaining > 0, snapshots.isEmpty || snapshots.contains(where: { $0.image == nil }) {
+                retryScheduled = true
+                self.prefetchTimer = self.dependencies.timer(0.4, false) { [weak self] in
+                    guard let self, self.dependencies.frontmostProcessIdentifier() == processIdentifier else { return }
+                    self.captureForegroundApplication(retriesRemaining: retriesRemaining - 1)
+                }
             }
         }
     }
@@ -779,8 +795,11 @@ final class WindowPreviewController: ObservableObject {
                 if !self.dependencies.hasPermissions() {
                     self.stopMonitoring()
                 } else {
-                    self.windows = []
-                    self.dependencies.present(self, nil)
+                    self.windows = self.imageCache.reconcile(
+                        [], processIdentifier: selection.processIdentifier,
+                        presentWindowIDs: self.dependencies.presentWindowIDs
+                    )
+                    self.dependencies.present(self, self.selection)
                 }
             }
         }

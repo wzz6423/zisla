@@ -448,6 +448,143 @@ struct WindowPreviewLifecycleTests {
         #expect(captures == [1, 1])
     }
 
+    @Test(arguments: ["empty", "transparent", "partial", "error"])
+    func foregroundCaptureRetriesUntilTheFullscreenImageCanBeCached(failure: String) async throws {
+        let system = PreviewSystem()
+        system.foregroundPID = 1
+        let visible = PreviewSystem.snapshot(11)
+        var captures = 0
+        var dependencies = system.dependencies()
+        dependencies.captureWindows = { pid in
+            captures += 1
+            guard system.foregroundPID == pid else { return [PreviewSystem.snapshot(11, alpha: nil)] }
+            if captures == 1 {
+                switch failure {
+                case "error": throw PreviewCaptureGate.Failure.unavailable
+                case "transparent": return [PreviewSystem.snapshot(11, alpha: nil)]
+                case "partial": return [PreviewSystem.snapshot(12), PreviewSystem.snapshot(11, alpha: nil)]
+                default: return []
+                }
+            }
+            return [visible]
+        }
+        let controller = WindowPreviewController(dependencies: dependencies)
+        defer { controller.stop() }
+        controller.configure(enabled: true)
+        system.applicationActivated?()
+        try #require(system.timers.last).fire()
+        await controller.prefetchTask?.value
+
+        let retry = try #require(system.timers.last)
+        #expect(retry.isValid, "A missing full-screen image must be retried while its application is visible")
+        retry.fire()
+        await controller.prefetchTask?.value
+        #expect(captures == 2)
+        #expect(!retry.isValid)
+        #expect(system.timers.allSatisfy { !$0.isValid }, "A successful capture must end background retries")
+
+        system.foregroundPID = 2
+        controller.select(PreviewSystem.selection(1, source: .dock))
+        await controller.captureTask?.value
+        #expect(controller.windows.first?.image === visible.image,
+                "The successful foreground retry must supply the preview after leaving the full-screen Space")
+    }
+
+    @Test
+    func unavailableForegroundImagesHaveABoundedRetryBudget() async throws {
+        let system = PreviewSystem()
+        system.foregroundPID = 1
+        var captures = 0
+        var dependencies = system.dependencies()
+        dependencies.captureWindows = { _ in
+            captures += 1
+            return []
+        }
+        let controller = WindowPreviewController(dependencies: dependencies)
+        defer { controller.stop() }
+        controller.configure(enabled: true)
+        system.applicationActivated?()
+
+        for _ in 0..<10 {
+            guard let timer = system.timers.last, timer.isValid else { break }
+            timer.fire()
+            await controller.prefetchTask?.value
+        }
+        #expect(captures == 4, "One foreground event permits an initial attempt and at most three retries")
+        #expect(system.timers.allSatisfy { !$0.isValid })
+        #expect(controller.prefetchTask == nil)
+    }
+
+    @Test(arguments: ["activation", "selection", "stop", "permission", "termination", "silent-switch"])
+    func obsoleteForegroundRetriesCannotCaptureAfterTheirContextEnds(reason: String) async throws {
+        let system = PreviewSystem()
+        system.foregroundPID = 1
+        var captures: [pid_t] = []
+        var dependencies = system.dependencies()
+        dependencies.captureWindows = { pid in
+            captures.append(pid)
+            return []
+        }
+        let controller = WindowPreviewController(dependencies: dependencies)
+        defer { controller.stop() }
+        controller.configure(enabled: true)
+        try #require(system.timers.last).fire()
+        await controller.prefetchTask?.value
+        let retry = try #require(system.timers.last)
+        try #require(retry.isValid)
+
+        switch reason {
+        case "activation":
+            system.foregroundPID = 2
+            system.applicationActivated?()
+        case "selection":
+            controller.select(PreviewSystem.selection(1, source: .dock))
+            await controller.captureTask?.value
+        case "permission":
+            system.authorized = false
+            controller.refreshPermissions()
+        case "termination":
+            system.applicationTerminated?(1)
+        case "silent-switch":
+            system.foregroundPID = 2
+        default:
+            controller.stop()
+        }
+        if reason != "silent-switch" { #expect(!retry.isValid) }
+        let completedCaptures = captures
+        retry.fire()
+        await controller.prefetchTask?.value
+        #expect(captures == completedCaptures, "An obsolete retry must not capture a departed or newly restoring app")
+    }
+
+    @Test
+    func aSpaceChangeWithoutAForegroundAppCancelsQueuedPrefetch() async throws {
+        let system = PreviewSystem()
+        system.foregroundPID = 1
+        var captures: [pid_t] = []
+        var dependencies = system.dependencies()
+        dependencies.captureWindows = { pid in
+            captures.append(pid)
+            return [PreviewSystem.snapshot(pid)]
+        }
+        let controller = WindowPreviewController(dependencies: dependencies)
+        defer { controller.stop() }
+        controller.configure(enabled: true)
+        try #require(system.timers.last).fire()
+        let queued = try #require(controller.prefetchTask)
+
+        system.foregroundPID = nil
+        system.spaceChanged?()
+        await queued.value
+        #expect(queued.isCancelled)
+        #expect(captures.isEmpty, "A transiently missing foreground app must not leave old capture work running")
+
+        system.foregroundPID = 2
+        try #require(system.timers.last).fire()
+        await controller.prefetchTask?.value
+        #expect(captures == [2])
+    }
+
     @Test(arguments: [WindowPreviewSource.dock, .switcher], [false, true])
     func applicationActivationDefersSelectedAndForegroundCapturesUntilTheAnimationSettles(
         source: WindowPreviewSource, spaceChange: Bool
@@ -860,7 +997,9 @@ struct WindowPreviewLifecycleTests {
 
         refresh.fire()
         await controller.captureTask?.value
-        #expect(controller.windows.isEmpty)
+        #expect(controller.windows.map(\.id) == [11])
+        #expect(controller.windows.first?.image === first.image,
+                "A live off-Space window must retain its preview even when temporarily absent from capture candidates")
         refresh.fire()
         await controller.captureTask?.value
         #expect(controller.windows.first?.image === first.image)
@@ -871,6 +1010,66 @@ struct WindowPreviewLifecycleTests {
         refresh.fire()
         await controller.captureTask?.value
         #expect(controller.windows.first?.image == nil)
+    }
+
+    @Test(arguments: [WindowPreviewSource.dock, .switcher])
+    func captureErrorsRetainTheCachedImageOfALiveOffSpaceWindow(source: WindowPreviewSource) async throws {
+        let system = PreviewSystem()
+        system.existingWindowIDs = [11]
+        let visible = PreviewSystem.snapshot(11)
+        var captures = 0
+        var dependencies = system.dependencies()
+        dependencies.captureWindows = { _ in
+            captures += 1
+            if captures == 1 { return [visible] }
+            throw PreviewCaptureGate.Failure.unavailable
+        }
+        let controller = WindowPreviewController(dependencies: dependencies)
+        defer { controller.stop() }
+        controller.configure(enabled: true)
+        controller.select(PreviewSystem.selection(1, source: source))
+        await controller.captureTask?.value
+        let refresh = try #require(system.timers.first { $0.timeInterval == 1 })
+
+        refresh.fire()
+        await controller.captureTask?.value
+        #expect(controller.windows.map(\.id) == [11])
+        #expect(controller.windows.first?.image === visible.image)
+        #expect(system.presentationAnchors.last == PreviewSystem.selection(1, source: source).anchor)
+
+        system.existingWindowIDs = []
+        refresh.fire()
+        await controller.captureTask?.value
+        #expect(controller.windows.isEmpty, "A closed window must not survive through the cached fallback")
+    }
+
+    @Test(arguments: [Optional(Set<CGWindowID>([11])), Set<CGWindowID>(), nil])
+    func missingCaptureCandidatesOnlyUseCacheWhenWindowLivenessIsConfirmed(liveIDs: Set<CGWindowID>?) {
+        var cache = WindowPreviewImageCache()
+        let first = PreviewSystem.snapshot(11)
+        let other = PreviewSystem.snapshot(11, alpha: 0.5)
+        _ = cache.reconcile([first], processIdentifier: 1, presentWindowIDs: { _ in [11] })
+        _ = cache.reconcile([other], processIdentifier: 2, presentWindowIDs: { _ in [11] })
+
+        let result = cache.reconcile([], processIdentifier: 1, presentWindowIDs: { _ in liveIDs })
+        #expect(result.map(\.id) == (liveIDs == [11] ? [11] : []))
+        if liveIDs == [11] { #expect(result.first?.image === first.image) }
+        let otherResult = cache.reconcile([], processIdentifier: 2, presentWindowIDs: { _ in [11] })
+        #expect(otherResult.first?.image === other.image, "Cached windows must remain isolated by process")
+    }
+
+    @Test
+    func cachedFallbackDoesNotDuplicateFreshlyCapturedWindows() {
+        var cache = WindowPreviewImageCache()
+        let first = PreviewSystem.snapshot(11)
+        let offSpace = PreviewSystem.snapshot(12)
+        let refreshed = PreviewSystem.snapshot(11, alpha: 0.5)
+        _ = cache.reconcile([first, offSpace], processIdentifier: 1, presentWindowIDs: { _ in [11, 12] })
+
+        let result = cache.reconcile([refreshed], processIdentifier: 1, presentWindowIDs: { _ in [11, 12] })
+        #expect(result.map(\.id) == [11, 12])
+        #expect(result.first?.image === refreshed.image)
+        #expect(result.last?.image === offSpace.image)
     }
 
     @Test
