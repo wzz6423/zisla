@@ -25,6 +25,14 @@ struct ToolboxModuleView: View {
             toolActions
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+        .alert(AppLocalization.text("保持亮屏"), isPresented: Binding(
+            get: { model.powerAssertions.displayAwakeError != nil },
+            set: { if !$0 { model.powerAssertions.displayAwakeError = nil } }
+        )) {
+            Button(AppLocalization.text("好"), role: .cancel) {}
+        } message: {
+            Text(AppLocalization.text(model.powerAssertions.displayAwakeError ?? ""))
+        }
     }
 
     private var focusPanelShape: UnevenRoundedRectangle {
@@ -308,12 +316,15 @@ struct ToolboxModuleView: View {
     private var toolTogglesRow: some View {
         HStack(spacing: 8) {
             ToolToggleButton(
-                title: AppLocalization.text("保持亮屏"),
+                title: AppLocalization.text(model.powerAssertions.isChangingDisplayAwake ? "正在处理…" : "保持亮屏"),
                 symbol: "sun.max.fill",
                 isOn: model.powerAssertions.keepDisplayAwake,
-                help: AppLocalization.text("防止用户闲置导致显示器休眠")
+                help: AppLocalization.text("包括合盖时保持亮屏；需要管理员授权，关闭后恢复原有休眠设置。"),
+                isDisabled: model.powerAssertions.isChangingDisplayAwake
             ) {
-                model.powerAssertions.setKeepDisplayAwake(!model.powerAssertions.keepDisplayAwake)
+                Task {
+                    await model.powerAssertions.setKeepDisplayAwakeIncludingLidClose(!model.powerAssertions.keepDisplayAwake)
+                }
             }
 
             ToolToggleButton(

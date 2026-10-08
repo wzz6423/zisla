@@ -2645,3 +2645,6 @@
 "搜索设置" = "Instellingen zoeken";
 "搜索结果" = "Zoekresultaten";
 "未找到设置项" = "Geen instellingen gevonden";
+"包括合盖时保持亮屏；需要管理员授权，关闭后恢复原有休眠设置。" = "Houdt het scherm aan, ook met het deksel dicht. Vereist toestemming van een beheerder; herstelt bij uitschakelen de vorige sluimerinstelling.";
+"无法开启合盖亮屏，请检查管理员授权后重试。" = "Het scherm kon niet aan blijven met het deksel dicht. Controleer de beheerderstoestemming en probeer het opnieuw.";
+"无法恢复休眠设置，请重试关闭保持亮屏。" = "De sluimerinstelling kon niet worden hersteld. Probeer Scherm aanhouden opnieuw uit te schakelen.";

@@ -37,8 +37,7 @@ public final class IOPMPowerAssertionManager: PowerAssertionManaging {
 /// Manages display-on and idle-system-sleep-prevention assertions.
 /// - Display on: `kIOPMAssertPreventUserIdleDisplaySleep`
 /// - Prevent idle system sleep: `kIOPMAssertPreventUserIdleSystemSleep`
-/// Both assertions affect idle behaviour only; macOS still sleeps for lid close, low battery,
-/// user-initiated sleep, or hardware policy.
+/// Manual keep-awake also owns a reversible system sleep override for lid closure.
 @MainActor
 public final class PowerAssertionController: ObservableObject {
     public static let clamshellLimitationHint =
@@ -46,8 +45,13 @@ public final class PowerAssertionController: ObservableObject {
 
     @Published public private(set) var keepDisplayAwake = false
     @Published public private(set) var preventIdleSystemSleep = false
+    @Published public private(set) var isChangingDisplayAwake = false
+    @Published public var displayAwakeError: String?
 
     private let manager: any PowerAssertionManaging
+    private let startLidClosedSession: @Sendable () async throws -> any LidClosedDisplaySession
+    private var lidClosedSession: (any LidClosedDisplaySession)?
+    private var displayRequestRevision = 0
     private var displayAssertionID: IOPMAssertionID = 0
     private var activityDisplayAssertionID: IOPMAssertionID = 0
     private var systemAssertionID: IOPMAssertionID = 0
@@ -60,11 +64,24 @@ public final class PowerAssertionController: ObservableObject {
         self.init(manager: IOPMPowerAssertionManager())
     }
 
-    public init(manager: any PowerAssertionManaging) {
+    public convenience init(manager: any PowerAssertionManaging) {
+        self.init(manager: manager, startLidClosedSession: {
+            try await Task.detached(priority: .userInitiated) {
+                try PMSetLidClosedDisplaySession.start()
+            }.value
+        })
+    }
+
+    init(
+        manager: any PowerAssertionManaging,
+        startLidClosedSession: @escaping @Sendable () async throws -> any LidClosedDisplaySession
+    ) {
         self.manager = manager
+        self.startLidClosedSession = startLidClosedSession
     }
 
     isolated deinit {
+        lidClosedSession?.cancel()
         // IOKit release is safe from any thread for teardown.
         if hasDisplayAssertion {
             _ = manager.release(assertionID: displayAssertionID)
@@ -78,12 +95,62 @@ public final class PowerAssertionController: ObservableObject {
     }
 
     public func setKeepDisplayAwake(_ enabled: Bool) {
+        displayRequestRevision &+= 1
         if enabled {
             acquireDisplay()
         } else {
+            lidClosedSession?.cancel()
+            lidClosedSession = nil
             releaseDisplay()
         }
         keepDisplayAwake = hasDisplayAssertion
+    }
+
+    public func setKeepDisplayAwakeIncludingLidClose(_ enabled: Bool) async {
+        guard !isChangingDisplayAwake else { return }
+        isChangingDisplayAwake = true
+        displayAwakeError = nil
+        displayRequestRevision &+= 1
+        let revision = displayRequestRevision
+        defer { isChangingDisplayAwake = false }
+
+        if enabled {
+            guard lidClosedSession == nil else { return }
+            let alreadyAwake = hasDisplayAssertion
+            acquireDisplay()
+            guard hasDisplayAssertion else {
+                displayAwakeError = "无法开启合盖亮屏，请检查管理员授权后重试。"
+                return
+            }
+            do {
+                let session = try await startLidClosedSession()
+                guard revision == displayRequestRevision else {
+                    session.cancel()
+                    return
+                }
+                lidClosedSession = session
+                keepDisplayAwake = true
+            } catch {
+                guard revision == displayRequestRevision else { return }
+                if !alreadyAwake { releaseDisplay() }
+                displayAwakeError = "无法开启合盖亮屏，请检查管理员授权后重试。"
+            }
+        } else {
+            do {
+                if let session = lidClosedSession {
+                    try await Task.detached(priority: .userInitiated) {
+                        try session.stop()
+                    }.value
+                }
+                guard revision == displayRequestRevision else { return }
+                lidClosedSession = nil
+                releaseDisplay()
+                keepDisplayAwake = false
+            } catch {
+                guard revision == displayRequestRevision else { return }
+                displayAwakeError = "无法恢复休眠设置，请重试关闭保持亮屏。"
+            }
+        }
     }
 
     public func setPreventIdleSystemSleep(_ enabled: Bool) {
@@ -111,6 +178,10 @@ public final class PowerAssertionController: ObservableObject {
     }
 
     public func releaseAll() {
+        displayRequestRevision &+= 1
+        lidClosedSession?.cancel()
+        lidClosedSession = nil
+        displayAwakeError = nil
         releaseDisplay()
         releaseActivityDisplay()
         releaseSystem()
