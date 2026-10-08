@@ -130,7 +130,7 @@ struct IslandSurface<Content: View>: View {
             unifiedSurface
                 .allowsHitTesting(false)
             content()
-            if let resultSweep {
+            if maskIsCollapsed, let resultSweep {
                 AIResultSweepOverlay(controller: resultSweep)
             }
         }
