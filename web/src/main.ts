@@ -398,8 +398,9 @@ const renderSite = (locale: SiteLocale, preserveScroll = false) => {
     })
     .join('');
 
-  const toolMarkup = supportedAITools()
-    .map((tool) => '<span class="tool-chip"><span class="tool-chip-dot"></span>' + escapeHtml(tool) + '</span>')
+  const aiTools = supportedAITools();
+  const toolMarkup = aiTools
+    .map((tool) => '<li class="tool-chip"><span class="tool-chip-dot" aria-hidden="true"></span>' + escapeHtml(tool) + '</li>')
     .join('');
 
   const crossModuleMarkup = crossModuleFeatureIds
@@ -716,14 +717,16 @@ const renderSite = (locale: SiteLocale, preserveScroll = false) => {
     '</p><span>' +
     escapeHtml(content.ai.summaryNote) +
     '</span></aside><div class="ai-detail-list reveal-sequence"><article class="ai-detail reveal-step" style="--reveal-index: 0"><span class="ai-detail-order">01</span><div><h3>' +
-    escapeHtml(content.ai.toolsHeading) +
+    escapeHtml(format(content.ai.toolsHeading, { tools: aiTools.length })) +
     '</h3><p>' +
     escapeHtml(content.ai.toolsLede) +
-    '</p><div class="tool-list" aria-label="' +
+    '</p><ul class="tool-list" aria-label="' +
     escapeHtml(content.ai.toolsAriaLabel) +
     '">' +
     toolMarkup +
-    '</div></div></article><article class="ai-detail reveal-step" style="--reveal-index: 1"><span class="ai-detail-order">02</span><div><h3>' +
+    '</ul>' +
+    (content.ai.usageNote ? '<p class="ai-usage-note">' + escapeHtml(content.ai.usageNote) + '</p>' : '') +
+    '</div></article><article class="ai-detail reveal-step" style="--reveal-index: 1"><span class="ai-detail-order">02</span><div><h3>' +
     escapeHtml(content.ai.boundariesHeading) +
     '</h3><ul class="privacy-list">' +
     content.ai.privacyPoints.map((point) => '<li>' + icon('shield', 15) + '<span>' + escapeHtml(point) + '</span></li>').join('') +
