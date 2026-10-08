@@ -10,7 +10,7 @@ struct LocalVoiceHardwareReaderTests {
         }
         #expect(hardware.processor == .appleSilicon)
         #expect(hardware.physicalMemoryBytes == 51_539_607_552)
-        #expect(LocalVoiceModelRecommendation.recommended(for: hardware) == .qwen35_9B)
+        #expect(LocalVoiceModelRecommendation.recommended(for: hardware) == .gemma4_26BA4B)
     }
 
     @Test(arguments: [Int?.none, 0])
@@ -23,7 +23,7 @@ struct LocalVoiceHardwareReaderTests {
             }
         }
         #expect(hardware.processor == .appleSilicon)
-        #expect(LocalVoiceModelRecommendation.recommended(for: hardware) == .qwen35_9B)
+        #expect(LocalVoiceModelRecommendation.recommended(for: hardware) == .gemma4_12B)
     }
 
     @Test(arguments: [Int?.none, 0])
@@ -36,7 +36,7 @@ struct LocalVoiceHardwareReaderTests {
             }
         }
         #expect(hardware.processor == .intel)
-        #expect(LocalVoiceModelRecommendation.recommended(for: hardware) == .qwen35_2B)
+        #expect(LocalVoiceModelRecommendation.recommended(for: hardware) == .gemma4_E2B)
     }
 
     @Test(arguments: [Int?.none, -1, 2])

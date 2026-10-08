@@ -105,9 +105,15 @@ public struct AIChatClient: Sendable {
             messages: messages,
             effort: effort
         )
-        if localInference, endpoint.kind == .ollama,
-           model.lowercased().split(separator: ":").first == "qwen3.5" {
-            body["reasoning_effort"] = "none"
+        if localInference, protocolKind == .openAICompatible {
+            body["temperature"] = 0
+            let family = model.lowercased().split(separator: ":").first
+            let supportsNonThinking = endpoint.kind == .ollama
+                ? family == "qwen3.5" || family == "gemma4"
+                : model.lowercased().hasPrefix("google/gemma-4-")
+            if supportsNonThinking {
+                body["reasoning_effort"] = "none"
+            }
         }
         request.httpBody = try JSONSerialization.data(withJSONObject: body)
         let (data, response) = try await session.data(for: request)

@@ -3235,14 +3235,17 @@ final class AppModel: ObservableObject {
           ),
           messages: VoiceTranscriptPostProcessor.messages(
             for: rawTranscript,
-            lexiconNormalizedTranscript: lexiconNormalizedTranscript
+            lexiconNormalizedTranscript: lexiconNormalizedTranscript,
+            enabledLexicons: enabledVoiceLexicons,
+            customHotwords: customVoiceHotwords
           )
         )
         guard !Task.isCancelled else { return }
         let delivered = VoiceLexicon.normalizeTranscript(
           VoiceTranscriptPostProcessor.deliveredText(
             response,
-            fallback: lexiconNormalizedTranscript
+            fallback: lexiconNormalizedTranscript,
+            customHotwords: customVoiceHotwords
           ),
           for: enabledVoiceLexicons,
           customTerms: customVoiceHotwords,

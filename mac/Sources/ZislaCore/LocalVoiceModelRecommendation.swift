@@ -17,37 +17,37 @@ public struct LocalVoiceHardware: Equatable, Sendable {
 }
 
 public enum LocalVoiceModelRecommendation: CaseIterable, Equatable, Sendable {
-    case qwen35_08B
-    case qwen35_2B
-    case qwen35_4B
-    case qwen35_9B
+    case gemma4_E2B
+    case gemma4_E4B
+    case gemma4_12B
+    case gemma4_26BA4B
 
     public var displayName: String {
         switch self {
-        case .qwen35_08B: "Qwen3.5-0.8B Q8_0"
-        case .qwen35_2B: "Qwen3.5-2B Q4_K_M"
-        case .qwen35_4B: "Qwen3.5-4B Q4_K_M"
-        case .qwen35_9B: "Qwen3.5-9B Q4_K_M"
+        case .gemma4_E2B: "Gemma 4 E2B QAT"
+        case .gemma4_E4B: "Gemma 4 E4B QAT"
+        case .gemma4_12B: "Gemma 4 12B QAT"
+        case .gemma4_26BA4B: "Gemma 4 26B A4B QAT"
         }
     }
 
     public var ollamaModelID: String {
         switch self {
-        case .qwen35_08B: "qwen3.5:0.8b-q8_0"
-        case .qwen35_2B: "qwen3.5:2b-q4_K_M"
-        case .qwen35_4B: "qwen3.5:4b-q4_K_M"
-        case .qwen35_9B: "qwen3.5:9b-q4_K_M"
+        case .gemma4_E2B: "gemma4:e2b-it-qat"
+        case .gemma4_E4B: "gemma4:e4b-it-qat"
+        case .gemma4_12B: "gemma4:12b-it-qat"
+        case .gemma4_26BA4B: "gemma4:26b-a4b-it-qat"
         }
     }
 
     // These are rounded download sizes, including the projector, not runtime memory estimates.
-    // Verified against https://ollama.com/library/qwen3.5/tags on 2026-10-08.
+    // Verified against https://ollama.com/library/gemma4/tags on 2026-10-08.
     public var approximateOllamaDownloadGigabytes: Double {
         switch self {
-        case .qwen35_08B: 1.0
-        case .qwen35_2B: 1.9
-        case .qwen35_4B: 3.3
-        case .qwen35_9B: 6.6
+        case .gemma4_E2B: 4.3
+        case .gemma4_E4B: 6.1
+        case .gemma4_12B: 7.2
+        case .gemma4_26BA4B: 16.0
         }
     }
 
@@ -55,16 +55,18 @@ public enum LocalVoiceModelRecommendation: CaseIterable, Equatable, Sendable {
         let gibibyte: UInt64 = 1_024 * 1_024 * 1_024
         guard hardware.physicalMemoryBytes >= 8 * gibibyte else { return nil }
 
-        // Leave headroom for macOS, other apps, and a modest context. This is a conservative
-        // starting point for text cleanup, not a guarantee based on currently free memory.
+        // Leave headroom for macOS, other apps, and a modest context. Full weights include
+        // E2B/E4B embeddings and all MoE experts (https://ai.google.dev/gemma/docs/core).
+        // This is a text-cleanup starting point, not a guarantee based on currently free memory.
         switch hardware.processor {
         case .appleSilicon:
-            if hardware.physicalMemoryBytes >= 24 * gibibyte { return .qwen35_9B }
-            if hardware.physicalMemoryBytes >= 12 * gibibyte { return .qwen35_4B }
-            return .qwen35_2B
+            if hardware.physicalMemoryBytes >= 48 * gibibyte { return .gemma4_26BA4B }
+            if hardware.physicalMemoryBytes >= 24 * gibibyte { return .gemma4_12B }
+            if hardware.physicalMemoryBytes >= 16 * gibibyte { return .gemma4_E4B }
+            return .gemma4_E2B
         case .intel:
             // CPU inference stays on smaller models even when plenty of RAM is installed.
-            return hardware.physicalMemoryBytes >= 16 * gibibyte ? .qwen35_2B : .qwen35_08B
+            return .gemma4_E2B
         case .unknown:
             return nil
         }
