@@ -168,17 +168,17 @@ export const downloadLinks: readonly DownloadLink[] = [
 ];
 
 export const latestRelease = {
-  version: 'v0.1.16',
-  date: '2026-10-05',
+  version: 'v0.1.17',
+  date: '2026-10-08',
   channel: 'Release',
-  releasePage: 'https://github.com/wzz6423/zisla/releases/tag/v0.1.16',
-  dmg: 'https://github.com/wzz6423/zisla/releases/download/v0.1.16/zisla-v0.1.16-macOS-arm64.dmg',
-  zip: 'https://github.com/wzz6423/zisla/releases/download/v0.1.16/zisla-v0.1.16-macOS-arm64.zip',
-  checksum: 'https://github.com/wzz6423/zisla/releases/download/v0.1.16/zisla-v0.1.16-macOS-arm64.zip.sha256',
-  universalDmg: 'https://github.com/wzz6423/zisla/releases/download/v0.1.16/zisla-v0.1.16-macOS-universal.dmg',
-  universalZip: 'https://github.com/wzz6423/zisla/releases/download/v0.1.16/zisla-v0.1.16-macOS-universal.zip',
-  intelDmg: 'https://github.com/wzz6423/zisla/releases/download/v0.1.16/zisla-v0.1.16-macOS-x86_64.dmg',
-  intelZip: 'https://github.com/wzz6423/zisla/releases/download/v0.1.16/zisla-v0.1.16-macOS-x86_64.zip',
+  releasePage: 'https://github.com/wzz6423/zisla/releases/tag/v0.1.17',
+  dmg: 'https://github.com/wzz6423/zisla/releases/download/v0.1.17/zisla-v0.1.17-macOS-arm64.dmg',
+  zip: 'https://github.com/wzz6423/zisla/releases/download/v0.1.17/zisla-v0.1.17-macOS-arm64.zip',
+  checksum: 'https://github.com/wzz6423/zisla/releases/download/v0.1.17/zisla-v0.1.17-macOS-arm64.zip.sha256',
+  universalDmg: 'https://github.com/wzz6423/zisla/releases/download/v0.1.17/zisla-v0.1.17-macOS-universal.dmg',
+  universalZip: 'https://github.com/wzz6423/zisla/releases/download/v0.1.17/zisla-v0.1.17-macOS-universal.zip',
+  intelDmg: 'https://github.com/wzz6423/zisla/releases/download/v0.1.17/zisla-v0.1.17-macOS-x86_64.dmg',
+  intelZip: 'https://github.com/wzz6423/zisla/releases/download/v0.1.17/zisla-v0.1.17-macOS-x86_64.zip',
   previewPage: 'https://github.com/wzz6423/zisla/releases/tag/v0.1.3-preview.1',
 };
 
@@ -194,6 +194,18 @@ export interface ChangelogEntry {
  * 统一以英文原文展示（11 版 × 17 语翻译不可维护）；v0.1.8/v0.1.0 无 Highlights 段，取其正文概述。
  */
 export const changelogEntries: readonly ChangelogEntry[] = [
+  {
+    version: 'v0.1.17',
+    date: '2026-10-08',
+    notes: [
+      'File dragging and shaking now opens a dedicated Share target beside the file shelf, reusing the native macOS sharing picker.',
+      'Refreshing the inbox requests new mail, and the message list supports pull-to-refresh while preserving loaded messages and pagination.',
+      'Inactive media metadata is cleared more reliably, and application icons recover when a previously missing icon becomes available.',
+      "Copying an annotated screenshot after changing a selected shape's color no longer leaves an opaque black editor surface during teardown.",
+      'Dock and full-screen window previews have more reliable window discovery and preview lifecycle handling.',
+      'Keep Screen On now manages an administrator-authorized lid-close sleep-prevention session and restores the original power setting when it ends, with authorization and restoration errors shown in all 17 languages.',
+    ],
+  },
   {
     version: 'v0.1.16',
     date: '2026-10-05',
