@@ -42,7 +42,7 @@ enum AIEndpointSecurity {
         }
         if scheme == "https" { return true }
         guard scheme == "http" else { return false }
-        return host == "localhost" || host == "::1" || isIPv4Loopback(host)
+        return host == "localhost" || host == "::1" || host == "[::1]" || isIPv4Loopback(host)
     }
 
     private static func isIPv4Loopback(_ host: String) -> Bool {

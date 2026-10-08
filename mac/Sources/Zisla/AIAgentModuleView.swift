@@ -657,10 +657,7 @@ private struct AILocalModelConfigurationRow: View {
     let model: AIAgentLocalModel
     @State private var apiKey = ""
     @State private var credentialError: String?
-    @State private var discoveredModels: [AIDiscoveredModel]?
-    @State private var discoveryError: String?
-    @State private var discoveryTask: Task<Void, Never>?
-    @State private var discoveryGeneration = 0
+    @StateObject private var discovery = LocalModelDiscoveryState()
 
     var body: some View {
         VStack(alignment: .leading, spacing: 7) {
@@ -701,31 +698,40 @@ private struct AILocalModelConfigurationRow: View {
                 .help(AppLocalization.text("删除本地模型"))
             }
             HStack(spacing: 7) {
-                TextField(AppLocalization.text("模型名"), text: Binding(
-                    get: { model.modelName },
-                    set: { value in update { $0.modelName = value } }
-                ))
-                .textFieldStyle(.roundedBorder)
-                .accessibilityLabel(AppLocalization.text("模型名"))
-                if let models = discoveredModels, !models.isEmpty {
-                    Menu {
-                        ForEach(models) { discovered in
-                            Button(discovered.name) { update { $0.modelName = discovered.name } }
+                if let models = discovery.catalog?.models, !models.isEmpty {
+                    Picker(AppLocalization.text("选择已发现的模型"), selection: Binding(
+                        get: { model.modelName },
+                        set: { value in update { $0.modelName = value } }
+                    )) {
+                        Text(AppLocalization.text("尚未选择模型")).tag("")
+                        if !model.modelName.isEmpty, !models.contains(where: { $0.name == model.modelName }) {
+                            Text(model.modelName).tag(model.modelName)
                         }
-                    } label: { Image(systemName: "list.bullet") }
-                    .menuStyle(.borderlessButton)
-                    .fixedSize()
+                        ForEach(models) { discovered in
+                            Text(discovered.name).tag(discovered.name)
+                        }
+                    }
+                    .labelsHidden()
+                    .pickerStyle(.menu)
+                    .frame(maxWidth: .infinity)
                     .accessibilityLabel(AppLocalization.text("选择已发现的模型"))
-                    .help(AppLocalization.text("选择已发现的模型"))
+                } else {
+                    TextField(AppLocalization.text("模型名"), text: Binding(
+                        get: { model.modelName },
+                        set: { value in update { $0.modelName = value } }
+                    ))
+                    .textFieldStyle(.roundedBorder)
+                    .accessibilityLabel(AppLocalization.text("模型名"))
                 }
                 SecureField(AppLocalization.text("API Key（可选）"), text: Binding(
                     get: { apiKey },
                     set: { value in
                         apiKey = value
-                        resetDiscovery()
+                        discovery.cancel()
                         do {
                             try store.replaceLocalModelSecret(value, for: model.id)
                             credentialError = nil
+                            discoverModels(delay: .milliseconds(350))
                         } catch {
                             credentialError = AppLocalization.text("无法保存模型凭据")
                         }
@@ -734,8 +740,8 @@ private struct AILocalModelConfigurationRow: View {
                 .textFieldStyle(.roundedBorder)
                 .frame(width: 135)
                 .accessibilityLabel(AppLocalization.text("API Key（可选）"))
-                Button(action: discoverModels) {
-                    if discoveryTask != nil {
+                Button { discoverModels() } label: {
+                    if discovery.isLoading {
                         ProgressView().controlSize(.small)
                     } else {
                         Text(AppLocalization.text("获取模型"))
@@ -744,14 +750,28 @@ private struct AILocalModelConfigurationRow: View {
                 .buttonStyle(.bordered)
                 .controlSize(.small)
                 .fixedSize()
-                .disabled(!model.isEnabled || discoveryTask != nil || credentialError != nil)
+                .disabled(!model.isEnabled || discovery.isLoading || credentialError != nil)
             }
             Text(AppLocalization.text("默认无需 API Key；仅在本地服务启用认证时填写。"))
                 .font(.system(size: 10))
                 .foregroundStyle(.secondary)
-            if let error = credentialError ?? discoveryError {
+            if let error = credentialError ?? discovery.error {
                 Text(error).font(.system(size: 10)).foregroundStyle(.red)
-            } else if discoveredModels?.isEmpty == true {
+            }
+            if let catalog = discovery.catalog, catalog.serverState != .ready {
+                Text(AppLocalization.text("LM Studio API 无法连接。请启动服务或检查地址和端口。"))
+                    .font(.system(size: 10))
+                    .foregroundStyle(.secondary)
+                if catalog.serverState == .stopped {
+                    Button(AppLocalization.text("启动 LM Studio 服务")) {
+                        discoverModels(action: .startServer)
+                    }
+                    .buttonStyle(.bordered)
+                    .controlSize(.small)
+                    .disabled(!model.isEnabled || discovery.isLoading || credentialError != nil)
+                }
+            }
+            if discovery.catalog?.models.isEmpty == true {
                 Text(AppLocalization.text("未发现模型，请先在本地服务中下载或加载模型。"))
                     .font(.system(size: 10))
                     .foregroundStyle(.secondary)
@@ -763,13 +783,15 @@ private struct AILocalModelConfigurationRow: View {
         .task(id: model.id) {
             do {
                 apiKey = try store.secret(for: model) ?? ""
+                credentialError = nil
+                discoverModels()
             } catch {
                 credentialError = AppLocalization.text("无法读取模型凭据")
             }
         }
-        .onChange(of: model.endpoint) { resetDiscovery() }
-        .onChange(of: model.isEnabled) { resetDiscovery() }
-        .onDisappear { resetDiscovery() }
+        .onChange(of: model.endpoint) { discoverModels(delay: .milliseconds(350)) }
+        .onChange(of: model.isEnabled) { discoverModels() }
+        .onDisappear { discovery.cancel() }
     }
 
     private func update(_ change: (inout AIAgentLocalModel) -> Void) {
@@ -778,29 +800,13 @@ private struct AILocalModelConfigurationRow: View {
         store.upsertLocalModel(configuration)
     }
 
-    private func discoverModels() {
-        resetDiscovery()
-        let generation = discoveryGeneration
-        discoveryTask = Task { @MainActor in
-            do {
-                let key = try store.secret(for: model)
-                let models = try await AIModelDiscoveryService().models(for: model.endpoint, apiKey: key)
-                guard !Task.isCancelled, discoveryGeneration == generation else { return }
-                discoveredModels = models
-                discoveryTask = nil
-            } catch {
-                guard !Task.isCancelled, discoveryGeneration == generation else { return }
-                discoveryError = error.localizedDescription
-                discoveryTask = nil
-            }
-        }
-    }
-
-    private func resetDiscovery() {
-        discoveryTask?.cancel()
-        discoveryTask = nil
-        discoveryGeneration &+= 1
-        discoveredModels = nil
-        discoveryError = nil
+    private func discoverModels(action: LocalModelDiscoveryState.Action = .discover, delay: Duration = .zero) {
+        discovery.refresh(
+            endpoint: model.endpoint,
+            apiKey: apiKey,
+            isEnabled: model.isEnabled && credentialError == nil,
+            action: action,
+            delay: delay
+        )
     }
 }

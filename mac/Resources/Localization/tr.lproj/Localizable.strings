@@ -2667,3 +2667,7 @@
 "在 LM Studio 中搜索此名称并选择对应量化版本。加载后，从服务模型列表选择实际模型 ID。" = "LM Studio’da bu adı arayın ve uygun kuantizasyon sürümünü seçin. Yükledikten sonra hizmetin model listesinden gerçek model kimliğini seçin.";
 "请在 LM Studio 中关闭思考模式，以便快速整理转写文本。" = "Döküm metnini daha hızlı düzenlemek için LM Studio’da düşünme modunu kapatın.";
 "硬件信息不可用或内存不足 8 GiB，暂不自动推荐。你仍可手动选择已安装的模型。" = "Donanım bilgileri kullanılamıyor veya bellek 8 GiB’nin altında olduğundan otomatik model önerilmiyor. Yüklü bir modeli yine de elle seçebilirsiniz.";
+"未找到 LM Studio CLI。请在 LM Studio 中启动 API 服务后重试。" = "LM Studio CLI bulunamadı. LM Studio’da API sunucusunu başlatıp yeniden deneyin.";
+"LM Studio 操作失败，请在 LM Studio 中检查本地服务后重试。" = "LM Studio işlemi başarısız oldu. LM Studio’daki yerel sunucuyu kontrol edip yeniden deneyin.";
+"LM Studio API 无法连接。请启动服务或检查地址和端口。" = "LM Studio API’sine bağlanılamıyor. Sunucuyu başlatın veya adresi ve bağlantı noktasını kontrol edin.";
+"启动 LM Studio 服务" = "LM Studio sunucusunu başlat";

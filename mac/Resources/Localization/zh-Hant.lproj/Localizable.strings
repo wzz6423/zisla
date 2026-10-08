@@ -2666,3 +2666,7 @@
 "在 LM Studio 中搜索此名称并选择对应量化版本。加载后，从服务模型列表选择实际模型 ID。" = "在 LM Studio 中搜尋此名稱並選擇對應量化版本。載入後，從服務模型清單選擇實際模型 ID。";
 "请在 LM Studio 中关闭思考模式，以便快速整理转写文本。" = "請在 LM Studio 中關閉思考模式，以便快速整理轉寫文字。";
 "硬件信息不可用或内存不足 8 GiB，暂不自动推荐。你仍可手动选择已安装的模型。" = "硬體資訊不可用或記憶體不足 8 GiB，暫不自動推薦。你仍可手動選擇已安裝的模型。";
+"未找到 LM Studio CLI。请在 LM Studio 中启动 API 服务后重试。" = "未找到 LM Studio CLI。請在 LM Studio 中啟動 API 服務後重試。";
+"LM Studio 操作失败，请在 LM Studio 中检查本地服务后重试。" = "LM Studio 操作失敗，請在 LM Studio 中檢查本機服務後重試。";
+"LM Studio API 无法连接。请启动服务或检查地址和端口。" = "無法連線至 LM Studio API。請啟動服務或檢查位址與連接埠。";
+"启动 LM Studio 服务" = "啟動 LM Studio 服務";

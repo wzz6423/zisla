@@ -2667,3 +2667,7 @@
 "在 LM Studio 中搜索此名称并选择对应量化版本。加载后，从服务模型列表选择实际模型 ID。" = "Tìm tên này trong LM Studio và chọn phiên bản lượng tử hóa tương ứng. Sau khi nạp, chọn ID mô hình thực tế từ danh sách mô hình của dịch vụ.";
 "请在 LM Studio 中关闭思考模式，以便快速整理转写文本。" = "Tắt chế độ suy nghĩ trong LM Studio để chỉnh lý bản chép lời nhanh hơn.";
 "硬件信息不可用或内存不足 8 GiB，暂不自动推荐。你仍可手动选择已安装的模型。" = "Không có thông tin phần cứng hoặc bộ nhớ dưới 8 GiB nên chưa tự động đề xuất mô hình. Bạn vẫn có thể chọn thủ công mô hình đã cài đặt.";
+"未找到 LM Studio CLI。请在 LM Studio 中启动 API 服务后重试。" = "Không tìm thấy LM Studio CLI. Hãy khởi động máy chủ API trong LM Studio rồi thử lại.";
+"LM Studio 操作失败，请在 LM Studio 中检查本地服务后重试。" = "Thao tác LM Studio thất bại. Hãy kiểm tra máy chủ cục bộ trong LM Studio rồi thử lại.";
+"LM Studio API 无法连接。请启动服务或检查地址和端口。" = "Không thể kết nối với API LM Studio. Hãy khởi động máy chủ hoặc kiểm tra địa chỉ và cổng.";
+"启动 LM Studio 服务" = "Khởi động máy chủ LM Studio";

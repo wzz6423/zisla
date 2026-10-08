@@ -2663,3 +2663,7 @@
 "在 LM Studio 中搜索此名称并选择对应量化版本。加载后，从服务模型列表选择实际模型 ID。" = "Recherchez ce nom dans LM Studio et choisissez la quantification correspondante. Après le chargement, sélectionnez l’ID réel du modèle dans la liste du service.";
 "请在 LM Studio 中关闭思考模式，以便快速整理转写文本。" = "Désactivez le mode de réflexion dans LM Studio pour corriger les transcriptions plus rapidement.";
 "硬件信息不可用或内存不足 8 GiB，暂不自动推荐。你仍可手动选择已安装的模型。" = "Les informations matérielles sont indisponibles ou la mémoire est inférieure à 8 GiB ; aucun modèle n’est donc conseillé automatiquement. Vous pouvez toujours choisir manuellement un modèle installé.";
+"未找到 LM Studio CLI。请在 LM Studio 中启动 API 服务后重试。" = "LM Studio CLI est introuvable. Démarrez le serveur API dans LM Studio et réessayez.";
+"LM Studio 操作失败，请在 LM Studio 中检查本地服务后重试。" = "L’opération LM Studio a échoué. Vérifiez le serveur local dans LM Studio et réessayez.";
+"LM Studio API 无法连接。请启动服务或检查地址和端口。" = "Connexion impossible à l’API LM Studio. Démarrez le serveur ou vérifiez l’adresse et le port.";
+"启动 LM Studio 服务" = "Démarrer le serveur LM Studio";
