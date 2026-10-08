@@ -1987,6 +1987,10 @@
 "已移到废纸篓" = "Çöp Kutusu'na taşındı";
 "开始自动滚动" = "Otomatik kaydırmayı başlat";
 "截图.png" = "Ekran görüntüsü.png";
+"暂存" = "Geçici sakla";
+"暂存截图" = "Saklanan ekran görüntüleri";
+"预览" = "Önizleme";
+"无法打开截图数据库" = "Ekran görüntüsü veritabanı açılamıyor";
 "找不到显示器" = "Ekran bulunamadı";
 "授权磁盘访问" = "Disk erişimi ver";
 "播放原始录音" = "Özgün kaydı çal";

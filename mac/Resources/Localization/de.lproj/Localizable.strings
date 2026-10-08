@@ -1988,6 +1988,10 @@
 "已移到废纸篓" = "In den Papierkorb gelegt";
 "开始自动滚动" = "Automatisches Scrollen starten";
 "截图.png" = "Screenshot.png";
+"暂存" = "Zwischenlagern";
+"暂存截图" = "Zwischengelagerte Screenshots";
+"预览" = "Vorschau";
+"无法打开截图数据库" = "Screenshot-Datenbank kann nicht geöffnet werden";
 "找不到显示器" = "Kein Display gefunden";
 "授权磁盘访问" = "Festplattenzugriff erlauben";
 "播放原始录音" = "Originalaufnahme abspielen";
