@@ -372,6 +372,17 @@ public enum VoiceLexicon: String, Codable, CaseIterable, Identifiable, Sendable,
         return normalizeSpelling(contextual, terms: custom)
     }
 
+    public static func literalTextCounts(in transcript: String) -> [Data: Int] {
+        let source = transcript as NSString
+        var counts: [Data: Int] = [:]
+        for range in literalRanges(in: transcript).rangeView {
+            let literal = source.substring(with: NSRange(location: range.lowerBound, length: range.count))
+            // Byte keys preserve the exact Unicode spelling, not just canonically equivalent text.
+            counts[Data(literal.utf8), default: 0] += 1
+        }
+        return counts
+    }
+
     private static func normalizeSpelling(_ transcript: String, terms: [String]) -> String {
         let source = transcript as NSString
         var replacements: [(range: NSRange, term: String)] = []

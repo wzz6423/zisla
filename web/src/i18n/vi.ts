@@ -101,7 +101,7 @@ export const vi = createCatalog({
         detail: 'Dock và Command-Tab · Nhấp để chuyển cửa sổ · Mặc định tắt',
       },
       capture: { title: 'Ảnh chụp, ảnh cuộn và ghim', description: 'Chụp hoặc ghim một phần màn hình bằng phím tắt toàn cục, thêm chú thích, ghép ảnh cuộn và nhận dạng hoặc xuất bảng. Chú thích đang sửa vẫn được giữ khi xuất. Tùy chỉnh phím tắt chụp màn hình, ghim ảnh, chụp cuộn và công cụ chú thích. Cài đặt kiểm tra xung đột với chụp ảnh, nhập giọng nói và Thao tác nhanh; dùng riêng phím bổ trợ cần quyền Giám sát đầu vào.', detail: 'Phím tắt tùy chỉnh · Kiểm tra xung đột · Giữ chú thích khi xuất' },
-      voice: { title: 'Nhập giọng nói và làm sạch', description: 'Bật bằng phím hoặc giữ để nói, dùng nhận dạng giọng nói hệ thống. Thêm từ vựng, từ nóng tùy chỉnh, định dạng có cấu trúc hoặc làm sạch bằng mô hình cục bộ hay từ xa.', detail: 'Hai chế độ ghi âm · Từ vựng và từ nóng · Làm sạch tùy chọn' },
+      voice: { title: 'Nhập giọng nói và làm sạch', description: 'Nhấn phím để bật/tắt hoặc giữ để nói với tính năng nhận dạng giọng nói của hệ thống, từ vựng chuyên ngành và từ tùy chỉnh. Có thể dùng Ollama, LM Studio hoặc mô hình từ xa để sửa bản chép lời mà vẫn giữ nguyên ý nghĩa và định dạng các mục được liệt kê rõ ràng.', detail: 'Hai chế độ ghi âm · Từ vựng và từ nóng · Làm sạch tùy chọn' },
       media: { title: 'Phương tiện và âm thanh nền hệ thống', description: 'Điều khiển nội dung đang phát từ đầu đảo hoặc chọn âm thanh nền macOS. Âm thanh có thể tự dừng khi khóa màn hình, bật trình bảo vệ hoặc màn hình ngủ.', detail: 'Điều khiển phát · Lời bài hát đồng bộ · Tự dừng âm thanh' },
       browserDownloads: { title: 'Tiến trình tải xuống trình duyệt', description: 'Phát hiện tải xuống từ Safari, Chrome, Edge, Firefox, Brave, Vivaldi, Opera và Arc, hiển thị nguồn và tiến trình trực tiếp ở trên.', detail: '8 trình duyệt · Nhận dạng nguồn · Thông báo hoàn tất' },
       copyAssistant: { title: 'Thao tác nhanh và bước tiếp theo', description: 'Khi bật, văn bản, liên kết, tệp hoặc ảnh đã sao chép được xem trước trong thanh riêng, kèm đề xuất mở, hiện trong Finder, tìm kiếm, dịch, tính toán hoặc lưu chỉ sau khi bạn xác nhận. Mở thư mục chứa tệp qua Thao tác nhanh sau khi tải bằng trình duyệt hoặc nhận qua AirDrop. Hỗ trợ thư mục tải mặc định và tự chọn của Chrome, với công tắc riêng so với hiển thị tiến trình tải.', detail: 'Bật tùy chọn · Nhận dạng cục bộ · Command+N mặc định' },
@@ -211,7 +211,19 @@ export const vi = createCatalog({
       <p>Bạn có thể tắt tính năng trong cài đặt ứng dụng hoặc thu hồi quyền bất cứ lúc nào tại Cài đặt hệ thống → Quyền riêng tư &amp; Bảo mật. Thu hồi một quyền chỉ tắt tính năng liên quan và không ảnh hưởng các mô-đun khác. Tên mục có thể hơi khác giữa các phiên bản macOS.</p>
     `.trim(),
       },
-      network: { question: 'zisla có kết nối mạng không?', answer: 'Thời tiết, kiểm tra cập nhật có chữ ký, lượt tải bạn khởi động và làm sạch giọng nói từ xa tùy chọn dùng mạng khi cần. Nhận dạng liên kết clipboard chạy cục bộ.' },
+      localVoice: {
+        question: 'Làm thế nào để dùng mô hình cục bộ chỉnh sửa bản chép lời?',
+        answer: `
+      <p>Hỗ trợ Ollama, LM Studio và các dịch vụ cục bộ khác tương thích với OpenAI.</p>
+      <ol>
+        <li>Tải xuống hoặc nạp mô hình mong muốn trong ứng dụng mô hình cục bộ, rồi khởi động dịch vụ.</li>
+        <li>Mở Cài đặt → Giọng nói → Mô hình Cục bộ, thêm và bật cấu hình, chọn Ollama hoặc LM Studio rồi nhập URL dịch vụ. Với dịch vụ khác tương thích OpenAI, cũng chọn LM Studio. Để trống API Key nếu dịch vụ không yêu cầu xác thực.</li>
+        <li>Chọn một mô hình được tự động tìm thấy, rồi chọn cấu hình đó trong Mô hình Tổ chức Giọng nói → Sử dụng Mô hình.</li>
+      </ol>
+      <p>zisla đề xuất mô hình Gemma 4 QAT dựa trên chip và tổng dung lượng RAM. Mô hình được đề xuất không được tự động tải xuống hay nạp.</p>
+    `.trim(),
+      },
+      network: { question: 'zisla có kết nối mạng không?', answer: 'Thời tiết, kiểm tra cập nhật có chữ ký, lượt tải bạn khởi động và làm sạch giọng nói từ xa tùy chọn dùng mạng khi cần. Nhận dạng liên kết clipboard chạy cục bộ. Mô hình cục bộ chỉnh sửa văn bản sau khi chép lời; nhận dạng giọng nói của Apple vẫn có thể dùng mạng, tùy vào ngôn ngữ và khả năng hỗ trợ của hệ thống.' },
       multiDisplay: { question: 'zisla có hỗ trợ nhiều màn hình không?', answer: 'Có: nhiều màn hình, Spaces và ứng dụng toàn màn hình thông thường; mở rộng không lấy tiêu điểm.' },
       intel: { question: 'Có thể dùng trên Mac Intel không?', answer: 'Có thể có bản dựng cho Intel nhưng không đảm bảo tương thích. Cấu hình được hỗ trợ hiện tại là Apple Silicon.' },
       storage: { question: 'zisla lưu dữ liệu ở đâu?', answer: 'Dữ liệu cục bộ nằm tại ~/Library/Application Support/zisla/. Thống kê gõ được lưu riêng tại ~/Library/Application Support/zisla/typing-stats.sqlite3. Ghi chú nhanh dùng ứng dụng Ghi chú hệ thống.' },

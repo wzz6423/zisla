@@ -101,7 +101,7 @@ export const id = createCatalog({
         detail: 'Dock dan Command-Tab · Klik untuk beralih jendela · Nonaktif secara default',
       },
       capture: { title: 'Tangkapan, tangkapan gulir, dan pin', description: 'Tangkap atau pin bagian layar dengan pintasan global, beri anotasi, gabungkan tangkapan gulir, serta kenali atau ekspor tabel. Anotasi teks yang masih diedit tetap tersimpan saat ekspor. Sesuaikan pintasan tangkapan layar, penyematan, tangkapan bergulir, dan alat anotasi. Pengaturan memeriksa konflik dengan tangkapan, input suara, dan Tindakan Cepat; pemicu dengan tombol pengubah saja memerlukan izin Pemantauan Input.', detail: 'Pintasan khusus · Pemeriksaan konflik · Anotasi dipertahankan saat ekspor' },
-      voice: { title: 'Input suara dan pembersihan', description: 'Beralih dengan tombol atau tahan untuk berbicara memakai pengenal suara sistem. Tambahkan kosakata, kata khusus, format terstruktur, atau pembersihan oleh model lokal maupun jarak jauh.', detail: 'Dua mode rekaman · Kosakata dan kata khusus · Pembersihan opsional' },
+      voice: { title: 'Input suara dan pembersihan', description: 'Tekan tombol untuk beralih atau tahan untuk berbicara dengan pengenalan suara sistem, kosakata khusus bidang, dan kata khusus Anda. Jika diinginkan, gunakan Ollama, LM Studio, atau model jarak jauh untuk mengoreksi transkrip tanpa mengubah maknanya dan memformat hal-hal yang disebutkan sebagai daftar secara jelas.', detail: 'Dua mode rekaman · Kosakata dan kata khusus · Pembersihan opsional' },
       media: { title: 'Media dan suara latar sistem', description: 'Kendalikan pemutaran dari bagian atas pulau atau pilih suara latar macOS. Suara dapat berhenti saat layar terkunci, screensaver dimulai, atau layar tidur.', detail: 'Kontrol pemutaran · Lirik tersinkron · Berhenti otomatis' },
       browserDownloads: { title: 'Progres unduhan browser', description: 'Mendeteksi unduhan Safari, Chrome, Edge, Firefox, Brave, Vivaldi, Opera, dan Arc, lalu menampilkan sumber serta progres langsung di atas.', detail: '8 browser · Deteksi sumber · Pemberitahuan selesai' },
       copyAssistant: { title: 'Tindakan Cepat dan langkah berikutnya', description: 'Setelah diaktifkan, teks, tautan, berkas, atau gambar yang disalin dipratinjau di bilah terpisah dengan saran buka, tampilkan di Finder, cari, terjemahkan, hitung, atau simpan—hanya setelah Anda mengonfirmasi. Buka folder berkas melalui Tindakan Cepat setelah unduhan browser atau transfer AirDrop. Mendukung folder unduhan bawaan dan pilihan di Chrome, dengan sakelar terpisah dari tampilan progres unduhan.', detail: 'Sakelar opsional · Pengenalan lokal · Command+N sebagai default' },
@@ -211,7 +211,19 @@ export const id = createCatalog({
       <p>Anda dapat menonaktifkan fitur di pengaturan aplikasi, atau mencabut izin kapan saja melalui Pengaturan Sistem → Privasi &amp; Keamanan. Mencabut satu izin hanya menonaktifkan fitur terkait dan tidak memengaruhi modul lain. Nama item dapat sedikit berbeda di berbagai versi macOS.</p>
     `.trim(),
       },
-      network: { question: 'Apakah zisla terhubung ke internet?', answer: 'Cuaca, pemeriksaan pembaruan bertanda tangan, unduhan yang Anda mulai, dan pembersihan suara jarak jauh opsional menggunakan jaringan sesuai kebutuhan. Deteksi tautan clipboard berjalan lokal.' },
+      localVoice: {
+        question: 'Bagaimana cara memakai model lokal untuk merapikan transkrip suara?',
+        answer: `
+      <p>Ollama, LM Studio, dan layanan lokal lain yang kompatibel dengan OpenAI didukung.</p>
+      <ol>
+        <li>Unduh atau muat model yang diinginkan di aplikasi model lokal, lalu jalankan layanannya.</li>
+        <li>Buka Pengaturan → Suara → Model Lokal, tambahkan dan aktifkan konfigurasi, pilih Ollama atau LM Studio, lalu masukkan URL layanan. Untuk layanan lain yang kompatibel dengan OpenAI, pilih LM Studio juga. Biarkan API Key kosong jika layanan tidak memerlukan autentikasi.</li>
+        <li>Pilih model yang ditemukan secara otomatis, lalu pilih konfigurasi tersebut di Model Organisasi Suara → Gunakan Model.</li>
+      </ol>
+      <p>zisla menyarankan model Gemma 4 QAT berdasarkan chip dan total RAM. Model yang disarankan tidak diunduh atau dimuat secara otomatis.</p>
+    `.trim(),
+      },
+      network: { question: 'Apakah zisla terhubung ke internet?', answer: 'Cuaca, pemeriksaan pembaruan bertanda tangan, unduhan yang Anda mulai, dan pembersihan suara jarak jauh opsional menggunakan jaringan sesuai kebutuhan. Deteksi tautan clipboard berjalan lokal. Model lokal merapikan teks setelah transkripsi; pengenalan suara Apple masih dapat menggunakan jaringan, bergantung pada bahasa dan dukungan sistem.' },
       multiDisplay: { question: 'Apakah zisla mendukung banyak layar?', answer: 'Ya: banyak layar, Spaces, dan aplikasi layar penuh biasa; membuka tidak mengambil fokus.' },
       intel: { question: 'Bisakah digunakan di Mac Intel?', answer: 'Build Intel mungkin tersedia, tetapi kompatibilitas tidak dijamin. Konfigurasi yang didukung saat ini adalah Apple Silicon.' },
       storage: { question: 'Di mana zisla menyimpan data?', answer: 'Data lokal berada di ~/Library/Application Support/zisla/. Statistik mengetik disimpan terpisah di ~/Library/Application Support/zisla/typing-stats.sqlite3. Catatan cepat memakai aplikasi Catatan sistem.' },

@@ -178,7 +178,7 @@ export const it = createCatalog({
       voice: {
         title: 'Input vocale e pulizia',
         description:
-          'Attiva con un tasto o tieni premuto per parlare usando il riconoscimento vocale di sistema. Aggiungi vocabolari, parole personalizzate, formattazione strutturata o pulizia con un modello locale o remoto.',
+          'Attiva con un tasto o tienilo premuto per parlare usando il riconoscimento di sistema, con vocabolari specialistici e parole personalizzate. Se vuoi, usa Ollama, LM Studio o un modello remoto per correggere la trascrizione mantenendone il senso e formattare gli elementi elencati esplicitamente.',
         detail: 'Due modalità di registrazione · Vocabolari e parole chiave · Pulizia opzionale',
       },
       media: {
@@ -346,9 +346,21 @@ export const it = createCatalog({
       <p>Puoi disattivare una funzione nelle impostazioni dell'app o revocare un permesso in qualsiasi momento in Impostazioni di Sistema → Privacy e sicurezza. La revoca di un permesso disattiva solo la funzione collegata e non tocca gli altri moduli. I nomi delle voci possono variare leggermente a seconda della versione di macOS.</p>
     `.trim(),
       },
+      localVoice: {
+        question: 'Come uso un modello locale per correggere la trascrizione vocale?',
+        answer: `
+      <p>Sono supportati Ollama, LM Studio e altri servizi locali compatibili con OpenAI.</p>
+      <ol>
+        <li>Scarica o carica il modello desiderato nell’app per modelli locali, quindi avvia il servizio.</li>
+        <li>Apri Impostazioni → Voce → Modelli Locali, aggiungi e attiva una configurazione, scegli Ollama o LM Studio e inserisci l’URL del servizio. Per altri servizi compatibili con OpenAI, scegli sempre LM Studio. Lascia API Key vuoto se il servizio non richiede autenticazione.</li>
+        <li>Seleziona un modello rilevato automaticamente e scegli la relativa configurazione in Modello Organizzazione Vocale → Usa Modello.</li>
+      </ol>
+      <p>zisla suggerisce un modello Gemma 4 QAT in base al chip e alla memoria RAM totale. Non scarica né carica automaticamente il modello consigliato.</p>
+    `.trim(),
+      },
       network: {
         question: 'zisla va online?',
-        answer: 'Meteo, aggiornamenti firmati, download avviati da te e pulizia vocale remota opzionale usano la rete quando serve. Il rilevamento dei link è locale.',
+        answer: 'Meteo, aggiornamenti firmati, download avviati da te e pulizia vocale remota opzionale usano la rete quando serve. Il rilevamento dei link è locale. Il modello locale corregge il testo dopo la trascrizione; il riconoscimento vocale Apple può ancora usare la rete, a seconda della lingua e del supporto del sistema.',
       },
       multiDisplay: {
         question: 'zisla supporta più schermi?',
