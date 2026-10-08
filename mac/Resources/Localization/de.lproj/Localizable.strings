@@ -2646,3 +2646,6 @@
 "搜索设置" = "Einstellungen suchen";
 "搜索结果" = "Suchergebnisse";
 "未找到设置项" = "Keine Einstellungen gefunden";
+"包括合盖时保持亮屏；需要管理员授权，关闭后恢复原有休眠设置。" = "Hält das Display auch bei geschlossenem Deckel eingeschaltet. Erfordert eine Administratorfreigabe; stellt beim Ausschalten die vorherige Ruhezustandseinstellung wieder her.";
+"无法开启合盖亮屏，请检查管理员授权后重试。" = "Das Display konnte bei geschlossenem Deckel nicht eingeschaltet bleiben. Prüfe die Administratorfreigabe und versuche es erneut.";
+"无法恢复休眠设置，请重试关闭保持亮屏。" = "Die Ruhezustandseinstellung konnte nicht wiederhergestellt werden. Versuche erneut, das Wachhalten des Displays auszuschalten.";

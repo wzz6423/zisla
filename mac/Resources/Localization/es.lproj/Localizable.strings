@@ -2645,3 +2645,6 @@
 "搜索设置" = "Buscar ajustes";
 "搜索结果" = "Resultados de búsqueda";
 "未找到设置项" = "No se encontraron ajustes";
+"包括合盖时保持亮屏；需要管理员授权，关闭后恢复原有休眠设置。" = "Mantiene la pantalla encendida incluso con la tapa cerrada. Requiere autorización del administrador; al desactivarlo, restaura el ajuste de reposo anterior.";
+"无法开启合盖亮屏，请检查管理员授权后重试。" = "No se pudo mantener la pantalla encendida con la tapa cerrada. Comprueba la autorización del administrador e inténtalo de nuevo.";
+"无法恢复休眠设置，请重试关闭保持亮屏。" = "No se pudo restaurar el ajuste de reposo. Intenta desactivar de nuevo Mantener la pantalla encendida.";

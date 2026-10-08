@@ -310,6 +310,213 @@ struct PowerAssertionControllerTests {
     private static let idleSystemType = kIOPMAssertPreventUserIdleSystemSleep as String
 
     @Test
+    func manualKeepAwakePreventsLidSleepAndRestoresItWhenDisabled() async {
+        let manager = FakePowerAssertionManager()
+        let session = FakeLidClosedDisplaySession()
+        let controller = makeController(manager: manager, session: session)
+
+        await controller.setKeepDisplayAwakeIncludingLidClose(true)
+
+        #expect(session.isActive, "Manual keep-awake must also disable lid-close sleep")
+        #expect(controller.keepDisplayAwake)
+        #expect(manager.activeIDs.count == 1)
+        #expect(!controller.preventIdleSystemSleep)
+
+        await controller.setKeepDisplayAwakeIncludingLidClose(false)
+
+        #expect(!session.isActive)
+        #expect(!controller.keepDisplayAwake)
+        #expect(manager.activeIDs.isEmpty)
+        #expect(controller.displayAwakeError == nil)
+    }
+
+    @Test(arguments: [false, true])
+    func deniedAuthorizationPreservesEarlierDisplayState(wasAwake: Bool) async {
+        let manager = FakePowerAssertionManager()
+        let session = FakeLidClosedDisplaySession()
+        session.failStart = true
+        let controller = makeController(manager: manager, session: session)
+        controller.setKeepDisplayAwake(wasAwake)
+
+        await controller.setKeepDisplayAwakeIncludingLidClose(true)
+
+        #expect(!session.isActive)
+        #expect(controller.keepDisplayAwake == wasAwake)
+        #expect(manager.activeIDs.count == (wasAwake ? 1 : 0))
+        #expect(controller.displayAwakeError != nil)
+        #expect(!controller.isChangingDisplayAwake)
+    }
+
+    @Test
+    func failedDisplayAssertionDoesNotChangeLidSleepPolicy() async {
+        let manager = FakePowerAssertionManager()
+        manager.failingTypes = [Self.displayType]
+        let session = FakeLidClosedDisplaySession()
+        let controller = makeController(manager: manager, session: session)
+
+        await controller.setKeepDisplayAwakeIncludingLidClose(true)
+
+        #expect(!session.isActive)
+        #expect(!controller.keepDisplayAwake)
+        #expect(controller.displayAwakeError != nil)
+    }
+
+    @Test
+    func repeatedEnableOwnsOnlyOneSleepSession() async {
+        let session = FakeLidClosedDisplaySession()
+        let manager = FakePowerAssertionManager()
+        let controller = makeController(manager: manager, session: session)
+
+        await controller.setKeepDisplayAwakeIncludingLidClose(true)
+        await controller.setKeepDisplayAwakeIncludingLidClose(true)
+
+        #expect(session.starts == 1)
+        #expect(manager.activeIDs.count == 1)
+        controller.releaseAll()
+        #expect(!session.isActive)
+        #expect(manager.activeIDs.isEmpty)
+    }
+
+    @Test
+    func failedRestoreKeepsToggleOnAndCanBeRetried() async {
+        let session = FakeLidClosedDisplaySession()
+        let controller = makeController(manager: FakePowerAssertionManager(), session: session)
+        await controller.setKeepDisplayAwakeIncludingLidClose(true)
+        session.failStop = true
+
+        await controller.setKeepDisplayAwakeIncludingLidClose(false)
+
+        #expect(session.isActive)
+        #expect(controller.keepDisplayAwake)
+        #expect(controller.displayAwakeError != nil)
+        session.failStop = false
+
+        await controller.setKeepDisplayAwakeIncludingLidClose(false)
+
+        #expect(!session.isActive)
+        #expect(!controller.keepDisplayAwake)
+        #expect(controller.displayAwakeError == nil)
+    }
+
+    @Test
+    func teardownClosesLidSleepSession() async {
+        let manager = FakePowerAssertionManager()
+        let session = FakeLidClosedDisplaySession()
+        var controller: PowerAssertionController? = makeController(manager: manager, session: session)
+        await controller?.setKeepDisplayAwakeIncludingLidClose(true)
+
+        controller = nil
+
+        #expect(!session.isActive)
+        #expect(manager.activeIDs.isEmpty)
+    }
+
+    @Test(arguments: [false, true])
+    func releaseAllDuringAuthorizationRejectsLateResultsAndDuplicateRequests(failStart: Bool) async {
+        let manager = FakePowerAssertionManager()
+        let session = FakeLidClosedDisplaySession()
+        let gate = DisplayAuthorizationGate()
+        let controller = PowerAssertionController(manager: manager, startLidClosedSession: {
+            await gate.wait()
+            try session.start()
+            return session
+        })
+        let pending = Task { await controller.setKeepDisplayAwakeIncludingLidClose(true) }
+        for await _ in gate.started.stream { break }
+        #expect(controller.isChangingDisplayAwake)
+        await controller.setKeepDisplayAwakeIncludingLidClose(true)
+        controller.releaseAll()
+        session.failStart = failStart
+        gate.resume()
+        await pending.value
+
+        #expect(!session.isActive)
+        #expect(!controller.keepDisplayAwake)
+        #expect(manager.activeIDs.isEmpty)
+        #expect(!controller.isChangingDisplayAwake)
+        #expect(controller.displayAwakeError == nil)
+    }
+
+    @Test(arguments: [false, true])
+    func lateRestoreCannotOverwriteANewerAutomaticDisplayRequest(failStop: Bool) async {
+        let manager = FakePowerAssertionManager()
+        let session = FakeLidClosedDisplaySession()
+        let controller = makeController(manager: manager, session: session)
+        await controller.setKeepDisplayAwakeIncludingLidClose(true)
+        let started = AsyncStream<Void>.makeStream()
+        let resume = DispatchSemaphore(value: 0)
+        session.beforeStop = {
+            started.continuation.yield(())
+            started.continuation.finish()
+            resume.wait()
+        }
+        session.failStop = failStop
+        let pending = Task { await controller.setKeepDisplayAwakeIncludingLidClose(false) }
+        for await _ in started.stream { break }
+        controller.releaseAll()
+        controller.setKeepDisplayAwake(true)
+        resume.signal()
+        await pending.value
+
+        #expect(controller.keepDisplayAwake)
+        #expect(manager.activeIDs.count == 1)
+        #expect(controller.displayAwakeError == nil)
+        #expect(!controller.isChangingDisplayAwake)
+    }
+
+    @Test
+    func automaticDisableCancelsTheManualLidOverride() async {
+        let manager = FakePowerAssertionManager()
+        let session = FakeLidClosedDisplaySession()
+        let controller = makeController(manager: manager, session: session)
+        await controller.setKeepDisplayAwakeIncludingLidClose(true)
+
+        controller.setKeepDisplayAwake(false)
+
+        #expect(!session.isActive)
+        #expect(!controller.keepDisplayAwake)
+        #expect(manager.activeIDs.isEmpty)
+    }
+
+    @Test
+    func manualDisableAlsoReleasesAnAutomaticDisplayAssertion() async {
+        let manager = FakePowerAssertionManager()
+        let controller = makeController(manager: manager, session: FakeLidClosedDisplaySession())
+        controller.setKeepDisplayAwake(true)
+
+        await controller.setKeepDisplayAwakeIncludingLidClose(false)
+
+        #expect(!controller.keepDisplayAwake)
+        #expect(manager.activeIDs.isEmpty)
+    }
+
+    @Test
+    func automaticDisplayRequestsDoNotRequestLidSleepAuthorization() {
+        let manager = FakePowerAssertionManager()
+        let session = FakeLidClosedDisplaySession()
+        let controller = makeController(manager: manager, session: session)
+        controller.setKeepDisplayAwake(true)
+        controller.setPreventIdleSystemSleep(true)
+        controller.setAIActivityActive(true)
+
+        #expect(controller.keepDisplayAwake)
+        #expect(!session.isActive)
+        #expect(session.starts == 0)
+        controller.releaseAll()
+        #expect(manager.activeIDs.isEmpty)
+    }
+
+    private func makeController(
+        manager: FakePowerAssertionManager,
+        session: FakeLidClosedDisplaySession
+    ) -> PowerAssertionController {
+        PowerAssertionController(manager: manager, startLidClosedSession: {
+            try session.start()
+            return session
+        })
+    }
+
+    @Test
     func lifecycleCreatesAndReleasesAssertions() {
         let manager = FakePowerAssertionManager()
         let controller = PowerAssertionController(manager: manager)
@@ -404,6 +611,57 @@ struct PowerAssertionControllerTests {
         #expect(controller.preventIdleSystemSleep == false)
         #expect(manager.releaseCallCount == 0)
         #expect(manager.activeIDs.isEmpty)
+    }
+}
+
+@MainActor
+private final class DisplayAuthorizationGate {
+    let started = AsyncStream<Void>.makeStream()
+    private var continuation: CheckedContinuation<Void, Never>?
+
+    func wait() async {
+        await withCheckedContinuation { pending in
+            continuation = pending
+            started.continuation.yield(())
+            started.continuation.finish()
+        }
+    }
+
+    func resume() {
+        continuation?.resume()
+        continuation = nil
+    }
+}
+
+private final class FakeLidClosedDisplaySession: LidClosedDisplaySession, @unchecked Sendable {
+    private let lock = NSLock()
+    private var active = false
+    private var startCount = 0
+    var failStart = false
+    var failStop = false
+    var beforeStop: (@Sendable () -> Void)?
+
+    var isActive: Bool { lock.withLock { active } }
+    var starts: Int { lock.withLock { startCount } }
+
+    func start() throws {
+        try lock.withLock {
+            if failStart { throw CocoaError(.userCancelled) }
+            startCount += 1
+            active = true
+        }
+    }
+
+    func stop() throws {
+        beforeStop?()
+        try lock.withLock {
+            if failStop { throw CocoaError(.fileWriteUnknown) }
+            active = false
+        }
+    }
+
+    func cancel() {
+        lock.withLock { active = false }
     }
 }
 

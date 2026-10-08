@@ -2645,3 +2645,6 @@
 "搜索设置" = "Buscar ajustes";
 "搜索结果" = "Resultados da busca";
 "未找到设置项" = "Nenhum ajuste encontrado";
+"包括合盖时保持亮屏；需要管理员授权，关闭后恢复原有休眠设置。" = "Mantém a tela ligada mesmo com a tampa fechada. Requer autorização de administrador; ao desativar, restaura a configuração de repouso anterior.";
+"无法开启合盖亮屏，请检查管理员授权后重试。" = "Não foi possível manter a tela ligada com a tampa fechada. Verifique a autorização de administrador e tente novamente.";
+"无法恢复休眠设置，请重试关闭保持亮屏。" = "Não foi possível restaurar a configuração de repouso. Tente desativar novamente a opção de manter a tela ligada.";

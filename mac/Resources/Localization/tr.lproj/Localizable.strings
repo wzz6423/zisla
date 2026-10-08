@@ -2645,3 +2645,6 @@
 "搜索设置" = "Ayarlarda ara";
 "搜索结果" = "Arama sonuçları";
 "未找到设置项" = "Ayar bulunamadı";
+"包括合盖时保持亮屏；需要管理员授权，关闭后恢复原有休眠设置。" = "Kapak kapalıyken de ekranı açık tutar. Yönetici onayı gerekir; kapatıldığında önceki uyku ayarı geri yüklenir.";
+"无法开启合盖亮屏，请检查管理员授权后重试。" = "Kapak kapalıyken ekran açık tutulamadı. Yönetici onayını kontrol edip tekrar deneyin.";
+"无法恢复休眠设置，请重试关闭保持亮屏。" = "Uyku ayarı geri yüklenemedi. Ekranı açık tutma özelliğini tekrar kapatmayı deneyin.";

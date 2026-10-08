@@ -2641,3 +2641,6 @@
 "搜索设置" = "Rechercher dans les réglages";
 "搜索结果" = "Résultats de recherche";
 "未找到设置项" = "Aucun réglage trouvé";
+"包括合盖时保持亮屏；需要管理员授权，关闭后恢复原有休眠设置。" = "Garde l’écran allumé même lorsque le capot est fermé. Nécessite l’autorisation d’un administrateur ; rétablit le réglage de veille précédent à la désactivation.";
+"无法开启合盖亮屏，请检查管理员授权后重试。" = "Impossible de garder l’écran allumé lorsque le capot est fermé. Vérifiez l’autorisation de l’administrateur et réessayez.";
+"无法恢复休眠设置，请重试关闭保持亮屏。" = "Impossible de rétablir le réglage de veille. Essayez à nouveau de désactiver le maintien de l’écran allumé.";

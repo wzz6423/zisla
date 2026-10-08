@@ -12,7 +12,7 @@ private func zislaAuthorizationExecuteWithPrivileges(
     _ communicationsPipe: UnsafeMutablePointer<UnsafeMutablePointer<FILE>?>?
 ) -> OSStatus
 
-private final class BatteryPowerModeAuthorizationSession: @unchecked Sendable {
+final class BatteryPowerModeAuthorizationSession: @unchecked Sendable {
     static let shared = BatteryPowerModeAuthorizationSession()
 
     private let lock = NSLock()
@@ -25,16 +25,31 @@ private final class BatteryPowerModeAuthorizationSession: @unchecked Sendable {
     }
 
     func execute(arguments: [String]) -> AIAgentProcessOutput {
+        let (status, pipe) = launch(path: "/usr/bin/pmset", arguments: arguments)
+        var output = Data()
+        if let pipe {
+            let fileHandle = FileHandle(fileDescriptor: fileno(pipe), closeOnDealloc: false)
+            output = fileHandle.readDataToEndOfFile()
+            fclose(pipe)
+        }
+        return AIAgentProcessOutput(
+            status: status,
+            standardOutput: output,
+            standardError: "",
+            didTimeout: false
+        )
+    }
+
+    func openLidClosedDisplaySession() -> (OSStatus, UnsafeMutablePointer<FILE>?) {
+        launch(path: "/bin/sh", arguments: ["-p", "-c", PMSetLidClosedDisplaySession.script])
+    }
+
+    private func launch(path: String, arguments: [String]) -> (OSStatus, UnsafeMutablePointer<FILE>?) {
         lock.lock()
         defer { lock.unlock() }
 
         guard let authorization = authorize() else {
-            return AIAgentProcessOutput(
-                status: errAuthorizationDenied,
-                standardOutput: Data(),
-                standardError: "",
-                didTimeout: false
-            )
+            return (errAuthorizationDenied, nil)
         }
 
         let cArguments = arguments.map { strdup($0) }
@@ -54,7 +69,7 @@ private final class BatteryPowerModeAuthorizationSession: @unchecked Sendable {
             ) { pointer in
                 zislaAuthorizationExecuteWithPrivileges(
                     authorization,
-                    "/usr/bin/pmset",
+                    path,
                     [],
                     pointer,
                     &pipe
@@ -62,18 +77,7 @@ private final class BatteryPowerModeAuthorizationSession: @unchecked Sendable {
             }
         }
 
-        var output = Data()
-        if let pipe {
-            let fileHandle = FileHandle(fileDescriptor: fileno(pipe), closeOnDealloc: false)
-            output = fileHandle.readDataToEndOfFile()
-            fclose(pipe)
-        }
-        return AIAgentProcessOutput(
-            status: status,
-            standardOutput: output,
-            standardError: "",
-            didTimeout: false
-        )
+        return (status, pipe)
     }
 
     private func authorize() -> AuthorizationRef? {
