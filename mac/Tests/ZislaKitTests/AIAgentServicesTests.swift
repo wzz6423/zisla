@@ -138,70 +138,272 @@ struct AIAgentServicesTests {
 
     @Test
     func cliAutoUpdateRunsByDefault() async throws {
-        let directory = FileManager.default.temporaryDirectory
-            .appendingPathComponent("zisla-cli-auto-update-\(UUID().uuidString)", isDirectory: true)
-        defer { try? FileManager.default.removeItem(at: directory) }
-        let toolDirectory = directory.appendingPathComponent("toolchain/bin", isDirectory: true)
-        let updateMarker = directory.appendingPathComponent("updated")
-        let codex = toolDirectory.appendingPathComponent("codex")
-        let npm = toolDirectory.appendingPathComponent("npm")
-        try writeExecutable(at: codex, contents: "#!/bin/sh\nprintf '1.0.0\\n'\n")
-        try writeExecutable(at: npm, contents: "#!/bin/sh\ntouch '\(updateMarker.path)'\n")
-        let store = AIAgentStore(storageURL: directory.appendingPathComponent("state.json"))
-        let workspace = AIAgentWorkspace(
-            store: store,
-            cliService: AIAgentCLIService(
-                environment: ["PATH": "\(toolDirectory.path):/usr/bin:/bin"],
-                homeDirectory: directory
-            ),
-            cliUpdateService: AIAgentCLIUpdateService(loadLatestVersion: { kind in
-                kind == .codex ? "1.1.0" : nil
-            })
-        )
+        let (workspace, directory, updateMarker) = try makeCLIAutoUpdateWorkspace(latestVersion: { kind in
+            kind == .codex ? "1.1.0" : nil
+        })
+        let store = workspace.store
+        defer {
+            workspace.stop()
+            store.flushPendingChanges()
+            try? FileManager.default.removeItem(at: directory)
+        }
 
         workspace.start()
         #expect(await waitForCLIUpdate(workspace, kind: .codex))
         await waitForFile(at: updateMarker)
         await waitForCLICommandRunToFinish(workspace)
 
-        #expect(store.state.cliAutoUpdateEnabled)
+        #expect(store.state.isCLIAutoUpdateEnabled(for: .codex))
         #expect(FileManager.default.fileExists(atPath: updateMarker.path))
 
-        workspace.setCLIAutoUpdateEnabled(false)
-        #expect(!store.state.cliAutoUpdateEnabled)
+        workspace.setCLIAutoUpdateEnabled(false, for: .codex)
+        #expect(!store.state.isCLIAutoUpdateEnabled(for: .codex))
     }
 
     @Test
     func cliAutoUpdateRunsWhenEnabledBeforeWorkspaceStart() async throws {
-        let directory = FileManager.default.temporaryDirectory
-            .appendingPathComponent("zisla-cli-auto-update-on-start-\(UUID().uuidString)", isDirectory: true)
-        defer { try? FileManager.default.removeItem(at: directory) }
-        let toolDirectory = directory.appendingPathComponent("toolchain/bin", isDirectory: true)
-        let updateMarker = directory.appendingPathComponent("updated")
-        let codex = toolDirectory.appendingPathComponent("codex")
-        let npm = toolDirectory.appendingPathComponent("npm")
-        try writeExecutable(at: codex, contents: "#!/bin/sh\nprintf '1.0.0\\n'\n")
-        try writeExecutable(at: npm, contents: "#!/bin/sh\ntouch '\(updateMarker.path)'\n")
-        let store = AIAgentStore(storageURL: directory.appendingPathComponent("state.json"))
-        let workspace = AIAgentWorkspace(
-            store: store,
-            cliService: AIAgentCLIService(
-                environment: ["PATH": "\(toolDirectory.path):/usr/bin:/bin"],
-                homeDirectory: directory
-            ),
-            cliUpdateService: AIAgentCLIUpdateService(loadLatestVersion: { kind in
-                kind == .codex ? "1.1.0" : nil
-            })
-        )
+        let (workspace, directory, updateMarker) = try makeCLIAutoUpdateWorkspace(latestVersion: { kind in
+            kind == .codex ? "1.1.0" : nil
+        })
+        let store = workspace.store
+        defer {
+            workspace.stop()
+            store.flushPendingChanges()
+            try? FileManager.default.removeItem(at: directory)
+        }
 
-        workspace.setCLIAutoUpdateEnabled(true)
+        store.state = AIAgentState(cliAutoUpdateEnabled: false)
+        workspace.setCLIAutoUpdateEnabled(true, for: .codex)
         workspace.start()
         await waitForFile(at: updateMarker)
         await waitForCLICommandRunToFinish(workspace)
 
-        #expect(store.state.cliAutoUpdateEnabled)
+        #expect(store.state.isCLIAutoUpdateEnabled(for: .codex))
         #expect(FileManager.default.fileExists(atPath: updateMarker.path))
         #expect(workspace.cliCommandProgress?.title == "自动更新 Codex")
+    }
+
+    @Test
+    func cliAutoUpdateExcludesDisabledCLIsFromBatchCommands() async throws {
+        let (workspace, directory, argumentsFile) = try makeCLIAutoUpdateWorkspace()
+        defer {
+            workspace.stop()
+            workspace.store.flushPendingChanges()
+            try? FileManager.default.removeItem(at: directory)
+        }
+        workspace.setCLIAutoUpdateEnabled(false, for: .codex)
+        workspace.start()
+        await waitForFile(at: argumentsFile)
+        await waitForCLICommandRunToFinish(workspace)
+
+        let arguments = try String(contentsOf: argumentsFile, encoding: .utf8)
+        #expect(arguments.contains("@anthropic-ai/claude-code@latest"))
+        #expect(!arguments.contains("@openai/codex"))
+        #expect(workspace.cliCommandProgress?.kinds == [.claude])
+        #expect(workspace.cliCommandProgress?.state == .succeeded)
+        #expect(Set(workspace.cliUpdates.map(\.kind)) == Set([.claude, .codex]))
+    }
+
+    @Test
+    func disablingEveryCLIAutoUpdateStillAllowsManualUpdates() async throws {
+        let (workspace, directory, argumentsFile) = try makeCLIAutoUpdateWorkspace()
+        defer {
+            workspace.stop()
+            workspace.store.flushPendingChanges()
+            try? FileManager.default.removeItem(at: directory)
+        }
+        for kind in AgentCLIKind.managedCases {
+            workspace.setCLIAutoUpdateEnabled(false, for: kind)
+        }
+        workspace.start()
+        await workspace.refreshCLIs()
+
+        #expect(Set(workspace.cliUpdates.map(\.kind)) == Set([.claude, .codex]))
+        #expect(workspace.cliCommandProgress == nil)
+        #expect(!FileManager.default.fileExists(atPath: argumentsFile.path))
+
+        workspace.startCLICommands(
+            workspace.commandsForCLIInstallation([.codex], update: true),
+            title: "更新 Codex",
+            kinds: [.codex]
+        )
+        await waitForFile(at: argumentsFile)
+        await waitForCLICommandRunToFinish(workspace)
+
+        let arguments = try String(contentsOf: argumentsFile, encoding: .utf8)
+        #expect(arguments.contains("@openai/codex@latest"))
+        #expect(!arguments.contains("@anthropic-ai/claude-code"))
+        #expect(workspace.cliCommandProgress?.state == .succeeded)
+        #expect(!workspace.store.state.isCLIAutoUpdateEnabled(for: .codex))
+    }
+
+    @Test(.timeLimit(.minutes(1)), arguments: [true, false])
+    func queuedCLIAutoUpdatesUsePreferencesAtLaunch(keepClaudeEnabled: Bool) async throws {
+        let (lookupStarted, started) = AsyncStream<Void>.makeStream()
+        let (resumeLookup, resume) = AsyncStream<Void>.makeStream()
+        let (workspace, directory, argumentsFile) = try makeCLIAutoUpdateWorkspace(latestVersion: { kind in
+            if kind == .codex {
+                started.finish()
+                for await _ in resumeLookup {}
+            }
+            return [.claude, .codex].contains(kind) ? "1.1.0" : nil
+        })
+        let manualStarted = directory.appendingPathComponent("manual-started")
+        let releaseManual = directory.appendingPathComponent("release-manual")
+        defer {
+            resume.finish()
+            try? Data().write(to: releaseManual)
+            workspace.stop()
+            workspace.store.flushPendingChanges()
+            try? FileManager.default.removeItem(at: directory)
+        }
+        workspace.store.state = AIAgentState(
+            cliAutoUpdateEnabled: false,
+            cliAutoUpdateOverrides: ["claude": true, "codex": true]
+        )
+        workspace.start()
+        for await _ in lookupStarted {}
+        workspace.startCLICommands([
+            AIAgentCLICommand(
+                executableURL: URL(fileURLWithPath: "/bin/sh"),
+                arguments: ["-c", "touch '\(manualStarted.path)'; for i in $(seq 1 200); do [ -f '\(releaseManual.path)' ] && exit 0; sleep 0.01; done; exit 1"]
+            ),
+        ], title: "手动任务", kinds: [])
+        resume.finish()
+        await waitForFile(at: manualStarted)
+        try #require(FileManager.default.fileExists(atPath: manualStarted.path))
+        workspace.setCLIAutoUpdateEnabled(false, for: .codex)
+        workspace.setCLIAutoUpdateEnabled(keepClaudeEnabled, for: .claude)
+        try Data().write(to: releaseManual)
+        await waitForCLICommandRunToFinish(workspace)
+
+        #expect(workspace.cliCommandProgress?.state == .succeeded)
+        if keepClaudeEnabled {
+            let arguments = try String(contentsOf: argumentsFile, encoding: .utf8)
+            #expect(arguments.contains("@anthropic-ai/claude-code@latest"))
+            #expect(!arguments.contains("@openai/codex"))
+            #expect(workspace.cliCommandProgress?.kinds == [.claude])
+            #expect(workspace.cliCommandProgress?.title == "自动更新 Claude")
+        } else {
+            #expect(!FileManager.default.fileExists(atPath: argumentsFile.path))
+            #expect(workspace.cliCommandProgress?.title == "手动任务")
+        }
+    }
+
+    @Test(.timeLimit(.minutes(1)))
+    func cliAutoUpdateSchedulerFollowsTheCombinedCLIPreferences() async throws {
+        let clock = CLIAutoUpdateClock()
+        let (workspace, directory, argumentsFile) = try makeCLIAutoUpdateWorkspace(sleep: { duration in
+            #expect(duration == .seconds(600))
+            try await clock.sleep()
+        })
+        defer {
+            workspace.stop()
+            workspace.store.flushPendingChanges()
+            try? FileManager.default.removeItem(at: directory)
+        }
+        workspace.store.state = AIAgentState(
+            cliAutoUpdateEnabled: false,
+            cliAutoUpdateOverrides: ["future-cli": true]
+        )
+        workspace.start()
+        await workspace.refreshCLIs()
+        #expect(await clock.sleepCount == 0)
+        #expect(!FileManager.default.fileExists(atPath: argumentsFile.path))
+
+        workspace.setCLIAutoUpdateEnabled(true, for: .codex)
+        await clock.waitForSleeps(1)
+        await waitForCLICommandRunToFinish(workspace)
+        #expect(workspace.cliCommandProgress?.kinds == [.codex])
+
+        workspace.setCLIAutoUpdateEnabled(false, for: .claude)
+        await clock.advance()
+        await clock.waitForSleeps(2)
+        await waitForCLICommandRunToFinish(workspace)
+        #expect(await clock.cancellationCount == 0)
+
+        workspace.setCLIAutoUpdateEnabled(false, for: .codex)
+        await clock.waitForCancellations(1)
+        workspace.setCLIAutoUpdateEnabled(true, for: .claude)
+        await clock.waitForSleeps(3)
+        await waitForCLICommandRunToFinish(workspace)
+        #expect(workspace.cliCommandProgress?.kinds == [.claude])
+        workspace.stop()
+        await clock.waitForCancellations(2)
+    }
+
+    @Test(.timeLimit(.minutes(1)))
+    func disablingCLIAutoUpdateDuringLookupPreventsLaunchingIt() async throws {
+        let (lookupStarted, started) = AsyncStream<Void>.makeStream()
+        let (resumeLookup, resume) = AsyncStream<Void>.makeStream()
+        let (workspace, directory, argumentsFile) = try makeCLIAutoUpdateWorkspace(latestVersion: { kind in
+            guard kind == .codex else { return nil }
+            started.finish()
+            for await _ in resumeLookup {}
+            return "1.1.0"
+        })
+        defer {
+            resume.finish()
+            workspace.stop()
+            workspace.store.flushPendingChanges()
+            try? FileManager.default.removeItem(at: directory)
+        }
+        workspace.store.state = AIAgentState(cliAutoUpdateEnabled: false, cliAutoUpdateOverrides: ["codex": true])
+        let refresh = Task { await workspace.refreshCLIs() }
+        for await _ in lookupStarted {}
+        workspace.start()
+        workspace.setCLIAutoUpdateEnabled(false, for: .codex)
+        resume.finish()
+        await refresh.value
+
+        #expect(workspace.cliUpdates.map(\.kind) == [.codex])
+        #expect(workspace.cliCommandProgress == nil)
+        #expect(!FileManager.default.fileExists(atPath: argumentsFile.path))
+    }
+
+    @Test
+    func disablingCLIAutoUpdateLetsAnAlreadyRunningUpdateFinish() async throws {
+        let (workspace, directory, argumentsFile) = try makeCLIAutoUpdateWorkspace()
+        let started = directory.appendingPathComponent("update-started")
+        let release = directory.appendingPathComponent("release-update")
+        defer {
+            try? Data().write(to: release)
+            workspace.stop()
+            workspace.store.flushPendingChanges()
+            try? FileManager.default.removeItem(at: directory)
+        }
+        try writeExecutable(
+            at: directory.appendingPathComponent("bin/npm"),
+            contents: "#!/bin/sh\ntouch '\(started.path)'\nfor i in $(seq 1 200); do [ -f '\(release.path)' ] && break; sleep 0.01; done\nprintf '%s\\n' \"$@\" > '\(argumentsFile.path)'\n"
+        )
+        workspace.store.state = AIAgentState(cliAutoUpdateEnabled: false, cliAutoUpdateOverrides: ["codex": true])
+        workspace.start()
+        await waitForFile(at: started)
+        try #require(FileManager.default.fileExists(atPath: started.path))
+        #expect(workspace.isRunningCLICommands)
+        workspace.setCLIAutoUpdateEnabled(false, for: .codex)
+        try Data().write(to: release)
+        await waitForCLICommandRunToFinish(workspace)
+
+        #expect(workspace.cliCommandProgress?.state == .succeeded)
+        #expect(try String(contentsOf: argumentsFile, encoding: .utf8).contains("@openai/codex@latest"))
+        #expect(!workspace.store.state.isCLIAutoUpdateEnabled(for: .codex))
+    }
+
+    @Test
+    func cliAutoUpdateDoesNotRunWhenVersionLookupFails() async throws {
+        let (workspace, directory, argumentsFile) = try makeCLIAutoUpdateWorkspace(latestVersion: { _ in nil })
+        defer {
+            workspace.stop()
+            workspace.store.flushPendingChanges()
+            try? FileManager.default.removeItem(at: directory)
+        }
+        workspace.start()
+        await workspace.refreshCLIs()
+
+        #expect(workspace.cliUpdates.isEmpty)
+        #expect(workspace.cliCommandProgress == nil)
+        #expect(!FileManager.default.fileExists(atPath: argumentsFile.path))
     }
 
     @Test
@@ -1345,6 +1547,39 @@ struct AIAgentServicesTests {
         ])
     }
 
+    private func makeCLIAutoUpdateWorkspace(
+        latestVersion: @escaping AIAgentCLIUpdateService.LatestVersionLoader = { kind in
+            [.claude, .codex].contains(kind) ? "1.1.0" : nil
+        },
+        sleep: @escaping @Sendable (Duration) async throws -> Void = { try await Task.sleep(for: $0) }
+    ) throws -> (AIAgentWorkspace, URL, URL) {
+        let directory = FileManager.default.temporaryDirectory
+            .appendingPathComponent("zisla-per-cli-update-\(UUID().uuidString)", isDirectory: true)
+        let toolDirectory = directory.appendingPathComponent("bin", isDirectory: true)
+        let argumentsFile = directory.appendingPathComponent("update-arguments")
+        for kind in AgentCLIKind.detectableCases {
+            let contents = [.claude, .codex].contains(kind) ? "#!/bin/sh\nprintf '1.0.0\\n'\n" : "#!/bin/sh\nexit 0\n"
+            try writeExecutable(at: toolDirectory.appendingPathComponent(kind.executableName), contents: contents)
+        }
+        try writeExecutable(
+            at: toolDirectory.appendingPathComponent("npm"),
+            contents: "#!/bin/sh\nprintf '%s\\n' \"$@\" > '\(argumentsFile.path)'\n"
+        )
+        let workspace = AIAgentWorkspace(
+            store: AIAgentStore(
+                storageURL: directory.appendingPathComponent("state.json"),
+                secretStore: DatabaseAIAgentSecretStore(storageURL: directory.appendingPathComponent("secrets.sqlite"))
+            ),
+            cliService: AIAgentCLIService(
+                environment: ["PATH": "\(toolDirectory.path):/usr/bin:/bin"],
+                homeDirectory: directory
+            ),
+            cliUpdateService: AIAgentCLIUpdateService(loadLatestVersion: latestVersion),
+            cliAutoUpdateSleep: sleep
+        )
+        return (workspace, directory, argumentsFile)
+    }
+
     private func writeExecutable(at url: URL, contents: String = "#!/bin/sh\nexit 0\n") throws {
         try FileManager.default.createDirectory(
             at: url.deletingLastPathComponent(),
@@ -1575,6 +1810,57 @@ struct AIAgentServicesTests {
         #expect(updates == [
             AIAgentCLIUpdate(kind: .qwen, installedVersion: "0.21.10", latestVersion: "0.22.0"),
         ])
+    }
+}
+
+private actor CLIAutoUpdateClock {
+    private(set) var sleepCount = 0
+    private(set) var cancellationCount = 0
+    private var sleepers: [UUID: CheckedContinuation<Void, Error>] = [:]
+    private var observers: [(Int, Bool, AsyncStream<Void>.Continuation)] = []
+
+    func sleep() async throws {
+        let id = UUID()
+        try await withTaskCancellationHandler {
+            try Task.checkCancellation()
+            try await withCheckedThrowingContinuation { continuation in
+                sleepers[id] = continuation
+                sleepCount += 1
+                notifyObservers()
+            }
+        } onCancel: {
+            Task { await self.cancel(id) }
+        }
+    }
+
+    func advance() {
+        let pending = sleepers.values
+        sleepers.removeAll()
+        pending.forEach { $0.resume() }
+    }
+
+    func waitForSleeps(_ count: Int) async { await waitFor(count, cancellation: false) }
+    func waitForCancellations(_ count: Int) async { await waitFor(count, cancellation: true) }
+
+    private func waitFor(_ count: Int, cancellation: Bool) async {
+        if (cancellation ? cancellationCount : sleepCount) >= count { return }
+        let (events, continuation) = AsyncStream<Void>.makeStream()
+        observers.append((count, cancellation, continuation))
+        for await _ in events {}
+    }
+
+    private func cancel(_ id: UUID) {
+        sleepers.removeValue(forKey: id)?.resume(throwing: CancellationError())
+        cancellationCount += 1
+        notifyObservers()
+    }
+
+    private func notifyObservers() {
+        observers.removeAll { count, cancellation, continuation in
+            guard (cancellation ? cancellationCount : sleepCount) >= count else { return false }
+            continuation.finish()
+            return true
+        }
     }
 }
 

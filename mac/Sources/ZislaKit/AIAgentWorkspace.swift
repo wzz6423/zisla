@@ -66,6 +66,7 @@ public final class AIAgentWorkspace: ObservableObject {
         let commands: [AIAgentCLICommand]
         let title: String
         let kinds: [AgentCLIKind]
+        let isAutomatic: Bool
     }
 
     public let store: AIAgentStore
@@ -84,6 +85,7 @@ public final class AIAgentWorkspace: ObservableObject {
     private let cliProfileService: AIAgentCLIProfileService
     private let skillService: AIAgentSkillService
     private let skillSynchronizationService: AIAgentSkillSynchronizationService
+    private let cliAutoUpdateSleep: @Sendable (Duration) async throws -> Void
     private let relayLock = AIAgentCLIRelayLock()
     private var cliAutoUpdateTask: Task<Void, Never>?
     private var cliCommandTask: Task<Void, Never>?
@@ -102,7 +104,10 @@ public final class AIAgentWorkspace: ObservableObject {
         cliUpdateService: AIAgentCLIUpdateService = AIAgentCLIUpdateService(),
         cliProfileService: AIAgentCLIProfileService = AIAgentCLIProfileService(),
         skillService: AIAgentSkillService = AIAgentSkillService(),
-        skillSynchronizationService: AIAgentSkillSynchronizationService = AIAgentSkillSynchronizationService()
+        skillSynchronizationService: AIAgentSkillSynchronizationService = AIAgentSkillSynchronizationService(),
+        cliAutoUpdateSleep: @escaping @Sendable (Duration) async throws -> Void = {
+            try await Task.sleep(for: $0)
+        }
     ) {
         self.store = store
         self.balanceService = balanceService
@@ -113,6 +118,7 @@ public final class AIAgentWorkspace: ObservableObject {
         self.cliProfileService = cliProfileService
         self.skillService = skillService
         self.skillSynchronizationService = skillSynchronizationService
+        self.cliAutoUpdateSleep = cliAutoUpdateSleep
         store.objectWillChange
             .sink { [weak self] in self?.objectWillChange.send() }
             .store(in: &cancellables)
@@ -131,7 +137,7 @@ public final class AIAgentWorkspace: ObservableObject {
         Task { [weak self] in
             await self?.refreshCLIs()
         }
-        updateCLIAutoUpdateLoop(enabled: store.state.cliAutoUpdateEnabled)
+        updateCLIAutoUpdateLoop()
     }
 
     /// Stops CLI management work while preserving user configuration.
@@ -283,12 +289,11 @@ public final class AIAgentWorkspace: ObservableObject {
             grokUpdateState = checkedState
         }
         cliUpdates = updates.sorted { AIAgentCLIService.cliKindOrder($0.kind, $1.kind) }
-        startAutomaticCLIUpdateIfNeeded(for: cliUpdates)
+        enqueueAutomaticCLIUpdateIfNeeded(for: cliUpdates)
     }
 
-    private func startAutomaticCLIUpdateIfNeeded(for updates: [AIAgentCLIUpdate]) {
+    private func enqueueAutomaticCLIUpdateIfNeeded(for updates: [AIAgentCLIUpdate]) {
         guard runtimeEnabled,
-              store.state.cliAutoUpdateEnabled,
               !Task.isCancelled,
               !isRunningCLICommands,
               cliCommandTask == nil else { return }
@@ -296,7 +301,12 @@ public final class AIAgentWorkspace: ObservableObject {
         let commands = commandsForCLIInstallation(kinds, update: true)
         guard !commands.isEmpty else { return }
         let names = kinds.map(\.displayName).joined(separator: AppLocalization.text("、"))
-        startCLICommands(commands, title: AppLocalization.text("自动更新 %@", names), kinds: kinds)
+        pendingCLICommandRuns.append(CLICommandRun(
+            commands: commands,
+            title: AppLocalization.text("自动更新 %@", names),
+            kinds: kinds,
+            isAutomatic: true
+        ))
     }
 
     public func refreshSkills() async {
@@ -481,7 +491,7 @@ public final class AIAgentWorkspace: ObservableObject {
         kinds: [AgentCLIKind]
     ) {
         guard !commands.isEmpty else { return }
-        let run = CLICommandRun(commands: commands, title: title, kinds: kinds)
+        let run = CLICommandRun(commands: commands, title: title, kinds: kinds, isAutomatic: false)
         guard cliCommandTask == nil, cliRefreshTask == nil else {
             pendingCLICommandRuns.append(run)
             return
@@ -490,16 +500,27 @@ public final class AIAgentWorkspace: ObservableObject {
     }
 
     private func startCLICommandRun(_ run: CLICommandRun) {
+        let kinds = run.isAutomatic
+            ? run.kinds.filter { store.state.isCLIAutoUpdateEnabled(for: $0) }
+            : run.kinds
+        let commands = run.isAutomatic ? commandsForCLIInstallation(kinds, update: true) : run.commands
+        guard !commands.isEmpty else {
+            startNextCLICommandRunIfNeeded()
+            return
+        }
+        let title = kinds == run.kinds
+            ? run.title
+            : AppLocalization.text("自动更新 %@", kinds.map(\.displayName).joined(separator: AppLocalization.text("、")))
         lastError = nil
         cliCommandProgress = AIAgentCLICommandProgress(
-            title: run.title,
-            kinds: run.kinds,
+            title: title,
+            kinds: kinds,
             completedCount: 0,
-            totalCount: run.commands.count,
+            totalCount: commands.count,
             state: .running
         )
         cliCommandTask = Task { [weak self] in
-            await self?.performCLICommands(run.commands, title: run.title, kinds: run.kinds)
+            await self?.performCLICommands(commands, title: title, kinds: kinds)
         }
     }
 
@@ -662,9 +683,9 @@ public final class AIAgentWorkspace: ObservableObject {
         }
     }
 
-    public func setCLIAutoUpdateEnabled(_ enabled: Bool) {
-        store.setCLIAutoUpdateEnabled(enabled)
-        updateCLIAutoUpdateLoop(enabled: enabled)
+    public func setCLIAutoUpdateEnabled(_ enabled: Bool, for kind: AgentCLIKind) {
+        store.setCLIAutoUpdateEnabled(enabled, for: kind)
+        updateCLIAutoUpdateLoop()
     }
 
     public func setNetworkProxyURL(_ value: String) {
@@ -677,18 +698,19 @@ public final class AIAgentWorkspace: ObservableObject {
         Task { await cliUpdateService.setNetworkProxy(url: url, enabled: enabled) }
     }
 
-    private func updateCLIAutoUpdateLoop(enabled: Bool) {
-        guard runtimeEnabled, enabled else {
+    private func updateCLIAutoUpdateLoop() {
+        guard runtimeEnabled,
+              AgentCLIKind.managedCases.contains(where: { store.state.isCLIAutoUpdateEnabled(for: $0) }) else {
             cliAutoUpdateTask?.cancel()
             cliAutoUpdateTask = nil
             return
         }
         guard cliAutoUpdateTask == nil else { return }
-        cliAutoUpdateTask = Task { [weak self] in
+        cliAutoUpdateTask = Task { [weak self, cliAutoUpdateSleep] in
             while !Task.isCancelled {
                 await self?.refreshCLIs()
                 do {
-                    try await Task.sleep(for: .seconds(600))
+                    try await cliAutoUpdateSleep(.seconds(600))
                 } catch {
                     return
                 }

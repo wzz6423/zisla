@@ -30,6 +30,47 @@ struct AIAgentModelsTests {
     }
 
     @Test
+    func cliAutoUpdateOverridesSurviveRoundTrip() throws {
+        let data = Data(#"{"cliAutoUpdateEnabled":false,"cliAutoUpdateOverrides":{"codex":true,"claude":false,"future-cli":true}}"#.utf8)
+        let state = try JSONDecoder().decode(AIAgentState.self, from: data)
+        let encoded = try #require(
+            JSONSerialization.jsonObject(with: JSONEncoder().encode(state)) as? [String: Any]
+        )
+
+        #expect(encoded["cliAutoUpdateOverrides"] as? [String: Bool] == [
+            "codex": true,
+            "claude": false,
+            "future-cli": true,
+        ])
+        #expect(state.isCLIAutoUpdateEnabled(for: .codex))
+        #expect(!state.isCLIAutoUpdateEnabled(for: .claude))
+        #expect(!state.isCLIAutoUpdateEnabled(for: .gemini))
+    }
+
+    @Test(arguments: [true, false], AgentCLIKind.managedCases)
+    func cliAutoUpdateOverridesOnlyChangeTheSelectedCLI(legacyEnabled: Bool, kind: AgentCLIKind) throws {
+        let data = try JSONSerialization.data(withJSONObject: ["cliAutoUpdateEnabled": legacyEnabled])
+        var state = try JSONDecoder().decode(AIAgentState.self, from: data)
+        #expect(AgentCLIKind.managedCases.allSatisfy { state.isCLIAutoUpdateEnabled(for: $0) == legacyEnabled })
+
+        state.cliAutoUpdateOverrides[kind.rawValue] = !legacyEnabled
+        let restored = try JSONDecoder().decode(AIAgentState.self, from: JSONEncoder().encode(state))
+
+        for candidate in AgentCLIKind.managedCases {
+            #expect(restored.isCLIAutoUpdateEnabled(for: candidate) == (candidate == kind ? !legacyEnabled : legacyEnabled))
+        }
+    }
+
+    @Test(arguments: ["[]", "false", #"{"codex":"true"}"#, #"{"codex":1}"#])
+    func cliAutoUpdateOverridesRejectInvalidPreferences(value: String) {
+        let data = Data("{\"cliAutoUpdateOverrides\":\(value)}".utf8)
+
+        #expect(throws: DecodingError.self) {
+            try JSONDecoder().decode(AIAgentState.self, from: data)
+        }
+    }
+
+    @Test
     func channelEffortDefaultsForLegacyDataAndRoundTrips() throws {
         let legacy = try JSONDecoder().decode(
             AgentChannel.self,

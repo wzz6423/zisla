@@ -756,7 +756,9 @@ public struct AIAgentState: Codable, Equatable, Sendable {
     public var channelProbes: [AgentChannelProbe]
     public var channelModelCatalogs: [AgentChannelModelCatalog]
     public var cliStatuses: [AgentCLIStatus]
+    /// Preserve the legacy preference as the default for CLIs without an override.
     public var cliAutoUpdateEnabled: Bool
+    public var cliAutoUpdateOverrides: [String: Bool]
     public var skills: [AgentSkill]
     public var skillSyncConfiguration: AgentSkillSyncConfiguration
     /// The last activated CLI profile account, used to save refreshed auth files before switching.
@@ -772,6 +774,7 @@ public struct AIAgentState: Codable, Equatable, Sendable {
         channelModelCatalogs: [AgentChannelModelCatalog] = [],
         cliStatuses: [AgentCLIStatus] = [],
         cliAutoUpdateEnabled: Bool = true,
+        cliAutoUpdateOverrides: [String: Bool] = [:],
         skills: [AgentSkill] = [],
         skillSyncConfiguration: AgentSkillSyncConfiguration = AgentSkillSyncConfiguration(),
         activeCLIProfileAccountID: UUID? = nil,
@@ -784,10 +787,15 @@ public struct AIAgentState: Codable, Equatable, Sendable {
         self.channelModelCatalogs = channelModelCatalogs
         self.cliStatuses = cliStatuses
         self.cliAutoUpdateEnabled = cliAutoUpdateEnabled
+        self.cliAutoUpdateOverrides = cliAutoUpdateOverrides
         self.skills = skills
         self.skillSyncConfiguration = skillSyncConfiguration
         self.activeCLIProfileAccountID = activeCLIProfileAccountID
         self.activeCLIProfilePreservesAuthentication = activeCLIProfilePreservesAuthentication
+    }
+
+    public func isCLIAutoUpdateEnabled(for kind: AgentCLIKind) -> Bool {
+        cliAutoUpdateOverrides[kind.rawValue] ?? cliAutoUpdateEnabled
     }
 
     private enum CodingKeys: String, CodingKey {
@@ -798,6 +806,7 @@ public struct AIAgentState: Codable, Equatable, Sendable {
         case channelModelCatalogs
         case cliStatuses
         case cliAutoUpdateEnabled
+        case cliAutoUpdateOverrides
         case skills
         case skillSyncConfiguration
         case activeCLIProfileAccountID
@@ -813,6 +822,7 @@ public struct AIAgentState: Codable, Equatable, Sendable {
         channelModelCatalogs = try container.decodeIfPresent([AgentChannelModelCatalog].self, forKey: .channelModelCatalogs) ?? []
         cliStatuses = try container.decodeIfPresent([AgentCLIStatus].self, forKey: .cliStatuses) ?? []
         cliAutoUpdateEnabled = try container.decodeIfPresent(Bool.self, forKey: .cliAutoUpdateEnabled) ?? true
+        cliAutoUpdateOverrides = try container.decodeIfPresent([String: Bool].self, forKey: .cliAutoUpdateOverrides) ?? [:]
         skills = try container.decodeIfPresent([AgentSkill].self, forKey: .skills) ?? []
         skillSyncConfiguration = try container.decodeIfPresent(AgentSkillSyncConfiguration.self, forKey: .skillSyncConfiguration) ?? AgentSkillSyncConfiguration()
         activeCLIProfileAccountID = try container.decodeIfPresent(UUID.self, forKey: .activeCLIProfileAccountID)

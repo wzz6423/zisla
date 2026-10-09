@@ -1026,7 +1026,7 @@
 "配置本地代理，用于更新、安装、下载与 GitHub 访问。" = "Configura il proxy locale usato per aggiornamenti, installazioni, download e accesso a GitHub.";
 "按来源分组展示可清理项和需复核项；所有可操作项只会移入废纸篓" = "Raggruppa per origine gli elementi da pulire e quelli da verificare; tutto ciò su cui puoi agire viene solo spostato nel cestino";
 "请在系统设置的“隐私与安全性 > 屏幕录制”中允许 zisla" = "Autorizza zisla in Impostazioni di Sistema, in “Privacy e sicurezza > Registrazione schermo”";
-"检测到新版本后自动执行更新；关闭后不再启动新任务，已开始的更新会完成" = "Installa l’aggiornamento automaticamente quando rileva una nuova versione; se disattivato non avvia nuove attività, ma completa quelle già iniziate";
+"选中每个cli后的自动更新选项后检测到新版本后自动执行更新；关闭后不再启动新任务，已开始的更新会完成" = "Dopo aver selezionato l’opzione di aggiornamento automatico accanto a ciascuna CLI, l’aggiornamento viene installato automaticamente quando viene rilevata una nuova versione; se disattivato non avvia nuove attività, ma completa quelle già iniziate";
 "未找到 Homebrew；请先安装 Homebrew 后再管理推荐工具" = "Homebrew non trovato; installa Homebrew prima di gestire gli strumenti consigliati";
 "未找到 LibreOffice；请安装 LibreOffice 后重试" = "LibreOffice non trovato; installa LibreOffice e riprova";
 "未找到可用的 yt-dlp。请在 设置 → 下载 → 组件 中一键安装后重试。" = "Nessun yt-dlp utilizzabile. Installalo in Impostazioni → Download → Componenti e riprova.";

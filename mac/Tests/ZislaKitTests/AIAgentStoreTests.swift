@@ -170,10 +170,35 @@ struct AIAgentStoreTests {
             secretStore: StubSecretStore()
         )
 
-        store.setCLIAutoUpdateEnabled(true)
+        store.setCLIAutoUpdateEnabled(false, for: .codex)
         store.flushPendingChanges()
 
         #expect(store.persistenceError != nil)
+        #expect(!store.state.isCLIAutoUpdateEnabled(for: .codex))
+    }
+
+    @Test
+    func cliAutoUpdatePreferencesSurviveStatusRefreshAndReload() {
+        let (store, directory) = makeStore()
+        defer { try? FileManager.default.removeItem(at: directory) }
+
+        store.setCLIAutoUpdateEnabled(false, for: .codex)
+        store.setCLIAutoUpdateEnabled(true, for: .claude)
+        store.setCLIAutoUpdateEnabled(false, for: .qwen)
+        store.replaceCLIStatuses([AgentCLIStatus(kind: .codex, executablePath: "/test/codex", version: "1.0.0")])
+        store.replaceCLIStatuses([])
+        store.flushPendingChanges()
+
+        let restored = AIAgentStore(
+            storageURL: directory.appendingPathComponent("state.json"),
+            secretStore: StubSecretStore()
+        )
+        #expect(!restored.state.isCLIAutoUpdateEnabled(for: .codex))
+        #expect(restored.state.isCLIAutoUpdateEnabled(for: .claude))
+        #expect(!restored.state.isCLIAutoUpdateEnabled(for: .qwen))
+        #expect(restored.state.isCLIAutoUpdateEnabled(for: .gemini))
+        #expect(restored.state.cliStatuses.isEmpty)
+        #expect(store.persistenceError == nil)
     }
 
 

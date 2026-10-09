@@ -144,6 +144,46 @@ struct AIAgentModuleViewRefreshTests {
         #expect(source.contains("argument.replacingOccurrences(of: \"'\", with:"))
     }
 
+    @Test(arguments: AppLanguage.allCases)
+    func cliAutoUpdateLabelsAreLocalized(language: AppLanguage) throws {
+        let packageRoot = URL(fileURLWithPath: #filePath)
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+        let source = try String(
+            contentsOf: packageRoot.appendingPathComponent("Sources/Zisla/AIAgentModuleView.swift"),
+            encoding: .utf8
+        )
+        let pattern = try NSRegularExpression(pattern: #"AppLocalization\.text\("(自动更新[^"\n]*|选中每个cli[^"\n]*)""#)
+        let keys = Set(pattern.matches(in: source, range: NSRange(source.startIndex..., in: source)).compactMap {
+            Range($0.range(at: 1), in: source).map { String(source[$0]) }
+        })
+        #expect(keys.count == 3)
+        #expect(keys.contains("自动更新 %@"))
+        #expect(keys.contains("选中每个cli后的自动更新选项后检测到新版本后自动执行更新；关闭后不再启动新任务，已开始的更新会完成"))
+        let table = try #require(NSDictionary(contentsOf: packageRoot.appendingPathComponent(
+            "Resources/Localization/\(language.rawValue).lproj/Localizable.strings"
+        )) as? [String: String])
+
+        for key in keys {
+            let translation = try #require(table[key], "\(language.rawValue) 缺少自动更新文案：\(key)")
+            #expect(!translation.isEmpty)
+            #expect(translation.components(separatedBy: "%@").count == key.components(separatedBy: "%@").count)
+            #expect(AppLocalization.string(key, locale: language.locale) == translation)
+        }
+        let label = try #require(table["自动更新 %@"])
+        for kind in AgentCLIKind.managedCases {
+            let name = language.isRightToLeft ? "\u{2068}\(kind.displayName)\u{2069}" : kind.displayName
+            #expect(
+                AppLocalization.format("自动更新 %@", locale: language.locale, [kind.displayName])
+                    == label.replacingOccurrences(of: "%@", with: name)
+            )
+        }
+        if language == .english {
+            #expect(AppLocalization.format("自动更新 %@", locale: language.locale, ["Codex"]) == "Auto-update Codex")
+        }
+    }
+
     private func writeExecutable(at url: URL, contents: String = "#!/bin/sh\nexit 0\n") throws {
         try FileManager.default.createDirectory(
             at: url.deletingLastPathComponent(),

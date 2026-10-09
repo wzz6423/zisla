@@ -1026,7 +1026,7 @@
 "配置本地代理，用于更新、安装、下载与 GitHub 访问。" = "Konfigurasikan proksi lokal untuk pembaruan, pemasangan, unduhan, dan akses GitHub.";
 "按来源分组展示可清理项和需复核项；所有可操作项只会移入废纸篓" = "Mengelompokkan kandidat pembersihan dan item yang perlu ditinjau berdasarkan sumber; setiap item yang bisa ditindak hanya dipindahkan ke Tempat Sampah";
 "请在系统设置的“隐私与安全性 > 屏幕录制”中允许 zisla" = "Izinkan zisla di Pengaturan Sistem › Privasi & Keamanan › Perekaman Layar";
-"检测到新版本后自动执行更新；关闭后不再启动新任务，已开始的更新会完成" = "Pasang pembaruan otomatis begitu versi baru ditemukan; mematikannya menghentikan tugas baru, pembaruan yang sudah dimulai akan tetap selesai";
+"选中每个cli后的自动更新选项后检测到新版本后自动执行更新；关闭后不再启动新任务，已开始的更新会完成" = "Setelah memilih opsi pembaruan otomatis di samping setiap CLI, pembaruan dipasang otomatis begitu versi baru ditemukan; mematikannya menghentikan tugas baru, pembaruan yang sudah dimulai akan tetap selesai";
 "未找到 Homebrew；请先安装 Homebrew 后再管理推荐工具" = "Homebrew tidak ditemukan. Pasang Homebrew dulu, lalu kelola alat rekomendasi";
 "未找到 LibreOffice；请安装 LibreOffice 后重试" = "LibreOffice tidak ditemukan. Pasang LibreOffice lalu coba lagi.";
 "未找到可用的 yt-dlp。请在 设置 → 下载 → 组件 中一键安装后重试。" = "yt-dlp yang bisa dipakai tidak ditemukan. Pasang dari Pengaturan → Unduhan → Komponen lalu coba lagi.";
