@@ -18,6 +18,8 @@ struct VoiceLocalModelLocalizationTests {
         #expect(keys.contains("默认无需 API Key；仅在本地服务启用认证时填写。"))
         #expect(keys.contains("未发现模型，请先在本地服务中下载或加载模型。"))
         #expect(keys.contains("启动 LM Studio 服务"))
+        #expect(keys.contains("思考"))
+        #expect(keys.contains("默认关闭以加快语音整理。开启后允许模型思考，可能提高准确性，但会增加等待时间。"))
         #expect(keys.contains("未找到 LM Studio CLI。请在 LM Studio 中启动 API 服务后重试。"))
         #expect(AppLanguage.allCases.count == 17)
         let english = try table(for: .english)
@@ -35,6 +37,9 @@ struct VoiceLocalModelLocalizationTests {
             }
         }
         #expect(AppLocalization.string("启动 LM Studio 服务", locale: Locale(identifier: "en")) == "Start LM Studio server")
+        #expect(AppLocalization.string("思考", locale: Locale(identifier: "en")) == "Thinking")
+        #expect(AppLocalization.string("思考", locale: Locale(identifier: "ar")) == "التفكير")
+        #expect(AppLocalization.string("默认关闭以加快语音整理。开启后允许模型思考，可能提高准确性，但会增加等待时间。", locale: Locale(identifier: "zh-Hant")) == "預設關閉以加快語音整理。開啟後允許模型思考，可能提高準確性，但會增加等待時間。")
     }
 
     private let newKeys: Set<String> = [
@@ -45,6 +50,8 @@ struct VoiceLocalModelLocalizationTests {
         "LM Studio 操作失败，请在 LM Studio 中检查本地服务后重试。",
         "LM Studio API 无法连接。请启动服务或检查地址和端口。",
         "启动 LM Studio 服务",
+        "思考",
+        "默认关闭以加快语音整理。开启后允许模型思考，可能提高准确性，但会增加等待时间。",
     ]
 
     private func placeholders(_ value: String) -> [String] {

@@ -2646,6 +2646,8 @@
 "无法恢复休眠设置，请重试关闭保持亮屏。" = "Impossible de rétablir le réglage de veille. Essayez à nouveau de désactiver le maintien de l’écran allumé.";
 
 "本地服务" = "Service local";
+"思考" = "Réflexion";
+"默认关闭以加快语音整理。开启后允许模型思考，可能提高准确性，但会增加等待时间。" = "Désactivé par défaut pour traiter les transcriptions plus rapidement. L’activer permet au modèle de réfléchir, ce qui peut améliorer la précision, mais augmente le temps d’attente.";
 "选择已发现的模型" = "Choisir un modèle détecté";
 "API Key（可选）" = "Clé API (facultative)";
 "获取模型" = "Récupérer les modèles";

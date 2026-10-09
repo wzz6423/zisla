@@ -356,7 +356,8 @@ final class AppModel: ObservableObject {
       model: String,
       apiKey: String?,
       effort: AgentModelEffort?,
-      localInference: Bool
+      localInference: Bool,
+      localThinkingEnabled: Bool
     )
     case cliProfile(accountID: UUID, model: String)
   }
@@ -3338,7 +3339,8 @@ final class AppModel: ObservableObject {
         model: model,
         apiKey: try store.secret(for: configuration),
         effort: nil,
-        localInference: true
+        localInference: true,
+        localThinkingEnabled: configuration.thinkingEnabled
       )
     case .channel:
       guard let channel = store.channel(id: reference.id),
@@ -3362,7 +3364,8 @@ final class AppModel: ObservableObject {
         model: model,
         apiKey: apiKey.trimmingCharacters(in: .whitespacesAndNewlines),
         effort: channel.effort,
-        localInference: false
+        localInference: false,
+        localThinkingEnabled: false
       )
     }
   }
@@ -3373,7 +3376,7 @@ final class AppModel: ObservableObject {
     messages: [AIOutboundMessage]
   ) async throws -> String {
     switch target {
-    case let .http(endpoint, protocolKind, model, apiKey, effort, localInference):
+    case let .http(endpoint, protocolKind, model, apiKey, effort, localInference, localThinkingEnabled):
       return try await AIChatClient().complete(
         endpoint: endpoint,
         protocolKind: protocolKind,
@@ -3382,7 +3385,8 @@ final class AppModel: ObservableObject {
         messages: messages,
         apiKey: apiKey,
         effort: effort,
-        localInference: localInference
+        localInference: localInference,
+        localThinkingEnabled: localThinkingEnabled
       ).content
     case let .cliProfile(accountID, model):
       return try await aiAgent.completeWithCLIProfile(
@@ -3501,7 +3505,7 @@ final class AppModel: ObservableObject {
       discoveredModels = []
       return
     }
-    guard case let .http(endpoint, _, _, apiKey, _, _) = target else {
+    guard case let .http(endpoint, _, _, apiKey, _, _, _) = target else {
       voiceModelDiscoveryState = .failed(AppLocalization.text("官方 CLI 档案不支持 API 模型发现"))
       discoveredModels = []
       return

@@ -2651,6 +2651,8 @@
 "无法恢复休眠设置，请重试关闭保持亮屏。" = "Die Ruhezustandseinstellung konnte nicht wiederhergestellt werden. Versuche erneut, das Wachhalten des Displays auszuschalten.";
 
 "本地服务" = "Lokaler Dienst";
+"思考" = "Denken";
+"默认关闭以加快语音整理。开启后允许模型思考，可能提高准确性，但会增加等待时间。" = "Standardmäßig deaktiviert, damit Sprachtranskripte schneller aufbereitet werden. Wenn aktiviert, darf das Modell nachdenken. Das kann die Genauigkeit verbessern, verlängert aber die Wartezeit.";
 "选择已发现的模型" = "Gefundenes Modell auswählen";
 "API Key（可选）" = "API-Schlüssel (optional)";
 "获取模型" = "Modelle abrufen";

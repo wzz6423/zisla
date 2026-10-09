@@ -2650,6 +2650,8 @@
 "无法恢复休眠设置，请重试关闭保持亮屏。" = "Impossibile ripristinare l’impostazione di stop. Prova di nuovo a disattivare il mantenimento dello schermo acceso.";
 
 "本地服务" = "Servizio locale";
+"思考" = "Ragionamento";
+"默认关闭以加快语音整理。开启后允许模型思考，可能提高准确性，但会增加等待时间。" = "Disattivato per impostazione predefinita per elaborare più rapidamente le trascrizioni. Se attivato, consente al modello di ragionare, migliorando potenzialmente l’accuratezza ma aumentando l’attesa.";
 "选择已发现的模型" = "Scegli un modello rilevato";
 "API Key（可选）" = "Chiave API (facoltativa)";
 "获取模型" = "Recupera modelli";

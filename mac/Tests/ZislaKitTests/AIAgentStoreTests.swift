@@ -8,6 +8,79 @@ import Testing
 struct AIAgentStoreTests {
 
     @Test
+    func localThinkingPreferencesSurviveReloadIndependently() throws {
+        let (store, directory) = makeStore()
+        defer {
+            store.flushPendingChanges()
+            try? FileManager.default.removeItem(at: directory)
+        }
+        let endpoint = AIEndpoint(name: "LM Studio", baseURL: AIEndpointKind.openAICompatible.defaultBaseURL)
+        var first = AIAgentLocalModel(name: "Fast", endpoint: endpoint, modelName: "google/gemma-4-e4b")
+        var second = AIAgentLocalModel(name: "Careful", endpoint: endpoint, modelName: "google/gemma-4-e4b", thinkingEnabled: true)
+        store.upsertLocalModel(first)
+        store.upsertLocalModel(second)
+        store.flushPendingChanges()
+
+        let storageURL = directory.appendingPathComponent("state.json")
+        let restored = AIAgentStore(storageURL: storageURL, secretStore: StubSecretStore())
+        #expect(restored.localModel(id: first.id) == first)
+        #expect(restored.localModel(id: second.id) == second)
+        first.thinkingEnabled = true
+        second.thinkingEnabled = false
+        restored.upsertLocalModel(first)
+        restored.upsertLocalModel(second)
+        restored.flushPendingChanges()
+
+        let reopened = AIAgentStore(storageURL: storageURL, secretStore: StubSecretStore())
+        #expect(reopened.state.localModels == [first, second])
+        #expect(reopened.localModel(id: first.id)?.thinkingEnabled == true)
+        #expect(reopened.localModel(id: second.id)?.thinkingEnabled == false)
+    }
+
+    @Test
+    func failedThinkingPreferenceWritePreservesDiskStateAndCanRecover() throws {
+        let directory = FileManager.default.temporaryDirectory.appendingPathComponent("zisla-local-thinking-write-\(UUID())")
+        let storageURL = directory.appendingPathComponent("state.json")
+        let failureMarker = directory.appendingPathComponent("inject-write-failure")
+        let store = AIAgentStore(
+            storageURL: storageURL,
+            secretStore: StubSecretStore(),
+            persistenceDelay: 60,
+            persistenceWriter: { state, url in
+                if FileManager.default.fileExists(atPath: failureMarker.path) {
+                    throw CocoaError(.fileWriteNoPermission)
+                }
+                try AIAgentStore.write(state, to: url)
+            }
+        )
+        defer {
+            store.flushPendingChanges()
+            try? FileManager.default.removeItem(at: directory)
+        }
+        var model = AIAgentLocalModel(
+            name: "LM Studio",
+            endpoint: AIEndpoint(name: "LM Studio", baseURL: AIEndpointKind.openAICompatible.defaultBaseURL),
+            modelName: "google/gemma-4-e4b"
+        )
+        store.upsertLocalModel(model)
+        store.flushPendingChanges()
+        let previous = try Data(contentsOf: storageURL)
+        try Data().write(to: failureMarker)
+        model.thinkingEnabled = true
+        store.upsertLocalModel(model)
+        store.flushPendingChanges()
+        #expect(store.persistenceError != nil)
+        #expect(try Data(contentsOf: storageURL) == previous)
+        #expect(store.localModel(id: model.id)?.thinkingEnabled == true)
+
+        try FileManager.default.removeItem(at: failureMarker)
+        store.flushPendingChanges()
+        #expect(store.persistenceError == nil)
+        let restored = AIAgentStore(storageURL: storageURL, secretStore: StubSecretStore())
+        #expect(restored.localModel(id: model.id) == model)
+    }
+
+    @Test
     func localCredentialsSurviveReloadWithoutEnteringConfigurationJSON() throws {
         let directory = FileManager.default.temporaryDirectory.appendingPathComponent("zisla-local-secrets-\(UUID())")
         defer { try? FileManager.default.removeItem(at: directory) }

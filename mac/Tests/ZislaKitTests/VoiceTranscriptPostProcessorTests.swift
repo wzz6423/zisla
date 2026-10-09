@@ -42,10 +42,12 @@ struct VoiceTranscriptPostProcessorTests {
             "“就是”表判断或强调", "哈喽 哈喽 哈喽", "只返回整理后的文本",
             "数字及版本保留原有写法和分隔符", "不互换中文数字和阿拉伯数字",
             "禁止把英文名称改成中文音译或音近的日常词",
+            "只保留最后确认的内容", "修正某个列举项时原位替换，不新增事项",
+            "普通否定、引用或没有明确替换内容时保留原话",
         ] {
             #expect(prompt.contains(rule), "Missing cleanup contract: \(rule)")
         }
-        for example in ["Gemma", "Qwen", "Google", "感冒", "伽马射线"] {
+        for example in ["Gemma", "Qwen", "Google", "感冒", "伽马射线", "起床", "睡觉", "出去玩", "三个是"] {
             #expect(!prompt.contains(example), "Domain-specific example in cleanup instructions: \(example)")
         }
     }
@@ -174,6 +176,88 @@ struct VoiceTranscriptPostProcessorTests {
         #expect(VoiceTranscriptPostProcessor.deliveredText(
             "今天做两件事：\n1、更新模型。\n2、更新词库。", fallback: "今天做两件事，第一更新模型，第二更新词库"
         ) == "今天做两件事：\n1、更新模型。\n2、更新词库。")
+    }
+
+    @Test(arguments: [
+        (
+            "今天有三个是：\n1、第一个是起床，\n2、第二个是吃饭，\n3、第三个是睡觉不对，第三个事儿是出去玩",
+            "今天有三个事：第一个是起床，第二个是吃饭，第三个是出去玩。"
+        ),
+        ("1、洗衣服\n2、跑步，不对\n2、散步", "1、洗衣服\n2、散步"),
+        ("1. 买 3 个苹果\n2. 买 4 个梨", "买 3 个苹果，买 4 个梨。"),
+        ("  1) 带雨伞\n\t2) 带水杯", "带雨伞，带水杯。"),
+        ("1、读取 /tmp/报告.txt\n2、返回", "读取 /tmp/报告.txt，然后返回。"),
+    ])
+    func allowsCleanupToReplaceOrRemoveListMarkers(_ input: String, _ response: String) {
+        #expect(VoiceTranscriptPostProcessor.deliveredText(response, fallback: input) == response)
+    }
+
+    @Test(arguments: [
+        ("买 1 个苹果，再买梨", "1、买苹果\n2、买梨"),
+        ("1、买 3 个苹果\n2、买梨\n3、回家", "1、买苹果\n2、买梨\n3、回家"),
+        ("1. 买 3 个苹果\n2. 买 4 个梨", "1. 买 4 个苹果\n2. 买梨"),
+        ("3.14 是这个值", "3.15 是这个值"),
+        ("2026.10.09 是日期", "2026.10.10 是日期"),
+        ("1.swift 是文件名", "2.swift 是文件名"),
+        ("第 3 个服务器需要重启", "服务器需要重启"),
+        ("参数可选 1、2、3", "参数可选 2、3"),
+        ("1、读取 /tmp/报告.txt\n2、返回", "读取 /tmp/备份.txt，然后返回。"),
+    ])
+    func listMarkersCannotStandInForQuantitiesOrOtherProtectedContent(_ input: String, _ response: String) {
+        #expect(VoiceTranscriptPostProcessor.deliveredText(response, fallback: input) == input)
+    }
+
+    @Test(arguments: [1, 2, 3, 7, 12, 100])
+    func changingListLayoutPreservesBodyQuantities(_ quantity: Int) {
+        for marker in ["、", ".", ")"] {
+            for indent in ["", "  ", "\t"] {
+                for newline in ["\n", "\r\n"] {
+                    let input = "\(indent)1\(marker) 买 \(quantity) 个苹果\(newline)\(indent)2\(marker) 回家"
+                    let prose = "买 \(quantity) 个苹果，然后回家。"
+                    #expect(VoiceTranscriptPostProcessor.deliveredText(prose, fallback: input) == prose)
+                    #expect(VoiceTranscriptPostProcessor.deliveredText(
+                        "1\(marker) 买苹果\(newline)2\(marker) 回家", fallback: input
+                    ) == input)
+                }
+            }
+        }
+    }
+
+    @Test(arguments: [
+        (
+            "他原话说“明天去，不对，后天去”，这句话我要逐字记录。",
+            "他原话说“明天去，后天去”，这句话我要逐字记录。"
+        ),
+        ("She said \"tomorrow, no, the day after tomorrow\".", "She said \"tomorrow, the day after tomorrow\"."),
+        ("他原话说“不能上线”。", "他原话说“能上线”。"),
+        ("先引用“甲”，再引用“乙”。", "先引用“乙”，再引用“甲”。"),
+        ("引用“甲”。", "引用“甲”和“甲”。"),
+    ])
+    func rejectsRewritingSurvivingQuotations(_ input: String, _ response: String) {
+        #expect(VoiceTranscriptPostProcessor.deliveredText(response, fallback: input) == input)
+    }
+
+    @Test(arguments: [
+        ("第一用“蓝色”，不对，第一用“红色”，第二用“白色”。", "1、用“红色”\n2、用“白色”"),
+        ("我选“红色”，不对，蓝色。", "我选蓝色。"),
+        ("He said \"not today\"", "He said “not today”."),
+        ("标题是“示例”，然后打开程序", "标题是“示例”。\n然后打开程序。"),
+        ("他说明天见", "他说“明天见”。"),
+        ("他说“晚点回", "他说“晚点回”。"),
+    ])
+    func allowsWholeQuotationRetractionsAndPunctuationEdits(_ input: String, _ response: String) {
+        #expect(VoiceTranscriptPostProcessor.deliveredText(response, fallback: input) == response)
+    }
+
+    @Test(arguments: ["不对", "hello", "don't", "資料📁", "甲\n乙", "", String(repeating: "字", count: 1_024)])
+    func quotationIntegrityHandlesUnicodeAndLineBreaks(_ contents: String) {
+        for (opening, closing) in [("“", "”"), ("\"", "\"")] {
+            let input = "原话是\(opening)\(contents)\(closing)，今天去公园，不对，去图书馆。"
+            let response = "原话是\(opening)\(contents)\(closing)。今天去图书馆。"
+            #expect(VoiceTranscriptPostProcessor.deliveredText(response, fallback: input) == response)
+            let rewritten = "原话是\(opening)\(contents)新增\(closing)。今天去图书馆。"
+            #expect(VoiceTranscriptPostProcessor.deliveredText(rewritten, fallback: input) == input)
+        }
     }
 
     @Test(arguments: [

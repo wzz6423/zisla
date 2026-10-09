@@ -6,18 +6,18 @@ import Testing
 
 @MainActor
 struct VoiceLocalModelConfigurationTests {
-    @Test(arguments: AIEndpointKind.allCases)
-    func localVoiceTargetNeedsNoAPIKey(kind: AIEndpointKind) throws {
+    @Test(arguments: AIEndpointKind.allCases, [false, true])
+    func localVoiceTargetNeedsNoAPIKeyAndKeepsThinkingPreference(kind: AIEndpointKind, thinkingEnabled: Bool) throws {
         let (store, directory) = makeStore()
         defer {
             store.flushPendingChanges()
             try? FileManager.default.removeItem(at: directory)
         }
-        let model = AIAgentLocalModel(name: kind.defaultEndpointName, endpoint: AIEndpoint(name: kind.defaultEndpointName, baseURL: kind.defaultBaseURL, kind: kind), modelName: " local-model \n")
+        let model = AIAgentLocalModel(name: kind.defaultEndpointName, endpoint: AIEndpoint(name: kind.defaultEndpointName, baseURL: kind.defaultBaseURL, kind: kind), modelName: " local-model \n", thinkingEnabled: thinkingEnabled)
         store.upsertLocalModel(model)
 
         let target = try AppModel.voicePostProcessingTarget(for: .local(model.id), store: store)
-        guard case let .http(endpoint, protocolKind, name, key, effort, localInference) = target else {
+        guard case let .http(endpoint, protocolKind, name, key, effort, localInference, localThinkingEnabled) = target else {
             Issue.record("Enabled local configuration should resolve without a key")
             return
         }
@@ -27,6 +27,7 @@ struct VoiceLocalModelConfigurationTests {
         #expect(key == nil)
         #expect(effort == nil)
         #expect(localInference)
+        #expect(localThinkingEnabled == thinkingEnabled)
     }
 
     @Test
@@ -41,7 +42,7 @@ struct VoiceLocalModelConfigurationTests {
         #expect(try AppModel.voicePostProcessingTarget(for: .local(model.id), store: store) == nil)
 
         let target = try AppModel.voicePostProcessingTarget(for: .local(model.id), store: store, requiresModel: false)
-        guard case let .http(_, _, name, key, _, _) = target else {
+        guard case let .http(_, _, name, key, _, _, _) = target else {
             Issue.record("Model discovery must not require a model name")
             return
         }
@@ -84,7 +85,7 @@ struct VoiceLocalModelConfigurationTests {
         store.upsertChannel(channel)
 
         let target = try AppModel.voicePostProcessingTarget(for: .channel(channel.id), store: store)
-        guard case let .http(_, _, name, key, effort, localInference) = target else {
+        guard case let .http(_, _, name, key, effort, localInference, localThinkingEnabled) = target else {
             Issue.record("Existing cloud configuration should resolve")
             return
         }
@@ -92,6 +93,7 @@ struct VoiceLocalModelConfigurationTests {
         #expect(key == "cloud-test-key")
         #expect(effort == .medium)
         #expect(!localInference)
+        #expect(!localThinkingEnabled)
         channel.defaultModel = ""
         store.upsertChannel(channel)
         #expect(try AppModel.voicePostProcessingTarget(for: .channel(channel.id), store: store, requiresModel: false) == nil)

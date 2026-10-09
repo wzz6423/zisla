@@ -2650,6 +2650,8 @@
 "无法恢复休眠设置，请重试关闭保持亮屏。" = "Não foi possível restaurar a configuração de repouso. Tente desativar novamente a opção de manter a tela ligada.";
 
 "本地服务" = "Serviço local";
+"思考" = "Raciocínio";
+"默认关闭以加快语音整理。开启后允许模型思考，可能提高准确性，但会增加等待时间。" = "Desativado por padrão para agilizar a revisão da transcrição. Ao ativar, o modelo pode raciocinar, o que pode melhorar a precisão, mas aumenta o tempo de espera.";
 "选择已发现的模型" = "Escolher um modelo encontrado";
 "API Key（可选）" = "Chave de API (opcional)";
 "获取模型" = "Buscar modelos";

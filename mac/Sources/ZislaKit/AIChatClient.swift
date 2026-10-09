@@ -69,6 +69,14 @@ public struct AIChatClient: Sendable {
         self.session = session
     }
 
+    public static func supportsLocalThinking(endpoint: AIEndpoint, model: String) -> Bool {
+        let model = model.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+        let family = model.split(separator: ":").first
+        return endpoint.kind == .ollama
+            ? family == "qwen3.5" || family == "gemma4"
+            : model.hasPrefix("google/gemma-4-")
+    }
+
     public func complete(
         endpoint: AIEndpoint,
         protocolKind: AgentChannelProtocol = .openAICompatible,
@@ -77,7 +85,8 @@ public struct AIChatClient: Sendable {
         messages: [AIOutboundMessage],
         apiKey: String? = nil,
         effort: AgentModelEffort? = nil,
-        localInference: Bool = false
+        localInference: Bool = false,
+        localThinkingEnabled: Bool = false
     ) async throws -> AIChatResponse {
         let url = try completionURL(for: endpoint, protocolKind: protocolKind, model: model)
         var request = URLRequest(url: url)
@@ -107,11 +116,7 @@ public struct AIChatClient: Sendable {
         )
         if localInference, protocolKind == .openAICompatible {
             body["temperature"] = 0
-            let family = model.lowercased().split(separator: ":").first
-            let supportsNonThinking = endpoint.kind == .ollama
-                ? family == "qwen3.5" || family == "gemma4"
-                : model.lowercased().hasPrefix("google/gemma-4-")
-            if supportsNonThinking {
+            if !localThinkingEnabled, Self.supportsLocalThinking(endpoint: endpoint, model: model) {
                 body["reasoning_effort"] = "none"
             }
         }

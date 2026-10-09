@@ -2650,6 +2650,8 @@
 "无法恢复休眠设置，请重试关闭保持亮屏。" = "Tidak dapat memulihkan pengaturan tidur. Coba matikan kembali fitur layar tetap menyala.";
 
 "本地服务" = "Layanan lokal";
+"思考" = "Berpikir";
+"默认关闭以加快语音整理。开启后允许模型思考，可能提高准确性，但会增加等待时间。" = "Dinonaktifkan secara default agar perapian transkrip lebih cepat. Jika diaktifkan, model dapat berpikir, yang mungkin meningkatkan akurasi tetapi menambah waktu tunggu.";
 "选择已发现的模型" = "Pilih model yang ditemukan";
 "API Key（可选）" = "Kunci API (opsional)";
 "获取模型" = "Ambil model";

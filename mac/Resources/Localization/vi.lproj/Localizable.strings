@@ -2650,6 +2650,8 @@
 "无法恢复休眠设置，请重试关闭保持亮屏。" = "Không thể khôi phục cài đặt ngủ. Hãy thử tắt lại tính năng giữ màn hình sáng.";
 
 "本地服务" = "Dịch vụ cục bộ";
+"思考" = "Suy nghĩ";
+"默认关闭以加快语音整理。开启后允许模型思考，可能提高准确性，但会增加等待时间。" = "Mặc định tắt để xử lý bản chép lời nhanh hơn. Bật tùy chọn này cho phép mô hình suy nghĩ, có thể tăng độ chính xác nhưng sẽ phải chờ lâu hơn.";
 "选择已发现的模型" = "Chọn mô hình đã tìm thấy";
 "API Key（可选）" = "Khóa API (tùy chọn)";
 "获取模型" = "Lấy danh sách mô hình";
