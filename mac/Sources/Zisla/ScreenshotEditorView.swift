@@ -4091,7 +4091,7 @@ private struct ScreenshotInlineTextEditor: NSViewRepresentable {
     }
 }
 
-/// Presents the PNG save panel shared by the editor toolbar and the ⌘S shortcut.
+/// Presents the PNG save panel shared by the shelf, editor toolbar, pinned image, and ⌘S shortcut.
 @MainActor
 enum ScreenshotImageExport {
     static func writePNG(_ data: Data, to url: URL) throws {
@@ -4101,13 +4101,27 @@ enum ScreenshotImageExport {
     /// - Parameter status: Receives the result message, or `nil` when the panel closes without writing a file.
     static func presentSavePanel(
         for data: Data,
+        panel: NSSavePanel = NSSavePanel(),
+        systemPreferences: UserDefaults = .standard,
+        themeNotifications: NotificationCenter = DistributedNotificationCenter.default(),
         status: @escaping @MainActor (String?) -> Void
     ) {
-        let panel = NSSavePanel()
         panel.nameFieldStringValue = AppLocalization.text("截图.png")
         panel.allowedContentTypes = [.png]
         panel.canCreateDirectories = true
+        // System dialogs must not inherit the island's or app's explicit appearance override.
+        let updateAppearance: @MainActor @Sendable () -> Void = {
+            panel.appearance = NSAppearance(named:
+                systemPreferences.string(forKey: "AppleInterfaceStyle") == "Dark" ? .darkAqua : .aqua)
+        }
+        updateAppearance()
+        let themeObserver = themeNotifications.addObserver(
+            forName: Notification.Name("AppleInterfaceThemeChangedNotification"), object: nil, queue: .main
+        ) { _ in
+            MainActor.assumeIsolated { updateAppearance() }
+        }
         let response: (NSApplication.ModalResponse) -> Void = { response in
+            themeNotifications.removeObserver(themeObserver)
             guard response == .OK, let url = panel.url else {
                 Task { @MainActor in status(nil) }
                 return
@@ -4119,12 +4133,8 @@ enum ScreenshotImageExport {
                 Task { @MainActor in status(AppLocalization.text("保存失败：%@", error.localizedDescription)) }
             }
         }
-        if let window = NSApp.keyWindow ?? NSApp.mainWindow, window.isVisible {
-            panel.beginSheetModal(for: window, completionHandler: response)
-        } else {
-            WindowPlacement.prepareModal(panel)
-            panel.begin(completionHandler: response)
-        }
+        WindowPlacement.prepareModal(panel)
+        panel.begin(completionHandler: response)
     }
 }
 
