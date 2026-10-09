@@ -300,19 +300,12 @@ struct AIAgentModuleView: View {
                 VStack(alignment: .leading, spacing: 2) {
                     Text(AppLocalization.text("自动更新 CLI"))
                         .font(.system(size: 11, weight: .semibold))
-                    Text(AppLocalization.text("检测到新版本后自动执行更新；关闭后不再启动新任务，已开始的更新会完成"))
+                    Text(AppLocalization.text("选中每个cli后的自动更新选项后检测到新版本后自动执行更新；关闭后不再启动新任务，已开始的更新会完成"))
                         .font(.system(size: 9))
                         .foregroundStyle(.secondary)
                         .fixedSize(horizontal: false, vertical: true)
                 }
                 Spacer(minLength: 8)
-                Toggle("", isOn: Binding(
-                    get: { agent.store.state.cliAutoUpdateEnabled },
-                    set: { agent.setCLIAutoUpdateEnabled($0) }
-                ))
-                .labelsHidden()
-                .toggleStyle(.switch)
-                .controlSize(.small)
             }
             .padding(8)
             .background(Color.primary.opacity(0.05))
@@ -351,80 +344,96 @@ struct AIAgentModuleView: View {
                                 }
                             }
                         }
-                        Spacer()
-                        if AgentCLIKind.managedCases.contains(kind), isInstalled {
-                            let update = agent.commandsForCLIInstallation([kind], update: true)
-                            let availableUpdate = agent.cliUpdates.first { $0.kind == kind }
-                            if agent.isCheckingCLIs {
-                                ProgressView()
-                                    .controlSize(.small)
-                                    .frame(width: 16, height: 16)
-                                    .help(AppLocalization.text("正在检查 %@ 更新", kind.displayName))
-                            } else if let availableUpdate {
-                                Button {
-                                    queueCLIAction(
-                                        title: AppLocalization.text("更新 %@？", kind.displayName),
-                                        message: AppLocalization.text("将 %@ 从 %@ 更新到 %@", kind.displayName, availableUpdate.installedVersion, availableUpdate.latestVersion),
-                                        kinds: [kind],
-                                        commands: update
-                                    )
-                                } label: {
-                                    Image(systemName: "arrow.up.circle")
-                                }
-                                .buttonStyle(.borderless)
-                                .foregroundStyle(Color.zislaInfo)
-                                .disabled(agent.isRunningCLICommands || update.isEmpty)
-                                .help(AppLocalization.text("已确认新版本 %@，更新 %@", availableUpdate.latestVersion, kind.displayName))
-                            } else if status?.version != nil, kind != .kimi {
-                                Image(systemName: "checkmark.circle.fill")
-                                    .foregroundStyle(kind == .grok && agent.grokUpdateState == .upToDate ? .green : .secondary)
-                                    .help(kind == .grok && agent.grokUpdateState == .upToDate ? AppLocalization.text("Grok 已是最新版本") : AppLocalization.text("当前未检测到可用更新"))
-                            } else {
-                                Button {
-                                    queueCLIAction(
-                                        title: AppLocalization.text("更新 %@？", kind.displayName),
-                                        message: cliActionMessage(AppLocalization.text("将更新"), kinds: [kind]),
-                                        kinds: [kind],
-                                        commands: update
-                                    )
-                                } label: {
-                                    Image(systemName: "arrow.up.circle")
-                                }
-                                .buttonStyle(.borderless)
-                                .foregroundStyle(.secondary)
-                                .disabled(agent.isRunningCLICommands || update.isEmpty)
-                                .help(status?.version == nil ? AppLocalization.text("版本未知，可尝试更新 %@", kind.displayName) : AppLocalization.text("检查并升级 %@", kind.displayName))
-                            }
-                            let uninstall = agent.commandsForCLIUninstallation([kind])
-                            Button(role: .destructive) {
-                                queueCLIAction(
-                                    title: AppLocalization.text("卸载 %@？", kind.displayName),
-                                    message: cliActionMessage(AppLocalization.text("将卸载"), kinds: [kind], isUninstall: true),
-                                    kinds: [kind],
-                                    commands: uninstall
-                                )
-                            } label: {
-                                Image(systemName: "trash")
-                            }
-                            .buttonStyle(.borderless)
-                            .disabled(agent.isRunningCLICommands || uninstall.isEmpty)
-                            .help(AppLocalization.text("卸载 %@", kind.displayName))
-                        } else if AgentCLIKind.managedCases.contains(kind) {
-                            let install = agent.commandsForCLIInstallation([kind], update: false)
-                            Button {
-                                queueCLIAction(
-                                    title: AppLocalization.text("下载 %@？", kind.displayName),
-                                    message: cliActionMessage(AppLocalization.text("将下载并安装"), kinds: [kind]),
-                                    kinds: [kind],
-                                    commands: install
-                                )
-                            } label: {
-                                Image(systemName: "arrow.down.circle")
-                            }
-                            .buttonStyle(.borderless)
-                            .disabled(install.isEmpty)
-                            .help(AppLocalization.text("下载并安装 %@", kind.displayName))
+                        if isInstalled {
+                            Spacer()
                         }
+                        if AgentCLIKind.managedCases.contains(kind), isInstalled {
+                            Toggle(AppLocalization.text("自动更新 %@", kind.displayName), isOn: Binding(
+                                get: { agent.store.state.isCLIAutoUpdateEnabled(for: kind) },
+                                set: { agent.setCLIAutoUpdateEnabled($0, for: kind) }
+                            ))
+                            .labelsHidden()
+                            .toggleStyle(.checkbox)
+                            .controlSize(.small)
+                            .frame(width: 16)
+                            .help(AppLocalization.text("自动更新 %@", kind.displayName))
+                        }
+                        HStack(spacing: 8) {
+                            if AgentCLIKind.managedCases.contains(kind), isInstalled {
+                                let update = agent.commandsForCLIInstallation([kind], update: true)
+                                let availableUpdate = agent.cliUpdates.first { $0.kind == kind }
+                                if agent.isCheckingCLIs {
+                                    ProgressView()
+                                        .controlSize(.small)
+                                        .frame(width: 16, height: 16)
+                                        .help(AppLocalization.text("正在检查 %@ 更新", kind.displayName))
+                                } else if let availableUpdate {
+                                    Button {
+                                        queueCLIAction(
+                                            title: AppLocalization.text("更新 %@？", kind.displayName),
+                                            message: AppLocalization.text("将 %@ 从 %@ 更新到 %@", kind.displayName, availableUpdate.installedVersion, availableUpdate.latestVersion),
+                                            kinds: [kind],
+                                            commands: update
+                                        )
+                                    } label: {
+                                        Image(systemName: "arrow.up.circle")
+                                    }
+                                    .buttonStyle(.borderless)
+                                    .foregroundStyle(Color.zislaInfo)
+                                    .disabled(agent.isRunningCLICommands || update.isEmpty)
+                                    .help(AppLocalization.text("已确认新版本 %@，更新 %@", availableUpdate.latestVersion, kind.displayName))
+                                } else if status?.version != nil, kind != .kimi {
+                                    Image(systemName: "checkmark.circle.fill")
+                                        .foregroundStyle(kind == .grok && agent.grokUpdateState == .upToDate ? .green : .secondary)
+                                        .help(kind == .grok && agent.grokUpdateState == .upToDate ? AppLocalization.text("Grok 已是最新版本") : AppLocalization.text("当前未检测到可用更新"))
+                                } else {
+                                    Button {
+                                        queueCLIAction(
+                                            title: AppLocalization.text("更新 %@？", kind.displayName),
+                                            message: cliActionMessage(AppLocalization.text("将更新"), kinds: [kind]),
+                                            kinds: [kind],
+                                            commands: update
+                                        )
+                                    } label: {
+                                        Image(systemName: "arrow.up.circle")
+                                    }
+                                    .buttonStyle(.borderless)
+                                    .foregroundStyle(.secondary)
+                                    .disabled(agent.isRunningCLICommands || update.isEmpty)
+                                    .help(status?.version == nil ? AppLocalization.text("版本未知，可尝试更新 %@", kind.displayName) : AppLocalization.text("检查并升级 %@", kind.displayName))
+                                }
+                                let uninstall = agent.commandsForCLIUninstallation([kind])
+                                Button(role: .destructive) {
+                                    queueCLIAction(
+                                        title: AppLocalization.text("卸载 %@？", kind.displayName),
+                                        message: cliActionMessage(AppLocalization.text("将卸载"), kinds: [kind], isUninstall: true),
+                                        kinds: [kind],
+                                        commands: uninstall
+                                    )
+                                } label: {
+                                    Image(systemName: "trash")
+                                }
+                                .buttonStyle(.borderless)
+                                .disabled(agent.isRunningCLICommands || uninstall.isEmpty)
+                                .help(AppLocalization.text("卸载 %@", kind.displayName))
+                            } else if AgentCLIKind.managedCases.contains(kind) {
+                                let install = agent.commandsForCLIInstallation([kind], update: false)
+                                Button {
+                                    queueCLIAction(
+                                        title: AppLocalization.text("下载 %@？", kind.displayName),
+                                        message: cliActionMessage(AppLocalization.text("将下载并安装"), kinds: [kind]),
+                                        kinds: [kind],
+                                        commands: install
+                                    )
+                                } label: {
+                                    Image(systemName: "arrow.down.circle")
+                                }
+                                .buttonStyle(.borderless)
+                                .disabled(install.isEmpty)
+                                .help(AppLocalization.text("下载并安装 %@", kind.displayName))
+                            }
+                        }
+                        .frame(width: isInstalled ? 40 : nil, alignment: .trailing)
                     }
                     if AgentCLIKind.managedCases.contains(kind), isInstalled {
                         cliCommandRows(

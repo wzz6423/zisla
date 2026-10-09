@@ -1026,7 +1026,7 @@
 "配置本地代理，用于更新、安装、下载与 GitHub 访问。" = "Cấu hình proxy cục bộ dùng cho cập nhật, cài đặt, tải xuống và truy cập GitHub.";
 "按来源分组展示可清理项和需复核项；所有可操作项只会移入废纸篓" = "Nhóm các mục có thể dọn và mục cần rà soát theo nguồn; mọi mục có thể xử lý chỉ được chuyển vào Thùng rác";
 "请在系统设置的“隐私与安全性 > 屏幕录制”中允许 zisla" = "Cho phép zisla trong Cài đặt hệ thống › Quyền riêng tư và Bảo mật › Ghi màn hình";
-"检测到新版本后自动执行更新；关闭后不再启动新任务，已开始的更新会完成" = "Tự động cài bản cập nhật khi tìm thấy phiên bản mới; tắt tùy chọn này sẽ dừng nhiệm vụ mới, các bản cập nhật đã bắt đầu vẫn hoàn tất";
+"选中每个cli后的自动更新选项后检测到新版本后自动执行更新；关闭后不再启动新任务，已开始的更新会完成" = "Sau khi chọn tùy chọn cập nhật tự động bên cạnh mỗi CLI, bản cập nhật sẽ được cài tự động khi tìm thấy phiên bản mới; tắt tùy chọn này sẽ dừng nhiệm vụ mới, các bản cập nhật đã bắt đầu vẫn hoàn tất";
 "未找到 Homebrew；请先安装 Homebrew 后再管理推荐工具" = "Không tìm thấy Homebrew. Hãy cài Homebrew trước, rồi quản lý công cụ đề xuất";
 "未找到 LibreOffice；请安装 LibreOffice 后重试" = "Không tìm thấy LibreOffice. Hãy cài LibreOffice và thử lại";
 "未找到可用的 yt-dlp。请在 设置 → 下载 → 组件 中一键安装后重试。" = "Không tìm thấy yt-dlp khả dụng. Hãy cài từ Cài đặt → Tải xuống → Thành phần rồi thử lại.";
