@@ -1258,8 +1258,7 @@ struct SettingsView: View {
                             settingRow(
                                 symbol: tool.symbol,
                                 title: tool.title,
-                                detail: "",
-                                isNested: true
+                                detail: ""
                             ) {
                                 HotkeyRecorder(
                                     hotkey: Binding(
@@ -1284,7 +1283,7 @@ struct SettingsView: View {
                         }
                         rowDivider
                         ForEach(ScreenshotEditorWindow.fixedShortcuts, id: \.title) { shortcut in
-                            settingRow(symbol: shortcut.symbol, title: shortcut.title, detail: "", isNested: true) {
+                            settingRow(symbol: shortcut.symbol, title: shortcut.title, detail: "") {
                                 Text(shortcut.displayName)
                                     .font(.system(size: 10, design: .monospaced))
                             }

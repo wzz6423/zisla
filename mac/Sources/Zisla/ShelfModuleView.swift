@@ -10,8 +10,6 @@ struct ShelfModuleView: View {
     @StateObject private var dropState = FileDropState()
     @State private var searchText = ""
 
-    @State private var screenshotPreview: ShelfScreenshotPreview?
-
     private static let shelfShape = IslandSurfaceGeometry.moduleContentShape(
         bottomTrailingRadius: IslandSurfaceGeometry.moduleOuterBottomCornerRadius
     )
@@ -140,6 +138,12 @@ struct ShelfModuleView: View {
                                               onSave: { model.saveShelfContextNote() },
                                               onClose: { noteEditor.close() })
                             .id(ObjectIdentifier(draft))
+                    } else if let screenshot = noteEditor.screenshot {
+                        ShelfScreenshotDetailView(detail: screenshot, onCopy: {
+                            if let item = model.shelf.items.first(where: { $0.id == screenshot.id }) { model.copyShelfItems([item]) }
+                        }, onSave: {
+                            if let item = model.shelf.items.first(where: { $0.id == screenshot.id }) { model.saveShelfScreenshot(item) }
+                        }, onClose: { noteEditor.close() })
                     } else if model.shelf.items.isEmpty {
                         EmptyState(
                             symbol: "tray.and.arrow.down",
@@ -163,8 +167,7 @@ struct ShelfModuleView: View {
                                         if item.noteLocation != nil { noteEditor.open(item) }
                                         else if item.screenshotMetadata != nil {
                                             do {
-                                                screenshotPreview = ShelfScreenshotPreview(id: item.id,
-                                                    data: try model.shelf.screenshotData(id: item.id))
+                                                try noteEditor.openScreenshot(item, in: model.shelf)
                                             } catch { model.transientMessage = error.localizedDescription }
                                         }
                                         else { NSWorkspace.shared.open(item.linkURL ?? item.url) }
@@ -214,28 +217,6 @@ struct ShelfModuleView: View {
             }
         }
         .frame(height: IslandModuleLayout.shelfContentHeight)
-        .sheet(item: $screenshotPreview) { preview in
-            VStack(spacing: 12) {
-                if let image = NSImage(data: preview.data) {
-                    Image(nsImage: image)
-                        .resizable()
-                        .scaledToFit()
-                        .frame(maxWidth: .infinity, maxHeight: .infinity)
-                }
-                HStack {
-                    Button(AppLocalization.text("复制")) {
-                        if let item = model.shelf.items.first(where: { $0.id == preview.id }) { model.copyShelfItems([item]) }
-                    }
-                    Button(AppLocalization.text("保存")) {
-                        if let item = model.shelf.items.first(where: { $0.id == preview.id }) { model.saveShelfScreenshot(item) }
-                    }
-                    Spacer()
-                    Button(AppLocalization.text("关闭")) { screenshotPreview = nil }
-                }
-            }
-            .padding(16)
-            .frame(width: 600, height: 480)
-        }
     }
 
     private var searchBar: some View {
@@ -392,11 +373,6 @@ struct ShelfModuleView: View {
     private func moduleStroke(targeted: Bool) -> Color {
         targeted ? .accentColor : .strokeCard
     }
-}
-
-private struct ShelfScreenshotPreview: Identifiable {
-    let id: UUID
-    let data: Data
 }
 
 struct ShelfNoteApplicationGroup: Identifiable {
