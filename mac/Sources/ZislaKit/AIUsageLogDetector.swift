@@ -51,6 +51,8 @@ public final class AIUsageLogDetector: AIUsageDetecting {
     public let maxBytesPerFile: Int
     public let maxSamplesPerFile: Int
 
+    private let enabledProviders: Set<AIProvider>
+    private let additionalLogFiles: [AIProvider: [URL]]
     private let fileManager: FileManager
     private let scanInterval: TimeInterval
     private var cache: [String: CachedSamples] = [:]
@@ -83,6 +85,8 @@ public final class AIUsageLogDetector: AIUsageDetecting {
         maxBytesPerFile: Int = .max,
         maxSamplesPerFile: Int = .max,
         scanInterval: TimeInterval = 60,
+        enabledProviders: Set<AIProvider> = Set(AIProvider.allCases),
+        additionalLogFiles: [AIProvider: [URL]] = [:],
         fileManager: FileManager = .default
     ) {
         let home = fileManager.homeDirectoryForCurrentUser
@@ -116,6 +120,8 @@ public final class AIUsageLogDetector: AIUsageDetecting {
         self.maxBytesPerFile = max(4_096, maxBytesPerFile)
         self.maxSamplesPerFile = max(1, maxSamplesPerFile)
         self.scanInterval = max(0, scanInterval)
+        self.enabledProviders = enabledProviders
+        self.additionalLogFiles = additionalLogFiles
         self.fileManager = fileManager
     }
 
@@ -196,11 +202,25 @@ public final class AIUsageLogDetector: AIUsageDetecting {
         for root in copilotUsageLogRoots {
             result.append(contentsOf: candidates(provider: .copilot, root: root))
         }
-        return result
+        for (provider, urls) in additionalLogFiles where enabledProviders.contains(provider) {
+            for url in urls where accepts(url, for: provider, explicitFile: true) {
+                guard let values = try? url.resourceValues(forKeys: [
+                    .isRegularFileKey, .contentModificationDateKey, .fileSizeKey,
+                ]), values.isRegularFile == true else { continue }
+                result.append(Candidate(
+                    provider: provider, url: url.standardizedFileURL,
+                    modificationDate: values.contentModificationDate ?? .distantPast,
+                    changeDate: Self.fileChangeDate(for: url), size: UInt64(max(0, values.fileSize ?? 0))
+                ))
+            }
+        }
+        var seen: Set<String> = []
+        return result.filter { seen.insert(cacheKey(for: $0)).inserted }
     }
 
     private func candidates(provider: AIProvider, root: URL) -> [Candidate] {
-        guard fileManager.fileExists(atPath: root.path),
+        guard enabledProviders.contains(provider),
+              fileManager.fileExists(atPath: root.path),
               let enumerator = fileManager.enumerator(
                 at: root,
                 includingPropertiesForKeys: [
@@ -241,7 +261,7 @@ public final class AIUsageLogDetector: AIUsageDetecting {
         }.prefix(maxFilesPerProvider))
     }
 
-    private func accepts(_ url: URL, for provider: AIProvider) -> Bool {
+    private func accepts(_ url: URL, for provider: AIProvider, explicitFile: Bool = false) -> Bool {
         guard url.pathExtension == "jsonl" || url.pathExtension == "json" else { return false }
         switch provider {
         case .grok:
@@ -249,12 +269,13 @@ public final class AIUsageLogDetector: AIUsageDetecting {
         case .gemini:
             return url.lastPathComponent.hasPrefix("session-")
         case .coder:
-            return url.path.contains("/logs/sessions/")
+            // A host-provided transcript is authoritative even outside Qoder's default tree.
+            return explicitFile || url.path.contains("/logs/sessions/")
         case .copilot:
             return true
         case .pi:
             return url.lastPathComponent.hasSuffix(".jsonl")
-        case .kimi, .zcode, .zed, .trae, .opencode, .harness, .doubao:
+        case .kimi, .zcode, .zed, .trae, .opencode, .harness, .doubao, .delta, .orca, .workbuddy, .workbuddyAI:
             return false
         case .codex, .claude, .qwen, .gpt:
             return true
@@ -302,7 +323,7 @@ public final class AIUsageLogDetector: AIUsageDetecting {
             if parserState.copilotHasDetailedUsage {
                 samples.removeAll(where: isCopilotShutdownSummary)
             }
-        case .kimi, .zcode, .zed, .trae, .opencode, .harness, .doubao:
+        case .kimi, .zcode, .zed, .trae, .opencode, .harness, .doubao, .delta, .orca, .workbuddy, .workbuddyAI:
             return []
         }
         return Array(samples.suffix(maxSamplesPerFile))
@@ -423,7 +444,7 @@ public final class AIUsageLogDetector: AIUsageDetecting {
             return parseCopilot(root, candidate: candidate, parserState: &parserState)
         case .pi:
             return parsePi(root, candidate: candidate).map { [$0] } ?? []
-        case .kimi, .zcode, .zed, .trae, .opencode, .harness, .doubao:
+        case .kimi, .zcode, .zed, .trae, .opencode, .harness, .doubao, .delta, .orca, .workbuddy, .workbuddyAI:
             return []
         }
     }

@@ -1096,6 +1096,23 @@ struct CLIParserTests {
     }
 
     @Test
+    func workBuddyProductsHaveIndependentAliasesAndStableSerialization() throws {
+        #expect(AIProvider(token: "WorkBuddy") == .workbuddy)
+        #expect(AIProvider(token: "workbuddy-desktop") == .workbuddy)
+        #expect(AIProvider(token: "WorkBuddy AI") == .workbuddyAI)
+        #expect(AIProvider(token: "workbuddy-ai") == .workbuddyAI)
+        #expect(AIProvider(token: "workbuddyai") == .workbuddyAI)
+        #expect(AIProvider.workbuddy.rawValue == "workbuddy")
+        #expect(AIProvider.workbuddyAI.rawValue == "workbuddy-ai")
+        #expect(AIProvider(token: "harnext") == .harness)
+        for provider in [AIProvider.workbuddy, .workbuddyAI, .harness] {
+            let encoded = try JSONEncoder().encode(provider)
+            #expect(try JSONDecoder().decode(AIProvider.self, from: encoded) == provider)
+        }
+        #expect(try JSONDecoder().decode(AIProvider.self, from: Data(#""harness""#.utf8)) == .harness)
+    }
+
+    @Test
     func updateAcceptsPercentAndNormalizesIt() throws {
         let command = try CLIParser.parse(arguments: [
             "update", "--id", "job-1", "--provider", "qwen",

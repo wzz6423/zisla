@@ -92,7 +92,7 @@ export const en: SiteContent = {
       aiMonitor: {
         name: 'AI monitor',
         caption:
-          'Automatically detects activity from supported AI CLIs, desktop apps and IDEs and shows tasks, status, cumulative token trends and a contribution heatmap. It parses structured events only and never reads conversation text.',
+          'Aggregates tasks and status from AI CLIs, desktop apps and IDEs, including Delta, Orca, WorkBuddy and WorkBuddy AI. Cumulative token trends and a contribution heatmap use reliable numeric usage where available, without parsing prompt or reply text.',
         points: [
           'Tasks aggregated across tools',
           'Token consumption trends',
@@ -230,21 +230,22 @@ export const en: SiteContent = {
   ai: {
     eyebrow: 'AI WITHOUT A BLACK BOX',
     title: 'See AI status <span>without reading the conversation.</span>',
-    lede: 'Tasks, status and token trends stay on your Mac. This page describes what the feature does and does not invent a screenshot of a running task.',
+    lede: 'Bring session status from CLIs, desktop apps and IDEs into the island. Token trends use reliable numeric usage, never context occupancy as consumption.',
     summaryMono: 'ON-DEVICE STATUS / CLEAR BOUNDARIES',
-    summaryLede:
-      'Connect the AI tools you already use while keeping the context boundaries your work requires.',
+    summaryLede: 'Different harnesses. One place for status.',
     summaryNote:
-      'This page only describes the detection scope, the data boundary and how to connect — it does not simulate a live session.',
-    toolsHeading: 'Supported AI tools',
+      'WorkBuddy and WorkBuddy AI are detected independently, with separate sessions, branding and open actions — not one interchangeable product.',
+    toolsHeading: '{tools} AI tools and harnesses',
     toolsLede:
-      'Detects activity from supported CLIs, desktop apps and IDEs, and aggregates task status.',
-    toolsAriaLabel: 'Supported AI tools',
+      'Detects supported CLI, desktop and IDE activity. Delta, Orca, WorkBuddy and WorkBuddy AI each retain their own name.',
+    toolsAriaLabel: 'Supported AI tools and harnesses',
+    usageNote:
+      'Session detection does not imply usage tracking. Delta uses its local numeric usage ledger. Orca reuses and deduplicates bound CLI usage under the underlying provider. WorkBuddy AI is session-only for now: context occupancy and credits are not converted into cumulative tokens or USD cost.',
     boundariesHeading: 'Only status boundaries are recorded',
     privacyPoints: [
-      'Parses only the event type, status, timestamp, model and session ID from structured events',
-      'Never reads prompt or reply text',
-      'Protocol and status are stored on your Mac',
+      'Parses status metadata (including session titles, timestamps, models and session identifiers) and reliable numeric usage only',
+      'Does not parse prompt or reply text, or upload conversations',
+      'Third-party session stores are read-only; protocol, status and usage records stay on your Mac',
     ],
     bridgeHeading: 'Bring in your own tasks',
     bridgeLede: 'Use zislactl to push structured status from external tasks into the status bar.',

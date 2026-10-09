@@ -89,6 +89,10 @@ enum AIMascotIdentity: String, CaseIterable, Identifiable {
     case coder
     case zcode
     case zed
+    case delta
+    case orca
+    case workbuddy
+    case workbuddyAI
     case trae
     case opencode
     case pi
@@ -101,6 +105,13 @@ enum AIMascotIdentity: String, CaseIterable, Identifiable {
     init(provider: AIProvider, taskID: String, title: String? = nil) {
         if provider == .harness, title == "DeepSeek Harness" {
             self = .deepseekHarness
+            return
+        }
+        // Historical WorkBuddy tasks used the shared harness provider. Preserve their brand
+        // without relabelling unrelated Harnext/DeepSeek records or changing stored identifiers.
+        if provider == .harness,
+           taskID.hasPrefix("workbuddy-session-") || taskID.hasPrefix("ai-active-harness-workbuddy-session-") {
+            self = .workbuddy
             return
         }
         // The desktop app and the CLI share one provider, so the task ID decides which logo applies.
@@ -121,6 +132,10 @@ enum AIMascotIdentity: String, CaseIterable, Identifiable {
         case .coder: self = .coder
         case .zcode: self = .zcode
         case .zed: self = .zed
+        case .delta: self = .delta
+        case .orca: self = .orca
+        case .workbuddy: self = .workbuddy
+        case .workbuddyAI: self = .workbuddyAI
         case .trae: self = .trae
         case .opencode: self = .opencode
         case .pi: self = .pi
@@ -191,6 +206,10 @@ enum AIMascotIdentity: String, CaseIterable, Identifiable {
         case .coder: .coder
         case .zcode: .zcode
         case .zed: .zed
+        case .delta: .delta
+        case .orca: .orca
+        case .workbuddy: .workbuddy
+        case .workbuddyAI: .workbuddyAI
         case .trae: .trae
         case .opencode: .opencode
         case .pi: .pi
@@ -284,6 +303,13 @@ struct AIMascotView: View {
         case .zed:
             return imageCache.image(for: "installed|zed") {
                 AIMascotLibrary.installedZedApplicationURL().map {
+                    NSWorkspace.shared.icon(forFile: $0.path)
+                }
+            }
+        case .delta, .orca, .workbuddy, .workbuddyAI:
+            guard let provider = identity.provider else { return nil }
+            return imageCache.image(for: "installed|desktop-\(provider.rawValue)") {
+                AIMascotLibrary.installedDesktopAgentApplicationURL(for: provider).map {
                     NSWorkspace.shared.icon(forFile: $0.path)
                 }
             }

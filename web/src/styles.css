@@ -744,7 +744,9 @@ svg {
   display: flex;
   flex-wrap: wrap;
   gap: 8px;
-  margin-top: 24px;
+  margin: 24px 0 0;
+  padding: 0;
+  list-style: none;
 }
 
 .tool-chip {
@@ -756,6 +758,15 @@ svg {
   color: var(--foreground);
   font-size: 14px;
   line-height: 1.4;
+  white-space: nowrap;
+}
+
+.ai-detail .ai-usage-note {
+  margin-top: 24px;
+  padding-inline-start: 16px;
+  border-inline-start: 2px solid var(--accent);
+  font-size: 14px;
+  line-height: 1.7;
 }
 
 .tool-chip-dot {

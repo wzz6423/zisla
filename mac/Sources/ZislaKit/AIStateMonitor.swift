@@ -177,6 +177,8 @@ public final class AIStateMonitor: ObservableObject {
             QoderSessionActivityDetector(maxLogFiles: 4, initialTailBytes: 256 * 1_024),
             ZCodeSessionActivityDetector(),
             ZedSessionActivityDetector(),
+            DeltaSessionActivityDetector(),
+            OrcaSessionActivityDetector(),
             TraeSessionActivityDetector(maxLogFiles: 4, tailBytes: 256 * 1_024),
             OpenCodeSessionActivityDetector(maxSessions: 4),
             PiSessionActivityDetector(maxSessionFiles: 4),
@@ -187,6 +189,7 @@ public final class AIStateMonitor: ObservableObject {
                 maxFiles: 4
             ),
             WorkBuddySessionActivityDetector(),
+            WorkBuddyAISessionActivityDetector(),
         ]
     }
 
@@ -194,6 +197,8 @@ public final class AIStateMonitor: ObservableObject {
         [
             AIUsageLogDetector(),
             ZedUsageLogDetector(),
+            DeltaSessionActivityDetector(),
+            OrcaSessionActivityDetector(),
             ZCodeUsageDetector(),
         ]
     }
