@@ -33,7 +33,7 @@ helper = swift.parent.parent / "libexec/swift/pm/swiftpm-testing-helper"
 platform = Path(subprocess.check_output(["xcrun", "--sdk", "macosx", "--show-sdk-platform-path"], text=True).strip())
 test_name = "ZislaKitTests.AIAgentSkillSynchronizationSystemTests/isolatedHomeLifecycle()"
 counts = os.environ.get("ZISLA_SKILL_SYNC_COUNTS", "0 1 50 100 150 1000").split()
-layouts = os.environ.get("ZISLA_SKILL_SYNC_LAYOUTS", "plain relative absolute chain root-link mixed broken cycle readonly-backup").split()
+layouts = os.environ.get("ZISLA_SKILL_SYNC_LAYOUTS", "plain relative absolute chain root-link reverse-root-link mixed broken cycle readonly-backup").split()
 modes = os.environ.get("ZISLA_SKILL_SYNC_MODES", "symbolicLink fileCopy").split()
 cases = [(layout, count, mode) for layout, count, mode in itertools.product(layouts, counts, modes)
          if not (layout in ("broken", "cycle") and count == "0")]

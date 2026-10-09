@@ -262,6 +262,113 @@ struct AIAgentSkillSynchronizationServiceTests {
         #expect(try FileManager.default.destinationOfSymbolicLink(atPath: backups[0].path) == external.path)
     }
 
+    @Test(arguments: [AIAgentSkillSynchronizationMode.symbolicLink, .fileCopy], ["alias", "alias/"])
+    func takesOverIndirectManagedRootLinkWithBackup(mode: AIAgentSkillSynchronizationMode, target: String) throws {
+        let root = try temporaryDirectory()
+        defer { try? FileManager.default.removeItem(at: root) }
+        let managed = root.appendingPathComponent("managed", isDirectory: true)
+        let alias = root.appendingPathComponent("alias")
+        let destination = root.appendingPathComponent("skills")
+        let backupRoot = root.appendingPathComponent("backups")
+        try writeFile("original", at: managed.appendingPathComponent("review/SKILL.md"))
+        try FileManager.default.createSymbolicLink(atPath: alias.path, withDestinationPath: "managed")
+        try FileManager.default.createSymbolicLink(atPath: destination.path, withDestinationPath: target)
+        let service = AIAgentSkillSynchronizationService()
+
+        #expect(throws: AIAgentSkillSynchronizationError.self) {
+            try service.synchronize(managedDirectory: managed, to: destination, mode: mode)
+        }
+        try service.synchronize(managedDirectory: managed, to: destination, mode: mode, backupRoot: backupRoot)
+
+        #expect(try String(contentsOf: destination.appendingPathComponent("review/SKILL.md"), encoding: .utf8) == "original")
+        #expect(try FileManager.default.destinationOfSymbolicLink(atPath: alias.path) == "managed")
+        let backups = try FileManager.default.contentsOfDirectory(at: backupRoot, includingPropertiesForKeys: nil)
+        try #require(backups.count == 1)
+        let backup = try #require(backups.first)
+        #expect(try FileManager.default.destinationOfSymbolicLink(atPath: backup.path) == target)
+        try service.synchronize(managedDirectory: managed, to: destination, mode: mode, backupRoot: backupRoot)
+        #expect(try FileManager.default.contentsOfDirectory(atPath: backupRoot.path).count == 1)
+        try FileManager.default.removeItem(at: destination)
+        try FileManager.default.moveItem(at: backup, to: destination)
+        #expect(try String(contentsOf: destination.appendingPathComponent("review/SKILL.md"), encoding: .utf8) == "original")
+        try expectNoStagingDirectories(beside: managed)
+    }
+
+    @Test(arguments: ["alias", "alias/"])
+    func disableKeepsThirdPartyIndirectManagedRootLink(target: String) throws {
+        let root = try temporaryDirectory()
+        defer { try? FileManager.default.removeItem(at: root) }
+        let managed = root.appendingPathComponent("managed", isDirectory: true)
+        let alias = root.appendingPathComponent("alias")
+        let destination = root.appendingPathComponent("skills")
+        try writeFile("original", at: managed.appendingPathComponent("review/SKILL.md"))
+        try FileManager.default.createSymbolicLink(atPath: alias.path, withDestinationPath: "managed")
+        try FileManager.default.createSymbolicLink(atPath: destination.path, withDestinationPath: target)
+
+        try AIAgentSkillSynchronizationService().disable(at: destination, managedDirectory: managed)
+
+        #expect(try FileManager.default.destinationOfSymbolicLink(atPath: destination.path) == target)
+        #expect(try String(contentsOf: destination.appendingPathComponent("review/SKILL.md"), encoding: .utf8) == "original")
+    }
+
+    @Test(arguments: [AIAgentSkillSynchronizationMode.symbolicLink, .fileCopy])
+    func preservesLinksWhoseDotDotTargetResolvesOutsideManagedRoot(mode: AIAgentSkillSynchronizationMode) throws {
+        let root = try temporaryDirectory()
+        defer { try? FileManager.default.removeItem(at: root) }
+        let managed = root.appendingPathComponent("managed", isDirectory: true)
+        let destination = root.appendingPathComponent("skills")
+        let alias = root.appendingPathComponent("alias")
+        let external = root.appendingPathComponent("external/managed", isDirectory: true)
+        let backupRoot = root.appendingPathComponent("backups")
+        try writeFile("managed", at: managed.appendingPathComponent("review/SKILL.md"))
+        try writeFile("external", at: external.appendingPathComponent("custom/SKILL.md"))
+        try FileManager.default.createDirectory(at: root.appendingPathComponent("external/nested"), withIntermediateDirectories: true)
+        try FileManager.default.createSymbolicLink(atPath: alias.path, withDestinationPath: "external/nested")
+        try FileManager.default.createSymbolicLink(atPath: destination.path, withDestinationPath: "alias/../managed")
+        let service = AIAgentSkillSynchronizationService()
+
+        try service.disable(at: destination, managedDirectory: managed)
+        #expect(try FileManager.default.destinationOfSymbolicLink(atPath: destination.path) == "alias/../managed")
+        try service.synchronize(managedDirectory: managed, to: destination, mode: mode, backupRoot: backupRoot)
+
+        #expect(try String(contentsOf: managed.appendingPathComponent("custom/SKILL.md"), encoding: .utf8) == "external")
+        #expect(try String(contentsOf: external.appendingPathComponent("custom/SKILL.md"), encoding: .utf8) == "external")
+        let backups = try FileManager.default.contentsOfDirectory(at: backupRoot, includingPropertiesForKeys: nil)
+        try #require(backups.count == 1)
+        let backup = try #require(backups.first)
+        #expect(try FileManager.default.destinationOfSymbolicLink(atPath: backup.path) == "alias/../managed")
+        try FileManager.default.removeItem(at: destination)
+        try FileManager.default.moveItem(at: backup, to: destination)
+        #expect(try String(contentsOf: destination.appendingPathComponent("custom/SKILL.md"), encoding: .utf8) == "external")
+        try expectNoStagingDirectories(beside: managed)
+    }
+
+    @Test(arguments: [AIAgentSkillSynchronizationMode.symbolicLink, .fileCopy])
+    func refusesTakeoverWhenManagedRootDependsOnDestination(mode: AIAgentSkillSynchronizationMode) throws {
+        let root = try temporaryDirectory()
+        defer { try? FileManager.default.removeItem(at: root) }
+        let managed = root.appendingPathComponent("managed")
+        let destination = root.appendingPathComponent("skills")
+        let external = root.appendingPathComponent("external", isDirectory: true)
+        let backupRoot = root.appendingPathComponent("backups")
+        try writeFile("original", at: external.appendingPathComponent("review/SKILL.md"))
+        try FileManager.default.createSymbolicLink(atPath: destination.path, withDestinationPath: "external")
+        try FileManager.default.createSymbolicLink(atPath: managed.path, withDestinationPath: "skills")
+
+        #expect(throws: AIAgentSkillSynchronizationError.self) {
+            try AIAgentSkillSynchronizationService().synchronize(
+                managedDirectory: managed, to: destination, mode: mode, backupRoot: backupRoot
+            )
+        }
+
+        #expect(try FileManager.default.destinationOfSymbolicLink(atPath: managed.path) == "skills")
+        #expect(try FileManager.default.destinationOfSymbolicLink(atPath: destination.path) == "external")
+        #expect(try String(contentsOf: managed.appendingPathComponent("review/SKILL.md"), encoding: .utf8) == "original")
+        #expect(try FileManager.default.contentsOfDirectory(atPath: external.path) == ["review"])
+        #expect((try? FileManager.default.contentsOfDirectory(atPath: backupRoot.path))?.isEmpty != false)
+        try expectNoStagingDirectories(beside: managed)
+    }
+
     @Test(arguments: [AIAgentSkillSynchronizationMode.symbolicLink, .fileCopy])
     func importsRelativeSkillLinksAndKeepsRestorableOriginals(mode: AIAgentSkillSynchronizationMode) throws {
         let root = try temporaryDirectory()

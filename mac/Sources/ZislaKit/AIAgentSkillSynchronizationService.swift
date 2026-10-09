@@ -98,6 +98,10 @@ public struct AIAgentSkillSynchronizationService {
         }
         var installedItems: [URL] = []
         do {
+            // A managed root that depends on the moved destination would become a cycle.
+            guard fileManager.fileExists(atPath: managedDirectory.path) else {
+                throw AIAgentSkillSynchronizationError.destinationIsNotManaged(destination.path)
+            }
             for item in importedItems {
                 let managedItem = managedDirectory.appendingPathComponent(item.lastPathComponent)
                 try fileManager.moveItem(at: item, to: managedItem)
@@ -139,8 +143,10 @@ public struct AIAgentSkillSynchronizationService {
         _ destination: URL,
         managedDirectory: URL
     ) -> Bool {
-        if (try? fileManager.destinationOfSymbolicLink(atPath: destination.path)) != nil {
-            return isManagedLink(destination, managedDirectory: managedDirectory)
+        if let target = try? fileManager.destinationOfSymbolicLink(atPath: destination.path) {
+            return URL(fileURLWithPath: target, relativeTo: destination.deletingLastPathComponent())
+                .standardizedFileURL.path == managedDirectory.standardizedFileURL.path
+                && resolvedDirectory(destination).path == resolvedDirectory(managedDirectory).path
         }
         return (try? String(
             contentsOf: destination.appendingPathComponent(markerFileName),
@@ -222,12 +228,8 @@ public struct AIAgentSkillSynchronizationService {
         let managedPath = resolvedDirectory(managedDirectory)
         let destinationPath = resolvedDirectory(destination)
         let linkTarget = try? fileManager.destinationOfSymbolicLink(atPath: destination.path)
-        let linksDirectlyToManaged = linkTarget.map {
-            URL(fileURLWithPath: $0, relativeTo: destination.deletingLastPathComponent())
-                .standardizedFileURL.path == managedDirectory.standardizedFileURL.path
-        } ?? false
         guard managedDirectory.standardizedFileURL.path != destination.standardizedFileURL.path,
-              (managedPath.path == destinationPath.path && linksDirectlyToManaged)
+              (managedPath.path == destinationPath.path && linkTarget != nil)
                 || (!managedPath.pathComponents.starts(with: destinationPath.pathComponents)
                     && !destinationPath.pathComponents.starts(with: managedPath.pathComponents)) else {
             throw AIAgentSkillSynchronizationError.destinationIsNotManaged(destination.path)

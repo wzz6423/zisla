@@ -20,7 +20,7 @@ struct AIAgentSkillSynchronizationSystemTests {
         let layout = try #require(environment["ZISLA_SKILL_SYNC_TEST_LAYOUT"])
         let mode = try #require(AgentSkillSyncMode(rawValue: environment["ZISLA_SKILL_SYNC_TEST_MODE"] ?? ""))
         let failureLayouts = ["broken", "cycle", "readonly-backup"]
-        try #require((["plain", "relative", "absolute", "chain", "root-link", "mixed"] + failureLayouts).contains(layout))
+        try #require((["plain", "relative", "absolute", "chain", "root-link", "reverse-root-link", "mixed"] + failureLayouts).contains(layout))
         let start = ProcessInfo.processInfo.systemUptime
         let fileManager = FileManager.default
         let storeURL = home.appendingPathComponent(".zisla/test-state.json")
@@ -45,7 +45,7 @@ struct AIAgentSkillSynchronizationSystemTests {
             try write("Hidden resource \(index)\n", to: fixture.appendingPathComponent(".resource"))
 
             let owner: Int
-            if failureLayouts.contains(layout) {
+            if failureLayouts.contains(layout) || layout == "reverse-root-link" {
                 owner = 0
             } else {
                 owner = ["plain", "mixed"].contains(layout) ? index % roots.count : 2
@@ -73,10 +73,12 @@ struct AIAgentSkillSynchronizationSystemTests {
                 }
             }
         }
-        if layout == "root-link" {
-            for root in roots.prefix(2) {
+        if ["root-link", "reverse-root-link"].contains(layout) {
+            let owner = layout == "root-link" ? 2 : 0
+            for index in roots.indices where index != owner {
+                let root = roots[index]
                 try fileManager.removeItem(at: root)
-                try fileManager.createSymbolicLink(atPath: root.path, withDestinationPath: "../.agents/skills")
+                try fileManager.createSymbolicLink(atPath: root.path, withDestinationPath: "../.\(destinations[owner].rawValue)/skills")
             }
         }
         if ["broken", "cycle"].contains(layout) {
@@ -94,6 +96,12 @@ struct AIAgentSkillSynchronizationSystemTests {
 
         let originalTrees = try roots.map { try manifest(at: $0) }
         let originalFixtures = try manifest(at: fixtures)
+        #expect(store.state.skillSyncConfiguration.enabledDestinations.isEmpty)
+        workspace.synchronizeManagedSkills()
+        try #require(workspace.lastError == nil)
+        #expect(try roots.map { try manifest(at: $0) } == originalTrees)
+        #expect(try manifest(at: fixtures) == originalFixtures)
+        store.state.skillSyncConfiguration.enabledDestinations = Set(destinations)
         workspace.synchronizeManagedSkills()
         if failureLayouts.contains(layout) {
             try #require(workspace.lastError != nil, "\(layout) must abort synchronization")
