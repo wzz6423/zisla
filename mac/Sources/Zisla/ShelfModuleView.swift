@@ -67,7 +67,7 @@ struct ShelfModuleView: View {
 
                     if !model.shelf.items.isEmpty {
                         Button {
-                            model.receiveQuickNoteTransferItems(model.shelf.items.map { TransferDropItem(payload: $0.payload) })
+                            model.receiveQuickNoteTransferItems(model.shelfTransferItems(model.shelf.items))
                         } label: {
                             HStack(spacing: 4) {
                                 Image(systemName: "note.text")
@@ -93,7 +93,7 @@ struct ShelfModuleView: View {
                         .help(AppLocalization.text("复制全部内容"))
 
                         Button {
-                            model.share(model.shelf.items.map { TransferDropItem(payload: $0.payload) })
+                            model.share(model.shelfTransferItems(model.shelf.items))
                         } label: {
                             HStack(spacing: 4) {
                                 Image(systemName: "square.and.arrow.up")
@@ -138,6 +138,12 @@ struct ShelfModuleView: View {
                                               onSave: { model.saveShelfContextNote() },
                                               onClose: { noteEditor.close() })
                             .id(ObjectIdentifier(draft))
+                    } else if let screenshot = noteEditor.screenshot {
+                        ShelfScreenshotDetailView(detail: screenshot, onCopy: {
+                            if let item = model.shelf.items.first(where: { $0.id == screenshot.id }) { model.copyShelfItems([item]) }
+                        }, onSave: {
+                            if let item = model.shelf.items.first(where: { $0.id == screenshot.id }) { model.saveShelfScreenshot(item) }
+                        }, onClose: { noteEditor.close() })
                     } else if model.shelf.items.isEmpty {
                         EmptyState(
                             symbol: "tray.and.arrow.down",
@@ -159,14 +165,29 @@ struct ShelfModuleView: View {
                                     item: item,
                                     onOpen: {
                                         if item.noteLocation != nil { noteEditor.open(item) }
+                                        else if item.screenshotMetadata != nil {
+                                            do {
+                                                try noteEditor.openScreenshot(item, in: model.shelf)
+                                            } catch { model.transientMessage = error.localizedDescription }
+                                        }
                                         else { NSWorkspace.shared.open(item.linkURL ?? item.url) }
                                     },
                                     onCopy: { model.copyShelfItems([item]) },
+                                    onSave: { model.saveShelfScreenshot(item) },
+                                    prepareDragPayload: {
+                                        guard item.screenshotMetadata != nil else { return item.payload }
+                                        do { return .file(try model.shelf.screenshotFileURL(id: item.id)) }
+                                        catch {
+                                            model.transientMessage = error.localizedDescription
+                                            return nil
+                                        }
+                                    },
                                     onSendToQuickNote: {
                                         model.receiveQuickNoteTransferItems([TransferDropItem(payload: item.payload)])
                                     },
                                     onRemove: {
                                         model.shelf.remove(id: item.id)
+                                        if let error = model.shelf.errorDescription { model.transientMessage = error }
                                         if !model.shelf.items.contains(where: { $0.id == item.id }) { noteEditor.removed(item.id) }
                                     }
                                 )
@@ -276,7 +297,7 @@ struct ShelfModuleView: View {
         // Apply the search filter.
         if !searchText.isEmpty {
             items = items.filter { item in
-                (item.text ?? item.url.lastPathComponent).localizedCaseInsensitiveContains(searchText)
+                item.searchText.localizedCaseInsensitiveContains(searchText)
             }
         }
 
@@ -284,10 +305,14 @@ struct ShelfModuleView: View {
     }
 
     private func categoryCount(for category: FileShelfCategory) -> Int {
+        Self.categoryCount(for: category, in: model.shelf.items)
+    }
+
+    static func categoryCount(for category: FileShelfCategory, in items: [FileShelfItem]) -> Int {
         if category == .all {
-            return model.shelf.items.count
+            return items.count
         }
-        return model.shelf.items.filter { $0.category == category }.count
+        return items.filter { $0.category == category }.count
     }
 
     private var shareShoulder: some View {
@@ -412,7 +437,7 @@ struct ShelfItemCollection<Content: View>: View {
         ShelfGridLayout() {
             ForEach(items) { item in
                 content(item)
-                    .layoutValue(key: ShelfColumnSpan.self, value: item.noteLocation == nil ? 1 : 2)
+                    .layoutValue(key: ShelfColumnSpan.self, value: item.noteLocation == nil && item.screenshotMetadata == nil ? 1 : 2)
             }
         }
     }
@@ -466,6 +491,8 @@ struct ShelfItemView: View {
     var item: FileShelfItem
     var onOpen: () -> Void
     var onCopy: () -> Void
+    var onSave: () -> Void = {}
+    var prepareDragPayload: (() -> TransferPasteboardPayload?)? = nil
     var onSendToQuickNote: () -> Void
     var onRemove: () -> Void
 
@@ -473,21 +500,54 @@ struct ShelfItemView: View {
         Group {
             if let location = item.noteLocation {
                 contextNoteCard(location: location)
+            } else if item.screenshotMetadata != nil {
+                screenshotCard
             } else {
                 fileCard
             }
         }
         .contextMenu {
-            Button(AppLocalization.text("打开"), action: onOpen)
-            if item.text == nil {
+            Button(AppLocalization.text(item.screenshotMetadata == nil ? "打开" : "预览"), action: onOpen)
+            if item.text == nil && item.screenshotMetadata == nil {
                 Button(AppLocalization.text("在 Finder 中显示")) {
                     NSWorkspace.shared.activateFileViewerSelecting([item.url])
                 }
             }
             Button(AppLocalization.text("复制"), action: onCopy)
-            Button(AppLocalization.text("发送到随记"), action: onSendToQuickNote)
+            if item.screenshotMetadata != nil {
+                Button(AppLocalization.text("保存"), action: onSave)
+            } else {
+                Button(AppLocalization.text("发送到随记"), action: onSendToQuickNote)
+            }
             Divider()
             Button(AppLocalization.text("移除"), role: .destructive, action: onRemove)
+        }
+    }
+
+    private var screenshotCard: some View {
+        ZStack(alignment: .topTrailing) {
+            VStack(alignment: .leading, spacing: 4) {
+                FileShelfDragSourceView(
+                    payload: item.payload,
+                    image: FileIconCache.shared.icon(for: item.url.path),
+                    onOpen: onOpen,
+                    onReveal: onOpen,
+                    onCopy: onCopy,
+                    onRemove: onRemove,
+                    onSave: onSave,
+                    preparePayload: prepareDragPayload
+                )
+                .frame(width: 124, height: 48)
+                Text(item.screenshotMetadata?.source.applicationName ?? AppLocalization.text("截图"))
+                    .font(.system(size: 9, weight: .medium))
+                    .foregroundStyle(.secondary)
+                    .lineLimit(1)
+            }
+            .padding(8)
+            .frame(width: 140, height: 84, alignment: .topLeading)
+            .background(Color.blue.opacity(0.12), in: RoundedRectangle(cornerRadius: 9))
+            .overlay(RoundedRectangle(cornerRadius: 9).strokeBorder(Color.strokeCard, lineWidth: 1))
+            removeButton.padding(2)
         }
     }
 

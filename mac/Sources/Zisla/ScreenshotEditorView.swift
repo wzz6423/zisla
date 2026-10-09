@@ -38,7 +38,7 @@ enum ScreenshotTool: String, CaseIterable, Identifiable {
         case .arrow: "箭头"
         case .number: "标号"
         case .text: "文字"
-        case .mosaic: "马赛克"
+        case .mosaic: "模糊"
         }
     }
 
@@ -2967,9 +2967,9 @@ final class ScreenshotToolbarDragHandleView: NSView {
 }
 
 enum ScreenshotToolbarLayout {
-    static let controlCount = 15
+    static let controlCount = 16
     /// Chinese fits every toolbar label in a 60pt cell (widest: 取消置顶 at 40pt). The same words run
-    /// 61–145pt in other languages, and growing 15 equal cells to fit would push the rail from 968pt
+    /// 61–145pt in other languages, and growing 16 equal cells to fit would push the rail from 1030pt
     /// to 1.6–2.5k and let `viewportWidth` clip tools away. Those languages drop to icons only —
     /// every button already carries the full wording in `.help`.
     static var controlWidth: CGFloat { showsControlTitles ? 60 : 34 }
@@ -3010,7 +3010,7 @@ enum ScreenshotToolbarLayout {
         ScreenshotTool.allCases.filter { $0 != .mosaic }.map(\.title)
             + ScreenshotObscureEffect.allCases.map(\.title)
             + ScreenshotLongCaptureDirection.allCases.map(\.title)
-            + ["撤销", "重做", "继续", "长截图", "完成", "缩小", "放大", "取消置顶", "钉图", "复制", "保存", "关闭"]
+            + ["撤销", "重做", "继续", "长截图", "完成", "缩小", "放大", "取消置顶", "钉图", "暂存", "复制", "保存", "关闭"]
     }
 
     /// `NSCache` is thread-safe; declared with `nonisolated(unsafe)` to satisfy strict concurrency checking.
@@ -4091,47 +4091,63 @@ private struct ScreenshotInlineTextEditor: NSViewRepresentable {
     }
 }
 
-/// Presents the PNG save panel shared by the editor toolbar and the ⌘S shortcut.
+/// Presents the PNG save panel shared by the shelf, editor toolbar, pinned image, and ⌘S shortcut.
 @MainActor
 enum ScreenshotImageExport {
+    static func writePNG(_ data: Data, to url: URL) throws {
+        try data.write(to: url, options: .atomic)
+    }
+
     /// - Parameter status: Receives the result message, or `nil` when the panel closes without writing a file.
     static func presentSavePanel(
         for data: Data,
+        panel: NSSavePanel = NSSavePanel(),
+        systemPreferences: UserDefaults = .standard,
+        themeNotifications: NotificationCenter = DistributedNotificationCenter.default(),
         status: @escaping @MainActor (String?) -> Void
     ) {
-        let panel = NSSavePanel()
         panel.nameFieldStringValue = AppLocalization.text("截图.png")
         panel.allowedContentTypes = [.png]
         panel.canCreateDirectories = true
+        // System dialogs must not inherit the island's or app's explicit appearance override.
+        let updateAppearance: @MainActor @Sendable () -> Void = {
+            panel.appearance = NSAppearance(named:
+                systemPreferences.string(forKey: "AppleInterfaceStyle") == "Dark" ? .darkAqua : .aqua)
+        }
+        updateAppearance()
+        let themeObserver = themeNotifications.addObserver(
+            forName: Notification.Name("AppleInterfaceThemeChangedNotification"), object: nil, queue: .main
+        ) { _ in
+            MainActor.assumeIsolated { updateAppearance() }
+        }
         let response: (NSApplication.ModalResponse) -> Void = { response in
+            themeNotifications.removeObserver(themeObserver)
             guard response == .OK, let url = panel.url else {
                 Task { @MainActor in status(nil) }
                 return
             }
             do {
-                try data.write(to: url, options: .atomic)
+                try writePNG(data, to: url)
                 Task { @MainActor in status(AppLocalization.text("已保存：%@", url.lastPathComponent)) }
             } catch {
                 Task { @MainActor in status(AppLocalization.text("保存失败：%@", error.localizedDescription)) }
             }
         }
-        if let window = NSApp.keyWindow ?? NSApp.mainWindow, window.isVisible {
-            panel.beginSheetModal(for: window, completionHandler: response)
-        } else {
-            WindowPlacement.prepareModal(panel)
-            panel.begin(completionHandler: response)
-        }
+        WindowPlacement.prepareModal(panel)
+        panel.begin(completionHandler: response)
     }
 }
 
 struct ScreenshotEditorView: View {
     @Environment(\.accessibilityReduceMotion) private var accessibilityReduceMotion
+    @ObservedObject private var shortcutSettings: FeatureSettingsStore
     @ObservedObject var model: ScreenshotEditorModel
     @ObservedObject var selectionState: ScreenshotAnnotationSelectionState
     let overlayConfiguration: ScreenshotEditorOverlayConfiguration?
     let toolbarOnly: Bool
     let onClose: () -> Void
     let onCopy: () -> Void
+    let onStash: () -> Void
     let onSave: () -> Void
     let onPinToggle: (Bool) -> Void
     let onLongCapture: () -> Void
@@ -4164,7 +4180,7 @@ struct ScreenshotEditorView: View {
     }
 
     private var toolbarControlCount: Int {
-        13
+        14
             + (model.canUndo ? 1 : 0)
             + (model.canRedo ? 1 : 0)
             + (model.isLongCapturePreviewing ? 2 : 0)
@@ -4174,10 +4190,12 @@ struct ScreenshotEditorView: View {
     init(
         model: ScreenshotEditorModel,
         selectionState: ScreenshotAnnotationSelectionState,
+        settingsStore: FeatureSettingsStore = AppModel.shared.settingsStore,
         overlayConfiguration: ScreenshotEditorOverlayConfiguration? = nil,
         toolbarOnly: Bool = false,
         onClose: @escaping () -> Void,
         onCopy: @escaping () -> Void,
+        onStash: @escaping () -> Void = {},
         onSave: @escaping () -> Void = {},
         onPinToggle: @escaping (Bool) -> Void,
         onLongCapture: @escaping () -> Void,
@@ -4185,10 +4203,12 @@ struct ScreenshotEditorView: View {
     ) {
         self.model = model
         self.selectionState = selectionState
+        self.shortcutSettings = settingsStore
         self.overlayConfiguration = overlayConfiguration
         self.toolbarOnly = toolbarOnly
         self.onClose = onClose
         self.onCopy = onCopy
+        self.onStash = onStash
         self.onSave = onSave
         self.onPinToggle = onPinToggle
         self.onLongCapture = onLongCapture
@@ -5293,6 +5313,10 @@ struct ScreenshotEditorView: View {
                     model.isPinned.toggle()
                     onPinToggle(model.isPinned)
                 }
+                iconButton("tray.and.arrow.down", title: AppLocalization.text("暂存")) {
+                    commitInlineText()
+                    onStash()
+                }
                 iconButton("doc.on.doc", title: AppLocalization.text("复制")) {
                     commitInlineText()
                     onCopy()
@@ -5414,7 +5438,7 @@ struct ScreenshotEditorView: View {
         }
         .buttonStyle(.plain)
         .foregroundStyle(.primary)
-        .help(AppLocalization.text(tool.title))
+        .help(shortcutHelp(tool.title, hotkey: shortcutSettings.settings.screenshotToolHotkeys[tool.rawValue]))
         .popover(isPresented: Binding(
             get: { activeToolMenuID == tool },
             set: { if !$0 { activeToolMenuID = nil } }
@@ -5554,9 +5578,7 @@ struct ScreenshotEditorView: View {
         }
         .buttonStyle(.plain)
         .foregroundStyle(.primary)
-        .help(ScreenshotToolbarLayout.showsControlTitles
-            ? AppLocalization.text("马赛克 / 模糊")
-            : AppLocalization.text(model.obscureEffect.title))
+        .help(shortcutHelp("模糊", hotkey: shortcutSettings.settings.screenshotToolHotkeys["mosaic"]))
         .popover(isPresented: Binding(
             get: { activeToolMenuID == .mosaic },
             set: { if !$0 { activeToolMenuID = nil } }
@@ -5708,7 +5730,27 @@ struct ScreenshotEditorView: View {
         .buttonStyle(.plain)
         .foregroundStyle(disabled ? .secondary : .primary)
         .disabled(disabled)
-        .help(AppLocalization.text(title))
+        .help(actionShortcutHelp(symbol: symbol, title: title))
+    }
+
+    private func shortcutHelp(_ title: String, hotkey: VoiceInputHotkeyPreset?) -> String {
+        let title = AppLocalization.text(title)
+        return hotkey.map { "\(title) (\($0.settingsDisplayName))" } ?? title
+    }
+
+    private func actionShortcutHelp(symbol: String, title: String) -> String {
+        let settings = shortcutSettings.settings
+        switch symbol {
+        case "pin", "pin.fill": return shortcutHelp(title, hotkey: settings.screenshotPinHotkey)
+        case "tray.and.arrow.down": return shortcutHelp(title, hotkey: settings.screenshotStashHotkey)
+        case "rectangle.on.rectangle", "arrow.clockwise", "checkmark":
+            return shortcutHelp(title, hotkey: settings.screenshotEditorLongHotkey)
+        default:
+            if let fixed = ScreenshotEditorWindow.fixedShortcuts.first(where: { $0.symbol == symbol }) {
+                return "\(title) (\(fixed.displayName))"
+            }
+            return title
+        }
     }
 
     private func toolbarControlLabel(
@@ -6627,7 +6669,14 @@ private final class ScreenshotLongCaptureRangeWindow: NSPanel {
 
 @MainActor
 final class ScreenshotEditorWindow: NSWindow {
+    static let fixedShortcuts: [(title: String, symbol: String, displayName: String)] = [
+        ("复制", "doc.on.doc", "Enter"),
+        ("保存", "square.and.arrow.down", "⌘S"),
+        ("撤销", "arrow.uturn.backward", "⌘Z"),
+        ("重做", "arrow.uturn.forward", "⌘⇧Z"),
+    ]
     var onConfirm: (() -> Void)?
+    var onCommitText: (() -> Void)?
     var onCancelEditing: (() -> Void)?
     var onUndo: (() -> Void)?
     var onRedo: (() -> Void)?
@@ -6636,6 +6685,7 @@ final class ScreenshotEditorWindow: NSWindow {
     /// Returns false while editing so ⌘C stays with the inline text editor; only the pinned image copies here.
     var onCopyImage: (() -> Bool)?
     var onToolHotkey: ((UInt32, UInt32) -> Bool)?
+    var onEditorHotkey: ((NSEvent) -> Bool)?
 
     static func reservedAction(for hotkey: VoiceInputHotkeyPreset) -> String? {
         switch (hotkey.keyCode, hotkey.carbonModifiers) {
@@ -6673,7 +6723,17 @@ final class ScreenshotEditorWindow: NSWindow {
     override func keyDown(with event: NSEvent) {
         if handleImageShortcut(event) { return }
         if handleEditingKey(event) { return }
+        if handleToolHotkey(event) { return }
         super.keyDown(with: event)
+    }
+
+    override func sendEvent(_ event: NSEvent) {
+        // NSTextView consumes Return before it can reach the window's keyDown handler.
+        if event.type == .keyDown,
+           event.keyCode == UInt16(kVK_Return) || event.keyCode == UInt16(kVK_ANSI_KeypadEnter),
+           firstResponder is NSTextView,
+           handleEditingKey(event) { return }
+        super.sendEvent(event)
     }
 
     override func flagsChanged(with event: NSEvent) {
@@ -6739,6 +6799,12 @@ final class ScreenshotEditorWindow: NSWindow {
         guard modifiers.isEmpty else { return false }
         switch event.keyCode {
         case UInt16(kVK_Return), UInt16(kVK_ANSI_KeypadEnter):
+            if let text = firstResponder as? NSTextView {
+                guard !text.hasMarkedText(), !text.isFieldEditor else { return false }
+                onCommitText?()
+                makeFirstResponder(nil)
+                return true
+            }
             onConfirm?()
             return true
         case UInt16(kVK_Escape):
@@ -6752,11 +6818,34 @@ final class ScreenshotEditorWindow: NSWindow {
     }
 
     private func handleToolHotkey(_ event: NSEvent) -> Bool {
-        guard !(firstResponder is NSTextView) else { return false }
+        if firstResponder is NSTextView,
+           GlobalHotkeyManager.carbonModifiers(from: event.modifierFlags) == 0 { return false }
+        if let onEditorHotkey { return onEditorHotkey(event) }
         return onToolHotkey?(
             UInt32(event.keyCode),
             GlobalHotkeyManager.carbonModifiers(from: event.modifierFlags)
         ) ?? false
+    }
+}
+
+enum ScreenshotHotkeyContext {
+    static func shouldSuspend(selecting: Bool, editors: [(pinned: Bool, key: Bool)]) -> Bool {
+        selecting || editors.contains { !$0.pinned || $0.key }
+    }
+
+    @MainActor
+    static func update(
+        selecting: Bool,
+        editors: [ScreenshotEditorWindowController],
+        globalManagers: [GlobalHotkeyManager]
+    ) {
+        let suspended = shouldSuspend(
+            selecting: selecting,
+            editors: editors.map { ($0.isPinnedPresentation, $0.window?.isKeyWindow == true) }
+        )
+        for manager in globalManagers + editors.map(\.pinnedEscapeHotkeyManager) {
+            manager.setSuspended(suspended, reason: "screenshotEditor")
+        }
     }
 }
 
@@ -6767,6 +6856,7 @@ final class ScreenshotEditorWindowController: NSWindowController, NSWindowDelega
 
     private let model: ScreenshotEditorModel
     private let annotationSelectionState: ScreenshotAnnotationSelectionState
+    private let shortcutSettings: FeatureSettingsStore
     /// SF Symbols such as `textformat` render a localized glyph, so this window needs the
     /// interface locale even when every string already goes through AppLocalization.
     private let languageStore = AppLanguageStore()
@@ -6777,6 +6867,11 @@ final class ScreenshotEditorWindowController: NSWindowController, NSWindowDelega
     private let screenCGImage: CGImage
     private var captureRect: CGRect
     private weak var capturedApplication: NSRunningApplication?
+    private let sourceSnapshot: ScreenshotSourceSnapshot
+    private let initialCaptureRect: CGRect
+    private let capturedScreenFrame: CGRect?
+    private let capturedDisplayIdentifier: UInt32?
+    private let onStash: (Data, ShelfScreenshotMetadata) throws -> Void
     private let writeImageToPasteboard: (Data) -> Bool
     private let presentSavePanel: PresentSavePanel
     private var isLongCaptureInProgress = false
@@ -6795,12 +6890,13 @@ final class ScreenshotEditorWindowController: NSWindowController, NSWindowDelega
     private var pinnedImage: NSImage?
     private var pinnedDragStartFrame: CGRect?
     private var pinnedResizeStartFrame: CGRect?
-    private let pinnedEscapeHotkeyManager = GlobalHotkeyManager()
+    let pinnedEscapeHotkeyManager = GlobalHotkeyManager()
     private let pinnedFocusState = ScreenshotPinnedFocusState()
     private(set) var pinnedScale: CGFloat = 1
     private(set) var pinnedOpacity: CGFloat = 1
     let pinnedScaleRange: ClosedRange<CGFloat> = 0.2...3
     let pinnedToolbarVisible: Bool
+    var onHotkeyContextChanged: (() -> Void)?
 
     var isPinnedPresentation: Bool {
         isPinnedImagePresentation && model.isPinned
@@ -6836,6 +6932,11 @@ final class ScreenshotEditorWindowController: NSWindowController, NSWindowDelega
         screen: NSScreen?,
         captureRect: CGRect,
         capturedApplication: NSRunningApplication?,
+        settingsStore: FeatureSettingsStore = AppModel.shared.settingsStore,
+        sourceSnapshot: ScreenshotSourceSnapshot? = nil,
+        onStash: @escaping (Data, ShelfScreenshotMetadata) throws -> Void = { data, metadata in
+            try AppModel.shared.stashScreenshot(data, metadata: metadata)
+        },
         writeImageToPasteboard: @escaping (Data) -> Bool = {
             ClipboardHistoryPasteboard.write(.image($0))
         },
@@ -6847,12 +6948,22 @@ final class ScreenshotEditorWindowController: NSWindowController, NSWindowDelega
     ) {
         model = ScreenshotEditorModel(image: image)
         annotationSelectionState = ScreenshotAnnotationSelectionState()
+        shortcutSettings = settingsStore
         self.screenImage = screenImage
         self.screenCGImage = screenCGImage
         currentScreen = screen
         currentDisplayID = screen.flatMap(ScreenshotCaptureService.displayID(for:))
         self.captureRect = captureRect
         self.capturedApplication = capturedApplication
+        self.sourceSnapshot = sourceSnapshot ?? ScreenshotSourceSnapshot(
+            applicationName: capturedApplication?.localizedName,
+            bundleIdentifier: capturedApplication?.bundleIdentifier,
+            processIdentifier: capturedApplication?.processIdentifier
+        )
+        initialCaptureRect = captureRect
+        capturedScreenFrame = screen?.frame
+        capturedDisplayIdentifier = screen.flatMap(ScreenshotCaptureService.displayID(for:))
+        self.onStash = onStash
         self.writeImageToPasteboard = writeImageToPasteboard
         self.presentSavePanel = presentSavePanel
         self.pinnedToolbarVisible = pinnedToolbarVisible
@@ -6878,29 +6989,70 @@ final class ScreenshotEditorWindowController: NSWindowController, NSWindowDelega
         window.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary]
         window.hidesOnDeactivate = false
         super.init(window: window)
-        window.onConfirm = { [weak self] in self?.quickPasteAndClose() }
+        window.onConfirm = { [weak self] in
+            guard let self else { return }
+            if self.model.pendingTextDraft != nil {
+                self.model.commitPendingTextDraft()
+                return
+            }
+            self.quickPasteAndClose()
+        }
         window.onCancelEditing = { [weak self] in self?.close() }
+        window.onCommitText = { [weak self] in self?.model.commitPendingTextDraft() }
         window.onUndo = { [weak self] in self?.model.undo() }
         window.onRedo = { [weak self] in self?.model.redo() }
         window.onDelete = { [weak self] in self?.deleteSelectedAnnotation() ?? false }
         window.onSave = { [weak self] in self?.saveImage() }
         window.onCopyImage = { [weak self] in self?.copyPinnedImage() ?? false }
-        window.onToolHotkey = { [weak self] keyCode, modifiers in
-            guard let self, !self.isPinnedImagePresentation,
-                  let tool = ScreenshotTool.matchingShortcut(
-                    keyCode: keyCode,
-                    modifiers: modifiers,
-                    hotkeys: AppModel.shared.settingsStore.settings.screenshotToolHotkeys
-                  )
-            else { return false }
-            if self.model.tool != tool {
-                self.annotationSelectionState.deselect()
-            }
-            self.model.tool = tool
-            return true
+        window.onEditorHotkey = { [weak self] event in
+            guard let self else { return false }
+            return self.performEditorShortcut(
+                keyCode: UInt32(event.keyCode),
+                modifiers: GlobalHotkeyManager.carbonModifiers(from: event.modifierFlags),
+                modifierSides: GlobalHotkeyManager.modifierSides(
+                    from: CGEventFlags(rawValue: UInt64(event.modifierFlags.rawValue))
+                )
+            )
         }
         configureOverlayView(in: window)
         window.delegate = self
+    }
+
+    func performEditorShortcut(keyCode: UInt32, modifiers: UInt32, modifierSides: Set<VoiceInputModifier>? = nil) -> Bool {
+        guard !isClosed else { return false }
+        let settings = shortcutSettings.settings
+        func matches(_ hotkey: VoiceInputHotkeyPreset) -> Bool {
+            guard hotkey.keyCode == keyCode && hotkey.carbonModifiers == modifiers else { return false }
+            if hotkey.requiresInputMonitoring, let modifierSides {
+                return hotkey.matches(keyCode: keyCode, modifierSides: modifierSides)
+            }
+            return true
+        }
+        if matches(settings.screenshotPinHotkey) {
+            model.commitPendingTextDraft()
+            togglePinned()
+            return true
+        }
+        if matches(settings.screenshotStashHotkey) {
+            stashImage()
+            return true
+        }
+        if !isPinnedImagePresentation, matches(settings.screenshotEditorLongHotkey) {
+            model.commitPendingTextDraft()
+            if isLongCaptureInProgress { finishLongCapture() } else { captureNextScreen() }
+            return true
+        }
+        guard !isPinnedImagePresentation,
+                  let tool = ScreenshotTool.allCases.first(where: {
+                      settings.screenshotToolHotkeys[$0.rawValue].map(matches) ?? false
+                  })
+            else { return false }
+        model.commitPendingTextDraft()
+        if model.tool != tool {
+            annotationSelectionState.deselect()
+        }
+        model.tool = tool
+        return true
     }
 
     required init?(coder: NSCoder) {
@@ -6939,15 +7091,18 @@ final class ScreenshotEditorWindowController: NSWindowController, NSWindowDelega
         guard let notificationWindow = notification.object as? NSWindow,
               notificationWindow === window else { return }
         pinnedFocusState.windowIsKey = true
+        onHotkeyContextChanged?()
     }
 
     func windowDidResignKey(_ notification: Notification) {
         guard let notificationWindow = notification.object as? NSWindow,
               notificationWindow === window else { return }
         pinnedFocusState.windowIsKey = false
+        onHotkeyContextChanged?()
     }
 
     func setPinned(_ pinned: Bool) {
+        model.commitPendingTextDraft()
         model.isPinned = pinned
         if pinned {
             switchToPinnedImagePresentation()
@@ -6956,6 +7111,7 @@ final class ScreenshotEditorWindowController: NSWindowController, NSWindowDelega
         } else {
             window?.level = pinned ? .floating : WindowPlacement.modalWindowLevel
         }
+        onHotkeyContextChanged?()
     }
 
     func togglePinned() {
@@ -6969,6 +7125,7 @@ final class ScreenshotEditorWindowController: NSWindowController, NSWindowDelega
                 content: ScreenshotEditorView(
                     model: model,
                     selectionState: annotationSelectionState,
+                    settingsStore: shortcutSettings,
                     overlayConfiguration: ScreenshotEditorOverlayConfiguration(
                         backgroundImage: screenImage,
                         initialSelection: captureRect,
@@ -6976,6 +7133,7 @@ final class ScreenshotEditorWindowController: NSWindowController, NSWindowDelega
                     ),
                     onClose: { [weak self] in self?.close() },
                     onCopy: { [weak self] in self?.quickPasteAndClose() },
+                    onStash: { [weak self] in self?.stashImage() },
                     onSave: { [weak self] in self?.saveImage() },
                     onPinToggle: { [weak self] pinned in self?.setPinned(pinned) },
                     onLongCapture: { [weak self] in self?.captureNextScreen() },
@@ -6992,9 +7150,11 @@ final class ScreenshotEditorWindowController: NSWindowController, NSWindowDelega
                 content: ScreenshotEditorView(
                     model: model,
                     selectionState: annotationSelectionState,
+                    settingsStore: shortcutSettings,
                     toolbarOnly: true,
                     onClose: { [weak self] in self?.close() },
                     onCopy: { [weak self] in self?.quickPasteAndClose() },
+                    onStash: { [weak self] in self?.stashImage() },
                     onSave: { [weak self] in self?.saveImage() },
                     onPinToggle: { [weak self] pinned in self?.setPinned(pinned) },
                     onLongCapture: { [weak self] in self?.captureNextScreen() },
@@ -7220,6 +7380,31 @@ final class ScreenshotEditorWindowController: NSWindowController, NSWindowDelega
             model.statusMessage = AppLocalization.text("粘贴板写入失败")
         }
         return true
+    }
+
+    /// Keep toolbar and keyboard stashing on the same success-only close path, including pinned images.
+    @discardableResult
+    func stashImage() -> Bool {
+        guard !isClosed else { return false }
+        model.commitPendingTextDraft()
+        guard let data = model.pngData() else {
+            model.statusMessage = AppLocalization.text("图片生成失败")
+            return false
+        }
+        do {
+            let dimensions = try FileShelfStore.screenshotDimensions(data)
+            let metadata = ShelfScreenshotMetadata(source: sourceSnapshot,
+                isLongScreenshot: model.hasLongCaptureResult || model.isLongCapturePreviewing,
+                initialCaptureRect: initialCaptureRect, captureRect: captureRect,
+                screenFrame: capturedScreenFrame, displayIdentifier: capturedDisplayIdentifier,
+                pixelWidth: dimensions.width, pixelHeight: dimensions.height)
+            try onStash(data, metadata)
+            close()
+            return true
+        } catch {
+            model.statusMessage = error.localizedDescription
+            return false
+        }
     }
 
     private func quickPasteAndClose() {

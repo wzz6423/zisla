@@ -27,6 +27,8 @@ struct SettingsView: View {
     @State private var selectedVoiceHistoryIDs: Set<UUID> = []
     @State private var customVoiceHotword = ""
     @State private var screenshotHotkeyValidationMessage: String?
+    @State private var voiceHotkeyValidationMessage: String?
+    @State private var assistantHotkeyValidationMessage: String?
     @State private var expandedClipboardAssistantKind: ClipboardAssistantKind?
     @Namespace private var sectionSelectionNamespace
 
@@ -586,6 +588,16 @@ struct SettingsView: View {
                                 hotkey: Binding(
                                     get: { model.settingsStore.settings.clipboardAssistantTriggerConfiguration.hotkey },
                                     set: { newValue in
+                                        if let newValue,
+                                           let conflict = Self.conflictingScreenshotAction(
+                                               forGlobalHotkey: newValue, in: model.settingsStore.settings
+                                           ) {
+                                            assistantHotkeyValidationMessage = screenshotConflictMessage(
+                                                actionName: "快捷操作", conflict: conflict
+                                            )
+                                            return
+                                        }
+                                        assistantHotkeyValidationMessage = nil
                                         model.settingsStore.settings.clipboardAssistantTriggerConfiguration =
                                             newValue.map(ClipboardAssistantTriggerConfiguration.hotkey) ?? .none
                                     }
@@ -593,6 +605,7 @@ struct SettingsView: View {
                             )
                             if model.settingsStore.settings.clipboardAssistantTriggerConfiguration.hotkey != nil {
                                 Button {
+                                    assistantHotkeyValidationMessage = nil
                                     model.settingsStore.settings.clipboardAssistantTriggerConfiguration = .none
                                 } label: {
                                     Image(systemName: "xmark.circle.fill")
@@ -809,7 +822,7 @@ struct SettingsView: View {
                             .accessibilityLabel(AppLocalization.text("自定义搜索网址"))
                         }
                     }
-                    if let conflictMessage = clipboardAssistantHotkeyConflictMessage {
+                    if let conflictMessage = assistantHotkeyValidationMessage ?? clipboardAssistantHotkeyConflictMessage {
                         rowDivider
                         Label(conflictMessage, systemImage: "exclamationmark.triangle.fill")
                             .font(.system(size: 10))
@@ -1153,22 +1166,6 @@ struct SettingsView: View {
                         }
                         rowDivider
                         settingRow(
-                            symbol: "pin.fill",
-                            title: "钉图快捷键",
-                            detail: "钉住已截取的图片"
-                        ) {
-                            HotkeyRecorder(
-                                hotkey: Binding(
-                                    get: { model.settingsStore.settings.screenshotPinHotkey },
-                                    set: { newValue in
-                                        guard let newValue else { return }
-                                        updateScreenshotHotkey(newValue, action: .pin)
-                                    }
-                                )
-                            )
-                        }
-                        rowDivider
-                        settingRow(
                             symbol: "rectangle.on.rectangle",
                             title: "长截图",
                             detail: "触发截图功能"
@@ -1243,12 +1240,25 @@ struct SettingsView: View {
                 }
                 if input.selection == .screenshot {
                     settingsGroup("工具") {
+                        settingRow(symbol: "pin.fill", title: "钉图快捷键", detail: "钉住已截取的图片") {
+                            HotkeyRecorder(hotkey: Binding(
+                                get: { model.settingsStore.settings.screenshotPinHotkey },
+                                set: { if let value = $0 { updateScreenshotHotkey(value, action: .pin) } }
+                            ))
+                        }
+                        rowDivider
+                        settingRow(symbol: "tray.and.arrow.down", title: "暂存", detail: "") {
+                            HotkeyRecorder(hotkey: Binding(
+                                get: { model.settingsStore.settings.screenshotStashHotkey },
+                                set: { if let value = $0 { updateScreenshotHotkey(value, action: .stash) } }
+                            ))
+                        }
+                        rowDivider
                         ForEach(ScreenshotTool.allCases) { tool in
                             settingRow(
                                 symbol: tool.symbol,
                                 title: tool.title,
-                                detail: "",
-                                isNested: true
+                                detail: ""
                             ) {
                                 HotkeyRecorder(
                                     hotkey: Binding(
@@ -1263,6 +1273,21 @@ struct SettingsView: View {
                             if tool != ScreenshotTool.allCases.last {
                                 rowDivider
                             }
+                        }
+                        rowDivider
+                        settingRow(symbol: "rectangle.on.rectangle", title: "长截图", detail: "") {
+                            HotkeyRecorder(hotkey: Binding(
+                                get: { model.settingsStore.settings.screenshotEditorLongHotkey },
+                                set: { if let value = $0 { updateScreenshotHotkey(value, action: .editorLongCapture) } }
+                            ))
+                        }
+                        rowDivider
+                        ForEach(ScreenshotEditorWindow.fixedShortcuts, id: \.title) { shortcut in
+                            settingRow(symbol: shortcut.symbol, title: shortcut.title, detail: "") {
+                                Text(shortcut.displayName)
+                                    .font(.system(size: 10, design: .monospaced))
+                            }
+                            if shortcut.title != "重做" { rowDivider }
                         }
                     }
                 }
@@ -2042,10 +2067,25 @@ struct SettingsView: View {
                                 get: { model.settingsStore.settings.voiceInputHotkeyPreset },
                                 set: { newValue in
                                     guard let newValue else { return }
+                                    if let conflict = Self.conflictingScreenshotAction(
+                                        forGlobalHotkey: newValue, in: model.settingsStore.settings
+                                    ) {
+                                        voiceHotkeyValidationMessage = screenshotConflictMessage(
+                                            actionName: "语音输入", conflict: conflict
+                                        )
+                                        return
+                                    }
+                                    voiceHotkeyValidationMessage = nil
                                     model.settingsStore.settings.voiceInputHotkeyPreset = newValue
                                 }
                             )
                         )
+                    }
+                    if let message = voiceHotkeyValidationMessage {
+                        Label(message, systemImage: "exclamationmark.triangle.fill")
+                            .font(.system(size: 10))
+                            .foregroundStyle(Color.zislaWarning)
+                            .frame(maxWidth: .infinity, minHeight: 34, alignment: .leading)
                     }
                     if model.settingsStore.settings.voiceInputHotkeyPreset.requiresInputMonitoring {
                         rowDivider
@@ -2222,13 +2262,19 @@ struct SettingsView: View {
         case capture
         case pin
         case longCapture
+        case stash
+        case editorLongCapture
         case tool(ScreenshotTool)
+
+        var isGlobal: Bool { self == .capture || self == .longCapture }
 
         var name: String {
             switch self {
             case .capture: "截图"
             case .pin: "钉图"
             case .longCapture: "长截图"
+            case .stash: "暂存"
+            case .editorLongCapture: "长截图"
             case .tool(let tool): tool.title
             }
         }
@@ -2239,6 +2285,8 @@ struct SettingsView: View {
             (.capture, settings.screenshotHotkey),
             (.pin, settings.screenshotPinHotkey),
             (.longCapture, settings.screenshotLongHotkey),
+            (.stash, settings.screenshotStashHotkey),
+            (.editorLongCapture, settings.screenshotEditorLongHotkey),
         ] + ScreenshotTool.allCases.compactMap { tool in
             settings.screenshotToolHotkeys[tool.rawValue].map { (.tool(tool), $0) }
         }
@@ -2250,15 +2298,27 @@ struct SettingsView: View {
         in settings: FeatureSettings
     ) -> ScreenshotHotkeyAction? {
         screenshotHotkeys(in: settings).first {
-            $0.0 != action && hotkey.conflicts(with: $0.1)
+            $0.0 != action && $0.0.isGlobal == action.isGlobal && hotkey.conflicts(with: $0.1)
         }?.0
+    }
+
+    static func conflictingScreenshotAction(
+        forGlobalHotkey hotkey: VoiceInputHotkeyPreset,
+        in settings: FeatureSettings
+    ) -> ScreenshotHotkeyAction? {
+        guard settings.screenshotEnabled else { return nil }
+        return screenshotHotkeys(in: settings).first { hotkey.conflicts(with: $0.1) }?.0
+    }
+
+    private func screenshotConflictMessage(actionName: String, conflict: ScreenshotHotkeyAction) -> String {
+        AppLocalization.text("%@快捷键与%@冲突，未保存",
+            AppLocalization.text(actionName), AppLocalization.text(conflict.name))
     }
 
     private var screenshotHotkeysRequireInputMonitoring: Bool {
         let settings = model.settingsStore.settings
         return settings.screenshotEnabled
             && (settings.screenshotHotkey.requiresInputMonitoring
-                || settings.screenshotPinHotkey.requiresInputMonitoring
                 || settings.screenshotLongHotkey.requiresInputMonitoring)
     }
 
@@ -2266,7 +2326,9 @@ struct SettingsView: View {
         let settings = model.settingsStore.settings
         let hotkeys = Self.screenshotHotkeys(in: settings)
         for (index, entry) in hotkeys.enumerated() {
-            if let other = hotkeys.dropFirst(index + 1).first(where: { entry.1.conflicts(with: $0.1) }) {
+            if let other = hotkeys.dropFirst(index + 1).first(where: {
+                entry.0.isGlobal == $0.0.isGlobal && entry.1.conflicts(with: $0.1)
+            }) {
                 return AppLocalization.text(
                     "%@快捷键与%@冲突，请修改其中一个",
                     AppLocalization.text(entry.0.name),
@@ -2339,6 +2401,10 @@ struct SettingsView: View {
             settings.screenshotPinHotkey = hotkey
         case .longCapture:
             settings.screenshotLongHotkey = hotkey
+        case .stash:
+            settings.screenshotStashHotkey = hotkey
+        case .editorLongCapture:
+            settings.screenshotEditorLongHotkey = hotkey
         case .tool(let tool):
             settings.screenshotToolHotkeys[tool.rawValue] = hotkey
         }
@@ -3295,14 +3361,10 @@ struct SettingsView: View {
         let settings = model.settingsStore.settings
         let conflicts: [String] = [
             settings.voiceInputEnabled && hotkey.conflicts(with: settings.voiceInputHotkeyPreset) ? loc("语音输入") : nil,
-            settings.screenshotEnabled && hotkey.conflicts(with: settings.screenshotHotkey) ? loc("截图") : nil,
-            settings.screenshotEnabled && hotkey.conflicts(with: settings.screenshotPinHotkey) ? loc("钉图") : nil,
-            settings.screenshotEnabled && hotkey.conflicts(with: settings.screenshotLongHotkey) ? loc("长截图") : nil,
         ].compactMap { $0 } + (settings.screenshotEnabled
-            ? ScreenshotTool.allCases.compactMap { tool in
-                guard let toolHotkey = settings.screenshotToolHotkeys[tool.rawValue],
-                      hotkey.conflicts(with: toolHotkey) else { return nil }
-                return loc(tool.title)
+            ? Self.screenshotHotkeys(in: settings).compactMap { action, screenshotHotkey in
+                guard hotkey.conflicts(with: screenshotHotkey) else { return nil }
+                return loc(action.name)
             }
             : [])
         guard !conflicts.isEmpty else { return nil }
@@ -3934,8 +3996,13 @@ private struct HotkeyRecorder: NSViewRepresentable {
     }
 
     func updateNSView(_ nsView: HotkeyRecorderButton, context: Context) {
+        context.coordinator.update(self)
         nsView.hotkey = hotkey
         nsView.locale = locale
+    }
+
+    static func dismantleNSView(_ nsView: HotkeyRecorderButton, coordinator: Coordinator) {
+        nsView.stopRecording()
     }
 
     /// A representable without a reported size takes the whole settings row. The field is measured
@@ -3957,6 +4024,10 @@ private struct HotkeyRecorder: NSViewRepresentable {
             self.parent = parent
         }
 
+        func update(_ parent: HotkeyRecorder) {
+            self.parent = parent
+        }
+
         func record(_ hotkey: VoiceInputHotkeyPreset) {
             parent.hotkey = hotkey
         }
@@ -3964,7 +4035,7 @@ private struct HotkeyRecorder: NSViewRepresentable {
 }
 
 @MainActor
-private final class HotkeyRecorderButton: NSButton {
+final class HotkeyRecorderButton: NSButton {
     var hotkey: VoiceInputHotkeyPreset? {
         didSet {
             if !isRecording {
@@ -3979,7 +4050,7 @@ private final class HotkeyRecorderButton: NSButton {
     }
     var onRecord: ((VoiceInputHotkeyPreset) -> Void)?
 
-    private var isRecording = false {
+    private(set) var isRecording = false {
         didSet {
             if !isRecording {
                 recordingModifierSides.removeAll()
@@ -3990,6 +4061,8 @@ private final class HotkeyRecorderButton: NSButton {
     }
     private var recordingModifierSides: Set<VoiceInputModifier> = []
     private var sawMultipleModifiers = false
+    private var recordingOwner: UUID?
+    private var windowObservers: [NSObjectProtocol] = []
 
     init(hotkey: VoiceInputHotkeyPreset?, locale: Locale) {
         self.hotkey = hotkey
@@ -4010,10 +4083,41 @@ private final class HotkeyRecorderButton: NSButton {
 
     override func mouseDown(with event: NSEvent) {
         guard !isRecording else { return }
+        guard window?.makeFirstResponder(self) == true else { return }
         recordingModifierSides.removeAll()
         sawMultipleModifiers = false
+        recordingOwner = GlobalHotkeyManager.beginRecording()
+        if let window {
+            for name in [NSWindow.didResignKeyNotification, NSWindow.willCloseNotification] {
+                windowObservers.append(NotificationCenter.default.addObserver(
+                    forName: name, object: window, queue: .main
+                ) { [weak self] _ in
+                    MainActor.assumeIsolated { self?.stopRecording() }
+                })
+            }
+        }
         isRecording = true
-        window?.makeFirstResponder(self)
+    }
+
+    func stopRecording() {
+        isRecording = false
+        for observer in windowObservers { NotificationCenter.default.removeObserver(observer) }
+        windowObservers.removeAll()
+        if let owner = recordingOwner {
+            recordingOwner = nil
+            GlobalHotkeyManager.endRecording(owner)
+        }
+    }
+
+    override func viewWillMove(toWindow newWindow: NSWindow?) {
+        if newWindow !== window { stopRecording() }
+        super.viewWillMove(toWindow: newWindow)
+    }
+
+    override func performKeyEquivalent(with event: NSEvent) -> Bool {
+        guard isRecording else { return super.performKeyEquivalent(with: event) }
+        keyDown(with: event)
+        return true
     }
 
     override func flagsChanged(with event: NSEvent) {
@@ -4061,7 +4165,7 @@ private final class HotkeyRecorderButton: NSButton {
 
         let modifiers = carbonModifiers(from: event.modifierFlags)
         if event.keyCode == 53, modifiers == 0 {
-            isRecording = false
+            stopRecording()
             return
         }
         record(VoiceInputHotkeyPreset(
@@ -4074,14 +4178,14 @@ private final class HotkeyRecorderButton: NSButton {
 
     private func record(_ recordedHotkey: VoiceInputHotkeyPreset) {
         hotkey = recordedHotkey
-        isRecording = false
         onRecord?(recordedHotkey)
+        stopRecording()
         window?.makeFirstResponder(nil)
     }
 
     override func cancelOperation(_ sender: Any?) {
         if isRecording {
-            isRecording = false
+            stopRecording()
         } else {
             super.cancelOperation(sender)
         }
@@ -4090,7 +4194,7 @@ private final class HotkeyRecorderButton: NSButton {
     override func resignFirstResponder() -> Bool {
         let didResign = super.resignFirstResponder()
         if didResign, isRecording {
-            isRecording = false
+            stopRecording()
         }
         return didResign
     }

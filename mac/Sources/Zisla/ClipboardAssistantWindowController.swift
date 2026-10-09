@@ -1477,6 +1477,10 @@ final class ClipboardAssistantTriggerMonitor: ClipboardAssistantTriggerRegisteri
     }
 
     private func handle(type: CGEventType, event: CGEvent) {
+        guard !GlobalHotkeyManager.isRecordingHotkeys else {
+            lastModifierReleaseAt = 0
+            return
+        }
         switch type {
         case .flagsChanged:
             handleFlagsChanged(event)

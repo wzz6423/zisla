@@ -15,6 +15,41 @@ public enum GlobalHotkeyRegistrationResult: Equatable, Sendable {
 /// The event tap is added to the main RunLoop, so its callbacks and register/unregister calls
 /// are all serialized on the main thread.
 public final class GlobalHotkeyManager: @unchecked Sendable {
+    private nonisolated(unsafe) static let instances = NSHashTable<GlobalHotkeyManager>.weakObjects()
+    private nonisolated(unsafe) static var recordingOwners: Set<UUID> = []
+    private var suspensionReasons: Set<String> = []
+    private var requestedRegistration: (() -> GlobalHotkeyRegistrationResult)?
+
+    @MainActor
+    public static var isRecordingHotkeys: Bool { !recordingOwners.isEmpty }
+
+    /// Release global registrations, including voice and quick actions, until every recorder finishes.
+    @MainActor
+    public static func beginRecording() -> UUID {
+        let owner = UUID()
+        recordingOwners.insert(owner)
+        for manager in instances.allObjects { manager.setSuspended(true, reason: "recording") }
+        return owner
+    }
+
+    @MainActor
+    public static func endRecording(_ owner: UUID) {
+        recordingOwners.remove(owner)
+        guard recordingOwners.isEmpty else { return }
+        for manager in instances.allObjects { manager.setSuspended(false, reason: "recording") }
+    }
+
+    public func setSuspended(_ suspended: Bool, reason: String) {
+        let wasSuspended = !suspensionReasons.isEmpty
+        if suspended { suspensionReasons.insert(reason) } else { suspensionReasons.remove(reason) }
+        guard wasSuspended != !suspensionReasons.isEmpty else { return }
+        if suspended { handleCarbonHotkeyReleased() }
+        unregisterActiveRegistration()
+        if suspensionReasons.isEmpty { _ = requestedRegistration?() }
+    }
+
+    public var isSuspended: Bool { !suspensionReasons.isEmpty }
+    var hasActiveRegistration: Bool { hotKeyRef != nil || eventTap != nil }
     // CGEventFlags preserves device-specific bits that distinguish left and right physical modifier keys.
     private static let deviceModifierMasks: [(modifier: VoiceInputModifier, mask: UInt64)] = [
         (.leftControl, 0x0000_0000_0000_0001),
@@ -44,7 +79,10 @@ public final class GlobalHotkeyManager: @unchecked Sendable {
     var onKeyDown: (() -> Void)?
     var onKeyUp: (() -> Void)?
 
-    public init() {}
+    public init() {
+        Self.instances.add(self)
+        if !Self.recordingOwners.isEmpty { suspensionReasons.insert("recording") }
+    }
 
     public static var hasInputMonitoringAccess: Bool {
         CGPreflightListenEventAccess()
@@ -68,23 +106,20 @@ public final class GlobalHotkeyManager: @unchecked Sendable {
         onKeyUp: @escaping () -> Void
     ) -> GlobalHotkeyRegistrationResult {
         unregister()
-
-        if hotkey.requiresInputMonitoring {
-            guard Self.hasInputMonitoringAccess else {
-                return .inputMonitoringPermissionRequired
+        let registration: () -> GlobalHotkeyRegistrationResult = { [weak self] in
+            guard let self else { return .registrationFailed }
+            if hotkey.requiresInputMonitoring {
+                guard Self.hasInputMonitoringAccess else { return .inputMonitoringPermissionRequired }
+                return self.registerSideSpecific(hotkey: hotkey, onKeyDown: onKeyDown, onKeyUp: onKeyUp)
             }
-            return registerSideSpecific(
-                hotkey: hotkey,
-                onKeyDown: onKeyDown,
-                onKeyUp: onKeyUp
-            )
+            return self.registerCarbon(keyCode: hotkey.keyCode, modifiers: hotkey.carbonModifiers,
+                onKeyDown: onKeyDown, onKeyUp: onKeyUp)
         }
-        return registerCarbon(
-            keyCode: hotkey.keyCode,
-            modifiers: hotkey.carbonModifiers,
-            onKeyDown: onKeyDown,
-            onKeyUp: onKeyUp
-        )
+        requestedRegistration = registration
+        if hotkey.requiresInputMonitoring, !Self.hasInputMonitoringAccess {
+            return .inputMonitoringPermissionRequired
+        }
+        return isSuspended ? .registered : registration()
     }
 
     /// Registers a conventional combination hotkey that only needs a press action.
@@ -94,16 +129,16 @@ public final class GlobalHotkeyManager: @unchecked Sendable {
         modifiers: UInt32,
         action: @escaping () -> Void
     ) -> GlobalHotkeyRegistrationResult {
-        unregister()
-        return registerCarbon(
-            keyCode: keyCode,
-            modifiers: modifiers,
-            onKeyDown: action,
-            onKeyUp: {}
-        )
+        register(hotkey: .init(keyCode: keyCode, carbonModifiers: modifiers, keyDisplayName: ""),
+            onKeyDown: action, onKeyUp: {})
     }
 
     public func unregister() {
+        requestedRegistration = nil
+        unregisterActiveRegistration()
+    }
+
+    private func unregisterActiveRegistration() {
         releaseSideSpecificHotkey()
         stopObservingMenuTracking()
         carbonHotkey = nil

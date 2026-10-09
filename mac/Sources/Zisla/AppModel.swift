@@ -1507,11 +1507,46 @@ final class AppModel: ObservableObject {
   }
 
   func copyShelfItems(_ items: [FileShelfItem]) {
-    guard FileShelfPasteboard.writeItems(items) else {
+    let screenshots: [UUID: Data]
+    do {
+      screenshots = try Dictionary(uniqueKeysWithValues: items.filter { $0.screenshotMetadata != nil }.map {
+        ($0.id, try shelf.screenshotData(id: $0.id))
+      })
+    } catch {
+      transientMessage = error.localizedDescription
+      return
+    }
+    guard FileShelfPasteboard.writeItems(items, screenshotData: screenshots) else {
       transientMessage = AppLocalization.text("无法写入剪贴板")
       return
     }
     transientMessage = AppLocalization.text("已复制到剪贴板")
+  }
+
+  func stashScreenshot(_ data: Data, metadata: ShelfScreenshotMetadata) throws {
+    try shelf.stashScreenshot(png: data, metadata: metadata)
+    transientMessage = AppLocalization.text("已加入 %ld 个项目", 1)
+  }
+
+  func saveShelfScreenshot(_ item: FileShelfItem) {
+    do {
+      ScreenshotImageExport.presentSavePanel(for: try shelf.screenshotData(id: item.id)) { [weak self] message in
+        if let message { self?.transientMessage = message }
+      }
+    } catch { transientMessage = error.localizedDescription }
+  }
+
+  func shelfTransferItems(_ items: [FileShelfItem]) -> [TransferDropItem] {
+    do {
+      return try items.map { item in
+        let payload: TransferPasteboardPayload = item.screenshotMetadata == nil
+          ? item.payload : .file(try shelf.screenshotFileURL(id: item.id))
+        return TransferDropItem(payload: payload)
+      }
+    } catch {
+      transientMessage = error.localizedDescription
+      return []
+    }
   }
 
   func saveShelfContextNote() {

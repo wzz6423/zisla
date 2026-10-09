@@ -1983,6 +1983,10 @@
 "已移到废纸篓" = "Placé dans la corbeille";
 "开始自动滚动" = "Démarrer le défilement automatique";
 "截图.png" = "Capture d'écran.png";
+"暂存" = "Mettre de côté";
+"暂存截图" = "Captures mises de côté";
+"预览" = "Aperçu";
+"无法打开截图数据库" = "Impossible d’ouvrir la base de données des captures d’écran";
 "找不到显示器" = "Aucun écran trouvé";
 "授权磁盘访问" = "Autoriser l'accès au disque";
 "播放原始录音" = "Lire l'enregistrement d'origine";

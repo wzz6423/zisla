@@ -1987,6 +1987,10 @@
 "已移到废纸篓" = "Spostato nel cestino";
 "开始自动滚动" = "Avvia lo scorrimento automatico";
 "截图.png" = "Istantanea.png";
+"暂存" = "Conserva";
+"暂存截图" = "Istantanee conservate";
+"预览" = "Anteprima";
+"无法打开截图数据库" = "Impossibile aprire il database delle istantanee";
 "找不到显示器" = "Nessun display trovato";
 "授权磁盘访问" = "Autorizza l'accesso al disco";
 "播放原始录音" = "Riproduci la registrazione originale";

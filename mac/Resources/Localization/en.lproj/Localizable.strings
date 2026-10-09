@@ -1986,6 +1986,10 @@
 "已移到废纸篓" = "Moved to Trash";
 "开始自动滚动" = "Start auto-scroll";
 "截图.png" = "screenshot.png";
+"暂存" = "Stash";
+"暂存截图" = "Stashed screenshots";
+"预览" = "Preview";
+"无法打开截图数据库" = "Unable to open screenshot database";
 "找不到显示器" = "Display not found";
 "授权磁盘访问" = "Grant Full Disk Access";
 "播放原始录音" = "Play original recording";

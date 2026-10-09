@@ -34,6 +34,10 @@ public final class FeatureSettingsStore: ObservableObject {
                 settings.updateChannel = self.defaultUpdateChannel
                 shouldPersistMigration = true
             }
+            if let object = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+               object["screenshotHotkeyVersion"] as? Int == nil {
+                shouldPersistMigration = true
+            }
             initialSettings = settings
         } else {
             var settings = FeatureSettings.default

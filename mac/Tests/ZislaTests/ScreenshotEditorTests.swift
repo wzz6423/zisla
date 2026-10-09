@@ -129,7 +129,7 @@ struct ScreenshotEditorTests {
 
     @Test
     func toolbarUsesCompactControlsAndDragPositionStaysOnScreen() {
-        #expect(ScreenshotToolbarLayout.controlCount == 15)
+        #expect(ScreenshotToolbarLayout.controlCount == 16)
         #expect(ScreenshotToolbarLayout.cornerRadius == 10)
         #expect(ScreenshotToolbarLayout.borderOpacity == 0.08)
         #expect(ScreenshotToolbarLayout.dragHandleColumns == 2)
@@ -144,7 +144,7 @@ struct ScreenshotEditorTests {
             + CGFloat(ScreenshotToolbarLayout.controlCount) * ScreenshotToolbarLayout.spacing
         #expect(ScreenshotToolbarLayout.contentWidth == expectedWidth)
         #expect(ScreenshotToolbarLayout.viewportWidth(availableWidth: 2_000) == expectedWidth)
-        #expect(ScreenshotToolbarLayout.viewportWidth(availableWidth: 1_200) == 968)
+        #expect(ScreenshotToolbarLayout.viewportWidth(availableWidth: 1_200) == 1030)
         #expect(ScreenshotToolbarLayout.controlWidth <= 60)
         #expect(ScreenshotToolbarLayout.height <= 38)
 
@@ -211,8 +211,8 @@ struct ScreenshotEditorTests {
 
     @Test
     func toolbarWidthShrinksWhenHistoryActionsAreHidden() {
-        let full = ScreenshotToolbarLayout.contentWidth(forControlCount: 15)
-        let withoutHistory = ScreenshotToolbarLayout.contentWidth(forControlCount: 13)
+        let full = ScreenshotToolbarLayout.contentWidth(forControlCount: 16)
+        let withoutHistory = ScreenshotToolbarLayout.contentWidth(forControlCount: 14)
         #expect(withoutHistory < full)
     }
 
@@ -817,7 +817,7 @@ struct ScreenshotEditorTests {
         var selected = false
         window.onToolHotkey = { _, _ in selected = true; return true }
         let event = try #require(keyEvent(
-            keyCode: UInt16(kVK_ANSI_5), characters: "5", modifiers: [.control]
+            keyCode: UInt16(kVK_ANSI_5), characters: "5", modifiers: []
         ))
 
         _ = window.performKeyEquivalent(with: event)
@@ -828,17 +828,17 @@ struct ScreenshotEditorTests {
     func screenshotToolShortcutsFollowSavedSettingsAndIgnoreUnassignedKeys() {
         var hotkeys = ScreenshotHotkeyDefaults.tools
         #expect(ScreenshotTool.matchingShortcut(
-            keyCode: UInt32(kVK_ANSI_4),
+            keyCode: UInt32(kVK_ANSI_3),
             modifiers: UInt32(controlKey),
             hotkeys: hotkeys
         ) == .rectangle)
         #expect(ScreenshotTool.matchingShortcut(
-            keyCode: UInt32(kVK_ANSI_4),
+            keyCode: UInt32(kVK_ANSI_3),
             modifiers: UInt32(controlKey | shiftKey),
             hotkeys: hotkeys
         ) == nil)
         #expect(ScreenshotTool.matchingShortcut(
-            keyCode: UInt32(kVK_ANSI_4),
+            keyCode: UInt32(kVK_ANSI_3),
             modifiers: UInt32(optionKey),
             hotkeys: hotkeys
         ) == nil)
@@ -849,7 +849,7 @@ struct ScreenshotEditorTests {
             keyDisplayName: "R"
         )
         #expect(ScreenshotTool.matchingShortcut(
-            keyCode: UInt32(kVK_ANSI_4),
+            keyCode: UInt32(kVK_ANSI_3),
             modifiers: UInt32(controlKey),
             hotkeys: hotkeys
         ) == nil)
@@ -904,12 +904,12 @@ struct ScreenshotEditorTests {
     @Test
     func screenshotShortcutRecordingRejectsAnotherScreenshotAction() throws {
         var settings = FeatureSettings.default
-        let globalHotkeys: [(SettingsView.ScreenshotHotkeyAction, VoiceInputHotkeyPreset)] = [
-            (.capture, settings.screenshotHotkey),
+        let editorHotkeys: [(SettingsView.ScreenshotHotkeyAction, VoiceInputHotkeyPreset)] = [
             (.pin, settings.screenshotPinHotkey),
-            (.longCapture, settings.screenshotLongHotkey),
+            (.stash, settings.screenshotStashHotkey),
+            (.editorLongCapture, settings.screenshotEditorLongHotkey),
         ]
-        for (action, hotkey) in globalHotkeys {
+        for (action, hotkey) in editorHotkeys {
             #expect(SettingsView.conflictingScreenshotAction(
                 for: hotkey,
                 action: .tool(.rectangle),
@@ -921,6 +921,12 @@ struct ScreenshotEditorTests {
                 in: settings
             ) == nil)
         }
+        #expect(SettingsView.conflictingScreenshotAction(
+            for: settings.screenshotHotkey, action: .capture, in: settings
+        ) == nil)
+        #expect(SettingsView.conflictingScreenshotAction(
+            for: settings.screenshotLongHotkey, action: .longCapture, in: settings
+        ) == nil)
 
         let custom = VoiceInputHotkeyPreset(
             keyCode: UInt32(kVK_ANSI_R),
