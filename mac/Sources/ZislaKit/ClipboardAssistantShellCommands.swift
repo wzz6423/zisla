@@ -66,6 +66,12 @@ extension ClipboardAssistantDetector {
     }
 }
 
+// Detached subprocesses have no terminal for zsh job control. Keep interactive
+// startup files for aliases/functions without changing other shells' options.
+private func detachedShellArguments(for shell: URL, command: String) -> [String] {
+    (shell.lastPathComponent == "zsh" ? ["+m", "-ilc"] : ["-ilc"]) + [command]
+}
+
 public enum ClipboardShellCommandResolver {
     public static func resolve(
         _ text: String,
@@ -92,9 +98,10 @@ public enum ClipboardShellCommandResolver {
         // Only variable references enter shell source; clipboard text stays inert environment data.
         let marker = "\u{001E}zisla-command-found\u{001F}"
         checks.append("printf '\\036zisla-command-found\\037'")
+        let shell = URL(fileURLWithPath: environment["SHELL"] ?? "/bin/zsh")
         guard let result = try? await AIAgentProcessRunner.run(
-            executableURL: URL(fileURLWithPath: environment["SHELL"] ?? "/bin/zsh"),
-            arguments: ["-ilc", checks.joined(separator: " && ")],
+            executableURL: shell,
+            arguments: detachedShellArguments(for: shell, command: checks.joined(separator: " && ")),
             standardInput: Data(),
             environment: environment,
             workingDirectoryURL: workingDirectory,
@@ -176,8 +183,9 @@ public enum ClipboardShellCommandRunner {
         workingDirectory: URL = FileManager.default.homeDirectoryForCurrentUser
     ) throws -> Process {
         let process = Process()
-        process.executableURL = URL(fileURLWithPath: environment["SHELL"] ?? "/bin/zsh")
-        process.arguments = ["-ilc", command]
+        let shell = URL(fileURLWithPath: environment["SHELL"] ?? "/bin/zsh")
+        process.executableURL = shell
+        process.arguments = detachedShellArguments(for: shell, command: command)
         process.environment = environment
         process.currentDirectoryURL = workingDirectory
         process.standardInput = FileHandle.nullDevice

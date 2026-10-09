@@ -2,7 +2,7 @@ import Foundation
 import SQLite3
 import ZislaCore
 
-/// Infers active tasks from WorkBuddy Desktop's shared local session database.
+/// Infers active tasks from WorkBuddy's local session database, independently of WorkBuddy AI.
 ///
 /// WorkBuddy keeps every conversation in `~/.workbuddy/workbuddy.db`. The legacy
 /// `~/.workbuddy/app/sessions.json` index is no longer rewritten, so it cannot tell whether a
@@ -10,7 +10,10 @@ import ZislaCore
 /// queried; message content is never read.
 public final class WorkBuddySessionActivityDetector: AIActivityDetecting {
     /// `custom_title` is set when the user renames a conversation and takes precedence over `title`.
-    private static let defaultTitle = "WorkBuddy"
+    private let defaultTitle: String
+    private let provider: AIProvider
+    private let urlScheme: String
+    private let taskIDPrefix: String
 
     private static let activeStatuses = ["working", "pending", "blocked", "error"]
 
@@ -24,7 +27,11 @@ public final class WorkBuddySessionActivityDetector: AIActivityDetecting {
         databaseURL: URL? = nil,
         recencyThreshold: TimeInterval = 30 * 60,
         now: @escaping () -> Date = Date.init,
-        fileManager: FileManager = .default
+        fileManager: FileManager = .default,
+        provider: AIProvider = .workbuddy,
+        sourceName: String = "WorkBuddy",
+        urlScheme: String = "workbuddy",
+        taskIDPrefix: String = "workbuddy-session-"
     ) {
         self.databaseURL = databaseURL ?? Self.defaultDatabaseURL(
             home: fileManager.homeDirectoryForCurrentUser
@@ -32,6 +39,15 @@ public final class WorkBuddySessionActivityDetector: AIActivityDetecting {
         self.recencyThreshold = max(0, recencyThreshold)
         self.now = now
         self.fileManager = fileManager
+        self.provider = provider
+        self.defaultTitle = sourceName
+        self.urlScheme = urlScheme
+        self.taskIDPrefix = taskIDPrefix
+    }
+
+    public var activityFileURLs: [URL] {
+        [databaseURL, URL(fileURLWithPath: databaseURL.path + "-wal")]
+            .filter { fileManager.fileExists(atPath: $0.path) }
     }
 
     /// Detection is best effort: WorkBuddy owns its schema and may migrate it between releases,
@@ -107,14 +123,14 @@ public final class WorkBuddySessionActivityDetector: AIActivityDetecting {
                 let title = stringColumn(statement, 1)?
                     .trimmingCharacters(in: .whitespacesAndNewlines)
                 tasks.append(AIProgressTask(
-                    id: Self.taskID(forConversationID: conversationID),
-                    provider: .harness,
-                    title: (title?.isEmpty == false ? title : nil) ?? Self.defaultTitle,
+                    id: taskIDPrefix + conversationID,
+                    provider: provider,
+                    title: (title?.isEmpty == false ? title : nil) ?? defaultTitle,
                     detail: stringColumn(statement, 3),
                     progress: nil,
                     status: status,
                     updatedAt: Date(timeIntervalSince1970: Double(updatedAtMilliseconds) / 1_000),
-                    sessionURL: Self.sessionURL(for: conversationID),
+                    sessionURL: Self.sessionURL(for: conversationID, scheme: urlScheme),
                     effort: nil,
                     startedAt: optionalInt64Column(statement, 4).map {
                         Date(timeIntervalSince1970: Double($0) / 1_000)
@@ -141,9 +157,9 @@ public final class WorkBuddySessionActivityDetector: AIActivityDetecting {
 
     /// WorkBuddy registers the `workbuddy` URL scheme and routes `workbuddy://chat/<id>` to a
     /// conversation, so the island can jump straight to the running task.
-    static func sessionURL(for conversationID: String) -> URL? {
+    static func sessionURL(for conversationID: String, scheme: String = "workbuddy") -> URL? {
         var components = URLComponents()
-        components.scheme = "workbuddy"
+        components.scheme = scheme
         components.host = "chat"
         components.path = "/\(conversationID)"
         return components.url

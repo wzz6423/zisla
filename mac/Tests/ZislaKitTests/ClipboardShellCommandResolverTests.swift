@@ -37,6 +37,22 @@ struct ClipboardShellCommandResolverTests {
     }
 
     @Test
+    func zshProbesDisableJobControlWhileReadingInteractiveConfiguration() async throws {
+        try await withShell("/bin/zsh") { directory, environment in
+            let startup = """
+            case $- in *m*) exit 19 ;; esac
+            alias fixture_alias='exit 7'
+            fixture_function() { exit 9; }
+
+            """
+            try startup.write(to: directory.appendingPathComponent(".zshrc"), atomically: true, encoding: .utf8)
+            for command in ["fixture_alias", "fixture_function", "pwd"] {
+                #expect(await ClipboardShellCommandResolver.resolve(command, environment: environment, workingDirectory: directory) == command)
+            }
+        }
+    }
+
+    @Test
     func rereadsTheShellConfigurationOnTheNextCopy() async throws {
         try await withShell("/bin/zsh") { directory, environment in
             let name = "alias_" + UUID().uuidString.replacingOccurrences(of: "-", with: "")

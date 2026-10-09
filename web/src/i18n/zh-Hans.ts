@@ -90,7 +90,7 @@ export const zhHans: SiteContent = {
       aiMonitor: {
         name: 'AI 监控',
         caption:
-          '自动识别受支持的 AI CLI、桌面端与 IDE 活动，展示任务、状态、累计 Token 趋势和贡献热力图；只解析结构化事件，不读取对话正文。',
+          '聚合 AI CLI、桌面端与 IDE 的任务和状态，包括 Delta、Orca、WorkBuddy 与 WorkBuddy AI；有可靠数值用量时展示累计 Token 趋势和贡献热力图，不解析提示词或回答正文。',
         points: ['多工具任务聚合', 'Token 消耗趋势', '不读取提示词与回答'],
       },
       keyboardSound: {
@@ -221,18 +221,19 @@ export const zhHans: SiteContent = {
   ai: {
     eyebrow: '没有黑箱的 AI',
     title: '看见 AI 状态，<span>不读取对话。</span>',
-    lede: '任务、状态和 Token 趋势留在本机；页面只说明能力，不虚构运行中的任务画面。',
+    lede: '从 CLI 到桌面端与 IDE，把分散的会话状态带到灵动岛；Token 趋势只使用可靠的数值用量，不把上下文占用当作消耗。',
     summaryMono: '本机状态 / 明确边界',
-    summaryLede: '接入常用 AI 工具，保留当前工作需要的上下文边界。',
-    summaryNote: '页面只说明检测范围、数据边界和接入方式，不模拟正在运行的会话。',
-    toolsHeading: '支持的 AI 工具',
-    toolsLede: '自动识别受支持的 CLI、桌面端与 IDE 活动，并聚合任务状态。',
-    toolsAriaLabel: '支持的 AI 工具',
+    summaryLede: '不同 Harness，同一个状态入口。',
+    summaryNote: 'WorkBuddy 与 WorkBuddy AI 独立识别，保留各自的会话、品牌和打开入口，不混为一个产品。',
+    toolsHeading: '{tools} 个 AI 工具与 Harness',
+    toolsLede: '自动检测受支持的 CLI、桌面端与 IDE 活动；Delta、Orca、WorkBuddy 和 WorkBuddy AI 均保留独立名称。',
+    toolsAriaLabel: '支持的 AI 工具与 Harness',
+    usageNote: '会话检测不等于用量统计。Delta 使用本机数值用量账本；Orca 复用已绑定 CLI 的用量并去重，按底层 provider 归属。WorkBuddy AI 目前仅检测会话，不将上下文占用或 credits 换算为累计 Token 或美元费用。',
     boundariesHeading: '只记录状态边界',
     privacyPoints: [
-      '只解析结构化事件中的事件类型、状态、时间、模型和会话 ID',
-      '不读取提示词或回答正文',
-      '协议与状态均保存在本机',
+      '只解析状态元数据（含会话标题、时间、模型和会话标识）及可靠的数值用量',
+      '不解析提示词或回答正文，也不上传对话',
+      '第三方会话存储只读访问；协议、状态与用量记录留在本机',
     ],
     bridgeHeading: '接入你自己的任务',
     bridgeLede: '通过 zislactl 将外部任务的结构化状态送入顶部状态条。',

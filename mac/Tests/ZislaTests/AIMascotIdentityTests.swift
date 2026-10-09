@@ -34,6 +34,30 @@ struct AIMascotIdentityTests {
     }
 
     @Test
+    func mapsDesktopProvidersAndTheirActivityNotices() {
+        #expect(AIMascotIdentity(provider: .delta, taskID: "delta-thread-example") == .delta)
+        #expect(AIMascotIdentity(provider: .orca, taskID: "orca-pane-example") == .orca)
+        #expect(AIMascotIdentity(provider: .workbuddy, taskID: "workbuddy-session-example") == .workbuddy)
+        #expect(AIMascotIdentity(provider: .workbuddyAI, taskID: "workbuddy-ai-session-example") == .workbuddyAI)
+        #expect(AIMascotIdentity(noticeID: "ai-active-delta-delta-thread-example") == .delta)
+        #expect(AIMascotIdentity(noticeID: "ai-active-orca-orca-pane-example") == .orca)
+        #expect(AIMascotIdentity(noticeID: "ai-active-workbuddy-workbuddy-session-example") == .workbuddy)
+        #expect(AIMascotIdentity(noticeID: "ai-active-workbuddy-ai-workbuddy-ai-session-example") == .workbuddyAI)
+        #expect(AIMascotIdentity(noticeID: "ai-active-workbuddy:ai-job") == .workbuddy)
+        #expect(AIMascotIdentity(noticeID: "ai-active-workbuddy-ai:ai-job") == .workbuddyAI)
+        #expect(AIMascotIdentity.workbuddy.displayName == "WorkBuddy")
+        #expect(AIMascotIdentity.workbuddyAI.displayName == "WorkBuddy AI")
+    }
+
+    @Test
+    func historicalWorkBuddyTasksKeepTheirProductIdentity() {
+        #expect(AIMascotIdentity(provider: .harness, taskID: "workbuddy-session-example") == .workbuddy)
+        #expect(AIMascotIdentity(noticeID: "ai-active-harness-workbuddy-session-example") == .workbuddy)
+        #expect(AIMascotIdentity(provider: .harness, taskID: "harnext-session-example") == .harness)
+        #expect(AIMascotIdentity(provider: .harness, taskID: "dsh-session-example", title: "DeepSeek Harness") == .deepseekHarness)
+    }
+
+    @Test
     func distinguishesGeminiDesktopChatsFromCLISessions() {
         #expect(AIMascotIdentity(
             provider: .gemini,

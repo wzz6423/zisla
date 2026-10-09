@@ -30,7 +30,7 @@ struct WorkBuddySessionActivityDetectorTests {
         ).activeTasks().first)
 
         #expect(task.id == WorkBuddySessionActivityDetector.taskID(forConversationID: Self.conversationID))
-        #expect(task.provider == .harness)
+        #expect(task.provider == .workbuddy)
         #expect(task.title == "创建 worktree 分支并支持检测 workbuddy 任务")
         #expect(task.detail == "deepseek-v4.1-flash")
         #expect(task.progress == nil)
@@ -38,6 +38,74 @@ struct WorkBuddySessionActivityDetectorTests {
         #expect(task.sessionURL?.absoluteString == "workbuddy://chat/\(Self.conversationID)")
         #expect(task.startedAt == startedAt)
         #expect(task.updatedAt == Self.now.addingTimeInterval(-60))
+    }
+
+    @Test
+    func detectsWorkBuddyAIWithIndependentIdentityAndURLScheme() throws {
+        let databaseURL = try makeWorkBuddyDatabase()
+        defer { removeWorkBuddyDatabase(at: databaseURL) }
+        try insertWorkBuddySession(
+            at: databaseURL, id: Self.conversationID, title: "  ", status: "working",
+            createdAt: Self.milliseconds(Self.now.addingTimeInterval(-4 * 60 * 60)),
+            updatedAt: Self.milliseconds(Self.now.addingTimeInterval(-60)),
+            lastActivityAt: Self.milliseconds(Self.now.addingTimeInterval(-4 * 60 * 60))
+        )
+        let detector = WorkBuddyAISessionActivityDetector(databaseURL: databaseURL, now: { Self.now })
+        let task = try #require(detector.activeTasks().first)
+        #expect(task.provider == .workbuddyAI)
+        #expect(task.title == "WorkBuddy AI")
+        #expect(task.id == "workbuddy-ai-session-\(Self.conversationID)")
+        #expect(task.sessionURL?.absoluteString == "workbuddy-ai://chat/\(Self.conversationID)")
+        #expect(task.updatedAt == Self.now.addingTimeInterval(-60))
+        #expect(detector.activityFileURLs.contains(databaseURL))
+        let workBuddy = try #require(WorkBuddySessionActivityDetector(databaseURL: databaseURL, now: { Self.now }).activeTasks().first)
+        #expect(workBuddy.id != task.id)
+        #expect(workBuddy.provider == .workbuddy)
+        #expect(workBuddy.title == "WorkBuddy")
+        #expect(workBuddy.sessionURL?.scheme == "workbuddy")
+    }
+
+    @Test
+    func separateProductStoresDoNotMergeTheSameConversationID() throws {
+        let workBuddyURL = try makeWorkBuddyDatabase()
+        defer { removeWorkBuddyDatabase(at: workBuddyURL) }
+        let aiURL = try makeWorkBuddyDatabase()
+        defer { removeWorkBuddyDatabase(at: aiURL) }
+        try insertWorkBuddySession(at: workBuddyURL, id: Self.conversationID,
+            title: "WorkBuddy task", status: "working", createdAt: Self.milliseconds(Self.now),
+            updatedAt: Self.milliseconds(Self.now))
+        try insertWorkBuddySession(at: aiURL, id: Self.conversationID,
+            title: "WorkBuddy AI task", status: "blocked", createdAt: Self.milliseconds(Self.now),
+            updatedAt: Self.milliseconds(Self.now))
+        let workBuddyDetector = WorkBuddySessionActivityDetector(databaseURL: workBuddyURL, now: { Self.now })
+        let aiDetector = WorkBuddyAISessionActivityDetector(databaseURL: aiURL, now: { Self.now })
+        let workBuddy = try #require(workBuddyDetector.activeTasks().first)
+        let ai = try #require(aiDetector.activeTasks().first)
+        #expect(workBuddy.provider == .workbuddy)
+        #expect(ai.provider == .workbuddyAI)
+        #expect(workBuddy.id != ai.id)
+        #expect(workBuddy.title == "WorkBuddy task")
+        #expect(ai.title == "WorkBuddy AI task")
+        #expect(workBuddy.status == .running)
+        #expect(ai.status == .blocked)
+        #expect(workBuddy.sessionURL?.scheme == "workbuddy")
+        #expect(ai.sessionURL?.scheme == "workbuddy-ai")
+        #expect(!workBuddyDetector.activityFileURLs.contains(aiURL))
+        #expect(!aiDetector.activityFileURLs.contains(workBuddyURL))
+        let historical = try #require(WorkBuddySessionActivityDetector(databaseURL: workBuddyURL,
+            now: { Self.now }, provider: .harness).activeTasks().first)
+        #expect(historical.id == workBuddy.id)
+        #expect(historical.provider == .harness)
+    }
+
+    @Test
+    func workBuddyAIUsesSeparateRootAndFailsClosed() throws {
+        let home = URL(fileURLWithPath: "/example/home")
+        #expect(WorkBuddyAISessionActivityDetector.defaultDatabaseURL(home: home).path == "/example/home/.workbuddy-ai/workbuddy.db")
+        #expect(WorkBuddySessionActivityDetector.defaultDatabaseURL(home: home).path == "/example/home/.workbuddy/workbuddy.db")
+        let url = try makeWorkBuddyDatabase(createSessionTable: false)
+        defer { removeWorkBuddyDatabase(at: url) }
+        #expect(try WorkBuddyAISessionActivityDetector(databaseURL: url).activeTasks().isEmpty)
     }
 
     @Test

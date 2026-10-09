@@ -6,6 +6,66 @@ import Testing
 
 struct AIMascotLibraryTests {
     @Test
+    func desktopAgentIconsResolveKnownBundlesAndOfflineAssets() {
+        let examples: [(AIProvider, String, String, String)] = [
+            (.delta, "com.zed-industries.delta", "Delta", "delta.icns"),
+            (.orca, "com.stablyai.orca", "Orca", "orca.icns"),
+            (.workbuddy, "com.workbuddy.workbuddy", "WorkBuddy", "workbuddy.icns"),
+            (.workbuddyAI, "com.workbuddy.workbuddy-ai", "WorkBuddy AI", "workbuddy-ai.icns"),
+        ]
+        // Fixture paths must not infer directoryness from applications installed on the host.
+        let applications = URL(fileURLWithPath: "/fixture/Applications", isDirectory: true)
+        for (provider, identifier, name, asset) in examples {
+            let url = applications.appendingPathComponent("\(name).app", isDirectory: true)
+            #expect(AIMascotLibrary.installedDesktopAgentApplicationURL(for: provider,
+                resolveBundleIdentifier: { $0 == identifier ? url : nil },
+                applicationDirectories: [], fileExists: { _ in false }) == url)
+            #expect(AIMascotLibrary.installedDesktopAgentApplicationURL(for: provider,
+                resolveBundleIdentifier: { _ in nil },
+                applicationDirectories: [applications], fileExists: { $0 == url }) == url)
+            #expect(AIMascotLibrary.providerAssetName(for: provider) == asset)
+        }
+    }
+
+    @Test
+    func workBuddyProductsKeepBrandsAndNoticeProvidersSeparate() {
+        #expect(AIMascotLibrary.providerDisplayName(for: .workbuddy) == "WorkBuddy")
+        #expect(AIMascotLibrary.providerDisplayName(for: .workbuddyAI) == "WorkBuddy AI")
+        #expect(AIMascotLibrary.providerAssetName(for: .workbuddy) == "workbuddy.icns")
+        #expect(AIMascotLibrary.providerAssetName(for: .workbuddyAI) == "workbuddy-ai.icns")
+        #expect(AIMascotLibrary.provider(fromNoticeID: "ai-active-workbuddy-workbuddy-session-id") == .workbuddy)
+        #expect(AIMascotLibrary.provider(fromNoticeID: "ai-active-workbuddy-ai-workbuddy-ai-session-id") == .workbuddyAI)
+        #expect(AIMascotLibrary.uniqueProviders(fromNoticeIDs: [
+            "ai-active-workbuddy-workbuddy-session-id",
+            "ai-active-workbuddy-ai-workbuddy-ai-session-id",
+        ]) == [.workbuddy, .workbuddyAI])
+        let directory = URL(fileURLWithPath: "/fixture/Applications", isDirectory: true)
+        let onlyWorkBuddy = directory.appendingPathComponent("WorkBuddy.app", isDirectory: true)
+        let onlyAI = directory.appendingPathComponent("WorkBuddy AI.app", isDirectory: true)
+        #expect(AIMascotLibrary.installedDesktopAgentApplicationURL(for: .workbuddyAI,
+            resolveBundleIdentifier: { _ in nil }, applicationDirectories: [directory],
+            fileExists: { $0 == onlyWorkBuddy }) == nil)
+        #expect(AIMascotLibrary.installedDesktopAgentApplicationURL(for: .workbuddy,
+            resolveBundleIdentifier: { _ in nil }, applicationDirectories: [directory],
+            fileExists: { $0 == onlyAI }) == nil)
+    }
+
+    @Test
+    func workBuddyNoticeBoundaryDoesNotConfuseManualTaskIDs() {
+        for id in ["ai-job", "workbuddy-ai-session-example", "example:with:colon"] {
+            let workBuddy = AIProgressTask(id: id, provider: .workbuddy, title: "task",
+                progress: nil, updatedAt: .distantPast)
+            let ai = AIProgressTask(id: id, provider: .workbuddyAI, title: "task",
+                progress: nil, updatedAt: .distantPast)
+            let workBuddyID = AIMascotLibrary.activeNoticeID(for: workBuddy)
+            let aiID = AIMascotLibrary.activeNoticeID(for: ai)
+            #expect(workBuddyID != aiID)
+            #expect(AIMascotLibrary.provider(fromNoticeID: workBuddyID) == .workbuddy)
+            #expect(AIMascotLibrary.provider(fromNoticeID: aiID) == .workbuddyAI)
+        }
+    }
+
+    @Test
     func coderResolutionCandidatesCoverKnownQoderHosts() {
         #expect(AIMascotLibrary.coderBundleIdentifiers.first == "com.qoder.work.cn")
         #expect(

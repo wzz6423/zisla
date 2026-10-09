@@ -152,6 +152,29 @@ public enum AIMascotLibrary {
         )
     }
 
+    public static func installedDesktopAgentApplicationURL(
+        for provider: AIProvider,
+        resolveBundleIdentifier: (String) -> URL? = { NSWorkspace.shared.urlForApplication(withBundleIdentifier: $0) },
+        applicationDirectories: [URL] = FileManager.default.urls(for: .applicationDirectory, in: .allDomainsMask),
+        fileExists: (URL) -> Bool = { FileManager.default.fileExists(atPath: $0.path) }
+    ) -> URL? {
+        let identifier: String
+        let name: String
+        switch provider {
+        case .delta: identifier = "com.zed-industries.delta"; name = "Delta"
+        case .orca: identifier = "com.stablyai.orca"; name = "Orca"
+        case .workbuddy: identifier = "com.workbuddy.workbuddy"; name = "WorkBuddy"
+        case .workbuddyAI: identifier = "com.workbuddy.workbuddy-ai"; name = "WorkBuddy AI"
+        default: return nil
+        }
+        return installedApplicationURL(
+            bundleIdentifiers: [identifier], applicationNames: [name],
+            resolveBundleIdentifier: resolveBundleIdentifier,
+            applicationDirectories: applicationDirectories,
+            fileExists: fileExists
+        )
+    }
+
     private static func installedApplicationURL(
         bundleIdentifiers: [String],
         applicationNames: [String],
@@ -188,6 +211,10 @@ public enum AIMascotLibrary {
         case .coder: "qoder.icns"
         case .zcode: "zcode.icns"
         case .zed: "zed.icns"
+        case .delta: "delta.icns"
+        case .orca: "orca.icns"
+        case .workbuddy: "workbuddy.icns"
+        case .workbuddyAI: "workbuddy-ai.icns"
         case .trae: "trae.icns"
         case .opencode: "opencode.svg"
         case .pi: "pi.svg"
@@ -229,6 +256,10 @@ public enum AIMascotLibrary {
         case .coder: "Qoder"
         case .zcode: "ZCode"
         case .zed: "Zed"
+        case .delta: "Delta"
+        case .orca: "Orca"
+        case .workbuddy: "WorkBuddy"
+        case .workbuddyAI: "WorkBuddy AI"
         case .trae: "TRAE"
         case .opencode: "opencode"
         case .pi: "Pi"
@@ -237,12 +268,33 @@ public enum AIMascotLibrary {
         }
     }
 
+    public static func activeNoticeID(for task: AIProgressTask) -> String {
+        // An explicit boundary prevents WorkBuddy task IDs starting with "ai-" from
+        // being mistaken for the separate hyphenated WorkBuddy AI provider.
+        let separator = task.provider == .workbuddy || task.provider == .workbuddyAI ? ":" : "-"
+        return "ai-active-\(task.provider.rawValue)\(separator)\(task.id)"
+    }
+
     public static func provider(fromNoticeID noticeID: String?) -> AIProvider? {
         guard let noticeID = noticeID?.lowercased() else { return nil }
         let prefix = "ai-active-"
         guard noticeID.hasPrefix(prefix) else { return nil }
-        let token = noticeID
-            .dropFirst(prefix.count)
+        let suffix = noticeID.dropFirst(prefix.count)
+        if let boundary = suffix.firstIndex(of: ":") {
+            let token = String(suffix[..<boundary])
+            if let provider = AIProvider(rawValue: token),
+               provider == .workbuddy || provider == .workbuddyAI {
+                return provider
+            }
+        }
+        // Accept earlier draft notices for compatibility. New WorkBuddy notices use
+        // an explicit ':' boundary; other providers retain their existing format.
+        if let provider = AIProvider.allCases
+            .sorted(by: { $0.rawValue.count > $1.rawValue.count })
+            .first(where: { suffix == $0.rawValue || suffix.hasPrefix($0.rawValue + "-") }) {
+            return provider
+        }
+        let token = suffix
             .split(separator: "-", maxSplits: 1)
             .first
         return token.flatMap { AIProvider(token: String($0)) }

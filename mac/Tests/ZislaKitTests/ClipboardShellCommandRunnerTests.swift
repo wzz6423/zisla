@@ -107,6 +107,33 @@ struct ClipboardShellCommandRunnerTests {
     }
 
     @Test
+    func backgroundZshDisablesJobControlButReadsInteractiveConfiguration() throws {
+        try withTemporaryDirectory { directory in
+            try "unsetopt GLOBAL_RCS\n".write(to: directory.appendingPathComponent(".zshenv"), atomically: true, encoding: .utf8)
+            try """
+            case $- in *m*) exit 19 ;; esac
+            fixture_function() { printf '%s' 'configured' > output; }
+
+            """.write(to: directory.appendingPathComponent(".zshrc"), atomically: true, encoding: .utf8)
+            let process = try ClipboardShellCommandRunner.runInBackground(
+                "fixture_function; exit 7",
+                environment: ["SHELL": "/bin/zsh", "HOME": directory.path, "ZDOTDIR": directory.path],
+                workingDirectory: directory
+            )
+            let completed = DispatchSemaphore(value: 0)
+            process.terminationHandler = { _ in completed.signal() }
+            let exited = completed.wait(timeout: .now() + 5) == .success
+            defer {
+                if process.isRunning { kill(process.processIdentifier, SIGKILL) }
+                process.waitUntilExit()
+            }
+            try #require(exited)
+            #expect(process.terminationStatus == 7)
+            #expect(try String(contentsOf: directory.appendingPathComponent("output"), encoding: .utf8) == "configured")
+        }
+    }
+
+    @Test
     func backgroundCommandReallyRunsAndReportsItsExitStatus() throws {
         try withTemporaryDirectory { directory in
             let marker = directory.appendingPathComponent("output")

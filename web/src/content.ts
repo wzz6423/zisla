@@ -148,6 +148,9 @@ export const supportedAITools = (): readonly string[] => [
   'OpenCode',
   'Harnext',
   'WorkBuddy',
+  'WorkBuddy AI',
+  'Delta',
+  'Orca',
   'Pi',
   'Zed Agent',
 ];
@@ -478,6 +481,8 @@ export interface SiteContent {
     toolsHeading: string;
     toolsLede: string;
     toolsAriaLabel: string;
+    /** Integration-specific usage caveats, where the catalog supplies them. */
+    usageNote?: string;
     boundariesHeading: string;
     privacyPoints: readonly [string, string, string];
     bridgeHeading: string;
