@@ -442,6 +442,16 @@ public final class AIAgentWorkspace: ObservableObject {
                     )
                 }
             }
+            if configuration.mode == .fileCopy {
+                // Later destinations can contribute skills after earlier copies were written.
+                for destination in configuration.enabledDestinations {
+                    try skillSynchronizationService.synchronize(
+                        managedDirectory: managedSkillsDirectory,
+                        to: managedSkillDestinationDirectory(for: destination),
+                        mode: .fileCopy
+                    )
+                }
+            }
             Task { [weak self] in await self?.refreshSkills() }
         } catch {
             lastError = AppLocalization.text("Skills 同步失败：%@", error.localizedDescription)
