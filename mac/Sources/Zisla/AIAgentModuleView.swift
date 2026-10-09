@@ -300,7 +300,7 @@ struct AIAgentModuleView: View {
                 VStack(alignment: .leading, spacing: 2) {
                     Text(AppLocalization.text("自动更新 CLI"))
                         .font(.system(size: 11, weight: .semibold))
-                    Text(AppLocalization.text("检测到新版本后自动执行更新；关闭后不再启动新任务，已开始的更新会完成"))
+                    Text(AppLocalization.text("选中每个cli后的自动更新选项后检测到新版本后自动执行更新；关闭后不再启动新任务，已开始的更新会完成"))
                         .font(.system(size: 9))
                         .foregroundStyle(.secondary)
                         .fixedSize(horizontal: false, vertical: true)
@@ -345,7 +345,7 @@ struct AIAgentModuleView: View {
                             }
                         }
                         Spacer()
-                        if AgentCLIKind.managedCases.contains(kind) {
+                        if AgentCLIKind.managedCases.contains(kind), isInstalled {
                             Toggle(AppLocalization.text("自动更新 %@", kind.displayName), isOn: Binding(
                                 get: { agent.store.state.isCLIAutoUpdateEnabled(for: kind) },
                                 set: { agent.setCLIAutoUpdateEnabled($0, for: kind) }
@@ -431,7 +431,7 @@ struct AIAgentModuleView: View {
                                 .help(AppLocalization.text("下载并安装 %@", kind.displayName))
                             }
                         }
-                        .frame(width: 40, alignment: .trailing)
+                        .frame(width: isInstalled ? 40 : nil, alignment: .trailing)
                     }
                     if AgentCLIKind.managedCases.contains(kind), isInstalled {
                         cliCommandRows(

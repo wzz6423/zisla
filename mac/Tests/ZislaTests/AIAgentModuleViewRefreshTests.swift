@@ -154,12 +154,13 @@ struct AIAgentModuleViewRefreshTests {
             contentsOf: packageRoot.appendingPathComponent("Sources/Zisla/AIAgentModuleView.swift"),
             encoding: .utf8
         )
-        let pattern = try NSRegularExpression(pattern: #"AppLocalization\.text\("(自动更新[^"\n]*|检测到新版本[^"\n]*)""#)
+        let pattern = try NSRegularExpression(pattern: #"AppLocalization\.text\("(自动更新[^"\n]*|选中每个cli[^"\n]*)""#)
         let keys = Set(pattern.matches(in: source, range: NSRange(source.startIndex..., in: source)).compactMap {
             Range($0.range(at: 1), in: source).map { String(source[$0]) }
         })
         #expect(keys.count == 3)
         #expect(keys.contains("自动更新 %@"))
+        #expect(keys.contains("选中每个cli后的自动更新选项后检测到新版本后自动执行更新；关闭后不再启动新任务，已开始的更新会完成"))
         let table = try #require(NSDictionary(contentsOf: packageRoot.appendingPathComponent(
             "Resources/Localization/\(language.rawValue).lproj/Localizable.strings"
         )) as? [String: String])
