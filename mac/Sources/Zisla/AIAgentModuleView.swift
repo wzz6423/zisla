@@ -344,7 +344,9 @@ struct AIAgentModuleView: View {
                                 }
                             }
                         }
-                        Spacer()
+                        if isInstalled {
+                            Spacer()
+                        }
                         if AgentCLIKind.managedCases.contains(kind), isInstalled {
                             Toggle(AppLocalization.text("自动更新 %@", kind.displayName), isOn: Binding(
                                 get: { agent.store.state.isCLIAutoUpdateEnabled(for: kind) },
