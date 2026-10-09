@@ -600,7 +600,7 @@ struct ContextNoteLocalizationTests {
         let reusedKeys: Set<String> = ["复制", "关闭", "保存"]
         let indirectKeys: Set<String> = ["摇动鼠标记便签", "按住快捷键并左右摇动鼠标，在当前位置记录，返回时提醒", "便签快捷键", "默认按住 Command；可录制修饰键或组合键", "需要辅助功能权限来识别窗口和网页", "无法识别当前位置，请检查辅助功能权限", "查看便签", "前往记录位置", "无法前往记录位置，窗口或显示器可能已关闭", "记录便签", "已保存便签"]
         let keys = Set(directKeys).subtracting(reusedKeys).union(indirectKeys)
-        #expect(keys.count == 19)
+        #expect(keys.count == 21)
         for key in keys {
             let value = try #require(table[key], "Missing \(language.rawValue): \(key)")
             #expect(!value.isEmpty)

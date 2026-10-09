@@ -203,7 +203,7 @@ struct ScreenshotLifecycleTests {
         let registration = source[registerHotkeys.lowerBound..<source.endIndex]
 
         #expect(registration.contains("onKeyDown: { [weak self] in self?.startScreenshot() }"))
-        #expect(registration.contains("onKeyDown: { [weak self] in self?.startPinnedScreenshot() }"))
+        #expect(!registration.contains("onKeyDown: { [weak self] in self?.startPinnedScreenshot() }"))
         #expect(registration.contains("hotkey: settings.screenshotLongHotkey"))
         #expect(registration.contains("reportScreenshotHotkeyRegistration(longResult"))
         #expect(!registration.contains("Task { @MainActor [weak self] in self?.startScreenshot() }"))

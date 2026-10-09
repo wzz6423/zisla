@@ -15,7 +15,7 @@ macOS 14 and later are supported. macOS 26 uses Liquid Glass; macOS 14/15 fall b
 | Module | Implemented capabilities |
 | --- | --- |
 | Home | Summarizes the current Pomodoro timer, first active AI task, native downloads, and multiple browser download progresses on demand. |
-| Handoff | Drag files, media, or links to the top trigger area to keep them in the handoff tray, reveal them in Finder, or open the system share menu. |
+| Handoff | Drag files, media, or links to the top trigger area to keep them in the handoff tray, reveal them in Finder, or open the system share menu. Stashed screenshots have blue, double-width cards and their own category, with image copy, PNG export, and deletion. |
 | Clipboard | Stores a searchable local history, filters by image, URL, and file, and marks favorites; history and link detection are independent switches. |
 | AI monitoring | Aggregates activity tasks, status, token trends, contribution heatmaps, and side notices from supported CLIs, desktop apps, and IDEs. |
 | Downloads | Uses `yt-dlp` for video and audio; without `ffmpeg`, AVFoundation wraps compatible tracks and a read-only Bilibili fallback is available. |
@@ -39,6 +39,33 @@ macOS 14 and later are supported. macOS 26 uses Liquid Glass; macOS 14/15 fall b
 - **Updates:** The selected Release or Preview channel resolves the public egress country code once per app run. `CN` checks its signed Gitee appcast first and retries GitHub once; other country codes check GitHub first and retry Gitee once. An unavailable lookup preserves the Gitee-first order. Sparkle then downloads, verifies, installs, and relaunches updates. Changing the channel applies to both automatic and manual checks.
 - **Appearance and interaction:** Settings can follow the system, light, or dark appearance. The island supports transparent or frosted surfaces, pinned expansion, multiple displays, Spaces, and external displays without a notch.
 - **Defaults:** New installations enable feature modules by default. Each feature, collapsed-state indicator, side notice, menu-bar metric, and update behavior can be adjusted independently; existing installations keep their current configuration.
+
+### Screenshot shortcuts and stashing
+
+The screenshot toolbar's **Stash** action sits between **Pin** and **Copy**. It stores the final edited image, including annotations and completed scrolling captures, in the handoff tray without copying it to the clipboard. The PNG and capture metadata, including the original application and capture time, are stored locally in SQLite and survive app restarts. The **Stashed screenshots** category shows only these cards.
+
+| Context | Action | Default shortcut |
+| --- | --- | --- |
+| Global | Screenshot | `Control+1` |
+| Global | Scrolling screenshot | `Control+2` |
+| Screenshot editor | Pin | `Control+1` |
+| Screenshot editor | Stash | `Control+2` |
+| Screenshot editor | Rectangle | `Control+3` |
+| Screenshot editor | Ellipse | `Control+4` |
+| Screenshot editor | Brush | `Control+5` |
+| Screenshot editor | Arrow | `Control+6` |
+| Screenshot editor | Number | `Control+7` |
+| Screenshot editor | Text | `Control+8` |
+| Screenshot editor | Blur | `Control+9` |
+| Screenshot editor | Scrolling capture | `Control+0` |
+| Screenshot editor | Copy | `Enter` |
+| Screenshot editor | Save | `Command+S` |
+| Screenshot editor | Undo | `Command+Z` |
+| Screenshot editor | Redo | `Command+Shift+Z` |
+
+Screenshot settings show and record the global and editor shortcuts. Copy, Save, Undo, and Redo are displayed but cannot be re-recorded. User-recorded shortcuts are retained when upgrading; Pin is an editor action rather than a separate global shortcut, while its menu entry remains available.
+
+On upgrade, an untouched legacy screenshot shortcut layout moves to the defaults above once. If any screenshot shortcut was customized, the existing layout is kept; new actions choose an unused combination when their default conflicts. These initial combinations can also be re-recorded.
 
 ## Quick start
 

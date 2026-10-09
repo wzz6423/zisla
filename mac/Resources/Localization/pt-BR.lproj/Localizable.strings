@@ -1987,6 +1987,10 @@
 "已移到废纸篓" = "Movido para o lixo";
 "开始自动滚动" = "Iniciar a rolagem automática";
 "截图.png" = "Captura de tela.png";
+"暂存" = "Guardar temporariamente";
+"暂存截图" = "Capturas guardadas";
+"预览" = "Prévia";
+"无法打开截图数据库" = "Não foi possível abrir o banco de dados de capturas de tela";
 "找不到显示器" = "Nenhuma tela encontrada";
 "授权磁盘访问" = "Autorizar o acesso ao disco";
 "播放原始录音" = "Reproduzir a gravação original";

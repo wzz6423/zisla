@@ -9,6 +9,7 @@ import ZislaCore
 public enum FileShelfCategory: String, CaseIterable, Hashable, Identifiable, Sendable {
     case all = "全部"
     case note = "便签"
+    case screenshot = "暂存截图"
     case folder = "文件夹"
     case image = "图片"
     case url = "URL"
@@ -30,6 +31,7 @@ public enum FileShelfCategory: String, CaseIterable, Hashable, Identifiable, Sen
         switch self {
         case .all: return "square.grid.2x2"
         case .note: return "note.text"
+        case .screenshot: return "camera"
         case .folder: return "folder"
         case .image: return "photo"
         case .url: return "link"
@@ -45,7 +47,7 @@ public enum FileShelfCategory: String, CaseIterable, Hashable, Identifiable, Sen
     }
 
     public static let fileShelfCases = allCases.filter { $0 != .path }
-    public static let clipboardCases = allCases.filter { $0 != .note }
+    public static let clipboardCases = allCases.filter { $0 != .note && $0 != .screenshot }
 }
 
 public struct FileShelfItem: Identifiable, Equatable {
@@ -56,8 +58,9 @@ public struct FileShelfItem: Identifiable, Equatable {
     public var text: String?
     public var isManaged: Bool
     public var noteLocation: ContextNoteLocation?
+    public var screenshotMetadata: ShelfScreenshotMetadata?
 
-    public init(id: UUID, url: URL, addedAt: Date, bookmarkData: Data, text: String? = nil, isManaged: Bool = false, noteLocation: ContextNoteLocation? = nil) {
+    public init(id: UUID, url: URL, addedAt: Date, bookmarkData: Data, text: String? = nil, isManaged: Bool = false, noteLocation: ContextNoteLocation? = nil, screenshotMetadata: ShelfScreenshotMetadata? = nil) {
         self.id = id
         self.url = url
         self.addedAt = addedAt
@@ -65,6 +68,7 @@ public struct FileShelfItem: Identifiable, Equatable {
         self.text = text
         self.isManaged = isManaged
         self.noteLocation = noteLocation
+        self.screenshotMetadata = screenshotMetadata
     }
 
     public var linkURL: URL? { text.flatMap(TransferPasteboard.webURL) }
@@ -74,11 +78,26 @@ public struct FileShelfItem: Identifiable, Equatable {
     }
 
     public var displayName: String {
-        text.map { String($0.trimmingCharacters(in: .whitespacesAndNewlines).prefix(120)) }
+        if let metadata = screenshotMetadata {
+            return [AppLocalization.text(metadata.isLongScreenshot ? "长截图" : "截图"),
+                    metadata.source.applicationName, metadata.source.capturedAt.formatted()]
+                .compactMap { $0 }.joined(separator: " · ")
+        }
+        return text.map { String($0.trimmingCharacters(in: .whitespacesAndNewlines).prefix(120)) }
             ?? url.lastPathComponent
     }
 
+    public var searchText: String {
+        guard let metadata = screenshotMetadata else { return text ?? url.lastPathComponent }
+        return [displayName, metadata.source.bundleIdentifier,
+                metadata.source.processIdentifier.map(String.init),
+                metadata.source.capturedAt.ISO8601Format(),
+                "\(metadata.pixelWidth)×\(metadata.pixelHeight)"]
+            .compactMap { $0 }.joined(separator: " ")
+    }
+
     public var category: FileShelfCategory {
+        if screenshotMetadata != nil { return .screenshot }
         if noteLocation != nil { return .note }
         if text != nil { return linkURL == nil ? .text : .url }
         var isDirectory: ObjCBool = false
@@ -123,14 +142,130 @@ public final class FileShelfStore: ObservableObject {
         var text: String?
         var isManaged: Bool?
         var noteLocation: ContextNoteLocation?
+        var shelfOrder: Int64?
     }
 
     private let storageURL: URL
+    private let screenshotDatabase: ShelfScreenshotDatabase
+    // Notes can be backdated, so insertion order must not depend on capture or creation dates.
+    private var shelfOrder: [UUID: Int64] = [:]
     var managedDirectory: URL { storageURL.deletingPathExtension().appendingPathExtension("items") }
 
     public init(storageURL: URL = AppPaths.fileShelf) {
         self.storageURL = storageURL
+        screenshotDatabase = ShelfScreenshotDatabase(directory: storageURL.deletingPathExtension().appendingPathExtension("screenshots"))
         load()
+        loadScreenshots()
+    }
+
+    /// A database commit is durable; drag and share files are recoverable caches.
+    @discardableResult
+    public func stashScreenshot(png: Data, metadata: ShelfScreenshotMetadata) throws -> FileShelfItem {
+        let dimensions = try Self.screenshotDimensions(png)
+        guard dimensions.width == metadata.pixelWidth, dimensions.height == metadata.pixelHeight else {
+            throw CocoaError(.fileReadCorruptFile)
+        }
+        let record = ShelfScreenshotRecord(id: UUID(), addedAt: Date(), shelfOrder: try nextShelfOrder(),
+                                           metadata: metadata, png: png)
+        do {
+            try screenshotDatabase.insert(record)
+        } catch {
+            errorDescription = error.localizedDescription
+            throw error
+        }
+        let item = screenshotItem(id: record.id, addedAt: record.addedAt, metadata: record.metadata)
+        shelfOrder[record.id] = record.shelfOrder
+        items.append(item)
+        errorDescription = nil
+        do { _ = try cacheScreenshot(record) }
+        catch { errorDescription = error.localizedDescription }
+        return item
+    }
+
+    public func screenshotData(id: UUID) throws -> Data {
+        try screenshotDatabase.record(id: id).png
+    }
+
+    private func nextShelfOrder() throws -> Int64 {
+        let result = (shelfOrder.values.max() ?? -1).addingReportingOverflow(1)
+        guard !result.overflow else { throw CocoaError(.fileReadCorruptFile) }
+        return result.partialValue
+    }
+
+    public func screenshotFileURL(id: UUID) throws -> URL {
+        try cacheScreenshot(screenshotDatabase.record(id: id)).url
+    }
+
+    public static func screenshotDimensions(_ data: Data) throws -> (width: Int, height: Int) {
+        guard try imageFormat(for: data, maximumBytes: Int(Int32.max), maximumPixels: Int.max / 9, requiresExactPixelBytes: true) == "png",
+              let source = CGImageSourceCreateWithData(data as CFData, nil),
+              let properties = CGImageSourceCopyPropertiesAtIndex(source, 0, nil) as? [CFString: Any],
+              let width = properties[kCGImagePropertyPixelWidth] as? Int,
+              let height = properties[kCGImagePropertyPixelHeight] as? Int else {
+            throw CocoaError(.fileReadCorruptFile)
+        }
+        return (width, height)
+    }
+
+    private func cacheScreenshot(_ record: ShelfScreenshotRecord) throws -> FileShelfItem {
+        let dimensions = try Self.screenshotDimensions(record.png)
+        guard dimensions.width == record.metadata.pixelWidth, dimensions.height == record.metadata.pixelHeight else {
+            throw CocoaError(.fileReadCorruptFile)
+        }
+        let directory = screenshotDatabase.directory.appendingPathComponent("cache", isDirectory: true)
+        let manager = FileManager.default
+        try manager.createDirectory(at: directory, withIntermediateDirectories: true, attributes: [.posixPermissions: 0o700])
+        try manager.setAttributes([.posixPermissions: 0o700], ofItemAtPath: screenshotDatabase.directory.path)
+        try manager.setAttributes([.posixPermissions: 0o700], ofItemAtPath: directory.path)
+        let url = directory.appendingPathComponent(record.id.uuidString + ".png")
+        try record.png.write(to: url, options: [.atomic])
+        try manager.setAttributes([.posixPermissions: 0o600], ofItemAtPath: url.path)
+        return screenshotItem(id: record.id, addedAt: record.addedAt, metadata: record.metadata)
+    }
+
+    private func screenshotItem(id: UUID, addedAt: Date, metadata: ShelfScreenshotMetadata) -> FileShelfItem {
+        FileShelfItem(id: id,
+            url: screenshotDatabase.directory.appendingPathComponent("cache").appendingPathComponent(id.uuidString + ".png"),
+            addedAt: addedAt, bookmarkData: Data(), screenshotMetadata: metadata)
+    }
+
+    private func removeScreenshotCache(id: UUID) {
+        let url = screenshotDatabase.directory.appendingPathComponent("cache").appendingPathComponent(id.uuidString + ".png")
+        guard FileManager.default.fileExists(atPath: url.path) else { return }
+        do { try FileManager.default.removeItem(at: url) }
+        catch {
+            errorDescription = [errorDescription, error.localizedDescription].compactMap { $0 }.joined(separator: "\n")
+        }
+    }
+
+    private func loadScreenshots() {
+        do {
+            let records = try screenshotDatabase.records()
+            for record in records {
+                shelfOrder[record.id] = record.shelfOrder
+                let item = screenshotItem(id: record.id, addedAt: record.addedAt, metadata: record.metadata)
+                items.append(item)
+                if !FileManager.default.fileExists(atPath: item.url.path) {
+                    do { _ = try cacheScreenshot(screenshotDatabase.record(id: record.id)) }
+                    catch { errorDescription = error.localizedDescription }
+                }
+            }
+            if !records.isEmpty {
+                items.sort {
+                    let first = shelfOrder[$0.id] ?? 0
+                    let second = shelfOrder[$1.id] ?? 0
+                    return first == second ? $0.id.uuidString < $1.id.uuidString : first < second
+                }
+            }
+            let cache = screenshotDatabase.directory.appendingPathComponent("cache", isDirectory: true)
+            if FileManager.default.fileExists(atPath: cache.path) {
+                let retained = Set(records.map(\.id))
+                for url in try FileManager.default.contentsOfDirectory(at: cache, includingPropertiesForKeys: nil) {
+                    if url.pathExtension == "png", let id = UUID(uuidString: url.deletingPathExtension().lastPathComponent),
+                       !retained.contains(id) { removeScreenshotCache(id: id) }
+                }
+            }
+        } catch { errorDescription = error.localizedDescription }
     }
 
     @discardableResult
@@ -247,13 +382,37 @@ public final class FileShelfStore: ObservableObject {
     public func remove(id: UUID) {
         let removed = items.filter { $0.id == id }
         let remaining = items.filter { $0.id != id }
+        if removed.contains(where: { $0.screenshotMetadata != nil }) {
+            do {
+                try screenshotDatabase.remove(ids: [id])
+                items = remaining
+                errorDescription = nil
+                removeScreenshotCache(id: id)
+            } catch { errorDescription = error.localizedDescription }
+            return
+        }
         guard persist(remaining) else { return }
         items = remaining
         removed.forEach(removeManagedFile)
     }
 
     public func removeAll() {
+        let screenshots = items.filter { $0.screenshotMetadata != nil }
+        // Each store commits separately; failed commits must retain their cards.
+        if !screenshots.isEmpty {
+            do {
+                try screenshotDatabase.remove(ids: screenshots.map(\.id))
+                items.removeAll { $0.screenshotMetadata != nil }
+                errorDescription = nil
+                screenshots.forEach { removeScreenshotCache(id: $0.id) }
+            } catch {
+                errorDescription = error.localizedDescription
+                return
+            }
+        }
+        let cacheError = errorDescription
         guard persist([]) else { return }
+        errorDescription = cacheError
         let removed = items
         items = []
         removed.forEach(removeManagedFile)
@@ -326,8 +485,9 @@ public final class FileShelfStore: ObservableObject {
     static let maximumImageBytes = 32 * 1_024 * 1_024
     static let maximumImagePixels = 16_000_000
 
-    static func imageFormat(for data: Data) throws -> String {
-        guard data.count <= maximumImageBytes else { throw CocoaError(.fileReadTooLarge) }
+    static func imageFormat(for data: Data, maximumBytes: Int = maximumImageBytes, maximumPixels: Int = maximumImagePixels,
+                            requiresExactPixelBytes: Bool = false) throws -> String {
+        guard data.count <= maximumBytes else { throw CocoaError(.fileReadTooLarge) }
         // Read dimensions without decoding first, so tiny compressed inputs cannot allocate huge bitmaps.
         guard let source = CGImageSourceCreateWithData(data as CFData, [kCGImageSourceShouldCache: false] as CFDictionary),
               CGImageSourceGetCount(source) == 1,
@@ -337,14 +497,48 @@ public final class FileShelfStore: ObservableObject {
               let width = properties[kCGImagePropertyPixelWidth] as? Int,
               let height = properties[kCGImagePropertyPixelHeight] as? Int,
               width > 0, height > 0 else { throw CocoaError(.fileReadCorruptFile) }
-        guard width <= maximumImagePixels / height else { throw CocoaError(.fileReadTooLarge) }
-        if type == UTType.png.identifier, !hasCompletePNGData(data, maximumDecodedBytes: width * height * 9) {
-            throw CocoaError(.fileReadCorruptFile)
+        guard width <= maximumPixels / height else { throw CocoaError(.fileReadTooLarge) }
+        if type == UTType.png.identifier {
+            let expectedBytes = requiresExactPixelBytes ? pngPixelStreamBytes(data, width: width, height: height) : nil
+            guard !requiresExactPixelBytes || expectedBytes != nil,
+                  hasCompletePNGData(data, maximumDecodedBytes: expectedBytes ?? width * height * 9,
+                                     expectedDecodedBytes: expectedBytes) else { throw CocoaError(.fileReadCorruptFile) }
         }
         return type == UTType.png.identifier ? "png" : "tiff"
     }
 
-    private static func hasCompletePNGData(_ data: Data, maximumDecodedBytes: Int) -> Bool {
+    private static func pngPixelStreamBytes(_ data: Data, width: Int, height: Int) -> Int? {
+        guard data.count >= 33 else { return nil }
+        let depth = Int(data[24])
+        let samples: Int
+        switch data[25] {
+        case 0: guard [1, 2, 4, 8, 16].contains(depth) else { return nil }; samples = 1
+        case 2: guard [8, 16].contains(depth) else { return nil }; samples = 3
+        case 3: guard [1, 2, 4, 8].contains(depth) else { return nil }; samples = 1
+        case 4: guard [8, 16].contains(depth) else { return nil }; samples = 2
+        case 6: guard [8, 16].contains(depth) else { return nil }; samples = 4
+        default: return nil
+        }
+        let bits = depth * samples
+        guard width <= (Int.max - 7) / bits, data[26] == 0, data[27] == 0 else { return nil }
+        func passBytes(x: Int, y: Int, dx: Int, dy: Int) -> Int {
+            guard width > x, height > y else { return 0 }
+            let columns = (width - x + dx - 1) / dx
+            let rows = (height - y + dy - 1) / dy
+            return ((columns * bits + 7) / 8 + 1) * rows
+        }
+        switch data[28] {
+        case 0: return passBytes(x: 0, y: 0, dx: 1, dy: 1)
+        case 1:
+            return [(0, 0, 8, 8), (4, 0, 8, 8), (0, 4, 4, 8), (2, 0, 4, 4),
+                    (0, 2, 2, 4), (1, 0, 2, 2), (0, 1, 1, 2)].reduce(0) {
+                $0 + passBytes(x: $1.0, y: $1.1, dx: $1.2, dy: $1.3)
+            }
+        default: return nil
+        }
+    }
+
+    private static func hasCompletePNGData(_ data: Data, maximumDecodedBytes: Int, expectedDecodedBytes: Int? = nil) -> Bool {
         // ImageIO repairs truncated PNGs and invalid pixel streams, which must not be saved as originals.
         var offset = 8
         var compressed = Data()
@@ -386,6 +580,7 @@ public final class FileShelfStore: ObservableObject {
                 guard stream.total_out <= maximumDecodedBytes else { return false }
             }
             return status == Z_STREAM_END && stream.avail_in == 0
+                && (expectedDecodedBytes == nil || Int(stream.total_out) == expectedDecodedBytes)
         }
     }
 
@@ -418,7 +613,7 @@ public final class FileShelfStore: ObservableObject {
         do {
             let stored = try JSONDecoder().decode([StoredItem].self, from: data)
             var loaded: [FileShelfItem] = []
-            for value in stored {
+            for (index, value) in stored.enumerated() {
                 var stale = false
                 let url: URL
                 do {
@@ -448,6 +643,7 @@ public final class FileShelfStore: ObservableObject {
                     isManaged: value.isManaged ?? false,
                     noteLocation: value.noteLocation
                 ))
+                shelfOrder[value.id] = value.shelfOrder ?? Int64(index)
             }
             items = loaded
             errorDescription = nil
@@ -469,11 +665,20 @@ public final class FileShelfStore: ObservableObject {
     private func persist(_ items: [FileShelfItem]) -> Bool {
         do {
             try FileManager.default.createDirectory(at: storageURL.deletingLastPathComponent(), withIntermediateDirectories: true)
-            let stored = items.map {
-                StoredItem(id: $0.id, bookmarkData: $0.bookmarkData, addedAt: $0.addedAt, url: $0.url, text: $0.text, isManaged: $0.isManaged ? true : nil, noteLocation: $0.noteLocation)
+            var order = shelfOrder
+            var next = try nextShelfOrder()
+            let stored = try items.filter { $0.screenshotMetadata == nil }.map { item in
+                if order[item.id] == nil {
+                    order[item.id] = next
+                    guard next < Int64.max else { throw CocoaError(.fileReadCorruptFile) }
+                    next += 1
+                }
+                return StoredItem(id: item.id, bookmarkData: item.bookmarkData, addedAt: item.addedAt, url: item.url,
+                    text: item.text, isManaged: item.isManaged ? true : nil, noteLocation: item.noteLocation, shelfOrder: order[item.id])
             }
             let data = try JSONEncoder().encode(stored)
             try data.write(to: storageURL, options: .atomic)
+            shelfOrder = order
             errorDescription = nil
             return true
         } catch {

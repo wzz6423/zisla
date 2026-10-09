@@ -1987,6 +1987,10 @@
 "已移到废纸篓" = "Đã chuyển vào Thùng rác";
 "开始自动滚动" = "Bắt đầu tự động cuộn";
 "截图.png" = "Ảnh chụp màn hình.png";
+"暂存" = "Lưu tạm";
+"暂存截图" = "Ảnh chụp lưu tạm";
+"预览" = "Xem trước";
+"无法打开截图数据库" = "Không thể mở cơ sở dữ liệu ảnh chụp màn hình";
 "找不到显示器" = "Không tìm thấy màn hình";
 "授权磁盘访问" = "Cấp quyền truy cập đĩa";
 "播放原始录音" = "Phát bản ghi gốc";

@@ -6,6 +6,23 @@ import Testing
 
 struct FeatureSettingsStoreTests {
     @Test @MainActor
+    func screenshotEditorHotkeysPersistAndMigrationMarkerIsWrittenOnLoad() throws {
+        let suiteName = "Zisla.ScreenshotHotkeys.\(UUID().uuidString)"
+        let defaults = try #require(UserDefaults(suiteName: suiteName))
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+        defaults.set(Data("{}".utf8), forKey: "feature-settings-v1")
+        let store = FeatureSettingsStore(defaults: defaults)
+        let data = try #require(defaults.data(forKey: "feature-settings-v1"))
+        let migrated = try #require(JSONSerialization.jsonObject(with: data) as? [String: Any])
+        #expect(migrated["screenshotHotkeyVersion"] as? Int == 1)
+        store.settings.screenshotStashHotkey = .init(keyCode: 15, carbonModifiers: 0x0800, keyDisplayName: "R")
+        store.settings.screenshotEditorLongHotkey = .init(keyCode: 17, carbonModifiers: 0x0800, keyDisplayName: "T")
+        store.flushPendingChanges()
+        let restored = FeatureSettingsStore(defaults: defaults)
+        #expect(restored.settings == store.settings)
+    }
+
+    @Test @MainActor
     func fileShelfShakeOptOutSurvivesParentChangesAndStoreRecreation() throws {
         let suiteName = "Zisla.FeatureSettingsStoreTests.\(UUID().uuidString)"
         let defaults = try #require(UserDefaults(suiteName: suiteName))

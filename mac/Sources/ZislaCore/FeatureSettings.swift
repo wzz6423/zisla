@@ -528,16 +528,29 @@ public enum ScreenshotHotkeyDefaults {
         keyDisplayName: "1"
     )
     public static let pin = VoiceInputHotkeyPreset(
+        keyCode: 18,
+        carbonModifiers: 0x1000,
+        keyDisplayName: "1"
+    )
+    public static let longCapture = VoiceInputHotkeyPreset(
         keyCode: 19,
         carbonModifiers: 0x1000,
         keyDisplayName: "2"
     )
-    public static let longCapture = VoiceInputHotkeyPreset(
-        keyCode: 20,
-        carbonModifiers: 0x1000,
-        keyDisplayName: "3"
+    public static let stash = longCapture
+    public static let editorLongCapture = VoiceInputHotkeyPreset(
+        keyCode: 29, carbonModifiers: 0x1000, keyDisplayName: "0"
     )
     public static let tools: [String: VoiceInputHotkeyPreset] = [
+        "rectangle": .init(keyCode: 20, carbonModifiers: 0x1000, keyDisplayName: "3"),
+        "ellipse": .init(keyCode: 21, carbonModifiers: 0x1000, keyDisplayName: "4"),
+        "brush": .init(keyCode: 23, carbonModifiers: 0x1000, keyDisplayName: "5"),
+        "arrow": .init(keyCode: 22, carbonModifiers: 0x1000, keyDisplayName: "6"),
+        "number": .init(keyCode: 26, carbonModifiers: 0x1000, keyDisplayName: "7"),
+        "text": .init(keyCode: 28, carbonModifiers: 0x1000, keyDisplayName: "8"),
+        "mosaic": .init(keyCode: 25, carbonModifiers: 0x1000, keyDisplayName: "9"),
+    ]
+    static let legacyTools: [String: VoiceInputHotkeyPreset] = [
         "rectangle": .init(keyCode: 21, carbonModifiers: 0x1000, keyDisplayName: "4"),
         "ellipse": .init(keyCode: 23, carbonModifiers: 0x1000, keyDisplayName: "5"),
         "brush": .init(keyCode: 22, carbonModifiers: 0x1000, keyDisplayName: "6"),
@@ -808,10 +821,13 @@ public struct FeatureSettings: Codable, Equatable, Sendable {
     public var screenshotEnabled: Bool
     /// Global hotkey for capturing a screenshot.
     public var screenshotHotkey: VoiceInputHotkeyPreset
-    /// Global hotkey for toggling screenshot pin state.
+    /// Editor shortcut for toggling screenshot pin state.
     public var screenshotPinHotkey: VoiceInputHotkeyPreset
     /// Opens screenshot selection and starts manual scrolling capture after a region is selected.
     public var screenshotLongHotkey: VoiceInputHotkeyPreset
+    public var screenshotStashHotkey: VoiceInputHotkeyPreset
+    public var screenshotEditorLongHotkey: VoiceInputHotkeyPreset
+    private var screenshotHotkeyVersion: Int
     /// Shortcuts that select annotation tools while the screenshot editor is active.
     public var screenshotToolHotkeys: [String: VoiceInputHotkeyPreset]
     /// Whether the pinned screenshot shows its bottom control bar.
@@ -923,6 +939,8 @@ public struct FeatureSettings: Codable, Equatable, Sendable {
         screenshotHotkey: VoiceInputHotkeyPreset = ScreenshotHotkeyDefaults.capture,
         screenshotPinHotkey: VoiceInputHotkeyPreset = ScreenshotHotkeyDefaults.pin,
         screenshotLongHotkey: VoiceInputHotkeyPreset = ScreenshotHotkeyDefaults.longCapture,
+        screenshotStashHotkey: VoiceInputHotkeyPreset = ScreenshotHotkeyDefaults.stash,
+        screenshotEditorLongHotkey: VoiceInputHotkeyPreset = ScreenshotHotkeyDefaults.editorLongCapture,
         screenshotToolHotkeys: [String: VoiceInputHotkeyPreset] = ScreenshotHotkeyDefaults.tools,
         screenshotPinnedToolbarVisible: Bool = true,
         keyboardEnabled: Bool = true,
@@ -1045,6 +1063,9 @@ public struct FeatureSettings: Codable, Equatable, Sendable {
         self.screenshotHotkey = screenshotHotkey
         self.screenshotPinHotkey = screenshotPinHotkey
         self.screenshotLongHotkey = screenshotLongHotkey
+        self.screenshotStashHotkey = screenshotStashHotkey
+        self.screenshotEditorLongHotkey = screenshotEditorLongHotkey
+        self.screenshotHotkeyVersion = 1
         self.screenshotToolHotkeys = screenshotToolHotkeys.filter { ScreenshotHotkeyDefaults.tools[$0.key] != nil }
         self.screenshotPinnedToolbarVisible = screenshotPinnedToolbarVisible
         self.keyboardEnabled = keyboardEnabled
@@ -1183,6 +1204,9 @@ public struct FeatureSettings: Codable, Equatable, Sendable {
         case screenshotHotkey
         case screenshotPinHotkey
         case screenshotLongHotkey
+        case screenshotStashHotkey
+        case screenshotEditorLongHotkey
+        case screenshotHotkeyVersion
         case screenshotToolHotkeys
         case screenshotPinnedToolbarVisible
         case keyboardEnabled
@@ -1508,9 +1532,42 @@ public struct FeatureSettings: Codable, Equatable, Sendable {
             [String: VoiceInputHotkeyPreset].self,
             forKey: .screenshotToolHotkeys
         ) ?? defaults.screenshotToolHotkeys).filter { ScreenshotHotkeyDefaults.tools[$0.key] != nil }
-        if screenshotToolHotkeys == ScreenshotHotkeyDefaults.previousTools {
-            screenshotToolHotkeys = ScreenshotHotkeyDefaults.tools
+        let version = try container.decodeIfPresent(Int.self, forKey: .screenshotHotkeyVersion) ?? 0
+        if version == 0 {
+            let legacyPin = VoiceInputHotkeyPreset(keyCode: 19, carbonModifiers: 0x1000, keyDisplayName: "2")
+            let legacyLong = VoiceInputHotkeyPreset(keyCode: 20, carbonModifiers: 0x1000, keyDisplayName: "3")
+            let hasLegacyTools = screenshotToolHotkeys == ScreenshotHotkeyDefaults.legacyTools
+                || screenshotToolHotkeys == ScreenshotHotkeyDefaults.previousTools
+            let isCompleteLegacyDefault = screenshotHotkey == ScreenshotHotkeyDefaults.capture
+                && screenshotPinHotkey == legacyPin && screenshotLongHotkey == legacyLong && hasLegacyTools
+            if isCompleteLegacyDefault {
+                screenshotPinHotkey = defaults.screenshotPinHotkey
+                screenshotLongHotkey = defaults.screenshotLongHotkey
+                screenshotToolHotkeys = defaults.screenshotToolHotkeys
+            }
         }
+        // Preserve customized legacy groups; new actions take unused combinations without replacing tools.
+        var occupied = [screenshotPinHotkey] + Array(screenshotToolHotkeys.values)
+        if voiceInputEnabled { occupied.append(voiceInputHotkeyPreset) }
+        if clipboardAssistantEnabled, let hotkey = clipboardAssistantTriggerConfiguration.hotkey {
+            occupied.append(hotkey)
+        }
+        func available(_ preferred: VoiceInputHotkeyPreset) -> VoiceInputHotkeyPreset {
+            if !occupied.contains(where: { preferred.conflicts(with: $0) }) { return preferred }
+            for modifiers: UInt32 in [0x1200, 0x1800, 0x1A00, 0x1B00] {
+                for (keyCode, name): (UInt32, String) in [(29, "0"), (19, "2"), (18, "1"), (20, "3"), (21, "4"), (23, "5"), (22, "6"), (26, "7"), (28, "8"), (25, "9")] {
+                    let candidate = VoiceInputHotkeyPreset(keyCode: keyCode, carbonModifiers: modifiers, keyDisplayName: name)
+                    if !occupied.contains(where: { candidate.conflicts(with: $0) }) { return candidate }
+                }
+            }
+            return preferred
+        }
+        screenshotStashHotkey = try container.decodeIfPresent(VoiceInputHotkeyPreset.self, forKey: .screenshotStashHotkey)
+            ?? available(defaults.screenshotStashHotkey)
+        occupied.append(screenshotStashHotkey)
+        screenshotEditorLongHotkey = try container.decodeIfPresent(VoiceInputHotkeyPreset.self, forKey: .screenshotEditorLongHotkey)
+            ?? available(defaults.screenshotEditorLongHotkey)
+        screenshotHotkeyVersion = 1
         screenshotPinnedToolbarVisible = try container.decodeIfPresent(
             Bool.self,
             forKey: .screenshotPinnedToolbarVisible

@@ -2,10 +2,22 @@ import AppKit
 
 public enum FileShelfPasteboard {
     @discardableResult
-    public static func writeItems(_ items: [FileShelfItem], to pasteboard: NSPasteboard = .general) -> Bool {
+    public static func writeItems(_ items: [FileShelfItem], screenshotData: [UUID: Data] = [:], to pasteboard: NSPasteboard = .general) -> Bool {
         guard !items.isEmpty else { return false }
+        var writers: [any NSPasteboardWriting] = []
+        for item in items {
+            if item.screenshotMetadata != nil {
+                guard let data = screenshotData[item.id], let image = NSImage(data: data),
+                      let tiff = image.tiffRepresentation else { return false }
+                let writer = NSPasteboardItem()
+                guard writer.setData(data, forType: .png), writer.setData(tiff, forType: .tiff) else { return false }
+                writers.append(writer)
+            } else {
+                writers.append(pasteboardWriter(for: item.payload))
+            }
+        }
         pasteboard.clearContents()
-        return pasteboard.writeObjects(items.map { pasteboardWriter(for: $0.payload) })
+        return pasteboard.writeObjects(writers)
     }
 
     public static func pasteboardWriter(for payload: TransferPasteboardPayload) -> any NSPasteboardWriting {

@@ -9,6 +9,37 @@ import Testing
 @MainActor
 struct GlobalHotkeyManagerTests {
     @Test
+    func recordingAndEditorSuspensionComposeAndResumeTheLatestRegistration() throws {
+        _ = NSApplication.shared
+        let manager = GlobalHotkeyManager()
+        let flags = UInt32(controlKey | optionKey | cmdKey | shiftKey)
+        var count = 0
+        var releases = 0
+        #expect(manager.register(
+            hotkey: .init(keyCode: UInt32(kVK_F17), carbonModifiers: flags, keyDisplayName: "F17"),
+            onKeyDown: { count += 1 }, onKeyUp: { releases += 1 }
+        ) == .registered)
+        defer { manager.unregister() }
+        try sendHotkeyPressed(keyCode: UInt32(kVK_F17), modifiers: flags)
+        let owner = GlobalHotkeyManager.beginRecording()
+        #expect(manager.isSuspended)
+        #expect(!manager.hasActiveRegistration)
+        #expect(releases == 1)
+        let nested = GlobalHotkeyManager.beginRecording()
+        manager.setSuspended(true, reason: "editor")
+        #expect(manager.register(keyCode: UInt32(kVK_F18), modifiers: flags, action: { count += 10 }) == .registered)
+        GlobalHotkeyManager.endRecording(owner)
+        GlobalHotkeyManager.endRecording(nested)
+        #expect(manager.isSuspended)
+        #expect(count == 1)
+        manager.setSuspended(false, reason: "editor")
+        #expect(!manager.isSuspended)
+        #expect(manager.hasActiveRegistration)
+        try sendHotkeyPressed(keyCode: UInt32(kVK_F18), modifiers: flags)
+        #expect(count == 11)
+    }
+
+    @Test
     func carbonHandlersForwardEventsToTheMatchingManager() throws {
         _ = NSApplication.shared
         let firstManager = GlobalHotkeyManager()

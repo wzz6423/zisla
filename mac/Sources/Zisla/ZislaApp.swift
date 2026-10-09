@@ -38,8 +38,12 @@ final class SettingsWindow: NSWindow {
     }
 
     override func performKeyEquivalent(with event: NSEvent) -> Bool {
+        if let recorder = firstResponder as? HotkeyRecorderButton, recorder.isRecording {
+            return recorder.performKeyEquivalent(with: event)
+        }
         guard let action = Self.editingAction(for: event),
               let firstResponder,
+              firstResponder.responds(to: action),
               NSApp.sendAction(action, to: firstResponder, from: self)
         else {
             return super.performKeyEquivalent(with: event)
@@ -360,7 +364,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
     private var screenshotEditorController: ScreenshotEditorWindowController?
     private var additionalScreenshotEditors: [ScreenshotEditorWindowController] = []
     private var screenshotHotkeyManager = GlobalHotkeyManager()
-    private var screenshotPinHotkeyManager = GlobalHotkeyManager()
     private var screenshotLongHotkeyManager = GlobalHotkeyManager()
     private var pendingScreenshotPin = false
     private var isScreenshotSessionActive = false
@@ -716,24 +719,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
             .store(in: &cancellables)
 
         model.settingsStore.$settings
-            .map(\.screenshotEnabled)
-            .removeDuplicates()
-            .dropFirst()
-            .sink { [weak self] _ in
-                Task { @MainActor [weak self] in
-                    self?.registerScreenshotHotkeys()
-                }
+            .removeDuplicates {
+                $0.screenshotEnabled == $1.screenshotEnabled
+                    && $0.screenshotHotkey == $1.screenshotHotkey
+                    && $0.screenshotLongHotkey == $1.screenshotLongHotkey
             }
-            .store(in: &cancellables)
-
-        model.settingsStore.$settings
-            .map { ($0.screenshotHotkey, $0.screenshotPinHotkey, $0.screenshotLongHotkey) }
-            .removeDuplicates { $0 == $1 }
             .dropFirst()
-            .sink { [weak self] _ in
-                Task { @MainActor [weak self] in
-                    self?.registerScreenshotHotkeys()
-                }
+            .sink { [weak self] settings in
+                self?.registerScreenshotHotkeys(settings: settings)
             }
             .store(in: &cancellables)
 
@@ -940,7 +933,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
         systemScreenshotMonitor = nil
         AppModel.shared.stop()
         screenshotHotkeyManager.unregister()
-        screenshotPinHotkeyManager.unregister()
         screenshotLongHotkeyManager.unregister()
         setScreenshotSessionActive(false)
         screenshotSelectionController?.cancel()
@@ -1598,6 +1590,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
             frontmost: frontmostApplication?.processIdentifier,
             currentProcess: currentProcess
         )
+        let sourceApplication = capturedApplication
+            ?? capturedProcessIdentifier.flatMap { NSRunningApplication(processIdentifier: $0) }
+        let sourceSnapshot = ScreenshotSourceSnapshot(
+            applicationName: sourceApplication?.localizedName,
+            bundleIdentifier: sourceApplication?.bundleIdentifier,
+            processIdentifier: sourceApplication?.processIdentifier ?? capturedProcessIdentifier
+        )
         let screens = NSScreen.screens
         let preferredScreen = WindowPlacement.screenUnderMouse()
         let captureScreens: [NSScreen]
@@ -1615,6 +1614,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
         ScreenshotModalSession.dismissForSelectionPresentation()
         modalWindowSnapshot?.restoreAfterModalDismissal()
         setScreenshotSessionActive(true)
+        updateScreenshotHotkeyContext(selecting: true)
         setScreenshotLiveCaptureActive(true)
         let clipboardAssistantSnapshot = ScreenshotModalWindowSnapshot.capture(
             from: AppModel.shared.clipboardAssistant.windowForFrameUpdate
@@ -1661,6 +1661,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
                 screen: result.screen,
                 captureRect: result.selectionRect,
                 capturedApplication: capturedApplication,
+                sourceSnapshot: sourceSnapshot,
                 onClose: { [weak self] in
                     guard let self else { return }
                     if self.screenshotEditorController === editor {
@@ -1678,6 +1679,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
             } else {
                 self.additionalScreenshotEditors.append(editor)
             }
+            editor.onHotkeyContextChanged = { [weak self] in self?.updateScreenshotHotkeyContext() }
             modalWindowSnapshot?.restore()
             editor.present()
             if shouldPin {
@@ -1724,6 +1726,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
     }
 
     private func endScreenshotSessionIfNeeded() {
+        updateScreenshotHotkeyContext()
         guard screenshotSelectionController == nil,
               screenshotEditorController == nil,
               additionalScreenshotEditors.isEmpty
@@ -1735,10 +1738,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
         }
     }
 
-    private func registerScreenshotHotkeys() {
-        let settings = AppModel.shared.settingsStore.settings
+    private func registerScreenshotHotkeys(settings: FeatureSettings = AppModel.shared.settingsStore.settings) {
         screenshotHotkeyManager.unregister()
-        screenshotPinHotkeyManager.unregister()
         screenshotLongHotkeyManager.unregister()
         guard settings.screenshotEnabled else { return }
         let captureResult = screenshotHotkeyManager.register(
@@ -1748,18 +1749,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
         )
         reportScreenshotHotkeyRegistration(captureResult, actionName: AppLocalization.text("截图"))
 
-        if settings.screenshotHotkey.conflicts(with: settings.screenshotPinHotkey) {
-            AppModel.shared.transientMessage = AppLocalization.text("截图与钉图快捷键冲突，钉图快捷键未启用")
-        } else {
-            let pinResult = screenshotPinHotkeyManager.register(
-                hotkey: settings.screenshotPinHotkey,
-                onKeyDown: { [weak self] in self?.startPinnedScreenshot() },
-                onKeyUp: {}
-            )
-            reportScreenshotHotkeyRegistration(pinResult, actionName: AppLocalization.text("钉图"))
-        }
-        guard !settings.screenshotLongHotkey.conflicts(with: settings.screenshotHotkey),
-              !settings.screenshotLongHotkey.conflicts(with: settings.screenshotPinHotkey)
+        guard !settings.screenshotLongHotkey.conflicts(with: settings.screenshotHotkey)
         else { return }
         let longResult = screenshotLongHotkeyManager.register(
             hotkey: settings.screenshotLongHotkey,
@@ -1769,6 +1759,15 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
             onKeyUp: {}
         )
         reportScreenshotHotkeyRegistration(longResult, actionName: AppLocalization.text("长截图"))
+    }
+
+    private func updateScreenshotHotkeyContext(selecting: Bool? = nil) {
+        let editors = [screenshotEditorController].compactMap { $0 } + additionalScreenshotEditors
+        ScreenshotHotkeyContext.update(
+            selecting: selecting ?? (screenshotSelectionController != nil),
+            editors: editors,
+            globalManagers: [screenshotHotkeyManager, screenshotLongHotkeyManager]
+        )
     }
 
     private func reportScreenshotHotkeyRegistration(
