@@ -11,7 +11,8 @@ import ZislaCore
 struct AIResultSweepPresentationTests {
     @Test(arguments: [AIProgressStatus.succeeded, .failed, .error])
     func resultSweepOnlyTintsTheCollapsedSurface(status: AIProgressStatus) throws {
-        let fixture = try Fixture()
+        var now = Date(timeIntervalSince1970: 100)
+        let fixture = try Fixture(now: { now })
         defer { fixture.cleanUp() }
         for isCollapsed in [true, false] {
             #expect(try surfaceTint(isCollapsed: isCollapsed, sweep: fixture.sweep) < 0.01)
@@ -19,13 +20,9 @@ struct AIResultSweepPresentationTests {
 
         fixture.receive(makeTask(id: "surface-visibility", provider: .codex, status: status))
         let sweep = try #require(fixture.sweep.current)
-        let deadline = sweep.startedAt.addingTimeInterval(AIResultSweep.duration / 2)
-        var collapsedTint: CGFloat = 0
-        repeat {
-            collapsedTint = try surfaceTint(isCollapsed: true, sweep: fixture.sweep)
-            if collapsedTint > 0.02 { break }
-            RunLoop.main.run(mode: .default, before: min(deadline, Date().addingTimeInterval(1.0 / 120)))
-        } while Date() < deadline
+        // Every visibility snapshot must sample the same frame of the moving sweep.
+        now.addTimeInterval(AIResultSweep.duration / 2)
+        let collapsedTint = try surfaceTint(isCollapsed: true, sweep: fixture.sweep)
         try #require(collapsedTint > 0.02, "收起的小岛必须实际绘制结果扫光，才能检查展开后的隐藏行为")
 
         #expect(try surfaceTint(isCollapsed: false, sweep: fixture.sweep) < 0.01,
@@ -248,7 +245,7 @@ struct AIResultSweepPresentationTests {
     @MainActor
     private struct Fixture {
         let queue = SideNoticeQueue()
-        let sweep = AIResultSweepController()
+        let sweep: AIResultSweepController
         let displayState = SideNoticeDisplayState()
         let media = NowPlayingService(loadLyrics: { _, _, _ in
             Issue.record("结果动画测试不应请求歌词")
@@ -259,7 +256,8 @@ struct AIResultSweepPresentationTests {
         let defaults: UserDefaults
         let settings: FeatureSettingsStore
 
-        init() throws {
+        init(now: @escaping () -> Date = Date.init) throws {
+            sweep = AIResultSweepController(now: now)
             defaults = try #require(UserDefaults(suiteName: suiteName))
             settings = FeatureSettingsStore(defaults: defaults)
             settings.settings.islandNotchBackground = .black

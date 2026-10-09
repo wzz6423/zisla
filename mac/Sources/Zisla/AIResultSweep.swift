@@ -20,8 +20,13 @@ struct AIResultSweep: Identifiable {
 @MainActor
 final class AIResultSweepController: ObservableObject {
     @Published private(set) var current: AIResultSweep?
+    let now: () -> Date
     private var pending: [AIProgressTask] = []
     private var playbackTask: Task<Void, Never>?
+
+    init(now: @escaping () -> Date = Date.init) {
+        self.now = now
+    }
 
     func receive(previous: AIProgressStatus?, task: AIProgressTask, observedSince: Date, settings: FeatureSettings) {
         guard settings.aiProgressEnabled, settings.aiTaskResultSweepEnabled else {
@@ -75,7 +80,7 @@ final class AIResultSweepController: ObservableObject {
     }
 
     private func start(_ task: AIProgressTask) {
-        let sweep = AIResultSweep(task: task, startedAt: .now)
+        let sweep = AIResultSweep(task: task, startedAt: now())
         current = sweep
         playbackTask = Task { [weak self] in
             do {
@@ -94,10 +99,10 @@ struct AIResultSweepOverlay: View {
 
     var body: some View {
         if let sweep = controller.current {
-            TimelineView(.animation) { context in
+            TimelineView(.animation) { _ in
                 AIResultSweepBand(
                     status: sweep.status,
-                    progress: sweep.progress(at: context.date),
+                    progress: sweep.progress(at: controller.now()),
                     reduceMotion: reduceMotion
                 )
             }
