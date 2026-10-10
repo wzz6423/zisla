@@ -330,6 +330,10 @@ enum ScreenshotLongCaptureMatcher {
         else { return nil }
         let incomingAxisLength = direction == .vertical ? next.height : next.width
         guard incomingAxisLength > 1 else { return nil }
+        let minimumNewContent = max(
+            minimumNewContentPixels,
+            Int((Double(incomingAxisLength) * minimumNewContentFraction).rounded(.up))
+        )
 
         // The coarse pass only proposes candidates: pages with repeating rows offer several offsets that
         // look alike once they are blurred down, so each proposal is confirmed on native-resolution rows
@@ -347,6 +351,7 @@ enum ScreenshotLongCaptureMatcher {
                 score: refined.score,
                 than: best!,
                 incomingAxisLength: incomingAxisLength,
+                minimumNewContent: minimumNewContent,
                 expectedNewContent: expectedNewContent
             ) {
                 best = (candidate.placement, refined.overlap, refined.score)
@@ -355,10 +360,6 @@ enum ScreenshotLongCaptureMatcher {
         let placement = best?.placement ?? primary.placement
         let overlap = best?.overlap
             ?? scaledOverlap(previous: previous, next: next, direction: direction, coarse: primary)
-        let minimumNewContent = max(
-            minimumNewContentPixels,
-            Int((Double(incomingAxisLength) * minimumNewContentFraction).rounded(.up))
-        )
         guard incomingAxisLength - overlap >= minimumNewContent else { return nil }
         return ScreenshotLongCaptureMatch(
             placement: placement,
@@ -368,18 +369,22 @@ enum ScreenshotLongCaptureMatcher {
     }
 
     /// Ranks two native-resolution refinements. The better score always wins; when two alignments are
-    /// indistinguishable the one that continues the scroll we just observed wins, and only if there is no
-    /// such history does the longer overlap — the one that adds the least content — win. Preferring the
-    /// longer overlap unconditionally is what used to swallow a whole row of a repeating page.
+    /// indistinguishable, near-stationary motion takes priority so scroll history cannot turn a small
+    /// bounce into a duplicated row. Otherwise the previous scroll step breaks ties, since always
+    /// preferring the longer overlap would swallow whole rows of a repeating page.
     private static func isBetterRefinement(
         overlap: Int,
         score: Double,
         than best: (placement: ScreenshotLongCapturePlacement, overlap: Int, score: Double),
         incomingAxisLength: Int,
+        minimumNewContent: Int,
         expectedNewContent: Int?
     ) -> Bool {
         if score < best.score - refinedTieTolerance { return true }
         guard abs(score - best.score) <= refinedTieTolerance else { return false }
+        if incomingAxisLength - max(overlap, best.overlap) < minimumNewContent {
+            return overlap > best.overlap
+        }
         if let expectedNewContent {
             let candidateDistance = abs((incomingAxisLength - overlap) - expectedNewContent)
             let bestDistance = abs((incomingAxisLength - best.overlap) - expectedNewContent)
@@ -422,7 +427,7 @@ enum ScreenshotLongCaptureMatcher {
         let height = Int(sampleSize.height)
         let axisLength = direction == .vertical ? height : width
         let minimumOverlap = max(12, Int(CGFloat(axisLength) * 0.12))
-        let maximumOverlap = axisLength - 4
+        let maximumOverlap = axisLength
         guard minimumOverlap <= maximumOverlap else { return nil }
 
         var primary: (match: CoarseMatch, score: Double)?

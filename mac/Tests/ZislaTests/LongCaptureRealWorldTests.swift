@@ -607,8 +607,8 @@ struct LongCaptureRealWorldTests {
         #expect(report == "identical", "changing scroll steps shifted the seam: \(report)")
     }
 
-    @Test
-    func realWorldTableIgnoresReverseScrollJitter() throws {
+    @Test(arguments: [540, 598, 599, 601, 602, 603])
+    func realWorldTableIgnoresScrollJitter(jitterOffset: Int) throws {
         let pageWidth = 360
         let frameHeight = 700
         let page = try #require(makeListPageImage(width: pageWidth, height: 2_400))
@@ -628,7 +628,7 @@ struct LongCaptureRealWorldTests {
         }
 
         let settled = try #require(model.image.cgImage(forProposedRect: nil, context: nil, hints: nil))
-        let jitter = try #require(frame(from: page, offset: 540, height: frameHeight))
+        let jitter = try #require(frame(from: page, offset: jitterOffset, height: frameHeight))
         let didAppendJitter = model.append(
             image: NSImage(cgImage: jitter, size: CGSize(width: pageWidth, height: frameHeight)),
             direction: .vertical
@@ -639,8 +639,8 @@ struct LongCaptureRealWorldTests {
             expected: rgbaPixels(settled),
             width: pageWidth
         )
-        #expect(!didAppendJitter, "reverse scroll jitter should not prepend content to the top")
-        #expect(jitterReport == "identical", "reverse jitter changed the composite: \(jitterReport)")
+        #expect(!didAppendJitter, "scroll jitter at \(jitterOffset) must not duplicate a row")
+        #expect(jitterReport == "identical", "scroll jitter changed the composite: \(jitterReport)")
 
         let forward = try #require(frame(from: page, offset: 900, height: frameHeight))
         let didAppendForward = model.append(
@@ -660,6 +660,58 @@ struct LongCaptureRealWorldTests {
         )
         #expect(combined.height == expected.height, "height \(combined.height) vs \(expected.height)")
         #expect(report == "identical", "reverse jitter moved tail content to the top: \(report)")
+    }
+
+    @Test(arguments: [320, 700, 1_400])
+    func realWorldTinyScrollDoesNotStartADuplicateCapture(frameHeight: Int) throws {
+        let pageWidth = 360
+        let page = try #require(makeListPageImage(width: pageWidth, height: 3_000))
+        let first = try #require(frame(from: page, offset: 600, height: frameHeight))
+        let frameSize = CGSize(width: pageWidth, height: frameHeight)
+        let model = ScreenshotEditorModel(image: NSImage(cgImage: first, size: frameSize))
+        model.beginLongCapturePreview()
+
+        for delta in [-3, -2, -1, 0, 1, 2, 3] {
+            let jitter = try #require(frame(from: page, offset: 600 + delta, height: frameHeight))
+            let didAppend = model.append(image: NSImage(cgImage: jitter, size: frameSize))
+            #expect(!didAppend,
+                    "a \(delta)-pixel jitter must not duplicate content at height \(frameHeight)")
+        }
+
+        let unchanged = try #require(model.image.cgImage(forProposedRect: nil, context: nil, hints: nil))
+        let jitterReport = describeMismatch(
+            actual: rgbaPixels(unchanged), expected: rgbaPixels(first), width: pageWidth
+        )
+        #expect(jitterReport == "identical", "tiny scroll changed the composite: \(jitterReport)")
+        #expect(!model.canUndo, "ignored jitter must not add undo history")
+
+        let scrolled = try #require(frame(from: page, offset: 760, height: frameHeight))
+        let didAppend = model.append(image: NSImage(cgImage: scrolled, size: frameSize))
+        #expect(didAppend, "scrolling must resume after ignored jitter")
+        let expected = try #require(page.cropping(
+            to: CGRect(x: 0, y: 600, width: pageWidth, height: frameHeight + 160)
+        ))
+        let combined = try #require(model.image.cgImage(forProposedRect: nil, context: nil, hints: nil))
+        let report = describeMismatch(
+            actual: rgbaPixels(combined), expected: rgbaPixels(expected), width: pageWidth
+        )
+        #expect(report == "identical", "scrolling after ignored jitter shifted the seam: \(report)")
+    }
+
+    @Test(arguments: [-13, -3, -1, 0, 1, 3, 13])
+    func realWorldPeriodicRowsDoNotTurnJitterIntoThePreviousScrollStep(delta: Int) throws {
+        let page = try #require(makePeriodicListPageImage(width: 360, height: 2_000))
+        let previous = try #require(frame(from: page, offset: 600, height: 700))
+        let next = try #require(frame(from: page, offset: 600 + delta, height: 700))
+
+        let match = ScreenshotLongCaptureMatcher.match(
+            previous: previous,
+            next: next,
+            direction: .vertical,
+            expectedNewContent: 260
+        )
+
+        #expect(match == nil, "scroll history must not turn \(delta)-pixel jitter into a repeated row")
     }
 
     @Test
