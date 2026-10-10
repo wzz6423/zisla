@@ -685,8 +685,7 @@ private struct AILocalModelConfigurationRow: View {
                 ))
                 .textFieldStyle(.roundedBorder)
                 .font(.system(size: 10, design: .monospaced))
-                .frame(minWidth: 140)
-                .layoutPriority(1)
+                .frame(minWidth: 140, maxWidth: 180)
                 .accessibilityLabel(AppLocalization.text("URL / IP:端口"))
                 SecureField(AppLocalization.text("API Key（可选）"), text: Binding(
                     get: { apiKey },
@@ -703,7 +702,7 @@ private struct AILocalModelConfigurationRow: View {
                     }
                 ))
                 .textFieldStyle(.roundedBorder)
-                .frame(width: 125)
+                .frame(width: 100)
                 .accessibilityLabel(AppLocalization.text("API Key（可选）"))
                 .help(AppLocalization.text("默认无需 API Key；仅在本地服务启用认证时填写。"))
                 HStack(spacing: 4) {
@@ -736,7 +735,7 @@ private struct AILocalModelConfigurationRow: View {
                         .accessibilityLabel(AppLocalization.text("模型名"))
                     }
                 }
-                .frame(width: 200)
+                .frame(width: 160)
                 .help(model.modelName)
                 if AIChatClient.supportsLocalThinking(endpoint: model.endpoint, model: model.modelName) {
                     Toggle(AppLocalization.text("思考"), isOn: Binding(
@@ -746,8 +745,10 @@ private struct AILocalModelConfigurationRow: View {
                     .toggleStyle(.checkbox)
                     .controlSize(.mini)
                     .font(.system(size: 10))
+                    .keepsIntrinsicWidth()
                     .help(AppLocalization.text("默认关闭以加快语音整理。开启后允许模型思考，可能提高准确性，但会增加等待时间。"))
                 }
+                Spacer(minLength: 0)
                 Button {
                     do {
                         try store.removeLocalModel(id: model.id)
