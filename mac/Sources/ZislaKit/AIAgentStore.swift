@@ -289,7 +289,23 @@ public final class AIAgentStore: ObservableObject {
         }
     }
 
-    public func removeLocalModel(id: UUID) {
+    public func secret(for model: AIAgentLocalModel) throws -> String? {
+        try secretStore.secret(for: model.secretReference)
+    }
+
+    public func replaceLocalModelSecret(_ secret: String, for id: UUID) throws {
+        guard let model = localModel(id: id) else { return }
+        let value = secret.trimmingCharacters(in: .whitespacesAndNewlines)
+        if value.isEmpty {
+            try secretStore.removeSecret(for: model.secretReference)
+        } else {
+            try secretStore.setSecret(value, for: model.secretReference)
+        }
+    }
+
+    public func removeLocalModel(id: UUID) throws {
+        guard let model = localModel(id: id) else { return }
+        try secretStore.removeSecret(for: model.secretReference)
         state.localModels.removeAll { $0.id == id }
     }
 

@@ -334,19 +334,53 @@ public struct AIAgentLocalModel: Identifiable, Codable, Equatable, Sendable {
     public var endpoint: AIEndpoint
     public var modelName: String
     public var isEnabled: Bool
+    public var thinkingEnabled: Bool
+
+    public var secretReference: String { "local-model.\(id.uuidString)" }
 
     public init(
         id: UUID = UUID(),
         name: String,
         endpoint: AIEndpoint,
         modelName: String,
-        isEnabled: Bool = true
+        isEnabled: Bool = true,
+        thinkingEnabled: Bool = false
     ) {
         self.id = id
         self.name = name
         self.endpoint = endpoint
         self.modelName = modelName
         self.isEnabled = isEnabled
+        self.thinkingEnabled = thinkingEnabled
+    }
+
+    private enum CodingKeys: String, CodingKey {
+        case id
+        case name
+        case endpoint
+        case modelName
+        case isEnabled
+        case thinkingEnabled
+    }
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        id = try container.decode(UUID.self, forKey: .id)
+        name = try container.decode(String.self, forKey: .name)
+        endpoint = try container.decode(AIEndpoint.self, forKey: .endpoint)
+        modelName = try container.decode(String.self, forKey: .modelName)
+        isEnabled = try container.decode(Bool.self, forKey: .isEnabled)
+        thinkingEnabled = try container.decodeIfPresent(Bool.self, forKey: .thinkingEnabled) ?? false
+    }
+
+    public mutating func selectEndpointKind(_ kind: AIEndpointKind) {
+        let currentURL = endpoint.baseURL.trimmingCharacters(in: .whitespacesAndNewlines)
+        if currentURL.isEmpty || currentURL == endpoint.kind.defaultBaseURL {
+            endpoint.baseURL = kind.defaultBaseURL
+        }
+        endpoint.kind = kind
+        endpoint.name = kind.defaultEndpointName
+        name = kind.defaultEndpointName
     }
 }
 

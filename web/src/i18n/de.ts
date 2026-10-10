@@ -195,7 +195,7 @@ export const de: SiteContent = {
       voice: {
         title: 'Spracheingabe und Aufbereitung',
         description:
-          'Mit einer Taste umschalten oder zum Sprechen halten, mit der Spracherkennung des Systems. Bei Bedarf kommen Fachwortlisten, eigene Schlüsselwörter, ein strukturiertes Format oder die Aufbereitung durch ein lokales oder entferntes Modell hinzu.',
+          'Mit einer Taste umschalten oder zum Sprechen gedrückt halten: Die Spracherkennung des Systems lässt sich mit Fachwortlisten und eigenen Schlüsselwörtern ergänzen. Optional korrigieren Ollama, LM Studio oder ein entferntes Modell das Transkript unter Beibehaltung des Sinns und formatieren ausdrücklich aufgezählte Punkte.',
         detail: 'Zwei Aufnahmearten · Wortlisten und Schlüsselwörter · Modell optional',
       },
       media: {
@@ -373,10 +373,22 @@ export const de: SiteContent = {
       <p>Du kannst die jeweilige Funktion in den Einstellungen der App abschalten oder eine Berechtigung jederzeit unter „Systemeinstellungen → Datenschutz &amp; Sicherheit“ widerrufen. Widerrufst du eine, wird nur die zugehörige Funktion deaktiviert; andere Module bleiben unberührt. Die Bezeichnungen unterscheiden sich je nach macOS-Version leicht.</p>
     `.trim(),
       },
+      localVoice: {
+        question: 'Wie nutze ich ein lokales Modell zur Aufbereitung von Spracheingaben?',
+        answer: `
+      <p>Ollama, LM Studio und andere lokale OpenAI-kompatible Dienste werden unterstützt.</p>
+      <ol>
+        <li>Lade das gewünschte Modell in deiner lokalen Modell-App herunter oder in den Speicher und starte den Dienst.</li>
+        <li>Öffne Einstellungen → Sprache → Lokale Modelle, füge eine Konfiguration hinzu und aktiviere sie. Wähle Ollama oder LM Studio und gib die Dienst-URL ein. Für andere OpenAI-kompatible Dienste wählst du ebenfalls LM Studio. Lass API Key leer, sofern der Dienst keine Authentifizierung verlangt.</li>
+        <li>Wähle ein automatisch erkanntes Modell und anschließend diese Konfiguration unter Sprachorganisationsmodell → Modell verwenden.</li>
+      </ol>
+      <p>zisla empfiehlt anhand deines Chips und des gesamten Arbeitsspeichers ein Gemma 4 QAT-Modell. Das empfohlene Modell wird nicht automatisch heruntergeladen oder geladen.</p>
+    `.trim(),
+      },
       network: {
         question: 'Geht zisla ins Netz?',
         answer:
-          'Wetter, signierte Update-Prüfungen, von dir gestartete Downloads und die optionale entfernte Sprachaufbereitung nutzen das Netz nach Bedarf. Die Linkerkennung in der Zwischenablage läuft rein lokal und startet nie selbst einen Download.',
+          'Wetter, signierte Update-Prüfungen, von dir gestartete Downloads und die optionale entfernte Sprachaufbereitung nutzen das Netz nach Bedarf. Die Linkerkennung in der Zwischenablage läuft rein lokal und startet nie selbst einen Download. Ein lokales Modell bereitet den Text nach der Transkription auf. Die Spracherkennung von Apple kann je nach Sprache und Systemunterstützung weiterhin das Netzwerk nutzen.',
       },
       multiDisplay: {
         question: 'Unterstützt zisla mehrere Displays?',

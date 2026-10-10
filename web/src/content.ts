@@ -105,6 +105,7 @@ export const faqIds = [
   'aiPrivacy',
   'copyAssistant',
   'permissions',
+  'localVoice',
   'network',
   'multiDisplay',
   'intel',

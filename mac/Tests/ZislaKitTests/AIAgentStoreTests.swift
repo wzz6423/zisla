@@ -8,6 +8,157 @@ import Testing
 struct AIAgentStoreTests {
 
     @Test
+    func localThinkingPreferencesSurviveReloadIndependently() throws {
+        let (store, directory) = makeStore()
+        defer {
+            store.flushPendingChanges()
+            try? FileManager.default.removeItem(at: directory)
+        }
+        let endpoint = AIEndpoint(name: "LM Studio", baseURL: AIEndpointKind.openAICompatible.defaultBaseURL)
+        var first = AIAgentLocalModel(name: "Fast", endpoint: endpoint, modelName: "google/gemma-4-e4b")
+        var second = AIAgentLocalModel(name: "Careful", endpoint: endpoint, modelName: "google/gemma-4-e4b", thinkingEnabled: true)
+        store.upsertLocalModel(first)
+        store.upsertLocalModel(second)
+        store.flushPendingChanges()
+
+        let storageURL = directory.appendingPathComponent("state.json")
+        let restored = AIAgentStore(storageURL: storageURL, secretStore: StubSecretStore())
+        #expect(restored.localModel(id: first.id) == first)
+        #expect(restored.localModel(id: second.id) == second)
+        first.thinkingEnabled = true
+        second.thinkingEnabled = false
+        restored.upsertLocalModel(first)
+        restored.upsertLocalModel(second)
+        restored.flushPendingChanges()
+
+        let reopened = AIAgentStore(storageURL: storageURL, secretStore: StubSecretStore())
+        #expect(reopened.state.localModels == [first, second])
+        #expect(reopened.localModel(id: first.id)?.thinkingEnabled == true)
+        #expect(reopened.localModel(id: second.id)?.thinkingEnabled == false)
+    }
+
+    @Test
+    func failedThinkingPreferenceWritePreservesDiskStateAndCanRecover() throws {
+        let directory = FileManager.default.temporaryDirectory.appendingPathComponent("zisla-local-thinking-write-\(UUID())")
+        let storageURL = directory.appendingPathComponent("state.json")
+        let failureMarker = directory.appendingPathComponent("inject-write-failure")
+        let store = AIAgentStore(
+            storageURL: storageURL,
+            secretStore: StubSecretStore(),
+            persistenceDelay: 60,
+            persistenceWriter: { state, url in
+                if FileManager.default.fileExists(atPath: failureMarker.path) {
+                    throw CocoaError(.fileWriteNoPermission)
+                }
+                try AIAgentStore.write(state, to: url)
+            }
+        )
+        defer {
+            store.flushPendingChanges()
+            try? FileManager.default.removeItem(at: directory)
+        }
+        var model = AIAgentLocalModel(
+            name: "LM Studio",
+            endpoint: AIEndpoint(name: "LM Studio", baseURL: AIEndpointKind.openAICompatible.defaultBaseURL),
+            modelName: "google/gemma-4-e4b"
+        )
+        store.upsertLocalModel(model)
+        store.flushPendingChanges()
+        let previous = try Data(contentsOf: storageURL)
+        try Data().write(to: failureMarker)
+        model.thinkingEnabled = true
+        store.upsertLocalModel(model)
+        store.flushPendingChanges()
+        #expect(store.persistenceError != nil)
+        #expect(try Data(contentsOf: storageURL) == previous)
+        #expect(store.localModel(id: model.id)?.thinkingEnabled == true)
+
+        try FileManager.default.removeItem(at: failureMarker)
+        store.flushPendingChanges()
+        #expect(store.persistenceError == nil)
+        let restored = AIAgentStore(storageURL: storageURL, secretStore: StubSecretStore())
+        #expect(restored.localModel(id: model.id) == model)
+    }
+
+    @Test
+    func localCredentialsSurviveReloadWithoutEnteringConfigurationJSON() throws {
+        let directory = FileManager.default.temporaryDirectory.appendingPathComponent("zisla-local-secrets-\(UUID())")
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let storageURL = directory.appendingPathComponent("state.json")
+        let credentialsURL = directory.appendingPathComponent("secrets.sqlite")
+        let secrets = DatabaseAIAgentSecretStore(storageURL: credentialsURL)
+        let store = AIAgentStore(storageURL: storageURL, secretStore: secrets)
+        let model = AIAgentLocalModel(name: "LM Studio", endpoint: AIEndpoint(name: "LM Studio", baseURL: "http://127.0.0.1:1234/v1"), modelName: "model")
+        let account = AgentAccount(id: model.id, name: "Cloud", provider: "Cloud")
+        try store.upsertAccount(account, secret: "cloud-test-key")
+        store.upsertLocalModel(model)
+        try store.replaceLocalModelSecret("  local-test-key \n", for: model.id)
+        store.flushPendingChanges()
+
+        let restored = AIAgentStore(storageURL: storageURL, secretStore: secrets)
+        #expect(restored.localModel(id: model.id) == model)
+        #expect(try restored.secret(for: model) == "local-test-key")
+        #expect(try restored.secret(for: account) == "cloud-test-key")
+        let configuration = try String(contentsOf: storageURL, encoding: .utf8)
+        #expect(!configuration.contains("local-test-key"))
+        #expect(!configuration.contains("cloud-test-key"))
+        let permissions = try FileManager.default.attributesOfItem(atPath: credentialsURL.path)[.posixPermissions] as? NSNumber
+        #expect(permissions?.intValue == 0o600)
+
+        try restored.removeLocalModel(id: model.id)
+        restored.flushPendingChanges()
+        #expect(restored.localModel(id: model.id) == nil)
+        #expect(try restored.secret(for: model) == nil)
+        #expect(try restored.secret(for: account) == "cloud-test-key")
+    }
+
+    @Test
+    func localCredentialsAreOptionalAndCanBeCleared() throws {
+        let directory = FileManager.default.temporaryDirectory.appendingPathComponent("zisla-local-optional-\(UUID())")
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let secrets = FailureInjectingSecretStore()
+        let store = AIAgentStore(storageURL: directory.appendingPathComponent("state.json"), secretStore: secrets)
+        let model = AIAgentLocalModel(name: "Ollama", endpoint: AIEndpoint(name: "Ollama", baseURL: AIEndpointKind.ollama.defaultBaseURL, kind: .ollama), modelName: "")
+        store.upsertLocalModel(model)
+        defer { store.flushPendingChanges() }
+
+        #expect(try store.secret(for: model) == nil)
+        try store.replaceLocalModelSecret("fake-key", for: model.id)
+        #expect(try store.secret(for: model) == "fake-key")
+        try store.replaceLocalModelSecret(" \n\t", for: model.id)
+        #expect(try store.secret(for: model) == nil)
+        try store.replaceLocalModelSecret("ignored-key", for: UUID())
+        #expect(store.state.localModels == [model])
+    }
+
+    @Test
+    func failedLocalCredentialChangesPreserveThePreviousState() throws {
+        let directory = FileManager.default.temporaryDirectory.appendingPathComponent("zisla-local-secret-failure-\(UUID())")
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let secrets = FailureInjectingSecretStore()
+        let store = AIAgentStore(storageURL: directory.appendingPathComponent("state.json"), secretStore: secrets)
+        let model = AIAgentLocalModel(name: "LM Studio", endpoint: AIEndpoint(name: "LM Studio", baseURL: "http://127.0.0.1:1234/v1"), modelName: "model")
+        store.upsertLocalModel(model)
+        defer { store.flushPendingChanges() }
+        try store.replaceLocalModelSecret("previous-key", for: model.id)
+        secrets.failWrites(endingWith: model.secretReference)
+
+        #expect(throws: AIAgentSecretStoreError.storageFailed("injected")) {
+            try store.replaceLocalModelSecret("new-key", for: model.id)
+        }
+        #expect(try store.secret(for: model) == "previous-key")
+        secrets.failRemovals = true
+        #expect(throws: AIAgentSecretStoreError.storageFailed("injected")) {
+            try store.removeLocalModel(id: model.id)
+        }
+        #expect(throws: AIAgentSecretStoreError.storageFailed("injected")) {
+            try store.replaceLocalModelSecret("", for: model.id)
+        }
+        #expect(store.localModel(id: model.id) == model)
+        #expect(try store.secret(for: model) == "previous-key")
+    }
+
+    @Test
     func remoteChannelConfigurationSurvivesReload() throws {
         let (store, directory) = makeStore()
         defer { try? FileManager.default.removeItem(at: directory) }
@@ -224,6 +375,7 @@ private final class FailureInjectingSecretStore: AIAgentSecretStoring, @unchecke
     private let lock = NSLock()
     private var values: [String: String] = [:]
     private var failingWriteSuffix: String?
+    var failRemovals = false
 
     func failWrites(endingWith suffix: String) {
         lock.lock()
@@ -249,6 +401,7 @@ private final class FailureInjectingSecretStore: AIAgentSecretStoring, @unchecke
     func removeSecret(for reference: String) throws {
         lock.lock()
         defer { lock.unlock() }
+        if failRemovals { throw AIAgentSecretStoreError.storageFailed("injected") }
         values.removeValue(forKey: reference)
     }
 }

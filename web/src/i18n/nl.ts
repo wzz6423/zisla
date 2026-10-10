@@ -178,7 +178,7 @@ export const nl = createCatalog({
       voice: {
         title: 'Spraakinvoer en opschonen',
         description:
-          'Schakel met een toets of houd vast om te praten met de systeemherkenner. Voeg vakwoorden, eigen trefwoorden, gestructureerde opmaak of opschoning door een lokaal of extern model toe.',
+          'Schakel met een toets of houd die ingedrukt om te praten via de spraakherkenning van het systeem, met vakwoordenlijsten en eigen trefwoorden. Gebruik desgewenst Ollama, LM Studio of een extern model om de transcriptie met behoud van betekenis te corrigeren en expliciet opgesomde punten op te maken.',
         detail: 'Twee opnamemodi · Woordenlijsten en trefwoorden · Optionele modelbewerking',
       },
       media: {
@@ -324,7 +324,19 @@ export const nl = createCatalog({
       <p>Je kunt een functie uitschakelen in de instellingen van de app of een machtiging op elk moment intrekken via Systeeminstellingen → Privacy en beveiliging. Het intrekken van één machtiging schakelt alleen de bijbehorende functie uit en laat andere modules ongemoeid. Namen van onderdelen kunnen per macOS-versie iets verschillen.</p>
     `.trim(),
       },
-      network: { question: 'Gaat zisla online?', answer: 'Weer, ondertekende updatecontroles, downloads die je start en optionele externe spraakbewerking gebruiken indien nodig het netwerk. Linkherkenning gebeurt lokaal.' },
+      localVoice: {
+        question: 'Hoe gebruik ik een lokaal model om spraaktranscripties te corrigeren?',
+        answer: `
+      <p>Ollama, LM Studio en andere lokale OpenAI-compatibele diensten worden ondersteund.</p>
+      <ol>
+        <li>Download of laad het gewenste model in je lokale model-app en start de dienst.</li>
+        <li>Open Instellingen → Spraak → Lokale modellen, voeg een configuratie toe en schakel die in. Kies Ollama of LM Studio en vul de URL van de dienst in. Kies ook voor andere OpenAI-compatibele diensten LM Studio. Laat API Key leeg als de dienst geen authenticatie vereist.</li>
+        <li>Selecteer een automatisch gevonden model en kies die configuratie onder Spraakorganisatiemodel → Gebruik model.</li>
+      </ol>
+      <p>zisla stelt een Gemma 4 QAT-model voor op basis van je chip en het totale werkgeheugen. Het aanbevolen model wordt niet automatisch gedownload of geladen.</p>
+    `.trim(),
+      },
+      network: { question: 'Gaat zisla online?', answer: 'Weer, ondertekende updatecontroles, downloads die je start en optionele externe spraakbewerking gebruiken indien nodig het netwerk. Linkherkenning gebeurt lokaal. Een lokaal model corrigeert de tekst na de transcriptie; de spraakherkenning van Apple kan nog steeds het netwerk gebruiken, afhankelijk van de taal en de systeemondersteuning.' },
       multiDisplay: { question: 'Ondersteunt zisla meerdere schermen?', answer: 'Ja: meerdere schermen, Spaces en gewone apps op volledig scherm; uitklappen neemt nooit de focus.' },
       intel: { question: 'Kan ik zisla op een Intel-Mac gebruiken?', answer: 'Er kan een Intel-build bestaan, maar compatibiliteit is niet gegarandeerd. De huidige ondersteunde configuratie is Apple Silicon.' },
       storage: { question: 'Waar slaat zisla gegevens op?', answer: 'Lokale gegevens staan in ~/Library/Application Support/zisla/. Typestatistieken staan apart in ~/Library/Application Support/zisla/typing-stats.sqlite3. Snelle notities gebruikt de systeemapp Notities.' },

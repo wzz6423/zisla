@@ -7,6 +7,198 @@ import Testing
 @MainActor
 @Suite(.serialized)
 struct AIChatClientTests {
+    @Test(arguments: AIEndpointKind.allCases)
+    func localInferenceAllowsColdLoadingWithoutRequiringAKey(kind: AIEndpointKind) async throws {
+        StubURLProtocol.reset()
+        let configuration = URLSessionConfiguration.ephemeral
+        configuration.protocolClasses = [StubURLProtocol.self]
+        let client = AIChatClient(session: URLSession(configuration: configuration))
+        _ = try await client.complete(
+            endpoint: AIEndpoint(name: kind.defaultEndpointName, baseURL: kind.defaultBaseURL, kind: kind),
+            model: "qwen3.5:4b", systemPrompt: "", messages: [], localInference: true
+        )
+        let request = try #require(StubURLProtocol.lastRequest)
+        #expect(request.timeoutInterval == 120)
+        #expect(request.value(forHTTPHeaderField: "Authorization") == nil)
+        #expect(request.url?.absoluteString == "\(kind.defaultBaseURL)/chat/completions")
+        let body = try #require(requestBody(request))
+        let json = try #require(try JSONSerialization.jsonObject(with: body) as? [String: Any])
+        #expect(json["reasoning_effort"] as? String == "none")
+        #expect(json["temperature"] as? Double == 0)
+    }
+
+    @Test(arguments: ["", " \n", "gpt-oss:20b", "qwen3:8b", "qwen/qwen3.5-9b", "QWEN/QWEN3.5-9B", "custom-model", "qwen3.5-custom:4b", "gemma3:4b", "gemma4-custom:4b", "google/gemma-3-4b"], AIEndpointKind.allCases)
+    func localThinkingPreferenceAppliesWithoutModelNameFiltering(model: String, kind: AIEndpointKind) async throws {
+        let endpoint = AIEndpoint(name: kind.defaultEndpointName, baseURL: kind.defaultBaseURL, kind: kind)
+        for thinkingEnabled in [false, true] {
+            StubURLProtocol.reset()
+            let configuration = URLSessionConfiguration.ephemeral
+            configuration.protocolClasses = [StubURLProtocol.self]
+            let client = AIChatClient(session: URLSession(configuration: configuration))
+            _ = try await client.complete(endpoint: endpoint, model: model, systemPrompt: "", messages: [], localInference: true, localThinkingEnabled: thinkingEnabled)
+            let request = try #require(StubURLProtocol.lastRequest)
+            let body = try #require(requestBody(request))
+            let json = try #require(try JSONSerialization.jsonObject(with: body) as? [String: Any])
+            #expect(json["reasoning_effort"] as? String == (thinkingEnabled ? "medium" : "none"))
+        }
+    }
+
+    @Test(arguments: [
+        (AIEndpointKind.ollama, "gemma4:e2b-it-qat"),
+        (.ollama, "gemma4:26b-a4b-it-qat"),
+        (.ollama, "GEMMA4:E4B"),
+        (.openAICompatible, "google/gemma-4-26b-a4b-qat"),
+        (.openAICompatible, "google/gemma-4-e4b"),
+        (.openAICompatible, "GOOGLE/GEMMA-4-E2B"),
+    ])
+    func gemmaModelsUseNonThinkingCleanupByDefault(kind: AIEndpointKind, model: String) async throws {
+        StubURLProtocol.reset()
+        let configuration = URLSessionConfiguration.ephemeral
+        configuration.protocolClasses = [StubURLProtocol.self]
+        let client = AIChatClient(session: URLSession(configuration: configuration))
+        _ = try await client.complete(
+            endpoint: AIEndpoint(name: kind.defaultEndpointName, baseURL: kind.defaultBaseURL, kind: kind),
+            model: model, systemPrompt: "", messages: [], localInference: true
+        )
+        let request = try #require(StubURLProtocol.lastRequest)
+        let body = try #require(requestBody(request))
+        let json = try #require(try JSONSerialization.jsonObject(with: body) as? [String: Any])
+        #expect(json["reasoning_effort"] as? String == "none")
+        #expect(json["temperature"] as? Double == 0)
+    }
+
+    @Test(arguments: [
+        (AIEndpointKind.ollama, "qwen3.5:4b"),
+        (.ollama, "gemma4:e2b-it-qat"),
+        (.ollama, "gemma4:26b-a4b-it-qat"),
+        (.ollama, "GEMMA4:E4B"),
+        (.openAICompatible, "google/gemma-4-26b-a4b-qat"),
+        (.openAICompatible, "google/gemma-4-e4b"),
+        (.openAICompatible, "GOOGLE/GEMMA-4-E2B"),
+        (.openAICompatible, "qwen/qwen3.5-9b"),
+        (.openAICompatible, "custom-model"),
+        (.ollama, "custom-model"),
+    ], [false, true])
+    func localThinkingPreferencePreservesConfiguredEffort(configuration: (AIEndpointKind, String), thinkingEnabled: Bool) async throws {
+        let (kind, model) = configuration
+        let endpoint = AIEndpoint(name: kind.defaultEndpointName, baseURL: kind.defaultBaseURL, kind: kind)
+        let efforts: [AgentModelEffort?] = [nil, .high]
+        for effort in efforts {
+            StubURLProtocol.reset()
+            let configuration = URLSessionConfiguration.ephemeral
+            configuration.protocolClasses = [StubURLProtocol.self]
+            let client = AIChatClient(session: URLSession(configuration: configuration))
+            _ = try await client.complete(
+                endpoint: endpoint, model: model, systemPrompt: "", messages: [],
+                effort: effort, localInference: true, localThinkingEnabled: thinkingEnabled
+            )
+            let request = try #require(StubURLProtocol.lastRequest)
+            let body = try #require(requestBody(request))
+            let json = try #require(try JSONSerialization.jsonObject(with: body) as? [String: Any])
+            let expectedEffort = thinkingEnabled ? (effort ?? .medium).rawValue : "none"
+            #expect(json["reasoning_effort"] as? String == expectedEffort)
+            #expect(json["temperature"] as? Double == 0)
+            #expect(request.timeoutInterval == 120)
+        }
+    }
+
+    @Test(arguments: [false, true])
+    func remoteGemmaKeepsConfiguredSamplingAndEffort(thinkingEnabled: Bool) async throws {
+        StubURLProtocol.reset()
+        let configuration = URLSessionConfiguration.ephemeral
+        configuration.protocolClasses = [StubURLProtocol.self]
+        let client = AIChatClient(session: URLSession(configuration: configuration))
+        _ = try await client.complete(
+            endpoint: AIEndpoint(name: "Remote", baseURL: "https://voice.example/v1"),
+            model: "google/gemma-4-26b-a4b-qat", systemPrompt: "", messages: [], effort: .high,
+            localThinkingEnabled: thinkingEnabled
+        )
+        let request = try #require(StubURLProtocol.lastRequest)
+        let body = try #require(requestBody(request))
+        let json = try #require(try JSONSerialization.jsonObject(with: body) as? [String: Any])
+        #expect(json["reasoning_effort"] as? String == "high")
+        #expect(json["temperature"] == nil)
+        #expect(request.timeoutInterval == 30)
+    }
+
+    @Test(arguments: [AgentChannelProtocol.anthropicMessages, .geminiGenerateContent], [false, true])
+    func localCleanupControlsStayWithinTheOpenAIProtocol(protocolKind: AgentChannelProtocol, thinkingEnabled: Bool) async throws {
+        StubURLProtocol.reset()
+        StubURLProtocol.nextResponseBody = #"{"content":[{"text":"Final text"}],"candidates":[{"content":{"parts":[{"text":"Final text"}]}}]}"#
+        let configuration = URLSessionConfiguration.ephemeral
+        configuration.protocolClasses = [StubURLProtocol.self]
+        let client = AIChatClient(session: URLSession(configuration: configuration))
+        let response = try await client.complete(
+            endpoint: AIEndpoint(name: "Local", baseURL: "http://127.0.0.1:1234"),
+            protocolKind: protocolKind,
+            model: "google/gemma-4-e4b", systemPrompt: "", messages: [], effort: .high,
+            localInference: true, localThinkingEnabled: thinkingEnabled
+        )
+        #expect(response.content == "Final text")
+        let request = try #require(StubURLProtocol.lastRequest)
+        let body = try #require(requestBody(request))
+        let json = try #require(try JSONSerialization.jsonObject(with: body) as? [String: Any])
+        #expect(json["reasoning_effort"] == nil)
+        #expect(json["temperature"] == nil)
+        if protocolKind == .anthropicMessages {
+            #expect((json["output_config"] as? [String: String])?["effort"] == "high")
+        }
+    }
+
+    @Test(arguments: [false, true])
+    func authenticatedLMStudioUsesBearerKeyAndOnlyReturnsFinalContent(thinkingEnabled: Bool) async throws {
+        StubURLProtocol.reset()
+        StubURLProtocol.nextResponseBody = #"{"choices":[{"message":{"reasoning_content":"private reasoning","content":"Final text"}}]}"#
+        let configuration = URLSessionConfiguration.ephemeral
+        configuration.protocolClasses = [StubURLProtocol.self]
+        let client = AIChatClient(session: URLSession(configuration: configuration))
+        let response = try await client.complete(endpoint: AIEndpoint(name: "LM Studio", baseURL: AIEndpointKind.openAICompatible.defaultBaseURL), model: "google/gemma-4-e4b", systemPrompt: "", messages: [], apiKey: " lm-test-key ", localInference: true, localThinkingEnabled: thinkingEnabled)
+        #expect(response.content == "Final text")
+        #expect(StubURLProtocol.lastRequest?.value(forHTTPHeaderField: "Authorization") == "Bearer lm-test-key")
+    }
+
+    @Test(arguments: ["<think>private reasoning</think>Final text", "private reasoning</think>Final text", "<THINK>private reasoning</THINK>"], [false, true])
+    func localInferenceRejectsUnseparatedThinkingInsteadOfDeliveringIt(content: String, thinkingEnabled: Bool) async throws {
+        StubURLProtocol.reset()
+        let body = try JSONSerialization.data(withJSONObject: ["choices": [["message": ["content": content]]]])
+        StubURLProtocol.nextResponseBody = String(decoding: body, as: UTF8.self)
+        let configuration = URLSessionConfiguration.ephemeral
+        configuration.protocolClasses = [StubURLProtocol.self]
+        let client = AIChatClient(session: URLSession(configuration: configuration))
+        await #expect(throws: AIChatClientError.invalidResponse) {
+            try await client.complete(endpoint: AIEndpoint(name: "LM Studio", baseURL: AIEndpointKind.openAICompatible.defaultBaseURL), model: "local-model", systemPrompt: "", messages: [], localInference: true, localThinkingEnabled: thinkingEnabled)
+        }
+    }
+
+    @Test(arguments: [400, 503])
+    func failedThinkingRequestsDoNotChangeTheNextRequestPreference(statusCode: Int) async throws {
+        StubURLProtocol.reset()
+        StubURLProtocol.statusCode = statusCode
+        let configuration = URLSessionConfiguration.ephemeral
+        configuration.protocolClasses = [StubURLProtocol.self]
+        let session = URLSession(configuration: configuration)
+        defer { session.invalidateAndCancel() }
+        let client = AIChatClient(session: session)
+        let endpoint = AIEndpoint(name: "LM Studio", baseURL: AIEndpointKind.openAICompatible.defaultBaseURL)
+        await #expect(throws: AIChatClientError.http(statusCode: statusCode)) {
+            try await client.complete(
+                endpoint: endpoint, model: "google/gemma-4-e4b", systemPrompt: "", messages: [],
+                localInference: true, localThinkingEnabled: true
+            )
+        }
+
+        StubURLProtocol.reset()
+        let response = try await client.complete(
+            endpoint: endpoint, model: "google/gemma-4-e4b", systemPrompt: "", messages: [],
+            localInference: true, localThinkingEnabled: false
+        )
+        #expect(response.content == "明天十点开会。")
+        let request = try #require(StubURLProtocol.lastRequest)
+        let body = try #require(requestBody(request))
+        let json = try #require(try JSONSerialization.jsonObject(with: body) as? [String: Any])
+        #expect(json["reasoning_effort"] as? String == "none")
+    }
+
     @Test
     func sendsConfiguredAuthorizationAndDualTranscriptMessages() async throws {
         StubURLProtocol.reset()
@@ -22,7 +214,9 @@ struct AIChatClientTests {
             systemPrompt: VoiceTranscriptPostProcessor.systemPrompt,
             messages: VoiceTranscriptPostProcessor.messages(
                 for: "get up 的 SSH key",
-                lexiconNormalizedTranscript: "GitHub 的 SSH key"
+                lexiconNormalizedTranscript: "GitHub 的 SSH key",
+                enabledLexicons: [.computerTerms],
+                customHotwords: ["AcmeVoice"]
             ),
             apiKey: " test-key "
         )
@@ -30,6 +224,7 @@ struct AIChatClientTests {
         #expect(response.content == "明天十点开会。")
         let request = try #require(StubURLProtocol.lastRequest)
         #expect(request.url?.absoluteString == "https://voice.example/v1/chat/completions")
+        #expect(request.timeoutInterval == 30)
         #expect(request.value(forHTTPHeaderField: "Authorization") == "Bearer test-key")
 
         let body = try #require(requestBody(request))
@@ -38,7 +233,12 @@ struct AIChatClientTests {
         let messages = try #require(json["messages"] as? [[String: String]])
         #expect(messages.count == 2)
         #expect(messages[0]["role"] == "system")
-        #expect(messages[1]["content"] == "<raw_transcript>\nget up 的 SSH key\n</raw_transcript>\n<lexicon_transcript>\nGitHub 的 SSH key\n</lexicon_transcript>")
+        let content = try #require(messages[1]["content"]?.data(using: .utf8))
+        let input = try #require(try JSONSerialization.jsonObject(with: content) as? [String: Any])
+        #expect(input["raw_transcript"] as? String == "get up 的 SSH key")
+        #expect(input["lexicon_transcript"] as? String == "GitHub 的 SSH key")
+        #expect((input["reference_vocabulary"] as? [String])?.contains("GitHub") == true)
+        #expect(input["custom_vocabulary"] as? [String] == ["AcmeVoice"])
     }
 
     @Test

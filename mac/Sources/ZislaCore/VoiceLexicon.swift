@@ -79,6 +79,7 @@ public enum VoiceLexicon: String, Codable, CaseIterable, Identifiable, Sendable,
         switch self {
         case .computerTerms:
             [
+                "Gemma", "Qwen3.5", "Google", "LM Studio", "Ollama",
                 "GitHub", "SSH", "SSH key", "ssh key", "SSH 密钥", "人工智能", "Git", "GitLab",
                 "GitHub Actions", "AI", "AI Agent", "智能体", "Agentic Coding", "Vibe Coding", "MCP", "MCP Server",
                 "Model Context Protocol", "工具调用", "Function Calling", "Tool Calling", "上下文窗口", "上下文工程", "子代理", "subagent",
@@ -91,7 +92,7 @@ public enum VoiceLexicon: String, Codable, CaseIterable, Identifiable, Sendable,
                 "全栈", "接口", "仓库", "分支", "提交", "合并请求", "持续集成", "macOS", "iOS", "Xcode", "AppKit",
                 "Foundation", "Yarn", "Volta", "fnm", "nvm", "asdf", "Cursor", "Windsurf", "Cline", "Roo Code", "Aider", "Continue", "VS Code", "Visual Studio Code", "Zed",
                 "开源", "开源项目", "开源软件", "开源代码", "开源社区", "开源模型", "开源大模型", "开源协议", "开源框架", "开源仓库", "开源工具", "开源生态", "开源许可证", "开放源代码"
-            ] + Self.currentAgentEcosystemTerms + Self.supportedAIAgentTerms + Self.supportedAIProviderTerms
+            ] + Self.localInferenceTerms + Self.currentAgentEcosystemTerms + Self.supportedAIAgentTerms + Self.supportedAIProviderTerms
         case .classicalPoetry:
             [
                 "唐诗", "宋词", "古诗", "古文", "李白", "杜甫", "白居易", "王维", "孟浩然", "苏轼", "李清照",
@@ -132,7 +133,7 @@ public enum VoiceLexicon: String, Codable, CaseIterable, Identifiable, Sendable,
                 "OpenAI", "Anthropic", "xAI", "Moonshot AI", "通义千问", "豆包", "Doubao", "TRAE", "Qoder", "Z.ai", "Amazon Q",
                 "DeepSeek-R1", "DeepSeek-V3", "Kimi", "Kimi K2", "腾讯元宝", "元宝", "Qwen", "文心一言", "文小言", "智谱清言",
                 "讯飞星火", "夸克", "秘塔AI", "可灵AI", "即梦AI", "Suno", "Perplexity", "Midjourney", "Grok", "GitHub Copilot",
-                "小米汽车", "小米SU7", "问界", "鸿蒙智行", "极氪", "零跑"
+                "小米汽车", "小米SU7", "问界", "鸿蒙智行", "极氪", "零跑", "Google", "Gemma", "LM Studio", "Ollama"
             ]
         case .medicineAndHealth:
             [
@@ -213,6 +214,11 @@ public enum VoiceLexicon: String, Codable, CaseIterable, Identifiable, Sendable,
             ]
         }
     }
+
+    private static let localInferenceTerms: [String] = [
+        "llama.cpp", "MLX", "MLX LM", "GGUF", "QAT", "KV cache", "LoRA", "vLLM", "SGLang",
+        "Hugging Face", "safetensors", "CUDA", "Metal", "量化", "混合专家", "MoE", "推测解码"
+    ]
 
     private static let currentAgentEcosystemTerms: [String] = [
         "Amazon Q Developer", "Amazon Q Developer CLI", "OpenHands", "Goose", "Browser Use", "LangGraph", "AutoGen", "CrewAI",
@@ -302,14 +308,54 @@ public enum VoiceLexicon: String, Codable, CaseIterable, Identifiable, Sendable,
         .filter { seen.insert($0).inserted }
     }
 
-    /// Return the complete terms from all enabled lexicons; the app layer does not quota, sort, or weight terms by lexicon or term order.
+    /// Apple recommends at most 100 short phrases. Personal words precede a round-robin selection of enabled lexicons.
     public static func contextualTerms(
         for enabled: Set<Self>,
         customTerms: [String] = []
     ) -> [String] {
-        let builtInTerms = terms(for: enabled)
-        var seen = Set(builtInTerms)
-        return builtInTerms + normalizedCustomTerms(customTerms).filter { seen.insert($0).inserted }
+        var seen = Set<String>()
+        var result = normalizedCustomTerms(customTerms)
+            .filter { isShortHint($0) && seen.insert($0.lowercased()).inserted }
+            .prefix(100).map { $0 }
+        let lexicons = allCases.filter { enabled.contains($0) }.map(\.terms)
+        for offset in 0..<(lexicons.map(\.count).max() ?? 0) {
+            for lexicon in lexicons where offset < lexicon.count {
+                guard result.count < 100 else { return result }
+                let term = lexicon[offset]
+                if isShortHint(term), seen.insert(term.lowercased()).inserted {
+                    result.append(term)
+                }
+            }
+        }
+        return result
+    }
+
+    /// Select vocabulary for this utterance without sending unrelated built-in dictionaries to a small cleanup model.
+    public static func postProcessingTerms(
+        in transcript: String,
+        for enabled: Set<Self>,
+        customTerms: [String] = []
+    ) -> [String] {
+        let custom = normalizedCustomTerms(customTerms).filter(isShortHint)
+        let normalized = normalizeTranscript(transcript, for: enabled, customTerms: custom)
+        func isMentioned(_ term: String) -> Bool {
+            normalized.range(of: normalizationPattern(for: term), options: [.regularExpression, .caseInsensitive]) != nil
+        }
+        let matchingCustom = custom.filter(isMentioned)
+        let matchingBuiltIn = terms(for: enabled).filter(isMentioned)
+        let remainingCustom = custom.filter { !isMentioned($0) }.prefix(16)
+        var seen = Set<String>()
+        var characterCount = 0
+        return (matchingCustom + matchingBuiltIn + remainingCustom).filter { term in
+            guard isShortHint(term), seen.insert(compactMatchingKey(for: term)).inserted,
+                  characterCount + term.unicodeScalars.count <= 1_024 else { return false }
+            characterCount += term.unicodeScalars.count
+            return true
+        }.prefix(48).map { $0 }
+    }
+
+    private static func isShortHint(_ term: String) -> Bool {
+        !term.isEmpty && term.unicodeScalars.count <= 80 && !term.unicodeScalars.contains { CharacterSet.controlCharacters.contains($0) }
     }
 
     /// Normalize term variants already emitted by ASR to the canonical spelling from enabled lexicons.
@@ -321,32 +367,72 @@ public enum VoiceLexicon: String, Codable, CaseIterable, Identifiable, Sendable,
         customTerms: [String] = [],
         contextualTranscript: String? = nil
     ) -> String {
-        let enabledTerms = contextualTerms(for: enabled, customTerms: customTerms)
+        let custom = normalizedCustomTerms(customTerms)
+        let enabledTerms = custom + terms(for: enabled)
         guard !transcript.isEmpty, !enabledTerms.isEmpty else { return transcript }
 
-        var normalized = transcript
-        for candidate in normalizationCandidates(for: enabledTerms) {
+        let normalized = normalizeSpelling(transcript, terms: enabledTerms)
+        let contextual = normalizeContextualComputerAliases(
+            normalized,
+            enabled: enabled,
+            contextualTranscript: contextualTranscript
+        )
+        return normalizeSpelling(contextual, terms: custom)
+    }
+
+    public static func literalTextCounts(in transcript: String) -> [Data: Int] {
+        let source = transcript as NSString
+        var counts: [Data: Int] = [:]
+        for range in literalRanges(in: transcript).rangeView {
+            let literal = source.substring(with: NSRange(location: range.lowerBound, length: range.count))
+            // Byte keys preserve the exact Unicode spelling, not just canonically equivalent text.
+            counts[Data(literal.utf8), default: 0] += 1
+        }
+        return counts
+    }
+
+    private static func normalizeSpelling(_ transcript: String, terms: [String]) -> String {
+        let source = transcript as NSString
+        var replacements: [(range: NSRange, term: String)] = []
+        var occupied = literalRanges(in: transcript)
+        for candidate in normalizationCandidates(for: terms) {
             guard let expression = try? NSRegularExpression(
                 pattern: candidate.pattern,
                 options: [.caseInsensitive]
             ) else { continue }
 
             let matches = expression.matches(
-                in: normalized,
-                range: NSRange(location: 0, length: (normalized as NSString).length)
+                in: transcript,
+                range: NSRange(location: 0, length: source.length)
             )
-            for match in matches.reversed() {
-                normalized = (normalized as NSString).replacingCharacters(
-                    in: match.range,
-                    with: candidate.term
-                )
+            for match in matches {
+                let range = match.range.location..<NSMaxRange(match.range)
+                guard !occupied.intersects(integersIn: range) else { continue }
+                occupied.insert(integersIn: range)
+                replacements.append((match.range, candidate.term))
             }
         }
-        return normalizeContextualComputerAliases(
-            normalized,
-            enabled: enabled,
-            contextualTranscript: contextualTranscript
+        var normalized = transcript
+        // Match the original text once so a shorter built-in term cannot rewrite a personal phrase.
+        for replacement in replacements.sorted(by: { $0.range.location > $1.range.location }) {
+            normalized = (normalized as NSString).replacingCharacters(in: replacement.range, with: replacement.term)
+        }
+        return normalized
+    }
+
+    private static func literalRanges(in transcript: String) -> IndexSet {
+        let range = NSRange(location: 0, length: (transcript as NSString).length)
+        let links = try! NSDataDetector(types: NSTextCheckingResult.CheckingType.link.rawValue)
+        let paths = try! NSRegularExpression(
+            pattern: #"(?<![A-Za-z0-9])(?:~?/|\.\.?/|[\p{L}\p{N}_.-]+/)[^\s<>\"'，。！？、；（）【】]+|(?<![A-Za-z0-9_])[\p{L}\p{N}_-]+(?:\.[A-Za-z][A-Za-z0-9_-]*)+"#
         )
+        let aliases = githubAliasRanges(in: transcript)
+        var result = IndexSet()
+        for match in links.matches(in: transcript, range: range) + paths.matches(in: transcript, range: range)
+            where !aliases.contains(match.range) {
+            result.insert(integersIn: match.range.location..<NSMaxRange(match.range))
+        }
+        return result
     }
 
     private struct NormalizationCandidate {
@@ -419,6 +505,13 @@ public enum VoiceLexicon: String, Codable, CaseIterable, Identifiable, Sendable,
                 pieces.append(#"[\s\p{P}\p{S}]*"#)
             }
             if isTermSeparator(scalar) {
+                if index > 0, index + 1 < scalars.count,
+                   scalars[index - 1].properties.numericType != nil,
+                   scalars[index + 1].properties.numericType != nil {
+                    pieces.append(NSRegularExpression.escapedPattern(for: String(scalar)))
+                    index += 1
+                    continue
+                }
                 while index < scalars.count, isTermSeparator(scalars[index]) {
                     index += 1
                 }
@@ -454,10 +547,12 @@ public enum VoiceLexicon: String, Codable, CaseIterable, Identifiable, Sendable,
 
         // Ordinary "get up" must remain unchanged without lexicon context, so term correction does not alter everyday speech.
         let matches = githubAliasRanges(in: transcript)
+        let literals = literalRanges(in: transcript)
         var normalized = transcript
         let contextualMatches = contextualTranscript.map(githubAliasRanges(in:)) ?? []
         for index in matches.indices.reversed() {
             let match = matches[index]
+            guard !literals.intersects(integersIn: match.location..<NSMaxRange(match)) else { continue }
             let current = normalized as NSString
             let localContext = hasComputerLexiconContext(in: current, excluding: match)
             let originalContext: Bool
@@ -526,14 +621,57 @@ public enum VoiceLexicon: String, Codable, CaseIterable, Identifiable, Sendable,
         enabled: Set<Self>,
         contextualTranscript: String?
     ) -> String {
-        normalizeContextualOpenSourceAlias(
-            normalizeContextualGitHubAlias(
-                transcript,
-                enabled: enabled,
-                contextualTranscript: contextualTranscript
+        normalizeContextualModelAliases(
+            normalizeContextualOpenSourceAlias(
+                normalizeContextualGitHubAlias(
+                    transcript,
+                    enabled: enabled,
+                    contextualTranscript: contextualTranscript
+                ),
+                enabled: enabled
             ),
             enabled: enabled
         )
+    }
+
+    private static func normalizeContextualModelAliases(_ transcript: String, enabled: Set<Self>) -> String {
+        guard enabled.contains(.computerTerms) || enabled.contains(.brandsAndProducts) else { return transcript }
+        let expression = try! NSRegularExpression(pattern: #"(?<![A-Za-z0-9])Q运(?=\s*[0-9])|伽马"#, options: [.caseInsensitive])
+        let source = transcript as NSString
+        let literals = literalRanges(in: transcript)
+        var normalized = transcript
+        for match in expression.matches(in: transcript, range: NSRange(location: 0, length: source.length)).reversed() {
+            guard !literals.intersects(integersIn: match.range.location..<NSMaxRange(match.range)) else { continue }
+            let sentence = sentenceRange(containing: match.range, in: source)
+            let before = source.substring(with: NSRange(location: sentence.location, length: match.range.location - sentence.location))
+            let after = source.substring(with: NSRange(location: NSMaxRange(match.range), length: NSMaxRange(sentence) - NSMaxRange(match.range)))
+            let replacement: String
+            if source.substring(with: match.range) == "伽马" {
+                // Gamma is also a scientific term; only a vendor-qualified model name is unambiguous.
+                guard before.range(of: #"(?<![A-Za-z0-9])(?:Google|谷歌)\s*的?\s*$"#, options: [.regularExpression, .caseInsensitive]) != nil,
+                      after.range(of: #"^\s*(?:[0-9一二三四五六七八九十]+(?:\.[0-9]+)?)?\s*(?:系列|模型)"#, options: .regularExpression) != nil else { continue }
+                replacement = "Gemma"
+            } else {
+                let followsModelLabel = before.range(
+                    of: #"(?:模型|LLM)\s*(?:是|为|选用|换成)?\s*$"#,
+                    options: [.regularExpression, .caseInsensitive]
+                ) != nil
+                let switchesModel = before.range(
+                    of: #"(?:模型|LLM)\s*(?:从|由)\s*$"#, options: [.regularExpression, .caseInsensitive]
+                ) != nil && after.range(
+                    of: #"^\s*[0-9]+(?:\.[0-9]+)*(?:-[A-Za-z0-9]+)?\s*(?:改成|换成|改为|切换到)"#,
+                    options: .regularExpression
+                ) != nil
+                let precedesModelLabel = after.range(
+                    of: #"^\s*[0-9]+(?:\.[0-9]+)*(?:-[A-Za-z0-9]+)?\s*(?:系列|模型)"#,
+                    options: .regularExpression
+                ) != nil
+                guard followsModelLabel || switchesModel || precedesModelLabel else { continue }
+                replacement = "Qwen"
+            }
+            normalized = (normalized as NSString).replacingCharacters(in: match.range, with: replacement)
+        }
+        return normalized
     }
 
     private static func normalizeContextualOpenSourceAlias(
@@ -553,7 +691,9 @@ public enum VoiceLexicon: String, Codable, CaseIterable, Identifiable, Sendable,
             searchLocation = NSMaxRange(match)
         }
         var normalized = transcript
+        let literals = literalRanges(in: transcript)
         for match in matches.reversed() {
+            guard !literals.intersects(integersIn: match.location..<NSMaxRange(match)) else { continue }
             let current = normalized as NSString
             guard hasOpenSourceLexiconContext(in: current, excluding: match) else { continue }
             normalized = current.replacingCharacters(in: match, with: "开源")
@@ -623,19 +763,25 @@ public enum VoiceLexicon: String, Codable, CaseIterable, Identifiable, Sendable,
 
     private static func sentenceRange(containing range: NSRange, in transcript: NSString) -> NSRange {
         var start = range.location
-        while start > 0, !isSentenceBoundary(transcript.character(at: start - 1)) {
+        while start > 0, !isSentenceBoundary(at: start - 1, in: transcript) {
             start -= 1
         }
 
         var end = NSMaxRange(range)
-        while end < transcript.length, !isSentenceBoundary(transcript.character(at: end)) {
+        while end < transcript.length, !isSentenceBoundary(at: end, in: transcript) {
             end += 1
         }
         return NSRange(location: start, length: end - start)
     }
 
-    private static func isSentenceBoundary(_ scalar: unichar) -> Bool {
-        switch scalar {
+    private static func isSentenceBoundary(at index: Int, in transcript: NSString) -> Bool {
+        let scalar = transcript.character(at: index)
+        if scalar == 46, index > 0, index + 1 < transcript.length,
+           (48...57).contains(transcript.character(at: index - 1)),
+           (48...57).contains(transcript.character(at: index + 1)) {
+            return false
+        }
+        return switch scalar {
         case 10, 13, 33, 46, 63, 59, 12290, 65281, 65307, 65311:
             true
         default:
@@ -674,7 +820,8 @@ public enum VoiceLexicon: String, Codable, CaseIterable, Identifiable, Sendable,
             if offset > 0 {
                 let previous = scalars[offset - 1].value
                 let current = scalar.value
-                if isAcronym || (65...90).contains(current) && (97...122).contains(previous) {
+                let separatesDigits = (48...57).contains(previous) && (48...57).contains(current)
+                if !separatesDigits && (isAcronym || (65...90).contains(current) && (97...122).contains(previous)) {
                     result += #"[\s\p{P}\p{S}]*"#
                 }
             }

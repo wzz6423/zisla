@@ -180,7 +180,7 @@ export const en: SiteContent = {
       voice: {
         title: 'Voice input and cleanup',
         description:
-          'Toggle with a key or hold to talk, using the system speech recogniser. Add domain vocabularies, custom hot words, structured formatting, or cleanup by a local or remote model as needed.',
+          'Toggle with a key or hold to talk using system speech recognition, with domain vocabularies and custom hot words. Optionally use Ollama, LM Studio or a remote model to correct the transcript while preserving your meaning, and format explicitly listed items.',
         detail: 'Two recording modes · Vocabularies and hot words · Optional model cleanup',
       },
       media: {
@@ -358,10 +358,22 @@ export const en: SiteContent = {
       <p>You can turn a feature off in the app's settings, or revoke a permission at any time in System Settings → Privacy &amp; Security. Revoking one permission only disables the related feature and leaves other modules untouched. Item names differ slightly between macOS versions.</p>
     `.trim(),
       },
+      localVoice: {
+        question: 'How do I use a local model for voice cleanup?',
+        answer: `
+      <p>Ollama, LM Studio and other OpenAI-compatible local services are supported.</p>
+      <ol>
+        <li>Download or load the model you want in your local model app, then start its service.</li>
+        <li>Open Settings → Voice → Local Models, add and enable a configuration, choose Ollama or LM Studio, and enter the service URL. For another OpenAI-compatible service, also choose LM Studio. Leave API Key empty unless the service requires authentication.</li>
+        <li>Select an automatically discovered model, then choose that configuration under Voice Organization Model → Use Model.</li>
+      </ol>
+      <p>zisla suggests a Gemma 4 QAT model based on your chip and total RAM. It does not automatically download or load the recommended model.</p>
+    `.trim(),
+      },
       network: {
         question: 'Does zisla go online?',
         answer:
-          'Weather, signed update checks, downloads you start and the optional remote voice cleanup use the network on demand. Clipboard link detection runs entirely on your Mac and never starts a download on its own.',
+          'Weather, signed update checks, downloads you start and the optional remote voice cleanup use the network on demand. Clipboard link detection runs entirely on your Mac and never starts a download on its own. A local model handles the text cleanup after transcription; Apple speech recognition may still use the network, depending on the language and system support.',
       },
       multiDisplay: {
         question: 'Does zisla support multiple displays?',

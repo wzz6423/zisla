@@ -208,7 +208,7 @@ export const fr: SiteContent = {
       voice: {
         title: 'Dictée et mise en forme',
         description:
-          'Basculez avec une touche ou maintenez-la pour parler, avec la reconnaissance vocale du système. Ajoutez au besoin des vocabulaires spécialisés, des mots-clés personnalisés, un format structuré ou une mise en forme par modèle local ou distant.',
+          'Basculez avec une touche ou maintenez-la pour parler, avec la reconnaissance vocale du système, des vocabulaires spécialisés et des mots-clés personnalisés. Utilisez au besoin Ollama, LM Studio ou un modèle distant pour corriger la transcription en préservant le sens et mettre en forme les éléments explicitement énumérés.',
         detail: 'Deux modes d’enregistrement · Vocabulaires et mots-clés · Modèle facultatif',
       },
       media: {
@@ -386,10 +386,22 @@ export const fr: SiteContent = {
       <p>Vous pouvez désactiver la fonction dans les réglages de l’app, ou révoquer une autorisation à tout moment dans Réglages Système → Confidentialité et sécurité. Révoquer une autorisation désactive seulement la fonction associée et laisse les autres modules intacts. Le nom des éléments varie légèrement selon la version de macOS.</p>
     `.trim(),
       },
+      localVoice: {
+        question: 'Comment utiliser un modèle local pour corriger une transcription vocale ?',
+        answer: `
+      <p>Ollama, LM Studio et les autres services locaux compatibles avec OpenAI sont pris en charge.</p>
+      <ol>
+        <li>Téléchargez ou chargez le modèle souhaité dans votre application de modèles locaux, puis démarrez son service.</li>
+        <li>Ouvrez Réglages → Voix → Modèles locaux, ajoutez et activez une configuration, choisissez Ollama ou LM Studio, puis saisissez l’URL du service. Pour un autre service compatible avec OpenAI, choisissez également LM Studio. Laissez API Key vide si le service ne demande pas d’authentification.</li>
+        <li>Sélectionnez un modèle détecté automatiquement, puis choisissez cette configuration dans Modèle d'organisation vocale → Utiliser le modèle.</li>
+      </ol>
+      <p>zisla suggère un modèle Gemma 4 QAT selon votre puce et la mémoire vive totale. Le modèle recommandé n’est ni téléchargé ni chargé automatiquement.</p>
+    `.trim(),
+      },
       network: {
         question: 'zisla se connecte-t-il à Internet ?',
         answer:
-          'La météo, la vérification signée des mises à jour, les téléchargements que vous lancez et la mise en forme vocale distante facultative utilisent le réseau au besoin. La détection des liens du presse-papiers se fait entièrement sur votre Mac et ne lance jamais de téléchargement d’elle-même.',
+          'La météo, la vérification signée des mises à jour, les téléchargements que vous lancez et la mise en forme vocale distante facultative utilisent le réseau au besoin. La détection des liens du presse-papiers se fait entièrement sur votre Mac et ne lance jamais de téléchargement d’elle-même. Le modèle local corrige le texte après la transcription ; la reconnaissance vocale Apple peut toujours utiliser le réseau, selon la langue et la prise en charge du système.',
       },
       multiDisplay: {
         question: 'zisla prend-il en charge plusieurs écrans ?',
