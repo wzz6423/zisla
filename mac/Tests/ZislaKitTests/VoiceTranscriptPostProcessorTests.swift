@@ -334,6 +334,187 @@ struct VoiceTranscriptPostProcessorTests {
         ) == "NovaDesk，明天交付。")
     }
 
+    @MainActor
+    @Test
+    func proofreadsGuardedCleanupWithoutRevivingRetractedWords() async throws {
+        let original = "第一到会室，不对，第一到办公室，第二用 NovaDesk"
+        let cleaned = "1、到办公室\n2、用 NovaDesk"
+        let proofread = "1、到办公室。\n2、用 NovaDesk。"
+        var requests: [(String, [AIOutboundMessage])] = []
+        let result = try await VoiceTranscriptPostProcessor.process(
+            rawTranscript: original,
+            lexiconNormalizedTranscript: original,
+            customHotwords: ["NovaDesk"],
+            structuredFormattingEnabled: true,
+            proofreadingEnabled: true
+        ) { prompt, messages in
+            requests.append((prompt, messages))
+            return requests.count == 1 ? cleaned : proofread
+        }
+
+        #expect(result == proofread)
+        #expect(requests.count == 2)
+        let first = try #require(requests.first)
+        let second = try #require(requests.last)
+        #expect(first.0.contains("格式化整理已开启"))
+        #expect(second.0 == VoiceTranscriptPostProcessor.proofreadingPrompt)
+        let secondPayload = try payload(second.1)
+        #expect(secondPayload["raw_transcript"] as? String == cleaned)
+        #expect(secondPayload["lexicon_transcript"] as? String == cleaned)
+        #expect(secondPayload["custom_vocabulary"] as? [String] == ["NovaDesk"])
+        #expect(!second.1[0].content.contains("会室"))
+    }
+
+    @MainActor
+    @Test
+    func disabledProofreadingKeepsOneGuardedRequest() async throws {
+        var requestCount = 0
+        let result = try await VoiceTranscriptPostProcessor.process(
+            rawTranscript: "使用 Gemma 四系列",
+            lexiconNormalizedTranscript: "使用 Gemma 四系列",
+            proofreadingEnabled: false
+        ) { _, _ in
+            requestCount += 1
+            return "使用 Gemma 4 系列"
+        }
+        #expect(result == "使用 Gemma 四系列")
+        #expect(requestCount == 1)
+    }
+
+    @MainActor
+    @Test
+    func proofreadingReceivesSafeFallbackWhenCleanupCorruptsAPath() async throws {
+        let original = "读取 /tmp/报告.txt 明天开会"
+        let expected = "读取 /tmp/报告.txt，明天开会。"
+        var requestCount = 0
+        let result = try await VoiceTranscriptPostProcessor.process(
+            rawTranscript: original,
+            lexiconNormalizedTranscript: original,
+            proofreadingEnabled: true
+        ) { _, messages in
+            requestCount += 1
+            if requestCount == 1 { return "读取 /tmp/备份.txt，明天开会。" }
+            let data = try self.payload(messages)
+            #expect(data["raw_transcript"] as? String == original)
+            #expect(data["lexicon_transcript"] as? String == original)
+            return expected
+        }
+        #expect(result == expected)
+    }
+
+    @MainActor
+    @Test(arguments: [
+        ("使用 Gemma 四系列。", "使用 Gemma 4 系列。"),
+        ("读取 /tmp/报告.txt。", "读取 /tmp/备份.txt。"),
+        ("原话是“明天去，不对，后天去”。", "原话是“后天去”。"),
+        ("用 NovaDesk 完成工作。", "用 Nova Disk 完成工作。"),
+        ("明天开会。", "```\n明天开会。\n```"),
+        ("明天开会。", " \n\t "),
+    ])
+    func unsafeProofreadingPreservesTheCompletedCleanup(_ cleaned: String, _ proofread: String) async throws {
+        var requestCount = 0
+        let result = try await VoiceTranscriptPostProcessor.process(
+            rawTranscript: cleaned,
+            lexiconNormalizedTranscript: cleaned,
+            customHotwords: ["NovaDesk"],
+            proofreadingEnabled: true
+        ) { _, _ in
+            requestCount += 1
+            return requestCount == 1 ? cleaned : proofread
+        }
+        #expect(result == cleaned)
+        #expect(requestCount == 2)
+    }
+
+    @MainActor
+    @Test
+    func cleanupFailurePropagatesWithoutAProofreadingRequest() async {
+        var requestCount = 0
+        do {
+            _ = try await VoiceTranscriptPostProcessor.process(
+                rawTranscript: "明天开会",
+                lexiconNormalizedTranscript: "明天开会",
+                proofreadingEnabled: true
+            ) { _, _ in
+                requestCount += 1
+                throw AIChatClientError.http(statusCode: 503)
+            }
+            Issue.record("The first request failure must remain visible to the delivery caller")
+        } catch {
+            #expect(error as? AIChatClientError == .http(statusCode: 503))
+        }
+        #expect(requestCount == 1)
+    }
+
+    @MainActor
+    @Test(arguments: [URLError.timedOut, .cannotConnectToHost, .badServerResponse])
+    func proofreadingFailureRetainsSuccessfulCleanup(_ code: URLError.Code) async throws {
+        var requestCount = 0
+        let result = try await VoiceTranscriptPostProcessor.process(
+            rawTranscript: "明天不对后天开会",
+            lexiconNormalizedTranscript: "明天不对后天开会",
+            proofreadingEnabled: true
+        ) { _, _ in
+            requestCount += 1
+            if requestCount == 1 { return "后天开会。" }
+            throw URLError(code)
+        }
+        #expect(result == "后天开会。")
+        #expect(requestCount == 2)
+    }
+
+    @MainActor
+    @Test(arguments: [0, 1, 2])
+    func taskCancellationPreventsFurtherRequestsAndDelivery(_ completedRequests: Int) async {
+        var requestCount = 0
+        let operation = Task { @MainActor in
+            if completedRequests == 0 { withUnsafeCurrentTask { $0?.cancel() } }
+            return try await VoiceTranscriptPostProcessor.process(
+                rawTranscript: "明天开会",
+                lexiconNormalizedTranscript: "明天开会",
+                proofreadingEnabled: true
+            ) { _, _ in
+                requestCount += 1
+                if requestCount == completedRequests { withUnsafeCurrentTask { $0?.cancel() } }
+                return "明天开会。"
+            }
+        }
+        do {
+            _ = try await operation.value
+            Issue.record("Cancellation must not deliver either stage's text")
+        } catch {
+            #expect(error is CancellationError)
+        }
+        #expect(requestCount == completedRequests)
+    }
+
+    @MainActor
+    @Test(arguments: [false, true])
+    func proofreadingCancellationIsNotTreatedAsARecoverableFailure(_ errorAfterCancellation: Bool) async {
+        let operation = Task { @MainActor in
+            var requestCount = 0
+            return try await VoiceTranscriptPostProcessor.process(
+                rawTranscript: "明天开会",
+                lexiconNormalizedTranscript: "明天开会",
+                proofreadingEnabled: true
+            ) { _, _ in
+                requestCount += 1
+                if requestCount == 1 { return "明天开会。" }
+                if errorAfterCancellation {
+                    withUnsafeCurrentTask { $0?.cancel() }
+                    throw URLError(.cancelled)
+                }
+                throw CancellationError()
+            }
+        }
+        do {
+            _ = try await operation.value
+            Issue.record("A cancelled proofread must not fall back to a deliverable result")
+        } catch {
+            #expect(error is CancellationError)
+        }
+    }
+
     private func payload(_ messages: [AIOutboundMessage]) throws -> [String: Any] {
         let message = try #require(messages.first)
         return try #require(try JSONSerialization.jsonObject(with: Data(message.content.utf8)) as? [String: Any])

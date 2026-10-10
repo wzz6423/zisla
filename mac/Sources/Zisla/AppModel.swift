@@ -360,6 +360,15 @@ final class AppModel: ObservableObject {
       localThinkingEnabled: Bool
     )
     case cliProfile(accountID: UUID, model: String)
+
+    var requiresVoiceProofreading: Bool {
+      switch self {
+      case let .http(_, _, _, _, _, localInference, localThinkingEnabled):
+        localInference && !localThinkingEnabled
+      case .cliProfile:
+        false
+      }
+    }
   }
 
   static let shared = AppModel()
@@ -3227,27 +3236,19 @@ final class AppModel: ObservableObject {
       guard let self else { return }
       defer { self.endVoiceProcessingIndicator() }
       do {
-        let response = try await self.complete(
-          using: target,
-          systemPrompt: VoiceTranscriptPostProcessor.systemPrompt(
-            enabledLexicons: enabledVoiceLexicons,
-            customHotwords: customVoiceHotwords,
-            structuredFormattingEnabled: structuredFormattingEnabled
-          ),
-          messages: VoiceTranscriptPostProcessor.messages(
-            for: rawTranscript,
-            lexiconNormalizedTranscript: lexiconNormalizedTranscript,
-            enabledLexicons: enabledVoiceLexicons,
-            customHotwords: customVoiceHotwords
-          )
-        )
+        let processed = try await VoiceTranscriptPostProcessor.process(
+          rawTranscript: rawTranscript,
+          lexiconNormalizedTranscript: lexiconNormalizedTranscript,
+          enabledLexicons: enabledVoiceLexicons,
+          customHotwords: customVoiceHotwords,
+          structuredFormattingEnabled: structuredFormattingEnabled,
+          proofreadingEnabled: target.requiresVoiceProofreading
+        ) { systemPrompt, messages in
+          try await self.complete(using: target, systemPrompt: systemPrompt, messages: messages)
+        }
         guard !Task.isCancelled else { return }
         let delivered = VoiceLexicon.normalizeTranscript(
-          VoiceTranscriptPostProcessor.deliveredText(
-            response,
-            fallback: lexiconNormalizedTranscript,
-            customHotwords: customVoiceHotwords
-          ),
+          processed,
           for: enabledVoiceLexicons,
           customTerms: customVoiceHotwords,
           contextualTranscript: rawTranscript

@@ -28,6 +28,7 @@ struct VoiceLocalModelConfigurationTests {
         #expect(effort == nil)
         #expect(localInference)
         #expect(localThinkingEnabled == thinkingEnabled)
+        #expect(target?.requiresVoiceProofreading == !thinkingEnabled)
     }
 
     @Test
@@ -94,9 +95,16 @@ struct VoiceLocalModelConfigurationTests {
         #expect(effort == .medium)
         #expect(!localInference)
         #expect(!localThinkingEnabled)
+        #expect(target?.requiresVoiceProofreading == false)
         channel.defaultModel = ""
         store.upsertChannel(channel)
         #expect(try AppModel.voicePostProcessingTarget(for: .channel(channel.id), store: store, requiresModel: false) == nil)
+    }
+
+    @Test
+    func cliTargetsDoNotRequestAnAdditionalVoiceProofreadingPass() {
+        let target = AppModel.AIProcessingTarget.cliProfile(accountID: UUID(), model: "cli-model")
+        #expect(!target.requiresVoiceProofreading)
     }
 
     private func makeStore(key: String? = nil, failReads: Bool = false) -> (AIAgentStore, URL) {
