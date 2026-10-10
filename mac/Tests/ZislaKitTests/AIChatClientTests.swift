@@ -23,14 +23,13 @@ struct AIChatClientTests {
         #expect(request.url?.absoluteString == "\(kind.defaultBaseURL)/chat/completions")
         let body = try #require(requestBody(request))
         let json = try #require(try JSONSerialization.jsonObject(with: body) as? [String: Any])
-        #expect(json["reasoning_effort"] as? String == (kind == .ollama ? "none" : nil))
+        #expect(json["reasoning_effort"] as? String == "none")
         #expect(json["temperature"] as? Double == 0)
     }
 
-    @Test(arguments: ["", " \n", "gpt-oss:20b", "qwen3:8b", "custom-model", "qwen3.5-custom:4b", "gemma3:4b", "gemma4-custom:4b", "google/gemma-3-4b"], AIEndpointKind.allCases)
-    func localThinkingOverrideDoesNotChangeUnverifiedModels(model: String, kind: AIEndpointKind) async throws {
+    @Test(arguments: ["", " \n", "gpt-oss:20b", "qwen3:8b", "qwen/qwen3.5-9b", "QWEN/QWEN3.5-9B", "custom-model", "qwen3.5-custom:4b", "gemma3:4b", "gemma4-custom:4b", "google/gemma-3-4b"], AIEndpointKind.allCases)
+    func localThinkingPreferenceAppliesWithoutModelNameFiltering(model: String, kind: AIEndpointKind) async throws {
         let endpoint = AIEndpoint(name: kind.defaultEndpointName, baseURL: kind.defaultBaseURL, kind: kind)
-        #expect(!AIChatClient.supportsLocalThinking(endpoint: endpoint, model: model))
         for thinkingEnabled in [false, true] {
             StubURLProtocol.reset()
             let configuration = URLSessionConfiguration.ephemeral
@@ -40,7 +39,7 @@ struct AIChatClientTests {
             let request = try #require(StubURLProtocol.lastRequest)
             let body = try #require(requestBody(request))
             let json = try #require(try JSONSerialization.jsonObject(with: body) as? [String: Any])
-            #expect(json["reasoning_effort"] == nil)
+            #expect(json["reasoning_effort"] as? String == (thinkingEnabled ? "medium" : "none"))
         }
     }
 
@@ -52,7 +51,7 @@ struct AIChatClientTests {
         (.openAICompatible, "google/gemma-4-e4b"),
         (.openAICompatible, "GOOGLE/GEMMA-4-E2B"),
     ])
-    func verifiedGemmaModelsUseNonThinkingCleanup(kind: AIEndpointKind, model: String) async throws {
+    func gemmaModelsUseNonThinkingCleanupByDefault(kind: AIEndpointKind, model: String) async throws {
         StubURLProtocol.reset()
         let configuration = URLSessionConfiguration.ephemeral
         configuration.protocolClasses = [StubURLProtocol.self]
@@ -76,11 +75,13 @@ struct AIChatClientTests {
         (.openAICompatible, "google/gemma-4-26b-a4b-qat"),
         (.openAICompatible, "google/gemma-4-e4b"),
         (.openAICompatible, "GOOGLE/GEMMA-4-E2B"),
+        (.openAICompatible, "qwen/qwen3.5-9b"),
+        (.openAICompatible, "custom-model"),
+        (.ollama, "custom-model"),
     ], [false, true])
-    func localThinkingPreferenceControlsVerifiedModels(configuration: (AIEndpointKind, String), thinkingEnabled: Bool) async throws {
+    func localThinkingPreferencePreservesConfiguredEffort(configuration: (AIEndpointKind, String), thinkingEnabled: Bool) async throws {
         let (kind, model) = configuration
         let endpoint = AIEndpoint(name: kind.defaultEndpointName, baseURL: kind.defaultBaseURL, kind: kind)
-        #expect(AIChatClient.supportsLocalThinking(endpoint: endpoint, model: " \(model)\n"))
         let efforts: [AgentModelEffort?] = [nil, .high]
         for effort in efforts {
             StubURLProtocol.reset()
@@ -94,7 +95,7 @@ struct AIChatClientTests {
             let request = try #require(StubURLProtocol.lastRequest)
             let body = try #require(requestBody(request))
             let json = try #require(try JSONSerialization.jsonObject(with: body) as? [String: Any])
-            let expectedEffort = thinkingEnabled ? effort?.rawValue : "none"
+            let expectedEffort = thinkingEnabled ? (effort ?? .medium).rawValue : "none"
             #expect(json["reasoning_effort"] as? String == expectedEffort)
             #expect(json["temperature"] as? Double == 0)
             #expect(request.timeoutInterval == 120)

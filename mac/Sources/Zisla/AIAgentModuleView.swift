@@ -737,17 +737,15 @@ private struct AILocalModelConfigurationRow: View {
                 }
                 .frame(minWidth: 160, maxWidth: .infinity)
                 .help(model.modelName)
-                if AIChatClient.supportsLocalThinking(endpoint: model.endpoint, model: model.modelName) {
-                    Toggle(AppLocalization.text("思考"), isOn: Binding(
-                        get: { model.thinkingEnabled },
-                        set: { value in update { $0.thinkingEnabled = value } }
-                    ))
-                    .toggleStyle(.checkbox)
-                    .controlSize(.mini)
-                    .font(.system(size: 10))
-                    .keepsIntrinsicWidth()
-                    .help(AppLocalization.text("默认关闭以加快语音整理。开启后允许模型思考，可能提高准确性，但会增加等待时间。"))
-                }
+                Toggle(AppLocalization.text("思考"), isOn: Binding(
+                    get: { model.thinkingEnabled },
+                    set: { value in update { $0.thinkingEnabled = value } }
+                ))
+                .toggleStyle(.checkbox)
+                .controlSize(.mini)
+                .font(.system(size: 10))
+                .keepsIntrinsicWidth()
+                .help(AppLocalization.text("默认关闭以加快语音整理。开启后允许模型思考，可能提高准确性，但会增加等待时间。"))
                 Button {
                     do {
                         try store.removeLocalModel(id: model.id)

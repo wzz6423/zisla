@@ -69,14 +69,6 @@ public struct AIChatClient: Sendable {
         self.session = session
     }
 
-    public static func supportsLocalThinking(endpoint: AIEndpoint, model: String) -> Bool {
-        let model = model.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
-        let family = model.split(separator: ":").first
-        return endpoint.kind == .ollama
-            ? family == "qwen3.5" || family == "gemma4"
-            : model.hasPrefix("google/gemma-4-")
-    }
-
     public func complete(
         endpoint: AIEndpoint,
         protocolKind: AgentChannelProtocol = .openAICompatible,
@@ -116,9 +108,7 @@ public struct AIChatClient: Sendable {
         )
         if localInference, protocolKind == .openAICompatible {
             body["temperature"] = 0
-            if !localThinkingEnabled, Self.supportsLocalThinking(endpoint: endpoint, model: model) {
-                body["reasoning_effort"] = "none"
-            }
+            body["reasoning_effort"] = localThinkingEnabled ? (effort ?? .medium).rawValue : "none"
         }
         request.httpBody = try JSONSerialization.data(withJSONObject: body)
         let (data, response) = try await session.data(for: request)
