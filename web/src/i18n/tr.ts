@@ -102,7 +102,7 @@ export const tr = createCatalog({
         detail: 'Dock ve Command-Tab · Tıklayarak pencere değiştirin · Varsayılan olarak kapalı',
       },
       capture: { title: 'Ekran görüntüleri, kaydırmalı yakalama ve sabitleme', description: 'Global bir kısayolla ekranın bir bölümünü yakalayın veya sabitleyin; açıklama ekleyin, kaydırmalı görüntüyü birleştirin ve tabloları tanıyıp dışa aktarın. Hâlâ düzenlediğiniz metin açıklamaları dışa aktarırken korunur. Ekran görüntüsü, sabitleme, kaydırmalı çekim ve açıklama araçlarının kısayollarını özelleştirin. Ayarlar; çekim, sesle giriş ve Hızlı Eylemler arasındaki çakışmaları denetler. Tek başına değiştirici tuş kullanmak Giriş İzleme izni gerektirir.', detail: 'Özel kısayollar · Çakışma denetimi · Açıklamalar dışa aktarımda korunur' },
-      voice: { title: 'Sesli giriş ve temizleme', description: 'Bir tuşla geçiş yapın veya konuşmak için basılı tutun; sistemin konuşma tanıyıcısını kullanır. Gerektiğinde alan sözlükleri, özel etkin sözcükler, yapılandırılmış biçimlendirme ya da yerel veya uzak modelle temizleme ekleyin.', detail: 'İki kayıt modu · Sözlükler ve etkin sözcükler · İsteğe bağlı model temizleme' },
+      voice: { title: 'Sesli giriş ve temizleme', description: 'Sistemin konuşma tanımasını, alan sözlüklerini ve özel sözcükleri kullanarak kayıt için bir tuşla geçiş yapın veya konuşmak için tuşu basılı tutun. İsterseniz Ollama, LM Studio ya da uzak bir modelle anlamı koruyarak dökümü düzeltin ve açıkça sıraladığınız maddeleri biçimlendirin.', detail: 'İki kayıt modu · Sözlükler ve etkin sözcükler · İsteğe bağlı model temizleme' },
       media: { title: 'Medya ve sistem ortam sesleri', description: 'Çalan içeriği adanın üstünden kontrol edin veya bir macOS sistem ortam sesi seçin. Ekran kilitlendiğinde, ekran koruyucu başladığında ya da ekran uykuya geçtiğinde otomatik olarak durabilir.', detail: 'Oynatma denetimi · Eşzamanlı şarkı sözleri · Ortam sesi otomatik durur' },
       browserDownloads: { title: 'Tarayıcı indirme ilerlemesi', description: 'Safari, Chrome, Edge, Firefox, Brave, Vivaldi, Opera ve Arc indirmelerini algılar; kaynaklarını ve canlı ilerlemeyi ekranın üstünde gösterir.', detail: '8 tarayıcı · Kaynak algılama · Tamamlanma bildirimi' },
       copyAssistant: { title: 'Hızlı Eylemler ve akıllı sonraki adımlar', description: 'Etkinleştirildiğinde kopyalanan metin, bağlantı, dosya veya görüntü ayrı bir üst çubukta önizlenir; açma, Finder\'da gösterme, arama, çevirme, hesaplama veya kaydetme gibi sonraki adımlar yalnızca onayınızdan sonra gerçekleştirilir. Tarayıcı indirmesi veya AirDrop aktarımı bittikten sonra Hızlı Eylemler ile dosyanın klasörünü açın. Chrome’un varsayılan ve seçilen indirme klasörleri desteklenir; indirme ilerlemesinden bağımsız açılıp kapatılır.', detail: 'İsteğe bağlı anahtar · Cihazda tanıma · Varsayılan Command+N' },
@@ -216,7 +216,19 @@ export const tr = createCatalog({
       <p>İlgili özelliği uygulama ayarlarından kapatabilir veya izni istediğiniz zaman Sistem Ayarları → Gizlilik ve Güvenlik bölümünden iptal edebilirsiniz. Bir izni iptal etmek yalnızca ilgili özelliği devre dışı bırakır.</p>
     `.trim(),
       },
-      network: { question: 'zisla internete bağlanır mı?', answer: 'Hava durumu, imzalı güncelleme kontrolleri, başlattığınız indirmeler ve isteğe bağlı uzak ses temizleme gerektiğinde ağı kullanır. Pano bağlantısı algılama tamamen Mac\'inizde çalışır.' },
+      localVoice: {
+        question: 'Ses dökümünü düzenlemek için yerel modeli nasıl kullanırım?',
+        answer: `
+      <p>Ollama, LM Studio ve OpenAI uyumlu diğer yerel hizmetler desteklenir.</p>
+      <ol>
+        <li>İstediğiniz modeli yerel model uygulamanızda indirin veya yükleyin, ardından hizmeti başlatın.</li>
+        <li>“Ayarlar → Ses → Yerel Modeller” bölümünü açın, bir yapılandırma ekleyip etkinleştirin, Ollama veya LM Studio’yu seçin ve hizmet URL’sini girin. OpenAI uyumlu diğer hizmetler için de LM Studio’yu seçin. Hizmet kimlik doğrulama gerektirmiyorsa API Key alanını boş bırakın.</li>
+        <li>Otomatik keşfedilen bir modeli seçin, ardından “Ses Organizasyon Modeli → Model Kullan” altında bu yapılandırmayı seçin.</li>
+      </ol>
+      <p>zisla, çipinize ve toplam RAM miktarına göre bir Gemma 4 QAT modeli önerir. Önerilen modeli otomatik olarak indirmez veya yüklemez.</p>
+    `.trim(),
+      },
+      network: { question: 'zisla internete bağlanır mı?', answer: 'Hava durumu, imzalı güncelleme kontrolleri, başlattığınız indirmeler ve isteğe bağlı uzak ses temizleme gerektiğinde ağı kullanır. Pano bağlantısı algılama tamamen Mac\'inizde çalışır. Yerel model, dökümden sonra metni düzenler; Apple konuşma tanıma, dile ve sistem desteğine bağlı olarak ağı kullanmaya devam edebilir.' },
       multiDisplay: { question: 'zisla birden çok ekranı destekler mi?', answer: 'Evet: birden çok ekran, Spaces ve normal tam ekran uygulamaları desteklenir; genişletme odağı almaz.' },
       intel: { question: 'Intel Mac\'te kullanabilir miyim?', answer: 'Intel makineler için bir derleme bulunabilir ancak uyumluluk garanti edilmez. Günümüzde desteklenen yapılandırma Apple Silicon Mac\'lerdir.' },
       storage: { question: 'zisla verilerini nereye kaydeder?', answer: 'Yerel veriler ~/Library/Application Support/zisla/ konumundadır. Yazma istatistikleri ayrı olarak ~/Library/Application Support/zisla/typing-stats.sqlite3 konumunda tutulur. Hızlı Notlar sistem Notlar uygulamasını kullanır.' },

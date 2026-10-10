@@ -26,6 +26,7 @@ struct SettingsView: View {
     @State private var voiceHistorySelectionMode = false
     @State private var selectedVoiceHistoryIDs: Set<UUID> = []
     @State private var customVoiceHotword = ""
+    @State private var localVoiceHardware: LocalVoiceHardware?
     @State private var screenshotHotkeyValidationMessage: String?
     @State private var voiceHotkeyValidationMessage: String?
     @State private var assistantHotkeyValidationMessage: String?
@@ -1683,6 +1684,11 @@ struct SettingsView: View {
                             .disabled(model.voiceModelDiscoveryState.isTesting)
                         }
                     }
+                    if configuration.source == .local,
+                       let localModel = model.aiAgent.store.localModel(id: configuration.id) {
+                        rowDivider
+                        voiceLocalModelRecommendation(localModel.endpoint.kind)
+                    }
                 } else {
                     rowDivider
                     settingRow(
@@ -1794,6 +1800,41 @@ struct SettingsView: View {
                         }
                     }
                 }
+            }
+        }
+    }
+
+    private func voiceLocalModelRecommendation(_ endpointKind: AIEndpointKind) -> some View {
+        VStack(alignment: .leading, spacing: 7) {
+            Text(AppLocalization.text("本机模型建议"))
+                .font(.system(size: 11, weight: .medium))
+
+            if let hardware = localVoiceHardware {
+                if hardware.processor == .intel && endpointKind == .openAICompatible {
+                    Text(AppLocalization.text("LM Studio 暂不支持 Intel Mac。请改用 Ollama，或手动选择其他可用服务。"))
+                } else if let recommendation = LocalVoiceModelRecommendation.recommended(for: hardware) {
+                    Text(AppLocalization.text(
+                        "%@ · %.1f GiB 内存",
+                        hardware.processor == .appleSilicon ? "Apple Silicon" : "Intel",
+                        Double(hardware.physicalMemoryBytes) / 1_073_741_824
+                    ))
+                    Text(AppLocalization.text("建议使用 %@", recommendation.displayName))
+                        .foregroundStyle(.primary)
+                        .textSelection(.enabled)
+                } else {
+                    Text(AppLocalization.text("硬件信息不可用或内存不足 8 GiB，暂不自动推荐。你仍可手动选择已安装的模型。"))
+                }
+            }
+        }
+        .font(.system(size: 10))
+        .foregroundStyle(.secondary)
+        .fixedSize(horizontal: false, vertical: true)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(.horizontal, 14)
+        .padding(.vertical, 10)
+        .task {
+            if localVoiceHardware == nil {
+                localVoiceHardware = LocalVoiceHardwareReader.read()
             }
         }
     }
@@ -3258,7 +3299,7 @@ struct SettingsView: View {
                                 .truncationMode(.middle)
                             Spacer(minLength: 0)
                             IconButton(symbol: "doc.on.doc", help: loc("复制"), size: .compact) {
-                                copyClipboardAssistantConversionExample(example)
+                                copySettingsText(example)
                             }
                             .accessibilityLabel(loc("复制"))
                         }
@@ -3272,10 +3313,10 @@ struct SettingsView: View {
         .padding(.vertical, 6)
     }
 
-    private func copyClipboardAssistantConversionExample(_ example: String) {
+    private func copySettingsText(_ text: String) {
         let pasteboard = NSPasteboard.general
         pasteboard.clearContents()
-        pasteboard.setString(example, forType: .string)
+        pasteboard.setString(text, forType: .string)
     }
 
     private struct ClipboardAssistantConversionExampleGroup: Identifiable {

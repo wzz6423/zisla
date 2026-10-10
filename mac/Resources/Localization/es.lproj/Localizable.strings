@@ -2652,3 +2652,28 @@
 "包括合盖时保持亮屏；需要管理员授权，关闭后恢复原有休眠设置。" = "Mantiene la pantalla encendida incluso con la tapa cerrada. Requiere autorización del administrador; al desactivarlo, restaura el ajuste de reposo anterior.";
 "无法开启合盖亮屏，请检查管理员授权后重试。" = "No se pudo mantener la pantalla encendida con la tapa cerrada. Comprueba la autorización del administrador e inténtalo de nuevo.";
 "无法恢复休眠设置，请重试关闭保持亮屏。" = "No se pudo restaurar el ajuste de reposo. Intenta desactivar de nuevo Mantener la pantalla encendida.";
+
+"本地服务" = "Servicio local";
+"思考" = "Razonamiento";
+"默认关闭以加快语音整理。开启后允许模型思考，可能提高准确性，但会增加等待时间。" = "Desactivado de forma predeterminada para corregir las transcripciones más rápido. Al activarlo, el modelo puede razonar, lo que puede mejorar la precisión, pero aumenta el tiempo de espera.";
+"选择已发现的模型" = "Elegir un modelo detectado";
+"API Key（可选）" = "Clave API (opcional)";
+"获取模型" = "Obtener modelos";
+"默认无需 API Key；仅在本地服务启用认证时填写。" = "No se requiere una clave API de forma predeterminada. Introdúcela solo si la autenticación está activada en el servicio local.";
+"未发现模型，请先在本地服务中下载或加载模型。" = "No se encontraron modelos. Primero descarga o carga un modelo en el servicio local.";
+
+"本机模型建议" = "Modelo recomendado para este Mac";
+"LM Studio 暂不支持 Intel Mac。请改用 Ollama，或手动选择其他可用服务。" = "LM Studio aún no admite Macs con Intel. Usa Ollama o elige manualmente otro servicio disponible.";
+"%@ · %.1f GiB 内存" = "%@ · %.1f GiB de memoria";
+"建议使用 %@" = "Modelo recomendado: %@";
+"根据整机内存估算；内存紧张时可选择更小模型。" = "Estimación según la memoria total. Elige un modelo más pequeño si queda poca memoria.";
+"模型下载：约 %.1f GB" = "Descarga del modelo: unos %.1f GB";
+"复制下载命令" = "Copiar comando de descarga";
+"模型说明" = "Detalles del modelo";
+"在 LM Studio 中搜索此名称并选择对应量化版本。加载后，从服务模型列表选择实际模型 ID。" = "Busca este nombre en LM Studio y elige la cuantización correspondiente. Tras cargarlo, selecciona el ID real del modelo en la lista de modelos del servicio.";
+"请在 LM Studio 中关闭思考模式，以便快速整理转写文本。" = "Desactiva el modo de razonamiento en LM Studio para corregir las transcripciones más rápido.";
+"硬件信息不可用或内存不足 8 GiB，暂不自动推荐。你仍可手动选择已安装的模型。" = "La información del hardware no está disponible o la memoria es inferior a 8 GiB, por lo que no se recomienda ningún modelo automáticamente. Aún puedes elegir manualmente un modelo instalado.";
+"未找到 LM Studio CLI。请在 LM Studio 中启动 API 服务后重试。" = "No se encontró LM Studio CLI. Inicia el servidor API en LM Studio e inténtalo de nuevo.";
+"LM Studio 操作失败，请在 LM Studio 中检查本地服务后重试。" = "La operación de LM Studio falló. Revisa el servidor local en LM Studio e inténtalo de nuevo.";
+"LM Studio API 无法连接。请启动服务或检查地址和端口。" = "No se puede conectar con la API de LM Studio. Inicia el servidor o comprueba la dirección y el puerto.";
+"启动 LM Studio 服务" = "Iniciar servidor de LM Studio";

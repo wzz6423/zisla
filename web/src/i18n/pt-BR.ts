@@ -178,7 +178,7 @@ export const ptBR = createCatalog({
       voice: {
         title: 'Entrada de voz e limpeza',
         description:
-          'Alterne com uma tecla ou segure para falar usando o reconhecedor do sistema. Adicione vocabulários, palavras personalizadas, formatação estruturada ou limpeza por modelo local ou remoto.',
+          'Alterne com uma tecla ou segure para falar usando o reconhecimento do sistema, com vocabulários especializados e palavras personalizadas. Se quiser, use Ollama, LM Studio ou um modelo remoto para corrigir a transcrição preservando o sentido e formatar itens enumerados explicitamente.',
         detail: 'Dois modos de gravação · Vocabulários e palavras-chave · Limpeza opcional',
       },
       media: {
@@ -346,9 +346,21 @@ export const ptBR = createCatalog({
       <p>Você pode desativar um recurso nos ajustes do app ou revogar uma permissão a qualquer momento em Ajustes do Sistema → Privacidade e Segurança. Revogar uma permissão desativa apenas o recurso relacionado e não afeta os outros módulos. Os nomes dos itens podem variar um pouco conforme a versão do macOS.</p>
     `.trim(),
       },
+      localVoice: {
+        question: 'Como uso um modelo local para revisar a transcrição de voz?',
+        answer: `
+      <p>Ollama, LM Studio e outros serviços locais compatíveis com OpenAI são aceitos.</p>
+      <ol>
+        <li>Baixe ou carregue o modelo desejado no aplicativo de modelos locais e inicie o serviço.</li>
+        <li>Abra Ajustes → Voz → Modelos Locais, adicione e ative uma configuração, escolha Ollama ou LM Studio e informe a URL do serviço. Para outros serviços compatíveis com OpenAI, escolha também LM Studio. Deixe API Key vazio se o serviço não exigir autenticação.</li>
+        <li>Selecione um modelo descoberto automaticamente e escolha essa configuração em Modelo de Organização de Voz → Usar Modelo.</li>
+      </ol>
+      <p>O zisla sugere um modelo Gemma 4 QAT com base no chip e na memória RAM total. O modelo recomendado não é baixado nem carregado automaticamente.</p>
+    `.trim(),
+      },
       network: {
         question: 'O zisla acessa a Internet?',
-        answer: 'Clima, verificações de atualização assinadas, downloads iniciados por você e limpeza de voz remota opcional usam a rede sob demanda. A detecção de links é local.',
+        answer: 'Clima, verificações de atualização assinadas, downloads iniciados por você e limpeza de voz remota opcional usam a rede sob demanda. A detecção de links é local. O modelo local revisa o texto após a transcrição; o reconhecimento de voz da Apple ainda pode usar a rede, dependendo do idioma e do suporte do sistema.',
       },
       multiDisplay: {
         question: 'O zisla funciona com vários monitores?',

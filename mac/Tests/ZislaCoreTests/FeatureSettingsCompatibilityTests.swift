@@ -762,9 +762,12 @@ struct FeatureSettingsCompatibilityTests {
         #expect(Set(terms).count == terms.count)
 
         let contextualTerms = VoiceLexicon.contextualTerms(for: VoiceLexicon.defaultEnabled)
-        #expect(contextualTerms == terms)
+        #expect(contextualTerms.count <= 100)
+        #expect(Set(contextualTerms).isSubset(of: Set(terms)))
         for lexicon in VoiceLexicon.allCases {
-            #expect(VoiceLexicon.contextualTerms(for: [lexicon]) == lexicon.terms)
+            let hints = VoiceLexicon.contextualTerms(for: [lexicon])
+            #expect(!hints.isEmpty && hints.count <= 100)
+            #expect(Set(hints).isSubset(of: Set(lexicon.terms)))
         }
 
         for lexicon in VoiceLexicon.allCases {
@@ -897,7 +900,7 @@ struct FeatureSettingsCompatibilityTests {
         )
         #expect(mixedLexiconText == "QQ音乐和 A股")
 
-        let openSourceTerms = VoiceLexicon.contextualTerms(for: [.computerTerms])
+        let openSourceTerms = VoiceLexicon.terms(for: [.computerTerms])
         for term in ["开源", "开源项目", "开源软件", "开源代码", "开源模型", "开源协议", "开放源代码"] {
             #expect(openSourceTerms.contains(term))
         }
@@ -935,7 +938,7 @@ struct FeatureSettingsCompatibilityTests {
 
     @Test
     func computerLexiconIncludesCurrentAIAgentTools() {
-        let terms = VoiceLexicon.contextualTerms(for: [.computerTerms])
+        let terms = VoiceLexicon.terms(for: [.computerTerms])
         let agentTerms = [
             "Claude Code", "Codex", "OpenAI Codex", "Gemini CLI", "Grok CLI", "OpenCode", "Kimi Code", "Qwen Code",
             "Qoder CLI", "GLM Coding", "GitHub Copilot", "GitHub Copilot CLI", "DeepSeek Harness", "dsh", "Cordis", "Pi Coding Agent",

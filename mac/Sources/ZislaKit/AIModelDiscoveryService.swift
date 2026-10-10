@@ -15,16 +15,83 @@ public enum AIModelDiscoveryError: LocalizedError, Sendable {
     }
 }
 
+public struct AILocalModelCatalog: Equatable, Sendable {
+    public enum ServerState: Sendable {
+        case ready
+        case stopped
+        case unreachable
+    }
+
+    public var models: [AIDiscoveredModel]
+    public var serverState: ServerState
+
+    public init(models: [AIDiscoveredModel], serverState: ServerState = .ready) {
+        self.models = models
+        self.serverState = serverState
+    }
+}
+
 /// Reads the model catalog from a running local service or an OpenAI-compatible service without changing the workspace's chat or key-routing state.
 public struct AIModelDiscoveryService: Sendable {
     private let session: URLSession
+    private let lmStudio: LMStudioService
 
     public init(session: URLSession = .shared) {
         self.session = session
+        self.lmStudio = LMStudioService()
+    }
+
+    init(session: URLSession, lmStudio: LMStudioService) {
+        self.session = session
+        self.lmStudio = lmStudio
+    }
+
+    public func localCatalog(for endpoint: AIEndpoint, apiKey: String? = nil) async throws -> AILocalModelCatalog {
+        do {
+            return AILocalModelCatalog(models: try await localHTTPModels(for: endpoint, apiKey: apiKey))
+        } catch let error as URLError where error.code == .cannotConnectToHost
+            && LMStudioService.serverAddress(for: endpoint) != nil {
+            let running = try await lmStudio.isServerRunning()
+            let installed = try await lmStudio.installedModels()
+            return AILocalModelCatalog(models: installed, serverState: running ? .unreachable : .stopped)
+        }
+    }
+
+    public func startLMStudioServer(for endpoint: AIEndpoint, apiKey: String? = nil) async throws -> AILocalModelCatalog {
+        try await lmStudio.startServer(for: endpoint)
+        return AILocalModelCatalog(models: try await localHTTPModels(for: endpoint, apiKey: apiKey))
     }
 
     public func models(for endpoint: AIEndpoint, apiKey: String? = nil) async throws -> [AIDiscoveredModel] {
-        let url = try modelsURL(for: endpoint)
+        let data = try await catalogData(at: modelsURL(for: endpoint), apiKey: apiKey)
+        let names: [String]
+        switch endpoint.kind {
+        case .ollama:
+            names = try JSONDecoder().decode(OllamaTagsResponse.self, from: data).models.map(\.name)
+        case .openAICompatible:
+            names = try JSONDecoder().decode(OpenAIModelsResponse.self, from: data).data.map(\.id)
+        }
+        return Self.normalizedModels(names)
+    }
+
+    private func localHTTPModels(for endpoint: AIEndpoint, apiKey: String?) async throws -> [AIDiscoveredModel] {
+        guard LMStudioService.serverAddress(for: endpoint) != nil else {
+            return try await models(for: endpoint, apiKey: apiKey)
+        }
+        var url = try baseURL(from: endpoint)
+        url.deleteLastPathComponent()
+        url.appendPathComponent("api/v1/models")
+        do {
+            // The native catalog includes unloaded models and distinguishes embeddings from LLMs.
+            let data = try await catalogData(at: url, apiKey: apiKey)
+            let models = try JSONDecoder().decode(LMStudioModelsResponse.self, from: data).models
+            return Self.normalizedModels(models.filter { $0.type == "llm" }.map(\.key))
+        } catch AIModelDiscoveryError.http(let status) where status == 404 || status == 405 {
+            return try await models(for: endpoint, apiKey: apiKey)
+        }
+    }
+
+    private func catalogData(at url: URL, apiKey: String?) async throws -> Data {
         var request = URLRequest(url: url)
         request.timeoutInterval = 30
         request.setValue("application/json", forHTTPHeaderField: "Accept")
@@ -38,13 +105,10 @@ public struct AIModelDiscoveryService: Sendable {
             throw AIModelDiscoveryError.http(statusCode: http.statusCode)
         }
 
-        let names: [String]
-        switch endpoint.kind {
-        case .ollama:
-            names = try JSONDecoder().decode(OllamaTagsResponse.self, from: data).models.map(\.name)
-        case .openAICompatible:
-            names = try JSONDecoder().decode(OpenAIModelsResponse.self, from: data).data.map(\.id)
-        }
+        return data
+    }
+
+    static func normalizedModels(_ names: [String]) -> [AIDiscoveredModel] {
         let normalizedNames = names
             .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
             .filter { !$0.isEmpty }
@@ -107,4 +171,13 @@ private struct OpenAIModelsResponse: Decodable {
     }
 
     var data: [Model]
+}
+
+private struct LMStudioModelsResponse: Decodable {
+    struct Model: Decodable {
+        var type: String
+        var key: String
+    }
+
+    var models: [Model]
 }

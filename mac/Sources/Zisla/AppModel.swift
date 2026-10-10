@@ -349,15 +349,26 @@ struct IslandClipboardHandoff {
 
 @MainActor
 final class AppModel: ObservableObject {
-  private enum AIProcessingTarget {
+  enum AIProcessingTarget {
     case http(
       endpoint: AIEndpoint,
       protocolKind: AgentChannelProtocol,
       model: String,
       apiKey: String?,
-      effort: AgentModelEffort?
+      effort: AgentModelEffort?,
+      localInference: Bool,
+      localThinkingEnabled: Bool
     )
     case cliProfile(accountID: UUID, model: String)
+
+    var requiresVoiceProofreading: Bool {
+      switch self {
+      case let .http(_, _, _, _, _, localInference, localThinkingEnabled):
+        localInference && !localThinkingEnabled
+      case .cliProfile:
+        false
+      }
+    }
   }
 
   static let shared = AppModel()
@@ -3226,7 +3237,23 @@ final class AppModel: ObservableObject {
         id: recording.id,
         transcript: lexiconNormalizedTranscript
       )
-    guard let target = voicePostProcessingTarget() else {
+    let processingTarget: AIProcessingTarget?
+    do {
+      processingTarget = try Self.voicePostProcessingTarget(
+        for: selectedVoiceModelConfiguration,
+        store: aiAgent.store
+      )
+    } catch {
+      deliverVoiceTranscript(
+        lexiconNormalizedTranscript,
+        to: targetProcessIdentifier,
+        at: targetMouseLocation,
+        target: inputTarget,
+        message: AppLocalization.text("语音转写完成；整理失败")
+      )
+      return
+    }
+    guard let target = processingTarget else {
       deliverVoiceTranscript(
         lexiconNormalizedTranscript,
         to: targetProcessIdentifier,
@@ -3244,24 +3271,19 @@ final class AppModel: ObservableObject {
       guard let self else { return }
       defer { self.endVoiceProcessingIndicator() }
       do {
-        let response = try await self.complete(
-          using: target,
-          systemPrompt: VoiceTranscriptPostProcessor.systemPrompt(
-            enabledLexicons: enabledVoiceLexicons,
-            customHotwords: customVoiceHotwords,
-            structuredFormattingEnabled: structuredFormattingEnabled
-          ),
-          messages: VoiceTranscriptPostProcessor.messages(
-            for: rawTranscript,
-            lexiconNormalizedTranscript: lexiconNormalizedTranscript
-          )
-        )
+        let processed = try await VoiceTranscriptPostProcessor.process(
+          rawTranscript: rawTranscript,
+          lexiconNormalizedTranscript: lexiconNormalizedTranscript,
+          enabledLexicons: enabledVoiceLexicons,
+          customHotwords: customVoiceHotwords,
+          structuredFormattingEnabled: structuredFormattingEnabled,
+          proofreadingEnabled: target.requiresVoiceProofreading
+        ) { systemPrompt, messages in
+          try await self.complete(using: target, systemPrompt: systemPrompt, messages: messages)
+        }
         guard !Task.isCancelled else { return }
         let delivered = VoiceLexicon.normalizeTranscript(
-          VoiceTranscriptPostProcessor.deliveredText(
-            response,
-            fallback: lexiconNormalizedTranscript
-          ),
+          processed,
           for: enabledVoiceLexicons,
           customTerms: customVoiceHotwords,
           contextualTranscript: rawTranscript
@@ -3333,34 +3355,40 @@ final class AppModel: ObservableObject {
     notices.remove(id: "voice-processing-right")
   }
 
-  private func voicePostProcessingTarget() -> AIProcessingTarget? {
-    guard let reference = selectedVoiceModelConfiguration else { return nil }
+  static func voicePostProcessingTarget(
+    for reference: AIModelConfigurationReference?,
+    store: AIAgentStore,
+    requiresModel: Bool = true
+  ) throws -> AIProcessingTarget? {
+    guard let reference else { return nil }
     switch reference.source {
     case .local:
-      guard let configuration = aiAgent.store.localModel(id: reference.id),
+      guard let configuration = store.localModel(id: reference.id),
             configuration.isEnabled else {
         return nil
       }
       let model = configuration.modelName.trimmingCharacters(in: .whitespacesAndNewlines)
-      guard !model.isEmpty else { return nil }
+      guard !requiresModel || !model.isEmpty else { return nil }
       return .http(
         endpoint: configuration.endpoint,
         protocolKind: .openAICompatible,
         model: model,
-        apiKey: nil,
-        effort: nil
+        apiKey: try store.secret(for: configuration),
+        effort: nil,
+        localInference: true,
+        localThinkingEnabled: configuration.thinkingEnabled
       )
     case .channel:
-      guard let channel = aiAgent.store.channel(id: reference.id),
+      guard let channel = store.channel(id: reference.id),
             channel.isEnabled,
             channel.protocolKind == .openAICompatible || channel.protocolKind == .anthropicMessages,
             let endpointGroup = channel.endpointGroups.first,
             let baseURL = endpointGroup.baseURLs.first?.trimmingCharacters(in: .whitespacesAndNewlines),
             !baseURL.isEmpty,
             let accountID = endpointGroup.accountIDs.first,
-            let account = aiAgent.store.account(id: accountID),
+            let account = store.account(id: accountID),
             account.credentialKind == .apiKey,
-            let apiKey = try? aiAgent.store.secret(for: account),
+            let apiKey = try? store.secret(for: account),
             !apiKey.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
         return nil
       }
@@ -3371,7 +3399,9 @@ final class AppModel: ObservableObject {
         protocolKind: channel.protocolKind,
         model: model,
         apiKey: apiKey.trimmingCharacters(in: .whitespacesAndNewlines),
-        effort: channel.effort
+        effort: channel.effort,
+        localInference: false,
+        localThinkingEnabled: false
       )
     }
   }
@@ -3382,7 +3412,7 @@ final class AppModel: ObservableObject {
     messages: [AIOutboundMessage]
   ) async throws -> String {
     switch target {
-    case let .http(endpoint, protocolKind, model, apiKey, effort):
+    case let .http(endpoint, protocolKind, model, apiKey, effort, localInference, localThinkingEnabled):
       return try await AIChatClient().complete(
         endpoint: endpoint,
         protocolKind: protocolKind,
@@ -3390,7 +3420,9 @@ final class AppModel: ObservableObject {
         systemPrompt: systemPrompt,
         messages: messages,
         apiKey: apiKey,
-        effort: effort
+        effort: effort,
+        localInference: localInference,
+        localThinkingEnabled: localThinkingEnabled
       ).content
     case let .cliProfile(accountID, model):
       return try await aiAgent.completeWithCLIProfile(
@@ -3492,12 +3524,24 @@ final class AppModel: ObservableObject {
     voiceModelDiscoveryTask = nil
     voiceModelDiscoveryGeneration &+= 1
     let generation = voiceModelDiscoveryGeneration
-    guard let target = voicePostProcessingTarget() else {
+    let processingTarget: AIProcessingTarget?
+    do {
+      processingTarget = try Self.voicePostProcessingTarget(
+        for: selectedVoiceModelConfiguration,
+        store: aiAgent.store,
+        requiresModel: false
+      )
+    } catch {
+      voiceModelDiscoveryState = .failed(AppLocalization.text("无法读取模型凭据"))
+      discoveredModels = []
+      return
+    }
+    guard let target = processingTarget else {
       voiceModelDiscoveryState = .failed(AppLocalization.text("请先在上方添加、启用并选择一个模型配置"))
       discoveredModels = []
       return
     }
-    guard case let .http(endpoint, _, _, apiKey, _) = target else {
+    guard case let .http(endpoint, _, _, apiKey, _, _, _) = target else {
       voiceModelDiscoveryState = .failed(AppLocalization.text("官方 CLI 档案不支持 API 模型发现"))
       discoveredModels = []
       return
