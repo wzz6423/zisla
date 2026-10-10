@@ -92,7 +92,7 @@ public enum VoiceLexicon: String, Codable, CaseIterable, Identifiable, Sendable,
                 "全栈", "接口", "仓库", "分支", "提交", "合并请求", "持续集成", "macOS", "iOS", "Xcode", "AppKit",
                 "Foundation", "Yarn", "Volta", "fnm", "nvm", "asdf", "Cursor", "Windsurf", "Cline", "Roo Code", "Aider", "Continue", "VS Code", "Visual Studio Code", "Zed",
                 "开源", "开源项目", "开源软件", "开源代码", "开源社区", "开源模型", "开源大模型", "开源协议", "开源框架", "开源仓库", "开源工具", "开源生态", "开源许可证", "开放源代码"
-            ] + Self.localInferenceTerms + Self.currentAgentEcosystemTerms + Self.supportedAIAgentTerms + Self.supportedAIProviderTerms
+            ] + Self.localInferenceTerms + Self.currentAgentEcosystemTerms + Self.supportedAIAgentTerms + Self.supportedAIProviderTerms + Self.gitCollaborationTerms
         case .classicalPoetry:
             [
                 "唐诗", "宋词", "古诗", "古文", "李白", "杜甫", "白居易", "王维", "孟浩然", "苏轼", "李清照",
@@ -220,6 +220,11 @@ public enum VoiceLexicon: String, Codable, CaseIterable, Identifiable, Sendable,
         "Hugging Face", "safetensors", "CUDA", "Metal", "量化", "混合专家", "MoE", "推测解码"
     ]
 
+    private static let gitCollaborationTerms = [
+        "repo", "init", "draft", "PR", "pull request", "merge request", "draft PR", "draft pull request",
+        "git init", "git clone", "git commit", "git push", "git pull", "git rebase"
+    ]
+
     private static let currentAgentEcosystemTerms: [String] = [
         "Amazon Q Developer", "Amazon Q Developer CLI", "OpenHands", "Goose", "Browser Use", "LangGraph", "AutoGen", "CrewAI",
         "PydanticAI", "Semantic Kernel", "Google ADK", "OpenAI Agents SDK", "Agent Harness", "多智能体", "Multi-Agent",
@@ -338,15 +343,20 @@ public enum VoiceLexicon: String, Codable, CaseIterable, Identifiable, Sendable,
     ) -> [String] {
         let custom = normalizedCustomTerms(customTerms).filter(isShortHint)
         let normalized = normalizeTranscript(transcript, for: enabled, customTerms: custom)
+        let range = NSRange(location: 0, length: (normalized as NSString).length)
         func isMentioned(_ term: String) -> Bool {
-            normalized.range(of: normalizationPattern(for: term), options: [.regularExpression, .caseInsensitive]) != nil
+            let candidate = normalizationCandidateCache.candidate(for: term)
+            return candidate.expression?.firstMatch(in: normalized, range: range) != nil
         }
         let matchingCustom = custom.filter(isMentioned)
         let matchingBuiltIn = terms(for: enabled).filter(isMentioned)
+        let mentionedBuiltIn = Set(matchingBuiltIn)
+        let relatedLexicons = enabled.filter { !mentionedBuiltIn.isDisjoint(with: $0.terms) }
+        let suggestions = spellingReferences(in: normalized, terms: custom + terms(for: relatedLexicons), customTerms: custom).map(\.term)
         let remainingCustom = custom.filter { !isMentioned($0) }.prefix(16)
         var seen = Set<String>()
         var characterCount = 0
-        return (matchingCustom + matchingBuiltIn + remainingCustom).filter { term in
+        return (matchingCustom + matchingBuiltIn + suggestions + remainingCustom).filter { term in
             guard isShortHint(term), seen.insert(compactMatchingKey(for: term)).inserted,
                   characterCount + term.unicodeScalars.count <= 1_024 else { return false }
             characterCount += term.unicodeScalars.count
@@ -377,7 +387,9 @@ public enum VoiceLexicon: String, Codable, CaseIterable, Identifiable, Sendable,
             enabled: enabled,
             contextualTranscript: contextualTranscript
         )
-        return normalizeSpelling(contextual, terms: custom)
+        guard enabled.contains(.computerTerms) else { return normalizeSpelling(contextual, terms: custom) }
+        let corrected = normalizeContextualSpelling(contextual, customTerms: custom)
+        return normalizeSpelling(normalizeSpelling(corrected, terms: gitCollaborationTerms), terms: custom)
     }
 
     public static func literalTextCounts(in transcript: String) -> [Data: Int] {
@@ -391,15 +403,84 @@ public enum VoiceLexicon: String, Codable, CaseIterable, Identifiable, Sendable,
         return counts
     }
 
+    public static func preservesSpellingSources(
+        in response: String,
+        source: String,
+        for enabled: Set<Self>,
+        customTerms: [String] = []
+    ) -> Bool {
+        func counts(in text: String) -> (all: [String: Int], editable: [String: Int]) {
+            let protected = normalizationProtectedRanges(in: text, customTerms: customTerms)
+            var all: [String: Int] = [:]
+            var editable: [String: Int] = [:]
+            for token in spellingWords(in: text) {
+                all[token.word, default: 0] += 1
+                if !protected.intersects(integersIn: token.range.location..<NSMaxRange(token.range)) {
+                    editable[token.word, default: 0] += 1
+                }
+            }
+            return (all, editable)
+        }
+
+        let original = counts(in: source)
+        let updated = counts(in: response)
+        let introduced = updated.all.filter { word, count in
+            count > original.all[word, default: 0]
+        }
+        let candidates = (normalizedCustomTerms(customTerms) + terms(for: enabled)).filter {
+            introduced[$0.lowercased()] != nil
+        }
+        let references = spellingReferences(in: source, terms: candidates, customTerms: customTerms)
+        var sources: [String: Set<String>] = [:]
+        for reference in references {
+            sources[reference.term.lowercased(), default: []].insert(reference.source)
+        }
+        var available = original.editable
+        for word in available.keys {
+            available[word] = min(
+                original.all[word, default: 0] - updated.all[word, default: 0],
+                original.editable[word, default: 0] - updated.editable[word, default: 0]
+            )
+        }
+        var assignments: [String: [String: Int]] = [:]
+
+        func consumeSource(for target: String, visited: inout Set<String>) -> Bool {
+            guard visited.insert(target).inserted else { return false }
+            for word in sources[target, default: []].sorted() {
+                if available[word, default: 0] > 0 {
+                    available[word, default: 0] -= 1
+                    assignments[word, default: [:]][target, default: 0] += 1
+                    return true
+                }
+                let assigned = assignments[word, default: [:]]
+                for previous in assigned.keys.sorted() where assigned[previous, default: 0] > 0 {
+                    if consumeSource(for: previous, visited: &visited) {
+                        assignments[word, default: [:]][previous, default: 0] -= 1
+                        assignments[word, default: [:]][target, default: 0] += 1
+                        return true
+                    }
+                }
+            }
+            return false
+        }
+
+        // A hint can replace a misrecognition, but cannot be inserted elsewhere while that source survives.
+        for target in sources.keys.sorted() {
+            let addedCount = updated.all[target, default: 0] - original.all[target, default: 0]
+            for _ in 0..<addedCount {
+                var visited = Set<String>()
+                guard consumeSource(for: target, visited: &visited) else { return false }
+            }
+        }
+        return true
+    }
+
     private static func normalizeSpelling(_ transcript: String, terms: [String]) -> String {
         let source = transcript as NSString
         var replacements: [(range: NSRange, term: String)] = []
-        var occupied = literalRanges(in: transcript)
+        var occupied = normalizationProtectedRanges(in: transcript)
         for candidate in normalizationCandidates(for: terms) {
-            guard let expression = try? NSRegularExpression(
-                pattern: candidate.pattern,
-                options: [.caseInsensitive]
-            ) else { continue }
+            guard let expression = candidate.expression else { continue }
 
             let matches = expression.matches(
                 in: transcript,
@@ -435,21 +516,206 @@ public enum VoiceLexicon: String, Codable, CaseIterable, Identifiable, Sendable,
         return result
     }
 
-    private struct NormalizationCandidate {
-        let term: String
-        let pattern: String
+    private static func normalizationProtectedRanges(in transcript: String, customTerms: [String] = []) -> IndexSet {
+        let range = NSRange(location: 0, length: (transcript as NSString).length)
+        var result = literalRanges(in: transcript)
+        let expressions = [quotationExpression] + normalizationCandidates(for: customTerms).compactMap(\.expression)
+        for expression in expressions {
+            for match in expression.matches(in: transcript, range: range) {
+                result.insert(integersIn: match.range.location..<NSMaxRange(match.range))
+            }
+        }
+        return result
     }
+
+    private static func spellingWords(in text: String) -> [(word: String, range: NSRange)] {
+        let source = text as NSString
+        return spellingWordExpression.matches(in: text, range: NSRange(location: 0, length: source.length)).map {
+            (source.substring(with: $0.range).lowercased(), $0.range)
+        }
+    }
+
+    private static let quotationExpression = try! NSRegularExpression(
+        pattern: #"```[\s\S]*?(?:```|$)|`[^`\r\n]*(?:`|$)|"[^"]*"|'[^']*'|“[^”]*”|‘[^’]*’|「[^」]*」|『[^』]*』"#
+    )
+    private static let spellingWordExpression = try! NSRegularExpression(
+        pattern: #"(?<![A-Za-z0-9_])[A-Za-z]{2,32}(?![A-Za-z0-9_])"#
+    )
+    private static let knownComputerWords = Set(computerTerms.terms.flatMap { spellingWords(in: $0).map(\.word) })
+    private static let computerSpellingPhrases = spellingPhrases(in: computerTerms.terms)
+
+    private static func spellingPhrases(in terms: [String]) -> [[String]] {
+        terms.map { $0.split(separator: " ").map(String.init) }.filter { phrase in
+            phrase.count >= 2 && phrase.allSatisfy { $0.utf8.allSatisfy { (65...90).contains($0) || (97...122).contains($0) } }
+        }
+    }
+
+    private static func spellingReferences(in transcript: String, terms: [String], customTerms: [String]) -> [(source: String, term: String)] {
+        let candidates = terms.filter { term in
+            (3...32).contains(term.utf8.count) && term.utf8.allSatisfy { (65...90).contains($0) || (97...122).contains($0) }
+        }
+        let knownWords = Set(candidates.map { $0.lowercased() })
+        let protected = normalizationProtectedRanges(in: transcript, customTerms: customTerms)
+        var seen = Set<String>()
+        var result: [(source: String, term: String)] = []
+        for token in spellingWords(in: transcript) {
+            guard token.word.count >= 3, !knownWords.contains(token.word),
+                  !protected.intersects(integersIn: token.range.location..<NSMaxRange(token.range)),
+                  seen.insert(token.word).inserted else { continue }
+            let consonants = token.word.filter { !"aeiouy".contains($0) }
+            let matches = candidates.compactMap { term -> (term: String, phoneticPenalty: Int, distance: Int)? in
+                let word = term.lowercased()
+                let limit = max(word.count, token.word.count) >= 4 ? 2 : 1
+                guard let distance = spellingDistance(token.word, word, limit: limit) else { return nil }
+                // This coarse vowel-insensitive key only ranks bounded hints; it never authorizes a replacement.
+                let penalty = consonants == word.filter { !"aeiouy".contains($0) } ? 0 : 1
+                return (term, penalty, distance)
+            }.sorted {
+                if $0.phoneticPenalty != $1.phoneticPenalty { return $0.phoneticPenalty < $1.phoneticPenalty }
+                if $0.distance != $1.distance { return $0.distance < $1.distance }
+                return $0.term < $1.term
+            }
+            result.append(contentsOf: matches.prefix(8).map { (token.word, $0.term) })
+        }
+        return result
+    }
+
+    private static func normalizeContextualSpelling(_ transcript: String, customTerms: [String]) -> String {
+        let source = transcript as NSString
+        let words = spellingWords(in: transcript)
+        let protected = normalizationProtectedRanges(in: transcript, customTerms: customTerms)
+        var replacements: [NSRange: Set<String>] = [:]
+        for phrase in spellingPhrases(in: customTerms) + computerSpellingPhrases where phrase.count <= words.count {
+            for start in 0...(words.count - phrase.count) {
+                let window = Array(words[start..<(start + phrase.count)])
+                let differences = phrase.indices.filter { phrase[$0].lowercased() != window[$0].word }
+                guard differences.count == 1 else { continue }
+                let index = differences[0]
+                let token = window[index]
+                guard token.word.count >= 4, phrase[index].count >= 4, !knownComputerWords.contains(token.word),
+                      !protected.intersects(integersIn: token.range.location..<NSMaxRange(token.range)),
+                      spellingDistance(token.word, phrase[index].lowercased(), limit: 1) != nil else { continue }
+                let adjacent = window.indices.dropFirst().allSatisfy { offset in
+                    let end = NSMaxRange(window[offset - 1].range)
+                    let separator = source.substring(with: NSRange(location: end, length: window[offset].range.location - end))
+                    return separator.range(of: #"\A\h*(?:的\h*)?\z"#, options: .regularExpression) != nil
+                }
+                guard adjacent else { continue }
+                let phraseRange = NSRange(location: window[0].range.location, length: NSMaxRange(window[window.count - 1].range) - window[0].range.location)
+                let before = source.substring(to: phraseRange.location)
+                let after = source.substring(from: NSMaxRange(phraseRange))
+                guard before.range(of: #"[A-Za-z]\h+\z"#, options: .regularExpression) == nil,
+                      after.range(of: #"^\h+[A-Za-z]"#, options: .regularExpression) == nil else { continue }
+                // An exact neighboring word alone is insufficient: "a daft PR campaign" is ordinary English.
+                guard hasComputerLexiconContext(in: source, excluding: phraseRange) else { continue }
+                replacements[token.range, default: []].insert(phrase[index])
+            }
+        }
+        var normalized = transcript
+        for (range, candidates) in replacements.sorted(by: { $0.key.location > $1.key.location }) where candidates.count == 1 {
+            normalized = (normalized as NSString).replacingCharacters(in: range, with: candidates.first!)
+        }
+        return normalized
+    }
+
+    private static func spellingDistance(_ left: String, _ right: String, limit: Int) -> Int? {
+        let lhs = Array(left.utf8)
+        let rhs = Array(right.utf8)
+        guard abs(lhs.count - rhs.count) <= limit else { return nil }
+        var previous = Array(0...rhs.count)
+        var beforePrevious = previous
+        for row in 1...lhs.count {
+            var current = [row] + Array(repeating: 0, count: rhs.count)
+            for column in 1...rhs.count {
+                current[column] = min(previous[column] + 1, current[column - 1] + 1,
+                                      previous[column - 1] + (lhs[row - 1] == rhs[column - 1] ? 0 : 1))
+                if row > 1, column > 1, lhs[row - 1] == rhs[column - 2], lhs[row - 2] == rhs[column - 1] {
+                    current[column] = min(current[column], beforePrevious[column - 2] + 1)
+                }
+            }
+            guard current.min()! <= limit else { return nil }
+            beforePrevious = previous
+            previous = current
+        }
+        return previous[rhs.count] <= limit ? previous[rhs.count] : nil
+    }
+
+    struct NormalizationCandidate: Sendable {
+        let term: String
+        let key: String
+        let scalarCount: Int
+        let expression: NSRegularExpression?
+
+        init(term: String) {
+            self.term = term
+            key = compactMatchingKey(for: term)
+            scalarCount = term.unicodeScalars.count
+            expression = try? NSRegularExpression(
+                pattern: normalizationPattern(for: term),
+                options: [.caseInsensitive]
+            )
+        }
+    }
+
+    final class NormalizationCandidateCache: @unchecked Sendable {
+        private struct Entry {
+            let candidate: NormalizationCandidate
+            let textBytes: Int
+            var access: UInt64
+        }
+
+        private let lock = NSLock()
+        private var entries: [Data: Entry] = [:]
+        private var access: UInt64 = 0
+        private var textBytes = 0
+
+        func candidate(for term: String) -> NormalizationCandidate {
+            guard isShortHint(term) else { return NormalizationCandidate(term: term) }
+            let cacheKey = Data(term.utf8)
+            lock.lock()
+            defer { lock.unlock() }
+            access &+= 1
+            if var existing = entries[cacheKey] {
+                existing.access = access
+                entries[cacheKey] = existing
+                return existing.candidate
+            }
+
+            // A short word can still share an oversized buffer reserved by its caller.
+            let candidate = NormalizationCandidate(term: String(decoding: cacheKey, as: UTF8.self))
+            // This budget counts retained text, not Foundation's private compiled-pattern storage.
+            let cost = cacheKey.count + term.utf8.count + candidate.key.utf8.count
+                + (candidate.expression?.pattern.utf8.count ?? 0)
+            while entries.count >= 2_048 || textBytes + cost > 1_048_576 {
+                // Short hints always fit the byte budget, so eviction cannot exhaust the cache here.
+                let oldest = entries.min { $0.value.access < $1.value.access }!
+                entries.removeValue(forKey: oldest.key)
+                textBytes -= oldest.value.textBytes
+            }
+            entries[cacheKey] = Entry(candidate: candidate, textBytes: cost, access: access)
+            textBytes += cost
+            return candidate
+        }
+
+        var retainedResources: (count: Int, textBytes: Int) {
+            lock.lock()
+            defer { lock.unlock() }
+            return (entries.count, textBytes)
+        }
+    }
+
+    private static let normalizationCandidateCache = NormalizationCandidateCache()
 
     private static func normalizationCandidates(for terms: [String]) -> [NormalizationCandidate] {
         var seen = Set<String>()
-        return terms.compactMap { term in
-            let key = compactMatchingKey(for: term)
-            guard !key.isEmpty, seen.insert(key).inserted else { return nil }
-            return NormalizationCandidate(term: term, pattern: normalizationPattern(for: term))
+        return terms.compactMap { term -> NormalizationCandidate? in
+            let candidate = normalizationCandidateCache.candidate(for: term)
+            guard !candidate.key.isEmpty, seen.insert(candidate.key).inserted else { return nil }
+            return candidate
         }
         .sorted {
-            let leftLength = $0.term.unicodeScalars.count
-            let rightLength = $1.term.unicodeScalars.count
+            let leftLength = $0.scalarCount
+            let rightLength = $1.scalarCount
             if leftLength != rightLength { return leftLength > rightLength }
             return $0.term < $1.term
         }
@@ -486,6 +752,10 @@ public enum VoiceLexicon: String, Codable, CaseIterable, Identifiable, Sendable,
     }
 
     private static func normalizationPattern(for term: String) -> String {
+        if gitCollaborationTerms.contains(term), term.contains(" ") {
+            let body = term.split(separator: " ").map { asciiTokenPattern(String($0)) }.joined(separator: #"\h+"#)
+            return "(?<![A-Za-z0-9])\(body)(?![A-Za-z0-9])"
+        }
         let matchingKey = compactMatchingKey(for: term)
         if matchingKey == "sshkey" {
             return #"(?<![A-Za-z0-9])s[\s\p{P}\p{S}]*s?[\s\p{P}\p{S}]*h[\s\p{P}\p{S}]*(?:key|k|密钥|密匙)(?![A-Za-z0-9])"#
@@ -547,7 +817,7 @@ public enum VoiceLexicon: String, Codable, CaseIterable, Identifiable, Sendable,
 
         // Ordinary "get up" must remain unchanged without lexicon context, so term correction does not alter everyday speech.
         let matches = githubAliasRanges(in: transcript)
-        let literals = literalRanges(in: transcript)
+        let literals = normalizationProtectedRanges(in: transcript)
         var normalized = transcript
         let contextualMatches = contextualTranscript.map(githubAliasRanges(in:)) ?? []
         for index in matches.indices.reversed() {
@@ -638,7 +908,7 @@ public enum VoiceLexicon: String, Codable, CaseIterable, Identifiable, Sendable,
         guard enabled.contains(.computerTerms) || enabled.contains(.brandsAndProducts) else { return transcript }
         let expression = try! NSRegularExpression(pattern: #"(?<![A-Za-z0-9])Q运(?=\s*[0-9])|伽马"#, options: [.caseInsensitive])
         let source = transcript as NSString
-        let literals = literalRanges(in: transcript)
+        let literals = normalizationProtectedRanges(in: transcript)
         var normalized = transcript
         for match in expression.matches(in: transcript, range: NSRange(location: 0, length: source.length)).reversed() {
             guard !literals.intersects(integersIn: match.range.location..<NSMaxRange(match.range)) else { continue }
@@ -691,7 +961,7 @@ public enum VoiceLexicon: String, Codable, CaseIterable, Identifiable, Sendable,
             searchLocation = NSMaxRange(match)
         }
         var normalized = transcript
-        let literals = literalRanges(in: transcript)
+        let literals = normalizationProtectedRanges(in: transcript)
         for match in matches.reversed() {
             guard !literals.intersects(integersIn: match.location..<NSMaxRange(match)) else { continue }
             let current = normalized as NSString
@@ -757,7 +1027,7 @@ public enum VoiceLexicon: String, Codable, CaseIterable, Identifiable, Sendable,
         }
 
         return VoiceLexicon.computerTerms.terms
-            .filter { compactMatchingKey(for: $0) != "github" }
+            .filter { !["github", "repo", "init", "draft"].contains(compactMatchingKey(for: $0)) }
             .contains { containsCompactTerm($0, in: maskedSentence) }
     }
 

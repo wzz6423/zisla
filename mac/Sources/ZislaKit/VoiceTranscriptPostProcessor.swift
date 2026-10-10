@@ -48,7 +48,7 @@ public enum VoiceTranscriptPostProcessor {
             initialMessages
         )
         try Task.checkCancellation()
-        let cleaned = deliveredText(response, fallback: lexiconNormalizedTranscript, customHotwords: customHotwords)
+        let cleaned = deliveredText(response, fallback: lexiconNormalizedTranscript, customHotwords: customHotwords, enabledLexicons: enabledLexicons)
         guard proofreadingEnabled else { return cleaned }
 
         do {
@@ -63,7 +63,7 @@ public enum VoiceTranscriptPostProcessor {
                 )
             )
             try Task.checkCancellation()
-            return deliveredText(proofread, fallback: cleaned, customHotwords: customHotwords)
+            return deliveredText(proofread, fallback: cleaned, customHotwords: customHotwords, enabledLexicons: enabledLexicons)
         } catch is CancellationError {
             throw CancellationError()
         } catch {
@@ -126,7 +126,8 @@ public enum VoiceTranscriptPostProcessor {
     public static func deliveredText(
         _ response: String,
         fallback: String,
-        customHotwords: [String] = []
+        customHotwords: [String] = [],
+        enabledLexicons: Set<VoiceLexicon> = []
     ) -> String {
         let normalized = response.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !normalized.isEmpty else { return fallback }
@@ -174,6 +175,10 @@ public enum VoiceTranscriptPostProcessor {
             let responseCount = literalCount(of: term, in: normalized)
             if responseCount < originalCount { return fallback }
         }
+
+        guard VoiceLexicon.preservesSpellingSources(
+            in: normalized, source: normalizedFallback, for: enabledLexicons, customTerms: customHotwords
+        ) else { return fallback }
 
         return normalized
     }
