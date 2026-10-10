@@ -6,6 +6,44 @@ import ZislaCore
 
 struct VoiceTranscriptPostProcessorTests {
 
+    @MainActor
+    @Test(arguments: ["raw", "number", "url", "personal"])
+    func localCorrectionAndUncertainCandidatesSurviveGuardedProcessing(_ responseKind: String) async throws {
+        let raw = "不要提交 3 次，仓库创建 rap，再 unite，开 daft 的 PR；NovaDesk 使用 https://example.com/v3.5。"
+        let expected = "不要提交 3 次，仓库创建 rap，再 unite，开 dRaFt 的 PR；NovaDesk 使用 https://example.com/v3.5。"
+        let personal = ["NovaDesk", "dRaFt"]
+        let local = VoiceLexicon.normalizeTranscript(raw, for: [.computerTerms], customTerms: personal)
+        #expect(local == expected)
+        var requests = 0
+        let processed = try await VoiceTranscriptPostProcessor.process(
+            rawTranscript: raw,
+            lexiconNormalizedTranscript: local,
+            enabledLexicons: [.computerTerms],
+            customHotwords: personal,
+            proofreadingEnabled: true
+        ) { _, messages in
+            requests += 1
+            let data = try self.payload(messages)
+            #expect(data["raw_transcript"] as? String == (requests == 1 ? raw : expected))
+            #expect(data["lexicon_transcript"] as? String == expected)
+            let references = try #require(data["reference_vocabulary"] as? [String])
+            #expect(references.contains("repo"))
+            #expect(references.contains("init"))
+            #expect(data["custom_vocabulary"] as? [String] == personal)
+            switch responseKind {
+            case "number": return expected.replacingOccurrences(of: "3 次", with: "4 次")
+            case "url": return expected.replacingOccurrences(of: "/v3.5", with: "/v4.5")
+            case "personal": return expected.replacingOccurrences(of: "NovaDesk", with: "NovaDisk")
+            default: return raw
+            }
+        }
+        let delivered = VoiceLexicon.normalizeTranscript(
+            processed, for: [.computerTerms], customTerms: personal, contextualTranscript: raw
+        )
+        #expect(requests == 2)
+        #expect(delivered == expected)
+    }
+
     @Test
     func dictionaryContentIsDataAndDoesNotExpandSystemInstructions() throws {
         let baseline = VoiceTranscriptPostProcessor.systemPrompt
@@ -577,5 +615,54 @@ struct VoiceTranscriptPostProcessorTests {
                 fallback: "当然，整理如下：原文"
             ) == "当然，整理如下：新的原文"
         )
+    }
+}
+
+struct VoiceSpellingSourceIntegrationTests {
+    @MainActor
+    @Test(arguments: [1, 2])
+    func bothModelPassesRejectUnrelatedCandidateInsertions(_ corruptedPass: Int) async throws {
+        let source = "我在 GitHub 分享 rap 音乐，歌名是 unite，票价 7.31 元。"
+        let corrupt = "我在 GitHub 分享 rap 音乐，歌名是 unite，repo 7.31 元。"
+        var calls = 0
+        let result = try await VoiceTranscriptPostProcessor.process(
+            rawTranscript: source,
+            lexiconNormalizedTranscript: source,
+            enabledLexicons: [.computerTerms],
+            proofreadingEnabled: true
+        ) { _, messages in
+            calls += 1
+            if calls == 2 {
+                let message = try #require(messages.first)
+                let payload = try #require(JSONSerialization.jsonObject(with: Data(message.content.utf8)) as? [String: Any])
+                #expect(payload["raw_transcript"] as? String == source)
+                #expect(payload["lexicon_transcript"] as? String == source)
+            }
+            return calls == corruptedPass ? corrupt : source
+        }
+        #expect(calls == 2)
+        #expect(result == source)
+    }
+
+    @MainActor
+    @Test
+    func sourceGuardKeepsSuccessfulContextualCorrections() async throws {
+        let source = "GitHub 创建 rap，再 unite 这个 rap，最后开 draft 的 PR。"
+        let corrected = "GitHub 创建 repo，再 init 这个 repo，最后开 draft 的 PR。"
+        let result = try await VoiceTranscriptPostProcessor.process(
+            rawTranscript: source,
+            lexiconNormalizedTranscript: source,
+            enabledLexicons: [.computerTerms],
+            proofreadingEnabled: true
+        ) { _, _ in corrected }
+        #expect(result == corrected)
+    }
+
+    @Test
+    func personalCandidateCannotBeInsertedBesideItsUnchangedSource() {
+        let source = "cap cot"
+        #expect(VoiceTranscriptPostProcessor.deliveredText(
+            "cap cot cat", fallback: source, customHotwords: ["cat"]
+        ) == source)
     }
 }

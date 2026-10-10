@@ -3,6 +3,112 @@ import Testing
 @testable import ZislaCore
 
 struct VoiceLexiconTests {
+    @Test(arguments: [
+        ("再给他上创建一个rap，然后unite这个rap，然后提交推送到远端并开个daft的PR", "再给他上创建一个rap，然后unite这个rap，然后提交推送到远端并开个draft的PR"),
+        ("在仓库执行 git iniy。", "在仓库执行 git init。"),
+        ("提交分支前打开 drafft PR。", "提交分支前打开 draft PR。"),
+        ("仓库需要一个 draf 的 PR。", "仓库需要一个 draft 的 PR。"),
+        ("仓库里新建 drfat PR。", "仓库里新建 draft PR。"),
+        ("提交前准备 pull reqeust。", "提交前准备 pull request。"),
+        ("请在仓库执行 git commiy，再执行 git push。", "请在仓库执行 git commit，再执行 git push。"),
+        ("不要提交 3 次，仓库只开 1 个 daft 的 PR，版本仍是 3.5。", "不要提交 3 次，仓库只开 1 个 draft 的 PR，版本仍是 3.5。"),
+        ("Heading \ndaft PR 提交到仓库。", "Heading \ndraft PR 提交到仓库。"),
+    ])
+    func correctsOneEditOnlyInAnchoredDictionaryPhrases(_ input: String, _ expected: String) {
+        let output = VoiceLexicon.normalizeTranscript(input, for: [.computerTerms])
+        #expect(output == expected)
+        #expect(VoiceLexicon.normalizeTranscript(output, for: [.computerTerms]) == output)
+    }
+
+    @Test(arguments: [
+        "I enjoy rap and we unite for a good cause.",
+        "GitHub 的音乐项目里记录 rap，we unite through music。",
+        "a daft PR campaign",
+        "GitHub 的市场团队评价这是一场 daft PR campaign。",
+        "GitHub 仓库讨论这个 daft PR campaign 的文案。",
+        "GitHub 仓库里写 please open daft PR now。",
+        "仓库里的 daft clown 不需要修改。",
+        "仓库里的 draff pro 没有完整搭配。",
+        "仓库里只有 daf PR。",
+        "我在仓库整理 doft PR。",
+        "daft PR。仓库在后一句。",
+        "GitHub 仓库里的 daft，PR 需要写说明。",
+        "GitHub 仓库标识 daft2 PR 和 v2daft PR 不能改。",
+        "今天只做三个是，名字叫再给他。",
+        "I get up and write a draft.",
+        "I get up and read about repo and init.",
+    ])
+    func fuzzySpellingKeepsOrdinaryWordsAndInsufficientEvidence(_ input: String) {
+        #expect(VoiceLexicon.normalizeTranscript(input, for: [.computerTerms]) == input)
+    }
+
+    @Test(arguments: [
+        "仓库里保留 `daft PR`、\"git iniy\" 和 “pull reqeust”。",
+        "仓库里原样保留 'daft PR'、‘git iniy’ 和「pull reqeust」。",
+        "仓库里的 ```\ngit iniy\ndaft PR\n``` 按原样保留。",
+        "仓库里这个未闭合代码片段 `daft PR",
+        "仓库里的 https://example.com/daft/PR?q=unite 和 /tmp/daft/PR 不修改。",
+        "仓库里的 daft@example.com 和 ./daft PR.txt 不修改。",
+    ])
+    func fuzzySpellingPreservesQuotedAndLiteralText(_ input: String) {
+        #expect(VoiceLexicon.normalizeTranscript(input, for: [.computerTerms]) == input)
+    }
+
+    @Test
+    func fuzzySpellingHonorsPersonalWordsAndRejectsTiedPhrases() {
+        for custom in [["daft"], ["daft PR"]] {
+            let input = "提交仓库，开 daft PR。"
+            #expect(VoiceLexicon.normalizeTranscript(input, for: [.computerTerms], customTerms: custom) == input)
+        }
+        #expect(VoiceLexicon.normalizeTranscript(
+            "提交仓库，开 daft PR。", for: [.computerTerms], customTerms: ["DraFt"]
+        ) == "提交仓库，开 DraFt PR。")
+        #expect(VoiceLexicon.normalizeTranscript(
+            "仓库需要一个 graft PR。", for: [.computerTerms], customTerms: ["craft PR"]
+        ) == "仓库需要一个 graft PR。")
+        #expect(VoiceLexicon.normalizeTranscript(
+            "仓库需要一个 draft PR。", for: [.computerTerms], customTerms: ["craft PR"]
+        ) == "仓库需要一个 draft PR。")
+    }
+
+    @Test
+    func fuzzyReferencesRecallSoundAlikeWordsWithoutReplacingThem() {
+        let input = "再给他上创建一个rap，然后unite这个rap，然后提交推送到远端并开个daft的PR"
+        let references = VoiceLexicon.postProcessingTerms(in: input, for: [.computerTerms])
+        #expect(references.contains("repo"))
+        #expect(references.contains("init"))
+        #expect(references.contains("draft"))
+        if let repoIndex = references.firstIndex(of: "repo"), let ragIndex = references.firstIndex(of: "RAG") {
+            #expect(repoIndex < ragIndex)
+        }
+        #expect(!VoiceLexicon.postProcessingTerms(
+            in: "I enjoy rap and we unite for a good cause.", for: [.computerTerms]
+        ).contains("repo"))
+        #expect(!VoiceLexicon.postProcessingTerms(
+            in: input, for: [.computerTerms], customTerms: ["rap"]
+        ).contains("repo"))
+        #expect(VoiceLexicon.postProcessingTerms(
+            in: "仓库里原样引用 `rap unite`。", for: [.computerTerms]
+        ).allSatisfy { !["repo", "init"].contains($0) })
+    }
+
+    @Test
+    func fuzzyCorrectionsRespectLexiconSwitchesAndReferenceBudgets() {
+        let input = "仓库里创建 rap，unite 后开 daft 的 PR。"
+        for enabled: Set<VoiceLexicon> in [[], [.brandsAndProducts], [.filmAndMusic]] {
+            #expect(VoiceLexicon.normalizeTranscript(input, for: enabled) == input)
+            let references = VoiceLexicon.postProcessingTerms(in: input, for: enabled)
+            #expect(references.allSatisfy { !["repo", "init", "draft"].contains($0) })
+        }
+        let custom = (0..<100).map { "PersonalWord\($0)" }
+        let references = VoiceLexicon.postProcessingTerms(
+            in: input + " " + custom.joined(separator: " "), for: [.computerTerms], customTerms: custom
+        )
+        #expect(references.count <= 48)
+        #expect(references.reduce(0) { $0 + $1.unicodeScalars.count } <= 1_024)
+        #expect(references.first == custom.first)
+    }
+
     @Test
     func sharedMatchersPreservePerCallVocabularyAndPersonalPatterns() async {
         let configurations: [(Set<VoiceLexicon>, [String], String)] = [
@@ -341,5 +447,338 @@ struct VoiceLexiconTests {
         #expect(Array(hints.prefix(2)) == personal)
         #expect(["唐诗", "YYDS", "北京", "Apple", "新冠", "民法典", "股票", "高等数学", "电影", "英雄联盟", "高铁", "外卖"]
             .allSatisfy(hints.contains))
+    }
+}
+
+struct VoiceLexiconCacheTests {
+    @Test
+    func cacheReusesCandidatesAndEvictsTheLeastRecentlyUsedExpression() throws {
+        let cache = VoiceLexicon.NormalizationCandidateCache()
+        weak var first: NSRegularExpression?
+        weak var second: NSRegularExpression?
+        autoreleasepool {
+            first = cache.candidate(for: "Cache0").expression
+            second = cache.candidate(for: "Cache1").expression
+        }
+        #expect(first != nil)
+        #expect(second != nil)
+        for index in 2..<2_048 {
+            _ = cache.candidate(for: "Cache\(index)")
+        }
+        let touched = try #require(cache.candidate(for: "Cache0").expression)
+        #expect(touched === first)
+        let previousBytes = cache.retainedResources.textBytes
+        let removedBytes = "Cache1".utf8.count * 3 + (second?.pattern.utf8.count ?? 0)
+        let inserted = cache.candidate(for: "Cache2048")
+        let insertedBytes = inserted.term.utf8.count * 3 + (inserted.expression?.pattern.utf8.count ?? 0)
+        #expect(second == nil)
+        #expect(cache.retainedResources.textBytes == previousBytes - removedBytes + insertedBytes)
+        #expect(cache.candidate(for: "Cache0").expression === touched)
+        #expect(cache.retainedResources.count == 2_048)
+        let rebuilt = cache.candidate(for: "Cache1")
+        #expect(rebuilt.term == "Cache1")
+        #expect(rebuilt.expression?.firstMatch(in: "cache1", range: NSRange(location: 0, length: 6)) != nil)
+        #expect(cache.retainedResources.count == 2_048)
+    }
+
+    @Test
+    func cacheTextBudgetReleasesLongPatternsBeforeTheEntryLimit() {
+        let cache = VoiceLexicon.NormalizationCandidateCache()
+        let terms = (0..<1_200).map { String(format: "%04d", $0) + String(repeating: "A", count: 76) }
+        let observed = terms.map { term in
+            autoreleasepool { WeakExpression(cache.candidate(for: term).expression) }
+        }
+        #expect(observed.first?.value == nil)
+        #expect(observed.last?.value != nil)
+        var retainedBytes = 0
+        var retainedCount = 0
+        for (term, observed) in zip(terms, observed) {
+            if let expression = observed.value {
+                retainedCount += 1
+                retainedBytes += term.utf8.count * 3 + expression.pattern.utf8.count
+            }
+        }
+        #expect(retainedCount > 0 && retainedCount < terms.count)
+        #expect(retainedBytes <= 1_048_576)
+        #expect(cache.retainedResources == (retainedCount, retainedBytes))
+    }
+
+    @Test(arguments: [
+        String(repeating: "A", count: 81),
+        String(repeating: "长", count: 81),
+        "a" + String(repeating: "\u{0301}", count: 80),
+        "Line\nBreak",
+    ])
+    func oversizedAndControlCharacterTermsAreReturnedWithoutBeingRetained(_ term: String) {
+        let cache = VoiceLexicon.NormalizationCandidateCache()
+        weak var expression: NSRegularExpression?
+        autoreleasepool {
+            let candidate = cache.candidate(for: term)
+            #expect(Data(candidate.term.utf8) == Data(term.utf8))
+            #expect(candidate.expression != nil)
+            expression = candidate.expression
+        }
+        #expect(expression == nil)
+        #expect(cache.retainedResources == (0, 0))
+    }
+
+    @Test
+    func allBuiltInsAndOneHundredOnePersonalTermsFitTheWarmCache() {
+        let cache = VoiceLexicon.NormalizationCandidateCache()
+        let terms = VoiceLexicon.terms(for: VoiceLexicon.defaultEnabled)
+            + (0..<101).map { "PersonalProduct\($0)" }
+        let expressions = terms.map { cache.candidate(for: $0).expression }
+        for (term, expression) in zip(terms, expressions) {
+            #expect(cache.candidate(for: term).expression === expression)
+        }
+        #expect(cache.retainedResources.count == terms.count)
+        #expect(cache.retainedResources.textBytes <= 1_048_576)
+    }
+
+    @Test
+    func cacheKeysPreserveCaseSeparatorsAndUnicodeBytes() {
+        let cache = VoiceLexicon.NormalizationCandidateCache()
+        let terms = ["GPT", "gpt", "A+B", "A-B", "A B", "CaféDesk", "Cafe\u{0301}Desk"]
+        for _ in 0..<2 {
+            for term in terms {
+                #expect(Data(cache.candidate(for: term).term.utf8) == Data(term.utf8))
+            }
+        }
+        #expect(cache.retainedResources.count == terms.count)
+    }
+
+    @Test
+    func cachedTermsDoNotRetainOversizedCallerStorage() throws {
+        let cache = VoiceLexicon.NormalizationCandidateCache()
+        var term = "PersonalProductWithReservedStorage"
+        term.reserveCapacity(1_048_576)
+        let callerStorage = try #require(term.utf8.withContiguousStorageIfAvailable {
+            UInt(bitPattern: $0.baseAddress!)
+        })
+        let candidate = cache.candidate(for: term)
+        let cachedStorage = try #require(candidate.term.utf8.withContiguousStorageIfAvailable {
+            UInt(bitPattern: $0.baseAddress!)
+        })
+        withExtendedLifetime(term) {
+            #expect(cachedStorage != callerStorage)
+            #expect(Data(candidate.term.utf8) == Data(term.utf8))
+        }
+    }
+
+    @Test
+    func simultaneousMissesShareOneCompiledCandidate() async {
+        let cache = VoiceLexicon.NormalizationCandidateCache()
+        let candidates = await withTaskGroup(of: VoiceLexicon.NormalizationCandidate.self) { group in
+            for _ in 0..<64 {
+                group.addTask { cache.candidate(for: "ConcurrentProduct") }
+            }
+            var result: [VoiceLexicon.NormalizationCandidate] = []
+            for await candidate in group { result.append(candidate) }
+            return result
+        }
+        let first = candidates.first?.expression
+        #expect(first != nil)
+        #expect(candidates.allSatisfy { $0.expression === first })
+        #expect(cache.retainedResources.count == 1)
+    }
+
+    @Test
+    func concurrentVocabularyChurnPreservesResourceBoundsAndSpellings() async {
+        let cache = VoiceLexicon.NormalizationCandidateCache()
+        await withTaskGroup(of: Void.self) { group in
+            for worker in 0..<8 {
+                group.addTask {
+                    for index in 0..<512 {
+                        let term = "Worker\(worker)Product\(index)"
+                        #expect(cache.candidate(for: term).term == term)
+                        let resources = cache.retainedResources
+                        #expect(resources.count <= 2_048)
+                        #expect(resources.textBytes <= 1_048_576)
+                    }
+                }
+            }
+        }
+        #expect(cache.retainedResources.count == 2_048)
+    }
+
+    @Test
+    func destroyingTheCacheReleasesItsCompiledExpressions() {
+        weak var expression: NSRegularExpression?
+        autoreleasepool {
+            let cache = VoiceLexicon.NormalizationCandidateCache()
+            expression = cache.candidate(for: "TemporaryProduct").expression
+            #expect(expression != nil)
+        }
+        #expect(expression == nil)
+    }
+
+    @Test
+    func normalizationKeepsExactUnicodeSpellingsAfterCacheWarmup() {
+        for _ in 0..<2 {
+            for term in ["CaféDesk", "Cafe\u{0301}Desk"] {
+                let output = VoiceLexicon.normalizeTranscript("用 \(term.lowercased())。", for: [], customTerms: [term])
+                #expect(Data(output.utf8) == Data("用 \(term)。".utf8))
+            }
+        }
+    }
+
+    @Test
+    func evictionDoesNotTruncateCurrentVocabularyOrRetainRemovedPersonalWords() {
+        let terms = (0..<2_050).map { "PersonalWord\($0)" } + ["TailWord"]
+        #expect(VoiceLexicon.normalizeTranscript("tail word", for: [], customTerms: terms) == "TailWord")
+        #expect(VoiceLexicon.normalizeTranscript("tail word", for: [], customTerms: ["DifferentWord"]) == "tail word")
+        #expect(VoiceLexicon.normalizeTranscript("gemma", for: [.computerTerms], customTerms: ["gEmMa"]) == "gEmMa")
+        #expect(VoiceLexicon.normalizeTranscript("gemma", for: []) == "gemma")
+        #expect(VoiceLexicon.postProcessingTerms(in: "gemma", for: []).isEmpty)
+    }
+
+    @Test(arguments: ["Brand" + String(repeating: "a", count: 80), "Brand" + String(repeating: "\u{0301}", count: 80)])
+    func oversizedPersonalWordsKeepExistingNormalizationBehavior(_ term: String) {
+        let output = VoiceLexicon.normalizeTranscript(term.lowercased(), for: [], customTerms: [term])
+        #expect(Data(output.utf8) == Data(term.utf8))
+    }
+
+    private final class WeakExpression {
+        weak var value: NSRegularExpression?
+
+        init(_ value: NSRegularExpression?) {
+            self.value = value
+        }
+    }
+}
+
+extension VoiceLexiconTests {
+    @Test(arguments: [
+        "仓库原话是“get up 的 SSH key”，保留逐字引用。",
+        "仓库原话是“Google 的伽马四模型”，保留逐字引用。",
+        "仓库原话是“开元项目”，保留逐字引用。",
+        "仓库里的名字是 Gemna。",
+        "仓库执行 Git ini。",
+        "仓库执行 gitt pull。",
+        "GitHub 仓库里写 please open daft PR。",
+        "仓库里的 drax PR。",
+        "早上 get up，下午写 draft。",
+        "早上 get up，今天只学 repo 和 init 这两个单词。",
+    ])
+    func conservativeCorrectionBoundariesRemainLiteral(_ input: String) {
+        #expect(VoiceLexicon.normalizeTranscript(input, for: [.computerTerms]) == input)
+    }
+
+    @Test
+    func approximateHintsHaveTightDistanceAndTokenBudgets() {
+        #expect(!VoiceLexicon.postProcessingTerms(in: "仓库 Git", for: [.computerTerms]).contains("init"))
+        #expect(VoiceLexicon.postProcessingTerms(in: "仓库 completelyunrelatedword", for: [.computerTerms]) == ["仓库"])
+        #expect(!VoiceLexicon.postProcessingTerms(in: "仓库 pi", for: [.computerTerms]).contains("API"))
+        #expect(!VoiceLexicon.postProcessingTerms(in: "仓库 gao", for: [.computerTerms]).contains("RAG"))
+        let ranked = VoiceLexicon.postProcessingTerms(in: "仓库 azaaab", for: [.computerTerms], customTerms: ["aaaaaa", "azaaaa"])
+        #expect(ranked.filter { ["aaaaaa", "azaaaa"].contains($0) }.first == "azaaaa")
+        let personal = (65...90).map { "Draft" + String(Unicode.Scalar($0)!) }
+        let references = VoiceLexicon.postProcessingTerms(in: "仓库 dratf", for: [.computerTerms], customTerms: personal)
+        #expect(references.filter { !personal.prefix(16).contains($0) && $0 != "仓库" }.count <= 8)
+        #expect(VoiceLexicon.normalizeTranscript("仓库保留 Nova aaaab。", for: [.computerTerms], customTerms: ["Nova aaaa-"]) == "仓库保留 Nova aaaab。")
+    }
+
+}
+
+struct VoicePhraseBoundaryTests {
+    @Test(arguments: [
+        "仓库里的 daft\nPR 分行书写。",
+        "仓库记录 Git\niniy。",
+        "仓库里的 daft\r\nPR 分行书写。",
+        "GitHub 仓库记录 please\u{00A0}open\u{00A0}daft\u{00A0}PR。",
+        "仓库有 daft\u{00A0}PR\u{00A0}campaign。",
+    ])
+    func spellingCorrectionsRespectLineAndEnglishPhraseBoundaries(_ input: String) {
+        #expect(VoiceLexicon.normalizeTranscript(input, for: [.computerTerms]) == input)
+    }
+
+    @Test(arguments: [
+        "这些词是 draft、PR、repo，不要合并。",
+        "仓库里的 draft，PR 分别表示不同内容。",
+        "仓库里的 draft。PR 在下一句。",
+        "仓库里的 draft\nPR 分行书写。",
+        "Git，init 是两个术语。",
+        "仓库说明 pull、request 的区别。",
+        "仓库说明 merge；request 的区别。",
+        "仓库记录 draft+PR 这个表达式。",
+        "仓库名字 draftpr 保持原样。",
+    ])
+    func gitPhrasesPreservePunctuationAndLineBreaks(_ input: String) {
+        #expect(VoiceLexicon.normalizeTranscript(input, for: [.computerTerms]) == input)
+    }
+
+    @Test(arguments: [
+        ("仓库需要一个 draft pr。", "仓库需要一个 draft PR。"),
+        ("仓库需要一个 draft\tpr。", "仓库需要一个 draft PR。"),
+        ("仓库执行 Git INIT。", "仓库执行 git init。"),
+        ("仓库执行 git   init。", "仓库执行 git init。"),
+    ])
+    func gitPhrasesStillNormalizeWhitespaceAndCase(_ input: String, _ expected: String) {
+        #expect(VoiceLexicon.normalizeTranscript(input, for: [.computerTerms]) == expected)
+    }
+}
+
+struct VoiceSpellingReferenceTests {
+    @Test(arguments: [
+        "GitHub 原文“rap”，另一个 rap。",
+        "GitHub 原文 `rap`，另一个 rap。",
+        "GitHub 路径 /tmp/rap，另一个 rap。",
+    ])
+    func protectedOccurrencesDoNotConsumeEditableCandidateBudget(_ input: String) {
+        #expect(VoiceLexicon.postProcessingTerms(in: input, for: [.computerTerms]).contains("repo"))
+    }
+
+    @Test(arguments: [
+        "GitHub 原文“rap”。",
+        "GitHub 原文 `rap`。",
+        "GitHub 路径 /tmp/rap。",
+    ])
+    func protectedOccurrencesAloneDoNotProduceCandidates(_ input: String) {
+        #expect(!VoiceLexicon.postProcessingTerms(in: input, for: [.computerTerms]).contains("repo"))
+    }
+}
+
+struct VoiceSpellingSourceTests {
+    @Test(arguments: [
+        ("GitHub 创建 rap，再 unite 这个 rap。", "GitHub 创建 repo，再 init 这个 repo。"),
+        ("GitHub 创建 rap 和 rap。", "GitHub 创建 repo 和 rap。"),
+        ("GitHub 创建 RAP。", "GitHub 创建 repo。"),
+        ("GitHub 分享 rap 音乐。", "GitHub 分享 rap 音乐。"),
+        ("GitHub 仓库", "GitHub 仓库。"),
+        ("在给他创建仓库", "在 GitHub 创建仓库"),
+        ("", ""),
+    ])
+    func acceptsCorrectionsWithConsumedSources(_ source: String, _ response: String) {
+        #expect(VoiceLexicon.preservesSpellingSources(in: response, source: source, for: [.computerTerms]))
+    }
+
+    @Test(arguments: [
+        ("我在 GitHub 分享 rap 音乐，歌名是 unite，票价 7.31 元。", "我在 GitHub 分享 rap 音乐，歌名是 unite，repo 7.31 元。"),
+        ("GitHub 创建 rap。", "GitHub 创建 repo 和 repo。"),
+        ("GitHub 记录 rap 和 rap。", "GitHub 记录 rap 和 repo 与 repo。"),
+        ("GitHub 记录 rap 和 “rap”。", "GitHub 记录 rap 和 repo。"),
+        ("GitHub 记录 rap。", "GitHub 记录 “rap” 和 repo。"),
+        ("GitHub 记录 rap、unite。", "GitHub 记录 repo、init、init。"),
+        ("GitHub 记录 “rap”、rap。", "GitHub 记录 “rap”、rap、repo。"),
+        ("GitHub 用 rap，路径 /tmp/rap.md。", "GitHub 用 rap，路径 /tmp/repo.md。"),
+    ])
+    func rejectsHintsThatDoNotReplaceAvailableOccurrences(_ source: String, _ response: String) {
+        #expect(!VoiceLexicon.preservesSpellingSources(in: response, source: source, for: [.computerTerms]))
+    }
+
+    @Test(arguments: ["cap cot", "cap cap"])
+    func assignsOverlappingCandidatesWithoutReusingAnOccurrence(_ source: String) {
+        #expect(VoiceLexicon.preservesSpellingSources(
+            in: "cat map", source: source, for: [], customTerms: ["cat", "map"]
+        ))
+        #expect(!VoiceLexicon.preservesSpellingSources(
+            in: "cat map map", source: source, for: [], customTerms: ["cat", "map"]
+        ))
+    }
+
+    @Test
+    func inactiveDictionariesDoNotRestrictTheResponse() {
+        #expect(VoiceLexicon.preservesSpellingSources(in: "rap repo", source: "rap", for: []))
+        #expect(VoiceLexicon.preservesSpellingSources(in: "cat map", source: "cap cot", for: [], customTerms: [" cat ", "map", "cat"]))
     }
 }
