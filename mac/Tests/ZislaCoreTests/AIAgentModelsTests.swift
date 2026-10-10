@@ -4,13 +4,68 @@ import Testing
 
 struct AIAgentModelsTests {
     @Test
-    func skillSyncConfigurationDefaultsWhenLoadingExistingState() throws {
-        let state = try JSONDecoder().decode(AIAgentState.self, from: Data("{}".utf8))
+    func skillSyncConfigurationDefaultsOffForNewState() throws {
+        let state = AIAgentState()
+        let roundTripped = try JSONDecoder().decode(
+            AIAgentState.self,
+            from: JSONEncoder().encode(state)
+        )
 
         #expect(state.skillSyncConfiguration == AgentSkillSyncConfiguration())
         #expect(state.skillSyncConfiguration.mode == .symbolicLink)
-        #expect(state.skillSyncConfiguration.enabledDestinations == Set(AgentSkillSyncDestination.allCases))
+        #expect(state.skillSyncConfiguration.enabledDestinations.isEmpty)
+        #expect(roundTripped.skillSyncConfiguration == state.skillSyncConfiguration)
+    }
+
+    @Test(arguments: [
+        "{}",
+        #"{"accounts":[],"channels":[],"skills":[]}"#,
+        #"{"skillSyncConfiguration":null}"#,
+    ])
+    func skillSyncConfigurationDefaultsOffWithoutSavedPreference(payload: String) throws {
+        let state = try JSONDecoder().decode(AIAgentState.self, from: Data(payload.utf8))
+
+        #expect(state.skillSyncConfiguration.mode == .symbolicLink)
+        #expect(state.skillSyncConfiguration.enabledDestinations.isEmpty)
         #expect(state.cliAutoUpdateEnabled)
+    }
+
+    @Test(arguments: AgentSkillSyncMode.allCases, [
+        [], [.codex], [.claude], [.agents],
+        [.codex, .claude], [.codex, .agents], [.claude, .agents],
+        [.codex, .claude, .agents],
+    ] as [[AgentSkillSyncDestination]])
+    func savedSkillSyncPreferencesSurviveLoadingAndRoundTrip(
+        mode: AgentSkillSyncMode,
+        destinations: [AgentSkillSyncDestination]
+    ) throws {
+        let savedDestinations = destinations.map { "\"\($0.rawValue)\"" }.joined(separator: ",")
+        let payload = """
+        {"skillSyncConfiguration":{"mode":"\(mode.rawValue)","enabledDestinations":[\(savedDestinations)]}}
+        """
+        let state = try JSONDecoder().decode(AIAgentState.self, from: Data(payload.utf8))
+        let roundTripped = try JSONDecoder().decode(
+            AIAgentState.self,
+            from: JSONEncoder().encode(state)
+        )
+
+        #expect(state.skillSyncConfiguration.mode == mode)
+        #expect(state.skillSyncConfiguration.enabledDestinations == Set(destinations))
+        #expect(roundTripped.skillSyncConfiguration == state.skillSyncConfiguration)
+    }
+
+    @Test(arguments: [
+        "true", "{}",
+        #"{"mode":"unknown","enabledDestinations":[]}"#,
+        #"{"mode":"symbolicLink","enabledDestinations":["unknown"]}"#,
+        #"{"mode":"fileCopy","enabledDestinations":false}"#,
+    ])
+    func malformedSkillSyncPreferencesRemainRejected(configuration: String) {
+        let payload = "{\"skillSyncConfiguration\":\(configuration)}"
+
+        #expect(throws: DecodingError.self) {
+            try JSONDecoder().decode(AIAgentState.self, from: Data(payload.utf8))
+        }
     }
 
     @Test
