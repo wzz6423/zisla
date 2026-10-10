@@ -1830,7 +1830,8 @@ struct SettingsView: View {
         .foregroundStyle(.secondary)
         .fixedSize(horizontal: false, vertical: true)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .padding(.horizontal, 14)
+        .padding(.leading, 38)
+        .padding(.trailing, 14)
         .padding(.vertical, 10)
         .task {
             if localVoiceHardware == nil {
