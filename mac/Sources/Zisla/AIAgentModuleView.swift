@@ -754,10 +754,10 @@ private struct AILocalModelConfigurationRow: View {
                     }
                 } label: {
                     Image(systemName: "trash")
-                        .frame(width: 24, height: 24)
+                        .frame(height: 24)
                         .contentShape(Rectangle())
                 }
-                .buttonStyle(.borderless)
+                .buttonStyle(.plain)
                 .accessibilityLabel(AppLocalization.text("删除本地模型"))
                 .help(AppLocalization.text("删除本地模型"))
             }
