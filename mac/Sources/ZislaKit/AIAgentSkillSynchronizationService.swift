@@ -39,34 +39,89 @@ public struct AIAgentSkillSynchronizationService {
         mode: AIAgentSkillSynchronizationMode,
         backupRoot: URL? = nil
     ) throws {
+        try validateDirectories(managedDirectory: managedDirectory, destination: destination)
         try ensureManagedDirectory(at: managedDirectory)
         try fileManager.createDirectory(
             at: destination.deletingLastPathComponent(),
             withIntermediateDirectories: true
         )
-        let backup = try prepareDestination(
-            destination,
-            managedDirectory: managedDirectory,
-            backupRoot: backupRoot
-        )
+        let destinationExists = itemExists(at: destination)
+        let destinationIsManaged = isManagedDestination(destination, managedDirectory: managedDirectory)
+        if destinationExists, !destinationIsManaged, backupRoot == nil {
+            throw AIAgentSkillSynchronizationError.destinationIsNotManaged(destination.path)
+        }
 
-        do {
-            switch mode {
-            case .symbolicLink:
-                try fileManager.createSymbolicLink(at: destination, withDestinationURL: managedDirectory)
-            case .fileCopy:
-                try fileManager.copyItem(at: managedDirectory, to: destination)
-                try Data(managedDirectory.path.utf8).write(
-                    to: destination.appendingPathComponent(markerFileName),
-                    options: .atomic
-                )
+        let staging = managedDirectory.deletingLastPathComponent()
+            .appendingPathComponent(".zisla-skill-sync-\(UUID().uuidString)", isDirectory: true)
+        try fileManager.createDirectory(at: staging, withIntermediateDirectories: true)
+        let previous = staging.appendingPathComponent("previous")
+        defer {
+            // Keep the original available if restoring it fails.
+            if !itemExists(at: previous) {
+                try? fileManager.removeItem(at: staging)
             }
+        }
+        let imports = staging.appendingPathComponent("imports", isDirectory: true)
+        try fileManager.createDirectory(at: imports, withIntermediateDirectories: true)
+        if destinationExists, !destinationIsManaged {
+            // Resolve links while every original root is still in place.
+            try importDirectoryContents(
+                from: destination.resolvingSymlinksInPath(),
+                into: imports,
+                managedDirectory: managedDirectory
+            )
+        }
+        let importedItems = try fileManager.contentsOfDirectory(at: imports, includingPropertiesForKeys: nil)
+        let replacement = staging.appendingPathComponent("replacement")
+        switch mode {
+        case .symbolicLink:
+            try fileManager.createSymbolicLink(at: replacement, withDestinationURL: managedDirectory)
+        case .fileCopy:
+            try copySnapshot(from: managedDirectory, to: replacement)
+            for item in importedItems {
+                try fileManager.copyItem(at: item, to: replacement.appendingPathComponent(item.lastPathComponent))
+            }
+            try Data(managedDirectory.path.utf8).write(
+                to: replacement.appendingPathComponent(markerFileName),
+                options: .atomic
+            )
+        }
+
+        let backup: URL?
+        if !destinationExists {
+            backup = nil
+        } else if !destinationIsManaged, let backupRoot {
+            backup = try moveDestinationToBackup(destination, backupRoot: backupRoot)
+        } else {
+            backup = previous
+            try fileManager.moveItem(at: destination, to: previous)
+        }
+        var installedItems: [URL] = []
+        do {
+            // A managed root that depends on the moved destination would become a cycle.
+            guard fileManager.fileExists(atPath: managedDirectory.path) else {
+                throw AIAgentSkillSynchronizationError.destinationIsNotManaged(destination.path)
+            }
+            for item in importedItems {
+                let managedItem = managedDirectory.appendingPathComponent(item.lastPathComponent)
+                try fileManager.moveItem(at: item, to: managedItem)
+                installedItems.append(managedItem)
+            }
+            try fileManager.moveItem(at: replacement, to: destination)
         } catch {
+            if itemExists(at: destination) {
+                try fileManager.removeItem(at: destination)
+            }
             if let backup {
-                try? fileManager.removeItem(at: destination)
-                try? fileManager.moveItem(at: backup, to: destination)
+                try fileManager.moveItem(at: backup, to: destination)
+            }
+            for item in installedItems {
+                try fileManager.removeItem(at: item)
             }
             throw error
+        }
+        if itemExists(at: previous) {
+            try fileManager.removeItem(at: previous)
         }
     }
 
@@ -75,81 +130,28 @@ public struct AIAgentSkillSynchronizationService {
         managedDirectory: URL,
         backupRoot: URL? = nil
     ) throws {
-        _ = try prepareDestination(
-            destination,
-            managedDirectory: managedDirectory,
-            backupRoot: backupRoot,
-            preservesUnmanagedDestination: true
-        )
-    }
-
-    private func prepareDestination(
-        _ destination: URL,
-        managedDirectory: URL,
-        backupRoot: URL?,
-        preservesUnmanagedDestination: Bool = false
-    ) throws -> URL? {
-        let linkTarget = try? fileManager.destinationOfSymbolicLink(atPath: destination.path)
-        guard itemExists(at: destination) else {
-            return nil
-        }
-
-        if let linkTarget {
-            let targetURL = URL(fileURLWithPath: linkTarget, relativeTo: destination.deletingLastPathComponent())
-                .resolvingSymlinksInPath()
-                .standardizedFileURL
-            if targetURL == managedDirectory.resolvingSymlinksInPath().standardizedFileURL {
-                try fileManager.removeItem(at: destination)
-                return nil
-            }
+        try validateDirectories(managedDirectory: managedDirectory, destination: destination)
+        guard isManagedDestination(destination, managedDirectory: managedDirectory) else { return }
+        if !isManagedLink(destination, managedDirectory: managedDirectory), let backupRoot {
+            _ = try moveDestinationToBackup(destination, backupRoot: backupRoot)
         } else {
-            let markerContents = try? String(
-                contentsOf: destination.appendingPathComponent(markerFileName),
-                encoding: .utf8
-            )
-            if markerContents == managedDirectory.path {
-                if preservesUnmanagedDestination, let backupRoot {
-                    return try moveDestinationToBackup(destination, backupRoot: backupRoot)
-                }
-                try fileManager.removeItem(at: destination)
-                return nil
-            }
+            try fileManager.removeItem(at: destination)
         }
-
-        if preservesUnmanagedDestination {
-            return nil
-        }
-        guard let backupRoot else {
-            throw AIAgentSkillSynchronizationError.destinationIsNotManaged(destination.path)
-        }
-        return try takeOverUnmanagedDirectory(
-            destination,
-            linkTarget: linkTarget,
-            managedDirectory: managedDirectory,
-            backupRoot: backupRoot
-        )
     }
 
-    private func takeOverUnmanagedDirectory(
+    private func isManagedDestination(
         _ destination: URL,
-        linkTarget: String?,
-        managedDirectory: URL,
-        backupRoot: URL
-    ) throws -> URL {
-        let importSource = linkTarget.map {
-            URL(fileURLWithPath: $0, relativeTo: destination.deletingLastPathComponent())
-                .standardizedFileURL
+        managedDirectory: URL
+    ) -> Bool {
+        if let target = try? fileManager.destinationOfSymbolicLink(atPath: destination.path) {
+            return URL(fileURLWithPath: target, relativeTo: destination.deletingLastPathComponent())
+                .standardizedFileURL.path == managedDirectory.standardizedFileURL.path
+                && resolvedDirectory(destination).path == resolvedDirectory(managedDirectory).path
         }
-
-        let backup = try moveDestinationToBackup(destination, backupRoot: backupRoot)
-        do {
-            let source = importSource ?? backup
-            try importDirectoryContents(from: source, into: managedDirectory)
-        } catch {
-            try? fileManager.moveItem(at: backup, to: destination)
-            throw error
-        }
-        return backup
+        return (try? String(
+            contentsOf: destination.appendingPathComponent(markerFileName),
+            encoding: .utf8
+        )) == managedDirectory.path
     }
 
     private func moveDestinationToBackup(_ destination: URL, backupRoot: URL) throws -> URL {
@@ -165,7 +167,7 @@ public struct AIAgentSkillSynchronizationService {
         return backup
     }
 
-    private func importDirectoryContents(from source: URL, into managedDirectory: URL) throws {
+    private func importDirectoryContents(from source: URL, into staging: URL, managedDirectory: URL) throws {
         for item in try fileManager.contentsOfDirectory(at: source, includingPropertiesForKeys: nil) {
             guard item.lastPathComponent != markerFileName else { continue }
             if item.lastPathComponent == legacyManagedDirectoryName {
@@ -173,14 +175,72 @@ public struct AIAgentSkillSynchronizationService {
                     continue
                 }
                 if (try? item.resourceValues(forKeys: [.isDirectoryKey]).isDirectory) == true {
-                    try importDirectoryContents(from: item, into: managedDirectory)
+                    try importDirectoryContents(from: item, into: staging, managedDirectory: managedDirectory)
                     continue
                 }
             }
             let managedItem = managedDirectory.appendingPathComponent(item.lastPathComponent)
-            guard !itemExists(at: managedItem) else { continue }
-            try fileManager.copyItem(at: item, to: managedItem)
+            let stagedItem = staging.appendingPathComponent(item.lastPathComponent)
+            guard !itemExists(at: managedItem), !itemExists(at: stagedItem) else { continue }
+            try copySnapshot(from: item, to: stagedItem)
         }
+    }
+
+    private func copySnapshot(from source: URL, to destination: URL, ancestors: Set<URL> = []) throws {
+        let resolvedSource = source.resolvingSymlinksInPath().standardizedFileURL
+        let destinationPath = destination.deletingLastPathComponent().resolvingSymlinksInPath()
+            .appendingPathComponent(destination.lastPathComponent)
+        guard !ancestors.contains(resolvedSource),
+              !destinationPath.pathComponents.starts(with: resolvedSource.pathComponents) else {
+            throw POSIXError(.ELOOP, userInfo: [NSFilePathErrorKey: source.path])
+        }
+        var isDirectory: ObjCBool = false
+        guard fileManager.fileExists(atPath: resolvedSource.path, isDirectory: &isDirectory) else {
+            throw CocoaError(.fileReadNoSuchFile, userInfo: [NSFilePathErrorKey: source.path])
+        }
+        try fileManager.copyItem(at: resolvedSource, to: destination)
+        if isDirectory.boolValue {
+            try materializeCopiedLinks(
+                from: resolvedSource,
+                to: destination,
+                ancestors: ancestors.union([resolvedSource])
+            )
+        }
+    }
+
+    private func materializeCopiedLinks(from source: URL, to destination: URL, ancestors: Set<URL>) throws {
+        for item in try fileManager.contentsOfDirectory(at: source, includingPropertiesForKeys: [.isDirectoryKey]) {
+            let copiedItem = destination.appendingPathComponent(item.lastPathComponent)
+            if (try? fileManager.destinationOfSymbolicLink(atPath: item.path)) != nil {
+                try fileManager.removeItem(at: copiedItem)
+                try copySnapshot(from: item, to: copiedItem, ancestors: ancestors)
+            } else if try item.resourceValues(forKeys: [.isDirectoryKey]).isDirectory == true {
+                try materializeCopiedLinks(
+                    from: item,
+                    to: copiedItem,
+                    ancestors: ancestors
+                )
+            }
+        }
+    }
+
+    private func validateDirectories(managedDirectory: URL, destination: URL) throws {
+        let managedPath = resolvedDirectory(managedDirectory)
+        let destinationPath = resolvedDirectory(destination)
+        let linkTarget = try? fileManager.destinationOfSymbolicLink(atPath: destination.path)
+        guard managedDirectory.standardizedFileURL.path != destination.standardizedFileURL.path,
+              (managedPath.path == destinationPath.path && linkTarget != nil)
+                || (!managedPath.pathComponents.starts(with: destinationPath.pathComponents)
+                    && !destinationPath.pathComponents.starts(with: managedPath.pathComponents)) else {
+            throw AIAgentSkillSynchronizationError.destinationIsNotManaged(destination.path)
+        }
+    }
+
+    private func resolvedDirectory(_ directory: URL) -> URL {
+        // Resolve existing parents even when the final directory does not exist yet.
+        directory.pathComponents.dropFirst().reduce(URL(fileURLWithPath: "/", isDirectory: true)) {
+            $0.appendingPathComponent($1).resolvingSymlinksInPath()
+        }.standardizedFileURL
     }
 
     private func isManagedLink(_ item: URL, managedDirectory: URL) -> Bool {

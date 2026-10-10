@@ -683,7 +683,7 @@ public struct AgentSkillSyncConfiguration: Codable, Equatable, Sendable {
 
     public init(
         mode: AgentSkillSyncMode = .symbolicLink,
-        enabledDestinations: Set<AgentSkillSyncDestination> = Set(AgentSkillSyncDestination.allCases)
+        enabledDestinations: Set<AgentSkillSyncDestination> = []
     ) {
         self.mode = mode
         self.enabledDestinations = enabledDestinations
