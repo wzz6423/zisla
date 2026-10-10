@@ -338,8 +338,10 @@ public enum VoiceLexicon: String, Codable, CaseIterable, Identifiable, Sendable,
     ) -> [String] {
         let custom = normalizedCustomTerms(customTerms).filter(isShortHint)
         let normalized = normalizeTranscript(transcript, for: enabled, customTerms: custom)
+        let range = NSRange(location: 0, length: (normalized as NSString).length)
         func isMentioned(_ term: String) -> Bool {
-            normalized.range(of: normalizationPattern(for: term), options: [.regularExpression, .caseInsensitive]) != nil
+            let candidate = builtInNormalizationCandidates[term] ?? NormalizationCandidate(term: term)
+            return candidate.expression?.firstMatch(in: normalized, range: range) != nil
         }
         let matchingCustom = custom.filter(isMentioned)
         let matchingBuiltIn = terms(for: enabled).filter(isMentioned)
@@ -396,10 +398,7 @@ public enum VoiceLexicon: String, Codable, CaseIterable, Identifiable, Sendable,
         var replacements: [(range: NSRange, term: String)] = []
         var occupied = literalRanges(in: transcript)
         for candidate in normalizationCandidates(for: terms) {
-            guard let expression = try? NSRegularExpression(
-                pattern: candidate.pattern,
-                options: [.caseInsensitive]
-            ) else { continue }
+            guard let expression = candidate.expression else { continue }
 
             let matches = expression.matches(
                 in: transcript,
@@ -435,21 +434,38 @@ public enum VoiceLexicon: String, Codable, CaseIterable, Identifiable, Sendable,
         return result
     }
 
-    private struct NormalizationCandidate {
+    private struct NormalizationCandidate: Sendable {
         let term: String
-        let pattern: String
+        let key: String
+        let scalarCount: Int
+        let expression: NSRegularExpression?
+
+        init(term: String) {
+            self.term = term
+            key = compactMatchingKey(for: term)
+            scalarCount = term.unicodeScalars.count
+            expression = try? NSRegularExpression(
+                pattern: normalizationPattern(for: term),
+                options: [.caseInsensitive]
+            )
+        }
     }
+
+    // Only immutable built-ins are retained; personal spellings and enabled lexicons remain per-call choices.
+    private static let builtInNormalizationCandidates = Dictionary(uniqueKeysWithValues:
+        terms(for: defaultEnabled).map { ($0, NormalizationCandidate(term: $0)) }
+    )
 
     private static func normalizationCandidates(for terms: [String]) -> [NormalizationCandidate] {
         var seen = Set<String>()
-        return terms.compactMap { term in
-            let key = compactMatchingKey(for: term)
-            guard !key.isEmpty, seen.insert(key).inserted else { return nil }
-            return NormalizationCandidate(term: term, pattern: normalizationPattern(for: term))
+        return terms.compactMap { term -> NormalizationCandidate? in
+            let candidate = builtInNormalizationCandidates[term] ?? NormalizationCandidate(term: term)
+            guard !candidate.key.isEmpty, seen.insert(candidate.key).inserted else { return nil }
+            return candidate
         }
         .sorted {
-            let leftLength = $0.term.unicodeScalars.count
-            let rightLength = $1.term.unicodeScalars.count
+            let leftLength = $0.scalarCount
+            let rightLength = $1.scalarCount
             if leftLength != rightLength { return leftLength > rightLength }
             return $0.term < $1.term
         }

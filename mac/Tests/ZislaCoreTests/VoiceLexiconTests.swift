@@ -4,6 +4,26 @@ import Testing
 
 struct VoiceLexiconTests {
     @Test
+    func sharedMatchersPreservePerCallVocabularyAndPersonalPatterns() async {
+        let configurations: [(Set<VoiceLexicon>, [String], String)] = [
+            ([.computerTerms], [], "用 GPT 和 Gemma。"),
+            ([.computerTerms], ["gpt", "gemma"], "用 g p t 和 gemma。"),
+            ([], ["GPT", "gEmMa"], "用 GPT 和 gEmMa。"),
+            ([], [], "用 g p t 和 gemma。"),
+        ]
+        await withTaskGroup(of: Void.self) { group in
+            for (enabled, custom, expected) in configurations {
+                group.addTask {
+                    let input = "用 g p t 和 gemma。"
+                    #expect(VoiceLexicon.normalizeTranscript(input, for: enabled, customTerms: custom) == expected)
+                    _ = VoiceLexicon.postProcessingTerms(in: input, for: enabled, customTerms: custom)
+                    #expect(VoiceLexicon.normalizeTranscript(input, for: enabled, customTerms: custom) == expected)
+                }
+            }
+        }
+    }
+
+    @Test
     func computerDictionaryIncludesLocalModelsAndInferenceTools() {
         let terms = VoiceLexicon.terms(for: [.computerTerms])
         for term in ["Gemma", "Qwen3.5", "Google", "LM Studio", "Ollama", "llama.cpp", "MLX", "GGUF", "QAT", "KV cache", "LoRA", "Hugging Face"] {
