@@ -172,17 +172,17 @@ export const downloadLinks: readonly DownloadLink[] = [
 ];
 
 export const latestRelease = {
-  version: 'v0.1.17',
-  date: '2026-10-08',
+  version: 'v0.1.18',
+  date: '2026-10-11',
   channel: 'Release',
-  releasePage: 'https://github.com/wzz6423/zisla/releases/tag/v0.1.17',
-  dmg: 'https://github.com/wzz6423/zisla/releases/download/v0.1.17/zisla-v0.1.17-macOS-arm64.dmg',
-  zip: 'https://github.com/wzz6423/zisla/releases/download/v0.1.17/zisla-v0.1.17-macOS-arm64.zip',
-  checksum: 'https://github.com/wzz6423/zisla/releases/download/v0.1.17/zisla-v0.1.17-macOS-arm64.zip.sha256',
-  universalDmg: 'https://github.com/wzz6423/zisla/releases/download/v0.1.17/zisla-v0.1.17-macOS-universal.dmg',
-  universalZip: 'https://github.com/wzz6423/zisla/releases/download/v0.1.17/zisla-v0.1.17-macOS-universal.zip',
-  intelDmg: 'https://github.com/wzz6423/zisla/releases/download/v0.1.17/zisla-v0.1.17-macOS-x86_64.dmg',
-  intelZip: 'https://github.com/wzz6423/zisla/releases/download/v0.1.17/zisla-v0.1.17-macOS-x86_64.zip',
+  releasePage: 'https://github.com/wzz6423/zisla/releases/tag/v0.1.18',
+  dmg: 'https://github.com/wzz6423/zisla/releases/download/v0.1.18/zisla-v0.1.18-macOS-arm64.dmg',
+  zip: 'https://github.com/wzz6423/zisla/releases/download/v0.1.18/zisla-v0.1.18-macOS-arm64.zip',
+  checksum: 'https://github.com/wzz6423/zisla/releases/download/v0.1.18/zisla-v0.1.18-macOS-arm64.zip.sha256',
+  universalDmg: 'https://github.com/wzz6423/zisla/releases/download/v0.1.18/zisla-v0.1.18-macOS-universal.dmg',
+  universalZip: 'https://github.com/wzz6423/zisla/releases/download/v0.1.18/zisla-v0.1.18-macOS-universal.zip',
+  intelDmg: 'https://github.com/wzz6423/zisla/releases/download/v0.1.18/zisla-v0.1.18-macOS-x86_64.dmg',
+  intelZip: 'https://github.com/wzz6423/zisla/releases/download/v0.1.18/zisla-v0.1.18-macOS-x86_64.zip',
   previewPage: 'https://github.com/wzz6423/zisla/releases/tag/v0.1.3-preview.1',
 };
 
@@ -198,6 +198,19 @@ export interface ChangelogEntry {
  * 统一以英文原文展示（11 版 × 17 语翻译不可维护）；v0.1.8/v0.1.0 无 Highlights 段，取其正文概述。
  */
 export const changelogEntries: readonly ChangelogEntry[] = [
+  {
+    version: 'v0.1.18',
+    date: '2026-10-11',
+    notes: [
+      'Voice cleanup supports Ollama and LM Studio with model discovery, optional API keys and a per-configuration Thinking setting. Both text passes honor the selected formatting preference.',
+      'Dictation reuses a bounded lexicon matcher cache, offers conservative Git spelling candidates and checks their source words before accepting substitutions. Final system-dictation results are delivered before the session finishes.',
+      'Annotated screenshots can be stashed on the shelf with source information, then viewed, copied, saved, dragged out or deleted. Screenshot and long-screenshot defaults use Control+1 and Control+2, while existing custom shortcuts are preserved.',
+      'Long screenshots avoid duplicate rows caused by small movements near the page bottom. Removing shelf items also releases their ordering records after a successful storage commit.',
+      'Skill synchronization starts disabled for new configurations. When enabled, it snapshots skill trees and preserves original directories and links for recovery on failure.',
+      'AI session detection adds Delta, Orca and WorkBuddy AI. Automatic updates can be configured separately for each managed AI CLI.',
+      'Bluetooth accessories with readable battery levels show low-battery alerts at 20% or below. Battery power-mode controls, GPU graph lines and collapsed-island AI result animations are refined.',
+    ],
+  },
   {
     version: 'v0.1.17',
     date: '2026-10-08',
