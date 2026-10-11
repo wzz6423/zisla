@@ -38,6 +38,124 @@ struct ShelfScreenshotStoreTests {
         }
     }
 
+    @Test(arguments: [false, true], [false, true])
+    func removedItemsDoNotReserveShelfOrder(screenshot: Bool, removeAll: Bool) throws {
+        try withDirectory { directory in
+            let storage = directory.appendingPathComponent("shelf.json")
+            let png = try imageData()
+            let removedID = try maximumOrderItem(at: storage, screenshot: screenshot, png: png)
+            let store = FileShelfStore(storageURL: storage)
+            let survivingIDs = removeAll ? [] : store.items.filter { $0.id != removedID }.map(\.id)
+            if removeAll { store.removeAll() } else { store.remove(id: removedID) }
+            #expect(store.errorDescription == nil)
+            #expect(store.items.map(\.id) == survivingIDs)
+
+            let added = try store.stashScreenshot(png: png, metadata: Self.metadata(width: 80, height: 40))
+            let database = ShelfScreenshotDatabase(directory: storage.deletingPathExtension().appendingPathExtension("screenshots"))
+            #expect(try database.record(id: added.id).shelfOrder == (removeAll ? 0 : 8))
+            #expect(store.add(payloads: [.text("after removal")]) == 1)
+            #expect(FileShelfStore(storageURL: storage).items.map(\.id) == store.items.map(\.id))
+        }
+    }
+
+    @Test(arguments: [false, true], [false, true])
+    func failedRemovalPreservesShelfOrderUntilItsCommit(screenshot: Bool, removeAll: Bool) throws {
+        try withDirectory { directory in
+            let storage = directory.appendingPathComponent("shelf.json")
+            let png = try imageData()
+            let removedID = try maximumOrderItem(at: storage, screenshot: screenshot, png: png)
+            let store = FileShelfStore(storageURL: storage)
+            let original = store.items
+            let databaseURL = storage.deletingPathExtension().appendingPathExtension("screenshots")
+                .appendingPathComponent("screenshots.sqlite")
+            var connection: OpaquePointer?
+            var originalJSON: Data?
+            defer { sqlite3_close(connection) }
+            if screenshot {
+                try #require(sqlite3_open(databaseURL.path, &connection) == SQLITE_OK)
+                try #require(sqlite3_exec(connection,
+                    "CREATE TRIGGER reject_delete BEFORE DELETE ON screenshots BEGIN SELECT RAISE(ABORT, 'test delete denied'); END;",
+                    nil, nil, nil) == SQLITE_OK)
+            } else {
+                originalJSON = try Data(contentsOf: storage)
+                try FileManager.default.removeItem(at: storage)
+                try FileManager.default.createDirectory(at: storage, withIntermediateDirectories: false)
+            }
+
+            if removeAll { store.removeAll() } else { store.remove(id: removedID) }
+            #expect(store.errorDescription != nil)
+            let retained = removeAll && !screenshot ? original.filter { $0.screenshotMetadata == nil } : original
+            #expect(store.items == retained)
+            #expect(throws: CocoaError(.fileReadCorruptFile)) {
+                try store.stashScreenshot(png: png, metadata: Self.metadata(width: 80, height: 40))
+            }
+
+            if screenshot {
+                try #require(sqlite3_exec(connection, "DROP TRIGGER reject_delete", nil, nil, nil) == SQLITE_OK)
+            } else {
+                try FileManager.default.removeItem(at: storage)
+                try #require(originalJSON).write(to: storage)
+            }
+            if removeAll { store.removeAll() } else { store.remove(id: removedID) }
+            #expect(store.errorDescription == nil)
+            let added = try store.stashScreenshot(png: png, metadata: Self.metadata(width: 80, height: 40))
+            let database = ShelfScreenshotDatabase(directory: databaseURL.deletingLastPathComponent())
+            #expect(try database.record(id: added.id).shelfOrder == (removeAll ? 0 : 8))
+            #expect(FileShelfStore(storageURL: storage).items.map(\.id) == store.items.map(\.id))
+        }
+    }
+
+    @Test
+    func committedScreenshotRemovalReleasesOrderWhenLegacyClearingFails() throws {
+        try withDirectory { directory in
+            let storage = directory.appendingPathComponent("shelf.json")
+            let png = try imageData()
+            let database = ShelfScreenshotDatabase(directory: storage.deletingPathExtension().appendingPathExtension("screenshots"))
+            try {
+                let store = FileShelfStore(storageURL: storage)
+                try #require(store.add(payloads: [.text("retained text")]) == 1)
+                try database.insert(ShelfScreenshotRecord(id: UUID(), addedAt: .distantPast, shelfOrder: Int64.max,
+                    metadata: Self.metadata(width: 80, height: 40), png: png))
+            }()
+            let store = FileShelfStore(storageURL: storage)
+            let originalJSON = try Data(contentsOf: storage)
+            try FileManager.default.removeItem(at: storage)
+            try FileManager.default.createDirectory(at: storage, withIntermediateDirectories: false)
+            store.removeAll()
+            #expect(store.errorDescription != nil)
+            #expect(store.items.map(\.text) == ["retained text"])
+            #expect(try database.records().isEmpty)
+            let added = try store.stashScreenshot(png: png, metadata: Self.metadata(width: 80, height: 40))
+            #expect(try database.record(id: added.id).shelfOrder == 1)
+            try FileManager.default.removeItem(at: storage)
+            try originalJSON.write(to: storage)
+            #expect(FileShelfStore(storageURL: storage).items.map(\.id) == store.items.map(\.id))
+        }
+    }
+
+    @Test
+    func editingAndRemovingExistingNotesDoNotAllocateShelfOrder() throws {
+        try withDirectory { directory in
+            let storage = directory.appendingPathComponent("shelf.json")
+            let png = try imageData()
+            let database = ShelfScreenshotDatabase(directory: storage.deletingPathExtension().appendingPathExtension("screenshots"))
+            let note = try {
+                let store = FileShelfStore(storageURL: storage)
+                let note = try #require(store.addContextNote("original", location: .desktop(displayID: "test", displayName: "Test")))
+                try database.insert(ShelfScreenshotRecord(id: UUID(), addedAt: .distantPast, shelfOrder: Int64.max,
+                    metadata: Self.metadata(width: 80, height: 40), png: png))
+                return note
+            }()
+            let store = FileShelfStore(storageURL: storage)
+            let updated = try #require(store.updateContextNote(id: note.id, text: "updated"))
+            #expect(updated.text == "updated")
+            store.remove(id: note.id)
+            #expect(store.errorDescription == nil)
+            #expect(store.items.count == 1)
+            #expect(FileShelfStore(storageURL: storage).items.map(\.id) == store.items.map(\.id))
+        }
+    }
+
     @Test(arguments: [false, true])
     func missingOrCorruptJSONAndDeletedCachesCannotHideDatabaseScreenshots(corruptJSON: Bool) throws {
         try withDirectory { directory in
@@ -363,6 +481,24 @@ struct ShelfScreenshotStoreTests {
         }
         png.replaceSubrange(29..<33, with: withUnsafeBytes(of: UInt32(checksum).bigEndian, Array.init))
         #expect(throws: (any Error).self) { try FileShelfStore.screenshotDimensions(png) }
+    }
+
+    private func maximumOrderItem(at storage: URL, screenshot: Bool, png: Data) throws -> UUID {
+        let database = ShelfScreenshotDatabase(directory: storage.deletingPathExtension().appendingPathExtension("screenshots"))
+        let metadata = Self.metadata(width: 80, height: 40)
+        try database.insert(ShelfScreenshotRecord(id: UUID(), addedAt: .distantPast, shelfOrder: 7, metadata: metadata, png: png))
+        if screenshot {
+            let id = UUID()
+            try database.insert(ShelfScreenshotRecord(id: id, addedAt: .distantPast, shelfOrder: Int64.max, metadata: metadata, png: png))
+            return id
+        }
+        let store = FileShelfStore(storageURL: storage)
+        try #require(store.add(payloads: [.text("remove this text")]) == 1)
+        let item = try #require(store.items.last)
+        var records = try #require(JSONSerialization.jsonObject(with: Data(contentsOf: storage)) as? [[String: Any]])
+        records[0]["shelfOrder"] = Int64.max
+        try JSONSerialization.data(withJSONObject: records).write(to: storage)
+        return item.id
     }
 
     private static func metadata(width: Int, height: Int) -> ShelfScreenshotMetadata {
