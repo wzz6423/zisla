@@ -165,7 +165,7 @@ public final class FileShelfStore: ObservableObject {
         guard dimensions.width == metadata.pixelWidth, dimensions.height == metadata.pixelHeight else {
             throw CocoaError(.fileReadCorruptFile)
         }
-        let record = ShelfScreenshotRecord(id: UUID(), addedAt: Date(), shelfOrder: try nextShelfOrder(),
+        let record = ShelfScreenshotRecord(id: UUID(), addedAt: Date(), shelfOrder: try nextShelfOrder(after: shelfOrder.values.max() ?? -1),
                                            metadata: metadata, png: png)
         do {
             try screenshotDatabase.insert(record)
@@ -186,8 +186,8 @@ public final class FileShelfStore: ObservableObject {
         try screenshotDatabase.record(id: id).png
     }
 
-    private func nextShelfOrder() throws -> Int64 {
-        let result = (shelfOrder.values.max() ?? -1).addingReportingOverflow(1)
+    private func nextShelfOrder(after order: Int64) throws -> Int64 {
+        let result = order.addingReportingOverflow(1)
         guard !result.overflow else { throw CocoaError(.fileReadCorruptFile) }
         return result.partialValue
     }
@@ -385,6 +385,7 @@ public final class FileShelfStore: ObservableObject {
         if removed.contains(where: { $0.screenshotMetadata != nil }) {
             do {
                 try screenshotDatabase.remove(ids: [id])
+                shelfOrder[id] = nil
                 items = remaining
                 errorDescription = nil
                 removeScreenshotCache(id: id)
@@ -397,11 +398,13 @@ public final class FileShelfStore: ObservableObject {
     }
 
     public func removeAll() {
+        errorDescription = nil
         let screenshots = items.filter { $0.screenshotMetadata != nil }
         // Each store commits separately; failed commits must retain their cards.
         if !screenshots.isEmpty {
             do {
                 try screenshotDatabase.remove(ids: screenshots.map(\.id))
+                for screenshot in screenshots { shelfOrder[screenshot.id] = nil }
                 items.removeAll { $0.screenshotMetadata != nil }
                 errorDescription = nil
                 screenshots.forEach { removeScreenshotCache(id: $0.id) }
@@ -665,13 +668,13 @@ public final class FileShelfStore: ObservableObject {
     private func persist(_ items: [FileShelfItem]) -> Bool {
         do {
             try FileManager.default.createDirectory(at: storageURL.deletingLastPathComponent(), withIntermediateDirectories: true)
-            var order = shelfOrder
-            var next = try nextShelfOrder()
+            let retainedIDs = Set(items.map(\.id))
+            var order = shelfOrder.filter { retainedIDs.contains($0.key) }
+            var lastOrder = order.values.max() ?? -1
             let stored = try items.filter { $0.screenshotMetadata == nil }.map { item in
                 if order[item.id] == nil {
-                    order[item.id] = next
-                    guard next < Int64.max else { throw CocoaError(.fileReadCorruptFile) }
-                    next += 1
+                    lastOrder = try nextShelfOrder(after: lastOrder)
+                    order[item.id] = lastOrder
                 }
                 return StoredItem(id: item.id, bookmarkData: item.bookmarkData, addedAt: item.addedAt, url: item.url,
                     text: item.text, isManaged: item.isManaged ? true : nil, noteLocation: item.noteLocation, shelfOrder: order[item.id])
