@@ -255,13 +255,11 @@ final class VoiceInputController: ObservableObject {
                     sourceFormat: preparedFormat,
                     contextualStrings: contextualStrings,
                     onResult: { [weak self] range, text in
-                        Task { @MainActor [weak self] in
-                            self?.receiveSystemDictationResult(
-                                text,
-                                range: range,
-                                recordingID: recordingID
-                            )
-                        }
+                        self?.receiveSystemDictationResult(
+                            text,
+                            range: range,
+                            recordingID: recordingID
+                        )
                     },
                     onError: { [weak self] error in
                         Task { @MainActor [weak self] in
@@ -623,7 +621,7 @@ private final class LegacyRecognitionRequestAppender: @unchecked Sendable {
 }
 
 @available(macOS 26.0, *)
-private final class SystemDictationSession: DictationSession, @unchecked Sendable {
+final class SystemDictationSession: DictationSession, @unchecked Sendable {
     private enum SessionError: Error {
         case unsupportedLocale
         case incompatibleAudioFormat
@@ -641,7 +639,7 @@ private final class SystemDictationSession: DictationSession, @unchecked Sendabl
     init(
         sourceFormat: AVAudioFormat,
         contextualStrings: [String],
-        onResult: @escaping @Sendable (CMTimeRange, String) -> Void,
+        onResult: @escaping @MainActor @Sendable (CMTimeRange, String) -> Void,
         onError: @escaping @Sendable (Error) -> Void
     ) async throws {
         guard let locale = await DictationTranscriber.supportedLocale(
@@ -678,11 +676,26 @@ private final class SystemDictationSession: DictationSession, @unchecked Sendabl
         self.converter = converter
         self.outputFormat = outputFormat
         self.onError = onError
-        resultsTask = Task {
+        resultsTask = Self.makeResultsTask(
+            for: transcriber.results,
+            onResult: { result in
+                await onResult(result.range, String(result.text.characters))
+            },
+            onError: onError
+        )
+    }
+
+    static func makeResultsTask<Results: AsyncSequence & Sendable>(
+        for results: Results,
+        onResult: @escaping @Sendable (Results.Element) async -> Void,
+        onError: @escaping @Sendable (Error) -> Void
+    ) -> Task<Void, Never> where Results.Element: Sendable {
+        Task {
             do {
-                for try await result in transcriber.results {
+                for try await result in results {
                     guard !Task.isCancelled else { return }
-                    onResult(result.range, String(result.text.characters))
+                    // Finalization awaits this task, including the last update on the main actor.
+                    await onResult(result)
                 }
             } catch is CancellationError {
                 return
