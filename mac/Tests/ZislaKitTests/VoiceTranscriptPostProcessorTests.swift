@@ -395,12 +395,35 @@ struct VoiceTranscriptPostProcessorTests {
         let first = try #require(requests.first)
         let second = try #require(requests.last)
         #expect(first.0.contains("格式化整理已开启"))
-        #expect(second.0 == VoiceTranscriptPostProcessor.proofreadingPrompt)
+        #expect(second.0.contains("格式化整理已开启"))
+        #expect(second.0.contains("每项独占一行"))
         let secondPayload = try payload(second.1)
         #expect(secondPayload["raw_transcript"] as? String == cleaned)
         #expect(secondPayload["lexicon_transcript"] as? String == cleaned)
         #expect(secondPayload["custom_vocabulary"] as? [String] == ["NovaDesk"])
         #expect(!second.1[0].content.contains("会室"))
+    }
+
+    @MainActor
+    @Test(arguments: [false, true])
+    func proofreadingUsesSelectedFormattingMode(_ structuredFormattingEnabled: Bool) async throws {
+        let raw = "明天有三个时起床、吃饭和出发哦，不对，是休息。"
+        let cleaned = "明天有三个时起床、吃饭和休息。"
+        let formatted = "明天有三个事：\n1、起床\n2、吃饭\n3、休息"
+        var prompts: [String] = []
+        let result = try await VoiceTranscriptPostProcessor.process(
+            rawTranscript: raw,
+            lexiconNormalizedTranscript: raw,
+            structuredFormattingEnabled: structuredFormattingEnabled,
+            proofreadingEnabled: true
+        ) { prompt, _ in
+            prompts.append(prompt)
+            return prompts.count == 1 ? cleaned : (structuredFormattingEnabled ? formatted : cleaned)
+        }
+
+        #expect(prompts.count == 2)
+        #expect(prompts.allSatisfy { $0.contains(structuredFormattingEnabled ? "格式化整理已开启" : "格式化整理已关闭") })
+        #expect(result == (structuredFormattingEnabled ? formatted : cleaned))
     }
 
     @MainActor
