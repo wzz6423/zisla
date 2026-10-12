@@ -385,4 +385,14 @@ touch "$FAKE_KEYCHAIN"
   exit 1
 }
 
+CERTIFICATE_APP="$TEMPORARY_ROOT/certificate-output/zisla.app"
+[[ ! -e "$CERTIFICATE_APP/Contents/Library/LaunchServices/dev.wzz.zisla.power-helper" ]] || {
+  print -u2 -r -- "FAIL: keep-awake must not package a separate privileged helper"
+  exit 1
+}
+if plutil -extract SMPrivilegedExecutables xml1 -o - "$CERTIFICATE_APP/Contents/Info.plist" >/dev/null 2>&1; then
+  print -u2 -r -- "FAIL: keep-awake must not advertise helper installation"
+  exit 1
+fi
+
 print -r -- "PASS: build-app identity, signing, data, icon, and architecture isolation"

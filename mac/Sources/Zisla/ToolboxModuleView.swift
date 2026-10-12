@@ -25,14 +25,6 @@ struct ToolboxModuleView: View {
             toolActions
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
-        .alert(AppLocalization.text("保持亮屏"), isPresented: Binding(
-            get: { model.powerAssertions.displayAwakeError != nil },
-            set: { if !$0 { model.powerAssertions.displayAwakeError = nil } }
-        )) {
-            Button(AppLocalization.text("好"), role: .cancel) {}
-        } message: {
-            Text(AppLocalization.text(model.powerAssertions.displayAwakeError ?? ""))
-        }
     }
 
     private var focusPanelShape: UnevenRoundedRectangle {

@@ -716,6 +716,11 @@ final class AppModel: ObservableObject {
       }
       .store(in: &cancellables)
 
+    Self.observeDisplayAwakeErrors(powerAssertions) { [weak self] message in
+      self?.transientMessage = message
+    }
+    .store(in: &cancellables)
+
     voiceInput.isCapturingInputPublisher
       .sink { [weak self] _ in
         Task { @MainActor [weak self] in self?.updateSpectrumMonitoring() }
@@ -1167,6 +1172,16 @@ final class AppModel: ObservableObject {
   }
 
   // MARK: - Transient notice
+
+  static func observeDisplayAwakeErrors(
+    _ controller: PowerAssertionController,
+    onMessage: @escaping (String) -> Void
+  ) -> AnyCancellable {
+    controller.$displayAwakeError
+      .compactMap { $0 }
+      .map { AppLocalization.text($0) }
+      .sink(receiveValue: onMessage)
+  }
 
   /// The island shows `transientMessage` as a row protruding under the pill, so it has to recycle
   /// itself — nothing else ever clears it. A message too wide for the row scrolls once, so the
