@@ -1,7 +1,7 @@
 #!/bin/zsh
 set -euo pipefail
 
-python3 - "${0:A:h:h:h}/Sources/ZislaPowerHelperSupport/LidClosedDisplaySessionScript.swift" <<'PYTHON'
+python3 - "${0:A:h:h:h}/Sources/ZislaKit/LidClosedDisplaySession.swift" <<'PYTHON'
 import pathlib
 import os
 import select
@@ -57,7 +57,22 @@ class SessionTests(unittest.TestCase):
             fi
             '''))
         fake.chmod(0o700)
-        self.script = script.replace("/usr/bin/pmset", shlex.quote(str(fake)))
+        sudo = self.root / "fake-sudo"
+        sudo.write_text(textwrap.dedent('''\
+            #!/bin/sh
+            root=$(/usr/bin/dirname "$0")
+            [ "$1" = -n ] && [ "$2" = -- ] || exit 1
+            shift 2
+            [ "$1" = "$root/fake-pmset" ] || exit 1
+            shift
+            case "$*" in '-a disablesleep 0'|'-a disablesleep 1') ;; *) exit 1 ;; esac
+            printf '%s\n' "$*" >> "$root/sudo-calls"
+            [ ! -f "$root/sudo-denied" ] || exit 1
+            exec "$root/fake-pmset" "$@"
+            '''))
+        sudo.chmod(0o700)
+        self.script = (script.replace("/usr/bin/pmset", shlex.quote(str(fake)))
+                      .replace("/usr/bin/sudo", shlex.quote(str(sudo))))
 
     def tearDown(self):
         if self.process:
@@ -99,6 +114,15 @@ class SessionTests(unittest.TestCase):
         self.assertEqual(self.stop(), "restored")
         self.assert_restored()
         self.assertEqual((self.root / "writes").read_text().splitlines(), ["-a disablesleep 1", "-a disablesleep 0"])
+        self.assertEqual((self.root / "sudo-calls").read_text().splitlines(), ["-a disablesleep 1", "-a disablesleep 0"])
+
+    def test_revoked_permission_fails_without_prompting_or_changing_power_settings(self):
+        (self.root / "sudo-denied").touch()
+        self.start()
+        self.assertEqual(self.line(), "")
+        self.assertNotEqual(self.process.wait(timeout=5), 0)
+        self.assertEqual(self.state.read_text(), "0")
+        self.assertFalse((self.root / "writes").exists())
 
     def test_an_existing_disabled_sleep_setting_is_never_overwritten(self):
         self.state.write_text("1")
