@@ -6,9 +6,78 @@ import ZislaKit
 
 @MainActor
 @Suite(.serialized)
+struct ScreenshotDialogMainQueueTests {
+    @Test(arguments: [0, 1])
+    func ocrResultAllowsMainQueueProgressBeforeItCloses(buttonIndex: Int) async {
+        _ = NSApplication.shared
+        let alert = NSAlert()
+        alert.messageText = "Synthetic OCR result"
+        alert.addButton(withTitle: "Copy")
+        alert.addButton(withTitle: "Close")
+        alert.window.alphaValue = 0
+        alert.window.isReleasedWhenClosed = false
+        let progress = ModalProgress()
+        let probe = Timer(timeInterval: 0.01, repeats: true) { timer in
+            let observedModal = MainActor.assumeIsolated {
+                guard NSApp.modalWindow === alert.window else { return false }
+                progress.observedModal = true
+                DispatchQueue.main.async {
+                    guard NSApp.modalWindow === alert.window else { return }
+                    progress.mainQueueRanWhileModal = true
+                    alert.buttons[buttonIndex].performClick(nil)
+                }
+                return true
+            }
+            if observedModal { timer.invalidate() }
+        }
+        let watchdog = Timer(timeInterval: 1, repeats: false) { _ in
+            MainActor.assumeIsolated {
+                NSApp.stopModal(withCode: .abort)
+                if let event = NSEvent.otherEvent(
+                    with: .applicationDefined, location: .zero, modifierFlags: [], timestamp: 0,
+                    windowNumber: 0, context: nil, subtype: 0, data1: 0, data2: 0
+                ) {
+                    NSApp.postEvent(event, atStart: true)
+                }
+            }
+        }
+        defer {
+            probe.invalidate()
+            watchdog.invalidate()
+            alert.window.close()
+        }
+
+        let response: NSApplication.ModalResponse = await withCheckedContinuation { continuation in
+            DispatchQueue.main.async {
+                RunLoop.main.add(probe, forMode: .modalPanel)
+                RunLoop.main.add(watchdog, forMode: .modalPanel)
+                ScreenshotDialogPresentation.present(alert) { response in
+                    progress.mainQueueRanBeforeCompletion = progress.mainQueueRanWhileModal
+                    continuation.resume(returning: response)
+                }
+            }
+        }
+        #expect(progress.observedModal, "The probe must reach the real AppKit modal loop")
+        #expect(progress.mainQueueRanBeforeCompletion,
+                "An OCR result must not prevent the next screenshot's main-queue work from running")
+        #expect(response.rawValue == NSApplication.ModalResponse.alertFirstButtonReturn.rawValue + buttonIndex)
+        #expect(NSApp.modalWindow == nil)
+        #expect(!alert.window.isVisible)
+    }
+
+    @MainActor
+    private final class ModalProgress {
+        var observedModal = false
+        var mainQueueRanWhileModal = false
+        var mainQueueRanBeforeCompletion = false
+    }
+}
+
+@MainActor
+@Suite(.serialized)
 struct ScreenshotDialogPresentationTests {
     @Test(arguments: [false, true], [false, true])
-    func dialogsAppearBeforeClosingScreenshots(unrelatedWindowIsKey: Bool, accepts: Bool) throws {
+    func dialogsAppearBeforeClosingScreenshots(unrelatedWindowIsKey: Bool, accepts: Bool) async throws {
         _ = NSApplication.shared
         let screenshot = makeWindow(screenshot: true, level: .screenSaver)
         let lowerScreenshot = makeWindow(screenshot: true, level: .floating)
@@ -51,7 +120,13 @@ struct ScreenshotDialogPresentationTests {
 
         alert.response = accepts ? .alertFirstButtonReturn : .alertSecondButtonReturn
         var alertResponses: [NSApplication.ModalResponse] = []
-        ScreenshotDialogPresentation.present(alert) { alertResponses.append($0) }
+        await withCheckedContinuation { continuation in
+            ScreenshotDialogPresentation.present(alert) {
+                alertResponses.append($0)
+                continuation.resume()
+            }
+            #expect(alertResponses.isEmpty)
+        }
         #expect(alert.presentedStandalone)
         #expect(alert.levelWhenPresented > screenshot.level.rawValue)
         #expect(alert.window.sheetParent == nil)
@@ -68,7 +143,7 @@ struct ScreenshotDialogPresentationTests {
     }
 
     @Test(arguments: ["no screenshot", "hidden screenshot", "unrelated window", "normal-level screenshot"])
-    func dialogsKeepTheNormalModalLevelWhenNoOverlayNeedsIt(scenario: String) {
+    func dialogsKeepTheNormalModalLevelWhenNoOverlayNeedsIt(scenario: String) async {
         _ = NSApplication.shared
         let window: NSWindow? = scenario == "no screenshot" ? nil : makeWindow(
             screenshot: scenario != "unrelated window",
@@ -88,8 +163,28 @@ struct ScreenshotDialogPresentationTests {
         ScreenshotDialogPresentation.present(panel) { _ in }
         #expect(panel.levelWhenPresented == WindowPlacement.modalWindowLevel.rawValue)
         panel.respond(.cancel)
-        ScreenshotDialogPresentation.present(alert) { _ in }
+        await withCheckedContinuation { continuation in
+            ScreenshotDialogPresentation.present(alert) { _ in continuation.resume() }
+        }
         #expect(alert.levelWhenPresented == WindowPlacement.modalWindowLevel.rawValue)
+    }
+
+    @Test
+    func dialogLevelTracksScreenshotChangesBeforePresentation() async {
+        _ = NSApplication.shared
+        let screenshot = makeWindow(screenshot: true, level: .floating)
+        let alert = Alert()
+        alert.window.isReleasedWhenClosed = false
+        defer {
+            screenshot.close()
+            alert.window.close()
+        }
+        await withCheckedContinuation { continuation in
+            ScreenshotDialogPresentation.present(alert) { _ in continuation.resume() }
+            screenshot.level = .screenSaver
+        }
+        #expect(alert.levelWhenPresented > screenshot.level.rawValue,
+                "The dialog must use the screenshot level at presentation time")
     }
 
     private func makeWindow(screenshot: Bool, level: NSWindow.Level, visible: Bool = true) -> NSWindow {
