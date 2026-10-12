@@ -8,6 +8,37 @@ import ZislaCore
 @MainActor
 @Suite(.serialized)
 struct ScreenshotImageExportTests {
+    @Test
+    func savePanelAppearsAboveScreenshotBeforeTheEditorCloses() async throws {
+        _ = NSApplication.shared
+        let fixture = try Fixture()
+        defer { fixture.close() }
+        let screenshot = ScreenshotEditorWindow(
+            contentRect: CGRect(x: 0, y: 0, width: 320, height: 200),
+            styleMask: [.borderless], backing: .buffered, defer: false
+        )
+        screenshot.isReleasedWhenClosed = false
+        screenshot.alphaValue = 0
+        screenshot.level = .screenSaver
+        screenshot.orderFrontRegardless()
+        defer { screenshot.close() }
+
+        let message: String? = await withCheckedContinuation { continuation in
+            ScreenshotImageExport.presentSavePanel(for: Self.png, panel: fixture.panel,
+                systemPreferences: fixture.preferences, themeNotifications: fixture.notifications) {
+                continuation.resume(returning: $0)
+            }
+            #expect(fixture.panel.presentedStandalone)
+            #expect(fixture.panel.level.rawValue > screenshot.level.rawValue,
+                    "Saving must be visible while the screenshot overlay is still open")
+            #expect(screenshot.isVisible)
+            fixture.panel.respond(.cancel)
+        }
+        #expect(message == nil)
+        #expect(screenshot.isVisible)
+        #expect(screenshot.level == .screenSaver)
+    }
+
     @Test(arguments: [false, true], [false, true])
     func savesIndependentlyAtScreenCenterWithSystemAppearance(systemIsDark: Bool, appIsDark: Bool) async throws {
         _ = NSApplication.shared

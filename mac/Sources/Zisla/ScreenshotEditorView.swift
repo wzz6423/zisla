@@ -4096,6 +4096,34 @@ private struct ScreenshotInlineTextEditor: NSViewRepresentable {
     }
 }
 
+@MainActor
+enum ScreenshotDialogPresentation {
+    static func present(
+        _ panel: NSSavePanel,
+        completionHandler: @escaping (NSApplication.ModalResponse) -> Void
+    ) {
+        prepare(panel)
+        panel.begin(completionHandler: completionHandler)
+    }
+
+    static func present(
+        _ alert: NSAlert,
+        completionHandler: (NSApplication.ModalResponse) -> Void
+    ) {
+        prepare(alert.window)
+        NSApp.activate(ignoringOtherApps: true)
+        completionHandler(alert.runModal())
+    }
+
+    private static func prepare(_ window: NSWindow) {
+        WindowPlacement.prepareModal(window)
+        // Screenshot overlays stay open above the app's usual modal level, even when another window has focus.
+        for editor in NSApp.windows where editor is ScreenshotEditorWindow && editor.isVisible {
+            window.level = NSWindow.Level(rawValue: max(window.level.rawValue, editor.level.rawValue + 1))
+        }
+    }
+}
+
 /// Presents the PNG save panel shared by the shelf, editor toolbar, pinned image, and ⌘S shortcut.
 @MainActor
 enum ScreenshotImageExport {
@@ -4138,8 +4166,7 @@ enum ScreenshotImageExport {
                 Task { @MainActor in status(AppLocalization.text("保存失败：%@", error.localizedDescription)) }
             }
         }
-        WindowPlacement.prepareModal(panel)
-        panel.begin(completionHandler: response)
+        ScreenshotDialogPresentation.present(panel, completionHandler: response)
     }
 }
 
@@ -5790,12 +5817,7 @@ struct ScreenshotEditorView: View {
         let response: (NSApplication.ModalResponse) -> Void = { response in
             completion(response == .OK ? panel.url : nil)
         }
-        if let window = NSApp.keyWindow ?? NSApp.mainWindow, window.isVisible {
-            panel.beginSheetModal(for: window, completionHandler: response)
-        } else {
-            WindowPlacement.prepareModal(panel)
-            panel.begin(completionHandler: response)
-        }
+        ScreenshotDialogPresentation.present(panel, completionHandler: response)
     }
 
     private enum RecognitionMode {
@@ -5937,12 +5959,7 @@ struct ScreenshotEditorView: View {
                     pasteboard.setString(result, forType: .string)
                     model.statusMessage = AppLocalization.text("%@，结果已复制", AppLocalization.text(mode.title))
                 }
-                NSApp.activate(ignoringOtherApps: true)
-                if let window = NSApp.keyWindow, window.isVisible {
-                    alert.beginSheetModal(for: window, completionHandler: handleResponse)
-                } else {
-                    handleResponse(alert.runModal())
-                }
+                ScreenshotDialogPresentation.present(alert, completionHandler: handleResponse)
             }
         }
     }
