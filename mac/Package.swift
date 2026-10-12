@@ -38,12 +38,18 @@ let package = Package(
         .library(name: "KeyboardKit", targets: ["KeyboardKit"]),
         .executable(name: "zisla", targets: ["Zisla"]),
         .executable(name: "zislactl", targets: ["zislactl"]),
+        .executable(name: "zisla-power-helper", targets: ["zisla-power-helper"]),
     ],
     dependencies: [
         .package(path: "Vendor/SkyLightWindow"),
         .package(path: "Vendor/zstd.swift"),
     ],
     targets: [
+        .target(name: "ZislaPowerHelperSupport"),
+        .executableTarget(
+            name: "zisla-power-helper",
+            dependencies: ["ZislaPowerHelperSupport"]
+        ),
         .target(
             name: "ZislaCore",
             resources: [
@@ -72,6 +78,7 @@ let package = Package(
             dependencies: [
                 "ZislaCore",
                 "ZislaNVMe",
+                "ZislaPowerHelperSupport",
                 .product(name: "zstd", package: "zstd.swift"),
             ],
             resources: [

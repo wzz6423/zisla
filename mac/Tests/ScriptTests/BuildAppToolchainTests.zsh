@@ -80,6 +80,10 @@ else
   print -r -- "$DEVELOPER_DIR" > "$FAKE_CAPTURE_FILE"
   mkdir -p "$bin_directory"
   touch "$bin_directory/zisla"
+  touch "$bin_directory/zisla-power-helper"
+  if [[ "$*" == *"--product zisla-power-helper"* ]]; then
+    print -r -- "$*" > "$FAKE_CAPTURE_FILE.helper-build"
+  fi
   mkdir -p "$bin_directory/zisla_KeyboardKit.bundle" \
     "$bin_directory/zisla_ZislaKit.bundle/Contents/Resources/Pomodoro"
   print -r -- pomodoro-complete > \
@@ -104,6 +108,13 @@ SCRIPT
 cat > "$FAKE_BIN/codesign" <<'SCRIPT'
 #!/bin/zsh
 set -euo pipefail
+arguments=("$@")
+for (( index = 1; index < ${#arguments[@]}; index += 1 )); do
+  if [[ "${arguments[index]}" == -R && "${arguments[index + 1]}" != "="* ]]; then
+    print -u2 -r -- "inline code signing requirements need an = prefix"
+    exit 1
+  fi
+done
 if [[ "$*" == *"--sign"* ]]; then
   print -r -- "$*" > "$FAKE_CODESIGN_CAPTURE_FILE"
   if [[ "$*" == *"--sign -"* ]]; then
@@ -121,7 +132,13 @@ if [[ "$*" == *"-dv"* ]]; then
     print -u2 -r -- "TeamIdentifier=not set"
   fi
 elif [[ "$*" == *"-d -r-"* ]]; then
-  print -u2 -r -- 'designated => identifier "zisla" and certificate root = H"test"'
+  target="${@[-1]}"
+  if [[ -d "$target" ]]; then
+    identifier="$(/usr/libexec/PlistBuddy -c 'Print :CFBundleIdentifier' "$target/Contents/Info.plist")"
+  else
+    identifier="${target:t}"
+  fi
+  print -u2 -r -- "designated => identifier \"$identifier\" and certificate root = H\"0000000000000000000000000000000000000000\""
 fi
 exit 0
 SCRIPT
@@ -205,6 +222,10 @@ RELEASE_PLIST="$TEMPORARY_ROOT/output/zisla.app/Contents/Info.plist"
   print -u2 -r -- "FAIL: release application support directory was not rendered"
   exit 1
 }
+if plutil -extract SMPrivilegedExecutables xml1 -o - "$RELEASE_PLIST" >/dev/null 2>&1; then
+  print -u2 -r -- "FAIL: ad-hoc builds must not advertise an installable privileged helper"
+  exit 1
+fi
 for architecture in arm64 x86_64; do
   [[ -f "$TEST_ROOT/.build/$architecture/out/Products/Release/zisla" ]] || {
     print -u2 -r -- "FAIL: build-app did not isolate $architecture build output"
@@ -361,6 +382,7 @@ print -r -- "PASS: build-app identity, data, icon, and architecture isolation"
 print -r -- "PASS: 8 build-app version cases"
 
 touch "$FAKE_KEYCHAIN"
+for signed_debug_build in false true; do
 (
   PATH="$FAKE_BIN:$PATH" \
     FAKE_CAPTURE_FILE="$CAPTURE_FILE" \
@@ -368,7 +390,8 @@ touch "$FAKE_KEYCHAIN"
     FAKE_CODESIGN_STATE_FILE="$CODESIGN_STATE_FILE" \
     FAKE_CLT_DEVELOPER="$CLT_DEVELOPER" \
     FAKE_XCODE_APP="$XCODE_APP" \
-    BUILD_ARCHITECTURES=arm64 \
+    DEBUG_BUILD="$signed_debug_build" \
+    BUILD_ARCHITECTURES='arm64 x86_64' \
     CODE_SIGN_IDENTITY='zisla Release Signing' \
     CODE_SIGN_KEYCHAIN="$FAKE_KEYCHAIN" \
     OUTPUT_DIRECTORY="$TEMPORARY_ROOT/certificate-output" \
@@ -385,4 +408,48 @@ touch "$FAKE_KEYCHAIN"
   exit 1
 }
 
+if [[ "$signed_debug_build" == true ]]; then
+  CERTIFICATE_APP="$TEMPORARY_ROOT/certificate-output/zisla-debug.app"
+  EXPECTED_POWER_HELPER_LABEL=dev.wzz.zisla.debug.power-helper
+else
+  CERTIFICATE_APP="$TEMPORARY_ROOT/certificate-output/zisla.app"
+  EXPECTED_POWER_HELPER_LABEL=dev.wzz.zisla.power-helper
+fi
+[[ -x "$CERTIFICATE_APP/Contents/Library/LaunchServices/$EXPECTED_POWER_HELPER_LABEL" ]] || {
+  print -u2 -r -- "FAIL: certificate-signed build did not package the persistent power helper"
+  exit 1
+}
+[[ "$(<"$CAPTURE_FILE.helper-build")" == *"-sectcreate -Xlinker __TEXT -Xlinker __info_plist"* && \
+   "$(<"$CAPTURE_FILE.helper-build")" == *"-sectcreate -Xlinker __TEXT -Xlinker __launchd_plist"* ]] || {
+  print -u2 -r -- "FAIL: power helper does not embed its authorization and launchd metadata"
+  exit 1
+}
+python3 - "$CERTIFICATE_APP" "$TEST_ROOT/.build/power-helper-metadata" <<'PYTHON'
+import pathlib
+import plistlib
+import sys
+
+app, metadata = map(pathlib.Path, sys.argv[1:])
+with (app / "Contents/Info.plist").open("rb") as stream:
+    info = plistlib.load(stream)
+with (metadata / "Info.plist").open("rb") as stream:
+    helper = plistlib.load(stream)
+with (metadata / "Launchd.plist").open("rb") as stream:
+    daemon = plistlib.load(stream)
+label = info["CFBundleIdentifier"] + ".power-helper"
+certificate = ' and certificate root = H"' + "0" * 40 + '"'
+assert helper["CFBundleIdentifier"] == label
+assert helper["CFBundleVersion"] == "1", "Helper compatibility version must survive app updates"
+assert helper["SMAuthorizedClients"] == ['identifier "' + info["CFBundleIdentifier"] + '"' + certificate]
+assert info["SMPrivilegedExecutables"] == {label: 'identifier "' + label + '"' + certificate}
+assert daemon["Label"] == label
+assert daemon["MachServices"] == {label: True}
+assert daemon["ProgramArguments"] == ["/Library/PrivilegedHelperTools/" + label]
+assert daemon["AbandonProcessGroup"], "A daemon restart must leave the lease alive to restore sleep on app disconnect"
+assert not daemon.get("RunAtLoad", False)
+assert not daemon.get("KeepAlive", False)
+PYTHON
+done
+
 print -r -- "PASS: build-app identity, signing, data, icon, and architecture isolation"
+print -r -- "PASS: persistent power helper signing, metadata, and ad-hoc exclusion"

@@ -1,7 +1,7 @@
 #!/bin/zsh
 set -euo pipefail
 
-python3 - "${0:A:h:h:h}/Sources/ZislaKit/LidClosedDisplaySession.swift" <<'PYTHON'
+python3 - "${0:A:h:h:h}/Sources/ZislaPowerHelperSupport/LidClosedDisplaySessionScript.swift" <<'PYTHON'
 import pathlib
 import os
 import select

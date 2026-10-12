@@ -283,27 +283,30 @@ fi
 ENTITLEMENTS="$ROOT/Resources/Zisla.entitlements"
 CERTIFICATE_SIGNING_ARGUMENTS=(--sign "$IDENTITY")
 [[ -z "$SIGNING_KEYCHAIN" ]] || CERTIFICATE_SIGNING_ARGUMENTS+=(--keychain "$SIGNING_KEYCHAIN")
-if [[ "$SIGNING_MODE" == "adhoc" ]]; then
-  # Ad-hoc signs cannot carry WeatherKit (or other restricted) entitlements.
-  # Note: an ad hoc designated requirement is the build-specific cdhash,
-  # so every rebuild silently invalidates TCC permissions (such as Accessibility).
-  echo "warning: ad-hoc code signature (TeamIdentifier empty); WeatherKit unavailable, mainland China uses China Weather alerts" >&2
-  codesign --force --deep --sign - "$APP"
-elif [[ "$SIGNING_MODE" == "dev" ]]; then
-  # A stable certificate identity keeps TCC permissions valid across builds. This mode also
-  # signs self-signed releases, which cannot carry restricted Developer ID entitlements.
-  # Do not include entitlements because restricted entitlements such as WeatherKit are rejected by AMFI without a provisioning profile,
-  # and do not enable the hardened runtime because this path is not notarized.
-  codesign --force --deep "${CERTIFICATE_SIGNING_ARGUMENTS[@]}" "$APP"
-else
-  if [[ ! -f "$ENTITLEMENTS" ]]; then
-    echo "error: missing entitlements file: $ENTITLEMENTS" >&2
-    exit 1
+function sign_app() {
+  if [[ "$SIGNING_MODE" == "adhoc" ]]; then
+    # Ad-hoc signs cannot carry WeatherKit (or other restricted) entitlements.
+    # Note: an ad hoc designated requirement is the build-specific cdhash,
+    # so every rebuild silently invalidates TCC permissions (such as Accessibility).
+    echo "warning: ad-hoc code signature (TeamIdentifier empty); WeatherKit unavailable, mainland China uses China Weather alerts" >&2
+    codesign --force "$@" --sign - "$APP"
+  elif [[ "$SIGNING_MODE" == "dev" ]]; then
+    # A stable certificate identity keeps TCC permissions valid across builds. This mode also
+    # signs self-signed releases, which cannot carry restricted Developer ID entitlements.
+    # Do not include entitlements because restricted entitlements such as WeatherKit are rejected by AMFI without a provisioning profile,
+    # and do not enable the hardened runtime because this path is not notarized.
+    codesign --force "$@" "${CERTIFICATE_SIGNING_ARGUMENTS[@]}" "$APP"
+  else
+    if [[ ! -f "$ENTITLEMENTS" ]]; then
+      echo "error: missing entitlements file: $ENTITLEMENTS" >&2
+      exit 1
+    fi
+    codesign --force "$@" --options runtime --timestamp \
+      --entitlements "$ENTITLEMENTS" \
+      "${CERTIFICATE_SIGNING_ARGUMENTS[@]}" "$APP"
   fi
-  codesign --force --deep --options runtime --timestamp \
-    --entitlements "$ENTITLEMENTS" \
-    "${CERTIFICATE_SIGNING_ARGUMENTS[@]}" "$APP"
-fi
+}
+sign_app --deep
 codesign --verify --deep --strict --all-architectures --verbose=2 "$APP"
 SIGNATURE_DETAILS="$(codesign -dv --verbose=4 "$APP" 2>&1)"
 if [[ "$SIGNING_MODE" == "adhoc" ]]; then
@@ -325,5 +328,79 @@ else
     echo "error: certificate signing did not produce a stable designated requirement" >&2
     exit 1
   }
+fi
+
+if [[ "$SIGNING_MODE" != "adhoc" ]]; then
+  # SMJobBless needs stable mutual identities. Ad-hoc cdhashes change when the helper is embedded.
+  APP_REQUIREMENT="${DESIGNATED_REQUIREMENT#*designated => }"
+  POWER_HELPER_LABEL="$BUNDLE_ID.power-helper"
+  POWER_HELPER_METADATA="$BUILD_SCRATCH_DIRECTORY/power-helper-metadata"
+  mkdir -p "$POWER_HELPER_METADATA" "$CONTENTS/Library/LaunchServices"
+  python3 - "$POWER_HELPER_METADATA" "$POWER_HELPER_LABEL" "$APP_REQUIREMENT" <<'PYTHON'
+import pathlib
+import plistlib
+import sys
+
+directory, label, client = sys.argv[1:]
+metadata = {
+    "Info.plist": {
+        "CFBundleIdentifier": label,
+        "CFBundleName": "zisla Power Helper",
+        "CFBundleVersion": "1",
+        "SMAuthorizedClients": [client],
+    },
+    "Launchd.plist": {
+        "Label": label,
+        "ProgramArguments": ["/Library/PrivilegedHelperTools/" + label],
+        "MachServices": {label: True},
+        "AbandonProcessGroup": True,
+    },
+}
+for name, content in metadata.items():
+    with (pathlib.Path(directory) / name).open("wb") as stream:
+        plistlib.dump(content, stream)
+PYTHON
+  POWER_HELPER_BINARIES=()
+  for ARCHITECTURE in "${ARCHITECTURES[@]}"; do
+    TARGET_TRIPLE="${ARCHITECTURE}-apple-macosx"
+    SCRATCH_DIRECTORY="$BUILD_SCRATCH_DIRECTORY/$ARCHITECTURE"
+    swift build --package-path "$ROOT" -c "$CONFIGURATION" --disable-sandbox \
+      --scratch-path "$SCRATCH_DIRECTORY" --triple "$TARGET_TRIPLE" \
+      "${HAND_BUILT_APP_SWIFT_FLAGS[@]}" --product zisla-power-helper \
+      -Xlinker -sectcreate -Xlinker __TEXT -Xlinker __info_plist -Xlinker "$POWER_HELPER_METADATA/Info.plist" \
+      -Xlinker -sectcreate -Xlinker __TEXT -Xlinker __launchd_plist -Xlinker "$POWER_HELPER_METADATA/Launchd.plist"
+    BIN_DIRECTORY="$(swift build --package-path "$ROOT" -c "$CONFIGURATION" --disable-sandbox \
+      --scratch-path "$SCRATCH_DIRECTORY" --triple "$TARGET_TRIPLE" \
+      "${HAND_BUILT_APP_SWIFT_FLAGS[@]}" --show-bin-path)"
+    POWER_HELPER_BINARIES+=("$BIN_DIRECTORY/zisla-power-helper")
+  done
+  POWER_HELPER="$CONTENTS/Library/LaunchServices/$POWER_HELPER_LABEL"
+  if (( ${#POWER_HELPER_BINARIES[@]} == 1 )); then
+    install -m 0755 "$POWER_HELPER_BINARIES[1]" "$POWER_HELPER"
+  else
+    lipo -create "${POWER_HELPER_BINARIES[@]}" -output "$POWER_HELPER"
+    chmod 0755 "$POWER_HELPER"
+  fi
+  POWER_HELPER_SIGNING_ARGUMENTS=()
+  [[ "$SIGNING_MODE" != "release" ]] || POWER_HELPER_SIGNING_ARGUMENTS+=(--options runtime --timestamp)
+  codesign --force --identifier "$POWER_HELPER_LABEL" "${CERTIFICATE_SIGNING_ARGUMENTS[@]}" \
+    "${POWER_HELPER_SIGNING_ARGUMENTS[@]}" "$POWER_HELPER"
+  POWER_HELPER_REQUIREMENT="$(codesign -d -r- "$POWER_HELPER" 2>&1)"
+  POWER_HELPER_REQUIREMENT="${POWER_HELPER_REQUIREMENT#*designated => }"
+  python3 - "$CONTENTS/Info.plist" "$POWER_HELPER_LABEL" "$POWER_HELPER_REQUIREMENT" <<'PYTHON'
+import plistlib
+import sys
+
+path, label, requirement = sys.argv[1:]
+with open(path, "rb") as stream:
+    info = plistlib.load(stream)
+info["SMPrivilegedExecutables"] = {label: requirement}
+with open(path, "wb") as stream:
+    plistlib.dump(info, stream)
+PYTHON
+  sign_app
+  codesign --verify --deep --strict --all-architectures --verbose=2 "$APP"
+  codesign --verify --strict --all-architectures -R "=$APP_REQUIREMENT" "$APP"
+  codesign --verify --strict --all-architectures -R "=$POWER_HELPER_REQUIREMENT" "$POWER_HELPER"
 fi
 echo "$APP"

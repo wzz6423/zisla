@@ -40,10 +40,6 @@ final class BatteryPowerModeAuthorizationSession: @unchecked Sendable {
         )
     }
 
-    func openLidClosedDisplaySession() -> (OSStatus, UnsafeMutablePointer<FILE>?) {
-        launch(path: "/bin/sh", arguments: ["-p", "-c", PMSetLidClosedDisplaySession.script])
-    }
-
     private func launch(path: String, arguments: [String]) -> (OSStatus, UnsafeMutablePointer<FILE>?) {
         lock.lock()
         defer { lock.unlock() }
