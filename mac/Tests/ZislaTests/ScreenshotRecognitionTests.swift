@@ -294,14 +294,95 @@ struct ScreenshotRecognitionTests {
     }
 
     @Test
+    func warmUpRunsOffMainThreadOnlyOnce() async throws {
+        let warmUp = ScreenshotRecognitionWarmUp()
+        let gate = RecognitionGate()
+        let mainQueueProgress = DispatchSemaphore(value: 0)
+        warmUp.start {
+            Self.checkBackgroundProgress(mainQueueProgress)
+            #expect(Task.currentPriority == .utility)
+            _ = try await gate.recognize()
+        }
+        await gate.waitUntilStarted()
+        let first = try #require(warmUp.task)
+        warmUp.start { Issue.record("Repeated startup callbacks must not compile another model") }
+        let repeated = try #require(warmUp.task)
+        await gate.finish(.success([]))
+        try await first.value
+        try await repeated.value
+        warmUp.start { Issue.record("A completed warm-up must remain cached for this launch") }
+        try await warmUp.task?.value
+    }
+
+    @Test(arguments: [false, true])
+    func recognitionWaitsForWarmUpEvenWhenCancelled(cancel: Bool) async throws {
+        let warmUp = ScreenshotRecognitionWarmUp()
+        let gate = RecognitionGate()
+        let ready = DispatchSemaphore(value: 0)
+        warmUp.start {
+            _ = try await gate.recognize()
+            ready.signal()
+        }
+        await gate.waitUntilStarted()
+        let request = CancellationProbeRequest()
+        request.onSupportedLanguages = {
+            #expect(!Thread.isMainThread, "The first real Vision request must stay off the UI thread")
+            #expect(ready.wait(timeout: .now()) == .success,
+                    "A user request must not race the model compilation")
+        }
+        let operation = ScreenshotRecognitionOperation(request: request)
+        let image = try #require(makeImage().cgImage(forProposedRect: nil, context: nil, hints: nil))
+        let started = AsyncStream<Void>.makeStream()
+        let task = Task.detached {
+            started.continuation.yield()
+            started.continuation.finish()
+            return try await warmUp.recognize(image, operation: operation)
+        }
+        for await _ in started.stream {}
+        if cancel { operation.cancel() }
+        await gate.finish(.success([]))
+        do {
+            let result = try await task.value
+            #expect(!cancel)
+            #expect(result.map(\.text).joined().contains("Synthetic"))
+        } catch is CancellationError {
+            #expect(cancel)
+            #expect(request.wasCancelled)
+        }
+    }
+
+    @Test(arguments: ["not started", "failed", "empty"])
+    func recognitionStillWorksWithoutSuccessfulWarmUp(outcome: String) async throws {
+        let warmUp = ScreenshotRecognitionWarmUp()
+        if outcome != "not started" {
+            warmUp.start {
+                if outcome == "failed" { throw RecognitionFailure() }
+            }
+        }
+        let model = ScreenshotEditorModel(image: try makeImage())
+        var result: String?
+        let task = try #require(model.recognize(.text, recognizeImage: { image, operation in
+            try await warmUp.recognize(image, operation: operation)
+        }) { text, _ in result = text })
+        await task.value
+        #expect(result?.contains("Synthetic") == true)
+        #expect(model.statusMessage == nil)
+        #expect(!model.isRecognizing)
+    }
+
+    @Test
     func recognizesSyntheticTextUsingTheProductionVisionWorker() async throws {
+        let warmUp = ScreenshotRecognitionWarmUp()
+        warmUp.start()
+        try await warmUp.task?.value
         let model = ScreenshotEditorModel(image: try makeImage(text: "Screenshot OCR 2468"))
         for pass in 1...2 {
             let mainQueueProgress = DispatchSemaphore(value: 0)
             let start = ContinuousClock.now
             var result: String?
             let task = try #require(model.recognize(.text, recognizeImage: { image, operation in
-                try Self.recognizeSynthetic(image, operation: operation, mainQueueProgress: mainQueueProgress)
+                try await Self.recognizeSynthetic(image, operation: operation, warmUp: warmUp,
+                                                  mainQueueProgress: mainQueueProgress)
             }) { text, _ in result = text })
             await task.value
             print("Synthetic OCR pass \(pass): \(start.duration(to: .now))")
@@ -317,14 +398,20 @@ struct ScreenshotRecognitionTests {
     private nonisolated static func recognizeSynthetic(
         _ image: CGImage,
         operation: ScreenshotRecognitionOperation,
+        warmUp: ScreenshotRecognitionWarmUp,
         mainQueueProgress: DispatchSemaphore
-    ) throws -> [ScreenshotRecognizedFragment] {
+    ) async throws -> [ScreenshotRecognizedFragment] {
+        checkBackgroundProgress(mainQueueProgress)
+        let fragments = try await warmUp.recognize(image, operation: operation)
+        checkBackgroundProgress(mainQueueProgress)
+        return fragments
+    }
+
+    private nonisolated static func checkBackgroundProgress(_ mainQueueProgress: DispatchSemaphore) {
         #expect(!Thread.isMainThread, "Vision must run outside the UI thread")
         DispatchQueue.main.async { mainQueueProgress.signal() }
-        let fragments = try operation.recognize(image)
         #expect(mainQueueProgress.wait(timeout: .now() + 2) == .success,
                 "The main queue must stay responsive while recognition is running")
-        return fragments
     }
 
     private func makeImage(text: String = "Synthetic") throws -> NSImage {

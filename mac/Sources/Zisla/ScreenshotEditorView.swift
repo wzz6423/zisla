@@ -1662,7 +1662,7 @@ final class ScreenshotEditorModel: ObservableObject {
         _ mode: ScreenshotRecognitionMode,
         chooseTableDestination: @escaping @MainActor () async -> URL? = { nil },
         recognizeImage: @escaping @Sendable (CGImage, ScreenshotRecognitionOperation) async throws -> [ScreenshotRecognizedFragment] = {
-            try $1.recognize($0)
+            try await ScreenshotRecognitionWarmUp.shared.recognize($0, operation: $1)
         },
         presentText: @escaping @MainActor (String, ScreenshotRecognitionOperation) -> Void
     ) -> Task<Void, Never>? {
@@ -3230,6 +3230,32 @@ enum ScreenshotRecognitionMode: Sendable {
         case .text: "识图完成"
         case .table: "表格识别完成"
         }
+    }
+}
+
+@MainActor
+final class ScreenshotRecognitionWarmUp {
+    static let shared = ScreenshotRecognitionWarmUp()
+    private(set) var task: Task<Void, any Error>?
+
+    func start(prepare: @escaping @Sendable () async throws -> Void = {
+        guard let context = CGContext(data: nil, width: 64, height: 64, bitsPerComponent: 8,
+                                      bytesPerRow: 0, space: CGColorSpaceCreateDeviceRGB(),
+                                      bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue),
+              let image = context.makeImage() else { return }
+        _ = try ScreenshotRecognitionOperation().recognize(image)
+    }) {
+        guard task == nil else { return }
+        task = Task.detached(priority: .utility, operation: prepare)
+    }
+
+    nonisolated func recognize(
+        _ image: CGImage,
+        operation: ScreenshotRecognitionOperation
+    ) async throws -> [ScreenshotRecognizedFragment] {
+        // A failed warm-up must still allow the user's request to try Vision.
+        _ = await task?.result
+        return try operation.recognize(image)
     }
 }
 
