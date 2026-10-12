@@ -40,8 +40,11 @@ final class BatteryPowerModeAuthorizationSession: @unchecked Sendable {
         )
     }
 
-    func openLidClosedDisplaySession() -> (OSStatus, UnsafeMutablePointer<FILE>?) {
-        launch(path: "/bin/sh", arguments: ["-p", "-c", PMSetLidClosedDisplaySession.script])
+    func installLidClosedDisplayPermission(userID: uid_t) -> (OSStatus, UnsafeMutablePointer<FILE>?) {
+        launch(path: "/bin/sh", arguments: [
+            "-p", "-c", LidClosedDisplayAuthorization.installationScript,
+            "zisla-keep-awake", String(userID),
+        ])
     }
 
     private func launch(path: String, arguments: [String]) -> (OSStatus, UnsafeMutablePointer<FILE>?) {
