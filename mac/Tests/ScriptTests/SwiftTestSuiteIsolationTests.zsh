@@ -82,6 +82,25 @@ if mode == "workflow":
         "ZislaTests.FutureAppKitTestsExtra/test()",
         "ZislaTests.topLevel()/Tests.swift:1:1",
     ]
+if mode in ("throughput", "throughput-failure"):
+    tests = [
+        "ZislaTests.AShortTests/test()",
+        "ZislaTests.LongCaptureRealWorldTests/testOne()",
+        "ZislaTests.LongCaptureRealWorldTests/testOneExtra()",
+        "ZislaTests.LongCaptureRealWorldTests/testTwo(frameHeight:)",
+        "ZislaTests.LongCaptureRealWorldTests/Nested/test()",
+        "ZislaTests.LongCaptureRealWorldTests/realWorldTinyScrollDoesNotStartADuplicateCapture(frameHeight:)",
+        "ZislaTests.LongCaptureRealWorldTests/realWorldRetinaSparseChatPageStitchesExactly()",
+        "ZislaTests.LongCaptureRealWorldTestsExtra/testOne()",
+        "ZislaTests.LongCaptureRealWorldTestsExtra/testTwo()",
+        "ZislaKitTests.EmojiNameCatalogTests/testOne()",
+        "ZislaKitTests.EmojiNameCatalogTests/testTwo()",
+        "ZislaKitTests.ClipboardAssistantSmartActionsTests/test()",
+        "ZislaKitTests.ClipboardAssistantShellCommandTests/test()",
+        "ZislaKitTests.ClipboardAssistantDetectorTests/test()",
+        "ZislaKitTests.ClipboardAssistantNumericActionsTests/test()",
+        "ZislaKitTests.ClipboardAssistantCurrencyDetectionTests/test()",
+    ]
 is_swift = Path(sys.argv[0]).name == "swift"
 if not is_swift:
     frameworks = os.environ["DYLD_FRAMEWORK_PATH"].split(os.pathsep)
@@ -143,6 +162,8 @@ if mode in ("parallel", "parallel-failure", "interrupted", "orphaned-worker", "o
     coordinate(record, orphan=mode in ("orphaned-worker", "orphaned-failure"))
 if mode == "test-failure" and "Second" in selector:
     sys.exit(6)
+if mode == "throughput-failure" and any("LongCaptureRealWorldTests/" in test for test in selected):
+    sys.exit(6)
 output = args[args.index("--event-stream-output-path") + 1]
 with open(output, "w") as events:
     for kind in ("testEnded", "runEnded"):
@@ -176,6 +197,8 @@ expected = [
 ]
 environment = dict(os.environ, PATH=str(tools) + ":" + os.environ["PATH"],
     TMPDIR=str(results), SWIFT_TEST_FIXTURE_ROOT=str(test_root))
+environment.pop("SWIFT_TEST_SHARD_COUNT", None)
+environment.pop("SWIFT_TEST_SHARD_INDEX", None)
 command = ["zsh", str(root / "Scripts/swift-test-suites.sh"), "FixtureTests"]
 checks = 0
 
@@ -191,7 +214,8 @@ def check_cleanup(records):
             continue
         raise AssertionError(f"Test worker still running: {record['pid']}")
 
-def run_case(mode, status, selected, workers=None, arguments=()):
+def run_case(mode, status, selected, workers=None, arguments=(), target="FixtureTests",
+             shard_count=None, shard_index=None):
     global checks
     capture = test_root / (mode + "-" + str(checks) + ".jsonl")
     case_environment = dict(environment, SWIFT_TEST_MODE=mode, SWIFT_TEST_CAPTURE=str(capture))
@@ -199,7 +223,11 @@ def run_case(mode, status, selected, workers=None, arguments=()):
         case_environment.pop("SWIFT_TEST_WORKERS", None)
     else:
         case_environment["SWIFT_TEST_WORKERS"] = workers
-    result = subprocess.run(command + list(arguments),
+    if shard_count is not None:
+        case_environment["SWIFT_TEST_SHARD_COUNT"] = shard_count
+    if shard_index is not None:
+        case_environment["SWIFT_TEST_SHARD_INDEX"] = shard_index
+    result = subprocess.run(command[:-1] + [target] + list(arguments),
         env=case_environment,
         stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, timeout=15)
     assert result.returncode == status, f"{mode}: expected exit {status}, got {result.returncode}\n{result.stdout}"
@@ -210,8 +238,12 @@ def run_case(mode, status, selected, workers=None, arguments=()):
     assert len({record["tmp"] for record in records}) == len(records), "Suites shared a temporary directory"
     check_cleanup(records)
     checks += 1
+    return records
 
 run_case("success", 0, expected)
+run_case("success", 0, expected + ["OtherTests.First/test()"], target="FixtureTests,OtherTests")
+run_case("success", 1, [], target="FixtureTests,MissingTests")
+run_case("success", 1, [], target="FixtureTests,")
 run_case("empty", 1, [])
 run_case("list-failure", 5, [])
 run_case("test-failure", 6, expected[:5])
@@ -223,6 +255,59 @@ run_case("duplicate-discovery", 1, [])
 run_case("success", 0, expected, arguments=("--skip-build", "--scratch-path", str(test_root / "build with spaces")))
 for workers in ("0", "-1", "not-a-number", "1.5", "", "1; touch unexpected"):
     run_case("invalid-workers", 1, [], workers=workers)
+
+throughput_tests = [
+    "ZislaTests.AShortTests/test()",
+    "ZislaTests.LongCaptureRealWorldTests/testOne()",
+    "ZislaTests.LongCaptureRealWorldTests/testOneExtra()",
+    "ZislaTests.LongCaptureRealWorldTests/testTwo(frameHeight:)",
+    "ZislaTests.LongCaptureRealWorldTests/Nested/test()",
+    "ZislaTests.LongCaptureRealWorldTests/realWorldTinyScrollDoesNotStartADuplicateCapture(frameHeight:)",
+    "ZislaTests.LongCaptureRealWorldTests/realWorldRetinaSparseChatPageStitchesExactly()",
+    "ZislaTests.LongCaptureRealWorldTestsExtra/testOne()",
+    "ZislaTests.LongCaptureRealWorldTestsExtra/testTwo()",
+    "ZislaKitTests.EmojiNameCatalogTests/testOne()",
+    "ZislaKitTests.EmojiNameCatalogTests/testTwo()",
+    "ZislaKitTests.ClipboardAssistantSmartActionsTests/test()",
+    "ZislaKitTests.ClipboardAssistantShellCommandTests/test()",
+    "ZislaKitTests.ClipboardAssistantDetectorTests/test()",
+    "ZislaKitTests.ClipboardAssistantNumericActionsTests/test()",
+    "ZislaKitTests.ClipboardAssistantCurrencyDetectionTests/test()",
+]
+records = run_case("throughput", 0, throughput_tests, target="ZislaKitTests,ZislaTests")
+assert [record["selected"][0] for record in records[:8]] == [
+    "ZislaKitTests.EmojiNameCatalogTests/testOne()",
+    "ZislaKitTests.ClipboardAssistantSmartActionsTests/test()",
+    "ZislaKitTests.ClipboardAssistantShellCommandTests/test()",
+    "ZislaTests.LongCaptureRealWorldTests/realWorldTinyScrollDoesNotStartADuplicateCapture(frameHeight:)",
+    "ZislaKitTests.ClipboardAssistantDetectorTests/test()",
+    "ZislaKitTests.ClipboardAssistantNumericActionsTests/test()",
+    "ZislaKitTests.ClipboardAssistantCurrencyDetectionTests/test()",
+    "ZislaTests.LongCaptureRealWorldTests/realWorldRetinaSparseChatPageStitchesExactly()",
+], "Long suites waited behind short suites"
+assert all(len(record["selected"]) == 1 for record in records
+           if record["selected"][0].startswith("ZislaTests.LongCaptureRealWorldTests/")), "Long capture methods shared a worker"
+assert all(record["selected"][0].startswith("ZislaTests.LongCaptureRealWorldTests/") for record in records[8:12]), "Long capture methods waited behind short suites"
+assert len(records[-1]["selected"]) == 2, "A similarly named ordinary suite lost its shared host"
+run_case("throughput-failure", 6,
+    [test for record in records[:4] for test in record["selected"]], target="ZislaKitTests,ZislaTests")
+
+shard_tasks = [
+    [0, 7, 9, 12],
+    [1, 4, 6, 10, 13],
+    [2, 3, 5, 8, 11],
+]
+for index, tasks in enumerate(shard_tasks):
+    selected = [test for task in tasks for test in records[task]["selected"]]
+    for target in ("ZislaKitTests,ZislaTests", "ZislaTests,ZislaKitTests"):
+        run_case("throughput", 0, selected, target=target, shard_count="3", shard_index=str(index))
+run_case("throughput-failure", 6,
+    [test for record in records[2:4] for test in record["selected"]],
+    target="ZislaKitTests,ZislaTests", shard_count="3", shard_index="2")
+for count, index in (("0", "0"), ("-1", "0"), ("invalid", "0"), ("1.5", "0"),
+                     ("", "0"), ("3", "-1"), ("3", "3"), ("3", "invalid"),
+                     ("3", "1.5"), ("3", ""), ("3; touch unexpected", "0"), ("99", "0")):
+    run_case("invalid-shard", 1, [], shard_count=count, shard_index=index)
 
 for mode in ("parallel", "parallel-failure", "interrupted", "orphaned-worker", "orphaned-failure"):
     capture = test_root / (mode + ".jsonl")

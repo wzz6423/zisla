@@ -14,6 +14,9 @@
       "paths": ["mac/**", "Makefile", ".github/**"],
       "checks": [
         "Swift Tests",
+        "Swift Suites (0)",
+        "Swift Suites (1)",
+        "Swift Suites (2)",
         "App Build Smoke Test",
         "CodeQL (swift)"
       ]
@@ -23,20 +26,7 @@
       "file": "web-ci.yml",
       "aliases": ["web"],
       "paths": ["web/**", ".github/**"],
-      "checks": ["Web Build & Test", "CodeQL (JavaScript)"]
-    },
-    {
-      "name": "Skill CI",
-      "file": "skill-ci.yml",
-      "aliases": ["skills"],
-      "paths": ["skills/**", ".github/**"],
-      "checks": ["Validate Skills"]
-    },
-    {
-      "name": "Repository Hygiene",
-      "file": "repository-hygiene.yml",
-      "aliases": ["hygiene"],
-      "checks": ["Repository Hygiene"]
+      "checks": ["Web Build & Test"]
     },
     {
       "name": "PR Quality Gates",

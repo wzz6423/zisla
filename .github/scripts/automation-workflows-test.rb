@@ -144,7 +144,7 @@ class AutomationWorkflowsTest < Minitest::Test
 
   def test_web_codeql_excludes_only_generated_sparkle_relocation_maps
     workflow = YAML.load_file(File.join(ROOT, '.github/workflows/web-ci.yml'))
-    initialization = workflow.fetch('jobs').fetch('codeql').fetch('steps').find do |entry|
+    initialization = workflow.fetch('jobs').fetch('build').fetch('steps').find do |entry|
       entry.fetch('uses', '').start_with?('github/codeql-action/init@')
     end
     config = YAML.load_file(File.join(ROOT, initialization.fetch('with').fetch('config-file')))
@@ -161,6 +161,31 @@ class AutomationWorkflowsTest < Minitest::Test
       'mac/Vendor/Sparkle.xcframework/macos-arm64_x86_64/dSYMs/Sparkle.framework.dSYM/Contents/Resources/config.yml',
       'mac/Vendor/Other/Contents/Resources/Relocations/aarch64/config.yml'
     ].each { |path| refute excluded.call(path), path }
+  end
+
+  def test_swift_required_check_rejects_incomplete_shards_and_smoke_checks
+    aggregate = step('swift-tests', 'Require every Swift test shard and smoke check')
+    environment = {
+      'GATE_RESULT' => 'success', 'SKIP' => 'false', 'RELEVANT' => 'true',
+      'TEST_RESULT' => 'success', 'SMOKE_RESULT' => 'success'
+    }
+    output, status = run_step(aggregate, environment)
+    assert status.success?, output
+
+    %w[GATE_RESULT TEST_RESULT SMOKE_RESULT].each do |result|
+      %w[failure cancelled skipped].each do |outcome|
+        output, status = run_step(aggregate, environment.merge(result => outcome))
+        refute status.success?, "#{result}=#{outcome}: #{output}"
+      end
+    end
+
+    [{ 'SKIP' => 'true' }, { 'RELEVANT' => 'false' }].each do |decision|
+      skipped = environment.merge('TEST_RESULT' => 'skipped', 'SMOKE_RESULT' => 'skipped').merge(decision)
+      output, status = run_step(aggregate, skipped)
+      assert status.success?, output
+      output, status = run_step(aggregate, skipped.merge('GATE_RESULT' => 'failure'))
+      refute status.success?, output
+    end
   end
 
   def test_issue_timeline_tracks_close_and_reopen_without_losing_edits

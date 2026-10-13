@@ -36,6 +36,18 @@ jobs:
           workflow-name: CI Lint
           github-token: ${{ github.token }}
 
+      - name: Check committed files
+        if: steps.gate.outputs.skip != 'true'
+        run: .github/scripts/check-repository-hygiene.sh
+
+      - name: Test skill validator
+        if: steps.gate.outputs.skip != 'true'
+        run: ruby .github/scripts/validate-skills-test.rb
+
+      - name: Run skill validation
+        if: steps.gate.outputs.skip != 'true'
+        run: ruby .github/scripts/validate-skills.rb
+
       - name: Run actionlint
         if: steps.gate.outputs.skip != 'true'
         env:

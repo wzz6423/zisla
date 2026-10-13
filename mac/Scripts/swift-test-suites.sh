@@ -2,7 +2,7 @@
 set -euo pipefail
 
 ROOT="${0:A:h:h}"
-TARGET="${1:?a Swift test target is required}"
+TARGET="${1:?comma-separated Swift test targets are required}"
 shift
 exec python3 - "$ROOT" "$TARGET" "$@" <<'PYTHON'
 import os
@@ -16,12 +16,20 @@ import tempfile
 import time
 
 root, target, *arguments = sys.argv[1:]
+targets = target.split(",")
 try:
     workers = int(os.environ.get("SWIFT_TEST_WORKERS", "1"))
     if workers < 1:
         raise ValueError()
 except ValueError:
     sys.exit("SWIFT_TEST_WORKERS must be a positive integer")
+try:
+    shard_count = int(os.environ.get("SWIFT_TEST_SHARD_COUNT", "1"))
+    shard_index = int(os.environ.get("SWIFT_TEST_SHARD_INDEX", "0"))
+    if shard_count < 1 or not 0 <= shard_index < shard_count:
+        raise ValueError()
+except ValueError:
+    sys.exit("SWIFT_TEST_SHARD_COUNT must be positive and SWIFT_TEST_SHARD_INDEX must be between zero and count - 1")
 
 def interrupted(signum, _frame):
     sys.exit(128 + signum)
@@ -31,7 +39,7 @@ signal.signal(signal.SIGTERM, interrupted)
 
 def selected_tests(output):
     return {re.sub(r"/[^/]+\.swift:\d+:\d+$", "", line.strip())
-            for line in output.splitlines() if line.startswith(target + ".")}
+            for line in output.splitlines() if line.startswith(tuple(name + "." for name in targets))}
 
 def stop_workers(workers):
     for process, _suite, _output in workers:
@@ -70,8 +78,9 @@ def capture(command, environment=None):
 with tempfile.TemporaryDirectory(prefix="zisla-swift-test-suites.") as temporary:
     scratch = Path(temporary)
     expected = selected_tests(capture(["swift", "test", *arguments, "list"]))
-    if not expected:
-        sys.exit(f"No Swift test suites found for {target}")
+    for name in targets:
+        if not any(test.startswith(name + ".") for test in expected):
+            sys.exit(f"No Swift test suites found for {name}")
 
     build_arguments = [argument for argument in arguments if argument != "--skip-build"]
     binary_directory = Path(capture(["swift", "build", *build_arguments, "--show-bin-path"]).strip())
@@ -96,7 +105,47 @@ with tempfile.TemporaryDirectory(prefix="zisla-swift-test-suites.") as temporary
     if discovered != expected:
         sys.exit(f"Swift test discovery mismatch; missing={sorted(expected - discovered)}, unexpected={sorted(discovered - expected)}")
 
-    pending = iter(enumerate(sorted(suites)))
+    # Measured on the macos-26 runner; run the longest work first to avoid a serial tail.
+    durations = {
+        "ZislaKitTests.EmojiNameCatalogTests": 221,
+        "ZislaKitTests.ClipboardAssistantSmartActionsTests": 114,
+        "ZislaKitTests.ClipboardAssistantShellCommandTests": 98,
+        "ZislaKitTests.ClipboardAssistantDetectorTests": 85,
+        "ZislaKitTests.ClipboardAssistantNumericActionsTests": 63,
+        "ZislaKitTests.ClipboardAssistantCurrencyDetectionTests": 55,
+        "ZislaTests.LongCaptureRealWorldTests/realWorldMultiFrameSessionReproducesThePage()": 63,
+        "ZislaTests.LongCaptureRealWorldTests/realWorldSmallScrollStepsStillStitchExactly()": 53,
+        "ZislaTests.LongCaptureRealWorldTests/realWorldRepeatingListRowsDoNotShiftTheSeam()": 21,
+        "ZislaTests.LongCaptureRealWorldTests/realWorldRepeatingListWithChangingScrollStepsKeepsExactAlignment()": 19,
+        "ZislaTests.LongCaptureRealWorldTests/realWorldTableIgnoresScrollJitter()": 38,
+        "ZislaTests.LongCaptureRealWorldTests/realWorldTinyScrollDoesNotStartADuplicateCapture(frameHeight:)": 92,
+        "ZislaTests.LongCaptureRealWorldTests/realWorldPeriodicRowsDoNotTurnJitterIntoThePreviousScrollStep(delta:)": 29,
+        "ZislaTests.LongCaptureRealWorldTests/realWorldStationaryRepeatingListIsNeverAppended()": 8,
+        "ZislaTests.LongCaptureRealWorldTests/realWorldStationaryPageIsNeverAppended()": 8,
+        "ZislaTests.LongCaptureRealWorldTests/realWorldStationaryPageWithTickingContentIsNeverAppended()": 44,
+        "ZislaTests.LongCaptureRealWorldTests/realWorldSparseChatPageStitchesExactly()": 26,
+        "ZislaTests.LongCaptureRealWorldTests/realWorldChatSmallScrollIsNotDiscardedAsUnchanged()": 4,
+        "ZislaTests.LongCaptureRealWorldTests/realWorldStationarySparseChatFrameIsNotAppended()": 4,
+        "ZislaTests.LongCaptureRealWorldTests/realWorldRetinaSparseChatPageStitchesExactly()": 33,
+    }
+    tasks = {}
+    for suite, command in suites.items():
+        if suite == "ZislaTests.LongCaptureRealWorldTests":
+            # Each scenario owns its model and images; separate hosts keep MainActor work parallel.
+            for test in discovered:
+                if test.startswith(suite + "/"):
+                    tasks[test] = (command, durations.get(test, 32))
+        else:
+            tasks[suite] = (command, durations.get(suite, 1))
+    if shard_count > len(tasks):
+        sys.exit("SWIFT_TEST_SHARD_COUNT exceeds the number of test tasks")
+    shards = [[] for _ in range(shard_count)]
+    loads = [0] * shard_count
+    for name in sorted(tasks, key=lambda name: (-tasks[name][1], name)):
+        index = min(range(shard_count), key=lambda index: (loads[index], index))
+        shards[index].append(name)
+        loads[index] += tasks[name][1]
+    pending = iter(enumerate(shards[shard_index]))
     running = {}
     exhausted = False
     try:
@@ -118,8 +167,8 @@ with tempfile.TemporaryDirectory(prefix="zisla-swift-test-suites.") as temporary
                 process = subprocess.Popen(
                     ["zsh", str(Path(root) / "Scripts/swift-test.sh"), "--runner", "/usr/bin/env",
                      "DYLD_FRAMEWORK_PATH=" + environment["DYLD_FRAMEWORK_PATH"],
-                     "DYLD_LIBRARY_PATH=" + environment["DYLD_LIBRARY_PATH"], *suites[suite],
-                     "--filter", "^" + re.escape(suite) + "/"],
+                     "DYLD_LIBRARY_PATH=" + environment["DYLD_LIBRARY_PATH"], *tasks[suite][0],
+                     "--filter", "^" + re.escape(suite) + r"(?:/|$)"],
                     env=suite_environment, stdout=output, stderr=subprocess.STDOUT, start_new_session=True)
                 running[process.pid] = (process, suite, output)
             if running:

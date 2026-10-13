@@ -39,12 +39,20 @@ jobs:
           workflow-name: Swift Tests
           github-token: ${{ github.token }}
 
-  test:
-    name: Swift Tests
+  test-suites:
+    name: Swift Suites (${{ matrix.shard }})
     needs: gate
     if: needs.gate.outputs.skip != 'true' && needs.gate.outputs.relevant != 'false'
     runs-on: macos-26
-    timeout-minutes: 45
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [0, 1, 2]
+    env:
+      SWIFT_TEST_WORKERS: "3"
+      SWIFT_TEST_SHARD_COUNT: "3"
+      SWIFT_TEST_SHARD_INDEX: ${{ matrix.shard }}
     defaults:
       run:
         working-directory: mac
@@ -53,35 +61,42 @@ jobs:
         with:
           persist-credentials: false
       - run: swift --version
-      - name: Check shell script syntax
-        run: |
-          for script in Scripts/*.sh; do
-            case "$(head -n 1 "$script")" in
-              "#!/bin/zsh") zsh -n "$script" ;;
-              "#!/usr/bin/env bash") bash -n "$script" ;;
-              *) echo "Unsupported shell in $script" >&2; exit 1 ;;
-            esac
-          done
-      - name: Run shell script tests
-        run: |
-          for test_script in Tests/ScriptTests/*.zsh; do
-            zsh "$test_script"
-          done
       - name: Build Swift tests
         run: |
           swift build --build-tests
       - name: Run Swift core tests
+        if: matrix.shard == 0
         run: |
           zsh Scripts/swift-test.sh --skip-build --filter '^ZislaCoreTests\.'
       - name: Run isolated Swift suites
-        env:
-          SWIFT_TEST_WORKERS: "3"
         run: |
-          zsh Scripts/swift-test-suites.sh ZislaKitTests --skip-build
-          zsh Scripts/swift-test-suites.sh ZislaTests --skip-build
+          zsh Scripts/swift-test-suites.sh ZislaKitTests,ZislaTests --skip-build
       - name: Remove test artifacts
         if: always()
         run: rm -rf .build
+
+  test:
+    name: Swift Tests
+    needs: [gate, test-suites, app-smoke]
+    if: always()
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Require every Swift test shard and smoke check
+        env:
+          GATE_RESULT: ${{ needs.gate.result }}
+          SKIP: ${{ needs.gate.outputs.skip }}
+          RELEVANT: ${{ needs.gate.outputs.relevant }}
+          TEST_RESULT: ${{ needs.test-suites.result }}
+          SMOKE_RESULT: ${{ needs.app-smoke.result }}
+        run: |
+          set -euo pipefail
+          test "$GATE_RESULT" = success
+          if [[ "$SKIP" == true || "$RELEVANT" == false ]]; then
+            exit 0
+          fi
+          test "$TEST_RESULT" = success
+          test "$SMOKE_RESULT" = success
 
   app-smoke:
     name: App Build Smoke Test
@@ -96,6 +111,20 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
+      - name: Check shell script syntax
+        run: |
+          for script in Scripts/*.sh; do
+            case "$(head -n 1 "$script")" in
+              "#!/bin/zsh") zsh -n "$script" ;;
+              "#!/usr/bin/env bash") bash -n "$script" ;;
+              *) echo "Unsupported shell in $script" >&2; exit 1 ;;
+            esac
+          done
+      - name: Run shell script tests
+        run: |
+          for test_script in Tests/ScriptTests/*.zsh; do
+            zsh "$test_script"
+          done
       - name: Build ad-hoc signed app (single architecture)
         env:
           VERSION: "0.1.0"
@@ -134,7 +163,7 @@ jobs:
     name: CodeQL (swift)
     needs: gate
     if: needs.gate.outputs.skip != 'true' && needs.gate.outputs.relevant != 'false'
-    runs-on: macos-26
+    runs-on: macos-26-intel
     timeout-minutes: 45
     permissions:
       actions: read
@@ -153,7 +182,8 @@ jobs:
           build-mode: manual
           queries: security-and-quality
       - name: Build all Swift products for CodeQL
-        run: swift build
+        # Keep ARM64/DEBUG coverage; WMO needs an explicit thread count for SwiftPM's object-file map.
+        run: swift build --arch arm64 -Xswiftc -whole-module-optimization -Xswiftc -num-threads -Xswiftc 1
       - uses: github/codeql-action/analyze@24c54180a607b1449ed407dd24f251e4e9147c8d # v4.38.3
         with:
           category: /language:swift
