@@ -182,8 +182,9 @@ jobs:
           build-mode: manual
           queries: security-and-quality
       - name: Build all Swift products for CodeQL
-        # Keep ARM64/DEBUG coverage; WMO needs an explicit thread count for SwiftPM's object-file map.
-        run: swift build --arch arm64 -Xswiftc -whole-module-optimization -Xswiftc -num-threads -Xswiftc 1
+        # Keep ARM64/DEBUG coverage and emit modules in the same pass to avoid a second traced frontend.
+        # WMO needs an explicit thread count for SwiftPM's object-file map.
+        run: swift build --arch arm64 -Xswiftc -whole-module-optimization -Xswiftc -num-threads -Xswiftc 1 -Xswiftc -no-emit-module-separately-wmo
       - uses: github/codeql-action/analyze@24c54180a607b1449ed407dd24f251e4e9147c8d # v4.38.3
         with:
           category: /language:swift
