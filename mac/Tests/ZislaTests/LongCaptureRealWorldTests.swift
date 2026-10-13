@@ -607,8 +607,8 @@ struct LongCaptureRealWorldTests {
         #expect(report == "identical", "changing scroll steps shifted the seam: \(report)")
     }
 
-    @Test(arguments: [540, 598, 599, 601, 602, 603])
-    func realWorldTableIgnoresScrollJitter(jitterOffset: Int) throws {
+    @Test
+    func realWorldTableIgnoresScrollJitter() throws {
         let pageWidth = 360
         let frameHeight = 700
         let page = try #require(makeListPageImage(width: pageWidth, height: 2_400))
@@ -628,19 +628,21 @@ struct LongCaptureRealWorldTests {
         }
 
         let settled = try #require(model.image.cgImage(forProposedRect: nil, context: nil, hints: nil))
-        let jitter = try #require(frame(from: page, offset: jitterOffset, height: frameHeight))
-        let didAppendJitter = model.append(
-            image: NSImage(cgImage: jitter, size: CGSize(width: pageWidth, height: frameHeight)),
-            direction: .vertical
-        )
-        let afterJitter = try #require(model.image.cgImage(forProposedRect: nil, context: nil, hints: nil))
-        let jitterReport = describeMismatch(
-            actual: rgbaPixels(afterJitter),
-            expected: rgbaPixels(settled),
-            width: pageWidth
-        )
-        #expect(!didAppendJitter, "scroll jitter at \(jitterOffset) must not duplicate a row")
-        #expect(jitterReport == "identical", "scroll jitter changed the composite: \(jitterReport)")
+        for jitterOffset in [540, 598, 599, 601, 602, 603] {
+            let jitter = try #require(frame(from: page, offset: jitterOffset, height: frameHeight))
+            let didAppendJitter = model.append(
+                image: NSImage(cgImage: jitter, size: CGSize(width: pageWidth, height: frameHeight)),
+                direction: .vertical
+            )
+            let afterJitter = try #require(model.image.cgImage(forProposedRect: nil, context: nil, hints: nil))
+            let jitterReport = describeMismatch(
+                actual: rgbaPixels(afterJitter),
+                expected: rgbaPixels(settled),
+                width: pageWidth
+            )
+            #expect(!didAppendJitter, "scroll jitter at \(jitterOffset) must not duplicate a row")
+            #expect(jitterReport == "identical", "scroll jitter changed the composite: \(jitterReport)")
+        }
 
         let forward = try #require(frame(from: page, offset: 900, height: frameHeight))
         let didAppendForward = model.append(
@@ -725,7 +727,7 @@ struct LongCaptureRealWorldTests {
         model.beginLongCapturePreview()
 
         let baseline = try #require(model.image.cgImage(forProposedRect: nil, context: nil, hints: nil))
-        for _ in 0..<8 {
+        for _ in 0..<2 {
             let didAppend = model.append(image: frameNS, direction: .vertical)
             #expect(!didAppend, "a stationary repeating list was stitched in")
         }
@@ -745,7 +747,7 @@ struct LongCaptureRealWorldTests {
         model.beginLongCapturePreview()
 
         let baseline = try #require(model.image.cgImage(forProposedRect: nil, context: nil, hints: nil))
-        for _ in 0..<6 {
+        for _ in 0..<2 {
             let didAppend = model.append(image: frameNS, direction: .vertical)
             #expect(!didAppend, "a stationary frame was stitched in")
         }

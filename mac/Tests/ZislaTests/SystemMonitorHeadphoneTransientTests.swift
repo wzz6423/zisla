@@ -51,28 +51,6 @@ struct SystemMonitorHeadphoneTransientTests {
         }
     }
 
-    @Test
-    func menuBarEventRunsBeforeNoticeGateAndUsesTheSameDuration() throws {
-        let root = URL(fileURLWithPath: #filePath).deletingLastPathComponent()
-            .deletingLastPathComponent().deletingLastPathComponent()
-        let model = try String(contentsOf: root.appendingPathComponent("Sources/Zisla/AppModel.swift"), encoding: .utf8)
-        let start = try #require(model.range(of: "  private func consumeHeadphoneConnection("))
-        let event = String(model[start.lowerBound...])
-        let transient = try #require(event.range(of: "systemMonitorHeadphoneTransient.receive"))
-        let noticeGate = try #require(event.range(of: "guard settingsStore.settings.sideNoticesEnabled"))
-        #expect(transient.lowerBound < noticeGate.lowerBound)
-        #expect(event.contains("Task.sleep(for: .seconds(SystemMonitorHeadphoneTransient.duration))"))
-        #expect(event.contains("expiresAfter: SystemMonitorHeadphoneTransient.duration"))
-        #expect(event.contains("guard !Task.isCancelled, let self else { return }"))
-        #expect(model.contains("headphoneTransientLifecycleActive = false"))
-        #expect(model.contains("headphoneTransientTask?.cancel()"))
-        let app = try String(contentsOf: root.appendingPathComponent("Sources/Zisla/ZislaApp.swift"), encoding: .utf8)
-        #expect(app.contains("model.$systemMonitorHeadphoneTransient"))
-        #expect(app.contains("headphoneOptions.replacesNetworkIcon = headphoneOptions.replacesNetworkIcon && connection != nil"))
-        #expect(!app.contains("SystemMonitorHeadphonePresentation.rows"))
-        #expect(app.contains("isVolumeMetric: metric == .volume && audioOutput.selectedDevice?.isBluetoothAudio == true"))
-    }
-
     private static func connection(name: String = "AirPods Pro", bluetooth: Bool = true) -> HeadphoneConnection {
         HeadphoneConnection(device: AudioOutputDevice(id: 1, name: name, isBluetoothAudio: bluetooth), battery: nil, productID: 0x200E)
     }

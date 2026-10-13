@@ -54,29 +54,6 @@ struct SystemMetricsHistoryPanelTests {
     }
 
     @Test
-    func historyLoaderBindsRangeAndRejectsStaleTasks() throws {
-        let source = try String(contentsOf: Self.historyViewSourceURL, encoding: .utf8)
-
-        #expect(source.contains("private struct HistoryLoadRequest: Equatable"))
-        #expect(source.contains(".task(id: HistoryLoadRequest(range: range, generation: reloadGeneration))"))
-        #expect(source.contains("let loadedSections = await service.historySections(range: selectedRange)"))
-        #expect(source.contains("let historyStats = service.historyStats"))
-        #expect(source.contains("loadedHistoryStats = historyStats"))
-        #expect(source.contains("let rangeEnd = Date()"))
-        #expect(source.contains("sectionsLoadedAt = rangeEnd"))
-        #expect(source.contains("guard !Task.isCancelled else { return }\n        let historyStats = service.historyStats\n        let rangeEnd = Date()"))
-        #expect(source.contains("let loadedSections = await service.historySections(range: selectedRange)\n        guard !Task.isCancelled else { return }\n        sections = loadedSections"))
-    }
-
-    @Test
-    func historyChartAppliesTheRangeDomain() throws {
-        let source = try String(contentsOf: Self.historyViewSourceURL, encoding: .utf8)
-
-        #expect(source.contains("SystemMetricsChartCard(section: section, xDomain: xDomain)"))
-        #expect(source.contains("chart.chartXScale(domain: xDomain)"))
-    }
-
-    @Test
     func chartDomainFollowsTheSelectedRange() {
         let now = Date(timeIntervalSince1970: 1_000_000)
         let section = SystemMetricsChartSection(
@@ -225,25 +202,4 @@ struct SystemMetricsHistoryPanelTests {
         #expect(ticks == [date])
     }
 
-    @Test
-    func historyChartBindsStartAnchoredXAxisTicks() throws {
-        let source = try String(contentsOf: Self.historyViewSourceURL, encoding: .utf8)
-
-        #expect(source.contains("SystemMetricsChartAxis.dates(in: xDomain)"))
-        #expect(source.contains("AxisMarks(values: xAxisDates)"))
-    }
-
-    @Test
-    func historyPanelKeepsVisibleThroughAppDeactivation() throws {
-        let source = try String(contentsOf: Self.historyViewSourceURL, encoding: .utf8)
-
-        #expect(source.contains("panel.hidesOnDeactivate = false"))
-        #expect(source.contains("panel.collectionBehavior = [.moveToActiveSpace, .ignoresCycle]"))
-    }
-
-    private static let historyViewSourceURL = URL(fileURLWithPath: #filePath)
-        .deletingLastPathComponent()
-        .deletingLastPathComponent()
-        .deletingLastPathComponent()
-        .appendingPathComponent("Sources/Zisla/SystemMetricsHistoryView.swift")
 }

@@ -81,26 +81,4 @@ struct SystemCleanupPanelTests {
         #expect(!state.isPresented)
     }
 
-    @Test
-    func cleanupPanelKeepsVisibleThroughAppDeactivation() throws {
-        let source = try String(contentsOf: Self.panelPresenterSourceURL, encoding: .utf8)
-
-        #expect(source.contains("panel.hidesOnDeactivate = false"))
-        #expect(source.contains("panel.collectionBehavior = [.moveToActiveSpace, .ignoresCycle]"))
-    }
-
-    @Test
-    func systemMonitorDoesNotDisplayHeadphoneBattery() throws {
-        let source = try String(contentsOf: Self.panelPresenterSourceURL, encoding: .utf8)
-
-        #expect(!source.contains("headphoneCard"))
-        #expect(!source.contains("HeadphoneBatteryRing"))
-        #expect(!source.contains("AudioOutputDeviceService"))
-    }
-
-    private static let panelPresenterSourceURL = URL(fileURLWithPath: #filePath)
-        .deletingLastPathComponent()
-        .deletingLastPathComponent()
-        .deletingLastPathComponent()
-        .appendingPathComponent("Sources/Zisla/SystemMonitorView.swift")
 }

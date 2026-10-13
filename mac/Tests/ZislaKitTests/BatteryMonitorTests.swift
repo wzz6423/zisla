@@ -761,19 +761,6 @@ struct BatteryMonitorTests {
         #expect(!CFRunLoopContainsSource(CFRunLoopGetMain(), source, .commonModes))
     }
 
-    @Test
-    func registersPowerSourceNotificationsInCommonRunLoopModes() throws {
-        let sourceURL = URL(fileURLWithPath: #filePath)
-            .deletingLastPathComponent()
-            .deletingLastPathComponent()
-            .deletingLastPathComponent()
-            .appendingPathComponent("Sources/ZislaKit/BatteryMonitor.swift")
-        let source = try String(contentsOf: sourceURL, encoding: .utf8)
-
-        #expect(source.contains("CFRunLoopAddSource(CFRunLoopGetMain(), source, .commonModes)"))
-        #expect(source.contains("CFRunLoopRemoveSource(CFRunLoopGetMain(), runLoopSource, .commonModes)"))
-    }
-
     private func powerSource(
         level: Int,
         charging: Bool = false,

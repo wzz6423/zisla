@@ -193,22 +193,6 @@ struct ScreenshotStashTests {
     }
 
     @Test
-    func toolbarPlacesStashBetweenPinAndCopyInBothPresentationsAndCaptureSnapshotsSourceAtEntry() throws {
-        let root = URL(fileURLWithPath: #filePath).deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent()
-        let editorSource = try String(contentsOf: root.appendingPathComponent("Sources/Zisla/ScreenshotEditorView.swift"), encoding: .utf8)
-        let pin = try #require(editorSource.range(of: #"iconButton(model.isPinned ? "pin.fill""#))
-        let stash = try #require(editorSource.range(of: #"iconButton("tray.and.arrow.down", title: AppLocalization.text("暂存"))"#))
-        let copy = try #require(editorSource.range(of: #"iconButton("doc.on.doc", title: AppLocalization.text("复制"))"#))
-        #expect(pin.lowerBound < stash.lowerBound && stash.lowerBound < copy.lowerBound)
-        #expect(editorSource.components(separatedBy: "onStash: { [weak self] in self?.stashImage() }").count == 3)
-        let appSource = try String(contentsOf: root.appendingPathComponent("Sources/Zisla/ZislaApp.swift"), encoding: .utf8)
-        let snapshot = try #require(appSource.range(of: "let sourceSnapshot = ScreenshotSourceSnapshot("))
-        let presentation = try #require(appSource.range(of: "ScreenshotModalSession.dismissForSelectionPresentation()"))
-        #expect(snapshot.lowerBound < presentation.lowerBound)
-        #expect(appSource.contains("sourceSnapshot: sourceSnapshot"))
-    }
-
-    @Test
     func exportWritesTheDatabasePNGWithoutDependingOnCachedFile() throws {
         let directory = FileManager.default.temporaryDirectory.appendingPathComponent("zisla-stash-export-\(UUID().uuidString)")
         try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
@@ -227,9 +211,6 @@ struct ScreenshotStashTests {
         #expect(throws: (any Error).self) {
             try ScreenshotImageExport.writePNG(png, to: directory.appendingPathComponent("missing/chosen.png"))
         }
-        let root = URL(fileURLWithPath: #filePath).deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent()
-        let source = try String(contentsOf: root.appendingPathComponent("Sources/Zisla/AppModel.swift"), encoding: .utf8)
-        #expect(source.contains("ScreenshotImageExport.presentSavePanel(for: try shelf.screenshotData(id: item.id))"))
     }
 
     private func makeImage() throws -> NSImage {

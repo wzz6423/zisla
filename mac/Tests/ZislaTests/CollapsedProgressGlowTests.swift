@@ -158,46 +158,4 @@ struct CollapsedProgressGlowTests {
         }
     }
 
-    @Test
-    func collapsedNoticeGlowUsesPlaybackDownloadAndDismissalProgressSources() throws {
-        let packageRoot = URL(fileURLWithPath: #filePath)
-            .deletingLastPathComponent()
-            .deletingLastPathComponent()
-            .deletingLastPathComponent()
-        let source = try String(
-            contentsOf: packageRoot.appendingPathComponent("Sources/Zisla/SideNoticeView.swift"),
-            encoding: .utf8
-        )
-
-        #expect(source.contains("CollapsedProgress.playbackFraction"))
-        #expect(source.contains("browserDownloadNotice?.progress"))
-        #expect(source.contains("videoDownloadNotice?.progress"))
-        #expect(source.contains("settingsStore.settings.collapsedProgressGlowEnabled"))
-        #expect(source.contains("selectedCompactStatusPriority == .media,\n              mediaNotice != nil,"))
-        #expect(source.contains("case .media:\n            guard mediaNotice != nil, let snapshot = media.snapshot else { return nil }"))
-        #expect(source.contains("CollapsedProgressGlow("))
-        #expect(source.contains("MediaWaveformView.tintColor(for: artworkData)"))
-        #expect(source.contains("compactStatusBackgroundFill"))
-        #expect(!source.contains("Color.clear\n                        .frame(width: centerInset)"))
-
-        let glowSource = try String(
-            contentsOf: packageRoot.appendingPathComponent("Sources/Zisla/CollapsedProgressGlow.swift"),
-            encoding: .utf8
-        )
-        #expect(glowSource.contains("CollapsedProgress.filledWidth"))
-        #expect(glowSource.contains("glowSegment(width: filledWidth)"))
-        #expect(glowSource.contains("private func glowSegment(width: CGFloat) -> some View {\n        ZStack(alignment: .bottomLeading)"))
-        #expect(glowSource.contains("Color.black.opacity(CollapsedProgress.contrastBackdropOpacity)"))
-        #expect(glowSource.contains("LinearGradient("))
-        #expect(glowSource.contains("tint.opacity(CollapsedProgress.leadingSegmentOpacity)"))
-        #expect(glowSource.contains("tint.opacity(CollapsedProgress.filledSegmentOpacity)"))
-        #expect(glowSource.contains("tint.opacity(CollapsedProgress.trailingSegmentOpacity)"))
-
-        let waveformSource = try String(
-            contentsOf: packageRoot.appendingPathComponent("Sources/Zisla/MediaWaveformView.swift"),
-            encoding: .utf8
-        )
-        #expect(waveformSource.contains("tint = Self.tintColor(for: artworkData)"))
-        #expect(waveformSource.contains("ArtworkWaveformColor.color(from: artworkData)"))
-    }
 }

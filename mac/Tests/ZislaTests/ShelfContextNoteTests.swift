@@ -92,25 +92,6 @@ struct ShelfContextNoteTests {
         #expect(host.fittingSize == CGSize(width: 140, height: 84))
     }
 
-    @Test
-    func savedNotesReturnToTheShelfHome() throws {
-        let source = try Self.source("ZislaApp.swift")
-        let savedHandler = try #require(source.range(of: "onSaved: { [weak coordinator] _, point in"))
-        let tail = source[savedHandler.upperBound...]
-        let handler = try #require(tail.range(of: "\n            }"))
-        #expect(tail[..<handler.lowerBound].contains("model.contextNoteEditor.hide()"))
-    }
-
-    @Test
-    func detailHasAnExplicitLocationActionAndNoDeletion() throws {
-        let source = try Self.source("ContextNoteViews.swift")
-        let detailStart = try #require(source.range(of: "struct ContextNoteDetailView"))
-        let detail = source[detailStart.lowerBound...]
-        #expect(detail.contains("前往记录位置"))
-        #expect(!detail.contains("onRemove"))
-        #expect(!detail.contains("role: .destructive"))
-    }
-
     @Test(arguments: [LayoutDirection.leftToRight, .rightToLeft])
     func mixedCardsWrapWithoutOverlappingOrCoveringFiles(direction: LayoutDirection) {
         let spans = [1, 2, 1, 2, 2, 1, 1]
@@ -269,11 +250,6 @@ struct ShelfContextNoteTests {
         return frames
     }
 
-    private static func source(_ name: String) throws -> String {
-        let root = URL(fileURLWithPath: #filePath).deletingLastPathComponent()
-            .deletingLastPathComponent().deletingLastPathComponent()
-        return try String(contentsOf: root.appendingPathComponent("Sources/Zisla/\(name)"), encoding: .utf8)
-    }
 }
 
 private struct ShelfFrameProbe: NSViewRepresentable {

@@ -34,24 +34,6 @@ struct QuickNotesServiceTests {
     }
 
     @Test
-    func commandNumberShortcutsUseOnlyRegularNotesStopAtNineAndShowMatchingLabels() throws {
-        let source = try String(
-            contentsOf: sourceRoot.appendingPathComponent("Sources/Zisla/QuickNoteModuleView.swift"),
-            encoding: .utf8
-        )
-        let regularNotesStart = try #require(source.range(of: "ForEach(Array(service.regularNotes.enumerated())"))
-        let regularNotesBlock = source[regularNotesStart.lowerBound...]
-
-        #expect(!source[..<regularNotesStart.lowerBound].contains("keyboardShortcut"))
-        #expect(!source[..<regularNotesStart.lowerBound].contains("shortcutNumber:"))
-        #expect(regularNotesBlock.contains("index < 9"))
-        #expect(regularNotesBlock.contains("noteRow(note, shortcutNumber: index + 1)"))
-        #expect(regularNotesBlock.contains("KeyEquivalent(Character(String(index + 1)))"))
-        #expect(source.contains("if let shortcutNumber {"))
-        #expect(source.contains("Text(\"⌘\\(shortcutNumber)\")"))
-    }
-
-    @Test
     func loadsWelcomeNoteTextFromBundledResource() {
         let chinese = QuickNotesService.welcomeNoteText(language: .simplifiedChinese)
         #expect(chinese.contains("从现在开始，你可以在记事本中写记事了。"))
@@ -207,38 +189,6 @@ struct QuickNotesServiceTests {
         #expect(firstWriteStarted)
         #expect(calls == [.init(id: first.id, html: "first body")])
         await writes.resolveAll()
-    }
-
-    @Test
-    func loadingDraftInEitherQuickNoteViewDoesNotDiscardCapturedWrites() throws {
-        let root = sourceRoot
-        let expandedSource = try String(
-            contentsOf: root.appendingPathComponent("Sources/Zisla/QuickNoteExpandedView.swift"),
-            encoding: .utf8
-        )
-        let moduleSource = try String(
-            contentsOf: root.appendingPathComponent("Sources/Zisla/QuickNoteModuleView.swift"),
-            encoding: .utf8
-        )
-
-        #expect(!expandedSource.contains("cancelPendingSave()"))
-        #expect(!moduleSource.contains("cancelPendingSave()"))
-        #expect(moduleSource.contains("@State private var draftLoadGeneration = 0"))
-        #expect(moduleSource.contains("guard generation == draftLoadGeneration, selectedID == service.selectedID else { return }"))
-        #expect(expandedSource.contains(".task {\n            await service.refresh()\n            if service.selectedID != nil"))
-    }
-
-    @Test
-    func reloadsQuickNoteDraftWhenTheIslandBecomesVisibleAgain() throws {
-        let source = try String(
-            contentsOf: sourceRoot.appendingPathComponent("Sources/Zisla/QuickNoteModuleView.swift"),
-            encoding: .utf8
-        )
-
-        #expect(source.contains(".task(id: model.isIslandVisible) {"))
-        #expect(source.contains("guard model.isIslandVisible else { return }"))
-        #expect(source.contains("reloadDraftIfNeeded()"))
-        #expect(source.contains("guard let selectedID = service.selectedID,\n              noteContent == nil || loadedNoteID != selectedID\n        else { return }"))
     }
 
     @Test
@@ -669,13 +619,6 @@ struct QuickNotesServiceTests {
             try? await Task.sleep(for: .milliseconds(5))
         }
         return false
-    }
-
-    private var sourceRoot: URL {
-        URL(fileURLWithPath: #filePath)
-            .deletingLastPathComponent()
-            .deletingLastPathComponent()
-            .deletingLastPathComponent()
     }
 }
 

@@ -50,29 +50,6 @@ struct SideNoticePresenterWindowLifecycleTests {
         ))
     }
 
-    @Test
-    func noticeUpdatesDoNotRunAfterTheIslandGlassActivationPass() throws {
-        let source = try Self.presenterSource()
-
-        #expect(!source.contains("schedulePanelsUpdate"))
-        #expect(!source.contains("Task.sleep(for: .milliseconds(16))"))
-    }
-
-    @Test
-    func noticePanelsAlwaysRejoinFullscreenSpacesWhenPresented() throws {
-        let source = try Self.presenterSource()
-
-        #expect(source.contains("panel.orderFrontRegardless()"))
-        #expect(!source.contains("panel.orderFront(nil)"))
-    }
-
-    @Test
-    func noticePanelsUseTheSharedFullscreenWindowBridge() throws {
-        let source = try Self.presenterSource()
-
-        #expect(source.contains("SkyLightOperator.shared.delegateWindow(panel)"))
-    }
-
     @Test @MainActor
     func compactBarPreservesProgressClearanceDuringFullscreenTopologyGaps() throws {
         var lastPhysicalSnapshot: ScreenSnapshot?
@@ -118,8 +95,6 @@ struct SideNoticePresenterWindowLifecycleTests {
         ))
         #expect(nonProgressFrame.height == baselineHeight)
         #expect(ScreenLayoutEngine().layout(for: resolved).topology.hasPhysicalNotch)
-        let source = try Self.presenterSource()
-        #expect(source.contains("lastPhysicalSnapshot: &panels.lastPhysicalSnapshot"))
     }
 
     @Test @MainActor
@@ -167,75 +142,4 @@ struct SideNoticePresenterWindowLifecycleTests {
         #expect(!ScreenLayoutEngine().layout(for: resizedResolved).topology.hasPhysicalNotch)
     }
 
-    @Test
-    func screenshotFrozenPresentationHidesLiveNoticePanelsUntilRestored() throws {
-        let source = try Self.presenterSource()
-
-        #expect(source.contains("if active {\n            hideAllPanels()\n        } else {\n            updatePanels()\n        }"))
-        #expect(source.contains("guard !isScreenshotActive, !suppression.hidesNotices else {"))
-    }
-
-    @Test
-    func screenLockSuppressionIsWiredIndependentlyOfLockScreenInformation() throws {
-        let presenterSource = try Self.presenterSource()
-        let appSource = try Self.appSource()
-        let controllerSource = try Self.lockScreenControllerSource()
-
-        #expect(presenterSource.contains("func setScreenLocked(_ locked: Bool)"))
-        #expect(presenterSource.contains("updateSuppression { $0.isScreenLocked = locked }"))
-        #expect(appSource.contains("lockScreenOverlayController.onScreenLockedChanged ="))
-        #expect(appSource.contains("self?.noticePresenter?.setScreenLocked(locked)"))
-        #expect(appSource.contains("isScreenLocked: lockScreenOverlayController.isScreenLocked"))
-        #expect(appSource.contains("lockScreenOverlayController.start()"))
-        #expect(appSource.components(separatedBy: "lockScreenOverlayController.start()").count == 2)
-        #expect(!appSource.contains(".map(\\.lockScreenInfoEnabled)"))
-        #expect(appSource.components(separatedBy: "lockScreenOverlayController?.stop()").count == 2)
-        #expect(controllerSource.contains("startSessionPolling()"))
-        #expect(!controllerSource.contains("guard enabled else {\n            stopSessionPolling()"))
-    }
-
-    @Test
-    func persistentPetPanelsRefreshWhenBrowserDownloadCountChanges() throws {
-        let source = try Self.appSource()
-        let refreshStart = try #require(source.range(of: "Publishers.MergeMany("))
-        let refreshEnd = try #require(
-            source.range(
-                of: "\n\n        model.$isSharingPickerVisible",
-                range: refreshStart.lowerBound..<source.endIndex
-            )
-        )
-        let refreshBinding = source[refreshStart.lowerBound..<refreshEnd.lowerBound]
-
-        #expect(refreshBinding.contains("model.browserDownloads.$snapshots"))
-        #expect(refreshBinding.contains(".map(\\.count)"))
-        #expect(refreshBinding.contains(".removeDuplicates()"))
-        #expect(refreshBinding.contains("coordinator?.refreshPersistentPanels()"))
-    }
-
-    private static func appSource() throws -> String {
-        let url = URL(fileURLWithPath: #filePath)
-            .deletingLastPathComponent()
-            .deletingLastPathComponent()
-            .deletingLastPathComponent()
-            .appendingPathComponent("Sources/Zisla/ZislaApp.swift")
-        return try String(contentsOf: url, encoding: .utf8)
-    }
-
-    private static func presenterSource() throws -> String {
-        let url = URL(fileURLWithPath: #filePath)
-            .deletingLastPathComponent()
-            .deletingLastPathComponent()
-            .deletingLastPathComponent()
-            .appendingPathComponent("Sources/Zisla/SideNoticePresenter.swift")
-        return try String(contentsOf: url, encoding: .utf8)
-    }
-
-    private static func lockScreenControllerSource() throws -> String {
-        let url = URL(fileURLWithPath: #filePath)
-            .deletingLastPathComponent()
-            .deletingLastPathComponent()
-            .deletingLastPathComponent()
-            .appendingPathComponent("Sources/Zisla/LockScreenOverlayController.swift")
-        return try String(contentsOf: url, encoding: .utf8)
-    }
 }

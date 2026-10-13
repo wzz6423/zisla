@@ -144,7 +144,7 @@ class AutomationWorkflowsTest < Minitest::Test
 
   def test_web_codeql_excludes_only_generated_sparkle_relocation_maps
     workflow = YAML.load_file(File.join(ROOT, '.github/workflows/web-ci.yml'))
-    initialization = workflow.fetch('jobs').fetch('codeql').fetch('steps').find do |entry|
+    initialization = workflow.fetch('jobs').fetch('build').fetch('steps').find do |entry|
       entry.fetch('uses', '').start_with?('github/codeql-action/init@')
     end
     config = YAML.load_file(File.join(ROOT, initialization.fetch('with').fetch('config-file')))
@@ -163,33 +163,28 @@ class AutomationWorkflowsTest < Minitest::Test
     ].each { |path| refute excluded.call(path), path }
   end
 
-  def test_windows_core_configurations_have_static_checks_when_skipped
-    jobs = YAML.safe_load(File.read(File.join(ROOT, '.github/workflows/core-build.yml')), aliases: true).fetch('jobs')
-    gate = "needs.gate.outputs.skip != 'true' && needs.gate.outputs.relevant != 'false'"
-    %w[Debug Release].each do |configuration|
-      job = jobs.fetch("core-#{configuration.downcase}")
-      assert_equal "Windows Core (#{configuration})", job.fetch('name')
-      assert_equal configuration, job.fetch('env').fetch('CONFIGURATION')
-      assert_equal 'gate', job.fetch('needs')
-      assert_equal gate, job.fetch('if')
-      refute job.key?('strategy')
-    end
-    debug_steps = jobs.fetch('core-debug').fetch('steps')
-    assert_equal debug_steps, jobs.fetch('core-release').fetch('steps')
-    assert_includes debug_steps.find { |entry| entry['name'] == 'Configure, build, and test' }.fetch('run'),
-                    '-DCMAKE_BUILD_TYPE=$env:CONFIGURATION'
+  def test_swift_required_check_rejects_incomplete_shards_and_smoke_checks
+    aggregate = step('swift-tests', 'Require every Swift test shard and smoke check')
+    environment = {
+      'GATE_RESULT' => 'success', 'SKIP' => 'false', 'RELEVANT' => 'true',
+      'TEST_RESULT' => 'success', 'SMOKE_RESULT' => 'success'
+    }
+    output, status = run_step(aggregate, environment)
+    assert status.success?, output
 
-    result = jobs.fetch('core-result')
-    assert_equal 'Windows Core Tests', result.fetch('name')
-    assert_equal %w[gate core-debug core-release], result.fetch('needs')
-    assert_equal "always() && #{gate}", result.fetch('if')
-    verification = result.fetch('steps').first
-    assert_equal({ 'DEBUG_RESULT' => '${{ needs.core-debug.result }}',
-                   'RELEASE_RESULT' => '${{ needs.core-release.result }}' }, verification.fetch('env'))
-    %w[success failure cancelled skipped].product(%w[success failure cancelled skipped]).each do |debug, release|
-      output, status = run_step(verification, 'DEBUG_RESULT' => debug, 'RELEASE_RESULT' => release)
-      assert_equal debug == 'success' && release == 'success', status.success?,
-                   "Debug=#{debug}, Release=#{release}: #{output}"
+    %w[GATE_RESULT TEST_RESULT SMOKE_RESULT].each do |result|
+      %w[failure cancelled skipped].each do |outcome|
+        output, status = run_step(aggregate, environment.merge(result => outcome))
+        refute status.success?, "#{result}=#{outcome}: #{output}"
+      end
+    end
+
+    [{ 'SKIP' => 'true' }, { 'RELEVANT' => 'false' }].each do |decision|
+      skipped = environment.merge('TEST_RESULT' => 'skipped', 'SMOKE_RESULT' => 'skipped').merge(decision)
+      output, status = run_step(aggregate, skipped)
+      assert status.success?, output
+      output, status = run_step(aggregate, skipped.merge('GATE_RESULT' => 'failure'))
+      refute status.success?, output
     end
   end
 

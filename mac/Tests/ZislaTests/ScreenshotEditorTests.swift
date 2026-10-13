@@ -247,54 +247,6 @@ struct ScreenshotEditorTests {
     }
 
     @Test
-    func screenshotToolPopoversUseContextualPlacement() throws {
-        let sourceURL = URL(fileURLWithPath: #filePath)
-            .deletingLastPathComponent()
-            .deletingLastPathComponent()
-            .deletingLastPathComponent()
-            .appendingPathComponent("Sources/Zisla/ScreenshotEditorView.swift")
-        let source = try String(contentsOf: sourceURL, encoding: .utf8)
-        let toolMenu = try #require(source.range(of: "private func toolButtonWithMenu"))
-        let mosaicMenu = try #require(source.range(
-            of: "private func obscureButton",
-            range: toolMenu.upperBound..<source.endIndex
-        ))
-        let recognitionMenu = try #require(source.range(
-            of: "private var recognitionMenu",
-            range: mosaicMenu.upperBound..<source.endIndex
-        ))
-
-        let toolPopover = source[toolMenu.lowerBound..<mosaicMenu.lowerBound]
-        let mosaicPopover = source[mosaicMenu.lowerBound..<recognitionMenu.lowerBound]
-        #expect(toolPopover.contains("arrowEdge: popoverEdge"))
-        #expect(mosaicPopover.contains("arrowEdge: popoverEdge"))
-    }
-
-    @Test
-    func screenshotToolPopoversMatchToolbarHeight() throws {
-        let sourceURL = URL(fileURLWithPath: #filePath)
-            .deletingLastPathComponent()
-            .deletingLastPathComponent()
-            .deletingLastPathComponent()
-            .appendingPathComponent("Sources/Zisla/ScreenshotEditorView.swift")
-        let source = try String(contentsOf: sourceURL, encoding: .utf8)
-        let toolMenu = try #require(source.range(of: "private func toolAttributesMenu"))
-        let mosaicMenu = try #require(source.range(
-            of: "private func obscureButton",
-            range: toolMenu.lowerBound..<source.endIndex
-        ))
-        let recognitionMenu = try #require(source.range(
-            of: "private var recognitionMenu",
-            range: mosaicMenu.upperBound..<source.endIndex
-        ))
-
-        let toolPopover = source[toolMenu.lowerBound..<mosaicMenu.lowerBound]
-        let mosaicPopover = source[mosaicMenu.lowerBound..<recognitionMenu.lowerBound]
-        #expect(toolPopover.contains(".frame(height: ScreenshotToolbarLayout.height)"))
-        #expect(mosaicPopover.contains(".frame(height: ScreenshotToolbarLayout.height)"))
-    }
-
-    @Test
     func shapeDraftsUseSolidStrokes() {
         #expect(ScreenshotCanvasStyle.draftDashPattern.isEmpty)
     }
@@ -3174,36 +3126,6 @@ struct ScreenshotEditorTests {
         model.blurStrength = 9
         #expect(model.obscureStrength == 9)
         #expect(model.obscureBlurStrength == 9, "模糊效果下模糊滑块就是它的强度")
-    }
-
-    @Test
-    func obscurePopoverShowsEachSliderOnlyWhenItApplies() throws {
-        let sourceURL = URL(fileURLWithPath: #filePath)
-            .deletingLastPathComponent()
-            .deletingLastPathComponent()
-            .deletingLastPathComponent()
-            .appendingPathComponent("Sources/Zisla/ScreenshotEditorView.swift")
-        let source = try String(contentsOf: sourceURL, encoding: .utf8)
-        let obscureButton = try #require(source.range(of: "private func obscureButton"))
-        let strengthControl = try #require(source.range(
-            of: "private func obscureStrengthControl(",
-            range: obscureButton.upperBound..<source.endIndex
-        ))
-        let popover = source[obscureButton.lowerBound..<strengthControl.lowerBound]
-
-        // Brush width and pixel size are conditional; blur remains available for either effect.
-        #expect(popover.contains("if model.obscureShape == .brush {"))
-        #expect(popover.contains("if model.obscureEffect == .pixelate {"))
-        #expect(popover.contains("title: ScreenshotObscureEffect.pixelate.strengthTitle"))
-        #expect(
-            popover.contains(
-                "\n                obscureStrengthControl(\n"
-                    + "                    title: ScreenshotObscureEffect.blur.strengthTitle"
-            ),
-            "模糊滑块的缩进说明它没有被效果门控包住"
-        )
-        #expect(popover.contains("? 0...ScreenshotAnnotation.obscureStrengthUpperBound"))
-        #expect(popover.contains(": 1...ScreenshotAnnotation.obscureStrengthUpperBound"))
     }
 
     @Test

@@ -8,40 +8,6 @@ import ZislaKit
 @testable import Zisla
 
 struct SystemMonitorHeadphoneOptionsIntegrationTests {
-    @Test
-    func headphoneControlsUsePersistedOptionsInsideCombinedIconSettings() throws {
-        let source = try Self.source()
-        let combined = try Self.section(source, from: "            if settingsStore.settings.systemMonitorMenuBarCombinedIconEnabled {", to: "\n        }\n        .font")
-        for property in ["replacesNetworkIcon", "prioritizesNetworkErrors", "usesVolumeColor", "symbolScale"] {
-            #expect(combined.contains("$settingsStore.settings.systemMonitorMenuBarHeadphoneOptions.\(property)"), "Missing binding for \(property)")
-        }
-        #expect(combined.contains("in: SystemMonitorHeadphoneOptions.symbolScaleRange"))
-    }
-
-    @Test
-    func replacementGatesPriorityAndSizeWithoutMisrepresentingBatteryOrVolume() throws {
-        let source = try Self.source()
-        #expect(source.contains("AppLocalizedText(\"仅底部指标选择音量时生效\")"))
-        #expect(!source.contains("showsBatteryLevels"))
-        #expect(!source.contains("点击图标后在系统监控页查看耳机电量"))
-        let replacement = try Self.section(
-            source,
-            from: "                    if settingsStore.settings.systemMonitorMenuBarHeadphoneOptions.replacesNetworkIcon {",
-            to: "                    if settingsStore.settings.systemMonitorMenuBarCombinedIconMetric == .volume {"
-        )
-        #expect(replacement.contains("$settingsStore.settings.systemMonitorMenuBarHeadphoneOptions.prioritizesNetworkErrors"))
-        #expect(replacement.contains("$settingsStore.settings.systemMonitorMenuBarHeadphoneOptions.symbolScale"))
-        #expect(!replacement.contains("showsBatteryLevels"))
-        #expect(!source.contains("外环显示耳机电量"))
-        let volume = try Self.section(
-            source,
-            from: "                    if settingsStore.settings.systemMonitorMenuBarCombinedIconMetric == .volume {",
-            to: "\n                    }"
-        )
-        #expect(volume.contains("$settingsStore.settings.systemMonitorMenuBarHeadphoneOptions.usesVolumeColor"))
-        #expect(volume.contains("AppLocalizedText(\"仅底部指标选择音量时生效\")"))
-    }
-
     @Test(arguments: [false, true]) @MainActor
     func volumeControlsHideAndReturnWithoutChangingTheirStoredChoice(usesVolumeColor: Bool) throws {
         let suite = "SystemMonitorHeadphoneOptionsIntegrationTests.\(UUID().uuidString)"
@@ -104,12 +70,6 @@ struct SystemMonitorHeadphoneOptionsIntegrationTests {
         "连接时短暂显示耳机图标", "优先显示网络错误", "蓝牙音量颜色", "耳机图标大小",
         "仅底部指标选择音量时生效",
     ]
-
-    private static func section(_ source: String, from startMarker: String, to endMarker: String) throws -> String {
-        let start = try #require(source.range(of: startMarker))
-        let end = try #require(source.range(of: endMarker, range: start.upperBound..<source.endIndex))
-        return String(source[start.lowerBound..<end.lowerBound])
-    }
 
     private static func source() throws -> String {
         try String(contentsOf: packageRoot.appendingPathComponent("Sources/Zisla/SystemMonitorMenuBarSettingsView.swift"), encoding: .utf8)

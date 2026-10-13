@@ -62,6 +62,55 @@ struct LidClosedDisplaySessionProcessTests {
         }
     }
 
+    @Test(arguments: [false, true])
+    func completedHelpersReleaseLocksInheritedByOtherProcesses(failsDuringStartup: Bool) throws {
+        let fixture = try Fixture()
+        defer { fixture.remove() }
+        let gatePath = fixture.directory.appendingPathComponent("release-descendant").path
+        let pidPath = fixture.directory.appendingPathComponent("descendant-pid").path
+        guard mkfifo(gatePath, 0o600) == 0 else { throw CocoaError(.fileWriteUnknown) }
+        let gate = open(gatePath, O_RDWR | O_CLOEXEC)
+        guard gate >= 0 else { throw CocoaError(.fileReadUnknown) }
+        defer {
+            let exited = DispatchGroup()
+            var watcher: DispatchSourceProcess?
+            if let text = try? String(contentsOfFile: pidPath, encoding: .utf8), let pid = Int32(text) {
+                exited.enter()
+                let source = DispatchSource.makeProcessSource(identifier: pid, eventMask: .exit, queue: .global())
+                source.setEventHandler { exited.leave() }
+                source.activate()
+                watcher = source
+            }
+            #expect("\n".withCString { write(gate, $0, 1) } == 1)
+            close(gate)
+            #expect(exited.wait(timeout: .now() + 5) == .success)
+            watcher?.cancel()
+        }
+        let launcher = fixture.launcher(script: """
+        if [ ! -f '\(pidPath)' ]; then
+            ( IFS= read -r release < '\(gatePath)' ) </dev/null >/dev/null 2>&1 &
+            printf '%s' "$!" > '\(pidPath)'
+            \(failsDuringStartup ? "exit 1" : "")
+        fi
+        \(Self.script)
+        """)
+        if failsDuringStartup {
+            #expect(throws: CocoaError.self) { try launcher.start() }
+        } else {
+            let session = try launcher.start()
+            defer { session.cancel() }
+            #expect(throws: CocoaError.self) { try fixture.launcher().start() }
+            try session.stop()
+        }
+        let descendant = try #require(Int32(String(contentsOfFile: pidPath, encoding: .utf8)))
+        #expect(kill(descendant, 0) == 0)
+
+        let subsequent = try launcher.start()
+        defer { subsequent.cancel() }
+        #expect(kill(descendant, 0) == 0)
+        try subsequent.stop()
+    }
+
     @Test
     func leaseProcessesDoNotInheritTheApplicationsCredentials() throws {
         let fixture = try Fixture()

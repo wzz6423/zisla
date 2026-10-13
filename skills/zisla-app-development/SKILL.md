@@ -127,6 +127,6 @@ description: 此技能用于开发、修复、重构或评审 zisla 应用及其
 - PR 正文可只使用文字，不需要图片、截图或封面；界面变更用文字记录实际验证结果。
 - 标签由 `PR Automation` 从正文推导（类型标签、`development`、`ai-assisted`），不要手工添加或删除这些标签；`skip-ci` 由 `CI Skip` 管理。
 - Issue 与 PR 由 `Project Automation` 放入 `zisla Development` 看板，所在列取自 `area:*` 与类型标签，关闭后转入 `Done`；不要手工拖动列来替代改标签。
-- 平台工作流按 `.github/ci-skip.json` 的 `paths` 裁剪：只改 `mac/**` 时 `Core Tests`、`Web CI`、`Skill CI` 会被跳过并报告成功，这是预期行为，不要因此重跑或改条件；新增顶层目录时同步补上对应的 `paths`。
+- 平台工作流按 `.github/ci-skip.json` 的 `paths` 裁剪：只改 `mac/**` 时 `Web CI` 会跳过校验并报告成功，这是预期行为，不要因此重跑或改条件；仓库卫生和技能校验统一在 `CI Checks` 中执行，新增顶层目录时同步补上对应的 `paths`。
 - 不得用 `skip-all` 或 `skip-<workflow>` 让检查变绿。AI 只能在改动确实不可能影响某个工作流时提出建议并给出理由，由维护者自己评论指令。
 - 在交付报告的“自动化证据”部分写出实际使用的 `Co-authored-by` trailer 与正文声明，便于核对署名一致。

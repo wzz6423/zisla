@@ -19,16 +19,15 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  gate:
-    name: Skip Gate
+  build:
+    name: Web Build & Test
     runs-on: ubuntu-latest
-    timeout-minutes: 5
+    timeout-minutes: 20
     permissions:
+      actions: read
       contents: read
       pull-requests: read
-    outputs:
-      skip: ${{ steps.gate.outputs.skip }}
-      relevant: ${{ steps.gate.outputs.relevant }}
+      security-events: write
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -38,20 +37,9 @@ jobs:
         with:
           workflow-name: Web CI
           github-token: ${{ github.token }}
-
-  build:
-    name: Web Build & Test
-    needs: gate
-    if: needs.gate.outputs.skip != 'true' && needs.gate.outputs.relevant != 'false'
-    runs-on: ubuntu-latest
-    timeout-minutes: 20
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          persist-credentials: false
-
       - name: Check if web directory exists
         id: check-web
+        if: steps.gate.outputs.skip != 'true' && steps.gate.outputs.relevant != 'false'
         run: |
           if [ ! -d "web" ]; then
             echo "exists=false" >> "$GITHUB_OUTPUT"
@@ -62,6 +50,19 @@ jobs:
             echo "web/package.json and web/package-lock.json are both required." >&2
             exit 1
           fi
+
+      - uses: github/codeql-action/init@24c54180a607b1449ed407dd24f251e4e9147c8d # v4.38.3
+        if: steps.check-web.outputs.exists == 'true'
+        with:
+          languages: javascript-typescript
+          build-mode: none
+          queries: security-and-quality
+          config-file: ./.github/codeql/web-config.yml
+
+      - uses: github/codeql-action/analyze@24c54180a607b1449ed407dd24f251e4e9147c8d # v4.38.3
+        if: steps.check-web.outputs.exists == 'true'
+        with:
+          category: /language:javascript-typescript
 
       - name: Setup Node.js
         if: steps.check-web.outputs.exists == 'true'
@@ -154,41 +155,3 @@ jobs:
         if: always() && steps.check-web.outputs.exists == 'true'
         working-directory: web
         run: rm -rf dist node_modules
-
-  codeql:
-    name: CodeQL (JavaScript)
-    needs: gate
-    if: needs.gate.outputs.skip != 'true' && needs.gate.outputs.relevant != 'false'
-    runs-on: ubuntu-latest
-    timeout-minutes: 30
-    permissions:
-      actions: read
-      contents: read
-      security-events: write
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          persist-credentials: false
-
-      - name: Check if web directory exists
-        id: check-web
-        run: |
-          if [ -d "web" ]; then
-            echo "exists=true" >> "$GITHUB_OUTPUT"
-          else
-            echo "exists=false" >> "$GITHUB_OUTPUT"
-            echo "web directory not present in this revision."
-          fi
-
-      - uses: github/codeql-action/init@24c54180a607b1449ed407dd24f251e4e9147c8d # v4.38.3
-        if: steps.check-web.outputs.exists == 'true'
-        with:
-          languages: javascript-typescript
-          build-mode: none
-          queries: security-and-quality
-          config-file: ./.github/codeql/web-config.yml
-
-      - uses: github/codeql-action/analyze@24c54180a607b1449ed407dd24f251e4e9147c8d # v4.38.3
-        if: steps.check-web.outputs.exists == 'true'
-        with:
-          category: /language:javascript-typescript

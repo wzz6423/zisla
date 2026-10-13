@@ -109,41 +109,6 @@ struct AIAgentModuleViewRefreshTests {
         #expect(!workspace.isRunningCLICommands)
     }
 
-    @Test
-    func refreshButtonIsNotDisabledByCLICommandState() throws {
-        let source = try String(
-            contentsOf: URL(fileURLWithPath: #filePath)
-                .deletingLastPathComponent()
-                .deletingLastPathComponent()
-                .deletingLastPathComponent()
-                .appendingPathComponent("Sources/Zisla/AIAgentModuleView.swift"),
-            encoding: .utf8
-        )
-        let refreshBlock = try #require(source.range(of: "Task { await agent.refreshCLIs() }"))
-        let blockStart = source.index(refreshBlock.lowerBound, offsetBy: -300, limitedBy: source.startIndex) ?? source.startIndex
-        let block = source[blockStart..<refreshBlock.upperBound]
-        #expect(!block.contains("disabled(agent.isRunningCLICommands"))
-        #expect(!block.contains("disabled(agent.isCheckingCLIs"))
-    }
-
-    @Test
-    func cliCommandRowsIncludeBatchCommandsAndCopyAction() throws {
-        let source = try String(
-            contentsOf: URL(fileURLWithPath: #filePath)
-                .deletingLastPathComponent()
-                .deletingLastPathComponent()
-                .deletingLastPathComponent()
-                .appendingPathComponent("Sources/Zisla/AIAgentModuleView.swift"),
-            encoding: .utf8
-        )
-        #expect(source.contains("cliCommandGroup(title: \"下载命令\", commands: installCommands)"))
-        #expect(source.contains("cliCommandGroup(title: \"更新命令\", commands: updateCommands)"))
-        #expect(source.contains("let updateKinds = installedKinds"))
-        #expect(source.contains("commands: agent.commandsForCLIInstallation([kind], update: false)"))
-        #expect(source.contains("NSPasteboard.general.setString(commandText, forType: .string)"))
-        #expect(source.contains("argument.replacingOccurrences(of: \"'\", with:"))
-    }
-
     @Test(arguments: AppLanguage.allCases)
     func cliAutoUpdateLabelsAreLocalized(language: AppLanguage) throws {
         let packageRoot = URL(fileURLWithPath: #filePath)

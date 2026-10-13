@@ -299,7 +299,9 @@ class CiSkipDirectivesTest < Minitest::Test
                 - uses: ./.github/actions/ci-skip-gate
             test:
               name: Swift Tests
-              steps: []
+              steps:
+                - uses: ./.github/actions/ci-skip-gate
+                - run: swift test
             matrix-job:
               name: CodeQL (${{ matrix.language }})
               steps: []
@@ -322,16 +324,14 @@ class CiSkipDirectivesTest < Minitest::Test
 
   def test_repository_manifest_scopes_every_platform_workflow
     manifest = CiSkip::Manifest.load(File.expand_path('../ci-skip.json', __dir__))
-    platform = ['Swift Tests', 'Core Tests', 'Web CI', 'Skill CI']
+    platform = ['Swift Tests', 'Web CI']
 
     {
       'mac/Sources/App.swift' => 'Swift Tests',
-      'windows/CMakeLists.txt' => 'Core Tests',
       'web/src/main.ts' => 'Web CI',
       # The site directory was renamed from Web/ to web/, and either spelling
       # must keep its own workflow relevant.
-      'Web/src/main.ts' => 'Web CI',
-      'skills/development-workflow/SKILL.md' => 'Skill CI'
+      'Web/src/main.ts' => 'Web CI'
     }.each do |file, owner|
       assert_equal [owner], platform.select { |name| manifest.relevant?(name, [file]) }, file
     end
@@ -339,6 +339,7 @@ class CiSkipDirectivesTest < Minitest::Test
     # A documentation change runs none of them, and a CI change runs all of them.
     assert_empty platform.select { |name| manifest.relevant?(name, ['README.md', 'docs/notes/plan.md']) }
     assert_equal platform, platform.select { |name| manifest.relevant?(name, ['.github/ci-skip.json']) }
+    assert manifest.relevant?('CI Lint', ['skills/zisla-app-development/SKILL.md'])
   end
 
   private

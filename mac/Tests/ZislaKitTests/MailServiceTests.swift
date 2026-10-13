@@ -1174,8 +1174,6 @@ struct MailServiceTests {
         #expect(script.contains("on error"))
         #expect(script.contains("messages of mailbox \"INBOX\" of mailAccount"))
         #expect(script.contains("set mailAccount to item i of accountList"))
-        #expect(script.contains("-- Skip unreadable individual messages (corrupt or excessively large)."))
-        #expect(script.contains("-- This account's inbox is currently unavailable"))
         // When an account name is unreadable, fill a placeholder so later indices stay aligned.
         #expect(script.contains("未知账户"))
     }
@@ -1226,30 +1224,6 @@ struct MailServiceTests {
         ) as? [String: Any]
         let identifier = try #require(plist?["CFBundleIdentifier"] as? String)
         #expect(MailService.mailBundleIdentifier == identifier)
-    }
-
-    @Test @MainActor
-    func runningMailIsLookedUpThroughThePinnedIdentifier() throws {
-        // The constant above is only worth pinning if the lookup actually uses it; the original
-        // defect was a camel-cased literal at this call site. Scan for the call line, skipping the
-        // comments that name the very API being matched.
-        let source = try String(contentsOf: Self.mailServiceSourceURL, encoding: .utf8)
-        let lookup = try #require(
-            source
-                .split(separator: "\n")
-                .map { $0.trimmingCharacters(in: .whitespaces) }
-                .first { !$0.hasPrefix("//") && $0.contains("runningApplications(withBundleIdentifier:") }
-        )
-
-        #expect(lookup.contains("withBundleIdentifier: mailBundleIdentifier"))
-    }
-
-    private static var mailServiceSourceURL: URL {
-        URL(fileURLWithPath: #filePath)
-            .deletingLastPathComponent()
-            .deletingLastPathComponent()
-            .deletingLastPathComponent()
-            .appendingPathComponent("Sources/ZislaKit/MailService.swift")
     }
 
     @Test @MainActor

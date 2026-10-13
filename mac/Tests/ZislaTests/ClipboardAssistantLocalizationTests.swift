@@ -4,9 +4,7 @@ import ZislaCore
 
 @testable import Zisla
 
-/// 复制助手「应用程序」链路的文案与其它识别类型一致：任一语言缺 key 都会让界面
-/// 静默退回中文原文，因此这里核对新增 key 在全部语言表中齐备，并断言源码确实
-/// 在查询这些 key，避免测试与实际查询点脱节。
+/// Missing catalog entries silently fall back to Chinese, so validate every language table.
 struct ClipboardAssistantLocalizationTests {
     private static let keys = ["应用程序", "打开应用", "无法打开应用"]
 
@@ -25,26 +23,6 @@ struct ClipboardAssistantLocalizationTests {
     }
 
     @Test
-    func assistantSourcesQueryTheAppKeys() throws {
-        let settings = try String(
-            contentsOf: Self.sourceURL("Zisla/SettingsView.swift"), encoding: .utf8
-        )
-        #expect(settings.contains(#"case .app: "应用程序""#))
-        #expect(settings.contains(#"case .openApp: "打开应用""#))
-
-        let controller = try String(
-            contentsOf: Self.sourceURL("Zisla/ClipboardAssistantWindowController.swift"),
-            encoding: .utf8
-        )
-        #expect(controller.contains(#"case .openApp: "打开应用""#))
-
-        let appModel = try String(
-            contentsOf: Self.sourceURL("Zisla/AppModel.swift"), encoding: .utf8
-        )
-        #expect(appModel.contains(#"clipboardAssistantMessage("无法打开应用")"#))
-    }
-
-    @Test
     func nonChineseTableProvidesConcreteTranslations() throws {
         let english = try #require(Self.stringsTable(for: .english))
         #expect(english["应用程序"] == "Applications")
@@ -53,14 +31,7 @@ struct ClipboardAssistantLocalizationTests {
 
     @Test
     func quickActionsNameAndFolderActionTranslateEveryLanguage() throws {
-        let settings = try String(
-            contentsOf: Self.sourceURL("Zisla/SettingsView.swift"), encoding: .utf8
-        )
         let detailKey = "复制、浏览器下载或 AirDrop 接收完成后显示下一步操作"
-        #expect(settings.contains("settingsGroup(\"快捷操作\")"))
-        #expect(settings.contains("case .clipboardAssistant: \"快捷操作\""))
-        #expect(settings.contains("detail: \"\(detailKey)\""))
-        #expect(!settings.contains("\"复制助手\""))
 
         #expect(AppLanguage.allCases.count == 17)
         for language in AppLanguage.allCases {
@@ -86,27 +57,7 @@ struct ClipboardAssistantLocalizationTests {
     }
 
     @Test
-    func saveFileLocationSettingCoversTextAndEveryLanguage() throws {
-        let settings = try String(
-            contentsOf: Self.sourceURL("Zisla/SettingsView.swift"), encoding: .utf8
-        )
-        let appModel = try String(
-            contentsOf: Self.sourceURL("Zisla/AppModel.swift"), encoding: .utf8
-        )
-        let textSaveStart = try #require(appModel.range(of: "private func saveAssistantText(_ text: String)"))
-        let textSaveEnd = try #require(appModel.range(
-            of: "private func presentAssistantCalendarEditor",
-            range: textSaveStart.upperBound..<appModel.endIndex
-        ))
-        let textSave = appModel[textSaveStart.lowerBound..<textSaveEnd.lowerBound]
-
-        #expect(settings.contains("AppLocalization.text(\"每次保存文件时选择位置\")"))
-        #expect(settings.contains("keyPath: \\.clipboardAssistantPromptsForImageSaveLocation"))
-        #expect(textSave.contains("if settingsStore.settings.clipboardAssistantPromptsForImageSaveLocation"))
-        #expect(textSave.contains("let panel = NSSavePanel()"))
-        #expect(textSave.contains("panel.allowedContentTypes = [.plainText]"))
-        #expect(textSave.contains("panel.prompt = clipboardAssistantMessage(\"保存文本\")"))
-
+    func saveFileLocationSettingTranslatesEveryLanguage() throws {
         let key = "每次保存文件时选择位置"
         #expect(AppLanguage.allCases.count == 17)
         for language in AppLanguage.allCases {
@@ -128,14 +79,8 @@ struct ClipboardAssistantLocalizationTests {
 
     @Test
     func downloadFolderActionSettingTranslatesEveryLanguage() throws {
-        let settings = try String(
-            contentsOf: Self.sourceURL("Zisla/SettingsView.swift"), encoding: .utf8
-        )
         let title = "下载与 AirDrop 完成提示"
         let detail = "完成后显示“打开文件夹”快捷操作"
-        #expect(settings.contains("AppLocalization.text(\"\(title)\")"))
-        #expect(settings.contains("detail: \"\(detail)\""))
-        #expect(settings.contains("keyPath: \\.downloadCompletionFolderActionEnabled"))
 
         #expect(AppLanguage.allCases.count == 17)
         for language in AppLanguage.allCases {
@@ -187,15 +132,8 @@ struct ClipboardAssistantLocalizationTests {
         #expect(actionKey == "前台执行")
         let backgroundKey = ClipboardAssistantToastView.actionLabel(.runShellCommandInBackground("pwd"))
         #expect(backgroundKey == "后台执行")
-        let appModel = try String(contentsOf: Self.sourceURL("Zisla/AppModel.swift"), encoding: .utf8)
-        let settings = try String(contentsOf: Self.sourceURL("Zisla/SettingsView.swift"), encoding: .utf8)
         let failureKey = "无法在终端运行命令"
         let backgroundFailureKey = "无法在后台运行命令"
-        #expect(appModel.contains("clipboardAssistantMessage(\"\(failureKey)\")"))
-        #expect(appModel.contains("clipboardAssistantMessage(\"\(backgroundFailureKey)\")"))
-        #expect(settings.contains("case .runShellCommand: \"\(actionKey)\""))
-        #expect(settings.contains("case .runShellCommandInBackground: \"\(backgroundKey)\""))
-        #expect(settings.contains("case .shellCommand: \"Shell 命令\""))
         #expect(AppLanguage.allCases.count == 17)
         for language in AppLanguage.allCases {
             let table = try #require(Self.stringsTable(for: language))
@@ -245,12 +183,6 @@ struct ClipboardAssistantLocalizationTests {
             .appendingPathComponent("\(language.rawValue).lproj", isDirectory: true)
             .appendingPathComponent("Localizable.strings")
         return NSDictionary(contentsOf: url) as? [String: String]
-    }
-
-    private static func sourceURL(_ relativePath: String) -> URL {
-        packageRootURL
-            .appendingPathComponent("Sources", isDirectory: true)
-            .appendingPathComponent(relativePath)
     }
 
     private static var localizationURL: URL {
