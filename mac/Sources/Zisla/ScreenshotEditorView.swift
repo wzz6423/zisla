@@ -1581,7 +1581,9 @@ final class ScreenshotEditorModel: ObservableObject {
         let nextNumber: Int
     }
 
-    @Published var image: NSImage
+    @Published var image: NSImage {
+        didSet { cancelRecognition() }
+    }
     @Published private(set) var mosaicPreviewImage: NSImage
     @Published private(set) var annotations: [ScreenshotAnnotation] = []
     @Published private(set) var canUndo = false
@@ -1598,6 +1600,7 @@ final class ScreenshotEditorModel: ObservableObject {
     /// How far a mosaic block refracts what sits under it; 0 by default, the plain mosaic.
     @Published var mosaicBlurStrength: CGFloat = 0
     @Published var statusMessage: String?
+    @Published private(set) var isRecognizing = false
     @Published var isPinned = false
     @Published private(set) var isLongCapturePreviewing = false
     @Published private(set) var hasLongCaptureResult = false
@@ -1635,6 +1638,7 @@ final class ScreenshotEditorModel: ObservableObject {
     /// Pixels the most recently stitched frame added below the composite. Repeating pages score a whole
     /// row away just as well as the truth, so the previous step is what tells the two apart.
     private var lastLongCaptureNewContent: Int?
+    private var recognitionOperation: ScreenshotRecognitionOperation?
 
     struct PendingTextDraft: Equatable {
         let id: UUID
@@ -1651,6 +1655,88 @@ final class ScreenshotEditorModel: ObservableObject {
     init(image: NSImage) {
         self.image = image
         mosaicPreviewImage = image
+    }
+
+    @discardableResult
+    func recognize(
+        _ mode: ScreenshotRecognitionMode,
+        chooseTableDestination: @escaping @MainActor () async -> URL? = { nil },
+        recognizeImage: @escaping @Sendable (CGImage, ScreenshotRecognitionOperation) async throws -> [ScreenshotRecognizedFragment] = {
+            try await ScreenshotRecognitionWarmUp.shared.recognize($0, operation: $1)
+        },
+        presentText: @escaping @MainActor (String, ScreenshotRecognitionOperation) -> Void
+    ) -> Task<Void, Never>? {
+        guard !isRecognizing else { return nil }
+        let operation = ScreenshotRecognitionOperation()
+        recognitionOperation = operation
+        isRecognizing = true
+
+        return Task {
+            defer {
+                if isCurrentRecognition(operation) { isRecognizing = false }
+            }
+            guard isCurrentRecognition(operation) else { return }
+            var tableURL: URL?
+            if case .table = mode {
+                tableURL = await chooseTableDestination()
+                guard isCurrentRecognition(operation) else { return }
+                guard tableURL != nil else {
+                    statusMessage = AppLocalization.text("已取消保存表格")
+                    return
+                }
+            }
+            guard let cgImage = image.cgImage(forProposedRect: nil, context: nil, hints: nil) else {
+                statusMessage = AppLocalization.text("无法读取图片")
+                return
+            }
+            statusMessage = AppLocalization.text("正在识别...")
+            let destination = tableURL
+            let result = await Task.detached(priority: .userInitiated) { () -> Result<String, any Error> in
+                do {
+                    let fragments = try await recognizeImage(cgImage, operation)
+                    try operation.checkCancellation()
+                    switch mode {
+                    case .text:
+                        return .success(ScreenshotRecognitionFormatter.plainText(from: fragments))
+                    case .table:
+                        let table = ScreenshotRecognitionFormatter.table(from: fragments, image: cgImage)
+                        if !table.isEmpty, let destination {
+                            try ScreenshotXLSXExporter.write(table, to: destination, checkCancellation: operation.checkCancellation)
+                        }
+                        return .success(table.rows.map { $0.joined(separator: "\t") }.joined(separator: "\n"))
+                    }
+                } catch {
+                    return .failure(error)
+                }
+            }.value
+            guard isCurrentRecognition(operation) else { return }
+            switch result {
+            case let .failure(error):
+                statusMessage = AppLocalization.text("识别失败：%@", error.localizedDescription)
+            case let .success(text):
+                guard !text.isEmpty else {
+                    statusMessage = AppLocalization.text("未识别到文字")
+                    return
+                }
+                if let tableURL {
+                    statusMessage = AppLocalization.text("表格已保存：%@", tableURL.lastPathComponent)
+                } else {
+                    statusMessage = nil
+                    presentText(text, operation)
+                }
+            }
+        }
+    }
+
+    func cancelRecognition() {
+        recognitionOperation?.cancel()
+        recognitionOperation = nil
+        if isRecognizing { statusMessage = nil }
+        isRecognizing = false
+    }
+
+    func isCurrentRecognition(_ operation: ScreenshotRecognitionOperation) -> Bool {
+        recognitionOperation === operation
     }
 
     func add(_ annotation: ScreenshotAnnotation, saveUndo: Bool = true) {
@@ -3135,7 +3221,80 @@ struct ScreenshotToolbarDragDots: View {
     }
 }
 
-struct ScreenshotRecognizedFragment: Equatable {
+enum ScreenshotRecognitionMode: Sendable {
+    case text
+    case table
+
+    var title: String {
+        switch self {
+        case .text: "识图完成"
+        case .table: "表格识别完成"
+        }
+    }
+}
+
+@MainActor
+final class ScreenshotRecognitionWarmUp {
+    static let shared = ScreenshotRecognitionWarmUp()
+    private(set) var task: Task<Void, any Error>?
+
+    func start(prepare: @escaping @Sendable () async throws -> Void = {
+        guard let context = CGContext(data: nil, width: 64, height: 64, bitsPerComponent: 8,
+                                      bytesPerRow: 0, space: CGColorSpaceCreateDeviceRGB(),
+                                      bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue),
+              let image = context.makeImage() else { return }
+        _ = try ScreenshotRecognitionOperation().recognize(image)
+    }) {
+        guard task == nil else { return }
+        task = Task.detached(priority: .utility, operation: prepare)
+    }
+
+    nonisolated func recognize(
+        _ image: CGImage,
+        operation: ScreenshotRecognitionOperation
+    ) async throws -> [ScreenshotRecognizedFragment] {
+        // A failed warm-up must still allow the user's request to try Vision.
+        _ = await task?.result
+        return try operation.recognize(image)
+    }
+}
+
+final class ScreenshotRecognitionOperation: @unchecked Sendable {
+    private let lock = NSLock()
+    private var isCancelled = false
+    private let request: VNRecognizeTextRequest
+
+    init(request: VNRecognizeTextRequest = VNRecognizeTextRequest()) {
+        self.request = request
+    }
+
+    func cancel() {
+        lock.withLock { isCancelled = true }
+        request.cancel()
+    }
+
+    func checkCancellation() throws {
+        if lock.withLock({ isCancelled }) { throw CancellationError() }
+    }
+
+    func recognize(_ image: CGImage) throws -> [ScreenshotRecognizedFragment] {
+        request.recognitionLevel = .accurate
+        request.usesLanguageCorrection = true
+        if let supportedLanguages = try? request.supportedRecognitionLanguages() {
+            let preferredLanguages = ["zh-Hans", "zh-Hant", "en-US", "en"]
+            let validLanguages = preferredLanguages.filter { supportedLanguages.contains($0) }
+            if !validLanguages.isEmpty { request.recognitionLanguages = validLanguages }
+        }
+        try checkCancellation()
+        try VNImageRequestHandler(cgImage: image, options: [:]).perform([request])
+        return (request.results ?? []).compactMap { observation in
+            guard let candidate = observation.topCandidates(1).first else { return nil }
+            return ScreenshotRecognizedFragment(text: candidate.string, boundingBox: observation.boundingBox)
+        }
+    }
+}
+
+struct ScreenshotRecognizedFragment: Equatable, Sendable {
     let text: String
     let boundingBox: CGRect
 }
@@ -3699,7 +3858,11 @@ enum ScreenshotXLSXExporter {
         }
     }
 
-    static func write(_ table: ScreenshotRecognizedTable, to destination: URL) throws {
+    static func write(
+        _ table: ScreenshotRecognizedTable,
+        to destination: URL,
+        checkCancellation: () throws -> Void = {}
+    ) throws {
         let fileManager = FileManager.default
         let temporaryRoot = fileManager.temporaryDirectory
             .appendingPathComponent("zisla-xlsx-\(UUID().uuidString)", isDirectory: true)
@@ -3735,6 +3898,7 @@ enum ScreenshotXLSXExporter {
         guard output.status == 0 else {
             throw ExportError.archiveFailed(output.standardError)
         }
+        try checkCancellation()
         try Data(contentsOf: archive).write(to: destination, options: .atomic)
     }
 
@@ -4096,6 +4260,56 @@ private struct ScreenshotInlineTextEditor: NSViewRepresentable {
     }
 }
 
+@MainActor
+enum ScreenshotDialogPresentation {
+    static func present(
+        _ panel: NSSavePanel,
+        completionHandler: @escaping (NSApplication.ModalResponse) -> Void
+    ) {
+        prepare(panel)
+        panel.begin(completionHandler: completionHandler)
+    }
+
+    static func present(
+        _ alert: NSAlert,
+        shouldPresent: @escaping @MainActor () -> Bool = { true },
+        completionHandler: @escaping @MainActor (NSApplication.ModalResponse) -> Void
+    ) {
+        // Entering a modal loop from a main-queue callback prevents later main-queue work from running.
+        RunLoop.main.perform(inModes: [.common]) {
+            MainActor.assumeIsolated {
+                guard shouldPresent() else { return }
+                alert.addButton(withTitle: AppLocalization.text("复制"))
+                alert.addButton(withTitle: AppLocalization.text("关闭")).keyEquivalent = "\u{1b}"
+                prepare(alert.window)
+                // AppKit resets the alert's level while runModal() makes it key.
+                let observer = NotificationCenter.default.addObserver(
+                    forName: NSWindow.didBecomeKeyNotification, object: alert.window, queue: nil
+                ) { _ in
+                    MainActor.assumeIsolated { promoteAboveScreenshots(alert.window) }
+                }
+                defer { NotificationCenter.default.removeObserver(observer) }
+                NSApp.activate(ignoringOtherApps: true)
+                let response = alert.runModal()
+                guard shouldPresent() else { return }
+                completionHandler(response)
+            }
+        }
+    }
+
+    private static func prepare(_ window: NSWindow) {
+        WindowPlacement.prepareModal(window)
+        promoteAboveScreenshots(window)
+    }
+
+    private static func promoteAboveScreenshots(_ window: NSWindow) {
+        // Screenshot overlays stay open above the app's usual modal level, even when another window has focus.
+        for editor in NSApp.windows where editor is ScreenshotEditorWindow && editor.isVisible {
+            window.level = NSWindow.Level(rawValue: max(window.level.rawValue, editor.level.rawValue + 1))
+        }
+    }
+}
+
 /// Presents the PNG save panel shared by the shelf, editor toolbar, pinned image, and ⌘S shortcut.
 @MainActor
 enum ScreenshotImageExport {
@@ -4138,8 +4352,7 @@ enum ScreenshotImageExport {
                 Task { @MainActor in status(AppLocalization.text("保存失败：%@", error.localizedDescription)) }
             }
         }
-        WindowPlacement.prepareModal(panel)
-        panel.begin(completionHandler: response)
+        ScreenshotDialogPresentation.present(panel, completionHandler: response)
     }
 }
 
@@ -5708,8 +5921,17 @@ struct ScreenshotEditorView: View {
             }
         } label: {
             toolbarControlLabel(symbol: "text.viewfinder", title: "识图")
+                .opacity(model.isRecognizing ? 0 : 1)
+                .overlay {
+                    if model.isRecognizing {
+                        ProgressView()
+                            .controlSize(.small)
+                            .accessibilityLabel(AppLocalization.text("正在识别..."))
+                    }
+                }
         }
         .menuStyle(.borderlessButton)
+        .disabled(model.isRecognizing)
         .help(AppLocalization.text("识别图片中的文字或表格"))
     }
 
@@ -5790,160 +6012,77 @@ struct ScreenshotEditorView: View {
         let response: (NSApplication.ModalResponse) -> Void = { response in
             completion(response == .OK ? panel.url : nil)
         }
-        if let window = NSApp.keyWindow ?? NSApp.mainWindow, window.isVisible {
-            panel.beginSheetModal(for: window, completionHandler: response)
-        } else {
-            WindowPlacement.prepareModal(panel)
-            panel.begin(completionHandler: response)
-        }
+        ScreenshotDialogPresentation.present(panel, completionHandler: response)
     }
 
-    private enum RecognitionMode {
-        case text
-        case table
-
-        var title: String {
-            switch self {
-            case .text: "识图完成"
-            case .table: "表格识别完成"
+    private func recognize(_ mode: ScreenshotRecognitionMode) {
+        model.recognize(mode, chooseTableDestination: {
+            await withCheckedContinuation { continuation in
+                chooseTableDestination { continuation.resume(returning: $0) }
             }
-        }
-    }
+        }) { text, operation in
+            let result = text
+            let alert = NSAlert()
+            alert.messageText = AppLocalization.text(mode.title)
+            let contentWidth: CGFloat = 480
+            let textView = NSTextView(frame: NSRect(x: 0, y: 0, width: contentWidth, height: 0))
+            textView.string = result
+            textView.isEditable = false
+            textView.isSelectable = true
+            textView.drawsBackground = false
+            textView.isHorizontallyResizable = false
+            textView.textContainer?.containerSize = NSSize(
+                width: contentWidth,
+                height: .greatestFiniteMagnitude
+            )
+            textView.textContainer?.widthTracksTextView = true
 
-    private func recognize(_ mode: RecognitionMode, tableURL: URL? = nil) {
-        if case .table = mode, tableURL == nil {
-            chooseTableDestination { url in
-                guard let url else {
-                    model.statusMessage = AppLocalization.text("已取消保存表格")
-                    return
-                }
-                recognize(.table, tableURL: url)
-            }
-            return
-        }
-        guard let cgImage = model.image.cgImage(forProposedRect: nil, context: nil, hints: nil) else {
-            model.statusMessage = AppLocalization.text("无法读取图片")
-            return
-        }
-        model.statusMessage = AppLocalization.text("正在识别...")
-        DispatchQueue.global(qos: .userInitiated).async {
-            let request = VNRecognizeTextRequest()
-            request.recognitionLevel = .accurate
-            request.usesLanguageCorrection = true
-            if let supportedLanguages = try? request.supportedRecognitionLanguages() {
-                let preferredLanguages = ["zh-Hans", "zh-Hant", "en-US", "en"]
-                let validLanguages = preferredLanguages.filter { supportedLanguages.contains($0) }
-                if !validLanguages.isEmpty {
-                    request.recognitionLanguages = validLanguages
-                }
-            }
-            let handler = VNImageRequestHandler(cgImage: cgImage, options: [:])
-            var text = ""
-            var failureMessage: String?
-            do {
-                try handler.perform([request])
-                let observations = request.results ?? []
-                let fragments = observations.compactMap { observation -> ScreenshotRecognizedFragment? in
-                    guard let candidate = observation.topCandidates(1).first else { return nil }
-                    return ScreenshotRecognizedFragment(
-                        text: candidate.string,
-                        boundingBox: observation.boundingBox
-                    )
-                }
-                switch mode {
-                case .text:
-                    text = ScreenshotRecognitionFormatter.plainText(from: fragments)
-                case .table:
-                    let table = ScreenshotRecognitionFormatter.table(from: fragments, image: cgImage)
-                    text = table.rows.map { $0.joined(separator: "\t") }.joined(separator: "\n")
-                    if !table.isEmpty, let tableURL {
-                        try ScreenshotXLSXExporter.write(table, to: tableURL)
-                    }
-                }
-            } catch {
-                failureMessage = AppLocalization.text("识别失败：%@", error.localizedDescription)
-            }
-            DispatchQueue.main.async {
-                if let failureMessage {
-                    model.statusMessage = failureMessage
-                    return
-                }
-                guard !text.isEmpty else {
-                    model.statusMessage = AppLocalization.text("未识别到文字")
-                    return
-                }
-                if case .table = mode, let tableURL {
-                    model.statusMessage = AppLocalization.text("表格已保存：%@", tableURL.lastPathComponent)
-                    return
-                }
-                let result = text
-                let alert = NSAlert()
-                alert.messageText = AppLocalization.text(mode.title)
-                let contentWidth: CGFloat = 480
-                let textView = NSTextView(frame: NSRect(x: 0, y: 0, width: contentWidth, height: 0))
-                textView.string = result
-                textView.isEditable = false
-                textView.isSelectable = true
-                textView.drawsBackground = false
-                textView.isHorizontallyResizable = false
-                textView.textContainer?.containerSize = NSSize(
-                    width: contentWidth,
-                    height: .greatestFiniteMagnitude
-                )
-                textView.textContainer?.widthTracksTextView = true
+            let textContainer = textView.textContainer
+            textView.layoutManager?.ensureLayout(for: textContainer!)
+            let textHeight = (textView.layoutManager?.usedRect(for: textContainer!).height ?? 0)
+                + textView.textContainerInset.height * 2
+            textView.frame.size.height = textHeight
 
-                let textContainer = textView.textContainer
-                textView.layoutManager?.ensureLayout(for: textContainer!)
-                let textHeight = (textView.layoutManager?.usedRect(for: textContainer!).height ?? 0)
-                    + textView.textContainerInset.height * 2
-                textView.frame.size.height = textHeight
+            let visibleHeight = NSApp.keyWindow?.screen?.visibleFrame.height
+                ?? NSScreen.main?.visibleFrame.height
+                ?? 800
+            let scrollView = NSScrollView(frame: NSRect(
+                x: 0,
+                y: 0,
+                width: contentWidth,
+                height: min(max(textHeight, 120), max(120, visibleHeight - 220))
+            ))
+            scrollView.documentView = textView
+            scrollView.drawsBackground = false
+            scrollView.hasVerticalScroller = true
+            scrollView.hasHorizontalScroller = false
+            scrollView.autohidesScrollers = true
+            scrollView.borderType = .noBorder
+            scrollView.scrollerStyle = .overlay
+            ThinScrollChrome.apply(to: scrollView)
 
-                let visibleHeight = NSApp.keyWindow?.screen?.visibleFrame.height
-                    ?? NSScreen.main?.visibleFrame.height
-                    ?? 800
-                let scrollView = NSScrollView(frame: NSRect(
-                    x: 0,
-                    y: 0,
-                    width: contentWidth,
-                    height: min(max(textHeight, 120), max(120, visibleHeight - 220))
-                ))
-                scrollView.documentView = textView
-                scrollView.drawsBackground = false
-                scrollView.hasVerticalScroller = true
-                scrollView.hasHorizontalScroller = false
-                scrollView.autohidesScrollers = true
-                scrollView.borderType = .noBorder
-                scrollView.scrollerStyle = .overlay
-                ThinScrollChrome.apply(to: scrollView)
-
-                let resultContainer = NSVisualEffectView(frame: scrollView.frame)
-                resultContainer.material = .sidebar
-                resultContainer.blendingMode = .withinWindow
-                resultContainer.state = .active
-                resultContainer.appearance = NSAppearance(named: .aqua)
-                resultContainer.wantsLayer = true
-                resultContainer.layer?.cornerRadius = 8
-                resultContainer.layer?.masksToBounds = true
-                scrollView.frame = resultContainer.bounds.insetBy(dx: 1, dy: 1)
-                scrollView.autoresizingMask = [.width, .height]
-                resultContainer.addSubview(scrollView)
-                alert.accessoryView = resultContainer
-                alert.addButton(withTitle: AppLocalization.text("复制"))
-                alert.addButton(withTitle: AppLocalization.text("关闭"))
-                let handleResponse: (NSApplication.ModalResponse) -> Void = { response in
-                    guard response == .alertFirstButtonReturn else { return }
-                    let pasteboard = NSPasteboard.general
-                    pasteboard.clearContents()
-                    pasteboard.setString(result, forType: .string)
-                    model.statusMessage = AppLocalization.text("%@，结果已复制", AppLocalization.text(mode.title))
-                }
-                NSApp.activate(ignoringOtherApps: true)
-                if let window = NSApp.keyWindow, window.isVisible {
-                    alert.beginSheetModal(for: window, completionHandler: handleResponse)
-                } else {
-                    handleResponse(alert.runModal())
-                }
+            let resultContainer = NSVisualEffectView(frame: scrollView.frame)
+            resultContainer.material = .sidebar
+            resultContainer.blendingMode = .withinWindow
+            resultContainer.state = .active
+            resultContainer.appearance = NSAppearance(named: .aqua)
+            resultContainer.wantsLayer = true
+            resultContainer.layer?.cornerRadius = 8
+            resultContainer.layer?.masksToBounds = true
+            scrollView.frame = resultContainer.bounds.insetBy(dx: 1, dy: 1)
+            scrollView.autoresizingMask = [.width, .height]
+            resultContainer.addSubview(scrollView)
+            alert.accessoryView = resultContainer
+            let handleResponse: @MainActor (NSApplication.ModalResponse) -> Void = { response in
+                guard response == .alertFirstButtonReturn else { return }
+                let pasteboard = NSPasteboard.general
+                pasteboard.clearContents()
+                pasteboard.setString(result, forType: .string)
+                model.statusMessage = AppLocalization.text("%@，结果已复制", AppLocalization.text(mode.title))
             }
+            ScreenshotDialogPresentation.present(alert, shouldPresent: {
+                model.isCurrentRecognition(operation)
+            }, completionHandler: handleResponse)
         }
     }
 }
@@ -7076,6 +7215,7 @@ final class ScreenshotEditorWindowController: NSWindowController, NSWindowDelega
 
     func windowWillClose(_ notification: Notification) {
         isClosed = true
+        model.cancelRecognition()
         invalidateLongCaptureSession()
         window?.ignoresMouseEvents = false
         pinnedEscapeHotkeyManager.unregister()
