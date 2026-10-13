@@ -48,6 +48,7 @@ func require(_ condition: Bool, _ message: String) {
 @MainActor func windowServerLayer(_ window: NSWindow) -> Int? {
     let windows = CGWindowListCopyWindowInfo(.optionIncludingWindow, CGWindowID(window.windowNumber))
         as? [[String: Any]]
+    print("[DEBUG-ci-dialog] requested=\(window.windowNumber) count=\(windows?.count ?? 0) firstID=\(String(describing: windows?.first?[kCGWindowNumber as String])) firstLayer=\(String(describing: windows?.first?[kCGWindowLayer as String]))")
     return (windows?.first?[kCGWindowLayer as String] as? NSNumber)?.intValue
 }
 
@@ -79,7 +80,8 @@ func require(_ condition: Bool, _ message: String) {
             let alertLayer = windowServerLayer(alert.window)
             let screenshotLayer = windowServerLayer(screenshot)
             require(alertLayer != nil && screenshotLayer != nil, "Both windows must exist in WindowServer")
-            require(alertLayer! > screenshotLayer!, "WindowServer must display OCR above the screenshot")
+            require(alertLayer! > screenshotLayer!,
+                    "WindowServer must display OCR above the screenshot: OCR=\(alertLayer!), screenshot=\(screenshotLayer!)")
 
             let movedFrame = alert.window.frame.offsetBy(dx: 20, dy: 20)
             alert.window.setFrame(movedFrame, display: false)
