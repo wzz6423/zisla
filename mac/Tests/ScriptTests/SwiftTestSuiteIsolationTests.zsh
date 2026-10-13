@@ -83,6 +83,11 @@ if mode == "workflow":
         "ZislaTests.topLevel()/Tests.swift:1:1",
     ]
 is_swift = Path(sys.argv[0]).name == "swift"
+if not is_swift:
+    frameworks = os.environ["DYLD_FRAMEWORK_PATH"].split(os.pathsep)
+    assert str(root / "platform/Developer/Library/Frameworks") in frameworks, "Test helper cannot resolve public XCTest frameworks"
+    assert str(root / "platform/Developer/Library/PrivateFrameworks") in frameworks, "Test helper cannot resolve XCTestCore"
+    assert os.environ["DYLD_LIBRARY_PATH"] == str(root / "platform/Developer/usr/lib")
 if is_swift and args[0] == "build":
     assert "--skip-build" not in args
     if "--build-tests" in args:
@@ -128,8 +133,6 @@ assert "--skip" not in args
 if is_swift:
     assert mode == "workflow" and "--skip-build" in args and (root / "built").exists()
 else:
-    assert os.environ["DYLD_FRAMEWORK_PATH"] == str(root / "platform/Developer/Library/Frameworks")
-    assert os.environ["DYLD_LIBRARY_PATH"] == str(root / "platform/Developer/usr/lib")
     assert os.environ["HOME"] == os.environ["CFFIXED_USER_HOME"]
     assert Path(os.environ["HOME"]).parent == Path(os.environ["TMPDIR"]).parent
     assert str(root / "results") in os.environ["HOME"]

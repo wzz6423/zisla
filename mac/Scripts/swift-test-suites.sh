@@ -79,7 +79,8 @@ with tempfile.TemporaryDirectory(prefix="zisla-swift-test-suites.") as temporary
     helper = swift.parent.parent / "libexec/swift/pm/swiftpm-testing-helper"
     platform = Path(capture(["xcrun", "--sdk", "macosx", "--show-sdk-platform-path"]).strip())
     environment = dict(os.environ,
-        DYLD_FRAMEWORK_PATH=str(platform / "Developer/Library/Frameworks"),
+        DYLD_FRAMEWORK_PATH=os.pathsep.join(str(platform / "Developer/Library" / directory)
+            for directory in ("Frameworks", "PrivateFrameworks")),
         DYLD_LIBRARY_PATH=str(platform / "Developer/usr/lib"))
     suites = {}
     discovered = set()
