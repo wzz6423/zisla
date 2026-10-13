@@ -128,7 +128,6 @@ final class LidClosedDisplaySessionProcess: @unchecked Sendable {
             let descriptor = open(lockPath, O_RDONLY | O_CLOEXEC)
             guard descriptor >= 0 else { throw CocoaError(.fileLocking) }
             let leaseLock = FileHandle(fileDescriptor: descriptor, closeOnDealloc: true)
-            defer { try? leaseLock.close() }
             guard flock(descriptor, LOCK_EX | LOCK_NB) == 0 else { throw CocoaError(.fileLocking) }
 
             var descriptors: [Int32] = [-1, -1]
@@ -150,7 +149,11 @@ final class LidClosedDisplaySessionProcess: @unchecked Sendable {
             process.standardError = leaseLock
             let completed = DispatchGroup()
             completed.enter()
-            process.terminationHandler = { _ in completed.leave() }
+            process.terminationHandler = { _ in
+                // Concurrent spawns can briefly inherit the lock even with CLOEXEC.
+                flock(leaseLock.fileDescriptor, LOCK_UN)
+                completed.leave()
+            }
             try process.run()
             self.completed = completed
             try child.close()

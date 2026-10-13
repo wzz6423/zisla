@@ -39,25 +39,8 @@ struct ContextNoteShakeDetectorTests {
         }
     }
 
-    @Test(arguments: [60.0, 125.0, 1_000.0], [40.0, 60.0])
+    @Test(arguments: [60.0, 125.0, 1_000.0], [30.0, 40.0, 60.0])
     func aShortLightShakeIsEnough(sampleRate: Double, width: Double) {
-        for phase in [0.0, 0.3, 0.7] {
-            var detector = ContextNoteShakeDetector()
-            var throttle = PointerEdgeEventThrottle()
-            var triggers = 0
-            for index in 0...Int(sampleRate * 0.85) {
-                let time = Double(index) / sampleRate
-                guard throttle.shouldEmit(eventType: .mouseMoved, timestamp: time) else { continue }
-                let angle = Double.pi * (time / 0.16 + phase)
-                let point = CGPoint(x: 600 + width / 2 * cos(angle), y: 400 + width / 4 * sin(angle))
-                if detector.record(point, at: time) { triggers += 1 }
-            }
-            #expect(triggers == 1, "phase=\(phase)")
-        }
-    }
-
-    @Test(arguments: [60.0, 125.0, 1_000.0], [30.0, 40.0])
-    func originalSmallShakeSurvivesPointerMoveCoalescing(sampleRate: Double, width: Double) {
         for phase in [0.0, 0.3, 0.7] {
             var detector = ContextNoteShakeDetector()
             var throttle = PointerEdgeEventThrottle()

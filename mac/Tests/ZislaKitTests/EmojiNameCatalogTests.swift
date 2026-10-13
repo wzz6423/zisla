@@ -50,14 +50,6 @@ struct EmojiNameCatalogTests {
         )
     }
 
-    @Test(arguments: AppLanguage.allCases)
-    func resolvesAppleCharacterViewerNamesInEverySupportedLanguage(language: AppLanguage) throws {
-        let name = try #require(
-            EmojiNameCatalog.AppleEmojiNameCatalog.canonicalNames(for: language)["🌚"]?.first
-        )
-        #expect(EmojiNameCatalog.emoji(for: name, language: language) == "🌚")
-    }
-
     @Test
     func ignoresUnavailableOrMalformedAppleCharacterViewerCatalogs() {
         #expect(EmojiNameCatalog.AppleEmojiNameCatalog.canonicalNames(from: nil).isEmpty)
@@ -107,7 +99,8 @@ struct EmojiNameCatalogTests {
         #expect(EmojiNameCatalog.emojiCandidates(for: "orca", language: .english).contains("🫍"))
     }
 
-    @Test(arguments: AppLanguage.allCases)
+    // Keep each language's resource checks together to avoid churning the four-catalog cache.
+    @Test(.serialized, arguments: AppLanguage.allCases)
     func bundledCatalogCoversTheStableRosterInEverySupportedLanguage(language: AppLanguage) throws {
         let englishCount = try #require(EmojiNameCatalog.supplementalEmojiCount(for: .english))
         let count = try #require(EmojiNameCatalog.supplementalEmojiCount(for: language))
@@ -116,6 +109,11 @@ struct EmojiNameCatalogTests {
         #expect(englishCount >= 3_944)
         #expect(count == englishCount)
         #expect(EmojiNameCatalog.emojiCandidates(for: sample.alias, language: language).contains(sample.emoji))
+
+        let name = try #require(
+            EmojiNameCatalog.AppleEmojiNameCatalog.canonicalNames(for: language)["🌚"]?.first
+        )
+        #expect(EmojiNameCatalog.emoji(for: name, language: language) == "🌚")
     }
 
     @Test

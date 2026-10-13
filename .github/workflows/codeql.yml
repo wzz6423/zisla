@@ -21,15 +21,15 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  gate:
-    name: Skip Gate
+  actions:
+    name: CodeQL (actions)
     runs-on: ubuntu-latest
-    timeout-minutes: 5
+    timeout-minutes: 30
     permissions:
+      actions: read
       contents: read
       pull-requests: read
-    outputs:
-      skip: ${{ steps.gate.outputs.skip }}
+      security-events: write
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -40,25 +40,13 @@ jobs:
           workflow-name: CodeQL
           github-token: ${{ github.token }}
 
-  actions:
-    name: CodeQL (actions)
-    needs: gate
-    if: needs.gate.outputs.skip != 'true'
-    runs-on: ubuntu-latest
-    timeout-minutes: 30
-    permissions:
-      actions: read # Required to resolve the workflows CodeQL analyzes.
-      contents: read
-      security-events: write # Required to upload the analysis results.
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          persist-credentials: false
       - uses: github/codeql-action/init@24c54180a607b1449ed407dd24f251e4e9147c8d # v4.38.3
+        if: steps.gate.outputs.skip != 'true'
         with:
           languages: actions
           build-mode: none
           queries: security-and-quality
       - uses: github/codeql-action/analyze@24c54180a607b1449ed407dd24f251e4e9147c8d # v4.38.3
+        if: steps.gate.outputs.skip != 'true'
         with:
           category: /language:actions

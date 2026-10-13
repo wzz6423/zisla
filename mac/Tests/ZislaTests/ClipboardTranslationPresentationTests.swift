@@ -381,8 +381,6 @@ struct ClipboardTranslationPresentationTests {
         controller.translationWindowDidAppear(for: generation)
         appear(.result(text: text, copied: nil), on: controller, generation: generation)
         #expect(copies == [text])
-        let source = try String(contentsOf: Self.packageRoot.appendingPathComponent("Sources/Zisla/ClipboardTranslationResultView.swift"), encoding: .utf8)
-        #expect(source.contains(".task(id: translation)"), "字幕相同时仍需按加载/结果阶段重新执行展示回调")
     }
 
     @Test

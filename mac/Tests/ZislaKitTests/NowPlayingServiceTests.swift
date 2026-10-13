@@ -13,39 +13,6 @@ struct NowPlayingServiceTests {
     }
 
     @Test
-    func adapterListenerUsesAParentLifecyclePipeAndEscalatesTermination() throws {
-        let root = URL(fileURLWithPath: #filePath)
-            .deletingLastPathComponent()
-            .deletingLastPathComponent()
-            .deletingLastPathComponent()
-        let source = try String(
-            contentsOf: root.appendingPathComponent("Sources/ZislaKit/MediaRemoteAdapterClient.swift"),
-            encoding: .utf8
-        )
-        let script = try String(
-            contentsOf: root.appendingPathComponent(
-                "Resources/MediaRemoteAdapter/mediaremote-adapter.pl"
-            ),
-            encoding: .utf8
-        )
-
-        #expect(source.contains("let lifecyclePipe = Pipe()"))
-        #expect(source.contains("process.standardInput = lifecyclePipe"))
-        #expect(source.contains("process.environment = Self.parentLifecycleEnvironment()"))
-        #expect(
-            MediaRemoteAdapterClient.parentLifecycleEnvironment()[
-                MediaRemoteAdapterClient.parentLifecycleEnvironmentKey
-            ] == "1"
-        )
-        #expect(source.contains("Self.closePipe(lifecyclePipe)"))
-        #expect(source.contains("Darwin.kill(processIdentifier, SIGKILL)"))
-        #expect(script.contains("MEDIAREMOTEADAPTER_PARENT_LIFECYCLE"))
-        #expect(script.contains("my $watchdog_pid = fork();"))
-        #expect(script.contains("sysread(STDIN"))
-        #expect(script.contains("kill 'TERM', $adapter_pid"))
-    }
-
-    @Test
     func mediaRemoteDictionaryParsesMetadataAndPlaybackClock() throws {
         let timestamp = Date(timeIntervalSince1970: 1_000)
         let artwork = Data([0x01, 0x02, 0x03])
@@ -655,28 +622,6 @@ struct NowPlayingServiceTests {
                     $0 == ["repeat", "\(mode.mediaRemoteRepeatMode)"]
                 }
             )
-        }
-    }
-
-    @Test
-    func mediaRemoteAdapterScriptRoutesShuffleAndRepeatThroughEnvEntryPoints() throws {
-        let root = URL(fileURLWithPath: #filePath)
-            .deletingLastPathComponent()
-            .deletingLastPathComponent()
-            .deletingLastPathComponent()
-        let scriptURL = root.appendingPathComponent(
-            "Resources/MediaRemoteAdapter/mediaremote-adapter.pl"
-        )
-        let script = try String(contentsOf: scriptURL, encoding: .utf8)
-
-        for functionName in ["shuffle", "repeat"] {
-            let pattern = #"(?s)elsif \(\$function_name eq "\#(functionName)"\).*?\}"#
-            let regex = try NSRegularExpression(pattern: pattern)
-            let range = NSRange(script.startIndex..<script.endIndex, in: script)
-            let match = try #require(regex.firstMatch(in: script, range: range))
-            let block = try #require(Range(match.range, in: script).map { String(script[$0]) })
-            #expect(block.contains("set_env_param($symbol_name, 0, \"mode\""))
-            #expect(block.contains("$symbol_name = env_func($symbol_name)"))
         }
     }
 

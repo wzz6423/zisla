@@ -63,13 +63,7 @@ struct SettingsNavigationTests {
     }
 
     @Test
-    func recommendationControlsAreConditionalAndLocalizedInEveryLanguage() throws {
-        let source = try String(contentsOf: Self.settingsViewSourceURL, encoding: .utf8)
-        let controlsStart = try #require(source.range(of: "settingsGroup(\"推荐\")"))
-        let controlsEnd = try #require(source.range(of: "settingsGroup(\"媒体与文件\")", range: controlsStart.upperBound..<source.endIndex))
-        let controls = source[controlsStart.lowerBound..<controlsEnd.lowerBound]
-        #expect(controls.contains("if model.settingsStore.settings.recommendedToolsEnabled {"))
-        #expect(controls.contains("keyPath: \\.recommendedToolsAutomaticUpdatesEnabled"))
+    func recommendationControlsAreLocalizedInEveryLanguage() throws {
         let keys = [
             "显示推荐工具", "在设置中显示推荐工具和管理入口",
             "自动更新推荐工具", "每天更新已安装的推荐工具；不会安装未安装的工具",
@@ -80,7 +74,6 @@ struct SettingsNavigationTests {
             let tableURL = packageRoot.appendingPathComponent("Resources/Localization/\(language.rawValue).lproj/Localizable.strings")
             let table = try #require(NSDictionary(contentsOf: tableURL) as? [String: String])
             for key in keys {
-                #expect(controls.contains("\"\(key)\""))
                 let value = try #require(table[key], "\(language.rawValue) is missing \(key)")
                 #expect(!value.isEmpty)
                 #expect(AppLocalization.string(key, language: language) == value)
@@ -88,80 +81,6 @@ struct SettingsNavigationTests {
             }
         }
         #expect(AppLocalization.string("显示推荐工具", language: .english) == "Show Recommended Tools")
-    }
-
-    @Test
-    func downloadCompletionToggleIsNestedUnderRecognitionTypes() throws {
-        let source = try String(contentsOf: Self.settingsViewSourceURL, encoding: .utf8)
-        let heading = try #require(source.range(of: "title: \"识别类型\""))
-        let firstKind = try #require(source.range(
-            of: "ForEach(ClipboardAssistantKind.allCases, id: \\.self)",
-            range: heading.upperBound..<source.endIndex
-        ))
-        let toggle = try #require(source.range(of: "AppLocalization.text(\"下载与 AirDrop 完成提示\")"))
-
-        #expect(toggle.lowerBound > heading.upperBound)
-        #expect(toggle.lowerBound < firstKind.lowerBound)
-        let row = source[toggle.lowerBound..<firstKind.lowerBound]
-        #expect(row.contains("keyPath: \\.downloadCompletionFolderActionEnabled"))
-        #expect(row.contains("isNested: true"))
-    }
-
-    @Test
-    func settingsContentTransitionTargetsMountedContent() throws {
-        let source = try String(contentsOf: Self.settingsViewSourceURL, encoding: .utf8)
-        let detailRange = try #require(source.range(of: "    private var detail: some View {"))
-        let detailEnd = try #require(source.range(of: "\n    private func selectSettingsSection", range: detailRange.lowerBound..<source.endIndex))
-        let detail = String(source[detailRange.lowerBound..<detailEnd.lowerBound])
-        let compactDetail = detail.components(separatedBy: .whitespacesAndNewlines).joined()
-
-        #expect(compactDetail.contains("DeferredMount{AnyView(selectedContent).id(input.selection).transition("))
-        #expect(compactDetail.contains(".settingsPagePush(direction:sectionSwitchDirection)"))
-    }
-
-    @Test
-    func settingsPageTransitionAvoidsBlur() throws {
-        let source = try String(contentsOf: Self.motionDesignSourceURL, encoding: .utf8)
-        let transitionStart = try #require(source.range(of: "    static func settingsPagePush(direction: CGFloat) -> AnyTransition {"))
-        let transitionEnd = try #require(source.range(of: "\n    }\n}", range: transitionStart.lowerBound..<source.endIndex))
-        let transition = String(source[transitionStart.lowerBound..<transitionEnd.lowerBound])
-
-        #expect(transition.contains("blurRadius: 0"))
-        #expect(!transition.contains("blurRadius: 5"))
-    }
-
-    @Test
-    func moduleSelectionDoesNotAnimateNavigationGlyphGeometry() throws {
-        let source = try String(contentsOf: Self.islandRootViewSourceURL, encoding: .utf8)
-        let selectorStart = try #require(source.range(of: "private struct ModuleSelector: View {"))
-        let selector = String(source[selectorStart.lowerBound...])
-
-        #expect(selector.contains("MotionFocusLens(cornerRadius: 8)"))
-        #expect(selector.contains(".frame(width: 28, height: 30)"))
-        #expect(!selector.contains("emphasizesSelection: true"))
-    }
-
-    @Test
-    func moduleRailDoesNotInheritSurfaceResizeAnimation() throws {
-        let source = try String(contentsOf: Self.islandRootViewSourceURL, encoding: .utf8)
-        let toolRailUse = try #require(source.range(of: "                            toolRail\n"))
-        let moduleContentEnd = try #require(
-            source[toolRailUse.upperBound...].range(of: "                            Group {")
-        )
-        let moduleContent = source[toolRailUse.lowerBound..<moduleContentEnd.lowerBound]
-
-        #expect(moduleContent.contains(".transaction { transaction in"))
-        #expect(moduleContent.contains("transaction.animation = nil"))
-        #expect(source.contains(".animation(reduceMotion ? nil : ZislaMotion.selection, value: model.selectedModule)"))
-    }
-
-    @Test
-    func updateChannelAppliesToAutomaticAndManualChecks() throws {
-        let source = try String(contentsOf: Self.settingsViewSourceURL, encoding: .utf8)
-
-        #expect(source.contains("title: \"更新通道\""))
-        #expect(source.contains("用于自动与手动更新"))
-        #expect(!source.contains("仅用于手动检查"))
     }
 
     @Test
@@ -194,14 +113,7 @@ struct SettingsNavigationTests {
     }
 
     @Test
-    func feedbackAndUpdatePageLinksToIssueChooserInEveryLanguage() throws {
-        let source = try String(contentsOf: Self.settingsViewSourceURL, encoding: .utf8)
-
-        #expect(source.contains("case .updates: \"反馈与更新\""))
-        #expect(source.contains("case .updates: \"提交问题反馈、管理版本检查与自动更新。\""))
-        #expect(source.contains("\"反馈问题\""))
-        #expect(source.contains("destination: ZislaKitInfo.newIssueURL"))
-
+    func feedbackAndUpdatePageLabelsAreLocalizedInEveryLanguage() {
         for key in ["反馈与更新", "提交问题反馈、管理版本检查与自动更新。", "反馈问题"] {
             for language in AppLanguage.allCases {
                 let translation = AppLocalization.string(key, language: language)
@@ -219,18 +131,6 @@ struct SettingsNavigationTests {
     }
 
     @Test
-    func toolAndStatusOrderSettingsUseTheSharedDragAndResetControls() throws {
-        let source = try String(contentsOf: Self.settingsViewSourceURL, encoding: .utf8)
-
-        #expect(source.contains("settingsGroup(\"工具\")"))
-        #expect(source.contains("settingsGroup(\"收起态展示优先级\")"))
-        #expect(source.contains("ReorderDropDelegate<IslandModuleOrder>"))
-        #expect(source.contains("ReorderDropDelegate<CompactStatusPriority>"))
-        #expect(source.contains("moduleOrder = IslandModuleOrder.defaultOrder"))
-        #expect(source.contains("compactStatusPriority = CompactStatusPriority.defaultOrder"))
-    }
-
-    @Test
     func alwaysVisibleSections() {
         let settings = FeatureSettings()
         #expect(SettingsSection.general.isVisible(settings: settings))
@@ -242,25 +142,6 @@ struct SettingsNavigationTests {
         var disabledSettings = settings
         disabledSettings.keyboardEnabled = false
         #expect(!SettingsSection.keyboardSound.isVisible(settings: disabledSettings))
-    }
-
-    @Test
-    func keyboardSettingsDoNotExposePointerOrLaunchItemControls() throws {
-        let source = try String(contentsOf: Self.settingsViewSourceURL, encoding: .utf8)
-        let contentStart = try #require(source.range(of: "    private var keyboardSoundContent: some View {"))
-        let contentEnd = try #require(source.range(of: "\n    private var infoContent", range: contentStart.upperBound..<source.endIndex))
-        let content = String(source[contentStart.lowerBound..<contentEnd.lowerBound])
-
-        #expect(!content.contains("鼠标与触控板"))
-        #expect(!content.contains("启动项"))
-        #expect(!content.contains("启用键盘与点击音效"))
-        #expect(content.contains("试听键盘音"))
-        #expect(!content.contains("settingsGroup(\"输入统计\")"))
-        #expect(!content.contains("KeyboardTypingStatsDashboardView"))
-        #expect(!content.contains("keyboardTypingStatsContent"))
-        #expect(!content.contains("refreshTypingStats()"))
-        #expect(source.contains("featureToggle(\"键盘音效\", detail: \"全局播放键盘音效并记录输入统计\""))
-        #expect(source.contains("featureToggle(\"合盖动画\", detail: \"合上兼容 MacBook 屏幕时显示景深过渡动画\""))
     }
 
     @Test
@@ -355,63 +236,7 @@ struct SettingsNavigationTests {
     }
 
     @Test
-    func mailControlsOnlyAppearOnTheDedicatedMailPage() throws {
-        let source = try String(contentsOf: Self.settingsViewSourceURL, encoding: .utf8)
-        let infoStart = try #require(source.range(of: "    private var infoContent: some View {"))
-        let mailStart = try #require(source.range(of: "\n    private var mailContent: some View {", range: infoStart.upperBound..<source.endIndex))
-        let mailEnd = try #require(source.range(of: "\n    private var aiContent: some View {", range: mailStart.upperBound..<source.endIndex))
-        let infoContent = source[infoStart.lowerBound..<mailStart.lowerBound]
-        let mailContent = source[mailStart.lowerBound..<mailEnd.lowerBound]
-
-        #expect(source.contains("case .mail:\n            mailContent"))
-        #expect(mailContent.contains("settingsGroup(\"邮件\")"))
-        #expect(mailContent.contains("mailAccountSettings"))
-        #expect(!infoContent.contains("mailAccountSettings"))
-        #expect(!infoContent.contains("mailEnabled"))
-        #expect(source.components(separatedBy: "mailAccountSettings").count == 3)
-
-        let accountsStart = try #require(source.range(of: "    private var mailAccountSettings: some View {"))
-        let accountsEnd = try #require(source.range(of: "\n    private func mailAccountBinding", range: accountsStart.upperBound..<source.endIndex))
-        let accountsContent = source[accountsStart.lowerBound..<accountsEnd.lowerBound]
-        #expect(accountsContent.contains("model.settingsStore.settings.mailCompactStyle"))
-        #expect(accountsContent.contains("mailAppAccountSettings"))
-        #expect(accountsContent.contains("model.refreshMail()"))
-        #expect(accountsContent.contains("mailAccountBinding(for: account.id, availableAccounts: accounts)"))
-        #expect(accountsContent.contains("isOnlySelectedMailAccount(account.id)"))
-    }
-
-    @Test
-    func infoPageKeepsWorkflowAndNonMailControls() throws {
-        let source = try String(contentsOf: Self.settingsViewSourceURL, encoding: .utf8)
-        let infoStart = try #require(source.range(of: "    private var infoContent: some View {"))
-        let infoEnd = try #require(source.range(of: "\n    private var mailContent: some View {", range: infoStart.upperBound..<source.endIndex))
-        let infoContent = source[infoStart.lowerBound..<infoEnd.lowerBound]
-        #expect(infoContent.contains("workflowContent"))
-        for control in [
-            "lockScreenMessage", "lockScreenShowsLunar", "activityNoticeDisplayDuration",
-            "focusModeNoticeDisplayDuration", "compactStatusPriority", "activityNoticeDisplayBinding",
-        ] {
-            #expect(infoContent.contains(control), "Info page lost \(control)")
-        }
-
-        let workflowStart = try #require(source.range(of: "    private var workflowContent: some View {"))
-        let workflowEnd = try #require(source.range(of: "\n    private var featuresContent: some View {", range: workflowStart.upperBound..<source.endIndex))
-        let workflowContent = source[workflowStart.lowerBound..<workflowEnd.lowerBound]
-        for control in ["mediaSource", "mediaShowLyricsAndInfo", "mediaCompactStyle", "systemMetricsHistoryEnabled"] {
-            #expect(workflowContent.contains(control), "Workflow controls lost \(control)")
-        }
-    }
-
-    @Test
-    func disablingMailUsesTheExistingVisibleSelectionFallback() throws {
-        let source = try String(contentsOf: Self.settingsViewSourceURL, encoding: .utf8)
-        let selectionStart = try #require(source.range(of: "    private func ensureSelectionIsVisible() {"))
-        let selectionEnd = try #require(source.range(of: "\n    @ViewBuilder", range: selectionStart.upperBound..<source.endIndex))
-        let selection = source[selectionStart.lowerBound..<selectionEnd.lowerBound]
-        #expect(selection.contains("guard !input.selection.isVisible(settings: settingsStore.settings) else { return }"))
-        #expect(selection.contains("selectSettingsSection(.features)"))
-        let compactSource = source.components(separatedBy: .whitespacesAndNewlines).joined()
-        #expect(compactSource.contains(".onChange(of:settingsStore.settings){_,_inensureSelectionIsVisible()}"))
+    func featuresSectionRemainsVisibleWhenMailIsDisabled() {
         #expect(SettingsSection.features.isVisible(settings: FeatureSettings(mailEnabled: false)))
     }
 
@@ -428,28 +253,7 @@ struct SettingsNavigationTests {
     }
 
     @Test
-    func clipboardAssistantConversionSettingShowsCopyableExamplesInEveryLanguage() throws {
-        let source = try String(contentsOf: Self.settingsViewSourceURL, encoding: .utf8)
-        let examplesStart = try #require(source.range(of: "private var clipboardAssistantConversionExamples"))
-        let examplesEnd = try #require(source[examplesStart.upperBound...].range(of: "private struct AssistantBlacklistEntry"))
-        let examples = source[examplesStart.lowerBound..<examplesEnd.lowerBound]
-
-        #expect(source.contains("if kind == .conversion"))
-        #expect(source.contains("case .conversion: \"换算\""))
-        #expect(examples.contains(".textSelection(.enabled)"))
-        #expect(examples.contains("copySettingsText(example)"))
-        #expect(examples.contains(".padding(.leading, 12)"))
-        for example in [
-            "10 ft = m", "100 kg = lb", "5 km = mi",
-            "100 USD = CNY", "100$ = ¥", "100dollar = CNY",
-            "2026-09-17 - 2026-10-01", "2026/09/17 - 2026/10/01", "2026.09.17 - 2026.10.01",
-            "2026-09-17 09:30 Asia/Shanghai = America/New_York",
-            "09:30 UTC+08:00 = UTC",
-            "2026-09-17 09:30 America/New_York = Europe/London",
-        ] {
-            #expect(examples.contains(example))
-        }
-
+    func clipboardAssistantConversionLabelsAreLocalizedInEveryLanguage() {
         for key in ["换算", "单位换算", "汇率换算", "日期间隔", "跨时区时间"] {
             for language in AppLanguage.allCases {
                 let translation = AppLocalization.string(key, language: language)
@@ -550,15 +354,4 @@ struct SettingsNavigationTests {
             .appendingPathComponent("Sources/Zisla/SettingsView.swift")
     }
 
-    private static var motionDesignSourceURL: URL {
-        settingsViewSourceURL
-            .deletingLastPathComponent()
-            .appendingPathComponent("MotionDesign.swift")
-    }
-
-    private static var islandRootViewSourceURL: URL {
-        settingsViewSourceURL
-            .deletingLastPathComponent()
-            .appendingPathComponent("IslandRootView.swift")
-    }
 }

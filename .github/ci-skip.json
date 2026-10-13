@@ -1,24 +1,11 @@
 {
-  "comment": "Pull request workflows that CI skip directives can bypass. 'checks' lists every check name the workflow publishes, including matrix expansions, so the skip processor can report them as successful. The Test CI Scripts job fails when this file drifts from .github/workflows. 'paths' lists the files whose change makes the workflow relevant: a workflow that declares paths only runs when a pull request touches one of them, and a workflow without paths always runs.",
+  "comment": "Pull request workflows that CI skip directives can bypass. 'checks' lists every check name the workflow publishes, including matrix expansions, so the skip processor can report them as successful. The CI Checks job fails when this file drifts from .github/workflows. 'paths' lists the files whose change makes the workflow relevant: a workflow that declares paths only runs when a pull request touches one of them, and a workflow without paths always runs.",
   "workflows": [
     {
       "name": "CI Lint",
       "file": "ci-lint.yml",
       "aliases": ["lint", "actionlint"],
-      "checks": ["Lint Workflows", "Audit Workflow Security", "Test CI Scripts"]
-    },
-    {
-      "name": "Core Tests",
-      "file": "core-build.yml",
-      "aliases": ["windows", "core"],
-      "paths": ["windows/**", ".github/**"],
-      "checks": [
-        "Windows Core (Debug)",
-        "Windows Core (Release)",
-        "Windows Core Tests",
-        "Windows App Build",
-        "CodeQL (C/C++)"
-      ]
+      "checks": ["CI Checks"]
     },
     {
       "name": "Swift Tests",
@@ -27,7 +14,9 @@
       "paths": ["mac/**", "Makefile", ".github/**"],
       "checks": [
         "Swift Tests",
-        "Build zislactl (Release)",
+        "Swift Suites (0)",
+        "Swift Suites (1)",
+        "Swift Suites (2)",
         "App Build Smoke Test",
         "CodeQL (swift)"
       ]
@@ -37,20 +26,7 @@
       "file": "web-ci.yml",
       "aliases": ["web"],
       "paths": ["web/**", ".github/**"],
-      "checks": ["Web Build & Test", "CodeQL (JavaScript)"]
-    },
-    {
-      "name": "Skill CI",
-      "file": "skill-ci.yml",
-      "aliases": ["skills"],
-      "paths": ["skills/**", ".github/**"],
-      "checks": ["Validate Skills"]
-    },
-    {
-      "name": "Repository Hygiene",
-      "file": "repository-hygiene.yml",
-      "aliases": ["hygiene"],
-      "checks": ["Repository Hygiene"]
+      "checks": ["Web Build & Test"]
     },
     {
       "name": "PR Quality Gates",

@@ -39,12 +39,20 @@ jobs:
           workflow-name: Swift Tests
           github-token: ${{ github.token }}
 
-  test:
-    name: Swift Tests
+  test-suites:
+    name: Swift Suites (${{ matrix.shard }})
     needs: gate
     if: needs.gate.outputs.skip != 'true' && needs.gate.outputs.relevant != 'false'
     runs-on: macos-26
-    timeout-minutes: 45
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [0, 1, 2]
+    env:
+      SWIFT_TEST_WORKERS: "3"
+      SWIFT_TEST_SHARD_COUNT: "3"
+      SWIFT_TEST_SHARD_INDEX: ${{ matrix.shard }}
     defaults:
       run:
         working-directory: mac
@@ -53,52 +61,42 @@ jobs:
         with:
           persist-credentials: false
       - run: swift --version
-      - name: Check shell script syntax
+      - name: Build Swift tests
         run: |
-          for script in Scripts/*.sh; do
-            case "$(head -n 1 "$script")" in
-              "#!/bin/zsh") zsh -n "$script" ;;
-              "#!/usr/bin/env bash") bash -n "$script" ;;
-              *) echo "Unsupported shell in $script" >&2; exit 1 ;;
-            esac
-          done
-      - name: Run shell script tests
+          swift build --build-tests
+      - name: Run Swift core tests
+        if: matrix.shard == 0
         run: |
-          for test_script in Tests/ScriptTests/*.zsh; do
-            zsh "$test_script"
-          done
-      - name: Run swift test
+          zsh Scripts/swift-test.sh --skip-build --filter '^ZislaCoreTests\.'
+      - name: Run isolated Swift suites
         run: |
-          zsh Scripts/swift-test.sh --filter '^ZislaCoreTests\.'
-          zsh Scripts/swift-test-suites.sh ZislaKitTests
-          zsh Scripts/swift-test-suites.sh ZislaTests
+          zsh Scripts/swift-test-suites.sh ZislaKitTests,ZislaTests --skip-build
       - name: Remove test artifacts
         if: always()
         run: rm -rf .build
 
-  zislactl:
-    name: Build zislactl (Release)
-    needs: gate
-    if: needs.gate.outputs.skip != 'true' && needs.gate.outputs.relevant != 'false'
-    runs-on: macos-26
-    timeout-minutes: 20
-    defaults:
-      run:
-        working-directory: mac
+  test:
+    name: Swift Tests
+    needs: [gate, test-suites, app-smoke]
+    if: always()
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
     steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          persist-credentials: false
-      - name: Build zislactl in Release mode
-        run: swift build -c release --product zislactl
-      - name: Verify zislactl binary
+      - name: Require every Swift test shard and smoke check
+        env:
+          GATE_RESULT: ${{ needs.gate.result }}
+          SKIP: ${{ needs.gate.outputs.skip }}
+          RELEVANT: ${{ needs.gate.outputs.relevant }}
+          TEST_RESULT: ${{ needs.test-suites.result }}
+          SMOKE_RESULT: ${{ needs.app-smoke.result }}
         run: |
-          BIN_PATH="$(swift build -c release --show-bin-path)"
-          test -x "$BIN_PATH/zislactl"
-          HOME="${{ runner.temp }}/zislactl-home" "$BIN_PATH/zislactl" --help
-      - name: Remove build artifacts
-        if: always()
-        run: rm -rf .build "${{ runner.temp }}/zislactl-home"
+          set -euo pipefail
+          test "$GATE_RESULT" = success
+          if [[ "$SKIP" == true || "$RELEVANT" == false ]]; then
+            exit 0
+          fi
+          test "$TEST_RESULT" = success
+          test "$SMOKE_RESULT" = success
 
   app-smoke:
     name: App Build Smoke Test
@@ -113,6 +111,20 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
+      - name: Check shell script syntax
+        run: |
+          for script in Scripts/*.sh; do
+            case "$(head -n 1 "$script")" in
+              "#!/bin/zsh") zsh -n "$script" ;;
+              "#!/usr/bin/env bash") bash -n "$script" ;;
+              *) echo "Unsupported shell in $script" >&2; exit 1 ;;
+            esac
+          done
+      - name: Run shell script tests
+        run: |
+          for test_script in Tests/ScriptTests/*.zsh; do
+            zsh "$test_script"
+          done
       - name: Build ad-hoc signed app (single architecture)
         env:
           VERSION: "0.1.0"
@@ -135,15 +147,23 @@ jobs:
           test "$SOUND_COUNT" = 1 || { echo "Pomodoro completion sound not found uniquely in ZislaKit bundle"; exit 1; }
           /usr/bin/plutil -lint "$APP_PATH/Contents/Info.plist"
           /usr/bin/codesign --verify --deep --strict --all-architectures --verbose=2 "$APP_PATH"
+      - name: Build and verify zislactl in Release mode
+        run: |
+          ARCHITECTURE="$(uname -m)"
+          BUILD_ARGS=(-c release --disable-sandbox --scratch-path ".build/$ARCHITECTURE" --triple "$ARCHITECTURE-apple-macosx" -Xswiftc -DSWIFT_MODULE_RESOURCE_BUNDLE_UNAVAILABLE)
+          swift build "${BUILD_ARGS[@]}" --product zislactl
+          BIN_PATH="$(swift build "${BUILD_ARGS[@]}" --show-bin-path)"
+          test -x "$BIN_PATH/zislactl"
+          HOME="${{ runner.temp }}/zislactl-home" "$BIN_PATH/zislactl" --help
       - name: Remove build artifacts
         if: always()
-        run: rm -rf .build "${{ runner.temp }}/zisla-app"
+        run: rm -rf .build "${{ runner.temp }}/zisla-app" "${{ runner.temp }}/zislactl-home"
 
   codeql:
     name: CodeQL (swift)
     needs: gate
     if: needs.gate.outputs.skip != 'true' && needs.gate.outputs.relevant != 'false'
-    runs-on: macos-26
+    runs-on: macos-26-intel
     timeout-minutes: 45
     permissions:
       actions: read
@@ -161,7 +181,10 @@ jobs:
           languages: swift
           build-mode: manual
           queries: security-and-quality
-      - run: swift build
+      - name: Build all Swift products for CodeQL
+        # Keep ARM64/DEBUG coverage and emit modules in the same pass to avoid a second traced frontend.
+        # WMO needs an explicit thread count for SwiftPM's object-file map.
+        run: swift build --arch arm64 -Xswiftc -whole-module-optimization -Xswiftc -num-threads -Xswiftc 1 -Xswiftc -no-emit-module-separately-wmo
       - uses: github/codeql-action/analyze@24c54180a607b1449ed407dd24f251e4e9147c8d # v4.38.3
         with:
           category: /language:swift

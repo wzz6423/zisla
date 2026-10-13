@@ -134,7 +134,7 @@ module CiSkip
 
     # A workflow that declares no paths always runs. One that declares them only
     # runs when the pull request touches a matching file, which keeps a
-    # documentation-only change from booting a Windows or macOS runner. An empty
+    # documentation-only change from booting a macOS runner. An empty
     # file list means the caller could not read the change set, so the workflow
     # runs rather than silently reporting a check nobody verified.
     def relevant?(name, files)
@@ -332,7 +332,7 @@ module CiSkip
     end
 
     def gate_job?(job)
-      return false unless job.is_a?(Hash)
+      return false unless job.is_a?(Hash) && job['name'] == 'Skip Gate'
 
       Array(job['steps']).any? { |step| step.is_a?(Hash) && step['uses'].to_s.include?(GATE_ACTION) }
     end

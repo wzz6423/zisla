@@ -5,7 +5,13 @@ SWIFT_TEST_RESULTS="$(mktemp -d "${TMPDIR:-/tmp}/zisla-swift-test.XXXXXX")"
 trap 'find "$SWIFT_TEST_RESULTS" -depth -delete' EXIT
 
 # SwiftPM can exit successfully before Swift Testing finishes its AppKit run loop.
-swift test "$@" --event-stream-output-path "$SWIFT_TEST_RESULTS/events.jsonl" --event-stream-version 0
+runner=(swift test)
+if [[ "${1:-}" == --runner ]]; then
+  shift
+  runner=("${1:?--runner requires an executable}")
+  shift
+fi
+"${runner[@]}" "$@" --event-stream-output-path "$SWIFT_TEST_RESULTS/events.jsonl" --event-stream-version 0
 python3 - "$SWIFT_TEST_RESULTS/events.jsonl" <<'PYTHON'
 import json
 import sys

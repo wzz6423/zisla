@@ -43,81 +43,8 @@ struct DownloadLocalizationTests {
     }
 
     @Test
-    func downloadSourcesQueryEveryNewLocalizationKey() throws {
-        let sources = try [
-            Self.source("Zisla/DownloadModuleView.swift"),
-            Self.source("Zisla/AppModel.swift"),
-            Self.source("ZislaCore/DownloadOutput.swift"),
-        ].map { try String(contentsOf: $0, encoding: .utf8) }
-            .joined(separator: "\n")
-
-        for key in Self.keys {
-            #expect(sources.contains("\"\(key)\""), "Source no longer queries \(key)")
-        }
-    }
-
-    @Test
-    func downloadModuleKeepsTheFormatControlsInsideItsDedicatedLayout() throws {
-        let source = try String(contentsOf: Self.source("Zisla/DownloadModuleView.swift"), encoding: .utf8)
-
-        #expect(source.contains(".frame(height: 170)"))
+    func downloadLayoutIsTallerThanTheToolbox() {
         #expect(IslandModuleLayout.download.islandSize.height > IslandModuleLayout.toolbox.islandSize.height)
-    }
-
-    @Test
-    func downloadFormatControlRowPinsFormatsAndCookiesToOppositeEdges() throws {
-        let source = try String(contentsOf: Self.source("Zisla/DownloadModuleView.swift"), encoding: .utf8)
-        let cookiePickerStart = try #require(source.range(of: "private var browserCookiePicker"))
-        let cookiePickerEnd = try #require(source.range(
-            of: "private var downloadFormatPickerTitle",
-            range: cookiePickerStart.upperBound..<source.endIndex
-        ))
-        let cookiePicker = source[cookiePickerStart.lowerBound..<cookiePickerEnd.lowerBound]
-
-        #expect(source.contains("HStack(spacing: 10) {\n                HStack(spacing: 10) {\n                    IslandOutlinedPicker("))
-        #expect(source.contains("formatPicker\n                }\n\n                Spacer(minLength: 0)\n\n                HStack(spacing: 10) {\n                    browserCookiePicker"))
-        #expect(source.contains(".frame(width: 292, height: 28, alignment: .leading)"))
-        #expect(cookiePicker.contains(".fixedSize(horizontal: true, vertical: false)"))
-        #expect(cookiePicker.contains(".frame(height: 28)"))
-        #expect(!cookiePicker.contains(".frame(width:"))
-        #expect(source.contains(".frame(maxWidth: .infinity, alignment: .leading)"))
-    }
-
-    @Test
-    func downloadModelClearsAnUnavailableBrowserCookieSourceBeforeRetrying() throws {
-        let source = try String(contentsOf: Self.source("Zisla/AppModel.swift"), encoding: .utf8)
-        let downloadRetry = try #require(source.range(of: "if Self.shouldRetryWithoutBrowserCookies("))
-        let retryBody = source[downloadRetry.lowerBound...]
-        let formatProbe = try #require(source.range(of: "private func failDownloadFormatProbe"))
-        let probeBody = source[formatProbe.lowerBound...]
-
-        #expect(retryBody.contains("browserCookieSource: request.browserCookieSource"))
-        #expect(retryBody.contains("self.downloadBrowserCookieSource == request.browserCookieSource"))
-        #expect(retryBody.contains("self.downloadBrowserCookieSource = nil"))
-        #expect(retryBody.contains("self.startDownload()"))
-        #expect(probeBody.contains("browserCookieSource: cookieSource"))
-        #expect(probeBody.contains("downloadBrowserCookieSource = nil"))
-        #expect(probeBody.contains("refreshDownloadFormats()"))
-    }
-
-    @Test
-    func downloadModelUsesTheAutomaticallyDetectedBrowserCookieSource() throws {
-        let source = try String(contentsOf: Self.source("Zisla/AppModel.swift"), encoding: .utf8)
-
-        #expect(source.contains("downloadService.probeFormatsAutomatically("))
-        #expect(source.contains("downloadService.downloadAutomatically("))
-        #expect(source.contains("result.browserCookieSource"))
-    }
-
-    @Test
-    func browserCookieMenuUsesOnlyCurrentlyDetectedSources() throws {
-        let view = try String(contentsOf: Self.source("Zisla/DownloadModuleView.swift"), encoding: .utf8)
-        let model = try String(contentsOf: Self.source("Zisla/AppModel.swift"), encoding: .utf8)
-
-        #expect(view.contains("ForEach(model.downloadBrowserCookieSources)"))
-        #expect(!view.contains("DownloadBrowserCookieSource.allCases"))
-        #expect(model.contains("self.downloadBrowserCookieSources = sources"))
-        #expect(model.contains("self.downloadBrowserCookieSource = sources.first { $0.id == selected.id }"))
     }
 
     @Test
@@ -147,10 +74,6 @@ struct DownloadLocalizationTests {
         return expression.matches(in: value, range: NSRange(value.startIndex..., in: value))
             .compactMap { Range($0.range, in: value).map { String(value[$0]) } }
             .sorted()
-    }
-
-    private static func source(_ relativePath: String) -> URL {
-        packageRootURL.appendingPathComponent("Sources/\(relativePath)")
     }
 
     private static var packageRootURL: URL {

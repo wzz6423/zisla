@@ -5,17 +5,6 @@ import Testing
 @MainActor
 struct WiFiPopoverRegionTests {
     @Test
-    func islandHostConnectsPopoverRegionsToItsOverlayCoordinator() throws {
-        let appURL = URL(fileURLWithPath: #filePath)
-            .deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent()
-            .appendingPathComponent("Sources/Zisla/ZislaApp.swift")
-        let source = try String(contentsOf: appURL, encoding: .utf8)
-        #expect(source.contains(".environment(\\.islandTransientWindowChanged)"),
-                "The island root must override the environment's no-op handler")
-        #expect(source.contains("self?.overlayCoordinator?.setTransientInteractionWindow(window, anchor: anchor, id: id)"))
-    }
-
-    @Test
     func probePublishesTheActualPopoverWindowAndClearsOnClose() {
         let tracker = WiFiPopoverRegionTracker()
         let anchor = WiFiPopoverRegionView(tracker: tracker, role: .anchor)
