@@ -4,6 +4,7 @@ on:
   pull_request:
     branches:
       - main
+      - ci/optimize-actions-throughput
       - "publish-v*"
 
 permissions:
