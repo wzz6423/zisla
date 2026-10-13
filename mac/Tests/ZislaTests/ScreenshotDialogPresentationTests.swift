@@ -12,8 +12,6 @@ struct ScreenshotDialogMainQueueTests {
         _ = NSApplication.shared
         let alert = NSAlert()
         alert.messageText = "Synthetic OCR result"
-        alert.addButton(withTitle: "Copy")
-        alert.addButton(withTitle: "Close")
         alert.window.alphaValue = 0
         alert.window.isReleasedWhenClosed = false
         let progress = ModalProgress()
@@ -133,6 +131,10 @@ struct ScreenshotDialogPresentationTests {
         #expect(abs(alert.window.frame.midX - screen.visibleFrame.midX) <= 1)
         #expect(abs(alert.window.frame.midY - screen.visibleFrame.midY) <= 1)
         #expect(alertResponses == [alert.response])
+
+        alert.window.level = .normal
+        NotificationCenter.default.post(name: NSWindow.didBecomeKeyNotification, object: alert.window)
+        #expect(alert.window.level == .normal, "A completed result must not retain its level observer")
 
         #expect(screenshot.isVisible)
         #expect(screenshot.level == .screenSaver)

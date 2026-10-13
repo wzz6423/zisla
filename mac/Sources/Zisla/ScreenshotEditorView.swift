@@ -4279,7 +4279,16 @@ enum ScreenshotDialogPresentation {
         RunLoop.main.perform(inModes: [.common]) {
             MainActor.assumeIsolated {
                 guard shouldPresent() else { return }
+                alert.addButton(withTitle: AppLocalization.text("复制"))
+                alert.addButton(withTitle: AppLocalization.text("关闭")).keyEquivalent = "\u{1b}"
                 prepare(alert.window)
+                // AppKit resets the alert's level while runModal() makes it key.
+                let observer = NotificationCenter.default.addObserver(
+                    forName: NSWindow.didBecomeKeyNotification, object: alert.window, queue: nil
+                ) { _ in
+                    MainActor.assumeIsolated { promoteAboveScreenshots(alert.window) }
+                }
+                defer { NotificationCenter.default.removeObserver(observer) }
                 NSApp.activate(ignoringOtherApps: true)
                 let response = alert.runModal()
                 guard shouldPresent() else { return }
@@ -4290,6 +4299,10 @@ enum ScreenshotDialogPresentation {
 
     private static func prepare(_ window: NSWindow) {
         WindowPlacement.prepareModal(window)
+        promoteAboveScreenshots(window)
+    }
+
+    private static func promoteAboveScreenshots(_ window: NSWindow) {
         // Screenshot overlays stay open above the app's usual modal level, even when another window has focus.
         for editor in NSApp.windows where editor is ScreenshotEditorWindow && editor.isVisible {
             window.level = NSWindow.Level(rawValue: max(window.level.rawValue, editor.level.rawValue + 1))
@@ -6060,8 +6073,6 @@ struct ScreenshotEditorView: View {
             scrollView.autoresizingMask = [.width, .height]
             resultContainer.addSubview(scrollView)
             alert.accessoryView = resultContainer
-            alert.addButton(withTitle: AppLocalization.text("复制"))
-            alert.addButton(withTitle: AppLocalization.text("关闭"))
             let handleResponse: @MainActor (NSApplication.ModalResponse) -> Void = { response in
                 guard response == .alertFirstButtonReturn else { return }
                 let pasteboard = NSPasteboard.general
