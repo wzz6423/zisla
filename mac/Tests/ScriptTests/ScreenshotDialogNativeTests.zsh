@@ -33,6 +33,7 @@ enum AppLocalization {
     + placement + presentation + r'''
 
 @MainActor final class ModalProgress {
+    var samples = 0
     var observedModal = false
     var mainQueueRan = false
     var response: NSApplication.ModalResponse?
@@ -77,8 +78,11 @@ func require(_ condition: Bool, _ message: String) {
             progress.observedModal = true
             require(alert.window.level.rawValue > screenshot.level.rawValue,
                     "Visible OCR level \(alert.window.level.rawValue) must exceed screenshot level \(screenshot.level.rawValue)")
+            progress.samples += 1
+            guard [1, 20, 100].contains(progress.samples) else { return false }
             let alertLayer = windowServerLayer(alert.window)
             let screenshotLayer = windowServerLayer(screenshot)
+            guard progress.samples == 100 else { return false }
             require(alertLayer != nil && screenshotLayer != nil, "Both windows must exist in WindowServer")
             require(alertLayer! > screenshotLayer!,
                     "WindowServer must display OCR above the screenshot: OCR=\(alertLayer!), screenshot=\(screenshotLayer!)")
