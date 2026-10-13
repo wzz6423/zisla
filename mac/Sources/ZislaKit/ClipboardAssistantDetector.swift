@@ -91,9 +91,6 @@ public enum ClipboardAssistantDetector {
         let phoneDetection = phone.map {
             ClipboardAssistantDetection(kind: .phone, title: text, actions: [.callPhone($0.e164)])
         }
-        if let phone, phone.prefersBareNumber || !text.allSatisfy(\.isNumber) {
-            return phoneDetection
-        }
         // Dot-separated dates and decimal currency amounts also resemble bare web hosts.
         // Strict whole-value grammars must get the first chance to classify them.
         if enabledKinds.contains(.conversion), var conversion = conversionDetection(
@@ -105,6 +102,9 @@ public enum ClipboardAssistantDetector {
         ) {
             conversion.kind = .conversion
             return conversion
+        }
+        if let phone, phone.prefersBareNumber || !text.allSatisfy(\.isNumber) {
+            return phoneDetection
         }
         // Date/time runs before math and phone: dashed digit groups like "2024-03-05" parse as
         // both arithmetic and a phone shape, but the date reading is the one users mean.
