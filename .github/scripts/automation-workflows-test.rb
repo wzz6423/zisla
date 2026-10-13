@@ -165,7 +165,7 @@ class AutomationWorkflowsTest < Minitest::Test
 
   def test_windows_core_configurations_have_static_checks_when_skipped
     jobs = YAML.safe_load(File.read(File.join(ROOT, '.github/workflows/core-build.yml')), aliases: true).fetch('jobs')
-    gate = "needs.gate.outputs.skip != 'true' && needs.gate.outputs.relevant != 'false'"
+    gate = "needs.gate.outputs.skip != 'true' && needs.gate.outputs.relevant != 'false' && needs.gate.outputs.core == 'true'"
     %w[Debug Release].each do |configuration|
       job = jobs.fetch("core-#{configuration.downcase}")
       assert_equal "Windows Core (#{configuration})", job.fetch('name')
@@ -182,7 +182,7 @@ class AutomationWorkflowsTest < Minitest::Test
     result = jobs.fetch('core-result')
     assert_equal 'Windows Core Tests', result.fetch('name')
     assert_equal %w[gate core-debug core-release], result.fetch('needs')
-    assert_equal "always() && #{gate}", result.fetch('if')
+    assert_equal "always() && (needs.gate.result != 'success' || (#{gate}))", result.fetch('if')
     verification = result.fetch('steps').first
     assert_equal({ 'DEBUG_RESULT' => '${{ needs.core-debug.result }}',
                    'RELEASE_RESULT' => '${{ needs.core-release.result }}' }, verification.fetch('env'))
@@ -190,6 +190,24 @@ class AutomationWorkflowsTest < Minitest::Test
       output, status = run_step(verification, 'DEBUG_RESULT' => debug, 'RELEASE_RESULT' => release)
       assert_equal debug == 'success' && release == 'success', status.success?,
                    "Debug=#{debug}, Release=#{release}: #{output}"
+    end
+  end
+
+  def test_windows_preflight_detects_core_and_application_independently
+    directory = File.join(@directory, 'windows')
+    FileUtils.mkdir_p(directory)
+    output_path = File.join(@directory, 'github-output')
+    [false, true].product([false, true]).each do |core, application|
+      { 'CMakeLists.txt' => core, 'Zisla.Windows.sln' => application }.each do |filename, present|
+        path = File.join(directory, filename)
+        FileUtils.rm_f(path)
+        File.write(path, '') if present
+      end
+      File.write(output_path, '')
+      output, status = run_step(step('core-build', 'Check Windows source availability'),
+                                'GITHUB_OUTPUT' => output_path)
+      assert status.success?, output
+      assert_equal ["core=#{core}", "application=#{application}"], File.readlines(output_path, chomp: true)
     end
   end
 
@@ -663,7 +681,7 @@ class AutomationWorkflowsTest < Minitest::Test
   end
 
   def step(workflow, name)
-    YAML.load_file(File.join(ROOT, '.github/workflows', "#{workflow}.yml"))
+    YAML.load_file(File.join(ROOT, '.github/workflows', "#{workflow}.yml"), aliases: true)
         .fetch('jobs').values.flat_map { |job| job.fetch('steps') }.find { |entry| entry['name'] == name } || raise(name)
   end
 

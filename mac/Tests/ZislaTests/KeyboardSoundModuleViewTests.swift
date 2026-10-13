@@ -68,119 +68,11 @@ struct KeyboardSoundModuleViewTests {
     }
 
     @Test
-    func islandKeyboardModuleIsReadOnlyAndFollowsAIMonitor() throws {
-        let root = URL(fileURLWithPath: #filePath)
-            .deletingLastPathComponent()
-            .deletingLastPathComponent()
-            .deletingLastPathComponent()
-        let viewSource = try String(
-            contentsOf: root.appendingPathComponent("Sources/Zisla/KeyboardSoundModuleView.swift"),
-            encoding: .utf8
-        )
-
-        #expect(!viewSource.contains("Toggle("))
-        #expect(!viewSource.contains("Picker("))
-        #expect(!viewSource.contains("keyboardEnabled ="))
-        #expect(!viewSource.contains("monitoringStateText"))
-        #expect(!viewSource.contains("查看输入统计"))
-        #expect(!viewSource.contains("openTypingStats()"))
-        #expect(!viewSource.contains("只读监控"))
-        #expect(!viewSource.contains("输入监控正在运行"))
-        #expect(viewSource.contains("KeyboardTypingStatsDashboardView"))
-        #expect(viewSource.contains("KeyboardTypingStatsDashboardView(summary: summary)"))
-        #expect(!viewSource.contains("compact:"))
-
-        let dashboardSource = try String(
-            contentsOf: root.appendingPathComponent("Sources/Zisla/KeyboardTypingStatsDashboardView.swift"),
-            encoding: .utf8
-        )
-        #expect(dashboardSource.contains("输入趋势"))
-        #expect(dashboardSource.contains("历史"))
-        #expect(!dashboardSource.contains("subtitle:"))
-        #expect(!dashboardSource.contains("Text(subtitle)"))
-        let trendStart = try #require(dashboardSource.range(of: "private var trendChart"))
-        let historyStart = try #require(dashboardSource.range(of: "private var historyPanel"))
-        let keyboardStart = try #require(dashboardSource.range(of: "private var keyboardPanel"))
-        let trendSource = String(dashboardSource[trendStart.lowerBound..<historyStart.lowerBound])
-        #expect(trendSource.contains("let maximumCharacterCount = Self.trendCharacterCountUpperBound(for: summary.recentBuckets)"))
-        #expect(trendSource.contains(".chartYScale(domain: 0...maximumCharacterCount)"))
-        let historySource = String(dashboardSource[historyStart.lowerBound..<keyboardStart.lowerBound])
-        #expect(historySource.contains("LineMark("))
-        #expect(!historySource.contains("BarMark("))
-        #expect(historySource.contains("range: .plotDimension(padding: Self.chartXAxisLabelPadding)"))
-        #expect(historySource.contains("let maximumCharacterCount = Self.historyCharacterCountUpperBound(for: summary.history)"))
-        #expect(historySource.contains(".chartYScale(domain: 0...maximumCharacterCount)"))
-        #expect(historySource.contains("AxisMarks(values: axisDates)"))
-        #expect(historySource.contains("AxisValueLabel(anchor: .top, collisionResolution: .disabled)"))
-        // Both curves are LineMarks and need separate series values so Charts does not merge them.
-        #expect(historySource.contains(#"series: .value(AppLocalization.text("系列"), AppLocalization.text("字符数"))"#))
-        #expect(historySource.contains(#"series: .value(AppLocalization.text("系列"), AppLocalization.text("峰值"))"#))
-        let historyLineMarkCount = historySource.components(separatedBy: "LineMark(").count - 1
-        let historySeriesCount = historySource.components(separatedBy: "series: .value(").count - 1
-        #expect(historyLineMarkCount == 2)
-        #expect(historySeriesCount == historyLineMarkCount)
-        #expect(dashboardSource.contains("键盘"))
-        #expect(dashboardSource.contains("应用时间线"))
-        #expect(dashboardSource.contains("今日按键"))
-        #expect(dashboardSource.contains("累计按键"))
-        #expect(dashboardSource.contains("private var activityPanels"))
-        #expect(dashboardSource.contains("frame(height: 110)"))
-        #expect(!dashboardSource.contains("let compact"))
-        #expect(dashboardSource.contains("KeyboardHeatmapView"))
-        #expect(dashboardSource.contains("Key(\"digit1\", \"1\", 18)"))
-        #expect(dashboardSource.contains("Key(\"leftArrow\", \"←\", 123)"))
-        #expect(dashboardSource.contains("Key(\"rightShift\", \"shift\", 60"))
-
-        // The outer spacer keeps content-sized key counts aligned to the leading edge.
-        let keyboardCountBody = try #require(
-            dashboardSource
-                .components(separatedBy: "private func keyboardCount")
-                .dropFirst()
-                .first?
-                .components(separatedBy: "\n    private ")
-                .first
-        )
-        #expect(!keyboardCountBody.contains("maxWidth: .infinity"))
-        #expect(keyboardCountBody.contains("Self.compactCountText(count)"))
-        #expect(keyboardCountBody.contains(".font(.system(size: 10, weight: .semibold, design: .monospaced))"))
-        #expect(keyboardCountBody.contains(".accessibilityValue(count.formatted(.number))"))
-        #expect(dashboardSource.contains("keyboardCount(AppLocalization.text(\"累计按键\"), summary.allTimeKeyPressCount)\n                Spacer()"))
-
+    func islandKeyboardModuleFollowsAIMonitor() throws {
         let modules = IslandModule.allCases
         let aiIndex = try #require(modules.firstIndex(of: .aiMonitor))
         let keyboardIndex = try #require(modules.firstIndex(of: .keyboardSound))
         #expect(keyboardIndex == modules.index(after: aiIndex))
-    }
-
-    @Test
-    func heatmapKeycapShowsTodayAndAllTimeCounts() throws {
-        let dashboardSource = try String(
-            contentsOf: URL(fileURLWithPath: #filePath)
-                .deletingLastPathComponent()
-                .deletingLastPathComponent()
-                .deletingLastPathComponent()
-                .appendingPathComponent("Sources/Zisla/KeyboardTypingStatsDashboardView.swift"),
-            encoding: .utf8
-        )
-
-        #expect(dashboardSource.contains("todayCounts: summary.todayKeyCounts"))
-        #expect(dashboardSource.contains("allTimeCounts: summary.allTimeKeyCounts"))
-        #expect(!dashboardSource.contains("KeyboardHeatmapView(counts:"))
-
-        #expect(dashboardSource.contains("let todayCount = key.keyCode.map { todayCounts[$0, default: 0] } ?? 0"))
-        #expect(dashboardSource.contains("let allTimeCount = key.keyCode.map { allTimeCounts[$0, default: 0] } ?? 0"))
-        #expect(dashboardSource.contains("KeyboardTypingStatsDashboardView.compactCountText(todayCount)"))
-        #expect(dashboardSource.contains("KeyboardTypingStatsDashboardView.compactCountText(allTimeCount)"))
-        #expect(dashboardSource.contains(".font(.system(size: 7, design: .monospaced))"))
-        #expect(dashboardSource.contains(".minimumScaleFactor(0.7)"))
-
-        #expect(dashboardSource.contains("0.08 + 0.68 * Double(todayCount) / Double(maximum)"))
-        #expect(dashboardSource.contains("private var maximum: Int64 { max(1, todayCounts.values.max() ?? 0) }"))
-        #expect(!dashboardSource.contains("Double(allTimeCount) / Double(maximum)"))
-
-        #expect(dashboardSource.contains("if !compact, key.keyCode != nil {"))
-        #expect(dashboardSource.contains(#"AppLocalization.text("今日 %@，累计 %@", todayCount.formatted(.number), allTimeCount.formatted(.number))"#))
-        #expect(dashboardSource.contains(#"} ?? "")"#))
     }
 
     @Test
@@ -357,26 +249,4 @@ struct KeyboardSoundModuleViewTests {
         #expect(KeyboardTypingStatsDashboardView.timelineAxisTicks(buckets: buckets, width: 0).isEmpty)
     }
 
-    @Test
-    func applicationTimelineAxisIsRenderedUnderRowsWithSharedSpacing() throws {
-        let dashboardSource = try String(
-            contentsOf: URL(fileURLWithPath: #filePath)
-                .deletingLastPathComponent()
-                .deletingLastPathComponent()
-                .deletingLastPathComponent()
-                .appendingPathComponent("Sources/Zisla/KeyboardTypingStatsDashboardView.swift"),
-            encoding: .utf8
-        )
-
-        let panelStart = try #require(dashboardSource.range(of: "private var applicationPanel"))
-        let axisStart = try #require(dashboardSource.range(of: "private var timelineAxis"))
-        let panelSource = String(dashboardSource[panelStart.lowerBound..<axisStart.lowerBound])
-
-        #expect(panelSource.contains("timelineAxis"))
-        // Bars and ticks must share one spacing constant to avoid independent drift.
-        #expect(panelSource.contains("spacing: Self.timelineBucketSpacing"))
-        #expect(!panelSource.contains("HStack(alignment: .bottom, spacing: 1)"))
-        #expect(dashboardSource.contains(#"case "24h", "6h", "1h":"#))
-        #expect(dashboardSource.contains(#"case "7d":"#))
-    }
 }

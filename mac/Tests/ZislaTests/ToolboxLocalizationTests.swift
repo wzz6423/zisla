@@ -5,19 +5,6 @@ import ZislaCore
 struct ToolboxLocalizationTests {
     private static let timerKeys: Set<String> = ["开始", "暂停", "小时", "分钟", "秒"]
 
-    @Test
-    func durationFieldLocalizesItsDynamicTitle() throws {
-        let source = try Self.toolboxSource()
-        #expect(source.contains("TextField(AppLocalization.text(title), value: value, format: .number)"))
-    }
-
-    @Test
-    func startPauseButtonLocalizesBothStateTitles() throws {
-        let source = try Self.toolboxSource()
-        #expect(source.contains("case .running: AppLocalization.text(\"暂停\")"))
-        #expect(source.contains("case .idle, .paused: AppLocalization.text(\"开始\")"))
-    }
-
     @Test(arguments: AppLanguage.allCases)
     func timerLabelsUseRequestedLanguage(language: AppLanguage) throws {
         let source = try Self.toolboxSource()

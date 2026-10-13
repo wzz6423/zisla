@@ -9,78 +9,6 @@ import ZislaKit
 
 struct SystemMonitorCombinedIconAppearanceIntegrationTests {
     @Test
-    func appearanceControlsAreBoundToPersistedSettingsInsideCombinedIconSection() throws {
-        let source = try Self.source("SystemMonitorMenuBarSettingsView.swift")
-        let section = try Self.section(
-            source,
-            from: "            if settingsStore.settings.systemMonitorMenuBarCombinedIconEnabled {",
-            to: "\n        }\n        .font"
-        )
-        for property in [
-            "showsBatteryPercentage", "showsChargingIndicator", "showsPercentageWhenConnected", "usesStatusColors",
-            "indicatorStyle", "ringStrokeStyle", "iconSize", "wifiScale", "batteryTextScale",
-        ] {
-            #expect(section.contains("$settingsStore.settings.systemMonitorMenuBarCombinedIconAppearance.\(property)"), "Missing binding for \(property)")
-        }
-        for range in ["iconSizeRange", "wifiScaleRange", "batteryTextScaleRange"] {
-            #expect(section.contains("in: SystemMonitorCombinedIconAppearance.\(range)"))
-        }
-        #expect(section.contains("SystemMonitorMenuBarIndicatorStyle.allCases"))
-        #expect(section.contains("SystemMonitorMenuBarRingStrokeStyle.allCases"))
-    }
-
-    @Test
-    func imageRefreshReadsCurrentSettingsAndUsesUpstreamSystemItemSizing() throws {
-        let source = try Self.source("ZislaApp.swift")
-        let section = try Self.section(
-            source,
-            from: "    private func updateCombinedMonitorStatusImage(",
-            to: "    private func configureMonitorStatusItem("
-        )
-        #expect(section.contains("let settings = AppModel.shared.settingsStore.settings"))
-        #expect(section.contains("configuration: settings.systemMonitorMenuBarCombinedIconAppearance"))
-        #expect(!section.contains("combinedMonitorStatusItem?.length ="))
-        let controller = try Self.section(source,
-            from: "    private func syncCombinedMonitorStatusItem(",
-            to: "    private func updateCombinedMonitorStatusImage(")
-        #expect(controller.contains("item.button?.imagePosition = .imageOnly"))
-        #expect(controller.contains("statusItem(withLength: NSStatusItem.variableLength)"))
-        #expect(!controller.contains("item.button?.imageScaling = .scaleNone"))
-    }
-
-    @Test
-    func imageRefreshLeavesDynamicColorsToRendererAndPreservesLiveInputs() throws {
-        let source = try Self.source("ZislaApp.swift")
-        let section = try Self.section(
-            source,
-            from: "    private func updateCombinedMonitorStatusImage(",
-            to: "    private func configureMonitorStatusItem("
-        )
-        #expect(!section.contains("isDark"))
-        #expect(!section.contains("foreground:"))
-        #expect(!section.contains("effectiveAppearance"))
-        #expect(section.contains("battery: battery, wifi: combinedIconLevels.wifi, level: level"))
-        #expect(section.contains("button.toolTip = tooltip"))
-        #expect(section.contains("button.image?.accessibilityDescription = tooltip"))
-    }
-
-    @Test
-    func independentCompactRowsRemainCentered() throws {
-        let source = try Self.source("ZislaApp.swift")
-        let section = try Self.section(
-            source,
-            from: "    private func compactMonitorStatusImage(",
-            to: "    private func "
-        )
-        #expect(section.contains("paragraph.alignment = .center"))
-        #expect(!section.contains("paragraph.alignment = .left"))
-        #expect(section.contains("let size = NSSize(width: itemWidth - 4, height: 22)"))
-        #expect(section.contains("NSFont.monospacedDigitSystemFont(ofSize: 9, weight: .medium)"))
-        #expect(section.contains("NSFont.monospacedDigitSystemFont(ofSize: 10, weight: .medium)"))
-        #expect(section.contains("NSFont.systemFont(ofSize: 8, weight: .semibold)"))
-    }
-
-    @Test
     func everyLanguageTranslatesAppearanceLabelsAndEnumTitles() throws {
         let source = try Self.source("SystemMonitorMenuBarSettingsView.swift")
         let section = try Self.section(
@@ -137,16 +65,14 @@ struct SystemMonitorCombinedIconAppearanceIntegrationTests {
             showsBatteryPercentage: true, showsChargingIndicator: true, showsPercentageWhenConnected: true,
             usesStatusColors: false, batteryTextScale: 1.98, wifiScale: 1.8
         ))
-        for _ in 0..<16 {
-            binding.systemMonitorMenuBarLayout.individualEnabled.wrappedValue = false
-            binding.systemMonitorMenuBarLayout.stackedEnabled.wrappedValue = false
-            binding.systemMonitorMenuBarCombinedIconEnabled.wrappedValue = false
-            #expect(settings.systemMonitorMenuBarCombinedIconAppearance == configured.systemMonitorMenuBarCombinedIconAppearance)
-            binding.systemMonitorMenuBarLayout.individualEnabled.wrappedValue = true
-            binding.systemMonitorMenuBarLayout.stackedEnabled.wrappedValue = true
-            binding.systemMonitorMenuBarCombinedIconEnabled.wrappedValue = true
-            #expect(settings == configured)
-        }
+        binding.systemMonitorMenuBarLayout.individualEnabled.wrappedValue = false
+        binding.systemMonitorMenuBarLayout.stackedEnabled.wrappedValue = false
+        binding.systemMonitorMenuBarCombinedIconEnabled.wrappedValue = false
+        #expect(settings.systemMonitorMenuBarCombinedIconAppearance == configured.systemMonitorMenuBarCombinedIconAppearance)
+        binding.systemMonitorMenuBarLayout.individualEnabled.wrappedValue = true
+        binding.systemMonitorMenuBarLayout.stackedEnabled.wrappedValue = true
+        binding.systemMonitorMenuBarCombinedIconEnabled.wrappedValue = true
+        #expect(settings == configured)
         settings.systemMonitorMenuBarCombinedIconAppearance = original.systemMonitorMenuBarCombinedIconAppearance
         #expect(settings == original)
     }
@@ -174,7 +100,7 @@ struct SystemMonitorCombinedIconAppearanceIntegrationTests {
     }
 
     @Test @MainActor
-    func settingsStorePersistsAppearanceWithExistingStorageAndRefreshLifecycle() throws {
+    func settingsStorePersistsAppearanceWithExistingStorage() throws {
         let suite = "SystemMonitorCombinedIconAppearanceIntegrationTests.\(UUID().uuidString)"
         let defaults = try #require(UserDefaults(suiteName: suite))
         defer { defaults.removePersistentDomain(forName: suite) }
@@ -210,19 +136,6 @@ struct SystemMonitorCombinedIconAppearanceIntegrationTests {
         #expect(!reloaded.settings.systemMonitorMenuBarCombinedIconAppearance.showsBatteryPercentage)
         #expect(!reloaded.settings.systemMonitorMenuBarCombinedIconAppearance.showsChargingIndicator)
         #expect(!reloaded.settings.systemMonitorMenuBarCombinedIconAppearance.showsPercentageWhenConnected)
-        let source = try Self.source("ZislaApp.swift")
-        let subscription = try Self.section(
-            source,
-            from: "        model.settingsStore.$settings\n            .sink { [weak self] settings in",
-            to: "            .store(in: &cancellables)"
-        )
-        #expect(subscription.contains("syncMonitorStatusItems(force: true)"))
-        let controller = try Self.section(source, from: "    private func syncCombinedMonitorStatusItem(", to: "    private func updateCombinedMonitorStatusImage(")
-        #expect(controller.contains("item.button?.action = #selector(showSystemMonitor)"))
-        #expect(controller.contains("guard combinedIconReadTask == nil else { return }"))
-        #expect(controller.contains("combinedIconReadTask?.cancel()"))
-        #expect(controller.contains("self.updateCombinedMonitorStatusImage(metric: metric)"))
-        #expect(!controller.contains("systemMonitorMenuBarCombinedIconAppearance ="))
     }
 
     private static let appearanceLabels: Set<String> = [

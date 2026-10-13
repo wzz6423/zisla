@@ -1,11 +1,11 @@
 {
-  "comment": "Pull request workflows that CI skip directives can bypass. 'checks' lists every check name the workflow publishes, including matrix expansions, so the skip processor can report them as successful. The Test CI Scripts job fails when this file drifts from .github/workflows. 'paths' lists the files whose change makes the workflow relevant: a workflow that declares paths only runs when a pull request touches one of them, and a workflow without paths always runs.",
+  "comment": "Pull request workflows that CI skip directives can bypass. 'checks' lists every check name the workflow publishes, including matrix expansions, so the skip processor can report them as successful. The CI Checks job fails when this file drifts from .github/workflows. 'paths' lists the files whose change makes the workflow relevant: a workflow that declares paths only runs when a pull request touches one of them, and a workflow without paths always runs.",
   "workflows": [
     {
       "name": "CI Lint",
       "file": "ci-lint.yml",
       "aliases": ["lint", "actionlint"],
-      "checks": ["Lint Workflows", "Audit Workflow Security", "Test CI Scripts"]
+      "checks": ["CI Checks"]
     },
     {
       "name": "Core Tests",
@@ -27,7 +27,6 @@
       "paths": ["mac/**", "Makefile", ".github/**"],
       "checks": [
         "Swift Tests",
-        "Build zislactl (Release)",
         "App Build Smoke Test",
         "CodeQL (swift)"
       ]

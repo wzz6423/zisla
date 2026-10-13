@@ -44,11 +44,16 @@ esac
 SCRIPT
 chmod +x "$TEST_ROOT/bin/swift"
 
+for launch in swiftpm runner; do
+  arguments=(--filter '^FixtureTests\.')
+  if [[ "$launch" == runner ]]; then
+    arguments=(--runner "$TEST_ROOT/bin/swift" test "${arguments[@]}")
+  fi
 for fixture in success skipped skipped-unfinished suite-skipped unknown-skipped missing truncated empty unfinished nonzero; do
   result=0
   PATH="$TEST_ROOT/bin:$PATH" TMPDIR="$TEST_ROOT/results" \
     SWIFT_TEST_FIXTURE="$fixture" SWIFT_TEST_CAPTURE="$TEST_ROOT/result-path" \
-    zsh "$ROOT/Scripts/swift-test.sh" --filter '^FixtureTests\.' \
+    zsh "$ROOT/Scripts/swift-test.sh" "${arguments[@]}" \
     > "$TEST_ROOT/$fixture.log" 2>&1 || result=$?
   if [[ "$fixture" == success || "$fixture" == skipped ]]; then
     [[ "$result" == 0 ]] || { cat "$TEST_ROOT/$fixture.log"; exit 1; }
@@ -59,5 +64,12 @@ for fixture in success skipped skipped-unfinished suite-skipped unknown-skipped 
   fi
   [[ ! -e "$(<"$TEST_ROOT/result-path")" ]] || { print -u2 -- "Leaked test results: $fixture"; exit 1; }
 done
+done
 
-print -- 'PASS: Swift test results accept completed explicit function skips and reject suite-only, unknown, missing, truncated, empty, unfinished, and nonzero runs; temporary results are removed'
+if TMPDIR="$TEST_ROOT/results" zsh "$ROOT/Scripts/swift-test.sh" --runner > "$TEST_ROOT/missing-runner.log" 2>&1; then
+  print -u2 -- 'Accepted a missing test runner executable'
+  exit 1
+fi
+[[ -z "$(find "$TEST_ROOT/results" -mindepth 1 -print)" ]] || { print -u2 -- 'Leaked results after invalid runner input'; exit 1; }
+
+print -- 'PASS: 21 SwiftPM/direct-runner cases preserve result validation, failure status, and temporary result cleanup'

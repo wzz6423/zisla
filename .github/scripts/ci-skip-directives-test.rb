@@ -299,7 +299,9 @@ class CiSkipDirectivesTest < Minitest::Test
                 - uses: ./.github/actions/ci-skip-gate
             test:
               name: Swift Tests
-              steps: []
+              steps:
+                - uses: ./.github/actions/ci-skip-gate
+                - run: swift test
             matrix-job:
               name: CodeQL (${{ matrix.language }})
               steps: []

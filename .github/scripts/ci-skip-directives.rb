@@ -332,7 +332,7 @@ module CiSkip
     end
 
     def gate_job?(job)
-      return false unless job.is_a?(Hash)
+      return false unless job.is_a?(Hash) && job['name'] == 'Skip Gate'
 
       Array(job['steps']).any? { |step| step.is_a?(Hash) && step['uses'].to_s.include?(GATE_ACTION) }
     end

@@ -29,6 +29,8 @@ jobs:
     outputs:
       skip: ${{ steps.gate.outputs.skip }}
       relevant: ${{ steps.gate.outputs.relevant }}
+      core: ${{ steps.sources.outputs.core }}
+      application: ${{ steps.sources.outputs.application }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -38,11 +40,19 @@ jobs:
         with:
           workflow-name: Core Tests
           github-token: ${{ github.token }}
+      - name: Check Windows source availability
+        id: sources
+        run: |
+          core=false
+          application=false
+          if [ -f windows/CMakeLists.txt ]; then core=true; fi
+          if [ -f windows/Zisla.Windows.sln ]; then application=true; fi
+          printf 'core=%s\napplication=%s\n' "$core" "$application" >> "$GITHUB_OUTPUT"
 
   core-debug:
     name: Windows Core (Debug)
     needs: gate
-    if: needs.gate.outputs.skip != 'true' && needs.gate.outputs.relevant != 'false'
+    if: needs.gate.outputs.skip != 'true' && needs.gate.outputs.relevant != 'false' && needs.gate.outputs.core == 'true'
     runs-on: windows-latest
     timeout-minutes: 30
     env:
@@ -71,7 +81,7 @@ jobs:
   core-release:
     name: Windows Core (Release)
     needs: gate
-    if: needs.gate.outputs.skip != 'true' && needs.gate.outputs.relevant != 'false'
+    if: needs.gate.outputs.skip != 'true' && needs.gate.outputs.relevant != 'false' && needs.gate.outputs.core == 'true'
     runs-on: windows-latest
     timeout-minutes: 30
     env:
@@ -83,7 +93,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 5
     needs: [gate, core-debug, core-release]
-    if: always() && needs.gate.outputs.skip != 'true' && needs.gate.outputs.relevant != 'false'
+    if: always() && (needs.gate.result != 'success' || (needs.gate.outputs.skip != 'true' && needs.gate.outputs.relevant != 'false' && needs.gate.outputs.core == 'true'))
     steps:
       - name: Verify configuration results
         env:
@@ -94,7 +104,7 @@ jobs:
   application:
     name: Windows App Build
     needs: gate
-    if: needs.gate.outputs.skip != 'true' && needs.gate.outputs.relevant != 'false'
+    if: needs.gate.outputs.skip != 'true' && needs.gate.outputs.relevant != 'false' && needs.gate.outputs.application == 'true'
     runs-on: windows-latest
     timeout-minutes: 45
     steps:
@@ -157,7 +167,7 @@ jobs:
   codeql:
     name: CodeQL (C/C++)
     needs: gate
-    if: needs.gate.outputs.skip != 'true' && needs.gate.outputs.relevant != 'false'
+    if: needs.gate.outputs.skip != 'true' && needs.gate.outputs.relevant != 'false' && needs.gate.outputs.core == 'true'
     runs-on: windows-latest
     timeout-minutes: 45
     permissions:

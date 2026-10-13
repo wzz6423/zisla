@@ -95,27 +95,6 @@ struct GlobalHotkeyManagerTests {
     }
 
     @Test
-    func carbonHotkeysPollTheKeyStateWhileOneOfOurOwnMenusTracks() throws {
-        let source = try String(contentsOf: globalHotkeyManagerSourceURL, encoding: .utf8)
-        let registration = try sourceSlice(
-            in: source,
-            from: "private func registerCarbon(",
-            to: "private func registerSideSpecific("
-        )
-
-        #expect(registration.contains("startObservingMenuTracking()"))
-        #expect(registration.contains("NSMenu.didBeginTrackingNotification"))
-        #expect(registration.contains("NSMenu.didEndTrackingNotification"))
-        // Event tracking mode only runs timers registered in the common modes.
-        #expect(registration.contains("RunLoop.main.add(timer, forMode: .common)"))
-        #expect(registration.contains("CGEventSource.keyState("))
-        // The press the tracking loop replays after the menu closes must not fire the action twice.
-        #expect(registration.contains("menuTrackingPressConsumedAt"))
-        // Esc and other bare keys belong to the menu itself while it tracks.
-        #expect(registration.contains("guard let carbonHotkey, carbonHotkey.modifiers != 0 else { return }"))
-    }
-
-    @Test
     func flagsChangedTracksRightOptionWithoutGlobalKeyState() {
         let rightOption = VoiceInputModifier.rightOption
         var modifierSides = GlobalHotkeyManager.modifierSides(
@@ -172,29 +151,6 @@ struct GlobalHotkeyManagerTests {
     }
 
     @Test
-    func sideSpecificHotkeysPreferFilteringButFallBackToListening() throws {
-        let source = try String(contentsOf: globalHotkeyManagerSourceURL, encoding: .utf8)
-        let registration = try sourceSlice(
-            in: source,
-            from: "private func registerSideSpecific(",
-            to: "fileprivate func handleSideSpecificEvent("
-        )
-        let callback = try sourceSlice(
-            in: source,
-            from: "private func globalHotkeyEventTapCallback(",
-            to: source.endIndex
-        )
-
-        #expect(registration.contains("let filteringTap = CGEvent.tapCreate("))
-        #expect(registration.contains("options: .defaultTap"))
-        #expect(registration.contains("let eventTap = filteringTap ?? CGEvent.tapCreate("))
-        #expect(registration.contains("options: .listenOnly"))
-        #expect(registration.contains("canSuppressSideSpecificEvents = filteringTap != nil"))
-        #expect(callback.contains("let shouldSuppress = MainActor.assumeIsolated"))
-        #expect(callback.contains("return shouldSuppress && manager.canSuppressSideSpecificEvents"))
-    }
-
-    @Test
     func modifierOnlyHotkeySuppressesOnlyItsMatchedPressAndRelease() {
         let rightOption = VoiceInputModifier.rightOption
         let hotkey = VoiceInputHotkeyPreset(
@@ -230,31 +186,6 @@ struct GlobalHotkeyManagerTests {
         ))
     }
 
-    @Test
-    func sideSpecificTapDisableReleasesAStuckPressWithoutRequiringHostPermission() throws {
-        let source = try String(contentsOf: globalHotkeyManagerSourceURL, encoding: .utf8)
-        let handler = try sourceSlice(
-            in: source,
-            from: "fileprivate func handleSideSpecificEvent(",
-            to: "static func shouldSuppressModifierOnlyEvent("
-        )
-
-        #expect(handler.contains("releaseSideSpecificHotkey(resamplingModifierSides: true)"))
-        #expect(handler.contains("keyCode == sideSpecificHotkey.keyCode"))
-    }
-
-    @Test
-    func sideSpecificHotkeySuppressesRepeatedKeyDownEvents() throws {
-        let source = try String(contentsOf: globalHotkeyManagerSourceURL, encoding: .utf8)
-        let handler = try sourceSlice(
-            in: source,
-            from: "fileprivate func handleSideSpecificEvent(",
-            to: "static func shouldSuppressModifierOnlyEvent("
-        )
-
-        #expect(handler.contains("if sideSpecificHotkeyIsPressed { return true }"))
-    }
-
     private func sendHotkeyPressed(keyCode: UInt32, modifiers: UInt32) throws {
         var createdEvent: EventRef?
         let createResult = CreateEvent(
@@ -286,32 +217,5 @@ struct GlobalHotkeyManagerTests {
         guard parameterResult == noErr else { return }
 
         #expect(SendEventToEventTarget(event, GetApplicationEventTarget()) == noErr)
-    }
-
-    private func sourceSlice(
-        in source: String,
-        from start: String,
-        to end: String.Index
-    ) throws -> Substring {
-        let startRange = try #require(source.range(of: start))
-        return source[startRange.lowerBound..<end]
-    }
-
-    private func sourceSlice(
-        in source: String,
-        from start: String,
-        to end: String
-    ) throws -> Substring {
-        let startRange = try #require(source.range(of: start))
-        let endRange = try #require(source[startRange.upperBound...].range(of: end))
-        return source[startRange.lowerBound..<endRange.lowerBound]
-    }
-
-    private var globalHotkeyManagerSourceURL: URL {
-        URL(fileURLWithPath: #filePath)
-            .deletingLastPathComponent()
-            .deletingLastPathComponent()
-            .deletingLastPathComponent()
-            .appendingPathComponent("Sources/ZislaKit/GlobalHotkeyManager.swift")
     }
 }

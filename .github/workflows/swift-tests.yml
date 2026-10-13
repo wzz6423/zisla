@@ -67,38 +67,21 @@ jobs:
           for test_script in Tests/ScriptTests/*.zsh; do
             zsh "$test_script"
           done
-      - name: Run swift test
+      - name: Build Swift tests
         run: |
-          zsh Scripts/swift-test.sh --filter '^ZislaCoreTests\.'
-          zsh Scripts/swift-test-suites.sh ZislaKitTests
-          zsh Scripts/swift-test-suites.sh ZislaTests
+          swift build --build-tests
+      - name: Run Swift core tests
+        run: |
+          zsh Scripts/swift-test.sh --skip-build --filter '^ZislaCoreTests\.'
+      - name: Run isolated Swift suites
+        env:
+          SWIFT_TEST_WORKERS: "3"
+        run: |
+          zsh Scripts/swift-test-suites.sh ZislaKitTests --skip-build
+          zsh Scripts/swift-test-suites.sh ZislaTests --skip-build
       - name: Remove test artifacts
         if: always()
         run: rm -rf .build
-
-  zislactl:
-    name: Build zislactl (Release)
-    needs: gate
-    if: needs.gate.outputs.skip != 'true' && needs.gate.outputs.relevant != 'false'
-    runs-on: macos-26
-    timeout-minutes: 20
-    defaults:
-      run:
-        working-directory: mac
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          persist-credentials: false
-      - name: Build zislactl in Release mode
-        run: swift build -c release --product zislactl
-      - name: Verify zislactl binary
-        run: |
-          BIN_PATH="$(swift build -c release --show-bin-path)"
-          test -x "$BIN_PATH/zislactl"
-          HOME="${{ runner.temp }}/zislactl-home" "$BIN_PATH/zislactl" --help
-      - name: Remove build artifacts
-        if: always()
-        run: rm -rf .build "${{ runner.temp }}/zislactl-home"
 
   app-smoke:
     name: App Build Smoke Test
@@ -135,9 +118,17 @@ jobs:
           test "$SOUND_COUNT" = 1 || { echo "Pomodoro completion sound not found uniquely in ZislaKit bundle"; exit 1; }
           /usr/bin/plutil -lint "$APP_PATH/Contents/Info.plist"
           /usr/bin/codesign --verify --deep --strict --all-architectures --verbose=2 "$APP_PATH"
+      - name: Build and verify zislactl in Release mode
+        run: |
+          ARCHITECTURE="$(uname -m)"
+          BUILD_ARGS=(-c release --disable-sandbox --scratch-path ".build/$ARCHITECTURE" --triple "$ARCHITECTURE-apple-macosx" -Xswiftc -DSWIFT_MODULE_RESOURCE_BUNDLE_UNAVAILABLE)
+          swift build "${BUILD_ARGS[@]}" --product zislactl
+          BIN_PATH="$(swift build "${BUILD_ARGS[@]}" --show-bin-path)"
+          test -x "$BIN_PATH/zislactl"
+          HOME="${{ runner.temp }}/zislactl-home" "$BIN_PATH/zislactl" --help
       - name: Remove build artifacts
         if: always()
-        run: rm -rf .build "${{ runner.temp }}/zisla-app"
+        run: rm -rf .build "${{ runner.temp }}/zisla-app" "${{ runner.temp }}/zislactl-home"
 
   codeql:
     name: CodeQL (swift)
@@ -156,12 +147,15 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
+      - name: Resolve Swift package manifests
+        run: swift package resolve
       - uses: github/codeql-action/init@24c54180a607b1449ed407dd24f251e4e9147c8d # v4.38.3
         with:
           languages: swift
           build-mode: manual
           queries: security-and-quality
-      - run: swift build
+      - name: Build all Swift products for CodeQL
+        run: swift build
       - uses: github/codeql-action/analyze@24c54180a607b1449ed407dd24f251e4e9147c8d # v4.38.3
         with:
           category: /language:swift

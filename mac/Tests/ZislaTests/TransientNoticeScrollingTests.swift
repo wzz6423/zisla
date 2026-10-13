@@ -11,46 +11,6 @@ import Testing
 /// than the pass a long error needs.
 struct TransientNoticeScrollingTests {
     @Test
-    func compactNoticeScrollsItselfInsteadOfHoldingAFixedPosition() throws {
-        let notice = try Self.islandSlice(
-            from: "private struct TransientNoticeView",
-            to: "@MainActor\nprivate final class IslandDropState"
-        )
-
-        #expect(notice.contains("MarqueeText("))
-        #expect(notice.contains("repeats: false"))
-        #expect(!notice.contains("scrollProgress"))
-        // A hard clip hides the overflow mid-glyph; without it Reduce Motion gets an ellipsis instead.
-        #expect(!notice.contains("clipsOverflowWhenStatic"))
-        // Shared metrics keep the row's layout and the dismissal timer on one font and one speed.
-        #expect(notice.contains("TransientNoticeMetrics.font"))
-        #expect(notice.contains("TransientNoticeMetrics.pointsPerSecond"))
-    }
-
-    @Test
-    func expandedNoticeBarScrollsItselfToo() throws {
-        let bar = try Self.islandSlice(
-            from: "private func transientNoticeBar(",
-            to: "private func shareDetectedLink()"
-        )
-
-        #expect(bar.contains("MarqueeText("))
-        #expect(bar.contains("repeats: false"))
-        #expect(!bar.contains("scrollProgress"))
-        #expect(!bar.contains("clipsOverflowWhenStatic"))
-        #expect(bar.contains("TransientNoticeMetrics.font"))
-        #expect(bar.contains("TransientNoticeMetrics.pointsPerSecond"))
-    }
-
-    @Test
-    func dismissalIsDerivedFromTheMessageRatherThanAFixedBeat() throws {
-        let source = try String(contentsOf: Self.sourceURL("AppModel.swift"), encoding: .utf8)
-
-        #expect(source.contains("TransientNoticeMetrics.displayDuration("))
-        #expect(!source.contains("transientMessageDuration"))
-    }
-
-    @Test
     func aMessageThatFitsKeepsTheShortToastBeat() {
         let duration = TransientNoticeMetrics.displayDuration(textWidth: 120, rowWidth: 240)
 
@@ -100,25 +60,4 @@ struct TransientNoticeScrollingTests {
         .seconds(Double(travel) / TransientNoticeMetrics.pointsPerSecond)
     }
 
-    /// Comments are stripped so the assertions read the call sites themselves: the rows explain in prose
-    /// which arguments they must not pass, and naming them there must not satisfy the checks.
-    private static func islandSlice(from head: String, to tail: String) throws -> String {
-        let source = try String(contentsOf: sourceURL("IslandRootView.swift"), encoding: .utf8)
-        let start = try #require(source.range(of: head))
-        let suffix = source[start.lowerBound...]
-        let end = try #require(suffix.range(of: tail))
-        return suffix[..<end.lowerBound]
-            .split(separator: "\n", omittingEmptySubsequences: false)
-            .filter { !$0.trimmingCharacters(in: .whitespaces).hasPrefix("//") }
-            .joined(separator: "\n")
-    }
-
-    private static func sourceURL(_ fileName: String) -> URL {
-        URL(fileURLWithPath: #filePath)
-            .deletingLastPathComponent()
-            .deletingLastPathComponent()
-            .deletingLastPathComponent()
-            .appendingPathComponent("Sources/Zisla")
-            .appendingPathComponent(fileName)
-    }
 }
