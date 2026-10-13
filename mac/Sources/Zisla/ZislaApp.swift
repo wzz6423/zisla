@@ -1742,6 +1742,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
         screenshotHotkeyManager.unregister()
         screenshotLongHotkeyManager.unregister()
         guard settings.screenshotEnabled else { return }
+        ScreenshotRecognitionWarmUp.shared.start()
         let captureResult = screenshotHotkeyManager.register(
             hotkey: settings.screenshotHotkey,
             onKeyDown: { [weak self] in self?.startScreenshot() },
