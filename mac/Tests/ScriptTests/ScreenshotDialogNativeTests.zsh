@@ -80,11 +80,11 @@ func require(_ condition: Bool, _ message: String) {
                     "Visible OCR level \(alert.window.level.rawValue) must exceed screenshot level \(screenshot.level.rawValue)")
             let alertLayer = windowServerLayer(alert.window)
             let screenshotLayer = windowServerLayer(screenshot)
-            require(alertLayer != nil && screenshotLayer != nil, "Both windows must exist in WindowServer")
             progress.alertLayer = alertLayer
             progress.screenshotLayer = screenshotLayer
-            // AppKit's key-window callback precedes the WindowServer level update on macOS 26.
-            guard alertLayer! > screenshotLayer! else { return false }
+            // AppKit can report a key window before WindowServer exposes its record or updated level.
+            guard let alertLayer, let screenshotLayer,
+                  alertLayer > screenshotLayer else { return false }
 
             let movedFrame = alert.window.frame.offsetBy(dx: 20, dy: 20)
             alert.window.setFrame(movedFrame, display: false)
@@ -138,6 +138,7 @@ func require(_ condition: Bool, _ message: String) {
         RunLoop.main.run(mode: .default, before: deadline)
     }
     require(progress.observedModal, "The probe must reach the visible native modal")
+    require(progress.alertLayer != nil && progress.screenshotLayer != nil, "Both windows must exist in WindowServer")
     require(progress.alertLayer! > progress.screenshotLayer!,
             "WindowServer must display OCR above the screenshot: OCR=\(progress.alertLayer!), screenshot=\(progress.screenshotLayer!)")
     require(progress.mainQueueRan, "The visible modal must allow main-queue work")
