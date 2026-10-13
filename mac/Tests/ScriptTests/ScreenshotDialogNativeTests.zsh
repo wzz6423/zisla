@@ -33,9 +33,10 @@ enum AppLocalization {
     + placement + presentation + r'''
 
 @MainActor final class ModalProgress {
-    var samples = 0
     var observedModal = false
     var mainQueueRan = false
+    var alertLayer: Int?
+    var screenshotLayer: Int?
     var response: NSApplication.ModalResponse?
 }
 
@@ -49,7 +50,6 @@ func require(_ condition: Bool, _ message: String) {
 @MainActor func windowServerLayer(_ window: NSWindow) -> Int? {
     let windows = CGWindowListCopyWindowInfo(.optionIncludingWindow, CGWindowID(window.windowNumber))
         as? [[String: Any]]
-    print("[DEBUG-ci-dialog] requested=\(window.windowNumber) count=\(windows?.count ?? 0) firstID=\(String(describing: windows?.first?[kCGWindowNumber as String])) firstLayer=\(String(describing: windows?.first?[kCGWindowLayer as String]))")
     return (windows?.first?[kCGWindowLayer as String] as? NSNumber)?.intValue
 }
 
@@ -78,14 +78,13 @@ func require(_ condition: Bool, _ message: String) {
             progress.observedModal = true
             require(alert.window.level.rawValue > screenshot.level.rawValue,
                     "Visible OCR level \(alert.window.level.rawValue) must exceed screenshot level \(screenshot.level.rawValue)")
-            progress.samples += 1
-            guard [1, 20, 100].contains(progress.samples) else { return false }
             let alertLayer = windowServerLayer(alert.window)
             let screenshotLayer = windowServerLayer(screenshot)
-            guard progress.samples == 100 else { return false }
             require(alertLayer != nil && screenshotLayer != nil, "Both windows must exist in WindowServer")
-            require(alertLayer! > screenshotLayer!,
-                    "WindowServer must display OCR above the screenshot: OCR=\(alertLayer!), screenshot=\(screenshotLayer!)")
+            progress.alertLayer = alertLayer
+            progress.screenshotLayer = screenshotLayer
+            // AppKit's key-window callback precedes the WindowServer level update on macOS 26.
+            guard alertLayer! > screenshotLayer! else { return false }
 
             let movedFrame = alert.window.frame.offsetBy(dx: 20, dy: 20)
             alert.window.setFrame(movedFrame, display: false)
@@ -138,7 +137,10 @@ func require(_ condition: Bool, _ message: String) {
     while progress.response == nil, Date() < deadline {
         RunLoop.main.run(mode: .default, before: deadline)
     }
-    require(progress.observedModal && progress.mainQueueRan, "The visible modal must allow main-queue work")
+    require(progress.observedModal, "The probe must reach the visible native modal")
+    require(progress.alertLayer! > progress.screenshotLayer!,
+            "WindowServer must display OCR above the screenshot: OCR=\(progress.alertLayer!), screenshot=\(progress.screenshotLayer!)")
+    require(progress.mainQueueRan, "The visible modal must allow main-queue work")
     require(progress.response == (dismissal == "copy" ? .alertFirstButtonReturn : .alertSecondButtonReturn),
             "\(dismissal) must finish the modal without the watchdog")
     require(NSApp.modalWindow == nil && !alert.window.isVisible, "The OCR modal must be dismissed")
