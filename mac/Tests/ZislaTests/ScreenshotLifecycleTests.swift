@@ -89,6 +89,28 @@ struct ScreenshotLifecycleTests {
         #expect(below.hex == "#000000")
     }
 
+    @Test
+    func restoringEditorPresentationInstallsContentBeforePaintingTheWindow() throws {
+        let sourceURL = URL(fileURLWithPath: #filePath)
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+            .appendingPathComponent("Sources/Zisla/ScreenshotEditorView.swift")
+        let source = try String(contentsOf: sourceURL, encoding: .utf8)
+        let restore = try #require(source.range(of: "private func restoreEditorPresentation()"))
+        let dismissOverlays = try #require(source.range(
+            of: "private func dismissLongCaptureOverlays()",
+            range: restore.upperBound..<source.endIndex
+        ))
+        let restoreLifecycle = source[restore.lowerBound..<dismissOverlays.lowerBound]
+        let restoresContent = try #require(restoreLifecycle.range(of: "configureOverlayView(in: window)"))
+        let turnsOpaque = try #require(restoreLifecycle.range(of: "window.isOpaque = true"))
+        let paintsBlack = try #require(restoreLifecycle.range(of: "window.backgroundColor = .black"))
+        // Restoring opacity before the editor content causes a full-screen black flash.
+        #expect(restoresContent.lowerBound < turnsOpaque.lowerBound)
+        #expect(restoresContent.lowerBound < paintsBlack.lowerBound)
+    }
+
     private static func solidImage(
         width: Int,
         height: Int,

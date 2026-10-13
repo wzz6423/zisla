@@ -559,4 +559,22 @@ struct ClipboardAssistantIslandPresentationTests {
         ))
     }
 
+    @Test
+    func clipboardAssistantDismissalKeepsTheCollapsedStatusBarHidden() throws {
+        let sourceURL = URL(fileURLWithPath: #filePath)
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+            .appendingPathComponent("Sources/Zisla/ZislaApp.swift")
+        let source = try String(contentsOf: sourceURL, encoding: .utf8)
+        let handlerStart = try #require(source.range(of: "model.clipboardAssistant.onPresentationChanged"))
+        let handlerEnd = try #require(
+            source[handlerStart.upperBound...].range(of: "coordinator.setPersistentContentVisible")
+        )
+        let handler = source[handlerStart.lowerBound..<handlerEnd.lowerBound]
+        // Dismissal must not clear the expanded island's suppression of the collapsed status bar.
+        #expect(handler.contains("setClipboardAssistantVisible(visible)"))
+        #expect(!handler.contains("setIslandExpanded"))
+    }
+
 }

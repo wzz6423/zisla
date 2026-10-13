@@ -157,11 +157,38 @@ struct AudioSpectrumServiceTests {
         ))
     }
 
+    /// `AudioHardwareCreateProcessTap` cannot be injected, so guard the call site itself: the host may
+    /// only be built after the prompt decision, never unconditionally as it once was.
+    @Test
+    func authorizationHostStaysBehindThePromptDecision() throws {
+        let source = try String(
+            contentsOf: Self.sourcesDirectoryURL.appendingPathComponent("ZislaKit/AudioSpectrumService.swift"),
+            encoding: .utf8
+        )
+        let createGraph = try #require(source.range(of: "private func createGraph("))
+        let graphBody = source[createGraph.lowerBound...]
+        let hostCreation = try #require(
+            graphBody.range(of: "WindowPlacement.authorizationPromptHost()")
+        )
+
+        #expect(graphBody[..<hostCreation.lowerBound]
+            .contains("Self.shouldRequestAuthorizationPrompt("))
+        #expect(!graphBody.contains("CGPreflightScreenCaptureAccess()"))
+    }
+
     @MainActor
     private func drainMainActor() async {
         for _ in 0..<10 {
             await Task.yield()
         }
+    }
+
+    private static var sourcesDirectoryURL: URL {
+        URL(fileURLWithPath: #filePath)
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+            .appendingPathComponent("Sources")
     }
 }
 
