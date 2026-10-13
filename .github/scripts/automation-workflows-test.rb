@@ -163,54 +163,6 @@ class AutomationWorkflowsTest < Minitest::Test
     ].each { |path| refute excluded.call(path), path }
   end
 
-  def test_windows_core_configurations_have_static_checks_when_skipped
-    jobs = YAML.safe_load(File.read(File.join(ROOT, '.github/workflows/core-build.yml')), aliases: true).fetch('jobs')
-    gate = "needs.gate.outputs.skip != 'true' && needs.gate.outputs.relevant != 'false' && needs.gate.outputs.core == 'true'"
-    %w[Debug Release].each do |configuration|
-      job = jobs.fetch("core-#{configuration.downcase}")
-      assert_equal "Windows Core (#{configuration})", job.fetch('name')
-      assert_equal configuration, job.fetch('env').fetch('CONFIGURATION')
-      assert_equal 'gate', job.fetch('needs')
-      assert_equal gate, job.fetch('if')
-      refute job.key?('strategy')
-    end
-    debug_steps = jobs.fetch('core-debug').fetch('steps')
-    assert_equal debug_steps, jobs.fetch('core-release').fetch('steps')
-    assert_includes debug_steps.find { |entry| entry['name'] == 'Configure, build, and test' }.fetch('run'),
-                    '-DCMAKE_BUILD_TYPE=$env:CONFIGURATION'
-
-    result = jobs.fetch('core-result')
-    assert_equal 'Windows Core Tests', result.fetch('name')
-    assert_equal %w[gate core-debug core-release], result.fetch('needs')
-    assert_equal "always() && (needs.gate.result != 'success' || (#{gate}))", result.fetch('if')
-    verification = result.fetch('steps').first
-    assert_equal({ 'DEBUG_RESULT' => '${{ needs.core-debug.result }}',
-                   'RELEASE_RESULT' => '${{ needs.core-release.result }}' }, verification.fetch('env'))
-    %w[success failure cancelled skipped].product(%w[success failure cancelled skipped]).each do |debug, release|
-      output, status = run_step(verification, 'DEBUG_RESULT' => debug, 'RELEASE_RESULT' => release)
-      assert_equal debug == 'success' && release == 'success', status.success?,
-                   "Debug=#{debug}, Release=#{release}: #{output}"
-    end
-  end
-
-  def test_windows_preflight_detects_core_and_application_independently
-    directory = File.join(@directory, 'windows')
-    FileUtils.mkdir_p(directory)
-    output_path = File.join(@directory, 'github-output')
-    [false, true].product([false, true]).each do |core, application|
-      { 'CMakeLists.txt' => core, 'Zisla.Windows.sln' => application }.each do |filename, present|
-        path = File.join(directory, filename)
-        FileUtils.rm_f(path)
-        File.write(path, '') if present
-      end
-      File.write(output_path, '')
-      output, status = run_step(step('core-build', 'Check Windows source availability'),
-                                'GITHUB_OUTPUT' => output_path)
-      assert status.success?, output
-      assert_equal ["core=#{core}", "application=#{application}"], File.readlines(output_path, chomp: true)
-    end
-  end
-
   def test_issue_timeline_tracks_close_and_reopen_without_losing_edits
     install_workflow_fixture
     event = workflow_event('issue', 'closed', closed_at: '2026-10-05T02:30:00Z')
@@ -681,7 +633,7 @@ class AutomationWorkflowsTest < Minitest::Test
   end
 
   def step(workflow, name)
-    YAML.load_file(File.join(ROOT, '.github/workflows', "#{workflow}.yml"), aliases: true)
+    YAML.load_file(File.join(ROOT, '.github/workflows', "#{workflow}.yml"))
         .fetch('jobs').values.flat_map { |job| job.fetch('steps') }.find { |entry| entry['name'] == name } || raise(name)
   end
 

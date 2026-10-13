@@ -8,19 +8,6 @@
       "checks": ["CI Checks"]
     },
     {
-      "name": "Core Tests",
-      "file": "core-build.yml",
-      "aliases": ["windows", "core"],
-      "paths": ["windows/**", ".github/**"],
-      "checks": [
-        "Windows Core (Debug)",
-        "Windows Core (Release)",
-        "Windows Core Tests",
-        "Windows App Build",
-        "CodeQL (C/C++)"
-      ]
-    },
-    {
       "name": "Swift Tests",
       "file": "swift-tests.yml",
       "aliases": ["swift", "mac"],

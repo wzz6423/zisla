@@ -324,11 +324,10 @@ class CiSkipDirectivesTest < Minitest::Test
 
   def test_repository_manifest_scopes_every_platform_workflow
     manifest = CiSkip::Manifest.load(File.expand_path('../ci-skip.json', __dir__))
-    platform = ['Swift Tests', 'Core Tests', 'Web CI', 'Skill CI']
+    platform = ['Swift Tests', 'Web CI', 'Skill CI']
 
     {
       'mac/Sources/App.swift' => 'Swift Tests',
-      'windows/CMakeLists.txt' => 'Core Tests',
       'web/src/main.ts' => 'Web CI',
       # The site directory was renamed from Web/ to web/, and either spelling
       # must keep its own workflow relevant.
