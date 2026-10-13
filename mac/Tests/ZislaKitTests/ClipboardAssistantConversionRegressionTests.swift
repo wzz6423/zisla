@@ -33,6 +33,8 @@ struct ClipboardAssistantConversionRegressionTests {
             "10 ft = m",
             "100 USD = CNY",
             "2026-09-17 - 2026-10-01",
+            "2026.10.28+15",
+            "2026.10.28往前15天=？",
             "2026-09-17 09:30 UTC+08:00 = UTC",
         ] {
             let detection = try #require(ClipboardAssistantDetector.detect(
@@ -50,6 +52,8 @@ struct ClipboardAssistantConversionRegressionTests {
             "10 ft = m",
             "100 USD = CNY",
             "2026-09-17 - 2026-10-01",
+            "2026.10.28+15",
+            "2026.10.28往前15天=？",
             "2026-09-17 09:30 UTC+08:00 = UTC",
         ] {
             #expect(ClipboardAssistantDetector.detect(

@@ -17,6 +17,11 @@ extension ClipboardAssistantDetector {
             kind = .math
             title = "\(formatNumber(conversion.result, locale: locale)) \(conversion.targetUnit)"
             expression = "\(conversion.amountText) \(conversion.sourceUnit) → \(conversion.targetUnit)"
+        } else if let offset = parseDateOffset(text, now: now, timeZone: timeZone) {
+            kind = .dateTime
+            title = dateText(offset.targetDate, timeZone: timeZone)
+            let days = AppLocalization.format("%@ 天", locale: locale, [String(abs(offset.days))])
+            expression = "\(dateText(offset.startDate, timeZone: timeZone)) \(offset.days < 0 ? "-" : "+") \(days)"
         } else if enabledKinds.contains(.dateTime),
                   let interval = parseDateInterval(text, now: now, timeZone: timeZone) {
             kind = .dateTime
@@ -122,6 +127,23 @@ extension ClipboardAssistantDetector {
         let days: Int
         let startDate: Date
         let targetDate: Date
+    }
+
+    static func parseDateOffset(_ text: String, now: Date, timeZone: TimeZone) -> ParsedDateInterval? {
+        let datePattern = fullNumericDatePattern + #"|[0-9]{4}\s*年\s*[0-9]{1,2}\s*月\s*[0-9]{1,2}\s*日"#
+        // Bound offsets to the supported 1600...9999 span before Foundation can wrap huge values.
+        guard let parts = conversionCaptures(
+            "(" + datePattern + #")\s*(往后|往後|往前|[+-])\s*([0-9]+)\s*天?\s*(?:=\s*|是哪(?:一)?天\s*)?[？?]?"#,
+            in: text
+        ), let amount = Int(parts[2]), amount <= 3_068_036 else { return nil }
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = timeZone
+        let days = parts[1] == "-" || parts[1] == "往前" ? -amount : amount
+        guard let start = intervalDate(parts[0], now: now, calendar: calendar),
+              let target = calendar.date(byAdding: .day, value: days, to: start),
+              calendar.component(.era, from: target) == 1,
+              (1600...9999).contains(calendar.component(.year, from: target)) else { return nil }
+        return ParsedDateInterval(days: days, startDate: start, targetDate: target)
     }
 
     static func parseDateInterval(_ text: String, now: Date = Date(), timeZone: TimeZone = .current) -> ParsedDateInterval? {
