@@ -337,6 +337,9 @@ enum PersistentPetNoticePolicy {
 
 @MainActor
 final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
+    private var onboardingController: FirstLaunchOnboardingController?
+    private var onboardingLifecycle: FirstLaunchOnboardingLifecycle?
+    private var runningModel: AppModel?
     private var overlayCoordinator: OverlayCoordinator?
     private var fileShelfShakeController: FileShelfShakeController?
     private var contextNoteController: ContextNoteController?
@@ -393,7 +396,32 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
         }
         NSApp.setActivationPolicy(.accessory)
         WindowPlacement.installTransientWindowPromotion()
+        let defaults = UserDefaults.standard
+        let hasExistingInstallation = [
+            "feature-settings-v1", "keyboardVolumeCurveVersion",
+            "selectedPointerProfile", "download-directory-bookmark",
+        ].contains { defaults.object(forKey: $0) != nil }
+        let state = FirstLaunchOnboardingState(hasExistingInstallation: hasExistingInstallation)
+        let lifecycle = FirstLaunchOnboardingLifecycle(state: state) { [weak self] in
+            self?.startNormalApplication()
+        }
+        onboardingLifecycle = lifecycle
+        if lifecycle.begin() {
+            let controller = FirstLaunchOnboardingController { [weak self] completed in
+                guard let self else { return }
+                self.onboardingController?.close()
+                self.onboardingController = nil
+                self.onboardingLifecycle?.finish(completed: completed)
+            }
+            onboardingController = controller
+            controller.show()
+        }
+    }
+
+    private func startNormalApplication() {
+        guard runningModel == nil else { return }
         let model = AppModel.shared
+        runningModel = model
         model.start()
         configureApplicationIconUpdates(model: model)
         let lockScreenOverlayController = LockScreenOverlayController(model: model)
@@ -919,10 +947,15 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
     func applicationShouldTerminate(
         _ application: NSApplication
     ) -> NSApplication.TerminateReply {
-        AppModel.shared.keyboardSound.applicationShouldTerminate(application)
+        guard let runningModel else { return .terminateNow }
+        return runningModel.keyboardSound.applicationShouldTerminate(application)
     }
 
     func applicationWillTerminate(_ notification: Notification) {
+        onboardingLifecycle?.terminate()
+        onboardingController?.close()
+        onboardingController = nil
+        guard let runningModel else { return }
         combinedIconReadTask?.cancel()
         expandedSizeUpdateTask?.cancel()
         fileShelfShakeController?.stop()
@@ -931,7 +964,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
         lidCloseController?.stop()
         systemScreenshotMonitor?.stop()
         systemScreenshotMonitor = nil
-        AppModel.shared.stop()
+        runningModel.stop()
         screenshotHotkeyManager.unregister()
         screenshotLongHotkeyManager.unregister()
         setScreenshotSessionActive(false)
@@ -1804,6 +1837,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
     }
 
     @objc private func showSettings() {
+        guard runningModel != nil else {
+            onboardingController?.show()
+            return
+        }
         let targetScreen = WindowPlacement.screenUnderMouse()
         if settingsWindowController == nil {
             let rootView = SettingsView(model: AppModel.shared)
