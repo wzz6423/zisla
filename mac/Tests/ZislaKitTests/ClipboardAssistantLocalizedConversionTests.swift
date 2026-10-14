@@ -138,6 +138,46 @@ struct ClipboardAssistantLocalizedConversionTests {
         #expect(detection.kind == .dateTime)
     }
 
+    @Test(arguments: [
+        ("2026.10.28 sub 15days", "2026-10-13", -15),
+        ("2026.10.28 SUB 15 DAYS=?", "2026-10-13", -15),
+        ("what date is 2026.10.28 sub 15days?", "2026-10-13", -15),
+        ("2026.10.28 sub 15", "2026-10-13", -15),
+        ("2026.10.28 15days sub", "2026-10-13", -15),
+        ("2026.10.28 sub15d", "2026-10-13", -15),
+        ("2026.10.28 add15d", "2026-11-12", 15),
+        ("2026.10.28-15d", "2026-10-13", -15),
+        ("2026.10.28+15D", "2026-11-12", 15),
+        ("15d before 2026.10.28", "2026-10-13", -15),
+        ("15d after 2026.10.28", "2026-11-12", 15),
+        ("2024.03.01 sub 1d", "2024-02-29", -1),
+        ("2026.10.28 sub 0d", "2026-10-28", 0),
+    ])
+    func dateOffsetAbbreviationsKeepDirectionsAndCopyResultsAcrossInterfaceLanguages(_ query: String, expected: String, days: Int) throws {
+        for language in AppLanguage.allCases {
+            let detection = try #require(ClipboardAssistantDetector.detect(
+                text: query, enabledKinds: [.dateTime], now: now, timeZone: utc, locale: language.locale
+            ), "date abbreviation failed for \(language.rawValue): \(query)")
+            #expect(detection.kind == .dateTime)
+            #expect(detection.action == .copyText(expected))
+            let amount = AppLocalization.format("%@ 天", locale: language.locale, [String(abs(days))])
+            let start = query.contains("2024") ? "2024-03-01" : "2026-10-28"
+            #expect(detection.actions.last == .copyFullExpression("\(start) \(days < 0 ? "-" : "+") \(amount) = \(expected)"))
+            #expect(ClipboardAssistantDetector.detect(text: query, enabledKinds: [.conversion], now: now, timeZone: utc) == nil)
+        }
+    }
+
+    @Test(arguments: [
+        "2026.10.28 submarine 15days", "2026.10.28 subtraction 15d", "2026.10.28 subbing 15d",
+        "2026.10.28 add 15dollars", "2026.10.28 sub 15dayss", "2026.10.28 sub 15d trailing",
+        "2026.10.28 sub -15d", "2026.10.28 sub +15d", "2026.10.28 sub add 15d",
+        "2026.10.28 sub 15d after", "2026.10.28 sub 1.5d", "2026.10.28 sub 15d==?",
+        "2026.10.28 sub 15d\u{0}", "2026.10.28 sub 15d\u{202E}",
+    ])
+    func dateOffsetAbbreviationsRejectPrefixCollisionsAndMalformedRequests(_ query: String) {
+        #expect(ClipboardAssistantDetector.detect(text: query, enabledKinds: [.dateTime], now: now, timeZone: utc) == nil)
+    }
+
     @Test(arguments: AppLanguage.allCases)
     func localizedDateOffsetAdditionAndSubtractionVerbsKeepExplicitDirections(language: AppLanguage) throws {
         let verbs = try #require(Self.offsetVerbs[language])
