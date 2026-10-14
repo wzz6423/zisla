@@ -2459,6 +2459,9 @@
 "汇率换算" = "Conversione valuta";
 "换算" = "Conversioni";
 "单位换算" = "Conversione delle unità";
+"日期加减" = "Addizione e sottrazione di date";
+"2026.10.28往后15天" = "15 giorni dopo il 2026.10.28";
+"2026.10.28往前15天" = "15 giorni prima del 2026.10.28";
 "日期间隔" = "Intervallo tra date";
 "跨时区时间" = "Ora tra fusi orari";
 "汇率获取失败" = "Impossibile recuperare il tasso di cambio";

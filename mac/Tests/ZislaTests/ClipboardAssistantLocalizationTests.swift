@@ -1,6 +1,7 @@
 import Foundation
 import Testing
 import ZislaCore
+import ZislaKit
 
 @testable import Zisla
 
@@ -176,6 +177,104 @@ struct ClipboardAssistantLocalizationTests {
         let infoURL = Self.packageRootURL.appendingPathComponent("Resources/Info.plist")
         let info = try #require(NSDictionary(contentsOf: infoURL))
         #expect(info[key] as? String == descriptions[.simplifiedChinese])
+    }
+
+    @Test @MainActor
+    func settingsExampleGroupsFollowTheirRecognitionControls() throws {
+        let groups = SettingsView.clipboardAssistantExampleGroups
+        #expect(Set(groups.keys) == [.conversion, .dateTime])
+        #expect(groups[.conversion]?.map(\.title) == ["单位换算", "汇率换算"])
+        #expect(groups[.dateTime]?.map(\.title) == ["日期加减", "日期间隔", "跨时区时间"])
+        let arithmetic = try #require(groups[.dateTime]?.first)
+        #expect(Set(arithmetic.examples) == [
+            "2026.10.28+15", "2026.10.28-15", "2026.10.28往后15天", "2026.10.28往前15天",
+        ])
+    }
+
+    @Test @MainActor
+    func settingsExampleTitlesAndLocalPhrasesTranslateEveryLanguage() throws {
+        let groups = SettingsView.clipboardAssistantExampleGroups.values.flatMap { $0 }
+        let titles = groups.map(\.title)
+        let localExamples = ["2026.10.28往后15天", "2026.10.28往前15天"]
+        for language in AppLanguage.allCases {
+            let table = try #require(Self.stringsTable(for: language))
+            for key in titles + localExamples {
+                let value = try #require(table[key], "\(language.rawValue) is missing \(key)")
+                #expect(!value.isEmpty)
+                #expect(AppLocalization.string(key, language: language) == value)
+                if language != .simplifiedChinese && language != .traditionalChinese {
+                    #expect(value != key, "\(language.rawValue) did not translate \(key)")
+                }
+                if language != .english {
+                    #expect(value != AppLocalization.string(key, language: .english))
+                }
+            }
+            for group in groups {
+                let examples = group.localizedExamples(language: language)
+                #expect(examples.count == group.examples.count)
+                for (key, example) in zip(group.examples, examples) {
+                    if localExamples.contains(key) {
+                        #expect(example == table[key])
+                    } else {
+                        #expect(example == key)
+                    }
+                }
+            }
+        }
+        #expect(AppLocalization.string(localExamples[0], language: .english) == "2026.10.28 add 15days")
+        #expect(AppLocalization.string(localExamples[1], language: .english) == "2026.10.28 subtract 15days")
+    }
+
+    @Test(arguments: AppLanguage.allCases) @MainActor
+    func displayedSettingsExamplesUseTheirControlAndCorrectDateResult(language: AppLanguage) throws {
+        let utc = try #require(TimeZone(secondsFromGMT: 0))
+        let now = Date(timeIntervalSince1970: 1_790_035_200)
+        let arithmeticResults = [
+            "2026.10.28+15": "2026-11-12", "2026.10.28-15": "2026-10-13",
+            "2026.10.28往后15天": "2026-11-12", "2026.10.28往前15天": "2026-10-13",
+        ]
+        for (kind, groups) in SettingsView.clipboardAssistantExampleGroups {
+            for group in groups {
+                for (key, example) in zip(group.examples, group.localizedExamples(language: language)) {
+                    let result = try #require(ClipboardAssistantDetector.detect(
+                        text: example, enabledKinds: [kind], preferredCurrencyCode: "CNY",
+                        now: now, timeZone: utc, locale: language.locale
+                    ), "\(language.rawValue) cannot recognize the displayed \(group.title) example: \(example)")
+                    #expect(result.kind == kind)
+                    #expect(ClipboardAssistantDetector.detect(
+                        text: example, enabledKinds: kind == .dateTime ? [.conversion] : [.dateTime],
+                        preferredCurrencyCode: "CNY", now: now, timeZone: utc, locale: language.locale
+                    ) == nil)
+                    if group.title == "日期加减" {
+                        let expected = try #require(arithmeticResults[key])
+                        #expect(result.action == .copyText(expected))
+                    } else if group.title == "日期间隔" {
+                        let expected = AppLocalization.format("%@ 天", locale: language.locale, ["14"])
+                        #expect(result.action == .copyText(expected))
+                    } else if kind == .dateTime {
+                        guard case .copyText(let text) = result.action else {
+                            Issue.record("Time-zone examples must provide a copyable result")
+                            continue
+                        }
+                        #expect(!text.isEmpty)
+                    }
+                }
+            }
+        }
+    }
+
+    @Test(arguments: AppLanguage.allCases) @MainActor
+    func settingsExampleCategoriesAreSearchableInEveryLanguage(language: AppLanguage) {
+        var settings = FeatureSettings.default
+        settings.clipboardAssistantEnabled = true
+        for groups in SettingsView.clipboardAssistantExampleGroups.values {
+            for group in groups {
+                let title = AppLocalization.string(group.title, language: language)
+                #expect(SettingsSearchIndex.results(for: title, settings: settings, locale: language.locale).contains {
+                    $0.section == .clipboardAssistant && $0.anchor == .row("识别类型")
+                }, "\(language.rawValue) cannot find the \(title) examples")
+            }
+        }
     }
 
     private static func stringsTable(for language: AppLanguage) -> [String: String]? {

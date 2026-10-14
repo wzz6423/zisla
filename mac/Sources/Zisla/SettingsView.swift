@@ -946,8 +946,8 @@ struct SettingsView: View {
                             .toggleStyle(.switch)
                             .controlSize(.small)
                         }
-                        if kind == .conversion {
-                            clipboardAssistantConversionExamples
+                        if let groups = Self.clipboardAssistantExampleGroups[kind] {
+                            clipboardAssistantExamples(groups)
                         }
                     }
                 }
@@ -3282,15 +3282,15 @@ struct SettingsView: View {
         }
     }
 
-    private var clipboardAssistantConversionExamples: some View {
+    private func clipboardAssistantExamples(_ groups: [ClipboardAssistantExampleGroup]) -> some View {
         VStack(alignment: .leading, spacing: 8) {
             Divider()
-            ForEach(Self.clipboardAssistantConversionExampleGroups) { group in
+            ForEach(groups) { group in
                 VStack(alignment: .leading, spacing: 2) {
                     AppLocalizedText(group.title)
                         .font(.system(size: 10, weight: .medium))
                         .foregroundStyle(.secondary)
-                    ForEach(group.examples, id: \.self) { example in
+                    ForEach(group.localizedExamples(language: model.languageStore.language), id: \.self) { example in
                         HStack(spacing: 6) {
                             Text(example)
                                 .font(.system(size: 9, design: .monospaced))
@@ -3320,34 +3320,46 @@ struct SettingsView: View {
         pasteboard.setString(text, forType: .string)
     }
 
-    private struct ClipboardAssistantConversionExampleGroup: Identifiable {
+    struct ClipboardAssistantExampleGroup: Identifiable {
         let title: String
         let examples: [String]
 
         var id: String { title }
+
+        func localizedExamples(language: AppLanguage) -> [String] {
+            examples.map { AppLocalization.string($0, language: language) }
+        }
     }
 
-    private static let clipboardAssistantConversionExampleGroups = [
-        ClipboardAssistantConversionExampleGroup(
-            title: "单位换算",
-            examples: ["10 ft = m", "100 kg = lb", "5 km = mi"]
-        ),
-        ClipboardAssistantConversionExampleGroup(
-            title: "汇率换算",
-            examples: ["100 USD = CNY", "100$ = ¥", "100dollar = CNY"]
-        ),
-        ClipboardAssistantConversionExampleGroup(
-            title: "日期间隔",
-            examples: ["2026-09-17 - 2026-10-01", "2026/09/17 - 2026/10/01", "2026.09.17 - 2026.10.01"]
-        ),
-        ClipboardAssistantConversionExampleGroup(
-            title: "跨时区时间",
-            examples: [
-                "2026-09-17 09:30 Asia/Shanghai = America/New_York",
-                "09:30 UTC+08:00 = UTC",
-                "2026-09-17 09:30 America/New_York = Europe/London",
-            ]
-        ),
+    static let clipboardAssistantExampleGroups: [ClipboardAssistantKind: [ClipboardAssistantExampleGroup]] = [
+        .conversion: [
+            ClipboardAssistantExampleGroup(
+                title: "单位换算",
+                examples: ["10 ft = m", "100 kg = lb", "5 km = mi"]
+            ),
+            ClipboardAssistantExampleGroup(
+                title: "汇率换算",
+                examples: ["100 USD = CNY", "100$ = ¥", "100dollar = CNY"]
+            ),
+        ],
+        .dateTime: [
+            ClipboardAssistantExampleGroup(
+                title: "日期加减",
+                examples: ["2026.10.28+15", "2026.10.28-15", "2026.10.28往后15天", "2026.10.28往前15天"]
+            ),
+            ClipboardAssistantExampleGroup(
+                title: "日期间隔",
+                examples: ["2026-09-17 - 2026-10-01", "2026/09/17 - 2026/10/01", "2026.09.17 - 2026.10.01"]
+            ),
+            ClipboardAssistantExampleGroup(
+                title: "跨时区时间",
+                examples: [
+                    "2026-09-17 09:30 Asia/Shanghai = America/New_York",
+                    "09:30 UTC+08:00 = UTC",
+                    "2026-09-17 09:30 America/New_York = Europe/London",
+                ]
+            ),
+        ],
     ]
 
     private struct AssistantBlacklistEntry {

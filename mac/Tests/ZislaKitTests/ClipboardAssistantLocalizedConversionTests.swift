@@ -57,6 +57,26 @@ struct ClipboardAssistantLocalizedConversionTests {
         .turkish: "2026.10.28'den 15 gün önce hangi tarih olur?",
     ]
 
+    private static let offsetVerbs: [AppLanguage: (addition: String, subtraction: String)] = [
+        .simplifiedChinese: ("2026.10.28加15天", "2026.10.28减15天"),
+        .traditionalChinese: ("2026.10.28加15天", "2026.10.28減15天"),
+        .english: ("2026.10.28 add 15days", "2026.10.28 subtract 15days"),
+        .japanese: ("2026.10.28に15日を加える", "2026.10.28から15日を引く"),
+        .korean: ("2026.10.28에 15일을 더하기", "2026.10.28에서 15일을 빼기"),
+        .french: ("2026.10.28 ajouter 15 jours", "2026.10.28 soustraire 15 jours"),
+        .german: ("2026.10.28 addieren 15 Tage", "2026.10.28 subtrahieren 15 Tage"),
+        .spanish: ("2026.10.28 sumar 15 días", "2026.10.28 restar 15 días"),
+        .brazilianPortuguese: ("2026.10.28 adicionar 15 dias", "2026.10.28 subtrair 15 dias"),
+        .italian: ("2026.10.28 aggiungere 15 giorni", "2026.10.28 sottrarre 15 giorni"),
+        .dutch: ("2026.10.28 15 dagen optellen", "2026.10.28 15 dagen aftrekken"),
+        .russian: ("2026.10.28 добавить 15 дней", "2026.10.28 вычесть 15 дней"),
+        .arabic: ("2026.10.28 أضف 15 يومًا", "2026.10.28 اطرح 15 يومًا"),
+        .thai: ("2026.10.28เพิ่ม15วัน", "2026.10.28ลบ15วัน"),
+        .indonesian: ("2026.10.28 tambah 15 hari", "2026.10.28 kurangi 15 hari"),
+        .vietnamese: ("2026.10.28 cộng 15 ngày", "2026.10.28 trừ 15 ngày"),
+        .turkish: ("2026.10.28 15 gün ekle", "2026.10.28 15 gün çıkar"),
+    ]
+
     private static let clocks: [AppLanguage: (morning: String, afternoon: String, now: String)] = [
         .simplifiedChinese: ("上午03:15", "下午03:15", "现在"),
         .traditionalChinese: ("上午03:15", "下午03:15", "現在"),
@@ -84,16 +104,70 @@ struct ClipboardAssistantLocalizedConversionTests {
             let parsed = try #require(ClipboardAssistantDetector.parseDateOffset(query, now: now, timeZone: utc), "date offset failed for \(language.rawValue): \(query)")
             #expect(parsed.days == days)
             let detection = try #require(ClipboardAssistantDetector.detect(
-                text: query, enabledKinds: [.conversion], now: now, timeZone: utc,
+                text: query, enabledKinds: [.dateTime], now: now, timeZone: utc,
                 locale: language == .english ? Locale(identifier: "ja") : Locale(identifier: "en")
             ))
-            #expect(detection.kind == .conversion)
+            #expect(detection.kind == .dateTime)
             #expect(detection.actions.first == .copyText(expected))
-            #expect(ClipboardAssistantDetector.detect(text: query, enabledKinds: [.dateTime], now: now, timeZone: utc) == nil)
+            #expect(ClipboardAssistantDetector.detect(text: query, enabledKinds: [.conversion], now: now, timeZone: utc) == nil)
             #expect(ClipboardAssistantDetector.parseDateOffset(query + "=?", now: now, timeZone: utc)?.days == days)
         }
         let question = try #require(Self.offsetQuestions[language])
-        #expect(ClipboardAssistantDetector.detect(text: question, enabledKinds: [.conversion], now: now, timeZone: utc)?.action == .copyText("2026-10-13"))
+        #expect(ClipboardAssistantDetector.detect(text: question, enabledKinds: [.dateTime], now: now, timeZone: utc)?.action == .copyText("2026-10-13"))
+    }
+
+    @Test(arguments: [
+        ("2026.10.28 add 15days", "2026-11-12", 15),
+        ("2026.10.28 subtract 15days", "2026-10-13", -15),
+        ("2026.10.28 ADD 15DAYS=?", "2026-11-12", 15),
+        ("2026.10.28 SUBTRACT 15DAYS=？", "2026-10-13", -15),
+        ("what date is 2026.10.28 add 15days?", "2026-11-12", 15),
+        ("what date is 2026.10.28 subtract 15days?", "2026-10-13", -15),
+        ("2026.10.28 15days add", "2026-11-12", 15),
+        ("2026.10.28 15days subtract", "2026-10-13", -15),
+        ("2024.02.28 add 1day", "2024-02-29", 1),
+        ("2026.10.28 subtract 0days", "2026-10-28", 0),
+    ])
+    func dateOffsetAddSubtractVerbsRecognizeCompactDaysAndExactResults(_ query: String, expected: String, days: Int) throws {
+        let offset = try #require(ClipboardAssistantDetector.parseDateOffset(query, now: now, timeZone: utc), "date verb failed: \(query)")
+        #expect(offset.days == days)
+        let detection = try #require(ClipboardAssistantDetector.detect(
+            text: query, enabledKinds: [.dateTime], now: now, timeZone: utc, locale: Locale(identifier: "en")
+        ))
+        #expect(detection.actions.first == .copyText(expected))
+        #expect(detection.kind == .dateTime)
+    }
+
+    @Test(arguments: AppLanguage.allCases)
+    func localizedDateOffsetAdditionAndSubtractionVerbsKeepExplicitDirections(language: AppLanguage) throws {
+        let verbs = try #require(Self.offsetVerbs[language])
+        for (query, expected, days) in [(verbs.addition, "2026-11-12", 15), (verbs.subtraction, "2026-10-13", -15)] {
+            let offset = try #require(ClipboardAssistantDetector.parseDateOffset(query, now: now, timeZone: utc), "date verb failed for \(language.rawValue): \(query)")
+            #expect(offset.days == days)
+            let detection = try #require(ClipboardAssistantDetector.detect(
+                text: query + "=?", enabledKinds: [.dateTime], now: now, timeZone: utc, locale: Locale(identifier: "en")
+            ))
+            #expect(detection.actions.first == .copyText(expected))
+            #expect(detection.kind == .dateTime)
+            #expect(ClipboardAssistantDetector.detect(text: query, enabledKinds: [.conversion], now: now, timeZone: utc) == nil)
+            #expect(ClipboardAssistantDetector.parseDateOffset(query.replacingOccurrences(of: "15", with: "-15"), now: now, timeZone: utc) == nil)
+            #expect(ClipboardAssistantDetector.parseDateOffset(query + " add subtract", now: now, timeZone: utc) == nil)
+        }
+    }
+
+    @Test(arguments: [
+        "2026.10.28 add -15days", "2026.10.28 subtract -15days", "2026.10.28 add +15days",
+        "2026.10.28 add subtract 15days", "2026.10.28 subtract add 15days",
+        "2026.10.28 add 15days before", "2026.10.28 subtract 15days after",
+        "2026.10.28 before 15days add", "2026.10.28 after 15days subtract",
+        "2026.10.28 add 15days trailing", "2026.10.28 add 15days==?", "2026.10.28 add 15days=1",
+        "2026.10.28 add 15months", "2026.10.28 add 1.5days", "2026.10.28 addition 15days",
+        "2026.10.28 subtracting 15days", "2026.10.28 add 9223372036854775807days",
+        "2026.10.28 add 15days\u{0}", "2026.10.28 subtract 15days\u{202E}",
+    ])
+    func dateOffsetAddSubtractVerbsRejectSignedAmountsAndMixedDirections(_ query: String) {
+        #expect(ClipboardAssistantDetector.parseDateOffset(query, now: now, timeZone: utc) == nil)
+        #expect(ClipboardAssistantDetector.detect(text: query, enabledKinds: [.dateTime], now: now, timeZone: utc) == nil)
     }
 
     @Test(arguments: AppLanguage.allCases)
@@ -222,7 +296,7 @@ struct ClipboardAssistantLocalizedConversionTests {
     ])
     func localizedOffsetGrammarRejectsMixedDirectionsAndWholeInputViolations(_ query: String) {
         #expect(ClipboardAssistantDetector.parseDateOffset(query, now: now, timeZone: utc) == nil)
-        #expect(ClipboardAssistantDetector.detect(text: query, enabledKinds: [.conversion], now: now, timeZone: utc) == nil)
+        #expect(ClipboardAssistantDetector.detect(text: query, enabledKinds: [.dateTime], now: now, timeZone: utc) == nil)
     }
 
     @Test(arguments: [

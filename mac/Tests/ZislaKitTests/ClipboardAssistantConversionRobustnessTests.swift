@@ -24,7 +24,7 @@ struct ClipboardAssistantConversionRobustnessTests {
         let detection = try #require(ClipboardAssistantDetector.detect(
             text: query, enabledKinds: Set(ClipboardAssistantKind.allCases), now: now, timeZone: utc, locale: Locale(identifier: "en_US")
         ))
-        #expect(detection.kind == .conversion)
+        #expect(detection.kind == .dateTime)
         #expect(detection.actions.first == .copyText("\(days) days"))
     }
 
@@ -58,7 +58,7 @@ struct ClipboardAssistantConversionRobustnessTests {
             locale: Locale(identifier: "zh-Hans"), countryCode: "CN"
         ))
         let expression = "2026-10-28 \(sign) 15 天"
-        #expect(detection.kind == .conversion)
+        #expect(detection.kind == .dateTime)
         #expect(detection.title == expected)
         #expect(detection.detail == .mathExpression(expression))
         #expect(detection.actions == [.copyText(expected), .copyFullExpression("\(expression) = \(expected)")])
@@ -75,7 +75,7 @@ struct ClipboardAssistantConversionRobustnessTests {
     ])
     func dateOffsetsRespectLeapDaysYearBoundariesAndZero(_ query: String, expected: String) throws {
         let detection = try #require(ClipboardAssistantDetector.detect(
-            text: query, enabledKinds: [.conversion], now: now, timeZone: utc
+            text: query, enabledKinds: [.dateTime], now: now, timeZone: utc
         ))
         #expect(detection.action == .copyText(expected))
     }
@@ -92,7 +92,7 @@ struct ClipboardAssistantConversionRobustnessTests {
     func dateOffsetsUseLocalCalendarDaysAcrossClockChanges(_ query: String, expected: String, identifier: String) throws {
         let zone = try #require(TimeZone(identifier: identifier))
         let detection = try #require(ClipboardAssistantDetector.detect(
-            text: query, enabledKinds: [.conversion], now: now, timeZone: zone
+            text: query, enabledKinds: [.dateTime], now: now, timeZone: zone
         ))
         #expect(detection.action == .copyText(expected))
     }
@@ -112,7 +112,7 @@ struct ClipboardAssistantConversionRobustnessTests {
     ])
     func dateOffsetsRejectInvalidAmbiguousAndOutOfRangeRequests(_ query: String) {
         #expect(ClipboardAssistantDetector.detect(
-            text: query, enabledKinds: [.conversion], now: now, timeZone: utc
+            text: query, enabledKinds: [.dateTime], now: now, timeZone: utc
         ) == nil, "unexpected date conversion for \(query)")
     }
 
@@ -127,7 +127,7 @@ struct ClipboardAssistantConversionRobustnessTests {
         ]
         let days = try #require(dayUnits[language])
         let detection = try #require(ClipboardAssistantDetector.detect(
-            text: "2026.10.28+15", enabledKinds: [.conversion], now: now, timeZone: utc, locale: language.locale
+            text: "2026.10.28+15", enabledKinds: [.dateTime], now: now, timeZone: utc, locale: language.locale
         ))
         #expect(detection.title == "2026-11-12")
         #expect(detection.actions.last == .copyFullExpression("2026-10-28 + \(days) = 2026-11-12"))
@@ -158,16 +158,16 @@ struct ClipboardAssistantConversionRobustnessTests {
             let start = try #require(calendar.date(from: DateComponents(year: year, month: month, day: day)))
             let expected = formatter.string(from: start.addingTimeInterval(Double(delta) * 86_400))
             let detection = try #require(ClipboardAssistantDetector.detect(
-                text: query, enabledKinds: [.conversion], now: now, timeZone: utc
+                text: query, enabledKinds: [.dateTime], now: now, timeZone: utc
             ))
             #expect(detection.action == .copyText(expected), "seeded offset failed: \(query)")
             let inverse = "\(expected)\(delta < 0 ? "+" : "-")\(abs(delta))"
             #expect(ClipboardAssistantDetector.detect(
-                text: inverse, enabledKinds: [.conversion], now: now, timeZone: utc
+                text: inverse, enabledKinds: [.dateTime], now: now, timeZone: utc
             )?.action == .copyText(formatter.string(from: start)), "offset did not round trip: \(query)")
             let corrupt = query + ["x", "? trailing", "\u{0}", "=1"][next(4)]
             #expect(ClipboardAssistantDetector.detect(
-                text: corrupt, enabledKinds: [.conversion], now: now, timeZone: utc
+                text: corrupt, enabledKinds: [.dateTime], now: now, timeZone: utc
             ) == nil, "unexpected conversion for corrupted offset: \(corrupt)")
         }
     }
@@ -210,7 +210,7 @@ struct ClipboardAssistantConversionRobustnessTests {
     func parsesNaturalTimeZoneRequests(_ query: String, expected: String) throws {
         let parsed = try #require(ClipboardAssistantDetector.parseTimeZoneConversion(query, now: now))
         #expect(parsed.targetText == expected)
-        #expect(ClipboardAssistantDetector.detect(text: query, enabledKinds: Set(ClipboardAssistantKind.allCases), now: now, timeZone: utc)?.kind == .conversion)
+        #expect(ClipboardAssistantDetector.detect(text: query, enabledKinds: Set(ClipboardAssistantKind.allCases), now: now, timeZone: utc)?.kind == .dateTime)
     }
 
     @Test(arguments: [
@@ -276,11 +276,11 @@ struct ClipboardAssistantConversionRobustnessTests {
         var calendar = Calendar(identifier: .gregorian)
         calendar.timeZone = shanghai
         #expect(calendar.component(.year, from: interval.startDate) == calendar.component(.year, from: beforeUTCNewYear))
-        for query in ["09-21～09-23", "100美元=？人民币", "10英寸是多少厘米", "北京时间09:30是多少纽约时间？"] {
+        for query in ["100美元=？人民币", "10英寸是多少厘米"] {
             #expect(ClipboardAssistantDetector.detect(text: query, enabledKinds: [.conversion], preferredCurrencyCode: "CNY", now: now, timeZone: utc)?.kind == .conversion)
             #expect(ClipboardAssistantDetector.detect(text: query, enabledKinds: [.dateTime], now: now, timeZone: utc) == nil)
         }
-        for query in ["1790035200", "2026-01-23T09:30:00Z", "09:30"] {
+        for query in ["09-21～09-23", "2026.10.28+15", "北京时间09:30是多少纽约时间？", "1790035200", "2026-01-23T09:30:00Z", "09:30"] {
             #expect(ClipboardAssistantDetector.detect(text: query, enabledKinds: [.conversion], now: now, timeZone: utc) == nil)
             #expect(ClipboardAssistantDetector.detect(text: query, enabledKinds: [.dateTime], now: now, timeZone: utc)?.kind == .dateTime)
         }
