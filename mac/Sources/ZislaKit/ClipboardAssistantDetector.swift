@@ -83,7 +83,7 @@ public enum ClipboardAssistantDetector {
             return command
         }
         if let detection = smartActionDetection(
-            text, enabledKinds: enabledKinds, countryCode: countryCode, now: now, timeZone: timeZone
+            rawText, enabledKinds: enabledKinds, countryCode: countryCode, now: now, timeZone: timeZone
         ) {
             return detection
         }
@@ -428,7 +428,8 @@ public enum ClipboardAssistantDetector {
     }
 
     private static func unixDate(_ text: String) -> Date? {
-        guard let parts = conversionCaptures(#"(?:(?:unix(?:\s+timestamp)?|timestamp|时间戳|時間戳)\s*[:：=]?\s*)?([1-9][0-9]{9}|[1-9][0-9]{12}|[1-9][0-9]{15}|[1-9][0-9]{18})"#, in: text),
+        let label = #"unix(?:\s+timestamp)?|timestamp(?:\s+unix)?|时间戳|時間戳|(?:unix\s*)?タイムスタンプ|(?:유닉스\s*)?타임스탬프|horodatage(?:\s+unix)?|(?:unix[-\s]+)?zeitstempel|marca\s+de\s+tiempo(?:\s+unix)?|carimbo\s+de\s+data/hora(?:\s+unix)?|marca\s+temporale(?:\s+unix)?|(?:unix[-\s]+)?tijdstempel|метка\s+времени(?:\s+unix)?|الطابع\s+الزمني(?:\s+unix)?|ประทับเวลา(?:\s+unix)?|stempel\s+waktu(?:\s+unix)?|dấu\s+thời\s+gian(?:\s+unix)?|(?:unix\s+)?zaman\s+damgası"#
+        guard let parts = conversionCaptures("(?:(?:" + label + #")\s*[:：=]?\s*)?([1-9][0-9]{9}|[1-9][0-9]{12}|[1-9][0-9]{15}|[1-9][0-9]{18})"#, in: text),
               let integer = UInt64(parts[0]) else { return nil }
         let divisor: Double = switch parts[0].count {
         case 10: 1
@@ -458,14 +459,14 @@ public enum ClipboardAssistantDetector {
 
     private static func namedDate(_ text: String, calendar: Calendar) -> Date? {
         let parts: [String]
-        if let monthFirst = conversionCaptures(#"([A-Za-z]+)\s+([0-9]{1,2}),\s+([0-9]{4})"#, in: text) {
+        if let monthFirst = conversionCaptures(#"(.+?)\s+([0-9]{1,2}),\s+([0-9]{4})"#, in: text) {
             parts = monthFirst
-        } else if let dayFirst = conversionCaptures(#"([0-9]{1,2})\s+([A-Za-z]+)\s+([0-9]{4})"#, in: text) {
+        } else if let dayFirst = conversionCaptures(#"([0-9]{1,2})\.?\s+(?:de\s+)?(.+?)\s+(?:de\s+)?([0-9]{4})(?:\s+г\.?)?"#, in: text) {
             parts = [dayFirst[1], dayFirst[0], dayFirst[2]]
         } else {
             return nil
         }
-        guard let month = englishMonth(parts[0]), let year = Int(parts[2]), year >= 1600 else { return nil }
+        guard let month = localizedMonths[parts[0].lowercased()], let year = Int(parts[2]), year >= 1600 else { return nil }
         let components = DateComponents(year: year, month: month, day: Int(parts[1]))
         guard components.isValidDate(in: calendar) else { return nil }
         return calendar.date(from: components)
@@ -475,6 +476,20 @@ public enum ClipboardAssistantDetector {
         let months = ["january", "february", "march", "april", "may", "june", "july", "august", "september", "october", "november", "december"]
         return months.firstIndex { $0 == text.lowercased() || String($0.prefix(3)) == text.lowercased() }.map { $0 + 1 }
     }
+
+    private static let localizedMonths: [String: Int] = {
+        var months: [String: Int] = [:]
+        for language in AppLanguage.allCases {
+            let formatter = DateFormatter()
+            formatter.locale = language.locale
+            for names in [formatter.monthSymbols!, formatter.shortMonthSymbols!] {
+                for (index, name) in names.enumerated() {
+                    months[name.lowercased()] = index + 1
+                }
+            }
+        }
+        return months
+    }()
 
     private static func isoText(_ date: Date, timeZone: TimeZone) -> String {
         let formatter = DateFormatter()
@@ -725,18 +740,36 @@ public enum ClipboardAssistantDetector {
         "naira": "NGN",
         "kip": "LAK",
         "shilling": "KES",
+        "us dollars": "USD", "american dollars": "USD",
+        "dollar américain": "USD", "dollars américains": "USD",
+        "dólares estadounidenses": "USD", "dólares americanos": "USD",
+        "dollari statunitensi": "USD", "amerikaanse dollars": "USD",
+        "доллара сша": "USD", "долларов сша": "USD", "доллары сша": "USD",
+        "دولارات أمريكية": "USD",
     ]
+
+    private static let localizedCurrencyNames: [String: String] = {
+        var names: [String: String] = [:]
+        for language in AppLanguage.allCases {
+            for code in Set(currencyAliases.values) {
+                if let name = language.locale.localizedString(forCurrencyCode: code) {
+                    names[name.lowercased()] = code
+                }
+            }
+        }
+        return names
+    }()
 
     /// CJK currency spellings matched verbatim.
     private static let cjkCurrencyNames: [String: String] = [
-        "元": "CNY", "块": "CNY", "圆": "CNY", "人民币": "CNY", "人民幣": "CNY",
+        "元": "CNY", "块": "CNY", "塊": "CNY", "圆": "CNY", "圓": "CNY", "人民币": "CNY", "人民幣": "CNY",
         "美元": "USD", "美金": "USD",
         "日元": "JPY", "円": "JPY",
-        "欧元": "EUR",
-        "英镑": "GBP",
-        "韩元": "KRW", "港币": "HKD", "港元": "HKD", "台币": "TWD",
+        "欧元": "EUR", "歐元": "EUR",
+        "英镑": "GBP", "英鎊": "GBP",
+        "韩元": "KRW", "韓元": "KRW", "港币": "HKD", "港幣": "HKD", "港元": "HKD", "台币": "TWD", "台幣": "TWD",
         "澳元": "AUD", "加元": "CAD",
-        "卢布": "RUB", "泰铢": "THB", "卢比": "INR",
+        "卢布": "RUB", "盧布": "RUB", "泰铢": "THB", "泰銖": "THB", "卢比": "INR", "盧比": "INR",
         "ドル": "USD", "원": "KRW", "달러": "USD", "엔": "JPY", "루피": "INR",
     ]
 
@@ -758,7 +791,7 @@ public enum ClipboardAssistantDetector {
         if let code = currencyNames[lower] {
             return code
         }
-        return cjkCurrencyNames[token]
+        return cjkCurrencyNames[token] ?? localizedCurrencyNames[lower]
     }
 
     /// Full-token symbol match (single-character symbols or prefixed ones like "US$").
