@@ -7,6 +7,7 @@ struct FirstLaunchOnboardingView: View {
     @ObservedObject var screen: FirstLaunchOnboardingScreen
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @Environment(\.locale) private var locale
+    @Environment(\.layoutDirection) private var layoutDirection
 
     var body: some View {
         GeometryReader { viewport in
@@ -30,14 +31,6 @@ struct FirstLaunchOnboardingView: View {
                 VStack {
                     Spacer()
                     navigation
-                        .frame(maxWidth: FirstLaunchOnboardingPresentation.readingWidth)
-                        .padding(20)
-                        .background {
-                            FirstLaunchOnboardingBackdrop(material: .popover)
-                                .allowsHitTesting(false)
-                                .accessibilityHidden(true)
-                        }
-                        .clipShape(RoundedRectangle(cornerRadius: 12))
                         .padding(.horizontal, 24)
                         .padding(.bottom, 20)
                         .frame(maxWidth: .infinity)
@@ -86,13 +79,6 @@ struct FirstLaunchOnboardingView: View {
             )
             .frame(height: 180)
             thanks
-            Button {
-                session.isMuted.toggle()
-            } label: {
-                Label(localized(session.isMuted ? "onboarding.unmute" : "onboarding.mute"),
-                      systemImage: session.isMuted ? "speaker.slash" : "speaker.wave.2")
-            }
-            .buttonStyle(.bordered)
         }
         .frame(maxWidth: .infinity)
     }
@@ -144,21 +130,36 @@ struct FirstLaunchOnboardingView: View {
             }
             VStack(alignment: .trailing, spacing: 12) {
                 continueButton
-                HStack(spacing: 16) { secondaryActions }
+                HStack(spacing: 16) {
+                    secondaryActions
+                    Spacer(minLength: 0)
+                }
             }
         }
+        .environment(\.layoutDirection, .leftToRight)
     }
 
     @ViewBuilder
     private var secondaryActions: some View {
-        if session.page != .greeting {
-            Button(localized("onboarding.back")) { session.back() }
+        Group {
+            if session.page == .greeting {
+                Button {
+                    session.isMuted.toggle()
+                } label: {
+                    Label(localized(session.isMuted ? "onboarding.unmute" : "onboarding.mute"),
+                          systemImage: session.isMuted ? "speaker.slash" : "speaker.wave.2")
+                }
+                .buttonStyle(.bordered)
+            } else {
+                Button(localized("onboarding.back")) { session.back() }
+            }
+            if session.page == .permissions {
+                Button(localized("onboarding.skip_permission")) { session.advance() }
+            } else if session.page == .introduction {
+                Button(localized("onboarding.skip_intro")) { session.skipIntroduction() }
+            }
         }
-        if session.page == .permissions {
-            Button(localized("onboarding.skip_permission")) { session.advance() }
-        } else if session.page == .introduction {
-            Button(localized("onboarding.skip_intro")) { session.skipIntroduction() }
-        }
+        .environment(\.layoutDirection, layoutDirection)
     }
 
     private var continueButton: some View {
@@ -168,6 +169,7 @@ struct FirstLaunchOnboardingView: View {
         }
         .buttonStyle(.borderedProminent)
         .keyboardShortcut(.defaultAction)
+        .environment(\.layoutDirection, layoutDirection)
     }
 
     private func heading(_ title: String, body: String) -> some View {
