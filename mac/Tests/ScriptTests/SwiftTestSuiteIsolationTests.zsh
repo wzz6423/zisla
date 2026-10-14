@@ -101,6 +101,16 @@ if mode in ("throughput", "throughput-failure"):
         "ZislaKitTests.ClipboardAssistantNumericActionsTests/test()",
         "ZislaKitTests.ClipboardAssistantCurrencyDetectionTests/test()",
     ]
+if mode in ("smart-throughput", "smart-throughput-failure"):
+    tests = [
+        "ZislaKitTests.ClipboardAssistantSmartActionsTests/testOne()",
+        "ZislaKitTests.ClipboardAssistantSmartActionsTests/testOneExtra()",
+        "ZislaKitTests.ClipboardAssistantSmartActionsTests/testTwo(sample:)",
+        "ZislaKitTests.ClipboardAssistantSmartActionsTests/Nested/test()",
+        "ZislaKitTests.ClipboardAssistantSmartActionsTestsExtra/testOne()",
+        "ZislaKitTests.ClipboardAssistantSmartActionsTestsExtra/testTwo()",
+        "ZislaTests.OtherTests/test()",
+    ]
 is_swift = Path(sys.argv[0]).name == "swift"
 if not is_swift:
     frameworks = os.environ["DYLD_FRAMEWORK_PATH"].split(os.pathsep)
@@ -163,6 +173,8 @@ if mode in ("parallel", "parallel-failure", "interrupted", "orphaned-worker", "o
 if mode == "test-failure" and "Second" in selector:
     sys.exit(6)
 if mode == "throughput-failure" and any("LongCaptureRealWorldTests/" in test for test in selected):
+    sys.exit(6)
+if mode == "smart-throughput-failure" and any("ClipboardAssistantSmartActionsTests/" in test for test in selected):
     sys.exit(6)
 output = args[args.index("--event-stream-output-path") + 1]
 with open(output, "w") as events:
@@ -256,6 +268,25 @@ run_case("success", 0, expected, arguments=("--skip-build", "--scratch-path", st
 for workers in ("0", "-1", "not-a-number", "1.5", "", "1; touch unexpected"):
     run_case("invalid-workers", 1, [], workers=workers)
 
+smart_tests = [
+    "ZislaKitTests.ClipboardAssistantSmartActionsTests/testOne()",
+    "ZislaKitTests.ClipboardAssistantSmartActionsTests/testOneExtra()",
+    "ZislaKitTests.ClipboardAssistantSmartActionsTests/testTwo(sample:)",
+    "ZislaKitTests.ClipboardAssistantSmartActionsTests/Nested/test()",
+    "ZislaKitTests.ClipboardAssistantSmartActionsTestsExtra/testOne()",
+    "ZislaKitTests.ClipboardAssistantSmartActionsTestsExtra/testTwo()",
+    "ZislaTests.OtherTests/test()",
+]
+smart_records = run_case("smart-throughput", 0, smart_tests, target="ZislaKitTests,ZislaTests")
+assert all(len(record["selected"]) == 1 for record in smart_records
+           if record["selected"][0].startswith("ZislaKitTests.ClipboardAssistantSmartActionsTests/")), "Smart Action methods shared a worker"
+assert len(smart_records[-2]["selected"]) == 2, "A similarly named Smart Action suite lost its shared host"
+for index, positions in enumerate(([3, 2], [0, 4, 5], [1, 6])):
+    for target in ("ZislaKitTests,ZislaTests", "ZislaTests,ZislaKitTests"):
+        run_case("smart-throughput", 0, [smart_tests[position] for position in positions],
+                 target=target, shard_count="3", shard_index=str(index))
+run_case("smart-throughput-failure", 6, [smart_tests[3]], target="ZislaKitTests,ZislaTests")
+
 throughput_tests = [
     "ZislaTests.AShortTests/test()",
     "ZislaTests.LongCaptureRealWorldTests/testOne()",
@@ -277,32 +308,32 @@ throughput_tests = [
 records = run_case("throughput", 0, throughput_tests, target="ZislaKitTests,ZislaTests")
 assert [record["selected"][0] for record in records[:8]] == [
     "ZislaKitTests.EmojiNameCatalogTests/testOne()",
-    "ZislaKitTests.ClipboardAssistantSmartActionsTests/test()",
     "ZislaKitTests.ClipboardAssistantShellCommandTests/test()",
     "ZislaTests.LongCaptureRealWorldTests/realWorldTinyScrollDoesNotStartADuplicateCapture(frameHeight:)",
     "ZislaKitTests.ClipboardAssistantDetectorTests/test()",
     "ZislaKitTests.ClipboardAssistantNumericActionsTests/test()",
     "ZislaKitTests.ClipboardAssistantCurrencyDetectionTests/test()",
     "ZislaTests.LongCaptureRealWorldTests/realWorldRetinaSparseChatPageStitchesExactly()",
+    "ZislaKitTests.ClipboardAssistantSmartActionsTests/test()",
 ], "Long suites waited behind short suites"
 assert all(len(record["selected"]) == 1 for record in records
            if record["selected"][0].startswith("ZislaTests.LongCaptureRealWorldTests/")), "Long capture methods shared a worker"
 assert all(record["selected"][0].startswith("ZislaTests.LongCaptureRealWorldTests/") for record in records[8:12]), "Long capture methods waited behind short suites"
 assert len(records[-1]["selected"]) == 2, "A similarly named ordinary suite lost its shared host"
 run_case("throughput-failure", 6,
-    [test for record in records[:4] for test in record["selected"]], target="ZislaKitTests,ZislaTests")
+    [test for record in records[:3] for test in record["selected"]], target="ZislaKitTests,ZislaTests")
 
 shard_tasks = [
-    [0, 7, 9, 12],
-    [1, 4, 6, 10, 13],
-    [2, 3, 5, 8, 11],
+    [0, 9, 12, 13],
+    [1, 4, 5, 8, 11],
+    [2, 3, 6, 7, 10],
 ]
 for index, tasks in enumerate(shard_tasks):
     selected = [test for task in tasks for test in records[task]["selected"]]
     for target in ("ZislaKitTests,ZislaTests", "ZislaTests,ZislaKitTests"):
         run_case("throughput", 0, selected, target=target, shard_count="3", shard_index=str(index))
 run_case("throughput-failure", 6,
-    [test for record in records[2:4] for test in record["selected"]],
+    [test for record in records[2:3] for test in record["selected"]],
     target="ZislaKitTests,ZislaTests", shard_count="3", shard_index="2")
 for count, index in (("0", "0"), ("-1", "0"), ("invalid", "0"), ("1.5", "0"),
                      ("", "0"), ("3", "-1"), ("3", "3"), ("3", "invalid"),

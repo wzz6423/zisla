@@ -108,7 +108,6 @@ with tempfile.TemporaryDirectory(prefix="zisla-swift-test-suites.") as temporary
     # Measured on the macos-26 runner; run the longest work first to avoid a serial tail.
     durations = {
         "ZislaKitTests.EmojiNameCatalogTests": 221,
-        "ZislaKitTests.ClipboardAssistantSmartActionsTests": 114,
         "ZislaKitTests.ClipboardAssistantShellCommandTests": 98,
         "ZislaKitTests.ClipboardAssistantDetectorTests": 85,
         "ZislaKitTests.ClipboardAssistantNumericActionsTests": 63,
@@ -130,8 +129,8 @@ with tempfile.TemporaryDirectory(prefix="zisla-swift-test-suites.") as temporary
     }
     tasks = {}
     for suite, command in suites.items():
-        if suite == "ZislaTests.LongCaptureRealWorldTests":
-            # Each scenario owns its model and images; separate hosts keep MainActor work parallel.
+        if suite in ("ZislaTests.LongCaptureRealWorldTests", "ZislaKitTests.ClipboardAssistantSmartActionsTests"):
+            # Independent scenarios use separate hosts to spread long suites across workers and shards.
             for test in discovered:
                 if test.startswith(suite + "/"):
                     tasks[test] = (command, durations.get(test, 32))

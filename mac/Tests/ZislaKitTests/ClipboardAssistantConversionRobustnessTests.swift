@@ -24,7 +24,7 @@ struct ClipboardAssistantConversionRobustnessTests {
         let detection = try #require(ClipboardAssistantDetector.detect(
             text: query, enabledKinds: Set(ClipboardAssistantKind.allCases), now: now, timeZone: utc, locale: Locale(identifier: "en_US")
         ))
-        #expect(detection.kind == .conversion)
+        #expect(detection.kind == .dateTime)
         #expect(detection.actions.first == .copyText("\(days) days"))
     }
 
@@ -35,6 +35,141 @@ struct ClipboardAssistantConversionRobustnessTests {
     ])
     func refusesInvalidAndNonDateIntervals(_ query: String) {
         #expect(ClipboardAssistantDetector.parseDateInterval(query, now: now, timeZone: utc) == nil)
+    }
+
+    @Test(arguments: [
+        ("2026.10.28往后15天", "2026-11-12", "+"),
+        ("2026.10.28往前15天", "2026-10-13", "-"),
+        ("2026.10.28+15天", "2026-11-12", "+"),
+        ("2026.10.28-15天", "2026-10-13", "-"),
+        ("2026.10.28+15", "2026-11-12", "+"),
+        ("2026.10.28-15", "2026-10-13", "-"),
+        ("2026.10.28往后15天是哪天", "2026-11-12", "+"),
+        ("2026.10.28往前15天=？", "2026-10-13", "-"),
+        ("2026-10-28+15=", "2026-11-12", "+"),
+        ("2026-10-28-15天=?", "2026-10-13", "-"),
+        ("2026/10/28 + 15 天是哪一天？", "2026-11-12", "+"),
+        ("2026年10月28日往後15天是哪天?", "2026-11-12", "+"),
+        (" \n2026.10.28 往前 15 天 = ?\t", "2026-10-13", "-"),
+    ])
+    func dateOffsetsOfferTheCalculatedDateAndCompleteExpression(_ query: String, expected: String, sign: String) throws {
+        let detection = try #require(ClipboardAssistantDetector.detect(
+            text: query, enabledKinds: Set(ClipboardAssistantKind.allCases), now: now, timeZone: utc,
+            locale: Locale(identifier: "zh-Hans"), countryCode: "CN"
+        ))
+        let expression = "2026-10-28 \(sign) 15 天"
+        #expect(detection.kind == .dateTime)
+        #expect(detection.title == expected)
+        #expect(detection.detail == .mathExpression(expression))
+        #expect(detection.actions == [.copyText(expected), .copyFullExpression("\(expression) = \(expected)")])
+        #expect(detection.fullContent == "\(expression) = \(expected)")
+    }
+
+    @Test(arguments: [
+        ("2024.02.28+1", "2024-02-29"), ("2024.03.01-1", "2024-02-29"),
+        ("2026.02.28+1", "2026-03-01"), ("2026.03.01-1", "2026-02-28"),
+        ("2026.12.31+1", "2027-01-01"), ("2026.01.01-1", "2025-12-31"),
+        ("2026.10.28+0", "2026-10-28"), ("2026.10.28-0", "2026-10-28"),
+        ("1600.01.01+0", "1600-01-01"), ("9999.12.31-0", "9999-12-31"),
+        ("1600.01.01+3068036", "9999-12-31"), ("9999.12.31-3068036", "1600-01-01"),
+    ])
+    func dateOffsetsRespectLeapDaysYearBoundariesAndZero(_ query: String, expected: String) throws {
+        let detection = try #require(ClipboardAssistantDetector.detect(
+            text: query, enabledKinds: [.dateTime], now: now, timeZone: utc
+        ))
+        #expect(detection.action == .copyText(expected))
+    }
+
+    @Test(arguments: [
+        ("2026.03.07+2", "2026-03-09", "America/New_York"),
+        ("2026.03.09-2", "2026-03-07", "America/New_York"),
+        ("2026.10.31+2", "2026-11-02", "America/New_York"),
+        ("2026.11.02-2", "2026-10-31", "America/New_York"),
+        ("2026.10.03+2", "2026-10-05", "Australia/Lord_Howe"),
+        ("2026.10.05-2", "2026-10-03", "Australia/Lord_Howe"),
+        ("2026.10.28+15", "2026-11-12", "Asia/Shanghai"),
+    ])
+    func dateOffsetsUseLocalCalendarDaysAcrossClockChanges(_ query: String, expected: String, identifier: String) throws {
+        let zone = try #require(TimeZone(identifier: identifier))
+        let detection = try #require(ClipboardAssistantDetector.detect(
+            text: query, enabledKinds: [.dateTime], now: now, timeZone: zone
+        ))
+        #expect(detection.action == .copyText(expected))
+    }
+
+    @Test(arguments: [
+        "", "10-3", "09-21+15", "1.2.3+15", "v2026.10.28+15", "2026.10/28+15",
+        "2026.02.29+1", "2026.02.30-1", "2026.13.01+1", "1599.12.31+1", "0000.01.01+1",
+        "1600.01.01-1", "9999.12.31+1", "1600.01.01-3068036",
+        "2026.10.28+9223372036854775807", "2026.10.28-9223372036854775807",
+        "2026.10.28+99999999999999999999999999999999999999999999",
+        "2026.10.28+", "2026.10.28+-15", "2026.10.28--15", "2026.10.28+1.5天",
+        "2026.10.28往前-15天", "2026.10.28+15个月", "2026.10.28+15天==？",
+        "2026.10.28+15天是哪天??", "2026.10.28+15天=1", "2026.10.28+15天 trailing",
+        "请计算2026.10.28+15天", "https://example.com/2026.10.28+15",
+        "2026.10.28+15\u{0}", "2026.10.28+15\u{202E}",
+        "2026.10.28+" + String(repeating: "1", count: 200),
+    ])
+    func dateOffsetsRejectInvalidAmbiguousAndOutOfRangeRequests(_ query: String) {
+        #expect(ClipboardAssistantDetector.detect(
+            text: query, enabledKinds: [.dateTime], now: now, timeZone: utc
+        ) == nil, "unexpected date conversion for \(query)")
+    }
+
+    @Test(arguments: AppLanguage.allCases)
+    func dateOffsetsReuseLocalizedDayUnitsInEveryLanguage(language: AppLanguage) throws {
+        let dayUnits: [AppLanguage: String] = [
+            .simplifiedChinese: "15 天", .traditionalChinese: "15 天", .english: "15 days",
+            .japanese: "15 日", .korean: "15일", .french: "15 jours", .german: "15 Tage",
+            .spanish: "15 días", .brazilianPortuguese: "15 dias", .italian: "15 giorni",
+            .dutch: "15 dagen", .russian: "15 дн.", .arabic: "\u{2068}15\u{2069} يوم", .thai: "15 วัน",
+            .indonesian: "15 hari", .vietnamese: "15 ngày", .turkish: "15 gün",
+        ]
+        let days = try #require(dayUnits[language])
+        let detection = try #require(ClipboardAssistantDetector.detect(
+            text: "2026.10.28+15", enabledKinds: [.dateTime], now: now, timeZone: utc, locale: language.locale
+        ))
+        #expect(detection.title == "2026-11-12")
+        #expect(detection.actions.last == .copyFullExpression("2026-10-28 + \(days) = 2026-11-12"))
+    }
+
+    @Test
+    func boundedSeededDateOffsetPropertiesAndInvalidSuffixFuzz() throws {
+        var seed: UInt64 = 0xDA7E
+        func next(_ bound: Int) -> Int {
+            seed = seed &* 6_364_136_223_846_793_005 &+ 1
+            return Int((seed >> 32) % UInt64(bound))
+        }
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = utc
+        let formatter = DateFormatter()
+        formatter.locale = Locale(identifier: "en_US_POSIX")
+        formatter.calendar = calendar
+        formatter.timeZone = utc
+        formatter.dateFormat = "yyyy-MM-dd"
+        for _ in 0..<64 {
+            let year = 2000 + next(80), month = 1 + next(12), day = 1 + next(28)
+            let delta = next(733) - 366
+            let separator = [".", "/", "-"][next(3)]
+            let source = "\(year)\(separator)\(month)\(separator)\(day)"
+            let sign = delta < 0 ? "-" : "+"
+            let suffix = ["", "天", "天是哪天？", "=？"][next(4)]
+            let query = "\(source)\(sign)\(abs(delta))\(suffix)"
+            let start = try #require(calendar.date(from: DateComponents(year: year, month: month, day: day)))
+            let expected = formatter.string(from: start.addingTimeInterval(Double(delta) * 86_400))
+            let detection = try #require(ClipboardAssistantDetector.detect(
+                text: query, enabledKinds: [.dateTime], now: now, timeZone: utc
+            ))
+            #expect(detection.action == .copyText(expected), "seeded offset failed: \(query)")
+            let inverse = "\(expected)\(delta < 0 ? "+" : "-")\(abs(delta))"
+            #expect(ClipboardAssistantDetector.detect(
+                text: inverse, enabledKinds: [.dateTime], now: now, timeZone: utc
+            )?.action == .copyText(formatter.string(from: start)), "offset did not round trip: \(query)")
+            let corrupt = query + ["x", "? trailing", "\u{0}", "=1"][next(4)]
+            #expect(ClipboardAssistantDetector.detect(
+                text: corrupt, enabledKinds: [.dateTime], now: now, timeZone: utc
+            ) == nil, "unexpected conversion for corrupted offset: \(corrupt)")
+        }
     }
 
     @Test(arguments: [
@@ -75,7 +210,7 @@ struct ClipboardAssistantConversionRobustnessTests {
     func parsesNaturalTimeZoneRequests(_ query: String, expected: String) throws {
         let parsed = try #require(ClipboardAssistantDetector.parseTimeZoneConversion(query, now: now))
         #expect(parsed.targetText == expected)
-        #expect(ClipboardAssistantDetector.detect(text: query, enabledKinds: Set(ClipboardAssistantKind.allCases), now: now, timeZone: utc)?.kind == .conversion)
+        #expect(ClipboardAssistantDetector.detect(text: query, enabledKinds: Set(ClipboardAssistantKind.allCases), now: now, timeZone: utc)?.kind == .dateTime)
     }
 
     @Test(arguments: [
@@ -141,11 +276,11 @@ struct ClipboardAssistantConversionRobustnessTests {
         var calendar = Calendar(identifier: .gregorian)
         calendar.timeZone = shanghai
         #expect(calendar.component(.year, from: interval.startDate) == calendar.component(.year, from: beforeUTCNewYear))
-        for query in ["09-21～09-23", "100美元=？人民币", "10英寸是多少厘米", "北京时间09:30是多少纽约时间？"] {
+        for query in ["100美元=？人民币", "10英寸是多少厘米"] {
             #expect(ClipboardAssistantDetector.detect(text: query, enabledKinds: [.conversion], preferredCurrencyCode: "CNY", now: now, timeZone: utc)?.kind == .conversion)
             #expect(ClipboardAssistantDetector.detect(text: query, enabledKinds: [.dateTime], now: now, timeZone: utc) == nil)
         }
-        for query in ["1790035200", "2026-01-23T09:30:00Z", "09:30"] {
+        for query in ["09-21～09-23", "2026.10.28+15", "北京时间09:30是多少纽约时间？", "1790035200", "2026-01-23T09:30:00Z", "09:30"] {
             #expect(ClipboardAssistantDetector.detect(text: query, enabledKinds: [.conversion], now: now, timeZone: utc) == nil)
             #expect(ClipboardAssistantDetector.detect(text: query, enabledKinds: [.dateTime], now: now, timeZone: utc)?.kind == .dateTime)
         }
