@@ -17,7 +17,7 @@ extension ClipboardAssistantDetector {
             kind = .math
             title = "\(formatNumber(conversion.result, locale: locale)) \(conversion.targetUnit)"
             expression = "\(conversion.amountText) \(conversion.sourceUnit) → \(conversion.targetUnit)"
-        } else if let offset = parseDateOffset(text, now: now, timeZone: timeZone) {
+        } else if enabledKinds.contains(.dateTime), let offset = parseDateOffset(text, now: now, timeZone: timeZone) {
             kind = .dateTime
             title = dateText(offset.targetDate, timeZone: timeZone)
             let days = AppLocalization.format("%@ 天", locale: locale, [String(abs(offset.days))])
@@ -179,15 +179,15 @@ extension ClipboardAssistantDetector {
         let prefix = #"(?:(?:¿\s*)?(?:what\s+(?:date|day)\s+is|quelle\s+est\s+la\s+date|welches\s+datum\s+(?:ist|liegt)|qu[eé]\s+fecha\s+es|qual\s+[eé]\s+a\s+data|qual\s+[eè]\s+la\s+data|welke\s+datum\s+is|какая\s+дата\s+будет\s+(?:за|через)|ما\s+هو\s+التاريخ|tanggal\s+berapa)\s+)?"#
         let suffix = #"\s*(?:=|是哪(?:一)?天|は何日(?:ですか)?|(?:은|는)\s*언제인가요|เป็นวันที่เท่าไหร่|là\s+ngày\s+nào|hangi\s+tarih(?:\s+olur)?)?\s*[？?؟]?"#
         let directions = [
-            (1, "往后|往後|之后|之後|后|後|after|later|later than|après|après le|plus tard|nach|nach dem|danach|später|después|después de|después del|más tarde|depois|depois de|após|mais tarde|dopo|dopo il|più tardi|na|после|позже|спустя|بعد|หลัง|หลังจาก|อีก|후|뒤|setelah|sesudah|setelahnya|sau|sonra"),
-            (-1, "往前|之前|前|before|earlier|earlier than|avant|avant le|plus tôt|vor|vor dem|davor|früher|antes|antes de|antes del|más temprano|mais cedo|prima|prima di|prima del|voor|eerder|до|раньше|قبل|ก่อน|ย้อนหลัง|전|sebelum|sebelumnya|trước|önce"),
+            (1, "往后|往後|之后|之後|后|後|after|later|later than|après|après le|plus tard|nach|nach dem|danach|später|después|después de|después del|más tarde|depois|depois de|após|mais tarde|dopo|dopo il|più tardi|na|после|позже|спустя|بعد|หลัง|หลังจาก|อีก|후|뒤|setelah|sesudah|setelahnya|sau|sonra|加|add|加える|더하기|ajouter|addieren|sumar|adicionar|aggiungere|optellen|добавить|أضف|เพิ่ม|tambah|cộng|ekle"),
+            (-1, "往前|之前|前|before|earlier|earlier than|avant|avant le|plus tôt|vor|vor dem|davor|früher|antes|antes de|antes del|más temprano|mais cedo|prima|prima di|prima del|voor|eerder|до|раньше|قبل|ก่อน|ย้อนหลัง|전|sebelum|sebelumnya|trước|önce|减|減|subtract|引く|빼기|soustraire|subtrahieren|restar|subtrair|sottrarre|aftrekken|вычесть|اطرح|ลบ|kurangi|trừ|çıkar"),
         ]
         var patterns: [(pattern: String, dateIndex: Int, amountIndex: Int, direction: Int)] = []
         for (direction, words) in directions {
             let operators = words + (direction > 0 ? #"|\+"# : "|-")
             patterns.append((prefix + "(" + date + ")\\s*(?:" + operators + #")\s*([0-9]+)\s*"# + day + "?" + suffix, 0, 1, direction))
             patterns.append((prefix + #"([0-9]+)\s*"# + day + "\\s*(?:" + words + ")\\s*(" + date + ")" + suffix, 1, 0, direction))
-            patterns.append((prefix + "(" + date + #")\s*(?:の|より|から|에서|로부터|['’]?(?:den|dan|ten|tan))?\s*([0-9]+)\s*"# + day + "\\s*(?:" + words + ")" + suffix, 0, 1, direction))
+            patterns.append((prefix + "(" + date + #")\s*(?:の|に|より|から|에|에서|로부터|['’]?(?:den|dan|ten|tan))?\s*([0-9]+)\s*"# + day + #"\s*(?:を|을)?\s*(?:"# + words + ")" + suffix, 0, 1, direction))
             patterns.append((prefix + (direction > 0 ? "بعد" : "قبل") + "\\s*(" + date + #")\s+بـ?\s*([0-9]+)\s*"# + day + suffix, 0, 1, direction))
         }
         return patterns

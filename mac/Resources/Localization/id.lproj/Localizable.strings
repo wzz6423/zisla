@@ -2459,6 +2459,9 @@
 "汇率换算" = "Konversi Mata Uang";
 "换算" = "Konversi";
 "单位换算" = "Konversi Satuan";
+"日期加减" = "Penambahan dan pengurangan tanggal";
+"2026.10.28往后15天" = "15 hari setelah 2026.10.28";
+"2026.10.28往前15天" = "15 hari sebelum 2026.10.28";
 "日期间隔" = "Rentang Tanggal";
 "跨时区时间" = "Waktu Lintas Zona Waktu";
 "汇率获取失败" = "Gagal mengambil kurs";

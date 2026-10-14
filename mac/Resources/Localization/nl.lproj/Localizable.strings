@@ -2459,6 +2459,9 @@
 "汇率换算" = "Valutaconversie";
 "换算" = "Conversies";
 "单位换算" = "Eenhedenconversie";
+"日期加减" = "Datumberekeningen";
+"2026.10.28往后15天" = "15 dagen na 2026.10.28";
+"2026.10.28往前15天" = "15 dagen voor 2026.10.28";
 "日期间隔" = "Datuminterval";
 "跨时区时间" = "Tijd tussen tijdzones";
 "汇率获取失败" = "Wisselkoers ophalen mislukt";

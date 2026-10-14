@@ -95,13 +95,22 @@ public enum ClipboardAssistantDetector {
         // Strict whole-value grammars must get the first chance to classify them.
         if enabledKinds.contains(.conversion), var conversion = conversionDetection(
             text,
-            enabledKinds: [.math, .dateTime],
+            enabledKinds: [.math],
             now: now,
             timeZone: timeZone,
             locale: locale
         ) {
             conversion.kind = .conversion
             return conversion
+        }
+        if enabledKinds.contains(.dateTime), let calculation = conversionDetection(
+            text,
+            enabledKinds: [.dateTime],
+            now: now,
+            timeZone: timeZone,
+            locale: locale
+        ) {
+            return calculation
         }
         if let phone, phone.prefersBareNumber || !text.allSatisfy(\.isNumber) {
             return phoneDetection

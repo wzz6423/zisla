@@ -2460,6 +2460,9 @@
 "汇率换算" = "Währungsumrechnung";
 "换算" = "Umrechnungen";
 "单位换算" = "Einheitenumrechnung";
+"日期加减" = "Datumsaddition und -subtraktion";
+"2026.10.28往后15天" = "15 Tage nach dem 2026.10.28";
+"2026.10.28往前15天" = "15 Tage vor dem 2026.10.28";
 "日期间隔" = "Datumsintervall";
 "跨时区时间" = "Zeitzonenübergreifende Zeit";
 "汇率获取失败" = "Wechselkurs konnte nicht abgerufen werden";
