@@ -2290,6 +2290,8 @@
 "删除%@" = "Excluir %@";
 "%ld 字词" = "%ld palavras";
 "%ld 字词/分" = "%ld palavras/min";
+"字词" = "palavras";
+"字词/分" = "palavras/min";
 "%ld 秒" = "%ld s";
 "已发现 %ld 个模型" = "%ld modelos encontrados";
 "%@（已导入）" = "%@ (importado)";

@@ -1841,34 +1841,7 @@ struct SettingsView: View {
     }
 
     private var voiceHistoryContent: some View {
-        let statistics = model.voiceHistory.statistics
-        return VStack(alignment: .leading, spacing: 20) {
-            LazyVGrid(
-                columns: [GridItem(.flexible(), spacing: 10), GridItem(.flexible())],
-                spacing: 10
-            ) {
-                voiceStatistic(
-                    symbol: "textformat",
-                    title: "总识别字词",
-                    value: AppLocalization.text("%ld 字词", statistics.totalWordCount)
-                )
-                voiceStatistic(
-                    symbol: "waveform",
-                    title: "累计口述时间",
-                    value: voiceDurationText(statistics.totalDuration)
-                )
-                voiceStatistic(
-                    symbol: "bolt.fill",
-                    title: "输入速度",
-                    value: AppLocalization.text("%ld 字词/分", Int(statistics.wordsPerMinute.rounded()))
-                )
-                voiceStatistic(
-                    symbol: "clock",
-                    title: "节省时间",
-                    value: voiceDurationText(statistics.savedTime)
-                )
-            }
-
+        VStack(alignment: .leading, spacing: 20) {
             settingsGroup("语音记录") {
                 HStack(spacing: 8) {
                     Text(AppLocalization.text("全部记录仅保存在本机"))
@@ -1952,33 +1925,6 @@ struct SettingsView: View {
         }
     }
 
-    private func voiceStatistic(symbol: String, title: String, value: String) -> some View {
-        HStack(spacing: 10) {
-            Image(systemName: symbol)
-                .font(.system(size: 13, weight: .semibold))
-                .foregroundStyle(Color.accentColor)
-                .frame(width: 26, height: 26)
-                .background(Color.accentColor.opacity(0.10), in: RoundedRectangle(cornerRadius: 6))
-            VStack(alignment: .leading, spacing: 3) {
-                AppLocalizedText(title)
-                    .font(.system(size: 9))
-                    .foregroundStyle(.secondary)
-                Text(value)
-                    .font(.system(size: 15, weight: .semibold))
-                    .fitsSingleLine()
-            }
-            Spacer(minLength: 0)
-        }
-        .padding(12)
-        .frame(maxWidth: .infinity, minHeight: 68)
-        .background(Color.primary.opacity(colorScheme == .dark ? 0.06 : 0.035))
-        .overlay {
-            RoundedRectangle(cornerRadius: 6, style: .continuous)
-                .strokeBorder(Color.primary.opacity(0.08), lineWidth: 0.5)
-        }
-        .clipShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
-    }
-
     private func voiceHistoryRow(_ entry: VoiceHistoryEntry) -> some View {
         HStack(alignment: .top, spacing: 10) {
             if voiceHistorySelectionMode {
@@ -2002,7 +1948,7 @@ struct SettingsView: View {
                     Text(entry.createdAt.formatted(date: .abbreviated, time: .shortened))
                         .font(.system(size: 9, design: .monospaced))
                         .foregroundStyle(.secondary)
-                    Text(AppLocalization.text("%@ · %ld 字词", voiceDurationText(entry.duration), entry.wordCount))
+                    Text(AppLocalization.text("%@ · %ld 字词", VoiceHistoryFormatting.duration(entry.duration).text, entry.wordCount))
                         .font(.system(size: 9))
                         .foregroundStyle(.tertiary)
                 }
@@ -2042,17 +1988,6 @@ struct SettingsView: View {
         .padding(.horizontal, 4)
         .padding(.vertical, 10)
         .frame(maxWidth: .infinity, minHeight: 64)
-    }
-
-    private func voiceDurationText(_ duration: TimeInterval) -> String {
-        let duration = max(0, duration)
-        if duration < 60 {
-            return AppLocalization.text("%ld 秒", Int(duration.rounded()))
-        }
-        if duration < 3_600 {
-            return AppLocalization.text("%.1f 分钟", duration / 60)
-        }
-        return AppLocalization.text("%.1f 小时", duration / 3_600)
     }
 
     private func deleteSelectedVoiceHistoryEntries() {

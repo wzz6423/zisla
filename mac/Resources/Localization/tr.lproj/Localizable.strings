@@ -2290,6 +2290,8 @@
 "删除%@" = "%@ ögesini sil";
 "%ld 字词" = "%ld sözcük";
 "%ld 字词/分" = "%ld sözcük/dk";
+"字词" = "sözcük";
+"字词/分" = "sözcük/dk";
 "%ld 秒" = "%ld sn";
 "已发现 %ld 个模型" = "%ld model bulundu";
 "%@（已导入）" = "%@ (içe aktarıldı)";

@@ -10,7 +10,11 @@ struct KeyboardSoundModuleView: View {
         ScrollView {
             VStack(alignment: .leading, spacing: 10) {
                 if let summary = model.keyboardSound.typingStatsSummary {
-                    KeyboardTypingStatsDashboardView(summary: summary)
+                    KeyboardTypingStatsDashboardView(
+                        summary: summary,
+                        voiceStatistics: model.settingsStore.settings.voiceInputEnabled
+                            ? model.voiceHistory.statistics : nil
+                    )
                 } else {
                     Label(AppLocalization.text("暂无可显示的输入统计"), systemImage: "chart.xyaxis.line")
                         .font(.system(size: 10))
