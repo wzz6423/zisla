@@ -72,26 +72,34 @@ struct KeyboardTypingStatsDashboardView: View {
     }
 
     private func voiceMetricsGrid(_ statistics: VoiceHistoryStatistics) -> some View {
-        HStack(spacing: 8) {
+        let totalDuration = VoiceHistoryFormatting.duration(statistics.totalDuration)
+        let savedTime = VoiceHistoryFormatting.duration(statistics.savedTime)
+        let numberFormat = IntegerFormatStyle<Int>.number.locale(AppLocalization.currentLanguage.locale)
+
+        return HStack(spacing: 8) {
             compactMetricCard(
                 symbol: "textformat",
                 title: AppLocalization.text("总识别字词"),
-                value: AppLocalization.text("%ld 字词", statistics.totalWordCount)
+                value: statistics.totalWordCount.formatted(numberFormat),
+                detail: AppLocalization.text("字词")
             )
             compactMetricCard(
                 symbol: "waveform",
                 title: AppLocalization.text("累计口述时间"),
-                value: VoiceHistoryFormatting.durationText(statistics.totalDuration)
+                value: totalDuration.value,
+                detail: totalDuration.unit
             )
             compactMetricCard(
                 symbol: "bolt.fill",
                 title: AppLocalization.text("输入速度"),
-                value: AppLocalization.text("%ld 字词/分", Int(statistics.wordsPerMinute.rounded()))
+                value: Int(statistics.wordsPerMinute.rounded()).formatted(numberFormat),
+                detail: AppLocalization.text("字词/分")
             )
             compactMetricCard(
                 symbol: "clock",
                 title: AppLocalization.text("节省时间"),
-                value: VoiceHistoryFormatting.durationText(statistics.savedTime)
+                value: savedTime.value,
+                detail: savedTime.unit
             )
         }
     }
@@ -101,7 +109,7 @@ struct KeyboardTypingStatsDashboardView: View {
         title: String,
         value: String,
         unit: String? = nil,
-        detail: String? = nil
+        detail: String
     ) -> some View {
         VStack(alignment: .leading, spacing: 4) {
             HStack(spacing: 5) {
@@ -126,13 +134,11 @@ struct KeyboardTypingStatsDashboardView: View {
                         .foregroundStyle(.secondary)
                 }
             }
-            if let detail {
-                Text(detail)
-                    .font(.system(size: 8))
-                    .foregroundStyle(.secondary)
-                    .lineLimit(1)
-                    .minimumScaleFactor(0.7)
-            }
+            Text(detail)
+                .font(.system(size: 8))
+                .foregroundStyle(.secondary)
+                .lineLimit(1)
+                .minimumScaleFactor(0.7)
         }
         .padding(9)
         .frame(maxWidth: .infinity, minHeight: 76, alignment: .leading)

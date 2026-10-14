@@ -1948,7 +1948,7 @@ struct SettingsView: View {
                     Text(entry.createdAt.formatted(date: .abbreviated, time: .shortened))
                         .font(.system(size: 9, design: .monospaced))
                         .foregroundStyle(.secondary)
-                    Text(AppLocalization.text("%@ · %ld 字词", VoiceHistoryFormatting.durationText(entry.duration), entry.wordCount))
+                    Text(AppLocalization.text("%@ · %ld 字词", VoiceHistoryFormatting.duration(entry.duration).text, entry.wordCount))
                         .font(.system(size: 9))
                         .foregroundStyle(.tertiary)
                 }

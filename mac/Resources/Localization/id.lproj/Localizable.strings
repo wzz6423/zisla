@@ -2290,6 +2290,8 @@
 "删除%@" = "Hapus %@";
 "%ld 字词" = "%ld kata";
 "%ld 字词/分" = "%ld kata/mnt";
+"字词" = "kata";
+"字词/分" = "kata/mnt";
 "%ld 秒" = "%ld dtk";
 "已发现 %ld 个模型" = "%ld model ditemukan";
 "%@（已导入）" = "%@ (diimpor)";

@@ -2291,6 +2291,8 @@
 "删除%@" = "%@ löschen";
 "%ld 字词" = "%ld Wörter";
 "%ld 字词/分" = "%ld Wörter/Min.";
+"字词" = "Wörter";
+"字词/分" = "Wörter/Min.";
 "%ld 秒" = "%ld Sek.";
 "已发现 %ld 个模型" = "%ld Modelle gefunden";
 "%@（已导入）" = "%@ (importiert)";
