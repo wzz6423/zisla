@@ -10,6 +10,7 @@ final class FirstLaunchOnboardingLifecycle {
     private var startApplication: (() -> Void)?
     private var hasBegun = false
     private var hasEnded = false
+    private(set) var isPresenting = false
 
     init(state: FirstLaunchOnboardingState, startApplication: @escaping () -> Void) {
         self.state = state
@@ -19,26 +20,40 @@ final class FirstLaunchOnboardingLifecycle {
     func begin() -> Bool {
         guard !hasBegun, !hasEnded else { return false }
         hasBegun = true
-        if state.shouldPresent {
-            state.recordStarted()
-            return true
-        }
-        finish(completed: false)
-        return false
+        isPresenting = state.shouldPresent
+        if isPresenting { state.recordStarted() }
+        let start = startApplication
+        startApplication = nil
+        start?()
+        return isPresenting && !hasEnded
     }
 
     func finish(completed: Bool) {
         guard hasBegun, !hasEnded else { return }
         hasEnded = true
-        if completed { state.recordCompleted() }
-        let start = startApplication
-        startApplication = nil
-        start?()
+        if completed, isPresenting { state.recordCompleted() }
+        isPresenting = false
     }
 
     func terminate() {
+        isPresenting = false
         hasEnded = true
         startApplication = nil
+    }
+}
+
+struct FirstLaunchOnboardingRuntimePolicy {
+    let isOnboardingActive: Bool
+    let hoverActivationEnabled: Bool
+    let petEnabled: Bool
+    let isPinned: Bool
+
+    var shouldRun: Bool {
+        isOnboardingActive || hoverActivationEnabled || petEnabled || isPinned
+    }
+
+    static func allowsKeyboardServices(isOnboardingActive: Bool, hasInputMonitoringAccess: Bool) -> Bool {
+        !isOnboardingActive || hasInputMonitoringAccess
     }
 }
 
@@ -185,6 +200,16 @@ struct FirstLaunchOnboardingPresentation {
         topContentInset = min(frame.height, anchorFrame.maxY + 72)
     }
 
+    static func suppressesRepeatedReturn(isKey: Bool, isRepeat: Bool, characters: String?) -> Bool {
+        isKey && isRepeat && characters == "\r"
+    }
+
+    @MainActor
+    static func configureHostWindow(_ window: NSWindow) {
+        window.isOpaque = false
+        window.backgroundColor = .clear
+    }
+
     static func presentationOptions(
         original: NSApplication.PresentationOptions,
         isActive: Bool, isKey: Bool, isRequesting: Bool
@@ -206,7 +231,10 @@ final class FirstLaunchOnboardingWindow: NSWindow {
     override func constrainFrameRect(_ frameRect: NSRect, to screen: NSScreen?) -> NSRect { frameRect }
 
     override func performKeyEquivalent(with event: NSEvent) -> Bool {
-        if event.isARepeat, event.charactersIgnoringModifiers == "\r" { return true }
+        if FirstLaunchOnboardingPresentation.suppressesRepeatedReturn(
+            isKey: isKeyWindow, isRepeat: event.isARepeat,
+            characters: event.charactersIgnoringModifiers
+        ) { return true }
         return super.performKeyEquivalent(with: event)
     }
 }
@@ -221,15 +249,20 @@ final class FirstLaunchOnboardingController: NSObject, NSWindowDelegate {
     private var originalPresentationOptions: NSApplication.PresentationOptions?
     private var cancellables = Set<AnyCancellable>()
 
-    init(onEnd: @escaping (Bool) -> Void) {
+    convenience init(onEnd: @escaping (Bool) -> Void) {
         let audio = FirstLaunchOnboardingAudio()
         let languageStore = AppLanguageStore()
-        session = FirstLaunchOnboardingSession(
+        let session = FirstLaunchOnboardingSession(
             permissions: OnboardingPermissionCoordinator(),
             audio: .init(play: { audio.play() }, stop: { audio.stop() }, setMuted: { audio.isMuted = $0 }),
             preferredLanguage: languageStore.language,
             onEnd: onEnd
         )
+        self.init(session: session, languageStore: languageStore)
+    }
+
+    init(session: FirstLaunchOnboardingSession, languageStore: AppLanguageStore) {
+        self.session = session
         self.languageStore = languageStore
         super.init()
         for name in [NSApplication.didBecomeActiveNotification, NSApplication.didResignActiveNotification] {
@@ -270,6 +303,7 @@ final class FirstLaunchOnboardingController: NSObject, NSWindowDelegate {
             window.isMovable = false
             window.hasShadow = false
             window.level = .normal
+            FirstLaunchOnboardingPresentation.configureHostWindow(window)
             window.delegate = self
             window.contentView = NSHostingView(rootView: AppLanguageEnvironment(
                 languageStore: languageStore,

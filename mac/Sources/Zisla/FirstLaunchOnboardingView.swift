@@ -32,15 +32,26 @@ struct FirstLaunchOnboardingView: View {
                     navigation
                         .frame(maxWidth: FirstLaunchOnboardingPresentation.readingWidth)
                         .padding(20)
+                        .background {
+                            FirstLaunchOnboardingBackdrop(material: .popover)
+                                .allowsHitTesting(false)
+                                .accessibilityHidden(true)
+                        }
+                        .clipShape(RoundedRectangle(cornerRadius: 12))
+                        .padding(.horizontal, 24)
+                        .padding(.bottom, 20)
                         .frame(maxWidth: .infinity)
-                        .background(Color(nsColor: .windowBackgroundColor))
                 }
                 if let presentation = screen.presentation {
                     islandAnchor(presentation)
                 }
             }
         }
-        .background(Color(nsColor: .windowBackgroundColor))
+        .background {
+            FirstLaunchOnboardingBackdrop()
+                .allowsHitTesting(false)
+                .accessibilityHidden(true)
+        }
         .ignoresSafeArea()
         .task(id: reduceMotion) { session.start(reduceMotion: reduceMotion) }
         .onChange(of: session.page) { _, page in
@@ -53,20 +64,16 @@ struct FirstLaunchOnboardingView: View {
     private func islandAnchor(_ presentation: FirstLaunchOnboardingPresentation) -> some View {
         let anchor = presentation.anchorFrame
         return VStack(spacing: 6) {
-            Capsule()
-                .fill(Color.black)
-                .frame(width: anchor.width, height: anchor.height)
-                .accessibilityHidden(true)
-            Image(systemName: "arrow.up")
-                .font(.title2.weight(.semibold))
-                .accessibilityHidden(true)
+            FirstLaunchOnboardingArrow()
+                .frame(width: 44, height: 40)
             AppLocalizedText("onboarding.feature.island.title")
                 .font(.caption)
         }
         .accessibilityElement(children: .ignore)
         .accessibilityLabel(Text(localized("onboarding.feature.island.title")))
         .fixedSize()
-        .position(x: anchor.midX, y: anchor.minY + (anchor.height + 54) / 2)
+        .frame(height: 60, alignment: .top)
+        .position(x: anchor.midX, y: anchor.maxY + 8 + 30)
         .allowsHitTesting(false)
     }
 

@@ -1,3 +1,4 @@
+import AppKit
 import Foundation
 import Testing
 import ZislaCore
@@ -146,7 +147,7 @@ struct FirstLaunchOnboardingViewTests {
         #expect(fake.outcomes == [true])
     }
 
-    @Test func skippingAnimationKeepsPermissionSetupBeforeNormalStartup() {
+    @Test func skippingAnimationKeepsPermissionSetupWhileRuntimeIsRunning() {
         let name = "FirstLaunchOnboardingViewTests.\(UUID().uuidString)"
         let defaults = UserDefaults(suiteName: name)!
         defer { defaults.removePersistentDomain(forName: name) }
@@ -159,7 +160,7 @@ struct FirstLaunchOnboardingViewTests {
         session.start(reduceMotion: false)
         session.skipIntroduction()
         #expect(session.page == .permissions)
-        #expect(!normalApplicationIsRunning)
+        #expect(normalApplicationIsRunning)
         #expect(state.shouldPresent)
         #expect(!fake.audioIsPlaying)
         #expect(!fake.permissions.isClosed)
@@ -294,4 +295,27 @@ struct FirstLaunchOnboardingViewTests {
         #expect(!fake.permissionResourceIsActive)
         #expect(!fake.audioIsPlaying)
     }
+    @Test func islandAndToolFocusDoNotAdvanceOrStopGreeting() {
+        let fake = OnboardingViewFixture()
+        let session = fake.session()
+        let controller = FirstLaunchOnboardingController(session: session, languageStore: AppLanguageStore())
+        defer { controller.close() }
+        session.start(reduceMotion: false)
+        let startedAt = session.greetingStartedAt
+        let navigationID = session.navigationID
+        controller.windowDidResignKey(Notification(name: NSWindow.didResignKeyNotification))
+        controller.windowDidBecomeKey(Notification(name: NSWindow.didBecomeKeyNotification))
+        #expect(!session.isClosed)
+        #expect(session.page == .greeting)
+        #expect(session.greetingStartedAt == startedAt)
+        #expect(session.navigationID == navigationID)
+        #expect(fake.audioIsPlaying)
+        #expect(fake.playCount == 1)
+        #expect(fake.stopCount == 0)
+        #expect(fake.outcomes.isEmpty)
+        session.advance(from: navigationID)
+        #expect(session.page == .introduction)
+        #expect(!fake.audioIsPlaying)
+    }
+
 }

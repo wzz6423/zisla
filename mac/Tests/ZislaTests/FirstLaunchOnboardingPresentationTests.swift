@@ -47,7 +47,11 @@ struct FirstLaunchOnboardingPresentationTests {
             contentRect: frame, styleMask: [.borderless], backing: .buffered, defer: true
         )
         window.isReleasedWhenClosed = false
+        FirstLaunchOnboardingPresentation.configureHostWindow(window)
         defer { window.close() }
+        #expect(!window.isOpaque)
+        #expect(window.backgroundColor == .clear)
+        #expect(window.level == .normal)
         #expect(window.canBecomeKey)
         #expect(window.canBecomeMain)
         #expect(!window.styleMask.contains(.titled))
@@ -56,7 +60,7 @@ struct FirstLaunchOnboardingPresentationTests {
         #expect(!window.isVisible)
     }
 
-    @Test @MainActor func holdingReturnDoesNotRepeatNavigation() throws {
+    @Test @MainActor func inactiveTutorialDoesNotSwallowIslandReturn() throws {
         _ = NSApplication.shared
         let window = FirstLaunchOnboardingWindow(
             contentRect: .zero, styleMask: [.borderless], backing: .buffered, defer: true
@@ -68,7 +72,7 @@ struct FirstLaunchOnboardingPresentationTests {
             windowNumber: 0, context: nil, characters: "\r", charactersIgnoringModifiers: "\r",
             isARepeat: true, keyCode: 36
         ))
-        #expect(window.performKeyEquivalent(with: event))
+        #expect(!window.performKeyEquivalent(with: event))
         #expect(!window.isVisible)
     }
 
@@ -97,4 +101,11 @@ struct FirstLaunchOnboardingPresentationTests {
             original: original, isActive: false, isKey: false, isRequesting: false
         ) == original)
     }
+    @Test func repeatedReturnIsSuppressedOnlyInKeyTutorialWindow() {
+        #expect(FirstLaunchOnboardingPresentation.suppressesRepeatedReturn(isKey: true, isRepeat: true, characters: "\r"))
+        #expect(!FirstLaunchOnboardingPresentation.suppressesRepeatedReturn(isKey: false, isRepeat: true, characters: "\r"))
+        #expect(!FirstLaunchOnboardingPresentation.suppressesRepeatedReturn(isKey: true, isRepeat: false, characters: "\r"))
+        #expect(!FirstLaunchOnboardingPresentation.suppressesRepeatedReturn(isKey: true, isRepeat: true, characters: nil))
+    }
+
 }
