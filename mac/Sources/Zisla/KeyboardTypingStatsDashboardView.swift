@@ -8,6 +8,7 @@ import ZislaKit
 /// instead of embedding KeyboardKit's standalone statistics window.
 struct KeyboardTypingStatsDashboardView: View {
     let summary: KeyboardTypingStatsSummary
+    let voiceStatistics: VoiceHistoryStatistics?
 
     private var accent: Color { Color.accentColor }
     static let chartXAxisLabelPadding: CGFloat = 24
@@ -20,6 +21,9 @@ struct KeyboardTypingStatsDashboardView: View {
     private var compactDashboard: some View {
         VStack(alignment: .leading, spacing: 16) {
             metricsGrid
+            if let voiceStatistics {
+                voiceMetricsGrid(voiceStatistics)
+            }
             activityPanels
             keyboardPanel
             applicationPanel
@@ -67,12 +71,37 @@ struct KeyboardTypingStatsDashboardView: View {
         }
     }
 
+    private func voiceMetricsGrid(_ statistics: VoiceHistoryStatistics) -> some View {
+        HStack(spacing: 8) {
+            compactMetricCard(
+                symbol: "textformat",
+                title: AppLocalization.text("总识别字词"),
+                value: AppLocalization.text("%ld 字词", statistics.totalWordCount)
+            )
+            compactMetricCard(
+                symbol: "waveform",
+                title: AppLocalization.text("累计口述时间"),
+                value: VoiceHistoryFormatting.durationText(statistics.totalDuration)
+            )
+            compactMetricCard(
+                symbol: "bolt.fill",
+                title: AppLocalization.text("输入速度"),
+                value: AppLocalization.text("%ld 字词/分", Int(statistics.wordsPerMinute.rounded()))
+            )
+            compactMetricCard(
+                symbol: "clock",
+                title: AppLocalization.text("节省时间"),
+                value: VoiceHistoryFormatting.durationText(statistics.savedTime)
+            )
+        }
+    }
+
     private func compactMetricCard(
         symbol: String,
         title: String,
         value: String,
         unit: String? = nil,
-        detail: String
+        detail: String? = nil
     ) -> some View {
         VStack(alignment: .leading, spacing: 4) {
             HStack(spacing: 5) {
@@ -97,11 +126,13 @@ struct KeyboardTypingStatsDashboardView: View {
                         .foregroundStyle(.secondary)
                 }
             }
-            Text(detail)
-                .font(.system(size: 8))
-                .foregroundStyle(.secondary)
-                .lineLimit(1)
-                .minimumScaleFactor(0.7)
+            if let detail {
+                Text(detail)
+                    .font(.system(size: 8))
+                    .foregroundStyle(.secondary)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.7)
+            }
         }
         .padding(9)
         .frame(maxWidth: .infinity, minHeight: 76, alignment: .leading)
