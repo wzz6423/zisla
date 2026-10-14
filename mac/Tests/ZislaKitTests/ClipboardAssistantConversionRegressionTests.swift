@@ -25,36 +25,27 @@ struct ClipboardAssistantConversionRegressionTests {
     }
 
     @Test
-    func conversionKindControlsEveryConversionWithoutChangingMathOrDateTime() throws {
+    func conversionKindControlsOnlyUnitsAndCurrency() throws {
         let now = Date(timeIntervalSince1970: 0)
         let timeZone = try #require(TimeZone(secondsFromGMT: 0))
-        let conversionKinds: Set<ClipboardAssistantKind> = [.conversion, .text]
-        for text in [
-            "10 ft = m",
-            "100 USD = CNY",
-            "2026-09-17 - 2026-10-01",
-            "2026-09-17 09:30 UTC+08:00 = UTC",
-        ] {
-            let detection = try #require(ClipboardAssistantDetector.detect(
-                text: text,
-                enabledKinds: conversionKinds,
-                preferredCurrencyCode: "CNY",
-                now: now,
-                timeZone: timeZone
-            ))
-            #expect(detection.kind == .conversion, "expected \(text) to use the conversion kind")
+        let enabledKindSets: [Set<ClipboardAssistantKind>] = [[.conversion], [.conversion, .math, .dateTime]]
+        for enabledKinds in enabledKindSets {
+            for text in ["10 ft = m", "100 USD = CNY"] {
+                let detection = try #require(ClipboardAssistantDetector.detect(
+                    text: text,
+                    enabledKinds: enabledKinds,
+                    preferredCurrencyCode: "CNY",
+                    now: now,
+                    timeZone: timeZone
+                ))
+                #expect(detection.kind == .conversion, "expected \(text) to use the conversion kind")
+            }
         }
 
-        let standardKinds: Set<ClipboardAssistantKind> = [.math, .dateTime, .text]
-        for text in [
-            "10 ft = m",
-            "100 USD = CNY",
-            "2026-09-17 - 2026-10-01",
-            "2026-09-17 09:30 UTC+08:00 = UTC",
-        ] {
+        for text in ["10 ft = m", "100 USD = CNY"] {
             #expect(ClipboardAssistantDetector.detect(
                 text: text,
-                enabledKinds: standardKinds,
+                enabledKinds: [.math, .dateTime, .text],
                 preferredCurrencyCode: "CNY",
                 now: now,
                 timeZone: timeZone
@@ -71,6 +62,38 @@ struct ClipboardAssistantConversionRegressionTests {
             enabledKinds: [.dateTime],
             now: now
         )?.kind == .dateTime)
+    }
+
+    @Test(arguments: [
+        ("2026-09-17 - 2026-10-01", "14 days"),
+        ("2026.10.28+15", "2026-11-12"),
+        ("2026.10.28-15", "2026-10-13"),
+        ("2026.10.28往前15天=？", "2026-10-13"),
+        ("2026-09-17 09:30 UTC+08:00 = UTC", "2026-09-17 01:30:00 Z [GMT]"),
+    ])
+    func dateTimeKindControlsDateCalculationsAndPreservesCopyActions(_ query: String, expected: String) throws {
+        let now = Date(timeIntervalSince1970: 0)
+        let timeZone = try #require(TimeZone(secondsFromGMT: 0))
+        let enabledKindSets: [Set<ClipboardAssistantKind>] = [
+            [.dateTime], [.conversion, .dateTime], Set(ClipboardAssistantKind.allCases),
+        ]
+        for enabledKinds in enabledKindSets {
+            let detection = try #require(ClipboardAssistantDetector.detect(
+                text: query, enabledKinds: enabledKinds, now: now, timeZone: timeZone,
+                locale: Locale(identifier: "en_US"), countryCode: "US"
+            ))
+            #expect(detection.kind == .dateTime, "expected date/time calculation for \(query)")
+            #expect(detection.title == expected)
+            #expect(detection.action == .copyText(expected))
+            let fullExpression = try #require(detection.fullContent)
+            #expect(detection.actions.last == .copyFullExpression(fullExpression))
+        }
+        #expect(ClipboardAssistantDetector.detect(
+            text: query, enabledKinds: [.conversion], now: now, timeZone: timeZone
+        ) == nil, "conversion must not enable date/time calculations: \(query)")
+        #expect(ClipboardAssistantDetector.detect(
+            text: query, enabledKinds: [.text], now: now, timeZone: timeZone
+        )?.kind == .text, "disabled date/time calculation must retain the text fallback: \(query)")
     }
 
     @Test(arguments: [

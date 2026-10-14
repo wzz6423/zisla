@@ -2458,6 +2458,9 @@
 "汇率换算" = "Currency Conversion";
 "换算" = "Conversions";
 "单位换算" = "Unit Conversion";
+"日期加减" = "Date Arithmetic";
+"2026.10.28往后15天" = "2026.10.28 add 15days";
+"2026.10.28往前15天" = "2026.10.28 subtract 15days";
 "日期间隔" = "Date Interval";
 "跨时区时间" = "Cross-Time-Zone Time";
 "汇率获取失败" = "Couldn't fetch the exchange rate";

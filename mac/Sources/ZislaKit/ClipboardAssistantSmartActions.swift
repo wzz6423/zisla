@@ -11,7 +11,7 @@ extension ClipboardAssistantDetector {
     ) -> ClipboardAssistantDetection? {
         let text = rawText.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !text.isEmpty, text.count <= 4_096,
-              !text.unicodeScalars.contains(where: {
+              !rawText.unicodeScalars.contains(where: {
                   ($0.properties.generalCategory == .control && $0 != "\n" && $0 != "\r" && $0 != "\t")
                       || $0.properties.generalCategory == .format
               }) else { return nil }
@@ -37,9 +37,11 @@ extension ClipboardAssistantDetector {
         return nil
     }
 
+    private static let addressLabels = #"地址|收[货貨]地址|address|shipping address|住所|配送先住所|주소|배송지|adresse|lieferadresse|dirección|direccion|endereço|endereco|indirizzo|adres|адрес|العنوان|عنوان|ที่อยู่|alamat|địa chỉ|dia chi"#
+
     private static func addressDetection(_ text: String, countryCode: String?) -> ClipboardAssistantDetection? {
         let address = text.replacingOccurrences(
-            of: #"(?i)^(?:地址|收货地址|address)\s*[:：]\s*"#, with: "", options: .regularExpression
+            of: "(?i)^(?:" + addressLabels + #")\s*[:：]\s*"#, with: "", options: .regularExpression
         )
         guard !address.contains("\n"), !address.contains("://") else { return nil }
         let chinese = smartMatch(#"^(?:中国)?[\p{Han}]{2,}(?:省|市|自治区|特别行政区)[\p{Han}0-9（）()·\s-]{1,}(?:路|街|道|巷|弄)[0-9一二三四五六七八九十百]+号[\p{Han}0-9A-Za-z（）()·\s-]*$"#, address) != nil
@@ -315,13 +317,53 @@ extension ClipboardAssistantDetector {
         return .openService(service: service, url: components.url!)
     }
 
+    private static let meetingKeywords = smartPhrasePattern([
+        "会议", "开会", "例会", "评审会", "研讨会", "面试", "日程", "會議", "開會", "例會", "評審會", "研討會", "面試",
+        "meeting", "interview", "appointment", "workshop", "会議", "ミーティング", "面接", "打ち合わせ", "회의", "미팅", "면접",
+        "réunion", "entretien", "rendez-vous", "atelier", "besprechung", "vorstellungsgespräch", "termin",
+        "reunión", "entrevista", "cita", "taller", "reunião", "consulta", "riunione", "colloquio", "appuntamento",
+        "vergadering", "sollicitatiegesprek", "afspraak", "совещание", "встреча", "собеседование",
+        "اجتماع", "مقابلة", "موعد", "ประชุม", "สัมภาษณ์", "นัดหมาย", "rapat", "wawancara", "janji temu",
+        "cuộc họp", "họp", "phỏng vấn", "cuộc hẹn", "toplantı", "mülakat", "randevu",
+    ])
+    private static let meetingLocationLabels = #"地点|地點|location|where|場所|会場|장소|위치|lieu|emplacement|ort|standort|ubicación|ubicacion|lugar|local|localização|luogo|sede|locatie|место|местоположение|المكان|مكان|الموقع|موقع|สถานที่|lokasi|tempat|địa điểm|dia diem|yer|konum|"# + addressLabels
+    private static let meetingTitleLabels = #"会议主题|會議主題|主题|主題|标题|標題|subject|title|件名|議題|タイトル|주제|제목|sujet|objet|titre|thema|betreff|titel|asunto|tema|título|titulo|assunto|oggetto|titolo|onderwerp|тема|заголовок|الموضوع|موضوع|عنوان الاجتماع|หัวข้อ|ชื่อเรื่อง|subjek|judul|chủ đề|chu de|tiêu đề|tieu de|konu|başlık"#
+    private static let meetingDateLabels = #"时间|時間|日期|when|date|time|日時|日付|일시|날짜|시간|quand|heure|datum|zeit|wann|fecha|hora|data|horário|quando|orario|tijd|wanneer|дата|время|когда|التاريخ|تاريخ|الوقت|وقت|วันที่|เวลา|tanggal|waktu|ngày|giờ|thời gian|tarih|saat"#
+    private static let meetingRejectionPattern = #"(?i)(?:取消|改期|待定|暂定|暫定|没有会议|沒有會議|不[开開][会會]|中止|キャンセル|延期|未定|会議(?:は|が|を)?(?:なし|しない)|ยกเลิก|เลื่อน|ยังไม่กำหนด|ไม่(?:มี|จัด)?(?:การ)?ประชุม|(?<![\p{L}\p{M}])(?:cancel(?:led|ed|lation)?|reschedul\w*|tentative|tbd|no(?![.0-9])|not|취소|연기|미정|잠정|없음|annul(?:ée?s?|er|ation)|report(?:ée?s?|er)|provisoire|à confirmer|pas|abgesagt|absagen|verschoben|verschieben|vorläufig|kein(?:e|en|er|es)?|nicht|cancelad[oa]s?|cancelar|cancelación|aplazad[oa]s?|reprogramad[oa]s?|por confirmar|sin|cancelamento|adiad[oa]s?|remarcad[oa]s?|a confirmar|sem|não|annullat[oaie]|annullare|rinviat[oaie]|provvisori[oaie]|da confermare|nessun[oa]?|non|geannuleerd|annuleren|uitgesteld|verplaatst|voorlopig|geen|niet|отмен[а-яё]*|перенес[а-яё]*|предварительн[а-яё]*|не|нет|ملغي|ملغى|ملغاة|إلغاء|الغاء|مؤجل|تأجيل|غير مؤكد|لا|ليس|dibatalkan|batal|ditunda|tentatif|belum ditentukan|tidak|bukan|hủy|huỷ|hoãn|dời lịch|chưa xác định|không|iptal|ertelendi|belirsiz|yok|değil)(?![\p{L}\p{M}]))"#
+    static let meetingPeriods: [String: Bool] = [
+        "上午": false, "早上": false, "凌晨": false, "下午": true, "晚上": true, "中午": true,
+        "am": false, "a.m.": false, "morning": false, "pm": true, "p.m.": true, "afternoon": true,
+        "午前": false, "朝": false, "午後": true, "夕方": true, "夜": true,
+        "오전": false, "아침": false, "오후": true, "저녁": true,
+        "du matin": false, "de l'après-midi": true, "de l’après-midi": true, "du soir": true,
+        "vormittags": false, "morgens": false, "nachmittags": true, "abends": true,
+        "de la mañana": false, "de la tarde": true, "de la noche": true,
+        "da manhã": false, "da tarde": true, "da noite": true,
+        "di mattina": false, "del pomeriggio": true, "di sera": true,
+        "'s ochtends": false, "’s ochtends": false, "'s middags": true, "’s middags": true, "'s avonds": true, "’s avonds": true,
+        "утра": false, "дня": true, "вечера": true,
+        "صباحًا": false, "صباحا": false, "مساءً": true, "مساء": true,
+        "เช้า": false, "ก่อนเที่ยง": false, "บ่าย": true, "เย็น": true,
+        "pagi": false, "siang": true, "sore": true,
+        "sáng": false, "chiều": true, "tối": true,
+        "sabah": false, "öğleden önce": false, "öğleden sonra": true, "akşam": true,
+    ]
+    static let meetingPeriodPattern = smartPhrasePattern(Array(meetingPeriods.keys))
+    private static let meetingRangeSeparators: Set<String> = ["-", "–", "—", "~", "～", "〜", "至", "到", "to", "から", "부터", "à", "bis", "a", "até", "às", "alle", "tot", "до", "إلى", "الى", "ถึง", "sampai", "hingga", "đến", "ile"]
+    private static let meetingRangePattern = meetingRangeSeparators.joined(separator: "|")
+    private static let meetingRelativeDatePattern = smartPhrasePattern(Array(intervalDateOffsets.keys))
+    private static let meetingZoneAliasPattern = smartPhrasePattern(Array(timeZoneAliases.keys))
+
     private static func meetingDraft(_ text: String, now: Date, timeZone: TimeZone) -> ClipboardCalendarDraft? {
-        guard smartMatch(#"(?i)(会议|开会|例会|评审会|研讨会|面试|日程|\bmeeting\b|\binterview\b|\bappointment\b|\bworkshop\b)"#, text) != nil else { return nil }
+        let locationPattern = #"(?i)(?:^|[\n，,；;]|\s)(?:"# + meetingLocationLabels + #")\h*[:：]\h*([^\n，；;]+)"#
         var parsingText = text.replacingOccurrences(of: #"https?://[^\s]+"#, with: "", options: .regularExpression)
+        parsingText = parsingText.replacingOccurrences(of: locationPattern, with: "", options: .regularExpression)
+        let meetingText = parsingText
+        guard smartMatch("(?i)" + meetingKeywords, meetingText) != nil else { return nil }
         parsingText = parsingText.replacingOccurrences(
-            of: #"(?im)^\s*(?:地点|地址|location|where)\s*[:：][^\r\n]*"#, with: "", options: .regularExpression
+            of: #"(?im)^\h*(?:"# + meetingTitleLabels + #")\h*[:：][^\r\n]*"#, with: "", options: .regularExpression
         )
-        let timePattern = #"(?i)(?<![0-9:：])(?:(上午|下午|晚上|中午|早上|凌晨)\s*)?([0-9]{1,2})(?:[:：]([0-9]{2})(?:[:：]([0-9]{2})(?:\.([0-9]{1,9}))?)?|点(?:([0-9]{1,2})分?|半)?)(?:\s*(am|pm))?(?![0-9:：])"#
+        let timePattern = #"(?i)(?<![0-9:：])(?:((?:"# + meetingPeriodPattern + #"))\h*)?([0-9]{1,2})(?:[:：]([0-9]{2})(?:[:：]([0-9]{2})(?:\.([0-9]{1,9}))?)?|点(?:([0-9]{1,2})分?|半)?)(?:\h*((?:"# + meetingPeriodPattern + #")))?(?![0-9:：])"#
         let timeRegex = try! NSRegularExpression(pattern: timePattern)
         let zonePattern = #"(?i)(?<![A-Z_])(?:(?:[A-Z_]+/[A-Z0-9_+.-]+(?:/[A-Z0-9_+.-]+)*|(?:UTC|GMT)(?:[ \t]*[+-][ \t]*[^\s,，;；)\]]*)?)(?![A-Z0-9_:])|(?:New York[ \t]+time|London[ \t]+time|Tokyo[ \t]+time|Beijing[ \t]+time|Shanghai[ \t]+time|(?:北京|上海|中国|中國|东京|東京|纽约|紐約|伦敦|倫敦)(?:时间|時間))(?![A-Z_]))"#
         let zoneRegex = try! NSRegularExpression(pattern: zonePattern)
@@ -332,9 +374,9 @@ extension ClipboardAssistantDetector {
             parsingText.removeSubrange(range)
         }
         let abbreviations = TimeZone.abbreviationDictionary.keys.map(NSRegularExpression.escapedPattern(for:)).joined(separator: "|")
-        let suffixPattern = #"^[ \t]*(?:\([ \t]*)?((?i:Z)(?:[+-][^\s,，;；)\]]*)?|[+-][^\s,，;；)\]]+|(?i:"# + abbreviations + #")|[A-Z]{2,5})(?![\p{L}0-9_])"#
+        let suffixPattern = #"^[ \t]*(?:\([ \t]*)?((?i:Z)(?:[+-][^\s,，;；)\]]*)?|[+-][^\s,，;；)\]]+|(?i:"# + meetingZoneAliasPattern + "|" + abbreviations + #")|[A-Z]{2,5})(?![\p{L}0-9_])"#
         let suffixRegex = try! NSRegularExpression(pattern: suffixPattern)
-        let prefixRegex = try! NSRegularExpression(pattern: #"(?:^|[ \t(])((?i:"# + abbreviations + #")|[A-Z]{2,5})[ \t]*$"#)
+        let prefixRegex = try! NSRegularExpression(pattern: #"(?:^|[ \t(])((?i:"# + meetingZoneAliasPattern + "|" + abbreviations + #")|[A-Z]{2,5})[ \t]*$"#)
         var zoneRanges: [NSRange] = []
         for clock in timeRegex.matches(in: parsingText, range: NSRange(parsingText.startIndex..., in: parsingText)) {
             let clockRange = Range(clock.range, in: parsingText)!
@@ -353,8 +395,19 @@ extension ClipboardAssistantDetector {
                     || suffix.range(of: #"^[ \t]+-[ \t]+[0-9]"#, options: .regularExpression) != nil { break }
                 guard let match = suffixRegex.firstMatch(in: suffix, range: NSRange(suffix.startIndex..., in: suffix)) else { break }
                 let candidate = String(suffix[Range(match.range(at: 1), in: suffix)!])
-                zoneTexts.append(candidate)
                 let end = parsingText.index(cursor, offsetBy: suffix[Range(match.range, in: suffix)!].count)
+                let remainder = String(parsingText[end...].prefix { !$0.isNewline && !",，;；".contains($0) })
+                    .trimmingCharacters(in: .whitespaces.union(CharacterSet(charactersIn: ")]")))
+                if timeZoneAliases[candidate.lowercased()] != nil,
+                   !timeZoneAliases.keys.contains(where: { alias in
+                       alias.count < candidate.count
+                           && smartMatch("(?i)" + smartPhrasePattern([alias]), candidate) != nil
+                   }), !remainder.isEmpty,
+                   suffixRegex.firstMatch(in: remainder, range: NSRange(remainder.startIndex..., in: remainder)) == nil,
+                   smartMatch("^\\h*(?:" + meetingRangePattern + ")\\h*" + timePattern, remainder) == nil {
+                    break
+                }
+                zoneTexts.append(candidate)
                 zoneRanges.append(NSRange(cursor..<end, in: parsingText))
                 cursor = end
             }
@@ -369,49 +422,35 @@ extension ClipboardAssistantDetector {
         for range in zoneRanges.reversed() { parsingText.removeSubrange(Range(range, in: parsingText)!) }
         var calendar = Calendar(identifier: .gregorian)
         calendar.timeZone = meetingTimeZone
-        let datePattern = #"(?i)(?:(?<![0-9:：])(?:([0-9]{4})[-年/.]([0-9]{1,2})[-月/.]([0-9]{1,2})日?|([0-9]{1,2})[月./-]([0-9]{1,2})日?)(?![0-9:：])|今天|明天|后天|\btoday\b|\btomorrow\b)"#
+        let dateParsingText = parsingText.replacingOccurrences(of: timePattern, with: "", options: .regularExpression)
+        let datePattern = #"(?i)(?:(?<![0-9:：])(?:[0-9]{4}[-年/.][0-9]{1,2}[-月/.][0-9]{1,2}日?|[0-9]{1,2}[月./-][0-9]{1,2}日?)(?![0-9:：])|"# + meetingRelativeDatePattern + ")"
         let dateRegex = try! NSRegularExpression(pattern: datePattern)
-        let dateMatches = dateRegex.matches(in: parsingText, range: NSRange(parsingText.startIndex..., in: parsingText))
+        let dateMatches = dateRegex.matches(in: dateParsingText, range: NSRange(dateParsingText.startIndex..., in: dateParsingText))
         // Multiple dates can describe alternatives, reschedules, or a cancellation.
         guard dateMatches.count == 1,
-              smartMatch(#"(?i)(取消|改期|待定|取消会议|\bcancel(?:led|ed)?\b|\breschedul\w*\b|\btentative\b|\btbd\b)"#, text) == nil,
-              let dateTokens = smartMatch(datePattern, parsingText) else { return nil }
-        var day: Date
-        if !dateTokens[1].isEmpty || !dateTokens[4].isEmpty {
-            let year = Int(dateTokens[1]) ?? calendar.component(.year, from: now)
-            let month = Int(dateTokens[2].isEmpty ? dateTokens[4] : dateTokens[2])!
-            let dayNumber = Int(dateTokens[3].isEmpty ? dateTokens[5] : dateTokens[3])!
-            let components = DateComponents(year: year, month: month, day: dayNumber)
-            guard let parsed = calendar.date(from: components),
-                  calendar.dateComponents([.year, .month, .day], from: parsed) == components else { return nil }
-            day = parsed
-        } else {
-            let offset: Int
-            switch dateTokens[0].lowercased() {
-            case "明天", "tomorrow": offset = 1
-            case "后天": offset = 2
-            default: offset = 0
-            }
-            day = calendar.date(byAdding: .day, value: offset, to: calendar.startOfDay(for: now))!
-        }
+              smartMatch(meetingRejectionPattern, meetingText) == nil else { return nil }
+        let dateValue = String(dateParsingText[Range(dateMatches[0].range, in: dateParsingText)!])
+            .replacingOccurrences(of: #"(?<=[0-9])[年月/.]"#, with: "-", options: .regularExpression)
+            .replacingOccurrences(of: #"(?<=[0-9])日$"#, with: "", options: .regularExpression)
+        guard let day = intervalDate(dateValue, now: now, calendar: calendar) else { return nil }
         let timeMatches = timeRegex.matches(in: parsingText, range: NSRange(parsingText.startIndex..., in: parsingText))
         guard (1...2).contains(timeMatches.count) else { return nil }
         let timeValues = timeMatches.map { String(parsingText[Range($0.range, in: parsingText)!]) }
-        let commonPeriod = timeValues.compactMap { value -> String? in
-            let tokens = smartMatch(timePattern, value)!
-            let period = (tokens[1] + tokens[7]).lowercased()
-            return period.isEmpty ? nil : period
-        }.first ?? ""
+        let timeTokens = timeValues.map { smartMatch(timePattern, $0)! }
+        for tokens in timeTokens {
+            if let prefix = meetingPeriods[tokens[1].lowercased()], let suffix = meetingPeriods[tokens[7].lowercased()],
+               prefix != suffix { return nil }
+        }
+        let commonPeriod = timeTokens.compactMap {
+            meetingPeriods[$0[1].lowercased()] ?? meetingPeriods[$0[7].lowercased()]
+        }.first
         var times: [Date] = []
-        for value in timeValues {
-            let tokens = smartMatch(timePattern, value)!
+        for (index, tokens) in timeTokens.enumerated() {
             var hour = Int(tokens[2])!
-            let minute = Int(tokens[3].isEmpty ? tokens[6] : tokens[3]) ?? (value.contains("半") ? 30 : 0)
-            let period = (tokens[1] + tokens[7]).lowercased()
-            let inheritedPeriod = period.isEmpty ? commonPeriod : period
-            if !inheritedPeriod.isEmpty {
+            let minute = Int(tokens[3].isEmpty ? tokens[6] : tokens[3]) ?? (timeValues[index].contains("半") ? 30 : 0)
+            if let afternoon = meetingPeriods[tokens[1].lowercased()] ?? meetingPeriods[tokens[7].lowercased()] ?? commonPeriod {
                 guard (1...12).contains(hour) else { return nil }
-                if ["下午", "晚上", "中午", "pm"].contains(inheritedPeriod) {
+                if afternoon {
                     if hour < 12 { hour += 12 }
                 } else if hour == 12 { hour = 0 }
             }
@@ -433,24 +472,32 @@ extension ClipboardAssistantDetector {
             let second = Range(timeMatches[1].range, in: parsingText)!
             let between = String(parsingText[first.upperBound..<second.lowerBound])
                 .trimmingCharacters(in: .whitespacesAndNewlines)
-            guard ["-", "–", "—", "~", "～", "至", "到", "to"].contains(between.lowercased()) else { return nil }
+            guard meetingRangeSeparators.contains(between.lowercased()) else { return nil }
         }
-        let locationPattern = #"(?i)(?:^|[\n，,；;]|\s)(?:地点|地址|location|where)\s*[:：]\s*([^\n，；;]+)"#
         let location = smartMatch(locationPattern, text)?[1].trimmingCharacters(in: .whitespaces)
-        let explicitTitle = smartMatch(#"(?im)^(?:会议主题|主题|标题|subject|title)\s*[:：]\s*([^\r\n]+)"#, text)?[1]
+        let explicitTitle = smartMatch(#"(?im)^\h*(?:"# + meetingTitleLabels + #")\h*[:：]\h*([^\r\n]+)"#, text)?[1]
         var title = explicitTitle ?? text.components(separatedBy: .newlines).first!
         if explicitTitle == nil {
-            title = title.replacingOccurrences(of: datePattern, with: "", options: .regularExpression)
-                .replacingOccurrences(of: timePattern, with: "", options: .regularExpression)
+            title = title.replacingOccurrences(of: timePattern + #"(?:\h*(?:"# + meetingRangePattern + #")\h*"# + timePattern + ")?", with: "", options: .regularExpression)
+                .replacingOccurrences(of: datePattern, with: "", options: .regularExpression)
                 .replacingOccurrences(of: locationPattern, with: "", options: .regularExpression)
-                .replacingOccurrences(of: #"(?i)^(?:时间|日期|when|date)\s*[:：]\s*"#, with: "", options: .regularExpression)
+                .replacingOccurrences(of: #"(?i)^(?:"# + meetingDateLabels + #")\h*[:：]\h*"#, with: "", options: .regularExpression)
                 .trimmingCharacters(in: CharacterSet.whitespacesAndNewlines.union(CharacterSet(charactersIn: ",，;；:：-–—~～至到")))
         }
         guard !title.isEmpty, title.count <= 160,
-              smartMatch(#"(?i)(会议|开会|例会|评审会|研讨会|面试|日程|\bmeeting\b|\binterview\b|\bappointment\b|\bworkshop\b)"#, title) != nil || explicitTitle != nil else { return nil }
+              smartMatch("(?i)" + meetingKeywords, title) != nil || explicitTitle != nil else { return nil }
         return ClipboardCalendarDraft(
             title: title, startDate: start, endDate: end, location: location, notes: text
         )
+    }
+
+    private static func smartPhrasePattern(_ phrases: [String]) -> String {
+        phrases.sorted { $0.count > $1.count }.map { phrase in
+            let pattern = NSRegularExpression.escapedPattern(for: phrase)
+            let boundary = phrase.range(of: #"^[\p{Han}\p{Hiragana}\p{Katakana}\p{Thai}]+$"#, options: .regularExpression) != nil
+                ? #"[\p{Latin}\p{Cyrillic}\p{Arabic}\p{Hangul}\p{M}]"# : #"[\p{L}\p{M}]"#
+            return "(?<!" + boundary + ")" + pattern + "(?!" + boundary + ")"
+        }.joined(separator: "|")
     }
 
     private static func smartMatch(_ pattern: String, _ text: String) -> [String]? {

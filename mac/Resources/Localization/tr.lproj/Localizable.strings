@@ -2459,6 +2459,9 @@
 "汇率换算" = "Döviz Çevirisi";
 "换算" = "Dönüşümler";
 "单位换算" = "Birim Dönüşümü";
+"日期加减" = "Tarih toplama ve çıkarma";
+"2026.10.28往后15天" = "2026.10.28'den 15 gün sonra";
+"2026.10.28往前15天" = "2026.10.28'den 15 gün önce";
 "日期间隔" = "Tarih Aralığı";
 "跨时区时间" = "Saat Dilimleri Arası Zaman";
 "汇率获取失败" = "Döviz kuru alınamadı";
