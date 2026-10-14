@@ -66,48 +66,44 @@ final class FirstLaunchOnboardingSession: ObservableObject {
     let greetingTimeline: FirstLaunchGreetingTimeline
     let preferredLanguage: AppLanguage
     private let audio: Audio
-    private let sleep: (Duration) async throws -> Void
+    private let now: () -> Date
+    private var greetingHasStarted = false
+    @Published private(set) var navigationID = UUID()
     private var onEnd: ((Bool) -> Void)?
-    private var greetingTask: Task<Void, Never>?
     private(set) var isClosed = false
-    var hasGreetingTask: Bool { greetingTask != nil }
 
     init(
         permissions: OnboardingPermissionCoordinator,
         audio: Audio,
         preferredLanguage: AppLanguage = .english,
-        sleep: @escaping (Duration) async throws -> Void = { try await Task.sleep(for: $0) },
+        now: @escaping () -> Date = Date.init,
         onEnd: @escaping (Bool) -> Void
     ) {
         self.permissions = permissions
         self.audio = audio
         self.preferredLanguage = preferredLanguage
         greetingTimeline = FirstLaunchGreetingTimeline(preferredLanguage: preferredLanguage)
-        self.sleep = sleep
+        self.now = now
         self.onEnd = onEnd
     }
 
-    @discardableResult
-    func start(reduceMotion: Bool) -> Task<Void, Never>? {
-        guard !isClosed, page == .greeting else { return nil }
-        greetingTask?.cancel()
-        greetingTask = nil
-        permissions.refresh()
-        _ = audio.play()
-        greetingStartedAt = reduceMotion ? nil : Date()
-        guard !reduceMotion else { return nil }
-        greetingTask = Task { @MainActor [weak self, sleep] in
-            do {
-                try await sleep(.seconds(FirstLaunchOnboardingScore.duration))
-            } catch {
-                guard !Task.isCancelled else { return }
-                self?.stopGreeting()
-                return
-            }
-            guard !Task.isCancelled, let self else { return }
-            self.advance()
+    func start(reduceMotion: Bool) {
+        guard !isClosed, page == .greeting else { return }
+        if !greetingHasStarted {
+            greetingHasStarted = true
+            permissions.refresh()
+            _ = audio.play()
+            greetingStartedAt = reduceMotion ? nil : now()
+        } else if reduceMotion {
+            greetingStartedAt = nil
+        } else if greetingStartedAt == nil {
+            greetingStartedAt = now()
         }
-        return greetingTask
+    }
+
+    func advance(from navigationID: UUID) {
+        guard self.navigationID == navigationID else { return }
+        advance()
     }
 
     func advance() {
@@ -147,13 +143,13 @@ final class FirstLaunchOnboardingSession: ObservableObject {
     private func move(to page: Page) {
         stopGreeting()
         if permissions.requesting != nil { permissions.cancelCurrentRequest() }
+        navigationID = UUID()
         self.page = page
         if page == .permissions { permissions.refresh() }
     }
 
     private func stopGreeting() {
-        greetingTask?.cancel()
-        greetingTask = nil
+        greetingHasStarted = false
         greetingStartedAt = nil
         audio.stop()
     }
@@ -174,11 +170,55 @@ final class FirstLaunchOnboardingSession: ObservableObject {
     }
 }
 
+struct FirstLaunchOnboardingPresentation {
+    let anchorFrame: CGRect
+    let topContentInset: CGFloat
+    static let readingWidth: CGFloat = 656
+
+    init(screen: ScreenSnapshot) {
+        let frame = screen.frame
+        let anchor = ScreenLayoutEngine().layout(for: screen).collapsedFrame
+        anchorFrame = CGRect(
+            x: anchor.minX - frame.minX, y: frame.maxY - anchor.maxY,
+            width: anchor.width, height: anchor.height
+        )
+        topContentInset = min(frame.height, anchorFrame.maxY + 72)
+    }
+
+    static func presentationOptions(
+        original: NSApplication.PresentationOptions,
+        isActive: Bool, isKey: Bool, isRequesting: Bool
+    ) -> NSApplication.PresentationOptions {
+        guard isActive, isKey, !isRequesting else { return original }
+        return original.subtracting([.hideDock, .hideMenuBar]).union([.autoHideDock, .autoHideMenuBar])
+    }
+}
+
+@MainActor
+final class FirstLaunchOnboardingScreen: ObservableObject {
+    @Published var presentation: FirstLaunchOnboardingPresentation?
+}
+
+@MainActor
+final class FirstLaunchOnboardingWindow: NSWindow {
+    override var canBecomeKey: Bool { true }
+    override var canBecomeMain: Bool { true }
+    override func constrainFrameRect(_ frameRect: NSRect, to screen: NSScreen?) -> NSRect { frameRect }
+
+    override func performKeyEquivalent(with event: NSEvent) -> Bool {
+        if event.isARepeat, event.charactersIgnoringModifiers == "\r" { return true }
+        return super.performKeyEquivalent(with: event)
+    }
+}
+
 @MainActor
 final class FirstLaunchOnboardingController: NSObject, NSWindowDelegate {
     private var window: NSWindow?
     private let session: FirstLaunchOnboardingSession
     private let languageStore: AppLanguageStore
+    private let screenState = FirstLaunchOnboardingScreen()
+    private var displayID: CGDirectDisplayID?
+    private var originalPresentationOptions: NSApplication.PresentationOptions?
     private var cancellables = Set<AnyCancellable>()
 
     init(onEnd: @escaping (Bool) -> Void) {
@@ -192,40 +232,82 @@ final class FirstLaunchOnboardingController: NSObject, NSWindowDelegate {
         )
         self.languageStore = languageStore
         super.init()
-        NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification)
+        for name in [NSApplication.didBecomeActiveNotification, NSApplication.didResignActiveNotification] {
+            NotificationCenter.default.publisher(for: name)
+                .sink { [weak self] _ in
+                    MainActor.assumeIsolated {
+                        guard let self else { return }
+                        self.updatePresentationOptions()
+                        if NSApp.isActive { self.session.permissions.refresh() }
+                    }
+                }.store(in: &cancellables)
+        }
+        NotificationCenter.default.publisher(for: NSApplication.didChangeScreenParametersNotification)
             .sink { [weak self] _ in
-                MainActor.assumeIsolated { self?.session.permissions.refresh() }
+                MainActor.assumeIsolated { self?.updateScreen() }
             }.store(in: &cancellables)
-        languageStore.$language.sink { [weak self] language in
-            self?.window?.title = AppLocalization.string("onboarding.introduction.title", language: language)
+        session.permissions.$requesting.sink { [weak self] requesting in
+            self?.updatePresentationOptions(isRequesting: requesting != nil)
         }.store(in: &cancellables)
+        NotificationCenter.default.publisher(for: NSApplication.willTerminateNotification)
+            .sink { [weak self] _ in MainActor.assumeIsolated { self?.close() } }
+            .store(in: &cancellables)
     }
 
     func show() {
-        guard !session.isClosed else { return }
-        let screen = WindowPlacement.screenUnderMouse()
+        guard !session.isClosed, let screen = WindowPlacement.screenUnderMouse(),
+              let snapshot = ScreenSnapshot(screen: screen) else { return }
+        displayID = snapshot.displayID
         if window == nil {
-            let available = screen?.visibleFrame.size ?? CGSize(width: 720, height: 640)
-            let window = NSWindow(
-                contentRect: CGRect(x: 0, y: 0, width: min(720, available.width - 32), height: min(640, available.height - 32)),
-                styleMask: [.titled, .closable, .resizable, .miniaturizable], backing: .buffered, defer: false
+            originalPresentationOptions = NSApp.presentationOptions
+            let window = FirstLaunchOnboardingWindow(
+                contentRect: snapshot.frame, styleMask: [.borderless], backing: .buffered, defer: false
             )
             window.title = AppLocalization.string("onboarding.introduction.title", language: languageStore.language)
             window.isReleasedWhenClosed = false
             window.collectionBehavior = [.moveToActiveSpace, .fullScreenAuxiliary]
+            window.animationBehavior = .none
+            window.isMovable = false
+            window.hasShadow = false
+            window.level = .normal
             window.delegate = self
             window.contentView = NSHostingView(rootView: AppLanguageEnvironment(
                 languageStore: languageStore,
-                content: FirstLaunchOnboardingView(session: session)
+                content: FirstLaunchOnboardingView(session: session, screen: screenState)
             ))
             self.window = window
         }
+        updateScreen()
         NSApp.activate(ignoringOtherApps: true)
-        if let window {
-            WindowPlacement.center(window, on: screen)
-            window.makeKeyAndOrderFront(nil)
+        window?.makeKeyAndOrderFront(nil)
+        updatePresentationOptions()
+    }
+
+    private func updateScreen() {
+        guard let window else { return }
+        let snapshots = NSScreen.screens.compactMap { ScreenSnapshot(screen: $0) }
+        guard let snapshot = snapshots.first(where: { $0.displayID == displayID })
+            ?? WindowPlacement.screenUnderMouse().flatMap({ ScreenSnapshot(screen: $0) }) else { return }
+        displayID = snapshot.displayID
+        screenState.presentation = FirstLaunchOnboardingPresentation(screen: snapshot)
+        NSAnimationContext.runAnimationGroup { context in
+            context.duration = 0
+            context.allowsImplicitAnimation = false
+            window.setFrame(snapshot.frame, display: true)
         }
     }
+
+    private func updatePresentationOptions(isRequesting: Bool? = nil) {
+        guard let originalPresentationOptions else { return }
+        NSApp.presentationOptions = FirstLaunchOnboardingPresentation.presentationOptions(
+            original: originalPresentationOptions, isActive: NSApp.isActive,
+            isKey: window?.isKeyWindow == true,
+            isRequesting: isRequesting ?? (session.permissions.requesting != nil)
+        )
+    }
+
+    func windowDidBecomeKey(_ notification: Notification) { updatePresentationOptions() }
+    func windowDidResignKey(_ notification: Notification) { updatePresentationOptions() }
 
     func windowWillClose(_ notification: Notification) {
         session.end(completed: false)
@@ -235,6 +317,8 @@ final class FirstLaunchOnboardingController: NSObject, NSWindowDelegate {
     func close() {
         session.close()
         cancellables.removeAll()
+        if let originalPresentationOptions { NSApp.presentationOptions = originalPresentationOptions }
+        originalPresentationOptions = nil
         window?.delegate = nil
         window?.contentView = nil
         window?.close()

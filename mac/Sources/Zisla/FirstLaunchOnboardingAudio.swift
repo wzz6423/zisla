@@ -4,6 +4,7 @@ import Foundation
 @MainActor
 protocol FirstLaunchOnboardingAudioPlaying: AnyObject {
     var volume: Float { get set }
+    var numberOfLoops: Int { get set }
     var isPlaying: Bool { get }
     var onFinish: (@MainActor () -> Void)? { get set }
     func prepareToPlay() -> Bool
@@ -38,6 +39,7 @@ final class FirstLaunchOnboardingAudio {
             let candidate = try makePlayer(FirstLaunchOnboardingScore.wavData())
             let id = UUID()
             candidate.volume = isMuted ? 0 : 1
+            candidate.numberOfLoops = -1
             candidate.onFinish = { [weak self] in
                 // A queued completion from an old player must not stop a new playback.
                 guard self?.playbackID == id else { return }
@@ -74,11 +76,14 @@ private final class FirstLaunchOnboardingAVPlayer: NSObject, FirstLaunchOnboardi
         set { player.volume = newValue }
     }
     var isPlaying: Bool { player.isPlaying }
+    var numberOfLoops: Int {
+        get { player.numberOfLoops }
+        set { player.numberOfLoops = newValue }
+    }
 
     init(data: Data) throws {
         player = try AVAudioPlayer(data: data)
         super.init()
-        player.numberOfLoops = 0
         player.delegate = self
     }
 

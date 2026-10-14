@@ -6,8 +6,11 @@ import ZislaKit
 
 @MainActor
 private final class OnboardingViewFixture {
+    var playCount = 0
+    var stopCount = 0
     var audioIsPlaying = false
     var audioIsMuted = false
+    var audioCanPlay = true
     var requestCompletion: OnboardingPermissionCoordinator.RequestCompletion?
     var requests: [OnboardingPermissionID] = []
     var openedSettings: [URL] = []
@@ -30,18 +33,18 @@ private final class OnboardingViewFixture {
 
     func session(
         preferredLanguage: AppLanguage = .english,
-        sleep: @escaping (Duration) async throws -> Void = { try await Task.sleep(for: $0) },
+        now: @escaping () -> Date = Date.init,
         onEnd: ((Bool) -> Void)? = nil
     ) -> FirstLaunchOnboardingSession {
         FirstLaunchOnboardingSession(
             permissions: permissions,
             audio: .init(
-                play: { self.audioIsPlaying = true; return true },
-                stop: { self.audioIsPlaying = false },
+                play: { self.playCount += 1; self.audioIsPlaying = self.audioCanPlay; return self.audioCanPlay },
+                stop: { self.stopCount += 1; self.audioIsPlaying = false },
                 setMuted: { self.audioIsMuted = $0 }
             ),
             preferredLanguage: preferredLanguage,
-            sleep: sleep,
+            now: now,
             onEnd: { self.outcomes.append($0); onEnd?($0) }
         )
     }
@@ -67,7 +70,6 @@ struct FirstLaunchOnboardingViewTests {
         defer { session.close() }
         session.start(reduceMotion: true)
         #expect(session.page == .greeting)
-        #expect(!session.hasGreetingTask)
         #expect(fake.audioIsPlaying)
         #expect(fake.requests.isEmpty)
         session.isMuted = true
@@ -75,16 +77,13 @@ struct FirstLaunchOnboardingViewTests {
         session.advance()
         #expect(session.page == .introduction)
         #expect(!fake.audioIsPlaying)
-        #expect(!session.hasGreetingTask)
     }
 
     @Test func closingCancelsGreetingAndPermissionResourcesWithoutCompletion() {
         let fake = OnboardingViewFixture()
         let session = fake.session()
         session.start(reduceMotion: false)
-        #expect(session.hasGreetingTask)
         session.advance()
-        #expect(!session.hasGreetingTask)
         session.advance()
         session.performPermissionAction(fake.item(.microphone))
         #expect(fake.permissionResourceIsActive)
@@ -95,7 +94,6 @@ struct FirstLaunchOnboardingViewTests {
         #expect(fake.permissions.isClosed)
         #expect(!fake.audioIsPlaying)
         #expect(!fake.permissionResourceIsActive)
-        #expect(!session.hasGreetingTask)
         #expect(fake.outcomes == [false])
         session.end(completed: true)
         #expect(fake.outcomes == [false])
@@ -164,7 +162,6 @@ struct FirstLaunchOnboardingViewTests {
         #expect(!normalApplicationIsRunning)
         #expect(state.shouldPresent)
         #expect(!fake.audioIsPlaying)
-        #expect(!session.hasGreetingTask)
         #expect(!fake.permissions.isClosed)
         #expect(fake.requests.isEmpty)
         session.advance()
@@ -174,137 +171,127 @@ struct FirstLaunchOnboardingViewTests {
         #expect(fake.permissions.isClosed)
     }
 
-    @Test func enablingReduceMotionCancelsExistingGreetingTask() {
+    @Test func repeatedStartPreservesGreetingAndAudio() {
+        let fake = OnboardingViewFixture()
+        var now = Date(timeIntervalSince1970: 0)
+        let session = fake.session(now: { now })
+        defer { session.close() }
+        session.start(reduceMotion: false)
+        let startedAt = session.greetingStartedAt
+        now = Date(timeIntervalSince1970: 3600)
+        session.start(reduceMotion: false)
+        #expect(session.page == .greeting)
+        #expect(session.greetingStartedAt == startedAt)
+        #expect(fake.playCount == 1)
+        #expect(fake.audioIsPlaying)
+        #expect(fake.outcomes.isEmpty)
+    }
+
+    @Test func laterPagesCannotRestartGreetingAudio() {
         let fake = OnboardingViewFixture()
         let session = fake.session()
         defer { session.close() }
         session.start(reduceMotion: false)
-        #expect(session.hasGreetingTask)
-        session.start(reduceMotion: true)
-        #expect(!session.hasGreetingTask)
-        #expect(session.greetingStartedAt == nil)
-    }
-
-    @Test func greetingAutoAdvancesWithScoreWithoutRequestingPermissions() async throws {
-        let fake = OnboardingViewFixture()
-        let delay = GreetingDelay()
-        let session = fake.session(preferredLanguage: .arabic, sleep: { try await delay.sleep($0) })
-        defer { session.close() }
-        let task = try #require(session.start(reduceMotion: false))
-        await delay.waitUntilStarted()
-        #expect(delay.durations == [.seconds(FirstLaunchOnboardingScore.duration)])
-        #expect(session.page == .greeting)
-        #expect(session.greetingStartedAt != nil)
-        #expect(session.greetingTimeline.languages.last == .arabic)
-        delay.release()
-        await task.value
-        #expect(session.page == .introduction)
-        #expect(!session.hasGreetingTask)
-        #expect(session.greetingStartedAt == nil)
-        #expect(!fake.audioIsPlaying)
-        #expect(fake.requests.isEmpty)
-        #expect(fake.outcomes.isEmpty)
-    }
-
-    @Test(arguments: [false, true])
-    func lateGreetingCompletionCannotNavigateAfterSkippingOrClosing(close: Bool) async throws {
-        let fake = OnboardingViewFixture()
-        let delay = GreetingDelay()
-        let session = fake.session(sleep: { try await delay.sleep($0) })
-        defer { session.close() }
-        let task = try #require(session.start(reduceMotion: false))
-        await delay.waitUntilStarted()
-        if close { session.close() } else { session.skipIntroduction() }
-        let page = session.page
-        delay.release()
-        await task.value
-        #expect(session.page == page)
-        #expect(session.isClosed == close)
-        #expect(!session.hasGreetingTask)
-        #expect(session.greetingStartedAt == nil)
-        #expect(!fake.audioIsPlaying)
-        #expect(fake.outcomes.isEmpty)
-        #expect(fake.requests.isEmpty)
-    }
-
-    @Test func reduceMotionIgnoresAlreadyScheduledCompletion() async throws {
-        let fake = OnboardingViewFixture()
-        let delay = GreetingDelay()
-        let session = fake.session(sleep: { try await delay.sleep($0) })
-        defer { session.close() }
-        let task = try #require(session.start(reduceMotion: false))
-        await delay.waitUntilStarted()
-        #expect(session.start(reduceMotion: true) == nil)
-        delay.release()
-        await task.value
-        #expect(session.page == .greeting)
-        #expect(session.greetingStartedAt == nil)
-        #expect(!session.hasGreetingTask)
-        #expect(fake.audioIsPlaying)
-    }
-
-    @Test(arguments: [false, true])
-    func returningToGreetingReplaysMusicAndIgnoresOldCompletion(failed: Bool) async throws {
-        let fake = OnboardingViewFixture()
-        let delay = GreetingDelay()
-        let session = fake.session(sleep: { try await delay.sleep($0) })
-        defer { session.close() }
-        let old = try #require(session.start(reduceMotion: false))
-        await delay.waitUntilStarted()
-        session.advance()
-        #expect(!fake.audioIsPlaying)
-        session.back()
-        let current = try #require(session.start(reduceMotion: false))
-        await delay.waitUntilStarted(count: 2)
-        #expect(fake.audioIsPlaying)
-        delay.release(error: failed ? CancellationError() : nil)
-        await old.value
-        #expect(session.page == .greeting)
-        #expect(session.hasGreetingTask)
-        delay.release()
-        await current.value
-        #expect(session.page == .introduction)
-        #expect(!fake.audioIsPlaying)
-    }
-
-    @Test func failedGreetingDelayLeavesStaticGreetingAndManualNavigation() async throws {
-        let fake = OnboardingViewFixture()
-        let session = fake.session(sleep: { _ in throw CancellationError() })
-        defer { session.close() }
-        let task = try #require(session.start(reduceMotion: false))
-        await task.value
-        #expect(session.page == .greeting)
-        #expect(!session.hasGreetingTask)
-        #expect(session.greetingStartedAt == nil)
-        #expect(!fake.audioIsPlaying)
-        session.advance()
-        #expect(session.page == .introduction)
-    }
-}
-
-@MainActor
-private final class GreetingDelay {
-    private(set) var durations: [Duration] = []
-    private var continuations: [CheckedContinuation<Void, Error>] = []
-    private var started: CheckedContinuation<Void, Never>?
-
-    func sleep(_ duration: Duration) async throws {
-        durations.append(duration)
-        try await withCheckedThrowingContinuation { continuation in
-            continuations.append(continuation)
-            started?.resume()
-            started = nil
+        for page in [FirstLaunchOnboardingSession.Page.introduction, .permissions, .ready] {
+            session.advance()
+            session.start(reduceMotion: false)
+            #expect(session.page == page)
+            #expect(session.greetingStartedAt == nil)
+            #expect(!fake.audioIsPlaying)
+            #expect(fake.playCount == 1)
         }
     }
 
-    func waitUntilStarted(count: Int = 1) async {
-        if durations.count >= count { return }
-        await withCheckedContinuation { started = $0 }
+    @Test func unavailableAudioStillWaitsForExplicitContinue() {
+        let fake = OnboardingViewFixture()
+        fake.audioCanPlay = false
+        let session = fake.session()
+        defer { session.close() }
+        session.start(reduceMotion: false)
+        #expect(session.page == .greeting)
+        #expect(session.greetingStartedAt != nil)
+        #expect(!fake.audioIsPlaying)
+        #expect(fake.requests.isEmpty)
+        session.advance(from: session.navigationID)
+        #expect(session.page == .introduction)
+        #expect(session.greetingStartedAt == nil)
+        #expect(fake.outcomes.isEmpty)
     }
 
-    func release(error: Error? = nil) {
-        let continuation = continuations.removeFirst()
-        if let error { continuation.resume(throwing: error) }
-        else { continuation.resume() }
+    @Test(arguments: [0.0, 7.2, 60.0, 86400.0])
+    func elapsedTimeNeverAdvancesGreeting(elapsed: TimeInterval) async {
+        let fake = OnboardingViewFixture()
+        var now = Date(timeIntervalSince1970: 0)
+        let session = fake.session(preferredLanguage: .arabic, now: { now })
+        defer { session.close() }
+        session.start(reduceMotion: false)
+        now = now.addingTimeInterval(elapsed)
+        _ = session.greetingTimeline.frame(at: elapsed)
+        await Task.yield()
+        #expect(session.page == .greeting)
+        #expect(fake.audioIsPlaying)
+        #expect(fake.requests.isEmpty)
+        #expect(fake.outcomes.isEmpty)
+        session.advance(from: session.navigationID)
+        #expect(session.page == .introduction)
+        #expect(session.greetingStartedAt == nil)
+        #expect(!fake.audioIsPlaying)
+    }
+
+    @Test func repeatedAndLateContinueOnlyMovesOnce() {
+        let fake = OnboardingViewFixture()
+        let session = fake.session()
+        defer { session.close() }
+        session.start(reduceMotion: false)
+        let greetingEvent = session.navigationID
+        session.advance(from: greetingEvent)
+        session.advance(from: greetingEvent)
+        #expect(session.page == .introduction)
+        #expect(fake.stopCount == 1)
+        session.back()
+        session.start(reduceMotion: false)
+        session.advance(from: greetingEvent)
+        #expect(session.page == .greeting)
+        #expect(fake.playCount == 2)
+        #expect(fake.audioIsPlaying)
+        session.close()
+        session.advance(from: session.navigationID)
+        session.start(reduceMotion: false)
+        #expect(fake.playCount == 2)
+        #expect(!fake.audioIsPlaying)
+        #expect(fake.outcomes.isEmpty)
+    }
+
+    @Test func reduceMotionCanChangeWithoutRestartingAudio() {
+        let fake = OnboardingViewFixture()
+        let session = fake.session()
+        defer { session.close() }
+        session.start(reduceMotion: false)
+        session.start(reduceMotion: true)
+        #expect(session.greetingStartedAt == nil)
+        #expect(session.page == .greeting)
+        #expect(fake.playCount == 1)
+        #expect(fake.audioIsPlaying)
+        session.start(reduceMotion: false)
+        #expect(session.greetingStartedAt != nil)
+        #expect(fake.playCount == 1)
+        session.advance()
+        #expect(!fake.audioIsPlaying)
+    }
+
+    @Test func latePermissionCompletionCannotFinishOrRestartServices() {
+        let fake = OnboardingViewFixture()
+        let session = fake.session()
+        session.skipIntroduction()
+        session.performPermissionAction(fake.item(.microphone))
+        let lateCompletion = fake.requestCompletion
+        session.end(completed: false)
+        lateCompletion?(.success(.granted))
+        session.advance()
+        session.end(completed: true)
+        #expect(fake.outcomes == [false])
+        #expect(fake.permissions.isClosed)
+        #expect(!fake.permissionResourceIsActive)
+        #expect(!fake.audioIsPlaying)
     }
 }

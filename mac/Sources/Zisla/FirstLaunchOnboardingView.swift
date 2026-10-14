@@ -4,12 +4,14 @@ import ZislaKit
 
 struct FirstLaunchOnboardingView: View {
     @ObservedObject var session: FirstLaunchOnboardingSession
+    @ObservedObject var screen: FirstLaunchOnboardingScreen
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @Environment(\.locale) private var locale
 
     var body: some View {
-        VStack(spacing: 0) {
-            GeometryReader { viewport in
+        GeometryReader { viewport in
+            let clearance = max(screen.presentation?.topContentInset ?? 106, 112)
+            ZStack {
                 ScrollView {
                     VStack(alignment: .leading, spacing: 24) {
                         switch session.page {
@@ -19,25 +21,53 @@ struct FirstLaunchOnboardingView: View {
                         case .ready: ready
                         }
                     }
-                    .frame(
-                        maxWidth: .infinity,
-                        minHeight: max(0, viewport.size.height - 64),
-                        alignment: session.page == .greeting ? .center : .topLeading
-                    )
-                    .padding(32)
+                    .frame(maxWidth: FirstLaunchOnboardingPresentation.readingWidth)
+                    .frame(minHeight: max(0, viewport.size.height - clearance * 2))
+                    .padding(.horizontal, 24)
+                    .padding(.vertical, clearance)
+                    .frame(maxWidth: .infinity)
+                }
+                VStack {
+                    Spacer()
+                    navigation
+                        .frame(maxWidth: FirstLaunchOnboardingPresentation.readingWidth)
+                        .padding(20)
+                        .frame(maxWidth: .infinity)
+                        .background(Color(nsColor: .windowBackgroundColor))
+                }
+                if let presentation = screen.presentation {
+                    islandAnchor(presentation)
                 }
             }
-            Hairline()
-            navigation
-                .padding(20)
         }
         .background(Color(nsColor: .windowBackgroundColor))
+        .ignoresSafeArea()
         .task(id: reduceMotion) { session.start(reduceMotion: reduceMotion) }
         .onChange(of: session.page) { _, page in
             if page == .greeting { session.start(reduceMotion: reduceMotion) }
         }
         .onDisappear { session.close() }
         .onExitCommand { session.end(completed: false) }
+    }
+
+    private func islandAnchor(_ presentation: FirstLaunchOnboardingPresentation) -> some View {
+        let anchor = presentation.anchorFrame
+        return VStack(spacing: 6) {
+            Capsule()
+                .fill(Color.black)
+                .frame(width: anchor.width, height: anchor.height)
+                .accessibilityHidden(true)
+            Image(systemName: "arrow.up")
+                .font(.title2.weight(.semibold))
+                .accessibilityHidden(true)
+            AppLocalizedText("onboarding.feature.island.title")
+                .font(.caption)
+        }
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(Text(localized("onboarding.feature.island.title")))
+        .fixedSize()
+        .position(x: anchor.midX, y: anchor.minY + (anchor.height + 54) / 2)
+        .allowsHitTesting(false)
     }
 
     private var greeting: some View {
@@ -119,14 +149,15 @@ struct FirstLaunchOnboardingView: View {
         }
         if session.page == .permissions {
             Button(localized("onboarding.skip_permission")) { session.advance() }
-        } else if session.page != .ready {
+        } else if session.page == .introduction {
             Button(localized("onboarding.skip_intro")) { session.skipIntroduction() }
         }
     }
 
     private var continueButton: some View {
-        Button(localized(session.page == .ready ? "onboarding.finish" : "onboarding.continue")) {
-            session.advance()
+        let navigationID = session.navigationID
+        return Button(localized(session.page == .ready ? "onboarding.finish" : "onboarding.continue")) {
+            session.advance(from: navigationID)
         }
         .buttonStyle(.borderedProminent)
         .keyboardShortcut(.defaultAction)

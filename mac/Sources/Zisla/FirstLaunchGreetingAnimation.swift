@@ -9,24 +9,21 @@ struct FirstLaunchGreetingTimeline {
     }
 
     let languages: [AppLanguage]
-    var wordDuration: TimeInterval { FirstLaunchOnboardingScore.duration / Double(languages.count) }
+    let wordDuration: TimeInterval = 2.4
 
     init(preferredLanguage: AppLanguage) {
-        var languages = Array(FirstLaunchOnboardingSession.greetingLanguages.prefix(3))
-        let hello = AppLocalization.string("onboarding.hello", language: preferredLanguage)
-        if !languages.contains(where: { AppLocalization.string("onboarding.hello", language: $0) == hello }) {
-            languages.append(preferredLanguage)
-        }
-        self.languages = languages
+        languages = FirstLaunchOnboardingSession.greetingLanguages
     }
 
     func frame(at elapsed: TimeInterval) -> Frame {
-        let elapsed = max(0, elapsed)
-        if elapsed >= FirstLaunchOnboardingScore.duration {
-            return Frame(language: languages.last!, progress: 1, opacity: 1)
-        }
-        let index = min(languages.count - 1, Int(elapsed / wordDuration))
-        let phase = (elapsed - Double(index) * wordDuration) / wordDuration
+        let duration = Double(languages.count) * wordDuration
+        var position = elapsed.truncatingRemainder(dividingBy: duration)
+        // Multiplication can round an exact cycle boundary away from a zero remainder.
+        if elapsed == (elapsed / duration).rounded() * duration { position = 0 }
+        let index = (0..<(languages.count - 1)).first {
+            position < Double($0 + 1) * wordDuration
+        } ?? (languages.count - 1)
+        let phase = max(0, (position - Double(index) * wordDuration) / wordDuration)
         return Frame(
             language: languages[index],
             progress: CGFloat(min(1, phase / 0.68)),

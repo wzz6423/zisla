@@ -31,6 +31,24 @@ struct FirstLaunchOnboardingLifecycleTests {
         }
     }
 
+    @Test func repeatedBeginAndLateFinishCannotStartAfterTermination() {
+        withDefaults { defaults in
+            let state = FirstLaunchOnboardingState(defaults: defaults, bundleIdentifier: "dev.wzz.zisla", environment: [:], hasExistingInstallation: false)
+            var startupCount = 0
+            let lifecycle = FirstLaunchOnboardingLifecycle(state: state) { startupCount += 1 }
+            #expect(lifecycle.begin())
+            #expect(!lifecycle.begin())
+            #expect(startupCount == 0)
+            lifecycle.terminate()
+            lifecycle.terminate()
+            lifecycle.finish(completed: false)
+            lifecycle.finish(completed: true)
+            #expect(!lifecycle.begin())
+            #expect(startupCount == 0)
+            #expect(!defaults.bool(forKey: FirstLaunchOnboardingState.completedKey))
+        }
+    }
+
     @Test func closingStartsNormallyButInterruptedInstallRemainsEligible() {
         withDefaults { defaults in
             let state = FirstLaunchOnboardingState(defaults: defaults, bundleIdentifier: "dev.wzz.zisla", environment: [:], hasExistingInstallation: false)

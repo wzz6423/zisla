@@ -76,11 +76,15 @@ struct FirstLaunchOnboardingAudioTests {
         #expect(audio.isPlaying)
         #expect(first.isAudible)
         #expect(first.position == 0)
+        #expect(first.numberOfLoops == -1)
+        #expect(first.loopsAtPreparation == -1)
+        #expect(output.creationCount == 1)
         first.position = 1.5
 
         #expect(audio.play())
         #expect(output.current === first)
         #expect(first.position == 1.5)
+        #expect(output.creationCount == 1)
         #expect(first.isAudible)
         audio.stop()
         #expect(!first.isAudible)
@@ -115,11 +119,14 @@ struct FirstLaunchOnboardingAudioTests {
         #expect(audio.isPlaying)
         #expect(!player.isAudible)
         #expect(player.volume == 0)
+        player.advance(by: 0.5)
+        #expect(audio.play())
+        #expect(output.creationCount == 1)
 
         audio.isMuted = false
         #expect(player.isAudible)
         #expect(player.volume == 1)
-        #expect(player.position == 2)
+        #expect(player.position == 2.5)
         audio.isMuted = true
         #expect(!player.isAudible)
         audio.stop()
@@ -130,15 +137,35 @@ struct FirstLaunchOnboardingAudioTests {
     }
 
     @Test
-    func naturalCompletionReleasesThePlayerAndCanPlayAgain() {
+    func phraseLoopsKeepTheSamePlayerAndPCMUntilExplicitlyStopped() throws {
         let output = OnboardingAudioOutput()
         let audio = FirstLaunchOnboardingAudio(makePlayer: output.makePlayer)
         #expect(audio.play())
-        output.current?.finish()
+        let player = try #require(output.current)
+        #expect(output.pcmByteCount == 345_644)
+        for _ in 0..<100 {
+            player.advance(by: FirstLaunchOnboardingScore.duration)
+            #expect(audio.isPlaying)
+            #expect(audio.play())
+            #expect(output.current === player)
+            #expect(output.creationCount == 1)
+            #expect(player.position == 0)
+        }
+        audio.stop()
+        #expect(!player.isPlaying)
+        #expect(player.onFinish == nil)
+    }
+
+    @Test
+    func unexpectedTerminationReleasesThePlayerAndAllowsRetry() {
+        let output = OnboardingAudioOutput()
+        let audio = FirstLaunchOnboardingAudio(makePlayer: output.makePlayer)
+        #expect(audio.play())
+        output.current?.fail()
         #expect(!audio.isPlaying)
         #expect(output.current == nil)
         #expect(audio.play())
-        #expect(output.current?.isAudible == true)
+        #expect(output.current?.numberOfLoops == -1)
         audio.stop()
     }
 
@@ -188,8 +215,12 @@ private final class OnboardingAudioOutput {
 
     var failure: Failure?
     weak var current: OnboardingAudioPlayer?
+    private(set) var creationCount = 0
+    private(set) var pcmByteCount = 0
 
     func makePlayer(data: Data) throws -> any FirstLaunchOnboardingAudioPlaying {
+        creationCount += 1
+        pcmByteCount = data.count
         if failure == .initialization { throw Failure.initialization }
         let player = OnboardingAudioPlayer(failure: failure)
         current = player
@@ -200,6 +231,8 @@ private final class OnboardingAudioOutput {
 @MainActor
 private final class OnboardingAudioPlayer: FirstLaunchOnboardingAudioPlaying {
     var volume: Float = 1
+    var numberOfLoops = 0
+    private(set) var loopsAtPreparation: Int?
     private(set) var isPlaying = false
     var onFinish: (@MainActor () -> Void)?
     var position = 0.0
@@ -210,7 +243,10 @@ private final class OnboardingAudioPlayer: FirstLaunchOnboardingAudioPlaying {
         self.failure = failure
     }
 
-    func prepareToPlay() -> Bool { failure != .preparation }
+    func prepareToPlay() -> Bool {
+        loopsAtPreparation = numberOfLoops
+        return failure != .preparation
+    }
 
     func play() -> Bool {
         guard failure != .playback else { return false }
@@ -224,7 +260,19 @@ private final class OnboardingAudioPlayer: FirstLaunchOnboardingAudioPlaying {
         position = 0
     }
 
-    func finish() {
+    func advance(by duration: TimeInterval) {
+        guard isPlaying else { return }
+        position += duration
+        if position >= FirstLaunchOnboardingScore.duration {
+            if numberOfLoops == -1 {
+                position = position.truncatingRemainder(dividingBy: FirstLaunchOnboardingScore.duration)
+            } else {
+                fail()
+            }
+        }
+    }
+
+    func fail() {
         isPlaying = false
         onFinish?()
     }
