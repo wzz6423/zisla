@@ -8,6 +8,7 @@ import ZislaKit
 /// instead of embedding KeyboardKit's standalone statistics window.
 struct KeyboardTypingStatsDashboardView: View {
     let summary: KeyboardTypingStatsSummary
+    let voiceStatistics: VoiceHistoryStatistics?
 
     private var accent: Color { Color.accentColor }
     static let chartXAxisLabelPadding: CGFloat = 24
@@ -20,6 +21,9 @@ struct KeyboardTypingStatsDashboardView: View {
     private var compactDashboard: some View {
         VStack(alignment: .leading, spacing: 16) {
             metricsGrid
+            if let voiceStatistics {
+                voiceMetricsGrid(voiceStatistics)
+            }
             activityPanels
             keyboardPanel
             applicationPanel
@@ -63,6 +67,39 @@ struct KeyboardTypingStatsDashboardView: View {
                 title: AppLocalization.text("活跃时间"),
                 value: durationText(summary.todayActiveSeconds),
                 detail: AppLocalization.text("%@ 分钟", summary.todayActiveMinuteBuckets.formatted(.number))
+            )
+        }
+    }
+
+    private func voiceMetricsGrid(_ statistics: VoiceHistoryStatistics) -> some View {
+        let totalDuration = VoiceHistoryFormatting.duration(statistics.totalDuration)
+        let savedTime = VoiceHistoryFormatting.duration(statistics.savedTime)
+        let numberFormat = IntegerFormatStyle<Int>.number.locale(AppLocalization.currentLanguage.locale)
+
+        return HStack(spacing: 8) {
+            compactMetricCard(
+                symbol: "textformat",
+                title: AppLocalization.text("总识别字词"),
+                value: statistics.totalWordCount.formatted(numberFormat),
+                detail: AppLocalization.text("字词")
+            )
+            compactMetricCard(
+                symbol: "waveform",
+                title: AppLocalization.text("累计口述时间"),
+                value: totalDuration.value,
+                detail: totalDuration.unit
+            )
+            compactMetricCard(
+                symbol: "bolt.fill",
+                title: AppLocalization.text("输入速度"),
+                value: Int(statistics.wordsPerMinute.rounded()).formatted(numberFormat),
+                detail: AppLocalization.text("字词/分")
+            )
+            compactMetricCard(
+                symbol: "clock",
+                title: AppLocalization.text("节省时间"),
+                value: savedTime.value,
+                detail: savedTime.unit
             )
         }
     }
