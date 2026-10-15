@@ -951,6 +951,16 @@ final class AppModel: ObservableObject {
     dashboardCardCount = count
   }
 
+  @Published private(set) var isFirstLaunchOnboardingActive = false
+
+  func setFirstLaunchOnboardingActive(_ active: Bool) {
+    let wasActive = isFirstLaunchOnboardingActive
+    isFirstLaunchOnboardingActive = active
+    if wasActive, !active, GlobalHotkeyManager.hasInputMonitoringAccess {
+      applyKeyboardSettings(settingsStore.settings)
+    }
+  }
+
   func start() {
     headphoneTransientLifecycleActive = true
     backgroundSounds.startLifecycleMonitoring()
@@ -2912,6 +2922,21 @@ final class AppModel: ObservableObject {
     return sideNoticesEnabled || (systemMonitorEnabled && needsHeadphones)
   }
 
+  private func applyKeyboardSettings(_ settings: FeatureSettings) {
+    let allowsServices = FirstLaunchOnboardingRuntimePolicy.allowsKeyboardServices(
+      isOnboardingActive: isFirstLaunchOnboardingActive,
+      hasInputMonitoringAccess: GlobalHotkeyManager.hasInputMonitoringAccess
+    )
+    keyboardSound.apply(
+      enabled: settings.keyboardEnabled && allowsServices,
+      keyboardProfileID: settings.keyboardSelectedProfileID,
+      keyboardVolume: settings.keyboardVolume,
+      playsReleaseSound: settings.keyboardPlaysReleaseSound,
+      usesPitchVariation: settings.keyboardUsesPitchVariation,
+      typingStatsEnabled: settings.keyboardTypingStatsEnabled && allowsServices
+    )
+  }
+
   private func apply(settings: FeatureSettings, requestWindowPreviewPermissions: Bool = false) {
     if !settings.aiProgressEnabled || !settings.aiTaskResultSweepEnabled {
       aiResultSweep.cancel()
@@ -2923,14 +2948,7 @@ final class AppModel: ObservableObject {
     )
     // Regular UI appearance is controlled by user settings; the island panel is separately pinned to dark at the window level (see IslandPanel).
     NSApp.appearance = settings.appearanceMode.nsAppearance
-    keyboardSound.apply(
-      enabled: settings.keyboardEnabled,
-      keyboardProfileID: settings.keyboardSelectedProfileID,
-      keyboardVolume: settings.keyboardVolume,
-      playsReleaseSound: settings.keyboardPlaysReleaseSound,
-      usesPitchVariation: settings.keyboardUsesPitchVariation,
-      typingStatsEnabled: settings.keyboardTypingStatsEnabled
-    )
+    applyKeyboardSettings(settings)
     media.setPreferredSource(settings.mediaSource)
     voiceInput.setContextualStrings(
       VoiceLexicon.contextualTerms(

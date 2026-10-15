@@ -159,6 +159,9 @@ function resolve_dev_code_sign_identity() {
 function start_service() {
   local pid
   local dev_identity
+  local first_launch=0
+
+  [[ "${ZISLA_FIRST:-}" == "1" ]] && first_launch=1
 
   dev_identity="$(resolve_dev_code_sign_identity)"
   stop_service
@@ -172,6 +175,8 @@ function start_service() {
   plutil -insert Label -string "$SERVICE_LABEL" "$LAUNCH_AGENT"
   plutil -insert ProgramArguments -array "$LAUNCH_AGENT"
   plutil -insert ProgramArguments.0 -string "$APP_BINARY" "$LAUNCH_AGENT"
+  plutil -insert EnvironmentVariables -dictionary "$LAUNCH_AGENT"
+  plutil -insert EnvironmentVariables.ZISLA_FIRST -string "$first_launch" "$LAUNCH_AGENT"
   plutil -insert ProcessType -string Interactive "$LAUNCH_AGENT"
   plutil -insert RunAtLoad -bool true "$LAUNCH_AGENT"
   plutil -insert KeepAlive -bool true "$LAUNCH_AGENT"

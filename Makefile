@@ -1,15 +1,16 @@
 .PHONY: run stop update build-package sync-cask clean
 
 LOCAL_SIGNING_ENV := SIGNING_MODE=dev
+ZISLA_FIRST ?= 0
 
 run:
-	@$(LOCAL_SIGNING_ENV) mac/Scripts/dev-service.sh run
+	@ZISLA_FIRST="$(ZISLA_FIRST)" $(LOCAL_SIGNING_ENV) mac/Scripts/dev-service.sh run
 
 stop:
 	@mac/Scripts/dev-service.sh stop
 
 update:
-	@$(LOCAL_SIGNING_ENV) mac/Scripts/dev-service.sh run
+	@ZISLA_FIRST="$(ZISLA_FIRST)" $(LOCAL_SIGNING_ENV) mac/Scripts/dev-service.sh run
 
 build-package:
 	@mac/Scripts/build-package.sh

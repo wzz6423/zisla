@@ -71,6 +71,11 @@ public final class OverlayCoordinator: NSObject {
     private var isScreenshotActive = false
     private var isScreenLocked = false
     private var collapsedOnTop = true
+    private var isOnboardingActive = false
+
+    internal var collapsedPanelLevel: NSWindow.Level {
+        isOnboardingActive || collapsedOnTop ? IslandPanel.onTopLevel : IslandPanel.onBottomLevel
+    }
     private var isPersistentContentVisible = true
     internal var applicationActivationHandler: () -> Void = {
         NSApp.activate(ignoringOtherApps: true)
@@ -559,6 +564,17 @@ public final class OverlayCoordinator: NSObject {
         applyPersistentPanelLevels()
     }
 
+    public func setOnboardingActive(_ active: Bool) {
+        guard isOnboardingActive != active else { return }
+        isOnboardingActive = active
+        applyPanelLevel()
+        if active, isRunning {
+            ensureActiveDisplay()
+            _ = reducer.start()
+            presentCurrentLayout()
+        }
+    }
+
     public func setPersistentContentVisible(_ visible: Bool) {
         guard isPersistentContentVisible != visible else { return }
         isPersistentContentVisible = visible
@@ -576,9 +592,7 @@ public final class OverlayCoordinator: NSObject {
             || reducer.state.visibility == .pinned
         let target = isScreenshotActive
             ? IslandPanel.onBottomLevel
-            : ((isExpanded || collapsedOnTop)
-            ? IslandPanel.onTopLevel
-            : IslandPanel.onBottomLevel)
+            : (isExpanded ? IslandPanel.onTopLevel : collapsedPanelLevel)
         guard panel.level != target else { return }
         panel.level = target
     }

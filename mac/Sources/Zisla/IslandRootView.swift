@@ -421,11 +421,26 @@ struct IslandRootView: View {
     }
 
     private var hidesIslandSurface: Bool {
-        !model.isIslandVisible
-            && !voiceInput.isCapturingInput
-            && !showsTransientNotice
-            && !model.isMirrorPresented
-            && !model.isTeleprompterPresented
+        Self.hidesIslandSurface(
+            isOnboardingActive: model.isFirstLaunchOnboardingActive,
+            isIslandVisible: model.isIslandVisible,
+            isCapturingInput: voiceInput.isCapturingInput,
+            showsTransientNotice: showsTransientNotice,
+            isMirrorPresented: model.isMirrorPresented,
+            isTeleprompterPresented: model.isTeleprompterPresented
+        )
+    }
+
+    nonisolated static func hidesIslandSurface(
+        isOnboardingActive: Bool,
+        isIslandVisible: Bool,
+        isCapturingInput: Bool,
+        showsTransientNotice: Bool,
+        isMirrorPresented: Bool,
+        isTeleprompterPresented: Bool
+    ) -> Bool {
+        !isOnboardingActive && !isIslandVisible && !isCapturingInput
+            && !showsTransientNotice && !isMirrorPresented && !isTeleprompterPresented
     }
 
     private var showsTransientNotice: Bool {

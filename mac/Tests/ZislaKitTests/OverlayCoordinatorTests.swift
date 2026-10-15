@@ -5,6 +5,68 @@ import Testing
 
 struct OverlayCoordinatorTests {
     @Test @MainActor
+    func tutorialPresentsIdleIslandAndKeepsHoverInteractionWithTemporaryLevel() throws {
+        let content = NSView()
+        let screen = ScreenSnapshot(
+            displayID: 101,
+            frame: CGRect(x: -100_000, y: -100_000, width: 1440, height: 900),
+            visibleFrame: CGRect(x: -100_000, y: -100_000, width: 1440, height: 875)
+        )
+        let coordinator = OverlayCoordinator(contentView: content)
+        coordinator.screenSnapshotProvider = { [screen] }
+        var presentations = 0
+        var visibilityChanges: [Bool] = []
+        coordinator.onCollapsedSizeChanged = { _ in presentations += 1 }
+        coordinator.onVisibilityChanged = { visibilityChanges.append($0) }
+        coordinator.start()
+        defer { coordinator.stop() }
+        coordinator.setCollapsedOnTop(false)
+        coordinator.setOnboardingActive(true)
+
+        let panel = try #require(content.window as? IslandPanel)
+        #expect(panel.isVisible)
+        #expect(coordinator.isVisible)
+        #expect(panel.ignoresMouseEvents)
+        #expect(!panel.isKeyWindow)
+        #expect(panel.level == IslandPanel.onTopLevel)
+        #expect(visibilityChanges.isEmpty)
+        let initialPresentations = presentations
+        coordinator.setOnboardingActive(true)
+        #expect(presentations == initialPresentations)
+
+        let trigger = ScreenLayoutEngine().layout(for: screen).triggerFrame
+        coordinator.handlePointer(at: CGPoint(x: trigger.midX, y: trigger.midY))
+        #expect(!panel.ignoresMouseEvents)
+        #expect(visibilityChanges.last == true)
+        coordinator.collapseImmediately()
+        #expect(panel.ignoresMouseEvents)
+        coordinator.setOnboardingActive(false)
+        #expect(panel.level == IslandPanel.onBottomLevel)
+        #expect(!panel.isKeyWindow)
+    }
+
+    @Test @MainActor
+    func onboardingLevelOverrideRestoresLatestPreferenceWithoutStartingServices() {
+        let coordinator = OverlayCoordinator(contentView: NSView())
+        coordinator.setCollapsedOnTop(false)
+        #expect(coordinator.collapsedPanelLevel == IslandPanel.onBottomLevel)
+        coordinator.setOnboardingActive(true)
+        #expect(coordinator.collapsedPanelLevel == IslandPanel.onTopLevel)
+        #expect(coordinator.collapsedPanelLevel.rawValue > NSWindow.Level.normal.rawValue)
+        coordinator.setCollapsedOnTop(true)
+        coordinator.setCollapsedOnTop(false)
+        #expect(coordinator.collapsedPanelLevel == IslandPanel.onTopLevel)
+        coordinator.setOnboardingActive(false)
+        #expect(coordinator.collapsedPanelLevel == IslandPanel.onBottomLevel)
+        coordinator.setOnboardingActive(true)
+        coordinator.setCollapsedOnTop(true)
+        coordinator.setOnboardingActive(false)
+        #expect(coordinator.collapsedPanelLevel == IslandPanel.onTopLevel)
+        #expect(!coordinator.isRunning)
+        #expect(coordinator.layouts.isEmpty)
+    }
+
+    @Test @MainActor
     func compactNoticeMovesToItsOriginatingDisplayWithoutExpandingTheIsland() throws {
         let content = NSView()
         let coordinator = OverlayCoordinator(contentView: content)

@@ -337,6 +337,10 @@ enum PersistentPetNoticePolicy {
 
 @MainActor
 final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
+    private var onboardingController: FirstLaunchOnboardingController?
+    private var onboardingLifecycle: FirstLaunchOnboardingLifecycle?
+    private var runningModel: AppModel?
+    private var isTerminating = false
     private var overlayCoordinator: OverlayCoordinator?
     private var fileShelfShakeController: FileShelfShakeController?
     private var contextNoteController: ContextNoteController?
@@ -393,7 +397,35 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
         }
         NSApp.setActivationPolicy(.accessory)
         WindowPlacement.installTransientWindowPromotion()
+        let defaults = UserDefaults.standard
+        let hasExistingInstallation = [
+            "feature-settings-v1", "keyboardVolumeCurveVersion",
+            "selectedPointerProfile", "download-directory-bookmark",
+        ].contains { defaults.object(forKey: $0) != nil }
+        let state = FirstLaunchOnboardingState(hasExistingInstallation: hasExistingInstallation)
+        let lifecycle = FirstLaunchOnboardingLifecycle(state: state) { [weak self] in
+            self?.startNormalApplication()
+        }
+        onboardingLifecycle = lifecycle
+        if lifecycle.begin() {
+            let controller = FirstLaunchOnboardingController { [weak self] completed in
+                guard let self else { return }
+                self.onboardingController?.close()
+                self.onboardingController = nil
+                self.onboardingLifecycle?.finish(completed: completed)
+                self.runningModel?.setFirstLaunchOnboardingActive(false)
+                self.updateOverlayRuntime()
+            }
+            onboardingController = controller
+            controller.show()
+        }
+    }
+
+    private func startNormalApplication() {
+        guard !isTerminating, runningModel == nil else { return }
         let model = AppModel.shared
+        runningModel = model
+        model.setFirstLaunchOnboardingActive(onboardingLifecycle?.isPresenting == true)
         model.start()
         configureApplicationIconUpdates(model: model)
         let lockScreenOverlayController = LockScreenOverlayController(model: model)
@@ -551,9 +583,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
             .store(in: &cancellables)
         model.$isMirrorPresented
             .combineLatest(model.$isTeleprompterPresented)
-            .sink { [weak coordinator, weak model] isMirrorPresented, isTeleprompterPresented in
-                Task { @MainActor in
-                    guard let model else { return }
+            .sink { [weak self, weak coordinator, weak model] isMirrorPresented, isTeleprompterPresented in
+                Task { @MainActor [weak self] in
+                    guard let self, !self.isTerminating, let model else { return }
                     if isTeleprompterPresented {
                         coordinator?.start()
                         coordinator?.selectActiveDisplay(
@@ -624,10 +656,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
         }
         coordinator.setPersistentContentVisible(model.settingsStore.settings.petEnabled)
         coordinator.setCollapsedOnTop(model.settingsStore.settings.islandCollapsedOnTop)
-        if model.settingsStore.settings.hoverActivationEnabled
-            || model.settingsStore.settings.petEnabled {
-            coordinator.start()
-        }
+        updateOverlayRuntime()
         // Mount the island content now so the first reveal animates instead of snapping in.
         coordinator.prewarmPanel()
         if ProcessInfo.processInfo.environment["ZISLA_VISUAL_TEST_SHOW"] == "1" {
@@ -686,14 +715,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
         model.settingsStore.$settings
             .map(\.hoverActivationEnabled)
             .removeDuplicates()
-            .sink { [weak self] enabled in
+            .sink { [weak self] _ in
                 Task { @MainActor [weak self] in
                     guard let self else { return }
-                    if enabled {
-                        self.overlayCoordinator?.start()
-                    } else if !model.settingsStore.settings.petEnabled && !model.isPinned {
-                        self.overlayCoordinator?.stop()
-                    }
+                    self.updateOverlayRuntime()
                 }
             }
             .store(in: &cancellables)
@@ -743,19 +768,16 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
         model.settingsStore.$settings
             .map(\.petEnabled)
             .removeDuplicates()
-            .sink { [weak self, weak coordinator, weak model] enabled in
+            .sink { [weak self, weak coordinator] enabled in
                 Task { @MainActor [weak self] in
+                    guard let self, !self.isTerminating else { return }
                     coordinator?.setPersistentContentVisible(enabled)
-                    guard let model else { return }
                     if enabled {
-                        self?.petController?.start()
-                        coordinator?.start()
+                        self.petController?.start()
                     } else {
-                        self?.petController?.stop()
-                        if !model.settingsStore.settings.hoverActivationEnabled && !model.isPinned {
-                            coordinator?.stop()
-                        }
+                        self.petController?.stop()
                     }
+                    self.updateOverlayRuntime()
                 }
             }
             .store(in: &cancellables)
@@ -919,10 +941,16 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
     func applicationShouldTerminate(
         _ application: NSApplication
     ) -> NSApplication.TerminateReply {
-        AppModel.shared.keyboardSound.applicationShouldTerminate(application)
+        guard let runningModel else { return .terminateNow }
+        return runningModel.keyboardSound.applicationShouldTerminate(application)
     }
 
     func applicationWillTerminate(_ notification: Notification) {
+        isTerminating = true
+        onboardingLifecycle?.terminate()
+        onboardingController?.close()
+        onboardingController = nil
+        guard let runningModel else { return }
         combinedIconReadTask?.cancel()
         expandedSizeUpdateTask?.cancel()
         fileShelfShakeController?.stop()
@@ -931,7 +959,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
         lidCloseController?.stop()
         systemScreenshotMonitor?.stop()
         systemScreenshotMonitor = nil
-        AppModel.shared.stop()
+        runningModel.stop()
         screenshotHotkeyManager.unregister()
         screenshotLongHotkeyManager.unregister()
         setScreenshotSessionActive(false)
@@ -945,6 +973,25 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
         petController?.stop()
         overlayCoordinator?.stop()
         islandClipboardHandoffTask?.cancel()
+    }
+
+    private func updateOverlayRuntime() {
+        guard !isTerminating, let model = runningModel, let coordinator = overlayCoordinator else { return }
+        let settings = model.settingsStore.settings
+        let policy = FirstLaunchOnboardingRuntimePolicy(
+            isOnboardingActive: onboardingLifecycle?.isPresenting == true,
+            hoverActivationEnabled: settings.hoverActivationEnabled,
+            petEnabled: settings.petEnabled,
+            isPinned: model.isPinned || model.isMirrorPresented || model.isTeleprompterPresented
+        )
+        coordinator.setCollapsedOnTop(settings.islandCollapsedOnTop)
+        if policy.shouldRun {
+            coordinator.start()
+            coordinator.setOnboardingActive(policy.isOnboardingActive)
+        } else {
+            coordinator.setOnboardingActive(false)
+            coordinator.stop()
+        }
     }
 
     /// Holds the island panel at its recording size until the recycle fold has folded the pill back
@@ -1804,6 +1851,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
     }
 
     @objc private func showSettings() {
+        guard runningModel != nil else {
+            onboardingController?.show()
+            return
+        }
         let targetScreen = WindowPlacement.screenUnderMouse()
         if settingsWindowController == nil {
             let rootView = SettingsView(model: AppModel.shared)
