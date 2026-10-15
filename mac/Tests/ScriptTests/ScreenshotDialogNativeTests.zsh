@@ -35,6 +35,7 @@ enum AppLocalization {
 @MainActor final class ModalProgress {
     var observedModal = false
     var mainQueueRan = false
+    var mainQueueRanBeforeCompletion = false
     var alertLayer: Int?
     var screenshotLayer: Int?
     var response: NSApplication.ModalResponse?
@@ -131,7 +132,10 @@ func require(_ condition: Bool, _ message: String) {
     DispatchQueue.main.async {
         RunLoop.main.add(probe, forMode: .modalPanel)
         RunLoop.main.add(watchdog, forMode: .modalPanel)
-        ScreenshotDialogPresentation.present(alert) { progress.response = $0 }
+        ScreenshotDialogPresentation.present(alert) {
+            progress.mainQueueRanBeforeCompletion = progress.mainQueueRan
+            progress.response = $0
+        }
     }
     let deadline = Date(timeIntervalSinceNow: 3)
     while progress.response == nil, Date() < deadline {
@@ -141,7 +145,8 @@ func require(_ condition: Bool, _ message: String) {
     require(progress.alertLayer != nil && progress.screenshotLayer != nil, "Both windows must exist in WindowServer")
     require(progress.alertLayer! > progress.screenshotLayer!,
             "WindowServer must display OCR above the screenshot: OCR=\(progress.alertLayer!), screenshot=\(progress.screenshotLayer!)")
-    require(progress.mainQueueRan, "The visible modal must allow main-queue work")
+    require(progress.mainQueueRanBeforeCompletion,
+            "The visible modal must allow main-queue work before its completion handler runs")
     require(progress.response == (dismissal == "copy" ? .alertFirstButtonReturn : .alertSecondButtonReturn),
             "\(dismissal) must finish the modal without the watchdog")
     require(NSApp.modalWindow == nil && !alert.window.isVisible, "The OCR modal must be dismissed")
