@@ -172,17 +172,17 @@ export const downloadLinks: readonly DownloadLink[] = [
 ];
 
 export const latestRelease = {
-  version: 'v0.1.18',
-  date: '2026-10-11',
+  version: 'v0.1.19',
+  date: '2026-10-15',
   channel: 'Release',
-  releasePage: 'https://github.com/wzz6423/zisla/releases/tag/v0.1.18',
-  dmg: 'https://github.com/wzz6423/zisla/releases/download/v0.1.18/zisla-v0.1.18-macOS-arm64.dmg',
-  zip: 'https://github.com/wzz6423/zisla/releases/download/v0.1.18/zisla-v0.1.18-macOS-arm64.zip',
-  checksum: 'https://github.com/wzz6423/zisla/releases/download/v0.1.18/zisla-v0.1.18-macOS-arm64.zip.sha256',
-  universalDmg: 'https://github.com/wzz6423/zisla/releases/download/v0.1.18/zisla-v0.1.18-macOS-universal.dmg',
-  universalZip: 'https://github.com/wzz6423/zisla/releases/download/v0.1.18/zisla-v0.1.18-macOS-universal.zip',
-  intelDmg: 'https://github.com/wzz6423/zisla/releases/download/v0.1.18/zisla-v0.1.18-macOS-x86_64.dmg',
-  intelZip: 'https://github.com/wzz6423/zisla/releases/download/v0.1.18/zisla-v0.1.18-macOS-x86_64.zip',
+  releasePage: 'https://github.com/wzz6423/zisla/releases/tag/v0.1.19',
+  dmg: 'https://github.com/wzz6423/zisla/releases/download/v0.1.19/zisla-v0.1.19-macOS-arm64.dmg',
+  zip: 'https://github.com/wzz6423/zisla/releases/download/v0.1.19/zisla-v0.1.19-macOS-arm64.zip',
+  checksum: 'https://github.com/wzz6423/zisla/releases/download/v0.1.19/zisla-v0.1.19-macOS-arm64.zip.sha256',
+  universalDmg: 'https://github.com/wzz6423/zisla/releases/download/v0.1.19/zisla-v0.1.19-macOS-universal.dmg',
+  universalZip: 'https://github.com/wzz6423/zisla/releases/download/v0.1.19/zisla-v0.1.19-macOS-universal.zip',
+  intelDmg: 'https://github.com/wzz6423/zisla/releases/download/v0.1.19/zisla-v0.1.19-macOS-x86_64.dmg',
+  intelZip: 'https://github.com/wzz6423/zisla/releases/download/v0.1.19/zisla-v0.1.19-macOS-x86_64.zip',
   previewPage: 'https://github.com/wzz6423/zisla/releases/tag/v0.1.3-preview.1',
 };
 
@@ -198,6 +198,17 @@ export interface ChangelogEntry {
  * 统一以英文原文展示（11 版 × 17 语翻译不可维护）；v0.1.8/v0.1.0 无 Highlights 段，取其正文概述。
  */
 export const changelogEntries: readonly ChangelogEntry[] = [
+  {
+    version: 'v0.1.19',
+    date: '2026-10-15',
+    notes: [
+      'Fresh installations open a fullscreen welcome with original handwritten greetings in all 17 supported languages, desktop blur and optional music. The introduction keeps the Dynamic Island interactive and offers permission requests initiated by the user. Existing installations skip onboarding.',
+      'Quick Actions recognize common expressions in all 17 supported languages, including date addition and subtraction, date intervals, time zones, units, currencies and meeting details. Date and time actions have their own setting and localized examples, with support for compact forms such as 2026.10.28 sub15d.',
+      'Voice-input totals, dictation duration, speed and saved time now appear together on the keyboard dashboard when voice input is enabled. Voice History retains the recording list and its controls.',
+      'Screenshot dialogs retain their intended window level and restore focus. OCR keeps the main queue responsive while recognizing text and presenting progress.',
+      'Keep Screen On reuses a single administrator authorization for its lid-close session and presents consistent, localized error notices.',
+    ],
+  },
   {
     version: 'v0.1.18',
     date: '2026-10-11',
