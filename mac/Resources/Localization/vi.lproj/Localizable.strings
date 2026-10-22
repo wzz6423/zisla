@@ -2744,3 +2744,15 @@
 "onboarding.permission.system_audio.body" = "Để hiển thị hình ảnh theo nhạc. Bật quyền ghi âm thanh trong Cài đặt hệ thống; macOS có thể yêu cầu xác nhận khi dùng lần đầu.";
 "onboarding.permission.full_disk_access.title" = "Truy cập toàn bộ ổ đĩa";
 "onboarding.permission.full_disk_access.body" = "Chỉ cần cho chỉ mục thư cục bộ hoặc cookie của trình duyệt. Bật trong Cài đặt hệ thống nếu bạn dùng những tính năng này.";
+
+"更新日志" = "Ghi chú phát hành";
+"已更新至 %@" = "Đã cập nhật lên %@";
+"正在加载更新日志" = "Đang tải ghi chú phát hành";
+"无法加载更新日志" = "Không thể tải ghi chú phát hành";
+"查看发布页面" = "Xem trang phát hành";
+"安装更新" = "Cài đặt bản cập nhật";
+"安装并重新启动" = "Cài đặt và khởi động lại";
+"退出时安装" = "Cài đặt khi thoát";
+"稍后提醒" = "Nhắc tôi sau";
+"跳过此版本" = "Bỏ qua phiên bản này";
+"了解更多" = "Tìm hiểu thêm";

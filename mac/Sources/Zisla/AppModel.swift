@@ -547,7 +547,7 @@ final class AppModel: ObservableObject {
   private let weatherService = WeatherService()
   private let weatherLocationService = WeatherLocationService()
   private lazy var sparkleUpdateController: SparkleUpdateController? = {
-    let controller = SparkleUpdateController()
+    let controller = SparkleUpdateController(languageStore: languageStore)
     controller?.onUpdateFound = { [weak self] in
       guard let self else { return }
       self.updateState = .available
@@ -961,11 +961,14 @@ final class AppModel: ObservableObject {
     }
   }
 
-  func start() {
+  func start(hasExistingInstallation: Bool) {
     headphoneTransientLifecycleActive = true
     backgroundSounds.startLifecycleMonitoring()
     apply(settings: settingsStore.settings)
     LegacyAlarmNotificationCleanup.removeScheduledNotifications()
+    sparkleUpdateController?.showInstalledReleaseNotes(hasExistingInstallation: hasExistingInstallation) { [weak self] in
+      await self?.updateFeedResolver.resolvedPreference()
+    }
   }
 
   func toggleBackgroundSound() {

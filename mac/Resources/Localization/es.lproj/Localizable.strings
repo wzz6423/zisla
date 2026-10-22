@@ -2744,3 +2744,15 @@
 "onboarding.permission.system_audio.body" = "Para visualizar la música. Permite la grabación de audio en Ajustes del Sistema; macOS puede pedir confirmación al usarla por primera vez.";
 "onboarding.permission.full_disk_access.title" = "Acceso total al disco";
 "onboarding.permission.full_disk_access.body" = "Solo se necesita para los índices de correo locales o las cookies del navegador. Actívalo en Ajustes del Sistema si usas estas funciones.";
+
+"更新日志" = "Notas de la versión";
+"已更新至 %@" = "Actualizado a %@";
+"正在加载更新日志" = "Cargando notas de la versión";
+"无法加载更新日志" = "No se pueden cargar las notas de la versión";
+"查看发布页面" = "Ver la página de la versión";
+"安装更新" = "Instalar actualización";
+"安装并重新启动" = "Instalar y reiniciar";
+"退出时安装" = "Instalar al salir";
+"稍后提醒" = "Recordarme más tarde";
+"跳过此版本" = "Omitir esta versión";
+"了解更多" = "Más información";

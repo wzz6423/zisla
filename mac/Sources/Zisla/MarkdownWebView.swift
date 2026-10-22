@@ -9,6 +9,7 @@ import WebKit
 struct MarkdownWebView: NSViewRepresentable {
     let html: String
     var baseURL: URL?
+    var allowedLinkSchemes: Set<String>?
 
     func makeNSView(context: Context) -> WKWebView {
         let configuration = WKWebViewConfiguration()
@@ -26,17 +27,27 @@ struct MarkdownWebView: NSViewRepresentable {
     }
 
     func updateNSView(_ webView: WKWebView, context: Context) {
+        context.coordinator.allowedLinkSchemes = allowedLinkSchemes
         guard context.coordinator.lastHTML != html else { return }
         context.coordinator.lastHTML = html
         webView.loadHTMLString(html, baseURL: baseURL)
     }
 
     func makeCoordinator() -> Coordinator {
-        Coordinator()
+        Coordinator(allowedLinkSchemes: allowedLinkSchemes)
     }
 
     final class Coordinator: NSObject, WKNavigationDelegate {
         var lastHTML: String?
+        var allowedLinkSchemes: Set<String>?
+
+        init(allowedLinkSchemes: Set<String>? = nil) {
+            self.allowedLinkSchemes = allowedLinkSchemes
+        }
+
+        func allowsExternalLink(_ url: URL) -> Bool {
+            allowedLinkSchemes.map { $0.contains(url.scheme?.lowercased() ?? "") } ?? true
+        }
 
         func webView(
             _ webView: WKWebView,
@@ -45,7 +56,7 @@ struct MarkdownWebView: NSViewRepresentable {
         ) {
             // Only allow loading our injected HTML; user link clicks open externally.
             if navigationAction.navigationType == .linkActivated {
-                if let url = navigationAction.request.url {
+                if let url = navigationAction.request.url, allowsExternalLink(url) {
                     NSWorkspace.shared.open(url)
                 }
                 decisionHandler(.cancel)
