@@ -507,6 +507,36 @@ public enum ClipboardAssistantDetail: Equatable, Sendable {
     case path(String)
 }
 
+public struct ClipboardAssistantMoneyConversion: Equatable, Sendable {
+    public struct Unit: Equatable, Sendable {
+        public let currencyCode: String
+        public let name: String
+        public let majorUnitValue: Double
+
+        public init(currencyCode: String, name: String, majorUnitValue: Double) {
+            self.currencyCode = currencyCode
+            self.name = name
+            self.majorUnitValue = majorUnitValue
+        }
+    }
+
+    public let amount: Double
+    public let amountText: String
+    public let source: Unit
+    public let target: Unit
+
+    public init(amount: Double, amountText: String, source: Unit, target: Unit) {
+        self.amount = amount
+        self.amountText = amountText
+        self.source = source
+        self.target = target
+    }
+
+    public func unitRate(from majorUnitRate: Double) -> Double {
+        source.majorUnitValue * majorUnitRate / target.majorUnitValue
+    }
+}
+
 /// Detection result rendered by the assistant toast.
 public struct ClipboardAssistantDetection: Equatable, Sendable {
     public var kind: ClipboardAssistantKind
@@ -523,6 +553,7 @@ public struct ClipboardAssistantDetection: Equatable, Sendable {
     /// Full content available through the expandable preview; `nil` when there is nothing more
     /// to show than the one-line title.
     public var fullContent: String?
+    public var moneyConversion: ClipboardAssistantMoneyConversion?
 
     public struct ColorComponents: Equatable, Sendable {
         public var red: Double
@@ -543,7 +574,8 @@ public struct ClipboardAssistantDetection: Equatable, Sendable {
         actions: [ClipboardAssistantAction] = [],
         colorComponents: ColorComponents? = nil,
         fullContent: String? = nil,
-        emoji: String? = nil
+        emoji: String? = nil,
+        moneyConversion: ClipboardAssistantMoneyConversion? = nil
     ) {
         self.kind = kind
         self.title = title
@@ -552,6 +584,7 @@ public struct ClipboardAssistantDetection: Equatable, Sendable {
         self.colorComponents = colorComponents
         self.fullContent = fullContent
         self.emoji = emoji
+        self.moneyConversion = moneyConversion
     }
 
     /// The primary action fired by the action button or the quick trigger.
