@@ -11,10 +11,12 @@ enum ScreenshotTool: String, CaseIterable, Identifiable {
     case rectangle
     case ellipse
     case brush
+    case highlighter
     case arrow
     case number
     case text
     case mosaic
+    case extraction
 
     var id: Self { self }
 
@@ -23,10 +25,12 @@ enum ScreenshotTool: String, CaseIterable, Identifiable {
         case .rectangle: "rectangle"
         case .ellipse: "circle"
         case .brush: "pencil.tip"
+        case .highlighter: "highlighter"
         case .arrow: "arrow.up.right"
         case .number: "1.circle"
         case .text: "textformat"
         case .mosaic: "square.grid.3x3"
+        case .extraction: "square.dashed.inset.filled"
         }
     }
 
@@ -35,10 +39,12 @@ enum ScreenshotTool: String, CaseIterable, Identifiable {
         case .rectangle: "矩形"
         case .ellipse: "椭圆"
         case .brush: "画笔"
+        case .highlighter: "荧光笔"
         case .arrow: "箭头"
         case .number: "标号"
         case .text: "文字"
         case .mosaic: "模糊"
+        case .extraction: "提取"
         }
     }
 
@@ -981,11 +987,47 @@ enum ScreenshotInlineTextLayout {
 
 }
 
+enum ScreenshotHighlighterGeometry {
+    static let opacity: CGFloat = 0.3
+
+    static func markersPath(in rect: CGRect, lineWidth: CGFloat) -> Path {
+        guard !rect.isEmpty else { return Path() }
+        let radius = lineWidth * 2
+        return Path { path in
+            path.addRect(CGRect(
+                x: rect.minX - lineWidth / 2,
+                y: rect.minY - radius,
+                width: lineWidth,
+                height: rect.height + radius
+            ))
+            path.addRect(CGRect(
+                x: rect.maxX - lineWidth / 2,
+                y: rect.minY,
+                width: lineWidth,
+                height: rect.height + radius
+            ))
+            path.addEllipse(in: CGRect(
+                x: rect.minX - radius,
+                y: rect.minY - radius * 2,
+                width: radius * 2,
+                height: radius * 2
+            ))
+            path.addEllipse(in: CGRect(
+                x: rect.maxX - radius,
+                y: rect.maxY,
+                width: radius * 2,
+                height: radius * 2
+            ))
+        }
+    }
+}
+
 struct ScreenshotAnnotation: Identifiable, Equatable {
     enum Kind: String, Equatable {
         case rectangle
         case ellipse
         case brush
+        case highlighter
         case arrow
         case number
         case text
@@ -999,6 +1041,7 @@ struct ScreenshotAnnotation: Identifiable, Equatable {
     var text = ""
     var color = ScreenshotRGBA.accent
     var lineWidth: CGFloat = 3
+    var highlighterShowsMarkers = true
     var arrowStyle: ScreenshotArrowStyle = .straight
     var fontSize: CGFloat = ScreenshotTextRendering.defaultFontSize
     var number = 1
@@ -1041,6 +1084,7 @@ struct ScreenshotAnnotation: Identifiable, Equatable {
         text: String = "",
         color: ScreenshotRGBA = .accent,
         lineWidth: CGFloat = 3,
+        highlighterShowsMarkers: Bool = true,
         arrowStyle: ScreenshotArrowStyle = .straight,
         fontSize: CGFloat = ScreenshotTextRendering.defaultFontSize,
         number: Int = 1,
@@ -1057,6 +1101,7 @@ struct ScreenshotAnnotation: Identifiable, Equatable {
         self.text = text
         self.color = color
         self.lineWidth = lineWidth
+        self.highlighterShowsMarkers = highlighterShowsMarkers
         self.arrowStyle = arrowStyle
         self.fontSize = fontSize
         self.number = number
@@ -1349,7 +1394,7 @@ enum ScreenshotAnnotationGeometry {
             (.bottomRight, CGPoint(x: rect.maxX, y: rect.maxY)),
             (.bottomLeft, CGPoint(x: rect.minX, y: rect.maxY)),
         ]
-        if annotation.kind == .rectangle {
+        if annotation.kind == .rectangle || annotation.kind == .highlighter {
             candidates += [
                 (.top, CGPoint(x: rect.midX, y: rect.minY)),
                 (.right, CGPoint(x: rect.maxX, y: rect.midY)),
@@ -1357,7 +1402,8 @@ enum ScreenshotAnnotationGeometry {
                 (.left, CGPoint(x: rect.minX, y: rect.midY)),
             ]
         }
-        if annotation.kind == .rectangle || annotation.kind == .text || annotation.kind == .arrow {
+        if annotation.kind == .rectangle || annotation.kind == .highlighter
+            || annotation.kind == .text || annotation.kind == .arrow {
             candidates.append((.rotation, CGPoint(x: rect.midX, y: rect.minY - rotationOffset)))
         }
         return candidates.first { local.distance(to: $0.1) <= hitRadius }?.0
@@ -1579,18 +1625,39 @@ final class ScreenshotEditorModel: ObservableObject {
         let image: NSImage
         let annotations: [ScreenshotAnnotation]
         let nextNumber: Int
+        let hasExtractedImage: Bool
+        let cornerRadius: CGFloat
     }
 
     @Published var image: NSImage {
-        didSet { cancelRecognition() }
+        didSet {
+            cancelRecognition()
+            cancelExtraction()
+            extractionRegions = []
+            pendingExtractionRegion = []
+            hasExtractedImage = false
+            cornerRadius = ScreenshotRoundedCornerGeometry.clampedRadius(cornerRadius, in: image.size)
+            cornerRadiusAdjustmentHasUndoPoint = nil
+        }
     }
     @Published private(set) var mosaicPreviewImage: NSImage
-    @Published private(set) var annotations: [ScreenshotAnnotation] = []
+    @Published private(set) var annotations: [ScreenshotAnnotation] = [] {
+        didSet { cancelExtraction() }
+    }
     @Published private(set) var canUndo = false
     @Published private(set) var canRedo = false
-    @Published var tool: ScreenshotTool = .rectangle
+    @Published var tool: ScreenshotTool = .rectangle {
+        didSet {
+            guard tool != oldValue else { return }
+            cancelExtraction()
+            extractionRegions = []
+            pendingExtractionRegion = []
+        }
+    }
     @Published var color = ScreenshotRGBA.accent
     @Published var lineWidth: CGFloat = 3
+    @Published var highlighterShowsMarkers = true
+    @Published private(set) var cornerRadius: CGFloat = 0
     @Published var arrowStyle: ScreenshotArrowStyle = .straight
     @Published var fontSize: CGFloat = ScreenshotTextRendering.defaultFontSize
     @Published var obscureShape: ScreenshotObscureShape = .rectangle
@@ -1601,7 +1668,19 @@ final class ScreenshotEditorModel: ObservableObject {
     @Published var mosaicBlurStrength: CGFloat = 0
     @Published var statusMessage: String?
     @Published private(set) var isRecognizing = false
-    @Published var isPinned = false
+    @Published private(set) var isExtracting = false
+    @Published private(set) var hasExtractedImage = false
+    @Published var extractionMode = ScreenshotExtractionMode.foreground {
+        didSet {
+            guard extractionMode != oldValue else { return }
+            clearExtractionSelection()
+        }
+    }
+    @Published private(set) var extractionRegions: [[CGPoint]] = []
+    @Published private(set) var pendingExtractionRegion: [CGPoint] = []
+    @Published var isPinned = false {
+        didSet { if isPinned { cancelExtraction() } }
+    }
     @Published private(set) var isLongCapturePreviewing = false
     @Published private(set) var hasLongCaptureResult = false
     @Published var longCaptureDirection = ScreenshotLongCaptureDirection.vertical
@@ -1639,6 +1718,8 @@ final class ScreenshotEditorModel: ObservableObject {
     /// row away just as well as the truth, so the previous step is what tells the two apart.
     private var lastLongCaptureNewContent: Int?
     private var recognitionOperation: ScreenshotRecognitionOperation?
+    private var extractionOperation: ScreenshotExtractionOperation?
+    private var cornerRadiusAdjustmentHasUndoPoint: Bool?
 
     struct PendingTextDraft: Equatable {
         let id: UUID
@@ -1655,6 +1736,153 @@ final class ScreenshotEditorModel: ObservableObject {
     init(image: NSImage) {
         self.image = image
         mosaicPreviewImage = image
+    }
+
+    func beginCornerRadiusAdjustment() {
+        cornerRadiusAdjustmentHasUndoPoint = false
+    }
+
+    func setCornerRadius(_ radius: CGFloat) {
+        let next = ScreenshotRoundedCornerGeometry.clampedRadius(radius, in: image.size)
+        guard next != cornerRadius else { return }
+        cancelExtraction()
+        if cornerRadiusAdjustmentHasUndoPoint != true {
+            saveUndoPoint()
+            if cornerRadiusAdjustmentHasUndoPoint != nil {
+                cornerRadiusAdjustmentHasUndoPoint = true
+            }
+        }
+        cornerRadius = next
+    }
+
+    func endCornerRadiusAdjustment() {
+        cornerRadiusAdjustmentHasUndoPoint = nil
+    }
+
+    @discardableResult
+    func extract(
+        extractImage: @escaping @Sendable (CGImage, ScreenshotExtractionOperation) async throws -> CGImage? = {
+            try $1.extract($0)
+        }
+    ) -> Task<Void, Never>? {
+        guard !isExtracting else { return nil }
+        let operation = ScreenshotExtractionOperation(
+            mode: extractionMode,
+            imageSize: image.size,
+            regions: extractionRegions
+        )
+        extractionOperation = operation
+        isExtracting = true
+        let renderModel = ScreenshotEditorModel(image: image)
+        renderModel.annotations = annotations
+        renderModel.nextNumber = nextNumber
+        renderModel.hasExtractedImage = hasExtractedImage
+        renderModel.pendingTextDraft = pendingTextDraft
+        renderModel.pendingAnnotationDraft = pendingAnnotationDraft
+
+        return Task {
+            await withTaskCancellationHandler {
+                defer {
+                    if extractionOperation === operation {
+                        extractionOperation = nil
+                        isExtracting = false
+                    }
+                }
+                guard extractionOperation === operation, !Task.isCancelled else { return }
+                // Export commits drafts, so render a copy until extraction has a successful result.
+                let rendered = renderModel.renderedImage()
+                guard let source = rendered.cgImage(forProposedRect: nil, context: nil, hints: nil) else {
+                    statusMessage = AppLocalization.text("无法读取图片")
+                    return
+                }
+                let saved = renderModel.snapshot
+                statusMessage = AppLocalization.text("正在提取...")
+                let result = await Task.detached(priority: .userInitiated) { () -> Result<CGImage?, any Error> in
+                    do {
+                        try operation.checkCancellation()
+                        let image = try await extractImage(source, operation)
+                        if let image {
+                            guard image.width == source.width, image.height == source.height else {
+                                throw ScreenshotExtractionError.maskSizeMismatch
+                            }
+                            guard try ScreenshotImageExtraction.containsVisiblePixels(image) else { return .success(nil) }
+                        }
+                        return .success(image)
+                    } catch {
+                        return .failure(error)
+                    }
+                }.value
+                guard extractionOperation === operation else { return }
+                guard !Task.isCancelled else {
+                    statusMessage = nil
+                    return
+                }
+                switch result {
+                case let .failure(error):
+                    if error is CancellationError {
+                        statusMessage = nil
+                    } else {
+                        statusMessage = AppLocalization.text("提取失败：%@", error.localizedDescription)
+                    }
+                case let .success(extracted):
+                    guard let extracted else {
+                        statusMessage = AppLocalization.text("未找到可提取区域")
+                        return
+                    }
+                    extractionOperation = nil
+                    isExtracting = false
+                    saveUndoPoint(Snapshot(
+                        image: saved.image,
+                        annotations: saved.annotations,
+                        nextNumber: saved.nextNumber,
+                        hasExtractedImage: saved.hasExtractedImage,
+                        cornerRadius: cornerRadius
+                    ))
+                    pendingTextDraft = nil
+                    pendingAnnotationDraft = nil
+                    annotations = []
+                    nextNumber = saved.nextNumber
+                    image = NSImage(cgImage: extracted, size: rendered.size)
+                    hasExtractedImage = true
+                    refreshMosaicPreview()
+                    statusMessage = AppLocalization.text("提取完成")
+                }
+            } onCancel: {
+                operation.cancel()
+            }
+        }
+    }
+
+    func cancelExtraction() {
+        extractionOperation?.cancel()
+        extractionOperation = nil
+        if isExtracting { statusMessage = nil }
+        isExtracting = false
+    }
+
+    func updateExtractionRegion(_ points: [CGPoint], isComplete: Bool) {
+        cancelExtraction()
+        pendingExtractionRegion = points
+        guard isComplete else { return }
+        pendingExtractionRegion = []
+        guard points.count >= 3 else { return }
+        extractionRegions.append(points)
+    }
+
+    func selectAllExtractionRegions() {
+        clearExtractionSelection()
+        extractionRegions = [[
+            .zero,
+            CGPoint(x: image.size.width, y: 0),
+            CGPoint(x: image.size.width, y: image.size.height),
+            CGPoint(x: 0, y: image.size.height),
+        ]]
+    }
+
+    func clearExtractionSelection() {
+        cancelExtraction()
+        extractionRegions = []
+        pendingExtractionRegion = []
     }
 
     @discardableResult
@@ -1768,6 +1996,7 @@ final class ScreenshotEditorModel: ObservableObject {
         to annotationID: UUID,
         color: ScreenshotRGBA? = nil,
         lineWidth: CGFloat? = nil,
+        highlighterShowsMarkers: Bool? = nil,
         arrowStyle: ScreenshotArrowStyle? = nil,
         fontSize: CGFloat? = nil,
         obscureStrength: CGFloat? = nil,
@@ -1781,9 +2010,15 @@ final class ScreenshotEditorModel: ObservableObject {
             changed = true
         }
         switch annotation.kind {
-        case .rectangle, .ellipse:
+        case .rectangle, .ellipse, .highlighter:
             if let lineWidth, annotation.lineWidth != lineWidth {
                 updated.lineWidth = lineWidth
+                changed = true
+            }
+            if annotation.kind == .highlighter,
+               let highlighterShowsMarkers,
+               annotation.highlighterShowsMarkers != highlighterShowsMarkers {
+                updated.highlighterShowsMarkers = highlighterShowsMarkers
                 changed = true
             }
         case .arrow:
@@ -1849,20 +2084,25 @@ final class ScreenshotEditorModel: ObservableObject {
             Snapshot(
                 image: newImage,
                 annotations: Self.translated(snapshot.annotations, by: translation),
-                nextNumber: snapshot.nextNumber
+                nextNumber: snapshot.nextNumber,
+                hasExtractedImage: false,
+                cornerRadius: ScreenshotRoundedCornerGeometry.clampedRadius(snapshot.cornerRadius, in: newImage.size)
             )
         }
         redoStack = redoStack.map { snapshot in
             Snapshot(
                 image: newImage,
                 annotations: Self.translated(snapshot.annotations, by: translation),
-                nextNumber: snapshot.nextNumber
+                nextNumber: snapshot.nextNumber,
+                hasExtractedImage: false,
+                cornerRadius: ScreenshotRoundedCornerGeometry.clampedRadius(snapshot.cornerRadius, in: newImage.size)
             )
         }
         refreshMosaicPreview()
     }
 
     func undo() {
+        clearExtractionSelection()
         pendingAnnotationDraft = nil
         guard let previous = undoStack.popLast() else { return }
         redoStack.append(snapshot)
@@ -1871,6 +2111,7 @@ final class ScreenshotEditorModel: ObservableObject {
     }
 
     func redo() {
+        clearExtractionSelection()
         pendingAnnotationDraft = nil
         guard let next = redoStack.popLast() else { return }
         undoStack.append(snapshot)
@@ -1965,6 +2206,7 @@ final class ScreenshotEditorModel: ObservableObject {
     }
 
     func beginLongCapturePreview() {
+        cancelExtraction()
         isLongCapturePreviewing = true
         hasLongCaptureResult = false
         lastLongCaptureFrame = image
@@ -1989,10 +2231,12 @@ final class ScreenshotEditorModel: ObservableObject {
     }
 
     func beginTextDraft(id: UUID, text: String, isNew: Bool) {
+        cancelExtraction()
         pendingTextDraft = PendingTextDraft(id: id, text: text, isNew: isNew)
     }
 
     func updateTextDraft(id: UUID, text: String, isNew: Bool) {
+        cancelExtraction()
         guard let pendingTextDraft, pendingTextDraft.id == id else {
             self.pendingTextDraft = PendingTextDraft(id: id, text: text, isNew: isNew)
             return
@@ -2048,11 +2292,13 @@ final class ScreenshotEditorModel: ObservableObject {
 
     func discardPendingTextDraft() {
         guard let draft = pendingTextDraft else { return }
+        cancelExtraction()
         pendingTextDraft = nil
         if draft.isNew { remove(id: draft.id, saveUndo: false) }
     }
 
     func updatePendingAnnotationDraft(_ annotation: ScreenshotAnnotation?) {
+        cancelExtraction()
         pendingAnnotationDraft = annotation
     }
 
@@ -2065,6 +2311,7 @@ final class ScreenshotEditorModel: ObservableObject {
     }
 
     func discardPendingAnnotationDraft() {
+        if pendingAnnotationDraft != nil { cancelExtraction() }
         pendingAnnotationDraft = nil
     }
 
@@ -2107,6 +2354,12 @@ final class ScreenshotEditorModel: ObservableObject {
         for annotation in annotations where annotation.kind != .mosaic {
             draw(annotation, in: image.size)
         }
+        let bounds = CGRect(origin: .zero, size: image.size)
+        let context = graphicsContext.cgContext
+        context.addRect(bounds)
+        context.addPath(CGPath(roundedRect: bounds, cornerWidth: cornerRadius, cornerHeight: cornerRadius, transform: nil))
+        context.clip(using: .evenOdd)
+        context.clear(bounds)
         graphicsContext.flushGraphics()
         NSGraphicsContext.restoreGraphicsState()
 
@@ -2301,8 +2554,8 @@ final class ScreenshotEditorModel: ObservableObject {
         return CIImage(cgImage: image).cropped(to: extent)
     }
 
-    private func saveUndoPoint() {
-        undoStack.append(snapshot)
+    private func saveUndoPoint(_ saved: Snapshot? = nil) {
+        undoStack.append(saved ?? snapshot)
         if undoStack.count > 80 { undoStack.removeFirst() }
         redoStack.removeAll(keepingCapacity: true)
         syncHistoryState()
@@ -2314,13 +2567,21 @@ final class ScreenshotEditorModel: ObservableObject {
     }
 
     private var snapshot: Snapshot {
-        Snapshot(image: image, annotations: annotations, nextNumber: nextNumber)
+        Snapshot(
+            image: image,
+            annotations: annotations,
+            nextNumber: nextNumber,
+            hasExtractedImage: hasExtractedImage,
+            cornerRadius: cornerRadius
+        )
     }
 
     private func restore(_ snapshot: Snapshot) {
         image = snapshot.image
         annotations = snapshot.annotations
         nextNumber = snapshot.nextNumber
+        hasExtractedImage = snapshot.hasExtractedImage
+        cornerRadius = snapshot.cornerRadius
         refreshMosaicPreview()
     }
 
@@ -2348,7 +2609,10 @@ final class ScreenshotEditorModel: ObservableObject {
     }
 
     private func draw(_ annotation: ScreenshotAnnotation, in imageSize: CGSize) {
-        let color = annotation.color.nsColor
+        let color = annotation.kind == .highlighter
+            ? NSColor(srgbRed: annotation.color.red, green: annotation.color.green,
+                      blue: annotation.color.blue, alpha: annotation.color.alpha)
+            : annotation.color.nsColor
         color.setStroke()
         color.setFill()
 
@@ -2360,7 +2624,7 @@ final class ScreenshotEditorModel: ObservableObject {
             imageHeight: imageSize.height
         )
         context?.translateBy(x: center.x, y: center.y)
-        context?.rotate(by: annotation.rotation)
+        context?.rotate(by: annotation.kind == .highlighter ? -annotation.rotation : annotation.rotation)
         context?.translateBy(x: -center.x, y: -center.y)
 
         switch annotation.kind {
@@ -2376,6 +2640,21 @@ final class ScreenshotEditorModel: ObservableObject {
             path.stroke()
         case .brush:
             drawLine(annotation.points, imageHeight: imageSize.height, lineWidth: annotation.lineWidth)
+        case .highlighter:
+            context?.translateBy(x: 0, y: imageSize.height)
+            context?.scaleBy(x: 1, y: -1)
+            context?.setFillColor(color.withAlphaComponent(
+                annotation.color.alpha * ScreenshotHighlighterGeometry.opacity
+            ).cgColor)
+            context?.fill(annotation.rect.standardized)
+            if annotation.highlighterShowsMarkers {
+                context?.setFillColor(color.cgColor)
+                context?.addPath(ScreenshotHighlighterGeometry.markersPath(
+                    in: annotation.rect,
+                    lineWidth: annotation.lineWidth
+                ).cgPath)
+                context?.fillPath()
+            }
         case .arrow:
             guard let start = annotation.points.first, let end = annotation.points.last else { return }
             if annotation.arrowStyle == .tapered,
@@ -3058,10 +3337,10 @@ final class ScreenshotToolbarDragHandleView: NSView {
 }
 
 enum ScreenshotToolbarLayout {
-    static let controlCount = 16
+    static let controlCount = 19
     /// Chinese fits every toolbar label in a 60pt cell (widest: 取消置顶 at 40pt). The same words run
-    /// 61–145pt in other languages, and growing 16 equal cells to fit would push the rail from 1030pt
-    /// to 1.6–2.5k and let `viewportWidth` clip tools away. Those languages drop to icons only —
+    /// 61–145pt in other languages, and growing every equal cell to fit would push the rail beyond
+    /// the viewport and clip tools away. Those languages drop to icons only —
     /// every button already carries the full wording in `.help`.
     static var controlWidth: CGFloat { showsControlTitles ? 60 : 34 }
     static let controlHeight: CGFloat = 28
@@ -3101,7 +3380,7 @@ enum ScreenshotToolbarLayout {
         ScreenshotTool.allCases.filter { $0 != .mosaic }.map(\.title)
             + ScreenshotObscureEffect.allCases.map(\.title)
             + ScreenshotLongCaptureDirection.allCases.map(\.title)
-            + ["撤销", "重做", "继续", "长截图", "完成", "缩小", "放大", "取消置顶", "钉图", "暂存", "复制", "保存", "关闭"]
+            + ["圆角", "撤销", "重做", "继续", "长截图", "完成", "缩小", "放大", "取消置顶", "钉图", "暂存", "复制", "保存", "关闭"]
     }
 
     /// `NSCache` is thread-safe; declared with `nonisolated(unsafe)` to satisfy strict concurrency checking.
@@ -4356,6 +4635,25 @@ enum ScreenshotImageExport {
     }
 }
 
+struct ScreenshotTransparencyBackground: View {
+    var body: some View {
+        Canvas { context, size in
+            context.fill(Path(CGRect(origin: .zero, size: size)), with: .color(Color(nsColor: .white)))
+            let tileSize: CGFloat = 10
+            for y in 0..<Int(ceil(size.height / tileSize)) {
+                for x in 0..<Int(ceil(size.width / tileSize)) where (x + y).isMultiple(of: 2) {
+                    context.fill(Path(CGRect(
+                        x: CGFloat(x) * tileSize, y: CGFloat(y) * tileSize,
+                        width: tileSize, height: tileSize
+                    )), with: .color(Color(white: 0.88)))
+                }
+            }
+        }
+        .allowsHitTesting(false)
+        .accessibilityHidden(true)
+    }
+}
+
 struct ScreenshotEditorView: View {
     @Environment(\.accessibilityReduceMotion) private var accessibilityReduceMotion
     @ObservedObject private var shortcutSettings: FeatureSettingsStore
@@ -4381,6 +4679,8 @@ struct ScreenshotEditorView: View {
     @State private var activeAnnotationEdit: ActiveAnnotationEdit?
     @State private var editPreview: ScreenshotAnnotation?
     @State private var activeToolMenuID: ScreenshotTool?
+    @State private var isCornerRadiusPopoverPresented = false
+    @State private var cornerRadiusDragStart: CGFloat?
     @State private var statusMessage: String?
     @State private var selectionRect: CGRect
     @State private var resizeStartRect: CGRect?
@@ -4398,7 +4698,7 @@ struct ScreenshotEditorView: View {
     }
 
     private var toolbarControlCount: Int {
-        14
+        17
             + (model.canUndo ? 1 : 0)
             + (model.canRedo ? 1 : 0)
             + (model.isLongCapturePreviewing ? 2 : 0)
@@ -4449,6 +4749,21 @@ struct ScreenshotEditorView: View {
             canvasZoom = 1
             canvasOffset = .zero
         }
+        .onChange(of: model.tool) { _, _ in
+            model.commitPendingAnnotationDraft()
+            draftPoints.removeAll(keepingCapacity: true)
+            draftRect = .zero
+        }
+        .onChange(of: model.image) { _, _ in
+            selectionState.deselect()
+            inlineTextID = nil
+            inlineTextIsNew = false
+            inlineTextFocused = false
+            selectionState.isInlineTextEditing = false
+            textDraft = ""
+            draftPoints.removeAll(keepingCapacity: true)
+            draftRect = .zero
+        }
         .onChange(of: selectionState.selectedAnnotationID) { _, newValue in
             guard let newValue else {
                 editPreview = nil
@@ -4460,6 +4775,9 @@ struct ScreenshotEditorView: View {
             switch annotation.kind {
             case .rectangle, .ellipse:
                 model.lineWidth = annotation.lineWidth
+            case .highlighter:
+                model.lineWidth = annotation.lineWidth
+                model.highlighterShowsMarkers = annotation.highlighterShowsMarkers
             case .arrow:
                 model.arrowStyle = annotation.arrowStyle
             case .text:
@@ -4484,6 +4802,16 @@ struct ScreenshotEditorView: View {
         .onChange(of: model.lineWidth) { _, newValue in
             guard let annotationID = selectionState.selectedAnnotationID else { return }
             model.applySelectedStyle(to: annotationID, lineWidth: newValue)
+        }
+        .onChange(of: model.highlighterShowsMarkers) { _, newValue in
+            guard let annotationID = selectionState.selectedAnnotationID else { return }
+            model.applySelectedStyle(to: annotationID, highlighterShowsMarkers: newValue)
+        }
+        .onChange(of: model.annotations) { _, newValue in
+            guard let selectedID = selectionState.selectedAnnotationID,
+                  let annotation = newValue.first(where: { $0.id == selectedID && $0.kind == .highlighter })
+            else { return }
+            model.highlighterShowsMarkers = annotation.highlighterShowsMarkers
         }
         .onChange(of: model.arrowStyle) { _, newValue in
             guard let annotationID = selectionState.selectedAnnotationID else { return }
@@ -4606,13 +4934,13 @@ struct ScreenshotEditorView: View {
                 ScreenshotBackingImage(image: configuration.backgroundImage)
                     .frame(width: proxy.size.width, height: proxy.size.height)
                     .mask {
-                        Rectangle()
+                        RoundedRectangle(cornerRadius: selectionCornerRadius, style: .circular)
                             .frame(width: selectionRect.width, height: selectionRect.height)
                             .position(selectionRect.center)
                     }
                     .allowsHitTesting(false)
 
-                canvas(showsImage: model.hasLongCaptureResult)
+                canvas(showsImage: model.hasLongCaptureResult || model.hasExtractedImage)
                     .frame(width: selectionRect.width, height: selectionRect.height)
                     .position(selectionRect.center)
                     .clipped()
@@ -4622,6 +4950,8 @@ struct ScreenshotEditorView: View {
                 ForEach(ScreenshotSelectionHandle.allCases, id: \.self) { handle in
                     selectionHandle(handle, bounds: bounds)
                 }
+
+                cornerRadiusHandle
 
                 ScreenshotToolbarDragWrapper(
                     restingCenter: restingToolbarCenter,
@@ -4636,7 +4966,8 @@ struct ScreenshotEditorView: View {
 
                 ScreenshotSelectionSizeBadge(
                     selection: selectionRect,
-                    bounds: proxy.size
+                    bounds: proxy.size,
+                    cornerRadius: model.cornerRadius
                 )
 
             }
@@ -4651,9 +4982,10 @@ struct ScreenshotEditorView: View {
                 .foregroundStyle(Color.accentColor)
             Text(AppLocalization.text("截图编辑"))
                 .font(.system(size: 14, weight: .semibold))
-            Text("\(Int(model.image.size.width.rounded())) × \(Int(model.image.size.height.rounded()))")
+            Text("\(Int(model.image.size.width.rounded())) × \(Int(model.image.size.height.rounded())) · r: \(Int(model.cornerRadius.rounded()))")
                 .font(.system(size: 11, design: .monospaced))
                 .foregroundStyle(.secondary)
+                .help(AppLocalization.text("圆角"))
             Spacer()
             if let message = statusMessage ?? model.statusMessage {
                 Text(message)
@@ -4690,22 +5022,43 @@ struct ScreenshotEditorView: View {
                 if showsImage {
                     Color.black.opacity(0.12)
                 }
-                if showsImage || model.annotations.contains(where: { $0.kind == .mosaic }) || mosaicDraft != nil {
-                    Image(nsImage: previewImage)
-                        .resizable()
-                        .interpolation(.high)
-                        .frame(width: geometry.renderedSize.width, height: geometry.renderedSize.height)
-                        .position(
-                            x: geometry.origin.x + geometry.renderedSize.width / 2,
-                            y: geometry.origin.y + geometry.renderedSize.height / 2
-                        )
-                }
+                ZStack(alignment: .topLeading) {
+                    if model.hasExtractedImage {
+                        ScreenshotTransparencyBackground()
+                    }
+                    if showsImage || model.annotations.contains(where: { $0.kind == .mosaic }) || mosaicDraft != nil {
+                        Image(nsImage: previewImage)
+                            .resizable()
+                            .interpolation(.high)
+                            .frame(width: geometry.renderedSize.width, height: geometry.renderedSize.height)
+                            .position(
+                                x: geometry.origin.x + geometry.renderedSize.width / 2,
+                                y: geometry.origin.y + geometry.renderedSize.height / 2
+                            )
+                    }
 
-                ForEach(model.annotations) { storedAnnotation in
-                    let annotation = editPreview?.id == storedAnnotation.id
-                        ? editPreview!
-                        : storedAnnotation
-                    annotationView(annotation, geometry: geometry)
+                    ForEach(model.annotations) { storedAnnotation in
+                        let annotation = editPreview?.id == storedAnnotation.id
+                            ? editPreview!
+                            : storedAnnotation
+                        annotationView(annotation, geometry: geometry)
+                    }
+
+                    draftAnnotation(geometry: geometry)
+                }
+                .frame(width: proxy.size.width, height: proxy.size.height, alignment: .topLeading)
+                .mask {
+                    if overlayConfiguration != nil && !model.hasLongCaptureResult {
+                        RoundedRectangle(cornerRadius: selectionCornerRadius, style: .circular)
+                            .frame(width: proxy.size.width, height: proxy.size.height)
+                    } else {
+                        RoundedRectangle(cornerRadius: model.cornerRadius * geometry.scale, style: .circular)
+                            .frame(width: geometry.renderedSize.width, height: geometry.renderedSize.height)
+                            .position(
+                                x: geometry.origin.x + geometry.renderedSize.width / 2,
+                                y: geometry.origin.y + geometry.renderedSize.height / 2
+                            )
+                    }
                 }
 
                 if let selectedAnnotationID = selectionState.selectedAnnotationID,
@@ -4715,7 +5068,9 @@ struct ScreenshotEditorView: View {
                     annotationSelectionOverlay(inlineTextPreview(selected), geometry: geometry)
                 }
 
-                draftAnnotation(geometry: geometry)
+                if model.tool == .extraction, model.extractionMode == .lasso {
+                    extractionSelectionOverlay(geometry: geometry)
+                }
 
                 ScreenshotPointerInteractionView(
                     onDrag: { start, current, isComplete in
@@ -4730,10 +5085,14 @@ struct ScreenshotEditorView: View {
                         // A lost mouse-up leaves the previous stroke pending; pressing again keeps
                         // it instead of folding its geometry into the next one.
                         model.commitPendingAnnotationDraft()
+                        if model.tool == .extraction {
+                            model.updateExtractionRegion([], isComplete: false)
+                        }
                         draftPoints.removeAll(keepingCapacity: true)
                         draftRect = .zero
                     },
                     onDoubleClick: { location in
+                        guard model.tool != .extraction else { return }
                         let point = geometry.imagePoint(from: location)
                         guard let annotation = editableAnnotation(at: point), annotation.kind == .text else {
                             return
@@ -4765,11 +5124,68 @@ struct ScreenshotEditorView: View {
     }
 
     private var selectionBorder: some View {
-        Rectangle()
+        RoundedRectangle(cornerRadius: selectionCornerRadius, style: .circular)
             .stroke(Color.accentColor, lineWidth: 2)
             .frame(width: selectionRect.width, height: selectionRect.height)
             .position(selectionRect.center)
             .allowsHitTesting(false)
+    }
+
+    private var selectionCornerRadius: CGFloat {
+        let scale = model.hasLongCaptureResult
+            ? ScreenshotCanvasGeometry(canvasSize: selectionRect.size, imageSize: model.image.size, zoom: canvasZoom).scale
+            : 1
+        return ScreenshotRoundedCornerGeometry.clampedRadius(model.cornerRadius * scale, in: selectionRect.size)
+    }
+
+    private var cornerRadiusHandle: some View {
+        let position = ScreenshotRoundedCornerGeometry.handlePosition(in: selectionRect, radius: selectionCornerRadius)
+        let scale = model.hasLongCaptureResult
+            ? ScreenshotCanvasGeometry(canvasSize: selectionRect.size, imageSize: model.image.size, zoom: canvasZoom).scale
+            : 1
+        return ZStack(alignment: .topLeading) {
+            Path { path in
+                path.move(to: position)
+                path.addLine(to: CGPoint(x: position.x, y: selectionRect.minY))
+            }
+            .stroke(Color.accentColor, lineWidth: 1)
+            .allowsHitTesting(false)
+
+            Circle()
+                .fill(Color.accentColor)
+                .overlay(Circle().stroke(.white, lineWidth: 2))
+                .overlay {
+                    ScreenshotPointerInteractionView(
+                        onDrag: { start, current, isComplete in
+                            guard let cornerRadiusDragStart else { return }
+                            model.setCornerRadius(cornerRadiusDragStart + (current.x - start.x) / scale)
+                            if isComplete {
+                                model.endCornerRadiusAdjustment()
+                                self.cornerRadiusDragStart = nil
+                            }
+                        },
+                        onDragBegan: {
+                            commitInlineText()
+                            cornerRadiusDragStart = model.cornerRadius
+                            model.beginCornerRadiusAdjustment()
+                        },
+                        usesScreenCoordinatesForDrag: true
+                    )
+                }
+                .frame(width: 16, height: 16)
+                .position(position)
+                .help(AppLocalization.text("圆角"))
+                .accessibilityElement(children: .ignore)
+                .accessibilityLabel(AppLocalization.text("圆角"))
+                .accessibilityValue("\(Int(model.cornerRadius.rounded()))")
+                .accessibilityAdjustableAction { direction in
+                    switch direction {
+                    case .increment: model.setCornerRadius(model.cornerRadius + 1)
+                    case .decrement: model.setCornerRadius(model.cornerRadius - 1)
+                    @unknown default: break
+                    }
+                }
+        }
     }
 
     private func selectionHandle(_ handle: ScreenshotSelectionHandle, bounds: CGRect) -> some View {
@@ -4874,6 +5290,20 @@ struct ScreenshotEditorView: View {
                 color: color,
                 lineWidth: annotation.lineWidth
             )
+        case .highlighter:
+            let canvasRect = geometry.canvasRect(from: annotation.rect)
+            ZStack {
+                Rectangle().fill(color.opacity(Double(ScreenshotHighlighterGeometry.opacity)))
+                if annotation.highlighterShowsMarkers {
+                    ScreenshotHighlighterGeometry.markersPath(
+                        in: CGRect(origin: .zero, size: canvasRect.size),
+                        lineWidth: annotation.lineWidth * geometry.scale
+                    ).fill(color)
+                }
+            }
+            .frame(width: canvasRect.width, height: canvasRect.height)
+            .rotationEffect(.radians(Double(annotation.rotation)))
+            .position(geometry.canvasPoint(from: annotation.rect.standardized.center))
         case .arrow:
             let bounds = ScreenshotAnnotationGeometry.bounds(for: annotation)
             arrowView(
@@ -4931,6 +5361,7 @@ struct ScreenshotEditorView: View {
         let canvasRect = geometry.canvasRect(from: rect)
         let handleSize = max(8, 10 * geometry.scale)
         let showRotationHandle = annotation.kind == .rectangle
+            || annotation.kind == .highlighter
             || annotation.kind == .text
             || annotation.kind == .arrow
         let rotationDistance = ScreenshotAnnotationGeometry.rotationOffset * geometry.scale
@@ -4939,7 +5370,7 @@ struct ScreenshotEditorView: View {
             CGPoint(x: canvasRect.width, y: 0),
             CGPoint(x: canvasRect.width, y: canvasRect.height),
             CGPoint(x: 0, y: canvasRect.height),
-        ] + (annotation.kind == .rectangle ? [
+        ] + (annotation.kind == .rectangle || annotation.kind == .highlighter ? [
             CGPoint(x: canvasRect.width / 2, y: 0),
             CGPoint(x: canvasRect.width, y: canvasRect.height / 2),
             CGPoint(x: canvasRect.width / 2, y: canvasRect.height),
@@ -5126,6 +5557,14 @@ struct ScreenshotEditorView: View {
                     .frame(width: rect.width, height: rect.height)
                     .position(geometry.canvasPoint(from: draftRect.standardized.center))
             }
+        } else if model.tool == .highlighter, draftRect.width > 1, draftRect.height > 1 {
+            annotationView(ScreenshotAnnotation(
+                kind: .highlighter,
+                rect: draftRect,
+                color: model.color,
+                lineWidth: model.lineWidth,
+                highlighterShowsMarkers: model.highlighterShowsMarkers
+            ), geometry: geometry)
         } else if (model.tool == .brush || model.tool == .arrow), !draftPoints.isEmpty {
             if model.tool == .brush {
                 strokePath(
@@ -5280,6 +5719,16 @@ struct ScreenshotEditorView: View {
         let start = geometry.imagePoint(from: startLocation)
         let point = geometry.imagePoint(from: currentLocation)
 
+        if model.tool == .extraction {
+            guard model.extractionMode == .lasso else { return }
+            selectionState.deselect()
+            if draftPoints.isEmpty { appendDraftPoint(start) }
+            appendDraftPoint(point)
+            model.updateExtractionRegion(draftPoints, isComplete: isComplete)
+            if isComplete { draftPoints.removeAll(keepingCapacity: true) }
+            return
+        }
+
         if activeAnnotationEdit == nil,
            editPreview == nil,
            !isComplete,
@@ -5330,7 +5779,7 @@ struct ScreenshotEditorView: View {
         }
 
         switch model.tool {
-        case .rectangle, .ellipse:
+        case .rectangle, .ellipse, .highlighter:
             draftRect = CGRect(
                 x: min(start.x, point.x),
                 y: min(start.y, point.y),
@@ -5353,7 +5802,7 @@ struct ScreenshotEditorView: View {
             appendDraftPoint(point)
         case .arrow:
             draftPoints = [start, point]
-        case .number, .text:
+        case .number, .text, .extraction:
             break
         }
 
@@ -5368,7 +5817,7 @@ struct ScreenshotEditorView: View {
         }
 
         switch model.tool {
-        case .rectangle, .ellipse, .mosaic, .brush, .arrow, .number:
+        case .rectangle, .ellipse, .highlighter, .mosaic, .brush, .arrow, .number:
             guard let annotation = committableDraftAnnotation(at: point) else { return }
             model.add(annotation)
         case .text:
@@ -5406,6 +5855,8 @@ struct ScreenshotEditorView: View {
             )
             model.add(annotation, saveUndo: false)
             beginInlineTextEditing(annotation, isNew: true, placeholderColor: placeholderColor)
+        case .extraction:
+            break
         }
     }
 
@@ -5429,6 +5880,15 @@ struct ScreenshotEditorView: View {
                 rect: draftRect,
                 color: model.color,
                 lineWidth: model.lineWidth
+            )
+        case .highlighter:
+            guard draftRect.width > 2, draftRect.height > 2 else { return nil }
+            return ScreenshotAnnotation(
+                kind: .highlighter,
+                rect: draftRect,
+                color: model.color,
+                lineWidth: model.lineWidth,
+                highlighterShowsMarkers: model.highlighterShowsMarkers
             )
         case .mosaic:
             switch model.obscureShape {
@@ -5467,7 +5927,7 @@ struct ScreenshotEditorView: View {
             )
         case .number:
             return model.numberAnnotation(at: point)
-        case .text:
+        case .text, .extraction:
             return nil
         }
     }
@@ -5477,10 +5937,12 @@ struct ScreenshotEditorView: View {
         case .rectangle: [.rectangle]
         case .ellipse: [.ellipse]
         case .brush: [.brush]
+        case .highlighter: [.highlighter]
         case .arrow: [.arrow]
         case .number: [.number]
         case .text: [.text]
         case .mosaic: [.mosaic]
+        case .extraction: []
         }
         return model.annotations.reversed().first {
             guard expectedKinds.contains($0.kind) else { return false }
@@ -5495,14 +5957,30 @@ struct ScreenshotEditorView: View {
         }
     }
 
+    private func extractionSelectionOverlay(geometry: ScreenshotCanvasGeometry) -> some View {
+        Canvas { context, _ in
+            for points in model.extractionRegions + [model.pendingExtractionRegion] where !points.isEmpty {
+                var path = Path()
+                path.move(to: geometry.canvasPoint(from: points[0]))
+                for point in points.dropFirst() { path.addLine(to: geometry.canvasPoint(from: point)) }
+                path.closeSubpath()
+                context.fill(path, with: .color(.accentColor.opacity(0.18)), style: FillStyle(eoFill: true))
+                context.stroke(path, with: .color(.accentColor), style: StrokeStyle(lineWidth: 1.5, dash: [5, 3]))
+            }
+        }
+        .allowsHitTesting(false)
+    }
+
     private func toolbar(viewportWidth: CGFloat, popoverEdge: Edge = .bottom) -> some View {
         ScrollView(.horizontal, showsIndicators: false) {
             HStack(spacing: ScreenshotToolbarLayout.spacing) {
                 toolbarDragHandle
-                ForEach(ScreenshotTool.allCases.filter { $0 != .mosaic }) { tool in
+                ForEach(ScreenshotTool.allCases.filter { $0 != .mosaic && $0 != .extraction }) { tool in
                     toolButtonWithMenu(tool, popoverEdge: popoverEdge)
                 }
                 obscureButton(popoverEdge: popoverEdge)
+                extractionButton(popoverEdge: popoverEdge)
+                cornerRadiusButton(popoverEdge: popoverEdge)
                 if model.canUndo {
                     iconButton("arrow.uturn.backward", title: AppLocalization.text("撤销")) { model.undo() }
                 }
@@ -5672,6 +6150,13 @@ struct ScreenshotEditorView: View {
                 colorPicker
                 Divider().frame(height: 24)
                 lineWidthSlider
+            } else if tool == .highlighter {
+                colorPicker
+                Divider().frame(height: 24)
+                lineWidthSlider
+                Divider().frame(height: 24)
+                Toggle(AppLocalization.text("保留左右标记"), isOn: $model.highlighterShowsMarkers)
+                    .toggleStyle(.checkbox)
             } else if tool == .arrow {
                 colorPicker
                 Divider().frame(height: 24)
@@ -5765,9 +6250,90 @@ struct ScreenshotEditorView: View {
 
     private func selectTool(_ tool: ScreenshotTool) {
         if model.tool != tool {
+            commitInlineText()
+            model.commitPendingAnnotationDraft()
             selectionState.deselect()
         }
         model.tool = tool
+    }
+
+    private func extractionButton(popoverEdge: Edge) -> some View {
+        Button {
+            selectTool(.extraction)
+            activeToolMenuID = .extraction
+        } label: {
+            HStack(spacing: 4) {
+                Image(systemName: ScreenshotTool.extraction.symbol)
+                    .font(.system(size: 12, weight: .semibold))
+                if ScreenshotToolbarLayout.showsControlTitles {
+                    Text(AppLocalization.text("提取"))
+                        .fitsSingleLine()
+                        .font(.system(size: 10, weight: .medium))
+                }
+                Image(systemName: "chevron.down")
+                    .font(.system(size: 7, weight: .bold))
+            }
+            .frame(width: ScreenshotToolbarLayout.controlWidth, height: ScreenshotToolbarLayout.controlHeight)
+            .background {
+                toolbarSelectionBackground(isSelected: model.tool == .extraction, cornerRadius: 6)
+            }
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .foregroundStyle(.primary)
+        .help(shortcutHelp("提取", hotkey: shortcutSettings.settings.screenshotToolHotkeys["extraction"]))
+        .popover(isPresented: Binding(
+            get: { activeToolMenuID == .extraction },
+            set: { if !$0 { activeToolMenuID = nil } }
+        ), arrowEdge: popoverEdge) {
+            VStack(alignment: .leading, spacing: 10) {
+                Picker(AppLocalization.text("提取方式"), selection: $model.extractionMode) {
+                    ForEach(ScreenshotExtractionMode.allCases) { mode in
+                        Label(AppLocalization.text(mode.title), systemImage: mode.symbol).tag(mode)
+                    }
+                }
+                .pickerStyle(.menu)
+                .disabled(model.isExtracting)
+                if model.extractionMode == .lasso {
+                    Text(AppLocalization.text("拖动圈选任意区域，可连续圈选多处"))
+                        .font(.system(size: 11))
+                        .foregroundStyle(.secondary)
+                    HStack(spacing: 10) {
+                        Button(AppLocalization.text("全选")) {
+                            draftPoints.removeAll(keepingCapacity: true)
+                            model.selectAllExtractionRegions()
+                        }
+                        Button(AppLocalization.text("清除")) {
+                            draftPoints.removeAll(keepingCapacity: true)
+                            model.clearExtractionSelection()
+                        }
+                        Text(AppLocalization.text("已圈选 %ld 个区域", model.extractionRegions.count))
+                            .font(.system(size: 11))
+                    }
+                    .disabled(model.isExtracting)
+                }
+                HStack {
+                    if model.isExtracting {
+                        ProgressView().controlSize(.small)
+                        Text(AppLocalization.text("正在提取..."))
+                        Spacer()
+                        Button(AppLocalization.text("取消")) { model.cancelExtraction() }
+                    } else {
+                        Button(AppLocalization.text(model.extractionMode == .lasso ? "提取所选区域" : model.extractionMode.title)) {
+                            commitInlineText()
+                            selectionState.deselect()
+                            model.extract()
+                        }
+                        .disabled(model.extractionMode == .lasso && model.extractionRegions.isEmpty)
+                    }
+                }
+                if let status = model.statusMessage {
+                    Text(status).font(.system(size: 11)).foregroundStyle(.secondary)
+                }
+            }
+            .padding(12)
+            .frame(minWidth: 280)
+        }
     }
 
     private func obscureButton(popoverEdge: Edge) -> some View {
@@ -5909,6 +6475,40 @@ struct ScreenshotEditorView: View {
               model.annotations.first(where: { $0.id == annotationID })?.obscureEffect == effect
         else { return nil }
         return annotationID
+    }
+
+    private func cornerRadiusButton(popoverEdge: Edge) -> some View {
+        Button {
+            commitInlineText()
+            activeToolMenuID = nil
+            isCornerRadiusPopoverPresented = true
+        } label: {
+            toolbarControlLabel(symbol: "rectangle.roundedtop", title: "圆角", selected: model.cornerRadius > 0)
+        }
+        .buttonStyle(.plain)
+        .help(AppLocalization.text("圆角"))
+        .popover(isPresented: $isCornerRadiusPopoverPresented, arrowEdge: popoverEdge) {
+            HStack(spacing: 10) {
+                Text(AppLocalization.text("圆角"))
+                    .font(.system(size: 11, weight: .medium))
+                Slider(
+                    value: Binding(get: { model.cornerRadius }, set: { model.setCornerRadius($0) }),
+                    in: 0...ScreenshotRoundedCornerGeometry.maximumRadius(for: model.image.size),
+                    onEditingChanged: { isEditing in
+                        if isEditing { model.beginCornerRadiusAdjustment() }
+                        else { model.endCornerRadiusAdjustment() }
+                    }
+                )
+                .frame(width: 150)
+                .accessibilityLabel(AppLocalization.text("圆角"))
+                Text("\(Int(model.cornerRadius.rounded()))")
+                    .font(.system(size: 11, design: .monospaced))
+                    .frame(minWidth: 24, alignment: .trailing)
+            }
+            .padding(.horizontal, 12)
+            .frame(height: ScreenshotToolbarLayout.height)
+            .onDisappear { model.endCornerRadiusAdjustment() }
+        }
     }
 
     private var recognitionMenu: some View {
@@ -7192,6 +7792,7 @@ final class ScreenshotEditorWindowController: NSWindowController, NSWindowDelega
                   })
             else { return false }
         model.commitPendingTextDraft()
+        model.commitPendingAnnotationDraft()
         if model.tool != tool {
             annotationSelectionState.deselect()
         }
@@ -7216,6 +7817,7 @@ final class ScreenshotEditorWindowController: NSWindowController, NSWindowDelega
     func windowWillClose(_ notification: Notification) {
         isClosed = true
         model.cancelRecognition()
+        model.cancelExtraction()
         invalidateLongCaptureSession()
         window?.ignoresMouseEvents = false
         pinnedEscapeHotkeyManager.unregister()

@@ -455,8 +455,12 @@ enum ScreenshotSelectionGeometry {
     static let badgeEstimatedSize = CGSize(width: 104, height: 27)
 
     /// Places the badge outside the selection's lower-right edge, falling back inside when needed.
-    static func badgePosition(for selection: CGRect, in bounds: CGSize) -> CGPoint {
-        let badge = badgeEstimatedSize
+    static func badgePosition(
+        for selection: CGRect,
+        in bounds: CGSize,
+        badgeSize: CGSize = badgeEstimatedSize
+    ) -> CGPoint {
+        let badge = badgeSize
         let gap: CGFloat = 8
         let rect = selection.standardized
 
@@ -1205,10 +1209,23 @@ struct ScreenshotSelectionView: View {
 struct ScreenshotSelectionSizeBadge: View {
     let selection: CGRect
     let bounds: CGSize
+    var cornerRadius: CGFloat? = nil
+
+    private var label: String {
+        "\(Int(selection.width.rounded())) × \(Int(selection.height.rounded()))"
+            + (cornerRadius.map { " · r: \(Int($0.rounded()))" } ?? "")
+    }
+
+    var badgeSize: CGSize {
+        let textSize = (label as NSString).size(withAttributes: [
+            .font: NSFont.monospacedSystemFont(ofSize: 12, weight: .medium),
+        ])
+        return CGSize(width: textSize.width + 20, height: textSize.height + 12)
+    }
 
     var body: some View {
-        let pos = ScreenshotSelectionGeometry.badgePosition(for: selection, in: bounds)
-        Text("\(Int(selection.width.rounded())) × \(Int(selection.height.rounded()))")
+        let pos = ScreenshotSelectionGeometry.badgePosition(for: selection, in: bounds, badgeSize: badgeSize)
+        Text(label)
             .font(.system(size: 12, weight: .medium, design: .monospaced))
             .foregroundStyle(.white)
             .padding(.horizontal, 10)

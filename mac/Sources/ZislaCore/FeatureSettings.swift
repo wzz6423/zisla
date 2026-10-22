@@ -522,6 +522,7 @@ public enum VoiceRecordingCleanupPolicy: String, Codable, CaseIterable, Sendable
 }
 
 public enum ScreenshotHotkeyDefaults {
+    public static let currentVersion = 2
     public static let capture = VoiceInputHotkeyPreset(
         keyCode: 18,
         carbonModifiers: 0x1000,
@@ -539,9 +540,20 @@ public enum ScreenshotHotkeyDefaults {
     )
     public static let stash = longCapture
     public static let editorLongCapture = VoiceInputHotkeyPreset(
-        keyCode: 29, carbonModifiers: 0x1000, keyDisplayName: "0"
+        keyCode: 11, carbonModifiers: 0x1000, keyDisplayName: "B"
     )
     public static let tools: [String: VoiceInputHotkeyPreset] = [
+        "rectangle": .init(keyCode: 20, carbonModifiers: 0x1000, keyDisplayName: "3"),
+        "ellipse": .init(keyCode: 21, carbonModifiers: 0x1000, keyDisplayName: "4"),
+        "brush": .init(keyCode: 23, carbonModifiers: 0x1000, keyDisplayName: "5"),
+        "highlighter": .init(keyCode: 22, carbonModifiers: 0x1000, keyDisplayName: "6"),
+        "arrow": .init(keyCode: 26, carbonModifiers: 0x1000, keyDisplayName: "7"),
+        "number": .init(keyCode: 28, carbonModifiers: 0x1000, keyDisplayName: "8"),
+        "text": .init(keyCode: 25, carbonModifiers: 0x1000, keyDisplayName: "9"),
+        "mosaic": .init(keyCode: 29, carbonModifiers: 0x1000, keyDisplayName: "0"),
+        "extraction": .init(keyCode: 0, carbonModifiers: 0x1000, keyDisplayName: "A"),
+    ]
+    static let versionOneTools: [String: VoiceInputHotkeyPreset] = [
         "rectangle": .init(keyCode: 20, carbonModifiers: 0x1000, keyDisplayName: "3"),
         "ellipse": .init(keyCode: 21, carbonModifiers: 0x1000, keyDisplayName: "4"),
         "brush": .init(keyCode: 23, carbonModifiers: 0x1000, keyDisplayName: "5"),
@@ -1065,7 +1077,7 @@ public struct FeatureSettings: Codable, Equatable, Sendable {
         self.screenshotLongHotkey = screenshotLongHotkey
         self.screenshotStashHotkey = screenshotStashHotkey
         self.screenshotEditorLongHotkey = screenshotEditorLongHotkey
-        self.screenshotHotkeyVersion = 1
+        self.screenshotHotkeyVersion = ScreenshotHotkeyDefaults.currentVersion
         self.screenshotToolHotkeys = screenshotToolHotkeys.filter { ScreenshotHotkeyDefaults.tools[$0.key] != nil }
         self.screenshotPinnedToolbarVisible = screenshotPinnedToolbarVisible
         self.keyboardEnabled = keyboardEnabled
@@ -1533,41 +1545,59 @@ public struct FeatureSettings: Codable, Equatable, Sendable {
             forKey: .screenshotToolHotkeys
         ) ?? defaults.screenshotToolHotkeys).filter { ScreenshotHotkeyDefaults.tools[$0.key] != nil }
         let version = try container.decodeIfPresent(Int.self, forKey: .screenshotHotkeyVersion) ?? 0
-        if version == 0 {
-            let legacyPin = VoiceInputHotkeyPreset(keyCode: 19, carbonModifiers: 0x1000, keyDisplayName: "2")
-            let legacyLong = VoiceInputHotkeyPreset(keyCode: 20, carbonModifiers: 0x1000, keyDisplayName: "3")
-            let hasLegacyTools = screenshotToolHotkeys == ScreenshotHotkeyDefaults.legacyTools
-                || screenshotToolHotkeys == ScreenshotHotkeyDefaults.previousTools
-            let isCompleteLegacyDefault = screenshotHotkey == ScreenshotHotkeyDefaults.capture
-                && screenshotPinHotkey == legacyPin && screenshotLongHotkey == legacyLong && hasLegacyTools
-            if isCompleteLegacyDefault {
-                screenshotPinHotkey = defaults.screenshotPinHotkey
-                screenshotLongHotkey = defaults.screenshotLongHotkey
-                screenshotToolHotkeys = defaults.screenshotToolHotkeys
-            }
+        let storedStashHotkey = try container.decodeIfPresent(VoiceInputHotkeyPreset.self, forKey: .screenshotStashHotkey)
+        let storedEditorLongHotkey = try container.decodeIfPresent(VoiceInputHotkeyPreset.self, forKey: .screenshotEditorLongHotkey)
+        let oldEditorLongHotkey = VoiceInputHotkeyPreset(keyCode: 29, carbonModifiers: 0x1000, keyDisplayName: "0")
+        let legacyPin = VoiceInputHotkeyPreset(keyCode: 19, carbonModifiers: 0x1000, keyDisplayName: "2")
+        let legacyLong = VoiceInputHotkeyPreset(keyCode: 20, carbonModifiers: 0x1000, keyDisplayName: "3")
+        let hasLegacyTools = screenshotToolHotkeys == ScreenshotHotkeyDefaults.legacyTools
+            || screenshotToolHotkeys == ScreenshotHotkeyDefaults.previousTools
+        let isCompleteLegacyDefault = version == 0 && screenshotHotkey == ScreenshotHotkeyDefaults.capture
+            && screenshotPinHotkey == legacyPin && screenshotLongHotkey == legacyLong && hasLegacyTools
+        let isCompleteVersionOneDefault = version < ScreenshotHotkeyDefaults.currentVersion
+            && screenshotHotkey == defaults.screenshotHotkey && screenshotPinHotkey == defaults.screenshotPinHotkey
+            && screenshotLongHotkey == defaults.screenshotLongHotkey
+            && screenshotToolHotkeys == ScreenshotHotkeyDefaults.versionOneTools
+        let migratesCompleteDefault = (isCompleteLegacyDefault || isCompleteVersionOneDefault)
+            && (storedStashHotkey == nil || storedStashHotkey == defaults.screenshotStashHotkey)
+            && (storedEditorLongHotkey == nil || storedEditorLongHotkey == oldEditorLongHotkey)
+        if migratesCompleteDefault {
+            screenshotPinHotkey = defaults.screenshotPinHotkey
+            screenshotLongHotkey = defaults.screenshotLongHotkey
+            screenshotToolHotkeys = [:]
         }
-        // Preserve customized legacy groups; new actions take unused combinations without replacing tools.
+        let savedStashHotkey = migratesCompleteDefault ? defaults.screenshotStashHotkey : storedStashHotkey
+        let savedEditorLongHotkey = migratesCompleteDefault ? nil : storedEditorLongHotkey
+        // Reserve every saved editor action before filling gaps, including customized new-tool shortcuts.
         var occupied = [screenshotPinHotkey] + Array(screenshotToolHotkeys.values)
+        occupied += [savedStashHotkey, savedEditorLongHotkey].compactMap { $0 }
         if voiceInputEnabled { occupied.append(voiceInputHotkeyPreset) }
         if clipboardAssistantEnabled, let hotkey = clipboardAssistantTriggerConfiguration.hotkey {
             occupied.append(hotkey)
         }
         func available(_ preferred: VoiceInputHotkeyPreset) -> VoiceInputHotkeyPreset {
             if !occupied.contains(where: { preferred.conflicts(with: $0) }) { return preferred }
-            for modifiers: UInt32 in [0x1200, 0x1800, 0x1A00, 0x1B00] {
-                for (keyCode, name): (UInt32, String) in [(29, "0"), (19, "2"), (18, "1"), (20, "3"), (21, "4"), (23, "5"), (22, "6"), (26, "7"), (28, "8"), (25, "9")] {
-                    let candidate = VoiceInputHotkeyPreset(keyCode: keyCode, carbonModifiers: modifiers, keyDisplayName: name)
-                    if !occupied.contains(where: { candidate.conflicts(with: $0) }) { return candidate }
-                }
-            }
-            return preferred
+            // Q/M/N/W are omitted because a mistaken Command press can quit, minimize, open, or close a window.
+            let candidates: [(UInt32, String)] = [
+                (18, "1"), (19, "2"), (20, "3"), (21, "4"), (23, "5"), (22, "6"), (26, "7"), (28, "8"), (25, "9"), (29, "0"),
+                (0, "A"), (11, "B"), (8, "C"), (2, "D"),
+            ]
+            // At most 13 distinct bindings occupy keys while filling a gap, so one of these 14 keys is free.
+            return candidates.map { VoiceInputHotkeyPreset(keyCode: $0.0, carbonModifiers: 0x1000, keyDisplayName: $0.1) }
+                .first { candidate in !occupied.contains { candidate.conflicts(with: $0) } }!
         }
-        screenshotStashHotkey = try container.decodeIfPresent(VoiceInputHotkeyPreset.self, forKey: .screenshotStashHotkey)
-            ?? available(defaults.screenshotStashHotkey)
+        screenshotStashHotkey = savedStashHotkey ?? available(defaults.screenshotStashHotkey)
         occupied.append(screenshotStashHotkey)
-        screenshotEditorLongHotkey = try container.decodeIfPresent(VoiceInputHotkeyPreset.self, forKey: .screenshotEditorLongHotkey)
-            ?? available(defaults.screenshotEditorLongHotkey)
-        screenshotHotkeyVersion = 1
+        let toolIDs = migratesCompleteDefault
+            ? ["rectangle", "ellipse", "brush", "highlighter", "arrow", "number", "text", "mosaic", "extraction"]
+            : version < ScreenshotHotkeyDefaults.currentVersion ? ["highlighter", "extraction"] : []
+        for id in toolIDs where screenshotToolHotkeys[id] == nil {
+            let hotkey = available(ScreenshotHotkeyDefaults.tools[id]!)
+            screenshotToolHotkeys[id] = hotkey
+            occupied.append(hotkey)
+        }
+        screenshotEditorLongHotkey = savedEditorLongHotkey ?? available(defaults.screenshotEditorLongHotkey)
+        screenshotHotkeyVersion = ScreenshotHotkeyDefaults.currentVersion
         screenshotPinnedToolbarVisible = try container.decodeIfPresent(
             Bool.self,
             forKey: .screenshotPinnedToolbarVisible

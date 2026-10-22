@@ -274,13 +274,16 @@ struct ScreenshotShortcutContextTests {
         store.settings.screenshotToolHotkeys["rectangle"] = .init(keyCode: 15, carbonModifiers: 0x0800, keyDisplayName: "R")
         #expect(window.performKeyEquivalent(with: try event(window: window, key: "r", code: 15, flags: .option)))
         #expect(model.tool == .rectangle)
-        #expect(window.performKeyEquivalent(with: try event(window: window, key: "0", code: 29, flags: .control)))
+        let longCaptureHotkey = store.settings.screenshotEditorLongHotkey
+        #expect(window.performKeyEquivalent(with: try event(window: window,
+            key: longCaptureHotkey.keyDisplayName, code: UInt16(longCaptureHotkey.keyCode), flags: .control)))
         if NSScreen.screens.isEmpty {
             #expect(model.statusMessage == AppLocalization.text("找不到显示器"))
         } else {
             #expect(model.isLongCapturePreviewing)
             #expect(model.statusMessage == AppLocalization.text("请滚动页面，停止后自动拼接"))
-            #expect(window.performKeyEquivalent(with: try event(window: window, key: "0", code: 29, flags: .control)))
+            #expect(window.performKeyEquivalent(with: try event(window: window,
+                key: longCaptureHotkey.keyDisplayName, code: UInt16(longCaptureHotkey.keyCode), flags: .control)))
             #expect(model.isLongCapturePreviewing)
         }
         // Close before the asynchronous capture task can request screen access or read the display.
