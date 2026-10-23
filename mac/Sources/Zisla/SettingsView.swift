@@ -40,10 +40,16 @@ struct SettingsView: View {
     }
 
     var body: some View {
-        HStack(spacing: 0) {
-            sidebar
+        VStack(spacing: 0) {
+            navigationToolbar
             Divider()
-            detail
+            HStack(spacing: 0) {
+                if input.isSidebarVisible {
+                    sidebar
+                    Divider()
+                }
+                detail
+            }
         }
         .frame(
             width: input.selection.prefersWideLayout ? 1120 : 960,
@@ -101,6 +107,57 @@ struct SettingsView: View {
         }
     }
 
+    private var navigationToolbar: some View {
+        HStack(spacing: 12) {
+            Button {
+                input.isSidebarVisible.toggle()
+            } label: {
+                IconButtonLabel(symbol: "sidebar.left")
+            }
+            .buttonStyle(PressableStyle())
+            .help(AppLocalization.text(input.isSidebarVisible ? "隐藏侧边栏" : "显示侧边栏"))
+            .accessibilityLabel(AppLocalization.text(input.isSidebarVisible ? "隐藏侧边栏" : "显示侧边栏"))
+            .accessibilityIdentifier("settings-sidebar-toggle")
+
+            HStack(spacing: 2) {
+                historyButton(backward: true)
+                historyButton(backward: false)
+            }
+            .padding(3)
+            .background(Color.fillControl, in: Capsule())
+            .overlay {
+                Capsule().strokeBorder(Color.primary.opacity(0.12), lineWidth: 0.5)
+            }
+
+            Spacer(minLength: 0)
+        }
+        .padding(.horizontal, 12)
+        .padding(.vertical, 8)
+    }
+
+    private func historyButton(backward: Bool) -> some View {
+        let isEnabled = input.canNavigate(backward: backward, settings: settingsStore.settings)
+        let title = AppLocalization.text(backward ? "后退" : "前进")
+        return Button {
+            sectionSwitchDirection = backward ? -1 : 1
+            withAnimation(reduceMotion ? nil : ZislaMotion.settingsPageSwitch) {
+                input.navigate(backward: backward, settings: settingsStore.settings)
+            }
+            settingsSearchFieldFocused = false
+        } label: {
+            IconButtonLabel(
+                symbol: backward ? "chevron.backward" : "chevron.forward",
+                showsInactiveBackground: false
+            )
+            .opacity(isEnabled ? 1 : 0.35)
+        }
+        .buttonStyle(PressableStyle())
+        .disabled(!isEnabled)
+        .help(title)
+        .accessibilityLabel(title)
+        .accessibilityIdentifier(backward ? "settings-history-back" : "settings-history-forward")
+    }
+
     private var sidebar: some View {
         VStack(alignment: .leading, spacing: 0) {
             settingsSearchField
@@ -124,6 +181,7 @@ struct SettingsView: View {
                     }
                 }
                 .padding(.vertical, 4)
+                .padding(.trailing, 20)
             }
             .thinScrollChrome()
             .padding(.top, 18)
@@ -4519,8 +4577,29 @@ enum SettingsSection: String, CaseIterable, Identifiable {
 
 @MainActor
 final class SettingsInput: ObservableObject {
-    @Published var selection: SettingsSection = .general
-    @Published var voicePage: VoiceSettingsPage = .settings
+    private struct Destination: Equatable {
+        let section: SettingsSection
+        let searchTarget: SettingsSearchAnchor?
+        let voicePage: VoiceSettingsPage?
+    }
+
+    @Published var selection: SettingsSection = .general {
+        didSet {
+            if selection != oldValue {
+                searchTarget = nil
+                recordDestination()
+            }
+        }
+    }
+    @Published var voicePage: VoiceSettingsPage = .settings {
+        didSet {
+            if voicePage != oldValue && selection == .voice {
+                searchTarget = nil
+                recordDestination()
+            }
+        }
+    }
+    @Published var isSidebarVisible = true
     @Published var weatherQuery = ""
     @Published var settingsQuery = "" {
         didSet {
@@ -4529,6 +4608,9 @@ final class SettingsInput: ObservableObject {
         }
     }
     @Published var searchTarget: SettingsSearchAnchor?
+    private var history = [Destination(section: .general, searchTarget: nil, voicePage: nil)]
+    private var historyIndex = 0
+    private var isRestoringDestination = false
 
     var isSearching: Bool {
         !settingsQuery.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
@@ -4540,11 +4622,53 @@ final class SettingsInput: ObservableObject {
     }
 
     func select(_ section: SettingsSection, searchTarget: SettingsSearchAnchor? = nil) {
+        isRestoringDestination = true
         selection = section
         settingsQuery = ""
-        self.searchTarget = searchTarget
         if section == .voice && searchTarget != nil {
             voicePage = .settings
+        }
+        self.searchTarget = searchTarget
+        isRestoringDestination = false
+        recordDestination()
+    }
+
+    func canNavigate(backward: Bool, settings: FeatureSettings) -> Bool {
+        destinationIndex(backward: backward, settings: settings) != nil
+    }
+
+    func navigate(backward: Bool, settings: FeatureSettings) {
+        guard let index = destinationIndex(backward: backward, settings: settings) else { return }
+        let destination = history[index]
+        isRestoringDestination = true
+        selection = destination.section
+        settingsQuery = ""
+        if let page = destination.voicePage { voicePage = page }
+        searchTarget = destination.searchTarget
+        historyIndex = index
+        isRestoringDestination = false
+    }
+
+    private func recordDestination() {
+        guard !isRestoringDestination else { return }
+        let destination = Destination(
+            section: selection,
+            searchTarget: searchTarget,
+            voicePage: selection == .voice ? voicePage : nil
+        )
+        guard history[historyIndex] != destination else { return }
+        history.removeSubrange((historyIndex + 1)..<history.count)
+        history.append(destination)
+        historyIndex = history.count - 1
+    }
+
+    private func destinationIndex(backward: Bool, settings: FeatureSettings) -> Int? {
+        stride(
+            from: historyIndex + (backward ? -1 : 1),
+            to: backward ? -1 : history.count,
+            by: backward ? -1 : 1
+        ).first { index in
+            history[index].section.isVisible(settings: settings) && history[index] != history[historyIndex]
         }
     }
 }

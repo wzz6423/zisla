@@ -2777,3 +2777,8 @@
 "稍后提醒" = "Remind Me Later";
 "跳过此版本" = "Skip This Version";
 "了解更多" = "Learn More";
+
+"隐藏侧边栏" = "Hide Sidebar";
+"显示侧边栏" = "Show Sidebar";
+"后退" = "Back";
+"前进" = "Forward";

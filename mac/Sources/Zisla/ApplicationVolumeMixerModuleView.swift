@@ -8,20 +8,12 @@ struct ApplicationVolumeMixerModuleView: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
-            VStack(alignment: .leading, spacing: 4) {
-                AppLocalizedText("应用音量混音器")
-                    .font(.system(size: 15, weight: .semibold))
-                AppLocalizedText("分别调整正在播放声音的应用")
-                    .font(.system(size: 11))
-                    .foregroundStyle(.secondary)
-            }
-
             if !service.isSupported {
-                ContentUnavailableView {
-                    Label(AppLocalization.text("应用音量混音器"), systemImage: "speaker.slash")
-                } description: {
-                    AppLocalizedText("应用音量需要 macOS 14.4 或更高版本")
-                }
+                EmptyState(
+                    symbol: "speaker.slash",
+                    title: AppLocalization.text("应用音量混音器"),
+                    detail: AppLocalization.text("应用音量需要 macOS 14.4 或更高版本")
+                )
             } else {
                 if let errorMessage = service.errorMessage {
                     Label(errorMessage, systemImage: "exclamationmark.triangle.fill")
@@ -34,11 +26,11 @@ struct ApplicationVolumeMixerModuleView: View {
                 }
 
                 if service.applications.isEmpty {
-                    ContentUnavailableView {
-                        Label(AppLocalization.text("暂无正在播放声音的应用"), systemImage: "speaker.wave.2")
-                    } description: {
-                        AppLocalizedText("播放音乐或视频后，应用会显示在这里。")
-                    }
+                    EmptyState(
+                        symbol: "speaker.wave.2",
+                        title: AppLocalization.text("暂无正在播放声音的应用"),
+                        detail: AppLocalization.text("播放音乐或视频后，应用会显示在这里。")
+                    )
                 } else {
                     ScrollView {
                         LazyVStack(spacing: 8) {

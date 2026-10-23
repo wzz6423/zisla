@@ -81,9 +81,9 @@ enum IslandModule: String, CaseIterable, Identifiable {
       .clipboard
     case .aiMonitor:
       .ai
-    case .mail, .quickNotes, .volumeMixer, .system, .battery, .keyboardSound:
+    case .mail, .quickNotes, .system, .battery, .keyboardSound:
       .system
-    case .download, .agenda:
+    case .download, .agenda, .volumeMixer:
       .agenda
     case .toolbox:
       .toolbox

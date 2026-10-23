@@ -151,6 +151,7 @@ struct SettingsMediaLocalizationTests {
     }
 
     private static let newKeys: Set<String> = [
+        "隐藏侧边栏", "显示侧边栏", "后退", "前进",
         "基础功能", "声音", "网络与其他",
         "仅影响 zisla 的窗口与面板，不会更改 macOS 外观。",
         "在设置中合并、拆分、加密与转换 PDF。", "应用音量混音器",

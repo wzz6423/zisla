@@ -47,6 +47,7 @@ struct PDFToolsModuleView: View {
                 header
                 inputSection
                 configuration
+                Spacer(minLength: 0)
                 footer
             }
             .frame(maxWidth: .infinity, alignment: .topLeading)
@@ -231,6 +232,7 @@ struct PDFToolsModuleView: View {
             }
             .buttonStyle(.borderedProminent)
             .disabled(inputURLs.isEmpty || isProcessing || !configurationIsValid)
+            .frame(maxWidth: .infinity, alignment: .trailing)
         }
     }
 
