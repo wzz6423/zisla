@@ -455,6 +455,7 @@
 "识别类型" = "Jenis yang dikenali";
 "控制哪些内容会触发提示" = "Pilih jenis konten yang memunculkan notifikasi";
 "链接" = "Tautan";
+"IP 地址" = "Alamat IP";
 "文件路径" = "Jalur berkas";
 "邮箱" = "Alamat email";
 "电话号码" = "Nomor telepon";
@@ -2461,6 +2462,10 @@
 "汇率换算" = "Konversi Mata Uang";
 "换算" = "Konversi";
 "单位换算" = "Konversi Satuan";
+"金额换算" = "Konversi satuan uang";
+"1元 = ?角" = "1 rupiah = ?sen";
+"0.1角 = ?分" = "100 sen = ?rupiah";
+"1dollar = ?cent" = "0,1 rupiah = ?sen";
 "日期加减" = "Penambahan dan pengurangan tanggal";
 "2026.10.28往后15天" = "15 hari setelah 2026.10.28";
 "2026.10.28往前15天" = "15 hari sebelum 2026.10.28";
@@ -2762,6 +2767,7 @@
 "提取蒙版尺寸不匹配" = "Ukuran mask ekstraksi tidak cocok";
 "无法生成提取图片" = "Tidak dapat membuat gambar hasil ekstraksi";
 "圆角" = "Radius sudut";
+"查询 IP 信息" = "Cari informasi IP";
 
 "更新日志" = "Catatan rilis";
 "已更新至 %@" = "Diperbarui ke %@";

@@ -183,7 +183,8 @@ struct ClipboardAssistantLocalizationTests {
     func settingsExampleGroupsFollowTheirRecognitionControls() throws {
         let groups = SettingsView.clipboardAssistantExampleGroups
         #expect(Set(groups.keys) == [.conversion, .dateTime])
-        #expect(groups[.conversion]?.map(\.title) == ["单位换算", "汇率换算"])
+        #expect(groups[.conversion]?.map(\.title) == ["单位换算", "金额换算", "汇率换算"])
+        #expect(groups[.conversion]?[1].examples == ["1元 = ?角", "0.1角 = ?分", "1dollar = ?cent"])
         #expect(groups[.dateTime]?.map(\.title) == ["日期加减", "日期间隔", "跨时区时间"])
         let arithmetic = try #require(groups[.dateTime]?.first)
         #expect(Set(arithmetic.examples) == [
@@ -195,7 +196,11 @@ struct ClipboardAssistantLocalizationTests {
     func settingsExampleTitlesAndLocalPhrasesTranslateEveryLanguage() throws {
         let groups = SettingsView.clipboardAssistantExampleGroups.values.flatMap { $0 }
         let titles = groups.map(\.title)
-        let localExamples = ["2026.10.28往后15天", "2026.10.28往前15天"]
+        let localExamples = [
+            "2026.10.28往后15天", "2026.10.28往前15天",
+            "1元 = ?角", "0.1角 = ?分", "1dollar = ?cent",
+        ]
+        #expect(AppLanguage.allCases.count == 17)
         for language in AppLanguage.allCases {
             let table = try #require(Self.stringsTable(for: language))
             for key in titles + localExamples {
@@ -223,6 +228,37 @@ struct ClipboardAssistantLocalizationTests {
         }
         #expect(AppLocalization.string(localExamples[0], language: .english) == "2026.10.28 add 15days")
         #expect(AppLocalization.string(localExamples[1], language: .english) == "2026.10.28 subtract 15days")
+    }
+
+    @Test(arguments: AppLanguage.allCases) @MainActor
+    func displayedMoneyExamplesOfferImmediateCopyableResults(language: AppLanguage) throws {
+        let group = try #require(SettingsView.clipboardAssistantExampleGroups[.conversion]?.first {
+            $0.title == "金额换算"
+        }, "Money conversion examples must appear under the conversion control")
+        let expectedAmounts: [Double] = language == .simplifiedChinese || language == .traditionalChinese
+            ? [10, 1, 100] : [100, 1, 10]
+        let examples = group.localizedExamples(language: language)
+        #expect(examples.count == expectedAmounts.count)
+        let formatter = NumberFormatter()
+        formatter.numberStyle = .decimal
+        formatter.locale = language.locale
+        for (example, expectedAmount) in zip(examples, expectedAmounts) {
+            let result = try #require(ClipboardAssistantDetector.detect(
+                text: example, enabledKinds: [.conversion], preferredCurrencyCode: "CNY", locale: language.locale
+            ), "\(language.rawValue) cannot recognize the displayed money example: \(example)")
+            let conversion = try #require(result.moneyConversion)
+            #expect(conversion.source.currencyCode == conversion.target.currencyCode)
+            #expect(abs(conversion.amount * conversion.unitRate(from: 1) - expectedAmount) < 0.000001)
+            let expected = try #require(formatter.string(from: NSNumber(value: expectedAmount)))
+                + " " + conversion.target.name
+            #expect(result.title == expected, "\(language.rawValue) shows the wrong amount for \(example)")
+            #expect(result.action == .copyText(expected))
+            #expect(result.actions.count == 2)
+            guard case .mathExpression = result.detail else {
+                Issue.record("Same-currency examples must finish without a live exchange request: \(example)")
+                continue
+            }
+        }
     }
 
     @Test(arguments: AppLanguage.allCases) @MainActor

@@ -3,6 +3,7 @@ import Foundation
 /// Content kinds recognized by the clipboard assistant; each kind can be toggled in Settings.
 public enum ClipboardAssistantKind: String, Codable, CaseIterable, Sendable, Equatable, Hashable {
     case url
+    case ipAddress
     case filePath
     case email
     case phone
@@ -29,6 +30,7 @@ public enum ClipboardAssistantKind: String, Codable, CaseIterable, Sendable, Equ
     /// `currency` is migrated to `conversion` by `FeatureSettings` and is never shown as a separate control.
     public static let allCases: [Self] = [
         .url,
+        .ipAddress,
         .filePath,
         .email,
         .phone,
@@ -55,6 +57,7 @@ public enum ClipboardAssistantKind: String, Codable, CaseIterable, Sendable, Equ
     public var symbolName: String {
         switch self {
         case .url: "link"
+        case .ipAddress: "network"
         case .filePath: "doc.text"
         case .email: "envelope"
         case .phone: "phone"
@@ -259,6 +262,7 @@ public enum ClipboardAssistantTriggerConfiguration: Codable, Equatable, Sendable
 /// `ClipboardAssistantAction`; only the order is persisted.
 public enum ClipboardAssistantActionKind: String, Codable, CaseIterable, Sendable, Equatable, Hashable {
     case openURL
+    case lookupIP
     case openDownload
     case revealInFinder
     case search
@@ -283,6 +287,7 @@ public enum ClipboardAssistantActionKind: String, Codable, CaseIterable, Sendabl
     public var symbolName: String {
         switch self {
         case .openURL: "arrow.up.right.square"
+        case .lookupIP: "network"
         case .openDownload: "arrow.down.circle"
         case .revealInFinder: "folder"
         case .search: "magnifyingglass"
@@ -311,6 +316,7 @@ public enum ClipboardAssistantActionOrder {
     public static func defaults(for kind: ClipboardAssistantKind) -> [ClipboardAssistantActionKind] {
         switch kind {
         case .url: [.openURL, .openDownload, .addToQuickNote, .share]
+        case .ipAddress: [.lookupIP, .openURL, .copyText, .addToQuickNote, .share]
         case .filePath: [.revealInFinder, .compress, .addToQuickNote, .share]
         case .file: [.revealInFinder, .compress, .copyText, .addToQuickNote, .share]
         case .email: [.composeMail, .addToQuickNote, .share]
@@ -353,7 +359,11 @@ public enum ClipboardAssistantActionOrder {
         _ orders: [ClipboardAssistantKind: [ClipboardAssistantActionKind]]
     ) -> [ClipboardAssistantKind: [ClipboardAssistantActionKind]] {
         Dictionary(uniqueKeysWithValues: ClipboardAssistantKind.allCases.map { kind in
-            let savedOrder = orders[kind] ?? defaults(for: kind)
+            var savedOrder = orders[kind] ?? defaults(for: kind)
+            // Earlier IP preferences stored the lookup priority as openURL.
+            if kind == .ipAddress, !savedOrder.contains(.lookupIP) {
+                savedOrder = savedOrder.map { $0 == .openURL ? .lookupIP : $0 }
+            }
             let order: [ClipboardAssistantActionKind]
             if let legacyDefault = legacyDefault(for: kind), savedOrder == legacyDefault {
                 order = defaults(for: kind)
@@ -459,7 +469,7 @@ public enum ClipboardAssistantAction: Equatable, Sendable {
     public var kind: ClipboardAssistantActionKind? {
         switch self {
         case .openURL: .openURL
-        case .openService: .openURL
+        case .openService(let service, _): service == .ipInfo ? .lookupIP : .openURL
         case .openDownload: .openDownload
         case .revealInFinder: .revealInFinder
         case .openFolder, .showContextNote, .copyContextNote, .deleteContextNote: nil
@@ -507,6 +517,36 @@ public enum ClipboardAssistantDetail: Equatable, Sendable {
     case path(String)
 }
 
+public struct ClipboardAssistantMoneyConversion: Equatable, Sendable {
+    public struct Unit: Equatable, Sendable {
+        public let currencyCode: String
+        public let name: String
+        public let majorUnitValue: Double
+
+        public init(currencyCode: String, name: String, majorUnitValue: Double) {
+            self.currencyCode = currencyCode
+            self.name = name
+            self.majorUnitValue = majorUnitValue
+        }
+    }
+
+    public let amount: Double
+    public let amountText: String
+    public let source: Unit
+    public let target: Unit
+
+    public init(amount: Double, amountText: String, source: Unit, target: Unit) {
+        self.amount = amount
+        self.amountText = amountText
+        self.source = source
+        self.target = target
+    }
+
+    public func unitRate(from majorUnitRate: Double) -> Double {
+        source.majorUnitValue * majorUnitRate / target.majorUnitValue
+    }
+}
+
 /// Detection result rendered by the assistant toast.
 public struct ClipboardAssistantDetection: Equatable, Sendable {
     public var kind: ClipboardAssistantKind
@@ -523,6 +563,7 @@ public struct ClipboardAssistantDetection: Equatable, Sendable {
     /// Full content available through the expandable preview; `nil` when there is nothing more
     /// to show than the one-line title.
     public var fullContent: String?
+    public var moneyConversion: ClipboardAssistantMoneyConversion?
 
     public struct ColorComponents: Equatable, Sendable {
         public var red: Double
@@ -543,7 +584,8 @@ public struct ClipboardAssistantDetection: Equatable, Sendable {
         actions: [ClipboardAssistantAction] = [],
         colorComponents: ColorComponents? = nil,
         fullContent: String? = nil,
-        emoji: String? = nil
+        emoji: String? = nil,
+        moneyConversion: ClipboardAssistantMoneyConversion? = nil
     ) {
         self.kind = kind
         self.title = title
@@ -552,6 +594,7 @@ public struct ClipboardAssistantDetection: Equatable, Sendable {
         self.colorComponents = colorComponents
         self.fullContent = fullContent
         self.emoji = emoji
+        self.moneyConversion = moneyConversion
     }
 
     /// The primary action fired by the action button or the quick trigger.

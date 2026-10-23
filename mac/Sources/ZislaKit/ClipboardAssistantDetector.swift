@@ -1,4 +1,5 @@
 import AppKit
+import Darwin
 import NaturalLanguage
 import ZislaCore
 
@@ -79,6 +80,24 @@ public enum ClipboardAssistantDetector {
         let text = rawText.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !text.isEmpty else { return nil }
 
+        var ipv4 = in_addr()
+        var ipv6 = in6_addr()
+        let isIPAddress = rawText.unicodeScalars.allSatisfy {
+            $0.properties.isWhitespace || "0123456789abcdefABCDEF:.".unicodeScalars.contains($0)
+        } && text.withCString {
+            if inet_pton(AF_INET, $0, &ipv4) == 1 {
+                return text.split(separator: ".").allSatisfy { $0 == "0" || !$0.hasPrefix("0") }
+            }
+            return inet_pton(AF_INET6, $0, &ipv6) == 1
+        }
+        if isIPAddress, enabledKinds.contains(.ipAddress) {
+            let host = text.contains(":") ? "[\(text)]" : text
+            return ClipboardAssistantDetection(kind: .ipAddress, title: text, actions: [
+                .openService(service: .ipInfo, url: URL(string: "https://ipinfo.io/\(text)")!),
+                .openURL(HTTPURLParser.url(from: host)!),
+                .copyText(text),
+            ])
+        }
         if enabledKinds.contains(.shellCommand), let command = shellCommandDetection(rawText, commandExists: shellCommandExists) {
             return command
         }
@@ -87,7 +106,7 @@ public enum ClipboardAssistantDetector {
         ) {
             return detection
         }
-        let phone = enabledKinds.contains(.phone) ? ClipboardAssistantPhoneNumbers.parse(text, countryCode: countryCode) : nil
+        let phone = !isIPAddress && enabledKinds.contains(.phone) ? ClipboardAssistantPhoneNumbers.parse(text, countryCode: countryCode) : nil
         let phoneDetection = phone.map {
             ClipboardAssistantDetection(kind: .phone, title: text, actions: [.callPhone($0.e164)])
         }
@@ -131,12 +150,30 @@ public enum ClipboardAssistantDetector {
                 actions: actions
             )
         }
+        if enabledKinds.contains(.conversion), let conversion = parseMoneyConversion(
+            text, preferredCurrencyCode: preferredCurrencyCode, locale: locale
+        ) {
+            if conversion.source.currencyCode == conversion.target.currencyCode {
+                return completedMoneyConversion(conversion, rate: 1, locale: locale)
+            }
+            return ClipboardAssistantDetection(
+                kind: .conversion,
+                title: text,
+                detail: .currencyExpression(
+                    amount: conversion.amount * conversion.source.majorUnitValue,
+                    amountText: formatNumber(conversion.amount * conversion.source.majorUnitValue, locale: locale),
+                    sourceCurrencyCode: conversion.source.currencyCode,
+                    targetCurrencyCode: conversion.target.currencyCode
+                ),
+                moneyConversion: conversion
+            )
+        }
         // Currency runs before math: values like "100$=" or "100dollar=cny" carry a currency
         // token the arithmetic parser cannot consume, but keep the order explicit anyway so
         // future overlaps resolve predictably. The live rate is fetched afterwards by the
         // presentation layer; this branch only recognizes the shape and defers the numbers.
         if enabledKinds.contains(.conversion),
-           let conversion = parseCurrencyConversion(text, preferredCurrencyCode: preferredCurrencyCode),
+           let conversion = parseCurrencyConversion(text, preferredCurrencyCode: preferredCurrencyCode, locale: locale),
            conversion.sourceCurrencyCode
               != (conversion.targetCurrencyCode ?? resolvedPreferredCurrencyCode(preferredCurrencyCode)) {
             let target = conversion.targetCurrencyCode ?? resolvedPreferredCurrencyCode(preferredCurrencyCode)
@@ -152,7 +189,7 @@ public enum ClipboardAssistantDetector {
                 actions: []
             )
         }
-        if enabledKinds.contains(.url), let url = HTTPURLParser.url(from: text) {
+        if !isIPAddress, enabledKinds.contains(.url), let url = HTTPURLParser.url(from: text) {
             var actions: [ClipboardAssistantAction] = [.openURL(url)]
             if offersDownload, DownloadURLClassifier.isLikelyDownloadable(url.absoluteString) {
                 actions.append(.openDownload(url))
@@ -534,7 +571,8 @@ public enum ClipboardAssistantDetector {
     /// resolved against the preferred currency when they are ambiguous (`$`, `¥`).
     static func parseCurrencyConversion(
         _ rawText: String,
-        preferredCurrencyCode: String?
+        preferredCurrencyCode: String?,
+        locale: Locale = Locale(identifier: "en_US_POSIX")
     ) -> ParsedCurrencyConversion? {
         let text = rawText.trimmingCharacters(in: .whitespacesAndNewlines)
         guard (1...200).contains(text.count) else { return nil }
@@ -545,12 +583,12 @@ public enum ClipboardAssistantDetector {
         let targetToken = operands.flatMap { $0[1].isEmpty ? nil : $0[1] }
 
         // Prefix symbol form first: "$100", "¥100.5", "US$1,000".
-        if let prefixed = parsePrefixedCurrencyAmount(head, preferred: preferred) {
+        if let prefixed = parsePrefixedCurrencyAmount(head, preferred: preferred, locale: locale) {
             return completedConversion(prefixed, targetToken: targetToken, preferred: preferred)
         }
 
         // Suffix token form: "100$", "100 dollar", "100dollar", "100CNY", "100元".
-        guard let (amount, amountText, token) = parseSuffixedCurrencyAmount(head),
+        guard let (amount, amountText, token) = parseSuffixedCurrencyAmount(head, locale: locale),
               let source = resolveCurrencyToken(token, preferred: preferred) else {
             return nil
         }
@@ -611,16 +649,17 @@ public enum ClipboardAssistantDetector {
 
     /// "<symbol><amount>" for bare and prefixed symbols. Longest symbol first so "US$" wins
     /// over a bare "$".
-    private static func parsePrefixedCurrencyAmount(
+    static func parsePrefixedCurrencyAmount(
         _ head: String,
-        preferred: String
+        preferred: String,
+        locale: Locale
     ) -> ParsedCurrencyConversion? {
         for symbol in currencySymbols.sorted(by: { $0.count > $1.count }) where head.hasPrefix(symbol) {
             let rest = String(head.dropFirst(symbol.count))
                 .trimmingCharacters(in: .whitespacesAndNewlines)
             guard let amountText = leadingAmount(in: rest),
                   rest.dropFirst(amountText.count).trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
-                  let amount = normalizedAmount(amountText) else {
+                  let amount = normalizedAmount(amountText, locale: locale) else {
                 return nil
             }
             return ParsedCurrencyConversion(
@@ -634,10 +673,10 @@ public enum ClipboardAssistantDetector {
     }
 
     /// "<amount><token>" with optional whitespace between: (100, "100", "dollar").
-    private static func parseSuffixedCurrencyAmount(_ head: String) -> (Double, String, String)? {
+    static func parseSuffixedCurrencyAmount(_ head: String, locale: Locale) -> (Double, String, String)? {
         guard let amountText = leadingAmount(in: head) else { return nil }
         let token = head.dropFirst(amountText.count).trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !token.isEmpty, let amount = normalizedAmount(amountText) else { return nil }
+        guard !token.isEmpty, let amount = normalizedAmount(amountText, locale: locale) else { return nil }
         return (amount, amountText, token)
     }
 
@@ -645,20 +684,31 @@ public enum ClipboardAssistantDetector {
     private static func leadingAmount(in text: String) -> String? {
         var end = text.startIndex
         if text.first == "+" || text.first == "-" { end = text.index(after: end) }
-        while end < text.endIndex, "0123456789.,".contains(text[end]) {
+        while end < text.endIndex, text[end].unicodeScalars.allSatisfy({ $0.properties.numericType == .decimal })
+            || ".,٫٬ \u{00A0}\u{202F}".contains(text[end]) {
             end = text.index(after: end)
         }
         guard end > text.startIndex else { return nil }
-        return String(text[..<end])
+        return String(text[..<end]).trimmingCharacters(in: .whitespaces)
     }
 
     /// Validates an amount's shape (`1,000` / `100.50` / `100`) and parses it.
-    private static func normalizedAmount(_ text: String) -> Double? {
-        guard text.range(
-            of: "^" + conversionAmountPattern + "$",
-            options: .regularExpression
-        ) != nil else { return nil }
-        return Double(text.replacingOccurrences(of: ",", with: ""))
+    private static func normalizedAmount(_ text: String, locale: Locale) -> Double? {
+        let text = text.map { character in
+            character.wholeNumberValue.map(String.init) ?? String(character)
+        }.joined()
+        let decimal = text.contains("٫") ? "٫" : locale.decimalSeparator ?? "."
+        let grouping = text.contains("٬") ? "٬" : locale.groupingSeparator ?? ","
+        let separators = [(decimal, grouping), (".", ",")]
+        for (decimal, grouping) in separators {
+            let d = NSRegularExpression.escapedPattern(for: decimal)
+            let g = NSRegularExpression.escapedPattern(for: grouping)
+            let pattern = "[+-]?(?:[0-9]{1,3}(?:" + g + "[0-9]{3})+(?:" + d + "[0-9]+)?|[0-9]+(?:" + d + "[0-9]+)?|" + d + "[0-9]+)"
+            guard text.range(of: "^" + pattern + "$", options: .regularExpression) != nil,
+                  let value = Double(text.replacingOccurrences(of: grouping, with: "").replacingOccurrences(of: decimal, with: ".")) else { continue }
+            return value
+        }
+        return nil
     }
 
     /// Currency symbols recognized at the start or right after an amount. Bare `$`/`¥` are
@@ -730,6 +780,7 @@ public enum ClipboardAssistantDetector {
         "won": "KRW",
         "rupee": "INR", "rupees": "INR",
         "ruble": "RUB", "rouble": "RUB", "rubles": "RUB",
+        "рубль": "RUB", "рубля": "RUB", "рублей": "RUB", "рубли": "RUB",
         "baht": "THB",
         "dong": "VND",
         "rupiah": "IDR",
@@ -741,6 +792,9 @@ public enum ClipboardAssistantDetector {
         "forint": "HUF",
         "leu": "RON",
         "lira": "TRY",
+        "real": "BRL", "reais": "BRL",
+        "جنيه": "EGP", "جنيها": "EGP", "جنيهًا": "EGP", "جنيهات": "EGP",
+        "đồng": "VND",
         "dirham": "AED", "dirhams": "AED",
         "riyal": "SAR", "riyals": "SAR",
         "shekel": "ILS", "shekels": "ILS",

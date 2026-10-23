@@ -456,6 +456,7 @@
 "识别类型" = "Erkennungstypen";
 "控制哪些内容会触发提示" = "Wählen Sie, welche Inhaltstypen den Hinweis auslösen";
 "链接" = "Link";
+"IP 地址" = "IP-Adresse";
 "文件路径" = "Dateipfad";
 "邮箱" = "E-Mail-Adresse";
 "电话号码" = "Telefonnummer";
@@ -2462,6 +2463,10 @@
 "汇率换算" = "Währungsumrechnung";
 "换算" = "Umrechnungen";
 "单位换算" = "Einheitenumrechnung";
+"金额换算" = "Währungseinheiten";
+"1元 = ?角" = "1 Euro = ?Cent";
+"0.1角 = ?分" = "100 Cent = ?Euro";
+"1dollar = ?cent" = "0,1 Euro = ?Cent";
 "日期加减" = "Datumsaddition und -subtraktion";
 "2026.10.28往后15天" = "15 Tage nach dem 2026.10.28";
 "2026.10.28往前15天" = "15 Tage vor dem 2026.10.28";
@@ -2763,6 +2768,7 @@
 "提取蒙版尺寸不匹配" = "Die Größe der Freistellungsmaske stimmt nicht überein";
 "无法生成提取图片" = "Das freigestellte Bild konnte nicht erstellt werden";
 "圆角" = "Eckenradius";
+"查询 IP 信息" = "IP-Informationen abfragen";
 
 "更新日志" = "Versionshinweise";
 "已更新至 %@" = "Auf %@ aktualisiert";

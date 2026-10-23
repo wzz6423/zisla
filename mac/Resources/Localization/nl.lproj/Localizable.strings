@@ -455,6 +455,7 @@
 "识别类型" = "Herkende typen";
 "控制哪些内容会触发提示" = "Kies welke inhoudstypen de melding activeren";
 "链接" = "Link";
+"IP 地址" = "IP-adres";
 "文件路径" = "Bestandspad";
 "邮箱" = "E-mailadres";
 "电话号码" = "Telefoonnummer";
@@ -2461,6 +2462,10 @@
 "汇率换算" = "Valutaconversie";
 "换算" = "Conversies";
 "单位换算" = "Eenhedenconversie";
+"金额换算" = "Geldeenheden omrekenen";
+"1元 = ?角" = "1 euro = ?cent";
+"0.1角 = ?分" = "100 cent = ?euro";
+"1dollar = ?cent" = "0,1 euro = ?cent";
 "日期加减" = "Datumberekeningen";
 "2026.10.28往后15天" = "15 dagen na 2026.10.28";
 "2026.10.28往前15天" = "15 dagen voor 2026.10.28";
@@ -2762,6 +2767,7 @@
 "提取蒙版尺寸不匹配" = "De afmetingen van het uitsnijmasker komen niet overeen";
 "无法生成提取图片" = "De uitgesneden afbeelding kan niet worden gemaakt";
 "圆角" = "Hoekradius";
+"查询 IP 信息" = "IP-informatie opzoeken";
 
 "更新日志" = "Versieopmerkingen";
 "已更新至 %@" = "Bijgewerkt naar %@";
