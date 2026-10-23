@@ -155,9 +155,6 @@ public final class ManagedToolService: ObservableObject {
                 "/Applications/Kaku.app/Contents/MacOS/kaku",
             ]
         }
-        if tool == .kero {
-            return ["/Applications/Kero.app/Contents/MacOS/kero"]
-        }
         if tool == .zshell {
             return ["/Applications/zshell.app/Contents/MacOS/zshell"]
         }
