@@ -275,17 +275,16 @@ struct ManagedToolServiceTests {
             (.tectonic, .homebrewFormula(name: "tectonic"), "tectonic"),
             (.packer, .homebrewFormula(name: "hashicorp/tap/packer"), "packer"),
             (.ytt, .homebrewFormula(name: "ytt"), "ytt"),
-            (.kero, .homebrewCask(name: "egoist/tap/kero"), "kero"),
             (.dockDoor, .homebrewCask(name: "dockdoor"), "DockDoor"),
             (.openScreen, .homebrewCask(name: "getopenscreen/openscreen/openscreen"), "Openscreen"),
         ]
 
-        #expect(ManagedTool.allCases.count == 48)
+        #expect(ManagedTool.allCases.count == 47)
+        #expect(ManagedTool(rawValue: "kero") == nil)
         for (tool, source, executableName) in expected {
             #expect(tool.installationSource == source)
             #expect(tool.executableName == executableName)
         }
-        #expect(ManagedTool.kero.requiredHomebrewTap == "egoist/tap")
         #expect(ManagedTool.packer.requiredHomebrewTap == "hashicorp/tap")
     }
 
@@ -299,7 +298,7 @@ struct ManagedToolServiceTests {
         #expect(count(.networkAndData) == 7)
         #expect(count(.developmentToolchain) == 21)
         #expect(count(.utility) == 3)
-        #expect(count(.desktopApplication) == 6)
+        #expect(count(.desktopApplication) == 5)
     }
 
     @Test
@@ -393,13 +392,13 @@ struct ManagedToolServiceTests {
     @Test
     func parsesTappedCaskMetadataByFullToken() throws {
         let data = Data("""
-        {"casks":[{"token":"kero","full_token":"egoist/tap/kero","version":"0.1.47"}]}
+        {"casks":[{"token":"kakuku","full_token":"tw93/tap/kakuku","version":"0.1.47"}]}
         """.utf8)
 
         #expect(try ManagedToolService.parseHomebrewCaskInfo(
             data,
-            caskName: "egoist/tap/kero",
-            tool: .kero
+            caskName: "tw93/tap/kakuku",
+            tool: .kaku
         ) == "0.1.47")
     }
 

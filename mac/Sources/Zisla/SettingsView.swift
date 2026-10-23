@@ -2797,7 +2797,6 @@ struct SettingsView: View {
         case .kaku: "terminal.fill"
         case .markdownPreview: "doc.text.magnifyingglass"
         case .keka: "archivebox.fill"
-        case .kero: "terminal"
         case .zshell: "terminal.fill"
         default:
             switch tool.recommendationGroup {
