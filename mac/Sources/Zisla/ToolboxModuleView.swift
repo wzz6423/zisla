@@ -183,6 +183,16 @@ struct ToolboxModuleView: View {
             }
 
             HStack(spacing: 8) {
+                if settingsStore.settings.screenRecordingEnabled {
+                    ToolShortcutButton(
+                        title: AppLocalization.text("录屏"),
+                        symbol: "record.circle",
+                        help: AppLocalization.text("打开录屏工作室")
+                    ) {
+                        model.presentScreenRecording()
+                    }
+                }
+
                 ToolShortcutButton(
                     title: AppLocalization.text("提词器"),
                     symbol: "text.viewfinder",

@@ -1,9 +1,9 @@
 "NSCalendarsFullAccessUsageDescription" = "zisla, üst bilgi paneli için yaklaşan takvim etkinliklerine erişim gerektirir.";
-"NSAudioCaptureUsageDescription" = "zisla, yalnızca medya oynatılırken veya bir uygulamanın ses düzeyini ayarladığınızda sistem sesini okur; ses dalgasını görüntüler ve o uygulamanın çıkış ses düzeyini ayarlar.";
-"NSCameraUsageDescription" = "zisla kamerayı yalnızca ayna açıkken kullanır.";
+"NSAudioCaptureUsageDescription" = "zisla, dalga biçimini göstermek ve uygulama ses düzeyini ayarlamak için sistem sesini okur; ekran kaydı için sistem sesini etkinleştirdiğinizde çalınan sesi kaydeder.";
+"NSCameraUsageDescription" = "zisla kamerayı yalnızca aynayı açtığınızda veya ekran kaydı için kamera katmanını etkinleştirdiğinizde kullanır.";
 "NSRemindersFullAccessUsageDescription" = "zisla, takvim etkinlikleriyle birlikte göstermek için tarihli hatırlatıcıları okur.";
 "NSLocationWhenInUseUsageDescription" = "zisla, yerel hava durumunu, yer adlarını ve yakındaki Wi-Fi ağlarını göstermek için konum erişimine ihtiyaç duyar.";
-"NSMicrophoneUsageDescription" = "zisla mikrofonu yalnızca sesli giriş başlattığınızda, konuşmayı mevcut AI sohbet metnine dönüştürmek için kullanır.";
-"NSSpeechRecognitionUsageDescription" = "zisla, aktif olarak kaydettiğiniz konuşmayı AI sohbet metnine dönüştürür.";
+"NSMicrophoneUsageDescription" = "zisla yalnızca ses girişini başlattığınızda veya ekran kaydı için mikrofonu etkinleştirdiğinizde ses kaydeder.";
+"NSSpeechRecognitionUsageDescription" = "zisla bilinçli olarak kaydettiğiniz konuşmayı metne dönüştürür ve ekran kaydı altyazıları oluşturduğunuzda aygıtta yazıya döker.";
 "NSAppleEventsUsageDescription" = "zisla, gelen kutuları, okundu durumu, silme ve yanıtlar dahil olmak üzere e-postaları okumak ve yönetmek için Mail.app'i kullanır. Ayrıca seçtiğiniz komutları Terminal veya iTerm içinde çalıştırır.";
 "NSBluetoothAlwaysUsageDescription" = "zisla, Bluetooth sayfasını açtığınızda bağlı veya eşleştirilmiş Bluetooth aygıtlarının herkese açık pil bilgilerini okur.";

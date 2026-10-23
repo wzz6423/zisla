@@ -1,9 +1,9 @@
 "NSCalendarsFullAccessUsageDescription" = "zisla heeft toegang nodig tot aankomende agenda-evenementen voor het bovenste informatiepaneel.";
-"NSAudioCaptureUsageDescription" = "zisla leest systeemaudio alleen tijdens het afspelen van media of wanneer je het volume van een app aanpast, om een golfvorm weer te geven en het uitvoervolume van die app aan te passen.";
-"NSCameraUsageDescription" = "zisla gebruikt de camera alleen als de spiegel open is.";
+"NSAudioCaptureUsageDescription" = "zisla leest systeemaudio om een golfvorm te tonen en het appvolume aan te passen, en neemt afspeelgeluid op wanneer je systeemaudio voor schermopnamen inschakelt.";
+"NSCameraUsageDescription" = "zisla gebruikt de camera alleen wanneer je de spiegel opent of de camera-overlay voor schermopname inschakelt.";
 "NSRemindersFullAccessUsageDescription" = "zisla leest gedateerde herinneringen om ze samen met agenda-evenementen te tonen.";
 "NSLocationWhenInUseUsageDescription" = "zisla heeft locatietoegang nodig om het lokale weer, plaatsnamen en wifinetwerken in de buurt te tonen.";
-"NSMicrophoneUsageDescription" = "zisla gebruikt de microfoon alleen wanneer je spraakinvoer start, om spraak om te zetten naar de huidige AI-gesprekstekst.";
-"NSSpeechRecognitionUsageDescription" = "zisla transcribeert de spraak die je actief opneemt naar AI-gesprekstekst.";
+"NSMicrophoneUsageDescription" = "zisla neemt alleen audio op wanneer je spraakinvoer start of de microfoon voor schermopname inschakelt.";
+"NSSpeechRecognitionUsageDescription" = "zisla zet spraak die je bewust opneemt om in tekst en transcribeert lokaal wanneer je ondertitels voor een schermopname maakt.";
 "NSAppleEventsUsageDescription" = "zisla gebruikt Mail.app om e-mail te lezen en beheren, inclusief postvakken, gelezen status, verwijdering en antwoorden. Ook voert zisla de opdrachten die je kiest uit in Terminal of iTerm.";
 "NSBluetoothAlwaysUsageDescription" = "zisla leest alleen openbare batterijgegevens van verbonden of gekoppelde Bluetooth-apparaten wanneer je de batterijpagina opent.";

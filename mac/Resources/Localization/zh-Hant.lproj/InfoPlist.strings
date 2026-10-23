@@ -1,9 +1,9 @@
 "NSCalendarsFullAccessUsageDescription" = "zisla 需要存取即將到來的日曆事件以顯示於頂部資訊面板。";
-"NSAudioCaptureUsageDescription" = "zisla 僅在播放媒體或你主動調整應用程式音量時讀取系統音訊，用於顯示音浪與調整該應用程式的輸出音量。";
-"NSCameraUsageDescription" = "zisla 僅在鏡子開啟時使用相機。";
+"NSAudioCaptureUsageDescription" = "zisla 讀取系統音訊以顯示音浪與調整應用程式音量，並在你啟用螢幕錄製系統音訊時記錄播放聲音。";
+"NSCameraUsageDescription" = "zisla 僅在你開啟鏡子或啟用螢幕錄影的攝影機疊加時使用攝影機。";
 "NSRemindersFullAccessUsageDescription" = "zisla 讀取有日期的提醒事項，以便與日曆事件一起顯示。";
 "NSLocationWhenInUseUsageDescription" = "zisla 需要定位權限來顯示本地天氣、地區名稱和附近的 Wi-Fi 網路。";
-"NSMicrophoneUsageDescription" = "zisla 僅在您啟動語音輸入時使用麥克風，以將語音轉換為目前 AI 對話文字。";
-"NSSpeechRecognitionUsageDescription" = "zisla 將您主動錄製的語音轉錄為 AI 對話文字。";
+"NSMicrophoneUsageDescription" = "zisla 僅在你主動語音輸入或啟用螢幕錄影的麥克風時錄音。";
+"NSSpeechRecognitionUsageDescription" = "zisla 需要將你主動錄入的語音轉為文字，並在你產生錄影字幕時在本機轉寫。";
 "NSAppleEventsUsageDescription" = "zisla 使用 Mail.app 來讀取和管理郵件，包括收件匣、已讀狀態、刪除和回覆。也可在 Terminal 或 iTerm 中執行你選擇的命令。";
 "NSBluetoothAlwaysUsageDescription" = "zisla 僅在您開啟電池頁面時讀取已連線或已配對藍牙裝置公開的電量資訊。";

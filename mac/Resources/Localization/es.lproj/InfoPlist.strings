@@ -1,9 +1,9 @@
 "NSCalendarsFullAccessUsageDescription" = "zisla necesita acceso a los próximos eventos del calendario para el panel de información superior.";
-"NSAudioCaptureUsageDescription" = "zisla lee el audio del sistema solo durante la reproducción multimedia o cuando ajustas el volumen de una app, para mostrar una forma de onda y ajustar el volumen de salida de esa app.";
-"NSCameraUsageDescription" = "zisla usa la cámara solo cuando el espejo está abierto.";
+"NSAudioCaptureUsageDescription" = "zisla lee el audio del sistema para mostrar una forma de onda y ajustar el volumen de las apps, y graba el sonido de reproducción cuando activas el audio del sistema al grabar la pantalla.";
+"NSCameraUsageDescription" = "zisla usa la cámara solo cuando abres el espejo o activas la superposición de cámara para la grabación de pantalla.";
 "NSRemindersFullAccessUsageDescription" = "zisla lee recordatorios con fecha para mostrarlos junto con eventos del calendario.";
 "NSLocationWhenInUseUsageDescription" = "zisla necesita acceso a tu ubicación para mostrar el tiempo local, nombres de lugares y redes Wi-Fi cercanas.";
-"NSMicrophoneUsageDescription" = "zisla usa el micrófono solo cuando inicias la entrada de voz, para convertir el habla en texto de conversación de IA.";
-"NSSpeechRecognitionUsageDescription" = "zisla transcribe el habla que grabas activamente en texto de conversación de IA.";
+"NSMicrophoneUsageDescription" = "zisla graba audio solo cuando inicias la entrada de voz o activas el micrófono para la grabación de pantalla.";
+"NSSpeechRecognitionUsageDescription" = "zisla convierte en texto la voz que grabas de forma voluntaria y transcribe localmente cuando generas subtítulos de una grabación de pantalla.";
 "NSAppleEventsUsageDescription" = "zisla usa Mail.app para leer y administrar correos, incluidas las bandejas de entrada, estado de lectura, eliminación y respuestas. También ejecuta los comandos que elijas en Terminal o iTerm.";
 "NSBluetoothAlwaysUsageDescription" = "zisla solo lee la información pública de batería de dispositivos Bluetooth conectados o vinculados cuando abres la página de batería.";

@@ -534,6 +534,7 @@ final class AppModel: ObservableObject {
   /// Synchronous hook used by the app delegate to arm overlay focus protection before any
   /// recording-start cleanup can reorder windows.
   var onVoiceInputWillStart: (() -> Void)?
+  var onScreenRecordingRequested: (() -> Void)?
 
   /// Model discovery state: used by the settings page to show connection test results and the available model list.
   @Published var voiceModelDiscoveryState: VoiceModelDiscoveryState = .idle
@@ -1501,6 +1502,12 @@ final class AppModel: ObservableObject {
     guard settingsStore.settings.systemMonitorEnabled else { return }
     selectModule(.system)
     Task { await systemMonitor.sampleOnce() }
+  }
+
+  func presentScreenRecording() {
+    guard settingsStore.settings.screenRecordingEnabled else { return }
+    islandCollapseRequested = true
+    onScreenRecordingRequested?()
   }
 
   func presentMirror() {
