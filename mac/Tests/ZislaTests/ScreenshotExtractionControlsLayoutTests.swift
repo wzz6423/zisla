@@ -2,12 +2,51 @@ import AppKit
 import SwiftUI
 import Testing
 import ZislaCore
+import ZislaKit
 
 @testable import Zisla
 
 @MainActor
 @Suite(.serialized)
 struct ScreenshotExtractionControlsLayoutTests {
+    @Test
+    func extractionMatchesTheExistingToolAttributeRegionAndControlInsets() async throws {
+        let releaseAccessibility = EnhancedAccessibilityTestScope.acquire()
+        defer { releaseAccessibility() }
+        let suiteName = "zisla-extraction-layout-\(UUID())"
+        let defaults = try #require(UserDefaults(suiteName: suiteName))
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+        let settings = FeatureSettingsStore(defaults: defaults)
+        defer { settings.flushPendingChanges() }
+        let model = ScreenshotEditorModel(image: sourceImage())
+        let editor = ScreenshotEditorView(
+            model: model, selectionState: ScreenshotAnnotationSelectionState(), settingsStore: settings,
+            onClose: {}, onCopy: {}, onPinToggle: { _ in }, onLongCapture: {}
+        )
+        let reference = Fixture(editor.toolAttributesMenu(for: .arrow))
+        let extraction = Fixture(model: model)
+        defer { reference.window.close(); extraction.window.close() }
+        await reference.settle()
+        await extraction.settle()
+
+        #expect(reference.host.fittingSize.height == ScreenshotToolbarLayout.height)
+        #expect(extraction.host.fittingSize.height == reference.host.fittingSize.height)
+        let referencePicker = try #require(reference.segmentedControl())
+        let extractionPicker = try #require(extraction.segmentedControl())
+        let referenceFrame = referencePicker.convert(referencePicker.bounds, to: reference.host)
+        let extractionFrame = extractionPicker.convert(extractionPicker.bounds, to: extraction.host)
+        #expect(referenceFrame.height == 24)
+        #expect(extractionFrame.height == referenceFrame.height)
+        #expect(reference.host.bounds.contains(referenceFrame))
+        #expect(extraction.host.bounds.contains(extractionFrame))
+        let referenceInsets = [referenceFrame.minY, reference.host.bounds.maxY - referenceFrame.maxY]
+        let extractionInsets = [extractionFrame.minY, extraction.host.bounds.maxY - extractionFrame.maxY]
+        for (expected, actual) in zip(referenceInsets, extractionInsets) {
+            #expect(expected > 0 && actual > 0, "Native controls must have space above and below the shared region")
+            #expect(abs(actual - expected) <= 0.5, "Extraction must preserve the existing tool region's vertical insets")
+        }
+    }
+
     @Test(arguments: AppLanguage.allCases)
     func everyModeAndItsActionsFitOneRowInEveryLanguage(language: AppLanguage) async throws {
         let releaseAccessibility = EnhancedAccessibilityTestScope.acquire()
@@ -122,12 +161,16 @@ struct ScreenshotExtractionControlsLayoutTests {
         let host: NSView
         let language: AppLanguage
 
-        init(model: ScreenshotEditorModel, language: AppLanguage = .simplifiedChinese, onExtract: @escaping () -> Void = {}) {
-            self.language = language
-            let hosting = NSHostingView(rootView: ScreenshotExtractionControls(
+        convenience init(model: ScreenshotEditorModel, language: AppLanguage = .simplifiedChinese, onExtract: @escaping () -> Void = {}) {
+            self.init(ScreenshotExtractionControls(
                 model: model, onSelectAll: { model.selectAllExtractionRegions() },
                 onClear: { model.clearExtractionSelection() }, onExtract: onExtract
-            ).environment(\.locale, language.locale)
+            ), language: language)
+        }
+
+        init<Content: View>(_ content: Content, language: AppLanguage = .simplifiedChinese) {
+            self.language = language
+            let hosting = NSHostingView(rootView: content.environment(\.locale, language.locale)
                 .environment(\.layoutDirection, language.isRightToLeft ? .rightToLeft : .leftToRight))
             host = hosting
             window = NSWindow(contentRect: CGRect(origin: .zero, size: hosting.fittingSize),
@@ -196,11 +239,13 @@ struct ScreenshotExtractionControlsLayoutTests {
             let row = try [group] + labels.map { title in
                 try #require(elements.first { $0.label == title }, "Missing visible control: \(title)")
             }
-            #expect(host.fittingSize.height <= ScreenshotToolbarLayout.height)
+            #expect(host.fittingSize.height == ScreenshotToolbarLayout.height)
             let bounds = window.convertToScreen(host.convert(host.bounds, to: nil))
             for element in row {
                 #expect(element.frame.width > 0 && element.frame.height > 0)
                 #expect(bounds.insetBy(dx: -1, dy: -1).contains(element.frame))
+                #expect(element.frame.minY > bounds.minY && element.frame.maxY < bounds.maxY,
+                        "Extraction controls must preserve vertical space inside the shared tool region")
             }
             let centers = row.map(\.frame.midY)
             #expect(try #require(centers.max()) - #require(centers.min()) <= 2,

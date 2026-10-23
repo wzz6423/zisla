@@ -16,20 +16,15 @@ enum ScreenshotRoundedCornerGeometry {
 
     static func handlePosition(in selection: CGRect, radius: CGFloat, within bounds: CGRect) -> CGPoint {
         let halfSize = handleSize / 2
-        let above = selection.minY - handleOffset
-        let y = above - halfSize >= bounds.minY ? above : selection.minY + handleOffset
         var position = CGPoint(
-            x: min(max(selection.minX + clampedRadius(radius, in: selection.size), bounds.minX + halfSize), bounds.maxX - halfSize),
-            y: min(y, bounds.maxY - halfSize)
+            x: selection.minX + max(handleOffset, clampedRadius(radius, in: selection.size)),
+            y: min(max(selection.minY, bounds.minY + halfSize), bounds.maxY - halfSize)
         )
-        let frame = CGRect(x: position.x - halfSize, y: position.y - halfSize, width: handleSize, height: handleSize)
-        if ScreenshotSelectionHandle.allCases.contains(where: { frame.contains(ScreenshotSelectionGeometry.position(of: $0, in: selection)) }) {
-            if selection.maxX + handleOffset + halfSize <= bounds.maxX {
-                position.x = selection.maxX + handleOffset
-            } else if selection.minX - handleOffset - halfSize >= bounds.minX {
-                position.x = selection.minX - handleOffset
-            } else {
-                position.x = selection.minX + handleOffset
+        for x in [position.x, selection.midX - handleOffset, selection.maxX + handleOffset, selection.minX - handleOffset] {
+            position.x = min(max(x, bounds.minX + halfSize), bounds.maxX - halfSize)
+            let frame = CGRect(x: position.x - halfSize, y: position.y - halfSize, width: handleSize, height: handleSize)
+            if !ScreenshotSelectionHandle.allCases.contains(where: { frame.contains(ScreenshotSelectionGeometry.position(of: $0, in: selection)) }) {
+                return position
             }
         }
         return position

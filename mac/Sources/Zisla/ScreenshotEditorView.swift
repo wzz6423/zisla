@@ -4654,6 +4654,18 @@ struct ScreenshotTransparencyBackground: View {
     }
 }
 
+struct ScreenshotToolAttributesRow<Content: View>: View {
+    @ViewBuilder var content: Content
+
+    var body: some View {
+        HStack(spacing: 10) {
+            content
+        }
+        .padding(.horizontal, 12)
+        .frame(height: ScreenshotToolbarLayout.height)
+    }
+}
+
 struct ScreenshotExtractionControls: View {
     @Environment(\.locale) private var locale
     @ObservedObject var model: ScreenshotEditorModel
@@ -4662,7 +4674,7 @@ struct ScreenshotExtractionControls: View {
     let onExtract: () -> Void
 
     var body: some View {
-        HStack(spacing: 10) {
+        ScreenshotToolAttributesRow {
             Picker(AppLocalization.string("提取方式", locale: locale), selection: $model.extractionMode) {
                 ForEach(ScreenshotExtractionMode.allCases) { mode in
                     Text(AppLocalization.string(mode.title, locale: locale)).tag(mode)
@@ -4707,7 +4719,6 @@ struct ScreenshotExtractionControls: View {
                     .help(status)
             }
         }
-        .padding(.horizontal, 12)
     }
 }
 
@@ -5210,49 +5221,40 @@ struct ScreenshotEditorView: View {
         let scale = model.hasLongCaptureResult
             ? ScreenshotCanvasGeometry(canvasSize: selectionRect.size, imageSize: model.image.size, zoom: canvasZoom).scale
             : 1
-        return ZStack(alignment: .topLeading) {
-            Path { path in
-                path.move(to: position)
-                path.addLine(to: CGPoint(x: position.x, y: selectionRect.minY))
+        return Circle()
+            .fill(Color.accentColor)
+            .overlay(Circle().stroke(.white, lineWidth: 2))
+            .overlay {
+                ScreenshotPointerInteractionView(
+                    onDrag: { start, current, isComplete in
+                        guard let cornerRadiusDragStart else { return }
+                        model.setCornerRadius(cornerRadiusDragStart + (current.x - start.x) / scale)
+                        if isComplete {
+                            model.endCornerRadiusAdjustment()
+                            self.cornerRadiusDragStart = nil
+                        }
+                    },
+                    onDragBegan: {
+                        commitInlineText()
+                        cornerRadiusDragStart = model.cornerRadius
+                        model.beginCornerRadiusAdjustment()
+                    },
+                    usesScreenCoordinatesForDrag: true
+                )
             }
-            .stroke(Color.accentColor, lineWidth: 1)
-            .allowsHitTesting(false)
-
-            Circle()
-                .fill(Color.accentColor)
-                .overlay(Circle().stroke(.white, lineWidth: 2))
-                .overlay {
-                    ScreenshotPointerInteractionView(
-                        onDrag: { start, current, isComplete in
-                            guard let cornerRadiusDragStart else { return }
-                            model.setCornerRadius(cornerRadiusDragStart + (current.x - start.x) / scale)
-                            if isComplete {
-                                model.endCornerRadiusAdjustment()
-                                self.cornerRadiusDragStart = nil
-                            }
-                        },
-                        onDragBegan: {
-                            commitInlineText()
-                            cornerRadiusDragStart = model.cornerRadius
-                            model.beginCornerRadiusAdjustment()
-                        },
-                        usesScreenCoordinatesForDrag: true
-                    )
+            .frame(width: ScreenshotRoundedCornerGeometry.handleSize, height: ScreenshotRoundedCornerGeometry.handleSize)
+            .position(position)
+            .help(AppLocalization.text("圆角"))
+            .accessibilityElement(children: .ignore)
+            .accessibilityLabel(AppLocalization.text("圆角"))
+            .accessibilityValue("\(Int(model.cornerRadius.rounded()))")
+            .accessibilityAdjustableAction { direction in
+                switch direction {
+                case .increment: model.setCornerRadius(model.cornerRadius + 1)
+                case .decrement: model.setCornerRadius(model.cornerRadius - 1)
+                @unknown default: break
                 }
-                .frame(width: ScreenshotRoundedCornerGeometry.handleSize, height: ScreenshotRoundedCornerGeometry.handleSize)
-                .position(position)
-                .help(AppLocalization.text("圆角"))
-                .accessibilityElement(children: .ignore)
-                .accessibilityLabel(AppLocalization.text("圆角"))
-                .accessibilityValue("\(Int(model.cornerRadius.rounded()))")
-                .accessibilityAdjustableAction { direction in
-                    switch direction {
-                    case .increment: model.setCornerRadius(model.cornerRadius + 1)
-                    case .decrement: model.setCornerRadius(model.cornerRadius - 1)
-                    @unknown default: break
-                    }
-                }
-        }
+            }
     }
 
     private func selectionHandle(_ handle: ScreenshotSelectionHandle, bounds: CGRect) -> some View {
@@ -6211,8 +6213,8 @@ struct ScreenshotEditorView: View {
     }
 
     @ViewBuilder
-    private func toolAttributesMenu(for tool: ScreenshotTool) -> some View {
-        HStack(spacing: 10) {
+    func toolAttributesMenu(for tool: ScreenshotTool) -> some View {
+        ScreenshotToolAttributesRow {
             if tool == .rectangle || tool == .ellipse || tool == .brush {
                 colorPicker
                 Divider().frame(height: 24)
@@ -6255,8 +6257,6 @@ struct ScreenshotEditorView: View {
                 fontSizeSlider
             }
         }
-        .padding(.horizontal, 12)
-        .frame(height: ScreenshotToolbarLayout.height)
     }
 
     private var colorPicker: some View {

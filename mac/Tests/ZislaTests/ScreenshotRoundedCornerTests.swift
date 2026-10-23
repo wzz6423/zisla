@@ -37,14 +37,19 @@ struct ScreenshotRoundedCornerTests {
         #expect(ScreenshotRoundedCornerGeometry.clampedRadius(23, in: size) == 0)
     }
 
-    @Test(arguments: [CGFloat(0), 23, 205, 300])
+    @Test(arguments: [CGFloat(0), 1, 18, 23, 205, 300])
     func radiusControlFollowsTheTangentWithoutCoveringResizeHandleCenters(radius: CGFloat) {
         let selection = CGRect(x: 100, y: 80, width: 410, height: 701)
         let position = ScreenshotRoundedCornerGeometry.handlePosition(
             in: selection, radius: radius, within: CGRect(x: 0, y: 0, width: 800, height: 900)
         )
-        #expect(position.x == selection.minX + min(radius, 205))
-        #expect(position.y == selection.minY - 18)
+        #expect(position.x > selection.minX && position.x < selection.midX,
+                "The radius control must stay to the right of the top-left handle and before the top resize handle")
+        #expect(position.y == selection.minY, "The radius control must follow the top-edge tangent")
+        if radius <= 18 {
+            #expect(position.x <= selection.minX + 28, "A zero or small radius must keep its control next to the top-left handle")
+        }
+        if radius == 23 { #expect(position.x == selection.minX + radius) }
         for handle in ScreenshotSelectionHandle.allCases {
             let resize = ScreenshotSelectionGeometry.position(of: handle, in: selection)
             #expect(abs(position.x - resize.x) > 14 || abs(position.y - resize.y) > 14,
@@ -56,11 +61,14 @@ struct ScreenshotRoundedCornerTests {
         (CGRect(x: 100, y: 0, width: 200, height: 120), CGRect(x: 0, y: 0, width: 800, height: 600)),
         (CGRect(x: 100, y: 20, width: 200, height: 120), CGRect(x: 0, y: 0, width: 800, height: 600)),
         (CGRect(x: 0, y: 80, width: 200, height: 120), CGRect(x: 0, y: 0, width: 800, height: 600)),
+        (CGRect(x: 600, y: 80, width: 200, height: 120), CGRect(x: 0, y: 0, width: 800, height: 600)),
         (CGRect(x: 0, y: 0, width: 800, height: 600), CGRect(x: 0, y: 0, width: 800, height: 600)),
         (CGRect(x: 0, y: 0, width: 24, height: 24), CGRect(x: 0, y: 0, width: 800, height: 600)),
         (CGRect(x: 776, y: 0, width: 24, height: 24), CGRect(x: 0, y: 0, width: 800, height: 600)),
         (CGRect(x: 799, y: 0, width: 1, height: 1), CGRect(x: 0, y: 0, width: 800, height: 600)),
         (CGRect(x: 0, y: 20, width: 24, height: 20), CGRect(x: 0, y: 0, width: 80, height: 40)),
+        (CGRect(x: 24, y: 0, width: 32, height: 16), CGRect(x: 0, y: 0, width: 80, height: 40)),
+        (CGRect(x: 0, y: 0, width: 800, height: 24), CGRect(x: 0, y: 0, width: 800, height: 600)),
         (CGRect(x: 10, y: 20, width: 24, height: 24), CGRect(x: 10, y: 20, width: 800, height: 600)),
     ], [CGFloat(0), 23, 10_000])
     func completeRadiusControlRemainsInsideScreenBounds(scenario: (selection: CGRect, bounds: CGRect), radius: CGFloat) {
@@ -370,9 +378,11 @@ struct ScreenshotRoundedCornerTests {
         CGRect(x: 100, y: 0, width: 200, height: 120),
         CGRect(x: 100, y: 20, width: 200, height: 120),
         CGRect(x: 0, y: 80, width: 200, height: 120),
+        CGRect(x: 400, y: 80, width: 200, height: 120),
         CGRect(x: 0, y: 0, width: 600, height: 420),
         CGRect(x: 0, y: 0, width: 24, height: 24),
         CGRect(x: 576, y: 0, width: 24, height: 24),
+        CGRect(x: 599, y: 0, width: 1, height: 1),
         CGRect(x: 0, y: 0, width: 600, height: 24),
     ], [1, 2])
     func radiusHandleDragsThroughTheEditorAndGroupsHistory(selection: CGRect, pixelScale: Int) async throws {
@@ -406,6 +416,11 @@ struct ScreenshotRoundedCornerTests {
         let begin = try #require(handle.onDragBegan)
         #expect(handle.bounds.size == CGSize(width: 16, height: 16))
         assertRadiusHandleRemainsVisibleAndHittable(handle, in: host, selection: selection)
+        if selection.width == 200 {
+            let frame = host.convert(handle.bounds, from: handle)
+            #expect(frame.midX > selection.minX && frame.midX <= selection.minX + 28)
+            #expect(frame.midY == max(8, selection.minY), "The real editor must place the control on the visible top-edge tangent")
+        }
         begin()
         drag(.zero, .zero, false)
         drag(.zero, .zero, true)
@@ -422,6 +437,11 @@ struct ScreenshotRoundedCornerTests {
             await Task.yield()
         }
         assertRadiusHandleRemainsVisibleAndHittable(handle, in: host, selection: selection)
+        if selection.width == 200 {
+            let frame = host.convert(handle.bounds, from: handle)
+            #expect(frame.midX == selection.minX + targetRadius)
+            #expect(frame.midY == max(8, selection.minY))
+        }
         model.undo()
         #expect(model.cornerRadius == 0)
         #expect(!model.canUndo)
