@@ -2079,6 +2079,7 @@
 "清除" = "清除";
 "搜索地区" = "搜索地区";
 "链接" = "链接";
+"IP 地址" = "IP 地址";
 "文件路径" = "文件路径";
 "邮箱" = "邮箱";
 "电话号码" = "电话号码";
@@ -2688,6 +2689,7 @@
 "onboarding.permission.system_audio.body" = "用于显示音乐音浪。请在系统设置中开启音频录制，首次使用时 macOS 可能再次确认。";
 "onboarding.permission.full_disk_access.title" = "完全磁盘访问";
 "onboarding.permission.full_disk_access.body" = "仅在使用本地邮件索引或浏览器 Cookies 时需要，可在系统设置中按需开启。";
+"查询 IP 信息" = "查询 IP 信息";
 
 "更新日志" = "更新日志";
 "已更新至 %@" = "已更新至 %@";

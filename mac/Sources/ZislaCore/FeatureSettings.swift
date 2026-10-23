@@ -1092,7 +1092,7 @@ public struct FeatureSettings: Codable, Equatable, Sendable {
     }
 
     /// Current clipboard-assistant kind preference payload version.
-    public static let clipboardAssistantKindSetVersionCurrent = 3
+    public static let clipboardAssistantKindSetVersionCurrent = 4
     /// Kinds shipped after the previous version; enabled once when a stored
     /// preference from an older version is decoded. Empty stored sets keep
     /// their "all kinds" meaning and need no migration.
@@ -1100,6 +1100,7 @@ public struct FeatureSettings: Codable, Equatable, Sendable {
         1: [.emojiName],
         2: [.address, .flight, .train, .tracking, .meeting],
         3: [.shellCommand],
+        4: [.ipAddress],
     ]
 
     public static let `default` = FeatureSettings()

@@ -280,7 +280,7 @@ extension ClipboardAssistantDetector {
         case .fedEx: "https://www.fedex.com/en-us/tracking.html"
         case .dhl: "https://www.dhl.com/us-en/home/tracking.html"
         case .usps: "https://tools.usps.com/go/TrackAction"
-        case .baiduMaps, .googleMaps: preconditionFailure("Map actions require an encoded address")
+        case .baiduMaps, .googleMaps, .ipInfo: preconditionFailure("These service actions require their own URL")
         }
         var components = URLComponents(string: endpoint)!
         if let number {

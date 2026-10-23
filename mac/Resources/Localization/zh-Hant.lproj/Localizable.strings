@@ -509,6 +509,7 @@
 "识别类型" = "識別類型";
 "控制哪些内容会触发提示" = "控制哪些內容會觸發提示";
 "链接" = "連結";
+"IP 地址" = "IP 位址";
 "文件路径" = "檔案路徑";
 "邮箱" = "電子郵件";
 "电话号码" = "電話號碼";
@@ -2747,6 +2748,7 @@
 "onboarding.permission.system_audio.body" = "用於顯示音樂波形。請在系統設定中開啟音訊錄製，首次使用時 macOS 可能再次確認。";
 "onboarding.permission.full_disk_access.title" = "完整磁碟存取";
 "onboarding.permission.full_disk_access.body" = "僅在使用本機郵件索引或瀏覽器 Cookies 時需要，可在系統設定中依需要開啟。";
+"查询 IP 信息" = "查詢 IP 資訊";
 
 "更新日志" = "更新日誌";
 "已更新至 %@" = "已更新至 %@";
