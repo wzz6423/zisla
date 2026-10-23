@@ -3273,6 +3273,10 @@ struct SettingsView: View {
                 examples: ["10 ft = m", "100 kg = lb", "5 km = mi"]
             ),
             ClipboardAssistantExampleGroup(
+                title: "金额换算",
+                examples: ["1元 = ?角", "0.1角 = ?分", "1dollar = ?cent"]
+            ),
+            ClipboardAssistantExampleGroup(
                 title: "汇率换算",
                 examples: ["100 USD = CNY", "100$ = ¥", "100dollar = CNY"]
             ),

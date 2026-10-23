@@ -2460,6 +2460,10 @@
 "汇率换算" = "Currency Conversion";
 "换算" = "Conversions";
 "单位换算" = "Unit Conversion";
+"金额换算" = "Money Unit Conversion";
+"1元 = ?角" = "1 dollar = ?cents";
+"0.1角 = ?分" = "100 cents = ?dollar";
+"1dollar = ?cent" = "0.1 dollar = ?cents";
 "日期加减" = "Date Arithmetic";
 "2026.10.28往后15天" = "2026.10.28 add 15days";
 "2026.10.28往前15天" = "2026.10.28 subtract 15days";
