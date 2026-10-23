@@ -455,6 +455,7 @@
 "识别类型" = "Tipos reconhecidos";
 "控制哪些内容会触发提示" = "Escolha quais tipos de conteúdo mostram o aviso";
 "链接" = "Link";
+"IP 地址" = "Endereço IP";
 "文件路径" = "Caminho do arquivo";
 "邮箱" = "Endereço de e-mail";
 "电话号码" = "Número de telefone";
@@ -2744,3 +2745,4 @@
 "onboarding.permission.system_audio.body" = "Para visualizar a música. Ative a gravação de áudio nos Ajustes do Sistema; o macOS pode pedir confirmação no primeiro uso.";
 "onboarding.permission.full_disk_access.title" = "Acesso Total ao Disco";
 "onboarding.permission.full_disk_access.body" = "Necessário apenas para índices locais de e-mail ou cookies do navegador. Ative nos Ajustes do Sistema se usar esses recursos.";
+"查询 IP 信息" = "Consultar informações do IP";

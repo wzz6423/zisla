@@ -3,6 +3,7 @@ import Foundation
 /// Content kinds recognized by the clipboard assistant; each kind can be toggled in Settings.
 public enum ClipboardAssistantKind: String, Codable, CaseIterable, Sendable, Equatable, Hashable {
     case url
+    case ipAddress
     case filePath
     case email
     case phone
@@ -29,6 +30,7 @@ public enum ClipboardAssistantKind: String, Codable, CaseIterable, Sendable, Equ
     /// `currency` is migrated to `conversion` by `FeatureSettings` and is never shown as a separate control.
     public static let allCases: [Self] = [
         .url,
+        .ipAddress,
         .filePath,
         .email,
         .phone,
@@ -55,6 +57,7 @@ public enum ClipboardAssistantKind: String, Codable, CaseIterable, Sendable, Equ
     public var symbolName: String {
         switch self {
         case .url: "link"
+        case .ipAddress: "network"
         case .filePath: "doc.text"
         case .email: "envelope"
         case .phone: "phone"
@@ -311,6 +314,7 @@ public enum ClipboardAssistantActionOrder {
     public static func defaults(for kind: ClipboardAssistantKind) -> [ClipboardAssistantActionKind] {
         switch kind {
         case .url: [.openURL, .openDownload, .addToQuickNote, .share]
+        case .ipAddress: [.openURL, .copyText, .addToQuickNote, .share]
         case .filePath: [.revealInFinder, .compress, .addToQuickNote, .share]
         case .file: [.revealInFinder, .compress, .copyText, .addToQuickNote, .share]
         case .email: [.composeMail, .addToQuickNote, .share]

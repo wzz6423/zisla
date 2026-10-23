@@ -455,6 +455,7 @@
 "识别类型" = "Jenis yang dikenali";
 "控制哪些内容会触发提示" = "Pilih jenis konten yang memunculkan notifikasi";
 "链接" = "Tautan";
+"IP 地址" = "Alamat IP";
 "文件路径" = "Jalur berkas";
 "邮箱" = "Alamat email";
 "电话号码" = "Nomor telepon";
@@ -2744,3 +2745,4 @@
 "onboarding.permission.system_audio.body" = "Untuk visualisasi musik. Aktifkan perekaman audio di Pengaturan Sistem; macOS dapat meminta konfirmasi saat pertama kali digunakan.";
 "onboarding.permission.full_disk_access.title" = "Akses Disk Penuh";
 "onboarding.permission.full_disk_access.body" = "Hanya diperlukan untuk indeks email lokal atau cookie browser. Aktifkan di Pengaturan Sistem jika Anda menggunakan fitur ini.";
+"查询 IP 信息" = "Cari informasi IP";

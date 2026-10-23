@@ -451,6 +451,7 @@
 "识别类型" = "Types reconnus";
 "控制哪些内容会触发提示" = "Choisissez les types de contenu qui déclenchent le toast";
 "链接" = "Lien";
+"IP 地址" = "Adresse IP";
 "文件路径" = "Chemin de fichier";
 "邮箱" = "Adresse e-mail";
 "电话号码" = "Numéro de téléphone";
@@ -2740,3 +2741,4 @@
 "onboarding.permission.system_audio.body" = "Pour visualiser la musique. Autorisez l’enregistrement audio dans les Réglages Système ; macOS peut demander une confirmation lors de la première utilisation.";
 "onboarding.permission.full_disk_access.title" = "Accès complet au disque";
 "onboarding.permission.full_disk_access.body" = "Nécessaire uniquement pour les index de courrier locaux ou les cookies du navigateur. Activez-le dans les Réglages Système si vous utilisez ces fonctions.";
+"查询 IP 信息" = "Rechercher les informations IP";
