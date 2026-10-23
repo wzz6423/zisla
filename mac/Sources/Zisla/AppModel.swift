@@ -3263,10 +3263,13 @@ final class AppModel: ObservableObject {
         : (retainsAudio ? AppLocalization.text("录音文件已保留，但记录索引保存失败") : AppLocalization.text("语音记录保存失败"))
       return
     }
-    let lexiconNormalizedTranscript = VoiceLexicon.normalizeTranscript(
-      rawTranscript,
-      for: enabledVoiceLexicons,
-      customTerms: customVoiceHotwords
+    let lexiconNormalizedTranscript = VoiceTranscriptPunctuation.normalize(
+      VoiceLexicon.normalizeTranscript(
+        rawTranscript,
+        for: enabledVoiceLexicons,
+        customTerms: customVoiceHotwords
+      ),
+      customHotwords: customVoiceHotwords
     )
     let localTranscriptSaved = lexiconNormalizedTranscript == rawTranscript
       || voiceHistory.updateProcessedTranscript(
