@@ -2762,3 +2762,15 @@
 "提取蒙版尺寸不匹配" = "Kích thước mặt nạ tách ảnh không khớp";
 "无法生成提取图片" = "Không thể tạo ảnh đã tách";
 "圆角" = "Bán kính góc";
+
+"更新日志" = "Ghi chú phát hành";
+"已更新至 %@" = "Đã cập nhật lên %@";
+"正在加载更新日志" = "Đang tải ghi chú phát hành";
+"无法加载更新日志" = "Không thể tải ghi chú phát hành";
+"查看发布页面" = "Xem trang phát hành";
+"安装更新" = "Cài đặt bản cập nhật";
+"安装并重新启动" = "Cài đặt và khởi động lại";
+"退出时安装" = "Cài đặt khi thoát";
+"稍后提醒" = "Nhắc tôi sau";
+"跳过此版本" = "Bỏ qua phiên bản này";
+"了解更多" = "Tìm hiểu thêm";

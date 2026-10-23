@@ -6,6 +6,28 @@ import ZislaCore
 
 @MainActor
 struct UpdateFeedResolverTests {
+    @Test
+    func installedReleaseNotesShareAnExistingLookupAndDoNotReplaceTheManualCheck() async throws {
+        let gate = LookupGate()
+        let resolver = UpdateFeedResolver { await gate.load() }
+        var didCheckManually = false
+        resolver.resolve(manual: true) { _ in didCheckManually = true }
+        await gate.waitUntilStarted()
+        let notes = Task { await resolver.resolvedPreference() }
+        gate.release(.githubFirst)
+        #expect(await notes.value == .githubFirst)
+        #expect(didCheckManually)
+        #expect(gate.requests == 1)
+        #expect(await resolver.resolvedPreference() == .githubFirst)
+        #expect(gate.requests == 1)
+    }
+
+    @Test
+    func installedReleaseNotesResolveMirrorOrderWhenAutomaticChecksAreDisabled() async {
+        let resolver = UpdateFeedResolver { .giteeFirst }
+        #expect(await resolver.resolvedPreference() == .giteeFirst)
+    }
+
     @Test(arguments: ["CN", "US", nil])
     func settingsChangesPreserveManualCheckAndShareMirrorOrder(countryCode: String?) async throws {
         let gate = LookupGate()

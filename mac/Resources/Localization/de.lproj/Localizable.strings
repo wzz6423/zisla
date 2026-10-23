@@ -2763,3 +2763,15 @@
 "提取蒙版尺寸不匹配" = "Die Größe der Freistellungsmaske stimmt nicht überein";
 "无法生成提取图片" = "Das freigestellte Bild konnte nicht erstellt werden";
 "圆角" = "Eckenradius";
+
+"更新日志" = "Versionshinweise";
+"已更新至 %@" = "Auf %@ aktualisiert";
+"正在加载更新日志" = "Versionshinweise werden geladen";
+"无法加载更新日志" = "Versionshinweise konnten nicht geladen werden";
+"查看发布页面" = "Veröffentlichungsseite öffnen";
+"安装更新" = "Update installieren";
+"安装并重新启动" = "Installieren und neu starten";
+"退出时安装" = "Beim Beenden installieren";
+"稍后提醒" = "Später erinnern";
+"跳过此版本" = "Diese Version überspringen";
+"了解更多" = "Mehr erfahren";

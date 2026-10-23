@@ -2761,3 +2761,15 @@
 "提取蒙版尺寸不匹配" = "Extraction mask size does not match";
 "无法生成提取图片" = "Unable to create the extracted image";
 "圆角" = "Corner radius";
+
+"更新日志" = "Release Notes";
+"已更新至 %@" = "Updated to %@";
+"正在加载更新日志" = "Loading release notes";
+"无法加载更新日志" = "Unable to load release notes";
+"查看发布页面" = "View release page";
+"安装更新" = "Install Update";
+"安装并重新启动" = "Install and Relaunch";
+"退出时安装" = "Install on Quit";
+"稍后提醒" = "Remind Me Later";
+"跳过此版本" = "Skip This Version";
+"了解更多" = "Learn More";

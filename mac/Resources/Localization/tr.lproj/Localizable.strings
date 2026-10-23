@@ -2762,3 +2762,15 @@
 "提取蒙版尺寸不匹配" = "Ayıklama maskesinin boyutu eşleşmiyor";
 "无法生成提取图片" = "Ayıklanan görüntü oluşturulamıyor";
 "圆角" = "Köşe yarıçapı";
+
+"更新日志" = "Sürüm notları";
+"已更新至 %@" = "%@ sürümüne güncellendi";
+"正在加载更新日志" = "Sürüm notları yükleniyor";
+"无法加载更新日志" = "Sürüm notları yüklenemedi";
+"查看发布页面" = "Sürüm sayfasını görüntüle";
+"安装更新" = "Güncellemeyi yükle";
+"安装并重新启动" = "Yükle ve yeniden başlat";
+"退出时安装" = "Çıkışta yükle";
+"稍后提醒" = "Daha sonra hatırlat";
+"跳过此版本" = "Bu sürümü atla";
+"了解更多" = "Daha fazla bilgi";

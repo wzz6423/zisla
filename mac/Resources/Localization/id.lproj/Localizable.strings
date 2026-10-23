@@ -2762,3 +2762,15 @@
 "提取蒙版尺寸不匹配" = "Ukuran mask ekstraksi tidak cocok";
 "无法生成提取图片" = "Tidak dapat membuat gambar hasil ekstraksi";
 "圆角" = "Radius sudut";
+
+"更新日志" = "Catatan rilis";
+"已更新至 %@" = "Diperbarui ke %@";
+"正在加载更新日志" = "Memuat catatan rilis";
+"无法加载更新日志" = "Tidak dapat memuat catatan rilis";
+"查看发布页面" = "Lihat halaman rilis";
+"安装更新" = "Instal pembaruan";
+"安装并重新启动" = "Instal dan mulai ulang";
+"退出时安装" = "Instal saat keluar";
+"稍后提醒" = "Ingatkan nanti";
+"跳过此版本" = "Lewati versi ini";
+"了解更多" = "Pelajari lebih lanjut";

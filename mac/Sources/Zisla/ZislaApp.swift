@@ -337,6 +337,7 @@ enum PersistentPetNoticePolicy {
 
 @MainActor
 final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
+    private var hasExistingInstallation = false
     private var onboardingController: FirstLaunchOnboardingController?
     private var onboardingLifecycle: FirstLaunchOnboardingLifecycle?
     private var runningModel: AppModel?
@@ -402,6 +403,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
             "feature-settings-v1", "keyboardVolumeCurveVersion",
             "selectedPointerProfile", "download-directory-bookmark",
         ].contains { defaults.object(forKey: $0) != nil }
+        self.hasExistingInstallation = hasExistingInstallation
         let state = FirstLaunchOnboardingState(hasExistingInstallation: hasExistingInstallation)
         let lifecycle = FirstLaunchOnboardingLifecycle(state: state) { [weak self] in
             self?.startNormalApplication()
@@ -426,7 +428,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
         let model = AppModel.shared
         runningModel = model
         model.setFirstLaunchOnboardingActive(onboardingLifecycle?.isPresenting == true)
-        model.start()
+        model.start(hasExistingInstallation: hasExistingInstallation)
         configureApplicationIconUpdates(model: model)
         let lockScreenOverlayController = LockScreenOverlayController(model: model)
         self.lockScreenOverlayController = lockScreenOverlayController

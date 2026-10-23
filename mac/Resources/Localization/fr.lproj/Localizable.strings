@@ -2758,3 +2758,15 @@
 "提取蒙版尺寸不匹配" = "La taille du masque d’extraction ne correspond pas";
 "无法生成提取图片" = "Impossible de créer l’image extraite";
 "圆角" = "Rayon des coins";
+
+"更新日志" = "Notes de version";
+"已更新至 %@" = "Mise à jour vers %@ effectuée";
+"正在加载更新日志" = "Chargement des notes de version";
+"无法加载更新日志" = "Impossible de charger les notes de version";
+"查看发布页面" = "Voir la page de la version";
+"安装更新" = "Installer la mise à jour";
+"安装并重新启动" = "Installer et relancer";
+"退出时安装" = "Installer à la fermeture";
+"稍后提醒" = "Me rappeler plus tard";
+"跳过此版本" = "Ignorer cette version";
+"了解更多" = "En savoir plus";
