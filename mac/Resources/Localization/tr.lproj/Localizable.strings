@@ -2744,3 +2744,15 @@
 "onboarding.permission.system_audio.body" = "Müzik görselleştirmeleri için kullanılır. Sistem Ayarları’nda ses kaydını etkinleştirin; macOS ilk kullanımda onay isteyebilir.";
 "onboarding.permission.full_disk_access.title" = "Tam Disk Erişimi";
 "onboarding.permission.full_disk_access.body" = "Yalnızca yerel posta dizinleri veya tarayıcı çerezleri için gereklidir. Bu özellikleri kullanıyorsanız Sistem Ayarları’nda etkinleştirin.";
+
+"更新日志" = "Sürüm notları";
+"已更新至 %@" = "%@ sürümüne güncellendi";
+"正在加载更新日志" = "Sürüm notları yükleniyor";
+"无法加载更新日志" = "Sürüm notları yüklenemedi";
+"查看发布页面" = "Sürüm sayfasını görüntüle";
+"安装更新" = "Güncellemeyi yükle";
+"安装并重新启动" = "Yükle ve yeniden başlat";
+"退出时安装" = "Çıkışta yükle";
+"稍后提醒" = "Daha sonra hatırlat";
+"跳过此版本" = "Bu sürümü atla";
+"了解更多" = "Daha fazla bilgi";

@@ -2743,3 +2743,15 @@
 "onboarding.permission.system_audio.body" = "For music visualizations. Enable audio recording in System Settings; macOS may confirm again when you first use it.";
 "onboarding.permission.full_disk_access.title" = "Full Disk Access";
 "onboarding.permission.full_disk_access.body" = "Needed only for local mail indexes or browser cookies. Enable in System Settings if you use these features.";
+
+"更新日志" = "Release Notes";
+"已更新至 %@" = "Updated to %@";
+"正在加载更新日志" = "Loading release notes";
+"无法加载更新日志" = "Unable to load release notes";
+"查看发布页面" = "View release page";
+"安装更新" = "Install Update";
+"安装并重新启动" = "Install and Relaunch";
+"退出时安装" = "Install on Quit";
+"稍后提醒" = "Remind Me Later";
+"跳过此版本" = "Skip This Version";
+"了解更多" = "Learn More";

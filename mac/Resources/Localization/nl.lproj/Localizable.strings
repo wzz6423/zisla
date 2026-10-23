@@ -2744,3 +2744,15 @@
 "onboarding.permission.system_audio.body" = "Voor muziekvisualisaties. Sta audio-opname toe in Systeeminstellingen; macOS kan bij het eerste gebruik opnieuw om bevestiging vragen.";
 "onboarding.permission.full_disk_access.title" = "Volledige schijftoegang";
 "onboarding.permission.full_disk_access.body" = "Alleen nodig voor lokale e-mailindexen of browsercookies. Schakel dit in Systeeminstellingen in als u deze functies gebruikt.";
+
+"更新日志" = "Versieopmerkingen";
+"已更新至 %@" = "Bijgewerkt naar %@";
+"正在加载更新日志" = "Versieopmerkingen laden";
+"无法加载更新日志" = "Versieopmerkingen kunnen niet worden geladen";
+"查看发布页面" = "Versiepagina bekijken";
+"安装更新" = "Update installeren";
+"安装并重新启动" = "Installeren en herstarten";
+"退出时安装" = "Installeren bij afsluiten";
+"稍后提醒" = "Later herinneren";
+"跳过此版本" = "Deze versie overslaan";
+"了解更多" = "Meer informatie";

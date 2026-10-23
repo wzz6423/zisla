@@ -2744,3 +2744,15 @@
 "onboarding.permission.system_audio.body" = "Untuk visualisasi musik. Aktifkan perekaman audio di Pengaturan Sistem; macOS dapat meminta konfirmasi saat pertama kali digunakan.";
 "onboarding.permission.full_disk_access.title" = "Akses Disk Penuh";
 "onboarding.permission.full_disk_access.body" = "Hanya diperlukan untuk indeks email lokal atau cookie browser. Aktifkan di Pengaturan Sistem jika Anda menggunakan fitur ini.";
+
+"更新日志" = "Catatan rilis";
+"已更新至 %@" = "Diperbarui ke %@";
+"正在加载更新日志" = "Memuat catatan rilis";
+"无法加载更新日志" = "Tidak dapat memuat catatan rilis";
+"查看发布页面" = "Lihat halaman rilis";
+"安装更新" = "Instal pembaruan";
+"安装并重新启动" = "Instal dan mulai ulang";
+"退出时安装" = "Instal saat keluar";
+"稍后提醒" = "Ingatkan nanti";
+"跳过此版本" = "Lewati versi ini";
+"了解更多" = "Pelajari lebih lanjut";
