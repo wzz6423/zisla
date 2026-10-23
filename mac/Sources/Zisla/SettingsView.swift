@@ -31,7 +31,6 @@ struct SettingsView: View {
     @State private var voiceHotkeyValidationMessage: String?
     @State private var assistantHotkeyValidationMessage: String?
     @State private var expandedClipboardAssistantKind: ClipboardAssistantKind?
-    @Namespace private var sectionSelectionNamespace
 
     init(model: AppModel) {
         self.model = model
@@ -40,16 +39,19 @@ struct SettingsView: View {
     }
 
     var body: some View {
-        VStack(spacing: 0) {
-            navigationToolbar
-            Divider()
-            HStack(spacing: 0) {
-                if input.isSidebarVisible {
-                    sidebar
-                    Divider()
+        SettingsSplitView(input: input, settings: settingsStore.settings, onNavigate: navigateSettingsHistory) {
+            SettingsSidebar(
+                input: input, settings: settingsStore.settings, appVersion: appVersion,
+                settingsSearchFieldFocused: $settingsSearchFieldFocused,
+                onSelect: { selectSettingsSection($0) },
+                onSubmitSearch: {
+                    if let result = settingsSearchResults.first {
+                        openSettingsSearchResult(result)
+                    }
                 }
-                detail
-            }
+            )
+        } detail: {
+            detail
         }
         .frame(
             width: input.selection.prefersWideLayout ? 1120 : 960,
@@ -107,191 +109,12 @@ struct SettingsView: View {
         }
     }
 
-    private var navigationToolbar: some View {
-        HStack(spacing: 12) {
-            Button {
-                input.isSidebarVisible.toggle()
-            } label: {
-                IconButtonLabel(symbol: "sidebar.left")
-            }
-            .buttonStyle(PressableStyle())
-            .help(AppLocalization.text(input.isSidebarVisible ? "隐藏侧边栏" : "显示侧边栏"))
-            .accessibilityLabel(AppLocalization.text(input.isSidebarVisible ? "隐藏侧边栏" : "显示侧边栏"))
-            .accessibilityIdentifier("settings-sidebar-toggle")
-
-            HStack(spacing: 2) {
-                historyButton(backward: true)
-                historyButton(backward: false)
-            }
-            .padding(3)
-            .background(Color.fillControl, in: Capsule())
-            .overlay {
-                Capsule().strokeBorder(Color.primary.opacity(0.12), lineWidth: 0.5)
-            }
-
-            Spacer(minLength: 0)
+    private func navigateSettingsHistory(backward: Bool) {
+        sectionSwitchDirection = backward ? -1 : 1
+        withAnimation(reduceMotion ? nil : ZislaMotion.settingsPageSwitch) {
+            input.navigate(backward: backward, settings: settingsStore.settings)
         }
-        .padding(.horizontal, 12)
-        .padding(.vertical, 8)
-    }
-
-    private func historyButton(backward: Bool) -> some View {
-        let isEnabled = input.canNavigate(backward: backward, settings: settingsStore.settings)
-        let title = AppLocalization.text(backward ? "后退" : "前进")
-        return Button {
-            sectionSwitchDirection = backward ? -1 : 1
-            withAnimation(reduceMotion ? nil : ZislaMotion.settingsPageSwitch) {
-                input.navigate(backward: backward, settings: settingsStore.settings)
-            }
-            settingsSearchFieldFocused = false
-        } label: {
-            IconButtonLabel(
-                symbol: backward ? "chevron.backward" : "chevron.forward",
-                showsInactiveBackground: false
-            )
-            .opacity(isEnabled ? 1 : 0.35)
-        }
-        .buttonStyle(PressableStyle())
-        .disabled(!isEnabled)
-        .help(title)
-        .accessibilityLabel(title)
-        .accessibilityIdentifier(backward ? "settings-history-back" : "settings-history-forward")
-    }
-
-    private var sidebar: some View {
-        VStack(alignment: .leading, spacing: 0) {
-            settingsSearchField
-
-            ScrollView {
-                VStack(alignment: .leading, spacing: 20) {
-                    ForEach(SettingsSectionGroup.allCases) { group in
-                        let sections = visibleSections.filter { $0.group == group }
-                        if !sections.isEmpty {
-                            VStack(alignment: .leading, spacing: 5) {
-                                AppLocalizedText(group.title)
-                                    .font(.system(size: 11, weight: .medium))
-                                    .foregroundStyle(.secondary)
-                                    .padding(.horizontal, 10)
-                                    .padding(.bottom, 2)
-                                ForEach(sections) { section in
-                                    sidebarButton(section)
-                                }
-                            }
-                        }
-                    }
-                }
-                .padding(.vertical, 4)
-                .padding(.trailing, 20)
-            }
-            .thinScrollChrome()
-            .padding(.top, 18)
-            .animation(reduceMotion ? nil : ZislaMotion.selection, value: input.selection)
-
-            Spacer(minLength: 12)
-
-            HStack(spacing: 6) {
-                Text(AppLocalization.text("版本 %@", appVersion))
-                    .font(.system(size: 11, design: .monospaced))
-                    .foregroundStyle(.tertiary)
-                    .fitsSingleLine(0.7)
-                Spacer(minLength: 0)
-                Button {
-                    NSApp.terminate(nil)
-                } label: {
-                    HStack(spacing: 6) {
-                        IconButtonLabel(
-                            symbol: "power",
-                            size: .compact,
-                            showsInactiveBackground: false
-                        )
-                        Text(AppLocalization.text("退出"))
-                            .font(.system(size: 11, weight: .medium))
-                            .fitsSingleLine(0.7)
-                    }
-                    .padding(.trailing, 7)
-                    .background(Color.fillControl)
-                    .clipShape(Capsule())
-                    .contentShape(Capsule())
-                }
-                .buttonStyle(PressableStyle(hoverScale: 1.018, pressedScale: 0.965))
-                .help(AppLocalization.text("退出应用"))
-                .accessibilityLabel(AppLocalization.text("退出应用"))
-            }
-            .frame(maxWidth: .infinity)
-        }
-        .padding(12)
-        .frame(width: 250)
-        .frame(maxHeight: .infinity, alignment: .topLeading)
-        .background(Color.primary.opacity(colorScheme == .dark ? 0.035 : 0.025))
-    }
-
-    private func sidebarButton(_ section: SettingsSection) -> some View {
-        Button {
-            selectSettingsSection(section)
-        } label: {
-            HStack(spacing: 10) {
-                Image(systemName: section.symbol)
-                    .font(.system(size: 15, weight: .medium))
-                    .foregroundStyle(input.selection == section ? Color.white : Color.accentColor)
-                    .frame(width: 21)
-                AppLocalizedText(section.title)
-                    .font(.system(size: 13, weight: .medium))
-                    .fitsLines(2, minScale: 0.85)
-                Spacer(minLength: 0)
-            }
-            .padding(.horizontal, 10)
-            .frame(minHeight: 38)
-            .contentShape(Rectangle())
-        }
-        .buttonStyle(PressableStyle(hoverScale: 1.018, pressedScale: 0.965))
-        .foregroundStyle(input.selection == section ? Color.white : Color.primary)
-        .background {
-            if input.selection == section {
-                RoundedRectangle(cornerRadius: 8, style: .continuous)
-                    .fill(Color.blue)
-                    .matchedGeometryEffect(id: "settings-section-selection", in: sectionSelectionNamespace)
-            }
-        }
-        .accessibilityLabel(AppLocalization.text("%@设置", AppLocalization.text(section.title)))
-        .accessibilityAddTraits(input.selection == section ? .isSelected : [])
-    }
-
-    private var settingsSearchField: some View {
-        HStack(spacing: 5) {
-            Image(systemName: "magnifyingglass")
-                .foregroundStyle(.secondary)
-            TextField(AppLocalization.text("搜索设置"), text: $input.settingsQuery)
-                .textFieldStyle(.plain)
-                .focused($settingsSearchFieldFocused)
-                .accessibilityIdentifier("settings-search-field")
-                .accessibilityLabel(AppLocalization.text("搜索设置"))
-                .onSubmit {
-                    if let result = settingsSearchResults.first {
-                        openSettingsSearchResult(result)
-                    }
-                }
-                .onExitCommand { input.settingsQuery = "" }
-            if !input.settingsQuery.isEmpty {
-                Button {
-                    input.settingsQuery = ""
-                    settingsSearchFieldFocused = true
-                } label: {
-                    Image(systemName: "xmark.circle.fill")
-                        .foregroundStyle(.secondary)
-                }
-                .buttonStyle(.plain)
-                .help(AppLocalization.text("清除"))
-                .accessibilityLabel(AppLocalization.text("清除"))
-            }
-        }
-        .font(.system(size: 13))
-        .padding(.horizontal, 10)
-        .frame(height: 34)
-        .background(Color.fillControl, in: RoundedRectangle(cornerRadius: 9, style: .continuous))
-        .overlay {
-            RoundedRectangle(cornerRadius: 9, style: .continuous)
-                .strokeBorder(Color.primary.opacity(0.12), lineWidth: 0.5)
-        }
+        settingsSearchFieldFocused = false
     }
 
     private var settingsSearchResults: [SettingsSearchItem] {
@@ -392,10 +215,6 @@ struct SettingsView: View {
     private func openSettingsSearchResult(_ result: SettingsSearchItem) {
         selectSettingsSection(result.section, searchTarget: result.anchor)
         settingsSearchFieldFocused = false
-    }
-
-    private var visibleSections: [SettingsSection] {
-        SettingsSection.allCases.filter { $0.isVisible(settings: settingsStore.settings) }
     }
 
     private func ensureSelectionIsVisible() {
@@ -4577,6 +4396,158 @@ enum SettingsSection: String, CaseIterable, Identifiable {
             return settings.weatherEnabled
         case .updates:
             return settings.updateChecksEnabled
+        }
+    }
+}
+
+struct SettingsSidebar: View {
+    @ObservedObject var input: SettingsInput
+    let settings: FeatureSettings
+    let appVersion: String
+    var settingsSearchFieldFocused: FocusState<Bool>.Binding
+    let onSelect: (SettingsSection) -> Void
+    let onSubmitSearch: () -> Void
+    @Environment(\.colorScheme) private var colorScheme
+    @Environment(\.locale) private var locale
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @Namespace private var sectionSelectionNamespace
+
+    private var visibleSections: [SettingsSection] {
+        SettingsSection.allCases.filter { $0.isVisible(settings: settings) }
+    }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            settingsSearchField
+
+            ScrollView {
+                VStack(alignment: .leading, spacing: 20) {
+                    ForEach(SettingsSectionGroup.allCases) { group in
+                        let sections = visibleSections.filter { $0.group == group }
+                        if !sections.isEmpty {
+                            VStack(alignment: .leading, spacing: 5) {
+                                AppLocalizedText(group.title)
+                                    .font(.system(size: 11, weight: .medium))
+                                    .foregroundStyle(.secondary)
+                                    .padding(.horizontal, 10)
+                                    .padding(.bottom, 2)
+                                ForEach(sections) { section in
+                                    sidebarButton(section)
+                                }
+                            }
+                        }
+                    }
+                }
+                .padding(.vertical, 4)
+                .padding(.trailing, 20)
+            }
+            .scrollIndicators(.visible)
+            .thinScrollChrome(visibleWhenScrollable: true)
+            .padding(.top, 18)
+            .animation(reduceMotion ? nil : ZislaMotion.selection, value: input.selection)
+
+            Spacer(minLength: 12)
+
+            HStack(spacing: 6) {
+                Text(AppLocalization.format("版本 %@", locale: locale, [appVersion]))
+                    .font(.system(size: 11, design: .monospaced))
+                    .foregroundStyle(.tertiary)
+                    .fitsSingleLine(0.7)
+                Spacer(minLength: 0)
+                Button {
+                    NSApp.terminate(nil)
+                } label: {
+                    HStack(spacing: 6) {
+                        IconButtonLabel(
+                            symbol: "power",
+                            size: .compact,
+                            showsInactiveBackground: false
+                        )
+                        Text(AppLocalization.string("退出", locale: locale))
+                            .font(.system(size: 11, weight: .medium))
+                            .fitsSingleLine(0.7)
+                    }
+                    .padding(.trailing, 7)
+                    .background(Color.fillControl)
+                    .clipShape(Capsule())
+                    .contentShape(Capsule())
+                }
+                .buttonStyle(PressableStyle(hoverScale: 1.018, pressedScale: 0.965))
+                .help(AppLocalization.string("退出应用", locale: locale))
+                .accessibilityLabel(AppLocalization.string("退出应用", locale: locale))
+            }
+            .frame(maxWidth: .infinity)
+        }
+        .padding(12)
+        .frame(maxWidth: .infinity)
+        .frame(maxHeight: .infinity, alignment: .topLeading)
+        .background(Color.primary.opacity(colorScheme == .dark ? 0.035 : 0.025))
+    }
+
+    private func sidebarButton(_ section: SettingsSection) -> some View {
+        Button {
+            onSelect(section)
+        } label: {
+            HStack(spacing: 10) {
+                Image(systemName: section.symbol)
+                    .font(.system(size: 15, weight: .medium))
+                    .foregroundStyle(input.selection == section ? Color.white : Color.accentColor)
+                    .frame(width: 21)
+                AppLocalizedText(section.title)
+                    .font(.system(size: 13, weight: .medium))
+                    .fitsLines(2, minScale: 0.85)
+                Spacer(minLength: 0)
+            }
+            .padding(.horizontal, 10)
+            .frame(minHeight: 38)
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(PressableStyle(hoverScale: 1.018, pressedScale: 0.965))
+        .foregroundStyle(input.selection == section ? Color.white : Color.primary)
+        .background {
+            if input.selection == section {
+                RoundedRectangle(cornerRadius: 8, style: .continuous)
+                    .fill(Color.blue)
+                    .matchedGeometryEffect(id: "settings-section-selection", in: sectionSelectionNamespace)
+            }
+        }
+        .accessibilityLabel(AppLocalization.format("%@设置", locale: locale, [AppLocalization.string(section.title, locale: locale)]))
+        .accessibilityAddTraits(input.selection == section ? .isSelected : [])
+    }
+
+    private var settingsSearchField: some View {
+        HStack(spacing: 5) {
+            Image(systemName: "magnifyingglass")
+                .foregroundStyle(.secondary)
+            TextField(AppLocalization.string("搜索设置", locale: locale), text: $input.settingsQuery)
+                .textFieldStyle(.plain)
+                .focused(settingsSearchFieldFocused)
+                .accessibilityIdentifier("settings-search-field")
+                .accessibilityLabel(AppLocalization.string("搜索设置", locale: locale))
+                .onSubmit {
+                    onSubmitSearch()
+                }
+                .onExitCommand { input.settingsQuery = "" }
+            if !input.settingsQuery.isEmpty {
+                Button {
+                    input.settingsQuery = ""
+                    settingsSearchFieldFocused.wrappedValue = true
+                } label: {
+                    Image(systemName: "xmark.circle.fill")
+                        .foregroundStyle(.secondary)
+                }
+                .buttonStyle(.plain)
+                .help(AppLocalization.string("清除", locale: locale))
+                .accessibilityLabel(AppLocalization.string("清除", locale: locale))
+            }
+        }
+        .font(.system(size: 13))
+        .padding(.horizontal, 10)
+        .frame(height: 34)
+        .background(Color.fillControl, in: RoundedRectangle(cornerRadius: 9, style: .continuous))
+        .overlay {
+            RoundedRectangle(cornerRadius: 9, style: .continuous)
+                .strokeBorder(Color.primary.opacity(0.12), lineWidth: 0.5)
         }
     }
 }

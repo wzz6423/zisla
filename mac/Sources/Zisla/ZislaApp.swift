@@ -1862,11 +1862,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
             let rootView = SettingsView(model: AppModel.shared)
             let window = SettingsWindow(
                 contentRect: CGRect(x: 0, y: 0, width: 960, height: 680),
-                styleMask: [.titled, .closable, .miniaturizable],
+                styleMask: [.titled, .closable, .miniaturizable, .fullSizeContentView],
                 backing: .buffered,
                 defer: false
             )
             window.title = localized("zisla 设置")
+            window.toolbarStyle = .unified
+            window.titleVisibility = .hidden
+            window.titlebarAppearsTransparent = true
             window.level = WindowPlacement.modalWindowLevel
             window.isReleasedWhenClosed = false
             window.contentView = NSHostingView(
