@@ -2461,6 +2461,10 @@
 "汇率换算" = "Valutaconversie";
 "换算" = "Conversies";
 "单位换算" = "Eenhedenconversie";
+"金额换算" = "Geldeenheden omrekenen";
+"1元 = ?角" = "1 euro = ?cent";
+"0.1角 = ?分" = "100 cent = ?euro";
+"1dollar = ?cent" = "0,1 euro = ?cent";
 "日期加减" = "Datumberekeningen";
 "2026.10.28往后15天" = "15 dagen na 2026.10.28";
 "2026.10.28往前15天" = "15 dagen voor 2026.10.28";

@@ -2461,6 +2461,10 @@
 "汇率换算" = "Döviz Çevirisi";
 "换算" = "Dönüşümler";
 "单位换算" = "Birim Dönüşümü";
+"金额换算" = "Para alt birimlerini dönüştürme";
+"1元 = ?角" = "1 Türk lirası = ?kuruş";
+"0.1角 = ?分" = "100 kuruş = ?Türk lirası";
+"1dollar = ?cent" = "0,1 Türk lirası = ?kuruş";
 "日期加减" = "Tarih toplama ve çıkarma";
 "2026.10.28往后15天" = "2026.10.28'den 15 gün sonra";
 "2026.10.28往前15天" = "2026.10.28'den 15 gün önce";

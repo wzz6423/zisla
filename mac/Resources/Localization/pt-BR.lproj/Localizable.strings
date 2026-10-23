@@ -2461,6 +2461,10 @@
 "汇率换算" = "Conversão de moeda";
 "换算" = "Conversões";
 "单位换算" = "Conversão de unidades";
+"金额换算" = "Conversão de unidades monetárias";
+"1元 = ?角" = "1 real = ?centavos";
+"0.1角 = ?分" = "100 centavos = ?real";
+"1dollar = ?cent" = "0,1 real = ?centavos";
 "日期加减" = "Adição e subtração de datas";
 "2026.10.28往后15天" = "15 dias depois de 2026.10.28";
 "2026.10.28往前15天" = "15 dias antes de 2026.10.28";
