@@ -40,13 +40,37 @@ struct ScreenshotRoundedCornerTests {
     @Test(arguments: [CGFloat(0), 23, 205, 300])
     func radiusControlFollowsTheTangentWithoutCoveringResizeHandleCenters(radius: CGFloat) {
         let selection = CGRect(x: 100, y: 80, width: 410, height: 701)
-        let position = ScreenshotRoundedCornerGeometry.handlePosition(in: selection, radius: radius)
+        let position = ScreenshotRoundedCornerGeometry.handlePosition(
+            in: selection, radius: radius, within: CGRect(x: 0, y: 0, width: 800, height: 900)
+        )
         #expect(position.x == selection.minX + min(radius, 205))
         #expect(position.y == selection.minY - 18)
         for handle in ScreenshotSelectionHandle.allCases {
             let resize = ScreenshotSelectionGeometry.position(of: handle, in: selection)
             #expect(abs(position.x - resize.x) > 14 || abs(position.y - resize.y) > 14,
                     "The radius control must remain outside the existing resize handles' center hit area")
+        }
+    }
+
+    @Test(arguments: [
+        (CGRect(x: 100, y: 0, width: 200, height: 120), CGRect(x: 0, y: 0, width: 800, height: 600)),
+        (CGRect(x: 100, y: 20, width: 200, height: 120), CGRect(x: 0, y: 0, width: 800, height: 600)),
+        (CGRect(x: 0, y: 80, width: 200, height: 120), CGRect(x: 0, y: 0, width: 800, height: 600)),
+        (CGRect(x: 0, y: 0, width: 800, height: 600), CGRect(x: 0, y: 0, width: 800, height: 600)),
+        (CGRect(x: 0, y: 0, width: 24, height: 24), CGRect(x: 0, y: 0, width: 800, height: 600)),
+        (CGRect(x: 776, y: 0, width: 24, height: 24), CGRect(x: 0, y: 0, width: 800, height: 600)),
+        (CGRect(x: 799, y: 0, width: 1, height: 1), CGRect(x: 0, y: 0, width: 800, height: 600)),
+        (CGRect(x: 0, y: 20, width: 24, height: 20), CGRect(x: 0, y: 0, width: 80, height: 40)),
+        (CGRect(x: 10, y: 20, width: 24, height: 24), CGRect(x: 10, y: 20, width: 800, height: 600)),
+    ], [CGFloat(0), 23, 10_000])
+    func completeRadiusControlRemainsInsideScreenBounds(scenario: (selection: CGRect, bounds: CGRect), radius: CGFloat) {
+        let (selection, bounds) = scenario
+        let position = ScreenshotRoundedCornerGeometry.handlePosition(in: selection, radius: radius, within: bounds)
+        let frame = CGRect(x: position.x - 8, y: position.y - 8, width: 16, height: 16)
+        #expect(bounds.contains(frame), "The complete radius drag target must remain visible at every screen edge")
+        for handle in ScreenshotSelectionHandle.allCases {
+            #expect(!frame.contains(ScreenshotSelectionGeometry.position(of: handle, in: selection)),
+                    "The radius target must leave every resize handle center available")
         }
     }
 
@@ -341,11 +365,19 @@ struct ScreenshotRoundedCornerTests {
         #expect(try color(try bitmap(model.renderedImage()), at: .zero).alphaComponent == 0)
     }
 
-    @Test
-    func radiusHandleDragsThroughTheEditorAndGroupsHistory() async throws {
-        let image = try sourceImage()
+    @Test(arguments: [
+        CGRect(x: 50, y: 80, width: 200, height: 120),
+        CGRect(x: 100, y: 0, width: 200, height: 120),
+        CGRect(x: 100, y: 20, width: 200, height: 120),
+        CGRect(x: 0, y: 80, width: 200, height: 120),
+        CGRect(x: 0, y: 0, width: 600, height: 420),
+        CGRect(x: 0, y: 0, width: 24, height: 24),
+        CGRect(x: 576, y: 0, width: 24, height: 24),
+        CGRect(x: 0, y: 0, width: 600, height: 24),
+    ], [1, 2])
+    func radiusHandleDragsThroughTheEditorAndGroupsHistory(selection: CGRect, pixelScale: Int) async throws {
+        let image = try sourceImage(size: selection.size, pixelScale: pixelScale)
         let model = ScreenshotEditorModel(image: image)
-        let selection = CGRect(x: 50, y: 80, width: 200, height: 120)
         let suiteName = "zisla-rounded-corner-\(UUID())"
         let defaults = try #require(UserDefaults(suiteName: suiteName))
         defer { defaults.removePersistentDomain(forName: suiteName) }
@@ -373,21 +405,28 @@ struct ScreenshotRoundedCornerTests {
         let drag = try #require(handle.onDrag)
         let begin = try #require(handle.onDragBegan)
         #expect(handle.bounds.size == CGSize(width: 16, height: 16))
+        assertRadiusHandleRemainsVisibleAndHittable(handle, in: host, selection: selection)
         begin()
         drag(.zero, .zero, false)
         drag(.zero, .zero, true)
         #expect(!model.canUndo)
+        let targetRadius = min(23, ScreenshotRoundedCornerGeometry.maximumRadius(for: image.size))
         begin()
         drag(.zero, CGPoint(x: 10, y: 0), false)
-        drag(.zero, CGPoint(x: 23, y: 0), false)
-        drag(.zero, CGPoint(x: 23, y: 0), true)
-        #expect(model.cornerRadius == 23)
+        drag(.zero, CGPoint(x: targetRadius, y: 0), false)
+        drag(.zero, CGPoint(x: targetRadius, y: 0), true)
+        #expect(model.cornerRadius == targetRadius)
         #expect(model.annotations.isEmpty)
+        for _ in 0..<3 {
+            host.layoutSubtreeIfNeeded()
+            await Task.yield()
+        }
+        assertRadiusHandleRemainsVisibleAndHittable(handle, in: host, selection: selection)
         model.undo()
         #expect(model.cornerRadius == 0)
         #expect(!model.canUndo)
         model.redo()
-        #expect(model.cornerRadius == 23)
+        #expect(model.cornerRadius == targetRadius)
     }
 
     @Test(arguments: AppLanguage.allCases)
@@ -440,6 +479,26 @@ struct ScreenshotRoundedCornerTests {
     private func findRadiusHandle(in view: NSView) -> ScreenshotPointerInteractionNSView? {
         if let handle = view as? ScreenshotPointerInteractionNSView, handle.usesScreenCoordinatesForDrag { return handle }
         return view.subviews.lazy.compactMap { findRadiusHandle(in: $0) }.first
+    }
+
+    private func assertRadiusHandleRemainsVisibleAndHittable(
+        _ handle: ScreenshotPointerInteractionNSView,
+        in host: NSView,
+        selection: CGRect
+    ) {
+        let frame = host.convert(handle.bounds, from: handle)
+        #expect(host.bounds.contains(frame), "The editor must display all 16 points of the radius drag target")
+        let point = host.convert(CGPoint(x: frame.midX, y: frame.midY), to: host.superview)
+        let hit = host.hitTest(point)
+        let receivesPointerInput = hit === handle
+        #expect(receivesPointerInput,
+                "The visible radius control must receive pointer input; frame=\(frame), point=\(point), hit=\(hit.map { String(describing: type(of: $0)) } ?? "nil")")
+        for resizeHandle in ScreenshotSelectionHandle.allCases {
+            let center = ScreenshotSelectionGeometry.position(of: resizeHandle, in: selection)
+            let point = host.convert(center, to: host.superview)
+            let coversResizeHandle = host.hitTest(point) === handle
+            #expect(!coversResizeHandle, "The radius control must not cover the \(resizeHandle) resize handle center")
+        }
     }
 
     private actor ExtractionGate {

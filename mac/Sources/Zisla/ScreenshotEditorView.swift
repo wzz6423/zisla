@@ -4654,6 +4654,63 @@ struct ScreenshotTransparencyBackground: View {
     }
 }
 
+struct ScreenshotExtractionControls: View {
+    @Environment(\.locale) private var locale
+    @ObservedObject var model: ScreenshotEditorModel
+    let onSelectAll: () -> Void
+    let onClear: () -> Void
+    let onExtract: () -> Void
+
+    var body: some View {
+        HStack(spacing: 10) {
+            Picker(AppLocalization.string("提取方式", locale: locale), selection: $model.extractionMode) {
+                ForEach(ScreenshotExtractionMode.allCases) { mode in
+                    Text(AppLocalization.string(mode.title, locale: locale)).tag(mode)
+                }
+            }
+            .pickerStyle(.segmented)
+            .disabled(model.isExtracting)
+
+            Divider().frame(height: 24)
+
+            if model.extractionMode == .lasso {
+                HStack(spacing: 10) {
+                    Button(AppLocalization.string("全选", locale: locale), action: onSelectAll)
+                    Button(AppLocalization.string("清除", locale: locale), action: onClear)
+                    Text(AppLocalization.format("已圈选 %ld 个区域", locale: locale, [model.extractionRegions.count]))
+                        .font(.system(size: 11))
+                }
+                .disabled(model.isExtracting)
+                .help(AppLocalization.string("拖动圈选任意区域，可连续圈选多处", locale: locale))
+
+                Divider().frame(height: 24)
+            }
+
+            if model.isExtracting {
+                ProgressView().controlSize(.small)
+                Text(AppLocalization.string("正在提取...", locale: locale))
+                Button(AppLocalization.string("取消", locale: locale)) { model.cancelExtraction() }
+            } else {
+                Button(AppLocalization.string(
+                    model.extractionMode == .lasso ? "提取所选区域" : model.extractionMode.title,
+                    locale: locale
+                ), action: onExtract)
+                .disabled(model.extractionMode == .lasso && model.extractionRegions.isEmpty)
+            }
+
+            if let status = model.statusMessage, !model.isExtracting {
+                Text(status)
+                    .font(.system(size: 11))
+                    .foregroundStyle(.secondary)
+                    .lineLimit(1)
+                    .frame(maxWidth: 200)
+                    .help(status)
+            }
+        }
+        .padding(.horizontal, 12)
+    }
+}
+
 struct ScreenshotEditorView: View {
     @Environment(\.accessibilityReduceMotion) private var accessibilityReduceMotion
     @ObservedObject private var shortcutSettings: FeatureSettingsStore
@@ -4735,6 +4792,27 @@ struct ScreenshotEditorView: View {
     }
 
     var body: some View {
+        annotationStyleObservedContent
+        .onChange(of: model.arrowStyle) { _, newValue in
+            guard let annotationID = selectionState.selectedAnnotationID else { return }
+            model.applySelectedStyle(to: annotationID, arrowStyle: newValue)
+        }
+        .onChange(of: model.fontSize) { _, newValue in
+            guard let annotationID = selectionState.selectedAnnotationID else { return }
+            model.applySelectedStyle(to: annotationID, fontSize: newValue)
+        }
+        .onChange(of: model.pixelateStrength) { _, newValue in
+            applyObscureStrength(newValue, ifSelectedRegionUses: .pixelate)
+        }
+        .onChange(of: model.blurStrength) { _, newValue in
+            applyObscureStrength(newValue, ifSelectedRegionUses: .blur)
+        }
+        .onChange(of: model.mosaicBlurStrength) { _, newValue in
+            applyObscureBlurStrength(newValue, ifSelectedRegionUses: .pixelate)
+        }
+    }
+
+    private var editorStateObservedContent: some View {
         Group {
             if toolbarOnly {
                 toolbarOnlyContent
@@ -4795,6 +4873,10 @@ struct ScreenshotEditorView: View {
                 break
             }
         }
+    }
+
+    private var annotationStyleObservedContent: some View {
+        editorStateObservedContent
         .onChange(of: model.color) { _, newValue in
             guard let annotationID = selectionState.selectedAnnotationID else { return }
             model.applySelectedStyle(to: annotationID, color: newValue)
@@ -4812,23 +4894,6 @@ struct ScreenshotEditorView: View {
                   let annotation = newValue.first(where: { $0.id == selectedID && $0.kind == .highlighter })
             else { return }
             model.highlighterShowsMarkers = annotation.highlighterShowsMarkers
-        }
-        .onChange(of: model.arrowStyle) { _, newValue in
-            guard let annotationID = selectionState.selectedAnnotationID else { return }
-            model.applySelectedStyle(to: annotationID, arrowStyle: newValue)
-        }
-        .onChange(of: model.fontSize) { _, newValue in
-            guard let annotationID = selectionState.selectedAnnotationID else { return }
-            model.applySelectedStyle(to: annotationID, fontSize: newValue)
-        }
-        .onChange(of: model.pixelateStrength) { _, newValue in
-            applyObscureStrength(newValue, ifSelectedRegionUses: .pixelate)
-        }
-        .onChange(of: model.blurStrength) { _, newValue in
-            applyObscureStrength(newValue, ifSelectedRegionUses: .blur)
-        }
-        .onChange(of: model.mosaicBlurStrength) { _, newValue in
-            applyObscureBlurStrength(newValue, ifSelectedRegionUses: .pixelate)
         }
     }
 
@@ -4951,7 +5016,7 @@ struct ScreenshotEditorView: View {
                     selectionHandle(handle, bounds: bounds)
                 }
 
-                cornerRadiusHandle
+                cornerRadiusHandle(bounds: bounds)
 
                 ScreenshotToolbarDragWrapper(
                     restingCenter: restingToolbarCenter,
@@ -5138,8 +5203,10 @@ struct ScreenshotEditorView: View {
         return ScreenshotRoundedCornerGeometry.clampedRadius(model.cornerRadius * scale, in: selectionRect.size)
     }
 
-    private var cornerRadiusHandle: some View {
-        let position = ScreenshotRoundedCornerGeometry.handlePosition(in: selectionRect, radius: selectionCornerRadius)
+    private func cornerRadiusHandle(bounds: CGRect) -> some View {
+        let position = ScreenshotRoundedCornerGeometry.handlePosition(
+            in: selectionRect, radius: selectionCornerRadius, within: bounds
+        )
         let scale = model.hasLongCaptureResult
             ? ScreenshotCanvasGeometry(canvasSize: selectionRect.size, imageSize: model.image.size, zoom: canvasZoom).scale
             : 1
@@ -5172,7 +5239,7 @@ struct ScreenshotEditorView: View {
                         usesScreenCoordinatesForDrag: true
                     )
                 }
-                .frame(width: 16, height: 16)
+                .frame(width: ScreenshotRoundedCornerGeometry.handleSize, height: ScreenshotRoundedCornerGeometry.handleSize)
                 .position(position)
                 .help(AppLocalization.text("圆角"))
                 .accessibilityElement(children: .ignore)
@@ -6286,53 +6353,17 @@ struct ScreenshotEditorView: View {
             get: { activeToolMenuID == .extraction },
             set: { if !$0 { activeToolMenuID = nil } }
         ), arrowEdge: popoverEdge) {
-            VStack(alignment: .leading, spacing: 10) {
-                Picker(AppLocalization.text("提取方式"), selection: $model.extractionMode) {
-                    ForEach(ScreenshotExtractionMode.allCases) { mode in
-                        Label(AppLocalization.text(mode.title), systemImage: mode.symbol).tag(mode)
-                    }
-                }
-                .pickerStyle(.menu)
-                .disabled(model.isExtracting)
-                if model.extractionMode == .lasso {
-                    Text(AppLocalization.text("拖动圈选任意区域，可连续圈选多处"))
-                        .font(.system(size: 11))
-                        .foregroundStyle(.secondary)
-                    HStack(spacing: 10) {
-                        Button(AppLocalization.text("全选")) {
-                            draftPoints.removeAll(keepingCapacity: true)
-                            model.selectAllExtractionRegions()
-                        }
-                        Button(AppLocalization.text("清除")) {
-                            draftPoints.removeAll(keepingCapacity: true)
-                            model.clearExtractionSelection()
-                        }
-                        Text(AppLocalization.text("已圈选 %ld 个区域", model.extractionRegions.count))
-                            .font(.system(size: 11))
-                    }
-                    .disabled(model.isExtracting)
-                }
-                HStack {
-                    if model.isExtracting {
-                        ProgressView().controlSize(.small)
-                        Text(AppLocalization.text("正在提取..."))
-                        Spacer()
-                        Button(AppLocalization.text("取消")) { model.cancelExtraction() }
-                    } else {
-                        Button(AppLocalization.text(model.extractionMode == .lasso ? "提取所选区域" : model.extractionMode.title)) {
-                            commitInlineText()
-                            selectionState.deselect()
-                            model.extract()
-                        }
-                        .disabled(model.extractionMode == .lasso && model.extractionRegions.isEmpty)
-                    }
-                }
-                if let status = model.statusMessage {
-                    Text(status).font(.system(size: 11)).foregroundStyle(.secondary)
-                }
-            }
-            .padding(12)
-            .frame(minWidth: 280)
+            ScreenshotExtractionControls(model: model, onSelectAll: {
+                draftPoints.removeAll(keepingCapacity: true)
+                model.selectAllExtractionRegions()
+            }, onClear: {
+                draftPoints.removeAll(keepingCapacity: true)
+                model.clearExtractionSelection()
+            }, onExtract: {
+                commitInlineText()
+                selectionState.deselect()
+                model.extract()
+            })
         }
     }
 
