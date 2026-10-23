@@ -1,4 +1,5 @@
 import AppKit
+import Darwin
 import NaturalLanguage
 import ZislaCore
 
@@ -79,6 +80,24 @@ public enum ClipboardAssistantDetector {
         let text = rawText.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !text.isEmpty else { return nil }
 
+        var ipv4 = in_addr()
+        var ipv6 = in6_addr()
+        let isIPAddress = rawText.unicodeScalars.allSatisfy {
+            $0.properties.isWhitespace || "0123456789abcdefABCDEF:.".unicodeScalars.contains($0)
+        } && text.withCString {
+            if inet_pton(AF_INET, $0, &ipv4) == 1 {
+                return text.split(separator: ".").allSatisfy { $0 == "0" || !$0.hasPrefix("0") }
+            }
+            return inet_pton(AF_INET6, $0, &ipv6) == 1
+        }
+        if isIPAddress, enabledKinds.contains(.ipAddress) {
+            let host = text.contains(":") ? "[\(text)]" : text
+            return ClipboardAssistantDetection(kind: .ipAddress, title: text, actions: [
+                .openService(service: .ipInfo, url: URL(string: "https://ipinfo.io/\(text)")!),
+                .openURL(HTTPURLParser.url(from: host)!),
+                .copyText(text),
+            ])
+        }
         if enabledKinds.contains(.shellCommand), let command = shellCommandDetection(rawText, commandExists: shellCommandExists) {
             return command
         }
@@ -87,7 +106,7 @@ public enum ClipboardAssistantDetector {
         ) {
             return detection
         }
-        let phone = enabledKinds.contains(.phone) ? ClipboardAssistantPhoneNumbers.parse(text, countryCode: countryCode) : nil
+        let phone = !isIPAddress && enabledKinds.contains(.phone) ? ClipboardAssistantPhoneNumbers.parse(text, countryCode: countryCode) : nil
         let phoneDetection = phone.map {
             ClipboardAssistantDetection(kind: .phone, title: text, actions: [.callPhone($0.e164)])
         }
@@ -170,7 +189,7 @@ public enum ClipboardAssistantDetector {
                 actions: []
             )
         }
-        if enabledKinds.contains(.url), let url = HTTPURLParser.url(from: text) {
+        if !isIPAddress, enabledKinds.contains(.url), let url = HTTPURLParser.url(from: text) {
             var actions: [ClipboardAssistantAction] = [.openURL(url)]
             if offersDownload, DownloadURLClassifier.isLikelyDownloadable(url.absoluteString) {
                 actions.append(.openDownload(url))
