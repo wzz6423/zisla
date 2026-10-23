@@ -1904,6 +1904,7 @@ final class AppModel: ObservableObject {
             sourceCurrencyCode: source,
             targetCurrencyCode: target,
             quote: quote,
+            moneyConversion: detection.moneyConversion,
             content: content,
             sourceApplication: sourceApplication,
             orders: orders,
@@ -1932,17 +1933,50 @@ final class AppModel: ObservableObject {
     sourceCurrencyCode: String,
     targetCurrencyCode: String,
     quote: ExchangeRateQuote,
+    moneyConversion: ClipboardAssistantMoneyConversion?,
     content: ClipboardHistoryContent,
     sourceApplication: NSRunningApplication?,
     orders: [ClipboardAssistantKind: [ClipboardAssistantActionKind]],
     presentationGeneration: Int
   ) {
+    guard let result = Self.currencyConversionResult(
+      amount: amount, amountText: amountText,
+      sourceCurrencyCode: sourceCurrencyCode, targetCurrencyCode: targetCurrencyCode,
+      quote: quote, moneyConversion: moneyConversion, locale: AppLocalization.currentLanguage.locale
+    ) else {
+      presentCurrencyConversionFailure(
+        amountText: amountText, sourceCurrencyCode: sourceCurrencyCode,
+        targetCurrencyCode: targetCurrencyCode, presentationGeneration: presentationGeneration
+      )
+      return
+    }
+    let detection = augmentedClipboardAssistantDetection(
+      result,
+      content: content,
+      sourceApplication: sourceApplication,
+      orders: orders
+    )
+    clipboardAssistant.updateDetection(detection, for: presentationGeneration)
+  }
+
+  static func currencyConversionResult(
+    amount: Double,
+    amountText: String,
+    sourceCurrencyCode: String,
+    targetCurrencyCode: String,
+    quote: ExchangeRateQuote,
+    moneyConversion: ClipboardAssistantMoneyConversion?,
+    locale: Locale
+  ) -> ClipboardAssistantDetection? {
+    if let moneyConversion {
+      return ClipboardAssistantDetector.completedMoneyConversion(moneyConversion, rate: quote.rate, locale: locale)
+    }
     let converted = amount * quote.rate
     let title = Self.currencyConversionTitle(for: converted, currencyCode: targetCurrencyCode)
     let rateText = ClipboardAssistantDetector.formatNumber(quote.rate)
     let fullExpression =
       "\(amountText) \(sourceCurrencyCode) = \(title) · 1 \(sourceCurrencyCode) = \(rateText) \(targetCurrencyCode)"
-    var detection = ClipboardAssistantDetection(
+    return ClipboardAssistantDetection(
       kind: .conversion,
       title: title,
       detail: .currencyRate(
@@ -1953,13 +1987,6 @@ final class AppModel: ObservableObject {
       actions: [.copyText(title), .copyFullExpression(fullExpression)],
       fullContent: fullExpression
     )
-    detection = augmentedClipboardAssistantDetection(
-      detection,
-      content: content,
-      sourceApplication: sourceApplication,
-      orders: orders
-    )
-    clipboardAssistant.updateDetection(detection, for: presentationGeneration)
   }
 
   /// Network failure keeps the toast on screen with the copied expression, but without actions:
