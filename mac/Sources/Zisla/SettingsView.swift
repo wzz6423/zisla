@@ -1037,7 +1037,7 @@ struct SettingsView: View {
                                             setPrimaryClipboardAssistantAction(action, for: kind)
                                         } label: {
                                             Label(
-                                                clipboardAssistantActionTitle(action),
+                                                AppLocalization.text(Self.clipboardAssistantActionTitle(action)),
                                                 systemImage: action == actions.first ? "checkmark" : action.symbolName
                                             )
                                         }
@@ -1046,7 +1046,7 @@ struct SettingsView: View {
                                     HStack(spacing: 4) {
                                         Image(systemName: "star.fill")
                                         AppLocalizedText(
-                                            actions.first.map(clipboardAssistantActionTitle) ?? "恢复默认顺序"
+                                            actions.first.map(Self.clipboardAssistantActionTitle) ?? "恢复默认顺序"
                                         )
                                     }
                                 }
@@ -1071,14 +1071,14 @@ struct SettingsView: View {
                                 rowDivider
                                 settingRow(
                                     symbol: action.symbolName,
-                                    title: clipboardAssistantActionTitle(action),
+                                    title: Self.clipboardAssistantActionTitle(action),
                                     detail: "",
                                     isNested: true
                                 ) {
                                     HStack(spacing: 4) {
                                         IconButton(
                                             symbol: "arrow.up",
-                                            help: AppLocalization.text("上移%@", AppLocalization.text(clipboardAssistantActionTitle(action))),
+                                            help: AppLocalization.text("上移%@", AppLocalization.text(Self.clipboardAssistantActionTitle(action))),
                                             size: .compact
                                         ) {
                                             moveClipboardAssistantAction(action, for: kind, by: -1)
@@ -1087,7 +1087,7 @@ struct SettingsView: View {
 
                                         IconButton(
                                             symbol: "arrow.down",
-                                            help: AppLocalization.text("下移%@", AppLocalization.text(clipboardAssistantActionTitle(action))),
+                                            help: AppLocalization.text("下移%@", AppLocalization.text(Self.clipboardAssistantActionTitle(action))),
                                             size: .compact
                                         ) {
                                             moveClipboardAssistantAction(action, for: kind, by: 1)
@@ -3285,6 +3285,7 @@ struct SettingsView: View {
     private func assistantKindTitle(_ kind: ClipboardAssistantKind) -> String {
         switch kind {
         case .url: "链接"
+        case .ipAddress: "IP 地址"
         case .filePath: "文件路径"
         case .email: "邮箱"
         case .phone: "电话号码"
@@ -3363,6 +3364,10 @@ struct SettingsView: View {
             ClipboardAssistantExampleGroup(
                 title: "单位换算",
                 examples: ["10 ft = m", "100 kg = lb", "5 km = mi"]
+            ),
+            ClipboardAssistantExampleGroup(
+                title: "金额换算",
+                examples: ["1元 = ?角", "0.1角 = ?分", "1dollar = ?cent"]
             ),
             ClipboardAssistantExampleGroup(
                 title: "汇率换算",
@@ -3713,9 +3718,10 @@ struct SettingsView: View {
             ClipboardAssistantActionOrder.defaults(for: kind)
     }
 
-    private func clipboardAssistantActionTitle(_ action: ClipboardAssistantActionKind) -> String {
+    static func clipboardAssistantActionTitle(_ action: ClipboardAssistantActionKind) -> String {
         switch action {
         case .openURL: "打开链接"
+        case .lookupIP: ClipboardAssistantService.ipInfo.localizedTitleKey
         case .openDownload: "下载"
         case .revealInFinder: "在 Finder 中显示"
         case .search: "搜索"

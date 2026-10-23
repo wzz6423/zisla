@@ -455,6 +455,7 @@
 "识别类型" = "Tipos reconhecidos";
 "控制哪些内容会触发提示" = "Escolha quais tipos de conteúdo mostram o aviso";
 "链接" = "Link";
+"IP 地址" = "Endereço IP";
 "文件路径" = "Caminho do arquivo";
 "邮箱" = "Endereço de e-mail";
 "电话号码" = "Número de telefone";
@@ -2461,6 +2462,10 @@
 "汇率换算" = "Conversão de moeda";
 "换算" = "Conversões";
 "单位换算" = "Conversão de unidades";
+"金额换算" = "Conversão de unidades monetárias";
+"1元 = ?角" = "1 real = ?centavos";
+"0.1角 = ?分" = "100 centavos = ?real";
+"1dollar = ?cent" = "0,1 real = ?centavos";
 "日期加减" = "Adição e subtração de datas";
 "2026.10.28往后15天" = "15 dias depois de 2026.10.28";
 "2026.10.28往前15天" = "15 dias antes de 2026.10.28";
@@ -2744,6 +2749,7 @@
 "onboarding.permission.system_audio.body" = "Para visualizar a música. Ative a gravação de áudio nos Ajustes do Sistema; o macOS pode pedir confirmação no primeiro uso.";
 "onboarding.permission.full_disk_access.title" = "Acesso Total ao Disco";
 "onboarding.permission.full_disk_access.body" = "Necessário apenas para índices locais de e-mail ou cookies do navegador. Ative nos Ajustes do Sistema se usar esses recursos.";
+"查询 IP 信息" = "Consultar informações do IP";
 
 "基础功能" = "Recursos básicos";
 "声音" = "Som";

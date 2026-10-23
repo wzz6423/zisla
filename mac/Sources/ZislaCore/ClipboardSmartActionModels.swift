@@ -26,6 +26,7 @@ public struct ClipboardCalendarDraft: Equatable, Sendable {
 }
 
 public enum ClipboardAssistantService: String, CaseIterable, Sendable {
+    case ipInfo
     case baiduMaps, googleMaps, umetrip, flightAware
     case united, lufthansa, britishAirways
     case railway12306, deutscheBahn, amtrak, sncf
@@ -33,6 +34,7 @@ public enum ClipboardAssistantService: String, CaseIterable, Sendable {
 
     public var localizedTitleKey: String {
         switch self {
+        case .ipInfo: "查询 IP 信息"
         case .baiduMaps: "百度地图"
         case .googleMaps: "Google Maps"
         case .umetrip: "航旅纵横"

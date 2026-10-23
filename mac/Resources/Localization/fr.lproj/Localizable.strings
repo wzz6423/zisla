@@ -451,6 +451,7 @@
 "识别类型" = "Types reconnus";
 "控制哪些内容会触发提示" = "Choisissez les types de contenu qui déclenchent le toast";
 "链接" = "Lien";
+"IP 地址" = "Adresse IP";
 "文件路径" = "Chemin de fichier";
 "邮箱" = "Adresse e-mail";
 "电话号码" = "Numéro de téléphone";
@@ -2457,6 +2458,10 @@
 "汇率换算" = "Conversion de devise";
 "换算" = "Conversions";
 "单位换算" = "Conversion d'unités";
+"金额换算" = "Conversion des unités monétaires";
+"1元 = ?角" = "1 euro = ?centimes";
+"0.1角 = ?分" = "100 centimes = ?euro";
+"1dollar = ?cent" = "0,1 euro = ?centimes";
 "日期加减" = "Calcul de dates";
 "2026.10.28往后15天" = "15 jours après le 2026.10.28";
 "2026.10.28往前15天" = "15 jours avant le 2026.10.28";
@@ -2740,6 +2745,7 @@
 "onboarding.permission.system_audio.body" = "Pour visualiser la musique. Autorisez l’enregistrement audio dans les Réglages Système ; macOS peut demander une confirmation lors de la première utilisation.";
 "onboarding.permission.full_disk_access.title" = "Accès complet au disque";
 "onboarding.permission.full_disk_access.body" = "Nécessaire uniquement pour les index de courrier locaux ou les cookies du navigateur. Activez-le dans les Réglages Système si vous utilisez ces fonctions.";
+"查询 IP 信息" = "Rechercher les informations IP";
 
 "基础功能" = "Fonctions de base";
 "声音" = "Son";
