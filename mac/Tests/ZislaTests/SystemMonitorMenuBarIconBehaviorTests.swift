@@ -8,11 +8,11 @@ import ZislaKit
 
 @MainActor
 struct SystemMonitorMenuBarIconBehaviorTests {
-    @Test(arguments: [false, true])
-    func connectedHeaderRemainsCenteredAfterEnlargingPercentage(showsPercentage: Bool) throws {
+    @Test(arguments: [false, true], [false, true])
+    func connectedHeaderRemainsCenteredAfterEnlargingPercentage(showsPercentage: Bool, charging: Bool) throws {
         for percentage in showsPercentage ? [0, 1, 9, 70, 100] : [100] {
             for textScale in [1.62, 1.88, 1.98] {
-                var snapshot = battery(charging: true, pluggedIn: true)
+                var snapshot = battery(charging: charging, pluggedIn: true)
                 snapshot.level = Double(percentage) / 100
                 let appearance = SystemMonitorCombinedIconAppearance(
                     showsBatteryPercentage: showsPercentage,
@@ -102,7 +102,7 @@ struct SystemMonitorMenuBarIconBehaviorTests {
     }
 
     @Test
-    func topIndicatorUsesPercentageAndBoltStates() throws {
+    func topIndicatorUsesPercentageBoltAndPlugStates() throws {
         var appearance = SystemMonitorCombinedIconAppearance(
             showsBatteryPercentage: true, showsChargingIndicator: true,
             showsPercentageWhenConnected: false, usesStatusColors: false
@@ -114,12 +114,13 @@ struct SystemMonitorMenuBarIconBehaviorTests {
         #expect(charging != plugged)
         #expect(percentage != plugged)
         appearance.showsPercentageWhenConnected = true
-        #expect(try bitmap(battery: battery(pluggedIn: true), appearance: appearance) == charging)
+        #expect(try bitmap(battery: battery(pluggedIn: true), appearance: appearance) != charging)
+        #expect(try bitmap(battery: battery(pluggedIn: true), appearance: appearance) != percentage)
         #expect(try bitmap(battery: battery(charging: true, pluggedIn: true), appearance: appearance) == charging)
     }
 
     @Test(arguments: [0.7, 1.0], [false, true])
-    func connectedBatteryUsesTheSameLightningAsCharging(level: Double, showsPercentage: Bool) throws {
+    func connectedBatteryUsesPlugInsteadOfLightning(level: Double, showsPercentage: Bool) throws {
         let appearance = SystemMonitorCombinedIconAppearance(
             showsBatteryPercentage: showsPercentage, showsChargingIndicator: true,
             showsPercentageWhenConnected: true, usesStatusColors: true
@@ -131,12 +132,12 @@ struct SystemMonitorMenuBarIconBehaviorTests {
         charging.isCharging = true
         charging.isCharged = false
         #expect(try bitmap(battery: connected, appearance: appearance)
-            == bitmap(battery: charging, appearance: appearance),
-            "External power must retain the lightning glyph after charging finishes")
+            != bitmap(battery: charging, appearance: appearance),
+            "External power must use a plug instead of lightning when charging pauses or finishes")
     }
 
-    @Test
-    func chargingHeaderHonorsIndependentValueAndIndicatorSwitches() {
+    @Test(arguments: [false, true])
+    func chargingHeaderHonorsIndependentValueAndIndicatorSwitches(pluggedIn: Bool) {
         for charging in [false, true] {
             for value in [false, true] {
                 for indicator in [false, true] {
@@ -145,12 +146,12 @@ struct SystemMonitorMenuBarIconBehaviorTests {
                             showsBatteryPercentage: value, showsChargingIndicator: indicator,
                             showsPercentageWhenConnected: connectedValue
                         )
-                        let status = MenuBarIconStatus(battery: battery(charging: charging, pluggedIn: true), wifi: .off, level: nil)
+                        let status = MenuBarIconStatus(battery: battery(charging: charging, pluggedIn: pluggedIn), wifi: .off, level: nil)
                         let expected: MenuBarIconBatteryGapContent
-                        if indicator {
+                        if indicator && (charging || pluggedIn) {
                             expected = charging
                                 ? (value ? .boltAndPercentage : .bolt)
-                                : (value && connectedValue ? .boltAndPercentage : .bolt)
+                                : (value && connectedValue ? .plugAndPercentage : .plug)
                         } else {
                             expected = value ? .percentage : .empty
                         }
@@ -158,6 +159,38 @@ struct SystemMonitorMenuBarIconBehaviorTests {
                             options: MenuBarIconBatteryOptions(appearance: appearance)) == expected)
                     }
                 }
+            }
+        }
+    }
+
+    @Test
+    func plugIndicatorRemainsVisibleWithoutPercentage() throws {
+        let appearance = SystemMonitorCombinedIconAppearance(
+            showsBatteryPercentage: false, showsChargingIndicator: true, usesStatusColors: true
+        )
+        for component in [CGFloat(0), 1] {
+            for size in [CGFloat(16), 22, 26, 36] {
+                let image = try #require(SystemMonitorMenuBarIconRenderer.render(
+                    menuBarStatus: MenuBarIconStatus(battery: battery(pluggedIn: true), wifi: .off, level: nil),
+                    size: size, scale: 2, foreground: CGColor(gray: component, alpha: 1),
+                    options: MenuBarIconBatteryOptions(appearance: appearance),
+                    connectionOptions: MenuBarIconConnectionOptions(appearance: appearance),
+                    volumeOptions: MenuBarIconVolumeOptions(appearance: appearance)
+                ))
+                let bitmap = NSBitmapImageRep(cgImage: image)
+                var glyphPixels = 0
+                for y in 0..<(bitmap.pixelsHigh / 4) {
+                    for x in 0..<bitmap.pixelsWide {
+                        let color = try #require(bitmap.colorAt(x: x, y: y)?.usingColorSpace(.deviceRGB))
+                        if color.alphaComponent > 0.8,
+                           abs(color.redComponent - component) < 0.1,
+                           abs(color.greenComponent - component) < 0.1,
+                           abs(color.blueComponent - component) < 0.1 {
+                            glyphPixels += 1
+                        }
+                    }
+                }
+                #expect(glyphPixels > 0, "Power plug must remain visible at size \(size), foreground \(component)")
             }
         }
     }
@@ -303,12 +336,14 @@ struct SystemMonitorMenuBarIconBehaviorTests {
             showsBatteryPercentage: true, showsChargingIndicator: true
         ))
         #expect(plain == configured)
-        for level in [Double.nan, .infinity] {
-            var snapshot = battery(charging: true, pluggedIn: true)
-            snapshot.level = level
-            #expect(try bitmap(battery: snapshot, appearance: SystemMonitorCombinedIconAppearance(
-                showsBatteryPercentage: true, showsChargingIndicator: true
-            )) == configured)
+        for charging in [false, true] {
+            for level in [Double.nan, .infinity, -.infinity] {
+                var snapshot = battery(charging: charging, pluggedIn: true)
+                snapshot.level = level
+                #expect(try bitmap(battery: snapshot, appearance: SystemMonitorCombinedIconAppearance(
+                    showsBatteryPercentage: true, showsChargingIndicator: true
+                )) == configured)
+            }
         }
     }
 
