@@ -2740,3 +2740,15 @@
 "onboarding.permission.system_audio.body" = "Pour visualiser la musique. Autorisez l’enregistrement audio dans les Réglages Système ; macOS peut demander une confirmation lors de la première utilisation.";
 "onboarding.permission.full_disk_access.title" = "Accès complet au disque";
 "onboarding.permission.full_disk_access.body" = "Nécessaire uniquement pour les index de courrier locaux ou les cookies du navigateur. Activez-le dans les Réglages Système si vous utilisez ces fonctions.";
+
+"更新日志" = "Notes de version";
+"已更新至 %@" = "Mise à jour vers %@ effectuée";
+"正在加载更新日志" = "Chargement des notes de version";
+"无法加载更新日志" = "Impossible de charger les notes de version";
+"查看发布页面" = "Voir la page de la version";
+"安装更新" = "Installer la mise à jour";
+"安装并重新启动" = "Installer et relancer";
+"退出时安装" = "Installer à la fermeture";
+"稍后提醒" = "Me rappeler plus tard";
+"跳过此版本" = "Ignorer cette version";
+"了解更多" = "En savoir plus";
