@@ -1,9 +1,9 @@
 "NSCalendarsFullAccessUsageDescription" = "zisla benötigt Zugriff auf bevorstehende Kalenderereignisse für das obere Informationsfenster.";
-"NSAudioCaptureUsageDescription" = "zisla liest Systemaudio nur während der Medienwiedergabe oder wenn du die Lautstärke einer App anpasst, um eine Wellenform anzuzeigen und die Ausgabelautstärke dieser App anzupassen.";
-"NSCameraUsageDescription" = "zisla verwendet die Kamera nur, wenn der Spiegel geöffnet ist.";
+"NSAudioCaptureUsageDescription" = "zisla liest Systemaudio, um eine Wellenform anzuzeigen und die App-Lautstärke anzupassen, und zeichnet Wiedergabeton auf, wenn du Systemaudio für Bildschirmaufnahmen aktivierst.";
+"NSCameraUsageDescription" = "zisla verwendet die Kamera nur, wenn Sie den Spiegel öffnen oder die Kameraeinblendung für die Bildschirmaufnahme aktivieren.";
 "NSRemindersFullAccessUsageDescription" = "zisla liest datierte Erinnerungen, um sie zusammen mit Kalenderereignissen anzuzeigen.";
 "NSLocationWhenInUseUsageDescription" = "zisla benötigt Standortzugriff, um das lokale Wetter, Ortsnamen und WLAN-Netzwerke in der Nähe anzuzeigen.";
-"NSMicrophoneUsageDescription" = "zisla verwendet das Mikrofon nur, wenn Sie die Spracheingabe starten, um Sprache in aktuellen KI-Konversationstext umzuwandeln.";
-"NSSpeechRecognitionUsageDescription" = "zisla transkribiert die Sprache, die Sie aktiv aufzeichnen, in KI-Konversationstext.";
+"NSMicrophoneUsageDescription" = "zisla nimmt Audio nur auf, wenn Sie die Spracheingabe starten oder das Mikrofon für die Bildschirmaufnahme aktivieren.";
+"NSSpeechRecognitionUsageDescription" = "zisla wandelt von Ihnen bewusst aufgenommene Sprache in Text um und transkribiert lokal, wenn Sie Untertitel für eine Bildschirmaufnahme erstellen.";
 "NSAppleEventsUsageDescription" = "zisla verwendet Mail.app, um E-Mails zu lesen und zu verwalten, einschließlich Postfächern, Lesestatus, Löschen und Antworten. Außerdem führt zisla die von dir ausgewählten Befehle in Terminal oder iTerm aus.";
 "NSBluetoothAlwaysUsageDescription" = "zisla liest öffentliche Akkudaten verbundener oder gekoppelter Bluetooth-Geräte nur beim Öffnen der Batterieseite.";

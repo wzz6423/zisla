@@ -1,9 +1,9 @@
 "NSCalendarsFullAccessUsageDescription" = "zisla precisa de acesso aos próximos eventos do calendário para o painel de informações superior.";
-"NSAudioCaptureUsageDescription" = "O zisla lê o áudio do sistema apenas durante a reprodução de mídia ou quando você ajusta o volume de um app, para exibir uma forma de onda e ajustar o volume de saída desse app.";
-"NSCameraUsageDescription" = "zisla usa a câmera apenas quando o espelho está aberto.";
+"NSAudioCaptureUsageDescription" = "O zisla lê o áudio do sistema para exibir uma forma de onda e ajustar o volume dos apps, e grava o som reproduzido quando você ativa o áudio do sistema na gravação de tela.";
+"NSCameraUsageDescription" = "zisla usa a câmera apenas quando você abre o espelho ou ativa a sobreposição da câmera para a gravação de tela.";
 "NSRemindersFullAccessUsageDescription" = "zisla lê lembretes datados para mostrá-los junto com eventos do calendário.";
 "NSLocationWhenInUseUsageDescription" = "O zisla precisa de acesso à localização para mostrar o clima local, nomes de lugares e redes Wi-Fi próximas.";
-"NSMicrophoneUsageDescription" = "zisla usa o microfone apenas quando você inicia a entrada de voz, para converter fala em texto de conversa de IA.";
-"NSSpeechRecognitionUsageDescription" = "zisla transcreve a fala que você grava ativamente em texto de conversa de IA.";
+"NSMicrophoneUsageDescription" = "zisla grava áudio apenas quando você inicia a entrada de voz ou ativa o microfone para a gravação de tela.";
+"NSSpeechRecognitionUsageDescription" = "zisla converte em texto a fala que você grava por escolha própria e transcreve localmente quando você gera legendas de uma gravação de tela.";
 "NSAppleEventsUsageDescription" = "zisla usa o Mail.app para ler e gerenciar e-mails, incluindo caixas de entrada, status de leitura, exclusão e respostas. Também executa os comandos que você escolher no Terminal ou no iTerm.";
 "NSBluetoothAlwaysUsageDescription" = "zisla lê informações públicas da bateria de dispositivos Bluetooth conectados ou emparelhados somente quando você abre a página Bateria.";

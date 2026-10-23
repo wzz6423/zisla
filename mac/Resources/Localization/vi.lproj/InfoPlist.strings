@@ -1,9 +1,9 @@
 "NSCalendarsFullAccessUsageDescription" = "zisla cần quyền truy cập các sự kiện lịch sắp tới cho bảng thông tin trên cùng.";
-"NSAudioCaptureUsageDescription" = "zisla chỉ đọc âm thanh hệ thống khi phát nội dung hoặc khi bạn chủ động điều chỉnh âm lượng ứng dụng, để hiển thị dạng sóng và điều chỉnh âm lượng đầu ra của ứng dụng đó.";
-"NSCameraUsageDescription" = "zisla chỉ sử dụng camera khi gương được mở.";
+"NSAudioCaptureUsageDescription" = "zisla đọc âm thanh hệ thống để hiển thị dạng sóng và điều chỉnh âm lượng ứng dụng, đồng thời ghi lại âm thanh đang phát khi bạn bật âm thanh hệ thống cho bản ghi màn hình.";
+"NSCameraUsageDescription" = "zisla chỉ sử dụng camera khi bạn mở gương hoặc bật lớp phủ camera để ghi màn hình.";
 "NSRemindersFullAccessUsageDescription" = "zisla đọc các lời nhắc có ngày để hiển thị chúng cùng với sự kiện lịch.";
 "NSLocationWhenInUseUsageDescription" = "zisla cần quyền truy cập vị trí để hiển thị thời tiết địa phương, tên địa điểm và các mạng Wi-Fi ở gần.";
-"NSMicrophoneUsageDescription" = "zisla chỉ sử dụng micrô khi bạn bắt đầu nhập giọng nói, để chuyển lời nói thành văn bản hội thoại AI hiện tại.";
-"NSSpeechRecognitionUsageDescription" = "zisla sao chép lời nói bạn ghi âm chủ động thành văn bản hội thoại AI.";
+"NSMicrophoneUsageDescription" = "zisla chỉ ghi âm khi bạn bắt đầu nhập bằng giọng nói hoặc bật micrô để ghi màn hình.";
+"NSSpeechRecognitionUsageDescription" = "zisla chuyển lời nói bạn chủ động ghi thành văn bản và chép lời cục bộ khi bạn tạo phụ đề cho bản ghi màn hình.";
 "NSAppleEventsUsageDescription" = "zisla sử dụng Mail.app để đọc và quản lý thư, bao gồm hộp thư đến, trạng thái đã đọc, xóa và trả lời. Zisla cũng chạy các lệnh bạn chọn trong Terminal hoặc iTerm.";
 "NSBluetoothAlwaysUsageDescription" = "zisla chỉ đọc thông tin pin công khai của thiết bị Bluetooth đã kết nối hoặc ghép đôi khi bạn mở trang Pin.";

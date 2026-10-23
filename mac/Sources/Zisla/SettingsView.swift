@@ -28,6 +28,7 @@ struct SettingsView: View {
     @State private var customVoiceHotword = ""
     @State private var localVoiceHardware: LocalVoiceHardware?
     @State private var screenshotHotkeyValidationMessage: String?
+    @State private var recordingHotkeyValidationMessage: String?
     @State private var voiceHotkeyValidationMessage: String?
     @State private var assistantHotkeyValidationMessage: String?
     @State private var expandedClipboardAssistantKind: ClipboardAssistantKind?
@@ -231,7 +232,7 @@ struct SettingsView: View {
             featuresContent
         case .keyboardSound:
             keyboardSoundContent
-        case .clipboardAssistant, .screenshot:
+        case .clipboardAssistant, .screenshot, .recording:
             featuresContent
         case .pdfTools:
             PDFToolsModuleView(model: model, initialOperation: input.selectedPDFOperation)
@@ -479,6 +480,11 @@ struct SettingsView: View {
                                     get: { model.settingsStore.settings.clipboardAssistantTriggerConfiguration.hotkey },
                                     set: { newValue in
                                         if let newValue,
+                                           let message = recordingConflictMessage(for: newValue, actionName: "快捷操作") {
+                                            assistantHotkeyValidationMessage = message
+                                            return
+                                        }
+                                        if let newValue,
                                            let conflict = Self.conflictingScreenshotAction(
                                                forGlobalHotkey: newValue, in: model.settingsStore.settings
                                            ) {
@@ -517,6 +523,12 @@ struct SettingsView: View {
                                 hotkey: Binding(
                                     get: { model.settingsStore.settings.clipboardAssistantDismissConfiguration.hotkey },
                                     set: { newValue in
+                                        if let newValue,
+                                           let message = recordingConflictMessage(for: newValue, actionName: "关闭弹窗快捷键") {
+                                            assistantHotkeyValidationMessage = message
+                                            return
+                                        }
+                                        assistantHotkeyValidationMessage = nil
                                         model.settingsStore.settings.clipboardAssistantDismissConfiguration =
                                             newValue.map(ClipboardAssistantTriggerConfiguration.hotkey) ?? .none
                                     }
@@ -1027,6 +1039,50 @@ struct SettingsView: View {
                             model.settingsStore.settings.moduleOrder = IslandModuleOrder.defaultOrder
                         }
                         .disabled(order == IslandModuleOrder.defaultOrder)
+                    }
+                }
+            }
+
+            if input.selection == .features || input.selection == .recording {
+                settingsGroup("录屏") {
+                    featureToggle("启用录屏", detail: "全屏、窗口或区域录制，支持音频与摄像头",
+                        symbol: "record.circle", keyPath: \.screenRecordingEnabled)
+                    if input.selection == .recording {
+                        rowDivider
+                        settingRow(symbol: "rectangle.stack", title: "录屏工作室", detail: "打开录屏与剪辑工作室") {
+                            Button(AppLocalization.text("打开")) { model.presentScreenRecording() }
+                                .controlSize(.small)
+                        }
+                        ForEach(RecordingShortcutAction.allCases) { action in
+                            rowDivider
+                            settingRow(symbol: "keyboard", title: action.title, detail: "") {
+                                HotkeyRecorder(hotkey: Binding(
+                                    get: { model.settingsStore.settings.screenRecordingHotkey(for: action) },
+                                    set: { if let value = $0 { updateRecordingHotkey(value, action: action) } }
+                                ))
+                            }
+                        }
+                        rowDivider
+                        settingRow(symbol: "arrow.counterclockwise", title: "恢复默认快捷键", detail: "") {
+                            Button(AppLocalization.text("恢复默认快捷键")) {
+                                model.settingsStore.settings.screenRecordingHotkeys.removeAll()
+                                recordingHotkeyValidationMessage = nil
+                            }.controlSize(.small)
+                        }
+                        if let message = recordingHotkeyValidationMessage ?? currentRecordingHotkeyConflict {
+                            rowDivider
+                            Label(message, systemImage: "exclamationmark.triangle.fill")
+                                .font(.caption).foregroundStyle(Color.zislaWarning)
+                        }
+                        if RecordingShortcutAction.allCases.contains(where: {
+                            model.settingsStore.settings.screenRecordingHotkey(for: $0).requiresInputMonitoring
+                        }) {
+                            rowDivider
+                            settingRow(symbol: "lock.shield", title: "输入监控", detail: "单独修饰键需要监听全局键盘事件") {
+                                Button(AppLocalization.text("打开设置")) { model.openVoiceInputInputMonitoringSettings() }
+                                    .controlSize(.small)
+                            }
+                        }
                     }
                 }
             }
@@ -1935,6 +1991,10 @@ struct SettingsView: View {
                                 get: { model.settingsStore.settings.voiceInputHotkeyPreset },
                                 set: { newValue in
                                     guard let newValue else { return }
+                                    if let message = recordingConflictMessage(for: newValue, actionName: "语音输入") {
+                                        voiceHotkeyValidationMessage = message
+                                        return
+                                    }
                                     if let conflict = Self.conflictingScreenshotAction(
                                         forGlobalHotkey: newValue, in: model.settingsStore.settings
                                     ) {
@@ -2224,12 +2284,48 @@ struct SettingsView: View {
         return nil
     }
 
+    private var currentRecordingHotkeyConflict: String? {
+        let settings = model.settingsStore.settings
+        for action in RecordingShortcutAction.allCases {
+            if let conflict = settings.recordingShortcutConflict(for: settings.screenRecordingHotkey(for: action), excluding: action) {
+                return AppLocalization.text("%@快捷键与%@冲突，请修改其中一个",
+                    AppLocalization.text(action.title), AppLocalization.text(conflict))
+            }
+        }
+        return nil
+    }
+
+    private func updateRecordingHotkey(_ hotkey: VoiceInputHotkeyPreset, action: RecordingShortcutAction) {
+        let settings = model.settingsStore.settings
+        if let conflict = settings.recordingShortcutConflict(for: hotkey, excluding: action) {
+            recordingHotkeyValidationMessage = AppLocalization.text("%@快捷键与%@冲突，未保存",
+                AppLocalization.text(action.title), AppLocalization.text(conflict))
+            return
+        }
+        model.settingsStore.settings.screenRecordingHotkeys[String(action.rawValue)] = hotkey
+        recordingHotkeyValidationMessage = nil
+    }
+
+    private func recordingConflictMessage(for hotkey: VoiceInputHotkeyPreset, actionName: String) -> String? {
+        let settings = model.settingsStore.settings
+        guard settings.screenRecordingEnabled,
+              let conflict = RecordingShortcutAction.allCases.first(where: { hotkey.conflicts(with: settings.screenRecordingHotkey(for: $0)) }) else { return nil }
+        return AppLocalization.text("%@快捷键与%@冲突，未保存",
+            AppLocalization.text(actionName), AppLocalization.text(conflict.title))
+    }
+
     private func updateScreenshotHotkey(
         _ hotkey: VoiceInputHotkeyPreset,
         action: ScreenshotHotkeyAction
     ) {
         var settings = model.settingsStore.settings
         let actionName = AppLocalization.text(action.name)
+        if settings.screenRecordingEnabled,
+           let conflict = RecordingShortcutAction.allCases.first(where: { hotkey.conflicts(with: settings.screenRecordingHotkey(for: $0)) }) {
+            screenshotHotkeyValidationMessage = AppLocalization.text("%@快捷键与%@冲突，未保存",
+                actionName, AppLocalization.text(conflict.title))
+            return
+        }
         if let reservedAction = ScreenshotEditorWindow.reservedAction(for: hotkey) {
             screenshotHotkeyValidationMessage = AppLocalization.text(
                 "%@快捷键与%@冲突，未保存",
@@ -4267,6 +4363,7 @@ enum SettingsSection: String, CaseIterable, Identifiable {
     case clipboardAssistant
     case screenshot
     case pdfTools
+    case recording
     case ai
     case voice
     case mail
@@ -4284,7 +4381,7 @@ enum SettingsSection: String, CaseIterable, Identifiable {
         switch self {
         case .general, .features, .info: .basics
         case .keyboardSound: .sound
-        case .clipboardAssistant, .screenshot, .pdfTools, .download: .files
+        case .clipboardAssistant, .screenshot, .pdfTools, .recording, .download: .files
         case .ai, .voice: .aiAndVoice
         case .mail, .weather, .networkProxy, .pet, .recommendations, .updates: .networkAndOthers
         }
@@ -4303,6 +4400,7 @@ enum SettingsSection: String, CaseIterable, Identifiable {
         case .clipboardAssistant: "快捷操作"
         case .screenshot: "截图"
         case .pdfTools: "PDF 工具"
+        case .recording: "录屏"
         case .info: "信息"
         case .mail: "邮件"
         case .ai: "AI"
@@ -4324,6 +4422,7 @@ enum SettingsSection: String, CaseIterable, Identifiable {
         case .clipboardAssistant: "sparkles.rectangle.stack"
         case .screenshot: "camera.viewfinder"
         case .pdfTools: "doc.text.fill"
+        case .recording: "record.circle"
         case .info: "info.circle.fill"
         case .mail: "envelope.fill"
         case .ai: "sparkles"
@@ -4345,6 +4444,7 @@ enum SettingsSection: String, CaseIterable, Identifiable {
         case .clipboardAssistant: "复制、浏览器下载或 AirDrop 接收完成后显示下一步操作"
         case .screenshot: "启用截图、钉图与全局快捷键"
         case .pdfTools: "在设置中合并、拆分、加密与转换 PDF。"
+        case .recording: "录制屏幕、编辑视频与保存项目。"
         case .info: "配置媒体、系统监控、锁屏与通知显示。"
         case .mail: "读取已配置的 Mail.app 账户并提醒新邮件"
         case .ai: "管理 AI CLI 与 Skills。"
@@ -4372,6 +4472,8 @@ enum SettingsSection: String, CaseIterable, Identifiable {
             return settings.screenshotEnabled
         case .pdfTools:
             return settings.pdfToolsEnabled
+        case .recording:
+            return settings.screenRecordingEnabled
         case .info:
             return settings.mediaEnabled || settings.systemMonitorEnabled
                 || settings.lockScreenInfoEnabled || settings.sideNoticesEnabled
