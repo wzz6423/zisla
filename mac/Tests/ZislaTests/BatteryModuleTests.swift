@@ -60,7 +60,7 @@ struct BatteryModuleTests {
     @Test
     func groupedTallModuleLayoutsShareHeights() {
         let tallModules: [IslandModule] = [
-            .quickNotes, .keyboardSound, .mail, .system, .battery, .pdf,
+            .quickNotes, .keyboardSound, .mail, .system, .battery, .volumeMixer,
         ]
 
         for module in tallModules {

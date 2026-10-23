@@ -46,8 +46,8 @@ struct SettingsView: View {
             detail
         }
         .frame(
-            width: input.selection.prefersWideLayout ? 980 : 640,
-            height: 640
+            width: input.selection.prefersWideLayout ? 1120 : 960,
+            height: 680
         )
         .background(Color(nsColor: .windowBackgroundColor))
         .onAppear {
@@ -103,59 +103,37 @@ struct SettingsView: View {
 
     private var sidebar: some View {
         VStack(alignment: .leading, spacing: 0) {
-            Text("zisla")
-                .font(.system(size: 14, weight: .semibold))
-            Text(AppLocalization.text("设置"))
-                .font(.system(size: 10))
-                .foregroundStyle(.secondary)
-                .padding(.top, 1)
-
             settingsSearchField
-                .padding(.top, 14)
 
             ScrollView {
-                VStack(spacing: 2) {
-                    ForEach(visibleSections) { section in
-                        Button {
-                            selectSettingsSection(section)
-                        } label: {
-                            HStack(spacing: 8) {
-                                Image(systemName: section.symbol)
-                                    .font(.system(size: 12, weight: .semibold))
-                                    .frame(width: 17)
-                                AppLocalizedText(section.title)
+                VStack(alignment: .leading, spacing: 20) {
+                    ForEach(SettingsSectionGroup.allCases) { group in
+                        let sections = visibleSections.filter { $0.group == group }
+                        if !sections.isEmpty {
+                            VStack(alignment: .leading, spacing: 5) {
+                                AppLocalizedText(group.title)
                                     .font(.system(size: 11, weight: .medium))
-                                    .fitsLines(2, minScale: 0.7)
-                                Spacer(minLength: 0)
-                            }
-                            .padding(.horizontal, 8)
-                            .frame(height: 34)
-                            .contentShape(Rectangle())
-                        }
-                        .buttonStyle(PressableStyle(hoverScale: 1.018, pressedScale: 0.965))
-                        .foregroundStyle(input.selection == section ? Color.primary : Color.secondary)
-                        .background {
-                            if input.selection == section {
-                                SelectionGlassBackground(cornerRadius: 6)
-                                    .matchedGeometryEffect(
-                                        id: "settings-section-selection",
-                                        in: sectionSelectionNamespace
-                                    )
+                                    .foregroundStyle(.secondary)
+                                    .padding(.horizontal, 10)
+                                    .padding(.bottom, 2)
+                                ForEach(sections) { section in
+                                    sidebarButton(section)
+                                }
                             }
                         }
-                        .accessibilityLabel(AppLocalization.text("%@设置", AppLocalization.text(section.title)))
                     }
                 }
+                .padding(.vertical, 4)
             }
             .thinScrollChrome()
-            .padding(.top, 8)
+            .padding(.top, 18)
             .animation(reduceMotion ? nil : ZislaMotion.selection, value: input.selection)
 
             Spacer(minLength: 12)
 
             HStack(spacing: 6) {
                 Text(AppLocalization.text("版本 %@", appVersion))
-                    .font(.system(size: 9, design: .monospaced))
+                    .font(.system(size: 11, design: .monospaced))
                     .foregroundStyle(.tertiary)
                     .fitsSingleLine(0.7)
                 Spacer(minLength: 0)
@@ -169,7 +147,7 @@ struct SettingsView: View {
                             showsInactiveBackground: false
                         )
                         Text(AppLocalization.text("退出"))
-                            .font(.system(size: 10, weight: .medium))
+                            .font(.system(size: 11, weight: .medium))
                             .fitsSingleLine(0.7)
                     }
                     .padding(.trailing, 7)
@@ -184,9 +162,40 @@ struct SettingsView: View {
             .frame(maxWidth: .infinity)
         }
         .padding(12)
-        .frame(width: 148)
+        .frame(width: 250)
         .frame(maxHeight: .infinity, alignment: .topLeading)
         .background(Color.primary.opacity(colorScheme == .dark ? 0.035 : 0.025))
+    }
+
+    private func sidebarButton(_ section: SettingsSection) -> some View {
+        Button {
+            selectSettingsSection(section)
+        } label: {
+            HStack(spacing: 10) {
+                Image(systemName: section.symbol)
+                    .font(.system(size: 15, weight: .medium))
+                    .foregroundStyle(input.selection == section ? Color.white : Color.accentColor)
+                    .frame(width: 21)
+                AppLocalizedText(section.title)
+                    .font(.system(size: 13, weight: .medium))
+                    .fitsLines(2, minScale: 0.85)
+                Spacer(minLength: 0)
+            }
+            .padding(.horizontal, 10)
+            .frame(minHeight: 38)
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(PressableStyle(hoverScale: 1.018, pressedScale: 0.965))
+        .foregroundStyle(input.selection == section ? Color.white : Color.primary)
+        .background {
+            if input.selection == section {
+                RoundedRectangle(cornerRadius: 8, style: .continuous)
+                    .fill(Color.blue)
+                    .matchedGeometryEffect(id: "settings-section-selection", in: sectionSelectionNamespace)
+            }
+        }
+        .accessibilityLabel(AppLocalization.text("%@设置", AppLocalization.text(section.title)))
+        .accessibilityAddTraits(input.selection == section ? .isSelected : [])
     }
 
     private var settingsSearchField: some View {
@@ -217,12 +226,12 @@ struct SettingsView: View {
                 .accessibilityLabel(AppLocalization.text("清除"))
             }
         }
-        .font(.system(size: 11))
-        .padding(.horizontal, 7)
-        .frame(height: 28)
-        .background(Color.fillControl, in: RoundedRectangle(cornerRadius: 6, style: .continuous))
+        .font(.system(size: 13))
+        .padding(.horizontal, 10)
+        .frame(height: 34)
+        .background(Color.fillControl, in: RoundedRectangle(cornerRadius: 9, style: .continuous))
         .overlay {
-            RoundedRectangle(cornerRadius: 6, style: .continuous)
+            RoundedRectangle(cornerRadius: 9, style: .continuous)
                 .strokeBorder(Color.primary.opacity(0.12), lineWidth: 0.5)
         }
     }
@@ -285,9 +294,9 @@ struct SettingsView: View {
                 } else {
                     VStack(alignment: .leading, spacing: 3) {
                         AppLocalizedText(input.selection.title)
-                            .font(.system(size: 20, weight: .semibold))
+                            .font(.system(size: 23, weight: .semibold))
                         AppLocalizedText(input.selection.subtitle)
-                            .font(.system(size: 10))
+                            .font(.system(size: 12))
                             .foregroundStyle(.secondary)
                     }
                     DeferredMount {
@@ -301,8 +310,8 @@ struct SettingsView: View {
                     }
                 }
             }
-            .padding(.horizontal, 20)
-            .padding(.vertical, 18)
+            .padding(.horizontal, 26)
+            .padding(.vertical, 24)
             .frame(maxWidth: .infinity, alignment: .leading)
         }
         .animation(reduceMotion ? nil : ZislaMotion.settingsPageSwitch, value: input.selection)
@@ -347,6 +356,9 @@ struct SettingsView: View {
             keyboardSoundContent
         case .clipboardAssistant, .screenshot:
             featuresContent
+        case .pdfTools:
+            PDFToolsModuleView(model: model, initialOperation: input.selectedPDFOperation)
+                .id(input.selectedPDFOperation)
         case .info:
             infoContent
         case .mail:
@@ -1090,6 +1102,8 @@ struct SettingsView: View {
                     featureToggle("随记", detail: "Markdown 随手记，可发送到系统备忘录", symbol: "note.text", keyPath: \.quickNotesEnabled)
                     rowDivider
                     featureToggle("PDF 工具", detail: "合并、拆分、加密与转换 PDF", symbol: "doc.text.fill", keyPath: \.pdfToolsEnabled)
+                    rowDivider
+                    featureToggle("应用音量混音器", detail: "在灵动岛分别调整应用的媒体音量。", symbol: "slider.horizontal.3", keyPath: \.volumeMixerEnabled)
                     rowDivider
                     featureToggle("系统状态与清理", detail: "监控资源并安全清理缓存和日志", symbol: "gauge.with.dots.needle.67percent", keyPath: \.systemMonitorEnabled)
                     rowDivider
@@ -2391,7 +2405,52 @@ struct SettingsView: View {
 
     private var generalContent: some View {
         VStack(alignment: .leading, spacing: 20) {
-            settingsGroup("外观与语言") {
+            settingsGroup("启动") {
+                settingRow(
+                    symbol: "power.circle.fill",
+                    title: "登录时启动",
+                    detail: launchAtLogin.statusMessage ?? "开机或登录后自动在后台运行"
+                ) {
+                    Toggle(
+                        "",
+                        isOn: Binding(
+                            get: { launchAtLogin.isEnabled },
+                            set: { launchAtLogin.setEnabled($0) }
+                        )
+                    )
+                    .labelsHidden()
+                    .toggleStyle(.switch)
+                }
+
+                if launchAtLogin.showsOpenLoginItemsButton {
+                    rowDivider
+                    settingRow(
+                        symbol: "gearshape.fill",
+                        title: "需要系统批准",
+                        detail: "在登录项中允许 zisla 后即可生效"
+                    ) {
+                        Button(AppLocalization.text("打开登录项…")) {
+                            launchAtLogin.openLoginItemsSettings()
+                        }
+                        .buttonStyle(.bordered)
+                        .keepsIntrinsicWidth()
+                    }
+                }
+
+                if let errorMessage = launchAtLogin.errorMessage {
+                    rowDivider
+                    HStack(spacing: 8) {
+                        Image(systemName: "exclamationmark.triangle.fill")
+                        Text(errorMessage)
+                            .lineLimit(2)
+                    }
+                    .font(.system(size: 11))
+                    .foregroundStyle(Color.zislaError)
+                    .padding(.horizontal, 4)
+                    .frame(minHeight: 36, alignment: .leading)
+                }
+
+                rowDivider
                 settingRow(
                     symbol: "character.bubble",
                     title: "界面语言",
@@ -2410,29 +2469,26 @@ struct SettingsView: View {
                     }
                     .labelsHidden()
                     .pickerStyle(.menu)
-                    .controlSize(.small)
                     .keepsIntrinsicWidth()
                 }
-                rowDivider
-                settingRow(
-                    symbol: "circle.lefthalf.filled",
-                    title: "界面外观",
-                    detail: ""
-                ) {
-                    IslandOutlinedPicker(
-                        selection: Binding(
-                            get: { model.settingsStore.settings.appearanceMode },
-                            set: { model.settingsStore.settings.appearanceMode = $0 }
-                        ),
-                        options: Array(AppearanceMode.allCases),
-                        title: { $0.menuTitle },
-                        selectionID: "appearance-mode-selection",
-                        fontSize: 9,
-                        width: 216,
-                        height: 34
-                    )
+            }
+
+            settingsGroup("外观") {
+                VStack(alignment: .leading, spacing: 14) {
+                    HStack(spacing: 12) {
+                        ForEach(AppearanceMode.allCases, id: \.self) { mode in
+                            appearanceButton(mode)
+                        }
+                    }
+                    .settingsSearchAnchor(.row(AppLocalization.string("界面外观", locale: locale)))
+                    AppLocalizedText("仅影响 zisla 的窗口与面板，不会更改 macOS 外观。")
+                        .font(.system(size: 11))
+                        .foregroundStyle(.secondary)
                 }
-                rowDivider
+                .padding(.vertical, 5)
+            }
+
+            settingsGroup("灵动岛样式") {
                 settingRow(
                     symbol: "rectangle.on.rectangle.angled",
                     title: "灵动岛样式",
@@ -2460,56 +2516,35 @@ struct SettingsView: View {
                     )
                 }
             }
-
-            settingsGroup("启动") {
-                settingRow(
-                    symbol: "power.circle.fill",
-                    title: "登录时启动",
-                    detail: launchAtLogin.statusMessage ?? "开机或登录后自动在后台运行"
-                ) {
-                    Toggle(
-                        "",
-                        isOn: Binding(
-                            get: { launchAtLogin.isEnabled },
-                            set: { launchAtLogin.setEnabled($0) }
-                        )
-                    )
-                    .labelsHidden()
-                    .toggleStyle(.switch)
-                    .controlSize(.small)
-                }
-
-                if launchAtLogin.showsOpenLoginItemsButton {
-                    rowDivider
-                    settingRow(
-                        symbol: "gearshape.fill",
-                        title: "需要系统批准",
-                        detail: "在登录项中允许 zisla 后即可生效"
-                    ) {
-                        Button(AppLocalization.text("打开登录项…")) {
-                            launchAtLogin.openLoginItemsSettings()
-                        }
-                        .buttonStyle(.bordered)
-                        .controlSize(.small)
-                        .keepsIntrinsicWidth()
-                    }
-                }
-
-                if let errorMessage = launchAtLogin.errorMessage {
-                    rowDivider
-                    HStack(spacing: 8) {
-                        Image(systemName: "exclamationmark.triangle.fill")
-                        Text(errorMessage)
-                            .lineLimit(2)
-                    }
-                    .font(.system(size: 9))
-                    .foregroundStyle(Color.zislaError)
-                    .padding(.horizontal, 4)
-                    .frame(minHeight: 36, alignment: .leading)
-                }
-            }
-
         }
+    }
+
+    private func appearanceButton(_ mode: AppearanceMode) -> some View {
+        let isSelected = settingsStore.settings.appearanceMode == mode
+        return Button {
+            settingsStore.settings.appearanceMode = mode
+        } label: {
+            VStack(spacing: 9) {
+                SettingsAppearancePreview(mode: mode)
+                    .frame(height: 80)
+                    .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+                    .overlay {
+                        RoundedRectangle(cornerRadius: 8, style: .continuous)
+                            .strokeBorder(isSelected ? Color.blue : Color.primary.opacity(0.16), lineWidth: isSelected ? 2 : 1)
+                    }
+                AppLocalizedText(mode.menuTitle)
+                    .font(.system(size: 12, weight: .medium))
+                    .fitsLines(2)
+            }
+            .padding(9)
+            .frame(maxWidth: .infinity)
+            .background(isSelected ? Color.blue.opacity(0.09) : Color.clear, in: RoundedRectangle(cornerRadius: 10, style: .continuous))
+            .contentShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+        }
+        .buttonStyle(.plain)
+        .foregroundStyle(isSelected ? Color.blue : Color.primary)
+        .accessibilityLabel(AppLocalization.text(mode.menuTitle))
+        .accessibilityAddTraits(isSelected ? .isSelected : [])
     }
 
     private var networkProxyStatusText: String {
@@ -3677,6 +3712,7 @@ struct SettingsView: View {
         case .system: "gauge.with.dots.needle.67percent"
         case .battery: "battery.100percent"
         case .pdf: "doc.viewfinder"
+        case .volumeMixer: "slider.horizontal.3"
         }
     }
 
@@ -3690,17 +3726,18 @@ struct SettingsView: View {
     ) -> some View {
         HStack(spacing: 10) {
             Image(systemName: symbol)
-                .font(.system(size: 12, weight: .semibold))
+                .font(.system(size: 15, weight: .medium))
                 .foregroundStyle(Color.accentColor)
-                .frame(width: 24)
+                .frame(width: 32, height: 32)
+                .background(Color.accentColor.opacity(0.10), in: RoundedRectangle(cornerRadius: 8, style: .continuous))
             VStack(alignment: .leading, spacing: 2) {
                 AppLocalizedText(title)
-                    .font(.system(size: 11, weight: .medium))
+                    .font(.system(size: 13, weight: .medium))
                     .fitsLines(2)
                     .truncationMode(.tail)
                 if !detail.isEmpty {
                     AppLocalizedText(detail)
-                        .font(.system(size: 9))
+                        .font(.system(size: 11))
                         .foregroundStyle(.secondary)
                         .lineLimit(detailLineLimit)
                 }
@@ -3711,7 +3748,7 @@ struct SettingsView: View {
         }
         .padding(.leading, isNested ? 24 : 4)
         .padding(.trailing, 4)
-        .frame(maxWidth: .infinity, minHeight: 48)
+        .frame(maxWidth: .infinity, minHeight: 56)
         .settingsSearchAnchor(SettingsSearchAnchor.row(AppLocalization.string(title, locale: locale)))
     }
 
@@ -3794,21 +3831,20 @@ struct SettingsView: View {
         _ title: String,
         @ViewBuilder content: () -> Content
     ) -> some View {
-        VStack(alignment: .leading, spacing: 7) {
+        VStack(alignment: .leading, spacing: 10) {
             AppLocalizedText(title)
-                .font(.system(size: 10, weight: .semibold))
-                .foregroundStyle(.secondary)
+                .font(.system(size: 13, weight: .semibold))
             VStack(spacing: 0) {
                 content()
             }
-            .overlay(alignment: .top) { Divider() }
-            .overlay(alignment: .bottom) { Divider() }
         }
+        .padding(16)
+        .background(Color.primary.opacity(colorScheme == .dark ? 0.045 : 0.025), in: RoundedRectangle(cornerRadius: 14, style: .continuous))
         .settingsSearchAnchor(SettingsSearchAnchor.group(AppLocalization.string(title, locale: locale)))
     }
 
     private var rowDivider: some View {
-        Divider().padding(.leading, 38)
+        Divider().padding(.leading, 46)
     }
 
     @ViewBuilder
@@ -4267,12 +4303,95 @@ final class HotkeyRecorderButton: NSButton {
     }
 }
 
+private struct SettingsAppearancePreview: View {
+    let mode: AppearanceMode
+
+    var body: some View {
+        ZStack {
+            SettingsAppearanceWindowPreview(isDark: mode == .dark)
+            if mode == .system {
+                SettingsAppearanceWindowPreview(isDark: true)
+                    .mask {
+                        GeometryReader { geometry in
+                            Path { path in
+                                path.move(to: CGPoint(x: geometry.size.width, y: 0))
+                                path.addLine(to: CGPoint(x: geometry.size.width, y: geometry.size.height))
+                                path.addLine(to: CGPoint(x: 0, y: geometry.size.height))
+                                path.closeSubpath()
+                            }
+                        }
+                    }
+            }
+        }
+        .accessibilityHidden(true)
+    }
+}
+
+private struct SettingsAppearanceWindowPreview: View {
+    let isDark: Bool
+
+    var body: some View {
+        VStack(spacing: 0) {
+            HStack(spacing: 4) {
+                Circle().fill(Color.red)
+                Circle().fill(Color.yellow)
+                Circle().fill(Color.green)
+                Spacer(minLength: 0)
+            }
+            .frame(height: 5)
+            .padding(8)
+            .background(isDark ? Color(white: 0.16) : Color(white: 0.92))
+
+            HStack(alignment: .top, spacing: 0) {
+                previewLines
+                    .frame(width: 52, alignment: .leading)
+                    .frame(maxHeight: .infinity, alignment: .topLeading)
+                    .background(isDark ? Color(white: 0.12) : Color(white: 0.94))
+                previewLines
+                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+                    .background(isDark ? Color(white: 0.18) : Color.white)
+            }
+        }
+    }
+
+    private var previewLines: some View {
+        VStack(alignment: .leading, spacing: 5) {
+            RoundedRectangle(cornerRadius: 1).frame(width: 25, height: 3)
+            RoundedRectangle(cornerRadius: 1).frame(width: 39, height: 3)
+            RoundedRectangle(cornerRadius: 1).frame(width: 33, height: 3)
+        }
+        .foregroundStyle(isDark ? Color(white: 0.38) : Color(white: 0.73))
+        .padding(9)
+    }
+}
+
+enum SettingsSectionGroup: CaseIterable, Identifiable, Hashable {
+    case basics
+    case sound
+    case files
+    case aiAndVoice
+    case networkAndOthers
+
+    var id: Self { self }
+
+    var title: String {
+        switch self {
+        case .basics: "基础功能"
+        case .sound: "声音"
+        case .files: "文件"
+        case .aiAndVoice: "AI 与语音"
+        case .networkAndOthers: "网络与其他"
+        }
+    }
+}
+
 enum SettingsSection: String, CaseIterable, Identifiable {
     case general
     case features
     case info
     case clipboardAssistant
     case screenshot
+    case pdfTools
     case ai
     case voice
     case mail
@@ -4286,6 +4405,16 @@ enum SettingsSection: String, CaseIterable, Identifiable {
 
     var id: Self { self }
 
+    var group: SettingsSectionGroup {
+        switch self {
+        case .general, .features, .info: .basics
+        case .keyboardSound: .sound
+        case .clipboardAssistant, .screenshot, .pdfTools, .download: .files
+        case .ai, .voice: .aiAndVoice
+        case .mail, .weather, .networkProxy, .pet, .recommendations, .updates: .networkAndOthers
+        }
+    }
+
     /// AI and voice settings need room for their dense content.
     var prefersWideLayout: Bool {
         self == .ai || self == .voice
@@ -4298,6 +4427,7 @@ enum SettingsSection: String, CaseIterable, Identifiable {
         case .keyboardSound: "键盘音效"
         case .clipboardAssistant: "快捷操作"
         case .screenshot: "截图"
+        case .pdfTools: "PDF 工具"
         case .info: "信息"
         case .mail: "邮件"
         case .ai: "AI"
@@ -4318,6 +4448,7 @@ enum SettingsSection: String, CaseIterable, Identifiable {
         case .keyboardSound: "keyboard.badge.ellipsis"
         case .clipboardAssistant: "sparkles.rectangle.stack"
         case .screenshot: "camera.viewfinder"
+        case .pdfTools: "doc.text.fill"
         case .info: "info.circle.fill"
         case .mail: "envelope.fill"
         case .ai: "sparkles"
@@ -4338,6 +4469,7 @@ enum SettingsSection: String, CaseIterable, Identifiable {
         case .keyboardSound: "键盘音效与输入统计。"
         case .clipboardAssistant: "复制、浏览器下载或 AirDrop 接收完成后显示下一步操作"
         case .screenshot: "启用截图、钉图与全局快捷键"
+        case .pdfTools: "在设置中合并、拆分、加密与转换 PDF。"
         case .info: "配置媒体、系统监控、锁屏与通知显示。"
         case .mail: "读取已配置的 Mail.app 账户并提醒新邮件"
         case .ai: "管理 AI CLI 与 Skills。"
@@ -4363,6 +4495,8 @@ enum SettingsSection: String, CaseIterable, Identifiable {
             return settings.clipboardAssistantEnabled
         case .screenshot:
             return settings.screenshotEnabled
+        case .pdfTools:
+            return settings.pdfToolsEnabled
         case .info:
             return settings.mediaEnabled || settings.systemMonitorEnabled
                 || settings.lockScreenInfoEnabled || settings.sideNoticesEnabled
@@ -4399,6 +4533,11 @@ final class SettingsInput: ObservableObject {
 
     var isSearching: Bool {
         !settingsQuery.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+    }
+
+    var selectedPDFOperation: PDFToolOperation {
+        if case .pdfOperation(let operation) = searchTarget { return operation }
+        return .merge
     }
 
     func select(_ section: SettingsSection, searchTarget: SettingsSearchAnchor? = nil) {

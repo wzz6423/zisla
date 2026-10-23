@@ -208,8 +208,8 @@ struct IslandRootView: View {
                                             )
                                         case .quickNotes:
                                             QuickNoteModuleView(model: model)
-                                        case .pdf:
-                                            PDFToolsModuleView(model: model)
+                                        case .volumeMixer:
+                                            ApplicationVolumeMixerModuleView(service: model.applicationVolumes)
                                         case .toolbox:
                                             ToolboxModuleView(model: model)
                                         case .system, .battery:

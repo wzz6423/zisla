@@ -119,6 +119,65 @@ struct SettingsSearchTests {
         }
     }
 
+    @Test(arguments: PDFToolOperation.allCases)
+    func pdfToolTitlesAndDescriptionsResolveToTheirOperation(operation: PDFToolOperation) {
+        let matches = results(operation.title)
+        #expect(matches.first?.section == .pdfTools)
+        #expect(matches.first?.anchor == .pdfOperation(operation))
+        #expect(results(operation.detail).contains { $0.section == .pdfTools && $0.anchor == .pdfOperation(operation) })
+    }
+
+    @Test(arguments: AppLanguage.allCases)
+    func localizedPDFSearchRetainsTypedDestinations(language: AppLanguage) {
+        for operation in PDFToolOperation.allCases {
+            let title = AppLocalization.string(operation.title, language: language)
+            let detail = AppLocalization.string(operation.detail, language: language)
+            #expect(results(title, locale: language.locale).contains { $0.section == .pdfTools && $0.anchor == .pdfOperation(operation) })
+            #expect(results(detail, locale: language.locale).contains { $0.section == .pdfTools && $0.anchor == .pdfOperation(operation) })
+            #expect(SettingsSearchAnchor.pdfOperation(operation).localized(locale: language.locale) == .pdfOperation(operation))
+        }
+    }
+
+    @Test(arguments: AppLanguage.allCases)
+    func disablingPDFKeepsItsSwitchAndRemovesProcessingDestinations(language: AppLanguage) {
+        var settings = Self.enabledSettings
+        settings.pdfToolsEnabled = false
+        let items = SettingsSearchIndex.items(settings: settings)
+        #expect(items.contains { $0.section == .features && $0.title == "PDF 工具" })
+        #expect(!items.contains { $0.section == .pdfTools })
+        let switchTitle = AppLocalization.string("PDF 工具", language: language)
+        #expect(results(switchTitle, settings: settings, locale: language.locale).contains {
+            $0.section == .features && $0.anchor == .row("PDF 工具")
+        })
+        for operation in PDFToolOperation.allCases {
+            let title = AppLocalization.string(operation.title, language: language)
+            #expect(results(title, settings: settings, locale: language.locale).allSatisfy { $0.section != .pdfTools })
+        }
+        #expect(items.contains { $0.section == .features && $0.title == "应用音量混音器" })
+    }
+
+    @Test @MainActor
+    func PDFSearchSelectsOperationAndOrdinaryNavigationRestoresMerge() throws {
+        let input = SettingsInput()
+        #expect(input.selectedPDFOperation == .merge)
+        for operation in PDFToolOperation.allCases {
+            input.settingsQuery = operation.title
+            let result = try #require(results(operation.title).first { $0.section == .pdfTools })
+            input.select(result.section, searchTarget: result.anchor)
+            #expect(input.selection == .pdfTools)
+            #expect(input.selectedPDFOperation == operation)
+            #expect(!input.isSearching)
+            #expect(input.settingsQuery.isEmpty)
+            input.select(.pdfTools)
+            #expect(input.selectedPDFOperation == .merge)
+            #expect(input.searchTarget == nil)
+        }
+        input.select(.general, searchTarget: .row("界面语言"))
+        #expect(input.selectedPDFOperation == .merge)
+        input.select(.voice, searchTarget: .group("本地模型"))
+        #expect(input.selectedPDFOperation == .merge)
+    }
+
     @Test
     func nestedConfigurationSearchTargetsReachableEntries() {
         #expect(results("自动更新 CLI").contains { $0.section == .ai && $0.anchor == .group("CLI 与 Skills") })

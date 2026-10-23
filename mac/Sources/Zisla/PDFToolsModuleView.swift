@@ -7,8 +7,9 @@ import ZislaKit
 struct PDFToolsModuleView: View {
     @ObservedObject var model: AppModel
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @Environment(\.colorScheme) private var colorScheme
 
-    @State private var operation: PDFToolOperation = .merge
+    @State private var operation: PDFToolOperation
     @State private var inputURLs: [URL] = []
     @State private var inputSummary = ""
     @State private var watermarkImageURL: URL?
@@ -32,220 +33,203 @@ struct PDFToolsModuleView: View {
 
     private let pdfService = PDFProcessingService()
 
-    var body: some View {
-        HStack(alignment: .top, spacing: 12) {
-            operationList
-                .frame(width: 152)
+    init(model: AppModel, initialOperation: PDFToolOperation = .merge) {
+        self.model = model
+        _operation = State(initialValue: initialOperation)
+    }
 
-            VStack(alignment: .leading, spacing: 10) {
+    var body: some View {
+        HStack(alignment: .top, spacing: 20) {
+            operationList
+                .frame(width: 176)
+
+            VStack(alignment: .leading, spacing: 20) {
                 header
                 inputSection
                 configuration
-                Spacer(minLength: 0)
                 footer
             }
-            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+            .frame(maxWidth: .infinity, alignment: .topLeading)
         }
-        .padding(10)
+        .controlSize(.regular)
+        .textFieldStyle(.roundedBorder)
     }
 
     private var operationList: some View {
-        ScrollView {
-            LazyVStack(alignment: .leading, spacing: 4) {
-                ForEach(PDFToolOperation.allCases) { item in
-                    Button {
-                        if reduceMotion {
+        VStack(alignment: .leading, spacing: 4) {
+            ForEach(PDFToolOperation.allCases) { item in
+                Button {
+                    if reduceMotion {
+                        operation = item
+                    } else {
+                        withAnimation(ZislaMotion.selection) {
                             operation = item
-                        } else {
-                            withAnimation(ZislaMotion.selection) {
-                                operation = item
-                            }
-                        }
-                        inputURLs = []
-                        inputSummary = ""
-                        watermarkImageURL = nil
-                        statusMessage = nil
-                        // A password entered for encryption must not silently pre-fill the password-removal field.
-                        password = ""
-                        ownerPassword = ""
-                    } label: {
-                        Label(AppLocalization.text(item.title), systemImage: item.symbol)
-                            .font(.system(size: 11, weight: .medium))
-                            .foregroundStyle(operation == item ? .primary : .secondary)
-                            .frame(maxWidth: .infinity, alignment: .leading)
-                            .frame(height: 28)
-                            .padding(.horizontal, 7)
-                            .clipShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
-                            .background {
-                                if operation == item {
-                                    SelectionGlassBackground(cornerRadius: 6)
-                                        .matchedGeometryEffect(
-                                            id: "pdf-tool-operation-selection",
-                                            in: operationSelectionNamespace
-                                        )
-                                }
-                            }
-                    }
-                    .buttonStyle(PressableStyle(hoverScale: 1.018, pressedScale: 0.965))
-                    .onHover { isHovering in
-                        if isHovering {
-                            hoveredOperation = item
-                        } else if hoveredOperation == item {
-                            hoveredOperation = nil
                         }
                     }
-                    .zIndex(hoveredOperation == item ? 1 : 0)
-                    .help(AppLocalization.text(item.detail))
+                    inputURLs = []
+                    inputSummary = ""
+                    watermarkImageURL = nil
+                    statusMessage = nil
+                    // A password entered for encryption must not silently pre-fill the password-removal field.
+                    password = ""
+                    ownerPassword = ""
+                } label: {
+                    Label(AppLocalization.text(item.title), systemImage: item.symbol)
+                        .font(.system(size: 12, weight: .medium))
+                        .foregroundStyle(operation == item ? Color.blue : Color.primary)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .frame(minHeight: 36)
+                        .padding(.horizontal, 10)
+                        .contentShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+                        .background {
+                            if operation == item {
+                                RoundedRectangle(cornerRadius: 8, style: .continuous)
+                                    .fill(Color.blue.opacity(0.10))
+                                    .matchedGeometryEffect(
+                                        id: "pdf-tool-operation-selection",
+                                        in: operationSelectionNamespace
+                                    )
+                            }
+                        }
                 }
+                .buttonStyle(PressableStyle(hoverScale: 1.018, pressedScale: 0.965))
+                .accessibilityAddTraits(operation == item ? .isSelected : [])
+                .settingsSearchAnchor(.pdfOperation(item))
+                .onHover { isHovering in
+                    if isHovering {
+                        hoveredOperation = item
+                    } else if hoveredOperation == item {
+                        hoveredOperation = nil
+                    }
+                }
+                .zIndex(hoveredOperation == item ? 1 : 0)
+                .help(AppLocalization.text(item.detail))
             }
-            .padding(.horizontal, 3)
-            .animation(reduceMotion ? nil : ZislaMotion.selection, value: operation)
         }
-        .thinScrollChrome()
+        .animation(reduceMotion ? nil : ZislaMotion.selection, value: operation)
     }
 
     private var header: some View {
-        HStack(alignment: .firstTextBaseline) {
+        VStack(alignment: .leading, spacing: 6) {
             Label(AppLocalization.text(operation.title), systemImage: operation.symbol)
-                .font(.system(size: 14, weight: .semibold))
+                .font(.system(size: 17, weight: .semibold))
             AppLocalizedText(operation.detail)
-                .font(.islandMicro())
+                .font(.system(size: 12))
                 .foregroundStyle(.secondary)
-                .fitsSingleLine()
-            Spacer(minLength: 8)
+                .fixedSize(horizontal: false, vertical: true)
         }
     }
 
     private var inputSection: some View {
-        HStack(spacing: 8) {
-            Button(inputURLs.isEmpty ? operation.inputButtonTitle : AppLocalization.text("重新选择")) {
+        VStack(alignment: .leading, spacing: 12) {
+            VStack(alignment: .leading, spacing: 5) {
+                Text(inputURLs.isEmpty ? AppLocalization.text("尚未选择文件") : inputDescription)
+                    .font(.system(size: 13, weight: .medium))
+                    .lineLimit(2)
+                if !inputSummary.isEmpty {
+                    Text(inputSummary)
+                        .font(.system(size: 11))
+                        .foregroundStyle(.secondary)
+                        .lineLimit(2)
+                }
+            }
+            Button(AppLocalization.text(inputURLs.isEmpty ? operation.inputButtonTitle : "重新选择")) {
                 chooseInputs()
             }
             .buttonStyle(.bordered)
-            .controlSize(.small)
             .disabled(isProcessing)
-
-            VStack(alignment: .leading, spacing: 1) {
-                Text(inputURLs.isEmpty ? AppLocalization.text("尚未选择文件") : inputDescription)
-                    .font(.system(size: 11, weight: .medium))
-                    .fitsSingleLine()
-                if !inputSummary.isEmpty {
-                    Text(inputSummary)
-                        .font(.islandMicro())
-                        .foregroundStyle(.secondary)
-                        .fitsSingleLine()
-                }
-            }
-            Spacer(minLength: 0)
         }
-        .padding(8)
-        .background(Color.fillCard)
-        .clipShape(RoundedRectangle(cornerRadius: 7, style: .continuous))
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(16)
+        .background(Color.primary.opacity(colorScheme == .dark ? 0.045 : 0.025), in: RoundedRectangle(cornerRadius: 12, style: .continuous))
     }
 
     @ViewBuilder
     private var configuration: some View {
-        switch operation {
-        case .split, .rotate, .extractText, .crop:
-            pageRangeField
-        default:
-            EmptyView()
-        }
+        VStack(alignment: .leading, spacing: 14) {
+            switch operation {
+            case .split, .rotate, .extractText, .crop:
+                pageRangeField
+            default:
+                EmptyView()
+            }
 
-        switch operation {
-        case .rotate:
-            IslandOutlinedPicker(
-                selection: $rotationDegrees,
-                options: [90, 180, 270],
-                title: { degrees in
-                    switch degrees {
-                    case 90: return "顺时针 90 度"
-                    case 180: return "180 度"
-                    case 270: return "逆时针 90 度"
-                    default: return AppLocalization.text("%ld 度", degrees)
-                    }
-                },
-                selectionID: "pdf-rotation-degrees",
-                fontSize: 9,
-                width: 280,
-                height: 34
-            )
-        case .textWatermark:
-            TextField(AppLocalization.text("水印文字"), text: $watermarkText)
-                .islandGlassField()
-        case .imageWatermark:
-            HStack(spacing: 8) {
-                Button(watermarkImageURL == nil ? AppLocalization.text("选择水印图片") : AppLocalization.text("更换水印图片")) {
-                    chooseWatermarkImage()
+            switch operation {
+            case .rotate:
+                Picker(AppLocalization.text(operation.title), selection: $rotationDegrees) {
+                    AppLocalizedText("顺时针 90 度").tag(90)
+                    AppLocalizedText("180 度").tag(180)
+                    AppLocalizedText("逆时针 90 度").tag(270)
                 }
-                .buttonStyle(.bordered)
-                .controlSize(.small)
-                Text(watermarkImageURL?.lastPathComponent ?? AppLocalization.text("未选择"))
-                    .font(.islandMicro())
-                    .foregroundStyle(.secondary)
-                    .fitsSingleLine()
+                .pickerStyle(.menu)
+                .labelsHidden()
+            case .textWatermark:
+                TextField(AppLocalization.text("水印文字"), text: $watermarkText)
+            case .imageWatermark:
+                HStack(spacing: 8) {
+                    Button(watermarkImageURL == nil ? AppLocalization.text("选择水印图片") : AppLocalization.text("更换水印图片")) {
+                        chooseWatermarkImage()
+                    }
+                    .buttonStyle(.bordered)
+                    Text(watermarkImageURL?.lastPathComponent ?? AppLocalization.text("未选择"))
+                        .font(.system(size: 12))
+                        .foregroundStyle(.secondary)
+                        .lineLimit(2)
+                }
+            case .pageNumbers:
+                HStack(spacing: 8) {
+                    TextField(AppLocalization.text("前缀"), text: $pagePrefix)
+                    TextField(AppLocalization.text("后缀"), text: $pageSuffix)
+                }
+            case .crop:
+                HStack(spacing: 6) {
+                    cropField("X", value: $cropX)
+                    cropField("Y", value: $cropY)
+                    cropField(AppLocalization.text("宽"), value: $cropWidth)
+                    cropField(AppLocalization.text("高"), value: $cropHeight)
+                }
+            case .protect:
+                HStack(spacing: 8) {
+                    SecureField(AppLocalization.text("打开密码"), text: $password)
+                    SecureField(AppLocalization.text("所有者密码（可选）"), text: $ownerPassword)
+                }
+            case .unlock:
+                SecureField(AppLocalization.text("当前密码"), text: $password)
+            case .metadata:
+                HStack(spacing: 8) {
+                    TextField(AppLocalization.text("标题"), text: $metadataTitle)
+                    TextField(AppLocalization.text("作者"), text: $metadataAuthor)
+                }
+            default:
+                EmptyView()
             }
-        case .pageNumbers:
-            HStack(spacing: 8) {
-                TextField(AppLocalization.text("前缀"), text: $pagePrefix)
-                    .islandGlassField()
-                TextField(AppLocalization.text("后缀"), text: $pageSuffix)
-                    .islandGlassField()
-            }
-        case .crop:
-            HStack(spacing: 6) {
-                cropField("X", value: $cropX)
-                cropField("Y", value: $cropY)
-                cropField(AppLocalization.text("宽"), value: $cropWidth)
-                cropField(AppLocalization.text("高"), value: $cropHeight)
-            }
-        case .protect:
-            HStack(spacing: 8) {
-                SecureField(AppLocalization.text("打开密码"), text: $password)
-                    .islandGlassField()
-                SecureField(AppLocalization.text("所有者密码（可选）"), text: $ownerPassword)
-                    .islandGlassField()
-            }
-        case .unlock:
-            SecureField(AppLocalization.text("当前密码"), text: $password)
-                .islandGlassField()
-        case .metadata:
-            HStack(spacing: 8) {
-                TextField(AppLocalization.text("标题"), text: $metadataTitle)
-                    .islandGlassField()
-                TextField(AppLocalization.text("作者"), text: $metadataAuthor)
-                    .islandGlassField()
-            }
-        default:
-            EmptyView()
         }
     }
 
     private var pageRangeField: some View {
         TextField(AppLocalization.text("页码范围：留空表示全部，例如 1-3,5"), text: $pageSelection)
-            .islandGlassField()
+            .accessibilityLabel(AppLocalization.text("页码范围：留空表示全部，例如 1-3,5"))
     }
 
     private var footer: some View {
-        HStack(spacing: 8) {
+        VStack(alignment: .leading, spacing: 12) {
             if isProcessing {
-                ProgressView()
-                    .controlSize(.small)
-                Text(AppLocalization.text("正在处理…"))
-                    .font(.islandMicro())
-                    .foregroundStyle(.secondary)
+                HStack(spacing: 8) {
+                    ProgressView().controlSize(.small)
+                    AppLocalizedText("正在处理…")
+                        .font(.system(size: 12))
+                        .foregroundStyle(.secondary)
+                }
             } else if let statusMessage {
                 Text(statusMessage)
-                    .font(.islandMicro())
+                    .font(.system(size: 12))
                     .foregroundStyle(.secondary)
-                    .fitsSingleLine()
+                    .fixedSize(horizontal: false, vertical: true)
             }
-            Spacer(minLength: 8)
-            Button(operation.actionTitle) {
+            Button(AppLocalization.text(operation.actionTitle)) {
                 startProcessing()
             }
             .buttonStyle(.borderedProminent)
-            .controlSize(.small)
             .disabled(inputURLs.isEmpty || isProcessing || !configurationIsValid)
         }
     }
@@ -274,8 +258,7 @@ struct PDFToolsModuleView: View {
 
     private func cropField(_ title: String, value: Binding<String>) -> some View {
         TextField(title, text: value)
-            .islandGlassField()
-            .frame(width: 72)
+            .frame(maxWidth: .infinity)
     }
 
     private func chooseInputs() {
@@ -458,7 +441,7 @@ struct PDFToolsModuleView: View {
     }
 }
 
-private enum PDFToolOperation: String, CaseIterable, Identifiable {
+enum PDFToolOperation: String, CaseIterable, Identifiable {
     case merge
     case split
     case rotate

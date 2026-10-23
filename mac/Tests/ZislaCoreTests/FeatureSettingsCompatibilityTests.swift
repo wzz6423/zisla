@@ -1280,7 +1280,7 @@ struct FeatureSettingsCompatibilityTests {
             .aiMonitor,
             .keyboardSound,
             .system,
-            .pdf,
+            .volumeMixer,
         ])
         #expect(FeatureSettings.default.moduleOrder == IslandModuleOrder.defaultOrder)
     }
@@ -1295,7 +1295,7 @@ struct FeatureSettingsCompatibilityTests {
         )
 
         #expect(decoded.moduleOrder == [
-            .pdf,
+            .volumeMixer,
             .dashboard,
             .shelf,
             .clipboard,

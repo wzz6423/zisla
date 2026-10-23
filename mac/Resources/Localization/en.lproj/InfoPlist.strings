@@ -1,5 +1,5 @@
 "NSCalendarsFullAccessUsageDescription" = "zisla needs access to upcoming calendar events for the top information panel.";
-"NSAudioCaptureUsageDescription" = "zisla reads the current audio spectrum to render a live waveform.";
+"NSAudioCaptureUsageDescription" = "zisla reads system audio only during media playback or when you adjust an app's volume, to display a waveform and adjust that app's output volume.";
 "NSCameraUsageDescription" = "zisla uses the camera only while the mirror is open.";
 "NSRemindersFullAccessUsageDescription" = "zisla reads dated reminders to show them with calendar events.";
 "NSLocationWhenInUseUsageDescription" = "zisla needs location access to show local weather, place names, and nearby Wi-Fi networks.";

@@ -2745,3 +2745,25 @@
 "onboarding.permission.system_audio.body" = "Für die Musikvisualisierung. Aktivieren Sie die Audioaufnahme in den Systemeinstellungen; macOS kann beim ersten Einsatz erneut nachfragen.";
 "onboarding.permission.full_disk_access.title" = "Festplattenvollzugriff";
 "onboarding.permission.full_disk_access.body" = "Nur für lokale E-Mail-Indizes oder Browser-Cookies erforderlich. Aktivieren Sie ihn bei Bedarf in den Systemeinstellungen.";
+
+"基础功能" = "Grundfunktionen";
+"声音" = "Ton";
+"网络与其他" = "Netzwerk und Weiteres";
+"仅影响 zisla 的窗口与面板，不会更改 macOS 外观。" = "Gilt nur für Fenster und Panels von zisla. Das Erscheinungsbild von macOS bleibt unverändert.";
+"在设置中合并、拆分、加密与转换 PDF。" = "PDFs in den Einstellungen zusammenführen, teilen, verschlüsseln und konvertieren.";
+"应用音量混音器" = "App-Lautstärkemixer";
+"在灵动岛分别调整应用的媒体音量。" = "Die Medienlautstärke jeder App in Dynamic Island einzeln anpassen.";
+"分别调整正在播放声音的应用" = "Lautstärke für Apps mit Audiowiedergabe einzeln anpassen";
+"应用音量需要 macOS 14.4 或更高版本" = "App-Lautstärke erfordert macOS 14.4 oder neuer";
+"暂无正在播放声音的应用" = "Keine App gibt Audio wieder";
+"播放音乐或视频后，应用会显示在这里。" = "Apps erscheinen hier, sobald du Musik oder Videos abspielst.";
+"%@ 的音量" = "Lautstärke von %@";
+"取消 %@ 的静音" = "Stummschaltung von %@ aufheben";
+"将 %@ 静音" = "%@ stummschalten";
+"等待应用音量控制生效" = "App-Lautstärkeregelung wird aktiviert";
+"音量调整未生效" = "Die Lautstärkeänderung ist noch nicht wirksam";
+"请允许音频录制以调整应用音量" = "Erlaube Audioaufnahmen, um die App-Lautstärke anzupassen";
+"当前音频输出设备不可用" = "Das aktuelle Audioausgabegerät ist nicht verfügbar";
+"无法调整应用音量，已恢复原始输出" = "App-Lautstärke kann nicht angepasst werden. Die ursprüngliche Audioausgabe wurde wiederhergestellt";
+"取消静音" = "Stummschaltung aufheben";
+"当前音频输出格式不支持应用音量调整" = "Das aktuelle Audioausgabeformat unterstützt keine App-Lautstärkeregelung";

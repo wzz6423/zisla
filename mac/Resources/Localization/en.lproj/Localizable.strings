@@ -2743,3 +2743,25 @@
 "onboarding.permission.system_audio.body" = "For music visualizations. Enable audio recording in System Settings; macOS may confirm again when you first use it.";
 "onboarding.permission.full_disk_access.title" = "Full Disk Access";
 "onboarding.permission.full_disk_access.body" = "Needed only for local mail indexes or browser cookies. Enable in System Settings if you use these features.";
+
+"基础功能" = "Basic Features";
+"声音" = "Sound";
+"网络与其他" = "Network & More";
+"仅影响 zisla 的窗口与面板，不会更改 macOS 外观。" = "Only affects zisla windows and panels. macOS appearance stays unchanged.";
+"在设置中合并、拆分、加密与转换 PDF。" = "Merge, split, encrypt, and convert PDFs in Settings.";
+"应用音量混音器" = "App Volume Mixer";
+"在灵动岛分别调整应用的媒体音量。" = "Adjust each app's media volume in Dynamic Island.";
+"分别调整正在播放声音的应用" = "Adjust volume for each app playing audio";
+"应用音量需要 macOS 14.4 或更高版本" = "App volume requires macOS 14.4 or later";
+"暂无正在播放声音的应用" = "No apps are playing audio";
+"播放音乐或视频后，应用会显示在这里。" = "Apps appear here when you play music or videos.";
+"%@ 的音量" = "Volume for %@";
+"取消 %@ 的静音" = "Unmute %@";
+"将 %@ 静音" = "Mute %@";
+"等待应用音量控制生效" = "Waiting for app volume control to take effect";
+"音量调整未生效" = "The volume adjustment hasn't taken effect";
+"请允许音频录制以调整应用音量" = "Allow audio recording to adjust app volume";
+"当前音频输出设备不可用" = "The current audio output device is unavailable";
+"无法调整应用音量，已恢复原始输出" = "Unable to adjust app volume. Original audio output restored";
+"取消静音" = "Unmute";
+"当前音频输出格式不支持应用音量调整" = "The current audio output format does not support app volume adjustment";

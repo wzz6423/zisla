@@ -2744,3 +2744,25 @@
 "onboarding.permission.system_audio.body" = "Para visualizar a música. Ative a gravação de áudio nos Ajustes do Sistema; o macOS pode pedir confirmação no primeiro uso.";
 "onboarding.permission.full_disk_access.title" = "Acesso Total ao Disco";
 "onboarding.permission.full_disk_access.body" = "Necessário apenas para índices locais de e-mail ou cookies do navegador. Ative nos Ajustes do Sistema se usar esses recursos.";
+
+"基础功能" = "Recursos básicos";
+"声音" = "Som";
+"网络与其他" = "Rede e outros";
+"仅影响 zisla 的窗口与面板，不会更改 macOS 外观。" = "Afeta apenas as janelas e os painéis do zisla, sem alterar a aparência do macOS.";
+"在设置中合并、拆分、加密与转换 PDF。" = "Mescle, divida, criptografe e converta PDFs nos Ajustes.";
+"应用音量混音器" = "Mixer de volume de apps";
+"在灵动岛分别调整应用的媒体音量。" = "Ajuste o volume de mídia de cada app na Dynamic Island.";
+"分别调整正在播放声音的应用" = "Ajuste separadamente o volume dos apps que estão reproduzindo áudio";
+"应用音量需要 macOS 14.4 或更高版本" = "O volume de apps requer macOS 14.4 ou posterior";
+"暂无正在播放声音的应用" = "Nenhum app está reproduzindo áudio";
+"播放音乐或视频后，应用会显示在这里。" = "Os apps aparecerão aqui quando você reproduzir música ou vídeos.";
+"%@ 的音量" = "Volume de %@";
+"取消 %@ 的静音" = "Ativar som de %@";
+"将 %@ 静音" = "Silenciar %@";
+"等待应用音量控制生效" = "Aguardando a ativação do controle de volume de apps";
+"音量调整未生效" = "O ajuste de volume não foi aplicado";
+"请允许音频录制以调整应用音量" = "Permita a gravação de áudio para ajustar o volume de apps";
+"当前音频输出设备不可用" = "O dispositivo de saída de áudio atual não está disponível";
+"无法调整应用音量，已恢复原始输出" = "Não foi possível ajustar o volume de apps. A saída de áudio original foi restaurada";
+"取消静音" = "Ativar som";
+"当前音频输出格式不支持应用音量调整" = "O formato de saída de áudio atual não permite ajustar o volume de apps";

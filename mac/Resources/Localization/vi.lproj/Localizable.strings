@@ -2744,3 +2744,25 @@
 "onboarding.permission.system_audio.body" = "Để hiển thị hình ảnh theo nhạc. Bật quyền ghi âm thanh trong Cài đặt hệ thống; macOS có thể yêu cầu xác nhận khi dùng lần đầu.";
 "onboarding.permission.full_disk_access.title" = "Truy cập toàn bộ ổ đĩa";
 "onboarding.permission.full_disk_access.body" = "Chỉ cần cho chỉ mục thư cục bộ hoặc cookie của trình duyệt. Bật trong Cài đặt hệ thống nếu bạn dùng những tính năng này.";
+
+"基础功能" = "Tính năng cơ bản";
+"声音" = "Âm thanh";
+"网络与其他" = "Mạng và mục khác";
+"仅影响 zisla 的窗口与面板，不会更改 macOS 外观。" = "Chỉ áp dụng cho cửa sổ và bảng của zisla, không thay đổi giao diện macOS.";
+"在设置中合并、拆分、加密与转换 PDF。" = "Gộp, tách, mã hóa và chuyển đổi PDF trong Cài đặt.";
+"应用音量混音器" = "Bộ trộn âm lượng ứng dụng";
+"在灵动岛分别调整应用的媒体音量。" = "Điều chỉnh riêng âm lượng nội dung của từng ứng dụng trong Dynamic Island.";
+"分别调整正在播放声音的应用" = "Điều chỉnh riêng âm lượng của từng ứng dụng đang phát âm thanh";
+"应用音量需要 macOS 14.4 或更高版本" = "Âm lượng ứng dụng yêu cầu macOS 14.4 trở lên";
+"暂无正在播放声音的应用" = "Không có ứng dụng nào đang phát âm thanh";
+"播放音乐或视频后，应用会显示在这里。" = "Ứng dụng sẽ xuất hiện ở đây khi bạn phát nhạc hoặc video.";
+"%@ 的音量" = "Âm lượng của %@";
+"取消 %@ 的静音" = "Bật tiếng %@";
+"将 %@ 静音" = "Tắt tiếng %@";
+"等待应用音量控制生效" = "Đang chờ tính năng điều chỉnh âm lượng ứng dụng có hiệu lực";
+"音量调整未生效" = "Điều chỉnh âm lượng chưa có hiệu lực";
+"请允许音频录制以调整应用音量" = "Hãy cho phép ghi âm để điều chỉnh âm lượng ứng dụng";
+"当前音频输出设备不可用" = "Thiết bị đầu ra âm thanh hiện tại không khả dụng";
+"无法调整应用音量，已恢复原始输出" = "Không thể điều chỉnh âm lượng ứng dụng. Đã khôi phục đầu ra âm thanh ban đầu";
+"取消静音" = "Bật tiếng";
+"当前音频输出格式不支持应用音量调整" = "Định dạng đầu ra âm thanh hiện tại không hỗ trợ điều chỉnh âm lượng ứng dụng";
