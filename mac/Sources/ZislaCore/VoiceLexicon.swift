@@ -516,7 +516,7 @@ public enum VoiceLexicon: String, Codable, CaseIterable, Identifiable, Sendable,
         return result
     }
 
-    private static func normalizationProtectedRanges(in transcript: String, customTerms: [String] = []) -> IndexSet {
+    package static func normalizationProtectedRanges(in transcript: String, customTerms: [String] = []) -> IndexSet {
         let range = NSRange(location: 0, length: (transcript as NSString).length)
         var result = literalRanges(in: transcript)
         let expressions = [quotationExpression] + normalizationCandidates(for: customTerms).compactMap(\.expression)
@@ -771,6 +771,7 @@ public enum VoiceLexicon: String, Codable, CaseIterable, Identifiable, Sendable,
             let scalar = scalars[index]
             if index > 0,
                !isTermSeparator(scalars[index - 1]),
+               !isTermSeparator(scalar),
                isASCIIWordScalar(scalars[index - 1]) != isASCIIWordScalar(scalar) {
                 pieces.append(#"[\s\p{P}\p{S}]*"#)
             }
@@ -782,10 +783,14 @@ public enum VoiceLexicon: String, Codable, CaseIterable, Identifiable, Sendable,
                     index += 1
                     continue
                 }
+                let separatorStart = index
                 while index < scalars.count, isTermSeparator(scalars[index]) {
                     index += 1
                 }
-                pieces.append(#"[\s\p{P}\p{S}]*"#)
+                let separators = String(String.UnicodeScalarView(scalars[separatorStart..<index]))
+                pieces.append(index == scalars.count
+                    ? NSRegularExpression.escapedPattern(for: separators)
+                    : #"[\s\p{P}\p{S}]*"#)
                 continue
             }
 

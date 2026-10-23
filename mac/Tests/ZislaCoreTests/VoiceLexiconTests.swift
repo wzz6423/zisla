@@ -422,6 +422,18 @@ struct VoiceLexiconTests {
         #expect(Set(references) == Set(customTerms))
     }
 
+    @Test(arguments: [
+        ("A:B!", "请保留 A:B! ,然后返回 .", "请保留 A:B! ,然后返回 ."),
+        ("你好,world!", "请保留 你好,world! ,然后返回 .", "请保留 你好,world! ,然后返回 ."),
+        ("C++", "请保留 C++ ,然后返回 .", "请保留 C++ ,然后返回 ."),
+        ("Tool!", "请保留 tool!，然后继续。", "请保留 Tool!，然后继续。"),
+        ("Tool!", "请保留 Tool?!，然后继续。", "请保留 Tool?!，然后继续。"),
+        ("Tool!", "请保留 Tool,然后继续。", "请保留 Tool,然后继续。"),
+    ])
+    func symbolEndingHotwordsPreserveSurroundingSentenceMarks(_ term: String, _ input: String, _ expected: String) {
+        #expect(VoiceLexicon.normalizeTranscript(input, for: [], customTerms: [term]) == expected)
+    }
+
     @Test(arguments: ["", "gemma 与 qwen3.5", "床前明月广，名字是张维。", "价格7.31，文件在 /tmp/ct.csv。"])
     func disabledDictionariesLeaveAllUtterancesAlone(_ transcript: String) {
         #expect(VoiceLexicon.normalizeTranscript(transcript, for: []) == transcript)
