@@ -2746,3 +2746,15 @@
 "onboarding.permission.full_disk_access.title" = "Acesso Total ao Disco";
 "onboarding.permission.full_disk_access.body" = "Necessário apenas para índices locais de e-mail ou cookies do navegador. Ative nos Ajustes do Sistema se usar esses recursos.";
 "查询 IP 信息" = "Consultar informações do IP";
+
+"更新日志" = "Notas da versão";
+"已更新至 %@" = "Atualizado para %@";
+"正在加载更新日志" = "Carregando notas da versão";
+"无法加载更新日志" = "Não foi possível carregar as notas da versão";
+"查看发布页面" = "Ver página da versão";
+"安装更新" = "Instalar atualização";
+"安装并重新启动" = "Instalar e reiniciar";
+"退出时安装" = "Instalar ao sair";
+"稍后提醒" = "Lembrar mais tarde";
+"跳过此版本" = "Ignorar esta versão";
+"了解更多" = "Saiba mais";

@@ -2747,3 +2747,15 @@
 "onboarding.permission.full_disk_access.title" = "Festplattenvollzugriff";
 "onboarding.permission.full_disk_access.body" = "Nur für lokale E-Mail-Indizes oder Browser-Cookies erforderlich. Aktivieren Sie ihn bei Bedarf in den Systemeinstellungen.";
 "查询 IP 信息" = "IP-Informationen abfragen";
+
+"更新日志" = "Versionshinweise";
+"已更新至 %@" = "Auf %@ aktualisiert";
+"正在加载更新日志" = "Versionshinweise werden geladen";
+"无法加载更新日志" = "Versionshinweise konnten nicht geladen werden";
+"查看发布页面" = "Veröffentlichungsseite öffnen";
+"安装更新" = "Update installieren";
+"安装并重新启动" = "Installieren und neu starten";
+"退出时安装" = "Beim Beenden installieren";
+"稍后提醒" = "Später erinnern";
+"跳过此版本" = "Diese Version überspringen";
+"了解更多" = "Mehr erfahren";
