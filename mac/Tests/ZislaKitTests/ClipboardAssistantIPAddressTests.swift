@@ -5,7 +5,7 @@ import ZislaCore
 
 struct ClipboardAssistantIPAddressTests {
     @Test(arguments: ["192.168.1.1", "8.8.8.8", "2001:db8::1"])
-    func pureIPDoesNotOfferWebActions(text: String) {
+    func disabledIPDoesNotOfferWebActions(text: String) {
         let detection = ClipboardAssistantDetector.detect(
             text: text, enabledKinds: [.url, .text], offersDownload: true,
             locale: Locale(identifier: "en"), countryCode: nil
@@ -37,8 +37,34 @@ struct ClipboardAssistantIPAddressTests {
         #expect(detection.actions.contains(.copyText(address)))
     }
 
+    @Test(arguments: [
+        ("192.168.1.1", "https://192.168.1.1"),
+        ("0.0.0.0", "https://0.0.0.0"),
+        ("::", "https://[::]"),
+        ("::1", "https://[::1]"),
+        (" \n2001:DB8::1\t", "https://[2001:DB8::1]"),
+        ("::ffff:192.0.2.128", "https://[::ffff:192.0.2.128]"),
+    ])
+    func bareIPOffersAnIndependentDirectLink(text: String, expectedURL: String) throws {
+        let detection = try #require(ClipboardAssistantDetector.detect(
+            text: text, enabledKinds: [.ipAddress], locale: Locale(identifier: "en"), countryCode: nil
+        ))
+        let directURL = try #require(URL(string: expectedURL))
+        let lookup = try #require(detection.action)
+        #expect(detection.kind == .ipAddress)
+        #expect(detection.actions.contains(.openURL(directURL)))
+        #expect(lookup.kind != ClipboardAssistantAction.openURL(directURL).kind,
+                "Lookup and navigation must be independently selectable")
+        #expect(detection.actions.contains(.copyText(text.trimmingCharacters(in: .whitespacesAndNewlines))))
+        let ordered = ClipboardAssistantActionOrder.ordered(
+            detection.actions, for: .ipAddress, using: [.ipAddress: [.openURL]]
+        )
+        #expect(ordered.first == .openURL(directURL))
+        #expect(ordered.count == detection.actions.count)
+    }
+
     @Test(arguments: ["192.0.2.1", " \n2001:DB8::1\t", "::ffff:192.0.2.128"])
-    func pureIPQueryIsPrimaryAndCopyRemainsSecondary(text: String) throws {
+    func IPLookupRemainsPrimaryWithLinkAndCopySecondary(text: String) throws {
         let detection = try #require(ClipboardAssistantDetector.detect(
             text: text, enabledKinds: [.ipAddress], locale: Locale(identifier: "en"), countryCode: nil
         ))
@@ -49,7 +75,7 @@ struct ClipboardAssistantIPAddressTests {
             return
         }
         #expect(service.rawValue == "ipInfo")
-        #expect(primary.kind == .openURL)
+        #expect(primary.kind == .lookupIP)
         #expect(primary.identifier == "openService:ipInfo")
         #expect(url.absoluteString == "https://ipinfo.io/\(address)")
         #expect(url.scheme == "https")
@@ -58,7 +84,12 @@ struct ClipboardAssistantIPAddressTests {
         #expect(url.query == nil)
         #expect(url.fragment == nil)
         #expect(url.user == nil && url.password == nil && url.port == nil)
-        #expect(detection.secondaryActions == [.copyText(address)])
+        let navigation = try #require(detection.secondaryActions.first)
+        guard case .openURL = navigation else {
+            Issue.record("Direct navigation must remain available after IP lookup")
+            return
+        }
+        #expect(detection.secondaryActions == [navigation, .copyText(address)])
     }
 
     @Test(arguments: [

@@ -262,6 +262,7 @@ public enum ClipboardAssistantTriggerConfiguration: Codable, Equatable, Sendable
 /// `ClipboardAssistantAction`; only the order is persisted.
 public enum ClipboardAssistantActionKind: String, Codable, CaseIterable, Sendable, Equatable, Hashable {
     case openURL
+    case lookupIP
     case openDownload
     case revealInFinder
     case search
@@ -286,6 +287,7 @@ public enum ClipboardAssistantActionKind: String, Codable, CaseIterable, Sendabl
     public var symbolName: String {
         switch self {
         case .openURL: "arrow.up.right.square"
+        case .lookupIP: "network"
         case .openDownload: "arrow.down.circle"
         case .revealInFinder: "folder"
         case .search: "magnifyingglass"
@@ -314,7 +316,7 @@ public enum ClipboardAssistantActionOrder {
     public static func defaults(for kind: ClipboardAssistantKind) -> [ClipboardAssistantActionKind] {
         switch kind {
         case .url: [.openURL, .openDownload, .addToQuickNote, .share]
-        case .ipAddress: [.openURL, .copyText, .addToQuickNote, .share]
+        case .ipAddress: [.lookupIP, .openURL, .copyText, .addToQuickNote, .share]
         case .filePath: [.revealInFinder, .compress, .addToQuickNote, .share]
         case .file: [.revealInFinder, .compress, .copyText, .addToQuickNote, .share]
         case .email: [.composeMail, .addToQuickNote, .share]
@@ -357,7 +359,11 @@ public enum ClipboardAssistantActionOrder {
         _ orders: [ClipboardAssistantKind: [ClipboardAssistantActionKind]]
     ) -> [ClipboardAssistantKind: [ClipboardAssistantActionKind]] {
         Dictionary(uniqueKeysWithValues: ClipboardAssistantKind.allCases.map { kind in
-            let savedOrder = orders[kind] ?? defaults(for: kind)
+            var savedOrder = orders[kind] ?? defaults(for: kind)
+            // Earlier IP preferences stored the lookup priority as openURL.
+            if kind == .ipAddress, !savedOrder.contains(.lookupIP) {
+                savedOrder = savedOrder.map { $0 == .openURL ? .lookupIP : $0 }
+            }
             let order: [ClipboardAssistantActionKind]
             if let legacyDefault = legacyDefault(for: kind), savedOrder == legacyDefault {
                 order = defaults(for: kind)
@@ -463,7 +469,7 @@ public enum ClipboardAssistantAction: Equatable, Sendable {
     public var kind: ClipboardAssistantActionKind? {
         switch self {
         case .openURL: .openURL
-        case .openService: .openURL
+        case .openService(let service, _): service == .ipInfo ? .lookupIP : .openURL
         case .openDownload: .openDownload
         case .revealInFinder: .revealInFinder
         case .openFolder, .showContextNote, .copyContextNote, .deleteContextNote: nil

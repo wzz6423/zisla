@@ -91,8 +91,10 @@ public enum ClipboardAssistantDetector {
             return inet_pton(AF_INET6, $0, &ipv6) == 1
         }
         if isIPAddress, enabledKinds.contains(.ipAddress) {
+            let host = text.contains(":") ? "[\(text)]" : text
             return ClipboardAssistantDetection(kind: .ipAddress, title: text, actions: [
                 .openService(service: .ipInfo, url: URL(string: "https://ipinfo.io/\(text)")!),
+                .openURL(HTTPURLParser.url(from: host)!),
                 .copyText(text),
             ])
         }

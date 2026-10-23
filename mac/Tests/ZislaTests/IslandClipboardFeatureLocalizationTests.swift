@@ -59,9 +59,9 @@ struct IslandClipboardFeatureLocalizationTests {
         let url = try #require(URL(string: "https://ipinfo.io/8.8.8.8"))
         #expect(key == "查询 IP 信息")
         #expect(ClipboardAssistantToastView.actionLabel(.openService(service: .ipInfo, url: url)) == key)
-        #expect(SettingsView.clipboardAssistantActionTitle(.openURL, for: .ipAddress) == key)
-        #expect(SettingsView.clipboardAssistantActionTitle(.openURL, for: .url) == "打开链接")
-        #expect(SettingsView.clipboardAssistantActionTitle(.copyText, for: .ipAddress) == "复制结果")
+        #expect(SettingsView.clipboardAssistantActionTitle(.lookupIP) == key)
+        #expect(SettingsView.clipboardAssistantActionTitle(.openURL) == "打开链接")
+        #expect(SettingsView.clipboardAssistantActionTitle(.copyText) == "复制结果")
         #expect(AppLocalization.string(key, language: .english) == "Look Up IP Info")
         #expect(AppLocalization.string(key, language: .arabic) == "الاستعلام عن معلومات IP")
     }

@@ -11,8 +11,9 @@ struct ClipboardAssistantIPAddressSettingsTests {
         #expect(ClipboardAssistantKind.ipAddress.symbolName == "network")
         #expect(FeatureSettings.default.clipboardAssistantEnabledKinds.contains(.ipAddress))
         #expect(FeatureSettings.clipboardAssistantKindSetVersionCurrent == 4)
-        #expect(ClipboardAssistantActionOrder.defaults(for: .ipAddress) == [.openURL, .copyText, .addToQuickNote, .share])
-        #expect(FeatureSettings.default.clipboardAssistantActionOrders[.ipAddress] == [.openURL, .copyText, .addToQuickNote, .share])
+        #expect(ClipboardAssistantActionOrder.defaults(for: .ipAddress) == [.lookupIP, .openURL, .copyText, .addToQuickNote, .share])
+        #expect(FeatureSettings.default.clipboardAssistantActionOrders[.ipAddress] == [.lookupIP, .openURL, .copyText, .addToQuickNote, .share])
+        #expect(try JSONDecoder().decode(ClipboardAssistantActionKind.self, from: Data(#""lookupIP""#.utf8)) == .lookupIP)
     }
 
     @Test
@@ -61,8 +62,8 @@ struct ClipboardAssistantIPAddressSettingsTests {
         var upgraded = try JSONDecoder().decode(FeatureSettings.self, from: JSONEncoder().encode(settings))
         #expect(upgraded.clipboardAssistantActionOrders[.url] == urlOrder)
         #expect(upgraded.clipboardAssistantActionOrders[.text] == textOrder)
-        #expect(upgraded.clipboardAssistantActionOrders[.ipAddress] == [.openURL, .copyText, .addToQuickNote, .share])
-        let ipOrder: [ClipboardAssistantActionKind] = [.share, .copyText, .addToQuickNote, .openURL]
+        #expect(upgraded.clipboardAssistantActionOrders[.ipAddress] == [.lookupIP, .openURL, .copyText, .addToQuickNote, .share])
+        let ipOrder: [ClipboardAssistantActionKind] = [.share, .copyText, .addToQuickNote, .openURL, .lookupIP]
         upgraded.clipboardAssistantActionOrders[.ipAddress] = ipOrder
         let restored = try JSONDecoder().decode(FeatureSettings.self, from: JSONEncoder().encode(upgraded))
         #expect(restored.clipboardAssistantActionOrders[.ipAddress] == ipOrder)
@@ -70,22 +71,46 @@ struct ClipboardAssistantIPAddressSettingsTests {
         #expect(restored.clipboardAssistantActionOrders[.text] == textOrder)
     }
 
-    @Test(arguments: [ClipboardAssistantActionKind.openURL, .copyText])
+    @Test(arguments: [ClipboardAssistantActionKind.lookupIP, .openURL, .copyText])
     func IPPrimaryActionSurvivesRestart(primary: ClipboardAssistantActionKind) throws {
         let address = "8.8.8.8"
         let url = try #require(URL(string: "https://ipinfo.io/8.8.8.8"))
         let lookup = ClipboardAssistantAction.openService(service: .ipInfo, url: url)
+        let navigation = ClipboardAssistantAction.openURL(try #require(URL(string: "https://8.8.8.8")))
+        let expected: [ClipboardAssistantActionKind: ClipboardAssistantAction] = [
+            .lookupIP: lookup, .openURL: navigation, .copyText: .copyText(address),
+        ]
         var settings = FeatureSettings.default
         settings.clipboardAssistantActionOrders[.ipAddress] = ClipboardAssistantActionOrder.normalized(
             [primary], for: .ipAddress
         )
         let restored = try JSONDecoder().decode(FeatureSettings.self, from: JSONEncoder().encode(settings))
         let actions = ClipboardAssistantActionOrder.ordered(
-            [lookup, .copyText(address), .addToQuickNote, .share],
+            [lookup, navigation, .copyText(address), .addToQuickNote, .share],
             for: .ipAddress, using: restored.clipboardAssistantActionOrders
         )
-        #expect(actions.first?.kind == primary)
+        #expect(actions.first == expected[primary])
+        #expect(actions.count == 5)
         #expect(actions.contains(lookup))
+        #expect(actions.contains(navigation))
         #expect(actions.contains(.copyText(address)))
+    }
+
+    @Test(arguments: [
+        ([ClipboardAssistantActionKind.openURL, .copyText, .addToQuickNote, .share],
+         [ClipboardAssistantActionKind.lookupIP, .copyText, .addToQuickNote, .share, .openURL]),
+        ([ClipboardAssistantActionKind.copyText, .openURL, .share, .addToQuickNote],
+         [ClipboardAssistantActionKind.copyText, .lookupIP, .share, .addToQuickNote, .openURL]),
+    ])
+    func earlierIPLookupPriorityMigratesOnce(
+        legacy: [ClipboardAssistantActionKind], expected: [ClipboardAssistantActionKind]
+    ) throws {
+        var previous = FeatureSettings.default
+        previous.clipboardAssistantActionOrders[.ipAddress] = legacy
+        let upgraded = try JSONDecoder().decode(FeatureSettings.self, from: JSONEncoder().encode(previous))
+        #expect(upgraded.clipboardAssistantActionOrders[.ipAddress] == expected)
+        #expect(upgraded.clipboardAssistantActionOrders[.url] == previous.clipboardAssistantActionOrders[.url])
+        let reopened = try JSONDecoder().decode(FeatureSettings.self, from: JSONEncoder().encode(upgraded))
+        #expect(reopened.clipboardAssistantActionOrders == upgraded.clipboardAssistantActionOrders)
     }
 }
