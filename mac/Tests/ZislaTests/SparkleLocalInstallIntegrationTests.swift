@@ -38,6 +38,11 @@ struct SparkleLocalInstallIntegrationTests {
         #expect(harness.userDriver.foundVersion == "0.1.9")
         #expect(harness.installedShortVersion == "0.1.9")
         #expect(harness.installedBuildVersion == "15")
+        let installedRelease = try #require(harness.takeInstalledReleaseNotes())
+        #expect(installedRelease.release.version == "0.1.9")
+        #expect(installedRelease.release.build == "15")
+        #expect(installedRelease.preference == .githubFirst)
+        #expect(harness.takeInstalledReleaseNotes() == nil)
         // The swap must keep a valid ad-hoc signature, or macOS refuses to launch what
         // Sparkle just installed.
         #expect(try harness.installedBundleSignatureIsValid())
@@ -115,6 +120,10 @@ private final class SparkleLocalInstallHarness {
     private let installedBundleURL: URL
     private let server: Process
     private let updater: SPUUpdater
+    private let feedDelegate: SparkleFeedDelegate
+    private let releaseNotesStore: UpdateReleaseNotesStore
+    private let releaseNotesDefaults: UserDefaults
+    private let releaseNotesSuite = "zisla-sparkle-install-notes-\(UUID().uuidString)"
 
     init(
         installedVersion: String,
@@ -173,12 +182,19 @@ private final class SparkleLocalInstallHarness {
 
         server = try Self.startServer(root: servedURL, port: port)
         let bundle = try #require(Bundle(url: installedBundleURL))
+        releaseNotesDefaults = try #require(UserDefaults(suiteName: releaseNotesSuite))
+        let store = UpdateReleaseNotesStore(defaults: releaseNotesDefaults)
+        releaseNotesStore = store
+        let feedURL = try #require(URL(string: "http://127.0.0.1:\(port)/appcast.xml"))
+        let delegate = SparkleFeedDelegate(feeds: SparkleFeedPair(gitee: feedURL, github: feedURL))
+        feedDelegate = delegate
+        delegate.onUpdatePrepared = { item in store.record(UpdateRelease(item: item), preference: .githubFirst, notes: nil) }
         userDriver = SparkleLocalInstallUserDriver(hostBundle: bundle)
         updater = SPUUpdater(
             hostBundle: bundle,
             applicationBundle: bundle,
             userDriver: userDriver,
-            delegate: nil
+            delegate: delegate
         )
     }
 
@@ -205,6 +221,10 @@ private final class SparkleLocalInstallHarness {
     // reporting the version that was installed when the test started.
     var installedShortVersion: String? { infoValue(forKey: "CFBundleShortVersionString") }
     var installedBuildVersion: String? { infoValue(forKey: "CFBundleVersion") }
+
+    func takeInstalledReleaseNotes() -> UpdateReleaseNotesStore.InstalledRelease? {
+        releaseNotesStore.takeInstalledRelease(version: installedShortVersion ?? "", build: installedBuildVersion ?? "")
+    }
 
     private func infoValue(forKey key: String) -> String? {
         guard let data = try? Data(
@@ -250,6 +270,7 @@ private final class SparkleLocalInstallHarness {
             )
         }
         UserDefaults.standard.removePersistentDomain(forName: Self.bundleIdentifier)
+        releaseNotesDefaults.removePersistentDomain(forName: releaseNotesSuite)
     }
 
     private static let bundleIdentifier = "dev.wzz.zisla.sparkle-install-test"

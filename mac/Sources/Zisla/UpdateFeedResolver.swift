@@ -49,6 +49,15 @@ final class UpdateFeedResolver {
         automaticConfiguration = nil
     }
 
+    func resolvedPreference() async -> UpdateFeedPreference? {
+        if let preference { return preference }
+        if task == nil {
+            resolve(manual: false) { _ in }
+        }
+        await task?.value
+        return preference
+    }
+
     func cancel() {
         task?.cancel()
         task = nil

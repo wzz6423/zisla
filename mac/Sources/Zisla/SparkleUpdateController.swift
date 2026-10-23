@@ -1,6 +1,7 @@
 @preconcurrency import Foundation
 import Sparkle
 import ZislaCore
+import ZislaKit
 
 struct SparkleFeedPair: Equatable {
     let gitee: URL
@@ -137,6 +138,7 @@ final class SparkleFeedDelegate: NSObject, SPUUpdaterDelegate {
     var onFallbackRequested: ((SPUUpdateCheck) -> Void)?
     var onCheckFailed: ((Error) -> Void)?
     var onUpdateSkipped: (() -> Void)?
+    var onUpdatePrepared: ((SUAppcastItem) -> Void)?
 
     private var feeds: SparkleFeedPair
     private var preference: UpdateFeedPreference
@@ -221,6 +223,11 @@ final class SparkleFeedDelegate: NSObject, SPUUpdaterDelegate {
         }
     }
 
+    func updater(_ updater: SPUUpdater, didExtractUpdate item: SUAppcastItem) {
+        // Persist before quitting: Sparkle's installer can finish after this process exits.
+        onUpdatePrepared?(item)
+    }
+
     func updater(
         _ updater: SPUUpdater,
         didFinishUpdateCycleFor updateCheck: SPUUpdateCheck,
@@ -244,16 +251,90 @@ final class SparkleFeedDelegate: NSObject, SPUUpdaterDelegate {
 @MainActor
 class SparkleStandardUserDriver: SPUStandardUserDriver {
     private let shouldSuppressUpdaterError: () -> Bool
+    private let languageStore: AppLanguageStore
+    let releaseNotesStore: UpdateReleaseNotesStore
+    private var releaseNotesWindow: UpdateReleaseNotesWindowController?
+    private var installedReleaseNotesWindow: UpdateReleaseNotesWindowController?
+    private var releaseNotesModel: UpdateReleaseNotesModel?
+    var feedPreference: UpdateFeedPreference = .giteeFirst
     var onUpdaterErrorPresented: ((Error) -> Void)?
 
     init(
         hostBundle: Bundle,
         shouldSuppressUpdaterError: @escaping () -> Bool,
-        onUpdaterErrorPresented: ((Error) -> Void)? = nil
+        onUpdaterErrorPresented: ((Error) -> Void)? = nil,
+        languageStore: AppLanguageStore? = nil,
+        releaseNotesStore: UpdateReleaseNotesStore? = nil
     ) {
         self.shouldSuppressUpdaterError = shouldSuppressUpdaterError
         self.onUpdaterErrorPresented = onUpdaterErrorPresented
+        self.languageStore = languageStore ?? AppLanguageStore()
+        self.releaseNotesStore = releaseNotesStore ?? UpdateReleaseNotesStore()
         super.init(hostBundle: hostBundle, delegate: nil)
+    }
+
+    override func showUpdateFound(
+        with appcastItem: SUAppcastItem,
+        state: SPUUserUpdateState,
+        reply: @escaping (SPUUserUpdateChoice) -> Void
+    ) {
+        super.dismissUpdateInstallation()
+        releaseNotesWindow?.dismiss()
+        let release = UpdateRelease(item: appcastItem)
+        if releaseNotesModel?.release != release || releaseNotesModel?.preference != feedPreference {
+            let model = UpdateReleaseNotesModel(release: release, preference: feedPreference)
+            model.onNotesLoaded = { [weak self] notes in
+                self?.releaseNotesStore.updateNotes(notes, for: release)
+            }
+            releaseNotesModel = model
+        }
+        releaseNotesWindow = UpdateReleaseNotesWindowController(
+            model: releaseNotesModel!,
+            presentation: .available(
+                stage: state.stage,
+                critical: appcastItem.isCriticalUpdate && !appcastItem.isMajorUpgrade,
+                informationURL: appcastItem.isInformationOnlyUpdate ? appcastItem.infoURL : nil
+            ),
+            languageStore: languageStore,
+            reply: { [weak self] choice in
+                self?.releaseNotesWindow = nil
+                reply(choice)
+            }
+        )
+        releaseNotesWindow?.show()
+    }
+
+    override func showUpdateInFocus() {
+        if let releaseNotesWindow {
+            releaseNotesWindow.show()
+        } else {
+            super.showUpdateInFocus()
+        }
+    }
+
+    override func dismissUpdateInstallation() {
+        releaseNotesWindow?.dismiss()
+        releaseNotesWindow = nil
+        super.dismissUpdateInstallation()
+    }
+
+    func recordPendingUpdate(_ item: SUAppcastItem) {
+        let release = UpdateRelease(item: item)
+        releaseNotesStore.record(
+            release,
+            preference: feedPreference,
+            notes: releaseNotesModel?.release == release ? releaseNotesModel?.notes : nil
+        )
+    }
+
+    func showInstalledReleaseNotes(_ installed: UpdateReleaseNotesStore.InstalledRelease, preference: UpdateFeedPreference) {
+        installedReleaseNotesWindow = UpdateReleaseNotesWindowController(
+            model: UpdateReleaseNotesModel(release: installed.release, preference: preference, notes: installed.notes),
+            presentation: .installed,
+            languageStore: languageStore,
+            reply: { [weak self] _ in self?.installedReleaseNotesWindow = nil }
+        )
+        installedReleaseNotesWindow?.show()
     }
 
     override func showUpdaterError(
@@ -282,10 +363,14 @@ final class SparkleUpdateController {
     private let updater: SPUUpdater
     private var notificationObservers: [NSObjectProtocol] = []
     private var didStart = false
+    private var installedNotesTask: Task<Void, Never>?
 
-    init?(configuration: SparkleUpdateConfiguration? = SparkleUpdateConfiguration(
-        infoDictionary: Bundle.main.infoDictionary ?? [:]
-    )) {
+    init?(
+        configuration: SparkleUpdateConfiguration? = SparkleUpdateConfiguration(
+            infoDictionary: Bundle.main.infoDictionary ?? [:]
+        ),
+        languageStore: AppLanguageStore? = nil
+    ) {
         guard let configuration,
               let releaseFeeds = configuration.feedPair(for: .release) else {
             return nil
@@ -297,7 +382,8 @@ final class SparkleUpdateController {
             hostBundle: Bundle.main,
             shouldSuppressUpdaterError: { [weak delegate] in
                 delegate?.shouldSuppressUpdaterError == true
-            }
+            },
+            languageStore: languageStore
         )
         self.userDriver = userDriver
         updater = SPUUpdater(
@@ -316,7 +402,11 @@ final class SparkleUpdateController {
             self?.onCheckFailed?(error)
         }
         updaterDelegate.onUpdateSkipped = { [weak self] in
+            self?.userDriver.releaseNotesStore.clear()
             self?.onUpdateSkipped?()
+        }
+        updaterDelegate.onUpdatePrepared = { [weak self] item in
+            self?.userDriver.recordPendingUpdate(item)
         }
 
         notificationObservers = [
@@ -342,6 +432,7 @@ final class SparkleUpdateController {
     }
 
     deinit {
+        installedNotesTask?.cancel()
         for observer in notificationObservers {
             NotificationCenter.default.removeObserver(observer)
         }
@@ -363,6 +454,7 @@ final class SparkleUpdateController {
         guard startIfNeeded() else { return false }
         updater.automaticallyChecksForUpdates = checksEnabled
         updater.automaticallyDownloadsUpdates = checksEnabled && automaticDownloadEnabled
+        userDriver.feedPreference = feedPreference
         if wasStarted && didChangeFeed {
             updater.resetUpdateCycle()
         }
@@ -399,6 +491,29 @@ final class SparkleUpdateController {
             updater.checkForUpdateInformation()
         @unknown default:
             updater.checkForUpdatesInBackground()
+        }
+    }
+
+    func showInstalledReleaseNotes(
+        hasExistingInstallation: Bool,
+        loadPreference: @escaping () async -> UpdateFeedPreference?
+    ) {
+        guard let version = Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String,
+              let build = Bundle.main.object(forInfoDictionaryKey: "CFBundleVersion") as? String,
+              let installed = userDriver.releaseNotesStore.takeInstalledRelease(
+                  version: version,
+                  build: build,
+                  hasExistingInstallation: hasExistingInstallation
+              ) else {
+            return
+        }
+        if let preference = installed.preference {
+            userDriver.showInstalledReleaseNotes(installed, preference: preference)
+        } else {
+            installedNotesTask = Task { [weak self] in
+                guard let preference = await loadPreference(), !Task.isCancelled else { return }
+                self?.userDriver.showInstalledReleaseNotes(installed, preference: preference)
+            }
         }
     }
 

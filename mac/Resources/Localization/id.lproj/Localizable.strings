@@ -2766,3 +2766,15 @@
 "无法调整应用音量，已恢复原始输出" = "Tidak dapat menyesuaikan volume aplikasi. Keluaran audio asli telah dipulihkan";
 "取消静音" = "Aktifkan suara";
 "当前音频输出格式不支持应用音量调整" = "Format keluaran audio saat ini tidak mendukung penyesuaian volume aplikasi";
+
+"更新日志" = "Catatan rilis";
+"已更新至 %@" = "Diperbarui ke %@";
+"正在加载更新日志" = "Memuat catatan rilis";
+"无法加载更新日志" = "Tidak dapat memuat catatan rilis";
+"查看发布页面" = "Lihat halaman rilis";
+"安装更新" = "Instal pembaruan";
+"安装并重新启动" = "Instal dan mulai ulang";
+"退出时安装" = "Instal saat keluar";
+"稍后提醒" = "Ingatkan nanti";
+"跳过此版本" = "Lewati versi ini";
+"了解更多" = "Pelajari lebih lanjut";

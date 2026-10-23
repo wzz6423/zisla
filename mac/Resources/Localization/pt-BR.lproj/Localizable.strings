@@ -2766,3 +2766,15 @@
 "无法调整应用音量，已恢复原始输出" = "Não foi possível ajustar o volume de apps. A saída de áudio original foi restaurada";
 "取消静音" = "Ativar som";
 "当前音频输出格式不支持应用音量调整" = "O formato de saída de áudio atual não permite ajustar o volume de apps";
+
+"更新日志" = "Notas da versão";
+"已更新至 %@" = "Atualizado para %@";
+"正在加载更新日志" = "Carregando notas da versão";
+"无法加载更新日志" = "Não foi possível carregar as notas da versão";
+"查看发布页面" = "Ver página da versão";
+"安装更新" = "Instalar atualização";
+"安装并重新启动" = "Instalar e reiniciar";
+"退出时安装" = "Instalar ao sair";
+"稍后提醒" = "Lembrar mais tarde";
+"跳过此版本" = "Ignorar esta versão";
+"了解更多" = "Saiba mais";

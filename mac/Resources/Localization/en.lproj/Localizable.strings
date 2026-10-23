@@ -2765,3 +2765,15 @@
 "无法调整应用音量，已恢复原始输出" = "Unable to adjust app volume. Original audio output restored";
 "取消静音" = "Unmute";
 "当前音频输出格式不支持应用音量调整" = "The current audio output format does not support app volume adjustment";
+
+"更新日志" = "Release Notes";
+"已更新至 %@" = "Updated to %@";
+"正在加载更新日志" = "Loading release notes";
+"无法加载更新日志" = "Unable to load release notes";
+"查看发布页面" = "View release page";
+"安装更新" = "Install Update";
+"安装并重新启动" = "Install and Relaunch";
+"退出时安装" = "Install on Quit";
+"稍后提醒" = "Remind Me Later";
+"跳过此版本" = "Skip This Version";
+"了解更多" = "Learn More";
