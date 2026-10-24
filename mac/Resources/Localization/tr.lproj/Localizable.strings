@@ -2978,3 +2978,40 @@
 "高度比例" = "Yükseklik oranı";
 "麦克风" = "Mikrofon";
 "鼠标大小" = "İmleç boyutu";
+
+
+"录屏控制条" = "Kayıt Denetimleri";
+"保存位置" = "Kayıt Konumu";
+"更改保存位置" = "Kayıt Konumunu Değiştir";
+"选择录屏保存目录" = "Kayıtların Kaydedileceği Klasörü Seç";
+
+"系统声音音量" = "Sistem Sesi Düzeyi";
+"麦克风音量" = "Mikrofon Ses Düzeyi";
+"显示摄像头" = "Kamerayı Göster";
+"画布比例" = "Tuval En Boy Oranı";
+"原始比例" = "Özgün Oran";
+"自定义背景颜色" = "Özel Arka Plan Rengi";
+"背景颜色" = "Arka Plan Rengi";
+"标注" = "Ek Açıklamalar";
+"添加标注" = "Ek Açıklama Ekle";
+"文字标注" = "Metin Açıklaması";
+"箭头标注" = "Ok Açıklaması";
+"矩形标注" = "Dikdörtgen Açıklaması";
+"删除标注" = "Ek Açıklamayı Sil";
+"标注内容" = "Açıklama Metni";
+"文字大小" = "Metin Boyutu";
+"线条粗细" = "Çizgi Kalınlığı";
+"起点 X" = "Başlangıç X";
+"起点 Y" = "Başlangıç Y";
+"终点 X" = "Bitiş X";
+"终点 Y" = "Bitiş Y";
+"位置使用画布左上角为原点，时间对应原始素材" = "Koordinatların başlangıcı tuvalin sol üst köşesidir. Zamanlar özgün kaynağa aittir.";
+"时间线按输出时间排列，精确输入对应原始素材" = "Zaman çizelgesi çıktı süresini kullanır. Kesin değerler özgün kaynağa aittir.";
+"16:9" = "16:9";
+"9:16" = "9:16";
+"1:1" = "1:1";
+"4:3" = "4:3";
+
+"画布" = "Tuval";
+"光标" = "İmleç";
+"片段" = "Klip";

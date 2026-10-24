@@ -1,5 +1,5 @@
 "NSCalendarsFullAccessUsageDescription" = "zisla cần quyền truy cập các sự kiện lịch sắp tới cho bảng thông tin trên cùng.";
-"NSAudioCaptureUsageDescription" = "zisla đọc âm thanh hệ thống để hiển thị dạng sóng và điều chỉnh âm lượng ứng dụng, đồng thời ghi lại âm thanh đang phát khi bạn bật âm thanh hệ thống cho bản ghi màn hình.";
+"NSAudioCaptureUsageDescription" = "zisla đọc âm thanh hệ thống khi phát nội dung, khi bạn điều chỉnh âm lượng ứng dụng hoặc bật âm thanh hệ thống cho bản ghi màn hình, để hiển thị dạng sóng, điều chỉnh âm lượng hoặc ghi âm thanh đang phát.";
 "NSCameraUsageDescription" = "zisla chỉ sử dụng camera khi bạn mở gương hoặc bật lớp phủ camera để ghi màn hình.";
 "NSRemindersFullAccessUsageDescription" = "zisla đọc các lời nhắc có ngày để hiển thị chúng cùng với sự kiện lịch.";
 "NSLocationWhenInUseUsageDescription" = "zisla cần quyền truy cập vị trí để hiển thị thời tiết địa phương, tên địa điểm và các mạng Wi-Fi ở gần.";

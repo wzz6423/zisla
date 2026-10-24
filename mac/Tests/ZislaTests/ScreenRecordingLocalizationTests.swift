@@ -13,8 +13,11 @@ struct ScreenRecordingLocalizationTests {
             "录制屏幕、编辑视频与保存项目。", "打开录屏工作室", "留白", "起点（秒）",
             "片段 %d · 缩放 %d · 字幕 %d", "录屏项目数据无效", "录屏文件写入超时",
             "AI 未返回有效的剪辑计划，未应用任何修改", "字幕在本机转写，不上传录音",
-            "正在播放剪辑顺序与音频，画面效果请暂停预览或导出查看", "正在播放原始素材",
+            "正在播放原始素材",
             "预览与导出使用相同的画面效果",
+            "录屏控制条", "保存位置", "更改保存位置", "选择录屏保存目录",
+            "圆角", "圆形摄像头", "矩形",
+            "系统声音音量", "麦克风音量", "显示摄像头", "画布比例", "背景颜色", "标注",
         ]
         #expect(requiredKeys.isSubset(of: keys), "The recording source scan missed runtime keys")
         #expect(keys.isDisjoint(with: ["pause.fill", "play.fill", "record.circle", "source."]))
@@ -120,12 +123,15 @@ struct ScreenRecordingLocalizationTests {
         keys.formUnion(RecordingCameraPosition.allCases.map(\.title))
         keys.formUnion(RecordingExportResolution.allCases.map(\.title))
         keys.formUnion(RecordingShortcutAction.allCases.map(\.title))
+        keys.formUnion(RecordingCanvasAspectRatio.allCases.map(\.title))
+        keys.formUnion(RecordingAnnotationKind.allCases.map(\.title))
         keys.formUnion([SettingsSection.recording.title, SettingsSection.recording.subtitle])
 
         for path in paths {
             let text = try String(contentsOf: path, encoding: .utf8)
             keys.formUnion(try localizedKeys(text))
-            keys.formUnion(try captures(#"(?:parameter|timeField|zoomField|cropField)\(\s*"([^"\\]+)""#, in: text))
+            keys.formUnion(try captures(#"(?:parameter|timeField|zoomField|cropField|audioParameter|numberField)\(\s*"([^"\\]+)""#, in: text))
+            keys.formUnion(try captures(#"ScreenRecordingColorPicker\(title:\s*"([^"\\]+)""#, in: text))
             if path.lastPathComponent == "ScreenRecordingModels.swift" {
                 keys.formUnion(try captures(#"return "([^"\\]+)""#, in: text))
             }

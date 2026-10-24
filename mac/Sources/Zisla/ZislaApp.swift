@@ -1829,7 +1829,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
 
     @objc private func showScreenRecording() {
         guard AppModel.shared.settingsStore.settings.screenRecordingEnabled else { return }
-        recordingStudio().present()
+        recordingStudio().presentCaptureControls()
     }
 
     private func recordingStudio() -> ScreenRecordingStudioController {

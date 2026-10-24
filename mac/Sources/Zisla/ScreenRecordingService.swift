@@ -45,6 +45,7 @@ struct ScreenRecordingDeviceCatalog: Sendable {
 
 @MainActor
 protocol ScreenRecordingCaptureSession: AnyObject {
+    func useCameraPreview(_ preview: any ScreenRecordingCameraPreviewSession)
     func start() async throws -> Double
     func setPaused(_ paused: Bool, atHostTime time: Double) async
     func stop(atHostTime time: Double) async throws -> ScreenRecordingResult
@@ -52,11 +53,26 @@ protocol ScreenRecordingCaptureSession: AnyObject {
 }
 
 @MainActor
+protocol ScreenRecordingCameraPreviewSession: AnyObject {
+    var previewSession: AVCaptureSession { get }
+    func start() async throws
+    func attach(to bridge: ScreenRecordingCaptureBridge)
+    func stop() async
+}
+
+enum ScreenRecordingCameraPreviewState: Equatable {
+    case idle, preparing, running, failed(String)
+}
+
+typealias ScreenRecordingCameraFailureHandler = @MainActor @Sendable (Error) async -> Void
+
+@MainActor
 struct ScreenRecordingCaptureDependencies {
     var loadSources: () async throws -> [RecordingCaptureSource]
     var loadDevices: () -> ScreenRecordingDeviceCatalog
     var requestPermission: (ScreenRecordingPermission) async -> Bool
     var makeSession: (RecordingCaptureConfiguration, URL, @escaping @Sendable (Error) -> Void) throws -> any ScreenRecordingCaptureSession
+    var makeCameraPreview: (String?, @escaping ScreenRecordingCameraFailureHandler) -> any ScreenRecordingCameraPreviewSession
     var now: () -> Double
     var scheduleTick: (@escaping @MainActor () -> Void) -> (() -> Void)
 
@@ -77,6 +93,9 @@ struct ScreenRecordingCaptureDependencies {
             makeSession: { configuration, directory, onFailure in
                 ScreenRecordingNativeCapture(configuration: configuration, directory: directory, onFailure: onFailure)
             },
+            makeCameraPreview: { identifier, onFailure in
+                ScreenRecordingCameraCapture(identifier: identifier, onFailure: onFailure)
+            },
             now: { CMClockGetTime(CMClockGetHostTimeClock()).seconds },
             scheduleTick: { tick in
                 let timer = Timer.scheduledTimer(withTimeInterval: 0.1, repeats: true) { _ in
@@ -96,6 +115,8 @@ final class ScreenRecordingService: ObservableObject {
     @Published private(set) var sources: [RecordingCaptureSource] = []
     @Published private(set) var cameras: [RecordingDevice] = []
     @Published private(set) var microphones: [RecordingDevice] = []
+    @Published private(set) var cameraPreviewSession: AVCaptureSession?
+    @Published private(set) var cameraPreviewState: ScreenRecordingCameraPreviewState = .idle
 
     @MainActor private final class Run {
         var session: (any ScreenRecordingCaptureSession)?
@@ -109,13 +130,107 @@ final class ScreenRecordingService: ObservableObject {
         var cancelled = false
     }
 
+    @MainActor private final class CameraRun {
+        let identifier: String?
+        var session: (any ScreenRecordingCameraPreviewSession)?
+        var startTask: Task<Void, Error>?
+        var invalidated = false
+
+        init(identifier: String?) { self.identifier = identifier }
+    }
+
     private let dependencies: ScreenRecordingCaptureDependencies
     private var run: Run?
     private var lastStopResult: Result<ScreenRecordingResult, Error>?
     private var sourceRevision: UInt64 = 0
+    private var cameraRun: CameraRun?
+    private var cameraCleanupTask: Task<Void, Never>?
 
     init(dependencies: ScreenRecordingCaptureDependencies = .live) {
         self.dependencies = dependencies
+    }
+
+    func prepareCameraPreview(configuration: RecordingCaptureConfiguration) async throws {
+        guard run == nil else { return }
+        if configuration.camera {
+            try await prepareCamera(identifier: configuration.cameraID, permissionGranted: false)
+        } else {
+            await releaseCameraPreview().value
+        }
+    }
+
+    func stopCameraPreview() async {
+        guard run == nil else { return }
+        await releaseCameraPreview().value
+    }
+
+    private func prepareCamera(identifier: String?, permissionGranted: Bool) async throws {
+        if let current = cameraRun, current.identifier == identifier, let task = current.startTask {
+            try await task.value
+            return
+        }
+        let release = releaseCameraPreview()
+        let current = CameraRun(identifier: identifier)
+        cameraRun = current
+        cameraPreviewState = .preparing
+        let task = Task { [weak self, current] in
+            guard let self else { throw CancellationError() }
+            await release.value
+            try self.requireCamera(current)
+            if !permissionGranted {
+                let granted = await self.dependencies.requestPermission(.camera)
+                try self.requireCamera(current)
+                guard granted else { throw ScreenRecordingCaptureError.permission(.camera) }
+            }
+            try self.requireCamera(current)
+            let session = self.dependencies.makeCameraPreview(identifier) { [weak self, weak current] error in
+                guard let self, let current, self.cameraRun === current, !current.invalidated else { return }
+                if let recording = self.run {
+                    await self.fail(recording, with: error)
+                    self.cameraPreviewState = .failed(error.localizedDescription)
+                } else {
+                    await self.releaseCameraPreview(state: .failed(error.localizedDescription)).value
+                }
+            }
+            current.session = session
+            try await session.start()
+            try self.requireCamera(current)
+            self.cameraPreviewSession = session.previewSession
+            self.cameraPreviewState = .running
+        }
+        current.startTask = task
+        do {
+            try await task.value
+        } catch {
+            if cameraRun === current {
+                await releaseCameraPreview(state: error is CancellationError ? .idle : .failed(error.localizedDescription)).value
+            }
+            throw error
+        }
+    }
+
+    private func requireCamera(_ current: CameraRun) throws {
+        try Task.checkCancellation()
+        guard cameraRun === current, !current.invalidated else { throw CancellationError() }
+    }
+
+    private func releaseCameraPreview(state: ScreenRecordingCameraPreviewState = .idle) -> Task<Void, Never> {
+        let current = cameraRun
+        current?.invalidated = true
+        current?.startTask?.cancel()
+        cameraRun = nil
+        cameraPreviewSession = nil
+        cameraPreviewState = state
+        let previous = cameraCleanupTask
+        let task = Task {
+            await previous?.value
+            if let session = current?.session {
+                _ = await current?.startTask?.result
+                await session.stop()
+            }
+        }
+        cameraCleanupTask = task
+        return task
     }
 
     func loadSources() async throws {
@@ -162,12 +277,20 @@ final class ScreenRecordingService: ObservableObject {
                 try self.requireCurrent(current)
                 guard granted else { throw ScreenRecordingCaptureError.permission(permission) }
             }
+            if configuration.camera {
+                try await self.prepareCamera(identifier: configuration.cameraID, permissionGranted: true)
+                try self.requireCurrent(current)
+            } else {
+                await self.releaseCameraPreview().value
+                try self.requireCurrent(current)
+            }
             current.session = try self.dependencies.makeSession(configuration, directory) { [weak self, weak current] error in
                 Task { @MainActor [weak self, weak current] in
                     guard let self, let current, self.run === current, !current.invalidated else { return }
                     await self.fail(current, with: error)
                 }
             }
+            if let camera = self.cameraRun?.session { current.session!.useCameraPreview(camera) }
             let epoch = try await current.session!.start()
             try self.requireCurrent(current)
             current.timeline.begin(at: epoch)
@@ -235,6 +358,8 @@ final class ScreenRecordingService: ObservableObject {
             do {
                 let result = try await session.stop(atHostTime: time)
                 try self.requireCurrent(current)
+                await self.releaseCameraPreview().value
+                try self.requireCurrent(current)
                 self.elapsed = result.duration
                 self.lastStopResult = .success(result)
                 self.run = nil
@@ -250,7 +375,7 @@ final class ScreenRecordingService: ObservableObject {
     }
 
     func cancel() async {
-        guard let current = run else { return }
+        guard let current = run else { await releaseCameraPreview().value; return }
         await cancel(current)
     }
 
@@ -268,7 +393,11 @@ final class ScreenRecordingService: ObservableObject {
         current.stopTask?.cancel()
         phase = .finishing
         let session = current.session
-        let task = Task { await session?.cancel() }
+        let task = Task {
+            let error = await session?.cancel()
+            await self.releaseCameraPreview().value
+            return error
+        }
         current.cleanupTask = task
         return await task.value
     }

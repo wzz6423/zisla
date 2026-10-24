@@ -1,5 +1,5 @@
 "NSCalendarsFullAccessUsageDescription" = "zisla memerlukan akses ke acara kalender mendatang untuk panel informasi atas.";
-"NSAudioCaptureUsageDescription" = "zisla membaca audio sistem untuk menampilkan gelombang suara dan menyesuaikan volume aplikasi, serta merekam suara pemutaran saat Anda mengaktifkan audio sistem untuk perekaman layar.";
+"NSAudioCaptureUsageDescription" = "zisla membaca audio sistem saat media diputar, saat Anda menyesuaikan volume aplikasi, atau saat mengaktifkan audio sistem untuk perekaman layar, guna menampilkan gelombang suara, menyesuaikan volume, atau merekam suara pemutaran.";
 "NSCameraUsageDescription" = "zisla menggunakan kamera hanya saat Anda membuka cermin atau mengaktifkan lapisan kamera untuk perekaman layar.";
 "NSRemindersFullAccessUsageDescription" = "zisla membaca pengingat bertanggal untuk menampilkannya bersama acara kalender.";
 "NSLocationWhenInUseUsageDescription" = "zisla memerlukan akses lokasi untuk menampilkan cuaca setempat, nama tempat, dan jaringan Wi-Fi di sekitar.";

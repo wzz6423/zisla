@@ -2978,3 +2978,40 @@
 "高度比例" = "Tỷ lệ chiều cao";
 "麦克风" = "Micrô";
 "鼠标大小" = "Kích thước con trỏ";
+
+
+"录屏控制条" = "Thanh điều khiển ghi màn hình";
+"保存位置" = "Vị trí lưu";
+"更改保存位置" = "Đổi vị trí lưu";
+"选择录屏保存目录" = "Chọn thư mục lưu bản ghi màn hình";
+
+"系统声音音量" = "Âm lượng hệ thống";
+"麦克风音量" = "Âm lượng micrô";
+"显示摄像头" = "Hiện camera";
+"画布比例" = "Tỷ lệ khung vẽ";
+"原始比例" = "Tỷ lệ gốc";
+"自定义背景颜色" = "Màu nền tùy chỉnh";
+"背景颜色" = "Màu nền";
+"标注" = "Chú thích";
+"添加标注" = "Thêm chú thích";
+"文字标注" = "Chú thích văn bản";
+"箭头标注" = "Chú thích mũi tên";
+"矩形标注" = "Chú thích hình chữ nhật";
+"删除标注" = "Xóa chú thích";
+"标注内容" = "Nội dung chú thích";
+"文字大小" = "Cỡ chữ";
+"线条粗细" = "Độ dày nét";
+"起点 X" = "Điểm đầu X";
+"起点 Y" = "Điểm đầu Y";
+"终点 X" = "Điểm cuối X";
+"终点 Y" = "Điểm cuối Y";
+"位置使用画布左上角为原点，时间对应原始素材" = "Gốc tọa độ nằm ở góc trên bên trái khung vẽ. Thời gian tính theo nội dung gốc.";
+"时间线按输出时间排列，精确输入对应原始素材" = "Dòng thời gian dùng thời gian đầu ra. Các giá trị chính xác tính theo nội dung gốc.";
+"16:9" = "16:9";
+"9:16" = "9:16";
+"1:1" = "1:1";
+"4:3" = "4:3";
+
+"画布" = "Khung vẽ";
+"光标" = "Con trỏ";
+"片段" = "Đoạn";

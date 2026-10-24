@@ -1,5 +1,5 @@
 "NSCalendarsFullAccessUsageDescription" = "zisla 需要存取即將到來的日曆事件以顯示於頂部資訊面板。";
-"NSAudioCaptureUsageDescription" = "zisla 讀取系統音訊以顯示音浪與調整應用程式音量，並在你啟用螢幕錄製系統音訊時記錄播放聲音。";
+"NSAudioCaptureUsageDescription" = "zisla 在播放媒體、你主動調整應用程式音量或啟用螢幕錄製系統音訊時讀取系統音訊，用於顯示音浪、調整應用程式音量或記錄播放聲音。";
 "NSCameraUsageDescription" = "zisla 僅在你開啟鏡子或啟用螢幕錄影的攝影機疊加時使用攝影機。";
 "NSRemindersFullAccessUsageDescription" = "zisla 讀取有日期的提醒事項，以便與日曆事件一起顯示。";
 "NSLocationWhenInUseUsageDescription" = "zisla 需要定位權限來顯示本地天氣、地區名稱和附近的 Wi-Fi 網路。";

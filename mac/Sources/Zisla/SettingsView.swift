@@ -4362,8 +4362,8 @@ enum SettingsSection: String, CaseIterable, Identifiable {
     case info
     case clipboardAssistant
     case screenshot
-    case pdfTools
     case recording
+    case pdfTools
     case ai
     case voice
     case mail

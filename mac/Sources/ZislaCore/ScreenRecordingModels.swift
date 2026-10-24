@@ -220,16 +220,30 @@ public struct RecordingEdits: Codable, Equatable, Sendable {
     public var cameraSize: Double
     public var cameraMirrored: Bool
     public var cameraRound: Bool
+    public var cameraCornerRadius: Double?
+    public var showCamera: Bool?
+    public var screenAudioVolume: Double?
+    public var microphoneVolume: Double?
     public var showCaptions: Bool
     public var crop: RecordingRect?
+    public var canvasAspectRatio: RecordingCanvasAspectRatio?
+    public var backgroundColor: RecordingColor?
+    public var annotations: [RecordingAnnotation]?
+
+    public var effectiveCameraCornerRadius: Double { cameraRound ? 0.5 : cameraCornerRadius ?? 0.1 }
+    public var effectiveShowCamera: Bool { showCamera ?? true }
+    public var effectiveScreenAudioVolume: Double { screenAudioVolume ?? 1 }
+    public var effectiveMicrophoneVolume: Double { microphoneVolume ?? 1 }
 
     public init(segments: [RecordingSegment] = [], zoomClips: [RecordingZoom] = [],
                 background: RecordingBackground = .gradient, padding: Double = 0.06,
                 cornerRadius: Double = 0.02, shadow: Double = 0.3, cursorSize: Double = 1.5,
                 showCursor: Bool = true, clickEffects: Bool = true, autoZoom: Bool = false,
                 cameraPosition: RecordingCameraPosition = .bottomRight, cameraSize: Double = 0.25,
-                cameraMirrored: Bool = true, cameraRound: Bool = true, showCaptions: Bool = true,
-                crop: RecordingRect? = nil) {
+                cameraMirrored: Bool = true, cameraRound: Bool = true, cameraCornerRadius: Double? = nil,
+                showCamera: Bool? = nil, screenAudioVolume: Double? = nil, microphoneVolume: Double? = nil, showCaptions: Bool = true,
+                crop: RecordingRect? = nil, canvasAspectRatio: RecordingCanvasAspectRatio? = nil,
+                backgroundColor: RecordingColor? = nil, annotations: [RecordingAnnotation]? = nil) {
         self.segments = segments
         self.zoomClips = zoomClips
         self.background = background
@@ -244,8 +258,15 @@ public struct RecordingEdits: Codable, Equatable, Sendable {
         self.cameraSize = cameraSize
         self.cameraMirrored = cameraMirrored
         self.cameraRound = cameraRound
+        self.cameraCornerRadius = cameraCornerRadius
+        self.showCamera = showCamera
+        self.screenAudioVolume = screenAudioVolume
+        self.microphoneVolume = microphoneVolume
         self.showCaptions = showCaptions
         self.crop = crop
+        self.canvasAspectRatio = canvasAspectRatio
+        self.backgroundColor = backgroundColor
+        self.annotations = annotations
     }
 }
 
@@ -362,7 +383,17 @@ public struct ScreenRecordingProject: Codable, Equatable, Identifiable, Sendable
                   && (0...1).contains($0.x) && (0...1).contains($0.y) }),
               (0...0.3).contains(edits.padding), (0...0.2).contains(edits.cornerRadius),
               (0...1).contains(edits.shadow), (0.5...4).contains(edits.cursorSize),
-              (0.1...0.5).contains(edits.cameraSize), edits.crop?.isNormalized != false
+              (0.1...0.5).contains(edits.cameraSize),
+              edits.cameraCornerRadius.map({ (0...0.5).contains($0) }) != false,
+              (0...1).contains(edits.effectiveScreenAudioVolume),
+              (0...1).contains(edits.effectiveMicrophoneVolume),
+              edits.backgroundColor?.isValid != false,
+              edits.annotations.map({ annotations in
+                  annotations.count <= RecordingAnnotation.maximumCount
+                      && Set(annotations.map(\.id)).count == annotations.count
+                      && annotations.allSatisfy { $0.isValid(duration: duration) }
+              }) != false,
+              edits.crop?.isNormalized != false
         else { throw ScreenRecordingProjectError.invalidProject }
         for path in [videoFile, cameraFile, microphoneFile].compactMap({ $0 }) {
             guard Self.isSafeMediaPath(path) else { throw ScreenRecordingProjectError.unsafeMediaPath }

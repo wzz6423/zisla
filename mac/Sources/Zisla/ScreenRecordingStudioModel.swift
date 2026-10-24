@@ -11,8 +11,11 @@ final class ScreenRecordingStudioModel: ObservableObject {
     let capture: ScreenRecordingService
     let exporter: ScreenRecordingExporter
     let transcriber: ScreenRecordingTranscriber
-    let projectStore: ScreenRecordingProjectStore
+    var projectStore: ScreenRecordingProjectStore { ScreenRecordingProjectStore(root: recordingOutputDirectory) }
+    @Published private(set) var recordingOutputDirectory: URL
     @Published var configuration = RecordingCaptureConfiguration()
+    @Published var recordingCameraRound = true
+    @Published var recordingCameraCornerRadius = 0.1
     @Published var exportConfiguration = RecordingExportConfiguration()
     @Published private(set) var project: ScreenRecordingProject?
     @Published private(set) var directory: URL?
@@ -34,9 +37,9 @@ final class ScreenRecordingStudioModel: ObservableObject {
     @Published private(set) var isShowingSourcePlayback = false
     @Published private(set) var isShowingTimelinePlayback = false
     private var timelinePlayer: AVPlayer?
-    @Published var showCaptureSetup = false
     @Published var subtitleLanguage: AppLanguage = .simplifiedChinese
     private let appModel: AppModel?
+    private let outputDirectoryStore: ScreenRecordingOutputDirectoryStore
     private let renderPreview: (ScreenRecordingProject, URL, Double) async throws -> CGImage
     private let aiCompletion: ((ScreenRecordingProject, String, AIModelConfigurationReference?) async throws -> String)?
     private(set) var previewTask: Task<Void, Never>?
@@ -54,14 +57,16 @@ final class ScreenRecordingStudioModel: ObservableObject {
     init(appModel: AppModel? = nil, capture: ScreenRecordingService = ScreenRecordingService(),
          exporter: ScreenRecordingExporter = ScreenRecordingExporter(),
          transcriber: ScreenRecordingTranscriber = ScreenRecordingTranscriber(),
-         projectStore: ScreenRecordingProjectStore = ScreenRecordingProjectStore(),
+         projectStore: ScreenRecordingProjectStore? = nil,
+         outputDirectoryStore: ScreenRecordingOutputDirectoryStore = ScreenRecordingOutputDirectoryStore(),
          renderPreview: ((ScreenRecordingProject, URL, Double) async throws -> CGImage)? = nil,
          aiCompletion: ((ScreenRecordingProject, String, AIModelConfigurationReference?) async throws -> String)? = nil) {
         self.appModel = appModel
         self.capture = capture
         self.exporter = exporter
         self.transcriber = transcriber
-        self.projectStore = projectStore
+        self.outputDirectoryStore = outputDirectoryStore
+        self.recordingOutputDirectory = projectStore?.root ?? outputDirectoryStore.directory
         self.renderPreview = renderPreview ?? { project, directory, time in
             try await exporter.preview(project: project, directory: directory, sourceTime: time,
                 maximumSize: CGSize(width: 1_200, height: 800))
@@ -119,16 +124,45 @@ final class ScreenRecordingStudioModel: ObservableObject {
         guard !isRecording else { return }
         do {
             try await capture.loadSources()
+            guard !isRecording else { return }
             if !availableSources.contains(where: { $0.id == configuration.sourceID }) {
                 configuration.sourceID = availableSources.first?.id ?? 0
+                configuration.region = nil
             }
             errorMessage = nil
-        } catch { errorMessage = error.localizedDescription }
+        } catch {
+            if !(error is CancellationError) { errorMessage = error.localizedDescription }
+        }
     }
 
     func requestScreenAccess() {
         _ = CGRequestScreenCaptureAccess()
         Task { await loadSources() }
+    }
+
+    func chooseRecordingOutputDirectory() {
+        guard !isRecording, !isBusy, !isChoosingFile, !exporter.isExporting else { return }
+        let panel = NSOpenPanel()
+        panel.canChooseDirectories = true
+        panel.canChooseFiles = false
+        panel.allowsMultipleSelection = false
+        panel.canCreateDirectories = true
+        panel.directoryURL = recordingOutputDirectory
+        panel.message = AppLocalization.text("选择录屏保存目录")
+        isChoosingFile = true
+        panel.begin { [weak self] response in
+            guard let self else { return }
+            self.isChoosingFile = false
+            guard response == .OK, let url = panel.url else { return }
+            do { try self.setRecordingOutputDirectory(url); self.errorMessage = nil }
+            catch { self.errorMessage = error.localizedDescription }
+        }
+    }
+
+    func setRecordingOutputDirectory(_ url: URL) throws {
+        guard !isRecording, !isBusy, !exporter.isExporting else { return }
+        try outputDirectoryStore.setDirectory(url)
+        recordingOutputDirectory = outputDirectoryStore.directory
     }
 
     func selectMode(_ mode: RecordingCaptureMode) {
@@ -142,9 +176,10 @@ final class ScreenRecordingStudioModel: ObservableObject {
         guard !isRecording, !isBusy, !isChoosingFile, !exporter.isExporting else { return }
         if configuration.mode == .region, configuration.region == nil { return }
         isStarting = true
+        errorMessage = nil
         operationTask = Task { [weak self] in
             guard let self else { return }
-            defer { isStarting = false; operationTask = nil }
+            defer { isStarting = false; operationTask = nil; showWindow?() }
             do {
                 if isDirty { try save() }
                 let target = try projectStore.createDirectory()
@@ -158,7 +193,6 @@ final class ScreenRecordingStudioModel: ObservableObject {
                     try? FileManager.default.removeItem(at: target)
                 }
                 recordingDirectory = nil
-                showWindow?()
             }
         }
     }
@@ -174,14 +208,19 @@ final class ScreenRecordingStudioModel: ObservableObject {
             defer { isStopping = false; operationTask = nil; showWindow?() }
             do {
                 let result = try await capture.stop()
+                try Task.checkCancellation()
                 guard let target = recordingDirectory else { throw ScreenRecordingProjectError.invalidProject }
                 let date = DateFormatter.localizedString(from: Date(), dateStyle: .short, timeStyle: .short)
-                let recording = ScreenRecordingProject(result: result, name: AppLocalization.text("录屏 %@", date))
+                var recording = ScreenRecordingProject(result: result, name: AppLocalization.text("录屏 %@", date))
+                recording.edits.cameraRound = recordingCameraRound
+                recording.edits.cameraCornerRadius = recordingCameraCornerRadius
                 install(recording, directory: target)
                 isDirty = true
                 recordingDirectory = nil
                 try save()
-            } catch { errorMessage = error.localizedDescription }
+            } catch {
+                if !(error is CancellationError) { errorMessage = error.localizedDescription }
+            }
         }
     }
 
@@ -193,17 +232,16 @@ final class ScreenRecordingStudioModel: ObservableObject {
             isCancelling = true
             Task { [weak self] in
                 guard let self else { return }
-                defer { isCancelling = false }
+                defer { isCancelling = false; showWindow?() }
                 await capture.cancel()
                 await operationTask?.value
-                if let target = recordingDirectory,
-                   (try? FileManager.default.contentsOfDirectory(atPath: target.path).isEmpty) == true {
-                    try? FileManager.default.removeItem(at: target)
+                if let target = recordingDirectory {
+                    do { try FileManager.default.removeItem(at: target) }
+                    catch { errorMessage = error.localizedDescription }
                 }
                 recordingDirectory = nil
                 isStarting = false
                 isStopping = false
-                showWindow?()
             }
         }
     }
@@ -214,7 +252,7 @@ final class ScreenRecordingStudioModel: ObservableObject {
         panel.canChooseDirectories = true
         panel.canChooseFiles = true
         panel.allowsMultipleSelection = false
-        panel.allowedContentTypes = [.init(filenameExtension: ScreenRecordingProjectStore.projectExtension) ?? .directory]
+        panel.allowedContentTypes = [.directory, .json]
         panel.message = AppLocalization.text("选择录屏项目")
         isChoosingFile = true
         panel.begin { [weak self] response in
@@ -289,7 +327,8 @@ final class ScreenRecordingStudioModel: ObservableObject {
     func saveCopy() {
         guard canEdit, let project, let directory else { return }
         let panel = NSSavePanel()
-        panel.nameFieldStringValue = project.name + "." + ScreenRecordingProjectStore.projectExtension
+        panel.nameFieldStringValue = Self.fileName(project.name, extension: ScreenRecordingProjectStore.projectExtension)
+        panel.directoryURL = recordingOutputDirectory
         panel.allowedContentTypes = [.init(filenameExtension: ScreenRecordingProjectStore.projectExtension) ?? .directory]
         panel.canCreateDirectories = true
         isChoosingFile = true
@@ -301,7 +340,7 @@ final class ScreenRecordingStudioModel: ObservableObject {
                 try self.projectStore.copy(project, from: directory, to: url)
                 self.directory = url
                 self.isDirty = false
-            self.refreshPreview()
+                self.refreshPreview()
             } catch { self.errorMessage = error.localizedDescription }
         }
     }
@@ -310,7 +349,8 @@ final class ScreenRecordingStudioModel: ObservableObject {
         guard canEdit, let project, let directory else { return }
         let configuration = exportConfiguration
         let panel = NSSavePanel()
-        panel.nameFieldStringValue = project.name + "." + configuration.format.rawValue
+        panel.nameFieldStringValue = Self.fileName(project.name, extension: configuration.format.rawValue)
+        panel.directoryURL = recordingOutputDirectory
         panel.allowedContentTypes = [configuration.format == .gif ? .gif : .mpeg4Movie]
         panel.canCreateDirectories = true
         isChoosingFile = true
@@ -331,6 +371,15 @@ final class ScreenRecordingStudioModel: ObservableObject {
         }
     }
 
+    static func fileName(_ name: String, extension fileExtension: String) -> String {
+        let invalid = CharacterSet.controlCharacters.union(CharacterSet(charactersIn: "/\\:"))
+        var stem = String(name.map { character in
+            character.unicodeScalars.contains(where: invalid.contains) ? Character("-") : character
+        })
+        while stem.utf8.count + fileExtension.utf8.count + 1 > 255 { stem.removeLast() }
+        return (stem.isEmpty ? AppLocalization.text("录屏") : stem) + "." + fileExtension
+    }
+
     func update(_ change: (inout ScreenRecordingProject) -> Void) {
         guard canEdit, let original = project else { return }
         var replacement = original
@@ -343,10 +392,8 @@ final class ScreenRecordingStudioModel: ObservableObject {
             redoHistory.removeAll()
             project = replacement
             dismissAIEdit()
-            timelinePlayer?.pause()
-            isShowingTimelinePlayback = false
             isDirty = true
-            refreshPreview()
+            seekTimeline(to: playbackTime)
         } catch { errorMessage = error.localizedDescription }
     }
 
@@ -355,10 +402,8 @@ final class ScreenRecordingStudioModel: ObservableObject {
         redoHistory.append(original)
         project = previous
         dismissAIEdit()
-        timelinePlayer?.pause()
-        isShowingTimelinePlayback = false
         isDirty = true
-        refreshPreview()
+        seekTimeline(to: playbackTime)
     }
 
     func redo() {
@@ -366,10 +411,8 @@ final class ScreenRecordingStudioModel: ObservableObject {
         undoHistory.append(original)
         project = next
         dismissAIEdit()
-        timelinePlayer?.pause()
-        isShowingTimelinePlayback = false
         isDirty = true
-        refreshPreview()
+        seekTimeline(to: playbackTime)
     }
 
     func split(at time: Double) {
@@ -396,12 +439,27 @@ final class ScreenRecordingStudioModel: ObservableObject {
     func seek(to time: Double) {
         guard let project, time.isFinite else { return }
         currentTime = min(max(0, time), project.duration)
+        if let timeline = try? RecordingExportTimeline(project: project),
+           let slice = timeline.slices.first(where: { currentTime >= $0.sourceStart && currentTime <= $0.sourceEnd }) {
+            playbackTime = slice.outputStart + (currentTime - slice.sourceStart) / slice.speed
+        } else { playbackTime = 0 }
         player?.pause()
         timelinePlayer?.pause()
         isShowingSourcePlayback = false
         isShowingTimelinePlayback = false
         player?.seek(to: CMTime(seconds: currentTime, preferredTimescale: 600))
         refreshPreview()
+    }
+
+    func seekTimeline(to time: Double) {
+        guard time.isFinite, let project else { return }
+        if project.edits.segments.isEmpty { seek(to: currentTime); return }
+        guard let timeline = try? RecordingExportTimeline(project: project) else { return }
+        let output = min(max(0, time), timeline.duration)
+        let source = timeline.slice(at: output).map { $0.sourceTime(at: output) }
+            ?? timeline.slices.last!.sourceEnd
+        seek(to: source)
+        playbackTime = output
     }
 
     func playSource() {
@@ -422,6 +480,7 @@ final class ScreenRecordingStudioModel: ObservableObject {
             return
         }
         guard canEdit, let project, let directory else { return }
+        let start = playbackTime < project.outputDuration ? playbackTime : 0
         isBusy = true
         operationTask = Task { [weak self] in
             guard let self else { return }
@@ -435,13 +494,23 @@ final class ScreenRecordingStudioModel: ObservableObject {
                 if let timelineObserver { timelinePlayer?.removeTimeObserver(timelineObserver); self.timelineObserver = nil }
                 let player = AVPlayer(playerItem: item)
                 timelinePlayer = player
-                playbackTime = 0
+                playbackTime = start
                 timelineObserver = player.addPeriodicTimeObserver(forInterval: CMTime(seconds: 0.1, preferredTimescale: 600), queue: .main) { [weak self] time in
                     Task { @MainActor [weak self] in
                         guard let self, isShowingTimelinePlayback else { return }
                         playbackTime = time.seconds
                         if let slice = timeline.slice(at: time.seconds) { currentTime = slice.sourceTime(at: time.seconds) }
+                        if time.seconds >= timeline.duration {
+                            isShowingTimelinePlayback = false
+                            playbackTime = 0
+                            refreshPreview()
+                        }
                     }
+                }
+                if start > 0 {
+                    await player.seek(to: CMTime(seconds: start, preferredTimescale: 60_000),
+                                      toleranceBefore: .zero, toleranceAfter: .zero)
+                    try Task.checkCancellation()
                 }
                 isShowingTimelinePlayback = true
                 player.play()
@@ -473,8 +542,9 @@ final class ScreenRecordingStudioModel: ObservableObject {
     func exportSubtitles() {
         guard canEdit, let project else { return }
         let panel = NSSavePanel()
-        panel.nameFieldStringValue = project.name + ".srt"
         panel.allowedContentTypes = [.init(filenameExtension: "srt") ?? .plainText]
+        panel.nameFieldStringValue = Self.fileName(project.name, extension: "srt")
+        panel.directoryURL = recordingOutputDirectory
         isChoosingFile = true
         panel.begin { [weak self] response in
             guard let self else { return }
@@ -543,7 +613,7 @@ final class ScreenRecordingStudioModel: ObservableObject {
         redoHistory.removeAll()
         isDirty = false
         currentTime = 0
-        showCaptureSetup = false
+        playbackTime = 0
         errorMessage = nil
         dismissAIEdit()
         isShowingSourcePlayback = false
@@ -557,7 +627,7 @@ final class ScreenRecordingStudioModel: ObservableObject {
                 if player.rate == 0 { self.isShowingSourcePlayback = false; self.refreshPreview() }
             }
         }
-        refreshPreview()
+        seekTimeline(to: 0)
     }
 
     func refreshPreview() {
@@ -574,7 +644,7 @@ final class ScreenRecordingStudioModel: ObservableObject {
                 preview = NSImage(cgImage: image, size: NSSize(width: image.width, height: image.height))
             } catch {
                 guard !Task.isCancelled, revision == previewRevision else { return }
-                errorMessage = error.localizedDescription
+                if errorMessage == nil { errorMessage = error.localizedDescription }
             }
         }
     }

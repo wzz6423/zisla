@@ -1,5 +1,5 @@
 "NSCalendarsFullAccessUsageDescription" = "zisla, üst bilgi paneli için yaklaşan takvim etkinliklerine erişim gerektirir.";
-"NSAudioCaptureUsageDescription" = "zisla, dalga biçimini göstermek ve uygulama ses düzeyini ayarlamak için sistem sesini okur; ekran kaydı için sistem sesini etkinleştirdiğinizde çalınan sesi kaydeder.";
+"NSAudioCaptureUsageDescription" = "zisla, medya oynatılırken, bir uygulamanın ses düzeyini ayarladığınızda veya ekran kaydı için sistem sesini etkinleştirdiğinizde sistem sesini okuyarak dalga biçimini gösterir, ses düzeyini ayarlar veya çalınan sesi kaydeder.";
 "NSCameraUsageDescription" = "zisla kamerayı yalnızca aynayı açtığınızda veya ekran kaydı için kamera katmanını etkinleştirdiğinizde kullanır.";
 "NSRemindersFullAccessUsageDescription" = "zisla, takvim etkinlikleriyle birlikte göstermek için tarihli hatırlatıcıları okur.";
 "NSLocationWhenInUseUsageDescription" = "zisla, yerel hava durumunu, yer adlarını ve yakındaki Wi-Fi ağlarını göstermek için konum erişimine ihtiyaç duyar.";

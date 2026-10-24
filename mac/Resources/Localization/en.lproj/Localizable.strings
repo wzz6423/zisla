@@ -2977,3 +2977,40 @@
 "高度比例" = "Height Ratio";
 "麦克风" = "Microphone";
 "鼠标大小" = "Cursor Size";
+
+
+"录屏控制条" = "Recording Controls";
+"保存位置" = "Save Location";
+"更改保存位置" = "Change Save Location";
+"选择录屏保存目录" = "Choose Recording Save Location";
+
+"系统声音音量" = "System Audio Volume";
+"麦克风音量" = "Microphone Volume";
+"显示摄像头" = "Show Camera";
+"画布比例" = "Canvas Aspect Ratio";
+"原始比例" = "Original Ratio";
+"自定义背景颜色" = "Custom Background Color";
+"背景颜色" = "Background Color";
+"标注" = "Annotations";
+"添加标注" = "Add Annotation";
+"文字标注" = "Text Annotation";
+"箭头标注" = "Arrow Annotation";
+"矩形标注" = "Rectangle Annotation";
+"删除标注" = "Delete Annotation";
+"标注内容" = "Annotation Text";
+"文字大小" = "Text Size";
+"线条粗细" = "Line Width";
+"起点 X" = "Start X";
+"起点 Y" = "Start Y";
+"终点 X" = "End X";
+"终点 Y" = "End Y";
+"位置使用画布左上角为原点，时间对应原始素材" = "Positions use the top-left corner of the canvas as the origin. Times refer to the original source.";
+"时间线按输出时间排列，精确输入对应原始素材" = "The timeline uses output time. Precise values refer to the original source.";
+"16:9" = "16:9";
+"9:16" = "9:16";
+"1:1" = "1:1";
+"4:3" = "4:3";
+
+"画布" = "Canvas";
+"光标" = "Cursor";
+"片段" = "Clip";

@@ -111,14 +111,15 @@ struct RecordingExportMedia {
     let camera: RecordingExportMediaTrack?
     let audioComposition: AVMutableComposition?
     let audioTracks: [AVMutableCompositionTrack]
+    let audioVolumes: [Float]
     let sourceSize: CGSize
     let timeline: RecordingExportTimeline
 
     func audioMix(for tracks: [AVCompositionTrack]) -> AVAudioMix {
         let mix = AVMutableAudioMix()
-        mix.inputParameters = tracks.map { track in
+        mix.inputParameters = tracks.enumerated().map { index, track in
             let parameters = AVMutableAudioMixInputParameters(track: track)
-            parameters.setVolume(1, at: .zero)
+            parameters.setVolume(audioVolumes[index], at: .zero)
             if timeline.slices.contains(where: { $0.speed != 1 }) {
                 parameters.audioTimePitchAlgorithm = .spectral
             }
@@ -159,20 +160,22 @@ struct RecordingExportMedia {
                                    timeline: timeline, mediaType: .video)
         } else { camera = nil }
 
-        var audioSources = try await asset.loadTracks(withMediaType: .audio).prefix(1).map { $0 }
+        var audioSources = try await asset.loadTracks(withMediaType: .audio).prefix(1).map {
+            (track: $0, volume: Float(project.edits.effectiveScreenAudioVolume))
+        }
         if let microphoneFile = project.microphoneFile {
             let microphoneAsset = AVURLAsset(url: try store.mediaURL(microphoneFile, in: directory))
             sourceAssets.append(microphoneAsset)
             guard let sourceMicrophone = try await microphoneAsset.loadTracks(withMediaType: .audio).first else {
                 throw ScreenRecordingExportError.unavailableMedia
             }
-            audioSources.append(sourceMicrophone)
+            audioSources.append((track: sourceMicrophone, volume: Float(project.edits.effectiveMicrophoneVolume)))
         }
         let audioComposition = audioSources.isEmpty ? nil : AVMutableComposition()
         var audioTracks: [AVMutableCompositionTrack] = []
         if let audioComposition {
             for source in audioSources {
-                let part = try makeTrack(source: source, range: try await availableRange(of: source),
+                let part = try makeTrack(source: source.track, range: try await availableRange(of: source.track),
                                          transform: .identity, timeline: timeline, mediaType: .audio,
                                          composition: audioComposition)
                 audioTracks.append(part.track)
@@ -181,7 +184,8 @@ struct RecordingExportMedia {
         // AVAssetTrack holds its asset weakly; retain every source until composition insertion finishes.
         withExtendedLifetime(sourceAssets) {}
         return RecordingExportMedia(video: video, camera: camera, audioComposition: audioComposition,
-                                    audioTracks: audioTracks, sourceSize: sourceBounds.size, timeline: timeline)
+                                    audioTracks: audioTracks, audioVolumes: audioSources.map { $0.volume },
+                                    sourceSize: sourceBounds.size, timeline: timeline)
     }
 
     static func availableRange(of track: AVAssetTrack) async throws -> CMTimeRange {

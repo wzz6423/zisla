@@ -2978,3 +2978,40 @@
 "高度比例" = "Rasio tinggi";
 "麦克风" = "Mikrofon";
 "鼠标大小" = "Ukuran kursor";
+
+
+"录屏控制条" = "Kontrol Perekaman";
+"保存位置" = "Lokasi Penyimpanan";
+"更改保存位置" = "Ubah Lokasi Penyimpanan";
+"选择录屏保存目录" = "Pilih Folder Penyimpanan Rekaman";
+
+"系统声音音量" = "Volume Audio Sistem";
+"麦克风音量" = "Volume Mikrofon";
+"显示摄像头" = "Tampilkan Kamera";
+"画布比例" = "Rasio Aspek Kanvas";
+"原始比例" = "Rasio Asli";
+"自定义背景颜色" = "Warna Latar Kustom";
+"背景颜色" = "Warna Latar";
+"标注" = "Anotasi";
+"添加标注" = "Tambah Anotasi";
+"文字标注" = "Anotasi Teks";
+"箭头标注" = "Anotasi Panah";
+"矩形标注" = "Anotasi Persegi Panjang";
+"删除标注" = "Hapus Anotasi";
+"标注内容" = "Teks Anotasi";
+"文字大小" = "Ukuran Teks";
+"线条粗细" = "Ketebalan Garis";
+"起点 X" = "Awal X";
+"起点 Y" = "Awal Y";
+"终点 X" = "Akhir X";
+"终点 Y" = "Akhir Y";
+"位置使用画布左上角为原点，时间对应原始素材" = "Titik asal berada di kiri atas kanvas. Waktu mengacu pada media asli.";
+"时间线按输出时间排列，精确输入对应原始素材" = "Linimasa menggunakan waktu keluaran. Nilai presisi mengacu pada media asli.";
+"16:9" = "16:9";
+"9:16" = "9:16";
+"1:1" = "1:1";
+"4:3" = "4:3";
+
+"画布" = "Kanvas";
+"光标" = "Kursor";
+"片段" = "Klip";

@@ -2978,3 +2978,40 @@
 "高度比例" = "Proporzione dell’altezza";
 "麦克风" = "Microfono";
 "鼠标大小" = "Dimensione del cursore";
+
+
+"录屏控制条" = "Controlli di registrazione";
+"保存位置" = "Posizione di salvataggio";
+"更改保存位置" = "Cambia posizione di salvataggio";
+"选择录屏保存目录" = "Scegli la cartella delle registrazioni";
+
+"系统声音音量" = "Volume audio di sistema";
+"麦克风音量" = "Volume microfono";
+"显示摄像头" = "Mostra videocamera";
+"画布比例" = "Proporzioni della tela";
+"原始比例" = "Proporzioni originali";
+"自定义背景颜色" = "Colore di sfondo personalizzato";
+"背景颜色" = "Colore di sfondo";
+"标注" = "Annotazioni";
+"添加标注" = "Aggiungi annotazione";
+"文字标注" = "Annotazione di testo";
+"箭头标注" = "Annotazione con freccia";
+"矩形标注" = "Annotazione rettangolare";
+"删除标注" = "Elimina annotazione";
+"标注内容" = "Testo dell’annotazione";
+"文字大小" = "Dimensione del testo";
+"线条粗细" = "Spessore della linea";
+"起点 X" = "Inizio X";
+"起点 Y" = "Inizio Y";
+"终点 X" = "Fine X";
+"终点 Y" = "Fine Y";
+"位置使用画布左上角为原点，时间对应原始素材" = "L’origine è l’angolo superiore sinistro della tela. I tempi si riferiscono al materiale originale.";
+"时间线按输出时间排列，精确输入对应原始素材" = "La sequenza temporale usa il tempo di uscita. I valori precisi si riferiscono al materiale originale.";
+"16:9" = "16:9";
+"9:16" = "9:16";
+"1:1" = "1:1";
+"4:3" = "4:3";
+
+"画布" = "Tela";
+"光标" = "Cursore";
+"片段" = "Clip";
