@@ -74,7 +74,7 @@ struct ScreenshotRoundedCornerTests {
     func completeRadiusControlRemainsInsideScreenBounds(scenario: (selection: CGRect, bounds: CGRect), radius: CGFloat) {
         let (selection, bounds) = scenario
         let position = ScreenshotRoundedCornerGeometry.handlePosition(in: selection, radius: radius, within: bounds)
-        let frame = CGRect(x: position.x - 8, y: position.y - 8, width: 16, height: 16)
+        let frame = CGRect(x: position.x - 4, y: position.y - 4, width: 8, height: 8)
         #expect(bounds.contains(frame), "The complete radius drag target must remain visible at every screen edge")
         for handle in ScreenshotSelectionHandle.allCases {
             #expect(!frame.contains(ScreenshotSelectionGeometry.position(of: handle, in: selection)),
@@ -300,9 +300,12 @@ struct ScreenshotRoundedCornerTests {
         let annotation = ScreenshotAnnotation(kind: .rectangle, rect: CGRect(x: 20, y: 20, width: 30, height: 20))
         model.add(annotation)
         let before = try #require(model.pngData())
-        model.extractionMode = .lasso
-        model.selectAllExtractionRegions()
-        let task = try #require(model.extract())
+        model.selectExtractionMode(.lasso)
+        let task = try #require(model.updateExtractionRegion([
+            .zero, CGPoint(x: model.image.size.width, y: 0),
+            CGPoint(x: model.image.size.width, y: model.image.size.height),
+            CGPoint(x: 0, y: model.image.size.height),
+        ], isComplete: true))
         await task.value
         #expect(model.hasExtractedImage)
         #expect(model.cornerRadius == 23)
@@ -328,7 +331,7 @@ struct ScreenshotRoundedCornerTests {
         let source = try sourceImage()
         let model = ScreenshotEditorModel(image: source)
         let gate = ExtractionGate()
-        let extraction = model.extract(extractImage: { image, operation in
+        let extraction = model.selectExtractionMode(.foreground, extractImage: { image, operation in
             try await gate.extract(image, operation: operation)
         })
         let task = try #require(extraction)
@@ -414,12 +417,14 @@ struct ScreenshotRoundedCornerTests {
         let handle = try #require(findRadiusHandle(in: host))
         let drag = try #require(handle.onDrag)
         let begin = try #require(handle.onDragBegan)
-        #expect(handle.bounds.size == CGSize(width: 16, height: 16))
+        #expect(handle.bounds.size == CGSize(width: 8, height: 8))
+        #expect(handle.bounds.width < 12 && handle.bounds.height < 12,
+                "The live radius control must be smaller than the 12-point corner resize handles")
         assertRadiusHandleRemainsVisibleAndHittable(handle, in: host, selection: selection)
         if selection.width == 200 {
             let frame = host.convert(handle.bounds, from: handle)
             #expect(frame.midX > selection.minX && frame.midX <= selection.minX + 28)
-            #expect(frame.midY == max(8, selection.minY), "The real editor must place the control on the visible top-edge tangent")
+            #expect(frame.midY == max(4, selection.minY), "The real editor must place the control on the visible top-edge tangent")
         }
         begin()
         drag(.zero, .zero, false)
@@ -440,7 +445,7 @@ struct ScreenshotRoundedCornerTests {
         if selection.width == 200 {
             let frame = host.convert(handle.bounds, from: handle)
             #expect(frame.midX == selection.minX + targetRadius)
-            #expect(frame.midY == max(8, selection.minY))
+            #expect(frame.midY == max(4, selection.minY))
         }
         model.undo()
         #expect(model.cornerRadius == 0)
@@ -507,7 +512,7 @@ struct ScreenshotRoundedCornerTests {
         selection: CGRect
     ) {
         let frame = host.convert(handle.bounds, from: handle)
-        #expect(host.bounds.contains(frame), "The editor must display all 16 points of the radius drag target")
+        #expect(host.bounds.contains(frame), "The editor must display all 8 points of the radius drag target")
         let point = host.convert(CGPoint(x: frame.midX, y: frame.midY), to: host.superview)
         let hit = host.hitTest(point)
         let receivesPointerInput = hit === handle

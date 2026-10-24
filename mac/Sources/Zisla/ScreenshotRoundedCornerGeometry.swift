@@ -2,7 +2,7 @@ import CoreGraphics
 
 enum ScreenshotRoundedCornerGeometry {
     static let handleOffset: CGFloat = 18
-    static let handleSize: CGFloat = 16
+    static let handleSize: CGFloat = 8
 
     static func maximumRadius(for size: CGSize) -> CGFloat {
         guard size.width.isFinite, size.height.isFinite else { return 0 }

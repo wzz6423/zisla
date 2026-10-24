@@ -18,7 +18,8 @@ struct ScreenshotExtractionTests {
         let model = ScreenshotEditorModel(image: original)
         model.tool = .extraction
         #expect(model.image === original)
-        #expect(model.extractionMode == .foreground)
+        #expect(model.extractionMode == nil)
+        #expect(model.updateExtractionRegion(loop(CGRect(origin: .zero, size: size)), isComplete: true) == nil)
         #expect(!model.hasExtractedImage)
         #expect(!model.isExtracting)
         #expect(!model.canUndo)
@@ -111,30 +112,74 @@ struct ScreenshotExtractionTests {
     }
 
     @Test
-    func freehandSelectionsSupportAllClearAndCancelWhenSwitchingToolsOrModes() throws {
-        let model = ScreenshotEditorModel(image: try sourceImage())
+    func completedLoopsExtractImmediatelyAndAccumulateTheirUnion() async throws {
+        let original = try sourceImage()
+        let model = ScreenshotEditorModel(image: original)
         model.tool = .extraction
-        model.extractionMode = .lasso
-        let first = loop(CGRect(x: 5, y: 5, width: 15, height: 10))
-        let second = loop(CGRect(x: 40, y: 20, width: 20, height: 10))
+        #expect(model.selectExtractionMode(.lasso) == nil)
+        #expect(model.image === original)
+        #expect(!model.canUndo)
+        let first = loop(CGRect(x: 5, y: 5, width: 25, height: 20))
+        let second = Array(loop(CGRect(x: 20, y: 15, width: 40, height: 20)).reversed())
         model.updateExtractionRegion(first, isComplete: false)
         #expect(model.pendingExtractionRegion == first)
         #expect(model.extractionRegions.isEmpty)
-        model.updateExtractionRegion(first, isComplete: true)
-        model.updateExtractionRegion(second, isComplete: true)
+        #expect(model.updateExtractionRegion(Array(first.prefix(2)), isComplete: true) == nil)
+        #expect(model.image === original && !model.canUndo)
+        let firstTask = try #require(model.updateExtractionRegion(first, isComplete: true))
+        await firstTask.value
+        let firstPNG = try #require(model.pngData())
+        #expect(try pixel(try pixels(model.image), x: 50, y: 25).alphaComponent == 0)
+        let secondTask = try #require(model.updateExtractionRegion(second, isComplete: true))
+        await secondTask.value
         #expect(model.pendingExtractionRegion.isEmpty)
         #expect(model.extractionRegions == [first, second])
-        #expect(!model.canUndo, "Selections must not add image edit history")
-        model.clearExtractionSelection()
-        #expect(model.extractionRegions.isEmpty)
-        model.selectAllExtractionRegions()
-        #expect(model.extractionRegions == [loop(CGRect(origin: .zero, size: size))])
-        model.extractionMode = .background
-        #expect(model.extractionRegions.isEmpty)
-        model.updateExtractionRegion(first, isComplete: true)
-        model.tool = .brush
-        #expect(model.extractionRegions.isEmpty)
-        #expect(model.pendingExtractionRegion.isEmpty)
+        for point in [CGPoint(x: 10, y: 10), CGPoint(x: 25, y: 20), CGPoint(x: 50, y: 25)] {
+            #expect(try pixel(try pixels(model.image), x: Int(point.x), y: Int(point.y)).alphaComponent == 1)
+        }
+        #expect(try pixel(try pixels(model.image), x: 70, y: 40).alphaComponent == 0)
+        let unionPNG = try #require(model.pngData())
+        model.undo()
+        #expect(model.extractionRegions == [first])
+        #expect(model.pngData() == firstPNG)
+        model.redo()
+        #expect(model.extractionRegions == [first, second])
+        #expect(model.pngData() == unionPNG)
+        #expect(model.selectExtractionMode(.lasso) == nil)
+        #expect(model.image === original)
+        #expect(model.extractionMode == nil && model.extractionRegions.isEmpty)
+        model.undo()
+        #expect(model.extractionMode == .lasso && model.extractionRegions == [first, second])
+        #expect(model.pngData() == unionPNG)
+        model.redo()
+        #expect(model.image === original && model.extractionMode == nil)
+    }
+
+    @Test
+    func switchingModesClearsPendingAndUncommittedLassoRegions() async throws {
+        let original = try sourceImage()
+        let model = ScreenshotEditorModel(image: original)
+        model.selectExtractionMode(.lasso)
+        let first = ExtractionGate()
+        let firstResult = model.updateExtractionRegion(loop(CGRect(x: 3, y: 3, width: 20, height: 20)), isComplete: true,
+            extractImage: { image, operation in try await first.extract(image, operation: operation) })
+        let firstTask = try #require(firstResult)
+        await first.waitUntilStarted()
+        model.updateExtractionRegion(loop(CGRect(x: 35, y: 20, width: 20, height: 20)), isComplete: false)
+        let next = ExtractionGate()
+        let nextResult = model.selectExtractionMode(.foreground, extractImage: { image, operation in
+            #expect(operation.regions.isEmpty, "An automatic extraction must not inherit lasso regions")
+            return try await next.extract(image, operation: operation)
+        })
+        let nextTask = try #require(nextResult)
+        #expect(model.extractionRegions.isEmpty && model.pendingExtractionRegion.isEmpty)
+        await next.waitUntilStarted()
+        model.selectExtractionMode(.foreground)
+        await first.finish()
+        await next.finish()
+        await firstTask.value
+        await nextTask.value
+        #expect(model.image === original && !model.canUndo && model.extractionMode == nil)
     }
 
     @Test(arguments: [1, 2])
@@ -144,16 +189,16 @@ struct ScreenshotExtractionTests {
             points: [CGPoint(x: 10, y: 10), CGPoint(x: 30, y: 10)], color: .black, lineWidth: 4)
         model.add(annotation)
         let before = try #require(model.pngData())
-        model.extractionMode = .lasso
-        model.updateExtractionRegion(loop(CGRect(x: 3, y: 3, width: 40, height: 25)), isComplete: true)
-        let taskResult = model.extract()
+        model.selectExtractionMode(.lasso)
+        let selection = loop(CGRect(x: 3, y: 3, width: 40, height: 25))
+        let taskResult = model.updateExtractionRegion(selection, isComplete: true)
         let task = try #require(taskResult)
         #expect(model.isExtracting)
         await task.value
         #expect(!model.isExtracting)
         #expect(model.hasExtractedImage)
         #expect(model.annotations.isEmpty)
-        #expect(model.extractionRegions.isEmpty)
+        #expect(model.extractionRegions == [selection])
         #expect(model.statusMessage == AppLocalization.text("提取完成"))
         #expect(model.image.size == size)
         let extracted = try #require(model.pngData())
@@ -183,8 +228,7 @@ struct ScreenshotExtractionTests {
         model.add(ScreenshotAnnotation(kind: .brush,
             points: [CGPoint(x: 10, y: 10), CGPoint(x: 30, y: 10)], color: .black, lineWidth: 4))
         let expected = try pixels(model.renderedImage())
-        model.extractionMode = mode
-        let taskResult = model.extract(extractImage: { source, operation in
+        let taskResult = model.selectExtractionMode(mode, extractImage: { source, operation in
             #expect(operation.mode == mode)
             #expect(operation.imageSize == CGSize(width: 80, height: 50))
             #expect(source.width == expected.width && source.height == expected.height)
@@ -197,6 +241,146 @@ struct ScreenshotExtractionTests {
         #expect(try pixel(try pixels(model.image), x: 20, y: 10, scale: 2).redComponent < 0.02)
     }
 
+    @Test(arguments: ScreenshotExtractionMode.allCases)
+    func deselectingRestoresOriginalAndKeepsLaterAnnotationsRadiusAndHistory(mode: ScreenshotExtractionMode) async throws {
+        let original = try sourceImage()
+        let model = ScreenshotEditorModel(image: original)
+        let annotation = ScreenshotAnnotation(kind: .brush,
+            points: [CGPoint(x: 10, y: 10), CGPoint(x: 30, y: 10)], color: .black, lineWidth: 4)
+        model.add(annotation)
+        let selection = loop(CGRect(x: 3, y: 3, width: 40, height: 25))
+        let extractImage: @Sendable (CGImage, ScreenshotExtractionOperation) async throws -> CGImage? = { source, operation in
+            try ScreenshotExtractionOperation(mode: .lasso, imageSize: operation.imageSize, regions: [selection]).extract(source)
+        }
+        let taskResult: Task<Void, Never>?
+        if mode == .lasso {
+            model.selectExtractionMode(mode)
+            taskResult = model.updateExtractionRegion(selection, isComplete: true, extractImage: extractImage)
+        } else {
+            taskResult = model.selectExtractionMode(mode, extractImage: extractImage)
+        }
+        await (try #require(taskResult)).value
+        let extracted = model.image
+        model.addNumber(at: CGPoint(x: 60, y: 30))
+        let later = try #require(model.annotations.first)
+        model.setCornerRadius(12)
+        model.selectExtractionMode(mode)
+        #expect(model.image === original && !model.hasExtractedImage)
+        #expect(model.annotations == [annotation, later])
+        #expect(model.cornerRadius == 12 && model.numberAnnotation(at: .zero).number == 2)
+        #expect(model.extractionMode == nil && model.extractionRegions.isEmpty)
+        model.undo()
+        #expect(model.image === extracted && model.hasExtractedImage)
+        #expect(model.annotations == [later] && model.cornerRadius == 12)
+        #expect(model.extractionMode == mode)
+        model.redo()
+        #expect(model.image === original && model.annotations == [annotation, later])
+        #expect(model.cornerRadius == 12 && model.extractionMode == nil)
+    }
+
+    @Test
+    func switchingAutomaticModesRecomputesOriginalAndLassoStartsFromOriginal() async throws {
+        let original = try sourceImage()
+        let model = ScreenshotEditorModel(image: original)
+        let annotation = ScreenshotAnnotation(kind: .rectangle, rect: CGRect(x: 5, y: 5, width: 20, height: 20))
+        model.add(annotation)
+        let selection = loop(CGRect(x: 3, y: 3, width: 30, height: 25))
+        let firstResult = model.selectExtractionMode(.foreground, extractImage: { source, operation in
+            try ScreenshotExtractionOperation(mode: .lasso, imageSize: operation.imageSize, regions: [selection]).extract(source)
+        })
+        let first = try #require(firstResult)
+        await first.value
+        #expect(try pixel(try pixels(model.image), x: 60, y: 30).alphaComponent == 0)
+        let secondResult = model.selectExtractionMode(.background, extractImage: { source, operation in
+            #expect(operation.mode == .background && operation.regions.isEmpty)
+            #expect(NSBitmapImageRep(cgImage: source).colorAt(x: 60, y: 30)?.alphaComponent == 1)
+            return source
+        })
+        let second = try #require(secondResult)
+        await second.value
+        #expect(model.extractionMode == .background && model.hasExtractedImage)
+        #expect(model.selectExtractionMode(.lasso) == nil)
+        #expect(model.image === original && model.annotations == [annotation])
+        #expect(model.extractionMode == .lasso && model.extractionRegions.isEmpty)
+        #expect(!model.hasExtractedImage && !model.isExtracting)
+    }
+
+    @Test
+    func undoingExtractionDoesNotResurrectAnAnnotationDeletedAfterUndo() async throws {
+        let original = try sourceImage()
+        let model = ScreenshotEditorModel(image: original)
+        let firstResult = model.selectExtractionMode(.foreground, extractImage: { source, _ in source })
+        let first = try #require(firstResult)
+        await first.value
+        let annotation = ScreenshotAnnotation(kind: .rectangle, rect: CGRect(x: 5, y: 5, width: 20, height: 20))
+        model.add(annotation)
+        let secondResult = model.selectExtractionMode(.background, extractImage: { source, _ in source })
+        let second = try #require(secondResult)
+        await second.value
+        model.undo()
+        #expect(model.annotations == [annotation] && model.extractionMode == .foreground)
+        model.remove(id: annotation.id)
+        model.selectExtractionMode(.foreground)
+        #expect(model.image === original && model.annotations.isEmpty,
+            "Undo must restore its own source so deleting a live annotation cannot resurrect it from a later extraction")
+    }
+
+    @Test
+    func deselectingKeepsPendingDraftsOnTheRestoredOriginal() async throws {
+        let original = try sourceImage()
+        let model = ScreenshotEditorModel(image: original)
+        let firstResult = model.selectExtractionMode(.foreground, extractImage: { source, _ in source })
+        let first = try #require(firstResult)
+        await first.value
+        let text = ScreenshotAnnotation(kind: .text, points: [CGPoint(x: 5, y: 20)],
+            rect: CGRect(x: 5, y: 12, width: 50, height: 18), text: "old")
+        let draft = ScreenshotAnnotation(kind: .number, points: [CGPoint(x: 60, y: 30)], number: 7)
+        model.add(text)
+        model.beginTextDraft(id: text.id, text: "edited", isNew: false)
+        model.updatePendingAnnotationDraft(draft)
+        model.selectExtractionMode(.foreground)
+        #expect(model.image === original && model.annotations == [text])
+        #expect(model.pendingTextDraft?.text == "edited" && model.pendingAnnotationDraft == draft)
+        #expect(!model.hasExtractedImage && model.extractionMode == nil)
+    }
+
+    @Test(arguments: ["annotation", "text draft", "shape draft"])
+    func cancellingASwitchDoesNotRestoreRemovedOrDiscardedEdits(action: String) async throws {
+        let original = try sourceImage()
+        let model = ScreenshotEditorModel(image: original)
+        let firstResult = model.selectExtractionMode(.foreground, extractImage: { source, _ in source })
+        let first = try #require(firstResult)
+        await first.value
+        let annotation = ScreenshotAnnotation(kind: .text, points: [CGPoint(x: 5, y: 20)],
+            rect: CGRect(x: 5, y: 12, width: 50, height: 18), text: "old")
+        if action == "shape draft" {
+            model.updatePendingAnnotationDraft(ScreenshotAnnotation(kind: .rectangle,
+                rect: CGRect(x: 5, y: 5, width: 20, height: 20)))
+        } else {
+            model.add(annotation)
+            if action == "text draft" { model.beginTextDraft(id: annotation.id, text: "edited", isNew: false) }
+        }
+        let gate = ExtractionGate()
+        let secondResult = model.selectExtractionMode(.background, extractImage: { image, operation in
+            try await gate.extract(image, operation: operation)
+        })
+        let second = try #require(secondResult)
+        await gate.waitUntilStarted()
+        switch action {
+        case "annotation": model.remove(id: annotation.id)
+        case "text draft": model.discardPendingTextDraft()
+        default: model.discardPendingAnnotationDraft()
+        }
+        let expectedAnnotations = model.annotations
+        model.selectExtractionMode(.background)
+        #expect(model.image === original && model.annotations == expectedAnnotations)
+        #expect(model.pendingTextDraft == nil && model.pendingAnnotationDraft == nil,
+            "A cancelled request must not retain a draft that the user has discarded")
+        await gate.finish()
+        await second.value
+        #expect(model.image === original && model.extractionMode == nil && !model.isExtracting)
+    }
+
     @Test(arguments: ["empty", "failure", "transparent", "wrong size", "invalid image", "cancelled"])
     func unsuccessfulExtractionPreservesImageAnnotationsHistoryAndDrafts(outcome: String) async throws {
         let original = outcome == "invalid image" ? NSImage() : try sourceImage()
@@ -207,7 +391,7 @@ struct ScreenshotExtractionTests {
         model.add(text, saveUndo: false)
         model.beginTextDraft(id: text.id, text: "edited", isNew: false)
         model.updatePendingAnnotationDraft(draft)
-        let taskResult = model.extract(extractImage: { _, _ in
+        let taskResult = model.selectExtractionMode(.foreground, extractImage: { _, _ in
             switch outcome {
             case "invalid image": Issue.record("Invalid image must not reach Vision"); return nil
             case "failure": throw ExtractionFailure()
@@ -237,16 +421,24 @@ struct ScreenshotExtractionTests {
         }
     }
 
-    @Test
-    func successfulExtractionIncludesPendingDraftsAndUndoRestoresTheirVisibleContent() async throws {
+    @Test(arguments: [false, true])
+    func successfulExtractionIncludesPendingDraftsAndUndoRestoresTheirVisibleContent(alreadyExtracted: Bool) async throws {
         let model = ScreenshotEditorModel(image: try sourceImage())
+        let base = ScreenshotAnnotation(kind: .rectangle, rect: CGRect(x: 20, y: 20, width: 30, height: 20))
+        if alreadyExtracted {
+            model.add(base, saveUndo: false)
+            let initialResult = model.selectExtractionMode(.foreground, extractImage: { source, _ in source })
+            let initial = try #require(initialResult)
+            await initial.value
+        }
         let text = ScreenshotAnnotation(kind: .text, points: [CGPoint(x: 5, y: 20)],
             rect: CGRect(x: 5, y: 12, width: 50, height: 18), text: "old", color: .black)
         let number = ScreenshotAnnotation(kind: .number, points: [CGPoint(x: 60, y: 30)], number: 7)
         model.add(text, saveUndo: false)
         model.beginTextDraft(id: text.id, text: "edited", isNew: false)
         model.updatePendingAnnotationDraft(number)
-        let taskResult = model.extract(extractImage: { source, _ in source })
+        let taskResult = model.selectExtractionMode(alreadyExtracted ? .background : .foreground,
+            extractImage: { source, _ in source })
         let task = try #require(taskResult)
         await task.value
         #expect(model.annotations.isEmpty)
@@ -255,11 +447,12 @@ struct ScreenshotExtractionTests {
         model.undo()
         #expect(model.annotations.map(\.text).contains("edited"))
         #expect(model.annotations.contains(number))
+        #expect(!model.annotations.contains(base), "Undo must keep annotations already flattened in the extracted base out of the live layer")
         #expect(model.numberAnnotation(at: .zero).number == 8)
-        #expect(!model.canUndo, "Rendering pending drafts must not add extra history to the live editor")
+        #expect(model.canUndo == alreadyExtracted, "Rendering pending drafts must not add extra history to the live editor")
     }
 
-    @Test(arguments: ["explicit", "parent task", "annotation", "draft", "text", "replacement", "tool", "selection", "undo", "discard annotation", "discard text", "pin"])
+    @Test(arguments: ["explicit", "parent task", "annotation", "draft", "text", "replacement", "tool", "mode", "same mode", "selection", "undo", "discard annotation", "discard text", "pin"])
     func cancelledOrSupersededExtractionDiscardsItsLateSuccess(action: String) async throws {
         let original = try sourceImage()
         let model = ScreenshotEditorModel(image: original)
@@ -267,9 +460,13 @@ struct ScreenshotExtractionTests {
         if action == "discard annotation" { model.updatePendingAnnotationDraft(annotationDraft) }
         if action == "discard text" { model.beginTextDraft(id: UUID(), text: "pending", isNew: false) }
         let gate = ExtractionGate()
-        let taskResult = model.extract(extractImage: { image, operation in
+        if action == "selection" { model.selectExtractionMode(.lasso) }
+        let extractImage: @Sendable (CGImage, ScreenshotExtractionOperation) async throws -> CGImage? = { image, operation in
             try await gate.extract(image, operation: operation)
-        })
+        }
+        let taskResult = action == "selection"
+            ? model.updateExtractionRegion(loop(CGRect(x: 3, y: 3, width: 10, height: 10)), isComplete: true, extractImage: extractImage)
+            : model.selectExtractionMode(.foreground, extractImage: extractImage)
         let task = try #require(taskResult)
         await gate.waitUntilStarted()
         let operation = try #require(await gate.operation)
@@ -281,7 +478,9 @@ struct ScreenshotExtractionTests {
         case "text": model.beginTextDraft(id: UUID(), text: "new", isNew: true)
         case "replacement": model.replaceCapture(with: try sourceImage(pixelScale: 2), translatingAnnotationsBy: .zero)
         case "tool": model.tool = .brush
-        case "selection": model.updateExtractionRegion(loop(CGRect(x: 3, y: 3, width: 10, height: 10)), isComplete: true)
+        case "mode": model.selectExtractionMode(.lasso)
+        case "same mode": model.selectExtractionMode(.foreground)
+        case "selection": model.updateExtractionRegion(loop(CGRect(x: 3, y: 3, width: 10, height: 10)), isComplete: false)
         case "discard annotation": model.discardPendingAnnotationDraft()
         case "discard text": model.discardPendingTextDraft()
         case "pin": model.isPinned = true
@@ -300,46 +499,44 @@ struct ScreenshotExtractionTests {
         if action != "parent task" { #expect(model.statusMessage == "new editor state") }
     }
 
-    @Test
-    func duplicateClicksShareOneRequestAndOldCompletionCannotFinishTheReplacement() async throws {
-        let model = ScreenshotEditorModel(image: try sourceImage())
+    @Test(arguments: [false, true])
+    func rapidModeSwitchIgnoresOldSuccessAndFailureAndCurrentModeCancels(oldFails: Bool) async throws {
+        let original = try sourceImage()
+        let model = ScreenshotEditorModel(image: original)
         let old = ExtractionGate()
         let next = ExtractionGate()
-        let firstResult = model.extract(extractImage: { image, operation in
+        let firstResult = model.selectExtractionMode(.foreground, extractImage: { image, operation in
             try await old.extract(image, operation: operation)
         })
         let first = try #require(firstResult)
         await old.waitUntilStarted()
-        #expect(model.extract(extractImage: { _, _ in
-            Issue.record("Duplicate clicks must not dispatch another extraction")
-            return nil
-        }) == nil)
-        model.cancelExtraction()
-        let secondResult = model.extract(extractImage: { image, operation in
+        let secondResult = model.selectExtractionMode(.background, extractImage: { image, operation in
             try await next.extract(image, operation: operation)
         })
         let second = try #require(secondResult)
         await next.waitUntilStarted()
-        await old.finish(fails: true)
+        let operation = try #require(await old.operation)
+        #expect(throws: CancellationError.self) { try operation.checkCancellation() }
+        await old.finish(fails: oldFails)
         await first.value
         #expect(model.isExtracting)
+        #expect(model.extractionMode == .background)
         #expect(model.statusMessage == AppLocalization.text("正在提取..."))
         #expect(!model.hasExtractedImage)
         await next.finish()
         await second.value
         #expect(model.hasExtractedImage)
         #expect(!model.isExtracting)
-        let retryResult = model.extract(extractImage: { image, _ in image })
-        let retry = try #require(retryResult)
-        await retry.value
-        #expect(!model.isExtracting)
+        #expect(model.selectExtractionMode(.background) == nil)
+        #expect(!model.isExtracting && model.extractionMode == nil)
+        #expect(model.image === original && !model.hasExtractedImage)
     }
 
     @Test
     func clearingAbsentDraftsKeepsAnActiveExtraction() async throws {
         let model = ScreenshotEditorModel(image: try sourceImage())
         let gate = ExtractionGate()
-        let taskResult = model.extract(extractImage: { image, operation in
+        let taskResult = model.selectExtractionMode(.foreground, extractImage: { image, operation in
             try await gate.extract(image, operation: operation)
         })
         let task = try #require(taskResult)
@@ -374,7 +571,7 @@ struct ScreenshotExtractionTests {
         let model = ScreenshotEditorModel(image: try sourceImage())
         let draft = ScreenshotAnnotation(kind: .rectangle, rect: CGRect(x: 5, y: 5, width: 20, height: 20))
         model.updatePendingAnnotationDraft(draft)
-        let taskResult = model.extract(extractImage: { _, _ in
+        let taskResult = model.selectExtractionMode(.foreground, extractImage: { _, _ in
             Issue.record("Closing before dispatch must not call the extraction dependency")
             return nil
         })
@@ -391,16 +588,23 @@ struct ScreenshotExtractionTests {
     @Test
     func replacingExtractedCaptureClearsItsTransparencyAndSelectionHistory() async throws {
         let model = ScreenshotEditorModel(image: try sourceImage())
-        model.extractionMode = .lasso
-        model.selectAllExtractionRegions()
-        let taskResult = model.extract()
+        model.selectExtractionMode(.lasso)
+        let taskResult = model.updateExtractionRegion(loop(CGRect(origin: .zero, size: size)), isComplete: true)
         let task = try #require(taskResult)
         await task.value
         #expect(model.hasExtractedImage)
         model.updateExtractionRegion(loop(CGRect(x: 5, y: 5, width: 10, height: 10)), isComplete: false)
         model.replaceCapture(with: try sourceImage(pixelScale: 2), translatingAnnotationsBy: .zero)
         #expect(!model.hasExtractedImage)
+        #expect(model.extractionMode == nil)
         #expect(model.pendingExtractionRegion.isEmpty && model.extractionRegions.isEmpty)
+        let nextResult = model.selectExtractionMode(.foreground, extractImage: { source, _ in
+            #expect(source.width == 160 && source.height == 100, "A new capture must replace the extraction source")
+            return source
+        })
+        await (try #require(nextResult)).value
+        model.undo()
+        #expect(!model.hasExtractedImage)
         model.undo()
         #expect(!model.hasExtractedImage, "Capture-bound changes also replace the base image in undo history")
     }
@@ -411,7 +615,7 @@ struct ScreenshotExtractionTests {
         let fixture = try Fixture(image: sourceImage())
         defer { fixture.close() }
         let gate = ExtractionGate()
-        let taskResult = fixture.model.extract(extractImage: { image, operation in
+        let taskResult = fixture.model.selectExtractionMode(.foreground, extractImage: { image, operation in
             try await gate.extract(image, operation: operation)
         })
         let task = try #require(taskResult)

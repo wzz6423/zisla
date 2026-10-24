@@ -48,103 +48,97 @@ struct ScreenshotExtractionControlsLayoutTests {
     }
 
     @Test(arguments: AppLanguage.allCases)
-    func everyModeAndItsActionsFitOneRowInEveryLanguage(language: AppLanguage) async throws {
+    func modesAndBusyOrFailureStatesKeepOneRowInEveryLanguage(language: AppLanguage) async throws {
         let releaseAccessibility = EnhancedAccessibilityTestScope.acquire()
         defer { releaseAccessibility() }
-        for mode in ScreenshotExtractionMode.allCases {
-            let model = ScreenshotEditorModel(image: sourceImage())
-            model.extractionMode = mode
-            let fixture = Fixture(model: model, language: language)
-            defer { fixture.window.close() }
-            await fixture.settle()
-
-            let picker = try #require(fixture.segmentedControl())
-            #expect(picker.segmentCount == ScreenshotExtractionMode.allCases.count)
-            for (index, option) in ScreenshotExtractionMode.allCases.enumerated() {
-                #expect(picker.label(forSegment: index) == AppLocalization.string(option.title, language: language))
-            }
-            var labels = [AppLocalization.string(mode == .lasso ? "提取所选区域" : mode.title, language: language)]
-            if mode == .lasso {
-                labels += ["全选", "清除"].map { AppLocalization.string($0, language: language) }
-                labels.append(AppLocalization.format("已圈选 %ld 个区域", locale: language.locale, [0]))
-            }
-            try fixture.expectSingleRow(labels: labels)
-            #expect(try fixture.button(mode == .lasso ? "提取所选区域" : mode.title).isEnabled == (mode != .lasso))
+        let model = ScreenshotEditorModel(image: sourceImage())
+        let gate = AsyncStream<Void>.makeStream()
+        var tasks: [Task<Void, Never>] = []
+        let fixture = Fixture(model: model, language: language, onSelectMode: { mode in
+            if let task = model.selectExtractionMode(mode, extractImage: { source, _ in
+                for await _ in gate.stream {}
+                return source
+            }) { tasks.append(task) }
+        })
+        defer { fixture.window.close() }
+        defer { model.cancelExtraction(); gate.continuation.finish() }
+        await fixture.settle()
+        let picker = try #require(fixture.segmentedControl())
+        #expect(picker.segmentCount == ScreenshotExtractionMode.allCases.count)
+        #expect(picker.accessibilityLabel() == AppLocalization.string("提取方式", language: language))
+        #expect(picker.userInterfaceLayoutDirection == (language.isRightToLeft ? .rightToLeft : .leftToRight))
+        for (index, option) in ScreenshotExtractionMode.allCases.enumerated() {
+            #expect(picker.label(forSegment: index) == AppLocalization.string(option.title, language: language))
+            #expect(!picker.isSelected(forSegment: index))
         }
+        try fixture.expectSingleRow()
+        let idleSize = fixture.host.fittingSize
+        for mode in [ScreenshotExtractionMode.lasso, .foreground, .background] {
+            try fixture.press(mode)
+            await fixture.settle()
+            #expect(model.extractionMode == mode)
+            #expect(picker.isEnabled, "Modes must stay available so the current request can be cancelled or replaced")
+            #expect(fixture.host.fittingSize == idleSize)
+            if mode != .lasso {
+                #expect(model.isExtracting)
+                let index = try #require(ScreenshotExtractionMode.allCases.firstIndex(of: mode))
+                #expect(picker.toolTip(forSegment: index) == AppLocalization.string("正在提取...", language: language))
+                for other in ScreenshotExtractionMode.allCases.indices where other != index {
+                    #expect(picker.toolTip(forSegment: other) == nil)
+                }
+            }
+            try fixture.expectSingleRow()
+        }
+        try fixture.press(.background)
+        await fixture.settle()
+        #expect(!model.isExtracting && model.extractionMode == nil)
+        #expect(model.statusMessage == nil && fixture.host.fittingSize == idleSize)
+        gate.continuation.finish()
+        for task in tasks { await task.value }
+        try fixture.press(.lasso)
+        let failure = AppLocalization.format("提取失败：%@", locale: language.locale, [String(repeating: "failure ", count: 100)])
+        model.statusMessage = failure
+        await fixture.settle()
+        #expect(picker.toolTip(forSegment: 2) == failure)
+        #expect(fixture.host.fittingSize == idleSize)
+        try fixture.expectSingleRow()
     }
 
     @Test
-    func lassoActionsUpdateSelectionAndModeWithoutChangingTheImage() async throws {
+    func nativeSegmentsToggleAndSwitchBeforeSwiftUIRefresh() async throws {
         let releaseAccessibility = EnhancedAccessibilityTestScope.acquire()
         defer { releaseAccessibility() }
         let image = sourceImage()
         let model = ScreenshotEditorModel(image: image)
-        model.extractionMode = .lasso
-        var extractions = 0
-        let fixture = Fixture(model: model, onExtract: { extractions += 1 })
-        defer { fixture.window.close() }
-        await fixture.settle()
-        #expect(try fixture.button("提取所选区域").isEnabled == false)
-
-        try fixture.press("全选")
-        await fixture.settle()
-        #expect(model.extractionRegions.count == 1)
-        #expect(try fixture.button("提取所选区域").isEnabled == true)
-        #expect(fixture.elements().contains { $0.label == "已圈选 1 个区域" })
-        try fixture.press("提取所选区域")
-        #expect(extractions == 1)
-
-        try fixture.press("清除")
-        await fixture.settle()
-        #expect(model.extractionRegions.isEmpty)
-        #expect(try fixture.button("提取所选区域").isEnabled == false)
-        let picker = try #require(fixture.segmentedControl())
-        picker.selectedSegment = 1
-        picker.sendAction(picker.action, to: picker.target)
-        #expect(model.extractionMode == .background)
-        #expect(model.image === image)
-        #expect(!model.canUndo)
-    }
-
-    @Test
-    func busyCancellationAndLongFailureKeepTheControlsOnOneRow() async throws {
-        let releaseAccessibility = EnhancedAccessibilityTestScope.acquire()
-        defer { releaseAccessibility() }
-        let model = ScreenshotEditorModel(image: sourceImage())
-        model.extractionMode = .lasso
-        model.selectAllExtractionRegions()
-        let gate = AsyncStream<Void>.makeStream()
-        let taskResult = model.extract(extractImage: { _, _ in
-            for await _ in gate.stream {}
-            throw CancellationError()
+        var modes: [ScreenshotExtractionMode] = []
+        var tasks: [Task<Void, Never>] = []
+        let fixture = Fixture(model: model, onSelectMode: { mode in
+            modes.append(mode)
+            if let task = model.selectExtractionMode(mode, extractImage: { source, _ in source }) { tasks.append(task) }
         })
-        let task = try #require(taskResult)
-        defer { model.cancelExtraction(); gate.continuation.finish() }
-        let fixture = Fixture(model: model)
         defer { fixture.window.close() }
         await fixture.settle()
-        #expect(try #require(fixture.segmentedControl()).isEnabled == false)
-        #expect(try fixture.button("全选").isEnabled == false)
-        #expect(try fixture.button("清除").isEnabled == false)
-        #expect(try fixture.button("取消").isEnabled == true)
-        try fixture.expectSingleRow(labels: ["全选", "清除", "已圈选 1 个区域", "正在提取...", "取消"])
-        #expect(fixture.elements().filter { $0.label == "正在提取..." }.count == 1)
-
-        try fixture.press("取消")
+        let picker = try #require(fixture.segmentedControl())
+        #expect(picker.sendAction(picker.action, to: picker.target))
+        #expect(modes.isEmpty && model.extractionMode == nil)
+        for mode in [ScreenshotExtractionMode.lasso, .lasso, .foreground, .background, .lasso, .lasso] {
+            let wasSelected = model.extractionMode == mode
+            try fixture.press(mode)
+            #expect(model.extractionMode == (wasSelected ? nil : mode))
+            for (index, option) in ScreenshotExtractionMode.allCases.enumerated() {
+                #expect(picker.isSelected(forSegment: index) == (model.extractionMode == option))
+            }
+        }
+        #expect(modes == [.lasso, .lasso, .foreground, .background, .lasso, .lasso])
+        for task in tasks { await task.value }
+        #expect(model.image === image && !model.canUndo && !model.isExtracting)
+        #expect(model.extractionMode == nil)
+        model.selectExtractionMode(.lasso)
         await fixture.settle()
-        #expect(!model.isExtracting)
-        #expect(model.statusMessage == nil)
-        #expect(try fixture.button("提取所选区域").isEnabled == true)
-        gate.continuation.finish()
-        await task.value
-
-        let failure = AppLocalization.text("提取失败：%@", String(repeating: "failure ", count: 100))
-        model.statusMessage = failure
-        await fixture.settle()
-        let status = try #require(fixture.elements().first { $0.label == failure })
-        #expect(fixture.host.fittingSize.width < 1024, "Failure details must not push controls beyond a compact display")
-        #expect(status.help == failure)
-        try fixture.expectSingleRow(labels: ["全选", "清除", "已圈选 1 个区域", "提取所选区域", failure])
+        #expect(picker.isSelected(forSegment: 2))
+        try fixture.press(.lasso)
+        #expect(model.extractionMode == nil)
+        #expect(!picker.isSelected(forSegment: 2))
     }
 
     private func sourceImage() -> NSImage {
@@ -161,10 +155,10 @@ struct ScreenshotExtractionControlsLayoutTests {
         let host: NSView
         let language: AppLanguage
 
-        convenience init(model: ScreenshotEditorModel, language: AppLanguage = .simplifiedChinese, onExtract: @escaping () -> Void = {}) {
+        convenience init(model: ScreenshotEditorModel, language: AppLanguage = .simplifiedChinese,
+                         onSelectMode: ((ScreenshotExtractionMode) -> Void)? = nil) {
             self.init(ScreenshotExtractionControls(
-                model: model, onSelectAll: { model.selectAllExtractionRegions() },
-                onClear: { model.clearExtractionSelection() }, onExtract: onExtract
+                model: model, onSelectMode: onSelectMode ?? { model.selectExtractionMode($0) }
             ), language: language)
         }
 
@@ -193,63 +187,26 @@ struct ScreenshotExtractionControlsLayoutTests {
             return view.subviews.lazy.compactMap { self.segmentedControl(in: $0) }.first
         }
 
-        struct Element {
-            let object: NSObject
-            let label: String?
-            let role: String?
-            let frame: CGRect
-            let isEnabled: Bool?
-            let help: String?
+        func press(_ mode: ScreenshotExtractionMode) throws {
+            let picker = try #require(segmentedControl())
+            let index = try #require(ScreenshotExtractionMode.allCases.firstIndex(of: mode))
+            picker.setSelected(true, forSegment: index)
+            #expect(picker.sendAction(picker.action, to: picker.target))
         }
 
-        func elements() -> [Element] {
-            var result: [Element] = []
-            func visit(_ object: NSObject) {
-                func value(_ key: String) -> Any? {
-                    object.responds(to: NSSelectorFromString(key)) ? object.value(forKey: key) : nil
-                }
-                if let element = object as? any NSAccessibilityElementProtocol {
-                    let label = ["accessibilityTitle", "accessibilityLabel", "accessibilityValue"]
-                        .compactMap { value($0) as? String }.first { !$0.isEmpty }
-                    result.append(Element(object: object, label: label, role: value("accessibilityRole") as? String,
-                        frame: element.accessibilityFrame(), isEnabled: value("isAccessibilityEnabled") as? Bool,
-                        help: value("accessibilityHelp") as? String))
-                }
-                for child in value("accessibilityChildren") as? [NSObject] ?? [] { visit(child) }
-            }
-            for child in host.accessibilityChildren() as? [NSObject] ?? [] { visit(child) }
-            return result
-        }
-
-        func button(_ key: String) throws -> Element {
-            let title = AppLocalization.string(key, language: language)
-            return try #require(elements().first { $0.label == title && $0.role == NSAccessibility.Role.button.rawValue })
-        }
-
-        func press(_ key: String) throws {
-            let element = try button(key)
-            let selector = NSSelectorFromString("accessibilityPerformPress")
-            #expect(element.object.responds(to: selector))
-            _ = element.object.perform(selector)
-        }
-
-        func expectSingleRow(labels: [String]) throws {
-            let elements = elements()
-            let group = try #require(elements.first { $0.role == NSAccessibility.Role.radioGroup.rawValue })
-            let row = try [group] + labels.map { title in
-                try #require(elements.first { $0.label == title }, "Missing visible control: \(title)")
-            }
+        func expectSingleRow() throws {
+            let picker = try #require(segmentedControl())
+            #expect(host.fittingSize.height == 38)
             #expect(host.fittingSize.height == ScreenshotToolbarLayout.height)
-            let bounds = window.convertToScreen(host.convert(host.bounds, to: nil))
-            for element in row {
-                #expect(element.frame.width > 0 && element.frame.height > 0)
-                #expect(bounds.insetBy(dx: -1, dy: -1).contains(element.frame))
-                #expect(element.frame.minY > bounds.minY && element.frame.maxY < bounds.maxY,
-                        "Extraction controls must preserve vertical space inside the shared tool region")
+            #expect(host.fittingSize.width < 1024)
+            let frame = picker.convert(picker.bounds, to: host)
+            #expect(frame.height == 24)
+            #expect(frame.width > 0 && host.bounds.contains(frame))
+            #expect(frame.minY > host.bounds.minY && frame.maxY < host.bounds.maxY)
+            func buttons(in view: NSView) -> [NSButton] {
+                (view as? NSButton).map { [$0] } ?? view.subviews.flatMap { buttons(in: $0) }
             }
-            let centers = row.map(\.frame.midY)
-            #expect(try #require(centers.max()) - #require(centers.min()) <= 2,
-                    "All extraction controls must share one row in \(language.rawValue)")
+            #expect(buttons(in: host).isEmpty, "Extraction must only expose its three native mode segments")
             #expect(!window.isVisible)
         }
     }

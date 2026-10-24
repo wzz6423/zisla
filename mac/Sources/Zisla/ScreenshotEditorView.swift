@@ -1627,12 +1627,25 @@ final class ScreenshotEditorModel: ObservableObject {
         let nextNumber: Int
         let hasExtractedImage: Bool
         let cornerRadius: CGFloat
+        var extractionMode: ScreenshotExtractionMode? = nil
+        var extractionSource: ExtractionSource? = nil
+        var extractionRegions: [[CGPoint]] = []
+    }
+
+    private struct ExtractionSource {
+        let image: NSImage
+        var annotations: [ScreenshotAnnotation]
+        var nextNumber: Int
+        var pendingTextDraft: PendingTextDraft?
+        var pendingAnnotationDraft: ScreenshotAnnotation?
     }
 
     @Published var image: NSImage {
         didSet {
             cancelRecognition()
             cancelExtraction()
+            extractionMode = nil
+            extractionSource = nil
             extractionRegions = []
             pendingExtractionRegion = []
             hasExtractedImage = false
@@ -1650,7 +1663,6 @@ final class ScreenshotEditorModel: ObservableObject {
         didSet {
             guard tool != oldValue else { return }
             cancelExtraction()
-            extractionRegions = []
             pendingExtractionRegion = []
         }
     }
@@ -1670,12 +1682,7 @@ final class ScreenshotEditorModel: ObservableObject {
     @Published private(set) var isRecognizing = false
     @Published private(set) var isExtracting = false
     @Published private(set) var hasExtractedImage = false
-    @Published var extractionMode = ScreenshotExtractionMode.foreground {
-        didSet {
-            guard extractionMode != oldValue else { return }
-            clearExtractionSelection()
-        }
-    }
+    @Published private(set) var extractionMode: ScreenshotExtractionMode?
     @Published private(set) var extractionRegions: [[CGPoint]] = []
     @Published private(set) var pendingExtractionRegion: [CGPoint] = []
     @Published var isPinned = false {
@@ -1719,6 +1726,7 @@ final class ScreenshotEditorModel: ObservableObject {
     private var lastLongCaptureNewContent: Int?
     private var recognitionOperation: ScreenshotRecognitionOperation?
     private var extractionOperation: ScreenshotExtractionOperation?
+    private var extractionSource: ExtractionSource?
     private var cornerRadiusAdjustmentHasUndoPoint: Bool?
 
     struct PendingTextDraft: Equatable {
@@ -1760,25 +1768,47 @@ final class ScreenshotEditorModel: ObservableObject {
     }
 
     @discardableResult
-    func extract(
+    func selectExtractionMode(
+        _ mode: ScreenshotExtractionMode,
         extractImage: @escaping @Sendable (CGImage, ScreenshotExtractionOperation) async throws -> CGImage? = {
             try $1.extract($0)
         }
     ) -> Task<Void, Never>? {
-        guard !isExtracting else { return nil }
+        let previous = snapshot
+        let source = extractionInput
+        let isDeselecting = extractionMode == mode
+        cancelExtraction()
+        extractionRegions = []
+        pendingExtractionRegion = []
+        if image !== source.image, isDeselecting || mode == .lasso {
+            saveUndoPoint(previous)
+            restore(Snapshot(
+                image: source.image, annotations: source.annotations, nextNumber: source.nextNumber,
+                hasExtractedImage: false, cornerRadius: cornerRadius
+            ))
+            pendingTextDraft = source.pendingTextDraft
+            pendingAnnotationDraft = source.pendingAnnotationDraft
+        }
+        extractionMode = isDeselecting ? nil : mode
+        statusMessage = nil
+        guard !isDeselecting, mode != .lasso else { return nil }
+        return extract(mode, previous: previous, extractImage: extractImage)
+    }
+
+    private func extract(
+        _ mode: ScreenshotExtractionMode,
+        previous: Snapshot,
+        extractImage: @escaping @Sendable (CGImage, ScreenshotExtractionOperation) async throws -> CGImage?
+    ) -> Task<Void, Never> {
+        let input = extractionInput
         let operation = ScreenshotExtractionOperation(
-            mode: extractionMode,
-            imageSize: image.size,
+            mode: mode,
+            imageSize: input.image.size,
             regions: extractionRegions
         )
         extractionOperation = operation
         isExtracting = true
-        let renderModel = ScreenshotEditorModel(image: image)
-        renderModel.annotations = annotations
-        renderModel.nextNumber = nextNumber
-        renderModel.hasExtractedImage = hasExtractedImage
-        renderModel.pendingTextDraft = pendingTextDraft
-        renderModel.pendingAnnotationDraft = pendingAnnotationDraft
+        let renderModel = extractionRenderModel(input)
 
         return Task {
             await withTaskCancellationHandler {
@@ -1831,19 +1861,34 @@ final class ScreenshotEditorModel: ObservableObject {
                     }
                     extractionOperation = nil
                     isExtracting = false
+                    let undoModel = extractionRenderModel(ExtractionSource(
+                        image: previous.image, annotations: previous.annotations, nextNumber: previous.nextNumber,
+                        pendingTextDraft: pendingTextDraft, pendingAnnotationDraft: pendingAnnotationDraft
+                    ))
+                    undoModel.commitPendingTextDraft()
+                    undoModel.commitPendingAnnotationDraft()
                     saveUndoPoint(Snapshot(
-                        image: saved.image,
-                        annotations: saved.annotations,
-                        nextNumber: saved.nextNumber,
-                        hasExtractedImage: saved.hasExtractedImage,
-                        cornerRadius: cornerRadius
+                        image: previous.image,
+                        annotations: undoModel.annotations,
+                        nextNumber: undoModel.nextNumber,
+                        hasExtractedImage: previous.hasExtractedImage,
+                        cornerRadius: cornerRadius,
+                        extractionMode: previous.extractionMode,
+                        extractionSource: previous.extractionSource,
+                        extractionRegions: previous.extractionRegions
                     ))
                     pendingTextDraft = nil
                     pendingAnnotationDraft = nil
+                    image = NSImage(cgImage: extracted, size: rendered.size)
                     annotations = []
                     nextNumber = saved.nextNumber
-                    image = NSImage(cgImage: extracted, size: rendered.size)
                     hasExtractedImage = true
+                    extractionSource = ExtractionSource(
+                        image: saved.image, annotations: saved.annotations, nextNumber: saved.nextNumber,
+                        pendingTextDraft: nil, pendingAnnotationDraft: nil
+                    )
+                    extractionMode = mode
+                    extractionRegions = operation.regions
                     refreshMosaicPreview()
                     statusMessage = AppLocalization.text("提取完成")
                 }
@@ -1860,29 +1905,46 @@ final class ScreenshotEditorModel: ObservableObject {
         isExtracting = false
     }
 
-    func updateExtractionRegion(_ points: [CGPoint], isComplete: Bool) {
+    @discardableResult
+    func updateExtractionRegion(
+        _ points: [CGPoint],
+        isComplete: Bool,
+        extractImage: @escaping @Sendable (CGImage, ScreenshotExtractionOperation) async throws -> CGImage? = {
+            try $1.extract($0)
+        }
+    ) -> Task<Void, Never>? {
+        guard extractionMode == .lasso else { return nil }
+        let previous = snapshot
         cancelExtraction()
         pendingExtractionRegion = points
-        guard isComplete else { return }
+        guard isComplete else { return nil }
         pendingExtractionRegion = []
-        guard points.count >= 3 else { return }
+        guard points.count >= 3 else { return nil }
         extractionRegions.append(points)
+        return extract(.lasso, previous: previous, extractImage: extractImage)
     }
 
-    func selectAllExtractionRegions() {
-        clearExtractionSelection()
-        extractionRegions = [[
-            .zero,
-            CGPoint(x: image.size.width, y: 0),
-            CGPoint(x: image.size.width, y: image.size.height),
-            CGPoint(x: 0, y: image.size.height),
-        ]]
+    private var extractionInput: ExtractionSource {
+        guard var source = extractionSource else {
+            return ExtractionSource(
+                image: image, annotations: annotations, nextNumber: nextNumber,
+                pendingTextDraft: pendingTextDraft, pendingAnnotationDraft: pendingAnnotationDraft
+            )
+        }
+        source.annotations += annotations
+        source.nextNumber = nextNumber
+        source.pendingTextDraft = pendingTextDraft
+        source.pendingAnnotationDraft = pendingAnnotationDraft
+        return source
     }
 
-    func clearExtractionSelection() {
-        cancelExtraction()
-        extractionRegions = []
-        pendingExtractionRegion = []
+    private func extractionRenderModel(_ source: ExtractionSource) -> ScreenshotEditorModel {
+        let model = ScreenshotEditorModel(image: source.image)
+        model.annotations = source.annotations
+        model.nextNumber = source.nextNumber
+        model.pendingTextDraft = source.pendingTextDraft
+        model.pendingAnnotationDraft = source.pendingAnnotationDraft
+        return model
     }
 
     @discardableResult
@@ -2102,7 +2164,8 @@ final class ScreenshotEditorModel: ObservableObject {
     }
 
     func undo() {
-        clearExtractionSelection()
+        cancelExtraction()
+        pendingExtractionRegion = []
         pendingAnnotationDraft = nil
         guard let previous = undoStack.popLast() else { return }
         redoStack.append(snapshot)
@@ -2111,7 +2174,8 @@ final class ScreenshotEditorModel: ObservableObject {
     }
 
     func redo() {
-        clearExtractionSelection()
+        cancelExtraction()
+        pendingExtractionRegion = []
         pendingAnnotationDraft = nil
         guard let next = redoStack.popLast() else { return }
         undoStack.append(snapshot)
@@ -2572,7 +2636,10 @@ final class ScreenshotEditorModel: ObservableObject {
             annotations: annotations,
             nextNumber: nextNumber,
             hasExtractedImage: hasExtractedImage,
-            cornerRadius: cornerRadius
+            cornerRadius: cornerRadius,
+            extractionMode: extractionMode,
+            extractionSource: extractionSource,
+            extractionRegions: extractionRegions
         )
     }
 
@@ -2582,6 +2649,9 @@ final class ScreenshotEditorModel: ObservableObject {
         nextNumber = snapshot.nextNumber
         hasExtractedImage = snapshot.hasExtractedImage
         cornerRadius = snapshot.cornerRadius
+        extractionMode = snapshot.extractionMode
+        extractionSource = snapshot.extractionSource
+        extractionRegions = snapshot.extractionRegions
         refreshMosaicPreview()
     }
 
@@ -4669,54 +4739,62 @@ struct ScreenshotToolAttributesRow<Content: View>: View {
 struct ScreenshotExtractionControls: View {
     @Environment(\.locale) private var locale
     @ObservedObject var model: ScreenshotEditorModel
-    let onSelectAll: () -> Void
-    let onClear: () -> Void
-    let onExtract: () -> Void
+    let onSelectMode: (ScreenshotExtractionMode) -> Void
 
     var body: some View {
         ScreenshotToolAttributesRow {
-            Picker(AppLocalization.string("提取方式", locale: locale), selection: $model.extractionMode) {
-                ForEach(ScreenshotExtractionMode.allCases) { mode in
-                    Text(AppLocalization.string(mode.title, locale: locale)).tag(mode)
-                }
-            }
-            .pickerStyle(.segmented)
-            .disabled(model.isExtracting)
+            ScreenshotExtractionModePicker(
+                selection: model.extractionMode,
+                status: model.isExtracting ? AppLocalization.string("正在提取...", locale: locale) : model.statusMessage,
+                locale: locale, onSelectMode: onSelectMode
+            )
+        }
+    }
+}
 
-            Divider().frame(height: 24)
+private struct ScreenshotExtractionModePicker: NSViewRepresentable {
+    @Environment(\.layoutDirection) private var layoutDirection
+    var selection: ScreenshotExtractionMode?
+    let status: String?
+    let locale: Locale
+    let onSelectMode: (ScreenshotExtractionMode) -> Void
 
-            if model.extractionMode == .lasso {
-                HStack(spacing: 10) {
-                    Button(AppLocalization.string("全选", locale: locale), action: onSelectAll)
-                    Button(AppLocalization.string("清除", locale: locale), action: onClear)
-                    Text(AppLocalization.format("已圈选 %ld 个区域", locale: locale, [model.extractionRegions.count]))
-                        .font(.system(size: 11))
-                }
-                .disabled(model.isExtracting)
-                .help(AppLocalization.string("拖动圈选任意区域，可连续圈选多处", locale: locale))
+    func makeCoordinator() -> Coordinator { Coordinator(self) }
 
-                Divider().frame(height: 24)
-            }
+    func makeNSView(context: Context) -> NSSegmentedControl {
+        let control = NSSegmentedControl()
+        control.segmentCount = ScreenshotExtractionMode.allCases.count
+        control.target = context.coordinator
+        control.action = #selector(Coordinator.selectMode(_:))
+        return control
+    }
 
-            if model.isExtracting {
-                ProgressView().controlSize(.small)
-                Text(AppLocalization.string("正在提取...", locale: locale))
-                Button(AppLocalization.string("取消", locale: locale)) { model.cancelExtraction() }
-            } else {
-                Button(AppLocalization.string(
-                    model.extractionMode == .lasso ? "提取所选区域" : model.extractionMode.title,
-                    locale: locale
-                ), action: onExtract)
-                .disabled(model.extractionMode == .lasso && model.extractionRegions.isEmpty)
-            }
+    func updateNSView(_ control: NSSegmentedControl, context: Context) {
+        context.coordinator.picker = self
+        control.userInterfaceLayoutDirection = layoutDirection == .rightToLeft ? .rightToLeft : .leftToRight
+        for (index, mode) in ScreenshotExtractionMode.allCases.enumerated() {
+            control.setLabel(AppLocalization.string(mode.title, locale: locale), forSegment: index)
+            control.setSelected(selection == mode, forSegment: index)
+            control.setToolTip(selection == mode ? status : nil, forSegment: index)
+        }
+        control.setAccessibilityLabel(AppLocalization.string("提取方式", locale: locale))
+    }
 
-            if let status = model.statusMessage, !model.isExtracting {
-                Text(status)
-                    .font(.system(size: 11))
-                    .foregroundStyle(.secondary)
-                    .lineLimit(1)
-                    .frame(maxWidth: 200)
-                    .help(status)
+    @MainActor
+    final class Coordinator: NSObject {
+        var picker: ScreenshotExtractionModePicker
+
+        init(_ picker: ScreenshotExtractionModePicker) { self.picker = picker }
+
+        @objc func selectMode(_ control: NSSegmentedControl) {
+            let modes = ScreenshotExtractionMode.allCases
+            let next = modes.indices.first { control.isSelected(forSegment: $0) }
+                .map { modes[$0] }
+            let selection = next == picker.selection ? nil : next
+            if let next { picker.onSelectMode(next) }
+            picker.selection = selection
+            for (index, mode) in modes.enumerated() {
+                control.setSelected(mode == selection, forSegment: index)
             }
         }
     }
@@ -6353,16 +6431,11 @@ struct ScreenshotEditorView: View {
             get: { activeToolMenuID == .extraction },
             set: { if !$0 { activeToolMenuID = nil } }
         ), arrowEdge: popoverEdge) {
-            ScreenshotExtractionControls(model: model, onSelectAll: {
+            ScreenshotExtractionControls(model: model, onSelectMode: { mode in
                 draftPoints.removeAll(keepingCapacity: true)
-                model.selectAllExtractionRegions()
-            }, onClear: {
-                draftPoints.removeAll(keepingCapacity: true)
-                model.clearExtractionSelection()
-            }, onExtract: {
                 commitInlineText()
                 selectionState.deselect()
-                model.extract()
+                model.selectExtractionMode(mode)
             })
         }
     }
