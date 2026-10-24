@@ -6480,7 +6480,6 @@ struct ScreenshotEditorView: View {
                 }
                 .pickerStyle(.segmented)
                 .labelsHidden()
-                .frame(width: 150)
                 .help(AppLocalization.text(model.obscureShape.title))
 
                 Divider().frame(height: 24)
