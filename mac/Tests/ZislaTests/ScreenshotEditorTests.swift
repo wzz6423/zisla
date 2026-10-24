@@ -129,7 +129,7 @@ struct ScreenshotEditorTests {
 
     @Test
     func toolbarUsesCompactControlsAndDragPositionStaysOnScreen() {
-        #expect(ScreenshotToolbarLayout.controlCount == 16)
+        #expect(ScreenshotToolbarLayout.controlCount == 19)
         #expect(ScreenshotToolbarLayout.cornerRadius == 10)
         #expect(ScreenshotToolbarLayout.borderOpacity == 0.08)
         #expect(ScreenshotToolbarLayout.dragHandleColumns == 2)
@@ -144,7 +144,7 @@ struct ScreenshotEditorTests {
             + CGFloat(ScreenshotToolbarLayout.controlCount) * ScreenshotToolbarLayout.spacing
         #expect(ScreenshotToolbarLayout.contentWidth == expectedWidth)
         #expect(ScreenshotToolbarLayout.viewportWidth(availableWidth: 2_000) == expectedWidth)
-        #expect(ScreenshotToolbarLayout.viewportWidth(availableWidth: 1_200) == 1030)
+        #expect(ScreenshotToolbarLayout.viewportWidth(availableWidth: 1_200) == 1176)
         #expect(ScreenshotToolbarLayout.controlWidth <= 60)
         #expect(ScreenshotToolbarLayout.height <= 38)
 
@@ -436,6 +436,7 @@ struct ScreenshotEditorTests {
         let tools: [(ScreenshotTool, ScreenshotAnnotation.Kind)] = [
             (.ellipse, .ellipse),
             (.brush, .brush),
+            (.highlighter, .highlighter),
             (.arrow, .arrow),
             (.number, .number),
         ]

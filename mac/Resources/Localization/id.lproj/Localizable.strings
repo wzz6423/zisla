@@ -2749,6 +2749,24 @@
 "onboarding.permission.system_audio.body" = "Untuk visualisasi musik. Aktifkan perekaman audio di Pengaturan Sistem; macOS dapat meminta konfirmasi saat pertama kali digunakan.";
 "onboarding.permission.full_disk_access.title" = "Akses Disk Penuh";
 "onboarding.permission.full_disk_access.body" = "Hanya diperlukan untuk indeks email lokal atau cookie browser. Aktifkan di Pengaturan Sistem jika Anda menggunakan fitur ini.";
+"荧光笔" = "Pena penyorot";
+"保留左右标记" = "Pertahankan penanda di kedua ujung";
+"提取" = "Ekstrak";
+"提取主体" = "Ekstrak subjek";
+"提取背景" = "Ekstrak latar";
+"自由圈选" = "Seleksi bebas";
+"提取方式" = "Mode ekstraksi";
+"提取所选区域" = "Ekstrak area terpilih";
+"拖动圈选任意区域，可连续圈选多处" = "Seret untuk melingkari area; Anda dapat memilih beberapa area secara berurutan";
+"已圈选 %ld 个区域" = "%ld area dipilih";
+"正在提取..." = "Mengekstrak...";
+"提取完成" = "Ekstraksi selesai";
+"未找到可提取区域" = "Tidak ditemukan area untuk diekstrak";
+"提取失败：%@" = "Ekstraksi gagal: %@";
+"圈选区域无效" = "Area seleksi tidak valid";
+"提取蒙版尺寸不匹配" = "Ukuran mask ekstraksi tidak cocok";
+"无法生成提取图片" = "Tidak dapat membuat gambar hasil ekstraksi";
+"圆角" = "Radius sudut";
 "查询 IP 信息" = "Cari informasi IP";
 
 "更新日志" = "Catatan rilis";

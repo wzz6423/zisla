@@ -44,6 +44,8 @@ macOS 14 and later are supported. macOS 26 uses Liquid Glass; macOS 14/15 fall b
 
 The screenshot toolbar's **Stash** action sits between **Pin** and **Copy**. It stores the final edited image, including annotations and completed scrolling captures, in the handoff tray without copying it to the clipboard. The PNG and capture metadata, including the original application and capture time, are stored locally in SQLite and survive app restarts. The **Stashed screenshots** category shows only these cards.
 
+**Highlighter** follows **Brush** and draws a translucent highlight; end lines and circular markers are kept by default and can be disabled in its menu. **Extract** follows **Blur** and supports macOS subject or background extraction, plus freehand selection of arbitrary areas. Multiple loops retain their combined areas, with Select All and Clear controls; unselected pixels become transparent and extraction can be undone. Screenshot corners default to a radius of 0. Drag the radius handle above the selection or use the **Corner radius** slider; the size badge shows `r`. PNG exports have transparent corners, and resetting the radius to 0 restores the original corner pixels.
+
 | Context | Action | Default shortcut |
 | --- | --- | --- |
 | Global | Screenshot | `Control+1` |
@@ -53,11 +55,13 @@ The screenshot toolbar's **Stash** action sits between **Pin** and **Copy**. It 
 | Screenshot editor | Rectangle | `Control+3` |
 | Screenshot editor | Ellipse | `Control+4` |
 | Screenshot editor | Brush | `Control+5` |
-| Screenshot editor | Arrow | `Control+6` |
-| Screenshot editor | Number | `Control+7` |
-| Screenshot editor | Text | `Control+8` |
-| Screenshot editor | Blur | `Control+9` |
-| Screenshot editor | Scrolling capture | `Control+0` |
+| Screenshot editor | Highlighter | `Control+6` |
+| Screenshot editor | Arrow | `Control+7` |
+| Screenshot editor | Number | `Control+8` |
+| Screenshot editor | Text | `Control+9` |
+| Screenshot editor | Blur | `Control+0` |
+| Screenshot editor | Extraction | `Control+A` |
+| Screenshot editor | Scrolling capture | `Control+B` |
 | Screenshot editor | Copy | `Enter` |
 | Screenshot editor | Save | `Command+S` |
 | Screenshot editor | Undo | `Command+Z` |
@@ -65,7 +69,9 @@ The screenshot toolbar's **Stash** action sits between **Pin** and **Copy**. It 
 
 Screenshot settings show and record the global and editor shortcuts. Copy, Save, Undo, and Redo are displayed but cannot be re-recorded. User-recorded shortcuts are retained when upgrading; Pin is an editor action rather than a separate global shortcut, while its menu entry remains available.
 
-On upgrade, an untouched legacy screenshot shortcut layout moves to the defaults above once. If any screenshot shortcut was customized, the existing layout is kept; new actions choose an unused combination when their default conflicts. These initial combinations can also be re-recorded.
+Default editor shortcuts follow toolbar order: `Control+1` through `Control+9`, then `Control+0`, `Control+A`, `Control+B`, and subsequent letters. Default allocation skips `Q`, `M`, `N`, and `W`: pressing Command by mistake could quit the app, minimize a window, open a new window, or close a window. User-recorded combinations are still allowed.
+
+On upgrade, untouched legacy layouts, including the previous Pin/Stash layout, move to the defaults above once. If any screenshot shortcut was customized, the existing layout is kept; new actions choose an unused Control combination in the same safe order when their default conflicts. These initial combinations can also be re-recorded.
 
 ## Quick start
 

@@ -1349,7 +1349,7 @@ struct FeatureSettingsCompatibilityTests {
         #expect(decoded.screenshotLongHotkey.keyCode == 19)
         #expect(decoded.screenshotLongHotkey.carbonModifiers == 0x1000)
         #expect(decoded.screenshotToolHotkeys == ScreenshotHotkeyDefaults.tools)
-        #expect(decoded.screenshotToolHotkeys.count == 7)
+        #expect(decoded.screenshotToolHotkeys.count == 9)
     }
 
     @Test
@@ -1490,25 +1490,31 @@ struct FeatureSettingsCompatibilityTests {
             carbonModifiers: 0x0100,
             keyDisplayName: "R"
         )
+        var object = try #require(JSONSerialization.jsonObject(with: JSONEncoder().encode(legacy)) as? [String: Any])
+        object["screenshotHotkeyVersion"] = 1
 
         let decoded = try JSONDecoder().decode(
             FeatureSettings.self,
-            from: JSONEncoder().encode(legacy)
+            from: JSONSerialization.data(withJSONObject: object)
         )
 
-        #expect(decoded.screenshotToolHotkeys == legacy.screenshotToolHotkeys)
+        for (id, hotkey) in legacy.screenshotToolHotkeys {
+            #expect(decoded.screenshotToolHotkeys[id] == hotkey)
+        }
     }
 
     @Test
-    func screenshotToolDefaultsFollowControlNumberSequence() {
+    func screenshotToolDefaultsFollowControlNumbersThenLetters() {
         let expected: [(String, UInt32, String)] = [
             ("rectangle", 20, "3"),
             ("ellipse", 21, "4"),
             ("brush", 23, "5"),
-            ("arrow", 22, "6"),
-            ("number", 26, "7"),
-            ("text", 28, "8"),
-            ("mosaic", 25, "9"),
+            ("highlighter", 22, "6"),
+            ("arrow", 26, "7"),
+            ("number", 28, "8"),
+            ("text", 25, "9"),
+            ("mosaic", 29, "0"),
+            ("extraction", 0, "A"),
         ]
         #expect(ScreenshotHotkeyDefaults.tools.count == expected.count)
         for (tool, keyCode, displayName) in expected {
@@ -1532,7 +1538,7 @@ struct FeatureSettingsCompatibilityTests {
             FeatureSettings.self,
             from: Data(#"{"screenshotToolHotkeys":{}}"#.utf8)
         )
-        #expect(emptyTools.screenshotToolHotkeys.isEmpty)
+        #expect(Set(emptyTools.screenshotToolHotkeys.keys) == ["highlighter", "extraction"])
 
         for json in [
             #"{"screenshotLongHotkey":"unknown"}"#,

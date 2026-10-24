@@ -2749,6 +2749,24 @@
 "onboarding.permission.system_audio.body" = "Để hiển thị hình ảnh theo nhạc. Bật quyền ghi âm thanh trong Cài đặt hệ thống; macOS có thể yêu cầu xác nhận khi dùng lần đầu.";
 "onboarding.permission.full_disk_access.title" = "Truy cập toàn bộ ổ đĩa";
 "onboarding.permission.full_disk_access.body" = "Chỉ cần cho chỉ mục thư cục bộ hoặc cookie của trình duyệt. Bật trong Cài đặt hệ thống nếu bạn dùng những tính năng này.";
+"荧光笔" = "Bút tô sáng";
+"保留左右标记" = "Giữ dấu ở hai đầu";
+"提取" = "Tách ảnh";
+"提取主体" = "Tách chủ thể";
+"提取背景" = "Tách nền";
+"自由圈选" = "Chọn tự do";
+"提取方式" = "Chế độ tách ảnh";
+"提取所选区域" = "Tách vùng đã chọn";
+"拖动圈选任意区域，可连续圈选多处" = "Kéo để khoanh vùng bất kỳ; có thể chọn liên tiếp nhiều vùng";
+"已圈选 %ld 个区域" = "Đã chọn %ld vùng";
+"正在提取..." = "Đang tách ảnh...";
+"提取完成" = "Tách ảnh hoàn tất";
+"未找到可提取区域" = "Không tìm thấy vùng để tách";
+"提取失败：%@" = "Tách ảnh thất bại: %@";
+"圈选区域无效" = "Vùng chọn không hợp lệ";
+"提取蒙版尺寸不匹配" = "Kích thước mặt nạ tách ảnh không khớp";
+"无法生成提取图片" = "Không thể tạo ảnh đã tách";
+"圆角" = "Bán kính góc";
 "查询 IP 信息" = "Tra cứu thông tin IP";
 
 "更新日志" = "Ghi chú phát hành";
