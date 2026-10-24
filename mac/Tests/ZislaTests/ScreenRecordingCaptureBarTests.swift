@@ -7,6 +7,15 @@ import ZislaCore
 @Suite
 struct ScreenRecordingCaptureBarTests {
     @Test
+    func setupLeadingControlsUseCompactSpacing() {
+        #expect(ScreenRecordingCaptureBarGeometry.dragHandleWidth == 24)
+        #expect(ScreenRecordingCaptureBarGeometry.dragHandleWidth < ScreenshotToolbarLayout.dragHandleWidth)
+        #expect(ScreenRecordingCaptureBarGeometry.closeButtonWidth == 24)
+        #expect(ScreenRecordingCaptureBarGeometry.separatorHorizontalPadding == 1)
+        #expect(ScreenRecordingCaptureBarGeometry.fixedSetupWidth == 440)
+    }
+
+    @Test
     func captureBarStartsInsideTheChosenScreenAndClampsDraggedPositions() {
         let screen = CGRect(x: -1_920, y: -500, width: 1_920, height: 1_055)
         let size = CGSize(width: ScreenRecordingCaptureBarGeometry.setupWidth, height: ScreenshotToolbarLayout.height)
