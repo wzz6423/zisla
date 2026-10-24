@@ -2769,6 +2769,28 @@
 "圆角" = "Raggio degli angoli";
 "查询 IP 信息" = "Cerca informazioni IP";
 
+"基础功能" = "Funzioni di base";
+"声音" = "Suono";
+"网络与其他" = "Rete e altro";
+"仅影响 zisla 的窗口与面板，不会更改 macOS 外观。" = "Si applica solo alle finestre e ai pannelli di zisla, senza modificare l’aspetto di macOS.";
+"在设置中合并、拆分、加密与转换 PDF。" = "Unisci, dividi, cifra e converti PDF nelle Impostazioni.";
+"应用音量混音器" = "Mixer del volume delle app";
+"在灵动岛分别调整应用的媒体音量。" = "Regola il volume multimediale di ogni app in Dynamic Island.";
+"分别调整正在播放声音的应用" = "Regola separatamente il volume delle app che riproducono audio";
+"应用音量需要 macOS 14.4 或更高版本" = "Il volume delle app richiede macOS 14.4 o versioni successive";
+"暂无正在播放声音的应用" = "Nessuna app sta riproducendo audio";
+"播放音乐或视频后，应用会显示在这里。" = "Le app appariranno qui quando riproduci musica o video.";
+"%@ 的音量" = "Volume di %@";
+"取消 %@ 的静音" = "Riattiva l’audio di %@";
+"将 %@ 静音" = "Disattiva l’audio di %@";
+"等待应用音量控制生效" = "In attesa dell’attivazione del controllo del volume delle app";
+"音量调整未生效" = "La regolazione del volume non è stata applicata";
+"请允许音频录制以调整应用音量" = "Consenti la registrazione audio per regolare il volume delle app";
+"当前音频输出设备不可用" = "Il dispositivo di uscita audio attuale non è disponibile";
+"无法调整应用音量，已恢复原始输出" = "Impossibile regolare il volume delle app. L’uscita audio originale è stata ripristinata";
+"取消静音" = "Riattiva audio";
+"当前音频输出格式不支持应用音量调整" = "Il formato di uscita audio attuale non supporta la regolazione del volume delle app";
+
 "更新日志" = "Note di rilascio";
 "已更新至 %@" = "Aggiornato alla versione %@";
 "正在加载更新日志" = "Caricamento delle note di rilascio";
@@ -2780,3 +2802,8 @@
 "稍后提醒" = "Ricordamelo più tardi";
 "跳过此版本" = "Ignora questa versione";
 "了解更多" = "Ulteriori informazioni";
+
+"隐藏侧边栏" = "Nascondi barra laterale";
+"显示侧边栏" = "Mostra barra laterale";
+"后退" = "Indietro";
+"前进" = "Avanti";

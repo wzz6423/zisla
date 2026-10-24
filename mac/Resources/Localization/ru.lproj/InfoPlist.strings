@@ -1,5 +1,5 @@
 "NSCalendarsFullAccessUsageDescription" = "zisla требуется доступ к предстоящим событиям календаря для панели информации.";
-"NSAudioCaptureUsageDescription" = "zisla читает текущий аудиоспектр для отображения живой волны.";
+"NSAudioCaptureUsageDescription" = "zisla считывает системный звук только при воспроизведении медиа или когда вы настраиваете громкость приложения, чтобы показывать звуковую волну и менять выходную громкость этого приложения.";
 "NSCameraUsageDescription" = "zisla использует камеру только при открытом зеркале.";
 "NSRemindersFullAccessUsageDescription" = "zisla читает напоминания с датами, чтобы показывать их вместе с событиями календаря.";
 "NSLocationWhenInUseUsageDescription" = "zisla нужен доступ к геопозиции для отображения местной погоды, названий мест и сетей Wi-Fi поблизости.";

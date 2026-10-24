@@ -208,8 +208,8 @@ struct IslandRootView: View {
                                             )
                                         case .quickNotes:
                                             QuickNoteModuleView(model: model)
-                                        case .pdf:
-                                            PDFToolsModuleView(model: model)
+                                        case .volumeMixer:
+                                            ApplicationVolumeMixerModuleView(service: model.applicationVolumes)
                                         case .toolbox:
                                             ToolboxModuleView(model: model)
                                         case .system, .battery:
@@ -812,7 +812,6 @@ private struct BackgroundSoundControl: View {
                             ? "arrow.down.circle"
                             : (service.isPlaying ? "waveform" : "waveform.slash"),
                         isActive: service.isPlaying,
-                        activeColor: .mint,
                         size: .compact,
                         // The shared capsule below provides the control surface.
                         showsActiveBackground: false,
@@ -885,7 +884,7 @@ private struct BackgroundSoundControl: View {
         .frame(height: 28)
         .background(
             Capsule()
-                .fill(service.isPlaying ? Color.mint.opacity(0.16) : Color.fillControl)
+                .fill(service.isPlaying ? Color.accentColor.opacity(0.16) : Color.fillControl)
         )
         .animation(ZislaMotion.selection, value: service.isPlaying)
     }

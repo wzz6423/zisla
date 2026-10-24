@@ -38,7 +38,7 @@ struct SettingsSearchLocalizationTests {
             encoding: .utf8
         )
         let expression = try NSRegularExpression(
-            pattern: #"AppLocal(?:ization\.text|izedText)\("(搜索设置|搜索结果|未找到设置项)""#
+            pattern: #"AppLocal(?:ization\.(?:text|string)|izedText)\("(搜索设置|搜索结果|未找到设置项)""#
         )
         return Set(expression.matches(in: source, range: NSRange(source.startIndex..., in: source)).map {
             String(source[Range($0.range(at: 1), in: source)!])

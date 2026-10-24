@@ -1,5 +1,5 @@
 "NSCalendarsFullAccessUsageDescription" = "zisla heeft toegang nodig tot aankomende agenda-evenementen voor het bovenste informatiepaneel.";
-"NSAudioCaptureUsageDescription" = "zisla leest het huidige audiospectrum om een live golfvorm weer te geven.";
+"NSAudioCaptureUsageDescription" = "zisla leest systeemaudio alleen tijdens het afspelen van media of wanneer je het volume van een app aanpast, om een golfvorm weer te geven en het uitvoervolume van die app aan te passen.";
 "NSCameraUsageDescription" = "zisla gebruikt de camera alleen als de spiegel open is.";
 "NSRemindersFullAccessUsageDescription" = "zisla leest gedateerde herinneringen om ze samen met agenda-evenementen te tonen.";
 "NSLocationWhenInUseUsageDescription" = "zisla heeft locatietoegang nodig om het lokale weer, plaatsnamen en wifinetwerken in de buurt te tonen.";

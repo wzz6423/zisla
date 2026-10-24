@@ -1,5 +1,5 @@
 "NSCalendarsFullAccessUsageDescription" = "zisla benötigt Zugriff auf bevorstehende Kalenderereignisse für das obere Informationsfenster.";
-"NSAudioCaptureUsageDescription" = "zisla liest das aktuelle Audiospektrum, um eine Live-Wellenform darzustellen.";
+"NSAudioCaptureUsageDescription" = "zisla liest Systemaudio nur während der Medienwiedergabe oder wenn du die Lautstärke einer App anpasst, um eine Wellenform anzuzeigen und die Ausgabelautstärke dieser App anzupassen.";
 "NSCameraUsageDescription" = "zisla verwendet die Kamera nur, wenn der Spiegel geöffnet ist.";
 "NSRemindersFullAccessUsageDescription" = "zisla liest datierte Erinnerungen, um sie zusammen mit Kalenderereignissen anzuzeigen.";
 "NSLocationWhenInUseUsageDescription" = "zisla benötigt Standortzugriff, um das lokale Wetter, Ortsnamen und WLAN-Netzwerke in der Nähe anzuzeigen.";

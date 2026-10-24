@@ -91,6 +91,7 @@ struct SettingsNavigationTests {
             "信息",
             "快捷操作",
             "截图",
+            "PDF 工具",
             "AI",
             "语音",
             "邮件",
@@ -250,6 +251,62 @@ struct SettingsNavigationTests {
         settings.screenshotEnabled = true
         #expect(SettingsSection.clipboardAssistant.isVisible(settings: settings))
         #expect(SettingsSection.screenshot.isVisible(settings: settings))
+    }
+
+    @Test(arguments: [false, true], [false, true])
+    func pdfSettingsVisibilityIsIndependentOfVolumeMixer(pdfEnabled: Bool, mixerEnabled: Bool) {
+        var settings = FeatureSettings.default
+        settings.pdfToolsEnabled = pdfEnabled
+        settings.volumeMixerEnabled = mixerEnabled
+
+        #expect(SettingsSection.pdfTools.isVisible(settings: settings) == pdfEnabled)
+        #expect(SettingsSection.features.isVisible(settings: settings))
+        #expect(settings.pdfToolsEnabled == pdfEnabled)
+        #expect(settings.volumeMixerEnabled == mixerEnabled)
+    }
+
+    @Test
+    func pdfMigrationPreservesAllFourteenOperationsInSettings() {
+        #expect(PDFToolOperation.allCases.map(\.rawValue) == [
+            "merge", "split", "rotate", "imagesToPDF", "officeToPDF", "render", "extractText",
+            "textWatermark", "imageWatermark", "pageNumbers", "crop", "protect", "unlock", "metadata",
+        ])
+        #expect(!IslandModule.allCases.map(\.rawValue).contains("pdf"))
+    }
+
+    @Test
+    func sidebarGroupsKeepExistingPagesAndPutPDFWithFileTools() {
+        #expect(SettingsSectionGroup.allCases.map(\.title) == ["基础功能", "声音", "文件", "AI 与语音", "网络与其他"])
+        #expect(SettingsSection.allCases.filter { $0.group == .basics } == [.general, .features, .info])
+        #expect(SettingsSection.allCases.filter { $0.group == .sound } == [.keyboardSound])
+        #expect(SettingsSection.allCases.filter { $0.group == .files } == [.clipboardAssistant, .screenshot, .pdfTools, .download])
+        #expect(SettingsSection.allCases.filter { $0.group == .aiAndVoice } == [.ai, .voice])
+        #expect(SettingsSection.allCases.filter { $0.group == .networkAndOthers } == [.mail, .weather, .networkProxy, .pet, .recommendations, .updates])
+    }
+
+    @Test(arguments: AppLanguage.allCases)
+    func groupedSettingsAndPDFLabelsUseEveryRequestedLanguage(language: AppLanguage) throws {
+        let keys = Set(SettingsSectionGroup.allCases.map(\.title) + [
+            SettingsSection.pdfTools.title,
+            SettingsSection.pdfTools.subtitle,
+            "仅影响 zisla 的窗口与面板，不会更改 macOS 外观。",
+            "应用音量混音器",
+            "在灵动岛分别调整应用的媒体音量。",
+        ])
+        let packageRoot = Self.settingsViewSourceURL.deletingLastPathComponent()
+            .deletingLastPathComponent().deletingLastPathComponent()
+        let tableURL = packageRoot.appendingPathComponent("Resources/Localization/\(language.rawValue).lproj/Localizable.strings")
+        let table = try #require(NSDictionary(contentsOf: tableURL) as? [String: String])
+        for key in keys {
+            let value = try #require(table[key], "\(language.rawValue) is missing \(key)")
+            #expect(!value.isEmpty)
+            #expect(AppLocalization.string(key, language: language) == value)
+            if language == .traditionalChinese && key == "PDF 工具" {
+                #expect(value == "PDF 工具")
+            } else if language != .simplifiedChinese {
+                #expect(value != key, "\(language.rawValue) did not translate \(key)")
+            }
+        }
     }
 
     @Test

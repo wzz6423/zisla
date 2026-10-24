@@ -1,5 +1,5 @@
 "NSCalendarsFullAccessUsageDescription" = "zisla ต้องการเข้าถึงกิจกรรมปฏิทินที่กำลังจะมาถึงสำหรับแผงข้อมูลด้านบน";
-"NSAudioCaptureUsageDescription" = "zisla อ่านสเปกตรัมเสียงปัจจุบันเพื่อแสดงคลื่นเสียงสด";
+"NSAudioCaptureUsageDescription" = "zisla อ่านเสียงของระบบเฉพาะขณะเล่นสื่อหรือเมื่อคุณปรับระดับเสียงแอป เพื่อแสดงคลื่นเสียงและปรับระดับเสียงเอาต์พุตของแอปนั้น";
 "NSCameraUsageDescription" = "zisla ใช้กล้องเฉพาะเมื่อเปิดกระจกเท่านั้น";
 "NSRemindersFullAccessUsageDescription" = "zisla อ่านการเตือนความจำที่มีวันที่เพื่อแสดงพร้อมกับกิจกรรมปฏิทิน";
 "NSLocationWhenInUseUsageDescription" = "zisla ต้องเข้าถึงตำแหน่งที่ตั้งเพื่อแสดงสภาพอากาศในพื้นที่ ชื่อสถานที่ และเครือข่าย Wi-Fi ใกล้เคียง";

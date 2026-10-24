@@ -97,8 +97,8 @@ struct ThinScrollChromeTests {
         window.contentView = host
 
         var scrollView: NSScrollView?
-        let deadline = Date().addingTimeInterval(1)
-        repeat {
+        // Parallel rendering must not consume a wall-clock deadline before layout can run.
+        for _ in 0..<20 {
             host.layoutSubtreeIfNeeded()
             host.displayIfNeeded()
             var pending = [host as NSView]
@@ -116,7 +116,7 @@ struct ThinScrollChromeTests {
             await withCheckedContinuation { continuation in
                 DispatchQueue.main.async { continuation.resume() }
             }
-        } while Date() < deadline
+        }
 
         let scroller = try #require(scrollView?.verticalScroller as? ThinScroller)
         #expect(!scroller.isHidden)

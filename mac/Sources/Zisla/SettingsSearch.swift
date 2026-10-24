@@ -5,11 +5,13 @@ import ZislaKit
 enum SettingsSearchAnchor: Hashable {
     case row(String)
     case group(String)
+    case pdfOperation(PDFToolOperation)
 
     func localized(locale: Locale) -> Self {
         switch self {
         case .row(let key): .row(AppLocalization.string(key, locale: locale))
         case .group(let key): .group(AppLocalization.string(key, locale: locale))
+        case .pdfOperation: self
         }
     }
 }
@@ -67,7 +69,7 @@ enum SettingsSearchIndex {
             "显示推荐工具", "媒体播放", "Mac 未使用时关闭背景音", "中转站", "晃动唤出中转窗口",
             "链接下载", "剪贴板历史", "剪贴板链接检测", "快捷操作", "日历日程", "天气", "邮件",
             "侧翼通知", "锁屏信息", "专注倒计时", "工具箱提醒", "AI 进度与用量", "AI 任务结果扫光",
-            "语音输入", "窗口预览", "小工具", "随记", "PDF 工具", "系统状态与清理", "电池监控",
+            "语音输入", "窗口预览", "小工具", "随记", "PDF 工具", "应用音量混音器", "系统状态与清理", "电池监控",
             "键盘音效", "合盖动画", "预览动画", "启用截图", "鼠标移入展开", "显示 zisla 图标",
             "始终置顶", "提示条进度光效", "浏览器下载进度", "原生下载进度", "静音 Zisla 通知",
             "宠物", "自动检查更新", "自动下载更新",
@@ -76,6 +78,10 @@ enum SettingsSearchIndex {
             rows(.features, ["自动更新推荐工具"])
         }
         entry(.features, "工具", anchor: .group("工具"), keywords: ["恢复默认顺序"] + IslandModuleOrder.allCases.map(\.title))
+
+        for operation in PDFToolOperation.allCases {
+            entry(.pdfTools, operation.title, anchor: .pdfOperation(operation), keywords: [operation.detail])
+        }
 
         rows(.info, ["播放来源", "歌词与歌曲信息", "收起态音乐样式", "活动展示", "专注模式展示"])
         if settings.systemMonitorEnabled {
