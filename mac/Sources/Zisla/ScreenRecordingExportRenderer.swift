@@ -95,11 +95,21 @@ final class RecordingExportRenderer {
         context = CIContext(options: [.cacheIntermediates: false, .workingColorSpace: CGColorSpace(name: CGColorSpace.sRGB)!])
         sourceCrop = project.edits.crop ?? RecordingRect(x: 0, y: 0, width: 1, height: 1)
         let shortSide = min(size.width, size.height)
-        let padding = project.edits.background == .none ? 0 : shortSide * project.edits.padding
-        screenRect = canvas.insetBy(dx: padding, dy: padding)
+        let padding = project.edits.background == .none && project.edits.backgroundColor == nil ? 0 : shortSide * project.edits.padding
+        let available = canvas.insetBy(dx: padding, dy: padding)
+        if project.edits.canvasAspectRatio?.ratio != nil {
+            let sourceWidth = Double(project.width) * sourceCrop.width
+            let sourceHeight = Double(project.height) * sourceCrop.height
+            let scale = min(available.width / sourceWidth, available.height / sourceHeight)
+            let width = sourceWidth * scale
+            let height = sourceHeight * scale
+            screenRect = CGRect(x: available.midX - width / 2, y: available.midY - height / 2, width: width, height: height)
+        } else { screenRect = available }
         screenMask = try Self.mask(rect: screenRect, radius: shortSide * project.edits.cornerRadius,
                                    canvas: canvas)
-        background = try Self.background(project.edits.background, canvas: canvas)
+        if let color = project.edits.backgroundColor {
+            background = CIImage(color: CIColor(red: color.red, green: color.green, blue: color.blue)).cropped(to: canvas)
+        } else { background = try Self.background(project.edits.background, canvas: canvas) }
         cursor = try Self.cursorImage(size: max(8, shortSide * 0.028 * project.edits.cursorSize))
         if project.edits.shadow > 0 {
             let alphaMask = screenMask.applyingFilter("CIColorMatrix", parameters: [
@@ -113,18 +123,19 @@ final class RecordingExportRenderer {
             ]).transformed(by: CGAffineTransform(translationX: 0, y: -shortSide * 0.012))
         } else { shadow = nil }
         let side = shortSide * project.edits.cameraSize
+        let cameraHeight = project.edits.cameraRound ? side : side * 0.75
         let margin = shortSide * 0.025
         let cameraX: CGFloat
         let cameraY: CGFloat
         switch project.edits.cameraPosition {
-        case .topLeft: cameraX = margin; cameraY = size.height - margin - side
-        case .topRight: cameraX = size.width - margin - side; cameraY = size.height - margin - side
+        case .topLeft: cameraX = margin; cameraY = size.height - margin - cameraHeight
+        case .topRight: cameraX = size.width - margin - side; cameraY = size.height - margin - cameraHeight
         case .bottomLeft: cameraX = margin; cameraY = margin
         case .bottomRight: cameraX = size.width - margin - side; cameraY = margin
         }
-        cameraRect = CGRect(x: cameraX, y: cameraY, width: side, height: side)
+        cameraRect = CGRect(x: cameraX, y: cameraY, width: side, height: cameraHeight)
         cameraMask = try Self.mask(rect: cameraRect,
-                                   radius: project.edits.cameraRound ? side / 2 : side * 0.1,
+                                   radius: min(side, cameraHeight) * project.edits.effectiveCameraCornerRadius,
                                    canvas: canvas)
     }
 
@@ -143,9 +154,9 @@ final class RecordingExportRenderer {
         case .quadHD: longest = 2_560
         case .ultraHD: longest = 3_840
         }
-        let scale = longest / max(width, height)
-        let output = CGSize(width: max(2, (width * scale / 2).rounded() * 2),
-                            height: max(2, (height * scale / 2).rounded() * 2))
+        let aspect = edits.canvasAspectRatio?.ratio ?? width / height
+        let output = CGSize(width: max(2, (longest * min(1, aspect) / 2).rounded() * 2),
+                            height: max(2, (longest / max(1, aspect) / 2).rounded() * 2))
         guard output.width <= 16_384, output.height <= 16_384,
               output.width * output.height <= 40_000_000 else {
             throw ScreenRecordingExportError.invalidConfiguration
@@ -186,7 +197,7 @@ final class RecordingExportRenderer {
         var scene = background
         if let shadow { scene = shadow.composited(over: scene) }
         scene = Self.masked(screenLayer, mask: screenMask, canvas: canvas).composited(over: scene)
-        if let camera {
+        if project.edits.effectiveShowCamera, let camera {
             var image = Self.normalized(camera)
             if project.edits.cameraMirrored {
                 image = image.transformed(by: CGAffineTransform(translationX: image.extent.width, y: 0)
@@ -194,6 +205,9 @@ final class RecordingExportRenderer {
             }
             let cameraLayer = Self.fit(image, to: cameraRect, fill: true)
             scene = Self.masked(cameraLayer, mask: cameraMask, canvas: canvas).composited(over: scene)
+        }
+        for annotation in project.edits.annotations ?? [] where annotation.isVisible(at: sourceTime) {
+            scene = try Self.annotationImage(annotation, canvas: canvas).composited(over: scene)
         }
         if project.edits.showCaptions,
            let caption = project.captions.first(where: { sourceTime >= $0.start && sourceTime < $0.end }),
@@ -328,6 +342,47 @@ final class RecordingExportRenderer {
         let frame = CTFramesetterCreateFrame(framesetter, CFRange(location: 0, length: 0), path, nil)
         CTFrameDraw(frame, context)
         return try bitmapImage(context).transformed(by: CGAffineTransform(translationX: box.minX, y: box.minY))
+    }
+
+    private static func annotationImage(_ annotation: RecordingAnnotation, canvas: CGRect) throws -> CIImage {
+        let bounds = annotation.bounds
+        let rect = CGRect(x: bounds.x * canvas.width, y: (1 - bounds.y - bounds.height) * canvas.height,
+                          width: bounds.width * canvas.width, height: bounds.height * canvas.height)
+        let shortSide = min(canvas.width, canvas.height)
+        let lineWidth = shortSide * annotation.lineWidth
+        let inset = annotation.kind == .arrow ? max(shortSide * 0.05, lineWidth * 2) : lineWidth
+        let imageBounds = rect.insetBy(dx: -inset, dy: -inset).intersection(canvas).integral
+        let context = try bitmap(size: imageBounds.size)
+        context.translateBy(x: -imageBounds.minX, y: -imageBounds.minY)
+        let color = CGColor(red: annotation.color.red, green: annotation.color.green, blue: annotation.color.blue, alpha: 1)
+        context.setStrokeColor(color)
+        context.setLineWidth(lineWidth)
+        context.setLineCap(.round)
+        context.setLineJoin(.round)
+        switch annotation.kind {
+        case .rectangle:
+            context.stroke(rect)
+        case .arrow:
+            let start = CGPoint(x: annotation.x * canvas.width, y: (1 - annotation.y) * canvas.height)
+            let end = CGPoint(x: annotation.endX * canvas.width, y: (1 - annotation.endY) * canvas.height)
+            let angle = atan2(end.y - start.y, end.x - start.x)
+            let length = min(max(shortSide * 0.025, lineWidth * 3), hypot(end.x - start.x, end.y - start.y) * 0.4)
+            let first = CGPoint(x: end.x - length * cos(angle - .pi / 6), y: end.y - length * sin(angle - .pi / 6))
+            let second = CGPoint(x: end.x - length * cos(angle + .pi / 6), y: end.y - length * sin(angle + .pi / 6))
+            context.strokeLineSegments(between: [start, end, end, first, end, second])
+        case .text:
+            context.clip(to: rect)
+            let text = NSAttributedString(string: annotation.text, attributes: [
+                NSAttributedString.Key(kCTFontAttributeName as String): CTFontCreateWithName("Helvetica-Bold" as CFString,
+                                                                                          shortSide * annotation.fontSize, nil),
+                NSAttributedString.Key(kCTForegroundColorAttributeName as String): color,
+            ])
+            let setter = CTFramesetterCreateWithAttributedString(text)
+            let frame = CTFramesetterCreateFrame(setter, CFRange(location: 0, length: 0), CGPath(rect: rect, transform: nil), nil)
+            CTFrameDraw(frame, context)
+        }
+        return try bitmapImage(context).transformed(by: .init(translationX: imageBounds.minX, y: imageBounds.minY))
+            .cropped(to: canvas)
     }
 
     private static func bitmap(size: CGSize) throws -> CGContext {

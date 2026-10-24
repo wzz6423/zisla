@@ -1,5 +1,5 @@
 "NSCalendarsFullAccessUsageDescription" = "zisla 需要读取近期日程并显示在顶部信息面板中。";
-"NSAudioCaptureUsageDescription" = "zisla 读取系统音频以显示音浪与调整应用音量，并在你启用录屏系统音频时记录播放声音。";
+"NSAudioCaptureUsageDescription" = "zisla 在播放媒体、你主动调整应用音量或启用录屏系统音频时读取系统音频，用于显示音浪、调整应用音量或记录播放声音。";
 "NSBluetoothAlwaysUsageDescription" = "zisla 仅在你打开电池页面时读取已连接或已配对蓝牙设备公开的电量信息。";
 "NSCameraUsageDescription" = "zisla 仅在你打开镜子或启用录屏摄像头叠加时使用摄像头。";
 "NSRemindersFullAccessUsageDescription" = "zisla 需要读取带日期的提醒事项并与日历事件一起展示。";

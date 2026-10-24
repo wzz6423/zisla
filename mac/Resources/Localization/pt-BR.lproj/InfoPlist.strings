@@ -1,5 +1,5 @@
 "NSCalendarsFullAccessUsageDescription" = "zisla precisa de acesso aos próximos eventos do calendário para o painel de informações superior.";
-"NSAudioCaptureUsageDescription" = "O zisla lê o áudio do sistema para exibir uma forma de onda e ajustar o volume dos apps, e grava o som reproduzido quando você ativa o áudio do sistema na gravação de tela.";
+"NSAudioCaptureUsageDescription" = "O zisla lê o áudio do sistema durante a reprodução de mídia, quando você ajusta o volume de um app ou ativa o áudio do sistema na gravação de tela, para exibir uma forma de onda, ajustar o volume ou gravar o som reproduzido.";
 "NSCameraUsageDescription" = "zisla usa a câmera apenas quando você abre o espelho ou ativa a sobreposição da câmera para a gravação de tela.";
 "NSRemindersFullAccessUsageDescription" = "zisla lê lembretes datados para mostrá-los junto com eventos do calendário.";
 "NSLocationWhenInUseUsageDescription" = "O zisla precisa de acesso à localização para mostrar o clima local, nomes de lugares e redes Wi-Fi próximas.";

@@ -2995,3 +2995,40 @@
 "高度比例" = "Hoogteverhouding";
 "麦克风" = "Microfoon";
 "鼠标大小" = "Cursorgrootte";
+
+
+"录屏控制条" = "Opnamebediening";
+"保存位置" = "Opslaglocatie";
+"更改保存位置" = "Opslaglocatie wijzigen";
+"选择录屏保存目录" = "Opslagmap voor opnamen kiezen";
+
+"系统声音音量" = "Systeemaudiovolume";
+"麦克风音量" = "Microfoonvolume";
+"显示摄像头" = "Camera tonen";
+"画布比例" = "Beeldverhouding van canvas";
+"原始比例" = "Oorspronkelijke verhouding";
+"自定义背景颜色" = "Aangepaste achtergrondkleur";
+"背景颜色" = "Achtergrondkleur";
+"标注" = "Annotaties";
+"添加标注" = "Annotatie toevoegen";
+"文字标注" = "Tekstannotatie";
+"箭头标注" = "Pijlannotatie";
+"矩形标注" = "Rechthoekannotatie";
+"删除标注" = "Annotatie verwijderen";
+"标注内容" = "Annotatietekst";
+"文字大小" = "Tekstgrootte";
+"线条粗细" = "Lijndikte";
+"起点 X" = "Begin X";
+"起点 Y" = "Begin Y";
+"终点 X" = "Einde X";
+"终点 Y" = "Einde Y";
+"位置使用画布左上角为原点，时间对应原始素材" = "De oorsprong ligt linksboven op het canvas. Tijden verwijzen naar het oorspronkelijke materiaal.";
+"时间线按输出时间排列，精确输入对应原始素材" = "De tijdlijn toont de uitvoertijd. Precieze waarden verwijzen naar het oorspronkelijke materiaal.";
+"16:9" = "16:9";
+"9:16" = "9:16";
+"1:1" = "1:1";
+"4:3" = "4:3";
+
+"画布" = "Canvas";
+"光标" = "Cursor";
+"片段" = "Fragment";

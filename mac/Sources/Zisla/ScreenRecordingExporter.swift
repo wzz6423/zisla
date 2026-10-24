@@ -54,6 +54,15 @@ final class ScreenRecordingExporter: ObservableObject {
         let media = try await RecordingExportMedia.prepare(project: project, directory: directory, timeline: timeline)
         let composition = media.video.composition
         let duration = CMTime(seconds: timeline.duration, preferredTimescale: 60_000)
+        let cameraTrack: AVMutableCompositionTrack?
+        if let camera = media.camera {
+            guard let track = composition.addMutableTrack(withMediaType: .video,
+                                                          preferredTrackID: kCMPersistentTrackID_Invalid) else {
+                throw ScreenRecordingExportError.unavailableMedia
+            }
+            try track.insertTimeRange(CMTimeRange(start: .zero, duration: duration), of: camera.track, at: .zero)
+            cameraTrack = track
+        } else { cameraTrack = nil }
         var audioTracks: [AVMutableCompositionTrack] = []
         for source in media.audioTracks {
             try Task.checkCancellation()
@@ -66,6 +75,18 @@ final class ScreenRecordingExporter: ObservableObject {
         }
         try Task.checkCancellation()
         let item = AVPlayerItem(asset: composition)
+        let original = try RecordingExportRenderer.outputSize(source: media.sourceSize, edits: project.edits,
+                                                              resolution: .source)
+        let scale = min(1, 1_280 / max(original.width, original.height))
+        let size = CGSize(width: max(2, (original.width * scale / 2).rounded(.down) * 2),
+                          height: max(2, (original.height * scale / 2).rounded(.down) * 2))
+        let videoComposition = AVMutableVideoComposition()
+        videoComposition.customVideoCompositorClass = RecordingPlaybackCompositor.self
+        videoComposition.renderSize = size
+        videoComposition.frameDuration = CMTime(value: 1, timescale: 30)
+        videoComposition.instructions = [try RecordingPlaybackInstruction(
+            project: project, media: media, cameraTrackID: cameraTrack?.trackID, size: size)]
+        item.videoComposition = videoComposition
         if !audioTracks.isEmpty { item.audioMix = media.audioMix(for: audioTracks) }
         item.audioTimePitchAlgorithm = .spectral
         return item

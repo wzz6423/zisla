@@ -15,6 +15,51 @@ struct ScreenRecordingModelsTests {
         #expect(decoded == source)
     }
 
+    @Test func legacyProjectWithoutCameraCornerRadiusKeepsItsDefaultRounding() throws {
+        var source = project()
+        source.edits.cameraRound = false
+        source.edits.cameraCornerRadius = 0.3
+        var legacy = try #require(JSONSerialization.jsonObject(with: JSONEncoder().encode(source)) as? [String: Any])
+        var edits = try #require(legacy["edits"] as? [String: Any])
+        edits.removeValue(forKey: "cameraCornerRadius")
+        legacy["edits"] = edits
+        let decoded = try JSONDecoder().decode(ScreenRecordingProject.self, from: JSONSerialization.data(withJSONObject: legacy))
+        try decoded.validate()
+        #expect(decoded.version == source.version)
+        #expect(decoded.edits.cameraCornerRadius == nil)
+        #expect(decoded.edits.effectiveCameraCornerRadius == 0.1)
+    }
+
+    @Test(arguments: [0.0, 0.125, 0.5])
+    func cameraCornerRadiusRoundTripsAtItsBoundaries(_ radius: Double) throws {
+        var source = project()
+        source.edits.cameraRound = false
+        source.edits.cameraCornerRadius = radius
+        try source.validate()
+        let decoded = try JSONDecoder().decode(ScreenRecordingProject.self, from: JSONEncoder().encode(source))
+        #expect(decoded == source)
+        #expect(decoded.edits.effectiveCameraCornerRadius == radius)
+    }
+
+    @Test(arguments: [Double.nan, .infinity, -.infinity, -0.001, 0.500_001])
+    func refusesNonFiniteAndOutOfRangeCameraCornerRadius(_ radius: Double) {
+        for round in [false, true] {
+            var source = project()
+            source.edits.cameraRound = round
+            source.edits.cameraCornerRadius = radius
+            #expect(throws: ScreenRecordingProjectError.invalidProject) { try source.validate() }
+        }
+    }
+
+    @Test func circleOverridesTheCustomRadiusWithoutDiscardingItsRectangleSetting() {
+        var edits = RecordingEdits(cameraRound: true, cameraCornerRadius: 0.2)
+        #expect(edits.effectiveCameraCornerRadius == 0.5)
+        edits.cameraRound = false
+        #expect(edits.effectiveCameraCornerRadius == 0.2)
+        edits.cameraCornerRadius = nil
+        #expect(edits.effectiveCameraCornerRadius == 0.1)
+    }
+
     @Test func timelineCanReorderAndRepeatSourceAtDifferentSpeeds() throws {
         var source = project()
         source.edits.segments = [.init(start: 8, end: 12, speed: 2), .init(start: 0, end: 4), .init(start: 0, end: 4)]

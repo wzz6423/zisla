@@ -6,7 +6,7 @@ public struct ScreenRecordingProjectStore: Sendable {
     public static let manifestName = "project.json"
     public static let projectExtension = "zisla-recording"
 
-    public init(root: URL = AppPaths.applicationSupport.appendingPathComponent("Recordings", isDirectory: true)) {
+    public init(root: URL = AppPaths.downloads) {
         self.root = root
     }
 
@@ -76,7 +76,7 @@ public struct ScreenRecordingProjectStore: Sendable {
         }
         let root = directory.resolvingSymlinksInPath().standardizedFileURL
         let url = directory.appendingPathComponent(name).resolvingSymlinksInPath().standardizedFileURL
-        guard url.deletingLastPathComponent() == root else {
+        guard url.deletingLastPathComponent().path == root.path else {
             throw ScreenRecordingProjectError.unsafeMediaPath
         }
         let values = try url.resourceValues(forKeys: [.isRegularFileKey, .fileSizeKey])

@@ -122,6 +122,60 @@ struct ScreenRecordingExportTests {
     }
 
     @Test
+    func customCameraCornerRadiusChangesPixelsAndRectangleKeepsItsLandscapeShape() throws {
+        let size = CGSize(width: 240, height: 200)
+        var project = Self.project()
+        project.edits.cameraRound = false
+        project.edits.cameraSize = 0.5
+        project.edits.cameraPosition = .topLeft
+        let screen = Self.solid(red: 0, green: 0, blue: 0, size: size)
+        let camera = Self.solid(red: 1, green: 1, blue: 1, size: size)
+        project.edits.cameraCornerRadius = 0
+        let squareCorners = try RecordingExportRenderer(project: project, size: size)
+            .image(screen: screen, camera: camera, sourceTime: 0)
+        project.edits.cameraCornerRadius = 0.1
+        let smallRadius = try RecordingExportRenderer(project: project, size: size)
+            .image(screen: screen, camera: camera, sourceTime: 0)
+        project.edits.cameraCornerRadius = 0.4
+        let largeRadius = try RecordingExportRenderer(project: project, size: size)
+            .image(screen: screen, camera: camera, sourceTime: 0)
+        #expect(try Self.pixel(squareCorners, x: 7, y: 7).red > 0.9)
+        #expect(try Self.pixel(largeRadius, x: 7, y: 7).red < 0.1)
+        #expect(try Self.pixel(smallRadius, x: 10, y: 10).red > 0.9)
+        #expect(try Self.pixel(largeRadius, x: 10, y: 10).red < 0.1)
+        #expect(try Self.pixel(largeRadius, x: 55, y: 7).red > 0.9)
+        #expect(try Self.pixel(squareCorners, x: 55, y: 95).red < 0.1,
+                "矩形摄像头应为4:3，而不是延伸到100像素高的正方形")
+
+        project.edits.cameraRound = true
+        project.edits.cameraCornerRadius = 0
+        let circle = try RecordingExportRenderer(project: project, size: size)
+            .image(screen: screen, camera: camera, sourceTime: 0)
+        #expect(try Self.pixel(circle, x: 7, y: 7).red < 0.1)
+        #expect(try Self.pixel(circle, x: 55, y: 95).red > 0.9,
+                "圆形模式应保持正方形外接框，并覆盖自定义零圆角")
+    }
+
+    @Test(arguments: RecordingCameraPosition.allCases)
+    func rectangularCameraUsesItsOwnHeightForEveryCornerAnchor(_ position: RecordingCameraPosition) throws {
+        let size = CGSize(width: 240, height: 200)
+        var project = Self.project()
+        project.edits.cameraRound = false
+        project.edits.cameraCornerRadius = 0
+        project.edits.cameraSize = 0.5
+        project.edits.cameraPosition = position
+        let image = try RecordingExportRenderer(project: project, size: size)
+            .image(screen: Self.solid(red: 0, green: 0, blue: 0, size: size),
+                   camera: Self.solid(red: 1, green: 1, blue: 1, size: size), sourceTime: 0)
+        let left = position == .topLeft || position == .bottomLeft
+        let top = position == .topLeft || position == .topRight
+        let x = left ? 55 : 185
+        #expect(try Self.pixel(image, x: x, y: top ? 42 : 157).red > 0.9)
+        #expect(try Self.pixel(image, x: x, y: top ? 82 : 118).red < 0.1,
+                "摄像头高度必须为75像素，并贴合对应顶边或底边")
+    }
+
+    @Test
     func backgroundsRoundedCornersAndShadowChangePixels() throws {
         let size = CGSize(width: 200, height: 160)
         let screen = Self.solid(red: 1, green: 0, blue: 0, size: size)
@@ -566,6 +620,7 @@ struct ScreenRecordingExportTests {
         #expect(abs(try await item.asset.load(.duration).seconds - 1.5) < 0.001)
         #expect(try await item.asset.loadTracks(withMediaType: .audio).count == 2)
         let generator = AVAssetImageGenerator(asset: item.asset)
+        generator.videoComposition = item.videoComposition
         generator.requestedTimeToleranceBefore = .zero
         generator.requestedTimeToleranceAfter = .zero
         #expect(try Self.pixel(try await generator.image(at: .zero).image, x: 80, y: 60).blue > 0.7)
@@ -576,6 +631,60 @@ struct ScreenRecordingExportTests {
         #expect(Self.toneEnergy(samples, frequency: 440) > 0.000_05)
         #expect(Self.toneEnergy(samples, frequency: 880) > 0.000_03)
         #expect(try fixture.stagingFiles().isEmpty)
+    }
+
+    @Test
+    func editedPlaybackRendersTheSameBackgroundCameraAndCaptionsAsPausedPreview() async throws {
+        let fixture = try Fixture()
+        defer { fixture.remove() }
+        try await fixture.createVideo()
+        try await fixture.createVideo(name: "camera.mp4", camera: true)
+        var project = Self.project()
+        project.cameraFile = "camera.mp4"
+        project.edits.segments = [.init(start: 1, end: 2, speed: 2), .init(start: 0, end: 0.5, speed: 0.5)]
+        project.edits.background = .gradient
+        project.edits.padding = 0.1
+        project.edits.cornerRadius = 0.04
+        project.edits.cameraPosition = .topLeft
+        project.edits.cameraSize = 0.4
+        project.captions = [.init(start: 1, end: 2, text: "Edited playback")]
+        let exporter = ScreenRecordingExporter()
+        let item = try await exporter.playbackItem(project: project, directory: fixture.directory)
+        let videoComposition = try #require(item.videoComposition)
+        let generator = AVAssetImageGenerator(asset: item.asset)
+        generator.videoComposition = videoComposition
+        generator.requestedTimeToleranceBefore = .zero
+        generator.requestedTimeToleranceAfter = .zero
+        let actual = try await generator.image(at: .init(seconds: 0.1, preferredTimescale: 600)).image
+        let expected = try await exporter.preview(project: project, directory: fixture.directory,
+                                                  sourceTime: 1.2, maximumSize: videoComposition.renderSize)
+        #expect(actual.width == expected.width && actual.height == expected.height)
+        #expect(try Self.pixel(actual, x: 80, y: 60).blue > 0.7)
+        #expect(try Self.pixel(actual, x: 27, y: 27).green > 0.7)
+        let differences = try zip(Self.digest(actual), Self.digest(expected)).map { abs(Int($0) - Int($1)) }
+        #expect(Double(differences.reduce(0, +)) / Double(differences.count) < 2)
+        #expect(try fixture.stagingFiles().isEmpty)
+    }
+
+    @Test
+    func playingTheEditedTimelineStartsAtItsSelectedOutputPosition() async throws {
+        let fixture = try Fixture()
+        defer { fixture.remove() }
+        try await fixture.createVideo()
+        var project = Self.project()
+        project.edits.segments = [.init(start: 1, end: 2, speed: 2), .init(start: 0, end: 0.5, speed: 0.5)]
+        let model = ScreenRecordingStudioModel(projectStore: .init(root: fixture.root))
+        defer { model.shutdown() }
+        model.install(project, directory: fixture.directory)
+        model.seekTimeline(to: 0.8)
+
+        model.playTimeline()
+        await model.operationTask?.value
+
+        #expect(model.isShowingTimelinePlayback)
+        #expect((model.activePlayer?.currentTime().seconds ?? 0) >= 0.79)
+        model.playTimeline()
+        #expect(!model.isShowingTimelinePlayback)
     }
 
     @Test
@@ -603,6 +712,15 @@ struct ScreenRecordingExportTests {
         let preview = try await ScreenRecordingExporter().preview(project: project, directory: fixture.directory,
                                                                   sourceTime: 0.137, maximumSize: .init(width: 160, height: 120))
         #expect(try Self.pixel(preview, x: 27, y: 27).green < 0.2)
+        let item = try await ScreenRecordingExporter().playbackItem(project: project, directory: fixture.directory)
+        let generator = AVAssetImageGenerator(asset: item.asset)
+        generator.videoComposition = item.videoComposition
+        generator.requestedTimeToleranceBefore = .zero
+        generator.requestedTimeToleranceAfter = .zero
+        let playbackFirst = try await generator.image(at: .zero).image
+        let playbackLater = try await generator.image(at: .init(seconds: 0.5, preferredTimescale: 600)).image
+        #expect(try Self.pixel(playbackFirst, x: 27, y: 27).green < 0.2)
+        #expect(try Self.pixel(playbackLater, x: 27, y: 27).green > 0.7)
     }
 
     @Test

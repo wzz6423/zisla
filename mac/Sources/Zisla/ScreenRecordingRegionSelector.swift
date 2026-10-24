@@ -26,7 +26,12 @@ final class ScreenRecordingRegionSelector {
         panel.backgroundColor = .clear
         panel.hasShadow = false
         panel.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary]
+        panel.setAccessibilityIdentifier("screenRecording.regionSelector")
         selectionView = RegionView(frame: NSRect(origin: .zero, size: screen.frame.size))
+        selectionView.setAccessibilityIdentifier("screenRecording.regionCanvas")
+        selectionView.setAccessibilityElement(true)
+        selectionView.setAccessibilityRole(.group)
+        selectionView.setAccessibilityLabel(AppLocalization.text("拖动选择录制区域，按 Esc 取消"))
         panel.contentView = selectionView
         selectionView.finish = { [weak self] value in self?.finish(value) }
     }
@@ -72,6 +77,15 @@ private final class RegionView: NSView {
             let border = NSBezierPath(rect: rect)
             border.lineWidth = 2
             border.stroke()
+            let dimensions = String(format: "%.0f × %.0f", rect.width, rect.height) as NSString
+            let attributes: [NSAttributedString.Key: Any] = [.font: NSFont.monospacedDigitSystemFont(ofSize: 12, weight: .medium),
+                .foregroundColor: NSColor.white]
+            let size = dimensions.size(withAttributes: attributes)
+            let badge = CGRect(x: min(rect.minX, bounds.maxX - size.width - 20),
+                y: min(rect.maxY + 8, bounds.maxY - size.height - 16), width: size.width + 16, height: size.height + 8)
+            NSColor.black.withAlphaComponent(0.8).setFill()
+            NSBezierPath(roundedRect: badge, xRadius: 4, yRadius: 4).fill()
+            dimensions.draw(at: CGPoint(x: badge.minX + 8, y: badge.minY + 4), withAttributes: attributes)
         } else {
             NSColor.black.withAlphaComponent(0.35).setFill()
             mask.fill()

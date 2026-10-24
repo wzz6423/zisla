@@ -81,7 +81,7 @@ final class ScreenRecordingCaptureWriter: @unchecked Sendable {
     private var state = State.accepting
     private var timeline = ScreenRecordingCaptureTimeline()
     private var assets: [ScreenRecordingSampleKind: any ScreenRecordingCaptureAssetWriter] = [:]
-    private var lastTimes: [ScreenRecordingSampleKind: Double] = [:]
+    private var lastTimes: [ScreenRecordingSampleKind: CMTime] = [:]
     private var buffered: [ScreenRecordingCaptureSample] = []
     private var terminalError: Error?
     private var recordedDuration: Double = 0
@@ -226,8 +226,10 @@ final class ScreenRecordingCaptureWriter: @unchecked Sendable {
             buffered.append(sample)
             return
         }
-        guard let time = timeline.epoch == nil ? 0 : timeline.time(for: sample.hostTime),
-              lastTimes[sample.kind].map({ time > $0 }) != false else { return }
+        guard let time = timeline.epoch == nil ? 0 : timeline.time(for: sample.hostTime) else { return }
+        // Distinct host times can become equal at the media timescale, especially after a pause.
+        let presentationTime = CMTime(seconds: time, preferredTimescale: 1_000_000)
+        guard lastTimes[sample.kind].map({ CMTimeCompare(presentationTime, $0) > 0 }) != false else { return }
         let key: ScreenRecordingSampleKind = sample.kind == .systemAudio ? .screen : sample.kind
         if assets[key] == nil {
             let name: String
@@ -238,10 +240,10 @@ final class ScreenRecordingCaptureWriter: @unchecked Sendable {
             }
             assets[key] = try factory(files.url(for: name), key, sample.buffer)
         }
-        let retimed = try ScreenRecordingCaptureRetimer.copy(sample.buffer, presentationTime: CMTime(seconds: time, preferredTimescale: 1_000_000))
+        let retimed = try ScreenRecordingCaptureRetimer.copy(sample.buffer, presentationTime: presentationTime)
         guard try assets[key]!.append(retimed, kind: sample.kind) else { return }
         if timeline.epoch == nil { timeline.begin(at: sample.hostTime) }
-        lastTimes[sample.kind] = time
+        lastTimes[sample.kind] = presentationTime
         let duration = CMSampleBufferGetDuration(sample.buffer).seconds
         let end = time + (duration.isFinite && duration > 0 ? duration : 1 / Double(configuration.frameRate))
         lastSampleEnd = max(lastSampleEnd, end)
@@ -362,11 +364,11 @@ private final class ScreenRecordingNativeAssetWriter: ScreenRecordingCaptureAsse
         }
         let sample = lastScreenSample
         lastScreenSample = nil
-        let tailTime = time - 1 / Double(frameRate)
-        if let sample, let input = inputs[.screen], tailTime > CMSampleBufferGetPresentationTimeStamp(sample).seconds {
+        let tailTime = CMTime(seconds: time - 1 / Double(frameRate), preferredTimescale: 1_000_000)
+        if let sample, let input = inputs[.screen], CMTimeCompare(tailTime, CMSampleBufferGetPresentationTimeStamp(sample)) > 0 {
             do {
-                let buffer = try ScreenRecordingCaptureRetimer.copy(sample, presentationTime: CMTime(seconds: tailTime, preferredTimescale: 1_000_000))
-                let tail = ScreenRecordingCaptureSample(buffer: buffer, kind: .screen, hostTime: tailTime)
+                let buffer = try ScreenRecordingCaptureRetimer.copy(sample, presentationTime: tailTime)
+                let tail = ScreenRecordingCaptureSample(buffer: buffer, kind: .screen, hostTime: tailTime.seconds)
                 input.requestMediaDataWhenReady(on: finishQueue) { [self] in
                     let input = inputs[.screen]!
                     guard input.isReadyForMoreMediaData else { return }

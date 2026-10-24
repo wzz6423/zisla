@@ -14,6 +14,7 @@ final class ScreenRecordingNativeCapture: ScreenRecordingCaptureSession {
     private var runningStreams: [SCStream] = []
     private var bridge: ScreenRecordingCaptureBridge?
     private var hardware: ScreenRecordingCaptureHardware?
+    private var camera: (any ScreenRecordingCameraPreviewSession)?
     private var writer: ScreenRecordingCaptureWriter?
     private var files: ScreenRecordingCaptureFiles?
     private var pointer: ScreenRecordingCapturePointer?
@@ -32,19 +33,38 @@ final class ScreenRecordingNativeCapture: ScreenRecordingCaptureSession {
 
     static func sources() async throws -> [RecordingCaptureSource] {
         guard CGPreflightScreenCaptureAccess() else { throw ScreenRecordingCaptureError.permission(.screen) }
-        let content = try await SCShareableContent.excludingDesktopWindows(false, onScreenWindowsOnly: true)
+        let content = try await SCShareableContent.excludingDesktopWindows(false, onScreenWindowsOnly: false)
+        let windowAlphas = (CGWindowListCopyWindowInfo(.optionAll, kCGNullWindowID) as? [[String: Any]])?
+            .reduce(into: [CGWindowID: Double]()) { alphas, window in
+                if let identifier = (window[kCGWindowNumber as String] as? NSNumber)?.uint32Value,
+                   let alpha = (window[kCGWindowAlpha as String] as? NSNumber)?.doubleValue {
+                    alphas[identifier] = alpha
+                }
+            }
         return content.displays.map { display in
             let screen = NSScreen.screens.first { ScreenshotCaptureService.displayID(for: $0) == display.displayID }
             return RecordingCaptureSource(id: display.displayID,
                                           name: screen?.localizedName ?? AppLocalization.text("显示器"),
                                           mode: .display, frame: recordRect(display.frame))
-        } + content.windows.compactMap { window in
-            guard window.windowLayer == 0, window.frame.width > 1, window.frame.height > 1,
-                  window.owningApplication?.processID != getpid() else { return nil }
+        } + content.windows.sorted { first, second in
+            first.title?.isEmpty == false && second.title?.isEmpty != false
+        }.compactMap { window in
+            let processIdentifier = window.owningApplication?.processID
+            let applicationPolicy = processIdentifier.flatMap { NSRunningApplication(processIdentifier: $0) }?.activationPolicy
+            guard includesWindow(frame: window.frame, layer: window.windowLayer,
+                                 processIdentifier: processIdentifier, isRegularApplication: applicationPolicy == .regular,
+                                 isOnScreen: window.isOnScreen, isActive: window.isActive,
+                                 alpha: windowAlphas?[window.windowID]) else { return nil }
             let application = window.owningApplication?.applicationName ?? AppLocalization.text("窗口")
             let name = window.title.flatMap { $0.isEmpty ? nil : $0 }.map { "\(application) — \($0)" } ?? application
             return RecordingCaptureSource(id: window.windowID, name: name, mode: .window, frame: recordRect(window.frame))
         }
+    }
+
+    nonisolated static func includesWindow(frame: CGRect, layer: Int, processIdentifier: pid_t?, isRegularApplication: Bool,
+                                          isOnScreen: Bool, isActive: Bool, alpha: Double?) -> Bool {
+        isRegularApplication && layer == 0 && frame.width > 1 && frame.height > 1 && processIdentifier != getpid()
+            && (isOnScreen || isActive) && (alpha ?? 1) > 0.01
     }
 
     static func devices() -> ScreenRecordingDeviceCatalog {
@@ -62,6 +82,10 @@ final class ScreenRecordingNativeCapture: ScreenRecordingCaptureSession {
         case .denied, .restricted: return false
         @unknown default: return false
         }
+    }
+
+    func useCameraPreview(_ preview: any ScreenRecordingCameraPreviewSession) {
+        camera = preview
     }
 
     func start() async throws -> Double {
@@ -96,6 +120,13 @@ final class ScreenRecordingNativeCapture: ScreenRecordingCaptureSession {
             try self.requireActive()
             let duration = try await writer.finish()
             try self.requireActive()
+            let result = try await ScreenRecordingCaptureMedia.finalizedResult(
+                ScreenRecordingResult(videoFile: files.screenName,
+                                      cameraFile: self.configuration.camera ? files.cameraName : nil,
+                                      microphoneFile: self.configuration.microphone ? files.microphoneName : nil,
+                                      duration: duration, width: self.width, height: self.height, pointers: pointers),
+                videoURL: files.url(for: files.screenName))
+            try self.requireActive()
             var names = [files.screenName]
             if self.configuration.microphone { names.append(files.microphoneName) }
             if self.configuration.camera { names.append(files.cameraName) }
@@ -103,10 +134,8 @@ final class ScreenRecordingNativeCapture: ScreenRecordingCaptureSession {
             self.writer = nil
             self.bridge = nil
             self.hardware = nil
-            return ScreenRecordingResult(videoFile: files.screenName,
-                                         cameraFile: self.configuration.camera ? files.cameraName : nil,
-                                         microphoneFile: self.configuration.microphone ? files.microphoneName : nil,
-                                         duration: duration, width: self.width, height: self.height, pointers: pointers)
+            self.camera = nil
+            return result
         }
         stopTask = task
         return try await task.value
@@ -130,6 +159,7 @@ final class ScreenRecordingNativeCapture: ScreenRecordingCaptureSession {
             self.writer = nil
             self.bridge = nil
             self.hardware = nil
+            self.camera = nil
             self.files = nil
             return fileError ?? inputError
         }
@@ -198,7 +228,8 @@ final class ScreenRecordingNativeCapture: ScreenRecordingCaptureSession {
             try audioStream.addStreamOutput(bridge, type: .audio, sampleHandlerQueue: bridge.sampleQueue)
             streams.append(audioStream)
         }
-        if configuration.microphone || configuration.camera {
+        camera?.attach(to: bridge)
+        if configuration.microphone {
             let hardware = ScreenRecordingCaptureHardware(configuration: configuration, bridge: bridge)
             self.hardware = hardware
             try await hardware.start()
@@ -234,6 +265,7 @@ final class ScreenRecordingNativeCapture: ScreenRecordingCaptureSession {
             do { try await stream.stopCapture() } catch let failure { error = failure }
         }
         await hardware?.stop()
+        await camera?.stop()
         return error
     }
 
@@ -265,12 +297,29 @@ final class ScreenRecordingNativeCapture: ScreenRecordingCaptureSession {
     }
 }
 
+enum ScreenRecordingCaptureMedia {
+    static func finalizedResult(_ result: ScreenRecordingResult, videoURL: URL) async throws -> ScreenRecordingResult {
+        let asset = AVURLAsset(url: videoURL)
+        guard let track = try await asset.loadTracks(withMediaType: .video).first else {
+            throw ScreenRecordingCaptureError.noScreenFrames
+        }
+        let end = try await RecordingExportMedia.availableRange(of: track).end.seconds
+        withExtendedLifetime(asset) {}
+        let duration = min(result.duration, end)
+        guard end.isFinite, duration.isFinite, duration > 0 else { throw ScreenRecordingCaptureError.noScreenFrames }
+        var finalized = result
+        finalized.duration = duration
+        finalized.pointers = result.pointers.filter { $0.time <= duration }
+        return finalized
+    }
+}
+
 private extension CGSize {
     var area: CGFloat { width * height }
 }
 
 final class ScreenRecordingCaptureBridge: NSObject, SCStreamOutput, SCStreamDelegate,
-    AVCaptureAudioDataOutputSampleBufferDelegate, AVCaptureVideoDataOutputSampleBufferDelegate, @unchecked Sendable {
+    AVCaptureAudioDataOutputSampleBufferDelegate, @unchecked Sendable {
     let sampleQueue = DispatchQueue(label: "dev.wzz.zisla.recording.samples", qos: .userInitiated)
     private let writer: ScreenRecordingCaptureWriter
     private let onFailure: @Sendable (Error) -> Void
@@ -317,10 +366,10 @@ final class ScreenRecordingCaptureBridge: NSObject, SCStreamOutput, SCStreamDele
         let clock = hardwareClock
         lock.unlock()
         guard let clock else { return }
-        receive(sampleBuffer, kind: output is AVCaptureVideoDataOutput ? .camera : .microphone, clock: clock)
+        receive(sampleBuffer, kind: .microphone, clock: clock)
     }
 
-    private func receive(_ sample: CMSampleBuffer, kind: ScreenRecordingSampleKind, clock: CMClock?) {
+    func receive(_ sample: CMSampleBuffer, kind: ScreenRecordingSampleKind, clock: CMClock?) {
         lock.lock()
         let active = active
         lock.unlock()
@@ -395,15 +444,6 @@ final class ScreenRecordingCaptureHardware: @unchecked Sendable {
     private func configure() throws {
         session.beginConfiguration()
         defer { session.commitConfiguration() }
-        if configuration.camera {
-            try addDevice(mediaType: .video, identifier: configuration.cameraID)
-            let output = AVCaptureVideoDataOutput()
-            output.videoSettings = [kCVPixelBufferPixelFormatTypeKey as String: kCVPixelFormatType_32BGRA]
-            output.alwaysDiscardsLateVideoFrames = true
-            output.setSampleBufferDelegate(bridge, queue: bridge.sampleQueue)
-            guard session.canAddOutput(output) else { throw ScreenRecordingCaptureError.deviceUnavailable }
-            session.addOutput(output)
-        }
         if configuration.microphone {
             try addDevice(mediaType: .audio, identifier: configuration.microphoneID)
             let output = AVCaptureAudioDataOutput()
@@ -421,6 +461,106 @@ final class ScreenRecordingCaptureHardware: @unchecked Sendable {
         let input = try AVCaptureDeviceInput(device: device)
         guard session.canAddInput(input) else { throw ScreenRecordingCaptureError.deviceUnavailable }
         session.addInput(input)
+    }
+}
+
+nonisolated final class ScreenRecordingCameraCapture: NSObject, ScreenRecordingCameraPreviewSession,
+    AVCaptureVideoDataOutputSampleBufferDelegate, @unchecked Sendable {
+    let previewSession = AVCaptureSession()
+    private let identifier: String?
+    private let onFailure: ScreenRecordingCameraFailureHandler
+    private let queue = DispatchQueue(label: "dev.wzz.zisla.recording.camera", qos: .userInitiated)
+    private let sampleQueue = DispatchQueue(label: "dev.wzz.zisla.recording.camera-samples", qos: .userInitiated)
+    private let lock = NSLock()
+    private var bridge: ScreenRecordingCaptureBridge?
+    private var clock: CMClock?
+    private var observers: [NSObjectProtocol] = []
+
+    init(identifier: String?, onFailure: @escaping ScreenRecordingCameraFailureHandler) {
+        self.identifier = identifier
+        self.onFailure = onFailure
+    }
+
+    func attach(to bridge: ScreenRecordingCaptureBridge) {
+        lock.lock()
+        self.bridge = bridge
+        lock.unlock()
+    }
+
+    nonisolated func start() async throws {
+        try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Void, Error>) in
+            queue.async { [self] in
+                do {
+                    try configure()
+                    for notification in [AVCaptureSession.runtimeErrorNotification, AVCaptureSession.wasInterruptedNotification] {
+                        observers.append(NotificationCenter.default.addObserver(forName: notification, object: previewSession, queue: nil) { [onFailure] _ in
+                            Task { @MainActor in await onFailure(ScreenRecordingCaptureError.deviceUnavailable) }
+                        })
+                    }
+                    previewSession.startRunning()
+                    guard previewSession.isRunning, let clock = previewSession.synchronizationClock else {
+                        throw ScreenRecordingCaptureError.deviceUnavailable
+                    }
+                    lock.lock()
+                    self.clock = clock
+                    lock.unlock()
+                    continuation.resume()
+                } catch {
+                    stopSession()
+                    continuation.resume(throwing: error)
+                }
+            }
+        }
+    }
+
+    nonisolated func stop() async {
+        await withCheckedContinuation { continuation in
+            queue.async { [self] in
+                stopSession()
+                continuation.resume()
+            }
+        }
+    }
+
+    nonisolated func captureOutput(_ output: AVCaptureOutput, didOutput sampleBuffer: CMSampleBuffer, from connection: AVCaptureConnection) {
+        lock.lock()
+        let bridge = bridge
+        let clock = clock
+        lock.unlock()
+        if let bridge, let clock { bridge.receive(sampleBuffer, kind: .camera, clock: clock) }
+    }
+
+    nonisolated private func configure() throws {
+        let device: AVCaptureDevice?
+        if let identifier { device = ScreenRecordingNativeCapture.devices(for: .video).first { $0.uniqueID == identifier } }
+        else { device = AVCaptureDevice.default(for: .video) }
+        guard let device else { throw ScreenRecordingCaptureError.deviceUnavailable }
+        let input = try AVCaptureDeviceInput(device: device)
+        previewSession.beginConfiguration()
+        defer { previewSession.commitConfiguration() }
+        guard previewSession.canAddInput(input) else { throw ScreenRecordingCaptureError.deviceUnavailable }
+        previewSession.addInput(input)
+        let output = AVCaptureVideoDataOutput()
+        output.videoSettings = [kCVPixelBufferPixelFormatTypeKey as String: kCVPixelFormatType_32BGRA]
+        output.alwaysDiscardsLateVideoFrames = true
+        output.setSampleBufferDelegate(self, queue: sampleQueue)
+        guard previewSession.canAddOutput(output) else { throw ScreenRecordingCaptureError.deviceUnavailable }
+        previewSession.addOutput(output)
+    }
+
+    nonisolated private func stopSession() {
+        lock.lock()
+        bridge = nil
+        clock = nil
+        lock.unlock()
+        for observer in observers { NotificationCenter.default.removeObserver(observer) }
+        observers.removeAll()
+        if previewSession.isRunning { previewSession.stopRunning() }
+        for output in previewSession.outputs {
+            (output as? AVCaptureVideoDataOutput)?.setSampleBufferDelegate(nil, queue: nil)
+            previewSession.removeOutput(output)
+        }
+        for input in previewSession.inputs { previewSession.removeInput(input) }
     }
 }
 

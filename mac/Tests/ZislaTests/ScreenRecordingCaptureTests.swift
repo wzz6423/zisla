@@ -476,6 +476,109 @@ struct ScreenRecordingCaptureTests {
     }
 
     @Test
+    func completedCaptureUsesTheActualScreenEndAndCanImmediatelyPreviewAndExport() async throws {
+        let disk = try CaptureTestDisk()
+        defer { disk.remove() }
+        let directory = disk.url.appendingPathComponent("project", isDirectory: true)
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: false)
+        let files = try ScreenRecordingCaptureFiles(directory: directory)
+        let writer = ScreenRecordingCaptureWriter(files: files, configuration: .init(systemAudio: true, microphone: true, camera: true),
+                                                  width: 16, height: 16, onFailure: { _ in })
+        writer.receive(try syntheticVideo(time: 100, kind: .screen, duration: CMTime(value: 1, timescale: 300)))
+        await writer.flush()
+        writer.receive(try syntheticVideo(time: 100.003333, kind: .camera))
+        await writer.flush()
+        writer.receive(try syntheticVideo(time: 100.04, kind: .screen, duration: CMTime(value: 1, timescale: 300)))
+        await writer.flush()
+        for time in stride(from: 100.001, through: 100.091, by: 0.01) {
+            writer.receive(try syntheticAudio(time: time, kind: .systemAudio))
+            await writer.flush()
+            writer.receive(try syntheticAudio(time: time, kind: .microphone))
+            await writer.flush()
+        }
+        await writer.seal(at: 100.103357)
+        let requestedDuration = try await writer.finish()
+        let screenAsset = AVURLAsset(url: files.url(for: files.screenName))
+        let screenTrack = try #require(try await screenAsset.loadTracks(withMediaType: .video).first)
+        let screenEnd = try await screenTrack.load(.timeRange).end.seconds
+        #expect(requestedDuration > screenEnd + 0.001, "短屏幕 sample 的最后一帧不会被 endSession 延长到停止时刻")
+        #expect(try await screenAsset.load(.duration).seconds > screenEnd, "音频尾部不能用作屏幕有效时长")
+        let provisional = ScreenRecordingResult(videoFile: files.screenName, cameraFile: files.cameraName,
+                                                microphoneFile: files.microphoneName, duration: requestedDuration,
+                                                width: 16, height: 16, pointers: [
+                                                    .init(time: 0, x: 0.5, y: 0.5),
+                                                    .init(time: screenEnd, x: 0.5, y: 0.5),
+                                                    .init(time: screenEnd + 0.002, x: 0.5, y: 0.5),
+                                                    .init(time: requestedDuration, x: 0.5, y: 0.5),
+                                                ])
+        let result = try await ScreenRecordingCaptureMedia.finalizedResult(provisional, videoURL: files.url(for: files.screenName))
+        #expect(result.duration == screenEnd)
+        #expect(result.pointers.map(\.time) == [0, screenEnd])
+        try files.publish([files.screenName, files.cameraName, files.microphoneName])
+
+        let oversized = ScreenRecordingProject(result: provisional, name: "Uncorrected capture")
+        let oversizedTimeline = try RecordingExportTimeline(project: oversized)
+        await #expect(throws: ScreenRecordingExportError.timelineOutsideMedia) {
+            try await RecordingExportMedia.prepare(project: oversized, directory: directory, timeline: oversizedTimeline)
+        }
+        let project = ScreenRecordingProject(result: result, name: "Completed capture")
+        try project.validate()
+        let timeline = try RecordingExportTimeline(project: project)
+        let media = try await RecordingExportMedia.prepare(project: project, directory: directory, timeline: timeline)
+        #expect(media.timeline.duration == screenEnd)
+        let exporter = ScreenRecordingExporter()
+        let preview = try await exporter.preview(project: project, directory: directory, sourceTime: result.duration,
+                                                 maximumSize: CGSize(width: 32, height: 32))
+        #expect(preview.width > 0 && preview.height > 0, "最后一帧边界仍须可预览")
+        let output = disk.url.appendingPathComponent("completed.mp4")
+        try await exporter.export(project: project, directory: directory, to: output,
+                                  configuration: .init(resolution: .source, frameRate: 30))
+        let exported = AVURLAsset(url: output)
+        #expect(try await exported.loadTracks(withMediaType: .video).count == 1)
+        #expect(try await exported.load(.duration).seconds > 0)
+
+        var shorter = provisional
+        shorter.duration = screenEnd / 2
+        let bounded = try await ScreenRecordingCaptureMedia.finalizedResult(shorter, videoURL: directory.appendingPathComponent(files.screenName))
+        #expect(bounded.duration == shorter.duration, "读取媒体元数据不得延长实际录制的停止时长")
+        #expect(bounded.pointers.map(\.time) == [0])
+        withExtendedLifetime(screenAsset) {}
+    }
+
+    @Test
+    func completedCaptureRejectsMissingCorruptAndAudioOnlyScreenMedia() async throws {
+        let disk = try CaptureTestDisk()
+        defer { disk.remove() }
+        let provisional = ScreenRecordingResult(videoFile: "screen.mp4", duration: 1, width: 16, height: 16)
+        let missing = disk.url.appendingPathComponent("missing.mp4")
+        await #expect(throws: (any Error).self) {
+            try await ScreenRecordingCaptureMedia.finalizedResult(provisional, videoURL: missing)
+        }
+        #expect(!FileManager.default.fileExists(atPath: missing.path))
+        let corrupt = disk.url.appendingPathComponent("corrupt.mp4")
+        let invalidBytes = Data([0, 1, 2, 3])
+        try invalidBytes.write(to: corrupt)
+        await #expect(throws: (any Error).self) {
+            try await ScreenRecordingCaptureMedia.finalizedResult(provisional, videoURL: corrupt)
+        }
+        #expect(try Data(contentsOf: corrupt) == invalidBytes)
+
+        let files = try ScreenRecordingCaptureFiles(directory: disk.url)
+        let writer = ScreenRecordingCaptureWriter(files: files, configuration: .init(systemAudio: false, microphone: true),
+                                                  width: 16, height: 16, onFailure: { _ in })
+        writer.receive(try syntheticVideo(time: 100, kind: .screen))
+        await writer.flush()
+        writer.receive(try syntheticAudio(time: 100.1, kind: .microphone))
+        await writer.flush()
+        await writer.seal(at: 101)
+        _ = try await writer.finish()
+        await #expect(throws: ScreenRecordingCaptureError.noScreenFrames) {
+            try await ScreenRecordingCaptureMedia.finalizedResult(provisional, videoURL: files.url(for: files.microphoneName))
+        }
+        #expect(FileManager.default.fileExists(atPath: files.url(for: files.microphoneName).path))
+    }
+
+    @Test
     func finishTimeoutCancelsAStalledWriterAndUnblocksTheCaller() async throws {
         let disk = try CaptureTestDisk()
         defer { disk.remove() }
@@ -741,7 +844,8 @@ struct ScreenRecordingCaptureTests {
         }
     }
 
-    private func syntheticVideo(time: Double, kind: ScreenRecordingSampleKind) throws -> ScreenRecordingCaptureSample {
+    private func syntheticVideo(time: Double, kind: ScreenRecordingSampleKind,
+                                duration: CMTime = CMTime(value: 1, timescale: 30)) throws -> ScreenRecordingCaptureSample {
         var pixel: CVPixelBuffer?
         let status = CVPixelBufferCreate(kCFAllocatorDefault, 16, 16, kCVPixelFormatType_32BGRA,
                                          [kCVPixelBufferIOSurfacePropertiesKey: [:]] as CFDictionary, &pixel)
@@ -755,7 +859,7 @@ struct ScreenRecordingCaptureTests {
         var format: CMVideoFormatDescription?
         #expect(CMVideoFormatDescriptionCreateForImageBuffer(allocator: kCFAllocatorDefault, imageBuffer: buffer,
                                                             formatDescriptionOut: &format) == noErr)
-        var timing = CMSampleTimingInfo(duration: CMTime(value: 1, timescale: 30),
+        var timing = CMSampleTimingInfo(duration: duration,
                                         presentationTimeStamp: CMTime(seconds: time, preferredTimescale: 1_000_000), decodeTimeStamp: .invalid)
         var sample: CMSampleBuffer?
         #expect(CMSampleBufferCreateReadyWithImageBuffer(allocator: kCFAllocatorDefault, imageBuffer: buffer,
@@ -808,6 +912,7 @@ private final class CaptureTestSystem {
                                  microphones: [.init(id: "synthetic-mic", name: "Microphone")]) },
             requestPermission: { [self] permission in permissions.append(permission); return denied != permission },
             makeSession: { [self] _, _, _ in session },
+            makeCameraPreview: { _, _ in CaptureTestCameraPreview() },
             now: { [self] in now },
             scheduleTick: { [self] callback in tick = callback; return { [self] in tick = nil } }
         )
@@ -829,6 +934,8 @@ private final class CaptureTestSession: ScreenRecordingCaptureSession {
     var cancelError: CaptureTestError?
     var pauseEvents: [(paused: Bool, time: Double)] = []
 
+    func useCameraPreview(_ preview: any ScreenRecordingCameraPreviewSession) {}
+
     func start() async throws -> Double {
         started = true
         startEntered.signal()
@@ -846,6 +953,14 @@ private final class CaptureTestSession: ScreenRecordingCaptureSession {
         finish.resolve(returnsResultAfterCancellation ? .success(result) : .failure(CancellationError()))
         return cancelError
     }
+}
+
+@MainActor
+private final class CaptureTestCameraPreview: ScreenRecordingCameraPreviewSession {
+    let previewSession = AVCaptureSession()
+    func start() async throws {}
+    func attach(to bridge: ScreenRecordingCaptureBridge) {}
+    func stop() async {}
 }
 
 @MainActor

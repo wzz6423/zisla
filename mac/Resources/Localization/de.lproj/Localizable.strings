@@ -2996,3 +2996,40 @@
 "高度比例" = "Höhenanteil";
 "麦克风" = "Mikrofon";
 "鼠标大小" = "Mauszeigergröße";
+
+
+"录屏控制条" = "Aufnahmesteuerung";
+"保存位置" = "Speicherort";
+"更改保存位置" = "Speicherort ändern";
+"选择录屏保存目录" = "Speicherordner für Aufnahmen wählen";
+
+"系统声音音量" = "Systemlautstärke";
+"麦克风音量" = "Mikrofonlautstärke";
+"显示摄像头" = "Kamera anzeigen";
+"画布比例" = "Seitenverhältnis der Leinwand";
+"原始比例" = "Ursprüngliches Seitenverhältnis";
+"自定义背景颜色" = "Eigene Hintergrundfarbe";
+"背景颜色" = "Hintergrundfarbe";
+"标注" = "Anmerkungen";
+"添加标注" = "Anmerkung hinzufügen";
+"文字标注" = "Textanmerkung";
+"箭头标注" = "Pfeilanmerkung";
+"矩形标注" = "Rechteckanmerkung";
+"删除标注" = "Anmerkung löschen";
+"标注内容" = "Anmerkungstext";
+"文字大小" = "Textgröße";
+"线条粗细" = "Linienstärke";
+"起点 X" = "Start X";
+"起点 Y" = "Start Y";
+"终点 X" = "Ende X";
+"终点 Y" = "Ende Y";
+"位置使用画布左上角为原点，时间对应原始素材" = "Der Ursprung liegt oben links auf der Leinwand. Zeiten beziehen sich auf das Originalmaterial.";
+"时间线按输出时间排列，精确输入对应原始素材" = "Die Zeitleiste zeigt die Ausgabezeit. Genaue Werte beziehen sich auf das Originalmaterial.";
+"16:9" = "16:9";
+"9:16" = "9:16";
+"1:1" = "1:1";
+"4:3" = "4:3";
+
+"画布" = "Leinwand";
+"光标" = "Mauszeiger";
+"片段" = "Clip";

@@ -1,0 +1,107 @@
+import AppKit
+import Testing
+import ZislaCore
+
+@testable import Zisla
+
+@Suite
+struct ScreenRecordingCaptureBarTests {
+    @Test
+    func captureBarStartsInsideTheChosenScreenAndClampsDraggedPositions() {
+        let screen = CGRect(x: -1_920, y: -500, width: 1_920, height: 1_055)
+        let size = CGSize(width: ScreenRecordingCaptureBarGeometry.setupWidth, height: ScreenshotToolbarLayout.height)
+        let initial = ScreenRecordingCaptureBarGeometry.panelFrame(size: size, in: screen)
+        #expect(screen.contains(initial))
+        #expect(initial.midX == screen.midX)
+        #expect(initial.minY == screen.minY + 80)
+        let outside = ScreenRecordingCaptureBarGeometry.panelFrame(size: size, in: screen,
+            center: CGPoint(x: -10_000, y: 10_000))
+        #expect(outside.minX == screen.minX)
+        #expect(outside.maxY == screen.maxY)
+        #expect(screen.contains(outside))
+    }
+
+    @Test
+    func captureBarCanFitSmallerDisplaysAndKeepsItsCenterWhenRecordingBegins() {
+        let smallScreen = CGRect(x: 0, y: 0, width: 640, height: 400)
+        let setup = ScreenRecordingCaptureBarGeometry.panelFrame(
+            size: .init(width: ScreenRecordingCaptureBarGeometry.setupWidth, height: ScreenshotToolbarLayout.height), in: smallScreen)
+        #expect(setup.width == ScreenRecordingCaptureBarGeometry.setupWidth)
+        #expect(smallScreen.contains(setup))
+        let recording = ScreenRecordingCaptureBarGeometry.panelFrame(
+            size: .init(width: ScreenRecordingCaptureBarGeometry.recordingWidth, height: ScreenshotToolbarLayout.height),
+            in: smallScreen, center: CGPoint(x: setup.midX, y: setup.midY))
+        #expect(recording.midX == setup.midX)
+        #expect(recording.midY == setup.midY)
+        #expect(recording.height == setup.height)
+        #expect(smallScreen.contains(recording))
+    }
+
+    @Test(arguments: [600.0, 640.0, 704.0, 1_024.0], [false, true])
+    func sourceTitleYieldsWidthSoTheSingleRowControlsStayInsideTheScreen(screenWidth: Double, showingError: Bool) {
+        let screen = CGRect(x: 0, y: 0, width: screenWidth, height: 600).insetBy(dx: 12, dy: 12)
+        let panel = ScreenRecordingCaptureBarGeometry.panelFrame(
+            size: .init(width: ScreenRecordingCaptureBarGeometry.setupWidth, height: ScreenshotToolbarLayout.height), in: screen)
+        let rowWidth = panel.width - (showingError ? 30 : 0)
+        let sourceWidth = ScreenRecordingCaptureBarGeometry.sourceWidth(availableWidth: rowWidth)
+        #expect(screen.contains(panel))
+        #expect(panel.height == ScreenshotToolbarLayout.height)
+        #expect(sourceWidth >= 32)
+        #expect(sourceWidth <= 152)
+        #expect(ScreenRecordingCaptureBarGeometry.fixedSetupWidth + sourceWidth <= rowWidth)
+    }
+
+    @Test
+    func selectedDisplayOutlineUsesTheMatchingAppKitScreen() {
+        let primary = CGRect(x: 0, y: 0, width: 1_920, height: 1_080)
+        let secondary = CGRect(x: -1_280, y: -200, width: 1_280, height: 1_024)
+        let sources: [RecordingCaptureSource] = [
+            .init(id: 1, name: "Primary", mode: .display, frame: .init(x: 0, y: 0, width: 1_920, height: 1_080)),
+            .init(id: 2, name: "Secondary", mode: .display, frame: .init(x: -1_280, y: 256, width: 1_280, height: 1_024))
+        ]
+        #expect(ScreenRecordingCaptureBarGeometry.targetFrame(configuration: .init(sourceID: 2), sources: sources,
+            screenFrames: [1: primary, 2: secondary], primaryScreenFrame: primary) == secondary)
+        #expect(ScreenRecordingCaptureBarGeometry.targetFrame(configuration: .init(sourceID: 3), sources: sources,
+            screenFrames: [1: primary, 2: secondary], primaryScreenFrame: primary) == nil)
+        #expect(ScreenRecordingCaptureBarGeometry.targetFrame(configuration: .init(sourceID: 2), sources: sources,
+            screenFrames: [1: primary], primaryScreenFrame: primary) == nil)
+    }
+
+    @Test
+    func regionOutlineConvertsTopLeftCoordinatesAndClipsToTheSelectedScreen() {
+        let primary = CGRect(x: 0, y: 0, width: 1_920, height: 1_080)
+        let screen = CGRect(x: -1_280, y: -200, width: 1_280, height: 1_024)
+        let source = RecordingCaptureSource(id: 2, name: "Secondary", mode: .display,
+            frame: .init(x: -1_280, y: 256, width: 1_280, height: 1_024))
+        func frame(_ region: RecordingRect?) -> CGRect? {
+            ScreenRecordingCaptureBarGeometry.targetFrame(configuration: .init(mode: .region, sourceID: 2, region: region),
+                sources: [source], screenFrames: [2: screen], primaryScreenFrame: primary)
+        }
+        #expect(frame(.init(x: 100, y: 40, width: 500, height: 300))
+            == CGRect(x: -1_180, y: 484, width: 500, height: 300))
+        #expect(frame(.init(x: 1_200, y: 900, width: 200, height: 200))
+            == CGRect(x: -80, y: -200, width: 80, height: 124))
+        #expect(frame(nil) == nil)
+        #expect(frame(.init(x: 0, y: 0, width: 0, height: 100)) == nil)
+        #expect(frame(.init(x: .infinity, y: 0, width: 100, height: 100)) == nil)
+        #expect(frame(.init(x: 2_000, y: 0, width: 100, height: 100))?.isNull == true)
+    }
+
+    @Test
+    func windowOutlineUsesQuartzGlobalCoordinatesWithoutMatchingASeparateScreenID() {
+        let primary = CGRect(x: 0, y: 0, width: 1_920, height: 1_080)
+        let window = RecordingCaptureSource(id: 42, name: "Example", mode: .window,
+            frame: .init(x: -1_000, y: 200, width: 800, height: 600))
+        let displayWithSameID = RecordingCaptureSource(id: 42, name: "Display", mode: .display,
+            frame: .init(x: 0, y: 0, width: 1_920, height: 1_080))
+        #expect(ScreenRecordingCaptureBarGeometry.targetFrame(configuration: .init(mode: .window, sourceID: 42),
+            sources: [displayWithSameID, window], screenFrames: [:], primaryScreenFrame: primary)
+            == CGRect(x: -1_000, y: 280, width: 800, height: 600))
+        #expect(ScreenRecordingCaptureBarGeometry.targetFrame(configuration: .init(mode: .display, sourceID: 42),
+            sources: [window], screenFrames: [:], primaryScreenFrame: primary) == nil)
+        let invalid = RecordingCaptureSource(id: 43, name: "Gone", mode: .window,
+            frame: .init(x: 0, y: 0, width: -10, height: 100))
+        #expect(ScreenRecordingCaptureBarGeometry.targetFrame(configuration: .init(mode: .window, sourceID: 43),
+            sources: [invalid], screenFrames: [:], primaryScreenFrame: primary) == nil)
+    }
+}

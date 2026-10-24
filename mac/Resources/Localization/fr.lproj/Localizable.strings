@@ -2991,3 +2991,40 @@
 "高度比例" = "Rapport de hauteur";
 "麦克风" = "Microphone";
 "鼠标大小" = "Taille du curseur";
+
+
+"录屏控制条" = "Commandes d’enregistrement";
+"保存位置" = "Emplacement de sauvegarde";
+"更改保存位置" = "Changer l’emplacement de sauvegarde";
+"选择录屏保存目录" = "Choisir le dossier des enregistrements";
+
+"系统声音音量" = "Volume du son système";
+"麦克风音量" = "Volume du microphone";
+"显示摄像头" = "Afficher la caméra";
+"画布比例" = "Format du canevas";
+"原始比例" = "Format d’origine";
+"自定义背景颜色" = "Couleur de fond personnalisée";
+"背景颜色" = "Couleur de fond";
+"标注" = "Annotations";
+"添加标注" = "Ajouter une annotation";
+"文字标注" = "Annotation textuelle";
+"箭头标注" = "Annotation flèche";
+"矩形标注" = "Annotation rectangle";
+"删除标注" = "Supprimer l’annotation";
+"标注内容" = "Texte de l’annotation";
+"文字大小" = "Taille du texte";
+"线条粗细" = "Épaisseur du trait";
+"起点 X" = "Début X";
+"起点 Y" = "Début Y";
+"终点 X" = "Fin X";
+"终点 Y" = "Fin Y";
+"位置使用画布左上角为原点，时间对应原始素材" = "L’origine est le coin supérieur gauche du canevas. Les temps correspondent au média d’origine.";
+"时间线按输出时间排列，精确输入对应原始素材" = "La chronologie utilise le temps de sortie. Les valeurs précises correspondent au média d’origine.";
+"16:9" = "16:9";
+"9:16" = "9:16";
+"1:1" = "1:1";
+"4:3" = "4:3";
+
+"画布" = "Canevas";
+"光标" = "Curseur";
+"片段" = "Séquence";
