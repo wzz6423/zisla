@@ -52,6 +52,27 @@ struct ScreenRecordingCaptureBarTests {
     }
 
     @Test
+    func regionSelectionIsEnabledForValidWindowAndDisplaySourcesOnly() {
+        let window = RecordingCaptureSource(id: 42, name: "Example", mode: .window,
+            frame: .init(x: 10, y: 20, width: 800, height: 600))
+        let display = RecordingCaptureSource(id: 7, name: "Display", mode: .display,
+            frame: .init(x: 0, y: 0, width: 1_920, height: 1_080))
+
+        #expect(ScreenRecordingCaptureBarGeometry.canSelectRegion(
+            configuration: .init(mode: .window, sourceID: 42), sources: [window], displayIDs: [7]))
+        #expect(!ScreenRecordingCaptureBarGeometry.canSelectRegion(
+            configuration: .init(mode: .window, sourceID: 42), sources: [window], displayIDs: []))
+        #expect(!ScreenRecordingCaptureBarGeometry.canSelectRegion(
+            configuration: .init(mode: .window, sourceID: 42), sources: [
+                .init(id: 42, name: "Gone", mode: .window, frame: .init(x: 0, y: 0, width: -1, height: 10)),
+            ], displayIDs: [7]))
+        #expect(ScreenRecordingCaptureBarGeometry.canSelectRegion(
+            configuration: .init(mode: .display, sourceID: 7), sources: [display], displayIDs: [7]))
+        #expect(!ScreenRecordingCaptureBarGeometry.canSelectRegion(
+            configuration: .init(mode: .display, sourceID: 8), sources: [display], displayIDs: [7]))
+    }
+
+    @Test
     func selectedDisplayOutlineUsesTheMatchingAppKitScreen() {
         let primary = CGRect(x: 0, y: 0, width: 1_920, height: 1_080)
         let secondary = CGRect(x: -1_280, y: -200, width: 1_280, height: 1_024)

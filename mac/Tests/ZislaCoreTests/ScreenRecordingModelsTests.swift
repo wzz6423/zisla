@@ -15,6 +15,26 @@ struct ScreenRecordingModelsTests {
         #expect(decoded == source)
     }
 
+    @Test
+    func cameraAspectRatiosRoundTripAndLegacyDefaultsFollowTheShape() throws {
+        #expect(RecordingCameraAspectRatio.allCases.map(\.title) == ["1:1", "4:3", "16:9"])
+        #expect(RecordingCameraAspectRatio.square.ratio == 1)
+        #expect(RecordingCameraAspectRatio.standard.ratio == 4.0 / 3)
+        #expect(RecordingCameraAspectRatio.widescreen.ratio == 16.0 / 9)
+
+        var source = project()
+        source.edits.cameraAspectRatio = .widescreen
+        let decoded = try JSONDecoder().decode(ScreenRecordingProject.self, from: JSONEncoder().encode(source))
+        #expect(decoded.edits.cameraAspectRatio == .widescreen)
+        #expect(decoded.edits.effectiveCameraAspectRatio == .widescreen)
+
+        source.edits.cameraAspectRatio = nil
+        source.edits.cameraRound = false
+        let legacy = try JSONEncoder().encode(source)
+        let restored = try JSONDecoder().decode(ScreenRecordingProject.self, from: legacy)
+        #expect(restored.edits.effectiveCameraAspectRatio == .standard)
+    }
+
     @Test func legacyProjectWithoutCameraCornerRadiusKeepsItsDefaultRounding() throws {
         var source = project()
         source.edits.cameraRound = false

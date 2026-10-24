@@ -15,6 +15,7 @@ final class ScreenRecordingStudioModel: ObservableObject {
     @Published private(set) var recordingOutputDirectory: URL
     @Published var configuration = RecordingCaptureConfiguration()
     @Published var recordingCameraRound = true
+    @Published var recordingCameraAspectRatio: RecordingCameraAspectRatio = .square
     @Published var recordingCameraCornerRadius = 0.1
     @Published var exportConfiguration = RecordingExportConfiguration()
     @Published private(set) var project: ScreenRecordingProject?
@@ -172,6 +173,11 @@ final class ScreenRecordingStudioModel: ObservableObject {
         configuration.region = nil
     }
 
+    func setRecordingCameraAspectRatio(_ ratio: RecordingCameraAspectRatio) {
+        recordingCameraAspectRatio = ratio
+        if ratio != .square { recordingCameraRound = false }
+    }
+
     func start() {
         guard !isRecording, !isBusy, !isChoosingFile, !exporter.isExporting else { return }
         if configuration.mode == .region, configuration.region == nil { return }
@@ -213,6 +219,7 @@ final class ScreenRecordingStudioModel: ObservableObject {
                 let date = DateFormatter.localizedString(from: Date(), dateStyle: .short, timeStyle: .short)
                 var recording = ScreenRecordingProject(result: result, name: AppLocalization.text("录屏 %@", date))
                 recording.edits.cameraRound = recordingCameraRound
+                recording.edits.cameraAspectRatio = recordingCameraAspectRatio
                 recording.edits.cameraCornerRadius = recordingCameraCornerRadius
                 install(recording, directory: target)
                 isDirty = true

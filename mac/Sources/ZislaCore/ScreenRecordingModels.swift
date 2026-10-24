@@ -191,6 +191,26 @@ public enum RecordingCameraPosition: String, Codable, CaseIterable, Sendable {
     }
 }
 
+public enum RecordingCameraAspectRatio: String, Codable, CaseIterable, Sendable {
+    case square, standard, widescreen
+
+    public var title: String {
+        switch self {
+        case .square: "1:1"
+        case .standard: "4:3"
+        case .widescreen: "16:9"
+        }
+    }
+
+    public var ratio: Double {
+        switch self {
+        case .square: 1
+        case .standard: 4.0 / 3
+        case .widescreen: 16.0 / 9
+        }
+    }
+}
+
 public struct RecordingCaption: Codable, Equatable, Identifiable, Sendable {
     public var id: UUID
     public var start: Double
@@ -220,6 +240,7 @@ public struct RecordingEdits: Codable, Equatable, Sendable {
     public var cameraSize: Double
     public var cameraMirrored: Bool
     public var cameraRound: Bool
+    public var cameraAspectRatio: RecordingCameraAspectRatio?
     public var cameraCornerRadius: Double?
     public var showCamera: Bool?
     public var screenAudioVolume: Double?
@@ -230,7 +251,12 @@ public struct RecordingEdits: Codable, Equatable, Sendable {
     public var backgroundColor: RecordingColor?
     public var annotations: [RecordingAnnotation]?
 
-    public var effectiveCameraCornerRadius: Double { cameraRound ? 0.5 : cameraCornerRadius ?? 0.1 }
+    public var effectiveCameraAspectRatio: RecordingCameraAspectRatio {
+        cameraAspectRatio ?? (cameraRound ? .square : .standard)
+    }
+    public var effectiveCameraCornerRadius: Double {
+        cameraRound && effectiveCameraAspectRatio == .square ? 0.5 : cameraCornerRadius ?? 0.1
+    }
     public var effectiveShowCamera: Bool { showCamera ?? true }
     public var effectiveScreenAudioVolume: Double { screenAudioVolume ?? 1 }
     public var effectiveMicrophoneVolume: Double { microphoneVolume ?? 1 }
@@ -240,7 +266,8 @@ public struct RecordingEdits: Codable, Equatable, Sendable {
                 cornerRadius: Double = 0.02, shadow: Double = 0.3, cursorSize: Double = 1.5,
                 showCursor: Bool = true, clickEffects: Bool = true, autoZoom: Bool = false,
                 cameraPosition: RecordingCameraPosition = .bottomRight, cameraSize: Double = 0.25,
-                cameraMirrored: Bool = true, cameraRound: Bool = true, cameraCornerRadius: Double? = nil,
+                cameraMirrored: Bool = true, cameraRound: Bool = true,
+                cameraAspectRatio: RecordingCameraAspectRatio? = nil, cameraCornerRadius: Double? = nil,
                 showCamera: Bool? = nil, screenAudioVolume: Double? = nil, microphoneVolume: Double? = nil, showCaptions: Bool = true,
                 crop: RecordingRect? = nil, canvasAspectRatio: RecordingCanvasAspectRatio? = nil,
                 backgroundColor: RecordingColor? = nil, annotations: [RecordingAnnotation]? = nil) {
@@ -258,6 +285,7 @@ public struct RecordingEdits: Codable, Equatable, Sendable {
         self.cameraSize = cameraSize
         self.cameraMirrored = cameraMirrored
         self.cameraRound = cameraRound
+        self.cameraAspectRatio = cameraAspectRatio
         self.cameraCornerRadius = cameraCornerRadius
         self.showCamera = showCamera
         self.screenAudioVolume = screenAudioVolume

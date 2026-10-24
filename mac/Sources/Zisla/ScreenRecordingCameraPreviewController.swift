@@ -7,9 +7,10 @@ enum ScreenRecordingCameraPreviewLayout {
     static func frame(configuration: RecordingEdits, visibleFrame: CGRect) -> CGRect {
         let inset = min(24, min(visibleFrame.width, visibleFrame.height) / 10)
         let available = visibleFrame.insetBy(dx: inset, dy: inset)
-        let width = min(320, max(120, min(visibleFrame.width, visibleFrame.height) * configuration.cameraSize),
-                        available.width, configuration.cameraRound ? available.height : .greatestFiniteMagnitude)
-        let height = min(configuration.cameraRound ? width : width * 0.75, available.height)
+        let ratio = CGFloat(configuration.effectiveCameraAspectRatio.ratio)
+        let preferredWidth = min(320, max(120, min(visibleFrame.width, visibleFrame.height) * configuration.cameraSize))
+        let width = min(preferredWidth, available.width, available.height * ratio)
+        let height = min(width / ratio, available.height)
         let left = configuration.cameraPosition == .topLeft || configuration.cameraPosition == .bottomLeft
         let top = configuration.cameraPosition == .topLeft || configuration.cameraPosition == .topRight
         return CGRect(x: left ? available.minX : available.maxX - width,
@@ -63,6 +64,7 @@ final class ScreenRecordingCameraPreviewController {
     func update(configuration: RecordingEdits) {
         let layoutChanged = self.configuration.cameraPosition != configuration.cameraPosition
             || self.configuration.cameraRound != configuration.cameraRound
+            || self.configuration.effectiveCameraAspectRatio != configuration.effectiveCameraAspectRatio
             || self.configuration.cameraSize != configuration.cameraSize
         self.configuration = configuration
         if layoutChanged, let screen = panel.screen ?? NSScreen.main {

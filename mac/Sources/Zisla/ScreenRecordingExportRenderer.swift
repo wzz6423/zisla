@@ -123,7 +123,7 @@ final class RecordingExportRenderer {
             ]).transformed(by: CGAffineTransform(translationX: 0, y: -shortSide * 0.012))
         } else { shadow = nil }
         let side = shortSide * project.edits.cameraSize
-        let cameraHeight = project.edits.cameraRound ? side : side * 0.75
+        let cameraHeight = side / CGFloat(project.edits.effectiveCameraAspectRatio.ratio)
         let margin = shortSide * 0.025
         let cameraX: CGFloat
         let cameraY: CGFloat

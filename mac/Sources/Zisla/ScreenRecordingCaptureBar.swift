@@ -13,6 +13,17 @@ enum ScreenRecordingCaptureBarGeometry {
         min(152, max(32, availableWidth - fixedSetupWidth))
     }
 
+    static func canSelectRegion(configuration: RecordingCaptureConfiguration, sources: [RecordingCaptureSource],
+                                displayIDs: [UInt32]) -> Bool {
+        guard !displayIDs.isEmpty else { return false }
+        if configuration.mode == .window {
+            return sources.contains {
+                $0.id == configuration.sourceID && $0.mode == .window && $0.frame.isValid
+            }
+        }
+        return displayIDs.contains(configuration.sourceID)
+    }
+
     static func panelFrame(size: CGSize, in visibleFrame: CGRect, center: CGPoint? = nil) -> CGRect {
         let size = CGSize(width: min(size.width, visibleFrame.width), height: min(size.height, visibleFrame.height))
         let center = ScreenshotToolbarLayout.clampedCenter(
@@ -234,9 +245,7 @@ private struct ScreenRecordingCaptureBar: View {
                 .buttonStyle(.plain).help(AppLocalization.text("选择录制区域"))
                 .accessibilityLabel(AppLocalization.text("选择录制区域"))
                 .accessibilityIdentifier("screenRecording.selectRegion")
-                .disabled(model.configuration.mode != .region || !NSScreen.screens.contains(where: {
-                    ScreenshotCaptureService.displayID(for: $0) == model.configuration.sourceID
-                }))
+                .disabled(!canSelectRegion)
                 separator
                 inputButton("speaker.wave.2", disabledSymbol: "speaker.slash", title: "系统音频",
                     value: $model.configuration.systemAudio, identifier: "systemAudio")
@@ -343,6 +352,9 @@ private struct ScreenRecordingCaptureBar: View {
     private func cameraShapeButton(round: Bool) -> some View {
         let title = AppLocalization.text(round ? "圆形摄像头" : "矩形")
         return Button {
+            if round, model.recordingCameraAspectRatio != .square {
+                model.setRecordingCameraAspectRatio(.square)
+            }
             model.recordingCameraRound = round
             showsCameraCornerRadius = !round
         } label: {
@@ -374,9 +386,32 @@ private struct ScreenRecordingCaptureBar: View {
 
     private var cameraShapeControls: some View {
         HStack(spacing: 0) {
+            cameraAspectRatioMenu
             cameraShapeButton(round: true)
             cameraShapeButton(round: false)
         }
+    }
+
+    private var cameraAspectRatioMenu: some View {
+        Menu {
+            Picker(AppLocalization.text("摄像头比例"), selection: Binding(
+                get: { model.recordingCameraAspectRatio },
+                set: { model.setRecordingCameraAspectRatio($0) }
+            )) {
+                ForEach(RecordingCameraAspectRatio.allCases, id: \.self) { ratio in
+                    Text(AppLocalization.text(ratio.title)).tag(ratio)
+                }
+            }
+        } label: {
+            Image(systemName: "aspectratio")
+                .font(.system(size: 13, weight: .medium))
+                .frame(width: 28, height: ScreenshotToolbarLayout.controlHeight)
+        }
+        .menuStyle(.borderlessButton).menuIndicator(.hidden)
+        .help(AppLocalization.text("摄像头比例"))
+        .accessibilityLabel(AppLocalization.text("摄像头比例"))
+        .accessibilityValue(AppLocalization.text(model.recordingCameraAspectRatio.title))
+        .accessibilityIdentifier("screenRecording.cameraAspectRatio")
     }
 
     private var optionsMenu: some View {
@@ -467,6 +502,13 @@ private struct ScreenRecordingCaptureBar: View {
     }
 
     private var separator: some View { Divider().frame(width: 1, height: 20).padding(.horizontal, 3) }
+
+    private var canSelectRegion: Bool {
+        ScreenRecordingCaptureBarGeometry.canSelectRegion(configuration: model.configuration,
+            sources: model.capture.sources,
+            displayIDs: NSScreen.screens.compactMap { ScreenshotCaptureService.displayID(for: $0) }
+        )
+    }
 
     private func symbol(for mode: RecordingCaptureMode) -> String {
         switch mode {
