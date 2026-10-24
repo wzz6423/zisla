@@ -235,6 +235,7 @@ struct ScreenRecordingStudioTests {
         await model.operationTask?.value
         #expect(model.capture.phase == .recording)
         model.recordingCameraRound = cameraRound
+        model.recordingCameraAspectRatio = .widescreen
         model.recordingCameraCornerRadius = cameraCornerRadius
 
         model.stop()
@@ -244,6 +245,7 @@ struct ScreenRecordingStudioTests {
         let directory = try #require(model.directory)
         let project = try #require(model.project)
         #expect(project.edits.cameraRound == cameraRound)
+        #expect(project.edits.cameraAspectRatio == .widescreen)
         #expect(project.edits.cameraCornerRadius == cameraCornerRadius)
         #expect(directory.path == session.directory?.path)
         #expect(directory.deletingLastPathComponent().path == root.path)

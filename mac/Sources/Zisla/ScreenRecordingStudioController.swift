@@ -52,6 +52,9 @@ final class ScreenRecordingStudioController: NSWindowController, NSWindowDelegat
         model.$recordingCameraRound.dropFirst().receive(on: RunLoop.main)
             .sink { [weak self] _ in self?.refreshCameraPreview() }
             .store(in: &subscriptions)
+        model.$recordingCameraAspectRatio.dropFirst().receive(on: RunLoop.main)
+            .sink { [weak self] _ in self?.refreshCameraPreview() }
+            .store(in: &subscriptions)
         model.$recordingCameraCornerRadius.dropFirst().receive(on: RunLoop.main)
             .sink { [weak self] _ in self?.refreshCameraPreview() }
             .store(in: &subscriptions)
@@ -130,6 +133,7 @@ final class ScreenRecordingStudioController: NSWindowController, NSWindowDelegat
         let configuration = model.configuration
         if configuration.camera {
             cameraPreview.present(configuration: .init(cameraRound: model.recordingCameraRound,
+                cameraAspectRatio: model.recordingCameraAspectRatio,
                 cameraCornerRadius: model.recordingCameraCornerRadius))
         }
         else { cameraPreview.hide() }
@@ -161,20 +165,50 @@ final class ScreenRecordingStudioController: NSWindowController, NSWindowDelegat
 
     func selectRegion() {
         guard !model.isRecording, !model.isBusy, !model.isChoosingFile, regionSelector == nil else { return }
-        guard let screen = NSScreen.screens.first(where: {
-            ScreenshotCaptureService.displayID(for: $0) == model.configuration.sourceID
-        }) else { return }
+        let originalSourceID = model.configuration.sourceID
+        let screenFrames = Dictionary(uniqueKeysWithValues: NSScreen.screens.compactMap { screen in
+            ScreenshotCaptureService.displayID(for: screen).map { ($0, screen.frame) }
+        })
+        let primaryScreen = NSScreen.main ?? NSScreen.screens.first
+        let windowTarget = model.configuration.mode == .window
+            ? model.capture.sources.first(where: { $0.id == originalSourceID && $0.mode == .window })
+            : nil
+        let targetFrame: CGRect? = windowTarget.flatMap { source in
+            primaryScreen.flatMap { primary in
+                ScreenRecordingCaptureBarGeometry.targetFrame(configuration: model.configuration,
+                    sources: [source], screenFrames: screenFrames, primaryScreenFrame: primary.frame)
+            }
+        }
+        let targetScreen: NSScreen? = targetFrame.flatMap { target -> NSScreen? in
+            let screen = NSScreen.screens.max { left, right in
+                func area(_ frame: CGRect) -> CGFloat {
+                    let intersection = frame.intersection(target)
+                    return intersection.isNull ? 0 : intersection.width * intersection.height
+                }
+                return area(left.frame) < area(right.frame)
+            }
+            guard let screen else { return nil }
+            let intersection = screen.frame.intersection(target)
+            return intersection.isNull || intersection.width <= 0 || intersection.height <= 0 ? nil : screen
+        }
+        let screen = targetScreen ?? (model.configuration.mode == .window
+            ? NSScreen.screens.first(where: { $0.frame.contains(NSEvent.mouseLocation) })
+            : NSScreen.screens.first(where: { ScreenshotCaptureService.displayID(for: $0) == originalSourceID }))
+            ?? NSScreen.main ?? NSScreen.screens.first
+        guard let screen, let displayID = ScreenshotCaptureService.displayID(for: screen) else { return }
+        model.configuration.mode = .region
+        model.configuration.sourceID = displayID
+        model.configuration.region = nil
         window?.orderOut(nil)
         captureBar.hide()
         cameraPreview.hide()
-        let sourceID = model.configuration.sourceID
         let returnsToCaptureControls = captureControlsPresented
         let selector = ScreenRecordingRegionSelector(screen: screen)
         regionSelector = selector
-        selector.onFinish = { [weak self] region in
+        selector.onFinish = { [weak self] (region: RecordingRect?) in
             guard let self else { return }
             regionSelector = nil
-            if let region, model.configuration.sourceID == sourceID {
+            if let region, model.configuration.sourceID == displayID {
                 model.configuration.region = region
             }
             if returnsToCaptureControls {

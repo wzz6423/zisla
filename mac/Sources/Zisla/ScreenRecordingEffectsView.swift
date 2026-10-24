@@ -95,6 +95,11 @@ struct ScreenRecordingEffectsView: View {
                         }
                     }
                     parameter("摄像头大小", value: editBinding(\.cameraSize, default: 0.25), in: 0.1...0.5)
+                    Picker(AppLocalization.text("摄像头比例"), selection: cameraAspectRatioBinding) {
+                        ForEach(RecordingCameraAspectRatio.allCases, id: \.self) { ratio in
+                            Text(AppLocalization.text(ratio.title)).tag(ratio)
+                        }
+                    }
                     Toggle(AppLocalization.text("镜像摄像头"), isOn: editBinding(\.cameraMirrored, default: true))
                     Toggle(AppLocalization.text("圆形摄像头"), isOn: editBinding(\.cameraRound, default: true))
                     if !project.edits.cameraRound {
@@ -115,6 +120,15 @@ struct ScreenRecordingEffectsView: View {
     private func optionalEditBinding<Value>(_ path: WritableKeyPath<RecordingEdits, Value?>, default value: Value) -> Binding<Value> {
         Binding(get: { model.project?.edits[keyPath: path] ?? value },
                 set: { value in model.update { $0.edits[keyPath: path] = value } })
+    }
+
+    private var cameraAspectRatioBinding: Binding<RecordingCameraAspectRatio> {
+        Binding(get: { model.project?.edits.effectiveCameraAspectRatio ?? .square }, set: { ratio in
+            model.update {
+                $0.edits.cameraAspectRatio = ratio
+                if ratio != .square { $0.edits.cameraRound = false }
+            }
+        })
     }
 
     private func audioParameter(_ title: String, value: Binding<Double>) -> some View {

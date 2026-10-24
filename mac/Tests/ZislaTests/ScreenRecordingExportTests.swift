@@ -175,6 +175,24 @@ struct ScreenRecordingExportTests {
                 "摄像头高度必须为75像素，并贴合对应顶边或底边")
     }
 
+    @Test(arguments: RecordingCameraAspectRatio.allCases)
+    func exportedCameraUsesTheSelectedAspectRatio(_ ratio: RecordingCameraAspectRatio) throws {
+        let size = CGSize(width: 240, height: 200)
+        var project = Self.project()
+        project.edits.cameraRound = false
+        project.edits.cameraAspectRatio = ratio
+        project.edits.cameraCornerRadius = 0
+        project.edits.cameraSize = 0.5
+        project.edits.cameraPosition = .topLeft
+        let image = try RecordingExportRenderer(project: project, size: size)
+            .image(screen: Self.solid(red: 0, green: 0, blue: 0, size: size),
+                   camera: Self.solid(red: 1, green: 1, blue: 1, size: size), sourceTime: 0)
+        let topDownBottom = 5 + Int((100 / ratio.ratio).rounded(.down))
+        #expect(try Self.pixel(image, x: 55, y: 7).red > 0.9)
+        #expect(try Self.pixel(image, x: 55, y: topDownBottom - 1).red > 0.9)
+        #expect(try Self.pixel(image, x: 55, y: topDownBottom + 2).red < 0.1)
+    }
+
     @Test
     func backgroundsRoundedCornersAndShadowChangePixels() throws {
         let size = CGSize(width: 200, height: 160)

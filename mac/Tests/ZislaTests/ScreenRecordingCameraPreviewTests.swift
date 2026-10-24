@@ -328,6 +328,15 @@ struct ScreenRecordingCameraPreviewTests {
         #expect(frame.height == frame.width * 0.75)
     }
 
+    @Test(arguments: RecordingCameraAspectRatio.allCases)
+    func previewUsesTheSelectedCameraAspectRatio(_ ratio: RecordingCameraAspectRatio) {
+        let configuration = RecordingEdits(cameraRound: false, cameraAspectRatio: ratio)
+        let frame = ScreenRecordingCameraPreviewLayout.frame(configuration: configuration,
+                                                              visibleFrame: CGRect(x: 0, y: 0, width: 1440, height: 900))
+        #expect(abs(frame.width / frame.height - ratio.ratio) < 0.000_001)
+        #expect(CGRect(x: 0, y: 0, width: 1440, height: 900).contains(frame))
+    }
+
     @Test(arguments: [0.0, 0.1, 0.5])
     func customCameraRoundingDoesNotResizeOrMoveTheRectangularPreview(_ radius: Double) {
         let visible = CGRect(x: -1440, y: 100, width: 1440, height: 900)
