@@ -273,7 +273,8 @@ enum SystemMonitorMenuBarIconRenderer {
         if let plugSymbol {
             context.saveGState()
             context.translateBy(x: left + indicatorWidth / 2, y: boltBounds.midY)
-            context.rotate(by: .pi / 2)
+            // With the artwork's flipped Y axis, a negative turn points the pins up.
+            context.rotate(by: -.pi / 2)
             drawTintedImage(
                 plugSymbol,
                 maxDimension: boltBounds.height,

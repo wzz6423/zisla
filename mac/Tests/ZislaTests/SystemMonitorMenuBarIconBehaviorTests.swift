@@ -195,6 +195,45 @@ struct SystemMonitorMenuBarIconBehaviorTests {
         }
     }
 
+    @Test(arguments: [1.62, 1.88, 1.98])
+    func plugPinsFaceUpAndCordFacesDown(textScale: Double) throws {
+        let appearance = SystemMonitorCombinedIconAppearance(
+            showsBatteryPercentage: false, showsChargingIndicator: true,
+            usesStatusColors: true, batteryTextScale: textScale, wifiScale: 1
+        )
+        let image = try #require(SystemMonitorMenuBarIconRenderer.render(
+            menuBarStatus: MenuBarIconStatus(battery: battery(pluggedIn: true), wifi: .off, level: nil),
+            size: 120, scale: 2, foreground: NSColor.white.cgColor,
+            options: MenuBarIconBatteryOptions(appearance: appearance),
+            connectionOptions: MenuBarIconConnectionOptions(appearance: appearance),
+            volumeOptions: MenuBarIconVolumeOptions(appearance: appearance)
+        ))
+        let bitmap = NSBitmapImageRep(cgImage: image)
+        var rows: [Int: [Int]] = [:]
+        for y in 0..<(bitmap.pixelsHigh / 3) {
+            for x in 0..<bitmap.pixelsWide {
+                let color = try #require(bitmap.colorAt(x: x, y: y)?.usingColorSpace(.deviceRGB))
+                if color.alphaComponent > 0.8, color.redComponent > 0.9,
+                   color.greenComponent > 0.9, color.blueComponent > 0.9 {
+                    rows[y, default: []].append(x)
+                }
+            }
+        }
+        let top = try #require(rows.keys.min())
+        let bottom = try #require(rows.keys.max())
+        let bandHeight = (bottom - top + 1) / 4
+        func splitRowCount(in band: Range<Int>) -> Int {
+            band.filter { y in
+                let columns = rows[y, default: []]
+                return zip(columns, columns.dropFirst()).filter { $1 > $0 + 1 }.count == 1
+            }.count
+        }
+        #expect(splitRowCount(in: top..<(top + bandHeight)) > 0,
+            "Two separated plug pins must face upward at text scale \(textScale)")
+        #expect(splitRowCount(in: (bottom - bandHeight + 1)..<(bottom + 1)) == 0,
+            "The single power cord must face downward at text scale \(textScale)")
+    }
+
     @Test
     func batteryHeaderPixelsStaySeparatedFromRingAcrossSizes() throws {
         for charging in [false, true] {
