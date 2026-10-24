@@ -39,32 +39,18 @@ struct ApplicationVolumeMixerModuleTests {
             monitor: VolumeLayoutMonitor(), backend: backend,
             ownProcessIdentifier: -1, ownBundleIdentifier: "fixture.zisla"
         )
-        let renderer = ImageRenderer(content: ApplicationVolumeMixerModuleView(service: service)
-            .frame(width: 752, height: height)
-            .background(.black)
-            .environment(\.colorScheme, .dark))
-        renderer.scale = 1
-        let bitmap = NSBitmapImageRep(cgImage: try #require(renderer.cgImage))
-        var minX = bitmap.pixelsWide
-        var maxX = 0
-        var minY = bitmap.pixelsHigh
-        var maxY = 0
-        for y in 0..<bitmap.pixelsHigh {
-            for x in 0..<bitmap.pixelsWide {
-                let color = try #require(bitmap.colorAt(x: x, y: y)?.usingColorSpace(.deviceRGB))
-                if max(color.redComponent, color.greenComponent, color.blueComponent) > 0.1 {
-                    minX = min(minX, x)
-                    maxX = max(maxX, x)
-                    minY = min(minY, y)
-                    maxY = max(maxY, y)
-                }
-            }
-        }
-        try #require(maxX > minX && maxY > minY)
-        #expect(abs(Double(minX + maxX) / 2 - 376) <= 3,
-                "The message must be centered across the entire module width")
-        #expect(abs(Double(minY + maxY) / 2 - height / 2) <= 5,
-                "The message must be vertically centered without a separate heading")
+        let actual = try renderedContentBounds(ApplicationVolumeMixerModuleView(service: service), height: height)
+        let reference = EmptyState(
+            symbol: isSupported ? "speaker.wave.2" : "speaker.slash",
+            title: AppLocalization.text(isSupported ? "暂无正在播放声音的应用" : "应用音量混音器"),
+            detail: AppLocalization.text(isSupported
+                ? "播放音乐或视频后，应用会显示在这里。"
+                : "应用音量需要 macOS 14.4 或更高版本")
+        )
+        // Glyph ink can be asymmetric; compare against the same content centered by SwiftUI on this OS.
+        let expected = try renderedContentBounds(reference, height: height)
+        #expect(actual == expected,
+                "The module message must match the position and size of a standalone centered empty state")
     }
 
     @Test(arguments: [false, true]) @MainActor
@@ -144,6 +130,33 @@ struct ApplicationVolumeMixerModuleTests {
         #expect(ApplicationVolumeMixerModuleView.controlStatus(
             for: application, errorMessage: sample.error
         ) == sample.expected)
+    }
+
+    @MainActor
+    private func renderedContentBounds(_ content: some View, height: Double) throws -> CGRect {
+        let renderer = ImageRenderer(content: content
+            .frame(width: 752, height: height)
+            .background(.black)
+            .environment(\.colorScheme, .dark))
+        renderer.scale = 1
+        let bitmap = NSBitmapImageRep(cgImage: try #require(renderer.cgImage))
+        var minX = bitmap.pixelsWide
+        var maxX = 0
+        var minY = bitmap.pixelsHigh
+        var maxY = 0
+        for y in 0..<bitmap.pixelsHigh {
+            for x in 0..<bitmap.pixelsWide {
+                let color = try #require(bitmap.colorAt(x: x, y: y)?.usingColorSpace(.deviceRGB))
+                if max(color.redComponent, color.greenComponent, color.blueComponent) > 0.1 {
+                    minX = min(minX, x)
+                    maxX = max(maxX, x)
+                    minY = min(minY, y)
+                    maxY = max(maxY, y)
+                }
+            }
+        }
+        try #require(maxX > minX && maxY > minY)
+        return CGRect(x: minX, y: minY, width: maxX - minX + 1, height: maxY - minY + 1)
     }
 }
 
