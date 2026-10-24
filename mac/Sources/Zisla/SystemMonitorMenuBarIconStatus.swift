@@ -166,8 +166,10 @@ enum MenuBarIconBatteryColorRole: Equatable, Sendable {
 
 enum MenuBarIconBatteryGapContent: Equatable, Sendable {
     case bolt
+    case plug
     case percentage
     case boltAndPercentage
+    case plugAndPercentage
     case empty
 }
 
@@ -214,7 +216,7 @@ enum MenuBarIconMappings {
         if options.showsChargingIndicator {
             if battery.isCharging { return options.showsPercentage ? .boltAndPercentage : .bolt }
             let showsPercentageForPower = options.showsPercentageWhenConnected && options.showsPercentage
-            if battery.isConnectedToPower { return showsPercentageForPower ? .boltAndPercentage : .bolt }
+            if battery.isConnectedToPower { return showsPercentageForPower ? .plugAndPercentage : .plug }
         }
         return options.showsPercentage ? .percentage : .empty
     }

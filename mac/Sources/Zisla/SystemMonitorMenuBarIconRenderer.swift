@@ -194,8 +194,10 @@ enum SystemMonitorMenuBarIconRenderer {
     ) {
         let gapContent = MenuBarIconMappings.batteryGapContent(battery, options: options)
         let hasTopGap = gapContent != .empty
-        let showsValue = [.percentage, .boltAndPercentage].contains(gapContent)
+        let showsValue = [.percentage, .boltAndPercentage, .plugAndPercentage].contains(gapContent)
         let showsBolt = [.bolt, .boltAndPercentage].contains(gapContent)
+        let showsPlug = [.plug, .plugAndPercentage].contains(gapContent)
+        let showsIndicator = showsBolt || showsPlug
         let percentageScale: CGFloat = 1.2
         let fontSize = batteryValueFontSize(scale: options.textScale)
         let valueLine = batteryPercentageLine(battery.percentage, fontSize: fontSize, color: foreground)
@@ -203,7 +205,13 @@ enum SystemMonitorMenuBarIconRenderer {
         let valueBounds = showsValue ? CTLineGetBoundsWithOptions(valueLine, .useGlyphPathBounds) : .zero
         let indicatorScale = batteryChargingBoltScale(textScale: options.textScale)
         let boltBounds = SystemMonitorMenuBarIconGeometry.batteryChargingBolt(scale: indicatorScale).boundingBoxOfPath
-        let indicatorWidth = showsBolt ? boltBounds.width : 0
+        // Rotate the macOS 12 symbol; the portrait variant requires macOS 15.
+        let plugSymbol = showsPlug ? configuredSymbol(
+            name: "powerplug.fill", pointSize: fontSize,
+            foreground: .white
+        ) : nil
+        let indicatorWidth = showsBolt ? boltBounds.width
+            : plugSymbol.map { $0.size.height * boltBounds.height / $0.size.width } ?? 0
         let headerWidth = valueWidth + indicatorWidth + (showsValue && indicatorWidth > 0 ? 6 : 0)
         // Scale the fitting budget with the slider so fitting cannot cancel glyph growth.
         let headerWidthLimit = 70 * CGFloat(options.textScale / SystemMonitorCombinedIconAppearance.batteryTextScaleRange.upperBound)
@@ -252,7 +260,7 @@ enum SystemMonitorMenuBarIconRenderer {
         context.translateBy(x: centerX, y: 2.1)
         context.scaleBy(x: headerScale, y: headerScale)
         context.translateBy(x: -centerX, y: -2.1)
-        let inkExpansion = showsBolt ? valueBounds.maxX * percentageScale - valueWidth : 0
+        let inkExpansion = showsIndicator ? valueBounds.maxX * percentageScale - valueWidth : 0
         let left = centerX - (headerWidth + inkExpansion) / 2
         if showsBolt {
             context.saveGState()
@@ -262,10 +270,24 @@ enum SystemMonitorMenuBarIconRenderer {
             context.fillPath()
             context.restoreGState()
         }
+        if let plugSymbol {
+            context.saveGState()
+            context.translateBy(x: left + indicatorWidth / 2, y: boltBounds.midY)
+            // With the artwork's flipped Y axis, a negative turn points the pins up.
+            context.rotate(by: -.pi / 2)
+            drawTintedImage(
+                plugSymbol,
+                maxDimension: boltBounds.height,
+                center: .zero,
+                tint: foreground,
+                in: context
+            )
+            context.restoreGState()
+        }
         if showsValue {
             let baseline = SystemMonitorMenuBarIconGeometry.batteryValueBaseline(fontSize: fontSize)
             let valueX = left + headerWidth - valueWidth
-            if showsBolt {
+            if showsIndicator {
                 // Enlarge only the digits into the existing gap; the indicator and battery arc stay fixed.
                 let inkTop = baseline.y - valueBounds.maxY
                 context.translateBy(x: valueX, y: inkTop)
