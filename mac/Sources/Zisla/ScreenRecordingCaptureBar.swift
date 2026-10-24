@@ -7,7 +7,10 @@ import ZislaKit
 enum ScreenRecordingCaptureBarGeometry {
     static let setupWidth: CGFloat = 604
     static let recordingWidth: CGFloat = 256
-    static let fixedSetupWidth: CGFloat = 452
+    static let dragHandleWidth: CGFloat = 24
+    static let closeButtonWidth: CGFloat = 24
+    static let separatorHorizontalPadding: CGFloat = 1
+    static let fixedSetupWidth: CGFloat = 440
 
     static func sourceWidth(availableWidth: CGFloat) -> CGFloat {
         min(152, max(32, availableWidth - fixedSetupWidth))
@@ -232,20 +235,23 @@ private struct ScreenRecordingCaptureBar: View {
             HStack(spacing: ScreenshotToolbarLayout.spacing) {
                 dragHandle
                 Button(action: cancel) { Image(systemName: "xmark") }
-                    .buttonStyle(.plain).frame(width: 28, height: ScreenshotToolbarLayout.controlHeight)
+                    .buttonStyle(.plain).frame(width: ScreenRecordingCaptureBarGeometry.closeButtonWidth,
+                        height: ScreenshotToolbarLayout.controlHeight)
                     .help(AppLocalization.text("关闭"))
                     .accessibilityLabel(AppLocalization.text("关闭"))
                     .accessibilityIdentifier("screenRecording.closeCaptureBar")
                 separator
                 ForEach(RecordingCaptureMode.allCases, id: \.self) { mode in modeButton(mode) }
-                sourcePicker(width: ScreenRecordingCaptureBarGeometry.sourceWidth(availableWidth: width))
-                Button(action: selectRegion) {
-                    Image(systemName: "viewfinder").frame(width: 28, height: ScreenshotToolbarLayout.controlHeight)
+                if model.configuration.mode == .region {
+                    Button(action: selectRegion) {
+                        Image(systemName: "viewfinder").frame(width: 28, height: ScreenshotToolbarLayout.controlHeight)
+                    }
+                    .buttonStyle(.plain).help(AppLocalization.text("选择录制区域"))
+                    .accessibilityLabel(AppLocalization.text("选择录制区域"))
+                    .accessibilityIdentifier("screenRecording.selectRegion")
+                    .disabled(!canSelectRegion)
                 }
-                .buttonStyle(.plain).help(AppLocalization.text("选择录制区域"))
-                .accessibilityLabel(AppLocalization.text("选择录制区域"))
-                .accessibilityIdentifier("screenRecording.selectRegion")
-                .disabled(!canSelectRegion)
+                sourcePicker(width: ScreenRecordingCaptureBarGeometry.sourceWidth(availableWidth: width))
                 separator
                 inputButton("speaker.wave.2", disabledSymbol: "speaker.slash", title: "系统音频",
                     value: $model.configuration.systemAudio, identifier: "systemAudio")
@@ -322,10 +328,11 @@ private struct ScreenRecordingCaptureBar: View {
                             .font(.system(size: 11)).lineLimit(1).truncationMode(.middle)
                     } else { Image(systemName: symbol(for: model.configuration.mode)).font(.system(size: 12)) }
                     Image(systemName: "chevron.down").font(.system(size: 8, weight: .semibold))
-                }.frame(width: width, height: ScreenshotToolbarLayout.controlHeight)
+                }.frame(height: ScreenshotToolbarLayout.controlHeight)
             }
             .menuStyle(.borderlessButton).menuIndicator(.hidden)
-            .frame(width: width).accessibilityIdentifier("screenRecording.captureSource")
+            .frame(maxWidth: width).fixedSize(horizontal: true, vertical: false)
+            .accessibilityIdentifier("screenRecording.captureSource")
             .accessibilityLabel(AppLocalization.text("录制来源"))
             .accessibilityValue(model.availableSources.first(where: { $0.id == model.configuration.sourceID })?.name ?? "")
             .help(model.availableSources.first(where: { $0.id == model.configuration.sourceID })?.name
@@ -494,14 +501,17 @@ private struct ScreenRecordingCaptureBar: View {
     }
 
     private var dragHandle: some View {
-        ScreenRecordingCaptureBarDragHandle().frame(width: ScreenshotToolbarLayout.dragHandleWidth,
+        ScreenRecordingCaptureBarDragHandle().frame(width: ScreenRecordingCaptureBarGeometry.dragHandleWidth,
             height: ScreenshotToolbarLayout.controlHeight)
             .help(AppLocalization.text("拖动工具栏"))
             .accessibilityLabel(AppLocalization.text("拖动工具栏"))
             .accessibilityIdentifier("screenRecording.captureBarDragHandle")
     }
 
-    private var separator: some View { Divider().frame(width: 1, height: 20).padding(.horizontal, 3) }
+    private var separator: some View {
+        Divider().frame(width: 1, height: 20)
+            .padding(.horizontal, ScreenRecordingCaptureBarGeometry.separatorHorizontalPadding)
+    }
 
     private var canSelectRegion: Bool {
         ScreenRecordingCaptureBarGeometry.canSelectRegion(configuration: model.configuration,
