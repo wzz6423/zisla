@@ -91,6 +91,7 @@ struct SettingsNavigationTests {
             "信息",
             "快捷操作",
             "截图",
+            "录屏",
             "PDF 工具",
             "AI",
             "语音",
@@ -242,15 +243,19 @@ struct SettingsNavigationTests {
     }
 
     @Test
-    func clipboardAssistantAndScreenshotVisibilityFollowFeatureToggles() {
-        var settings = FeatureSettings(clipboardAssistantEnabled: false, screenshotEnabled: false)
+    func captureAndClipboardVisibilityFollowFeatureToggles() {
+        var settings = FeatureSettings(clipboardAssistantEnabled: false, screenshotEnabled: false,
+                                       screenRecordingEnabled: false)
         #expect(!SettingsSection.clipboardAssistant.isVisible(settings: settings))
         #expect(!SettingsSection.screenshot.isVisible(settings: settings))
+        #expect(!SettingsSection.recording.isVisible(settings: settings))
 
         settings.clipboardAssistantEnabled = true
         settings.screenshotEnabled = true
+        settings.screenRecordingEnabled = true
         #expect(SettingsSection.clipboardAssistant.isVisible(settings: settings))
         #expect(SettingsSection.screenshot.isVisible(settings: settings))
+        #expect(SettingsSection.recording.isVisible(settings: settings))
     }
 
     @Test(arguments: [false, true], [false, true])
@@ -279,7 +284,7 @@ struct SettingsNavigationTests {
         #expect(SettingsSectionGroup.allCases.map(\.title) == ["基础功能", "声音", "文件", "AI 与语音", "网络与其他"])
         #expect(SettingsSection.allCases.filter { $0.group == .basics } == [.general, .features, .info])
         #expect(SettingsSection.allCases.filter { $0.group == .sound } == [.keyboardSound])
-        #expect(SettingsSection.allCases.filter { $0.group == .files } == [.clipboardAssistant, .screenshot, .pdfTools, .download])
+        #expect(SettingsSection.allCases.filter { $0.group == .files } == [.clipboardAssistant, .screenshot, .recording, .pdfTools, .download])
         #expect(SettingsSection.allCases.filter { $0.group == .aiAndVoice } == [.ai, .voice])
         #expect(SettingsSection.allCases.filter { $0.group == .networkAndOthers } == [.mail, .weather, .networkProxy, .pet, .recommendations, .updates])
     }

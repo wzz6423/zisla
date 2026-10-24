@@ -1408,8 +1408,6 @@ private struct CompactAIWing: View {
     var role: CompactAIWingRole
     var usesTransparentBackground = false
 
-    @Environment(\.accessibilityReduceMotion) private var reduceMotion
-
     @ViewBuilder
     var body: some View {
         wing
@@ -1420,12 +1418,7 @@ private struct CompactAIWing: View {
             if role == .identity {
                 mascotStack
             } else {
-                HStack(spacing: 5) {
-                    CompactStatusPulseView(
-                        color: statusNSColor,
-                        isAnimated: !reduceMotion
-                    )
-                    .frame(width: 4, height: 4)
+                HStack(spacing: 0) {
                     Text("\(count)")
                         .font(.system(size: 10, weight: .bold, design: .rounded))
                         .monospacedDigit()
@@ -1470,16 +1463,6 @@ private struct CompactAIWing: View {
         }
     }
 
-    private var statusColor: Color {
-        Color(nsColor: statusNSColor)
-    }
-
-    private var statusNSColor: NSColor {
-        if notices.contains(where: { $0.kind == .error }) { return .systemRed }
-        if notices.contains(where: { $0.kind == .warning }) { return .systemYellow }
-        return .systemGreen
-    }
-
     private var statusDescription: String {
         if notices.contains(where: { $0.kind == .error }) { return AppLocalization.text("有错误") }
         if notices.contains(where: { $0.kind == .warning }) { return AppLocalization.text("等待操作") }
@@ -1492,70 +1475,6 @@ private struct CompactAIWing: View {
 
     private var errorAccessibilityText: String {
         errorCount > 0 ? AppLocalization.text("，其中 %ld 个错误", errorCount) : ""
-    }
-}
-
-private struct CompactStatusPulseView: NSViewRepresentable {
-    var color: NSColor
-    var isAnimated: Bool
-
-    func makeNSView(context: Context) -> CompactStatusPulseNSView {
-        let view = CompactStatusPulseNSView()
-        view.configure(color: color, isAnimated: isAnimated)
-        return view
-    }
-
-    func updateNSView(_ view: CompactStatusPulseNSView, context: Context) {
-        view.configure(color: color, isAnimated: isAnimated)
-    }
-}
-
-private final class CompactStatusPulseNSView: NSView {
-    private static let animationKey = "zisla.compact-status-pulse"
-
-    override init(frame frameRect: NSRect) {
-        super.init(frame: frameRect)
-        wantsLayer = true
-    }
-
-    @available(*, unavailable)
-    required init?(coder: NSCoder) {
-        nil
-    }
-
-    override func layout() {
-        super.layout()
-        layer?.cornerRadius = min(bounds.width, bounds.height) / 2
-        layer?.shadowPath = CGPath(ellipseIn: bounds.insetBy(dx: -1, dy: -1), transform: nil)
-    }
-
-    func configure(color: NSColor, isAnimated: Bool) {
-        guard let layer else { return }
-        layer.backgroundColor = color.cgColor
-        layer.shadowColor = color.cgColor
-        layer.shadowOpacity = 0.7
-        layer.shadowRadius = 2
-        layer.shadowOffset = .zero
-
-        guard isAnimated else {
-            layer.removeAnimation(forKey: Self.animationKey)
-            return
-        }
-        guard layer.animation(forKey: Self.animationKey) == nil else { return }
-
-        let opacity = CABasicAnimation(keyPath: "opacity")
-        opacity.fromValue = 0.5
-        opacity.toValue = 1
-        let scale = CABasicAnimation(keyPath: "transform.scale")
-        scale.fromValue = 0.9
-        scale.toValue = 1.1
-        let group = CAAnimationGroup()
-        group.animations = [opacity, scale]
-        group.duration = 0.7
-        group.autoreverses = true
-        group.repeatCount = .infinity
-        group.timingFunction = CAMediaTimingFunction(name: .easeInEaseOut)
-        layer.add(group, forKey: Self.animationKey)
     }
 }
 
@@ -2091,8 +2010,6 @@ private struct CompactBrowserDownloadWing: View {
     var height: CGFloat
     var usesTransparentBackground = false
 
-    @Environment(\.accessibilityReduceMotion) private var reduceMotion
-
     private var isFinished: Bool { notice.kind == .success }
     private var downloadCount: Int { max(1, snapshots.count) }
 
@@ -2144,7 +2061,7 @@ private struct CompactBrowserDownloadWing: View {
         } else if downloadCount == 2 {
             twoFileProgressStack
         } else {
-            multiFileStatusDot
+            multiFileStatusCount
         }
     }
 
@@ -2214,13 +2131,8 @@ private struct CompactBrowserDownloadWing: View {
         .frame(maxHeight: min(22, height * 0.72))
     }
 
-    private var multiFileStatusDot: some View {
-        HStack(spacing: 5) {
-            CompactStatusPulseView(
-                color: .systemGreen,
-                isAnimated: !reduceMotion
-            )
-            .frame(width: 4, height: 4)
+    private var multiFileStatusCount: some View {
+        HStack(spacing: 0) {
             Text("\(downloadCount)")
                 .font(.system(size: 10, weight: .bold, design: .rounded))
                 .monospacedDigit()

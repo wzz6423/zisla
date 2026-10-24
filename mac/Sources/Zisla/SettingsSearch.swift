@@ -126,6 +126,8 @@ enum SettingsSearchIndex {
         entry(.screenshot, "截图快捷键", anchor: .row("截图快捷键"), keywords: ["输入监控"])
         rows(.screenshot, ["钉图快捷键", "长截图", "显示钉图控制条", "鼠标操作", "触控板手势"])
         rows(.screenshot, ScreenshotTool.allCases.map(\.title))
+        rows(.recording, RecordingShortcutAction.allCases.map(\.title))
+        rows(.recording, ["恢复默认快捷键"])
 
         entry(.ai, "CLI 与 Skills", anchor: .group("CLI 与 Skills"), keywords: ["自动更新 CLI", "下载命令", "更新命令"])
         rows(.voice, ["录音模式", "使用模型", "格式化整理", "保留原始录音", "自动清理录音", "记录目录", "自定义热词"])

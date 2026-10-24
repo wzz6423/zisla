@@ -68,3 +68,28 @@ https://github.com/unicode-org/cldr-json
 
 Copyright 1991-2026 Unicode, Inc. Licensed under Unicode License V3. See
 `Unicode-CLDR-LICENSE.txt` in this directory.
+
+The native recording studio draws on the capture clock, pause handling,
+non-destructive editing, and rendering techniques in DogSC:
+
+https://github.com/laogou717/dogsc
+
+Pinned revision: `567fd6ed3bf113227dcf3e815f87ce60f0b69497`.
+Copyright (c) 2026 神烦老狗. Licensed under the MIT License. See
+`DogSC-LICENSE.txt` in this directory.
+
+The zoom interpolation, caption grouping, source-time edit plans, and AI
+editing workflow also draw on OpenScreen:
+
+https://github.com/getopenscreen/openscreen
+
+Pinned revision: `d8bf2d8138cc2ce2c6542549853260f716cb8fb6`.
+Relevant sources include `src/lib/captioning/annotationsFromCaptions.ts`,
+`src/lib/ai-edition/captions/cues.ts`, and
+`electron/ai-edition/agent-tools.ts`.
+Copyright (c) 2025 Siddharth Vaddem and (c) 2025-2026 OpenScreen contributors.
+Licensed under the MIT License. See `OpenScreen-LICENSE.txt` in this directory.
+
+Zisla implements these workflows in Swift using its own project model and
+existing AI settings. No upstream application, Electron runtime, or remote
+build dependency is bundled.
