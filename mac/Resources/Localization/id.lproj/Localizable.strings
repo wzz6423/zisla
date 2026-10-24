@@ -2769,6 +2769,28 @@
 "圆角" = "Radius sudut";
 "查询 IP 信息" = "Cari informasi IP";
 
+"基础功能" = "Fitur dasar";
+"声音" = "Suara";
+"网络与其他" = "Jaringan dan lainnya";
+"仅影响 zisla 的窗口与面板，不会更改 macOS 外观。" = "Hanya memengaruhi jendela dan panel zisla, tanpa mengubah tampilan macOS.";
+"在设置中合并、拆分、加密与转换 PDF。" = "Gabungkan, pisahkan, enkripsi, dan konversi PDF di Pengaturan.";
+"应用音量混音器" = "Mixer volume aplikasi";
+"在灵动岛分别调整应用的媒体音量。" = "Sesuaikan volume media setiap aplikasi di Dynamic Island.";
+"分别调整正在播放声音的应用" = "Sesuaikan volume setiap aplikasi yang sedang memutar audio";
+"应用音量需要 macOS 14.4 或更高版本" = "Volume aplikasi memerlukan macOS 14.4 atau lebih baru";
+"暂无正在播放声音的应用" = "Tidak ada aplikasi yang sedang memutar audio";
+"播放音乐或视频后，应用会显示在这里。" = "Aplikasi akan muncul di sini saat Anda memutar musik atau video.";
+"%@ 的音量" = "Volume %@";
+"取消 %@ 的静音" = "Aktifkan suara %@";
+"将 %@ 静音" = "Bisukan %@";
+"等待应用音量控制生效" = "Menunggu kontrol volume aplikasi aktif";
+"音量调整未生效" = "Penyesuaian volume belum diterapkan";
+"请允许音频录制以调整应用音量" = "Izinkan perekaman audio untuk menyesuaikan volume aplikasi";
+"当前音频输出设备不可用" = "Perangkat keluaran audio saat ini tidak tersedia";
+"无法调整应用音量，已恢复原始输出" = "Tidak dapat menyesuaikan volume aplikasi. Keluaran audio asli telah dipulihkan";
+"取消静音" = "Aktifkan suara";
+"当前音频输出格式不支持应用音量调整" = "Format keluaran audio saat ini tidak mendukung penyesuaian volume aplikasi";
+
 "更新日志" = "Catatan rilis";
 "已更新至 %@" = "Diperbarui ke %@";
 "正在加载更新日志" = "Memuat catatan rilis";
@@ -2780,3 +2802,8 @@
 "稍后提醒" = "Ingatkan nanti";
 "跳过此版本" = "Lewati versi ini";
 "了解更多" = "Pelajari lebih lanjut";
+
+"隐藏侧边栏" = "Sembunyikan Bilah Samping";
+"显示侧边栏" = "Tampilkan Bilah Samping";
+"后退" = "Kembali";
+"前进" = "Maju";

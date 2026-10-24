@@ -2769,6 +2769,28 @@
 "圆角" = "Köşe yarıçapı";
 "查询 IP 信息" = "IP bilgilerini sorgula";
 
+"基础功能" = "Temel özellikler";
+"声音" = "Ses";
+"网络与其他" = "Ağ ve diğerleri";
+"仅影响 zisla 的窗口与面板，不会更改 macOS 外观。" = "Yalnızca zisla pencerelerini ve panellerini etkiler, macOS görünümünü değiştirmez.";
+"在设置中合并、拆分、加密与转换 PDF。" = "Ayarlar’da PDF’leri birleştirin, bölün, şifreleyin ve dönüştürün.";
+"应用音量混音器" = "Uygulama ses düzeyi mikseri";
+"在灵动岛分别调整应用的媒体音量。" = "Dynamic Island’da her uygulamanın medya ses düzeyini ayrı ayrı ayarlayın.";
+"分别调整正在播放声音的应用" = "Ses çalan her uygulamanın ses düzeyini ayrı ayrı ayarlayın";
+"应用音量需要 macOS 14.4 或更高版本" = "Uygulama ses düzeyi için macOS 14.4 veya daha yenisi gerekir";
+"暂无正在播放声音的应用" = "Şu anda ses çalan uygulama yok";
+"播放音乐或视频后，应用会显示在这里。" = "Müzik veya video oynattığınızda uygulamalar burada görünür.";
+"%@ 的音量" = "%@ ses düzeyi";
+"取消 %@ 的静音" = "%@ sesini aç";
+"将 %@ 静音" = "%@ sesini kapat";
+"等待应用音量控制生效" = "Uygulama ses denetiminin etkinleşmesi bekleniyor";
+"音量调整未生效" = "Ses düzeyi ayarı uygulanmadı";
+"请允许音频录制以调整应用音量" = "Uygulama ses düzeyini ayarlamak için ses kaydına izin verin";
+"当前音频输出设备不可用" = "Geçerli ses çıkış aygıtı kullanılamıyor";
+"无法调整应用音量，已恢复原始输出" = "Uygulama ses düzeyi ayarlanamadı. Özgün ses çıkışı geri yüklendi";
+"取消静音" = "Sesi aç";
+"当前音频输出格式不支持应用音量调整" = "Geçerli ses çıkış biçimi uygulama ses düzeyi ayarını desteklemiyor";
+
 "更新日志" = "Sürüm notları";
 "已更新至 %@" = "%@ sürümüne güncellendi";
 "正在加载更新日志" = "Sürüm notları yükleniyor";
@@ -2780,3 +2802,8 @@
 "稍后提醒" = "Daha sonra hatırlat";
 "跳过此版本" = "Bu sürümü atla";
 "了解更多" = "Daha fazla bilgi";
+
+"隐藏侧边栏" = "Kenar Çubuğunu Gizle";
+"显示侧边栏" = "Kenar Çubuğunu Göster";
+"后退" = "Geri";
+"前进" = "İleri";

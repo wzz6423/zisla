@@ -2769,6 +2769,28 @@
 "圆角" = "Hoekradius";
 "查询 IP 信息" = "IP-informatie opzoeken";
 
+"基础功能" = "Basisfuncties";
+"声音" = "Geluid";
+"网络与其他" = "Netwerk en meer";
+"仅影响 zisla 的窗口与面板，不会更改 macOS 外观。" = "Geldt alleen voor vensters en panelen van zisla. De weergave van macOS blijft ongewijzigd.";
+"在设置中合并、拆分、加密与转换 PDF。" = "Voeg pdf’s samen, splits, versleutel en converteer ze in Instellingen.";
+"应用音量混音器" = "Appvolumemixer";
+"在灵动岛分别调整应用的媒体音量。" = "Pas het mediavolume van elke app aan in Dynamic Island.";
+"分别调整正在播放声音的应用" = "Pas het volume van apps die audio afspelen afzonderlijk aan";
+"应用音量需要 macOS 14.4 或更高版本" = "Appvolume vereist macOS 14.4 of nieuwer";
+"暂无正在播放声音的应用" = "Er zijn geen apps die audio afspelen";
+"播放音乐或视频后，应用会显示在这里。" = "Apps verschijnen hier zodra je muziek of video’s afspeelt.";
+"%@ 的音量" = "Volume van %@";
+"取消 %@ 的静音" = "Dempen van %@ opheffen";
+"将 %@ 静音" = "%@ dempen";
+"等待应用音量控制生效" = "Wachten tot de appvolumeregeling actief is";
+"音量调整未生效" = "De volumeaanpassing is niet toegepast";
+"请允许音频录制以调整应用音量" = "Sta audio-opname toe om het appvolume aan te passen";
+"当前音频输出设备不可用" = "Het huidige audio-uitvoerapparaat is niet beschikbaar";
+"无法调整应用音量，已恢复原始输出" = "Kan het appvolume niet aanpassen. De oorspronkelijke audio-uitvoer is hersteld";
+"取消静音" = "Dempen opheffen";
+"当前音频输出格式不支持应用音量调整" = "Het huidige audio-uitvoerformaat ondersteunt geen appvolumeregeling";
+
 "更新日志" = "Versieopmerkingen";
 "已更新至 %@" = "Bijgewerkt naar %@";
 "正在加载更新日志" = "Versieopmerkingen laden";
@@ -2780,3 +2802,8 @@
 "稍后提醒" = "Later herinneren";
 "跳过此版本" = "Deze versie overslaan";
 "了解更多" = "Meer informatie";
+
+"隐藏侧边栏" = "Navigatiekolom verbergen";
+"显示侧边栏" = "Navigatiekolom tonen";
+"后退" = "Terug";
+"前进" = "Vooruit";

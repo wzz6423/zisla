@@ -1,5 +1,5 @@
 "NSCalendarsFullAccessUsageDescription" = "zislaは、トップ情報パネルに今後のカレンダーイベントを表示するためにアクセスが必要です。";
-"NSAudioCaptureUsageDescription" = "zislaは、ライブウェーブフォームをレンダリングするために現在のオーディオスペクトラムを読み取ります。";
+"NSAudioCaptureUsageDescription" = "zisla は、メディアの再生中またはアプリ音量を調整するときにのみシステム音声を読み取り、波形の表示とそのアプリの出力音量の調整に使用します。";
 "NSCameraUsageDescription" = "zislaは、ミラーを開いているときのみカメラを使用します。";
 "NSRemindersFullAccessUsageDescription" = "zislaは、日付付きリマインダーを読み取り、カレンダーイベントと一緒に表示します。";
 "NSLocationWhenInUseUsageDescription" = "zisla は、地域の天気、地名、近くの Wi-Fi ネットワークを表示するために位置情報へのアクセスを必要とします。";

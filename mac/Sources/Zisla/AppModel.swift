@@ -16,7 +16,7 @@ enum IslandModule: String, CaseIterable, Identifiable {
   case agenda
   case mail
   case quickNotes
-  case pdf
+  case volumeMixer
   case toolbox
   case system
   case battery
@@ -45,7 +45,7 @@ enum IslandModule: String, CaseIterable, Identifiable {
     case .agenda: "天气日程"
     case .mail: "邮件"
     case .quickNotes: "随记"
-    case .pdf: "PDF 工具"
+    case .volumeMixer: "应用音量混音器"
     case .toolbox: "小工具"
     case .system: "CPU"
     case .battery: "电池"
@@ -64,7 +64,7 @@ enum IslandModule: String, CaseIterable, Identifiable {
     case .agenda: "calendar"
     case .mail: "envelope.fill"
     case .quickNotes: "note.text"
-    case .pdf: "doc.viewfinder"
+    case .volumeMixer: "slider.horizontal.3"
     case .toolbox: "wrench.and.screwdriver.fill"
     case .system: "gauge.with.dots.needle.67percent"
     case .battery: "battery.100percent"
@@ -81,9 +81,9 @@ enum IslandModule: String, CaseIterable, Identifiable {
       .clipboard
     case .aiMonitor:
       .ai
-    case .mail, .quickNotes, .pdf, .system, .battery, .keyboardSound:
-      .pdf
-    case .download, .agenda:
+    case .mail, .quickNotes, .system, .battery, .keyboardSound:
+      .system
+    case .download, .agenda, .volumeMixer:
       .agenda
     case .toolbox:
       .toolbox
@@ -113,7 +113,7 @@ extension IslandModule {
     case .agenda: settings.calendarEnabled || settings.weatherEnabled
     case .mail: settings.mailEnabled
     case .quickNotes: settings.quickNotesEnabled
-    case .pdf: settings.pdfToolsEnabled
+    case .volumeMixer: settings.volumeMixerEnabled
     case .toolbox: settings.toolboxEnabled
     case .system, .battery: settings.systemMonitorEnabled || settings.batteryMonitorEnabled
     case .lockScreen: settings.lockScreenInfoEnabled
@@ -164,7 +164,6 @@ struct IslandModuleLayout: Equatable {
   static let agenda = compactModule(contentHeight: 160)
   /// Tall modules share the former CPU monitor height to keep their panel geometry consistent.
   static let system = compactModule(contentHeight: 401)
-  static let pdf = system
   /// Shelf content fills the shared 500pt outer surface and scrolls internally when it contains more files.
   static let shelfContentHeight: CGFloat = 355
   static let shelfShareWidth: CGFloat = 84
@@ -494,6 +493,7 @@ final class AppModel: ObservableObject {
   let aiResultSweep = AIResultSweepController()
   let media = NowPlayingService()
   let audioOutput = AudioOutputDeviceService()
+  let applicationVolumes = ApplicationVolumeMixerService()
   let calendar = CalendarService()
   let shelf = FileShelfStore()
   @Published var selectedShelfCategory: FileShelfCategory = .all
@@ -1134,6 +1134,7 @@ final class AppModel: ObservableObject {
     aiMonitor.stop()
     aiAgent.stop()
     media.stop()
+    applicationVolumes.stop()
     clearHeadphoneTransient()
     audioOutput.stop()
     calendar.stop()
@@ -3011,6 +3012,11 @@ final class AppModel: ObservableObject {
     } else {
       media.stop()
       clearMediaNotices()
+    }
+    if settings.volumeMixerEnabled {
+      applicationVolumes.start()
+    } else {
+      applicationVolumes.stop()
     }
     if !settings.weatherEnabled {
       weatherTask?.cancel()

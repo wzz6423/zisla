@@ -644,15 +644,22 @@ public enum IslandModuleOrder: String, Codable, CaseIterable, Sendable, Equatabl
     case system
     case battery
     case pdf
+    case volumeMixer
 
     public static let defaultOrder: [Self] = [
         .dashboard, .shelf, .clipboard, .download, .agenda, .toolbox,
-        .quickNotes, .aiMonitor, .keyboardSound, .mail, .system, .pdf,
+        .quickNotes, .aiMonitor, .keyboardSound, .mail, .system, .volumeMixer,
     ]
 
     public static func normalized(_ order: [Self]) -> [Self] {
         var seen: Set<Self> = []
-        return order.map { $0 == .battery ? .system : $0 }.filter { seen.insert($0).inserted }
+        return order.map { module in
+            switch module {
+            case .battery: .system
+            case .pdf: .volumeMixer
+            default: module
+            }
+        }.filter { seen.insert($0).inserted }
             + defaultOrder.filter { !seen.contains($0) }
     }
 
@@ -675,6 +682,7 @@ public enum IslandModuleOrder: String, Codable, CaseIterable, Sendable, Equatabl
         case .system: "CPU"
         case .battery: "电池"
         case .pdf: "PDF 工具"
+        case .volumeMixer: "应用音量混音器"
         }
     }
 }
@@ -690,6 +698,7 @@ public struct FeatureSettings: Codable, Equatable, Sendable {
     public var calendarEnabled: Bool
     public var toolboxEnabled: Bool
     public var pdfToolsEnabled: Bool
+    public var volumeMixerEnabled: Bool
     public var toolboxReminderEnabled: Bool
     /// Whether to show a countdown in the collapsed Dynamic Island during Focus sessions.
     public var focusCountdownIslandEnabled: Bool
@@ -864,6 +873,7 @@ public struct FeatureSettings: Codable, Equatable, Sendable {
         calendarEnabled: Bool = true,
         toolboxEnabled: Bool = true,
         pdfToolsEnabled: Bool = true,
+        volumeMixerEnabled: Bool = true,
         toolboxReminderEnabled: Bool = true,
         focusCountdownIslandEnabled: Bool = true,
         browserDownloadIslandEnabled: Bool = true,
@@ -972,6 +982,7 @@ public struct FeatureSettings: Codable, Equatable, Sendable {
         self.calendarEnabled = calendarEnabled
         self.toolboxEnabled = toolboxEnabled
         self.pdfToolsEnabled = pdfToolsEnabled
+        self.volumeMixerEnabled = volumeMixerEnabled
         self.toolboxReminderEnabled = toolboxReminderEnabled
         self.focusCountdownIslandEnabled = focusCountdownIslandEnabled
         self.browserDownloadIslandEnabled = browserDownloadIslandEnabled
@@ -1127,6 +1138,7 @@ public struct FeatureSettings: Codable, Equatable, Sendable {
         case calendarEnabled
         case toolboxEnabled
         case pdfToolsEnabled
+        case volumeMixerEnabled
         case toolboxReminderEnabled
         case focusCountdownIslandEnabled
         case browserDownloadIslandEnabled
@@ -1247,6 +1259,7 @@ public struct FeatureSettings: Codable, Equatable, Sendable {
         calendarEnabled = try container.decodeIfPresent(Bool.self, forKey: .calendarEnabled) ?? defaults.calendarEnabled
         toolboxEnabled = try container.decodeIfPresent(Bool.self, forKey: .toolboxEnabled) ?? defaults.toolboxEnabled
         pdfToolsEnabled = try container.decodeIfPresent(Bool.self, forKey: .pdfToolsEnabled) ?? defaults.pdfToolsEnabled
+        volumeMixerEnabled = try container.decodeIfPresent(Bool.self, forKey: .volumeMixerEnabled) ?? defaults.volumeMixerEnabled
         toolboxReminderEnabled = try container.decodeIfPresent(Bool.self, forKey: .toolboxReminderEnabled) ?? defaults.toolboxReminderEnabled
         focusCountdownIslandEnabled = try container.decodeIfPresent(
             Bool.self,
