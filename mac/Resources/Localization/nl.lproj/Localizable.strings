@@ -2749,6 +2749,24 @@
 "onboarding.permission.system_audio.body" = "Voor muziekvisualisaties. Sta audio-opname toe in Systeeminstellingen; macOS kan bij het eerste gebruik opnieuw om bevestiging vragen.";
 "onboarding.permission.full_disk_access.title" = "Volledige schijftoegang";
 "onboarding.permission.full_disk_access.body" = "Alleen nodig voor lokale e-mailindexen of browsercookies. Schakel dit in Systeeminstellingen in als u deze functies gebruikt.";
+"荧光笔" = "Markeerstift";
+"保留左右标记" = "Markeringen aan de uiteinden behouden";
+"提取" = "Uitsnijden";
+"提取主体" = "Onderwerp uitsnijden";
+"提取背景" = "Achtergrond uitsnijden";
+"自由圈选" = "Vrije selectie";
+"提取方式" = "Uitsnijmodus";
+"提取所选区域" = "Geselecteerde gebieden uitsnijden";
+"拖动圈选任意区域，可连续圈选多处" = "Sleep om een gebied te omcirkelen; je kunt meerdere gebieden selecteren";
+"已圈选 %ld 个区域" = "%ld gebieden geselecteerd";
+"正在提取..." = "Bezig met uitsnijden...";
+"提取完成" = "Uitsnijden voltooid";
+"未找到可提取区域" = "Geen gebied gevonden om uit te snijden";
+"提取失败：%@" = "Uitsnijden mislukt: %@";
+"圈选区域无效" = "Ongeldig selectiegebied";
+"提取蒙版尺寸不匹配" = "De afmetingen van het uitsnijmasker komen niet overeen";
+"无法生成提取图片" = "De uitgesneden afbeelding kan niet worden gemaakt";
+"圆角" = "Hoekradius";
 "查询 IP 信息" = "IP-informatie opzoeken";
 
 "更新日志" = "Versieopmerkingen";

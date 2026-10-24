@@ -2749,6 +2749,24 @@
 "onboarding.permission.system_audio.body" = "Per visualizzare la musica. Consenti la registrazione audio in Impostazioni di Sistema; macOS potrebbe chiedere conferma al primo utilizzo.";
 "onboarding.permission.full_disk_access.title" = "Accesso completo al disco";
 "onboarding.permission.full_disk_access.body" = "Necessario solo per gli indici della posta locale o i cookie del browser. Abilitalo in Impostazioni di Sistema se usi queste funzioni.";
+"荧光笔" = "Evidenziatore";
+"保留左右标记" = "Mantieni i marcatori alle estremità";
+"提取" = "Estrai";
+"提取主体" = "Estrai soggetto";
+"提取背景" = "Estrai sfondo";
+"自由圈选" = "Selezione libera";
+"提取方式" = "Modalità di estrazione";
+"提取所选区域" = "Estrai le aree selezionate";
+"拖动圈选任意区域，可连续圈选多处" = "Trascina per circondare un’area; puoi selezionarne più di una";
+"已圈选 %ld 个区域" = "%ld aree selezionate";
+"正在提取..." = "Estrazione in corso...";
+"提取完成" = "Estrazione completata";
+"未找到可提取区域" = "Nessuna area da estrarre trovata";
+"提取失败：%@" = "Estrazione non riuscita: %@";
+"圈选区域无效" = "Area di selezione non valida";
+"提取蒙版尺寸不匹配" = "Le dimensioni della maschera di estrazione non corrispondono";
+"无法生成提取图片" = "Impossibile creare l’immagine estratta";
+"圆角" = "Raggio degli angoli";
 "查询 IP 信息" = "Cerca informazioni IP";
 
 "更新日志" = "Note di rilascio";

@@ -35,7 +35,7 @@ public final class FeatureSettingsStore: ObservableObject {
                 shouldPersistMigration = true
             }
             if let object = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
-               object["screenshotHotkeyVersion"] as? Int == nil {
+               (object["screenshotHotkeyVersion"] as? Int ?? 0) < ScreenshotHotkeyDefaults.currentVersion {
                 shouldPersistMigration = true
             }
             initialSettings = settings

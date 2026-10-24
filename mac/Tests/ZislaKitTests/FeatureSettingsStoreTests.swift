@@ -14,12 +14,66 @@ struct FeatureSettingsStoreTests {
         let store = FeatureSettingsStore(defaults: defaults)
         let data = try #require(defaults.data(forKey: "feature-settings-v1"))
         let migrated = try #require(JSONSerialization.jsonObject(with: data) as? [String: Any])
-        #expect(migrated["screenshotHotkeyVersion"] as? Int == 1)
+        #expect(migrated["screenshotHotkeyVersion"] as? Int == ScreenshotHotkeyDefaults.currentVersion)
         store.settings.screenshotStashHotkey = .init(keyCode: 15, carbonModifiers: 0x0800, keyDisplayName: "R")
         store.settings.screenshotEditorLongHotkey = .init(keyCode: 17, carbonModifiers: 0x0800, keyDisplayName: "T")
         store.flushPendingChanges()
         let restored = FeatureSettingsStore(defaults: defaults)
         #expect(restored.settings == store.settings)
+    }
+
+    @Test(arguments: ["defaults", "custom", "previousWithVoiceShortcut"]) @MainActor
+    func oldScreenshotLayoutMigratesAndPersistsOnFirstLoad(layout: String) throws {
+        let suiteName = "Zisla.ScreenshotHotkeys.\(UUID().uuidString)"
+        let defaults = try #require(UserDefaults(suiteName: suiteName))
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+        var old = FeatureSettings.default
+        old.screenshotToolHotkeys = ScreenshotHotkeyDefaults.versionOneTools
+        old.screenshotEditorLongHotkey = .init(keyCode: 29, carbonModifiers: 0x1000, keyDisplayName: "0")
+        if layout == "custom" {
+            old.screenshotToolHotkeys["rectangle"] = .init(keyCode: 15, carbonModifiers: 0x0800, keyDisplayName: "R")
+            old.screenshotStashHotkey = .init(keyCode: 17, carbonModifiers: 0x0800, keyDisplayName: "T")
+        } else if layout == "previousWithVoiceShortcut" {
+            old.screenshotToolHotkeys = ScreenshotHotkeyDefaults.previousTools
+            old.screenshotPinHotkey = .init(keyCode: 19, carbonModifiers: 0x1000, keyDisplayName: "2")
+            old.screenshotLongHotkey = .init(keyCode: 20, carbonModifiers: 0x1000, keyDisplayName: "3")
+            old.voiceInputHotkeyPreset = .init(keyCode: 21, carbonModifiers: 0x1000, keyDisplayName: "4")
+        }
+        var object = try #require(JSONSerialization.jsonObject(with: JSONEncoder().encode(old)) as? [String: Any])
+        if layout == "previousWithVoiceShortcut" {
+            object.removeValue(forKey: "screenshotHotkeyVersion")
+            object.removeValue(forKey: "screenshotStashHotkey")
+            object.removeValue(forKey: "screenshotEditorLongHotkey")
+        } else {
+            object["screenshotHotkeyVersion"] = 1
+        }
+        defaults.set(try JSONSerialization.data(withJSONObject: object), forKey: "feature-settings-v1")
+
+        let store = FeatureSettingsStore(defaults: defaults)
+        let data = try #require(defaults.data(forKey: "feature-settings-v1"))
+        let persisted = try #require(JSONSerialization.jsonObject(with: data) as? [String: Any])
+        #expect(persisted["screenshotHotkeyVersion"] as? Int == ScreenshotHotkeyDefaults.currentVersion)
+        #expect(try JSONDecoder().decode(FeatureSettings.self, from: data) == store.settings)
+        if layout == "custom" {
+            #expect(store.settings.screenshotStashHotkey == old.screenshotStashHotkey)
+            #expect(store.settings.screenshotEditorLongHotkey == old.screenshotEditorLongHotkey)
+            for (id, hotkey) in old.screenshotToolHotkeys {
+                #expect(store.settings.screenshotToolHotkeys[id] == hotkey)
+            }
+            #expect(store.settings.screenshotToolHotkeys.count == 9)
+        } else if layout == "previousWithVoiceShortcut" {
+            #expect(store.settings.voiceInputHotkeyPreset == old.voiceInputHotkeyPreset)
+            let editor = [store.settings.screenshotPinHotkey, store.settings.screenshotStashHotkey,
+                store.settings.screenshotEditorLongHotkey] + Array(store.settings.screenshotToolHotkeys.values)
+            #expect(editor.allSatisfy { !$0.conflicts(with: old.voiceInputHotkeyPreset) })
+            #expect(store.settings.screenshotToolHotkeys["ellipse"]?.keyDisplayName == "5")
+            #expect(store.settings.screenshotToolHotkeys.count == 9)
+        } else {
+            #expect(store.settings == FeatureSettings.default)
+        }
+        let restored = FeatureSettingsStore(defaults: defaults)
+        #expect(restored.settings == store.settings)
+        #expect(defaults.data(forKey: "feature-settings-v1") == data)
     }
 
     @Test @MainActor
