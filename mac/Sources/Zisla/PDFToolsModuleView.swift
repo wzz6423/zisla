@@ -77,15 +77,14 @@ struct PDFToolsModuleView: View {
                 } label: {
                     Label(AppLocalization.text(item.title), systemImage: item.symbol)
                         .font(.system(size: 12, weight: .medium))
-                        .foregroundStyle(operation == item ? Color.blue : Color.primary)
+                        .foregroundStyle(operation == item ? Color.accentColor : Color.primary)
                         .frame(maxWidth: .infinity, alignment: .leading)
                         .frame(minHeight: 36)
                         .padding(.horizontal, 10)
                         .contentShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
                         .background {
                             if operation == item {
-                                RoundedRectangle(cornerRadius: 8, style: .continuous)
-                                    .fill(Color.blue.opacity(0.10))
+                                SettingsTintedBackground(cornerRadius: 8)
                                     .matchedGeometryEffect(
                                         id: "pdf-tool-operation-selection",
                                         in: operationSelectionNamespace
@@ -230,7 +229,7 @@ struct PDFToolsModuleView: View {
             Button(AppLocalization.text(operation.actionTitle)) {
                 startProcessing()
             }
-            .buttonStyle(.borderedProminent)
+            .buttonStyle(SettingsTintedButtonStyle())
             .disabled(inputURLs.isEmpty || isProcessing || !configurationIsValid)
             .frame(maxWidth: .infinity, alignment: .trailing)
         }

@@ -2901,7 +2901,7 @@ struct SettingsView: View {
                                 systemImage: "arrow.clockwise"
                             )
                         }
-                        .buttonStyle(.borderedProminent)
+                        .buttonStyle(SettingsTintedButtonStyle())
                         .controlSize(.small)
                     }
 
@@ -3697,14 +3697,7 @@ struct SettingsView: View {
         }
         .buttonStyle(.plain)
         .foregroundStyle(tint)
-        .background(
-            RoundedRectangle(cornerRadius: 6, style: .continuous)
-                .fill(tint.opacity(colorScheme == .dark ? 0.18 : 0.10))
-        )
-        .overlay(
-            RoundedRectangle(cornerRadius: 6, style: .continuous)
-                .strokeBorder(tint.opacity(colorScheme == .dark ? 0.42 : 0.24), lineWidth: 0.5)
-        )
+        .background(SettingsTintedBackground(tint: tint))
         .help(AppLocalization.text("在浏览器中打开 %@", AppLocalization.text(title)))
         .accessibilityLabel(AppLocalization.text("在浏览器中打开 %@", AppLocalization.text(title)))
     }
@@ -4491,7 +4484,7 @@ struct SettingsSidebar: View {
             HStack(spacing: 10) {
                 Image(systemName: section.symbol)
                     .font(.system(size: 15, weight: .medium))
-                    .foregroundStyle(input.selection == section ? Color.white : Color.accentColor)
+                    .foregroundStyle(Color.accentColor)
                     .frame(width: 21)
                 AppLocalizedText(section.title)
                     .font(.system(size: 13, weight: .medium))
@@ -4503,11 +4496,10 @@ struct SettingsSidebar: View {
             .contentShape(Rectangle())
         }
         .buttonStyle(PressableStyle(hoverScale: 1.018, pressedScale: 0.965))
-        .foregroundStyle(input.selection == section ? Color.white : Color.primary)
+        .foregroundStyle(input.selection == section ? Color.accentColor : Color.primary)
         .background {
             if input.selection == section {
-                RoundedRectangle(cornerRadius: 8, style: .continuous)
-                    .fill(Color.blue)
+                SettingsTintedBackground(cornerRadius: 8)
                     .matchedGeometryEffect(id: "settings-section-selection", in: sectionSelectionNamespace)
             }
         }

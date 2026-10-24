@@ -160,10 +160,12 @@ struct SettingsSplitViewTests {
         }
     }
 
-    @Test
-    func productionSidebarShowsOverflowScrollerWithoutOverlappingRowsAndHidesItWhenContentFits() async throws {
+    @Test(arguments: [ColorScheme.light, .dark])
+    func productionSidebarShowsOverflowScrollerWithoutOverlappingRowsAndHidesItWhenContentFits(colorScheme: ColorScheme) async throws {
         let fixture = Fixture()
         defer { fixture.close() }
+        fixture.state.colorScheme = colorScheme
+        fixture.state.isEnabled = true
         await fixture.layout()
         let split = try fixture.controller()
         let sidebarHost = split.splitViewItems[0].viewController.view
@@ -181,9 +183,8 @@ struct SettingsSplitViewTests {
             var blueColumns = [Int]()
             for x in 0..<bitmap.pixelsWide {
                 let color = try #require(bitmap.colorAt(x: x, y: y)?.usingColorSpace(.deviceRGB))
-                if color.blueComponent > 0.6,
-                   color.blueComponent > color.redComponent + 0.2,
-                   color.blueComponent > color.greenComponent + 0.15 {
+                if color.blueComponent > color.redComponent + 0.015,
+                   color.blueComponent > color.greenComponent + 0.01 {
                     blueColumns.append(x)
                 }
             }
@@ -196,6 +197,11 @@ struct SettingsSplitViewTests {
         let rowRightEdge = CGFloat(try #require(selectedRowColumns.max()) + 1) / scale
         #expect(CGFloat(selectedRowPixels.count) / scale >= 24, "The real selected row must render a visible background")
         #expect(track.minX - rowRightEdge >= 5, "The selected row must leave a visible gap before the scrollbar track")
+        let sampleX = Int((rowRightEdge - 12) * scale)
+        let rows = selectedRowPixels.sorted()
+        let sample = try #require(bitmap.colorAt(x: sampleX, y: rows[rows.count / 2])?.usingColorSpace(.deviceRGB))
+        #expect(sample.alphaComponent < 0.5 || sample.blueComponent - sample.redComponent < 0.3,
+                "Selection must use a pale tint instead of an opaque accent fill in both appearances")
 
         fixture.state.settings.keyboardEnabled = false
         fixture.state.settings.clipboardAssistantEnabled = false
@@ -252,6 +258,8 @@ struct SettingsSplitViewTests {
         @Published var settings = FeatureSettings.default
         @Published var language = AppLanguage.english
         @Published var height: CGFloat = 400
+        @Published var colorScheme = ColorScheme.dark
+        @Published var isEnabled = false
 
         init() {
             settings.voiceInputEnabled = true
@@ -278,8 +286,9 @@ struct SettingsSplitViewTests {
             .frame(width: 960, height: state.height)
             .environment(\.locale, state.language.locale)
             .environment(\.layoutDirection, state.language.isRightToLeft ? .rightToLeft : .leftToRight)
-            .environment(\.colorScheme, .dark)
-            .environment(\.isEnabled, false)
+            .environment(\.colorScheme, state.colorScheme)
+            .accentColor(.blue)
+            .environment(\.isEnabled, state.isEnabled)
         }
     }
 
