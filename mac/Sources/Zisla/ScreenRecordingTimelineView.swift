@@ -42,9 +42,9 @@ struct ScreenRecordingTimelineView: View {
                             }
                             Divider()
                             HStack(spacing: 14) {
-                                Button { move(segment.id, by: -1) } label: { Image(systemName: "arrow.up") }
+                                Button { model.moveSegment(segment.id, to: index - 1); selectSegment(segment.id) } label: { Image(systemName: "arrow.up") }
                                     .help(AppLocalization.text("上移")).disabled(index == 0)
-                                Button { move(segment.id, by: 1) } label: { Image(systemName: "arrow.down") }
+                                Button { model.moveSegment(segment.id, to: index + 1); selectSegment(segment.id) } label: { Image(systemName: "arrow.down") }
                                     .help(AppLocalization.text("下移")).disabled(index == project.edits.segments.count - 1)
                                 Button { duplicate(segment.id) } label: { Image(systemName: "plus.square.on.square") }
                                     .help(AppLocalization.text("复制片段"))
@@ -85,6 +85,7 @@ struct ScreenRecordingTimelineView: View {
     private var splitButton: some View {
         Button(AppLocalization.text("在播放头处分割"), action: splitAtPlayhead)
             .buttonStyle(SettingsTintedButtonStyle())
+            .disabled(model.timelineSplitTarget(at: model.playbackTime) == nil)
     }
 
     private var restoreButton: some View {
@@ -120,37 +121,15 @@ struct ScreenRecordingTimelineView: View {
     }
 
     private func splitAtPlayhead() {
-        guard let project = model.project else { return }
-        let time = model.currentTime
-        let playingIndex = model.isShowingTimelinePlayback
-            ? (try? RecordingExportTimeline(project: project))?.slice(at: model.playbackTime)?.index : nil
-        let targetID = playingIndex.map { project.edits.segments[$0].id } ?? selectedSegmentID
-        guard let targetID else { model.split(at: time); return }
-        model.update { project in
-            guard let index = project.edits.segments.firstIndex(where: { $0.id == targetID }),
-                  let pieces = ScreenRecordingTimelineTrim.split(project.edits.segments[index], at: time) else { return }
-            project.edits.segments.replaceSubrange(index...index, with: pieces)
-        }
-    }
-
-    private func move(_ id: UUID, by offset: Int) {
-        model.update { project in
-            guard let index = project.edits.segments.firstIndex(where: { $0.id == id }),
-                  project.edits.segments.indices.contains(index + offset) else { return }
-            project.edits.segments.swapAt(index, index + offset)
-        }
+        if let id = model.splitTimeline(at: model.playbackTime) { selectedSegmentID = id }
     }
 
     private func duplicate(_ id: UUID) {
-        model.update { project in
-            guard let index = project.edits.segments.firstIndex(where: { $0.id == id }) else { return }
-            var segment = project.edits.segments[index]
-            segment.id = UUID()
-            project.edits.segments.insert(segment, at: index + 1)
-        }
+        if let copyID = model.duplicateSegment(id) { selectSegment(copyID) }
     }
 
     private func remove(_ id: UUID) {
-        model.update { $0.edits.segments.removeAll { $0.id == id } }
+        selectedSegmentID = model.deleteSegment(id)
+        if let selectedSegmentID { selectSegment(selectedSegmentID) }
     }
 }

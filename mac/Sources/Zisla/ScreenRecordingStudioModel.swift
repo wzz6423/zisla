@@ -1,6 +1,7 @@
 import AppKit
 import AVFoundation
 import Combine
+import CoreImage
 import SwiftUI
 import UniformTypeIdentifiers
 import ZislaCore
@@ -23,6 +24,7 @@ final class ScreenRecordingStudioModel: ObservableObject {
     @Published private(set) var directory: URL?
     @Published var player: AVPlayer?
     @Published private(set) var preview: NSImage?
+    @Published private(set) var canvasPreview: CGImage?
     @Published private(set) var currentTime = 0.0
     @Published private(set) var playbackTime = 0.0
     @Published private(set) var errorMessage: String?
@@ -43,6 +45,7 @@ final class ScreenRecordingStudioModel: ObservableObject {
     private let appModel: AppModel?
     private let outputDirectoryStore: ScreenRecordingOutputDirectoryStore
     private let renderPreview: (ScreenRecordingProject, URL, Double) async throws -> CGImage
+    private let presentExportPanel: (NSSavePanel, @escaping (NSApplication.ModalResponse) -> Void) -> Void
     private let aiCompletion: ((ScreenRecordingProject, String, AIModelConfigurationReference?) async throws -> String)?
     private(set) var previewTask: Task<Void, Never>?
     private(set) var operationTask: Task<Void, Never>?
@@ -51,10 +54,13 @@ final class ScreenRecordingStudioModel: ObservableObject {
     private var undoHistory: [ScreenRecordingProject] = []
     private var redoHistory: [ScreenRecordingProject] = []
     private var previewRevision = 0
+    private let previewContext = CIContext(options: [.cacheIntermediates: false,
+        .workingColorSpace: CGColorSpace(name: CGColorSpace.sRGB)!])
     private var recordingDirectory: URL?
     private var cancellables: Set<AnyCancellable> = []
     var hideWindow: (() -> Void)?
     var showWindow: (() -> Void)?
+    var commitPendingCanvasText: (() -> Void)?
 
     init(appModel: AppModel? = nil, capture: ScreenRecordingService = ScreenRecordingService(),
          exporter: ScreenRecordingExporter = ScreenRecordingExporter(),
@@ -62,6 +68,9 @@ final class ScreenRecordingStudioModel: ObservableObject {
          projectStore: ScreenRecordingProjectStore? = nil,
          outputDirectoryStore: ScreenRecordingOutputDirectoryStore = ScreenRecordingOutputDirectoryStore(),
          renderPreview: ((ScreenRecordingProject, URL, Double) async throws -> CGImage)? = nil,
+         presentExportPanel: @escaping (NSSavePanel, @escaping (NSApplication.ModalResponse) -> Void) -> Void = {
+             panel, completion in panel.begin(completionHandler: completion)
+         },
          aiCompletion: ((ScreenRecordingProject, String, AIModelConfigurationReference?) async throws -> String)? = nil,
          onError: ((String) -> Void)? = nil) {
         self.appModel = appModel
@@ -69,6 +78,7 @@ final class ScreenRecordingStudioModel: ObservableObject {
         self.exporter = exporter
         self.transcriber = transcriber
         self.outputDirectoryStore = outputDirectoryStore
+        self.presentExportPanel = presentExportPanel
         self.recordingOutputDirectory = projectStore?.root ?? outputDirectoryStore.directory
         self.renderPreview = renderPreview ?? { project, directory, time in
             try await exporter.preview(project: project, directory: directory, sourceTime: time,
@@ -194,6 +204,7 @@ final class ScreenRecordingStudioModel: ObservableObject {
     }
 
     func start() {
+        commitPendingCanvasText?()
         guard !isRecording, !isBusy, !isChoosingFile, !exporter.isExporting else { return }
         if configuration.mode == .region, configuration.region == nil { return }
         isStarting = true
@@ -270,6 +281,7 @@ final class ScreenRecordingStudioModel: ObservableObject {
     }
 
     func openProject() {
+        commitPendingCanvasText?()
         guard !isRecording, !isBusy, !isChoosingFile, !exporter.isExporting else { return }
         let panel = NSOpenPanel()
         panel.canChooseDirectories = true
@@ -293,6 +305,7 @@ final class ScreenRecordingStudioModel: ObservableObject {
     }
 
     func importVideo() {
+        commitPendingCanvasText?()
         guard !isRecording, !isBusy, !isChoosingFile, !exporter.isExporting else { return }
         let panel = NSOpenPanel()
         panel.allowedContentTypes = [.movie, .video]
@@ -337,6 +350,7 @@ final class ScreenRecordingStudioModel: ObservableObject {
     }
 
     func save() throws {
+        commitPendingCanvasText?()
         guard let project, let directory else { return }
         try projectStore.save(project, in: directory)
         isDirty = false
@@ -348,6 +362,7 @@ final class ScreenRecordingStudioModel: ObservableObject {
     }
 
     func saveCopy() {
+        commitPendingCanvasText?()
         guard canEdit, let project, let directory else { return }
         let panel = NSSavePanel()
         panel.nameFieldStringValue = Self.fileName(project.name, extension: ScreenRecordingProjectStore.projectExtension)
@@ -369,6 +384,7 @@ final class ScreenRecordingStudioModel: ObservableObject {
     }
 
     func export() {
+        commitPendingCanvasText?()
         guard canEdit, let project, let directory else { return }
         let configuration = exportConfiguration
         let panel = NSSavePanel()
@@ -377,7 +393,7 @@ final class ScreenRecordingStudioModel: ObservableObject {
         panel.allowedContentTypes = [configuration.format == .gif ? .gif : .mpeg4Movie]
         panel.canCreateDirectories = true
         isChoosingFile = true
-        panel.begin { [weak self] response in
+        presentExportPanel(panel) { [weak self] response in
             guard let self else { return }
             self.isChoosingFile = false
             guard response == .OK, let url = panel.url else { return }
@@ -404,6 +420,7 @@ final class ScreenRecordingStudioModel: ObservableObject {
     }
 
     func update(_ change: (inout ScreenRecordingProject) -> Void) {
+        commitPendingCanvasText?()
         guard canEdit, let original = project else { return }
         var replacement = original
         change(&replacement)
@@ -421,6 +438,7 @@ final class ScreenRecordingStudioModel: ObservableObject {
     }
 
     func undo() {
+        commitPendingCanvasText?()
         guard canUndo, let original = project, let previous = undoHistory.popLast() else { return }
         redoHistory.append(original)
         project = previous
@@ -430,6 +448,7 @@ final class ScreenRecordingStudioModel: ObservableObject {
     }
 
     func redo() {
+        commitPendingCanvasText?()
         guard canRedo, let original = project, let next = redoHistory.popLast() else { return }
         undoHistory.append(original)
         project = next
@@ -438,9 +457,11 @@ final class ScreenRecordingStudioModel: ObservableObject {
         seekTimeline(to: playbackTime)
     }
 
-    func split(at time: Double) {
+    func split(at time: Double, segmentID: UUID? = nil) {
         update { project in
-            guard let index = project.edits.segments.firstIndex(where: { time > $0.start + 0.001 && time < $0.end - 0.001 }) else { return }
+            guard let index = project.edits.segments.firstIndex(where: {
+                (segmentID == nil || $0.id == segmentID) && time > $0.start + 0.001 && time < $0.end - 0.001
+            }) else { return }
             let segment = project.edits.segments[index]
             project.edits.segments.replaceSubrange(index...index, with: [
                 .init(id: segment.id, start: segment.start, end: time, speed: segment.speed),
@@ -449,7 +470,55 @@ final class ScreenRecordingStudioModel: ObservableObject {
         }
     }
 
+    func timelineSplitTarget(at outputTime: Double) -> ScreenRecordingTimelineStripGeometry.Target? {
+        guard canEdit, let project,
+              let timeline = try? RecordingExportTimeline(project: project),
+              let slice = timeline.slice(at: outputTime) else { return nil }
+        let sourceTime = slice.sourceTime(at: outputTime)
+        guard sourceTime > slice.sourceStart + 0.001, sourceTime < slice.sourceEnd - 0.001 else { return nil }
+        return .init(segmentID: project.edits.segments[slice.index].id, sourceTime: sourceTime, outputTime: outputTime)
+    }
+
+    @discardableResult
+    func splitTimeline(at outputTime: Double) -> UUID? {
+        guard let target = timelineSplitTarget(at: outputTime) else { return nil }
+        let original = project?.edits.segments
+        split(at: target.sourceTime, segmentID: target.segmentID)
+        return project?.edits.segments != original ? target.segmentID : nil
+    }
+
+    func moveSegment(_ id: UUID, to destination: Int) {
+        update { project in
+            guard let index = project.edits.segments.firstIndex(where: { $0.id == id }),
+                  project.edits.segments.indices.contains(destination) else { return }
+            let segment = project.edits.segments.remove(at: index)
+            project.edits.segments.insert(segment, at: destination)
+        }
+    }
+
+    @discardableResult
+    func duplicateSegment(_ id: UUID) -> UUID? {
+        let copyID = UUID()
+        update { project in
+            guard let index = project.edits.segments.firstIndex(where: { $0.id == id }) else { return }
+            var segment = project.edits.segments[index]
+            segment.id = copyID
+            project.edits.segments.insert(segment, at: index + 1)
+        }
+        return project?.edits.segments.contains(where: { $0.id == copyID }) == true ? copyID : nil
+    }
+
+    @discardableResult
+    func deleteSegment(_ id: UUID) -> UUID? {
+        guard canEdit, let project, let index = project.edits.segments.firstIndex(where: { $0.id == id }) else { return nil }
+        let nextID = index + 1 < project.edits.segments.count ? project.edits.segments[index + 1].id
+            : project.edits.segments.prefix(index).last?.id
+        update { $0.edits.segments.remove(at: index) }
+        return nextID
+    }
+
     func cut(start: Double, end: Double) {
+        commitPendingCanvasText?()
         guard let project, canEdit else { return }
         do {
             let data = try JSONSerialization.data(withJSONObject: ["version": 1,
@@ -460,7 +529,9 @@ final class ScreenRecordingStudioModel: ObservableObject {
     }
 
     func seek(to time: Double) {
-        guard let project, time.isFinite else { return }
+        guard time.isFinite else { return }
+        commitPendingCanvasText?()
+        guard let project else { return }
         currentTime = min(max(0, time), project.duration)
         if let timeline = try? RecordingExportTimeline(project: project),
            let slice = timeline.slices.first(where: { currentTime >= $0.sourceStart && currentTime <= $0.sourceEnd }) {
@@ -475,7 +546,9 @@ final class ScreenRecordingStudioModel: ObservableObject {
     }
 
     func seekTimeline(to time: Double) {
-        guard time.isFinite, let project else { return }
+        guard time.isFinite else { return }
+        commitPendingCanvasText?()
+        guard let project else { return }
         if project.edits.segments.isEmpty { seek(to: currentTime); return }
         guard let timeline = try? RecordingExportTimeline(project: project) else { return }
         let output = min(max(0, time), timeline.duration)
@@ -486,6 +559,7 @@ final class ScreenRecordingStudioModel: ObservableObject {
     }
 
     func playSource() {
+        commitPendingCanvasText?()
         guard let player else { return }
         timelinePlayer?.pause()
         isShowingTimelinePlayback = false
@@ -496,6 +570,7 @@ final class ScreenRecordingStudioModel: ObservableObject {
     var activePlayer: AVPlayer? { isShowingTimelinePlayback ? timelinePlayer : player }
 
     func playTimeline() {
+        commitPendingCanvasText?()
         if isShowingTimelinePlayback {
             timelinePlayer?.pause()
             isShowingTimelinePlayback = false
@@ -542,6 +617,7 @@ final class ScreenRecordingStudioModel: ObservableObject {
     }
 
     func generateCaptions() {
+        commitPendingCanvasText?()
         guard canEdit, let project, let directory else { return }
         isBusy = true
         operationTask = Task { [weak self] in
@@ -563,6 +639,7 @@ final class ScreenRecordingStudioModel: ObservableObject {
     }
 
     func exportSubtitles() {
+        commitPendingCanvasText?()
         guard canEdit, let project else { return }
         let panel = NSSavePanel()
         panel.allowedContentTypes = [.init(filenameExtension: "srt") ?? .plainText]
@@ -598,6 +675,7 @@ final class ScreenRecordingStudioModel: ObservableObject {
     }
 
     func requestAIEdit() {
+        commitPendingCanvasText?()
         guard canEdit, let project, let aiCompletion,
               !aiInstruction.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return }
             isBusy = true
@@ -617,6 +695,7 @@ final class ScreenRecordingStudioModel: ObservableObject {
     }
 
     func applyAIEdit() {
+        commitPendingCanvasText?()
         guard let pending = pendingAIProject, pendingAIBase == project, canEdit else { return }
         update { $0 = pending }
         dismissAIEdit()
@@ -632,6 +711,8 @@ final class ScreenRecordingStudioModel: ObservableObject {
         if let playerObserver { player?.removeTimeObserver(playerObserver); self.playerObserver = nil }
         self.project = project
         self.directory = directory
+        preview = nil
+        canvasPreview = nil
         undoHistory.removeAll()
         redoHistory.removeAll()
         isDirty = false
@@ -657,14 +738,20 @@ final class ScreenRecordingStudioModel: ObservableObject {
         previewRevision += 1
         let revision = previewRevision
         previewTask?.cancel()
-        guard let project, let directory else { preview = nil; return }
+        guard let project, let directory else { preview = nil; canvasPreview = nil; return }
+        var baseProject = project
+        baseProject.edits.annotations = []
+        baseProject.edits.showCaptions = false
         let time = currentTime
         previewTask = Task { [weak self] in
             guard let self else { return }
             do {
-                let image = try await renderPreview(project, directory, time)
+                let image = try await renderPreview(baseProject, directory, time)
                 guard !Task.isCancelled, revision == previewRevision else { return }
-                preview = NSImage(cgImage: image, size: NSSize(width: image.width, height: image.height))
+                let composed = try RecordingExportRenderer.composedPreview(base: image, project: project,
+                    sourceTime: time, context: previewContext)
+                canvasPreview = image
+                preview = NSImage(cgImage: composed, size: NSSize(width: composed.width, height: composed.height))
             } catch {
                 guard !Task.isCancelled, revision == previewRevision else { return }
                 if errorMessage == nil { errorMessage = error.localizedDescription }
@@ -672,7 +759,12 @@ final class ScreenRecordingStudioModel: ObservableObject {
         }
     }
 
+    func reportCanvasRenderingFailure(_ error: Error) {
+        if errorMessage == nil { errorMessage = error.localizedDescription }
+    }
+
     func prepareToClose() -> Bool {
+        commitPendingCanvasText?()
         if isRecording || isBusy || isChoosingFile || exporter.isExporting {
             errorMessage = AppLocalization.text("请先停止录制或取消操作再关闭工作室")
             return false
@@ -689,6 +781,7 @@ final class ScreenRecordingStudioModel: ObservableObject {
     }
 
     func shutdown() {
+        commitPendingCanvasText = nil
         operationTask?.cancel()
         previewTask?.cancel()
         transcriber.cancel()

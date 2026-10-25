@@ -24,10 +24,13 @@ struct ScreenRecordingColorPicker: View {
 
 struct ScreenRecordingAnnotationsView: View {
     @ObservedObject var model: ScreenRecordingStudioModel
+    @Environment(\.recordingCanvasSelection) private var canvasSelection
     @State private var expandedAnnotationID: UUID?
+    @State private var sectionExpanded = false
 
     var body: some View {
-        ScreenRecordingInspectorSection(AppLocalization.text("标注"), symbol: "pencil.tip.crop.circle", expanded: false) {
+        ScreenRecordingInspectorSection(AppLocalization.text("标注"), symbol: "pencil.tip.crop.circle",
+                                        expanded: false, isExpanded: $sectionExpanded) {
             Menu(AppLocalization.text("添加标注")) {
                 ForEach(RecordingAnnotationKind.allCases, id: \.self) { kind in
                     Button { add(kind) } label: { Label(AppLocalization.text(kind.title), systemImage: kind.symbol) }
@@ -38,6 +41,7 @@ struct ScreenRecordingAnnotationsView: View {
                 ForEach(model.project?.edits.annotations ?? []) { annotation in
                     DisclosureGroup(isExpanded: Binding(get: { expandedAnnotationID == annotation.id }, set: {
                         expandedAnnotationID = $0 ? annotation.id : nil
+                        if $0 { canvasSelection.wrappedValue = .annotation(annotation.id); model.seek(to: annotation.start) }
                     })) {
                         VStack(alignment: .leading, spacing: 10) {
                             HStack {
@@ -73,9 +77,10 @@ struct ScreenRecordingAnnotationsView: View {
                     .accessibilityIdentifier("screenRecording.annotation." + annotation.id.uuidString)
                 }
             }
-            Text(AppLocalization.text("位置使用画布左上角为原点，时间对应原始素材"))
-                .font(.system(size: 10)).foregroundStyle(.secondary)
         }.disabled(!model.canEdit)
+        .onChange(of: canvasSelection.wrappedValue, initial: true) { _, selection in
+            if case let .annotation(id) = selection { expandedAnnotationID = id; sectionExpanded = true }
+        }
     }
 
     private func add(_ kind: RecordingAnnotationKind) {
@@ -85,6 +90,7 @@ struct ScreenRecordingAnnotationsView: View {
                 end: min(project.duration, model.currentTime + 2), text: kind == .text ? AppLocalization.text("文字标注") : "")
             project.edits.annotations = (project.edits.annotations ?? []) + [annotation]
             expandedAnnotationID = annotation.id
+            canvasSelection.wrappedValue = .annotation(annotation.id)
         }
     }
 

@@ -98,21 +98,39 @@ struct ScreenRecordingTimelineTrim {
 }
 
 struct ScreenRecordingTimelineStrip: View {
-    let project: ScreenRecordingProject
-    let sourceTime: Double
-    let outputTime: Double?
+    @ObservedObject var model: ScreenRecordingStudioModel
     @Binding var selectedID: UUID?
-    let seekSource: (Double) -> Void
-    let seekOutput: (Double) -> Void
-    let commitTrim: (RecordingSegment, RecordingSegment) -> Void
     @Environment(\.isEnabled) private var isEnabled
     @State private var zoom = 1.0
     @State private var trim: ScreenRecordingTimelineTrim?
 
     var body: some View {
+        if let project = model.project {
+            content(project).disabled(!model.canEdit)
+        }
+    }
+
+    private var selectedSegmentID: UUID? { selectedID ?? model.project?.edits.segments.first?.id }
+
+    private func content(_ project: ScreenRecordingProject) -> some View {
         VStack(spacing: 6) {
             HStack(spacing: 6) {
                 Text(AppLocalization.text("时间线")).font(.caption.bold())
+                Button(action: splitAtPlayhead) { Image(systemName: "scissors") }
+                    .help(AppLocalization.text("在播放头处分割"))
+                    .accessibilityLabel(AppLocalization.text("在播放头处分割"))
+                    .accessibilityIdentifier("screenRecording.timelineSplit")
+                    .disabled(model.timelineSplitTarget(at: model.playbackTime) == nil)
+                Button { if let id = selectedSegmentID { duplicate(id) } } label: { Image(systemName: "plus.square.on.square") }
+                    .help(AppLocalization.text("复制片段"))
+                    .accessibilityLabel(AppLocalization.text("复制片段"))
+                    .accessibilityIdentifier("screenRecording.timelineDuplicate")
+                    .disabled(selectedSegmentID == nil)
+                Button(role: .destructive) { if let id = selectedSegmentID { remove(id) } } label: { Image(systemName: "trash") }
+                    .help(AppLocalization.text("删除片段"))
+                    .accessibilityLabel(AppLocalization.text("删除片段"))
+                    .accessibilityIdentifier("screenRecording.timelineDelete")
+                    .disabled(selectedSegmentID == nil)
                 Spacer(minLength: 4)
                 Button { zoom = max(1, zoom / 2) } label: { Image(systemName: "minus.magnifyingglass") }
                     .help(AppLocalization.text("缩小")).disabled(zoom <= 1)
@@ -130,7 +148,7 @@ struct ScreenRecordingTimelineStrip: View {
                 if let geometry = ScreenRecordingTimelineStripGeometry(segments: project.edits.segments,
                     viewportWidth: proxy.size.width - 16, zoom: zoom) {
                     ScrollView(.horizontal) {
-                        timeline(geometry).padding(.horizontal, 8)
+                        timeline(geometry, project: project).padding(.horizontal, 8)
                     }
                 }
             }.frame(height: 98)
@@ -143,11 +161,12 @@ struct ScreenRecordingTimelineStrip: View {
         .onExitCommand { trim = nil }
     }
 
-    private func timeline(_ geometry: ScreenRecordingTimelineStripGeometry) -> some View {
-        ZStack(alignment: .topLeading) {
+    private func timeline(_ geometry: ScreenRecordingTimelineStripGeometry, project: ScreenRecordingProject) -> some View {
+        let splitID = model.timelineSplitTarget(at: model.playbackTime)?.segmentID
+        return ZStack(alignment: .topLeading) {
             ruler(geometry)
             ForEach(geometry.items) { item in
-                segment(item)
+                segment(item, splitID: splitID)
                     .frame(width: item.width, height: 48)
                     .position(x: item.x + item.width / 2, y: 48)
             }
@@ -163,12 +182,12 @@ struct ScreenRecordingTimelineStrip: View {
                         .frame(width: right - left, height: 48).position(x: (left + right) / 2, y: 48)
                         .allowsHitTesting(false)
                 }
-                trimHandle(selected, edge: .start, geometry: geometry)
+                trimHandle(selected, edge: .start, geometry: geometry, sourceDuration: project.duration)
                     .position(x: left, y: 48)
-                trimHandle(selected, edge: .end, geometry: geometry)
+                trimHandle(selected, edge: .end, geometry: geometry, sourceDuration: project.duration)
                     .position(x: right, y: 48)
             }
-            if let position = geometry.playheadX(sourceTime: sourceTime, selectedID: selectedID, outputTime: outputTime) {
+            if let position = geometry.playheadX(sourceTime: model.currentTime, selectedID: selectedID, outputTime: model.playbackTime) {
                 Rectangle().fill(.red).frame(width: 2, height: 76).position(x: position, y: 38)
                     .allowsHitTesting(false).accessibilityHidden(true)
             }
@@ -179,7 +198,7 @@ struct ScreenRecordingTimelineStrip: View {
         .gesture(SpatialTapGesture().onEnded { event in
             if let target = geometry.target(at: event.location.x) {
                 selectedID = target.segmentID
-                seekOutput(target.outputTime)
+                model.seekTimeline(to: target.outputTime)
             }
         })
         .environment(\.layoutDirection, .leftToRight)
@@ -201,8 +220,8 @@ struct ScreenRecordingTimelineStrip: View {
         }.frame(height: 22).allowsHitTesting(false).accessibilityHidden(true)
     }
 
-    private func segment(_ item: ScreenRecordingTimelineStripGeometry.Item) -> some View {
-        let selected = item.id == (selectedID ?? project.edits.segments.first?.id)
+    private func segment(_ item: ScreenRecordingTimelineStripGeometry.Item, splitID: UUID?) -> some View {
+        let selected = item.id == selectedSegmentID
         return RoundedRectangle(cornerRadius: 5)
             .fill(Color.accentColor.opacity(selected ? 0.35 : 0.14))
             .overlay(RoundedRectangle(cornerRadius: 5).stroke(selected ? Color.accentColor : Color.secondary.opacity(0.3), lineWidth: selected ? 2 : 1))
@@ -219,12 +238,23 @@ struct ScreenRecordingTimelineStrip: View {
             .accessibilityElement(children: .ignore)
             .accessibilityLabel(AppLocalization.text("片段 %d", item.slice.index + 1))
             .accessibilityAddTraits(selected ? [.isButton, .isSelected] : [.isButton])
-            .accessibilityAction { selectedID = item.id; seekOutput(item.slice.outputStart) }
+            .contextMenu {
+                Button(AppLocalization.text("在播放头处分割"), action: splitAtPlayhead)
+                    .disabled(splitID != item.id)
+                Button(AppLocalization.text("复制片段")) { duplicate(item.id) }
+                Button(AppLocalization.text("上移")) { move(item.id, to: item.slice.index - 1) }
+                    .disabled(item.slice.index == 0)
+                Button(AppLocalization.text("下移")) { move(item.id, to: item.slice.index + 1) }
+                    .disabled(item.slice.index == (model.project?.edits.segments.count ?? 0) - 1)
+                Divider()
+                Button(AppLocalization.text("删除片段"), role: .destructive) { remove(item.id) }
+            }
+            .accessibilityAction { selectSegment(item.id) }
             .accessibilityIdentifier("screenRecording.timelineSegment." + item.id.uuidString)
     }
 
     private func trimHandle(_ item: ScreenRecordingTimelineStripGeometry.Item, edge: ScreenRecordingTimelineTrim.Edge,
-                            geometry: ScreenRecordingTimelineStripGeometry) -> some View {
+                            geometry: ScreenRecordingTimelineStripGeometry, sourceDuration: Double) -> some View {
         let start = edge == .start
         return RoundedRectangle(cornerRadius: 3).fill(Color.accentColor)
             .overlay(Image(systemName: "line.3.vertical").font(.system(size: 8, weight: .bold)).foregroundStyle(.white))
@@ -239,12 +269,40 @@ struct ScreenRecordingTimelineStrip: View {
                     guard var completed = trim else { return }
                     trim = nil
                     completed.translation = event.translation.width
-                    guard let replacement = completed.replacement(sourceDuration: project.duration), replacement != completed.original else { return }
-                    commitTrim(completed.original, replacement)
-                    seekSource(start ? replacement.start : replacement.end)
+                    guard let replacement = completed.replacement(sourceDuration: sourceDuration), replacement != completed.original else { return }
+                    model.update { project in
+                        guard let index = project.edits.segments.firstIndex(where: { $0.id == completed.original.id }),
+                              project.edits.segments[index] == completed.original else { return }
+                        project.edits.segments[index] = replacement
+                    }
+                    model.seekTimeline(to: item.slice.outputStart + (start ? 0 : replacement.outputDuration))
                 })
             .help(AppLocalization.text(start ? "起点（秒）" : "终点（秒）"))
             .accessibilityLabel(AppLocalization.text(start ? "起点（秒）" : "终点（秒）"))
             .accessibilityIdentifier("screenRecording.timelineTrim." + (start ? "start." : "end.") + item.id.uuidString)
+    }
+
+    private func selectSegment(_ id: UUID) {
+        guard let project = model.project, let index = project.edits.segments.firstIndex(where: { $0.id == id }) else { return }
+        selectedID = id
+        model.seekTimeline(to: project.edits.segments.prefix(index).reduce(0) { $0 + $1.outputDuration })
+    }
+
+    private func splitAtPlayhead() {
+        if let id = model.splitTimeline(at: model.playbackTime) { selectedID = id }
+    }
+
+    private func duplicate(_ id: UUID) {
+        if let copyID = model.duplicateSegment(id) { selectSegment(copyID) }
+    }
+
+    private func move(_ id: UUID, to index: Int) {
+        model.moveSegment(id, to: index)
+        selectSegment(id)
+    }
+
+    private func remove(_ id: UUID) {
+        selectedID = model.deleteSegment(id)
+        if let selectedID { selectSegment(selectedID) }
     }
 }

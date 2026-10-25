@@ -193,7 +193,8 @@ final class RecordingExportRenderer {
             visible = image.transformed(by: CGAffineTransform(translationX: origin.x, y: origin.y))
                 .composited(over: visible).cropped(to: viewport)
         }
-        let screenLayer = Self.fit(visible, to: screenRect, fill: false)
+        // Even-pixel export and preview sizes can differ slightly from the source aspect ratio.
+        let screenLayer = Self.fit(visible, from: viewport, to: screenRect, fill: screenRect == canvas)
         var scene = background
         if let shadow { scene = shadow.composited(over: scene) }
         scene = Self.masked(screenLayer, mask: screenMask, canvas: canvas).composited(over: scene)
@@ -203,18 +204,10 @@ final class RecordingExportRenderer {
                 image = image.transformed(by: CGAffineTransform(translationX: image.extent.width, y: 0)
                     .scaledBy(x: -1, y: 1))
             }
-            let cameraLayer = Self.fit(image, to: cameraRect, fill: true)
+            let cameraLayer = Self.fit(image, from: image.extent, to: cameraRect, fill: true)
             scene = Self.masked(cameraLayer, mask: cameraMask, canvas: canvas).composited(over: scene)
         }
-        for annotation in project.edits.annotations ?? [] where annotation.isVisible(at: sourceTime) {
-            scene = try Self.annotationImage(annotation, canvas: canvas).composited(over: scene)
-        }
-        if project.edits.showCaptions,
-           let caption = project.captions.first(where: { sourceTime >= $0.start && sourceTime < $0.end }),
-           !caption.text.isEmpty {
-            let image = try Self.captionImage(text: caption.text, canvas: canvas)
-            scene = image.composited(over: scene)
-        }
+        scene = try Self.overlays(project: project, sourceTime: sourceTime, canvas: canvas).composited(over: scene)
         return scene.cropped(to: canvas)
     }
 
@@ -239,14 +232,15 @@ final class RecordingExportRenderer {
                       width: width, height: height)
     }
 
-    private static func fit(_ image: CIImage, to rect: CGRect, fill: Bool) -> CIImage {
-        let scaleX = rect.width / image.extent.width
-        let scaleY = rect.height / image.extent.height
+    private static func fit(_ image: CIImage, from source: CGRect, to rect: CGRect, fill: Bool) -> CIImage {
+        let scaleX = rect.width / source.width
+        let scaleY = rect.height / source.height
         let scale = fill ? max(scaleX, scaleY) : min(scaleX, scaleY)
-        let normalized = normalized(image).transformed(by: CGAffineTransform(scaleX: scale, y: scale))
-        return normalized.transformed(by: CGAffineTransform(translationX: rect.midX - normalized.extent.width / 2,
-                                                            y: rect.midY - normalized.extent.height / 2))
-            .cropped(to: rect)
+        // Keep the fractional viewport in one transform because Core Image rounds intermediate extents outward.
+        let transform = CGAffineTransform(a: scale, b: 0, c: 0, d: scale,
+                                          tx: rect.midX - source.midX * scale,
+                                          ty: rect.midY - source.midY * scale)
+        return image.transformed(by: transform).cropped(to: rect)
     }
 
     private static func masked(_ image: CIImage, mask: CIImage, canvas: CGRect) -> CIImage {
@@ -318,33 +312,7 @@ final class RecordingExportRenderer {
                                                                          y: center.y - side / 2))
     }
 
-    private static func captionImage(text: String, canvas: CGRect) throws -> CIImage {
-        let fontSize = max(12, min(canvas.width, canvas.height) * 0.035)
-        let attributed = NSAttributedString(string: text, attributes: [
-            NSAttributedString.Key(kCTFontAttributeName as String): CTFontCreateWithName("Helvetica-Bold" as CFString,
-                                                                                      fontSize, nil),
-            NSAttributedString.Key(kCTForegroundColorAttributeName as String): CGColor(gray: 1, alpha: 1),
-        ])
-        let framesetter = CTFramesetterCreateWithAttributedString(attributed)
-        let padding = fontSize * 0.6
-        let width = canvas.width * 0.88 - padding * 2
-        let suggested = CTFramesetterSuggestFrameSizeWithConstraints(framesetter, CFRange(location: 0, length: 0),
-                                                                     nil, CGSize(width: width, height: .infinity), nil)
-        let height = min(suggested.height, canvas.height * 0.3)
-        let box = CGRect(x: (canvas.width - width - padding * 2) / 2, y: canvas.height * 0.05,
-                         width: width + padding * 2, height: height + padding * 2)
-        let context = try bitmap(size: box.size)
-        let localBox = CGRect(origin: .zero, size: box.size)
-        context.setFillColor(CGColor(gray: 0, alpha: 0.78))
-        context.addPath(CGPath(roundedRect: localBox, cornerWidth: padding, cornerHeight: padding, transform: nil))
-        context.fillPath()
-        let path = CGPath(rect: localBox.insetBy(dx: padding, dy: padding), transform: nil)
-        let frame = CTFramesetterCreateFrame(framesetter, CFRange(location: 0, length: 0), path, nil)
-        CTFrameDraw(frame, context)
-        return try bitmapImage(context).transformed(by: CGAffineTransform(translationX: box.minX, y: box.minY))
-    }
-
-    private static func annotationImage(_ annotation: RecordingAnnotation, canvas: CGRect) throws -> CIImage {
+    static func annotationImage(_ annotation: RecordingAnnotation, canvas: CGRect) throws -> CIImage {
         let bounds = annotation.bounds
         let rect = CGRect(x: bounds.x * canvas.width, y: (1 - bounds.y - bounds.height) * canvas.height,
                           width: bounds.width * canvas.width, height: bounds.height * canvas.height)
@@ -385,7 +353,7 @@ final class RecordingExportRenderer {
             .cropped(to: canvas)
     }
 
-    private static func bitmap(size: CGSize) throws -> CGContext {
+    static func bitmap(size: CGSize) throws -> CGContext {
         guard let context = CGContext(data: nil, width: Int(ceil(size.width)), height: Int(ceil(size.height)),
                                       bitsPerComponent: 8, bytesPerRow: Int(ceil(size.width)) * 4,
                                       space: CGColorSpace(name: CGColorSpace.sRGB)!,
@@ -395,7 +363,7 @@ final class RecordingExportRenderer {
         return context
     }
 
-    private static func bitmapImage(_ context: CGContext) throws -> CIImage {
+    static func bitmapImage(_ context: CGContext) throws -> CIImage {
         guard let image = context.makeImage() else { throw ScreenRecordingExportError.cannotRender }
         return CIImage(cgImage: image)
     }

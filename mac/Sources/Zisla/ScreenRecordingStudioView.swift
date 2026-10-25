@@ -8,6 +8,7 @@ struct ScreenRecordingStudioView: View {
     let prepareCapture: () -> Void
     @State private var inspector = 0
     @State private var selectedSegmentID: UUID?
+    @State private var canvasSelection: RecordingCanvasSelection?
 
     var body: some View {
         VStack(spacing: 0) {
@@ -26,22 +27,11 @@ struct ScreenRecordingStudioView: View {
                         Divider().padding(.top, 8)
                         VStack(alignment: .leading, spacing: 6) {
                             if !project.edits.segments.isEmpty {
-                                ScreenRecordingTimelineStrip(project: project, sourceTime: model.currentTime,
-                                    outputTime: model.playbackTime,
-                                    selectedID: $selectedSegmentID, seekSource: model.seek, seekOutput: model.seekTimeline,
-                                    commitTrim: { original, replacement in
-                                        model.update { project in
-                                            guard let index = project.edits.segments.firstIndex(where: { $0.id == original.id }),
-                                                  project.edits.segments[index] == original else { return }
-                                            project.edits.segments[index] = replacement
-                                        }
-                                    })
+                                ScreenRecordingTimelineStrip(model: model, selectedID: $selectedSegmentID)
                             } else {
                                 Text(AppLocalization.text("所有片段已删除，请恢复素材后导出"))
                                     .font(.caption).foregroundStyle(.secondary).frame(maxWidth: .infinity, minHeight: 100)
                             }
-                            Text(AppLocalization.text("时间线按输出时间排列，精确输入对应原始素材"))
-                                .font(.system(size: 10)).foregroundStyle(.secondary)
                         }
                         .padding(12).disabled(!model.canEdit)
                     }
@@ -90,7 +80,16 @@ struct ScreenRecordingStudioView: View {
         .frame(minWidth: 960, minHeight: 640)
         .environment(\.locale, languageStore.language.locale)
         .environment(\.layoutDirection, languageStore.language.isRightToLeft ? .rightToLeft : .leftToRight)
+        .environment(\.recordingCanvasSelection, $canvasSelection)
         .onChange(of: languageStore.language) { _, _ in model.objectWillChange.send() }
+        .onChange(of: model.project?.id) { _, _ in canvasSelection = nil }
+        .onChange(of: canvasSelection) { _, selection in
+            switch selection {
+            case .annotation: inspector = 1
+            case .caption: inspector = 2
+            case nil: break
+            }
+        }
         .onChange(of: model.project?.edits.segments.map(\.id), initial: true) { _, ids in
             if !(ids ?? []).contains(where: { $0 == selectedSegmentID }) { selectedSegmentID = ids?.first }
         }
@@ -137,6 +136,9 @@ struct ScreenRecordingStudioView: View {
     @ViewBuilder private var preview: some View {
         if let player = model.activePlayer, model.isShowingSourcePlayback || model.isShowingTimelinePlayback {
             ScreenRecordingPlayerView(player: player).frame(maxWidth: .infinity, maxHeight: .infinity)
+        } else if model.canvasPreview != nil {
+            ScreenRecordingCanvasEditor(model: model, selection: $canvasSelection)
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
         } else if let preview = model.preview {
             Image(nsImage: preview).resizable().scaledToFit()
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -146,8 +148,6 @@ struct ScreenRecordingStudioView: View {
                     .font(.system(size: 52)).foregroundStyle(model.isRecording ? Color.red : Color.white.opacity(0.6))
                 Text(AppLocalization.text(model.isRecording ? "录制中，可使用快捷键暂停或停止" : "录制屏幕，制作演示视频"))
                     .font(.title3)
-                Text(AppLocalization.text("全屏、窗口或区域录制，支持音频与摄像头"))
-                    .font(.callout).foregroundStyle(.white.opacity(0.6))
                 if model.isRecording { Text(Self.clock(model.capture.elapsed)).font(.largeTitle).monospacedDigit() }
                 else { Button(AppLocalization.text("导入视频"), action: model.importVideo) }
             }.foregroundStyle(.white.opacity(0.9)).padding(24)
@@ -191,8 +191,6 @@ struct ScreenRecordingStudioView: View {
                 Label(AppLocalization.text("开始录制"), systemImage: "record.circle")
                     .frame(maxWidth: .infinity)
             }.buttonStyle(.borderedProminent).tint(.red)
-            Text(AppLocalization.text("录制素材和项目保存在本机"))
-                .font(.caption).foregroundStyle(.secondary)
         }
         .disabled(model.isRecording || model.isBusy)
     }

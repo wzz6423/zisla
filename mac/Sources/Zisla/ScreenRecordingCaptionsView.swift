@@ -3,6 +3,7 @@ import ZislaCore
 
 struct ScreenRecordingCaptionsView: View {
     @ObservedObject var model: ScreenRecordingStudioModel
+    @Environment(\.recordingCanvasSelection) private var canvasSelection
     @State private var expandedCaptionID: UUID?
 
     var body: some View {
@@ -17,8 +18,6 @@ struct ScreenRecordingCaptionsView: View {
                     HStack { generateButton; exportButton }
                     VStack(alignment: .leading, spacing: 6) { generateButton; exportButton }
                 }
-                Text(AppLocalization.text("字幕在本机转写，不上传录音"))
-                    .font(.system(size: 10)).foregroundStyle(.secondary)
             }
             ScreenRecordingInspectorSection(AppLocalization.text("字幕"), symbol: "captions.bubble") {
                 Toggle(AppLocalization.text("在视频中显示字幕"), isOn: Binding(get: {
@@ -31,12 +30,14 @@ struct ScreenRecordingCaptionsView: View {
                             end: min(project.duration, model.currentTime + 2), text: AppLocalization.text("新字幕"))
                         project.captions.append(caption)
                         expandedCaptionID = caption.id
+                        canvasSelection.wrappedValue = .caption(caption.id)
                     }
                 }.buttonStyle(SettingsTintedButtonStyle())
                 LazyVStack(alignment: .leading, spacing: 12) {
                     ForEach(model.project?.captions ?? []) { caption in
                         DisclosureGroup(isExpanded: Binding(get: { expandedCaptionID == caption.id }, set: {
                             expandedCaptionID = $0 ? caption.id : nil
+                            if $0 { canvasSelection.wrappedValue = .caption(caption.id); model.seek(to: caption.start) }
                         })) {
                             VStack(alignment: .leading, spacing: 10) {
                                 HStack {
@@ -64,10 +65,11 @@ struct ScreenRecordingCaptionsView: View {
                         .accessibilityIdentifier("screenRecording.caption." + caption.id.uuidString)
                     }
                 }
-                Text(AppLocalization.text("转写时间可能需要校正，可编辑字幕内容和起止时间"))
-                    .font(.system(size: 10)).foregroundStyle(.secondary)
             }
         }.disabled(!model.canEdit)
+        .onChange(of: canvasSelection.wrappedValue, initial: true) { _, selection in
+            if case let .caption(id) = selection { expandedCaptionID = id }
+        }
     }
 
     private var generateButton: some View {

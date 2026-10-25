@@ -4,17 +4,20 @@ struct ScreenRecordingInspectorSection<Content: View>: View {
     let title: String
     let symbol: String
     private let content: Content
+    private let isExpanded: Binding<Bool>?
     @State private var expanded: Bool
 
-    init(_ title: String, symbol: String, expanded: Bool = true, @ViewBuilder content: () -> Content) {
+    init(_ title: String, symbol: String, expanded: Bool = true, isExpanded: Binding<Bool>? = nil,
+         @ViewBuilder content: () -> Content) {
         self.title = title
         self.symbol = symbol
         self.content = content()
+        self.isExpanded = isExpanded
         _expanded = State(initialValue: expanded)
     }
 
     var body: some View {
-        DisclosureGroup(isExpanded: $expanded) {
+        DisclosureGroup(isExpanded: isExpanded ?? $expanded) {
             VStack(alignment: .leading, spacing: 12) { content }
                 .padding(.top, 10).frame(maxWidth: .infinity, alignment: .leading)
         } label: {

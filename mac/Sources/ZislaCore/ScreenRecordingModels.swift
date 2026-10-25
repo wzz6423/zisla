@@ -216,12 +216,17 @@ public struct RecordingCaption: Codable, Equatable, Identifiable, Sendable {
     public var start: Double
     public var end: Double
     public var text: String
+    public var layout: RecordingRect?
+    public var fontSize: Double?
 
-    public init(id: UUID = UUID(), start: Double, end: Double, text: String) {
+    public init(id: UUID = UUID(), start: Double, end: Double, text: String,
+                layout: RecordingRect? = nil, fontSize: Double? = nil) {
         self.id = id
         self.start = start
         self.end = end
         self.text = text
+        self.layout = layout
+        self.fontSize = fontSize
     }
 }
 
@@ -406,7 +411,8 @@ public struct ScreenRecordingProject: Codable, Equatable, Identifiable, Sendable
                   && $0.duration <= duration && (1...5).contains($0.scale)
                   && (0...1).contains($0.x) && (0...1).contains($0.y) }),
               captions.allSatisfy({ $0.start.isFinite && $0.end.isFinite && $0.start >= 0
-                  && $0.end > $0.start && $0.end <= duration + 0.001 && $0.text.count <= 4_000 }),
+                  && $0.end > $0.start && $0.end <= duration + 0.001 && $0.text.count <= 4_000
+                  && $0.layout?.isNormalized != false && $0.fontSize.map({ (0.01...0.3).contains($0) }) != false }),
               pointers.allSatisfy({ $0.time.isFinite && $0.time >= 0 && $0.time <= duration + 0.1
                   && (0...1).contains($0.x) && (0...1).contains($0.y) }),
               (0...0.3).contains(edits.padding), (0...0.2).contains(edits.cornerRadius),
