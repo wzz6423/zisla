@@ -8,6 +8,51 @@ import ZislaKit
 @Suite
 struct ScreenRecordingCaptureBarTests {
     @MainActor
+    @Test(arguments: [RecordingCaptureMode.display, .region])
+    func switchingModesResizesTheExistingPanelWithoutTrailingSpace(initialMode: RecordingCaptureMode) async throws {
+        var dependencies = ScreenRecordingCaptureDependencies.live
+        dependencies.loadSources = { [.init(id: .max, name: "内建视网膜显示器", mode: .display,
+                                            frame: .init(x: 0, y: 0, width: 1920, height: 1080))] }
+        dependencies.loadDevices = { .init() }
+        let model = ScreenRecordingStudioModel(capture: .init(dependencies: dependencies))
+        await model.loadSources()
+        model.selectMode(initialMode)
+        defer { model.shutdown() }
+        var presentationRequested = false
+        let controller = ScreenRecordingCaptureBarController(model: model, languageStore: AppLanguageStore(),
+            selectRegion: {}, start: {}, chooseDirectory: {}, openStudio: {}, cancel: {},
+            displaySaveDirectory: { "" }, presentPanel: { _ in presentationRequested = true })
+        defer { controller.shutdown() }
+        let window = try #require(controller.hostingView.window)
+        func settleLayout() async {
+            for _ in 0..<6 {
+                await withCheckedContinuation { continuation in DispatchQueue.main.async { continuation.resume() } }
+                controller.hostingView.layoutSubtreeIfNeeded()
+            }
+        }
+        controller.present()
+        await settleLayout()
+        let original = window.frame
+        #expect(presentationRequested)
+        #expect(!window.isVisible, "The presentation boundary must keep automated layout tests off screen")
+        for _ in 0..<2 {
+            model.selectMode(initialMode == .display ? .region : .display)
+            await settleLayout()
+            let changed = window.frame
+            let difference: CGFloat = initialMode == .display ? 30 : -30
+            #expect(abs(changed.width - original.width - difference) < 0.5,
+                    "The whole panel must follow its 28pt region button and 2pt spacing: \(original.width) -> \(changed.width)")
+            #expect(changed.midX == original.midX && changed.midY == original.midY)
+            model.selectMode(initialMode)
+            await settleLayout()
+            #expect(abs(window.frame.width - original.width) < 0.5,
+                    "Restoring the original mode must restore the panel width without leaving trailing space")
+            #expect(window.frame.height == original.height)
+            #expect(!window.isVisible)
+        }
+    }
+
+    @MainActor
     @Test
     func setupWidthTracksItsContentAndRegionButtonWithoutReservingTrailingSpace() async throws {
         let compact = try await measuredSetupWidth(sourceName: "A", mode: .display, viewportWidth: 604)

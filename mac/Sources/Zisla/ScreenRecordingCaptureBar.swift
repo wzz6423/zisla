@@ -58,6 +58,7 @@ final class ScreenRecordingCaptureBarController {
     private let model: ScreenRecordingStudioModel
     private let panel: ScreenRecordingCapturePanel
     private let outline: NSPanel
+    private let presentPanel: @MainActor (NSPanel) -> Void
     private let outlineView = ScreenRecordingTargetOutlineView()
     let hostingView: NSHostingView<ScreenRecordingCaptureBar>
     private var subscriptions: Set<AnyCancellable> = []
@@ -69,8 +70,9 @@ final class ScreenRecordingCaptureBarController {
          cancel: @escaping () -> Void,
          displaySaveDirectory: @escaping () -> String = {
              FileManager.default.urls(for: .downloadsDirectory, in: .userDomainMask).first?.path ?? ""
-         }) {
+         }, presentPanel: @escaping @MainActor (NSPanel) -> Void = { $0.makeKeyAndOrderFront(nil) }) {
         self.model = model
+        self.presentPanel = presentPanel
         panel = ScreenRecordingCapturePanel(contentRect: .zero,
             styleMask: [.borderless, .nonactivatingPanel], backing: .buffered, defer: false)
         outline = NSPanel(contentRect: .zero,
@@ -120,7 +122,7 @@ final class ScreenRecordingCaptureBarController {
                 in: target.visibleFrame.insetBy(dx: 12, dy: 12)), display: false)
         }
         refreshTargetOutline()
-        panel.makeKeyAndOrderFront(nil)
+        presentPanel(panel)
     }
 
     func hide() {
@@ -156,7 +158,9 @@ final class ScreenRecordingCaptureBarController {
     }
 
     var preferredSize: CGSize {
-        CGSize(width: model.isRecording ? ScreenRecordingCaptureBarGeometry.recordingWidth + (model.configuration.camera ? 64 : 0)
+        // Model notifications can arrive before SwiftUI lays out the changed controls.
+        hostingView.layoutSubtreeIfNeeded()
+        return CGSize(width: model.isRecording ? ScreenRecordingCaptureBarGeometry.recordingWidth + (model.configuration.camera ? 64 : 0)
             : hostingView.fittingSize.width,
             height: ScreenshotToolbarLayout.height)
     }
