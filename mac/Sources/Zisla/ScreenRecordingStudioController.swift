@@ -14,7 +14,12 @@ final class ScreenRecordingStudioController: NSWindowController, NSWindowDelegat
     private var cameraTask: Task<Void, Error>?
     private var captureControlsPresented = false
     private var recordingProjectID: UUID?
-    private lazy var cameraPreview = ScreenRecordingCameraPreviewController(capture: model.capture)
+    private lazy var cameraPreview = ScreenRecordingCameraPreviewController(capture: model.capture,
+        changeSize: { [weak self] in self?.model.recordingCameraSize = $0 },
+        changeCornerRadius: { [weak self] radius in
+            self?.model.recordingCameraRound = false
+            self?.model.recordingCameraCornerRadius = radius
+        })
     private lazy var captureBar: ScreenRecordingCaptureBarController = {
         let model = self.model
         return ScreenRecordingCaptureBarController(model: model, languageStore: languageStore,
@@ -50,13 +55,16 @@ final class ScreenRecordingStudioController: NSWindowController, NSWindowDelegat
             .sink { [weak self] _ in self?.refreshCameraPreview() }
             .store(in: &subscriptions)
         model.$recordingCameraRound.dropFirst().receive(on: RunLoop.main)
-            .sink { [weak self] _ in self?.refreshCameraPreview() }
+            .sink { [weak self] _ in self?.updateCameraPreviewLayout() }
             .store(in: &subscriptions)
         model.$recordingCameraAspectRatio.dropFirst().receive(on: RunLoop.main)
-            .sink { [weak self] _ in self?.refreshCameraPreview() }
+            .sink { [weak self] _ in self?.updateCameraPreviewLayout() }
             .store(in: &subscriptions)
         model.$recordingCameraCornerRadius.dropFirst().receive(on: RunLoop.main)
-            .sink { [weak self] _ in self?.refreshCameraPreview() }
+            .sink { [weak self] _ in self?.updateCameraPreviewLayout() }
+            .store(in: &subscriptions)
+        model.$recordingCameraSize.dropFirst().receive(on: RunLoop.main)
+            .sink { [weak self] _ in self?.updateCameraPreviewLayout() }
             .store(in: &subscriptions)
         model.$isChoosingFile.dropFirst().receive(on: RunLoop.main)
             .sink { [weak self] choosing in
@@ -128,16 +136,22 @@ final class ScreenRecordingStudioController: NSWindowController, NSWindowDelegat
         model.chooseRecordingOutputDirectory()
     }
 
-    private func refreshCameraPreview() {
+    private func updateCameraPreviewLayout() {
         guard captureControlsPresented else { return }
         let configuration = model.configuration
         if configuration.camera {
-            cameraPreview.present(configuration: .init(cameraRound: model.recordingCameraRound,
+            cameraPreview.present(configuration: .init(cameraSize: model.recordingCameraSize,
+                cameraRound: model.recordingCameraRound,
                 cameraAspectRatio: model.recordingCameraAspectRatio,
                 cameraCornerRadius: model.recordingCameraCornerRadius))
         }
         else { cameraPreview.hide() }
-        guard !model.isRecording else { return }
+    }
+
+    private func refreshCameraPreview() {
+        updateCameraPreviewLayout()
+        guard captureControlsPresented, !model.isRecording else { return }
+        let configuration = model.configuration
         cameraTask?.cancel()
         cameraTask = Task { [capture = model.capture] in
             try await capture.prepareCameraPreview(configuration: configuration)

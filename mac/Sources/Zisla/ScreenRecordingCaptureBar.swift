@@ -59,7 +59,7 @@ final class ScreenRecordingCaptureBarController {
     private let panel: ScreenRecordingCapturePanel
     private let outline: NSPanel
     private let outlineView = ScreenRecordingTargetOutlineView()
-    private let hostingView: NSHostingView<ScreenRecordingCaptureBar>
+    let hostingView: NSHostingView<ScreenRecordingCaptureBar>
     private var subscriptions: Set<AnyCancellable> = []
     private var isPresented = false
 
@@ -155,9 +155,10 @@ final class ScreenRecordingCaptureBarController {
         if panel.isVisible { panel.orderFrontRegardless() }
     }
 
-    private var preferredSize: CGSize {
+    var preferredSize: CGSize {
         CGSize(width: model.isRecording ? ScreenRecordingCaptureBarGeometry.recordingWidth + (model.configuration.camera ? 64 : 0)
-            : ScreenRecordingCaptureBarGeometry.setupWidth, height: ScreenshotToolbarLayout.height)
+            : hostingView.fittingSize.width,
+            height: ScreenshotToolbarLayout.height)
     }
 
     private func refresh() {
@@ -187,7 +188,7 @@ private final class ScreenRecordingTargetOutlineView: NSView {
     }
 }
 
-private struct ScreenRecordingCaptureBar: View {
+struct ScreenRecordingCaptureBar: View {
     @ObservedObject var model: ScreenRecordingStudioModel
     @ObservedObject var languageStore: AppLanguageStore
     let selectRegion: () -> Void
@@ -196,29 +197,12 @@ private struct ScreenRecordingCaptureBar: View {
     let openStudio: () -> Void
     let cancel: () -> Void
     let displaySaveDirectory: () -> String
-    @State private var showsCaptureError = false
     @State private var showsCameraCornerRadius = false
 
     var body: some View {
-        GeometryReader { proxy in
-            HStack(spacing: ScreenshotToolbarLayout.spacing) {
-                if model.isRecording { recordingControls }
-                else {
-                    setupControls(width: proxy.size.width
-                        - ((model.errorMessage ?? model.capture.errorMessage) == nil ? 0 : 30))
-                }
-                if let error = model.errorMessage ?? model.capture.errorMessage {
-                    Button { showsCaptureError.toggle() } label: {
-                        Image(systemName: "exclamationmark.triangle.fill")
-                            .foregroundStyle(.red).frame(width: 28, height: ScreenshotToolbarLayout.controlHeight)
-                    }
-                    .buttonStyle(.plain).help(error).accessibilityLabel(error)
-                    .accessibilityIdentifier("screenRecording.captureError")
-                    .popover(isPresented: $showsCaptureError) {
-                        Text(error).font(.callout).textSelection(.enabled).padding(14).frame(maxWidth: 340)
-                    }
-                }
-            }
+        HStack(spacing: ScreenshotToolbarLayout.spacing) {
+            if model.isRecording { recordingControls }
+            else { setupControls }
         }
         .frame(height: ScreenshotToolbarLayout.height)
         .background(.ultraThinMaterial, in: RoundedRectangle(
@@ -230,7 +214,7 @@ private struct ScreenRecordingCaptureBar: View {
         .environment(\.layoutDirection, languageStore.language.isRightToLeft ? .rightToLeft : .leftToRight)
     }
 
-    private func setupControls(width: CGFloat) -> some View {
+    private var setupControls: some View {
         ScrollView(.horizontal, showsIndicators: false) {
             HStack(spacing: ScreenshotToolbarLayout.spacing) {
                 dragHandle
@@ -251,7 +235,8 @@ private struct ScreenRecordingCaptureBar: View {
                     .accessibilityIdentifier("screenRecording.selectRegion")
                     .disabled(!canSelectRegion)
                 }
-                sourcePicker(width: ScreenRecordingCaptureBarGeometry.sourceWidth(availableWidth: width))
+                sourcePicker(width: ScreenRecordingCaptureBarGeometry.sourceWidth(
+                    availableWidth: ScreenRecordingCaptureBarGeometry.setupWidth))
                 separator
                 inputButton("speaker.wave.2", disabledSymbol: "speaker.slash", title: "系统音频",
                     value: $model.configuration.systemAudio, identifier: "systemAudio")
@@ -278,7 +263,7 @@ private struct ScreenRecordingCaptureBar: View {
             .frame(height: ScreenshotToolbarLayout.height)
             .fixedSize(horizontal: true, vertical: false)
         }
-        .frame(width: width, height: ScreenshotToolbarLayout.height)
+        .frame(height: ScreenshotToolbarLayout.height)
         .disabled(model.isBusy || model.isChoosingFile)
     }
 
@@ -393,32 +378,33 @@ private struct ScreenRecordingCaptureBar: View {
 
     private var cameraShapeControls: some View {
         HStack(spacing: 0) {
-            cameraAspectRatioMenu
             cameraShapeButton(round: true)
             cameraShapeButton(round: false)
         }
     }
 
-    private var cameraAspectRatioMenu: some View {
-        Menu {
-            Picker(AppLocalization.text("摄像头比例"), selection: Binding(
-                get: { model.recordingCameraAspectRatio },
-                set: { model.setRecordingCameraAspectRatio($0) }
-            )) {
-                ForEach(RecordingCameraAspectRatio.allCases, id: \.self) { ratio in
-                    Text(AppLocalization.text(ratio.title)).tag(ratio)
-                }
+    private var cameraAspectRatioPicker: some View {
+        Picker(AppLocalization.text("摄像头比例"), selection: Binding(
+            get: { model.recordingCameraAspectRatio },
+            set: { model.setRecordingCameraAspectRatio($0) }
+        )) {
+            ForEach(RecordingCameraAspectRatio.allCases, id: \.self) { ratio in
+                Text(AppLocalization.text(ratio.title)).tag(ratio)
             }
-        } label: {
-            Image(systemName: "aspectratio")
-                .font(.system(size: 13, weight: .medium))
-                .frame(width: 28, height: ScreenshotToolbarLayout.controlHeight)
         }
-        .menuStyle(.borderlessButton).menuIndicator(.hidden)
-        .help(AppLocalization.text("摄像头比例"))
-        .accessibilityLabel(AppLocalization.text("摄像头比例"))
         .accessibilityValue(AppLocalization.text(model.recordingCameraAspectRatio.title))
         .accessibilityIdentifier("screenRecording.cameraAspectRatio")
+    }
+
+    private var recordingCameraOptionsMenu: some View {
+        Menu { cameraAspectRatioPicker } label: {
+            Image(systemName: "ellipsis.circle").font(.system(size: 14))
+                .frame(width: 28, height: ScreenshotToolbarLayout.controlHeight)
+        }
+        .menuStyle(.borderlessButton).menuIndicator(.hidden).frame(width: 28)
+        .help(AppLocalization.text("更多操作"))
+        .accessibilityLabel(AppLocalization.text("更多操作"))
+        .accessibilityIdentifier("screenRecording.captureOptions")
     }
 
     private var optionsMenu: some View {
@@ -431,6 +417,7 @@ private struct ScreenRecordingCaptureBar: View {
                 Text(AppLocalization.text("系统默认")).tag(Optional<String>.none)
                 ForEach(model.capture.cameras) { device in Text(device.name).tag(Optional(device.id)) }
             }
+            cameraAspectRatioPicker
             Picker(AppLocalization.text("帧率"), selection: $model.configuration.frameRate) {
                 ForEach([30, 60], id: \.self) { rate in Text("\(rate) FPS").tag(rate) }
             }
@@ -465,7 +452,12 @@ private struct ScreenRecordingCaptureBar: View {
                     .font(.system(size: 13, weight: .medium, design: .monospaced)).monospacedDigit()
                     .accessibilityIdentifier("screenRecording.captureElapsed")
                 Spacer(minLength: 0)
-                if model.configuration.camera { cameraShapeControls }
+                if model.configuration.camera {
+                    HStack(spacing: 0) {
+                        cameraShapeControls
+                        recordingCameraOptionsMenu
+                    }
+                }
                 Button(action: model.pause) {
                     Image(systemName: model.capture.phase == .paused ? "play.fill" : "pause.fill")
                         .frame(width: 28, height: ScreenshotToolbarLayout.controlHeight)
@@ -483,8 +475,7 @@ private struct ScreenRecordingCaptureBar: View {
                 .accessibilityIdentifier("screenRecording.stopCapture")
             } else {
                 ProgressView().controlSize(.small)
-                Text(AppLocalization.text(model.isStopping || model.capture.phase == .finishing
-                    ? "正在保存录屏" : "正在准备录制"))
+                Text(model.captureProgressMessage)
                     .font(.caption).lineLimit(1).frame(maxWidth: .infinity, alignment: .leading)
                     .accessibilityIdentifier("screenRecording.captureProgress")
                 if !model.isStopping, !model.isCancelling {

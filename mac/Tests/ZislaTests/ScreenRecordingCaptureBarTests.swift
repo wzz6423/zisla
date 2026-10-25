@@ -1,11 +1,61 @@
 import AppKit
 import Testing
 import ZislaCore
+import ZislaKit
 
 @testable import Zisla
 
 @Suite
 struct ScreenRecordingCaptureBarTests {
+    @MainActor
+    @Test
+    func setupWidthTracksItsContentAndRegionButtonWithoutReservingTrailingSpace() async throws {
+        let compact = try await measuredSetupWidth(sourceName: "A", mode: .display, viewportWidth: 604)
+        let region = try await measuredSetupWidth(sourceName: "A", mode: .region, viewportWidth: 604)
+        let long = try await measuredSetupWidth(sourceName: String(repeating: "Long display name ", count: 20),
+                                               mode: .display, viewportWidth: 604)
+        #expect(compact > 0 && compact < ScreenRecordingCaptureBarGeometry.setupWidth)
+        #expect(abs(region - compact - 30) < 0.5, "Only the 28pt region button and normal 2pt spacing should be added")
+        #expect(long > compact, "A short source name must reduce the panel width rather than leave trailing space")
+        #expect(long - compact < 152, "Long source labels must retain their existing maximum width")
+    }
+
+    @MainActor
+    @Test
+    func narrowViewportPreservesScrollableContentWidth() async throws {
+        let regular = try await measuredSetupWidth(sourceName: "A", mode: .region, viewportWidth: 604)
+        let narrow = try await measuredSetupWidth(sourceName: "A", mode: .region, viewportWidth: 240)
+        #expect(abs(regular - narrow) < 0.5, "A narrow panel must scroll the same contents instead of squeezing controls")
+        let screen = CGRect(x: -500, y: -100, width: 240, height: 300)
+        let panel = ScreenRecordingCaptureBarGeometry.panelFrame(size: .init(width: narrow, height: 38), in: screen)
+        #expect(panel.width == 240)
+        #expect(screen.contains(panel))
+    }
+
+    @MainActor
+    private func measuredSetupWidth(sourceName: String, mode: RecordingCaptureMode, viewportWidth: CGFloat) async throws -> CGFloat {
+        var dependencies = ScreenRecordingCaptureDependencies.live
+        dependencies.loadSources = { [.init(id: 1, name: sourceName, mode: .display,
+                                            frame: .init(x: 0, y: 0, width: 1920, height: 1080))] }
+        dependencies.loadDevices = { .init() }
+        let model = ScreenRecordingStudioModel(capture: .init(dependencies: dependencies))
+        await model.loadSources()
+        model.selectMode(mode)
+        defer { model.shutdown() }
+        let controller = ScreenRecordingCaptureBarController(model: model, languageStore: AppLanguageStore(),
+            selectRegion: {}, start: {}, chooseDirectory: {}, openStudio: {}, cancel: {},
+            displaySaveDirectory: { "" })
+        defer { controller.shutdown() }
+        let host = controller.hostingView
+        host.window?.setContentSize(.init(width: viewportWidth, height: 38))
+        for _ in 0..<3 {
+            host.layoutSubtreeIfNeeded()
+            await withCheckedContinuation { continuation in DispatchQueue.main.async { continuation.resume() } }
+        }
+        #expect(host.window?.isVisible == false, "Layout tests must not present a toolbar")
+        return controller.preferredSize.width
+    }
+
     @Test
     func setupLeadingControlsUseCompactSpacing() {
         #expect(ScreenRecordingCaptureBarGeometry.dragHandleWidth == 24)

@@ -17,6 +17,7 @@ final class ScreenRecordingStudioModel: ObservableObject {
     @Published var recordingCameraRound = true
     @Published var recordingCameraAspectRatio: RecordingCameraAspectRatio = .square
     @Published var recordingCameraCornerRadius = 0.1
+    @Published var recordingCameraSize = 0.25
     @Published var exportConfiguration = RecordingExportConfiguration()
     @Published private(set) var project: ScreenRecordingProject?
     @Published private(set) var directory: URL?
@@ -61,7 +62,8 @@ final class ScreenRecordingStudioModel: ObservableObject {
          projectStore: ScreenRecordingProjectStore? = nil,
          outputDirectoryStore: ScreenRecordingOutputDirectoryStore = ScreenRecordingOutputDirectoryStore(),
          renderPreview: ((ScreenRecordingProject, URL, Double) async throws -> CGImage)? = nil,
-         aiCompletion: ((ScreenRecordingProject, String, AIModelConfigurationReference?) async throws -> String)? = nil) {
+         aiCompletion: ((ScreenRecordingProject, String, AIModelConfigurationReference?) async throws -> String)? = nil,
+         onError: ((String) -> Void)? = nil) {
         self.appModel = appModel
         self.capture = capture
         self.exporter = exporter
@@ -92,16 +94,29 @@ final class ScreenRecordingStudioModel: ObservableObject {
         }
         selectedAIModel = appModel?.settingsStore.settings.voiceModelConfiguration
         subtitleLanguage = appModel?.languageStore.language ?? .simplifiedChinese
+        let notifyError = onError ?? { [weak appModel] message in appModel?.transientMessage = message }
+        $errorMessage.removeDuplicates().compactMap { $0 }
+            .sink(receiveValue: notifyError).store(in: &cancellables)
         capture.$phase.combineLatest(capture.$elapsed)
             .sink { [weak self] _, _ in self?.objectWillChange.send() }.store(in: &cancellables)
         capture.$errorMessage.sink { [weak self] error in
-            if let error { self?.errorMessage = error; self?.showWindow?() }
+            if let error { self?.errorMessage = error }
+        }.store(in: &cancellables)
+        capture.$cameraPreviewState.sink { [weak self] state in
+            switch state {
+            case .preparing: self?.errorMessage = nil
+            case let .failed(message): self?.errorMessage = message
+            default: break
+            }
         }.store(in: &cancellables)
         exporter.objectWillChange.sink { [weak self] in self?.objectWillChange.send() }
             .store(in: &cancellables)
     }
 
     var isRecording: Bool { capture.phase.isActive || isStarting || isStopping || isCancelling }
+    var captureProgressMessage: String {
+        AppLocalization.text(isStopping ? "正在保存录屏" : "正在准备录制")
+    }
     var canEdit: Bool { project != nil && !isRecording && !isBusy && !isChoosingFile && !exporter.isExporting }
     var canUndo: Bool { !undoHistory.isEmpty && canEdit }
     var canRedo: Bool { !redoHistory.isEmpty && canEdit }
@@ -221,6 +236,7 @@ final class ScreenRecordingStudioModel: ObservableObject {
                 recording.edits.cameraRound = recordingCameraRound
                 recording.edits.cameraAspectRatio = recordingCameraAspectRatio
                 recording.edits.cameraCornerRadius = recordingCameraCornerRadius
+                recording.edits.cameraSize = recordingCameraSize
                 install(recording, directory: target)
                 isDirty = true
                 recordingDirectory = nil

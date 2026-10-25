@@ -86,13 +86,6 @@ struct ScreenRecordingStudioView: View {
                 .frame(minWidth: 320, idealWidth: 340, maxWidth: 390)
                 .background(Color(nsColor: .windowBackgroundColor))
             }
-            if let error = model.errorMessage ?? model.capture.errorMessage {
-                Divider()
-                Label(error, systemImage: "exclamationmark.triangle")
-                    .foregroundStyle(.red).font(.caption)
-                    .textSelection(.enabled).padding(10)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-            }
         }
         .frame(minWidth: 960, minHeight: 640)
         .environment(\.locale, languageStore.language.locale)

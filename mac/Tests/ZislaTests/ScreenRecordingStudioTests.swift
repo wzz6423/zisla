@@ -32,7 +32,8 @@ struct ScreenRecordingStudioTests {
     private func fixture(capture: ScreenRecordingService = ScreenRecordingService(),
                          outputDirectoryStore: ScreenRecordingOutputDirectoryStore = ScreenRecordingOutputDirectoryStore(),
                          aiCompletion: ((ScreenRecordingProject, String, AIModelConfigurationReference?) async throws -> String)? = nil,
-                         preview: ((ScreenRecordingProject, URL, Double) async throws -> CGImage)? = nil) throws -> (ScreenRecordingStudioModel, URL, ScreenRecordingProject) {
+                         preview: ((ScreenRecordingProject, URL, Double) async throws -> CGImage)? = nil,
+                         onError: ((String) -> Void)? = nil) throws -> (ScreenRecordingStudioModel, URL, ScreenRecordingProject) {
         let root = FileManager.default.temporaryDirectory.appendingPathComponent("zisla-studio-test-\(UUID())")
         try FileManager.default.createDirectory(at: root, withIntermediateDirectories: false)
         let store = ScreenRecordingProjectStore(root: root)
@@ -41,7 +42,8 @@ struct ScreenRecordingStudioTests {
         let project = ScreenRecordingProject(name: "Demo", videoFile: "screen.mp4", duration: 10, width: 64, height: 48)
         try store.save(project, in: directory)
         let model = ScreenRecordingStudioModel(capture: capture, projectStore: store, outputDirectoryStore: outputDirectoryStore,
-            renderPreview: preview ?? { _, _, _ in throw ScreenRecordingExportError.cannotRender }, aiCompletion: aiCompletion)
+            renderPreview: preview ?? { _, _, _ in throw ScreenRecordingExportError.cannotRender },
+            aiCompletion: aiCompletion, onError: onError)
         model.install(project, directory: directory)
         return (model, root, project)
     }
@@ -50,7 +52,11 @@ struct ScreenRecordingStudioTests {
                                 sources: @escaping () async throws -> [RecordingCaptureSource] = { [] }) -> ScreenRecordingService {
         ScreenRecordingService(dependencies: .init(
             loadSources: sources, loadDevices: { .init() }, requestPermission: { _ in true },
-            makeSession: { _, directory, _ in session.directory = directory; return session },
+            makeSession: { _, directory, onFailure in
+                session.directory = directory
+                session.onFailure = onFailure
+                return session
+            },
             makeCameraPreview: { _, _ in fatalError("Camera preview is disabled in these tests") },
             now: { 10 }, scheduleTick: { _ in {} }))
     }
@@ -224,6 +230,99 @@ struct ScreenRecordingStudioTests {
         }
     }
 
+    @Test func sourceFailuresNotifyOnceAndCanNotifyAgainAfterRecovery() async {
+        let failure = ScreenRecordingCaptureError.captureFailed("synthetic source failure")
+        var fails = true
+        var notices: [String] = []
+        let capture = captureService(RecordingStudioTestSession(), sources: {
+            if fails { throw failure }
+            return []
+        })
+        let model = ScreenRecordingStudioModel(capture: capture, onError: { notices.append($0) })
+        defer { model.shutdown() }
+        var showsWindow = false
+        model.showWindow = { showsWindow = true }
+
+        await model.loadSources()
+        await model.loadSources()
+        #expect(notices == [failure.localizedDescription], "The service and model must report one failure only once")
+        #expect(!showsWindow, "A transient island error must not open the studio")
+
+        fails = false
+        await model.loadSources()
+        #expect(model.errorMessage == nil)
+        fails = true
+        await model.loadSources()
+        #expect(notices == [failure.localizedDescription, failure.localizedDescription])
+        #expect(model.errorMessage == failure.localizedDescription)
+    }
+
+    @Test func cancellingSourceLoadingDoesNotShowAnErrorNotice() async {
+        var notices: [String] = []
+        let capture = captureService(RecordingStudioTestSession(), sources: { throw CancellationError() })
+        let model = ScreenRecordingStudioModel(capture: capture, onError: { notices.append($0) })
+        defer { model.shutdown() }
+        await model.loadSources()
+        #expect(notices.isEmpty)
+        #expect(model.errorMessage == nil)
+    }
+
+    @Test func runtimeCaptureFailureUsesTheIslandNoticeAndPreservesTheOpenProject() async throws {
+        let session = RecordingStudioTestSession()
+        let preview = try image(red: 1, blue: 0, width: 3)
+        var notices: [String] = []
+        let (model, root, original) = try fixture(capture: captureService(session),
+            preview: { _, _, _ in preview }, onError: { notices.append($0) })
+        defer { model.shutdown(); try? FileManager.default.removeItem(at: root) }
+        await model.previewTask?.value
+        var showsWindow = false
+        model.start()
+        await model.operationTask?.value
+        model.showWindow = { showsWindow = true }
+        #expect(model.capture.phase == .recording)
+
+        session.onFailure?(ScreenRecordingCaptureError.deviceUnavailable)
+        for await phase in model.capture.$phase.values {
+            if phase == .idle { break }
+        }
+
+        #expect(notices == [ScreenRecordingCaptureError.deviceUnavailable.localizedDescription])
+        #expect(model.errorMessage == notices.first)
+        #expect(!showsWindow)
+        #expect(!model.isRecording)
+        #expect(model.project == original)
+    }
+
+    @Test func invalidEditsUseTheSameErrorNoticeAndPreserveTheProject() async throws {
+        let preview = try image(red: 1, blue: 0, width: 3)
+        var notices: [String] = []
+        let (model, root, original) = try fixture(preview: { _, _, _ in preview }, onError: { notices.append($0) })
+        defer { model.shutdown(); try? FileManager.default.removeItem(at: root) }
+        await model.previewTask?.value
+        model.update { $0.edits.cameraSize = 0 }
+        #expect(notices == [ScreenRecordingProjectError.invalidProject.localizedDescription])
+        #expect(model.project == original)
+        #expect(!model.isDirty)
+    }
+
+    @Test func startupFailureCleanupKeepsPreparingProgressUntilTheErrorIsReported() async throws {
+        let cleanup = Gate<Void>()
+        let session = RecordingStudioTestSession()
+        session.beforeStart = { throw ScreenRecordingCaptureError.writerUnavailable }
+        session.beforeCancel = { _ = try? await cleanup.wait() }
+        let (model, root, _) = try fixture(capture: captureService(session))
+        defer { model.shutdown(); try? FileManager.default.removeItem(at: root) }
+        model.start()
+        await cleanup.waitUntilEntered()
+        #expect(model.isStarting && model.capture.phase == .finishing)
+        #expect(model.captureProgressMessage == AppLocalization.text("正在准备录制"),
+                "Releasing a failed startup must not look like saving a recording")
+        cleanup.resolve(())
+        await model.operationTask?.value
+        #expect(!model.isRecording)
+        #expect(model.capture.phase == .idle)
+    }
+
     @Test(arguments: [true, false], [0.0, 0.1, 0.35, 0.5])
     func stopAutomaticallySavesCapturedMediaAndReopensTheProject(cameraRound: Bool, cameraCornerRadius: Double) async throws {
         let session = RecordingStudioTestSession()
@@ -237,8 +336,10 @@ struct ScreenRecordingStudioTests {
         model.recordingCameraRound = cameraRound
         model.recordingCameraAspectRatio = .widescreen
         model.recordingCameraCornerRadius = cameraCornerRadius
+        model.recordingCameraSize = 0.4
 
         model.stop()
+        #expect(model.captureProgressMessage == AppLocalization.text("正在保存录屏"))
         await model.operationTask?.value
         await model.previewTask?.value
 
@@ -247,6 +348,7 @@ struct ScreenRecordingStudioTests {
         #expect(project.edits.cameraRound == cameraRound)
         #expect(project.edits.cameraAspectRatio == .widescreen)
         #expect(project.edits.cameraCornerRadius == cameraCornerRadius)
+        #expect(project.edits.cameraSize == 0.4)
         #expect(directory.path == session.directory?.path)
         #expect(directory.deletingLastPathComponent().path == root.path)
         #expect(!model.isDirty)
@@ -608,11 +710,15 @@ struct ScreenRecordingStudioTests {
 @MainActor
 private final class RecordingStudioTestSession: ScreenRecordingCaptureSession {
     var directory: URL?
+    var onFailure: (@Sendable (Error) -> Void)?
+    var beforeStart: (() throws -> Void)?
+    var beforeCancel: (() async -> Void)?
     var beforeStop: ((URL) throws -> Void)?
 
     func useCameraPreview(_ preview: any ScreenRecordingCameraPreviewSession) {}
 
     func start() async throws -> Double {
+        try beforeStart?()
         let directory = try #require(directory)
         try Data([1, 2, 3]).write(to: directory.appendingPathComponent("screen.mp4"))
         return 10
@@ -626,5 +732,5 @@ private final class RecordingStudioTestSession: ScreenRecordingCaptureSession {
         return ScreenRecordingResult(videoFile: "screen.mp4", duration: 2, width: 64, height: 48)
     }
 
-    func cancel() async -> Error? { nil }
+    func cancel() async -> Error? { await beforeCancel?(); return nil }
 }

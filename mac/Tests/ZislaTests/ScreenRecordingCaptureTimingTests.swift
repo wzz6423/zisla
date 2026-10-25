@@ -8,6 +8,60 @@ import ZislaCore
 @Suite(.serialized)
 @MainActor
 struct ScreenRecordingCaptureTimingTests {
+    @Test(arguments: [8_000.0, 16_000.0, 24_000.0, 44_100.0, 48_000.0], [UInt32(1), UInt32(2)])
+    func microphoneAACSupportsLowSampleRatesAndBothChannelLayouts(sampleRate: Double, channels: UInt32) async throws {
+        let directory = try makeDirectory()
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let files = try ScreenRecordingCaptureFiles(directory: directory)
+        let writer = ScreenRecordingCaptureWriter(files: files, configuration: .init(systemAudio: false, microphone: true),
+                                                  width: 16, height: 16, onFailure: { _ in })
+        writer.receive(try video(at: 100))
+        await writer.flush()
+        #expect(try await writer.waitForFirstFrame() == 100)
+        writer.receive(try audio(at: 100.01, sampleRate: sampleRate, channels: channels, floatingPoint: true, kind: .microphone))
+        await writer.flush()
+        await writer.seal(at: 101)
+        #expect(try await writer.finish() == 1)
+        try files.publish([files.screenName, files.microphoneName])
+        let asset = AVURLAsset(url: directory.appendingPathComponent(files.microphoneName))
+        #expect(try await asset.loadTracks(withMediaType: .audio).count == 1)
+        #expect(try await asset.load(.duration).seconds > 0)
+    }
+
+    @Test
+    func stereoMicrophoneKeepsTheExistingEncodedBitrateBudget() async throws {
+        let directory = try makeDirectory()
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let files = try ScreenRecordingCaptureFiles(directory: directory)
+        let writer = ScreenRecordingCaptureWriter(files: files, configuration: .init(systemAudio: false, microphone: true),
+                                                  width: 16, height: 16, onFailure: { _ in })
+        writer.receive(try video(at: 100))
+        await writer.flush()
+        var seed: UInt64 = 0x19A8
+        for index in 0..<100 {
+            let sample = try audio(at: 100 + Double(index) / 100, sampleRate: 48_000, channels: 2,
+                                   floatingPoint: true, kind: .microphone)
+            let block = try #require(CMSampleBufferGetDataBuffer(sample.buffer))
+            let noise: [Float] = (0..<960).map { _ in
+                seed = seed &* 6_364_136_223_846_793_005 &+ 1
+                return Float(Int32(truncatingIfNeeded: seed >> 32)) / Float(Int32.max)
+            }
+            #expect(noise.withUnsafeBytes {
+                CMBlockBufferReplaceDataBytes(with: $0.baseAddress!, blockBuffer: block,
+                                              offsetIntoDestination: 0, dataLength: $0.count)
+            } == noErr)
+            writer.receive(sample)
+            await writer.flush()
+        }
+        await writer.seal(at: 101)
+        _ = try await writer.finish()
+        try files.publish([files.screenName, files.microphoneName])
+        let asset = AVURLAsset(url: directory.appendingPathComponent(files.microphoneName))
+        let track = try #require(try await asset.loadTracks(withMediaType: .audio).first)
+        let bitrate = try await track.load(.estimatedDataRate)
+        #expect(bitrate > 128_000 && bitrate < 250_000, "Stereo microphone output must retain its existing 192 kbps budget: \(bitrate)")
+    }
+
     @Test(arguments: [0.0, 20.0])
     func timestampsThatBecomeEqualAtTheWriterTimescaleAreNotAppended(pause: Double) async throws {
         let directory = try makeDirectory()
@@ -167,30 +221,34 @@ struct ScreenRecordingCaptureTimingTests {
         return ScreenRecordingCaptureSample(buffer: try #require(sample), kind: .screen, hostTime: time)
     }
 
-    private func audio(at time: Double) throws -> ScreenRecordingCaptureSample {
-        var description = AudioStreamBasicDescription(mSampleRate: 48_000, mFormatID: kAudioFormatLinearPCM,
-                                                      mFormatFlags: kAudioFormatFlagIsSignedInteger | kAudioFormatFlagIsPacked,
-                                                      mBytesPerPacket: 4, mFramesPerPacket: 1, mBytesPerFrame: 4,
-                                                      mChannelsPerFrame: 2, mBitsPerChannel: 16, mReserved: 0)
+    private func audio(at time: Double, sampleRate: Double = 48_000, channels: UInt32 = 2,
+                       floatingPoint: Bool = false, kind: ScreenRecordingSampleKind = .systemAudio) throws -> ScreenRecordingCaptureSample {
+        let bytesPerChannel: UInt32 = floatingPoint ? 4 : 2
+        let bytesPerFrame = bytesPerChannel * channels
+        let length = Int(bytesPerFrame) * 480
+        var description = AudioStreamBasicDescription(mSampleRate: sampleRate, mFormatID: kAudioFormatLinearPCM,
+                                                      mFormatFlags: (floatingPoint ? kAudioFormatFlagIsFloat : kAudioFormatFlagIsSignedInteger) | kAudioFormatFlagIsPacked,
+                                                      mBytesPerPacket: bytesPerFrame, mFramesPerPacket: 1, mBytesPerFrame: bytesPerFrame,
+                                                      mChannelsPerFrame: channels, mBitsPerChannel: bytesPerChannel * 8, mReserved: 0)
         var format: CMAudioFormatDescription?
         #expect(CMAudioFormatDescriptionCreate(allocator: kCFAllocatorDefault, asbd: &description, layoutSize: 0,
                                               layout: nil, magicCookieSize: 0, magicCookie: nil,
                                               extensions: nil, formatDescriptionOut: &format) == noErr)
         var block: CMBlockBuffer?
-        #expect(CMBlockBufferCreateWithMemoryBlock(allocator: kCFAllocatorDefault, memoryBlock: nil, blockLength: 1_920,
+        #expect(CMBlockBufferCreateWithMemoryBlock(allocator: kCFAllocatorDefault, memoryBlock: nil, blockLength: length,
                                                   blockAllocator: kCFAllocatorDefault, customBlockSource: nil,
-                                                  offsetToData: 0, dataLength: 1_920, flags: 0, blockBufferOut: &block) == noErr)
+                                                  offsetToData: 0, dataLength: length, flags: 0, blockBufferOut: &block) == noErr)
         let data = try #require(block)
-        #expect(CMBlockBufferFillDataBytes(with: 0, blockBuffer: data, offsetIntoDestination: 0, dataLength: 1_920) == noErr)
-        var timing = CMSampleTimingInfo(duration: CMTime(value: 1, timescale: 48_000),
+        #expect(CMBlockBufferFillDataBytes(with: 0, blockBuffer: data, offsetIntoDestination: 0, dataLength: length) == noErr)
+        var timing = CMSampleTimingInfo(duration: CMTime(value: 1, timescale: Int32(sampleRate)),
                                         presentationTimeStamp: CMTime(seconds: time, preferredTimescale: 1_000_000_000),
                                         decodeTimeStamp: .invalid)
-        var sampleSize = 4
+        var sampleSize = Int(bytesPerFrame)
         var sample: CMSampleBuffer?
         #expect(CMSampleBufferCreateReady(allocator: kCFAllocatorDefault, dataBuffer: data, formatDescription: format,
                                           sampleCount: 480, sampleTimingEntryCount: 1, sampleTimingArray: &timing,
                                           sampleSizeEntryCount: 1, sampleSizeArray: &sampleSize, sampleBufferOut: &sample) == noErr)
-        return ScreenRecordingCaptureSample(buffer: try #require(sample), kind: .systemAudio, hostTime: time)
+        return ScreenRecordingCaptureSample(buffer: try #require(sample), kind: kind, hostTime: time)
     }
 }
 

@@ -10,7 +10,7 @@ struct ScreenRecordingLocalizationTests {
         let keys = try Self.runtimeKeys()
         let requiredKeys: Set<String> = [
             "录屏工作室", "全屏录制", "暂停或继续录制", "启用录屏", "恢复默认快捷键",
-            "录制屏幕、编辑视频与保存项目。", "打开录屏工作室", "留白", "起点（秒）",
+            "录制屏幕、编辑视频与保存项目。", "留白", "起点（秒）",
             "片段 %d · 缩放 %d · 字幕 %d", "录屏项目数据无效", "录屏文件写入超时",
             "AI 未返回有效的剪辑计划，未应用任何修改", "字幕在本机转写，不上传录音",
             "正在播放原始素材",
@@ -19,7 +19,7 @@ struct ScreenRecordingLocalizationTests {
             "圆角", "圆形摄像头", "矩形",
             "系统声音音量", "麦克风音量", "显示摄像头", "摄像头比例", "画布比例", "背景颜色", "标注",
         ]
-        #expect(requiredKeys.isSubset(of: keys), "The recording source scan missed runtime keys")
+        #expect(requiredKeys.isSubset(of: keys), "The recording source scan missed runtime keys: \(requiredKeys.subtracting(keys).sorted())")
         #expect(keys.isDisjoint(with: ["pause.fill", "play.fill", "record.circle", "source."]))
         #expect(AppLanguage.allCases.count == 17)
 

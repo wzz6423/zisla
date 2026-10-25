@@ -325,7 +325,7 @@ private final class ScreenRecordingNativeAssetWriter: ScreenRecordingCaptureAsse
             } else { rate = 48_000; channels = 2 }
             let input = AVAssetWriterInput(mediaType: .audio, outputSettings: [
                 AVFormatIDKey: kAudioFormatMPEG4AAC, AVSampleRateKey: rate,
-                AVNumberOfChannelsKey: channels, AVEncoderBitRateKey: 192_000,
+                AVNumberOfChannelsKey: channels, AVEncoderBitRateKey: Int(rate) * Int(channels) * 2,
             ])
             input.expectsMediaDataInRealTime = true
             guard asset.canAdd(input) else { throw ScreenRecordingCaptureError.writerUnavailable }

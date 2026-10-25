@@ -4,18 +4,62 @@ import Combine
 import ZislaCore
 
 enum ScreenRecordingCameraPreviewLayout {
-    static func frame(configuration: RecordingEdits, visibleFrame: CGRect) -> CGRect {
+    enum Corner: CaseIterable {
+        case topLeft, topRight, bottomLeft, bottomRight
+
+        var isLeft: Bool { self == .topLeft || self == .bottomLeft }
+        var isTop: Bool { self == .topLeft || self == .topRight }
+
+        func point(in frame: CGRect) -> CGPoint {
+            CGPoint(x: isLeft ? frame.minX : frame.maxX, y: isTop ? frame.maxY : frame.minY)
+        }
+    }
+
+    static func frame(configuration: RecordingEdits, visibleFrame: CGRect, center: CGPoint? = nil) -> CGRect {
         let inset = min(24, min(visibleFrame.width, visibleFrame.height) / 10)
         let available = visibleFrame.insetBy(dx: inset, dy: inset)
         let ratio = CGFloat(configuration.effectiveCameraAspectRatio.ratio)
         let preferredWidth = min(320, max(120, min(visibleFrame.width, visibleFrame.height) * configuration.cameraSize))
         let width = min(preferredWidth, available.width, available.height * ratio)
         let height = min(width / ratio, available.height)
+        if let center {
+            return CGRect(x: min(max(available.minX, center.x - width / 2), available.maxX - width),
+                          y: min(max(available.minY, center.y - height / 2), available.maxY - height),
+                          width: width, height: height)
+        }
         let left = configuration.cameraPosition == .topLeft || configuration.cameraPosition == .bottomLeft
         let top = configuration.cameraPosition == .topLeft || configuration.cameraPosition == .topRight
         return CGRect(x: left ? available.minX : available.maxX - width,
                       y: top ? available.maxY - height : available.minY,
                       width: width, height: height)
+    }
+
+    static func resize(frame: CGRect, corner: Corner, translation: CGSize, visibleFrame: CGRect) -> (frame: CGRect, size: Double) {
+        let ratio = frame.width / frame.height
+        let inset = min(24, min(visibleFrame.width, visibleFrame.height) / 10)
+        let available = visibleFrame.insetBy(dx: inset, dy: inset)
+        let anchor = CGPoint(x: corner.isLeft ? frame.maxX : frame.minX,
+                             y: corner.isTop ? frame.minY : frame.maxY)
+        let maximumWidth = min(320, max(120, min(visibleFrame.width, visibleFrame.height) * 0.5),
+                               corner.isLeft ? anchor.x - available.minX : available.maxX - anchor.x,
+                               (corner.isTop ? available.maxY - anchor.y : anchor.y - available.minY) * ratio)
+        let minimumWidth = min(maximumWidth, max(120, min(visibleFrame.width, visibleFrame.height) * 0.1))
+        let dx = corner.isLeft ? -translation.width : translation.width
+        let dy = corner.isTop ? translation.height : -translation.height
+        let width = min(maximumWidth, max(minimumWidth, frame.width + (dx + dy / ratio) / (1 + 1 / (ratio * ratio))))
+        let height = width / ratio
+        return (CGRect(x: corner.isLeft ? anchor.x - width : anchor.x,
+                       y: corner.isTop ? anchor.y : anchor.y - height, width: width, height: height),
+                min(0.5, max(0.1, Double(width / min(visibleFrame.width, visibleFrame.height)))))
+    }
+
+    static func cornerRadius(start: Double, translation: CGFloat, side: CGFloat) -> Double {
+        min(0.5, max(0, start + Double(translation / side)))
+    }
+
+    static func radiusHandle(in bounds: CGRect, radius: Double) -> CGPoint {
+        CGPoint(x: min(bounds.maxX - 18, bounds.minX + 18 + min(bounds.width, bounds.height) * radius),
+                y: bounds.maxY - 10)
     }
 }
 
@@ -29,7 +73,8 @@ final class ScreenRecordingCameraPreviewController {
     private var isPresented = false
     private var placed = false
 
-    init(capture: ScreenRecordingService) {
+    init(capture: ScreenRecordingService, changeSize: @escaping (Double) -> Void,
+         changeCornerRadius: @escaping (Double) -> Void) {
         self.capture = capture
         panel = NSPanel(contentRect: CGRect(x: 0, y: 0, width: 200, height: 200),
                         styleMask: [.borderless, .nonactivatingPanel], backing: .buffered, defer: false)
@@ -43,10 +88,27 @@ final class ScreenRecordingCameraPreviewController {
         panel.isOpaque = false
         panel.backgroundColor = .clear
         panel.hasShadow = true
-        panel.isMovableByWindowBackground = true
+        panel.isMovableByWindowBackground = false
         panel.sharingType = .none
         preview = ScreenRecordingCameraPreviewView(frame: CGRect(origin: .zero, size: panel.frame.size))
         panel.contentView = preview
+        preview.onResize = { [weak self] corner, frame, translation in
+            guard let self, let screen = NSScreen.screens.first(where: {
+                $0.frame.contains(CGPoint(x: frame.midX, y: frame.midY))
+            }) ?? panel.screen ?? NSScreen.main else { return }
+            let resized = ScreenRecordingCameraPreviewLayout.resize(frame: frame, corner: corner,
+                translation: translation, visibleFrame: screen.visibleFrame)
+            configuration.cameraSize = resized.size
+            panel.setFrame(resized.frame, display: true)
+            changeSize(resized.size)
+        }
+        preview.onCornerRadiusChange = { [weak self] radius in
+            guard let self else { return }
+            configuration.cameraRound = false
+            configuration.cameraCornerRadius = radius
+            refresh(session: capture.cameraPreviewSession, state: capture.cameraPreviewState)
+            changeCornerRadius(radius)
+        }
         capture.$cameraPreviewSession.combineLatest(capture.$cameraPreviewState).sink { [weak self] session, state in
             self?.refresh(session: session, state: state)
         }.store(in: &subscriptions)
@@ -63,12 +125,14 @@ final class ScreenRecordingCameraPreviewController {
 
     func update(configuration: RecordingEdits) {
         let layoutChanged = self.configuration.cameraPosition != configuration.cameraPosition
-            || self.configuration.cameraRound != configuration.cameraRound
             || self.configuration.effectiveCameraAspectRatio != configuration.effectiveCameraAspectRatio
             || self.configuration.cameraSize != configuration.cameraSize
+        let positionChanged = self.configuration.cameraPosition != configuration.cameraPosition
         self.configuration = configuration
         if layoutChanged, let screen = panel.screen ?? NSScreen.main {
-            panel.setFrame(ScreenRecordingCameraPreviewLayout.frame(configuration: configuration, visibleFrame: screen.visibleFrame), display: true)
+            panel.setFrame(ScreenRecordingCameraPreviewLayout.frame(configuration: configuration,
+                visibleFrame: screen.visibleFrame,
+                center: positionChanged ? nil : CGPoint(x: panel.frame.midX, y: panel.frame.midY)), display: true)
         }
         refresh(session: capture.cameraPreviewSession, state: capture.cameraPreviewState)
     }
@@ -92,23 +156,43 @@ final class ScreenRecordingCameraPreviewController {
     }
 }
 
-private final class ScreenRecordingCameraPreviewView: NSView {
+final class ScreenRecordingCameraPreviewView: NSView {
+    private enum Drag {
+        case resize(ScreenRecordingCameraPreviewLayout.Corner, CGRect, CGPoint)
+        case cornerRadius(Double, CGFloat, CGPoint)
+    }
+
     private let previewLayer = AVCaptureVideoPreviewLayer()
+    private let cameraLayer = CALayer()
+    private let handlesLayer = CAShapeLayer()
     private let status = NSTextField(wrappingLabelWithString: "")
     private let spinner = NSProgressIndicator()
     private var cornerRadiusRatio: CGFloat = 0.5
+    private var tracking: NSTrackingArea?
+    private var hovered = false
+    private var drag: Drag?
+    var onResize: ((ScreenRecordingCameraPreviewLayout.Corner, CGRect, CGSize) -> Void)?
+    var onCornerRadiusChange: ((Double) -> Void)?
 
-    override var mouseDownCanMoveWindow: Bool { true }
+    override var mouseDownCanMoveWindow: Bool { false }
+    override func acceptsFirstMouse(for event: NSEvent?) -> Bool { true }
+    override func hitTest(_ point: NSPoint) -> NSView? { super.hitTest(point).map { _ in self } }
 
     override init(frame frameRect: NSRect) {
         super.init(frame: frameRect)
         wantsLayer = true
-        layer?.backgroundColor = NSColor.black.cgColor
-        layer?.borderWidth = 2
-        layer?.borderColor = NSColor.white.withAlphaComponent(0.8).cgColor
-        layer?.masksToBounds = true
+        cameraLayer.backgroundColor = NSColor.black.cgColor
+        cameraLayer.borderWidth = 2
+        cameraLayer.borderColor = NSColor.white.withAlphaComponent(0.8).cgColor
+        cameraLayer.masksToBounds = true
+        layer?.addSublayer(cameraLayer)
         previewLayer.videoGravity = .resizeAspectFill
-        layer?.addSublayer(previewLayer)
+        cameraLayer.addSublayer(previewLayer)
+        handlesLayer.fillColor = NSColor.white.cgColor
+        handlesLayer.strokeColor = NSColor.black.withAlphaComponent(0.65).cgColor
+        handlesLayer.lineWidth = 1
+        handlesLayer.isHidden = true
+        layer?.addSublayer(handlesLayer)
         status.alignment = .center
         status.textColor = .white
         status.font = .systemFont(ofSize: 12, weight: .medium)
@@ -137,10 +221,63 @@ private final class ScreenRecordingCameraPreviewView: NSView {
         super.layout()
         CATransaction.begin()
         CATransaction.setDisableActions(true)
-        previewLayer.frame = bounds
-        layer?.cornerRadius = min(bounds.width, bounds.height) * cornerRadiusRatio
+        cameraLayer.frame = bounds
+        previewLayer.frame = cameraLayer.bounds
+        handlesLayer.frame = bounds
+        cameraLayer.cornerRadius = min(bounds.width, bounds.height) * cornerRadiusRatio
+        let handles = CGMutablePath()
+        for corner in ScreenRecordingCameraPreviewLayout.Corner.allCases {
+            let point = corner.point(in: bounds.insetBy(dx: 6, dy: 6))
+            handles.addEllipse(in: CGRect(x: point.x - 4, y: point.y - 4, width: 8, height: 8))
+        }
+        let radius = ScreenRecordingCameraPreviewLayout.radiusHandle(in: bounds, radius: Double(cornerRadiusRatio))
+        handles.addEllipse(in: CGRect(x: radius.x - 4, y: radius.y - 4, width: 8, height: 8))
+        handlesLayer.path = handles
+        handlesLayer.isHidden = !hovered && drag == nil
         CATransaction.commit()
     }
+
+    override func updateTrackingAreas() {
+        super.updateTrackingAreas()
+        if let tracking { removeTrackingArea(tracking) }
+        let tracking = NSTrackingArea(rect: .zero, options: [.activeAlways, .mouseEnteredAndExited, .inVisibleRect],
+                                      owner: self, userInfo: nil)
+        addTrackingArea(tracking)
+        self.tracking = tracking
+    }
+
+    override func mouseEntered(with event: NSEvent) { hovered = true; needsLayout = true }
+    override func mouseExited(with event: NSEvent) { hovered = false; needsLayout = true }
+
+    override func mouseDown(with event: NSEvent) {
+        guard let window else { return }
+        let point = convert(event.locationInWindow, from: nil)
+        let origin = window.convertPoint(toScreen: event.locationInWindow)
+        let radius = ScreenRecordingCameraPreviewLayout.radiusHandle(in: bounds, radius: Double(cornerRadiusRatio))
+        if hypot(point.x - radius.x, point.y - radius.y) <= 9 {
+            drag = .cornerRadius(Double(cornerRadiusRatio), min(bounds.width, bounds.height), origin)
+        } else if let corner = ScreenRecordingCameraPreviewLayout.Corner.allCases.first(where: {
+            let handle = $0.point(in: bounds.insetBy(dx: 6, dy: 6))
+            return hypot(point.x - handle.x, point.y - handle.y) <= 9
+        }) {
+            drag = .resize(corner, window.frame, origin)
+        } else { window.performDrag(with: event) }
+        needsLayout = true
+    }
+
+    override func mouseDragged(with event: NSEvent) {
+        guard let window, let drag else { return }
+        let point = window.convertPoint(toScreen: event.locationInWindow)
+        switch drag {
+        case let .resize(corner, frame, origin):
+            onResize?(corner, frame, CGSize(width: point.x - origin.x, height: point.y - origin.y))
+        case let .cornerRadius(radius, side, origin):
+            onCornerRadiusChange?(ScreenRecordingCameraPreviewLayout.cornerRadius(start: radius,
+                translation: point.x - origin.x, side: side))
+        }
+    }
+
+    override func mouseUp(with event: NSEvent) { drag = nil; needsLayout = true }
 
     func update(session: AVCaptureSession?, state: ScreenRecordingCameraPreviewState, configuration: RecordingEdits) {
         if previewLayer.session !== session { previewLayer.session = session }
