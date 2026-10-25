@@ -320,7 +320,7 @@ private final class ScreenRecordingNativeAssetWriter: ScreenRecordingCaptureAsse
                       let description = CMAudioFormatDescriptionGetStreamBasicDescription(format) else {
                     throw ScreenRecordingCaptureError.writerUnavailable
                 }
-                rate = description.pointee.mSampleRate
+                rate = min(description.pointee.mSampleRate, 48_000)
                 channels = description.pointee.mChannelsPerFrame
             } else { rate = 48_000; channels = 2 }
             let input = AVAssetWriterInput(mediaType: .audio, outputSettings: [

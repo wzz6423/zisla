@@ -8,7 +8,7 @@ import ZislaCore
 @Suite(.serialized)
 @MainActor
 struct ScreenRecordingCaptureTimingTests {
-    @Test(arguments: [8_000.0, 16_000.0, 24_000.0, 44_100.0, 48_000.0], [UInt32(1), UInt32(2)])
+    @Test(arguments: [8_000.0, 16_000.0, 24_000.0, 44_100.0, 48_000.0, 96_000.0], [UInt32(1), UInt32(2)])
     func microphoneAACSupportsLowSampleRatesAndBothChannelLayouts(sampleRate: Double, channels: UInt32) async throws {
         let directory = try makeDirectory()
         defer { try? FileManager.default.removeItem(at: directory) }
@@ -24,8 +24,40 @@ struct ScreenRecordingCaptureTimingTests {
         #expect(try await writer.finish() == 1)
         try files.publish([files.screenName, files.microphoneName])
         let asset = AVURLAsset(url: directory.appendingPathComponent(files.microphoneName))
-        #expect(try await asset.loadTracks(withMediaType: .audio).count == 1)
+        let tracks = try await asset.loadTracks(withMediaType: .audio)
+        #expect(tracks.count == 1)
+        let track = try #require(tracks.first)
+        let format = try #require(try await track.load(.formatDescriptions).first)
+        let description = try #require(CMAudioFormatDescriptionGetStreamBasicDescription(format)).pointee
+        #expect(description.mSampleRate == (sampleRate == 96_000 ? 48_000 : sampleRate))
+        #expect(description.mChannelsPerFrame == channels)
         #expect(try await asset.load(.duration).seconds > 0)
+    }
+
+    @Test(arguments: [UInt32(1), UInt32(2)])
+    func highSampleRateMicrophoneIsResampledWithoutChangingTheRecordedDuration(channels: UInt32) async throws {
+        let directory = try makeDirectory()
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let files = try ScreenRecordingCaptureFiles(directory: directory)
+        let writer = ScreenRecordingCaptureWriter(files: files, configuration: .init(systemAudio: false, microphone: true),
+                                                  width: 16, height: 16, onFailure: { _ in })
+        writer.receive(try video(at: 100))
+        await writer.flush()
+        for index in 0..<100 {
+            writer.receive(try audio(at: 100 + Double(index) / 200, sampleRate: 96_000, channels: channels,
+                                     floatingPoint: true, kind: .microphone))
+            await writer.flush()
+        }
+        await writer.seal(at: 100.5)
+        #expect(abs(try await writer.finish() - 0.5) < 0.000_001)
+        try files.publish([files.screenName, files.microphoneName])
+        let asset = AVURLAsset(url: directory.appendingPathComponent(files.microphoneName))
+        let track = try #require(try await asset.loadTracks(withMediaType: .audio).first)
+        let format = try #require(try await track.load(.formatDescriptions).first)
+        let description = try #require(CMAudioFormatDescriptionGetStreamBasicDescription(format)).pointee
+        #expect(description.mSampleRate == 48_000)
+        #expect(description.mChannelsPerFrame == channels)
+        #expect(abs(try await asset.load(.duration).seconds - 0.5) < 0.03)
     }
 
     @Test
