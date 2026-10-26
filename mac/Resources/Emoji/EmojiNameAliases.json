@@ -8008,6 +8008,9 @@
       "🛘": [
         "انزلاق أرضي"
       ],
+      "🛙": [
+        "منارة"
+      ],
       "🛜": [
         "اتصال لاسلكي"
       ],
@@ -11305,6 +11308,15 @@
       "🪊": [
         "ترومبون"
       ],
+      "🪋": [
+        "نيزك"
+      ],
+      "🪌": [
+        "ممحاة"
+      ],
+      "🪍": [
+        "شبكة بمقبض"
+      ],
       "🪎": [
         "صندوق كنز"
       ],
@@ -11524,6 +11536,9 @@
       "🫈": [
         "كائن مشعر"
       ],
+      "🫌": [
+        "فراشة ملكية"
+      ],
       "🫍": [
         "الحوت القاتل"
       ],
@@ -11572,6 +11587,9 @@
       "🫜": [
         "خضراوات جذرية"
       ],
+      "🫝": [
+        "مخلّل"
+      ],
       "🫟": [
         "بقعة"
       ],
@@ -11607,6 +11625,9 @@
       ],
       "🫪": [
         "وجه بأعين زائعة"
+      ],
+      "🫫": [
+        "وجه يتشقق"
       ],
       "🫯": [
         "سحابة اقتتال"
@@ -11832,6 +11853,42 @@
       ],
       "🫸🏿": [
         "يد تدفع يمينًا: بشرة بلون غامق"
+      ],
+      "🫹": [
+        "إشارة الإبهام إلى اليسار"
+      ],
+      "🫹🏻": [
+        "إشارة الإبهام إلى اليسار: بشرة بلون فاتح"
+      ],
+      "🫹🏼": [
+        "إشارة الإبهام إلى اليسار: بشرة بلون فاتح ومعتدل"
+      ],
+      "🫹🏽": [
+        "إشارة الإبهام إلى اليسار: بشرة بلون معتدل"
+      ],
+      "🫹🏾": [
+        "إشارة الإبهام إلى اليسار: بشرة بلون معتدل مائل للغامق"
+      ],
+      "🫹🏿": [
+        "إشارة الإبهام إلى اليسار: بشرة بلون غامق"
+      ],
+      "🫺": [
+        "إشارة الإبهام إلى اليمين"
+      ],
+      "🫺🏻": [
+        "إشارة الإبهام إلى اليمين: بشرة بلون فاتح"
+      ],
+      "🫺🏼": [
+        "إشارة الإبهام إلى اليمين: بشرة بلون فاتح ومعتدل"
+      ],
+      "🫺🏽": [
+        "إشارة الإبهام إلى اليمين: بشرة بلون معتدل"
+      ],
+      "🫺🏾": [
+        "إشارة الإبهام إلى اليمين: بشرة بلون معتدل مائل للغامق"
+      ],
+      "🫺🏿": [
+        "إشارة الإبهام إلى اليمين: بشرة بلون غامق"
       ]
     },
     "de": {
@@ -19842,6 +19899,9 @@
       "🛘": [
         "Erdrutsch"
       ],
+      "🛙": [
+        "Leuchtturm"
+      ],
       "🛜": [
         "WLAN"
       ],
@@ -23139,6 +23199,15 @@
       "🪊": [
         "Posaune"
       ],
+      "🪋": [
+        "Meteor"
+      ],
+      "🪌": [
+        "Radiergummi"
+      ],
+      "🪍": [
+        "Kescher"
+      ],
       "🪎": [
         "Schatztruhe"
       ],
@@ -23358,6 +23427,9 @@
       "🫈": [
         "haariges Wesen"
       ],
+      "🫌": [
+        "Monarchfalter"
+      ],
       "🫍": [
         "Orca"
       ],
@@ -23406,6 +23478,9 @@
       "🫜": [
         "Wurzelgemüse"
       ],
+      "🫝": [
+        "Saure Gurke"
+      ],
       "🫟": [
         "Spritzer"
       ],
@@ -23441,6 +23516,9 @@
       ],
       "🫪": [
         "verzerrtes Gesicht"
+      ],
+      "🫫": [
+        "Zerbrechendes Gesicht"
       ],
       "🫯": [
         "Kampfwolke"
@@ -23666,6 +23744,42 @@
       ],
       "🫸🏿": [
         "nach rechts schiebende Hand: dunkle Hautfarbe"
+      ],
+      "🫹": [
+        "Daumen nach links"
+      ],
+      "🫹🏻": [
+        "Daumen nach links: helle Hautfarbe"
+      ],
+      "🫹🏼": [
+        "Daumen nach links: mittelhelle Hautfarbe"
+      ],
+      "🫹🏽": [
+        "Daumen nach links: mittlere Hautfarbe"
+      ],
+      "🫹🏾": [
+        "Daumen nach links: mitteldunkle Hautfarbe"
+      ],
+      "🫹🏿": [
+        "Daumen nach links: dunkle Hautfarbe"
+      ],
+      "🫺": [
+        "Daumen nach rechts"
+      ],
+      "🫺🏻": [
+        "Daumen nach rechts: helle Hautfarbe"
+      ],
+      "🫺🏼": [
+        "Daumen nach rechts: mittelhelle Hautfarbe"
+      ],
+      "🫺🏽": [
+        "Daumen nach rechts: mittlere Hautfarbe"
+      ],
+      "🫺🏾": [
+        "Daumen nach rechts: mitteldunkle Hautfarbe"
+      ],
+      "🫺🏿": [
+        "Daumen nach rechts: dunkle Hautfarbe"
       ]
     },
     "en": {
@@ -24705,7 +24819,7 @@
         "flag: Hong Kong SAR China"
       ],
       "🇭🇲": [
-        "flag: Heard & McDonald Islands"
+        "flag: Heard Island & McDonald Islands"
       ],
       "🇭🇳": [
         "flag: Honduras"
@@ -25017,7 +25131,7 @@
         "flag: Singapore"
       ],
       "🇸🇭": [
-        "flag: St. Helena"
+        "flag: St. Helena, Ascension & Tristan da Cunha"
       ],
       "🇸🇮": [
         "flag: Slovenia"
@@ -25071,7 +25185,7 @@
         "flag: Chad"
       ],
       "🇹🇫": [
-        "flag: French Southern Territories"
+        "flag: French Southern and Antarctic Lands"
       ],
       "🇹🇬": [
         "flag: Togo"
@@ -31676,6 +31790,9 @@
       "🛘": [
         "landslide"
       ],
+      "🛙": [
+        "lighthouse"
+      ],
       "🛜": [
         "wireless"
       ],
@@ -34973,6 +35090,15 @@
       "🪊": [
         "trombone"
       ],
+      "🪋": [
+        "meteor"
+      ],
+      "🪌": [
+        "eraser"
+      ],
+      "🪍": [
+        "net with handle"
+      ],
       "🪎": [
         "treasure chest"
       ],
@@ -35192,6 +35318,9 @@
       "🫈": [
         "hairy creature"
       ],
+      "🫌": [
+        "monarch butterfly"
+      ],
       "🫍": [
         "orca"
       ],
@@ -35240,6 +35369,9 @@
       "🫜": [
         "root vegetable"
       ],
+      "🫝": [
+        "pickle"
+      ],
       "🫟": [
         "splatter"
       ],
@@ -35275,6 +35407,9 @@
       ],
       "🫪": [
         "distorted face"
+      ],
+      "🫫": [
+        "cracking face"
       ],
       "🫯": [
         "fight cloud"
@@ -35500,6 +35635,42 @@
       ],
       "🫸🏿": [
         "rightwards pushing hand: dark skin tone"
+      ],
+      "🫹": [
+        "leftwards thumb sign"
+      ],
+      "🫹🏻": [
+        "leftwards thumb sign: light skin tone"
+      ],
+      "🫹🏼": [
+        "leftwards thumb sign: medium-light skin tone"
+      ],
+      "🫹🏽": [
+        "leftwards thumb sign: medium skin tone"
+      ],
+      "🫹🏾": [
+        "leftwards thumb sign: medium-dark skin tone"
+      ],
+      "🫹🏿": [
+        "leftwards thumb sign: dark skin tone"
+      ],
+      "🫺": [
+        "rightwards thumb sign"
+      ],
+      "🫺🏻": [
+        "rightwards thumb sign: light skin tone"
+      ],
+      "🫺🏼": [
+        "rightwards thumb sign: medium-light skin tone"
+      ],
+      "🫺🏽": [
+        "rightwards thumb sign: medium skin tone"
+      ],
+      "🫺🏾": [
+        "rightwards thumb sign: medium-dark skin tone"
+      ],
+      "🫺🏿": [
+        "rightwards thumb sign: dark skin tone"
       ]
     },
     "es": {
@@ -35675,7 +35846,7 @@
         "muñeco de nieve con nieve"
       ],
       "☄️": [
-        "meteorito"
+        "cometa espacial"
       ],
       "☎️": [
         "teléfono"
@@ -43510,6 +43681,9 @@
       "🛘": [
         "desprendimiento"
       ],
+      "🛙": [
+        "faro"
+      ],
       "🛜": [
         "wifi"
       ],
@@ -46807,6 +46981,15 @@
       "🪊": [
         "trombón"
       ],
+      "🪋": [
+        "meteorito"
+      ],
+      "🪌": [
+        "goma de borrar"
+      ],
+      "🪍": [
+        "red con mango"
+      ],
       "🪎": [
         "cofre de tesoro"
       ],
@@ -47026,6 +47209,9 @@
       "🫈": [
         "criatura peluda"
       ],
+      "🫌": [
+        "mariposa monarca"
+      ],
       "🫍": [
         "orca"
       ],
@@ -47074,6 +47260,9 @@
       "🫜": [
         "túberculo comestible"
       ],
+      "🫝": [
+        "pepinillo"
+      ],
       "🫟": [
         "salpicadura"
       ],
@@ -47109,6 +47298,9 @@
       ],
       "🫪": [
         "cara deformada"
+      ],
+      "🫫": [
+        "cara resquebrajándose"
       ],
       "🫯": [
         "nube de pelea"
@@ -47334,6 +47526,42 @@
       ],
       "🫸🏿": [
         "mano empujando hacia la derecha: tono de piel oscuro"
+      ],
+      "🫹": [
+        "pulgar hacia la izquierda"
+      ],
+      "🫹🏻": [
+        "pulgar hacia la izquierda: tono de piel claro"
+      ],
+      "🫹🏼": [
+        "pulgar hacia la izquierda: tono de piel claro medio"
+      ],
+      "🫹🏽": [
+        "pulgar hacia la izquierda: tono de piel medio"
+      ],
+      "🫹🏾": [
+        "pulgar hacia la izquierda: tono de piel oscuro medio"
+      ],
+      "🫹🏿": [
+        "pulgar hacia la izquierda: tono de piel oscuro"
+      ],
+      "🫺": [
+        "pulgar hacia la derecha"
+      ],
+      "🫺🏻": [
+        "pulgar hacia la derecha: tono de piel claro"
+      ],
+      "🫺🏼": [
+        "pulgar hacia la derecha: tono de piel claro medio"
+      ],
+      "🫺🏽": [
+        "pulgar hacia la derecha: tono de piel medio"
+      ],
+      "🫺🏾": [
+        "pulgar hacia la derecha: tono de piel oscuro medio"
+      ],
+      "🫺🏿": [
+        "pulgar hacia la derecha: tono de piel oscuro"
       ]
     },
     "fr": {
@@ -55344,6 +55572,9 @@
       "🛘": [
         "éboulement"
       ],
+      "🛙": [
+        "phare"
+      ],
       "🛜": [
         "sans fil"
       ],
@@ -58641,6 +58872,15 @@
       "🪊": [
         "trombone à coulisse"
       ],
+      "🪋": [
+        "météorite"
+      ],
+      "🪌": [
+        "gomme"
+      ],
+      "🪍": [
+        "filet avec manche"
+      ],
       "🪎": [
         "coffre au trésor"
       ],
@@ -58860,6 +59100,9 @@
       "🫈": [
         "créature velue"
       ],
+      "🫌": [
+        "monarque"
+      ],
       "🫍": [
         "orque"
       ],
@@ -58908,6 +59151,9 @@
       "🫜": [
         "légume-racine"
       ],
+      "🫝": [
+        "cornichon"
+      ],
       "🫟": [
         "éclaboussure"
       ],
@@ -58943,6 +59189,9 @@
       ],
       "🫪": [
         "visage déformé"
+      ],
+      "🫫": [
+        "visage craquelé"
       ],
       "🫯": [
         "nuage de colère"
@@ -59168,6 +59417,42 @@
       ],
       "🫸🏿": [
         "main qui pousse vers la droite : peau foncée"
+      ],
+      "🫹": [
+        "pouce vers la gauche"
+      ],
+      "🫹🏻": [
+        "pouce vers la gauche : peau claire"
+      ],
+      "🫹🏼": [
+        "pouce vers la gauche : peau moyennement claire"
+      ],
+      "🫹🏽": [
+        "pouce vers la gauche : peau légèrement mate"
+      ],
+      "🫹🏾": [
+        "pouce vers la gauche : peau mate"
+      ],
+      "🫹🏿": [
+        "pouce vers la gauche : peau foncée"
+      ],
+      "🫺": [
+        "pouce vers la droite"
+      ],
+      "🫺🏻": [
+        "pouce vers la droite : peau claire"
+      ],
+      "🫺🏼": [
+        "pouce vers la droite : peau moyennement claire"
+      ],
+      "🫺🏽": [
+        "pouce vers la droite : peau légèrement mate"
+      ],
+      "🫺🏾": [
+        "pouce vers la droite : peau mate"
+      ],
+      "🫺🏿": [
+        "pouce vers la droite : peau foncée"
       ]
     },
     "id": {
@@ -59988,7 +60273,7 @@
         "bendera: Bermuda"
       ],
       "🇧🇳": [
-        "bendera: Brunei"
+        "bendera: Brunei Darussalam"
       ],
       "🇧🇴": [
         "bendera: Bolivia"
@@ -67178,6 +67463,9 @@
       "🛘": [
         "longsor"
       ],
+      "🛙": [
+        "mercusuar"
+      ],
       "🛜": [
         "nirkabel"
       ],
@@ -70475,6 +70763,15 @@
       "🪊": [
         "trombon"
       ],
+      "🪋": [
+        "meteor"
+      ],
+      "🪌": [
+        "penghapus"
+      ],
+      "🪍": [
+        "jaring dengan gagang"
+      ],
       "🪎": [
         "peti harta karun"
       ],
@@ -70694,6 +70991,9 @@
       "🫈": [
         "makhluk berbulu"
       ],
+      "🫌": [
+        "kupu-kupu raja"
+      ],
       "🫍": [
         "orca"
       ],
@@ -70742,6 +71042,9 @@
       "🫜": [
         "sayuran umbi"
       ],
+      "🫝": [
+        "acar ketimun"
+      ],
       "🫟": [
         "percikan"
       ],
@@ -70777,6 +71080,9 @@
       ],
       "🫪": [
         "wajah syok"
+      ],
+      "🫫": [
+        "wajah retak"
       ],
       "🫯": [
         "awan duel"
@@ -71002,6 +71308,42 @@
       ],
       "🫸🏿": [
         "tangan mendorong ke kanan: warna kulit gelap"
+      ],
+      "🫹": [
+        "isyarat jempol ke kiri"
+      ],
+      "🫹🏻": [
+        "isyarat jempol ke kiri: warna kulit cerah"
+      ],
+      "🫹🏼": [
+        "isyarat jempol ke kiri: warna kulit cerah-sedang"
+      ],
+      "🫹🏽": [
+        "isyarat jempol ke kiri: warna kulit sedang"
+      ],
+      "🫹🏾": [
+        "isyarat jempol ke kiri: warna kulit gelap-sedang"
+      ],
+      "🫹🏿": [
+        "isyarat jempol ke kiri: warna kulit gelap"
+      ],
+      "🫺": [
+        "isyarat jempol ke kanan"
+      ],
+      "🫺🏻": [
+        "isyarat jempol ke kanan: warna kulit cerah"
+      ],
+      "🫺🏼": [
+        "isyarat jempol ke kanan: warna kulit cerah-sedang"
+      ],
+      "🫺🏽": [
+        "isyarat jempol ke kanan: warna kulit sedang"
+      ],
+      "🫺🏾": [
+        "isyarat jempol ke kanan: warna kulit gelap-sedang"
+      ],
+      "🫺🏿": [
+        "isyarat jempol ke kanan: warna kulit gelap"
       ]
     },
     "it": {
@@ -71273,7 +71615,7 @@
         "Segno zodiacale dello Scorpione"
       ],
       "♐": [
-        "Segno zodiacale del Saggitario"
+        "Segno zodiacale del Sagittario"
       ],
       "♑": [
         "Segno zodiacale del Capricorno"
@@ -77360,7 +77702,7 @@
         "pulsante di ripetizione della riproduzione"
       ],
       "🔂": [
-        "pulsante di ripetizione della riproduzione di una traccia"
+        "pulsante di ripetizione di una traccia"
       ],
       "🔃": [
         "frecce verticali che ruotano in senso orario"
@@ -79011,6 +79353,9 @@
       ],
       "🛘": [
         "frana"
+      ],
+      "🛙": [
+        "faro"
       ],
       "🛜": [
         "wireless"
@@ -82309,6 +82654,15 @@
       "🪊": [
         "trombone"
       ],
+      "🪋": [
+        "meteora"
+      ],
+      "🪌": [
+        "gomma per cancellare"
+      ],
+      "🪍": [
+        "retino"
+      ],
       "🪎": [
         "forziere"
       ],
@@ -82316,7 +82670,7 @@
         "vanga"
       ],
       "🪐": [
-        "pianeta con satellite"
+        "pianeta con anelli"
       ],
       "🪑": [
         "sedia"
@@ -82528,6 +82882,9 @@
       "🫈": [
         "creatura pelosa"
       ],
+      "🫌": [
+        "farfalla monarca"
+      ],
       "🫍": [
         "orca"
       ],
@@ -82576,6 +82933,9 @@
       "🫜": [
         "ortaggio da radice"
       ],
+      "🫝": [
+        "sottaceto"
+      ],
       "🫟": [
         "spruzzo"
       ],
@@ -82611,6 +82971,9 @@
       ],
       "🫪": [
         "faccina stravolta"
+      ],
+      "🫫": [
+        "faccia screpolata"
       ],
       "🫯": [
         "nuvoletta di zuffa"
@@ -82836,6 +83199,42 @@
       ],
       "🫸🏿": [
         "mano che spinge a destra: carnagione scura"
+      ],
+      "🫹": [
+        "segno del pollice a sinistra"
+      ],
+      "🫹🏻": [
+        "segno del pollice a sinistra: carnagione chiara"
+      ],
+      "🫹🏼": [
+        "segno del pollice a sinistra: carnagione abbastanza chiara"
+      ],
+      "🫹🏽": [
+        "segno del pollice a sinistra: carnagione olivastra"
+      ],
+      "🫹🏾": [
+        "segno del pollice a sinistra: carnagione abbastanza scura"
+      ],
+      "🫹🏿": [
+        "segno del pollice a sinistra: carnagione scura"
+      ],
+      "🫺": [
+        "segno del pollice a destra"
+      ],
+      "🫺🏻": [
+        "segno del pollice a destra: carnagione chiara"
+      ],
+      "🫺🏼": [
+        "segno del pollice a destra: carnagione abbastanza chiara"
+      ],
+      "🫺🏽": [
+        "segno del pollice a destra: carnagione olivastra"
+      ],
+      "🫺🏾": [
+        "segno del pollice a destra: carnagione abbastanza scura"
+      ],
+      "🫺🏿": [
+        "segno del pollice a destra: carnagione scura"
       ]
     },
     "ja": {
@@ -90846,6 +91245,9 @@
       "🛘": [
         "地滑り"
       ],
+      "🛙": [
+        "灯台"
+      ],
       "🛜": [
         "Wi-Fi"
       ],
@@ -94143,6 +94545,15 @@
       "🪊": [
         "トロンボーン"
       ],
+      "🪋": [
+        "隕石"
+      ],
+      "🪌": [
+        "消しゴム"
+      ],
+      "🪍": [
+        "虫取り網"
+      ],
       "🪎": [
         "宝箱"
       ],
@@ -94362,6 +94773,9 @@
       "🫈": [
         "毛むくじゃらの生物"
       ],
+      "🫌": [
+        "オオカバマダラ"
+      ],
       "🫍": [
         "シャチ"
       ],
@@ -94410,6 +94824,9 @@
       "🫜": [
         "根菜"
       ],
+      "🫝": [
+        "ピクルス"
+      ],
       "🫟": [
         "飛び散ったペンキ"
       ],
@@ -94445,6 +94862,9 @@
       ],
       "🫪": [
         "ゆがんだ顔"
+      ],
+      "🫫": [
+        "ひび割れた顔"
       ],
       "🫯": [
         "ボカスカ"
@@ -94670,6 +95090,42 @@
       ],
       "🫸🏿": [
         "右向きに押している手: 濃い肌色"
+      ],
+      "🫹": [
+        "左向きの親指"
+      ],
+      "🫹🏻": [
+        "左向きの親指: 薄い肌色"
+      ],
+      "🫹🏼": [
+        "左向きの親指: やや薄い肌色"
+      ],
+      "🫹🏽": [
+        "左向きの親指: 中間の肌色"
+      ],
+      "🫹🏾": [
+        "左向きの親指: やや濃い肌色"
+      ],
+      "🫹🏿": [
+        "左向きの親指: 濃い肌色"
+      ],
+      "🫺": [
+        "右向きの親指"
+      ],
+      "🫺🏻": [
+        "右向きの親指: 薄い肌色"
+      ],
+      "🫺🏼": [
+        "右向きの親指: やや薄い肌色"
+      ],
+      "🫺🏽": [
+        "右向きの親指: 中間の肌色"
+      ],
+      "🫺🏾": [
+        "右向きの親指: やや濃い肌色"
+      ],
+      "🫺🏿": [
+        "右向きの親指: 濃い肌色"
       ]
     },
     "ko": {
@@ -102680,6 +103136,9 @@
       "🛘": [
         "산사태"
       ],
+      "🛙": [
+        "등대"
+      ],
       "🛜": [
         "무선"
       ],
@@ -105977,6 +106436,15 @@
       "🪊": [
         "트롬본"
       ],
+      "🪋": [
+        "유성"
+      ],
+      "🪌": [
+        "지우개"
+      ],
+      "🪍": [
+        "잠자리채"
+      ],
       "🪎": [
         "보물 상자"
       ],
@@ -106196,6 +106664,9 @@
       "🫈": [
         "털복숭이"
       ],
+      "🫌": [
+        "제왕나비"
+      ],
       "🫍": [
         "범고래"
       ],
@@ -106244,6 +106715,9 @@
       "🫜": [
         "뿌리채소"
       ],
+      "🫝": [
+        "피클"
+      ],
       "🫟": [
         "튀어오른 액체"
       ],
@@ -106279,6 +106753,9 @@
       ],
       "🫪": [
         "왜곡된 얼굴"
+      ],
+      "🫫": [
+        "금이 간 얼굴"
       ],
       "🫯": [
         "싸움 구름"
@@ -106504,6 +106981,42 @@
       ],
       "🫸🏿": [
         "오른쪽으로 밀치는 손: 검은색 피부"
+      ],
+      "🫹": [
+        "왼쪽을 향한 엄지"
+      ],
+      "🫹🏻": [
+        "왼쪽을 향한 엄지: 하얀 피부"
+      ],
+      "🫹🏼": [
+        "왼쪽을 향한 엄지: 연한 갈색 피부"
+      ],
+      "🫹🏽": [
+        "왼쪽을 향한 엄지: 갈색 피부"
+      ],
+      "🫹🏾": [
+        "왼쪽을 향한 엄지: 진한 갈색 피부"
+      ],
+      "🫹🏿": [
+        "왼쪽을 향한 엄지: 검은색 피부"
+      ],
+      "🫺": [
+        "오른쪽을 향한 엄지"
+      ],
+      "🫺🏻": [
+        "오른쪽을 향한 엄지: 하얀 피부"
+      ],
+      "🫺🏼": [
+        "오른쪽을 향한 엄지: 연한 갈색 피부"
+      ],
+      "🫺🏽": [
+        "오른쪽을 향한 엄지: 갈색 피부"
+      ],
+      "🫺🏾": [
+        "오른쪽을 향한 엄지: 진한 갈색 피부"
+      ],
+      "🫺🏿": [
+        "오른쪽을 향한 엄지: 검은색 피부"
       ]
     },
     "nl": {
@@ -113408,7 +113921,7 @@
         "grijnzend gezicht met zweetdruppels"
       ],
       "😆": [
-        "grijnzend gezicht met stijf dichtgeknepen ogen"
+        "grijnzend gezicht met dichtgeknepen ogen"
       ],
       "😇": [
         "lachend gezicht met halo"
@@ -114513,6 +115026,9 @@
       ],
       "🛘": [
         "aardverschuiving"
+      ],
+      "🛙": [
+        "vuurtoren"
       ],
       "🛜": [
         "draadloos"
@@ -117811,6 +118327,15 @@
       "🪊": [
         "trombone"
       ],
+      "🪋": [
+        "meteoor"
+      ],
+      "🪌": [
+        "gum"
+      ],
+      "🪍": [
+        "net met steel"
+      ],
       "🪎": [
         "schatkist"
       ],
@@ -118030,6 +118555,9 @@
       "🫈": [
         "harig wezen"
       ],
+      "🫌": [
+        "monarchvlinder"
+      ],
       "🫍": [
         "orka"
       ],
@@ -118078,6 +118606,9 @@
       "🫜": [
         "knol"
       ],
+      "🫝": [
+        "augurk"
+      ],
       "🫟": [
         "Gespat"
       ],
@@ -118113,6 +118644,9 @@
       ],
       "🫪": [
         "verwrongen gezicht"
+      ],
+      "🫫": [
+        "barstend gezicht"
       ],
       "🫯": [
         "vechtwolk"
@@ -118338,6 +118872,42 @@
       ],
       "🫸🏿": [
         "hand die naar rechts duwt: donkere huidskleur"
+      ],
+      "🫹": [
+        "duim naar links"
+      ],
+      "🫹🏻": [
+        "duim naar links: lichte huidskleur"
+      ],
+      "🫹🏼": [
+        "duim naar links: lichtgetinte huidskleur"
+      ],
+      "🫹🏽": [
+        "duim naar links: getinte huidskleur"
+      ],
+      "🫹🏾": [
+        "duim naar links: donkergetinte huidskleur"
+      ],
+      "🫹🏿": [
+        "duim naar links: donkere huidskleur"
+      ],
+      "🫺": [
+        "duim naar rechts"
+      ],
+      "🫺🏻": [
+        "duim naar rechts: lichte huidskleur"
+      ],
+      "🫺🏼": [
+        "duim naar rechts: lichtgetinte huidskleur"
+      ],
+      "🫺🏽": [
+        "duim naar rechts: getinte huidskleur"
+      ],
+      "🫺🏾": [
+        "duim naar rechts: donkergetinte huidskleur"
+      ],
+      "🫺🏿": [
+        "duim naar rechts: donkere huidskleur"
       ]
     },
     "pt-BR": {
@@ -120013,7 +120583,7 @@
         "nuvem com neve"
       ],
       "🌩️": [
-        "nuvem com trovão"
+        "nuvem com relâmpago"
       ],
       "🌪️": [
         "tornado"
@@ -126348,6 +126918,9 @@
       "🛘": [
         "deslizamento"
       ],
+      "🛙": [
+        "farol"
+      ],
       "🛜": [
         "sem fio"
       ],
@@ -129645,6 +130218,15 @@
       "🪊": [
         "trombone"
       ],
+      "🪋": [
+        "meteoro"
+      ],
+      "🪌": [
+        "borracha"
+      ],
+      "🪍": [
+        "rede com cabo"
+      ],
       "🪎": [
         "baú de tesouro"
       ],
@@ -129864,6 +130446,9 @@
       "🫈": [
         "criatura peluda"
       ],
+      "🫌": [
+        "borboleta-monarca"
+      ],
       "🫍": [
         "orca"
       ],
@@ -129912,6 +130497,9 @@
       "🫜": [
         "tubérculo"
       ],
+      "🫝": [
+        "picles"
+      ],
       "🫟": [
         "respingo"
       ],
@@ -129947,6 +130535,9 @@
       ],
       "🫪": [
         "rosto distorcido"
+      ],
+      "🫫": [
+        "rosto rachando"
       ],
       "🫯": [
         "nuvem de briga"
@@ -130172,6 +130763,42 @@
       ],
       "🫸🏿": [
         "mão empurrando para a direita: pele escura"
+      ],
+      "🫹": [
+        "sinal de polegar para a esquerda"
+      ],
+      "🫹🏻": [
+        "sinal de polegar para a esquerda: pele clara"
+      ],
+      "🫹🏼": [
+        "sinal de polegar para a esquerda: pele morena clara"
+      ],
+      "🫹🏽": [
+        "sinal de polegar para a esquerda: pele morena"
+      ],
+      "🫹🏾": [
+        "sinal de polegar para a esquerda: pele morena escura"
+      ],
+      "🫹🏿": [
+        "sinal de polegar para a esquerda: pele escura"
+      ],
+      "🫺": [
+        "sinal de polegar para a direita"
+      ],
+      "🫺🏻": [
+        "sinal de polegar para a direita: pele clara"
+      ],
+      "🫺🏼": [
+        "sinal de polegar para a direita: pele morena clara"
+      ],
+      "🫺🏽": [
+        "sinal de polegar para a direita: pele morena"
+      ],
+      "🫺🏾": [
+        "sinal de polegar para a direita: pele morena escura"
+      ],
+      "🫺🏿": [
+        "sinal de polegar para a direita: pele escura"
       ]
     },
     "ru": {
@@ -138182,6 +138809,9 @@
       "🛘": [
         "оползень"
       ],
+      "🛙": [
+        "маяк"
+      ],
       "🛜": [
         "беспроводная сеть"
       ],
@@ -141479,6 +142109,15 @@
       "🪊": [
         "тромбон"
       ],
+      "🪋": [
+        "метеорит"
+      ],
+      "🪌": [
+        "ластик"
+      ],
+      "🪍": [
+        "сачок"
+      ],
       "🪎": [
         "сундук с сокровищами"
       ],
@@ -141698,6 +142337,9 @@
       "🫈": [
         "снежный человек"
       ],
+      "🫌": [
+        "бабочка-монарх"
+      ],
       "🫍": [
         "косатка"
       ],
@@ -141746,6 +142388,9 @@
       "🫜": [
         "корнеплод"
       ],
+      "🫝": [
+        "маринованный огурец"
+      ],
       "🫟": [
         "клякса"
       ],
@@ -141781,6 +142426,9 @@
       ],
       "🫪": [
         "лицо перекосило"
+      ],
+      "🫫": [
+        "трескается"
       ],
       "🫯": [
         "драка"
@@ -142006,6 +142654,42 @@
       ],
       "🫸🏿": [
         "рука ладонью вправо: очень темный тон кожи"
+      ],
+      "🫹": [
+        "большой палец влево"
+      ],
+      "🫹🏻": [
+        "большой палец влево: очень светлый тон кожи"
+      ],
+      "🫹🏼": [
+        "большой палец влево: светлый тон кожи"
+      ],
+      "🫹🏽": [
+        "большой палец влево: средний тон кожи"
+      ],
+      "🫹🏾": [
+        "большой палец влево: темный тон кожи"
+      ],
+      "🫹🏿": [
+        "большой палец влево: очень темный тон кожи"
+      ],
+      "🫺": [
+        "большой палец вправо"
+      ],
+      "🫺🏻": [
+        "большой палец вправо: очень светлый тон кожи"
+      ],
+      "🫺🏼": [
+        "большой палец вправо: светлый тон кожи"
+      ],
+      "🫺🏽": [
+        "большой палец вправо: средний тон кожи"
+      ],
+      "🫺🏾": [
+        "большой палец вправо: темный тон кожи"
+      ],
+      "🫺🏿": [
+        "большой палец вправо: очень темный тон кожи"
       ]
     },
     "th": {
@@ -150016,6 +150700,9 @@
       "🛘": [
         "ดินถล่ม"
       ],
+      "🛙": [
+        "ประภาคาร"
+      ],
       "🛜": [
         "ไร้สาย"
       ],
@@ -153313,6 +154000,15 @@
       "🪊": [
         "ทรอมโบน"
       ],
+      "🪋": [
+        "อุกกาบาต"
+      ],
+      "🪌": [
+        "ยางลบ"
+      ],
+      "🪍": [
+        "กระชอนถุงตาข่าย"
+      ],
       "🪎": [
         "หีบสมบัติ"
       ],
@@ -153532,6 +154228,9 @@
       "🫈": [
         "สิ่งมีชีวิตขนยาว"
       ],
+      "🫌": [
+        "ผีเสื้อจักรพรรดิ"
+      ],
       "🫍": [
         "วาฬออร์กา"
       ],
@@ -153580,6 +154279,9 @@
       "🫜": [
         "พืชหัว"
       ],
+      "🫝": [
+        "แตงกวาดอง"
+      ],
       "🫟": [
         "กระเด็น"
       ],
@@ -153615,6 +154317,9 @@
       ],
       "🫪": [
         "หน้าบิดเบี้ยว"
+      ],
+      "🫫": [
+        "หน้าแตก"
       ],
       "🫯": [
         "ก้อนเมฆต่อสู้"
@@ -153840,6 +154545,42 @@
       ],
       "🫸🏿": [
         "มือผลักไปทางขวา: โทนผิวสีเข้ม"
+      ],
+      "🫹": [
+        "ชี้นิ้วโป้งไปด้านซ้าย"
+      ],
+      "🫹🏻": [
+        "ชี้นิ้วโป้งไปด้านซ้าย: โทนผิวสีขาว"
+      ],
+      "🫹🏼": [
+        "ชี้นิ้วโป้งไปด้านซ้าย: โทนผิวสีขาวเหลือง"
+      ],
+      "🫹🏽": [
+        "ชี้นิ้วโป้งไปด้านซ้าย: โทนผิวสีเหลือง"
+      ],
+      "🫹🏾": [
+        "ชี้นิ้วโป้งไปด้านซ้าย: โทนผิวสีแทน"
+      ],
+      "🫹🏿": [
+        "ชี้นิ้วโป้งไปด้านซ้าย: โทนผิวสีเข้ม"
+      ],
+      "🫺": [
+        "ชี้นิ้วโป้งไปด้านขวา"
+      ],
+      "🫺🏻": [
+        "ชี้นิ้วโป้งไปด้านขวา: โทนผิวสีขาว"
+      ],
+      "🫺🏼": [
+        "ชี้นิ้วโป้งไปด้านขวา: โทนผิวสีขาวเหลือง"
+      ],
+      "🫺🏽": [
+        "ชี้นิ้วโป้งไปด้านขวา: โทนผิวสีเหลือง"
+      ],
+      "🫺🏾": [
+        "ชี้นิ้วโป้งไปด้านขวา: โทนผิวสีแทน"
+      ],
+      "🫺🏿": [
+        "ชี้นิ้วโป้งไปด้านขวา: โทนผิวสีเข้ม"
       ]
     },
     "tr": {
@@ -161850,6 +162591,9 @@
       "🛘": [
         "heyelan"
       ],
+      "🛙": [
+        "deniz feneri"
+      ],
       "🛜": [
         "kablosuz"
       ],
@@ -165147,6 +165891,15 @@
       "🪊": [
         "trombon"
       ],
+      "🪋": [
+        "gök taşı"
+      ],
+      "🪌": [
+        "silgi"
+      ],
+      "🪍": [
+        "kelebek ağı"
+      ],
       "🪎": [
         "hazine sandığı"
       ],
@@ -165366,6 +166119,9 @@
       "🫈": [
         "tüylü yaratık"
       ],
+      "🫌": [
+        "kral kelebeği"
+      ],
       "🫍": [
         "orka"
       ],
@@ -165414,6 +166170,9 @@
       "🫜": [
         "kök sebze"
       ],
+      "🫝": [
+        "turşu"
+      ],
       "🫟": [
         "sıçratma"
       ],
@@ -165449,6 +166208,9 @@
       ],
       "🫪": [
         "biçimsiz yüz"
+      ],
+      "🫫": [
+        "çatlayan yüz"
       ],
       "🫯": [
         "dövüş bulutu"
@@ -165674,6 +166436,42 @@
       ],
       "🫸🏿": [
         "sağa iten el: koyu cilt tonu"
+      ],
+      "🫹": [
+        "baş parmak solda"
+      ],
+      "🫹🏻": [
+        "baş parmak solda: açık cilt tonu"
+      ],
+      "🫹🏼": [
+        "baş parmak solda: orta açık cilt tonu"
+      ],
+      "🫹🏽": [
+        "baş parmak solda: orta cilt tonu"
+      ],
+      "🫹🏾": [
+        "baş parmak solda: orta koyu cilt tonu"
+      ],
+      "🫹🏿": [
+        "baş parmak solda: koyu cilt tonu"
+      ],
+      "🫺": [
+        "başparmak sağda"
+      ],
+      "🫺🏻": [
+        "başparmak sağda: açık cilt tonu"
+      ],
+      "🫺🏼": [
+        "başparmak sağda: orta açık cilt tonu"
+      ],
+      "🫺🏽": [
+        "başparmak sağda: orta cilt tonu"
+      ],
+      "🫺🏾": [
+        "başparmak sağda: orta koyu cilt tonu"
+      ],
+      "🫺🏿": [
+        "başparmak sağda: koyu cilt tonu"
       ]
     },
     "vi": {
@@ -173684,6 +174482,9 @@
       "🛘": [
         "lở đất"
       ],
+      "🛙": [
+        "hải đăng"
+      ],
       "🛜": [
         "không dây"
       ],
@@ -176981,6 +177782,15 @@
       "🪊": [
         "kèn trombone"
       ],
+      "🪋": [
+        "thiên thạch"
+      ],
+      "🪌": [
+        "cục tẩy"
+      ],
+      "🪍": [
+        "vợt bắt côn trùng"
+      ],
       "🪎": [
         "rương báu"
       ],
@@ -177200,6 +178010,9 @@
       "🫈": [
         "sinh vật nhiều lông"
       ],
+      "🫌": [
+        "bướm chúa"
+      ],
       "🫍": [
         "cá voi sát thủ"
       ],
@@ -177248,6 +178061,9 @@
       "🫜": [
         "rau củ"
       ],
+      "🫝": [
+        "dưa muối"
+      ],
       "🫟": [
         "bắn tung tóe"
       ],
@@ -177283,6 +178099,9 @@
       ],
       "🫪": [
         "mặt méo"
+      ],
+      "🫫": [
+        "mặt rạn nứt"
       ],
       "🫯": [
         "đám mây chiến đấu"
@@ -177508,6 +178327,42 @@
       ],
       "🫸🏿": [
         "bàn tay đẩy sang phải: màu da tối"
+      ],
+      "🫹": [
+        "biểu tượng ngón tay cái chỉ sang trái"
+      ],
+      "🫹🏻": [
+        "biểu tượng ngón tay cái chỉ sang trái: màu da sáng"
+      ],
+      "🫹🏼": [
+        "biểu tượng ngón tay cái chỉ sang trái: màu da sáng trung bình"
+      ],
+      "🫹🏽": [
+        "biểu tượng ngón tay cái chỉ sang trái: màu da trung bình"
+      ],
+      "🫹🏾": [
+        "biểu tượng ngón tay cái chỉ sang trái: màu da tối trung bình"
+      ],
+      "🫹🏿": [
+        "biểu tượng ngón tay cái chỉ sang trái: màu da tối"
+      ],
+      "🫺": [
+        "biểu tượng ngón tay cái chỉ sang phải"
+      ],
+      "🫺🏻": [
+        "biểu tượng ngón tay cái chỉ sang phải: màu da sáng"
+      ],
+      "🫺🏼": [
+        "biểu tượng ngón tay cái chỉ sang phải: màu da sáng trung bình"
+      ],
+      "🫺🏽": [
+        "biểu tượng ngón tay cái chỉ sang phải: màu da trung bình"
+      ],
+      "🫺🏾": [
+        "biểu tượng ngón tay cái chỉ sang phải: màu da tối trung bình"
+      ],
+      "🫺🏿": [
+        "biểu tượng ngón tay cái chỉ sang phải: màu da tối"
       ]
     },
     "zh-Hans": {
@@ -180050,7 +180905,7 @@
         "沙滩伞"
       ],
       "🏗️": [
-        "施工"
+        "建筑施工"
       ],
       "🏘️": [
         "房屋建筑"
@@ -184478,7 +185333,7 @@
         "吐舌"
       ],
       "😜": [
-        "单眼吐舌"
+        "眨眼吐舌"
       ],
       "😝": [
         "眯眼吐舌"
@@ -185153,7 +186008,7 @@
         "纵向的红绿灯"
       ],
       "🚧": [
-        "路障"
+        "施工"
       ],
       "🚨": [
         "警车灯"
@@ -185517,6 +186372,9 @@
       ],
       "🛘": [
         "山体滑坡"
+      ],
+      "🛙": [
+        "灯塔"
       ],
       "🛜": [
         "无线"
@@ -188815,6 +189673,15 @@
       "🪊": [
         "长号"
       ],
+      "🪋": [
+        "陨石"
+      ],
+      "🪌": [
+        "橡皮擦"
+      ],
+      "🪍": [
+        "抄网"
+      ],
       "🪎": [
         "宝箱"
       ],
@@ -189034,6 +189901,9 @@
       "🫈": [
         "毛怪"
       ],
+      "🫌": [
+        "帝王蝶"
+      ],
       "🫍": [
         "虎鲸"
       ],
@@ -189082,6 +189952,9 @@
       "🫜": [
         "根菜"
       ],
+      "🫝": [
+        "酸黄瓜"
+      ],
       "🫟": [
         "泼溅"
       ],
@@ -189117,6 +189990,9 @@
       ],
       "🫪": [
         "变形的脸"
+      ],
+      "🫫": [
+        "裂开"
       ],
       "🫯": [
         "打斗云团"
@@ -189342,6 +190218,42 @@
       ],
       "🫸🏿": [
         "向右推: 较深肤色"
+      ],
+      "🫹": [
+        "拇指左指"
+      ],
+      "🫹🏻": [
+        "拇指左指: 较浅肤色"
+      ],
+      "🫹🏼": [
+        "拇指左指: 中等-浅肤色"
+      ],
+      "🫹🏽": [
+        "拇指左指: 中等肤色"
+      ],
+      "🫹🏾": [
+        "拇指左指: 中等-深肤色"
+      ],
+      "🫹🏿": [
+        "拇指左指: 较深肤色"
+      ],
+      "🫺": [
+        "拇指右指"
+      ],
+      "🫺🏻": [
+        "拇指右指: 较浅肤色"
+      ],
+      "🫺🏼": [
+        "拇指右指: 中等-浅肤色"
+      ],
+      "🫺🏽": [
+        "拇指右指: 中等肤色"
+      ],
+      "🫺🏾": [
+        "拇指右指: 中等-深肤色"
+      ],
+      "🫺🏿": [
+        "拇指右指: 较深肤色"
       ]
     },
     "zh-Hant": {
@@ -197352,6 +198264,9 @@
       "🛘": [
         "山崩"
       ],
+      "🛙": [
+        "燈塔"
+      ],
       "🛜": [
         "無線"
       ],
@@ -200649,6 +201564,15 @@
       "🪊": [
         "長號"
       ],
+      "🪋": [
+        "隕星"
+      ],
+      "🪌": [
+        "橡皮擦"
+      ],
+      "🪍": [
+        "帶柄的網子"
+      ],
       "🪎": [
         "藏寶箱"
       ],
@@ -200868,6 +201792,9 @@
       "🫈": [
         "毛怪"
       ],
+      "🫌": [
+        "帝王斑蝶"
+      ],
       "🫍": [
         "虎鯨"
       ],
@@ -200916,6 +201843,9 @@
       "🫜": [
         "根莖類蔬菜"
       ],
+      "🫝": [
+        "醃黃瓜"
+      ],
       "🫟": [
         "潑濺"
       ],
@@ -200951,6 +201881,9 @@
       ],
       "🫪": [
         "變形的臉"
+      ],
+      "🫫": [
+        "裂開的臉"
       ],
       "🫯": [
         "打鬥的雲"
@@ -201176,13 +202109,49 @@
       ],
       "🫸🏿": [
         "手向右推：黑皮膚"
+      ],
+      "🫹": [
+        "拇指向左指"
+      ],
+      "🫹🏻": [
+        "拇指向左指：白皮膚"
+      ],
+      "🫹🏼": [
+        "拇指向左指：黃皮膚"
+      ],
+      "🫹🏽": [
+        "拇指向左指：淺褐皮膚"
+      ],
+      "🫹🏾": [
+        "拇指向左指：褐皮膚"
+      ],
+      "🫹🏿": [
+        "拇指向左指：黑皮膚"
+      ],
+      "🫺": [
+        "拇指向右指"
+      ],
+      "🫺🏻": [
+        "拇指向右指：白皮膚"
+      ],
+      "🫺🏼": [
+        "拇指向右指：黃皮膚"
+      ],
+      "🫺🏽": [
+        "拇指向右指：淺褐皮膚"
+      ],
+      "🫺🏾": [
+        "拇指向右指：褐皮膚"
+      ],
+      "🫺🏿": [
+        "拇指向右指：黑皮膚"
       ]
     }
   },
-  "cldrRevision": "91c267402229a59e3ef2774544f001bf959e8809",
-  "cldrVersion": "48.2",
-  "emojiTestRevision": "c0bada0f0e1e05eda345652bd01af16750a54297",
-  "emojiVersion": "17.0",
+  "cldrRevision": "a4b67247b446fd51b475991017a2481911210c60",
+  "cldrVersion": "49.0",
+  "emojiTestRevision": "6e25b6181e50d52c0f4669956f014c395f3510b9",
+  "emojiVersion": "18.0",
   "fallbackLanguage": "en",
   "languages": {
     "ar": {
@@ -202927,7 +203896,14 @@
         "قلب"
       ],
       "❤️‍🩹": [
-        "قلب يتعافى"
+        "قلب يتعافى",
+        "إسترداد الصحة",
+        "استشفاء",
+        "تحسن",
+        "تماثل للشفاء",
+        "صحة أفضل",
+        "قلب",
+        "يتعافى"
       ],
       "➕": [
         "علامة جمع",
@@ -204414,21 +205390,15 @@
       ],
       "🌈": [
         "ألوان الطيف",
-        "إل جي بي تي",
         "الوان الطيف",
         "انعكاس الضوء",
         "انكسار الضوء",
-        "ثنائي الميول",
+        "تدبّر",
+        "تفكّر",
         "طبيعة",
         "طقس",
-        "قوس الرحمة",
+        "قوس الله",
         "قوس قزح",
-        "متحول",
-        "مثلي",
-        "مثليات",
-        "مثلية",
-        "مثليين",
-        "مسيرة الفخر",
         "مطر"
       ],
       "🌉": [
@@ -205838,7 +206808,7 @@
         "صوت",
         "طرب",
         "غناء",
-        "كاراوكي",
+        "كاريوكي",
         "مايك",
         "موسيقى"
       ],
@@ -208028,7 +208998,8 @@
         "خيل",
         "ركوب",
         "سباق",
-        "سبق احضنة",
+        "سباق أحصنة",
+        "فرس",
         "مزرعة"
       ],
       "🐏": [
@@ -208098,6 +209069,7 @@
       ],
       "🐕": [
         "كلب",
+        "أليف",
         "اليف",
         "حيوان",
         "مزرعة"
@@ -208368,6 +209340,7 @@
       ],
       "🐱": [
         "وجه قطة",
+        "أليف",
         "اليف",
         "بسة",
         "بيسة",
@@ -208426,6 +209399,7 @@
       ],
       "🐶": [
         "وجه كلب",
+        "أليف",
         "اليف",
         "حيوان",
         "كلب",
@@ -211010,6 +211984,7 @@
       "👨🏻‍🤝‍👨🏼": [
         "رجلان يمسكان بيد بعضهما: بشرة بلون فاتح وبشرة بلون فاتح ومعتدل",
         "أخ",
+        "أخلاء",
         "أصدقاء",
         "إخوة",
         "بشرة بلون فاتح",
@@ -211018,13 +211993,13 @@
         "ثنائي",
         "رجل",
         "رجلان",
-        "زوج",
         "صديق",
         "يد بيد"
       ],
       "👨🏻‍🤝‍👨🏽": [
         "رجلان يمسكان بيد بعضهما: بشرة بلون فاتح وبشرة بلون معتدل",
         "أخ",
+        "أخلاء",
         "أصدقاء",
         "إخوة",
         "بشرة بلون فاتح",
@@ -211033,13 +212008,13 @@
         "ثنائي",
         "رجل",
         "رجلان",
-        "زوج",
         "صديق",
         "يد بيد"
       ],
       "👨🏻‍🤝‍👨🏾": [
         "رجلان يمسكان بيد بعضهما: بشرة بلون فاتح وبشرة بلون معتدل مائل للغامق",
         "أخ",
+        "أخلاء",
         "أصدقاء",
         "إخوة",
         "بشرة بلون فاتح",
@@ -211048,13 +212023,13 @@
         "ثنائي",
         "رجل",
         "رجلان",
-        "زوج",
         "صديق",
         "يد بيد"
       ],
       "👨🏻‍🤝‍👨🏿": [
         "رجلان يمسكان بيد بعضهما: بشرة بلون فاتح وبشرة بلون غامق",
         "أخ",
+        "أخلاء",
         "أصدقاء",
         "إخوة",
         "بشرة بلون غامق",
@@ -211063,7 +212038,6 @@
         "ثنائي",
         "رجل",
         "رجلان",
-        "زوج",
         "صديق",
         "يد بيد"
       ],
@@ -211734,6 +212708,7 @@
       "👨🏼‍🤝‍👨🏻": [
         "رجلان يمسكان بيد بعضهما: بشرة بلون فاتح ومعتدل وبشرة بلون فاتح",
         "أخ",
+        "أخلاء",
         "أصدقاء",
         "إخوة",
         "بشرة بلون فاتح",
@@ -211742,13 +212717,13 @@
         "ثنائي",
         "رجل",
         "رجلان",
-        "زوج",
         "صديق",
         "يد بيد"
       ],
       "👨🏼‍🤝‍👨🏽": [
         "رجلان يمسكان بيد بعضهما: بشرة بلون فاتح ومعتدل وبشرة بلون معتدل",
         "أخ",
+        "أخلاء",
         "أصدقاء",
         "إخوة",
         "بشرة بلون فاتح ومعتدل",
@@ -211757,13 +212732,13 @@
         "ثنائي",
         "رجل",
         "رجلان",
-        "زوج",
         "صديق",
         "يد بيد"
       ],
       "👨🏼‍🤝‍👨🏾": [
         "رجلان يمسكان بيد بعضهما: بشرة بلون فاتح ومعتدل وبشرة بلون معتدل مائل للغامق",
         "أخ",
+        "أخلاء",
         "أصدقاء",
         "إخوة",
         "بشرة بلون فاتح ومعتدل",
@@ -211772,13 +212747,13 @@
         "ثنائي",
         "رجل",
         "رجلان",
-        "زوج",
         "صديق",
         "يد بيد"
       ],
       "👨🏼‍🤝‍👨🏿": [
         "رجلان يمسكان بيد بعضهما: بشرة بلون فاتح ومعتدل وبشرة بلون غامق",
         "أخ",
+        "أخلاء",
         "أصدقاء",
         "إخوة",
         "بشرة بلون غامق",
@@ -211787,7 +212762,6 @@
         "ثنائي",
         "رجل",
         "رجلان",
-        "زوج",
         "صديق",
         "يد بيد"
       ],
@@ -212458,6 +213432,7 @@
       "👨🏽‍🤝‍👨🏻": [
         "رجلان يمسكان بيد بعضهما: بشرة بلون معتدل وبشرة بلون فاتح",
         "أخ",
+        "أخلاء",
         "أصدقاء",
         "إخوة",
         "بشرة بلون فاتح",
@@ -212466,13 +213441,13 @@
         "ثنائي",
         "رجل",
         "رجلان",
-        "زوج",
         "صديق",
         "يد بيد"
       ],
       "👨🏽‍🤝‍👨🏼": [
         "رجلان يمسكان بيد بعضهما: بشرة بلون معتدل وبشرة بلون فاتح ومعتدل",
         "أخ",
+        "أخلاء",
         "أصدقاء",
         "إخوة",
         "بشرة بلون فاتح ومعتدل",
@@ -212481,13 +213456,13 @@
         "ثنائي",
         "رجل",
         "رجلان",
-        "زوج",
         "صديق",
         "يد بيد"
       ],
       "👨🏽‍🤝‍👨🏾": [
         "رجلان يمسكان بيد بعضهما: بشرة بلون معتدل وبشرة بلون معتدل مائل للغامق",
         "أخ",
+        "أخلاء",
         "أصدقاء",
         "إخوة",
         "بشرة بلون معتدل",
@@ -212496,13 +213471,13 @@
         "ثنائي",
         "رجل",
         "رجلان",
-        "زوج",
         "صديق",
         "يد بيد"
       ],
       "👨🏽‍🤝‍👨🏿": [
         "رجلان يمسكان بيد بعضهما: بشرة بلون معتدل وبشرة بلون غامق",
         "أخ",
+        "أخلاء",
         "أصدقاء",
         "إخوة",
         "بشرة بلون غامق",
@@ -212511,7 +213486,6 @@
         "ثنائي",
         "رجل",
         "رجلان",
-        "زوج",
         "صديق",
         "يد بيد"
       ],
@@ -213182,6 +214156,7 @@
       "👨🏾‍🤝‍👨🏻": [
         "رجلان يمسكان بيد بعضهما: بشرة بلون معتدل مائل للغامق وبشرة بلون فاتح",
         "أخ",
+        "أخلاء",
         "أصدقاء",
         "إخوة",
         "بشرة بلون فاتح",
@@ -213190,13 +214165,13 @@
         "ثنائي",
         "رجل",
         "رجلان",
-        "زوج",
         "صديق",
         "يد بيد"
       ],
       "👨🏾‍🤝‍👨🏼": [
         "رجلان يمسكان بيد بعضهما: بشرة بلون معتدل مائل للغامق وبشرة بلون فاتح ومعتدل",
         "أخ",
+        "أخلاء",
         "أصدقاء",
         "إخوة",
         "بشرة بلون فاتح ومعتدل",
@@ -213205,13 +214180,13 @@
         "ثنائي",
         "رجل",
         "رجلان",
-        "زوج",
         "صديق",
         "يد بيد"
       ],
       "👨🏾‍🤝‍👨🏽": [
         "رجلان يمسكان بيد بعضهما: بشرة بلون معتدل مائل للغامق وبشرة بلون معتدل",
         "أخ",
+        "أخلاء",
         "أصدقاء",
         "إخوة",
         "بشرة بلون معتدل",
@@ -213220,13 +214195,13 @@
         "ثنائي",
         "رجل",
         "رجلان",
-        "زوج",
         "صديق",
         "يد بيد"
       ],
       "👨🏾‍🤝‍👨🏿": [
         "رجلان يمسكان بيد بعضهما: بشرة بلون معتدل مائل للغامق وبشرة بلون غامق",
         "أخ",
+        "أخلاء",
         "أصدقاء",
         "إخوة",
         "بشرة بلون غامق",
@@ -213235,7 +214210,6 @@
         "ثنائي",
         "رجل",
         "رجلان",
-        "زوج",
         "صديق",
         "يد بيد"
       ],
@@ -213906,6 +214880,7 @@
       "👨🏿‍🤝‍👨🏻": [
         "رجلان يمسكان بيد بعضهما: بشرة بلون غامق وبشرة بلون فاتح",
         "أخ",
+        "أخلاء",
         "أصدقاء",
         "إخوة",
         "بشرة بلون غامق",
@@ -213914,13 +214889,13 @@
         "ثنائي",
         "رجل",
         "رجلان",
-        "زوج",
         "صديق",
         "يد بيد"
       ],
       "👨🏿‍🤝‍👨🏼": [
         "رجلان يمسكان بيد بعضهما: بشرة بلون غامق وبشرة بلون فاتح ومعتدل",
         "أخ",
+        "أخلاء",
         "أصدقاء",
         "إخوة",
         "بشرة بلون غامق",
@@ -213929,13 +214904,13 @@
         "ثنائي",
         "رجل",
         "رجلان",
-        "زوج",
         "صديق",
         "يد بيد"
       ],
       "👨🏿‍🤝‍👨🏽": [
         "رجلان يمسكان بيد بعضهما: بشرة بلون غامق وبشرة بلون معتدل",
         "أخ",
+        "أخلاء",
         "أصدقاء",
         "إخوة",
         "بشرة بلون غامق",
@@ -213944,13 +214919,13 @@
         "ثنائي",
         "رجل",
         "رجلان",
-        "زوج",
         "صديق",
         "يد بيد"
       ],
       "👨🏿‍🤝‍👨🏾": [
         "رجلان يمسكان بيد بعضهما: بشرة بلون غامق وبشرة بلون معتدل مائل للغامق",
         "أخ",
+        "أخلاء",
         "أصدقاء",
         "إخوة",
         "بشرة بلون غامق",
@@ -213959,7 +214934,6 @@
         "ثنائي",
         "رجل",
         "رجلان",
-        "زوج",
         "صديق",
         "يد بيد"
       ],
@@ -215381,7 +216355,6 @@
         "بشرة بلون فاتح ومعتدل",
         "بنات",
         "ثنائي",
-        "زوج",
         "سيدة",
         "سيدتان",
         "صداقة",
@@ -215400,7 +216373,6 @@
         "بشرة بلون معتدل",
         "بنات",
         "ثنائي",
-        "زوج",
         "سيدة",
         "سيدتان",
         "صداقة",
@@ -215419,7 +216391,6 @@
         "بشرة بلون معتدل مائل للغامق",
         "بنات",
         "ثنائي",
-        "زوج",
         "سيدة",
         "سيدتان",
         "صداقة",
@@ -215438,7 +216409,6 @@
         "بشرة بلون فاتح",
         "بنات",
         "ثنائي",
-        "زوج",
         "سيدة",
         "سيدتان",
         "صداقة",
@@ -216358,7 +217328,6 @@
         "بشرة بلون فاتح ومعتدل",
         "بنات",
         "ثنائي",
-        "زوج",
         "سيدة",
         "سيدتان",
         "صداقة",
@@ -216377,7 +217346,6 @@
         "بشرة بلون معتدل",
         "بنات",
         "ثنائي",
-        "زوج",
         "سيدة",
         "سيدتان",
         "صداقة",
@@ -216396,7 +217364,6 @@
         "بشرة بلون معتدل مائل للغامق",
         "بنات",
         "ثنائي",
-        "زوج",
         "سيدة",
         "سيدتان",
         "صداقة",
@@ -216415,7 +217382,6 @@
         "بشرة بلون فاتح ومعتدل",
         "بنات",
         "ثنائي",
-        "زوج",
         "سيدة",
         "سيدتان",
         "صداقة",
@@ -217335,7 +218301,6 @@
         "بشرة بلون معتدل",
         "بنات",
         "ثنائي",
-        "زوج",
         "سيدة",
         "سيدتان",
         "صداقة",
@@ -217354,7 +218319,6 @@
         "بشرة بلون معتدل",
         "بنات",
         "ثنائي",
-        "زوج",
         "سيدة",
         "سيدتان",
         "صداقة",
@@ -217373,7 +218337,6 @@
         "بشرة بلون معتدل مائل للغامق",
         "بنات",
         "ثنائي",
-        "زوج",
         "سيدة",
         "سيدتان",
         "صداقة",
@@ -217392,7 +218355,6 @@
         "بشرة بلون معتدل",
         "بنات",
         "ثنائي",
-        "زوج",
         "سيدة",
         "سيدتان",
         "صداقة",
@@ -218312,7 +219274,6 @@
         "بشرة بلون معتدل مائل للغامق",
         "بنات",
         "ثنائي",
-        "زوج",
         "سيدة",
         "سيدتان",
         "صداقة",
@@ -218331,7 +219292,6 @@
         "بشرة بلون معتدل مائل للغامق",
         "بنات",
         "ثنائي",
-        "زوج",
         "سيدة",
         "سيدتان",
         "صداقة",
@@ -218350,7 +219310,6 @@
         "بشرة بلون معتدل مائل للغامق",
         "بنات",
         "ثنائي",
-        "زوج",
         "سيدة",
         "سيدتان",
         "صداقة",
@@ -218369,7 +219328,6 @@
         "بشرة بلون معتدل مائل للغامق",
         "بنات",
         "ثنائي",
-        "زوج",
         "سيدة",
         "سيدتان",
         "صداقة",
@@ -219289,7 +220247,6 @@
         "بشرة بلون فاتح",
         "بنات",
         "ثنائي",
-        "زوج",
         "سيدة",
         "سيدتان",
         "صداقة",
@@ -219308,7 +220265,6 @@
         "بشرة بلون فاتح ومعتدل",
         "بنات",
         "ثنائي",
-        "زوج",
         "سيدة",
         "سيدتان",
         "صداقة",
@@ -219327,7 +220283,6 @@
         "بشرة بلون معتدل",
         "بنات",
         "ثنائي",
-        "زوج",
         "سيدة",
         "سيدتان",
         "صداقة",
@@ -219346,7 +220301,6 @@
         "بشرة بلون معتدل مائل للغامق",
         "بنات",
         "ثنائي",
-        "زوج",
         "سيدة",
         "سيدتان",
         "صداقة",
@@ -219676,19 +220630,20 @@
       "👬": [
         "رجلان يمسكان بيد بعضهما",
         "أخ",
+        "أخلاء",
         "أصدقاء",
         "إخوة",
         "توأم",
         "ثنائي",
         "رجل",
         "رجلان",
-        "زوج",
         "صديق",
         "يد بيد"
       ],
       "👬🏻": [
         "رجلان يمسكان بيد بعضهما: بشرة بلون فاتح",
         "أخ",
+        "أخلاء",
         "أصدقاء",
         "إخوة",
         "بشرة بلون فاتح",
@@ -219696,13 +220651,13 @@
         "ثنائي",
         "رجل",
         "رجلان",
-        "زوج",
         "صديق",
         "يد بيد"
       ],
       "👬🏼": [
         "رجلان يمسكان بيد بعضهما: بشرة بلون فاتح ومعتدل",
         "أخ",
+        "أخلاء",
         "أصدقاء",
         "إخوة",
         "بشرة بلون فاتح ومعتدل",
@@ -219710,13 +220665,13 @@
         "ثنائي",
         "رجل",
         "رجلان",
-        "زوج",
         "صديق",
         "يد بيد"
       ],
       "👬🏽": [
         "رجلان يمسكان بيد بعضهما: بشرة بلون معتدل",
         "أخ",
+        "أخلاء",
         "أصدقاء",
         "إخوة",
         "بشرة بلون معتدل",
@@ -219724,13 +220679,13 @@
         "ثنائي",
         "رجل",
         "رجلان",
-        "زوج",
         "صديق",
         "يد بيد"
       ],
       "👬🏾": [
         "رجلان يمسكان بيد بعضهما: بشرة بلون معتدل مائل للغامق",
         "أخ",
+        "أخلاء",
         "أصدقاء",
         "إخوة",
         "بشرة بلون معتدل مائل للغامق",
@@ -219738,13 +220693,13 @@
         "ثنائي",
         "رجل",
         "رجلان",
-        "زوج",
         "صديق",
         "يد بيد"
       ],
       "👬🏿": [
         "رجلان يمسكان بيد بعضهما: بشرة بلون غامق",
         "أخ",
+        "أخلاء",
         "أصدقاء",
         "إخوة",
         "بشرة بلون غامق",
@@ -219752,7 +220707,6 @@
         "ثنائي",
         "رجل",
         "رجلان",
-        "زوج",
         "صديق",
         "يد بيد"
       ],
@@ -219764,7 +220718,6 @@
         "امرأتان",
         "بنات",
         "ثنائي",
-        "زوج",
         "سيدة",
         "سيدتان",
         "صداقة",
@@ -219782,7 +220735,6 @@
         "بشرة بلون فاتح",
         "بنات",
         "ثنائي",
-        "زوج",
         "سيدة",
         "سيدتان",
         "صداقة",
@@ -219800,7 +220752,6 @@
         "بشرة بلون فاتح ومعتدل",
         "بنات",
         "ثنائي",
-        "زوج",
         "سيدة",
         "سيدتان",
         "صداقة",
@@ -219818,7 +220769,6 @@
         "بشرة بلون معتدل",
         "بنات",
         "ثنائي",
-        "زوج",
         "سيدة",
         "سيدتان",
         "صداقة",
@@ -219836,7 +220786,6 @@
         "بشرة بلون معتدل مائل للغامق",
         "بنات",
         "ثنائي",
-        "زوج",
         "سيدة",
         "سيدتان",
         "صداقة",
@@ -219854,7 +220803,6 @@
         "بشرة بلون غامق",
         "بنات",
         "ثنائي",
-        "زوج",
         "سيدة",
         "سيدتان",
         "صداقة",
@@ -221332,7 +222280,7 @@
         "خرافة",
         "شرير",
         "غضب",
-        "قتاع",
+        "قناع",
         "كائن",
         "وجه",
         "وحش",
@@ -225491,11 +226439,9 @@
       "😇": [
         "وجه مبتسم بهالة",
         "أرواح",
-        "إنجيل",
         "ابتسام",
         "ابتسامة",
         "ابتسامة مع هالة",
-        "الكتاب المقدس",
         "حدوتة",
         "خرافة",
         "روح",
@@ -225505,6 +226451,7 @@
         "مبارك",
         "مبسوط",
         "مسالم",
+        "ملائكي",
         "ملاك",
         "نعمة",
         "هالة",
@@ -225526,8 +226473,9 @@
       ],
       "😉": [
         "وجه يغمز",
-        "سيكسي",
+        "جذاب",
         "غمزة",
+        "مثير",
         "وجه"
       ],
       "😊": [
@@ -228102,6 +229050,7 @@
         "سكة حديد",
         "قطار",
         "مركبة",
+        "مونوريل",
         "نقل عام"
       ],
       "🚉": [
@@ -228269,6 +229218,7 @@
         "خط سكة حديد أحادي",
         "قطار",
         "مركبة",
+        "مونوريل",
         "نقل عام"
       ],
       "🚞": [
@@ -228585,7 +229535,7 @@
       ],
       "🚪": [
         "باب",
-        "باب امامي",
+        "باب أمامي",
         "باب خلفي",
         "خزانة",
         "مدخل"
@@ -229734,6 +230684,22 @@
         "صخور",
         "كارثة",
         "هزة أرضية"
+      ],
+      "🛙": [
+        "منارة",
+        "أمل",
+        "إرشاد",
+        "إشارة",
+        "إضاءة",
+        "بحر",
+        "بحري",
+        "بحرية",
+        "تنبيه",
+        "تنقل",
+        "ضوء",
+        "فنار",
+        "محيط",
+        "ملاحة"
       ],
       "🛜": [
         "اتصال لاسلكي",
@@ -236471,12 +237437,12 @@
       ],
       "🧑‍🤝‍🧑": [
         "أشخاص يمسكون بأيدي بعضهم",
+        "أخلاء",
         "أشخاص",
+        "أصدقاء",
         "أيدي",
         "توأم",
-        "زوجان",
         "شخص",
-        "شريكان",
         "صداقة",
         "ولدان",
         "يد",
@@ -236998,13 +237964,13 @@
       ],
       "🧑🏻‍🤝‍🧑🏻": [
         "أشخاص يمسكون بأيدي بعضهم: بشرة بلون فاتح",
+        "أخلاء",
         "أشخاص",
+        "أصدقاء",
         "أيدي",
         "بشرة بلون فاتح",
         "توأم",
-        "زوجان",
         "شخص",
-        "شريكان",
         "صداقة",
         "ولدان",
         "يد",
@@ -237012,14 +237978,14 @@
       ],
       "🧑🏻‍🤝‍🧑🏼": [
         "أشخاص يمسكون بأيدي بعضهم: بشرة بلون فاتح وبشرة بلون فاتح ومعتدل",
+        "أخلاء",
         "أشخاص",
+        "أصدقاء",
         "أيدي",
         "بشرة بلون فاتح",
         "بشرة بلون فاتح ومعتدل",
         "توأم",
-        "زوجان",
         "شخص",
-        "شريكان",
         "صداقة",
         "ولدان",
         "يد",
@@ -237027,14 +237993,14 @@
       ],
       "🧑🏻‍🤝‍🧑🏽": [
         "أشخاص يمسكون بأيدي بعضهم: بشرة بلون فاتح وبشرة بلون معتدل",
+        "أخلاء",
         "أشخاص",
+        "أصدقاء",
         "أيدي",
         "بشرة بلون فاتح",
         "بشرة بلون معتدل",
         "توأم",
-        "زوجان",
         "شخص",
-        "شريكان",
         "صداقة",
         "ولدان",
         "يد",
@@ -237042,14 +238008,14 @@
       ],
       "🧑🏻‍🤝‍🧑🏾": [
         "أشخاص يمسكون بأيدي بعضهم: بشرة بلون فاتح وبشرة بلون معتدل مائل للغامق",
+        "أخلاء",
         "أشخاص",
+        "أصدقاء",
         "أيدي",
         "بشرة بلون فاتح",
         "بشرة بلون معتدل مائل للغامق",
         "توأم",
-        "زوجان",
         "شخص",
-        "شريكان",
         "صداقة",
         "ولدان",
         "يد",
@@ -237057,14 +238023,14 @@
       ],
       "🧑🏻‍🤝‍🧑🏿": [
         "أشخاص يمسكون بأيدي بعضهم: بشرة بلون فاتح وبشرة بلون غامق",
+        "أخلاء",
         "أشخاص",
+        "أصدقاء",
         "أيدي",
         "بشرة بلون غامق",
         "بشرة بلون فاتح",
         "توأم",
-        "زوجان",
         "شخص",
-        "شريكان",
         "صداقة",
         "ولدان",
         "يد",
@@ -237616,14 +238582,14 @@
       ],
       "🧑🏼‍🤝‍🧑🏻": [
         "أشخاص يمسكون بأيدي بعضهم: بشرة بلون فاتح ومعتدل وبشرة بلون فاتح",
+        "أخلاء",
         "أشخاص",
+        "أصدقاء",
         "أيدي",
         "بشرة بلون فاتح",
         "بشرة بلون فاتح ومعتدل",
         "توأم",
-        "زوجان",
         "شخص",
-        "شريكان",
         "صداقة",
         "ولدان",
         "يد",
@@ -237631,13 +238597,13 @@
       ],
       "🧑🏼‍🤝‍🧑🏼": [
         "أشخاص يمسكون بأيدي بعضهم: بشرة بلون فاتح ومعتدل",
+        "أخلاء",
         "أشخاص",
+        "أصدقاء",
         "أيدي",
         "بشرة بلون فاتح ومعتدل",
         "توأم",
-        "زوجان",
         "شخص",
-        "شريكان",
         "صداقة",
         "ولدان",
         "يد",
@@ -237645,14 +238611,14 @@
       ],
       "🧑🏼‍🤝‍🧑🏽": [
         "أشخاص يمسكون بأيدي بعضهم: بشرة بلون فاتح ومعتدل وبشرة بلون معتدل",
+        "أخلاء",
         "أشخاص",
+        "أصدقاء",
         "أيدي",
         "بشرة بلون فاتح ومعتدل",
         "بشرة بلون معتدل",
         "توأم",
-        "زوجان",
         "شخص",
-        "شريكان",
         "صداقة",
         "ولدان",
         "يد",
@@ -237660,14 +238626,14 @@
       ],
       "🧑🏼‍🤝‍🧑🏾": [
         "أشخاص يمسكون بأيدي بعضهم: بشرة بلون فاتح ومعتدل وبشرة بلون معتدل مائل للغامق",
+        "أخلاء",
         "أشخاص",
+        "أصدقاء",
         "أيدي",
         "بشرة بلون فاتح ومعتدل",
         "بشرة بلون معتدل مائل للغامق",
         "توأم",
-        "زوجان",
         "شخص",
-        "شريكان",
         "صداقة",
         "ولدان",
         "يد",
@@ -237675,14 +238641,14 @@
       ],
       "🧑🏼‍🤝‍🧑🏿": [
         "أشخاص يمسكون بأيدي بعضهم: بشرة بلون فاتح ومعتدل وبشرة بلون غامق",
+        "أخلاء",
         "أشخاص",
+        "أصدقاء",
         "أيدي",
         "بشرة بلون غامق",
         "بشرة بلون فاتح ومعتدل",
         "توأم",
-        "زوجان",
         "شخص",
-        "شريكان",
         "صداقة",
         "ولدان",
         "يد",
@@ -238234,14 +239200,14 @@
       ],
       "🧑🏽‍🤝‍🧑🏻": [
         "أشخاص يمسكون بأيدي بعضهم: بشرة بلون معتدل وبشرة بلون فاتح",
+        "أخلاء",
         "أشخاص",
+        "أصدقاء",
         "أيدي",
         "بشرة بلون فاتح",
         "بشرة بلون معتدل",
         "توأم",
-        "زوجان",
         "شخص",
-        "شريكان",
         "صداقة",
         "ولدان",
         "يد",
@@ -238249,14 +239215,14 @@
       ],
       "🧑🏽‍🤝‍🧑🏼": [
         "أشخاص يمسكون بأيدي بعضهم: بشرة بلون معتدل وبشرة بلون فاتح ومعتدل",
+        "أخلاء",
         "أشخاص",
+        "أصدقاء",
         "أيدي",
         "بشرة بلون فاتح ومعتدل",
         "بشرة بلون معتدل",
         "توأم",
-        "زوجان",
         "شخص",
-        "شريكان",
         "صداقة",
         "ولدان",
         "يد",
@@ -238264,13 +239230,13 @@
       ],
       "🧑🏽‍🤝‍🧑🏽": [
         "أشخاص يمسكون بأيدي بعضهم: بشرة بلون معتدل",
+        "أخلاء",
         "أشخاص",
+        "أصدقاء",
         "أيدي",
         "بشرة بلون معتدل",
         "توأم",
-        "زوجان",
         "شخص",
-        "شريكان",
         "صداقة",
         "ولدان",
         "يد",
@@ -238278,14 +239244,14 @@
       ],
       "🧑🏽‍🤝‍🧑🏾": [
         "أشخاص يمسكون بأيدي بعضهم: بشرة بلون معتدل وبشرة بلون معتدل مائل للغامق",
+        "أخلاء",
         "أشخاص",
+        "أصدقاء",
         "أيدي",
         "بشرة بلون معتدل",
         "بشرة بلون معتدل مائل للغامق",
         "توأم",
-        "زوجان",
         "شخص",
-        "شريكان",
         "صداقة",
         "ولدان",
         "يد",
@@ -238293,14 +239259,14 @@
       ],
       "🧑🏽‍🤝‍🧑🏿": [
         "أشخاص يمسكون بأيدي بعضهم: بشرة بلون معتدل وبشرة بلون غامق",
+        "أخلاء",
         "أشخاص",
+        "أصدقاء",
         "أيدي",
         "بشرة بلون غامق",
         "بشرة بلون معتدل",
         "توأم",
-        "زوجان",
         "شخص",
-        "شريكان",
         "صداقة",
         "ولدان",
         "يد",
@@ -238852,14 +239818,14 @@
       ],
       "🧑🏾‍🤝‍🧑🏻": [
         "أشخاص يمسكون بأيدي بعضهم: بشرة بلون معتدل مائل للغامق وبشرة بلون فاتح",
+        "أخلاء",
         "أشخاص",
+        "أصدقاء",
         "أيدي",
         "بشرة بلون فاتح",
         "بشرة بلون معتدل مائل للغامق",
         "توأم",
-        "زوجان",
         "شخص",
-        "شريكان",
         "صداقة",
         "ولدان",
         "يد",
@@ -238867,14 +239833,14 @@
       ],
       "🧑🏾‍🤝‍🧑🏼": [
         "أشخاص يمسكون بأيدي بعضهم: بشرة بلون معتدل مائل للغامق وبشرة بلون فاتح ومعتدل",
+        "أخلاء",
         "أشخاص",
+        "أصدقاء",
         "أيدي",
         "بشرة بلون فاتح ومعتدل",
         "بشرة بلون معتدل مائل للغامق",
         "توأم",
-        "زوجان",
         "شخص",
-        "شريكان",
         "صداقة",
         "ولدان",
         "يد",
@@ -238882,14 +239848,14 @@
       ],
       "🧑🏾‍🤝‍🧑🏽": [
         "أشخاص يمسكون بأيدي بعضهم: بشرة بلون معتدل مائل للغامق وبشرة بلون معتدل",
+        "أخلاء",
         "أشخاص",
+        "أصدقاء",
         "أيدي",
         "بشرة بلون معتدل",
         "بشرة بلون معتدل مائل للغامق",
         "توأم",
-        "زوجان",
         "شخص",
-        "شريكان",
         "صداقة",
         "ولدان",
         "يد",
@@ -238897,13 +239863,13 @@
       ],
       "🧑🏾‍🤝‍🧑🏾": [
         "أشخاص يمسكون بأيدي بعضهم: بشرة بلون معتدل مائل للغامق",
+        "أخلاء",
         "أشخاص",
+        "أصدقاء",
         "أيدي",
         "بشرة بلون معتدل مائل للغامق",
         "توأم",
-        "زوجان",
         "شخص",
-        "شريكان",
         "صداقة",
         "ولدان",
         "يد",
@@ -238911,14 +239877,14 @@
       ],
       "🧑🏾‍🤝‍🧑🏿": [
         "أشخاص يمسكون بأيدي بعضهم: بشرة بلون معتدل مائل للغامق وبشرة بلون غامق",
+        "أخلاء",
         "أشخاص",
+        "أصدقاء",
         "أيدي",
         "بشرة بلون غامق",
         "بشرة بلون معتدل مائل للغامق",
         "توأم",
-        "زوجان",
         "شخص",
-        "شريكان",
         "صداقة",
         "ولدان",
         "يد",
@@ -239470,14 +240436,14 @@
       ],
       "🧑🏿‍🤝‍🧑🏻": [
         "أشخاص يمسكون بأيدي بعضهم: بشرة بلون غامق وبشرة بلون فاتح",
+        "أخلاء",
         "أشخاص",
+        "أصدقاء",
         "أيدي",
         "بشرة بلون غامق",
         "بشرة بلون فاتح",
         "توأم",
-        "زوجان",
         "شخص",
-        "شريكان",
         "صداقة",
         "ولدان",
         "يد",
@@ -239485,14 +240451,14 @@
       ],
       "🧑🏿‍🤝‍🧑🏼": [
         "أشخاص يمسكون بأيدي بعضهم: بشرة بلون غامق وبشرة بلون فاتح ومعتدل",
+        "أخلاء",
         "أشخاص",
+        "أصدقاء",
         "أيدي",
         "بشرة بلون غامق",
         "بشرة بلون فاتح ومعتدل",
         "توأم",
-        "زوجان",
         "شخص",
-        "شريكان",
         "صداقة",
         "ولدان",
         "يد",
@@ -239500,14 +240466,14 @@
       ],
       "🧑🏿‍🤝‍🧑🏽": [
         "أشخاص يمسكون بأيدي بعضهم: بشرة بلون غامق وبشرة بلون معتدل",
+        "أخلاء",
         "أشخاص",
+        "أصدقاء",
         "أيدي",
         "بشرة بلون غامق",
         "بشرة بلون معتدل",
         "توأم",
-        "زوجان",
         "شخص",
-        "شريكان",
         "صداقة",
         "ولدان",
         "يد",
@@ -239515,14 +240481,14 @@
       ],
       "🧑🏿‍🤝‍🧑🏾": [
         "أشخاص يمسكون بأيدي بعضهم: بشرة بلون غامق وبشرة بلون معتدل مائل للغامق",
+        "أخلاء",
         "أشخاص",
+        "أصدقاء",
         "أيدي",
         "بشرة بلون غامق",
         "بشرة بلون معتدل مائل للغامق",
         "توأم",
-        "زوجان",
         "شخص",
-        "شريكان",
         "صداقة",
         "ولدان",
         "يد",
@@ -239530,13 +240496,13 @@
       ],
       "🧑🏿‍🤝‍🧑🏿": [
         "أشخاص يمسكون بأيدي بعضهم: بشرة بلون غامق",
+        "أخلاء",
         "أشخاص",
+        "أصدقاء",
         "أيدي",
         "بشرة بلون غامق",
         "توأم",
-        "زوجان",
         "شخص",
-        "شريكان",
         "صداقة",
         "ولدان",
         "يد",
@@ -241228,10 +242194,28 @@
         "موتى أحياء"
       ],
       "🧟‍♀️": [
-        "امرأة زومبي"
+        "امرأة زومبي",
+        "أموات أحياء",
+        "امرأة",
+        "رعب",
+        "زومبي",
+        "مخيف",
+        "ميت",
+        "هالوين",
+        "يمشي",
+        "يمشي كالميت"
       ],
       "🧟‍♂️": [
-        "رجل زومبي"
+        "رجل زومبي",
+        "أموات أحياء",
+        "رجل",
+        "رعب",
+        "زومبي",
+        "مخيف",
+        "ميت",
+        "هالوين",
+        "يمشي",
+        "يمشي كالميت"
       ],
       "🧠": [
         "دماغ",
@@ -241904,6 +242888,40 @@
         "حزين",
         "موسيقى",
         "نحاس"
+      ],
+      "🪋": [
+        "نيزك",
+        "جاذبية",
+        "سقوط",
+        "شهاب",
+        "صخرة",
+        "فضاء",
+        "كرة نار",
+        "نجمة",
+        "نهاية العالم"
+      ],
+      "🪌": [
+        "ممحاة",
+        "إزالة",
+        "تراجع",
+        "تصحيح",
+        "حذف",
+        "خطأ",
+        "رسم",
+        "غلط",
+        "غلطة",
+        "فرك",
+        "كتابة",
+        "محو",
+        "مسح"
+      ],
+      "🪍": [
+        "شبكة بمقبض",
+        "التقاط",
+        "جمع",
+        "صيد",
+        "فخ",
+        "في شبكة"
       ],
       "🪎": [
         "صندوق كنز",
@@ -242675,6 +243693,20 @@
         "غول",
         "مخلوق ضخم"
       ],
+      "🫌": [
+        "فراشة ملكية",
+        "أمل",
+        "التبدل الشكلي",
+        "تحوّل",
+        "تحويل",
+        "تغيير",
+        "تغيير المظهر",
+        "حشرة",
+        "ضعيف",
+        "هجرة",
+        "يرقانة",
+        "يسروع"
+      ],
       "🫍": [
         "الحوت القاتل",
         "المحيط",
@@ -242852,6 +243884,20 @@
         "شمندر",
         "لفت"
       ],
+      "🫝": [
+        "مخلّل",
+        "تخليل",
+        "تخمير",
+        "خيار",
+        "كبس",
+        "كبيس",
+        "مأزق",
+        "مطيّب",
+        "مقتة",
+        "مكبوس",
+        "مملح",
+        "ورطة"
+      ],
       "🫟": [
         "بقعة",
         "انسكاب",
@@ -242976,6 +244022,16 @@
         "منتفخ",
         "مندهش",
         "واهن"
+      ],
+      "🫫": [
+        "وجه يتشقق",
+        "انكسار",
+        "تحول",
+        "تفتت",
+        "تقنّع",
+        "توتر",
+        "صمود",
+        "كشف"
       ],
       "🫯": [
         "سحابة اقتتال",
@@ -243806,6 +244862,130 @@
         "مهلاً",
         "يد تدفع يمينًا",
         "يمين"
+      ],
+      "🫹": [
+        "إشارة الإبهام إلى اليسار",
+        "إشارة",
+        "الشمال",
+        "اليسار",
+        "ذلك",
+        "عادي",
+        "قبضة",
+        "هذا"
+      ],
+      "🫹🏻": [
+        "إشارة الإبهام إلى اليسار: بشرة بلون فاتح",
+        "إشارة",
+        "الشمال",
+        "اليسار",
+        "بشرة بلون فاتح",
+        "ذلك",
+        "عادي",
+        "قبضة",
+        "هذا"
+      ],
+      "🫹🏼": [
+        "إشارة الإبهام إلى اليسار: بشرة بلون فاتح ومعتدل",
+        "إشارة",
+        "الشمال",
+        "اليسار",
+        "بشرة بلون فاتح ومعتدل",
+        "ذلك",
+        "عادي",
+        "قبضة",
+        "هذا"
+      ],
+      "🫹🏽": [
+        "إشارة الإبهام إلى اليسار: بشرة بلون معتدل",
+        "إشارة",
+        "الشمال",
+        "اليسار",
+        "بشرة بلون معتدل",
+        "ذلك",
+        "عادي",
+        "قبضة",
+        "هذا"
+      ],
+      "🫹🏾": [
+        "إشارة الإبهام إلى اليسار: بشرة بلون معتدل مائل للغامق",
+        "إشارة",
+        "الشمال",
+        "اليسار",
+        "بشرة بلون معتدل مائل للغامق",
+        "ذلك",
+        "عادي",
+        "قبضة",
+        "هذا"
+      ],
+      "🫹🏿": [
+        "إشارة الإبهام إلى اليسار: بشرة بلون غامق",
+        "إشارة",
+        "الشمال",
+        "اليسار",
+        "بشرة بلون غامق",
+        "ذلك",
+        "عادي",
+        "قبضة",
+        "هذا"
+      ],
+      "🫺": [
+        "إشارة الإبهام إلى اليمين",
+        "إشارة",
+        "اليمين",
+        "ذلك",
+        "عادي",
+        "قبضة",
+        "هذا"
+      ],
+      "🫺🏻": [
+        "إشارة الإبهام إلى اليمين: بشرة بلون فاتح",
+        "إشارة",
+        "اليمين",
+        "بشرة بلون فاتح",
+        "ذلك",
+        "عادي",
+        "قبضة",
+        "هذا"
+      ],
+      "🫺🏼": [
+        "إشارة الإبهام إلى اليمين: بشرة بلون فاتح ومعتدل",
+        "إشارة",
+        "اليمين",
+        "بشرة بلون فاتح ومعتدل",
+        "ذلك",
+        "عادي",
+        "قبضة",
+        "هذا"
+      ],
+      "🫺🏽": [
+        "إشارة الإبهام إلى اليمين: بشرة بلون معتدل",
+        "إشارة",
+        "اليمين",
+        "بشرة بلون معتدل",
+        "ذلك",
+        "عادي",
+        "قبضة",
+        "هذا"
+      ],
+      "🫺🏾": [
+        "إشارة الإبهام إلى اليمين: بشرة بلون معتدل مائل للغامق",
+        "إشارة",
+        "اليمين",
+        "بشرة بلون معتدل مائل للغامق",
+        "ذلك",
+        "عادي",
+        "قبضة",
+        "هذا"
+      ],
+      "🫺🏿": [
+        "إشارة الإبهام إلى اليمين: بشرة بلون غامق",
+        "إشارة",
+        "اليمين",
+        "بشرة بلون غامق",
+        "ذلك",
+        "عادي",
+        "قبضة",
+        "هذا"
       ]
     },
     "de": {
@@ -267484,6 +268664,17 @@
         "Murgang",
         "Schlammlawine"
       ],
+      "🛙": [
+        "Leuchtturm",
+        "Hoffnung",
+        "Leuchtfeuer",
+        "Licht",
+        "Meer",
+        "Orientierung",
+        "Schiffe",
+        "Seefahrt",
+        "Wegweiser"
+      ],
       "🛜": [
         "WLAN",
         "Computer",
@@ -278249,6 +279440,31 @@
         "traurig",
         "ziehen"
       ],
+      "🪋": [
+        "Meteor",
+        "Atmosphäre",
+        "Feuerkugel",
+        "Gestein",
+        "Sternschnuppe",
+        "verglühen"
+      ],
+      "🪌": [
+        "Radiergummi",
+        "ausradieren",
+        "Bleistift",
+        "Fehler",
+        "radieren",
+        "Radierer",
+        "Ratzefummel",
+        "wegradieren"
+      ],
+      "🪍": [
+        "Kescher",
+        "einsammeln",
+        "fangen",
+        "herausholen",
+        "keschern"
+      ],
       "🪎": [
         "Schatztruhe",
         "Beute",
@@ -279055,6 +280271,17 @@
         "Woodwose",
         "Yeti"
       ],
+      "🫌": [
+        "Monarchfalter",
+        "Hoffnung",
+        "Insekt",
+        "Metamorphose",
+        "Raupe",
+        "Veränderung",
+        "Verwandlung",
+        "Wechsel",
+        "zart"
+      ],
       "🫍": [
         "Orca",
         "Meer",
@@ -279219,6 +280446,14 @@
         "Rübe",
         "Wurzel"
       ],
+      "🫝": [
+        "Saure Gurke",
+        "eingelegt",
+        "Essig",
+        "Gewürzgurke",
+        "Gurke",
+        "saure Gurke"
+      ],
       "🫟": [
         "Spritzer",
         "Farbe",
@@ -279375,6 +280610,14 @@
         "panisch",
         "schockiert",
         "überrascht"
+      ],
+      "🫫": [
+        "Zerbrechendes Gesicht",
+        "Spannung",
+        "Verwandlung",
+        "widerstandsfähig",
+        "zerbrechend",
+        "zerfallend"
       ],
       "🫯": [
         "Kampfwolke",
@@ -280355,6 +281598,98 @@
         "Stopp",
         "warte mal",
         "warten"
+      ],
+      "🫹": [
+        "Daumen nach links",
+        "geschlossene Finger",
+        "neutral",
+        "zeigen"
+      ],
+      "🫹🏻": [
+        "Daumen nach links: helle Hautfarbe",
+        "Daumen nach links",
+        "geschlossene Finger",
+        "helle Hautfarbe",
+        "neutral",
+        "zeigen"
+      ],
+      "🫹🏼": [
+        "Daumen nach links: mittelhelle Hautfarbe",
+        "Daumen nach links",
+        "geschlossene Finger",
+        "mittelhelle Hautfarbe",
+        "neutral",
+        "zeigen"
+      ],
+      "🫹🏽": [
+        "Daumen nach links: mittlere Hautfarbe",
+        "Daumen nach links",
+        "geschlossene Finger",
+        "mittlere Hautfarbe",
+        "neutral",
+        "zeigen"
+      ],
+      "🫹🏾": [
+        "Daumen nach links: mitteldunkle Hautfarbe",
+        "Daumen nach links",
+        "geschlossene Finger",
+        "mitteldunkle Hautfarbe",
+        "neutral",
+        "zeigen"
+      ],
+      "🫹🏿": [
+        "Daumen nach links: dunkle Hautfarbe",
+        "Daumen nach links",
+        "dunkle Hautfarbe",
+        "geschlossene Finger",
+        "neutral",
+        "zeigen"
+      ],
+      "🫺": [
+        "Daumen nach rechts",
+        "geschlossene Finger",
+        "neutral",
+        "zeigen"
+      ],
+      "🫺🏻": [
+        "Daumen nach rechts: helle Hautfarbe",
+        "Daumen nach rechts",
+        "geschlossene Finger",
+        "helle Hautfarbe",
+        "neutral",
+        "zeigen"
+      ],
+      "🫺🏼": [
+        "Daumen nach rechts: mittelhelle Hautfarbe",
+        "Daumen nach rechts",
+        "geschlossene Finger",
+        "mittelhelle Hautfarbe",
+        "neutral",
+        "zeigen"
+      ],
+      "🫺🏽": [
+        "Daumen nach rechts: mittlere Hautfarbe",
+        "Daumen nach rechts",
+        "geschlossene Finger",
+        "mittlere Hautfarbe",
+        "neutral",
+        "zeigen"
+      ],
+      "🫺🏾": [
+        "Daumen nach rechts: mitteldunkle Hautfarbe",
+        "Daumen nach rechts",
+        "geschlossene Finger",
+        "mitteldunkle Hautfarbe",
+        "neutral",
+        "zeigen"
+      ],
+      "🫺🏿": [
+        "Daumen nach rechts: dunkle Hautfarbe",
+        "Daumen nach rechts",
+        "dunkle Hautfarbe",
+        "geschlossene Finger",
+        "neutral",
+        "zeigen"
       ]
     },
     "en": {
@@ -281950,6 +283285,7 @@
       "❕": [
         "white exclamation mark",
         "!",
+        "bang",
         "exclamation",
         "mark",
         "outlined",
@@ -281959,6 +283295,7 @@
       "❗": [
         "red exclamation mark",
         "!",
+        "bang",
         "exclamation",
         "mark",
         "punctuation",
@@ -281966,6 +283303,7 @@
       ],
       "❣️": [
         "heart exclamation",
+        "bang",
         "exclamation",
         "heart",
         "heavy",
@@ -282640,7 +283978,7 @@
         "flag"
       ],
       "🇭🇲": [
-        "flag: Heard & McDonald Islands",
+        "flag: Heard Island & McDonald Islands",
         "flag"
       ],
       "🇭🇳": [
@@ -283056,7 +284394,7 @@
         "flag"
       ],
       "🇸🇭": [
-        "flag: St. Helena",
+        "flag: St. Helena, Ascension & Tristan da Cunha",
         "flag"
       ],
       "🇸🇮": [
@@ -283128,7 +284466,7 @@
         "flag"
       ],
       "🇹🇫": [
-        "flag: French Southern Territories",
+        "flag: French Southern and Antarctic Lands",
         "flag"
       ],
       "🇹🇬": [
@@ -308635,6 +309973,18 @@
         "mudslide",
         "rocks"
       ],
+      "🛙": [
+        "lighthouse",
+        "beacon",
+        "enlightenment",
+        "guidance",
+        "hope",
+        "light",
+        "maritime",
+        "navigation",
+        "sea",
+        "signal"
+      ],
       "🛜": [
         "wireless",
         "broadband",
@@ -320417,6 +321767,36 @@
         "sad",
         "slide"
       ],
+      "🪋": [
+        "meteor",
+        "apocalypse",
+        "falling",
+        "fireball",
+        "gravity",
+        "rock",
+        "space",
+        "star"
+      ],
+      "🪌": [
+        "eraser",
+        "correction",
+        "delete",
+        "drawing",
+        "erase",
+        "error",
+        "mistake",
+        "remove",
+        "rub",
+        "undo",
+        "writing"
+      ],
+      "🪍": [
+        "net with handle",
+        "catch",
+        "collect",
+        "mesh",
+        "trap"
+      ],
       "🪎": [
         "treasure chest",
         "gem",
@@ -321130,6 +322510,17 @@
         "woodwose",
         "yeti"
       ],
+      "🫌": [
+        "monarch butterfly",
+        "caterpillar",
+        "change",
+        "fragile",
+        "hope",
+        "insect",
+        "metamorphosis",
+        "migration",
+        "transformation"
+      ],
       "🫍": [
         "orca",
         "marine",
@@ -321272,6 +322663,16 @@
         "turnip",
         "vegetable",
         "vegetarian"
+      ],
+      "🫝": [
+        "pickle",
+        "brine",
+        "condiment",
+        "cucumber",
+        "ferment",
+        "gherkin",
+        "relish",
+        "trouble"
       ],
       "🫟": [
         "splatter",
@@ -321444,6 +322845,16 @@
         "shocked",
         "surprised",
         "vulnerable"
+      ],
+      "🫫": [
+        "cracking face",
+        "breaking",
+        "crumbling",
+        "masking",
+        "resilience",
+        "reveal",
+        "tension",
+        "transformation"
       ],
       "🫯": [
         "fight cloud",
@@ -322421,6 +323832,124 @@
         "slap",
         "stop",
         "wait"
+      ],
+      "🫹": [
+        "leftwards thumb sign",
+        "grip",
+        "left",
+        "neutral",
+        "point",
+        "that",
+        "this"
+      ],
+      "🫹🏻": [
+        "leftwards thumb sign: light skin tone",
+        "grip",
+        "left",
+        "light skin tone",
+        "neutral",
+        "point",
+        "that",
+        "this"
+      ],
+      "🫹🏼": [
+        "leftwards thumb sign: medium-light skin tone",
+        "grip",
+        "left",
+        "medium-light skin tone",
+        "neutral",
+        "point",
+        "that",
+        "this"
+      ],
+      "🫹🏽": [
+        "leftwards thumb sign: medium skin tone",
+        "grip",
+        "left",
+        "medium skin tone",
+        "neutral",
+        "point",
+        "that",
+        "this"
+      ],
+      "🫹🏾": [
+        "leftwards thumb sign: medium-dark skin tone",
+        "grip",
+        "left",
+        "medium-dark skin tone",
+        "neutral",
+        "point",
+        "that",
+        "this"
+      ],
+      "🫹🏿": [
+        "leftwards thumb sign: dark skin tone",
+        "dark skin tone",
+        "grip",
+        "left",
+        "neutral",
+        "point",
+        "that",
+        "this"
+      ],
+      "🫺": [
+        "rightwards thumb sign",
+        "grip",
+        "neutral",
+        "point",
+        "right",
+        "that",
+        "this"
+      ],
+      "🫺🏻": [
+        "rightwards thumb sign: light skin tone",
+        "grip",
+        "light skin tone",
+        "neutral",
+        "point",
+        "right",
+        "that",
+        "this"
+      ],
+      "🫺🏼": [
+        "rightwards thumb sign: medium-light skin tone",
+        "grip",
+        "medium-light skin tone",
+        "neutral",
+        "point",
+        "right",
+        "that",
+        "this"
+      ],
+      "🫺🏽": [
+        "rightwards thumb sign: medium skin tone",
+        "grip",
+        "medium skin tone",
+        "neutral",
+        "point",
+        "right",
+        "that",
+        "this"
+      ],
+      "🫺🏾": [
+        "rightwards thumb sign: medium-dark skin tone",
+        "grip",
+        "medium-dark skin tone",
+        "neutral",
+        "point",
+        "right",
+        "that",
+        "this"
+      ],
+      "🫺🏿": [
+        "rightwards thumb sign: dark skin tone",
+        "dark skin tone",
+        "grip",
+        "neutral",
+        "point",
+        "right",
+        "that",
+        "this"
       ]
     },
     "es": {
@@ -322752,9 +324281,10 @@
         "nieve"
       ],
       "☄️": [
-        "meteorito",
+        "cometa espacial",
         "cometa",
-        "espacio"
+        "espacio",
+        "meteorito"
       ],
       "☎️": [
         "teléfono"
@@ -341746,6 +343276,18 @@
         "rocas",
         "terremoto"
       ],
+      "🛙": [
+        "faro",
+        "baliza",
+        "esperanza",
+        "guía",
+        "iluminación",
+        "luz",
+        "mar",
+        "marítimo",
+        "navegación",
+        "señal"
+      ],
       "🛜": [
         "wifi",
         "conexión",
@@ -350255,6 +351797,39 @@
         "triste",
         "viento"
       ],
+      "🪋": [
+        "meteorito",
+        "apocalipsis",
+        "bola de fuego",
+        "caída",
+        "espacio",
+        "estrella",
+        "gravedad",
+        "roca"
+      ],
+      "🪌": [
+        "goma de borrar",
+        "borrar",
+        "corrección",
+        "deshacer",
+        "dibujar",
+        "eliminar",
+        "equivocación",
+        "error",
+        "escribir",
+        "goma",
+        "quitar"
+      ],
+      "🪍": [
+        "red con mango",
+        "atrapar",
+        "capturar",
+        "cazamariposas",
+        "cazar",
+        "malla",
+        "pescar",
+        "red"
+      ],
       "🪎": [
         "cofre de tesoro",
         "botín",
@@ -350854,6 +352429,17 @@
         "sasquatch",
         "yeti"
       ],
+      "🫌": [
+        "mariposa monarca",
+        "cambio",
+        "esperanza",
+        "frágil",
+        "insecto",
+        "metamorfosis",
+        "migración",
+        "oruga",
+        "transformación"
+      ],
       "🫍": [
         "orca",
         "ballena",
@@ -350982,6 +352568,15 @@
         "vegetariano",
         "verdura"
       ],
+      "🫝": [
+        "pepinillo",
+        "aperitivo",
+        "condimento",
+        "encurtido",
+        "fermentar",
+        "pepino",
+        "salmuera"
+      ],
       "🫟": [
         "salpicadura",
         "gotear",
@@ -351087,6 +352682,16 @@
         "pánico",
         "sorprendido",
         "vulnerable"
+      ],
+      "🫫": [
+        "cara resquebrajándose",
+        "desmoronar",
+        "enmascarar",
+        "resiliencia",
+        "revelar",
+        "romper",
+        "tensión",
+        "transformación"
       ],
       "🫯": [
         "nube de pelea",
@@ -351756,6 +353361,124 @@
         "mano empujando hacia la derecha",
         "rechazar",
         "stop",
+        "tono de piel oscuro"
+      ],
+      "🫹": [
+        "pulgar hacia la izquierda",
+        "agarrar",
+        "eso",
+        "esto",
+        "izquierda",
+        "neutral",
+        "señalar"
+      ],
+      "🫹🏻": [
+        "pulgar hacia la izquierda: tono de piel claro",
+        "agarrar",
+        "eso",
+        "esto",
+        "izquierda",
+        "neutral",
+        "señalar",
+        "tono de piel claro"
+      ],
+      "🫹🏼": [
+        "pulgar hacia la izquierda: tono de piel claro medio",
+        "agarrar",
+        "eso",
+        "esto",
+        "izquierda",
+        "neutral",
+        "señalar",
+        "tono de piel claro medio"
+      ],
+      "🫹🏽": [
+        "pulgar hacia la izquierda: tono de piel medio",
+        "agarrar",
+        "eso",
+        "esto",
+        "izquierda",
+        "neutral",
+        "señalar",
+        "tono de piel medio"
+      ],
+      "🫹🏾": [
+        "pulgar hacia la izquierda: tono de piel oscuro medio",
+        "agarrar",
+        "eso",
+        "esto",
+        "izquierda",
+        "neutral",
+        "señalar",
+        "tono de piel oscuro medio"
+      ],
+      "🫹🏿": [
+        "pulgar hacia la izquierda: tono de piel oscuro",
+        "agarrar",
+        "eso",
+        "esto",
+        "izquierda",
+        "neutral",
+        "señalar",
+        "tono de piel oscuro"
+      ],
+      "🫺": [
+        "pulgar hacia la derecha",
+        "agarrar",
+        "derecha",
+        "eso",
+        "esto",
+        "neutral",
+        "señalar"
+      ],
+      "🫺🏻": [
+        "pulgar hacia la derecha: tono de piel claro",
+        "agarrar",
+        "derecha",
+        "eso",
+        "esto",
+        "neutral",
+        "señalar",
+        "tono de piel claro"
+      ],
+      "🫺🏼": [
+        "pulgar hacia la derecha: tono de piel claro medio",
+        "agarrar",
+        "derecha",
+        "eso",
+        "esto",
+        "neutral",
+        "señalar",
+        "tono de piel claro medio"
+      ],
+      "🫺🏽": [
+        "pulgar hacia la derecha: tono de piel medio",
+        "agarrar",
+        "derecha",
+        "eso",
+        "esto",
+        "neutral",
+        "señalar",
+        "tono de piel medio"
+      ],
+      "🫺🏾": [
+        "pulgar hacia la derecha: tono de piel oscuro medio",
+        "agarrar",
+        "derecha",
+        "eso",
+        "esto",
+        "neutral",
+        "señalar",
+        "tono de piel oscuro medio"
+      ],
+      "🫺🏿": [
+        "pulgar hacia la derecha: tono de piel oscuro",
+        "agarrar",
+        "derecha",
+        "eso",
+        "esto",
+        "neutral",
+        "señalar",
         "tono de piel oscuro"
       ]
     },
@@ -359102,103 +360825,80 @@
       ],
       "👍": [
         "pouce vers le haut",
+        "+1",
         "bien",
         "compris",
         "d’accord",
         "génial",
         "haut",
-        "main",
-        "moi aussi",
         "OK",
         "oui",
-        "pouce levé",
-        "super",
-        "top"
+        "super"
       ],
       "👍🏻": [
         "pouce vers le haut : peau claire",
+        "+1",
         "bien",
         "compris",
         "d’accord",
         "génial",
         "haut",
-        "main",
-        "moi aussi",
         "OK",
         "oui",
         "peau claire",
-        "pouce levé",
-        "pouce vers le haut",
-        "super",
-        "top"
+        "super"
       ],
       "👍🏼": [
         "pouce vers le haut : peau moyennement claire",
+        "+1",
         "bien",
         "compris",
         "d’accord",
         "génial",
         "haut",
-        "main",
-        "moi aussi",
         "OK",
         "oui",
         "peau moyennement claire",
-        "pouce levé",
-        "pouce vers le haut",
-        "super",
-        "top"
+        "super"
       ],
       "👍🏽": [
         "pouce vers le haut : peau légèrement mate",
+        "+1",
         "bien",
         "compris",
         "d’accord",
         "génial",
         "haut",
-        "main",
-        "moi aussi",
         "OK",
         "oui",
         "peau légèrement mate",
-        "pouce levé",
-        "pouce vers le haut",
-        "super",
-        "top"
+        "super"
       ],
       "👍🏾": [
         "pouce vers le haut : peau mate",
+        "+1",
         "bien",
         "compris",
         "d’accord",
         "génial",
         "haut",
-        "main",
-        "moi aussi",
         "OK",
         "oui",
         "peau mate",
-        "pouce levé",
-        "pouce vers le haut",
-        "super",
-        "top"
+        "super"
       ],
       "👍🏿": [
         "pouce vers le haut : peau foncée",
+        "+1",
         "bien",
         "compris",
         "d’accord",
         "génial",
         "haut",
-        "main",
-        "moi aussi",
         "OK",
         "oui",
         "peau foncée",
-        "pouce levé",
-        "pouce vers le haut",
-        "super",
-        "top"
+        "super"
       ],
       "👎": [
         "pouce vers le bas",
@@ -377265,6 +378965,15 @@
         "rochers",
         "tremblement de terre"
       ],
+      "🛙": [
+        "phare",
+        "lumière",
+        "mer",
+        "navigation",
+        "repère",
+        "signal",
+        "tour"
+      ],
       "🛜": [
         "sans fil",
         "connexion",
@@ -387962,9 +389671,36 @@
       ],
       "🪊": [
         "trombone à coulisse",
+        "cuivre",
         "instrument",
-        "musique",
-        "trombone"
+        "jazz",
+        "musique"
+      ],
+      "🪋": [
+        "météorite",
+        "apocalypse",
+        "boule de feu",
+        "chute",
+        "espace",
+        "étoile",
+        "gravité",
+        "roche"
+      ],
+      "🪌": [
+        "gomme",
+        "annuler",
+        "dessin",
+        "effacer",
+        "erreur",
+        "oups",
+        "supprimer"
+      ],
+      "🪍": [
+        "filet avec manche",
+        "attraper",
+        "capturer",
+        "épuisette",
+        "piège"
       ],
       "🪎": [
         "coffre au trésor",
@@ -388643,6 +390379,14 @@
         "sasquatch",
         "yéti"
       ],
+      "🫌": [
+        "monarque",
+        "chenille",
+        "fragile",
+        "insecte",
+        "métamorphose",
+        "papillon"
+      ],
       "🫍": [
         "orque",
         "baleine",
@@ -388786,6 +390530,13 @@
         "navet",
         "racine"
       ],
+      "🫝": [
+        "cornichon",
+        "condiment",
+        "pickle",
+        "saumure",
+        "vinaigre"
+      ],
       "🫟": [
         "éclaboussure",
         "holi",
@@ -388896,6 +390647,16 @@
         "panique",
         "surprise",
         "vulnérabilité"
+      ],
+      "🫫": [
+        "visage craquelé",
+        "craquer",
+        "effondrement",
+        "masquer",
+        "résilience",
+        "révéler",
+        "tension",
+        "transformation"
       ],
       "🫯": [
         "nuage de colère",
@@ -389744,6 +391505,112 @@
         "stop",
         "tape m’en cinq",
         "top là"
+      ],
+      "🫹": [
+        "pouce vers la gauche",
+        "ça",
+        "gauche",
+        "neutre",
+        "poing",
+        "stop"
+      ],
+      "🫹🏻": [
+        "pouce vers la gauche : peau claire",
+        "ça",
+        "gauche",
+        "neutre",
+        "peau claire",
+        "poing",
+        "stop"
+      ],
+      "🫹🏼": [
+        "pouce vers la gauche : peau moyennement claire",
+        "ça",
+        "gauche",
+        "neutre",
+        "peau moyennement claire",
+        "poing",
+        "stop"
+      ],
+      "🫹🏽": [
+        "pouce vers la gauche : peau légèrement mate",
+        "ça",
+        "gauche",
+        "neutre",
+        "peau légèrement mate",
+        "poing",
+        "stop"
+      ],
+      "🫹🏾": [
+        "pouce vers la gauche : peau mate",
+        "ça",
+        "gauche",
+        "neutre",
+        "peau mate",
+        "poing",
+        "stop"
+      ],
+      "🫹🏿": [
+        "pouce vers la gauche : peau foncée",
+        "ça",
+        "gauche",
+        "neutre",
+        "peau foncée",
+        "poing",
+        "stop"
+      ],
+      "🫺": [
+        "pouce vers la droite",
+        "ça",
+        "droite",
+        "neutre",
+        "poing",
+        "stop"
+      ],
+      "🫺🏻": [
+        "pouce vers la droite : peau claire",
+        "ça",
+        "droite",
+        "neutre",
+        "peau claire",
+        "poing",
+        "stop"
+      ],
+      "🫺🏼": [
+        "pouce vers la droite : peau moyennement claire",
+        "ça",
+        "droite",
+        "neutre",
+        "peau moyennement claire",
+        "poing",
+        "stop"
+      ],
+      "🫺🏽": [
+        "pouce vers la droite : peau légèrement mate",
+        "ça",
+        "droite",
+        "neutre",
+        "peau légèrement mate",
+        "poing",
+        "stop"
+      ],
+      "🫺🏾": [
+        "pouce vers la droite : peau mate",
+        "ça",
+        "droite",
+        "neutre",
+        "peau mate",
+        "poing",
+        "stop"
+      ],
+      "🫺🏿": [
+        "pouce vers la droite : peau foncée",
+        "ça",
+        "droite",
+        "neutre",
+        "peau foncée",
+        "poing",
+        "stop"
       ]
     },
     "id": {
@@ -391729,7 +393596,7 @@
         "bendera"
       ],
       "🇧🇳": [
-        "bendera: Brunei",
+        "bendera: Brunei Darussalam",
         "bendera"
       ],
       "🇧🇴": [
@@ -415385,6 +417252,18 @@
         "longsor lumpur",
         "musibah"
       ],
+      "🛙": [
+        "mercusuar",
+        "bimbingan",
+        "cahaya",
+        "harapan",
+        "laut",
+        "maritim",
+        "navigasi",
+        "pencerahan",
+        "sinyal",
+        "suar"
+      ],
       "🛜": [
         "nirkabel",
         "daring",
@@ -426251,6 +428130,34 @@
         "musik",
         "sedih"
       ],
+      "🪋": [
+        "meteor",
+        "batu",
+        "bintang",
+        "bola api",
+        "gravitasi",
+        "jatuh",
+        "kiamat",
+        "luar angkasa"
+      ],
+      "🪌": [
+        "penghapus",
+        "gambar",
+        "gosok",
+        "hapus",
+        "kekeliruan",
+        "kesalahan",
+        "koreksi",
+        "tulisan",
+        "urungkan"
+      ],
+      "🪍": [
+        "jaring dengan gagang",
+        "menangkap",
+        "mengumpulkan",
+        "menjebak",
+        "menjerat"
+      ],
       "🪎": [
         "peti harta karun",
         "barang berharga",
@@ -427039,6 +428946,17 @@
         "sasquatch",
         "yeti"
       ],
+      "🫌": [
+        "kupu-kupu raja",
+        "harapan",
+        "metamorfosis",
+        "migrasi",
+        "perubahan",
+        "rapuh",
+        "serangga",
+        "transformasi",
+        "ulat"
+      ],
       "🫍": [
         "orca",
         "laut",
@@ -427178,6 +429096,15 @@
         "sayur",
         "umbi"
       ],
+      "🫝": [
+        "acar ketimun",
+        "air garam",
+        "bumbu",
+        "fermentasi",
+        "ketimun",
+        "masalah",
+        "saus"
+      ],
       "🫟": [
         "percikan",
         "cat",
@@ -427314,6 +429241,16 @@
         "rentan",
         "syok",
         "terkejut"
+      ],
+      "🫫": [
+        "wajah retak",
+        "ketahanan",
+        "ketegangan",
+        "mengungkapkan",
+        "menutupi",
+        "pecah",
+        "runtuh",
+        "transformasi"
       ],
       "🫯": [
         "awan duel",
@@ -428254,6 +430191,124 @@
         "tos",
         "tunggu",
         "warna kulit gelap"
+      ],
+      "🫹": [
+        "isyarat jempol ke kiri",
+        "genggaman",
+        "ini",
+        "itu",
+        "kiri",
+        "netral",
+        "tunjuk"
+      ],
+      "🫹🏻": [
+        "isyarat jempol ke kiri: warna kulit cerah",
+        "genggaman",
+        "ini",
+        "itu",
+        "kiri",
+        "netral",
+        "tunjuk",
+        "warna kulit cerah"
+      ],
+      "🫹🏼": [
+        "isyarat jempol ke kiri: warna kulit cerah-sedang",
+        "genggaman",
+        "ini",
+        "itu",
+        "kiri",
+        "netral",
+        "tunjuk",
+        "warna kulit cerah-sedang"
+      ],
+      "🫹🏽": [
+        "isyarat jempol ke kiri: warna kulit sedang",
+        "genggaman",
+        "ini",
+        "itu",
+        "kiri",
+        "netral",
+        "tunjuk",
+        "warna kulit sedang"
+      ],
+      "🫹🏾": [
+        "isyarat jempol ke kiri: warna kulit gelap-sedang",
+        "genggaman",
+        "ini",
+        "itu",
+        "kiri",
+        "netral",
+        "tunjuk",
+        "warna kulit gelap-sedang"
+      ],
+      "🫹🏿": [
+        "isyarat jempol ke kiri: warna kulit gelap",
+        "genggaman",
+        "ini",
+        "itu",
+        "kiri",
+        "netral",
+        "tunjuk",
+        "warna kulit gelap"
+      ],
+      "🫺": [
+        "isyarat jempol ke kanan",
+        "genggaman",
+        "ini",
+        "itu",
+        "kanan",
+        "netral",
+        "tunjuk"
+      ],
+      "🫺🏻": [
+        "isyarat jempol ke kanan: warna kulit cerah",
+        "genggaman",
+        "ini",
+        "itu",
+        "kanan",
+        "netral",
+        "tunjuk",
+        "warna kulit cerah"
+      ],
+      "🫺🏼": [
+        "isyarat jempol ke kanan: warna kulit cerah-sedang",
+        "genggaman",
+        "ini",
+        "itu",
+        "kanan",
+        "netral",
+        "tunjuk",
+        "warna kulit cerah-sedang"
+      ],
+      "🫺🏽": [
+        "isyarat jempol ke kanan: warna kulit sedang",
+        "genggaman",
+        "ini",
+        "itu",
+        "kanan",
+        "netral",
+        "tunjuk",
+        "warna kulit sedang"
+      ],
+      "🫺🏾": [
+        "isyarat jempol ke kanan: warna kulit gelap-sedang",
+        "genggaman",
+        "ini",
+        "itu",
+        "kanan",
+        "netral",
+        "tunjuk",
+        "warna kulit gelap-sedang"
+      ],
+      "🫺🏿": [
+        "isyarat jempol ke kanan: warna kulit gelap",
+        "genggaman",
+        "ini",
+        "itu",
+        "kanan",
+        "netral",
+        "tunjuk",
+        "warna kulit gelap"
       ]
     },
     "it": {
@@ -428900,10 +430955,11 @@
         "zodiaco"
       ],
       "♐": [
-        "Segno zodiacale del Saggitario",
+        "Segno zodiacale del Sagittario",
         "oroscopo",
         "Sagittario",
         "segno zodiacale",
+        "Segno zodiacale del Saggitario",
         "zodiaco"
       ],
       "♑": [
@@ -431229,8 +433285,7 @@
         "qui",
         "simbolo",
         "tabelloni",
-        "tasto",
-        "ココ"
+        "tasto"
       ],
       "🈂️": [
         "ideogramma giapponese di “Costo del servizio”",
@@ -431711,7 +433766,7 @@
         "meteo",
         "natura",
         "nevica",
-        "nuovola",
+        "nuvola",
         "nuvole",
         "tempo"
       ],
@@ -431999,11 +434054,9 @@
       ],
       "🍈": [
         "melone",
-        "cantaloupe",
         "cibo",
         "frutta",
-        "frutto",
-        "oliva"
+        "frutto"
       ],
       "🍉": [
         "anguria",
@@ -432357,13 +434410,9 @@
       "🍭": [
         "lecca lecca",
         "caramella",
-        "chupa chups",
         "dolce",
-        "dolcetti",
         "dolcetto",
-        "dolci",
         "ristorante",
-        "willi wonka",
         "zucchero"
       ],
       "🍮": [
@@ -432385,9 +434434,7 @@
         "dolce",
         "miele",
         "ristorante",
-        "vaso",
         "vaso di miele",
-        "winnie the pooh",
         "zucchero"
       ],
       "🍰": [
@@ -432578,11 +434625,7 @@
       "🎀": [
         "fiocco",
         "auguri",
-        "bambina",
-        "bebé",
-        "festa",
-        "fiocco rosa",
-        "neonata"
+        "festa"
       ],
       "🎁": [
         "regalo",
@@ -432893,7 +434936,6 @@
       "🎞️": [
         "pellicola cinematografica",
         "cinema",
-        "cinema paradiso",
         "film",
         "fotogrammi",
         "fotogrammi di film",
@@ -432998,7 +435040,6 @@
       "🎩": [
         "cilindro",
         "abbigliamento",
-        "bombetta",
         "cappello",
         "elegante",
         "inglese",
@@ -433011,7 +435052,6 @@
         "festa",
         "fiera",
         "intrattenimento",
-        "orfei",
         "spettacolo",
         "tenda",
         "tenda da circo",
@@ -433021,7 +435061,6 @@
         "biglietto",
         "ammissione",
         "cartellino",
-        "giallo",
         "ingresso"
       ],
       "🎬": [
@@ -433174,8 +435213,7 @@
         "jazz",
         "musica",
         "strumento",
-        "strumento musicale",
-        "trombone"
+        "strumento musicale"
       ],
       "🎻": [
         "violino",
@@ -434951,7 +436989,7 @@
       "🏢": [
         "edificio",
         "edificio di uffici",
-        "edifico di uffici",
+        "lavoro",
         "palazzo",
         "ufficio"
       ],
@@ -435415,10 +437453,7 @@
       "🐗": [
         "cinghiale",
         "animale",
-        "animali",
         "bosco",
-        "faccina cinghiale",
-        "game of thones",
         "maiale selvatico"
       ],
       "🐘": [
@@ -436003,7 +438038,7 @@
         "in alto",
         "indice in su",
         "mano",
-        "sù"
+        "su"
       ],
       "👆🏻": [
         "indice alzato: carnagione chiara",
@@ -436016,7 +438051,7 @@
         "indice alzato",
         "indice in su",
         "mano",
-        "sù"
+        "su"
       ],
       "👆🏼": [
         "indice alzato: carnagione abbastanza chiara",
@@ -436029,7 +438064,7 @@
         "indice alzato",
         "indice in su",
         "mano",
-        "sù"
+        "su"
       ],
       "👆🏽": [
         "indice alzato: carnagione olivastra",
@@ -436042,7 +438077,7 @@
         "indice alzato",
         "indice in su",
         "mano",
-        "sù"
+        "su"
       ],
       "👆🏾": [
         "indice alzato: carnagione abbastanza scura",
@@ -436055,7 +438090,7 @@
         "indice alzato",
         "indice in su",
         "mano",
-        "sù"
+        "su"
       ],
       "👆🏿": [
         "indice alzato: carnagione scura",
@@ -436068,7 +438103,7 @@
         "indice alzato",
         "indice in su",
         "mano",
-        "sù"
+        "su"
       ],
       "👇": [
         "indice abbassato",
@@ -436929,8 +438964,8 @@
         "abbigliamento",
         "abbigliamento uomo",
         "camicia",
-        "camicia a righe",
         "colletto",
+        "cravatta a righe",
         "vestiti da uomo"
       ],
       "👕": [
@@ -436942,7 +438977,6 @@
         "maglia",
         "maglietta",
         "maniche corte",
-        "polo",
         "shopping"
       ],
       "👖": [
@@ -436982,13 +439016,13 @@
       "👚": [
         "maglietta da donna",
         "abbigliamento",
+        "blusa",
+        "camicetta",
+        "camicia",
+        "colletto",
         "donna",
-        "maglietta",
-        "maglietta rosa",
-        "polo",
-        "t-shirt",
-        "vestiti",
-        "vestiti da donna"
+        "shopping",
+        "vestiti"
       ],
       "👛": [
         "borsellino",
@@ -448397,8 +450431,7 @@
         "lavoro",
         "londra",
         "sentinella",
-        "turno di guardia",
-        "uomo"
+        "turno di guardia"
       ],
       "💂‍♀️": [
         "guardia donna",
@@ -448427,8 +450460,7 @@
         "lavoro",
         "londra",
         "sentinella",
-        "turno di guardia",
-        "uomo"
+        "turno di guardia"
       ],
       "💂🏻‍♀️": [
         "guardia donna: carnagione chiara",
@@ -448459,8 +450491,7 @@
         "lavoro",
         "londra",
         "sentinella",
-        "turno di guardia",
-        "uomo"
+        "turno di guardia"
       ],
       "💂🏼‍♀️": [
         "guardia donna: carnagione abbastanza chiara",
@@ -448491,8 +450522,7 @@
         "lavoro",
         "londra",
         "sentinella",
-        "turno di guardia",
-        "uomo"
+        "turno di guardia"
       ],
       "💂🏽‍♀️": [
         "guardia donna: carnagione olivastra",
@@ -448523,8 +450553,7 @@
         "lavoro",
         "londra",
         "sentinella",
-        "turno di guardia",
-        "uomo"
+        "turno di guardia"
       ],
       "💂🏾‍♀️": [
         "guardia donna: carnagione abbastanza scura",
@@ -448555,8 +450584,7 @@
         "lavoro",
         "londra",
         "sentinella",
-        "turno di guardia",
-        "uomo"
+        "turno di guardia"
       ],
       "💂🏿‍♀️": [
         "guardia donna: carnagione scura",
@@ -449218,7 +451246,7 @@
         "malattia",
         "medicina",
         "pillole",
-        "vitaminca"
+        "vitamina"
       ],
       "💋": [
         "impronta della bocca",
@@ -449918,7 +451946,7 @@
         "crisi",
         "denaro",
         "Euro",
-        "millionario",
+        "milionario",
         "soldi",
         "valuta"
       ],
@@ -450052,7 +452080,7 @@
         "calendario",
         "17",
         "data",
-        "diciasette",
+        "diciassette",
         "giorno",
         "ricorrenza",
         "sfortuna",
@@ -450635,12 +452663,8 @@
         "cinepresa",
         "film",
         "filmato",
-        "fotocamera",
-        "fotografare",
-        "macchina fotografica",
         "ricordi",
         "riproduzione",
-        "scattare foto",
         "video",
         "videoproiettore"
       ],
@@ -450671,11 +452695,12 @@
         "tasto"
       ],
       "🔂": [
-        "pulsante di ripetizione della riproduzione di una traccia",
+        "pulsante di ripetizione di una traccia",
         "frecce",
         "frecce a cerchio numero 1",
         "frecce senso orario",
         "frecce senso orario numero 1",
+        "pulsante di ripetizione della riproduzione di una traccia",
         "ripeti",
         "ripetizione",
         "senso orario"
@@ -451603,12 +453628,11 @@
       ],
       "🕵️": [
         "detective",
-        "investigatore",
         "lavoro",
         "lente",
         "mistero",
-        "spia",
-        "uomo"
+        "segugio",
+        "spia"
       ],
       "🕵️‍♀️": [
         "investigatrice",
@@ -451630,12 +453654,11 @@
         "detective: carnagione chiara",
         "carnagione chiara",
         "detective",
-        "investigatore",
         "lavoro",
         "lente",
         "mistero",
-        "spia",
-        "uomo"
+        "segugio",
+        "spia"
       ],
       "🕵🏻‍♀️": [
         "investigatrice: carnagione chiara",
@@ -451661,12 +453684,11 @@
         "detective: carnagione abbastanza chiara",
         "carnagione abbastanza chiara",
         "detective",
-        "investigatore",
         "lavoro",
         "lente",
         "mistero",
-        "spia",
-        "uomo"
+        "segugio",
+        "spia"
       ],
       "🕵🏼‍♀️": [
         "investigatrice: carnagione abbastanza chiara",
@@ -451692,12 +453714,11 @@
         "detective: carnagione olivastra",
         "carnagione olivastra",
         "detective",
-        "investigatore",
         "lavoro",
         "lente",
         "mistero",
-        "spia",
-        "uomo"
+        "segugio",
+        "spia"
       ],
       "🕵🏽‍♀️": [
         "investigatrice: carnagione olivastra",
@@ -451723,12 +453744,11 @@
         "detective: carnagione abbastanza scura",
         "carnagione abbastanza scura",
         "detective",
-        "investigatore",
         "lavoro",
         "lente",
         "mistero",
-        "spia",
-        "uomo"
+        "segugio",
+        "spia"
       ],
       "🕵🏾‍♀️": [
         "investigatrice: carnagione abbastanza scura",
@@ -451754,12 +453774,11 @@
         "detective: carnagione scura",
         "carnagione scura",
         "detective",
-        "investigatore",
         "lavoro",
         "lente",
         "mistero",
-        "spia",
-        "uomo"
+        "segugio",
+        "spia"
       ],
       "🕵🏿‍♀️": [
         "investigatrice: carnagione scura",
@@ -453266,11 +455285,8 @@
       ],
       "🙅": [
         "persona che fa segno di no",
-        "donna",
         "escluso",
-        "faccina",
         "gesto",
-        "gesto di rifiuto",
         "no",
         "non bene",
         "persona",
@@ -453299,11 +455315,8 @@
       "🙅🏻": [
         "persona che fa segno di no: carnagione chiara",
         "carnagione chiara",
-        "donna",
         "escluso",
-        "faccina",
         "gesto",
-        "gesto di rifiuto",
         "no",
         "non bene",
         "persona",
@@ -453336,11 +455349,8 @@
       "🙅🏼": [
         "persona che fa segno di no: carnagione abbastanza chiara",
         "carnagione abbastanza chiara",
-        "donna",
         "escluso",
-        "faccina",
         "gesto",
-        "gesto di rifiuto",
         "no",
         "non bene",
         "persona",
@@ -453373,11 +455383,8 @@
       "🙅🏽": [
         "persona che fa segno di no: carnagione olivastra",
         "carnagione olivastra",
-        "donna",
         "escluso",
-        "faccina",
         "gesto",
-        "gesto di rifiuto",
         "no",
         "non bene",
         "persona",
@@ -453410,11 +455417,8 @@
       "🙅🏾": [
         "persona che fa segno di no: carnagione abbastanza scura",
         "carnagione abbastanza scura",
-        "donna",
         "escluso",
-        "faccina",
         "gesto",
-        "gesto di rifiuto",
         "no",
         "non bene",
         "persona",
@@ -453447,11 +455451,8 @@
       "🙅🏿": [
         "persona che fa segno di no: carnagione scura",
         "carnagione scura",
-        "donna",
         "escluso",
-        "faccina",
         "gesto",
-        "gesto di rifiuto",
         "no",
         "non bene",
         "persona",
@@ -453483,8 +455484,7 @@
       ],
       "🙆": [
         "persona con gesto OK",
-        "donna",
-        "donna con braccia alzate",
+        "braccia alzate",
         "esercizio",
         "fitness",
         "gesto",
@@ -453516,9 +455516,8 @@
       ],
       "🙆🏻": [
         "persona con gesto OK: carnagione chiara",
+        "braccia alzate",
         "carnagione chiara",
-        "donna",
-        "donna con braccia alzate",
         "esercizio",
         "fitness",
         "gesto",
@@ -453555,9 +455554,8 @@
       ],
       "🙆🏼": [
         "persona con gesto OK: carnagione abbastanza chiara",
+        "braccia alzate",
         "carnagione abbastanza chiara",
-        "donna",
-        "donna con braccia alzate",
         "esercizio",
         "fitness",
         "gesto",
@@ -453594,9 +455592,8 @@
       ],
       "🙆🏽": [
         "persona con gesto OK: carnagione olivastra",
+        "braccia alzate",
         "carnagione olivastra",
-        "donna",
-        "donna con braccia alzate",
         "esercizio",
         "fitness",
         "gesto",
@@ -453633,9 +455630,8 @@
       ],
       "🙆🏾": [
         "persona con gesto OK: carnagione abbastanza scura",
+        "braccia alzate",
         "carnagione abbastanza scura",
-        "donna",
-        "donna con braccia alzate",
         "esercizio",
         "fitness",
         "gesto",
@@ -453672,9 +455668,8 @@
       ],
       "🙆🏿": [
         "persona con gesto OK: carnagione scura",
+        "braccia alzate",
         "carnagione scura",
-        "donna",
-        "donna con braccia alzate",
         "esercizio",
         "fitness",
         "gesto",
@@ -453986,7 +455981,6 @@
       "🙋": [
         "persona con mano alzata",
         "ciao",
-        "donna",
         "eccomi",
         "felice",
         "gesto",
@@ -454018,7 +456012,6 @@
         "persona con mano alzata: carnagione chiara",
         "carnagione chiara",
         "ciao",
-        "donna",
         "eccomi",
         "felice",
         "gesto",
@@ -454055,7 +456048,6 @@
         "persona con mano alzata: carnagione abbastanza chiara",
         "carnagione abbastanza chiara",
         "ciao",
-        "donna",
         "eccomi",
         "felice",
         "gesto",
@@ -454092,7 +456084,6 @@
         "persona con mano alzata: carnagione olivastra",
         "carnagione olivastra",
         "ciao",
-        "donna",
         "eccomi",
         "felice",
         "gesto",
@@ -454129,7 +456120,6 @@
         "persona con mano alzata: carnagione abbastanza scura",
         "carnagione abbastanza scura",
         "ciao",
-        "donna",
         "eccomi",
         "felice",
         "gesto",
@@ -454166,7 +456156,6 @@
         "persona con mano alzata: carnagione scura",
         "carnagione scura",
         "ciao",
-        "donna",
         "eccomi",
         "felice",
         "gesto",
@@ -454292,7 +456281,6 @@
         "arrabbiata",
         "corrucciata",
         "delusa",
-        "donna",
         "faccia",
         "frustrata",
         "gesto",
@@ -454302,10 +456290,15 @@
       ],
       "🙍‍♀️": [
         "donna corrucciata",
+        "arrabbiata",
         "corrucciata",
+        "delusa",
         "donna",
-        "femmina",
-        "gesto"
+        "faccia",
+        "frustrata",
+        "gesto",
+        "infelice",
+        "triste"
       ],
       "🙍‍♂️": [
         "uomo corrucciato",
@@ -454328,7 +456321,6 @@
         "carnagione chiara",
         "corrucciata",
         "delusa",
-        "donna",
         "faccia",
         "frustrata",
         "gesto",
@@ -454338,11 +456330,16 @@
       ],
       "🙍🏻‍♀️": [
         "donna corrucciata: carnagione chiara",
+        "arrabbiata",
         "carnagione chiara",
         "corrucciata",
+        "delusa",
         "donna",
-        "femmina",
-        "gesto"
+        "faccia",
+        "frustrata",
+        "gesto",
+        "infelice",
+        "triste"
       ],
       "🙍🏻‍♂️": [
         "uomo corrucciato: carnagione chiara",
@@ -454366,7 +456363,6 @@
         "carnagione abbastanza chiara",
         "corrucciata",
         "delusa",
-        "donna",
         "faccia",
         "frustrata",
         "gesto",
@@ -454376,11 +456372,16 @@
       ],
       "🙍🏼‍♀️": [
         "donna corrucciata: carnagione abbastanza chiara",
+        "arrabbiata",
         "carnagione abbastanza chiara",
         "corrucciata",
+        "delusa",
         "donna",
-        "femmina",
-        "gesto"
+        "faccia",
+        "frustrata",
+        "gesto",
+        "infelice",
+        "triste"
       ],
       "🙍🏼‍♂️": [
         "uomo corrucciato: carnagione abbastanza chiara",
@@ -454404,7 +456405,6 @@
         "carnagione olivastra",
         "corrucciata",
         "delusa",
-        "donna",
         "faccia",
         "frustrata",
         "gesto",
@@ -454414,11 +456414,16 @@
       ],
       "🙍🏽‍♀️": [
         "donna corrucciata: carnagione olivastra",
+        "arrabbiata",
         "carnagione olivastra",
         "corrucciata",
+        "delusa",
         "donna",
-        "femmina",
-        "gesto"
+        "faccia",
+        "frustrata",
+        "gesto",
+        "infelice",
+        "triste"
       ],
       "🙍🏽‍♂️": [
         "uomo corrucciato: carnagione olivastra",
@@ -454442,7 +456447,6 @@
         "carnagione abbastanza scura",
         "corrucciata",
         "delusa",
-        "donna",
         "faccia",
         "frustrata",
         "gesto",
@@ -454452,11 +456456,16 @@
       ],
       "🙍🏾‍♀️": [
         "donna corrucciata: carnagione abbastanza scura",
+        "arrabbiata",
         "carnagione abbastanza scura",
         "corrucciata",
+        "delusa",
         "donna",
-        "femmina",
-        "gesto"
+        "faccia",
+        "frustrata",
+        "gesto",
+        "infelice",
+        "triste"
       ],
       "🙍🏾‍♂️": [
         "uomo corrucciato: carnagione abbastanza scura",
@@ -454480,7 +456489,6 @@
         "carnagione scura",
         "corrucciata",
         "delusa",
-        "donna",
         "faccia",
         "frustrata",
         "gesto",
@@ -454490,11 +456498,16 @@
       ],
       "🙍🏿‍♀️": [
         "donna corrucciata: carnagione scura",
+        "arrabbiata",
         "carnagione scura",
         "corrucciata",
+        "delusa",
         "donna",
-        "femmina",
-        "gesto"
+        "faccia",
+        "frustrata",
+        "gesto",
+        "infelice",
+        "triste"
       ],
       "🙍🏿‍♂️": [
         "uomo corrucciato: carnagione scura",
@@ -454517,7 +456530,6 @@
         "arrabbiata",
         "broncio",
         "delusa",
-        "donna",
         "gesto",
         "imbronciata",
         "persona",
@@ -454526,10 +456538,14 @@
       ],
       "🙎‍♀️": [
         "donna imbronciata",
+        "arrabbiata",
+        "broncio",
+        "delusa",
         "donna",
-        "femmina",
         "gesto",
-        "imbronciata"
+        "imbronciata",
+        "seccata",
+        "sguardo arrabbiato"
       ],
       "🙎‍♂️": [
         "uomo imbronciato",
@@ -454539,7 +456555,6 @@
         "gesto",
         "imbronciato",
         "maschio",
-        "person",
         "uomo"
       ],
       "🙎🏻": [
@@ -454548,7 +456563,6 @@
         "broncio",
         "carnagione chiara",
         "delusa",
-        "donna",
         "gesto",
         "imbronciata",
         "persona",
@@ -454557,11 +456571,15 @@
       ],
       "🙎🏻‍♀️": [
         "donna imbronciata: carnagione chiara",
+        "arrabbiata",
+        "broncio",
         "carnagione chiara",
+        "delusa",
         "donna",
-        "femmina",
         "gesto",
-        "imbronciata"
+        "imbronciata",
+        "seccata",
+        "sguardo arrabbiato"
       ],
       "🙎🏻‍♂️": [
         "uomo imbronciato: carnagione chiara",
@@ -454572,7 +456590,6 @@
         "gesto",
         "imbronciato",
         "maschio",
-        "person",
         "uomo"
       ],
       "🙎🏼": [
@@ -454581,7 +456598,6 @@
         "broncio",
         "carnagione abbastanza chiara",
         "delusa",
-        "donna",
         "gesto",
         "imbronciata",
         "persona",
@@ -454590,11 +456606,15 @@
       ],
       "🙎🏼‍♀️": [
         "donna imbronciata: carnagione abbastanza chiara",
+        "arrabbiata",
+        "broncio",
         "carnagione abbastanza chiara",
+        "delusa",
         "donna",
-        "femmina",
         "gesto",
-        "imbronciata"
+        "imbronciata",
+        "seccata",
+        "sguardo arrabbiato"
       ],
       "🙎🏼‍♂️": [
         "uomo imbronciato: carnagione abbastanza chiara",
@@ -454605,7 +456625,6 @@
         "gesto",
         "imbronciato",
         "maschio",
-        "person",
         "uomo"
       ],
       "🙎🏽": [
@@ -454614,7 +456633,6 @@
         "broncio",
         "carnagione olivastra",
         "delusa",
-        "donna",
         "gesto",
         "imbronciata",
         "persona",
@@ -454623,11 +456641,15 @@
       ],
       "🙎🏽‍♀️": [
         "donna imbronciata: carnagione olivastra",
+        "arrabbiata",
+        "broncio",
         "carnagione olivastra",
+        "delusa",
         "donna",
-        "femmina",
         "gesto",
-        "imbronciata"
+        "imbronciata",
+        "seccata",
+        "sguardo arrabbiato"
       ],
       "🙎🏽‍♂️": [
         "uomo imbronciato: carnagione olivastra",
@@ -454638,7 +456660,6 @@
         "gesto",
         "imbronciato",
         "maschio",
-        "person",
         "uomo"
       ],
       "🙎🏾": [
@@ -454647,7 +456668,6 @@
         "broncio",
         "carnagione abbastanza scura",
         "delusa",
-        "donna",
         "gesto",
         "imbronciata",
         "persona",
@@ -454656,11 +456676,15 @@
       ],
       "🙎🏾‍♀️": [
         "donna imbronciata: carnagione abbastanza scura",
+        "arrabbiata",
+        "broncio",
         "carnagione abbastanza scura",
+        "delusa",
         "donna",
-        "femmina",
         "gesto",
-        "imbronciata"
+        "imbronciata",
+        "seccata",
+        "sguardo arrabbiato"
       ],
       "🙎🏾‍♂️": [
         "uomo imbronciato: carnagione abbastanza scura",
@@ -454671,7 +456695,6 @@
         "gesto",
         "imbronciato",
         "maschio",
-        "person",
         "uomo"
       ],
       "🙎🏿": [
@@ -454680,7 +456703,6 @@
         "broncio",
         "carnagione scura",
         "delusa",
-        "donna",
         "gesto",
         "imbronciata",
         "persona",
@@ -454689,11 +456711,15 @@
       ],
       "🙎🏿‍♀️": [
         "donna imbronciata: carnagione scura",
+        "arrabbiata",
+        "broncio",
         "carnagione scura",
+        "delusa",
         "donna",
-        "femmina",
         "gesto",
-        "imbronciata"
+        "imbronciata",
+        "seccata",
+        "sguardo arrabbiato"
       ],
       "🙎🏿‍♂️": [
         "uomo imbronciato: carnagione scura",
@@ -454704,7 +456730,6 @@
         "gesto",
         "imbronciato",
         "maschio",
-        "person",
         "uomo"
       ],
       "🙏": [
@@ -456559,7 +458584,7 @@
       ],
       "🚿": [
         "doccia",
-        "aqua",
+        "acqua",
         "fare la doccia",
         "lavare",
         "lavarsi"
@@ -456865,6 +458890,17 @@
         "smottamento",
         "terremoto",
         "valanga"
+      ],
+      "🛙": [
+        "faro",
+        "guida",
+        "illuminazione",
+        "luce",
+        "mare",
+        "marittimo",
+        "navigazione",
+        "segnale",
+        "speranza"
       ],
       "🛜": [
         "wireless",
@@ -458436,13 +460472,11 @@
         "testa che esplode",
         "cervello",
         "faccina sorpresa",
-        "mindblown",
         "non ci credo",
         "sbalordito",
         "scioccato",
         "sconcertato",
-        "sorpesa",
-        "sorpreso",
+        "sorpresa",
         "stupore"
       ],
       "🤰": [
@@ -460693,7 +462727,6 @@
       "🥝": [
         "kiwi",
         "cibo",
-        "frutt",
         "frutta",
         "frutto"
       ],
@@ -461145,8 +463178,8 @@
       "🦀": [
         "granchio",
         "cancro",
+        "crostaceo",
         "mare",
-        "mollusco",
         "oceano",
         "segno zodiacale"
       ],
@@ -461365,8 +463398,6 @@
         "animale",
         "guanaco",
         "lana",
-        "lana di alpaca",
-        "vicuña",
         "vigogna"
       ],
       "🦚": [
@@ -467613,8 +469644,7 @@
         "giacca",
         "giaccone",
         "giubbotto",
-        "inverno",
-        "rosso"
+        "inverno"
       ],
       "🧦": [
         "calzini",
@@ -467779,7 +469809,7 @@
       ],
       "🧶": [
         "gomitolo",
-        "fare a maglia",
+        "fare la maglia",
         "filo",
         "lavorare a maglia",
         "palla",
@@ -468079,6 +470109,36 @@
         "strumento",
         "tiro"
       ],
+      "🪋": [
+        "meteora",
+        "apocalisse",
+        "caduta",
+        "gravità",
+        "palla di fuoco",
+        "roccia",
+        "spazio",
+        "stella"
+      ],
+      "🪌": [
+        "gomma per cancellare",
+        "annullare",
+        "cancellare",
+        "correzione",
+        "disegno",
+        "eliminare",
+        "errore",
+        "rimuovere",
+        "sbaglio",
+        "scrittura",
+        "strofinare"
+      ],
+      "🪍": [
+        "retino",
+        "catturare",
+        "raccogliere",
+        "rete",
+        "trappola"
+      ],
       "🪎": [
         "forziere",
         "argento",
@@ -468099,10 +470159,10 @@
         "spalare"
       ],
       "🪐": [
-        "pianeta con satellite",
-        "corpo celeste",
         "pianeta con anelli",
-        "satellite",
+        "anelli",
+        "corpo celeste",
+        "pianeta",
         "Saturno",
         "spazio"
       ],
@@ -468428,8 +470488,6 @@
         "coltivare",
         "curare",
         "decorare",
-        "inutile",
-        "noioso",
         "pianta",
         "vaso",
         "verde"
@@ -468776,6 +470834,17 @@
         "scimmione",
         "yeti"
       ],
+      "🫌": [
+        "farfalla monarca",
+        "bruco",
+        "cambiamento",
+        "fragile",
+        "insetto",
+        "metamorfosi",
+        "migrazione",
+        "speranza",
+        "trasformazione"
+      ],
       "🫍": [
         "orca",
         "animale",
@@ -468904,6 +470973,15 @@
         "radice",
         "rapa",
         "vegetale"
+      ],
+      "🫝": [
+        "sottaceto",
+        "cetriolino",
+        "cetriolo",
+        "condimento",
+        "fermentare",
+        "salamoia",
+        "salsa"
       ],
       "🫟": [
         "spruzzo",
@@ -469049,6 +471127,16 @@
         "sconvolto",
         "sorpresa",
         "vulnerabile"
+      ],
+      "🫫": [
+        "faccia screpolata",
+        "maschera",
+        "resilienza",
+        "rivelare",
+        "rottura",
+        "sgretolamento",
+        "tensione",
+        "trasformazione"
       ],
       "🫯": [
         "nuvoletta di zuffa",
@@ -470067,6 +472155,124 @@
         "spingere",
         "spinta",
         "stop"
+      ],
+      "🫹": [
+        "segno del pollice a sinistra",
+        "indicare",
+        "neutro",
+        "presa",
+        "quello",
+        "questo",
+        "sinistra"
+      ],
+      "🫹🏻": [
+        "segno del pollice a sinistra: carnagione chiara",
+        "carnagione chiara",
+        "indicare",
+        "neutro",
+        "presa",
+        "quello",
+        "questo",
+        "sinistra"
+      ],
+      "🫹🏼": [
+        "segno del pollice a sinistra: carnagione abbastanza chiara",
+        "carnagione abbastanza chiara",
+        "indicare",
+        "neutro",
+        "presa",
+        "quello",
+        "questo",
+        "sinistra"
+      ],
+      "🫹🏽": [
+        "segno del pollice a sinistra: carnagione olivastra",
+        "carnagione olivastra",
+        "indicare",
+        "neutro",
+        "presa",
+        "quello",
+        "questo",
+        "sinistra"
+      ],
+      "🫹🏾": [
+        "segno del pollice a sinistra: carnagione abbastanza scura",
+        "carnagione abbastanza scura",
+        "indicare",
+        "neutro",
+        "presa",
+        "quello",
+        "questo",
+        "sinistra"
+      ],
+      "🫹🏿": [
+        "segno del pollice a sinistra: carnagione scura",
+        "carnagione scura",
+        "indicare",
+        "neutro",
+        "presa",
+        "quello",
+        "questo",
+        "sinistra"
+      ],
+      "🫺": [
+        "segno del pollice a destra",
+        "destra",
+        "indicare",
+        "neutro",
+        "presa",
+        "quello",
+        "questo"
+      ],
+      "🫺🏻": [
+        "segno del pollice a destra: carnagione chiara",
+        "carnagione chiara",
+        "destra",
+        "indicare",
+        "neutro",
+        "presa",
+        "quello",
+        "questo"
+      ],
+      "🫺🏼": [
+        "segno del pollice a destra: carnagione abbastanza chiara",
+        "carnagione abbastanza chiara",
+        "destra",
+        "indicare",
+        "neutro",
+        "presa",
+        "quello",
+        "questo"
+      ],
+      "🫺🏽": [
+        "segno del pollice a destra: carnagione olivastra",
+        "carnagione olivastra",
+        "destra",
+        "indicare",
+        "neutro",
+        "presa",
+        "quello",
+        "questo"
+      ],
+      "🫺🏾": [
+        "segno del pollice a destra: carnagione abbastanza scura",
+        "carnagione abbastanza scura",
+        "destra",
+        "indicare",
+        "neutro",
+        "presa",
+        "quello",
+        "questo"
+      ],
+      "🫺🏿": [
+        "segno del pollice a destra: carnagione scura",
+        "carnagione scura",
+        "destra",
+        "indicare",
+        "neutro",
+        "presa",
+        "quello",
+        "questo"
       ]
     },
     "ja": {
@@ -492923,6 +495129,18 @@
         "災害",
         "落石"
       ],
+      "🛙": [
+        "灯台",
+        "ビーコン",
+        "信号",
+        "光",
+        "導き",
+        "希望",
+        "海",
+        "灯り",
+        "航海",
+        "船"
+      ],
       "🛜": [
         "Wi-Fi",
         "インターネット",
@@ -502920,6 +505138,37 @@
         "管楽器",
         "音楽"
       ],
+      "🪋": [
+        "隕石",
+        "大惨事",
+        "宇宙",
+        "岩",
+        "引力",
+        "星",
+        "火の玉",
+        "落ちる"
+      ],
+      "🪌": [
+        "消しゴム",
+        "こする",
+        "やり直す",
+        "修正",
+        "削除",
+        "書く",
+        "校正",
+        "消す",
+        "訂正",
+        "誤字",
+        "間違い"
+      ],
+      "🪍": [
+        "虫取り網",
+        "捕まえる",
+        "捕獲",
+        "網",
+        "罠",
+        "集める"
+      ],
       "🪎": [
         "宝箱",
         "お宝",
@@ -503550,6 +505799,17 @@
         "森",
         "毛むくじゃら"
       ],
+      "🫌": [
+        "オオカバマダラ",
+        "変態",
+        "変身",
+        "希望",
+        "成長",
+        "芋虫",
+        "虫",
+        "蛹から蝶",
+        "蝶"
+      ],
       "🫍": [
         "シャチ",
         "クジラ",
@@ -503681,6 +505941,16 @@
         "根",
         "野菜"
       ],
+      "🫝": [
+        "ピクルス",
+        "キュウリ",
+        "レリッシュ",
+        "付け合わせ",
+        "漬物",
+        "発酵",
+        "胡瓜",
+        "酢漬け"
+      ],
       "🫟": [
         "飛び散ったペンキ",
         "しぶき",
@@ -503789,6 +506059,16 @@
         "不安",
         "膨れた",
         "驚いた"
+      ],
+      "🫫": [
+        "ひび割れた顔",
+        "ひび",
+        "マスク",
+        "割れる",
+        "壊れる",
+        "変身",
+        "正体",
+        "緊張"
       ],
       "🫯": [
         "ボカスカ",
@@ -504569,6 +506849,124 @@
         "押す",
         "断る",
         "止まれ",
+        "濃い肌色"
+      ],
+      "🫹": [
+        "左向きの親指",
+        "あれ",
+        "これ",
+        "中立",
+        "左",
+        "指差す",
+        "握る"
+      ],
+      "🫹🏻": [
+        "左向きの親指: 薄い肌色",
+        "あれ",
+        "これ",
+        "中立",
+        "左",
+        "指差す",
+        "握る",
+        "薄い肌色"
+      ],
+      "🫹🏼": [
+        "左向きの親指: やや薄い肌色",
+        "あれ",
+        "これ",
+        "やや薄い肌色",
+        "中立",
+        "左",
+        "指差す",
+        "握る"
+      ],
+      "🫹🏽": [
+        "左向きの親指: 中間の肌色",
+        "あれ",
+        "これ",
+        "中立",
+        "中間の肌色",
+        "左",
+        "指差す",
+        "握る"
+      ],
+      "🫹🏾": [
+        "左向きの親指: やや濃い肌色",
+        "あれ",
+        "これ",
+        "やや濃い肌色",
+        "中立",
+        "左",
+        "指差す",
+        "握る"
+      ],
+      "🫹🏿": [
+        "左向きの親指: 濃い肌色",
+        "あれ",
+        "これ",
+        "中立",
+        "左",
+        "指差す",
+        "握る",
+        "濃い肌色"
+      ],
+      "🫺": [
+        "右向きの親指",
+        "あれ",
+        "これ",
+        "中立",
+        "右",
+        "指差す",
+        "握る"
+      ],
+      "🫺🏻": [
+        "右向きの親指: 薄い肌色",
+        "あれ",
+        "これ",
+        "中立",
+        "右",
+        "指差す",
+        "握る",
+        "薄い肌色"
+      ],
+      "🫺🏼": [
+        "右向きの親指: やや薄い肌色",
+        "あれ",
+        "これ",
+        "やや薄い肌色",
+        "中立",
+        "右",
+        "指差す",
+        "握る"
+      ],
+      "🫺🏽": [
+        "右向きの親指: 中間の肌色",
+        "あれ",
+        "これ",
+        "中立",
+        "中間の肌色",
+        "右",
+        "指差す",
+        "握る"
+      ],
+      "🫺🏾": [
+        "右向きの親指: やや濃い肌色",
+        "あれ",
+        "これ",
+        "やや濃い肌色",
+        "中立",
+        "右",
+        "指差す",
+        "握る"
+      ],
+      "🫺🏿": [
+        "右向きの親指: 濃い肌色",
+        "あれ",
+        "これ",
+        "中立",
+        "右",
+        "指差す",
+        "握る",
         "濃い肌色"
       ]
     },
@@ -532164,6 +534562,17 @@
         "재난",
         "지진"
       ],
+      "🛙": [
+        "등대",
+        "깨달음",
+        "바다",
+        "빛",
+        "신호",
+        "안내",
+        "항해",
+        "해양",
+        "희망"
+      ],
       "🛜": [
         "무선",
         "Wi-Fi",
@@ -542896,6 +545305,39 @@
         "음악",
         "재즈"
       ],
+      "🪋": [
+        "유성",
+        "바위",
+        "별",
+        "별똥별",
+        "불덩이",
+        "우주",
+        "종말",
+        "중력",
+        "추락"
+      ],
+      "🪌": [
+        "지우개",
+        "그리기",
+        "그림",
+        "글쓰기",
+        "문지르기",
+        "삭제",
+        "수정",
+        "실수",
+        "실행 취소",
+        "오류",
+        "제거",
+        "지우기"
+      ],
+      "🪍": [
+        "잠자리채",
+        "그물",
+        "덫",
+        "모으다",
+        "잡다",
+        "채집"
+      ],
       "🪎": [
         "보물 상자",
         "귀중품",
@@ -543631,6 +546073,17 @@
         "숲",
         "털"
       ],
+      "🫌": [
+        "제왕나비",
+        "곤충",
+        "깨지기 쉬운",
+        "변신",
+        "변화",
+        "애벌레",
+        "이동",
+        "탈바꿈",
+        "희망"
+      ],
       "🫍": [
         "범고래",
         "고래",
@@ -543773,6 +546226,16 @@
         "정원",
         "채소",
         "채식주의"
+      ],
+      "🫝": [
+        "피클",
+        "난처",
+        "렐리시",
+        "발효",
+        "소금물",
+        "양념",
+        "오이",
+        "오이피클"
       ],
       "🫟": [
         "튀어오른 액체",
@@ -543919,6 +546382,18 @@
         "부푼",
         "불안",
         "충격"
+      ],
+      "🫫": [
+        "금이 간 얼굴",
+        "갈라지는",
+        "금이 간",
+        "긴장하는",
+        "깨진",
+        "드러나는",
+        "무너지는",
+        "바뀌는",
+        "부서지는",
+        "허물어지는"
       ],
       "🫯": [
         "싸움 구름",
@@ -544839,6 +547314,124 @@
         "오른쪽 방향",
         "오른쪽으로 밀치는 손",
         "하이 파이브"
+      ],
+      "🫹": [
+        "왼쪽을 향한 엄지",
+        "가리키다",
+        "왼쪽",
+        "이것",
+        "저것",
+        "중립",
+        "쥐다"
+      ],
+      "🫹🏻": [
+        "왼쪽을 향한 엄지: 하얀 피부",
+        "가리키다",
+        "왼쪽",
+        "이것",
+        "저것",
+        "중립",
+        "쥐다",
+        "하얀 피부"
+      ],
+      "🫹🏼": [
+        "왼쪽을 향한 엄지: 연한 갈색 피부",
+        "가리키다",
+        "연한 갈색 피부",
+        "왼쪽",
+        "이것",
+        "저것",
+        "중립",
+        "쥐다"
+      ],
+      "🫹🏽": [
+        "왼쪽을 향한 엄지: 갈색 피부",
+        "가리키다",
+        "갈색 피부",
+        "왼쪽",
+        "이것",
+        "저것",
+        "중립",
+        "쥐다"
+      ],
+      "🫹🏾": [
+        "왼쪽을 향한 엄지: 진한 갈색 피부",
+        "가리키다",
+        "왼쪽",
+        "이것",
+        "저것",
+        "중립",
+        "쥐다",
+        "진한 갈색 피부"
+      ],
+      "🫹🏿": [
+        "왼쪽을 향한 엄지: 검은색 피부",
+        "가리키다",
+        "검은색 피부",
+        "왼쪽",
+        "이것",
+        "저것",
+        "중립",
+        "쥐다"
+      ],
+      "🫺": [
+        "오른쪽을 향한 엄지",
+        "가리키다",
+        "오른쪽",
+        "이것",
+        "저것",
+        "중립",
+        "쥐다"
+      ],
+      "🫺🏻": [
+        "오른쪽을 향한 엄지: 하얀 피부",
+        "가리키다",
+        "오른쪽",
+        "이것",
+        "저것",
+        "중립",
+        "쥐다",
+        "하얀 피부"
+      ],
+      "🫺🏼": [
+        "오른쪽을 향한 엄지: 연한 갈색 피부",
+        "가리키다",
+        "연한 갈색 피부",
+        "오른쪽",
+        "이것",
+        "저것",
+        "중립",
+        "쥐다"
+      ],
+      "🫺🏽": [
+        "오른쪽을 향한 엄지: 갈색 피부",
+        "가리키다",
+        "갈색 피부",
+        "오른쪽",
+        "이것",
+        "저것",
+        "중립",
+        "쥐다"
+      ],
+      "🫺🏾": [
+        "오른쪽을 향한 엄지: 진한 갈색 피부",
+        "가리키다",
+        "오른쪽",
+        "이것",
+        "저것",
+        "중립",
+        "쥐다",
+        "진한 갈색 피부"
+      ],
+      "🫺🏿": [
+        "오른쪽을 향한 엄지: 검은색 피부",
+        "가리키다",
+        "검은색 피부",
+        "오른쪽",
+        "이것",
+        "저것",
+        "중립",
+        "쥐다"
       ]
     },
     "nl": {
@@ -546374,7 +548967,6 @@
       ],
       "❣️": [
         "hart als uitroepteken",
-        "hart",
         "hart met druppel eronder",
         "interpunctie",
         "leesteken",
@@ -550906,10 +553498,12 @@
       "🏧": [
         "pinautomaat",
         "ATM",
-        "automaat",
         "bank",
+        "contant",
+        "geautomatiseerd",
         "geld",
-        "pinnen"
+        "pinnen",
+        "teken"
       ],
       "🏨": [
         "hotel",
@@ -553565,7 +556159,6 @@
         "jongens",
         "lichte huidskleur",
         "lichtgetinte huidskleur",
-        "mannen",
         "paar",
         "schatje",
         "tweeling",
@@ -553583,7 +556176,6 @@
         "hand",
         "jongens",
         "lichte huidskleur",
-        "mannen",
         "paar",
         "schatje",
         "tweeling",
@@ -553601,7 +556193,6 @@
         "hand",
         "jongens",
         "lichte huidskleur",
-        "mannen",
         "paar",
         "schatje",
         "tweeling",
@@ -553619,7 +556210,6 @@
         "hand",
         "jongens",
         "lichte huidskleur",
-        "mannen",
         "paar",
         "schatje",
         "tweeling",
@@ -554171,7 +556761,6 @@
         "jongens",
         "lichte huidskleur",
         "lichtgetinte huidskleur",
-        "mannen",
         "paar",
         "schatje",
         "tweeling",
@@ -554189,7 +556778,6 @@
         "hand",
         "jongens",
         "lichtgetinte huidskleur",
-        "mannen",
         "paar",
         "schatje",
         "tweeling",
@@ -554207,7 +556795,6 @@
         "hand",
         "jongens",
         "lichtgetinte huidskleur",
-        "mannen",
         "paar",
         "schatje",
         "tweeling",
@@ -554225,7 +556812,6 @@
         "hand",
         "jongens",
         "lichtgetinte huidskleur",
-        "mannen",
         "paar",
         "schatje",
         "tweeling",
@@ -554777,7 +557363,6 @@
         "hand",
         "jongens",
         "lichte huidskleur",
-        "mannen",
         "paar",
         "schatje",
         "tweeling",
@@ -554795,7 +557380,6 @@
         "hand",
         "jongens",
         "lichtgetinte huidskleur",
-        "mannen",
         "paar",
         "schatje",
         "tweeling",
@@ -554813,7 +557397,6 @@
         "getinte huidskleur",
         "hand",
         "jongens",
-        "mannen",
         "paar",
         "schatje",
         "tweeling",
@@ -554831,7 +557414,6 @@
         "getinte huidskleur",
         "hand",
         "jongens",
-        "mannen",
         "paar",
         "schatje",
         "tweeling",
@@ -555383,7 +557965,6 @@
         "hand",
         "jongens",
         "lichte huidskleur",
-        "mannen",
         "paar",
         "schatje",
         "tweeling",
@@ -555401,7 +557982,6 @@
         "hand",
         "jongens",
         "lichtgetinte huidskleur",
-        "mannen",
         "paar",
         "schatje",
         "tweeling",
@@ -555419,7 +557999,6 @@
         "getinte huidskleur",
         "hand",
         "jongens",
-        "mannen",
         "paar",
         "schatje",
         "tweeling",
@@ -555437,7 +558016,6 @@
         "flirten",
         "hand",
         "jongens",
-        "mannen",
         "paar",
         "schatje",
         "tweeling",
@@ -555989,7 +558567,6 @@
         "hand",
         "jongens",
         "lichte huidskleur",
-        "mannen",
         "paar",
         "schatje",
         "tweeling",
@@ -556007,7 +558584,6 @@
         "hand",
         "jongens",
         "lichtgetinte huidskleur",
-        "mannen",
         "paar",
         "schatje",
         "tweeling",
@@ -556025,7 +558601,6 @@
         "getinte huidskleur",
         "hand",
         "jongens",
-        "mannen",
         "paar",
         "schatje",
         "tweeling",
@@ -556043,7 +558618,6 @@
         "flirten",
         "hand",
         "jongens",
-        "mannen",
         "paar",
         "schatje",
         "tweeling",
@@ -560832,7 +563406,6 @@
         "flirten",
         "hand",
         "jongens",
-        "mannen",
         "paar",
         "schatje",
         "tweeling",
@@ -560849,7 +563422,6 @@
         "hand",
         "jongens",
         "lichte huidskleur",
-        "mannen",
         "paar",
         "schatje",
         "tweeling",
@@ -560866,7 +563438,6 @@
         "hand",
         "jongens",
         "lichtgetinte huidskleur",
-        "mannen",
         "paar",
         "schatje",
         "tweeling",
@@ -560883,7 +563454,6 @@
         "getinte huidskleur",
         "hand",
         "jongens",
-        "mannen",
         "paar",
         "schatje",
         "tweeling",
@@ -560900,7 +563470,6 @@
         "flirten",
         "hand",
         "jongens",
-        "mannen",
         "paar",
         "schatje",
         "tweeling",
@@ -560917,7 +563486,6 @@
         "flirten",
         "hand",
         "jongens",
-        "mannen",
         "paar",
         "schatje",
         "tweeling",
@@ -566342,7 +568910,7 @@
         "zweet"
       ],
       "😆": [
-        "grijnzend gezicht met stijf dichtgeknepen ogen",
+        "grijnzend gezicht met dichtgeknepen ogen",
         "blij",
         "gesloten",
         "gezicht",
@@ -566611,7 +569179,6 @@
         "ik hou van je",
         "kus",
         "kussen",
-        "kussend",
         "lach",
         "lachen",
         "liefde",
@@ -566861,14 +569428,12 @@
         "gezicht met open mond",
         "geschokt",
         "geschrokken",
-        "gezicht",
         "mond",
         "oeps",
         "omg",
         "ongelofelijk",
         "ongelooflijk",
         "open",
-        "smiley",
         "sympathie",
         "vergeten",
         "wauw"
@@ -566901,7 +569466,6 @@
       ],
       "😰": [
         "angstig gezicht met zweetdruppel",
-        "angstig",
         "angstzweet",
         "blauw",
         "blauw gezicht met angstzweet",
@@ -566910,7 +569474,6 @@
         "gezicht met open mond en zweetdruppel",
         "koud",
         "nerveus",
-        "smiley",
         "zweet",
         "zweetdruppel"
       ],
@@ -566941,8 +569504,6 @@
       "😳": [
         "blozend gezicht",
         "beschaamd",
-        "blozend",
-        "dood",
         "gek",
         "gezicht",
         "heet",
@@ -567149,13 +569710,21 @@
       ],
       "🙂‍↔️": [
         "hoofd dat horizontaal beweegt",
+        "bewegen",
+        "heen en weer",
+        "horizontaal",
         "nee",
-        "schudden"
+        "schudden",
+        "van links naar rechts"
       ],
       "🙂‍↕️": [
         "hoofd dat verticaal beweegt",
+        "bewegen",
+        "instemmen",
         "ja",
-        "knikken"
+        "knikken",
+        "op en neer",
+        "verticaal"
       ],
       "🙃": [
         "omgekeerd gezicht",
@@ -570385,6 +572954,18 @@
         "modderlawine",
         "ramp",
         "stenen"
+      ],
+      "🛙": [
+        "vuurtoren",
+        "baken",
+        "gids",
+        "hoop",
+        "licht",
+        "maritiem",
+        "navigatie",
+        "signaal",
+        "verlichting",
+        "zee"
       ],
       "🛜": [
         "draadloos",
@@ -573875,12 +576456,12 @@
         "gaap",
         "gapen",
         "geeuwen",
+        "gezicht",
         "moe",
         "rusten",
         "saai",
         "slaap lekker",
         "slaperig",
-        "smiley",
         "vermoeid",
         "verveeld"
       ],
@@ -574050,7 +576631,6 @@
         "dankbaar",
         "dankbaarheid",
         "gevoelens",
-        "gezicht",
         "houden",
         "huilen",
         "tegen",
@@ -575507,12 +578087,22 @@
       "🧏‍♀️": [
         "dove vrouw",
         "doof",
+        "gebaar",
+        "gebarentaal",
+        "horen",
+        "oor",
+        "toegankelijkheid",
         "vrouw"
       ],
       "🧏‍♂️": [
         "dove man",
         "doof",
-        "man"
+        "gebaar",
+        "gebarentaal",
+        "horen",
+        "man",
+        "oor",
+        "toegankelijkheid"
       ],
       "🧏🏻": [
         "doof persoon: lichte huidskleur",
@@ -575527,16 +578117,24 @@
       "🧏🏻‍♀️": [
         "dove vrouw: lichte huidskleur",
         "doof",
-        "dove vrouw",
+        "gebaar",
+        "gebarentaal",
+        "horen",
         "lichte huidskleur",
+        "oor",
+        "toegankelijkheid",
         "vrouw"
       ],
       "🧏🏻‍♂️": [
         "dove man: lichte huidskleur",
         "doof",
-        "dove man",
+        "gebaar",
+        "gebarentaal",
+        "horen",
         "lichte huidskleur",
-        "man"
+        "man",
+        "oor",
+        "toegankelijkheid"
       ],
       "🧏🏼": [
         "doof persoon: lichtgetinte huidskleur",
@@ -575551,16 +578149,24 @@
       "🧏🏼‍♀️": [
         "dove vrouw: lichtgetinte huidskleur",
         "doof",
-        "dove vrouw",
+        "gebaar",
+        "gebarentaal",
+        "horen",
         "lichtgetinte huidskleur",
+        "oor",
+        "toegankelijkheid",
         "vrouw"
       ],
       "🧏🏼‍♂️": [
         "dove man: lichtgetinte huidskleur",
         "doof",
-        "dove man",
+        "gebaar",
+        "gebarentaal",
+        "horen",
         "lichtgetinte huidskleur",
-        "man"
+        "man",
+        "oor",
+        "toegankelijkheid"
       ],
       "🧏🏽": [
         "doof persoon: getinte huidskleur",
@@ -575575,16 +578181,24 @@
       "🧏🏽‍♀️": [
         "dove vrouw: getinte huidskleur",
         "doof",
-        "dove vrouw",
+        "gebaar",
+        "gebarentaal",
         "getinte huidskleur",
+        "horen",
+        "oor",
+        "toegankelijkheid",
         "vrouw"
       ],
       "🧏🏽‍♂️": [
         "dove man: getinte huidskleur",
         "doof",
-        "dove man",
+        "gebaar",
+        "gebarentaal",
         "getinte huidskleur",
-        "man"
+        "horen",
+        "man",
+        "oor",
+        "toegankelijkheid"
       ],
       "🧏🏾": [
         "doof persoon: donkergetinte huidskleur",
@@ -575600,15 +578214,23 @@
         "dove vrouw: donkergetinte huidskleur",
         "donkergetinte huidskleur",
         "doof",
-        "dove vrouw",
+        "gebaar",
+        "gebarentaal",
+        "horen",
+        "oor",
+        "toegankelijkheid",
         "vrouw"
       ],
       "🧏🏾‍♂️": [
         "dove man: donkergetinte huidskleur",
         "donkergetinte huidskleur",
         "doof",
-        "dove man",
-        "man"
+        "gebaar",
+        "gebarentaal",
+        "horen",
+        "man",
+        "oor",
+        "toegankelijkheid"
       ],
       "🧏🏿": [
         "doof persoon: donkere huidskleur",
@@ -575624,15 +578246,23 @@
         "dove vrouw: donkere huidskleur",
         "donkere huidskleur",
         "doof",
-        "dove vrouw",
+        "gebaar",
+        "gebarentaal",
+        "horen",
+        "oor",
+        "toegankelijkheid",
         "vrouw"
       ],
       "🧏🏿‍♂️": [
         "dove man: donkere huidskleur",
         "donkere huidskleur",
         "doof",
-        "dove man",
-        "man"
+        "gebaar",
+        "gebarentaal",
+        "horen",
+        "man",
+        "oor",
+        "toegankelijkheid"
       ],
       "🧐": [
         "gezicht met monocle",
@@ -580693,6 +583323,35 @@
         "muziek",
         "schuiven"
       ],
+      "🪋": [
+        "meteoor",
+        "apocalyps",
+        "ruimte",
+        "steen",
+        "vallende ster",
+        "vuurbal",
+        "zwaartekracht"
+      ],
+      "🪌": [
+        "gum",
+        "correctie",
+        "fout",
+        "ongedaan maken",
+        "schrappen",
+        "schrijven",
+        "tekenen",
+        "vergissing",
+        "verwijderen",
+        "wissen",
+        "wrijven"
+      ],
+      "🪍": [
+        "net met steel",
+        "gaas",
+        "schepnet",
+        "vangen",
+        "verzamelen"
+      ],
       "🪎": [
         "schatkist",
         "buit",
@@ -581132,7 +583791,7 @@
         "oceaan",
         "ongewerveld",
         "plankton",
-        "stekel",
+        "steek",
         "tentakels",
         "zee"
       ],
@@ -581408,6 +584067,17 @@
         "woud",
         "yeti"
       ],
+      "🫌": [
+        "monarchvlinder",
+        "fragiel",
+        "hoop",
+        "insect",
+        "metamorfose",
+        "migratie",
+        "rups",
+        "transformatie",
+        "verandering"
+      ],
       "🫍": [
         "orka",
         "oceaan",
@@ -581534,6 +584204,15 @@
         "raap",
         "tuin",
         "wortel"
+      ],
+      "🫝": [
+        "augurk",
+        "condiment",
+        "fermenteren",
+        "ingemaakt",
+        "komkommer",
+        "kruiderij",
+        "zuur"
       ],
       "🫟": [
         "Gespat",
@@ -581666,6 +584345,16 @@
         "opgeblazen",
         "paniek",
         "verrast"
+      ],
+      "🫫": [
+        "barstend gezicht",
+        "afbrokkelend",
+        "brekend",
+        "maskeren",
+        "onthullen",
+        "spanning",
+        "transformatie",
+        "weerbarstig"
       ],
       "🫯": [
         "vechtwolk",
@@ -582450,6 +585139,124 @@
         "stoppen",
         "wachten",
         "weigeren"
+      ],
+      "🫹": [
+        "duim naar links",
+        "dat",
+        "dit",
+        "grip",
+        "links",
+        "neutraal",
+        "wijzen"
+      ],
+      "🫹🏻": [
+        "duim naar links: lichte huidskleur",
+        "dat",
+        "dit",
+        "grip",
+        "lichte huidskleur",
+        "links",
+        "neutraal",
+        "wijzen"
+      ],
+      "🫹🏼": [
+        "duim naar links: lichtgetinte huidskleur",
+        "dat",
+        "dit",
+        "grip",
+        "lichtgetinte huidskleur",
+        "links",
+        "neutraal",
+        "wijzen"
+      ],
+      "🫹🏽": [
+        "duim naar links: getinte huidskleur",
+        "dat",
+        "dit",
+        "getinte huidskleur",
+        "grip",
+        "links",
+        "neutraal",
+        "wijzen"
+      ],
+      "🫹🏾": [
+        "duim naar links: donkergetinte huidskleur",
+        "dat",
+        "dit",
+        "donkergetinte huidskleur",
+        "grip",
+        "links",
+        "neutraal",
+        "wijzen"
+      ],
+      "🫹🏿": [
+        "duim naar links: donkere huidskleur",
+        "dat",
+        "dit",
+        "donkere huidskleur",
+        "grip",
+        "links",
+        "neutraal",
+        "wijzen"
+      ],
+      "🫺": [
+        "duim naar rechts",
+        "dat",
+        "dit",
+        "grip",
+        "neutraal",
+        "rechts",
+        "wijzen"
+      ],
+      "🫺🏻": [
+        "duim naar rechts: lichte huidskleur",
+        "dat",
+        "dit",
+        "grip",
+        "lichte huidskleur",
+        "neutraal",
+        "rechts",
+        "wijzen"
+      ],
+      "🫺🏼": [
+        "duim naar rechts: lichtgetinte huidskleur",
+        "dat",
+        "dit",
+        "grip",
+        "lichtgetinte huidskleur",
+        "neutraal",
+        "rechts",
+        "wijzen"
+      ],
+      "🫺🏽": [
+        "duim naar rechts: getinte huidskleur",
+        "dat",
+        "dit",
+        "getinte huidskleur",
+        "grip",
+        "neutraal",
+        "rechts",
+        "wijzen"
+      ],
+      "🫺🏾": [
+        "duim naar rechts: donkergetinte huidskleur",
+        "dat",
+        "dit",
+        "donkergetinte huidskleur",
+        "grip",
+        "neutraal",
+        "rechts",
+        "wijzen"
+      ],
+      "🫺🏿": [
+        "duim naar rechts: donkere huidskleur",
+        "dat",
+        "dit",
+        "donkere huidskleur",
+        "grip",
+        "neutraal",
+        "rechts",
+        "wijzen"
       ]
     },
     "pt-BR": {
@@ -584270,26 +587077,17 @@
       ],
       "㊗️": [
         "botão japonês de “parabéns”",
-        "“parabéns”",
-        "alfabeto",
-        "ideográfico",
-        "ideográfico circular “parabéns”",
+        "botão",
         "ideograma",
-        "janonês",
         "japonês",
-        "parabéns",
-        "祝"
+        "parabéns"
       ],
       "㊙️": [
         "botão japonês de “segredo”",
-        "“segredo”",
-        "alfabeto",
-        "ideográfico",
-        "ideográfico circular “segredo”",
+        "botão",
         "ideograma",
         "japonês",
-        "segredo",
-        "秘"
+        "segredo"
       ],
       "🀄": [
         "dragão vermelho de mahjong",
@@ -585454,167 +588252,119 @@
       ],
       "🈁": [
         "botão japonês de “aqui”",
-        "\"aqui\"",
-        "“aqui”",
-        "alfabeto",
-        "botão \"aqui\"",
+        "aqui",
+        "botão",
         "japonês",
-        "katakana",
-        "koko",
-        "ココ"
+        "katakana"
       ],
       "🈂️": [
         "botão japonês de “taxa de serviço”",
-        "“taxa de serviço”",
-        "alfabeto",
+        "botão",
+        "cobrança",
         "japonês",
         "katakana",
-        "katanaka",
-        "sa",
-        "taxa de serviço",
-        "サ"
+        "serviço"
       ],
       "🈚": [
         "botão japonês de “gratuito”",
-        "“gratuito”",
-        "alfabeto",
-        "de graça",
-        "grátis",
-        "ideográfico",
+        "botão",
+        "gratuito",
         "ideograma",
-        "japonês",
-        "sem custo",
-        "無"
+        "japonês"
       ],
       "🈯": [
         "botão japonês de “reservado”",
-        "“reservado”",
-        "alfabeto",
-        "ideográfico",
+        "botão",
         "ideograma",
         "japonês",
-        "reservado",
-        "指"
+        "reservado"
       ],
       "🈲": [
         "botão japonês de “proibido”",
-        "“proibido”",
-        "alfabeto",
-        "ideográfico",
-        "ideográfico quadrado “proibir”",
+        "botão",
         "ideograma",
         "japonês",
-        "proibido",
-        "proibir",
-        "禁"
+        "proibido"
       ],
       "🈳": [
         "botão japonês de “vago”",
-        "“vago”",
-        "alfabeto",
-        "ideográfico",
+        "botão",
         "ideograma",
         "japonês",
-        "vaga",
-        "vago",
-        "vazio",
-        "空"
+        "vago"
       ],
       "🈴": [
         "botão japonês de “nota mínima”",
-        "“nota mínima”",
-        "alfabeto",
-        "chinês",
-        "ideográfico",
-        "ideográfico quadrado “juntos”",
+        "botão",
         "ideograma",
         "japonês",
-        "juntos",
-        "合"
+        "mínima",
+        "nota"
       ],
       "🈵": [
         "botão japonês de “sem vagas”",
-        "“sem vagas”",
-        "alfabeto",
-        "completude",
-        "ideográfico",
-        "ideográfico quadrado “completude”",
+        "botão",
         "ideograma",
         "japonês",
-        "満"
+        "sem",
+        "vagas"
       ],
       "🈶": [
         "botão japonês de “não gratuito”",
-        "“não gratuito”",
-        "alfabeto",
-        "ideográfico",
+        "botão",
+        "grátis",
         "ideograma",
+        "isento",
         "japonês",
-        "não gratuito",
-        "有"
+        "não",
+        "taxa"
       ],
       "🈷️": [
         "botão japonês de “quantidade mensal”",
-        "“quantidade mensal”",
-        "alfabeto",
-        "ideográfico",
+        "botão",
         "ideograma",
         "japonês",
-        "valor mensal",
-        "月"
+        "mensal",
+        "quantidade",
+        "valor"
       ],
       "🈸": [
         "botão japonês de “aplicação”",
-        "“aplicação”",
-        "alfabeto",
-        "aplicar",
-        "chinês",
-        "ideográfico quadrado “aplicar”",
+        "aplicação",
+        "aplicativo",
+        "botão",
         "ideograma",
-        "japonês",
-        "申"
+        "japonês"
       ],
       "🈹": [
         "botão japonês de “desconto”",
-        "“desconto”",
-        "alfabeto",
+        "botão",
         "desconto",
-        "ideográfico",
         "ideograma",
-        "japonês",
-        "割"
+        "japonês"
       ],
       "🈺": [
         "botão japonês de “aberto para negócios”",
-        "“aberto para negócios”",
-        "chinês",
-        "ideográfico quadrado “operando”",
+        "aberto",
+        "botão",
         "ideograma",
         "japonês",
-        "operando",
-        "営"
+        "negócios"
       ],
       "🉐": [
         "botão japonês de “barganha”",
-        "“barganha”",
-        "alfabeto",
         "barganha",
-        "ideográfico",
+        "botão",
         "ideograma",
         "japonês",
-        "pechincha",
-        "得"
+        "promoção"
       ],
       "🉑": [
         "botão japonês de “aceitável”",
-        "“aceitável”",
-        "aceitar",
-        "alfabeto",
-        "chinês",
-        "ideográfico circular “aceitar”",
+        "aceitável",
+        "botão",
         "ideograma",
-        "japonês",
-        "可"
+        "japonês"
       ],
       "🌀": [
         "ciclone",
@@ -585896,9 +588646,10 @@
         "nuvem"
       ],
       "🌩️": [
-        "nuvem com trovão",
+        "nuvem com relâmpago",
         "clima",
         "nuvem",
+        "nuvem com trovão",
         "relâmpago"
       ],
       "🌪️": [
@@ -606654,6 +609405,17 @@
         "rochas",
         "terremoto"
       ],
+      "🛙": [
+        "farol",
+        "esperança",
+        "iluminação",
+        "luz",
+        "mar",
+        "marítimo",
+        "navegação",
+        "orientação",
+        "sinal"
+      ],
       "🛜": [
         "sem fio",
         "banda larga",
@@ -616843,6 +619605,36 @@
         "sopro",
         "triste"
       ],
+      "🪋": [
+        "meteoro",
+        "apocalipse",
+        "bola de fogo",
+        "espaço",
+        "estrela",
+        "gravidade",
+        "queda",
+        "rocha"
+      ],
+      "🪌": [
+        "borracha",
+        "apagar",
+        "correção",
+        "desenho",
+        "desfazer",
+        "equívoco",
+        "erro",
+        "escrita",
+        "excluir",
+        "passar",
+        "remover"
+      ],
+      "🪍": [
+        "rede com cabo",
+        "armadilha",
+        "capturar",
+        "coletar",
+        "malha"
+      ],
       "🪎": [
         "baú de tesouro",
         "dinheiro",
@@ -617628,6 +620420,17 @@
         "sasquatch",
         "yeti"
       ],
+      "🫌": [
+        "borboleta-monarca",
+        "esperança",
+        "frágil",
+        "inseto",
+        "lagarta",
+        "metamorfose",
+        "migração",
+        "mudança",
+        "transformação"
+      ],
       "🫍": [
         "orca",
         "baleia",
@@ -617788,6 +620591,15 @@
         "raiz",
         "vegetal"
       ],
+      "🫝": [
+        "picles",
+        "condimento",
+        "conserva",
+        "fermentar",
+        "pepino",
+        "problema",
+        "salmoura"
+      ],
       "🫟": [
         "respingo",
         "mancha",
@@ -617936,6 +620748,16 @@
         "pânico",
         "surpreso",
         "vulnerável"
+      ],
+      "🫫": [
+        "rosto rachando",
+        "decepção",
+        "quebrar",
+        "quebrar a cara",
+        "resiliência",
+        "revelação",
+        "tensão",
+        "transformação"
       ],
       "🫯": [
         "nuvem de briga",
@@ -618821,6 +621643,196 @@
         "pele escura",
         "recusar",
         "toca aqui"
+      ],
+      "🫹": [
+        "sinal de polegar para a esquerda",
+        "apontar",
+        "aquele",
+        "aquilo",
+        "esquerda",
+        "essa",
+        "esse",
+        "esta",
+        "este",
+        "isso",
+        "isto",
+        "lado",
+        "neutro"
+      ],
+      "🫹🏻": [
+        "sinal de polegar para a esquerda: pele clara",
+        "apontar",
+        "aquele",
+        "aquilo",
+        "esquerda",
+        "essa",
+        "esse",
+        "esta",
+        "este",
+        "isso",
+        "isto",
+        "lado",
+        "neutro",
+        "pele clara"
+      ],
+      "🫹🏼": [
+        "sinal de polegar para a esquerda: pele morena clara",
+        "apontar",
+        "aquele",
+        "aquilo",
+        "esquerda",
+        "essa",
+        "esse",
+        "esta",
+        "este",
+        "isso",
+        "isto",
+        "lado",
+        "neutro",
+        "pele morena clara"
+      ],
+      "🫹🏽": [
+        "sinal de polegar para a esquerda: pele morena",
+        "apontar",
+        "aquele",
+        "aquilo",
+        "esquerda",
+        "essa",
+        "esse",
+        "esta",
+        "este",
+        "isso",
+        "isto",
+        "lado",
+        "neutro",
+        "pele morena"
+      ],
+      "🫹🏾": [
+        "sinal de polegar para a esquerda: pele morena escura",
+        "apontar",
+        "aquele",
+        "aquilo",
+        "esquerda",
+        "essa",
+        "esse",
+        "esta",
+        "este",
+        "isso",
+        "isto",
+        "lado",
+        "neutro",
+        "pele morena escura"
+      ],
+      "🫹🏿": [
+        "sinal de polegar para a esquerda: pele escura",
+        "apontar",
+        "aquele",
+        "aquilo",
+        "esquerda",
+        "essa",
+        "esse",
+        "esta",
+        "este",
+        "isso",
+        "isto",
+        "lado",
+        "neutro",
+        "pele escura"
+      ],
+      "🫺": [
+        "sinal de polegar para a direita",
+        "apontar",
+        "aquele",
+        "aquilo",
+        "direita",
+        "essa",
+        "esse",
+        "esta",
+        "este",
+        "isso",
+        "isto",
+        "lado",
+        "neutro"
+      ],
+      "🫺🏻": [
+        "sinal de polegar para a direita: pele clara",
+        "apontar",
+        "aquele",
+        "aquilo",
+        "direita",
+        "essa",
+        "esse",
+        "esta",
+        "este",
+        "isso",
+        "isto",
+        "lado",
+        "neutro",
+        "pele clara"
+      ],
+      "🫺🏼": [
+        "sinal de polegar para a direita: pele morena clara",
+        "apontar",
+        "aquele",
+        "aquilo",
+        "direita",
+        "essa",
+        "esse",
+        "esta",
+        "este",
+        "isso",
+        "isto",
+        "lado",
+        "neutro",
+        "pele morena clara"
+      ],
+      "🫺🏽": [
+        "sinal de polegar para a direita: pele morena",
+        "apontar",
+        "aquele",
+        "aquilo",
+        "direita",
+        "essa",
+        "esse",
+        "esta",
+        "este",
+        "isso",
+        "isto",
+        "lado",
+        "neutro",
+        "pele morena"
+      ],
+      "🫺🏾": [
+        "sinal de polegar para a direita: pele morena escura",
+        "apontar",
+        "aquele",
+        "aquilo",
+        "direita",
+        "essa",
+        "esse",
+        "esta",
+        "este",
+        "isso",
+        "isto",
+        "lado",
+        "neutro",
+        "pele morena escura"
+      ],
+      "🫺🏿": [
+        "sinal de polegar para a direita: pele escura",
+        "apontar",
+        "aquele",
+        "aquilo",
+        "direita",
+        "essa",
+        "esse",
+        "esta",
+        "este",
+        "isso",
+        "isto",
+        "lado",
+        "neutro",
+        "pele escura"
       ]
     },
     "ru": {
@@ -619166,8 +622178,7 @@
       "Ⓜ️": [
         "буква «м» в кружке",
         "буква",
-        "буква \"м\" в кружке",
-        "буква в кружке",
+        "в кружке",
         "кружок",
         "м"
       ],
@@ -620517,9 +623528,10 @@
         "закрытие",
         "квадрат",
         "кнопка",
-        "кнопка \"крестик\"",
         "крестик",
-        "умножение"
+        "отметка",
+        "умножение",
+        "умножить"
       ],
       "❓": [
         "красный вопросительный знак",
@@ -620831,7 +623843,7 @@
       "🆕": [
         "значок «новинка»",
         "значок",
-        "значок \"новинка\"",
+        "новая",
         "новинка",
         "новое",
         "новый"
@@ -620839,7 +623851,6 @@
       "🆖": [
         "значок «не годится»",
         "значок",
-        "значок \"не годится\"",
         "не годится",
         "нехорошо",
         "плохо"
@@ -620865,8 +623876,8 @@
         "значок «обновление»",
         "вверх",
         "значок",
-        "значок \"обновление\"",
-        "обновление"
+        "обновление",
+        "отметка"
       ],
       "🆚": [
         "значок «против»",
@@ -622017,11 +625028,10 @@
         "скидка",
         "деление",
         "значок",
-        "значок \"скидка\"",
         "иероглиф",
         "кнопка",
-        "кнопка \"скидка\"",
-        "япония"
+        "япония",
+        "японский"
       ],
       "🈺": [
         "открыто",
@@ -643614,10 +646624,10 @@
         "движение",
         "дети",
         "дорога",
-        "знак \"дети\"",
+        "дорожное",
+        "знак",
         "переход",
-        "пешеход",
-        "пешеходы"
+        "пешеход"
       ],
       "🚹": [
         "мужской туалет",
@@ -643911,6 +646921,16 @@
         "опасность",
         "осыпь",
         "сель"
+      ],
+      "🛙": [
+        "маяк",
+        "башня",
+        "море",
+        "навигация",
+        "надежда",
+        "ориентир",
+        "свет",
+        "сигнал"
       ],
       "🛜": [
         "беспроводная сеть",
@@ -654345,6 +657365,37 @@
         "инструмент",
         "музыка"
       ],
+      "🪋": [
+        "метеорит",
+        "апокалипсис",
+        "гравитация",
+        "звезда",
+        "камень",
+        "космос",
+        "огненный",
+        "падающая",
+        "падение",
+        "шар"
+      ],
+      "🪌": [
+        "ластик",
+        "исправить",
+        "исправление",
+        "ошибка",
+        "резинка",
+        "стереть",
+        "стирательная",
+        "удалить"
+      ],
+      "🪍": [
+        "сачок",
+        "коллекционирование",
+        "ловить",
+        "ловушка",
+        "поймать",
+        "сеть",
+        "собирать"
+      ],
       "🪎": [
         "сундук с сокровищами",
         "богатство",
@@ -655013,6 +658064,17 @@
         "снежный",
         "человек"
       ],
+      "🫌": [
+        "бабочка-монарх",
+        "гусеница",
+        "изменение",
+        "метаморфозы",
+        "миграция",
+        "надежда",
+        "насекомое",
+        "трансформация",
+        "хрупкость"
+      ],
       "🫍": [
         "косатка",
         "животное",
@@ -655144,6 +658206,16 @@
         "огород",
         "репа",
         "свекла"
+      ],
+      "🫝": [
+        "маринованный огурец",
+        "закуска",
+        "засолка",
+        "огурец",
+        "огурчик",
+        "рассол",
+        "соленья",
+        "ферментация"
       ],
       "🫟": [
         "клякса",
@@ -655281,6 +658353,16 @@
         "удивление",
         "шок",
         "эмоции"
+      ],
+      "🫫": [
+        "трескается",
+        "ломается",
+        "маска",
+        "напряжение",
+        "раскрытие",
+        "стойкость",
+        "трансформация",
+        "трещины"
       ],
       "🫯": [
         "драка",
@@ -656073,6 +659155,136 @@
         "пять",
         "стоп",
         "толкать"
+      ],
+      "🫹": [
+        "большой палец влево",
+        "влево",
+        "нейтральный",
+        "там",
+        "туда",
+        "указывать",
+        "хват",
+        "это"
+      ],
+      "🫹🏻": [
+        "большой палец влево: очень светлый тон кожи",
+        "влево",
+        "нейтральный",
+        "очень светлый тон кожи",
+        "там",
+        "туда",
+        "указывать",
+        "хват",
+        "это"
+      ],
+      "🫹🏼": [
+        "большой палец влево: светлый тон кожи",
+        "влево",
+        "нейтральный",
+        "светлый тон кожи",
+        "там",
+        "туда",
+        "указывать",
+        "хват",
+        "это"
+      ],
+      "🫹🏽": [
+        "большой палец влево: средний тон кожи",
+        "влево",
+        "нейтральный",
+        "средний тон кожи",
+        "там",
+        "туда",
+        "указывать",
+        "хват",
+        "это"
+      ],
+      "🫹🏾": [
+        "большой палец влево: темный тон кожи",
+        "влево",
+        "нейтральный",
+        "там",
+        "темный тон кожи",
+        "туда",
+        "указывать",
+        "хват",
+        "это"
+      ],
+      "🫹🏿": [
+        "большой палец влево: очень темный тон кожи",
+        "влево",
+        "нейтральный",
+        "очень темный тон кожи",
+        "там",
+        "туда",
+        "указывать",
+        "хват",
+        "это"
+      ],
+      "🫺": [
+        "большой палец вправо",
+        "вправо",
+        "нейтральный",
+        "там",
+        "туда",
+        "указывать",
+        "хват",
+        "это"
+      ],
+      "🫺🏻": [
+        "большой палец вправо: очень светлый тон кожи",
+        "вправо",
+        "нейтральный",
+        "очень светлый тон кожи",
+        "там",
+        "туда",
+        "указывать",
+        "хват",
+        "это"
+      ],
+      "🫺🏼": [
+        "большой палец вправо: светлый тон кожи",
+        "вправо",
+        "нейтральный",
+        "светлый тон кожи",
+        "там",
+        "туда",
+        "указывать",
+        "хват",
+        "это"
+      ],
+      "🫺🏽": [
+        "большой палец вправо: средний тон кожи",
+        "вправо",
+        "нейтральный",
+        "средний тон кожи",
+        "там",
+        "туда",
+        "указывать",
+        "хват",
+        "это"
+      ],
+      "🫺🏾": [
+        "большой палец вправо: темный тон кожи",
+        "вправо",
+        "нейтральный",
+        "там",
+        "темный тон кожи",
+        "туда",
+        "указывать",
+        "хват",
+        "это"
+      ],
+      "🫺🏿": [
+        "большой палец вправо: очень темный тон кожи",
+        "вправо",
+        "нейтральный",
+        "очень темный тон кожи",
+        "там",
+        "туда",
+        "указывать",
+        "хват",
+        "это"
       ]
     },
     "th": {
@@ -677884,6 +681096,16 @@
         "หิมะถล่ม",
         "อันตราย"
       ],
+      "🛙": [
+        "ประภาคาร",
+        "การเดินเรือ",
+        "ความหวัง",
+        "ทะเล",
+        "นำทาง",
+        "ไฟ",
+        "สัญญาณ",
+        "แสงสว่าง"
+      ],
       "🛜": [
         "ไร้สาย",
         "การเชื่อมต่อ",
@@ -687771,6 +690993,31 @@
         "เพลง",
         "เศร้า"
       ],
+      "🪋": [
+        "อุกกาบาต",
+        "ดาว",
+        "วันสิ้นโลก",
+        "สะเก็ดดาว",
+        "อวกาศ"
+      ],
+      "🪌": [
+        "ยางลบ",
+        "แก้",
+        "แก้ไข",
+        "เขียน",
+        "ถู",
+        "ผิดพลาด",
+        "ลบ",
+        "วาด"
+      ],
+      "🪍": [
+        "กระชอนถุงตาข่าย",
+        "กรอง",
+        "จับ",
+        "ดัก",
+        "ตัก",
+        "ตาข่าย"
+      ],
       "🪎": [
         "หีบสมบัติ",
         "ของมีค่า",
@@ -688459,6 +691706,13 @@
         "เยติ",
         "สัตว์ประหลาด"
       ],
+      "🫌": [
+        "ผีเสื้อจักรพรรดิ",
+        "ผีเสื้อ",
+        "แมลง",
+        "หนอนผีเสื้อ",
+        "อพยพ"
+      ],
       "🫍": [
         "วาฬออร์กา",
         "เพชรฆาต",
@@ -688591,6 +691845,13 @@
         "สวน",
         "หัวไชเท้า",
         "อาหาร"
+      ],
+      "🫝": [
+        "แตงกวาดอง",
+        "เครื่องปรุง",
+        "ดอง",
+        "แตง",
+        "แตงกวา"
       ],
       "🫟": [
         "กระเด็น",
@@ -688729,6 +691990,12 @@
         "เปราะบาง",
         "วิตกกังวล",
         "อึดอัด"
+      ],
+      "🫫": [
+        "หน้าแตก",
+        "แตก",
+        "แตกสลาย",
+        "หน้า"
       ],
       "🫯": [
         "ก้อนเมฆต่อสู้",
@@ -689597,6 +692864,112 @@
         "พักก่อน",
         "รอ",
         "หยุด"
+      ],
+      "🫹": [
+        "ชี้นิ้วโป้งไปด้านซ้าย",
+        "ชี้",
+        "ซ้าย",
+        "ทางนั้น",
+        "ทางนี้",
+        "ทางโน้น"
+      ],
+      "🫹🏻": [
+        "ชี้นิ้วโป้งไปด้านซ้าย: โทนผิวสีขาว",
+        "ชี้",
+        "ซ้าย",
+        "ทางนั้น",
+        "ทางนี้",
+        "ทางโน้น",
+        "โทนผิวสีขาว"
+      ],
+      "🫹🏼": [
+        "ชี้นิ้วโป้งไปด้านซ้าย: โทนผิวสีขาวเหลือง",
+        "ชี้",
+        "ซ้าย",
+        "ทางนั้น",
+        "ทางนี้",
+        "ทางโน้น",
+        "โทนผิวสีขาวเหลือง"
+      ],
+      "🫹🏽": [
+        "ชี้นิ้วโป้งไปด้านซ้าย: โทนผิวสีเหลือง",
+        "ชี้",
+        "ซ้าย",
+        "ทางนั้น",
+        "ทางนี้",
+        "ทางโน้น",
+        "โทนผิวสีเหลือง"
+      ],
+      "🫹🏾": [
+        "ชี้นิ้วโป้งไปด้านซ้าย: โทนผิวสีแทน",
+        "ชี้",
+        "ซ้าย",
+        "ทางนั้น",
+        "ทางนี้",
+        "ทางโน้น",
+        "โทนผิวสีแทน"
+      ],
+      "🫹🏿": [
+        "ชี้นิ้วโป้งไปด้านซ้าย: โทนผิวสีเข้ม",
+        "ชี้",
+        "ซ้าย",
+        "ทางนั้น",
+        "ทางนี้",
+        "ทางโน้น",
+        "โทนผิวสีเข้ม"
+      ],
+      "🫺": [
+        "ชี้นิ้วโป้งไปด้านขวา",
+        "ขวา",
+        "ชี้",
+        "ทางนั้น",
+        "ทางนี้",
+        "ทางโน้น"
+      ],
+      "🫺🏻": [
+        "ชี้นิ้วโป้งไปด้านขวา: โทนผิวสีขาว",
+        "ขวา",
+        "ชี้",
+        "ทางนั้น",
+        "ทางนี้",
+        "ทางโน้น",
+        "โทนผิวสีขาว"
+      ],
+      "🫺🏼": [
+        "ชี้นิ้วโป้งไปด้านขวา: โทนผิวสีขาวเหลือง",
+        "ขวา",
+        "ชี้",
+        "ทางนั้น",
+        "ทางนี้",
+        "ทางโน้น",
+        "โทนผิวสีขาวเหลือง"
+      ],
+      "🫺🏽": [
+        "ชี้นิ้วโป้งไปด้านขวา: โทนผิวสีเหลือง",
+        "ขวา",
+        "ชี้",
+        "ทางนั้น",
+        "ทางนี้",
+        "ทางโน้น",
+        "โทนผิวสีเหลือง"
+      ],
+      "🫺🏾": [
+        "ชี้นิ้วโป้งไปด้านขวา: โทนผิวสีแทน",
+        "ขวา",
+        "ชี้",
+        "ทางนั้น",
+        "ทางนี้",
+        "ทางโน้น",
+        "โทนผิวสีแทน"
+      ],
+      "🫺🏿": [
+        "ชี้นิ้วโป้งไปด้านขวา: โทนผิวสีเข้ม",
+        "ขวา",
+        "ชี้",
+        "ทางนั้น",
+        "ทางนี้",
+        "ทางโน้น",
+        "โทนผิวสีเข้ม"
       ]
     },
     "tr": {
@@ -713602,6 +716975,18 @@
         "tehlike",
         "toprak kayması"
       ],
+      "🛙": [
+        "deniz feneri",
+        "aydınlanma",
+        "deniz",
+        "denizcilik",
+        "fener",
+        "ışık",
+        "navigasyon",
+        "rehberlik",
+        "sinyal",
+        "umut"
+      ],
       "🛜": [
         "kablosuz",
         "ağ",
@@ -715372,7 +718757,6 @@
       ],
       "🤷‍♀️": [
         "omuz silken kadın",
-        "bayan",
         "belki",
         "bilmem",
         "cahillik",
@@ -715382,10 +718766,8 @@
         "kadın",
         "kişi",
         "kuşku",
-        "omuz silkme",
         "sanırım",
-        "şüphe",
-        "vücut"
+        "şüphe"
       ],
       "🤷‍♂️": [
         "omuz silken erkek",
@@ -715420,7 +718802,6 @@
       "🤷🏻‍♀️": [
         "omuz silken kadın: açık cilt tonu",
         "açık cilt tonu",
-        "bayan",
         "belki",
         "bilmem",
         "cahillik",
@@ -715430,11 +718811,8 @@
         "kadın",
         "kişi",
         "kuşku",
-        "omuz silken kadın",
-        "omuz silkme",
         "sanırım",
-        "şüphe",
-        "vücut"
+        "şüphe"
       ],
       "🤷🏻‍♂️": [
         "omuz silken erkek: açık cilt tonu",
@@ -715470,7 +718848,6 @@
       ],
       "🤷🏼‍♀️": [
         "omuz silken kadın: orta açık cilt tonu",
-        "bayan",
         "belki",
         "bilmem",
         "cahillik",
@@ -715480,12 +718857,9 @@
         "kadın",
         "kişi",
         "kuşku",
-        "omuz silken kadın",
-        "omuz silkme",
         "orta açık cilt tonu",
         "sanırım",
-        "şüphe",
-        "vücut"
+        "şüphe"
       ],
       "🤷🏼‍♂️": [
         "omuz silken erkek: orta açık cilt tonu",
@@ -715521,7 +718895,6 @@
       ],
       "🤷🏽‍♀️": [
         "omuz silken kadın: orta cilt tonu",
-        "bayan",
         "belki",
         "bilmem",
         "cahillik",
@@ -715531,12 +718904,9 @@
         "kadın",
         "kişi",
         "kuşku",
-        "omuz silken kadın",
-        "omuz silkme",
         "orta cilt tonu",
         "sanırım",
-        "şüphe",
-        "vücut"
+        "şüphe"
       ],
       "🤷🏽‍♂️": [
         "omuz silken erkek: orta cilt tonu",
@@ -715572,7 +718942,6 @@
       ],
       "🤷🏾‍♀️": [
         "omuz silken kadın: orta koyu cilt tonu",
-        "bayan",
         "belki",
         "bilmem",
         "cahillik",
@@ -715582,12 +718951,9 @@
         "kadın",
         "kişi",
         "kuşku",
-        "omuz silken kadın",
-        "omuz silkme",
         "orta koyu cilt tonu",
         "sanırım",
-        "şüphe",
-        "vücut"
+        "şüphe"
       ],
       "🤷🏾‍♂️": [
         "omuz silken erkek: orta koyu cilt tonu",
@@ -715623,7 +718989,6 @@
       ],
       "🤷🏿‍♀️": [
         "omuz silken kadın: koyu cilt tonu",
-        "bayan",
         "belki",
         "bilmem",
         "cahillik",
@@ -715634,11 +718999,8 @@
         "kişi",
         "koyu cilt tonu",
         "kuşku",
-        "omuz silken kadın",
-        "omuz silkme",
         "sanırım",
-        "şüphe",
-        "vücut"
+        "şüphe"
       ],
       "🤷🏿‍♂️": [
         "omuz silken erkek: koyu cilt tonu",
@@ -723873,16 +727235,11 @@
         "sabun",
         "banyo",
         "banyo yapmak",
-        "el sabunu",
         "el yıkamak",
-        "kalıp",
-        "katı sabun",
         "köpük",
         "köpürmek",
-        "köpürtmek",
         "sabun köpüğü",
         "sabunlamak",
-        "sabunluk",
         "temiz",
         "temizlik",
         "yıkamak",
@@ -723892,16 +727249,12 @@
         "sünger",
         "banyo",
         "banyo yapmak",
-        "bulaşık",
         "emici",
         "emmek",
-        "ev işi",
         "gözenek",
         "gözenekli",
         "keselemek",
-        "köpürmek",
         "köpürtmek",
-        "silmek",
         "temizlik",
         "yıkamak",
         "yıkanmak"
@@ -723924,16 +727277,10 @@
       "🧿": [
         "nazarlık",
         "boncuk",
-        "göz",
-        "iyi şans",
-        "kem göz",
-        "kötü şans",
         "maşallah",
-        "mavi boncuk",
+        "mavi",
         "muska",
         "nazar",
-        "nazar boncuğu",
-        "nazar değmesin",
         "tılsım"
       ],
       "🩰": [
@@ -724180,6 +727527,34 @@
         "müzik",
         "sürgü",
         "üzgün"
+      ],
+      "🪋": [
+        "gök taşı",
+        "ateş topu",
+        "düşüş",
+        "kaya",
+        "kıyamet",
+        "uzay",
+        "yerçekimi",
+        "yıldız"
+      ],
+      "🪌": [
+        "silgi",
+        "çizim",
+        "düzeltme",
+        "geri al",
+        "hata",
+        "kaldırmak",
+        "silme",
+        "yanlışlık",
+        "yazma"
+      ],
+      "🪍": [
+        "kelebek ağı",
+        "ağ",
+        "toplamak",
+        "tuzak",
+        "yakalamak"
       ],
       "🪎": [
         "hazine sandığı",
@@ -724738,19 +728113,14 @@
         "kucaklaşan insanlar",
         "aşk",
         "elveda",
-        "güle güle",
         "hoşçakal",
-        "hoşçakalın",
         "insan",
         "kucaklaşma",
         "merhaba",
         "sağol",
-        "sağolun",
         "sarılma",
-        "selam",
         "sevgi",
         "teşekkür",
-        "teşekkürler",
         "teselli",
         "veda"
       ],
@@ -725015,6 +728385,17 @@
         "tüylü",
         "yeti"
       ],
+      "🫌": [
+        "kral kelebeği",
+        "başkalaşım",
+        "böcek",
+        "değişim",
+        "dönüşüm",
+        "göç",
+        "kırılgan",
+        "tırtıl",
+        "umut"
+      ],
       "🫍": [
         "orka",
         "balina",
@@ -725178,6 +728559,15 @@
         "sebze",
         "turp"
       ],
+      "🫝": [
+        "turşu",
+        "çeşni",
+        "fermente",
+        "kornişon",
+        "salatalık",
+        "sorun",
+        "tuzlu su"
+      ],
       "🫟": [
         "sıçratma",
         "boya",
@@ -725323,6 +728713,16 @@
         "şaşkın",
         "savunmasız",
         "şişkin"
+      ],
+      "🫫": [
+        "çatlayan yüz",
+        "açığa çıkarma",
+        "dayanıklılık",
+        "dönüşüm",
+        "gerginlik",
+        "kırılma",
+        "maskeleme",
+        "parçalanma"
       ],
       "🫯": [
         "dövüş bulutu",
@@ -726289,6 +729689,124 @@
         "reddetme",
         "sağa",
         "sağa iten el"
+      ],
+      "🫹": [
+        "baş parmak solda",
+        "bu",
+        "gösterme",
+        "kavrama",
+        "nötr",
+        "sol",
+        "şu"
+      ],
+      "🫹🏻": [
+        "baş parmak solda: açık cilt tonu",
+        "açık cilt tonu",
+        "bu",
+        "gösterme",
+        "kavrama",
+        "nötr",
+        "sol",
+        "şu"
+      ],
+      "🫹🏼": [
+        "baş parmak solda: orta açık cilt tonu",
+        "bu",
+        "gösterme",
+        "kavrama",
+        "nötr",
+        "orta açık cilt tonu",
+        "sol",
+        "şu"
+      ],
+      "🫹🏽": [
+        "baş parmak solda: orta cilt tonu",
+        "bu",
+        "gösterme",
+        "kavrama",
+        "nötr",
+        "orta cilt tonu",
+        "sol",
+        "şu"
+      ],
+      "🫹🏾": [
+        "baş parmak solda: orta koyu cilt tonu",
+        "bu",
+        "gösterme",
+        "kavrama",
+        "nötr",
+        "orta koyu cilt tonu",
+        "sol",
+        "şu"
+      ],
+      "🫹🏿": [
+        "baş parmak solda: koyu cilt tonu",
+        "bu",
+        "gösterme",
+        "kavrama",
+        "koyu cilt tonu",
+        "nötr",
+        "sol",
+        "şu"
+      ],
+      "🫺": [
+        "başparmak sağda",
+        "bu",
+        "gösterme",
+        "kavrama",
+        "nötr",
+        "sağ",
+        "şu"
+      ],
+      "🫺🏻": [
+        "başparmak sağda: açık cilt tonu",
+        "açık cilt tonu",
+        "bu",
+        "gösterme",
+        "kavrama",
+        "nötr",
+        "sağ",
+        "şu"
+      ],
+      "🫺🏼": [
+        "başparmak sağda: orta açık cilt tonu",
+        "bu",
+        "gösterme",
+        "kavrama",
+        "nötr",
+        "orta açık cilt tonu",
+        "sağ",
+        "şu"
+      ],
+      "🫺🏽": [
+        "başparmak sağda: orta cilt tonu",
+        "bu",
+        "gösterme",
+        "kavrama",
+        "nötr",
+        "orta cilt tonu",
+        "sağ",
+        "şu"
+      ],
+      "🫺🏾": [
+        "başparmak sağda: orta koyu cilt tonu",
+        "bu",
+        "gösterme",
+        "kavrama",
+        "nötr",
+        "orta koyu cilt tonu",
+        "sağ",
+        "şu"
+      ],
+      "🫺🏿": [
+        "başparmak sağda: koyu cilt tonu",
+        "bu",
+        "gösterme",
+        "kavrama",
+        "koyu cilt tonu",
+        "nötr",
+        "sağ",
+        "şu"
       ]
     },
     "vi": {
@@ -746696,6 +750214,18 @@
         "thảm họa",
         "tuyết lở"
       ],
+      "🛙": [
+        "hải đăng",
+        "ánh sáng",
+        "biển",
+        "đèn biển",
+        "điều hướng",
+        "giác ngộ",
+        "hàng hải",
+        "hướng dẫn",
+        "hy vọng",
+        "tín hiệu"
+      ],
       "🛜": [
         "không dây",
         "băng thông rộng",
@@ -755853,6 +759383,36 @@
         "nhạc cụ",
         "trượt"
       ],
+      "🪋": [
+        "thiên thạch",
+        "đá",
+        "không gian",
+        "ngôi sao",
+        "rơi",
+        "sao băng",
+        "tận thế",
+        "trọng lực"
+      ],
+      "🪌": [
+        "cục tẩy",
+        "chà xát",
+        "hoàn tác",
+        "loại bỏ",
+        "lỗi",
+        "sai sót",
+        "sửa đổi",
+        "tẩy",
+        "vẽ",
+        "viết",
+        "xoá"
+      ],
+      "🪍": [
+        "vợt bắt côn trùng",
+        "bắt",
+        "bẫy",
+        "lưới",
+        "thu thập"
+      ],
       "🪎": [
         "rương báu",
         "bạc",
@@ -756461,6 +760021,17 @@
         "sinh vật bí ẩn",
         "yeti"
       ],
+      "🫌": [
+        "bướm chúa",
+        "biến đổi",
+        "côn trùng",
+        "di cư",
+        "hoá bướm",
+        "hy vọng",
+        "mỏng manh",
+        "sâu bướm",
+        "thay đổi"
+      ],
       "🫍": [
         "cá voi sát thủ",
         "biển",
@@ -756581,6 +760152,16 @@
         "rễ",
         "vườn"
       ],
+      "🫝": [
+        "dưa muối",
+        "dưa chuột",
+        "dưa chuột bao tử",
+        "gia vị",
+        "lên men",
+        "nước muối",
+        "rắc rối",
+        "tương ớt ngọt"
+      ],
       "🫟": [
         "bắn tung tóe",
         "ngày lễ",
@@ -756679,6 +760260,16 @@
         "lo lắng",
         "ngạc nhiên",
         "sốc"
+      ],
+      "🫫": [
+        "mặt rạn nứt",
+        "sự căng thẳng",
+        "sự che giấu",
+        "sự chuyển hoá",
+        "sự hé lộ",
+        "sự kiên cường",
+        "sự sụp đổ",
+        "sự tan vỡ"
       ],
       "🫯": [
         "đám mây chiến đấu",
@@ -757393,6 +760984,124 @@
         "sang phải",
         "thôi",
         "từ chối"
+      ],
+      "🫹": [
+        "biểu tượng ngón tay cái chỉ sang trái",
+        "cầm",
+        "chỉ",
+        "đó",
+        "này",
+        "trái",
+        "trung lập"
+      ],
+      "🫹🏻": [
+        "biểu tượng ngón tay cái chỉ sang trái: màu da sáng",
+        "cầm",
+        "chỉ",
+        "đó",
+        "màu da sáng",
+        "này",
+        "trái",
+        "trung lập"
+      ],
+      "🫹🏼": [
+        "biểu tượng ngón tay cái chỉ sang trái: màu da sáng trung bình",
+        "cầm",
+        "chỉ",
+        "đó",
+        "màu da sáng trung bình",
+        "này",
+        "trái",
+        "trung lập"
+      ],
+      "🫹🏽": [
+        "biểu tượng ngón tay cái chỉ sang trái: màu da trung bình",
+        "cầm",
+        "chỉ",
+        "đó",
+        "màu da trung bình",
+        "này",
+        "trái",
+        "trung lập"
+      ],
+      "🫹🏾": [
+        "biểu tượng ngón tay cái chỉ sang trái: màu da tối trung bình",
+        "cầm",
+        "chỉ",
+        "đó",
+        "màu da tối trung bình",
+        "này",
+        "trái",
+        "trung lập"
+      ],
+      "🫹🏿": [
+        "biểu tượng ngón tay cái chỉ sang trái: màu da tối",
+        "cầm",
+        "chỉ",
+        "đó",
+        "màu da tối",
+        "này",
+        "trái",
+        "trung lập"
+      ],
+      "🫺": [
+        "biểu tượng ngón tay cái chỉ sang phải",
+        "cầm",
+        "chỉ",
+        "đó",
+        "này",
+        "phải",
+        "trung lập"
+      ],
+      "🫺🏻": [
+        "biểu tượng ngón tay cái chỉ sang phải: màu da sáng",
+        "cầm",
+        "chỉ",
+        "đó",
+        "màu da sáng",
+        "này",
+        "phải",
+        "trung lập"
+      ],
+      "🫺🏼": [
+        "biểu tượng ngón tay cái chỉ sang phải: màu da sáng trung bình",
+        "cầm",
+        "chỉ",
+        "đó",
+        "màu da sáng trung bình",
+        "này",
+        "phải",
+        "trung lập"
+      ],
+      "🫺🏽": [
+        "biểu tượng ngón tay cái chỉ sang phải: màu da trung bình",
+        "cầm",
+        "chỉ",
+        "đó",
+        "màu da trung bình",
+        "này",
+        "phải",
+        "trung lập"
+      ],
+      "🫺🏾": [
+        "biểu tượng ngón tay cái chỉ sang phải: màu da tối trung bình",
+        "cầm",
+        "chỉ",
+        "đó",
+        "màu da tối trung bình",
+        "này",
+        "phải",
+        "trung lập"
+      ],
+      "🫺🏿": [
+        "biểu tượng ngón tay cái chỉ sang phải: màu da tối",
+        "cầm",
+        "chỉ",
+        "đó",
+        "màu da tối",
+        "này",
+        "phải",
+        "trung lập"
       ]
     },
     "zh-Hans": {
@@ -757407,7 +761116,8 @@
       "0️⃣": [
         "按键: 0",
         "0",
-        "按键"
+        "按键",
+        "零"
       ],
       "1️⃣": [
         "按键: 1",
@@ -758092,15 +761802,11 @@
       "⚒️": [
         "锤子与镐",
         "工具",
-        "铁锤",
         "铁镐",
-        "锤子",
-        "镐",
-        "镐子"
+        "锤子"
       ],
       "⚓": [
         "锚",
-        "停泊",
         "工具",
         "船"
       ],
@@ -758244,10 +761950,7 @@
       "⛏️": [
         "铁镐",
         "工具",
-        "挖",
-        "挖掘",
         "采矿",
-        "锄头",
         "鹤嘴锄"
       ],
       "⛑️": [
@@ -763064,9 +766767,9 @@
         "阳伞"
       ],
       "🏗️": [
-        "施工",
+        "建筑施工",
         "兴建",
-        "建筑施工"
+        "施工"
       ],
       "🏘️": [
         "房屋建筑",
@@ -763386,7 +767089,11 @@
       ],
       "🐌": [
         "蜗牛",
-        "法国蜗牛"
+        "动物",
+        "自然",
+        "花园",
+        "食用蜗牛",
+        "鼻涕虫"
       ],
       "🐍": [
         "蛇",
@@ -763483,7 +767190,10 @@
         "毛虫"
       ],
       "🐜": [
-        "蚂蚁"
+        "蚂蚁",
+        "动物",
+        "昆虫",
+        "花园"
       ],
       "🐝": [
         "蜜蜂",
@@ -775802,11 +779512,7 @@
         "锤子",
         "修理",
         "家居修缮",
-        "工具",
-        "敲",
-        "施工",
-        "砸",
-        "铁锤"
+        "工具"
       ],
       "🔩": [
         "螺母与螺栓",
@@ -777138,13 +780844,13 @@
         "调皮"
       ],
       "😜": [
-        "单眼吐舌",
-        "单眼",
-        "古怪",
+        "眨眼吐舌",
+        "古灵精怪",
         "吐舌",
         "开玩笑",
-        "怪人",
         "挤眉弄眼",
+        "搞怪",
+        "眨眼",
         "脸"
       ],
       "😝": [
@@ -779263,8 +782969,8 @@
         "红绿灯"
       ],
       "🚧": [
-        "路障",
-        "施工"
+        "施工",
+        "路障"
       ],
       "🚨": [
         "警车灯",
@@ -780479,6 +784185,20 @@
         "泥石流",
         "灾害",
         "灾难"
+      ],
+      "🛙": [
+        "灯塔",
+        "信号",
+        "信标",
+        "大海",
+        "导航",
+        "希望",
+        "引路",
+        "指引",
+        "海事",
+        "灯光",
+        "灯标",
+        "航海"
       ],
       "🛜": [
         "无线",
@@ -790761,6 +794481,35 @@
         "铜管乐",
         "音乐"
       ],
+      "🪋": [
+        "陨石",
+        "地心引力",
+        "坠落",
+        "天启",
+        "太空",
+        "星星",
+        "火球",
+        "石头",
+        "重力"
+      ],
+      "🪌": [
+        "橡皮擦",
+        "删除",
+        "撤销",
+        "擦除",
+        "改正",
+        "移除",
+        "笔迹",
+        "绘图",
+        "错误"
+      ],
+      "🪍": [
+        "抄网",
+        "捕捉",
+        "收集",
+        "网罗",
+        "诱捕"
+      ],
       "🪎": [
         "宝箱",
         "劫掠",
@@ -791499,6 +795248,17 @@
         "神秘生物",
         "雪怪"
       ],
+      "🫌": [
+        "帝王蝶",
+        "变化",
+        "希望",
+        "昆虫",
+        "毛毛虫",
+        "脆弱",
+        "蜕变",
+        "转变",
+        "迁徙"
+      ],
       "🫍": [
         "虎鲸",
         "大海",
@@ -791645,6 +795405,16 @@
         "蔬菜",
         "食物"
       ],
+      "🫝": [
+        "酸黄瓜",
+        "佐料",
+        "发酵",
+        "困境",
+        "小黄瓜",
+        "盐水",
+        "调味小菜",
+        "黄瓜"
+      ],
       "🫟": [
         "泼溅",
         "喷洒",
@@ -791777,6 +795547,16 @@
         "脆弱",
         "膨胀",
         "震惊"
+      ],
+      "🫫": [
+        "裂开",
+        "打破",
+        "掩饰",
+        "瓦解",
+        "紧张",
+        "蜕变",
+        "透露",
+        "韧性"
       ],
       "🫯": [
         "打斗云团",
@@ -792660,6 +796440,124 @@
         "等等",
         "较深肤色",
         "阻挡"
+      ],
+      "🫹": [
+        "拇指左指",
+        "中性",
+        "四指握住",
+        "左侧",
+        "指向",
+        "这",
+        "那"
+      ],
+      "🫹🏻": [
+        "拇指左指: 较浅肤色",
+        "中性",
+        "四指握住",
+        "左侧",
+        "指向",
+        "较浅肤色",
+        "这",
+        "那"
+      ],
+      "🫹🏼": [
+        "拇指左指: 中等-浅肤色",
+        "中性",
+        "中等-浅肤色",
+        "四指握住",
+        "左侧",
+        "指向",
+        "这",
+        "那"
+      ],
+      "🫹🏽": [
+        "拇指左指: 中等肤色",
+        "中性",
+        "中等肤色",
+        "四指握住",
+        "左侧",
+        "指向",
+        "这",
+        "那"
+      ],
+      "🫹🏾": [
+        "拇指左指: 中等-深肤色",
+        "中性",
+        "中等-深肤色",
+        "四指握住",
+        "左侧",
+        "指向",
+        "这",
+        "那"
+      ],
+      "🫹🏿": [
+        "拇指左指: 较深肤色",
+        "中性",
+        "四指握住",
+        "左侧",
+        "指向",
+        "较深肤色",
+        "这",
+        "那"
+      ],
+      "🫺": [
+        "拇指右指",
+        "中性",
+        "右侧",
+        "四指握住",
+        "指向",
+        "这",
+        "那"
+      ],
+      "🫺🏻": [
+        "拇指右指: 较浅肤色",
+        "中性",
+        "右侧",
+        "四指握住",
+        "指向",
+        "较浅肤色",
+        "这",
+        "那"
+      ],
+      "🫺🏼": [
+        "拇指右指: 中等-浅肤色",
+        "中性",
+        "中等-浅肤色",
+        "右侧",
+        "四指握住",
+        "指向",
+        "这",
+        "那"
+      ],
+      "🫺🏽": [
+        "拇指右指: 中等肤色",
+        "中性",
+        "中等肤色",
+        "右侧",
+        "四指握住",
+        "指向",
+        "这",
+        "那"
+      ],
+      "🫺🏾": [
+        "拇指右指: 中等-深肤色",
+        "中性",
+        "中等-深肤色",
+        "右侧",
+        "四指握住",
+        "指向",
+        "这",
+        "那"
+      ],
+      "🫺🏿": [
+        "拇指右指: 较深肤色",
+        "中性",
+        "右侧",
+        "四指握住",
+        "指向",
+        "较深肤色",
+        "这",
+        "那"
       ]
     },
     "zh-Hant": {
@@ -812046,6 +815944,17 @@
         "災難",
         "雪崩"
       ],
+      "🛙": [
+        "燈塔",
+        "光明",
+        "導航",
+        "希望",
+        "指引",
+        "啟蒙",
+        "海事",
+        "海洋",
+        "訊號"
+      ],
       "🛜": [
         "無線",
         "無線網路，wifi，路由器，連線，熱點，寬頻，網路，智慧型手機，電腦",
@@ -821146,6 +825055,36 @@
         "難過",
         "音樂"
       ],
+      "🪋": [
+        "隕星",
+        "墜落",
+        "太空",
+        "岩石",
+        "星星",
+        "末日",
+        "火球",
+        "重力"
+      ],
+      "🪌": [
+        "橡皮擦",
+        "刪除",
+        "失誤",
+        "寫作",
+        "撤銷",
+        "擦拭",
+        "擦除",
+        "更正",
+        "移除",
+        "繪圖",
+        "錯誤"
+      ],
+      "🪍": [
+        "帶柄的網子",
+        "捕捉",
+        "收集",
+        "網子",
+        "陷阱"
+      ],
       "🪎": [
         "藏寶箱",
         "寶石",
@@ -821790,6 +825729,17 @@
         "神秘",
         "雪怪"
       ],
+      "🫌": [
+        "帝王斑蝶",
+        "希望",
+        "昆蟲",
+        "毛毛蟲",
+        "脆弱",
+        "變化",
+        "變態",
+        "轉變",
+        "遷徙"
+      ],
       "🫍": [
         "虎鯨",
         "大洋",
@@ -821934,6 +825884,16 @@
         "蔬菜",
         "蘿蔔"
       ],
+      "🫝": [
+        "醃黃瓜",
+        "佐料",
+        "小黃瓜",
+        "發酵",
+        "調味品",
+        "鹽水",
+        "麻煩",
+        "黃瓜"
+      ],
       "🫟": [
         "潑濺",
         "侯麗節",
@@ -822062,6 +826022,16 @@
         "腫脹",
         "驚喜",
         "驚嚇"
+      ],
+      "🫫": [
+        "裂開的臉",
+        "崩塌",
+        "掩蓋",
+        "揭開",
+        "破碎",
+        "緊張",
+        "變形",
+        "韌性"
       ],
       "🫯": [
         "打鬥的雲",
@@ -822932,11 +826902,129 @@
         "擊掌",
         "等一下",
         "黑皮膚"
+      ],
+      "🫹": [
+        "拇指向左指",
+        "中立",
+        "左",
+        "握把",
+        "這",
+        "那",
+        "點"
+      ],
+      "🫹🏻": [
+        "拇指向左指：白皮膚",
+        "中立",
+        "左",
+        "握把",
+        "白皮膚",
+        "這",
+        "那",
+        "點"
+      ],
+      "🫹🏼": [
+        "拇指向左指：黃皮膚",
+        "中立",
+        "左",
+        "握把",
+        "這",
+        "那",
+        "黃皮膚",
+        "點"
+      ],
+      "🫹🏽": [
+        "拇指向左指：淺褐皮膚",
+        "中立",
+        "左",
+        "握把",
+        "淺褐皮膚",
+        "這",
+        "那",
+        "點"
+      ],
+      "🫹🏾": [
+        "拇指向左指：褐皮膚",
+        "中立",
+        "左",
+        "握把",
+        "褐皮膚",
+        "這",
+        "那",
+        "點"
+      ],
+      "🫹🏿": [
+        "拇指向左指：黑皮膚",
+        "中立",
+        "左",
+        "握把",
+        "這",
+        "那",
+        "黑皮膚",
+        "點"
+      ],
+      "🫺": [
+        "拇指向右指",
+        "中立",
+        "右",
+        "握把",
+        "這",
+        "那",
+        "點"
+      ],
+      "🫺🏻": [
+        "拇指向右指：白皮膚",
+        "中立",
+        "右",
+        "握把",
+        "白皮膚",
+        "這",
+        "那",
+        "點"
+      ],
+      "🫺🏼": [
+        "拇指向右指：黃皮膚",
+        "中立",
+        "右",
+        "握把",
+        "這",
+        "那",
+        "黃皮膚",
+        "點"
+      ],
+      "🫺🏽": [
+        "拇指向右指：淺褐皮膚",
+        "中立",
+        "右",
+        "握把",
+        "淺褐皮膚",
+        "這",
+        "那",
+        "點"
+      ],
+      "🫺🏾": [
+        "拇指向右指：褐皮膚",
+        "中立",
+        "右",
+        "握把",
+        "褐皮膚",
+        "這",
+        "那",
+        "點"
+      ],
+      "🫺🏿": [
+        "拇指向右指：黑皮膚",
+        "中立",
+        "右",
+        "握把",
+        "這",
+        "那",
+        "黑皮膚",
+        "點"
       ]
     }
   },
   "sources": {
-    "annotations": "https://github.com/unicode-org/cldr-json/tree/91c267402229a59e3ef2774544f001bf959e8809/cldr-json",
-    "emojiTest": "https://github.com/unicode-org/cldr/blob/11299982335beb974c1c63c45265184e759c0f41/tools/cldr-code/src/main/resources/org/unicode/cldr/util/data/emoji/emoji-test.txt"
+    "annotations": "https://github.com/unicode-org/cldr-json/tree/a4b67247b446fd51b475991017a2481911210c60/cldr-json",
+    "emojiTest": "https://github.com/unicode-org/cldr/blob/96e54b273d2da4ec6fbad350ba19ff23fa24a588/tools/cldr-code/src/main/resources/org/unicode/cldr/util/data/emoji/emoji-test.txt"
   }
 }
