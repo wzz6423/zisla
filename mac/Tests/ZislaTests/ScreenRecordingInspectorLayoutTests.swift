@@ -256,7 +256,7 @@ struct ScreenRecordingInspectorLayoutTests {
         #expect((disclosureObject.value(forKey: "accessibilityValue") as? NSNumber)?.boolValue == false)
         #expect(fixture.host.fittingSize.height < expandedHeight)
         let add = try #require(fixture.element("screenRecording.addCaption"))
-        try fixture.click(add.accessibilityFrame())
+        try fixture.press(add)
         await fixture.settle()
         if time == project.duration {
             #expect(model.project == project && !model.canUndo)
