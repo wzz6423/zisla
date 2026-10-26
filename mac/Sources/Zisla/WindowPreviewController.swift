@@ -1,7 +1,9 @@
 import AppKit
 import ApplicationServices
+import CoreMedia
 import ScreenCaptureKit
 import SwiftUI
+import VideoToolbox
 import ZislaCore
 import ZislaKit
 
@@ -82,9 +84,31 @@ enum WindowPreviewCapture {
         configuration.width = max(1, Int(frame.width * scale))
         configuration.height = max(1, Int(frame.height * scale))
         configuration.captureResolution = .best
+        configuration.pixelFormat = kCVPixelFormatType_32BGRA
         configuration.ignoreShadowsSingleWindow = true
         configuration.showsCursor = false
         return configuration
+    }
+
+    @MainActor
+    static func image(
+        for frame: CGRect,
+        screenFrames: [CGRect],
+        companionFrames: [CGRect],
+        captureImage: () async throws -> CGImage,
+        captureSampleBuffer: () async throws -> CMSampleBuffer
+    ) async throws -> NSImage? {
+        if WindowPreviewWindowMatch.matchesFullScreenDisplay(
+            frame, screenFrames: screenFrames, companionFrames: companionFrames
+        ) {
+            // Image screenshots fail with -3811 in inactive fullscreen Spaces; sample buffers remain available.
+            let sample = try await captureSampleBuffer()
+            guard let pixelBuffer = CMSampleBufferGetImageBuffer(sample) else { return nil }
+            var capture: CGImage?
+            _ = VTCreateCGImageFromCVPixelBuffer(pixelBuffer, options: nil, imageOut: &capture)
+            return capture.flatMap { image(from: $0) }
+        }
+        return image(from: try await captureImage())
     }
 
     static func image(from capture: CGImage) -> NSImage? {
@@ -229,7 +253,7 @@ struct WindowPreviewWindowMatch {
         return isOnScreen || matchesFullScreenDisplay(frame, screenFrames: screenFrames, companionFrames: companionFrames)
     }
 
-    private static func matchesFullScreenDisplay(_ frame: CGRect, screenFrames: [CGRect], companionFrames: [CGRect]) -> Bool {
+    fileprivate static func matchesFullScreenDisplay(_ frame: CGRect, screenFrames: [CGRect], companionFrames: [CGRect]) -> Bool {
         // Full-screen browsers can split their top chrome into separate layer-zero windows.
         let headers = companionFrames.filter { $0.width > $0.height * 6 }.sorted { $0.minY < $1.minY }
         return screenFrames.contains { screen in
@@ -849,16 +873,22 @@ final class WindowPreviewController: ObservableObject {
             try Task.checkCancellation()
             let filter = SCContentFilter(desktopIndependentWindow: window)
             let configuration = WindowPreviewCapture.configuration(for: window.frame)
-            let image = try? await SCScreenshotManager.captureImage(contentFilter: filter, configuration: configuration)
+            let frame = WindowPreviewLayout.appKitFrame(for: window.frame, mainScreenTop: mainScreenTop)
+            let image = try? await WindowPreviewCapture.image(
+                for: frame, screenFrames: screenFrames, companionFrames: companionFrames,
+                captureImage: {
+                    try await SCScreenshotManager.captureImage(contentFilter: filter, configuration: configuration)
+                },
+                captureSampleBuffer: {
+                    try await SCScreenshotManager.captureSampleBuffer(contentFilter: filter, configuration: configuration)
+                }
+            )
             try Task.checkCancellation()
             snapshots.append(WindowPreviewSnapshot(
                 id: window.windowID,
                 title: window.title ?? "",
-                frame: WindowPreviewLayout.appKitFrame(
-                    for: window.frame,
-                    mainScreenTop: mainScreenTop
-                ),
-                image: image.flatMap(WindowPreviewCapture.image(from:))
+                frame: frame,
+                image: image
             ))
         }
         return snapshots
