@@ -230,6 +230,223 @@ struct ScreenRecordingStudioTests {
         }
     }
 
+    @Test(arguments: ["screen.mp4", "camera.mov", "microphone.m4a", "directory"], [false, true])
+    func deletedPreviousMediaClearsTheSelectionWithoutBlockingANewRecording(removed: String, dirty: Bool) async throws {
+        let session = RecordingStudioTestSession()
+        let preview = try image(red: 1, blue: 0, width: 3)
+        var notices: [String] = []
+        let (model, root, original) = try fixture(capture: captureService(session),
+            preview: { _, _, _ in preview }, onError: { notices.append($0) })
+        defer { model.shutdown(); try? FileManager.default.removeItem(at: root) }
+        let previousDirectory = try #require(model.directory)
+        var project = original
+        project.cameraFile = "camera.mov"
+        project.microphoneFile = "microphone.m4a"
+        for name in ["camera.mov", "microphone.m4a"] {
+            try Data([1]).write(to: previousDirectory.appendingPathComponent(name))
+        }
+        model.install(project, directory: previousDirectory)
+        try model.save()
+        await model.previewTask?.value
+        #expect(model.prepareToClose())
+        let manifest = previousDirectory.appendingPathComponent(ScreenRecordingProjectStore.manifestName)
+        let saved = try Data(contentsOf: manifest)
+        if dirty {
+            model.split(at: 4)
+            await model.previewTask?.value
+            #expect(model.isDirty && model.canUndo)
+        }
+        model.seek(to: 2)
+        await model.previewTask?.value
+        #expect(model.preview != nil && model.player != nil)
+        let configuration = model.configuration
+        try FileManager.default.removeItem(at: removed == "directory"
+            ? previousDirectory : previousDirectory.appendingPathComponent(removed))
+
+        model.start()
+        await model.operationTask?.value
+
+        #expect(model.capture.phase == .recording, "Deleted media in the previous project must not prevent new capture")
+        #expect(model.project == nil && model.directory == nil, "Missing media must leave no selected project")
+        #expect(model.player == nil && model.preview == nil && model.canvasPreview == nil)
+        #expect(model.currentTime == 0 && model.playbackTime == 0)
+        #expect(!model.isDirty && !model.canUndo && !model.canRedo && !model.canEdit)
+        #expect(model.configuration == configuration)
+        #expect(model.errorMessage == nil && notices.isEmpty)
+        let target = try #require(session.directory)
+        #expect(target != previousDirectory)
+        if removed == "directory" {
+            #expect(!FileManager.default.fileExists(atPath: previousDirectory.path))
+        } else {
+            #expect(try Data(contentsOf: manifest) == saved, "Recovery must not rewrite the previous project")
+        }
+
+        model.stop()
+        await model.operationTask?.value
+        await model.previewTask?.value
+        let recorded = try #require(model.project)
+        #expect(recorded.id != project.id && model.directory == target)
+        #expect(try model.projectStore.load(from: target) == recorded)
+        #expect(model.errorMessage == nil && !model.isDirty && !model.isRecording)
+    }
+
+    @Test func aFirstRecordingNeedsNoPreviousProject() async throws {
+        let session = RecordingStudioTestSession()
+        let root = FileManager.default.temporaryDirectory.appendingPathComponent("zisla-first-recording-\(UUID())")
+        let preview = try image(red: 1, blue: 0, width: 3)
+        let model = ScreenRecordingStudioModel(capture: captureService(session), projectStore: .init(root: root),
+            renderPreview: { _, _, _ in preview })
+        defer { model.shutdown(); try? FileManager.default.removeItem(at: root) }
+
+        model.start()
+        await model.operationTask?.value
+        #expect(model.capture.phase == .recording && model.project == nil && model.errorMessage == nil)
+        model.stop()
+        await model.operationTask?.value
+        let project = try #require(model.project)
+        #expect(try model.projectStore.load(from: #require(model.directory)) == project)
+        #expect(!model.isDirty && !model.isRecording && model.errorMessage == nil)
+    }
+
+    @Test func unrelatedSaveFailuresKeepThePreviousUnsavedProject() async throws {
+        let session = RecordingStudioTestSession()
+        let preview = try image(red: 1, blue: 0, width: 3)
+        let (model, root, original) = try fixture(capture: captureService(session), preview: { _, _, _ in preview })
+        defer { model.shutdown(); try? FileManager.default.removeItem(at: root) }
+        let directory = try #require(model.directory)
+        let manifest = directory.appendingPathComponent(ScreenRecordingProjectStore.manifestName)
+        try FileManager.default.removeItem(at: manifest)
+        try FileManager.default.createDirectory(at: manifest, withIntermediateDirectories: false)
+        model.split(at: 4)
+        let edited = try #require(model.project)
+
+        model.start()
+        await model.operationTask?.value
+
+        #expect(session.directory == nil && !model.isRecording)
+        #expect(model.project == edited && model.directory == directory && model.isDirty && model.canUndo)
+        #expect(model.errorMessage != nil)
+        #expect(try Data(contentsOf: directory.appendingPathComponent(original.videoFile)) == Data([1]))
+        try FileManager.default.removeItem(at: manifest)
+        try model.save()
+        #expect(try model.projectStore.load(from: directory) == edited)
+    }
+
+    @Test func aMissingFileInTheNewCaptureStillReportsItsOwnFailure() async throws {
+        let session = RecordingStudioTestSession()
+        session.beforeStart = { throw CocoaError(.fileReadNoSuchFile) }
+        let preview = try image(red: 1, blue: 0, width: 3)
+        var notices: [String] = []
+        let (model, root, original) = try fixture(capture: captureService(session),
+            preview: { _, _, _ in preview }, onError: { notices.append($0) })
+        defer { model.shutdown(); try? FileManager.default.removeItem(at: root) }
+        let directory = try #require(model.directory)
+        await model.previewTask?.value
+
+        model.start()
+        await model.operationTask?.value
+
+        #expect(!model.isRecording && model.errorMessage != nil && notices.count == 1)
+        #expect(model.project == original && model.directory == directory)
+        let target = try #require(session.directory)
+        #expect(!FileManager.default.fileExists(atPath: target.path))
+    }
+
+    @Test(arguments: [false, true])
+    func unsafePreviousMediaIsNotTreatedAsADeletedProject(dirty: Bool) async throws {
+        let session = RecordingStudioTestSession()
+        let preview = try image(red: 1, blue: 0, width: 3)
+        let (model, root, original) = try fixture(capture: captureService(session), preview: { _, _, _ in preview })
+        defer { model.shutdown(); try? FileManager.default.removeItem(at: root) }
+        let directory = try #require(model.directory)
+        if dirty { model.split(at: 4) }
+        let previous = try #require(model.project)
+        let media = directory.appendingPathComponent(original.videoFile)
+        let outside = root.appendingPathComponent("outside.mp4")
+        try Data([7]).write(to: outside)
+        try FileManager.default.removeItem(at: media)
+        try FileManager.default.createSymbolicLink(at: media, withDestinationURL: outside)
+        await model.previewTask?.value
+
+        model.start()
+        await model.operationTask?.value
+
+        if dirty {
+            #expect(session.directory == nil && !model.isRecording)
+            #expect(model.errorMessage == ScreenRecordingProjectError.unsafeMediaPath.localizedDescription)
+        } else {
+            #expect(model.capture.phase == .recording && model.errorMessage == nil)
+        }
+        #expect(model.project == previous && model.directory == directory && model.isDirty == dirty)
+        #expect(try Data(contentsOf: outside) == Data([7]))
+        model.cancelOperation()
+        for await cancelling in model.$isCancelling.values {
+            if !cancelling { break }
+        }
+    }
+
+    @Test(arguments: [false, true])
+    func unreadablePreviousMediaPreservesTheOriginalSaveAndCaptureBehavior(dirty: Bool) async throws {
+        let session = RecordingStudioTestSession()
+        let preview = try image(red: 1, blue: 0, width: 3)
+        let (model, root, _) = try fixture(capture: captureService(session), preview: { _, _, _ in preview })
+        defer { model.shutdown(); try? FileManager.default.removeItem(at: root) }
+        let directory = try #require(model.directory)
+        if dirty { model.split(at: 4) }
+        let previous = try #require(model.project)
+        await model.previewTask?.value
+        try FileManager.default.setAttributes([.posixPermissions: 0], ofItemAtPath: directory.path)
+        defer { try? FileManager.default.setAttributes([.posixPermissions: 0o700], ofItemAtPath: directory.path) }
+
+        model.start()
+        await model.operationTask?.value
+
+        if dirty {
+            #expect(session.directory == nil && !model.isRecording)
+            #expect(model.errorMessage != nil)
+        } else {
+            #expect(model.capture.phase == .recording && model.errorMessage == nil)
+        }
+        #expect(model.project == previous && model.directory == directory && model.isDirty == dirty)
+        model.cancelOperation()
+        for await cancelling in model.$isCancelling.values {
+            if !cancelling { break }
+        }
+    }
+
+    @Test(arguments: [false, true])
+    func clearingMissingMediaRejectsLatePreviewsAndPendingAIProposals(fails: Bool) async throws {
+        let gate = Gate<CGImage>()
+        let session = RecordingStudioTestSession()
+        let preview = try image(red: 1, blue: 0, width: 3)
+        var notices: [String] = []
+        let (model, root, original) = try fixture(capture: captureService(session),
+            aiCompletion: { _, _, _ in #"{"version":1,"operations":[{"type":"cut","start":2,"end":4}]}"# },
+            preview: { _, _, _ in try await gate.wait() }, onError: { notices.append($0) })
+        defer { model.shutdown(); try? FileManager.default.removeItem(at: root) }
+        await gate.waitUntilEntered()
+        let previousPreview = model.previewTask
+        model.aiInstruction = "Synthetic edit"
+        model.requestAIEdit()
+        await model.operationTask?.value
+        _ = try #require(model.pendingAIProject)
+        try FileManager.default.removeItem(at: #require(model.directory).appendingPathComponent(original.videoFile))
+
+        model.start()
+        await model.operationTask?.value
+        #expect(model.project == nil && model.pendingAIProject == nil)
+        if fails { gate.reject(CocoaError(.fileReadNoSuchFile)) }
+        else { gate.resolve(preview) }
+        await previousPreview?.value
+
+        #expect(model.preview == nil && model.canvasPreview == nil && model.errorMessage == nil && notices.isEmpty)
+        #expect(model.capture.phase == .recording)
+        model.cancelOperation()
+        for await cancelling in model.$isCancelling.values {
+            if !cancelling { break }
+        }
+    }
+
     @Test func sourceFailuresNotifyOnceAndCanNotifyAgainAfterRecovery() async {
         let failure = ScreenRecordingCaptureError.captureFailed("synthetic source failure")
         var fails = true

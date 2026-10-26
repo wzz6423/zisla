@@ -213,6 +213,15 @@ final class ScreenRecordingStudioModel: ObservableObject {
             guard let self else { return }
             defer { isStarting = false; operationTask = nil; showWindow?() }
             do {
+                if let project, let directory {
+                    let missingMedia = [project.videoFile, project.cameraFile, project.microphoneFile].compactMap({ $0 }).contains { name in
+                        guard case let .failure(error as CocoaError) = Result(catching: {
+                            try projectStore.mediaURL(name, in: directory)
+                        }) else { return false }
+                        return error.code == .fileReadNoSuchFile
+                    }
+                    if missingMedia { clearProject() }
+                }
                 if isDirty { try save() }
                 let target = try projectStore.createDirectory()
                 recordingDirectory = target
@@ -703,14 +712,16 @@ final class ScreenRecordingStudioModel: ObservableObject {
 
     func dismissAIEdit() { pendingAIProject = nil; pendingAIBase = nil }
 
-    func install(_ project: ScreenRecordingProject, directory: URL) {
+    private func clearProject() {
+        previewTask?.cancel()
         player?.pause()
         timelinePlayer?.pause()
         if let timelineObserver { timelinePlayer?.removeTimeObserver(timelineObserver); self.timelineObserver = nil }
         timelinePlayer = nil
         if let playerObserver { player?.removeTimeObserver(playerObserver); self.playerObserver = nil }
-        self.project = project
-        self.directory = directory
+        player = nil
+        project = nil
+        directory = nil
         preview = nil
         canvasPreview = nil
         undoHistory.removeAll()
@@ -722,6 +733,12 @@ final class ScreenRecordingStudioModel: ObservableObject {
         dismissAIEdit()
         isShowingSourcePlayback = false
         isShowingTimelinePlayback = false
+    }
+
+    func install(_ project: ScreenRecordingProject, directory: URL) {
+        clearProject()
+        self.project = project
+        self.directory = directory
         let player = AVPlayer(url: directory.appendingPathComponent(project.videoFile))
         self.player = player
         playerObserver = player.addPeriodicTimeObserver(forInterval: CMTime(seconds: 0.1, preferredTimescale: 600), queue: .main) { [weak self] time in
