@@ -213,8 +213,8 @@ struct WindowPreviewWindowMatch {
         frame: CGRect,
         isOnScreen: Bool,
         accessibleWindows: [CGRect]?,
-        hasUnmeasuredAccessibleWindow: Bool = false,
-        screenFrames: [CGRect] = []
+        screenFrames: [CGRect] = [],
+        companionFrames: [CGRect] = []
     ) -> Bool {
         // Browsers expose toolbar surfaces as layer-zero windows with extreme aspect ratios.
         guard frame.width <= frame.height * 6, frame.height <= frame.width * 6 else { return false }
@@ -223,32 +223,41 @@ struct WindowPreviewWindowMatch {
                 abs($0.minX - frame.minX) <= 8 && abs($0.minY - frame.minY) <= 8
                     && abs($0.width - frame.width) <= 8 && abs($0.height - frame.height) <= 8
             }) { return true }
-            // An unmeasurable AX window can belong to an inactive full-screen Space.
-            return hasUnmeasuredAccessibleWindow && matchesFullScreenDisplay(frame, screenFrames: screenFrames)
+            // AX can omit full-screen windows even while reporting the app's ordinary windows.
+            return matchesFullScreenDisplay(frame, screenFrames: screenFrames, companionFrames: companionFrames)
         }
-        return isOnScreen || matchesFullScreenDisplay(frame, screenFrames: screenFrames)
+        return isOnScreen || matchesFullScreenDisplay(frame, screenFrames: screenFrames, companionFrames: companionFrames)
     }
 
-    private static func matchesFullScreenDisplay(_ frame: CGRect, screenFrames: [CGRect]) -> Bool {
-        screenFrames.contains {
-            abs($0.minX - frame.minX) <= 8 && abs($0.maxX - frame.maxX) <= 8
-                && abs($0.minY - frame.minY) <= 48 && abs($0.maxY - frame.maxY) <= 48
+    private static func matchesFullScreenDisplay(_ frame: CGRect, screenFrames: [CGRect], companionFrames: [CGRect]) -> Bool {
+        // Full-screen browsers can split their top chrome into separate layer-zero windows.
+        let headers = companionFrames.filter { $0.width > $0.height * 6 }.sorted { $0.minY < $1.minY }
+        return screenFrames.contains { screen in
+            guard abs(screen.minX - frame.minX) <= 8 && abs(screen.maxX - frame.maxX) <= 8
+                    && abs(screen.minY - frame.minY) <= 48 else { return false }
+            var top = frame.maxY
+            for header in headers where abs(screen.minX - header.minX) <= 8 && abs(screen.maxX - header.maxX) <= 8
+                && header.minY <= top + 8 && header.maxY <= screen.maxY + 8 {
+                top = max(top, header.maxY)
+            }
+            return abs(screen.maxY - top) <= 48
         }
     }
 
     static func canActivateWithoutAccessibilityWindow(
         frame: CGRect,
         isOnlyPreview: Bool,
-        screenFrames: [CGRect]
+        screenFrames: [CGRect],
+        companionFrames: [CGRect] = []
     ) -> Bool {
-        isOnlyPreview && matchesFullScreenDisplay(frame, screenFrames: screenFrames)
+        isOnlyPreview && matchesFullScreenDisplay(frame, screenFrames: screenFrames, companionFrames: companionFrames)
     }
 
     static func currentTarget(
         windowID: CGWindowID,
         processIdentifier: pid_t,
         mainScreenTop: CGFloat
-    ) -> (title: String, frame: CGRect)? {
+    ) -> (title: String, frame: CGRect, companionFrames: [CGRect])? {
         guard let windowInfo = CGWindowListCopyWindowInfo(
             .optionAll, kCGNullWindowID
         ) as? [[String: Any]] else { return nil }
@@ -263,15 +272,23 @@ struct WindowPreviewWindowMatch {
         processIdentifier: pid_t,
         windowInfo: [[String: Any]],
         mainScreenTop: CGFloat
-    ) -> (title: String, frame: CGRect)? {
+    ) -> (title: String, frame: CGRect, companionFrames: [CGRect])? {
         guard let info = windowInfo.first(where: {
             ($0[kCGWindowNumber as String] as? NSNumber)?.uint32Value == windowID
                 && ($0[kCGWindowOwnerPID as String] as? NSNumber)?.int32Value == processIdentifier
         }), let bounds = info[kCGWindowBounds as String] as? NSDictionary,
             let frame = CGRect(dictionaryRepresentation: bounds as CFDictionary) else { return nil }
+        let companionFrames = windowInfo.compactMap { window -> CGRect? in
+            guard (window[kCGWindowOwnerPID as String] as? NSNumber)?.int32Value == processIdentifier,
+                  (window[kCGWindowLayer as String] as? NSNumber)?.intValue == 0,
+                  let bounds = window[kCGWindowBounds as String] as? NSDictionary,
+                  let frame = CGRect(dictionaryRepresentation: bounds as CFDictionary) else { return nil }
+            return WindowPreviewLayout.appKitFrame(for: frame, mainScreenTop: mainScreenTop)
+        }
         return (
             info[kCGWindowName as String] as? String ?? "",
-            WindowPreviewLayout.appKitFrame(for: frame, mainScreenTop: mainScreenTop)
+            WindowPreviewLayout.appKitFrame(for: frame, mainScreenTop: mainScreenTop),
+            companionFrames
         )
     }
 
@@ -280,10 +297,11 @@ struct WindowPreviewWindowMatch {
         frame: CGRect,
         candidates: [(title: String?, frame: CGRect?)],
         screenFrames: [CGRect] = [],
-        isOnlyPreview: Bool = false
+        isOnlyPreview: Bool = false,
+        companionFrames: [CGRect] = []
     ) -> Int? {
         if isOnlyPreview, candidates.count == 1, candidates[0].frame == nil,
-           matchesFullScreenDisplay(frame, screenFrames: screenFrames) {
+           matchesFullScreenDisplay(frame, screenFrames: screenFrames, companionFrames: companionFrames) {
             return 0
         }
         let nearby = candidates.indices.filter {
@@ -813,15 +831,17 @@ final class WindowPreviewController: ObservableObject {
         ) as? [AXUIElement]
         let accessibleFrames = axWindows?.compactMap { Self.frame(of: $0) }
         let screenFrames = NSScreen.screens.map(\.frame)
-        let hasUnmeasuredAccessibleWindow = (axWindows?.count ?? 0) > (accessibleFrames?.count ?? 0)
         let mainScreenTop = screenFrames.first?.maxY ?? 0
-        let candidates = content.windows.filter {
-            guard $0.owningApplication?.processID == processIdentifier && $0.windowLayer == 0
-                    && $0.frame.width >= 80 && $0.frame.height >= 50 else { return false }
+        let applicationWindows = content.windows.filter { $0.owningApplication?.processID == processIdentifier }
+        let companionFrames = applicationWindows.filter { $0.windowLayer == 0 }.map {
+            WindowPreviewLayout.appKitFrame(for: $0.frame, mainScreenTop: mainScreenTop)
+        }
+        let candidates = applicationWindows.filter {
+            guard $0.windowLayer == 0 && $0.frame.width >= 80 && $0.frame.height >= 50 else { return false }
             let frame = WindowPreviewLayout.appKitFrame(for: $0.frame, mainScreenTop: mainScreenTop)
             return WindowPreviewWindowMatch.isPreviewCandidate(
                 frame: frame, isOnScreen: $0.isOnScreen, accessibleWindows: accessibleFrames,
-                hasUnmeasuredAccessibleWindow: hasUnmeasuredAccessibleWindow, screenFrames: screenFrames
+                screenFrames: screenFrames, companionFrames: companionFrames
             )
         }
         var snapshots: [WindowPreviewSnapshot] = []
@@ -995,7 +1015,8 @@ final class WindowPreviewController: ObservableObject {
         let screenFrames = NSScreen.screens.map(\.frame)
         if axWindows.isEmpty {
             guard WindowPreviewWindowMatch.canActivateWithoutAccessibilityWindow(
-                frame: target.frame, isOnlyPreview: isOnlyPreview, screenFrames: screenFrames
+                frame: target.frame, isOnlyPreview: isOnlyPreview, screenFrames: screenFrames,
+                companionFrames: target.companionFrames
             ) else { return }
             _ = app.activate()
             return
@@ -1008,7 +1029,8 @@ final class WindowPreviewController: ObservableObject {
             frame: target.frame,
             candidates: candidates,
             screenFrames: screenFrames,
-            isOnlyPreview: isOnlyPreview
+            isOnlyPreview: isOnlyPreview,
+            companionFrames: target.companionFrames
         )
         guard let index else { return }
         _ = app.activate()

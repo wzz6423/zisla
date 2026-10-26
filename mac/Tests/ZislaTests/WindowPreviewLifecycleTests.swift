@@ -295,6 +295,53 @@ struct WindowPreviewLifecycleTests {
         #expect(controller.windows.map(\.id) == [1])
     }
 
+    @Test(arguments: [WindowPreviewSource.dock, .switcher])
+    func bothEntryPointsPresentAFullscreenWindowOmittedByTheAXList(source: WindowPreviewSource) async throws {
+        let system = PreviewSystem()
+        let screen = CGRect(x: 0, y: 0, width: 1512, height: 982)
+        let ordinary = PreviewSystem.snapshot(11)
+        let image = try #require(PreviewSystem.snapshot(12).image)
+        let fullscreen = WindowPreviewSnapshot(
+            id: 12, title: "Fullscreen", frame: CGRect(x: 0, y: 33, width: 1512, height: 949),
+            image: image
+        )
+        let ghost = WindowPreviewSnapshot(
+            id: 13, title: "Auxiliary surface", frame: ordinary.frame.offsetBy(dx: 100, dy: 80), image: nil
+        )
+        let selection = PreviewSystem.selection(1, source: source)
+        var dependencies = system.dependencies()
+        dependencies.dockSelection = { selection }
+        dependencies.captureWindows = { _ in
+            [ordinary, fullscreen, ghost].filter {
+                WindowPreviewWindowMatch.isPreviewCandidate(
+                    frame: $0.frame, isOnScreen: false, accessibleWindows: [ordinary.frame],
+                    screenFrames: [screen]
+                )
+            }
+        }
+        let controller = WindowPreviewController(dependencies: dependencies)
+        defer { controller.stop() }
+        controller.configure(enabled: true)
+
+        if source == .dock {
+            let event = try #require(NSEvent.mouseEvent(
+                with: .mouseMoved, location: .zero, modifierFlags: [], timestamp: 1,
+                windowNumber: 0, context: nil, eventNumber: 1, clickCount: 0, pressure: 0
+            ))
+            system.globalHandler?(event)
+            try #require(system.timers.last).fire()
+        } else {
+            system.switcher = selection
+            controller.beginSwitcher()
+        }
+        await controller.captureTask?.value
+
+        #expect(controller.windows.map(\.id) == [11, 12],
+                "Both preview entry points must retain the off-Space fullscreen window without admitting auxiliary surfaces")
+        #expect(controller.windows.last?.image === image)
+        #expect(system.presentationAnchors.last == selection.anchor)
+    }
+
     @Test
     func verifiedWindowRemainsAvailableWhenItsCaptureTemporarilyFails() async {
         let system = PreviewSystem()
@@ -446,6 +493,64 @@ struct WindowPreviewLifecycleTests {
         await controller.captureTask?.value
         #expect(controller.windows.first?.image === visible.image)
         #expect(captures == [1, 1])
+    }
+
+    @Test(arguments: [WindowPreviewSource.dock, .switcher],
+          [(captureThrows: false, browser: false), (captureThrows: true, browser: false),
+           (captureThrows: false, browser: true), (captureThrows: true, browser: true)])
+    func foregroundCaptureWithAnIncompleteAXListSeedsBothPreviewEntryPoints(
+        source: WindowPreviewSource, scenario: (captureThrows: Bool, browser: Bool)
+    ) async throws {
+        let system = PreviewSystem()
+        system.foregroundPID = 1
+        system.existingWindowIDs = [11, 12]
+        let screen = CGRect(x: 0, y: 0, width: 1512, height: 982)
+        let ordinary = PreviewSystem.snapshot(11)
+        let image = try #require(PreviewSystem.snapshot(12).image)
+        let frame = scenario.browser ? CGRect(x: 0, y: 0, width: 1512, height: 868)
+            : CGRect(x: 0, y: 33, width: 1512, height: 949)
+        let headers = scenario.browser ? [CGRect(x: 0, y: 949, width: 1512, height: 33),
+                                         CGRect(x: 0, y: 868, width: 1512, height: 81)] : []
+        let selection = PreviewSystem.selection(1, source: source)
+        var dependencies = system.dependencies()
+        dependencies.dockSelection = { selection }
+        dependencies.captureWindows = { _ in
+            if system.foregroundPID != 1 && scenario.captureThrows {
+                throw NSError(domain: "com.apple.ScreenCaptureKit.SCStreamErrorDomain", code: -3811)
+            }
+            let fullscreen = WindowPreviewSnapshot(
+                id: 12, title: "Fullscreen", frame: frame, image: system.foregroundPID == 1 ? image : nil
+            )
+            return [ordinary, fullscreen].filter {
+                WindowPreviewWindowMatch.isPreviewCandidate(
+                    frame: $0.frame, isOnScreen: system.foregroundPID == 1,
+                    accessibleWindows: [ordinary.frame], screenFrames: [screen], companionFrames: headers
+                )
+            }
+        }
+        let controller = WindowPreviewController(dependencies: dependencies)
+        defer { controller.stop() }
+        controller.configure(enabled: true)
+        try #require(system.timers.last).fire()
+        await controller.prefetchTask?.value
+
+        system.foregroundPID = 2
+        if source == .dock {
+            let event = try #require(NSEvent.mouseEvent(
+                with: .mouseMoved, location: .zero, modifierFlags: [], timestamp: 1,
+                windowNumber: 0, context: nil, eventNumber: 1, clickCount: 0, pressure: 0
+            ))
+            system.globalHandler?(event)
+            try #require(system.timers.last).fire()
+        } else {
+            system.switcher = selection
+            controller.beginSwitcher()
+        }
+        await controller.captureTask?.value
+
+        #expect(controller.windows.first { $0.id == 12 }?.image === image,
+                "Foreground prefetch must cache the AX-omitted fullscreen image before capture becomes unavailable off-Space")
+        #expect(system.presentationAnchors.last == selection.anchor)
     }
 
     @Test(arguments: ["empty", "transparent", "partial", "error"])
