@@ -4,6 +4,7 @@ import ZislaCore
 struct ScreenRecordingEffectsView: View {
     @ObservedObject var model: ScreenRecordingStudioModel
     @State private var expandedZoomID: UUID?
+    @State private var zoomSectionExpanded = false
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
@@ -44,15 +45,8 @@ struct ScreenRecordingEffectsView: View {
                     cropField("高度比例", keyPath: \.height)
                 }
             }
-            ScreenRecordingInspectorSection(AppLocalization.text("手动缩放"), symbol: "plus.magnifyingglass", expanded: false) {
-                Button(AppLocalization.text("添加缩放")) {
-                    model.update { project in
-                        guard model.currentTime < project.duration else { return }
-                        let zoom = RecordingZoom(time: model.currentTime, duration: min(2, project.duration - model.currentTime))
-                        project.edits.zoomClips.append(zoom)
-                        expandedZoomID = zoom.id
-                    }
-                }.buttonStyle(SettingsTintedButtonStyle())
+            ScreenRecordingInspectorSection(AppLocalization.text("手动缩放"), symbol: "plus.magnifyingglass",
+                                            expanded: false, isExpanded: $zoomSectionExpanded) {
                 LazyVStack(alignment: .leading, spacing: 12) {
                     ForEach(model.project?.edits.zoomClips ?? []) { zoom in
                         DisclosureGroup(isExpanded: Binding(get: { expandedZoomID == zoom.id }, set: {
@@ -79,6 +73,17 @@ struct ScreenRecordingEffectsView: View {
                         .accessibilityIdentifier("screenRecording.zoom." + zoom.id.uuidString)
                     }
                 }
+            } actions: {
+                Button(AppLocalization.text("添加缩放")) {
+                    model.update { project in
+                        guard model.currentTime < project.duration else { return }
+                        let zoom = RecordingZoom(time: model.currentTime, duration: min(2, project.duration - model.currentTime))
+                        project.edits.zoomClips.append(zoom)
+                        expandedZoomID = zoom.id
+                        zoomSectionExpanded = true
+                    }
+                }.buttonStyle(SettingsTintedButtonStyle())
+                    .accessibilityIdentifier("screenRecording.addZoom")
             }
             ScreenRecordingInspectorSection(AppLocalization.text("音频"), symbol: "speaker.wave.2", expanded: false) {
                 audioParameter("系统声音音量", value: optionalEditBinding(\.screenAudioVolume, default: 1))

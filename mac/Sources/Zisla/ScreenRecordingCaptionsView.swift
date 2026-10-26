@@ -5,6 +5,7 @@ struct ScreenRecordingCaptionsView: View {
     @ObservedObject var model: ScreenRecordingStudioModel
     @Environment(\.recordingCanvasSelection) private var canvasSelection
     @State private var expandedCaptionID: UUID?
+    @State private var sectionExpanded = true
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
@@ -14,25 +15,16 @@ struct ScreenRecordingCaptionsView: View {
                         Text(language.nativeDisplayName).tag(language)
                     }
                 }
+            } actions: {
                 ViewThatFits(in: .horizontal) {
                     HStack { generateButton; exportButton }
                     VStack(alignment: .leading, spacing: 6) { generateButton; exportButton }
                 }
             }
-            ScreenRecordingInspectorSection(AppLocalization.text("字幕"), symbol: "captions.bubble") {
+            ScreenRecordingInspectorSection(AppLocalization.text("字幕"), symbol: "captions.bubble", isExpanded: $sectionExpanded) {
                 Toggle(AppLocalization.text("在视频中显示字幕"), isOn: Binding(get: {
                     model.project?.edits.showCaptions ?? true
                 }, set: { value in model.update { $0.edits.showCaptions = value } }))
-                Button(AppLocalization.text("添加字幕")) {
-                    model.update { project in
-                        guard model.currentTime < project.duration else { return }
-                        let caption = RecordingCaption(start: model.currentTime,
-                            end: min(project.duration, model.currentTime + 2), text: AppLocalization.text("新字幕"))
-                        project.captions.append(caption)
-                        expandedCaptionID = caption.id
-                        canvasSelection.wrappedValue = .caption(caption.id)
-                    }
-                }.buttonStyle(SettingsTintedButtonStyle())
                 LazyVStack(alignment: .leading, spacing: 12) {
                     ForEach(model.project?.captions ?? []) { caption in
                         DisclosureGroup(isExpanded: Binding(get: { expandedCaptionID == caption.id }, set: {
@@ -65,10 +57,22 @@ struct ScreenRecordingCaptionsView: View {
                         .accessibilityIdentifier("screenRecording.caption." + caption.id.uuidString)
                     }
                 }
+            } actions: {
+                Button(AppLocalization.text("添加字幕")) {
+                    model.update { project in
+                        guard model.currentTime < project.duration else { return }
+                        let caption = RecordingCaption(start: model.currentTime,
+                            end: min(project.duration, model.currentTime + 2), text: AppLocalization.text("新字幕"))
+                        project.captions.append(caption)
+                        expandedCaptionID = caption.id
+                        canvasSelection.wrappedValue = .caption(caption.id)
+                    }
+                }.buttonStyle(SettingsTintedButtonStyle())
+                    .accessibilityIdentifier("screenRecording.addCaption")
             }
         }.disabled(!model.canEdit)
         .onChange(of: canvasSelection.wrappedValue, initial: true) { _, selection in
-            if case let .caption(id) = selection { expandedCaptionID = id }
+            if case let .caption(id) = selection { expandedCaptionID = id; sectionExpanded = true }
         }
     }
 

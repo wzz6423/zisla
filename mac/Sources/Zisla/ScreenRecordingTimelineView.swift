@@ -8,12 +8,12 @@ struct ScreenRecordingTimelineView: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
             if let project = model.project {
-                Text(AppLocalization.text("输出时长：%@", ScreenRecordingStudioView.clock(project.outputDuration)))
-                    .font(.caption).foregroundStyle(.secondary)
                 ViewThatFits(in: .horizontal) {
                     HStack { splitButton; restoreButton }
-                    VStack(alignment: .leading, spacing: 6) { splitButton; restoreButton }
-                }
+                    VStack(alignment: .trailing, spacing: 6) { splitButton; restoreButton }
+                }.frame(maxWidth: .infinity, alignment: .trailing)
+                Text(AppLocalization.text("输出时长：%@", ScreenRecordingStudioView.clock(project.outputDuration)))
+                    .font(.caption).foregroundStyle(.secondary)
                 if project.edits.segments.isEmpty {
                     Text(AppLocalization.text("所有片段已删除，请恢复素材后导出"))
                         .font(.caption).foregroundStyle(.secondary)

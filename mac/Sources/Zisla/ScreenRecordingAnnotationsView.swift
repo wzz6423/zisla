@@ -31,12 +31,6 @@ struct ScreenRecordingAnnotationsView: View {
     var body: some View {
         ScreenRecordingInspectorSection(AppLocalization.text("标注"), symbol: "pencil.tip.crop.circle",
                                         expanded: false, isExpanded: $sectionExpanded) {
-            Menu(AppLocalization.text("添加标注")) {
-                ForEach(RecordingAnnotationKind.allCases, id: \.self) { kind in
-                    Button { add(kind) } label: { Label(AppLocalization.text(kind.title), systemImage: kind.symbol) }
-                }
-            }.disabled(model.project.map { model.currentTime >= $0.duration
-                || ($0.edits.annotations?.count ?? 0) >= RecordingAnnotation.maximumCount } ?? true)
             LazyVStack(alignment: .leading, spacing: 12) {
                 ForEach(model.project?.edits.annotations ?? []) { annotation in
                     DisclosureGroup(isExpanded: Binding(get: { expandedAnnotationID == annotation.id }, set: {
@@ -77,6 +71,13 @@ struct ScreenRecordingAnnotationsView: View {
                     .accessibilityIdentifier("screenRecording.annotation." + annotation.id.uuidString)
                 }
             }
+        } actions: {
+            Menu(AppLocalization.text("添加标注")) {
+                ForEach(RecordingAnnotationKind.allCases, id: \.self) { kind in
+                    Button { add(kind) } label: { Label(AppLocalization.text(kind.title), systemImage: kind.symbol) }
+                }
+            }.disabled(model.project.map { model.currentTime >= $0.duration
+                || ($0.edits.annotations?.count ?? 0) >= RecordingAnnotation.maximumCount } ?? true)
         }.disabled(!model.canEdit)
         .onChange(of: canvasSelection.wrappedValue, initial: true) { _, selection in
             if case let .annotation(id) = selection { expandedAnnotationID = id; sectionExpanded = true }
