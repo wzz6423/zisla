@@ -5,11 +5,6 @@ import ZislaCore
 import ZislaKit
 import SwiftUI
 
-@objc private protocol EditingActionTarget {
-    func undo(_ sender: Any?)
-    func redo(_ sender: Any?)
-}
-
 @main
 enum ZislaMain {
     @MainActor
@@ -41,44 +36,16 @@ final class SettingsWindow: NSWindow {
         if let recorder = firstResponder as? HotkeyRecorderButton, recorder.isRecording {
             return recorder.performKeyEquivalent(with: event)
         }
-        guard let action = Self.editingAction(for: event),
-              let firstResponder,
-              firstResponder.responds(to: action),
-              NSApp.sendAction(action, to: firstResponder, from: self)
-        else {
-            return super.performKeyEquivalent(with: event)
-        }
-        return true
-    }
-
-    fileprivate static func editingAction(for event: NSEvent) -> Selector? {
-        let modifiers = event.modifierFlags
-            .intersection(.deviceIndependentFlagsMask)
-            .subtracting([.capsLock, .numericPad, .function])
-        let key = event.charactersIgnoringModifiers?.lowercased()
-
-        return switch (key, modifiers) {
-        case ("a", .command): #selector(NSResponder.selectAll(_:))
-        case ("c", .command): #selector(NSText.copy(_:))
-        case ("v", .command): #selector(NSText.paste(_:))
-        case ("x", .command): #selector(NSText.cut(_:))
-        case ("z", .command): #selector(EditingActionTarget.undo(_:))
-        case ("z", [.command, .shift]): #selector(EditingActionTarget.redo(_:))
-        default: nil
-        }
+        return TextEditingCommands.performKeyEquivalent(with: event, in: self)
+            || super.performKeyEquivalent(with: event)
     }
 }
 
 @MainActor
 final class QuickNotesEditorWindow: NSWindow {
     override func performKeyEquivalent(with event: NSEvent) -> Bool {
-        guard let action = SettingsWindow.editingAction(for: event),
-              let firstResponder,
-              NSApp.sendAction(action, to: firstResponder, from: self)
-        else {
-            return super.performKeyEquivalent(with: event)
-        }
-        return true
+        TextEditingCommands.performKeyEquivalent(with: event, in: self)
+            || super.performKeyEquivalent(with: event)
     }
 }
 
@@ -379,6 +346,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
     private var systemScreenshotMonitor: SystemScreenshotMonitor?
     private var cancellables: Set<AnyCancellable> = []
     private var effectiveAppearanceObservation: NSKeyValueObservation?
+    private var textEditingMonitor: Any?
     private var currentApplicationIconImage: NSImage?
     private var expandedSizeUpdateTask: Task<Void, Never>?
     private var islandClipboardHandoffTask: Task<Void, Never>?
@@ -399,6 +367,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
             return
         }
         NSApp.setActivationPolicy(.accessory)
+        configureTextEditingCommands()
         WindowPlacement.installTransientWindowPromotion()
         let defaults = UserDefaults.standard
         let hasExistingInstallation = [
@@ -973,6 +942,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
 
     func applicationWillTerminate(_ notification: Notification) {
         isTerminating = true
+        if let textEditingMonitor { NSEvent.removeMonitor(textEditingMonitor) }
+        textEditingMonitor = nil
         onboardingLifecycle?.terminate()
         onboardingController?.close()
         onboardingController = nil
@@ -1108,6 +1079,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
                 includesPet: includesPet
             )
         )
+    }
+
+    func configureTextEditingCommands() {
+        textEditingMonitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { event in
+            TextEditingCommands.handle(event)
+        }
     }
 
     private func configureMainMenu() {

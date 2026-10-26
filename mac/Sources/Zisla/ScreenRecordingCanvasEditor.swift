@@ -172,6 +172,7 @@ final class RecordingCanvasEditorView: NSView, NSTextViewDelegate {
 
     func cancelEditing() {
         textEditor?.delegate = nil
+        textEditor?.undoManager?.removeAllActions()
         textEditor?.removeFromSuperview()
         textEditor = nil
         clearDraft()
@@ -213,7 +214,6 @@ final class RecordingCanvasEditorView: NSView, NSTextViewDelegate {
         editor.isRichText = false
         editor.importsGraphics = false
         editor.drawsBackground = false
-        editor.allowsUndo = false
         editor.isVerticallyResizable = false
         editor.isHorizontallyResizable = false
         editor.textContainerInset = .zero
@@ -254,6 +254,7 @@ final class RecordingCanvasEditorView: NSView, NSTextViewDelegate {
         guard textEditor != nil else { return }
         let original = self.original, replacement = draft
         textEditor?.delegate = nil
+        textEditor?.undoManager?.removeAllActions()
         textEditor?.removeFromSuperview()
         textEditor = nil
         clearDraft()
@@ -309,7 +310,10 @@ final class RecordingCanvasEditorView: NSView, NSTextViewDelegate {
 }
 
 private final class RecordingCanvasTextView: NSTextView {
+    private let textUndoManager = UndoManager()
     var onFinish: (Bool) -> Void = { _ in }
+
+    override var undoManager: UndoManager? { textUndoManager }
 
     override func keyDown(with event: NSEvent) {
         if event.keyCode == 53 { onFinish(false) }

@@ -187,6 +187,75 @@ struct ScreenRecordingCanvasEditorTests {
         #expect(fixture.model.commitPendingCanvasText == nil)
     }
 
+    @Test(arguments: [false, true])
+    func inlineTextUndoAndRedoChangeOnlyTheDraftUntilOneProjectCommit(_ caption: Bool) async throws {
+        let fixture = try Fixture(kind: .text, caption: caption)
+        defer { fixture.close() }
+        await fixture.ready()
+        let original = try #require(fixture.model.project)
+        let originalText = try #require(caption ? original.captions.first?.text : original.edits.annotations?.first?.text)
+        fixture.view.mouseDown(with: fixture.mouse(.leftMouseDown, x: 0.4, y: 0.3, clicks: 2))
+        let editor = try #require(fixture.view.textEditor)
+        editor.insertText("Edited draft", replacementRange: editor.selectedRange())
+        editor.breakUndoCoalescing()
+        #expect(fixture.view.draft?.text == "Edited draft")
+        #expect(fixture.model.project == original && !fixture.model.canUndo)
+
+        #expect(TextEditingCommands.handle(fixture.key(6, characters: "z", modifiers: .command)) == nil)
+        #expect(editor.string == originalText && fixture.view.draft?.text == originalText)
+        #expect(fixture.model.project == original && !fixture.model.canUndo)
+        #expect(TextEditingCommands.handle(fixture.key(6, characters: "Z", modifiers: [.command, .shift])) == nil)
+        #expect(editor.string == "Edited draft" && fixture.view.draft?.text == "Edited draft")
+        #expect(fixture.model.project == original && !fixture.model.canUndo)
+
+        editor.keyDown(with: fixture.key(36))
+        let edited = try #require(fixture.model.project)
+        #expect((caption ? edited.captions.first?.text : edited.edits.annotations?.first?.text) == "Edited draft")
+        #expect(fixture.view.textEditor == nil && fixture.model.canUndo)
+        #expect(editor.undoManager?.canUndo == false && editor.undoManager?.canRedo == false)
+        fixture.model.undo()
+        #expect(fixture.model.project == original && !fixture.model.canUndo,
+                "Typing, undo and redo must commit exactly one project revision")
+        fixture.model.redo()
+        #expect(fixture.model.project == edited)
+    }
+
+    @Test(arguments: [false, true])
+    func finishingOrCancellingInlineTextClearsOnlyItsOwnHistory(_ commit: Bool) async throws {
+        let fixture = try Fixture(kind: .text)
+        defer { fixture.close() }
+        await fixture.ready()
+        let original = try #require(fixture.model.project)
+        let other = NSTextView(frame: CGRect(x: 0, y: 0, width: 200, height: 40))
+        other.allowsUndo = true
+        other.string = "Other input"
+        fixture.view.addSubview(other)
+        #expect(fixture.window.makeFirstResponder(other))
+        other.insertText("Other draft", replacementRange: NSRange(location: 0, length: 11))
+        other.breakUndoCoalescing()
+        let otherHistory = try #require(other.undoManager)
+        #expect(otherHistory.canUndo)
+
+        fixture.view.mouseDown(with: fixture.mouse(.leftMouseDown, x: 0.4, y: 0.3, clicks: 2))
+        let editor = try #require(fixture.view.textEditor)
+        editor.insertText("Canvas draft", replacementRange: editor.selectedRange())
+        editor.breakUndoCoalescing()
+        #expect(editor.undoManager?.canUndo == true)
+        if commit { editor.keyDown(with: fixture.key(36)) }
+        else { fixture.view.cancelEditing() }
+
+        #expect(editor.undoManager?.canUndo == false && editor.undoManager?.canRedo == false)
+        #expect(otherHistory.canUndo, "Ending an inline editor must not clear another input's undo stack")
+        #expect(fixture.window.makeFirstResponder(other))
+        #expect(TextEditingCommands.handle(fixture.key(6, characters: "z", modifiers: .command)) == nil)
+        #expect(other.string == "Other input")
+        if commit {
+            #expect(fixture.model.project?.edits.annotations?.first?.text == "Canvas draft")
+            fixture.model.undo()
+        }
+        #expect(fixture.model.project == original && !fixture.model.canUndo)
+    }
+
     @Test
     func flushingTextCannotReportSuccessForASplitRejectedByTheSegmentLimit() async throws {
         let fixture = try Fixture(kind: .text)
@@ -452,9 +521,9 @@ struct ScreenRecordingCanvasEditorTests {
                 windowNumber: window.windowNumber, context: nil, eventNumber: 0, clickCount: clicks, pressure: 1)!
         }
 
-        func key(_ code: UInt16) -> NSEvent {
-            NSEvent.keyEvent(with: .keyDown, location: .zero, modifierFlags: [], timestamp: 0,
-                windowNumber: window.windowNumber, context: nil, characters: "", charactersIgnoringModifiers: "",
+        func key(_ code: UInt16, characters: String = "", modifiers: NSEvent.ModifierFlags = []) -> NSEvent {
+            NSEvent.keyEvent(with: .keyDown, location: .zero, modifierFlags: modifiers, timestamp: 0,
+                windowNumber: window.windowNumber, context: nil, characters: characters, charactersIgnoringModifiers: characters,
                 isARepeat: false, keyCode: code)!
         }
 
