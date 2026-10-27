@@ -7,12 +7,29 @@ struct ScreenRecordingModelsTests {
         .init(name: "Demo", videoFile: "screen.mp4", duration: 12, width: 1_920, height: 1_080)
     }
 
-    @Test func newProjectPreservesFullSourceAndRoundTrips() throws {
-        let source = project()
+    @Test(arguments: [false, true])
+    func newProjectPreservesFullSourceAndRoundTrips(fromRecording: Bool) throws {
+        let source = fromRecording
+            ? ScreenRecordingProject(result: .init(videoFile: "screen.mp4", duration: 12, width: 1_920, height: 1_080), name: "Demo")
+            : project()
         try source.validate()
         #expect(source.outputDuration == 12)
+        #expect(source.edits.padding == 0, "New projects must fill their original canvas without background margins")
+        #expect(source.edits.cornerRadius == 0, "New projects must preserve square video corners")
+        #expect(source.edits.shadow == 0, "New projects must start without a video shadow")
         let decoded = try JSONDecoder().decode(ScreenRecordingProject.self, from: JSONEncoder().encode(source))
         #expect(decoded == source)
+    }
+
+    @Test(arguments: [(0.06, 0.02, 0.3), (0.3, 0.2, 1.0)])
+    func savedProjectPreservesExplicitCanvasEffects(padding: Double, cornerRadius: Double, shadow: Double) throws {
+        var source = project()
+        source.edits.padding = padding
+        source.edits.cornerRadius = cornerRadius
+        source.edits.shadow = shadow
+        let decoded = try JSONDecoder().decode(ScreenRecordingProject.self, from: JSONEncoder().encode(source))
+        try decoded.validate()
+        #expect(decoded == source, "Reopening a saved project must preserve its explicit canvas effects")
     }
 
     @Test

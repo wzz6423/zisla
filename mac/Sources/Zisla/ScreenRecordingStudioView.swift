@@ -62,10 +62,6 @@ struct ScreenRecordingStudioView: View {
                                 default: ScreenRecordingAIView(model: model)
                                 }
                             }
-                            if model.exporter.isExporting {
-                                ProgressView(value: model.exporter.progress)
-                                Text(AppLocalization.text("正在导出录屏")).font(.caption)
-                            }
                             if model.isBusy || model.isRecording || model.exporter.isExporting {
                                 Button(AppLocalization.text("取消"), role: .cancel, action: model.cancelOperation)
                             }

@@ -267,8 +267,8 @@ public struct RecordingEdits: Codable, Equatable, Sendable {
     public var effectiveMicrophoneVolume: Double { microphoneVolume ?? 1 }
 
     public init(segments: [RecordingSegment] = [], zoomClips: [RecordingZoom] = [],
-                background: RecordingBackground = .gradient, padding: Double = 0.06,
-                cornerRadius: Double = 0.02, shadow: Double = 0.3, cursorSize: Double = 1.5,
+                background: RecordingBackground = .gradient, padding: Double = 0,
+                cornerRadius: Double = 0, shadow: Double = 0, cursorSize: Double = 1.5,
                 showCursor: Bool = true, clickEffects: Bool = true, autoZoom: Bool = false,
                 cameraPosition: RecordingCameraPosition = .bottomRight, cameraSize: Double = 0.25,
                 cameraMirrored: Bool = true, cameraRound: Bool = true,

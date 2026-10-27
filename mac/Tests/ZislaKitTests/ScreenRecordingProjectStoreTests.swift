@@ -106,4 +106,53 @@ struct ScreenRecordingProjectStoreTests {
         #expect(try Data(contentsOf: destination) == Data([42]))
         #expect(try FileManager.default.contentsOfDirectory(atPath: root.path).count == 2)
     }
+
+    @Test func cancelledManifestWritePreservesPreviouslySavedEdits() async throws {
+        let root = try temporaryDirectory()
+        defer { try? FileManager.default.removeItem(at: root) }
+        let store = ScreenRecordingProjectStore(root: root)
+        let source = try store.createDirectory()
+        try Data([1]).write(to: source.appendingPathComponent("screen.mp4"))
+        let project = ScreenRecordingProject(name: "Saved", videoFile: "screen.mp4", duration: 1, width: 16, height: 16)
+        try store.save(project, in: source)
+        let task = Task {
+            withUnsafeCurrentTask { $0?.cancel() }
+            var edited = project
+            edited.name = "Cancelled"
+            try store.save(edited, in: source)
+        }
+        await #expect(throws: CancellationError.self) { try await task.value }
+        #expect(try store.load(from: source) == project)
+    }
+
+    @Test(arguments: [false, true])
+    func cancelledCopyBeforeMediaOrCommitRemovesStagingAndPreservesSource(_ beforeCommit: Bool) throws {
+        let root = try temporaryDirectory()
+        defer { try? FileManager.default.removeItem(at: root) }
+        let store = ScreenRecordingProjectStore(root: root)
+        let source = try store.createDirectory()
+        try Data([1]).write(to: source.appendingPathComponent("screen.mp4"))
+        let project = ScreenRecordingProject(name: "Saved", videoFile: "screen.mp4", duration: 1, width: 16, height: 16)
+        try store.save(project, in: source)
+        let destination = root.appendingPathComponent("copy.zisla-recording")
+        var cancellationChecked = false
+        #expect(throws: CancellationError.self) {
+            try store.copy(project, from: source, to: destination, checkCancellation: {
+                let staging = try #require(try FileManager.default.contentsOfDirectory(at: root, includingPropertiesForKeys: nil)
+                    .first { $0.lastPathComponent.hasPrefix(".zisla-recording-") })
+                let files = try FileManager.default.contentsOfDirectory(atPath: staging.path)
+                if beforeCommit {
+                    guard files.contains(ScreenRecordingProjectStore.manifestName) else { return }
+                } else {
+                    #expect(files.isEmpty, "A cancelled copy must be checked before copying the first media file")
+                }
+                cancellationChecked = true
+                throw CancellationError()
+            })
+        }
+        #expect(cancellationChecked)
+        #expect(try store.load(from: source) == project)
+        #expect(!FileManager.default.fileExists(atPath: destination.path))
+        #expect(try FileManager.default.contentsOfDirectory(atPath: root.path) == [source.lastPathComponent])
+    }
 }

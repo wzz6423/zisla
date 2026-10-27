@@ -241,6 +241,7 @@ struct CompactStatusBarView: View {
 
     private func compactProgress(at date: Date) -> Double? {
         guard settingsStore.settings.collapsedProgressGlowEnabled else { return nil }
+        if let recordingOperationNotice { return recordingOperationNotice.progress }
         switch selectedCompactStatusPriority {
         case .media:
             guard mediaNotice != nil, let snapshot = media.snapshot else { return nil }
@@ -255,6 +256,7 @@ struct CompactStatusBarView: View {
     }
 
     private var compactProgressTint: Color {
+        if recordingOperationNotice != nil { return .green }
         guard selectedCompactStatusPriority == .media else { return .green }
         let artworkData = detailedMediaItem?.artworkData ?? mediaNotice?.artworkData
         return MediaWaveformView.tintColor(for: artworkData)
@@ -279,7 +281,9 @@ struct CompactStatusBarView: View {
     }
 
     private var presentationNotices: [IslandNotice] {
-        resultSweep.presentationNotices(from: queue.left + queue.right)
+        let notices = resultSweep.presentationNotices(from: queue.left + queue.right)
+        return displayState.hidesVoiceProcessingIndicator
+            ? notices.filter { !$0.id.hasPrefix("voice-processing-") } : notices
     }
 
     private var mediaNotice: IslandNotice? {
@@ -319,6 +323,11 @@ struct CompactStatusBarView: View {
 
     private var videoDownloadNotice: IslandNotice? {
         presentationNotices.first { $0.id.hasPrefix("video-download-") }
+    }
+
+    var recordingOperationNotice: IslandNotice? {
+        SideNoticeLayoutEngine.screenRecordingOperationNotice(for: presentationNotices,
+                                                              settings: settingsStore.settings)
     }
 
     private var focusCountdownNotice: IslandNotice? {
@@ -382,6 +391,14 @@ struct CompactStatusBarView: View {
                     height: height,
                     usesTransparentBackground: compactWingsUseTransparentBackground
                 )
+            }
+        } else if let recordingOperationNotice {
+            HStack(spacing: 0) {
+                CompactScreenRecordingOperationWing(notice: recordingOperationNotice, side: .left,
+                    height: height, usesTransparentBackground: compactWingsUseTransparentBackground)
+                Spacer(minLength: 0)
+                CompactScreenRecordingOperationWing(notice: recordingOperationNotice, side: .right,
+                    height: height, usesTransparentBackground: compactWingsUseTransparentBackground)
             }
         } else {
             configuredCompactStatusContent
@@ -2161,6 +2178,44 @@ private struct CompactBrowserDownloadWing: View {
             }
         }
         return AppLocalization.text("%@ 下载完成：%@", source, notice.title)
+    }
+}
+
+private struct CompactScreenRecordingOperationWing: View {
+    var notice: IslandNotice
+    var side: NoticeSide
+    var height: CGFloat
+    var usesTransparentBackground = false
+
+    var body: some View {
+        Group {
+            if side == .left {
+                Image(systemName: notice.symbolName ?? "film")
+                    .font(.system(size: min(15, height * 0.56), weight: .semibold))
+                    .foregroundStyle(.white)
+            } else if notice.kind == .success {
+                Image(systemName: "checkmark").foregroundStyle(.green)
+            } else if notice.kind == .error {
+                Image(systemName: "exclamationmark.circle.fill").foregroundStyle(Color.zislaError)
+            } else if notice.progress != nil {
+                Text(ScreenRecordingOperationNotice.progressText(for: notice))
+                    .font(.system(size: min(13, height * 0.5), weight: .semibold, design: .rounded))
+                    .monospacedDigit()
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.65)
+                    .foregroundStyle(.white)
+            } else {
+                ProgressView().controlSize(.mini)
+            }
+        }
+        .padding(.horizontal, CompactStatusMetrics.horizontalContentInset)
+        .frame(width: CompactStatusMetrics.wingWidth, height: height,
+               alignment: side == .left ? .leading : .trailing)
+        .background(usesTransparentBackground ? Color.clear : Color.black, in: CompactAIWingShape(side: side))
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel([notice.title, notice.detail, ScreenRecordingOperationNotice.progressText(for: notice)]
+            .compactMap { $0 }.joined(separator: " · "))
+        .help(notice.detail ?? notice.title)
     }
 }
 

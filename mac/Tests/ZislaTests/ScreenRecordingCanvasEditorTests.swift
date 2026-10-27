@@ -17,7 +17,7 @@ struct ScreenRecordingCanvasEditorTests {
         var exportRequests = 0
         let fixture = try Fixture(kind: .text, caption: caption, presentExportPanel: { _, completion in
             exportRequests += 1
-            completion(.cancel)
+            completion(nil)
         }, aiCompletion: { _, _, _ in
             "{\"version\":1,\"operations\":[{\"type\":\"caption\",\"start\":0,\"end\":2,\"text\":\"Stale AI text\"}]}"
         })
@@ -468,7 +468,7 @@ struct ScreenRecordingCanvasEditorTests {
         var commits = 0
 
         init(kind: RecordingAnnotationKind, caption: Bool = false,
-             presentExportPanel: @escaping (NSSavePanel, @escaping (NSApplication.ModalResponse) -> Void) -> Void = { _, completion in completion(.cancel) },
+             presentExportPanel: @escaping (NSSavePanel, @escaping (URL?) -> Void) -> Void = { _, completion in completion(nil) },
              aiCompletion: ((ScreenRecordingProject, String, AIModelConfigurationReference?) async throws -> String)? = nil) throws {
             root = FileManager.default.temporaryDirectory.appendingPathComponent("zisla-canvas-test-\(UUID())")
             let store = ScreenRecordingProjectStore(root: root)

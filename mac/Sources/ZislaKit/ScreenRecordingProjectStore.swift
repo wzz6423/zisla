@@ -23,7 +23,9 @@ public struct ScreenRecordingProjectStore: Sendable {
         try validateMedia(project, in: directory)
         let encoder = JSONEncoder()
         encoder.outputFormatting = [.sortedKeys]
-        try encoder.encode(project).write(
+        let data = try encoder.encode(project)
+        try Task.checkCancellation()
+        try data.write(
             to: directory.appendingPathComponent(Self.manifestName), options: .atomic
         )
     }
@@ -40,7 +42,8 @@ public struct ScreenRecordingProjectStore: Sendable {
         return project
     }
 
-    public func copy(_ project: ScreenRecordingProject, from source: URL, to destination: URL) throws {
+    public func copy(_ project: ScreenRecordingProject, from source: URL, to destination: URL,
+                     checkCancellation: () throws -> Void = { try Task.checkCancellation() }) throws {
         try project.validate()
         try validateMedia(project, in: source)
         guard !FileManager.default.fileExists(atPath: destination.path) else {
@@ -51,9 +54,11 @@ public struct ScreenRecordingProjectStore: Sendable {
         try FileManager.default.createDirectory(at: staging, withIntermediateDirectories: false)
         defer { try? FileManager.default.removeItem(at: staging) }
         for name in mediaNames(project) {
+            try checkCancellation()
             try FileManager.default.copyItem(at: mediaURL(name, in: source), to: staging.appendingPathComponent(name))
         }
         try save(project, in: staging)
+        try checkCancellation()
         try FileManager.default.moveItem(at: staging, to: destination)
     }
 

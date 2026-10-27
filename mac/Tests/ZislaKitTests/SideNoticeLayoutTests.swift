@@ -30,6 +30,29 @@ struct SideNoticeLayoutTests {
 
     private let engine = SideNoticeLayoutEngine()
 
+    @Test(arguments: [false, true])
+    func recordingProgressUsesTheSharedCompactFrameAndPetAnchor(_ physical: Bool) throws {
+        let screen = ScreenSnapshot(displayID: 42, frame: CGRect(x: 0, y: 0, width: 1_512, height: 982),
+            visibleFrame: CGRect(x: 0, y: 0, width: 1_512, height: 950),
+            safeAreaInsets: ScreenInsets(top: physical ? 32 : 0),
+            auxiliaryTopLeftArea: physical ? CGRect(x: 0, y: 950, width: 716, height: 32) : nil,
+            auxiliaryTopRightArea: physical ? CGRect(x: 796, y: 950, width: 716, height: 32) : nil,
+            menuBarHeightFallback: 24)
+        let layout = ScreenLayoutEngine().layout(for: screen)
+        let notice = IslandNotice(id: "screen-recording-operation-export", title: "Output", progress: 0.5)
+        var settings = FeatureSettings.default
+        settings.collapsedProgressGlowEnabled = false
+        let frame = try #require(engine.compactBarFrame(for: screen, notices: [notice], settings: settings))
+        #expect(frame == engine.compactBarFrame(for: screen))
+        settings.collapsedProgressGlowEnabled = true
+        let glowing = try #require(engine.compactBarFrame(for: screen, notices: [notice], settings: settings))
+        #expect(glowing.maxY == frame.maxY && glowing.height == frame.height + (physical ? 2 : 0))
+        #expect(glowing == engine.compactBarFrame(for: layout, notices: [notice], settings: settings),
+                "The persistent pet must follow the same recording-progress contour")
+        settings.sideNoticesEnabled = false
+        #expect(engine.compactBarFrame(for: screen, notices: [notice], settings: settings) == nil)
+    }
+
     /// Expanding the island also dismisses the clipboard assistant; that dismissal must not
     /// clear the hidden state and let the collapsed status bar draw over the open panel.
     @Test

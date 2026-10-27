@@ -164,9 +164,6 @@ struct ScreenRecordingZeroPaddingTests {
     private func project(size: CGSize) -> ScreenRecordingProject {
         var project = ScreenRecordingProject(name: "Zero Padding", videoFile: "screen.mp4", duration: 1,
                                               width: Int(size.width), height: Int(size.height))
-        project.edits.padding = 0
-        project.edits.cornerRadius = 0
-        project.edits.shadow = 0
         project.edits.showCursor = false
         project.edits.clickEffects = false
         project.edits.showCaptions = false

@@ -8,6 +8,7 @@ struct IslandDashboardView: View {
     @ObservedObject private var aiMonitor: AIStateMonitor
     @ObservedObject private var media: NowPlayingService
     @ObservedObject private var browserDownloads: BrowserDownloadMonitor
+    @ObservedObject private var notices: SideNoticeQueue
 
     init(model: AppModel) {
         _model = ObservedObject(wrappedValue: model)
@@ -15,6 +16,7 @@ struct IslandDashboardView: View {
         _aiMonitor = ObservedObject(wrappedValue: model.aiMonitor)
         _media = ObservedObject(wrappedValue: model.media)
         _browserDownloads = ObservedObject(wrappedValue: model.browserDownloads)
+        _notices = ObservedObject(wrappedValue: model.notices)
     }
 
     var body: some View {
@@ -53,6 +55,9 @@ struct IslandDashboardView: View {
                 ForEach(browserDownloads.snapshots) { snapshot in
                     browserDownloadCard(snapshot).transition(cardTransition)
                 }
+            }
+            ForEach(notices.screenRecordingOperations) { notice in
+                screenRecordingOperationCard(notice).transition(cardTransition)
             }
         }
         .frame(maxWidth: .infinity, alignment: .center)
@@ -250,6 +255,37 @@ struct IslandDashboardView: View {
         )
     }
 
+    private func screenRecordingOperationCard(_ notice: IslandNotice) -> some View {
+        dashboardCard(symbol: notice.symbolName ?? "film", title: notice.title,
+                      tint: notice.kind == .error ? Color.zislaError : Color.zislaInfo) {
+            VStack(alignment: .leading, spacing: 4) {
+                Text(notice.detail ?? "")
+                    .font(.system(size: 10, weight: .semibold))
+                    .fitsSingleLine()
+                    .truncationMode(.middle)
+                HStack(spacing: 6) {
+                    if notice.kind == .info {
+                        if let progress = notice.progress {
+                            ProgressView(value: progress).tint(Color.zislaInfo)
+                        } else {
+                            ProgressView().controlSize(.mini)
+                        }
+                    } else {
+                        Image(systemName: notice.kind == .success ? "checkmark.circle.fill" : "exclamationmark.circle.fill")
+                            .foregroundStyle(notice.kind == .success ? Color.zislaSuccess : Color.zislaError)
+                    }
+                    Text(ScreenRecordingOperationNotice.progressText(for: notice))
+                        .font(.islandMicro(weight: .semibold, design: .monospaced))
+                        .foregroundStyle(.secondary)
+                        .monospacedDigit()
+                }
+            }
+        }
+        .accessibilityElement(children: .combine)
+        .help([notice.title, notice.detail, ScreenRecordingOperationNotice.progressText(for: notice)]
+            .compactMap { $0 }.joined(separator: " · "))
+    }
+
     private func dashboardCard<Content: View>(
         symbol: String,
         title: String,
@@ -308,7 +344,7 @@ struct IslandDashboardView: View {
         ].filter { $0 }.count + (
             model.settingsStore.settings.showsBrowserDownloadProgress
                 ? browserDownloads.snapshots.count : 0
-        )
+        ) + notices.screenRecordingOperations.count
     }
 
     private var gridColumns: [GridItem] {

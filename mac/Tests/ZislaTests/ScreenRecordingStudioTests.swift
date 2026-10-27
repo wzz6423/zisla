@@ -606,6 +606,7 @@ struct ScreenRecordingStudioTests {
 
         try FileManager.default.removeItem(at: directory.appendingPathComponent(ScreenRecordingProjectStore.manifestName))
         model.saveProject()
+        await model.operationTask?.value
         #expect(!model.isDirty)
         #expect(model.errorMessage == nil)
         #expect(try model.projectStore.load(from: directory) == project)
@@ -825,7 +826,7 @@ struct ScreenRecordingStudioTests {
         #expect(model.project == current, "A stale proposal must not overwrite \(change)")
     }
 
-    @Test func failedSaveKeepsUnsavedEditsAndPreventsClosingUntilRecovery() throws {
+    @Test func failedSaveKeepsUnsavedEditsAndPreventsClosingUntilRecovery() async throws {
         let (model, root, original) = try fixture()
         defer { model.shutdown(); try? FileManager.default.removeItem(at: root) }
         let directory = try #require(model.directory)
@@ -837,6 +838,7 @@ struct ScreenRecordingStudioTests {
         let edited = try #require(model.project)
 
         model.saveProject()
+        await model.operationTask?.value
         #expect(model.isDirty)
         #expect(model.project == edited)
         #expect(model.errorMessage != nil)

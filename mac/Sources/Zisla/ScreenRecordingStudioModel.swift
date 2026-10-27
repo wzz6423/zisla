@@ -45,7 +45,10 @@ final class ScreenRecordingStudioModel: ObservableObject {
     private let appModel: AppModel?
     private let outputDirectoryStore: ScreenRecordingOutputDirectoryStore
     private let renderPreview: (ScreenRecordingProject, URL, Double) async throws -> CGImage
-    private let presentExportPanel: (NSSavePanel, @escaping (NSApplication.ModalResponse) -> Void) -> Void
+    private let presentExportPanel: (NSSavePanel, @escaping (URL?) -> Void) -> Void
+    private let notices: SideNoticeQueue
+    private let writeProjectFiles: @Sendable (ScreenRecordingProject, URL, URL?) throws -> Void
+    private var outputNotice: IslandNotice?
     private let aiCompletion: ((ScreenRecordingProject, String, AIModelConfigurationReference?) async throws -> String)?
     private(set) var previewTask: Task<Void, Never>?
     private(set) var operationTask: Task<Void, Never>?
@@ -68,8 +71,15 @@ final class ScreenRecordingStudioModel: ObservableObject {
          projectStore: ScreenRecordingProjectStore? = nil,
          outputDirectoryStore: ScreenRecordingOutputDirectoryStore = ScreenRecordingOutputDirectoryStore(),
          renderPreview: ((ScreenRecordingProject, URL, Double) async throws -> CGImage)? = nil,
-         presentExportPanel: @escaping (NSSavePanel, @escaping (NSApplication.ModalResponse) -> Void) -> Void = {
-             panel, completion in panel.begin(completionHandler: completion)
+         presentExportPanel: @escaping (NSSavePanel, @escaping (URL?) -> Void) -> Void = { panel, completion in
+             panel.begin { response in completion(response == .OK ? panel.url : nil) }
+         },
+         notices: SideNoticeQueue? = nil,
+         writeProjectFiles: @escaping @Sendable (ScreenRecordingProject, URL, URL?) throws -> Void = {
+             project, directory, destination in
+             let store = ScreenRecordingProjectStore(root: directory)
+             if let destination { try store.copy(project, from: directory, to: destination) }
+             else { try store.save(project, in: directory) }
          },
          aiCompletion: ((ScreenRecordingProject, String, AIModelConfigurationReference?) async throws -> String)? = nil,
          onError: ((String) -> Void)? = nil) {
@@ -79,6 +89,8 @@ final class ScreenRecordingStudioModel: ObservableObject {
         self.transcriber = transcriber
         self.outputDirectoryStore = outputDirectoryStore
         self.presentExportPanel = presentExportPanel
+        self.notices = notices ?? appModel?.notices ?? SideNoticeQueue()
+        self.writeProjectFiles = writeProjectFiles
         self.recordingOutputDirectory = projectStore?.root ?? outputDirectoryStore.directory
         self.renderPreview = renderPreview ?? { project, directory, time in
             try await exporter.preview(project: project, directory: directory, sourceTime: time,
@@ -121,6 +133,12 @@ final class ScreenRecordingStudioModel: ObservableObject {
         }.store(in: &cancellables)
         exporter.objectWillChange.sink { [weak self] in self?.objectWillChange.send() }
             .store(in: &cancellables)
+        exporter.$progress.sink { [weak self] progress in
+            guard let self, var notice = outputNotice else { return }
+            notice.progress = progress
+            outputNotice = notice
+            self.notices.updateIfPresent(notice)
+        }.store(in: &cancellables)
     }
 
     var isRecording: Bool { capture.phase.isActive || isStarting || isStopping || isCancelling }
@@ -366,8 +384,9 @@ final class ScreenRecordingStudioModel: ObservableObject {
     }
 
     func saveProject() {
-        guard !isRecording, !isBusy, !isChoosingFile else { return }
-        do { try save(); errorMessage = nil } catch { errorMessage = error.localizedDescription }
+        commitPendingCanvasText?()
+        guard canEdit, let project, let directory else { return }
+        saveProject(project, from: directory, to: nil)
     }
 
     func saveCopy() {
@@ -379,16 +398,27 @@ final class ScreenRecordingStudioModel: ObservableObject {
         panel.allowedContentTypes = [.init(filenameExtension: ScreenRecordingProjectStore.projectExtension) ?? .directory]
         panel.canCreateDirectories = true
         isChoosingFile = true
-        panel.begin { [weak self] response in
-            guard let self else { return }
+        presentExportPanel(panel) { [weak self] url in
+            guard let self, self.isChoosingFile else { return }
             self.isChoosingFile = false
-            guard response == .OK, let url = panel.url else { return }
+            guard let url else { return }
+            self.saveProject(project, from: directory, to: url)
+        }
+    }
+
+    private func saveProject(_ project: ScreenRecordingProject, from directory: URL, to destination: URL?) {
+        beginOutputNotice(title: AppLocalization.text(destination == nil ? "保存录屏项目" : "项目另存为"),
+                          destination: destination ?? directory, symbol: "square.and.arrow.down")
+        operationTask = Task { [weak self] in
+            guard let self else { return }
+            defer { isBusy = false; operationTask = nil }
             do {
-                try self.projectStore.copy(project, from: directory, to: url)
-                self.directory = url
-                self.isDirty = false
-                self.refreshPreview()
-            } catch { self.errorMessage = error.localizedDescription }
+                try await writeProject(project, from: directory, to: destination)
+                guard outputNotice != nil else { return }
+                isDirty = false
+                if let destination { self.directory = destination; refreshPreview() }
+                finishOutputNotice()
+            } catch { finishOutputNotice(error: error) }
         }
     }
 
@@ -402,21 +432,61 @@ final class ScreenRecordingStudioModel: ObservableObject {
         panel.allowedContentTypes = [configuration.format == .gif ? .gif : .mpeg4Movie]
         panel.canCreateDirectories = true
         isChoosingFile = true
-        presentExportPanel(panel) { [weak self] response in
-            guard let self else { return }
+        presentExportPanel(panel) { [weak self] url in
+            guard let self, self.isChoosingFile else { return }
             self.isChoosingFile = false
-            guard response == .OK, let url = panel.url else { return }
-            self.isBusy = true
+            guard let url else { return }
+            self.beginOutputNotice(title: AppLocalization.text("导出录屏"), destination: url, symbol: "film")
             self.operationTask = Task { [weak self] in
                 guard let self else { return }
                 defer { isBusy = false; operationTask = nil }
                 do {
-                    try save()
+                    try await writeProject(project, from: directory, to: nil)
+                    guard outputNotice != nil else { return }
+                    isDirty = false
                     try await exporter.export(project: project, directory: directory, to: url, configuration: configuration)
-                    errorMessage = nil
-                } catch { if !(error is CancellationError) { errorMessage = error.localizedDescription } }
+                    finishOutputNotice()
+                } catch { finishOutputNotice(error: error) }
             }
         }
+    }
+
+    private func writeProject(_ project: ScreenRecordingProject, from directory: URL, to destination: URL?) async throws {
+        try Task.checkCancellation()
+        let write = writeProjectFiles
+        let worker = Task.detached(priority: .userInitiated) { try write(project, directory, destination) }
+        try await withTaskCancellationHandler {
+            try await worker.value
+        } onCancel: { worker.cancel() }
+    }
+
+    private func beginOutputNotice(title: String, destination: URL, symbol: String) {
+        isBusy = true
+        errorMessage = nil
+        notices.removeAll(withIDPrefix: ScreenRecordingOperationNotice.prefix)
+        let notice = IslandNotice(id: ScreenRecordingOperationNotice.prefix + UUID().uuidString,
+            title: title, detail: destination.lastPathComponent, side: .left, symbolName: symbol)
+        outputNotice = notice
+        notices.enqueue(notice, expiresAfter: nil)
+    }
+
+    private func finishOutputNotice(error: Error? = nil) {
+        guard var notice = outputNotice else { return }
+        outputNotice = nil
+        if error is CancellationError {
+            notices.remove(id: notice.id)
+            return
+        }
+        if let error {
+            notice.kind = .error
+            notice.progress = nil
+            notice.detail = error.localizedDescription
+            errorMessage = error.localizedDescription
+        } else {
+            notice.kind = .success
+            errorMessage = nil
+        }
+        notices.enqueue(notice, expiresAfter: 3)
     }
 
     static func fileName(_ name: String, extension fileExtension: String) -> String {
@@ -799,6 +869,9 @@ final class ScreenRecordingStudioModel: ObservableObject {
 
     func shutdown() {
         commitPendingCanvasText = nil
+        isChoosingFile = false
+        if let outputNotice { notices.remove(id: outputNotice.id) }
+        outputNotice = nil
         operationTask?.cancel()
         previewTask?.cancel()
         transcriber.cancel()
