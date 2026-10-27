@@ -147,10 +147,16 @@ public struct NetworkMetrics: Equatable, Sendable {
 public struct NetworkIdentity: Equatable, Sendable {
     public var privateIPv4Address: String?
     public var publicIPAddress: String?
+    public var publicIPv6Address: String?
 
-    public init(privateIPv4Address: String? = nil, publicIPAddress: String? = nil) {
+    public init(
+        privateIPv4Address: String? = nil,
+        publicIPAddress: String? = nil,
+        publicIPv6Address: String? = nil
+    ) {
         self.privateIPv4Address = privateIPv4Address
         self.publicIPAddress = publicIPAddress
+        self.publicIPv6Address = publicIPv6Address
     }
 }
 
@@ -257,21 +263,34 @@ public struct SystemMetricHistory: Equatable, Sendable {
 
 public protocol PublicIPProviding: Sendable {
     func publicIPAddress() async -> String?
+    func publicIPv6Address() async -> String?
 }
 
-private struct DefaultPublicIPProvider: PublicIPProviding {
+struct DefaultPublicIPProvider: PublicIPProviding {
+    var session: URLSession = .shared
+
     private struct Response: Decodable {
         let ip: String
     }
 
     func publicIPAddress() async -> String? {
-        guard let url = URL(string: "https://api64.ipify.org?format=json") else { return nil }
+        await address(from: URL(string: "https://api.ipify.org?format=json")!, family: AF_INET)
+    }
+
+    func publicIPv6Address() async -> String? {
+        await address(from: URL(string: "https://api6.ipify.org?format=json")!, family: AF_INET6)
+    }
+
+    private func address(from url: URL, family: Int32) async -> String? {
         var request = URLRequest(url: url)
         request.timeoutInterval = 5
         do {
-            let (data, response) = try await URLSession.shared.data(for: request)
+            let (data, response) = try await session.data(for: request)
             guard (response as? HTTPURLResponse)?.statusCode == 200 else { return nil }
-            return try JSONDecoder().decode(Response.self, from: data).ip
+            let address = try JSONDecoder().decode(Response.self, from: data).ip
+            var parsed = in6_addr()
+            guard !address.utf8.contains(0), inet_pton(family, address, &parsed) == 1 else { return nil }
+            return address
         } catch {
             return nil
         }
@@ -3494,6 +3513,7 @@ public final class SystemMonitorService: ObservableObject {
     @Published public private(set) var lastErrorDescription: String?
     @Published public private(set) var isSampling: Bool = false
     @Published public private(set) var publicIPAddress: String?
+    @Published public private(set) var publicIPv6Address: String?
     @Published public private(set) var isRefreshingPublicIPAddress = false
     /// Summary of the persisted samples shown in the history card.
     @Published public private(set) var historyStats = SystemMetricsHistoryStats.empty
@@ -3684,9 +3704,13 @@ public final class SystemMonitorService: ObservableObject {
         isRefreshingPublicIPAddress = true
         defer { isRefreshingPublicIPAddress = false }
 
-        guard let address = await publicIPProvider.publicIPAddress() else { return }
-        publicIPAddress = address
-        networkIdentity.publicIPAddress = address
+        async let ipv4 = publicIPProvider.publicIPAddress()
+        async let ipv6 = publicIPProvider.publicIPv6Address()
+        let addresses = await (ipv4, ipv6)
+        publicIPAddress = addresses.0
+        publicIPv6Address = addresses.1
+        networkIdentity.publicIPAddress = addresses.0
+        networkIdentity.publicIPv6Address = addresses.1
         if var current = snapshot {
             current.networkIdentity = networkIdentity
             snapshot = current
