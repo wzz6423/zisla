@@ -136,7 +136,11 @@ struct ShelfModuleView: View {
                         ContextNoteDetailView(draft: draft, onCopy: { model.copyContextNoteText(draft.text) },
                                               onNavigate: { model.navigateToContextNote(draft.location) },
                                               onSave: { model.saveShelfContextNote() },
-                                              onClose: { noteEditor.close() })
+                                              onClose: { noteEditor.close() }, onCopyScreenshot: { png in
+                                                  let copied = ClipboardHistoryPasteboard.write(.image(png))
+                                                  model.transientMessage = copied ? AppLocalization.text("已复制到剪贴板")
+                                                      : AppLocalization.text("无法写入剪贴板")
+                                              })
                             .id(ObjectIdentifier(draft))
                     } else if let screenshot = noteEditor.screenshot {
                         ShelfScreenshotDetailView(detail: screenshot, onCopy: {

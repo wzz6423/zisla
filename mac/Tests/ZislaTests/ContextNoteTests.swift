@@ -32,8 +32,14 @@ struct ContextNoteTests {
         var modifiers: NSEvent.ModifierFlags = .command
         var pressedKeys: Set<CGKeyCode> = [55]
         var nextShake = 0.0
+        var screenshotSource = ContextNoteScreenshotSource.window(11, processIdentifier: 42)
+        var capturedSources: [ContextNoteScreenshotSource] = []
+        var screenshotWarnings: [String?] = []
+        let screenshotCapture: (@MainActor (ContextNoteScreenshotSource) async throws -> Data)?
 
-        init(enabled: Bool = true, parentEnabled: Bool = true) throws {
+        init(enabled: Bool = true, parentEnabled: Bool = true,
+             screenshotCapture: (@MainActor (ContextNoteScreenshotSource) async throws -> Data)? = nil) throws {
+            self.screenshotCapture = screenshotCapture
             directory = FileManager.default.temporaryDirectory.appendingPathComponent("context-note-ui-\(UUID())")
             try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
             defaults = try #require(UserDefaults(suiteName: name))
@@ -44,19 +50,37 @@ struct ContextNoteTests {
             observation = .location(location)
             controller = ContextNoteController(
                 settingsStore: settings, languageStore: AppLanguageStore(defaults: defaults), shelf: shelf,
-                captureLocation: { [unowned self] _ in observation },
-                currentLocation: { [unowned self] _ in observation },
+                captureLocation: { [unowned self] _, onWindow in
+                    onWindow?(42, CGRect(x: 0, y: 0, width: 800, height: 600), "Document")
+                    return observation
+                },
+                currentLocation: { [unowned self] _, onWindow in
+                    onWindow?(42, CGRect(x: 0, y: 0, width: 800, height: 600), "Document")
+                    return observation
+                },
+                screenshotSource: { [unowned self] _, window in
+                    guard screenshotCapture != nil else { throw ScreenshotCaptureError.permissionRequired }
+                    #expect(window?.processIdentifier == 42)
+                    #expect(window?.frame == CGRect(x: 0, y: 0, width: 800, height: 600))
+                    #expect(window?.title == "Document")
+                    return screenshotSource
+                },
+                captureScreenshot: { [unowned self] source in
+                    capturedSources.append(source)
+                    return try await screenshotCapture!(source)
+                },
                 canInteract: { [unowned self] in !busy },
                 onReminder: { [unowned self] item, point in
                     if acceptsReminder { reminders.append(item.id); reminderPoints.append(point) }
                     return acceptsReminder
                 },
                 onCaptureFailure: { [unowned self] point in failedCaptures += 1; failurePoints.append(point) },
-                onSaved: { [unowned self] item, point in
+                onSaved: { [unowned self] item, point, screenshotError in
                     #expect(shelf.items.contains(item))
                     #expect(controller.draft == nil)
                     saved.append(item)
                     savedPoints.append(point)
+                    screenshotWarnings.append(screenshotError)
                 },
                 pressedMouseButtons: { [unowned self] in buttons },
                 modifierFlags: { [unowned self] in modifiers },
@@ -315,6 +339,138 @@ struct ContextNoteTests {
         fixture.controller.checkForReturn(at: .zero)
         #expect(fixture.reminders == fixture.saved.map(\.id))
         #expect(fixture.reminderPoints == [returnPoint])
+    }
+
+    @Test
+    func shakeAttachesTheOriginalWindowScreenshotBeforeNotifyingSave() async throws {
+        let png = try ContextNoteScreenshotTestImage.make().png
+        let fixture = try Fixture(screenshotCapture: { _ in png })
+        defer { fixture.close() }
+        fixture.shake()
+        let draft = try #require(fixture.controller.draft)
+        fixture.screenshotSource = .window(90, processIdentifier: 91)
+        fixture.observation = .ignored
+        draft.text = "Remember this window"
+        await draft.screenshotTask?.value
+        fixture.controller.save()
+        let saved = try #require(fixture.saved.first)
+        #expect(fixture.capturedSources == [.window(11, processIdentifier: 42)])
+        #expect(saved.text == "Remember this window")
+        #expect(try Data(contentsOf: #require(saved.noteScreenshotURL)) == png)
+        #expect(fixture.screenshotWarnings.count == 1 && fixture.screenshotWarnings[0] == nil)
+        #expect(FileShelfStore(storageURL: fixture.directory.appendingPathComponent("shelf.json")).items == [saved])
+    }
+
+    @Test
+    func shelfCapturePreparesTheOriginalSourceAndOnlyCapturesWhenCreatingANote() async throws {
+        let png = try ContextNoteScreenshotTestImage.make().png
+        let fixture = try Fixture(enabled: false, parentEnabled: false, screenshotCapture: { _ in png })
+        defer { fixture.close() }
+        fixture.controller.prepareShelfCapture(at: .zero)
+        #expect(fixture.capturedSources.isEmpty)
+        fixture.observation = .ignored
+        fixture.screenshotSource = .window(90, processIdentifier: 91)
+        let draft = try #require(fixture.controller.makeShelfDraft(at: .zero))
+        draft.text = "Remember before switching focus"
+        await draft.screenshotTask?.value
+        let editor = ContextNoteShelfEditor()
+        editor.begin(draft)
+        let saved = try #require(editor.save(in: fixture.shelf))
+        #expect(fixture.capturedSources == [.window(11, processIdentifier: 42)])
+        #expect(saved.noteLocation == fixture.location)
+        #expect(try Data(contentsOf: #require(saved.noteScreenshotURL)) == png)
+    }
+
+    @Test(arguments: ["permission", "closed window"])
+    func screenshotFailuresStillSaveTextAndReportFeedback(failure: String) async throws {
+        let capture: (@MainActor (ContextNoteScreenshotSource) async throws -> Data)?
+        if failure == "permission" { capture = nil }
+        else { capture = { @MainActor _ in throw ScreenshotCaptureError.windowUnavailable } }
+        let fixture = try Fixture(screenshotCapture: capture)
+        defer { fixture.close() }
+        fixture.shake()
+        let draft = try #require(fixture.controller.draft)
+        draft.text = "Keep this note despite capture failure"
+        await draft.screenshotTask?.value
+        let feedback = draft.screenshotError
+        fixture.controller.save()
+        #expect(fixture.saved.first?.text == "Keep this note despite capture failure")
+        #expect(fixture.saved.first?.noteScreenshotURL == nil)
+        #expect(feedback != nil && fixture.screenshotWarnings == [feedback])
+        #expect(fixture.controller.draft == nil)
+    }
+
+    @Test
+    func savingWhileCaptureIsPendingWaitsWithoutDroppingTheAttachment() async throws {
+        let png = try ContextNoteScreenshotTestImage.make().png
+        let gate = ContextNoteScreenshotGate()
+        let fixture = try Fixture(screenshotCapture: { _ in try await gate.capture() })
+        defer { fixture.close() }
+        fixture.shake()
+        let draft = try #require(fixture.controller.draft)
+        draft.text = "Keep both text and screenshot"
+        let task = try #require(draft.screenshotTask)
+        await gate.waitUntilStarted()
+        fixture.controller.save()
+        let editor = ContextNoteShelfEditor()
+        editor.begin(draft)
+        #expect(editor.save(in: fixture.shelf) == nil)
+        #expect(fixture.shelf.items.isEmpty)
+        #expect(fixture.controller.draft === draft)
+        #expect(editor.draft === draft)
+        gate.finish(.success(png))
+        await task.value
+        fixture.controller.save()
+        #expect(fixture.saved.count == 1)
+        #expect(try Data(contentsOf: #require(fixture.saved.first?.noteScreenshotURL)) == png)
+    }
+
+    @Test(arguments: ["discard", "lock", "stop"])
+    func cancelledCaptureCannotAttachPixelsAfterLeavingTheNote(action: String) async throws {
+        let png = try ContextNoteScreenshotTestImage.make().png
+        let gate = ContextNoteScreenshotGate()
+        let fixture = try Fixture(screenshotCapture: { _ in try await gate.capture() })
+        defer { fixture.close() }
+        fixture.shake()
+        let draft = try #require(fixture.controller.draft)
+        draft.text = "Preserve text when locked"
+        let task = try #require(draft.screenshotTask)
+        await gate.waitUntilStarted()
+        switch action {
+        case "discard": fixture.controller.discard()
+        case "lock": fixture.controller.setScreenLocked(true)
+        default: fixture.controller.stop()
+        }
+        gate.finish(.success(png))
+        await task.value
+        #expect(draft.screenshot == nil)
+        #expect(!draft.isCapturingScreenshot)
+        #expect(fixture.shelf.items.isEmpty)
+        if action == "lock" {
+            #expect(fixture.controller.draft === draft)
+            #expect(draft.text == "Preserve text when locked")
+        } else { #expect(fixture.controller.draft == nil) }
+    }
+
+    @Test(arguments: ["lock", "stop"])
+    func suspendingOrStoppingCancelsAShelfDraftWithoutLosingItsText(action: String) async throws {
+        let png = try ContextNoteScreenshotTestImage.make().png
+        let gate = ContextNoteScreenshotGate()
+        let fixture = try Fixture(screenshotCapture: { _ in try await gate.capture() })
+        defer { fixture.close() }
+        let draft = try #require(fixture.controller.makeShelfDraft(at: .zero))
+        draft.text = "Unsaved shelf note"
+        let task = try #require(draft.screenshotTask)
+        await gate.waitUntilStarted()
+        if action == "lock" { fixture.controller.setScreenLocked(true) }
+        else { fixture.controller.stop() }
+        gate.finish(.success(png))
+        await task.value
+        #expect(draft.screenshot == nil)
+        #expect(draft.screenshotError != nil)
+        #expect(!draft.isCapturingScreenshot)
+        #expect(draft.text == "Unsaved shelf note")
+        #expect(fixture.shelf.items.isEmpty)
     }
 
     @Test
@@ -597,16 +753,20 @@ struct ContextNoteLocalizationTests {
         let directKeys = expression.matches(in: source, range: NSRange(source.startIndex..., in: source)).compactMap {
             Range($0.range(at: 1), in: source).map { String(source[$0]) }
         }
-        let reusedKeys: Set<String> = ["复制", "关闭", "保存"]
-        let indirectKeys: Set<String> = ["摇动鼠标记便签", "按住快捷键并左右摇动鼠标，在当前位置记录，返回时提醒", "便签快捷键", "默认按住 Command；可录制修饰键或组合键", "需要辅助功能权限来识别窗口和网页", "无法识别当前位置，请检查辅助功能权限", "查看便签", "前往记录位置", "无法前往记录位置，窗口或显示器可能已关闭", "记录便签", "已保存便签"]
+        let reusedKeys: Set<String> = ["复制", "关闭", "保存", "截图"]
+        let indirectKeys: Set<String> = ["摇动鼠标记便签", "按住快捷键并左右摇动鼠标，在当前位置记录，返回时提醒", "便签快捷键", "默认按住 Command；可录制修饰键或组合键", "需要辅助功能权限来识别窗口和网页", "无法识别当前位置，请检查辅助功能权限", "查看便签", "前往记录位置", "无法前往记录位置，窗口或显示器可能已关闭", "记录便签", "已保存便签", "截图失败：%@", "无法读取便签关联的应用窗口"]
         let keys = Set(directKeys).subtracting(reusedKeys).union(indirectKeys)
-        #expect(keys.count == 21)
+        #expect(keys.count == 24)
         for key in keys {
             let value = try #require(table[key], "Missing \(language.rawValue): \(key)")
             #expect(!value.isEmpty)
             #expect(AppLocalization.string(key, language: language) == value)
             if language != .simplifiedChinese && language != .traditionalChinese { #expect(value != key) }
+            #expect(value.components(separatedBy: "%@").count == key.components(separatedBy: "%@").count)
         }
+        let reason = language.isRightToLeft ? "\u{2068}reason\u{2069}" : "reason"
+        #expect(AppLocalization.format("截图失败：%@", locale: language.locale, ["reason"])
+            == table["截图失败：%@"]?.replacingOccurrences(of: "%@", with: reason))
     }
 }
 

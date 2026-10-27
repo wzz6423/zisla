@@ -1591,9 +1591,11 @@ final class AppModel: ObservableObject {
 
   func saveShelfContextNote() {
     let isNew = contextNoteEditor.itemID == nil
+    let screenshotError = contextNoteEditor.draft?.screenshotError
     guard let item = contextNoteEditor.save(in: shelf) else { return }
     onContextNoteSaved?(item)
-    transientMessage = isNew ? AppLocalization.text("已加入 %ld 个项目", 1) : AppLocalization.text("已保存便签")
+    transientMessage = screenshotError.map { AppLocalization.text("已保存便签") + " · " + $0 }
+      ?? (isNew ? AppLocalization.text("已加入 %ld 个项目", 1) : AppLocalization.text("已保存便签"))
   }
 
   func copyContextNoteText(_ text: String) {

@@ -2808,3 +2808,8 @@
 "显示侧边栏" = "Seitenleiste einblenden";
 "后退" = "Zurück";
 "前进" = "Vorwärts";
+
+"查看截图" = "Screenshot anzeigen";
+"复制截图" = "Screenshot kopieren";
+"截图失败：%@" = "Screenshot fehlgeschlagen: %@";
+"无法读取便签关联的应用窗口" = "Das mit dieser Notiz verknüpfte Anwendungsfenster kann nicht erfasst werden";

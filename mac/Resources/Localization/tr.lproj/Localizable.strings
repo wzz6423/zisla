@@ -2807,3 +2807,8 @@
 "显示侧边栏" = "Kenar Çubuğunu Göster";
 "后退" = "Geri";
 "前进" = "İleri";
+
+"查看截图" = "Ekran görüntüsünü görüntüle";
+"复制截图" = "Ekran görüntüsünü kopyala";
+"截图失败：%@" = "Ekran görüntüsü alınamadı: %@";
+"无法读取便签关联的应用窗口" = "Bu notla ilişkili uygulama penceresi okunamıyor";

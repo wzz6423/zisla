@@ -28,20 +28,21 @@ public enum ContextNoteLocationReader {
         }
     }
 
-    public static func capture(at point: CGPoint) -> ContextNoteObservation {
+    public static func capture(at point: CGPoint, onWindow: ((pid_t, CGRect?, String) -> Void)? = nil) -> ContextNoteObservation {
         let screens = NSScreen.screens
         let windows = CGWindowListCopyWindowInfo(.optionOnScreenOnly, kCGNullWindowID) as? [[String: Any]]
         return observe(isTrusted: AccessibilityPermission.isTrusted, desktopLocation: {
             desktopLocation(at: point, screens: screens, windowInfo: windows)
         }) {
             let quartzPoint = CGPoint(x: point.x, y: (screens.first?.frame.maxY ?? 0) - point.y)
-            return captureWindow(at: quartzPoint, windowInfo: windows, screenFrames: screens.map(\.frame)) { surface in
+            return captureWindow(at: quartzPoint, windowInfo: windows, screenFrames: screens.map(\.frame), onWindow: onWindow) { surface in
                 desktopLocation(at: point, screens: screens, windowInfo: windows, capturedSurface: surface)
             }
         }
     }
 
     private static func captureWindow(at point: CGPoint, windowInfo: [[String: Any]]?, screenFrames: [CGRect],
+                                      onWindow: ((pid_t, CGRect?, String) -> Void)?,
                                       desktopLocation: (WindowSnapshot) -> ContextNoteLocation?) -> ContextNoteObservation {
         let hit = hitElement(at: point).map { hit in
             let direct = attribute(kAXRoleAttribute, from: hit.element) as? String == kAXWindowRole
@@ -57,7 +58,7 @@ public enum ContextNoteLocationReader {
             return attribute(name, from: application)
         }, frame: windowFrame, desktopLocation: desktopLocation) { pid, window in
             guard let app = NSRunningApplication(processIdentifier: pid) else { return .unavailable }
-            return read(app: app, window: window)
+            return read(app: app, window: window, onWindow: onWindow)
         }
     }
 
@@ -112,7 +113,7 @@ public enum ContextNoteLocationReader {
         return underlying
     }
 
-    public static func current(at point: CGPoint) -> ContextNoteObservation {
+    public static func current(at point: CGPoint, onWindow: ((pid_t, CGRect?, String) -> Void)? = nil) -> ContextNoteObservation {
         guard let app = NSWorkspace.shared.frontmostApplication else { return .unavailable }
         guard app.processIdentifier != ProcessInfo.processInfo.processIdentifier else { return .ignored }
         let trusted = AccessibilityPermission.isTrusted
@@ -125,7 +126,7 @@ public enum ContextNoteLocationReader {
                 guard let window = attribute(kAXFocusedWindowAttribute, from: application).flatMap(asElement),
                       !focusedWindowIsDesktop(frame: windowFrame(window), processIdentifier: app.processIdentifier,
                                               windowInfo: windows) else { return nil }
-                return read(app: app, window: window)
+                return read(app: app, window: window, onWindow: onWindow)
             }) { skippingMenuBar in
                 // The island opens over the menu bar before capturing the underlying Finder context.
                 desktopLocation(at: point, screens: screens, windowInfo: windows,
@@ -143,7 +144,7 @@ public enum ContextNoteLocationReader {
             let window = findWindow(direct: direct, candidates: {
                 attribute(kAXWindowsAttribute, from: application) as? [AXUIElement]
             }, matches: { _ in true })
-            return read(app: app, window: window)
+            return read(app: app, window: window, onWindow: onWindow)
         }
     }
 
@@ -249,7 +250,7 @@ public enum ContextNoteLocationReader {
         return CGRect(origin: point, size: dimensions)
     }
 
-    private static func read(app: NSRunningApplication, window: AXUIElement?) -> ContextNoteObservation {
+    private static func read(app: NSRunningApplication, window: AXUIElement?, onWindow: ((pid_t, CGRect?, String) -> Void)?) -> ContextNoteObservation {
         guard app.processIdentifier != ProcessInfo.processInfo.processIdentifier else { return .ignored }
         guard let bundle = app.bundleIdentifier else { return .unavailable }
         let appName = app.localizedName ?? bundle
@@ -258,8 +259,10 @@ public enum ContextNoteLocationReader {
         let title = attribute(kAXTitleAttribute, from: window) as? String ?? ""
         let browser = BrowserDownloadAgent.allCases.contains { $0 != .airDrop && $0.bundleIdentifiers.contains(bundle) }
         let pageURL = browser ? pageAddress(in: window) : nil
-        return resolve(bundleIdentifier: bundle, applicationName: appName, windowTitle: title,
-                       isBrowser: browser, pageAddress: pageURL)
+        let observation = resolve(bundleIdentifier: bundle, applicationName: appName, windowTitle: title,
+                                  isBrowser: browser, pageAddress: pageURL)
+        onWindow?(app.processIdentifier, windowFrame(window), title)
+        return observation
     }
 
     static func resolve(bundleIdentifier: String, applicationName: String, windowTitle: String,
