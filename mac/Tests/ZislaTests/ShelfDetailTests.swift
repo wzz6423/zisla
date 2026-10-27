@@ -117,7 +117,7 @@ struct ShelfDetailTests {
         var noteActions: [String] = []
         let note = DetailHost(ContextNoteDetailView(draft: draft,
             onCopy: { noteActions.append("copy") }, onNavigate: { noteActions.append("navigate") },
-            onSave: { noteActions.append("save") }, onClose: { noteActions.append("close") }, onCopyScreenshot: { _ in }))
+            onSave: { noteActions.append("save") }, onClose: { noteActions.append("close") }, onCopyScreenshot: { _ in }, onOpenScreenshot: { _ in }))
         defer { note.panel.close() }
         await note.settle()
         try note.render(name: "note")
@@ -168,7 +168,7 @@ struct ShelfDetailTests {
         let draft = ContextNoteDraft(location: Self.location)
         var saves = 0
         let fixture = DetailHost(ContextNoteDetailView(draft: draft, onCopy: {}, onNavigate: {},
-            onSave: { saves += 1; draft.error = "写入失败，请重试" }, onClose: {}, onCopyScreenshot: { _ in }))
+            onSave: { saves += 1; draft.error = "写入失败，请重试" }, onClose: {}, onCopyScreenshot: { _ in }, onOpenScreenshot: { _ in }))
         defer { fixture.panel.close() }
         await fixture.settle()
         let save = try #require(fixture.elements().first { $0.role == .button && $0.label == AppLocalization.text("保存") })
@@ -193,8 +193,8 @@ struct ShelfDetailTests {
         #expect(draft.error == nil)
     }
 
-    @Test(arguments: [false, true])
-    func renderedNoteScreenshotOpensAndCopiesItsOriginalPNGThenCloses(useEscape: Bool) async throws {
+    @Test
+    func renderedNoteScreenshotCopiesAndDispatchesItsOriginalPNGToTheIndependentWindow() async throws {
         let releaseAccessibility = EnhancedAccessibilityTestScope.acquire()
         defer { releaseAccessibility() }
         let png = try ContextNoteScreenshotTestImage.make().png
@@ -205,53 +205,50 @@ struct ShelfDetailTests {
         let pasteboard = NSPasteboard(name: .init(UUID().uuidString))
         defer { pasteboard.releaseGlobally() }
         var copies: [Data] = []
+        var saves: [Data] = []
+        let copy: (Data) -> Void = { data in
+            copies.append(data)
+            #expect(ClipboardHistoryPasteboard.write(.image(data), to: pasteboard))
+        }
+        let controller = ContextNoteScreenshotWindowController(presentWindow: { window in
+            window.setFrameOrigin(CGPoint(x: -100_000, y: -100_000))
+            window.orderFrontRegardless()
+        })
         let fixture = DetailHost(ContextNoteDetailView(draft: draft, onCopy: {}, onNavigate: {}, onSave: {}, onClose: {},
-            onCopyScreenshot: { data in
-                copies.append(data)
-                #expect(ClipboardHistoryPasteboard.write(.image(data), to: pasteboard))
+            onCopyScreenshot: copy, onOpenScreenshot: { screenshot in
+                controller.present(screenshot, onCopy: copy, onSave: { saves.append($0) })
             }), height: 520)
-        defer { fixture.panel.close() }
+        defer { fixture.panel.close(); controller.window?.close() }
         await fixture.settle()
         try fixture.render(name: "note-attachment")
-        let copy = try #require(fixture.elements().first { $0.role == .button && $0.label == AppLocalization.text("复制截图") })
-        try fixture.click(copy.frame)
+        let copyButton = try #require(fixture.elements().first { $0.role == .button && $0.label == AppLocalization.text("复制截图") })
+        try fixture.click(copyButton.frame)
         #expect(copies == [png])
         #expect(pasteboard.data(forType: .png) == png)
         #expect(pasteboard.canReadObject(forClasses: [NSImage.self], options: nil))
-        let windows = Set(NSApp.windows.map(ObjectIdentifier.init))
-        defer {
-            for window in NSApp.windows where !windows.contains(ObjectIdentifier(window)) { window.close() }
-        }
         let view = try #require(fixture.elements().first { $0.role == .button && $0.label == AppLocalization.text("查看截图") })
         #expect(view.frame.height <= 100 && view.frame.width > 0)
         try fixture.click(view.frame)
         await fixture.settle()
-        let preview = try #require(NSApp.windows.first { !windows.contains(ObjectIdentifier($0)) && $0.isVisible })
-        preview.isReleasedWhenClosed = false
-        preview.setFrameOrigin(CGPoint(x: -100_000, y: -100_000))
-        let content = try #require(preview.contentView)
-        let image = try #require(fixture.elements(in: content).first { $0.role == .image && $0.label == AppLocalization.text("截图") })
-        #expect(image.frame.width > 300 && image.frame.height > 100)
-        #expect(abs(image.frame.width / image.frame.height - 2) < 0.01)
-        #expect(preview.frame.contains(image.frame))
-        let previewCopy = try #require(fixture.elements(in: content).first { $0.role == .button && $0.label == AppLocalization.text("复制截图") })
-        try fixture.click(previewCopy.frame, in: preview)
+        let preview = try #require(controller.window)
+        #expect(preview.isVisible)
+        #expect(preview.styleMask.contains(.titled))
+        #expect(preview.parent == nil && preview.sheetParent == nil)
+        let image = try #require(preview.contentView as? NSImageView)
+        #expect(image.image === draft.screenshot?.image)
+        #expect(abs(image.bounds.width / image.bounds.height - 2) < 0.01)
+        fixture.panel.orderOut(nil)
+        #expect(preview.isVisible, "Hiding the island detail must not hide the native preview")
         let commandC = try #require(NSEvent.keyEvent(with: .keyDown, location: .zero, modifierFlags: .command,
             timestamp: 0, windowNumber: preview.windowNumber, context: nil, characters: "c", charactersIgnoringModifiers: "c",
             isARepeat: false, keyCode: 8))
         #expect(preview.performKeyEquivalent(with: commandC))
-        #expect(copies == [png, png, png])
+        #expect(copies == [png, png])
         #expect(pasteboard.data(forType: .png) == png)
-        if useEscape {
-            let escape = try #require(NSEvent.keyEvent(with: .keyDown, location: .zero, modifierFlags: [],
-                timestamp: 0, windowNumber: preview.windowNumber, context: nil, characters: "\u{1b}",
-                charactersIgnoringModifiers: "\u{1b}", isARepeat: false, keyCode: 53))
-            #expect(preview.performKeyEquivalent(with: escape))
-        } else {
-            let close = try #require(fixture.elements(in: content).first { $0.role == .button && $0.label == AppLocalization.text("关闭") })
-            try fixture.click(close.frame, in: preview)
-        }
-        await fixture.settle()
+        #expect(preview.performKeyEquivalent(with: try saveEvent(in: preview)))
+        #expect(saves == [png])
+        preview.performClose(nil)
+        #expect(controller.window == nil)
         #expect(!preview.isVisible)
         #expect(draft.screenshot?.png == png && draft.text == "Note with a screenshot")
     }
@@ -269,7 +266,7 @@ struct ShelfDetailTests {
         await gate.waitUntilStarted()
         var saves = 0
         let fixture = DetailHost(ContextNoteDetailView(draft: draft, onCopy: {}, onNavigate: {},
-            onSave: { saves += 1 }, onClose: {}, onCopyScreenshot: { _ in }))
+            onSave: { saves += 1 }, onClose: {}, onCopyScreenshot: { _ in }, onOpenScreenshot: { _ in }))
         defer { fixture.panel.close() }
         await fixture.settle()
         #expect(fixture.elements().first { $0.role == .button && $0.label == AppLocalization.text("保存") }?.isEnabled == false)

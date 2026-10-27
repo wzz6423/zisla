@@ -132,6 +132,24 @@ enum ContextNoteLayout {
     }
 }
 
+@MainActor
+final class ContextNoteFieldEditor: NSTextView, NSWindowDelegate {
+    override func firstRect(forCharacterRange range: NSRange, actualRange: NSRangePointer?) -> NSRect {
+        var rect = super.firstRect(forCharacterRange: range, actualRange: actualRange)
+        if let window {
+            // Candidate windows must clear the whole note surface, not just its text line.
+            rect.origin.y = window.frame.minY
+            rect.size.height = window.frame.height
+        }
+        return rect
+    }
+
+    func windowWillReturnFieldEditor(_ sender: NSWindow, to client: Any?) -> Any? {
+        isFieldEditor = true
+        return self
+    }
+}
+
 enum ContextNoteHoldShortcut {
     static func isPressed(_ hotkey: VoiceInputHotkeyPreset, modifiers: NSEvent.ModifierFlags,
                           keyIsPressed: (CGKeyCode) -> Bool) -> Bool {
@@ -183,6 +201,7 @@ final class ContextNoteController {
     private var shelfCapture = Capture.unavailable
     private weak var shelfDraft: ContextNoteDraft?
     private var window: IslandPanel?
+    private let fieldEditor = ContextNoteFieldEditor()
     private var cancelMonitor: Any?
     private var sourceApplication: NSRunningApplication?
     private var anchor = CGPoint.zero
@@ -409,6 +428,14 @@ final class ContextNoteController {
         visits.didSave(at: location)
     }
 
+    static func makeWindow(contentView: NSView, frame: CGRect, fieldEditor: ContextNoteFieldEditor) -> IslandPanel {
+        let panel = ClipboardAssistantController.makeWindow(contentView: contentView, frame: frame)
+        panel.allowsKeyWindow = true
+        panel.avoidsAppActivation = false
+        panel.delegate = fieldEditor
+        return panel
+    }
+
     private func presentWindow(at point: CGPoint, focus: Bool) {
         guard let draft, let screen = WindowPlacement.screenUnderMouse(point: point) else { return }
         if let window {
@@ -422,10 +449,9 @@ final class ContextNoteController {
                                           onDiscard: { [weak self] in self?.discard() })
         let hosting = NSHostingView(rootView: AppLanguageEnvironment(languageStore: languageStore, content: content))
         hosting.sizingOptions = []
-        let panel = ClipboardAssistantController.makeWindow(contentView: hosting,
-                                                            frame: ContextNoteLayout.frame(near: point, in: screen.visibleFrame))
-        panel.allowsKeyWindow = true
-        panel.avoidsAppActivation = false
+        let panel = Self.makeWindow(contentView: hosting,
+                                    frame: ContextNoteLayout.frame(near: point, in: screen.visibleFrame),
+                                    fieldEditor: fieldEditor)
         window = panel
         cancelMonitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { [weak self, weak panel] event in
             guard let panel, event.window === panel, ContextNoteInputCommand.isDiscard(event) else { return event }

@@ -267,8 +267,7 @@ public enum ContextNoteLocationReader {
 
     static func resolve(bundleIdentifier: String, applicationName: String, windowTitle: String,
                         isBrowser: Bool, pageAddress: String?) -> ContextNoteObservation {
-        if isBrowser {
-            guard let pageAddress, let url = webURL(pageAddress) else { return .unavailable }
+        if isBrowser, let pageAddress, let url = webURL(pageAddress) {
             return .location(.webPage(url: url, title: windowTitle, applicationName: applicationName))
         }
         guard !windowTitle.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return .unavailable }

@@ -314,9 +314,11 @@ struct ContextNoteLocationReaderTests {
     }
 
     @Test
-    func browserWithoutAValidAddressCannotFallBackToAnotherPagesWindowTitle() {
-        for value in [nil, "", "javascript:alert(1)", "file:///private/document", "https://"] as [String?] {
-            #expect(ContextNoteLocationReader.resolve(bundleIdentifier: "browser", applicationName: "Browser", windowTitle: "Shared title", isBrowser: true, pageAddress: value) == .unavailable)
+    func browserWithoutAValidAddressKeepsWindowIdentityWithoutAllowingURLNavigation() {
+        for value in [nil, "", "chrome://newtab/", "about:blank", "javascript:alert(1)", "file:///private/document", "https://"] as [String?] {
+            #expect(value.flatMap(ContextNoteLocationReader.webURL) == nil)
+            #expect(ContextNoteLocationReader.resolve(bundleIdentifier: "browser", applicationName: "Browser", windowTitle: "Shared title", isBrowser: true, pageAddress: value)
+                == .location(.window(bundleIdentifier: "browser", applicationName: "Browser", title: "Shared title")))
         }
     }
 

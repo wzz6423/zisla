@@ -119,9 +119,14 @@ final class ContextNoteShelfEditor: ObservableObject {
     @Published private(set) var draft: ContextNoteDraft?
     @Published private(set) var isPresented = false
     @Published private(set) var screenshot: ShelfScreenshotDetail?
+    let screenshotPreview: ContextNoteScreenshotWindowController
     private(set) var itemID: UUID?
     private var newDraft: ContextNoteDraft?
     private var edits: [UUID: ContextNoteDraft] = [:]
+
+    init(screenshotPreview: ContextNoteScreenshotWindowController = ContextNoteScreenshotWindowController()) {
+        self.screenshotPreview = screenshotPreview
+    }
 
     func begin(_ draft: ContextNoteDraft) {
         screenshot = nil
@@ -213,6 +218,7 @@ struct ContextNoteDetailView: View {
     let onSave: () -> Void
     let onClose: () -> Void
     let onCopyScreenshot: (Data) -> Void
+    let onOpenScreenshot: (ContextNoteScreenshot) -> Void
     @FocusState private var isEditing: Bool
 
     static func locationDescription(_ location: ContextNoteLocation) -> String {
@@ -237,14 +243,17 @@ struct ContextNoteDetailView: View {
                 .scrollContentBackground(.hidden)
                 .padding(6)
                 .frame(minHeight: 90)
-                .background(Color.fillCard, in: RoundedRectangle(cornerRadius: 6))
+                .background(Color.fillCard, in: IslandSurfaceGeometry.moduleContentShape(
+                    cornerRadius: IslandSurfaceGeometry.nestedBottomCornerRadius(inset: 10)
+                ))
                 .focused($isEditing)
                 .accessibilityLabel(AppLocalization.text("记录内容"))
             if let error = draft.error {
                 Text(error).foregroundStyle(.red).textSelection(.enabled)
             }
             if let screenshot = draft.screenshot {
-                ContextNoteScreenshotAttachmentView(screenshot: screenshot, onCopy: { onCopyScreenshot(screenshot.png) })
+                ContextNoteScreenshotAttachmentView(screenshot: screenshot, onCopy: { onCopyScreenshot(screenshot.png) },
+                                                    onOpen: { onOpenScreenshot(screenshot) })
             } else if draft.isCapturingScreenshot {
                 ProgressView(AppLocalization.text("截图")).controlSize(.small)
             } else if let error = draft.screenshotError {
@@ -259,7 +268,7 @@ struct ContextNoteDetailView: View {
 struct ContextNoteScreenshotAttachmentView: View {
     let screenshot: ContextNoteScreenshot
     let onCopy: () -> Void
-    @State private var isPreviewing = false
+    let onOpen: () -> Void
 
     var body: some View {
         VStack(alignment: .leading, spacing: 6) {
@@ -270,7 +279,7 @@ struct ContextNoteScreenshotAttachmentView: View {
                 Button(AppLocalization.text("复制截图"), action: onCopy)
                     .buttonStyle(.plain)
             }
-            Button { isPreviewing = true } label: {
+            Button(action: onOpen) {
                 Image(nsImage: screenshot.image)
                     .resizable()
                     .scaledToFit()
@@ -280,24 +289,6 @@ struct ContextNoteScreenshotAttachmentView: View {
             .buttonStyle(.plain)
             .help(AppLocalization.text("查看截图"))
             .accessibilityLabel(AppLocalization.text("查看截图"))
-            .popover(isPresented: $isPreviewing) {
-                VStack(spacing: 10) {
-                    HStack {
-                        Label(AppLocalization.text("截图"), systemImage: "camera")
-                        Spacer()
-                        Button(AppLocalization.text("复制截图"), action: onCopy)
-                            .keyboardShortcut("c", modifiers: .command)
-                        Button(AppLocalization.text("关闭")) { isPreviewing = false }
-                            .keyboardShortcut(.cancelAction)
-                    }
-                    Image(nsImage: screenshot.image)
-                        .resizable()
-                        .scaledToFit()
-                        .accessibilityLabel(AppLocalization.text("截图"))
-                }
-                .padding(12)
-                .frame(width: 640, height: 480)
-            }
         }
     }
 }

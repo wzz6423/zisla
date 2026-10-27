@@ -742,6 +742,155 @@ struct ContextNotePresentationTests {
     }
 }
 
+@MainActor
+@Suite(.serialized)
+struct ContextNoteInputMethodTests {
+    @MainActor
+    private final class FieldFixture {
+        let field: NSTextField
+        let panel: IslandPanel
+        let editor: NSTextView
+        private let customEditor: ContextNoteFieldEditor?
+
+        init(frame: CGRect, text: String, alignment: NSTextAlignment, usesNoteEditor: Bool) throws {
+            let content = NSView(frame: CGRect(origin: .zero, size: frame.size))
+            field = NSTextField(frame: CGRect(x: 32, y: 14, width: 240, height: 16))
+            field.isBordered = false
+            field.drawsBackground = false
+            field.focusRingType = .none
+            field.font = .systemFont(ofSize: 12)
+            field.usesSingleLineMode = true
+            field.alignment = alignment
+            field.stringValue = text
+            content.addSubview(field)
+            if usesNoteEditor {
+                let editor = ContextNoteFieldEditor()
+                customEditor = editor
+                panel = ContextNoteController.makeWindow(contentView: content, frame: frame, fieldEditor: editor)
+            } else {
+                customEditor = nil
+                panel = ClipboardAssistantController.makeWindow(contentView: content, frame: frame)
+                panel.allowsKeyWindow = true
+                panel.avoidsAppActivation = false
+            }
+            content.layoutSubtreeIfNeeded()
+            #expect(panel.makeFirstResponder(field))
+            editor = try #require(field.currentEditor() as? NSTextView)
+        }
+
+        func close() {
+            _ = panel.makeFirstResponder(nil)
+            panel.contentView = nil
+            panel.close()
+        }
+    }
+
+    @Test(arguments: [("", false), ("draft", false), ("输入", true), ("مرحبا", false)])
+    func candidateAnchorClearsTheNoteSurfaceAndPreservesNativeGlyphGeometry(text: String, composing: Bool) throws {
+        for alignment: NSTextAlignment in [.left, .right] {
+            let frame = CGRect(x: 120, y: 260, width: 360, height: 44)
+            let native = try FieldFixture(frame: frame, text: text, alignment: alignment, usesNoteEditor: false)
+            let note = try FieldFixture(frame: frame, text: text, alignment: alignment, usesNoteEditor: true)
+            defer { native.close(); note.close() }
+            if composing {
+                for editor in [native.editor, note.editor] {
+                    editor.setMarkedText(text, selectedRange: NSRange(location: text.utf16.count, length: 0),
+                                         replacementRange: NSRange(location: 0, length: editor.string.utf16.count))
+                    #expect(editor.hasMarkedText())
+                    #expect(!ContextNoteInputCommand.shouldSave(#selector(NSResponder.insertNewline(_:)),
+                                                               hasMarkedText: editor.hasMarkedText()))
+                }
+            }
+            let range = NSRange(location: 0, length: text.utf16.count)
+            for origin in [CGPoint(x: 120, y: 260), CGPoint(x: -1700, y: -320)] {
+                native.panel.setFrameOrigin(origin)
+                note.panel.setFrameOrigin(origin)
+                var nativeRange = NSRange(location: NSNotFound, length: 0)
+                var noteRange = nativeRange
+                let nativeRect = native.editor.firstRect(forCharacterRange: range, actualRange: &nativeRange)
+                let noteRect = note.editor.firstRect(forCharacterRange: range, actualRange: &noteRange)
+
+                #expect(nativeRect.minY > native.panel.frame.minY,
+                        "The default text anchor starts inside the 44-point note surface")
+                #expect(nativeRect.maxY < native.panel.frame.maxY,
+                        "The default text anchor ends inside the 44-point note surface")
+                #expect(noteRect.minY == note.panel.frame.minY)
+                #expect(noteRect.maxY == note.panel.frame.maxY)
+                #expect(noteRect.origin.x == nativeRect.origin.x)
+                #expect(noteRect.size.width == nativeRect.size.width)
+                #expect(noteRange == nativeRange)
+                #expect(note.editor.firstRect(forCharacterRange: range, actualRange: nil) == noteRect)
+                #expect(!native.panel.isVisible && !note.panel.isVisible)
+            }
+        }
+    }
+
+    @Test
+    func inputMethodUsesTheNotePanelsFieldEditorAndCurrentWindowLevel() throws {
+        let field = NSTextField(frame: CGRect(x: 10, y: 10, width: 240, height: 24))
+        field.stringValue = "输入"
+        let fieldEditor = ContextNoteFieldEditor()
+        let panel = ContextNoteController.makeWindow(contentView: field,
+            frame: CGRect(x: 0, y: 0, width: 360, height: 44), fieldEditor: fieldEditor)
+        defer { panel.contentView = nil; panel.close() }
+
+        #expect(panel.allowsKeyWindow)
+        #expect(!panel.avoidsAppActivation)
+        #expect(panel.delegate === fieldEditor)
+        #expect(panel.fieldEditor(true, for: field) === fieldEditor)
+        #expect(fieldEditor.isFieldEditor)
+        #expect(panel.makeFirstResponder(field))
+        let editor = try #require(field.currentEditor() as? NSTextView)
+        #expect(editor === fieldEditor)
+        let inputClient = try #require(editor.inputContext?.client)
+        #expect(inputClient as AnyObject === fieldEditor)
+
+        for level: NSWindow.Level in [ClipboardAssistantController.windowLevel, .normal, .floating, .popUpMenu] {
+            panel.level = level
+            #expect(inputClient.windowLevel?() == level.rawValue)
+            #expect(panel.level == level)
+        }
+        #expect(!panel.isVisible)
+        #expect(!panel.isKeyWindow)
+    }
+
+    @Test
+    func fieldEditorPreservesNativeDetachedGeometryAndComposition() throws {
+        let field = NSTextField(frame: CGRect(x: 0, y: 0, width: 240, height: 24))
+        let fieldEditor = ContextNoteFieldEditor()
+        let panel = ContextNoteController.makeWindow(contentView: field,
+            frame: CGRect(x: 0, y: 0, width: 360, height: 44), fieldEditor: fieldEditor)
+        defer { panel.contentView = nil; panel.close() }
+        #expect(panel.makeFirstResponder(field))
+        let inputClient = try #require(field.currentEditor() as? NSTextInputClient)
+        inputClient.setMarkedText("ni", selectedRange: NSRange(location: 2, length: 0),
+                                  replacementRange: NSRange(location: NSNotFound, length: 0))
+        #expect(inputClient.hasMarkedText())
+        #expect(!ContextNoteInputCommand.shouldSave(#selector(NSResponder.insertNewline(_:)),
+                                                   hasMarkedText: inputClient.hasMarkedText()))
+        inputClient.unmarkText()
+        #expect(!inputClient.hasMarkedText())
+        #expect(ContextNoteInputCommand.shouldSave(#selector(NSResponder.insertNewline(_:)),
+                                                  hasMarkedText: inputClient.hasMarkedText()))
+
+        #expect(panel.makeFirstResponder(nil))
+        panel.contentView = nil
+        #expect(fieldEditor.window == nil)
+        let nativeEditor = NSTextView()
+        nativeEditor.isFieldEditor = true
+        nativeEditor.font = fieldEditor.font
+        nativeEditor.string = fieldEditor.string
+        let range = NSRange(location: 0, length: 0)
+        var nativeRange = NSRange(location: NSNotFound, length: 0)
+        var noteRange = nativeRange
+        #expect(fieldEditor.firstRect(forCharacterRange: range, actualRange: &noteRange)
+                == nativeEditor.firstRect(forCharacterRange: range, actualRange: &nativeRange))
+        #expect(noteRange == nativeRange)
+        #expect(inputClient.windowLevel?() == NSWindow.Level.normal.rawValue)
+        #expect(!panel.isVisible)
+    }
+}
+
 struct ContextNoteLocalizationTests {
     @Test(arguments: AppLanguage.allCases)
     func everyNewVisibleStringExistsAndRendersInEveryLanguage(language: AppLanguage) throws {

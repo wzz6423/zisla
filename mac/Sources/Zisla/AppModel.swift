@@ -1605,6 +1605,11 @@ final class AppModel: ObservableObject {
     transientMessage = success ? AppLocalization.text("已复制到剪贴板") : AppLocalization.text("无法写入剪贴板")
   }
 
+  func copyContextNoteScreenshot(_ png: Data) {
+    let copied = ClipboardHistoryPasteboard.write(.image(png))
+    transientMessage = copied ? AppLocalization.text("已复制到剪贴板") : AppLocalization.text("无法写入剪贴板")
+  }
+
   static func contextNoteCopyAction(id: UUID, in shelf: FileShelfStore) -> ClipboardAssistantAction? {
     guard let text = shelf.items.first(where: { $0.id == id && $0.noteLocation != nil })?.text else { return nil }
     return .copyText(text)
