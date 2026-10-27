@@ -242,7 +242,9 @@ struct ScreenRecordingInspectorLayoutTests {
         model.install(project, directory: root)
         model.seek(to: time)
         let canvasSelection = CanvasSelectionState()
-        let fixture = Fixture(CaptionCanvasHost(model: model, selection: canvasSelection).frame(width: 296), language: .english)
+        // Exercise delayed view removal consistently across macOS versions.
+        let fixture = Fixture(CaptionCanvasHost(model: model, selection: canvasSelection).frame(width: 296)
+            .transaction { $0.animation = .linear(duration: 0.25) }, language: .english)
         defer { fixture.window.close() }
         fixture.window.setFrameOrigin(.init(x: -100_000, y: -100_000))
         fixture.window.orderFrontRegardless()
@@ -271,7 +273,7 @@ struct ScreenRecordingInspectorLayoutTests {
         #expect(fixture.host.bounds.contains(input.convert(input.bounds, to: fixture.host)))
         #expect(canvasSelection.value == .caption(caption.id))
         try fixture.press(try #require(fixture.control(AppLocalization.text("字幕"), role: .disclosureTriangle)))
-        await fixture.settle()
+        await fixture.settle(until: { fixture.editableFields().isEmpty })
         #expect(fixture.editableFields().isEmpty)
         canvasSelection.value = nil
         await fixture.settle()
@@ -320,12 +322,19 @@ struct ScreenRecordingInspectorLayoutTests {
             window.contentView = hosting
         }
 
-        func settle() async {
-            for _ in 0..<3 {
-                window.setContentSize(host.fittingSize)
-                host.layoutSubtreeIfNeeded()
-                await withCheckedContinuation { continuation in DispatchQueue.main.async { continuation.resume() } }
-            }
+        func settle(until isReady: () -> Bool = { true }) async {
+            let deadline = ContinuousClock.now.advanced(by: .seconds(2))
+            repeat {
+                for _ in 0..<3 {
+                    window.setContentSize(host.fittingSize)
+                    host.layoutSubtreeIfNeeded()
+                    await withCheckedContinuation { continuation in DispatchQueue.main.async { continuation.resume() } }
+                }
+                if isReady() || ContinuousClock.now >= deadline { return }
+                await withCheckedContinuation { continuation in
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.01) { continuation.resume() }
+                }
+            } while true
         }
 
         func editableFields(in view: NSView? = nil) -> [NSTextField] {
