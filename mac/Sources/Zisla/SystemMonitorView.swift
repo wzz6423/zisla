@@ -85,7 +85,7 @@ struct SystemMonitorView: View {
     // MARK: - Columns
 
     /// Left column: real-time waveforms and usage breakdown for CPU and GPU.
-    private var computeColumn: some View {
+    var computeColumn: some View {
         VStack(spacing: 10) {
             cpuCard
             gpuCard
@@ -94,7 +94,7 @@ struct SystemMonitorView: View {
     }
 
     /// Right column: compact readings for memory / disk / fan / network.
-    private var systemColumn: some View {
+    var systemColumn: some View {
         VStack(spacing: 10) {
             memoryCard
             diskCard
@@ -134,7 +134,8 @@ struct SystemMonitorView: View {
                     .font(.system(size: 10))
                     .foregroundStyle(.secondary)
                     .fitsSingleLine()
-                MultiLineWaveform(series: cpuWaveSeries, height: 65.5)
+                MultiLineWaveform(series: cpuWaveSeries, height: nil)
+                    .frame(minHeight: 65.5)
                 VStack(spacing: 4) {
                     metricRow(color: WaveformPalette.blue, label: "用户", value: percent(cpuUserUsage))
                     metricRow(color: WaveformPalette.red, label: "系统", value: percent(service.snapshot?.cpu.systemFraction))
@@ -165,7 +166,8 @@ struct SystemMonitorView: View {
                     .font(.system(size: 10))
                     .foregroundStyle(.secondary)
                     .fitsSingleLine()
-                MultiLineWaveform(series: gpuWaveSeries, height: 65.5)
+                MultiLineWaveform(series: gpuWaveSeries, height: nil)
+                    .frame(minHeight: 65.5)
                 VStack(spacing: 4) {
                     metricRow(color: WaveformPalette.blue, label: "利用率", value: gpuUsageText)
                     metricRow(color: WaveformPalette.red, label: "渲染", value: gpuRendererText)
@@ -255,7 +257,7 @@ struct SystemMonitorView: View {
         }
     }
 
-    private var networkCard: some View {
+    var networkCard: some View {
         MonitorCard {
             VStack(alignment: .leading, spacing: 7) {
                 CardHeader(symbol: "globe", title: AppLocalization.text("网络")) {
@@ -280,7 +282,14 @@ struct SystemMonitorView: View {
                 CopyableAddressRow(
                     label: "公网",
                     value: service.snapshot?.networkIdentity.publicIPAddress ?? service.publicIPAddress,
-                    placeholder: service.isRefreshingPublicIPAddress ? "正在获取" : "暂不可用"
+                    placeholder: "--",
+                    labelSuffix: " IPv4"
+                )
+                CopyableAddressRow(
+                    label: "公网",
+                    value: service.snapshot?.networkIdentity.publicIPv6Address ?? service.publicIPv6Address,
+                    placeholder: "--",
+                    labelSuffix: " IPv6"
                 )
             }
         }
@@ -499,14 +508,16 @@ struct SystemMonitorView: View {
         }
     }
 
-    private struct CopyableAddressRow: View {
+    struct CopyableAddressRow: View {
         let label: String
         let value: String?
         let placeholder: String
+        var labelSuffix: String = ""
+        @Environment(\.locale) private var locale
 
         var body: some View {
             HStack(spacing: 5) {
-                Text(label)
+                Text(AppLocalization.string(label, locale: locale) + labelSuffix)
                     .font(.islandMicro())
                     .foregroundStyle(.secondary)
                 Text(value.map { $0.isEmpty ? placeholder : $0 } ?? placeholder)
@@ -845,7 +856,7 @@ struct MultiLineWaveform: View {
     }
 
     var series: [WaveSeries]
-    var height: CGFloat = 54
+    var height: CGFloat? = 54
     var style: Style = .filled
 
     var body: some View {

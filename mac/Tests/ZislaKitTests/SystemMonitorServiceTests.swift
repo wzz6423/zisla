@@ -189,17 +189,21 @@ private struct FoundationVolumeCapacityFileManager: SystemMonitorFileManaging, @
 
 private struct StubPublicIPProvider: PublicIPProviding {
     let address: String?
+    var ipv6Address: String? = nil
 
     func publicIPAddress() async -> String? { address }
+    func publicIPv6Address() async -> String? { ipv6Address }
 }
 
 /// Countable public-IP stub that returns addresses in order; tests drive it serially on MainActor, so no lock is needed.
 private final class CountingPublicIPProvider: PublicIPProviding, @unchecked Sendable {
     private var addresses: [String?]
+    private var ipv6Addresses: [String?]
     private(set) var callCount = 0
 
-    init(addresses: [String?]) {
+    init(addresses: [String?], ipv6Addresses: [String?] = [nil]) {
         self.addresses = addresses
+        self.ipv6Addresses = ipv6Addresses
     }
 
     func publicIPAddress() async -> String? {
@@ -211,6 +215,11 @@ private final class CountingPublicIPProvider: PublicIPProviding, @unchecked Send
             return addresses[0]
         }
         return addresses.removeFirst()
+    }
+
+    func publicIPv6Address() async -> String? {
+        if ipv6Addresses.count == 1 { return ipv6Addresses[0] }
+        return ipv6Addresses.removeFirst()
     }
 }
 
@@ -2152,7 +2161,10 @@ struct SystemMonitorServiceTests {
         ]
 
         let clock = ControllableDateProvider(Date(timeIntervalSince1970: 1_700_000_000))
-        let provider = CountingPublicIPProvider(addresses: ["203.0.113.1", "203.0.113.2"])
+        let provider = CountingPublicIPProvider(
+            addresses: ["203.0.113.1", "203.0.113.2"],
+            ipv6Addresses: ["2001:db8::1", "2001:db8::2"]
+        )
         let service = SystemMonitorService(
             fileManager: mock,
             volumeURL: volume,
@@ -2169,6 +2181,8 @@ struct SystemMonitorServiceTests {
         #expect(provider.callCount == 1)
         #expect(service.snapshot?.networkIdentity.publicIPAddress == "203.0.113.1")
         #expect(service.publicIPAddress == "203.0.113.1")
+        #expect(service.publicIPv6Address == "2001:db8::1")
+        #expect(service.snapshot?.networkIdentity.publicIPv6Address == "2001:db8::1")
 
         // Within the throttle window: another sample must not hit the provider.
         clock.advance(by: 5 * 60)
@@ -2186,6 +2200,8 @@ struct SystemMonitorServiceTests {
         #expect(provider.callCount == 2)
         #expect(service.snapshot?.networkIdentity.publicIPAddress == "203.0.113.2")
         #expect(service.publicIPAddress == "203.0.113.2")
+        #expect(service.publicIPv6Address == "2001:db8::2")
+        #expect(service.snapshot?.networkIdentity.publicIPv6Address == "2001:db8::2")
     }
 
     @Test
@@ -2220,6 +2236,56 @@ struct SystemMonitorServiceTests {
         #expect(provider.callCount == 2)
         #expect(service.snapshot?.networkIdentity.publicIPAddress == "198.51.100.2")
         #expect(service.publicIPAddress == "198.51.100.2")
+    }
+
+    @Test(arguments: [
+        NetworkIdentity(publicIPAddress: "203.0.113.8", publicIPv6Address: "2001:db8::8"),
+        NetworkIdentity(publicIPAddress: "203.0.113.8"),
+        NetworkIdentity(publicIPv6Address: "2001:db8::8"),
+        NetworkIdentity(),
+    ])
+    func publicIPRefreshPublishesEachAvailableFamilyBeforeTheFirstSample(identity: NetworkIdentity) async {
+        let service = SystemMonitorService(publicIPProvider: StubPublicIPProvider(
+            address: identity.publicIPAddress, ipv6Address: identity.publicIPv6Address
+        ))
+        await service.refreshPublicIPAddress()
+
+        #expect(service.publicIPAddress == identity.publicIPAddress)
+        #expect(service.publicIPv6Address == identity.publicIPv6Address)
+        #expect(service.snapshot == nil)
+        #expect(!service.isRefreshingPublicIPAddress)
+    }
+
+    @Test
+    func publicIPRefreshClearsMissingFamiliesAndPreservesOtherSnapshotMetrics() async throws {
+        let provider = CountingPublicIPProvider(
+            addresses: ["203.0.113.1", nil, "203.0.113.3", nil],
+            ipv6Addresses: ["2001:db8::1", "2001:db8::2", nil, nil]
+        )
+        let service = SystemMonitorService(
+            fileManager: MockFileManager(), publicIPProvider: provider,
+            hardwareInfoProvider: { .unavailable }
+        )
+        await service.refreshPublicIPAddress()
+        let initial = await service.sampleOnce()
+        #expect(initial.networkIdentity.publicIPAddress == "203.0.113.1")
+        #expect(initial.networkIdentity.publicIPv6Address == "2001:db8::1")
+
+        for expected in [
+            NetworkIdentity(publicIPv6Address: "2001:db8::2"),
+            NetworkIdentity(publicIPAddress: "203.0.113.3"),
+            NetworkIdentity(),
+        ] {
+            await service.refreshPublicIPAddress()
+            let current = try #require(service.snapshot)
+            #expect(current.networkIdentity.publicIPAddress == expected.publicIPAddress)
+            #expect(current.networkIdentity.publicIPv6Address == expected.publicIPv6Address)
+            #expect(service.publicIPAddress == expected.publicIPAddress)
+            #expect(service.publicIPv6Address == expected.publicIPv6Address)
+            #expect(current.networkIdentity.privateIPv4Address == initial.networkIdentity.privateIPv4Address)
+            #expect(current.cpu == initial.cpu && current.network == initial.network)
+            #expect(!service.isRefreshingPublicIPAddress)
+        }
     }
 
     /// Poll until the condition holds or times out; used to wait for the public-IP task scheduled by sampleOnce.
