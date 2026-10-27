@@ -121,6 +121,39 @@ struct LongCaptureRealWorldTests {
         return page.cropping(to: CGRect(x: 0, y: clamped, width: page.width, height: height))
     }
 
+    private func redrawn(_ image: CGImage, verticalOffset: CGFloat) throws -> CGImage {
+        let context = try #require(CGContext(
+            data: nil,
+            width: image.width,
+            height: image.height,
+            bitsPerComponent: 8,
+            bytesPerRow: image.width * 4,
+            space: CGColorSpaceCreateDeviceRGB(),
+            bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue
+        ))
+        context.setFillColor(NSColor.white.cgColor)
+        context.fill(CGRect(x: 0, y: 0, width: image.width, height: image.height))
+        context.interpolationQuality = .high
+        context.draw(image, in: CGRect(
+            x: 0, y: verticalOffset, width: CGFloat(image.width), height: CGFloat(image.height)
+        ))
+        return try #require(context.makeImage())
+    }
+
+    private func transposed(_ image: CGImage) throws -> CGImage {
+        let context = try #require(CGContext(
+            data: nil, width: image.height, height: image.width, bitsPerComponent: 8,
+            bytesPerRow: image.height * 4, space: CGColorSpaceCreateDeviceRGB(),
+            bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue
+        ))
+        context.interpolationQuality = .none
+        context.concatenate(CGAffineTransform(
+            a: 0, b: -1, c: -1, d: 0, tx: CGFloat(image.height), ty: CGFloat(image.width)
+        ))
+        context.draw(image, in: CGRect(x: 0, y: 0, width: image.width, height: image.height))
+        return try #require(context.makeImage())
+    }
+
     /// A page built from a list of near-identical rows — a settings list, a table, or a feed. Every row
     /// has the same layout and the differences between rows are a few pixels wide, exactly like real
     /// text. This is the shape of the long screenshots users actually take, and the hardest input for an
@@ -453,6 +486,161 @@ struct LongCaptureRealWorldTests {
     }
 
     // MARK: - Scenarios
+
+    @Test(arguments: ScreenshotLongCaptureDirection.allCases, [false, true])
+    func realWorldSubpixelScrollSupportsBothAxesAndPlacements(
+        direction: ScreenshotLongCaptureDirection,
+        reverse: Bool
+    ) throws {
+        let page = try #require(makeListPageImage(width: 720, height: 2_000, pitch: 500))
+        let first = try #require(frame(from: page, offset: 0, height: 700))
+        let second = try redrawn(
+            #require(frame(from: page, offset: 260, height: 700)), verticalOffset: 0.5
+        )
+        let a = try direction == .horizontal ? transposed(first) : first
+        let b = try direction == .horizontal ? transposed(second) : second
+        let match = try #require(ScreenshotLongCaptureMatcher.match(
+            previous: reverse ? b : a,
+            next: reverse ? a : b,
+            direction: direction
+        ))
+
+        #expect(match.placement == (reverse ? .prepend : .append))
+        #expect(abs(700 - match.overlapPixels - 260) <= 1)
+    }
+
+    @Test
+    func realWorldNarrowFrameUsesItsAvailableProfileSamples() throws {
+        let page = try #require(makePageImage(width: 96, height: 2_000))
+        let first = try #require(frame(from: page, offset: 0, height: 700))
+        let next = try #require(frame(from: page, offset: 160, height: 700))
+
+        let match = try #require(ScreenshotLongCaptureMatcher.match(
+            previous: first, next: next, direction: .vertical
+        ))
+
+        #expect(match.placement == .append)
+        #expect(match.overlapPixels == 540)
+    }
+
+    @Test
+    func realWorldIncompatibleProfileWidthsDoNotAppend() throws {
+        let page = try #require(makeListPageImage(width: 720, height: 2_000, pitch: 500))
+        let first = try #require(frame(from: page, offset: 0, height: 700))
+        let next = try #require(page.cropping(to: CGRect(x: 0, y: 160, width: 96, height: 700)))
+        let size = CGSize(width: 720, height: 700)
+        let model = ScreenshotEditorModel(image: NSImage(cgImage: first, size: size))
+        model.beginLongCapturePreview()
+
+        #expect(ScreenshotLongCaptureMatcher.match(previous: first, next: next, direction: .vertical) == nil)
+        #expect(!model.append(image: NSImage(cgImage: next, size: CGSize(width: 96, height: 700))))
+        #expect(!model.canUndo)
+        #expect(model.image.size == size)
+    }
+
+    @Test(arguments: [(0, 140), (70, 30), (140, 260), (210, 260)])
+    func realWorldSubpixelSparseScrollDoesNotChooseBlankOverlap(start: Int, scroll: Int) throws {
+        let page = try #require(makeListPageImage(width: 720, height: 2_000, pitch: 500))
+        let previous = try #require(frame(from: page, offset: start, height: 700))
+        let incoming = try #require(frame(from: page, offset: start + scroll, height: 700))
+        let next = try redrawn(incoming, verticalOffset: 0.5)
+
+        let match = try #require(ScreenshotLongCaptureMatcher.match(
+            previous: previous, next: next, direction: .vertical, expectedNewContent: 260
+        ))
+
+        #expect(match.placement == .append, "downward scrolling must not become a reverse match")
+        #expect(abs(700 - match.overlapPixels - scroll) <= 1,
+                "blank overlap must not duplicate content during subpixel scrolling")
+    }
+
+    @Test(arguments: [1, 2])
+    func realWorldSubpixelSparseSessionKeepsAppending(pixelScale: Int) throws {
+        let width = 720
+        let height = 700
+        let page = try #require(makeListPageImage(width: width, height: 2_500, pitch: 500))
+        let first = try #require(frame(from: page, offset: 0, height: height))
+        let size = CGSize(width: width / pixelScale, height: height / pixelScale)
+        let model = ScreenshotEditorModel(image: NSImage(cgImage: first, size: size))
+        model.beginLongCapturePreview()
+
+        for (index, offset) in [140, 400, 660, 800, 1_000].enumerated() {
+            let crop = try #require(frame(from: page, offset: offset, height: height))
+            let next = try redrawn(crop, verticalOffset: index.isMultiple(of: 2) ? 0.5 : 0)
+            let didAppend = model.append(image: NSImage(cgImage: next, size: size))
+            let combined = try #require(model.image.cgImage(forProposedRect: nil, context: nil, hints: nil))
+
+            #expect(didAppend, "capture must keep advancing at offset \(offset)")
+            #expect(abs(combined.height - height - offset) <= index + 1,
+                    "subpixel rounding must not duplicate or omit a section at offset \(offset)")
+            #expect(combined.width == width)
+        }
+    }
+
+    @Test
+    func realWorldBlankOverlapWaitsWithoutAdvancingTheReferenceFrame() throws {
+        let page = try #require(makeListPageImage(width: 720, height: 2_000, pitch: 500))
+        let first = try #require(frame(from: page, offset: 280, height: 700))
+        let size = CGSize(width: 720, height: 700)
+        let model = ScreenshotEditorModel(image: NSImage(cgImage: first, size: size))
+        model.beginLongCapturePreview()
+        let blankOverlap = try redrawn(
+            #require(frame(from: page, offset: 700, height: 700)), verticalOffset: 0.5
+        )
+
+        #expect(!model.append(image: NSImage(cgImage: blankOverlap, size: size)))
+        #expect(!model.canUndo)
+        let unchanged = try #require(model.image.cgImage(forProposedRect: nil, context: nil, hints: nil))
+        #expect(rgbaPixels(unchanged) == rgbaPixels(first))
+
+        let overlapping = try #require(frame(from: page, offset: 500, height: 700))
+        #expect(model.append(image: NSImage(cgImage: overlapping, size: size)))
+        let expected = try #require(page.cropping(to: CGRect(x: 0, y: 280, width: 720, height: 920)))
+        let combined = try #require(model.image.cgImage(forProposedRect: nil, context: nil, hints: nil))
+        #expect(rgbaPixels(combined) == rgbaPixels(expected))
+    }
+
+    @Test(arguments: [-3, 0, 3])
+    func realWorldSubpixelRepaintAndJitterDoNotAppend(scroll: Int) throws {
+        let page = try #require(makeListPageImage(width: 720, height: 2_000, pitch: 500))
+        let first = try #require(frame(from: page, offset: 400, height: 700))
+        let next = try redrawn(
+            #require(frame(from: page, offset: 400 + scroll, height: 700)), verticalOffset: 0.5
+        )
+        let size = CGSize(width: 720, height: 700)
+        let model = ScreenshotEditorModel(image: NSImage(cgImage: first, size: size))
+        model.beginLongCapturePreview()
+
+        #expect(!model.append(image: NSImage(cgImage: next, size: size)))
+        #expect(!model.canUndo)
+        let combined = try #require(model.image.cgImage(forProposedRect: nil, context: nil, hints: nil))
+        #expect(rgbaPixels(combined) == rgbaPixels(first))
+    }
+
+    @Test
+    func realWorldFaintRulesAloneDoNotEstablishMotion() throws {
+        let context = try #require(CGContext(
+            data: nil, width: 720, height: 1_600, bitsPerComponent: 8, bytesPerRow: 720 * 4,
+            space: CGColorSpaceCreateDeviceRGB(),
+            bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue
+        ))
+        context.setFillColor(NSColor.white.cgColor)
+        context.fill(CGRect(x: 0, y: 0, width: 720, height: 1_600))
+        context.setFillColor(NSColor(white: 0.97, alpha: 1).cgColor)
+        for y in [180, 520, 1_080] {
+            context.fill(CGRect(x: 24, y: y, width: 672, height: 2))
+        }
+        let page = try #require(context.makeImage())
+        let first = try #require(frame(from: page, offset: 0, height: 700))
+        let next = try #require(frame(from: page, offset: 200, height: 700))
+        let size = CGSize(width: 720, height: 700)
+        let model = ScreenshotEditorModel(image: NSImage(cgImage: first, size: size))
+        model.beginLongCapturePreview()
+
+        #expect(ScreenshotLongCaptureMatcher.match(previous: first, next: next, direction: .vertical) == nil)
+        #expect(!model.append(image: NSImage(cgImage: next, size: size)))
+        #expect(!model.canUndo)
+    }
 
     @Test
     func realWorldMultiFrameSessionReproducesThePage() throws {
