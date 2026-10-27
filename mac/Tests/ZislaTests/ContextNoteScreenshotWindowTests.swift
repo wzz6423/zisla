@@ -8,7 +8,8 @@ import ZislaCore
 @MainActor
 @Suite(.serialized)
 struct ContextNoteScreenshotWindowTests {
-    @Test(arguments: [CGSize(width: 80, height: 40), CGSize(width: 40, height: 80), CGSize(width: 80, height: 80)])
+    @Test(arguments: [CGSize(width: 80, height: 40), CGSize(width: 40, height: 80), CGSize(width: 80, height: 80),
+                      CGSize(width: 100, height: 60)])
     func nativePreviewFillsItsContentWithoutVerticalMargins(imageSize: CGSize) async throws {
         _ = NSApplication.shared
         let screenshot = try makeScreenshot(size: imageSize)
@@ -33,27 +34,36 @@ struct ContextNoteScreenshotWindowTests {
         let image = try #require(window.contentView as? NSImageView)
         #expect(image.image === screenshot.image)
         #expect(image.accessibilityLabel() == AppLocalization.text("截图"))
-        #expect(abs(image.bounds.width / image.bounds.height - imageSize.width / imageSize.height) < 0.001)
-        #expect(abs(image.bounds.height - window.contentLayoutRect.height) < 0.01)
-        #expect(abs(image.bounds.width - window.contentLayoutRect.width) < 0.01)
-        for _ in 0..<3 {
-            image.layoutSubtreeIfNeeded()
-            image.displayIfNeeded()
-            await withCheckedContinuation { continuation in DispatchQueue.main.async { continuation.resume() } }
-        }
-        let bitmap = try #require(image.bitmapImageRepForCachingDisplay(in: image.bounds))
-        image.cacheDisplay(in: image.bounds, to: bitmap)
-        let center = try #require(bitmap.colorAt(x: bitmap.pixelsWide / 2, y: bitmap.pixelsHigh / 2)?
-            .usingColorSpace(.deviceRGB))
-        #expect(center.alphaComponent > 0.9 && center.redComponent > center.greenComponent + 0.3
-                && center.redComponent > center.blueComponent + 0.3)
-        for y in [1, bitmap.pixelsHigh / 2, bitmap.pixelsHigh - 2] {
-            let pixel = try #require(bitmap.colorAt(x: bitmap.pixelsWide / 2, y: y)?.usingColorSpace(.deviceRGB))
-            #expect(abs(pixel.redComponent - center.redComponent) < 0.01
-                    && abs(pixel.greenComponent - center.greenComponent) < 0.01
-                    && abs(pixel.blueComponent - center.blueComponent) < 0.01
-                    && abs(pixel.alphaComponent - center.alphaComponent) < 0.01,
-                    "The screenshot must reach both vertical content edges: \(pixel)")
+        for width in [image.bounds.width, 960, 480] {
+            window.orderOut(nil)
+            window.setContentSize(CGSize(width: width, height: width * imageSize.height / imageSize.width))
+            window.setFrameOrigin(CGPoint(x: -100_000, y: -100_000))
+            #expect(NSScreen.screens.allSatisfy { !$0.frame.intersects(window.frame) })
+            window.orderFrontRegardless()
+            #expect(abs(image.bounds.width / image.bounds.height - imageSize.width / imageSize.height) < 0.001)
+            #expect(abs(image.bounds.height - window.contentLayoutRect.height) < 0.01)
+            #expect(abs(image.bounds.width - window.contentLayoutRect.width) < 0.01)
+            for _ in 0..<3 {
+                image.layoutSubtreeIfNeeded()
+                image.displayIfNeeded()
+                await withCheckedContinuation { continuation in DispatchQueue.main.async { continuation.resume() } }
+            }
+            let bitmap = try #require(image.bitmapImageRepForCachingDisplay(in: image.bounds))
+            image.cacheDisplay(in: image.bounds, to: bitmap)
+            let center = try #require(bitmap.colorAt(x: bitmap.pixelsWide / 2, y: bitmap.pixelsHigh / 2)?
+                .usingColorSpace(.deviceRGB))
+            #expect(center.alphaComponent > 0.9 && center.redComponent > center.greenComponent + 0.3
+                    && center.redComponent > center.blueComponent + 0.3)
+            let edges = [(1, bitmap.pixelsHigh / 2), (bitmap.pixelsWide - 2, bitmap.pixelsHigh / 2),
+                         (bitmap.pixelsWide / 2, 1), (bitmap.pixelsWide / 2, bitmap.pixelsHigh - 2)]
+            for (x, y) in edges {
+                let pixel = try #require(bitmap.colorAt(x: x, y: y)?.usingColorSpace(.deviceRGB))
+                #expect(abs(pixel.redComponent - center.redComponent) < 0.01
+                        && abs(pixel.greenComponent - center.greenComponent) < 0.01
+                        && abs(pixel.blueComponent - center.blueComponent) < 0.01
+                        && abs(pixel.alphaComponent - center.alphaComponent) < 0.01,
+                        "The screenshot must reach every content edge after resizing: \(pixel)")
+            }
         }
         #expect(window.isVisible)
     }
@@ -65,12 +75,89 @@ struct ContextNoteScreenshotWindowTests {
         let frame = NSWindow.frameRect(forContentRect: CGRect(origin: .zero, size: size),
             styleMask: [.titled, .closable, .miniaturizable, .resizable])
         #expect(size.width > 0 && size.height > 0)
-        #expect(size.width <= 640)
+        #expect(size.width <= 960)
         #expect(frame.width <= screenSize.width + 0.01 && frame.height <= screenSize.height + 0.01)
         #expect(abs(size.width / size.height - imageSize.width / imageSize.height) < 0.0001)
+        if screenSize.width == 1920 && imageSize.width > imageSize.height {
+            #expect(abs(size.width - 960) < 0.01)
+        }
         let withoutScreen = ContextNoteScreenshotWindow.initialContentSize(for: imageSize, visibleFrame: nil)
-        #expect(withoutScreen.width == 640)
+        #expect(abs(withoutScreen.width - 960) < 0.01)
         #expect(abs(withoutScreen.width / withoutScreen.height - imageSize.width / imageSize.height) < 0.0001)
+    }
+
+    @Test(arguments: [CGSize(width: 160, height: 100), CGSize(width: 100, height: 160)])
+    func zoomedPreviewPreservesTheImageRatio(imageSize: CGSize) throws {
+        _ = NSApplication.shared
+        let screenshot = try makeScreenshot(size: imageSize)
+        let window = ContextNoteScreenshotWindow(screenshot: screenshot, onCopy: { _ in }, onSave: { _ in })
+        defer { window.close() }
+        #expect(!window.isVisible)
+        window.zoom(nil)
+        #expect(!window.isVisible)
+        let content = window.contentLayoutRect
+        #expect(abs(content.width / content.height - imageSize.width / imageSize.height) < 0.001)
+        let image = try #require(window.contentView as? NSImageView)
+        #expect(abs(image.bounds.width - content.width) < 0.01)
+        #expect(abs(image.bounds.height - content.height) < 0.01)
+    }
+
+    @Test(arguments: [CGRect(x: 0, y: 0, width: 88, height: 60), CGRect(x: 12, y: 0, width: 88, height: 60),
+                      CGRect(x: 9, y: 6, width: 80, height: 48)])
+    func paddedPreviewFitsTheVisibleImageAndKeepsTheOriginalPNG(visible: CGRect) async throws {
+        _ = NSApplication.shared
+        let screenshot = try makeScreenshot(size: CGSize(width: 100, height: 60), filledRect: visible)
+        var copied: [Data] = []
+        var saved: [Data] = []
+        let window = ContextNoteScreenshotWindow(screenshot: screenshot, onCopy: { copied.append($0) },
+            onSave: { saved.append($0) })
+        defer { window.close() }
+        window.setFrameOrigin(CGPoint(x: -100_000, y: -100_000))
+        #expect(NSScreen.screens.allSatisfy { !$0.frame.intersects(window.frame) })
+        window.orderFrontRegardless()
+        let image = try #require(window.contentView as? NSImageView)
+        #expect(image.image?.size == visible.size)
+        let content = window.contentLayoutRect
+        // AppKit rounds window content dimensions to whole points.
+        #expect(abs(content.height - content.width * visible.height / visible.width) <= 1)
+        #expect(window.contentAspectRatio == visible.size)
+        for _ in 0..<3 {
+            image.layoutSubtreeIfNeeded()
+            image.displayIfNeeded()
+            await withCheckedContinuation { continuation in DispatchQueue.main.async { continuation.resume() } }
+        }
+        let bitmap = try #require(image.bitmapImageRepForCachingDisplay(in: image.bounds))
+        image.cacheDisplay(in: image.bounds, to: bitmap)
+        let center = try #require(bitmap.colorAt(x: bitmap.pixelsWide / 2, y: bitmap.pixelsHigh / 2)?
+            .usingColorSpace(.deviceRGB))
+        #expect(center.alphaComponent > 0.99 && center.redComponent > center.greenComponent + 0.3
+                && center.redComponent > center.blueComponent + 0.3)
+        let edges = [(1, bitmap.pixelsHigh / 2), (bitmap.pixelsWide - 2, bitmap.pixelsHigh / 2),
+                     (bitmap.pixelsWide / 2, 1), (bitmap.pixelsWide / 2, bitmap.pixelsHigh - 2)]
+        for (x, y) in edges {
+            let pixel = try #require(bitmap.colorAt(x: x, y: y)?.usingColorSpace(.deviceRGB))
+            #expect(abs(pixel.redComponent - center.redComponent) < 0.01
+                    && abs(pixel.greenComponent - center.greenComponent) < 0.01
+                    && abs(pixel.blueComponent - center.blueComponent) < 0.01
+                    && abs(pixel.alphaComponent - center.alphaComponent) < 0.01,
+                    "Transparent capture padding must not create an empty preview edge: \(pixel)")
+        }
+        #expect(window.performKeyEquivalent(with: try key("c", in: window)))
+        #expect(window.performKeyEquivalent(with: try key("s", in: window)))
+        #expect(copied == [screenshot.png] && saved == [screenshot.png])
+        #expect(screenshot.image.size == CGSize(width: 100, height: 60))
+    }
+
+    @Test(arguments: [CGSize(width: 80, height: 40), CGSize(width: 40, height: 80)])
+    func transparentPreviewKeepsItsOriginalImageAndRatio(imageSize: CGSize) throws {
+        _ = NSApplication.shared
+        let screenshot = try makeScreenshot(size: imageSize, filledRect: .zero)
+        let window = ContextNoteScreenshotWindow(screenshot: screenshot, onCopy: { _ in }, onSave: { _ in })
+        defer { window.close() }
+        let image = try #require(window.contentView as? NSImageView)
+        #expect(image.image === screenshot.image)
+        #expect(window.contentAspectRatio == imageSize)
+        #expect(abs(window.contentLayoutRect.width / window.contentLayoutRect.height - imageSize.width / imageSize.height) < 0.001)
     }
 
     @Test
@@ -210,13 +297,14 @@ struct ContextNoteScreenshotWindowTests {
             isARepeat: false, keyCode: character == "c" ? 8 : character == "s" ? 1 : 13))
     }
 
-    private func makeScreenshot(size: CGSize) throws -> ContextNoteScreenshot {
+    private func makeScreenshot(size: CGSize, filledRect: CGRect? = nil) throws -> ContextNoteScreenshot {
         let space = try #require(CGColorSpace(name: CGColorSpace.sRGB))
         let context = try #require(CGContext(data: nil, width: Int(size.width), height: Int(size.height),
             bitsPerComponent: 8, bytesPerRow: Int(size.width) * 4, space: space,
             bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue))
+        context.clear(CGRect(origin: .zero, size: size))
         context.setFillColor(red: 1, green: 0, blue: 0, alpha: 1)
-        context.fill(CGRect(origin: .zero, size: size))
+        context.fill(filledRect ?? CGRect(origin: .zero, size: size))
         let image = try #require(context.makeImage())
         return try ContextNoteScreenshot(png: #require(NSBitmapImageRep(cgImage: image).representation(using: .png, properties: [:])))
     }

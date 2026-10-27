@@ -13,14 +13,23 @@ final class ContextNoteScreenshotWindow: NSWindow {
         self.screenshot = screenshot
         self.onCopy = onCopy
         self.onSave = onSave
+        // Capture padding must not determine the preview's visible aspect ratio.
+        let capture = screenshot.image.cgImage(forProposedRect: nil, context: nil, hints: nil)!
+        let cropped = WindowPreviewCapture.image(from: capture)
+        let image: NSImage
+        if let cropped, cropped.size != CGSize(width: capture.width, height: capture.height) {
+            image = cropped
+        } else {
+            image = screenshot.image
+        }
         let style: NSWindow.StyleMask = [.titled, .closable, .miniaturizable, .resizable]
-        let size = Self.initialContentSize(for: screenshot.image.size, visibleFrame: screen?.visibleFrame)
+        let size = Self.initialContentSize(for: image.size, visibleFrame: screen?.visibleFrame)
         super.init(contentRect: CGRect(origin: .zero, size: size), styleMask: style, backing: .buffered, defer: false)
         isReleasedWhenClosed = false
         title = AppLocalization.text("截图")
-        contentAspectRatio = screenshot.image.size
+        contentAspectRatio = image.size
         let imageView = NSImageView(frame: CGRect(origin: .zero, size: size))
-        imageView.image = screenshot.image
+        imageView.image = image
         imageView.imageScaling = .scaleProportionallyUpOrDown
         imageView.setAccessibilityLabel(AppLocalization.text("截图"))
         contentView = imageView
@@ -28,7 +37,7 @@ final class ContextNoteScreenshotWindow: NSWindow {
     }
 
     static func initialContentSize(for imageSize: CGSize, visibleFrame: CGRect?) -> CGSize {
-        var scale = 640 / imageSize.width
+        var scale = 960 / imageSize.width
         if let visibleFrame {
             let available = contentRect(forFrameRect: visibleFrame, styleMask: [.titled, .closable, .miniaturizable, .resizable]).size
             scale = min(scale, available.width / imageSize.width, available.height / imageSize.height)
