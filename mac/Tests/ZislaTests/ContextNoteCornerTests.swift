@@ -8,8 +8,8 @@ import ZislaCore
 @MainActor
 @Suite(.serialized)
 struct ContextNoteCornerTests {
-    @Test(arguments: [CGSize(width: 320, height: 270), CGSize(width: 436, height: 320)])
-    func editorCornersFollowTheIslandsInsetContinuousContour(size: CGSize) async throws {
+    @Test(arguments: [CGSize(width: 320, height: 270), CGSize(width: 436, height: 320)], [1, 2])
+    func editorCornersFollowTheIslandsInsetContinuousContour(size: CGSize, renderScale: Int) async throws {
         _ = NSApplication.shared
         let draft = ContextNoteDraft(location: .window(
             bundleIdentifier: "test.note", applicationName: "Test", title: "Window"
@@ -48,7 +48,12 @@ struct ContextNoteCornerTests {
         #expect(textView.string == draft.text)
         let surface = host.convert(scroll.bounds, from: scroll).insetBy(dx: -6, dy: -6)
         #expect(host.bounds.contains(surface))
-        let bitmap = try #require(host.bitmapImageRepForCachingDisplay(in: host.bounds))
+        let bitmap = try #require(NSBitmapImageRep(
+            bitmapDataPlanes: nil, pixelsWide: Int(host.bounds.width) * renderScale, pixelsHigh: Int(host.bounds.height) * renderScale,
+            bitsPerSample: 8, samplesPerPixel: 4, hasAlpha: true, isPlanar: false,
+            colorSpaceName: .deviceRGB, bytesPerRow: 0, bitsPerPixel: 0
+        ))
+        bitmap.size = host.bounds.size
         host.cacheDisplay(in: host.bounds, to: bitmap)
         let scale = CGFloat(bitmap.pixelsWide) / host.bounds.width
         let contour = IslandSurfaceGeometry.moduleContentShape(
@@ -71,10 +76,16 @@ struct ContextNoteCornerTests {
                         x: trailing ? surface.maxX - CGFloat(dx) : surface.minX + CGFloat(dx),
                         y: host.isFlipped ? surface.maxY - CGFloat(dy) : surface.minY + CGFloat(dy)
                     )
-                    let inside = contour.contains(point)
+                    let pixelY = host.isFlipped ? point.y : host.bounds.maxY - point.y
+                    let center = CGPoint(
+                        x: (floor(point.x * scale) + 0.5) / scale,
+                        y: host.isFlipped ? (floor(pixelY * scale) + 0.5) / scale
+                            : host.bounds.maxY - (floor(pixelY * scale) + 0.5) / scale
+                    )
+                    let inside = contour.contains(center)
                     let neighbors = [CGPoint(x: -0.75, y: 0), CGPoint(x: 0.75, y: 0),
                                      CGPoint(x: 0, y: -0.75), CGPoint(x: 0, y: 0.75)]
-                    guard neighbors.allSatisfy({ contour.contains(CGPoint(x: point.x + $0.x, y: point.y + $0.y)) == inside }) else { continue }
+                    guard neighbors.allSatisfy({ contour.contains(CGPoint(x: center.x + $0.x, y: center.y + $0.y)) == inside }) else { continue }
                     #expect((try fill(at: point) > cardFill / 2) == inside,
                             "The editor bottom corner must follow the shared inset continuous contour at \(point)")
                     comparedPixels += 1
