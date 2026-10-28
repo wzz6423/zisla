@@ -50,6 +50,7 @@ final class ScreenRecordingExporter: ObservableObject {
 
     func playbackItem(project: ScreenRecordingProject, directory: URL) async throws -> AVPlayerItem {
         try Task.checkCancellation()
+        if project.timeline != nil { return try await multitrackPlaybackItem(project: project, directory: directory) }
         let timeline = try RecordingExportTimeline(project: project)
         let media = try await RecordingExportMedia.prepare(project: project, directory: directory, timeline: timeline)
         let composition = media.video.composition
@@ -94,6 +95,10 @@ final class ScreenRecordingExporter: ObservableObject {
 
     func preview(project: ScreenRecordingProject, directory: URL, sourceTime: Double,
                  maximumSize: CGSize) async throws -> CGImage {
+        if project.timeline != nil {
+            let scene = try await multitrackPreview(project: project, directory: directory, time: sourceTime, maximumSize: maximumSize)
+            return try scene.image(project: project)
+        }
         try project.validate()
         guard sourceTime.isFinite, sourceTime >= 0, sourceTime <= project.duration,
               maximumSize.width.isFinite, maximumSize.height.isFinite,
@@ -149,11 +154,16 @@ final class ScreenRecordingExporter: ObservableObject {
     }
 }
 
-private enum RecordingExportJob {
+enum RecordingExportJob {
     static func run(project: ScreenRecordingProject, directory: URL, destination: URL,
                     configuration: RecordingExportConfiguration,
                     checkpoint: @escaping @Sendable (RecordingExportCheckpoint) throws -> Void,
                     progress: @escaping @Sendable (Double) async -> Void) async throws {
+        if project.timeline != nil {
+            try await RecordingMultitrackExportJob.run(project: project, directory: directory, destination: destination,
+                configuration: configuration, checkpoint: checkpoint, progress: progress)
+            return
+        }
         let timeline = try RecordingExportTimeline(project: project)
         let schedule = try RecordingExportFrameSchedule(duration: timeline.duration, configuration: configuration)
         let target = try validateDestination(destination, directory: directory)
@@ -230,7 +240,7 @@ private enum RecordingExportJob {
     }
 }
 
-private final class RecordingExportFrameReader {
+final class RecordingExportFrameReader {
     private let reader: AVAssetReader
     private let output: AVAssetReaderTrackOutput
     private let transform: CGAffineTransform
@@ -298,33 +308,39 @@ private final class RecordingExportCancellation: @unchecked Sendable {
     }
 }
 
-private final class RecordingExportMP4Writer: @unchecked Sendable {
+final class RecordingExportMP4Writer: @unchecked Sendable {
     private let writer: AVAssetWriter
     private let videoInput: AVAssetWriterInput
     private let adaptor: AVAssetWriterInputPixelBufferAdaptor
-    private let primary: RecordingExportFrameReader
-    private let camera: RecordingExportFrameReader?
+    private let frames: any RecordingExportFrameProviding
     private let audioReader: AVAssetReader?
     private let audioOutput: AVAssetReaderAudioMixOutput?
     private let audioInput: AVAssetWriterInput?
-    private let renderer: RecordingExportRenderer
-    private let timeline: RecordingExportTimeline
+    private let duration: Double
     private let schedule: RecordingExportFrameSchedule
     private let checkpoint: @Sendable (RecordingExportCheckpoint) throws -> Void
     private let cancellation = RecordingExportCancellation()
 
-    init(url: URL, media: RecordingExportMedia, renderer: RecordingExportRenderer,
+    convenience init(url: URL, media: RecordingExportMedia, renderer: RecordingExportRenderer,
+                     schedule: RecordingExportFrameSchedule,
+                     checkpoint: @escaping @Sendable (RecordingExportCheckpoint) throws -> Void) throws {
+        try self.init(url: url, frames: RecordingLegacyExportFrames(media: media, renderer: renderer),
+            audioComposition: media.audioComposition, audioTracks: media.audioTracks,
+            audioMix: media.audioMix(for: media.audioTracks), duration: media.timeline.duration,
+            adjustsSpeed: media.timeline.slices.contains { $0.speed != 1 }, schedule: schedule, checkpoint: checkpoint)
+    }
+
+    init(url: URL, frames: any RecordingExportFrameProviding, audioComposition: AVMutableComposition?,
+         audioTracks: [AVMutableCompositionTrack], audioMix: AVAudioMix, duration: Double, adjustsSpeed: Bool,
          schedule: RecordingExportFrameSchedule,
          checkpoint: @escaping @Sendable (RecordingExportCheckpoint) throws -> Void) throws {
-        self.renderer = renderer
-        timeline = media.timeline
+        self.frames = frames
+        self.duration = duration
         self.schedule = schedule
         self.checkpoint = checkpoint
-        primary = try RecordingExportFrameReader(media: media.video)
-        camera = try media.camera.map(RecordingExportFrameReader.init)
         writer = try AVAssetWriter(outputURL: url, fileType: .mp4)
-        let width = Int(renderer.canvas.width)
-        let height = Int(renderer.canvas.height)
+        let width = Int(frames.canvas.width)
+        let height = Int(frames.canvas.height)
         videoInput = AVAssetWriterInput(mediaType: .video, outputSettings: [
             AVVideoCodecKey: max(width, height) > 4_096 ? AVVideoCodecType.hevc : AVVideoCodecType.h264,
             AVVideoWidthKey: width,
@@ -350,9 +366,9 @@ private final class RecordingExportMP4Writer: @unchecked Sendable {
         ])
         guard writer.canAdd(videoInput) else { throw ScreenRecordingExportError.encoderFailure }
         writer.add(videoInput)
-        if let composition = media.audioComposition {
+        if let composition = audioComposition, !audioTracks.isEmpty {
             let reader = try AVAssetReader(asset: composition)
-            let output = AVAssetReaderAudioMixOutput(audioTracks: media.audioTracks, audioSettings: [
+            let output = AVAssetReaderAudioMixOutput(audioTracks: audioTracks, audioSettings: [
                 AVFormatIDKey: kAudioFormatLinearPCM,
                 AVSampleRateKey: 48_000,
                 AVNumberOfChannelsKey: 2,
@@ -360,12 +376,12 @@ private final class RecordingExportMP4Writer: @unchecked Sendable {
                 AVLinearPCMIsFloatKey: true,
                 AVLinearPCMIsNonInterleaved: false,
             ])
-            output.audioMix = media.audioMix(for: media.audioTracks)
-            if media.timeline.slices.contains(where: { $0.speed != 1 }) { output.audioTimePitchAlgorithm = .spectral }
+            output.audioMix = audioMix
+            if adjustsSpeed { output.audioTimePitchAlgorithm = .spectral }
             output.alwaysCopiesSampleData = false
             guard reader.canAdd(output) else { throw ScreenRecordingExportError.unavailableMedia }
             reader.add(output)
-            reader.timeRange = CMTimeRange(start: .zero, duration: CMTime(seconds: timeline.duration,
+            reader.timeRange = CMTimeRange(start: .zero, duration: CMTime(seconds: duration,
                                                                          preferredTimescale: 60_000))
             let input = AVAssetWriterInput(mediaType: .audio, outputSettings: [
                 AVFormatIDKey: kAudioFormatMPEG4AAC,
@@ -385,8 +401,7 @@ private final class RecordingExportMP4Writer: @unchecked Sendable {
     func run(progress: @escaping @Sendable (Double) async -> Void) async throws {
         try await withTaskCancellationHandler {
             defer {
-                primary.cancel()
-                camera?.cancel()
+                frames.cancel()
                 audioReader?.cancelReading()
                 if writer.status == .writing { writer.cancelWriting() }
             }
@@ -403,19 +418,13 @@ private final class RecordingExportMP4Writer: @unchecked Sendable {
                     try checkpoint(.frame(index))
                     try await ready(videoInput)
                     let time = schedule.time(at: index)
-                    guard let slice = timeline.slice(at: time.seconds),
-                          let screen = try primary.frame(at: time, slice: slice, useFirstFrame: true) else {
-                        throw ScreenRecordingExportError.unavailableMedia
-                    }
-                    let cameraImage = try camera?.frame(at: time, slice: slice, useFirstFrame: false)
                     try autoreleasepool {
                         guard let pool = adaptor.pixelBufferPool else { throw ScreenRecordingExportError.cannotRender }
                         var buffer: CVPixelBuffer?
                         guard CVPixelBufferPoolCreatePixelBuffer(nil, pool, &buffer) == kCVReturnSuccess,
                               let buffer else { throw ScreenRecordingExportError.cannotRender }
-                        let image = try renderer.render(screen: screen, camera: cameraImage,
-                                                        sourceTime: slice.sourceTime(at: time.seconds), slice: slice)
-                        renderer.context.render(image, to: buffer, bounds: renderer.canvas,
+                        let image = try frames.render(at: time)
+                        frames.context.render(image, to: buffer, bounds: frames.canvas,
                                                 colorSpace: CGColorSpace(name: CGColorSpace.sRGB))
                         guard adaptor.append(buffer, withPresentationTime: time) else {
                             throw ScreenRecordingExportError.encoderFailure
@@ -428,7 +437,7 @@ private final class RecordingExportMP4Writer: @unchecked Sendable {
                 videoInput.markAsFinished()
                 try await audio.value
                 try cancellation.check()
-                writer.endSession(atSourceTime: CMTime(seconds: timeline.duration, preferredTimescale: 60_000))
+                writer.endSession(atSourceTime: CMTime(seconds: duration, preferredTimescale: 60_000))
                 await writer.finishWriting()
                 try cancellation.check()
                 guard writer.status == .completed else { throw ScreenRecordingExportError.encoderFailure }

@@ -17,7 +17,8 @@ struct ScreenRecordingLocalizationTests {
             "预览与导出使用相同的画面效果",
             "录屏控制条", "保存位置", "更改保存位置", "选择录屏保存目录",
             "圆角", "圆形摄像头", "矩形",
-            "系统声音音量", "麦克风音量", "显示摄像头", "摄像头比例", "画布比例", "背景颜色", "标注",
+            "系统声音音量", "麦克风音量", "显示摄像头", "摄像头比例", "画布比例", "背景颜色", "标注", "摄像头边框",
+            "视频轨道", "图片轨道", "文字轨道", "音频轨道",
         ]
         #expect(requiredKeys.isSubset(of: keys), "The recording source scan missed runtime keys: \(requiredKeys.subtracting(keys).sorted())")
         #expect(keys.isDisjoint(with: ["pause.fill", "play.fill", "record.circle", "source."]))
@@ -126,6 +127,7 @@ struct ScreenRecordingLocalizationTests {
         keys.formUnion(RecordingShortcutAction.allCases.map(\.title))
         keys.formUnion(RecordingCanvasAspectRatio.allCases.map(\.title))
         keys.formUnion(RecordingAnnotationKind.allCases.map(\.title))
+        keys.formUnion(RecordingTimelineTrackKind.allCases.map(\.title))
         keys.formUnion([SettingsSection.recording.title, SettingsSection.recording.subtitle])
 
         for path in paths {

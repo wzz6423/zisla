@@ -106,6 +106,8 @@ struct ScreenRecordingEffectsView: View {
                         }
                     }
                     Toggle(AppLocalization.text("镜像摄像头"), isOn: editBinding(\.cameraMirrored, default: true))
+                    Toggle(AppLocalization.text("摄像头边框"), isOn: optionalEditBinding(\.cameraBorder, default: false))
+                        .accessibilityIdentifier("screenRecording.cameraBorder")
                     Toggle(AppLocalization.text("圆形摄像头"), isOn: editBinding(\.cameraRound, default: true))
                     if !project.edits.cameraRound {
                         parameter("圆角", value: Binding(get: { model.project?.edits.cameraCornerRadius ?? 0.1 },

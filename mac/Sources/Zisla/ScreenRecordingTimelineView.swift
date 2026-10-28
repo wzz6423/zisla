@@ -4,10 +4,14 @@ import ZislaCore
 struct ScreenRecordingTimelineView: View {
     @ObservedObject var model: ScreenRecordingStudioModel
     @Binding var selectedSegmentID: UUID?
+    var showsClipInspector = true
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
             if let project = model.project {
+                if project.timeline != nil && showsClipInspector {
+                    ScreenRecordingMultitrackClipInspector(model: model)
+                } else if project.timeline == nil && showsClipInspector {
                 ViewThatFits(in: .horizontal) {
                     HStack { splitButton; restoreButton }
                     VStack(alignment: .trailing, spacing: 6) { splitButton; restoreButton }
@@ -55,8 +59,11 @@ struct ScreenRecordingTimelineView: View {
                             Button(AppLocalization.text("预览片段起点")) { selectSegment(segment.id) }
                                 .font(.caption)
                                 .accessibilityIdentifier("screenRecording.timelineFormSegment." + segment.id.uuidString)
+                            Button(AppLocalization.text("分离音频")) { model.detachTimelineAudio(segment.id.uuidString) }
+                                .accessibilityIdentifier("screenRecording.detachAudio")
                         }
                     }
+                }
                 }
                 ScreenRecordingInspectorSection(AppLocalization.text("导出设置"), symbol: "square.and.arrow.up", expanded: false) {
                     Picker(AppLocalization.text("格式"), selection: $model.exportConfiguration.format) {

@@ -149,6 +149,8 @@ struct ScreenRecordingTimelineStrip: View {
                     viewportWidth: proxy.size.width - 16, zoom: zoom) {
                     ScrollView(.horizontal) {
                         timeline(geometry, project: project).padding(.horizontal, 8)
+                            .background(ScreenRecordingTimelineMagnification(zoom: $zoom,
+                                isEnabled: isEnabled && model.canEdit, onBegan: { trim = nil }))
                     }
                 }
             }.frame(height: 98)

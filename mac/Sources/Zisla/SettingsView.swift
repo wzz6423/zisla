@@ -1050,6 +1050,12 @@ struct SettingsView: View {
                             Button(AppLocalization.text("打开")) { model.presentScreenRecording() }
                                 .controlSize(.small)
                         }
+                        if let recordingModel = model.screenRecordingSettingsModel?() {
+                            rowDivider
+                            settingRow(symbol: "folder", title: "保存位置", detail: "") {
+                                ScreenRecordingOutputDirectorySettingsView(model: recordingModel)
+                            }
+                        }
                         ForEach(RecordingShortcutAction.allCases) { action in
                             rowDivider
                             settingRow(symbol: "keyboard", title: action.title, detail: "") {

@@ -547,12 +547,14 @@ struct ScreenRecordingStudioTests {
         let (model, root, _) = try fixture(capture: captureService(session), preview: { _, _, _ in preview })
         defer { model.shutdown(); try? FileManager.default.removeItem(at: root) }
         model.recordingCameraRound = !cameraRound
+        model.recordingCameraBorder = cameraRound
         model.start()
         await model.operationTask?.value
         #expect(model.capture.phase == .recording)
         model.recordingCameraRound = cameraRound
         model.recordingCameraAspectRatio = .widescreen
         model.recordingCameraCornerRadius = cameraCornerRadius
+        model.recordingCameraBorder = !cameraRound
         model.recordingCameraSize = 0.4
 
         model.stop()
@@ -565,6 +567,7 @@ struct ScreenRecordingStudioTests {
         #expect(project.edits.cameraRound == cameraRound)
         #expect(project.edits.cameraAspectRatio == .widescreen)
         #expect(project.edits.cameraCornerRadius == cameraCornerRadius)
+        #expect(project.edits.cameraBorder == !cameraRound, "The last border choice made during recording must be saved")
         #expect(project.edits.cameraSize == 0.4)
         #expect(directory.path == session.directory?.path)
         #expect(directory.deletingLastPathComponent().path == root.path)

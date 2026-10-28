@@ -38,8 +38,7 @@ struct ScreenRecordingCanvasEditorTests {
         let canvas = try #require(descendants(RecordingCanvasEditorView.self, in: host).first,
                                   "The real studio must mount its editable canvas after preparing a preview")
         #expect(canvas.canvasRect.width > 300 && canvas.canvasRect.height > 200)
-        let point = CGPoint(x: canvas.canvasRect.minX + canvas.canvasRect.width * 0.4,
-                            y: canvas.canvasRect.minY + canvas.canvasRect.height * 0.3)
+        let point = fixture.selectionPoint(in: canvas)
         let event = try #require(NSEvent.mouseEvent(with: .leftMouseDown, location: canvas.convert(point, to: nil),
             modifierFlags: [], timestamp: 0, windowNumber: window.windowNumber, context: nil,
             eventNumber: 0, clickCount: 2, pressure: 1))
@@ -161,7 +160,7 @@ struct ScreenRecordingCanvasEditorTests {
                 let content = try #require(host)
                 let canvas = try #require(descendants(RecordingCanvasEditorView.self, in: content).first)
                 removedCanvas = canvas
-                let point = CGPoint(x: canvas.canvasRect.midX, y: canvas.canvasRect.minY + canvas.canvasRect.height * 0.3)
+                let point = fixture.selectionPoint(in: canvas)
                 let event = try #require(NSEvent.mouseEvent(with: .leftMouseDown, location: canvas.convert(point, to: nil),
                     modifierFlags: [], timestamp: 0, windowNumber: window.windowNumber, context: nil,
                     eventNumber: 0, clickCount: 2, pressure: 1))
@@ -194,7 +193,7 @@ struct ScreenRecordingCanvasEditorTests {
         await fixture.ready()
         let original = try #require(fixture.model.project)
         let originalText = try #require(caption ? original.captions.first?.text : original.edits.annotations?.first?.text)
-        fixture.view.mouseDown(with: fixture.mouse(.leftMouseDown, x: 0.4, y: 0.3, clicks: 2))
+        fixture.view.mouseDown(with: fixture.textMouse())
         let editor = try #require(fixture.view.textEditor)
         editor.insertText("Edited draft", replacementRange: editor.selectedRange())
         editor.breakUndoCoalescing()
@@ -236,7 +235,7 @@ struct ScreenRecordingCanvasEditorTests {
         let otherHistory = try #require(other.undoManager)
         #expect(otherHistory.canUndo)
 
-        fixture.view.mouseDown(with: fixture.mouse(.leftMouseDown, x: 0.4, y: 0.3, clicks: 2))
+        fixture.view.mouseDown(with: fixture.textMouse())
         let editor = try #require(fixture.view.textEditor)
         editor.insertText("Canvas draft", replacementRange: editor.selectedRange())
         editor.breakUndoCoalescing()
@@ -264,7 +263,7 @@ struct ScreenRecordingCanvasEditorTests {
         await fixture.ready()
         let original = try #require(fixture.model.project)
         fixture.model.commitPendingCanvasText = { [weak view = fixture.view] in view?.finishTextEditing(commit: true) }
-        fixture.view.mouseDown(with: fixture.mouse(.leftMouseDown, x: 0.4, y: 0.3, clicks: 2))
+        fixture.view.mouseDown(with: fixture.textMouse())
         let editor = try #require(fixture.view.textEditor)
         editor.string = "Keep this text"
         fixture.view.textDidChange(Notification(name: NSText.didChangeNotification, object: editor))
@@ -333,7 +332,7 @@ struct ScreenRecordingCanvasEditorTests {
         await fixture.ready()
         let original = try #require(fixture.model.project)
         let initialPixels = try bytes(#require(fixture.view.renderedImage))
-        fixture.view.mouseDown(with: fixture.mouse(.leftMouseDown, x: 0.4, y: 0.3, clicks: 2))
+        fixture.view.mouseDown(with: fixture.textMouse())
         let editor = try #require(fixture.view.textEditor)
         editor.string = "新内容1234\nSecond line"
         fixture.view.textDidChange(Notification(name: NSText.didChangeNotification, object: editor))
@@ -345,7 +344,7 @@ struct ScreenRecordingCanvasEditorTests {
         #expect(fixture.model.project == original && fixture.commits == 0)
         #expect(try bytes(#require(fixture.view.renderedImage)) == initialPixels)
 
-        fixture.view.mouseDown(with: fixture.mouse(.leftMouseDown, x: 0.4, y: 0.3, clicks: 2))
+        fixture.view.mouseDown(with: fixture.textMouse())
         let secondEditor = try #require(fixture.view.textEditor)
         secondEditor.string = "新内容1234"
         fixture.view.textDidChange(Notification(name: NSText.didChangeNotification, object: secondEditor))
@@ -365,7 +364,7 @@ struct ScreenRecordingCanvasEditorTests {
         let fixture = try Fixture(kind: .text)
         defer { fixture.close() }
         await fixture.ready()
-        fixture.view.mouseDown(with: fixture.mouse(.leftMouseDown, x: 0.4, y: 0.3, clicks: 2))
+        fixture.view.mouseDown(with: fixture.textMouse())
         let editor = try #require(fixture.view.textEditor)
         editor.string = String(repeating: "字", count: 4_001)
         fixture.view.textDidChange(Notification(name: NSText.didChangeNotification, object: editor))
@@ -385,9 +384,12 @@ struct ScreenRecordingCanvasEditorTests {
             defer { fixture.close() }
             await fixture.ready()
             let original = try #require(fixture.model.project)
-            fixture.view.mouseDown(with: fixture.mouse(.leftMouseDown, x: 0.7, y: 0.4))
-            fixture.view.mouseDragged(with: fixture.mouse(.leftMouseDragged, x: 0.85, y: 0.5))
-            fixture.view.mouseUp(with: fixture.mouse(.leftMouseUp, x: 0.85, y: 0.5))
+            let element = RecordingCanvasElement.annotation(try #require(original.edits.annotations?.first))
+            let corner = try #require(RecordingCanvasGeometry.handles(for: element, canvas: fixture.view.canvasSize).last).1
+            let x = corner.x / fixture.view.canvasSize.width, y = corner.y / fixture.view.canvasSize.height
+            fixture.view.mouseDown(with: fixture.mouse(.leftMouseDown, x: x, y: y))
+            fixture.view.mouseDragged(with: fixture.mouse(.leftMouseDragged, x: x + 0.15, y: y + 0.1))
+            fixture.view.mouseUp(with: fixture.mouse(.leftMouseUp, x: x + 0.15, y: y + 0.1))
             let edited = try #require(fixture.model.project)
             #expect(edited != original && fixture.commits == 1)
             #expect(try bytes(#require(fixture.view.renderedImage)) == bytes(fixture.render(edited)))
@@ -402,7 +404,7 @@ struct ScreenRecordingCanvasEditorTests {
         let fixture = try Fixture(kind: .text)
         defer { fixture.close() }
         await fixture.ready()
-        fixture.view.mouseDown(with: fixture.mouse(.leftMouseDown, x: 0.4, y: 0.3, clicks: 2))
+        fixture.view.mouseDown(with: fixture.textMouse())
         let editor = try #require(fixture.view.textEditor)
         editor.string = "Uncommitted"
         fixture.view.textDidChange(Notification(name: NSText.didChangeNotification, object: editor))
@@ -412,7 +414,7 @@ struct ScreenRecordingCanvasEditorTests {
         #expect(fixture.view.hitTest(CGPoint(x: 300, y: 200)) == nil,
                 "The editor must not capture playback clicks when editing is disabled")
         await fixture.ready()
-        fixture.view.mouseDown(with: fixture.mouse(.leftMouseDown, x: 0.4, y: 0.3, clicks: 2))
+        fixture.view.mouseDown(with: fixture.textMouse())
         #expect(fixture.view.textEditor != nil)
         var removed = try #require(fixture.model.project)
         removed.edits.annotations = []
@@ -519,6 +521,20 @@ struct ScreenRecordingCanvasEditorTests {
             let point = view.convert(CGPoint(x: x * view.bounds.width, y: y * view.bounds.height), to: nil)
             return NSEvent.mouseEvent(with: type, location: point, modifierFlags: [], timestamp: 0,
                 windowNumber: window.windowNumber, context: nil, eventNumber: 0, clickCount: clicks, pressure: 1)!
+        }
+
+        func selectionPoint(in canvas: RecordingCanvasEditorView) -> CGPoint {
+            let element = RecordingCanvasElement.visible(in: model.project!, at: model.currentTime)
+                .first { $0.selection == selection }!
+            let box = element.bounds(canvas: canvas.canvasSize)
+            return CGPoint(x: canvas.canvasRect.minX + box.midX * canvas.canvasRect.width / canvas.canvasSize.width,
+                           y: canvas.canvasRect.minY + box.midY * canvas.canvasRect.height / canvas.canvasSize.height)
+        }
+
+        func textMouse() -> NSEvent {
+            NSEvent.mouseEvent(with: .leftMouseDown, location: view.convert(selectionPoint(in: view), to: nil),
+                modifierFlags: [], timestamp: 0, windowNumber: window.windowNumber, context: nil,
+                eventNumber: 0, clickCount: 2, pressure: 1)!
         }
 
         func key(_ code: UInt16, characters: String = "", modifiers: NSEvent.ModifierFlags = []) -> NSEvent {

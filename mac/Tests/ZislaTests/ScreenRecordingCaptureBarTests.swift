@@ -20,8 +20,8 @@ struct ScreenRecordingCaptureBarTests {
         defer { model.shutdown() }
         var presentationRequested = false
         let controller = ScreenRecordingCaptureBarController(model: model, languageStore: AppLanguageStore(),
-            selectRegion: {}, start: {}, chooseDirectory: {}, openStudio: {}, cancel: {},
-            displaySaveDirectory: { "" }, presentPanel: { _ in presentationRequested = true })
+            selectRegion: {}, start: {}, openStudio: {}, cancel: {},
+            presentPanel: { _ in presentationRequested = true })
         defer { controller.shutdown() }
         let window = try #require(controller.hostingView.window)
         func settleLayout() async {
@@ -88,8 +88,7 @@ struct ScreenRecordingCaptureBarTests {
         model.selectMode(mode)
         defer { model.shutdown() }
         let controller = ScreenRecordingCaptureBarController(model: model, languageStore: AppLanguageStore(),
-            selectRegion: {}, start: {}, chooseDirectory: {}, openStudio: {}, cancel: {},
-            displaySaveDirectory: { "" })
+            selectRegion: {}, start: {}, openStudio: {}, cancel: {})
         defer { controller.shutdown() }
         let host = controller.hostingView
         host.window?.setContentSize(.init(width: viewportWidth, height: 38))

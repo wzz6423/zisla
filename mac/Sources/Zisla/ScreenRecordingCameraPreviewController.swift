@@ -168,6 +168,7 @@ final class ScreenRecordingCameraPreviewView: NSView {
     private let status = NSTextField(wrappingLabelWithString: "")
     private let spinner = NSProgressIndicator()
     private var cornerRadiusRatio: CGFloat = 0.5
+    private var showsBorder = false
     private var tracking: NSTrackingArea?
     private var hovered = false
     private var drag: Drag?
@@ -182,7 +183,6 @@ final class ScreenRecordingCameraPreviewView: NSView {
         super.init(frame: frameRect)
         wantsLayer = true
         cameraLayer.backgroundColor = NSColor.black.cgColor
-        cameraLayer.borderWidth = 2
         cameraLayer.borderColor = NSColor.white.withAlphaComponent(0.8).cgColor
         cameraLayer.masksToBounds = true
         layer?.addSublayer(cameraLayer)
@@ -225,6 +225,7 @@ final class ScreenRecordingCameraPreviewView: NSView {
         previewLayer.frame = cameraLayer.bounds
         handlesLayer.frame = bounds
         cameraLayer.cornerRadius = min(bounds.width, bounds.height) * cornerRadiusRatio
+        cameraLayer.borderWidth = showsBorder ? min(bounds.width, bounds.height) * 0.01 : 0
         let handles = CGMutablePath()
         for corner in ScreenRecordingCameraPreviewLayout.Corner.allCases {
             let point = corner.point(in: bounds.insetBy(dx: 6, dy: 6))
@@ -286,6 +287,7 @@ final class ScreenRecordingCameraPreviewView: NSView {
             connection.isVideoMirrored = configuration.cameraMirrored
         }
         cornerRadiusRatio = configuration.effectiveCameraCornerRadius
+        showsBorder = configuration.effectiveCameraBorder
         switch state {
         case .idle:
             spinner.stopAnimation(nil)

@@ -80,24 +80,25 @@ final class RecordingExportRenderer {
     let context: CIContext
     private let project: ScreenRecordingProject
     private let effects: RecordingExportEffectTrack
-    private let background: CIImage
+    let background: CIImage
     private let screenMask: CIImage
     private let cursor: CIImage
     private let shadow: CIImage?
     private let cameraRect: CGRect
     private let cameraMask: CIImage
+    private let cameraBorder: CIImage?
     private let colorSpace = CGColorSpace(name: CGColorSpace.sRGB)!
 
-    init(project: ScreenRecordingProject, size: CGSize) throws {
+    init(project: ScreenRecordingProject, size: CGSize, fitSource: Bool = false, context: CIContext? = nil) throws {
         self.project = project
         effects = RecordingExportEffectTrack(project: project)
         canvas = CGRect(origin: .zero, size: size)
-        context = CIContext(options: [.cacheIntermediates: false, .workingColorSpace: CGColorSpace(name: CGColorSpace.sRGB)!])
+        self.context = context ?? CIContext(options: [.cacheIntermediates: false, .workingColorSpace: CGColorSpace(name: CGColorSpace.sRGB)!])
         sourceCrop = project.edits.crop ?? RecordingRect(x: 0, y: 0, width: 1, height: 1)
         let shortSide = min(size.width, size.height)
         let padding = project.edits.background == .none && project.edits.backgroundColor == nil ? 0 : shortSide * project.edits.padding
         let available = canvas.insetBy(dx: padding, dy: padding)
-        if project.edits.canvasAspectRatio?.ratio != nil {
+        if project.edits.canvasAspectRatio?.ratio != nil || fitSource {
             let sourceWidth = Double(project.width) * sourceCrop.width
             let sourceHeight = Double(project.height) * sourceCrop.height
             let scale = min(available.width / sourceWidth, available.height / sourceHeight)
@@ -137,6 +138,14 @@ final class RecordingExportRenderer {
         cameraMask = try Self.mask(rect: cameraRect,
                                    radius: min(side, cameraHeight) * project.edits.effectiveCameraCornerRadius,
                                    canvas: canvas)
+        if project.edits.effectiveCameraBorder {
+            let width = min(side, cameraHeight) * 0.01
+            let inner = try Self.mask(rect: cameraRect.insetBy(dx: width, dy: width),
+                radius: max(0, min(side, cameraHeight) * project.edits.effectiveCameraCornerRadius - width),
+                canvas: canvas)
+            cameraBorder = cameraMask.applyingFilter("CISourceOutCompositing", parameters: [kCIInputBackgroundImageKey: inner])
+                .applyingFilter("CIColorMatrix", parameters: ["inputAVector": CIVector(x: 0, y: 0, z: 0, w: 0.8)])
+        } else { cameraBorder = nil }
     }
 
     static func outputSize(source: CGSize, edits: RecordingEdits,
@@ -165,7 +174,7 @@ final class RecordingExportRenderer {
     }
 
     func render(screen: CIImage, camera: CIImage?, sourceTime: Double,
-                slice: RecordingExportSlice? = nil) throws -> CIImage {
+                slice: RecordingExportSlice? = nil, includeBackground: Bool = true) throws -> CIImage {
         let normalized = Self.normalized(screen)
         let crop = CGRect(x: sourceCrop.x * normalized.extent.width,
                           y: (1 - sourceCrop.y - sourceCrop.height) * normalized.extent.height,
@@ -195,7 +204,7 @@ final class RecordingExportRenderer {
         }
         // Even-pixel export and preview sizes can differ slightly from the source aspect ratio.
         let screenLayer = Self.fit(visible, from: viewport, to: screenRect, fill: screenRect == canvas)
-        var scene = background
+        var scene = includeBackground ? background : CIImage(color: .clear).cropped(to: canvas)
         if let shadow { scene = shadow.composited(over: scene) }
         scene = Self.masked(screenLayer, mask: screenMask, canvas: canvas).composited(over: scene)
         if project.edits.effectiveShowCamera, let camera {
@@ -206,6 +215,7 @@ final class RecordingExportRenderer {
             }
             let cameraLayer = Self.fit(image, from: image.extent, to: cameraRect, fill: true)
             scene = Self.masked(cameraLayer, mask: cameraMask, canvas: canvas).composited(over: scene)
+            if let cameraBorder { scene = cameraBorder.composited(over: scene) }
         }
         scene = try Self.overlays(project: project, sourceTime: sourceTime, canvas: canvas).composited(over: scene)
         return scene.cropped(to: canvas)
@@ -232,7 +242,7 @@ final class RecordingExportRenderer {
                       width: width, height: height)
     }
 
-    private static func fit(_ image: CIImage, from source: CGRect, to rect: CGRect, fill: Bool) -> CIImage {
+    static func fit(_ image: CIImage, from source: CGRect, to rect: CGRect, fill: Bool) -> CIImage {
         let scaleX = rect.width / source.width
         let scaleY = rect.height / source.height
         let scale = fill ? max(scaleX, scaleY) : min(scaleX, scaleY)
@@ -314,8 +324,10 @@ final class RecordingExportRenderer {
 
     static func annotationImage(_ annotation: RecordingAnnotation, canvas: CGRect) throws -> CIImage {
         let bounds = annotation.bounds
-        let rect = CGRect(x: bounds.x * canvas.width, y: (1 - bounds.y - bounds.height) * canvas.height,
-                          width: bounds.width * canvas.width, height: bounds.height * canvas.height)
+        let textLayout = annotation.kind == .text ? RecordingAnnotationTextLayout(annotation, canvas: canvas.size) : nil
+        let topLeft = textLayout?.bounds ?? CGRect(x: bounds.x * canvas.width, y: bounds.y * canvas.height,
+            width: bounds.width * canvas.width, height: bounds.height * canvas.height)
+        let rect = CGRect(x: topLeft.minX, y: canvas.height - topLeft.maxY, width: topLeft.width, height: topLeft.height)
         let shortSide = min(canvas.width, canvas.height)
         let lineWidth = shortSide * annotation.lineWidth
         let inset = annotation.kind == .arrow ? max(shortSide * 0.05, lineWidth * 2) : lineWidth
@@ -340,12 +352,7 @@ final class RecordingExportRenderer {
             context.strokeLineSegments(between: [start, end, end, first, end, second])
         case .text:
             context.clip(to: rect)
-            let text = NSAttributedString(string: annotation.text, attributes: [
-                NSAttributedString.Key(kCTFontAttributeName as String): CTFontCreateWithName("Helvetica-Bold" as CFString,
-                                                                                          shortSide * annotation.fontSize, nil),
-                NSAttributedString.Key(kCTForegroundColorAttributeName as String): color,
-            ])
-            let setter = CTFramesetterCreateWithAttributedString(text)
+            let setter = CTFramesetterCreateWithAttributedString(textLayout!.text)
             let frame = CTFramesetterCreateFrame(setter, CFRange(location: 0, length: 0), CGPath(rect: rect, transform: nil), nil)
             CTFrameDraw(frame, context)
         }

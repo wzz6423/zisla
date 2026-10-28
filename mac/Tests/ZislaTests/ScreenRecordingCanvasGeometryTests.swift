@@ -22,8 +22,11 @@ struct ScreenRecordingCanvasGeometryTests {
         let original = RecordingCanvasElement.annotation(annotation)
         guard case let .annotation(moved) = RecordingCanvasGeometry.transformed(original,
             by: CGSize(width: 1_000, height: -1_000), handle: nil, canvas: canvas) else { Issue.record("Expected annotation"); return }
-        #expect(moved.x == 1 && moved.endX == 0.5)
-        #expect(abs(moved.y - 0.4) < 0.000_001 && moved.endY == 0)
+        let bounds = RecordingCanvasElement.annotation(moved).bounds(canvas: canvas)
+        #expect(abs(bounds.maxX - canvas.width) < 1 && bounds.minY == 0)
+        #expect(abs(bounds.width - original.bounds(canvas: canvas).width) < 1)
+        #expect(abs(bounds.height - original.bounds(canvas: canvas).height) < 1)
+        #expect(moved.x > moved.endX && moved.y > moved.endY)
         #expect(moved.text == annotation.text && moved.fontSize == annotation.fontSize && moved.lineWidth == annotation.lineWidth)
         #expect(moved.isValid(duration: 1))
     }
@@ -31,10 +34,13 @@ struct ScreenRecordingCanvasGeometryTests {
     @Test
     func textCornerResizingScalesLettersWithTheBoxAndKeepsTheOppositeCorner() {
         let original = RecordingAnnotation(kind: .text, start: 0, end: 1, x: 0.1, y: 0.1, endX: 0.3, endY: 0.3, text: "1234")
+        let originalBounds = RecordingCanvasElement.annotation(original).bounds(canvas: canvas)
         guard case let .annotation(resized) = RecordingCanvasGeometry.transformed(.annotation(original),
-            by: CGSize(width: 160, height: 120), handle: .bottomRight, canvas: canvas) else { Issue.record("Expected annotation"); return }
+            by: originalBounds.size, handle: .bottomRight, canvas: canvas) else { Issue.record("Expected annotation"); return }
         #expect(resized.x == original.x && resized.y == original.y)
-        #expect(abs(resized.endX - 0.5) < 0.000_001 && abs(resized.endY - 0.5) < 0.000_001)
+        let resizedBounds = RecordingCanvasElement.annotation(resized).bounds(canvas: canvas)
+        #expect(abs(resizedBounds.width - originalBounds.width * 2) <= 1)
+        #expect(abs(resizedBounds.height - originalBounds.height * 2) <= 1)
         #expect(abs(resized.fontSize - 0.12) < 0.000_001)
         #expect(resized.isValid(duration: 1))
     }
@@ -134,6 +140,7 @@ struct ScreenRecordingCanvasGeometryTests {
                             switch resized {
                             case let .annotation(value): project.edits.annotations = [value]
                             case let .caption(value): project.captions = [value]
+                            case .image: Issue.record("Expected a text element")
                             }
                             try project.validate()
                         }

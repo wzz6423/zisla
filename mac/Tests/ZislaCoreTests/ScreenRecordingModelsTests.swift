@@ -67,6 +67,30 @@ struct ScreenRecordingModelsTests {
         #expect(decoded.edits.effectiveCameraCornerRadius == 0.1)
     }
 
+    @Test(arguments: [false, true])
+    func cameraBorderChoiceRoundTripsWithoutChangingOtherEffects(_ border: Bool) throws {
+        var source = project()
+        source.edits.cameraBorder = border
+        let decoded = try JSONDecoder().decode(ScreenRecordingProject.self, from: JSONEncoder().encode(source))
+        try decoded.validate()
+        #expect(decoded == source)
+        #expect(decoded.edits.effectiveCameraBorder == border)
+    }
+
+    @Test
+    func newAndLegacyProjectsHaveNoCameraBorder() throws {
+        let source = project()
+        #expect(!source.edits.effectiveCameraBorder)
+        var legacy = try #require(JSONSerialization.jsonObject(with: JSONEncoder().encode(source)) as? [String: Any])
+        var edits = try #require(legacy["edits"] as? [String: Any])
+        edits.removeValue(forKey: "cameraBorder")
+        legacy["edits"] = edits
+        let decoded = try JSONDecoder().decode(ScreenRecordingProject.self, from: JSONSerialization.data(withJSONObject: legacy))
+        try decoded.validate()
+        #expect(decoded.edits.cameraBorder == nil)
+        #expect(!decoded.edits.effectiveCameraBorder)
+    }
+
     @Test(arguments: [0.0, 0.125, 0.5])
     func cameraCornerRadiusRoundTripsAtItsBoundaries(_ radius: Double) throws {
         var source = project()

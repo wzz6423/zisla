@@ -29,11 +29,11 @@ struct ScreenRecordingCaptionsView: View {
                     ForEach(model.project?.captions ?? []) { caption in
                         DisclosureGroup(isExpanded: Binding(get: { expandedCaptionID == caption.id }, set: {
                             expandedCaptionID = $0 ? caption.id : nil
-                            if $0 { canvasSelection.wrappedValue = .caption(caption.id); model.seek(to: caption.start) }
+                            if $0 { canvasSelection.wrappedValue = .caption(caption.id); model.seekOverlay(.caption(caption.id), sourceStart: caption.start) }
                         })) {
                             VStack(alignment: .leading, spacing: 10) {
                                 HStack {
-                                    Button(ScreenRecordingStudioView.clock(caption.start)) { model.seek(to: caption.start) }
+                                    Button(ScreenRecordingStudioView.clock(caption.start)) { model.seekOverlay(.caption(caption.id), sourceStart: caption.start) }
                                     Spacer()
                                     Button(role: .destructive) {
                                         model.update { $0.captions.removeAll { $0.id == caption.id } }
@@ -45,7 +45,7 @@ struct ScreenRecordingCaptionsView: View {
                                     .textFieldStyle(.roundedBorder).lineLimit(2...5)
                                     .accessibilityIdentifier("screenRecording.captionText." + caption.id.uuidString)
                                 Button(AppLocalization.text("删除字幕对应片段")) {
-                                    model.cut(start: caption.start, end: caption.end)
+                                    model.cutCaption(caption.id)
                                 }.font(.caption)
                             }.padding(.top, 10)
                         } label: {
@@ -59,13 +59,9 @@ struct ScreenRecordingCaptionsView: View {
                 }
             } actions: {
                 Button(AppLocalization.text("添加字幕")) {
-                    model.update { project in
-                        guard model.currentTime < project.duration else { return }
-                        let caption = RecordingCaption(start: model.currentTime,
-                            end: min(project.duration, model.currentTime + 2), text: AppLocalization.text("新字幕"))
-                        project.captions.append(caption)
-                        expandedCaptionID = caption.id
-                        canvasSelection.wrappedValue = .caption(caption.id)
+                    if let id = model.addOverlayCaption() {
+                        expandedCaptionID = id
+                        canvasSelection.wrappedValue = .caption(id)
                     }
                 }.buttonStyle(SettingsTintedButtonStyle())
                     .accessibilityIdentifier("screenRecording.addCaption")
@@ -78,6 +74,7 @@ struct ScreenRecordingCaptionsView: View {
 
     private var generateButton: some View {
         Button(AppLocalization.text("生成字幕"), action: model.generateCaptions).buttonStyle(SettingsTintedButtonStyle())
+            .disabled(!model.canGenerateCaptions)
     }
 
     private var exportButton: some View {

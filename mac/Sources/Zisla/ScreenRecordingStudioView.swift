@@ -15,6 +15,8 @@ struct ScreenRecordingStudioView: View {
             toolbar
             Divider()
             HSplitView {
+                ScreenRecordingMediaLibraryView(model: model)
+                    .frame(minWidth: 180, idealWidth: 210, maxWidth: 260)
                 VStack(spacing: 0) {
                     ZStack { preview }
                         .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -25,18 +27,11 @@ struct ScreenRecordingStudioView: View {
                     if let project = model.project {
                         transport(project)
                         Divider().padding(.top, 8)
-                        VStack(alignment: .leading, spacing: 6) {
-                            if !project.edits.segments.isEmpty {
-                                ScreenRecordingTimelineStrip(model: model, selectedID: $selectedSegmentID)
-                            } else {
-                                Text(AppLocalization.text("所有片段已删除，请恢复素材后导出"))
-                                    .font(.caption).foregroundStyle(.secondary).frame(maxWidth: .infinity, minHeight: 100)
-                            }
-                        }
-                        .padding(12).disabled(!model.canEdit)
+                        ScreenRecordingMultitrackTimelineView(model: model)
+                            .padding(12).disabled(!model.canEdit)
                     }
                 }
-                .frame(minWidth: 520, maxWidth: .infinity, maxHeight: .infinity)
+                .frame(minWidth: 420, maxWidth: .infinity, maxHeight: .infinity)
                 .background(Color.black.opacity(0.05))
                 VStack(spacing: 0) {
                     if model.project != nil {
@@ -56,7 +51,15 @@ struct ScreenRecordingStudioView: View {
                                 Text(AppLocalization.text(inspectorTitle)).font(.system(size: 15, weight: .semibold))
                                     .padding(.bottom, 2)
                                 switch inspector {
-                                case 0: ScreenRecordingTimelineView(model: model, selectedSegmentID: $selectedSegmentID)
+                                case 0:
+                                    ScreenRecordingMultitrackClipInspector(model: model)
+                                    ScreenRecordingTimelineView(model: model, selectedSegmentID: $selectedSegmentID,
+                                        showsClipInspector: false)
+                                    if model.project?.timeline == nil {
+                                        DisclosureGroup(AppLocalization.text("恢复完整素材")) {
+                                            ScreenRecordingTimelineView(model: model, selectedSegmentID: $selectedSegmentID)
+                                        }
+                                    }
                                 case 1: ScreenRecordingEffectsView(model: model)
                                 case 2: ScreenRecordingCaptionsView(model: model)
                                 default: ScreenRecordingAIView(model: model)
@@ -81,10 +84,30 @@ struct ScreenRecordingStudioView: View {
         .onChange(of: model.project?.id) { _, _ in canvasSelection = nil }
         .onChange(of: canvasSelection) { _, selection in
             switch selection {
-            case .annotation: inspector = 1
-            case .caption: inspector = 2
+            case let .annotation(id):
+                inspector = 1
+                model.selectCanvasTimelineContent(.annotation(id))
+            case let .caption(id):
+                inspector = 2
+                model.selectCanvasTimelineContent(.caption(id))
+            case let .image(id): inspector = 0; model.selectedTimelineClipID = id
             case nil: break
             }
+        }
+        .onChange(of: model.selectedTimelineClipID, initial: true) { _, id in
+            if model.project?.timeline == nil, let segmentID = id.flatMap(UUID.init(uuidString:)),
+               model.project?.edits.segments.contains(where: { $0.id == segmentID }) == true {
+                selectedSegmentID = segmentID
+            }
+            switch model.selectedTimelineClip?.content {
+            case let .annotation(id): canvasSelection = .annotation(id)
+            case let .caption(id): canvasSelection = .caption(id)
+            case .image: canvasSelection = id.map(RecordingCanvasSelection.image)
+            default: canvasSelection = nil
+            }
+        }
+        .onChange(of: selectedSegmentID) { _, id in
+            if model.project?.timeline == nil { model.selectedTimelineClipID = id?.uuidString }
         }
         .onChange(of: model.project?.edits.segments.map(\.id), initial: true) { _, ids in
             if !(ids ?? []).contains(where: { $0 == selectedSegmentID }) { selectedSegmentID = ids?.first }
@@ -112,7 +135,7 @@ struct ScreenRecordingStudioView: View {
             } else {
                 Menu {
                     Button(AppLocalization.text("打开录屏项目"), action: model.openProject)
-                    Button(AppLocalization.text("导入视频"), action: model.importVideo)
+                    Button(AppLocalization.text("导入素材"), action: model.importVideo)
                     Button(AppLocalization.text("保存录屏项目"), action: model.saveProject).disabled(model.project == nil)
                     Button(AppLocalization.text("项目另存为"), action: model.saveCopy).disabled(!model.canEdit)
                 } label: { Label(AppLocalization.text("项目"), systemImage: "folder") }
@@ -123,7 +146,7 @@ struct ScreenRecordingStudioView: View {
                     .help(AppLocalization.text("重做")).disabled(!model.canRedo)
                 Button(AppLocalization.text("录制设置"), action: prepareCapture)
                     .disabled(model.isBusy || model.isChoosingFile || model.exporter.isExporting)
-                Button(AppLocalization.text("导出录屏"), action: model.export).disabled(!model.canEdit)
+                Button(AppLocalization.text("导出录屏"), action: model.export).disabled(!model.canExport)
             }
         }
         .padding(.horizontal, 16).padding(.vertical, 12)
@@ -145,7 +168,7 @@ struct ScreenRecordingStudioView: View {
                 Text(AppLocalization.text(model.isRecording ? "录制中，可使用快捷键暂停或停止" : "录制屏幕，制作演示视频"))
                     .font(.title3)
                 if model.isRecording { Text(Self.clock(model.capture.elapsed)).font(.largeTitle).monospacedDigit() }
-                else { Button(AppLocalization.text("导入视频"), action: model.importVideo) }
+                else { Button(AppLocalization.text("导入素材"), action: model.importVideo) }
             }.foregroundStyle(.white.opacity(0.9)).padding(24)
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
         }
@@ -156,7 +179,7 @@ struct ScreenRecordingStudioView: View {
     private func transport(_ project: ScreenRecordingProject) -> some View {
         let original = model.isShowingSourcePlayback
         let time = original ? model.currentTime : model.playbackTime
-        let duration = original ? project.duration : project.outputDuration
+        let duration = original ? model.sourceDuration : project.outputDuration
         return HStack(spacing: 10) {
             Button(action: model.playTimeline) {
                 Image(systemName: model.isShowingTimelinePlayback ? "pause.circle.fill" : "play.circle.fill")
@@ -166,11 +189,13 @@ struct ScreenRecordingStudioView: View {
             .help(AppLocalization.text(model.isShowingTimelinePlayback ? "暂停预览" : "预览与导出使用相同的画面效果"))
             .accessibilityLabel(AppLocalization.text(model.isShowingTimelinePlayback ? "暂停预览" : "播放剪辑"))
             .accessibilityIdentifier("screenRecording.playTimeline")
+            .disabled(!model.canExport)
             Button(action: model.playSource) { Image(systemName: "film").frame(width: 24, height: 26) }
                 .buttonStyle(.plain)
                 .help(AppLocalization.text(model.isShowingSourcePlayback ? "正在播放原始素材" : "播放原始素材"))
                 .accessibilityLabel(AppLocalization.text("播放原始素材"))
-            Slider(value: Binding(get: { time }, set: { original ? model.seek(to: $0) : model.seekTimeline(to: $0) }),
+                .disabled(model.player == nil)
+            Slider(value: Binding(get: { time }, set: { original ? model.seekSource(to: $0) : model.seekTimeline(to: $0) }),
                    in: 0...max(0.001, duration))
                 .accessibilityLabel(AppLocalization.text("时间线"))
                 .accessibilityIdentifier("screenRecording.playbackPosition")

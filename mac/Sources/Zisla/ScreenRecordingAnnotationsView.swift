@@ -35,11 +35,11 @@ struct ScreenRecordingAnnotationsView: View {
                 ForEach(model.project?.edits.annotations ?? []) { annotation in
                     DisclosureGroup(isExpanded: Binding(get: { expandedAnnotationID == annotation.id }, set: {
                         expandedAnnotationID = $0 ? annotation.id : nil
-                        if $0 { canvasSelection.wrappedValue = .annotation(annotation.id); model.seek(to: annotation.start) }
+                        if $0 { canvasSelection.wrappedValue = .annotation(annotation.id); model.seekOverlay(.annotation(annotation.id), sourceStart: annotation.start) }
                     })) {
                         VStack(alignment: .leading, spacing: 10) {
                             HStack {
-                                Button(ScreenRecordingStudioView.clock(annotation.start)) { model.seek(to: annotation.start) }
+                                Button(ScreenRecordingStudioView.clock(annotation.start)) { model.seekOverlay(.annotation(annotation.id), sourceStart: annotation.start) }
                                 Spacer()
                                 Button(role: .destructive) {
                                     model.update { $0.edits.annotations?.removeAll { $0.id == annotation.id } }
@@ -76,7 +76,7 @@ struct ScreenRecordingAnnotationsView: View {
                 ForEach(RecordingAnnotationKind.allCases, id: \.self) { kind in
                     Button { add(kind) } label: { Label(AppLocalization.text(kind.title), systemImage: kind.symbol) }
                 }
-            }.disabled(model.project.map { model.currentTime >= $0.duration
+            }.disabled(model.project.map { model.overlayTime >= model.overlayDuration
                 || ($0.edits.annotations?.count ?? 0) >= RecordingAnnotation.maximumCount } ?? true)
         }.disabled(!model.canEdit)
         .onChange(of: canvasSelection.wrappedValue, initial: true) { _, selection in
@@ -85,13 +85,9 @@ struct ScreenRecordingAnnotationsView: View {
     }
 
     private func add(_ kind: RecordingAnnotationKind) {
-        model.update { project in
-            guard model.currentTime < project.duration else { return }
-            let annotation = RecordingAnnotation(kind: kind, start: model.currentTime,
-                end: min(project.duration, model.currentTime + 2), text: kind == .text ? AppLocalization.text("文字标注") : "")
-            project.edits.annotations = (project.edits.annotations ?? []) + [annotation]
-            expandedAnnotationID = annotation.id
-            canvasSelection.wrappedValue = .annotation(annotation.id)
+        if let id = model.addOverlayAnnotation(kind) {
+            expandedAnnotationID = id
+            canvasSelection.wrappedValue = .annotation(id)
         }
     }
 

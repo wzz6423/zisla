@@ -247,6 +247,7 @@ public struct RecordingEdits: Codable, Equatable, Sendable {
     public var cameraRound: Bool
     public var cameraAspectRatio: RecordingCameraAspectRatio?
     public var cameraCornerRadius: Double?
+    public var cameraBorder: Bool?
     public var showCamera: Bool?
     public var screenAudioVolume: Double?
     public var microphoneVolume: Double?
@@ -263,6 +264,7 @@ public struct RecordingEdits: Codable, Equatable, Sendable {
         cameraRound && effectiveCameraAspectRatio == .square ? 0.5 : cameraCornerRadius ?? 0.1
     }
     public var effectiveShowCamera: Bool { showCamera ?? true }
+    public var effectiveCameraBorder: Bool { cameraBorder ?? false }
     public var effectiveScreenAudioVolume: Double { screenAudioVolume ?? 1 }
     public var effectiveMicrophoneVolume: Double { microphoneVolume ?? 1 }
 
@@ -273,6 +275,7 @@ public struct RecordingEdits: Codable, Equatable, Sendable {
                 cameraPosition: RecordingCameraPosition = .bottomRight, cameraSize: Double = 0.25,
                 cameraMirrored: Bool = true, cameraRound: Bool = true,
                 cameraAspectRatio: RecordingCameraAspectRatio? = nil, cameraCornerRadius: Double? = nil,
+                cameraBorder: Bool? = nil,
                 showCamera: Bool? = nil, screenAudioVolume: Double? = nil, microphoneVolume: Double? = nil, showCaptions: Bool = true,
                 crop: RecordingRect? = nil, canvasAspectRatio: RecordingCanvasAspectRatio? = nil,
                 backgroundColor: RecordingColor? = nil, annotations: [RecordingAnnotation]? = nil) {
@@ -292,6 +295,7 @@ public struct RecordingEdits: Codable, Equatable, Sendable {
         self.cameraRound = cameraRound
         self.cameraAspectRatio = cameraAspectRatio
         self.cameraCornerRadius = cameraCornerRadius
+        self.cameraBorder = cameraBorder
         self.showCamera = showCamera
         self.screenAudioVolume = screenAudioVolume
         self.microphoneVolume = microphoneVolume
@@ -350,7 +354,7 @@ public enum ScreenRecordingProjectError: LocalizedError, Equatable {
 }
 
 public struct ScreenRecordingProject: Codable, Equatable, Identifiable, Sendable {
-    public static let currentVersion = 1
+    public static let currentVersion = 2
     public var version: Int
     public var id: UUID
     public var name: String
@@ -364,11 +368,13 @@ public struct ScreenRecordingProject: Codable, Equatable, Identifiable, Sendable
     public var pointers: [RecordingPointer]
     public var edits: RecordingEdits
     public var captions: [RecordingCaption]
+    public var timeline: RecordingMultitrackTimeline?
 
     public init(id: UUID = UUID(), name: String, createdAt: Date = Date(), videoFile: String,
                 cameraFile: String? = nil, microphoneFile: String? = nil, duration: Double,
                 width: Int, height: Int, pointers: [RecordingPointer] = [],
-                edits: RecordingEdits? = nil, captions: [RecordingCaption] = []) {
+                edits: RecordingEdits? = nil, captions: [RecordingCaption] = [],
+                timeline: RecordingMultitrackTimeline? = nil) {
         version = Self.currentVersion
         self.id = id
         self.name = name
@@ -382,6 +388,7 @@ public struct ScreenRecordingProject: Codable, Equatable, Identifiable, Sendable
         self.pointers = pointers
         self.edits = edits ?? RecordingEdits(segments: [.init(start: 0, end: duration)])
         self.captions = captions
+        self.timeline = timeline
     }
 
     public init(result: ScreenRecordingResult, name: String) {
@@ -390,10 +397,17 @@ public struct ScreenRecordingProject: Codable, Equatable, Identifiable, Sendable
                   width: result.width, height: result.height, pointers: result.pointers)
     }
 
-    public var outputDuration: Double { edits.segments.reduce(0) { $0 + $1.outputDuration } }
+    public var outputDuration: Double { timeline?.duration ?? edits.segments.reduce(0) { $0 + $1.outputDuration } }
+    public var editingDuration: Double { max(duration, outputDuration) }
+    public var mediaFiles: [String] {
+        Array(Set(([videoFile, cameraFile, microphoneFile].compactMap { $0 }
+            + (timeline?.assets.map(\.file) ?? [])).filter { !$0.isEmpty })).sorted()
+    }
 
     public func validate() throws {
-        guard version == Self.currentVersion else { throw ScreenRecordingProjectError.unsupportedVersion }
+        guard (1...Self.currentVersion).contains(version) else { throw ScreenRecordingProjectError.unsupportedVersion }
+        guard timeline == nil || version >= 2 else { throw ScreenRecordingProjectError.invalidProject }
+        let overlayDuration = timeline == nil ? editingDuration : 604_800
         guard duration.isFinite, duration > 0, duration <= 604_800,
               (1...16_384).contains(width), (1...16_384).contains(height),
               !name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
@@ -411,7 +425,7 @@ public struct ScreenRecordingProject: Codable, Equatable, Identifiable, Sendable
                   && $0.duration <= duration && (1...5).contains($0.scale)
                   && (0...1).contains($0.x) && (0...1).contains($0.y) }),
               captions.allSatisfy({ $0.start.isFinite && $0.end.isFinite && $0.start >= 0
-                  && $0.end > $0.start && $0.end <= duration + 0.001 && $0.text.count <= 4_000
+                  && $0.end > $0.start && $0.end <= overlayDuration + 0.001 && $0.text.count <= 4_000
                   && $0.layout?.isNormalized != false && $0.fontSize.map({ (0.01...0.3).contains($0) }) != false }),
               pointers.allSatisfy({ $0.time.isFinite && $0.time >= 0 && $0.time <= duration + 0.1
                   && (0...1).contains($0.x) && (0...1).contains($0.y) }),
@@ -425,13 +439,15 @@ public struct ScreenRecordingProject: Codable, Equatable, Identifiable, Sendable
               edits.annotations.map({ annotations in
                   annotations.count <= RecordingAnnotation.maximumCount
                       && Set(annotations.map(\.id)).count == annotations.count
-                      && annotations.allSatisfy { $0.isValid(duration: duration) }
+                      && annotations.allSatisfy { $0.isValid(duration: overlayDuration) }
               }) != false,
               edits.crop?.isNormalized != false
         else { throw ScreenRecordingProjectError.invalidProject }
-        for path in [videoFile, cameraFile, microphoneFile].compactMap({ $0 }) {
+        if videoFile.isEmpty, timeline == nil { throw ScreenRecordingProjectError.unsafeMediaPath }
+        for path in mediaFiles {
             guard Self.isSafeMediaPath(path) else { throw ScreenRecordingProjectError.unsafeMediaPath }
         }
+        try timeline?.validate(project: self)
     }
 
     public static func isSafeMediaPath(_ path: String) -> Bool {

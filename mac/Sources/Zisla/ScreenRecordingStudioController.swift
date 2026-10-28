@@ -25,10 +25,8 @@ final class ScreenRecordingStudioController: NSWindowController, NSWindowDelegat
         return ScreenRecordingCaptureBarController(model: model, languageStore: languageStore,
             selectRegion: { [weak self] in self?.selectRegion() },
             start: { [weak self] in self?.startCapture() },
-            chooseDirectory: { [weak self] in self?.chooseRecordingDirectory() },
             openStudio: { [weak self] in self?.present() },
-            cancel: { [weak self] in self?.dismissCaptureControls() },
-            displaySaveDirectory: { model.recordingOutputDirectory.path(percentEncoded: false) })
+            cancel: { [weak self] in self?.dismissCaptureControls() })
     }()
 
     init(appModel: AppModel) {
@@ -61,6 +59,9 @@ final class ScreenRecordingStudioController: NSWindowController, NSWindowDelegat
             .sink { [weak self] _ in self?.updateCameraPreviewLayout() }
             .store(in: &subscriptions)
         model.$recordingCameraCornerRadius.dropFirst().receive(on: RunLoop.main)
+            .sink { [weak self] _ in self?.updateCameraPreviewLayout() }
+            .store(in: &subscriptions)
+        model.$recordingCameraBorder.dropFirst().receive(on: RunLoop.main)
             .sink { [weak self] _ in self?.updateCameraPreviewLayout() }
             .store(in: &subscriptions)
         model.$recordingCameraSize.dropFirst().receive(on: RunLoop.main)
@@ -131,11 +132,6 @@ final class ScreenRecordingStudioController: NSWindowController, NSWindowDelegat
         model.start()
     }
 
-    private func chooseRecordingDirectory() {
-        captureBar.hide()
-        model.chooseRecordingOutputDirectory()
-    }
-
     private func updateCameraPreviewLayout() {
         guard captureControlsPresented else { return }
         let configuration = model.configuration
@@ -143,7 +139,8 @@ final class ScreenRecordingStudioController: NSWindowController, NSWindowDelegat
             cameraPreview.present(configuration: .init(cameraSize: model.recordingCameraSize,
                 cameraRound: model.recordingCameraRound,
                 cameraAspectRatio: model.recordingCameraAspectRatio,
-                cameraCornerRadius: model.recordingCameraCornerRadius))
+                cameraCornerRadius: model.recordingCameraCornerRadius,
+                cameraBorder: model.recordingCameraBorder))
         }
         else { cameraPreview.hide() }
     }

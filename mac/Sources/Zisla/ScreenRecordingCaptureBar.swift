@@ -66,11 +66,8 @@ final class ScreenRecordingCaptureBarController {
 
     init(model: ScreenRecordingStudioModel, languageStore: AppLanguageStore,
          selectRegion: @escaping () -> Void, start: @escaping () -> Void,
-         chooseDirectory: @escaping () -> Void, openStudio: @escaping () -> Void,
-         cancel: @escaping () -> Void,
-         displaySaveDirectory: @escaping () -> String = {
-             FileManager.default.urls(for: .downloadsDirectory, in: .userDomainMask).first?.path ?? ""
-         }, presentPanel: @escaping @MainActor (NSPanel) -> Void = { $0.makeKeyAndOrderFront(nil) }) {
+         openStudio: @escaping () -> Void, cancel: @escaping () -> Void,
+         presentPanel: @escaping @MainActor (NSPanel) -> Void = { $0.makeKeyAndOrderFront(nil) }) {
         self.model = model
         self.presentPanel = presentPanel
         panel = ScreenRecordingCapturePanel(contentRect: .zero,
@@ -79,8 +76,7 @@ final class ScreenRecordingCaptureBarController {
             styleMask: [.borderless, .nonactivatingPanel], backing: .buffered, defer: false)
         hostingView = NSHostingView(rootView: ScreenRecordingCaptureBar(model: model,
             languageStore: languageStore, selectRegion: selectRegion, start: start,
-            chooseDirectory: chooseDirectory, openStudio: openStudio, cancel: cancel,
-            displaySaveDirectory: displaySaveDirectory))
+            openStudio: openStudio, cancel: cancel))
         panel.isReleasedWhenClosed = false
         panel.isOpaque = false
         panel.backgroundColor = .clear
@@ -197,10 +193,8 @@ struct ScreenRecordingCaptureBar: View {
     @ObservedObject var languageStore: AppLanguageStore
     let selectRegion: () -> Void
     let start: () -> Void
-    let chooseDirectory: () -> Void
     let openStudio: () -> Void
     let cancel: () -> Void
-    let displaySaveDirectory: () -> String
     @State private var showsCameraCornerRadius = false
 
     var body: some View {
@@ -401,7 +395,11 @@ struct ScreenRecordingCaptureBar: View {
     }
 
     private var recordingCameraOptionsMenu: some View {
-        Menu { cameraAspectRatioPicker } label: {
+        Menu {
+            cameraAspectRatioPicker
+            Toggle(AppLocalization.text("摄像头边框"), isOn: $model.recordingCameraBorder)
+                .accessibilityIdentifier("screenRecording.cameraBorder")
+        } label: {
             Image(systemName: "ellipsis.circle").font(.system(size: 14))
                 .frame(width: 28, height: ScreenshotToolbarLayout.controlHeight)
         }
@@ -422,20 +420,17 @@ struct ScreenRecordingCaptureBar: View {
                 ForEach(model.capture.cameras) { device in Text(device.name).tag(Optional(device.id)) }
             }
             cameraAspectRatioPicker
+            Toggle(AppLocalization.text("摄像头边框"), isOn: $model.recordingCameraBorder)
+                .accessibilityIdentifier("screenRecording.cameraBorder")
             Picker(AppLocalization.text("帧率"), selection: $model.configuration.frameRate) {
                 ForEach([30, 60], id: \.self) { rate in Text("\(rate) FPS").tag(rate) }
             }
             Divider()
             Button(AppLocalization.text("刷新来源")) { Task { await model.loadSources() } }
                 .accessibilityIdentifier("screenRecording.refreshCaptureSources")
-            Button(AppLocalization.text("更改保存位置"), action: chooseDirectory)
-                .help(AppLocalization.text("保存位置") + ": " + displaySaveDirectory())
-                .accessibilityValue(displaySaveDirectory())
-                .accessibilityIdentifier("screenRecording.captureSaveDirectory")
             Button(AppLocalization.text("录屏工作室"), action: openStudio)
                 .accessibilityIdentifier("screenRecording.openStudio")
             Button(AppLocalization.text("打开录屏项目")) { openStudio(); model.openProject() }
-            Button(AppLocalization.text("导入视频")) { openStudio(); model.importVideo() }
         } label: {
             Image(systemName: "ellipsis.circle").font(.system(size: 14))
                 .frame(width: 28, height: ScreenshotToolbarLayout.controlHeight)

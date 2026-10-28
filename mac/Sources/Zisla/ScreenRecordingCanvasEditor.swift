@@ -32,8 +32,10 @@ struct ScreenRecordingCanvasEditor: NSViewRepresentable {
             model.update { replacement.write(to: &$0, replacing: original) }
         }
         view.onRenderingFailure = model.reportCanvasRenderingFailure
-        view.configure(project: model.project, sourceTime: model.currentTime, baseImage: model.canvasPreview,
-                       selection: selection, editable: model.canEdit && !model.isShowingSourcePlayback && !model.isShowingTimelinePlayback)
+        let time = model.project?.timeline == nil ? model.currentTime : model.playbackTime
+        view.configure(project: model.project, sourceTime: time, baseImage: model.canvasPreview,
+                       selection: selection, editable: model.canEdit && !model.isShowingSourcePlayback && !model.isShowingTimelinePlayback,
+                       multitrackScene: model.multitrackPreviewScene)
     }
 
     static func dismantleNSView(_ view: RecordingCanvasEditorView, coordinator: ()) { view.cancelEditing() }
@@ -46,6 +48,7 @@ final class RecordingCanvasEditorView: NSView, NSTextViewDelegate {
     private var project: ScreenRecordingProject?
     private var sourceTime = 0.0
     private var baseImage: CGImage?
+    private var multitrackScene: RecordingMultitrackPreviewScene?
     private var selection: RecordingCanvasSelection?
     private var editable = false
     private let imageContext = CIContext(options: [.cacheIntermediates: false,
@@ -64,7 +67,9 @@ final class RecordingCanvasEditorView: NSView, NSTextViewDelegate {
     var canvasRect: CGRect { RecordingCanvasGeometry.fittedRect(canvas: canvasSize, in: bounds) }
 
     func configure(project: ScreenRecordingProject?, sourceTime: Double, baseImage: CGImage?,
-                   selection: RecordingCanvasSelection?, editable: Bool) {
+                   selection: RecordingCanvasSelection?, editable: Bool,
+                   multitrackScene: RecordingMultitrackPreviewScene? = nil) {
+        let editable = editable && (project?.timeline == nil || multitrackScene?.time == sourceTime)
         let originalStillPresent = original.map { original in
             project.map { RecordingCanvasElement.visible(in: $0, at: sourceTime).contains(original) } ?? false
         } ?? true
@@ -75,6 +80,7 @@ final class RecordingCanvasEditorView: NSView, NSTextViewDelegate {
         self.project = project
         self.sourceTime = sourceTime
         self.baseImage = baseImage
+        self.multitrackScene = multitrackScene
         self.selection = selection
         self.editable = editable
         setAccessibilityIdentifier("screenRecording.canvas")
@@ -240,6 +246,7 @@ final class RecordingCanvasEditorView: NSView, NSTextViewDelegate {
             let layout = RecordingExportRenderer.captionLayout(value, canvas: CGRect(origin: .zero, size: canvasSize))
             box = box.insetBy(dx: layout.padding, dy: layout.padding)
             color = .white
+        case .image: return
         }
         textEditor.frame = viewRect(box)
         let fontSize = RecordingCanvasGeometry.fontSize(of: element, canvas: canvasSize)
@@ -284,9 +291,20 @@ final class RecordingCanvasEditorView: NSView, NSTextViewDelegate {
         guard var project, let baseImage else { renderedImage = nil; needsDisplay = true; return }
         if let original, let draft { draft.write(to: &project, replacing: original) }
         do {
-            renderedImage = try RecordingExportRenderer.composedPreview(base: baseImage, project: project,
-                sourceTime: sourceTime, context: imageContext, editingText: textEditor == nil ? nil : selection)
+            let editingText = textEditor == nil ? nil : selection
+            if project.timeline != nil {
+                guard let multitrackScene, multitrackScene.time == sourceTime else {
+                    renderedImage = nil
+                    needsDisplay = true
+                    return
+                }
+                renderedImage = try multitrackScene.image(project: project, editingText: editingText)
+            } else {
+                renderedImage = try RecordingExportRenderer.composedPreview(base: baseImage, project: project,
+                    sourceTime: sourceTime, context: imageContext, editingText: editingText)
+            }
         } catch {
+            renderedImage = nil
             onRenderingFailure(error)
         }
         positionTextEditor()

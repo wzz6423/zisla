@@ -96,6 +96,6 @@ public struct ScreenRecordingProjectStore: Sendable {
     }
 
     private func mediaNames(_ project: ScreenRecordingProject) -> [String] {
-        Array(Set([project.videoFile, project.cameraFile, project.microphoneFile].compactMap { $0 })).sorted()
+        project.mediaFiles
     }
 }

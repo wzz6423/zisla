@@ -535,6 +535,7 @@ final class AppModel: ObservableObject {
   /// recording-start cleanup can reorder windows.
   var onVoiceInputWillStart: (() -> Void)?
   var onScreenRecordingRequested: (() -> Void)?
+  var screenRecordingSettingsModel: (() -> ScreenRecordingStudioModel?)?
 
   /// Model discovery state: used by the settings page to show connection test results and the available model list.
   @Published var voiceModelDiscoveryState: VoiceModelDiscoveryState = .idle

@@ -5,16 +5,19 @@ import ZislaCore
 enum RecordingCanvasSelection: Equatable {
     case annotation(UUID)
     case caption(UUID)
+    case image(String)
 }
 
 enum RecordingCanvasElement: Equatable {
     case annotation(RecordingAnnotation)
     case caption(RecordingCaption)
+    case image(RecordingTimelineClip)
 
     var selection: RecordingCanvasSelection {
         switch self {
         case let .annotation(value): .annotation(value.id)
         case let .caption(value): .caption(value.id)
+        case let .image(value): .image(value.id)
         }
     }
 
@@ -22,6 +25,7 @@ enum RecordingCanvasElement: Equatable {
         switch self {
         case let .annotation(value): value.kind == .text ? value.text : nil
         case let .caption(value): value.text
+        case .image: nil
         }
     }
 
@@ -29,18 +33,25 @@ enum RecordingCanvasElement: Equatable {
         switch self {
         case var .annotation(value): value.text = text; return .annotation(value)
         case var .caption(value): value.text = text; return .caption(value)
+        case .image: return self
         }
     }
 
     func bounds(canvas: CGSize) -> CGRect {
         switch self {
         case let .annotation(value):
+            if value.kind == .text, canvas.width > 0, canvas.height > 0 {
+                return RecordingAnnotationTextLayout(value, canvas: canvas).bounds
+            }
             let bounds = value.bounds
             return CGRect(x: bounds.x * canvas.width, y: bounds.y * canvas.height,
                           width: bounds.width * canvas.width, height: bounds.height * canvas.height)
         case let .caption(value):
             let box = RecordingExportRenderer.captionLayout(value, canvas: CGRect(origin: .zero, size: canvas)).box
             return CGRect(x: box.minX, y: canvas.height - box.maxY, width: box.width, height: box.height)
+        case let .image(value):
+            return CGRect(x: value.layout.x * canvas.width, y: value.layout.y * canvas.height,
+                          width: value.layout.width * canvas.width, height: value.layout.height * canvas.height)
         }
     }
 
@@ -54,11 +65,28 @@ enum RecordingCanvasElement: Equatable {
             if let index = project.captions.firstIndex(of: old), old.id == value.id {
                 project.captions[index] = value
             }
+        case let (.image(old), .image(value)):
+            if let index = project.timeline?.clips.firstIndex(of: old), old.id == value.id {
+                project.timeline?.clips[index] = value
+            }
         default: break
         }
     }
 
     static func visible(in project: ScreenRecordingProject, at time: Double) -> [Self] {
+        if let timeline = project.timeline {
+            return timeline.visibleClips(at: time).compactMap { clip in
+                switch clip.content {
+                case .image: return .image(clip)
+                case let .annotation(id):
+                    return project.edits.annotations?.first(where: { $0.id == id }).map(Self.annotation)
+                case let .caption(id):
+                    return project.edits.showCaptions
+                        ? project.captions.first(where: { $0.id == id && !$0.text.isEmpty }).map(Self.caption) : nil
+                case .recording, .video, .audio: return nil
+                }
+            }
+        }
         var elements = (project.edits.annotations ?? []).filter { $0.isVisible(at: time) }.map(Self.annotation)
         if project.edits.showCaptions,
            let caption = project.captions.first(where: { time >= $0.start && time < $0.end }), !caption.text.isEmpty {
@@ -106,7 +134,7 @@ enum RecordingCanvasGeometry {
     static func transformed(_ element: RecordingCanvasElement, by translation: CGSize,
                             handle: RecordingCanvasHandle?, canvas: CGSize) -> RecordingCanvasElement {
         guard translation.width.isFinite, translation.height.isFinite,
-              canvas.width > 0, canvas.height > 0 else { return element }
+              canvas.width.isFinite, canvas.height.isFinite, canvas.width > 0, canvas.height > 0 else { return element }
         let old = element.bounds(canvas: canvas)
         if case var .annotation(value) = element, value.kind == .arrow, let handle {
             let x = handle == .start ? value.x : value.endX
@@ -129,11 +157,15 @@ enum RecordingCanvasGeometry {
             let limitWidth = left ? anchor.x : canvas.width - anchor.x
             let limitHeight = top ? anchor.y : canvas.height - anchor.y
             let newSize: CGSize
+            let requested = (width * old.width + height * old.height) / (old.width * old.width + old.height * old.height)
             if element.text != nil {
-                let requested = (width * old.width + height * old.height) / (old.width * old.width + old.height * old.height)
                 let font = fontSize(of: element, canvas: canvas)
                 scale = min(max(requested, max(0.01 / font, 4 / min(old.width, old.height))),
                             min(0.3 / font, min(limitWidth / old.width, limitHeight / old.height)))
+                newSize = CGSize(width: old.width * scale, height: old.height * scale)
+            } else if case .image = element {
+                scale = min(max(requested, 4 / min(old.width, old.height)),
+                            min(limitWidth / old.width, limitHeight / old.height))
                 newSize = CGSize(width: old.width * scale, height: old.height * scale)
             } else {
                 newSize = CGSize(width: min(width, limitWidth), height: min(height, limitHeight))
@@ -148,8 +180,10 @@ enum RecordingCanvasGeometry {
         switch element {
         case var .annotation(value):
             let reversedX = value.x > value.endX, reversedY = value.y > value.endY
-            value.x = (reversedX ? rect.maxX : rect.minX) / canvas.width
-            value.endX = (reversedX ? rect.minX : rect.maxX) / canvas.width
+            let right = value.kind == .text
+                ? min(canvas.width, rect.minX + max(rect.width, value.bounds.width * canvas.width * scale)) : rect.maxX
+            value.x = (reversedX ? right : rect.minX) / canvas.width
+            value.endX = (reversedX ? rect.minX : right) / canvas.width
             value.y = (reversedY ? rect.maxY : rect.minY) / canvas.height
             value.endY = (reversedY ? rect.minY : rect.maxY) / canvas.height
             if handle != nil, value.kind == .text { value.fontSize = min(0.3, max(0.01, value.fontSize * scale)) }
@@ -159,6 +193,10 @@ enum RecordingCanvasGeometry {
                                          width: rect.width / canvas.width, height: rect.height / canvas.height)
             if handle != nil { value.fontSize = min(0.3, max(0.01, fontSize(of: element, canvas: canvas) * scale)) }
             return .caption(value)
+        case var .image(value):
+            value.layout = RecordingRect(x: rect.minX / canvas.width, y: rect.minY / canvas.height,
+                                         width: rect.width / canvas.width, height: rect.height / canvas.height)
+            return .image(value)
         }
     }
 
@@ -166,6 +204,7 @@ enum RecordingCanvasGeometry {
         switch element {
         case let .annotation(value): value.fontSize
         case let .caption(value): value.fontSize ?? max(12 / min(canvas.width, canvas.height), 0.035)
+        case .image: 0
         }
     }
 }

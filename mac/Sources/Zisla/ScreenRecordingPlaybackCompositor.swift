@@ -70,3 +70,59 @@ final class RecordingPlaybackCompositor: NSObject, AVVideoCompositing, @unchecke
         }
     }
 }
+
+final class RecordingMultitrackPlaybackInstruction: NSObject, AVVideoCompositionInstructionProtocol, @unchecked Sendable {
+    let timeRange: CMTimeRange
+    let enablePostProcessing = false
+    let containsTweening = true
+    let passthroughTrackID = kCMPersistentTrackID_Invalid
+    let requiredSourceTrackIDs: [NSValue]?
+    let media: RecordingMultitrackMedia
+    let renderer: RecordingMultitrackRenderer
+
+    init(project: ScreenRecordingProject, directory: URL, media: RecordingMultitrackMedia, size: CGSize) throws {
+        self.media = media
+        timeRange = CMTimeRange(start: .zero, duration: CMTime(seconds: media.duration, preferredTimescale: 60_000))
+        requiredSourceTrackIDs = (media.videoTracks.map(\.trackID) + [media.playbackClockTrackID].compactMap { $0 })
+            .map { NSNumber(value: $0) }
+        renderer = try RecordingMultitrackRenderer(project: project, directory: directory, size: size)
+    }
+}
+
+final class RecordingMultitrackPlaybackCompositor: NSObject, AVVideoCompositing, @unchecked Sendable {
+    var sourcePixelBufferAttributes: [String: any Sendable]? {
+        [kCVPixelBufferPixelFormatTypeKey as String: kCVPixelFormatType_32BGRA]
+    }
+
+    var requiredPixelBufferAttributesForRenderContext: [String: any Sendable] {
+        [kCVPixelBufferPixelFormatTypeKey as String: kCVPixelFormatType_32BGRA,
+         kCVPixelBufferIOSurfacePropertiesKey as String: [String: Int]()]
+    }
+
+    func renderContextChanged(_ newRenderContext: AVVideoCompositionRenderContext) {}
+
+    func startRequest(_ request: AVAsynchronousVideoCompositionRequest) {
+        autoreleasepool {
+            do {
+                guard let instruction = request.videoCompositionInstruction as? RecordingMultitrackPlaybackInstruction,
+                      let output = request.renderContext.newPixelBuffer() else { throw ScreenRecordingExportError.cannotRender }
+                let time = request.compositionTime
+                var frames: [String: CIImage] = [:]
+                for clip in instruction.renderer.index.clips(at: time.seconds) where clip.content.trackKind == .video {
+                    for key in [clip.id, clip.id + ".camera"] {
+                        if let layer = instruction.media.layers[key],
+                           (key == clip.id || layer.range.containsTime(time)),
+                           let frame = request.sourceFrame(byTrackID: layer.trackID) {
+                            frames[key] = RecordingExportRenderer.normalized(CIImage(cvPixelBuffer: frame).transformed(by: layer.transform))
+                        }
+                    }
+                }
+                let renderer = instruction.renderer
+                let image = try renderer.render(frames: frames, at: time.seconds)
+                renderer.context.render(image, to: output, bounds: renderer.canvas,
+                    colorSpace: CGColorSpace(name: CGColorSpace.sRGB))
+                request.finish(withComposedVideoFrame: output)
+            } catch { request.finish(with: error) }
+        }
+    }
+}

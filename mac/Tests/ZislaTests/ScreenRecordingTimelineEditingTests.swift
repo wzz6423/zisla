@@ -245,6 +245,39 @@ struct ScreenRecordingTimelineEditingTests {
         #expect(NSScreen.screens.allSatisfy { !$0.frame.intersects(window.frame) })
     }
 
+    @Test
+    func timelineInstallsPinchOnItsScrollViewAndKeepsTheProjectAndPlayheadUnchanged() async throws {
+        let (model, root, original) = try fixture(segments)
+        defer { model.shutdown(); try? FileManager.default.removeItem(at: root) }
+        model.seekTimeline(to: 3)
+        let time = model.currentTime
+        let host = NSHostingView(rootView: ScreenRecordingTimelineStrip(model: model,
+            selectedID: .constant(nil)).frame(width: 700))
+        host.sizingOptions = []
+        let window = NSPanel(contentRect: .init(x: -100_000, y: -100_000, width: 700, height: 150),
+            styleMask: [.borderless, .nonactivatingPanel], backing: .buffered, defer: false)
+        window.isReleasedWhenClosed = false
+        window.contentView = host
+        defer { window.contentView = nil; window.close() }
+        window.orderFrontRegardless()
+        await settle(host)
+        func find(_ view: NSView) -> ScreenRecordingTimelineMagnificationView? {
+            if let magnification = view as? ScreenRecordingTimelineMagnificationView { return magnification }
+            return view.subviews.lazy.compactMap { find($0) }.first
+        }
+        let magnification = try #require(find(host))
+        let scroll = try #require(magnification.magnificationRecognizer.view as? NSScrollView)
+        let document = try #require(scroll.documentView)
+        let originalWidth = document.frame.width
+        magnification.magnify(by: 1, phase: .began, location: 208)
+        await settle(host)
+        #expect(abs(document.frame.width - ((originalWidth - 16) * 2 + 16)) < 1)
+        #expect(abs(scroll.contentView.bounds.minX - 200) < 1)
+        magnification.magnify(by: 1, phase: .ended, location: 408)
+        #expect(model.project == original && !model.canUndo && !model.isDirty)
+        #expect(model.playbackTime == 3 && model.currentTime == time)
+    }
+
     private func fixture(_ segments: [RecordingSegment]) throws -> (ScreenRecordingStudioModel, URL, ScreenRecordingProject) {
         let root = FileManager.default.temporaryDirectory.appendingPathComponent("zisla-timeline-edit-\(UUID())", isDirectory: true)
         try FileManager.default.createDirectory(at: root, withIntermediateDirectories: false)
