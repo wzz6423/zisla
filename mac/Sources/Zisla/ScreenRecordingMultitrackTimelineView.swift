@@ -7,27 +7,70 @@ struct RecordingMultitrackClipDrag {
     let mode: Mode
     let pointsPerSecond: CGFloat
     var translation: CGSize = .zero
+    var isCancelled = false
 
-    func replacement(sourceDuration: Double?, tracks: [RecordingTimelineTrack], rowHeight: CGFloat) -> RecordingTimelineClip? {
-        guard pointsPerSecond.isFinite, pointsPerSecond > 0,
+    func snappingPoints(in timeline: RecordingMultitrackTimeline, playhead: Double) -> [Double] {
+        [0, playhead] + timeline.clips.filter { $0.id != original.id }.flatMap { [$0.start, $0.end] }
+    }
+
+    func alignedSnapPoint(for clip: RecordingTimelineClip, points: [Double]) -> Double? {
+        guard translation.width != 0 else { return nil }
+        return points.first { time in
+            switch mode {
+            case .move: abs(time - clip.start) < 0.000_001 || abs(time - clip.end) < 0.000_001
+            case .trimStart: abs(time - clip.start) < 0.000_001
+            case .trimEnd: abs(time - clip.end) < 0.000_001
+            }
+        }
+    }
+
+    func replacement(sourceDuration: Double?, tracks: [RecordingTimelineTrack], rowHeight: CGFloat,
+                     snappingPoints: [Double] = []) -> RecordingTimelineClip? {
+        guard !isCancelled, pointsPerSecond.isFinite, pointsPerSecond > 0,
               translation.width.isFinite, translation.height.isFinite else { return nil }
         let delta = translation.width / pointsPerSecond
         var clip = original
         let minimum = min(0.001, original.sourceEnd - original.sourceStart)
+        let earliest = max(0, original.sourceStart - original.start * original.speed)
+        let latest = sourceDuration ?? (original.sourceStart + (604_800 - original.start) * original.speed)
         switch mode {
         case .move:
+            guard rowHeight.isFinite, rowHeight > 0, let row = tracks.firstIndex(where: { $0.id == original.trackID }) else { return nil }
             clip.start = max(0, original.start + delta)
-            let row = tracks.firstIndex(where: { $0.id == original.trackID })!
-            let destination = min(tracks.count - 1, max(0, row + Int((translation.height / rowHeight).rounded())))
+            let destination = Int(min(CGFloat(tracks.count - 1), max(0, CGFloat(row) + (translation.height / rowHeight).rounded())))
             clip.trackID = tracks[destination].id
         case .trimStart:
-            let earliest = max(0, original.sourceStart - original.start * original.speed)
             clip.sourceStart = min(original.sourceEnd - minimum, max(earliest, original.sourceStart + delta * original.speed))
             clip.start = original.start + (clip.sourceStart - original.sourceStart) / original.speed
         case .trimEnd:
-            let latest = sourceDuration ?? (original.sourceStart + (604_800 - original.start) * original.speed)
             clip.sourceEnd = min(latest, max(original.sourceStart + minimum, original.sourceEnd + delta * original.speed))
         }
+        guard translation.width != 0 else { return clip }
+        let tolerance = 8 / pointsPerSecond
+        let edges = mode == .move ? [clip.start, clip.end] : [mode == .trimStart ? clip.start : clip.end]
+        var closest: (distance: Double, clip: RecordingTimelineClip)?
+        for time in snappingPoints {
+            for edge in edges {
+                let offset = time - edge
+                let distance = abs(offset)
+                guard distance <= tolerance, closest.map({ distance < $0.distance }) ?? true else { continue }
+                var snapped = clip
+                switch mode {
+                case .move:
+                    snapped.start += offset
+                    guard snapped.start >= 0 else { continue }
+                case .trimStart:
+                    snapped.sourceStart = original.sourceStart + (time - original.start) * original.speed
+                    guard snapped.sourceStart >= earliest, snapped.sourceStart <= original.sourceEnd - minimum else { continue }
+                    snapped.start = time
+                case .trimEnd:
+                    snapped.sourceEnd = original.sourceStart + (time - original.start) * original.speed
+                    guard snapped.sourceEnd <= latest, snapped.sourceEnd >= original.sourceStart + minimum else { continue }
+                }
+                closest = (distance, snapped)
+            }
+        }
+        if let closest { clip = closest.clip }
         return clip
     }
 }
@@ -35,9 +78,9 @@ struct RecordingMultitrackClipDrag {
 struct ScreenRecordingMultitrackTimelineView: View {
     @ObservedObject var model: ScreenRecordingStudioModel
     @Environment(\.isEnabled) private var isEnabled
-    @Environment(\.recordingCanvasSelection) private var canvasSelection
     @State private var zoom = 1.0
     @State private var drag: RecordingMultitrackClipDrag?
+    @FocusState private var isTimelineFocused: Bool
     private let rowHeight: CGFloat = 44
     private let rulerHeight: CGFloat = 24
     private let headerWidth: CGFloat = 154
@@ -62,7 +105,7 @@ struct ScreenRecordingMultitrackTimelineView: View {
                                     lanes(timeline, geometry: geometry)
                                         .padding(.horizontal, 8)
                                         .background(ScreenRecordingTimelineMagnification(zoom: $zoom,
-                                            isEnabled: isEnabled && model.canEdit, onBegan: { drag = nil }))
+                                            isEnabled: isEnabled && model.canEdit, onBegan: { drag?.isCancelled = true }))
                                 }
                             }
                         }
@@ -72,10 +115,12 @@ struct ScreenRecordingMultitrackTimelineView: View {
                 .frame(height: min(224, rulerHeight + CGFloat(max(1, timeline.tracks.count)) * rowHeight + 12))
             }
             .disabled(!model.canEdit)
+            .focusable()
+            .focused($isTimelineFocused)
             .environment(\.layoutDirection, .leftToRight)
-            .onChange(of: model.project) { _, _ in drag = nil }
-            .onChange(of: isEnabled) { _, enabled in if !enabled { drag = nil } }
-            .onExitCommand { drag = nil }
+            .onChange(of: model.project) { _, _ in drag?.isCancelled = true }
+            .onChange(of: isEnabled) { _, enabled in if !enabled { drag?.isCancelled = true } }
+            .onExitCommand { drag?.isCancelled = true }
             .accessibilityIdentifier("screenRecording.multitrackTimeline")
         }
     }
@@ -83,26 +128,18 @@ struct ScreenRecordingMultitrackTimelineView: View {
     private var toolbar: some View {
         HStack(spacing: 10) {
             Text(AppLocalization.text("时间线")).font(.caption.bold())
-            Button { model.addTimelineTrack() } label: { Image(systemName: "rectangle.stack.badge.plus") }
+            Button {
+                isTimelineFocused = true
+                model.addTimelineTrack()
+            } label: { Image(systemName: "plus.square.on.square") }
             .help(AppLocalization.text("添加轨道"))
             .accessibilityLabel(AppLocalization.text("添加轨道"))
             .accessibilityIdentifier("screenRecording.multitrackAddTrack")
-            Button {
-                if let id = model.addTimelineText() { canvasSelection.wrappedValue = .annotation(id) }
-            } label: { Image(systemName: "text.badge.plus") }
-            .help(AppLocalization.text("文字标注"))
-            .accessibilityLabel(AppLocalization.text("文字标注"))
-            .accessibilityIdentifier("screenRecording.multitrackAddText")
             Button { if let id = model.selectedTimelineClipID { split(id) } } label: { Image(systemName: "scissors") }
                 .help(AppLocalization.text("在播放头处分割"))
                 .accessibilityLabel(AppLocalization.text("在播放头处分割"))
                 .accessibilityIdentifier("screenRecording.multitrackSplit")
                 .disabled(!canSplit(model.selectedTimelineClip))
-            Button { if let id = model.selectedTimelineClipID { duplicate(id) } } label: { Image(systemName: "plus.square.on.square") }
-                .help(AppLocalization.text("复制片段"))
-                .accessibilityLabel(AppLocalization.text("复制片段"))
-                .accessibilityIdentifier("screenRecording.multitrackDuplicate")
-                .disabled(model.selectedTimelineClip == nil)
             Button(role: .destructive) { if let id = model.selectedTimelineClipID { model.deleteTimelineClip(id) } } label: {
                 Image(systemName: "trash")
             }
@@ -147,6 +184,8 @@ struct ScreenRecordingMultitrackTimelineView: View {
             .accessibilityLabel(AppLocalization.text("添加轨道"))
         }
         .buttonStyle(.plain).font(.system(size: 10)).padding(.trailing, 8)
+        .background(model.selectedTimelineTrackID == track.id ? Color.accentColor.opacity(0.1) : .clear)
+        .onTapGesture { isTimelineFocused = true; model.selectTimelineTrack(track.id) }
         .opacity(track.isHidden ? 0.55 : 1)
     }
 
@@ -166,7 +205,11 @@ struct ScreenRecordingMultitrackTimelineView: View {
                 ZStack(alignment: .topLeading) {
                     Rectangle().fill(Color.secondary.opacity(0.07))
                         .contentShape(Rectangle())
-                        .onTapGesture { location in model.seekTimeline(to: location.x / geometry.pointsPerSecond) }
+                        .onTapGesture { location in
+                            isTimelineFocused = true
+                            model.selectTimelineTrack(track.id)
+                            model.seekTimeline(to: location.x / geometry.pointsPerSecond)
+                        }
                     ForEach(grouped[track.id] ?? []) { clip in
                         clipView(clip, timeline: timeline, geometry: geometry)
                     }
@@ -176,12 +219,22 @@ struct ScreenRecordingMultitrackTimelineView: View {
                 .dropDestination(for: String.self) { ids, location in
                     addAssets(ids, at: location.x / geometry.pointsPerSecond, trackID: track.id)
                 }
+                .contextMenu {
+                    Button(AppLocalization.text("粘贴")) { model.pasteTimelineClip(trackID: track.id) }
+                        .disabled(!model.canPasteTimelineClip)
+                }
             }
         }
         .frame(width: geometry.width)
         .overlay(alignment: .topLeading) {
             Rectangle().fill(.red).frame(width: 2)
                 .offset(x: model.playbackTime * geometry.pointsPerSecond).allowsHitTesting(false)
+            if let drag, let changed = replacement(for: drag, timeline: timeline),
+               let time = drag.alignedSnapPoint(for: changed,
+                   points: drag.snappingPoints(in: timeline, playhead: model.playbackTime)) {
+                Rectangle().fill(Color.accentColor).frame(width: 1)
+                    .offset(x: time * geometry.pointsPerSecond).allowsHitTesting(false)
+            }
         }
         .coordinateSpace(name: "screenRecording.multitrackCoordinates")
     }
@@ -199,7 +252,10 @@ struct ScreenRecordingMultitrackTimelineView: View {
             }
         }
         .frame(height: rulerHeight).contentShape(Rectangle())
-        .onTapGesture { location in model.seekTimeline(to: location.x / geometry.pointsPerSecond) }
+        .onTapGesture { location in
+            isTimelineFocused = true
+            model.seekTimeline(to: location.x / geometry.pointsPerSecond)
+        }
         .accessibilityHidden(true)
     }
 
@@ -236,7 +292,9 @@ struct ScreenRecordingMultitrackTimelineView: View {
             .zIndex(drag?.original.id == clip.id ? 1 : 0)
             .contextMenu {
                 Button(AppLocalization.text("在播放头处分割")) { split(clip.id) }.disabled(!canSplit(clip))
-                Button(AppLocalization.text("复制片段")) { duplicate(clip.id) }
+                Button(AppLocalization.text("复制")) { model.copyTimelineClip(clip.id) }
+                Button(AppLocalization.text("粘贴")) { model.pasteTimelineClip(trackID: clip.trackID) }
+                    .disabled(!model.canPasteTimelineClip)
                 if clip.content.trackKind == .video {
                     Button(AppLocalization.text("分离音频")) { model.detachTimelineAudio(clip.id) }
                         .disabled(!clip.audioEnabled)
@@ -247,7 +305,7 @@ struct ScreenRecordingMultitrackTimelineView: View {
             .accessibilityElement(children: .ignore)
             .accessibilityLabel(model.timelineClipTitle(clip))
             .accessibilityAddTraits(selected ? [.isButton, .isSelected] : .isButton)
-            .accessibilityAction { model.selectTimelineClip(clip.id) }
+            .accessibilityAction { isTimelineFocused = true; model.selectTimelineClip(clip.id) }
             .accessibilityIdentifier("screenRecording.multitrackClip." + clip.id)
     }
 
@@ -255,9 +313,10 @@ struct ScreenRecordingMultitrackTimelineView: View {
                             timeline: RecordingMultitrackTimeline, geometry: ScreenRecordingTimelineStripGeometry) -> some View {
         RoundedRectangle(cornerRadius: 3).fill(Color.accentColor)
             .overlay(Image(systemName: "line.3.vertical").font(.system(size: 8)).foregroundStyle(.white))
-            .frame(width: 9).contentShape(Rectangle())
+            .frame(width: 12, height: rowHeight - 6).contentShape(Rectangle())
             .highPriorityGesture(dragGesture(clip, mode: mode, timeline: timeline, geometry: geometry))
             .accessibilityLabel(AppLocalization.text(mode == .trimStart ? "起点（秒）" : "终点（秒）"))
+            .accessibilityIdentifier("screenRecording.trim." + (mode == .trimStart ? "start." : "end.") + clip.id)
     }
 
     private func dragGesture(_ clip: RecordingTimelineClip, mode: RecordingMultitrackClipDrag.Mode,
@@ -265,7 +324,9 @@ struct ScreenRecordingMultitrackTimelineView: View {
         DragGesture(minimumDistance: mode == .move ? 3 : 0, coordinateSpace: .named("screenRecording.multitrackCoordinates"))
             .onChanged { event in
                 if drag == nil {
+                    isTimelineFocused = true
                     model.selectedTimelineClipID = clip.id
+                    model.selectedTimelineTrackID = clip.trackID
                     drag = .init(original: clip, mode: mode, pointsPerSecond: geometry.pointsPerSecond)
                 }
                 drag?.translation = event.translation
@@ -284,7 +345,8 @@ struct ScreenRecordingMultitrackTimelineView: View {
     private func replacement(for drag: RecordingMultitrackClipDrag, timeline: RecordingMultitrackTimeline) -> RecordingTimelineClip? {
         let media = timeline.assets.first { $0.id == drag.original.content.assetID }
         let duration = media?.kind == .image ? nil : media?.duration
-        return drag.replacement(sourceDuration: duration, tracks: Array(timeline.tracks.reversed()), rowHeight: rowHeight)
+        return drag.replacement(sourceDuration: duration, tracks: Array(timeline.tracks.reversed()), rowHeight: rowHeight,
+            snappingPoints: drag.snappingPoints(in: timeline, playhead: model.playbackTime))
     }
 
     private func canSplit(_ clip: RecordingTimelineClip?) -> Bool {
@@ -294,10 +356,6 @@ struct ScreenRecordingMultitrackTimelineView: View {
 
     private func split(_ id: String) {
         if let tail = model.splitTimelineClip(id, at: model.playbackTime) { model.selectTimelineClip(tail) }
-    }
-
-    private func duplicate(_ id: String) {
-        if let copy = model.duplicateTimelineClip(id) { model.selectTimelineClip(copy) }
     }
 
     private func addAssets(_ ids: [String], at time: Double, trackID: String?) -> Bool {

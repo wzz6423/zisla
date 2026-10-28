@@ -1,4 +1,5 @@
 import AppKit
+import AVFoundation
 import SwiftUI
 import Testing
 import ZislaCore
@@ -64,7 +65,10 @@ struct ScreenRecordingMultitrackUITests {
         try press(try #require(element("screenRecording.multitrackAddTrack", in: host)))
         await settle(host)
         #expect(model.timeline?.tracks.count == 3 && Set(model.timeline?.tracks.map(\.id) ?? []).count == 3)
-        #expect(element("screenRecording.clipStart", in: host) != nil && labelled("导出设置", in: host) == nil)
+        #expect(model.selectedTimelineClipID == nil && model.selectedTimelineTrackID == model.timeline?.tracks.last?.id)
+        #expect(element("screenRecording.clipStart", in: host) == nil && labelled("导出设置", in: host) == nil)
+        #expect(element("screenRecording.multitrackAddText", in: host) == nil)
+        #expect(element("screenRecording.multitrackDuplicate", in: host) == nil && labelled("播放原始素材", in: host) == nil)
         #expect(labelled("视频轨道", in: host) == nil && labelled("图片轨道", in: host) == nil
             && labelled("文字轨道", in: host) == nil && labelled("音频轨道", in: host) == nil)
         try press(try #require(element("screenRecording.undo", in: host)))
@@ -158,7 +162,10 @@ struct ScreenRecordingMultitrackUITests {
         await settle(host)
         let tail = try #require(model.selectedTimelineClip)
         #expect(tail.id != addedID && tail.sourceStart == 1 && tail.start == 1 && model.timeline?.clips.count == 3)
-        try press(try #require(element("screenRecording.multitrackDuplicate", in: host)))
+        #expect(model.copyTimelineClip(tail.id))
+        #expect(model.timeline?.clips.count == 3 && model.selectedTimelineClip?.id == tail.id)
+        model.seekTimeline(to: tail.end)
+        #expect(model.pasteTimelineClip() != nil)
         await settle(host)
         #expect(model.selectedTimelineClip?.id != tail.id && model.selectedTimelineClip?.start == 2)
         try press(try #require(element("screenRecording.multitrackDelete", in: host)))
@@ -166,6 +173,205 @@ struct ScreenRecordingMultitrackUITests {
         #expect(model.timeline?.clips.count == 3)
         for _ in 0..<4 { model.undo() }
         #expect(model.project == project && !model.canUndo)
+    }
+
+    @Test(arguments: [false, true])
+    func selectingTheSameTextAgainExplicitlyOpensItsInspectorAndCopyPasteButtonsHaveObservableFeedback(_ caption: Bool) async throws {
+        let fixture = try RecordingMultitrackTestFixture()
+        let model = try fixture.model()
+        defer { model.shutdown(); fixture.remove() }
+        var project = fixture.project()
+        if caption { project.captions = [.init(start: 0, end: 1, text: "Caption")] }
+        else { project.edits.annotations = [.init(kind: .text, start: 0, end: 1, text: "Annotation")] }
+        project.timeline = .migrating(project)
+        model.install(project, directory: fixture.directory)
+        model.selectTimelineClip(try #require(model.timeline?.clips.first { $0.content.trackKind == .text }?.id))
+        let releaseAccessibility = EnhancedAccessibilityTestScope.acquire()
+        defer { releaseAccessibility() }
+        let host = NSHostingView(rootView: ScreenRecordingStudioView(model: model,
+            languageStore: AppLanguageStore(), prepareCapture: {}))
+        host.sizingOptions = []
+        let window = mount(host, width: 1_180, height: 800)
+        defer { window.contentView = nil; window.close() }
+        await settle(host)
+        model.inspectorTab = 0
+        model.seekTimeline(to: 0.5)
+        await settle(host)
+        try press(try #require(element("screenRecording.editClipText", in: host)))
+        await settle(host)
+        #expect(model.inspectorTab == (caption ? 2 : 1) && model.playbackTime == 0)
+        model.inspectorTab = 0
+        await settle(host)
+        let original = model.project
+        try press(try #require(element("screenRecording.copyClip", in: host)))
+        await settle(host)
+        #expect(model.project == original && !model.canUndo && model.canPasteTimelineClip)
+        #expect(labelled("已复制", in: host) != nil)
+        model.seekTimeline(to: 1)
+        await settle(host)
+        try press(try #require(element("screenRecording.pasteClip", in: host)))
+        await settle(host)
+        #expect(model.timeline?.clips.count == project.timeline!.clips.count + 1 && model.selectedTimelineClip?.start == 1)
+        #expect(model.selectedTimelineClip?.content != project.timeline?.clips.first { $0.content.trackKind == .text }?.content)
+        model.undo()
+        #expect(model.project == original && !model.canUndo)
+        #expect(!window.isKeyWindow && NSScreen.screens.allSatisfy { !$0.frame.intersects(window.frame) })
+    }
+
+    @Test
+    func selectingATimelineClipAfterEditingTextMovesCopyPasteFocusToTheTimeline() async throws {
+        let fixture = try RecordingMultitrackTestFixture()
+        let model = try fixture.model()
+        defer { model.shutdown(); fixture.remove() }
+        model.install(fixture.project(), directory: fixture.directory)
+        let releaseAccessibility = EnhancedAccessibilityTestScope.acquire()
+        defer { releaseAccessibility() }
+        let host = NSHostingView(rootView: ScreenRecordingMultitrackTimelineView(model: model))
+        host.sizingOptions = []
+        let window = ScreenRecordingStudioWindow(contentRect: .init(x: -100_000, y: -100_000, width: 700, height: 240),
+            styleMask: .borderless, backing: .buffered, defer: false)
+        window.isReleasedWhenClosed = false
+        window.studioModel = model
+        window.contentView = host
+        window.orderFrontRegardless()
+        defer { window.contentView = nil; window.close() }
+        let editor = TimelineTextActionProbe(frame: .init(x: -1_000, y: -1_000, width: 200, height: 60))
+        host.addSubview(editor)
+        try #require(window.makeFirstResponder(editor))
+        await settle(host)
+        let original = model.project
+        let key = try #require(NSEvent.keyEvent(with: .keyDown, location: .zero, modifierFlags: .command, timestamp: 0,
+            windowNumber: window.windowNumber, context: nil, characters: "c", charactersIgnoringModifiers: "c",
+            isARepeat: false, keyCode: 8))
+        #expect(window.performKeyEquivalent(with: key) && editor.copies == 1 && !model.canPasteTimelineClip)
+        let clip = try #require(model.selectedTimelineClip)
+        let clipElement = try #require(element("screenRecording.multitrackClip." + clip.id, in: host))
+        let frame = window.convertFromScreen(clipElement.accessibilityFrame())
+        for type in [NSEvent.EventType.leftMouseDown, .leftMouseUp] {
+            let event = try #require(NSEvent.mouseEvent(with: type, location: .init(x: frame.minX + 40, y: frame.midY),
+                modifierFlags: [], timestamp: ProcessInfo.processInfo.systemUptime, windowNumber: window.windowNumber, context: nil,
+                eventNumber: 1, clickCount: 1, pressure: type == .leftMouseDown ? 1 : 0))
+            window.sendEvent(event)
+        }
+        await settle(host)
+        #expect(!(window.firstResponder is NSTextView), "Selecting a clip must end input focus before copying the clip")
+        #expect(model.selectedTimelineClipID == clip.id, "The click must select the clip rather than the surrounding track")
+        #expect(window.performKeyEquivalent(with: key) && model.canPasteTimelineClip && editor.copies == 1)
+        #expect(model.project == original && !model.canUndo && !window.isKeyWindow)
+        try #require(window.makeFirstResponder(editor))
+        try press(try #require(element("screenRecording.multitrackAddTrack", in: host)))
+        await settle(host)
+        #expect(!(window.firstResponder is NSTextView) && model.selectedTimelineClipID == nil)
+        let track = try #require(model.selectedTimelineTrackID)
+        let paste = try #require(NSEvent.keyEvent(with: .keyDown, location: .zero, modifierFlags: .command, timestamp: 0,
+            windowNumber: window.windowNumber, context: nil, characters: "v", charactersIgnoringModifiers: "v",
+            isARepeat: false, keyCode: 9))
+        #expect(window.performKeyEquivalent(with: paste))
+        #expect(model.selectedTimelineClip?.trackID == track && model.timeline?.clips.count == 2)
+        model.undo()
+        model.undo()
+        #expect(model.project == original && !model.canUndo)
+    }
+
+    @Test
+    func draggingAClipAndItsTwoEdgesCommitsOnlyOneUndoableEditAndEscapeCancelsTheGesture() async throws {
+        let fixture = try RecordingMultitrackTestFixture()
+        let model = try fixture.model()
+        defer { model.shutdown(); fixture.remove() }
+        model.install(fixture.project(), directory: fixture.directory)
+        let releaseAccessibility = EnhancedAccessibilityTestScope.acquire()
+        defer { releaseAccessibility() }
+        let host = NSHostingView(rootView: ScreenRecordingMultitrackTimelineView(model: model))
+        host.sizingOptions = []
+        let window = ScreenRecordingStudioWindow(contentRect: .init(x: -100_000, y: -100_000, width: 700, height: 240),
+            styleMask: .borderless, backing: .buffered, defer: false)
+        window.isReleasedWhenClosed = false
+        window.studioModel = model
+        window.contentView = host
+        window.orderFrontRegardless()
+        defer { window.contentView = nil; window.close() }
+        await settle(host)
+        let original = try #require(model.project)
+        let clip = try #require(model.selectedTimelineClip)
+        let clipElement = try #require(element("screenRecording.multitrackClip." + clip.id, in: host))
+        let frame = window.convertFromScreen(clipElement.accessibilityFrame())
+        let geometry = try #require(ScreenRecordingTimelineStripGeometry(segments: [.init(start: 0, end: 10)],
+            viewportWidth: frame.width, zoom: 1))
+        func send(_ type: NSEvent.EventType, _ point: CGPoint) throws {
+            let event = try #require(NSEvent.mouseEvent(with: type, location: point, modifierFlags: [],
+                timestamp: ProcessInfo.processInfo.systemUptime, windowNumber: window.windowNumber, context: nil,
+                eventNumber: 1, clickCount: 1, pressure: type == .leftMouseUp ? 0 : 1))
+            window.sendEvent(event)
+        }
+        for mode in [RecordingMultitrackClipDrag.Mode.trimStart, .trimEnd, .move] {
+            let start = CGPoint(x: frame.minX + (mode == .trimStart ? 6 : mode == .trimEnd ? clip.duration * geometry.pointsPerSecond - 6 : 40),
+                y: frame.midY)
+            let delta = geometry.pointsPerSecond * (mode == .trimEnd ? -0.5 : 0.5)
+            let end = CGPoint(x: start.x + delta, y: start.y)
+            try send(.leftMouseDown, start)
+            try send(.leftMouseDragged, end)
+            await settle(host)
+            #expect(model.project == original && !model.canUndo, "A drag must remain a preview until mouse-up")
+            try send(.leftMouseUp, end)
+            await settle(host)
+            let changed = try #require(model.selectedTimelineClip)
+            switch mode {
+            case .trimStart:
+                #expect(abs(changed.start - 0.5) < 0.000_001 && abs(changed.sourceStart - 0.5) < 0.000_001 && changed.end == 2)
+            case .trimEnd:
+                #expect(changed.start == 0 && abs(changed.sourceEnd - 1.5) < 0.000_001)
+            case .move:
+                #expect(abs(changed.start - 0.5) < 0.000_001 && changed.sourceStart == 0 && changed.sourceEnd == 2)
+            }
+            model.undo()
+            #expect(model.project == original && !model.canUndo)
+            await settle(host)
+        }
+        let start = CGPoint(x: frame.minX + 40, y: frame.midY)
+        try send(.leftMouseDown, start)
+        try send(.leftMouseDragged, .init(x: start.x + 30, y: start.y))
+        await settle(host)
+        let escape = try #require(NSEvent.keyEvent(with: .keyDown, location: .zero, modifierFlags: [],
+            timestamp: ProcessInfo.processInfo.systemUptime, windowNumber: window.windowNumber, context: nil,
+            characters: "\u{1b}", charactersIgnoringModifiers: "\u{1b}", isARepeat: false, keyCode: 53))
+        window.sendEvent(escape)
+        await settle(host)
+        try send(.leftMouseDragged, .init(x: start.x + 50, y: start.y))
+        try send(.leftMouseUp, .init(x: start.x + 50, y: start.y))
+        await settle(host)
+        #expect(model.project == original && !model.canUndo && !window.isKeyWindow,
+            "Escape must keep later movement and release in the same gesture from changing the project")
+    }
+
+    @Test
+    func previewClipStartButtonSeeksTheSelectedTextAndStartsTheCompositedTimelinePlayer() async throws {
+        let fixture = try RecordingMultitrackTestFixture()
+        let model = try fixture.model()
+        defer { model.shutdown(); fixture.remove() }
+        _ = try await fixture.createVideo()
+        var project = fixture.project()
+        project.edits.annotations = [.init(kind: .text, start: 0.25, end: 1.5, text: "Preview text")]
+        project.timeline = .migrating(project)
+        model.install(project, directory: fixture.directory)
+        let text = try #require(model.timeline?.clips.first { $0.content.trackKind == .text })
+        model.selectTimelineClip(text.id)
+        model.seekTimeline(to: 1)
+        let releaseAccessibility = EnhancedAccessibilityTestScope.acquire()
+        defer { releaseAccessibility() }
+        let host = NSHostingView(rootView: ScrollView { ScreenRecordingMultitrackClipInspector(model: model) })
+        host.sizingOptions = []
+        let window = mount(host, width: 400, height: 700)
+        defer { window.contentView = nil; window.close() }
+        await settle(host)
+        try press(try #require(element("screenRecording.previewClipStart", in: host)))
+        #expect(model.playbackTime == text.start)
+        await model.operationTask?.value
+        let item = try #require(model.activePlayer?.currentItem)
+        #expect(model.isShowingTimelinePlayback && !model.isShowingSourcePlayback)
+        #expect(item.videoComposition?.customVideoCompositorClass == RecordingMultitrackPlaybackCompositor.self)
+        #expect(model.project == project && !model.canUndo)
+        model.playTimeline()
+        #expect(!model.isShowingTimelinePlayback && !window.isKeyWindow)
     }
 
     @Test func multitrackPinchScalesTheHorizontalDocumentWithoutMovingHeadersOrEditingTheProject() async throws {
@@ -246,4 +452,9 @@ struct ScreenRecordingMultitrackUITests {
         try #require(object.responds(to: action))
         object.performSelector(onMainThread: action, with: nil, waitUntilDone: true)
     }
+}
+
+private final class TimelineTextActionProbe: NSTextView {
+    var copies = 0
+    override func copy(_ sender: Any?) { copies += 1 }
 }

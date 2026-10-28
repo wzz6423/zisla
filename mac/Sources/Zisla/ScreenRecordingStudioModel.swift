@@ -28,6 +28,10 @@ final class ScreenRecordingStudioModel: ObservableObject {
     @Published private(set) var canvasPreview: CGImage?
     @Published private(set) var multitrackPreviewScene: RecordingMultitrackPreviewScene?
     @Published var selectedTimelineClipID: String?
+    @Published var selectedTimelineTrackID: String?
+    @Published var inspectorTab = 0
+    @Published private var timelineClipCopy: (projectID: UUID, clip: RecordingTimelineClip,
+        annotation: RecordingAnnotation?, caption: RecordingCaption?)?
     @Published private(set) var selectedMediaAssetID: UUID?
     @Published private(set) var currentTime = 0.0
     @Published private(set) var playbackTime = 0.0
@@ -157,6 +161,8 @@ final class ScreenRecordingStudioModel: ObservableObject {
     var timeline: RecordingMultitrackTimeline? { project.map(RecordingMultitrackTimeline.migrating) }
     var mediaAssets: [RecordingMediaAsset] { timeline?.assets.filter { $0.isHiddenFromLibrary != true } ?? [] }
     var selectedTimelineClip: RecordingTimelineClip? { timeline?.clips.first { $0.id == selectedTimelineClipID } }
+    var canPasteTimelineClip: Bool { canEdit && timelineClipCopy.map { $0.projectID == project?.id } == true }
+    func isTimelineClipCopied(_ id: String) -> Bool { timelineClipCopy?.clip.id == id && timelineClipCopy?.projectID == project?.id }
     var selectedRemovedMediaAsset: RecordingMediaAsset? {
         let id = selectedTimelineClip?.content.assetID
         return timeline?.assets.first { $0.id == id && $0.isHiddenFromLibrary == true }
@@ -635,8 +641,27 @@ final class ScreenRecordingStudioModel: ObservableObject {
     func selectTimelineClip(_ id: String) {
         guard let clip = timeline?.clips.first(where: { $0.id == id }) else { return }
         selectedTimelineClipID = id
+        selectedTimelineTrackID = clip.trackID
         if let assetID = clip.content.assetID, selectedMediaAssetID != assetID { selectMediaAsset(assetID) }
         seekTimeline(to: clip.start)
+    }
+
+    func selectTimelineTrack(_ id: String) {
+        selectedTimelineTrackID = id
+        selectedTimelineClipID = nil
+    }
+
+    private func reconcileTimelineSelection() {
+        guard let timeline else { return }
+        if let clip = timeline.clips.first(where: { $0.id == selectedTimelineClipID }) {
+            selectedTimelineTrackID = clip.trackID
+        } else {
+            selectedTimelineClipID = nil
+            if !timeline.tracks.contains(where: { $0.id == selectedTimelineTrackID }) {
+                selectedTimelineClipID = timeline.clips.first?.id
+                selectedTimelineTrackID = timeline.clips.first?.trackID ?? timeline.tracks.first?.id
+            }
+        }
     }
 
     func removeMediaAsset(_ id: UUID) {
@@ -667,6 +692,7 @@ final class ScreenRecordingStudioModel: ObservableObject {
         guard project?.timeline != nil, selectedTimelineClip?.content != content else { return }
         let matching = timeline?.clips.filter { $0.content == content } ?? []
         selectedTimelineClipID = (matching.first { $0.contains(playbackTime) } ?? matching.first)?.id
+        reconcileTimelineSelection()
     }
 
     func seekOverlay(_ content: RecordingTimelineContent, sourceStart: Double) {
@@ -698,12 +724,14 @@ final class ScreenRecordingStudioModel: ObservableObject {
     }
 
     func addTimelineTrack(_ kind: RecordingTimelineTrackKind = .video) {
+        var added: String?
         update { project in
             var timeline = RecordingMultitrackTimeline.migrating(project)
-            timeline.addTrack(kind)
+            added = timeline.addTrack(kind)
             project.version = ScreenRecordingProject.currentVersion
             project.timeline = timeline
         }
+        if let added, timeline?.tracks.contains(where: { $0.id == added }) == true { selectTimelineTrack(added) }
     }
 
     @discardableResult
@@ -761,6 +789,7 @@ final class ScreenRecordingStudioModel: ObservableObject {
             project.version = ScreenRecordingProject.currentVersion
             project.timeline = timeline
         }
+        if selectedTimelineClipID == id { selectedTimelineTrackID = selectedTimelineClip?.trackID }
     }
 
     func moveTimelineClip(_ id: String, to time: Double, trackID: String? = nil) {
@@ -809,6 +838,42 @@ final class ScreenRecordingStudioModel: ObservableObject {
     }
 
     @discardableResult
+    func copyTimelineClip(_ id: String) -> Bool {
+        commitPendingCanvasText?()
+        guard canEdit, let project, let clip = timeline?.clips.first(where: { $0.id == id }) else { return false }
+        let annotation: RecordingAnnotation?
+        let caption: RecordingCaption?
+        if case let .annotation(id) = clip.content { annotation = project.edits.annotations?.first { $0.id == id } }
+        else { annotation = nil }
+        if case let .caption(id) = clip.content { caption = project.captions.first { $0.id == id } }
+        else { caption = nil }
+        timelineClipCopy = (project.id, clip, annotation, caption)
+        return true
+    }
+
+    @discardableResult
+    func pasteTimelineClip(at time: Double? = nil, trackID: String? = nil) -> String? {
+        guard canPasteTimelineClip, let copied = timelineClipCopy else { return nil }
+        let copyID = UUID().uuidString
+        let start = time ?? playbackTime
+        let destination = trackID ?? selectedTimelineTrackID ?? selectedTimelineClip?.trackID ?? copied.clip.trackID
+        update { project in
+            var timeline = RecordingMultitrackTimeline.migrating(project)
+            var clip = copied.clip
+            clip.id = copyID
+            clip.start = start
+            clip.trackID = destination
+            Self.copyOverlay(for: &clip, project: &project, annotation: copied.annotation, caption: copied.caption)
+            timeline.clips.append(clip)
+            project.version = ScreenRecordingProject.currentVersion
+            project.timeline = timeline
+        }
+        guard project?.timeline?.clips.contains(where: { $0.id == copyID }) == true else { return nil }
+        selectTimelineClip(copyID)
+        return copyID
+    }
+
+    @discardableResult
     func duplicateTimelineClip(_ id: String) -> String? {
         let copyID = UUID().uuidString
         update { project in
@@ -824,10 +889,11 @@ final class ScreenRecordingStudioModel: ObservableObject {
         return project?.timeline?.clips.contains { $0.id == copyID } == true ? copyID : nil
     }
 
-    private static func copyOverlay(for clip: inout RecordingTimelineClip, project: inout ScreenRecordingProject) {
+    private static func copyOverlay(for clip: inout RecordingTimelineClip, project: inout ScreenRecordingProject,
+                                    annotation: RecordingAnnotation? = nil, caption: RecordingCaption? = nil) {
         switch clip.content {
         case let .annotation(id):
-            if var annotation = project.edits.annotations?.first(where: { $0.id == id }) {
+            if var annotation = annotation ?? project.edits.annotations?.first(where: { $0.id == id }) {
                 annotation.id = UUID()
                 annotation.start = clip.start
                 annotation.end = clip.end
@@ -835,7 +901,7 @@ final class ScreenRecordingStudioModel: ObservableObject {
                 clip.content = .annotation(annotation.id)
             }
         case let .caption(id):
-            if var caption = project.captions.first(where: { $0.id == id }) {
+            if var caption = caption ?? project.captions.first(where: { $0.id == id }) {
                 caption.id = UUID()
                 caption.start = clip.start
                 caption.end = clip.end
@@ -858,7 +924,10 @@ final class ScreenRecordingStudioModel: ObservableObject {
             project.version = ScreenRecordingProject.currentVersion
             project.timeline = timeline
         }
-        if selectedTimelineClipID == id { selectedTimelineClipID = timeline?.clips.first?.id }
+        if selectedTimelineClipID == id {
+            selectedTimelineClipID = timeline?.clips.first?.id
+            reconcileTimelineSelection()
+        }
     }
 
     func detachTimelineAudio(_ id: String, probe: @escaping ScreenRecordingAudioDetachment.AudioProbe = ScreenRecordingAudioDetachment.audioRanges) {
@@ -891,6 +960,7 @@ final class ScreenRecordingStudioModel: ObservableObject {
         guard canUndo, let original = project, let previous = undoHistory.popLast() else { return }
         redoHistory.append(original)
         project = previous
+        reconcileTimelineSelection()
         dismissAIEdit()
         isDirty = true
         seekTimeline(to: playbackTime)
@@ -901,6 +971,7 @@ final class ScreenRecordingStudioModel: ObservableObject {
         guard canRedo, let original = project, let next = redoHistory.popLast() else { return }
         undoHistory.append(original)
         project = next
+        reconcileTimelineSelection()
         dismissAIEdit()
         isDirty = true
         seekTimeline(to: playbackTime)
@@ -1271,6 +1342,8 @@ final class ScreenRecordingStudioModel: ObservableObject {
         canvasPreview = nil
         multitrackPreviewScene = nil
         selectedTimelineClipID = nil
+        selectedTimelineTrackID = nil
+        timelineClipCopy = nil
         selectedMediaAssetID = nil
         undoHistory.removeAll()
         redoHistory.removeAll()
@@ -1288,6 +1361,7 @@ final class ScreenRecordingStudioModel: ObservableObject {
         self.project = project
         self.directory = directory
         selectedTimelineClipID = timeline?.clips.first?.id
+        selectedTimelineTrackID = timeline?.clips.first?.trackID
         if let asset = timeline?.assets.first {
             selectedMediaAssetID = asset.id
             if asset.kind != .image { installSourcePlayer(file: asset.file, directory: directory) }

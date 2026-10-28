@@ -5,6 +5,30 @@ import ZislaCore
 import ZislaKit
 
 @MainActor
+final class ScreenRecordingStudioWindow: NSWindow {
+    weak var studioModel: ScreenRecordingStudioModel?
+
+    override func performKeyEquivalent(with event: NSEvent) -> Bool {
+        guard event.window === self else { return super.performKeyEquivalent(with: event) }
+        if firstResponder is NSTextView {
+            return TextEditingCommands.performKeyEquivalent(with: event, in: self) || super.performKeyEquivalent(with: event)
+        }
+        let modifiers = event.modifierFlags.intersection(.deviceIndependentFlagsMask)
+            .subtracting([.capsLock, .numericPad, .function])
+        if modifiers == .command, let model = studioModel, model.canEdit {
+            switch event.charactersIgnoringModifiers?.lowercased() {
+            case "c":
+                if let id = model.selectedTimelineClipID, model.copyTimelineClip(id) { return true }
+            case "v":
+                if model.pasteTimelineClip() != nil { return true }
+            default: break
+            }
+        }
+        return super.performKeyEquivalent(with: event)
+    }
+}
+
+@MainActor
 final class ScreenRecordingStudioController: NSWindowController, NSWindowDelegate {
     let model: ScreenRecordingStudioModel
     private let languageStore: AppLanguageStore
@@ -31,8 +55,9 @@ final class ScreenRecordingStudioController: NSWindowController, NSWindowDelegat
     init(appModel: AppModel) {
         model = ScreenRecordingStudioModel(appModel: appModel)
         languageStore = appModel.languageStore
-        let window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 1_160, height: 740),
+        let window = ScreenRecordingStudioWindow(contentRect: NSRect(x: 0, y: 0, width: 1_160, height: 740),
             styleMask: [.titled, .closable, .miniaturizable, .resizable], backing: .buffered, defer: false)
+        window.studioModel = model
         window.isReleasedWhenClosed = false
         window.title = AppLocalization.text("录屏工作室")
         window.minSize = NSSize(width: 960, height: 640)

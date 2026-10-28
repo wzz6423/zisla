@@ -140,7 +140,7 @@ struct ScreenRecordingCanvasGeometryTests {
                             switch resized {
                             case let .annotation(value): project.edits.annotations = [value]
                             case let .caption(value): project.captions = [value]
-                            case .image: Issue.record("Expected a text element")
+                            case .image, .video: Issue.record("Expected a text element")
                             }
                             try project.validate()
                         }

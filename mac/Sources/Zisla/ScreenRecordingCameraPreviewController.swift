@@ -4,6 +4,8 @@ import Combine
 import ZislaCore
 
 enum ScreenRecordingCameraPreviewLayout {
+    static let controlsInset: CGFloat = 10
+
     enum Corner: CaseIterable {
         case topLeft, topRight, bottomLeft, bottomRight
 
@@ -99,7 +101,8 @@ final class ScreenRecordingCameraPreviewController {
             let resized = ScreenRecordingCameraPreviewLayout.resize(frame: frame, corner: corner,
                 translation: translation, visibleFrame: screen.visibleFrame)
             configuration.cameraSize = resized.size
-            panel.setFrame(resized.frame, display: true)
+            panel.setFrame(resized.frame.insetBy(dx: -ScreenRecordingCameraPreviewLayout.controlsInset,
+                                                dy: -ScreenRecordingCameraPreviewLayout.controlsInset), display: true)
             changeSize(resized.size)
         }
         preview.onCornerRadiusChange = { [weak self] radius in
@@ -116,7 +119,9 @@ final class ScreenRecordingCameraPreviewController {
     func present(configuration: RecordingEdits = .init(), screen: NSScreen? = nil) {
         isPresented = true
         if !placed, let screen = screen ?? NSScreen.screens.first(where: { $0.frame.contains(NSEvent.mouseLocation) }) ?? NSScreen.main {
-            panel.setFrame(ScreenRecordingCameraPreviewLayout.frame(configuration: configuration, visibleFrame: screen.visibleFrame), display: false)
+            let frame = ScreenRecordingCameraPreviewLayout.frame(configuration: configuration, visibleFrame: screen.visibleFrame)
+            panel.setFrame(frame.insetBy(dx: -ScreenRecordingCameraPreviewLayout.controlsInset,
+                                        dy: -ScreenRecordingCameraPreviewLayout.controlsInset), display: false)
             placed = true
         }
         update(configuration: configuration)
@@ -129,9 +134,11 @@ final class ScreenRecordingCameraPreviewController {
         let positionChanged = self.configuration.cameraPosition != configuration.cameraPosition
         self.configuration = configuration
         if layoutChanged, let screen = panel.screen ?? NSScreen.main {
-            panel.setFrame(ScreenRecordingCameraPreviewLayout.frame(configuration: configuration,
+            let frame = ScreenRecordingCameraPreviewLayout.frame(configuration: configuration,
                 visibleFrame: screen.visibleFrame,
-                center: positionChanged ? nil : CGPoint(x: panel.frame.midX, y: panel.frame.midY)), display: true)
+                center: positionChanged ? nil : CGPoint(x: panel.frame.midX, y: panel.frame.midY))
+            panel.setFrame(frame.insetBy(dx: -ScreenRecordingCameraPreviewLayout.controlsInset,
+                                        dy: -ScreenRecordingCameraPreviewLayout.controlsInset), display: true)
         }
         refresh(session: capture.cameraPreviewSession, state: capture.cameraPreviewState)
     }
@@ -220,17 +227,19 @@ final class ScreenRecordingCameraPreviewView: NSView {
         super.layout()
         CATransaction.begin()
         CATransaction.setDisableActions(true)
-        cameraLayer.frame = bounds
+        let inset = ScreenRecordingCameraPreviewLayout.controlsInset
+        let cameraFrame = bounds.insetBy(dx: inset, dy: inset)
+        cameraLayer.frame = cameraFrame
         previewLayer.frame = cameraLayer.bounds
         handlesLayer.frame = bounds
-        cameraLayer.cornerRadius = min(bounds.width, bounds.height) * cornerRadiusRatio
-        cameraLayer.borderWidth = showsBorder ? min(bounds.width, bounds.height) * 0.01 : 0
+        cameraLayer.cornerRadius = min(cameraFrame.width, cameraFrame.height) * cornerRadiusRatio
+        cameraLayer.borderWidth = showsBorder ? min(cameraFrame.width, cameraFrame.height) * 0.01 : 0
         let handles = CGMutablePath()
         for corner in ScreenRecordingCameraPreviewLayout.Corner.allCases {
             let point = corner.point(in: bounds.insetBy(dx: 6, dy: 6))
             handles.addEllipse(in: CGRect(x: point.x - 4, y: point.y - 4, width: 8, height: 8))
         }
-        let radius = ScreenRecordingCameraPreviewLayout.radiusHandle(in: bounds, radius: Double(cornerRadiusRatio))
+        let radius = ScreenRecordingCameraPreviewLayout.radiusHandle(in: cameraFrame, radius: Double(cornerRadiusRatio))
         handles.addEllipse(in: CGRect(x: radius.x - 4, y: radius.y - 4, width: 8, height: 8))
         handlesLayer.path = handles
         handlesLayer.isHidden = !hovered && drag == nil
@@ -253,14 +262,16 @@ final class ScreenRecordingCameraPreviewView: NSView {
         guard let window else { return }
         let point = convert(event.locationInWindow, from: nil)
         let origin = window.convertPoint(toScreen: event.locationInWindow)
-        let radius = ScreenRecordingCameraPreviewLayout.radiusHandle(in: bounds, radius: Double(cornerRadiusRatio))
+        let inset = ScreenRecordingCameraPreviewLayout.controlsInset
+        let cameraFrame = bounds.insetBy(dx: inset, dy: inset)
+        let radius = ScreenRecordingCameraPreviewLayout.radiusHandle(in: cameraFrame, radius: Double(cornerRadiusRatio))
         if hypot(point.x - radius.x, point.y - radius.y) <= 9 {
-            drag = .cornerRadius(Double(cornerRadiusRatio), min(bounds.width, bounds.height) - 36, origin)
+            drag = .cornerRadius(Double(cornerRadiusRatio), min(cameraFrame.width, cameraFrame.height) - 36, origin)
         } else if let corner = ScreenRecordingCameraPreviewLayout.Corner.allCases.first(where: {
             let handle = $0.point(in: bounds.insetBy(dx: 6, dy: 6))
             return hypot(point.x - handle.x, point.y - handle.y) <= 9
         }) {
-            drag = .resize(corner, window.frame, origin)
+            drag = .resize(corner, window.frame.insetBy(dx: inset, dy: inset), origin)
         } else { window.performDrag(with: event) }
         needsLayout = true
     }

@@ -138,7 +138,8 @@ final class RecordingCanvasEditorView: NSView, NSTextViewDelegate {
         let elements = RecordingCanvasElement.visible(in: project, at: sourceTime)
         let tolerance = 5 * canvasSize.width / canvasRect.width
         let selectedHit = selectedElement.flatMap {
-            RecordingCanvasGeometry.hit($0, at: canvasPoint, canvas: canvasSize, tolerance: tolerance) ? $0 : nil
+            if case .video = $0 { return nil as RecordingCanvasElement? }
+            return RecordingCanvasGeometry.hit($0, at: canvasPoint, canvas: canvasSize, tolerance: tolerance) ? $0 : nil
         }
         let hit = selectedHit ?? elements.reversed().first {
             RecordingCanvasGeometry.hit($0, at: canvasPoint, canvas: canvasSize, tolerance: tolerance)
@@ -246,7 +247,7 @@ final class RecordingCanvasEditorView: NSView, NSTextViewDelegate {
             let layout = RecordingExportRenderer.captionLayout(value, canvas: CGRect(origin: .zero, size: canvasSize))
             box = box.insetBy(dx: layout.padding, dy: layout.padding)
             color = .white
-        case .image: return
+        case .image, .video: return
         }
         textEditor.frame = viewRect(box)
         let fontSize = RecordingCanvasGeometry.fontSize(of: element, canvas: canvasSize)

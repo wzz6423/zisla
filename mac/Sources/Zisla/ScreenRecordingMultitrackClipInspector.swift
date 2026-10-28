@@ -64,21 +64,38 @@ struct ScreenRecordingMultitrackClipInspector: View {
                 }
                 .accessibilityIdentifier("screenRecording.clipTrack")
                 if case let .annotation(id) = clip.content {
-                    Button(AppLocalization.text("标注内容")) { canvasSelection.wrappedValue = .annotation(id) }
+                    Button(AppLocalization.text("标注内容")) {
+                        canvasSelection.wrappedValue = .annotation(id)
+                        model.inspectorTab = 1
+                        model.selectTimelineClip(clip.id)
+                    }
+                    .accessibilityIdentifier("screenRecording.editClipText")
                 } else if case let .caption(id) = clip.content {
-                    Button(AppLocalization.text("字幕")) { canvasSelection.wrappedValue = .caption(id) }
+                    Button(AppLocalization.text("字幕")) {
+                        canvasSelection.wrappedValue = .caption(id)
+                        model.inspectorTab = 2
+                        model.selectTimelineClip(clip.id)
+                    }
+                    .accessibilityIdentifier("screenRecording.editClipText")
                 }
                 Divider()
                 HStack {
-                    Button(AppLocalization.text("复制片段")) {
-                        if let id = model.duplicateTimelineClip(clip.id) { model.selectTimelineClip(id) }
-                    }
+                    Button(AppLocalization.text(model.isTimelineClipCopied(clip.id) ? "已复制" : "复制")) {
+                        model.copyTimelineClip(clip.id)
+                    }.accessibilityIdentifier("screenRecording.copyClip")
+                    Button(AppLocalization.text("粘贴")) { model.pasteTimelineClip() }
+                        .disabled(!model.canPasteTimelineClip)
+                        .accessibilityIdentifier("screenRecording.pasteClip")
                     Spacer()
                     Button(AppLocalization.text("删除片段"), role: .destructive) { model.deleteTimelineClip(clip.id) }
                 }
                 .buttonStyle(.borderless)
-                Button(AppLocalization.text("预览片段起点")) { model.selectTimelineClip(clip.id) }
+                Button(AppLocalization.text("预览片段起点")) {
+                    model.selectTimelineClip(clip.id)
+                    model.playTimeline()
+                }
                     .font(.caption)
+                    .accessibilityIdentifier("screenRecording.previewClipStart")
             }
         }
     }

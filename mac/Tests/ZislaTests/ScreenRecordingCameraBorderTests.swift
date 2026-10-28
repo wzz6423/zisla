@@ -9,7 +9,7 @@ import ZislaCore
 struct ScreenRecordingCameraBorderTests {
     @Test
     func previewBorderFollowsTheChoiceAndResizesWithTheCamera() throws {
-        let view = ScreenRecordingCameraPreviewView(frame: CGRect(x: 0, y: 0, width: 200, height: 160))
+        let view = ScreenRecordingCameraPreviewView(frame: CGRect(x: 0, y: 0, width: 220, height: 180))
         defer { view.detach() }
         let layer = try #require(view.layer?.sublayers?.first)
         view.update(session: nil, state: .running, configuration: .init())
@@ -21,7 +21,7 @@ struct ScreenRecordingCameraBorderTests {
             #expect(layer.borderWidth == (enabled ? 1.6 : 0))
         }
         let cornerRadius = layer.cornerRadius
-        view.setFrameSize(CGSize(width: 400, height: 320))
+        view.setFrameSize(CGSize(width: 420, height: 340))
         view.layoutSubtreeIfNeeded()
         #expect(layer.borderWidth == 3.2)
         #expect(layer.cornerRadius == cornerRadius * 2, "Changing border visibility must leave the camera shape intact")

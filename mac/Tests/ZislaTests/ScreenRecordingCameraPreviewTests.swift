@@ -395,7 +395,8 @@ struct ScreenRecordingCameraPreviewTests {
     func explicitRadiusControlsPreviewMaskWhileKeepingItsSizeAndLegacyFlag(
         ratio: RecordingCameraAspectRatio, radius: Double
     ) throws {
-        let frame = CGRect(x: 0, y: 0, width: 200, height: 200 / ratio.ratio)
+        let frame = CGRect(x: 0, y: 0, width: 220, height: 200 / ratio.ratio + 20)
+        let cameraFrame = frame.insetBy(dx: 10, dy: 10)
         let view = ScreenRecordingCameraPreviewView(frame: frame)
         defer { view.detach() }
         let layer = try #require(view.layer?.sublayers?.first)
@@ -403,14 +404,107 @@ struct ScreenRecordingCameraPreviewTests {
                                            cameraCornerRadius: radius, cameraBorder: true)
         view.update(session: nil, state: .running, configuration: configuration)
         view.layoutSubtreeIfNeeded()
-        #expect(abs(layer.cornerRadius - min(frame.width, frame.height) * radius) < 0.000_001,
+        #expect(layer.frame == cameraFrame)
+        #expect(abs(layer.cornerRadius - min(cameraFrame.width, cameraFrame.height) * radius) < 0.000_001,
                 "A saved circular flag must not override the radius shown in the camera controls")
         #expect(view.frame == frame)
-        #expect(layer.borderWidth == min(frame.width, frame.height) * 0.01)
+        #expect(layer.borderWidth == min(cameraFrame.width, cameraFrame.height) * 0.01)
         view.update(session: nil, state: .idle, configuration: configuration)
         view.layoutSubtreeIfNeeded()
         #expect(view.frame == frame)
-        #expect(abs(layer.cornerRadius - min(frame.width, frame.height) * radius) < 0.000_001)
+        #expect(abs(layer.cornerRadius - min(cameraFrame.width, cameraFrame.height) * radius) < 0.000_001)
+    }
+
+    @Test(arguments: RecordingCameraAspectRatio.allCases, [0.0, 0.125, 0.5])
+    func cornerHandlesStayOutsideTheCameraImageAndRemainFullyVisible(
+        ratio: RecordingCameraAspectRatio, radius: Double
+    ) throws {
+        for width in [76.0, 200.0, 320.0] {
+            let view = ScreenRecordingCameraPreviewView(frame: CGRect(x: 0, y: 0, width: width + 20,
+                                                                      height: width / ratio.ratio + 20))
+            defer { view.detach() }
+            view.update(session: nil, state: .running,
+                        configuration: .init(cameraAspectRatio: ratio, cameraCornerRadius: radius))
+            view.layoutSubtreeIfNeeded()
+            let camera = try #require(view.layer?.sublayers?.first)
+            let handles = try #require(view.layer?.sublayers?.last as? CAShapeLayer)
+            let path = try #require(handles.path)
+            let centers = path.boundingBoxOfPath.insetBy(dx: 4, dy: 4)
+            let paintedRadius = 4 + handles.lineWidth / 2
+            for corner in ScreenRecordingCameraPreviewLayout.Corner.allCases {
+                let point = corner.point(in: centers)
+                let painted = CGRect(x: point.x - paintedRadius, y: point.y - paintedRadius,
+                                     width: paintedRadius * 2, height: paintedRadius * 2)
+                #expect(path.contains(point), "Every corner must render its handle in the transparent control area")
+                #expect(view.bounds.contains(painted), "The complete corner handle and its stroke must remain visible")
+                let nearest = CGPoint(x: min(max(point.x, camera.frame.minX), camera.frame.maxX),
+                                      y: min(max(point.y, camera.frame.minY), camera.frame.maxY))
+                #expect(hypot(point.x - nearest.x, point.y - nearest.y) > paintedRadius,
+                        "Corner handles must not touch camera pixels, including the zero-radius rectangular mask")
+                let oldPoint = corner.point(in: camera.frame.insetBy(dx: 6, dy: 6))
+                #expect(!path.contains(oldPoint), "The previous inset handle must not remain over the camera image")
+            }
+            #expect(abs(camera.frame.width / camera.frame.height - ratio.ratio) < 0.000_001)
+            #expect(abs(camera.frame.width - width) < 0.000_001,
+                    "The transparent control area must not shrink the configured camera image")
+        }
+    }
+
+    @Test(arguments: RecordingCameraAspectRatio.allCases)
+    func controllerPlacementUpdatesAndCornerResizePreserveCameraGeometry(ratio: RecordingCameraAspectRatio) throws {
+        let app = NSApplication.shared
+        let windows = Set(app.windows.map(ObjectIdentifier.init))
+        let screen = try #require(NSScreen.main)
+        let system = CameraPreviewTestSystem()
+        let service = ScreenRecordingService(dependencies: system.dependencies())
+        var publishedSize: Double?
+        let controller = ScreenRecordingCameraPreviewController(capture: service,
+            changeSize: { publishedSize = $0 }, changeCornerRadius: { _ in })
+        let panel = try #require(app.windows.first {
+            !windows.contains(ObjectIdentifier($0)) && $0.contentView is ScreenRecordingCameraPreviewView
+        })
+        defer { controller.shutdown(); panel.close() }
+        let preview = try #require(panel.contentView as? ScreenRecordingCameraPreviewView)
+        func expectCameraFrame(_ frame: CGRect) throws -> CGRect {
+            preview.layoutSubtreeIfNeeded()
+            let layer = try #require(preview.layer?.sublayers?.first)
+            let expectedPanel = frame.insetBy(dx: -10, dy: -10).integral
+            let expectedCamera = expectedPanel.insetBy(dx: 10, dy: 10)
+            #expect(panel.frame == expectedPanel,
+                    "Transparent controls must be added around the configured camera size and position")
+            #expect(layer.frame == CGRect(origin: CGPoint(x: 10, y: 10), size: expectedCamera.size))
+            #expect(!panel.isVisible, "Idle controller geometry tests must not show a camera window")
+            return panel.frame.insetBy(dx: 10, dy: 10)
+        }
+        var configuration = RecordingEdits()
+        controller.present(configuration: configuration, screen: screen)
+        var cameraFrame = try expectCameraFrame(ScreenRecordingCameraPreviewLayout.frame(
+            configuration: configuration, visibleFrame: screen.visibleFrame))
+        configuration.cameraPosition = .topLeft
+        configuration.cameraSize = 0.2
+        configuration.cameraAspectRatio = ratio
+        controller.update(configuration: configuration)
+        cameraFrame = try expectCameraFrame(ScreenRecordingCameraPreviewLayout.frame(
+            configuration: configuration, visibleFrame: screen.visibleFrame))
+        configuration.cameraSize = 0.3
+        configuration.cameraAspectRatio = .widescreen
+        controller.update(configuration: configuration)
+        cameraFrame = try expectCameraFrame(ScreenRecordingCameraPreviewLayout.frame(
+            configuration: configuration, visibleFrame: screen.visibleFrame,
+            center: CGPoint(x: cameraFrame.midX, y: cameraFrame.midY)))
+        configuration.cameraPosition = .bottomRight
+        controller.update(configuration: configuration)
+        cameraFrame = try expectCameraFrame(ScreenRecordingCameraPreviewLayout.frame(
+            configuration: configuration, visibleFrame: screen.visibleFrame))
+        let translation = CGSize(width: -20, height: -20)
+        let resized = ScreenRecordingCameraPreviewLayout.resize(frame: cameraFrame, corner: .topLeft,
+            translation: translation, visibleFrame: screen.visibleFrame)
+        let onResize = try #require(preview.onResize)
+        onResize(.topLeft, cameraFrame, translation)
+        let actualResized = try expectCameraFrame(resized.frame)
+        #expect(publishedSize == resized.size)
+        #expect(actualResized.maxX == cameraFrame.maxX && actualResized.minY == cameraFrame.minY,
+                "Corner resizing must keep the camera's opposite anchor, excluding the transparent controls")
     }
 
     @Test(arguments: ScreenRecordingCameraPreviewLayout.Corner.allCases, RecordingCameraAspectRatio.allCases)
@@ -506,16 +600,18 @@ struct ScreenRecordingCameraPreviewTests {
                       CGSize(width: 200, height: 150), CGSize(width: 320, height: 180),
                       CGSize(width: 76, height: 42.75)])
     func radiusHandleTracksPointerTranslationAndClampsWithoutResizing(size: CGSize) throws {
-        let window = NSWindow(contentRect: CGRect(origin: CGPoint(x: 100, y: 100), size: size),
+        let previewSize = CGSize(width: size.width + 20, height: size.height + 20)
+        let window = CameraPreviewTestWindow(contentRect: CGRect(origin: CGPoint(x: 100, y: 100), size: previewSize),
                               styleMask: [.borderless], backing: .buffered, defer: false)
         window.isReleasedWhenClosed = false
         defer { window.close() }
-        let view = ScreenRecordingCameraPreviewView(frame: CGRect(origin: .zero, size: size))
+        let view = ScreenRecordingCameraPreviewView(frame: CGRect(origin: .zero, size: previewSize))
         window.contentView = view
         defer { view.detach() }
         let handles = try #require(view.layer?.sublayers?.last as? CAShapeLayer)
-        let minimum = ScreenRecordingCameraPreviewLayout.radiusHandle(in: view.bounds, radius: 0)
-        let maximum = ScreenRecordingCameraPreviewLayout.radiusHandle(in: view.bounds, radius: 0.5)
+        let cameraFrame = view.bounds.insetBy(dx: 10, dy: 10)
+        let minimum = ScreenRecordingCameraPreviewLayout.radiusHandle(in: cameraFrame, radius: 0)
+        let maximum = ScreenRecordingCameraPreviewLayout.radiusHandle(in: cameraFrame, radius: 0.5)
         let travel = maximum.x - minimum.x
         let original = window.frame
         var radius: Double?
@@ -528,7 +624,7 @@ struct ScreenRecordingCameraPreviewTests {
         }
         for start in [0.0, 0.25, 0.5] {
             view.update(session: nil, state: .running, configuration: .init(cameraCornerRadius: start))
-            let origin = ScreenRecordingCameraPreviewLayout.radiusHandle(in: view.bounds, radius: start)
+            let origin = ScreenRecordingCameraPreviewLayout.radiusHandle(in: cameraFrame, radius: start)
             let down = CGPoint(x: origin.x + 8, y: origin.y)
             view.mouseEntered(with: try event(.leftMouseDown, down))
             view.mouseDown(with: try event(.leftMouseDown, down))
@@ -543,7 +639,7 @@ struct ScreenRecordingCameraPreviewTests {
                         "Horizontal pointer movement must match the handle's visible travel, including both clamps")
                 view.update(session: nil, state: .running, configuration: .init(cameraCornerRadius: published))
                 view.layout()
-                let expectedPoint = CGPoint(x: minimum.x + travel * expected * 2, y: view.bounds.maxY - 4)
+                let expectedPoint = CGPoint(x: minimum.x + travel * expected * 2, y: cameraFrame.maxY - 4)
                 #expect(try #require(handles.path).contains(expectedPoint),
                         "The rendered radius handle must follow the pointer and ignore vertical movement")
                 #expect(window.frame == original)
@@ -556,16 +652,17 @@ struct ScreenRecordingCameraPreviewTests {
         }
     }
 
-    @Test(arguments: ScreenRecordingCameraPreviewLayout.Corner.allCases)
+    @Test(arguments: ScreenRecordingCameraPreviewLayout.Corner.allCases, RecordingCameraAspectRatio.allCases)
     func hoverRevealsHandlesAndCornerEventsResizeWithoutMovingTheWindow(
-        corner: ScreenRecordingCameraPreviewLayout.Corner
+        corner: ScreenRecordingCameraPreviewLayout.Corner, ratio: RecordingCameraAspectRatio
     ) throws {
-        let window = NSWindow(contentRect: CGRect(x: 100, y: 100, width: 200, height: 150),
+        let window = CameraPreviewTestWindow(contentRect: CGRect(x: 100, y: 100, width: 220, height: 200 / ratio.ratio + 20),
                               styleMask: [.borderless], backing: .buffered, defer: false)
         window.isReleasedWhenClosed = false
         defer { window.close() }
         let view = ScreenRecordingCameraPreviewView(frame: CGRect(origin: .zero, size: window.frame.size))
         window.contentView = view
+        defer { view.detach() }
         #expect(view.acceptsFirstMouse(for: nil))
         let handles = try #require(view.layer?.sublayers?.last as? CAShapeLayer)
         #expect(handles.isHidden)
@@ -578,15 +675,18 @@ struct ScreenRecordingCameraPreviewTests {
         view.mouseEntered(with: down)
         view.layout()
         #expect(!handles.isHidden)
-        let original = window.frame
+        let original = window.frame.insetBy(dx: 10, dy: 10)
         var drag: (ScreenRecordingCameraPreviewLayout.Corner, CGRect, CGSize)?
+        var radiusChanged = false
+        view.onCornerRadiusChange = { _ in radiusChanged = true }
         view.onResize = { drag = ($0, $1, $2) }
         view.mouseDown(with: down)
         view.mouseDragged(with: try event(.leftMouseDragged, CGPoint(x: point.x + 30, y: point.y + 20)))
         #expect(drag?.0 == corner)
         #expect(drag?.1 == original)
         #expect(drag?.2 == CGSize(width: 30, height: 20))
-        #expect(window.frame == original)
+        #expect(window.frame.insetBy(dx: 10, dy: 10) == original)
+        #expect(!radiusChanged, "Corner handle hits must not invoke radius changes")
         view.mouseExited(with: down)
         view.layout()
         #expect(!handles.isHidden, "Resize handles must remain visible while a drag leaves the preview")
@@ -594,18 +694,29 @@ struct ScreenRecordingCameraPreviewTests {
         view.mouseExited(with: down)
         view.layout()
         #expect(handles.isHidden)
+        drag = nil
+        view.mouseDragged(with: try event(.leftMouseDragged, CGPoint(x: point.x + 30, y: point.y + 20)))
+        #expect(drag == nil, "Releasing a corner handle must end its resize drag")
+        let backgroundPoint = CGPoint(x: point.x + (corner.isLeft ? 7 : -7),
+                                      y: point.y + (corner.isTop ? -7 : 7))
+        view.mouseDown(with: try event(.leftMouseDown, backgroundPoint))
+        view.mouseDragged(with: try event(.leftMouseDragged, backgroundPoint))
+        #expect(window.draggedBackground && drag == nil,
+                "A click beyond the corner handle's hit circle must drag the window instead of resizing")
     }
 
     @Test
     func circularPreviewRadiusHandlePublishesCustomRoundingAndStopsAfterMouseUp() throws {
-        let window = NSWindow(contentRect: CGRect(x: 100, y: 100, width: 200, height: 200),
+        let window = CameraPreviewTestWindow(contentRect: CGRect(x: 100, y: 100, width: 220, height: 220),
                               styleMask: [.borderless], backing: .buffered, defer: false)
         window.isReleasedWhenClosed = false
         defer { window.close() }
         let view = ScreenRecordingCameraPreviewView(frame: CGRect(origin: .zero, size: window.frame.size))
         window.contentView = view
+        defer { view.detach() }
         view.update(session: nil, state: .running, configuration: .init(cameraRound: true))
-        let point = ScreenRecordingCameraPreviewLayout.radiusHandle(in: view.bounds, radius: 0.5)
+        let cameraFrame = view.bounds.insetBy(dx: 10, dy: 10)
+        let point = ScreenRecordingCameraPreviewLayout.radiusHandle(in: cameraFrame, radius: 0.5)
         func event(_ type: NSEvent.EventType, _ location: CGPoint) throws -> NSEvent {
             try #require(NSEvent.mouseEvent(with: type, location: view.convert(location, to: nil), modifierFlags: [],
                 timestamp: 0, windowNumber: window.windowNumber, context: nil, eventNumber: 1, clickCount: 1, pressure: 1))
@@ -613,7 +724,7 @@ struct ScreenRecordingCameraPreviewTests {
         var radius: Double?
         view.onCornerRadiusChange = { radius = $0 }
         view.mouseDown(with: try event(.leftMouseDown, point))
-        let target = ScreenRecordingCameraPreviewLayout.radiusHandle(in: view.bounds, radius: 0.1)
+        let target = ScreenRecordingCameraPreviewLayout.radiusHandle(in: cameraFrame, radius: 0.1)
         let dragged = try event(.leftMouseDragged, target)
         view.mouseDragged(with: dragged)
         #expect(abs(try #require(radius) - 0.1) < 0.000_001)
@@ -680,6 +791,12 @@ struct ScreenRecordingCameraPreviewTests {
 }
 
 private enum CameraPreviewTestError: Error { case unavailable }
+
+@MainActor
+private final class CameraPreviewTestWindow: NSWindow {
+    var draggedBackground = false
+    override func performDrag(with event: NSEvent) { draggedBackground = true }
+}
 
 @MainActor
 private final class CameraPreviewTestSystem {

@@ -6,18 +6,21 @@ enum RecordingCanvasSelection: Equatable {
     case annotation(UUID)
     case caption(UUID)
     case image(String)
+    case video(String)
 }
 
 enum RecordingCanvasElement: Equatable {
     case annotation(RecordingAnnotation)
     case caption(RecordingCaption)
     case image(RecordingTimelineClip)
+    case video(RecordingTimelineClip)
 
     var selection: RecordingCanvasSelection {
         switch self {
         case let .annotation(value): .annotation(value.id)
         case let .caption(value): .caption(value.id)
         case let .image(value): .image(value.id)
+        case let .video(value): .video(value.id)
         }
     }
 
@@ -25,7 +28,7 @@ enum RecordingCanvasElement: Equatable {
         switch self {
         case let .annotation(value): value.kind == .text ? value.text : nil
         case let .caption(value): value.text
-        case .image: nil
+        case .image, .video: nil
         }
     }
 
@@ -33,7 +36,7 @@ enum RecordingCanvasElement: Equatable {
         switch self {
         case var .annotation(value): value.text = text; return .annotation(value)
         case var .caption(value): value.text = text; return .caption(value)
-        case .image: return self
+        case .image, .video: return self
         }
     }
 
@@ -49,7 +52,7 @@ enum RecordingCanvasElement: Equatable {
         case let .caption(value):
             let box = RecordingExportRenderer.captionLayout(value, canvas: CGRect(origin: .zero, size: canvas)).box
             return CGRect(x: box.minX, y: canvas.height - box.maxY, width: box.width, height: box.height)
-        case let .image(value):
+        case let .image(value), let .video(value):
             return CGRect(x: value.layout.x * canvas.width, y: value.layout.y * canvas.height,
                           width: value.layout.width * canvas.width, height: value.layout.height * canvas.height)
         }
@@ -65,7 +68,7 @@ enum RecordingCanvasElement: Equatable {
             if let index = project.captions.firstIndex(of: old), old.id == value.id {
                 project.captions[index] = value
             }
-        case let (.image(old), .image(value)):
+        case let (.image(old), .image(value)), let (.video(old), .video(value)):
             if let index = project.timeline?.clips.firstIndex(of: old), old.id == value.id {
                 project.timeline?.clips[index] = value
             }
@@ -78,12 +81,13 @@ enum RecordingCanvasElement: Equatable {
             return timeline.visibleClips(at: time).compactMap { clip in
                 switch clip.content {
                 case .image: return .image(clip)
+                case .recording, .video: return .video(clip)
                 case let .annotation(id):
                     return project.edits.annotations?.first(where: { $0.id == id }).map(Self.annotation)
                 case let .caption(id):
                     return project.edits.showCaptions
                         ? project.captions.first(where: { $0.id == id && !$0.text.isEmpty }).map(Self.caption) : nil
-                case .recording, .video, .audio: return nil
+                case .audio: return nil
                 }
             }
         }
@@ -163,7 +167,7 @@ enum RecordingCanvasGeometry {
                 scale = min(max(requested, max(0.01 / font, 4 / min(old.width, old.height))),
                             min(0.3 / font, min(limitWidth / old.width, limitHeight / old.height)))
                 newSize = CGSize(width: old.width * scale, height: old.height * scale)
-            } else if case .image = element {
+            } else if element.isMedia {
                 scale = min(max(requested, 4 / min(old.width, old.height)),
                             min(limitWidth / old.width, limitHeight / old.height))
                 newSize = CGSize(width: old.width * scale, height: old.height * scale)
@@ -197,6 +201,10 @@ enum RecordingCanvasGeometry {
             value.layout = RecordingRect(x: rect.minX / canvas.width, y: rect.minY / canvas.height,
                                          width: rect.width / canvas.width, height: rect.height / canvas.height)
             return .image(value)
+        case var .video(value):
+            value.layout = RecordingRect(x: rect.minX / canvas.width, y: rect.minY / canvas.height,
+                                         width: rect.width / canvas.width, height: rect.height / canvas.height)
+            return .video(value)
         }
     }
 
@@ -204,7 +212,16 @@ enum RecordingCanvasGeometry {
         switch element {
         case let .annotation(value): value.fontSize
         case let .caption(value): value.fontSize ?? max(12 / min(canvas.width, canvas.height), 0.035)
-        case .image: 0
+        case .image, .video: 0
+        }
+    }
+}
+
+private extension RecordingCanvasElement {
+    var isMedia: Bool {
+        switch self {
+        case .image, .video: true
+        default: false
         }
     }
 }

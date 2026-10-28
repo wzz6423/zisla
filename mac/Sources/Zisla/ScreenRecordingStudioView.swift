@@ -6,7 +6,6 @@ struct ScreenRecordingStudioView: View {
     @ObservedObject var model: ScreenRecordingStudioModel
     @ObservedObject var languageStore: AppLanguageStore
     let prepareCapture: () -> Void
-    @State private var inspector = 0
     @State private var selectedSegmentID: UUID?
     @State private var canvasSelection: RecordingCanvasSelection?
 
@@ -35,7 +34,7 @@ struct ScreenRecordingStudioView: View {
                 .background(Color.black.opacity(0.05))
                 VStack(spacing: 0) {
                     if model.project != nil {
-                        Picker("", selection: $inspector) {
+                        Picker("", selection: $model.inspectorTab) {
                             Label(AppLocalization.text("片段"), systemImage: "scissors").labelStyle(.iconOnly).tag(0)
                             Label(AppLocalization.text("画面效果"), systemImage: "slider.horizontal.3").labelStyle(.iconOnly).tag(1)
                             Label(AppLocalization.text("字幕"), systemImage: "captions.bubble").labelStyle(.iconOnly).tag(2)
@@ -50,7 +49,7 @@ struct ScreenRecordingStudioView: View {
                             if model.project != nil {
                                 Text(AppLocalization.text(inspectorTitle)).font(.system(size: 15, weight: .semibold))
                                     .padding(.bottom, 2)
-                                switch inspector {
+                                switch model.inspectorTab {
                                 case 0:
                                     ScreenRecordingMultitrackClipInspector(model: model)
                                     ScreenRecordingTimelineView(model: model, selectedSegmentID: $selectedSegmentID,
@@ -85,16 +84,17 @@ struct ScreenRecordingStudioView: View {
         .onChange(of: canvasSelection) { _, selection in
             switch selection {
             case let .annotation(id):
-                inspector = 1
+                model.inspectorTab = 1
                 model.selectCanvasTimelineContent(.annotation(id))
             case let .caption(id):
-                inspector = 2
+                model.inspectorTab = 2
                 model.selectCanvasTimelineContent(.caption(id))
-            case let .image(id): inspector = 0; model.selectedTimelineClipID = id
+            case let .image(id), let .video(id): model.inspectorTab = 0; model.selectedTimelineClipID = id
             case nil: break
             }
         }
         .onChange(of: model.selectedTimelineClipID, initial: true) { _, id in
+            if let clip = model.selectedTimelineClip { model.selectedTimelineTrackID = clip.trackID }
             if model.project?.timeline == nil, let segmentID = id.flatMap(UUID.init(uuidString:)),
                model.project?.edits.segments.contains(where: { $0.id == segmentID }) == true {
                 selectedSegmentID = segmentID
@@ -103,6 +103,7 @@ struct ScreenRecordingStudioView: View {
             case let .annotation(id): canvasSelection = .annotation(id)
             case let .caption(id): canvasSelection = .caption(id)
             case .image: canvasSelection = id.map(RecordingCanvasSelection.image)
+            case .recording, .video: canvasSelection = id.map(RecordingCanvasSelection.video)
             default: canvasSelection = nil
             }
         }
@@ -169,7 +170,7 @@ struct ScreenRecordingStudioView: View {
         }
     }
 
-    private var inspectorTitle: String { ["片段", "画面效果", "字幕", "AI 剪辑"][inspector] }
+    private var inspectorTitle: String { ["片段", "画面效果", "字幕", "AI 剪辑"][model.inspectorTab] }
 
     private func transport(_ project: ScreenRecordingProject) -> some View {
         let original = model.isShowingSourcePlayback
@@ -185,11 +186,6 @@ struct ScreenRecordingStudioView: View {
             .accessibilityLabel(AppLocalization.text(model.isShowingTimelinePlayback ? "暂停预览" : "播放剪辑"))
             .accessibilityIdentifier("screenRecording.playTimeline")
             .disabled(!model.canExport)
-            Button(action: model.playSource) { Image(systemName: "film").frame(width: 24, height: 26) }
-                .buttonStyle(.plain)
-                .help(AppLocalization.text(model.isShowingSourcePlayback ? "正在播放原始素材" : "播放原始素材"))
-                .accessibilityLabel(AppLocalization.text("播放原始素材"))
-                .disabled(model.player == nil)
             Slider(value: Binding(get: { time }, set: { original ? model.seekSource(to: $0) : model.seekTimeline(to: $0) }),
                    in: 0...max(0.001, duration))
                 .accessibilityLabel(AppLocalization.text("时间线"))
