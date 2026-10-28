@@ -2807,3 +2807,8 @@
 "显示侧边栏" = "Tampilkan Bilah Samping";
 "后退" = "Kembali";
 "前进" = "Maju";
+
+"查看截图" = "Lihat tangkapan layar";
+"复制截图" = "Salin tangkapan layar";
+"截图失败：%@" = "Gagal mengambil tangkapan layar: %@";
+"无法读取便签关联的应用窗口" = "Tidak dapat membaca jendela aplikasi yang terkait dengan catatan ini";

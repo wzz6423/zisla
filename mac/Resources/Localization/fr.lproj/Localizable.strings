@@ -2803,3 +2803,8 @@
 "显示侧边栏" = "Afficher la barre latérale";
 "后退" = "Précédent";
 "前进" = "Suivant";
+
+"查看截图" = "Afficher la capture d’écran";
+"复制截图" = "Copier la capture d’écran";
+"截图失败：%@" = "Échec de la capture d’écran : %@";
+"无法读取便签关联的应用窗口" = "Impossible de lire la fenêtre de l’application associée à cette note";

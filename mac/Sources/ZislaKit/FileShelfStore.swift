@@ -58,9 +58,10 @@ public struct FileShelfItem: Identifiable, Equatable {
     public var text: String?
     public var isManaged: Bool
     public var noteLocation: ContextNoteLocation?
+    public var noteScreenshotURL: URL?
     public var screenshotMetadata: ShelfScreenshotMetadata?
 
-    public init(id: UUID, url: URL, addedAt: Date, bookmarkData: Data, text: String? = nil, isManaged: Bool = false, noteLocation: ContextNoteLocation? = nil, screenshotMetadata: ShelfScreenshotMetadata? = nil) {
+    public init(id: UUID, url: URL, addedAt: Date, bookmarkData: Data, text: String? = nil, isManaged: Bool = false, noteLocation: ContextNoteLocation? = nil, screenshotMetadata: ShelfScreenshotMetadata? = nil, noteScreenshotURL: URL? = nil) {
         self.id = id
         self.url = url
         self.addedAt = addedAt
@@ -68,6 +69,7 @@ public struct FileShelfItem: Identifiable, Equatable {
         self.text = text
         self.isManaged = isManaged
         self.noteLocation = noteLocation
+        self.noteScreenshotURL = noteScreenshotURL
         self.screenshotMetadata = screenshotMetadata
     }
 
@@ -142,6 +144,7 @@ public final class FileShelfStore: ObservableObject {
         var text: String?
         var isManaged: Bool?
         var noteLocation: ContextNoteLocation?
+        var hasNoteScreenshot: Bool?
         var shelfOrder: Int64?
     }
 
@@ -315,13 +318,20 @@ public final class FileShelfStore: ObservableObject {
         return additions.count
     }
 
-    public func addContextNote(_ text: String, location: ContextNoteLocation, addedAt: Date = Date()) -> FileShelfItem? {
+    public func addContextNote(_ text: String, location: ContextNoteLocation, addedAt: Date = Date(), screenshot: Data? = nil) -> FileShelfItem? {
         guard !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return nil }
         do {
+            if let screenshot { _ = try Self.screenshotDimensions(screenshot) }
             var item = try makeManagedItem(name: "note.txt", text: text) {
                 try Data(text.utf8).write(to: $0, options: .atomic)
+                if let screenshot {
+                    let attachment = $0.deletingLastPathComponent().appendingPathComponent("screenshot.png")
+                    try screenshot.write(to: attachment, options: .atomic)
+                    try FileManager.default.setAttributes([.posixPermissions: 0o600], ofItemAtPath: attachment.path)
+                }
             }
             item.noteLocation = location
+            item.noteScreenshotURL = screenshot.map { _ in item.url.deletingLastPathComponent().appendingPathComponent("screenshot.png") }
             item.addedAt = addedAt
             guard persist(items + [item]) else {
                 removeManagedFile(item)
@@ -644,7 +654,9 @@ public final class FileShelfStore: ObservableObject {
                     bookmarkData: bookmark,
                     text: value.text,
                     isManaged: value.isManaged ?? false,
-                    noteLocation: value.noteLocation
+                    noteLocation: value.noteLocation,
+                    noteScreenshotURL: value.hasNoteScreenshot == true
+                        ? managedDirectory.appendingPathComponent(value.id.uuidString).appendingPathComponent("screenshot.png") : nil
                 ))
                 shelfOrder[value.id] = value.shelfOrder ?? Int64(index)
             }
@@ -677,7 +689,8 @@ public final class FileShelfStore: ObservableObject {
                     order[item.id] = lastOrder
                 }
                 return StoredItem(id: item.id, bookmarkData: item.bookmarkData, addedAt: item.addedAt, url: item.url,
-                    text: item.text, isManaged: item.isManaged ? true : nil, noteLocation: item.noteLocation, shelfOrder: order[item.id])
+                    text: item.text, isManaged: item.isManaged ? true : nil, noteLocation: item.noteLocation,
+                    hasNoteScreenshot: item.noteScreenshotURL == nil ? nil : true, shelfOrder: order[item.id])
             }
             let data = try JSONEncoder().encode(stored)
             try data.write(to: storageURL, options: .atomic)

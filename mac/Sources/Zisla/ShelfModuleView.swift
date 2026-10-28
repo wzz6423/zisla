@@ -136,7 +136,17 @@ struct ShelfModuleView: View {
                         ContextNoteDetailView(draft: draft, onCopy: { model.copyContextNoteText(draft.text) },
                                               onNavigate: { model.navigateToContextNote(draft.location) },
                                               onSave: { model.saveShelfContextNote() },
-                                              onClose: { noteEditor.close() })
+                                              onClose: { noteEditor.close() },
+                                              onCopyScreenshot: { model.copyContextNoteScreenshot($0) },
+                                              onOpenScreenshot: { screenshot in
+                                                  noteEditor.screenshotPreview.present(screenshot, onCopy: { [weak model] png in
+                                                      model?.copyContextNoteScreenshot(png)
+                                                  }, onSave: { [weak model] png in
+                                                      ScreenshotImageExport.presentSavePanel(for: png) { [weak model] message in
+                                                          if let message { model?.transientMessage = message }
+                                                      }
+                                                  })
+                                              })
                             .id(ObjectIdentifier(draft))
                     } else if let screenshot = noteEditor.screenshot {
                         ShelfScreenshotDetailView(detail: screenshot, onCopy: {

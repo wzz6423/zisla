@@ -31,16 +31,94 @@ struct ContextNoteVisitTracker {
 }
 
 @MainActor
+struct ContextNoteScreenshot {
+    let png: Data
+    let image: NSImage
+
+    init(png: Data) throws {
+        _ = try FileShelfStore.screenshotDimensions(png)
+        self.png = png
+        self.image = NSImage(data: png)!
+    }
+}
+
+@MainActor
 final class ContextNoteDraft: ObservableObject {
+    private enum ScreenshotState {
+        case none
+        case capturing
+        case captured(ContextNoteScreenshot)
+        case failed(Error)
+    }
+
     let location: ContextNoteLocation
     let createdAt: Date
     @Published var text = ""
     @Published var error: String?
+    @Published private var screenshotState = ScreenshotState.none
+    private(set) var screenshotTask: Task<Void, Never>?
+
+    var screenshot: ContextNoteScreenshot? {
+        if case .captured(let screenshot) = screenshotState { return screenshot }
+        return nil
+    }
+
+    var screenshotError: String? {
+        if case .failed(let error) = screenshotState { return Self.screenshotFailure(error) }
+        return nil
+    }
+
+    var isCapturingScreenshot: Bool {
+        if case .capturing = screenshotState { return true }
+        return false
+    }
 
     init(location: ContextNoteLocation, createdAt: Date = Date()) {
         self.location = location
         self.createdAt = createdAt
     }
+
+    func captureScreenshot(from source: Result<ContextNoteScreenshotSource, Error>,
+                           using capture: @escaping @MainActor (ContextNoteScreenshotSource) async throws -> Data) {
+        switch source {
+        case .failure(let error):
+            screenshotState = .failed(error)
+        case .success(let source):
+            screenshotState = .capturing
+            screenshotTask = Task { [weak self] in
+                do {
+                    try Task.checkCancellation()
+                    let png = try await capture(source)
+                    try Task.checkCancellation()
+                    self?.screenshotState = .captured(try ContextNoteScreenshot(png: png))
+                } catch {
+                    guard !Task.isCancelled else { return }
+                    self?.screenshotState = .failed(error)
+                }
+                self?.screenshotTask = nil
+            }
+        }
+    }
+
+    func loadScreenshot(at url: URL) {
+        do { screenshotState = .captured(try ContextNoteScreenshot(png: Data(contentsOf: url))) }
+        catch { screenshotState = .failed(error) }
+    }
+
+    func cancelScreenshotCapture() {
+        guard let screenshotTask else { return }
+        screenshotTask.cancel()
+        self.screenshotTask = nil
+        screenshotState = .failed(CocoaError(.userCancelled))
+    }
+
+    private static func screenshotFailure(_ error: Error) -> String {
+        let detail = (error as? ScreenshotCaptureError)?.errorDescription.map { AppLocalization.text($0) }
+            ?? error.localizedDescription
+        return AppLocalization.text("截图失败：%@", detail)
+    }
+
+    isolated deinit { screenshotTask?.cancel() }
 }
 
 enum ContextNoteLayout {
@@ -51,6 +129,24 @@ enum ContextNoteLayout {
         return CGRect(x: min(max(x, bounds.minX), bounds.maxX - size.width),
                       y: min(max(point.y - size.height / 2, bounds.minY), bounds.maxY - size.height),
                       width: size.width, height: size.height)
+    }
+}
+
+@MainActor
+final class ContextNoteFieldEditor: NSTextView, NSWindowDelegate {
+    override func firstRect(forCharacterRange range: NSRange, actualRange: NSRangePointer?) -> NSRect {
+        var rect = super.firstRect(forCharacterRange: range, actualRange: actualRange)
+        if let window {
+            // Candidate windows must clear the whole note surface, not just its text line.
+            rect.origin.y = window.frame.minY
+            rect.size.height = window.frame.height
+        }
+        return rect
+    }
+
+    func windowWillReturnFieldEditor(_ sender: NSWindow, to client: Any?) -> Any? {
+        isFieldEditor = true
+        return self
     }
 }
 
@@ -72,15 +168,25 @@ enum ContextNoteHoldShortcut {
 
 @MainActor
 final class ContextNoteController {
+    typealias LocationCapture = @MainActor (CGPoint, ((pid_t, CGRect?, String) -> Void)?) -> ContextNoteObservation
+
+    private enum Capture {
+        case location(ContextNoteLocation, Result<ContextNoteScreenshotSource, Error>)
+        case ignored
+        case unavailable
+    }
+
     private let settingsStore: FeatureSettingsStore
     private let languageStore: AppLanguageStore
     private let shelf: FileShelfStore
-    private let captureLocation: @MainActor (CGPoint) -> ContextNoteObservation
-    private let currentLocation: @MainActor (CGPoint) -> ContextNoteObservation
+    private let captureLocation: LocationCapture
+    private let currentLocation: LocationCapture
+    private let screenshotSource: (ContextNoteLocation, ContextNoteScreenshotCapture.WindowReference?) throws -> ContextNoteScreenshotSource
+    private let captureScreenshot: @MainActor (ContextNoteScreenshotSource) async throws -> Data
     private let canInteract: () -> Bool
     private let onReminder: (FileShelfItem, CGPoint) -> Bool
     private let onCaptureFailure: (CGPoint) -> Void
-    private let onSaved: (FileShelfItem, CGPoint) -> Void
+    private let onSaved: (FileShelfItem, CGPoint, String?) -> Void
     private let pressedMouseButtons: () -> Int
     private let modifierFlags: () -> NSEvent.ModifierFlags
     private let keyIsPressed: (CGKeyCode) -> Bool
@@ -92,8 +198,10 @@ final class ContextNoteController {
     private var detector = ContextNoteShakeDetector()
     private var holdHotkey: VoiceInputHotkeyPreset
     private var visits = ContextNoteVisitTracker()
-    private var shelfLocation: ContextNoteObservation = .unavailable
+    private var shelfCapture = Capture.unavailable
+    private weak var shelfDraft: ContextNoteDraft?
     private var window: IslandPanel?
+    private let fieldEditor = ContextNoteFieldEditor()
     private var cancelMonitor: Any?
     private var sourceApplication: NSRunningApplication?
     private var anchor = CGPoint.zero
@@ -108,12 +216,18 @@ final class ContextNoteController {
     private var isSuspended: Bool { screenLocked || screenshotActive || systemScreenshotActive || sleeping }
 
     init(settingsStore: FeatureSettingsStore, languageStore: AppLanguageStore, shelf: FileShelfStore,
-         captureLocation: @escaping @MainActor (CGPoint) -> ContextNoteObservation = ContextNoteLocationReader.capture,
-         currentLocation: @escaping @MainActor (CGPoint) -> ContextNoteObservation = ContextNoteLocationReader.current,
+         captureLocation: @escaping LocationCapture = ContextNoteLocationReader.capture,
+         currentLocation: @escaping LocationCapture = ContextNoteLocationReader.current,
+         screenshotSource: @escaping (ContextNoteLocation, ContextNoteScreenshotCapture.WindowReference?) throws -> ContextNoteScreenshotSource = {
+             try ContextNoteScreenshotCapture.source(for: $0, window: $1)
+         },
+         captureScreenshot: @escaping @MainActor (ContextNoteScreenshotSource) async throws -> Data = {
+             try await ContextNoteScreenshotCapture.capture($0)
+         },
          canInteract: @escaping () -> Bool,
          onReminder: @escaping (FileShelfItem, CGPoint) -> Bool,
          onCaptureFailure: @escaping (CGPoint) -> Void,
-         onSaved: @escaping (FileShelfItem, CGPoint) -> Void,
+         onSaved: @escaping (FileShelfItem, CGPoint, String?) -> Void,
          pressedMouseButtons: @escaping () -> Int = { NSEvent.pressedMouseButtons },
          modifierFlags: @escaping () -> NSEvent.ModifierFlags = { NSEvent.modifierFlags },
          keyIsPressed: @escaping (CGKeyCode) -> Bool = { CGEventSource.keyState(.combinedSessionState, key: $0) },
@@ -123,6 +237,8 @@ final class ContextNoteController {
         self.shelf = shelf
         self.captureLocation = captureLocation
         self.currentLocation = currentLocation
+        self.screenshotSource = screenshotSource
+        self.captureScreenshot = captureScreenshot
         self.canInteract = canInteract
         self.onReminder = onReminder
         self.onCaptureFailure = onCaptureFailure
@@ -162,7 +278,7 @@ final class ContextNoteController {
     func stop() {
         enabled = false
         isStarted = false
-        shelfLocation = .unavailable
+        shelfCapture = .unavailable
         subscription = nil
         pointerMonitor?.stop()
         pointerMonitor = nil
@@ -170,6 +286,7 @@ final class ContextNoteController {
         timer = nil
         observers.forEach { NSWorkspace.shared.notificationCenter.removeObserver($0) }
         observers.removeAll()
+        shelfDraft?.cancelScreenshotCapture()
         discard()
     }
 
@@ -184,7 +301,11 @@ final class ContextNoteController {
     private func updateMonitoring() {
         detector.reset()
         guard enabled, !isSuspended else {
-            if isSuspended { shelfLocation = .unavailable }
+            if isSuspended {
+                shelfCapture = .unavailable
+                draft?.cancelScreenshotCapture()
+                shelfDraft?.cancelScreenshotCapture()
+            }
             pointerMonitor?.stop()
             pointerMonitor = nil
             timer?.invalidate()
@@ -224,11 +345,13 @@ final class ContextNoteController {
         }
         guard detector.record(point, at: timestamp) else { return }
         detector.reset()
-        let observation = captureLocation(point)
-        if observation == .unavailable { onCaptureFailure(point) }
-        guard case .location(let location) = observation else { return }
+        let context = captureContext(at: point, using: captureLocation)
+        if case .unavailable = context { onCaptureFailure(point) }
+        guard case .location(let location, let screenshotSource) = context else { return }
         anchor = point
-        draft = ContextNoteDraft(location: location)
+        let draft = ContextNoteDraft(location: location)
+        draft.captureScreenshot(from: screenshotSource, using: captureScreenshot)
+        self.draft = draft
         windowPresenter(self, point, true)
     }
 
@@ -239,17 +362,19 @@ final class ContextNoteController {
     }
 
     func save(at date: Date = Date()) {
-        guard let draft, !draft.text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return }
-        guard let item = shelf.addContextNote(draft.text, location: draft.location, addedAt: date) else {
+        guard let draft, !draft.isCapturingScreenshot,
+              !draft.text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return }
+        guard let item = shelf.addContextNote(draft.text, location: draft.location, addedAt: date, screenshot: draft.screenshot?.png) else {
             draft.error = shelf.errorDescription
             return
         }
         didSaveNote(item)
         discard()
-        onSaved(item, anchor)
+        onSaved(item, anchor, draft.screenshotError)
     }
 
     func discard() {
+        draft?.cancelScreenshotCapture()
         draft = nil
         detector.reset()
         if let cancelMonitor { NSEvent.removeMonitor(cancelMonitor) }
@@ -262,29 +387,53 @@ final class ContextNoteController {
 
     func checkForReturn(at point: CGPoint) {
         guard enabled, !isSuspended, draft == nil, canInteract(), shelf.items.contains(where: { $0.noteLocation != nil }) else { return }
-        let observation = currentLocation(point)
+        let observation = currentLocation(point, nil)
         if let item = visits.candidate(for: observation, items: shelf.items), onReminder(item, point) {
             visits.didPresent()
         }
     }
 
     func prepareShelfCapture(at point: CGPoint) {
-        guard !isSuspended else { shelfLocation = .unavailable; return }
-        shelfLocation = currentLocation(point)
+        guard !isSuspended else { shelfCapture = .unavailable; return }
+        shelfCapture = captureContext(at: point, using: currentLocation)
     }
 
     func makeShelfDraft(at point: CGPoint, createdAt: Date = Date()) -> ContextNoteDraft? {
         guard !isSuspended else { return nil }
-        let observation = currentLocation(point)
+        let context = captureContext(at: point, using: currentLocation)
         // Clicking the island activates this app; keep the context captured before that click.
-        if observation != .ignored { shelfLocation = observation }
-        guard case .location(let location) = shelfLocation else { return nil }
-        return ContextNoteDraft(location: location, createdAt: createdAt)
+        switch context {
+        case .ignored: break
+        case .location, .unavailable: shelfCapture = context
+        }
+        guard case .location(let location, let screenshotSource) = shelfCapture else { return nil }
+        let draft = ContextNoteDraft(location: location, createdAt: createdAt)
+        draft.captureScreenshot(from: screenshotSource, using: captureScreenshot)
+        shelfDraft = draft
+        return draft
+    }
+
+    private func captureContext(at point: CGPoint, using read: LocationCapture) -> Capture {
+        var window: ContextNoteScreenshotCapture.WindowReference?
+        let observation = read(point) { window = .init(processIdentifier: $0, frame: $1, title: $2) }
+        switch observation {
+        case .location(let location): return .location(location, Result { try screenshotSource(location, window) })
+        case .ignored: return .ignored
+        case .unavailable: return .unavailable
+        }
     }
 
     func didSaveNote(_ item: FileShelfItem) {
         guard let location = item.noteLocation else { return }
         visits.didSave(at: location)
+    }
+
+    static func makeWindow(contentView: NSView, frame: CGRect, fieldEditor: ContextNoteFieldEditor) -> IslandPanel {
+        let panel = ClipboardAssistantController.makeWindow(contentView: contentView, frame: frame)
+        panel.allowsKeyWindow = true
+        panel.avoidsAppActivation = false
+        panel.delegate = fieldEditor
+        return panel
     }
 
     private func presentWindow(at point: CGPoint, focus: Bool) {
@@ -300,10 +449,9 @@ final class ContextNoteController {
                                           onDiscard: { [weak self] in self?.discard() })
         let hosting = NSHostingView(rootView: AppLanguageEnvironment(languageStore: languageStore, content: content))
         hosting.sizingOptions = []
-        let panel = ClipboardAssistantController.makeWindow(contentView: hosting,
-                                                            frame: ContextNoteLayout.frame(near: point, in: screen.visibleFrame))
-        panel.allowsKeyWindow = true
-        panel.avoidsAppActivation = false
+        let panel = Self.makeWindow(contentView: hosting,
+                                    frame: ContextNoteLayout.frame(near: point, in: screen.visibleFrame),
+                                    fieldEditor: fieldEditor)
         window = panel
         cancelMonitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { [weak self, weak panel] event in
             guard let panel, event.window === panel, ContextNoteInputCommand.isDiscard(event) else { return event }
