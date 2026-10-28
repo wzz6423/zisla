@@ -27,6 +27,8 @@ export const id = createCatalog({
     downloadCta: 'Unduh',
     downloadCtaAriaLabel: 'Buka bagian unduhan',
     languageLabel: 'Bahasa antarmuka',
+    themeLabel: 'Tampilan',
+    themeModes: { auto: 'Otomatis (sistem)', light: 'Mode terang', dark: 'Mode gelap' },
   },
   hero: {
     eyebrow: 'RUANG KERJA MACOS NATIVE',

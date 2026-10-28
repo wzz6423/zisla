@@ -27,6 +27,8 @@ export const tr = createCatalog({
     downloadCta: 'İndir',
     downloadCtaAriaLabel: 'İndirme bölümüne git',
     languageLabel: 'Arayüz dili',
+    themeLabel: 'Görünüm',
+    themeModes: { auto: 'Otomatik (sistem)', light: 'Açık mod', dark: 'Koyu mod' },
   },
   hero: {
     eyebrow: 'YEREL MACOS ÇALIŞMA ALANI',
