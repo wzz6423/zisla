@@ -203,6 +203,12 @@ class AutomationWorkflowsTest < Minitest::Test
     end
   end
 
+  def test_swift_suite_budget_leaves_time_after_the_recorded_runner_timeout
+    job = YAML.load_file(File.join(ROOT, '.github/workflows/swift-tests.yml')).fetch('jobs').fetch('test-suites')
+    # Job 122664290119 reached 20 minutes while its isolated suites were still running.
+    assert_operator job.fetch('timeout-minutes') * 60, :>=, 20 * 60 + 5 * 60
+  end
+
   def test_issue_timeline_tracks_close_and_reopen_without_losing_edits
     install_workflow_fixture
     event = workflow_event('issue', 'closed', closed_at: '2026-10-05T02:30:00Z')

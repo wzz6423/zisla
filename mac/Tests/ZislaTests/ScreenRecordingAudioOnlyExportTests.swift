@@ -46,6 +46,24 @@ struct ScreenRecordingAudioOnlyExportTests {
         #expect(try fixture.files() == ["screen.mp4", "tone.wav"])
     }
 
+    @Test(arguments: [RecordingExportFormat.wav, .flac, .aiff], [24_000, 48_001])
+    func losslessFormatsPreserveValidFramesWithoutDecoderPadding(_ format: RecordingExportFormat, _ frames: Int) async throws {
+        let fixture = try RecordingMultitrackTestFixture()
+        defer { fixture.remove() }
+        _ = try fixture.createTone()
+        var project = toneProject()
+        project.timeline?.clips[0].sourceEnd = Double(frames) / 48_000
+        let output = fixture.root.appendingPathComponent("valid-frames." + format.fileExtension)
+        try await ScreenRecordingExporter().export(project: project, directory: fixture.directory, to: output,
+            configuration: .init(format: format))
+        let file = try AVAudioFile(forReading: output)
+        #expect(file.length == AVAudioFramePosition(frames))
+        let decoded = try await decode(output)
+        #expect(decoded.samples.count == frames, "Decoder block padding must not extend the exported timeline")
+        #expect(energy(decoded.samples, start: 0.12, end: 0.35, rate: decoded.rate) > 0.000_5)
+        #expect(try stagingFiles(in: fixture.root).isEmpty)
+    }
+
     @Test func audioOnlyCompositionKeepsOverlapGainAndLeadingInternalTrailingSilence() async throws {
         let fixture = try RecordingMultitrackTestFixture()
         defer { fixture.remove() }
@@ -328,33 +346,17 @@ struct ScreenRecordingAudioOnlyExportTests {
     }
 
     private func decode(_ url: URL) async throws -> Decoded {
-        let asset = AVURLAsset(url: url)
-        let tracks = try await asset.loadTracks(withMediaType: .audio)
-        let reader = try AVAssetReader(asset: asset)
-        let output = AVAssetReaderAudioMixOutput(audioTracks: tracks, audioSettings: [
-            AVFormatIDKey: kAudioFormatLinearPCM, AVSampleRateKey: 48_000,
-            AVNumberOfChannelsKey: 2, AVLinearPCMBitDepthKey: 32,
-            AVLinearPCMIsFloatKey: true, AVLinearPCMIsNonInterleaved: false,
-        ])
-        reader.add(output)
-        try #require(reader.startReading())
-        defer { reader.cancelReading() }
+        let file = try AVAudioFile(forReading: url, commonFormat: .pcmFormatFloat32, interleaved: false)
+        let format = file.processingFormat
+        let buffer = try #require(AVAudioPCMBuffer(pcmFormat: format, frameCapacity: 4_096))
         var samples: [Float] = []
-        while let sample = output.copyNextSampleBuffer() {
-            let block = try #require(sample.dataBuffer)
-            var bytes = [UInt8](repeating: 0, count: CMBlockBufferGetDataLength(block))
-            let count = bytes.count
-            try bytes.withUnsafeMutableBytes { buffer in
-                try #require(CMBlockBufferCopyDataBytes(block, atOffset: 0, dataLength: count,
-                    destination: try #require(buffer.baseAddress)) == noErr)
-            }
-            let floats = bytes.withUnsafeBytes { Array($0.bindMemory(to: Float.self)) }
-            samples += stride(from: 0, to: floats.count, by: 2).map { floats[$0] }
+        while file.framePosition < file.length {
+            try file.read(into: buffer)
+            try #require(buffer.frameLength > 0)
+            let channel = try #require(buffer.floatChannelData?[0])
+            samples += UnsafeBufferPointer(start: channel, count: Int(buffer.frameLength))
         }
-        #expect(reader.status == .completed && reader.error == nil)
-        let format = try #require(try await tracks.first?.load(.formatDescriptions).first)
-        let audio = try #require(CMAudioFormatDescriptionGetStreamBasicDescription(format))
-        return .init(samples: samples, rate: audio.pointee.mSampleRate, channels: audio.pointee.mChannelsPerFrame)
+        return .init(samples: samples, rate: format.sampleRate, channels: format.channelCount)
     }
 
     fileprivate func energy(_ samples: [Float], start: Double, end: Double, rate: Double = 48_000) -> Double {
