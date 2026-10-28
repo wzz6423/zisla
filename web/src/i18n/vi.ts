@@ -27,6 +27,8 @@ export const vi = createCatalog({
     downloadCta: 'Tải xuống',
     downloadCtaAriaLabel: 'Đến phần tải xuống',
     languageLabel: 'Ngôn ngữ giao diện',
+    themeLabel: 'Giao diện',
+    themeModes: { auto: 'Tự động (theo hệ thống)', light: 'Chế độ sáng', dark: 'Chế độ tối' },
   },
   hero: {
     eyebrow: 'KHÔNG GIAN LÀM VIỆC MACOS NGUYÊN BẢN',

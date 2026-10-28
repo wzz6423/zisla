@@ -9,6 +9,15 @@ import type { SiteLocale } from './locales';
 export const navIds = ['showcase', 'ai', 'download', 'faq', 'developers', 'changelog'] as const;
 export type NavId = (typeof navIds)[number];
 
+export const themeModes = ['auto', 'light', 'dark'] as const;
+export type ThemeMode = (typeof themeModes)[number];
+
+export const themeModeIcons: Record<ThemeMode, string> = {
+  auto: 'monitor',
+  light: 'sun',
+  dark: 'moon',
+};
+
 export const navHrefs: Record<NavId, string> = {
   showcase: '#showcase',
   ai: '#ai',
@@ -456,6 +465,8 @@ export interface SiteContent {
     downloadCta: string;
     downloadCtaAriaLabel: string;
     languageLabel: string;
+    themeLabel: string;
+    themeModes: Record<ThemeMode, string>;
   };
   hero: {
     eyebrow: string;

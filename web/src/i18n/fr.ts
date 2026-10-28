@@ -27,6 +27,8 @@ export const fr: SiteContent = {
     downloadCta: 'Télécharger',
     downloadCtaAriaLabel: 'Aller à la section de téléchargement',
     languageLabel: 'Langue de l’interface',
+    themeLabel: 'Apparence',
+    themeModes: { auto: 'Automatique (système)', light: 'Mode clair', dark: 'Mode sombre' },
   },
   hero: {
     eyebrow: 'ESPACE DE TRAVAIL MACOS NATIF',

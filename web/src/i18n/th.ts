@@ -27,6 +27,8 @@ export const th = createCatalog({
     downloadCta: 'ดาวน์โหลด',
     downloadCtaAriaLabel: 'ไปยังส่วนดาวน์โหลด',
     languageLabel: 'ภาษาของอินเทอร์เฟซ',
+    themeLabel: 'รูปแบบการแสดงผล',
+    themeModes: { auto: 'อัตโนมัติ (ตามระบบ)', light: 'โหมดสว่าง', dark: 'โหมดมืด' },
   },
   hero: {
     eyebrow: 'พื้นที่ทำงาน MACOS แบบเนทีฟ',

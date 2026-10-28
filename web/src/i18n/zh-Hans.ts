@@ -27,6 +27,8 @@ export const zhHans: SiteContent = {
     downloadCta: '下载',
     downloadCtaAriaLabel: '跳转到下载区域',
     languageLabel: '界面语言',
+    themeLabel: '外观模式',
+    themeModes: { auto: '自动（跟随系统）', light: '日间模式', dark: '夜间模式' },
   },
   hero: {
     eyebrow: '原生 MACOS 工作空间',

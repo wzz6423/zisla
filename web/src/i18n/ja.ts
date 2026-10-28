@@ -27,6 +27,8 @@ export const ja: SiteContent = {
     downloadCta: 'ダウンロード',
     downloadCtaAriaLabel: 'ダウンロードセクションへ移動',
     languageLabel: '表示言語',
+    themeLabel: '外観モード',
+    themeModes: { auto: '自動（システムに従う）', light: 'ライトモード', dark: 'ダークモード' },
   },
   hero: {
     eyebrow: 'ネイティブ MACOS ワークスペース',

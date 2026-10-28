@@ -27,6 +27,8 @@ export const it = createCatalog({
     downloadCta: 'Scarica',
     downloadCtaAriaLabel: 'Vai alla sezione download',
     languageLabel: 'Lingua dell’interfaccia',
+    themeLabel: 'Aspetto',
+    themeModes: { auto: 'Automatico (sistema)', light: 'Modalità chiara', dark: 'Modalità scura' },
   },
   hero: {
     eyebrow: 'SPAZIO DI LAVORO NATIVO PER MACOS',

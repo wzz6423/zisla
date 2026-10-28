@@ -27,6 +27,8 @@ export const nl = createCatalog({
     downloadCta: 'Download',
     downloadCtaAriaLabel: 'Naar de downloadsectie',
     languageLabel: 'Interfacetaal',
+    themeLabel: 'Weergave',
+    themeModes: { auto: 'Automatisch (systeem)', light: 'Lichte modus', dark: 'Donkere modus' },
   },
   hero: {
     eyebrow: 'NATIVE MACOS-WERKRUIMTE',

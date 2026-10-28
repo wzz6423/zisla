@@ -27,6 +27,8 @@ export const ru = createCatalog({
     downloadCta: 'Скачать',
     downloadCtaAriaLabel: 'Перейти к разделу загрузки',
     languageLabel: 'Язык интерфейса',
+    themeLabel: 'Оформление',
+    themeModes: { auto: 'Автоматически (система)', light: 'Светлый режим', dark: 'Тёмный режим' },
   },
   hero: {
     eyebrow: 'НАТИВНОЕ ПРОСТРАНСТВО MACOS',

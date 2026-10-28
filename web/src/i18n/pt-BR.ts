@@ -27,6 +27,8 @@ export const ptBR = createCatalog({
     downloadCta: 'Baixar',
     downloadCtaAriaLabel: 'Ir para a seção de download',
     languageLabel: 'Idioma da interface',
+    themeLabel: 'Aparência',
+    themeModes: { auto: 'Automático (sistema)', light: 'Modo claro', dark: 'Modo escuro' },
   },
   hero: {
     eyebrow: 'ESPAÇO DE TRABALHO NATIVO PARA MACOS',

@@ -27,6 +27,8 @@ export const zhHant: SiteContent = {
     downloadCta: '下載',
     downloadCtaAriaLabel: '跳至下載區塊',
     languageLabel: '介面語言',
+    themeLabel: '外觀模式',
+    themeModes: { auto: '自動（跟隨系統）', light: '日間模式', dark: '夜間模式' },
   },
   hero: {
     eyebrow: '原生 MACOS 工作空間',

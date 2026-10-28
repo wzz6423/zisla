@@ -27,6 +27,8 @@ export const ar = createCatalog({
     downloadCta: 'تنزيل',
     downloadCtaAriaLabel: 'الانتقال إلى قسم التنزيل',
     languageLabel: 'لغة الواجهة',
+    themeLabel: 'المظهر',
+    themeModes: { auto: 'تلقائي (حسب النظام)', light: 'الوضع الفاتح', dark: 'الوضع الداكن' },
   },
   hero: {
     eyebrow: 'مساحة عمل أصلية لـ MACOS',

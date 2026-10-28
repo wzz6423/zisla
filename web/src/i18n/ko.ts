@@ -27,6 +27,8 @@ export const ko: SiteContent = {
     downloadCta: '다운로드',
     downloadCtaAriaLabel: '다운로드 섹션으로 이동',
     languageLabel: '표시 언어',
+    themeLabel: '화면 모드',
+    themeModes: { auto: '자동 (시스템 설정)', light: '라이트 모드', dark: '다크 모드' },
   },
   hero: {
     eyebrow: '네이티브 MACOS 워크스페이스',
