@@ -615,9 +615,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
                 model.clipboardAssistant.present(ClipboardAssistantDetection(kind: .text, title: message, fullContent: message),
                                                  visualStyle: model.settingsStore.settings.islandVisualStyle, at: point)
             },
-            onSaved: { [weak coordinator] _, point in
+            onSaved: { [weak coordinator] _, point, screenshotError in
                 model.contextNoteEditor.hide()
-                model.transientMessage = AppLocalization.text("已加入 %ld 个项目", 1)
+                model.transientMessage = screenshotError.map { AppLocalization.text("已保存便签") + " · " + $0 }
+                    ?? AppLocalization.text("已加入 %ld 个项目", 1)
                 coordinator?.setTransientNoticePresented(true, at: point)
                 model.selectModule(.shelf)
             }

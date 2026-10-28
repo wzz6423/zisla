@@ -2807,3 +2807,8 @@
 "显示侧边栏" = "Mostra barra laterale";
 "后退" = "Indietro";
 "前进" = "Avanti";
+
+"查看截图" = "Visualizza screenshot";
+"复制截图" = "Copia screenshot";
+"截图失败：%@" = "Acquisizione dello screenshot non riuscita: %@";
+"无法读取便签关联的应用窗口" = "Impossibile acquisire la finestra dell’applicazione associata a questa nota";

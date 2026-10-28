@@ -69,13 +69,18 @@ struct ContextNoteInputView: View {
 
     var body: some View {
         HStack(spacing: 8) {
-            Image(systemName: "note.text")
-                .foregroundStyle(.secondary)
-                .accessibilityHidden(true)
+            if draft.isCapturingScreenshot {
+                ProgressView().controlSize(.mini)
+                    .accessibilityLabel(AppLocalization.text("截图"))
+            } else {
+                Image(systemName: "note.text")
+                    .foregroundStyle(.secondary)
+                    .accessibilityHidden(true)
+            }
             ContextNoteTextField(text: $draft.text, onSave: onSave)
                 .frame(maxWidth: .infinity)
                 .help(ContextNoteDetailView.locationDescription(draft.location))
-            if let error = draft.error {
+            if let error = draft.error ?? draft.screenshotError {
                 Image(systemName: "exclamationmark.circle.fill")
                     .foregroundStyle(.red)
                     .help(error)
@@ -95,7 +100,7 @@ struct ContextNoteInputView: View {
                     .frame(width: 24, height: 28)
             }
             .buttonStyle(.plain)
-            .disabled(draft.text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+            .disabled(draft.isCapturingScreenshot || draft.text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
             .help(AppLocalization.text("保存便签（Enter）"))
             .accessibilityLabel(AppLocalization.text("保存便签（Enter）"))
         }
@@ -114,9 +119,14 @@ final class ContextNoteShelfEditor: ObservableObject {
     @Published private(set) var draft: ContextNoteDraft?
     @Published private(set) var isPresented = false
     @Published private(set) var screenshot: ShelfScreenshotDetail?
+    let screenshotPreview: ContextNoteScreenshotWindowController
     private(set) var itemID: UUID?
     private var newDraft: ContextNoteDraft?
     private var edits: [UUID: ContextNoteDraft] = [:]
+
+    init(screenshotPreview: ContextNoteScreenshotWindowController = ContextNoteScreenshotWindowController()) {
+        self.screenshotPreview = screenshotPreview
+    }
 
     func begin(_ draft: ContextNoteDraft) {
         screenshot = nil
@@ -138,6 +148,7 @@ final class ContextNoteShelfEditor: ObservableObject {
         if edits[item.id] == nil {
             let draft = ContextNoteDraft(location: location, createdAt: item.addedAt)
             draft.text = item.text ?? ""
+            if let url = item.noteScreenshotURL { draft.loadScreenshot(at: url) }
             edits[item.id] = draft
         }
         draft = edits[item.id]
@@ -166,6 +177,7 @@ final class ContextNoteShelfEditor: ObservableObject {
         }
         if let itemID { edits.removeValue(forKey: itemID) }
         else { newDraft = nil }
+        draft?.cancelScreenshotCapture()
         draft = nil
         itemID = nil
         isPresented = false
@@ -182,12 +194,13 @@ final class ContextNoteShelfEditor: ObservableObject {
     }
 
     func save(in shelf: FileShelfStore) -> FileShelfItem? {
-        guard let draft, !draft.text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return nil }
+        guard let draft, !draft.isCapturingScreenshot,
+              !draft.text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return nil }
         let item: FileShelfItem?
         if let itemID {
             item = shelf.updateContextNote(id: itemID, text: draft.text)
         } else {
-            item = shelf.addContextNote(draft.text, location: draft.location, addedAt: draft.createdAt)
+            item = shelf.addContextNote(draft.text, location: draft.location, addedAt: draft.createdAt, screenshot: draft.screenshot?.png)
         }
         guard let item else {
             draft.error = shelf.errorDescription
@@ -204,6 +217,8 @@ struct ContextNoteDetailView: View {
     let onNavigate: () -> Void
     let onSave: () -> Void
     let onClose: () -> Void
+    let onCopyScreenshot: (Data) -> Void
+    let onOpenScreenshot: (ContextNoteScreenshot) -> Void
     @FocusState private var isEditing: Bool
 
     static func locationDescription(_ location: ContextNoteLocation) -> String {
@@ -222,21 +237,59 @@ struct ContextNoteDetailView: View {
                         locationDescription: Self.locationDescription(draft.location), createdAt: draft.createdAt,
                         onCopy: onCopy, onNavigate: onNavigate, onSave: onSave, onClose: onClose,
                         canCopy: !draft.text.isEmpty,
-                        canSave: !draft.text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty) {
+                        canSave: !draft.isCapturingScreenshot && !draft.text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty) {
             TextEditor(text: $draft.text)
                 .font(.system(size: 12))
                 .scrollContentBackground(.hidden)
                 .padding(6)
                 .frame(minHeight: 90)
-                .background(Color.fillCard, in: RoundedRectangle(cornerRadius: 6))
+                .background(Color.fillCard, in: IslandSurfaceGeometry.moduleContentShape(
+                    cornerRadius: IslandSurfaceGeometry.nestedBottomCornerRadius(inset: 10)
+                ))
                 .focused($isEditing)
                 .accessibilityLabel(AppLocalization.text("记录内容"))
             if let error = draft.error {
                 Text(error).foregroundStyle(.red).textSelection(.enabled)
             }
+            if let screenshot = draft.screenshot {
+                ContextNoteScreenshotAttachmentView(screenshot: screenshot, onCopy: { onCopyScreenshot(screenshot.png) },
+                                                    onOpen: { onOpenScreenshot(screenshot) })
+            } else if draft.isCapturingScreenshot {
+                ProgressView(AppLocalization.text("截图")).controlSize(.small)
+            } else if let error = draft.screenshotError {
+                Text(error).foregroundStyle(.red)
+            }
         }
         .onAppear { isEditing = true }
         .onChange(of: draft.text) { _, _ in draft.error = nil }
+    }
+}
+
+struct ContextNoteScreenshotAttachmentView: View {
+    let screenshot: ContextNoteScreenshot
+    let onCopy: () -> Void
+    let onOpen: () -> Void
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            HStack {
+                Label(AppLocalization.text("截图"), systemImage: "camera")
+                    .foregroundStyle(.secondary)
+                Spacer()
+                Button(AppLocalization.text("复制截图"), action: onCopy)
+                    .buttonStyle(.plain)
+            }
+            Button(action: onOpen) {
+                Image(nsImage: screenshot.image)
+                    .resizable()
+                    .scaledToFit()
+                    .frame(maxWidth: .infinity, maxHeight: 100)
+                    .background(Color.fillCard, in: RoundedRectangle(cornerRadius: 6))
+            }
+            .buttonStyle(.plain)
+            .help(AppLocalization.text("查看截图"))
+            .accessibilityLabel(AppLocalization.text("查看截图"))
+        }
     }
 }
 

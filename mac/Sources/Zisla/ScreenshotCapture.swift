@@ -7,12 +7,15 @@ import SwiftUI
 
 enum ScreenshotCaptureError: LocalizedError, Equatable {
     case screenUnavailable
+    case windowUnavailable
     case permissionRequired
 
     var errorDescription: String? {
         switch self {
         case .screenUnavailable:
             "无法读取当前显示器"
+        case .windowUnavailable:
+            "无法读取便签关联的应用窗口"
         case .permissionRequired:
             "请在系统设置的“隐私与安全性 > 屏幕录制”中允许 zisla"
         }

@@ -2807,3 +2807,8 @@
 "显示侧边栏" = "Navigatiekolom tonen";
 "后退" = "Terug";
 "前进" = "Vooruit";
+
+"查看截图" = "Schermafbeelding bekijken";
+"复制截图" = "Schermafbeelding kopiëren";
+"截图失败：%@" = "Schermafbeelding mislukt: %@";
+"无法读取便签关联的应用窗口" = "Het toepassingsvenster dat aan deze notitie is gekoppeld kan niet worden vastgelegd";

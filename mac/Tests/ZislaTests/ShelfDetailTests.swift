@@ -117,7 +117,7 @@ struct ShelfDetailTests {
         var noteActions: [String] = []
         let note = DetailHost(ContextNoteDetailView(draft: draft,
             onCopy: { noteActions.append("copy") }, onNavigate: { noteActions.append("navigate") },
-            onSave: { noteActions.append("save") }, onClose: { noteActions.append("close") }))
+            onSave: { noteActions.append("save") }, onClose: { noteActions.append("close") }, onCopyScreenshot: { _ in }, onOpenScreenshot: { _ in }))
         defer { note.panel.close() }
         await note.settle()
         try note.render(name: "note")
@@ -168,7 +168,7 @@ struct ShelfDetailTests {
         let draft = ContextNoteDraft(location: Self.location)
         var saves = 0
         let fixture = DetailHost(ContextNoteDetailView(draft: draft, onCopy: {}, onNavigate: {},
-            onSave: { saves += 1; draft.error = "写入失败，请重试" }, onClose: {}))
+            onSave: { saves += 1; draft.error = "写入失败，请重试" }, onClose: {}, onCopyScreenshot: { _ in }, onOpenScreenshot: { _ in }))
         defer { fixture.panel.close() }
         await fixture.settle()
         let save = try #require(fixture.elements().first { $0.role == .button && $0.label == AppLocalization.text("保存") })
@@ -191,6 +191,93 @@ struct ShelfDetailTests {
         draft.text = "retry"
         await fixture.settle()
         #expect(draft.error == nil)
+    }
+
+    @Test
+    func renderedNoteScreenshotCopiesAndDispatchesItsOriginalPNGToTheIndependentWindow() async throws {
+        let releaseAccessibility = EnhancedAccessibilityTestScope.acquire()
+        defer { releaseAccessibility() }
+        let png = try ContextNoteScreenshotTestImage.make().png
+        let draft = ContextNoteDraft(location: Self.location)
+        draft.text = "Note with a screenshot"
+        draft.captureScreenshot(from: .success(.window(11, processIdentifier: 42))) { _ in png }
+        await draft.screenshotTask?.value
+        let pasteboard = NSPasteboard(name: .init(UUID().uuidString))
+        defer { pasteboard.releaseGlobally() }
+        var copies: [Data] = []
+        var saves: [Data] = []
+        let copy: (Data) -> Void = { data in
+            copies.append(data)
+            #expect(ClipboardHistoryPasteboard.write(.image(data), to: pasteboard))
+        }
+        let controller = ContextNoteScreenshotWindowController(presentWindow: { window in
+            window.setFrameOrigin(CGPoint(x: -100_000, y: -100_000))
+            window.orderFrontRegardless()
+        })
+        let fixture = DetailHost(ContextNoteDetailView(draft: draft, onCopy: {}, onNavigate: {}, onSave: {}, onClose: {},
+            onCopyScreenshot: copy, onOpenScreenshot: { screenshot in
+                controller.present(screenshot, onCopy: copy, onSave: { saves.append($0) })
+            }), height: 520)
+        defer { fixture.panel.close(); controller.window?.close() }
+        await fixture.settle()
+        try fixture.render(name: "note-attachment")
+        let copyButton = try #require(fixture.elements().first { $0.role == .button && $0.label == AppLocalization.text("复制截图") })
+        try fixture.click(copyButton.frame)
+        #expect(copies == [png])
+        #expect(pasteboard.data(forType: .png) == png)
+        #expect(pasteboard.canReadObject(forClasses: [NSImage.self], options: nil))
+        let view = try #require(fixture.elements().first { $0.role == .button && $0.label == AppLocalization.text("查看截图") })
+        #expect(view.frame.height <= 100 && view.frame.width > 0)
+        try fixture.click(view.frame)
+        await fixture.settle()
+        let preview = try #require(controller.window)
+        #expect(preview.isVisible)
+        #expect(preview.styleMask.contains(.titled))
+        #expect(preview.parent == nil && preview.sheetParent == nil)
+        let image = try #require(preview.contentView as? NSImageView)
+        #expect(image.image === draft.screenshot?.image)
+        #expect(abs(image.bounds.width / image.bounds.height - 2) < 0.01)
+        fixture.panel.orderOut(nil)
+        #expect(preview.isVisible, "Hiding the island detail must not hide the native preview")
+        let commandC = try #require(NSEvent.keyEvent(with: .keyDown, location: .zero, modifierFlags: .command,
+            timestamp: 0, windowNumber: preview.windowNumber, context: nil, characters: "c", charactersIgnoringModifiers: "c",
+            isARepeat: false, keyCode: 8))
+        #expect(preview.performKeyEquivalent(with: commandC))
+        #expect(copies == [png, png])
+        #expect(pasteboard.data(forType: .png) == png)
+        #expect(preview.performKeyEquivalent(with: try saveEvent(in: preview)))
+        #expect(saves == [png])
+        preview.performClose(nil)
+        #expect(controller.window == nil)
+        #expect(!preview.isVisible)
+        #expect(draft.screenshot?.png == png && draft.text == "Note with a screenshot")
+    }
+
+    @Test
+    func renderedCaptureDisablesSaveThenShowsFailureWithoutLosingText() async throws {
+        let releaseAccessibility = EnhancedAccessibilityTestScope.acquire()
+        defer { releaseAccessibility() }
+        let gate = ContextNoteScreenshotGate()
+        let draft = ContextNoteDraft(location: Self.location)
+        draft.text = "Keep the text even if the window closes"
+        draft.captureScreenshot(from: .success(.window(11, processIdentifier: 42))) { _ in try await gate.capture() }
+        let task = try #require(draft.screenshotTask)
+        defer { draft.cancelScreenshotCapture(); gate.finish(.failure(CocoaError(.userCancelled))) }
+        await gate.waitUntilStarted()
+        var saves = 0
+        let fixture = DetailHost(ContextNoteDetailView(draft: draft, onCopy: {}, onNavigate: {},
+            onSave: { saves += 1 }, onClose: {}, onCopyScreenshot: { _ in }, onOpenScreenshot: { _ in }))
+        defer { fixture.panel.close() }
+        await fixture.settle()
+        #expect(fixture.elements().first { $0.role == .button && $0.label == AppLocalization.text("保存") }?.isEnabled == false)
+        _ = fixture.panel.performKeyEquivalent(with: try saveEvent(in: fixture.panel))
+        #expect(saves == 0)
+        gate.finish(.failure(ScreenshotCaptureError.windowUnavailable))
+        await task.value
+        await fixture.settle()
+        #expect(fixture.elements().first { $0.role == .button && $0.label == AppLocalization.text("保存") }?.isEnabled == true)
+        #expect(fixture.elements().contains { $0.label == draft.screenshotError })
+        #expect(draft.text == "Keep the text even if the window closes")
     }
 
     private func withStore(_ body: (FileShelfStore, URL) throws -> Void) throws {
@@ -240,9 +327,9 @@ private final class DetailHost<Content: View> {
     let panel: NSPanel
     let host: NSView
 
-    init(_ content: Content) {
+    init(_ content: Content, height: CGFloat = 270) {
         _ = NSApplication.shared
-        panel = NSPanel(contentRect: CGRect(x: -100_000, y: -100_000, width: 436, height: 270),
+        panel = NSPanel(contentRect: CGRect(x: -100_000, y: -100_000, width: 436, height: height),
                         styleMask: [.borderless, .nonactivatingPanel], backing: .buffered, defer: false)
         panel.isReleasedWhenClosed = false
         let hosting = NSHostingView(rootView: content.environment(\.locale, AppLocalization.currentLanguage.locale)
@@ -269,7 +356,7 @@ private final class DetailHost<Content: View> {
         let isEnabled: Bool?
     }
 
-    func elements() -> [Element] {
+    func elements(in view: NSView? = nil) -> [Element] {
         var result: [Element] = []
         func visit(_ object: NSObject) {
             func value(_ key: String) -> Any? {
@@ -284,17 +371,18 @@ private final class DetailHost<Content: View> {
             }
             for child in value("accessibilityChildren") as? [NSObject] ?? [] { visit(child) }
         }
-        for child in host.accessibilityChildren() as? [NSObject] ?? [] { visit(child) }
+        for child in (view ?? host).accessibilityChildren() as? [NSObject] ?? [] { visit(child) }
         return result
     }
 
-    func click(_ frame: CGRect) throws {
-        let point = panel.convertPoint(fromScreen: CGPoint(x: frame.midX, y: frame.midY))
+    func click(_ frame: CGRect, in window: NSWindow? = nil) throws {
+        let window = window ?? panel
+        let point = window.convertPoint(fromScreen: CGPoint(x: frame.midX, y: frame.midY))
         for type in [NSEvent.EventType.leftMouseDown, .leftMouseUp] {
             let event = try #require(NSEvent.mouseEvent(with: type, location: point, modifierFlags: [],
-                timestamp: ProcessInfo.processInfo.systemUptime, windowNumber: panel.windowNumber, context: nil,
+                timestamp: ProcessInfo.processInfo.systemUptime, windowNumber: window.windowNumber, context: nil,
                 eventNumber: 0, clickCount: 1, pressure: type == .leftMouseDown ? 1 : 0))
-            panel.sendEvent(event)
+            window.sendEvent(event)
         }
     }
 

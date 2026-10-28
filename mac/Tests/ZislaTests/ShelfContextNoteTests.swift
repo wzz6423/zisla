@@ -187,6 +187,69 @@ struct ShelfContextNoteTests {
         }
     }
 
+    @Test
+    func openingAndEditingASavedNoteLoadsAndPreservesItsScreenshot() throws {
+        try withStore { store, _ in
+            let png = try ContextNoteScreenshotTestImage.make().png
+            let location = try #require(Self.note.noteLocation)
+            let note = try #require(store.addContextNote("original", location: location, screenshot: png))
+            let editor = ContextNoteShelfEditor()
+            editor.open(note)
+            #expect(editor.draft?.screenshot?.png == png)
+            editor.draft?.text = "edited"
+            editor.hide()
+            editor.open(note)
+            #expect(editor.draft?.text == "edited")
+            #expect(editor.draft?.screenshot?.png == png)
+            let edited = try #require(editor.save(in: store))
+            #expect(edited.noteScreenshotURL == note.noteScreenshotURL)
+            let screenshotURL = try #require(edited.noteScreenshotURL)
+            #expect(try Data(contentsOf: screenshotURL) == png)
+            #expect(!editor.isPresented)
+        }
+    }
+
+    @Test(arguments: ["missing", "corrupt"])
+    func unreadableAttachmentsDoNotPreventEditingOrDiscardTheSavedText(failure: String) throws {
+        try withStore { store, _ in
+            let png = try ContextNoteScreenshotTestImage.make().png
+            let location = try #require(Self.note.noteLocation)
+            let note = try #require(store.addContextNote("original", location: location, screenshot: png))
+            let url = try #require(note.noteScreenshotURL)
+            if failure == "missing" { try FileManager.default.removeItem(at: url) }
+            else { try Data("corrupt".utf8).write(to: url) }
+            let editor = ContextNoteShelfEditor()
+            editor.open(note)
+            #expect(editor.draft?.text == "original")
+            #expect(editor.draft?.screenshot == nil)
+            #expect(editor.draft?.screenshotError != nil)
+            editor.draft?.text = "edited"
+            #expect(editor.save(in: store)?.text == "edited")
+            #expect(store.items.count == 1)
+            try png.write(to: url)
+            editor.open(try #require(store.items.first))
+            #expect(editor.draft?.screenshot?.png == png)
+        }
+    }
+
+    @Test
+    func closingAShelfDraftCancelsItsCaptureAndRejectsLatePixels() async throws {
+        let gate = ContextNoteScreenshotGate()
+        let draft = ContextNoteDraft(location: try #require(Self.note.noteLocation))
+        draft.captureScreenshot(from: .success(.window(11, processIdentifier: 42))) { _ in try await gate.capture() }
+        let task = try #require(draft.screenshotTask)
+        await gate.waitUntilStarted()
+        let editor = ContextNoteShelfEditor()
+        editor.begin(draft)
+        editor.close()
+        gate.finish(.success(try ContextNoteScreenshotTestImage.make().png))
+        await task.value
+        #expect(draft.screenshot == nil)
+        #expect(!draft.isCapturingScreenshot)
+        #expect(editor.draft == nil)
+        #expect(!editor.resumeNew())
+    }
+
     private func withStore(_ body: (FileShelfStore, URL) throws -> Void) throws {
         let directory = FileManager.default.temporaryDirectory.appendingPathComponent("shelf-editor-tests-\(UUID())")
         try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)

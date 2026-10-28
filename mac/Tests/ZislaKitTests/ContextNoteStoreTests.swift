@@ -1,3 +1,4 @@
+import AppKit
 import Foundation
 import Testing
 import ZislaCore
@@ -27,6 +28,118 @@ struct ContextNoteStoreTests {
             #expect(restored.items.first?.noteLocation == location)
             #expect(restored.items.first?.addedAt == date)
         }
+    }
+
+    @Test
+    func screenshotAttachmentSurvivesReloadAndTextEditsWithoutChangingTheNotePayload() throws {
+        try withStore { store, directory in
+            let png = try screenshotData()
+            let date = Date(timeIntervalSince1970: 42)
+            let original = try #require(store.addContextNote("original", location: location, addedAt: date, screenshot: png))
+            let attachment = try #require(original.noteScreenshotURL)
+            #expect(original.category == .note)
+            #expect(original.payload == .text("original"))
+            #expect(original.displayName == "original")
+            #expect(try Data(contentsOf: attachment) == png)
+            #expect(try attachment.resourceValues(forKeys: [.isRegularFileKey]).isRegularFile == true)
+            #expect(try FileManager.default.attributesOfItem(atPath: attachment.path)[.posixPermissions] as? Int == 0o600)
+            let restored = FileShelfStore(storageURL: directory.appendingPathComponent("shelf.json"))
+            #expect(restored.items == [original])
+            let edited = try #require(restored.updateContextNote(id: original.id, text: "edited"))
+            #expect(edited.noteScreenshotURL == attachment)
+            #expect(edited.addedAt == date)
+            #expect(try Data(contentsOf: attachment) == png)
+            #expect(FileShelfStore(storageURL: directory.appendingPathComponent("shelf.json")).items == [edited])
+        }
+    }
+
+    @Test(arguments: [false, true])
+    func removingNotesDeletesTheirAttachmentsWithoutTouchingOtherNotes(clear: Bool) throws {
+        try withStore { store, directory in
+            let png = try screenshotData()
+            let first = try #require(store.addContextNote("first", location: location, screenshot: png))
+            let second = try #require(store.addContextNote("second", location: location, screenshot: png))
+            let attachment = try #require(first.noteScreenshotURL)
+            if clear { store.removeAll() }
+            else { store.remove(id: first.id) }
+            #expect(!FileManager.default.fileExists(atPath: attachment.path))
+            #expect(!FileManager.default.fileExists(atPath: first.url.deletingLastPathComponent().path))
+            let restored = FileShelfStore(storageURL: directory.appendingPathComponent("shelf.json"))
+            #expect(restored.items == (clear ? [] : [second]))
+            if !clear { #expect(try Data(contentsOf: #require(second.noteScreenshotURL)) == png) }
+        }
+    }
+
+    @Test
+    func failedAttachmentNoteCommitRollsBackBothFilesAndAllowsRetry() throws {
+        try withStore { store, directory in
+            let png = try screenshotData()
+            let existing = try #require(store.addContextNote("existing", location: location, screenshot: png))
+            let index = directory.appendingPathComponent("shelf.json")
+            try FileManager.default.removeItem(at: index)
+            try FileManager.default.createDirectory(at: index, withIntermediateDirectories: false)
+            #expect(store.addContextNote("unsaved", location: location, screenshot: png) == nil)
+            #expect(store.items == [existing])
+            #expect(store.errorDescription != nil)
+            #expect(try FileManager.default.contentsOfDirectory(atPath: store.managedDirectory.path) == [existing.id.uuidString])
+            #expect(try Data(contentsOf: #require(existing.noteScreenshotURL)) == png)
+            try FileManager.default.removeItem(at: index)
+            #expect(store.addContextNote("retry", location: location, screenshot: png) != nil)
+            #expect(store.items.count == 2)
+        }
+    }
+
+    @Test
+    func failedTextEditPreservesTheSavedScreenshotAndSupportsRetry() throws {
+        try withStore { store, directory in
+            let png = try screenshotData()
+            let original = try #require(store.addContextNote("original", location: location, screenshot: png))
+            let attachment = try #require(original.noteScreenshotURL)
+            let index = directory.appendingPathComponent("shelf.json")
+            try FileManager.default.removeItem(at: index)
+            try FileManager.default.createDirectory(at: index, withIntermediateDirectories: false)
+            #expect(store.updateContextNote(id: original.id, text: "edited") == nil)
+            #expect(store.items == [original])
+            #expect(try String(contentsOf: original.url, encoding: .utf8) == "original")
+            #expect(try Data(contentsOf: attachment) == png)
+            #expect(Set(try FileManager.default.contentsOfDirectory(atPath: attachment.deletingLastPathComponent().path)) == ["note.txt", "screenshot.png"])
+            try FileManager.default.removeItem(at: index)
+            #expect(store.updateContextNote(id: original.id, text: "retry")?.noteScreenshotURL == attachment)
+            #expect(try Data(contentsOf: attachment) == png)
+        }
+    }
+
+    @Test(arguments: [Data(), Data("not a PNG".utf8)])
+    func invalidScreenshotAttachmentsDoNotCreateNotesOrFiles(png: Data) throws {
+        try withStore { store, directory in
+            #expect(store.addContextNote("note", location: location, screenshot: png) == nil)
+            #expect(store.items.isEmpty)
+            #expect(store.errorDescription != nil)
+            let contents = try FileManager.default.contentsOfDirectory(atPath: directory.path)
+            #expect(contents.isEmpty)
+        }
+    }
+
+    @Test
+    func oldNotesWithoutScreenshotMetadataRemainEditable() throws {
+        try withStore { store, directory in
+            let note = try #require(store.addContextNote("legacy", location: location))
+            let index = directory.appendingPathComponent("shelf.json")
+            var records = try #require(JSONSerialization.jsonObject(with: Data(contentsOf: index)) as? [[String: Any]])
+            records[0].removeValue(forKey: "hasNoteScreenshot")
+            try JSONSerialization.data(withJSONObject: records).write(to: index)
+            let restored = FileShelfStore(storageURL: index)
+            #expect(restored.items == [note])
+            #expect(restored.items.first?.noteScreenshotURL == nil)
+            #expect(restored.updateContextNote(id: note.id, text: "updated")?.noteScreenshotURL == nil)
+        }
+    }
+
+    private func screenshotData() throws -> Data {
+        let bitmap = try #require(NSBitmapImageRep(bitmapDataPlanes: nil, pixelsWide: 80, pixelsHigh: 40,
+            bitsPerSample: 8, samplesPerPixel: 4, hasAlpha: true, isPlanar: false,
+            colorSpaceName: .deviceRGB, bytesPerRow: 0, bitsPerPixel: 0))
+        return try #require(bitmap.representation(using: .png, properties: [:]))
     }
 
     @Test
@@ -201,9 +314,11 @@ struct ContextNoteLocationReaderTests {
     }
 
     @Test
-    func browserWithoutAValidAddressCannotFallBackToAnotherPagesWindowTitle() {
-        for value in [nil, "", "javascript:alert(1)", "file:///private/document", "https://"] as [String?] {
-            #expect(ContextNoteLocationReader.resolve(bundleIdentifier: "browser", applicationName: "Browser", windowTitle: "Shared title", isBrowser: true, pageAddress: value) == .unavailable)
+    func browserWithoutAValidAddressKeepsWindowIdentityWithoutAllowingURLNavigation() {
+        for value in [nil, "", "chrome://newtab/", "about:blank", "javascript:alert(1)", "file:///private/document", "https://"] as [String?] {
+            #expect(value.flatMap(ContextNoteLocationReader.webURL) == nil)
+            #expect(ContextNoteLocationReader.resolve(bundleIdentifier: "browser", applicationName: "Browser", windowTitle: "Shared title", isBrowser: true, pageAddress: value)
+                == .location(.window(bundleIdentifier: "browser", applicationName: "Browser", title: "Shared title")))
         }
     }
 

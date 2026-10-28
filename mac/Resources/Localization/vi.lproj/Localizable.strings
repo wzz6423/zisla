@@ -2807,3 +2807,8 @@
 "显示侧边栏" = "Hiện thanh bên";
 "后退" = "Quay lại";
 "前进" = "Tiến tới";
+
+"查看截图" = "Xem ảnh chụp màn hình";
+"复制截图" = "Sao chép ảnh chụp màn hình";
+"截图失败：%@" = "Không thể chụp màn hình: %@";
+"无法读取便签关联的应用窗口" = "Không thể đọc cửa sổ ứng dụng liên kết với ghi chú này";

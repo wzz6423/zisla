@@ -826,6 +826,37 @@ extension ContextNoteLocationReaderTests {
         #expect(result == .unavailable)
     }
 
+    @Test(arguments: [nil, "chrome://newtab/", "chrome://settings/"] as [String?])
+    func chromeInternalPageWithoutAReadableURLKeepsTheOriginalWindow(pageAddress: String?) {
+        let address = ContextNoteLocationReader.findPageAddress(in: 0,
+            document: { _ in pageAddress }, role: { $0 == 1 ? "AXWebArea" : "AXWindow" },
+            url: { _ in pageAddress }, children: { node in
+                #expect(node == 0, "Internal pages must not expose page content to location capture")
+                return [1]
+            })
+        #expect(address == nil)
+        let result = ContextNoteLocationReader.observe(isTrusted: true, desktopLocation: { nil }) {
+            ContextNoteLocationReader.resolve(bundleIdentifier: "com.google.Chrome", applicationName: "Google Chrome",
+                windowTitle: "New Tab", isBrowser: true, pageAddress: address)
+        }
+        #expect(result == .location(.window(bundleIdentifier: "com.google.Chrome", applicationName: "Google Chrome", title: "New Tab")))
+    }
+
+    @Test(arguments: ["", " ", "\n\t"])
+    func browserWithoutAReadableURLStillRequiresAnIdentifiableWindowTitle(title: String) {
+        for address in [nil, "chrome://newtab/"] as [String?] {
+            #expect(ContextNoteLocationReader.resolve(bundleIdentifier: "com.google.Chrome", applicationName: "Google Chrome",
+                windowTitle: title, isBrowser: true, pageAddress: address) == .unavailable)
+        }
+    }
+
+    @Test(arguments: ["http://example.test/path?query=1#part", "https://example.test/path?query=1#part"])
+    func readableBrowserURLKeepsPrecedenceEvenWithoutAWindowTitle(address: String) throws {
+        #expect(ContextNoteLocationReader.resolve(bundleIdentifier: "com.google.Chrome", applicationName: "Google Chrome",
+            windowTitle: "", isBrowser: true, pageAddress: address)
+            == .location(.webPage(url: try #require(URL(string: address)), title: "", applicationName: "Google Chrome")))
+    }
+
     @Test
     func unidentifiedDesktopPreservesOrdinaryWindowAndBrowserResolution() {
         let folder = ContextNoteLocationReader.observe(isTrusted: true, desktopLocation: { nil }) {
@@ -837,6 +868,6 @@ extension ContextNoteLocationReaderTests {
             ContextNoteLocationReader.resolve(bundleIdentifier: "browser", applicationName: "Browser",
                                               windowTitle: "Desktop", isBrowser: true, pageAddress: nil)
         }
-        #expect(browser == .unavailable)
+        #expect(browser == .location(.window(bundleIdentifier: "browser", applicationName: "Browser", title: "Desktop")))
     }
 }

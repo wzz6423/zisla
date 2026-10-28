@@ -2806,3 +2806,8 @@
 "显示侧边栏" = "Show Sidebar";
 "后退" = "Back";
 "前进" = "Forward";
+
+"查看截图" = "View screenshot";
+"复制截图" = "Copy screenshot";
+"截图失败：%@" = "Screenshot failed: %@";
+"无法读取便签关联的应用窗口" = "Cannot read the application window associated with this note";

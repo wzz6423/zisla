@@ -1591,9 +1591,11 @@ final class AppModel: ObservableObject {
 
   func saveShelfContextNote() {
     let isNew = contextNoteEditor.itemID == nil
+    let screenshotError = contextNoteEditor.draft?.screenshotError
     guard let item = contextNoteEditor.save(in: shelf) else { return }
     onContextNoteSaved?(item)
-    transientMessage = isNew ? AppLocalization.text("已加入 %ld 个项目", 1) : AppLocalization.text("已保存便签")
+    transientMessage = screenshotError.map { AppLocalization.text("已保存便签") + " · " + $0 }
+      ?? (isNew ? AppLocalization.text("已加入 %ld 个项目", 1) : AppLocalization.text("已保存便签"))
   }
 
   func copyContextNoteText(_ text: String) {
@@ -1601,6 +1603,11 @@ final class AppModel: ObservableObject {
     pasteboard.clearContents()
     let success = pasteboard.writeObjects([FileShelfPasteboard.pasteboardWriter(for: .text(text))])
     transientMessage = success ? AppLocalization.text("已复制到剪贴板") : AppLocalization.text("无法写入剪贴板")
+  }
+
+  func copyContextNoteScreenshot(_ png: Data) {
+    let copied = ClipboardHistoryPasteboard.write(.image(png))
+    transientMessage = copied ? AppLocalization.text("已复制到剪贴板") : AppLocalization.text("无法写入剪贴板")
   }
 
   static func contextNoteCopyAction(id: UUID, in shelf: FileShelfStore) -> ClipboardAssistantAction? {
