@@ -8,6 +8,50 @@ import ZislaKit
 @Suite
 struct ScreenRecordingCaptureBarTests {
     @MainActor
+    @Test(arguments: [false, true])
+    func captureBarAlwaysExposesRadiusInsteadOfShapeChoices(cameraEnabled: Bool) async throws {
+        let releaseAccessibility = EnhancedAccessibilityTestScope.acquire()
+        defer { releaseAccessibility() }
+        var dependencies = ScreenRecordingCaptureDependencies.live
+        dependencies.loadSources = { [.init(id: 1, name: "Display", mode: .display,
+                                            frame: .init(x: 0, y: 0, width: 1920, height: 1080))] }
+        dependencies.loadDevices = { .init() }
+        let model = ScreenRecordingStudioModel(capture: .init(dependencies: dependencies))
+        model.configuration.camera = cameraEnabled
+        await model.loadSources()
+        defer { model.shutdown() }
+        let controller = ScreenRecordingCaptureBarController(model: model, languageStore: AppLanguageStore(),
+            selectRegion: {}, start: {}, openStudio: {}, cancel: {})
+        defer { controller.shutdown() }
+        for _ in 0..<4 {
+            controller.hostingView.layoutSubtreeIfNeeded()
+            await withCheckedContinuation { continuation in DispatchQueue.main.async { continuation.resume() } }
+        }
+        var identifiers = Set<String>()
+        var radiusButtonValue: String?
+        func visit(_ object: NSObject) {
+            if let element = object as? any NSAccessibilityElementProtocol,
+               let identifier = element.accessibilityIdentifier?() {
+                identifiers.insert(identifier)
+                if identifier == "screenRecording.cameraCornerRadiusButton",
+                   object.responds(to: NSSelectorFromString("accessibilityValue")) {
+                    radiusButtonValue = object.value(forKey: "accessibilityValue") as? String
+                }
+            }
+            if object.responds(to: NSSelectorFromString("accessibilityChildren")) {
+                for child in object.value(forKey: "accessibilityChildren") as? [NSObject] ?? [] { visit(child) }
+            }
+        }
+        for child in controller.hostingView.accessibilityChildren() as? [NSObject] ?? [] { visit(child) }
+        #expect(identifiers.contains("screenRecording.cameraCornerRadiusButton"),
+                "Radius must remain directly available without selecting a camera shape first")
+        #expect(radiusButtonValue == model.recordingCameraCornerRadius.formatted(.percent.precision(.fractionLength(0))),
+                "The radius entry must announce its current value to accessibility clients")
+        #expect(identifiers.allSatisfy { !$0.hasPrefix("screenRecording.cameraShape.") })
+        #expect(controller.hostingView.window?.isVisible == false)
+    }
+
+    @MainActor
     @Test(arguments: [RecordingCaptureMode.display, .region])
     func switchingModesResizesTheExistingPanelWithoutTrailingSpace(initialMode: RecordingCaptureMode) async throws {
         var dependencies = ScreenRecordingCaptureDependencies.live

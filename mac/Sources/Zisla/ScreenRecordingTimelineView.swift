@@ -65,26 +65,6 @@ struct ScreenRecordingTimelineView: View {
                     }
                 }
                 }
-                ScreenRecordingInspectorSection(AppLocalization.text("导出设置"), symbol: "square.and.arrow.up", expanded: false) {
-                    Picker(AppLocalization.text("格式"), selection: $model.exportConfiguration.format) {
-                        ForEach(RecordingExportFormat.allCases, id: \.self) { format in
-                            Text(format.rawValue.uppercased()).tag(format)
-                        }
-                    }
-                    Picker(AppLocalization.text("分辨率"), selection: $model.exportConfiguration.resolution) {
-                        ForEach(RecordingExportResolution.allCases, id: \.self) { resolution in
-                            Text(AppLocalization.text(resolution.title)).tag(resolution)
-                        }
-                    }
-                    Picker(AppLocalization.text("帧率"), selection: $model.exportConfiguration.frameRate) {
-                        ForEach(model.exportConfiguration.format == .gif ? [10, 15, 30] : [30, 60], id: \.self) { rate in
-                            Text("\(rate) FPS").tag(rate)
-                        }
-                    }
-                    .onChange(of: model.exportConfiguration.format) { _, format in
-                        if format == .gif && model.exportConfiguration.frameRate > 30 { model.exportConfiguration.frameRate = 30 }
-                    }
-                }
             }
         }.disabled(!model.canEdit)
     }

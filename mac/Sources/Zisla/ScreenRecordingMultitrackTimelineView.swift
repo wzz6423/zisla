@@ -8,7 +8,7 @@ struct RecordingMultitrackClipDrag {
     let pointsPerSecond: CGFloat
     var translation: CGSize = .zero
 
-    func replacement(sourceDuration: Double?) -> RecordingTimelineClip? {
+    func replacement(sourceDuration: Double?, tracks: [RecordingTimelineTrack], rowHeight: CGFloat) -> RecordingTimelineClip? {
         guard pointsPerSecond.isFinite, pointsPerSecond > 0,
               translation.width.isFinite, translation.height.isFinite else { return nil }
         let delta = translation.width / pointsPerSecond
@@ -17,6 +17,9 @@ struct RecordingMultitrackClipDrag {
         switch mode {
         case .move:
             clip.start = max(0, original.start + delta)
+            let row = tracks.firstIndex(where: { $0.id == original.trackID })!
+            let destination = min(tracks.count - 1, max(0, row + Int((translation.height / rowHeight).rounded())))
+            clip.trackID = tracks[destination].id
         case .trimStart:
             let earliest = max(0, original.sourceStart - original.start * original.speed)
             clip.sourceStart = min(original.sourceEnd - minimum, max(earliest, original.sourceStart + delta * original.speed))
@@ -80,15 +83,10 @@ struct ScreenRecordingMultitrackTimelineView: View {
     private var toolbar: some View {
         HStack(spacing: 10) {
             Text(AppLocalization.text("时间线")).font(.caption.bold())
-            Menu {
-                ForEach(RecordingTimelineTrackKind.allCases, id: \.self) { kind in
-                    Button { model.addTimelineTrack(kind) } label: {
-                        Label(AppLocalization.text(kind.title), systemImage: kind.symbol)
-                    }
-                }
-            } label: { Image(systemName: "rectangle.stack.badge.plus") }
+            Button { model.addTimelineTrack() } label: { Image(systemName: "rectangle.stack.badge.plus") }
             .help(AppLocalization.text("添加轨道"))
             .accessibilityLabel(AppLocalization.text("添加轨道"))
+            .accessibilityIdentifier("screenRecording.multitrackAddTrack")
             Button {
                 if let id = model.addTimelineText() { canvasSelection.wrappedValue = .annotation(id) }
             } label: { Image(systemName: "text.badge.plus") }
@@ -124,25 +122,21 @@ struct ScreenRecordingMultitrackTimelineView: View {
 
     private func trackHeader(_ track: RecordingTimelineTrack, timeline: RecordingMultitrackTimeline) -> some View {
         HStack(spacing: 5) {
-            Image(systemName: track.kind.symbol).foregroundStyle(color(track.kind)).frame(width: 15)
-            Text(track.name.isEmpty ? AppLocalization.text(track.kind.title) : track.name)
+            Image(systemName: "rectangle.stack").foregroundStyle(Color.secondary).frame(width: 15)
+            Text(track.title(at: timeline.tracks.firstIndex(where: { $0.id == track.id })!))
                 .font(.system(size: 10, weight: .medium)).lineLimit(1).frame(maxWidth: .infinity, alignment: .leading)
-            if track.kind != .audio {
-                Button { model.updateTimelineTrack(track.id) { $0.isHidden.toggle() } } label: {
-                    Image(systemName: track.isHidden ? "eye.slash" : "eye")
-                }
-                .help(AppLocalization.text(track.isHidden ? "显示轨道" : "隐藏轨道"))
-                .accessibilityLabel(AppLocalization.text(track.isHidden ? "显示轨道" : "隐藏轨道"))
-                .accessibilityIdentifier("screenRecording.trackVisibility." + track.id)
+            Button { model.updateTimelineTrack(track.id) { $0.isHidden.toggle() } } label: {
+                Image(systemName: track.isHidden ? "eye.slash" : "eye")
             }
-            if track.kind == .video || track.kind == .audio {
-                Button { model.updateTimelineTrack(track.id) { $0.isMuted.toggle() } } label: {
-                    Image(systemName: track.isMuted ? "speaker.slash" : "speaker.wave.2")
-                }
-                .help(AppLocalization.text(track.isMuted ? "取消轨道静音" : "静音轨道"))
-                .accessibilityLabel(AppLocalization.text(track.isMuted ? "取消轨道静音" : "静音轨道"))
-                .accessibilityIdentifier("screenRecording.trackMute." + track.id)
+            .help(AppLocalization.text(track.isHidden ? "显示轨道" : "隐藏轨道"))
+            .accessibilityLabel(AppLocalization.text(track.isHidden ? "显示轨道" : "隐藏轨道"))
+            .accessibilityIdentifier("screenRecording.trackVisibility." + track.id)
+            Button { model.updateTimelineTrack(track.id) { $0.isMuted.toggle() } } label: {
+                Image(systemName: track.isMuted ? "speaker.slash" : "speaker.wave.2")
             }
+            .help(AppLocalization.text(track.isMuted ? "取消轨道静音" : "静音轨道"))
+            .accessibilityLabel(AppLocalization.text(track.isMuted ? "取消轨道静音" : "静音轨道"))
+            .accessibilityIdentifier("screenRecording.trackMute." + track.id)
             Menu {
                 Button(AppLocalization.text("移到上一层")) { model.moveTimelineTrack(track.id, by: 1) }
                     .disabled(timeline.tracks.last?.id == track.id)
@@ -290,15 +284,7 @@ struct ScreenRecordingMultitrackTimelineView: View {
     private func replacement(for drag: RecordingMultitrackClipDrag, timeline: RecordingMultitrackTimeline) -> RecordingTimelineClip? {
         let media = timeline.assets.first { $0.id == drag.original.content.assetID }
         let duration = media?.kind == .image ? nil : media?.duration
-        guard var clip = drag.replacement(sourceDuration: duration) else { return nil }
-        if drag.mode == .move {
-            let tracks = Array(timeline.tracks.reversed())
-            if let row = tracks.firstIndex(where: { $0.id == clip.trackID }) {
-                let destination = min(tracks.count - 1, max(0, row + Int((drag.translation.height / rowHeight).rounded())))
-                if tracks[destination].kind == clip.content.trackKind { clip.trackID = tracks[destination].id }
-            }
-        }
-        return clip
+        return drag.replacement(sourceDuration: duration, tracks: Array(timeline.tracks.reversed()), rowHeight: rowHeight)
     }
 
     private func canSplit(_ clip: RecordingTimelineClip?) -> Bool {

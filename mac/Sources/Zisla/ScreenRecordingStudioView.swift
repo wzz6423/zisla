@@ -124,29 +124,24 @@ struct ScreenRecordingStudioView: View {
                 }
             }
             .frame(maxWidth: 240, alignment: .leading)
+            Menu {
+                Button(AppLocalization.text("打开录屏项目"), action: model.openProject)
+                Button(AppLocalization.text("导入素材"), action: model.importVideo)
+                Button(AppLocalization.text("保存录屏项目"), action: model.saveProject).disabled(model.project == nil)
+                Button(AppLocalization.text("项目另存为"), action: model.saveCopy).disabled(!model.canEdit)
+            } label: { Label(AppLocalization.text("项目"), systemImage: "folder") }
+            .disabled(model.isBusy || model.isChoosingFile || model.isRecording || model.exporter.isExporting)
+            .accessibilityIdentifier("screenRecording.projectMenu")
             Spacer()
-            if model.capture.phase == .recording || model.capture.phase == .paused {
-                Text(Self.clock(model.capture.elapsed)).monospacedDigit()
-                Button(AppLocalization.text(model.capture.phase == .paused ? "继续录制" : "暂停录制"), action: model.pause)
-                Button(AppLocalization.text("停止录制"), action: model.stop).tint(.red)
-            } else if model.isStarting || model.isStopping {
-                ProgressView().controlSize(.small)
-                Text(AppLocalization.text(model.isStopping ? "正在保存录屏" : "正在准备录制"))
-            } else {
-                Menu {
-                    Button(AppLocalization.text("打开录屏项目"), action: model.openProject)
-                    Button(AppLocalization.text("导入素材"), action: model.importVideo)
-                    Button(AppLocalization.text("保存录屏项目"), action: model.saveProject).disabled(model.project == nil)
-                    Button(AppLocalization.text("项目另存为"), action: model.saveCopy).disabled(!model.canEdit)
-                } label: { Label(AppLocalization.text("项目"), systemImage: "folder") }
-                .disabled(model.isBusy)
+            HStack(spacing: 10) {
                 Button(action: model.undo) { Image(systemName: "arrow.uturn.backward") }
                     .help(AppLocalization.text("撤销")).disabled(!model.canUndo)
+                    .accessibilityIdentifier("screenRecording.undo")
                 Button(action: model.redo) { Image(systemName: "arrow.uturn.forward") }
                     .help(AppLocalization.text("重做")).disabled(!model.canRedo)
-                Button(AppLocalization.text("录制设置"), action: prepareCapture)
-                    .disabled(model.isBusy || model.isChoosingFile || model.exporter.isExporting)
+                    .accessibilityIdentifier("screenRecording.redo")
                 Button(AppLocalization.text("导出录屏"), action: model.export).disabled(!model.canExport)
+                    .accessibilityIdentifier("screenRecording.export")
             }
         }
         .padding(.horizontal, 16).padding(.vertical, 12)

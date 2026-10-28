@@ -28,8 +28,7 @@ enum ScreenRecordingAudioDetachment {
         let videoRanges = try await probe(store.mediaURL(asset.file, in: directory))
         try Task.checkCancellation()
         var sources = [(asset: asset, ranges: videoRanges,
-            volume: clip.volume * (isRecording ? project.edits.effectiveScreenAudioVolume : 1),
-            name: isRecording ? AppLocalization.text("系统音频") : asset.name)]
+            volume: clip.volume * (isRecording ? project.edits.effectiveScreenAudioVolume : 1))]
         if isRecording, let microphoneFile = project.microphoneFile {
             let ranges = try await probe(store.mediaURL(microphoneFile, in: directory))
             try Task.checkCancellation()
@@ -37,8 +36,7 @@ enum ScreenRecordingAudioDetachment {
                 let microphone = timeline.assets.first(where: { $0.file == microphoneFile && $0.kind == .audio })
                     ?? RecordingMediaAsset(name: AppLocalization.text("麦克风"), file: microphoneFile,
                         kind: .audio, duration: end, hasAudio: true)
-                sources.append((microphone, ranges, clip.volume * project.edits.effectiveMicrophoneVolume,
-                                AppLocalization.text("麦克风")))
+                sources.append((microphone, ranges, clip.volume * project.edits.effectiveMicrophoneVolume))
             }
         }
 
@@ -52,7 +50,7 @@ enum ScreenRecordingAudioDetachment {
             media.hasAudio = true
             if let index = timeline.assets.firstIndex(where: { $0.id == media.id }) { timeline.assets[index] = media }
             else { timeline.assets.append(media) }
-            let track = RecordingTimelineTrack(kind: .audio, name: source.name, isMuted: sourceTrack.isMuted)
+            let track = RecordingTimelineTrack(isMuted: sourceTrack.isMuted)
             timeline.tracks.append(track)
             timeline.clips.append(.init(trackID: track.id, content: .audio(media.id),
                 start: clip.start + (start - clip.sourceStart) / clip.speed,

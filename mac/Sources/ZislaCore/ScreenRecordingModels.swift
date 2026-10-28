@@ -261,7 +261,7 @@ public struct RecordingEdits: Codable, Equatable, Sendable {
         cameraAspectRatio ?? (cameraRound ? .square : .standard)
     }
     public var effectiveCameraCornerRadius: Double {
-        cameraRound && effectiveCameraAspectRatio == .square ? 0.5 : cameraCornerRadius ?? 0.1
+        cameraCornerRadius ?? (cameraRound && effectiveCameraAspectRatio == .square ? 0.5 : 0.1)
     }
     public var effectiveShowCamera: Bool { showCamera ?? true }
     public var effectiveCameraBorder: Bool { cameraBorder ?? false }
@@ -308,7 +308,27 @@ public struct RecordingEdits: Codable, Equatable, Sendable {
 }
 
 public enum RecordingExportFormat: String, Codable, CaseIterable, Sendable {
-    case mp4, gif
+    case mp4, mov, m4v, mkv, webm, avi, wmv, flv, mpeg, ts
+    case threeGP = "3gp"
+    case gif
+    case livePhoto = "livephoto"
+    case m4a, mp3, wav, flac, aac, ogg, aiff, opus
+
+    public var title: String { self == .livePhoto ? "Live Photo" : rawValue.uppercased() }
+    public var fileExtension: String { rawValue }
+    public var isAudioOnly: Bool {
+        switch self {
+        case .m4a, .mp3, .wav, .flac, .aac, .ogg, .aiff, .opus: true
+        default: false
+        }
+    }
+    public var isVideo: Bool { !isAudioOnly && self != .gif && self != .livePhoto }
+    public var requiresFFmpeg: Bool {
+        switch self {
+        case .mkv, .webm, .avi, .wmv, .flv, .mpeg, .ts, .threeGP, .mp3, .ogg, .opus: true
+        default: false
+        }
+    }
 }
 
 public enum RecordingExportResolution: String, Codable, CaseIterable, Sendable {

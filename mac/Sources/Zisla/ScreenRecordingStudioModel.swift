@@ -15,9 +15,9 @@ final class ScreenRecordingStudioModel: ObservableObject {
     var projectStore: ScreenRecordingProjectStore { ScreenRecordingProjectStore(root: recordingOutputDirectory) }
     @Published private(set) var recordingOutputDirectory: URL
     @Published var configuration = RecordingCaptureConfiguration()
-    @Published var recordingCameraRound = true
+    @Published var recordingCameraRound = false
     @Published var recordingCameraAspectRatio: RecordingCameraAspectRatio = .square
-    @Published var recordingCameraCornerRadius = 0.1
+    @Published var recordingCameraCornerRadius = 0.5
     @Published var recordingCameraBorder = false
     @Published var recordingCameraSize = 0.25
     @Published var exportConfiguration = RecordingExportConfiguration()
@@ -50,6 +50,7 @@ final class ScreenRecordingStudioModel: ObservableObject {
     private let outputDirectoryStore: ScreenRecordingOutputDirectoryStore
     private let renderPreview: (ScreenRecordingProject, URL, Double) async throws -> CGImage
     private let presentExportPanel: (NSSavePanel, @escaping (URL?) -> Void) -> Void
+    private var outputPanel: NSSavePanel?
     private let notices: SideNoticeQueue
     private let writeProjectFiles: @Sendable (ScreenRecordingProject, URL, URL?) throws -> Void
     private var outputNotice: IslandNotice?
@@ -154,14 +155,18 @@ final class ScreenRecordingStudioModel: ObservableObject {
     var canUndo: Bool { !undoHistory.isEmpty && canEdit }
     var canRedo: Bool { !redoHistory.isEmpty && canEdit }
     var timeline: RecordingMultitrackTimeline? { project.map(RecordingMultitrackTimeline.migrating) }
-    var mediaAssets: [RecordingMediaAsset] { timeline?.assets ?? [] }
+    var mediaAssets: [RecordingMediaAsset] { timeline?.assets.filter { $0.isHiddenFromLibrary != true } ?? [] }
     var selectedTimelineClip: RecordingTimelineClip? { timeline?.clips.first { $0.id == selectedTimelineClipID } }
-    var sourceDuration: Double { mediaAssets.first { $0.id == selectedMediaAssetID }?.duration ?? project?.duration ?? 0 }
+    var selectedRemovedMediaAsset: RecordingMediaAsset? {
+        let id = selectedTimelineClip?.content.assetID
+        return timeline?.assets.first { $0.id == id && $0.isHiddenFromLibrary == true }
+    }
+    var sourceDuration: Double { timeline?.assets.first { $0.id == selectedMediaAssetID }?.duration ?? project?.duration ?? 0 }
     var canExport: Bool { canEdit && (project?.outputDuration ?? 0) > 0 }
     var overlayTime: Double { project?.timeline == nil ? currentTime : playbackTime }
     var overlayDuration: Double { project?.timeline == nil ? project?.duration ?? 0 : project?.outputDuration ?? 0 }
     var canGenerateCaptions: Bool {
-        canEdit && (project?.timeline == nil || mediaAssets.contains { $0.id == selectedMediaAssetID && $0.kind != .image })
+        canEdit && (project?.timeline == nil || timeline?.assets.contains { $0.id == selectedMediaAssetID && $0.kind != .image } == true)
     }
 
     func timelineClipTitle(_ clip: RecordingTimelineClip) -> String {
@@ -170,7 +175,7 @@ final class ScreenRecordingStudioModel: ObservableObject {
             let annotation = project?.edits.annotations?.first { $0.id == id }
             return annotation?.text.isEmpty == false ? annotation!.text : AppLocalization.text(annotation?.kind.title ?? "文字标注")
         case let .caption(id): return project?.captions.first { $0.id == id }?.text ?? AppLocalization.text("字幕")
-        default: return mediaAssets.first { $0.id == clip.content.assetID }?.name ?? AppLocalization.text(clip.content.trackKind.title)
+        default: return timeline?.assets.first { $0.id == clip.content.assetID }?.name ?? AppLocalization.text(clip.content.trackKind.title)
         }
     }
     var availableSources: [RecordingCaptureSource] {
@@ -243,7 +248,6 @@ final class ScreenRecordingStudioModel: ObservableObject {
 
     func setRecordingCameraAspectRatio(_ ratio: RecordingCameraAspectRatio) {
         recordingCameraAspectRatio = ratio
-        if ratio != .square { recordingCameraRound = false }
     }
 
     func start() {
@@ -433,9 +437,11 @@ final class ScreenRecordingStudioModel: ObservableObject {
         panel.directoryURL = recordingOutputDirectory
         panel.allowedContentTypes = [.init(filenameExtension: ScreenRecordingProjectStore.projectExtension) ?? .directory]
         panel.canCreateDirectories = true
+        outputPanel = panel
         isChoosingFile = true
-        presentExportPanel(panel) { [weak self] url in
-            guard let self, self.isChoosingFile else { return }
+        presentExportPanel(panel) { [weak self, weak panel] url in
+            guard let self, let panel, self.outputPanel === panel else { return }
+            self.outputPanel = nil
             self.isChoosingFile = false
             guard let url else { return }
             self.saveProject(project, from: directory, to: url)
@@ -461,18 +467,30 @@ final class ScreenRecordingStudioModel: ObservableObject {
     func export() {
         commitPendingCanvasText?()
         guard canExport, let project, let directory else { return }
-        let configuration = exportConfiguration
         let panel = NSSavePanel()
-        panel.nameFieldStringValue = Self.fileName(project.name, extension: configuration.format.rawValue)
+        panel.title = AppLocalization.text("导出设置")
+        panel.prompt = AppLocalization.text("导出录屏")
+        panel.nameFieldStringValue = Self.fileName(project.name, extension: exportConfiguration.format.fileExtension)
         panel.directoryURL = recordingOutputDirectory
-        panel.allowedContentTypes = [configuration.format == .gif ? .gif : .mpeg4Movie]
         panel.canCreateDirectories = true
+        let settings = ScreenRecordingExportSettings(configuration: exportConfiguration, panel: panel, duration: project.outputDuration)
+        let accessory = NSHostingView(rootView: ScreenRecordingExportSettingsView(settings: settings))
+        accessory.frame.size = accessory.fittingSize
+        panel.accessoryView = accessory
+        outputPanel = panel
         isChoosingFile = true
-        presentExportPanel(panel) { [weak self] url in
-            guard let self, self.isChoosingFile else { return }
+        presentExportPanel(panel) { [weak self, weak panel] url in
+            guard let self, let panel, self.outputPanel === panel else { return }
+            self.outputPanel = nil
+            panel.accessoryView = nil
+            panel.delegate = nil
             self.isChoosingFile = false
             guard let url else { return }
-            self.beginOutputNotice(title: AppLocalization.text("导出录屏"), destination: url, symbol: "film")
+            guard settings.canConfirm else { self.errorMessage = settings.validationMessage; return }
+            let configuration = settings.configuration
+            self.exportConfiguration = configuration
+            self.beginOutputNotice(title: AppLocalization.text(configuration.format.isAudioOnly ? "导出音频" : "导出录屏"),
+                destination: url, symbol: configuration.format.isAudioOnly ? "waveform" : configuration.format == .livePhoto ? "livephoto" : "film")
             self.operationTask = Task { [weak self] in
                 guard let self else { return }
                 defer { isBusy = false; operationTask = nil }
@@ -586,7 +604,12 @@ final class ScreenRecordingStudioModel: ObservableObject {
     private static func synchronize(_ content: RecordingTimelineContent, start: Double, end: Double,
                                     isNew: Bool, changed: Bool, matching: [Int], timeline: inout RecordingMultitrackTimeline) {
         if matching.isEmpty && isNew {
-            let track = timeline.tracks.first(where: { $0.kind == .text })?.id ?? timeline.addTrack(.text)
+            let track = timeline.clips.first(where: {
+                switch $0.content {
+                case .annotation, .caption: true
+                default: false
+                }
+            })?.trackID ?? timeline.addTrack()
             timeline.clips.append(.init(trackID: track, content: content, start: start, sourceEnd: end - start))
         } else if changed {
             for index in matching {
@@ -599,7 +622,7 @@ final class ScreenRecordingStudioModel: ObservableObject {
     }
 
     func selectMediaAsset(_ id: UUID) {
-        guard let asset = mediaAssets.first(where: { $0.id == id }) else { return }
+        guard let asset = timeline?.assets.first(where: { $0.id == id }) else { return }
         selectedMediaAssetID = id
         if asset.kind != .image, let directory { installSourcePlayer(file: asset.file, directory: directory) }
         else {
@@ -614,6 +637,30 @@ final class ScreenRecordingStudioModel: ObservableObject {
         selectedTimelineClipID = id
         if let assetID = clip.content.assetID, selectedMediaAssetID != assetID { selectMediaAsset(assetID) }
         seekTimeline(to: clip.start)
+    }
+
+    func removeMediaAsset(_ id: UUID) {
+        update { project in
+            var timeline = RecordingMultitrackTimeline.migrating(project)
+            guard let index = timeline.assets.firstIndex(where: { $0.id == id }) else { return }
+            timeline.assets[index].isHiddenFromLibrary = true
+            project.version = ScreenRecordingProject.currentVersion
+            project.timeline = timeline
+        }
+    }
+
+    func restoreMediaAsset(_ id: UUID) {
+        guard let directory else { return }
+        update { project in
+            guard var timeline = project.timeline,
+                  let index = timeline.assets.firstIndex(where: { $0.id == id && $0.isHiddenFromLibrary == true }) else { return }
+            do {
+                _ = try projectStore.mediaURL(timeline.assets[index].file, in: directory)
+                timeline.assets[index].isHiddenFromLibrary = nil
+                project.timeline = timeline
+                errorMessage = nil
+            } catch { errorMessage = error.localizedDescription }
+        }
     }
 
     func selectCanvasTimelineContent(_ content: RecordingTimelineContent) {
@@ -650,7 +697,7 @@ final class ScreenRecordingStudioModel: ObservableObject {
         return project?.captions.contains(where: { $0.id == caption.id }) == true ? caption.id : nil
     }
 
-    func addTimelineTrack(_ kind: RecordingTimelineTrackKind) {
+    func addTimelineTrack(_ kind: RecordingTimelineTrackKind = .video) {
         update { project in
             var timeline = RecordingMultitrackTimeline.migrating(project)
             timeline.addTrack(kind)
@@ -693,7 +740,7 @@ final class ScreenRecordingStudioModel: ObservableObject {
             text: AppLocalization.text("文字标注"))
         update { project in
             var timeline = RecordingMultitrackTimeline.migrating(project)
-            let track = timeline.addTrack(.text)
+            let track = timeline.addTrack()
             let clip = RecordingTimelineClip(trackID: track, content: .annotation(annotation.id),
                 start: annotation.start, sourceEnd: 2)
             timeline.clips.append(clip)
@@ -1086,7 +1133,7 @@ final class ScreenRecordingStudioModel: ObservableObject {
         commitPendingCanvasText?()
         guard canGenerateCaptions, let project, let directory else { return }
         let revision = projectRevision
-        let media = project.timeline == nil ? nil : mediaAssets.first { $0.id == selectedMediaAssetID }
+        let media = project.timeline?.assets.first { $0.id == selectedMediaAssetID }
         let recording = media == nil || (media?.id == project.id && media?.file == project.videoFile)
         let sourceFile = recording ? project.microphoneFile ?? project.videoFile : media!.file
         let sourceDuration = media?.duration ?? project.duration
@@ -1241,7 +1288,7 @@ final class ScreenRecordingStudioModel: ObservableObject {
         self.project = project
         self.directory = directory
         selectedTimelineClipID = timeline?.clips.first?.id
-        if let asset = mediaAssets.first {
+        if let asset = timeline?.assets.first {
             selectedMediaAssetID = asset.id
             if asset.kind != .image { installSourcePlayer(file: asset.file, directory: directory) }
         }
@@ -1331,6 +1378,9 @@ final class ScreenRecordingStudioModel: ObservableObject {
     func shutdown() {
         commitPendingCanvasText = nil
         isChoosingFile = false
+        outputPanel?.delegate = nil
+        outputPanel?.accessoryView = nil
+        outputPanel = nil
         if let outputNotice { notices.remove(id: outputNotice.id) }
         outputNotice = nil
         operationTask?.cancel()

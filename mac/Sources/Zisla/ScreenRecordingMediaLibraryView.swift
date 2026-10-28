@@ -26,9 +26,6 @@ struct ScreenRecordingMediaLibraryView: View {
                     .frame(maxWidth: .infinity)
                     .disabled(model.isBusy || model.isChoosingFile || model.isRecording || model.exporter.isExporting)
             }
-            Text(AppLocalization.text("将素材拖到轨道中开始剪辑"))
-                .font(.caption).foregroundStyle(.secondary)
-                .fixedSize(horizontal: false, vertical: true)
         }
         .padding(12)
         .background(Color(nsColor: .windowBackgroundColor))
@@ -63,10 +60,22 @@ struct ScreenRecordingMediaLibraryView: View {
             .help(AppLocalization.text("添加到时间线"))
             .accessibilityLabel(AppLocalization.text("添加到时间线"))
             .accessibilityIdentifier("screenRecording.addMedia." + asset.id.uuidString)
+            Button { model.removeMediaAsset(asset.id) } label: {
+                Image(systemName: "minus.circle")
+            }
+            .buttonStyle(.borderless)
+            .disabled(!model.canEdit)
+            .help(AppLocalization.text("移除素材"))
+            .accessibilityLabel(AppLocalization.text("移除素材"))
+            .accessibilityIdentifier("screenRecording.removeMedia." + asset.id.uuidString)
         }
         .padding(7)
         .background(Color.accentColor.opacity(model.selectedMediaAssetID == asset.id ? 0.12 : 0.03),
                     in: RoundedRectangle(cornerRadius: 7))
+        .contextMenu {
+            Button(AppLocalization.text("移除素材")) { model.removeMediaAsset(asset.id) }
+                .disabled(!model.canEdit)
+        }
     }
 
     private func symbol(_ kind: RecordingMediaKind) -> String {

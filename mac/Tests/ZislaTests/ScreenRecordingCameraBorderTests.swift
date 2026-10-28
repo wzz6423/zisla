@@ -68,7 +68,7 @@ struct ScreenRecordingCameraBorderTests {
         project.edits.cameraSize = 0.5
         project.edits.cameraRound = round
         project.edits.cameraAspectRatio = .square
-        project.edits.cameraCornerRadius = 0
+        project.edits.cameraCornerRadius = round ? 0.5 : 0
         return project
     }
 

@@ -61,20 +61,49 @@ struct ScreenRecordingMultitrackModelsTests {
         let added = project.timeline?.addAssetClip(image.id, at: 3)
         let clipID = try #require(added)
         try project.validate()
-        #expect(project.timeline?.tracks.map(\.kind) == [.image])
+        #expect(project.timeline?.tracks.count == 1 && project.timeline?.clips.first?.trackID == project.timeline?.tracks.first?.id)
+        #expect(project.timeline?.clips.first?.content == .image(image.id))
         #expect(project.timeline?.clips.first?.id == clipID && project.outputDuration == 8)
     }
 
-    @Test func matchingTracksAreReusedAndIncompatibleTracksStayUnchanged() {
+    @Test func everyExistingTrackAcceptsAssetsAndInvalidDestinationsDoNotCreateTracks() {
         let video = RecordingMediaAsset(name: "Video", file: "video.mp4", kind: .video, duration: 2, width: 64, height: 48)
         var timeline = RecordingMultitrackTimeline(assets: [video], tracks: [.init(id: "v", kind: .video), .init(id: "a", kind: .audio)])
         #expect(timeline.addAssetClip(video.id, at: 0, trackID: "v") != nil)
         #expect(timeline.tracks.count == 2 && timeline.clips[0].trackID == "v")
         #expect(timeline.addAssetClip(video.id, at: 2, trackID: "a") != nil)
-        #expect(timeline.tracks.count == 3 && timeline.clips[1].trackID != "a")
+        #expect(timeline.tracks.count == 2 && timeline.clips[1].trackID == "a")
         let unchanged = timeline
         for time in [-1, Double.nan, .infinity] { #expect(timeline.addAssetClip(video.id, at: time) == nil) }
         #expect(timeline.addAssetClip(UUID(), at: 0) == nil && timeline == unchanged)
+        #expect(timeline.addAssetClip(video.id, at: 0, trackID: "missing") == nil && timeline == unchanged)
+    }
+
+    @Test(arguments: RecordingTimelineTrackKind.allCases)
+    func legacyTracksAcceptEveryContentAndRoundTripWithoutLosingTheirNames(_ kind: RecordingTimelineTrackKind) throws {
+        var project = legacyProject()
+        project.version = 2
+        let image = RecordingMediaAsset(name: "Picture", file: "picture.png", kind: .image, duration: 2, width: 64, height: 48)
+        let audio = RecordingMediaAsset(name: "Sound", file: "tone.wav", kind: .audio, duration: 2)
+        let source = RecordingMediaAsset(id: project.id, name: project.name, file: project.videoFile,
+            kind: .video, duration: project.duration, width: project.width, height: project.height, hasAudio: true)
+        let annotation = try #require(project.edits.annotations?.first)
+        let contents: [RecordingTimelineContent] = [.recording(source.id), .video(source.id), .image(image.id),
+            .audio(audio.id), .annotation(annotation.id), .caption(project.captions[0].id)]
+        project.timeline = .init(assets: [source, image, audio],
+            tracks: [.init(id: "mixed", kind: kind, name: "My legacy track", isMuted: true)],
+            clips: contents.enumerated().map {
+                .init(id: "content\($0.offset)", trackID: "mixed", content: $0.element, start: 0, sourceEnd: 1)
+            })
+        try project.validate()
+        let decoded = try JSONDecoder().decode(ScreenRecordingProject.self, from: JSONEncoder().encode(project))
+        try decoded.validate()
+        #expect(decoded == project && decoded.timeline?.tracks[0].kind == kind)
+        #expect(decoded.timeline?.tracks[0].name == "My legacy track")
+        #expect(decoded.timeline?.visibleClips(at: 0.5).map(\.content) == contents.filter { $0 != .audio(audio.id) },
+            "Track metadata and mute state must not suppress visual content, and audio must never become a visual layer")
+        project.timeline?.tracks[0].isHidden = true
+        #expect(project.timeline?.visibleClips(at: 0.5).isEmpty == true)
     }
 
     @Test(arguments: [0.1, 0.5, 1.0, 2.0, 8.0])
@@ -97,6 +126,16 @@ struct ScreenRecordingMultitrackModelsTests {
         #expect(timeline == split)
     }
 
+    @Test func existingV2TrackMetadataDecodesAndKeepsItsSavedKindAndFlags() throws {
+        let data = Data(#"{"id":"legacy","kind":"audio","name":"My track","isHidden":true,"isMuted":true}"#.utf8)
+        let track = try JSONDecoder().decode(RecordingTimelineTrack.self, from: data)
+        #expect(track.id == "legacy" && track.kind == .audio && track.name == "My track" && track.isHidden && track.isMuted)
+        #expect(track.title(at: 3) == "My track")
+        let encoded = try #require(JSONSerialization.jsonObject(with: JSONEncoder().encode(track)) as? [String: Any])
+        #expect(encoded["kind"] as? String == "audio")
+        #expect(try JSONDecoder().decode(RecordingTimelineTrack.self, from: JSONEncoder().encode(track)) == track)
+    }
+
     @Test(arguments: [0.5, 1.0, 7.25, 65_536.0])
     func fourULPToleranceChoosesTheFollowingClipAtARoundedBoundary(_ boundary: Double) {
         let previous = RecordingTimelineClip(id: "previous", trackID: "v", content: .video(UUID()), start: 0, sourceEnd: boundary)
@@ -116,8 +155,9 @@ struct ScreenRecordingMultitrackModelsTests {
         let clips = ["front", "back", "hidden", "audio", "front"].enumerated().map {
             RecordingTimelineClip(id: String($0.offset), trackID: $0.element, content: .video(id), start: 1, sourceEnd: 2)
         }
-        let timeline = RecordingMultitrackTimeline(tracks: tracks, clips: clips)
-        #expect(timeline.visibleClips(at: 1.5).map(\.id) == ["1", "0", "4"])
+        var timeline = RecordingMultitrackTimeline(tracks: tracks, clips: clips)
+        timeline.clips.append(.init(id: "sound", trackID: "back", content: .audio(id), start: 1, sourceEnd: 2))
+        #expect(timeline.visibleClips(at: 1.5).map(\.id) == ["1", "0", "4", "3"])
         #expect(timeline.visibleClips(at: 0).isEmpty && timeline.visibleClips(at: 3).isEmpty)
     }
 
@@ -129,7 +169,7 @@ struct ScreenRecordingMultitrackModelsTests {
         let valid = project
         switch fault {
         case "asset": project.timeline?.assets.append(valid.timeline!.assets[0])
-        case "track": project.timeline?.tracks[0].kind = .audio
+        case "track": project.timeline?.clips[0].trackID = "missing"
         case "clip": project.timeline?.clips.append(valid.timeline!.clips[0])
         case "content": project.timeline?.clips[0].content = .video(UUID())
         case "path": project.timeline?.assets[0].file = "../escaped.mp4"

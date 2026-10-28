@@ -391,6 +391,28 @@ struct ScreenRecordingCameraPreviewTests {
         #expect(visible.contains(frame))
     }
 
+    @Test(arguments: RecordingCameraAspectRatio.allCases, [0.0, 0.125, 0.5])
+    func explicitRadiusControlsPreviewMaskWhileKeepingItsSizeAndLegacyFlag(
+        ratio: RecordingCameraAspectRatio, radius: Double
+    ) throws {
+        let frame = CGRect(x: 0, y: 0, width: 200, height: 200 / ratio.ratio)
+        let view = ScreenRecordingCameraPreviewView(frame: frame)
+        defer { view.detach() }
+        let layer = try #require(view.layer?.sublayers?.first)
+        let configuration = RecordingEdits(cameraRound: true, cameraAspectRatio: ratio,
+                                           cameraCornerRadius: radius, cameraBorder: true)
+        view.update(session: nil, state: .running, configuration: configuration)
+        view.layoutSubtreeIfNeeded()
+        #expect(abs(layer.cornerRadius - min(frame.width, frame.height) * radius) < 0.000_001,
+                "A saved circular flag must not override the radius shown in the camera controls")
+        #expect(view.frame == frame)
+        #expect(layer.borderWidth == min(frame.width, frame.height) * 0.01)
+        view.update(session: nil, state: .idle, configuration: configuration)
+        view.layoutSubtreeIfNeeded()
+        #expect(view.frame == frame)
+        #expect(abs(layer.cornerRadius - min(frame.width, frame.height) * radius) < 0.000_001)
+    }
+
     @Test(arguments: ScreenRecordingCameraPreviewLayout.Corner.allCases, RecordingCameraAspectRatio.allCases)
     func draggingEachCornerPreservesAspectRatioAndTheOppositeAnchor(
         corner: ScreenRecordingCameraPreviewLayout.Corner, ratio: RecordingCameraAspectRatio

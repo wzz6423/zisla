@@ -16,10 +16,12 @@ struct RecordingTimelineClipIndex {
 
     init(_ timeline: RecordingMultitrackTimeline) {
         let order = Dictionary(uniqueKeysWithValues: timeline.tracks.enumerated().filter {
-            !$0.element.isHidden && $0.element.kind != .audio
+            !$0.element.isHidden
         }.map { ($0.element.id, $0.offset) })
         trackOrder = order
-        let entries = timeline.clips.enumerated().filter { order[$0.element.trackID] != nil }
+        let entries = timeline.clips.enumerated().filter {
+            order[$0.element.trackID] != nil && $0.element.content.trackKind != .audio
+        }
             .sorted { $0.element.start == $1.element.start ? $0.offset < $1.offset : $0.element.start < $1.element.start }
         var built: [Node] = []
         func build(_ start: Int, _ end: Int) -> Int? {

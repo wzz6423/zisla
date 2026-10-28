@@ -108,11 +108,10 @@ struct ScreenRecordingEffectsView: View {
                     Toggle(AppLocalization.text("镜像摄像头"), isOn: editBinding(\.cameraMirrored, default: true))
                     Toggle(AppLocalization.text("摄像头边框"), isOn: optionalEditBinding(\.cameraBorder, default: false))
                         .accessibilityIdentifier("screenRecording.cameraBorder")
-                    Toggle(AppLocalization.text("圆形摄像头"), isOn: editBinding(\.cameraRound, default: true))
-                    if !project.edits.cameraRound {
-                        parameter("圆角", value: Binding(get: { model.project?.edits.cameraCornerRadius ?? 0.1 },
-                            set: { value in model.update { $0.edits.cameraCornerRadius = value } }), in: 0...0.5)
-                    }
+                    ScreenRecordingParameterRow(title: AppLocalization.text("圆角"), value: Binding(
+                        get: { project.edits.effectiveCameraCornerRadius },
+                        set: { value in model.update { $0.edits.cameraCornerRadius = value } }), range: 0...0.5,
+                        identifier: "screenRecording.cameraCornerRadius")
                 }
             }
             ScreenRecordingAnnotationsView(model: model)
@@ -129,11 +128,11 @@ struct ScreenRecordingEffectsView: View {
                 set: { value in model.update { $0.edits[keyPath: path] = value } })
     }
 
-    private var cameraAspectRatioBinding: Binding<RecordingCameraAspectRatio> {
+    var cameraAspectRatioBinding: Binding<RecordingCameraAspectRatio> {
         Binding(get: { model.project?.edits.effectiveCameraAspectRatio ?? .square }, set: { ratio in
             model.update {
+                $0.edits.cameraCornerRadius = $0.edits.effectiveCameraCornerRadius
                 $0.edits.cameraAspectRatio = ratio
-                if ratio != .square { $0.edits.cameraRound = false }
             }
         })
     }

@@ -113,6 +113,7 @@ enum RecordingMultitrackExportJob {
     static func run(project: ScreenRecordingProject, directory: URL, destination: URL,
                     configuration: RecordingExportConfiguration,
                     checkpoint: @escaping @Sendable (RecordingExportCheckpoint) throws -> Void,
+                    resolveFFmpeg: @escaping @Sendable () throws -> URL,
                     progress: @escaping @Sendable (Double) async -> Void) async throws {
         try project.validate()
         guard project.outputDuration > 0 else { throw ScreenRecordingExportError.emptyTimeline }
@@ -128,15 +129,23 @@ enum RecordingMultitrackExportJob {
         let staging = target.deletingLastPathComponent().appendingPathComponent(".zisla-recording-export-\(UUID())", isDirectory: true)
         try FileManager.default.createDirectory(at: staging, withIntermediateDirectories: false)
         defer { try? FileManager.default.removeItem(at: staging) }
-        let temporary = staging.appendingPathComponent("output." + configuration.format.rawValue)
+        let temporary = staging.appendingPathComponent("output." + configuration.format.fileExtension)
         try checkpoint(.beforeWrite)
         try Task.checkCancellation()
-        if configuration.format == .mp4 {
-            let writer = try RecordingExportMP4Writer(url: temporary, frames: frames,
+        if configuration.format.isVideo {
+            let executable = configuration.format.requiresFFmpeg ? try resolveFFmpeg() : nil
+            let rendered = executable == nil ? temporary : staging.appendingPathComponent("rendered.mp4")
+            let writer = try RecordingExportMP4Writer(url: rendered, frames: frames,
                 audioComposition: media.composition, audioTracks: media.audioTracks, audioMix: media.audioMix,
-                duration: media.duration, adjustsSpeed: media.adjustsSpeed, schedule: schedule, checkpoint: checkpoint)
-            try await writer.run(progress: progress)
-        } else {
+                duration: media.duration, adjustsSpeed: media.adjustsSpeed, schedule: schedule,
+                fileType: configuration.format.nativeVideoFileType, checkpoint: checkpoint)
+            try await writer.run { await progress($0 * (executable == nil ? 1 : 0.75)) }
+            if let executable {
+                try await ScreenRecordingFFmpegTranscoder.run(input: rendered, output: temporary,
+                    format: configuration.format, duration: media.duration, executable: executable,
+                    checkpoint: checkpoint) { await progress(0.75 + $0 * 0.23) }
+            }
+        } else if configuration.format == .gif {
             let writer = try RecordingExportGIFWriter(url: temporary, size: size, frameRate: schedule.frameRate, duration: media.duration)
             for index in 0..<schedule.frameCount {
                 try Task.checkCancellation()
@@ -152,7 +161,7 @@ enum RecordingMultitrackExportJob {
                 }
             }
             try writer.finish()
-        }
+        } else { throw ScreenRecordingExportError.unsupportedFormat }
         try checkpoint(.beforeCommit)
         try Task.checkCancellation()
         _ = try RecordingExportJob.validateDestination(target, directory: directory)

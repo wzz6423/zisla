@@ -16,9 +16,10 @@ struct ScreenRecordingLocalizationTests {
             "正在播放原始素材",
             "预览与导出使用相同的画面效果",
             "录屏控制条", "保存位置", "更改保存位置", "选择录屏保存目录",
-            "圆角", "圆形摄像头", "矩形",
+            "圆角",
             "系统声音音量", "麦克风音量", "显示摄像头", "摄像头比例", "画布比例", "背景颜色", "标注", "摄像头边框",
             "视频轨道", "图片轨道", "文字轨道", "音频轨道",
+            "轨道", "轨道 %ld", "移除素材", "素材已从素材库移除", "文件名：%@", "文件路径：%@", "重新导入",
         ]
         #expect(requiredKeys.isSubset(of: keys), "The recording source scan missed runtime keys: \(requiredKeys.subtracting(keys).sorted())")
         #expect(keys.isDisjoint(with: ["pause.fill", "play.fill", "record.circle", "source."]))
@@ -53,6 +54,10 @@ struct ScreenRecordingLocalizationTests {
                                        [2, 3, 4]) == "Segments 2 · Zooms 3 · Captions 4")
         #expect(AppLocalization.format("输出时长：%@", locale: Locale(identifier: "ar"),
                                        ["00:42"]) == "مدة الناتج: \u{2068}00:42\u{2069}")
+        #expect(AppLocalization.format("轨道 %ld", locale: Locale(identifier: "en"), [3]) == "Track 3")
+        #expect(AppLocalization.string("素材已从素材库移除", locale: Locale(identifier: "en")) == "Media removed from library")
+        #expect(AppLocalization.format("文件路径：%@", locale: Locale(identifier: "ar"), ["/tmp/clip.mp4"])
+            == "مسار الملف: \u{2068}/tmp/clip.mp4\u{2069}")
         #expect(AppLanguage.allCases.filter(\.isRightToLeft) == [.arabic])
 
         var settings = FeatureSettings.default
@@ -118,12 +123,14 @@ struct ScreenRecordingLocalizationTests {
         var paths = try FileManager.default.contentsOfDirectory(at: directory, includingPropertiesForKeys: nil)
             .filter { $0.lastPathComponent.hasPrefix("ScreenRecording") && $0.pathExtension == "swift" }
         paths += [packageURL.appendingPathComponent("Sources/ZislaCore/ScreenRecordingModels.swift"),
+                  packageURL.appendingPathComponent("Sources/ZislaCore/ScreenRecordingMultitrackModels.swift"),
                   packageURL.appendingPathComponent("Sources/ZislaKit/ScreenRecordingProjectStore.swift")]
         var keys = Set(RecordingCaptureMode.allCases.map(\.title))
         keys.formUnion(RecordingBackground.allCases.map(\.title))
         keys.formUnion(RecordingCameraPosition.allCases.map(\.title))
         keys.formUnion(RecordingCameraAspectRatio.allCases.map(\.title))
         keys.formUnion(RecordingExportResolution.allCases.map(\.title))
+        keys.formUnion(RecordingExportContent.allCases.map(\.title))
         keys.formUnion(RecordingShortcutAction.allCases.map(\.title))
         keys.formUnion(RecordingCanvasAspectRatio.allCases.map(\.title))
         keys.formUnion(RecordingAnnotationKind.allCases.map(\.title))

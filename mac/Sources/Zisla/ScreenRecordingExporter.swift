@@ -12,6 +12,7 @@ enum RecordingExportCheckpoint: Equatable, Sendable {
     case frame(Int)
     case audioSample(Int)
     case beforeCommit
+    case beforeTranscode
 }
 
 @MainActor
@@ -20,9 +21,16 @@ final class ScreenRecordingExporter: ObservableObject {
     @Published private(set) var isExporting = false
     private var task: Task<Void, any Error>?
     private let checkpoint: @Sendable (RecordingExportCheckpoint) throws -> Void
+    private let resolveFFmpeg: @Sendable () throws -> URL
 
-    init(checkpoint: @escaping @Sendable (RecordingExportCheckpoint) throws -> Void = { _ in }) {
+    convenience init(checkpoint: @escaping @Sendable (RecordingExportCheckpoint) throws -> Void = { _ in }) {
+        self.init(resolveFFmpeg: { try ScreenRecordingFFmpegTranscoder.resolveExecutable() }, checkpoint: checkpoint)
+    }
+
+    init(resolveFFmpeg: @escaping @Sendable () throws -> URL,
+         checkpoint: @escaping @Sendable (RecordingExportCheckpoint) throws -> Void = { _ in }) {
         self.checkpoint = checkpoint
+        self.resolveFFmpeg = resolveFFmpeg
     }
 
     func export(project: ScreenRecordingProject, directory: URL, to destination: URL,
@@ -32,9 +40,11 @@ final class ScreenRecordingExporter: ObservableObject {
         progress = 0
         isExporting = true
         let checkpoint = self.checkpoint
+        let resolveFFmpeg = self.resolveFFmpeg
         let worker = Task.detached(priority: .userInitiated) { [self] in
             try await RecordingExportJob.run(project: project, directory: directory, destination: destination,
-                                             configuration: configuration, checkpoint: checkpoint) { value in
+                                             configuration: configuration, checkpoint: checkpoint,
+                                             resolveFFmpeg: resolveFFmpeg) { value in
                 await MainActor.run { self.progress = value }
             }
         }
@@ -158,10 +168,21 @@ enum RecordingExportJob {
     static func run(project: ScreenRecordingProject, directory: URL, destination: URL,
                     configuration: RecordingExportConfiguration,
                     checkpoint: @escaping @Sendable (RecordingExportCheckpoint) throws -> Void,
+                    resolveFFmpeg: @escaping @Sendable () throws -> URL,
                     progress: @escaping @Sendable (Double) async -> Void) async throws {
+        if configuration.format == .livePhoto {
+            try await ScreenRecordingLivePhotoExporter.run(project: project, directory: directory, destination: destination,
+                configuration: configuration, checkpoint: checkpoint, progress: progress)
+            return
+        }
+        if configuration.format.isAudioOnly {
+            try await ScreenRecordingAudioOnlyExporter.run(project: project, directory: directory, destination: destination,
+                configuration: configuration, checkpoint: checkpoint, resolveFFmpeg: resolveFFmpeg, progress: progress)
+            return
+        }
         if project.timeline != nil {
             try await RecordingMultitrackExportJob.run(project: project, directory: directory, destination: destination,
-                configuration: configuration, checkpoint: checkpoint, progress: progress)
+                configuration: configuration, checkpoint: checkpoint, resolveFFmpeg: resolveFFmpeg, progress: progress)
             return
         }
         let timeline = try RecordingExportTimeline(project: project)
@@ -178,14 +199,21 @@ enum RecordingExportJob {
             .appendingPathComponent(".zisla-recording-export-\(UUID())", isDirectory: true)
         try FileManager.default.createDirectory(at: staging, withIntermediateDirectories: false)
         defer { try? FileManager.default.removeItem(at: staging) }
-        let temporary = staging.appendingPathComponent("output.\(configuration.format.rawValue)")
+        let temporary = staging.appendingPathComponent("output.\(configuration.format.fileExtension)")
         try checkpoint(.beforeWrite)
         try Task.checkCancellation()
-        if configuration.format == .mp4 {
-            let writer = try RecordingExportMP4Writer(url: temporary, media: media, renderer: renderer,
-                                                      schedule: schedule, checkpoint: checkpoint)
-            try await writer.run(progress: progress)
-        } else {
+        if configuration.format.isVideo {
+            let executable = configuration.format.requiresFFmpeg ? try resolveFFmpeg() : nil
+            let rendered = executable == nil ? temporary : staging.appendingPathComponent("rendered.mp4")
+            let writer = try RecordingExportMP4Writer(url: rendered, media: media, renderer: renderer,
+                schedule: schedule, fileType: configuration.format.nativeVideoFileType, checkpoint: checkpoint)
+            try await writer.run { await progress($0 * (executable == nil ? 1 : 0.75)) }
+            if let executable {
+                try await ScreenRecordingFFmpegTranscoder.run(input: rendered, output: temporary,
+                    format: configuration.format, duration: timeline.duration, executable: executable,
+                    checkpoint: checkpoint) { await progress(0.75 + $0 * 0.23) }
+            }
+        } else if configuration.format == .gif {
             let primary = try RecordingExportFrameReader(media: media.video)
             let camera = try media.camera.map(RecordingExportFrameReader.init)
             defer { primary.cancel(); camera?.cancel() }
@@ -211,7 +239,7 @@ enum RecordingExportJob {
                 }
             }
             try writer.finish()
-        }
+        } else { throw ScreenRecordingExportError.unsupportedFormat }
         try checkpoint(.beforeCommit)
         try Task.checkCancellation()
         _ = try validateDestination(target, directory: directory)
@@ -323,22 +351,25 @@ final class RecordingExportMP4Writer: @unchecked Sendable {
 
     convenience init(url: URL, media: RecordingExportMedia, renderer: RecordingExportRenderer,
                      schedule: RecordingExportFrameSchedule,
+                     fileType: AVFileType = .mp4,
                      checkpoint: @escaping @Sendable (RecordingExportCheckpoint) throws -> Void) throws {
         try self.init(url: url, frames: RecordingLegacyExportFrames(media: media, renderer: renderer),
             audioComposition: media.audioComposition, audioTracks: media.audioTracks,
             audioMix: media.audioMix(for: media.audioTracks), duration: media.timeline.duration,
-            adjustsSpeed: media.timeline.slices.contains { $0.speed != 1 }, schedule: schedule, checkpoint: checkpoint)
+            adjustsSpeed: media.timeline.slices.contains { $0.speed != 1 }, schedule: schedule,
+            fileType: fileType, checkpoint: checkpoint)
     }
 
     init(url: URL, frames: any RecordingExportFrameProviding, audioComposition: AVMutableComposition?,
          audioTracks: [AVMutableCompositionTrack], audioMix: AVAudioMix, duration: Double, adjustsSpeed: Bool,
          schedule: RecordingExportFrameSchedule,
+         fileType: AVFileType = .mp4,
          checkpoint: @escaping @Sendable (RecordingExportCheckpoint) throws -> Void) throws {
         self.frames = frames
         self.duration = duration
         self.schedule = schedule
         self.checkpoint = checkpoint
-        writer = try AVAssetWriter(outputURL: url, fileType: .mp4)
+        writer = try AVAssetWriter(outputURL: url, fileType: fileType)
         let width = Int(frames.canvas.width)
         let height = Int(frames.canvas.height)
         videoInput = AVAssetWriterInput(mediaType: .video, outputSettings: [

@@ -36,7 +36,7 @@ final class RecordingMultitrackMedia {
 
     deinit { if let carrier { try? FileManager.default.removeItem(at: carrier) } }
 
-    static func prepare(project: ScreenRecordingProject, directory: URL) async throws -> RecordingMultitrackMedia {
+    static func prepare(project: ScreenRecordingProject, directory: URL, includeVideo: Bool = true) async throws -> RecordingMultitrackMedia {
         try project.validate()
         guard let timeline = project.timeline, timeline.duration > 0 else { throw ScreenRecordingExportError.emptyTimeline }
         let store = ScreenRecordingProjectStore(root: directory)
@@ -95,7 +95,7 @@ final class RecordingMultitrackMedia {
             switch clip.content {
             case let .recording(id), let .video(id):
                 let file = assets[id]!.file
-                if !track.isHidden {
+                if includeVideo && !track.isHidden {
                     let (source, range, transform) = try await video(file)
                     guard clip.sourceStart < range.end.seconds, clip.sourceEnd <= range.end.seconds + 0.001 else {
                         throw ScreenRecordingExportError.timelineOutsideMedia

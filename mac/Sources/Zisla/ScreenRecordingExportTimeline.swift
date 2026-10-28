@@ -12,6 +12,9 @@ enum ScreenRecordingExportError: LocalizedError, Equatable, Sendable {
     case cannotRender
     case encoderFailure
     case exportInProgress
+    case missingFFmpeg
+    case unsupportedFormat
+    case transcodingFailure
 
     var errorDescription: String? {
         switch self {
@@ -23,6 +26,9 @@ enum ScreenRecordingExportError: LocalizedError, Equatable, Sendable {
         case .cannotRender: AppLocalization.text("无法分配或合成录屏画面")
         case .encoderFailure: AppLocalization.text("系统无法编码录屏文件")
         case .exportInProgress: AppLocalization.text("录屏正在导出，请等待或取消")
+        case .missingFFmpeg: AppLocalization.text("导出此格式需要 FFmpeg，请在设置中安装")
+        case .unsupportedFormat: AppLocalization.text("FFmpeg 无法导出此格式")
+        case .transcodingFailure: AppLocalization.text("录屏格式转换失败")
         }
     }
 }

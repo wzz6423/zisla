@@ -52,9 +52,10 @@ struct ScreenRecordingModelsTests {
         #expect(restored.edits.effectiveCameraAspectRatio == .standard)
     }
 
-    @Test func legacyProjectWithoutCameraCornerRadiusKeepsItsDefaultRounding() throws {
+    @Test(arguments: [false, true])
+    func legacyProjectWithoutCameraCornerRadiusKeepsItsDefaultRounding(round: Bool) throws {
         var source = project()
-        source.edits.cameraRound = false
+        source.edits.cameraRound = round
         source.edits.cameraCornerRadius = 0.3
         var legacy = try #require(JSONSerialization.jsonObject(with: JSONEncoder().encode(source)) as? [String: Any])
         var edits = try #require(legacy["edits"] as? [String: Any])
@@ -64,7 +65,7 @@ struct ScreenRecordingModelsTests {
         try decoded.validate()
         #expect(decoded.version == source.version)
         #expect(decoded.edits.cameraCornerRadius == nil)
-        #expect(decoded.edits.effectiveCameraCornerRadius == 0.1)
+        #expect(decoded.edits.effectiveCameraCornerRadius == (round ? 0.5 : 0.1))
     }
 
     @Test(arguments: [false, true])
@@ -91,10 +92,10 @@ struct ScreenRecordingModelsTests {
         #expect(!decoded.edits.effectiveCameraBorder)
     }
 
-    @Test(arguments: [0.0, 0.125, 0.5])
-    func cameraCornerRadiusRoundTripsAtItsBoundaries(_ radius: Double) throws {
+    @Test(arguments: [0.0, 0.125, 0.5], [false, true])
+    func cameraCornerRadiusRoundTripsAtItsBoundaries(_ radius: Double, round: Bool) throws {
         var source = project()
-        source.edits.cameraRound = false
+        source.edits.cameraRound = round
         source.edits.cameraCornerRadius = radius
         try source.validate()
         let decoded = try JSONDecoder().decode(ScreenRecordingProject.self, from: JSONEncoder().encode(source))
@@ -112,13 +113,19 @@ struct ScreenRecordingModelsTests {
         }
     }
 
-    @Test func circleOverridesTheCustomRadiusWithoutDiscardingItsRectangleSetting() {
-        var edits = RecordingEdits(cameraRound: true, cameraCornerRadius: 0.2)
-        #expect(edits.effectiveCameraCornerRadius == 0.5)
-        edits.cameraRound = false
-        #expect(edits.effectiveCameraCornerRadius == 0.2)
+    @Test(arguments: RecordingCameraAspectRatio.allCases, [false, true])
+    func explicitCameraRadiusOverridesTheLegacyShapeWithoutChangingItsAspectRatio(
+        ratio: RecordingCameraAspectRatio, round: Bool
+    ) {
+        var edits = RecordingEdits(cameraRound: round, cameraAspectRatio: ratio)
+        for radius in [0.0, 0.2, 0.5] {
+            edits.cameraCornerRadius = radius
+            #expect(edits.effectiveCameraCornerRadius == radius,
+                    "An explicit radius must work even when a saved project still carries its circular flag")
+            #expect(edits.effectiveCameraAspectRatio == ratio)
+        }
         edits.cameraCornerRadius = nil
-        #expect(edits.effectiveCameraCornerRadius == 0.1)
+        #expect(edits.effectiveCameraCornerRadius == (round && ratio == .square ? 0.5 : 0.1))
     }
 
     @Test func timelineCanReorderAndRepeatSourceAtDifferentSpeeds() throws {

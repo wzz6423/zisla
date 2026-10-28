@@ -2,6 +2,22 @@
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
+    <key>UTExportedTypeDeclarations</key>
+    <array>
+        <dict>
+            <key>UTTypeIdentifier</key>
+            <string>dev.wzz.zisla.livephoto</string>
+            <key>UTTypeDescription</key>
+            <string>Live Photo</string>
+            <key>UTTypeConformsTo</key>
+            <array><string>com.apple.package</string></array>
+            <key>UTTypeTagSpecification</key>
+            <dict>
+                <key>public.filename-extension</key>
+                <array><string>livephoto</string></array>
+            </dict>
+        </dict>
+    </array>
     <key>CFBundleDevelopmentRegion</key>
     <string>zh_CN</string>
     <key>CFBundleLocalizations</key>

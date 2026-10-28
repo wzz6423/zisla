@@ -8,7 +8,13 @@ import ZislaKit
 @MainActor
 @Suite(.serialized)
 struct ScreenRecordingMultitrackUITests {
-    @Test func studioShowsTheLibraryMultitrackInspectorAndExportSettingsBeforeTheFirstEdit() async throws {
+    @Test(arguments: [AppLanguage.simplifiedChinese, .english, .arabic], [960.0, 1_280.0])
+    func studioShowsTheLibraryUniversalTracksAndKeepsOutputControlsInTheToolbar(_ language: AppLanguage, _ width: Double) async throws {
+        let previousArguments = UserDefaults.standard.volatileDomain(forName: UserDefaults.argumentDomain)
+        var arguments = previousArguments
+        arguments[AppLocalization.defaultsKey] = language.rawValue
+        UserDefaults.standard.setVolatileDomain(arguments, forName: UserDefaults.argumentDomain)
+        defer { UserDefaults.standard.setVolatileDomain(previousArguments, forName: UserDefaults.argumentDomain) }
         let fixture = try RecordingMultitrackTestFixture()
         let model = try fixture.model()
         defer { model.shutdown(); fixture.remove() }
@@ -17,7 +23,8 @@ struct ScreenRecordingMultitrackUITests {
         defer { releaseAccessibility() }
         let host = NSHostingView(rootView: ScreenRecordingStudioView(model: model,
             languageStore: AppLanguageStore(), prepareCapture: {}))
-        let window = mount(host, width: 1_280, height: 800)
+        host.sizingOptions = []
+        let window = mount(host, width: width, height: 800)
         defer { window.contentView = nil; window.close() }
         await settle(host)
         #expect(element("screenRecording.mediaLibrary", in: host) != nil)
@@ -25,11 +32,89 @@ struct ScreenRecordingMultitrackUITests {
         #expect(element("screenRecording.clipStart", in: host) != nil,
             "A new recording must expose multitrack editing before timeline migration is persisted")
         #expect(element("screenRecording.detachAudio", in: host) != nil)
-        #expect(labelled("导出设置", in: host) != nil, "Multitrack projects must keep the export format, resolution and frame-rate controls")
+        #expect(labelled("导出设置", in: host) == nil,
+            "Export settings belong to the export dialog rather than the editing inspector")
+        #expect(element("screenRecording.export", in: host) != nil && labelled("录制设置", in: host) == nil)
+        let projectMenu = try #require(element("screenRecording.projectMenu", in: host))
+        let undo = try #require(element("screenRecording.undo", in: host))
+        let redo = try #require(element("screenRecording.redo", in: host))
+        let export = try #require(element("screenRecording.export", in: host))
+        let title = try #require(labelled("录屏工作室", in: host) as? any NSAccessibilityElementProtocol)
+        let frames = [title, projectMenu, undo, redo, export].map {
+            host.convert(window.convertFromScreen($0.accessibilityFrame()), from: nil)
+        }
+        for (first, next) in zip(frames, frames.dropFirst()) {
+            #expect(language.isRightToLeft ? first.minX > next.maxX : first.maxX < next.minX,
+                "The project menu must stay beside the title, followed by undo, redo and export in the interface direction")
+        }
+        for frame in frames {
+            #expect(frame.width > 0 && frame.height > 0 && host.bounds.insetBy(dx: -0.5, dy: -0.5).contains(frame),
+                "Toolbar controls must remain inside the studio at its minimum width")
+        }
+        #expect(language.isRightToLeft ? frames[1].midX > host.bounds.midX : frames[1].midX < host.bounds.midX,
+            "The project menu belongs to the title side of the studio")
+        let naturalExport = NSHostingView(rootView: Button(AppLocalization.text("导出录屏")) {})
+        #expect(frames[4].width + 0.5 >= naturalExport.fittingSize.width,
+            "The export button must show its complete translation")
+        #expect(try #require((export as? NSObject)?.value(forKey: "isAccessibilityEnabled") as? Bool))
         #expect(model.project?.timeline == nil && !model.isDirty && !model.canUndo)
-        model.addTimelineTrack(.audio)
+        let add = try #require(element("screenRecording.multitrackAddTrack", in: host))
+        try click(add.accessibilityFrame(), in: window)
         await settle(host)
-        #expect(element("screenRecording.clipStart", in: host) != nil && labelled("导出设置", in: host) != nil)
+        try click(try #require(element("screenRecording.multitrackAddTrack", in: host)).accessibilityFrame(), in: window)
+        await settle(host)
+        #expect(model.timeline?.tracks.count == 3 && Set(model.timeline?.tracks.map(\.id) ?? []).count == 3)
+        #expect(element("screenRecording.clipStart", in: host) != nil && labelled("导出设置", in: host) == nil)
+        #expect(labelled("视频轨道", in: host) == nil && labelled("图片轨道", in: host) == nil
+            && labelled("文字轨道", in: host) == nil && labelled("音频轨道", in: host) == nil)
+        try click(try #require(element("screenRecording.undo", in: host)).accessibilityFrame(), in: window)
+        await settle(host)
+        #expect(model.timeline?.tracks.count == 2 && model.canRedo)
+        try click(try #require(element("screenRecording.redo", in: host)).accessibilityFrame(), in: window)
+        await settle(host)
+        #expect(model.timeline?.tracks.count == 3 && !model.canRedo)
+        #expect(NSScreen.screens.allSatisfy { !$0.frame.intersects(window.frame) } && !window.isKeyWindow)
+    }
+
+    @Test func toolbarExportDisablesEditingUntilTheDestinationDecisionIsCancelled() async throws {
+        let fixture = try RecordingMultitrackTestFixture()
+        var panels: [NSSavePanel] = []
+        var complete: ((URL?) -> Void)?
+        let model = ScreenRecordingStudioModel(projectStore: fixture.store,
+            renderPreview: { _, _, _ in throw ScreenRecordingExportError.cannotRender },
+            presentExportPanel: { panel, completion in panels.append(panel); complete = completion })
+        defer { model.shutdown(); fixture.remove() }
+        let releaseAccessibility = EnhancedAccessibilityTestScope.acquire()
+        defer { releaseAccessibility() }
+        let host = NSHostingView(rootView: ScreenRecordingStudioView(model: model,
+            languageStore: AppLanguageStore(), prepareCapture: {}))
+        host.sizingOptions = []
+        let window = mount(host, width: 960, height: 800)
+        defer { window.contentView = nil; window.close() }
+        await settle(host)
+        let export = try #require(element("screenRecording.export", in: host) as? NSObject)
+        let emptyExportEnabled = try #require(export.value(forKey: "isAccessibilityEnabled") as? Bool)
+        #expect(!emptyExportEnabled && panels.isEmpty)
+        model.install(fixture.project(), directory: fixture.directory)
+        model.update { $0.name = "Unsaved" }
+        let edited = try #require(model.project)
+        let files = try fixture.files()
+        await settle(host)
+        try click(try #require(element("screenRecording.export", in: host)).accessibilityFrame(), in: window)
+        await settle(host)
+        #expect(panels.count == 1 && model.isChoosingFile && model.operationTask == nil)
+        #expect(panels.first?.accessoryView is NSHostingView<ScreenRecordingExportSettingsView>)
+        for identifier in ["screenRecording.projectMenu", "screenRecording.undo", "screenRecording.redo", "screenRecording.export"] {
+            let control = try #require(element(identifier, in: host) as? NSObject)
+            let enabled = try #require(control.value(forKey: "isAccessibilityEnabled") as? Bool)
+            #expect(!enabled, "Output destination selection must disable \(identifier)")
+        }
+        let cancelDestination = try #require(complete)
+        cancelDestination(nil)
+        await settle(host)
+        #expect(model.project == edited && model.isDirty && model.canUndo && !model.isChoosingFile)
+        #expect(model.canExport && model.operationTask == nil && panels.first?.accessoryView == nil)
+        #expect(try fixture.files() == files, "Cancelling export must leave the project files untouched")
         #expect(NSScreen.screens.allSatisfy { !$0.frame.intersects(window.frame) } && !window.isKeyWindow)
     }
 
@@ -139,8 +224,10 @@ struct ScreenRecordingMultitrackUITests {
     }
 
     private func labelled(_ label: String, in host: NSView) -> NSObject? {
-        objects(in: host).first {
-            $0.responds(to: NSSelectorFromString("accessibilityLabel")) && $0.value(forKey: "accessibilityLabel") as? String == AppLocalization.text(label)
+        objects(in: host).first { object in
+            ["accessibilityLabel", "accessibilityValue"].contains {
+                object.responds(to: NSSelectorFromString($0)) && object.value(forKey: $0) as? String == AppLocalization.text(label)
+            }
         }
     }
 

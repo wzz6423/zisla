@@ -19,9 +19,10 @@ struct ScreenRecordingMultitrackEditingTests {
         original.captions = [.init(start: 1.25, end: 1.75, text: "Repeated")]
         model.install(original, directory: fixture.directory)
         #expect(model.timeline?.clips.count == 3 && model.project?.timeline == nil && !model.isDirty)
-        model.addTimelineTrack(.image)
+        model.addTimelineTrack()
         let edited = try #require(model.project)
-        #expect(edited.version == 2 && edited.timeline?.tracks.last?.kind == .image)
+        #expect(edited.version == 2 && edited.timeline?.tracks.count == 3)
+        #expect(edited.timeline?.tracks.allSatisfy { $0.name.isEmpty } == true)
         #expect(edited.edits.segments == original.edits.segments && edited.captions == original.captions)
         #expect(model.canUndo && model.isDirty)
         model.undo()
@@ -29,8 +30,9 @@ struct ScreenRecordingMultitrackEditingTests {
         model.redo()
         #expect(model.project == edited)
         let before = model.project
-        model.addTimelineTrack(.audio)
+        model.addTimelineTrack()
         #expect(model.timeline?.clips == before?.timeline?.clips, "A second edit must not migrate repeated overlays twice")
+        #expect(model.timeline?.tracks.count == 4 && Set(model.timeline!.tracks.map(\.id)).count == 4)
     }
 
     @Test func importedAssetsStayInTheLibraryUntilUserAddsEachToAnIndependentTrack() async throws {
@@ -56,7 +58,9 @@ struct ScreenRecordingMultitrackEditingTests {
         model.redo()
         #expect(model.project == imported)
         for asset in assets { #expect(model.addAssetToTimeline(asset.id, at: 0) != nil) }
-        #expect(model.timeline?.tracks.map(\.kind) == [.video, .video, .image, .audio])
+        #expect(model.timeline?.tracks.count == 4 && Set(model.timeline!.clips.map(\.trackID)).count == 4)
+        #expect(model.timeline?.clips.map(\.content) == [.recording(original.id), .video(assets[0].id),
+            .image(assets[1].id), .audio(assets[2].id)])
         #expect(model.timeline?.clips.count == 4 && model.timeline?.assets == imported.timeline?.assets)
         try model.save()
         #expect(try fixture.store.load(from: fixture.directory) == model.project)
@@ -161,7 +165,7 @@ struct ScreenRecordingMultitrackEditingTests {
         let model = try fixture.model()
         defer { model.shutdown(); fixture.remove() }
         model.install(fixture.project(), directory: fixture.directory)
-        model.addTimelineTrack(.video)
+        model.addTimelineTrack(.audio)
         let initial = try #require(model.project)
         let clip = try #require(model.timeline?.clips.first)
         let secondTrack = try #require(model.timeline?.tracks.last?.id)
@@ -182,6 +186,111 @@ struct ScreenRecordingMultitrackEditingTests {
         model.moveTimelineClip("missing", to: 0)
         model.updateTimelineTrack("missing") { $0.name = "Changed" }
         #expect(model.project == valid && model.canRedo)
+        model.moveTimelineClip(clip.id, to: 0, trackID: "missing")
+        #expect(model.project == valid && model.canRedo, "An invalid destination must preserve the project and redo history")
+    }
+
+    @Test func everyContentMovesAcrossLegacyTracksAndPersistsWithAtomicUndo() throws {
+        let fixture = try RecordingMultitrackTestFixture()
+        let model = try fixture.model()
+        defer { model.shutdown(); fixture.remove() }
+        for file in ["screen.mp4", "picture.png", "tone.wav"] {
+            try Data([1]).write(to: fixture.directory.appendingPathComponent(file))
+        }
+        var project = fixture.project()
+        project.edits.annotations = [.init(kind: .text, start: 0, end: 1, text: "Text")]
+        project.captions = [.init(start: 0, end: 1, text: "Caption")]
+        var timeline = RecordingMultitrackTimeline.migrating(project)
+        let image = RecordingMediaAsset(name: "Image", file: "picture.png", kind: .image, duration: 2, width: 64, height: 48)
+        let sound = RecordingMediaAsset(name: "Sound", file: "tone.wav", kind: .audio, duration: 2)
+        timeline.assets += [image, sound]
+        let audioTrack = RecordingTimelineTrack(id: "legacy-audio", kind: .audio, name: "My track")
+        timeline.tracks.append(audioTrack)
+        project.timeline = timeline
+        model.install(project, directory: fixture.directory)
+        for asset in [image, sound] {
+            #expect(model.addAssetToTimeline(asset.id, at: 0, trackID: audioTrack.id) != nil)
+        }
+        #expect(model.timeline?.tracks.count == 4)
+        let initial = try #require(model.project)
+        let clips = try #require(model.timeline?.clips)
+        var history: [ScreenRecordingProject] = []
+        for (index, clip) in clips.enumerated() {
+            history.append(try #require(model.project))
+            model.moveTimelineClip(clip.id, to: Double(index + 1), trackID: audioTrack.id)
+            let moved = try #require(model.timeline?.clips.first { $0.id == clip.id })
+            #expect(moved.trackID == audioTrack.id && moved.content == clip.content && moved.layout == clip.layout)
+        }
+        let edited = try #require(model.project)
+        #expect(edited.timeline?.clips.allSatisfy { $0.trackID == audioTrack.id } == true)
+        #expect(edited.timeline?.tracks.last?.name == "My track" && edited.timeline?.assets == initial.timeline?.assets)
+        for previous in history.reversed() { model.undo(); #expect(model.project == previous) }
+        for _ in history { model.redo() }
+        #expect(model.project == edited)
+        try model.save()
+        let reopened = try fixture.store.load(from: fixture.directory)
+        #expect(reopened == edited)
+        model.install(reopened, directory: fixture.directory)
+        #expect(model.project == edited && !model.isDirty && !model.canUndo)
+    }
+
+    @Test func overlayCreationReusesContentTracksAfterTheyMoveToLegacyAudioTracks() throws {
+        let fixture = try RecordingMultitrackTestFixture()
+        let model = try fixture.model()
+        defer { model.shutdown(); fixture.remove() }
+        var project = fixture.project()
+        project.edits.annotations = [.init(kind: .text, start: 0, end: 1, text: "Text")]
+        var timeline = RecordingMultitrackTimeline.migrating(project)
+        timeline.tracks[1].kind = .audio
+        project.timeline = timeline
+        model.install(project, directory: fixture.directory)
+        let caption = try #require(model.addOverlayCaption())
+        #expect(model.timeline?.tracks.count == 2)
+        #expect(model.timeline?.clips.first { $0.content == .caption(caption) }?.trackID == timeline.tracks[1].id,
+            "Adding captions must reuse an overlay's current track without reading legacy kind metadata")
+        let annotation = try #require(model.addOverlayAnnotation(.rectangle))
+        #expect(model.timeline?.tracks.count == 2)
+        #expect(model.timeline?.clips.first { $0.content == .annotation(annotation) }?.trackID == timeline.tracks[1].id)
+        model.undo()
+        model.undo()
+        #expect(model.project == project)
+    }
+
+    @Test func trackTitlesUseTheirPositionAndPreserveCustomLegacyNames() {
+        for (index, kind) in RecordingTimelineTrackKind.allCases.enumerated() {
+            let track = RecordingTimelineTrack(id: "track\(index)", kind: kind)
+            #expect(track.title(at: index) == AppLocalization.text("轨道 %ld", index + 1))
+            #expect(RecordingTimelineTrack(kind: kind, name: "My track").title(at: index) == "My track")
+        }
+    }
+
+    @Test func draggingEveryContentAcrossDifferentLegacyTracksPreservesSourceAndClampsRows() throws {
+        let tracks: [RecordingTimelineTrack] = [.init(id: "audio", kind: .audio), .init(id: "image", kind: .image),
+            .init(id: "text", kind: .text), .init(id: "video", kind: .video)]
+        let id = UUID()
+        for content in [RecordingTimelineContent.recording(id), .video(id), .image(id), .audio(id), .annotation(id), .caption(id)] {
+            let original = RecordingTimelineClip(trackID: "image", content: content, start: 2,
+                sourceStart: 0.25, sourceEnd: 1.75, speed: 2,
+                layout: .init(x: 0.1, y: 0.2, width: 0.4, height: 0.5), volume: 0.3, audioEnabled: false)
+            for (vertical, expectedTrack) in [(0.0, "image"), (44.0, "text"), (-44.0, "audio"),
+                                               (440.0, "video"), (-440.0, "audio")] {
+                let drag = RecordingMultitrackClipDrag(original: original, mode: .move, pointsPerSecond: 100,
+                    translation: .init(width: 100, height: vertical))
+                let changed = try #require(drag.replacement(sourceDuration: 2, tracks: tracks, rowHeight: 44))
+                var expected = original
+                expected.start = 3
+                expected.trackID = expectedTrack
+                #expect(changed == expected, "Dragging must move any content to the nearest track without altering its source or gain")
+            }
+            let trimmed = RecordingMultitrackClipDrag(original: original, mode: .trimEnd, pointsPerSecond: 100,
+                translation: .init(width: -25, height: 44))
+            #expect(trimmed.replacement(sourceDuration: 2, tracks: tracks, rowHeight: 44)?.trackID == original.trackID)
+        }
+        let original = RecordingTimelineClip(trackID: "image", content: .video(id), start: 1, sourceEnd: 2)
+        for translation in [CGSize(width: CGFloat.nan, height: 0), .init(width: 0, height: CGFloat.infinity)] {
+            let drag = RecordingMultitrackClipDrag(original: original, mode: .move, pointsPerSecond: 100, translation: translation)
+            #expect(drag.replacement(sourceDuration: 2, tracks: tracks, rowHeight: 44) == nil)
+        }
     }
 
     @Test func canvasSelectionRetainsTheSelectedOccurrenceAndSeeksMovedOverlaysOnOutputTime() throws {

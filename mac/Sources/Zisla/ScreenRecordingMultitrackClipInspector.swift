@@ -10,6 +10,27 @@ struct ScreenRecordingMultitrackClipInspector: View {
             .font(.caption).foregroundStyle(.secondary)
         if let clip = model.selectedTimelineClip {
             ScreenRecordingInspectorSection(AppLocalization.text("片段"), symbol: clip.content.trackKind.symbol) {
+                if let asset = model.selectedRemovedMediaAsset, let directory = model.directory {
+                    VStack(alignment: .leading, spacing: 6) {
+                        Text(AppLocalization.text("素材已从素材库移除"))
+                            .font(.system(size: 11, weight: .medium))
+                            .accessibilityIdentifier("screenRecording.removedMediaNotice")
+                        Text(AppLocalization.text("文件名：%@", URL(fileURLWithPath: asset.file).lastPathComponent))
+                            .accessibilityIdentifier("screenRecording.removedMediaName")
+                        Text(AppLocalization.text("文件路径：%@",
+                            directory.appendingPathComponent(asset.file).path))
+                            .textSelection(.enabled)
+                            .accessibilityIdentifier("screenRecording.removedMediaPath")
+                        Button(AppLocalization.text("重新导入")) { model.restoreMediaAsset(asset.id) }
+                            .disabled(!model.canEdit)
+                            .accessibilityIdentifier("screenRecording.restoreMedia." + asset.id.uuidString)
+                    }
+                    .font(.caption).foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .padding(8)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .background(Color.secondary.opacity(0.08), in: RoundedRectangle(cornerRadius: 6))
+                }
                 Text(model.timelineClipTitle(clip)).font(.system(size: 12, weight: .medium)).lineLimit(3)
                 ScreenRecordingNumberField(title: AppLocalization.text("片段位置"), value: number(clip, \.start),
                     identifier: "screenRecording.clipStart")
@@ -35,10 +56,10 @@ struct ScreenRecordingMultitrackClipInspector: View {
                             .accessibilityIdentifier("screenRecording.detachAudio")
                     }
                 }
-                Picker(AppLocalization.text(clip.content.trackKind.title), selection: Binding(get: { clip.trackID },
+                Picker(AppLocalization.text("轨道"), selection: Binding(get: { clip.trackID },
                     set: { trackID in model.updateTimelineClip(clip.id) { $0.trackID = trackID } })) {
-                    ForEach((model.timeline?.tracks ?? []).filter { $0.kind == clip.content.trackKind }) { track in
-                        Text(track.name.isEmpty ? AppLocalization.text(track.kind.title) : track.name).tag(track.id)
+                    ForEach(Array((model.timeline?.tracks ?? []).enumerated()), id: \.element.id) { index, track in
+                        Text(track.title(at: index)).tag(track.id)
                     }
                 }
                 .accessibilityIdentifier("screenRecording.clipTrack")
@@ -59,9 +80,6 @@ struct ScreenRecordingMultitrackClipInspector: View {
                 Button(AppLocalization.text("预览片段起点")) { model.selectTimelineClip(clip.id) }
                     .font(.caption)
             }
-        } else {
-            Text(AppLocalization.text("将素材拖到轨道中开始剪辑"))
-                .font(.caption).foregroundStyle(.secondary)
         }
     }
 

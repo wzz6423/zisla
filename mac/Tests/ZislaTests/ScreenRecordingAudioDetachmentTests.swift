@@ -43,6 +43,8 @@ struct ScreenRecordingAudioDetachmentTests {
         #expect(audio.allSatisfy { $0.start == 0.25 && $0.sourceStart == 0.5 && $0.sourceEnd == 1.5 && $0.speed == 2 })
         #expect(Set(audio.map(\.volume)) == [0.4, 0.7])
         #expect(Set(audio.map(\.trackID)).count == 2)
+        #expect(timeline.tracks.allSatisfy { $0.name.isEmpty && $0.kind == .video },
+            "Audio detachment must create the same universal tracks as other timeline actions")
         #expect(timeline.assets.filter { $0.kind == .audio }.map(\.file) == ["microphone.wav"])
         #expect(detached.edits == original.edits)
         #expect(try fixture.files() == beforeFiles, "Detaching must not transcode, copy, or remove source media")
@@ -57,7 +59,7 @@ struct ScreenRecordingAudioDetachmentTests {
         original.edits.screenAudioVolume = 0.3
         original.edits.microphoneVolume = 0.8
         var timeline = RecordingMultitrackTimeline.migrating(original)
-        let trackID = timeline.addTrack(.video)
+        let trackID = timeline.addTrack(.image)
         timeline.tracks[timeline.tracks.count - 1].isMuted = true
         let imported = RecordingTimelineClip(trackID: trackID, content: .video(original.id),
             start: 3, sourceStart: 0.5, sourceEnd: 1.5, speed: 0.5, volume: 0.35)
@@ -74,6 +76,7 @@ struct ScreenRecordingAudioDetachmentTests {
         #expect(audio.start == 3 && audio.sourceStart == 0.5 && audio.sourceEnd == 1.5 && audio.speed == 0.5)
         #expect(audio.volume == 0.35)
         #expect(result.tracks.first { $0.id == audio.trackID }?.isMuted == true)
+        #expect(result.tracks.first { $0.id == audio.trackID }?.name.isEmpty == true)
         #expect(result.clips.filter { $0.content.trackKind == .audio }.count == 1)
     }
 
@@ -290,9 +293,11 @@ struct ScreenRecordingAudioDetachmentTests {
         await model.operationTask?.value
         let detached = try #require(model.project)
         let audioID = try #require(detached.timeline?.clips.first { $0.content.trackKind == .audio }?.id)
-        model.moveTimelineClip(audioID, to: 0.75)
+        let recordingTrack = try #require(detached.timeline?.tracks.first?.id)
+        model.moveTimelineClip(audioID, to: 0.75, trackID: recordingTrack)
         let moved = try #require(model.project)
         #expect(moved.timeline?.clips.first { $0.id == audioID }?.start == 0.75)
+        #expect(moved.timeline?.clips.first { $0.id == audioID }?.trackID == recordingTrack)
         model.updateTimelineClip(audioID) { $0.sourceStart = 0.5; $0.sourceEnd = 1.5; $0.speed = 2; $0.volume = 0.25 }
         let trimmed = try #require(model.project)
         #expect(trimmed.timeline?.clips.first { $0.id == audioID }?.duration == 0.5)
@@ -471,6 +476,7 @@ struct ScreenRecordingAudioDetachmentTests {
             directory: fixture.directory, clipID: original.edits.segments[0].id.uuidString))
         var timeline = try #require(project.timeline)
         let systemIndex = try #require(timeline.clips.firstIndex { $0.content == .audio(project.id) })
+        timeline.clips[systemIndex].trackID = timeline.tracks[0].id
         timeline.clips[systemIndex].start = 0.5
         timeline.clips[systemIndex].sourceStart = 0.2
         timeline.clips[systemIndex].sourceEnd = 0.8
@@ -516,6 +522,50 @@ struct ScreenRecordingAudioDetachmentTests {
         try await exporter.export(project: project, directory: fixture.directory, to: silentDestination,
             configuration: .init(resolution: .source, frameRate: 4))
         #expect(try await AVURLAsset(url: silentDestination).loadTracks(withMediaType: .audio).isEmpty)
+    }
+
+    @Test func universalTrackVisibilityAndMuteIndependentlyControlRealPreviewAndMP4() async throws {
+        let fixture = try Fixture()
+        defer { fixture.remove() }
+        try await fixture.createVideo(withAudio: true)
+        var project = fixture.project()
+        project.version = 2
+        var timeline = RecordingMultitrackTimeline.migrating(project)
+        timeline.tracks[0].kind = .text
+        timeline.clips[0].audioEnabled = false
+        timeline.clips.append(.init(trackID: timeline.tracks[0].id, content: .audio(project.id),
+            start: 0, sourceEnd: 2, volume: 0.5))
+        let exporter = ScreenRecordingExporter()
+        for (hidden, muted) in [(false, false), (true, false), (false, true), (true, true)] {
+            timeline.tracks[0].isHidden = hidden
+            timeline.tracks[0].isMuted = muted
+            project.timeline = timeline
+            let scene = try await exporter.multitrackPreview(project: project, directory: fixture.directory, time: 0.5)
+            let previewImage = try scene.image(project: project)
+            let preview = try await exporter.playbackItem(project: project, directory: fixture.directory)
+            let destination = fixture.root.appendingPathComponent("track-\(hidden)-\(muted).mp4")
+            try await exporter.export(project: project, directory: fixture.directory, to: destination,
+                configuration: .init(resolution: .source, frameRate: 4))
+            let exportedAsset = AVURLAsset(url: destination)
+            let frames = try await RecordingMultitrackTestFixture.decode(exportedAsset)
+            #expect(frames.count == 8)
+            for image in [previewImage, frames[2].1] {
+                let pixel = try RecordingMultitrackTestFixture.pixel(image, x: 32, y: 24)
+                #expect(hidden ? pixel.allSatisfy { $0 < 30 } : pixel[2] > 120,
+                    "Visibility controls visual content on all tracks independently of mute")
+            }
+            for asset in [preview.asset, exportedAsset] {
+                #expect(try await asset.loadTracks(withMediaType: .audio).isEmpty == muted,
+                    "Mute controls audio content on all tracks independently of visibility")
+            }
+            if !muted {
+                for samples in [try await Self.audioSamples(preview.asset, mix: preview.audioMix),
+                                try await Self.audioSamples(exportedAsset)] {
+                    #expect(Self.toneEnergy(samples, frequency: 440, range: 0.2..<0.8) > 0.000_5)
+                }
+            }
+        }
+        #expect(try fixture.files() == ["screen.mp4"])
     }
 
     @Test func realPreviewAndMP4KeepAdjacentAudioGainsConstantAndLeaveGapsSilent() async throws {

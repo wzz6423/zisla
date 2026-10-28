@@ -149,11 +149,16 @@ struct ScreenRecordingExportTests {
 
         project.edits.cameraRound = true
         project.edits.cameraCornerRadius = 0
+        let explicitSquareCorners = try RecordingExportRenderer(project: project, size: size)
+            .image(screen: screen, camera: camera, sourceTime: 0)
+        #expect(try Self.pixel(explicitSquareCorners, x: 7, y: 7).red > 0.9,
+                "An explicit zero radius must preserve square corners despite a saved circular flag")
+        project.edits.cameraCornerRadius = nil
         let circle = try RecordingExportRenderer(project: project, size: size)
             .image(screen: screen, camera: camera, sourceTime: 0)
         #expect(try Self.pixel(circle, x: 7, y: 7).red < 0.1)
         #expect(try Self.pixel(circle, x: 55, y: 95).red > 0.9,
-                "圆形模式应保持正方形外接框，并覆盖自定义零圆角")
+                "缺少显式圆角的旧圆形项目应保持圆形与正方形外接框")
     }
 
     @Test(arguments: RecordingCameraPosition.allCases)
@@ -762,7 +767,7 @@ struct ScreenRecordingExportTests {
         }
     }
 
-    @Test(arguments: RecordingExportFormat.allCases)
+    @Test(arguments: [RecordingExportFormat.mp4, .gif])
     func staticVFRCutsKeepTheFrameSpanningEachCut(format: RecordingExportFormat) async throws {
         let fixture = try Fixture()
         defer { fixture.remove() }

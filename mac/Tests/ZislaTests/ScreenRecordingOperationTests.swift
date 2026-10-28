@@ -2,6 +2,8 @@ import AppKit
 import AVFoundation
 import Combine
 import CoreImage
+import ImageIO
+import SwiftUI
 import Testing
 import ZislaCore
 @testable import ZislaKit
@@ -190,14 +192,14 @@ struct ScreenRecordingOperationTests {
         #expect(!FileManager.default.fileExists(atPath: fixture.destination.path))
     }
 
-    @Test(arguments: RecordingExportFormat.allCases)
+    @Test(arguments: [RecordingExportFormat.mp4, .gif])
     func exportingUsesEncoderProgressAndCompletesWithoutHidingTheStudio(_ format: RecordingExportFormat) async throws {
         let gate = WriteGate()
         let exporter = ScreenRecordingExporter { if $0 == .frame(2) { gate.pause() } }
         let fixture = try Fixture(exporter: exporter)
         defer { gate.resume(); fixture.close() }
         try await fixture.createVideo()
-        fixture.model.exportConfiguration = .init(format: format, resolution: .source, frameRate: 6)
+        fixture.model.exportConfiguration = .init(format: format, resolution: .source, frameRate: format == .gif ? 10 : 30)
         var fractions: [Double] = []
         let subscription = fixture.notices.$left.sink { notices in
             fractions += notices.filter { $0.kind == .info }.compactMap(\.progress)
@@ -234,7 +236,7 @@ struct ScreenRecordingOperationTests {
         let fixture = try Fixture(exporter: exporter)
         defer { gate.resume(); fixture.close() }
         try await fixture.createVideo()
-        fixture.model.exportConfiguration = .init(format: .gif, resolution: .source, frameRate: 6)
+        fixture.model.exportConfiguration = .init(format: .gif, resolution: .source, frameRate: 10)
         let original = Data("existing export".utf8)
         try original.write(to: fixture.destination)
         try fixture.perform(.export)
@@ -255,6 +257,50 @@ struct ScreenRecordingOperationTests {
             #expect(fixture.model.errorMessage != nil)
         }
         #expect(fixture.model.canEdit && fixture.hideCount == 0)
+    }
+
+    @Test(arguments: [RecordingExportFormat.mp4, .gif])
+    func outputEncodesTheResolutionAndFrameRateChosenInTheExportPanel(_ format: RecordingExportFormat) async throws {
+        let fixture = try Fixture()
+        defer { fixture.close() }
+        try await fixture.createVideo()
+        fixture.model.update { $0.edits.segments = [.init(start: 0, end: 0.2)] }
+        fixture.model.exportConfiguration = .init(format: .mp4, resolution: .source, frameRate: 30)
+        fixture.model.export()
+        let panel = try #require(fixture.panel.current)
+        let settings = try #require((panel.accessoryView as? NSHostingView<ScreenRecordingExportSettingsView>)?.rootView.settings)
+        let configuration = RecordingExportConfiguration(format: format, resolution: .fullHD, frameRate: format == .gif ? 15 : 60)
+        settings.configuration = configuration
+        fixture.selectedAction = .export
+        let destination = fixture.root.appendingPathComponent("Chosen settings." + format.rawValue)
+        try fixture.panel.respond(.OK, destination: destination)
+        #expect(fixture.model.exportConfiguration == configuration)
+        #expect(fixture.notices.screenRecordingOperations.first?.detail == destination.lastPathComponent)
+        await fixture.model.operationTask?.value
+
+        #expect(fixture.notices.screenRecordingOperations.first?.kind == .success)
+        #expect(fixture.model.canEdit && fixture.hideCount == 0)
+        #expect(fixture.panel.count == 1, "Confirming the export settings must not open a second destination panel")
+        if format == .mp4 {
+            let asset = AVURLAsset(url: destination)
+            let track = try #require(try await asset.loadTracks(withMediaType: .video).first)
+            #expect(try await track.load(.naturalSize) == CGSize(width: 1_920, height: 1_920))
+            #expect(abs(try await track.load(.nominalFrameRate) - 60) < 0.01)
+            #expect(abs(try await asset.load(.duration).seconds - 0.2) < 0.01)
+        } else {
+            let source = try #require(CGImageSourceCreateWithURL(destination as CFURL, nil))
+            #expect(CGImageSourceGetCount(source) == 3)
+            let first = try #require(CGImageSourceCreateImageAtIndex(source, 0, nil))
+            #expect(first.width == 1_920 && first.height == 1_920)
+            let duration = (0..<CGImageSourceGetCount(source)).reduce(0.0) { duration, index in
+                let properties = CGImageSourceCopyPropertiesAtIndex(source, index, nil) as? [CFString: Any]
+                let gif = properties?[kCGImagePropertyGIFDictionary] as? [CFString: Any]
+                return duration + (gif?[kCGImagePropertyGIFUnclampedDelayTime] as? Double ?? 0)
+            }
+            #expect(abs(duration - 0.2) < 0.001)
+        }
+        #expect(try FileManager.default.contentsOfDirectory(atPath: fixture.root.path)
+            .allSatisfy { !$0.hasPrefix(".zisla-recording-export-") })
     }
 
     @Test func completedProgressExpiresFromTheSharedDashboardSource() async throws {
@@ -367,9 +413,11 @@ struct ScreenRecordingOperationTests {
 
     @MainActor private final class Panel {
         var count = 0
+        private(set) var current: NSSavePanel?
         private var completion: ((URL?) -> Void)?
         func present(_ panel: NSSavePanel, completion: @escaping (URL?) -> Void) {
             count += 1
+            current = panel
             self.completion = completion
         }
         func respond(_ response: NSApplication.ModalResponse, destination: URL) throws {

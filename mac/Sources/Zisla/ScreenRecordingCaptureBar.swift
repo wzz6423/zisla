@@ -242,7 +242,7 @@ struct ScreenRecordingCaptureBar: View {
                     value: $model.configuration.microphone, identifier: "microphone")
                 inputButton("video", disabledSymbol: "video.slash", title: "摄像头",
                     value: $model.configuration.camera, identifier: "camera")
-                cameraShapeControls
+                cameraCornerRadiusButton
                 optionsMenu
                 Button(action: start) {
                     Image(systemName: "record.circle.fill")
@@ -339,26 +339,19 @@ struct ScreenRecordingCaptureBar: View {
         .accessibilityIdentifier("screenRecording.input." + identifier)
     }
 
-    private func cameraShapeButton(round: Bool) -> some View {
-        let title = AppLocalization.text(round ? "圆形摄像头" : "矩形")
-        return Button {
-            if round, model.recordingCameraAspectRatio != .square {
-                model.setRecordingCameraAspectRatio(.square)
-            }
-            model.recordingCameraRound = round
-            showsCameraCornerRadius = !round
+    private var cameraCornerRadiusButton: some View {
+        Button {
+            showsCameraCornerRadius = true
         } label: {
-            Image(systemName: round ? "circle" : "rectangle")
+            Image(systemName: "rectangle.roundedtop")
                 .font(.system(size: 14, weight: .medium))
                 .frame(width: 28, height: ScreenshotToolbarLayout.controlHeight)
-                .foregroundStyle(model.recordingCameraRound == round ? Color.accentColor : Color.secondary)
-                .background(model.recordingCameraRound == round ? Color.accentColor.opacity(0.12) : Color.clear,
-                    in: RoundedRectangle(cornerRadius: 5))
         }
-        .buttonStyle(.plain).help(title).accessibilityLabel(title)
-        .accessibilityAddTraits(model.recordingCameraRound == round ? [.isSelected] : [])
-        .accessibilityIdentifier("screenRecording.cameraShape." + (round ? "circle" : "rectangle"))
-        .popover(isPresented: Binding(get: { !round && showsCameraCornerRadius }, set: { showsCameraCornerRadius = $0 })) {
+        .buttonStyle(.plain).help(AppLocalization.text("圆角"))
+        .accessibilityLabel(AppLocalization.text("圆角"))
+        .accessibilityValue(Text(model.recordingCameraCornerRadius, format: .percent.precision(.fractionLength(0))))
+        .accessibilityIdentifier("screenRecording.cameraCornerRadiusButton")
+        .popover(isPresented: $showsCameraCornerRadius) {
             VStack(alignment: .leading, spacing: 10) {
                 HStack {
                     Text(AppLocalization.text("圆角"))
@@ -371,13 +364,6 @@ struct ScreenRecordingCaptureBar: View {
                     .accessibilityValue(Text(model.recordingCameraCornerRadius, format: .percent.precision(.fractionLength(0))))
                     .accessibilityIdentifier("screenRecording.cameraCornerRadius")
             }.padding(14).frame(width: 240)
-        }
-    }
-
-    private var cameraShapeControls: some View {
-        HStack(spacing: 0) {
-            cameraShapeButton(round: true)
-            cameraShapeButton(round: false)
         }
     }
 
@@ -453,7 +439,7 @@ struct ScreenRecordingCaptureBar: View {
                 Spacer(minLength: 0)
                 if model.configuration.camera {
                     HStack(spacing: 0) {
-                        cameraShapeControls
+                        cameraCornerRadiusButton
                         recordingCameraOptionsMenu
                     }
                 }

@@ -104,7 +104,6 @@ final class ScreenRecordingCameraPreviewController {
         }
         preview.onCornerRadiusChange = { [weak self] radius in
             guard let self else { return }
-            configuration.cameraRound = false
             configuration.cameraCornerRadius = radius
             refresh(session: capture.cameraPreviewSession, state: capture.cameraPreviewState)
             changeCornerRadius(radius)

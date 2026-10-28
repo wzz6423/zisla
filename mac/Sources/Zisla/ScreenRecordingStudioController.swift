@@ -17,7 +17,6 @@ final class ScreenRecordingStudioController: NSWindowController, NSWindowDelegat
     private lazy var cameraPreview = ScreenRecordingCameraPreviewController(capture: model.capture,
         changeSize: { [weak self] in self?.model.recordingCameraSize = $0 },
         changeCornerRadius: { [weak self] radius in
-            self?.model.recordingCameraRound = false
             self?.model.recordingCameraCornerRadius = radius
         })
     private lazy var captureBar: ScreenRecordingCaptureBarController = {
@@ -51,9 +50,6 @@ final class ScreenRecordingStudioController: NSWindowController, NSWindowDelegat
             .removeDuplicates { $0.camera == $1.camera && $0.cameraID == $1.cameraID }
             .dropFirst().receive(on: RunLoop.main)
             .sink { [weak self] _ in self?.refreshCameraPreview() }
-            .store(in: &subscriptions)
-        model.$recordingCameraRound.dropFirst().receive(on: RunLoop.main)
-            .sink { [weak self] _ in self?.updateCameraPreviewLayout() }
             .store(in: &subscriptions)
         model.$recordingCameraAspectRatio.dropFirst().receive(on: RunLoop.main)
             .sink { [weak self] _ in self?.updateCameraPreviewLayout() }
@@ -137,7 +133,6 @@ final class ScreenRecordingStudioController: NSWindowController, NSWindowDelegat
         let configuration = model.configuration
         if configuration.camera {
             cameraPreview.present(configuration: .init(cameraSize: model.recordingCameraSize,
-                cameraRound: model.recordingCameraRound,
                 cameraAspectRatio: model.recordingCameraAspectRatio,
                 cameraCornerRadius: model.recordingCameraCornerRadius,
                 cameraBorder: model.recordingCameraBorder))

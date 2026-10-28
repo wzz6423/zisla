@@ -13,9 +13,11 @@ public struct RecordingMediaAsset: Codable, Equatable, Identifiable, Sendable {
     public var width: Int
     public var height: Int
     public var hasAudio: Bool
+    public var isHiddenFromLibrary: Bool?
 
     public init(id: UUID = UUID(), name: String, file: String, kind: RecordingMediaKind,
-                duration: Double, width: Int = 0, height: Int = 0, hasAudio: Bool = false) {
+                duration: Double, width: Int = 0, height: Int = 0, hasAudio: Bool = false,
+                isHiddenFromLibrary: Bool? = nil) {
         self.id = id
         self.name = name
         self.file = file
@@ -24,6 +26,7 @@ public struct RecordingMediaAsset: Codable, Equatable, Identifiable, Sendable {
         self.width = width
         self.height = height
         self.hasAudio = hasAudio
+        self.isHiddenFromLibrary = isHiddenFromLibrary
     }
 }
 
@@ -56,13 +59,17 @@ public struct RecordingTimelineTrack: Codable, Equatable, Identifiable, Sendable
     public var isHidden: Bool
     public var isMuted: Bool
 
-    public init(id: String = UUID().uuidString, kind: RecordingTimelineTrackKind,
+    public init(id: String = UUID().uuidString, kind: RecordingTimelineTrackKind = .video,
                 name: String = "", isHidden: Bool = false, isMuted: Bool = false) {
         self.id = id
         self.kind = kind
         self.name = name
         self.isHidden = isHidden
         self.isMuted = isMuted
+    }
+
+    public func title(at index: Int) -> String {
+        name.isEmpty ? AppLocalization.text("轨道 %ld", index + 1) : name
     }
 }
 
@@ -144,9 +151,11 @@ public struct RecordingMultitrackTimeline: Codable, Equatable, Sendable {
 
     public func visibleClips(at time: Double) -> [RecordingTimelineClip] {
         let order = Dictionary(uniqueKeysWithValues: tracks.enumerated().filter {
-            !$0.element.isHidden && $0.element.kind != .audio
+            !$0.element.isHidden
         }.map { ($0.element.id, $0.offset) })
-        return clips.enumerated().filter { order[$0.element.trackID] != nil && $0.element.contains(time) }
+        return clips.enumerated().filter {
+            order[$0.element.trackID] != nil && $0.element.contains(time) && $0.element.content.trackKind != .audio
+        }
             .sorted {
                 let left = order[$0.element.trackID]!
                 let right = order[$1.element.trackID]!
@@ -178,7 +187,7 @@ public struct RecordingMultitrackTimeline: Codable, Equatable, Sendable {
         }
         for clip in clips {
             guard !clip.id.isEmpty, clip.id.count <= 255,
-                  trackMap[clip.trackID]?.kind == clip.content.trackKind,
+                  trackMap[clip.trackID] != nil,
                   [clip.start, clip.sourceStart, clip.sourceEnd, clip.speed, clip.volume].allSatisfy(\.isFinite),
                   clip.start >= 0, clip.sourceStart >= 0, clip.sourceEnd > clip.sourceStart,
                   (0.1...8).contains(clip.speed), (0...1).contains(clip.volume), clip.layout.isNormalized
@@ -208,7 +217,7 @@ public struct RecordingMultitrackTimeline: Codable, Equatable, Sendable {
 
     public static func migrating(_ project: ScreenRecordingProject) -> Self {
         if let timeline = project.timeline { return timeline }
-        let videoTrack = RecordingTimelineTrack(id: "recording", kind: .video)
+        let videoTrack = RecordingTimelineTrack(id: "recording")
         let source = RecordingMediaAsset(id: project.id, name: project.name, file: project.videoFile,
             kind: .video, duration: project.duration, width: project.width, height: project.height, hasAudio: true)
         var timeline = Self(assets: [source], tracks: [videoTrack])
@@ -230,7 +239,7 @@ public struct RecordingMultitrackTimeline: Codable, Equatable, Sendable {
             offset += segment.outputDuration
         }
         for id in ["annotations", "captions"] where timeline.clips.contains(where: { $0.trackID == id }) {
-            timeline.tracks.append(.init(id: id, kind: .text))
+            timeline.tracks.append(.init(id: id))
         }
         return timeline
     }
@@ -248,7 +257,7 @@ public struct RecordingMultitrackTimeline: Codable, Equatable, Sendable {
     }
 
     @discardableResult
-    public mutating func addTrack(_ kind: RecordingTimelineTrackKind) -> String {
+    public mutating func addTrack(_ kind: RecordingTimelineTrackKind = .video) -> String {
         let track = RecordingTimelineTrack(kind: kind)
         tracks.append(track)
         return track.id
@@ -263,8 +272,11 @@ public struct RecordingMultitrackTimeline: Codable, Equatable, Sendable {
         case .image: content = .image(id)
         case .audio: content = .audio(id)
         }
-        let target = tracks.first { $0.id == trackID && $0.kind == content.trackKind }?.id
-            ?? addTrack(content.trackKind)
+        let target: String
+        if let trackID {
+            guard tracks.contains(where: { $0.id == trackID }) else { return nil }
+            target = trackID
+        } else { target = addTrack() }
         let clip = RecordingTimelineClip(trackID: target, content: content, start: time, sourceEnd: asset.duration)
         clips.append(clip)
         return clip.id
