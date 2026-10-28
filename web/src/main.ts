@@ -12,13 +12,17 @@ import {
   Lock,
   Menu,
   Mic,
+  Monitor,
+  Moon,
   Plus,
   Shield,
   Sparkles,
+  Sun,
   Waves,
   X,
   createIcons,
 } from 'lucide';
+import * as THREE from 'three';
 import {
   brewInstallCommand,
   changelogEntries,
@@ -41,7 +45,10 @@ import {
   runCommand,
   showcaseModuleGroups,
   supportedAITools,
+  themeModeIcons,
+  themeModes,
   zislactlCommandTemplate,
+  type ThemeMode,
 } from './content';
 import {
   defaultLocale,
@@ -76,9 +83,12 @@ const siteIcons = {
   Lock,
   Menu,
   Mic,
+  Monitor,
+  Moon,
   Plus,
   Shield,
   Sparkles,
+  Sun,
   Waves,
   X,
 };
@@ -118,10 +128,34 @@ const readInitialLocale = (): SiteLocale => {
 
 const desktopQuery = window.matchMedia('(min-width: 1200px)');
 const reducedMotionQuery = window.matchMedia('(prefers-reduced-motion: reduce)');
+const colorSchemeQuery = window.matchMedia('(prefers-color-scheme: dark)');
+const themeStorageKey = 'zisla.theme-mode';
+const readInitialThemeMode = (): ThemeMode => {
+  try {
+    const stored = window.localStorage.getItem(themeStorageKey);
+    if (stored === 'light' || stored === 'dark') return stored;
+  } catch {
+    // Use the system preference when storage is unavailable.
+  }
+  return 'auto';
+};
+
+let currentThemeMode = readInitialThemeMode();
+const applyTheme = () => {
+  document.documentElement.dataset.theme =
+    currentThemeMode === 'auto' ? (colorSchemeQuery.matches ? 'dark' : 'light') : currentThemeMode;
+  document.querySelectorAll<HTMLButtonElement>('[data-theme-mode]').forEach((button) => {
+    button.setAttribute('aria-pressed', String(button.dataset.themeMode === currentThemeMode));
+  });
+  window.dispatchEvent(new Event('site-theme-change'));
+};
+applyTheme();
+
 let currentLocale = readInitialLocale();
 let revealObserver: IntersectionObserver | undefined;
 let toastTimer: number | undefined;
 let sectionProgressItems: { section: HTMLElement; link: HTMLAnchorElement }[] = [];
+let sectionAccentRegions: HTMLElement[] = [];
 const copyFeedbackTimers = new WeakMap<HTMLButtonElement, number>();
 const progressBar = document.createElement('div');
 progressBar.className = 'scroll-progress';
@@ -277,18 +311,28 @@ const bindReveals = () => {
 const updateScrollProgress = () => {
   const scrollableHeight = document.documentElement.scrollHeight - window.innerHeight;
   const progress = scrollableHeight > 0 ? window.scrollY / scrollableHeight : 0;
-  progressBar.style.transform = 'scaleX(' + Math.min(1, Math.max(0, progress)) + ')';
-
   const sectionThreshold =
     (document.querySelector<HTMLElement>('.site-header')?.getBoundingClientRect().height ?? 80) + 24;
+  const accentBounds = sectionAccentRegions.map((region) => region.getBoundingClientRect());
+  const itemStates = sectionProgressItems.map(({ section, link }) => {
+    const bounds = link.getBoundingClientRect();
+    const markerCenter = bounds.top + bounds.height / 2;
+    return {
+      link,
+      sectionTop: section.getBoundingClientRect().top,
+      overAccent: accentBounds.some(({ top, bottom }) => markerCenter >= top && markerCenter < bottom),
+    };
+  });
   let activeIndex = 0;
-  sectionProgressItems.forEach(({ section }, index) => {
-    if (section.getBoundingClientRect().top <= sectionThreshold) activeIndex = index;
+  itemStates.forEach(({ sectionTop }, index) => {
+    if (sectionTop <= sectionThreshold) activeIndex = index;
   });
   if (scrollableHeight > 0 && window.scrollY >= scrollableHeight - 2) {
     activeIndex = sectionProgressItems.length - 1;
   }
-  sectionProgressItems.forEach(({ link }, index) => {
+  progressBar.style.transform = 'scaleX(' + Math.min(1, Math.max(0, progress)) + ')';
+  itemStates.forEach(({ link, overAccent }, index) => {
+    link.classList.toggle('is-over-accent', overAccent);
     if (index === activeIndex) link.setAttribute('aria-current', 'location');
     else link.removeAttribute('aria-current');
   });
@@ -328,6 +372,278 @@ const setupChangelogPagination = () => {
     }
   });
   showPage(1);
+};
+
+let introScene: {
+  dispose: () => void;
+  updateScroll: (scrollY: number, windowHeight: number) => void;
+} | null = null;
+
+const initIntroScene = () => {
+  if (introScene) introScene.dispose();
+
+  const container = document.querySelector<HTMLElement>('.hero');
+  if (!container) {
+    console.error('[Intro] Hero container not found');
+    return;
+  }
+  const scene = new THREE.Scene();
+  const camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 1, 2000);
+  camera.position.set(0, 0, 800);
+
+  const canvas = document.createElement('canvas');
+  canvas.className = 'hero-canvas';
+  canvas.setAttribute('aria-hidden', 'true');
+  document.body.prepend(canvas);
+
+  const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: true });
+  renderer.setClearColor(0x09090b, 0);
+  renderer.setSize(window.innerWidth, window.innerHeight);
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+
+  // Circular particle texture
+  const circleTexture = (() => {
+    const size = 32;
+    const cnv = document.createElement('canvas');
+    cnv.width = size;
+    cnv.height = size;
+    const ctx = cnv.getContext('2d')!;
+    const gradient = ctx.createRadialGradient(16, 16, 0, 16, 16, 16);
+    gradient.addColorStop(0, 'rgba(250,250,250,1)');
+    gradient.addColorStop(0.5, 'rgba(250,250,250,0.5)');
+    gradient.addColorStop(1, 'rgba(250,250,250,0)');
+    ctx.fillStyle = gradient;
+    ctx.beginPath();
+    ctx.arc(16, 16, 16, 0, Math.PI * 2);
+    ctx.fill();
+    return new THREE.CanvasTexture(cnv);
+  })();
+
+  // Sample logo pixels from image
+  const logoTargets: THREE.Vector3[] = [];
+  let particleCount = 0;
+  let logoX = window.innerWidth > 768 ? 440 : 220;
+  const logoY = 60;
+  const logoScale = 0.34;
+  let logoRightExtent = 0;
+  let viewHeight = 2 * Math.tan(THREE.MathUtils.degToRad(camera.fov / 2)) * camera.position.z;
+  let viewWidth = viewHeight * camera.aspect;
+  const updateLogoPosition = () => {
+    const preferredX = window.innerWidth > 768 ? 440 : 220;
+    const nextX = Math.min(preferredX, viewWidth / 2 - logoRightExtent - 20);
+    logoTargets.forEach((target) => { target.x += nextX - logoX; });
+    logoX = nextX;
+  };
+
+  const img = document.createElement('img');
+  img.crossOrigin = 'anonymous';
+  img.onerror = (e) => {
+    console.error('[Intro] Image load failed', e);
+  };
+  img.onload = () => {
+    const tmpCanvas = document.createElement('canvas');
+    const size = 1024;
+    tmpCanvas.width = size;
+    tmpCanvas.height = size;
+    const ctx = tmpCanvas.getContext('2d')!;
+    ctx.drawImage(img, 0, 0, size, size);
+    const imageData = ctx.getImageData(0, 0, size, size);
+    const pixels = imageData.data;
+
+    // Sample non-transparent pixels (stricter alpha check)
+    const step = 6;
+    for (let y = 0; y < size; y += step) {
+      for (let x = 0; x < size; x += step) {
+        const i = (y * size + x) * 4;
+        const r = pixels[i];
+        const g = pixels[i + 1];
+        const b = pixels[i + 2];
+        const alpha = pixels[i + 3];
+
+        // Only sample fully opaque dark pixels (the actual icon, not anti-aliasing)
+        if (alpha > 250 && r + g + b < 100) {
+          const px = (x - size / 2) * logoScale;
+          const py = (size / 2 - y) * logoScale;
+          logoTargets.push(new THREE.Vector3(logoX + px, logoY + py, 0));
+          logoRightExtent = Math.max(logoRightExtent, px);
+        }
+      }
+    }
+
+    particleCount = Math.min(logoTargets.length, 3000);
+    updateLogoPosition();
+    initParticles();
+    updateScroll(window.scrollY, window.innerHeight);
+    if (!document.hidden) renderFrame();
+  };
+
+  const geometry = new THREE.BufferGeometry();
+  const material = new THREE.PointsMaterial({
+    color: 0xfafafa,
+    size: 2.5,
+    transparent: true,
+    opacity: 0.9,
+    map: circleTexture,
+    blending: THREE.AdditiveBlending,
+    depthWrite: false,
+  });
+
+  let particles: THREE.Points | null = null;
+  const originals: THREE.Vector3[] = [];
+  let progress = 0;
+  const ambientCount = 520;
+  const ambientGeometry = new THREE.BufferGeometry();
+  const ambientMaterial = new THREE.PointsMaterial({
+    size: 3.6,
+    sizeAttenuation: false,
+    transparent: true,
+    map: circleTexture,
+    depthWrite: false,
+  });
+  const ambientSeeds = Array.from({ length: ambientCount }, () =>
+    new THREE.Vector3(Math.random(), Math.random(), (Math.random() - 0.5) * 240),
+  );
+  ambientGeometry.setAttribute('position', new THREE.BufferAttribute(new Float32Array(ambientCount * 3), 3));
+  scene.add(new THREE.Points(ambientGeometry, ambientMaterial));
+
+  const initParticles = () => {
+    const positions = new Float32Array(particleCount * 3);
+
+    for (let i = 0; i < particleCount; i++) {
+      const i3 = i * 3;
+      const x = (Math.random() - 0.5) * 2000;
+      const y = (Math.random() - 0.5) * 1000;
+      const z = (Math.random() - 0.5) * 400;
+      positions[i3] = x;
+      positions[i3 + 1] = y;
+      positions[i3 + 2] = z;
+      originals.push(new THREE.Vector3(x, y, z));
+    }
+
+    geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+    particles = new THREE.Points(geometry, material);
+    scene.add(particles);
+  };
+
+  const updateScroll = (scrollY: number, windowHeight: number) => {
+    const scrollProgress = Math.min(scrollY / windowHeight, 1);
+    material.opacity = 0.9 * (1 - scrollProgress);
+    if (particles) particles.position.y = scrollY * viewHeight / windowHeight;
+    if (reducedMotionQuery.matches && !document.hidden) renderer.render(scene, camera);
+  };
+
+  let animationId: number | undefined;
+  const clock = new THREE.Clock();
+  let elapsed = 0;
+
+  const renderFrame = () => {
+    const reducedMotion = reducedMotionQuery.matches;
+    const delta = reducedMotion ? 0 : Math.min(clock.getDelta(), 0.05);
+    elapsed += delta;
+    if (particles) {
+      progress = reducedMotion ? 1 : Math.min(progress + delta * 0.72, 1);
+      const eased = 1 - Math.pow(1 - progress, 3);
+      const positions = geometry.attributes.position.array as Float32Array;
+      for (let i = 0; i < particleCount; i++) {
+        const i3 = i * 3;
+        const orig = originals[i];
+        const tgt = logoTargets[i];
+        positions[i3] = THREE.MathUtils.lerp(orig.x, tgt.x, eased);
+        positions[i3 + 1] = THREE.MathUtils.lerp(orig.y, tgt.y, eased);
+        positions[i3 + 2] = THREE.MathUtils.lerp(orig.z, tgt.z, eased);
+        if (!reducedMotion && progress > 0.85) {
+          positions[i3] += Math.sin(elapsed * 0.4 + i * 0.1) * 0.4;
+          positions[i3 + 1] += Math.cos(elapsed * 0.25 + i * 0.15) * 0.4;
+        }
+      }
+      geometry.attributes.position.needsUpdate = true;
+    }
+
+    const positions = ambientGeometry.attributes.position.array as Float32Array;
+    for (let i = 0; i < ambientCount; i++) {
+      const i3 = i * 3;
+      const seed = ambientSeeds[i];
+      const depthScale = (camera.position.z - seed.z) / camera.position.z;
+      const width = viewWidth * depthScale + 64;
+      const height = viewHeight * depthScale + 64;
+      positions[i3] = ((seed.x + elapsed * (0.004 + i % 5 * 0.0008)) % 1 - 0.5) * width
+        + Math.sin(elapsed * 0.45 + i) * 10;
+      positions[i3 + 1] = ((seed.y + elapsed * (0.012 + i % 7 * 0.0015)) % 1 - 0.5) * height;
+      positions[i3 + 2] = seed.z;
+    }
+    ambientGeometry.attributes.position.needsUpdate = true;
+    renderer.render(scene, camera);
+  };
+
+  const animate = () => {
+    animationId = undefined;
+    renderFrame();
+    if (!document.hidden && !reducedMotionQuery.matches) animationId = requestAnimationFrame(animate);
+  };
+  const updateMotion = () => {
+    if (animationId !== undefined) cancelAnimationFrame(animationId);
+    animationId = undefined;
+    clock.stop();
+    if (document.hidden) return;
+    clock.start();
+    animate();
+  };
+  const updateTheme = () => {
+    const styles = getComputedStyle(document.documentElement);
+    const color = styles.getPropertyValue('--particle-color').trim();
+    const blending = document.documentElement.dataset.theme === 'light'
+      ? THREE.NormalBlending : THREE.AdditiveBlending;
+    [material, ambientMaterial].forEach((pointsMaterial) => {
+      pointsMaterial.color.set(color);
+      pointsMaterial.blending = blending;
+    });
+    ambientMaterial.opacity = Number(styles.getPropertyValue('--particle-opacity'));
+    if (!document.hidden) renderer.render(scene, camera);
+  };
+
+  const handleResize = () => {
+    camera.aspect = window.innerWidth / window.innerHeight;
+    camera.updateProjectionMatrix();
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+    renderer.setSize(window.innerWidth, window.innerHeight);
+    viewHeight = 2 * Math.tan(THREE.MathUtils.degToRad(camera.fov / 2)) * camera.position.z;
+    viewWidth = viewHeight * camera.aspect;
+    updateLogoPosition();
+    updateScroll(window.scrollY, window.innerHeight);
+    if (!document.hidden) renderFrame();
+  };
+  window.addEventListener('resize', handleResize);
+  window.addEventListener('site-theme-change', updateTheme);
+  document.addEventListener('visibilitychange', updateMotion);
+  reducedMotionQuery.addEventListener('change', updateMotion);
+
+  introScene = {
+    dispose: () => {
+      if (animationId !== undefined) cancelAnimationFrame(animationId);
+      clock.stop();
+      img.onload = null;
+      img.onerror = null;
+      window.removeEventListener('resize', handleResize);
+      window.removeEventListener('site-theme-change', updateTheme);
+      document.removeEventListener('visibilitychange', updateMotion);
+      reducedMotionQuery.removeEventListener('change', updateMotion);
+      geometry.dispose();
+      material.dispose();
+      ambientGeometry.dispose();
+      ambientMaterial.dispose();
+      circleTexture.dispose();
+      scene.clear();
+      renderer.dispose();
+      renderer.forceContextLoss();
+      canvas.remove();
+      introScene = null;
+    },
+    updateScroll,
+  };
+  updateTheme();
+  updateScroll(window.scrollY, window.innerHeight);
+  updateMotion();
+  img.src = './assets/zisla-icon.png';
 };
 
 const renderSite = (locale: SiteLocale, preserveScroll = false) => {
@@ -638,7 +954,16 @@ const renderSite = (locale: SiteLocale, preserveScroll = false) => {
     escapeHtml(content.header.languageLabel) +
     '" dir="auto">' +
     languageOptions +
-    '</select></label><a class="header-cta" href="#download" aria-label="' +
+    '</select></label><div class="theme-picker" role="group" aria-label="' +
+    escapeHtml(content.header.themeLabel) +
+    '">' +
+    themeModes.map((mode) => {
+      const label = escapeHtml(content.header.themeModes[mode]);
+      return '<button class="theme-option" type="button" data-theme-mode="' + mode +
+        '" aria-pressed="' + String(mode === currentThemeMode) + '" aria-label="' + label +
+        '" title="' + label + '">' + icon(themeModeIcons[mode], 16) + '</button>';
+    }).join('') +
+    '</div><a class="header-cta" href="#download" aria-label="' +
     escapeHtml(content.header.downloadCtaAriaLabel) +
     '">' +
     escapeHtml(content.header.downloadCta) +
@@ -862,6 +1187,7 @@ const renderSite = (locale: SiteLocale, preserveScroll = false) => {
 
   createIcons({ icons: siteIcons });
   setMenuOpen(false);
+  applyTheme();
   bindReveals();
   sectionProgressItems = Array.from(
     document.querySelectorAll<HTMLAnchorElement>('.section-progress-link'),
@@ -869,6 +1195,9 @@ const renderSite = (locale: SiteLocale, preserveScroll = false) => {
     const section = document.getElementById(link.hash.substring(1));
     return section ? [{ section, link }] : [];
   });
+  sectionAccentRegions = Array.from(
+    document.querySelectorAll<HTMLElement>('.marquee-features, .download-section, .site-footer'),
+  );
 
   setupChangelogPagination();
 
@@ -886,6 +1215,18 @@ const renderSite = (locale: SiteLocale, preserveScroll = false) => {
       // Keep the in-memory selection when persistence is unavailable.
     }
     void showLocale(value, true);
+  });
+
+  themeModes.forEach((mode) => {
+    document.querySelector<HTMLButtonElement>('[data-theme-mode="' + mode + '"]')?.addEventListener('click', () => {
+      currentThemeMode = mode;
+      applyTheme();
+      try {
+        window.localStorage.setItem(themeStorageKey, mode);
+      } catch {
+        // Keep the active mode when persistence is unavailable.
+      }
+    });
   });
 
   document.querySelectorAll<HTMLAnchorElement>('.nav a, .header-cta').forEach((link) => {
@@ -945,12 +1286,23 @@ const showLocale = async (locale: SiteLocale, preserveScroll = false) => {
   }
   if (pendingLocale !== locale) return;
   renderSite(locale, preserveScroll);
+  initIntroScene();
 };
 
-window.addEventListener('scroll', updateScrollProgress, { passive: true });
+const updateScrollWithIntro = () => {
+  updateScrollProgress();
+  if (introScene) {
+    introScene.updateScroll(window.scrollY, window.innerHeight);
+  }
+};
+
+window.addEventListener('scroll', updateScrollWithIntro, { passive: true });
 window.addEventListener('resize', updateScrollProgress);
 desktopQuery.addEventListener?.('change', () => setMenuOpen(false));
 reducedMotionQuery.addEventListener?.('change', bindReveals);
+colorSchemeQuery.addEventListener('change', () => {
+  if (currentThemeMode === 'auto') applyTheme();
+});
 window.addEventListener('keydown', (event) => {
   if (event.key !== 'Escape' || !document.querySelector('.nav.is-open')) return;
   setMenuOpen(false);

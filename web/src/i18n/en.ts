@@ -27,6 +27,8 @@ export const en: SiteContent = {
     downloadCta: 'Download',
     downloadCtaAriaLabel: 'Jump to the download section',
     languageLabel: 'Interface language',
+    themeLabel: 'Appearance',
+    themeModes: { auto: 'Automatic (system)', light: 'Light mode', dark: 'Dark mode' },
   },
   hero: {
     eyebrow: 'NATIVE MACOS WORKSPACE',

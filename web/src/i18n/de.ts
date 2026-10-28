@@ -27,6 +27,8 @@ export const de: SiteContent = {
     downloadCta: 'Laden',
     downloadCtaAriaLabel: 'Zum Download-Abschnitt springen',
     languageLabel: 'Sprache der Oberfläche',
+    themeLabel: 'Erscheinungsbild',
+    themeModes: { auto: 'Automatisch (System)', light: 'Heller Modus', dark: 'Dunkler Modus' },
   },
   hero: {
     eyebrow: 'NATIVER MACOS-ARBEITSBEREICH',
