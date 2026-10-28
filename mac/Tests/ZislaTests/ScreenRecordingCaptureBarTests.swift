@@ -1,4 +1,5 @@
 import AppKit
+import AVFoundation
 import Testing
 import ZislaCore
 import ZislaKit
@@ -8,18 +9,29 @@ import ZislaKit
 @Suite
 struct ScreenRecordingCaptureBarTests {
     @MainActor
-    @Test(arguments: [false, true])
-    func captureBarAlwaysExposesRadiusInsteadOfShapeChoices(cameraEnabled: Bool) async throws {
+    @Test(arguments: [false, true], [RecordingPhase.idle, .recording, .paused])
+    func captureBarOmitsCameraRadiusControls(cameraEnabled: Bool, phase: RecordingPhase) async throws {
         let releaseAccessibility = EnhancedAccessibilityTestScope.acquire()
         defer { releaseAccessibility() }
         var dependencies = ScreenRecordingCaptureDependencies.live
         dependencies.loadSources = { [.init(id: 1, name: "Display", mode: .display,
                                             frame: .init(x: 0, y: 0, width: 1920, height: 1080))] }
         dependencies.loadDevices = { .init() }
+        dependencies.requestPermission = { _ in true }
+        dependencies.makeSession = { _, _, _ in CaptureBarTestSession() }
+        dependencies.makeCameraPreview = { _, _ in CaptureBarTestCameraPreview() }
+        dependencies.now = { 100 }
+        dependencies.scheduleTick = { _ in {} }
         let model = ScreenRecordingStudioModel(capture: .init(dependencies: dependencies))
         model.configuration.camera = cameraEnabled
         await model.loadSources()
         defer { model.shutdown() }
+        if phase != .idle {
+            try await model.capture.start(configuration: model.configuration,
+                directory: URL(fileURLWithPath: "/synthetic-recording-capture-bar"))
+            if phase == .paused { await model.capture.togglePause() }
+        }
+        #expect(model.capture.phase == phase)
         let controller = ScreenRecordingCaptureBarController(model: model, languageStore: AppLanguageStore(),
             selectRegion: {}, start: {}, openStudio: {}, cancel: {})
         defer { controller.shutdown() }
@@ -27,28 +39,37 @@ struct ScreenRecordingCaptureBarTests {
             controller.hostingView.layoutSubtreeIfNeeded()
             await withCheckedContinuation { continuation in DispatchQueue.main.async { continuation.resume() } }
         }
-        var identifiers = Set<String>()
-        var radiusButtonValue: String?
+        var identifiers: [String] = []
         func visit(_ object: NSObject) {
             if let element = object as? any NSAccessibilityElementProtocol,
                let identifier = element.accessibilityIdentifier?() {
-                identifiers.insert(identifier)
-                if identifier == "screenRecording.cameraCornerRadiusButton",
-                   object.responds(to: NSSelectorFromString("accessibilityValue")) {
-                    radiusButtonValue = object.value(forKey: "accessibilityValue") as? String
-                }
+                identifiers.append(identifier)
             }
             if object.responds(to: NSSelectorFromString("accessibilityChildren")) {
                 for child in object.value(forKey: "accessibilityChildren") as? [NSObject] ?? [] { visit(child) }
             }
         }
         for child in controller.hostingView.accessibilityChildren() as? [NSObject] ?? [] { visit(child) }
-        #expect(identifiers.contains("screenRecording.cameraCornerRadiusButton"),
-                "Radius must remain directly available without selecting a camera shape first")
-        #expect(radiusButtonValue == model.recordingCameraCornerRadius.formatted(.percent.precision(.fractionLength(0))),
-                "The radius entry must announce its current value to accessibility clients")
+        #expect(!identifiers.contains("screenRecording.cameraCornerRadiusButton"),
+                "The capture bar must not expose a camera radius button")
+        #expect(!identifiers.contains("screenRecording.cameraCornerRadius"))
         #expect(identifiers.allSatisfy { !$0.hasPrefix("screenRecording.cameraShape.") })
+        let expectedOrder = phase == .idle
+            ? ["screenRecording.input.systemAudio", "screenRecording.input.microphone", "screenRecording.input.camera",
+               "screenRecording.captureOptions", "screenRecording.startCapture"]
+            : (cameraEnabled ? ["screenRecording.captureOptions"] : [])
+                + ["screenRecording.pauseCapture", "screenRecording.stopCapture"]
+        let controlIndices = expectedOrder.compactMap { identifiers.firstIndex(of: $0) }
+        #expect(controlIndices.count == expectedOrder.count, "The remaining capture controls must stay accessible")
+        #expect(controlIndices == controlIndices.sorted(), "Removing the radius entry must preserve the adjacent control order")
+        #expect(identifiers.contains("screenRecording.captureOptions") == (phase == .idle || cameraEnabled))
+        if phase != .idle {
+            #expect(controller.preferredSize.width == ScreenRecordingCaptureBarGeometry.recordingWidth + (cameraEnabled ? 36 : 0),
+                    "Recording and paused bars must reserve width only for the remaining 28pt menu and 8pt spacing")
+        }
         #expect(controller.hostingView.window?.isVisible == false)
+        await model.capture.cancel()
+        #expect(model.capture.phase == .idle && model.capture.cameraPreviewState == .idle)
     }
 
     @MainActor
@@ -272,4 +293,21 @@ struct ScreenRecordingCaptureBarTests {
         #expect(ScreenRecordingCaptureBarGeometry.targetFrame(configuration: .init(mode: .window, sourceID: 43),
             sources: [invalid], screenFrames: [:], primaryScreenFrame: primary) == nil)
     }
+}
+
+@MainActor
+private final class CaptureBarTestSession: ScreenRecordingCaptureSession {
+    func useCameraPreview(_ preview: any ScreenRecordingCameraPreviewSession) {}
+    func start() async throws -> Double { 100 }
+    func setPaused(_ paused: Bool, atHostTime time: Double) async {}
+    func stop(atHostTime time: Double) async throws -> ScreenRecordingResult { throw CancellationError() }
+    func cancel() async -> Error? { nil }
+}
+
+@MainActor
+private final class CaptureBarTestCameraPreview: ScreenRecordingCameraPreviewSession {
+    let previewSession = AVCaptureSession()
+    func start() async throws {}
+    func attach(to bridge: ScreenRecordingCaptureBridge) {}
+    func stop() async {}
 }

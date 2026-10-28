@@ -156,7 +156,7 @@ final class ScreenRecordingCaptureBarController {
     var preferredSize: CGSize {
         // Model notifications can arrive before SwiftUI lays out the changed controls.
         hostingView.layoutSubtreeIfNeeded()
-        return CGSize(width: model.isRecording ? ScreenRecordingCaptureBarGeometry.recordingWidth + (model.configuration.camera ? 64 : 0)
+        return CGSize(width: model.isRecording ? ScreenRecordingCaptureBarGeometry.recordingWidth + (model.configuration.camera ? 36 : 0)
             : hostingView.fittingSize.width,
             height: ScreenshotToolbarLayout.height)
     }
@@ -195,7 +195,6 @@ struct ScreenRecordingCaptureBar: View {
     let start: () -> Void
     let openStudio: () -> Void
     let cancel: () -> Void
-    @State private var showsCameraCornerRadius = false
 
     var body: some View {
         HStack(spacing: ScreenshotToolbarLayout.spacing) {
@@ -242,7 +241,6 @@ struct ScreenRecordingCaptureBar: View {
                     value: $model.configuration.microphone, identifier: "microphone")
                 inputButton("video", disabledSymbol: "video.slash", title: "摄像头",
                     value: $model.configuration.camera, identifier: "camera")
-                cameraCornerRadiusButton
                 optionsMenu
                 Button(action: start) {
                     Image(systemName: "record.circle.fill")
@@ -339,34 +337,6 @@ struct ScreenRecordingCaptureBar: View {
         .accessibilityIdentifier("screenRecording.input." + identifier)
     }
 
-    private var cameraCornerRadiusButton: some View {
-        Button {
-            showsCameraCornerRadius = true
-        } label: {
-            Image(systemName: "rectangle.roundedtop")
-                .font(.system(size: 14, weight: .medium))
-                .frame(width: 28, height: ScreenshotToolbarLayout.controlHeight)
-        }
-        .buttonStyle(.plain).help(AppLocalization.text("圆角"))
-        .accessibilityLabel(AppLocalization.text("圆角"))
-        .accessibilityValue(Text(model.recordingCameraCornerRadius, format: .percent.precision(.fractionLength(0))))
-        .accessibilityIdentifier("screenRecording.cameraCornerRadiusButton")
-        .popover(isPresented: $showsCameraCornerRadius) {
-            VStack(alignment: .leading, spacing: 10) {
-                HStack {
-                    Text(AppLocalization.text("圆角"))
-                    Spacer()
-                    Text(model.recordingCameraCornerRadius, format: .percent.precision(.fractionLength(0)))
-                        .monospacedDigit()
-                }.font(.caption)
-                Slider(value: $model.recordingCameraCornerRadius, in: 0...0.5)
-                    .accessibilityLabel(AppLocalization.text("圆角"))
-                    .accessibilityValue(Text(model.recordingCameraCornerRadius, format: .percent.precision(.fractionLength(0))))
-                    .accessibilityIdentifier("screenRecording.cameraCornerRadius")
-            }.padding(14).frame(width: 240)
-        }
-    }
-
     private var cameraAspectRatioPicker: some View {
         Picker(AppLocalization.text("摄像头比例"), selection: Binding(
             get: { model.recordingCameraAspectRatio },
@@ -438,10 +408,7 @@ struct ScreenRecordingCaptureBar: View {
                     .accessibilityIdentifier("screenRecording.captureElapsed")
                 Spacer(minLength: 0)
                 if model.configuration.camera {
-                    HStack(spacing: 0) {
-                        cameraCornerRadiusButton
-                        recordingCameraOptionsMenu
-                    }
+                    recordingCameraOptionsMenu
                 }
                 Button(action: model.pause) {
                     Image(systemName: model.capture.phase == .paused ? "play.fill" : "pause.fill")

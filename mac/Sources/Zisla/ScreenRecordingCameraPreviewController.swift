@@ -58,8 +58,8 @@ enum ScreenRecordingCameraPreviewLayout {
     }
 
     static func radiusHandle(in bounds: CGRect, radius: Double) -> CGPoint {
-        CGPoint(x: min(bounds.maxX - 18, bounds.minX + 18 + min(bounds.width, bounds.height) * radius),
-                y: bounds.maxY - 10)
+        CGPoint(x: min(bounds.maxX - 18, bounds.minX + 18 + (min(bounds.width, bounds.height) - 36) * radius),
+                y: bounds.maxY - 4)
     }
 }
 
@@ -255,7 +255,7 @@ final class ScreenRecordingCameraPreviewView: NSView {
         let origin = window.convertPoint(toScreen: event.locationInWindow)
         let radius = ScreenRecordingCameraPreviewLayout.radiusHandle(in: bounds, radius: Double(cornerRadiusRatio))
         if hypot(point.x - radius.x, point.y - radius.y) <= 9 {
-            drag = .cornerRadius(Double(cornerRadiusRatio), min(bounds.width, bounds.height), origin)
+            drag = .cornerRadius(Double(cornerRadiusRatio), min(bounds.width, bounds.height) - 36, origin)
         } else if let corner = ScreenRecordingCameraPreviewLayout.Corner.allCases.first(where: {
             let handle = $0.point(in: bounds.insetBy(dx: 6, dy: 6))
             return hypot(point.x - handle.x, point.y - handle.y) <= 9

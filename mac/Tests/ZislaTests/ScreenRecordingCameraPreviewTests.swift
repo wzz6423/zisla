@@ -470,7 +470,89 @@ struct ScreenRecordingCameraPreviewTests {
             let handle = ScreenRecordingCameraPreviewLayout.radiusHandle(in: bounds, radius: radius)
             #expect(bounds.contains(handle))
             #expect(handle.x > bounds.minX + 6)
-            #expect(handle.y == bounds.maxY - 10)
+            #expect(handle.y + 4 == bounds.maxY)
+        }
+    }
+
+    @Test(arguments: [CGRect(x: 0, y: 0, width: 56, height: 56),
+                      CGRect(x: -140, y: 75, width: 200, height: 200),
+                      CGRect(x: 30, y: -200, width: 320, height: 320)])
+    func circularRadiusHandleIsCenteredAndItsTopEdgeAlignsWithThePreview(bounds: CGRect) {
+        let handle = ScreenRecordingCameraPreviewLayout.radiusHandle(in: bounds, radius: 0.5)
+        #expect(abs(handle.x - bounds.midX) < 0.000_001,
+                "The circular camera's radius handle must align horizontally with its center")
+        #expect(handle.y + 4 == bounds.maxY,
+                "The complete 8pt radius handle must sit inside the preview with its top edge flush")
+        #expect(bounds.contains(CGRect(x: handle.x - 4, y: handle.y - 4, width: 8, height: 8)))
+    }
+
+    @Test(arguments: RecordingCameraAspectRatio.allCases, [76.0, 200.0, 320.0])
+    func radiusHandleKeepsContinuousShortEdgeGeometry(ratio: RecordingCameraAspectRatio, width: Double) {
+        let bounds = CGRect(x: -130, y: 45, width: width, height: width / ratio.ratio)
+        let minimum = ScreenRecordingCameraPreviewLayout.radiusHandle(in: bounds, radius: 0)
+        let maximum = ScreenRecordingCameraPreviewLayout.radiusHandle(in: bounds, radius: 0.5)
+        #expect(minimum.x == bounds.minX + 18)
+        #expect(abs(maximum.x - (bounds.minX + min(bounds.width, bounds.height) / 2)) < 0.000_001)
+        for radius in [0.0, 0.01, 0.1, 0.25, 0.49, 0.5] {
+            let handle = ScreenRecordingCameraPreviewLayout.radiusHandle(in: bounds, radius: radius)
+            #expect(abs(handle.x - (minimum.x + (maximum.x - minimum.x) * radius * 2)) < 0.000_001,
+                    "The radius handle must move continuously between its visible endpoints")
+            #expect(handle.y + 4 == bounds.maxY)
+            #expect(bounds.contains(CGRect(x: handle.x - 4, y: handle.y - 4, width: 8, height: 8)))
+        }
+    }
+
+    @Test(arguments: [CGSize(width: 56, height: 56), CGSize(width: 200, height: 200),
+                      CGSize(width: 200, height: 150), CGSize(width: 320, height: 180),
+                      CGSize(width: 76, height: 42.75)])
+    func radiusHandleTracksPointerTranslationAndClampsWithoutResizing(size: CGSize) throws {
+        let window = NSWindow(contentRect: CGRect(origin: CGPoint(x: 100, y: 100), size: size),
+                              styleMask: [.borderless], backing: .buffered, defer: false)
+        window.isReleasedWhenClosed = false
+        defer { window.close() }
+        let view = ScreenRecordingCameraPreviewView(frame: CGRect(origin: .zero, size: size))
+        window.contentView = view
+        defer { view.detach() }
+        let handles = try #require(view.layer?.sublayers?.last as? CAShapeLayer)
+        let minimum = ScreenRecordingCameraPreviewLayout.radiusHandle(in: view.bounds, radius: 0)
+        let maximum = ScreenRecordingCameraPreviewLayout.radiusHandle(in: view.bounds, radius: 0.5)
+        let travel = maximum.x - minimum.x
+        let original = window.frame
+        var radius: Double?
+        var resized = false
+        view.onCornerRadiusChange = { radius = $0 }
+        view.onResize = { _, _, _ in resized = true }
+        func event(_ type: NSEvent.EventType, _ location: CGPoint) throws -> NSEvent {
+            try #require(NSEvent.mouseEvent(with: type, location: view.convert(location, to: nil), modifierFlags: [],
+                timestamp: 0, windowNumber: window.windowNumber, context: nil, eventNumber: 1, clickCount: 1, pressure: 1))
+        }
+        for start in [0.0, 0.25, 0.5] {
+            view.update(session: nil, state: .running, configuration: .init(cameraCornerRadius: start))
+            let origin = ScreenRecordingCameraPreviewLayout.radiusHandle(in: view.bounds, radius: start)
+            let down = CGPoint(x: origin.x + 8, y: origin.y)
+            view.mouseEntered(with: try event(.leftMouseDown, down))
+            view.mouseDown(with: try event(.leftMouseDown, down))
+            for target in [0.0, 0.01, 0.1, 0.25, 0.49, 0.5, -10.0, 10.0, 0.25] {
+                let translation = travel * (target - start) * 2
+                let expected = min(0.5, max(0, target))
+                let dragged = CGPoint(x: down.x + translation, y: down.y + 20)
+                radius = nil
+                view.mouseDragged(with: try event(.leftMouseDragged, dragged))
+                let published = try #require(radius)
+                #expect(abs(published - expected) < 0.000_001,
+                        "Horizontal pointer movement must match the handle's visible travel, including both clamps")
+                view.update(session: nil, state: .running, configuration: .init(cameraCornerRadius: published))
+                view.layout()
+                let expectedPoint = CGPoint(x: minimum.x + travel * expected * 2, y: view.bounds.maxY - 4)
+                #expect(try #require(handles.path).contains(expectedPoint),
+                        "The rendered radius handle must follow the pointer and ignore vertical movement")
+                #expect(window.frame == original)
+                #expect(!resized, "Radius handle hits must not invoke a corner resize")
+            }
+            view.mouseUp(with: try event(.leftMouseUp, down))
+            radius = nil
+            view.mouseDragged(with: try event(.leftMouseDragged, down))
+            #expect(radius == nil, "Releasing the radius handle must end the drag")
         }
     }
 
@@ -531,7 +613,8 @@ struct ScreenRecordingCameraPreviewTests {
         var radius: Double?
         view.onCornerRadiusChange = { radius = $0 }
         view.mouseDown(with: try event(.leftMouseDown, point))
-        let dragged = try event(.leftMouseDragged, CGPoint(x: point.x - 80, y: point.y))
+        let target = ScreenRecordingCameraPreviewLayout.radiusHandle(in: view.bounds, radius: 0.1)
+        let dragged = try event(.leftMouseDragged, target)
         view.mouseDragged(with: dragged)
         #expect(abs(try #require(radius) - 0.1) < 0.000_001)
         view.mouseUp(with: try event(.leftMouseUp, point))
