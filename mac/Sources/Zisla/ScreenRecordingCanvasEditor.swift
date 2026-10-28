@@ -259,12 +259,13 @@ final class RecordingCanvasEditorView: NSView, NSTextViewDelegate {
     }
 
     func finishTextEditing(commit: Bool) {
-        guard textEditor != nil else { return }
-        let original = self.original, replacement = draft
-        textEditor?.delegate = nil
-        textEditor?.undoManager?.removeAllActions()
-        textEditor?.removeFromSuperview()
-        textEditor = nil
+        guard let textEditor else { return }
+        let original = self.original
+        let replacement = original?.replacingText(String(textEditor.string.prefix(4_000)))
+        textEditor.delegate = nil
+        textEditor.undoManager?.removeAllActions()
+        textEditor.removeFromSuperview()
+        self.textEditor = nil
         clearDraft()
         if commit, let original, let replacement { self.commit(original, replacement) }
         window?.makeFirstResponder(self)
@@ -336,7 +337,10 @@ private final class RecordingCanvasTextView: NSTextView {
 
     override func keyDown(with event: NSEvent) {
         if event.keyCode == 53 { onFinish(false) }
-        else if event.keyCode == 36, !event.modifierFlags.contains(.shift), !event.modifierFlags.contains(.option) { onFinish(true) }
+        else if event.keyCode == 36, !event.modifierFlags.contains(.shift), !event.modifierFlags.contains(.option) {
+            if hasMarkedText() { unmarkText() }
+            else { onFinish(true) }
+        }
         else { super.keyDown(with: event) }
     }
 }

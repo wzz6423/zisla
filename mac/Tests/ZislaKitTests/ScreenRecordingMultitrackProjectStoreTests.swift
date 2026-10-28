@@ -53,6 +53,50 @@ struct ScreenRecordingMultitrackProjectStoreTests {
         #expect(try FileManager.default.contentsOfDirectory(atPath: copy.path).sorted() == ["project.json", "unused.png"])
     }
 
+    @Test func clipAnimationsAndTransitionsSurviveSaveReopenAndCopyWithoutChangingMediaOrTiming() throws {
+        let (root, folder, store, original) = try fixture()
+        defer { try? FileManager.default.removeItem(at: root) }
+        let files = try original.mediaFiles.map { try Data(contentsOf: folder.appendingPathComponent($0)) }
+        var project = original
+        project.timeline?.clips[0].exitAnimation = .init(kind: .slideLeft, duration: 0.25)
+        let visualTrack = try #require(original.timeline?.clips[0].trackID)
+        project.timeline?.clips[1].trackID = visualTrack
+        project.timeline?.clips[1].entranceAnimation = .init(kind: .scale, duration: 0.75)
+        project.timeline?.clips[1].transition = .init(kind: .dissolve, duration: 0.5)
+        let annotation = RecordingAnnotation(kind: .text, start: 0, end: 2, text: "字幕👩🏽‍💻e\u{301}")
+        project.edits.annotations = [annotation]
+        project.timeline?.tracks.append(.init(id: "text", kind: .text))
+        project.timeline?.clips.append(.init(trackID: "text", content: .annotation(annotation.id), start: 0, sourceEnd: 2,
+            entranceAnimation: .init(kind: .typewriter, duration: 1)))
+        try store.save(project, in: folder)
+        #expect(try store.load(from: folder) == project)
+        let copy = root.appendingPathComponent("animated-copy.zisla-recording")
+        try store.copy(project, from: folder, to: copy)
+        #expect(try store.load(from: copy) == project)
+        #expect(project.outputDuration == original.outputDuration && project.mediaFiles == original.mediaFiles)
+        for (index, file) in original.mediaFiles.enumerated() {
+            #expect(try Data(contentsOf: folder.appendingPathComponent(file)) == files[index])
+            #expect(try Data(contentsOf: copy.appendingPathComponent(file)) == files[index])
+        }
+        #expect(try FileManager.default.contentsOfDirectory(atPath: copy.path).sorted()
+            == (project.mediaFiles + [ScreenRecordingProjectStore.manifestName]).sorted())
+    }
+
+    @Test func invalidAnimationSavePreservesTheLastReadableManifestAndMediaBytes() throws {
+        let (root, folder, store, original) = try fixture()
+        defer { try? FileManager.default.removeItem(at: root) }
+        let saved = try Data(contentsOf: folder.appendingPathComponent("project.json"))
+        let media = try original.mediaFiles.map { try Data(contentsOf: folder.appendingPathComponent($0)) }
+        var invalid = original
+        invalid.timeline?.clips[0].entranceAnimation = .init(kind: .fade, duration: 0)
+        #expect(throws: ScreenRecordingProjectError.invalidProject.self) { try store.save(invalid, in: folder) }
+        #expect(try Data(contentsOf: folder.appendingPathComponent("project.json")) == saved)
+        #expect(try store.load(from: folder) == original)
+        for (index, file) in original.mediaFiles.enumerated() {
+            #expect(try Data(contentsOf: folder.appendingPathComponent(file)) == media[index])
+        }
+    }
+
     @Test(arguments: [false, true])
     func missingOrEscapedUnusedAssetRejectsSavingWithoutReplacingTheManifest(_ symlink: Bool) throws {
         let (root, folder, store, original) = try fixture()

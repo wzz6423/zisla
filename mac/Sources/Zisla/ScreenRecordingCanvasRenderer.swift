@@ -31,7 +31,8 @@ extension RecordingExportRenderer {
             padding: max(0, min(padding, min(box.width, box.height) / 2 - 0.01)))
     }
 
-    static func captionImage(_ caption: RecordingCaption, canvas: CGRect, drawsText: Bool = true) throws -> CIImage {
+    static func captionImage(_ caption: RecordingCaption, canvas: CGRect, drawsText: Bool = true,
+                             visibleCharacters: Int? = nil) throws -> CIImage {
         let layout = captionLayout(caption, canvas: canvas)
         let context = try bitmap(size: layout.box.size)
         let localBox = CGRect(origin: .zero, size: layout.box.size)
@@ -40,9 +41,11 @@ extension RecordingExportRenderer {
                                cornerHeight: layout.padding, transform: nil))
         context.fillPath()
         if drawsText {
-            let setter = CTFramesetterCreateWithAttributedString(captionText(caption.text, fontSize: layout.fontSize))
+            let text = captionText(caption.text, fontSize: layout.fontSize)
+            let setter = CTFramesetterCreateWithAttributedString(text)
             let path = CGPath(rect: localBox.insetBy(dx: layout.padding, dy: layout.padding), transform: nil)
-            CTFrameDraw(CTFramesetterCreateFrame(setter, CFRange(location: 0, length: 0), path, nil), context)
+            let frame = CTFramesetterCreateFrame(setter, CFRange(location: 0, length: 0), path, nil)
+            drawText(text, frame: frame, in: context, visibleCharacters: visibleCharacters)
         }
         return try bitmapImage(context).transformed(by: .init(translationX: layout.box.minX, y: layout.box.minY))
     }

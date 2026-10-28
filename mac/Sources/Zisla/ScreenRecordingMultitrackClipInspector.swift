@@ -97,6 +97,9 @@ struct ScreenRecordingMultitrackClipInspector: View {
                     .font(.caption)
                     .accessibilityIdentifier("screenRecording.previewClipStart")
             }
+            if clip.content.trackKind != .audio {
+                ScreenRecordingClipAnimationInspector(model: model, clip: clip)
+            }
         }
     }
 

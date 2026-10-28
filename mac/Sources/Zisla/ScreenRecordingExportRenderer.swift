@@ -322,7 +322,8 @@ final class RecordingExportRenderer {
                                                                          y: center.y - side / 2))
     }
 
-    static func annotationImage(_ annotation: RecordingAnnotation, canvas: CGRect) throws -> CIImage {
+    static func annotationImage(_ annotation: RecordingAnnotation, canvas: CGRect,
+                                visibleCharacters: Int? = nil) throws -> CIImage {
         let bounds = annotation.bounds
         let textLayout = annotation.kind == .text ? RecordingAnnotationTextLayout(annotation, canvas: canvas.size) : nil
         let topLeft = textLayout?.bounds ?? CGRect(x: bounds.x * canvas.width, y: bounds.y * canvas.height,
@@ -354,7 +355,7 @@ final class RecordingExportRenderer {
             context.clip(to: rect)
             let setter = CTFramesetterCreateWithAttributedString(textLayout!.text)
             let frame = CTFramesetterCreateFrame(setter, CFRange(location: 0, length: 0), CGPath(rect: rect, transform: nil), nil)
-            CTFrameDraw(frame, context)
+            drawText(textLayout!.text, frame: frame, in: context, visibleCharacters: visibleCharacters)
         }
         return try bitmapImage(context).transformed(by: .init(translationX: imageBounds.minX, y: imageBounds.minY))
             .cropped(to: canvas)

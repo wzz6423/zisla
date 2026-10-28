@@ -13,6 +13,7 @@ struct RecordingTimelineClipIndex {
     private var nodes: [Node] = []
     private let root: Int?
     private let trackOrder: [String: Int]
+    private let transitionSources: [String: RecordingTimelineClip]
 
     init(_ timeline: RecordingMultitrackTimeline) {
         let order = Dictionary(uniqueKeysWithValues: timeline.tracks.enumerated().filter {
@@ -23,6 +24,7 @@ struct RecordingTimelineClipIndex {
             order[$0.element.trackID] != nil && $0.element.content.trackKind != .audio
         }
             .sorted { $0.element.start == $1.element.start ? $0.offset < $1.offset : $0.element.start < $1.element.start }
+        transitionSources = timeline.transitionSources()
         var built: [Node] = []
         func build(_ start: Int, _ end: Int) -> Int? {
             guard start < end else { return nil }
@@ -59,6 +61,8 @@ struct RecordingTimelineClipIndex {
             return left == right ? $0.order < $1.order : left < right
         }.map(\.clip)
     }
+
+    func transitionSource(for clipID: String) -> RecordingTimelineClip? { transitionSources[clipID] }
 }
 
 struct RecordingMultitrackPreviewScene: @unchecked Sendable {
@@ -122,38 +126,77 @@ final class RecordingMultitrackRenderer {
 
     func render(frames: [String: CIImage], at time: Double,
                 editingText: RecordingCanvasSelection? = nil) throws -> CIImage {
-        var result = recording.background
-        for clip in index.clips(at: time) {
-            let layer: CIImage
+        let clips = index.clips(at: time).filter { clip in
             switch clip.content {
-            case .recording, .video:
-                guard let frame = frames[clip.id] else { throw ScreenRecordingExportError.unavailableMedia }
-                let isRecording: Bool
-                if case .recording = clip.content { isRecording = true } else { isRecording = false }
-                let renderer = try isRecording ? recording : videoRenderer(for: clip.content.assetID!)
-                let slice = RecordingExportSlice(index: 0, sourceStart: clip.sourceStart, sourceEnd: clip.sourceEnd,
-                    speed: clip.speed, outputStart: clip.start, outputEnd: clip.end)
-                let rendered = try renderer.render(screen: frame, camera: frames[clip.id + ".camera"],
-                    sourceTime: clip.sourceTime(at: time), slice: slice, includeBackground: false)
-                layer = RecordingExportRenderer.fit(rendered, from: canvas, to: rect(clip.layout), fill: false)
-            case let .image(id):
-                let bounds = rect(clip.layout)
-                let decodeSize = CGSize(width: max(1, bounds.width), height: max(1, bounds.height))
-                let image = CIImage(cgImage: try images.image(for: id, maximumSize: decodeSize))
-                layer = RecordingExportRenderer.fit(image, from: image.extent, to: bounds, fill: false)
-            case let .annotation(id):
-                guard let annotation = annotations[id] else { throw ScreenRecordingProjectError.invalidProject }
-                if annotation.kind == .text && editingText == .annotation(id) { continue }
-                layer = try RecordingExportRenderer.annotationImage(annotation, canvas: canvas)
-            case let .caption(id):
-                guard project.edits.showCaptions else { continue }
-                guard let caption = captions[id] else { throw ScreenRecordingProjectError.invalidProject }
-                layer = try RecordingExportRenderer.captionImage(caption, canvas: canvas, drawsText: editingText != .caption(id))
-            case .audio: continue
+            case .caption: return project.edits.showCaptions
+            case let .annotation(id): return editingText != .annotation(id)
+            default: return true
             }
-            result = layer.composited(over: result)
+        }
+        let visible = Set(clips.map(\.id))
+        var transitions: [String: (source: String, sample: RecordingClipTransitionSample)] = [:]
+        var consumed: Set<String> = []
+        for clip in clips {
+            if let source = index.transitionSource(for: clip.id), visible.contains(source.id),
+               let sample = RecordingClipTransitionSample.sample(clip, from: source, at: time) {
+                transitions[clip.id] = (source.id, sample)
+                consumed.insert(source.id)
+            }
+        }
+        var layers: [String: CIImage] = [:]
+        for clip in clips {
+            layers[clip.id] = try layer(clip, frames: frames, at: time, editingText: editingText)
+        }
+        var result = recording.background
+        for clip in clips where !consumed.contains(clip.id) {
+            var chain = [clip.id]
+            while let source = transitions[chain.last!]?.source { chain.append(source) }
+            var composed = layers[chain.last!]!
+            for id in chain.dropLast().reversed() {
+                composed = transitioned(from: composed, to: layers[id]!, sample: transitions[id]!.sample)
+            }
+            result = composed.composited(over: result)
         }
         return result.cropped(to: canvas)
+    }
+
+    private func layer(_ clip: RecordingTimelineClip, frames: [String: CIImage], at time: Double,
+                       editingText: RecordingCanvasSelection?) throws -> CIImage {
+        let characters: Int?
+        switch clip.content {
+        case let .annotation(id): characters = annotations[id]?.text.count
+        case let .caption(id): characters = captions[id]?.text.count
+        default: characters = nil
+        }
+        let animation = RecordingClipAnimationSample.sample(clip, at: time, characterCount: characters)
+        let image: CIImage
+        switch clip.content {
+        case .recording, .video:
+            guard let frame = frames[clip.id] else { throw ScreenRecordingExportError.unavailableMedia }
+            let isRecording: Bool
+            if case .recording = clip.content { isRecording = true } else { isRecording = false }
+            let renderer = try isRecording ? recording : videoRenderer(for: clip.content.assetID!)
+            let slice = RecordingExportSlice(index: 0, sourceStart: clip.sourceStart, sourceEnd: clip.sourceEnd,
+                speed: clip.speed, outputStart: clip.start, outputEnd: clip.end)
+            let rendered = try renderer.render(screen: frame, camera: frames[clip.id + ".camera"],
+                sourceTime: clip.sourceTime(at: time), slice: slice, includeBackground: false)
+            image = RecordingExportRenderer.fit(rendered, from: canvas, to: rect(clip.layout), fill: false)
+        case let .image(id):
+            let bounds = rect(clip.layout)
+            let decodeSize = CGSize(width: max(1, bounds.width), height: max(1, bounds.height))
+            let source = CIImage(cgImage: try images.image(for: id, maximumSize: decodeSize))
+            image = RecordingExportRenderer.fit(source, from: source.extent, to: bounds, fill: false)
+        case let .annotation(id):
+            guard let annotation = annotations[id] else { throw ScreenRecordingProjectError.invalidProject }
+            image = try RecordingExportRenderer.annotationImage(annotation, canvas: canvas,
+                visibleCharacters: animation.visibleCharacters)
+        case let .caption(id):
+            guard let caption = captions[id] else { throw ScreenRecordingProjectError.invalidProject }
+            image = try RecordingExportRenderer.captionImage(caption, canvas: canvas,
+                drawsText: editingText != .caption(id), visibleCharacters: animation.visibleCharacters)
+        case .audio: throw ScreenRecordingProjectError.invalidProject
+        }
+        return animated(image, sample: animation)
     }
 
     func image(frames: [String: CIImage], at time: Double,
@@ -167,6 +210,41 @@ final class RecordingMultitrackRenderer {
     private func rect(_ layout: RecordingRect) -> CGRect {
         CGRect(x: layout.x * canvas.width, y: (1 - layout.y - layout.height) * canvas.height,
             width: layout.width * canvas.width, height: layout.height * canvas.height)
+    }
+
+    private func animated(_ layer: CIImage, sample: RecordingClipAnimationSample) -> CIImage {
+        let center = CGPoint(x: layer.extent.midX, y: layer.extent.midY)
+        return layer.transformed(by: .init(translationX: -center.x, y: -center.y))
+            .transformed(by: .init(scaleX: sample.scale, y: sample.scale))
+            .transformed(by: .init(translationX: center.x, y: center.y))
+            .transformed(by: .init(translationX: sample.offsetX * canvas.width,
+                y: -sample.offsetY * canvas.height))
+            .applyingFilter("CIColorMatrix", parameters: [
+                "inputAVector": CIVector(x: 0, y: 0, z: 0, w: sample.opacity),
+            ])
+    }
+
+    private func transitioned(from outgoing: CIImage, to incoming: CIImage,
+                              sample: RecordingClipTransitionSample) -> CIImage {
+        switch sample.kind {
+        case .dissolve:
+            return outgoing.applyingFilter("CIDissolveTransition", parameters: [
+                kCIInputTargetImageKey: incoming, kCIInputTimeKey: sample.progress,
+            ]).cropped(to: canvas)
+        case .slideLeft, .slideRight:
+            let direction = sample.kind == .slideLeft ? -1.0 : 1.0
+            let previous = outgoing.transformed(by: .init(translationX: direction * sample.progress * canvas.width, y: 0))
+            let next = incoming.transformed(by: .init(translationX: -direction * (1 - sample.progress) * canvas.width, y: 0))
+            return next.composited(over: previous).cropped(to: canvas)
+        case .zoom:
+            var previous = RecordingClipAnimationSample()
+            previous.scale = 1 + sample.progress * 0.5
+            var next = RecordingClipAnimationSample()
+            next.scale = 0.5 + sample.progress * 0.5
+            return animated(outgoing, sample: previous).applyingFilter("CIDissolveTransition", parameters: [
+                kCIInputTargetImageKey: animated(incoming, sample: next), kCIInputTimeKey: sample.progress,
+            ]).cropped(to: canvas)
+        }
     }
 
     private func videoRenderer(for id: UUID) throws -> RecordingExportRenderer {

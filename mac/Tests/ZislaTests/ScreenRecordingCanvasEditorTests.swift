@@ -10,6 +10,186 @@ import ZislaKit
 
 @Suite(.serialized) @MainActor
 struct ScreenRecordingCanvasEditorTests {
+    @Test(arguments: [false, true], [false, true])
+    func multitrackStudioKeepsTypedTextAfterPreviewRefreshAndEnterOrFocusLoss(_ caption: Bool, _ loseFocus: Bool) async throws {
+        let fixture = try Fixture(kind: .text, caption: caption, multitrack: true)
+        defer { fixture.close() }
+        fixture.model.seekTimeline(to: 0.5)
+        await fixture.ready()
+        let original = try #require(fixture.model.project)
+        if caption {
+            fixture.model.selectCanvasTimelineContent(.caption(try #require(original.captions.first).id))
+        } else {
+            fixture.model.selectCanvasTimelineContent(.annotation(try #require(original.edits.annotations?.first).id))
+        }
+        let defaultsName = "zisla-canvas-multitrack-\(UUID())"
+        let defaults = try #require(UserDefaults(suiteName: defaultsName))
+        defer { defaults.removePersistentDomain(forName: defaultsName) }
+        let host = NSHostingView(rootView: ScreenRecordingStudioView(model: fixture.model,
+            languageStore: AppLanguageStore(defaults: defaults), prepareCapture: {}))
+        host.sizingOptions = []
+        host.frame = CGRect(x: 0, y: 0, width: 1_180, height: 760)
+        let window = NSWindow(contentRect: host.bounds, styleMask: .borderless, backing: .buffered, defer: false)
+        window.isReleasedWhenClosed = false
+        window.contentView = host
+        defer { window.contentView = nil; window.close() }
+        await settle(host)
+        let canvas = try #require(descendants(RecordingCanvasEditorView.self, in: host).first)
+        let point = fixture.selectionPoint(in: canvas)
+        let event = try #require(NSEvent.mouseEvent(with: .leftMouseDown, location: canvas.convert(point, to: nil),
+            modifierFlags: [], timestamp: 0, windowNumber: window.windowNumber, context: nil,
+            eventNumber: 0, clickCount: 2, pressure: 1))
+        canvas.mouseDown(with: event)
+        let editor = try #require(canvas.textEditor)
+        editor.insertText("Typed", replacementRange: editor.selectedRange())
+        editor.keyDown(with: fixture.key(49, characters: " "))
+        editor.insertText("5678", replacementRange: editor.selectedRange())
+        #expect(editor.string == "Typed 5678" && canvas.draft?.text == "Typed 5678")
+        #expect(fixture.model.project == original && !fixture.model.canUndo)
+        fixture.model.refreshPreview()
+        await fixture.model.previewTask?.value
+        await settle(host)
+        #expect(canvas.textEditor === editor && editor.string == "Typed 5678",
+                "Refreshing a multitrack preview must preserve the active native text draft")
+        if loseFocus {
+            let field = try #require(descendants(NSTextField.self, in: host).first(where: { $0.isEditable }),
+                                     "The real inspector must provide another focusable control")
+            #expect(window.makeFirstResponder(field))
+        } else {
+            editor.keyDown(with: fixture.key(36, characters: "\r"))
+        }
+        await fixture.model.previewTask?.value
+        await settle(host)
+        let edited = try #require(fixture.model.project)
+        #expect((caption ? edited.captions.first?.text : edited.edits.annotations?.first?.text) == "Typed 5678",
+                "Enter and native focus loss must commit the typed multitrack text")
+        #expect(canvas.textEditor == nil && fixture.model.canUndo)
+        try fixture.model.save()
+        #expect(try fixture.model.projectStore.load(from: fixture.directory) == edited)
+        fixture.model.undo()
+        #expect(fixture.model.project == original && !fixture.model.canUndo)
+        fixture.model.redo()
+        #expect(fixture.model.project == edited && !fixture.model.canRedo)
+        fixture.model.install(try fixture.model.projectStore.load(from: fixture.directory), directory: fixture.directory)
+        await fixture.model.previewTask?.value
+        await settle(host)
+        #expect(fixture.model.project == edited && !fixture.model.canUndo && !fixture.model.canRedo,
+                "Reopening the saved project must retain the submitted text without restoring edit history")
+        let reopenedCanvas = try #require(descendants(RecordingCanvasEditorView.self, in: host).first)
+        #expect(try bytes(#require(reopenedCanvas.renderedImage)) == bytes(#require(fixture.model.canvasPreview)),
+                "The reopened canvas must show the same text pixels as the rebuilt preview")
+        #expect(!window.isVisible && !fixture.window.isVisible)
+    }
+
+    @Test(arguments: [false, true], [false, true])
+    func markedTextSurvivesTheIMEConfirmKeyAndNativeFocusLoss(_ caption: Bool, _ loseFocus: Bool) async throws {
+        let fixture = try Fixture(kind: .text, caption: caption, multitrack: true)
+        defer { fixture.close() }
+        await fixture.ready()
+        let original = try #require(fixture.model.project)
+        fixture.view.mouseDown(with: fixture.textMouse())
+        let editor = try #require(fixture.view.textEditor)
+        editor.setMarkedText("中文输入", selectedRange: NSRange(location: 4, length: 0), replacementRange: editor.selectedRange())
+        #expect(editor.hasMarkedText() && editor.string == "中文输入")
+        fixture.model.refreshPreview()
+        await fixture.ready()
+        #expect(fixture.view.textEditor === editor && editor.hasMarkedText() && editor.string == "中文输入",
+                "An asynchronous preview must preserve the composition that has no did-change notification")
+        #expect(fixture.model.project == original && !fixture.model.canUndo)
+        if loseFocus {
+            let field = NSTextField(frame: CGRect(x: 10, y: 10, width: 120, height: 30))
+            fixture.view.addSubview(field)
+            #expect(fixture.window.makeFirstResponder(field))
+        } else {
+            editor.keyDown(with: fixture.key(36, characters: "\r"))
+            #expect(fixture.view.textEditor === editor,
+                    "Return must confirm marked input before it can submit the canvas text editor")
+            #expect(!editor.hasMarkedText() && editor.string == "中文输入",
+                    "Confirming a composition must preserve its text without inserting a newline")
+            editor.keyDown(with: fixture.key(36, characters: "\r"))
+        }
+        #expect((caption ? fixture.model.project?.captions.first?.text : fixture.model.project?.edits.annotations?.first?.text) == "中文输入",
+                "Submitting or leaving marked input must keep its current text")
+        #expect(fixture.view.textEditor == nil && fixture.model.canUndo)
+        fixture.model.undo()
+        #expect(fixture.model.project == original && !fixture.model.canUndo)
+    }
+
+    @Test(arguments: [false, true], ["enter", "focus", "save"])
+    func submittingReadsTheCurrentNativeTextWhenTheDraftNotificationIsPending(_ caption: Bool, _ finish: String) async throws {
+        let fixture = try Fixture(kind: .text, caption: caption, multitrack: true)
+        defer { fixture.close() }
+        await fixture.ready()
+        let original = try #require(fixture.model.project)
+        fixture.model.commitPendingCanvasText = { [weak view = fixture.view] in view?.finishTextEditing(commit: true) }
+        fixture.view.mouseDown(with: fixture.textMouse())
+        let editor = try #require(fixture.view.textEditor)
+        editor.insertText("Earlier draft", replacementRange: editor.selectedRange())
+        editor.string = "Current 中文 👩🏽‍💻"
+        #expect(fixture.view.draft?.text == "Earlier draft" && fixture.model.project == original)
+        if finish == "enter" {
+            editor.keyDown(with: fixture.key(36, characters: "\r"))
+        } else if finish == "focus" {
+            let field = NSTextField(frame: CGRect(x: 10, y: 10, width: 120, height: 30))
+            fixture.view.addSubview(field)
+            #expect(fixture.window.makeFirstResponder(field))
+        } else {
+            try fixture.model.save()
+        }
+        let edited = try #require(fixture.model.project)
+        #expect((caption ? edited.captions.first?.text : edited.edits.annotations?.first?.text) == editor.string,
+                "Submitting must read current native text even when the did-change draft still contains earlier text")
+        #expect(fixture.view.textEditor == nil && fixture.commits == 1 && fixture.model.canUndo)
+        try fixture.model.save()
+        #expect(try fixture.model.projectStore.load(from: fixture.directory) == edited)
+        fixture.model.undo()
+        #expect(fixture.model.project == original && !fixture.model.canUndo)
+        fixture.model.redo()
+        #expect(fixture.model.project == edited && !fixture.model.canRedo)
+    }
+
+    @Test(arguments: [false, true])
+    func savingPendingCompositionBoundsGraphemesAndPreservesEmptyTextObjects(_ caption: Bool) async throws {
+        let fixture = try Fixture(kind: .text, caption: caption, multitrack: true)
+        defer { fixture.close() }
+        await fixture.ready()
+        let original = try #require(fixture.model.project)
+        fixture.model.commitPendingCanvasText = { [weak view = fixture.view] in view?.finishTextEditing(commit: true) }
+        let text = String(repeating: "x", count: 3_999) + "👩🏽‍💻z"
+        fixture.view.mouseDown(with: fixture.textMouse())
+        let editor = try #require(fixture.view.textEditor)
+        editor.setMarkedText(text, selectedRange: NSRange(location: (text as NSString).length, length: 0),
+                             replacementRange: editor.selectedRange())
+        #expect(editor.hasMarkedText() && editor.string == text)
+        try fixture.model.save()
+        let edited = try #require(fixture.model.project)
+        let committed = try #require(caption ? edited.captions.first?.text : edited.edits.annotations?.first?.text)
+        #expect(committed == String(text.prefix(4_000)) && committed.count == 4_000,
+                "Saving pending composition must enforce the project limit without splitting a grapheme")
+        #expect(fixture.commits == 1 && fixture.view.textEditor == nil && fixture.model.errorMessage == nil)
+        #expect(try fixture.model.projectStore.load(from: fixture.directory) == edited)
+        fixture.model.undo()
+        #expect(fixture.model.project == original && !fixture.model.canUndo)
+        fixture.model.redo()
+        #expect(fixture.model.project == edited && !fixture.model.canRedo)
+        await fixture.ready()
+        fixture.view.mouseDown(with: fixture.textMouse())
+        let emptyEditor = try #require(fixture.view.textEditor)
+        emptyEditor.string = ""
+        try fixture.model.save()
+        let empty = try #require(fixture.model.project)
+        #expect((caption ? empty.captions.first?.text : empty.edits.annotations?.first?.text) == "")
+        #expect(empty.timeline == edited.timeline,
+                "Saving an empty label must preserve the object and its existing timeline clip")
+        #expect(caption ? empty.captions.count == 1 : empty.edits.annotations?.count == 1)
+        #expect(fixture.commits == 2)
+        #expect(try fixture.model.projectStore.load(from: fixture.directory) == empty)
+        fixture.model.undo()
+        #expect(fixture.model.project == edited)
+        fixture.model.undo()
+        #expect(fixture.model.project == original && !fixture.model.canUndo)
+    }
+
     @Test(arguments: [false, true])
     func studioHostsTheInteractiveCanvasAndConnectsTextEditsToTheSelectedInspector(_ caption: Bool) async throws {
         let releaseAccessibility = EnhancedAccessibilityTestScope.acquire()
@@ -469,7 +649,7 @@ struct ScreenRecordingCanvasEditorTests {
         var selection: RecordingCanvasSelection?
         var commits = 0
 
-        init(kind: RecordingAnnotationKind, caption: Bool = false,
+        init(kind: RecordingAnnotationKind, caption: Bool = false, multitrack: Bool = false,
              presentExportPanel: @escaping (NSSavePanel, @escaping (URL?) -> Void) -> Void = { _, completion in completion(nil) },
              aiCompletion: ((ScreenRecordingProject, String, AIModelConfigurationReference?) async throws -> String)? = nil) throws {
             root = FileManager.default.temporaryDirectory.appendingPathComponent("zisla-canvas-test-\(UUID())")
@@ -492,6 +672,22 @@ struct ScreenRecordingCanvasEditorTests {
                 project.edits.annotations = [value]
                 selection = .annotation(value.id)
             }
+            if multitrack {
+                project.version = ScreenRecordingProject.currentVersion
+                project.timeline = RecordingMultitrackTimeline.migrating(project)
+                project.timeline?.clips.removeAll { $0.content.assetID != nil }
+                let imageURL = directory.appendingPathComponent("background.png")
+                let image = try #require(CIContext().createCGImage(CIImage(color: .black),
+                    from: CGRect(x: 0, y: 0, width: 400, height: 300)))
+                let data = try #require(NSBitmapImageRep(cgImage: image).representation(using: .png, properties: [:]))
+                try data.write(to: imageURL)
+                let asset = RecordingMediaAsset(name: "Background", file: "background.png", kind: .image,
+                    duration: 2, width: 400, height: 300)
+                project.timeline?.assets = [asset]
+                let mediaTrack = try #require(project.timeline?.tracks.first)
+                project.timeline?.clips.insert(.init(trackID: mediaTrack.id, content: .image(asset.id),
+                    start: 0, sourceEnd: 2), at: 0)
+            }
             base = try #require(CIContext().createCGImage(CIImage(color: .black), from: CGRect(x: 0, y: 0, width: 400, height: 300)))
             let base = self.base
             model = ScreenRecordingStudioModel(projectStore: store, renderPreview: { _, _, _ in base },
@@ -511,8 +707,8 @@ struct ScreenRecordingCanvasEditorTests {
 
         func ready() async {
             await model.previewTask?.value
-            view.configure(project: model.project, sourceTime: model.currentTime, baseImage: model.canvasPreview,
-                           selection: selection, editable: true)
+            view.configure(project: model.project, sourceTime: model.overlayTime, baseImage: model.canvasPreview,
+                           selection: selection, editable: true, multitrackScene: model.multitrackPreviewScene)
         }
 
         func close() { view.cancelEditing(); window.close(); model.shutdown(); try? FileManager.default.removeItem(at: root) }

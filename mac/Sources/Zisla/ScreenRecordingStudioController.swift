@@ -13,6 +13,13 @@ final class ScreenRecordingStudioWindow: NSWindow {
         if firstResponder is NSTextView {
             return TextEditingCommands.performKeyEquivalent(with: event, in: self) || super.performKeyEquivalent(with: event)
         }
+        if event.charactersIgnoringModifiers == " ",
+           event.modifierFlags.intersection(.deviceIndependentFlagsMask).subtracting(.capsLock).isEmpty,
+           attachedSheet == nil, NSApp.modalWindow == nil,
+           let model = studioModel, model.canExport {
+            if !event.isARepeat { model.playTimeline() }
+            return true
+        }
         let modifiers = event.modifierFlags.intersection(.deviceIndependentFlagsMask)
             .subtracting([.capsLock, .numericPad, .function])
         if modifiers == .command, let model = studioModel, model.canEdit {

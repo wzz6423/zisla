@@ -507,6 +507,52 @@ struct ScreenRecordingCameraPreviewTests {
                 "Corner resizing must keep the camera's opposite anchor, excluding the transparent controls")
     }
 
+    @Test(arguments: ["present", "update", "resize"], [0.125, 0.5, 0.875])
+    func fractionalCameraResizeUsesOneExplicitWindowRoundingBoundary(operation: String, fraction: Double) throws {
+        let app = NSApplication.shared
+        let windows = Set(app.windows.map(ObjectIdentifier.init))
+        let screen = try #require(NSScreen.main)
+        let system = CameraPreviewTestSystem()
+        let service = ScreenRecordingService(dependencies: system.dependencies())
+        let controller = ScreenRecordingCameraPreviewController(capture: service,
+            changeSize: { _ in }, changeCornerRadius: { _ in })
+        let panel = try #require(app.windows.first {
+            !windows.contains(ObjectIdentifier($0)) && $0.contentView is ScreenRecordingCameraPreviewView
+        })
+        defer { controller.shutdown(); panel.close() }
+        let preview = try #require(panel.contentView as? ScreenRecordingCameraPreviewView)
+        let side = min(screen.visibleFrame.width, screen.visibleFrame.height)
+        let configuration = RecordingEdits(cameraSize: Double((203 + fraction) / side),
+            cameraRound: false, cameraAspectRatio: .widescreen)
+        let expected: CGRect
+        if operation == "present" {
+            let fractionalScreen = FractionalCameraTestScreen()
+            fractionalScreen.testVisibleFrame = CGRect(x: fraction, y: fraction, width: 1070, height: 835)
+            controller.present(screen: fractionalScreen)
+            expected = ScreenRecordingCameraPreviewLayout.frame(configuration: .init(),
+                visibleFrame: fractionalScreen.visibleFrame).insetBy(dx: -10, dy: -10).integral
+        } else if operation == "update" {
+            controller.present(screen: screen)
+            let center = CGPoint(x: panel.frame.midX, y: panel.frame.midY)
+            controller.update(configuration: configuration)
+            expected = ScreenRecordingCameraPreviewLayout.frame(configuration: configuration,
+                visibleFrame: screen.visibleFrame, center: center).insetBy(dx: -10, dy: -10).integral
+        } else {
+            controller.present(screen: screen)
+            let frame = CGRect(x: screen.visibleFrame.minX + 100 + fraction,
+                y: screen.visibleFrame.minY + 100 + fraction, width: 203.25, height: 114 + fraction)
+            let resize = try #require(preview.onResize)
+            resize(.topRight, frame, .zero)
+            expected = frame.insetBy(dx: -10, dy: -10).integral
+        }
+        preview.layoutSubtreeIfNeeded()
+        let layer = try #require(preview.layer?.sublayers?.first)
+        #expect(panel.frame == expected,
+            "The native window must receive the integral frame before AppKit applies platform rounding")
+        #expect(layer.frame == CGRect(x: 10, y: 10, width: expected.width - 20, height: expected.height - 20))
+        #expect(!panel.isVisible)
+    }
+
     @Test(arguments: ScreenRecordingCameraPreviewLayout.Corner.allCases, RecordingCameraAspectRatio.allCases)
     func draggingEachCornerPreservesAspectRatioAndTheOppositeAnchor(
         corner: ScreenRecordingCameraPreviewLayout.Corner, ratio: RecordingCameraAspectRatio
@@ -791,6 +837,12 @@ struct ScreenRecordingCameraPreviewTests {
 }
 
 private enum CameraPreviewTestError: Error { case unavailable }
+
+private final class FractionalCameraTestScreen: NSScreen {
+    var testVisibleFrame = CGRect.zero
+    override var frame: NSRect { testVisibleFrame }
+    override var visibleFrame: NSRect { testVisibleFrame }
+}
 
 @MainActor
 private final class CameraPreviewTestWindow: NSWindow {

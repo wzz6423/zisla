@@ -109,11 +109,16 @@ public struct RecordingTimelineClip: Codable, Equatable, Identifiable, Sendable 
     public var layout: RecordingRect
     public var volume: Double
     public var audioEnabled: Bool
+    public var entranceAnimation: RecordingClipAnimation?
+    public var exitAnimation: RecordingClipAnimation?
+    public var transition: RecordingClipTransition?
 
     public init(id: String = UUID().uuidString, trackID: String, content: RecordingTimelineContent,
                 start: Double, sourceStart: Double = 0, sourceEnd: Double, speed: Double = 1,
                 layout: RecordingRect = .init(x: 0, y: 0, width: 1, height: 1),
-                volume: Double = 1, audioEnabled: Bool = true) {
+                volume: Double = 1, audioEnabled: Bool = true,
+                entranceAnimation: RecordingClipAnimation? = nil, exitAnimation: RecordingClipAnimation? = nil,
+                transition: RecordingClipTransition? = nil) {
         self.id = id
         self.trackID = trackID
         self.content = content
@@ -124,6 +129,9 @@ public struct RecordingTimelineClip: Codable, Equatable, Identifiable, Sendable 
         self.layout = layout
         self.volume = volume
         self.audioEnabled = audioEnabled
+        self.entranceAnimation = entranceAnimation
+        self.exitAnimation = exitAnimation
+        self.transition = transition
     }
 
     public var duration: Double { (sourceEnd - sourceStart) / speed }
@@ -190,8 +198,24 @@ public struct RecordingMultitrackTimeline: Codable, Equatable, Sendable {
                   trackMap[clip.trackID] != nil,
                   [clip.start, clip.sourceStart, clip.sourceEnd, clip.speed, clip.volume].allSatisfy(\.isFinite),
                   clip.start >= 0, clip.sourceStart >= 0, clip.sourceEnd > clip.sourceStart,
-                  (0.1...8).contains(clip.speed), (0...1).contains(clip.volume), clip.layout.isNormalized
+                  (0.1...8).contains(clip.speed), (0...1).contains(clip.volume), clip.layout.isNormalized,
+                  clip.entranceAnimation?.isValid != false, clip.exitAnimation?.isValid != false,
+                  clip.transition?.isValid != false, clip.exitAnimation?.kind != .typewriter
             else { throw ScreenRecordingProjectError.invalidProject }
+            if clip.content.trackKind == .audio,
+               clip.entranceAnimation != nil || clip.exitAnimation != nil || clip.transition != nil {
+                throw ScreenRecordingProjectError.invalidProject
+            }
+            if clip.entranceAnimation?.kind == .typewriter {
+                switch clip.content {
+                case let .annotation(id):
+                    guard project.edits.annotations?.first(where: { $0.id == id })?.kind == .text else {
+                        throw ScreenRecordingProjectError.invalidProject
+                    }
+                case .caption: break
+                default: throw ScreenRecordingProjectError.invalidProject
+                }
+            }
             switch clip.content {
             case let .recording(id), let .video(id):
                 guard let asset = media[id], asset.kind == .video, clip.sourceEnd <= asset.duration + 0.001 else {
@@ -291,7 +315,10 @@ public struct RecordingMultitrackTimeline: Codable, Equatable, Sendable {
         tail.id = UUID().uuidString
         tail.start = time
         tail.sourceStart = clip.sourceTime(at: time)
+        tail.entranceAnimation = nil
+        tail.transition = nil
         clips[index].sourceEnd = tail.sourceStart
+        clips[index].exitAnimation = nil
         clips.insert(tail, at: index + 1)
         return tail.id
     }

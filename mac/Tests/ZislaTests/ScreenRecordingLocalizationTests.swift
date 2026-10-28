@@ -20,6 +20,8 @@ struct ScreenRecordingLocalizationTests {
             "视频轨道", "图片轨道", "文字轨道", "音频轨道",
             "轨道", "轨道 %ld", "移除素材", "素材已从素材库移除", "文件名：%@", "文件路径：%@", "重新导入",
             "复制", "粘贴", "已复制", "标注内容", "预览片段起点", "添加轨道",
+            "动画", "入场动画", "出场动画", "转场", "入场时长（秒）", "出场时长（秒）", "转场时长（秒）",
+            "转场需要与同轨前一片段重叠", "淡入", "淡出", "打字机", "叠化", "向左推移", "向右推移", "缩放转场",
         ]
         #expect(requiredKeys.isSubset(of: keys), "The recording source scan missed runtime keys: \(requiredKeys.subtracting(keys).sorted())")
         #expect(keys.isDisjoint(with: ["pause.fill", "play.fill", "record.circle", "source."]))
@@ -38,7 +40,8 @@ struct ScreenRecordingLocalizationTests {
         if language != .english && language != .simplifiedChinese {
             let english = try Self.table(language: .english)
             for key in ["仅在生成方案时发送指令和部分字幕，原始视频留在本机", "字幕在本机转写，不上传录音",
-                        "录屏正在进行，请先停止当前录制", "预览与导出使用相同的画面效果"] {
+                        "录屏正在进行，请先停止当前录制", "预览与导出使用相同的画面效果",
+                        "入场动画", "出场动画", "转场需要与同轨前一片段重叠", "打字机"] {
                 #expect(table[key] != english[key], "\(language.rawValue) copied the English text for \(key)")
             }
         }
@@ -56,6 +59,10 @@ struct ScreenRecordingLocalizationTests {
                                        ["00:42"]) == "مدة الناتج: \u{2068}00:42\u{2069}")
         #expect(AppLocalization.format("轨道 %ld", locale: Locale(identifier: "en"), [3]) == "Track 3")
         #expect(AppLocalization.string("素材已从素材库移除", locale: Locale(identifier: "en")) == "Media removed from library")
+        #expect(AppLocalization.string(RecordingClipAnimationKind.typewriter.entranceTitle,
+            locale: Locale(identifier: "en")) == "Typewriter")
+        #expect(AppLocalization.string(RecordingClipTransitionKind.dissolve.title,
+            locale: Locale(identifier: "ar")) == "تداخل تدريجي")
         #expect(AppLocalization.format("文件路径：%@", locale: Locale(identifier: "ar"), ["/tmp/clip.mp4"])
             == "مسار الملف: \u{2068}/tmp/clip.mp4\u{2069}")
         #expect(AppLanguage.allCases.filter(\.isRightToLeft) == [.arabic])
@@ -135,6 +142,9 @@ struct ScreenRecordingLocalizationTests {
         keys.formUnion(RecordingCanvasAspectRatio.allCases.map(\.title))
         keys.formUnion(RecordingAnnotationKind.allCases.map(\.title))
         keys.formUnion(RecordingTimelineTrackKind.allCases.map(\.title))
+        keys.formUnion(RecordingClipAnimationKind.allCases.map(\.entranceTitle))
+        keys.formUnion(RecordingClipAnimationKind.allCases.map(\.exitTitle))
+        keys.formUnion(RecordingClipTransitionKind.allCases.map(\.title))
         keys.formUnion([SettingsSection.recording.title, SettingsSection.recording.subtitle])
 
         for path in paths {
