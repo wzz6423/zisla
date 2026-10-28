@@ -19,6 +19,7 @@ import {
   X,
   createIcons,
 } from 'lucide';
+import * as THREE from 'three';
 import {
   brewInstallCommand,
   changelogEntries,
@@ -328,6 +329,225 @@ const setupChangelogPagination = () => {
     }
   });
   showPage(1);
+};
+
+// Three.js intro scene - Smooth flowing particle field
+let introScene: {
+  dispose: () => void;
+  updateScroll: (scrollY: number, windowHeight: number) => void;
+} | null = null;
+
+const initIntroScene = () => {
+  console.log('[Intro] Starting initIntroScene');
+  if (introScene) introScene.dispose();
+
+  const container = document.querySelector<HTMLElement>('.hero');
+  if (!container) {
+    console.error('[Intro] Hero container not found');
+    return;
+  }
+  console.log('[Intro] Hero container found', container);
+
+  const scene = new THREE.Scene();
+  const camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 1, 2000);
+  camera.position.set(0, 0, 800);
+
+  const canvas = document.createElement('canvas');
+  canvas.className = 'hero-canvas';
+  canvas.style.cssText = 'position: absolute; inset: 0; z-index: 0; pointer-events: none;';
+  container.prepend(canvas);
+  console.log('[Intro] Canvas created and added', canvas);
+
+  const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: true });
+  renderer.setClearColor(0x09090b, 0);
+  renderer.setSize(window.innerWidth, window.innerHeight);
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+  console.log('[Intro] Renderer initialized');
+
+  // Circular particle texture
+  const circleTexture = (() => {
+    const size = 32;
+    const cnv = document.createElement('canvas');
+    cnv.width = size;
+    cnv.height = size;
+    const ctx = cnv.getContext('2d')!;
+    const gradient = ctx.createRadialGradient(16, 16, 0, 16, 16, 16);
+    gradient.addColorStop(0, 'rgba(250,250,250,1)');
+    gradient.addColorStop(0.5, 'rgba(250,250,250,0.5)');
+    gradient.addColorStop(1, 'rgba(250,250,250,0)');
+    ctx.fillStyle = gradient;
+    ctx.beginPath();
+    ctx.arc(16, 16, 16, 0, Math.PI * 2);
+    ctx.fill();
+    return new THREE.CanvasTexture(cnv);
+  })();
+
+  // Sample logo pixels from image
+  const logoTargets: THREE.Vector3[] = [];
+  let particleCount = 3000;
+  const logoX = window.innerWidth > 768 ? 440 : 220;
+  const logoY = 60;
+  const logoScale = 0.34;
+
+  const img = document.createElement('img');
+  img.crossOrigin = 'anonymous';
+  img.onerror = (e) => {
+    console.error('[Intro] Image load failed', e);
+  };
+  img.onload = () => {
+    console.log('[Intro] Image loaded successfully');
+    const tmpCanvas = document.createElement('canvas');
+    const size = 1024;
+    tmpCanvas.width = size;
+    tmpCanvas.height = size;
+    const ctx = tmpCanvas.getContext('2d')!;
+    ctx.drawImage(img, 0, 0, size, size);
+    const imageData = ctx.getImageData(0, 0, size, size);
+    const pixels = imageData.data;
+
+    // Sample non-transparent pixels (stricter alpha check)
+    const step = 6;
+    let minY = Infinity, maxY = -Infinity;
+    for (let y = 0; y < size; y += step) {
+      for (let x = 0; x < size; x += step) {
+        const i = (y * size + x) * 4;
+        const r = pixels[i];
+        const g = pixels[i + 1];
+        const b = pixels[i + 2];
+        const alpha = pixels[i + 3];
+
+        // Only sample fully opaque dark pixels (the actual icon, not anti-aliasing)
+        if (alpha > 250 && r + g + b < 100) {
+          const px = (x - size / 2) * logoScale;
+          const py = (size / 2 - y) * logoScale;
+          logoTargets.push(new THREE.Vector3(logoX + px, logoY + py, 0));
+          if (py < minY) minY = py;
+          if (py > maxY) maxY = py;
+        }
+      }
+    }
+
+    particleCount = Math.min(logoTargets.length * 1.3, 3000);
+    console.log('[Intro] Sampled', logoTargets.length, 'logo points, Y range:', minY.toFixed(1), 'to', maxY.toFixed(1), ', using', particleCount, 'particles');
+    initParticles();
+  };
+  img.src = './assets/zisla-icon.png';
+  console.log('[Intro] Loading image from', img.src);
+
+  const geometry = new THREE.BufferGeometry();
+  const material = new THREE.PointsMaterial({
+    color: 0xfafafa,
+    size: 2.5,
+    transparent: true,
+    opacity: 0.9,
+    map: circleTexture,
+    blending: THREE.AdditiveBlending,
+    depthWrite: false,
+  });
+
+  let particles: THREE.Points | null = null;
+  const originals: THREE.Vector3[] = [];
+  const targets: THREE.Vector3[] = [];
+  let progress = 0;
+
+  const initParticles = () => {
+    const positions = new Float32Array(particleCount * 3);
+
+    for (let i = 0; i < particleCount; i++) {
+      const i3 = i * 3;
+      const x = (Math.random() - 0.5) * 2000;
+      const y = (Math.random() - 0.5) * 1000;
+      const z = (Math.random() - 0.5) * 400;
+      positions[i3] = x;
+      positions[i3 + 1] = y;
+      positions[i3 + 2] = z;
+      originals.push(new THREE.Vector3(x, y, z));
+
+      if (i < logoTargets.length) {
+        targets.push(logoTargets[i].clone());
+      } else {
+        // Extra ambient particles that keep floating
+        targets.push(new THREE.Vector3(
+          (Math.random() - 0.5) * 1200,
+          (Math.random() - 0.5) * 600,
+          (Math.random() - 0.5) * 200
+        ));
+      }
+    }
+
+    geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+    particles = new THREE.Points(geometry, material);
+    scene.add(particles);
+  };
+
+  const updateScroll = (scrollY: number, windowHeight: number) => {
+    const scrollProgress = Math.min(scrollY / (windowHeight * 1.2), 1);
+    material.opacity = 0.8 * (1 - scrollProgress * 0.9);
+  };
+
+  let animationId: number;
+  const clock = new THREE.Clock();
+
+  const animate = () => {
+    animationId = requestAnimationFrame(animate);
+
+    if (!particles) {
+      renderer.render(scene, camera);
+      return;
+    }
+
+    const elapsed = clock.getElapsedTime();
+    progress = Math.min(progress + 0.012, 1);
+    const eased = 1 - Math.pow(1 - progress, 3);
+
+    const positions = geometry.attributes.position.array as Float32Array;
+    for (let i = 0; i < particleCount; i++) {
+      const i3 = i * 3;
+      const orig = originals[i];
+      const tgt = targets[i];
+      positions[i3] = THREE.MathUtils.lerp(orig.x, tgt.x, eased);
+      positions[i3 + 1] = THREE.MathUtils.lerp(orig.y, tgt.y, eased);
+      positions[i3 + 2] = THREE.MathUtils.lerp(orig.z, tgt.z, eased);
+
+      // Always animate: logo particles subtle float, ambient particles keep drifting
+      if (i < logoTargets.length) {
+        // Logo particles: subtle breathing after converged
+        if (progress > 0.85) {
+          positions[i3] += Math.sin(elapsed * 0.4 + i * 0.1) * 0.4;
+          positions[i3 + 1] += Math.cos(elapsed * 0.25 + i * 0.15) * 0.4;
+        }
+      } else {
+        // Ambient particles: continuous drift
+        positions[i3] += Math.sin(elapsed * 0.2 + i) * 0.5;
+        positions[i3 + 1] += Math.cos(elapsed * 0.15 + i) * 0.5;
+      }
+    }
+    geometry.attributes.position.needsUpdate = true;
+    renderer.render(scene, camera);
+  };
+  animate();
+
+  const handleResize = () => {
+    camera.aspect = window.innerWidth / window.innerHeight;
+    camera.updateProjectionMatrix();
+    renderer.setSize(window.innerWidth, window.innerHeight);
+  };
+  window.addEventListener('resize', handleResize);
+
+  introScene = {
+    dispose: () => {
+      cancelAnimationFrame(animationId);
+      window.removeEventListener('resize', handleResize);
+      geometry.dispose();
+      material.dispose();
+      circleTexture.dispose();
+      scene.clear();
+      renderer.dispose();
+      canvas.remove();
+      introScene = null;
+    },
+    updateScroll,
+  };
 };
 
 const renderSite = (locale: SiteLocale, preserveScroll = false) => {
@@ -945,9 +1165,17 @@ const showLocale = async (locale: SiteLocale, preserveScroll = false) => {
   }
   if (pendingLocale !== locale) return;
   renderSite(locale, preserveScroll);
+  initIntroScene();
 };
 
-window.addEventListener('scroll', updateScrollProgress, { passive: true });
+const updateScrollWithIntro = () => {
+  updateScrollProgress();
+  if (introScene) {
+    introScene.updateScroll(window.scrollY, window.innerHeight);
+  }
+};
+
+window.addEventListener('scroll', updateScrollWithIntro, { passive: true });
 window.addEventListener('resize', updateScrollProgress);
 desktopQuery.addEventListener?.('change', () => setMenuOpen(false));
 reducedMotionQuery.addEventListener?.('change', bindReveals);
