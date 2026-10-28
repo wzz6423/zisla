@@ -59,18 +59,18 @@ struct ScreenRecordingMultitrackUITests {
         #expect(try #require((export as? NSObject)?.value(forKey: "isAccessibilityEnabled") as? Bool))
         #expect(model.project?.timeline == nil && !model.isDirty && !model.canUndo)
         let add = try #require(element("screenRecording.multitrackAddTrack", in: host))
-        try click(add.accessibilityFrame(), in: window)
+        try press(add)
         await settle(host)
-        try click(try #require(element("screenRecording.multitrackAddTrack", in: host)).accessibilityFrame(), in: window)
+        try press(try #require(element("screenRecording.multitrackAddTrack", in: host)))
         await settle(host)
         #expect(model.timeline?.tracks.count == 3 && Set(model.timeline?.tracks.map(\.id) ?? []).count == 3)
         #expect(element("screenRecording.clipStart", in: host) != nil && labelled("导出设置", in: host) == nil)
         #expect(labelled("视频轨道", in: host) == nil && labelled("图片轨道", in: host) == nil
             && labelled("文字轨道", in: host) == nil && labelled("音频轨道", in: host) == nil)
-        try click(try #require(element("screenRecording.undo", in: host)).accessibilityFrame(), in: window)
+        try press(try #require(element("screenRecording.undo", in: host)))
         await settle(host)
         #expect(model.timeline?.tracks.count == 2 && model.canRedo)
-        try click(try #require(element("screenRecording.redo", in: host)).accessibilityFrame(), in: window)
+        try press(try #require(element("screenRecording.redo", in: host)))
         await settle(host)
         #expect(model.timeline?.tracks.count == 3 && !model.canRedo)
         #expect(NSScreen.screens.allSatisfy { !$0.frame.intersects(window.frame) } && !window.isKeyWindow)
@@ -95,12 +95,16 @@ struct ScreenRecordingMultitrackUITests {
         let export = try #require(element("screenRecording.export", in: host) as? NSObject)
         let emptyExportEnabled = try #require(export.value(forKey: "isAccessibilityEnabled") as? Bool)
         #expect(!emptyExportEnabled && panels.isEmpty)
+        try press(try #require(element("screenRecording.export", in: host)))
+        await settle(host)
+        #expect(panels.isEmpty && model.project == nil && !model.isChoosingFile)
         model.install(fixture.project(), directory: fixture.directory)
         model.update { $0.name = "Unsaved" }
         let edited = try #require(model.project)
         let files = try fixture.files()
         await settle(host)
-        try click(try #require(element("screenRecording.export", in: host)).accessibilityFrame(), in: window)
+        try press(try #require(element("screenRecording.export", in: host)))
+        #expect(panels.count == 1 && model.isChoosingFile && model.operationTask == nil)
         await settle(host)
         #expect(panels.count == 1 && model.isChoosingFile && model.operationTask == nil)
         #expect(panels.first?.accessoryView is NSHostingView<ScreenRecordingExportSettingsView>)
@@ -109,6 +113,11 @@ struct ScreenRecordingMultitrackUITests {
             let enabled = try #require(control.value(forKey: "isAccessibilityEnabled") as? Bool)
             #expect(!enabled, "Output destination selection must disable \(identifier)")
         }
+        for identifier in ["screenRecording.undo", "screenRecording.redo", "screenRecording.export"] {
+            try press(try #require(element(identifier, in: host)))
+        }
+        await settle(host)
+        #expect(panels.count == 1 && model.project == edited && model.isChoosingFile)
         let cancelDestination = try #require(complete)
         cancelDestination(nil)
         await settle(host)
@@ -139,20 +148,20 @@ struct ScreenRecordingMultitrackUITests {
         let window = mount(host, width: 920, height: 240)
         defer { window.contentView = nil; window.close() }
         await settle(host)
-        try click(try #require(element("screenRecording.addMedia." + image.id.uuidString, in: host)).accessibilityFrame(), in: window)
+        try press(try #require(element("screenRecording.addMedia." + image.id.uuidString, in: host)))
         await settle(host)
         let addedID = try #require(model.selectedTimelineClipID)
         #expect(model.timeline?.clips.count == 2 && model.selectedTimelineClip?.content == .image(image.id))
         model.seekTimeline(to: 1)
         await settle(host)
-        try click(try #require(element("screenRecording.multitrackSplit", in: host)).accessibilityFrame(), in: window)
+        try press(try #require(element("screenRecording.multitrackSplit", in: host)))
         await settle(host)
         let tail = try #require(model.selectedTimelineClip)
         #expect(tail.id != addedID && tail.sourceStart == 1 && tail.start == 1 && model.timeline?.clips.count == 3)
-        try click(try #require(element("screenRecording.multitrackDuplicate", in: host)).accessibilityFrame(), in: window)
+        try press(try #require(element("screenRecording.multitrackDuplicate", in: host)))
         await settle(host)
         #expect(model.selectedTimelineClip?.id != tail.id && model.selectedTimelineClip?.start == 2)
-        try click(try #require(element("screenRecording.multitrackDelete", in: host)).accessibilityFrame(), in: window)
+        try press(try #require(element("screenRecording.multitrackDelete", in: host)))
         await settle(host)
         #expect(model.timeline?.clips.count == 3)
         for _ in 0..<4 { model.undo() }
@@ -231,12 +240,10 @@ struct ScreenRecordingMultitrackUITests {
         }
     }
 
-    private func click(_ frame: CGRect, in window: NSWindow) throws {
-        let point = window.convertPoint(fromScreen: CGPoint(x: frame.midX, y: frame.midY))
-        for type in [NSEvent.EventType.leftMouseDown, .leftMouseUp] {
-            window.sendEvent(try #require(NSEvent.mouseEvent(with: type, location: point, modifierFlags: [],
-                timestamp: ProcessInfo.processInfo.systemUptime, windowNumber: window.windowNumber, context: nil,
-                eventNumber: 0, clickCount: 1, pressure: type == .leftMouseDown ? 1 : 0)))
-        }
+    private func press(_ element: any NSAccessibilityElementProtocol) throws {
+        let object = try #require(element as? NSObject)
+        let action = NSSelectorFromString("accessibilityPerformPress")
+        try #require(object.responds(to: action))
+        object.performSelector(onMainThread: action, with: nil, waitUntilDone: true)
     }
 }

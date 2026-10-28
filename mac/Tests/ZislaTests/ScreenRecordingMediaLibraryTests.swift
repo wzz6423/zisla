@@ -271,6 +271,9 @@ struct ScreenRecordingMediaLibraryTests {
         await settle(host)
         let remove = try #require(element("screenRecording.removeMedia." + id.uuidString, in: host) as? NSObject)
         #expect(remove.value(forKey: "accessibilityEnabled") as? Bool == false)
+        try press(try #require(element("screenRecording.removeMedia." + id.uuidString, in: host)))
+        await settle(host)
+        #expect(model.project == before && !model.canUndo && !model.canRedo)
         let disabledMenu = try contextMenu(for: "screenRecording.mediaAsset." + id.uuidString, in: host, window: window)
         #expect(try #require(disabledMenu.items.first).isEnabled == false)
         model.cancelOperation()
@@ -286,6 +289,9 @@ struct ScreenRecordingMediaLibraryTests {
         await settle(host)
         let restore = try #require(element("screenRecording.restoreMedia." + id.uuidString, in: host) as? NSObject)
         #expect(restore.value(forKey: "accessibilityEnabled") as? Bool == false)
+        try press(try #require(element("screenRecording.restoreMedia." + id.uuidString, in: host)))
+        await settle(host)
+        #expect(model.project == removed && model.mediaAssets.isEmpty && model.isBusy)
         for _ in 0..<100 where completeRecognition == nil { await Task.yield() }
         model.cancelOperation()
         await model.operationTask?.value
@@ -428,7 +434,8 @@ struct ScreenRecordingMediaLibraryTests {
         #expect(menu.items.count == 1 && translations("移除素材").contains(firstItem.title))
         let remove = try #require(element("screenRecording.removeMedia." + image.id.uuidString, in: host))
         #expect(translations("移除素材").contains(label(remove) ?? ""))
-        try click(remove.accessibilityFrame(), in: window)
+        try press(remove)
+        #expect(model.selectedRemovedMediaAsset?.id == image.id && model.timeline?.clips == timeline.clips)
         await settle(host)
         #expect(element("screenRecording.mediaAsset." + image.id.uuidString, in: host) == nil)
         #expect(translations("素材已从素材库移除").contains(value(element("screenRecording.removedMediaNotice", in: host)) ?? ""))
@@ -437,7 +444,7 @@ struct ScreenRecordingMediaLibraryTests {
         #expect(model.timeline?.clips == timeline.clips)
         let restore = try #require(element("screenRecording.restoreMedia." + image.id.uuidString, in: host))
         #expect(translations("重新导入").contains(label(restore) ?? ""))
-        try click(restore.accessibilityFrame(), in: window)
+        try press(restore)
         await settle(host)
         #expect(element("screenRecording.mediaAsset." + image.id.uuidString, in: host) != nil)
         #expect(element("screenRecording.removedMediaNotice", in: host) == nil && model.project == project)
@@ -453,7 +460,7 @@ struct ScreenRecordingMediaLibraryTests {
         await settle(host)
         #expect(element("screenRecording.removedMediaNotice", in: host) != nil)
         try FileManager.default.removeItem(at: imageURL)
-        try click(try #require(element("screenRecording.restoreMedia." + image.id.uuidString, in: host)).accessibilityFrame(), in: window)
+        try press(try #require(element("screenRecording.restoreMedia." + image.id.uuidString, in: host)))
         await settle(host)
         #expect(translations("文件路径：%@", [imageURL.path]).contains(value(element("screenRecording.removedMediaPath", in: host)) ?? ""))
         #expect(model.selectedRemovedMediaAsset?.id == image.id && model.errorMessage != nil && model.timeline?.clips == timeline.clips)
@@ -543,13 +550,11 @@ struct ScreenRecordingMediaLibraryTests {
         (element as? NSObject)?.value(forKey: "accessibilityValue") as? String
     }
 
-    private func click(_ frame: CGRect, in window: NSWindow) throws {
-        let point = window.convertPoint(fromScreen: CGPoint(x: frame.midX, y: frame.midY))
-        for type in [NSEvent.EventType.leftMouseDown, .leftMouseUp] {
-            window.sendEvent(try #require(NSEvent.mouseEvent(with: type, location: point, modifierFlags: [],
-                timestamp: ProcessInfo.processInfo.systemUptime, windowNumber: window.windowNumber, context: nil,
-                eventNumber: 0, clickCount: 1, pressure: type == .leftMouseDown ? 1 : 0)))
-        }
+    private func press(_ element: any NSAccessibilityElementProtocol) throws {
+        let object = try #require(element as? NSObject)
+        let action = NSSelectorFromString("accessibilityPerformPress")
+        try #require(object.responds(to: action))
+        object.performSelector(onMainThread: action, with: nil, waitUntilDone: true)
     }
 
     private func contextMenu(for identifier: String, in host: NSView, window: NSWindow) throws -> NSMenu {
