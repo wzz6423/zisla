@@ -619,7 +619,17 @@ struct AIUsageLogDetectorTests {
         let codex = root.appendingPathComponent("codex", isDirectory: true)
         let broken = codex.appendingPathComponent("2026/07/25/rollout-broken.jsonl.zst")
         try FileManager.default.createDirectory(at: broken.deletingLastPathComponent(), withIntermediateDirectories: true)
-        try Data([0x28, 0xB5, 0x2F, 0xFD, 0x00]).write(to: broken)
+        // Several 128 KiB blocks, so a file cut inside its last block still decodes the earlier ones.
+        let lines = (0..<3_000).map { index in
+            codexTokenLine(
+                timestamp: String(format: "2026-07-25T01:%02d:%02d.000Z", index / 60, index % 60),
+                input: 100 * (index + 1),
+                output: 10 * (index + 1)
+            )
+        }
+        let complete = try ZStd.compress(Data((lines.joined(separator: "\n") + "\n").utf8))
+        #expect(throws: (any Error).self) { try ZStd.decompress(complete.dropLast()) }
+        try complete.dropLast().write(to: broken)
         try writeJSONL([
             codexTokenLine(timestamp: "2026-07-25T00:03:00.000Z", input: 40, output: 4),
         ], to: codex.appendingPathComponent("2026/07/25/rollout-plain.jsonl"))

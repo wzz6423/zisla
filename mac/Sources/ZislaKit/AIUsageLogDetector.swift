@@ -337,8 +337,15 @@ public final class AIUsageLogDetector: AIUsageDetecting {
 
         var parserState = ParserState()
         var samples: [AIUsageSample] = []
-        for line in jsonlLines(in: data) where line.count <= maxBytesPerFile {
-            guard let root = try? JSONSerialization.jsonObject(with: line) as? [String: Any] else {
+        // Decompressed rollouts reach well over 100 MiB, so lines are parsed as slices that share
+        // the buffer instead of being copied out one by one.
+        var lineStart = data.startIndex
+        while lineStart < data.endIndex {
+            let lineEnd = data[lineStart...].firstIndex(of: 0x0A) ?? data.endIndex
+            let line = data[lineStart..<lineEnd]
+            lineStart = lineEnd + 1
+            guard line.count <= maxBytesPerFile,
+                  let root = try? JSONSerialization.jsonObject(with: line) as? [String: Any] else {
                 continue
             }
             samples.append(contentsOf: parseRoot(
@@ -358,19 +365,6 @@ public final class AIUsageLogDetector: AIUsageDetecting {
             contentHash: nil,
             edgeHash: nil
         )
-    }
-
-    private func jsonlLines(in data: Data) -> [Data] {
-        var lines: [Data] = []
-        var start = data.startIndex
-        for index in data.indices where data[index] == 0x0A {
-            lines.append(Data(data[start..<index]))
-            start = data.index(after: index)
-        }
-        if start < data.endIndex {
-            lines.append(Data(data[start..<data.endIndex]))
-        }
-        return lines
     }
 
     private func parse(_ candidate: Candidate) -> [AIUsageSample] {
