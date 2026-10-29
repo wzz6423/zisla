@@ -1,5 +1,6 @@
 import AppKit
 import Foundation
+import SwiftUI
 import Testing
 import ZislaCore
 import ZislaKit
@@ -8,6 +9,174 @@ import ZislaKit
 
 @MainActor
 struct ContextNoteQuickActionTests {
+    @Test(.serialized, arguments: [false, true], [AppLanguage.simplifiedChinese, .english, .arabic])
+    func compactRemindersKeepContentAndTimeOnOppositeSidesOfTheNotch(hasNotch: Bool, language: AppLanguage) async throws {
+        _ = NSApplication.shared
+        let releaseAccessibility = EnhancedAccessibilityTestScope.acquire()
+        defer { releaseAccessibility() }
+        let controller = ClipboardAssistantController(windowPresenter: { _, _ in })
+        defer { controller.dismiss(animated: false) }
+        var settings = FeatureSettings.default
+        settings.contextNotesEnabled = true
+        settings.clipboardAssistantDisplayDuration = .never
+        settings.collapsedProgressGlowEnabled = false
+        settings.clipboardAssistantLightweightMode = false
+        let item = FileShelfItem(id: UUID(), url: URL(fileURLWithPath: "/synthetic-context-note/note"),
+                                 addedAt: Date(timeIntervalSince1970: 123_456), bookmarkData: Data(),
+                                 text: String(repeating: "Synthetic long note ", count: 25), noteLocation: Self.location)
+        #expect(ContextNoteReminderPresenter.present(item, at: .zero, on: controller, settings: settings))
+        controller.presentation.physicalNotchWidth = hasNotch ? 185 : 0
+        controller.presentation.islandTopHeight = 37
+        let host = NSHostingView(rootView: ClipboardAssistantToastView(presentation: controller.presentation, controller: controller)
+            .environment(\.locale, language.locale)
+            .environment(\.layoutDirection, language.isRightToLeft ? .rightToLeft : .leftToRight)
+            .transaction { $0.disablesAnimations = true })
+        host.sizingOptions = []
+        let panel = NSPanel(contentRect: CGRect(x: -100_000, y: -100_000, width: 533, height: 37),
+                            styleMask: [.borderless, .nonactivatingPanel], backing: .buffered, defer: false)
+        panel.isReleasedWhenClosed = false
+        defer { panel.close() }
+        panel.contentView = host
+        #expect(NSScreen.screens.allSatisfy { !$0.frame.intersects(panel.frame) })
+        panel.orderFrontRegardless()
+        for _ in 0..<3 {
+            host.layoutSubtreeIfNeeded()
+            host.displayIfNeeded()
+            await withCheckedContinuation { continuation in DispatchQueue.main.async { continuation.resume() } }
+        }
+        var frames: [String: CGRect] = [:]
+        var labels: [String] = []
+        func visit(_ object: NSObject) {
+            func value(_ key: String) -> Any? {
+                object.responds(to: NSSelectorFromString(key)) ? object.value(forKey: key) : nil
+            }
+            let label = ["accessibilityLabel", "accessibilityTitle", "accessibilityValue"]
+                .compactMap { value($0) as? String }.first { !$0.isEmpty }
+            if let element = object as? any NSAccessibilityElementProtocol, let label {
+                labels.append(label)
+                frames[label] = host.convert(panel.convertFromScreen(element.accessibilityFrame()), from: nil)
+            }
+            for child in value("accessibilityChildren") as? [NSObject] ?? [] { visit(child) }
+        }
+        visit(host)
+        let content = try #require(frames[item.text!])
+        let timeLabel = AppLocalization.string("添加时间", locale: language.locale) + " "
+            + item.addedAt.formatted(.dateTime.year().month().day().hour().minute().locale(language.locale))
+        let time = try #require(frames[timeLabel])
+        #expect(content.width > 0 && time.width > 0)
+        #expect(host.bounds.contains(time))
+        #expect(abs(content.midY - time.midY) <= 1)
+        if language.isRightToLeft { #expect(time.maxX < host.bounds.midX) }
+        else { #expect(time.minX > host.bounds.midX) }
+        if hasNotch {
+            let notch = CGRect(x: (host.bounds.width - 185) / 2, y: 0, width: 185, height: 37)
+            #expect(!time.intersects(notch))
+            let bitmap = try #require(host.bitmapImageRepForCachingDisplay(in: host.bounds))
+            host.cacheDisplay(in: host.bounds, to: bitmap)
+            let scale = CGFloat(bitmap.pixelsWide) / host.bounds.width
+            var brightPixels = 0
+            for x in Int(notch.minX * scale + 2)..<Int(notch.maxX * scale - 2) {
+                for y in Int(6 * scale)..<Int(30 * scale) {
+                    let color = try #require(bitmap.colorAt(x: x, y: y)?.usingColorSpace(.deviceRGB))
+                    if max(color.redComponent, color.greenComponent, color.blueComponent) * color.alphaComponent > 0.25 {
+                        brightPixels += 1
+                    }
+                }
+            }
+            #expect(brightPixels == 0, "Long note text must remain clipped away from the physical notch")
+        }
+        #expect(labels.filter { $0 == item.text }.count == 1)
+        #expect(!labels.contains(AppLocalization.string("查看便签", locale: language.locale)))
+        #expect(controller.presentation.detection?.title == item.text)
+        let bitmap = try #require(host.bitmapImageRepForCachingDisplay(in: host.bounds))
+        host.cacheDisplay(in: host.bounds, to: bitmap)
+        let scale = CGFloat(bitmap.pixelsWide) / host.bounds.width
+        let reference = NSHostingView(rootView: Image(systemName: "note.text")
+            .font(.system(size: 13, weight: .medium))
+            .foregroundStyle(.white.opacity(0.75))
+            .frame(width: 26, height: 37)
+            .background(.black)
+            .environment(\.colorScheme, .dark)
+            .environment(\.locale, language.locale)
+            .environment(\.layoutDirection, language.isRightToLeft ? .rightToLeft : .leftToRight))
+        reference.sizingOptions = []
+        let referencePanel = NSPanel(contentRect: CGRect(x: -100_000, y: -100_000, width: 26, height: 37),
+                                     styleMask: [.borderless, .nonactivatingPanel], backing: .buffered, defer: false)
+        referencePanel.isReleasedWhenClosed = false
+        defer { referencePanel.close() }
+        referencePanel.contentView = reference
+        referencePanel.orderFrontRegardless()
+        for _ in 0..<3 {
+            reference.layoutSubtreeIfNeeded()
+            reference.displayIfNeeded()
+            await withCheckedContinuation { continuation in DispatchQueue.main.async { continuation.resume() } }
+        }
+        let glyph = try #require(reference.bitmapImageRepForCachingDisplay(in: reference.bounds))
+        reference.cacheDisplay(in: reference.bounds, to: glyph)
+        let iconX = Int((language.isRightToLeft ? host.bounds.width - 40 : 14) * scale)
+        var differingPixels = 0
+        var referencePixels = 0
+        for x in 0..<glyph.pixelsWide {
+            for y in 0..<glyph.pixelsHigh {
+                let expected = try #require(glyph.colorAt(x: x, y: y)?.usingColorSpace(.deviceRGB))
+                let actual = try #require(bitmap.colorAt(x: iconX + x, y: y)?.usingColorSpace(.deviceRGB))
+                let expectedBright = expected.redComponent * expected.alphaComponent > 0.25
+                let actualBright = actual.redComponent * actual.alphaComponent > 0.25
+                if expectedBright { referencePixels += 1 }
+                if expectedBright != actualBright { differingPixels += 1 }
+            }
+        }
+        #expect(referencePixels > 0)
+        #expect(Double(differingPixels) / Double(max(1, referencePixels)) < 0.1,
+                "Reminder must show the note glyph instead of the generic clipboard text glyph")
+        var actions: [ClipboardAssistantAction] = []
+        controller.onPerformAction = { actions.append($0) }
+        for type in [NSEvent.EventType.leftMouseDown, .leftMouseUp] {
+            let event = try #require(NSEvent.mouseEvent(with: type,
+                location: CGPoint(x: language.isRightToLeft ? 440 : 100, y: 18.5), modifierFlags: [],
+                timestamp: ProcessInfo.processInfo.systemUptime, windowNumber: panel.windowNumber, context: nil,
+                eventNumber: 0, clickCount: 1, pressure: type == .leftMouseDown ? 1 : 0))
+            panel.sendEvent(event)
+        }
+        #expect(actions == [.showContextNote(item.id)])
+        #expect(controller.presentation.detection == nil)
+        #expect(!panel.isKeyWindow)
+    }
+
+    @Test
+    func reminderWidthReservesTheTimestampInsteadOfHiddenActionButtons() {
+        let id = UUID()
+        let ordinary = ClipboardAssistantDetection(kind: .text, title: "remember",
+            actions: [.showContextNote(id), .copyContextNote(id), .deleteContextNote(id)])
+        var reminder = ordinary
+        reminder.contextNoteAddedAt = Date(timeIntervalSince1970: 123_456)
+        let ordinaryWidth = ClipboardAssistantController.trailingControlsWidth(
+            for: ordinary, isLightweightMode: false, shortcutHint: nil)
+        let reminderWidth = ClipboardAssistantController.trailingControlsWidth(
+            for: reminder, isLightweightMode: false, shortcutHint: nil)
+        #expect(reminderWidth > 22)
+        #expect(reminderWidth < ordinaryWidth)
+        #expect(ClipboardAssistantController.trailingControlsWidth(
+            for: reminder, isLightweightMode: true, shortcutHint: nil) == reminderWidth)
+    }
+
+    @Test
+    func remindersPreviewAllLinesWithoutChangingSavedContent() throws {
+        let controller = ClipboardAssistantController(windowPresenter: { _, _ in })
+        defer { controller.dismiss(animated: false) }
+        var settings = FeatureSettings.default
+        settings.contextNotesEnabled = true
+        let text = "first\r\nsecond\nthird"
+        let item = FileShelfItem(id: UUID(), url: URL(fileURLWithPath: "/synthetic-context-note/note"),
+                                 addedAt: Date(timeIntervalSince1970: 42), bookmarkData: Data(), text: text,
+                                 noteLocation: Self.location)
+        #expect(ContextNoteReminderPresenter.present(item, at: .zero, on: controller, settings: settings))
+        let detection = try #require(controller.presentation.detection)
+        #expect(detection.title == "first second third")
+        #expect(detection.fullContent == text)
+        #expect(detection.contextNoteAddedAt == item.addedAt)
+    }
+
     @Test(arguments: [false, true])
     func remindersOfferViewCopyDeleteWithViewAsTheDefault(lightweight: Bool) throws {
         let controller = ClipboardAssistantController(windowPresenter: { _, _ in })
@@ -25,6 +194,7 @@ struct ContextNoteQuickActionTests {
 
         #expect(ContextNoteReminderPresenter.present(item, at: .zero, on: controller, settings: settings))
         let detection = try #require(controller.presentation.detection)
+        #expect(detection.contextNoteAddedAt == item.addedAt)
         #expect(detection.actions.map(\.identifier) == ["showContextNote", "copyContextNote", "deleteContextNote"])
         #expect(detection.actions.map(ClipboardAssistantToastView.actionLabel) == ["查看便签", "复制", "删除"])
         #expect(detection.action == .showContextNote(item.id))

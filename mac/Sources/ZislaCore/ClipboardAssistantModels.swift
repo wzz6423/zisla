@@ -564,6 +564,7 @@ public struct ClipboardAssistantDetection: Equatable, Sendable {
     /// to show than the one-line title.
     public var fullContent: String?
     public var moneyConversion: ClipboardAssistantMoneyConversion?
+    public var contextNoteAddedAt: Date?
 
     public struct ColorComponents: Equatable, Sendable {
         public var red: Double
@@ -585,7 +586,8 @@ public struct ClipboardAssistantDetection: Equatable, Sendable {
         colorComponents: ColorComponents? = nil,
         fullContent: String? = nil,
         emoji: String? = nil,
-        moneyConversion: ClipboardAssistantMoneyConversion? = nil
+        moneyConversion: ClipboardAssistantMoneyConversion? = nil,
+        contextNoteAddedAt: Date? = nil
     ) {
         self.kind = kind
         self.title = title
@@ -595,6 +597,7 @@ public struct ClipboardAssistantDetection: Equatable, Sendable {
         self.fullContent = fullContent
         self.emoji = emoji
         self.moneyConversion = moneyConversion
+        self.contextNoteAddedAt = contextNoteAddedAt
     }
 
     /// The primary action fired by the action button or the quick trigger.

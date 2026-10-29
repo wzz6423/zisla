@@ -2812,3 +2812,15 @@
 "复制截图" = "Copiar captura de pantalla";
 "截图失败：%@" = "Error al capturar la pantalla: %@";
 "无法读取便签关联的应用窗口" = "No se puede capturar la ventana de la aplicación asociada a esta nota";
+
+"主动提醒" = "Recordatorio periódico";
+"不主动提醒" = "Sin recordatorio periódico";
+"每 1 小时" = "Cada hora";
+"每 1.5 小时" = "Cada 1,5 horas";
+"每 3 小时" = "Cada 3 horas";
+"每 6 小时" = "Cada 6 horas";
+"每 12 小时" = "Cada 12 horas";
+"每 1 天" = "Cada día";
+"每 2 天" = "Cada 2 días";
+"每 3 天" = "Cada 3 días";
+"添加时间" = "Añadido el";

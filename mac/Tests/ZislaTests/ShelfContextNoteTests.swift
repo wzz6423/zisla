@@ -188,6 +188,72 @@ struct ShelfContextNoteTests {
     }
 
     @Test
+    func savedNoteDetailsCanSetPersistChangeAndDiscardReminderSettings() throws {
+        try withStore { store, directory in
+            let editor = ContextNoteShelfEditor()
+            let draft = ContextNoteDraft(location: try #require(Self.note.noteLocation), createdAt: Self.note.addedAt)
+            editor.begin(draft)
+            #expect(editor.itemID == nil)
+            #expect(draft.reminderInterval == .off)
+            draft.text = "remember"
+            let note = try #require(editor.save(in: store))
+            #expect(note.noteReminderInterval == .off)
+            #expect(note.nextNoteReminderAt == nil)
+            editor.open(note)
+            #expect(editor.itemID == note.id)
+            #expect(editor.draft?.reminderInterval == .off)
+            editor.draft?.reminderInterval = .oneAndAHalfHours
+            let date = Date(timeIntervalSince1970: 10_000)
+            let enabled = try #require(editor.save(in: store, at: date))
+            #expect(enabled.nextNoteReminderAt == date.addingTimeInterval(5_400))
+            #expect(enabled.addedAt == note.addedAt)
+            #expect(!editor.isPresented)
+            let restored = FileShelfStore(storageURL: directory.appendingPathComponent("shelf.json"))
+            editor.open(try #require(restored.items.first))
+            #expect(editor.draft?.reminderInterval == .oneAndAHalfHours)
+            editor.draft?.reminderInterval = .threeDays
+            editor.hide()
+            editor.open(enabled)
+            #expect(editor.draft?.reminderInterval == .threeDays)
+            #expect(restored.items.first?.noteReminderInterval == .oneAndAHalfHours)
+            editor.close()
+            editor.open(enabled)
+            #expect(editor.draft?.reminderInterval == .oneAndAHalfHours)
+            editor.draft?.reminderInterval = .off
+            let disabled = try #require(editor.save(in: restored))
+            #expect(disabled.nextNoteReminderAt == nil)
+            #expect(disabled.noteReminderInterval == .off)
+        }
+    }
+
+    @Test
+    func failedReminderEditRetainsDraftAndSavedSettingsForRetry() throws {
+        try withStore { store, directory in
+            let location = try #require(Self.note.noteLocation)
+            let note = try #require(store.addContextNote("remember", location: location))
+            let editor = ContextNoteShelfEditor()
+            editor.open(note)
+            let draft = try #require(editor.draft)
+            draft.reminderInterval = .sixHours
+            let index = directory.appendingPathComponent("shelf.json")
+            try FileManager.default.removeItem(at: index)
+            try FileManager.default.createDirectory(at: index, withIntermediateDirectories: false)
+            #expect(editor.save(in: store) == nil)
+            #expect(editor.draft === draft)
+            #expect(draft.reminderInterval == .sixHours)
+            #expect(draft.error != nil)
+            #expect(editor.isPresented)
+            #expect(store.items == [note])
+            try FileManager.default.removeItem(at: index)
+            let date = Date(timeIntervalSince1970: 10_000)
+            let saved = try #require(editor.save(in: store, at: date))
+            #expect(saved.noteReminderInterval == .sixHours)
+            #expect(saved.nextNoteReminderAt == date.addingTimeInterval(21_600))
+            #expect(!editor.isPresented)
+        }
+    }
+
+    @Test
     func openingAndEditingASavedNoteLoadsAndPreservesItsScreenshot() throws {
         try withStore { store, _ in
             let png = try ContextNoteScreenshotTestImage.make().png

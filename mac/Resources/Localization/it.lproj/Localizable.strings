@@ -2812,3 +2812,15 @@
 "复制截图" = "Copia screenshot";
 "截图失败：%@" = "Acquisizione dello screenshot non riuscita: %@";
 "无法读取便签关联的应用窗口" = "Impossibile acquisire la finestra dell’applicazione associata a questa nota";
+
+"主动提醒" = "Promemoria periodico";
+"不主动提醒" = "Nessun promemoria periodico";
+"每 1 小时" = "Ogni ora";
+"每 1.5 小时" = "Ogni 1,5 ore";
+"每 3 小时" = "Ogni 3 ore";
+"每 6 小时" = "Ogni 6 ore";
+"每 12 小时" = "Ogni 12 ore";
+"每 1 天" = "Ogni giorno";
+"每 2 天" = "Ogni 2 giorni";
+"每 3 天" = "Ogni 3 giorni";
+"添加时间" = "Aggiunto il";

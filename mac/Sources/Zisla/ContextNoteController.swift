@@ -54,6 +54,7 @@ final class ContextNoteDraft: ObservableObject {
     let location: ContextNoteLocation
     let createdAt: Date
     @Published var text = ""
+    @Published var reminderInterval: ContextNoteReminderInterval = .off
     @Published var error: String?
     @Published private var screenshotState = ScreenshotState.none
     private(set) var screenshotTask: Task<Void, Never>?
@@ -198,6 +199,8 @@ final class ContextNoteController {
     private var detector = ContextNoteShakeDetector()
     private var holdHotkey: VoiceInputHotkeyPreset
     private var visits = ContextNoteVisitTracker()
+    // A shown reminder must not repeat every tick when its new deadline cannot be saved.
+    private var failedReminderSchedules: [UUID: (scheduledAt: Date, nextReminderAt: Date)] = [:]
     private var shelfCapture = Capture.unavailable
     private weak var shelfDraft: ContextNoteDraft?
     private var window: IslandPanel?
@@ -284,6 +287,7 @@ final class ContextNoteController {
         pointerMonitor = nil
         timer?.invalidate()
         timer = nil
+        failedReminderSchedules.removeAll()
         observers.forEach { NSWorkspace.shared.notificationCenter.removeObserver($0) }
         observers.removeAll()
         shelfDraft?.cancelScreenshotCapture()
@@ -385,8 +389,27 @@ final class ContextNoteController {
         sourceApplication = nil
     }
 
-    func checkForReturn(at point: CGPoint) {
+    func checkForReturn(at point: CGPoint, now date: Date = Date()) {
         guard enabled, !isSuspended, draft == nil, canInteract(), shelf.items.contains(where: { $0.noteLocation != nil }) else { return }
+        let retainedIDs = Set(shelf.items.map(\.id))
+        failedReminderSchedules = failedReminderSchedules.filter { retainedIDs.contains($0.key) }
+        let due = shelf.items.filter { item in
+            guard item.noteLocation != nil, item.noteReminderInterval != .off,
+                  let deadline = item.nextNoteReminderAt, date >= deadline else { return false }
+            if let failed = failedReminderSchedules[item.id], failed.scheduledAt == deadline {
+                return date >= failed.nextReminderAt
+            }
+            return true
+        }.min { $0.nextNoteReminderAt! < $1.nextNoteReminderAt! }
+        if let item = due, onReminder(item, point) {
+            didSaveNote(item)
+            if shelf.rescheduleContextNoteReminder(id: item.id, at: date) {
+                failedReminderSchedules.removeValue(forKey: item.id)
+            } else {
+                failedReminderSchedules[item.id] = (item.nextNoteReminderAt!, date.addingTimeInterval(item.noteReminderInterval.duration))
+            }
+            return
+        }
         let observation = currentLocation(point, nil)
         if let item = visits.candidate(for: observation, items: shelf.items), onReminder(item, point) {
             visits.didPresent()
@@ -468,9 +491,11 @@ enum ContextNoteReminderPresenter {
     static func present(_ item: FileShelfItem, at point: CGPoint, on controller: ClipboardAssistantController, settings: FeatureSettings) -> Bool {
         guard settings.clipboardAssistantEnabled, settings.contextNotesEnabled, let text = item.text,
               let location = item.noteLocation, controller.presentation.detection == nil else { return false }
-        let detection = ClipboardAssistantDetection(kind: .text, title: text,
+        let preview = text.components(separatedBy: .newlines).filter { !$0.isEmpty }.joined(separator: " ")
+        let detection = ClipboardAssistantDetection(kind: .text, title: preview,
             detail: .path(ContextNoteDetailView.locationDescription(location)),
-            actions: [.showContextNote(item.id), .copyContextNote(item.id), .deleteContextNote(item.id)], fullContent: text)
+            actions: [.showContextNote(item.id), .copyContextNote(item.id), .deleteContextNote(item.id)], fullContent: text,
+            contextNoteAddedAt: item.addedAt)
         controller.displayDuration = settings.clipboardAssistantDisplayDuration
         controller.isLightweightMode = settings.clipboardAssistantLightweightMode
         controller.presentation.progressGlowEnabled = settings.collapsedProgressGlowEnabled

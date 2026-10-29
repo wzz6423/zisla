@@ -2813,3 +2813,15 @@
 "复制截图" = "Screenshot kopieren";
 "截图失败：%@" = "Screenshot fehlgeschlagen: %@";
 "无法读取便签关联的应用窗口" = "Das mit dieser Notiz verknüpfte Anwendungsfenster kann nicht erfasst werden";
+
+"主动提醒" = "Regelmäßige Erinnerung";
+"不主动提醒" = "Keine regelmäßige Erinnerung";
+"每 1 小时" = "Jede Stunde";
+"每 1.5 小时" = "Alle 1,5 Stunden";
+"每 3 小时" = "Alle 3 Stunden";
+"每 6 小时" = "Alle 6 Stunden";
+"每 12 小时" = "Alle 12 Stunden";
+"每 1 天" = "Jeden Tag";
+"每 2 天" = "Alle 2 Tage";
+"每 3 天" = "Alle 3 Tage";
+"添加时间" = "Hinzugefügt am";
