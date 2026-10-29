@@ -1227,11 +1227,13 @@ struct CLIParserTests {
         }
         #expect(sample.timestamp == now)
 
-        for (option, value) in [("--input-tokens", "-1"), ("--output-tokens", "-1")] {
+        for (option, value, otherOption) in [
+            ("--input-tokens", "-1", "--output-tokens"),
+            ("--output-tokens", "-1", "--input-tokens"),
+        ] {
             #expect(throws: CLIParseError.invalidValue(option: option, value: value)) {
                 try CLIParser.parse(arguments: [
-                    "usage", "--provider", "codex", "--input-tokens", "1", "--output-tokens", "2",
-                    option, value,
+                    "usage", "--provider", "codex", otherOption, "1", option, value,
                 ])
             }
         }
