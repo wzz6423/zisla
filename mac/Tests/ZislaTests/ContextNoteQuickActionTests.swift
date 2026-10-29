@@ -9,9 +9,17 @@ import ZislaKit
 
 @MainActor
 struct ContextNoteQuickActionTests {
-    @Test(.serialized, arguments: [false, true], [AppLanguage.simplifiedChinese, .english, .arabic])
-    func compactRemindersKeepContentAndTimeOnOppositeSidesOfTheNotch(hasNotch: Bool, language: AppLanguage) async throws {
+    @Test(.serialized, arguments: [(false, 1), (false, 2), (true, 1), (true, 2)],
+          [AppLanguage.simplifiedChinese, .english, .arabic])
+    func compactRemindersKeepContentAndTimeOnOppositeSidesOfTheNotch(
+        configuration: (hasNotch: Bool, renderScale: Int), language: AppLanguage
+    ) async throws {
+        let (hasNotch, renderScale) = configuration
         _ = NSApplication.shared
+        final class RasterPanel: NSPanel {
+            var renderScale: CGFloat = 1
+            override var backingScaleFactor: CGFloat { renderScale }
+        }
         let releaseAccessibility = EnhancedAccessibilityTestScope.acquire()
         defer { releaseAccessibility() }
         let controller = ClipboardAssistantController(windowPresenter: { _, _ in })
@@ -32,8 +40,9 @@ struct ContextNoteQuickActionTests {
             .environment(\.layoutDirection, language.isRightToLeft ? .rightToLeft : .leftToRight)
             .transaction { $0.disablesAnimations = true })
         host.sizingOptions = []
-        let panel = NSPanel(contentRect: CGRect(x: -100_000, y: -100_000, width: 533, height: 37),
+        let panel = RasterPanel(contentRect: CGRect(x: -100_000, y: -100_000, width: 533, height: 37),
                             styleMask: [.borderless, .nonactivatingPanel], backing: .buffered, defer: false)
+        panel.renderScale = CGFloat(renderScale)
         panel.isReleasedWhenClosed = false
         defer { panel.close() }
         panel.contentView = host
@@ -91,18 +100,24 @@ struct ContextNoteQuickActionTests {
         let bitmap = try #require(host.bitmapImageRepForCachingDisplay(in: host.bounds))
         host.cacheDisplay(in: host.bounds, to: bitmap)
         let scale = CGFloat(bitmap.pixelsWide) / host.bounds.width
-        let reference = NSHostingView(rootView: Image(systemName: "note.text")
-            .font(.system(size: 13, weight: .medium))
-            .foregroundStyle(.white.opacity(0.75))
-            .frame(width: 26, height: 26)
-            .frame(width: 26, height: 37)
-            .background(.black)
-            .environment(\.colorScheme, .dark)
-            .environment(\.locale, language.locale)
-            .environment(\.layoutDirection, language.isRightToLeft ? .rightToLeft : .leftToRight))
+        #expect(scale == CGFloat(renderScale))
+        // Match the toast mask compositing; an unmasked symbol rasterizes differently at 1x.
+        let reference = NSHostingView(rootView: IslandSurface(
+            isCollapsed: true, expandedSize: CGSize(width: 26, height: 37)
+        ) {
+            Image(systemName: "note.text")
+                .font(.system(size: 13, weight: .medium))
+                .foregroundStyle(.white.opacity(0.75))
+                .frame(width: 26, height: 26)
+                .frame(width: 26, height: 37)
+        }
+        .environment(\.colorScheme, .dark)
+        .environment(\.locale, language.locale)
+        .environment(\.layoutDirection, language.isRightToLeft ? .rightToLeft : .leftToRight))
         reference.sizingOptions = []
-        let referencePanel = NSPanel(contentRect: CGRect(x: -100_000, y: -100_000, width: 26, height: 37),
+        let referencePanel = RasterPanel(contentRect: CGRect(x: -100_000, y: -100_000, width: 26, height: 37),
                                      styleMask: [.borderless, .nonactivatingPanel], backing: .buffered, defer: false)
+        referencePanel.renderScale = CGFloat(renderScale)
         referencePanel.isReleasedWhenClosed = false
         defer { referencePanel.close() }
         referencePanel.contentView = reference
