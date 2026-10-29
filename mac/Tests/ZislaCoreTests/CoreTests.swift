@@ -1394,6 +1394,90 @@ struct CLIParserTests {
     }
 
     @Test
+    func valueOptionsDoNotSwallowAFlagOfTheSameCommand() throws {
+        // `--detail $EMPTY --failed` in a shell script reaches the parser without the empty value.
+        for arguments in [
+            ["finish", "--id", "job", "--detail", "--failed"],
+            ["finish", "--id", "job", "--detail", "--failed=true"],
+        ] {
+            let command = try CLIParser.parse(arguments: arguments)
+            guard case let .finish(id, failed, detail) = command else {
+                Issue.record("Expected finish for \(arguments)")
+                return
+            }
+            #expect(id == "job")
+            #expect(failed, "\(arguments)")
+            #expect(detail == "", "\(arguments)")
+        }
+
+        let queued = try CLIParser.parse(arguments: [
+            "update", "--id", "job", "--provider", "codex", "--title", "Task", "--detail", "--queued",
+        ])
+        guard case let .update(task) = queued else {
+            Issue.record("Expected update")
+            return
+        }
+        #expect(task.status == .queued)
+        #expect(task.detail == "")
+
+        let literal = try CLIParser.parse(arguments: ["finish", "--id", "job", "--detail=--failed"])
+        guard case let .finish(_, literalFailed, literalDetail) = literal else {
+            Issue.record("Expected finish")
+            return
+        }
+        #expect(!literalFailed)
+        #expect(literalDetail == "--failed")
+
+        // `--failed` is not a flag of `notify`, so it stays an ordinary value there.
+        let notice = try CLIParser.parse(arguments: ["notify", "--title", "x", "--detail", "--failed"])
+        guard case let .notify(value) = notice else {
+            Issue.record("Expected notify")
+            return
+        }
+        #expect(value.detail == "--failed")
+    }
+
+    @Test
+    func queuedAcceptsTheSameExplicitBooleansAsFailed() throws {
+        for (arguments, expected) in [
+            (["--queued"], AIProgressStatus.queued),
+            (["--queued=true"], .queued),
+            (["--queued", "true"], .queued),
+            (["--queued=false"], .running),
+            (["--queued", "false"], .running),
+            ([], .running),
+        ] {
+            let command = try CLIParser.parse(arguments: [
+                "update", "--id", "job", "--provider", "codex", "--title", "Task",
+            ] + arguments)
+            guard case let .update(task) = command else {
+                Issue.record("Expected update for \(arguments)")
+                return
+            }
+            #expect(task.status == expected, "\(arguments)")
+        }
+    }
+
+    @Test
+    func flagsRejectValuesOtherThanTrueOrFalse() {
+        #expect(throws: CLIParseError.invalidValue(option: "--failed", value: "yes")) {
+            try CLIParser.parse(arguments: ["finish", "--id", "job", "--failed=yes"])
+        }
+        #expect(throws: CLIParseError.invalidValue(option: "--queued", value: "later")) {
+            try CLIParser.parse(arguments: [
+                "update", "--id", "job", "--provider", "codex", "--title", "Task", "--queued", "later",
+            ])
+        }
+        // An explicit status wins, but a malformed `--queued` is still a usage error.
+        #expect(throws: CLIParseError.invalidValue(option: "--queued", value: "0")) {
+            try CLIParser.parse(arguments: [
+                "update", "--id", "job", "--provider", "codex", "--title", "Task",
+                "--status", "running", "--queued=0",
+            ])
+        }
+    }
+
+    @Test
     func equalsFormReportsTheOptionNameWhenItIsUnknown() {
         #expect(throws: CLIParseError.unknownOption("--faield")) {
             try CLIParser.parse(arguments: ["finish", "--id=job", "--faield=true"])

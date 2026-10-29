@@ -93,7 +93,9 @@ public enum CLIParser {
         }
     }
 
-    /// `--failed` and `--queued` stay flags. Every other option consumes the next token, even when it starts with `--`.
+    /// `--failed` and `--queued` stay flags. Every other option consumes the next token, even when it
+    /// starts with `--`, unless that token is a flag of the same subcommand: an empty unquoted shell
+    /// variable must not turn `--detail $EMPTY --failed` into a successful finish.
     private static let flagOptions: Set<String> = ["--failed", "--queued"]
 
     /// Repeated options are rejected so a later copy cannot silently replace an earlier one.
@@ -106,17 +108,7 @@ public enum CLIParser {
         while index < tokens.count {
             let token = tokens[index]
             guard token.hasPrefix("--") else { throw CLIParseError.unexpectedArgument(token) }
-            let body = token.dropFirst(2)
-
-            let name: String
-            let inlineValue: String?
-            if let separator = body.firstIndex(of: "=") {
-                name = "--" + body[..<separator]
-                inlineValue = String(body[body.index(after: separator)...])
-            } else {
-                name = token
-                inlineValue = nil
-            }
+            let (name, inlineValue) = splitOption(token)
             guard allowed.contains(name) else { throw CLIParseError.unknownOption(name) }
             guard options[name] == nil else { throw CLIParseError.duplicateOption(name) }
 
@@ -134,7 +126,7 @@ public enum CLIParser {
             } else if let inlineValue {
                 options[name] = inlineValue
                 index += 1
-            } else if index + 1 < tokens.count {
+            } else if index + 1 < tokens.count, !isFlag(tokens[index + 1], allowed: allowed) {
                 options[name] = tokens[index + 1]
                 index += 2
             } else {
@@ -143,6 +135,30 @@ public enum CLIParser {
             }
         }
         return options
+    }
+
+    private static func splitOption(_ token: String) -> (name: String, inlineValue: String?) {
+        let body = token.dropFirst(2)
+        guard let separator = body.firstIndex(of: "=") else { return (token, nil) }
+        return ("--" + body[..<separator], String(body[body.index(after: separator)...]))
+    }
+
+    private static func isFlag(_ token: String, allowed: Set<String>) -> Bool {
+        let name = splitOption(token).name
+        return flagOptions.contains(name) && allowed.contains(name)
+    }
+
+    /// A bare flag means true; `--flag=false` and `--flag false` turn it off. Anything else is rejected
+    /// instead of silently picking a state.
+    private static func flag(_ options: [String: String], _ key: String) throws -> Bool {
+        switch options[key] {
+        case nil, "false":
+            return false
+        case "", "true":
+            return true
+        case let raw?:
+            throw CLIParseError.invalidValue(option: key, value: raw)
+        }
     }
 
     private static func parseUpdate(_ options: [String: String], now: Date) throws -> CLICommand {
@@ -161,6 +177,7 @@ public enum CLIParser {
             progress = percent / 100
         }
 
+        let queued = try flag(options, "--queued")
         let status: AIProgressStatus
         if let raw = options["--status"] {
             guard let parsed = AIProgressStatus(rawValue: raw.lowercased()), parsed.isActive else {
@@ -168,7 +185,7 @@ public enum CLIParser {
             }
             status = parsed
         } else {
-            status = options["--queued"] != nil ? .queued : .running
+            status = queued ? .queued : .running
         }
         return .update(AIProgressTask(
             id: id, provider: provider, title: title,
@@ -181,7 +198,7 @@ public enum CLIParser {
 
     private static func parseFinish(_ options: [String: String]) throws -> CLICommand {
         let id = try require(options, "--id")
-        let failed = options["--failed"].map { $0.isEmpty || $0 == "true" } ?? false
+        let failed = try flag(options, "--failed")
         return .finish(id: id, failed: failed, detail: options["--detail"])
     }
 
