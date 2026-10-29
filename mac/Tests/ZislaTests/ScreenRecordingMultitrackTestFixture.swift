@@ -107,25 +107,33 @@ final class RecordingMultitrackTestFixture {
     }
 
     nonisolated static func decode(_ asset: AVAsset, composition: AVVideoComposition? = nil) async throws -> [(Double, CGImage)] {
-        let reader = try AVAssetReader(asset: asset)
         let tracks = try await asset.loadTracks(withMediaType: .video)
-        let output: AVAssetReaderOutput
-        let settings = [kCVPixelBufferPixelFormatTypeKey as String: kCVPixelFormatType_32BGRA]
-        if let composition {
-            let composed = AVAssetReaderVideoCompositionOutput(videoTracks: tracks, videoSettings: settings)
-            composed.videoComposition = composition
-            output = composed
-        } else { output = AVAssetReaderTrackOutput(track: try #require(tracks.first), outputSettings: settings) }
-        reader.add(output)
-        try #require(reader.startReading())
-        defer { reader.cancelReading() }
-        let context = CIContext()
-        var frames: [(Double, CGImage)] = []
-        while let sample = output.copyNextSampleBuffer() {
-            let source = CIImage(cvPixelBuffer: try #require(sample.imageBuffer))
-            frames.append((sample.presentationTimeStamp.seconds, try #require(context.createCGImage(source, from: source.extent))))
+        return try await withCheckedThrowingContinuation { continuation in
+            // Compositor callbacks may need the executor that is awaiting these blocking reads.
+            DispatchQueue(label: "zisla-test-media-decode").async(execute: DispatchWorkItem {
+                do {
+                    let reader = try AVAssetReader(asset: asset)
+                    let output: AVAssetReaderOutput
+                    let settings = [kCVPixelBufferPixelFormatTypeKey as String: kCVPixelFormatType_32BGRA]
+                    if let composition {
+                        let composed = AVAssetReaderVideoCompositionOutput(videoTracks: tracks, videoSettings: settings)
+                        composed.videoComposition = composition
+                        output = composed
+                    } else { output = AVAssetReaderTrackOutput(track: try #require(tracks.first), outputSettings: settings) }
+                    reader.add(output)
+                    try #require(reader.startReading())
+                    defer { reader.cancelReading() }
+                    let context = CIContext()
+                    var frames: [(Double, CGImage)] = []
+                    while let sample = output.copyNextSampleBuffer() {
+                        let source = CIImage(cvPixelBuffer: try #require(sample.imageBuffer))
+                        frames.append((sample.presentationTimeStamp.seconds,
+                            try #require(context.createCGImage(source, from: source.extent))))
+                    }
+                    #expect(reader.status == .completed && reader.error == nil, "The entire timeline must decode without dropped media")
+                    continuation.resume(returning: frames)
+                } catch { continuation.resume(throwing: error) }
+            })
         }
-        #expect(reader.status == .completed && reader.error == nil, "The entire timeline must decode without dropped media")
-        return frames
     }
 }
