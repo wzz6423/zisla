@@ -39,7 +39,8 @@ struct ScreenRecordingMultitrackEditingTests {
         let fixture = try RecordingMultitrackTestFixture()
         let model = try fixture.model()
         defer { model.shutdown(); fixture.remove() }
-        let video = try await fixture.createVideo()
+        _ = try await fixture.createVideo()
+        let video = try await fixture.createVideo("additional.mp4", duration: 3)
         let image = try fixture.createImage()
         let audio = try fixture.createTone()
         let original = fixture.project()
@@ -112,20 +113,21 @@ struct ScreenRecordingMultitrackEditingTests {
         let fixture = try RecordingMultitrackTestFixture()
         defer { fixture.remove() }
         let image = try fixture.createImage()
-        let second = try fixture.createImage("second.png")
+        let second = try fixture.createImage("second.png", color: .init(red: 1, green: 0, blue: 0))
         try Data([9]).write(to: fixture.directory.appendingPathComponent("screen.mp4"))
         let project = fixture.project()
         try fixture.store.save(project, in: fixture.directory)
         let files = try fixture.files()
         let directories = try FileManager.default.contentsOfDirectory(atPath: fixture.root.path)
-        let checkpoint = ImportCheckpoint()
+        let checkpoint = try RecordingImportCopyCancellation(root: fixture.root)
         await #expect(throws: CancellationError.self) {
             _ = try await RecordingMediaImporter.prepare(urls: [image, second], project: newProject ? nil : project,
                 directory: newProject ? nil : fixture.directory, store: fixture.store, checkCancellation: {
                     try checkpoint.check()
                 })
         }
-        #expect(checkpoint.count == 3, "Cancellation must be injected after the first media has been decoded and copied")
+        #expect(try checkpoint.copiedFiles.count == 1 && checkpoint.copiedBytes == Data(contentsOf: image),
+            "Cancellation must observe exactly the first copied media before rolling back")
         #expect(try fixture.files() == files)
         #expect(try FileManager.default.contentsOfDirectory(atPath: fixture.root.path) == directories)
         #expect(try fixture.store.load(from: fixture.directory) == project)
@@ -683,16 +685,6 @@ struct ScreenRecordingMultitrackEditingTests {
         model.generateCaptions()
         await model.operationTask?.value
         #expect(recognized == microphone && model.project?.captions.first?.text == "Microphone")
-    }
-
-    private final class ImportCheckpoint: @unchecked Sendable {
-        private let lock = NSLock()
-        private var checks = 0
-        var count: Int { lock.withLock { checks } }
-        func check() throws {
-            let value = lock.withLock { checks += 1; return checks }
-            if value == 3 { throw CancellationError() }
-        }
     }
 
     private actor AudioGate {

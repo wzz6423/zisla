@@ -19,6 +19,8 @@ struct ScreenRecordingLocalizationTests {
             "系统声音音量", "麦克风音量", "显示摄像头", "摄像头比例", "画布比例", "背景颜色", "标注", "摄像头边框",
             "视频轨道", "图片轨道", "文字轨道", "音频轨道",
             "轨道", "轨道 %ld", "移除素材", "素材已从素材库移除", "文件名：%@", "文件路径：%@", "重新导入",
+            "分组", "时间粒度", "不分组", "按类型", "按导入时间", "按拍摄时间",
+            "按小时", "按日", "按月", "按年", "未知导入时间", "未知拍摄时间", "已跳过 %d 个重复素材",
             "复制", "粘贴", "已复制", "标注内容", "预览片段起点", "添加轨道",
             "动画", "入场动画", "出场动画", "转场", "入场时长（秒）", "出场时长（秒）", "转场时长（秒）",
             "转场需要与同轨前一片段重叠", "淡入", "淡出", "打字机", "叠化", "向左推移", "向右推移", "缩放转场",
@@ -41,7 +43,9 @@ struct ScreenRecordingLocalizationTests {
             let english = try Self.table(language: .english)
             for key in ["仅在生成方案时发送指令和部分字幕，原始视频留在本机", "字幕在本机转写，不上传录音",
                         "录屏正在进行，请先停止当前录制", "预览与导出使用相同的画面效果",
-                        "入场动画", "出场动画", "转场需要与同轨前一片段重叠", "打字机"] {
+                        "入场动画", "出场动画", "转场需要与同轨前一片段重叠", "打字机",
+                        "分组", "时间粒度", "不分组", "按类型", "按导入时间", "按拍摄时间",
+                        "按小时", "按日", "按月", "按年", "未知导入时间", "未知拍摄时间", "已跳过 %d 个重复素材"] {
                 #expect(table[key] != english[key], "\(language.rawValue) copied the English text for \(key)")
             }
         }
@@ -145,6 +149,14 @@ struct ScreenRecordingLocalizationTests {
         keys.formUnion(RecordingClipAnimationKind.allCases.map(\.entranceTitle))
         keys.formUnion(RecordingClipAnimationKind.allCases.map(\.exitTitle))
         keys.formUnion(RecordingClipTransitionKind.allCases.map(\.title))
+        keys.formUnion(RecordingMediaGrouping.allCases.map(\.title))
+        keys.formUnion(RecordingMediaTimeGranularity.allCases.map(\.title))
+        keys.formUnion(RecordingMediaLibraryGrouping.groups(
+            assets: [.init(name: "Unknown", file: "unknown.png", kind: .image, duration: 1, width: 1, height: 1)],
+            grouping: .importedAt, granularity: .day).compactMap(\.title))
+        keys.formUnion(RecordingMediaLibraryGrouping.groups(
+            assets: [.init(name: "Unknown", file: "unknown.png", kind: .image, duration: 1, width: 1, height: 1)],
+            grouping: .capturedAt, granularity: .day).compactMap(\.title))
         keys.formUnion([SettingsSection.recording.title, SettingsSection.recording.subtitle])
 
         for path in paths {

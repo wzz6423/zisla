@@ -3095,3 +3095,16 @@
 "向左推移" = "Push Left";
 "向右推移" = "Push Right";
 "缩放转场" = "Zoom Transition";
+"分组" = "Group by";
+"时间粒度" = "Time interval";
+"不分组" = "No grouping";
+"按类型" = "By type";
+"按导入时间" = "By import time";
+"按拍摄时间" = "By capture time";
+"按小时" = "By hour";
+"按日" = "By day";
+"按月" = "By month";
+"按年" = "By year";
+"未知导入时间" = "Unknown import time";
+"未知拍摄时间" = "Unknown capture time";
+"已跳过 %d 个重复素材" = "Skipped %d duplicate media items";

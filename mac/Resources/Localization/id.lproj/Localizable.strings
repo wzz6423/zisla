@@ -3096,3 +3096,16 @@
 "向左推移" = "Dorong ke Kiri";
 "向右推移" = "Dorong ke Kanan";
 "缩放转场" = "Transisi Zoom";
+"分组" = "Kelompokkan menurut";
+"时间粒度" = "Interval waktu";
+"不分组" = "Tanpa pengelompokan";
+"按类型" = "Menurut jenis";
+"按导入时间" = "Menurut waktu impor";
+"按拍摄时间" = "Menurut waktu pengambilan";
+"按小时" = "Per jam";
+"按日" = "Per hari";
+"按月" = "Per bulan";
+"按年" = "Per tahun";
+"未知导入时间" = "Waktu impor tidak diketahui";
+"未知拍摄时间" = "Waktu pengambilan tidak diketahui";
+"已跳过 %d 个重复素材" = "%d media duplikat dilewati";

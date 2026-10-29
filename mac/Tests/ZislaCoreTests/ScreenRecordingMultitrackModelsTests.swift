@@ -66,6 +66,51 @@ struct ScreenRecordingMultitrackModelsTests {
         #expect(project.timeline?.clips.first?.id == clipID && project.outputDuration == 8)
     }
 
+    @Test func mediaDatesRoundTripIndependentlyAndOlderManifestsKeepUnknownDates() throws {
+        var project = legacyProject()
+        project.version = 2
+        project.timeline = .migrating(project)
+        let imported = Date(timeIntervalSince1970: 1_793_242_800.125)
+        let captured = Date(timeIntervalSince1970: 1_700_000_000.5)
+        project.timeline?.assets[0].importedAt = imported
+        project.timeline?.assets[0].capturedAt = captured
+        try project.validate()
+        let data = try JSONEncoder().encode(project)
+        let restored = try JSONDecoder().decode(ScreenRecordingProject.self, from: data)
+        #expect(restored == project && restored.timeline?.assets[0].importedAt == imported
+            && restored.timeline?.assets[0].capturedAt == captured)
+
+        var manifest = try #require(JSONSerialization.jsonObject(with: data) as? [String: Any])
+        var timeline = try #require(manifest["timeline"] as? [String: Any])
+        var assets = try #require(timeline["assets"] as? [[String: Any]])
+        assets[0].removeValue(forKey: "importedAt")
+        assets[0].removeValue(forKey: "capturedAt")
+        timeline["assets"] = assets
+        manifest["timeline"] = timeline
+        let old = try JSONDecoder().decode(ScreenRecordingProject.self,
+            from: JSONSerialization.data(withJSONObject: manifest))
+        try old.validate()
+        project.timeline?.assets[0].importedAt = nil
+        project.timeline?.assets[0].capturedAt = nil
+        #expect(old == project && old.timeline?.assets[0].importedAt == nil
+            && old.timeline?.assets[0].capturedAt == nil,
+            "Missing dates in older projects must remain unknown without changing their clips or assets")
+    }
+
+    @Test(arguments: [false, true], [Double.nan, .infinity, -.infinity])
+    func nonfiniteMediaDatesAreRejectedBeforeGrouping(captureDate: Bool, seconds: Double) throws {
+        var project = legacyProject()
+        project.version = 2
+        project.timeline = .migrating(project)
+        let original = project
+        let invalid = Date(timeIntervalSinceReferenceDate: seconds)
+        if captureDate { project.timeline?.assets[0].capturedAt = invalid }
+        else { project.timeline?.assets[0].importedAt = invalid }
+        #expect(throws: ScreenRecordingProjectError.invalidProject) { try project.validate() }
+        try original.validate()
+        #expect(original.timeline?.assets[0].importedAt == nil && original.timeline?.assets[0].capturedAt == nil)
+    }
+
     @Test func everyExistingTrackAcceptsAssetsAndInvalidDestinationsDoNotCreateTracks() {
         let video = RecordingMediaAsset(name: "Video", file: "video.mp4", kind: .video, duration: 2, width: 64, height: 48)
         var timeline = RecordingMultitrackTimeline(assets: [video], tracks: [.init(id: "v", kind: .video), .init(id: "a", kind: .audio)])

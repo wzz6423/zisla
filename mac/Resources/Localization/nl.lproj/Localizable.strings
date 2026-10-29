@@ -3096,3 +3096,16 @@
 "向左推移" = "Naar links duwen";
 "向右推移" = "Naar rechts duwen";
 "缩放转场" = "Zoomovergang";
+"分组" = "Groeperen op";
+"时间粒度" = "Tijdsinterval";
+"不分组" = "Niet groeperen";
+"按类型" = "Op type";
+"按导入时间" = "Op importtijd";
+"按拍摄时间" = "Op opnametijd";
+"按小时" = "Per uur";
+"按日" = "Per dag";
+"按月" = "Per maand";
+"按年" = "Per jaar";
+"未知导入时间" = "Onbekende importtijd";
+"未知拍摄时间" = "Onbekende opnametijd";
+"已跳过 %d 个重复素材" = "%d dubbele mediabestanden overgeslagen";

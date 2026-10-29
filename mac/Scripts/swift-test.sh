@@ -22,12 +22,30 @@ try:
 except (OSError, json.JSONDecodeError) as error:
     sys.exit(f"Swift Testing did not produce a complete event stream: {error}")
 
-kinds = [event["payload"]["kind"] for event in events if event["kind"] == "event"]
 functions = {event["payload"]["id"] for event in events
              if event["kind"] == "test" and event["payload"]["kind"] == "function"}
-skipped_function = any(event["kind"] == "event"
-                       and event["payload"]["kind"] == "testSkipped"
-                       and event["payload"].get("testID") in functions for event in events)
-if "runEnded" not in kinds or ("testEnded" not in kinds and not skipped_function):
+active = False
+pending = set()
+nonempty = False
+for event in events:
+    if event["kind"] != "event":
+        continue
+    payload = event["payload"]
+    kind = payload["kind"]
+    if kind == "runStarted":
+        if active:
+            sys.exit("Swift Testing started another target before completing the previous run")
+        active = True
+    elif kind == "testStarted":
+        pending.add(payload["testID"])
+    elif kind in ("testEnded", "testSkipped"):
+        test = payload["testID"]
+        pending.discard(test)
+        nonempty |= test in functions
+    elif kind == "runEnded":
+        if not active or pending:
+            sys.exit("Swift Testing ended a target with unfinished tests")
+        active = False
+if active or not nonempty:
     sys.exit("Swift Testing exited before completing a nonempty test run")
 PYTHON

@@ -106,7 +106,7 @@ final class RecordingMultitrackTestFixture {
         return Array(bytes[offset..<offset + 3])
     }
 
-    static func decode(_ asset: AVAsset, composition: AVVideoComposition? = nil) async throws -> [(Double, CGImage)] {
+    nonisolated static func decode(_ asset: AVAsset, composition: AVVideoComposition? = nil) async throws -> [(Double, CGImage)] {
         let reader = try AVAssetReader(asset: asset)
         let tracks = try await asset.loadTracks(withMediaType: .video)
         let output: AVAssetReaderOutput

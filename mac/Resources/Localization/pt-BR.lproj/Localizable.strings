@@ -3096,3 +3096,16 @@
 "向左推移" = "Empurrar para a esquerda";
 "向右推移" = "Empurrar para a direita";
 "缩放转场" = "Transição com zoom";
+"分组" = "Agrupar por";
+"时间粒度" = "Intervalo de tempo";
+"不分组" = "Sem agrupamento";
+"按类型" = "Por tipo";
+"按导入时间" = "Por data de importação";
+"按拍摄时间" = "Por data de captura";
+"按小时" = "Por hora";
+"按日" = "Por dia";
+"按月" = "Por mês";
+"按年" = "Por ano";
+"未知导入时间" = "Data de importação desconhecida";
+"未知拍摄时间" = "Data de captura desconhecida";
+"已跳过 %d 个重复素材" = "%d itens de mídia duplicados ignorados";

@@ -23,6 +23,10 @@ try:
         raise ValueError()
 except ValueError:
     sys.exit("SWIFT_TEST_WORKERS must be a positive integer")
+timeout_text = os.environ.get("SWIFT_TEST_SUITE_TIMEOUT", "600")
+if not re.fullmatch(r"[1-9][0-9]*", timeout_text):
+    sys.exit("SWIFT_TEST_SUITE_TIMEOUT must be a positive integer")
+suite_timeout = int(timeout_text)
 try:
     shard_count = int(os.environ.get("SWIFT_TEST_SHARD_COUNT", "1"))
     shard_index = int(os.environ.get("SWIFT_TEST_SHARD_INDEX", "0"))
@@ -146,6 +150,7 @@ with tempfile.TemporaryDirectory(prefix="zisla-swift-test-suites.") as temporary
         loads[index] += tasks[name][1]
     pending = iter(enumerate(shards[shard_index]))
     running = {}
+    deadlines = {}
     exhausted = False
     try:
         while running or not exhausted:
@@ -170,19 +175,36 @@ with tempfile.TemporaryDirectory(prefix="zisla-swift-test-suites.") as temporary
                      "--filter", "^" + re.escape(suite) + r"(?:/|$)"],
                     env=suite_environment, stdout=output, stderr=subprocess.STDOUT, start_new_session=True)
                 running[process.pid] = (process, suite, output)
+                deadlines[process.pid] = time.monotonic() + suite_timeout
+                print(f"Swift suite started: {suite} (pid={process.pid})", flush=True)
             if running:
-                pid, status = os.wait()
+                pid = next((pid for pid, (process, _suite, _output) in running.items()
+                            if process.poll() is not None), None)
+                timed_out = pid is None
+                if timed_out:
+                    pid = min(running, key=deadlines.__getitem__)
+                    remaining = deadlines[pid] - time.monotonic()
+                    if remaining > 0:
+                        time.sleep(min(0.05, remaining))
+                        continue
                 process, suite, output = running[pid]
-                process.returncode = os.waitstatus_to_exitcode(status)
-                output.close()
-                print(f"Swift suite: {suite}", flush=True)
+                if timed_out:
+                    print(f"Swift suite timed out after {suite_timeout} seconds: {suite} (pid={pid})", flush=True)
+                    stop_workers(running.values())
+                    running.clear()
+                else:
+                    output.close()
+                    print(f"Swift suite: {suite}", flush=True)
                 with open(output.name) as log:
                     shutil.copyfileobj(log, sys.stdout)
                 sys.stdout.flush()
+                if timed_out:
+                    sys.exit(124)
                 if process.returncode:
                     sys.exit(process.returncode if process.returncode > 0 else 128 - process.returncode)
                 stop_workers([running[pid]])
                 del running[pid]
+                del deadlines[pid]
     finally:
         stop_workers(running.values())
 PYTHON

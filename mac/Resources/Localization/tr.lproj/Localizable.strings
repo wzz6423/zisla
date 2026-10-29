@@ -3096,3 +3096,16 @@
 "向左推移" = "Sola İtme";
 "向右推移" = "Sağa İtme";
 "缩放转场" = "Yakınlaştırmalı Geçiş";
+"分组" = "Gruplandırma";
+"时间粒度" = "Zaman aralığı";
+"不分组" = "Gruplandırma yok";
+"按类型" = "Türe göre";
+"按导入时间" = "İçe aktarma zamanına göre";
+"按拍摄时间" = "Çekim zamanına göre";
+"按小时" = "Saate göre";
+"按日" = "Güne göre";
+"按月" = "Aya göre";
+"按年" = "Yıla göre";
+"未知导入时间" = "İçe aktarma zamanı bilinmiyor";
+"未知拍摄时间" = "Çekim zamanı bilinmiyor";
+"已跳过 %d 个重复素材" = "%d yinelenen medya öğesi atlandı";

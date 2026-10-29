@@ -14,10 +14,13 @@ public struct RecordingMediaAsset: Codable, Equatable, Identifiable, Sendable {
     public var height: Int
     public var hasAudio: Bool
     public var isHiddenFromLibrary: Bool?
+    public var importedAt: Date?
+    public var capturedAt: Date?
 
     public init(id: UUID = UUID(), name: String, file: String, kind: RecordingMediaKind,
                 duration: Double, width: Int = 0, height: Int = 0, hasAudio: Bool = false,
-                isHiddenFromLibrary: Bool? = nil) {
+                isHiddenFromLibrary: Bool? = nil, importedAt: Date? = nil,
+                capturedAt: Date? = nil) {
         self.id = id
         self.name = name
         self.file = file
@@ -27,6 +30,8 @@ public struct RecordingMediaAsset: Codable, Equatable, Identifiable, Sendable {
         self.height = height
         self.hasAudio = hasAudio
         self.isHiddenFromLibrary = isHiddenFromLibrary
+        self.importedAt = importedAt
+        self.capturedAt = capturedAt
     }
 }
 
@@ -183,6 +188,9 @@ public struct RecordingMultitrackTimeline: Codable, Equatable, Sendable {
                   asset.duration > 0, asset.duration <= 604_800,
                   asset.kind == .audio || ((1...16_384).contains(asset.width) && (1...16_384).contains(asset.height))
             else { throw ScreenRecordingProjectError.invalidProject }
+            for date in [asset.importedAt, asset.capturedAt].compactMap({ $0 }) {
+                guard date.timeIntervalSinceReferenceDate.isFinite else { throw ScreenRecordingProjectError.invalidProject }
+            }
         }
         let media = Dictionary(uniqueKeysWithValues: assets.map { ($0.id, $0) })
         let trackMap = Dictionary(uniqueKeysWithValues: tracks.map { ($0.id, $0) })

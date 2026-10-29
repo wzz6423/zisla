@@ -414,6 +414,10 @@ final class ScreenRecordingStudioModel: ObservableObject {
                     guard project == result.project else { result.discard(); return }
                 }
                 prepared = nil
+                if result.duplicateCount > 0 {
+                    notices.enqueue(.init(title: AppLocalization.text("已跳过 %d 个重复素材", result.duplicateCount),
+                        side: .left, symbolName: "rectangle.on.rectangle"), expiresAfter: 3)
+                }
             } catch {
                 prepared?.discard()
                 guard projectRevision == revision else { return }

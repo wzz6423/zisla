@@ -3,6 +3,9 @@ import ZislaCore
 
 struct ScreenRecordingMediaLibraryView: View {
     @ObservedObject var model: ScreenRecordingStudioModel
+    @State var grouping: RecordingMediaGrouping = .none
+    @State var timeGranularity: RecordingMediaTimeGranularity = .day
+    @Environment(\.locale) private var locale
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
@@ -16,9 +19,38 @@ struct ScreenRecordingMediaLibraryView: View {
                     .accessibilityIdentifier("screenRecording.importMedia")
                     .disabled(model.isBusy || model.isChoosingFile || model.isRecording || model.exporter.isExporting)
             }
+            Picker(AppLocalization.text("分组"), selection: $grouping) {
+                ForEach(RecordingMediaGrouping.allCases) { option in
+                    Text(AppLocalization.text(option.title)).tag(option)
+                }
+            }
+            .pickerStyle(.menu).controlSize(.small)
+            .accessibilityIdentifier("screenRecording.mediaGrouping")
+            if grouping == .importedAt || grouping == .capturedAt {
+                Picker(AppLocalization.text("时间粒度"), selection: $timeGranularity) {
+                    ForEach(RecordingMediaTimeGranularity.allCases) { option in
+                        Text(AppLocalization.text(option.title)).tag(option)
+                    }
+                }
+                .pickerStyle(.menu).controlSize(.small)
+                .accessibilityIdentifier("screenRecording.mediaTimeGranularity")
+            }
             ScrollView {
-                LazyVStack(spacing: 6) {
-                    ForEach(model.mediaAssets) { asset in mediaRow(asset) }
+                LazyVStack(alignment: .leading, spacing: 6) {
+                    ForEach(RecordingMediaLibraryGrouping.groups(assets: model.mediaAssets,
+                        grouping: grouping, granularity: timeGranularity)) { group in
+                        if let date = group.date {
+                            Text(dateTitle(date)).font(.caption.weight(.semibold)).foregroundStyle(.secondary)
+                                .padding(.top, 4)
+                                .accessibilityIdentifier("screenRecording.mediaGroup." + group.id)
+                        } else if let title = group.title {
+                            Text(AppLocalization.text(title)).font(.caption.weight(.semibold)).foregroundStyle(.secondary)
+                                .padding(.top, 4)
+                                .accessibilityIdentifier("screenRecording.mediaGroup." + group.id)
+                        }
+                        ForEach(group.assets) { asset in mediaRow(asset) }
+                    }
+                    ScreenRecordingRemovedMediaLibraryView(model: model)
                 }
             }
             if model.mediaAssets.isEmpty {
@@ -29,7 +61,22 @@ struct ScreenRecordingMediaLibraryView: View {
         }
         .padding(12)
         .background(Color(nsColor: .windowBackgroundColor))
+        .accessibilityElement(children: .contain)
         .accessibilityIdentifier("screenRecording.mediaLibrary")
+    }
+
+    private func dateTitle(_ date: Date) -> String {
+        let formatter = DateFormatter()
+        formatter.locale = locale
+        let template: String
+        switch timeGranularity {
+        case .hour: template = "yMMMdj"
+        case .day: template = "yMMMd"
+        case .month: template = "yMMMM"
+        case .year: template = "y"
+        }
+        formatter.setLocalizedDateFormatFromTemplate(template)
+        return formatter.string(from: date)
     }
 
     private func mediaRow(_ asset: RecordingMediaAsset) -> some View {

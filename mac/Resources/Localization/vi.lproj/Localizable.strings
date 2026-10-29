@@ -3096,3 +3096,16 @@
 "向左推移" = "Đẩy sang trái";
 "向右推移" = "Đẩy sang phải";
 "缩放转场" = "Chuyển cảnh thu phóng";
+"分组" = "Nhóm theo";
+"时间粒度" = "Khoảng thời gian";
+"不分组" = "Không nhóm";
+"按类型" = "Theo loại";
+"按导入时间" = "Theo thời gian nhập";
+"按拍摄时间" = "Theo thời gian chụp";
+"按小时" = "Theo giờ";
+"按日" = "Theo ngày";
+"按月" = "Theo tháng";
+"按年" = "Theo năm";
+"未知导入时间" = "Không rõ thời gian nhập";
+"未知拍摄时间" = "Không rõ thời gian chụp";
+"已跳过 %d 个重复素材" = "Đã bỏ qua %d mục phương tiện trùng lặp";
