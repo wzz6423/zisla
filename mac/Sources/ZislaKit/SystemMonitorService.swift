@@ -261,39 +261,59 @@ public struct SystemMetricHistory: Equatable, Sendable {
     }
 }
 
+/// Distinguishes a finished lookup from a transport or payload failure so a timeout cannot clear a known address.
+public enum PublicIPLookupResult: Equatable, Sendable {
+    case address(String)
+    case absent
+    case failed
+}
+
 public protocol PublicIPProviding: Sendable {
-    func publicIPAddress() async -> String?
-    func publicIPv6Address() async -> String?
+    func publicIPAddress() async -> PublicIPLookupResult
+    func publicIPv6Address() async -> PublicIPLookupResult
 }
 
 struct DefaultPublicIPProvider: PublicIPProviding {
     var session: URLSession = .shared
+    var hasRoutableAddress: @Sendable (Int32) -> Bool = { family in
+        SystemSampler.hasRoutableAddress(family: family)
+    }
 
     private struct Response: Decodable {
         let ip: String
     }
 
-    func publicIPAddress() async -> String? {
+    func publicIPAddress() async -> PublicIPLookupResult {
         await address(from: URL(string: "https://api.ipify.org?format=json")!, family: AF_INET)
     }
 
-    func publicIPv6Address() async -> String? {
+    func publicIPv6Address() async -> PublicIPLookupResult {
         await address(from: URL(string: "https://api6.ipify.org?format=json")!, family: AF_INET6)
     }
 
-    private func address(from url: URL, family: Int32) async -> String? {
+    private func address(from url: URL, family: Int32) async -> PublicIPLookupResult {
         var request = URLRequest(url: url)
         request.timeoutInterval = 5
         do {
             let (data, response) = try await session.data(for: request)
-            guard (response as? HTTPURLResponse)?.statusCode == 200 else { return nil }
+            guard (response as? HTTPURLResponse)?.statusCode == 200 else {
+                return unsuccessful(family: family)
+            }
             let address = try JSONDecoder().decode(Response.self, from: data).ip
             var parsed = in6_addr()
-            guard !address.utf8.contains(0), inet_pton(family, address, &parsed) == 1 else { return nil }
-            return address
+            guard !address.utf8.contains(0), inet_pton(family, address, &parsed) == 1 else {
+                return unsuccessful(family: family)
+            }
+            return .address(address)
         } catch {
-            return nil
+            return unsuccessful(family: family)
         }
+    }
+
+    /// A timeout or a bad response is not proof the family is gone. Clear only when this
+    /// machine has no routable address of that family, which is what makes the lookup unable to succeed.
+    private func unsuccessful(family: Int32) -> PublicIPLookupResult {
+        hasRoutableAddress(family) ? .failed : .absent
     }
 }
 
@@ -1064,6 +1084,74 @@ enum SystemSampler {
             fallback = fallback ?? value
         }
         return fallback
+    }
+
+    static func hasRoutableAddress(family: Int32) -> Bool {
+        hasRoutableAddress(family: family, addresses: interfaceAddresses(family: family))
+    }
+
+    /// `nil` means the interface list could not be read. That is a probe failure, not proof the family is gone.
+    static func hasRoutableAddress(family: Int32, addresses: [String]?) -> Bool {
+        guard let addresses else { return true }
+        return addresses.contains { isRoutableInterfaceAddress($0, family: family) }
+    }
+
+    private static func interfaceAddresses(family: Int32) -> [String]? {
+        var ifaddrPointer: UnsafeMutablePointer<ifaddrs>?
+        guard getifaddrs(&ifaddrPointer) == 0, let first = ifaddrPointer else { return nil }
+        defer { freeifaddrs(ifaddrPointer) }
+
+        var addresses: [String] = []
+        var cursor: UnsafeMutablePointer<ifaddrs>? = first
+        while let current = cursor {
+            defer { cursor = current.pointee.ifa_next }
+            let flags = Int32(current.pointee.ifa_flags)
+            guard (flags & IFF_UP) != 0, (flags & IFF_LOOPBACK) == 0,
+                  let address = current.pointee.ifa_addr,
+                  address.pointee.sa_family == UInt8(family) else {
+                continue
+            }
+            var host = [CChar](repeating: 0, count: Int(NI_MAXHOST))
+            let result = getnameinfo(
+                address,
+                socklen_t(address.pointee.sa_len),
+                &host,
+                socklen_t(host.count),
+                nil,
+                0,
+                NI_NUMERICHOST
+            )
+            guard result == 0 else { continue }
+            addresses.append(String(
+                decoding: host.prefix { $0 != 0 }.map { UInt8(bitPattern: $0) },
+                as: UTF8.self
+            ))
+        }
+        return addresses
+    }
+
+    static func isRoutableInterfaceAddress(_ address: String, family: Int32) -> Bool {
+        switch family {
+        case AF_INET:
+            let octets = address.split(separator: ".").compactMap { UInt8($0) }
+            guard octets.count == 4 else { return false }
+            if octets[0] == 0 || octets[0] == 127 { return false }
+            if octets[0] == 169 && octets[1] == 254 { return false }
+            return true
+        case AF_INET6:
+            let host = address.split(separator: "%", maxSplits: 1).first.map(String.init) ?? address
+            var bytes = [UInt8](repeating: 0, count: 16)
+            let parsed = host.withCString { pointer in
+                bytes.withUnsafeMutableBytes { buffer in
+                    inet_pton(AF_INET6, pointer, buffer.baseAddress)
+                }
+            }
+            guard parsed == 1 else { return false }
+            let first = (UInt16(bytes[0]) << 8) | UInt16(bytes[1])
+            return first >= 0x2000 && first <= 0x3FFF
+        default:
+            return false
+        }
     }
 
     private static func primaryInterfaceName() -> String? {
@@ -3540,6 +3628,7 @@ public final class SystemMonitorService: ObservableObject {
     private var previousDisk: (read: UInt64, write: UInt64, at: Date)?
     private var networkIdentity = NetworkIdentity()
     private var lastPublicIPRefresh: Date?
+    private var publicIPRefreshGeneration: UInt = 0
     private var lastDiskCapacitySample: Date?
     private var needsDiskCapacityRefresh = false
     private var hardware = SystemHardwareInfo.unavailable
@@ -3700,20 +3789,43 @@ public final class SystemMonitorService: ObservableObject {
         )
         else { return }
 
+        // Overlapping refreshes both run. Only the one that started last may publish or clear the flag.
+        publicIPRefreshGeneration &+= 1
+        let generation = publicIPRefreshGeneration
         lastPublicIPRefresh = now
         isRefreshingPublicIPAddress = true
-        defer { isRefreshingPublicIPAddress = false }
+        defer {
+            if generation == publicIPRefreshGeneration {
+                isRefreshingPublicIPAddress = false
+            }
+        }
 
         async let ipv4 = publicIPProvider.publicIPAddress()
         async let ipv6 = publicIPProvider.publicIPv6Address()
         let addresses = await (ipv4, ipv6)
-        publicIPAddress = addresses.0
-        publicIPv6Address = addresses.1
-        networkIdentity.publicIPAddress = addresses.0
-        networkIdentity.publicIPv6Address = addresses.1
+        guard generation == publicIPRefreshGeneration else { return }
+
+        let ipv4Address = resolvedPublicAddress(addresses.0, current: publicIPAddress)
+        let ipv6Address = resolvedPublicAddress(addresses.1, current: publicIPv6Address)
+        publicIPAddress = ipv4Address
+        publicIPv6Address = ipv6Address
+        networkIdentity.publicIPAddress = ipv4Address
+        networkIdentity.publicIPv6Address = ipv6Address
         if var current = snapshot {
             current.networkIdentity = networkIdentity
             snapshot = current
+        }
+    }
+
+    /// Failed lookups keep the address already on screen. A completed lookup that found no address clears it.
+    private func resolvedPublicAddress(_ result: PublicIPLookupResult, current: String?) -> String? {
+        switch result {
+        case let .address(value):
+            return value
+        case .absent:
+            return nil
+        case .failed:
+            return current
         }
     }
 

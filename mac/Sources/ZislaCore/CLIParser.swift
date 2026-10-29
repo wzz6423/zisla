@@ -17,6 +17,7 @@ public enum CLIParseError: Error, Equatable, Sendable, CustomStringConvertible {
     case unknownSubcommand(String)
     case unexpectedArgument(String)
     case unknownOption(String)
+    case duplicateOption(String)
     case missingOption(String)
     case invalidValue(option: String, value: String)
     case progressOutOfRange(Double)
@@ -34,6 +35,8 @@ public enum CLIParseError: Error, Equatable, Sendable, CustomStringConvertible {
             return "不支持的位置参数 '\(value)'。"
         case let .unknownOption(option):
             return "当前子命令不支持参数 \(option)。"
+        case let .duplicateOption(option):
+            return "参数 \(option) 重复了。每个参数只能写一次。"
         case let .missingOption(option):
             return "缺少必填参数 \(option)。"
         case let .invalidValue(option, value):
@@ -90,7 +93,10 @@ public enum CLIParser {
         }
     }
 
-    /// Folds a `--key value` sequence into a dictionary; valueless flags (e.g. --failed) are stored as "".
+    /// `--failed` and `--queued` stay flags. Every other option consumes the next token, even when it starts with `--`.
+    private static let flagOptions: Set<String> = ["--failed", "--queued"]
+
+    /// Repeated options are rejected so a later copy cannot silently replace an earlier one.
     private static func parseOptions(
         _ tokens: [String],
         allowed: Set<String>
@@ -100,12 +106,39 @@ public enum CLIParser {
         while index < tokens.count {
             let token = tokens[index]
             guard token.hasPrefix("--") else { throw CLIParseError.unexpectedArgument(token) }
-            guard allowed.contains(token) else { throw CLIParseError.unknownOption(token) }
-            if index + 1 < tokens.count, !tokens[index + 1].hasPrefix("--") {
-                options[token] = tokens[index + 1]
+            let body = token.dropFirst(2)
+
+            let name: String
+            let inlineValue: String?
+            if let separator = body.firstIndex(of: "=") {
+                name = "--" + body[..<separator]
+                inlineValue = String(body[body.index(after: separator)...])
+            } else {
+                name = token
+                inlineValue = nil
+            }
+            guard allowed.contains(name) else { throw CLIParseError.unknownOption(name) }
+            guard options[name] == nil else { throw CLIParseError.duplicateOption(name) }
+
+            if flagOptions.contains(name) {
+                if let inlineValue {
+                    options[name] = inlineValue
+                    index += 1
+                } else if index + 1 < tokens.count, !tokens[index + 1].hasPrefix("--") {
+                    options[name] = tokens[index + 1]
+                    index += 2
+                } else {
+                    options[name] = ""
+                    index += 1
+                }
+            } else if let inlineValue {
+                options[name] = inlineValue
+                index += 1
+            } else if index + 1 < tokens.count {
+                options[name] = tokens[index + 1]
                 index += 2
             } else {
-                options[token] = ""
+                options[name] = ""
                 index += 1
             }
         }

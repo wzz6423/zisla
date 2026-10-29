@@ -1,5 +1,6 @@
 import Foundation
 import Testing
+import zstd
 
 @testable import ZislaCore
 @testable import ZislaKit
@@ -570,6 +571,144 @@ struct AIUsageLogDetectorTests {
     }
 
     @Test
+    func countsTokensInACompressedCodexRolloutAndKeepsThePlainFileIdentity() throws {
+        let root = temporaryDirectory(named: "usage-log-codex-zst")
+        defer { try? FileManager.default.removeItem(at: root) }
+        let codex = root.appendingPathComponent("codex", isDirectory: true)
+        let lines = [
+            codexTokenLine(timestamp: "2026-07-25T00:00:00.000Z", input: 100, output: 10),
+            codexTokenLine(timestamp: "2026-07-25T00:01:00.000Z", input: 180, output: 30),
+        ]
+        let compressed = codex.appendingPathComponent("2026/07/25/rollout-session.jsonl.zst")
+        try writeCompressedJSONL(lines, to: compressed)
+
+        let detector = codexUsageDetector(codex: codex, empty: root.appendingPathComponent("empty"), scanInterval: 0)
+        let compressedSamples = try detector.usageSamples()
+        #expect(compressedSamples.map(\.inputTokens) == [100, 80])
+        #expect(compressedSamples.map(\.outputTokens) == [10, 20])
+
+        try FileManager.default.removeItem(at: compressed)
+        try writeJSONL(lines, to: codex.appendingPathComponent("2026/07/25/rollout-session.jsonl"))
+        let plainSamples = try detector.usageSamples()
+        #expect(plainSamples.map(\.sourceID) == compressedSamples.map(\.sourceID))
+        #expect(plainSamples.map(\.inputTokens) == compressedSamples.map(\.inputTokens))
+    }
+
+    @Test
+    func prefersThePlainCodexRolloutWhenTheCompressedSiblingIsPresent() throws {
+        let root = temporaryDirectory(named: "usage-log-codex-zst-sibling")
+        defer { try? FileManager.default.removeItem(at: root) }
+        let codex = root.appendingPathComponent("codex", isDirectory: true)
+        let plain = codex.appendingPathComponent("2026/07/25/rollout-session.jsonl")
+        try writeJSONL([
+            codexTokenLine(timestamp: "2026-07-25T00:00:00.000Z", input: 100, output: 10),
+        ], to: plain)
+        try writeCompressedJSONL([
+            codexTokenLine(timestamp: "2026-07-25T00:02:00.000Z", input: 999, output: 99),
+        ], to: codex.appendingPathComponent("2026/07/25/rollout-session.jsonl.zst"))
+
+        let samples = try codexUsageDetector(codex: codex, empty: root.appendingPathComponent("empty")).usageSamples()
+        #expect(samples.map(\.inputTokens) == [100])
+        #expect(samples.map(\.outputTokens) == [10])
+    }
+
+    @Test
+    func corruptCompressedRolloutDoesNotFailTheRestOfTheScan() throws {
+        let root = temporaryDirectory(named: "usage-log-codex-zst-corrupt")
+        defer { try? FileManager.default.removeItem(at: root) }
+        let codex = root.appendingPathComponent("codex", isDirectory: true)
+        let broken = codex.appendingPathComponent("2026/07/25/rollout-broken.jsonl.zst")
+        try FileManager.default.createDirectory(at: broken.deletingLastPathComponent(), withIntermediateDirectories: true)
+        try Data([0x28, 0xB5, 0x2F, 0xFD, 0x00]).write(to: broken)
+        try writeJSONL([
+            codexTokenLine(timestamp: "2026-07-25T00:03:00.000Z", input: 40, output: 4),
+        ], to: codex.appendingPathComponent("2026/07/25/rollout-plain.jsonl"))
+
+        let samples = try codexUsageDetector(codex: codex, empty: root.appendingPathComponent("empty")).usageSamples()
+        #expect(samples.map(\.inputTokens) == [40])
+        #expect(samples.map(\.outputTokens) == [4])
+    }
+
+    @Test
+    func compressedLogsOutsideCodexAreNotUsage() throws {
+        let root = temporaryDirectory(named: "usage-log-claude-zst")
+        defer { try? FileManager.default.removeItem(at: root) }
+        let claude = root.appendingPathComponent("claude", isDirectory: true)
+        try writeCompressedJSONL([
+            #"{"type":"assistant","timestamp":"2026-07-26T00:01:00.000Z","message":{"id":"claude-zst","model":"claude-opus","usage":{"input_tokens":10,"output_tokens":5,"cache_creation_input_tokens":20,"cache_read_input_tokens":30}}}"#,
+        ], to: claude.appendingPathComponent("project/session.jsonl.zst"))
+
+        let samples = try AIUsageLogDetector(
+            codexSessionsDirectory: root.appendingPathComponent("empty-codex"),
+            claudeProjectsDirectory: claude,
+            geminiSessionsDirectory: root.appendingPathComponent("empty"),
+            grokSessionsDirectory: root.appendingPathComponent("empty"),
+            qwenProjectsDirectory: root.appendingPathComponent("empty"),
+            piSessionsDirectory: root.appendingPathComponent("empty"),
+            qoderRoots: [],
+            copilotUsageLogRoots: []
+        ).usageSamples()
+        #expect(samples.isEmpty)
+    }
+
+    @Test
+    func oversizedCompressedCodexLinesAreIgnored() throws {
+        let root = temporaryDirectory(named: "usage-log-codex-zst-oversize")
+        defer { try? FileManager.default.removeItem(at: root) }
+        let codex = root.appendingPathComponent("codex", isDirectory: true)
+        let padding = String(repeating: "x", count: 5_000)
+        let oversized = """
+        {"timestamp":"2026-07-25T00:00:00.000Z","type":"event_msg","pad":"\(padding)","payload":{"type":"token_count","info":{"total_token_usage":{"input_tokens":999,"output_tokens":99},"last_token_usage":{"input_tokens":999,"output_tokens":99}}}}
+        """
+        try writeCompressedJSONL([
+            oversized,
+            codexTokenLine(timestamp: "2026-07-25T00:04:00.000Z", input: 15, output: 3),
+        ], to: codex.appendingPathComponent("2026/07/25/rollout-oversize.jsonl.zst"))
+
+        let samples = try codexUsageDetector(
+            codex: codex,
+            empty: root.appendingPathComponent("empty"),
+            maxBytesPerFile: 4_096
+        ).usageSamples()
+        #expect(samples.map(\.inputTokens) == [15])
+        #expect(samples.map(\.outputTokens) == [3])
+    }
+
+    @Test
+    func compressedCodexRolloutWithoutATrailingNewlineStillCountsTheLastEvent() throws {
+        let root = temporaryDirectory(named: "usage-log-codex-zst-unterminated")
+        defer { try? FileManager.default.removeItem(at: root) }
+        let codex = root.appendingPathComponent("codex", isDirectory: true)
+        let url = codex.appendingPathComponent("2026/07/25/rollout-unterminated.jsonl.zst")
+        try FileManager.default.createDirectory(at: url.deletingLastPathComponent(), withIntermediateDirectories: true)
+        let plain = Data(codexTokenLine(timestamp: "2026-07-25T00:05:00.000Z", input: 40, output: 4).utf8)
+        try ZStd.compress(plain).write(to: url)
+
+        let samples = try codexUsageDetector(codex: codex, empty: root.appendingPathComponent("empty")).usageSamples()
+        #expect(samples.map(\.inputTokens) == [40])
+        #expect(samples.map(\.outputTokens) == [4])
+    }
+
+    @Test
+    func compressedCodexRolloutKeepsOnlyTheNewestSamplesWithinTheCap() throws {
+        let root = temporaryDirectory(named: "usage-log-codex-zst-cap")
+        defer { try? FileManager.default.removeItem(at: root) }
+        let codex = root.appendingPathComponent("codex", isDirectory: true)
+        try writeCompressedJSONL([
+            codexTokenLine(timestamp: "2026-07-25T00:00:00.000Z", input: 100, output: 10),
+            codexTokenLine(timestamp: "2026-07-25T00:01:00.000Z", input: 180, output: 30),
+        ], to: codex.appendingPathComponent("2026/07/25/rollout-capped.jsonl.zst"))
+
+        let samples = try codexUsageDetector(
+            codex: codex,
+            empty: root.appendingPathComponent("empty"),
+            maxSamplesPerFile: 1
+        ).usageSamples()
+        #expect(samples.map(\.inputTokens) == [80])
+        #expect(samples.map(\.outputTokens) == [20])
+    }
+
+    @Test
     func defaultScanCountsEveryCodexSessionInsteadOfOnlyTheFourMostRecent() throws {
         let root = temporaryDirectory(named: "usage-log-all-codex-sessions")
         defer { try? FileManager.default.removeItem(at: root) }
@@ -1126,6 +1265,40 @@ private final class CountingActivityDetector: AIActivityDetecting {
         lock.withLock { calls += 1 }
         return []
     }
+}
+
+private func codexTokenLine(timestamp: String, input: Int, output: Int) -> String {
+    """
+    {"timestamp":"\(timestamp)","type":"event_msg","payload":{"type":"token_count","info":{"total_token_usage":{"input_tokens":\(input),"output_tokens":\(output)},"last_token_usage":{"input_tokens":\(input),"output_tokens":\(output)}}}}
+    """
+}
+
+private func codexUsageDetector(
+    codex: URL,
+    empty: URL,
+    maxBytesPerFile: Int = .max,
+    maxSamplesPerFile: Int = .max,
+    scanInterval: TimeInterval = 60
+) -> AIUsageLogDetector {
+    AIUsageLogDetector(
+        codexSessionsDirectory: codex,
+        claudeProjectsDirectory: empty,
+        geminiSessionsDirectory: empty,
+        grokSessionsDirectory: empty,
+        qwenProjectsDirectory: empty,
+        piSessionsDirectory: empty,
+        qoderRoots: [],
+        copilotUsageLogRoots: [],
+        maxBytesPerFile: maxBytesPerFile,
+        maxSamplesPerFile: maxSamplesPerFile,
+        scanInterval: scanInterval
+    )
+}
+
+private func writeCompressedJSONL(_ lines: [String], to url: URL) throws {
+    try FileManager.default.createDirectory(at: url.deletingLastPathComponent(), withIntermediateDirectories: true)
+    let plain = Data((lines.joined(separator: "\n") + "\n").utf8)
+    try ZStd.compress(plain).write(to: url)
 }
 
 private func writeJSONL(_ lines: [String], to url: URL) throws {

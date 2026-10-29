@@ -1,6 +1,7 @@
 import Darwin
 import Foundation
 import ZislaCore
+import zstd
 
 /// Reads recorded token usage from the structured session logs of local AI tools.
 /// Only parses numeric usage fields; does not read or persist session content.
@@ -261,8 +262,22 @@ public final class AIUsageLogDetector: AIUsageDetecting {
         }.prefix(maxFilesPerProvider))
     }
 
+    private static func isCompressedJSONL(_ url: URL) -> Bool {
+        url.pathExtension == "zst" && url.deletingPathExtension().pathExtension == "jsonl"
+    }
+
     private func accepts(_ url: URL, for provider: AIProvider, explicitFile: Bool = false) -> Bool {
-        guard url.pathExtension == "jsonl" || url.pathExtension == "json" else { return false }
+        if Self.isCompressedJSONL(url) {
+            // Codex stores cold rollouts as rollout-*.jsonl.zst and prefers the plain
+            // sibling while both representations exist, so the compressed copy must not
+            // be counted a second time.
+            guard provider == .codex,
+                  !fileManager.fileExists(atPath: url.deletingPathExtension().path) else {
+                return false
+            }
+        } else {
+            guard url.pathExtension == "jsonl" || url.pathExtension == "json" else { return false }
+        }
         switch provider {
         case .grok:
             return url.lastPathComponent == "updates.jsonl"
@@ -286,6 +301,9 @@ public final class AIUsageLogDetector: AIUsageDetecting {
         for candidate: Candidate,
         cached: CachedSamples?
     ) -> CachedSamples {
+        if Self.isCompressedJSONL(candidate.url) {
+            return parseCompressedJSONL(candidate)
+        }
         if candidate.url.pathExtension == "jsonl" {
             return parseJSONL(candidate, cached: cached)
         }
@@ -301,6 +319,58 @@ public final class AIUsageLogDetector: AIUsageDetecting {
             contentHash: nil,
             edgeHash: nil
         )
+    }
+
+    private func parseCompressedJSONL(_ candidate: Candidate) -> CachedSamples {
+        guard let data = try? ZStd.decompress(src: candidate.url) else {
+            return CachedSamples(
+                modificationDate: candidate.modificationDate,
+                changeDate: candidate.changeDate,
+                size: candidate.size,
+                samples: [],
+                readerState: nil,
+                parserState: nil,
+                contentHash: nil,
+                edgeHash: nil
+            )
+        }
+
+        var parserState = ParserState()
+        var samples: [AIUsageSample] = []
+        for line in jsonlLines(in: data) where line.count <= maxBytesPerFile {
+            guard let root = try? JSONSerialization.jsonObject(with: line) as? [String: Any] else {
+                continue
+            }
+            samples.append(contentsOf: parseRoot(
+                from: root,
+                candidate: candidate,
+                parserState: &parserState
+            ))
+        }
+
+        return CachedSamples(
+            modificationDate: candidate.modificationDate,
+            changeDate: candidate.changeDate,
+            size: candidate.size,
+            samples: Array(samples.suffix(maxSamplesPerFile)),
+            readerState: nil,
+            parserState: nil,
+            contentHash: nil,
+            edgeHash: nil
+        )
+    }
+
+    private func jsonlLines(in data: Data) -> [Data] {
+        var lines: [Data] = []
+        var start = data.startIndex
+        for index in data.indices where data[index] == 0x0A {
+            lines.append(Data(data[start..<index]))
+            start = data.index(after: index)
+        }
+        if start < data.endIndex {
+            lines.append(Data(data[start..<data.endIndex]))
+        }
+        return lines
     }
 
     private func parse(_ candidate: Candidate) -> [AIUsageSample] {
@@ -835,7 +905,15 @@ public final class AIUsageLogDetector: AIUsageDetecting {
     }
 
     private func sourceID(_ candidate: Candidate, component: String) -> String {
-        "\(candidate.provider.rawValue)-\(stableDigest(candidate.url.standardizedFileURL.path))-\(component)"
+        "\(candidate.provider.rawValue)-\(stableDigest(identityPath(for: candidate)))-\(component)"
+    }
+
+    /// Codex replaces `rollout-*.jsonl` with `rollout-*.jsonl.zst` in place. Identity stays on the
+    /// plain path so the same events are not recorded again after compression.
+    private func identityPath(for candidate: Candidate) -> String {
+        let url = candidate.url.standardizedFileURL
+        guard Self.isCompressedJSONL(url) else { return url.path }
+        return url.deletingPathExtension().path
     }
 
     private func codexEventSourceID(candidate: Candidate, root: [String: Any]) -> String {

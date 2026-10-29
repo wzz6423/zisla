@@ -1295,6 +1295,108 @@ struct CLIParserTests {
             #expect(error == .missingOption("--content"))
         }
     }
+
+    @Test
+    func optionValuesMayStartWithDashes() throws {
+        let spaced = try CLIParser.parse(arguments: [
+            "notify", "--title", "x", "--detail", "--oops",
+        ])
+        guard case let .notify(spacedNotice) = spaced else {
+            Issue.record("Expected notify")
+            return
+        }
+        #expect(spacedNotice.title == "x")
+        #expect(spacedNotice.detail == "--oops")
+
+        let attached = try CLIParser.parse(arguments: [
+            "notify", "--title=x", "--detail=--oops",
+        ])
+        guard case let .notify(attachedNotice) = attached else {
+            Issue.record("Expected notify")
+            return
+        }
+        #expect(attachedNotice.title == "x")
+        #expect(attachedNotice.detail == "--oops")
+    }
+
+    @Test
+    func equalsFormRoundTripsSeededOptionValues() throws {
+        var state: UInt64 = 0xC0FFEE
+        for index in 0..<24 {
+            state = state &* 6_364_136_223_846_793_005 &+ 1
+            var value = "v\(index)-\(state & 0xFFFF)"
+            if index.isMultiple(of: 3) { value = "--\(value)" }
+            if index.isMultiple(of: 5) { value += "=tail" }
+            let command = try CLIParser.parse(arguments: [
+                "notify", "--title=t", "--detail=\(value)",
+            ])
+            guard case let .notify(notice) = command else {
+                Issue.record("Expected notify")
+                return
+            }
+            #expect(notice.detail == value)
+        }
+    }
+
+    @Test
+    func repeatedOptionsAreRejected() {
+        #expect(throws: CLIParseError.duplicateOption("--title")) {
+            try CLIParser.parse(arguments: [
+                "notify", "--title", "first", "--title", "second",
+            ])
+        }
+        #expect(throws: CLIParseError.duplicateOption("--detail")) {
+            try CLIParser.parse(arguments: [
+                "notify", "--title=x", "--detail=one", "--detail=two",
+            ])
+        }
+    }
+
+    @Test
+    func flagsDoNotConsumeTheFollowingOption() throws {
+        let finished = try CLIParser.parse(arguments: [
+            "finish", "--failed", "--id", "job", "--detail", "done",
+        ])
+        guard case let .finish(id, failed, detail) = finished else {
+            Issue.record("Expected finish")
+            return
+        }
+        #expect(id == "job")
+        #expect(failed)
+        #expect(detail == "done")
+
+        let disabled = try CLIParser.parse(arguments: ["finish", "--id=job", "--failed=false"])
+        guard case let .finish(_, failedIsFalse, _) = disabled else {
+            Issue.record("Expected finish")
+            return
+        }
+        #expect(!failedIsFalse)
+
+        let explicitFalse = try CLIParser.parse(arguments: ["finish", "--id", "job", "--failed", "false"])
+        guard case let .finish(_, spacedFalse, _) = explicitFalse else {
+            Issue.record("Expected finish")
+            return
+        }
+        #expect(!spacedFalse)
+
+        let queued = try CLIParser.parse(arguments: [
+            "update", "--id", "job", "--provider", "codex", "--title", "Task",
+            "--queued", "--detail", "waiting",
+        ])
+        guard case let .update(task) = queued else {
+            Issue.record("Expected update")
+            return
+        }
+        #expect(task.status == .queued)
+        #expect(task.detail == "waiting")
+    }
+
+    @Test
+    func equalsFormReportsTheOptionNameWhenItIsUnknown() {
+        #expect(throws: CLIParseError.unknownOption("--faield")) {
+            try CLIParser.parse(arguments: ["finish", "--id=job", "--faield=true"])
+        }
+    }
 }
 
 

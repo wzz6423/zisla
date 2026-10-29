@@ -191,8 +191,12 @@ private struct StubPublicIPProvider: PublicIPProviding {
     let address: String?
     var ipv6Address: String? = nil
 
-    func publicIPAddress() async -> String? { address }
-    func publicIPv6Address() async -> String? { ipv6Address }
+    func publicIPAddress() async -> PublicIPLookupResult { lookup(address) }
+    func publicIPv6Address() async -> PublicIPLookupResult { lookup(ipv6Address) }
+
+    private func lookup(_ value: String?) -> PublicIPLookupResult {
+        value.map(PublicIPLookupResult.address) ?? .absent
+    }
 }
 
 /// Countable public-IP stub that returns addresses in order; tests drive it serially on MainActor, so no lock is needed.
@@ -206,20 +210,119 @@ private final class CountingPublicIPProvider: PublicIPProviding, @unchecked Send
         self.ipv6Addresses = ipv6Addresses
     }
 
-    func publicIPAddress() async -> String? {
+    func publicIPAddress() async -> PublicIPLookupResult {
         callCount += 1
-        if addresses.isEmpty {
-            return nil
-        }
-        if addresses.count == 1 {
-            return addresses[0]
-        }
-        return addresses.removeFirst()
+        return lookup(&addresses)
     }
 
-    func publicIPv6Address() async -> String? {
-        if ipv6Addresses.count == 1 { return ipv6Addresses[0] }
-        return ipv6Addresses.removeFirst()
+    func publicIPv6Address() async -> PublicIPLookupResult {
+        lookup(&ipv6Addresses)
+    }
+
+    private func lookup(_ values: inout [String?]) -> PublicIPLookupResult {
+        let value: String?
+        if values.isEmpty {
+            value = nil
+        } else if values.count == 1 {
+            value = values[0]
+        } else {
+            value = values.removeFirst()
+        }
+        return value.map(PublicIPLookupResult.address) ?? .absent
+    }
+}
+
+/// Returns scripted lookup results. A nil script entry is not used; pass `.absent` or `.failed` explicitly.
+private final class ScriptedPublicIPProvider: PublicIPProviding, @unchecked Sendable {
+    private var ipv4: [PublicIPLookupResult]
+    private var ipv6: [PublicIPLookupResult]
+
+    init(ipv4: [PublicIPLookupResult], ipv6: [PublicIPLookupResult]) {
+        self.ipv4 = ipv4
+        self.ipv6 = ipv6
+    }
+
+    func publicIPAddress() async -> PublicIPLookupResult {
+        ipv4.count == 1 ? ipv4[0] : ipv4.removeFirst()
+    }
+
+    func publicIPv6Address() async -> PublicIPLookupResult {
+        ipv6.count == 1 ? ipv6[0] : ipv6.removeFirst()
+    }
+}
+
+/// Blocks each IPv4 lookup until `release` so overlapping refreshes can finish out of order.
+private final class GatedPublicIPProvider: PublicIPProviding, @unchecked Sendable {
+    private let lock = NSLock()
+    private let addresses: [PublicIPLookupResult]
+    private var startCount = 0
+    private var pending: [Int: CheckedContinuation<PublicIPLookupResult, Never>] = [:]
+    private var released: Set<Int> = []
+    private var waiters: [CheckedContinuation<Void, Never>] = []
+
+    init(addresses: [PublicIPLookupResult]) {
+        self.addresses = addresses
+    }
+
+    func publicIPAddress() async -> PublicIPLookupResult {
+        let index: Int = lock.withLock {
+            let index = startCount
+            startCount += 1
+            return index
+        }
+        let waiters: [CheckedContinuation<Void, Never>] = lock.withLock {
+            let current = self.waiters
+            self.waiters.removeAll()
+            return current
+        }
+        waiters.forEach { $0.resume() }
+
+        let result = addresses.indices.contains(index) ? addresses[index] : .failed
+        return await withCheckedContinuation { continuation in
+            let alreadyReleased = lock.withLock { () -> Bool in
+                if released.contains(index) { return true }
+                pending[index] = continuation
+                return false
+            }
+            if alreadyReleased {
+                continuation.resume(returning: result)
+            }
+        }
+    }
+
+    func publicIPv6Address() async -> PublicIPLookupResult { .absent }
+
+    func waitUntilStarted(_ count: Int) async {
+        while true {
+            if lock.withLock({ startCount >= count }) { return }
+            await withCheckedContinuation { (continuation: CheckedContinuation<Void, Never>) in
+                let already = lock.withLock { () -> Bool in
+                    if startCount >= count { return true }
+                    waiters.append(continuation)
+                    return false
+                }
+                if already { continuation.resume() }
+            }
+        }
+    }
+
+    func release(_ index: Int) {
+        let continuation: CheckedContinuation<PublicIPLookupResult, Never>? = lock.withLock {
+            released.insert(index)
+            return pending.removeValue(forKey: index)
+        }
+        let result = addresses.indices.contains(index) ? addresses[index] : .failed
+        continuation?.resume(returning: result)
+    }
+
+    func releaseAll() {
+        let continuations: [CheckedContinuation<PublicIPLookupResult, Never>] = lock.withLock {
+            let current = Array(pending.values)
+            pending.removeAll()
+            released.formUnion(addresses.indices)
+            return current
+        }
+        continuations.forEach { $0.resume(returning: .failed) }
     }
 }
 
@@ -2286,6 +2389,93 @@ struct SystemMonitorServiceTests {
             #expect(current.cpu == initial.cpu && current.network == initial.network)
             #expect(!service.isRefreshingPublicIPAddress)
         }
+    }
+
+    @Test
+    func publicIPRefreshKeepsKnownAddressesWhenALookupFails() async throws {
+        let provider = ScriptedPublicIPProvider(
+            ipv4: [.address("203.0.113.8"), .failed, .address("203.0.113.9")],
+            ipv6: [.address("2001:db8::8"), .absent, .failed]
+        )
+        let service = SystemMonitorService(
+            fileManager: MockFileManager(), publicIPProvider: provider,
+            hardwareInfoProvider: { .unavailable }
+        )
+        await service.refreshPublicIPAddress()
+        let initial = await service.sampleOnce()
+        #expect(initial.networkIdentity.publicIPAddress == "203.0.113.8")
+        #expect(initial.networkIdentity.publicIPv6Address == "2001:db8::8")
+
+        await service.refreshPublicIPAddress()
+        let cleared = try #require(service.snapshot)
+        #expect(cleared.networkIdentity.publicIPAddress == "203.0.113.8")
+        #expect(cleared.networkIdentity.publicIPv6Address == nil)
+        #expect(service.publicIPAddress == "203.0.113.8")
+        #expect(service.publicIPv6Address == nil)
+        #expect(cleared.cpu == initial.cpu && cleared.network == initial.network)
+
+        await service.refreshPublicIPAddress()
+        #expect(service.publicIPAddress == "203.0.113.9")
+        #expect(service.publicIPv6Address == nil)
+        #expect(service.snapshot?.networkIdentity.publicIPv6Address == nil)
+        #expect(!service.isRefreshingPublicIPAddress)
+    }
+
+    @Test
+    func publicIPRefreshPublishesOnlyTheNewestOverlappingResult() async {
+        let provider = GatedPublicIPProvider(addresses: [
+            .address("198.51.100.1"),
+            .address("198.51.100.2"),
+        ])
+        defer { provider.releaseAll() }
+        let service = SystemMonitorService(
+            fileManager: MockFileManager(), publicIPProvider: provider,
+            hardwareInfoProvider: { .unavailable }
+        )
+
+        let older = Task { await service.refreshPublicIPAddress() }
+        await provider.waitUntilStarted(1)
+        let newer = Task { await service.refreshPublicIPAddress() }
+        await provider.waitUntilStarted(2)
+
+        provider.release(1)
+        await newer.value
+        #expect(service.publicIPAddress == "198.51.100.2")
+        #expect(!service.isRefreshingPublicIPAddress)
+
+        provider.release(0)
+        await older.value
+        #expect(service.publicIPAddress == "198.51.100.2")
+        #expect(service.publicIPv6Address == nil)
+        #expect(!service.isRefreshingPublicIPAddress)
+    }
+
+    @Test
+    func publicIPRefreshStaysMarkedRefreshingUntilTheNewestRequestFinishes() async {
+        let provider = GatedPublicIPProvider(addresses: [
+            .address("198.51.100.1"),
+            .address("198.51.100.2"),
+        ])
+        defer { provider.releaseAll() }
+        let service = SystemMonitorService(
+            fileManager: MockFileManager(), publicIPProvider: provider,
+            hardwareInfoProvider: { .unavailable }
+        )
+
+        let older = Task { await service.refreshPublicIPAddress() }
+        await provider.waitUntilStarted(1)
+        let newer = Task { await service.refreshPublicIPAddress() }
+        await provider.waitUntilStarted(2)
+
+        provider.release(0)
+        await older.value
+        #expect(service.publicIPAddress == nil)
+        #expect(service.isRefreshingPublicIPAddress)
+
+        provider.release(1)
+        await newer.value
+        #expect(service.publicIPAddress == "198.51.100.2")
+        #expect(!service.isRefreshingPublicIPAddress)
     }
 
     /// Poll until the condition holds or times out; used to wait for the public-IP task scheduled by sampleOnce.
