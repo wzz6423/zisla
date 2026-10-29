@@ -167,13 +167,13 @@ struct ContextNoteQuickActionTests {
         var reminder = ordinary
         reminder.contextNoteAddedAt = Date(timeIntervalSince1970: 123_456)
         let ordinaryWidth = ClipboardAssistantController.trailingControlsWidth(
-            for: ordinary, isLightweightMode: false, shortcutHint: nil)
+            for: ordinary, isLightweightMode: false, shortcutHint: nil, locale: Locale(identifier: "en"))
         let reminderWidth = ClipboardAssistantController.trailingControlsWidth(
-            for: reminder, isLightweightMode: false, shortcutHint: nil)
+            for: reminder, isLightweightMode: false, shortcutHint: nil, locale: Locale(identifier: "en"))
         #expect(reminderWidth > 22)
         #expect(reminderWidth < ordinaryWidth)
         #expect(ClipboardAssistantController.trailingControlsWidth(
-            for: reminder, isLightweightMode: true, shortcutHint: nil) == reminderWidth)
+            for: reminder, isLightweightMode: true, shortcutHint: nil, locale: Locale(identifier: "en")) == reminderWidth)
     }
 
     @Test
