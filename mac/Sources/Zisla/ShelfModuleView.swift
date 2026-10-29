@@ -133,7 +133,8 @@ struct ShelfModuleView: View {
 
                 Group {
                     if noteEditor.isPresented, let draft = noteEditor.draft {
-                        ContextNoteDetailView(draft: draft, onCopy: { model.copyContextNoteText(draft.text) },
+                        ContextNoteDetailView(draft: draft, canSetReminder: noteEditor.itemID != nil,
+                                              onCopy: { model.copyContextNoteText(draft.text) },
                                               onNavigate: { model.navigateToContextNote(draft.location) },
                                               onSave: { model.saveShelfContextNote() },
                                               onClose: { noteEditor.close() },

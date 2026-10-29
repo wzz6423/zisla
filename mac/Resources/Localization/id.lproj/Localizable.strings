@@ -2812,3 +2812,15 @@
 "复制截图" = "Salin tangkapan layar";
 "截图失败：%@" = "Gagal mengambil tangkapan layar: %@";
 "无法读取便签关联的应用窗口" = "Tidak dapat membaca jendela aplikasi yang terkait dengan catatan ini";
+
+"主动提醒" = "Pengingat berkala";
+"不主动提醒" = "Tanpa pengingat berkala";
+"每 1 小时" = "Setiap 1 jam";
+"每 1.5 小时" = "Setiap 1,5 jam";
+"每 3 小时" = "Setiap 3 jam";
+"每 6 小时" = "Setiap 6 jam";
+"每 12 小时" = "Setiap 12 jam";
+"每 1 天" = "Setiap 1 hari";
+"每 2 天" = "Setiap 2 hari";
+"每 3 天" = "Setiap 3 hari";
+"添加时间" = "Ditambahkan pada";

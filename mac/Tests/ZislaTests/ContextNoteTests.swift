@@ -127,6 +127,261 @@ struct ContextNoteTests {
         #expect(fixture.presented == 1)
     }
 
+    @Test(arguments: ContextNoteReminderInterval.allCases.filter { $0 != .off })
+    func periodicRemindersFireAtEveryIntervalAwayFromTheRecordedLocation(interval: ContextNoteReminderInterval) throws {
+        let fixture = try Fixture()
+        defer { fixture.close() }
+        let date = Date(timeIntervalSince1970: 10_000)
+        let note = try #require(fixture.shelf.addContextNote("remember", location: fixture.location))
+        #expect(fixture.shelf.updateContextNote(id: note.id, text: "remember", reminderInterval: interval, at: date) != nil)
+        fixture.observation = .unavailable
+        let deadline = date.addingTimeInterval(interval.duration)
+        let point = CGPoint(x: 20, y: 40)
+        fixture.controller.checkForReturn(at: point, now: deadline.addingTimeInterval(-1))
+        #expect(fixture.reminders.isEmpty)
+        fixture.controller.checkForReturn(at: point, now: deadline)
+        #expect(fixture.reminders == [note.id])
+        #expect(fixture.reminderPoints == [point])
+        fixture.controller.checkForReturn(at: point, now: deadline.addingTimeInterval(1))
+        #expect(fixture.reminders == [note.id])
+        fixture.controller.checkForReturn(at: point, now: deadline.addingTimeInterval(interval.duration))
+        #expect(fixture.reminders == [note.id, note.id])
+        let restored = FileShelfStore(storageURL: fixture.directory.appendingPathComponent("shelf.json"))
+        #expect(restored.items.first?.nextNoteReminderAt == deadline.addingTimeInterval(interval.duration * 2))
+    }
+
+    @Test
+    func overdueNotesTakeTurnsAndResumeWithoutACatchUpBurst() throws {
+        let fixture = try Fixture()
+        defer { fixture.close() }
+        let date = Date(timeIntervalSince1970: 10_000)
+        let first = try #require(fixture.shelf.addContextNote("first", location: fixture.location))
+        let second = try #require(fixture.shelf.addContextNote("second", location: fixture.location))
+        #expect(fixture.shelf.updateContextNote(id: first.id, text: "first", reminderInterval: .oneHour, at: date) != nil)
+        #expect(fixture.shelf.updateContextNote(id: second.id, text: "second", reminderInterval: .oneHour, at: date.addingTimeInterval(1)) != nil)
+        fixture.observation = .unavailable
+        let resumedAt = date.addingTimeInterval(10 * 86_400)
+        fixture.controller.checkForReturn(at: .zero, now: resumedAt)
+        #expect(fixture.reminders == [first.id])
+        fixture.controller.checkForReturn(at: .zero, now: resumedAt)
+        #expect(fixture.reminders == [first.id, second.id])
+        fixture.controller.checkForReturn(at: .zero, now: resumedAt.addingTimeInterval(1))
+        #expect(fixture.reminders == [first.id, second.id])
+        #expect(fixture.shelf.items.allSatisfy { $0.nextNoteReminderAt == resumedAt.addingTimeInterval(3_600) })
+    }
+
+    @Test
+    func earliestDueReminderWinsEvenWhenItWasAddedLast() throws {
+        let fixture = try Fixture()
+        defer { fixture.close() }
+        let date = Date(timeIntervalSince1970: 10_000)
+        let first = try #require(fixture.shelf.addContextNote("first", location: fixture.location))
+        let second = try #require(fixture.shelf.addContextNote("second", location: fixture.location))
+        #expect(fixture.shelf.updateContextNote(id: first.id, text: "first", reminderInterval: .threeHours, at: date) != nil)
+        #expect(fixture.shelf.updateContextNote(id: second.id, text: "second", reminderInterval: .oneHour, at: date) != nil)
+        fixture.observation = .unavailable
+        fixture.controller.checkForReturn(at: .zero, now: date.addingTimeInterval(20_000))
+        #expect(fixture.reminders == [second.id])
+    }
+
+    @Test
+    func rejectedPresentationLeavesTheReminderDueUntilItCanBeShown() throws {
+        let fixture = try Fixture()
+        defer { fixture.close() }
+        let date = Date(timeIntervalSince1970: 10_000)
+        let note = try #require(fixture.shelf.addContextNote("remember", location: fixture.location))
+        let enabled = try #require(fixture.shelf.updateContextNote(id: note.id, text: "remember", reminderInterval: .oneHour, at: date))
+        fixture.observation = .unavailable
+        fixture.acceptsReminder = false
+        let deadline = date.addingTimeInterval(3_600)
+        fixture.controller.checkForReturn(at: .zero, now: deadline)
+        #expect(fixture.reminders.isEmpty)
+        #expect(fixture.shelf.items == [enabled])
+        fixture.acceptsReminder = true
+        fixture.controller.checkForReturn(at: .zero, now: deadline.addingTimeInterval(5))
+        #expect(fixture.reminders == [note.id])
+        #expect(fixture.shelf.items.first?.nextNoteReminderAt == deadline.addingTimeInterval(3_605))
+    }
+
+    @Test(arguments: ["lock", "screenshot", "systemScreenshot", "busy", "draft", "stop", "disabled", "parentDisabled"])
+    func periodicRemindersRespectSuspensionAndFeatureState(state: String) throws {
+        let fixture = try Fixture(enabled: state != "disabled", parentEnabled: state != "parentDisabled")
+        defer { fixture.close() }
+        let date = Date(timeIntervalSince1970: 10_000)
+        let note = try #require(fixture.shelf.addContextNote("remember", location: fixture.location))
+        #expect(fixture.shelf.updateContextNote(id: note.id, text: "remember", reminderInterval: .oneHour, at: date) != nil)
+        if state == "draft" { fixture.shake() }
+        fixture.observation = .unavailable
+        switch state {
+        case "lock": fixture.controller.setScreenLocked(true)
+        case "screenshot": fixture.controller.setScreenshotActive(true)
+        case "systemScreenshot": fixture.controller.setSystemScreenshotActive(true)
+        case "busy": fixture.busy = true
+        case "stop": fixture.controller.stop()
+        default: break
+        }
+        let deadline = date.addingTimeInterval(3_600)
+        fixture.controller.checkForReturn(at: .zero, now: deadline)
+        #expect(fixture.reminders.isEmpty)
+        #expect(fixture.shelf.items.first?.nextNoteReminderAt == deadline)
+        switch state {
+        case "lock": fixture.controller.setScreenLocked(false)
+        case "screenshot": fixture.controller.setScreenshotActive(false)
+        case "systemScreenshot": fixture.controller.setSystemScreenshotActive(false)
+        case "busy": fixture.busy = false
+        case "draft": fixture.controller.discard()
+        default: return
+        }
+        fixture.controller.checkForReturn(at: .zero, now: deadline.addingTimeInterval(1))
+        #expect(fixture.reminders == [note.id])
+    }
+
+    @Test
+    func periodicReminderDoesNotImmediatelyRepeatAsALocationReminder() throws {
+        let fixture = try Fixture()
+        defer { fixture.close() }
+        let date = Date(timeIntervalSince1970: 10_000)
+        let note = try #require(fixture.shelf.addContextNote("remember", location: fixture.location))
+        #expect(fixture.shelf.updateContextNote(id: note.id, text: "remember", reminderInterval: .oneHour, at: date) != nil)
+        fixture.controller.checkForReturn(at: .zero, now: date.addingTimeInterval(3_600))
+        fixture.controller.checkForReturn(at: .zero, now: date.addingTimeInterval(3_601))
+        #expect(fixture.reminders == [note.id])
+    }
+
+    @Test
+    func failedDeadlineWriteDoesNotRepeatEveryTickAndRecoversNextInterval() throws {
+        let fixture = try Fixture()
+        defer { fixture.close() }
+        let date = Date(timeIntervalSince1970: 10_000)
+        let note = try #require(fixture.shelf.addContextNote("remember", location: fixture.location))
+        let enabled = try #require(fixture.shelf.updateContextNote(id: note.id, text: "remember", reminderInterval: .oneHour, at: date))
+        fixture.observation = .unavailable
+        let index = fixture.directory.appendingPathComponent("shelf.json")
+        let backup = fixture.directory.appendingPathComponent("backup.json")
+        try FileManager.default.moveItem(at: index, to: backup)
+        try FileManager.default.createDirectory(at: index, withIntermediateDirectories: false)
+        let deadline = date.addingTimeInterval(3_600)
+        fixture.controller.checkForReturn(at: .zero, now: deadline)
+        #expect(fixture.reminders == [note.id])
+        #expect(fixture.shelf.items == [enabled])
+        #expect(fixture.shelf.errorDescription != nil)
+        fixture.controller.checkForReturn(at: .zero, now: deadline.addingTimeInterval(1))
+        #expect(fixture.reminders == [note.id])
+        try FileManager.default.removeItem(at: index)
+        try FileManager.default.moveItem(at: backup, to: index)
+        #expect(FileShelfStore(storageURL: index).items == [enabled])
+        fixture.controller.checkForReturn(at: .zero, now: deadline.addingTimeInterval(3_600))
+        #expect(fixture.reminders == [note.id, note.id])
+        #expect(fixture.shelf.errorDescription == nil)
+        #expect(FileShelfStore(storageURL: index).items.first?.nextNoteReminderAt == date.addingTimeInterval(10_800))
+    }
+
+    @Test
+    func changingAnIntervalAfterAFailedWriteUsesTheNewSavedDeadline() throws {
+        let fixture = try Fixture()
+        defer { fixture.close() }
+        let date = Date(timeIntervalSince1970: 10_000)
+        let note = try #require(fixture.shelf.addContextNote("remember", location: fixture.location))
+        #expect(fixture.shelf.updateContextNote(id: note.id, text: "remember", reminderInterval: .threeHours, at: date) != nil)
+        fixture.observation = .unavailable
+        let index = fixture.directory.appendingPathComponent("shelf.json")
+        try FileManager.default.removeItem(at: index)
+        try FileManager.default.createDirectory(at: index, withIntermediateDirectories: false)
+        let deadline = date.addingTimeInterval(10_800)
+        fixture.controller.checkForReturn(at: .zero, now: deadline)
+        #expect(fixture.reminders == [note.id])
+        try FileManager.default.removeItem(at: index)
+        #expect(fixture.shelf.updateContextNote(id: note.id, text: "remember", reminderInterval: .oneHour, at: deadline) != nil)
+        fixture.controller.checkForReturn(at: .zero, now: deadline.addingTimeInterval(3_600))
+        #expect(fixture.reminders == [note.id, note.id])
+    }
+
+    @Test(arguments: [false, true])
+    func removingOrDisablingTheNoteStopsItsPeriodicReminder(remove: Bool) throws {
+        let fixture = try Fixture()
+        defer { fixture.close() }
+        let date = Date(timeIntervalSince1970: 10_000)
+        let note = try #require(fixture.shelf.addContextNote("remember", location: fixture.location))
+        #expect(fixture.shelf.updateContextNote(id: note.id, text: "remember", reminderInterval: .oneHour, at: date) != nil)
+        fixture.observation = .unavailable
+        if remove { fixture.shelf.remove(id: note.id) }
+        else { #expect(fixture.shelf.updateContextNote(id: note.id, text: "remember", reminderInterval: .off) != nil) }
+        fixture.controller.checkForReturn(at: .zero, now: date.addingTimeInterval(100_000))
+        #expect(fixture.reminders.isEmpty)
+    }
+
+    @Test(arguments: ["unsupported", "off", "ordinary", "missingDeadline"])
+    func invalidStoredSchedulesNeverBecomePeriodicReminders(failure: String) throws {
+        let fixture = try Fixture()
+        defer { fixture.close() }
+        let date = Date(timeIntervalSince1970: 10_000)
+        let note = try #require(fixture.shelf.addContextNote("remember", location: fixture.location))
+        #expect(fixture.shelf.updateContextNote(id: note.id, text: "remember", reminderInterval: .oneHour, at: date) != nil)
+        let other = try #require(fixture.shelf.addContextNote("other", location: fixture.location))
+        let index = fixture.directory.appendingPathComponent("shelf.json")
+        var records = try #require(JSONSerialization.jsonObject(with: Data(contentsOf: index)) as? [[String: Any]])
+        switch failure {
+        case "unsupported": records[0]["noteReminderInterval"] = 61
+        case "off": records[0]["noteReminderInterval"] = 0
+        case "ordinary": records[0].removeValue(forKey: "noteLocation")
+        default: records[0].removeValue(forKey: "nextNoteReminderAt")
+        }
+        try JSONSerialization.data(withJSONObject: records).write(to: index)
+        let restored = FileShelfStore(storageURL: index)
+        var reminders: [UUID] = []
+        let controller = ContextNoteController(settingsStore: fixture.settings,
+            languageStore: AppLanguageStore(defaults: fixture.defaults), shelf: restored,
+            currentLocation: { _, _ in .unavailable }, canInteract: { true },
+            onReminder: { item, _ in reminders.append(item.id); return true },
+            onCaptureFailure: { _ in }, onSaved: { _, _, _ in })
+        defer { controller.stop() }
+        controller.checkForReturn(at: .zero, now: date.addingTimeInterval(100_000))
+        #expect(reminders.isEmpty)
+        #expect(restored.items.count == 2)
+        #expect(restored.items.last == other)
+        #expect(try String(contentsOf: restored.items[0].url, encoding: .utf8) == "remember")
+    }
+
+    @Test
+    func failedReminderStateIsReleasedAfterDeletionRecoveryAndStop() throws {
+        let fixture = try Fixture()
+        defer { fixture.close() }
+        let date = Date(timeIntervalSince1970: 10_000)
+        let first = try #require(fixture.shelf.addContextNote("first", location: fixture.location))
+        let second = try #require(fixture.shelf.addContextNote("second", location: fixture.location))
+        for note in [first, second] {
+            #expect(fixture.shelf.updateContextNote(id: note.id, text: note.text!, reminderInterval: .oneHour, at: date) != nil)
+        }
+        fixture.observation = .unavailable
+        let index = fixture.directory.appendingPathComponent("shelf.json")
+        try FileManager.default.removeItem(at: index)
+        try FileManager.default.createDirectory(at: index, withIntermediateDirectories: false)
+        let deadline = date.addingTimeInterval(3_600)
+        fixture.controller.checkForReturn(at: .zero, now: deadline)
+        fixture.controller.checkForReturn(at: .zero, now: deadline)
+        #expect(fixture.reminders == [first.id, second.id])
+        func retainedFailureCount() throws -> Int {
+            let state = try #require(Mirror(reflecting: fixture.controller!).children.first {
+                $0.label == "failedReminderSchedules"
+            }?.value)
+            return Mirror(reflecting: state).children.count
+        }
+        #expect(try retainedFailureCount() == 2)
+        try FileManager.default.removeItem(at: index)
+        fixture.shelf.remove(id: first.id)
+        fixture.controller.checkForReturn(at: .zero, now: deadline.addingTimeInterval(1))
+        #expect(try retainedFailureCount() == 1)
+        fixture.controller.checkForReturn(at: .zero, now: deadline.addingTimeInterval(3_600))
+        #expect(fixture.reminders == [first.id, second.id, second.id])
+        #expect(try retainedFailureCount() == 0)
+        try FileManager.default.removeItem(at: index)
+        try FileManager.default.createDirectory(at: index, withIntermediateDirectories: false)
+        fixture.controller.checkForReturn(at: .zero, now: deadline.addingTimeInterval(7_200))
+        #expect(try retainedFailureCount() == 1)
+        fixture.controller.stop()
+        #expect(try retainedFailureCount() == 0)
+    }
+
     @Test
     func naturalShakeThroughPointerThrottlePresentsAnEditableDraft() throws {
         let fixture = try Fixture()
@@ -905,7 +1160,7 @@ struct ContextNoteLocalizationTests {
         let reusedKeys: Set<String> = ["复制", "关闭", "保存", "截图"]
         let indirectKeys: Set<String> = ["摇动鼠标记便签", "按住快捷键并左右摇动鼠标，在当前位置记录，返回时提醒", "便签快捷键", "默认按住 Command；可录制修饰键或组合键", "需要辅助功能权限来识别窗口和网页", "无法识别当前位置，请检查辅助功能权限", "查看便签", "前往记录位置", "无法前往记录位置，窗口或显示器可能已关闭", "记录便签", "已保存便签", "截图失败：%@", "无法读取便签关联的应用窗口"]
         let keys = Set(directKeys).subtracting(reusedKeys).union(indirectKeys)
-        #expect(keys.count == 24)
+        #expect(keys.count == 25)
         for key in keys {
             let value = try #require(table[key], "Missing \(language.rawValue): \(key)")
             #expect(!value.isEmpty)

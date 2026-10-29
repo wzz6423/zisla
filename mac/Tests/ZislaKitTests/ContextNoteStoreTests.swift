@@ -30,6 +30,163 @@ struct ContextNoteStoreTests {
         }
     }
 
+    @Test(arguments: ContextNoteReminderInterval.allCases.filter { $0 != .off })
+    func reminderSettingsAndDeadlinesSurviveReloadAndTextEdits(interval: ContextNoteReminderInterval) throws {
+        try withStore { store, directory in
+            let date = Date(timeIntervalSince1970: 10_000)
+            let original = try #require(store.addContextNote("saved", location: location, addedAt: date.addingTimeInterval(-100)))
+            #expect(original.noteReminderInterval == .off)
+            #expect(original.nextNoteReminderAt == nil)
+            let updated = try #require(store.updateContextNote(id: original.id, text: "saved", reminderInterval: interval, at: date))
+            #expect(updated.nextNoteReminderAt == date.addingTimeInterval(interval.duration))
+            #expect(updated.noteReminderInterval == interval)
+            #expect(updated.addedAt == original.addedAt)
+            let restored = FileShelfStore(storageURL: directory.appendingPathComponent("shelf.json"))
+            #expect(restored.items == [updated])
+            let edited = try #require(restored.updateContextNote(id: original.id, text: "edited", reminderInterval: interval, at: date.addingTimeInterval(100)))
+            #expect(edited.nextNoteReminderAt == updated.nextNoteReminderAt)
+            let textOnly = try #require(restored.updateContextNote(id: original.id, text: "another edit"))
+            #expect(textOnly.noteReminderInterval == interval)
+            #expect(textOnly.nextNoteReminderAt == updated.nextNoteReminderAt)
+            #expect(FileShelfStore(storageURL: directory.appendingPathComponent("shelf.json")).items == [textOnly])
+        }
+    }
+
+    @Test
+    func changingAndDisablingReminderResetsOnlyItsSchedule() throws {
+        try withStore { store, directory in
+            let date = Date(timeIntervalSince1970: 10_000)
+            let note = try #require(store.addContextNote("saved", location: location))
+            #expect(store.updateContextNote(id: note.id, text: "saved", reminderInterval: .oneHour, at: date) != nil)
+            let changedAt = date.addingTimeInterval(100)
+            let changed = try #require(store.updateContextNote(id: note.id, text: "saved", reminderInterval: .threeDays, at: changedAt))
+            #expect(changed.nextNoteReminderAt == changedAt.addingTimeInterval(259_200))
+            let disabled = try #require(store.updateContextNote(id: note.id, text: "saved", reminderInterval: .off))
+            #expect(disabled.noteReminderInterval == .off)
+            #expect(disabled.nextNoteReminderAt == nil)
+            #expect(disabled.id == note.id && disabled.addedAt == note.addedAt && disabled.noteLocation == note.noteLocation)
+            #expect(!store.rescheduleContextNoteReminder(id: note.id, at: changedAt))
+            #expect(FileShelfStore(storageURL: directory.appendingPathComponent("shelf.json")).items == [disabled])
+        }
+    }
+
+    @Test
+    func failedReminderSaveKeepsOriginalTextSettingsAndFilesUntilRetry() throws {
+        try withStore { store, directory in
+            let note = try #require(store.addContextNote("saved", location: location))
+            let index = directory.appendingPathComponent("shelf.json")
+            let backup = directory.appendingPathComponent("backup.json")
+            try FileManager.default.moveItem(at: index, to: backup)
+            try FileManager.default.createDirectory(at: index, withIntermediateDirectories: false)
+            #expect(store.updateContextNote(id: note.id, text: "unsaved", reminderInterval: .oneHour) == nil)
+            #expect(store.items == [note])
+            #expect(try String(contentsOf: note.url, encoding: .utf8) == "saved")
+            #expect(try FileManager.default.contentsOfDirectory(atPath: note.url.deletingLastPathComponent().path) == [note.url.lastPathComponent])
+            try FileManager.default.removeItem(at: index)
+            try FileManager.default.moveItem(at: backup, to: index)
+            #expect(FileShelfStore(storageURL: index).items == [note])
+            #expect(store.updateContextNote(id: note.id, text: "saved", reminderInterval: .oneHour) != nil)
+        }
+    }
+
+    @Test
+    func reschedulingPersistsWithoutReplacingNoteTextOrAttachment() throws {
+        try withStore { store, directory in
+            let date = Date(timeIntervalSince1970: 10_000)
+            let note = try #require(store.addContextNote("saved", location: location, screenshot: screenshotData()))
+            let enabled = try #require(store.updateContextNote(id: note.id, text: "saved", reminderInterval: .oneHour, at: date))
+            let originalFile = try Data(contentsOf: enabled.url)
+            let png = try Data(contentsOf: #require(enabled.noteScreenshotURL))
+            let remindedAt = date.addingTimeInterval(100_000)
+            #expect(store.rescheduleContextNoteReminder(id: note.id, at: remindedAt))
+            let rescheduled = try #require(store.items.first)
+            #expect(rescheduled.nextNoteReminderAt == remindedAt.addingTimeInterval(3_600))
+            #expect(rescheduled.url == enabled.url)
+            #expect(rescheduled.bookmarkData == enabled.bookmarkData)
+            #expect(rescheduled.addedAt == enabled.addedAt)
+            #expect(try Data(contentsOf: rescheduled.url) == originalFile)
+            #expect(try Data(contentsOf: #require(rescheduled.noteScreenshotURL)) == png)
+            #expect(FileShelfStore(storageURL: directory.appendingPathComponent("shelf.json")).items == [rescheduled])
+        }
+    }
+
+    @Test
+    func failedReschedulingRetainsTheSavedDeadlineAndCanRecover() throws {
+        try withStore { store, directory in
+            let date = Date(timeIntervalSince1970: 10_000)
+            let note = try #require(store.addContextNote("saved", location: location))
+            let enabled = try #require(store.updateContextNote(id: note.id, text: "saved", reminderInterval: .oneHour, at: date))
+            let index = directory.appendingPathComponent("shelf.json")
+            try FileManager.default.removeItem(at: index)
+            try FileManager.default.createDirectory(at: index, withIntermediateDirectories: false)
+            #expect(!store.rescheduleContextNoteReminder(id: note.id, at: date.addingTimeInterval(3_600)))
+            #expect(store.items == [enabled])
+            #expect(store.errorDescription != nil)
+            try FileManager.default.removeItem(at: index)
+            #expect(store.rescheduleContextNoteReminder(id: note.id, at: date.addingTimeInterval(3_600)))
+            #expect(store.errorDescription == nil)
+            #expect(FileShelfStore(storageURL: index).items.first?.nextNoteReminderAt == date.addingTimeInterval(7_200))
+        }
+    }
+
+    @Test(arguments: [false, true])
+    func removalDeletesTheReminderAlongWithTheNote(clear: Bool) throws {
+        try withStore { store, directory in
+            let note = try #require(store.addContextNote("saved", location: location))
+            #expect(store.updateContextNote(id: note.id, text: "saved", reminderInterval: .oneDay) != nil)
+            if clear { store.removeAll() } else { store.remove(id: note.id) }
+            #expect(!store.rescheduleContextNoteReminder(id: note.id, at: Date()))
+            #expect(store.items.isEmpty)
+            #expect(FileShelfStore(storageURL: directory.appendingPathComponent("shelf.json")).items.isEmpty)
+        }
+    }
+
+    @Test
+    func missingLegacyAndUnsupportedReminderValuesDoNotEnableReminders() throws {
+        try withStore { store, directory in
+            let note = try #require(store.addContextNote("legacy", location: location))
+            let index = directory.appendingPathComponent("shelf.json")
+            var records = try #require(JSONSerialization.jsonObject(with: Data(contentsOf: index)) as? [[String: Any]])
+            records[0].removeValue(forKey: "noteReminderInterval")
+            records[0].removeValue(forKey: "nextNoteReminderAt")
+            try JSONSerialization.data(withJSONObject: records).write(to: index)
+            #expect(FileShelfStore(storageURL: index).items == [note])
+            for minutes in [-1, 1, 30, 61, 4_321, Int.max] {
+                records[0]["noteReminderInterval"] = minutes
+                try JSONSerialization.data(withJSONObject: records).write(to: index)
+                let restored = FileShelfStore(storageURL: index)
+                #expect(restored.items == [note])
+                #expect(restored.errorDescription == nil)
+            }
+        }
+    }
+
+    @Test
+    func ordinaryAndMissingItemsCannotAcquireReminderSchedules() throws {
+        try withStore { store, directory in
+            #expect(store.add(payloads: [.text("ordinary")]) == 1)
+            let ordinary = try #require(store.items.first)
+            let index = directory.appendingPathComponent("shelf.json")
+            let before = try Data(contentsOf: index)
+            #expect(!store.rescheduleContextNoteReminder(id: ordinary.id, at: Date()))
+            #expect(!store.rescheduleContextNoteReminder(id: UUID(), at: Date()))
+            #expect(store.updateContextNote(id: ordinary.id, text: "ordinary", reminderInterval: .oneHour) == nil)
+            #expect(store.items == [ordinary])
+            #expect(try Data(contentsOf: index) == before)
+            var records = try #require(JSONSerialization.jsonObject(with: before) as? [[String: Any]])
+            records[0]["noteReminderInterval"] = 60
+            records[0]["nextNoteReminderAt"] = 10_000
+            let corrupted = try JSONSerialization.data(withJSONObject: records)
+            try corrupted.write(to: index)
+            let restored = FileShelfStore(storageURL: index)
+            #expect(restored.items.first?.noteLocation == nil)
+            #expect(restored.items.first?.noteReminderInterval == .oneHour)
+            #expect(!restored.rescheduleContextNoteReminder(id: ordinary.id, at: Date(timeIntervalSince1970: 20_000)))
+            #expect(try Data(contentsOf: index) == corrupted)
+            #expect(try String(contentsOf: ordinary.url, encoding: .utf8) == "ordinary")
+        }
+    }
+
     @Test
     func screenshotAttachmentSurvivesReloadAndTextEditsWithoutChangingTheNotePayload() throws {
         try withStore { store, directory in

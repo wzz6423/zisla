@@ -148,6 +148,7 @@ final class ContextNoteShelfEditor: ObservableObject {
         if edits[item.id] == nil {
             let draft = ContextNoteDraft(location: location, createdAt: item.addedAt)
             draft.text = item.text ?? ""
+            draft.reminderInterval = item.noteReminderInterval
             if let url = item.noteScreenshotURL { draft.loadScreenshot(at: url) }
             edits[item.id] = draft
         }
@@ -193,12 +194,12 @@ final class ContextNoteShelfEditor: ObservableObject {
         }
     }
 
-    func save(in shelf: FileShelfStore) -> FileShelfItem? {
+    func save(in shelf: FileShelfStore, at date: Date = Date()) -> FileShelfItem? {
         guard let draft, !draft.isCapturingScreenshot,
               !draft.text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return nil }
         let item: FileShelfItem?
         if let itemID {
-            item = shelf.updateContextNote(id: itemID, text: draft.text)
+            item = shelf.updateContextNote(id: itemID, text: draft.text, reminderInterval: draft.reminderInterval, at: date)
         } else {
             item = shelf.addContextNote(draft.text, location: draft.location, addedAt: draft.createdAt, screenshot: draft.screenshot?.png)
         }
@@ -213,12 +214,14 @@ final class ContextNoteShelfEditor: ObservableObject {
 
 struct ContextNoteDetailView: View {
     @ObservedObject var draft: ContextNoteDraft
+    var canSetReminder = false
     let onCopy: () -> Void
     let onNavigate: () -> Void
     let onSave: () -> Void
     let onClose: () -> Void
     let onCopyScreenshot: (Data) -> Void
     let onOpenScreenshot: (ContextNoteScreenshot) -> Void
+    @Environment(\.locale) private var locale
     @FocusState private var isEditing: Bool
 
     static func locationDescription(_ location: ContextNoteLocation) -> String {
@@ -238,6 +241,15 @@ struct ContextNoteDetailView: View {
                         onCopy: onCopy, onNavigate: onNavigate, onSave: onSave, onClose: onClose,
                         canCopy: !draft.text.isEmpty,
                         canSave: !draft.isCapturingScreenshot && !draft.text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty) {
+            if canSetReminder {
+                Picker(AppLocalization.string("主动提醒", locale: locale), selection: $draft.reminderInterval) {
+                    ForEach(ContextNoteReminderInterval.allCases) { interval in
+                        Text(AppLocalization.string(interval.localizationKey, locale: locale)).tag(interval)
+                    }
+                }
+                .pickerStyle(.menu)
+                .accessibilityLabel(AppLocalization.string("主动提醒", locale: locale))
+            }
             TextEditor(text: $draft.text)
                 .font(.system(size: 12))
                 .scrollContentBackground(.hidden)

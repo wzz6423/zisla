@@ -2811,3 +2811,15 @@
 "复制截图" = "Copy screenshot";
 "截图失败：%@" = "Screenshot failed: %@";
 "无法读取便签关联的应用窗口" = "Cannot read the application window associated with this note";
+
+"主动提醒" = "Proactive reminder";
+"不主动提醒" = "No proactive reminder";
+"每 1 小时" = "Every 1 hour";
+"每 1.5 小时" = "Every 1.5 hours";
+"每 3 小时" = "Every 3 hours";
+"每 6 小时" = "Every 6 hours";
+"每 12 小时" = "Every 12 hours";
+"每 1 天" = "Every 1 day";
+"每 2 天" = "Every 2 days";
+"每 3 天" = "Every 3 days";
+"添加时间" = "Added at";
