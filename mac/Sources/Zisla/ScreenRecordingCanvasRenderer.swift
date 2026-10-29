@@ -45,7 +45,7 @@ extension RecordingExportRenderer {
             let setter = CTFramesetterCreateWithAttributedString(text)
             let path = CGPath(rect: localBox.insetBy(dx: layout.padding, dy: layout.padding), transform: nil)
             let frame = CTFramesetterCreateFrame(setter, CFRange(location: 0, length: 0), path, nil)
-            drawText(text, frame: frame, in: context, visibleCharacters: visibleCharacters)
+            try drawText(text, frame: frame, in: context, visibleCharacters: visibleCharacters)
         }
         return try bitmapImage(context).transformed(by: .init(translationX: layout.box.minX, y: layout.box.minY))
     }

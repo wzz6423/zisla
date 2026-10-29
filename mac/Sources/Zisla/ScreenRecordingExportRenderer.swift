@@ -355,7 +355,7 @@ final class RecordingExportRenderer {
             context.clip(to: rect)
             let setter = CTFramesetterCreateWithAttributedString(textLayout!.text)
             let frame = CTFramesetterCreateFrame(setter, CFRange(location: 0, length: 0), CGPath(rect: rect, transform: nil), nil)
-            drawText(textLayout!.text, frame: frame, in: context, visibleCharacters: visibleCharacters)
+            try drawText(textLayout!.text, frame: frame, in: context, visibleCharacters: visibleCharacters)
         }
         return try bitmapImage(context).transformed(by: .init(translationX: imageBounds.minX, y: imageBounds.minY))
             .cropped(to: canvas)

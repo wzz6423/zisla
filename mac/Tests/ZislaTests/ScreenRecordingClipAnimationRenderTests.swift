@@ -111,13 +111,19 @@ struct ScreenRecordingClipAnimationRenderTests {
             "After both transitions, only the half-transparent white source must cover the green track")
     }
 
-    @Test(arguments: [false, true], ["你👨‍👩‍👧‍👦e\u{301}\n字!", "א ב ג 👩🏽‍💻 ד ה"])
+    @Test(arguments: [false, true], ["你👨‍👩‍👧‍👦e\u{301}\n字!", "א ב ג 👩🏽‍💻 ד ה", "你 office affinity"])
     func typewriterRevealsWholeUnicodeGlyphsWithoutMovingPreviouslyVisiblePixels(_ caption: Bool, text: String) throws {
+        for fontSize in [0.07, 0.11] {
+            try expectFixedTypewriterPixels(caption: caption, text: text, fontSize: fontSize)
+        }
+    }
+
+    private func expectFixedTypewriterPixels(caption: Bool, text: String, fontSize: Double) throws {
         let canvas = CGRect(x: 0, y: 0, width: 400, height: 300)
         let annotation = RecordingAnnotation(kind: .text, start: 0, end: 3, x: 0.1, y: 0.1, endX: 0.75, endY: 0.8,
-            text: text, color: .init(red: 1, green: 1, blue: 1), fontSize: 0.11)
+            text: text, color: .init(red: 1, green: 1, blue: 1), fontSize: fontSize)
         let subtitle = RecordingCaption(start: 0, end: 3, text: text,
-            layout: .init(x: 0.1, y: 0.1, width: 0.8, height: 0.8), fontSize: 0.11)
+            layout: .init(x: 0.1, y: 0.1, width: 0.8, height: 0.8), fontSize: fontSize)
         func render(_ count: Int?) throws -> RecordingImageFixture.Pixels {
             let image = try caption ? RecordingExportRenderer.captionImage(subtitle, canvas: canvas, visibleCharacters: count)
                 : RecordingExportRenderer.annotationImage(annotation, canvas: canvas, visibleCharacters: count)
@@ -233,7 +239,7 @@ struct ScreenRecordingClipAnimationRenderTests {
             CFRange(location: 0, length: 0), path, nil)
         let signature = frameSignature(original)
         for count in 1..<text.count {
-            let partial = RecordingExportRenderer.typewriterFrame(attributed, frame: original, visibleCharacters: count)
+            let partial = try RecordingExportRenderer.typewriterFrame(attributed, frame: original, visibleCharacters: count)
             let actual = frameSignature(partial)
             #expect(actual.glyphs == signature.glyphs && actual.positions == signature.positions
                 && actual.indices == signature.indices && actual.origins == signature.origins,
