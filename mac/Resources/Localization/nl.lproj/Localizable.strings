@@ -2812,3 +2812,15 @@
 "复制截图" = "Schermafbeelding kopiëren";
 "截图失败：%@" = "Schermafbeelding mislukt: %@";
 "无法读取便签关联的应用窗口" = "Het toepassingsvenster dat aan deze notitie is gekoppeld kan niet worden vastgelegd";
+
+"主动提醒" = "Periodieke herinnering";
+"不主动提醒" = "Geen periodieke herinnering";
+"每 1 小时" = "Elk uur";
+"每 1.5 小时" = "Elke 1,5 uur";
+"每 3 小时" = "Elke 3 uur";
+"每 6 小时" = "Elke 6 uur";
+"每 12 小时" = "Elke 12 uur";
+"每 1 天" = "Elke dag";
+"每 2 天" = "Elke 2 dagen";
+"每 3 天" = "Elke 3 dagen";
+"添加时间" = "Toegevoegd op";

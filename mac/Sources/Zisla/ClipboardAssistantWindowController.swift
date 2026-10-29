@@ -10,12 +10,16 @@ private extension ClipboardAssistantController {
     static let islandRowWidth = ScreenLayoutConfiguration().expandedSize.width + 60
     static let defaultRowHeight = ScreenLayoutConfiguration().simulatedIslandSize.height
 
-    static func trailingControlsWidth(
+    internal static func trailingControlsWidth(
         for detection: ClipboardAssistantDetection,
         isLightweightMode: Bool,
         shortcutHint: String?
     ) -> CGFloat {
         let horizontalPadding: CGFloat = 22
+        if let addedAt = detection.contextNoteAddedAt {
+            let time = addedAt.formatted(.dateTime.month().day().hour().minute().locale(AppModel.shared.languageStore.language.locale))
+            return horizontalPadding + (time as NSString).size(withAttributes: [.font: NSFont.systemFont(ofSize: 11)]).width
+        }
         guard !isLightweightMode, let action = detection.action else {
             return horizontalPadding + 20
         }
@@ -817,6 +821,7 @@ struct ClipboardAssistantToastView: View {
 
     private static let maxExpandedContentHeight: CGFloat = 220
     @Environment(\.locale) private var locale
+    @Environment(\.layoutDirection) private var layoutDirection
     @State private var isExpanded = false
 
     private var rowHeight: CGFloat {
@@ -999,25 +1004,34 @@ struct ClipboardAssistantToastView: View {
         HStack(spacing: 10) {
             leadingAccessory(detection)
 
-            VStack(alignment: .leading, spacing: 2) {
-                Text(AppLocalization.text(detection.title))
-                    .font(.system(size: 12, weight: .medium))
-                    .foregroundStyle(.white.opacity(0.92))
-                    .fitsSingleLine()
-                    .truncationMode(.middle)
-                if detailIsVisible, let detailText = detailText(detection.detail) {
-                    Text(detailText)
-                        .font(.system(size: 9.5, weight: .regular))
-                        .foregroundStyle(.white.opacity(0.55))
-                        .fitsSingleLine()
-                        .truncationMode(.middle)
+            Group {
+                if detection.contextNoteAddedAt != nil {
+                    MarqueeText(detection.title, font: .system(size: 12), textColor: .white.opacity(0.92),
+                                fontWeight: .medium, scrollDirection: layoutDirection == .rightToLeft ? .right : .left)
+                        .accessibilityElement(children: .ignore)
+                        .accessibilityLabel(detection.title)
+                } else {
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text(AppLocalization.text(detection.title))
+                            .font(.system(size: 12, weight: .medium))
+                            .foregroundStyle(.white.opacity(0.92))
+                            .fitsSingleLine()
+                            .truncationMode(.middle)
+                        if detailIsVisible, let detailText = detailText(detection.detail) {
+                            Text(detailText)
+                                .font(.system(size: 9.5, weight: .regular))
+                                .foregroundStyle(.white.opacity(0.55))
+                                .fitsSingleLine()
+                                .truncationMode(.middle)
+                        }
+                    }
                 }
             }
             .frame(maxWidth: .infinity, alignment: .leading)
         }
         .contentShape(Rectangle())
         .onTapGesture {
-            guard controller.isLightweightMode else { return }
+            guard controller.isLightweightMode || detection.contextNoteAddedAt != nil else { return }
             controller.performCurrentAction()
         }
     }
@@ -1056,7 +1070,7 @@ struct ClipboardAssistantToastView: View {
                 .font(.system(size: max(16, min(22, rowHeight - 8))))
                 .frame(width: 26, height: max(16, min(26, rowHeight - 6)))
         } else {
-            Image(systemName: detection.kind.symbolName)
+            Image(systemName: detection.contextNoteAddedAt == nil ? detection.kind.symbolName : "note.text")
                 .font(.system(size: 13, weight: .medium))
                 .foregroundStyle(.white.opacity(0.75))
                 .frame(width: 26, height: max(16, min(26, rowHeight - 6)))
@@ -1065,7 +1079,14 @@ struct ClipboardAssistantToastView: View {
 
     private func trailingControls(_ detection: ClipboardAssistantDetection) -> some View {
         HStack(spacing: 8) {
-            if controller.isLightweightMode {
+            if let addedAt = detection.contextNoteAddedAt {
+                Text(addedAt, format: .dateTime.month().day().hour().minute())
+                    .font(.system(size: 11))
+                    .monospacedDigit()
+                    .foregroundStyle(.white.opacity(0.55))
+                    .help(addedAt.formatted(.dateTime.year().month().day().hour().minute().second().locale(locale)))
+                    .accessibilityLabel(loc("添加时间") + " " + addedAt.formatted(.dateTime.year().month().day().hour().minute().locale(locale)))
+            } else if controller.isLightweightMode {
                 // Lightweight mode keeps the toast minimal: no buttons at all.
                 Image(systemName: "sparkle")
                     .font(.system(size: 10, weight: .medium))

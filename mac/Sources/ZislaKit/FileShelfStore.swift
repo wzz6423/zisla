@@ -60,8 +60,10 @@ public struct FileShelfItem: Identifiable, Equatable {
     public var noteLocation: ContextNoteLocation?
     public var noteScreenshotURL: URL?
     public var screenshotMetadata: ShelfScreenshotMetadata?
+    public var noteReminderInterval: ContextNoteReminderInterval
+    public var nextNoteReminderAt: Date?
 
-    public init(id: UUID, url: URL, addedAt: Date, bookmarkData: Data, text: String? = nil, isManaged: Bool = false, noteLocation: ContextNoteLocation? = nil, screenshotMetadata: ShelfScreenshotMetadata? = nil, noteScreenshotURL: URL? = nil) {
+    public init(id: UUID, url: URL, addedAt: Date, bookmarkData: Data, text: String? = nil, isManaged: Bool = false, noteLocation: ContextNoteLocation? = nil, screenshotMetadata: ShelfScreenshotMetadata? = nil, noteScreenshotURL: URL? = nil, noteReminderInterval: ContextNoteReminderInterval = .off, nextNoteReminderAt: Date? = nil) {
         self.id = id
         self.url = url
         self.addedAt = addedAt
@@ -71,6 +73,8 @@ public struct FileShelfItem: Identifiable, Equatable {
         self.noteLocation = noteLocation
         self.noteScreenshotURL = noteScreenshotURL
         self.screenshotMetadata = screenshotMetadata
+        self.noteReminderInterval = noteReminderInterval
+        self.nextNoteReminderAt = nextNoteReminderAt
     }
 
     public var linkURL: URL? { text.flatMap(TransferPasteboard.webURL) }
@@ -146,6 +150,8 @@ public final class FileShelfStore: ObservableObject {
         var noteLocation: ContextNoteLocation?
         var hasNoteScreenshot: Bool?
         var shelfOrder: Int64?
+        var noteReminderInterval: Int?
+        var nextNoteReminderAt: Date?
     }
 
     private let storageURL: URL
@@ -345,7 +351,7 @@ public final class FileShelfStore: ObservableObject {
         }
     }
 
-    public func updateContextNote(id: UUID, text: String) -> FileShelfItem? {
+    public func updateContextNote(id: UUID, text: String, reminderInterval: ContextNoteReminderInterval? = nil, at date: Date = Date()) -> FileShelfItem? {
         guard !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return nil }
         guard let index = items.firstIndex(where: { $0.id == id && $0.noteLocation != nil && $0.isManaged }) else {
             errorDescription = CocoaError(.fileReadNoSuchFile).localizedDescription
@@ -366,6 +372,10 @@ public final class FileShelfStore: ObservableObject {
             updated.url = replacementURL
             updated.bookmarkData = try makeBookmark(for: replacementURL)
             updated.text = text
+            if let reminderInterval, reminderInterval != original.noteReminderInterval {
+                updated.noteReminderInterval = reminderInterval
+                updated.nextNoteReminderAt = reminderInterval == .off ? nil : date.addingTimeInterval(reminderInterval.duration)
+            }
             var candidates = items
             candidates[index] = updated
             guard persist(candidates) else {
@@ -387,6 +397,18 @@ public final class FileShelfStore: ObservableObject {
             }
             return nil
         }
+    }
+
+    @discardableResult
+    public func rescheduleContextNoteReminder(id: UUID, at date: Date) -> Bool {
+        guard let index = items.firstIndex(where: { $0.id == id && $0.noteLocation != nil && $0.noteReminderInterval != .off }) else {
+            return false
+        }
+        var candidates = items
+        candidates[index].nextNoteReminderAt = date.addingTimeInterval(candidates[index].noteReminderInterval.duration)
+        guard persist(candidates) else { return false }
+        items = candidates
+        return true
     }
 
     public func remove(id: UUID) {
@@ -656,7 +678,9 @@ public final class FileShelfStore: ObservableObject {
                     isManaged: value.isManaged ?? false,
                     noteLocation: value.noteLocation,
                     noteScreenshotURL: value.hasNoteScreenshot == true
-                        ? managedDirectory.appendingPathComponent(value.id.uuidString).appendingPathComponent("screenshot.png") : nil
+                        ? managedDirectory.appendingPathComponent(value.id.uuidString).appendingPathComponent("screenshot.png") : nil,
+                    noteReminderInterval: ContextNoteReminderInterval(rawValue: value.noteReminderInterval ?? 0) ?? .off,
+                    nextNoteReminderAt: value.nextNoteReminderAt
                 ))
                 shelfOrder[value.id] = value.shelfOrder ?? Int64(index)
             }
@@ -690,7 +714,9 @@ public final class FileShelfStore: ObservableObject {
                 }
                 return StoredItem(id: item.id, bookmarkData: item.bookmarkData, addedAt: item.addedAt, url: item.url,
                     text: item.text, isManaged: item.isManaged ? true : nil, noteLocation: item.noteLocation,
-                    hasNoteScreenshot: item.noteScreenshotURL == nil ? nil : true, shelfOrder: order[item.id])
+                    hasNoteScreenshot: item.noteScreenshotURL == nil ? nil : true, shelfOrder: order[item.id],
+                    noteReminderInterval: item.noteReminderInterval.rawValue,
+                    nextNoteReminderAt: item.nextNoteReminderAt)
             }
             let data = try JSONEncoder().encode(stored)
             try data.write(to: storageURL, options: .atomic)
