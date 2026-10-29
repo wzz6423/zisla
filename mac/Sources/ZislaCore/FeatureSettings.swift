@@ -231,6 +231,7 @@ public enum IslandVisualStyle: String, Codable, CaseIterable, Sendable, Equatabl
 public enum IslandNotchBackground: String, Codable, CaseIterable, Sendable, Equatable, Hashable {
     case black
     case frosted
+    case liquidGlass = "liquidGlassCrown"
 
     public init(from decoder: Decoder) throws {
         let container = try decoder.singleValueContainer()
@@ -255,8 +256,9 @@ public enum IslandNotchBackground: String, Codable, CaseIterable, Sendable, Equa
 
     public var title: String {
         switch self {
-        case .black: "刘海"
+        case .black: "黑色"
         case .frosted: "磨砂玻璃"
+        case .liquidGlass: "Liquid Glass"
         }
     }
 
@@ -264,6 +266,7 @@ public enum IslandNotchBackground: String, Codable, CaseIterable, Sendable, Equa
         switch self {
         case .black: "收起时保留刘海外观"
         case .frosted: "收起时显示磨砂玻璃背景"
+        case .liquidGlass: "收起时上侧黑色，下侧透明"
         }
     }
 }
@@ -819,6 +822,18 @@ public struct FeatureSettings: Codable, Equatable, Sendable {
     public var mediaShowLyricsAndInfo: Bool
     /// Display style for the collapsed Dynamic Island when music is playing.
     public var mediaCompactStyle: MediaCompactStyle
+    public var mediaVisualizationStyle: MediaVisualizationStyle
+    public var islandLayoutStyle: IslandLayoutStyle
+    public var islandPlacement: IslandPlacement
+    public var islandPillWidth: Double {
+        didSet { islandPillWidth = Self.islandDimension(islandPillWidth, range: 80...400, fallback: 180) }
+    }
+    public var islandPillHeight: Double {
+        didSet { islandPillHeight = Self.islandDimension(islandPillHeight, range: 20...64, fallback: 32) }
+    }
+    public var islandEdgeInset: Double {
+        didSet { islandEdgeInset = Self.islandDimension(islandEdgeInset, range: 0...64, fallback: 8) }
+    }
     /// Visual style of the Dynamic Island surface.
     public var islandVisualStyle: IslandVisualStyle
     /// Background of the collapsed notch surface.
@@ -947,6 +962,12 @@ public struct FeatureSettings: Codable, Equatable, Sendable {
         petSide: PetSide = .left,
         mediaShowLyricsAndInfo: Bool = true,
         mediaCompactStyle: MediaCompactStyle = .compact,
+        mediaVisualizationStyle: MediaVisualizationStyle = .waveform,
+        islandLayoutStyle: IslandLayoutStyle = .notch,
+        islandPlacement: IslandPlacement = IslandPlacement(),
+        islandPillWidth: Double = 180,
+        islandPillHeight: Double = 32,
+        islandEdgeInset: Double = 8,
         islandVisualStyle: IslandVisualStyle = .transparent,
         islandNotchBackground: IslandNotchBackground = .black,
         islandCollapsedOnTop: Bool = true,
@@ -1074,6 +1095,12 @@ public struct FeatureSettings: Codable, Equatable, Sendable {
         self.petSide = petSide
         self.mediaShowLyricsAndInfo = mediaShowLyricsAndInfo
         self.mediaCompactStyle = mediaCompactStyle
+        self.mediaVisualizationStyle = mediaVisualizationStyle
+        self.islandLayoutStyle = islandLayoutStyle
+        self.islandPlacement = islandPlacement
+        self.islandPillWidth = Self.islandDimension(islandPillWidth, range: 80...400, fallback: 180)
+        self.islandPillHeight = Self.islandDimension(islandPillHeight, range: 20...64, fallback: 32)
+        self.islandEdgeInset = Self.islandDimension(islandEdgeInset, range: 0...64, fallback: 8)
         self.islandVisualStyle = islandVisualStyle
         self.islandNotchBackground = islandNotchBackground
         self.islandCollapsedOnTop = islandCollapsedOnTop
@@ -1219,6 +1246,12 @@ public struct FeatureSettings: Codable, Equatable, Sendable {
         case petSide
         case mediaShowLyricsAndInfo
         case mediaCompactStyle
+        case mediaVisualizationStyle
+        case islandLayoutStyle
+        case islandPlacement
+        case islandPillWidth
+        case islandPillHeight
+        case islandEdgeInset
         case islandVisualStyle
         case islandNotchBackground
         case islandCollapsedOnTop
@@ -1507,6 +1540,24 @@ public struct FeatureSettings: Codable, Equatable, Sendable {
             MediaCompactStyle.self,
             forKey: .mediaCompactStyle
         ) ?? defaults.mediaCompactStyle
+        mediaVisualizationStyle = try container.decodeIfPresent(MediaVisualizationStyle.self, forKey: .mediaVisualizationStyle)
+            ?? defaults.mediaVisualizationStyle
+        islandLayoutStyle = try container.decodeIfPresent(IslandLayoutStyle.self, forKey: .islandLayoutStyle)
+            ?? defaults.islandLayoutStyle
+        islandPlacement = try container.decodeIfPresent(IslandPlacement.self, forKey: .islandPlacement)
+            ?? defaults.islandPlacement
+        islandPillWidth = Self.islandDimension(
+            try container.decodeIfPresent(Double.self, forKey: .islandPillWidth) ?? defaults.islandPillWidth,
+            range: 80...400, fallback: 180
+        )
+        islandPillHeight = Self.islandDimension(
+            try container.decodeIfPresent(Double.self, forKey: .islandPillHeight) ?? defaults.islandPillHeight,
+            range: 20...64, fallback: 32
+        )
+        islandEdgeInset = Self.islandDimension(
+            try container.decodeIfPresent(Double.self, forKey: .islandEdgeInset) ?? defaults.islandEdgeInset,
+            range: 0...64, fallback: 8
+        )
         islandVisualStyle = try container.decodeIfPresent(
             IslandVisualStyle.self,
             forKey: .islandVisualStyle
@@ -1638,6 +1689,10 @@ public struct FeatureSettings: Codable, Equatable, Sendable {
         keyboardUsesPitchVariation = try container.decodeIfPresent(Bool.self, forKey: .keyboardUsesPitchVariation) ?? defaults.keyboardUsesPitchVariation
         keyboardTypingStatsEnabled = try container.decodeIfPresent(Bool.self, forKey: .keyboardTypingStatsEnabled) ?? defaults.keyboardTypingStatsEnabled
         lidCloseAnimationEnabled = try container.decodeIfPresent(Bool.self, forKey: .lidCloseAnimationEnabled) ?? defaults.lidCloseAnimationEnabled
+    }
+
+    private static func islandDimension(_ value: Double, range: ClosedRange<Double>, fallback: Double) -> Double {
+        value.isFinite ? min(range.upperBound, max(range.lowerBound, value)) : fallback
     }
 }
 

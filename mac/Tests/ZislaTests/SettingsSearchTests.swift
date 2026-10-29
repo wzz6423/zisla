@@ -25,7 +25,8 @@ struct SettingsSearchTests {
         #expect(results("ＬＯＧＩＮ", locale: .init(identifier: "en")).map(\.title) == ["登录时启动"])
         #expect(results("界面语言", locale: .init(identifier: "en")).map(\.title) == ["界面语言"])
         #expect(results("general", locale: .init(identifier: "fr")).allSatisfy { $0.section == .general })
-        #expect(results("general", locale: .init(identifier: "fr")).count == 5)
+        #expect(Set(results("general", locale: .init(identifier: "fr")).map(\.title))
+            == ["界面语言", "界面外观", "灵动岛样式", "灵动岛材质", "刘海材质", "登录时启动"])
     }
 
     @Test(arguments: AppLanguage.allCases)

@@ -8,12 +8,12 @@ import ZislaKit
 private extension ClipboardAssistantController {
     /// The clipboard assistant needs extra horizontal space for the content preview and trailing actions.
     static let islandRowWidth = ScreenLayoutConfiguration().expandedSize.width + 60
-    static let defaultRowHeight = ScreenLayoutConfiguration().simulatedIslandSize.height
 
     internal static func trailingControlsWidth(
         for detection: ClipboardAssistantDetection,
         isLightweightMode: Bool,
-        shortcutHint: String?
+        shortcutHint: String?,
+        locale: Locale
     ) -> CGFloat {
         let horizontalPadding: CGFloat = 22
         if let addedAt = detection.contextNoteAddedAt {
@@ -23,10 +23,7 @@ private extension ClipboardAssistantController {
         guard !isLightweightMode, let action = detection.action else {
             return horizontalPadding + 20
         }
-        let title = AppLocalization.string(
-            ClipboardAssistantToastView.actionLabel(action),
-            language: AppModel.shared.languageStore.language
-        )
+        let title = AppLocalization.string(ClipboardAssistantToastView.actionLabel(action), locale: locale)
         let textWidth = (title as NSString).size(withAttributes: [
             .font: NSFont.systemFont(ofSize: 11, weight: .medium),
         ]).width
@@ -54,6 +51,8 @@ final class ClipboardAssistantPresentation: ObservableObject {
     /// The crown remains the same height as the notch the prompt expands from.
     @Published var islandTopHeight: CGFloat = ScreenLayoutConfiguration().simulatedIslandSize.height
     @Published var physicalNotchWidth: CGFloat = 0
+    @Published var layout: ClipboardAssistantController.RowLayout?
+    @Published var isFolding = false
     @Published var progressGlowEnabled = true
     /// Toggled from the view so the countdown pauses while the pointer rests on the toast.
     var isHovered = false
@@ -88,6 +87,9 @@ final class ClipboardAssistantController: ObservableObject {
 
     let presentation = ClipboardAssistantPresentation()
     let systemTranslation = ClipboardSystemTranslationBridge()
+    var screenLayoutConfiguration = ScreenLayoutConfiguration() {
+        didSet { updateWindowLayout() }
+    }
     /// Lets the main island pause hover activation while this row occupies its trigger area.
     var onPresentationChanged: ((Bool) -> Void)?
     /// Auto-dismiss setting for newly presented assistant prompts.
@@ -114,6 +116,8 @@ final class ClipboardAssistantController: ObservableObject {
         didSet {
             guard isLightweightMode != oldValue else { return }
             presentation.objectWillChange.send()
+            if isLightweightMode { isExpanded = false }
+            updateWindowLayout()
         }
     }
 
@@ -139,7 +143,7 @@ final class ClipboardAssistantController: ObservableObject {
     }
     private var isSharingAnchorHeld = false
 
-    private var window: IslandPanel?
+    private var window: NSWindow?
     private var presentationPoint = CGPoint.zero
     var screenAtPoint: @MainActor (CGPoint) -> NSScreen? = { WindowPlacement.screenUnderMouse(point: $0) }
     private var dismissTask: Task<Void, Never>?
@@ -158,6 +162,7 @@ final class ClipboardAssistantController: ObservableObject {
         value: ClipboardTranslationPresentation, rowWidth: CGFloat, locale: Locale
     )?
     private let windowPresenter: @MainActor (ClipboardAssistantController, ClipboardAssistantDetection) -> Void
+    private let animateDismissal: @MainActor (NSWindow, TimeInterval, @escaping @MainActor () -> Void) -> Void
     private let dismissSleeper: @Sendable (Duration) async throws -> Void
     private let makeTriggerMonitor: @MainActor () -> any ClipboardAssistantTriggerRegistering
     private let triggerMonitor: any ClipboardAssistantTriggerRegistering
@@ -170,12 +175,21 @@ final class ClipboardAssistantController: ObservableObject {
     private var isDismissing = false
     private let gestureMonitor = ClipboardAssistantMouseGestureMonitor()
     @Published private(set) var isMoreActionsPresented = false
+    @Published private(set) var isExpanded = false
     @Published private(set) var actionHotkeys: [String: [VoiceInputHotkeyPreset]] = [:]
     @Published private(set) var dismissShortcutFeedbackKey: String?
 
     init(
+        window: NSWindow? = nil,
         windowPresenter: @escaping @MainActor (ClipboardAssistantController, ClipboardAssistantDetection) -> Void = {
             $0.showWindow($1)
+        },
+        animateDismissal: @escaping @MainActor (NSWindow, TimeInterval, @escaping @MainActor () -> Void) -> Void = { window, duration, completion in
+            NSAnimationContext.runAnimationGroup({ context in
+                context.duration = duration
+                context.timingFunction = CAMediaTimingFunction(name: .easeOut)
+                window.animator().alphaValue = 0
+            }, completionHandler: { MainActor.assumeIsolated { completion() } })
         },
         dismissSleeper: @escaping @Sendable (Duration) async throws -> Void = {
             try await Task.sleep(for: $0)
@@ -184,7 +198,9 @@ final class ClipboardAssistantController: ObservableObject {
             ClipboardAssistantTriggerMonitor()
         }
     ) {
+        self.window = window
         self.windowPresenter = windowPresenter
+        self.animateDismissal = animateDismissal
         self.dismissSleeper = dismissSleeper
         self.makeTriggerMonitor = makeTriggerMonitor
         triggerMonitor = makeTriggerMonitor()
@@ -208,7 +224,9 @@ final class ClipboardAssistantController: ObservableObject {
         configuredHotkey = hotkey
         configuredMouseButton = mouseButton
         configuredDismissHotkey = dismissHotkey
-        return refreshTriggers()
+        let registered = refreshTriggers()
+        updateWindowLayout()
+        return registered
     }
 
     func shortcutHint(for action: ClipboardAssistantAction) -> String? {
@@ -308,7 +326,6 @@ final class ClipboardAssistantController: ObservableObject {
         return CollapsedProgress.elapsedFraction(fromRemaining: remaining)
     }
 
-    /// Window accessor used by the toast view to animate expansion.
     var windowForFrameUpdate: NSWindow? { window }
 
     /// Anchor for system sharing launched from the assistant row.
@@ -393,6 +410,9 @@ final class ClipboardAssistantController: ObservableObject {
             }
         } else if screenshotPhase == .restored || screenshotPhase == .inactive {
             if !window.isVisible {
+                if let layout = presentation.layout {
+                    window.setFrame(layout.frame, display: false)
+                }
                 window.alphaValue = 1
                 window.orderFrontRegardless()
             }
@@ -406,6 +426,8 @@ final class ClipboardAssistantController: ObservableObject {
         guard !isScreenshotActive, !isScreenLocked else { return nil }
         presentationPoint = point
         isDismissing = false
+        isExpanded = false
+        presentation.isFolding = false
         cancelTranslation()
         isSharingAnchorHeld = false
         cancelDismissTask()
@@ -441,8 +463,10 @@ final class ClipboardAssistantController: ObservableObject {
 
     func dismiss(animated: Bool = true) {
         isDismissing = true
+        presentation.isFolding = animated && presentation.layout?.style == .pill
+        if !presentation.isFolding { isExpanded = false }
         refreshTriggers()
-        cancelTranslation()
+        cancelTranslation(keepingPresentation: presentation.isFolding)
         setMoreActionsPresented(false)
         isSharingAnchorHeld = false
         cancelDismissTask()
@@ -452,31 +476,37 @@ final class ClipboardAssistantController: ObservableObject {
         presentationGeneration &+= 1
         let generation = presentationGeneration
         guard let window, window.isVisible else {
+            presentation.layout = nil
             presentation.detection = nil
+            presentation.translation = nil
+            presentation.isFolding = false
+            isExpanded = false
             onPresentationChanged?(false)
             return
         }
         guard animated else {
             window.orderOut(nil)
             window.alphaValue = 1
+            presentation.layout = nil
             presentation.detection = nil
+            presentation.translation = nil
+            presentation.isFolding = false
+            isExpanded = false
             onPresentationChanged?(false)
             return
         }
-        NSAnimationContext.runAnimationGroup({ context in
-            context.duration = 0.18
-            context.timingFunction = CAMediaTimingFunction(name: .easeOut)
-            window.animator().alphaValue = 0
-        }, completionHandler: { [weak self] in
-            MainActor.assumeIsolated {
-                guard let self else { return }
-                guard self.presentationGeneration == generation else { return }
-                self.window?.orderOut(nil)
-                self.window?.alphaValue = 1
-                self.presentation.detection = nil
-                self.onPresentationChanged?(false)
-            }
-        })
+        animateDismissal(window, presentation.isFolding ? 0.26 : 0.18) { [weak self] in
+            guard let self else { return }
+            guard self.presentationGeneration == generation else { return }
+            self.window?.orderOut(nil)
+            self.window?.alphaValue = 1
+            self.presentation.layout = nil
+            self.presentation.detection = nil
+            self.presentation.translation = nil
+            self.presentation.isFolding = false
+            self.isExpanded = false
+            self.onPresentationChanged?(false)
+        }
     }
 
     /// Fires the given action and dismisses after completion; sharing keeps the anchor until its picker closes.
@@ -515,6 +545,7 @@ final class ClipboardAssistantController: ObservableObject {
               isSourceCurrent() else { return }
         cancelTranslation()
         cancelDismissTask()
+        isExpanded = false
         presentationGeneration &+= 1
         let generation = presentationGeneration
         presentation.translationGeneration = generation
@@ -548,6 +579,7 @@ final class ClipboardAssistantController: ObservableObject {
                 return
             }
             self.presentation.translation = translation
+            self.updateWindowLayout()
         }
     }
 
@@ -599,7 +631,7 @@ final class ClipboardAssistantController: ObservableObject {
         if !presentation.isHovered { scheduleDismiss() }
     }
 
-    private func cancelTranslation() {
+    private func cancelTranslation(keepingPresentation: Bool = false) {
         translationTask?.cancel()
         translationTask = nil
         systemTranslation.cancel()
@@ -608,7 +640,7 @@ final class ClipboardAssistantController: ObservableObject {
         translationReadingSeconds = nil
         visibleTranslationGeneration = nil
         pendingTranslationAppearance = nil
-        presentation.translation = nil
+        if !keepingPresentation { presentation.translation = nil }
     }
 
     func setHovered(_ hovered: Bool) {
@@ -702,7 +734,7 @@ final class ClipboardAssistantController: ObservableObject {
         guard let layout = rowLayout(for: detection) else { return }
         presentation.islandTopHeight = layout.rowHeight
         let frame = layout.frame
-        let window: IslandPanel
+        let window: NSWindow
         if let existing = self.window {
             window = existing
         } else {
@@ -734,61 +766,133 @@ final class ClipboardAssistantController: ObservableObject {
         })
     }
 
-    struct RowLayout {
+    struct RowLayout: Equatable {
         let frame: CGRect
+        let collapsedFrame: CGRect
+        let expandedFrame: CGRect
         let rowHeight: CGFloat
+        let style: IslandLayoutStyle
+        let edge: IslandEdge
+        let placementMode: IslandPlacementMode
+
+        var collapsedFrameInSurface: CGRect {
+            CGRect(x: collapsedFrame.minX - frame.minX, y: frame.maxY - collapsedFrame.maxY,
+                   width: collapsedFrame.width, height: collapsedFrame.height)
+        }
     }
 
-    /// Computes the row frame for a detection: centered on the screen's island anchor, sized
-    /// to the content. Shared by the initial presentation and async refreshes so a refreshed
-    /// detection (e.g. a currency result arriving after the live quote) keeps the same anchor.
     func rowLayout(for detection: ClipboardAssistantDetection) -> RowLayout? {
         guard let screen = screenAtPoint(presentationPoint) else { return nil }
-        let screenSnapshot = ScreenSnapshot(screen: screen)
-        let layout = screenSnapshot.map { ScreenLayoutEngine().layout(for: $0) }
-        let collapsedFrame = layout?.collapsedFrame
-            ?? CGRect(
-                x: screen.frame.midX,
-                y: screen.frame.maxY - Self.defaultRowHeight,
-                width: 0,
-                height: Self.defaultRowHeight
-            )
-        if let layout {
-            let topology = layout.topology
-            presentation.physicalNotchWidth = topology.hasPhysicalNotch ? topology.anchorFrame.width : 0
-        } else {
-            presentation.physicalNotchWidth = 0
-        }
-        let width = presentation.translation != nil
-            ? (layout?.collapsedFrame.width ?? ScreenLayoutConfiguration().simulatedIslandSize.width)
-                + (presentation.physicalNotchWidth > 0 ? SideNoticeLayoutEngine.compactStatusWingWidth * 2 : 0)
-            : ClipboardAssistantToastView.requiredRowWidth(
-            baseWidth: Self.islandRowWidth,
-            maximumWidth: max(320, screen.frame.width - 48),
-            notchWidth: presentation.physicalNotchWidth,
-            trailingControlsWidth: Self.trailingControlsWidth(
-                for: detection,
-                isLightweightMode: isLightweightMode,
-                shortcutHint: detection.action.flatMap { shortcutHint(for: $0) }
-            )
+        let snapshot = ScreenSnapshot(screen: screen) ?? ScreenSnapshot(
+            displayID: 0, frame: screen.frame, visibleFrame: screen.frame
         )
-        let rowHeight: CGFloat
-        if let screenSnapshot, layout?.topology.hasPhysicalNotch == true {
-            rowHeight = SideNoticeLayoutEngine().compactWingHeight(
-                for: screenSnapshot,
-                progressGlowEnabled: presentation.progressGlowEnabled
+        return rowLayout(for: detection, on: snapshot)
+    }
+
+    func rowLayout(
+        for detection: ClipboardAssistantDetection,
+        on screen: ScreenSnapshot,
+        locale: Locale = AppLocalization.currentLanguage.locale
+    ) -> RowLayout {
+        var configuration = screenLayoutConfiguration
+        let initial = ScreenLayoutEngine(configuration: configuration).layout(for: screen)
+        let rowHeight = initial.style == .pill
+            ? (initial.edge.isVertical ? initial.collapsedFrame.width : initial.collapsedFrame.height)
+            : initial.topology.hasPhysicalNotch
+                ? SideNoticeLayoutEngine().compactWingHeight(
+                    for: screen, progressGlowEnabled: presentation.progressGlowEnabled
+                )
+                : initial.collapsedFrame.height
+        let notchWidth = initial.style == .pill
+            ? initial.centerOcclusionWidth
+            : initial.topology.hasPhysicalNotch ? initial.collapsedFrame.width : 0
+        let shortcut = detection.action.flatMap { shortcutHint(for: $0) }
+        let controlsWidth = initial.style == .pill && configuration.placement.mode == .custom
+            ? ClipboardAssistantToastView.compactControlsWidth(
+                detection, isLightweightMode: isLightweightMode, shortcutHint: shortcut, locale: locale
+            )
+            : Self.trailingControlsWidth(
+                for: detection, isLightweightMode: isLightweightMode, shortcutHint: shortcut, locale: locale
+            )
+        let translation = presentation.translation
+        let expandsTranslation = translation != nil
+            && (translation != .loading || configuration.placement.mode == .camera)
+        let compactLength: CGFloat
+        if initial.style == .pill && configuration.placement.mode == .custom {
+            compactLength = translation != nil
+                ? ClipboardTranslationResultView.compactLength(
+                    text: ClipboardTranslationPresentation.loading.rowText(locale: locale),
+                    edge: initial.edge
+                )
+                : ClipboardAssistantToastView.compactLength(
+                    detection: detection, thickness: rowHeight, edge: initial.edge,
+                    isLightweightMode: isLightweightMode, controlsWidth: controlsWidth, locale: locale
+                )
+            configuration.compactStatusLength = compactLength
+        } else {
+            compactLength = translation != nil
+                ? initial.collapsedFrame.width
+                    + (initial.style == .notch && notchWidth > 0 ? SideNoticeLayoutEngine.compactStatusWingWidth * 2 : 0)
+                : ClipboardAssistantToastView.requiredRowWidth(
+                    baseWidth: Self.islandRowWidth, maximumWidth: max(320, screen.frame.width - 48),
+                    notchWidth: notchWidth, trailingControlsWidth: controlsWidth
+                )
+            configuration.pillSize.width = compactLength
+        }
+        let detailWidth = max(Self.islandRowWidth, initial.edge.isVertical ? 0 : compactLength)
+        let detailHeight = rowHeight + min(
+            ClipboardAssistantToastView.estimatedContentHeight(detection.fullContent ?? "", width: detailWidth), 220
+        )
+        configuration.expandedSize = translation != nil
+            ? CGSize(width: max(240, initial.edge.isVertical ? 0 : compactLength),
+                     height: rowHeight + VoiceRecordingIslandGeometry.transcriptRowHeight)
+            : CGSize(width: detailWidth, height: detailHeight)
+        let resolved: RowLayout
+        if initial.style == .pill {
+            let layout = ScreenLayoutEngine(configuration: configuration).layout(for: screen)
+            presentation.physicalNotchWidth = configuration.placement.mode == .camera ? layout.centerOcclusionWidth : 0
+            let expanded = isExpanded || expandsTranslation
+            resolved = RowLayout(
+                frame: expanded ? layout.expandedFrame : layout.collapsedFrame,
+                collapsedFrame: layout.collapsedFrame, expandedFrame: layout.expandedFrame,
+                rowHeight: rowHeight, style: .pill, edge: layout.edge,
+                placementMode: configuration.placement.mode
             )
         } else {
-            rowHeight = collapsedFrame.height
+            presentation.physicalNotchWidth = notchWidth
+            let collapsed = CGRect(
+                x: initial.collapsedFrame.midX - compactLength / 2,
+                y: initial.collapsedFrame.maxY - rowHeight, width: compactLength, height: rowHeight
+            )
+            let height = min(configuration.expandedSize.height, max(rowHeight, screen.visibleFrame.height - 80))
+            let expanded = CGRect(x: collapsed.minX, y: collapsed.maxY - height,
+                                  width: collapsed.width, height: height)
+            let frame = translation != nil || isExpanded ? expanded : collapsed
+            resolved = RowLayout(frame: frame, collapsedFrame: collapsed, expandedFrame: expanded,
+                                 rowHeight: rowHeight, style: .notch, edge: .top, placementMode: .camera)
         }
-        let height = rowHeight + (presentation.translation == nil ? 0 : VoiceRecordingIslandGeometry.transcriptRowHeight)
-        let frame = CGRect(
-            x: collapsedFrame.midX - width / 2,
-            y: collapsedFrame.maxY - height,
-            width: width,
-            height: height
-        )
-        return RowLayout(frame: frame, rowHeight: rowHeight)
+        presentation.islandTopHeight = resolved.rowHeight
+        presentation.layout = resolved
+        return resolved
+    }
+
+    func toggleExpansion(_ detection: ClipboardAssistantDetection) {
+        guard !isDismissing, !isScreenshotActive, !isSharingAnchorHeld,
+              presentation.translation == nil, presentation.detection == detection,
+              ClipboardAssistantToastView.canExpand(detection, isLightweightMode: isLightweightMode) else { return }
+        isExpanded.toggle()
+        updateWindowLayout()
+    }
+
+    private func updateWindowLayout() {
+        guard !isDismissing, let detection = presentation.detection,
+              let layout = rowLayout(for: detection) else { return }
+        guard let window, window.isVisible else { return }
+        NSAnimationContext.runAnimationGroup { context in
+            context.duration = 0.2
+            context.timingFunction = CAMediaTimingFunction(name: .easeOut)
+            window.animator().setFrame(layout.frame, display: false)
+        }
     }
 
     /// The result gets the full reading duration; obsolete requests cannot replace a newer prompt.
@@ -799,15 +903,10 @@ final class ClipboardAssistantController: ObservableObject {
         dismissalTotalDuration = displayDuration.expiresAfter
         pausedDismissalRemainingFraction = dismissalTotalDuration.map { _ in 1 }
         presentation.detection = detection
+        isExpanded = false
         refreshTriggers()
         if !presentation.isHovered { scheduleDismiss() }
-        guard let window, window.isVisible, let layout = rowLayout(for: detection) else { return }
-        presentation.islandTopHeight = layout.rowHeight
-        NSAnimationContext.runAnimationGroup { context in
-            context.duration = 0.18
-            context.timingFunction = CAMediaTimingFunction(name: .easeInEaseOut)
-            window.animator().setFrame(layout.frame, display: false)
-        }
+        updateWindowLayout()
     }
 
 }
@@ -819,10 +918,9 @@ struct ClipboardAssistantToastView: View {
     @ObservedObject var presentation: ClipboardAssistantPresentation
     @ObservedObject var controller: ClipboardAssistantController
 
-    private static let maxExpandedContentHeight: CGFloat = 220
     @Environment(\.locale) private var locale
     @Environment(\.layoutDirection) private var layoutDirection
-    @State private var isExpanded = false
+    private var isExpanded: Bool { controller.isExpanded }
 
     private var rowHeight: CGFloat {
         max(1, presentation.islandTopHeight)
@@ -848,54 +946,62 @@ struct ClipboardAssistantToastView: View {
                 .id(presentation.translationGeneration)
                 .id(presentation.translationIsPaused)
             } else if let detection = presentation.detection {
+                let style = presentation.layout?.style ?? .notch
+                let edge = presentation.layout?.edge ?? .top
+                let collapsed = presentation.layout?.collapsedFrameInSurface
+                    ?? CGRect(x: 0, y: 0, width: geometry.size.width,
+                              height: min(geometry.size.height, presentation.islandTopHeight))
                 IslandSurface(
-                    isCollapsed: !isExpanded,
-                    collapsedSize: CGSize(
-                        width: geometry.size.width,
-                        height: min(geometry.size.height, presentation.islandTopHeight)
-                    ),
+                    isCollapsed: !isExpanded || presentation.isFolding,
+                    collapsedSize: collapsed.size,
                     expandedSize: geometry.size,
                     visualStyle: presentation.visualStyle,
                     notchBackground: presentation.notchBackground,
                     collapsedTopCornerRadius: 0,
-                    bottomCornerRadius: VoiceRecordingIslandGeometry.bottomCornerRadius
+                    bottomCornerRadius: VoiceRecordingIslandGeometry.bottomCornerRadius,
+                    layoutStyle: style, collapsedFrame: style == .pill ? collapsed : nil, edge: edge
                 ) {
-                    VStack(spacing: 0) {
-                        toastHeader(detection)
-                        if isExpanded, let content = expandableContent(detection) {
-                            Rectangle()
-                                .fill(Color.white.opacity(0.08))
-                                .frame(height: 0.5)
-                                .padding(.horizontal, 14)
-                            expandedContentView(content)
+                    if isExpanded {
+                        VStack(spacing: 0) {
+                            toastHeader(detection)
+                            if let content = expandableContent(detection) {
+                                Rectangle()
+                                    .fill(Color.white.opacity(0.08))
+                                    .frame(height: 0.5)
+                                    .padding(.horizontal, 14)
+                                expandedContentView(content)
+                            }
                         }
+                        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+                    } else {
+                        toastHeader(detection)
+                            .frame(width: collapsed.width, height: collapsed.height)
+                            .position(x: collapsed.midX, y: collapsed.midY)
                     }
-                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
                 }
                 .overlay {
-                    TimelineView(
-                        .animation(
-                            minimumInterval: 1.0 / 30.0,
-                            paused: !isDismissalProgressActive
-                        )
-                    ) { context in
-                        if !isExpanded,
-                           presentation.progressGlowEnabled,
+                    TimelineView(.animation(minimumInterval: 1.0 / 30.0, paused: !isDismissalProgressActive)) { context in
+                        if !isExpanded, presentation.progressGlowEnabled,
                            let progress = controller.dismissalProgress(at: context.date) {
-                            CollapsedProgressGlow(progress: progress)
-                                .clipShape(IslandSilhouette(
-                                    topCornerRadius: 0,
-                                    bottomCornerRadius: VoiceRecordingIslandGeometry.bottomCornerRadius
-                                ))
+                            Group {
+                                if style == .pill {
+                                    CollapsedProgressGlow(progress: progress, layoutStyle: .pill)
+                                } else {
+                                    CollapsedProgressGlow(progress: progress)
+                                        .clipShape(IslandSilhouette(
+                                            topCornerRadius: 0,
+                                            bottomCornerRadius: VoiceRecordingIslandGeometry.bottomCornerRadius
+                                        ))
+                                }
+                            }
+                                .frame(width: collapsed.width, height: collapsed.height)
+                                .position(x: collapsed.midX, y: collapsed.midY)
+                                .allowsHitTesting(false)
                         }
                     }
                 }
-                .transition(.opacity.combined(with: .move(edge: .top)))
+                .transition(.opacity.combined(with: .move(edge: edge == .bottom ? .bottom : .top)))
                 .animation(.spring(response: 0.3, dampingFraction: 0.85), value: presentation.detection)
-                .onChange(of: presentation.detection) {
-                    // A new copy collapses any previously expanded preview.
-                    if isExpanded { isExpanded = false }
-                }
             }
         }
         .ignoresSafeArea(edges: .top)
@@ -918,14 +1024,16 @@ struct ClipboardAssistantToastView: View {
     @ViewBuilder
     private func toastHeader(_ detection: ClipboardAssistantDetection) -> some View {
         Group {
-            if presentation.physicalNotchWidth > 0 {
+            if isCompactSideHeader {
+                verticalHeader(detection)
+            } else if presentation.physicalNotchWidth > 0 {
                 physicalNotchHeader(detection)
             } else {
                 continuousHeader(detection)
                     .padding(.horizontal, 14)
             }
         }
-        .frame(height: rowHeight)
+        .frame(height: isCompactSideHeader ? nil : rowHeight)
         .contentShape(Rectangle())
         .contextMenu {
             actionMenuItems(detection.actions)
@@ -933,6 +1041,66 @@ struct ClipboardAssistantToastView: View {
         .onHover { hovering in
             controller.setHovered(hovering)
         }
+    }
+
+    private var isCompactSideHeader: Bool {
+        !isExpanded && presentation.layout?.style == .pill && presentation.layout?.edge.isVertical == true
+    }
+
+    private func verticalHeader(_ detection: ClipboardAssistantDetection) -> some View {
+        GeometryReader { geometry in
+            let controls = Self.verticalControlsLength(detection, isLightweightMode: controller.isLightweightMode)
+            VStack(spacing: 6) {
+                headerContent(detection, verticalTextHeight: max(0, geometry.size.height - 16 - 26 - controls - 12))
+                verticalControls(detection)
+            }
+            .padding(.vertical, 8)
+            .frame(width: geometry.size.width, height: geometry.size.height, alignment: .top)
+            .contentShape(Rectangle())
+            .onTapGesture {
+                if controller.isLightweightMode { controller.performCurrentAction() }
+            }
+        }
+    }
+
+    private func verticalControls(_ detection: ClipboardAssistantDetection) -> some View {
+        VStack(spacing: 6) {
+            if controller.isLightweightMode {
+                Image(systemName: "sparkle")
+                    .font(.system(size: 10))
+                    .frame(height: 20)
+            } else {
+                if Self.canExpand(detection, isLightweightMode: controller.isLightweightMode) {
+                    Button { controller.toggleExpansion(detection) } label: {
+                        Image(systemName: "chevron.down.circle").frame(width: 24, height: 22)
+                    }
+                    .help(loc("展开完整内容"))
+                }
+                if let primary = detection.action {
+                    Button { controller.perform(primary) } label: {
+                        Image(systemName: primary.kind?.symbolName ?? "arrow.up.right.square")
+                            .frame(width: 24, height: 22)
+                    }
+                    .help(actionTitleWithShortcut(primary))
+                    .accessibilityLabel(actionTitleWithShortcut(primary))
+                    Button { controller.setMoreActionsPresented(!controller.isMoreActionsPresented) } label: {
+                        Image(systemName: "ellipsis.circle").frame(width: 24, height: 22)
+                    }
+                    .help(loc("更多操作"))
+                    .popover(isPresented: Binding(get: { controller.isMoreActionsPresented },
+                                                 set: { controller.setMoreActionsPresented($0) })) {
+                        moreActionsPopover(for: detection)
+                    }
+                }
+                Button { controller.dismiss() } label: {
+                    Image(systemName: "xmark").font(.system(size: 9)).frame(width: 24, height: 20)
+                }
+                .help(loc("关闭"))
+            }
+        }
+        .buttonStyle(.plain)
+        .font(.system(size: 12, weight: .medium))
+        .foregroundStyle(.white.opacity(0.85))
     }
 
     private func continuousHeader(_ detection: ClipboardAssistantDetection) -> some View {
@@ -970,6 +1138,59 @@ struct ClipboardAssistantToastView: View {
         }
     }
 
+    static func compactControlsWidth(
+        _ detection: ClipboardAssistantDetection, isLightweightMode: Bool,
+        shortcutHint: String?, locale: Locale
+    ) -> CGFloat {
+        if isLightweightMode { return 20 }
+        var width: CGFloat = 20
+        if let action = detection.action {
+            let title = AppLocalization.string(actionLabel(action), locale: locale)
+            width += (title as NSString).size(withAttributes: [.font: NSFont.systemFont(ofSize: 11, weight: .medium)]).width
+                + 24 + 19 + 16
+            if let shortcutHint {
+                width += 6 + (shortcutHint as NSString).size(withAttributes: [
+                    .font: NSFont.systemFont(ofSize: 10, weight: .medium)
+                ]).width
+            }
+        }
+        if canExpand(detection, isLightweightMode: isLightweightMode) { width += 30 }
+        return width
+    }
+
+    static func verticalControlsLength(
+        _ detection: ClipboardAssistantDetection, isLightweightMode: Bool
+    ) -> CGFloat {
+        if isLightweightMode { return 20 }
+        var length: CGFloat = 20
+        if detection.action != nil { length += 56 }
+        if canExpand(detection, isLightweightMode: isLightweightMode) { length += 28 }
+        return length
+    }
+
+    static func compactLength(
+        detection: ClipboardAssistantDetection, thickness: CGFloat, edge: IslandEdge,
+        isLightweightMode: Bool, controlsWidth: CGFloat, locale: Locale
+    ) -> CGFloat {
+        let title = AppLocalization.string(detection.title, locale: locale)
+        if edge.isVertical {
+            let textLength = min(168, CGFloat(title.filter { !$0.isWhitespace }.count) * 14)
+            return 16 + 26 + 12 + textLength
+                + verticalControlsLength(detection, isLightweightMode: isLightweightMode)
+        }
+        let titleWidth = (title as NSString).size(withAttributes: [
+            .font: NSFont.systemFont(ofSize: 12, weight: .medium)
+        ]).width
+        let detailWidth = thickness >= 30 ? detailText(detection.detail, locale: locale).map {
+            ($0 as NSString).size(withAttributes: [.font: NSFont.systemFont(ofSize: 9.5)]).width
+        } ?? 0 : 0
+        let accessoryWidth: CGFloat = detection.actions.contains {
+            if case .saveImage = $0 { return true }
+            return false
+        } ? 38 : 26
+        return 28 + accessoryWidth + 20 + ceil(max(titleWidth, detailWidth)) + controlsWidth
+    }
+
     nonisolated static func physicalNotchSideWidth(totalWidth: CGFloat, notchWidth: CGFloat) -> CGFloat {
         let totalWidth = max(0, totalWidth)
         let reservedCenterWidth = min(max(0, notchWidth), totalWidth)
@@ -991,43 +1212,50 @@ struct ClipboardAssistantToastView: View {
     }
 
     @ViewBuilder
-    private func headerContent(_ detection: ClipboardAssistantDetection) -> some View {
-        if let dragText = dragText(for: detection) {
-            headerContentBody(detection)
+    private func headerContent(_ detection: ClipboardAssistantDetection, verticalTextHeight: CGFloat? = nil) -> some View {
+        if let dragText = Self.dragText(for: detection) {
+            headerContentBody(detection, verticalTextHeight: verticalTextHeight)
                 .onDrag { NSItemProvider(object: dragText as NSString) }
         } else {
-            headerContentBody(detection)
+            headerContentBody(detection, verticalTextHeight: verticalTextHeight)
         }
     }
 
-    private func headerContentBody(_ detection: ClipboardAssistantDetection) -> some View {
-        HStack(spacing: 10) {
+    private func headerContentBody(_ detection: ClipboardAssistantDetection, verticalTextHeight: CGFloat?) -> some View {
+        let layout = verticalTextHeight != nil
+            ? AnyLayout(VStackLayout(spacing: 6))
+            : AnyLayout(HStackLayout(spacing: 10))
+        return layout {
             leadingAccessory(detection)
 
-            Group {
-                if detection.contextNoteAddedAt != nil {
-                    MarqueeText(detection.title, font: .system(size: 12), textColor: .white.opacity(0.92),
-                                fontWeight: .medium, scrollDirection: layoutDirection == .rightToLeft ? .right : .left)
-                        .accessibilityElement(children: .ignore)
-                        .accessibilityLabel(detection.title)
-                } else {
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text(AppLocalization.text(detection.title))
-                            .font(.system(size: 12, weight: .medium))
-                            .foregroundStyle(.white.opacity(0.92))
-                            .fitsSingleLine()
-                            .truncationMode(.middle)
-                        if detailIsVisible, let detailText = detailText(detection.detail) {
-                            Text(detailText)
-                                .font(.system(size: 9.5, weight: .regular))
-                                .foregroundStyle(.white.opacity(0.55))
+            if let verticalTextHeight {
+                VerticalStatusText(text: loc(detection.title), availableHeight: verticalTextHeight)
+            } else {
+                Group {
+                    if detection.contextNoteAddedAt != nil {
+                        MarqueeText(detection.title, font: .system(size: 12), textColor: .white.opacity(0.92),
+                                    fontWeight: .medium, scrollDirection: layoutDirection == .rightToLeft ? .right : .left)
+                            .accessibilityElement(children: .ignore)
+                            .accessibilityLabel(detection.title)
+                    } else {
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text(AppLocalization.text(detection.title))
+                                .font(.system(size: 12, weight: .medium))
+                                .foregroundStyle(.white.opacity(0.92))
                                 .fitsSingleLine()
                                 .truncationMode(.middle)
+                            if detailIsVisible, let detailText = Self.detailText(detection.detail, locale: locale) {
+                                Text(detailText)
+                                    .font(.system(size: 9.5, weight: .regular))
+                                    .foregroundStyle(.white.opacity(0.55))
+                                    .fitsSingleLine()
+                                    .truncationMode(.middle)
+                            }
                         }
                     }
                 }
+                .frame(maxWidth: .infinity, alignment: .leading)
             }
-            .frame(maxWidth: .infinity, alignment: .leading)
         }
         .contentShape(Rectangle())
         .onTapGesture {
@@ -1036,7 +1264,7 @@ struct ClipboardAssistantToastView: View {
         }
     }
 
-    private func dragText(for detection: ClipboardAssistantDetection) -> String? {
+    nonisolated static func dragText(for detection: ClipboardAssistantDetection) -> String? {
         guard [.text, .nonSystemLanguageText, .code, .shellCommand, .math].contains(detection.kind),
               let content = detection.fullContent,
               !content.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
@@ -1051,7 +1279,8 @@ struct ClipboardAssistantToastView: View {
             Image(nsImage: thumbnail)
                 .resizable()
                 .scaledToFill()
-                .frame(width: 38, height: max(16, min(28, rowHeight - 6)))
+                .frame(width: isCompactSideHeader ? max(0, min(26, rowHeight - 6)) : 38,
+                       height: max(16, min(28, rowHeight - 6)))
                 .clipShape(RoundedRectangle(cornerRadius: 5, style: .continuous))
                 .overlay(
                     RoundedRectangle(cornerRadius: 5, style: .continuous)
@@ -1093,9 +1322,9 @@ struct ClipboardAssistantToastView: View {
                     .foregroundStyle(.white.opacity(0.4))
                     .frame(width: 20, height: max(16, min(20, rowHeight - 4)))
             } else {
-                if canExpand(detection) {
+                if Self.canExpand(detection, isLightweightMode: controller.isLightweightMode) {
                     Button {
-                        toggleExpansion(detection)
+                        controller.toggleExpansion(detection)
                     } label: {
                         Image(systemName: isExpanded ? "chevron.up.circle.fill" : "chevron.down.circle")
                             .font(.system(size: 11, weight: .medium))
@@ -1234,47 +1463,25 @@ struct ClipboardAssistantToastView: View {
 
     // MARK: Expanded content
 
-    private func canExpand(_ detection: ClipboardAssistantDetection) -> Bool {
+    static func canExpand(_ detection: ClipboardAssistantDetection, isLightweightMode: Bool) -> Bool {
         guard ![.url, .text, .nonSystemLanguageText, .code, .shellCommand, .math, .conversion].contains(detection.kind) else {
             return false
         }
-        guard !controller.isLightweightMode, let content = detection.fullContent else { return false }
+        guard !isLightweightMode, let content = detection.fullContent else { return false }
         return content.count > 40 || content.contains("\n")
     }
 
     private func expandableContent(_ detection: ClipboardAssistantDetection) -> String? {
-        canExpand(detection) ? detection.fullContent : nil
+        Self.canExpand(detection, isLightweightMode: controller.isLightweightMode) ? detection.fullContent : nil
     }
 
-    private func toggleExpansion(_ detection: ClipboardAssistantDetection) {
-        isExpanded.toggle()
-        let expanded = isExpanded
-        guard let window = controller.windowForFrameUpdate else { return }
-        guard let screen = WindowPlacement.screenUnderMouse() ?? NSScreen.main else { return }
-        var frame = window.frame
-        let topY = frame.maxY
-        var newHeight = rowHeight
-        if expanded {
-            let textHeight = estimateExpandedHeight(detection.fullContent ?? "", width: frame.width)
-            newHeight = rowHeight + min(textHeight, Self.maxExpandedContentHeight)
-        }
-        newHeight = min(newHeight, screen.visibleFrame.height - 80)
-        frame.origin.y = topY - newHeight
-        frame.size.height = newHeight
-        NSAnimationContext.runAnimationGroup { context in
-            context.duration = 0.2
-            context.timingFunction = CAMediaTimingFunction(name: .easeOut)
-            window.animator().setFrame(frame, display: false)
-        }
-    }
-
-    private func estimateExpandedHeight(_ content: String, width: CGFloat) -> CGFloat {
+    static func estimatedContentHeight(_ content: String, width: CGFloat) -> CGFloat {
         let font = NSFont.monospacedSystemFont(ofSize: 10, weight: .regular)
-        let textWidth = width - 40
+        let textWidth = max(1, width - 40)
         var totalLines: CGFloat = 0
         for line in content.components(separatedBy: "\n") {
             let lineWidth = (line as NSString).size(withAttributes: [.font: font]).width
-            totalLines += lineWidth > 0 ? max(1, ceil(lineWidth / max(textWidth, 1))) : 1
+            totalLines += max(1, ceil(lineWidth / textWidth))
         }
         return totalLines * 13 + 24
     }
@@ -1299,7 +1506,7 @@ struct ClipboardAssistantToastView: View {
     }
 
     /// Locale-aware rendering of the structured detection detail.
-    private func detailText(_ detail: ClipboardAssistantDetail?) -> String? {
+    static func detailText(_ detail: ClipboardAssistantDetail?, locale: Locale) -> String? {
         switch detail {
         case .characterCount(let count):
             AppLocalization.format("%ld 个字符", locale: locale, [count])
@@ -1328,7 +1535,7 @@ struct ClipboardAssistantToastView: View {
         }
     }
 
-    private func byteCountText(_ bytes: Int) -> String {
+    private static func byteCountText(_ bytes: Int) -> String {
         ByteCountFormatter.string(fromByteCount: Int64(bytes), countStyle: .file)
     }
 

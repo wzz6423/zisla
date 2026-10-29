@@ -3109,3 +3109,26 @@
 "未知导入时间" = "Không rõ thời gian nhập";
 "未知拍摄时间" = "Không rõ thời gian chụp";
 "已跳过 %d 个重复素材" = "Đã bỏ qua %d mục phương tiện trùng lặp";
+
+/* Adaptive island appearance and placement */
+"灵动岛材质" = "Chất liệu Dynamic Island";
+"刘海材质" = "Chất liệu phần khuyết";
+"选择贴边刘海或悬浮药丸" = "Chọn phần khuyết sát cạnh màn hình hoặc dạng viên nhộng nổi";
+"刘海模式" = "Chế độ phần khuyết";
+"灵动岛模式" = "Chế độ Dynamic Island";
+"灵动岛位置" = "Vị trí Dynamic Island";
+"摄像头位置居中对齐菜单栏；其他位置可拖动到屏幕四边" = "Vị trí camera nằm giữa thanh menu; vị trí tùy chỉnh có thể được kéo đến bất kỳ cạnh nào của màn hình";
+"其他位置" = "Vị trí tùy chỉnh";
+"调整位置" = "Điều chỉnh vị trí";
+"药丸宽度" = "Chiều rộng viên nhộng";
+"以屏幕点为单位微调药丸尺寸" = "Tinh chỉnh kích thước viên nhộng theo đơn vị điểm màn hình";
+"药丸高度" = "Chiều cao viên nhộng";
+"摄像头位置的高度自动限制在菜单栏内" = "Ở vị trí camera, chiều cao được tự động giới hạn trong thanh menu";
+"黑色" = "Màu đen";
+"收起时上侧黑色，下侧透明" = "Khi thu gọn, phần trên màu đen và phần dưới trong suốt";
+"音乐动效" = "Hiệu ứng nhạc";
+"音浪或随音乐节奏呼吸的专辑光晕" = "Hiển thị sóng âm hoặc bìa album với quầng sáng nhịp nhàng theo điệu nhạc";
+"音浪模式" = "Chế độ sóng âm";
+"光晕模式" = "Chế độ quầng sáng";
+"拖动药丸到屏幕边缘，按回车完成，按 Esc 取消。" = "Kéo viên nhộng đến cạnh màn hình. Nhấn Return để hoàn tất hoặc Esc để hủy.";
+"Liquid Glass" = "Liquid Glass";

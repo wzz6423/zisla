@@ -19,7 +19,10 @@ public final class OverlayCoordinator: NSObject {
     public private(set) var layouts: [ScreenOverlayLayout] = []
     public private(set) var activeDisplayID: CGDirectDisplayID? {
         didSet {
-            if oldValue != activeDisplayID { transientWindows.removeAll() }
+            if oldValue != activeDisplayID {
+                transientWindows.removeAll()
+                reportActiveLayout()
+            }
         }
     }
     public private(set) var isRunning = false
@@ -27,16 +30,22 @@ public final class OverlayCoordinator: NSObject {
     public var onDraggingChanged: (@MainActor (Bool) -> Void)?
     public var onCollapsedSizeChanged: (@MainActor (CGSize) -> Void)?
     public var onActiveDisplayHasPhysicalNotchChanged: (@MainActor (Bool) -> Void)?
+    public var onActiveLayoutChanged: (@MainActor (ScreenOverlayLayout?) -> Void)?
     public private(set) var persistentPanelDisplayIDs: Set<CGDirectDisplayID> = []
 
     public var isVisible: Bool {
         reducer.state.visibility != .hidden
     }
 
+    public var activeLayout: ScreenOverlayLayout? {
+        layout(for: activeDisplayID)
+    }
+
     private let contentView: NSView
     private let persistentContentViewProvider: ((ScreenOverlayLayout) -> NSView?)?
     private let persistentPanelFrameProvider: ((ScreenOverlayLayout) -> CGRect)?
     private var layoutEngine: ScreenLayoutEngine
+    private var lastReportedActiveLayout: ScreenOverlayLayout?
     private let collapseDelay: Duration
     private let pointerEntryGrace: Duration
     private var reducer = IslandPresentationReducer()
@@ -229,6 +238,7 @@ public final class OverlayCoordinator: NSObject {
                 ?? layouts.first?.displayID
         }
 
+        reportActiveLayout()
         if isVisible, repositionVisiblePanel {
             if activeDisplayID == nil {
                 activeDisplayID =
@@ -239,6 +249,27 @@ public final class OverlayCoordinator: NSObject {
         }
         if refreshPersistentPanels {
             updatePersistentPanels()
+        }
+    }
+
+    public func updatePlacement(
+        layoutStyle: IslandLayoutStyle,
+        placement: IslandPlacement,
+        pillSize: CGSize? = nil,
+        edgeInset: CGFloat? = nil
+    ) {
+        var configuration = layoutEngine.configuration
+        configuration.layoutStyle = layoutStyle
+        configuration.placement = placement
+        if let pillSize { configuration.pillSize = pillSize }
+        if let edgeInset { configuration.edgeInset = edgeInset }
+        guard configuration != layoutEngine.configuration else { return }
+        layoutEngine.configuration = configuration
+        refreshScreens()
+        if !isVisible, let layout = activeLayout {
+            onCollapsedSizeChanged?(layout.collapsedFrame.size)
+            onActiveDisplayHasPhysicalNotchChanged?(layout.topology.hasPhysicalNotch)
+            panel?.resize(to: layout.expandedFrame)
         }
     }
 
@@ -266,6 +297,18 @@ public final class OverlayCoordinator: NSObject {
             if isExpanded { schedulePointerRevalidation() }
         } else {
             presentCurrentLayout()
+        }
+    }
+
+    public func updateCompactStatus(expandsForDetailedStatus: Bool, compactStatusLength: CGFloat? = nil) {
+        guard layoutEngine.configuration.expandsForDetailedStatus != expandsForDetailedStatus
+            || layoutEngine.configuration.compactStatusLength != compactStatusLength else { return }
+        layoutEngine.configuration.expandsForDetailedStatus = expandsForDetailedStatus
+        layoutEngine.configuration.compactStatusLength = compactStatusLength
+        refreshScreens()
+        if !isVisible, let layout = activeLayout {
+            onCollapsedSizeChanged?(layout.collapsedFrame.size)
+            panel?.resize(to: layout.expandedFrame)
         }
     }
 
@@ -396,11 +439,31 @@ public final class OverlayCoordinator: NSObject {
 
     static func containsPopoverAttachment(_ point: CGPoint, island: CGRect, popover: CGRect, anchor: CGRect) -> Bool {
         // Bridge only the arrow's short gap, never the bounding box between two windows.
-        let gap = island.minY - popover.maxY
-        guard (0...16).contains(gap) else { return false }
         let left = max(anchor.minX, popover.minX)
         let right = min(anchor.maxX, popover.maxX)
-        return right > left && CGRect(x: left, y: popover.maxY, width: right - left, height: gap).contains(point)
+        if right > left {
+            let bottomGap = island.minY - popover.maxY
+            if (0...16).contains(bottomGap),
+               CGRect(x: left, y: popover.maxY, width: right - left, height: bottomGap).contains(point) {
+                return true
+            }
+            let topGap = popover.minY - island.maxY
+            if (0...16).contains(topGap),
+               CGRect(x: left, y: island.maxY, width: right - left, height: topGap).contains(point) {
+                return true
+            }
+        }
+        let bottom = max(anchor.minY, popover.minY)
+        let top = min(anchor.maxY, popover.maxY)
+        guard top > bottom else { return false }
+        let leftGap = island.minX - popover.maxX
+        if (0...16).contains(leftGap),
+           CGRect(x: popover.maxX, y: bottom, width: leftGap, height: top - bottom).contains(point) {
+            return true
+        }
+        let rightGap = popover.minX - island.maxX
+        return (0...16).contains(rightGap)
+            && CGRect(x: island.maxX, y: bottom, width: rightGap, height: top - bottom).contains(point)
     }
 
     /// Pauses hover expansion while another top-level prompt occupies the island trigger area.
@@ -844,6 +907,13 @@ public final class OverlayCoordinator: NSObject {
         layoutEngine.screenLayout(containing: point, in: layouts)
     }
 
+    private func reportActiveLayout() {
+        let layout = activeLayout
+        guard lastReportedActiveLayout != layout else { return }
+        lastReportedActiveLayout = layout
+        onActiveLayoutChanged?(layout)
+    }
+
     private func layout(for displayID: CGDirectDisplayID?) -> ScreenOverlayLayout? {
         guard let displayID else { return nil }
         return layouts.first { $0.displayID == displayID }
@@ -852,6 +922,7 @@ public final class OverlayCoordinator: NSObject {
     private func presentCurrentLayout() {
         guard !isScreenLocked,
             !isScreenshotActive,
+            !isHoverActivationSuspended,
             let layout = layout(for: activeDisplayID)
         else { return }
         // After repositioning to a different screen, don't let a pending collapse task on the old screen prematurely hide the shared panel.
@@ -885,6 +956,7 @@ public final class OverlayCoordinator: NSObject {
     private func updatePersistentPanels(forcePresent: Bool = false) {
         guard !isScreenLocked,
             !isScreenshotActive,
+            !isHoverActivationSuspended,
             !isVoiceRecording,
             !isTransientNoticePresented,
             isPersistentContentVisible,

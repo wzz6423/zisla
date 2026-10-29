@@ -21,19 +21,21 @@ struct VoiceRecordingIslandGeometry: Equatable {
 
     let collapsedSize: CGSize
     let surfaceSize: CGSize
+    var edge: IslandEdge = .top
 
     init(collapsedSize: CGSize, surfaceSize: CGSize) {
         self.collapsedSize = collapsedSize
         self.surfaceSize = surfaceSize
     }
 
-    init(collapsedSize: CGSize, availableSize: CGSize) {
+    init(collapsedSize: CGSize, availableSize: CGSize, edge: IslandEdge = .top) {
         self.collapsedSize = collapsedSize
+        self.edge = edge
         surfaceSize = CGSize(
             // The available size is already the collapsed pill's overflow width (notch +
             // wings); recording only adds one transcript row below, never a wider bottom.
             width: max(0, availableSize.width),
-            height: min(
+            height: edge.isVertical ? max(0, availableSize.height) : min(
                 max(0, availableSize.height),
                 max(0, collapsedSize.height) + Self.transcriptRowHeight
             )
@@ -43,20 +45,34 @@ struct VoiceRecordingIslandGeometry: Equatable {
     /// The top row spans the full overflow width: on notched screens the physical notch
     /// covers the center, so the mic and waveform must land in the left/right wings.
     var topRowFrame: CGRect {
-        CGRect(
+        if edge.isVertical {
+            let width = min(max(0, collapsedSize.width), surfaceSize.width)
+            return CGRect(
+                x: edge == .right ? surfaceSize.width - width : 0,
+                y: 0, width: width, height: surfaceSize.height
+            )
+        }
+        let height = min(max(0, collapsedSize.height), max(0, surfaceSize.height))
+        return CGRect(
             x: 0,
-            y: 0,
+            y: edge == .bottom ? surfaceSize.height - height : 0,
             width: surfaceSize.width,
-            height: min(max(0, collapsedSize.height), max(0, surfaceSize.height))
+            height: height
         )
     }
 
     var transcriptRowFrame: CGRect {
-        CGRect(
+        if edge.isVertical {
+            return CGRect(
+                x: edge == .left ? topRowFrame.maxX : 0,
+                y: 0, width: max(0, surfaceSize.width - topRowFrame.width), height: surfaceSize.height
+            )
+        }
+        return CGRect(
             x: 0,
-            y: topRowFrame.maxY,
+            y: edge == .bottom ? 0 : topRowFrame.maxY,
             width: surfaceSize.width,
-            height: max(0, surfaceSize.height - topRowFrame.maxY)
+            height: max(0, surfaceSize.height - topRowFrame.height)
         )
     }
 }
@@ -79,6 +95,9 @@ struct IslandSurface<Content: View>: View {
     private let bottomCornerRadius: CGFloat?
     private let collapsedCenterOffsetX: CGFloat
     private let resultSweep: AIResultSweepController?
+    private let layoutStyle: IslandLayoutStyle
+    private let collapsedFrame: CGRect?
+    private let edge: IslandEdge
 
     init(
         isCollapsed: Bool = false,
@@ -91,6 +110,9 @@ struct IslandSurface<Content: View>: View {
         bottomCornerRadius: CGFloat? = nil,
         collapsedCenterOffsetX: CGFloat = 0,
         resultSweep: AIResultSweepController? = nil,
+        layoutStyle: IslandLayoutStyle = .notch,
+        collapsedFrame: CGRect? = nil,
+        edge: IslandEdge = .top,
         @ViewBuilder content: @escaping () -> Content
     ) {
         self.isCollapsed = isCollapsed
@@ -103,6 +125,9 @@ struct IslandSurface<Content: View>: View {
         self.bottomCornerRadius = bottomCornerRadius
         self.collapsedCenterOffsetX = collapsedCenterOffsetX
         self.resultSweep = resultSweep
+        self.layoutStyle = layoutStyle
+        self.collapsedFrame = collapsedFrame
+        self.edge = edge
         self.content = content
     }
 
@@ -144,7 +169,9 @@ struct IslandSurface<Content: View>: View {
                 isCollapsed: maskIsCollapsed,
                 collapsedTopCornerRadius: collapsedTopCornerRadius,
                 expandedBottomCornerRadius: rimBottomCornerRadius,
-                collapsedCenterOffsetX: collapsedCenterOffsetX
+                collapsedCenterOffsetX: collapsedCenterOffsetX,
+                layoutStyle: layoutStyle,
+                collapsedFrame: collapsedFrame
             )
             .animation(
                 reduceMotion
@@ -164,14 +191,41 @@ struct IslandSurface<Content: View>: View {
     @ViewBuilder
     private var unifiedSurface: some View {
         if renderingPolicy.usesExpandedMaterial {
-            switch visualStyle {
-            case .frosted:
-                frostedSurface
-            case .transparent:
-                transparentSurface
+            if usesCompactGlassSurface, layoutStyle == .pill, edge.isVertical {
+                compactSideSurface
+            } else {
+                switch visualStyle {
+                case .frosted:
+                    frostedSurface
+                case .transparent:
+                    transparentSurface
+                }
             }
         } else {
             collapsedSurface
+        }
+    }
+
+    private var compactSideSurface: some View {
+        let crownWidth = collapsedSize.width
+        let blendWidth = min(expandedSize.width, crownWidth + 60)
+        return ZStack {
+            if reduceTransparency {
+                Color(white: 0.10)
+            } else if visualStyle == .transparent {
+                transparentLiquidGlassShell
+            } else {
+                glassBody
+            }
+            LinearGradient(
+                stops: [
+                    .init(color: .black, location: 0),
+                    .init(color: .black, location: min(1, crownWidth / max(1, expandedSize.width))),
+                    .init(color: .clear, location: min(1, blendWidth / max(1, expandedSize.width)))
+                ],
+                startPoint: edge == .left ? .leading : .trailing,
+                endPoint: edge == .left ? .trailing : .leading
+            )
         }
     }
 
@@ -218,7 +272,17 @@ struct IslandSurface<Content: View>: View {
 
     @ViewBuilder
     private var collapsedSurface: some View {
-        if reduceTransparency {
+        if layoutStyle == .pill {
+            GeometryReader { proxy in
+                let frame = collapsedFrame ?? CGRect(
+                    x: (proxy.size.width - collapsedSize.width) / 2,
+                    y: 0, width: collapsedSize.width, height: collapsedSize.height
+                )
+                IslandCollapsedMaterial(style: notchBackground)
+                    .frame(width: frame.width, height: frame.height)
+                    .position(x: frame.midX, y: frame.midY)
+            }
+        } else if reduceTransparency {
             Color.black
         } else {
             Group {
@@ -227,6 +291,8 @@ struct IslandSurface<Content: View>: View {
                     Color.black
                 case .frosted:
                     VisualEffectBackground(alphaValue: 0.92, material: .popover)
+                case .liquidGlass:
+                    IslandCollapsedMaterial(style: .liquidGlass)
                 }
             }
             .frame(width: collapsedSize.width, height: collapsedSize.height)
@@ -269,6 +335,7 @@ struct IslandSurface<Content: View>: View {
             blendHeight: blendHeight,
             peakOpacity: compactCrownOpacity
         )
+        .scaleEffect(x: 1, y: edge == .bottom ? -1 : 1)
         .allowsHitTesting(false)
     }
 
@@ -430,12 +497,14 @@ struct IslandCrownSurface: View, Animatable {
     }
 }
 
-private struct IslandRevealMask: Shape {
+struct IslandRevealMask: Shape {
     let collapsedSize: CGSize
     let expandedSize: CGSize
     let collapsedTopCornerRadius: CGFloat
     let expandedBottomCornerRadius: CGFloat
     let collapsedCenterOffsetX: CGFloat
+    let layoutStyle: IslandLayoutStyle
+    let collapsedFrame: CGRect?
     private var revealProgress: CGFloat
 
     init(
@@ -444,13 +513,17 @@ private struct IslandRevealMask: Shape {
         isCollapsed: Bool,
         collapsedTopCornerRadius: CGFloat = 5,
         expandedBottomCornerRadius: CGFloat = IslandSurfaceGeometry.expandedBottomCornerRadius,
-        collapsedCenterOffsetX: CGFloat = 0
+        collapsedCenterOffsetX: CGFloat = 0,
+        layoutStyle: IslandLayoutStyle = .notch,
+        collapsedFrame: CGRect? = nil
     ) {
         self.collapsedSize = collapsedSize
         self.expandedSize = expandedSize
         self.collapsedTopCornerRadius = collapsedTopCornerRadius
         self.expandedBottomCornerRadius = expandedBottomCornerRadius
         self.collapsedCenterOffsetX = collapsedCenterOffsetX
+        self.layoutStyle = layoutStyle
+        self.collapsedFrame = collapsedFrame
         revealProgress = isCollapsed ? 0 : 1
     }
 
@@ -460,6 +533,22 @@ private struct IslandRevealMask: Shape {
     }
 
     func path(in rect: CGRect) -> Path {
+        if layoutStyle == .pill {
+            let start = collapsedFrame ?? CGRect(
+                x: rect.midX - collapsedSize.width / 2,
+                y: rect.minY, width: collapsedSize.width, height: collapsedSize.height
+            )
+            let progress = min(1, max(0, revealProgress))
+            let frame = CGRect(
+                x: start.minX + (rect.minX - start.minX) * progress,
+                y: start.minY + (rect.minY - start.minY) * progress,
+                width: start.width + (rect.width - start.width) * progress,
+                height: start.height + (rect.height - start.height) * progress
+            )
+            let radius = min(start.width, start.height) / 2
+            return RoundedRectangle(cornerRadius: radius + (expandedBottomCornerRadius - radius) * progress)
+                .path(in: frame)
+        }
         let transform = IslandSurfaceTransform(
             collapsedSize: collapsedSize,
             expandedSize: expandedSize,
@@ -588,12 +677,12 @@ struct LiquidGlassPaneBackground: NSViewRepresentable {
 
 /// Uses the system Liquid Glass renderer only as an optical shell. Keeping content out of the
 /// native view avoids its large-surface white wash while retaining the real refraction effect.
-private enum NativeLiquidGlassMaterial {
+enum NativeLiquidGlassMaterial {
     case regular
     case clear
 }
 
-private struct NativeLiquidGlassShell: NSViewRepresentable {
+struct NativeLiquidGlassShell: NSViewRepresentable {
     let isCollapsed: Bool
     let material: NativeLiquidGlassMaterial
     let cornerRadius: CGFloat

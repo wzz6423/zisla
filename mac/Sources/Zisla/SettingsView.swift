@@ -323,6 +323,20 @@ struct SettingsView: View {
                     .keepsIntrinsicWidth()
                     .disabled(!model.settingsStore.settings.mediaEnabled)
                 }
+                rowDivider
+                settingRow(symbol: "waveform", title: "音乐动效", detail: "音浪或随音乐节奏呼吸的专辑光晕") {
+                    Picker("", selection: Binding(
+                        get: { settingsStore.settings.mediaVisualizationStyle },
+                        set: { settingsStore.settings.mediaVisualizationStyle = $0 }
+                    )) {
+                        ForEach(MediaVisualizationStyle.allCases, id: \.self) { style in
+                            AppLocalizedText(style.title).tag(style)
+                        }
+                    }
+                    .labelsHidden()
+                    .pickerStyle(.menu)
+                    .disabled(!settingsStore.settings.mediaEnabled)
+                }
                 if model.settingsStore.settings.systemMonitorEnabled {
                     rowDivider
                     settingRow(
@@ -2462,9 +2476,68 @@ struct SettingsView: View {
             }
 
             settingsGroup("灵动岛样式") {
+                settingRow(symbol: "capsule", title: "灵动岛样式", detail: "选择贴边刘海或悬浮药丸") {
+                    Picker("", selection: Binding(
+                        get: { settingsStore.settings.islandLayoutStyle },
+                        set: { settingsStore.settings.islandLayoutStyle = $0 }
+                    )) {
+                        AppLocalizedText("刘海模式").tag(IslandLayoutStyle.notch)
+                        AppLocalizedText("灵动岛模式").tag(IslandLayoutStyle.pill)
+                    }
+                    .labelsHidden()
+                    .pickerStyle(.menu)
+                }
+                if settingsStore.settings.islandLayoutStyle == .pill {
+                    rowDivider
+                    settingRow(symbol: "viewfinder", title: "灵动岛位置", detail: "摄像头位置居中对齐菜单栏；其他位置可拖动到屏幕四边") {
+                        HStack(spacing: 8) {
+                            Picker("", selection: Binding(
+                                get: { settingsStore.settings.islandPlacement.mode },
+                                set: { mode in
+                                    if mode == .custom {
+                                        model.onChooseIslandPlacement?()
+                                    } else {
+                                        settingsStore.settings.islandPlacement = IslandPlacement()
+                                    }
+                                }
+                            )) {
+                                AppLocalizedText("摄像头位置").tag(IslandPlacementMode.camera)
+                                AppLocalizedText("其他位置").tag(IslandPlacementMode.custom)
+                            }
+                            .labelsHidden()
+                            .pickerStyle(.menu)
+                            if settingsStore.settings.islandPlacement.mode == .custom {
+                                Button(AppLocalization.text("调整位置")) { model.onChooseIslandPlacement?() }
+                            }
+                        }
+                    }
+                    rowDivider
+                    settingRow(symbol: "arrow.left.and.right", title: "药丸宽度", detail: "以屏幕点为单位微调药丸尺寸") {
+                        Stepper(value: Binding(
+                            get: { settingsStore.settings.islandPillWidth },
+                            set: { settingsStore.settings.islandPillWidth = $0 }
+                        ), in: 80...400, step: 2) {
+                            Text("\(Int(settingsStore.settings.islandPillWidth)) pt")
+                                .monospacedDigit()
+                        }
+                        .fixedSize()
+                    }
+                    rowDivider
+                    settingRow(symbol: "arrow.up.and.down", title: "药丸高度", detail: "摄像头位置的高度自动限制在菜单栏内") {
+                        Stepper(value: Binding(
+                            get: { settingsStore.settings.islandPillHeight },
+                            set: { settingsStore.settings.islandPillHeight = $0 }
+                        ), in: 20...64, step: 2) {
+                            Text("\(Int(settingsStore.settings.islandPillHeight)) pt")
+                                .monospacedDigit()
+                        }
+                        .fixedSize()
+                    }
+                }
+                rowDivider
                 settingRow(
                     symbol: "rectangle.on.rectangle.angled",
-                    title: "灵动岛样式",
+                    title: "灵动岛材质",
                     detail: "",
                     detailLineLimit: nil
                 ) {
@@ -2478,7 +2551,7 @@ struct SettingsView: View {
                 rowDivider
                 settingRow(
                     symbol: "rectangle.topthird.inset.filled",
-                    title: "刘海背景",
+                    title: "刘海材质",
                     detail: ""
                 ) {
                     IslandNotchBackgroundPicker(

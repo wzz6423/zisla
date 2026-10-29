@@ -3109,3 +3109,26 @@
 "未知导入时间" = "Fecha de importación desconocida";
 "未知拍摄时间" = "Fecha de captura desconocida";
 "已跳过 %d 个重复素材" = "Se omitieron %d elementos multimedia duplicados";
+
+/* Adaptive island appearance and placement */
+"灵动岛材质" = "Material de Dynamic Island";
+"刘海材质" = "Material de la muesca";
+"选择贴边刘海或悬浮药丸" = "Elige una muesca alineada con el borde o una cápsula flotante";
+"刘海模式" = "Modo muesca";
+"灵动岛模式" = "Modo Dynamic Island";
+"灵动岛位置" = "Posición de Dynamic Island";
+"摄像头位置居中对齐菜单栏；其他位置可拖动到屏幕四边" = "La posición de la cámara se centra en la barra de menús; la posición personalizada se puede arrastrar a cualquier borde de la pantalla";
+"其他位置" = "Posición personalizada";
+"调整位置" = "Ajustar posición";
+"药丸宽度" = "Ancho de la cápsula";
+"以屏幕点为单位微调药丸尺寸" = "Ajusta con precisión el tamaño de la cápsula en puntos de pantalla";
+"药丸高度" = "Alto de la cápsula";
+"摄像头位置的高度自动限制在菜单栏内" = "En la posición de la cámara, la altura se limita automáticamente a la barra de menús";
+"黑色" = "Negro";
+"收起时上侧黑色，下侧透明" = "Parte superior negra e inferior transparente al contraerse";
+"音乐动效" = "Animación musical";
+"音浪或随音乐节奏呼吸的专辑光晕" = "Muestra una onda o la portada del álbum con un halo que pulsa al ritmo de la música";
+"音浪模式" = "Modo onda";
+"光晕模式" = "Modo halo";
+"拖动药丸到屏幕边缘，按回车完成，按 Esc 取消。" = "Arrastra la cápsula a un borde de la pantalla. Pulsa Retorno para terminar o Esc para cancelar.";
+"Liquid Glass" = "Liquid Glass";

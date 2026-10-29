@@ -188,6 +188,18 @@ struct IslandModuleLayout: Equatable {
     islandSize: CGSize(width: 240, height: 54),
     panelSize: CGSize(width: 240, height: 58)
   )
+
+  static func compactSurface(collapsedSize: CGSize, overflowWidth: CGFloat, edge: IslandEdge) -> IslandModuleLayout {
+    if edge.isVertical {
+      let size = CGSize(width: 320, height: max(80, collapsedSize.height))
+      return IslandModuleLayout(islandSize: size, panelSize: size)
+    }
+    let height = collapsedSize.height + VoiceRecordingIslandGeometry.transcriptRowHeight
+    return IslandModuleLayout(
+      islandSize: CGSize(width: max(70, overflowWidth), height: height),
+      panelSize: CGSize(width: max(70, overflowWidth), height: height + 4)
+    )
+  }
   /// Mirror uses a square panel so the camera preview maintains its natural aspect ratio without cropping.
   static let mirror = IslandModuleLayout(
     islandSize: CGSize(width: 640, height: 640),
@@ -455,6 +467,13 @@ final class AppModel: ObservableObject {
   var hasActiveDownloads: Bool { !activeDownloadIDs.isEmpty }
   @Published private(set) var mailComposeRequest: MailComposeRequest?
   @Published var collapsedIslandSize = CGSize(width: 240, height: 34)
+  @Published var islandScreenLayout: ScreenOverlayLayout?
+  var onChooseIslandPlacement: (() -> Void)?
+  var islandEdge: IslandEdge {
+    guard settingsStore.settings.islandLayoutStyle == .pill else { return .top }
+    let placement = settingsStore.settings.islandPlacement
+    return placement.mode == .camera ? .top : placement.edge
+  }
   @Published var isIslandOnPhysicalNotch = false
 
   /// Overflow width of the collapsed capsule. On notched displays, the compact bar extends one wing width past each side of the notch.
@@ -1213,7 +1232,9 @@ final class AppModel: ObservableObject {
     guard let message = transientMessage else { return }
     let duration = TransientNoticeMetrics.displayDuration(
       for: message,
-      rowWidth: collapsedOverflowWidth
+      rowWidth: islandEdge.isVertical
+        ? 320 - collapsedIslandSize.width
+        : collapsedOverflowWidth
     )
     transientMessageDismissTask = Task { @MainActor [weak self] in
       try? await Task.sleep(for: duration)
@@ -3126,6 +3147,7 @@ final class AppModel: ObservableObject {
     clipboardHistoryMonitor.setEnabled(
       settings.clipboardHistoryEnabled || settings.clipboardAssistantEnabled
     )
+    clipboardAssistant.screenLayoutConfiguration = settings.islandScreenConfiguration
     if settings.clipboardAssistantEnabled {
       clipboardAssistant.setTriggers(
         hotkey: settings.clipboardAssistantTriggerConfiguration.hotkey,
@@ -3865,13 +3887,15 @@ final class AppModel: ObservableObject {
       from: snapshot.artworkData,
       fallback: snapshot.sourceIconData
     )
+    let compactMetadata = ["compactLyric": MediaTextFormatting.lyricLine(snapshot, lyrics: snapshot.lyrics, date: .now)]
     let leftNotice = IslandNotice(
       id: "media-active-left",
       title: source,
       detail: snapshot.title,
       kind: .info,
       side: .left,
-      artworkData: artworkData
+      artworkData: artworkData,
+      metadata: compactMetadata
     )
     let rightNotice = IslandNotice(
       id: "media-active-right",
@@ -3881,7 +3905,8 @@ final class AppModel: ObservableObject {
         .joined(separator: " · "),
       kind: .info,
       side: .right,
-      artworkData: artworkData
+      artworkData: artworkData,
+      metadata: compactMetadata
     )
 
     let leftVisible = notices.updateIfPresent(leftNotice)

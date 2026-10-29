@@ -62,7 +62,10 @@ enum SettingsSearchIndex {
             items.append(SettingsSearchItem(section: section, title: title, anchor: anchor, keywords: keywords))
         }
 
-        rows(.general, ["界面语言", "界面外观", "灵动岛样式", "刘海背景"])
+        rows(.general, ["界面语言", "界面外观", "灵动岛样式", "灵动岛材质", "刘海材质"])
+        if settings.islandLayoutStyle == .pill {
+            rows(.general, ["灵动岛位置", "药丸宽度", "药丸高度"])
+        }
         entry(.general, "登录时启动", anchor: .row("登录时启动"), keywords: ["开机或登录后自动在后台运行", "需要系统批准"])
 
         rows(.features, [
@@ -83,7 +86,7 @@ enum SettingsSearchIndex {
             entry(.pdfTools, operation.title, anchor: .pdfOperation(operation), keywords: [operation.detail])
         }
 
-        rows(.info, ["播放来源", "歌词与歌曲信息", "收起态音乐样式", "活动展示", "专注模式展示"])
+        rows(.info, ["播放来源", "歌词与歌曲信息", "收起态音乐样式", "音乐动效", "活动展示", "专注模式展示"])
         if settings.systemMonitorEnabled {
             entry(.info, "菜单栏常驻", anchor: .row("菜单栏常驻"), keywords: ["独立"])
             if settings.systemMonitorMenuBarLayout.individualEnabled {

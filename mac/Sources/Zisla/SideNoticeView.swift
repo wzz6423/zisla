@@ -7,6 +7,8 @@ import SwiftUI
 
 @MainActor
 final class SideNoticeDisplayState: ObservableObject {
+    @Published var islandEdge: IslandEdge = .top
+    @Published var placementMode: IslandPlacementMode = .camera
     @Published var compactWingsEnabled = true
     @Published var compactWingHeight: CGFloat = 34
     @Published var reserveCompactWing = false
@@ -38,6 +40,8 @@ private struct CompactNotchBackground: View {
             Color.black
         case .frosted:
             VisualEffectBackground(alphaValue: 0.92, material: .popover)
+        case .liquidGlass:
+            IslandCollapsedMaterial(style: .liquidGlass)
         }
     }
 }
@@ -175,13 +179,16 @@ struct CompactStatusBarView: View {
     @ObservedObject var settingsStore: FeatureSettingsStore
     @ObservedObject var resultSweep: AIResultSweepController
     var onStatusHidden: () -> Void
+    var onCompactLengthChanged: (CGFloat) -> Void = { _ in }
 
     @Environment(\.accessibilityReduceTransparency) private var reduceTransparency
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     private var height: CGFloat { displayState.compactWingHeight }
 
     var body: some View {
-        TimelineView(.animation(minimumInterval: 1.0 / 30.0, paused: !isPlaybackProgressActive)) { context in
+        TimelineView(.animation(minimumInterval: reduceMotion ? 1 : 1.0 / 30.0,
+                                paused: displayState.compactStatusHidden || (!isPlaybackProgressActive && !showsCustomLyrics))) { context in
             statusBarContent(at: context.date)
         }
     }
@@ -191,7 +198,12 @@ struct CompactStatusBarView: View {
         GeometryReader { geometry in
             ZStack {
                 if !displayState.compactStatusHidden || resultSweep.current != nil {
-                    compactStatusContent
+                    if usesCustomPill {
+                        customStatusContent(at: date)
+
+                    } else {
+                        compactStatusContent
+                    }
                 }
             }
             .frame(width: geometry.size.width, height: geometry.size.height)
@@ -202,25 +214,28 @@ struct CompactStatusBarView: View {
                    let progress = compactProgress(at: date) {
                     CollapsedProgressGlow(
                         progress: progress,
-                        tint: compactProgressTint
+                        tint: compactProgressTint,
+                        layoutStyle: settingsStore.settings.islandLayoutStyle
                     )
                 }
             }
-            .clipShape(SimulatedIslandShape())
-            .contentShape(SimulatedIslandShape())
+            .clipShape(CompactIslandShape(layoutStyle: settingsStore.settings.islandLayoutStyle))
+            .contentShape(CompactIslandShape(layoutStyle: settingsStore.settings.islandLayoutStyle))
             // NSHostingView's safe area can push the SwiftUI content down by a few
             // points when the panel sits under the physical notch or the auto-hide
             // menu bar. Ignoring the top safe area keeps the bar flush with the
             // panel's top edge (which itself is anchored to screen.frame.maxY).
             .ignoresSafeArea(edges: .top)
             .environment(\.colorScheme, .dark)
+            .environment(\.mediaVisualizationStyle, settingsStore.settings.mediaVisualizationStyle)
             .simultaneousGesture(
                 DragGesture(minimumDistance: CompactStatusBarSwipeRecognizer.minimumDistance)
                     .onEnded { gesture in
+                        let vertical = displayState.islandEdge.isVertical
                         guard CompactStatusBarSwipeRecognizer.hidesStatusContent(
-                            startLocation: gesture.startLocation,
-                            translation: gesture.translation,
-                            containerWidth: geometry.size.width
+                            startLocation: vertical ? CGPoint(x: gesture.startLocation.y, y: gesture.startLocation.x) : gesture.startLocation,
+                            translation: vertical ? CGSize(width: gesture.translation.height, height: gesture.translation.width) : gesture.translation,
+                            containerWidth: vertical ? geometry.size.height : geometry.size.width
                         ) else { return }
                         displayState.compactStatusHidden = true
                         onStatusHidden()
@@ -260,6 +275,41 @@ struct CompactStatusBarView: View {
         guard selectedCompactStatusPriority == .media else { return .green }
         let artworkData = detailedMediaItem?.artworkData ?? mediaNotice?.artworkData
         return MediaWaveformView.tintColor(for: artworkData)
+    }
+
+    private var usesCustomPill: Bool {
+        settingsStore.settings.islandLayoutStyle == .pill && displayState.placementMode == .custom
+    }
+
+    private var showsCustomLyrics: Bool {
+        usesCustomPill && selectedCompactStatusPriority == .media
+            && settingsStore.settings.mediaCompactStyle == .detailed
+            && settingsStore.settings.mediaShowLyricsAndInfo
+            && media.snapshot?.isPlaying == true
+    }
+
+    @ViewBuilder
+    private func customStatusContent(at date: Date) -> some View {
+        let sizing = SideNoticeLayoutEngine().compactBarSizing(
+            for: presentationNotices,
+            settings: settingsStore.settings,
+            browserDownloadCount: settingsStore.settings.showsBrowserDownloadProgress
+                ? browserDownloads.snapshots.count : 0
+        )
+        if let presentation = sizing?.customPillPresentation {
+            let text = CompactPillStatusContent.displayText(
+                for: presentation, settings: settingsStore.settings, item: media.snapshot, at: date
+            )
+            let length = presentation.length(
+                thickness: height, edge: displayState.islandEdge, text: text
+            )
+            CompactPillStatusContent(
+                presentation: presentation, text: text, edge: displayState.islandEdge,
+                visualizationStyle: settingsStore.settings.mediaVisualizationStyle,
+                item: presentation.isMedia ? media.snapshot : nil
+            )
+            .onChange(of: length, initial: true) { _, value in onCompactLengthChanged(value) }
+        }
     }
 
     @ViewBuilder
@@ -1500,13 +1550,16 @@ private struct CompactMediaWing: View {
     var side: NoticeSide
     var height: CGFloat
     var usesTransparentBackground = false
+    @Environment(\.mediaVisualizationStyle) private var visualizationStyle
 
     @ViewBuilder
     var body: some View {
         if side == .left {
             sourceIcon
-        } else {
+        } else if visualizationStyle == .waveform {
             waveform
+        } else {
+            Color.clear.frame(width: CompactStatusMetrics.wingWidth, height: height)
         }
     }
 
@@ -1523,6 +1576,11 @@ private struct CompactMediaWing: View {
                     Image(systemName: sourceSymbol)
                         .font(.system(size: min(15, height * 0.56), weight: .semibold))
                         .foregroundStyle(.white)
+                }
+            }
+            .background(alignment: .bottom) {
+                if visualizationStyle == .glow {
+                    MediaArtworkGlow(artworkData: notice.artworkData, width: artworkSize, height: artworkSize, isActive: true)
                 }
             }
             .padding(.leading, CompactStatusMetrics.horizontalContentInset)
@@ -1629,6 +1687,7 @@ struct DetailedMediaBar: View {
     var lyrics: SyncedLyrics?
     var height: CGFloat
     var centerInset: CGFloat
+    @Environment(\.mediaVisualizationStyle) private var visualizationStyle
 
     var body: some View {
         GeometryReader { geometry in
@@ -1708,13 +1767,16 @@ struct DetailedMediaBar: View {
         .padding(.trailing, CompactStatusMetrics.horizontalContentInset)
     }
 
+    @ViewBuilder
     private var waveform: some View {
-        MediaWaveformView(
-            artworkData: item.artworkData,
-            width: 20,
-            height: min(18, height * 0.68),
-            isActive: item.isPlaying
-        )
+        if visualizationStyle == .waveform {
+            MediaWaveformView(
+                artworkData: item.artworkData,
+                width: 20,
+                height: min(18, height * 0.68),
+                isActive: item.isPlaying
+            )
+        }
     }
 
     /// Advances lyrics with playback; freezes on the current line when paused.
@@ -1774,6 +1836,16 @@ struct DetailedMediaBar: View {
 
     @ViewBuilder
     private var artwork: some View {
+        artworkImage.background(alignment: .bottom) {
+            if visualizationStyle == .glow {
+                MediaArtworkGlow(artworkData: item.artworkData, width: artworkSize, height: artworkSize,
+                                 isActive: item.isPlaying)
+            }
+        }
+    }
+
+    @ViewBuilder
+    private var artworkImage: some View {
         if let image = MediaArtworkImageCache.image(
             from: item.artworkData,
             fallback: item.sourceIconData
@@ -2387,23 +2459,6 @@ private struct CompactAIWingShape: InsettableShape {
         var copy = self
         copy.insetAmount += amount
         return copy
-    }
-}
-
-private struct SimulatedIslandShape: Shape {
-    func path(in rect: CGRect) -> Path {
-        let contour = CompactBarContourMetrics(size: rect.size)
-        let bottomRadius = min(contour.bottomRadius, rect.height / 2, rect.width / 2)
-        return UnevenRoundedRectangle(
-            cornerRadii: .init(
-                topLeading: 0,
-                bottomLeading: bottomRadius,
-                bottomTrailing: bottomRadius,
-                topTrailing: 0
-            ),
-            style: .continuous
-        )
-        .path(in: rect)
     }
 }
 

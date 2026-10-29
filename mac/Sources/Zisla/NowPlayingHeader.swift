@@ -144,12 +144,7 @@ struct NowPlayingHeader: View {
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
 
-                MediaWaveformView(
-                    artworkData: item.artworkData,
-                    width: 34,
-                    height: 28,
-                    isActive: item.isPlaying && model.isIslandVisible
-                )
+                waveform(item)
 
                 if item.supportsControls {
                     controls(item)
@@ -241,17 +236,24 @@ struct NowPlayingHeader: View {
     private func compactPlayingContent(_ item: NowPlayingSnapshot) -> some View {
         HStack(spacing: 10) {
             artwork(item)
+            waveform(item)
+            if item.supportsControls {
+                controls(item)
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .center)
+    }
+
+    @ViewBuilder
+    private func waveform(_ item: NowPlayingSnapshot) -> some View {
+        if model.settingsStore.settings.mediaVisualizationStyle == .waveform {
             MediaWaveformView(
                 artworkData: item.artworkData,
                 width: 34,
                 height: 28,
                 isActive: item.isPlaying && model.isIslandVisible
             )
-            if item.supportsControls {
-                controls(item)
-            }
         }
-        .frame(maxWidth: .infinity, alignment: .center)
     }
 
     private func controls(_ item: NowPlayingSnapshot) -> some View {
@@ -477,6 +479,19 @@ struct NowPlayingHeader: View {
         }
         .frame(width: 54, height: 54)
         .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+        .background(alignment: .bottom) {
+            if model.settingsStore.settings.mediaVisualizationStyle == .glow {
+                MediaArtworkGlow(
+                    artworkData: MediaArtworkImageCache.displayData(
+                        from: item.artworkData, fallback: item.sourceIconData
+                    ),
+                    width: 54,
+                    height: 54,
+                    isActive: item.isPlaying,
+                    isVisible: model.isIslandVisible
+                )
+            }
+        }
         .help(AppLocalization.text("打开播放软件"))
         .contentShape(Rectangle())
         .onTapGesture(perform: openSourceApplication)

@@ -16,6 +16,7 @@ struct IslandRootView: View {
     var onSettingsRequested: () -> Void
 
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @Environment(\.layoutDirection) private var layoutDirection
     @StateObject private var dropState = IslandDropState()
     @StateObject private var cleanupPanelPresentation = SystemCleanupPanelPresentationState()
     @StateObject private var historyPanelPresentation = SystemMetricsHistoryPanelPresentationState()
@@ -47,7 +48,8 @@ struct IslandRootView: View {
                 contentSize: layout.panelSize,
                 availableSize: proxy.size
             )
-            let usesCompactSurface = voiceInput.isCapturingInput || showsCompactTransientNotice
+            let usesCompactSurface = voiceInput.isCapturingInput
+                || (showsCompactTransientNotice && customTransientPresentation == nil)
             // The slot stays reserved while the island is collapsed: dropping it would shift the
             // surface back to the panel center at the exact frame the recycle fold starts, so the
             // fold would jump sideways before it ever reached the notch.
@@ -60,6 +62,7 @@ struct IslandRootView: View {
                 && !model.isTeleprompterPresented
                 && model.settingsStore.settings.petEnabled
                 && !usesCompactSurface
+                && settingsStore.settings.islandLayoutStyle == .notch
             let petSlotWidth = reservesPetSlot
                 ? min(
                     ExpandedPetLayout.sideSlotWidth,
@@ -76,7 +79,8 @@ struct IslandRootView: View {
                 * (settingsStore.settings.petSide == .right ? 1 : -1)
             let voiceRecordingGeometry = VoiceRecordingIslandGeometry(
                 collapsedSize: model.collapsedIslandSize,
-                availableSize: surfaceSize
+                availableSize: surfaceSize,
+                edge: model.islandEdge
             )
             let renderedSurfaceSize = usesCompactSurface
                 ? voiceRecordingGeometry.surfaceSize
@@ -84,7 +88,7 @@ struct IslandRootView: View {
 
             ZStack(alignment: .top) {
             if showsTransferHints {
-                HStack(spacing: 0) {
+                transferLayout {
                     transferShoulder(
                         symbol: "square.and.arrow.up",
                         title: "共享",
@@ -110,7 +114,9 @@ struct IslandRootView: View {
                         model.shareFromPasteboard()
                     }
 
-                    Spacer(minLength: max(0, surfaceSize.width - 216))
+                    if !model.islandEdge.isVertical {
+                        Spacer(minLength: max(0, surfaceSize.width - 216))
+                    }
 
                     transferShoulder(
                         symbol: "tray.and.arrow.down.fill",
@@ -126,7 +132,7 @@ struct IslandRootView: View {
                     }
                 }
                 .frame(width: surfaceSize.width)
-                .padding(.top, 62)
+                .padding(model.islandEdge == .bottom ? .bottom : .top, model.islandEdge.isVertical ? 16 : 62)
                 .transition(reduceMotion ? .opacity : .opacity.combined(with: .scale(scale: 0.92)))
                 .zIndex(0)
             }
@@ -139,7 +145,10 @@ struct IslandRootView: View {
                 notchBackground: settingsStore.settings.islandNotchBackground,
                 usesCompactGlassSurface: usesCompactSurface,
                 collapsedCenterOffsetX: collapsedCenterOffsetX,
-                resultSweep: model.aiResultSweep
+                resultSweep: model.aiResultSweep,
+                layoutStyle: settingsStore.settings.islandLayoutStyle,
+                collapsedFrame: pillCollapsedFrame(in: renderedSurfaceSize, panelSize: proxy.size),
+                edge: model.islandEdge
             ) {
                 if model.isMirrorPresented {
                     DeferredMount {
@@ -163,12 +172,24 @@ struct IslandRootView: View {
                         if voiceInput.isCapturingInput {
                             VoiceTranscriptionView(
                                 voiceInput: voiceInput,
-                                geometry: voiceRecordingGeometry
+                                geometry: voiceRecordingGeometry,
+                                keepsIconsAdjacent: settingsStore.settings.islandLayoutStyle == .pill
+                                    && settingsStore.settings.islandPlacement.mode == .custom
                             )
                                 .frame(height: layout.islandSize.height, alignment: .top)
                         } else if showsCompactTransientNotice, let notice = model.transientMessage {
-                            TransientNoticeView(message: notice, geometry: voiceRecordingGeometry)
-                                .frame(height: layout.islandSize.height, alignment: .top)
+                            if let presentation = customTransientPresentation {
+                                if let frame = pillCollapsedFrame(in: renderedSurfaceSize, panelSize: proxy.size) {
+                                    CompactPillStatusContent(presentation: presentation, text: presentation.text,
+                                        edge: model.islandEdge, visualizationStyle: settingsStore.settings.mediaVisualizationStyle,
+                                        item: nil)
+                                        .frame(width: frame.width, height: frame.height)
+                                        .position(x: frame.midX, y: frame.midY)
+                                }
+                            } else {
+                                TransientNoticeView(message: notice, geometry: voiceRecordingGeometry)
+                                    .frame(height: layout.islandSize.height, alignment: .top)
+                            }
                         } else if !isIslandCollapsed {
                             // Keep the top shell fixed so module changes replace only the functional area below.
                             NowPlayingHeader(model: model)
@@ -303,7 +324,11 @@ struct IslandRootView: View {
             .animation(reduceMotion ? nil : ZislaMotion.surfaceResize, value: surfaceSize)
             .environment(\.colorScheme, .dark)
             .environment(\.islandVisualStyle, settingsStore.settings.islandVisualStyle)
-            .contentShape(IslandSilhouette())
+            .environment(\.mediaVisualizationStyle, settingsStore.settings.mediaVisualizationStyle)
+            .contentShape(IslandSilhouette(
+                topCornerRadius: settingsStore.settings.islandLayoutStyle == .pill
+                    ? IslandSurfaceGeometry.expandedBottomCornerRadius : 0
+            ))
             .onHover { hovering in
                 if hovering { onPointerEntered() } else { onPointerExited() }
             }
@@ -338,9 +363,9 @@ struct IslandRootView: View {
             .frame(
                 width: panelSize.width,
                 height: surfaceSize.height,
-                alignment: .top
+                alignment: islandSurfaceAlignment
             )
-            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: islandSurfaceAlignment)
         }
         .background(
             SystemCleanupPanelPresenter(
@@ -457,7 +482,45 @@ struct IslandRootView: View {
         showsTransientNotice && !model.isIslandVisible
     }
 
-    private var contentTopInset: CGFloat { ExpandedPetLayout.contentTopInset }
+    private var customTransientPresentation: CompactPillStatusPresentation? {
+        guard showsCompactTransientNotice,
+              settingsStore.settings.islandLayoutStyle == .pill,
+              settingsStore.settings.islandPlacement.mode == .custom,
+              let message = model.transientMessage else { return nil }
+        return CompactPillStatusContent.transientPresentation(message: message)
+    }
+
+    private var contentTopInset: CGFloat {
+        guard settingsStore.settings.islandLayoutStyle == .pill,
+              let screenLayout = model.islandScreenLayout,
+              screenLayout.centerOcclusionWidth > 0 else { return ExpandedPetLayout.contentTopInset }
+        return screenLayout.collapsedFrame.height + 4
+    }
+
+    private func pillCollapsedFrame(in surface: CGSize, panelSize: CGSize) -> CGRect? {
+        guard settingsStore.settings.islandLayoutStyle == .pill,
+              let layout = model.islandScreenLayout else { return nil }
+        return Self.pillCollapsedFrame(for: layout, in: surface, panelSize: panelSize)
+    }
+
+    nonisolated static func pillCollapsedFrame(
+        for layout: ScreenOverlayLayout, in surface: CGSize, panelSize: CGSize
+    ) -> CGRect {
+        let frame = layout.collapsedFrameInExpandedTopLeading
+        let offset = CGPoint(
+            x: layout.edge == .right ? panelSize.width - surface.width :
+                layout.edge == .left ? 0 : (panelSize.width - surface.width) / 2,
+            y: layout.edge == .bottom ? panelSize.height - surface.height :
+                layout.edge.isVertical ? (panelSize.height - surface.height) / 2 : 0
+        )
+        return frame.offsetBy(dx: -offset.x, dy: -offset.y)
+    }
+
+    private var transferLayout: AnyLayout {
+        model.islandEdge.isVertical
+            ? AnyLayout(VStackLayout(spacing: 6))
+            : AnyLayout(HStackLayout(spacing: 0))
+    }
 
     @ViewBuilder
     private var expandedPetOverlay: some View {
@@ -502,12 +565,24 @@ struct IslandRootView: View {
     /// Matches `reservesPetSlot`: the surface keeps hugging the same panel edge while collapsed, so
     /// the recycle fold starts exactly where the expanded surface stood.
     private var islandSurfaceAlignment: Alignment {
+        if settingsStore.settings.islandLayoutStyle == .pill {
+            return Self.pillAlignment(edge: model.islandEdge, direction: layoutDirection)
+        }
         guard model.settingsStore.settings.petEnabled,
               !model.isMirrorPresented,
               !model.isTeleprompterPresented else {
             return .top
         }
         return model.settingsStore.settings.petSide == .right ? .topLeading : .topTrailing
+    }
+
+    nonisolated static func pillAlignment(edge: IslandEdge, direction: LayoutDirection) -> Alignment {
+        switch edge {
+        case .top: .top
+        case .bottom: .bottom
+        case .left: direction == .leftToRight ? .leading : .trailing
+        case .right: direction == .leftToRight ? .trailing : .leading
+        }
     }
 
     private var showsTransferHints: Bool {
@@ -533,10 +608,12 @@ struct IslandRootView: View {
         if model.isTeleprompterPresented {
             return .teleprompter
         }
-        if voiceInput.isCapturingInput || showsCompactTransientNotice {
-            // The recording surface matches the collapsed capsule's overflow width and extends downward by one row.
-            return IslandModuleLayout.voiceRecording
-                .matchingWidth(model.collapsedOverflowWidth)
+        if voiceInput.isCapturingInput || (showsCompactTransientNotice && customTransientPresentation == nil) {
+            return IslandModuleLayout.compactSurface(
+                collapsedSize: model.collapsedIslandSize,
+                overflowWidth: model.collapsedOverflowWidth,
+                edge: model.islandEdge
+            )
         }
         guard let activeModule else { return .standard }
         return IslandModuleLayout.resolved(
@@ -651,11 +728,28 @@ struct CollapsedPetView: View {
     @ObservedObject var model: AppModel
     @ObservedObject var petController: IslandPetController
     var isOnPhysicalNotch: Bool
+    var screenLayout: ScreenOverlayLayout? = nil
 
     var body: some View {
         GeometryReader { proxy in
             if model.settingsStore.settings.petEnabled,
                let sprite = petController.sprite {
+                if let screenLayout, screenLayout.style == .pill {
+                    let compactFrame = SideNoticeLayoutEngine().compactBarFrame(
+                        for: screenLayout,
+                        notices: model.aiResultSweep.presentationNotices(from: model.notices.left + model.notices.right),
+                        settings: model.settingsStore.settings,
+                        browserDownloadCount: model.settingsStore.settings.showsBrowserDownloadProgress
+                            ? model.browserDownloads.snapshots.count : 0
+                    )
+                    let container = CollapsedPetLayout.frame(for: screenLayout, compactBarFrame: compactFrame)
+                    if let frame = CollapsedPetLayout.petFrame(for: screenLayout, compactBarFrame: compactFrame,
+                                                               side: model.settingsStore.settings.petSide) {
+                        IslandPetView(sprite: sprite, behavior: petController.behavior,
+                                      side: model.settingsStore.settings.petSide, size: frame.width)
+                            .position(x: frame.midX - container.minX, y: container.maxY - frame.midY)
+                    }
+                } else {
                 let horizontalInset = CollapsedPetLayout.outerGap
                 let verticalInset = min(4, max(2, proxy.size.height * 0.1))
                 let size = max(
@@ -683,26 +777,31 @@ struct CollapsedPetView: View {
                     maxHeight: .infinity,
                     alignment: side == .right ? .topTrailing : .topLeading
                 )
+                }
             }
         }
     }
 
 }
 
-private struct VoiceTranscriptionView: View {
+struct VoiceTranscriptionView: View {
     @ObservedObject var voiceInput: VoiceInputController
     let geometry: VoiceRecordingIslandGeometry
+    let keepsIconsAdjacent: Bool
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     var body: some View {
-        VStack(spacing: 0) {
-            HStack {
+        let iconLayout = geometry.edge.isVertical
+            ? AnyLayout(VStackLayout(spacing: 8))
+            : AnyLayout(HStackLayout(spacing: keepsIconsAdjacent ? 8 : 0))
+        ZStack {
+            iconLayout {
                 Image(systemName: "mic.fill")
                     .font(.system(size: 13, weight: .semibold))
                     .foregroundStyle(voiceInput.isRecording ? Color.zislaError : .white.opacity(0.45))
                     .accessibilityLabel(voiceInput.isRecording ? AppLocalization.text("正在录音") : AppLocalization.text("正在准备录音"))
 
-                Spacer(minLength: 12)
+                if !keepsIconsAdjacent { Spacer(minLength: 12) }
 
                 Image(systemName: "waveform")
                     .font(.system(size: 13, weight: .semibold))
@@ -714,11 +813,12 @@ private struct VoiceTranscriptionView: View {
                     )
                     .accessibilityHidden(true)
             }
-            .padding(.horizontal, 12)
+            .padding(geometry.edge.isVertical ? .vertical : .horizontal, 12)
             .frame(
                 width: geometry.topRowFrame.width,
                 height: geometry.topRowFrame.height
             )
+            .position(x: geometry.topRowFrame.midX, y: geometry.topRowFrame.midY)
 
             MarqueeText(
                 transcriptOrPlaceholder,
@@ -735,8 +835,9 @@ private struct VoiceTranscriptionView: View {
                     height: geometry.transcriptRowFrame.height,
                     alignment: .leading
                 )
+                .position(x: geometry.transcriptRowFrame.midX, y: geometry.transcriptRowFrame.midY)
         }
-        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+        .frame(width: geometry.surfaceSize.width, height: geometry.surfaceSize.height)
     }
 
     private var transcriptOrPlaceholder: String {
@@ -756,16 +857,18 @@ private struct TransientNoticeView: View {
     let geometry: VoiceRecordingIslandGeometry
 
     var body: some View {
-        VStack(spacing: 0) {
+        ZStack {
             HStack {
+                if geometry.edge.isVertical { Spacer(minLength: 0) }
                 Image(systemName: "exclamationmark.triangle.fill")
                     .font(.system(size: 12, weight: .semibold))
                     .foregroundStyle(Color.zislaError)
                     .accessibilityHidden(true)
-                Spacer(minLength: 12)
+                Spacer(minLength: geometry.edge.isVertical ? 0 : 12)
             }
-            .padding(.horizontal, 12)
+            .padding(.horizontal, geometry.edge.isVertical ? 0 : 12)
             .frame(width: geometry.topRowFrame.width, height: geometry.topRowFrame.height)
+            .position(x: geometry.topRowFrame.midX, y: geometry.topRowFrame.midY)
 
             // See `transientNoticeBar`: the notice scrolls itself once, so it must not take an external
             // `scrollProgress`, which would show only the tail of a long error.
@@ -783,8 +886,9 @@ private struct TransientNoticeView: View {
                     height: geometry.transcriptRowFrame.height,
                     alignment: .leading
                 )
+                .position(x: geometry.transcriptRowFrame.midX, y: geometry.transcriptRowFrame.midY)
         }
-        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+        .frame(width: geometry.surfaceSize.width, height: geometry.surfaceSize.height)
         .accessibilityElement(children: .combine)
         .accessibilityLabel(message)
     }
