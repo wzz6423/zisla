@@ -130,6 +130,8 @@ with tempfile.TemporaryDirectory(prefix="zisla-swift-test-suites.") as temporary
         "ZislaTests.LongCaptureRealWorldTests/realWorldChatSmallScrollIsNotDiscardedAsUnchanged()": 4,
         "ZislaTests.LongCaptureRealWorldTests/realWorldStationarySparseChatFrameIsNotAppended()": 4,
         "ZislaTests.LongCaptureRealWorldTests/realWorldRetinaSparseChatPageStitchesExactly()": 33,
+        # Serialized multitrack transition exports: several real preview, playback and GIF/MP4 passes.
+        "ZislaTests.ScreenRecordingTransitionExportTests": 150,
     }
     tasks = {}
     for suite, command in suites.items():

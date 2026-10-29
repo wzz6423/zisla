@@ -5,9 +5,10 @@ import Testing
 import ZislaCore
 @testable import Zisla
 
-@Suite @MainActor
+// Each case opens AVAssetReaders and a hardware encoder. Parallel cases stall that pool until the suite timeout.
+@Suite(.serialized) @MainActor
 struct ScreenRecordingTransitionExportTests {
-    @Test(arguments: RecordingClipTransitionKind.allCases, [false, true])
+    @Test(.serialized, arguments: RecordingClipTransitionKind.allCases, [false, true])
     func explicitOverlappingTransitionsUseBothRetimedClipsInPreviewPlaybackMP4AndGIF(
         kind: RecordingClipTransitionKind, reversedStorage: Bool
     ) async throws {
@@ -94,7 +95,7 @@ struct ScreenRecordingTransitionExportTests {
             "Inspector availability and the renderer must use the same preceding clip before an effect is selected")
     }
 
-    @Test(arguments: [false, true])
+    @Test(.serialized, arguments: [false, true])
     func explicitTextAnimationsKeepTheSameRevealAndFadeInPreviewPlaybackMP4AndGIF(_ caption: Bool) async throws {
         let fixture = try RecordingMultitrackTestFixture()
         defer { fixture.remove() }

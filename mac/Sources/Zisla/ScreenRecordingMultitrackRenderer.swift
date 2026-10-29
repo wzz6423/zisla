@@ -102,6 +102,7 @@ final class RecordingMultitrackRenderer {
     private let images: RecordingMediaImageStore
     private let annotations: [UUID: RecordingAnnotation]
     private let captions: [UUID: RecordingCaption]
+    private var transparentCanvas: CIImage?
 
     init(project: ScreenRecordingProject, directory: URL, size: CGSize,
          imageStore: RecordingMediaImageStore? = nil) throws {
@@ -153,7 +154,7 @@ final class RecordingMultitrackRenderer {
             while let source = transitions[chain.last!]?.source { chain.append(source) }
             var composed = layers[chain.last!]!
             for id in chain.dropLast().reversed() {
-                composed = transitioned(from: composed, to: layers[id]!, sample: transitions[id]!.sample)
+                composed = try transitioned(from: composed, to: layers[id]!, sample: transitions[id]!.sample)
             }
             result = composed.composited(over: result)
         }
@@ -180,7 +181,9 @@ final class RecordingMultitrackRenderer {
                 speed: clip.speed, outputStart: clip.start, outputEnd: clip.end)
             let rendered = try renderer.render(screen: frame, camera: frames[clip.id + ".camera"],
                 sourceTime: clip.sourceTime(at: time), slice: slice, includeBackground: false)
-            image = RecordingExportRenderer.fit(rendered, from: canvas, to: rect(clip.layout), fill: false)
+            // Flatten before a transition filter. The render graph still contains an infinite
+            // color image, which CIDissolveTransition would sample without ever finishing.
+            image = try flatten(RecordingExportRenderer.fit(rendered, from: canvas, to: rect(clip.layout), fill: false))
         case let .image(id):
             let bounds = rect(clip.layout)
             let decodeSize = CGSize(width: max(1, bounds.width), height: max(1, bounds.height))
@@ -225,26 +228,63 @@ final class RecordingMultitrackRenderer {
     }
 
     private func transitioned(from outgoing: CIImage, to incoming: CIImage,
-                              sample: RecordingClipTransitionSample) -> CIImage {
+                              sample: RecordingClipTransitionSample) throws -> CIImage {
         switch sample.kind {
         case .dissolve:
-            return outgoing.applyingFilter("CIDissolveTransition", parameters: [
-                kCIInputTargetImageKey: incoming, kCIInputTimeKey: sample.progress,
-            ]).cropped(to: canvas)
+            return try crossfade(outgoing, incoming, progress: sample.progress)
         case .slideLeft, .slideRight:
             let direction = sample.kind == .slideLeft ? -1.0 : 1.0
-            let previous = outgoing.transformed(by: .init(translationX: direction * sample.progress * canvas.width, y: 0))
-            let next = incoming.transformed(by: .init(translationX: -direction * (1 - sample.progress) * canvas.width, y: 0))
+            let previous = try transitionImage(outgoing)
+                .transformed(by: .init(translationX: direction * sample.progress * canvas.width, y: 0))
+            let next = try transitionImage(incoming)
+                .transformed(by: .init(translationX: -direction * (1 - sample.progress) * canvas.width, y: 0))
             return next.composited(over: previous).cropped(to: canvas)
         case .zoom:
             var previous = RecordingClipAnimationSample()
             previous.scale = 1 + sample.progress * 0.5
             var next = RecordingClipAnimationSample()
             next.scale = 0.5 + sample.progress * 0.5
-            return animated(outgoing, sample: previous).applyingFilter("CIDissolveTransition", parameters: [
-                kCIInputTargetImageKey: animated(incoming, sample: next), kCIInputTimeKey: sample.progress,
-            ]).cropped(to: canvas)
+            // Scale around each layer's own center first; the dissolve inputs are rasterized afterwards.
+            return try crossfade(animated(outgoing, sample: previous), animated(incoming, sample: next),
+                progress: sample.progress)
         }
+    }
+
+    private func crossfade(_ outgoing: CIImage, _ incoming: CIImage, progress: Double) throws -> CIImage {
+        try transitionImage(outgoing).applyingFilter("CIDissolveTransition", parameters: [
+            kCIInputTargetImageKey: try transitionImage(incoming), kCIInputTimeKey: progress,
+        ]).cropped(to: canvas)
+    }
+
+    /// Full-canvas image clips keep their original graph so blended pixel tests stay exact.
+    /// Smaller layers and infinite domains are drawn into a finite canvas bitmap first:
+    /// CIDissolveTransition otherwise samples the uncropped domain and does not return.
+    private func transitionImage(_ image: CIImage) throws -> CIImage {
+        let extent = image.extent
+        if !extent.isInfinite, extent.integral == canvas.integral { return image }
+        let placed = image.composited(over: try transparentCanvasImage()).cropped(to: canvas)
+        return try flatten(placed)
+    }
+
+    private func transparentCanvasImage() throws -> CIImage {
+        if let transparentCanvas { return transparentCanvas }
+        let clear = try flatten(CIImage(color: .clear).cropped(to: canvas))
+        transparentCanvas = clear
+        return clear
+    }
+
+    private func flatten(_ image: CIImage) throws -> CIImage {
+        let extent = image.extent.intersection(canvas)
+        guard !extent.isInfinite, !extent.isNull, extent.width >= 1, extent.height >= 1 else {
+            throw ScreenRecordingExportError.cannotRender
+        }
+        guard let raster = context.createCGImage(image, from: extent, format: .RGBA8,
+            colorSpace: CGColorSpace(name: CGColorSpace.sRGB)!) else {
+            throw ScreenRecordingExportError.cannotRender
+        }
+        let bitmap = CIImage(cgImage: raster)
+        guard extent.minX != 0 || extent.minY != 0 else { return bitmap }
+        return bitmap.transformed(by: .init(translationX: extent.minX, y: extent.minY))
     }
 
     private func videoRenderer(for id: UUID) throws -> RecordingExportRenderer {
