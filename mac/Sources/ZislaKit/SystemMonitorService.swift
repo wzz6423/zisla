@@ -3618,6 +3618,7 @@ public final class SystemMonitorService: ObservableObject {
     private let fileManager: any SystemMonitorFileManaging
     private let dateProvider: @Sendable () -> Date
     private let publicIPProvider: any PublicIPProviding
+    private let privateIPv4AddressProvider: @Sendable () -> String?
     private let hardwareInfoProvider: @Sendable () -> SystemHardwareInfo
     private let batterySnapshotProvider: () -> BatterySnapshot?
     private let volumeURL: URL
@@ -3651,6 +3652,7 @@ public final class SystemMonitorService: ObservableObject {
         volumeURL: URL? = nil,
         dateProvider: @escaping @Sendable () -> Date = { Date() },
         publicIPProvider: (any PublicIPProviding)? = nil,
+        privateIPv4AddressProvider: (@Sendable () -> String?)? = nil,
         hardwareInfoProvider: (@Sendable () -> SystemHardwareInfo)? = nil,
         postCleanupDiskRefreshDelay: Duration = .seconds(30),
         diskCapacityRefreshInterval: TimeInterval = 20,
@@ -3665,6 +3667,7 @@ public final class SystemMonitorService: ObservableObject {
         self.fileManager = fileManager
         self.dateProvider = dateProvider
         self.publicIPProvider = publicIPProvider ?? DefaultPublicIPProvider()
+        self.privateIPv4AddressProvider = privateIPv4AddressProvider ?? { SystemSampler.samplePrivateIPv4Address() }
         self.hardwareInfoProvider = hardwareInfoProvider ?? { SystemHardwareInfoReader.read() }
         self.batterySnapshotProvider = batterySnapshotProvider
         self.postCleanupDiskRefreshDelay = max(.zero, postCleanupDiskRefreshDelay)
@@ -3883,6 +3886,7 @@ public final class SystemMonitorService: ObservableObject {
         let prevNet = previousNetwork
         let prevDisk = previousDisk
         let readHardwareInfo = hardwareInfoProvider
+        let readPrivateIPv4Address = privateIPv4AddressProvider
         let currentHardware = hardware
         let shouldSampleDiskCapacity = needsDiskCapacityRefresh
             || Self.shouldRefreshSlowMetrics(
@@ -3923,7 +3927,7 @@ public final class SystemMonitorService: ObservableObject {
                 : nil
             let diskCounters = shouldSampleSlowMetrics ? SystemSampler.sampleDiskCounters() : nil
             let counters = SystemSampler.sampleNetworkCounters()
-            let privateIP = SystemSampler.samplePrivateIPv4Address()
+            let privateIP = readPrivateIPv4Address()
             let gpu = shouldSampleSlowMetrics ? SystemSampler.sampleGPU() : nil
             let sensors = shouldSampleSlowMetrics ? AppleSMCSensorReader.sample(chipName: currentHardware.cpuName) : nil
             let network: NetworkMetrics
@@ -3959,6 +3963,15 @@ public final class SystemMonitorService: ObservableObject {
         previousNetwork = (payload.netCounters.0, payload.netCounters.1, now)
         if let counters = payload.diskCounters {
             previousDisk = (counters.0, counters.1, now)
+        }
+        if prevNet != nil, networkIdentity.privateIPv4Address != payload.privateIP {
+            // The public address belongs to the network that was just left. Drop it and look up the
+            // new one now, so a failed first lookup cannot keep showing the old network's address.
+            publicIPAddress = nil
+            publicIPv6Address = nil
+            networkIdentity.publicIPAddress = nil
+            networkIdentity.publicIPv6Address = nil
+            lastPublicIPRefresh = nil
         }
         networkIdentity.privateIPv4Address = payload.privateIP
         if shouldSampleDiskCapacity {

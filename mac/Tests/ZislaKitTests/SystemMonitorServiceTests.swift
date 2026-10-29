@@ -251,6 +251,15 @@ private final class ScriptedPublicIPProvider: PublicIPProviding, @unchecked Send
     }
 }
 
+/// Stands in for the sampled private IPv4 address; tests change it only between awaited samples.
+private final class PrivateIPv4Stub: @unchecked Sendable {
+    var value: String?
+
+    init(_ value: String?) {
+        self.value = value
+    }
+}
+
 /// Blocks each IPv4 lookup until `release` so overlapping refreshes can finish out of order.
 private final class GatedPublicIPProvider: PublicIPProviding, @unchecked Sendable {
     private let lock = NSLock()
@@ -2419,6 +2428,48 @@ struct SystemMonitorServiceTests {
         #expect(service.publicIPv6Address == nil)
         #expect(service.snapshot?.networkIdentity.publicIPv6Address == nil)
         #expect(!service.isRefreshingPublicIPAddress)
+    }
+
+    @Test
+    func networkChangeDropsThePreviousPublicIPAndLooksUpAgainWithinTheThrottleWindow() async {
+        let clock = ControllableDateProvider(Date(timeIntervalSince1970: 1_700_000_000))
+        let privateIP = PrivateIPv4Stub("192.168.1.20")
+        let provider = ScriptedPublicIPProvider(
+            ipv4: [.address("203.0.113.8"), .address("198.51.100.9"), .failed],
+            ipv6: [.address("2001:db8::8"), .address("2001:db8::9"), .failed]
+        )
+        let service = SystemMonitorService(
+            fileManager: MockFileManager(),
+            dateProvider: { clock.now() },
+            publicIPProvider: provider,
+            privateIPv4AddressProvider: { privateIP.value },
+            hardwareInfoProvider: { .unavailable }
+        )
+        await service.refreshPublicIPAddress()
+        // The first sample has no earlier network to compare with, so the address just looked up stays.
+        let first = await service.sampleOnce()
+        #expect(first.networkIdentity.publicIPAddress == "203.0.113.8")
+        #expect(first.networkIdentity.publicIPv6Address == "2001:db8::8")
+
+        privateIP.value = "10.0.0.7"
+        clock.advance(by: 1)
+        _ = await service.sampleOnce()
+        await waitUntil(timeoutSeconds: 2) {
+            service.publicIPAddress == "198.51.100.9" && !service.isRefreshingPublicIPAddress
+        }
+        #expect(service.publicIPv6Address == "2001:db8::9")
+        #expect(service.snapshot?.networkIdentity.publicIPAddress == "198.51.100.9")
+        #expect(service.snapshot?.networkIdentity.publicIPv6Address == "2001:db8::9")
+
+        // The next lookup fails, so nothing may bring back the address of the network that was left.
+        privateIP.value = "172.16.0.3"
+        clock.advance(by: 1)
+        let switched = await service.sampleOnce()
+        #expect(switched.networkIdentity.privateIPv4Address == "172.16.0.3")
+        #expect(switched.networkIdentity.publicIPAddress == nil)
+        #expect(switched.networkIdentity.publicIPv6Address == nil)
+        #expect(service.publicIPAddress == nil)
+        #expect(service.publicIPv6Address == nil)
     }
 
     @Test
