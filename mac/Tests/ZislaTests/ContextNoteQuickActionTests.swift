@@ -94,6 +94,7 @@ struct ContextNoteQuickActionTests {
         let reference = NSHostingView(rootView: Image(systemName: "note.text")
             .font(.system(size: 13, weight: .medium))
             .foregroundStyle(.white.opacity(0.75))
+            .frame(width: 26, height: 26)
             .frame(width: 26, height: 37)
             .background(.black)
             .environment(\.colorScheme, .dark)
