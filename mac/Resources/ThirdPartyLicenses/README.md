@@ -93,3 +93,32 @@ Licensed under the MIT License. See `OpenScreen-LICENSE.txt` in this directory.
 Zisla implements these workflows in Swift using its own project model and
 existing AI settings. No upstream application, Electron runtime, or remote
 build dependency is bundled.
+
+Cursor account usage, Grok Bot (Sand) quota, Muse Code usage and credentials,
+and Chromium Safe Storage decoding are adapted from CodexBar:
+
+https://github.com/steipete/CodexBar
+
+Pinned revision: `d253dd1137242889804326a89972dfa21cda4722`.
+Relevant sources are `CursorAppAuth.swift`, `CursorUsageEventsFetcher.swift`,
+`CursorStatusProbe+UsageSummary.swift`, `CursorSandUsage.swift`,
+`MuseLocalUsageReader.swift`, `MuseCredentials.swift`, the `muse.ts` provider
+plugin, `ChromiumSafeStorage.swift`, and `KeychainAccessPreflight.swift`.
+Copyright (c) 2026 Peter Steinberger. Licensed under the MIT License.
+See `CodexBar-LICENSE.txt` in this directory.
+
+Cursor SQLite metadata selection follows chat-stasher's Cursor source:
+
+https://github.com/dimpurr/chat-stasher
+
+Pinned revision: `9586c5518398d43b34cc73af70b237324d953d39`.
+Relevant sources are `docs/sources/cursor.md` and
+`crates/chat-stasher/src/activity.rs`. Licensed under the Apache License 2.0.
+See `ChatStasher-LICENSE.txt` in this directory.
+
+These adaptations retain native macOS metadata and account quota reading.
+They use Zisla's existing read-only SQLite, incremental JSONL reader, usage
+repository, and monitor. Upstream UI, browser cookie scanning, billing
+changes, conversation export, and runtimes are not bundled. Keychain reads
+require a successful noninteractive access check. No remote build dependency
+is introduced.
