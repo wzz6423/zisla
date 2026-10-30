@@ -33,5 +33,6 @@ The package is local so SwiftPM does not fetch it during normal builds. To updat
 - Commit: `475fe3175c1aacccf9f420add35bf55e69936936`
 - License: CC0, copied to `zstd.swift/LICENSE.md`
 - Bundled binary: upstream `libzstd.xcframework`, including its iOS, Mac Catalyst, simulator, and macOS universal slices
+- Local patch: `ZStd.decompress(src:dst:)` throws when the input ends inside a frame instead of returning the partial output, following the end-of-stream check in Zstandard's streaming decompression example. Reapply it after updating the snapshot.
 
 The package is local so SwiftPM does not fetch it during normal builds. To update it, replace `zstd.swift` with a verified upstream snapshot, retain its license and binary slices, and update the version and commit recorded above. The bundled Zstandard library remains covered by `Resources/ThirdPartyLicenses/Zstandard-LICENSE.txt`.

@@ -148,7 +148,11 @@ let package = Package(
         ),
         .testTarget(
             name: "ZislaKitTests",
-            dependencies: ["ZislaCore", "ZislaKit"]
+            dependencies: [
+                "ZislaCore",
+                "ZislaKit",
+                .product(name: "zstd", package: "zstd.swift"),
+            ]
         ),
         .testTarget(
             name: "ZislaTests",

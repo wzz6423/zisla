@@ -18,12 +18,17 @@ zislactl — 向灵动岛推送 AI 进度、用量与通知
   clear
   list
   usage   --provider <名> --input-tokens <n> --output-tokens <n>
-          [--cost <美元>] [--model <名>]
+          [--cost <美元>] [--model <名>] [--timestamp <Unix 秒>]
   notify  --title <标题> [--detail <文本>] [--kind <info|success|warning|error>]
           [--side <left|right>]
   message --app <应用名> --sender <发件人> --content <正文>
           [--app-bundle-id <bundle id>]
   help
+
+参数写法：
+  --key value 或 --key=value；每个参数只能写一次。
+  值可以以 -- 开头，但 --failed、--queued 不会被当作值；要传这类字面值请写 --detail=--failed。
+  --failed、--queued 单独出现表示开启，写 =false 或 false 表示关闭。
 
 状态数据库：\(defaultStateDirectory().appendingPathComponent("ai-state.sqlite").path)
 """

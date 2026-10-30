@@ -91,6 +91,7 @@ public struct ZStd {
         }
 
         var isEmpty = true
+        var lastRemaining = 0
 
         while true {
             let readSize = src.read(srcBuf, maxLength: inBufSize)
@@ -118,6 +119,7 @@ public struct ZStd {
                     dst.write(dstBuf, maxLength: output.pos)
                 }
 
+                lastRemaining = remaining
                 if remaining == 0 {
                     ZSTD_DCtx_reset(cctx, ZSTD_reset_session_only)
                 }
@@ -125,6 +127,11 @@ public struct ZStd {
         }
 
         if isEmpty {
+            throw ZStdReadingFromStreamSignalledError()
+        }
+
+        // zisla patch: input that ends inside a frame is truncated; report it instead of returning a partial result.
+        if lastRemaining != 0 {
             throw ZStdReadingFromStreamSignalledError()
         }
     }

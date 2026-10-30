@@ -14,7 +14,7 @@ struct SystemMonitorPublicIPProviderTests {
 
         let address = await DefaultPublicIPProvider(session: session).publicIPAddress()
 
-        #expect(address == "203.0.113.8")
+        #expect(address == .address("203.0.113.8"))
         let request = try #require(PublicIPURLProtocol.requests.first)
         #expect(request.url?.host == "api.ipify.org")
         #expect(request.url?.query == "format=json")
@@ -28,7 +28,7 @@ struct SystemMonitorPublicIPProviderTests {
         ])
         defer { session.invalidateAndCancel() }
 
-        #expect(await DefaultPublicIPProvider(session: session).publicIPv6Address() == address)
+        #expect(await DefaultPublicIPProvider(session: session).publicIPv6Address() == .address(address))
         let request = try #require(PublicIPURLProtocol.requests.first)
         #expect(request.url?.host == "api6.ipify.org")
         #expect(request.url?.query == "format=json")
@@ -44,7 +44,7 @@ struct SystemMonitorPublicIPProviderTests {
         let session = makeSession(responses: ["api.ipify.org": .body(200, body)])
         defer { session.invalidateAndCancel() }
 
-        #expect(await DefaultPublicIPProvider(session: session).publicIPAddress() == nil)
+        #expect(await provider(session: session, routable: true).publicIPAddress() == .failed)
     }
 
     @Test(arguments: [
@@ -56,7 +56,7 @@ struct SystemMonitorPublicIPProviderTests {
         let session = makeSession(responses: ["api6.ipify.org": .body(200, body)])
         defer { session.invalidateAndCancel() }
 
-        #expect(await DefaultPublicIPProvider(session: session).publicIPv6Address() == nil)
+        #expect(await provider(session: session, routable: true).publicIPv6Address() == .failed)
     }
 
     @Test(arguments: [true, false])
@@ -66,12 +66,12 @@ struct SystemMonitorPublicIPProviderTests {
             "api6.ipify.org": ipv4Fails ? .body(200, #"{"ip":"2001:db8::8"}"#) : .failure(.notConnectedToInternet),
         ])
         defer { session.invalidateAndCancel() }
-        let provider = DefaultPublicIPProvider(session: session)
+        let provider = provider(session: session, routable: true)
         async let ipv4 = provider.publicIPAddress()
         async let ipv6 = provider.publicIPv6Address()
 
-        #expect(await ipv4 == (ipv4Fails ? nil : "203.0.113.8"))
-        #expect(await ipv6 == (ipv4Fails ? "2001:db8::8" : nil))
+        #expect(await ipv4 == (ipv4Fails ? .failed : .address("203.0.113.8")))
+        #expect(await ipv6 == (ipv4Fails ? .address("2001:db8::8") : .failed))
     }
 
     @Test(arguments: [URLError.Code.timedOut, .notConnectedToInternet, .cancelled])
@@ -79,7 +79,7 @@ struct SystemMonitorPublicIPProviderTests {
         let session = makeSession(responses: ["api.ipify.org": .failure(error)])
         defer { session.invalidateAndCancel() }
 
-        #expect(await DefaultPublicIPProvider(session: session).publicIPAddress() == nil)
+        #expect(await provider(session: session, routable: true).publicIPAddress() == .failed)
     }
 
     @Test
@@ -89,7 +89,53 @@ struct SystemMonitorPublicIPProviderTests {
         ])
         defer { session.invalidateAndCancel() }
 
-        #expect(await DefaultPublicIPProvider(session: session).publicIPAddress() == nil)
+        #expect(await provider(session: session, routable: true).publicIPAddress() == .failed)
+    }
+
+    @Test
+    func aFailedLookupIsAbsenceOnlyWhenThisHostHasNoRoutableAddress() async {
+        let session = makeSession(responses: [
+            "api.ipify.org": .failure(.timedOut),
+            "api6.ipify.org": .failure(.cannotConnectToHost),
+        ])
+        defer { session.invalidateAndCancel() }
+        let lookup = provider(session: session, routable: false)
+
+        #expect(await lookup.publicIPAddress() == .absent)
+        #expect(await lookup.publicIPv6Address() == .absent)
+    }
+
+    @Test(arguments: [
+        ("203.0.113.8", AF_INET, true),
+        ("10.1.2.3", AF_INET, true),
+        ("10.1.2", AF_INET, false),
+        ("nope", AF_INET, false),
+        ("127.0.0.1", AF_INET, false),
+        ("169.254.1.1", AF_INET, false),
+        ("0.0.0.0", AF_INET, false),
+        ("2001:db8::8", AF_INET6, true),
+        ("2001:db8::8%en0", AF_INET6, true),
+        ("fe80::1%en0", AF_INET6, false),
+        ("::1", AF_INET6, false),
+        ("fd00::1", AF_INET6, false),
+    ])
+    func routableInterfaceAddressesExcludeLoopbackLinkLocalAndUniqueLocal(
+        address: String, family: Int32, routable: Bool
+    ) {
+        #expect(SystemSampler.isRoutableInterfaceAddress(address, family: family) == routable)
+    }
+
+    @Test
+    func aFailedInterfaceListingDoesNotLookLikeAMissingAddressFamily() {
+        #expect(SystemSampler.hasRoutableAddress(family: AF_INET, addresses: nil))
+        #expect(!SystemSampler.hasRoutableAddress(family: AF_INET6, addresses: []))
+        #expect(!SystemSampler.hasRoutableAddress(family: AF_INET, addresses: ["169.254.1.1", "127.0.0.1"]))
+        #expect(SystemSampler.hasRoutableAddress(family: AF_INET, addresses: ["10.0.0.8"]))
+        #expect(SystemSampler.hasRoutableAddress(family: AF_INET6, addresses: ["fe80::1%en0", "2001:db8::8"]))
+    }
+
+    private func provider(session: URLSession, routable: Bool) -> DefaultPublicIPProvider {
+        DefaultPublicIPProvider(session: session, hasRoutableAddress: { _ in routable })
     }
 
     private func makeSession(responses: [String: PublicIPURLProtocol.Response]) -> URLSession {

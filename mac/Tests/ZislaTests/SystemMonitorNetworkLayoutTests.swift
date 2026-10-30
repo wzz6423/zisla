@@ -153,6 +153,10 @@ struct SystemMonitorNetworkLayoutTests {
 private struct LayoutPublicIPProvider: PublicIPProviding {
     let identity: NetworkIdentity
 
-    func publicIPAddress() async -> String? { identity.publicIPAddress }
-    func publicIPv6Address() async -> String? { identity.publicIPv6Address }
+    func publicIPAddress() async -> PublicIPLookupResult { lookup(identity.publicIPAddress) }
+    func publicIPv6Address() async -> PublicIPLookupResult { lookup(identity.publicIPv6Address) }
+
+    private func lookup(_ value: String?) -> PublicIPLookupResult {
+        value.map(PublicIPLookupResult.address) ?? .absent
+    }
 }
