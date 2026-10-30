@@ -3111,8 +3111,8 @@
 "已跳过 %d 个重复素材" = "중복 미디어 %d개를 건너뛰었습니다";
 
 /* Adaptive island appearance and placement */
-"灵动岛材质" = "Dynamic Island 재질";
-"刘海材质" = "노치 재질";
+"灵动岛展开材质" = "펼친 상태의 Dynamic Island 재질";
+"灵动岛收起材质" = "접힌 상태의 Dynamic Island 재질";
 "选择贴边刘海或悬浮药丸" = "화면 가장자리에 붙는 노치 또는 떠 있는 알약 모양 선택";
 "刘海模式" = "노치 모드";
 "灵动岛模式" = "Dynamic Island 모드";

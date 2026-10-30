@@ -354,8 +354,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
     /// Last panel size actually applied to the coordinator; basis for the two-phase
     /// (union → target) resize that keeps the SwiftUI surface spring unclipped.
     private var lastAppliedPanelSize: CGSize?
-    /// Panel size saved before voice recording starts; restored when recording ends.
-    private var voiceRecordingSavedPanelSize: CGSize?
+    /// Latest module size held while voice recording uses its compact surface.
+    private(set) var voiceRecordingSavedPanelSize: CGSize?
     /// Module panel size waiting for the post-recording fold to finish before it is applied.
     private var pendingVoiceRecordingPanelRestore: CGSize?
     /// Display where the last voice recording happened; scopes the post-recording processing indicator.
@@ -559,31 +559,21 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
                 }
             )
         }
-        Publishers.CombineLatest(
-            Publishers.CombineLatest4(
+        Self.expandedPanelSizes(
+            presentation: Publishers.CombineLatest4(
                 model.$selectedModule,
                 model.$isMirrorPresented,
                 model.$isTeleprompterPresented,
                 model.$dashboardCardCount
-            ),
-            model.settingsStore.$settings
-                .removeDuplicates(),
+            ).eraseToAnyPublisher(),
+            settings: model.settingsStore.$settings
+                .removeDuplicates().eraseToAnyPublisher(),
+            screenLayout: model.$islandScreenLayout.eraseToAnyPublisher()
         )
-            .map { state, settings -> CGSize in
-                let (module, isMirrorPresented, isTeleprompterPresented, dashboardCardCount) = state
-                return Self.expandedPanelSize(
-                    module: module,
-                    isMirrorPresented: isMirrorPresented,
-                    isTeleprompterPresented: isTeleprompterPresented,
-                    dashboardCardCount: dashboardCardCount,
-                    includesPet: settings.petEnabled,
-                    layoutStyle: settings.islandLayoutStyle
-                ).panelSize
-            }
-            .removeDuplicates()
             .sink { [weak self, weak coordinator] size in
-                guard !model.voiceInput.isCapturingInput else { return }
-                self?.scheduleExpandedSizeUpdate(size, coordinator: coordinator)
+                self?.updateExpandedPanelSize(
+                    size, duringVoiceRecording: model.voiceInput.isCapturingInput, coordinator: coordinator
+                )
             }
             .store(in: &cancellables)
         model.$isMirrorPresented
@@ -901,7 +891,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
                             isTeleprompterPresented: model.isTeleprompterPresented,
                             dashboardCardCount: model.dashboardCardCount,
                             includesPet: model.settingsStore.settings.petEnabled,
-                            layoutStyle: model.settingsStore.settings.islandLayoutStyle
+                            layoutStyle: model.settingsStore.settings.islandLayoutStyle,
+                            contentTopInset: IslandRootView.contentTopInset(
+                                layoutStyle: model.settingsStore.settings.islandLayoutStyle,
+                                screenLayout: model.islandScreenLayout
+                            )
                         ).panelSize
                         // Direct resize (no two-phase): recording swaps layout instantly by design.
                         self.expandedSizeUpdateTask?.cancel()
@@ -1081,6 +1075,16 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
         lastAppliedPanelSize = size
     }
 
+    func updateExpandedPanelSize(
+        _ size: CGSize, duringVoiceRecording recording: Bool, coordinator: OverlayCoordinator?
+    ) {
+        if recording {
+            voiceRecordingSavedPanelSize = size
+            return
+        }
+        scheduleExpandedSizeUpdate(size, coordinator: coordinator)
+    }
+
     private func scheduleExpandedSizeUpdate(
         _ size: CGSize,
         coordinator: OverlayCoordinator?
@@ -1116,19 +1120,21 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
         }
     }
 
-    private static func expandedPanelSize(
+    nonisolated static func expandedPanelSize(
         module: IslandModule,
         isMirrorPresented: Bool,
         isTeleprompterPresented: Bool,
         dashboardCardCount: Int,
         includesPet: Bool,
-        layoutStyle: IslandLayoutStyle = .notch
+        layoutStyle: IslandLayoutStyle = .notch,
+        contentTopInset: CGFloat = IslandDashboardLayout.contentTopInset
     ) -> IslandModuleLayout {
         if isMirrorPresented { return .mirror }
         if isTeleprompterPresented { return .teleprompter }
         let layout = IslandModuleLayout.resolved(
             for: module,
-            dashboardCardCount: dashboardCardCount
+            dashboardCardCount: dashboardCardCount,
+            contentTopInset: contentTopInset
         )
         return IslandModuleLayout(
             islandSize: layout.islandSize,
@@ -1137,6 +1143,27 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
                 includesPet: includesPet && layoutStyle == .notch
             )
         )
+    }
+
+    nonisolated static func expandedPanelSizes(
+        presentation: AnyPublisher<(IslandModule, Bool, Bool, Int), Never>,
+        settings: AnyPublisher<FeatureSettings, Never>,
+        screenLayout: AnyPublisher<ScreenOverlayLayout?, Never>
+    ) -> AnyPublisher<CGSize, Never> {
+        Publishers.CombineLatest3(presentation, settings, screenLayout)
+            .map { state, settings, layout in
+                let (module, mirror, teleprompter, cardCount) = state
+                return Self.expandedPanelSize(
+                    module: module, isMirrorPresented: mirror,
+                    isTeleprompterPresented: teleprompter, dashboardCardCount: cardCount,
+                    includesPet: settings.petEnabled, layoutStyle: settings.islandLayoutStyle,
+                    contentTopInset: IslandRootView.contentTopInset(
+                        layoutStyle: settings.islandLayoutStyle, screenLayout: layout
+                    )
+                ).panelSize
+            }
+            .removeDuplicates()
+            .eraseToAnyPublisher()
     }
 
     func configureTextEditingCommands() {

@@ -188,16 +188,26 @@ struct CompactStatusBarView: View {
 
     var body: some View {
         TimelineView(.animation(minimumInterval: reduceMotion ? 1 : 1.0 / 30.0,
-                                paused: displayState.compactStatusHidden || (!isPlaybackProgressActive && !showsCustomLyrics))) { context in
+                                paused: pausesCompactTimeline)) { context in
             statusBarContent(at: context.date)
         }
+    }
+
+    var pausesCompactTimeline: Bool {
+        let showsIdleLogo = usesCustomPill && resultSweep.current == nil
+            && (displayState.compactStatusHidden
+                || (selectedCompactStatusPriority == nil && recordingOperationNotice == nil))
+        return !(showsIdleLogo && !reduceMotion)
+            && (displayState.compactStatusHidden || (!isPlaybackProgressActive && !showsCustomLyrics))
     }
 
     @ViewBuilder
     func statusBarContent(at date: Date) -> some View {
         GeometryReader { geometry in
             ZStack {
-                if !displayState.compactStatusHidden || resultSweep.current != nil {
+                if usesCustomPill, displayState.compactStatusHidden, resultSweep.current == nil {
+                    IslandParticleLogo(side: min(18, height), time: date.timeIntervalSinceReferenceDate)
+                } else if !displayState.compactStatusHidden || resultSweep.current != nil {
                     if usesCustomPill {
                         customStatusContent(at: date)
 
@@ -208,7 +218,7 @@ struct CompactStatusBarView: View {
             }
             .frame(width: geometry.size.width, height: geometry.size.height)
             .background(compactStatusBackground)
-            .overlay { AIResultSweepOverlay(controller: resultSweep) }
+            .overlay { AIResultSweepOverlay(controller: resultSweep, edge: displayState.islandEdge) }
             .overlay {
                 if settingsStore.settings.collapsedProgressGlowEnabled,
                    let progress = compactProgress(at: date) {
@@ -296,7 +306,16 @@ struct CompactStatusBarView: View {
             browserDownloadCount: settingsStore.settings.showsBrowserDownloadProgress
                 ? browserDownloads.snapshots.count : 0
         )
-        if let presentation = sizing?.customPillPresentation {
+        if let notice = recordingOperationNotice {
+            let layout = displayState.islandEdge.isVertical
+                ? AnyLayout(VStackLayout(spacing: 6)) : AnyLayout(HStackLayout(spacing: 6))
+            layout {
+                CompactScreenRecordingOperationWing(notice: notice, side: .left, height: height,
+                    usesTransparentBackground: true, usesCustomPillSlot: true)
+                CompactScreenRecordingOperationWing(notice: notice, side: .right, height: height,
+                    usesTransparentBackground: true, usesCustomPillSlot: true)
+            }
+        } else if let presentation = sizing?.customPillPresentation {
             let text = CompactPillStatusContent.displayText(
                 for: presentation, settings: settingsStore.settings, item: media.snapshot, at: date
             )
@@ -309,6 +328,8 @@ struct CompactStatusBarView: View {
                 item: presentation.isMedia ? media.snapshot : nil
             )
             .onChange(of: length, initial: true) { _, value in onCompactLengthChanged(value) }
+        } else if resultSweep.current == nil {
+            IslandParticleLogo(side: min(18, height), time: date.timeIntervalSinceReferenceDate)
         }
     }
 
@@ -2258,6 +2279,7 @@ private struct CompactScreenRecordingOperationWing: View {
     var side: NoticeSide
     var height: CGFloat
     var usesTransparentBackground = false
+    var usesCustomPillSlot = false
 
     var body: some View {
         Group {
@@ -2280,8 +2302,8 @@ private struct CompactScreenRecordingOperationWing: View {
                 ProgressView().controlSize(.mini)
             }
         }
-        .padding(.horizontal, CompactStatusMetrics.horizontalContentInset)
-        .frame(width: CompactStatusMetrics.wingWidth, height: height,
+        .padding(.horizontal, usesCustomPillSlot ? 0 : CompactStatusMetrics.horizontalContentInset)
+        .frame(width: usesCustomPillSlot ? height : CompactStatusMetrics.wingWidth, height: height,
                alignment: side == .left ? .leading : .trailing)
         .background(usesTransparentBackground ? Color.clear : Color.black, in: CompactAIWingShape(side: side))
         .accessibilityElement(children: .ignore)

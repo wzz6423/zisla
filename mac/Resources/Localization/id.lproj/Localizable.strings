@@ -3111,8 +3111,8 @@
 "已跳过 %d 个重复素材" = "%d media duplikat dilewati";
 
 /* Adaptive island appearance and placement */
-"灵动岛材质" = "Material Dynamic Island";
-"刘海材质" = "Material takik";
+"灵动岛展开材质" = "Material Dynamic Island saat diperluas";
+"灵动岛收起材质" = "Material Dynamic Island saat diciutkan";
 "选择贴边刘海或悬浮药丸" = "Pilih takik yang menempel di tepi layar atau kapsul mengambang";
 "刘海模式" = "Mode takik";
 "灵动岛模式" = "Mode Dynamic Island";

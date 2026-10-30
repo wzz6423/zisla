@@ -3110,8 +3110,8 @@
 "已跳过 %d 个重复素材" = "重複する素材 %d 件をスキップしました";
 
 /* Adaptive island appearance and placement */
-"灵动岛材质" = "Dynamic Islandの質感";
-"刘海材质" = "ノッチの質感";
+"灵动岛展开材质" = "展開時のDynamic Islandの質感";
+"灵动岛收起材质" = "折りたたみ時のDynamic Islandの質感";
 "选择贴边刘海或悬浮药丸" = "画面端に沿うノッチ、またはフローティングピルを選択";
 "刘海模式" = "ノッチモード";
 "灵动岛模式" = "Dynamic Islandモード";

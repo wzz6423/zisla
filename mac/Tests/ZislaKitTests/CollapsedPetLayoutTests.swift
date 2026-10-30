@@ -111,10 +111,15 @@ struct CollapsedPetLayoutTests {
         #expect(CollapsedPetLayout.containerSize(for: bar.size, edge: edge) == container.size)
     }
 
-    @Test(arguments: IslandEdge.allCases)
-    func pillPetFramesStayInsideNegativeCoordinateScreensAtCorners(edge: IslandEdge) throws {
+    @Test(arguments: IslandEdge.allCases, [
+        (ScreenLayoutConfiguration().pillSize, CGFloat(19.2)),
+        (CGSize(width: 180, height: 32), CGFloat(24)),
+    ])
+    func pillPetFramesStayInsideNegativeCoordinateScreensAtCorners(
+        edge: IslandEdge, sizing: (pillSize: CGSize, petSize: CGFloat)
+    ) throws {
         for offset in [0.0, 0.5, 1.0] {
-            let layout = pillLayout(edge: edge, offset: offset)
+            let layout = pillLayout(edge: edge, offset: offset, pillSize: sizing.pillSize)
             let bar = layout.collapsedFrame
             let container = CollapsedPetLayout.frame(for: layout)
             #expect(layout.screenFrame.contains(container))
@@ -124,7 +129,7 @@ struct CollapsedPetLayoutTests {
                 #expect(layout.screenFrame.contains(pet))
                 #expect(container.contains(pet))
                 #expect(!pet.intersects(bar))
-                #expect(pet.width == 24 && pet.height == 24)
+                #expect(pet.width == sizing.petSize && pet.height == sizing.petSize)
             }
         }
     }
@@ -186,13 +191,17 @@ struct CollapsedPetLayoutTests {
         #expect(CollapsedPetLayout.petFrame(for: layout, compactBarFrame: bar, side: .left) == nil)
     }
 
-    private func pillLayout(edge: IslandEdge, offset: Double = 0.5) -> ScreenOverlayLayout {
+    private func pillLayout(
+        edge: IslandEdge, offset: Double = 0.5,
+        pillSize: CGSize = ScreenLayoutConfiguration().pillSize
+    ) -> ScreenOverlayLayout {
         let screen = ScreenSnapshot(displayID: 9,
             frame: CGRect(x: -1920, y: -200, width: 1920, height: 1080),
             visibleFrame: CGRect(x: -1920, y: -200, width: 1920, height: 1056))
         return ScreenLayoutEngine(configuration: ScreenLayoutConfiguration(
             layoutStyle: .pill,
-            placement: IslandPlacement(mode: .custom, edge: edge, offset: offset)
+            placement: IslandPlacement(mode: .custom, edge: edge, offset: offset),
+            pillSize: pillSize
         )).layout(for: screen)
     }
 }

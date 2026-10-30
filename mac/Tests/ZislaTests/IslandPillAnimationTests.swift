@@ -34,14 +34,14 @@ struct IslandPillAnimationTests {
                 "The recycle must return to the same pill instead of the screen top center")
     }
 
-    @Test(arguments: IslandEdge.allCases)
-    func aPanelSizeUnionDoesNotMoveTheCollapseAnchor(edge: IslandEdge) {
+    @Test(arguments: IslandEdge.allCases, [false, true])
+    func aPanelSizeUnionDoesNotMoveTheCollapseAnchor(edge: IslandEdge, sideAnchorsAtTop: Bool) {
         let panel = CGSize(width: 900, height: 600)
         let surface = CGSize(width: 776, height: 340)
         let origin = CGPoint(x: edge == .right ? panel.width - surface.width : edge == .left ? 0 : (panel.width - surface.width) / 2,
-            y: edge == .bottom ? panel.height - surface.height : edge.isVertical ? (panel.height - surface.height) / 2 : 0)
+            y: edge == .bottom || (edge.isVertical && !sideAnchorsAtTop) ? panel.height - surface.height : 0)
         let anchor = CGRect(x: edge == .right ? 858 : edge == .left ? 0 : 405,
-            y: edge == .bottom ? 568 : edge.isVertical ? 265 : 0,
+            y: edge == .bottom ? 568 : edge.isVertical && !sideAnchorsAtTop ? 530 : 0,
             width: edge.isVertical ? 32 : 70, height: edge.isVertical ? 70 : 32)
         let expanded = CGRect(x: 50, y: -90, width: panel.width, height: panel.height)
         let collapsed = CGRect(x: expanded.minX + anchor.minX,
@@ -50,18 +50,145 @@ struct IslandPillAnimationTests {
             topology: .simulated(frame: collapsed), triggerFrame: collapsed,
             transferDragTriggerFrame: collapsed, expandedFrame: expanded,
             style: .pill, edge: edge, placementMode: .custom)
-        let local = IslandRootView.pillCollapsedFrame(for: layout, in: surface, panelSize: panel)
+        let local = IslandRootView.pillCollapsedFrame(for: layout, in: surface, panelSize: panel, direction: .leftToRight)
         #expect(equal(local.offsetBy(dx: origin.x, dy: origin.y), anchor))
     }
 
+    @Test(arguments: [IslandEdge.left, .right], [Double(0.499), 0.5, 0.501])
+    @MainActor
+    func aShrinkingSideSurfaceKeepsItsRenderedPillAtThePhysicalAnchor(edge: IslandEdge, offset: Double) throws {
+        let screen = ScreenSnapshot(displayID: 7,
+            frame: CGRect(x: -1600, y: 880, width: 1600, height: 900),
+            visibleFrame: CGRect(x: -1600, y: 880, width: 1600, height: 876))
+        let layout = ScreenLayoutEngine(configuration: ScreenLayoutConfiguration(
+            expandedSize: CGSize(width: 900, height: 600), layoutStyle: .pill,
+            placement: IslandPlacement(mode: .custom, edge: edge, offset: offset)
+        )).layout(for: screen)
+        let panel = layout.expandedFrame.size
+        let surface = CGSize(width: 776, height: 340)
+        let local = IslandRootView.pillCollapsedFrame(for: layout, in: surface, panelSize: panel, direction: .leftToRight)
+        let anchor = layout.collapsedFrameInExpandedTopLeading
+        for direction in [LayoutDirection.leftToRight, .rightToLeft] {
+            let alignment = IslandRootView.pillAlignment(edge: edge, direction: direction,
+                sideAnchorsAtTop: layout.collapsedFrame.midY >= screen.frame.midY)
+            let renderer = ImageRenderer(content: IslandSurface(isCollapsed: true,
+                collapsedSize: local.size, expandedSize: surface, notchBackground: .black,
+                layoutStyle: .pill, collapsedFrame: local, edge: edge
+            ) { Color.clear }
+                .transaction { $0.disablesAnimations = true }
+                .frame(width: surface.width, height: surface.height)
+                .frame(width: panel.width, height: panel.height, alignment: alignment)
+                .environment(\.layoutDirection, direction))
+            renderer.scale = 1
+            let bitmap = NSBitmapImageRep(cgImage: try #require(renderer.cgImage))
+            #expect(try #require(bitmap.colorAt(x: Int(anchor.midX), y: Int(anchor.midY))).alphaComponent > 0.95,
+                    "A smaller side surface must fold back into its screen anchor for either interface direction")
+            #expect(try #require(bitmap.colorAt(x: Int(anchor.midX), y: Int(panel.height - anchor.midY))).alphaComponent == 0,
+                    "The fold cannot move to the opposite vertical end of the union panel")
+        }
+    }
+
+    @Test(arguments: IslandLayoutStyle.allCases)
+    @MainActor
+    func thePhysicalSurfaceKeepsItsContentInTheOriginalInterfaceDirection(style: IslandLayoutStyle) throws {
+        let size = CGSize(width: 120, height: 80)
+        for direction in [LayoutDirection.leftToRight, .rightToLeft] {
+            let renderer = ImageRenderer(content: IslandSurface(expandedSize: size, layoutStyle: style) {
+                HStack(spacing: 0) {
+                    Color(.sRGB, red: 1, green: 0, blue: 0, opacity: 1).frame(width: 20)
+                    Spacer(minLength: 0)
+                    Color(.sRGB, red: 0, green: 0, blue: 1, opacity: 1).frame(width: 20)
+                }
+            }
+                .transaction { $0.disablesAnimations = true }
+                .frame(width: size.width, height: size.height)
+                .environment(\.layoutDirection, direction))
+            renderer.scale = 1
+            let bitmap = NSBitmapImageRep(cgImage: try #require(renderer.cgImage))
+            let firstX = direction == .leftToRight ? 10 : 110
+            let lastX = direction == .leftToRight ? 110 : 10
+            let first = try #require(bitmap.colorAt(x: firstX, y: 40)?.usingColorSpace(.sRGB))
+            let last = try #require(bitmap.colorAt(x: lastX, y: 40)?.usingColorSpace(.sRGB))
+            #expect(first.redComponent > 0.95 && first.blueComponent < 0.05,
+                    "Fixing physical pill coordinates must preserve the content's leading side")
+            #expect(last.blueComponent > 0.95 && last.redComponent < 0.05)
+        }
+    }
+
+    @Test(arguments: [IslandEdge.left, .right], [Double(0), 0.25, 0.75, 1])
+    @MainActor
+    func transientContentKeepsTheOriginalPillPositionInEitherInterfaceDirection(edge: IslandEdge, offset: Double) throws {
+        let screen = ScreenSnapshot(displayID: 7,
+            frame: CGRect(x: -1600, y: 880, width: 1600, height: 900),
+            visibleFrame: CGRect(x: -1600, y: 880, width: 1600, height: 876))
+        let layout = ScreenLayoutEngine(configuration: ScreenLayoutConfiguration(
+            expandedSize: CGSize(width: 900, height: 600), layoutStyle: .pill,
+            placement: IslandPlacement(mode: .custom, edge: edge, offset: offset)
+        )).layout(for: screen)
+        let panel = layout.expandedFrame.size
+        let surface = CGSize(width: 776, height: 340)
+        let physical = IslandRootView.pillCollapsedFrame(for: layout, in: surface, panelSize: panel, direction: .leftToRight)
+        let anchor = layout.collapsedFrameInExpandedTopLeading
+        let presentation = CompactPillStatusContent.transientPresentation(message: "جاهز")
+        for direction in [LayoutDirection.leftToRight, .rightToLeft] {
+            let frame = IslandRootView.pillCollapsedFrame(for: layout, in: surface, panelSize: panel, direction: direction)
+            let alignment = IslandRootView.pillAlignment(edge: edge, direction: direction,
+                sideAnchorsAtTop: layout.collapsedFrame.midY >= screen.frame.midY)
+            let renderer = ImageRenderer(content: IslandSurface(isCollapsed: true,
+                collapsedSize: physical.size, expandedSize: surface, notchBackground: .black,
+                layoutStyle: .pill, collapsedFrame: physical, edge: edge
+            ) {
+                CompactPillStatusContent(presentation: presentation, text: presentation.text,
+                    edge: edge, visualizationStyle: .waveform, item: nil)
+                    .frame(width: frame.width, height: frame.height)
+                    .position(x: frame.midX, y: frame.midY)
+            }
+                .transaction { $0.disablesAnimations = true }
+                .frame(width: surface.width, height: surface.height)
+                .frame(width: panel.width, height: panel.height, alignment: alignment)
+                .environment(\.layoutDirection, direction))
+            renderer.scale = 1
+            let bitmap = NSBitmapImageRep(cgImage: try #require(renderer.cgImage))
+            let colors = try (Int(anchor.minY)..<Int(anchor.maxY)).flatMap { y in
+                try (Int(anchor.minX)..<Int(anchor.maxX)).map { x in
+                    try #require(bitmap.colorAt(x: x, y: y)?.usingColorSpace(.deviceRGB))
+                }
+            }
+            #expect(colors.contains { $0.redComponent > 0.5 },
+                    "The real transient icon and text must stay visible inside the physical pill in RTL")
+        }
+    }
+
     @Test
-    func physicalSideAlignmentDoesNotFlipWhenTheInterfaceUsesArabic() {
-        #expect(IslandRootView.pillAlignment(edge: .top, direction: .rightToLeft) == .top)
-        #expect(IslandRootView.pillAlignment(edge: .bottom, direction: .rightToLeft) == .bottom)
-        #expect(IslandRootView.pillAlignment(edge: .left, direction: .leftToRight) == .leading)
-        #expect(IslandRootView.pillAlignment(edge: .left, direction: .rightToLeft) == .trailing)
-        #expect(IslandRootView.pillAlignment(edge: .right, direction: .leftToRight) == .trailing)
-        #expect(IslandRootView.pillAlignment(edge: .right, direction: .rightToLeft) == .leading)
+    @MainActor
+    func theNotchKeepsItsExistingRTLRenderingForAnOffsetPetSlot() throws {
+        let size = CGSize(width: 240, height: 80)
+        let renderer = ImageRenderer(content: IslandSurface(isCollapsed: true,
+            collapsedSize: CGSize(width: 60, height: 24), expandedSize: size,
+            notchBackground: .black, collapsedCenterOffsetX: 36
+        ) { Color.clear }
+            .transaction { $0.disablesAnimations = true }
+            .frame(width: size.width, height: size.height)
+            .environment(\.layoutDirection, .rightToLeft))
+        renderer.scale = 1
+        let bitmap = NSBitmapImageRep(cgImage: try #require(renderer.cgImage))
+        #expect(try #require(bitmap.colorAt(x: 100, y: 12)).alphaComponent > 0.95)
+        #expect(try #require(bitmap.colorAt(x: 140, y: 12)).alphaComponent == 0,
+                "Physical pill coordinates must not change the existing notch and pet-slot direction")
+    }
+
+    @Test(arguments: [false, true])
+    func physicalSideAlignmentDoesNotFlipWhenTheInterfaceUsesArabic(sideAnchorsAtTop: Bool) {
+        #expect(IslandRootView.pillAlignment(edge: .top, direction: .rightToLeft, sideAnchorsAtTop: sideAnchorsAtTop) == .top)
+        #expect(IslandRootView.pillAlignment(edge: .bottom, direction: .rightToLeft, sideAnchorsAtTop: sideAnchorsAtTop) == .bottom)
+        #expect(IslandRootView.pillAlignment(edge: .left, direction: .leftToRight, sideAnchorsAtTop: sideAnchorsAtTop)
+            == (sideAnchorsAtTop ? .topLeading : .bottomLeading))
+        #expect(IslandRootView.pillAlignment(edge: .left, direction: .rightToLeft, sideAnchorsAtTop: sideAnchorsAtTop)
+            == (sideAnchorsAtTop ? .topTrailing : .bottomTrailing))
+        #expect(IslandRootView.pillAlignment(edge: .right, direction: .leftToRight, sideAnchorsAtTop: sideAnchorsAtTop)
+            == (sideAnchorsAtTop ? .topTrailing : .bottomTrailing))
+        #expect(IslandRootView.pillAlignment(edge: .right, direction: .rightToLeft, sideAnchorsAtTop: sideAnchorsAtTop)
+            == (sideAnchorsAtTop ? .topLeading : .bottomLeading))
     }
 
     @Test

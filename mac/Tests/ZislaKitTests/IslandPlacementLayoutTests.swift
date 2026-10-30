@@ -25,7 +25,7 @@ struct IslandPlacementLayoutTests {
         #expect(layout.edge == edge)
         #expect(screen.frame.insetBy(dx: 8, dy: 8).contains(expanded))
         #expect(expanded.contains(pill))
-        #expect(pill.size == (edge.isVertical ? CGSize(width: 32, height: 180) : CGSize(width: 180, height: 32)))
+        #expect(pill.size == (edge.isVertical ? CGSize(width: 24, height: 80) : CGSize(width: 80, height: 24)))
         #expect(expanded.size == CGSize(width: 480, height: 680))
         switch edge {
         case .top:
@@ -68,6 +68,73 @@ struct IslandPlacementLayoutTests {
             #expect(CGRect(origin: .zero, size: layout.expandedFrame.size).contains(local))
             #expect(CGRect(origin: .zero, size: layout.expandedFrame.size).contains(flipped))
         }
+    }
+
+    @Test(arguments: [IslandEdge.left, .right], [Double(0.25), 0.75])
+    func sideExpansionKeepsTheNearestVerticalEndFixedAcrossModuleSizes(edge: IslandEdge, offset: Double) {
+        var configuration = ScreenLayoutConfiguration(
+            expandedSize: CGSize(width: 480, height: 180),
+            layoutStyle: .pill,
+            placement: IslandPlacement(mode: .custom, edge: edge, offset: offset)
+        )
+        let initial = ScreenLayoutEngine(configuration: configuration).layout(for: screen)
+        for height: CGFloat in [180, 340, 680, 340] {
+            configuration.expandedSize.height = height
+            let layout = ScreenLayoutEngine(configuration: configuration).layout(for: screen)
+            let pill = layout.collapsedFrame
+            #expect(pill == initial.collapsedFrame)
+            #expect(layout.expandedFrame.height == height)
+            #expect(layout.placementBounds.contains(layout.expandedFrame))
+            #expect(layout.expandedFrame.contains(pill))
+            #expect(layout.transferDragTriggerFrame == initial.transferDragTriggerFrame)
+            if offset > 0.5 {
+                #expect(layout.expandedFrame.maxY == pill.maxY,
+                        "An upper-side island must expand down from its fixed top")
+                #expect(layout.collapsedFrameInExpandedTopLeading.minY == 0)
+            } else {
+                #expect(layout.expandedFrame.minY == pill.minY,
+                        "A lower-side island must expand up from its fixed bottom")
+                #expect(layout.collapsedFrameInExpanded.minY == 0)
+            }
+        }
+    }
+
+    @Test(arguments: [IslandEdge.left, .right])
+    func sideExpansionLimitsHeightWithoutMovingTheFixedEndOnEachScreen(edge: IslandEdge) {
+        let other = ScreenSnapshot(displayID: 8,
+            frame: CGRect(x: 100, y: 880, width: 1440, height: 900),
+            visibleFrame: CGRect(x: 100, y: 880, width: 1440, height: 876))
+        for snapshot in [screen, other] {
+            for offset in [0.0, 0.25, 0.499, 0.5, 0.501, 0.75, 1.0] {
+                let layout = ScreenLayoutEngine(configuration: ScreenLayoutConfiguration(
+                    expandedSize: CGSize(width: 480, height: 10_000),
+                    layoutStyle: .pill,
+                    placement: IslandPlacement(mode: .custom, edge: edge, offset: offset)
+                )).layout(for: snapshot)
+                let pill = layout.collapsedFrame
+                let bounds = layout.placementBounds
+                #expect(bounds.contains(layout.expandedFrame))
+                #expect(layout.expandedFrame.contains(pill))
+                if offset >= 0.5 {
+                    #expect(layout.expandedFrame.maxY == pill.maxY)
+                    #expect(layout.expandedFrame.minY == bounds.minY)
+                } else {
+                    #expect(layout.expandedFrame.minY == pill.minY)
+                    #expect(layout.expandedFrame.maxY == bounds.maxY)
+                }
+            }
+        }
+    }
+
+    @Test(arguments: [IslandEdge.left, .right], [Double(0.25), 0.75])
+    func sideDragTriggerRetainsItsCenteredReach(edge: IslandEdge, offset: Double) {
+        let layout = ScreenLayoutEngine(configuration: ScreenLayoutConfiguration(
+            layoutStyle: .pill,
+            placement: IslandPlacement(mode: .custom, edge: edge, offset: offset)
+        )).layout(for: screen)
+        #expect(layout.transferDragTriggerFrame.midY == layout.collapsedFrame.midY)
+        #expect(layout.transferDragTriggerFrame.height == 320)
+        #expect(layout.transferDragTriggerFrame.contains(layout.collapsedFrame))
     }
 
     @Test
@@ -187,7 +254,7 @@ struct IslandPlacementLayoutTests {
     }
 
     @Test
-    func cameraModePreservesKnownOcclusionAndFortyPointWings() {
+    func cameraIdlePillDoesNotInflateToTheReservedScreenRegion() {
         let snapshot = ScreenSnapshot(displayID: 4,
             frame: CGRect(x: -1512, y: 200, width: 1512, height: 982),
             visibleFrame: CGRect(x: -1512, y: 200, width: 1512, height: 938),
@@ -200,11 +267,45 @@ struct IslandPlacementLayoutTests {
         )).layout(for: snapshot)
         #expect(layout.collapsedFrame.midX == -756)
         #expect(layout.collapsedFrame.midY == 1160)
-        #expect(layout.collapsedFrame.width == 280)
-        #expect(layout.centerOcclusionWidth == 200)
+        #expect(layout.collapsedFrame.width == 180)
+        #expect(layout.centerOcclusionWidth == 180)
         #expect(layout.physicalOcclusionFrame == CGRect(x: -856, y: 1138, width: 200, height: 44))
-        #expect((layout.collapsedFrame.width - layout.centerOcclusionWidth) / 2 == 40)
         #expect(!layout.topology.hasPhysicalNotch, "A software pill retains its capsule style even around a reserved camera region")
+    }
+
+    @Test(arguments: [CGFloat(16), CGFloat(200)])
+    func cameraContentReservesVisibleWingsOnlyWhilePresent(reservedWidth: CGFloat) throws {
+        let halfScreen: CGFloat = 756
+        let snapshot = ScreenSnapshot(displayID: 4,
+            frame: CGRect(x: 0, y: 0, width: 1512, height: 982),
+            visibleFrame: CGRect(x: 0, y: 0, width: 1512, height: 938),
+            safeAreaInsets: ScreenInsets(top: 44),
+            auxiliaryTopLeftArea: CGRect(x: 0, y: 938, width: halfScreen - reservedWidth / 2, height: 44),
+            auxiliaryTopRightArea: CGRect(x: halfScreen + reservedWidth / 2, y: 938,
+                                         width: halfScreen - reservedWidth / 2, height: 44))
+        let settings = FeatureSettings(islandLayoutStyle: .pill)
+        let engine = SideNoticeLayoutEngine()
+        let configuration = settings.islandScreenConfiguration
+        let idle = ScreenLayoutEngine(configuration: configuration).layout(for: snapshot)
+        #expect(idle.collapsedFrame.width == configuration.pillSize.width)
+        #expect(engine.compactBarFrame(for: snapshot, notices: [], settings: settings) == nil)
+        for notice in [IslandNotice(id: "media-active-test", title: "Music"),
+                       IslandNotice(id: "ai-active-test", title: "Codex")] {
+            let sizing = try #require(engine.compactBarSizing(for: [notice], settings: settings))
+            var activeConfiguration = configuration
+            activeConfiguration.compactStatusLength = sizing.customPillLength
+            let active = ScreenLayoutEngine(configuration: activeConfiguration).layout(for: snapshot)
+            #expect(active.collapsedFrame.width == max(configuration.pillSize.width, reservedWidth + 80))
+            #expect((active.collapsedFrame.width - active.centerOcclusionWidth) / 2 >= 40)
+            #expect(active.collapsedFrame.midX == idle.collapsedFrame.midX)
+            #expect(active.collapsedFrame.midY == idle.collapsedFrame.midY)
+            #expect(active.triggerFrame == active.collapsedFrame)
+            #expect(active.expandedFrame.contains(active.collapsedFrame))
+            #expect(engine.compactBarFrame(for: snapshot, notices: [notice], settings: settings) == active.collapsedFrame)
+            #expect(engine.compactBarFrame(for: idle, notices: [notice], settings: settings) == active.collapsedFrame)
+            #expect(engine.compactBarFrame(for: active, notices: [notice], settings: settings) == active.collapsedFrame)
+        }
+        #expect(ScreenLayoutEngine(configuration: configuration).layout(for: snapshot) == idle)
     }
 
     @Test
@@ -244,7 +345,7 @@ struct IslandPlacementLayoutTests {
             pillSize: CGSize(width: CGFloat.nan, height: CGFloat.infinity), edgeInset: .nan
         )).layout(for: screen)
         #expect(layout.collapsedFrame.size == (edge.isVertical
-            ? CGSize(width: 32, height: 180) : CGSize(width: 180, height: 32)))
+            ? CGSize(width: 24, height: 80) : CGSize(width: 80, height: 24)))
         #expect(layout.placementBounds == screen.frame.insetBy(dx: 8, dy: 8))
     }
 
@@ -262,8 +363,8 @@ struct IslandPlacementLayoutTests {
         for (snapshot, menuBarHeight) in snapshots {
             let layout = engine.layout(for: snapshot)
             #expect(layout.collapsedFrame.midY == frame.maxY - menuBarHeight / 2)
-            #expect(layout.collapsedFrame.height == min(32, menuBarHeight - 4))
-            #expect(layout.collapsedFrame.width == 180)
+            #expect(layout.collapsedFrame.height == min(24, menuBarHeight - 4))
+            #expect(layout.collapsedFrame.width == 80)
             #expect(layout.physicalOcclusionFrame == nil)
             #expect(layout.centerOcclusionWidth == 0, "Safe area alone cannot measure a camera cutout")
         }
@@ -345,13 +446,13 @@ struct IslandPlacementLayoutTests {
             var configuration = settings.islandScreenConfiguration
             configuration.expandedSize = CGSize(width: 480, height: 680)
             configuration.expandsForDetailedStatus = true
-            configuration.compactStatusLength = 70
+            configuration.compactStatusLength = 54
             let layout = ScreenLayoutEngine(configuration: configuration).layout(for: screen)
             let frame = layout.collapsedFrame
             let bounds = screen.frame.insetBy(dx: 16, dy: 16)
             #expect(bounds.contains(frame))
             #expect(layout.placementBounds == bounds)
-            #expect(edge.isVertical ? frame.height == 70 : frame.width == 70)
+            #expect(edge.isVertical ? frame.height == 54 : frame.width == 54)
             #expect(layout.triggerFrame == frame)
             #expect(layout.expandedFrame.contains(frame))
             #expect(layout.transferDragTriggerFrame.contains(frame))
@@ -457,7 +558,7 @@ struct IslandPlacementLayoutTests {
             #expect(presentation.text == text)
             #expect(presentation.showsWaveform == waveform)
             let length = sizing.customPillLength
-            let visualLength: CGFloat = waveform ? 70 : 32
+            let visualLength: CGFloat = waveform ? 54 : 24
             if text.isEmpty {
                 #expect(length == visualLength)
             } else if edge.isVertical {
@@ -471,7 +572,7 @@ struct IslandPlacementLayoutTests {
             configuration.expandsForDetailedStatus = sizing.expandsForDetailedStatus
             let layout = ScreenLayoutEngine(configuration: configuration).layout(for: screen)
             #expect(layout.collapsedFrame.size == (edge.isVertical
-                ? CGSize(width: 32, height: length) : CGSize(width: length, height: 32)))
+                ? CGSize(width: 24, height: length) : CGSize(width: length, height: 24)))
             #expect(layout.centerOcclusionWidth == 0)
             #expect(layout.triggerFrame == layout.collapsedFrame)
             #expect(layout.expandedFrame.contains(layout.collapsedFrame))
@@ -481,7 +582,7 @@ struct IslandPlacementLayoutTests {
         settings.mediaVisualizationStyle = .glow
         let music = IslandNotice(id: "media-active-left", title: "Music", side: .left)
         let glow = try #require(engine.compactBarFrame(for: screen, notices: [music], settings: settings))
-        #expect(glow.size == CGSize(width: 32, height: 32))
+        #expect(glow.size == CGSize(width: 24, height: 24))
     }
 
     @Test
@@ -505,7 +606,7 @@ struct IslandPlacementLayoutTests {
             )).layout(for: screen)
             #expect(layout.placementBounds.contains(layout.collapsedFrame))
             #expect(layout.collapsedFrame.width.isFinite && layout.collapsedFrame.height.isFinite)
-            #expect(layout.collapsedFrame.width >= 32 && layout.collapsedFrame.height >= 32)
+            #expect(layout.collapsedFrame.width >= 24 && layout.collapsedFrame.height >= 24)
             #expect(layout.expandedFrame.contains(layout.collapsedFrame))
         }
     }
@@ -538,7 +639,7 @@ struct IslandPlacementLayoutTests {
             #expect(presentation.notice == notice)
             #expect(presentation.text == text)
             #expect(presentation.isMedia == (priority == .media))
-            let base: CGFloat = priority == .media ? 70 : 32
+            let base: CGFloat = priority == .media ? 54 : 24
             #expect(sizing.customPillLength > base)
             #expect(sizing.customPillLength <= base + 174)
         }
@@ -563,9 +664,9 @@ struct IslandPlacementLayoutTests {
         settings.mediaCompactStyle = .detailed
         let noLyrics = try #require(engine.compactBarSizing(for: [music], settings: settings))
         #expect(noLyrics.customPillPresentation?.text == "")
-        #expect(noLyrics.customPillLength == 70)
+        #expect(noLyrics.customPillLength == 54)
         settings.mediaVisualizationStyle = .glow
-        #expect(try #require(engine.compactBarSizing(for: [music], settings: settings)).customPillLength == 32)
+        #expect(try #require(engine.compactBarSizing(for: [music], settings: settings)).customPillLength == 24)
         let background = IslandNotice(id: "background-sound-test", title: "Rain", detail: "White noise")
         settings.mediaVisualizationStyle = .waveform
         let backgroundPresentation = try #require(engine.compactBarSizing(for: [background], settings: settings)).customPillPresentation
@@ -583,7 +684,7 @@ struct IslandPlacementLayoutTests {
         settings.mailCompactStyle = .compact
         let compactMail = try #require(engine.compactBarSizing(for: [older, newest], settings: settings))
         #expect(compactMail.customPillPresentation?.text == "")
-        #expect(compactMail.customPillLength == 32)
+        #expect(compactMail.customPillLength == 24)
     }
 
     @Test
@@ -613,7 +714,7 @@ struct IslandPlacementLayoutTests {
             for: notices, settings: FeatureSettings(islandLayoutStyle: .pill)))
         #expect(sizing.customPillPresentation?.aiCount == count)
         #expect(sizing.customPillPresentation?.text == (count > 999 ? "999+" : String(count)))
-        #expect(sizing.customPillLength > 38 && sizing.customPillLength < 90)
+        #expect(sizing.customPillLength > 30 && sizing.customPillLength < 82)
     }
 
     @Test(arguments: IslandEdge.allCases)
@@ -624,15 +725,15 @@ struct IslandPlacementLayoutTests {
         let empty = IslandNotice(id: "toolbox-reminder-empty", title: "Keep awake", detail: " \n\t ")
         let compact = try #require(engine.compactBarSizing(for: [empty], settings: settings))
         #expect(compact.customPillPresentation?.text == "")
-        #expect(compact.customPillLength == 32)
+        #expect(compact.customPillLength == 24)
         let long = IslandNotice(id: "toolbox-reminder-long", title: "Keep awake", detail: String(repeating: "长", count: 1000))
         let bounded = try #require(engine.compactBarSizing(for: [long], settings: settings))
-        #expect(bounded.customPillLength == 206)
+        #expect(bounded.customPillLength == 198)
         #expect(bounded.customPillPresentation?.text.count == 1000)
         let short = IslandNotice(id: "toolbox-reminder-short", title: "Keep awake", detail: " 亮 屏 ")
         let shortSizing = try #require(engine.compactBarSizing(for: [short], settings: settings))
         #expect(shortSizing.customPillPresentation?.text == "亮 屏")
-        if edge.isVertical { #expect(shortSizing.customPillLength == 66) }
+        if edge.isVertical { #expect(shortSizing.customPillLength == 58) }
     }
 
     @Test
@@ -726,7 +827,7 @@ struct IslandPlacementLayoutTests {
             auxiliaryTopLeftArea: CGRect(x: 0, y: 938, width: 656, height: 44),
             auxiliaryTopRightArea: CGRect(x: 856, y: 938, width: 656, height: 44))
         var settings = FeatureSettings(islandLayoutStyle: .pill,
-            islandPlacement: IslandPlacement(mode: .custom, edge: .top, offset: 540.0 / 1512))
+            islandPlacement: IslandPlacement(mode: .custom, edge: .top, offset: 550.0 / 1512))
         settings.mediaCompactStyle = .detailed
         settings.mediaShowLyricsAndInfo = true
         let music = IslandNotice(id: "media-active-test", title: "Track", metadata: ["compactLyric": String(repeating: "长", count: 100)])
@@ -734,6 +835,7 @@ struct IslandPlacementLayoutTests {
         var configuration = settings.islandScreenConfiguration
         configuration.compactStatusLength = try #require(engine.compactBarSizing(for: [music], settings: settings)).customPillLength
         let long = ScreenLayoutEngine(configuration: configuration).layout(for: snapshot)
+        #expect(long.collapsedFrame.width == 228)
         #expect(long.collapsedFrame.maxY == 930)
         let short = IslandNotice(id: "toolbox-reminder-test", title: "Keep awake")
         let snapshotFrame = try #require(engine.compactBarFrame(for: snapshot, notices: [short], settings: settings))
@@ -758,6 +860,9 @@ struct IslandPlacementLayoutTests {
                 let idle = ScreenLayoutEngine(configuration: settings.islandScreenConfiguration).layout(for: snapshot)
                 var configuration = settings.islandScreenConfiguration
                 configuration.expandsForDetailedStatus = style == .detailed
+                configuration.compactStatusLength = try #require(
+                    engine.compactBarSizing(for: [music], settings: settings)
+                ).customPillLength
                 let actual = ScreenLayoutEngine(configuration: configuration).layout(for: snapshot)
                 #expect(engine.compactBarFrame(for: snapshot, notices: [music], settings: settings) == actual.collapsedFrame)
                 #expect(engine.compactBarFrame(for: idle, notices: [music], settings: settings) == actual.collapsedFrame)
@@ -777,12 +882,12 @@ struct IslandPlacementLayoutTests {
             metadata: ["compactLyric": String(repeating: "长", count: 100)])
         let engine = SideNoticeLayoutEngine()
         let waveform = try #require(engine.compactBarSizing(for: [notice], settings: settings))
-        let waveformLength: CGFloat = 32 + 6 + 168 + 6 + 32
+        let waveformLength: CGFloat = 24 + 6 + 168 + 6 + 24
         #expect(waveform.customPillLength == waveformLength)
         settings.mediaVisualizationStyle = .glow
         let glow = try #require(engine.compactBarSizing(for: [notice], settings: settings))
-        let glowLength: CGFloat = 32 + 6 + 168
-        let waveformSlot: CGFloat = 32 + 6
+        let glowLength: CGFloat = 24 + 6 + 168
+        let waveformSlot: CGFloat = 24 + 6
         #expect(glow.customPillLength == glowLength)
         #expect(waveform.customPillLength - glow.customPillLength == waveformSlot)
     }
@@ -795,13 +900,13 @@ struct IslandPlacementLayoutTests {
         let configuration = settings.islandScreenConfiguration
         #expect(configuration.layoutStyle == .pill)
         #expect(configuration.placement == settings.islandPlacement)
-        #expect(configuration.pillSize == CGSize(width: 220, height: 44))
+        #expect(configuration.pillSize == CGSize(width: 80, height: 24))
         #expect(configuration.edgeInset == 16)
         #expect(!configuration.expandsForDetailedStatus && configuration.compactStatusLength == nil)
         let layout = ScreenLayoutEngine(configuration: configuration).layout(for: screen)
         #expect(layout.edge == edge)
         #expect(layout.collapsedFrame.size == (edge.isVertical
-            ? CGSize(width: 44, height: 220) : CGSize(width: 220, height: 44)))
+            ? CGSize(width: 24, height: 80) : CGSize(width: 80, height: 24)))
         #expect(layout.placementBounds == screen.frame.insetBy(dx: 16, dy: 16))
     }
 

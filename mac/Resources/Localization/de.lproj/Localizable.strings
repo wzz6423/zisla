@@ -3112,8 +3112,8 @@
 "已跳过 %d 个重复素材" = "%d doppelte Medien übersprungen";
 
 /* Adaptive island appearance and placement */
-"灵动岛材质" = "Material von Dynamic Island";
-"刘海材质" = "Material der Aussparung";
+"灵动岛展开材质" = "Material der erweiterten Dynamic Island";
+"灵动岛收起材质" = "Material der eingeklappten Dynamic Island";
 "选择贴边刘海或悬浮药丸" = "Wähle eine Aussparung am Bildschirmrand oder eine schwebende Kapsel";
 "刘海模式" = "Aussparungsmodus";
 "灵动岛模式" = "Dynamic Island-Modus";

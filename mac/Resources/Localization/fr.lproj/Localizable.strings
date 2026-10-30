@@ -3107,8 +3107,8 @@
 "已跳过 %d 个重复素材" = "%d éléments multimédias en double ignorés";
 
 /* Adaptive island appearance and placement */
-"灵动岛材质" = "Matériau de Dynamic Island";
-"刘海材质" = "Matériau de l’encoche";
+"灵动岛展开材质" = "Matériau de Dynamic Island déployée";
+"灵动岛收起材质" = "Matériau de Dynamic Island repliée";
 "选择贴边刘海或悬浮药丸" = "Choisissez une encoche alignée sur le bord ou une capsule flottante";
 "刘海模式" = "Mode encoche";
 "灵动岛模式" = "Mode Dynamic Island";

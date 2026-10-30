@@ -138,7 +138,7 @@ public struct ScreenLayoutConfiguration: Equatable, Sendable {
         notchTriggerHorizontalPadding: CGFloat = 24,
         layoutStyle: IslandLayoutStyle = .notch,
         placement: IslandPlacement = IslandPlacement(),
-        pillSize: CGSize = CGSize(width: 180, height: 32),
+        pillSize: CGSize = CGSize(width: 80, height: 24),
         edgeInset: CGFloat = 8,
         expandsForDetailedStatus: Bool = false,
         compactStatusLength: CGFloat? = nil
@@ -372,17 +372,11 @@ public struct ScreenLayoutEngine: Equatable, Sendable {
         let menuBarHeight = min(screen.frame.height, screen.topBarHeight > 0 ? screen.topBarHeight : 24)
         let occlusion = physicalNotchFrame(for: screen)
         var horizontalSize = CGSize(
-            width: finiteNonnegative(configuration.pillSize.width, fallback: 180),
-            height: finiteNonnegative(configuration.pillSize.height, fallback: 32)
+            width: finiteNonnegative(configuration.pillSize.width, fallback: 80),
+            height: finiteNonnegative(configuration.pillSize.height, fallback: 24)
         )
         if isCamera {
             horizontalSize.height = min(horizontalSize.height, 32, max(0, menuBarHeight - 4))
-            if let occlusion {
-                horizontalSize.width = max(
-                    horizontalSize.width,
-                    occlusion.width + SideNoticeLayoutEngine.compactStatusWingWidth * 2
-                )
-            }
         }
         let size = CGSize(
             width: min(edge.isVertical ? horizontalSize.height : horizontalSize.width, bounds.width),
@@ -417,6 +411,16 @@ public struct ScreenLayoutEngine: Equatable, Sendable {
         let transferSize = edge.isVertical
             ? CGSize(width: configuration.transferDragTriggerSize.height, height: configuration.transferDragTriggerSize.width)
             : configuration.transferDragTriggerSize
+        var expandedFrame = inwardFrame(size: configuration.expandedSize, from: anchor, edge: edge, in: bounds)
+        if edge.isVertical {
+            if anchor.midY >= screen.frame.midY {
+                expandedFrame.size.height = min(expandedFrame.height, anchor.maxY - bounds.minY)
+                expandedFrame.origin.y = anchor.maxY - expandedFrame.height
+            } else {
+                expandedFrame.size.height = min(expandedFrame.height, bounds.maxY - anchor.minY)
+                expandedFrame.origin.y = anchor.minY
+            }
+        }
         return ScreenOverlayLayout(
             displayID: screen.displayID,
             screenFrame: screen.frame,
@@ -424,7 +428,7 @@ public struct ScreenLayoutEngine: Equatable, Sendable {
             topology: .simulated(frame: anchor),
             triggerFrame: anchor,
             transferDragTriggerFrame: inwardFrame(size: transferSize, from: anchor, edge: edge, in: bounds),
-            expandedFrame: inwardFrame(size: configuration.expandedSize, from: anchor, edge: edge, in: bounds),
+            expandedFrame: expandedFrame,
             style: .pill,
             edge: edge,
             physicalOcclusionFrame: occlusion,
@@ -449,6 +453,9 @@ public struct ScreenLayoutEngine: Equatable, Sendable {
         if placementMode == .camera, expandsForDetailedStatus {
             desiredLength = max(SideNoticeLayoutEngine.Layout.compactBarMediaDetailSimulatedWidth,
                                 (physicalOcclusionFrame?.width ?? 0) + 320)
+        } else if placementMode == .camera, compactStatusLength != nil, let physicalOcclusionFrame {
+            desiredLength = max(frame.width,
+                                physicalOcclusionFrame.width + SideNoticeLayoutEngine.compactStatusWingWidth * 2)
         } else if placementMode == .custom, let compactStatusLength {
             let thickness = edge.isVertical ? frame.width : frame.height
             desiredLength = max(thickness, compactStatusLength)

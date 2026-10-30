@@ -3111,8 +3111,8 @@
 "已跳过 %d 个重复素材" = "%d yinelenen medya öğesi atlandı";
 
 /* Adaptive island appearance and placement */
-"灵动岛材质" = "Dynamic Island malzemesi";
-"刘海材质" = "Çentik malzemesi";
+"灵动岛展开材质" = "Genişletilmiş Dynamic Island malzemesi";
+"灵动岛收起材质" = "Daraltılmış Dynamic Island malzemesi";
 "选择贴边刘海或悬浮药丸" = "Ekran kenarına yaslanan bir çentik veya yüzen bir kapsül seçin";
 "刘海模式" = "Çentik modu";
 "灵动岛模式" = "Dynamic Island modu";

@@ -3111,8 +3111,8 @@
 "已跳过 %d 个重复素材" = "Đã bỏ qua %d mục phương tiện trùng lặp";
 
 /* Adaptive island appearance and placement */
-"灵动岛材质" = "Chất liệu Dynamic Island";
-"刘海材质" = "Chất liệu phần khuyết";
+"灵动岛展开材质" = "Chất liệu Dynamic Island khi mở rộng";
+"灵动岛收起材质" = "Chất liệu Dynamic Island khi thu gọn";
 "选择贴边刘海或悬浮药丸" = "Chọn phần khuyết sát cạnh màn hình hoặc dạng viên nhộng nổi";
 "刘海模式" = "Chế độ phần khuyết";
 "灵动岛模式" = "Chế độ Dynamic Island";

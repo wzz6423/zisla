@@ -9,7 +9,7 @@ struct IslandAppearanceSettingsTests {
             let settings = try JSONDecoder().decode(FeatureSettings.self, from: Data(payload.utf8))
             #expect(settings.islandLayoutStyle == .notch)
             #expect(settings.islandPlacement == IslandPlacement())
-            #expect(settings.islandPillWidth == 180 && settings.islandPillHeight == 32)
+            #expect(settings.islandPillWidth == 80 && settings.islandPillHeight == 24)
             #expect(settings.islandEdgeInset == 8)
             #expect(settings.islandNotchBackground == .black)
             #expect(settings.mediaVisualizationStyle == .waveform)
@@ -21,8 +21,6 @@ struct IslandAppearanceSettingsTests {
         var settings = FeatureSettings.default
         settings.islandLayoutStyle = style
         settings.islandPlacement = IslandPlacement(mode: .custom, edge: edge, offset: 0.23)
-        settings.islandPillWidth = 224
-        settings.islandPillHeight = 44
         settings.islandEdgeInset = 17
         settings.islandNotchBackground = .liquidGlass
         settings.mediaVisualizationStyle = .glow
@@ -30,7 +28,7 @@ struct IslandAppearanceSettingsTests {
         let decoded = try JSONDecoder().decode(FeatureSettings.self, from: JSONEncoder().encode(settings))
         #expect(decoded == settings)
         #expect(decoded.islandPlacement.offset == 0.23)
-        #expect(decoded.islandPillWidth == 224 && decoded.islandPillHeight == 44)
+        #expect(decoded.islandPillWidth == 80 && decoded.islandPillHeight == 24)
         #expect(decoded.islandEdgeInset == 17)
         #expect(decoded.islandNotchBackground == .liquidGlass)
         #expect(decoded.islandLayoutStyle == style)
@@ -38,31 +36,35 @@ struct IslandAppearanceSettingsTests {
     }
 
     @Test
-    func dimensionsNormalizeOnConstructionMutationAndDecoding() throws {
+    func pillDimensionsStayFixedWhileEdgeInsetRemainsNormalized() throws {
         let values: [Double] = [-100, 0, 20, 32, 64, 80, 180, 400, 600, .nan, .infinity, -.infinity]
         for value in values {
-            let width = value.isFinite ? min(400, max(80, value)) : 180
-            let height = value.isFinite ? min(64, max(20, value)) : 32
             let inset = value.isFinite ? min(64, max(0, value)) : 8
-            var constructed = FeatureSettings(islandPillWidth: value, islandPillHeight: value, islandEdgeInset: value)
-            #expect(constructed.islandPillWidth == width)
-            #expect(constructed.islandPillHeight == height)
+            let constructed = FeatureSettings(islandPillWidth: value, islandPillHeight: value, islandEdgeInset: value)
+            #expect(constructed.islandPillWidth == 80)
+            #expect(constructed.islandPillHeight == 24)
             #expect(constructed.islandEdgeInset == inset)
-            constructed.islandPillWidth = value
-            constructed.islandPillHeight = value
-            constructed.islandEdgeInset = value
-            #expect(constructed.islandPillWidth == width)
-            #expect(constructed.islandPillHeight == height)
-            #expect(constructed.islandEdgeInset == inset)
-            #expect(try JSONDecoder().decode(FeatureSettings.self, from: JSONEncoder().encode(constructed)) == constructed)
+            let roundTripped = try JSONDecoder().decode(FeatureSettings.self, from: JSONEncoder().encode(constructed))
+            #expect(roundTripped.islandPillWidth == 80)
+            #expect(roundTripped.islandPillHeight == 24)
+            #expect(roundTripped == constructed)
             if value.isFinite {
                 let payload = "{\"islandPillWidth\":\(value),\"islandPillHeight\":\(value),\"islandEdgeInset\":\(value)}"
                 let decoded = try JSONDecoder().decode(FeatureSettings.self, from: Data(payload.utf8))
-                #expect(decoded.islandPillWidth == width)
-                #expect(decoded.islandPillHeight == height)
+                #expect(decoded.islandPillWidth == 80)
+                #expect(decoded.islandPillHeight == 24)
                 #expect(decoded.islandEdgeInset == inset)
             }
         }
+    }
+
+    @Test(arguments: [
+        #"{"islandPillWidth":"wide","islandPillHeight":[]}"#,
+        #"{"islandPillWidth":false,"islandPillHeight":{}}"#,
+    ])
+    func malformedLegacyPillDimensionsAreIgnored(payload: String) throws {
+        let settings = try JSONDecoder().decode(FeatureSettings.self, from: Data(payload.utf8))
+        #expect(settings.islandPillWidth == 80 && settings.islandPillHeight == 24)
     }
 
     @Test
@@ -80,7 +82,6 @@ struct IslandAppearanceSettingsTests {
     }
 
     @Test(arguments: [#"{"islandLayoutStyle":"unknown"}"#, #"{"islandLayoutStyle":1}"#,
-                      #"{"islandPillWidth":"wide"}"#, #"{"islandPillHeight":[]}"#,
                       #"{"islandEdgeInset":false}"#, #"{"islandNotchBackground":"unknown"}"#])
     func malformedAppearanceDoesNotSilentlyApplyAPartialConfiguration(payload: String) {
         #expect(throws: DecodingError.self) {
@@ -89,22 +90,21 @@ struct IslandAppearanceSettingsTests {
     }
 
     @Test
-    func boundedSeededDimensionChangesStaySerializableAndDoNotChangeDefaults() throws {
+    func seededEdgeInsetChangesStaySerializableAndDoNotChangeFixedPillDefaults() throws {
         var seed: UInt64 = 0xD1A_1D
         for _ in 0..<96 {
             seed = seed &* 6364136223846793005 &+ 1442695040888963407
             let value = Double(seed % 2000) / 2 - 250
             var changed = FeatureSettings.default
-            changed.islandPillWidth = value
-            changed.islandPillHeight = value
             changed.islandEdgeInset = value
             let decoded = try JSONDecoder().decode(FeatureSettings.self, from: JSONEncoder().encode(changed))
             #expect(decoded == changed)
-            #expect((80...400).contains(decoded.islandPillWidth))
-            #expect((20...64).contains(decoded.islandPillHeight))
+            #expect(decoded.islandPillWidth == 80)
+            #expect(decoded.islandPillHeight == 24)
             #expect((0...64).contains(decoded.islandEdgeInset))
         }
         #expect(FeatureSettings.default.islandLayoutStyle == .notch)
-        #expect(FeatureSettings.default.islandPillWidth == 180)
+        #expect(FeatureSettings.default.islandPillWidth == 80)
+        #expect(FeatureSettings.default.islandPillHeight == 24)
     }
 }

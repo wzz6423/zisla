@@ -9,6 +9,88 @@ import ZislaCore
 
 @MainActor
 struct AIResultSweepPresentationTests {
+    @Test(arguments: [IslandEdge.left, .right], [nil, CGFloat(18), 70])
+    func collapsedPillsSweepTheirOwnFrameFromTopToBottom(edge: IslandEdge, top: CGFloat?) throws {
+        let startedAt = Date(timeIntervalSince1970: 100)
+        var now = startedAt
+        let fixture = try Fixture(now: { now })
+        defer { fixture.cleanUp() }
+        fixture.receive(makeTask(id: "offset-pill", provider: .gpt, status: .succeeded))
+        let size = CGSize(width: 420, height: 340)
+        let frame = CGRect(
+            x: top == nil ? (size.width - 34) / 2 : edge == .left ? 0 : size.width - 34,
+            y: top ?? 0, width: 34, height: 250
+        )
+        var centers: [Double] = []
+        for progress in [0.25, 0.75] {
+            now = startedAt.addingTimeInterval(AIResultSweep.duration * progress)
+            let renderer = ImageRenderer(content: IslandSurface(
+                isCollapsed: true, collapsedSize: frame.size, expandedSize: size,
+                resultSweep: fixture.sweep, layoutStyle: .pill, collapsedFrame: top.map { _ in frame }, edge: edge
+            ) {
+                Color.black
+            }.frame(width: size.width, height: size.height))
+            let center = try resultLightCenter(in: #require(renderer.cgImage), edge: edge) - Double(frame.minY)
+            centers.append(center)
+            let reference = ImageRenderer(content: AIResultSweepBand(
+                status: .succeeded, progress: progress, edge: edge
+            ).frame(width: frame.width, height: frame.height).clipShape(Capsule()).background(.black))
+            let expected = try resultLightCenter(in: #require(reference.cgImage), edge: edge)
+            #expect(abs(center - expected) < 1, "药丸扫光必须匹配同尺寸画布，不能借用展开面板的画布")
+        }
+        #expect(centers[0] < 55 && centers[1] > 195,
+                "收起药丸必须在自己的完整高度上扫过，不能使用展开面板的画布")
+    }
+
+    @Test
+    func notchKeepsTheExistingExpandedSweepCanvas() throws {
+        let startedAt = Date(timeIntervalSince1970: 100)
+        var now = startedAt
+        let fixture = try Fixture(now: { now })
+        defer { fixture.cleanUp() }
+        fixture.receive(makeTask(id: "notch-canvas", provider: .gpt, status: .succeeded))
+        let size = CGSize(width: 420, height: 340)
+        let collapsedSize = CGSize(width: 250, height: 34)
+        for progress in [0.25, 0.75] {
+            now = startedAt.addingTimeInterval(AIResultSweep.duration * progress)
+            let renderer = ImageRenderer(content: IslandSurface(
+                isCollapsed: true, collapsedSize: collapsedSize, expandedSize: size,
+                collapsedCenterOffsetX: 70, resultSweep: fixture.sweep
+            ) { Color.black }.frame(width: size.width, height: size.height))
+            let reference = ImageRenderer(content: AIResultSweepBand(
+                status: .succeeded, progress: progress, edge: .top
+            ).frame(width: size.width, height: size.height).background(.black)
+                .mask(IslandRevealMask(collapsedSize: collapsedSize, expandedSize: size,
+                                      isCollapsed: true, collapsedCenterOffsetX: 70)))
+            let actual = try resultLightCenter(in: #require(renderer.cgImage), edge: .top)
+            let expected = try resultLightCenter(in: #require(reference.cgImage), edge: .top)
+            #expect(abs(actual - expected) < 1, "默认刘海扫光必须继续使用展开画布")
+        }
+    }
+
+    @Test(arguments: [IslandEdge.left, .right])
+    func compactStatusBarPassesItsActualEdgeToTheSweep(edge: IslandEdge) throws {
+        let startedAt = Date(timeIntervalSince1970: 100)
+        var now = startedAt
+        let fixture = try Fixture(now: { now })
+        defer { fixture.cleanUp() }
+        fixture.settings.settings.islandLayoutStyle = .pill
+        fixture.settings.settings.islandPlacement = IslandPlacement(mode: .custom, edge: edge)
+        fixture.settings.settings.collapsedProgressGlowEnabled = false
+        fixture.displayState.islandEdge = edge
+        fixture.displayState.placementMode = .custom
+        fixture.receive(makeTask(id: "side-bar", provider: .gpt, status: .succeeded))
+        var centers: [Double] = []
+        for progress in [0.25, 0.75] {
+            now = startedAt.addingTimeInterval(AIResultSweep.duration * progress)
+            let renderer = ImageRenderer(content: fixture.view.statusBarContent(at: now)
+                .frame(width: 34, height: 250))
+            centers.append(try resultLightCenter(in: #require(renderer.cgImage), edge: edge))
+        }
+        #expect(centers[1] - centers[0] > 140,
+                "侧边状态栏必须实际从上往下扫，不能遗漏方向参数")
+    }
+
     @Test(arguments: [AIProgressStatus.succeeded, .failed, .error])
     func resultSweepOnlyTintsTheCollapsedSurface(status: AIProgressStatus) throws {
         var now = Date(timeIntervalSince1970: 100)
@@ -193,6 +275,22 @@ struct AIResultSweepPresentationTests {
 
     private func makeTask(id: String, provider: AIProvider, status: AIProgressStatus) -> AIProgressTask {
         AIProgressTask(id: id, provider: provider, title: id, progress: nil, status: status, updatedAt: .now)
+    }
+
+    private func resultLightCenter(in image: CGImage, edge: IslandEdge) throws -> Double {
+        let bitmap = NSBitmapImageRep(cgImage: image)
+        var total = 0.0
+        var weighted = 0.0
+        for y in 0..<bitmap.pixelsHigh {
+            for x in 0..<bitmap.pixelsWide {
+                let color = try #require(bitmap.colorAt(x: x, y: y)?.usingColorSpace(.deviceRGB))
+                let signal = Double(max(0, color.greenComponent - color.redComponent)) * Double(color.alphaComponent)
+                total += signal
+                weighted += Double(edge.isVertical ? y : x) * signal
+            }
+        }
+        try #require(total > 0.5, "必须实际渲染结果光带才能检查移动方向")
+        return weighted / total
     }
 
     private func surfaceTint(

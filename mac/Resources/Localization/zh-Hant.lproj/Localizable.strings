@@ -3110,8 +3110,8 @@
 "已跳过 %d 个重复素材" = "已略過 %d 個重複素材";
 
 /* Adaptive island appearance and placement */
-"灵动岛材质" = "Dynamic Island 材質";
-"刘海材质" = "瀏海材質";
+"灵动岛展开材质" = "Dynamic Island 展開材質";
+"灵动岛收起材质" = "Dynamic Island 收起材質";
 "选择贴边刘海或悬浮药丸" = "選擇貼邊瀏海或懸浮膠囊";
 "刘海模式" = "瀏海模式";
 "灵动岛模式" = "Dynamic Island 模式";

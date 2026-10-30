@@ -3111,8 +3111,8 @@
 "已跳过 %d 个重复素材" = "Ignorati %d elementi multimediali duplicati";
 
 /* Adaptive island appearance and placement */
-"灵动岛材质" = "Materiale di Dynamic Island";
-"刘海材质" = "Materiale della tacca";
+"灵动岛展开材质" = "Materiale di Dynamic Island espansa";
+"灵动岛收起材质" = "Materiale di Dynamic Island compressa";
 "选择贴边刘海或悬浮药丸" = "Scegli una tacca allineata al bordo o una capsula fluttuante";
 "刘海模式" = "Modalità tacca";
 "灵动岛模式" = "Modalità Dynamic Island";

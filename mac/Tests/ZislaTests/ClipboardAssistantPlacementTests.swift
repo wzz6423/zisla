@@ -27,8 +27,8 @@ struct ClipboardAssistantPlacementTests {
                 "A custom pill must not retain a gap reserved for the camera")
         #expect(first.collapsedFrameInSurface == CGRect(origin: .zero, size: first.frame.size))
         #expect(screen.frame.contains(first.frame))
-        if edge.isVertical { #expect(first.frame.width == 32) }
-        else { #expect(first.frame.height == 32) }
+        if edge.isVertical { #expect(first.frame.width == 24) }
+        else { #expect(first.frame.height == 24) }
     }
 
     @Test
@@ -42,7 +42,17 @@ struct ClipboardAssistantPlacementTests {
         let expandable = ClipboardAssistantDetection(kind: .file, title: title,
                                                      actions: [.copyText("fixture")], fullContent: "line\nline")
         let baseWidth = controller.rowLayout(for: base, on: screen, locale: chinese).frame.width
-        #expect(controller.rowLayout(for: detail, on: screen, locale: chinese).frame.width > baseWidth)
+        #expect(controller.rowLayout(for: detail, on: screen, locale: chinese).frame.width == baseWidth,
+                "The 24pt pill keeps the hidden subtitle out of its width budget")
+        let tallBase = ClipboardAssistantToastView.compactLength(
+            detection: base, thickness: 32, edge: .bottom, isLightweightMode: false,
+            controlsWidth: 20, locale: chinese
+        )
+        let tallDetail = ClipboardAssistantToastView.compactLength(
+            detection: detail, thickness: 32, edge: .bottom, isLightweightMode: false,
+            controlsWidth: 20, locale: chinese
+        )
+        #expect(tallDetail > tallBase, "A row tall enough to show its subtitle must still reserve its width")
         let actionWidth = controller.rowLayout(for: action, on: screen, locale: chinese).frame.width
         #expect(actionWidth > baseWidth)
         #expect(controller.rowLayout(for: expandable, on: screen, locale: chinese).frame.width > actionWidth)
@@ -136,7 +146,7 @@ struct ClipboardAssistantPlacementTests {
         #expect(controller.presentation.physicalNotchWidth == 0)
         #expect(layout.style == style)
         if style == .pill {
-            #expect(layout.edge == .left && layout.frame.width == 32)
+            #expect(layout.edge == .left && layout.frame.width == 24)
         } else {
             #expect(layout.frame.maxY == screen.frame.maxY && layout.frame.width == 480)
         }
@@ -255,7 +265,7 @@ struct ClipboardAssistantPlacementTests {
         controller.presentation.translation = .loading
         let loading = controller.rowLayout(for: detection, on: screen, locale: chinese)
         #expect(loading.frame == loading.collapsedFrame)
-        #expect(loading.frame.width == 32 && loading.frame.height < 250)
+        #expect(loading.frame.width == 24 && loading.frame.height < 250)
         controller.presentation.translation = .result(text: "完整翻译结果", copied: nil)
         let result = controller.rowLayout(for: detection, on: screen, locale: chinese)
         #expect(result.collapsedFrame == loading.collapsedFrame)
@@ -485,6 +495,24 @@ struct ClipboardAssistantPlacementTests {
         #expect(visible.count * 14 <= Int(textLength))
         if text == "🧑‍💻" { #expect(visible == [text]) }
         if text.count > 12 { #expect(visible.last == "…") }
+    }
+
+    @Test(arguments: [IslandEdge.left, .right], [LayoutDirection.leftToRight, .rightToLeft])
+    func verticalMoreActionsPopoverPointsTowardTheScreenInterior(
+        edge: IslandEdge, layoutDirection: LayoutDirection
+    ) {
+        let expected: Edge
+        switch edge {
+        case .left:
+            expected = layoutDirection == .leftToRight ? .leading : .trailing
+        case .right:
+            expected = layoutDirection == .leftToRight ? .trailing : .leading
+        case .top, .bottom:
+            expected = .top
+        }
+        #expect(ClipboardAssistantToastView.verticalMoreActionsPopoverArrowEdge(
+            for: edge, layoutDirection: layoutDirection
+        ) == expected)
     }
 
     private func makeController(edge: IslandEdge, offset: Double = 0.5) -> ClipboardAssistantController {

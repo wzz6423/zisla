@@ -143,7 +143,10 @@ struct IslandModuleLayout: Equatable {
     islandSize: CGSize(width: unifiedIslandWidth, height: 340),
     panelSize: CGSize(width: unifiedPanelWidth, height: 344)
   )
-  private static let expandedChromeHeight: CGFloat = 121
+  private static let expandedChromeHeight = IslandDashboardLayout.contentTopInset
+    + IslandDashboardLayout.mediaHeaderHeight
+    + IslandDashboardLayout.toolbarHeight
+    + IslandDashboardLayout.toolbarBottomInset
   private static let moduleVerticalInsets = IslandSurfaceGeometry.moduleInset * 2
   private static let panelHeightAllowance: CGFloat = 4
   /// Fixed-height modules size the surface to their rendered content instead of inheriting
@@ -164,17 +167,14 @@ struct IslandModuleLayout: Equatable {
   static let agenda = compactModule(contentHeight: 160)
   /// Tall modules share the former CPU monitor height to keep their panel geometry consistent.
   static let system = compactModule(contentHeight: 401)
-  /// Shelf content fills the shared 500pt outer surface and scrolls internally when it contains more files.
+  /// Shelf content keeps its fixed budget below the shared chrome and scrolls when it contains more files.
   static let shelfContentHeight: CGFloat = 355
   static let shelfShareWidth: CGFloat = 84
   static let shelfColumnSpacing: CGFloat = 6
   static let shelf = compactModule(contentHeight: shelfContentHeight)
   /// Clipboard: taller than standard so more items are visible at once, reducing scrolling.
   /// Width matches standard; only the island body is taller.
-  static let clipboard = IslandModuleLayout(
-    islandSize: CGSize(width: unifiedIslandWidth, height: 500),
-    panelSize: CGSize(width: unifiedPanelWidth, height: 504)
-  )
+  static let clipboard = compactModule(contentHeight: shelfContentHeight)
   static let ai = compactModule(contentHeight: 350)
   static let battery = system
   static let keyboardSound = system
@@ -213,8 +213,10 @@ struct IslandModuleLayout: Equatable {
   /// Resolves the current layout. Dashboard height follows its rendered activity-card rows.
   nonisolated static func resolved(
     for module: IslandModule,
-    dashboardCardCount: Int
+    dashboardCardCount: Int,
+    contentTopInset: CGFloat = IslandDashboardLayout.contentTopInset
   ) -> IslandModuleLayout {
+    let layout: IslandModuleLayout
     if module == .dashboard {
       // Empty and single-card dashboards are clamped to the crown floor instead of falling back
       // to `.standard`: a fixed 340pt left a large black gap under the toolbar, while shrinking to
@@ -224,12 +226,18 @@ struct IslandModuleLayout: Equatable {
         IslandDashboardLayout.contentHeight(cardCount: dashboardCardCount),
         IslandModuleLayout.keyboardSound.islandSize.height
       )
-      return IslandModuleLayout(
+      layout = IslandModuleLayout(
         islandSize: CGSize(width: unifiedIslandWidth, height: islandHeight),
         panelSize: CGSize(width: unifiedPanelWidth, height: islandHeight + 4)
       )
+    } else {
+      layout = module.layout
     }
-    return module.layout
+    let additionalHeight = contentTopInset - IslandDashboardLayout.contentTopInset
+    return IslandModuleLayout(
+      islandSize: CGSize(width: layout.islandSize.width, height: layout.islandSize.height + additionalHeight),
+      panelSize: CGSize(width: layout.panelSize.width, height: layout.panelSize.height + additionalHeight)
+    )
   }
 }
 

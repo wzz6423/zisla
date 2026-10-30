@@ -3111,8 +3111,8 @@
 "已跳过 %d 个重复素材" = "Se omitieron %d elementos multimedia duplicados";
 
 /* Adaptive island appearance and placement */
-"灵动岛材质" = "Material de Dynamic Island";
-"刘海材质" = "Material de la muesca";
+"灵动岛展开材质" = "Material de Dynamic Island expandida";
+"灵动岛收起材质" = "Material de Dynamic Island contraída";
 "选择贴边刘海或悬浮药丸" = "Elige una muesca alineada con el borde o una cápsula flotante";
 "刘海模式" = "Modo muesca";
 "灵动岛模式" = "Modo Dynamic Island";

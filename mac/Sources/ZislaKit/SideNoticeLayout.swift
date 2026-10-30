@@ -486,18 +486,24 @@ public struct SideNoticeLayoutEngine: Equatable, Sendable {
             settings: settings,
             browserDownloadCount: browserDownloadCount
         ) else { return nil }
-        if layout.style == .pill, layout.placementMode == .custom {
+        if layout.style == .pill {
             var initial = layout.collapsedFrame
-            if layout.edge == .top { initial.origin.y = layout.placementBounds.maxY - initial.height }
+            let center: CGFloat
+            if layout.placementMode == .custom {
+                if layout.edge == .top { initial.origin.y = layout.placementBounds.maxY - initial.height }
+                center = layout.edge.isVertical
+                    ? layout.screenFrame.minY + layout.screenFrame.height * settings.islandPlacement.offset
+                    : layout.screenFrame.minX + layout.screenFrame.width * settings.islandPlacement.offset
+            } else {
+                center = initial.midX
+            }
             return ScreenLayoutEngine.compactPillFrame(
                 initial, edge: layout.edge, bounds: layout.placementBounds,
-                center: layout.edge.isVertical
-                    ? layout.screenFrame.minY + layout.screenFrame.height * settings.islandPlacement.offset
-                    : layout.screenFrame.minX + layout.screenFrame.width * settings.islandPlacement.offset,
+                center: center,
                 physicalOcclusionFrame: layout.physicalOcclusionFrame,
-                placementMode: .custom,
+                placementMode: layout.placementMode,
                 edgeInset: layout.screenFrame.maxY - layout.placementBounds.maxY,
-                expandsForDetailedStatus: false,
+                expandsForDetailedStatus: sizing.expandsForDetailedStatus,
                 compactStatusLength: sizing.customPillLength
             )
         }
@@ -532,7 +538,8 @@ public struct SideNoticeLayoutEngine: Equatable, Sendable {
                     presentation.length(thickness: thickness, edge: settings.islandPlacement.edge), presentation)
         }
         if Self.screenRecordingOperationNotice(for: notices, settings: settings) != nil {
-            return (0, false, settings.collapsedProgressGlowEnabled, Layout.compactWingWidth, 0)
+            return (0, false, settings.collapsedProgressGlowEnabled, Layout.compactWingWidth, 0,
+                    thickness * 2 + 6, nil)
         }
         let selectedPriority = Self.selectedCompactStatusPriority(for: notices, settings: settings)
         guard let selectedPriority else { return nil }

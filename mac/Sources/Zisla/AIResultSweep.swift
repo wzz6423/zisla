@@ -96,6 +96,7 @@ final class AIResultSweepController: ObservableObject {
 
 struct AIResultSweepOverlay: View {
     @ObservedObject var controller: AIResultSweepController
+    let edge: IslandEdge
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     var body: some View {
@@ -104,6 +105,7 @@ struct AIResultSweepOverlay: View {
                 AIResultSweepBand(
                     status: sweep.status,
                     progress: sweep.progress(at: controller.now()),
+                    edge: edge,
                     reduceMotion: reduceMotion
                 )
             }
@@ -116,10 +118,15 @@ struct AIResultSweepOverlay: View {
 struct AIResultSweepBand: View {
     let status: AIProgressStatus
     let progress: Double
+    let edge: IslandEdge
     var reduceMotion = false
 
     var body: some View {
         Canvas { context, size in
+            let size = edge.isVertical ? CGSize(width: size.height, height: size.width) : size
+            if edge.isVertical {
+                context.concatenate(CGAffineTransform(a: 0, b: 1, c: 1, d: 0, tx: 0, ty: 0))
+            }
             let width = size.width * 0.72
             let position = reduceMotion ? 0.5 : progress
             let x = -width + (size.width + width) * position

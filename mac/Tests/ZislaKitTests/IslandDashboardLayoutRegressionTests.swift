@@ -6,7 +6,7 @@ import Testing
 /// causing contentHeight() to underestimate by 12pt and clip the bottom of rendered cards.
 ///
 /// The layout arithmetic must match what IslandRootView actually renders:
-///   - contentTopInset (8) + NowPlayingHeader (72+4=76) + toolbar (30) + toolbarBottomInset (7)
+///   - contentTopInset (16) + NowPlayingHeader (72+4=76) + toolbar (30) + toolbarBottomInset (7)
 ///   - **moduleTopInset (12)** + card grid + **moduleBottomInset (12)**
 ///
 /// The old formula only counted moduleBottomInset, so the resolved island height was 12pt short.
@@ -14,16 +14,15 @@ struct IslandDashboardLayoutRegressionTests {
     @Test
     func chromeIncludesBothModuleInsets() {
         // chromeHeight must account for the module region's top AND bottom padding (12pt each).
-        // The old value was 57 (8 + 30 + 7 + 12); the correct value is 69 (57 + 12).
         let moduleTopInset: CGFloat = 12  // IslandSurfaceGeometry.moduleInset
         let expected = IslandDashboardLayout.contentTopInset
             + IslandDashboardLayout.toolbarHeight
             + IslandDashboardLayout.toolbarBottomInset
             + IslandDashboardLayout.moduleBottomInset
-            + moduleTopInset  // ← was missing
+            + moduleTopInset
 
         #expect(IslandDashboardLayout.chromeHeight == expected)
-        #expect(IslandDashboardLayout.chromeHeight == 69)
+        #expect(IslandDashboardLayout.chromeHeight == 77)
     }
 
     @Test(arguments: [1, 2, 3, 5])

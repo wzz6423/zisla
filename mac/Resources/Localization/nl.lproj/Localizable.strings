@@ -3111,8 +3111,8 @@
 "已跳过 %d 个重复素材" = "%d dubbele mediabestanden overgeslagen";
 
 /* Adaptive island appearance and placement */
-"灵动岛材质" = "Materiaal van Dynamic Island";
-"刘海材质" = "Materiaal van de inkeping";
+"灵动岛展开材质" = "Materiaal van uitgeklapte Dynamic Island";
+"灵动岛收起材质" = "Materiaal van ingeklapte Dynamic Island";
 "选择贴边刘海或悬浮药丸" = "Kies een inkeping langs de schermrand of een zwevende capsule";
 "刘海模式" = "Inkepingsmodus";
 "灵动岛模式" = "Dynamic Island-modus";

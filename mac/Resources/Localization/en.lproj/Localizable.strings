@@ -3110,8 +3110,8 @@
 "已跳过 %d 个重复素材" = "Skipped %d duplicate media items";
 
 /* Adaptive island appearance and placement */
-"灵动岛材质" = "Dynamic Island Material";
-"刘海材质" = "Notch Material";
+"灵动岛展开材质" = "Expanded Dynamic Island Material";
+"灵动岛收起材质" = "Collapsed Dynamic Island Material";
 "选择贴边刘海或悬浮药丸" = "Choose an edge-aligned notch or a floating pill";
 "刘海模式" = "Notch Mode";
 "灵动岛模式" = "Dynamic Island Mode";

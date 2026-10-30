@@ -11,14 +11,17 @@ struct ShelfModuleLayoutTests {
     func shelfContentHeightMatchesItsOuterLayout() {
         let outerLayout = IslandModuleLayout.resolved(for: .shelf, dashboardCardCount: 0)
         let expectedContentHeight = outerLayout.islandSize.height
-            - 121
+            - (IslandDashboardLayout.contentTopInset
+                + IslandDashboardLayout.mediaHeaderHeight
+                + IslandDashboardLayout.toolbarHeight
+                + IslandDashboardLayout.toolbarBottomInset)
             - IslandSurfaceGeometry.moduleInset * 2
 
         #expect(outerLayout == IslandModuleLayout.shelf)
         #expect(outerLayout == IslandModuleLayout.clipboard)
         #expect(IslandModuleLayout.shelfContentHeight == 355)
-        #expect(outerLayout.islandSize.height == 500)
-        #expect(outerLayout.panelSize.height == 504)
+        #expect(outerLayout.islandSize.height == 508)
+        #expect(outerLayout.panelSize.height == 512)
         #expect(expectedContentHeight == IslandModuleLayout.shelfContentHeight)
     }
 

@@ -62,9 +62,9 @@ enum SettingsSearchIndex {
             items.append(SettingsSearchItem(section: section, title: title, anchor: anchor, keywords: keywords))
         }
 
-        rows(.general, ["界面语言", "界面外观", "灵动岛样式", "灵动岛材质", "刘海材质"])
+        rows(.general, ["界面语言", "界面外观", "灵动岛样式", "灵动岛展开材质", "灵动岛收起材质"])
         if settings.islandLayoutStyle == .pill {
-            rows(.general, ["灵动岛位置", "药丸宽度", "药丸高度"])
+            rows(.general, ["灵动岛位置"])
         }
         entry(.general, "登录时启动", anchor: .row("登录时启动"), keywords: ["开机或登录后自动在后台运行", "需要系统批准"])
 

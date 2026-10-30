@@ -2511,33 +2511,11 @@ struct SettingsView: View {
                             }
                         }
                     }
-                    rowDivider
-                    settingRow(symbol: "arrow.left.and.right", title: "药丸宽度", detail: "以屏幕点为单位微调药丸尺寸") {
-                        Stepper(value: Binding(
-                            get: { settingsStore.settings.islandPillWidth },
-                            set: { settingsStore.settings.islandPillWidth = $0 }
-                        ), in: 80...400, step: 2) {
-                            Text("\(Int(settingsStore.settings.islandPillWidth)) pt")
-                                .monospacedDigit()
-                        }
-                        .fixedSize()
-                    }
-                    rowDivider
-                    settingRow(symbol: "arrow.up.and.down", title: "药丸高度", detail: "摄像头位置的高度自动限制在菜单栏内") {
-                        Stepper(value: Binding(
-                            get: { settingsStore.settings.islandPillHeight },
-                            set: { settingsStore.settings.islandPillHeight = $0 }
-                        ), in: 20...64, step: 2) {
-                            Text("\(Int(settingsStore.settings.islandPillHeight)) pt")
-                                .monospacedDigit()
-                        }
-                        .fixedSize()
-                    }
                 }
                 rowDivider
                 settingRow(
                     symbol: "rectangle.on.rectangle.angled",
-                    title: "灵动岛材质",
+                    title: "灵动岛展开材质",
                     detail: "",
                     detailLineLimit: nil
                 ) {
@@ -2551,7 +2529,7 @@ struct SettingsView: View {
                 rowDivider
                 settingRow(
                     symbol: "rectangle.topthird.inset.filled",
-                    title: "刘海材质",
+                    title: "灵动岛收起材质",
                     detail: ""
                 ) {
                     IslandNotchBackgroundPicker(

@@ -84,6 +84,7 @@ struct VoiceRecordingIslandGeometry: Equatable {
 struct IslandSurface<Content: View>: View {
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @Environment(\.accessibilityReduceTransparency) private var reduceTransparency
+    @Environment(\.layoutDirection) private var layoutDirection
     @ViewBuilder private let content: () -> Content
     private let isCollapsed: Bool
     private let collapsedSize: CGSize
@@ -98,6 +99,7 @@ struct IslandSurface<Content: View>: View {
     private let layoutStyle: IslandLayoutStyle
     private let collapsedFrame: CGRect?
     private let edge: IslandEdge
+    private let contentTopInset: CGFloat
 
     init(
         isCollapsed: Bool = false,
@@ -113,6 +115,7 @@ struct IslandSurface<Content: View>: View {
         layoutStyle: IslandLayoutStyle = .notch,
         collapsedFrame: CGRect? = nil,
         edge: IslandEdge = .top,
+        contentTopInset: CGFloat = IslandDashboardLayout.contentTopInset,
         @ViewBuilder content: @escaping () -> Content
     ) {
         self.isCollapsed = isCollapsed
@@ -128,6 +131,7 @@ struct IslandSurface<Content: View>: View {
         self.layoutStyle = layoutStyle
         self.collapsedFrame = collapsedFrame
         self.edge = edge
+        self.contentTopInset = contentTopInset
         self.content = content
     }
 
@@ -155,8 +159,19 @@ struct IslandSurface<Content: View>: View {
             unifiedSurface
                 .allowsHitTesting(false)
             content()
+                .environment(\.layoutDirection, layoutDirection)
             if maskIsCollapsed, let resultSweep {
-                AIResultSweepOverlay(controller: resultSweep)
+                if layoutStyle == .pill {
+                    let frame = collapsedFrame ?? CGRect(
+                        x: (expandedSize.width - collapsedSize.width) / 2,
+                        y: 0, width: collapsedSize.width, height: collapsedSize.height
+                    )
+                    AIResultSweepOverlay(controller: resultSweep, edge: edge)
+                        .frame(width: frame.width, height: frame.height)
+                        .position(x: frame.midX, y: frame.midY)
+                } else {
+                    AIResultSweepOverlay(controller: resultSweep, edge: edge)
+                }
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -184,6 +199,7 @@ struct IslandSurface<Content: View>: View {
                 value: maskIsCollapsed
             )
         }
+        .environment(\.layoutDirection, layoutStyle == .pill ? .leftToRight : layoutDirection)
     }
 
     // MARK: - Island surface
@@ -307,7 +323,8 @@ struct IslandSurface<Content: View>: View {
     private var crown: some View {
         let metrics = IslandCrownGeometry.crownMetrics(
             forSurfaceHeight: expandedSize.height,
-            blendHeight: crownBlend
+            blendHeight: crownBlend,
+            contentTopInset: contentTopInset
         )
         return IslandCrownSurface(
             solidHeight: metrics.solidHeight,
@@ -434,7 +451,8 @@ struct IslandSurface<Content: View>: View {
     private var transparentCrown: some View {
         let metrics = IslandCrownGeometry.crownMetrics(
             forSurfaceHeight: expandedSize.height,
-            blendHeight: transparentCrownBlend
+            blendHeight: transparentCrownBlend,
+            contentTopInset: contentTopInset
         )
         return IslandCrownSurface(
             solidHeight: metrics.solidHeight,

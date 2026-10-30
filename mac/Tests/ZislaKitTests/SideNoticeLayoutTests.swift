@@ -53,6 +53,51 @@ struct SideNoticeLayoutTests {
         #expect(engine.compactBarFrame(for: screen, notices: [notice], settings: settings) == nil)
     }
 
+    @Test(arguments: IslandEdge.allCases)
+    func recordingOperationsUseTwoAdjacentSlotsInCustomPills(edge: IslandEdge) throws {
+        let screen = ScreenSnapshot(displayID: 42, frame: CGRect(x: -1600, y: -200, width: 1600, height: 1000),
+            visibleFrame: CGRect(x: -1600, y: -200, width: 1600, height: 976))
+        var settings = FeatureSettings(islandLayoutStyle: .pill,
+            islandPlacement: IslandPlacement(mode: .custom, edge: edge, offset: 0.75))
+        let idle = ScreenLayoutEngine(configuration: settings.islandScreenConfiguration).layout(for: screen)
+        let notice = IslandNotice(id: "screen-recording-operation-export", title: "Output", progress: 0.43)
+        let frame = try #require(engine.compactBarFrame(for: screen, notices: [notice], settings: settings))
+        #expect(frame.size == (edge.isVertical ? CGSize(width: 24, height: 54) : CGSize(width: 54, height: 24)))
+        #expect(frame == engine.compactBarFrame(for: idle, notices: [notice], settings: settings))
+        #expect(idle.placementBounds.contains(frame))
+        #expect(engine.compactBarFrame(for: screen, notices: [], settings: settings) == nil)
+        settings.sideNoticesEnabled = false
+        #expect(engine.compactBarFrame(for: screen, notices: [notice], settings: settings) == nil)
+    }
+
+    @Test(arguments: [false, true], IslandEdge.allCases)
+    func cameraActivityFramesAgreeAcrossBothLayoutEntrypoints(
+        detailedMedia: Bool, savedEdge: IslandEdge
+    ) throws {
+        for physical in [false, true] {
+            let screen = ScreenSnapshot(displayID: 42,
+                frame: CGRect(x: -1512, y: -300, width: 1512, height: 982),
+                visibleFrame: CGRect(x: -1512, y: -300, width: 1512, height: 938),
+                safeAreaInsets: ScreenInsets(top: 44),
+                auxiliaryTopLeftArea: physical ? CGRect(x: -1512, y: 638, width: 656, height: 44) : nil,
+                auxiliaryTopRightArea: physical ? CGRect(x: -656, y: 638, width: 656, height: 44) : nil)
+            let settings = FeatureSettings(mediaCompactStyle: detailedMedia ? .detailed : .compact,
+                islandLayoutStyle: .pill,
+                islandPlacement: IslandPlacement(mode: .camera, edge: savedEdge, offset: 0.23))
+            let idle = ScreenLayoutEngine(configuration: settings.islandScreenConfiguration).layout(for: screen)
+            let notice = IslandNotice(id: detailedMedia ? "media-active-fixture" : "ai-active-fixture", title: "Fixture")
+            let screenFrame = try #require(engine.compactBarFrame(for: screen, notices: [notice], settings: settings))
+            let ownedFrame = try #require(engine.compactBarFrame(for: idle, notices: [notice], settings: settings))
+            #expect(ownedFrame == screenFrame, "Camera status must use the same frame regardless of its layout entrypoint")
+            #expect(ownedFrame.midX == screen.frame.midX, "Saved custom offsets cannot move a camera-aligned activity")
+            #expect(ownedFrame.height == 24)
+            #expect(ownedFrame.width == (detailedMedia ? (physical ? 520 : 380) : (physical ? 280 : 80)))
+            #expect(idle.collapsedFrame.size == CGSize(width: 80, height: 24))
+            #expect(engine.compactBarFrame(for: screen, notices: [], settings: settings) == nil)
+            #expect(engine.compactBarFrame(for: idle, notices: [], settings: settings) == nil)
+        }
+    }
+
     /// Expanding the island also dismisses the clipboard assistant; that dismissal must not
     /// clear the hidden state and let the collapsed status bar draw over the open panel.
     @Test

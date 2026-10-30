@@ -5,11 +5,11 @@ import SwiftUI
 import ZislaCore
 import ZislaKit
 
-private extension ClipboardAssistantController {
+extension ClipboardAssistantController {
     /// The clipboard assistant needs extra horizontal space for the content preview and trailing actions.
-    static let islandRowWidth = ScreenLayoutConfiguration().expandedSize.width + 60
+    private static let islandRowWidth = ScreenLayoutConfiguration().expandedSize.width + 60
 
-    internal static func trailingControlsWidth(
+    static func trailingControlsWidth(
         for detection: ClipboardAssistantDetection,
         isLightweightMode: Bool,
         shortcutHint: String?,
@@ -1088,7 +1088,11 @@ struct ClipboardAssistantToastView: View {
                     }
                     .help(loc("更多操作"))
                     .popover(isPresented: Binding(get: { controller.isMoreActionsPresented },
-                                                 set: { controller.setMoreActionsPresented($0) })) {
+                                                 set: { controller.setMoreActionsPresented($0) }),
+                             arrowEdge: Self.verticalMoreActionsPopoverArrowEdge(
+                                for: presentation.layout?.edge ?? .top,
+                                layoutDirection: layoutDirection
+                             )) {
                         moreActionsPopover(for: detection)
                     }
                 }
@@ -1166,6 +1170,12 @@ struct ClipboardAssistantToastView: View {
         if detection.action != nil { length += 56 }
         if canExpand(detection, isLightweightMode: isLightweightMode) { length += 28 }
         return length
+    }
+
+    static func verticalMoreActionsPopoverArrowEdge(
+        for edge: IslandEdge, layoutDirection: LayoutDirection
+    ) -> Edge {
+        (edge == .left) == (layoutDirection == .leftToRight) ? .leading : .trailing
     }
 
     static func compactLength(

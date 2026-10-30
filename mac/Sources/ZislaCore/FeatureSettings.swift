@@ -825,12 +825,8 @@ public struct FeatureSettings: Codable, Equatable, Sendable {
     public var mediaVisualizationStyle: MediaVisualizationStyle
     public var islandLayoutStyle: IslandLayoutStyle
     public var islandPlacement: IslandPlacement
-    public var islandPillWidth: Double {
-        didSet { islandPillWidth = Self.islandDimension(islandPillWidth, range: 80...400, fallback: 180) }
-    }
-    public var islandPillHeight: Double {
-        didSet { islandPillHeight = Self.islandDimension(islandPillHeight, range: 20...64, fallback: 32) }
-    }
+    public private(set) var islandPillWidth: Double
+    public private(set) var islandPillHeight: Double
     public var islandEdgeInset: Double {
         didSet { islandEdgeInset = Self.islandDimension(islandEdgeInset, range: 0...64, fallback: 8) }
     }
@@ -1098,8 +1094,8 @@ public struct FeatureSettings: Codable, Equatable, Sendable {
         self.mediaVisualizationStyle = mediaVisualizationStyle
         self.islandLayoutStyle = islandLayoutStyle
         self.islandPlacement = islandPlacement
-        self.islandPillWidth = Self.islandDimension(islandPillWidth, range: 80...400, fallback: 180)
-        self.islandPillHeight = Self.islandDimension(islandPillHeight, range: 20...64, fallback: 32)
+        self.islandPillWidth = 80
+        self.islandPillHeight = 24
         self.islandEdgeInset = Self.islandDimension(islandEdgeInset, range: 0...64, fallback: 8)
         self.islandVisualStyle = islandVisualStyle
         self.islandNotchBackground = islandNotchBackground
@@ -1546,14 +1542,8 @@ public struct FeatureSettings: Codable, Equatable, Sendable {
             ?? defaults.islandLayoutStyle
         islandPlacement = try container.decodeIfPresent(IslandPlacement.self, forKey: .islandPlacement)
             ?? defaults.islandPlacement
-        islandPillWidth = Self.islandDimension(
-            try container.decodeIfPresent(Double.self, forKey: .islandPillWidth) ?? defaults.islandPillWidth,
-            range: 80...400, fallback: 180
-        )
-        islandPillHeight = Self.islandDimension(
-            try container.decodeIfPresent(Double.self, forKey: .islandPillHeight) ?? defaults.islandPillHeight,
-            range: 20...64, fallback: 32
-        )
+        islandPillWidth = defaults.islandPillWidth
+        islandPillHeight = defaults.islandPillHeight
         islandEdgeInset = Self.islandDimension(
             try container.decodeIfPresent(Double.self, forKey: .islandEdgeInset) ?? defaults.islandEdgeInset,
             range: 0...64, fallback: 8

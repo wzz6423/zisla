@@ -305,7 +305,7 @@ final class SideNoticePresenter {
                 ? browserDownloads.snapshots.count : 0
         )
         configuration.expandsForDetailedStatus = sizing?.expandsForDetailedStatus == true
-        configuration.compactStatusLength = sizing?.customPillLength ?? CGFloat(settingsStore.settings.islandPillHeight)
+        configuration.compactStatusLength = sizing?.customPillLength
         if configuration.layoutStyle == .pill, configuration.placement.mode == .custom,
            let presentation = sizing?.customPillPresentation {
             let text = CompactPillStatusContent.displayText(

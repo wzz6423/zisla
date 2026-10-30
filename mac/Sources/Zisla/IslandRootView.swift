@@ -44,6 +44,10 @@ struct IslandRootView: View {
 
     var body: some View {
         GeometryReader { proxy in
+            let contentTopInset = Self.contentTopInset(
+                layoutStyle: settingsStore.settings.islandLayoutStyle,
+                screenLayout: model.islandScreenLayout
+            )
             let surfaceSize = IslandSurfaceTransform.fittingSize(
                 contentSize: layout.panelSize,
                 availableSize: proxy.size
@@ -147,8 +151,9 @@ struct IslandRootView: View {
                 collapsedCenterOffsetX: collapsedCenterOffsetX,
                 resultSweep: model.aiResultSweep,
                 layoutStyle: settingsStore.settings.islandLayoutStyle,
-                collapsedFrame: pillCollapsedFrame(in: renderedSurfaceSize, panelSize: proxy.size),
-                edge: model.islandEdge
+                collapsedFrame: pillCollapsedFrame(in: renderedSurfaceSize, panelSize: proxy.size, direction: .leftToRight),
+                edge: model.islandEdge,
+                contentTopInset: contentTopInset
             ) {
                 if model.isMirrorPresented {
                     DeferredMount {
@@ -179,7 +184,7 @@ struct IslandRootView: View {
                                 .frame(height: layout.islandSize.height, alignment: .top)
                         } else if showsCompactTransientNotice, let notice = model.transientMessage {
                             if let presentation = customTransientPresentation {
-                                if let frame = pillCollapsedFrame(in: renderedSurfaceSize, panelSize: proxy.size) {
+                                if let frame = pillCollapsedFrame(in: renderedSurfaceSize, panelSize: proxy.size, direction: layoutDirection) {
                                     CompactPillStatusContent(presentation: presentation, text: presentation.text,
                                         edge: model.islandEdge, visualizationStyle: settingsStore.settings.mediaVisualizationStyle,
                                         item: nil)
@@ -490,30 +495,34 @@ struct IslandRootView: View {
         return CompactPillStatusContent.transientPresentation(message: message)
     }
 
-    private var contentTopInset: CGFloat {
-        guard settingsStore.settings.islandLayoutStyle == .pill,
-              let screenLayout = model.islandScreenLayout,
+    nonisolated static func contentTopInset(
+        layoutStyle: IslandLayoutStyle, screenLayout: ScreenOverlayLayout?
+    ) -> CGFloat {
+        guard layoutStyle == .pill,
+              let screenLayout,
               screenLayout.centerOcclusionWidth > 0 else { return ExpandedPetLayout.contentTopInset }
-        return screenLayout.collapsedFrame.height + 4
+        return screenLayout.collapsedFrame.height + 12
     }
 
-    private func pillCollapsedFrame(in surface: CGSize, panelSize: CGSize) -> CGRect? {
+    private func pillCollapsedFrame(in surface: CGSize, panelSize: CGSize, direction: LayoutDirection) -> CGRect? {
         guard settingsStore.settings.islandLayoutStyle == .pill,
               let layout = model.islandScreenLayout else { return nil }
-        return Self.pillCollapsedFrame(for: layout, in: surface, panelSize: panelSize)
+        return Self.pillCollapsedFrame(for: layout, in: surface, panelSize: panelSize, direction: direction)
     }
 
     nonisolated static func pillCollapsedFrame(
-        for layout: ScreenOverlayLayout, in surface: CGSize, panelSize: CGSize
+        for layout: ScreenOverlayLayout, in surface: CGSize, panelSize: CGSize, direction: LayoutDirection
     ) -> CGRect {
         let frame = layout.collapsedFrameInExpandedTopLeading
         let offset = CGPoint(
             x: layout.edge == .right ? panelSize.width - surface.width :
                 layout.edge == .left ? 0 : (panelSize.width - surface.width) / 2,
-            y: layout.edge == .bottom ? panelSize.height - surface.height :
-                layout.edge.isVertical ? (panelSize.height - surface.height) / 2 : 0
+            y: layout.edge == .bottom || (layout.edge.isVertical && layout.collapsedFrame.midY < layout.screenFrame.midY)
+                ? panelSize.height - surface.height : 0
         )
-        return frame.offsetBy(dx: -offset.x, dy: -offset.y)
+        let local = frame.offsetBy(dx: -offset.x, dy: -offset.y)
+        guard direction == .rightToLeft else { return local }
+        return CGRect(x: surface.width - local.maxX, y: local.minY, width: local.width, height: local.height)
     }
 
     private var transferLayout: AnyLayout {
@@ -548,8 +557,8 @@ struct IslandRootView: View {
                 .monospacedDigit()
                 .fixedSize()
                 .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: uptimeAlignment)
-                .padding(.top, 4)
-                .padding(.trailing, 14)
+                .padding(.top, 10)
+                .padding(.trailing, 24)
         }
         .allowsHitTesting(false)
     }
@@ -566,7 +575,10 @@ struct IslandRootView: View {
     /// the recycle fold starts exactly where the expanded surface stood.
     private var islandSurfaceAlignment: Alignment {
         if settingsStore.settings.islandLayoutStyle == .pill {
-            return Self.pillAlignment(edge: model.islandEdge, direction: layoutDirection)
+            let sideAnchorsAtTop = model.islandScreenLayout.map {
+                $0.collapsedFrame.midY >= $0.screenFrame.midY
+            } ?? true
+            return Self.pillAlignment(edge: model.islandEdge, direction: layoutDirection, sideAnchorsAtTop: sideAnchorsAtTop)
         }
         guard model.settingsStore.settings.petEnabled,
               !model.isMirrorPresented,
@@ -576,12 +588,18 @@ struct IslandRootView: View {
         return model.settingsStore.settings.petSide == .right ? .topLeading : .topTrailing
     }
 
-    nonisolated static func pillAlignment(edge: IslandEdge, direction: LayoutDirection) -> Alignment {
+    nonisolated static func pillAlignment(
+        edge: IslandEdge, direction: LayoutDirection, sideAnchorsAtTop: Bool
+    ) -> Alignment {
         switch edge {
         case .top: .top
         case .bottom: .bottom
-        case .left: direction == .leftToRight ? .leading : .trailing
-        case .right: direction == .leftToRight ? .trailing : .leading
+        case .left: sideAnchorsAtTop
+            ? (direction == .leftToRight ? .topLeading : .topTrailing)
+            : (direction == .leftToRight ? .bottomLeading : .bottomTrailing)
+        case .right: sideAnchorsAtTop
+            ? (direction == .leftToRight ? .topTrailing : .topLeading)
+            : (direction == .leftToRight ? .bottomTrailing : .bottomLeading)
         }
     }
 
@@ -618,7 +636,11 @@ struct IslandRootView: View {
         guard let activeModule else { return .standard }
         return IslandModuleLayout.resolved(
             for: activeModule,
-            dashboardCardCount: model.dashboardCardCount
+            dashboardCardCount: model.dashboardCardCount,
+            contentTopInset: Self.contentTopInset(
+                layoutStyle: settingsStore.settings.islandLayoutStyle,
+                screenLayout: model.islandScreenLayout
+            )
         )
     }
 
@@ -713,7 +735,7 @@ struct IslandRootView: View {
 enum ExpandedPetLayout {
     static let size: CGFloat = 30
     static let topInset: CGFloat = 8
-    static let contentTopInset: CGFloat = 8
+    static let contentTopInset = IslandDashboardLayout.contentTopInset
     static let outerInset: CGFloat = 6
     static let islandGap: CGFloat = 8
     static let sideSlotWidth = size + outerInset + islandGap
