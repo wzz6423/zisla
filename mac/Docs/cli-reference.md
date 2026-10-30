@@ -67,6 +67,12 @@ WorkBuddy task whose ID starts with `ai-` cannot be mistaken for WorkBuddy AI.
   Neither queries replicated Delta thread bodies or Orca journal message bodies. Use `zislactl usage`
   for tools or versions that do not expose recorded numeric usage.
 
+## Option syntax
+
+- Write an option as `--key value` or `--key=value`. Each option may appear only once per command; a repeated option is a usage error (exit code 64).
+- A value may start with `--`, as in `--detail --verbose`. The exception is a flag of the same command (`--failed` for `finish`, `--queued` for `update`): it is never taken as a value, so an empty unquoted variable in `--detail $DETAIL --failed` still marks the task failed. Pass such a literal value as `--detail=--failed`.
+- `--failed` and `--queued` are flags. Alone they mean true; `--failed=false` or `--failed false` (and the same for `--queued`) turn them off. Any other value is a usage error.
+
 ## `update`
 
 Creates or replaces a task with the same `id`.
@@ -80,7 +86,7 @@ zislactl update --id <id> --provider <provider> --title <title>
 - If `--progress` is omitted, the UI shows indeterminate progress.
 - `--pid` is optional and should be supplied only when the caller can identify the task's process.
 - `--status` explicitly reports running, queued, waiting for user action, or an error while running.
-- `--queued` is an alias for `--status queued`; without an explicit status, the task is running.
+- `--queued` is an alias for `--status queued`; without an explicit status, the task is running. An explicit `--status` takes precedence over `--queued`.
 
 ## `finish`
 

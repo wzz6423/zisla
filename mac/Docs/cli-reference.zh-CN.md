@@ -60,6 +60,12 @@ WorkBuddy 与 WorkBuddy AI 是面向国内/国外市场的两个独立产品，�
 - 这些集成都只读、尽力兼容，缺失或不兼容的数据源不产生记录。不查询 Delta 复制树正文或
   Orca journal 的消息正文。没有数字用量接口的工具版本可通过 `zislactl usage` 上报。
 
+## 参数写法
+
+- 参数可写成 `--key value` 或 `--key=value`。同一命令里每个参数只能出现一次，重复会按用法错误处理（退出码 64）。
+- 值可以以 `--` 开头，例如 `--detail --verbose`。例外是同一命令的开关（`finish` 的 `--failed`、`update` 的 `--queued`）：它们不会被当作值，所以 `--detail $DETAIL --failed` 里的变量为空且没加引号时，任务仍记为失败。确实要传这类字面值时写成 `--detail=--failed`。
+- `--failed` 和 `--queued` 是开关。单独出现表示开启；`--failed=false` 或 `--failed false`（`--queued` 同理）表示关闭；其他值按用法错误处理。
+
 ## `update`
 
 新增或覆盖同一 `id` 的任务。
@@ -73,7 +79,7 @@ zislactl update --id <id> --provider <provider> --title <标题>
 - `--progress` 缺省时显示不确定进度。
 - `--pid` 可选；仅在调用方能确认任务所属进程时传入。
 - `--status` 可显式上报运行、排队、等待用户操作或运行中错误。
-- `--queued` 是 `--status queued` 的兼容写法；未指定状态时为运行中。
+- `--queued` 是 `--status queued` 的兼容写法；未指定状态时为运行中。同时传了 `--status` 时以 `--status` 为准。
 
 ## `finish`
 
