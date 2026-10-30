@@ -354,6 +354,18 @@ public enum SystemMonitorMenuBarMetric: String, Codable, CaseIterable, Sendable,
     }
 }
 
+public enum StatusIconDestination: String, Codable, CaseIterable, Sendable, Equatable {
+    case menuBar
+    case island
+
+    public var menuTitle: String {
+        switch self {
+        case .menuBar: "状态栏"
+        case .island: "灵动岛"
+        }
+    }
+}
+
 /// Display style of the menu bar monitor status items.
 public enum SystemMonitorMenuBarDisplayStyle: String, Codable, CaseIterable, Sendable, Equatable {
     case detailed
@@ -733,6 +745,13 @@ public struct FeatureSettings: Codable, Equatable, Sendable {
     public var systemMonitorMenuBarHeadphoneOptions: SystemMonitorHeadphoneOptions
     /// Whether to show Zisla's menu bar icon separately; does not affect monitor status items.
     public var menuBarAppIconEnabled: Bool
+    public var statusIconDestination: StatusIconDestination
+    public var supportsStatusIconsInIsland: Bool {
+        islandLayoutStyle == .pill && islandPlacement.mode == .custom
+    }
+    public var effectiveStatusIconDestination: StatusIconDestination {
+        supportsStatusIconsInIsland ? statusIconDestination : .menuBar
+    }
     public var weatherEnabled: Bool
     public var lockScreenInfoEnabled: Bool
     /// User-defined text shown above the native lock-screen clock; empty string means nothing is shown.
@@ -907,6 +926,7 @@ public struct FeatureSettings: Codable, Equatable, Sendable {
         systemMonitorMenuBarCombinedIconAppearance: SystemMonitorCombinedIconAppearance = SystemMonitorCombinedIconAppearance(),
         systemMonitorMenuBarHeadphoneOptions: SystemMonitorHeadphoneOptions = SystemMonitorHeadphoneOptions(),
         menuBarAppIconEnabled: Bool = false,
+        statusIconDestination: StatusIconDestination = .menuBar,
         weatherEnabled: Bool = true,
         lockScreenInfoEnabled: Bool = true,
         lockScreenMessage: String = "",
@@ -1024,6 +1044,7 @@ public struct FeatureSettings: Codable, Equatable, Sendable {
         self.systemMonitorMenuBarCombinedIconAppearance = systemMonitorMenuBarCombinedIconAppearance
         self.systemMonitorMenuBarHeadphoneOptions = systemMonitorMenuBarHeadphoneOptions
         self.menuBarAppIconEnabled = menuBarAppIconEnabled
+        self.statusIconDestination = statusIconDestination
         self.weatherEnabled = weatherEnabled
         self.lockScreenInfoEnabled = lockScreenInfoEnabled
         self.lockScreenMessage = lockScreenMessage
@@ -1188,6 +1209,7 @@ public struct FeatureSettings: Codable, Equatable, Sendable {
         case systemMonitorMenuBarCombinedIconAppearance
         case systemMonitorMenuBarHeadphoneOptions
         case menuBarAppIconEnabled
+        case statusIconDestination
         case weatherEnabled
         case lockScreenInfoEnabled
         case lockScreenMessage
@@ -1368,6 +1390,9 @@ public struct FeatureSettings: Codable, Equatable, Sendable {
             Bool.self,
             forKey: .menuBarAppIconEnabled
         ) ?? defaults.menuBarAppIconEnabled
+        // A malformed destination must not make the store reset unrelated preferences.
+        statusIconDestination = (try? container.decode(StatusIconDestination.self, forKey: .statusIconDestination))
+            ?? defaults.statusIconDestination
         weatherEnabled = try container.decodeIfPresent(Bool.self, forKey: .weatherEnabled) ?? defaults.weatherEnabled
         lockScreenInfoEnabled = try container.decodeIfPresent(Bool.self, forKey: .lockScreenInfoEnabled) ?? defaults.lockScreenInfoEnabled
         lockScreenMessage = try container.decodeIfPresent(String.self, forKey: .lockScreenMessage) ?? defaults.lockScreenMessage

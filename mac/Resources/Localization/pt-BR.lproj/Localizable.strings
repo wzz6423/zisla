@@ -3132,3 +3132,9 @@
 "光晕模式" = "Modo de brilho";
 "拖动药丸到屏幕边缘，按回车完成，按 Esc 取消。" = "Arraste a cápsula para uma borda da tela. Pressione Return para concluir ou Esc para cancelar.";
 "Liquid Glass" = "Liquid Glass";
+
+"图标显示位置" = "Local de exibição dos ícones";
+"状态栏" = "Barra de menus";
+"灵动岛" = "Ilha Dinâmica";
+"常驻监控图标" = "Ícones de monitoramento permanentes";
+"关闭后不影响已启用的监控图标" = "Desativar não afeta os ícones de monitoramento ativos";

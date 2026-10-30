@@ -3133,3 +3133,9 @@
 "光晕模式" = "Leuchtmodus";
 "拖动药丸到屏幕边缘，按回车完成，按 Esc 取消。" = "Ziehe die Kapsel an einen Bildschirmrand. Drücke die Eingabetaste zum Abschließen oder Esc zum Abbrechen.";
 "Liquid Glass" = "Liquid Glass";
+
+"图标显示位置" = "Symbolposition";
+"状态栏" = "Menüleiste";
+"灵动岛" = "Dynamic Island";
+"常驻监控图标" = "Dauerhafte Überwachungssymbole";
+"关闭后不影响已启用的监控图标" = "Das Ausschalten lässt aktivierte Überwachungssymbole unverändert";

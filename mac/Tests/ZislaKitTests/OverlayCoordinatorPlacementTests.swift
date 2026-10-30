@@ -25,7 +25,7 @@ struct OverlayCoordinatorPlacementTests {
             pillSize: CGSize(width: 220, height: 40), edgeInset: 12)
         let layout = try #require(coordinator.activeLayout)
         #expect(layout.edge == .left)
-        #expect(layout.collapsedFrame.size == CGSize(width: 40, height: 220))
+        #expect(layout.collapsedFrame.size == CGSize(width: 40, height: 40))
         #expect(layout.collapsedFrame.minX == screen.frame.minX + 12)
         #expect(changes.count == 2)
         #expect(changes.last! == layout)
@@ -75,6 +75,48 @@ struct OverlayCoordinatorPlacementTests {
         #expect(panel.frame == layout.expandedFrame)
         #expect(panel.frame.minY == layout.collapsedFrame.minY)
         #expect(!coordinator.isVisible)
+    }
+
+    @Test(arguments: IslandEdge.allCases)
+    func statusIconsKeepTheIslandCollapsedOnHoverAndExplicitRevealStillWorks(edge: IslandEdge) throws {
+        let coordinator = OverlayCoordinator(contentView: NSView(),
+            layoutEngine: ScreenLayoutEngine(configuration: ScreenLayoutConfiguration(layoutStyle: .pill,
+                placement: IslandPlacement(mode: .custom, edge: edge))), collapseDelay: .zero)
+        coordinator.screenSnapshotProvider = { [screen] }
+        coordinator.start()
+        defer { coordinator.stop() }
+        coordinator.selectActiveDisplay(at: CGPoint(x: screen.frame.midX, y: screen.frame.midY))
+        var expanded = false
+        coordinator.onVisibilityChanged = { expanded = $0 }
+        coordinator.updateCompactStatus(expandsForDetailedStatus: false,
+            statusIconSize: edge.isVertical ? CGSize(width: 24, height: 120) : CGSize(width: 120, height: 24))
+        let layout = try #require(coordinator.activeLayout)
+        let point = CGPoint(x: layout.collapsedFrame.midX, y: layout.collapsedFrame.midY)
+        coordinator.handlePointer(at: point)
+        #expect(!expanded, "Hovering monitor icons must keep them visible in the collapsed island")
+        coordinator.showExpanded(at: point)
+        #expect(expanded, "Existing menu and monitor actions may explicitly open the island")
+        coordinator.handlePointer(at: point)
+        #expect(expanded)
+        coordinator.collapseImmediately()
+        coordinator.handlePointer(at: point)
+        #expect(!expanded)
+        let outside = CGPoint(x: screen.frame.minX - 100, y: screen.frame.minY - 100)
+        coordinator.handlePointer(at: outside)
+        coordinator.showExpanded(at: outside)
+        coordinator.handlePointer(at: point)
+        coordinator.handlePointer(at: outside)
+        #expect(!expanded, "An explicit reveal must still collapse after the pointer enters and leaves")
+        coordinator.setPinned(true)
+        coordinator.handlePointer(at: point)
+        coordinator.setPinned(false)
+        #expect(expanded, "Unpinning while hovering an explicitly opened island must keep it open")
+        coordinator.collapseImmediately()
+        coordinator.handlePointer(at: outside)
+        coordinator.updateCompactStatus(expandsForDetailedStatus: false)
+        let idle = try #require(coordinator.activeLayout?.collapsedFrame)
+        coordinator.handlePointer(at: CGPoint(x: idle.midX, y: idle.midY))
+        #expect(expanded, "Removing all icons must restore the existing hover behavior")
     }
 
     @Test

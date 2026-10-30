@@ -3132,3 +3132,9 @@
 "光晕模式" = "Parıltı modu";
 "拖动药丸到屏幕边缘，按回车完成，按 Esc 取消。" = "Kapsülü ekranın kenarına sürükleyin. Bitirmek için Return, iptal etmek için Esc tuşuna basın.";
 "Liquid Glass" = "Liquid Glass";
+
+"图标显示位置" = "Simge konumu";
+"状态栏" = "Menü çubuğu";
+"灵动岛" = "Dinamik Ada";
+"常驻监控图标" = "Kalıcı izleme simgeleri";
+"关闭后不影响已启用的监控图标" = "Kapatmak etkin izleme simgelerini etkilemez";

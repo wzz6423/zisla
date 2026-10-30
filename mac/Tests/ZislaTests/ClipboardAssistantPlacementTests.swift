@@ -491,7 +491,7 @@ struct ClipboardAssistantPlacementTests {
         )
         let textLength = min(168, CGFloat(text.filter { !$0.isWhitespace }.count) * 14)
         #expect(length == 16 + 26 + 12 + textLength + 20)
-        let visible = VerticalStatusText.characters(text, availableHeight: textLength)
+        let visible = CompactPillStatusPresentation.verticalTextRows(text, availableWidth: 24, availableHeight: textLength).map(\.text)
         #expect(visible.count * 14 <= Int(textLength))
         if text == "🧑‍💻" { #expect(visible == [text]) }
         if text.count > 12 { #expect(visible.last == "…") }

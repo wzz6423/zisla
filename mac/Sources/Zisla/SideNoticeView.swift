@@ -19,6 +19,7 @@ final class SideNoticeDisplayState: ObservableObject {
     /// Voice-processing status is scoped to the display where the recording happened; every
     /// other display hides it so the collapsed pill (and the pet slot) stays in its normal place.
     @Published var hidesVoiceProcessingIndicator = false
+    @Published var statusIcons: [IslandStatusIcon] = []
 }
 
 private enum CompactStatusMetrics {
@@ -194,9 +195,10 @@ struct CompactStatusBarView: View {
     }
 
     var pausesCompactTimeline: Bool {
-        let showsIdleLogo = usesCustomPill && resultSweep.current == nil
-            && (displayState.compactStatusHidden
-                || (selectedCompactStatusPriority == nil && recordingOperationNotice == nil))
+        let showsIdleLogo = resultSweep.current == nil
+            && (displayState.statusIcons.contains { if case .application = $0.content { return true }; return false }
+                || (displayState.statusIcons.isEmpty && usesCustomPill && (displayState.compactStatusHidden
+                    || (selectedCompactStatusPriority == nil && recordingOperationNotice == nil))))
         return !(showsIdleLogo && !reduceMotion)
             && (displayState.compactStatusHidden || (!isPlaybackProgressActive && !showsCustomLyrics))
     }
@@ -205,7 +207,9 @@ struct CompactStatusBarView: View {
     func statusBarContent(at date: Date) -> some View {
         GeometryReader { geometry in
             ZStack {
-                if usesCustomPill, displayState.compactStatusHidden, resultSweep.current == nil {
+                if !displayState.statusIcons.isEmpty {
+                    IslandStatusIconStrip(icons: displayState.statusIcons, edge: displayState.islandEdge, date: date)
+                } else if usesCustomPill, displayState.compactStatusHidden, resultSweep.current == nil {
                     IslandParticleLogo(side: min(18, height), time: date.timeIntervalSinceReferenceDate)
                 } else if !displayState.compactStatusHidden || resultSweep.current != nil {
                     if usesCustomPill {
@@ -220,7 +224,7 @@ struct CompactStatusBarView: View {
             .background(compactStatusBackground)
             .overlay { AIResultSweepOverlay(controller: resultSweep, edge: displayState.islandEdge) }
             .overlay {
-                if settingsStore.settings.collapsedProgressGlowEnabled,
+                if displayState.statusIcons.isEmpty, settingsStore.settings.collapsedProgressGlowEnabled,
                    let progress = compactProgress(at: date) {
                     CollapsedProgressGlow(
                         progress: progress,

@@ -20,7 +20,7 @@ struct IslandPlacementControllerTests {
         fixture.controller.endDragging(at: destination)
         let snapped = try #require(fixture.controller.previewFrame)
         #expect(snapped.minX == fixture.screens[0].frame.minX + 8)
-        #expect(snapped.width < snapped.height)
+        #expect(snapped.size == CGSize(width: 24, height: 24))
         #expect(fixture.committed.isEmpty)
 
         fixture.controller.confirm()
@@ -97,7 +97,7 @@ struct IslandPlacementControllerTests {
         #expect(!fixture.controller.beginDragging(at: CGPoint(x: frame.midX, y: frame.minY - 200)))
         fixture.controller.drag(to: .zero)
         #expect(fixture.controller.previewFrame == frame)
-        let grip = CGPoint(x: frame.midX + 20, y: frame.midY)
+        let grip = CGPoint(x: frame.midX + frame.width / 4, y: frame.midY)
         #expect(fixture.controller.beginDragging(at: grip))
         fixture.controller.drag(to: CGPoint(x: grip.x + 100, y: grip.y - 100))
         #expect(fixture.controller.previewFrame?.midX == frame.midX + 100)

@@ -7,18 +7,171 @@ import ZislaKit
 
 struct VerticalCompactStatusTests {
     @Test
+    func shortNumbersUseOneLineOfTheNaturalVerticalLength() {
+        for text in ["20%", "25:00", "(1)", "[]", "12.5", "？，"] {
+            let presentation = CompactPillStatusPresentation(priority: .transient,
+                notice: IslandNotice(id: "fixture", title: "fixture"), text: text)
+            #expect(presentation.length(thickness: 32, edge: .left) == 52,
+                    "\(text) fits one 14pt row, so the icon and gap must reserve only that row")
+            #expect(CompactPillStatusPresentation.verticalTextRows(text, availableWidth: 32,
+                availableHeight: 14).map(\.text) == [text])
+        }
+    }
+
+    @Test
+    func oversizedNumberRunsUseTheFewestRowsThatFitTheirWidth() {
+        let rows = CompactPillStatusPresentation.verticalTextRows("12.34567890%", availableWidth: 24, availableHeight: 140)
+        #expect(rows.map(\.text).joined() == "12.34567890%")
+        #expect(rows.contains { $0.text.count > 1 })
+        for row in rows {
+            let width = ceil((row.text as NSString).size(withAttributes: [.font: NSFont.systemFont(ofSize: 11, weight: .medium)]).width)
+            #expect(width <= 24)
+            #expect(!row.rotatesClockwise)
+        }
+        let presentation = CompactPillStatusPresentation(priority: .transient,
+            notice: IslandNotice(id: "fixture", title: "fixture"), text: "12.34567890%")
+        #expect(presentation.length(thickness: 24, edge: .left) == 30 + CGFloat(rows.count) * 14)
+    }
+
+    @Test
+    func onlyStandaloneVerticalBracketsRotateAndOrdinaryPunctuationStaysUpright() {
+        for bracket in "()（）[]［］【】{}｛｝〈〉《》「」『』〔〕" {
+            let rows = CompactPillStatusPresentation.verticalTextRows("甲\(bracket)乙", availableWidth: 32, availableHeight: 140)
+            #expect(rows.map(\.text) == ["甲", String(bracket), "乙"])
+            #expect(rows.map(\.rotatesClockwise) == [false, true, false])
+        }
+        let punctuation = CompactPillStatusPresentation.verticalTextRows("甲。？乙", availableWidth: 32, availableHeight: 140)
+        #expect(punctuation.map(\.text) == ["甲", "。？", "乙"])
+        #expect(punctuation.allSatisfy { !$0.rotatesClockwise })
+        let inline = CompactPillStatusPresentation.verticalTextRows("甲(1)乙", availableWidth: 32, availableHeight: 140)
+        #expect(inline.map(\.text) == ["甲", "(1)", "乙"])
+        #expect(inline.allSatisfy { !$0.rotatesClockwise })
+        let paired = CompactPillStatusPresentation.verticalTextRows("甲[]乙", availableWidth: 32, availableHeight: 140)
+        #expect(paired.map(\.text) == ["甲", "[]", "乙"])
+        #expect(paired.allSatisfy { !$0.rotatesClockwise }, "Brackets sharing one horizontal row must stay horizontal")
+        let overflow = CompactPillStatusPresentation.verticalTextRows("[123456]", availableWidth: 24, availableHeight: 140)
+        #expect(overflow.first?.text == "[" && overflow.first?.rotatesClockwise == true)
+        #expect(overflow.last?.text == "]" && overflow.last?.rotatesClockwise == true)
+        #expect(overflow.dropFirst().dropLast().allSatisfy { !$0.rotatesClockwise })
+    }
+
+    @Test @MainActor
+    func monitorReadingSizesReserveTheirActualRowsAndKeepTheApplicationIconSmall() {
+        #expect(IslandStatusIcon.readingSize("20%") == CGSize(width: 32, height: 44))
+        #expect(IslandStatusIcon.readingSize("25:00") == CGSize(width: 32, height: 44))
+        #expect(IslandStatusIcon.readingSize("--") == CGSize(width: 32, height: 44))
+        #expect(IslandStatusIcon.readingSize(" ").height == 30)
+        #expect(IslandStatusIcon(id: "app", content: .application, tooltip: "zisla").size(edge: .left)
+            == CGSize(width: 24, height: 24))
+        let reading = "2 GB/8 GB"
+        let rows = CompactPillStatusPresentation.verticalTextRows(reading, availableWidth: 32, availableHeight: 200)
+        #expect(IslandStatusIcon.readingSize(reading).height == 30 + CGFloat(rows.count) * 14)
+    }
+
+    @Test @MainActor
+    func verticalTextRendersOneLineAndRotatesOnlyStandaloneBracketsClockwise() throws {
+        func render(_ content: some View) throws -> NSBitmapImageRep {
+            let renderer = ImageRenderer(content: content.frame(width: 32, height: 42).foregroundStyle(.white).background(.black))
+            renderer.scale = 2
+            return NSBitmapImageRep(cgImage: try #require(renderer.cgImage))
+        }
+        func expected(_ character: String, angle: Double) -> some View {
+            VStack(spacing: 1) {
+                Text("甲").font(.system(size: 11, weight: .medium)).fixedSize().frame(height: 13)
+                Text(character).font(.system(size: 11, weight: .medium)).fixedSize()
+                    .rotationEffect(.degrees(angle)).frame(height: 13)
+                Text("乙").font(.system(size: 11, weight: .medium)).fixedSize().frame(height: 13)
+            }
+        }
+        func differences(_ first: NSBitmapImageRep, _ second: NSBitmapImageRep) throws -> Int {
+            #expect(first.pixelsWide == second.pixelsWide && first.pixelsHigh == second.pixelsHigh)
+            var changed = 0
+            for y in 0..<first.pixelsHigh {
+                for x in 0..<first.pixelsWide {
+                    let a = try #require(first.colorAt(x: x, y: y)?.usingColorSpace(.sRGB))
+                    let b = try #require(second.colorAt(x: x, y: y)?.usingColorSpace(.sRGB))
+                    if abs(a.redComponent - b.redComponent) > 0.01 { changed += 1 }
+                }
+            }
+            return changed
+        }
+        for character in ["（", "[", "【"] {
+            let actual = try render(VerticalStatusText(text: "甲\(character)乙", availableWidth: 32, availableHeight: 42))
+            #expect(try differences(actual, render(expected(character, angle: 90))) == 0)
+            #expect(try differences(actual, render(expected(character, angle: -90))) > 10,
+                    "A standalone \(character) must face clockwise, not counterclockwise")
+        }
+        for character in ["。", "？"] {
+            let actual = try render(VerticalStatusText(text: "甲\(character)乙", availableWidth: 32, availableHeight: 42))
+            #expect(try differences(actual, render(expected(character, angle: 0))) == 0)
+        }
+        let numbers = try render(VerticalStatusText(text: "20%", availableWidth: 32, availableHeight: 14))
+        let reference = try render(Text("20%").font(.system(size: 11, weight: .medium)).fixedSize().frame(height: 13))
+        #expect(try differences(numbers, reference) == 0, "Short numeric readings must use the same pixels as one horizontal Text")
+        let legacy = try render(VerticalStatusText(text: "20", availableHeight: 14))
+        let legacyReference = try render(Text("20").font(.system(size: 11, weight: .medium)).fixedSize().frame(height: 13))
+        #expect(try differences(legacy, legacyReference) == 0, "Existing 24pt callers retain a usable width without extra configuration")
+    }
+
+    @Test @MainActor
+    func horizontalMonitorTextUsesTheSameMeasuredFontWithoutCroppingItsUnits() async throws {
+        let text = "↓123.45 MB/s ↑67.89 MB/s"
+        let icon = IslandStatusIcon(id: "network", content: .metric(.network, text: text, image: nil, style: .detailed), tooltip: "Network")
+        let measured = try #require(IslandStatusIconLayout.size(icons: [icon], edge: .top))
+        let renderSize = CGSize(width: measured.width + 80, height: 24)
+        func render(_ content: some View) async throws -> NSBitmapImageRep {
+            let host = NSHostingView(rootView: content.frame(width: renderSize.width, height: renderSize.height)
+                .foregroundStyle(.white).background(.black))
+            host.sizingOptions = []
+            let window = NSWindow(contentRect: CGRect(origin: CGPoint(x: 20000, y: 0), size: renderSize),
+                styleMask: .borderless, backing: .buffered, defer: false)
+            window.isReleasedWhenClosed = false
+            window.alphaValue = 0
+            window.contentView = host
+            window.orderFrontRegardless()
+            defer { window.close() }
+            host.layoutSubtreeIfNeeded()
+            host.displayIfNeeded()
+            await withCheckedContinuation { continuation in
+                DispatchQueue.main.async { continuation.resume() }
+            }
+            let bitmap = try #require(host.bitmapImageRepForCachingDisplay(in: host.bounds))
+            host.cacheDisplay(in: host.bounds, to: bitmap)
+            return bitmap
+        }
+        let actual = try await render(IslandStatusIconStrip(icons: [icon], edge: .top, date: .distantPast)
+            .frame(width: measured.width, height: measured.height))
+        let expected = try await render(HStack(spacing: 6) {
+            Image(systemName: SystemMonitorMenuBarMetric.network.symbolName).frame(width: 18)
+            Text(text).font(.system(size: 12, weight: .medium)).monospacedDigit().fixedSize()
+        }.frame(width: icon.size(edge: .top).width, height: 24).padding(.horizontal, 3)
+            .frame(width: measured.width, height: measured.height))
+        var changed = 0
+        for y in 0..<actual.pixelsHigh {
+            for x in 0..<actual.pixelsWide {
+                let a = try #require(actual.colorAt(x: x, y: y)?.usingColorSpace(.sRGB))
+                let b = try #require(expected.colorAt(x: x, y: y)?.usingColorSpace(.sRGB))
+                if abs(a.redComponent - b.redComponent) > 0.02 { changed += 1 }
+            }
+        }
+        #expect(changed == 0, "The complete network text must match the measured system font, including both MB/s suffixes")
+    }
+
+    @Test
     func verticalTextPreservesGraphemesAndHasAnEllipsisWithinItsBudget() {
         let text = "  A e\u{301} 👨‍👩‍👧‍👦 🇨🇳 \n B"
-        #expect(VerticalStatusText.characters(text, availableHeight: 70) == ["A", "e\u{301}", "👨‍👩‍👧‍👦", "🇨🇳", "B"])
-        #expect(VerticalStatusText.characters(text, availableHeight: 28) == ["A", "…"])
-        #expect(VerticalStatusText.characters(text, availableHeight: 14) == ["…"])
-        #expect(VerticalStatusText.characters(text, availableHeight: 13.9).isEmpty)
-        #expect(VerticalStatusText.characters(" \n", availableHeight: 100).isEmpty)
+        #expect(CompactPillStatusPresentation.verticalTextRows(text, availableWidth: 24, availableHeight: 70).map(\.text)
+            == ["A", "e\u{301}", "👨‍👩‍👧‍👦", "🇨🇳", "B"])
+        #expect(CompactPillStatusPresentation.verticalTextRows(text, availableWidth: 24, availableHeight: 28).map(\.text) == ["A", "…"])
+        #expect(CompactPillStatusPresentation.verticalTextRows(text, availableWidth: 24, availableHeight: 14).map(\.text) == ["…"])
+        #expect(CompactPillStatusPresentation.verticalTextRows(text, availableWidth: 24, availableHeight: 13.9).isEmpty)
+        #expect(CompactPillStatusPresentation.verticalTextRows(" \n", availableWidth: 24, availableHeight: 100).isEmpty)
     }
 
     @Test(arguments: [CGFloat(-1), -.greatestFiniteMagnitude, 0, .nan, .infinity, -.infinity])
     func invalidVerticalBudgetsDoNotCreateUnboundedGlyphs(height: CGFloat) {
-        #expect(VerticalStatusText.characters("测试", availableHeight: height).isEmpty)
+        #expect(CompactPillStatusPresentation.verticalTextRows("测试", availableWidth: 24, availableHeight: height).isEmpty)
+        #expect(CompactPillStatusPresentation.verticalTextRows("测试", availableWidth: height, availableHeight: 100).isEmpty)
     }
 
     @Test

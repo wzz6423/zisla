@@ -3132,3 +3132,9 @@
 "光晕模式" = "Mode cahaya";
 "拖动药丸到屏幕边缘，按回车完成，按 Esc 取消。" = "Seret kapsul ke tepi layar. Tekan Return untuk selesai atau Esc untuk membatalkan.";
 "Liquid Glass" = "Liquid Glass";
+
+"图标显示位置" = "Lokasi Ikon";
+"状态栏" = "Bilah Menu";
+"灵动岛" = "Pulau Dinamis";
+"常驻监控图标" = "Ikon Pemantauan Tetap";
+"关闭后不影响已启用的监控图标" = "Menonaktifkan ini tidak memengaruhi ikon pemantauan yang aktif";

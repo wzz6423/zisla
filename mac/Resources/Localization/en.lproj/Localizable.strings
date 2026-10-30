@@ -3131,3 +3131,9 @@
 "光晕模式" = "Glow Mode";
 "拖动药丸到屏幕边缘，按回车完成，按 Esc 取消。" = "Drag the pill to a screen edge. Press Return to finish or Esc to cancel.";
 "Liquid Glass" = "Liquid Glass";
+
+"图标显示位置" = "Icon Display Location";
+"状态栏" = "Menu Bar";
+"灵动岛" = "Dynamic Island";
+"常驻监控图标" = "Persistent Monitor Icons";
+"关闭后不影响已启用的监控图标" = "Turning this off keeps enabled monitor icons";

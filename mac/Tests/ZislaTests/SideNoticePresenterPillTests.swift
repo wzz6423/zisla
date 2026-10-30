@@ -84,7 +84,7 @@ struct SideNoticePresenterPillTests {
     func idleCustomPillsKeepTheFixedSizeBeforeAndAfterAnActivity(edge: IslandEdge) throws {
         let fixture = try Fixture(edge: edge)
         defer { fixture.close() }
-        let expected = edge.isVertical ? CGSize(width: 24, height: 80) : CGSize(width: 80, height: 24)
+        let expected = CGSize(width: 24, height: 24)
         let idle = try #require(fixture.presenter.compactFrame(for: fixture.screen, notices: [], at: fixture.date))
         #expect(idle.size == expected)
         #expect(fixture.presenter.compactConfiguration(for: [], at: fixture.date).compactStatusLength == nil)
@@ -110,7 +110,7 @@ struct SideNoticePresenterPillTests {
         let configuration = fixture.presenter.compactConfiguration(for: [notice], at: fixture.date, statusHidden: state.compactStatusHidden)
         #expect(configuration.compactStatusLength == nil)
         let frame = try #require(fixture.presenter.compactFrame(for: fixture.screen, notices: [notice], at: fixture.date, statusHidden: true))
-        #expect(frame.size == CGSize(width: 24, height: 80))
+        #expect(frame.size == CGSize(width: 24, height: 24))
         let next = IslandNotice(id: "ai-active-codex", title: "Codex")
         #expect(SideNoticePresenter.updateCompactVisibility(notices: [next], settings: fixture.settings.settings, displayState: state))
         #expect(!state.compactStatusHidden)
@@ -138,7 +138,7 @@ struct SideNoticePresenterPillTests {
         fixture.queue.enqueue(IslandNotice(id: "voice-processing-left", title: "语音", detail: "整理中"), expiresAfter: nil)
         fixture.presenter.setVoiceProcessingDisplayID(7)
         var dimensions: [UInt32: CGFloat?] = [:]
-        fixture.presenter.onCompactLayoutChanged = { displayID, _, length in dimensions[displayID] = length }
+        fixture.presenter.onCompactLayoutChanged = { displayID, _, length, _ in dimensions[displayID] = length }
         fixture.presenter.publishCompactLayout(on: 7)
         fixture.presenter.publishCompactLayout(on: 8)
         #expect(try #require(dimensions[7] ?? nil) > 24)
@@ -149,7 +149,7 @@ struct SideNoticePresenterPillTests {
     func stoppingThePresenterPreventsQueuedStateChangesFromRecreatingPanels() async throws {
         let fixture = try Fixture(edge: .right)
         var published = 0
-        fixture.presenter.onCompactLayoutChanged = { _, _, _ in published += 1 }
+        fixture.presenter.onCompactLayoutChanged = { _, _, _, _ in published += 1 }
         fixture.presenter.stop()
         fixture.queue.enqueue(IslandNotice(id: "ai-active-fixture", title: "Fixture"), expiresAfter: nil)
         for _ in 0..<6 { await Task.yield() }
@@ -174,9 +174,9 @@ struct SideNoticePresenterPillTests {
             published += 1
             if let displayID = layout?.displayID { fixture.presenter.publishCompactLayout(on: displayID) }
         }
-        fixture.presenter.onCompactLayoutChanged = { displayID, details, length in
+        fixture.presenter.onCompactLayoutChanged = { displayID, details, length, iconSize in
             guard coordinator.activeDisplayID == displayID else { return }
-            coordinator.updateCompactStatus(expandsForDetailedStatus: details, compactStatusLength: length)
+            coordinator.updateCompactStatus(expandsForDetailedStatus: details, compactStatusLength: length, statusIconSize: iconSize)
         }
         fixture.queue.enqueue(IslandNotice(id: "voice-processing-left", title: "语音", detail: "正在处理"), expiresAfter: nil)
         fixture.presenter.setVoiceProcessingDisplayID(7)
@@ -187,12 +187,10 @@ struct SideNoticePresenterPillTests {
         #expect(published <= 2, "Reentrant layout callbacks must converge without repeatedly resizing")
         coordinator.selectActiveDisplay(at: CGPoint(x: other.frame.midX, y: other.frame.midY))
         #expect(coordinator.activeLayout?.displayID == 8)
-        #expect(coordinator.activeLayout?.collapsedFrame.size == (edge.isVertical
-            ? CGSize(width: 24, height: 80) : CGSize(width: 80, height: 24)))
+        #expect(coordinator.activeLayout?.collapsedFrame.size == CGSize(width: 24, height: 24))
         #expect(published <= 4)
         fixture.presenter.publishCompactLayout(on: 7)
-        #expect(coordinator.activeLayout?.collapsedFrame.size == (edge.isVertical
-            ? CGSize(width: 24, height: 80) : CGSize(width: 80, height: 24)),
+        #expect(coordinator.activeLayout?.collapsedFrame.size == CGSize(width: 24, height: 24),
                 "A notification from another display cannot change the current animation anchor")
     }
 

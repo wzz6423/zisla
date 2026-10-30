@@ -3132,3 +3132,9 @@
 "光晕模式" = "Chế độ quầng sáng";
 "拖动药丸到屏幕边缘，按回车完成，按 Esc 取消。" = "Kéo viên nhộng đến cạnh màn hình. Nhấn Return để hoàn tất hoặc Esc để hủy.";
 "Liquid Glass" = "Liquid Glass";
+
+"图标显示位置" = "Vị trí hiển thị biểu tượng";
+"状态栏" = "Thanh menu";
+"灵动岛" = "Đảo động";
+"常驻监控图标" = "Biểu tượng giám sát thường trực";
+"关闭后不影响已启用的监控图标" = "Tắt tùy chọn này không ảnh hưởng đến các biểu tượng giám sát đang bật";

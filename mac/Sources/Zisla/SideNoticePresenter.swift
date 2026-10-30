@@ -22,7 +22,8 @@ final class SideNoticePresenter {
     private var isScreenshotActive = false
     private var isPlacementSelectionActive = false
     private var transientMessage: String?
-    var onCompactLayoutChanged: ((CGDirectDisplayID, Bool, CGFloat?) -> Void)?
+    private var statusIcons: [IslandStatusIcon] = []
+    var onCompactLayoutChanged: ((CGDirectDisplayID, Bool, CGFloat?, CGSize?) -> Void)?
     private var isStopped = false
     private let now: () -> Date
     /// Display where the last voice recording happened; the post-recording processing indicator stays scoped to it.
@@ -98,6 +99,11 @@ final class SideNoticePresenter {
     func setDisplayIDs(_ displayIDs: Set<UInt32>) {
         guard configuredDisplayIDs != displayIDs else { return }
         configuredDisplayIDs = displayIDs
+        updatePanels()
+    }
+
+    func setStatusIcons(_ icons: [IslandStatusIcon]) {
+        statusIcons = icons
         updatePanels()
     }
 
@@ -213,8 +219,9 @@ final class SideNoticePresenter {
             let configuration = compactConfiguration(
                 for: compactNotices, at: date, statusHidden: displayState.compactStatusHidden
             )
+            displayState.statusIcons = configuration.statusIconSize == nil ? [] : statusIcons
             onCompactLayoutChanged?(snapshot.displayID, configuration.expandsForDetailedStatus,
-                                    configuration.compactStatusLength)
+                                    configuration.compactStatusLength, configuration.statusIconSize)
             if hidesPanels {
                 panels.orderOut()
                 continue
@@ -315,6 +322,12 @@ final class SideNoticePresenter {
                 thickness: configuration.pillSize.height, edge: configuration.placement.edge, text: text
             )
         }
+        if settingsStore.settings.effectiveStatusIconDestination == .island, sizing == nil,
+           !suppression.isVoiceRecording, !suppression.isTransientNoticePresented,
+           resultSweep.current == nil {
+            configuration.statusIconSize = IslandStatusIconLayout.size(icons: statusIcons,
+                                                                       edge: configuration.placement.edge)
+        }
         return configuration
     }
 
@@ -322,8 +335,9 @@ final class SideNoticePresenter {
         for snapshot: ScreenSnapshot, notices: [IslandNotice], at date: Date = .now,
         statusHidden: Bool = false
     ) -> CGRect? {
+        let configuration = compactConfiguration(for: notices, at: date, statusHidden: statusHidden)
         if settingsStore.settings.islandLayoutStyle == .pill {
-            return ScreenLayoutEngine(configuration: compactConfiguration(for: notices, at: date, statusHidden: statusHidden))
+            return ScreenLayoutEngine(configuration: configuration)
                 .layout(for: snapshot).collapsedFrame
         }
         return Self.resultSweepFrame(
@@ -379,7 +393,8 @@ final class SideNoticePresenter {
         let configuration = compactConfiguration(
             for: notices, at: now(), statusHidden: displayState?.compactStatusHidden == true
         )
-        onCompactLayoutChanged?(displayID, configuration.expandsForDetailedStatus, configuration.compactStatusLength)
+        onCompactLayoutChanged?(displayID, configuration.expandsForDetailedStatus, configuration.compactStatusLength,
+                                configuration.statusIconSize)
     }
 
     private func updateCompactBar(
@@ -412,6 +427,7 @@ final class SideNoticePresenter {
             displayState.compactBarCenterInset = topology.anchorFrame.width
         }
         let panel = ensureCompactBarPanel(in: panels)
+        panel.ignoresMouseEvents = !displayState.statusIcons.isEmpty
         panel.level = isScreenshotActive ? IslandPanel.onBottomLevel : IslandPanel.onTopLevel
         if settingsStore.settings.islandLayoutStyle == .pill && !settingsStore.settings.islandCollapsedOnTop {
             panel.level = IslandPanel.onBottomLevel

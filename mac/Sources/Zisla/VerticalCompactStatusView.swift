@@ -5,22 +5,22 @@ import ZislaKit
 
 struct VerticalStatusText: View {
     let text: String
+    let availableWidth: CGFloat
     let availableHeight: CGFloat
 
-    nonisolated static func characters(_ text: String, availableHeight: CGFloat) -> [String] {
-        let characters = text.filter { !$0.isWhitespace }.map(String.init)
-        let count = availableHeight.isFinite ? max(0, availableHeight) / 14 : 0
-        let capacity = Int(min(CGFloat(characters.count), count))
-        guard characters.count > capacity else { return characters }
-        guard capacity > 0 else { return [] }
-        return Array(characters.prefix(capacity - 1)) + ["…"]
+    init(text: String, availableWidth: CGFloat = 24, availableHeight: CGFloat) {
+        self.text = text
+        self.availableWidth = availableWidth
+        self.availableHeight = availableHeight
     }
 
     var body: some View {
         VStack(spacing: 1) {
-            ForEach(Array(Self.characters(text, availableHeight: availableHeight).enumerated()), id: \.offset) { _, character in
-                Text(character)
+            ForEach(Array(CompactPillStatusPresentation.verticalTextRows(text, availableWidth: availableWidth,
+                availableHeight: availableHeight).enumerated()), id: \.offset) { _, row in
+                Text(row.text)
                     .font(.system(size: 11, weight: .medium))
+                    .rotationEffect(.degrees(row.rotatesClockwise ? 90 : 0))
                     .frame(height: 13)
             }
         }
@@ -69,7 +69,7 @@ struct CompactPillStatusContent: View {
                     .frame(width: thickness, height: thickness)
                 if !text.isEmpty {
                     if edge.isVertical {
-                        VerticalStatusText(text: text, availableHeight: textLength)
+                        VerticalStatusText(text: text, availableWidth: thickness, availableHeight: textLength)
                     } else {
                         MarqueeText(text, font: .system(size: 11, weight: .medium),
                                     textColor: .white, pointsPerSecond: TransientNoticeMetrics.pointsPerSecond,

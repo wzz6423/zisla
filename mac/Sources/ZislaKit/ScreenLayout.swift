@@ -129,6 +129,7 @@ public struct ScreenLayoutConfiguration: Equatable, Sendable {
     public var edgeInset: CGFloat
     public var expandsForDetailedStatus: Bool
     public var compactStatusLength: CGFloat?
+    public var statusIconSize: CGSize?
 
     public init(
         simulatedIslandSize: CGSize = CGSize(width: 240, height: 34),
@@ -141,7 +142,8 @@ public struct ScreenLayoutConfiguration: Equatable, Sendable {
         pillSize: CGSize = CGSize(width: 80, height: 24),
         edgeInset: CGFloat = 8,
         expandsForDetailedStatus: Bool = false,
-        compactStatusLength: CGFloat? = nil
+        compactStatusLength: CGFloat? = nil,
+        statusIconSize: CGSize? = nil
     ) {
         self.simulatedIslandSize = simulatedIslandSize
         self.expandedSize = expandedSize
@@ -154,6 +156,7 @@ public struct ScreenLayoutConfiguration: Equatable, Sendable {
         self.edgeInset = edgeInset
         self.expandsForDetailedStatus = expandsForDetailedStatus
         self.compactStatusLength = compactStatusLength
+        self.statusIconSize = statusIconSize
     }
 }
 
@@ -377,6 +380,12 @@ public struct ScreenLayoutEngine: Equatable, Sendable {
         )
         if isCamera {
             horizontalSize.height = min(horizontalSize.height, 32, max(0, menuBarHeight - 4))
+        } else {
+            horizontalSize.width = horizontalSize.height
+            if let iconSize = configuration.statusIconSize {
+                horizontalSize.width = max(horizontalSize.width, edge.isVertical ? iconSize.height : iconSize.width)
+                horizontalSize.height = max(horizontalSize.height, edge.isVertical ? iconSize.width : iconSize.height)
+            }
         }
         let size = CGSize(
             width: min(edge.isVertical ? horizontalSize.height : horizontalSize.width, bounds.width),

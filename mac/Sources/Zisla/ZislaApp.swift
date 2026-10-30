@@ -670,9 +670,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
             displayIDs: model.settingsStore.settings.activityNoticeDisplayIDs,
             isScreenLocked: lockScreenOverlayController.isScreenLocked
         )
-        noticePresenter?.onCompactLayoutChanged = { [weak coordinator] displayID, expanded, length in
+        noticePresenter?.onCompactLayoutChanged = { [weak coordinator] displayID, expanded, length, iconSize in
             guard coordinator?.activeDisplayID == displayID else { return }
-            coordinator?.updateCompactStatus(expandsForDetailedStatus: expanded, compactStatusLength: length)
+            coordinator?.updateCompactStatus(expandsForDetailedStatus: expanded, compactStatusLength: length,
+                                              statusIconSize: iconSize)
         }
         configureMainMenu()
         registerScreenshotHotkeys()
@@ -1356,6 +1357,25 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
             }
             monitorStatusTitles[metric] = title
         }
+        syncIslandStatusIcons()
+    }
+
+    private func syncIslandStatusIcons() {
+        let settings = AppModel.shared.settingsStore.settings
+        let metrics = SystemMonitorMenuBarMetric.allCases.compactMap { metric -> (SystemMonitorMenuBarMetric, NSStatusItem, String)? in
+            guard let item = monitorStatusItems[metric] else { return nil }
+            return (metric, item, monitorStatusTitle(for: metric, snapshot: AppModel.shared.systemMonitor.snapshot,
+                                                     style: settings.systemMonitorMenuBarDisplayStyle))
+        }
+        let readings = SystemMonitorMenuBarRows.normalized(top: settings.systemMonitorMenuBarTopRow,
+            bottom: settings.systemMonitorMenuBarBottomRow).joined().map { metric in
+                IslandStatusIcon.Reading(metric: metric,
+                    text: SystemMonitorCombinedMenuBarPresentation.value(metric, snapshot: AppModel.shared.systemMonitor.snapshot))
+            }
+        let icons = IslandStatusIconRouting.update(destination: settings.effectiveStatusIconDestination,
+            application: statusItem, metrics: metrics, stacked: mergedMonitorStatusItem, readings: readings,
+            combined: combinedMonitorStatusItem, style: settings.systemMonitorMenuBarDisplayStyle)
+        noticePresenter?.setStatusIcons(icons)
     }
 
     private func syncMergedMonitorStatusItem(settings: FeatureSettings) {
@@ -1424,6 +1444,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
                   current.systemMonitorMenuBarCombinedIconMetric == metric else { return }
             self.combinedIconLevels = levels
             self.updateCombinedMonitorStatusImage(metric: metric)
+            self.syncIslandStatusIcons()
         }
     }
 
@@ -1448,6 +1469,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
         )
         button.image = SystemMonitorMenuBarImageRenderer.combinedIcon(
             battery: battery, wifi: combinedIconLevels.wifi, level: level,
+            foreground: settings.effectiveStatusIconDestination == .island ? .white : nil,
             configuration: settings.systemMonitorMenuBarCombinedIconAppearance,
             headphones: headphones,
             headphoneOptions: headphoneOptions

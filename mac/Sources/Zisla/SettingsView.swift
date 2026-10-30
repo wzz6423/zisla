@@ -341,8 +341,8 @@ struct SettingsView: View {
                     rowDivider
                     settingRow(
                         symbol: "menubar.rectangle",
-                        title: "菜单栏常驻",
-                        detail: "选择一项或多项；点击任一指标直达系统监控"
+                        title: "常驻监控图标",
+                        detail: ""
                     ) {
                         EmptyView()
                     }
@@ -1262,7 +1262,21 @@ struct SettingsView: View {
                 settingsGroup("灵动岛与下载展示") {
                     featureToggle("鼠标移入展开", detail: "鼠标进入屏幕顶部感应区时显示", symbol: "cursorarrow.motionlines", keyPath: \.hoverActivationEnabled)
                     rowDivider
-                    featureToggle("显示 zisla 图标", detail: "关闭后不影响已启用的菜单栏监控项", symbol: "app.badge", keyPath: \.menuBarAppIconEnabled)
+                    featureToggle("显示 zisla 图标", detail: "关闭后不影响已启用的监控图标", symbol: "app.badge", keyPath: \.menuBarAppIconEnabled)
+                    rowDivider
+                    settingRow(symbol: "menubar.rectangle", title: "图标显示位置", detail: "") {
+                        IslandOutlinedPicker(
+                            selection: Binding(get: { settingsStore.settings.effectiveStatusIconDestination },
+                                               set: { settingsStore.settings.statusIconDestination = $0 }),
+                            options: settingsStore.settings.supportsStatusIconsInIsland
+                                ? Array(StatusIconDestination.allCases) : [.menuBar],
+                            title: { $0.menuTitle },
+                            selectionID: "status-icon-destination-selection",
+                            fontSize: 9,
+                            width: 128,
+                            height: 28
+                        )
+                    }
                     rowDivider
                     featureToggle(AppLocalization.text("始终置顶"), detail: "收起时保持在其他窗口和菜单栏图标上方", symbol: "rectangle.topthird.inset.filled", keyPath: \.islandCollapsedOnTop)
                     rowDivider

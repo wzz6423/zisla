@@ -25,7 +25,7 @@ struct IslandPlacementLayoutTests {
         #expect(layout.edge == edge)
         #expect(screen.frame.insetBy(dx: 8, dy: 8).contains(expanded))
         #expect(expanded.contains(pill))
-        #expect(pill.size == (edge.isVertical ? CGSize(width: 24, height: 80) : CGSize(width: 80, height: 24)))
+        #expect(pill.size == CGSize(width: 24, height: 24))
         #expect(expanded.size == CGSize(width: 480, height: 680))
         switch edge {
         case .top:
@@ -60,6 +60,7 @@ struct IslandPlacementLayoutTests {
                 placement: IslandPlacement(mode: .custom, edge: edge, offset: offset)
             ))
             let layout = engine.layout(for: screen)
+            #expect(layout.collapsedFrame.size == CGSize(width: 24, height: 24))
             let local = layout.collapsedFrameInExpanded
             let flipped = layout.collapsedFrameInExpandedTopLeading
             #expect(local.offsetBy(dx: layout.expandedFrame.minX, dy: layout.expandedFrame.minY) == layout.collapsedFrame)
@@ -225,7 +226,7 @@ struct IslandPlacementLayoutTests {
             edgeInset: 16
         ))
         let layout = engine.layout(for: screen)
-        #expect(layout.collapsedFrame.size == CGSize(width: 44, height: 220))
+        #expect(layout.collapsedFrame.size == CGSize(width: 44, height: 44))
         #expect(layout.collapsedFrame.maxX == screen.frame.maxX - 16)
         #expect(layout.centerOcclusionWidth == 0)
     }
@@ -344,8 +345,7 @@ struct IslandPlacementLayoutTests {
             layoutStyle: .pill, placement: IslandPlacement(mode: .custom, edge: edge),
             pillSize: CGSize(width: CGFloat.nan, height: CGFloat.infinity), edgeInset: .nan
         )).layout(for: screen)
-        #expect(layout.collapsedFrame.size == (edge.isVertical
-            ? CGSize(width: 24, height: 80) : CGSize(width: 80, height: 24)))
+        #expect(layout.collapsedFrame.size == CGSize(width: 24, height: 24))
         #expect(layout.placementBounds == screen.frame.insetBy(dx: 8, dy: 8))
     }
 
@@ -461,6 +461,7 @@ struct IslandPlacementLayoutTests {
                 : CGPoint(x: frame.minX + 1, y: frame.midY)
             #expect(layout.containsTrigger(tip))
             let engine = SideNoticeLayoutEngine()
+            #expect(engine.compactBarFrame(for: layout) == frame)
             #expect(engine.compactBarFrame(for: screen, notices: notices, settings: settings) == frame)
             #expect(engine.compactBarFrame(for: layout, notices: notices, settings: settings) == frame)
             let container = CollapsedPetLayout.frame(for: layout, compactBarFrame: frame)
@@ -543,16 +544,16 @@ struct IslandPlacementLayoutTests {
             islandPlacement: IslandPlacement(mode: .custom, edge: edge))
         settings.mediaCompactStyle = .detailed
         let engine = SideNoticeLayoutEngine()
-        let scenarios: [(IslandNotice, String, Bool)] = [
-            (IslandNotice(id: "ai-active-codex", title: "Codex", side: .left), "1", false),
-            (IslandNotice(id: "media-active-left", title: "Music", side: .left), "", true),
-            (IslandNotice(id: "browser-download-task", title: "Download", side: .left, progress: 0.25), "25%", false),
-            (IslandNotice(id: "video-download-task", title: "Download", side: .left, progress: 0.25), "25%", false),
-            (IslandNotice(id: "focus-countdown-left", title: "Focus", detail: "00:25:00", side: .left), "00:25:00", false),
-            (IslandNotice(id: "toolbox-reminder-awake", title: "Keep awake", detail: "亮屏", side: .left), "亮屏", false),
-            (IslandNotice(id: "voice-processing-request", title: "Processing", side: .left), "", false),
+        let scenarios: [(IslandNotice, String, Bool, Int)] = [
+            (IslandNotice(id: "ai-active-codex", title: "Codex", side: .left), "1", false, 1),
+            (IslandNotice(id: "media-active-left", title: "Music", side: .left), "", true, 0),
+            (IslandNotice(id: "browser-download-task", title: "Download", side: .left, progress: 0.25), "25%", false, 2),
+            (IslandNotice(id: "video-download-task", title: "Download", side: .left, progress: 0.25), "25%", false, 2),
+            (IslandNotice(id: "focus-countdown-left", title: "Focus", detail: "00:25:00", side: .left), "00:25:00", false, 3),
+            (IslandNotice(id: "toolbox-reminder-awake", title: "Keep awake", detail: "亮屏", side: .left), "亮屏", false, 2),
+            (IslandNotice(id: "voice-processing-request", title: "Processing", side: .left), "", false, 0),
         ]
-        for (notice, text, waveform) in scenarios {
+        for (notice, text, waveform, verticalRows) in scenarios {
             let sizing = try #require(engine.compactBarSizing(for: [notice], settings: settings))
             let presentation = try #require(sizing.customPillPresentation)
             #expect(presentation.text == text)
@@ -562,7 +563,7 @@ struct IslandPlacementLayoutTests {
             if text.isEmpty {
                 #expect(length == visualLength)
             } else if edge.isVertical {
-                #expect(length == visualLength + 6 + CGFloat(text.count) * 14)
+                #expect(length == visualLength + 6 + CGFloat(verticalRows) * 14)
             } else {
                 #expect(length > visualLength + 6)
                 #expect(length < visualLength + 100)
@@ -905,8 +906,7 @@ struct IslandPlacementLayoutTests {
         #expect(!configuration.expandsForDetailedStatus && configuration.compactStatusLength == nil)
         let layout = ScreenLayoutEngine(configuration: configuration).layout(for: screen)
         #expect(layout.edge == edge)
-        #expect(layout.collapsedFrame.size == (edge.isVertical
-            ? CGSize(width: 24, height: 80) : CGSize(width: 80, height: 24)))
+        #expect(layout.collapsedFrame.size == CGSize(width: 24, height: 24))
         #expect(layout.placementBounds == screen.frame.insetBy(dx: 16, dy: 16))
     }
 

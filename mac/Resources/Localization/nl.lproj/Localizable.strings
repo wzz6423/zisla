@@ -3132,3 +3132,9 @@
 "光晕模式" = "Gloedmodus";
 "拖动药丸到屏幕边缘，按回车完成，按 Esc 取消。" = "Sleep de capsule naar een schermrand. Druk op Return om af te ronden of op Esc om te annuleren.";
 "Liquid Glass" = "Liquid Glass";
+
+"图标显示位置" = "Locatie van pictogrammen";
+"状态栏" = "Menubalk";
+"灵动岛" = "Dynamic Island";
+"常驻监控图标" = "Vaste monitorpictogrammen";
+"关闭后不影响已启用的监控图标" = "Uitschakelen heeft geen invloed op ingeschakelde monitorpictogrammen";

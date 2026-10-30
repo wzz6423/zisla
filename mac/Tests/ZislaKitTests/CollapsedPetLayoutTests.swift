@@ -171,8 +171,8 @@ struct CollapsedPetLayoutTests {
     @Test
     func crampedScreenOmitsPetsWhenNeitherEndHasSpace() {
         let screen = ScreenSnapshot(displayID: 1,
-            frame: CGRect(x: -100, y: -80, width: 100, height: 80),
-            visibleFrame: CGRect(x: -100, y: -80, width: 100, height: 56))
+            frame: CGRect(x: -100, y: -80, width: 64, height: 64),
+            visibleFrame: CGRect(x: -100, y: -80, width: 64, height: 40))
         for edge in IslandEdge.allCases {
             let layout = ScreenLayoutEngine(configuration: ScreenLayoutConfiguration(
                 layoutStyle: .pill, placement: IslandPlacement(mode: .custom, edge: edge)

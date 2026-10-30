@@ -3128,3 +3128,9 @@
 "光晕模式" = "Mode halo";
 "拖动药丸到屏幕边缘，按回车完成，按 Esc 取消。" = "Faites glisser la capsule vers un bord de l’écran. Appuyez sur Retour pour terminer ou sur Échap pour annuler.";
 "Liquid Glass" = "Liquid Glass";
+
+"图标显示位置" = "Emplacement des icônes";
+"状态栏" = "Barre de menus";
+"灵动岛" = "Dynamic Island";
+"常驻监控图标" = "Icônes de surveillance permanentes";
+"关闭后不影响已启用的监控图标" = "La désactivation ne masque pas les icônes de surveillance activées";

@@ -3132,3 +3132,9 @@
 "光晕模式" = "Modalità alone";
 "拖动药丸到屏幕边缘，按回车完成，按 Esc 取消。" = "Trascina la capsula su un bordo dello schermo. Premi Invio per terminare o Esc per annullare.";
 "Liquid Glass" = "Liquid Glass";
+
+"图标显示位置" = "Posizione delle icone";
+"状态栏" = "Barra dei menu";
+"灵动岛" = "Isola dinamica";
+"常驻监控图标" = "Icone di monitoraggio permanenti";
+"关闭后不影响已启用的监控图标" = "La disattivazione non influisce sulle icone di monitoraggio attive";

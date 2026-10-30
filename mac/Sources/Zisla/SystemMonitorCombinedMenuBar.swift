@@ -1,4 +1,5 @@
 import AppKit
+import SwiftUI
 import ZislaCore
 import ZislaKit
 
@@ -88,6 +89,178 @@ enum SystemMonitorCombinedMenuBarPresentation {
         return min(1, max(0, value))
     }
 
+}
+
+@MainActor
+struct IslandStatusIcon: Identifiable {
+    struct Reading {
+        let metric: SystemMonitorMenuBarMetric
+        let text: String
+    }
+    enum Content {
+        case application
+        case metric(SystemMonitorMenuBarMetric, text: String, image: NSImage?, style: SystemMonitorMenuBarDisplayStyle)
+        case stacked(image: NSImage?, readings: [Reading])
+        case combined(NSImage?)
+    }
+    let id: String
+    let content: Content
+    let tooltip: String
+
+    func size(edge: IslandEdge) -> CGSize {
+        switch content {
+        case .application:
+            return CGSize(width: 24, height: 24)
+        case let .metric(_, text, image, style):
+            if edge.isVertical { return Self.readingSize(text) }
+            if style == .compact, let image { return CGSize(width: image.size.width, height: 24) }
+            return CGSize(width: 24 + Self.textWidth(text), height: 24)
+        case let .stacked(image, readings):
+            if edge.isVertical {
+                return CGSize(width: 32, height: readings.reduce(0) { $0 + Self.readingSize($1.text).height }
+                    + CGFloat(readings.dropFirst().count) * 8)
+            }
+            return CGSize(width: image?.size.width ?? 24, height: 24)
+        case let .combined(image):
+            return image?.size ?? CGSize(width: 24, height: 24)
+        }
+    }
+
+    static func readingSize(_ text: String) -> CGSize {
+        CGSize(width: 32, height: 30 + CGFloat(CompactPillStatusPresentation.verticalTextRows(text,
+            availableWidth: 32, availableHeight: CGFloat(text.count) * 14).count) * 14)
+    }
+
+    private static func textWidth(_ text: String) -> CGFloat {
+        ceil((text as NSString).size(withAttributes: [.font: NSFont.monospacedDigitSystemFont(ofSize: 12, weight: .medium)]).width)
+    }
+}
+
+@MainActor
+enum IslandStatusIconRouting {
+    static func update(
+        destination: StatusIconDestination,
+        application: NSStatusItem?,
+        metrics: [(SystemMonitorMenuBarMetric, NSStatusItem, String)],
+        stacked: NSStatusItem?,
+        readings: [IslandStatusIcon.Reading],
+        combined: NSStatusItem?,
+        style: SystemMonitorMenuBarDisplayStyle
+    ) -> [IslandStatusIcon] {
+        let items = [application, stacked, combined].compactMap { $0 } + metrics.map { $0.1 }
+        items.forEach { $0.isVisible = destination == .menuBar }
+        guard destination == .island else { return [] }
+        var icons: [IslandStatusIcon] = []
+        if application != nil {
+            icons.append(IslandStatusIcon(id: "status-icon-application", content: .application, tooltip: "zisla"))
+        }
+        for (metric, item, title) in metrics {
+            let text = style == .detailed
+                ? String(title.dropFirst(SystemMonitorMenuBarPresentation.label(for: metric).count + 1))
+                : title
+            icons.append(IslandStatusIcon(id: "status-icon-\(metric.rawValue)",
+                content: .metric(metric, text: text, image: item.button?.image, style: style),
+                tooltip: (item.button?.toolTip ?? text)
+                    .replacingOccurrences(of: AppLocalization.text("点击打开系统监控"), with: "")
+                    .trimmingCharacters(in: .whitespacesAndNewlines)))
+        }
+        if let stacked {
+            icons.append(IslandStatusIcon(id: "status-icon-stacked",
+                content: .stacked(image: stacked.button?.image, readings: readings),
+                tooltip: (stacked.button?.toolTip ?? readings.map(\.text).joined(separator: ", "))
+                    .replacingOccurrences(of: AppLocalization.text("点击打开系统监控"), with: "")
+                    .trimmingCharacters(in: .whitespacesAndNewlines)))
+        }
+        if let combined {
+            icons.append(IslandStatusIcon(id: "status-icon-combined", content: .combined(combined.button?.image),
+                tooltip: (combined.button?.toolTip ?? "zisla")
+                    .replacingOccurrences(of: AppLocalization.text("点击打开系统监控"), with: "")
+                    .trimmingCharacters(in: .whitespacesAndNewlines)))
+        }
+        return icons
+    }
+}
+
+@MainActor
+enum IslandStatusIconLayout {
+    static func size(icons: [IslandStatusIcon], edge: IslandEdge) -> CGSize? {
+        guard !icons.isEmpty else { return nil }
+        let sizes = icons.map { $0.size(edge: edge) }
+        let gaps = CGFloat(icons.count - 1) * 8 + 6
+        if edge.isVertical {
+            return CGSize(width: sizes.reduce(0) { max($0, $1.width) }, height: sizes.reduce(gaps) { $0 + $1.height })
+        }
+        return CGSize(width: sizes.reduce(gaps) { $0 + $1.width }, height: sizes.reduce(0) { max($0, $1.height) })
+    }
+}
+
+struct IslandStatusIconStrip: View {
+    let icons: [IslandStatusIcon]
+    let edge: IslandEdge
+    let date: Date
+
+    var body: some View {
+        iconContent
+            .foregroundStyle(.white)
+            .environment(\.layoutDirection, .leftToRight)
+    }
+
+    private var iconContent: some View {
+        let layout = edge.isVertical ? AnyLayout(VStackLayout(spacing: 8)) : AnyLayout(HStackLayout(spacing: 8))
+        return layout {
+            ForEach(icons) { icon in
+                iconView(icon)
+                .accessibilityLabel(icon.tooltip)
+                .accessibilityIdentifier(icon.id)
+                .help(icon.tooltip)
+            }
+        }
+        .padding(edge.isVertical ? .vertical : .horizontal, 3)
+    }
+
+    @ViewBuilder
+    private func iconView(_ icon: IslandStatusIcon) -> some View {
+        switch icon.content {
+        case .application:
+            IslandParticleLogo(side: 18, time: date.timeIntervalSinceReferenceDate)
+        case let .metric(metric, text, image, style):
+            if edge.isVertical {
+                readingView(metric: metric, text: text)
+            } else if style == .compact, let image {
+                Image(nsImage: image).renderingMode(.template)
+            } else {
+                HStack(spacing: 6) {
+                    Image(systemName: metric.symbolName).frame(width: 18)
+                    Text(text).font(.system(size: 12, weight: .medium)).monospacedDigit()
+                }
+            }
+        case let .stacked(image, readings):
+            if edge.isVertical {
+                VStack(spacing: 8) {
+                    ForEach(Array(readings.enumerated()), id: \.offset) { _, reading in
+                        readingView(metric: reading.metric, text: reading.text)
+                    }
+                }
+            } else if let image {
+                Image(nsImage: image).renderingMode(.template)
+            } else {
+                Text("--").font(.system(size: 12, design: .monospaced))
+            }
+        case let .combined(image):
+            if let image { Image(nsImage: image).renderingMode(.original) }
+            else { Text("--").font(.system(size: 12, design: .monospaced)) }
+        }
+    }
+
+    private func readingView(metric: SystemMonitorMenuBarMetric, text: String) -> some View {
+        let size = IslandStatusIcon.readingSize(text)
+        return VStack(spacing: 6) {
+            Image(systemName: metric.symbolName).font(.system(size: 14, weight: .medium))
+                .frame(width: 24, height: 24)
+            VerticalStatusText(text: text, availableWidth: size.width, availableHeight: size.height - 30)
+        }
+        .frame(width: size.width, height: size.height)
+    }
 }
 
 enum SystemMonitorMenuBarImageRenderer {

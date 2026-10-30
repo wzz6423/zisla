@@ -77,6 +77,7 @@ enum SettingsSearchIndex {
             "始终置顶", "提示条进度光效", "浏览器下载进度", "原生下载进度", "静音 Zisla 通知",
             "宠物", "自动检查更新", "自动下载更新",
         ])
+        entry(.features, "图标显示位置", anchor: .row("图标显示位置"), keywords: ["状态栏", "灵动岛"])
         if settings.recommendedToolsEnabled {
             rows(.features, ["自动更新推荐工具"])
         }
@@ -88,7 +89,7 @@ enum SettingsSearchIndex {
 
         rows(.info, ["播放来源", "歌词与歌曲信息", "收起态音乐样式", "音乐动效", "活动展示", "专注模式展示"])
         if settings.systemMonitorEnabled {
-            entry(.info, "菜单栏常驻", anchor: .row("菜单栏常驻"), keywords: ["独立"])
+            entry(.info, "常驻监控图标", anchor: .row("常驻监控图标"), keywords: ["独立", "菜单栏常驻"])
             if settings.systemMonitorMenuBarLayout.individualEnabled {
                 rows(.info, ["监控样式"] + SystemMonitorMenuBarMetric.allCases.map(\.menuTitle))
             }

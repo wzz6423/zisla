@@ -481,6 +481,7 @@ public struct SideNoticeLayoutEngine: Equatable, Sendable {
         settings: FeatureSettings,
         browserDownloadCount: Int = 0
     ) -> CGRect? {
+        if settings.effectiveStatusIconDestination == .island { return layout.collapsedFrame }
         guard let sizing = compactBarSizing(
             for: notices,
             settings: settings,

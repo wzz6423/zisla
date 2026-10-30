@@ -300,11 +300,14 @@ public final class OverlayCoordinator: NSObject {
         }
     }
 
-    public func updateCompactStatus(expandsForDetailedStatus: Bool, compactStatusLength: CGFloat? = nil) {
+    public func updateCompactStatus(expandsForDetailedStatus: Bool, compactStatusLength: CGFloat? = nil,
+                                    statusIconSize: CGSize? = nil) {
         guard layoutEngine.configuration.expandsForDetailedStatus != expandsForDetailedStatus
-            || layoutEngine.configuration.compactStatusLength != compactStatusLength else { return }
+            || layoutEngine.configuration.compactStatusLength != compactStatusLength
+            || layoutEngine.configuration.statusIconSize != statusIconSize else { return }
         layoutEngine.configuration.expandsForDetailedStatus = expandsForDetailedStatus
         layoutEngine.configuration.compactStatusLength = compactStatusLength
+        layoutEngine.configuration.statusIconSize = statusIconSize
         refreshScreens()
         if !isVisible, let layout = activeLayout {
             onCollapsedSizeChanged?(layout.collapsedFrame.size)
@@ -326,6 +329,8 @@ public final class OverlayCoordinator: NSObject {
             if changedDisplay, isVisible {
                 presentCurrentLayout()
             }
+            if layoutEngine.configuration.statusIconSize != nil,
+               reducer.state.visibility != .expanded, reducer.state.visibility != .pinned { return }
             endPointerEntryGrace()
             setPointerInside(true)
             return
