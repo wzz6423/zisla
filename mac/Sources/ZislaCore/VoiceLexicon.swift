@@ -292,7 +292,7 @@ public enum VoiceLexicon: String, Codable, CaseIterable, Identifiable, Sendable,
         case .doubao:
             ["豆包", "Doubao"]
         case .cursor:
-            ["Cursor", "Cursor Agent"]
+            ["Cursor Agent"]
         case .grokBot:
             ["Grok Bot"]
         case .muse:
