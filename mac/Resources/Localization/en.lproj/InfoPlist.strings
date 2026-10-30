@@ -1,9 +1,9 @@
 "NSCalendarsFullAccessUsageDescription" = "zisla needs access to upcoming calendar events for the top information panel.";
-"NSAudioCaptureUsageDescription" = "zisla reads system audio only during media playback or when you adjust an app's volume, to display a waveform and adjust that app's output volume.";
-"NSCameraUsageDescription" = "zisla uses the camera only while the mirror is open.";
+"NSAudioCaptureUsageDescription" = "zisla reads system audio during media playback, when you adjust an app's volume, or when you enable system audio for screen recording, to display a waveform, adjust app volume, or record playback sound.";
+"NSCameraUsageDescription" = "zisla uses the camera only when you open the mirror or enable the camera overlay for screen recording.";
 "NSRemindersFullAccessUsageDescription" = "zisla reads dated reminders to show them with calendar events.";
 "NSLocationWhenInUseUsageDescription" = "zisla needs location access to show local weather, place names, and nearby Wi-Fi networks.";
-"NSMicrophoneUsageDescription" = "zisla uses the microphone only when you start voice input, to turn speech into the current AI conversation text.";
-"NSSpeechRecognitionUsageDescription" = "zisla transcribes the speech you actively record into AI conversation text.";
+"NSMicrophoneUsageDescription" = "zisla records audio only when you start voice input or enable the microphone for screen recording.";
+"NSSpeechRecognitionUsageDescription" = "zisla converts speech you actively record into text and transcribes locally when you generate screen recording captions.";
 "NSAppleEventsUsageDescription" = "zisla uses Mail.app to read and manage mail, including inboxes, read status, deletion, and replies. It also runs commands you choose in Terminal or iTerm.";
 "NSBluetoothAlwaysUsageDescription" = "zisla reads public battery information from connected or paired Bluetooth devices only when you open the Battery page.";

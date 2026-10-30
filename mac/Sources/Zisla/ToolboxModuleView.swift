@@ -5,7 +5,6 @@ import SwiftUI
 struct ToolboxModuleView: View {
     @ObservedObject var model: AppModel
     @ObservedObject private var pomodoro: PomodoroService
-    @ObservedObject private var settingsStore: FeatureSettingsStore
     @State private var isDurationPickerPresented = false
 
     private enum Metrics {
@@ -16,7 +15,6 @@ struct ToolboxModuleView: View {
     init(model: AppModel) {
         _model = ObservedObject(wrappedValue: model)
         _pomodoro = ObservedObject(wrappedValue: model.pomodoro)
-        _settingsStore = ObservedObject(wrappedValue: model.settingsStore)
     }
 
     var body: some View {

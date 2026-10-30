@@ -2,6 +2,22 @@
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
+    <key>UTExportedTypeDeclarations</key>
+    <array>
+        <dict>
+            <key>UTTypeIdentifier</key>
+            <string>dev.wzz.zisla.livephoto</string>
+            <key>UTTypeDescription</key>
+            <string>Live Photo</string>
+            <key>UTTypeConformsTo</key>
+            <array><string>com.apple.package</string></array>
+            <key>UTTypeTagSpecification</key>
+            <dict>
+                <key>public.filename-extension</key>
+                <array><string>livephoto</string></array>
+            </dict>
+        </dict>
+    </array>
     <key>CFBundleDevelopmentRegion</key>
     <string>zh_CN</string>
     <key>CFBundleLocalizations</key>
@@ -49,11 +65,11 @@
 	<key>NSCalendarsFullAccessUsageDescription</key>
 	<string>zisla 需要读取近期日程并显示在顶部信息面板中。</string>
 	<key>NSAudioCaptureUsageDescription</key>
-	<string>zisla 仅在播放媒体或你主动调整应用音量时读取系统音频，用于显示音浪与调整该应用的输出音量。</string>
+	<string>zisla 在播放媒体、你主动调整应用音量或启用录屏系统音频时读取系统音频，用于显示音浪、调整应用音量或记录播放声音。</string>
 	<key>NSBluetoothAlwaysUsageDescription</key>
 	<string>zisla 仅在你打开电池页面时读取已连接或已配对蓝牙设备公开的电量信息。</string>
     <key>NSCameraUsageDescription</key>
-	<string>zisla 仅在你打开镜子时使用摄像头。</string>
+	<string>zisla 仅在你打开镜子或启用录屏摄像头叠加时使用摄像头。</string>
   <key>NSRemindersFullAccessUsageDescription</key>
   <string>zisla 需要读取带日期的提醒事项并与日历事件一起展示。</string>
     <key>NSHighResolutionCapable</key>
@@ -61,13 +77,13 @@
     <key>NSLocationWhenInUseUsageDescription</key>
     <string>zisla 需要定位权限来显示本地天气、地区名称和附近的 Wi-Fi 网络。</string>
     <key>NSMicrophoneUsageDescription</key>
-    <string>zisla 仅在你点击语音输入时使用麦克风，将语音转换为当前 AI 对话的文字。</string>
+    <string>zisla 仅在你主动语音输入或启用录屏麦克风时录音。</string>
     <key>NSHumanReadableCopyright</key>
     <string>Copyright 2026 zisla Contributors</string>
     <key>NSPrincipalClass</key>
     <string>NSApplication</string>
 	<key>NSSpeechRecognitionUsageDescription</key>
-	<string>zisla 需要将你主动录入的语音转换为 AI 对话文字。</string>
+	<string>zisla 需要将你主动录入的语音转为文字，并在你生成录屏字幕时在本机转写。</string>
 	<key>SUAllowsAutomaticUpdates</key>
 	<true/>
 	<key>SUAutomaticallyUpdate</key>

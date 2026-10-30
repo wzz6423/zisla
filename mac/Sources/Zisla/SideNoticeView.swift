@@ -241,6 +241,7 @@ struct CompactStatusBarView: View {
 
     private func compactProgress(at date: Date) -> Double? {
         guard settingsStore.settings.collapsedProgressGlowEnabled else { return nil }
+        if let recordingOperationNotice { return recordingOperationNotice.progress }
         switch selectedCompactStatusPriority {
         case .media:
             guard mediaNotice != nil, let snapshot = media.snapshot else { return nil }
@@ -255,6 +256,7 @@ struct CompactStatusBarView: View {
     }
 
     private var compactProgressTint: Color {
+        if recordingOperationNotice != nil { return .green }
         guard selectedCompactStatusPriority == .media else { return .green }
         let artworkData = detailedMediaItem?.artworkData ?? mediaNotice?.artworkData
         return MediaWaveformView.tintColor(for: artworkData)
@@ -279,7 +281,9 @@ struct CompactStatusBarView: View {
     }
 
     private var presentationNotices: [IslandNotice] {
-        resultSweep.presentationNotices(from: queue.left + queue.right)
+        let notices = resultSweep.presentationNotices(from: queue.left + queue.right)
+        return displayState.hidesVoiceProcessingIndicator
+            ? notices.filter { !$0.id.hasPrefix("voice-processing-") } : notices
     }
 
     private var mediaNotice: IslandNotice? {
@@ -319,6 +323,11 @@ struct CompactStatusBarView: View {
 
     private var videoDownloadNotice: IslandNotice? {
         presentationNotices.first { $0.id.hasPrefix("video-download-") }
+    }
+
+    var recordingOperationNotice: IslandNotice? {
+        SideNoticeLayoutEngine.screenRecordingOperationNotice(for: presentationNotices,
+                                                              settings: settingsStore.settings)
     }
 
     private var focusCountdownNotice: IslandNotice? {
@@ -382,6 +391,14 @@ struct CompactStatusBarView: View {
                     height: height,
                     usesTransparentBackground: compactWingsUseTransparentBackground
                 )
+            }
+        } else if let recordingOperationNotice {
+            HStack(spacing: 0) {
+                CompactScreenRecordingOperationWing(notice: recordingOperationNotice, side: .left,
+                    height: height, usesTransparentBackground: compactWingsUseTransparentBackground)
+                Spacer(minLength: 0)
+                CompactScreenRecordingOperationWing(notice: recordingOperationNotice, side: .right,
+                    height: height, usesTransparentBackground: compactWingsUseTransparentBackground)
             }
         } else {
             configuredCompactStatusContent
@@ -1408,8 +1425,6 @@ private struct CompactAIWing: View {
     var role: CompactAIWingRole
     var usesTransparentBackground = false
 
-    @Environment(\.accessibilityReduceMotion) private var reduceMotion
-
     @ViewBuilder
     var body: some View {
         wing
@@ -1420,12 +1435,7 @@ private struct CompactAIWing: View {
             if role == .identity {
                 mascotStack
             } else {
-                HStack(spacing: 5) {
-                    CompactStatusPulseView(
-                        color: statusNSColor,
-                        isAnimated: !reduceMotion
-                    )
-                    .frame(width: 4, height: 4)
+                HStack(spacing: 0) {
                     Text("\(count)")
                         .font(.system(size: 10, weight: .bold, design: .rounded))
                         .monospacedDigit()
@@ -1470,16 +1480,6 @@ private struct CompactAIWing: View {
         }
     }
 
-    private var statusColor: Color {
-        Color(nsColor: statusNSColor)
-    }
-
-    private var statusNSColor: NSColor {
-        if notices.contains(where: { $0.kind == .error }) { return .systemRed }
-        if notices.contains(where: { $0.kind == .warning }) { return .systemYellow }
-        return .systemGreen
-    }
-
     private var statusDescription: String {
         if notices.contains(where: { $0.kind == .error }) { return AppLocalization.text("有错误") }
         if notices.contains(where: { $0.kind == .warning }) { return AppLocalization.text("等待操作") }
@@ -1492,70 +1492,6 @@ private struct CompactAIWing: View {
 
     private var errorAccessibilityText: String {
         errorCount > 0 ? AppLocalization.text("，其中 %ld 个错误", errorCount) : ""
-    }
-}
-
-private struct CompactStatusPulseView: NSViewRepresentable {
-    var color: NSColor
-    var isAnimated: Bool
-
-    func makeNSView(context: Context) -> CompactStatusPulseNSView {
-        let view = CompactStatusPulseNSView()
-        view.configure(color: color, isAnimated: isAnimated)
-        return view
-    }
-
-    func updateNSView(_ view: CompactStatusPulseNSView, context: Context) {
-        view.configure(color: color, isAnimated: isAnimated)
-    }
-}
-
-private final class CompactStatusPulseNSView: NSView {
-    private static let animationKey = "zisla.compact-status-pulse"
-
-    override init(frame frameRect: NSRect) {
-        super.init(frame: frameRect)
-        wantsLayer = true
-    }
-
-    @available(*, unavailable)
-    required init?(coder: NSCoder) {
-        nil
-    }
-
-    override func layout() {
-        super.layout()
-        layer?.cornerRadius = min(bounds.width, bounds.height) / 2
-        layer?.shadowPath = CGPath(ellipseIn: bounds.insetBy(dx: -1, dy: -1), transform: nil)
-    }
-
-    func configure(color: NSColor, isAnimated: Bool) {
-        guard let layer else { return }
-        layer.backgroundColor = color.cgColor
-        layer.shadowColor = color.cgColor
-        layer.shadowOpacity = 0.7
-        layer.shadowRadius = 2
-        layer.shadowOffset = .zero
-
-        guard isAnimated else {
-            layer.removeAnimation(forKey: Self.animationKey)
-            return
-        }
-        guard layer.animation(forKey: Self.animationKey) == nil else { return }
-
-        let opacity = CABasicAnimation(keyPath: "opacity")
-        opacity.fromValue = 0.5
-        opacity.toValue = 1
-        let scale = CABasicAnimation(keyPath: "transform.scale")
-        scale.fromValue = 0.9
-        scale.toValue = 1.1
-        let group = CAAnimationGroup()
-        group.animations = [opacity, scale]
-        group.duration = 0.7
-        group.autoreverses = true
-        group.repeatCount = .infinity
-        group.timingFunction = CAMediaTimingFunction(name: .easeInEaseOut)
-        layer.add(group, forKey: Self.animationKey)
     }
 }
 
@@ -2091,8 +2027,6 @@ private struct CompactBrowserDownloadWing: View {
     var height: CGFloat
     var usesTransparentBackground = false
 
-    @Environment(\.accessibilityReduceMotion) private var reduceMotion
-
     private var isFinished: Bool { notice.kind == .success }
     private var downloadCount: Int { max(1, snapshots.count) }
 
@@ -2144,7 +2078,7 @@ private struct CompactBrowserDownloadWing: View {
         } else if downloadCount == 2 {
             twoFileProgressStack
         } else {
-            multiFileStatusDot
+            multiFileStatusCount
         }
     }
 
@@ -2214,13 +2148,8 @@ private struct CompactBrowserDownloadWing: View {
         .frame(maxHeight: min(22, height * 0.72))
     }
 
-    private var multiFileStatusDot: some View {
-        HStack(spacing: 5) {
-            CompactStatusPulseView(
-                color: .systemGreen,
-                isAnimated: !reduceMotion
-            )
-            .frame(width: 4, height: 4)
+    private var multiFileStatusCount: some View {
+        HStack(spacing: 0) {
             Text("\(downloadCount)")
                 .font(.system(size: 10, weight: .bold, design: .rounded))
                 .monospacedDigit()
@@ -2249,6 +2178,44 @@ private struct CompactBrowserDownloadWing: View {
             }
         }
         return AppLocalization.text("%@ 下载完成：%@", source, notice.title)
+    }
+}
+
+private struct CompactScreenRecordingOperationWing: View {
+    var notice: IslandNotice
+    var side: NoticeSide
+    var height: CGFloat
+    var usesTransparentBackground = false
+
+    var body: some View {
+        Group {
+            if side == .left {
+                Image(systemName: notice.symbolName ?? "film")
+                    .font(.system(size: min(15, height * 0.56), weight: .semibold))
+                    .foregroundStyle(.white)
+            } else if notice.kind == .success {
+                Image(systemName: "checkmark").foregroundStyle(.green)
+            } else if notice.kind == .error {
+                Image(systemName: "exclamationmark.circle.fill").foregroundStyle(Color.zislaError)
+            } else if notice.progress != nil {
+                Text(ScreenRecordingOperationNotice.progressText(for: notice))
+                    .font(.system(size: min(13, height * 0.5), weight: .semibold, design: .rounded))
+                    .monospacedDigit()
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.65)
+                    .foregroundStyle(.white)
+            } else {
+                ProgressView().controlSize(.mini)
+            }
+        }
+        .padding(.horizontal, CompactStatusMetrics.horizontalContentInset)
+        .frame(width: CompactStatusMetrics.wingWidth, height: height,
+               alignment: side == .left ? .leading : .trailing)
+        .background(usesTransparentBackground ? Color.clear : Color.black, in: CompactAIWingShape(side: side))
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel([notice.title, notice.detail, ScreenRecordingOperationNotice.progressText(for: notice)]
+            .compactMap { $0 }.joined(separator: " · "))
+        .help(notice.detail ?? notice.title)
     }
 }
 

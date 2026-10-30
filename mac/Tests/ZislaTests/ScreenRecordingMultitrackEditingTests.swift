@@ -1,0 +1,706 @@
+import AppKit
+import Foundation
+import Speech
+import Testing
+import ZislaCore
+import ZislaKit
+@testable import Zisla
+
+@MainActor
+@Suite(.serialized)
+struct ScreenRecordingMultitrackEditingTests {
+    @Test func firstMultitrackEditMigratesOnceAndUndoRestoresTheOriginalV1Manifest() throws {
+        let fixture = try RecordingMultitrackTestFixture()
+        let model = try fixture.model()
+        defer { model.shutdown(); fixture.remove() }
+        var original = fixture.project()
+        original.version = 1
+        original.edits.segments = [.init(start: 1, end: 2, speed: 2), .init(start: 0, end: 1)]
+        original.captions = [.init(start: 1.25, end: 1.75, text: "Repeated")]
+        model.install(original, directory: fixture.directory)
+        #expect(model.timeline?.clips.count == 3 && model.project?.timeline == nil && !model.isDirty)
+        model.addTimelineTrack()
+        let edited = try #require(model.project)
+        #expect(edited.version == 2 && edited.timeline?.tracks.count == 3)
+        #expect(edited.timeline?.tracks.allSatisfy { $0.name.isEmpty } == true)
+        #expect(edited.edits.segments == original.edits.segments && edited.captions == original.captions)
+        #expect(model.canUndo && model.isDirty)
+        model.undo()
+        #expect(model.project == original && model.canRedo)
+        model.redo()
+        #expect(model.project == edited)
+        let before = model.project
+        model.addTimelineTrack()
+        #expect(model.timeline?.clips == before?.timeline?.clips, "A second edit must not migrate repeated overlays twice")
+        #expect(model.timeline?.tracks.count == 4 && Set(model.timeline!.tracks.map(\.id)).count == 4)
+    }
+
+    @Test func importedAssetsStayInTheLibraryUntilUserAddsEachToAnIndependentTrack() async throws {
+        let fixture = try RecordingMultitrackTestFixture()
+        let model = try fixture.model()
+        defer { model.shutdown(); fixture.remove() }
+        _ = try await fixture.createVideo()
+        let video = try await fixture.createVideo("additional.mp4", duration: 3)
+        let image = try fixture.createImage()
+        let audio = try fixture.createTone()
+        let original = fixture.project()
+        model.install(original, directory: fixture.directory)
+        model.importMedia([video, image, audio])
+        let task = try #require(model.operationTask)
+        await task.value
+        let imported = try #require(model.project)
+        let assets = Array(try #require(imported.timeline).assets.dropFirst())
+        #expect(assets.map(\.kind) == [.video, .image, .audio])
+        #expect(imported.timeline?.clips.map(\.id) == original.edits.segments.map { $0.id.uuidString })
+        #expect(imported.timeline?.tracks.count == 1 && imported.outputDuration == original.outputDuration)
+        #expect(model.canEdit && model.isDirty && model.canUndo)
+        model.undo()
+        #expect(model.project == original)
+        model.redo()
+        #expect(model.project == imported)
+        for asset in assets { #expect(model.addAssetToTimeline(asset.id, at: 0) != nil) }
+        #expect(model.timeline?.tracks.count == 4 && Set(model.timeline!.clips.map(\.trackID)).count == 4)
+        #expect(model.timeline?.clips.map(\.content) == [.recording(original.id), .video(assets[0].id),
+            .image(assets[1].id), .audio(assets[2].id)])
+        #expect(model.timeline?.clips.count == 4 && model.timeline?.assets == imported.timeline?.assets)
+        try model.save()
+        #expect(try fixture.store.load(from: fixture.directory) == model.project)
+    }
+
+    @Test func newLibraryProjectSavesWithNoClipsAndBecomesExportableAfterAnExplicitAdd() async throws {
+        let fixture = try RecordingMultitrackTestFixture()
+        let model = try fixture.model()
+        defer { model.shutdown(); fixture.remove() }
+        let image = try fixture.createImage()
+        model.importMedia([image])
+        await model.operationTask?.value
+        let library = try #require(model.project)
+        let directory = try #require(model.directory)
+        #expect(library.videoFile.isEmpty && library.timeline?.clips.isEmpty == true && library.timeline?.tracks.isEmpty == true)
+        #expect(!model.canExport && model.canEdit && !model.isDirty)
+        #expect(try fixture.store.load(from: directory) == library)
+        #expect(model.addAssetToTimeline(try #require(library.timeline?.assets.first?.id), at: 1) != nil)
+        #expect(model.canExport && model.project?.outputDuration == 6)
+        model.undo()
+        #expect(model.project == library && !model.canExport)
+    }
+
+    @Test(arguments: [false, true])
+    func failedBatchImportRollsBackAllCopiedFilesAndPreservesThePreviousManifest(_ newProject: Bool) async throws {
+        let fixture = try RecordingMultitrackTestFixture()
+        defer { fixture.remove() }
+        let image = try fixture.createImage()
+        let invalid = fixture.directory.appendingPathComponent("corrupt.png")
+        try Data([1, 2, 3]).write(to: invalid)
+        let video = fixture.directory.appendingPathComponent("screen.mp4")
+        try Data([9]).write(to: video)
+        let project = fixture.project()
+        try fixture.store.save(project, in: fixture.directory)
+        let files = try fixture.files()
+        let directories = try FileManager.default.contentsOfDirectory(atPath: fixture.root.path)
+        await #expect(throws: Error.self) {
+            _ = try await RecordingMediaImporter.prepare(urls: [image, invalid], project: newProject ? nil : project,
+                directory: newProject ? nil : fixture.directory, store: fixture.store)
+        }
+        #expect(try fixture.files() == files)
+        #expect(try FileManager.default.contentsOfDirectory(atPath: fixture.root.path) == directories)
+        #expect(try fixture.store.load(from: fixture.directory) == project)
+        #expect(try Data(contentsOf: invalid) == Data([1, 2, 3]))
+    }
+
+    @Test(arguments: [false, true])
+    func cancellationAfterFirstCopiedAssetRemovesOnlyThisImportsFiles(_ newProject: Bool) async throws {
+        let fixture = try RecordingMultitrackTestFixture()
+        defer { fixture.remove() }
+        let image = try fixture.createImage()
+        let second = try fixture.createImage("second.png", color: .init(red: 1, green: 0, blue: 0))
+        try Data([9]).write(to: fixture.directory.appendingPathComponent("screen.mp4"))
+        let project = fixture.project()
+        try fixture.store.save(project, in: fixture.directory)
+        let files = try fixture.files()
+        let directories = try FileManager.default.contentsOfDirectory(atPath: fixture.root.path)
+        let checkpoint = try RecordingImportCopyCancellation(root: fixture.root)
+        await #expect(throws: CancellationError.self) {
+            _ = try await RecordingMediaImporter.prepare(urls: [image, second], project: newProject ? nil : project,
+                directory: newProject ? nil : fixture.directory, store: fixture.store, checkCancellation: {
+                    try checkpoint.check()
+                })
+        }
+        #expect(try checkpoint.copiedFiles.count == 1 && checkpoint.copiedBytes == Data(contentsOf: image),
+            "Cancellation must observe exactly the first copied media before rolling back")
+        #expect(try fixture.files() == files)
+        #expect(try FileManager.default.contentsOfDirectory(atPath: fixture.root.path) == directories)
+        #expect(try fixture.store.load(from: fixture.directory) == project)
+    }
+
+    @Test func duplicateAndSplitTextHaveIndependentContentAndAllEditsUndoAtomically() throws {
+        let fixture = try RecordingMultitrackTestFixture()
+        let model = try fixture.model()
+        defer { model.shutdown(); fixture.remove() }
+        model.install(fixture.project(), directory: fixture.directory)
+        let annotationID = try #require(model.addTimelineText())
+        let clip = try #require(model.selectedTimelineClip)
+        let duplicateID = try #require(model.duplicateTimelineClip(clip.id))
+        let duplicate = try #require(model.timeline?.clips.first { $0.id == duplicateID })
+        guard case let .annotation(copyID) = duplicate.content else { Issue.record("Text duplication must keep text content"); return }
+        #expect(copyID != annotationID && duplicate.start == clip.end)
+        model.update { project in
+            if let index = project.edits.annotations?.firstIndex(where: { $0.id == copyID }) { project.edits.annotations?[index].text = "Copy" }
+        }
+        #expect(model.project?.edits.annotations?.first { $0.id == annotationID }?.text != "Copy")
+        let beforeSplit = try #require(model.project)
+        let tailID = try #require(model.splitTimelineClip(duplicateID, at: duplicate.start + 1))
+        let tail = try #require(model.timeline?.clips.first { $0.id == tailID })
+        #expect(tail.content != duplicate.content && tail.start == duplicate.start + 1)
+        model.deleteTimelineClip(tailID)
+        #expect(model.timeline?.clips.contains { $0.id == tailID } == false)
+        model.undo()
+        #expect(model.timeline?.clips.contains { $0.id == tailID } == true)
+        model.undo()
+        #expect(model.project == beforeSplit)
+        model.redo()
+        #expect(model.timeline?.clips.count == beforeSplit.timeline!.clips.count + 1)
+    }
+
+    @Test(arguments: [false, true])
+    func copyingKeepsAnIndependentTextSnapshotAfterTheOriginalIsDeletedAndPastesOnceAtThePlayhead(_ caption: Bool) throws {
+        let fixture = try RecordingMultitrackTestFixture()
+        let model = try fixture.model()
+        defer { model.shutdown(); fixture.remove() }
+        var project = fixture.project()
+        if caption { project.captions = [.init(start: 0, end: 1, text: "Original caption")] }
+        else { project.edits.annotations = [.init(kind: .text, start: 0, end: 1, text: "Original annotation")] }
+        project.timeline = .migrating(project)
+        model.install(project, directory: fixture.directory)
+        let source = try #require(model.timeline?.clips.first { $0.content.trackKind == .text })
+        model.selectTimelineClip(source.id)
+        #expect(model.copyTimelineClip(source.id))
+        #expect(model.project == project && !model.isDirty && !model.canUndo && model.canPasteTimelineClip)
+        model.deleteTimelineClip(source.id)
+        let afterDelete = try #require(model.project)
+        let destination = try #require(model.timeline?.tracks.first?.id)
+        model.selectTimelineTrack(destination)
+        model.seekTimeline(to: 1.5)
+        let id = try #require(model.pasteTimelineClip())
+        let pasted = try #require(model.selectedTimelineClip)
+        #expect(pasted.id == id && pasted.id != source.id && pasted.content != source.content)
+        #expect(pasted.start == 1.5 && pasted.trackID == destination && pasted.duration == source.duration)
+        if caption, case let .caption(id) = pasted.content {
+            let text = try #require(model.project?.captions.first { $0.id == id })
+            #expect(text.text == "Original caption" && text.start == pasted.start && text.end == pasted.end)
+        } else if !caption, case let .annotation(id) = pasted.content {
+            let text = try #require(model.project?.edits.annotations?.first { $0.id == id })
+            #expect(text.text == "Original annotation" && text.start == pasted.start && text.end == pasted.end)
+        } else { Issue.record("The pasted clip must retain its original text kind") }
+        let afterPaste = model.project
+        model.undo()
+        #expect(model.project == afterDelete && model.canRedo, "One undo must remove the entire pasted clip and its text")
+        model.redo()
+        #expect(model.project == afterPaste)
+    }
+
+    @Test
+    func copyingAndRejectedPastesPreserveRedoAndClipboardIsClearedWhenAProjectIsInstalled() throws {
+        let fixture = try RecordingMultitrackTestFixture()
+        let model = try fixture.model()
+        defer { model.shutdown(); fixture.remove() }
+        model.install(fixture.project(), directory: fixture.directory)
+        #expect(!model.canPasteTimelineClip && model.pasteTimelineClip() == nil)
+        model.addTimelineTrack()
+        model.undo()
+        let original = model.project
+        let source = try #require(model.selectedTimelineClip)
+        #expect(model.copyTimelineClip(source.id) && model.canRedo)
+        #expect(!model.copyTimelineClip("missing") && model.canPasteTimelineClip)
+        #expect(model.pasteTimelineClip(at: .nan) == nil)
+        #expect(model.pasteTimelineClip(trackID: "missing") == nil)
+        #expect(model.project == original && model.canRedo && !model.canUndo)
+        model.selectedTimelineClipID = nil
+        model.selectedTimelineTrackID = nil
+        let pasted = try #require(model.pasteTimelineClip(at: 1))
+        #expect(model.timeline?.clips.first { $0.id == pasted }?.trackID == source.trackID)
+        model.install(try #require(original), directory: fixture.directory)
+        #expect(!model.canPasteTimelineClip && model.pasteTimelineClip() == nil && model.project == original)
+        #expect(model.copyTimelineClip(try #require(model.selectedTimelineClipID)))
+        model.update { $0.id = UUID() }
+        let changedIdentity = model.project
+        #expect(!model.canPasteTimelineClip && model.pasteTimelineClip() == nil && model.project == changedIdentity)
+        model.undo()
+        #expect(model.canPasteTimelineClip, "A cached clip belongs to its original project identity")
+        var other = try #require(original)
+        other.id = UUID()
+        model.install(other, directory: fixture.directory)
+        #expect(!model.canPasteTimelineClip && model.pasteTimelineClip() == nil && !model.canUndo)
+    }
+
+    @Test
+    func copiedMediaRetainsItsSourceLayoutAndGainAndPastesIntoAnExplicitlySelectedEmptyTrack() throws {
+        let fixture = try RecordingMultitrackTestFixture()
+        let model = try fixture.model()
+        defer { model.shutdown(); fixture.remove() }
+        var project = fixture.project()
+        project.timeline = .migrating(project)
+        project.timeline?.clips[0].sourceStart = 0.25
+        project.timeline?.clips[0].sourceEnd = 1.75
+        project.timeline?.clips[0].speed = 2
+        project.timeline?.clips[0].volume = 0.3
+        project.timeline?.clips[0].audioEnabled = false
+        project.timeline?.clips[0].layout = .init(x: 0.2, y: 0.1, width: 0.4, height: 0.3)
+        model.install(project, directory: fixture.directory)
+        let source = try #require(model.selectedTimelineClip)
+        #expect(model.copyTimelineClip(source.id))
+        model.addTimelineTrack()
+        let trackID = try #require(model.selectedTimelineTrackID)
+        #expect(model.selectedTimelineClipID == nil, "Adding a track must target that empty track for the next paste")
+        model.seekTimeline(to: 0.5)
+        let before = model.project
+        let pastedID = try #require(model.pasteTimelineClip())
+        var expected = source
+        expected.id = pastedID
+        expected.start = 0.5
+        expected.trackID = trackID
+        #expect(model.selectedTimelineClip == expected && model.timeline?.assets == project.timeline?.assets)
+        model.undo()
+        #expect(model.project == before)
+        #expect(model.copyTimelineClip(source.id) && model.canRedo)
+    }
+
+    @Test
+    func movingTheSelectedClipKeepsItsTrackAsTheNextPasteTargetThroughUndoAndRedo() throws {
+        let fixture = try RecordingMultitrackTestFixture()
+        let model = try fixture.model()
+        defer { model.shutdown(); fixture.remove() }
+        model.install(fixture.project(), directory: fixture.directory)
+        let source = try #require(model.selectedTimelineClip)
+        #expect(model.copyTimelineClip(source.id))
+        model.addTimelineTrack()
+        let destination = try #require(model.selectedTimelineTrackID)
+        model.selectTimelineClip(source.id)
+        model.moveTimelineClip(source.id, to: 0.5, trackID: destination)
+        #expect(model.selectedTimelineTrackID == destination)
+        model.undo()
+        #expect(model.selectedTimelineTrackID == source.trackID && model.selectedTimelineClipID == source.id)
+        model.redo()
+        #expect(model.selectedTimelineTrackID == destination)
+        let id = try #require(model.pasteTimelineClip(at: 1))
+        #expect(model.timeline?.clips.first { $0.id == id }?.trackID == destination)
+    }
+
+    @Test func trackOrderVisibilityMuteMoveTrimAndInvalidEditsPreserveTheLibraryAndRedo() throws {
+        let fixture = try RecordingMultitrackTestFixture()
+        let model = try fixture.model()
+        defer { model.shutdown(); fixture.remove() }
+        model.install(fixture.project(), directory: fixture.directory)
+        model.addTimelineTrack(.audio)
+        let initial = try #require(model.project)
+        let clip = try #require(model.timeline?.clips.first)
+        let secondTrack = try #require(model.timeline?.tracks.last?.id)
+        model.selectTimelineClip(clip.id)
+        model.moveTimelineClip(clip.id, to: 3, trackID: secondTrack)
+        model.updateTimelineClip(clip.id) { $0.sourceStart = 0.25; $0.sourceEnd = 1.5; $0.speed = 2 }
+        let edited = try #require(model.selectedTimelineClip)
+        #expect(edited.start == 3 && edited.duration == 0.625 && edited.trackID == secondTrack)
+        model.updateTimelineTrack(secondTrack) { $0.isHidden = true; $0.isMuted = true }
+        #expect(model.timeline?.visibleClips(at: 3.2).isEmpty == true)
+        model.moveTimelineTrack(secondTrack, by: -1)
+        #expect(model.timeline?.tracks.first?.id == secondTrack)
+        #expect(model.timeline?.assets == initial.timeline?.assets)
+        model.undo()
+        let valid = model.project
+        #expect(model.canRedo)
+        model.updateTimelineClip(clip.id) { $0.sourceEnd = 200 }
+        #expect(model.project == valid && model.canRedo)
+        model.moveTimelineClip("missing", to: 0)
+        model.updateTimelineTrack("missing") { $0.name = "Changed" }
+        #expect(model.project == valid && model.canRedo)
+        model.moveTimelineClip(clip.id, to: 0, trackID: "missing")
+        #expect(model.project == valid && model.canRedo, "An invalid destination must preserve the project and redo history")
+    }
+
+    @Test func everyContentMovesAcrossLegacyTracksAndPersistsWithAtomicUndo() throws {
+        let fixture = try RecordingMultitrackTestFixture()
+        let model = try fixture.model()
+        defer { model.shutdown(); fixture.remove() }
+        for file in ["screen.mp4", "picture.png", "tone.wav"] {
+            try Data([1]).write(to: fixture.directory.appendingPathComponent(file))
+        }
+        var project = fixture.project()
+        project.edits.annotations = [.init(kind: .text, start: 0, end: 1, text: "Text")]
+        project.captions = [.init(start: 0, end: 1, text: "Caption")]
+        var timeline = RecordingMultitrackTimeline.migrating(project)
+        let image = RecordingMediaAsset(name: "Image", file: "picture.png", kind: .image, duration: 2, width: 64, height: 48)
+        let sound = RecordingMediaAsset(name: "Sound", file: "tone.wav", kind: .audio, duration: 2)
+        timeline.assets += [image, sound]
+        let audioTrack = RecordingTimelineTrack(id: "legacy-audio", kind: .audio, name: "My track")
+        timeline.tracks.append(audioTrack)
+        project.timeline = timeline
+        model.install(project, directory: fixture.directory)
+        for asset in [image, sound] {
+            #expect(model.addAssetToTimeline(asset.id, at: 0, trackID: audioTrack.id) != nil)
+        }
+        #expect(model.timeline?.tracks.count == 4)
+        let initial = try #require(model.project)
+        let clips = try #require(model.timeline?.clips)
+        var history: [ScreenRecordingProject] = []
+        for (index, clip) in clips.enumerated() {
+            history.append(try #require(model.project))
+            model.moveTimelineClip(clip.id, to: Double(index + 1), trackID: audioTrack.id)
+            let moved = try #require(model.timeline?.clips.first { $0.id == clip.id })
+            #expect(moved.trackID == audioTrack.id && moved.content == clip.content && moved.layout == clip.layout)
+        }
+        let edited = try #require(model.project)
+        #expect(edited.timeline?.clips.allSatisfy { $0.trackID == audioTrack.id } == true)
+        #expect(edited.timeline?.tracks.last?.name == "My track" && edited.timeline?.assets == initial.timeline?.assets)
+        for previous in history.reversed() { model.undo(); #expect(model.project == previous) }
+        for _ in history { model.redo() }
+        #expect(model.project == edited)
+        try model.save()
+        let reopened = try fixture.store.load(from: fixture.directory)
+        #expect(reopened == edited)
+        model.install(reopened, directory: fixture.directory)
+        #expect(model.project == edited && !model.isDirty && !model.canUndo)
+    }
+
+    @Test func overlayCreationReusesContentTracksAfterTheyMoveToLegacyAudioTracks() throws {
+        let fixture = try RecordingMultitrackTestFixture()
+        let model = try fixture.model()
+        defer { model.shutdown(); fixture.remove() }
+        var project = fixture.project()
+        project.edits.annotations = [.init(kind: .text, start: 0, end: 1, text: "Text")]
+        var timeline = RecordingMultitrackTimeline.migrating(project)
+        timeline.tracks[1].kind = .audio
+        project.timeline = timeline
+        model.install(project, directory: fixture.directory)
+        let caption = try #require(model.addOverlayCaption())
+        #expect(model.timeline?.tracks.count == 2)
+        #expect(model.timeline?.clips.first { $0.content == .caption(caption) }?.trackID == timeline.tracks[1].id,
+            "Adding captions must reuse an overlay's current track without reading legacy kind metadata")
+        let annotation = try #require(model.addOverlayAnnotation(.rectangle))
+        #expect(model.timeline?.tracks.count == 2)
+        #expect(model.timeline?.clips.first { $0.content == .annotation(annotation) }?.trackID == timeline.tracks[1].id)
+        model.undo()
+        model.undo()
+        #expect(model.project == project)
+    }
+
+    @Test func trackTitlesUseTheirPositionAndPreserveCustomLegacyNames() {
+        for (index, kind) in RecordingTimelineTrackKind.allCases.enumerated() {
+            let track = RecordingTimelineTrack(id: "track\(index)", kind: kind)
+            #expect(track.title(at: index) == AppLocalization.text("轨道 %ld", index + 1))
+            #expect(RecordingTimelineTrack(kind: kind, name: "My track").title(at: index) == "My track")
+        }
+    }
+
+    @Test func draggingEveryContentAcrossDifferentLegacyTracksPreservesSourceAndClampsRows() throws {
+        let tracks: [RecordingTimelineTrack] = [.init(id: "audio", kind: .audio), .init(id: "image", kind: .image),
+            .init(id: "text", kind: .text), .init(id: "video", kind: .video)]
+        let id = UUID()
+        for content in [RecordingTimelineContent.recording(id), .video(id), .image(id), .audio(id), .annotation(id), .caption(id)] {
+            let original = RecordingTimelineClip(trackID: "image", content: content, start: 2,
+                sourceStart: 0.25, sourceEnd: 1.75, speed: 2,
+                layout: .init(x: 0.1, y: 0.2, width: 0.4, height: 0.5), volume: 0.3, audioEnabled: false)
+            for (vertical, expectedTrack) in [(0.0, "image"), (44.0, "text"), (-44.0, "audio"),
+                                               (440.0, "video"), (-440.0, "audio")] {
+                let drag = RecordingMultitrackClipDrag(original: original, mode: .move, pointsPerSecond: 100,
+                    translation: .init(width: 100, height: vertical))
+                let changed = try #require(drag.replacement(sourceDuration: 2, tracks: tracks, rowHeight: 44))
+                var expected = original
+                expected.start = 3
+                expected.trackID = expectedTrack
+                #expect(changed == expected, "Dragging must move any content to the nearest track without altering its source or gain")
+            }
+            let trimmed = RecordingMultitrackClipDrag(original: original, mode: .trimEnd, pointsPerSecond: 100,
+                translation: .init(width: -25, height: 44))
+            #expect(trimmed.replacement(sourceDuration: 2, tracks: tracks, rowHeight: 44)?.trackID == original.trackID)
+        }
+        let original = RecordingTimelineClip(trackID: "image", content: .video(id), start: 1, sourceEnd: 2)
+        for translation in [CGSize(width: CGFloat.nan, height: 0), .init(width: 0, height: CGFloat.infinity)] {
+            let drag = RecordingMultitrackClipDrag(original: original, mode: .move, pointsPerSecond: 100, translation: translation)
+            #expect(drag.replacement(sourceDuration: 2, tracks: tracks, rowHeight: 44) == nil)
+        }
+    }
+
+    @Test(arguments: [RecordingMultitrackClipDrag.Mode.move, .trimStart, .trimEnd])
+    func clipDraggingSnapsTheNearestEndpointWithinEightScreenPointsAndRespectsSourceSpeed(_ mode: RecordingMultitrackClipDrag.Mode) throws {
+        let source = RecordingTimelineClip(trackID: "first", content: .video(UUID()), start: 2,
+            sourceStart: 1, sourceEnd: 5, speed: 2)
+        let tracks: [RecordingTimelineTrack] = [.init(id: "first"), .init(id: "second")]
+        var drag = RecordingMultitrackClipDrag(original: source, mode: mode, pointsPerSecond: 100,
+            translation: .init(width: 103, height: 44))
+        let target = mode == .trimEnd ? 5.0 : 3.0
+        let snapped = try #require(drag.replacement(sourceDuration: 10, tracks: tracks, rowHeight: 44,
+            snappingPoints: [target + 0.07, target]))
+        #expect(drag.replacement(sourceDuration: 10, tracks: tracks, rowHeight: 44,
+            snappingPoints: [target, target + 0.07]) == snapped,
+            "The nearest boundary must win regardless of track or candidate order")
+        switch mode {
+        case .move:
+            #expect(snapped.start == 3 && snapped.end == 5 && snapped.sourceStart == source.sourceStart)
+            #expect(snapped.trackID == "second")
+        case .trimStart:
+            #expect(snapped.start == 3 && snapped.sourceStart == 3 && snapped.end == source.end)
+            #expect(snapped.trackID == source.trackID)
+        case .trimEnd:
+            #expect(snapped.end == 5 && snapped.sourceEnd == 7 && snapped.start == source.start)
+            #expect(snapped.trackID == source.trackID)
+        }
+        drag.translation.width = 110
+        let free = try #require(drag.replacement(sourceDuration: 10, tracks: tracks, rowHeight: 44, snappingPoints: [target]))
+        let edge = mode == .trimEnd ? free.end : free.start
+        #expect(abs(edge - target - 0.1) < 0.000_001, "Moving outside eight screen points must release the snap")
+        drag.translation = .zero
+        #expect(drag.replacement(sourceDuration: 10, tracks: tracks, rowHeight: 44,
+            snappingPoints: [source.start + 0.01, source.end + 0.01]) == source,
+            "Selecting or clicking a trim handle without moving must never move or trim a clip")
+    }
+
+    @Test
+    func snapDistanceScalesWithZoomAndMovingAnEndCanAlignAcrossTracksWithoutChangingDuration() throws {
+        let source = RecordingTimelineClip(trackID: "first", content: .image(UUID()), start: 1, sourceEnd: 2)
+        let tracks: [RecordingTimelineTrack] = [.init(id: "first"), .init(id: "second")]
+        let drag = RecordingMultitrackClipDrag(original: source, mode: .move, pointsPerSecond: 100,
+            translation: .init(width: 195, height: 44))
+        let changed = try #require(drag.replacement(sourceDuration: nil, tracks: tracks, rowHeight: 44,
+            snappingPoints: [5]))
+        #expect(changed.end == 5 && changed.start == 3 && changed.trackID == "second" && changed.duration == source.duration)
+        let zoomed = RecordingMultitrackClipDrag(original: source, mode: .move, pointsPerSecond: 200,
+            translation: .init(width: 390, height: 44))
+        #expect(zoomed.replacement(sourceDuration: nil, tracks: tracks, rowHeight: 44, snappingPoints: [5])?.start == 2.95,
+            "The same time difference outside eight points at higher zoom must remain unsnapped")
+        let vertical = RecordingMultitrackClipDrag(original: source, mode: .move, pointsPerSecond: 100,
+            translation: .init(width: 0, height: 44))
+        #expect(vertical.replacement(sourceDuration: nil, tracks: tracks, rowHeight: 44,
+            snappingPoints: [source.start + 0.01])?.start == source.start)
+    }
+
+    @Test
+    func snappingIncludesBothEndpointsOnOtherTracksAndThePlayheadAndExcludesTheDraggedClip() {
+        let source = RecordingTimelineClip(id: "source", trackID: "first", content: .image(UUID()), start: 2, sourceEnd: 1)
+        let other = RecordingTimelineClip(id: "other", trackID: "second", content: .image(UUID()), start: 5, sourceEnd: 2)
+        let timeline = RecordingMultitrackTimeline(tracks: [.init(id: "first"), .init(id: "second")], clips: [source, other])
+        let drag = RecordingMultitrackClipDrag(original: source, mode: .move, pointsPerSecond: 100)
+        #expect(drag.snappingPoints(in: timeline, playhead: 4) == [0, 4, 5, 7])
+    }
+
+    @Test(arguments: [RecordingMultitrackClipDrag.Mode.trimStart, .trimEnd])
+    func snappingGuideFollowsOnlyTheEdgeBeingTrimmedAndDoesNotAppearForAClick(_ mode: RecordingMultitrackClipDrag.Mode) {
+        let source = RecordingTimelineClip(trackID: "first", content: .image(UUID()), start: 2, sourceEnd: 2)
+        let drag = RecordingMultitrackClipDrag(original: source, mode: mode, pointsPerSecond: 100,
+            translation: .init(width: 10, height: 0))
+        let moving = mode == .trimStart ? source.start : source.end
+        let fixed = mode == .trimStart ? source.end : source.start
+        #expect(drag.alignedSnapPoint(for: source, points: [fixed, moving]) == moving)
+        #expect(drag.alignedSnapPoint(for: source, points: [fixed]) == nil)
+        let click = RecordingMultitrackClipDrag(original: source, mode: mode, pointsPerSecond: 100)
+        #expect(click.alignedSnapPoint(for: source, points: [moving]) == nil)
+    }
+
+    @Test(arguments: [RecordingMultitrackClipDrag.Mode.move, .trimStart, .trimEnd])
+    func cancellingADragKeepsItCancelledThroughFurtherMouseMovementAndRelease(_ mode: RecordingMultitrackClipDrag.Mode) throws {
+        let source = RecordingTimelineClip(trackID: "first", content: .video(UUID()), start: 2,
+            sourceStart: 1, sourceEnd: 5, speed: 2)
+        let tracks: [RecordingTimelineTrack] = [.init(id: "first"), .init(id: "second")]
+        var drag = RecordingMultitrackClipDrag(original: source, mode: mode, pointsPerSecond: 100,
+            translation: .init(width: 10, height: 44))
+        #expect(drag.replacement(sourceDuration: 8, tracks: tracks, rowHeight: 44) != source)
+        drag.isCancelled = true
+        drag.translation = .init(width: 100, height: 44)
+        #expect(drag.replacement(sourceDuration: 8, tracks: tracks, rowHeight: 44, snappingPoints: [3, 4]) == nil,
+            "Escape must keep later events in the same gesture from producing a committable clip")
+    }
+
+    @Test
+    func trimmingNearSnapTargetsCannotExceedTheMediaOrCollapseTheClipAndMissingRowsAreRejected() throws {
+        let source = RecordingTimelineClip(trackID: "first", content: .video(UUID()), start: 2,
+            sourceStart: 1, sourceEnd: 5, speed: 2)
+        let tracks: [RecordingTimelineTrack] = [.init(id: "first")]
+        let end = RecordingMultitrackClipDrag(original: source, mode: .trimEnd, pointsPerSecond: 100,
+            translation: .init(width: 100, height: 0))
+        #expect(end.replacement(sourceDuration: 5, tracks: tracks, rowHeight: 44, snappingPoints: [4.02]) == source)
+        let start = RecordingMultitrackClipDrag(original: source, mode: .trimStart, pointsPerSecond: 100,
+            translation: .init(width: -50, height: 0))
+        let trimmed = try #require(start.replacement(sourceDuration: 5, tracks: tracks, rowHeight: 44,
+            snappingPoints: [1.45]))
+        #expect(trimmed.start == 1.5 && trimmed.sourceStart == 0 && trimmed.end == source.end)
+        let collapsed = RecordingMultitrackClipDrag(original: source, mode: .trimEnd, pointsPerSecond: 100,
+            translation: .init(width: -300, height: 0))
+        let minimum = try #require(collapsed.replacement(sourceDuration: 5, tracks: tracks, rowHeight: 44,
+            snappingPoints: [source.start]))
+        #expect(minimum.sourceEnd > minimum.sourceStart && minimum.start == source.start)
+        let move = RecordingMultitrackClipDrag(original: source, mode: .move, pointsPerSecond: 100,
+            translation: .init(width: 1, height: 44))
+        #expect(move.replacement(sourceDuration: 5, tracks: [], rowHeight: 44) == nil)
+        #expect(move.replacement(sourceDuration: 5, tracks: tracks, rowHeight: 0) == nil)
+        let zero = RecordingTimelineClip(trackID: "first", content: .image(UUID()), start: 0, sourceEnd: 2)
+        let belowZero = RecordingMultitrackClipDrag(original: zero, mode: .move, pointsPerSecond: 100,
+            translation: .init(width: 1, height: 0))
+        #expect(belowZero.replacement(sourceDuration: nil, tracks: tracks, rowHeight: 44, snappingPoints: [-0.01])?.start == 0.01)
+    }
+
+    @Test func canvasSelectionRetainsTheSelectedOccurrenceAndSeeksMovedOverlaysOnOutputTime() throws {
+        let fixture = try RecordingMultitrackTestFixture()
+        let model = try fixture.model()
+        defer { model.shutdown(); fixture.remove() }
+        var project = fixture.project()
+        project.captions = [.init(start: 0, end: 1, text: "Caption")]
+        project.edits.segments = [.init(start: 0, end: 1), .init(start: 0, end: 1)]
+        project.timeline = .migrating(project)
+        let content = RecordingTimelineContent.caption(project.captions[0].id)
+        let copies = try #require(project.timeline?.clips.filter { $0.content == content })
+        model.install(project, directory: fixture.directory)
+        model.selectedTimelineClipID = copies[1].id
+        model.selectCanvasTimelineContent(content)
+        #expect(model.selectedTimelineClipID == copies[1].id)
+        model.selectedTimelineClipID = nil
+        model.seekTimeline(to: 1.25)
+        model.selectCanvasTimelineContent(content)
+        #expect(model.selectedTimelineClipID == copies[1].id)
+        model.moveTimelineClip(copies[1].id, to: 7)
+        model.seekOverlay(content, sourceStart: 0)
+        #expect(model.playbackTime == 7 && model.currentTime == 7)
+        let annotationID = try #require(model.addOverlayAnnotation(.rectangle))
+        let captionID = try #require(model.addOverlayCaption())
+        #expect(model.project?.edits.annotations?.first { $0.id == annotationID }?.start == 7)
+        #expect(model.project?.captions.first { $0.id == captionID }?.start == 7)
+        #expect(model.timeline?.clips.first { $0.content == .caption(captionID) }?.start == 7)
+        model.seekTimeline(to: model.project!.outputDuration)
+        let unchanged = model.project
+        #expect(model.addOverlayCaption() == nil && model.addOverlayAnnotation(.text) == nil && model.project == unchanged)
+    }
+
+    @Test func cuttingAMovedCaptionTrimsOnlyVideoClipsOnItsOutputRangeAndSupportsUndo() throws {
+        let fixture = try RecordingMultitrackTestFixture()
+        let model = try fixture.model()
+        defer { model.shutdown(); fixture.remove() }
+        var project = fixture.project()
+        project.captions = [.init(start: 0, end: 0.5, text: "Caption")]
+        var timeline = RecordingMultitrackTimeline.migrating(project)
+        timeline.clips[0].start = 3
+        timeline.clips[0].speed = 0.5
+        let captionIndex = try #require(timeline.clips.firstIndex { $0.content == .caption(project.captions[0].id) })
+        timeline.clips[captionIndex].start = 4
+        timeline.clips[captionIndex].sourceStart = 0
+        timeline.clips[captionIndex].sourceEnd = 1
+        timeline.clips[captionIndex].speed = 1
+        project.timeline = timeline
+        model.install(project, directory: fixture.directory)
+        model.selectedTimelineClipID = timeline.clips[captionIndex].id
+        model.cutCaption(project.captions[0].id)
+        let edited = try #require(model.project)
+        let video = try #require(edited.timeline?.clips.filter { $0.content.trackKind == .video })
+        #expect(video.count == 2 && video.map(\.start) == [3, 5])
+        #expect(video[0].sourceEnd == 0.5 && video[1].sourceStart == 1 && video[1].sourceEnd == 2)
+        #expect(video.allSatisfy { $0.speed == 0.5 } && edited.edits.segments == project.edits.segments)
+        #expect(edited.timeline?.clips.first { $0.content == .caption(project.captions[0].id) } == timeline.clips[captionIndex])
+        model.undo()
+        #expect(model.project == project)
+        model.redo()
+        #expect(model.project == edited)
+    }
+
+    @Test func aLateCancelledAudioTaskCannotClearTheNextProjectsBusyState() async throws {
+        let fixture = try RecordingMultitrackTestFixture()
+        let model = try fixture.model()
+        defer { model.shutdown(); fixture.remove() }
+        try Data([1]).write(to: fixture.directory.appendingPathComponent("screen.mp4"))
+        let firstGate = AudioGate()
+        let secondGate = AudioGate()
+        model.install(fixture.project(), directory: fixture.directory)
+        model.detachTimelineAudio(try #require(model.selectedTimelineClipID), probe: { _ in try await firstGate.wait() })
+        let oldTask = try #require(model.operationTask)
+        await firstGate.waitUntilEntered()
+        var next = fixture.project()
+        next.id = UUID()
+        next.name = "Next project"
+        model.install(next, directory: fixture.directory)
+        #expect(model.canEdit)
+        model.detachTimelineAudio(try #require(model.selectedTimelineClipID), probe: { _ in try await secondGate.wait() })
+        let newTask = try #require(model.operationTask)
+        await secondGate.waitUntilEntered()
+        await firstGate.release()
+        await oldTask.value
+        #expect(model.isBusy && model.operationTask != nil && model.project == next,
+            "An obsolete task must not unlock the editor while the new project's operation is pending")
+        await secondGate.release()
+        await newTask.value
+        #expect(model.canEdit && model.operationTask == nil && model.project?.timeline?.clips.count == 2)
+    }
+
+    @Test func libraryCaptionGenerationUsesTheSelectedMediaAndRetimesOnlyItsSelectedClip() async throws {
+        let fixture = try RecordingMultitrackTestFixture()
+        defer { fixture.remove() }
+        let audio = try fixture.createTone()
+        _ = try fixture.createImage()
+        var recognized: URL?
+        let transcriber = ScreenRecordingTranscriber(dependencies: .init(authorizationStatus: { .authorized },
+            requestAuthorization: { _ in }, onDeviceAvailable: { _ in true }, recognize: { url, _, complete in
+                recognized = url
+                complete(.success([.init(start: 0.5, end: 1.5, text: "Selected source")]))
+                return {}
+            }, scheduleDeadline: { _ in {} }))
+        let model = ScreenRecordingStudioModel(transcriber: transcriber, projectStore: fixture.store)
+        defer { model.shutdown() }
+        let sound = RecordingMediaAsset(name: "Sound", file: "tone.wav", kind: .audio, duration: 2)
+        let image = RecordingMediaAsset(name: "Image", file: "picture.png", kind: .image, duration: 5, width: 64, height: 48)
+        var project = fixture.project()
+        project.videoFile = ""
+        project.edits.segments = []
+        project.timeline = .init(assets: [image, sound], tracks: [.init(id: "audio", kind: .audio)], clips: [
+            .init(id: "first", trackID: "audio", content: .audio(sound.id), start: 0, sourceEnd: 2),
+            .init(id: "selected", trackID: "audio", content: .audio(sound.id), start: 7, sourceStart: 0.25, sourceEnd: 1.75, speed: 2),
+        ])
+        model.install(project, directory: fixture.directory)
+        #expect(!model.canGenerateCaptions)
+        model.generateCaptions()
+        #expect(model.operationTask == nil && recognized == nil)
+        model.selectTimelineClip("selected")
+        #expect(model.canGenerateCaptions)
+        model.generateCaptions()
+        await model.operationTask?.value
+        let caption = try #require(model.project?.captions.first)
+        #expect(recognized == audio)
+        #expect(caption.start == 7.125 && caption.end == 7.625)
+        #expect(model.project?.captions.count == 1 && model.timeline?.clips.first { $0.content == .caption(caption.id) }?.start == 7.125)
+        model.undo()
+        #expect(model.project == project)
+    }
+
+    @Test func recordedTimelineCaptionGenerationKeepsMicrophonePriorityAfterMigration() async throws {
+        let fixture = try RecordingMultitrackTestFixture()
+        defer { fixture.remove() }
+        let microphone = try fixture.createTone("microphone.wav")
+        var recognized: URL?
+        let transcriber = ScreenRecordingTranscriber(dependencies: .init(authorizationStatus: { .authorized },
+            requestAuthorization: { _ in }, onDeviceAvailable: { _ in true }, recognize: { url, _, complete in
+                recognized = url
+                complete(.success([.init(start: 0.25, end: 0.75, text: "Microphone")]))
+                return {}
+            }, scheduleDeadline: { _ in {} }))
+        let model = ScreenRecordingStudioModel(transcriber: transcriber, projectStore: fixture.store)
+        defer { model.shutdown() }
+        var project = fixture.project()
+        project.microphoneFile = "microphone.wav"
+        project.timeline = .migrating(project)
+        model.install(project, directory: fixture.directory)
+        model.generateCaptions()
+        await model.operationTask?.value
+        #expect(recognized == microphone && model.project?.captions.first?.text == "Microphone")
+    }
+
+    private actor AudioGate {
+        private var continuation: CheckedContinuation<[Range<Double>], Error>?
+        private var entered = false
+        private var waiter: CheckedContinuation<Void, Never>?
+        func wait() async throws -> [Range<Double>] {
+            entered = true
+            waiter?.resume()
+            waiter = nil
+            return try await withCheckedThrowingContinuation { continuation = $0 }
+        }
+        func waitUntilEntered() async {
+            if entered { return }
+            await withCheckedContinuation { waiter = $0 }
+        }
+        func release() { continuation?.resume(returning: [0..<2]); continuation = nil }
+    }
+}

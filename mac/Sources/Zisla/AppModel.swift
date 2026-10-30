@@ -534,6 +534,8 @@ final class AppModel: ObservableObject {
   /// Synchronous hook used by the app delegate to arm overlay focus protection before any
   /// recording-start cleanup can reorder windows.
   var onVoiceInputWillStart: (() -> Void)?
+  var onScreenRecordingRequested: (() -> Void)?
+  var screenRecordingSettingsModel: (() -> ScreenRecordingStudioModel?)?
 
   /// Model discovery state: used by the settings page to show connection test results and the available model list.
   @Published var voiceModelDiscoveryState: VoiceModelDiscoveryState = .idle
@@ -919,7 +921,11 @@ final class AppModel: ObservableObject {
       aiMonitor.$state.map { _ in () }.eraseToAnyPublisher(),
       settingsStore.$settings.map { _ in () }.eraseToAnyPublisher(),
       $downloadState.map { _ in () }.eraseToAnyPublisher(),
-      browserDownloads.$snapshots.map { _ in () }.eraseToAnyPublisher()
+      browserDownloads.$snapshots.map { _ in () }.eraseToAnyPublisher(),
+      notices.$left.combineLatest(notices.$right)
+        .map { ($0 + $1).filter { $0.id.hasPrefix(ScreenRecordingOperationNotice.prefix) }.count }
+        .removeDuplicates()
+        .map { _ in () }.eraseToAnyPublisher()
     )
     .sink { [weak self] in
       DispatchQueue.main.async { [weak self] in
@@ -940,7 +946,7 @@ final class AppModel: ObservableObject {
     let browserDownloadCount = settings.showsBrowserDownloadProgress
       ? browserDownloads.snapshots.count : 0
     let cardCount = [hasPomodoro, hasAITask, hasActiveDownloads].filter { $0 }.count
-      + browserDownloadCount
+      + browserDownloadCount + notices.screenRecordingOperations.count
     if dashboardCardCount != cardCount {
       dashboardCardCount = cardCount
     }
@@ -1501,6 +1507,12 @@ final class AppModel: ObservableObject {
     guard settingsStore.settings.systemMonitorEnabled else { return }
     selectModule(.system)
     Task { await systemMonitor.sampleOnce() }
+  }
+
+  func presentScreenRecording() {
+    guard settingsStore.settings.screenRecordingEnabled else { return }
+    islandCollapseRequested = true
+    onScreenRecordingRequested?()
   }
 
   func presentMirror() {
@@ -3145,7 +3157,10 @@ final class AppModel: ObservableObject {
       consumeFocusModeStatus(focusMode.status, showsTransition: false)
       refreshUpdateNotices()
     } else {
-      notices.removeAll()
+      // Output tasks still belong on the dashboard when side notices are disabled.
+      for notice in notices.left + notices.right where !notice.id.hasPrefix(ScreenRecordingOperationNotice.prefix) {
+        notices.remove(id: notice.id)
+      }
       activeAINoticeIDs.removeAll()
       activityNoticeShownIDs.removeAll()
       mediaActivityPresented = false
