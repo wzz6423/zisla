@@ -1,9 +1,9 @@
 "NSCalendarsFullAccessUsageDescription" = "zisla memerlukan akses ke acara kalender mendatang untuk panel informasi atas.";
-"NSAudioCaptureUsageDescription" = "zisla membaca audio sistem hanya saat media diputar atau saat Anda menyesuaikan volume aplikasi, untuk menampilkan bentuk gelombang dan menyesuaikan volume keluaran aplikasi tersebut.";
-"NSCameraUsageDescription" = "zisla menggunakan kamera hanya saat cermin dibuka.";
+"NSAudioCaptureUsageDescription" = "zisla membaca audio sistem saat media diputar, saat Anda menyesuaikan volume aplikasi, atau saat mengaktifkan audio sistem untuk perekaman layar, guna menampilkan gelombang suara, menyesuaikan volume, atau merekam suara pemutaran.";
+"NSCameraUsageDescription" = "zisla menggunakan kamera hanya saat Anda membuka cermin atau mengaktifkan lapisan kamera untuk perekaman layar.";
 "NSRemindersFullAccessUsageDescription" = "zisla membaca pengingat bertanggal untuk menampilkannya bersama acara kalender.";
 "NSLocationWhenInUseUsageDescription" = "zisla memerlukan akses lokasi untuk menampilkan cuaca setempat, nama tempat, dan jaringan Wi-Fi di sekitar.";
-"NSMicrophoneUsageDescription" = "zisla menggunakan mikrofon hanya saat Anda memulai input suara, untuk mengubah ucapan menjadi teks percakapan AI saat ini.";
-"NSSpeechRecognitionUsageDescription" = "zisla menyalin ucapan yang Anda rekam secara aktif ke dalam teks percakapan AI.";
+"NSMicrophoneUsageDescription" = "zisla merekam audio hanya saat Anda memulai input suara atau mengaktifkan mikrofon untuk perekaman layar.";
+"NSSpeechRecognitionUsageDescription" = "zisla mengubah ucapan yang Anda rekam secara sengaja menjadi teks dan mentranskripsi secara lokal saat Anda membuat takarir perekaman layar.";
 "NSAppleEventsUsageDescription" = "zisla menggunakan Mail.app untuk membaca dan mengelola email, termasuk kotak masuk, status baca, penghapusan, dan balasan. Zisla juga menjalankan perintah yang Anda pilih di Terminal atau iTerm.";
 "NSBluetoothAlwaysUsageDescription" = "zisla hanya membaca informasi baterai publik dari perangkat Bluetooth yang terhubung atau dipasangkan saat Anda membuka halaman Baterai.";

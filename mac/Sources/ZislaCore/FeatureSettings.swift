@@ -853,6 +853,8 @@ public struct FeatureSettings: Codable, Equatable, Sendable {
     public var screenshotToolHotkeys: [String: VoiceInputHotkeyPreset]
     /// Whether the pinned screenshot shows its bottom control bar.
     public var screenshotPinnedToolbarVisible: Bool
+    public var screenRecordingEnabled: Bool
+    public var screenRecordingHotkeys: [String: VoiceInputHotkeyPreset]
     /// Whether the integrated keyboard sounds are enabled.
     public var keyboardEnabled: Bool
     public var keyboardSelectedProfileID: String
@@ -965,6 +967,8 @@ public struct FeatureSettings: Codable, Equatable, Sendable {
         screenshotEditorLongHotkey: VoiceInputHotkeyPreset = ScreenshotHotkeyDefaults.editorLongCapture,
         screenshotToolHotkeys: [String: VoiceInputHotkeyPreset] = ScreenshotHotkeyDefaults.tools,
         screenshotPinnedToolbarVisible: Bool = true,
+        screenRecordingEnabled: Bool = true,
+        screenRecordingHotkeys: [String: VoiceInputHotkeyPreset] = [:],
         keyboardEnabled: Bool = true,
         keyboardSelectedProfileID: String = "holypanda",
         keyboardVolume: Double = 0.75,
@@ -1091,6 +1095,8 @@ public struct FeatureSettings: Codable, Equatable, Sendable {
         self.screenshotHotkeyVersion = ScreenshotHotkeyDefaults.currentVersion
         self.screenshotToolHotkeys = screenshotToolHotkeys.filter { ScreenshotHotkeyDefaults.tools[$0.key] != nil }
         self.screenshotPinnedToolbarVisible = screenshotPinnedToolbarVisible
+        self.screenRecordingEnabled = screenRecordingEnabled
+        self.screenRecordingHotkeys = screenRecordingHotkeys
         self.keyboardEnabled = keyboardEnabled
         self.keyboardSelectedProfileID = keyboardSelectedProfileID
         self.keyboardVolume = keyboardVolume
@@ -1234,6 +1240,8 @@ public struct FeatureSettings: Codable, Equatable, Sendable {
         case screenshotHotkeyVersion
         case screenshotToolHotkeys
         case screenshotPinnedToolbarVisible
+        case screenRecordingEnabled
+        case screenRecordingHotkeys
         case keyboardEnabled
         case keyboardSelectedProfileID
         case keyboardVolume
@@ -1542,6 +1550,13 @@ public struct FeatureSettings: Codable, Equatable, Sendable {
             Bool.self,
             forKey: .screenshotEnabled
         ) ?? defaults.screenshotEnabled
+        screenRecordingEnabled = try container.decodeIfPresent(Bool.self, forKey: .screenRecordingEnabled)
+            ?? defaults.screenRecordingEnabled
+        let decodedRecordingHotkeys = try container.decodeIfPresent(
+            [String: VoiceInputHotkeyPreset].self, forKey: .screenRecordingHotkeys
+        ) ?? defaults.screenRecordingHotkeys
+        let recordingShortcutKeys = Set(RecordingShortcutAction.allCases.map { String($0.rawValue) })
+        screenRecordingHotkeys = decodedRecordingHotkeys.filter { recordingShortcutKeys.contains($0.key) }
         screenshotHotkey = try container.decodeIfPresent(
             VoiceInputHotkeyPreset.self,
             forKey: .screenshotHotkey

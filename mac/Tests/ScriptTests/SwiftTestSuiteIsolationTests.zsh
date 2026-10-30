@@ -82,6 +82,8 @@ if mode == "workflow":
         "ZislaTests.FutureAppKitTestsExtra/test()",
         "ZislaTests.topLevel()/Tests.swift:1:1",
     ]
+if mode == "long-budget":
+    tests = ["FixtureTests.Long/test()"]
 if mode in ("throughput", "throughput-failure"):
     tests = [
         "ZislaTests.AShortTests/test()",
@@ -165,10 +167,13 @@ else:
     assert os.environ["HOME"] == os.environ["CFFIXED_USER_HOME"]
     assert Path(os.environ["HOME"]).parent == Path(os.environ["TMPDIR"]).parent
     assert str(root / "results") in os.environ["HOME"]
-record = dict(selected=selected, pid=os.getpid(), home=os.environ["HOME"], tmp=os.environ["TMPDIR"])
+record = dict(selected=selected, pid=os.getpid(), group=os.getpgrp(), home=os.environ["HOME"], tmp=os.environ["TMPDIR"])
 with open(os.environ["SWIFT_TEST_CAPTURE"], "a") as capture:
     capture.write(json.dumps(record) + "\n")
-if mode in ("parallel", "parallel-failure", "interrupted", "orphaned-worker", "orphaned-failure"):
+if mode in ("timeout", "timeout-orphan"):
+    print("LAST TEST: waiting for an injected media dependency", flush=True)
+    coordinate(record, orphan=mode == "timeout-orphan")
+if mode in ("parallel", "parallel-failure", "interrupted", "orphaned-worker", "orphaned-failure", "long-budget"):
     coordinate(record, orphan=mode in ("orphaned-worker", "orphaned-failure"))
 if mode == "test-failure" and "Second" in selector:
     sys.exit(6)
@@ -178,8 +183,12 @@ if mode == "smart-throughput-failure" and any("ClipboardAssistantSmartActionsTes
     sys.exit(6)
 output = args[args.index("--event-stream-output-path") + 1]
 with open(output, "w") as events:
-    for kind in ("testEnded", "runEnded"):
-        events.write(json.dumps({"kind": "event", "payload": {"kind": kind}, "version": 0}) + "\n")
+    events.write(json.dumps({"kind": "event", "payload": {"kind": "runStarted"}, "version": 0}) + "\n")
+    for test in selected:
+        events.write(json.dumps({"kind": "test", "payload": {"kind": "function", "id": test}, "version": 0}) + "\n")
+        for kind in ("testStarted", "testEnded"):
+            events.write(json.dumps({"kind": "event", "payload": {"kind": kind, "testID": test}, "version": 0}) + "\n")
+    events.write(json.dumps({"kind": "event", "payload": {"kind": "runEnded"}, "version": 0}) + "\n")
 """
 for executable in (tools / "swift", helper):
     executable.write_text(fake.replace("#!/usr/bin/env python3", "#!" + sys.executable, 1))
@@ -211,6 +220,7 @@ environment = dict(os.environ, PATH=str(tools) + ":" + os.environ["PATH"],
     TMPDIR=str(results), SWIFT_TEST_FIXTURE_ROOT=str(test_root))
 environment.pop("SWIFT_TEST_SHARD_COUNT", None)
 environment.pop("SWIFT_TEST_SHARD_INDEX", None)
+environment.pop("SWIFT_TEST_SUITE_TIMEOUT", None)
 command = ["zsh", str(root / "Scripts/swift-test-suites.sh"), "FixtureTests"]
 checks = 0
 
@@ -227,7 +237,7 @@ def check_cleanup(records):
         raise AssertionError(f"Test worker still running: {record['pid']}")
 
 def run_case(mode, status, selected, workers=None, arguments=(), target="FixtureTests",
-             shard_count=None, shard_index=None):
+             shard_count=None, shard_index=None, suite_timeout=None):
     global checks
     capture = test_root / (mode + "-" + str(checks) + ".jsonl")
     case_environment = dict(environment, SWIFT_TEST_MODE=mode, SWIFT_TEST_CAPTURE=str(capture))
@@ -239,6 +249,8 @@ def run_case(mode, status, selected, workers=None, arguments=(), target="Fixture
         case_environment["SWIFT_TEST_SHARD_COUNT"] = shard_count
     if shard_index is not None:
         case_environment["SWIFT_TEST_SHARD_INDEX"] = shard_index
+    if suite_timeout is not None:
+        case_environment["SWIFT_TEST_SUITE_TIMEOUT"] = suite_timeout
     result = subprocess.run(command[:-1] + [target] + list(arguments),
         env=case_environment,
         stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, timeout=15)
@@ -267,6 +279,9 @@ run_case("duplicate-discovery", 1, [])
 run_case("success", 0, expected, arguments=("--skip-build", "--scratch-path", str(test_root / "build with spaces")))
 for workers in ("0", "-1", "not-a-number", "1.5", "", "1; touch unexpected"):
     run_case("invalid-workers", 1, [], workers=workers)
+run_case("success", 0, expected, suite_timeout="1")
+for timeout in ("0", "-1", "not-a-number", "1.5", "", " 1", "1 ", "+1", "01", "1; touch unexpected"):
+    run_case("invalid-timeout", 1, [], suite_timeout=timeout)
 
 smart_tests = [
     "ZislaKitTests.ClipboardAssistantSmartActionsTests/testOne()",
@@ -423,6 +438,121 @@ with socket.socket(socket.AF_INET) as coordinator:
         except ProcessLookupError:
             pass
 checks += 1
+
+for mode in ("timeout", "timeout-orphan"):
+    capture = test_root / (mode + ".jsonl")
+    connections = []
+    with socket.socket(socket.AF_INET) as coordinator:
+        coordinator.bind(("127.0.0.1", 0))
+        coordinator.listen()
+        coordinator.settimeout(5)
+        address = str(coordinator.getsockname()[1])
+        with (test_root / (mode + ".log")).open("w") as output:
+            process = subprocess.Popen(command, stdout=output, stderr=subprocess.STDOUT,
+                env=dict(environment, SWIFT_TEST_MODE=mode, SWIFT_TEST_CAPTURE=str(capture),
+                    SWIFT_TEST_WORKERS="3", SWIFT_TEST_SUITE_TIMEOUT="1", SWIFT_TEST_COORDINATOR=address))
+            try:
+                for _ in range(3):
+                    connection, _ = coordinator.accept()
+                    record = json.loads(connection.makefile().readline())
+                    connections.append((connection, record))
+                initial_log = (test_root / (mode + ".log")).read_text()
+                for _, record in connections:
+                    name = record["selected"][0].split("/")[0]
+                    assert f"Swift suite started: {name} (pid={record['group']})" in initial_log, "A blocked suite and process group must be named before it completes"
+                suite = initial_log.split("Swift suite started: ", 1)[1].split(" (pid=", 1)[0]
+                actual_status = process.wait(timeout=10)
+                log = (test_root / (mode + ".log")).read_text()
+                assert actual_status == 124, f"{mode}: expected timeout exit 124, got {actual_status}\n{log}"
+                assert f"Swift suite timed out after 1 seconds: {suite}" in log, "Timeout must name the stuck suite"
+                assert "LAST TEST: waiting for an injected media dependency" in log, "Timeout discarded the last test output"
+                for connection, _ in connections:
+                    connection.settimeout(1)
+                    assert connection.recv(1) == b"", "Timed-out suite or parallel child survived cancellation"
+                check_cleanup(read_records(capture))
+            finally:
+                if process.poll() is None:
+                    process.terminate()
+                    process.wait(timeout=10)
+                for connection, record in connections:
+                    connection.close()
+                    try:
+                        os.killpg(record["group"], signal.SIGKILL)
+                    except (ProcessLookupError, PermissionError):
+                        pass
+                    if "child_pid" in record:
+                        try:
+                            os.kill(record["child_pid"], signal.SIGKILL)
+                        except ProcessLookupError:
+                            pass
+    checks += 1
+
+clock_tools = test_root / "clock-bin"
+clock_tools.mkdir()
+clock_python = clock_tools / "python3"
+clock_python.write_text("#!" + sys.executable + r"""
+import os
+import select
+import socket
+import sys
+import time
+
+if sys.argv[1:3] != ["-", os.environ["SWIFT_TEST_RUNNER_ROOT"]]:
+    os.execv(sys.executable, [sys.executable, *sys.argv[1:]])
+source = sys.stdin.read()
+clock = socket.create_connection(("127.0.0.1", int(os.environ["SWIFT_TEST_CLOCK_COORDINATOR"])))
+clock.sendall(b'{"clock":0}\n')
+clock.setblocking(False)
+elapsed = 0
+def monotonic():
+    global elapsed
+    if select.select([clock], [], [], 0)[0]:
+        elapsed = int(clock.recv(32))
+        clock.sendall(('{"clock":' + str(elapsed) + '}\n').encode())
+    return elapsed
+time.monotonic = monotonic
+sys.argv = sys.argv[1:]
+exec(compile(source, "swift-test-suites.sh", "exec"))
+""")
+clock_python.chmod(0o755)
+for elapsed, expected_status in ((221, 0), (600, 124)):
+    capture = test_root / ("long-budget-" + str(elapsed) + ".jsonl")
+    with socket.socket(socket.AF_INET) as coordinator:
+        coordinator.bind(("127.0.0.1", 0))
+        coordinator.listen()
+        coordinator.settimeout(5)
+        address = str(coordinator.getsockname()[1])
+        process = subprocess.Popen(command, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True,
+            env=dict(environment, PATH=str(clock_tools) + ":" + environment["PATH"],
+                SWIFT_TEST_MODE="long-budget", SWIFT_TEST_CAPTURE=str(capture), SWIFT_TEST_WORKERS="1",
+                SWIFT_TEST_COORDINATOR=address, SWIFT_TEST_CLOCK_COORDINATOR=address,
+                SWIFT_TEST_RUNNER_ROOT=str(root)))
+        clock, _ = coordinator.accept()
+        clock.settimeout(5)
+        ticks = clock.makefile()
+        assert json.loads(ticks.readline()) == {"clock": 0}
+        connection, _ = coordinator.accept()
+        json.loads(connection.makefile().readline())
+        try:
+            clock.sendall(str(elapsed).encode())
+            assert json.loads(ticks.readline()) == {"clock": elapsed}
+            if expected_status == 0:
+                connection.sendall(b"+")
+            output, _ = process.communicate(timeout=10)
+            assert process.returncode == expected_status, f"Default budget at {elapsed}s: expected {expected_status}, got {process.returncode}\n{output}"
+            if expected_status == 124:
+                assert "Swift suite timed out after 600 seconds: FixtureTests.Long" in output
+            connection.settimeout(1)
+            assert connection.recv(1) == b"", "Default budget left a test host running"
+            check_cleanup(read_records(capture))
+        finally:
+            if process.poll() is None:
+                process.terminate()
+                process.wait(timeout=10)
+            connection.close()
+            ticks.close()
+            clock.close()
+    checks += 1
 
 capture = test_root / "workflow.jsonl"
 (test_root / "built").unlink()

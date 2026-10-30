@@ -240,6 +240,7 @@ public struct SideNoticeLayoutEngine: Equatable, Sendable {
                 && !$0.id.hasPrefix("browser-download-")
                 && !$0.id.hasPrefix("video-download-")
                 && !$0.id.hasPrefix("voice-processing-")
+                && !$0.id.hasPrefix("screen-recording-operation-")
                 && $0.style != .headphone
         }
         let panelSize = panelSize(
@@ -297,6 +298,15 @@ public struct SideNoticeLayoutEngine: Equatable, Sendable {
 
     public func supportsCompactWings(for screen: ScreenSnapshot) -> Bool {
         ScreenLayoutEngine().layout(for: screen).topology.hasPhysicalNotch
+    }
+
+    public static func screenRecordingOperationNotice(
+        for notices: [IslandNotice], settings: FeatureSettings
+    ) -> IslandNotice? {
+        guard settings.sideNoticesEnabled,
+              !notices.contains(where: { $0.id.hasPrefix("voice-processing-") }),
+              selectedCompactStatusPriority(for: notices, settings: settings) != .transient else { return nil }
+        return notices.first { $0.id.hasPrefix("screen-recording-operation-") }
     }
 
     public func compactWingHeight(
@@ -483,6 +493,9 @@ public struct SideNoticeLayoutEngine: Equatable, Sendable {
     )? {
         if notices.contains(where: { $0.id.hasPrefix("voice-processing-") }) {
             return (0, false, false, Layout.compactWingWidth, 0)
+        }
+        if Self.screenRecordingOperationNotice(for: notices, settings: settings) != nil {
+            return (0, false, settings.collapsedProgressGlowEnabled, Layout.compactWingWidth, 0)
         }
         let selectedPriority = Self.selectedCompactStatusPriority(for: notices, settings: settings)
         guard let selectedPriority else { return nil }

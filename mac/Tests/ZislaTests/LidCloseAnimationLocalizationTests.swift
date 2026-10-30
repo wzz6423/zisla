@@ -11,7 +11,7 @@ struct LidCloseAnimationLocalizationTests {
     @Test
     func everyLanguageTranslatesTheLidCloseAnimationKeys() throws {
         let keys = try Self.lidCloseAnimationKeys()
-        #expect(keys.count == 4, "key 扫描失效，只找到 \(keys.count) 个")
+        #expect(keys.count == 3, "key 扫描失效，只找到 \(keys.count) 个")
 
         for language in AppLanguage.allCases {
             let table = try #require(
@@ -70,7 +70,7 @@ struct LidCloseAnimationLocalizationTests {
                 }
             }
         }
-        return keys
+        return keys.filter { !$0.isEmpty }
     }
 
     private static func stringsTable(for language: AppLanguage) -> [String: String]? {

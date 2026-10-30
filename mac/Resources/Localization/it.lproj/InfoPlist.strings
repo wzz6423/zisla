@@ -1,9 +1,9 @@
 "NSCalendarsFullAccessUsageDescription" = "zisla necessita dell'accesso agli eventi del calendario imminenti per il pannello informazioni superiore.";
-"NSAudioCaptureUsageDescription" = "zisla legge l’audio di sistema solo durante la riproduzione multimediale o quando regoli il volume di un’app, per mostrare una forma d’onda e regolare il volume di uscita di quell’app.";
-"NSCameraUsageDescription" = "zisla utilizza la fotocamera solo mentre lo specchio è aperto.";
+"NSAudioCaptureUsageDescription" = "zisla legge l’audio di sistema durante la riproduzione multimediale, quando regoli il volume di un’app o attivi l’audio di sistema per la registrazione dello schermo, per mostrare una forma d’onda, regolare il volume o registrare il suono riprodotto.";
+"NSCameraUsageDescription" = "zisla usa la fotocamera solo quando apri lo specchio o attivi la sovrapposizione della fotocamera per la registrazione dello schermo.";
 "NSRemindersFullAccessUsageDescription" = "zisla legge i promemoria con data per mostrarli insieme agli eventi del calendario.";
 "NSLocationWhenInUseUsageDescription" = "zisla richiede l’accesso alla posizione per mostrare il meteo locale, i nomi dei luoghi e le reti Wi-Fi nelle vicinanze.";
-"NSMicrophoneUsageDescription" = "zisla utilizza il microfono solo quando avvii l'input vocale, per trasformare il parlato in testo della conversazione AI corrente.";
-"NSSpeechRecognitionUsageDescription" = "zisla trascrive il parlato che registri attivamente in testo della conversazione AI.";
+"NSMicrophoneUsageDescription" = "zisla registra l’audio solo quando avvii l’input vocale o attivi il microfono per la registrazione dello schermo.";
+"NSSpeechRecognitionUsageDescription" = "zisla converte in testo la voce che registri volontariamente e trascrive localmente quando generi i sottotitoli di una registrazione dello schermo.";
 "NSAppleEventsUsageDescription" = "zisla utilizza Mail.app per leggere e gestire la posta, incluse caselle di posta, stato di lettura, eliminazione e risposte. Esegue inoltre i comandi che scegli in Terminal o iTerm.";
 "NSBluetoothAlwaysUsageDescription" = "zisla legge le informazioni pubbliche sulla batteria dei dispositivi Bluetooth collegati o associati solo quando apri la pagina Batteria.";

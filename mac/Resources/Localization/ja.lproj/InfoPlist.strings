@@ -1,9 +1,9 @@
 "NSCalendarsFullAccessUsageDescription" = "zislaは、トップ情報パネルに今後のカレンダーイベントを表示するためにアクセスが必要です。";
-"NSAudioCaptureUsageDescription" = "zisla は、メディアの再生中またはアプリ音量を調整するときにのみシステム音声を読み取り、波形の表示とそのアプリの出力音量の調整に使用します。";
-"NSCameraUsageDescription" = "zislaは、ミラーを開いているときのみカメラを使用します。";
+"NSAudioCaptureUsageDescription" = "zisla はメディアの再生中、アプリ音量の調整時、または画面収録でシステム音声を有効にしたときにシステム音声を読み取り、波形の表示、音量調整、再生音の録音に使用します。";
+"NSCameraUsageDescription" = "zisla はミラーを開いたとき、または画面収録でカメラの重ね合わせを有効にしたときだけカメラを使用します。";
 "NSRemindersFullAccessUsageDescription" = "zislaは、日付付きリマインダーを読み取り、カレンダーイベントと一緒に表示します。";
 "NSLocationWhenInUseUsageDescription" = "zisla は、地域の天気、地名、近くの Wi-Fi ネットワークを表示するために位置情報へのアクセスを必要とします。";
-"NSMicrophoneUsageDescription" = "zislaは、音声入力を開始したときのみマイクを使用し、音声を現在のAI会話テキストに変換します。";
-"NSSpeechRecognitionUsageDescription" = "zislaは、アクティブに録音した音声をAI会話テキストに変換します。";
+"NSMicrophoneUsageDescription" = "zisla は音声入力を開始したとき、または画面収録でマイクを有効にしたときだけ録音します。";
+"NSSpeechRecognitionUsageDescription" = "zisla は自分で録音した音声をテキストに変換し、画面収録の字幕を生成するときはこの Mac で文字起こしします。";
 "NSAppleEventsUsageDescription" = "zislaは、Mail.appを使用してメールの読み取りと管理を行います。受信トレイ、既読ステータス、削除、返信が含まれます。また、選択したコマンドをTerminalまたはiTermで実行します。";
 "NSBluetoothAlwaysUsageDescription" = "zislaは、バッテリーページを開いたときのみ、接続またはペアリングされたBluetoothデバイスの公開バッテリー情報を読み取ります。";

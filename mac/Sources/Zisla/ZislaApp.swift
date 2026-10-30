@@ -5,11 +5,6 @@ import ZislaCore
 import ZislaKit
 import SwiftUI
 
-@objc private protocol EditingActionTarget {
-    func undo(_ sender: Any?)
-    func redo(_ sender: Any?)
-}
-
 @main
 enum ZislaMain {
     @MainActor
@@ -41,44 +36,16 @@ final class SettingsWindow: NSWindow {
         if let recorder = firstResponder as? HotkeyRecorderButton, recorder.isRecording {
             return recorder.performKeyEquivalent(with: event)
         }
-        guard let action = Self.editingAction(for: event),
-              let firstResponder,
-              firstResponder.responds(to: action),
-              NSApp.sendAction(action, to: firstResponder, from: self)
-        else {
-            return super.performKeyEquivalent(with: event)
-        }
-        return true
-    }
-
-    fileprivate static func editingAction(for event: NSEvent) -> Selector? {
-        let modifiers = event.modifierFlags
-            .intersection(.deviceIndependentFlagsMask)
-            .subtracting([.capsLock, .numericPad, .function])
-        let key = event.charactersIgnoringModifiers?.lowercased()
-
-        return switch (key, modifiers) {
-        case ("a", .command): #selector(NSResponder.selectAll(_:))
-        case ("c", .command): #selector(NSText.copy(_:))
-        case ("v", .command): #selector(NSText.paste(_:))
-        case ("x", .command): #selector(NSText.cut(_:))
-        case ("z", .command): #selector(EditingActionTarget.undo(_:))
-        case ("z", [.command, .shift]): #selector(EditingActionTarget.redo(_:))
-        default: nil
-        }
+        return TextEditingCommands.performKeyEquivalent(with: event, in: self)
+            || super.performKeyEquivalent(with: event)
     }
 }
 
 @MainActor
 final class QuickNotesEditorWindow: NSWindow {
     override func performKeyEquivalent(with event: NSEvent) -> Bool {
-        guard let action = SettingsWindow.editingAction(for: event),
-              let firstResponder,
-              NSApp.sendAction(action, to: firstResponder, from: self)
-        else {
-            return super.performKeyEquivalent(with: event)
-        }
-        return true
+        TextEditingCommands.performKeyEquivalent(with: event, in: self)
+            || super.performKeyEquivalent(with: event)
     }
 }
 
@@ -370,6 +337,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
     private var additionalScreenshotEditors: [ScreenshotEditorWindowController] = []
     private var screenshotHotkeyManager = GlobalHotkeyManager()
     private var screenshotLongHotkeyManager = GlobalHotkeyManager()
+    private var screenRecordingController: ScreenRecordingStudioController?
+    private var recordingHotkeyManagers: [RecordingShortcutAction: GlobalHotkeyManager] = [:]
     private var pendingScreenshotPin = false
     private var isScreenshotSessionActive = false
     private var screenshotSnapTargetProcessTracker = ScreenshotSnapTargetProcessTracker()
@@ -377,6 +346,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
     private var systemScreenshotMonitor: SystemScreenshotMonitor?
     private var cancellables: Set<AnyCancellable> = []
     private var effectiveAppearanceObservation: NSKeyValueObservation?
+    private var textEditingMonitor: Any?
     private var currentApplicationIconImage: NSImage?
     private var expandedSizeUpdateTask: Task<Void, Never>?
     private var islandClipboardHandoffTask: Task<Void, Never>?
@@ -397,6 +367,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
             return
         }
         NSApp.setActivationPolicy(.accessory)
+        configureTextEditingCommands()
         WindowPlacement.installTransientWindowPromotion()
         let defaults = UserDefaults.standard
         let hasExistingInstallation = [
@@ -679,6 +650,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
         )
         configureMainMenu()
         registerScreenshotHotkeys()
+        model.onScreenRecordingRequested = { [weak self] in self?.showScreenRecording() }
+        model.screenRecordingSettingsModel = { [weak self] in self?.recordingStudio().model }
+        registerRecordingHotkeys()
         startSystemScreenshotMonitoring()
         syncAppStatusItem()
         syncMonitorStatusItems(force: true)
@@ -764,8 +738,26 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
             .sink { [weak self] _ in
                 Task { @MainActor [weak self] in
                     self?.registerScreenshotHotkeys()
+                    self?.registerRecordingHotkeys()
                 }
             }
+            .store(in: &cancellables)
+
+        model.settingsStore.$settings
+            .removeDuplicates {
+                $0.screenRecordingEnabled == $1.screenRecordingEnabled
+                    && $0.screenRecordingHotkeys == $1.screenRecordingHotkeys
+                    && $0.screenshotEnabled == $1.screenshotEnabled
+                    && $0.screenshotHotkey == $1.screenshotHotkey
+                    && $0.screenshotLongHotkey == $1.screenshotLongHotkey
+                    && $0.voiceInputEnabled == $1.voiceInputEnabled
+                    && $0.voiceInputHotkeyPreset == $1.voiceInputHotkeyPreset
+                    && $0.clipboardAssistantEnabled == $1.clipboardAssistantEnabled
+                    && $0.clipboardAssistantTriggerConfiguration == $1.clipboardAssistantTriggerConfiguration
+                    && $0.clipboardAssistantDismissConfiguration == $1.clipboardAssistantDismissConfiguration
+            }
+            .dropFirst()
+            .sink { [weak self] settings in self?.registerRecordingHotkeys(settings: settings) }
             .store(in: &cancellables)
 
         model.settingsStore.$settings
@@ -944,12 +936,15 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
     func applicationShouldTerminate(
         _ application: NSApplication
     ) -> NSApplication.TerminateReply {
+        if let screenRecordingController, !screenRecordingController.prepareToTerminate() { return .terminateCancel }
         guard let runningModel else { return .terminateNow }
         return runningModel.keyboardSound.applicationShouldTerminate(application)
     }
 
     func applicationWillTerminate(_ notification: Notification) {
         isTerminating = true
+        if let textEditingMonitor { NSEvent.removeMonitor(textEditingMonitor) }
+        textEditingMonitor = nil
         onboardingLifecycle?.terminate()
         onboardingController?.close()
         onboardingController = nil
@@ -965,6 +960,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
         runningModel.stop()
         screenshotHotkeyManager.unregister()
         screenshotLongHotkeyManager.unregister()
+        recordingHotkeyManagers.values.forEach { $0.unregister() }
+        recordingHotkeyManagers.removeAll()
+        screenRecordingController?.shutdown()
+        screenRecordingController = nil
+        runningModel.onScreenRecordingRequested = nil
+        runningModel.screenRecordingSettingsModel = nil
         setScreenshotSessionActive(false)
         screenshotSelectionController?.cancel()
         screenshotEditorController?.close()
@@ -1082,6 +1083,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
         )
     }
 
+    func configureTextEditingCommands() {
+        textEditingMonitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { event in
+            TextEditingCommands.handle(event)
+        }
+    }
+
     private func configureMainMenu() {
         let mainMenu = NSMenu()
 
@@ -1110,6 +1117,17 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
         pinItem.target = self
         applicationMenuItem.submenu = applicationMenu
         mainMenu.addItem(applicationMenuItem)
+
+        let recordingMenuItem = NSMenuItem(title: localized("录屏"), action: nil, keyEquivalent: "")
+        let recordingMenu = NSMenu(title: localized("录屏"))
+        for action in RecordingShortcutAction.allCases {
+            let item = recordingMenu.addItem(withTitle: localized(action.title),
+                action: #selector(performRecordingMenuAction(_:)), keyEquivalent: "")
+            item.tag = action.rawValue
+            item.target = self
+        }
+        recordingMenuItem.submenu = recordingMenu
+        mainMenu.addItem(recordingMenuItem)
 
         let windowMenuItem = NSMenuItem(title: localized("窗口"), action: nil, keyEquivalent: "")
         let windowMenu = NSMenu(title: localized("窗口"))
@@ -1187,6 +1205,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
         let menu = NSMenu()
         menu.addItem(withTitle: localized("显示灵动岛"), action: #selector(showIsland), keyEquivalent: "")
         menu.addItem(withTitle: localized("截图"), action: #selector(startScreenshot), keyEquivalent: "")
+        menu.addItem(withTitle: localized("录屏工作室"), action: #selector(showScreenRecording), keyEquivalent: "")
         menu.addItem(withTitle: localized("系统监控"), action: #selector(showSystemMonitor), keyEquivalent: "")
         menu.addItem(withTitle: localized("设置..."), action: #selector(showSettings), keyEquivalent: ",")
         menu.addItem(withTitle: localized("检查更新"), action: #selector(checkUpdates), keyEquivalent: "")
@@ -1785,6 +1804,49 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
         if isLidOverlaySuspendedForScreenshotSession {
             isLidOverlaySuspendedForScreenshotSession = false
             lidCloseController?.setOverlayHiddenForScreenshotSession(false)
+        }
+    }
+
+    @objc private func showScreenRecording() {
+        guard AppModel.shared.settingsStore.settings.screenRecordingEnabled else { return }
+        recordingStudio().presentCaptureControls()
+    }
+
+    private func recordingStudio() -> ScreenRecordingStudioController {
+        if let screenRecordingController { return screenRecordingController }
+        let controller = ScreenRecordingStudioController(appModel: AppModel.shared)
+        screenRecordingController = controller
+        return controller
+    }
+
+    @objc private func performRecordingMenuAction(_ sender: NSMenuItem) {
+        guard let action = RecordingShortcutAction(rawValue: sender.tag) else { return }
+        performRecordingAction(action)
+    }
+
+    private func performRecordingAction(_ action: RecordingShortcutAction) {
+        guard AppModel.shared.settingsStore.settings.screenRecordingEnabled
+                || action == .pause || action == .stop else { return }
+        if action == .pause || action == .stop { screenRecordingController?.perform(action); return }
+        recordingStudio().perform(action)
+    }
+
+    private func registerRecordingHotkeys(settings: FeatureSettings = AppModel.shared.settingsStore.settings) {
+        recordingHotkeyManagers.values.forEach { $0.unregister() }
+        recordingHotkeyManagers.removeAll()
+        guard settings.screenRecordingEnabled else { return }
+        for action in RecordingShortcutAction.allCases {
+            let hotkey = settings.screenRecordingHotkey(for: action)
+            if let conflict = settings.recordingShortcutConflict(for: hotkey, excluding: action) {
+                AppModel.shared.transientMessage = AppLocalization.text("%@快捷键与%@冲突，请修改其中一个",
+                    AppLocalization.text(action.title), AppLocalization.text(conflict))
+                continue
+            }
+            let manager = GlobalHotkeyManager()
+            let result = manager.register(hotkey: hotkey,
+                onKeyDown: { [weak self] in self?.performRecordingAction(action) }, onKeyUp: {})
+            recordingHotkeyManagers[action] = manager
+            reportScreenshotHotkeyRegistration(result, actionName: AppLocalization.text(action.title))
         }
     }
 

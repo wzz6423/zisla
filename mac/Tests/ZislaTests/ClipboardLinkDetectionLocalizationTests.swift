@@ -6,7 +6,7 @@ struct ClipboardLinkDetectionLocalizationTests {
     @Test
     func clipboardLinkDetectionSettingCopyIsTranslatedForEveryLanguage() throws {
         let keys = try Self.clipboardLinkDetectionKeys()
-        #expect(keys == ["剪贴板链接检测", "发现链接时提示"])
+        #expect(keys == ["剪贴板链接检测"])
 
         for language in AppLanguage.allCases {
             let table = try #require(
@@ -32,7 +32,7 @@ struct ClipboardLinkDetectionLocalizationTests {
         let match = try #require(matches.first)
         return [1, 2].compactMap { index in
             Range(match.range(at: index), in: source).map { String(source[$0]) }
-        }
+        }.filter { !$0.isEmpty }
     }
 
     private static func stringsTable(for language: AppLanguage) -> [String: String]? {

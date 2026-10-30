@@ -28,6 +28,7 @@ struct SettingsView: View {
     @State private var customVoiceHotword = ""
     @State private var localVoiceHardware: LocalVoiceHardware?
     @State private var screenshotHotkeyValidationMessage: String?
+    @State private var recordingHotkeyValidationMessage: String?
     @State private var voiceHotkeyValidationMessage: String?
     @State private var assistantHotkeyValidationMessage: String?
     @State private var expandedClipboardAssistantKind: ClipboardAssistantKind?
@@ -176,9 +177,6 @@ struct SettingsView: View {
                     VStack(alignment: .leading, spacing: 3) {
                         AppLocalizedText(input.selection.title)
                             .font(.system(size: 23, weight: .semibold))
-                        AppLocalizedText(input.selection.subtitle)
-                            .font(.system(size: 12))
-                            .foregroundStyle(.secondary)
                     }
                     DeferredMount {
                         AnyView(selectedContent)
@@ -231,7 +229,7 @@ struct SettingsView: View {
             featuresContent
         case .keyboardSound:
             keyboardSoundContent
-        case .clipboardAssistant, .screenshot:
+        case .clipboardAssistant, .screenshot, .recording:
             featuresContent
         case .pdfTools:
             PDFToolsModuleView(model: model, initialOperation: input.selectedPDFOperation)
@@ -349,7 +347,7 @@ struct SettingsView: View {
                         settingRow(
                             symbol: "rectangle.compress.vertical",
                             title: "监控样式",
-                            detail: "紧凑模式隐藏图标并减小字号，减少菜单栏占用",
+                            detail: "",
                             isNested: true
                         ) {
                             IslandOutlinedPicker(
@@ -370,7 +368,7 @@ struct SettingsView: View {
                             settingRow(
                                 symbol: metric.symbolName,
                                 title: metric.menuTitle,
-                                detail: "显示实时监控摘要",
+                                detail: "",
                                 isNested: true
                             ) {
                                 Toggle("", isOn: systemMonitorMenuBarBinding(for: metric))
@@ -411,7 +409,7 @@ struct SettingsView: View {
                 settingsGroup("推荐") {
                     featureToggle(
                         "显示推荐工具",
-                        detail: "在设置中显示推荐工具和管理入口",
+                        detail: "",
                         symbol: "sparkles",
                         keyPath: \.recommendedToolsEnabled
                     )
@@ -428,7 +426,7 @@ struct SettingsView: View {
             }
             if input.selection == .features {
                 settingsGroup("媒体与文件") {
-                    featureToggle("媒体播放", detail: "显示系统正在播放的音乐或视频", symbol: "play.square.fill", keyPath: \.mediaEnabled)
+                    featureToggle("媒体播放", detail: "", symbol: "play.square.fill", keyPath: \.mediaEnabled)
                     rowDivider
                     featureToggle(
                         AppLocalization.text("Mac 未使用时关闭背景音"),
@@ -448,11 +446,11 @@ struct SettingsView: View {
                     )
                     .disabled(!model.settingsStore.settings.fileShelfEnabled)
                     rowDivider
-                    featureToggle("链接下载", detail: "下载视频或音频", symbol: "arrow.down.circle.fill", keyPath: \.downloaderEnabled)
+                    featureToggle("链接下载", detail: "", symbol: "arrow.down.circle.fill", keyPath: \.downloaderEnabled)
                     rowDivider
                     featureToggle(AppLocalization.text("剪贴板历史"), detail: "仅本机保存文本和图片", symbol: "clipboard", keyPath: \.clipboardHistoryEnabled)
                     rowDivider
-                    featureToggle(AppLocalization.text("剪贴板链接检测"), detail: "发现链接时提示", symbol: "clipboard.fill", keyPath: \.clipboardDetectionEnabled)
+                    featureToggle(AppLocalization.text("剪贴板链接检测"), detail: "", symbol: "clipboard.fill", keyPath: \.clipboardDetectionEnabled)
                 }
             }
 
@@ -478,6 +476,11 @@ struct SettingsView: View {
                                 hotkey: Binding(
                                     get: { model.settingsStore.settings.clipboardAssistantTriggerConfiguration.hotkey },
                                     set: { newValue in
+                                        if let newValue,
+                                           let message = recordingConflictMessage(for: newValue, actionName: "快捷操作") {
+                                            assistantHotkeyValidationMessage = message
+                                            return
+                                        }
                                         if let newValue,
                                            let conflict = Self.conflictingScreenshotAction(
                                                forGlobalHotkey: newValue, in: model.settingsStore.settings
@@ -517,6 +520,12 @@ struct SettingsView: View {
                                 hotkey: Binding(
                                     get: { model.settingsStore.settings.clipboardAssistantDismissConfiguration.hotkey },
                                     set: { newValue in
+                                        if let newValue,
+                                           let message = recordingConflictMessage(for: newValue, actionName: "关闭弹窗快捷键") {
+                                            assistantHotkeyValidationMessage = message
+                                            return
+                                        }
+                                        assistantHotkeyValidationMessage = nil
                                         model.settingsStore.settings.clipboardAssistantDismissConfiguration =
                                             newValue.map(ClipboardAssistantTriggerConfiguration.hotkey) ?? .none
                                     }
@@ -672,7 +681,7 @@ struct SettingsView: View {
                     settingRow(
                         symbol: "magnifyingglass.circle",
                         title: "搜索引擎",
-                        detail: "文本搜索使用的搜索引擎"
+                        detail: ""
                     ) {
                         Picker(
                             "",
@@ -744,7 +753,7 @@ struct SettingsView: View {
                     settingRow(
                         symbol: "slider.horizontal.3",
                         title: "识别类型",
-                        detail: "控制哪些内容会触发提示"
+                        detail: ""
                     ) {
                         EmptyView()
                     }
@@ -938,17 +947,17 @@ struct SettingsView: View {
 
             if input.selection == .features {
                 settingsGroup("信息与通知") {
-                    featureToggle("日历日程", detail: "显示接下来的日程与会议", symbol: "calendar", keyPath: \.calendarEnabled)
+                    featureToggle("日历日程", detail: "", symbol: "calendar", keyPath: \.calendarEnabled)
                     rowDivider
-                    featureToggle("天气", detail: "显示当前或自选地区的天气", symbol: "cloud.sun.fill", keyPath: \.weatherEnabled)
+                    featureToggle("天气", detail: "", symbol: "cloud.sun.fill", keyPath: \.weatherEnabled)
                     rowDivider
                     featureToggle("邮件", detail: "读取已配置的 Mail.app 账户并提醒新邮件", symbol: "envelope.fill", keyPath: \.mailEnabled)
                     rowDivider
-                    featureToggle("侧翼通知", detail: "在灵动岛肩部显示任务变化", symbol: "bell.badge.fill", keyPath: \.sideNoticesEnabled)
+                    featureToggle("侧翼通知", detail: "", symbol: "bell.badge.fill", keyPath: \.sideNoticesEnabled)
                     rowDivider
-                    featureToggle("锁屏信息", detail: "在系统锁屏页显示状态信息与播放器", symbol: "lock.display", keyPath: \.lockScreenInfoEnabled)
+                    featureToggle("锁屏信息", detail: "", symbol: "lock.display", keyPath: \.lockScreenInfoEnabled)
                     rowDivider
-                    featureToggle("专注倒计时", detail: "专注时在收起态灵动岛显示剩余时间", symbol: "clock", keyPath: \.focusCountdownIslandEnabled)
+                    featureToggle("专注倒计时", detail: "", symbol: "clock", keyPath: \.focusCountdownIslandEnabled)
                         .disabled(!model.settingsStore.settings.sideNoticesEnabled)
                     rowDivider
                     featureToggle("工具箱提醒", detail: "在收起态提示番茄钟、亮屏和清洁状态", symbol: "bell.fill", keyPath: \.toolboxReminderEnabled)
@@ -978,13 +987,13 @@ struct SettingsView: View {
                     rowDivider
                     featureToggle("随记", detail: "Markdown 随手记，可发送到系统备忘录", symbol: "note.text", keyPath: \.quickNotesEnabled)
                     rowDivider
-                    featureToggle("PDF 工具", detail: "合并、拆分、加密与转换 PDF", symbol: "doc.text.fill", keyPath: \.pdfToolsEnabled)
+                    featureToggle("PDF 工具", detail: "", symbol: "doc.text.fill", keyPath: \.pdfToolsEnabled)
                     rowDivider
-                    featureToggle("应用音量混音器", detail: "在灵动岛分别调整应用的媒体音量。", symbol: "slider.horizontal.3", keyPath: \.volumeMixerEnabled)
+                    featureToggle("应用音量混音器", detail: "", symbol: "slider.horizontal.3", keyPath: \.volumeMixerEnabled)
                     rowDivider
                     featureToggle("系统状态与清理", detail: "监控资源并安全清理缓存和日志", symbol: "gauge.with.dots.needle.67percent", keyPath: \.systemMonitorEnabled)
                     rowDivider
-                    featureToggle("电池监控", detail: "显示电池详细信息与健康状态", symbol: "battery.100percent", keyPath: \.batteryMonitorEnabled)
+                    featureToggle("电池监控", detail: "", symbol: "battery.100percent", keyPath: \.batteryMonitorEnabled)
                     rowDivider
                     featureToggle("键盘音效", detail: "全局播放键盘音效并记录输入统计", symbol: "keyboard.badge.ellipsis", keyPath: \.keyboardEnabled)
                     rowDivider
@@ -1031,12 +1040,62 @@ struct SettingsView: View {
                 }
             }
 
+            if input.selection == .features || input.selection == .recording {
+                settingsGroup("录屏") {
+                    featureToggle("启用录屏", detail: "",
+                        symbol: "record.circle", keyPath: \.screenRecordingEnabled)
+                    if input.selection == .recording {
+                        rowDivider
+                        settingRow(symbol: "rectangle.stack", title: "录屏工作室", detail: "") {
+                            Button(AppLocalization.text("打开")) { model.presentScreenRecording() }
+                                .controlSize(.small)
+                        }
+                        if let recordingModel = model.screenRecordingSettingsModel?() {
+                            rowDivider
+                            settingRow(symbol: "folder", title: "保存位置", detail: "") {
+                                ScreenRecordingOutputDirectorySettingsView(model: recordingModel)
+                            }
+                        }
+                        ForEach(RecordingShortcutAction.allCases) { action in
+                            rowDivider
+                            settingRow(symbol: "keyboard", title: action.title, detail: "") {
+                                HotkeyRecorder(hotkey: Binding(
+                                    get: { model.settingsStore.settings.screenRecordingHotkey(for: action) },
+                                    set: { if let value = $0 { updateRecordingHotkey(value, action: action) } }
+                                ))
+                            }
+                        }
+                        rowDivider
+                        settingRow(symbol: "arrow.counterclockwise", title: "恢复默认快捷键", detail: "") {
+                            Button(AppLocalization.text("恢复默认快捷键")) {
+                                model.settingsStore.settings.screenRecordingHotkeys.removeAll()
+                                recordingHotkeyValidationMessage = nil
+                            }.controlSize(.small)
+                        }
+                        if let message = recordingHotkeyValidationMessage ?? currentRecordingHotkeyConflict {
+                            rowDivider
+                            Label(message, systemImage: "exclamationmark.triangle.fill")
+                                .font(.caption).foregroundStyle(Color.zislaWarning)
+                        }
+                        if RecordingShortcutAction.allCases.contains(where: {
+                            model.settingsStore.settings.screenRecordingHotkey(for: $0).requiresInputMonitoring
+                        }) {
+                            rowDivider
+                            settingRow(symbol: "lock.shield", title: "输入监控", detail: "单独修饰键需要监听全局键盘事件") {
+                                Button(AppLocalization.text("打开设置")) { model.openVoiceInputInputMonitoringSettings() }
+                                    .controlSize(.small)
+                            }
+                        }
+                    }
+                }
+            }
+
             if input.selection == .features || input.selection == .screenshot {
                 settingsGroup("截图") {
                     if input.selection == .features {
                         featureToggle(
                             AppLocalization.text("启用截图"),
-                            detail: "启用截图、钉图与全局快捷键",
+                            detail: "",
                             symbol: "camera.viewfinder",
                             keyPath: \.screenshotEnabled
                         )
@@ -1044,7 +1103,7 @@ struct SettingsView: View {
                         settingRow(
                             symbol: "camera.fill",
                             title: "截图快捷键",
-                            detail: "触发截图功能"
+                            detail: ""
                         ) {
                             HotkeyRecorder(
                                 hotkey: Binding(
@@ -1060,7 +1119,7 @@ struct SettingsView: View {
                         settingRow(
                             symbol: "rectangle.on.rectangle",
                             title: "长截图",
-                            detail: "触发截图功能"
+                            detail: ""
                         ) {
                             HotkeyRecorder(
                                 hotkey: Binding(
@@ -1132,7 +1191,7 @@ struct SettingsView: View {
                 }
                 if input.selection == .screenshot {
                     settingsGroup("工具") {
-                        settingRow(symbol: "pin.fill", title: "钉图快捷键", detail: "钉住已截取的图片") {
+                        settingRow(symbol: "pin.fill", title: "钉图快捷键", detail: "") {
                             HotkeyRecorder(hotkey: Binding(
                                 get: { model.settingsStore.settings.screenshotPinHotkey },
                                 set: { if let value = $0 { updateScreenshotHotkey(value, action: .pin) } }
@@ -1195,17 +1254,17 @@ struct SettingsView: View {
                     rowDivider
                     featureToggle(AppLocalization.text("提示条进度光效"), detail: AppLocalization.text("在收起态提示条边沿显示播放、下载和自动关闭进度"), symbol: "chart.bar.fill", keyPath: \.collapsedProgressGlowEnabled)
                     rowDivider
-                    featureToggle("浏览器下载进度", detail: "在灵动岛显示来源图标与百分比", symbol: "arrow.down.circle.fill", keyPath: \.browserDownloadIslandEnabled)
+                    featureToggle("浏览器下载进度", detail: "", symbol: "arrow.down.circle.fill", keyPath: \.browserDownloadIslandEnabled)
                         .disabled(!model.settingsStore.settings.sideNoticesEnabled)
                     rowDivider
-                    featureToggle("原生下载进度", detail: "下载器工作时显示来源平台图标与百分比", symbol: "arrow.down.square.fill", keyPath: \.videoDownloadIslandEnabled)
+                    featureToggle("原生下载进度", detail: "", symbol: "arrow.down.square.fill", keyPath: \.videoDownloadIslandEnabled)
                         .disabled(!model.settingsStore.settings.sideNoticesEnabled)
                     rowDivider
-                    featureToggle(AppLocalization.text("静音 Zisla 通知"), detail: "不发送番茄钟等由 Zisla 产生的系统通知", symbol: "bell.slash.fill", keyPath: \.notificationsMuted)
+                    featureToggle(AppLocalization.text("静音 Zisla 通知"), detail: "", symbol: "bell.slash.fill", keyPath: \.notificationsMuted)
                 }
 
                 settingsGroup("宠物与更新") {
-                    featureToggle("宠物", detail: "在灵动岛养一只小宠物", symbol: "pawprint.fill", keyPath: \.petEnabled)
+                    featureToggle("宠物", detail: "", symbol: "pawprint.fill", keyPath: \.petEnabled)
                     rowDivider
                     featureToggle(AppLocalization.text("自动检查更新"), detail: "定期检查当前安装包所属的更新通道", symbol: "arrow.triangle.2.circlepath", keyPath: \.updateChecksEnabled)
                     rowDivider
@@ -1219,7 +1278,7 @@ struct SettingsView: View {
     private var keyboardSoundContent: some View {
         VStack(alignment: .leading, spacing: 20) {
             settingsGroup("全局音效") {
-                settingRow(symbol: "waveform", title: "键盘音色", detail: "选择机械键盘音色") {
+                settingRow(symbol: "waveform", title: "键盘音色", detail: "") {
                     HStack(spacing: 6) {
                         Picker("", selection: Binding(
                             get: { model.settingsStore.settings.keyboardSelectedProfileID },
@@ -1244,7 +1303,7 @@ struct SettingsView: View {
                     .disabled(!model.settingsStore.settings.keyboardEnabled)
                 }
                 rowDivider
-                settingRow(symbol: "speaker.wave.2", title: "键盘音量", detail: "调整主音量") {
+                settingRow(symbol: "speaker.wave.2", title: "键盘音量", detail: "") {
                     Slider(value: Binding(
                         get: { model.settingsStore.settings.keyboardVolume },
                         set: { model.settingsStore.settings.keyboardVolume = $0 }
@@ -1253,10 +1312,10 @@ struct SettingsView: View {
                     .disabled(!model.settingsStore.settings.keyboardEnabled)
                 }
                 rowDivider
-                featureToggle("播放键盘回弹音", detail: "为支持的音色播放释放音", symbol: "arrow.uturn.backward", keyPath: \.keyboardPlaysReleaseSound, isNested: true)
+                featureToggle("播放键盘回弹音", detail: "", symbol: "arrow.uturn.backward", keyPath: \.keyboardPlaysReleaseSound, isNested: true)
                     .disabled(!model.settingsStore.settings.keyboardEnabled)
                 rowDivider
-                featureToggle(AppLocalization.text("自然音高变化"), detail: "在连续击键间使用轻微音量与音高变化", symbol: "waveform.path.ecg", keyPath: \.keyboardUsesPitchVariation, isNested: true)
+                featureToggle(AppLocalization.text("自然音高变化"), detail: "", symbol: "waveform.path.ecg", keyPath: \.keyboardUsesPitchVariation, isNested: true)
                     .disabled(!model.settingsStore.settings.keyboardEnabled)
             }
 
@@ -1425,7 +1484,7 @@ struct SettingsView: View {
                         settingRow(
                             symbol: "display",
                             title: display.name,
-                            detail: "播放与 AI 活动通知显示在此屏幕"
+                            detail: ""
                         ) {
                             Toggle(
                                 "",
@@ -1504,7 +1563,7 @@ struct SettingsView: View {
                 settingRow(
                     symbol: "cpu",
                     title: "使用模型",
-                    detail: "从上方已启用的本地或远端模型中选择"
+                    detail: ""
                 ) {
                     Picker(
                         "",
@@ -1935,6 +1994,10 @@ struct SettingsView: View {
                                 get: { model.settingsStore.settings.voiceInputHotkeyPreset },
                                 set: { newValue in
                                     guard let newValue else { return }
+                                    if let message = recordingConflictMessage(for: newValue, actionName: "语音输入") {
+                                        voiceHotkeyValidationMessage = message
+                                        return
+                                    }
                                     if let conflict = Self.conflictingScreenshotAction(
                                         forGlobalHotkey: newValue, in: model.settingsStore.settings
                                     ) {
@@ -1988,7 +2051,7 @@ struct SettingsView: View {
                 settingRow(
                     symbol: "shippingbox.fill",
                     title: "当前宠物",
-                    detail: "选择内置的宠物形象"
+                    detail: ""
                 ) {
                     Picker(
                         "",
@@ -2011,7 +2074,7 @@ struct SettingsView: View {
                 settingRow(
                     symbol: "arrow.left.and.right",
                     title: "在岛的哪一侧",
-                    detail: "宠物出现在灵动岛内部的左侧或右侧"
+                    detail: ""
                 ) {
                     Picker(
                         "",
@@ -2224,12 +2287,48 @@ struct SettingsView: View {
         return nil
     }
 
+    private var currentRecordingHotkeyConflict: String? {
+        let settings = model.settingsStore.settings
+        for action in RecordingShortcutAction.allCases {
+            if let conflict = settings.recordingShortcutConflict(for: settings.screenRecordingHotkey(for: action), excluding: action) {
+                return AppLocalization.text("%@快捷键与%@冲突，请修改其中一个",
+                    AppLocalization.text(action.title), AppLocalization.text(conflict))
+            }
+        }
+        return nil
+    }
+
+    private func updateRecordingHotkey(_ hotkey: VoiceInputHotkeyPreset, action: RecordingShortcutAction) {
+        let settings = model.settingsStore.settings
+        if let conflict = settings.recordingShortcutConflict(for: hotkey, excluding: action) {
+            recordingHotkeyValidationMessage = AppLocalization.text("%@快捷键与%@冲突，未保存",
+                AppLocalization.text(action.title), AppLocalization.text(conflict))
+            return
+        }
+        model.settingsStore.settings.screenRecordingHotkeys[String(action.rawValue)] = hotkey
+        recordingHotkeyValidationMessage = nil
+    }
+
+    private func recordingConflictMessage(for hotkey: VoiceInputHotkeyPreset, actionName: String) -> String? {
+        let settings = model.settingsStore.settings
+        guard settings.screenRecordingEnabled,
+              let conflict = RecordingShortcutAction.allCases.first(where: { hotkey.conflicts(with: settings.screenRecordingHotkey(for: $0)) }) else { return nil }
+        return AppLocalization.text("%@快捷键与%@冲突，未保存",
+            AppLocalization.text(actionName), AppLocalization.text(conflict.title))
+    }
+
     private func updateScreenshotHotkey(
         _ hotkey: VoiceInputHotkeyPreset,
         action: ScreenshotHotkeyAction
     ) {
         var settings = model.settingsStore.settings
         let actionName = AppLocalization.text(action.name)
+        if settings.screenRecordingEnabled,
+           let conflict = RecordingShortcutAction.allCases.first(where: { hotkey.conflicts(with: settings.screenRecordingHotkey(for: $0)) }) {
+            screenshotHotkeyValidationMessage = AppLocalization.text("%@快捷键与%@冲突，未保存",
+                actionName, AppLocalization.text(conflict.title))
+            return
+        }
         if let reservedAction = ScreenshotEditorWindow.reservedAction(for: hotkey) {
             screenshotHotkeyValidationMessage = AppLocalization.text(
                 "%@快捷键与%@冲突，未保存",
@@ -2286,7 +2385,7 @@ struct SettingsView: View {
                 settingRow(
                     symbol: "power.circle.fill",
                     title: "登录时启动",
-                    detail: launchAtLogin.statusMessage ?? "开机或登录后自动在后台运行"
+                    detail: launchAtLogin.statusMessage ?? ""
                 ) {
                     Toggle(
                         "",
@@ -2331,7 +2430,7 @@ struct SettingsView: View {
                 settingRow(
                     symbol: "character.bubble",
                     title: "界面语言",
-                    detail: "切换后立即应用到支持的界面文本"
+                    detail: ""
                 ) {
                     Picker(
                         "",
@@ -2358,9 +2457,6 @@ struct SettingsView: View {
                         }
                     }
                     .settingsSearchAnchor(.row(AppLocalization.string("界面外观", locale: locale)))
-                    AppLocalizedText("仅影响 zisla 的窗口与面板，不会更改 macOS 外观。")
-                        .font(.system(size: 11))
-                        .foregroundStyle(.secondary)
                 }
                 .padding(.vertical, 5)
             }
@@ -2369,7 +2465,7 @@ struct SettingsView: View {
                 settingRow(
                     symbol: "rectangle.on.rectangle.angled",
                     title: "灵动岛样式",
-                    detail: model.settingsStore.settings.islandVisualStyle.detail,
+                    detail: "",
                     detailLineLimit: nil
                 ) {
                     IslandVisualStylePicker(
@@ -2383,7 +2479,7 @@ struct SettingsView: View {
                 settingRow(
                     symbol: "rectangle.topthird.inset.filled",
                     title: "刘海背景",
-                    detail: model.settingsStore.settings.islandNotchBackground.detail
+                    detail: ""
                 ) {
                     IslandNotchBackgroundPicker(
                         selection: Binding(
@@ -2790,7 +2886,7 @@ struct SettingsView: View {
                 settingRow(
                     symbol: "cloud.sun.fill",
                     title: "天气数据",
-                    detail: "刷新当前位置与全部自选地区"
+                    detail: ""
                 ) {
                     Button {
                         model.refreshWeather()
@@ -2864,7 +2960,7 @@ struct SettingsView: View {
                 settingRow(
                     symbol: "arrow.triangle.branch",
                     title: "更新通道",
-                    detail: AppLocalization.text("%@；用于自动与手动更新", AppLocalization.text(model.settingsStore.settings.updateChannel.detail))
+                    detail: AppLocalization.text(model.settingsStore.settings.updateChannel.detail)
                 ) {
                     IslandOutlinedPicker(
                         selection: Binding(
@@ -3066,7 +3162,7 @@ struct SettingsView: View {
     }
 
     private func lidClosePreviewRow() -> some View {
-        settingRow(symbol: "play.circle", title: "预览动画", detail: "不用合盖，在当前屏幕内容上播放一次") {
+        settingRow(symbol: "play.circle", title: "预览动画", detail: "") {
             Button {
                 NotificationCenter.default.post(name: .lidCloseAnimationPreview, object: nil)
             } label: {
@@ -4266,6 +4362,7 @@ enum SettingsSection: String, CaseIterable, Identifiable {
     case info
     case clipboardAssistant
     case screenshot
+    case recording
     case pdfTools
     case ai
     case voice
@@ -4284,7 +4381,7 @@ enum SettingsSection: String, CaseIterable, Identifiable {
         switch self {
         case .general, .features, .info: .basics
         case .keyboardSound: .sound
-        case .clipboardAssistant, .screenshot, .pdfTools, .download: .files
+        case .clipboardAssistant, .screenshot, .pdfTools, .recording, .download: .files
         case .ai, .voice: .aiAndVoice
         case .mail, .weather, .networkProxy, .pet, .recommendations, .updates: .networkAndOthers
         }
@@ -4303,6 +4400,7 @@ enum SettingsSection: String, CaseIterable, Identifiable {
         case .clipboardAssistant: "快捷操作"
         case .screenshot: "截图"
         case .pdfTools: "PDF 工具"
+        case .recording: "录屏"
         case .info: "信息"
         case .mail: "邮件"
         case .ai: "AI"
@@ -4324,6 +4422,7 @@ enum SettingsSection: String, CaseIterable, Identifiable {
         case .clipboardAssistant: "sparkles.rectangle.stack"
         case .screenshot: "camera.viewfinder"
         case .pdfTools: "doc.text.fill"
+        case .recording: "record.circle"
         case .info: "info.circle.fill"
         case .mail: "envelope.fill"
         case .ai: "sparkles"
@@ -4345,6 +4444,7 @@ enum SettingsSection: String, CaseIterable, Identifiable {
         case .clipboardAssistant: "复制、浏览器下载或 AirDrop 接收完成后显示下一步操作"
         case .screenshot: "启用截图、钉图与全局快捷键"
         case .pdfTools: "在设置中合并、拆分、加密与转换 PDF。"
+        case .recording: "录制屏幕、编辑视频与保存项目。"
         case .info: "配置媒体、系统监控、锁屏与通知显示。"
         case .mail: "读取已配置的 Mail.app 账户并提醒新邮件"
         case .ai: "管理 AI CLI 与 Skills。"
@@ -4372,6 +4472,8 @@ enum SettingsSection: String, CaseIterable, Identifiable {
             return settings.screenshotEnabled
         case .pdfTools:
             return settings.pdfToolsEnabled
+        case .recording:
+            return settings.screenRecordingEnabled
         case .info:
             return settings.mediaEnabled || settings.systemMonitorEnabled
                 || settings.lockScreenInfoEnabled || settings.sideNoticesEnabled

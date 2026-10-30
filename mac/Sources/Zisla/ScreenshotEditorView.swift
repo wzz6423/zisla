@@ -186,7 +186,8 @@ enum ScreenshotLongCaptureMatcher {
     /// two, and that leftover strip is what users saw as a white line in long screenshots.
     private static let refinedProfileLength = 96
     private static let refinedMaximumSampleCount = 320
-    private static let refinedMaximumScore = 12.0
+    private static let refinedMaximumScore = 0.5
+    private static let refinedMinimumCornerContrast = 16
     private static let refinedTieTolerance = 0.05
 
     /// A frame overlapping everything but a few pixels only contributes a duplicated strip, so those
@@ -362,6 +363,14 @@ enum ScreenshotLongCaptureMatcher {
             ) {
                 best = (candidate.placement, refined.overlap, refined.score)
             }
+        }
+        let nativeAxisLength = min(
+            incomingAxisLength,
+            direction == .vertical ? previous.height : previous.width
+        )
+        // A coarse proposal can be a blank band. Do not revive it after native refinement rejected it.
+        guard best != nil || Double(nativeAxisLength) / Double(primary.axisLength) <= 1.01 else {
+            return nil
         }
         let placement = best?.placement ?? primary.placement
         let overlap = best?.overlap
@@ -539,8 +548,7 @@ enum ScreenshotLongCaptureMatcher {
 
     /// Re-scores one coarse proposal around its estimate using native-resolution rows, so the reported
     /// overlap is exact instead of rounded to the coarse sample grid. Returns `nil` when no overlap in
-    /// the window is convincing enough — a page scrolled by a fraction of a pixel still matches best
-    /// when the frames are blurred together, so the coarse estimate is kept in that case.
+    /// the window contains enough shared detail to distinguish scrolling from similar blank bands.
     private static func refinedCandidate(
         _ coarse: CoarseMatch,
         previous: CGImage,
@@ -559,16 +567,18 @@ enum ScreenshotLongCaptureMatcher {
         let upper = min(axisLength - 1, approximate + radius)
         guard lower <= upper else { return nil }
 
-        let profileLength = refinedProfileLength
         guard let previousProfile = axisProfile(
             in: previous,
             direction: direction,
-            profileLength: profileLength
+            profileLength: refinedProfileLength
         ), let nextProfile = axisProfile(
             in: next,
             direction: direction,
-            profileLength: profileLength
+            profileLength: refinedProfileLength
         ) else { return nil }
+
+        let profileLength = previousProfile.count / previousAxisLength
+        guard nextProfile.count == profileLength * nextAxisLength else { return nil }
 
         var best: (overlap: Int, score: Double)?
         for overlap in lower...upper {
@@ -640,6 +650,15 @@ enum ScreenshotLongCaptureMatcher {
         ) else { return nil }
         context.interpolationQuality = .medium
         context.draw(cropped, in: CGRect(x: 0, y: 0, width: width, height: height))
+        if direction == .horizontal {
+            var profile = [UInt8](repeating: 0, count: pixels.count)
+            for axis in 0..<axisLength {
+                for cross in 0..<samples {
+                    profile[axis * samples + cross] = pixels[cross * axisLength + axis]
+                }
+            }
+            return profile
+        }
         return pixels
     }
 
@@ -655,7 +674,8 @@ enum ScreenshotLongCaptureMatcher {
         guard overlap > 0 else { return nil }
         let step = max(1, overlap / refinedMaximumSampleCount)
         var difference = 0
-        var count = 0
+        var gradientMagnitude = 0
+        var sharedCornerContrast = 0
         var axis = step
         while axis < overlap {
             let previousAxis: Int
@@ -675,12 +695,32 @@ enum ScreenshotLongCaptureMatcher {
             let nextRow = nextAxis * profileLength
             for cross in 0..<profileLength {
                 difference += abs(Int(previous[previousRow + cross]) - Int(next[nextRow + cross]))
+                let previousGradient = Int(previous[previousRow + cross])
+                    - Int(previous[previousRow - step * profileLength + cross])
+                let nextGradient = Int(next[nextRow + cross])
+                    - Int(next[nextRow - step * profileLength + cross])
+                gradientMagnitude += abs(previousGradient) + abs(nextGradient)
+                // A repeated rule has contrast along only one axis; require shared corner detail.
+                let crossNeighbor = max(0, cross - 1)
+                let previousCrossGradient = max(
+                    abs(Int(previous[previousRow + cross]) - Int(previous[previousRow + crossNeighbor])),
+                    abs(Int(previous[previousRow - step * profileLength + cross])
+                        - Int(previous[previousRow - step * profileLength + crossNeighbor]))
+                )
+                let nextCrossGradient = max(
+                    abs(Int(next[nextRow + cross]) - Int(next[nextRow + crossNeighbor])),
+                    abs(Int(next[nextRow - step * profileLength + cross])
+                        - Int(next[nextRow - step * profileLength + crossNeighbor]))
+                )
+                sharedCornerContrast = max(sharedCornerContrast, min(
+                    abs(previousGradient), abs(nextGradient), previousCrossGradient, nextCrossGradient
+                ))
             }
-            count += profileLength
             axis += step
         }
-        guard count > 0 else { return nil }
-        return Double(difference) / Double(count)
+        guard sharedCornerContrast >= refinedMinimumCornerContrast else { return nil }
+        // Blank space must not dilute the residual from misaligned text or repeated borders.
+        return Double(difference) / Double(gradientMagnitude)
     }
 
     private static func samePositionScore(
@@ -696,19 +736,23 @@ enum ScreenshotLongCaptureMatcher {
         let nextOffset = nextAxisLength - overlap
         let step = max(1, overlap / refinedMaximumSampleCount)
         var difference = 0
-        var count = 0
+        var gradientMagnitude = 0
         var axis = step
         while axis < overlap {
             let previousRow = (previousOffset + axis) * profileLength
             let nextRow = (nextOffset + axis) * profileLength
             for cross in 0..<profileLength {
                 difference += abs(Int(previous[previousRow + cross]) - Int(next[nextRow + cross]))
+                let previousGradient = Int(previous[previousRow + cross])
+                    - Int(previous[previousRow - step * profileLength + cross])
+                let nextGradient = Int(next[nextRow + cross])
+                    - Int(next[nextRow - step * profileLength + cross])
+                gradientMagnitude += abs(previousGradient) + abs(nextGradient)
             }
-            count += profileLength
             axis += step
         }
-        guard count > 0 else { return nil }
-        return Double(difference) / Double(count)
+        guard gradientMagnitude > 0 else { return nil }
+        return Double(difference) / Double(gradientMagnitude)
     }
 
     private static func grayscalePixels(in image: CGImage, size: CGSize) -> [UInt8]? {

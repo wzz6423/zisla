@@ -200,7 +200,7 @@ struct WindowPreviewWindowMatchTests {
         let processIdentifier = getpid()
         let screenTop = NSScreen.screens.first?.frame.maxY ?? 0
 
-        func target(_ id: CGWindowID) -> (title: String, frame: CGRect)? {
+        func target(_ id: CGWindowID) -> (title: String, frame: CGRect, companionFrames: [CGRect])? {
             WindowPreviewWindowMatch.currentTarget(
                 windowID: id, processIdentifier: processIdentifier, mainScreenTop: screenTop
             )
@@ -284,11 +284,7 @@ struct WindowPreviewWindowMatchTests {
 
         #expect(WindowPreviewWindowMatch.isPreviewCandidate(
             frame: fullScreenWindow, isOnScreen: false, accessibleWindows: [],
-            hasUnmeasuredAccessibleWindow: true, screenFrames: [screen]
-        ))
-        #expect(WindowPreviewWindowMatch.isPreviewCandidate(
-            frame: fullScreenWindow, isOnScreen: false, accessibleWindows: [],
-            hasUnmeasuredAccessibleWindow: false, screenFrames: [screen]
+            screenFrames: [screen]
         ))
         #expect(WindowPreviewWindowMatch.isPreviewCandidate(
             frame: fullScreenWindow, isOnScreen: false, accessibleWindows: nil,
@@ -296,7 +292,7 @@ struct WindowPreviewWindowMatchTests {
         ))
         #expect(!WindowPreviewWindowMatch.isPreviewCandidate(
             frame: phantomWindow, isOnScreen: false, accessibleWindows: [],
-            hasUnmeasuredAccessibleWindow: true, screenFrames: [screen]
+            screenFrames: [screen]
         ))
         #expect(!WindowPreviewWindowMatch.isPreviewCandidate(
             frame: phantomWindow, isOnScreen: false, accessibleWindows: nil,
@@ -304,8 +300,101 @@ struct WindowPreviewWindowMatchTests {
         ))
         #expect(!WindowPreviewWindowMatch.isPreviewCandidate(
             frame: toolbar, isOnScreen: false, accessibleWindows: [],
-            hasUnmeasuredAccessibleWindow: true, screenFrames: [screen]
+            screenFrames: [screen]
         ))
+    }
+
+    @Test(arguments: [CGRect(x: 0, y: 0, width: 1512, height: 982),
+                      CGRect(x: -1920, y: -180, width: 1920, height: 1080)])
+    func offSpaceFullscreenWindowRemainsACandidateWhenAXOnlyListsAnOrdinaryWindow(screen: CGRect) {
+        let fullscreen = CGRect(x: screen.minX, y: screen.minY + 33,
+                                width: screen.width, height: screen.height - 33)
+        let ordinary = screen.insetBy(dx: 180, dy: 120)
+        #expect(WindowPreviewWindowMatch.isPreviewCandidate(
+            frame: fullscreen, isOnScreen: false, accessibleWindows: [ordinary],
+            screenFrames: [screen]
+        ), "An AX list that omits the off-Space fullscreen window must not suppress its verified capture candidate")
+        #expect(!WindowPreviewWindowMatch.isPreviewCandidate(
+            frame: ordinary.offsetBy(dx: 100, dy: 80), isOnScreen: false,
+            accessibleWindows: [ordinary], screenFrames: [screen]
+        ), "An unrelated ordinary surface must still be excluded")
+        #expect(!WindowPreviewWindowMatch.isPreviewCandidate(
+            frame: fullscreen.offsetBy(dx: 9, dy: 0), isOnScreen: false,
+            accessibleWindows: [ordinary], screenFrames: [screen]
+        ), "A surface outside the display tolerance must not be accepted as fullscreen")
+        #expect(!WindowPreviewWindowMatch.isPreviewCandidate(
+            frame: CGRect(x: screen.minX, y: screen.maxY - 81, width: screen.width, height: 81),
+            isOnScreen: false, accessibleWindows: [ordinary], screenFrames: [screen]
+        ), "A toolbar surface is not a fullscreen preview")
+    }
+
+    @Test(arguments: [CGRect(x: 0, y: 0, width: 1512, height: 982),
+                      CGRect(x: -1920, y: -180, width: 1920, height: 1080)])
+    func browserFullscreenContentWithASeparateToolbarRemainsAPreviewCandidate(screen: CGRect) {
+        let content = CGRect(x: screen.minX, y: screen.minY, width: screen.width, height: screen.height - 114)
+        let toolbar = CGRect(x: screen.minX, y: screen.maxY - 114, width: screen.width, height: 81)
+        let menuBar = CGRect(x: screen.minX, y: screen.maxY - 33, width: screen.width, height: 33)
+        let accessibleLists: [[CGRect]?] = [nil, [], [screen.insetBy(dx: 180, dy: 120)]]
+        let nestedBar = CGRect(x: screen.minX, y: screen.maxY - 104, width: screen.width, height: 32)
+        for accessibleWindows in accessibleLists {
+            #expect(WindowPreviewWindowMatch.isPreviewCandidate(
+                frame: content, isOnScreen: false, accessibleWindows: accessibleWindows, screenFrames: [screen],
+                companionFrames: [menuBar, toolbar, nestedBar]
+            ), "The fullscreen browser content and its separate toolbar must remain discoverable off-Space")
+        }
+        let bookmarks = CGRect(x: screen.minX, y: toolbar.minY - 32, width: screen.width, height: 32)
+        var shorterContent = content
+        shorterContent.size.height -= 32
+        #expect(WindowPreviewWindowMatch.isPreviewCandidate(
+            frame: shorterContent, isOnScreen: false, accessibleWindows: [], screenFrames: [screen],
+            companionFrames: [menuBar, toolbar, bookmarks]
+        ), "Multiple toolbar tiers must be joined in geometric order even when metadata lists them top-first")
+        for headers in [[], [menuBar], [toolbar.offsetBy(dx: 9, dy: 0), menuBar],
+                        [CGRect(x: toolbar.minX + 9, y: toolbar.minY, width: toolbar.width - 9, height: 81), menuBar],
+                        [CGRect(x: toolbar.minX, y: toolbar.minY, width: toolbar.width + 9, height: 81), menuBar],
+                        [toolbar.offsetBy(dx: 0, dy: 9), menuBar],
+                        [toolbar.insetBy(dx: 0, dy: -50)],
+                        [CGRect(x: screen.minX, y: screen.maxY - 433, width: screen.width, height: 400)]] {
+            #expect(!WindowPreviewWindowMatch.isPreviewCandidate(
+                frame: content, isOnScreen: false, accessibleWindows: [], screenFrames: [screen], companionFrames: headers
+            ), "Missing, disconnected, misplaced or non-toolbar surfaces must not establish a fullscreen window")
+        }
+        for invalid in [content.offsetBy(dx: 9, dy: 0),
+                        CGRect(x: content.minX + 9, y: content.minY, width: content.width - 9, height: content.height),
+                        CGRect(x: content.minX, y: content.minY, width: content.width + 9, height: content.height),
+                        content.offsetBy(dx: 0, dy: 49), toolbar] {
+            #expect(!WindowPreviewWindowMatch.isPreviewCandidate(
+                frame: invalid, isOnScreen: false, accessibleWindows: [], screenFrames: [screen],
+                companionFrames: [menuBar, toolbar]
+            ))
+        }
+    }
+
+    @Test(arguments: ["matching", "other-owner", "other-layer", "invalid-bounds"])
+    func browserToolbarActivationUsesOnlyTheCurrentApplicationsWindows(metadata: String) throws {
+        let screen = CGRect(x: 0, y: 0, width: 1512, height: 982)
+        let frames = [CGRect(x: 0, y: 114, width: 1512, height: 868),
+                      CGRect(x: 0, y: 33, width: 1512, height: 81),
+                      CGRect(x: 0, y: 0, width: 1512, height: 33)]
+        let info: [[String: Any]] = frames.enumerated().map { index, frame in
+            [kCGWindowNumber as String: index + 42,
+             kCGWindowOwnerPID as String: index > 0 && metadata == "other-owner" ? 456 : 123,
+             kCGWindowLayer as String: index > 0 && metadata == "other-layer" ? 3 : 0,
+             kCGWindowBounds as String: index == 1 && metadata == "invalid-bounds" ? "invalid" : frame.dictionaryRepresentation]
+        }
+        let target = try #require(WindowPreviewWindowMatch.currentTarget(
+            windowID: 42, processIdentifier: 123, windowInfo: info, mainScreenTop: screen.maxY
+        ))
+        #expect(target.frame == CGRect(x: 0, y: 0, width: 1512, height: 868))
+        #expect(WindowPreviewWindowMatch.canActivateWithoutAccessibilityWindow(
+            frame: target.frame, isOnlyPreview: true, screenFrames: [screen], companionFrames: target.companionFrames
+        ) == (metadata == "matching"))
+        #expect(!WindowPreviewWindowMatch.canActivateWithoutAccessibilityWindow(
+            frame: target.frame, isOnlyPreview: false, screenFrames: [screen], companionFrames: target.companionFrames
+        ))
+        #expect(WindowPreviewWindowMatch.index(title: "", frame: target.frame, candidates: [(nil, nil)],
+            screenFrames: [screen], isOnlyPreview: true, companionFrames: target.companionFrames
+        ) == (metadata == "matching" ? 0 : nil))
     }
 
     @Test

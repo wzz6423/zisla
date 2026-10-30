@@ -434,6 +434,7 @@ final class SideNoticePresenter {
             || notice.id.hasPrefix("browser-download-")
             || notice.id.hasPrefix("video-download-")
             || notice.id.hasPrefix("voice-processing-")
+            || notice.id.hasPrefix("screen-recording-operation-")
     }
 
     private static func isTransientCompactNotice(_ notice: IslandNotice) -> Bool {

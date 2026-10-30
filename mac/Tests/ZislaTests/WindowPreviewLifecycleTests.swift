@@ -1,5 +1,9 @@
 import AppKit
+import CoreMedia
+import CoreVideo
+import ScreenCaptureKit
 import Testing
+import VideoToolbox
 
 @testable import Zisla
 
@@ -295,6 +299,53 @@ struct WindowPreviewLifecycleTests {
         #expect(controller.windows.map(\.id) == [1])
     }
 
+    @Test(arguments: [WindowPreviewSource.dock, .switcher])
+    func bothEntryPointsPresentAFullscreenWindowOmittedByTheAXList(source: WindowPreviewSource) async throws {
+        let system = PreviewSystem()
+        let screen = CGRect(x: 0, y: 0, width: 1512, height: 982)
+        let ordinary = PreviewSystem.snapshot(11)
+        let image = try #require(PreviewSystem.snapshot(12).image)
+        let fullscreen = WindowPreviewSnapshot(
+            id: 12, title: "Fullscreen", frame: CGRect(x: 0, y: 33, width: 1512, height: 949),
+            image: image
+        )
+        let ghost = WindowPreviewSnapshot(
+            id: 13, title: "Auxiliary surface", frame: ordinary.frame.offsetBy(dx: 100, dy: 80), image: nil
+        )
+        let selection = PreviewSystem.selection(1, source: source)
+        var dependencies = system.dependencies()
+        dependencies.dockSelection = { selection }
+        dependencies.captureWindows = { _ in
+            [ordinary, fullscreen, ghost].filter {
+                WindowPreviewWindowMatch.isPreviewCandidate(
+                    frame: $0.frame, isOnScreen: false, accessibleWindows: [ordinary.frame],
+                    screenFrames: [screen]
+                )
+            }
+        }
+        let controller = WindowPreviewController(dependencies: dependencies)
+        defer { controller.stop() }
+        controller.configure(enabled: true)
+
+        if source == .dock {
+            let event = try #require(NSEvent.mouseEvent(
+                with: .mouseMoved, location: .zero, modifierFlags: [], timestamp: 1,
+                windowNumber: 0, context: nil, eventNumber: 1, clickCount: 0, pressure: 0
+            ))
+            system.globalHandler?(event)
+            try #require(system.timers.last).fire()
+        } else {
+            system.switcher = selection
+            controller.beginSwitcher()
+        }
+        await controller.captureTask?.value
+
+        #expect(controller.windows.map(\.id) == [11, 12],
+                "Both preview entry points must retain the off-Space fullscreen window without admitting auxiliary surfaces")
+        #expect(controller.windows.last?.image === image)
+        #expect(system.presentationAnchors.last == selection.anchor)
+    }
+
     @Test
     func verifiedWindowRemainsAvailableWhenItsCaptureTemporarilyFails() async {
         let system = PreviewSystem()
@@ -446,6 +497,207 @@ struct WindowPreviewLifecycleTests {
         await controller.captureTask?.value
         #expect(controller.windows.first?.image === visible.image)
         #expect(captures == [1, 1])
+    }
+
+    @Test(arguments: [WindowPreviewSource.dock, .switcher], [false, true])
+    func coldFullscreenPreviewDoesNotRequireVisitingItsSpace(
+        source: WindowPreviewSource, browser: Bool
+    ) async throws {
+        let system = PreviewSystem()
+        system.foregroundPID = 3
+        let screen = CGRect(x: 0, y: 0, width: 1512, height: 982)
+        let frame = CGRect(x: 0, y: 0, width: 1512, height: browser ? 868 : 949)
+        let headers = browser ? [CGRect(x: 0, y: 868, width: 1512, height: 81)] : []
+        let sample = try PreviewSystem.videoSampleBuffer()
+        let selection = PreviewSystem.selection(2, source: source)
+        var dependencies = system.dependencies()
+        dependencies.dockSelection = { selection }
+        dependencies.captureWindows = { pid in
+            let image = try? await WindowPreviewCapture.image(
+                for: frame, screenFrames: [screen], companionFrames: headers,
+                captureImage: {
+                    throw NSError(domain: "com.apple.ScreenCaptureKit.SCStreamErrorDomain", code: -3811)
+                },
+                captureSampleBuffer: { sample }
+            )
+            return [WindowPreviewSnapshot(id: CGWindowID(pid), title: "Fullscreen", frame: frame, image: image)]
+        }
+        let controller = WindowPreviewController(dependencies: dependencies)
+        defer { controller.stop() }
+        controller.configure(enabled: true)
+        if source == .dock {
+            let event = try #require(NSEvent.mouseEvent(
+                with: .mouseMoved, location: .zero, modifierFlags: [], timestamp: 1,
+                windowNumber: 0, context: nil, eventNumber: 1, clickCount: 0, pressure: 0
+            ))
+            system.globalHandler?(event)
+            try #require(system.timers.last).fire()
+        } else {
+            system.switcher = selection
+            controller.beginSwitcher()
+        }
+        await controller.captureTask?.value
+
+        #expect(controller.windows.map(\.id) == [2])
+        #expect(controller.windows.first?.image?.size == CGSize(width: 16, height: 10),
+                "An inactive fullscreen Space must have a preview on the first request without a foreground cache")
+        #expect(system.foregroundPID == 3, "Previewing must not activate the fullscreen application")
+    }
+
+    @Test(arguments: [WindowPreviewSource.dock, .switcher])
+    func fullscreenPreviewCropsTransparentPaddingAndKeepsOpaqueBlackContent(source: WindowPreviewSource) async throws {
+        let system = PreviewSystem()
+        system.foregroundPID = 3
+        let screen = CGRect(x: 0, y: 0, width: 1512, height: 982)
+        let frame = CGRect(x: 0, y: 0, width: 1512, height: 868)
+        let headers = [CGRect(x: 0, y: 868, width: 1512, height: 81)]
+        let configuration = WindowPreviewCapture.configuration(for: frame)
+        let sample = try PreviewSystem.letterboxedVideoSampleBuffer(configuration: configuration)
+        var dependencies = system.dependencies()
+        dependencies.captureWindows = { pid in
+            let image = try await WindowPreviewCapture.image(
+                for: frame, screenFrames: [screen], companionFrames: headers,
+                captureImage: { throw PreviewCaptureGate.Failure.unavailable },
+                captureSampleBuffer: { sample }
+            )
+            return [WindowPreviewSnapshot(id: CGWindowID(pid), title: "Fullscreen", frame: frame, image: image)]
+        }
+        let controller = WindowPreviewController(dependencies: dependencies)
+        defer { controller.stop() }
+        controller.configure(enabled: true)
+        controller.select(PreviewSystem.selection(2, source: source))
+        await controller.captureTask?.value
+
+        let image = try #require(controller.windows.first?.image)
+        #expect(image.size == CGSize(width: configuration.width - 4, height: configuration.height),
+                "Transparent right margin: expected \(configuration.width - 4)x\(configuration.height), got \(image.size)")
+        let bitmap = NSBitmapImageRep(cgImage: try #require(image.cgImage(
+            forProposedRect: nil, context: nil, hints: nil
+        )))
+        let white = try #require(bitmap.colorAt(x: 0, y: bitmap.pixelsHigh / 2)?.usingColorSpace(.deviceRGB))
+        let black = try #require(bitmap.colorAt(x: configuration.width - 5, y: bitmap.pixelsHigh / 2)?.usingColorSpace(.deviceRGB))
+        #expect(white.redComponent > 0.95 && white.greenComponent > 0.95 && white.blueComponent > 0.95)
+        #expect(black.redComponent == 0 && black.greenComponent == 0 && black.blueComponent == 0 && black.alphaComponent == 1,
+                "Opaque black page content beside the transparent margin must remain visible")
+        #expect(system.foregroundPID == 3)
+    }
+
+    @Test
+    func ordinaryWindowPreviewKeepsUsingImageCapture() async throws {
+        let capture = try #require(PreviewSystem.snapshot(11).image?.cgImage(
+            forProposedRect: nil, context: nil, hints: nil
+        ))
+        let image = try await WindowPreviewCapture.image(
+            for: CGRect(x: 20, y: 20, width: 300, height: 200),
+            screenFrames: [CGRect(x: 0, y: 0, width: 1512, height: 982)], companionFrames: [],
+            captureImage: { capture },
+            captureSampleBuffer: { throw PreviewCaptureGate.Failure.unavailable }
+        )
+        #expect(image?.size == CGSize(width: 2, height: 2))
+    }
+
+    @Test(arguments: [WindowPreviewSource.dock, .switcher], ["transparent", "no-image-buffer", "error"])
+    func unavailableFullscreenSamplesRecoverWithoutVisitingTheSpace(
+        source: WindowPreviewSource, failure: String
+    ) async throws {
+        let system = PreviewSystem()
+        system.foregroundPID = 3
+        let screen = CGRect(x: 0, y: 0, width: 1512, height: 982)
+        let frame = CGRect(x: 0, y: 0, width: 1512, height: 949)
+        let available = try PreviewSystem.videoSampleBuffer()
+        let unavailable = try failure == "no-image-buffer"
+            ? PreviewSystem.emptySampleBuffer() : PreviewSystem.videoSampleBuffer(alpha: 0)
+        var captures = 0
+        var dependencies = system.dependencies()
+        dependencies.captureWindows = { pid in
+            captures += 1
+            let image = try? await WindowPreviewCapture.image(
+                for: frame, screenFrames: [screen], companionFrames: [],
+                captureImage: { throw PreviewCaptureGate.Failure.unavailable },
+                captureSampleBuffer: {
+                    if captures == 2 { return available }
+                    if failure == "error" { throw PreviewCaptureGate.Failure.unavailable }
+                    return unavailable
+                }
+            )
+            return [WindowPreviewSnapshot(id: CGWindowID(pid), title: "Fullscreen", frame: frame, image: image)]
+        }
+        let controller = WindowPreviewController(dependencies: dependencies)
+        defer { controller.stop() }
+        controller.configure(enabled: true)
+        controller.select(PreviewSystem.selection(2, source: source))
+        await controller.captureTask?.value
+        #expect(controller.windows.map(\.id) == [2])
+        #expect(controller.windows.first?.image == nil, "An unavailable sample must not fabricate a thumbnail")
+        let refresh = try #require(system.timers.first { $0.timeInterval == 1 })
+
+        refresh.fire()
+        await controller.captureTask?.value
+        let image = try #require(controller.windows.first?.image)
+        #expect(image.size == CGSize(width: 16, height: 10))
+        refresh.fire()
+        await controller.captureTask?.value
+        #expect(controller.windows.first?.image === image,
+                "A later unavailable sample must retain the last valid thumbnail of the same window")
+        #expect(system.foregroundPID == 3)
+    }
+
+    @Test(arguments: [WindowPreviewSource.dock, .switcher],
+          [(captureThrows: false, browser: false), (captureThrows: true, browser: false),
+           (captureThrows: false, browser: true), (captureThrows: true, browser: true)])
+    func foregroundCaptureWithAnIncompleteAXListSeedsBothPreviewEntryPoints(
+        source: WindowPreviewSource, scenario: (captureThrows: Bool, browser: Bool)
+    ) async throws {
+        let system = PreviewSystem()
+        system.foregroundPID = 1
+        system.existingWindowIDs = [11, 12]
+        let screen = CGRect(x: 0, y: 0, width: 1512, height: 982)
+        let ordinary = PreviewSystem.snapshot(11)
+        let image = try #require(PreviewSystem.snapshot(12).image)
+        let frame = scenario.browser ? CGRect(x: 0, y: 0, width: 1512, height: 868)
+            : CGRect(x: 0, y: 33, width: 1512, height: 949)
+        let headers = scenario.browser ? [CGRect(x: 0, y: 949, width: 1512, height: 33),
+                                         CGRect(x: 0, y: 868, width: 1512, height: 81)] : []
+        let selection = PreviewSystem.selection(1, source: source)
+        var dependencies = system.dependencies()
+        dependencies.dockSelection = { selection }
+        dependencies.captureWindows = { _ in
+            if system.foregroundPID != 1 && scenario.captureThrows {
+                throw NSError(domain: "com.apple.ScreenCaptureKit.SCStreamErrorDomain", code: -3811)
+            }
+            let fullscreen = WindowPreviewSnapshot(
+                id: 12, title: "Fullscreen", frame: frame, image: system.foregroundPID == 1 ? image : nil
+            )
+            return [ordinary, fullscreen].filter {
+                WindowPreviewWindowMatch.isPreviewCandidate(
+                    frame: $0.frame, isOnScreen: system.foregroundPID == 1,
+                    accessibleWindows: [ordinary.frame], screenFrames: [screen], companionFrames: headers
+                )
+            }
+        }
+        let controller = WindowPreviewController(dependencies: dependencies)
+        defer { controller.stop() }
+        controller.configure(enabled: true)
+        try #require(system.timers.last).fire()
+        await controller.prefetchTask?.value
+
+        system.foregroundPID = 2
+        if source == .dock {
+            let event = try #require(NSEvent.mouseEvent(
+                with: .mouseMoved, location: .zero, modifierFlags: [], timestamp: 1,
+                windowNumber: 0, context: nil, eventNumber: 1, clickCount: 0, pressure: 0
+            ))
+            system.globalHandler?(event)
+            try #require(system.timers.last).fire()
+        } else {
+            system.switcher = selection
+            controller.beginSwitcher()
+        }
+        await controller.captureTask?.value
+
+        #expect(controller.windows.first { $0.id == 12 }?.image === image,
+                "Foreground prefetch must cache the AX-omitted fullscreen image before capture becomes unavailable off-Space")
+        #expect(system.presentationAnchors.last == selection.anchor)
     }
 
     @Test(arguments: ["empty", "transparent", "partial", "error"])
@@ -1238,6 +1490,77 @@ private final class PreviewSystem {
             frame: CGRect(x: 20, y: 20, width: 300, height: 200),
             image: alpha.map { image(alpha: $0) }
         )
+    }
+
+    static func videoSampleBuffer(alpha: CGFloat = 1, size: CGSize = CGSize(width: 16, height: 10)) throws -> CMSampleBuffer {
+        let width = Int(size.width)
+        let height = Int(size.height)
+        var pixel: CVPixelBuffer?
+        #expect(CVPixelBufferCreate(kCFAllocatorDefault, width, height, kCVPixelFormatType_32BGRA,
+                                   [kCVPixelBufferIOSurfacePropertiesKey: [:]] as CFDictionary, &pixel) == kCVReturnSuccess)
+        let buffer = try #require(pixel)
+        CVPixelBufferLockBaseAddress(buffer, [])
+        defer { CVPixelBufferUnlockBaseAddress(buffer, []) }
+        let context = try #require(CGContext(
+            data: CVPixelBufferGetBaseAddress(buffer), width: width, height: height,
+            bitsPerComponent: 8, bytesPerRow: CVPixelBufferGetBytesPerRow(buffer),
+            space: CGColorSpaceCreateDeviceRGB(),
+            bitmapInfo: CGBitmapInfo.byteOrder32Little.rawValue | CGImageAlphaInfo.premultipliedFirst.rawValue
+        ))
+        context.setBlendMode(.copy)
+        context.setFillColor(CGColor(red: 0, green: 0, blue: 0, alpha: alpha))
+        context.fill(CGRect(x: 0, y: 0, width: width, height: height))
+        return try videoSampleBuffer(from: buffer)
+    }
+
+    static func letterboxedVideoSampleBuffer(configuration: SCStreamConfiguration) throws -> CMSampleBuffer {
+        let size = CGSize(width: configuration.width, height: configuration.height)
+        let source = try #require(CMSampleBufferGetImageBuffer(videoSampleBuffer(size: size)))
+        do {
+            CVPixelBufferLockBaseAddress(source, [])
+            defer { CVPixelBufferUnlockBaseAddress(source, []) }
+            let context = try #require(CGContext(
+                data: CVPixelBufferGetBaseAddress(source), width: configuration.width, height: configuration.height,
+                bitsPerComponent: 8, bytesPerRow: CVPixelBufferGetBytesPerRow(source),
+                space: CGColorSpaceCreateDeviceRGB(),
+                bitmapInfo: CGBitmapInfo.byteOrder32Little.rawValue | CGImageAlphaInfo.premultipliedFirst.rawValue
+            ))
+            context.setFillColor(CGColor(red: 1, green: 1, blue: 1, alpha: 1))
+            context.fill(CGRect(x: 0, y: 0, width: configuration.width - 6, height: configuration.height))
+            context.clear(CGRect(x: configuration.width - 4, y: 0, width: 4, height: configuration.height))
+        }
+        var destination: CVPixelBuffer?
+        #expect(CVPixelBufferCreate(kCFAllocatorDefault, configuration.width, configuration.height, configuration.pixelFormat,
+                                   [kCVPixelBufferIOSurfacePropertiesKey: [:]] as CFDictionary, &destination) == kCVReturnSuccess)
+        let buffer = try #require(destination)
+        var transfer: VTPixelTransferSession?
+        #expect(VTPixelTransferSessionCreate(allocator: kCFAllocatorDefault, pixelTransferSessionOut: &transfer) == noErr)
+        let session = try #require(transfer)
+        defer { VTPixelTransferSessionInvalidate(session) }
+        #expect(VTPixelTransferSessionTransferImage(session, from: source, to: buffer) == noErr)
+        return try videoSampleBuffer(from: buffer)
+    }
+
+    private static func videoSampleBuffer(from buffer: CVPixelBuffer) throws -> CMSampleBuffer {
+        var format: CMVideoFormatDescription?
+        #expect(CMVideoFormatDescriptionCreateForImageBuffer(allocator: kCFAllocatorDefault, imageBuffer: buffer,
+                                                            formatDescriptionOut: &format) == noErr)
+        var timing = CMSampleTimingInfo(duration: .invalid, presentationTimeStamp: .zero, decodeTimeStamp: .invalid)
+        var sample: CMSampleBuffer?
+        #expect(CMSampleBufferCreateReadyWithImageBuffer(allocator: kCFAllocatorDefault, imageBuffer: buffer,
+                                                        formatDescription: try #require(format), sampleTiming: &timing,
+                                                        sampleBufferOut: &sample) == noErr)
+        return try #require(sample)
+    }
+
+    static func emptySampleBuffer() throws -> CMSampleBuffer {
+        var sample: CMSampleBuffer?
+        #expect(CMSampleBufferCreateReady(
+            allocator: kCFAllocatorDefault, dataBuffer: nil, formatDescription: nil, sampleCount: 0,
+            sampleTimingEntryCount: 0, sampleTimingArray: nil, sampleSizeEntryCount: 0,
+            sampleSizeArray: nil, sampleBufferOut: &sample
+        ) == noErr)
+        return try #require(sample)
     }
 
     private static func image(alpha: CGFloat) -> NSImage {

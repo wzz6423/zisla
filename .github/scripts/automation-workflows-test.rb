@@ -188,6 +188,27 @@ class AutomationWorkflowsTest < Minitest::Test
     end
   end
 
+  def test_swift_codeql_budget_leaves_time_for_the_unfinished_build_and_analysis
+    job = YAML.load_file(File.join(ROOT, '.github/workflows/swift-tests.yml')).fetch('jobs').fetch('codeql')
+    budget = job.fetch('timeout-minutes') * 60
+    # Job 122175893191 completed in 32m04s. Job 122156969465 was cancelled after
+    # 58m21s of building, before the app finished or analysis started. Reuse the
+    # successful job's app, analysis, and cleanup durations as a completion reserve.
+    scenarios = {
+      'completed main scan' => [64, 1573, 277, 10],
+      'timed-out PR build with a completion reserve' => [112, 3501, 457, 277, 10]
+    }
+    scenarios.each do |scenario, stages|
+      assert_operator budget, :>=, stages.sum, "#{scenario} needs at least #{stages.sum}s"
+    end
+  end
+
+  def test_swift_suite_budget_leaves_time_after_the_recorded_runner_timeout
+    job = YAML.load_file(File.join(ROOT, '.github/workflows/swift-tests.yml')).fetch('jobs').fetch('test-suites')
+    # Job 122664290119 reached 20 minutes while its isolated suites were still running.
+    assert_operator job.fetch('timeout-minutes') * 60, :>=, 20 * 60 + 5 * 60
+  end
+
   def test_issue_timeline_tracks_close_and_reopen_without_losing_edits
     install_workflow_fixture
     event = workflow_event('issue', 'closed', closed_at: '2026-10-05T02:30:00Z')

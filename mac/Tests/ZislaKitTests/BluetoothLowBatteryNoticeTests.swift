@@ -252,19 +252,31 @@ struct BluetoothLowBatteryNoticeTests {
         let controller = LowBatteryNoticeController(queue: queue)
         let reading = device(0.2)
         let monitor = NetworkBatteryMonitor(accessoryReader: { [reading] })
+        let (readings, readingsContinuation) = AsyncStream<[NetworkBatteryDevice]>.makeStream()
+        var firstPublication: CheckedContinuation<Void, Never>?
         let subscription = monitor.$devices.sink { devices in
             controller.update(devices: devices, enabled: true)
+            readingsContinuation.yield(devices)
+            if !devices.isEmpty {
+                readingsContinuation.finish()
+                firstPublication?.resume()
+                firstPublication = nil
+            }
         }
         defer {
             subscription.cancel()
+            readingsContinuation.finish()
             monitor.stop()
             queue.removeAll()
         }
 
-        monitor.start()
-        for await devices in monitor.$devices.values {
-            if !devices.isEmpty { break }
+        await withCheckedContinuation { continuation in
+            firstPublication = continuation
+            monitor.start()
         }
+        var iterator = readings.makeAsyncIterator()
+        #expect(await iterator.next() == [])
+        #expect(await iterator.next() == [reading])
         #expect(queue.left.first?.detail == "20%")
     }
 
