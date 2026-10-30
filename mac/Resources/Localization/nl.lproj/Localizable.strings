@@ -3109,3 +3109,10 @@
 "未知导入时间" = "Onbekende importtijd";
 "未知拍摄时间" = "Onbekende opnametijd";
 "已跳过 %d 个重复素材" = "%d dubbele mediabestanden overgeslagen";
+
+"剩余额度" = "Resterend quotum";
+"套餐额度" = "Abonnementsquotum";
+"5 小时额度" = "Quotum van 5 uur";
+"每周额度" = "Weekquotum";
+"额度重置：%@" = "Quotum wordt hersteld: %@";
+"试用额度" = "Proefquotum";

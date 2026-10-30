@@ -3105,3 +3105,10 @@
 "未知导入时间" = "Date d’importation inconnue";
 "未知拍摄时间" = "Date de prise de vue inconnue";
 "已跳过 %d 个重复素材" = "%d éléments multimédias en double ignorés";
+
+"剩余额度" = "Quota restant";
+"套餐额度" = "Quota du forfait";
+"5 小时额度" = "Quota de 5 heures";
+"每周额度" = "Quota hebdomadaire";
+"额度重置：%@" = "Réinitialisation du quota : %@";
+"试用额度" = "Quota d’essai";

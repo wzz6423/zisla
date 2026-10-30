@@ -3109,3 +3109,10 @@
 "未知导入时间" = "İçe aktarma zamanı bilinmiyor";
 "未知拍摄时间" = "Çekim zamanı bilinmiyor";
 "已跳过 %d 个重复素材" = "%d yinelenen medya öğesi atlandı";
+
+"剩余额度" = "Kalan kota";
+"套餐额度" = "Plan kotası";
+"5 小时额度" = "5 saatlik kota";
+"每周额度" = "Haftalık kota";
+"额度重置：%@" = "Kota sıfırlanır: %@";
+"试用额度" = "Deneme kotası";

@@ -3109,3 +3109,10 @@
 "未知导入时间" = "Không rõ thời gian nhập";
 "未知拍摄时间" = "Không rõ thời gian chụp";
 "已跳过 %d 个重复素材" = "Đã bỏ qua %d mục phương tiện trùng lặp";
+
+"剩余额度" = "Hạn mức còn lại";
+"套餐额度" = "Hạn mức gói";
+"5 小时额度" = "Hạn mức 5 giờ";
+"每周额度" = "Hạn mức hằng tuần";
+"额度重置：%@" = "Đặt lại hạn mức: %@";
+"试用额度" = "Hạn mức dùng thử";

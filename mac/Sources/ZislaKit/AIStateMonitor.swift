@@ -71,10 +71,16 @@ public final class AIStateMonitor: ObservableObject {
     @Published public private(set) var state: AIState = .empty
     @Published public private(set) var errorDescription: String?
     @Published public private(set) var usageHistoryState: AIUsageHistoryState = .idle
+    @Published public private(set) var quotas: [AIQuotaSnapshot] = []
+    @Published public private(set) var failedQuotaProviders: Set<AIProvider> = []
+    @Published public private(set) var failedUsageProviders: Set<AIProvider> = []
 
     private let repository: AIStateRepository
     private let activityDetectors: [any AIActivityDetecting]
     private let usageDetectors: [any AIUsageDetecting]
+    private let subscriptionUsageDetector: (any AISubscriptionUsageDetecting)?
+    private var subscriptionUsageTask: Task<Void, Never>?
+    private var lastSubscriptionRefreshAt = Date.distantPast
     private var source: DispatchSourceFileSystemObject?
     private var databaseSource: DispatchSourceFileSystemObject?
     private var walSource: DispatchSourceFileSystemObject?
@@ -119,6 +125,7 @@ public final class AIStateMonitor: ObservableObject {
             directoryURL: directoryURL,
             activityDetectors: Self.defaultActivityDetectors(),
             usageDetectors: Self.defaultUsageDetectors(),
+            subscriptionUsageDetector: AISubscriptionUsageService(),
             activeTaskTTL: activeTaskTTL,
             now: now
         )
@@ -146,6 +153,7 @@ public final class AIStateMonitor: ObservableObject {
         directoryURL: URL = AppPaths.applicationSupport,
         activityDetectors: [any AIActivityDetecting],
         usageDetectors: [any AIUsageDetecting] = [],
+        subscriptionUsageDetector: (any AISubscriptionUsageDetecting)? = nil,
         activeTaskTTL: TimeInterval = AIStateMonitor.defaultActiveTaskTTL,
         detectorRefreshInterval: TimeInterval = AIStateMonitor.defaultDetectorRefreshInterval,
         usageRefreshInterval: TimeInterval = AIStateMonitor.defaultUsageRefreshInterval,
@@ -154,6 +162,7 @@ public final class AIStateMonitor: ObservableObject {
         repository = AIStateRepository(directoryURL: directoryURL)
         self.activityDetectors = activityDetectors
         self.usageDetectors = usageDetectors
+        self.subscriptionUsageDetector = subscriptionUsageDetector
         self.activeTaskTTL = max(0, activeTaskTTL)
         self.detectorRefreshInterval = max(1, detectorRefreshInterval)
         self.usageRefreshInterval = max(1, usageRefreshInterval)
@@ -173,6 +182,7 @@ public final class AIStateMonitor: ObservableObject {
             ),
             GeminiDesktopSessionActivityDetector(maxChats: 4),
             GrokSessionActivityDetector(maxSessionFiles: 4, initialTailBytes: 256 * 1_024),
+            CursorSessionActivityDetector(),
             QwenSessionActivityDetector(maxRuntimeFiles: 4, initialTailBytes: 256 * 1_024),
             QoderSessionActivityDetector(maxLogFiles: 4, initialTailBytes: 256 * 1_024),
             ZCodeSessionActivityDetector(),
@@ -237,6 +247,7 @@ public final class AIStateMonitor: ObservableObject {
             // Load persisted tasks first; the completion schedules one activity refresh with the
             // loaded task snapshot, while usage log scans remain on the throttled timer.
             schedulePersistedReload(refreshDetectorsAfterLoad: true)
+            scheduleSubscriptionUsageRefresh()
 
             let pressureQueue = refreshQueue
             let memoryPressure = DispatchSource.makeMemoryPressureSource(
@@ -249,10 +260,11 @@ public final class AIStateMonitor: ObservableObject {
             memoryPressureSource = memoryPressure
             memoryPressure.resume()
 
-            if !activityDetectors.isEmpty || !usageDetectors.isEmpty {
+            if !activityDetectors.isEmpty || !usageDetectors.isEmpty || subscriptionUsageDetector != nil {
                 let timer = Timer(timeInterval: detectorRefreshInterval, repeats: true) { [weak self] _ in
                     Task { @MainActor [weak self] in
                         self?.scheduleDetectorRefresh(allowUsageScan: true)
+                        self?.scheduleSubscriptionUsageRefresh()
                     }
                 }
                 timer.tolerance = detectorRefreshInterval * 0.1
@@ -266,6 +278,12 @@ public final class AIStateMonitor: ObservableObject {
 
     public func stop() {
         refreshGeneration &+= 1
+        subscriptionUsageTask?.cancel()
+        subscriptionUsageTask = nil
+        lastSubscriptionRefreshAt = .distantPast
+        quotas = []
+        failedQuotaProviders = []
+        failedUsageProviders = []
         persistedReloadInFlight = false
         persistedReloadPending = false
         persistedReloadPendingForce = false
@@ -353,10 +371,42 @@ public final class AIStateMonitor: ObservableObject {
 
     /// Schedules a background refresh for interactive paths, avoiding a full decode of large state files on the main thread.
     public func refresh() {
+        scheduleSubscriptionUsageRefresh()
         schedulePersistedReload(
             refreshDetectorsAfterLoad: true,
             refreshDetectorsWhenUnchanged: true
         )
+    }
+
+    private func scheduleSubscriptionUsageRefresh() {
+        guard let detector = subscriptionUsageDetector, subscriptionUsageTask == nil,
+              now().timeIntervalSince(lastSubscriptionRefreshAt) >= usageRefreshInterval else { return }
+        lastSubscriptionRefreshAt = now()
+        let generation = refreshGeneration
+        let repository = repository
+        subscriptionUsageTask = Task { [weak self] in
+            let work = Task.detached(priority: .utility) { await detector.subscriptionUsage() }
+            let result = await withTaskCancellationHandler {
+                await work.value
+            } onCancel: { work.cancel() }
+            guard !Task.isCancelled, let self, self.refreshGeneration == generation else { return }
+            defer { if self.refreshGeneration == generation { self.subscriptionUsageTask = nil } }
+            self.quotas = result.quotas.sorted { $0.id < $1.id }
+            self.failedQuotaProviders = result.failedProviders
+            self.failedUsageProviders = result.failedUsageProviders
+            if !result.usageSamples.isEmpty {
+                do {
+                    let changed = try await Task.detached(priority: .utility) {
+                        try repository.recordDetectedUsage(result.usageSamples) > 0
+                    }.value
+                    guard self.refreshGeneration == generation else { return }
+                    if changed, self.usageHistoryRequested { self.requestUsageHistoryLoad(force: true) }
+                } catch {
+                    guard self.refreshGeneration == generation else { return }
+                    self.errorDescription = error.localizedDescription
+                }
+            }
+        }
     }
 
     /// Refreshes only currently active sessions. Historical usage logs are deliberately excluded.

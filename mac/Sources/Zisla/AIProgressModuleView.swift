@@ -24,7 +24,10 @@ struct AIProgressModuleView: View {
 
             Hairline()
 
-            usageSummary(endingAt: .now)
+            ScrollView(.vertical) {
+                usageSummary(endingAt: .now)
+            }
+                .thinScrollChrome()
                 .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
@@ -61,6 +64,39 @@ struct AIProgressModuleView: View {
             UsageTrendChart(series: series)
                 .frame(height: 128)
             UsageHeatmap(weeks: usageCalendar(endingAt: date))
+            ForEach(monitor.failedUsageProviders.sorted { $0.rawValue < $1.rawValue }, id: \.self) { provider in
+                Text("\(AIMascotLibrary.providerDisplayName(for: provider)) · \(AppLocalization.text("暂不可用"))")
+                    .font(.system(size: 9))
+                    .foregroundStyle(.secondary)
+            }
+            if !monitor.quotas.isEmpty || !monitor.failedQuotaProviders.isEmpty {
+                VStack(alignment: .leading, spacing: 6) {
+                    Text(AppLocalization.text("剩余额度"))
+                        .fontWeight(.semibold)
+                    ForEach(monitor.quotas) { quota in
+                        HStack(spacing: 6) {
+                            Text(AIMascotLibrary.providerDisplayName(for: quota.provider))
+                                .fontWeight(.medium)
+                            Text(AppLocalization.text(AIQuotaPresentation.windowKey(quota.window)))
+                                .foregroundStyle(.secondary)
+                            Spacer()
+                            Text(quota.remainingPercent / 100, format: .percent.precision(.fractionLength(0)))
+                                .monospacedDigit()
+                        }
+                        .accessibilityElement(children: .combine)
+                        .help(AIQuotaPresentation.helpText(quota))
+                    }
+                    ForEach(monitor.failedQuotaProviders.sorted { $0.rawValue < $1.rawValue }, id: \.self) { provider in
+                        HStack {
+                            Text(AIMascotLibrary.providerDisplayName(for: provider))
+                            Spacer()
+                            Text(AppLocalization.text("暂不可用")).foregroundStyle(.secondary)
+                        }
+                    }
+                }
+                .font(.system(size: 9))
+                .accessibilityLabel(AppLocalization.text("剩余额度"))
+            }
         }
     }
 
@@ -94,6 +130,25 @@ struct AIProgressModuleView: View {
         }
     }
 
+}
+
+enum AIQuotaPresentation {
+    static func windowKey(_ window: AIQuotaWindow) -> String {
+        switch window {
+        case .plan: "套餐额度"
+        case .fiveHours: "5 小时额度"
+        case .weekly: "每周额度"
+        case .trial: "试用额度"
+        }
+    }
+
+    static func helpText(_ quota: AIQuotaSnapshot, locale: Locale = AppLocalization.currentLanguage.locale) -> String {
+        let remaining = (quota.remainingPercent / 100).formatted(.percent.precision(.fractionLength(0)).locale(locale))
+        let text = AppLocalization.format("剩余 %@", locale: locale, [remaining])
+        guard let reset = quota.resetsAt else { return text }
+        return text + " · " + AppLocalization.format("额度重置：%@", locale: locale,
+            [reset.formatted(.dateTime.month().day().hour().minute().locale(locale))])
+    }
 }
 
 struct UsageTrendChart: View {
