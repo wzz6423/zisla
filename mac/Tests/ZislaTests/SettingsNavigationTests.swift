@@ -280,18 +280,35 @@ struct SettingsNavigationTests {
     }
 
     @Test
-    func sidebarGroupsKeepExistingPagesAndPutPDFWithFileTools() {
-        #expect(SettingsSectionGroup.allCases.map(\.title) == ["基础功能", "声音", "文件", "AI 与语音", "网络与其他"])
+    func sidebarGroupsSeparatePDFAndCaptureAndCollectTheOtherPages() {
+        #expect(SettingsSectionGroup.allCases.map(\.title) == [
+            "基础功能", "声音", "文件", "截图与录屏", "AI 与语音", "其他", "推荐与反馈更新",
+        ])
         #expect(SettingsSection.allCases.filter { $0.group == .basics } == [.general, .features, .info])
         #expect(SettingsSection.allCases.filter { $0.group == .sound } == [.keyboardSound])
-        #expect(SettingsSection.allCases.filter { $0.group == .files } == [.clipboardAssistant, .screenshot, .recording, .pdfTools, .download])
+        #expect(SettingsSection.allCases.filter { $0.group == .files } == [.pdfTools])
+        #expect(SettingsSection.allCases.filter { $0.group == .capture } == [.screenshot, .recording])
         #expect(SettingsSection.allCases.filter { $0.group == .aiAndVoice } == [.ai, .voice])
-        #expect(SettingsSection.allCases.filter { $0.group == .networkAndOthers } == [.mail, .weather, .networkProxy, .pet, .recommendations, .updates])
+        #expect(SettingsSection.allCases.filter { $0.group == .others } == [.clipboardAssistant, .mail, .download, .weather, .networkProxy, .pet])
+        #expect(SettingsSection.allCases.filter { $0.group == .recommendationsAndUpdates } == [.recommendations, .updates])
+    }
+
+    @Test(arguments: [false, true], [false, true])
+    func recommendationGroupTitleFollowsTheRecommendationToggle(recommendationsEnabled: Bool, updatesEnabled: Bool) {
+        var settings = FeatureSettings.default
+        settings.recommendedToolsEnabled = recommendationsEnabled
+        settings.updateChecksEnabled = updatesEnabled
+        #expect(SettingsSectionGroup.recommendationsAndUpdates.title(settings: settings)
+            == (recommendationsEnabled ? "推荐与反馈更新" : "反馈更新"))
+        for group in SettingsSectionGroup.allCases where group != .recommendationsAndUpdates {
+            #expect(group.title(settings: settings) == group.title)
+        }
     }
 
     @Test(arguments: AppLanguage.allCases)
     func groupedSettingsAndPDFLabelsUseEveryRequestedLanguage(language: AppLanguage) throws {
         let keys = Set(SettingsSectionGroup.allCases.map(\.title) + [
+            "反馈更新",
             SettingsSection.pdfTools.title,
             SettingsSection.pdfTools.subtitle,
             "仅影响 zisla 的窗口与面板，不会更改 macOS 外观。",
@@ -302,15 +319,27 @@ struct SettingsNavigationTests {
             .deletingLastPathComponent().deletingLastPathComponent()
         let tableURL = packageRoot.appendingPathComponent("Resources/Localization/\(language.rawValue).lproj/Localizable.strings")
         let table = try #require(NSDictionary(contentsOf: tableURL) as? [String: String])
+        let source = try String(contentsOf: tableURL, encoding: .utf8)
         for key in keys {
             let value = try #require(table[key], "\(language.rawValue) is missing \(key)")
             #expect(!value.isEmpty)
             #expect(AppLocalization.string(key, language: language) == value)
-            if language == .traditionalChinese && key == "PDF 工具" {
-                #expect(value == "PDF 工具")
+            #expect(AppLocalization.string(key, locale: language.locale) == value)
+            let expression = try NSRegularExpression(
+                pattern: "^\\s*\"" + NSRegularExpression.escapedPattern(for: key) + "\"\\s*=",
+                options: .anchorsMatchLines
+            )
+            #expect(expression.numberOfMatches(in: source, range: NSRange(source.startIndex..., in: source)) == 1)
+            if language == .traditionalChinese && ["PDF 工具", "其他"].contains(key) {
+                #expect(value == key)
             } else if language != .simplifiedChinese {
                 #expect(value != key, "\(language.rawValue) did not translate \(key)")
             }
+        }
+        if language == .english {
+            #expect(table["截图与录屏"] == "Screenshots & Recording")
+            #expect(table["推荐与反馈更新"] == "Recommendations, Feedback & Updates")
+            #expect(table["反馈更新"] == "Feedback & Updates")
         }
     }
 

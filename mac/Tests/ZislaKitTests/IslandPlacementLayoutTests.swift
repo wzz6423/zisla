@@ -446,13 +446,13 @@ struct IslandPlacementLayoutTests {
             var configuration = settings.islandScreenConfiguration
             configuration.expandedSize = CGSize(width: 480, height: 680)
             configuration.expandsForDetailedStatus = true
-            configuration.compactStatusLength = 54
+            configuration.compactStatusLength = 82
             let layout = ScreenLayoutEngine(configuration: configuration).layout(for: screen)
             let frame = layout.collapsedFrame
             let bounds = screen.frame.insetBy(dx: 16, dy: 16)
             #expect(bounds.contains(frame))
             #expect(layout.placementBounds == bounds)
-            #expect(edge.isVertical ? frame.height == 54 : frame.width == 54)
+            #expect(edge.isVertical ? frame.height == 82 : frame.width == 82)
             #expect(layout.triggerFrame == frame)
             #expect(layout.expandedFrame.contains(frame))
             #expect(layout.transferDragTriggerFrame.contains(frame))
@@ -547,9 +547,9 @@ struct IslandPlacementLayoutTests {
         let scenarios: [(IslandNotice, String, Bool, Int)] = [
             (IslandNotice(id: "ai-active-codex", title: "Codex", side: .left), "1", false, 1),
             (IslandNotice(id: "media-active-left", title: "Music", side: .left), "", true, 0),
-            (IslandNotice(id: "browser-download-task", title: "Download", side: .left, progress: 0.25), "25%", false, 2),
-            (IslandNotice(id: "video-download-task", title: "Download", side: .left, progress: 0.25), "25%", false, 2),
-            (IslandNotice(id: "focus-countdown-left", title: "Focus", detail: "00:25:00", side: .left), "00:25:00", false, 3),
+            (IslandNotice(id: "browser-download-task", title: "Download", side: .left, progress: 0.25), "25%", false, 1),
+            (IslandNotice(id: "video-download-task", title: "Download", side: .left, progress: 0.25), "25%", false, 1),
+            (IslandNotice(id: "focus-countdown-left", title: "Focus", detail: "00:25:00", side: .left), "00:25:00", false, 2),
             (IslandNotice(id: "toolbox-reminder-awake", title: "Keep awake", detail: "亮屏", side: .left), "亮屏", false, 2),
             (IslandNotice(id: "voice-processing-request", title: "Processing", side: .left), "", false, 0),
         ]
@@ -559,7 +559,7 @@ struct IslandPlacementLayoutTests {
             #expect(presentation.text == text)
             #expect(presentation.showsWaveform == waveform)
             let length = sizing.customPillLength
-            let visualLength: CGFloat = waveform ? 54 : 24
+            let visualLength: CGFloat = waveform ? 82 : 44
             if text.isEmpty {
                 #expect(length == visualLength)
             } else if edge.isVertical {
@@ -573,7 +573,9 @@ struct IslandPlacementLayoutTests {
             configuration.expandsForDetailedStatus = sizing.expandsForDetailedStatus
             let layout = ScreenLayoutEngine(configuration: configuration).layout(for: screen)
             #expect(layout.collapsedFrame.size == (edge.isVertical
-                ? CGSize(width: 24, height: length) : CGSize(width: length, height: 24)))
+                ? CGSize(width: 32, height: length) : CGSize(width: length, height: 32)))
+            #expect(layout.placementBounds.contains(layout.collapsedFrame),
+                    "A thicker activity pill must remain inside the same screen margin on every edge")
             #expect(layout.centerOcclusionWidth == 0)
             #expect(layout.triggerFrame == layout.collapsedFrame)
             #expect(layout.expandedFrame.contains(layout.collapsedFrame))
@@ -583,7 +585,7 @@ struct IslandPlacementLayoutTests {
         settings.mediaVisualizationStyle = .glow
         let music = IslandNotice(id: "media-active-left", title: "Music", side: .left)
         let glow = try #require(engine.compactBarFrame(for: screen, notices: [music], settings: settings))
-        #expect(glow.size == CGSize(width: 24, height: 24))
+        #expect(glow.size == (edge.isVertical ? CGSize(width: 32, height: 44) : CGSize(width: 44, height: 32)))
     }
 
     @Test
@@ -640,7 +642,7 @@ struct IslandPlacementLayoutTests {
             #expect(presentation.notice == notice)
             #expect(presentation.text == text)
             #expect(presentation.isMedia == (priority == .media))
-            let base: CGFloat = priority == .media ? 54 : 24
+            let base: CGFloat = priority == .media ? 82 : 44
             #expect(sizing.customPillLength > base)
             #expect(sizing.customPillLength <= base + 174)
         }
@@ -665,9 +667,9 @@ struct IslandPlacementLayoutTests {
         settings.mediaCompactStyle = .detailed
         let noLyrics = try #require(engine.compactBarSizing(for: [music], settings: settings))
         #expect(noLyrics.customPillPresentation?.text == "")
-        #expect(noLyrics.customPillLength == 54)
+        #expect(noLyrics.customPillLength == 82)
         settings.mediaVisualizationStyle = .glow
-        #expect(try #require(engine.compactBarSizing(for: [music], settings: settings)).customPillLength == 24)
+        #expect(try #require(engine.compactBarSizing(for: [music], settings: settings)).customPillLength == 44)
         let background = IslandNotice(id: "background-sound-test", title: "Rain", detail: "White noise")
         settings.mediaVisualizationStyle = .waveform
         let backgroundPresentation = try #require(engine.compactBarSizing(for: [background], settings: settings)).customPillPresentation
@@ -685,7 +687,7 @@ struct IslandPlacementLayoutTests {
         settings.mailCompactStyle = .compact
         let compactMail = try #require(engine.compactBarSizing(for: [older, newest], settings: settings))
         #expect(compactMail.customPillPresentation?.text == "")
-        #expect(compactMail.customPillLength == 24)
+        #expect(compactMail.customPillLength == 44)
     }
 
     @Test
@@ -726,15 +728,15 @@ struct IslandPlacementLayoutTests {
         let empty = IslandNotice(id: "toolbox-reminder-empty", title: "Keep awake", detail: " \n\t ")
         let compact = try #require(engine.compactBarSizing(for: [empty], settings: settings))
         #expect(compact.customPillPresentation?.text == "")
-        #expect(compact.customPillLength == 24)
+        #expect(compact.customPillLength == 44)
         let long = IslandNotice(id: "toolbox-reminder-long", title: "Keep awake", detail: String(repeating: "长", count: 1000))
         let bounded = try #require(engine.compactBarSizing(for: [long], settings: settings))
-        #expect(bounded.customPillLength == 198)
+        #expect(bounded.customPillLength == 218)
         #expect(bounded.customPillPresentation?.text.count == 1000)
         let short = IslandNotice(id: "toolbox-reminder-short", title: "Keep awake", detail: " 亮 屏 ")
         let shortSizing = try #require(engine.compactBarSizing(for: [short], settings: settings))
         #expect(shortSizing.customPillPresentation?.text == "亮 屏")
-        if edge.isVertical { #expect(shortSizing.customPillLength == 58) }
+        if edge.isVertical { #expect(shortSizing.customPillLength == 78) }
     }
 
     @Test
@@ -783,7 +785,7 @@ struct IslandPlacementLayoutTests {
         let originalLength = presentation.length(thickness: 32, edge: edge)
         let liveLength = presentation.length(thickness: 32, edge: edge, text: "正在播放的新歌词")
         #expect(liveLength > originalLength)
-        #expect(presentation.length(thickness: 32, edge: edge, text: " \n ") == 70)
+        #expect(presentation.length(thickness: 32, edge: edge, text: " \n ") == 82)
         #expect(presentation.text == "旧歌词")
         #expect(presentation.notice == notice)
         #expect(presentation.length(thickness: 32, edge: edge) == originalLength)
@@ -836,7 +838,7 @@ struct IslandPlacementLayoutTests {
         var configuration = settings.islandScreenConfiguration
         configuration.compactStatusLength = try #require(engine.compactBarSizing(for: [music], settings: settings)).customPillLength
         let long = ScreenLayoutEngine(configuration: configuration).layout(for: snapshot)
-        #expect(long.collapsedFrame.width == 228)
+        #expect(long.collapsedFrame.width == 256)
         #expect(long.collapsedFrame.maxY == 930)
         let short = IslandNotice(id: "toolbox-reminder-test", title: "Keep awake")
         let snapshotFrame = try #require(engine.compactBarFrame(for: snapshot, notices: [short], settings: settings))
@@ -883,12 +885,12 @@ struct IslandPlacementLayoutTests {
             metadata: ["compactLyric": String(repeating: "长", count: 100)])
         let engine = SideNoticeLayoutEngine()
         let waveform = try #require(engine.compactBarSizing(for: [notice], settings: settings))
-        let waveformLength: CGFloat = 24 + 6 + 168 + 6 + 24
+        let waveformLength: CGFloat = 32 + 6 + 168 + 6 + 32 + 12
         #expect(waveform.customPillLength == waveformLength)
         settings.mediaVisualizationStyle = .glow
         let glow = try #require(engine.compactBarSizing(for: [notice], settings: settings))
-        let glowLength: CGFloat = 24 + 6 + 168
-        let waveformSlot: CGFloat = 24 + 6
+        let glowLength: CGFloat = 32 + 6 + 168 + 12
+        let waveformSlot: CGFloat = 32 + 6
         #expect(glow.customPillLength == glowLength)
         #expect(waveform.customPillLength - glow.customPillLength == waveformSlot)
     }

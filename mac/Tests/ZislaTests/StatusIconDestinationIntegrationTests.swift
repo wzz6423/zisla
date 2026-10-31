@@ -135,16 +135,21 @@ struct StatusIconDestinationIntegrationTests {
             let icons = IslandStatusIconRouting.update(destination: .island, application: application,
                 metrics: titles, stacked: stacked, readings: readings, combined: combined, style: style)
             #expect(items.allSatisfy { !$0.isVisible })
-            #expect(icons.map(\.id) == ["status-icon-application"]
+            #expect(icons.map(\.id) == ["status-icon-combined", "status-icon-application"]
                 + SystemMonitorMenuBarMetric.allCases.map { "status-icon-\($0.rawValue)" }
-                + ["status-icon-stacked", "status-icon-combined"])
+                + ["status-icon-stacked"])
             for icon in icons {
                 if case let .metric(_, text, _, _) = icon.content { #expect(text == "--") }
             }
-            #expect(icons.last?.size(edge: .left) == CGSize(width: 36, height: 36))
+            #expect(icons.first?.size(edge: .left) == CGSize(width: 36, height: 36))
             let stackedIcon = try #require(icons.first { $0.id == "status-icon-stacked" })
             let expectedStackedHeight = readings.reduce(CGFloat(8)) { $0 + IslandStatusIcon.readingSize($1.text).height }
             #expect(stackedIcon.size(edge: .left) == CGSize(width: 32, height: expectedStackedHeight))
+            let withoutCombined = IslandStatusIconRouting.update(destination: .island, application: application,
+                metrics: titles, stacked: stacked, readings: readings, combined: nil, style: style)
+            #expect(withoutCombined.map(\.id) == ["status-icon-application"]
+                + SystemMonitorMenuBarMetric.allCases.map { "status-icon-\($0.rawValue)" }
+                + ["status-icon-stacked"])
             #expect(application.menu === menu)
             #expect(IslandStatusIconRouting.update(destination: .menuBar, application: application,
                 metrics: metrics, stacked: stacked, readings: readings, combined: combined, style: style).isEmpty)
@@ -229,16 +234,27 @@ struct StatusIconDestinationIntegrationTests {
         let bitmap = try await renderOffscreen(IslandStatusIconStrip(icons: icons, edge: edge, date: .distantPast), size: size)
         var redPixels = 0
         var textPixels = 0
+        var redBounds = CGRect.null
         for y in 0..<bitmap.pixelsHigh {
             for x in 0..<bitmap.pixelsWide {
                 let color = try #require(bitmap.colorAt(x: x, y: y))
-                if color.redComponent > 0.5 && color.greenComponent < 0.2 { redPixels += 1 }
+                if color.redComponent > 0.5 && color.greenComponent < 0.2 {
+                    redPixels += 1
+                    redBounds = redBounds.union(CGRect(x: x, y: y, width: 1, height: 1))
+                }
                 if min(color.redComponent, color.greenComponent, color.blueComponent) > 0.5 { textPixels += 1 }
             }
         }
         let pixelsPerPoint = CGFloat(bitmap.pixelsWide * bitmap.pixelsHigh) / (size.width * size.height)
         #expect(CGFloat(redPixels) / pixelsPerPoint > 1000, "The original-color combined icon must render at its configured 36pt size")
         #expect(CGFloat(textPixels) / pixelsPerPoint > 5, "The CPU reading must remain visible next to or below its symbol")
+        let scale = CGFloat(bitmap.pixelsWide) / size.width
+        let endInset = edge.isVertical ? CGFloat(bitmap.pixelsHigh) - redBounds.maxY
+            : CGFloat(bitmap.pixelsWide) - redBounds.maxX
+        let crossInset = edge.isVertical ? min(redBounds.minX, CGFloat(bitmap.pixelsWide) - redBounds.maxX)
+            : min(redBounds.minY, CGFloat(bitmap.pixelsHigh) - redBounds.maxY)
+        #expect(endInset / scale >= 7.5, "The last icon must leave eight points at the end of the strip")
+        #expect(crossInset / scale >= 3.5, "The widest icon must leave four points on both cross-axis sides")
     }
 
     @Test(arguments: IslandEdge.allCases) @MainActor
@@ -251,11 +267,11 @@ struct StatusIconDestinationIntegrationTests {
         let readings = [IslandStatusIcon.Reading(metric: .cpu, text: "20%")]
         let icons = IslandStatusIconRouting.update(destination: .island, application: nil,
             metrics: [(.cpu, item, "20%")], stacked: item, readings: readings, combined: item, style: .compact)
-        #expect(icons.map(\.tooltip) == ["20%", "20%", "zisla"])
+        #expect(icons.map(\.tooltip) == ["zisla", "20%", "20%"])
         for icon in icons {
             let size = try #require(IslandStatusIconLayout.size(icons: [icon], edge: edge))
             #expect(size.width >= 24 && size.height >= 24)
-            if case .combined = icon.content { #expect(size == (edge.isVertical ? CGSize(width: 24, height: 30) : CGSize(width: 30, height: 24))) }
+            if case .combined = icon.content { #expect(size == (edge.isVertical ? CGSize(width: 32, height: 40) : CGSize(width: 40, height: 32))) }
             let bitmap = try await renderOffscreen(IslandStatusIconStrip(icons: [icon], edge: edge, date: .distantPast), size: size)
             var foregroundPixels = 0
             for y in 0..<bitmap.pixelsHigh {
@@ -320,13 +336,14 @@ struct StatusIconDestinationIntegrationTests {
                      IslandStatusIcon(id: "stacked", content: .stacked(image: image,
                          readings: [.init(metric: .cpu, text: "20%"), .init(metric: .memory, text: "2 GB/8 GB")]), tooltip: "Monitors")]
         let size = try #require(IslandStatusIconLayout.size(icons: icons, edge: edge))
-        #expect(size == CGSize(width: metricImage.size.width + image.size.width + 14, height: 24))
+        #expect(size == CGSize(width: metricImage.size.width + image.size.width + 24, height: 32))
         let actual = try await renderOffscreen(IslandStatusIconStrip(icons: icons, edge: edge, date: .distantPast)
+            .frame(width: size.width, height: size.height)
             .environment(\.layoutDirection, .rightToLeft), size: size)
         let expected = try await renderOffscreen(HStack(spacing: 8) {
             Image(nsImage: metricImage).renderingMode(.template).frame(width: metricImage.size.width, height: 24)
             Image(nsImage: image).renderingMode(.template).frame(width: image.size.width, height: 24)
-        }.padding(.horizontal, 3).foregroundStyle(.white), size: size)
+        }.padding(.horizontal, 8).padding(.vertical, 4).foregroundStyle(.white), size: size)
         var changed = 0
         for y in 0..<actual.pixelsHigh {
             for x in 0..<actual.pixelsWide {
@@ -383,7 +400,7 @@ struct StatusIconDestinationIntegrationTests {
         fixture.presenter.setStatusIcons(icons)
         let more = try #require(fixture.presenter.compactFrame(for: fixture.screen, notices: []))
         #expect((edge.isVertical ? more.height : more.width) > (edge.isVertical ? first.height : first.width))
-        #expect((edge.isVertical ? more.width : more.height) == (edge.isVertical ? 32 : 24))
+        #expect((edge.isVertical ? more.width : more.height) == (edge.isVertical ? 40 : 32))
         #expect(fixture.screen.frame.contains(more))
         let pet = try #require(CollapsedPetLayout.petFrame(for: ScreenLayoutEngine(configuration:
             fixture.presenter.compactConfiguration(for: [], at: .now)).layout(for: fixture.screen), side: .left))
@@ -433,7 +450,7 @@ struct StatusIconDestinationIntegrationTests {
             fixture.presenter.setStatusIcons([IslandStatusIcon(id: "combined", content: .combined(image), tooltip: "Monitor")])
             let frame = try #require(fixture.presenter.compactFrame(for: fixture.screen, notices: []))
             let thickness = edge.isVertical ? frame.width : frame.height
-            let expectedThickness = max(CGFloat(24), CGFloat(pointSize))
+            let expectedThickness = max(CGFloat(24), CGFloat(pointSize) + 8)
             #expect(thickness == expectedThickness)
             #expect(coordinator.activeLayout?.collapsedFrame == frame)
             coordinator.updateCompactStatus(expandsForDetailedStatus: false)

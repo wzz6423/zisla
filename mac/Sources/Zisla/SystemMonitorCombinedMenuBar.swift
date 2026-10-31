@@ -151,6 +151,12 @@ enum IslandStatusIconRouting {
         items.forEach { $0.isVisible = destination == .menuBar }
         guard destination == .island else { return [] }
         var icons: [IslandStatusIcon] = []
+        if let combined {
+            icons.append(IslandStatusIcon(id: "status-icon-combined", content: .combined(combined.button?.image),
+                tooltip: (combined.button?.toolTip ?? "zisla")
+                    .replacingOccurrences(of: AppLocalization.text("点击打开系统监控"), with: "")
+                    .trimmingCharacters(in: .whitespacesAndNewlines)))
+        }
         if application != nil {
             icons.append(IslandStatusIcon(id: "status-icon-application", content: .application, tooltip: "zisla"))
         }
@@ -171,12 +177,6 @@ enum IslandStatusIconRouting {
                     .replacingOccurrences(of: AppLocalization.text("点击打开系统监控"), with: "")
                     .trimmingCharacters(in: .whitespacesAndNewlines)))
         }
-        if let combined {
-            icons.append(IslandStatusIcon(id: "status-icon-combined", content: .combined(combined.button?.image),
-                tooltip: (combined.button?.toolTip ?? "zisla")
-                    .replacingOccurrences(of: AppLocalization.text("点击打开系统监控"), with: "")
-                    .trimmingCharacters(in: .whitespacesAndNewlines)))
-        }
         return icons
     }
 }
@@ -186,11 +186,11 @@ enum IslandStatusIconLayout {
     static func size(icons: [IslandStatusIcon], edge: IslandEdge) -> CGSize? {
         guard !icons.isEmpty else { return nil }
         let sizes = icons.map { $0.size(edge: edge) }
-        let gaps = CGFloat(icons.count - 1) * 8 + 6
+        let gaps = CGFloat(icons.count - 1) * 8 + 16
         if edge.isVertical {
-            return CGSize(width: sizes.reduce(0) { max($0, $1.width) }, height: sizes.reduce(gaps) { $0 + $1.height })
+            return CGSize(width: sizes.reduce(0) { max($0, $1.width) } + 8, height: sizes.reduce(gaps) { $0 + $1.height })
         }
-        return CGSize(width: sizes.reduce(gaps) { $0 + $1.width }, height: sizes.reduce(0) { max($0, $1.height) })
+        return CGSize(width: sizes.reduce(gaps) { $0 + $1.width }, height: sizes.reduce(0) { max($0, $1.height) } + 8)
     }
 }
 

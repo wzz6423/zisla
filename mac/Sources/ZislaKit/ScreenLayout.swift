@@ -458,6 +458,15 @@ public struct ScreenLayoutEngine: Equatable, Sendable {
         compactStatusLength: CGFloat? = nil
     ) -> CGRect {
         var frame = initial
+        if placementMode == .custom, compactStatusLength != nil {
+            if edge.isVertical {
+                frame.size.width = min(bounds.width, max(frame.width, CompactPillStatusPresentation.minimumThickness))
+                frame.origin.x = edge == .left ? bounds.minX : bounds.maxX - frame.width
+            } else {
+                frame.size.height = min(bounds.height, max(frame.height, CompactPillStatusPresentation.minimumThickness))
+                frame.origin.y = edge == .top ? bounds.maxY - frame.height : bounds.minY
+            }
+        }
         let desiredLength: CGFloat?
         if placementMode == .camera, expandsForDetailedStatus {
             desiredLength = max(SideNoticeLayoutEngine.Layout.compactBarMediaDetailSimulatedWidth,

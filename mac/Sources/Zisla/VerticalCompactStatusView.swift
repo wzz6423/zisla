@@ -60,7 +60,8 @@ struct CompactPillStatusContent: View {
             let thickness = edge.isVertical ? proxy.size.width : proxy.size.height
             let iconSize = max(0, thickness - 8)
             let textLength = max(0, (edge.isVertical ? proxy.size.height : proxy.size.width)
-                - thickness - (presentation.showsWaveform ? thickness + 6 : 0) - 6)
+                - thickness - (presentation.showsWaveform ? thickness + 6 : 0) - 6
+                - CompactPillStatusPresentation.trailingInset)
             let layout = edge.isVertical
                 ? AnyLayout(VStackLayout(spacing: 6))
                 : AnyLayout(HStackLayout(spacing: 6))
@@ -84,6 +85,7 @@ struct CompactPillStatusContent: View {
                         .frame(width: thickness, height: thickness)
                 }
             }
+            .padding(edge.isVertical ? .bottom : .trailing, CompactPillStatusPresentation.trailingInset)
             .frame(width: proxy.size.width, height: proxy.size.height)
         }
         .foregroundStyle(.white)

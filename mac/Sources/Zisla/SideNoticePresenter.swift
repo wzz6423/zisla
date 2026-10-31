@@ -303,7 +303,8 @@ final class SideNoticePresenter {
         if configuration.layoutStyle == .pill, configuration.placement.mode == .custom,
            let transientMessage {
             configuration.compactStatusLength = CompactPillStatusContent.transientPresentation(message: transientMessage)
-                .length(thickness: configuration.pillSize.height, edge: configuration.placement.edge)
+                .length(thickness: max(configuration.pillSize.height, CompactPillStatusPresentation.minimumThickness),
+                        edge: configuration.placement.edge)
             return configuration
         }
         let sizing = layoutEngine.compactBarSizing(
@@ -319,7 +320,8 @@ final class SideNoticePresenter {
                 for: presentation, settings: settingsStore.settings, item: media.snapshot, at: date
             )
             configuration.compactStatusLength = presentation.length(
-                thickness: configuration.pillSize.height, edge: configuration.placement.edge, text: text
+                thickness: max(configuration.pillSize.height, CompactPillStatusPresentation.minimumThickness),
+                edge: configuration.placement.edge, text: text
             )
         }
         if settingsStore.settings.effectiveStatusIconDestination == .island, sizing == nil,

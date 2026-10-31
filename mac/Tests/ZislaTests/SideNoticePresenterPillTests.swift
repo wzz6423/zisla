@@ -33,10 +33,10 @@ struct SideNoticePresenterPillTests {
         fixture.media.publishSnapshot(snapshot)
         fixture.settings.settings.mediaShowLyricsAndInfo = false
         let paused = fixture.presenter.compactConfiguration(for: [notice], at: base)
-        #expect(paused.compactStatusLength == 54)
+        #expect(paused.compactStatusLength == 82)
         fixture.settings.settings.mediaVisualizationStyle = .glow
         let compact = fixture.presenter.compactConfiguration(for: [notice], at: base)
-        #expect(compact.compactStatusLength == 24)
+        #expect(compact.compactStatusLength == 44)
     }
 
     @Test
@@ -90,7 +90,7 @@ struct SideNoticePresenterPillTests {
         #expect(fixture.presenter.compactConfiguration(for: [], at: fixture.date).compactStatusLength == nil)
         let notice = IslandNotice(id: "ai-active-test", title: "Codex")
         let active = try #require(fixture.presenter.compactFrame(for: fixture.screen, notices: [notice], at: fixture.date))
-        #expect(active.size == (edge.isVertical ? CGSize(width: 24, height: 44) : CGSize(width: 36, height: 24)))
+        #expect(active.size == (edge.isVertical ? CGSize(width: 32, height: 64) : CGSize(width: 56, height: 32)))
         #expect(try #require(fixture.presenter.compactFrame(
             for: fixture.screen, notices: [notice], at: fixture.date, statusHidden: true
         )) == idle)
@@ -114,7 +114,7 @@ struct SideNoticePresenterPillTests {
         let next = IslandNotice(id: "ai-active-codex", title: "Codex")
         #expect(SideNoticePresenter.updateCompactVisibility(notices: [next], settings: fixture.settings.settings, displayState: state))
         #expect(!state.compactStatusHidden)
-        #expect(fixture.presenter.compactConfiguration(for: [next], at: fixture.date).compactStatusLength == 44)
+        #expect(fixture.presenter.compactConfiguration(for: [next], at: fixture.date).compactStatusLength == 64)
         _ = SideNoticePresenter.updateCompactVisibility(notices: [], settings: fixture.settings.settings, displayState: state)
         #expect(!state.compactStatusHidden && state.compactStatusIDs.isEmpty)
     }
@@ -183,7 +183,7 @@ struct SideNoticePresenterPillTests {
         coordinator.selectActiveDisplay(at: CGPoint(x: fixture.screen.frame.midX, y: fixture.screen.frame.midY))
         let recordingLayout = try #require(coordinator.activeLayout)
         #expect(recordingLayout.collapsedFrame.size == (edge.isVertical
-            ? CGSize(width: 24, height: 86) : CGSize(width: 74, height: 24)))
+            ? CGSize(width: 32, height: 106) : CGSize(width: 94, height: 32)))
         #expect(published <= 2, "Reentrant layout callbacks must converge without repeatedly resizing")
         coordinator.selectActiveDisplay(at: CGPoint(x: other.frame.midX, y: other.frame.midY))
         #expect(coordinator.activeLayout?.displayID == 8)
@@ -203,7 +203,7 @@ struct SideNoticePresenterPillTests {
         fixture.presenter.setTransientNoticePresented(true, message: "已保存")
         let short = fixture.presenter.compactConfiguration(for: notices, at: fixture.date)
         let text = CompactPillStatusContent.transientPresentation(message: "已保存")
-        #expect(short.compactStatusLength == text.length(thickness: 24, edge: edge))
+        #expect(short.compactStatusLength == text.length(thickness: 32, edge: edge))
         #expect(!short.expandsForDetailedStatus)
         fixture.presenter.setTransientNoticePresented(true, message: "操作结果稍长一些")
         let long = fixture.presenter.compactConfiguration(for: notices, at: fixture.date)

@@ -19,6 +19,7 @@ struct ScreenRecordingClipAnimationInspector: View {
                     Text(AppLocalization.text(kind.title)).tag(Optional(kind))
                 }
             }
+            .controlSize(.regular)
             .accessibilityIdentifier("screenRecording.clipTransition")
             .disabled(transitionSource == nil && currentClip.transition == nil)
             if let transition = currentClip.transition {
@@ -80,6 +81,7 @@ struct ScreenRecordingClipAnimationInspector: View {
                 Text(AppLocalization.text(entrance ? kind.entranceTitle : kind.exitTitle)).tag(Optional(kind))
             }
         }
+        .controlSize(.regular)
         .accessibilityIdentifier(identifier)
         if let animation = currentClip[keyPath: keyPath] {
             ScreenRecordingParameterRow(title: AppLocalization.text(entrance ? "入场时长（秒）" : "出场时长（秒）"),

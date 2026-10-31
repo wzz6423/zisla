@@ -178,7 +178,8 @@ struct IslandParticleLogoTests {
         fixture.settings.settings.islandPlacement = IslandPlacement(mode: .custom, edge: edge)
         fixture.state.islandEdge = edge
         fixture.state.placementMode = .custom
-        let size = edge.isVertical ? CGSize(width: 24, height: 54) : CGSize(width: 54, height: 24)
+        fixture.state.compactWingHeight = 32
+        let size = edge.isVertical ? CGSize(width: 32, height: 82) : CGSize(width: 82, height: 32)
         let idle = try pixels(fixture.view.statusBarContent(at: fixture.date).frame(width: size.width, height: size.height))
         var notice = IslandNotice(id: "screen-recording-operation-logo", title: "Output", symbolName: "film")
         var frames: [[UInt8]] = []
@@ -191,28 +192,31 @@ struct IslandParticleLogoTests {
             #expect(frame != idle, "Recording state must replace the idle mark")
             #expect(fixture.view.pausesCompactTimeline, "Recording status must not keep the idle particle clock running")
             let width = Int(size.width * 2)
-            let first = frame.indices.filter { edge.isVertical ? $0 / width < 48 : $0 % width < 48 }
-            let gap = frame.indices.filter { edge.isVertical ? (48..<60).contains($0 / width) : (48..<60).contains($0 % width) }
-            let second = frame.indices.filter { edge.isVertical ? $0 / width >= 60 : $0 % width >= 60 }
+            let first = frame.indices.filter { edge.isVertical ? $0 / width < 64 : $0 % width < 64 }
+            let gap = frame.indices.filter { edge.isVertical ? (64..<76).contains($0 / width) : (64..<76).contains($0 % width) }
+            let second = frame.indices.filter { edge.isVertical ? (76..<140).contains($0 / width) : (76..<140).contains($0 % width) }
+            let end = frame.indices.filter { edge.isVertical ? $0 / width >= 140 : $0 % width >= 140 }
             #expect(first.contains { frame[$0] > 0 })
             #expect(second.contains { frame[$0] > 0 }, "The progress or terminal indicator must remain visible in the second slot")
             #expect(gap.allSatisfy { frame[$0] == 0 }, "The two recording slots must keep their 6pt gap")
+            #expect(end.allSatisfy { frame[$0] == 0 }, "Recording status must leave its final 12pt clear")
             if kind == .info, progress != nil {
                 let layout = edge.isVertical ? AnyLayout(VStackLayout(spacing: 6)) : AnyLayout(HStackLayout(spacing: 6))
                 let percentage = try pixels(layout {
-                    Color.clear.frame(width: 24, height: 24)
+                    Color.clear.frame(width: 32, height: 32)
                     Text(ScreenRecordingOperationNotice.progressText(for: notice))
-                        .font(.system(size: 12, weight: .semibold, design: .rounded))
+                        .font(.system(size: 13, weight: .semibold, design: .rounded))
                         .monospacedDigit()
                         .lineLimit(1)
                         .minimumScaleFactor(0.65)
                         .foregroundStyle(.white)
-                        .frame(width: 24, height: 24)
+                        .frame(width: 32, height: 32, alignment: .trailing)
                 }
+                .padding(edge.isVertical ? .bottom : .trailing, 12)
                 .frame(width: size.width, height: size.height)
                 .clipShape(CompactIslandShape(layoutStyle: .pill)))
                 #expect(second.map { frame[$0] } == second.map { percentage[$0] },
-                        "The percentage must use the full 24pt slot without notch padding shrinking its text")
+                        "The percentage must use the full 32pt slot without notch padding shrinking its text")
             }
             frames.append(frame)
         }
@@ -230,7 +234,8 @@ struct IslandParticleLogoTests {
         fixture.settings.settings.islandNotchBackground = .liquidGlass
         fixture.state.islandEdge = edge
         fixture.state.placementMode = .custom
-        let size = edge.isVertical ? CGSize(width: 24, height: 54) : CGSize(width: 54, height: 24)
+        fixture.state.compactWingHeight = 32
+        let size = edge.isVertical ? CGSize(width: 32, height: 82) : CGSize(width: 82, height: 32)
         let background = try pixels(IslandCollapsedMaterial(style: .liquidGlass)
             .frame(width: size.width, height: size.height)
             .clipShape(CompactIslandShape(layoutStyle: .pill))
@@ -239,7 +244,7 @@ struct IslandParticleLogoTests {
         let recording = try pixels(fixture.view.statusBarContent(at: fixture.date)
             .frame(width: size.width, height: size.height).background(.white))
         let width = Int(size.width * 2)
-        let samples = edge.isVertical ? [44 * width + 24, 104 * width + 24] : [44 * width + 24, 44 * width + 84]
+        let samples = edge.isVertical ? [60 * width + 32, 136 * width + 32] : [60 * width + 32, 60 * width + 108]
         for sample in samples {
             try #require(background[sample] > 0, "The fixture must expose the backing color to verify slot transparency")
             #expect(recording[sample] == background[sample], "Recording slots must preserve the existing glass crown without adding black wing backgrounds")

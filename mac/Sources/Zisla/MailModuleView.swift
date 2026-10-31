@@ -660,7 +660,6 @@ private struct MailComposerView: View {
                 } label: {
                     HStack(spacing: 3) {
                         Text(selectedIdentity?.address ?? AppLocalization.text("系统默认账户"))
-                            .font(.system(size: 11, weight: .medium))
                             .fitsSingleLine()
                         if let identity = selectedIdentity, identity.accountName != identity.address {
                             Text("· \(identity.accountName)")

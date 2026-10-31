@@ -278,7 +278,6 @@ struct SettingsView: View {
                     }
                     .labelsHidden()
                     .pickerStyle(.menu)
-                    .controlSize(.small)
                     .keepsIntrinsicWidth()
                     .disabled(!model.settingsStore.settings.mediaEnabled)
                 }
@@ -297,7 +296,6 @@ struct SettingsView: View {
                     )
                     .labelsHidden()
                     .toggleStyle(.switch)
-                    .controlSize(.small)
                     .disabled(!model.settingsStore.settings.mediaEnabled)
                 }
                 rowDivider
@@ -319,7 +317,6 @@ struct SettingsView: View {
                     }
                     .labelsHidden()
                     .pickerStyle(.menu)
-                    .controlSize(.small)
                     .keepsIntrinsicWidth()
                     .disabled(!model.settingsStore.settings.mediaEnabled)
                 }
@@ -352,7 +349,6 @@ struct SettingsView: View {
                     }
                     .toggleStyle(.switch)
                     .font(.system(size: 10))
-                    .controlSize(.small)
                     .frame(maxWidth: .infinity, alignment: .leading)
                     .padding(.leading, 4)
                     .padding(.vertical, 6)
@@ -388,7 +384,6 @@ struct SettingsView: View {
                                 Toggle("", isOn: systemMonitorMenuBarBinding(for: metric))
                                     .labelsHidden()
                                     .toggleStyle(.switch)
-                                    .controlSize(.small)
                             }
                         }
                     }
@@ -410,7 +405,6 @@ struct SettingsView: View {
                         )
                         .labelsHidden()
                         .toggleStyle(.switch)
-                        .controlSize(.small)
                     }
                 }
             }
@@ -615,7 +609,6 @@ struct SettingsView: View {
                         }
                         .labelsHidden()
                         .pickerStyle(.menu)
-                        .controlSize(.small)
                         .keepsIntrinsicWidth()
                     }
                     rowDivider
@@ -635,7 +628,6 @@ struct SettingsView: View {
                         ))
                         .labelsHidden()
                         .toggleStyle(.switch)
-                        .controlSize(.small)
                     }
                     if model.settingsStore.settings.clipboardAssistantMouseGestureEnabled
                         && !model.assistantAccessibilityGranted {
@@ -681,7 +673,6 @@ struct SettingsView: View {
                         }
                         .labelsHidden()
                         .pickerStyle(.menu)
-                        .controlSize(.small)
                         .keepsIntrinsicWidth()
                     }
                     rowDivider
@@ -710,7 +701,6 @@ struct SettingsView: View {
                         }
                         .labelsHidden()
                         .pickerStyle(.menu)
-                        .controlSize(.small)
                         .keepsIntrinsicWidth()
                     }
                     if model.settingsStore.settings.clipboardAssistantSearchEngine == .custom {
@@ -795,7 +785,6 @@ struct SettingsView: View {
                         ))
                         .labelsHidden()
                         .toggleStyle(.switch)
-                        .controlSize(.small)
                     }
                     if model.settingsStore.settings.contextNotesEnabled {
                         rowDivider
@@ -856,7 +845,6 @@ struct SettingsView: View {
                             ))
                             .labelsHidden()
                             .toggleStyle(.switch)
-                            .controlSize(.small)
                         }
                         if let groups = Self.clipboardAssistantExampleGroups[kind] {
                             clipboardAssistantExamples(groups)
@@ -1318,7 +1306,6 @@ struct SettingsView: View {
                         }
                         .labelsHidden()
                         .pickerStyle(.menu)
-                        .controlSize(.small)
                         .keepsIntrinsicWidth()
 
                         IconButton(
@@ -1403,7 +1390,6 @@ struct SettingsView: View {
                         )
                         .labelsHidden()
                         .toggleStyle(.switch)
-                        .controlSize(.small)
                     }
                 }
                 rowDivider
@@ -1425,7 +1411,6 @@ struct SettingsView: View {
                     }
                     .labelsHidden()
                     .pickerStyle(.menu)
-                    .controlSize(.small)
                     .keepsIntrinsicWidth()
                     .disabled(!model.settingsStore.settings.sideNoticesEnabled)
                 }
@@ -1448,7 +1433,6 @@ struct SettingsView: View {
                     }
                     .labelsHidden()
                     .pickerStyle(.menu)
-                    .controlSize(.small)
                     .keepsIntrinsicWidth()
                     .disabled(!model.settingsStore.settings.sideNoticesEnabled)
                 }
@@ -1523,7 +1507,6 @@ struct SettingsView: View {
                             )
                             .labelsHidden()
                             .toggleStyle(.switch)
-                            .controlSize(.small)
                             .disabled(!model.settingsStore.settings.sideNoticesEnabled)
                         }
                     }
@@ -1616,7 +1599,6 @@ struct SettingsView: View {
                     }
                     .labelsHidden()
                     .pickerStyle(.menu)
-                    .controlSize(.small)
                     .keepsIntrinsicWidth()
                 }
                 rowDivider
@@ -1634,7 +1616,6 @@ struct SettingsView: View {
                     )
                     .labelsHidden()
                     .toggleStyle(.switch)
-                    .controlSize(.small)
                 }
                 if let configuration = model.selectedVoiceModelConfiguration {
                     rowDivider
@@ -1697,7 +1678,6 @@ struct SettingsView: View {
                     )
                     .labelsHidden()
                     .toggleStyle(.switch)
-                    .controlSize(.small)
                 }
                 rowDivider
                 settingRow(
@@ -1718,7 +1698,6 @@ struct SettingsView: View {
                     }
                     .labelsHidden()
                     .pickerStyle(.menu)
-                    .controlSize(.small)
                     .keepsIntrinsicWidth()
                 }
                 rowDivider
@@ -1744,7 +1723,6 @@ struct SettingsView: View {
                         Toggle("", isOn: voiceLexiconBinding(for: lexicon))
                             .labelsHidden()
                             .toggleStyle(.switch)
-                            .controlSize(.small)
                     }
                 }
                 rowDivider
@@ -2006,7 +1984,6 @@ struct SettingsView: View {
                         }
                         .labelsHidden()
                         .pickerStyle(.menu)
-                        .controlSize(.small)
                         .keepsIntrinsicWidth()
                     }
                     rowDivider
@@ -2094,7 +2071,6 @@ struct SettingsView: View {
                     }
                     .labelsHidden()
                     .pickerStyle(.menu)
-                    .controlSize(.small)
                     .keepsIntrinsicWidth()
                     .disabled(!model.settingsStore.settings.petEnabled)
                 }
@@ -2116,7 +2092,6 @@ struct SettingsView: View {
                     }
                     .labelsHidden()
                     .pickerStyle(.menu)
-                    .controlSize(.small)
                     .keepsIntrinsicWidth()
                     .disabled(!model.settingsStore.settings.petEnabled)
                 }
@@ -3120,7 +3095,6 @@ struct SettingsView: View {
                 )
                 .labelsHidden()
                 .toggleStyle(.switch)
-                .controlSize(.small)
             }
             rowDivider
             settingRow(
@@ -3222,7 +3196,6 @@ struct SettingsView: View {
             ))
             .labelsHidden()
             .toggleStyle(.switch)
-            .controlSize(.small)
         }
     }
 
@@ -3568,7 +3541,6 @@ struct SettingsView: View {
             }
             .labelsHidden()
             .pickerStyle(.menu)
-            .controlSize(.small)
             .keepsIntrinsicWidth()
         }
         rowDivider
@@ -3602,7 +3574,6 @@ struct SettingsView: View {
                     Toggle("", isOn: mailAccountBinding(for: account.id, availableAccounts: accounts))
                         .labelsHidden()
                         .toggleStyle(.switch)
-                        .controlSize(.small)
                         .disabled(isOnlySelectedMailAccount(account.id))
                 }
             }
@@ -4405,8 +4376,10 @@ enum SettingsSectionGroup: CaseIterable, Identifiable, Hashable {
     case basics
     case sound
     case files
+    case capture
     case aiAndVoice
-    case networkAndOthers
+    case others
+    case recommendationsAndUpdates
 
     var id: Self { self }
 
@@ -4415,9 +4388,15 @@ enum SettingsSectionGroup: CaseIterable, Identifiable, Hashable {
         case .basics: "基础功能"
         case .sound: "声音"
         case .files: "文件"
+        case .capture: "截图与录屏"
         case .aiAndVoice: "AI 与语音"
-        case .networkAndOthers: "网络与其他"
+        case .others: "其他"
+        case .recommendationsAndUpdates: "推荐与反馈更新"
         }
+    }
+
+    func title(settings: FeatureSettings) -> String {
+        self == .recommendationsAndUpdates && !settings.recommendedToolsEnabled ? "反馈更新" : title
     }
 }
 
@@ -4446,9 +4425,11 @@ enum SettingsSection: String, CaseIterable, Identifiable {
         switch self {
         case .general, .features, .info: .basics
         case .keyboardSound: .sound
-        case .clipboardAssistant, .screenshot, .pdfTools, .recording, .download: .files
+        case .pdfTools: .files
+        case .screenshot, .recording: .capture
         case .ai, .voice: .aiAndVoice
-        case .mail, .weather, .networkProxy, .pet, .recommendations, .updates: .networkAndOthers
+        case .clipboardAssistant, .download, .mail, .weather, .networkProxy, .pet: .others
+        case .recommendations, .updates: .recommendationsAndUpdates
         }
     }
 
@@ -4586,7 +4567,7 @@ struct SettingsSidebar: View {
                         let sections = visibleSections.filter { $0.group == group }
                         if !sections.isEmpty {
                             VStack(alignment: .leading, spacing: 5) {
-                                AppLocalizedText(group.title)
+                                AppLocalizedText(group.title(settings: settings))
                                     .font(.system(size: 11, weight: .medium))
                                     .foregroundStyle(.secondary)
                                     .padding(.horizontal, 10)

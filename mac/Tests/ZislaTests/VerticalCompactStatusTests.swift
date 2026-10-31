@@ -11,8 +11,8 @@ struct VerticalCompactStatusTests {
         for text in ["20%", "25:00", "(1)", "[]", "12.5", "？，"] {
             let presentation = CompactPillStatusPresentation(priority: .transient,
                 notice: IslandNotice(id: "fixture", title: "fixture"), text: text)
-            #expect(presentation.length(thickness: 32, edge: .left) == 52,
-                    "\(text) fits one 14pt row, so the icon and gap must reserve only that row")
+            #expect(presentation.length(thickness: 32, edge: .left) == 64,
+                    "\(text) fits one 14pt row with a 12pt clear end after the icon and gap")
             #expect(CompactPillStatusPresentation.verticalTextRows(text, availableWidth: 32,
                 availableHeight: 14).map(\.text) == [text])
         }
@@ -30,7 +30,7 @@ struct VerticalCompactStatusTests {
         }
         let presentation = CompactPillStatusPresentation(priority: .transient,
             notice: IslandNotice(id: "fixture", title: "fixture"), text: "12.34567890%")
-        #expect(presentation.length(thickness: 24, edge: .left) == 30 + CGFloat(rows.count) * 14)
+        #expect(presentation.length(thickness: 24, edge: .left) == 42 + CGFloat(rows.count) * 14)
     }
 
     @Test
@@ -118,7 +118,7 @@ struct VerticalCompactStatusTests {
         let text = "↓123.45 MB/s ↑67.89 MB/s"
         let icon = IslandStatusIcon(id: "network", content: .metric(.network, text: text, image: nil, style: .detailed), tooltip: "Network")
         let measured = try #require(IslandStatusIconLayout.size(icons: [icon], edge: .top))
-        let renderSize = CGSize(width: measured.width + 80, height: 24)
+        let renderSize = CGSize(width: measured.width + 80, height: 32)
         func render(_ content: some View) async throws -> NSBitmapImageRep {
             let host = NSHostingView(rootView: content.frame(width: renderSize.width, height: renderSize.height)
                 .foregroundStyle(.white).background(.black))
@@ -144,7 +144,8 @@ struct VerticalCompactStatusTests {
         let expected = try await render(HStack(spacing: 6) {
             Image(systemName: SystemMonitorMenuBarMetric.network.symbolName).frame(width: 18)
             Text(text).font(.system(size: 12, weight: .medium)).monospacedDigit().fixedSize()
-        }.frame(width: icon.size(edge: .top).width, height: 24).padding(.horizontal, 3)
+        }.frame(width: icon.size(edge: .top).width, height: 24)
+            .padding(.horizontal, 8).padding(.vertical, 4)
             .frame(width: measured.width, height: measured.height))
         var changed = 0
         for y in 0..<actual.pixelsHigh {
@@ -190,8 +191,8 @@ struct VerticalCompactStatusTests {
         let first = CompactPillStatusContent.displayText(for: presentation, settings: settings, item: item, at: date)
         let next = CompactPillStatusContent.displayText(for: presentation, settings: settings, item: item, at: date.addingTimeInterval(10))
         #expect(first == "短" && next == "长一些的歌词")
-        #expect(presentation.length(thickness: 32, edge: .left, text: first) == 90)
-        #expect(presentation.length(thickness: 32, edge: .left, text: next) == 160)
+        #expect(presentation.length(thickness: 32, edge: .left, text: first) == 102)
+        #expect(presentation.length(thickness: 32, edge: .left, text: next) == 172)
         #expect(presentation.text == "旧歌词")
         var paused = item
         paused.isPlaying = false
@@ -253,8 +254,50 @@ struct VerticalCompactStatusTests {
         #expect(presentation.priority == .transient)
         #expect(presentation.notice.symbolName == "exclamationmark.triangle.fill")
         #expect(presentation.text == "已保存")
-        #expect(presentation.length(thickness: 32, edge: .left) == 80)
+        #expect(presentation.length(thickness: 32, edge: .left) == 92)
         #expect(!presentation.showsWaveform && !presentation.isMedia)
+    }
+
+    @Test(arguments: IslandEdge.allCases) @MainActor
+    func aiCountsAndMediaContentLeaveClearSpaceAtTheEnd(edge: IslandEdge) throws {
+        let presentations = [
+            CompactPillStatusPresentation(priority: .aiActivity,
+                notice: IslandNotice(id: "ai-active-openai", title: "AI"), text: "2"),
+            CompactPillStatusPresentation(priority: .aiActivity,
+                notice: IslandNotice(id: "ai-active-openai", title: "AI"), text: "999+"),
+            CompactPillStatusPresentation(priority: .media,
+                notice: IslandNotice(id: "media-active-fixture", title: "Music"), text: "爱的期限"),
+            CompactPillStatusPresentation(priority: .media,
+                notice: IslandNotice(id: "media-active-fixture", title: "Music"), text: "爱的期限", showsWaveform: true),
+            CompactPillStatusPresentation(priority: .media,
+                notice: IslandNotice(id: "media-active-fixture", title: "Music"), text: "", showsWaveform: true),
+        ]
+        for presentation in presentations {
+            let length = presentation.length(thickness: 32, edge: edge)
+            let size = edge.isVertical ? CGSize(width: 32, height: length) : CGSize(width: length, height: 32)
+            let renderer = ImageRenderer(content: CompactPillStatusContent(presentation: presentation,
+                text: presentation.text, edge: edge, visualizationStyle: .waveform, item: nil)
+                .frame(width: size.width, height: size.height).background(.black))
+            renderer.scale = 2
+            let bitmap = NSBitmapImageRep(cgImage: try #require(renderer.cgImage))
+            let axisLength = edge.isVertical ? bitmap.pixelsHigh : bitmap.pixelsWide
+            let crossLength = edge.isVertical ? bitmap.pixelsWide : bitmap.pixelsHigh
+            var foreground = 0
+            var endPixels = 0
+            for axis in 0..<axisLength {
+                for cross in 0..<crossLength {
+                    let x = edge.isVertical ? cross : axis
+                    let y = edge.isVertical ? axis : cross
+                    let color = try #require(bitmap.colorAt(x: x, y: y)?.usingColorSpace(.deviceRGB))
+                    if max(color.redComponent, color.greenComponent, color.blueComponent) > 0.25 {
+                        foreground += 1
+                        if axis >= axisLength - 24 { endPixels += 1 }
+                    }
+                }
+            }
+            #expect(foreground > 10)
+            #expect(endPixels == 0, "\(presentation.notice.id) \(presentation.text) must leave 12pt empty at the end")
+        }
     }
 
     @Test(arguments: IslandEdge.allCases)
@@ -296,9 +339,11 @@ struct VerticalCompactStatusTests {
         if edge.isVertical {
             #expect(textBounds.minY >= 38 && textBounds.minY < 44)
             #expect(textBounds.height > textBounds.width * 2 && textBounds.maxX <= 32)
+            #expect(size.height - textBounds.maxY >= 12, "Vertical content must leave a clear end below its last character")
         } else {
             #expect(textBounds.minX >= 38 && textBounds.minX < 44)
             #expect(textBounds.width > textBounds.height * 2 && textBounds.maxY <= 32)
+            #expect(size.width - textBounds.maxX >= 12, "Horizontal content must leave a clear end after its last character")
         }
     }
 }

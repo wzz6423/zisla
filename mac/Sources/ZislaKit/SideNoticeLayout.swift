@@ -531,7 +531,9 @@ public struct SideNoticeLayoutEngine: Equatable, Sendable {
         customPillLength: CGFloat,
         customPillPresentation: CompactPillStatusPresentation?
     )? {
-        let thickness = CGFloat(settings.islandPillHeight)
+        let thickness = settings.islandLayoutStyle == .pill && settings.islandPlacement.mode == .custom
+            ? max(CGFloat(settings.islandPillHeight), CompactPillStatusPresentation.minimumThickness)
+            : CGFloat(settings.islandPillHeight)
         if let notice = notices.first(where: { $0.id.hasPrefix("voice-processing-") }) {
             let presentation = CompactPillStatusPresentation(priority: nil, notice: notice,
                 text: notice.detail ?? "")
@@ -540,7 +542,7 @@ public struct SideNoticeLayoutEngine: Equatable, Sendable {
         }
         if Self.screenRecordingOperationNotice(for: notices, settings: settings) != nil {
             return (0, false, settings.collapsedProgressGlowEnabled, Layout.compactWingWidth, 0,
-                    thickness * 2 + 6, nil)
+                    thickness * 2 + 6 + CompactPillStatusPresentation.trailingInset, nil)
         }
         let selectedPriority = Self.selectedCompactStatusPriority(for: notices, settings: settings)
         guard let selectedPriority else { return nil }

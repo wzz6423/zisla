@@ -8,6 +8,30 @@ import ZislaKit
 
 @MainActor
 struct IslandMaterialSelectionTests {
+    @Test(arguments: AppLanguage.allCases)
+    func materialOptionsKeepHorizontalRoomForEveryLocalizedLabel(language: AppLanguage) throws {
+        let expanded = NSHostingView(rootView: IslandVisualStylePicker(selection: .constant(.frosted))
+            .environment(\.locale, language.locale))
+        let collapsed = NSHostingView(rootView: IslandNotchBackgroundPicker(selection: .constant(.liquidGlass))
+            .environment(\.locale, language.locale))
+        let collapsedOptionWidth = (collapsed.fittingSize.width - 6 - 6) / 3
+        let expandedOptionWidth = (expanded.fittingSize.width - 6 - 3) / 2
+        for option in IslandNotchBackground.allCases {
+            let width = (AppLocalization.string(option.title, language: language) as NSString).size(withAttributes: [
+                .font: NSFont.systemFont(ofSize: 9, weight: .semibold)
+            ]).width
+            #expect(collapsedOptionWidth - width >= 20,
+                    "Collapsed material labels must have at least ten points on either side")
+        }
+        for option in IslandVisualStyle.allCases {
+            let width = (AppLocalization.string(option.title, language: language) as NSString).size(withAttributes: [
+                .font: NSFont.systemFont(ofSize: 9, weight: .semibold)
+            ]).width
+            #expect(expandedOptionWidth - width >= 20,
+                    "Expanded material labels must have at least ten points on either side")
+        }
+    }
+
     @Test(.timeLimit(.minutes(1)), arguments: [false, true])
     func selectedMaterialReplacesThePreviousNativeSurface(floatingTarget: Bool) async throws {
         let reduceTransparency = NSWorkspace.shared.accessibilityDisplayShouldReduceTransparency

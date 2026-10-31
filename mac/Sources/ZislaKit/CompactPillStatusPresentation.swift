@@ -2,6 +2,9 @@ import AppKit
 import ZislaCore
 
 public struct CompactPillStatusPresentation: Equatable, Sendable {
+    public static let minimumThickness: CGFloat = 32
+    public static let trailingInset: CGFloat = 12
+
     public struct VerticalTextRow: Equatable, Sendable {
         public let text: String
         public let rotatesClockwise: Bool
@@ -25,7 +28,7 @@ public struct CompactPillStatusPresentation: Equatable, Sendable {
 
     public func length(thickness: CGFloat, edge: IslandEdge, text: String? = nil) -> CGFloat {
         let text = (text ?? self.text).trimmingCharacters(in: .whitespacesAndNewlines)
-        let visualLength = showsWaveform ? thickness * 2 + 6 : thickness
+        let visualLength = (showsWaveform ? thickness * 2 + 6 : thickness) + Self.trailingInset
         guard !text.isEmpty else { return visualLength }
         let textLength: CGFloat
         if edge.isVertical {

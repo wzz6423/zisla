@@ -225,6 +225,99 @@ struct SettingsSplitViewTests {
         #expect(!fixture.window.isVisible)
     }
 
+    @Test(arguments: [AppLanguage.simplifiedChinese, .english, .arabic])
+    func productionSidebarHidesEmptyGroupsAndUpdatesItsRecommendationHeading(language: AppLanguage) async throws {
+        let releaseAccessibility = EnhancedAccessibilityTestScope.acquire()
+        defer { releaseAccessibility() }
+        let input = SettingsInput()
+        var settings = FeatureSettings.default
+        settings.keyboardEnabled = false
+        settings.clipboardAssistantEnabled = false
+        settings.screenshotEnabled = false
+        settings.screenRecordingEnabled = false
+        settings.pdfToolsEnabled = false
+        settings.mediaEnabled = false
+        settings.systemMonitorEnabled = false
+        settings.lockScreenInfoEnabled = false
+        settings.sideNoticesEnabled = false
+        settings.mailEnabled = false
+        settings.aiProgressEnabled = false
+        settings.voiceInputEnabled = false
+        settings.petEnabled = false
+        settings.downloaderEnabled = false
+        settings.weatherEnabled = false
+        settings.updateChecksEnabled = false
+        settings.recommendedToolsEnabled = false
+        let titles = SettingsSectionGroup.allCases.map(\.title) + ["反馈更新"]
+        let localizedTitles = Set(titles.map { AppLocalization.string($0, locale: language.locale) })
+        let sidebarHost = NSHostingView(rootView: AnyView(EmptyView()))
+        let sidebarWindow = NSWindow(contentRect: NSRect(x: 20_000, y: 100, width: 250, height: 1_200),
+                                     styleMask: .borderless, backing: .buffered, defer: false)
+        sidebarWindow.isReleasedWhenClosed = false
+        sidebarHost.sizingOptions = []
+        sidebarWindow.contentView = sidebarHost
+        defer { sidebarWindow.close() }
+
+        func expectHeadings(_ keys: [String]) async throws {
+            sidebarHost.rootView = AnyView(SidebarPage(input: input, settings: settings)
+                .environment(\.locale, language.locale)
+                .environment(\.layoutDirection, language.isRightToLeft ? .rightToLeft : .leftToRight))
+            for _ in 0..<3 {
+                sidebarHost.layoutSubtreeIfNeeded()
+                sidebarHost.displayIfNeeded()
+                await withCheckedContinuation { continuation in DispatchQueue.main.async { continuation.resume() } }
+            }
+            var values = Set<String>()
+            func visit(_ object: NSObject) {
+                for key in ["accessibilityLabel", "accessibilityValue"] {
+                    if object.responds(to: NSSelectorFromString(key)), let text = object.value(forKey: key) as? String {
+                        values.insert(text)
+                    }
+                }
+                if object.responds(to: NSSelectorFromString("accessibilityChildren")) {
+                    for child in object.value(forKey: "accessibilityChildren") as? [NSObject] ?? [] {
+                        visit(child)
+                    }
+                }
+            }
+            visit(sidebarHost)
+            #expect(values.intersection(localizedTitles)
+                == Set(keys.map { AppLocalization.string($0, locale: language.locale) }),
+                "Only groups with enabled pages should render a heading")
+            #expect(!sidebarWindow.isVisible)
+        }
+
+        try await expectHeadings(["基础功能", "其他"])
+        settings.pdfToolsEnabled = true
+        try await expectHeadings(["基础功能", "文件", "其他"])
+        settings.pdfToolsEnabled = false
+        settings.screenshotEnabled = true
+        try await expectHeadings(["基础功能", "截图与录屏", "其他"])
+        settings.screenshotEnabled = false
+        settings.screenRecordingEnabled = true
+        try await expectHeadings(["基础功能", "截图与录屏", "其他"])
+        settings.screenRecordingEnabled = false
+        settings.updateChecksEnabled = true
+        try await expectHeadings(["基础功能", "其他", "反馈更新"])
+        settings.recommendedToolsEnabled = true
+        try await expectHeadings(["基础功能", "其他", "推荐与反馈更新"])
+        settings.updateChecksEnabled = false
+        try await expectHeadings(["基础功能", "其他", "推荐与反馈更新"])
+        settings.recommendedToolsEnabled = false
+        try await expectHeadings(["基础功能", "其他"])
+    }
+
+    private struct SidebarPage: View {
+        @ObservedObject var input: SettingsInput
+        let settings: FeatureSettings
+        @FocusState private var searchFocused: Bool
+
+        var body: some View {
+            SettingsSidebar(input: input, settings: settings, appVersion: "1.0", settingsSearchFieldFocused: $searchFocused,
+                            onSelect: { input.select($0) }, onSubmitSearch: {})
+        }
+    }
+
     @Test
     func reparentingAndRemovingTheSplitReleasesOwnedToolbarWithoutClearingAnotherToolbar() async throws {
         let fixture = Fixture()
