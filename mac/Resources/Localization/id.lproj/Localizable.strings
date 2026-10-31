@@ -3109,3 +3109,36 @@
 "未知导入时间" = "Waktu impor tidak diketahui";
 "未知拍摄时间" = "Waktu pengambilan tidak diketahui";
 "已跳过 %d 个重复素材" = "%d media duplikat dilewati";
+
+/* Adaptive island appearance and placement */
+"灵动岛展开材质" = "Material Dynamic Island saat diperluas";
+"灵动岛收起材质" = "Material Dynamic Island saat diciutkan";
+"选择贴边刘海或悬浮药丸" = "Pilih takik yang menempel di tepi layar atau kapsul mengambang";
+"刘海模式" = "Mode takik";
+"灵动岛模式" = "Mode Dynamic Island";
+"灵动岛位置" = "Posisi Dynamic Island";
+"摄像头位置居中对齐菜单栏；其他位置可拖动到屏幕四边" = "Posisi kamera berada di tengah bilah menu; posisi khusus dapat diseret ke keempat tepi layar";
+"其他位置" = "Posisi khusus";
+"调整位置" = "Atur posisi";
+"药丸宽度" = "Lebar kapsul";
+"以屏幕点为单位微调药丸尺寸" = "Sesuaikan ukuran kapsul secara presisi dalam satuan poin layar";
+"药丸高度" = "Tinggi kapsul";
+"摄像头位置的高度自动限制在菜单栏内" = "Di posisi kamera, tinggi otomatis dibatasi agar tetap di dalam bilah menu";
+"黑色" = "Hitam";
+"收起时上侧黑色，下侧透明" = "Saat diciutkan, bagian atas berwarna hitam dan bagian bawah transparan";
+"音乐动效" = "Animasi musik";
+"音浪或随音乐节奏呼吸的专辑光晕" = "Tampilkan gelombang suara atau sampul album dengan cahaya yang berdenyut mengikuti irama musik";
+"音浪模式" = "Mode gelombang suara";
+"光晕模式" = "Mode cahaya";
+"拖动药丸到屏幕边缘，按回车完成，按 Esc 取消。" = "Seret kapsul ke tepi layar. Tekan Return untuk selesai atau Esc untuk membatalkan.";
+"Liquid Glass" = "Liquid Glass";
+
+"图标显示位置" = "Lokasi Ikon";
+"状态栏" = "Bilah Menu";
+"灵动岛" = "Pulau Dinamis";
+"常驻监控图标" = "Ikon Pemantauan Tetap";
+"关闭后不影响已启用的监控图标" = "Menonaktifkan ini tidak memengaruhi ikon pemantauan yang aktif";
+
+"截图与录屏" = "Tangkapan dan perekaman layar";
+"推荐与反馈更新" = "Rekomendasi, umpan balik, dan pembaruan";
+"反馈更新" = "Umpan balik dan pembaruan";

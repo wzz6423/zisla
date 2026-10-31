@@ -109,7 +109,16 @@ private struct IslandVisualStyleKey: EnvironmentKey {
     static let defaultValue: IslandVisualStyle = .frosted
 }
 
+private struct MediaVisualizationStyleKey: EnvironmentKey {
+    static let defaultValue: MediaVisualizationStyle = .waveform
+}
+
 extension EnvironmentValues {
+    var mediaVisualizationStyle: MediaVisualizationStyle {
+        get { self[MediaVisualizationStyleKey.self] }
+        set { self[MediaVisualizationStyleKey.self] = newValue }
+    }
+
     var islandVisualStyle: IslandVisualStyle {
         get { self[IslandVisualStyleKey.self] }
         set { self[IslandVisualStyleKey.self] = newValue }

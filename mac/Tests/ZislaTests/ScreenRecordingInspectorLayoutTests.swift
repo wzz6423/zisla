@@ -33,6 +33,72 @@ struct ScreenRecordingInspectorLayoutTests {
         #expect(!fixture.window.isVisible)
     }
 
+    enum MediumControlPanel: CaseIterable, Sendable { case ai, captions, effects, timeline, multitrack, media, export }
+
+    @Test(arguments: AppLanguage.allCases, MediumControlPanel.allCases)
+    func recordingMenusUseNativeMediumHeight(language: AppLanguage, panel: MediumControlPanel) async throws {
+        let previous = UserDefaults.standard.volatileDomain(forName: UserDefaults.argumentDomain)
+        var arguments = previous
+        arguments[AppLocalization.defaultsKey] = language.rawValue
+        UserDefaults.standard.setVolatileDomain(arguments, forName: UserDefaults.argumentDomain)
+        defer { UserDefaults.standard.setVolatileDomain(previous, forName: UserDefaults.argumentDomain) }
+        let release = EnhancedAccessibilityTestScope.acquire()
+        defer { release() }
+        let recording = try RecordingMultitrackTestFixture()
+        let model = try recording.model()
+        defer { model.shutdown(); recording.remove() }
+        var project = recording.project()
+        project.cameraFile = "camera.mp4"
+        project.timeline = panel == .multitrack ? .migrating(project) : nil
+        model.install(project, directory: recording.directory)
+        if let clip = project.timeline?.clips.first { model.selectTimelineClip(clip.id) }
+        let view: AnyView
+        let expectedCount: Int
+        switch panel {
+        case .ai:
+            view = AnyView(ScreenRecordingAIView(model: model))
+            expectedCount = 1
+        case .captions:
+            view = AnyView(ScreenRecordingCaptionsView(model: model))
+            expectedCount = 1
+        case .effects:
+            view = AnyView(ScreenRecordingEffectsView(model: model))
+            expectedCount = 4
+        case .timeline:
+            view = AnyView(ScreenRecordingTimelineView(model: model, selectedSegmentID: .constant(nil)))
+            expectedCount = 2
+        case .multitrack:
+            view = AnyView(ScreenRecordingMultitrackClipInspector(model: model))
+            expectedCount = 5
+        case .media:
+            view = AnyView(ScreenRecordingMediaLibraryView(model: model, grouping: .importedAt))
+            expectedCount = 2
+        case .export:
+            view = AnyView(ScreenRecordingExportSettingsView(settings: .init(configuration: .init(), panel: NSSavePanel(), duration: 2)))
+            expectedCount = 3
+        }
+        let reference = Fixture(Picker("Reference", selection: Binding.constant(0)) { Text("Medium").tag(0) }
+            .pickerStyle(.menu).controlSize(.regular).labelsHidden(), language: language)
+        let fixture = Fixture(view.frame(width: 366), language: language)
+        defer { fixture.window.close(); reference.window.close() }
+        await reference.settle()
+        await fixture.settle()
+        if panel == .effects {
+            let disclosure = try #require(fixture.control(AppLocalization.text("摄像头叠加"), role: .disclosureTriangle))
+            try fixture.press(disclosure)
+            await fixture.settle()
+        }
+        let referenceHeight = try #require(reference.menuFrames().first).height
+        let frames = fixture.menuFrames()
+        #expect(frames.count == expectedCount)
+        for frame in frames {
+            #expect(abs(frame.height - referenceHeight) < 0.5,
+                    "Every recording menu must keep the native medium height inside its production container")
+        }
+        #expect(model.project == project && !model.isDirty && !model.canUndo)
+        #expect(!fixture.window.isVisible && !reference.window.isVisible)
+    }
+
     @Test
     func collapsedSectionsLeaveThePreviewSpaceForTheTimeline() async {
         let expanded = Fixture(section(expanded: true), language: .english)
@@ -341,6 +407,15 @@ struct ScreenRecordingInspectorLayoutTests {
             let view = view ?? host
             if let field = view as? NSTextField, field.isEditable { return [field] }
             return view.subviews.flatMap { editableFields(in: $0) }
+        }
+
+        func menuFrames() -> [CGRect] {
+            accessibilityObjects(host).compactMap { object in
+                guard object.responds(to: NSSelectorFromString("accessibilityRole")),
+                      object.value(forKey: "accessibilityRole") as? String == NSAccessibility.Role.popUpButton.rawValue,
+                      let element = object as? any NSAccessibilityElementProtocol else { return nil }
+                return frame(element)
+            }
         }
 
         func element(_ identifier: String) -> (any NSAccessibilityElementProtocol)? {

@@ -231,6 +231,7 @@ public enum IslandVisualStyle: String, Codable, CaseIterable, Sendable, Equatabl
 public enum IslandNotchBackground: String, Codable, CaseIterable, Sendable, Equatable, Hashable {
     case black
     case frosted
+    case liquidGlass = "liquidGlassCrown"
 
     public init(from decoder: Decoder) throws {
         let container = try decoder.singleValueContainer()
@@ -255,8 +256,9 @@ public enum IslandNotchBackground: String, Codable, CaseIterable, Sendable, Equa
 
     public var title: String {
         switch self {
-        case .black: "刘海"
+        case .black: "黑色"
         case .frosted: "磨砂玻璃"
+        case .liquidGlass: "Liquid Glass"
         }
     }
 
@@ -264,6 +266,7 @@ public enum IslandNotchBackground: String, Codable, CaseIterable, Sendable, Equa
         switch self {
         case .black: "收起时保留刘海外观"
         case .frosted: "收起时显示磨砂玻璃背景"
+        case .liquidGlass: "收起时上侧黑色，下侧透明"
         }
     }
 }
@@ -347,6 +350,18 @@ public enum SystemMonitorMenuBarMetric: String, Codable, CaseIterable, Sendable,
         case .disk: "internaldrive"
         case .network: "network"
         case .fan: "fan"
+        }
+    }
+}
+
+public enum StatusIconDestination: String, Codable, CaseIterable, Sendable, Equatable {
+    case menuBar
+    case island
+
+    public var menuTitle: String {
+        switch self {
+        case .menuBar: "状态栏"
+        case .island: "灵动岛"
         }
     }
 }
@@ -730,6 +745,13 @@ public struct FeatureSettings: Codable, Equatable, Sendable {
     public var systemMonitorMenuBarHeadphoneOptions: SystemMonitorHeadphoneOptions
     /// Whether to show Zisla's menu bar icon separately; does not affect monitor status items.
     public var menuBarAppIconEnabled: Bool
+    public var statusIconDestination: StatusIconDestination
+    public var supportsStatusIconsInIsland: Bool {
+        islandLayoutStyle == .pill && islandPlacement.mode == .custom
+    }
+    public var effectiveStatusIconDestination: StatusIconDestination {
+        supportsStatusIconsInIsland ? statusIconDestination : .menuBar
+    }
     public var weatherEnabled: Bool
     public var lockScreenInfoEnabled: Bool
     /// User-defined text shown above the native lock-screen clock; empty string means nothing is shown.
@@ -819,6 +841,14 @@ public struct FeatureSettings: Codable, Equatable, Sendable {
     public var mediaShowLyricsAndInfo: Bool
     /// Display style for the collapsed Dynamic Island when music is playing.
     public var mediaCompactStyle: MediaCompactStyle
+    public var mediaVisualizationStyle: MediaVisualizationStyle
+    public var islandLayoutStyle: IslandLayoutStyle
+    public var islandPlacement: IslandPlacement
+    public private(set) var islandPillWidth: Double
+    public private(set) var islandPillHeight: Double
+    public var islandEdgeInset: Double {
+        didSet { islandEdgeInset = Self.islandDimension(islandEdgeInset, range: 0...64, fallback: 8) }
+    }
     /// Visual style of the Dynamic Island surface.
     public var islandVisualStyle: IslandVisualStyle
     /// Background of the collapsed notch surface.
@@ -896,6 +926,7 @@ public struct FeatureSettings: Codable, Equatable, Sendable {
         systemMonitorMenuBarCombinedIconAppearance: SystemMonitorCombinedIconAppearance = SystemMonitorCombinedIconAppearance(),
         systemMonitorMenuBarHeadphoneOptions: SystemMonitorHeadphoneOptions = SystemMonitorHeadphoneOptions(),
         menuBarAppIconEnabled: Bool = false,
+        statusIconDestination: StatusIconDestination = .menuBar,
         weatherEnabled: Bool = true,
         lockScreenInfoEnabled: Bool = true,
         lockScreenMessage: String = "",
@@ -947,6 +978,12 @@ public struct FeatureSettings: Codable, Equatable, Sendable {
         petSide: PetSide = .left,
         mediaShowLyricsAndInfo: Bool = true,
         mediaCompactStyle: MediaCompactStyle = .compact,
+        mediaVisualizationStyle: MediaVisualizationStyle = .waveform,
+        islandLayoutStyle: IslandLayoutStyle = .notch,
+        islandPlacement: IslandPlacement = IslandPlacement(),
+        islandPillWidth: Double = 180,
+        islandPillHeight: Double = 32,
+        islandEdgeInset: Double = 8,
         islandVisualStyle: IslandVisualStyle = .transparent,
         islandNotchBackground: IslandNotchBackground = .black,
         islandCollapsedOnTop: Bool = true,
@@ -1007,6 +1044,7 @@ public struct FeatureSettings: Codable, Equatable, Sendable {
         self.systemMonitorMenuBarCombinedIconAppearance = systemMonitorMenuBarCombinedIconAppearance
         self.systemMonitorMenuBarHeadphoneOptions = systemMonitorMenuBarHeadphoneOptions
         self.menuBarAppIconEnabled = menuBarAppIconEnabled
+        self.statusIconDestination = statusIconDestination
         self.weatherEnabled = weatherEnabled
         self.lockScreenInfoEnabled = lockScreenInfoEnabled
         self.lockScreenMessage = lockScreenMessage
@@ -1074,6 +1112,12 @@ public struct FeatureSettings: Codable, Equatable, Sendable {
         self.petSide = petSide
         self.mediaShowLyricsAndInfo = mediaShowLyricsAndInfo
         self.mediaCompactStyle = mediaCompactStyle
+        self.mediaVisualizationStyle = mediaVisualizationStyle
+        self.islandLayoutStyle = islandLayoutStyle
+        self.islandPlacement = islandPlacement
+        self.islandPillWidth = 80
+        self.islandPillHeight = 24
+        self.islandEdgeInset = Self.islandDimension(islandEdgeInset, range: 0...64, fallback: 8)
         self.islandVisualStyle = islandVisualStyle
         self.islandNotchBackground = islandNotchBackground
         self.islandCollapsedOnTop = islandCollapsedOnTop
@@ -1165,6 +1209,7 @@ public struct FeatureSettings: Codable, Equatable, Sendable {
         case systemMonitorMenuBarCombinedIconAppearance
         case systemMonitorMenuBarHeadphoneOptions
         case menuBarAppIconEnabled
+        case statusIconDestination
         case weatherEnabled
         case lockScreenInfoEnabled
         case lockScreenMessage
@@ -1219,6 +1264,12 @@ public struct FeatureSettings: Codable, Equatable, Sendable {
         case petSide
         case mediaShowLyricsAndInfo
         case mediaCompactStyle
+        case mediaVisualizationStyle
+        case islandLayoutStyle
+        case islandPlacement
+        case islandPillWidth
+        case islandPillHeight
+        case islandEdgeInset
         case islandVisualStyle
         case islandNotchBackground
         case islandCollapsedOnTop
@@ -1339,6 +1390,9 @@ public struct FeatureSettings: Codable, Equatable, Sendable {
             Bool.self,
             forKey: .menuBarAppIconEnabled
         ) ?? defaults.menuBarAppIconEnabled
+        // A malformed destination must not make the store reset unrelated preferences.
+        statusIconDestination = (try? container.decode(StatusIconDestination.self, forKey: .statusIconDestination))
+            ?? defaults.statusIconDestination
         weatherEnabled = try container.decodeIfPresent(Bool.self, forKey: .weatherEnabled) ?? defaults.weatherEnabled
         lockScreenInfoEnabled = try container.decodeIfPresent(Bool.self, forKey: .lockScreenInfoEnabled) ?? defaults.lockScreenInfoEnabled
         lockScreenMessage = try container.decodeIfPresent(String.self, forKey: .lockScreenMessage) ?? defaults.lockScreenMessage
@@ -1507,6 +1561,18 @@ public struct FeatureSettings: Codable, Equatable, Sendable {
             MediaCompactStyle.self,
             forKey: .mediaCompactStyle
         ) ?? defaults.mediaCompactStyle
+        mediaVisualizationStyle = try container.decodeIfPresent(MediaVisualizationStyle.self, forKey: .mediaVisualizationStyle)
+            ?? defaults.mediaVisualizationStyle
+        islandLayoutStyle = try container.decodeIfPresent(IslandLayoutStyle.self, forKey: .islandLayoutStyle)
+            ?? defaults.islandLayoutStyle
+        islandPlacement = try container.decodeIfPresent(IslandPlacement.self, forKey: .islandPlacement)
+            ?? defaults.islandPlacement
+        islandPillWidth = defaults.islandPillWidth
+        islandPillHeight = defaults.islandPillHeight
+        islandEdgeInset = Self.islandDimension(
+            try container.decodeIfPresent(Double.self, forKey: .islandEdgeInset) ?? defaults.islandEdgeInset,
+            range: 0...64, fallback: 8
+        )
         islandVisualStyle = try container.decodeIfPresent(
             IslandVisualStyle.self,
             forKey: .islandVisualStyle
@@ -1638,6 +1704,10 @@ public struct FeatureSettings: Codable, Equatable, Sendable {
         keyboardUsesPitchVariation = try container.decodeIfPresent(Bool.self, forKey: .keyboardUsesPitchVariation) ?? defaults.keyboardUsesPitchVariation
         keyboardTypingStatsEnabled = try container.decodeIfPresent(Bool.self, forKey: .keyboardTypingStatsEnabled) ?? defaults.keyboardTypingStatsEnabled
         lidCloseAnimationEnabled = try container.decodeIfPresent(Bool.self, forKey: .lidCloseAnimationEnabled) ?? defaults.lidCloseAnimationEnabled
+    }
+
+    private static func islandDimension(_ value: Double, range: ClosedRange<Double>, fallback: Double) -> Double {
+        value.isFinite ? min(range.upperBound, max(range.lowerBound, value)) : fallback
     }
 }
 

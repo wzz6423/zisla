@@ -3108,3 +3108,36 @@
 "未知导入时间" = "Unknown import time";
 "未知拍摄时间" = "Unknown capture time";
 "已跳过 %d 个重复素材" = "Skipped %d duplicate media items";
+
+/* Adaptive island appearance and placement */
+"灵动岛展开材质" = "Expanded Dynamic Island Material";
+"灵动岛收起材质" = "Collapsed Dynamic Island Material";
+"选择贴边刘海或悬浮药丸" = "Choose an edge-aligned notch or a floating pill";
+"刘海模式" = "Notch Mode";
+"灵动岛模式" = "Dynamic Island Mode";
+"灵动岛位置" = "Dynamic Island Position";
+"摄像头位置居中对齐菜单栏；其他位置可拖动到屏幕四边" = "The camera position is centered in the menu bar; custom positions can be dragged to any screen edge";
+"其他位置" = "Custom Position";
+"调整位置" = "Adjust Position";
+"药丸宽度" = "Pill Width";
+"以屏幕点为单位微调药丸尺寸" = "Fine-tune the pill size in screen points";
+"药丸高度" = "Pill Height";
+"摄像头位置的高度自动限制在菜单栏内" = "At the camera position, the height is automatically limited to the menu bar";
+"黑色" = "Black";
+"收起时上侧黑色，下侧透明" = "Black above and transparent below when collapsed";
+"音乐动效" = "Music Animation";
+"音浪或随音乐节奏呼吸的专辑光晕" = "Show a waveform or album artwork with a glow that pulses to the music";
+"音浪模式" = "Waveform Mode";
+"光晕模式" = "Glow Mode";
+"拖动药丸到屏幕边缘，按回车完成，按 Esc 取消。" = "Drag the pill to a screen edge. Press Return to finish or Esc to cancel.";
+"Liquid Glass" = "Liquid Glass";
+
+"图标显示位置" = "Icon Display Location";
+"状态栏" = "Menu Bar";
+"灵动岛" = "Dynamic Island";
+"常驻监控图标" = "Persistent Monitor Icons";
+"关闭后不影响已启用的监控图标" = "Turning this off keeps enabled monitor icons";
+
+"截图与录屏" = "Screenshots & Recording";
+"推荐与反馈更新" = "Recommendations, Feedback & Updates";
+"反馈更新" = "Feedback & Updates";

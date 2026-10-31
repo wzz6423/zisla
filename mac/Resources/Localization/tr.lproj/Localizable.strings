@@ -3109,3 +3109,36 @@
 "未知导入时间" = "İçe aktarma zamanı bilinmiyor";
 "未知拍摄时间" = "Çekim zamanı bilinmiyor";
 "已跳过 %d 个重复素材" = "%d yinelenen medya öğesi atlandı";
+
+/* Adaptive island appearance and placement */
+"灵动岛展开材质" = "Genişletilmiş Dynamic Island malzemesi";
+"灵动岛收起材质" = "Daraltılmış Dynamic Island malzemesi";
+"选择贴边刘海或悬浮药丸" = "Ekran kenarına yaslanan bir çentik veya yüzen bir kapsül seçin";
+"刘海模式" = "Çentik modu";
+"灵动岛模式" = "Dynamic Island modu";
+"灵动岛位置" = "Dynamic Island konumu";
+"摄像头位置居中对齐菜单栏；其他位置可拖动到屏幕四边" = "Kamera konumu menü çubuğunun ortasına hizalanır; özel konum ekranın dört kenarına da sürüklenebilir";
+"其他位置" = "Özel konum";
+"调整位置" = "Konumu ayarla";
+"药丸宽度" = "Kapsül genişliği";
+"以屏幕点为单位微调药丸尺寸" = "Kapsül boyutuna ekran noktası birimiyle ince ayar yapın";
+"药丸高度" = "Kapsül yüksekliği";
+"摄像头位置的高度自动限制在菜单栏内" = "Kamera konumunda yükseklik otomatik olarak menü çubuğuyla sınırlandırılır";
+"黑色" = "Siyah";
+"收起时上侧黑色，下侧透明" = "Daraltıldığında üst taraf siyah, alt taraf saydamdır";
+"音乐动效" = "Müzik animasyonu";
+"音浪或随音乐节奏呼吸的专辑光晕" = "Ses dalgası veya müziğin ritmine göre parlayan bir albüm kapağı halesi gösterin";
+"音浪模式" = "Ses dalgası modu";
+"光晕模式" = "Parıltı modu";
+"拖动药丸到屏幕边缘，按回车完成，按 Esc 取消。" = "Kapsülü ekranın kenarına sürükleyin. Bitirmek için Return, iptal etmek için Esc tuşuna basın.";
+"Liquid Glass" = "Liquid Glass";
+
+"图标显示位置" = "Simge konumu";
+"状态栏" = "Menü çubuğu";
+"灵动岛" = "Dinamik Ada";
+"常驻监控图标" = "Kalıcı izleme simgeleri";
+"关闭后不影响已启用的监控图标" = "Kapatmak etkin izleme simgelerini etkilemez";
+
+"截图与录屏" = "Ekran görüntüleri ve kayıt";
+"推荐与反馈更新" = "Öneriler, geri bildirim ve güncellemeler";
+"反馈更新" = "Geri bildirim ve güncellemeler";

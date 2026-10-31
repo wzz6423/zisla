@@ -311,6 +311,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
     private var isTerminating = false
     private var overlayCoordinator: OverlayCoordinator?
     private var fileShelfShakeController: FileShelfShakeController?
+    private var islandPlacementController: IslandPlacementController?
     private var contextNoteController: ContextNoteController?
     private var lockScreenOverlayController: LockScreenOverlayController?
     private var noticePresenter: SideNoticePresenter?
@@ -353,8 +354,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
     /// Last panel size actually applied to the coordinator; basis for the two-phase
     /// (union → target) resize that keeps the SwiftUI surface spring unclipped.
     private var lastAppliedPanelSize: CGSize?
-    /// Panel size saved before voice recording starts; restored when recording ends.
-    private var voiceRecordingSavedPanelSize: CGSize?
+    /// Latest module size held while voice recording uses its compact surface.
+    private(set) var voiceRecordingSavedPanelSize: CGSize?
     /// Module panel size waiting for the post-recording fold to finish before it is applied.
     private var pendingVoiceRecordingPanelRestore: CGSize?
     /// Display where the last voice recording happened; scopes the post-recording processing indicator.
@@ -446,9 +447,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
                 isMirrorPresented: model.isMirrorPresented,
                 isTeleprompterPresented: model.isTeleprompterPresented,
                 dashboardCardCount: model.dashboardCardCount,
-                includesPet: model.settingsStore.settings.petEnabled
+                includesPet: model.settingsStore.settings.petEnabled,
+                layoutStyle: model.settingsStore.settings.islandLayoutStyle
             ).panelSize,
-            horizontalMargin: 12
+            horizontalMargin: 12,
+            layoutStyle: model.settingsStore.settings.islandLayoutStyle,
+            placement: model.settingsStore.settings.islandPlacement,
+            pillSize: CGSize(width: model.settingsStore.settings.islandPillWidth, height: model.settingsStore.settings.islandPillHeight),
+            edgeInset: model.settingsStore.settings.islandEdgeInset
         ))
         let coordinator = OverlayCoordinator(
             contentView: hostingView,
@@ -458,7 +464,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
                 let persistentPetView = CollapsedPetView(
                     model: model,
                     petController: petController,
-                    isOnPhysicalNotch: layout.topology.hasPhysicalNotch
+                    isOnPhysicalNotch: layout.topology.hasPhysicalNotch,
+                    screenLayout: layout
                 )
                 let persistentPetHostingView = NSHostingView(
                     rootView: AppLanguageEnvironment(
@@ -527,31 +534,46 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
         coordinator.onActiveDisplayHasPhysicalNotchChanged = { hasPhysicalNotch in
             model.isIslandOnPhysicalNotch = hasPhysicalNotch
         }
-        Publishers.CombineLatest(
-            Publishers.CombineLatest4(
+        coordinator.onActiveLayoutChanged = { [weak self] layout in
+            model.islandScreenLayout = layout
+            if let displayID = layout?.displayID { self?.noticePresenter?.publishCompactLayout(on: displayID) }
+        }
+        model.onChooseIslandPlacement = { [weak self, weak coordinator] in
+            guard let self else { return }
+            let selector = self.islandPlacementController ?? IslandPlacementController()
+            guard !selector.isSelecting else { return }
+            self.islandPlacementController = selector
+            coordinator?.setHoverActivationSuspended(true)
+            self.noticePresenter?.setPlacementSelectionActive(true)
+            selector.show(
+                initialPlacement: model.settingsStore.settings.islandPlacement,
+                configuration: model.settingsStore.settings.islandScreenConfiguration,
+                completion: { [weak self, weak coordinator] placement in
+                    model.settingsStore.settings.islandPlacement = placement
+                    coordinator?.setHoverActivationSuspended(false)
+                    self?.noticePresenter?.setPlacementSelectionActive(false)
+                },
+                onCancel: { [weak self, weak coordinator] in
+                    coordinator?.setHoverActivationSuspended(false)
+                    self?.noticePresenter?.setPlacementSelectionActive(false)
+                }
+            )
+        }
+        Self.expandedPanelSizes(
+            presentation: Publishers.CombineLatest4(
                 model.$selectedModule,
                 model.$isMirrorPresented,
                 model.$isTeleprompterPresented,
                 model.$dashboardCardCount
-            ),
-            model.settingsStore.$settings
-                .map(\.petEnabled)
-                .removeDuplicates(),
+            ).eraseToAnyPublisher(),
+            settings: model.settingsStore.$settings
+                .removeDuplicates().eraseToAnyPublisher(),
+            screenLayout: model.$islandScreenLayout.eraseToAnyPublisher()
         )
-            .map { state, includesPet -> CGSize in
-                let (module, isMirrorPresented, isTeleprompterPresented, dashboardCardCount) = state
-                return Self.expandedPanelSize(
-                    module: module,
-                    isMirrorPresented: isMirrorPresented,
-                    isTeleprompterPresented: isTeleprompterPresented,
-                    dashboardCardCount: dashboardCardCount,
-                    includesPet: includesPet
-                ).panelSize
-            }
-            .removeDuplicates()
             .sink { [weak self, weak coordinator] size in
-                guard !model.voiceInput.isCapturingInput else { return }
-                self?.scheduleExpandedSizeUpdate(size, coordinator: coordinator)
+                self?.updateExpandedPanelSize(
+                    size, duringVoiceRecording: model.voiceInput.isCapturingInput, coordinator: coordinator
+                )
             }
             .store(in: &cancellables)
         model.$isMirrorPresented
@@ -648,6 +670,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
             displayIDs: model.settingsStore.settings.activityNoticeDisplayIDs,
             isScreenLocked: lockScreenOverlayController.isScreenLocked
         )
+        noticePresenter?.onCompactLayoutChanged = { [weak coordinator] displayID, expanded, length, iconSize in
+            guard coordinator?.activeDisplayID == displayID else { return }
+            coordinator?.updateCompactStatus(expandsForDetailedStatus: expanded, compactStatusLength: length,
+                                              statusIconSize: iconSize)
+        }
         configureMainMenu()
         registerScreenshotHotkeys()
         model.onScreenRecordingRequested = { [weak self] in self?.showScreenRecording() }
@@ -716,6 +743,21 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
             .sink { [weak self] style in
                 Task { @MainActor [weak self] in
                     self?.overlayCoordinator?.setKeepsNativeGlassActive(style == .transparent)
+                }
+            }
+            .store(in: &cancellables)
+
+        model.settingsStore.$settings
+            .map(\.islandScreenConfiguration)
+            .removeDuplicates()
+            .sink { [weak coordinator] configuration in
+                Task { @MainActor in
+                    coordinator?.updatePlacement(
+                        layoutStyle: configuration.layoutStyle,
+                        placement: configuration.placement,
+                        pillSize: configuration.pillSize,
+                        edgeInset: configuration.edgeInset
+                    )
                 }
             }
             .store(in: &cancellables)
@@ -849,7 +891,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
                             isMirrorPresented: model.isMirrorPresented,
                             isTeleprompterPresented: model.isTeleprompterPresented,
                             dashboardCardCount: model.dashboardCardCount,
-                            includesPet: model.settingsStore.settings.petEnabled
+                            includesPet: model.settingsStore.settings.petEnabled,
+                            layoutStyle: model.settingsStore.settings.islandLayoutStyle,
+                            contentTopInset: IslandRootView.contentTopInset(
+                                layoutStyle: model.settingsStore.settings.islandLayoutStyle,
+                                screenLayout: model.islandScreenLayout
+                            )
                         ).panelSize
                         // Direct resize (no two-phase): recording swaps layout instantly by design.
                         self.expandedSizeUpdateTask?.cancel()
@@ -858,9 +905,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
                         // Read the collapsed pill metrics only after `setVoiceRecording` resolved the
                         // active display: before the island has ever been presented they still hold
                         // the launch defaults, which sizes the first take's surface wrong.
-                        let recordingSize = IslandModuleLayout.voiceRecording
-                            .matchingWidth(model.collapsedOverflowWidth)
-                            .panelSize
+                        let recordingSize = IslandModuleLayout.compactSurface(
+                            collapsedSize: model.collapsedIslandSize,
+                            overflowWidth: model.collapsedOverflowWidth,
+                            edge: model.islandEdge
+                        ).panelSize
                         self.overlayCoordinator?.updateExpandedSize(recordingSize)
                         self.lastAppliedPanelSize = recordingSize
                         // Scope the post-recording processing indicator to the display where
@@ -888,16 +937,15 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
         // wings already suppressed by the expansion, and the mirror and teleprompter swallow it
         // entirely — suppressing anything for a message that never renders would be a regression.
         model.$transientMessage
-            .map { $0 != nil }
             .combineLatest(model.$isIslandVisible, model.$isMirrorPresented, model.$isTeleprompterPresented)
-            .map { hasMessage, islandVisible, mirror, teleprompter in
-                hasMessage && !islandVisible && !mirror && !teleprompter
+            .map { message, islandVisible, mirror, teleprompter in
+                islandVisible || mirror || teleprompter ? nil : message
             }
             .removeDuplicates()
-            .sink { [weak self, weak coordinator] presented in
+            .sink { [weak self, weak coordinator] message in
                 Task { @MainActor [weak self, weak coordinator] in
-                    self?.noticePresenter?.setTransientNoticePresented(presented)
-                    coordinator?.setTransientNoticePresented(presented)
+                    self?.noticePresenter?.setTransientNoticePresented(message != nil, message: message)
+                    coordinator?.setTransientNoticePresented(message != nil)
                 }
             }
             .store(in: &cancellables)
@@ -952,6 +1000,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
         combinedIconReadTask?.cancel()
         expandedSizeUpdateTask?.cancel()
         fileShelfShakeController?.stop()
+        islandPlacementController?.cancel()
+        runningModel.onChooseIslandPlacement = nil
         contextNoteController?.stop()
         lockScreenOverlayController?.stop()
         lidCloseController?.stop()
@@ -1026,6 +1076,16 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
         lastAppliedPanelSize = size
     }
 
+    func updateExpandedPanelSize(
+        _ size: CGSize, duringVoiceRecording recording: Bool, coordinator: OverlayCoordinator?
+    ) {
+        if recording {
+            voiceRecordingSavedPanelSize = size
+            return
+        }
+        scheduleExpandedSizeUpdate(size, coordinator: coordinator)
+    }
+
     private func scheduleExpandedSizeUpdate(
         _ size: CGSize,
         coordinator: OverlayCoordinator?
@@ -1061,26 +1121,50 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
         }
     }
 
-    private static func expandedPanelSize(
+    nonisolated static func expandedPanelSize(
         module: IslandModule,
         isMirrorPresented: Bool,
         isTeleprompterPresented: Bool,
         dashboardCardCount: Int,
-        includesPet: Bool
+        includesPet: Bool,
+        layoutStyle: IslandLayoutStyle = .notch,
+        contentTopInset: CGFloat = IslandDashboardLayout.contentTopInset
     ) -> IslandModuleLayout {
         if isMirrorPresented { return .mirror }
         if isTeleprompterPresented { return .teleprompter }
         let layout = IslandModuleLayout.resolved(
             for: module,
-            dashboardCardCount: dashboardCardCount
+            dashboardCardCount: dashboardCardCount,
+            contentTopInset: contentTopInset
         )
         return IslandModuleLayout(
             islandSize: layout.islandSize,
             panelSize: ExpandedPetLayout.panelSize(
                 for: layout.panelSize,
-                includesPet: includesPet
+                includesPet: includesPet && layoutStyle == .notch
             )
         )
+    }
+
+    nonisolated static func expandedPanelSizes(
+        presentation: AnyPublisher<(IslandModule, Bool, Bool, Int), Never>,
+        settings: AnyPublisher<FeatureSettings, Never>,
+        screenLayout: AnyPublisher<ScreenOverlayLayout?, Never>
+    ) -> AnyPublisher<CGSize, Never> {
+        Publishers.CombineLatest3(presentation, settings, screenLayout)
+            .map { state, settings, layout in
+                let (module, mirror, teleprompter, cardCount) = state
+                return Self.expandedPanelSize(
+                    module: module, isMirrorPresented: mirror,
+                    isTeleprompterPresented: teleprompter, dashboardCardCount: cardCount,
+                    includesPet: settings.petEnabled, layoutStyle: settings.islandLayoutStyle,
+                    contentTopInset: IslandRootView.contentTopInset(
+                        layoutStyle: settings.islandLayoutStyle, screenLayout: layout
+                    )
+                ).panelSize
+            }
+            .removeDuplicates()
+            .eraseToAnyPublisher()
     }
 
     func configureTextEditingCommands() {
@@ -1273,6 +1357,25 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
             }
             monitorStatusTitles[metric] = title
         }
+        syncIslandStatusIcons()
+    }
+
+    private func syncIslandStatusIcons() {
+        let settings = AppModel.shared.settingsStore.settings
+        let metrics = SystemMonitorMenuBarMetric.allCases.compactMap { metric -> (SystemMonitorMenuBarMetric, NSStatusItem, String)? in
+            guard let item = monitorStatusItems[metric] else { return nil }
+            return (metric, item, monitorStatusTitle(for: metric, snapshot: AppModel.shared.systemMonitor.snapshot,
+                                                     style: settings.systemMonitorMenuBarDisplayStyle))
+        }
+        let readings = SystemMonitorMenuBarRows.normalized(top: settings.systemMonitorMenuBarTopRow,
+            bottom: settings.systemMonitorMenuBarBottomRow).joined().map { metric in
+                IslandStatusIcon.Reading(metric: metric,
+                    text: SystemMonitorCombinedMenuBarPresentation.value(metric, snapshot: AppModel.shared.systemMonitor.snapshot))
+            }
+        let icons = IslandStatusIconRouting.update(destination: settings.effectiveStatusIconDestination,
+            application: statusItem, metrics: metrics, stacked: mergedMonitorStatusItem, readings: readings,
+            combined: combinedMonitorStatusItem, style: settings.systemMonitorMenuBarDisplayStyle)
+        noticePresenter?.setStatusIcons(icons)
     }
 
     private func syncMergedMonitorStatusItem(settings: FeatureSettings) {
@@ -1341,6 +1444,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
                   current.systemMonitorMenuBarCombinedIconMetric == metric else { return }
             self.combinedIconLevels = levels
             self.updateCombinedMonitorStatusImage(metric: metric)
+            self.syncIslandStatusIcons()
         }
     }
 
@@ -1365,6 +1469,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
         )
         button.image = SystemMonitorMenuBarImageRenderer.combinedIcon(
             battery: battery, wifi: combinedIconLevels.wifi, level: level,
+            foreground: settings.effectiveStatusIconDestination == .island ? .white : nil,
             configuration: settings.systemMonitorMenuBarCombinedIconAppearance,
             headphones: headphones,
             headphoneOptions: headphoneOptions

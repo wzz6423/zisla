@@ -25,7 +25,8 @@ struct SettingsSearchTests {
         #expect(results("ＬＯＧＩＮ", locale: .init(identifier: "en")).map(\.title) == ["登录时启动"])
         #expect(results("界面语言", locale: .init(identifier: "en")).map(\.title) == ["界面语言"])
         #expect(results("general", locale: .init(identifier: "fr")).allSatisfy { $0.section == .general })
-        #expect(results("general", locale: .init(identifier: "fr")).count == 5)
+        #expect(Set(results("general", locale: .init(identifier: "fr")).map(\.title))
+            == ["界面语言", "界面外观", "灵动岛样式", "灵动岛展开材质", "灵动岛收起材质", "登录时启动"])
     }
 
     @Test(arguments: AppLanguage.allCases)
@@ -92,6 +93,18 @@ struct SettingsSearchTests {
         settings.systemMonitorMenuBarLayout.individualEnabled = false
         #expect(!SettingsSearchIndex.items(settings: settings).contains { $0.title == "监控样式" })
         #expect(results("合并状态图标", settings: settings).contains { $0.anchor == .group("settings-search-monitor-layout") })
+    }
+
+    @Test
+    func fixedPillDimensionsAreNotSettingsSearchEntries() {
+        var settings = Self.enabledSettings
+        settings.islandLayoutStyle = .pill
+        let items = SettingsSearchIndex.items(settings: settings)
+        #expect(items.contains { $0.title == "灵动岛位置" })
+        #expect(!items.contains { $0.title == "药丸宽度" })
+        #expect(!items.contains { $0.title == "药丸高度" })
+        #expect(results("药丸宽度", settings: settings).isEmpty)
+        #expect(results("药丸高度", settings: settings).isEmpty)
     }
 
     @Test

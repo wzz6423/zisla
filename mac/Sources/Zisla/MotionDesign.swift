@@ -408,7 +408,8 @@ struct IslandVisualStylePicker: View {
             selection: $selection,
             options: Array(IslandVisualStyle.allCases),
             title: { $0.title },
-            selectionID: "island-style-selection"
+            selectionID: "island-style-selection",
+            width: 220
         )
     }
 }
@@ -421,7 +422,8 @@ struct IslandNotchBackgroundPicker: View {
             selection: $selection,
             options: Array(IslandNotchBackground.allCases),
             title: { $0.title },
-            selectionID: "island-notch-background-selection"
+            selectionID: "island-notch-background-selection",
+            width: 320
         )
     }
 }

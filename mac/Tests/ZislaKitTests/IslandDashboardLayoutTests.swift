@@ -144,8 +144,8 @@ struct IslandDashboardLayoutTests {
 
     @Test
     func chromeMatchesTheRenderedToolbarStack() {
-        // 8pt top inset + 30pt toolbar + 7pt gap + 12pt module insets.
-        #expect(IslandDashboardLayout.chromeHeight == 69)
+        // The shared chrome includes the lowered header and both module insets.
+        #expect(IslandDashboardLayout.chromeHeight == 77)
     }
 
     /// The crown chrome (top inset + media header + toolbar + its gap) is laid out above the

@@ -3109,3 +3109,36 @@
 "未知导入时间" = "Onbekende importtijd";
 "未知拍摄时间" = "Onbekende opnametijd";
 "已跳过 %d 个重复素材" = "%d dubbele mediabestanden overgeslagen";
+
+/* Adaptive island appearance and placement */
+"灵动岛展开材质" = "Materiaal van uitgeklapte Dynamic Island";
+"灵动岛收起材质" = "Materiaal van ingeklapte Dynamic Island";
+"选择贴边刘海或悬浮药丸" = "Kies een inkeping langs de schermrand of een zwevende capsule";
+"刘海模式" = "Inkepingsmodus";
+"灵动岛模式" = "Dynamic Island-modus";
+"灵动岛位置" = "Positie van Dynamic Island";
+"摄像头位置居中对齐菜单栏；其他位置可拖动到屏幕四边" = "De camerapositie staat in het midden van de menubalk; een eigen positie kun je naar elke schermrand slepen";
+"其他位置" = "Eigen positie";
+"调整位置" = "Positie aanpassen";
+"药丸宽度" = "Capsulebreedte";
+"以屏幕点为单位微调药丸尺寸" = "Stel het formaat van de capsule nauwkeurig in met schermpunten";
+"药丸高度" = "Capsulehoogte";
+"摄像头位置的高度自动限制在菜单栏内" = "Op de camerapositie wordt de hoogte automatisch beperkt tot de menubalk";
+"黑色" = "Zwart";
+"收起时上侧黑色，下侧透明" = "Ingeklapt is de bovenkant zwart en de onderkant transparant";
+"音乐动效" = "Muziekanimatie";
+"音浪或随音乐节奏呼吸的专辑光晕" = "Toon een golfvorm of een albumhoes met een gloed die op het ritme van de muziek pulseert";
+"音浪模式" = "Golfvormmodus";
+"光晕模式" = "Gloedmodus";
+"拖动药丸到屏幕边缘，按回车完成，按 Esc 取消。" = "Sleep de capsule naar een schermrand. Druk op Return om af te ronden of op Esc om te annuleren.";
+"Liquid Glass" = "Liquid Glass";
+
+"图标显示位置" = "Locatie van pictogrammen";
+"状态栏" = "Menubalk";
+"灵动岛" = "Dynamic Island";
+"常驻监控图标" = "Vaste monitorpictogrammen";
+"关闭后不影响已启用的监控图标" = "Uitschakelen heeft geen invloed op ingeschakelde monitorpictogrammen";
+
+"截图与录屏" = "Schermafbeeldingen en opnamen";
+"推荐与反馈更新" = "Aanbevelingen, feedback en updates";
+"反馈更新" = "Feedback en updates";

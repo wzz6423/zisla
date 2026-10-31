@@ -160,7 +160,6 @@ struct SkillManagementView: View {
             ))
             .labelsHidden()
             .toggleStyle(.switch)
-            .controlSize(.mini)
             VStack(alignment: .leading, spacing: 1) {
                 Text(AppLocalization.text(destination.displayName))
                     .font(.system(size: 10, weight: .medium))
@@ -186,7 +185,6 @@ struct SkillManagementView: View {
                         Toggle("", isOn: skillEnabledBinding(skill.path))
                             .labelsHidden()
                             .toggleStyle(.switch)
-                            .controlSize(.mini)
                         VStack(alignment: .leading, spacing: 1) {
                             Text(skill.name)
                                 .font(.system(size: 10))

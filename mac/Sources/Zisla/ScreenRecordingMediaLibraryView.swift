@@ -24,7 +24,7 @@ struct ScreenRecordingMediaLibraryView: View {
                     Text(AppLocalization.text(option.title)).tag(option)
                 }
             }
-            .pickerStyle(.menu).controlSize(.small)
+            .pickerStyle(.menu)
             .accessibilityIdentifier("screenRecording.mediaGrouping")
             if grouping == .importedAt || grouping == .capturedAt {
                 Picker(AppLocalization.text("时间粒度"), selection: $timeGranularity) {
@@ -32,7 +32,7 @@ struct ScreenRecordingMediaLibraryView: View {
                         Text(AppLocalization.text(option.title)).tag(option)
                     }
                 }
-                .pickerStyle(.menu).controlSize(.small)
+                .pickerStyle(.menu)
                 .accessibilityIdentifier("screenRecording.mediaTimeGranularity")
             }
             ScrollView {

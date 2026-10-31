@@ -1157,7 +1157,7 @@ struct FeatureSettingsCompatibilityTests {
         #expect(FeatureSettings.default.islandNotchBackground == .black)
         #expect(IslandVisualStyle.frosted.title == "磨砂玻璃")
         #expect(IslandVisualStyle.transparent.title == "Liquid Glass")
-        #expect(IslandNotchBackground.black.title == "刘海")
+        #expect(IslandNotchBackground.black.title == "黑色")
         #expect(IslandNotchBackground.frosted.title == "磨砂玻璃")
 
         let legacy = Data(#"{"activityNoticeDisplayDuration":"threeSeconds"}"#.utf8)

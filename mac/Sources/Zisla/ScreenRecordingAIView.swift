@@ -14,6 +14,7 @@ struct ScreenRecordingAIView: View {
                         Text(entry.title).tag(Optional(entry.reference))
                     }
                 }
+                .controlSize(.regular)
                 TextEditor(text: $model.aiInstruction)
                     .font(.system(size: 12)).scrollContentBackground(.hidden)
                     .padding(6).frame(height: 110)

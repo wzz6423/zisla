@@ -17,24 +17,28 @@ public enum IslandCrownGeometry: Sendable {
 
     /// Minimum solid crown height: must cover the white-text chrome (content inset + media
     /// header + toolbar) to preserve legibility. Below this, text would bleed into the blend.
-    public static let minimumSolidHeight: CGFloat = 114
+    public static let minimumSolidHeight = IslandDashboardLayout.contentTopInset
+        + IslandDashboardLayout.mediaHeaderHeight + IslandDashboardLayout.toolbarHeight
 
     /// Computes crown heights that fit inside the visible surface while preserving as much
     /// solid chrome and blend as the available height allows.
     public static func crownMetrics(
         forSurfaceHeight surfaceHeight: CGFloat,
-        blendHeight: CGFloat
+        blendHeight: CGFloat,
+        contentTopInset: CGFloat = IslandDashboardLayout.contentTopInset
     ) -> (solidHeight: CGFloat, blendHeight: CGFloat) {
         let availableHeight = max(0, surfaceHeight)
         let requestedBlendHeight = max(0, blendHeight)
-        let fullHeight = crownHeight + requestedBlendHeight
+        let additionalHeight = contentTopInset - IslandDashboardLayout.contentTopInset
+        let fullCrownHeight = crownHeight + additionalHeight
+        let fullHeight = fullCrownHeight + requestedBlendHeight
         guard availableHeight < fullHeight else {
-            return (crownHeight, requestedBlendHeight)
+            return (fullCrownHeight, requestedBlendHeight)
         }
 
-        let solidFloor = min(minimumSolidHeight, availableHeight)
+        let solidFloor = min(minimumSolidHeight + additionalHeight, availableHeight)
         let solidHeight = min(
-            crownHeight,
+            fullCrownHeight,
             max(solidFloor, availableHeight - requestedBlendHeight)
         )
         let visibleBlendHeight = min(
@@ -76,7 +80,7 @@ public enum IslandDashboardLayout: Sendable {
     /// Toolbar row height.
     public static let toolbarHeight: CGFloat = 30
     /// Top inset above the first chrome row (media header when present, otherwise the toolbar).
-    public static let contentTopInset: CGFloat = 8
+    public static let contentTopInset: CGFloat = 16
     /// Gap between the toolbar and the module content below it.
     public static let toolbarBottomInset: CGFloat = 7
     /// Inset above the module content, matching `IslandSurfaceGeometry.moduleInset`.

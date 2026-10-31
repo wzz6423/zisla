@@ -138,12 +138,10 @@ struct DownloadModuleView: View {
             }
         } label: {
             Label(downloadFormatPickerTitle, systemImage: "slider.horizontal.3")
-                .font(.system(size: 10, weight: .medium))
                 .fitsSingleLine()
                 .frame(maxWidth: .infinity, alignment: .leading)
         }
         .buttonStyle(.bordered)
-        .controlSize(.small)
         .frame(width: 292, height: 28, alignment: .leading)
         .disabled(!model.canSelectDownloadFormats)
         .help(
@@ -170,11 +168,9 @@ struct DownloadModuleView: View {
             }
         } label: {
             Label(browserCookiePickerTitle, systemImage: "lock.shield")
-                .font(.system(size: 10, weight: .medium))
                 .fitsSingleLine()
         }
         .buttonStyle(.bordered)
-        .controlSize(.small)
         .fixedSize(horizontal: true, vertical: false)
         .frame(height: 28)
     }

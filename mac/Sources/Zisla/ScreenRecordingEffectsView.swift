@@ -14,11 +14,13 @@ struct ScreenRecordingEffectsView: View {
                         Text(AppLocalization.text(value.title)).tag(value)
                     }
                 }
+                .controlSize(.regular)
                 Picker(AppLocalization.text("背景"), selection: editBinding(\.background, default: .gradient)) {
                     ForEach(RecordingBackground.allCases, id: \.self) { value in
                         Text(AppLocalization.text(value.title)).tag(value)
                     }
                 }
+                .controlSize(.regular)
                 Toggle(AppLocalization.text("自定义背景颜色"), isOn: Binding(get: { model.project?.edits.backgroundColor != nil },
                     set: { enabled in model.update { $0.edits.backgroundColor = enabled ? .background : nil } }))
                 if model.project?.edits.backgroundColor != nil {
@@ -99,12 +101,14 @@ struct ScreenRecordingEffectsView: View {
                             Text(AppLocalization.text(position.title)).tag(position)
                         }
                     }
+                    .controlSize(.regular)
                     parameter("摄像头大小", value: editBinding(\.cameraSize, default: 0.25), in: 0.1...0.5)
                     Picker(AppLocalization.text("摄像头比例"), selection: cameraAspectRatioBinding) {
                         ForEach(RecordingCameraAspectRatio.allCases, id: \.self) { ratio in
                             Text(AppLocalization.text(ratio.title)).tag(ratio)
                         }
                     }
+                    .controlSize(.regular)
                     Toggle(AppLocalization.text("镜像摄像头"), isOn: editBinding(\.cameraMirrored, default: true))
                     Toggle(AppLocalization.text("摄像头边框"), isOn: optionalEditBinding(\.cameraBorder, default: false))
                         .accessibilityIdentifier("screenRecording.cameraBorder")

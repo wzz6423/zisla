@@ -306,7 +306,7 @@ struct ScreenRecordingCaptureBar: View {
                     if width >= 64 {
                         Text(model.availableSources.first(where: { $0.id == model.configuration.sourceID })?.name
                             ?? AppLocalization.text("录制来源"))
-                            .font(.system(size: 11)).lineLimit(1).truncationMode(.middle)
+                            .lineLimit(1).truncationMode(.middle)
                     } else { Image(systemName: symbol(for: model.configuration.mode)).font(.system(size: 12)) }
                     Image(systemName: "chevron.down").font(.system(size: 8, weight: .semibold))
                 }.frame(height: ScreenshotToolbarLayout.controlHeight)

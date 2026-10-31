@@ -1,3 +1,4 @@
+import AppKit
 import Testing
 import SwiftUI
 @testable import Zisla
@@ -7,6 +8,69 @@ import SwiftUI
 @Suite(.serialized)
 @MainActor
 struct AIAgentModuleViewRefreshTests {
+    @Test(.serialized, arguments: [AppLanguage.simplifiedChinese, .english, .arabic])
+    func skillDestinationAndEntrySwitchesKeepNativeMediumHeight(language: AppLanguage) async throws {
+        let previousArguments = UserDefaults.standard.volatileDomain(forName: UserDefaults.argumentDomain)
+        var arguments = previousArguments
+        arguments[AppLocalization.defaultsKey] = language.rawValue
+        UserDefaults.standard.setVolatileDomain(arguments, forName: UserDefaults.argumentDomain)
+        defer { UserDefaults.standard.setVolatileDomain(previousArguments, forName: UserDefaults.argumentDomain) }
+        let directory = FileManager.default.temporaryDirectory
+            .appendingPathComponent("zisla-skill-control-size-\(UUID().uuidString)", isDirectory: true)
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let secretURL = directory.appendingPathComponent("secrets.sqlite3")
+        let store = AIAgentStore(storageURL: directory.appendingPathComponent("state.json"),
+            secretStore: DatabaseAIAgentSecretStore(storageURL: secretURL))
+        defer { store.flushPendingChanges() }
+        store.replaceSkills([AgentSkill(name: "Fixture skill", path: directory.appendingPathComponent("SKILL.md").path,
+            source: "fixture")])
+        store.flushPendingChanges()
+        let initialState = store.state
+        let workspace = AIAgentWorkspace(store: store,
+            cliService: AIAgentCLIService(environment: ["PATH": "/usr/bin:/bin"], homeDirectory: directory),
+            cliUpdateService: AIAgentCLIUpdateService(loadLatestVersion: { _ in nil }))
+        defer { workspace.stop() }
+        let releaseAccessibility = EnhancedAccessibilityTestScope.acquire()
+        defer { releaseAccessibility() }
+        let host = NSHostingView(rootView: VStack {
+            Toggle("Reference", isOn: .constant(true))
+                .labelsHidden().toggleStyle(.switch).controlSize(.regular)
+                .accessibilityIdentifier("reference-switch")
+            SkillManagementView(agent: workspace)
+        }
+        .environment(\.locale, language.locale)
+        .environment(\.layoutDirection, language.isRightToLeft ? .rightToLeft : .leftToRight))
+        host.sizingOptions = []
+        let panel = NSPanel(contentRect: .init(x: -100_000, y: -100_000, width: 560, height: 700),
+            styleMask: [.borderless, .nonactivatingPanel], backing: .buffered, defer: false)
+        panel.isReleasedWhenClosed = false
+        panel.contentView = host
+        defer { panel.contentView = nil; panel.close() }
+        for _ in 0..<4 {
+            host.layoutSubtreeIfNeeded()
+            await withCheckedContinuation { continuation in DispatchQueue.main.async { continuation.resume() } }
+        }
+        let controls = accessibilityObjects(host)
+        let referenceObject = controls.first {
+            value($0, "accessibilityIdentifier") as? String == "reference-switch"
+        }
+        let reference = try #require(referenceObject as? any NSAccessibilityElementProtocol)
+        #expect(reference.accessibilityFrame().height > 0)
+        let switches = controls.filter {
+            value($0, "accessibilitySubrole") as? String == "AXToggle"
+                && value($0, "accessibilityIdentifier") as? String != "reference-switch"
+        }.compactMap { $0 as? any NSAccessibilityElementProtocol }
+        #expect(switches.count == AgentSkillSyncDestination.allCases.count + initialState.skills.count,
+            "Both destination rows and discovered skill entries must expose their native switches")
+        for control in switches {
+            #expect(abs(control.accessibilityFrame().height - reference.accessibilityFrame().height) < 0.5)
+        }
+        #expect(store.state == initialState)
+        #expect(!workspace.isCheckingCLIs && !workspace.isRunningCLICommands)
+        #expect(!FileManager.default.fileExists(atPath: secretURL.path))
+        #expect(!panel.isVisible && !panel.isKeyWindow)
+    }
+
     @Test
     func refreshButtonRemainsEnabledDuringRefresh() async throws {
         let directory = FileManager.default.temporaryDirectory
@@ -156,6 +220,14 @@ struct AIAgentModuleViewRefreshTests {
         )
         try Data(contents.utf8).write(to: url)
         try FileManager.default.setAttributes([.posixPermissions: 0o755], ofItemAtPath: url.path)
+    }
+
+    private func accessibilityObjects(_ object: NSObject) -> [NSObject] {
+        [object] + (value(object, "accessibilityChildren") as? [NSObject] ?? []).flatMap(accessibilityObjects)
+    }
+
+    private func value(_ object: NSObject, _ key: String) -> Any? {
+        object.responds(to: NSSelectorFromString(key)) ? object.value(forKey: key) : nil
     }
 
     private func waitForFile(at url: URL) async {

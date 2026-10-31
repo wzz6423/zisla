@@ -143,7 +143,10 @@ struct IslandModuleLayout: Equatable {
     islandSize: CGSize(width: unifiedIslandWidth, height: 340),
     panelSize: CGSize(width: unifiedPanelWidth, height: 344)
   )
-  private static let expandedChromeHeight: CGFloat = 121
+  private static let expandedChromeHeight = IslandDashboardLayout.contentTopInset
+    + IslandDashboardLayout.mediaHeaderHeight
+    + IslandDashboardLayout.toolbarHeight
+    + IslandDashboardLayout.toolbarBottomInset
   private static let moduleVerticalInsets = IslandSurfaceGeometry.moduleInset * 2
   private static let panelHeightAllowance: CGFloat = 4
   /// Fixed-height modules size the surface to their rendered content instead of inheriting
@@ -164,17 +167,14 @@ struct IslandModuleLayout: Equatable {
   static let agenda = compactModule(contentHeight: 160)
   /// Tall modules share the former CPU monitor height to keep their panel geometry consistent.
   static let system = compactModule(contentHeight: 401)
-  /// Shelf content fills the shared 500pt outer surface and scrolls internally when it contains more files.
+  /// Shelf content keeps its fixed budget below the shared chrome and scrolls when it contains more files.
   static let shelfContentHeight: CGFloat = 355
   static let shelfShareWidth: CGFloat = 84
   static let shelfColumnSpacing: CGFloat = 6
   static let shelf = compactModule(contentHeight: shelfContentHeight)
   /// Clipboard: taller than standard so more items are visible at once, reducing scrolling.
   /// Width matches standard; only the island body is taller.
-  static let clipboard = IslandModuleLayout(
-    islandSize: CGSize(width: unifiedIslandWidth, height: 500),
-    panelSize: CGSize(width: unifiedPanelWidth, height: 504)
-  )
+  static let clipboard = compactModule(contentHeight: shelfContentHeight)
   static let ai = compactModule(contentHeight: 350)
   static let battery = system
   static let keyboardSound = system
@@ -188,6 +188,18 @@ struct IslandModuleLayout: Equatable {
     islandSize: CGSize(width: 240, height: 54),
     panelSize: CGSize(width: 240, height: 58)
   )
+
+  static func compactSurface(collapsedSize: CGSize, overflowWidth: CGFloat, edge: IslandEdge) -> IslandModuleLayout {
+    if edge.isVertical {
+      let size = CGSize(width: 320, height: max(80, collapsedSize.height))
+      return IslandModuleLayout(islandSize: size, panelSize: size)
+    }
+    let height = collapsedSize.height + VoiceRecordingIslandGeometry.transcriptRowHeight
+    return IslandModuleLayout(
+      islandSize: CGSize(width: max(70, overflowWidth), height: height),
+      panelSize: CGSize(width: max(70, overflowWidth), height: height + 4)
+    )
+  }
   /// Mirror uses a square panel so the camera preview maintains its natural aspect ratio without cropping.
   static let mirror = IslandModuleLayout(
     islandSize: CGSize(width: 640, height: 640),
@@ -201,8 +213,10 @@ struct IslandModuleLayout: Equatable {
   /// Resolves the current layout. Dashboard height follows its rendered activity-card rows.
   nonisolated static func resolved(
     for module: IslandModule,
-    dashboardCardCount: Int
+    dashboardCardCount: Int,
+    contentTopInset: CGFloat = IslandDashboardLayout.contentTopInset
   ) -> IslandModuleLayout {
+    let layout: IslandModuleLayout
     if module == .dashboard {
       // Empty and single-card dashboards are clamped to the crown floor instead of falling back
       // to `.standard`: a fixed 340pt left a large black gap under the toolbar, while shrinking to
@@ -212,12 +226,18 @@ struct IslandModuleLayout: Equatable {
         IslandDashboardLayout.contentHeight(cardCount: dashboardCardCount),
         IslandModuleLayout.keyboardSound.islandSize.height
       )
-      return IslandModuleLayout(
+      layout = IslandModuleLayout(
         islandSize: CGSize(width: unifiedIslandWidth, height: islandHeight),
         panelSize: CGSize(width: unifiedPanelWidth, height: islandHeight + 4)
       )
+    } else {
+      layout = module.layout
     }
-    return module.layout
+    let additionalHeight = contentTopInset - IslandDashboardLayout.contentTopInset
+    return IslandModuleLayout(
+      islandSize: CGSize(width: layout.islandSize.width, height: layout.islandSize.height + additionalHeight),
+      panelSize: CGSize(width: layout.panelSize.width, height: layout.panelSize.height + additionalHeight)
+    )
   }
 }
 
@@ -455,6 +475,13 @@ final class AppModel: ObservableObject {
   var hasActiveDownloads: Bool { !activeDownloadIDs.isEmpty }
   @Published private(set) var mailComposeRequest: MailComposeRequest?
   @Published var collapsedIslandSize = CGSize(width: 240, height: 34)
+  @Published var islandScreenLayout: ScreenOverlayLayout?
+  var onChooseIslandPlacement: (() -> Void)?
+  var islandEdge: IslandEdge {
+    guard settingsStore.settings.islandLayoutStyle == .pill else { return .top }
+    let placement = settingsStore.settings.islandPlacement
+    return placement.mode == .camera ? .top : placement.edge
+  }
   @Published var isIslandOnPhysicalNotch = false
 
   /// Overflow width of the collapsed capsule. On notched displays, the compact bar extends one wing width past each side of the notch.
@@ -1213,7 +1240,9 @@ final class AppModel: ObservableObject {
     guard let message = transientMessage else { return }
     let duration = TransientNoticeMetrics.displayDuration(
       for: message,
-      rowWidth: collapsedOverflowWidth
+      rowWidth: islandEdge.isVertical
+        ? 320 - collapsedIslandSize.width
+        : collapsedOverflowWidth
     )
     transientMessageDismissTask = Task { @MainActor [weak self] in
       try? await Task.sleep(for: duration)
@@ -3126,6 +3155,7 @@ final class AppModel: ObservableObject {
     clipboardHistoryMonitor.setEnabled(
       settings.clipboardHistoryEnabled || settings.clipboardAssistantEnabled
     )
+    clipboardAssistant.screenLayoutConfiguration = settings.islandScreenConfiguration
     if settings.clipboardAssistantEnabled {
       clipboardAssistant.setTriggers(
         hotkey: settings.clipboardAssistantTriggerConfiguration.hotkey,
@@ -3865,13 +3895,15 @@ final class AppModel: ObservableObject {
       from: snapshot.artworkData,
       fallback: snapshot.sourceIconData
     )
+    let compactMetadata = ["compactLyric": MediaTextFormatting.lyricLine(snapshot, lyrics: snapshot.lyrics, date: .now)]
     let leftNotice = IslandNotice(
       id: "media-active-left",
       title: source,
       detail: snapshot.title,
       kind: .info,
       side: .left,
-      artworkData: artworkData
+      artworkData: artworkData,
+      metadata: compactMetadata
     )
     let rightNotice = IslandNotice(
       id: "media-active-right",
@@ -3881,7 +3913,8 @@ final class AppModel: ObservableObject {
         .joined(separator: " · "),
       kind: .info,
       side: .right,
-      artworkData: artworkData
+      artworkData: artworkData,
+      metadata: compactMetadata
     )
 
     let leftVisible = notices.updateIfPresent(leftNotice)
