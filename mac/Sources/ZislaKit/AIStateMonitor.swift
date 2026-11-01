@@ -182,6 +182,7 @@ public final class AIStateMonitor: ObservableObject {
             ),
             GeminiDesktopSessionActivityDetector(maxChats: 4),
             GrokSessionActivityDetector(maxSessionFiles: 4, initialTailBytes: 256 * 1_024),
+            GrokBotSessionActivityDetector(),
             CursorSessionActivityDetector(),
             QwenSessionActivityDetector(maxRuntimeFiles: 4, initialTailBytes: 256 * 1_024),
             QoderSessionActivityDetector(maxLogFiles: 4, initialTailBytes: 256 * 1_024),

@@ -116,6 +116,16 @@ Relevant sources are `docs/sources/cursor.md` and
 `crates/chat-stasher/src/activity.rs`. Licensed under the Apache License 2.0.
 See `ChatStasher-LICENSE.txt` in this directory.
 
+Grok Bot client replica discovery and Base32 filename encoding are adapted
+from Vibe Replay:
+
+https://github.com/tuo-lei/vibe-replay
+
+Pinned revision: `6ab70213c04712c18f082c8123da77aa4c8389a8`.
+Relevant sources are `packages/provider-grok-bot/src/grok-bot/config.ts`,
+`replica.ts`, and `base32.ts`. Copyright (c) 2026 Tuo Lei.
+Licensed under the MIT License. See `VibeReplay-LICENSE.txt` in this directory.
+
 These adaptations retain native macOS metadata and account quota reading.
 They use Zisla's existing read-only SQLite, incremental JSONL reader, usage
 repository, and monitor. Upstream UI, browser cookie scanning, billing

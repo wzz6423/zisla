@@ -8,6 +8,12 @@ struct AIStateMonitorSubscriptionTests {
         #expect(AIStateMonitor.defaultActivityDetectors().contains { $0 is CursorSessionActivityDetector })
     }
 
+    @Test @MainActor func defaultActivityDetectorsIncludeGrokBotSeparatelyFromGrokCLI() {
+        let detectors = AIStateMonitor.defaultActivityDetectors()
+        #expect(detectors.contains { $0 is GrokBotSessionActivityDetector })
+        #expect(detectors.contains { $0 is GrokSessionActivityDetector })
+    }
+
     @Test @MainActor func refreshPublishesIndependentQuotasAndDeduplicatesUsageWithoutBlockingActivity() async throws {
         let root = FileManager.default.temporaryDirectory.appendingPathComponent("zisla-subscription-monitor-\(UUID())")
         defer { try? FileManager.default.removeItem(at: root) }

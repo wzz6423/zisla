@@ -121,18 +121,17 @@ struct AISubscriptionCredentials: Sendable {
             let status = SecItemCopyMatching(query, &result)
             return (status, result)
         },
-        allowsRead: (CFTypeRef) -> Bool = { item in
-            guard CFGetTypeID(item) == SecKeychainItemGetTypeID() else { return false }
-            return keychainItemAllowsRead(unsafeDowncast(item, to: SecKeychainItem.self))
-        }
+        allowsRead: (CFTypeRef) -> Bool = { keychainItemAllowsRead($0) },
+        uiFailPolicy: CFString? = keychainUIFailPolicy
     ) -> Data? {
+        guard let uiFailPolicy else { return nil }
         let context = LAContext()
         context.interactionNotAllowed = true
         var query: [String: Any] = [
             kSecClass as String: kSecClassGenericPassword, kSecAttrService as String: service,
             kSecAttrAccount as String: account, kSecMatchLimit as String: kSecMatchLimitOne,
             kSecUseAuthenticationContext as String: context,
-            kSecUseAuthenticationUI as String: kSecUseAuthenticationUIFail,
+            kSecUseAuthenticationUI as String: uiFailPolicy,
             kSecReturnAttributes as String: true, kSecReturnRef as String: true,
         ]
         let (status, reference) = copyMatching(query as CFDictionary)
@@ -148,22 +147,41 @@ struct AISubscriptionCredentials: Sendable {
         return result as? Data
     }
 
-    private static func keychainItemAllowsRead(_ item: SecKeychainItem) -> Bool {
-        var access: SecAccess?
-        guard SecKeychainItemCopyAccess(item, &access) == errSecSuccess, let access,
-              let rawACLs = SecAccessCopyMatchingACLList(access, kSecACLAuthorizationDecrypt),
-              let acls = rawACLs as? [SecACL],
-              let path = Bundle.main.executablePath else { return false }
+    static func keychainItemAllowsRead(
+        _ item: CFTypeRef,
+        executablePath: String? = Bundle.main.executablePath,
+        symbol: (String) -> UnsafeMutableRawPointer? = { name in
+            guard let securityFramework else { return nil }
+            return dlsym(securityFramework, name)
+        }
+    ) -> Bool {
+        guard let getTypeIDSymbol = symbol("SecKeychainItemGetTypeID"),
+              let copyAccessSymbol = symbol("SecKeychainItemCopyAccess"),
+              let copyACLListSymbol = symbol("SecAccessCopyMatchingACLList"),
+              let copyContentsSymbol = symbol("SecACLCopyContents"),
+              let path = executablePath else { return false }
+        let getTypeID = unsafeBitCast(getTypeIDSymbol, to: KeychainItemTypeID.self)
+        guard CFGetTypeID(item) == getTypeID() else { return false }
+        let copyAccess = unsafeBitCast(copyAccessSymbol, to: KeychainItemCopyAccess.self)
+        let copyACLList = unsafeBitCast(copyACLListSymbol, to: AccessCopyMatchingACLList.self)
+        let copyContents = unsafeBitCast(copyContentsSymbol, to: ACLCopyContents.self)
+        var accessReference: Unmanaged<SecAccess>?
+        let accessStatus = copyAccess(item, &accessReference)
+        let access = accessReference?.takeRetainedValue()
+        guard accessStatus == errSecSuccess, let access,
+              let rawACLs = copyACLList(access, kSecACLAuthorizationDecrypt)?.takeRetainedValue(),
+              let acls = rawACLs as? [SecACL] else { return false }
         for acl in acls {
-            var applications: CFArray?
-            var description: CFString?
+            var applicationsReference: Unmanaged<CFArray>?
+            var descriptionReference: Unmanaged<CFString>?
             var selector = SecKeychainPromptSelector()
-            guard SecACLCopyContents(acl, &applications, &description, &selector) == errSecSuccess,
-                  selector.rawValue == 0 else { continue }
+            let status = copyContents(acl, &applicationsReference, &descriptionReference, &selector)
+            let applications = applicationsReference?.takeRetainedValue()
+            _ = descriptionReference?.takeRetainedValue()
+            guard status == errSecSuccess, selector.rawValue == 0 else { continue }
             guard let applications else { return true }
-            guard let framework = securityFramework,
-                  let symbol = dlsym(framework, "SecTrustedApplicationValidateWithPath") else { continue }
-            let validate = unsafeBitCast(symbol, to: TrustedApplicationValidator.self)
+            guard let validateSymbol = symbol("SecTrustedApplicationValidateWithPath") else { continue }
+            let validate = unsafeBitCast(validateSymbol, to: TrustedApplicationValidator.self)
             if let trusted = applications as? [SecTrustedApplication], trusted.contains(where: { application in
                 path.withCString { validate(application, $0) == errSecSuccess }
             }) { return true }
@@ -171,6 +189,21 @@ struct AISubscriptionCredentials: Sendable {
         return false
     }
 
+    // Legacy ACLs can still prompt with LAContext alone; retain the explicit UI-fail policy.
+    private static var keychainUIFailPolicy: CFString? {
+        guard let securityFramework,
+              let symbol = dlsym(securityFramework, "kSecUseAuthenticationUIFail") else { return nil }
+        return symbol.assumingMemoryBound(to: CFString?.self).pointee
+    }
+
+    // Legacy ACL inspection has no SecItem equivalent. Resolve its C ABI without deprecated imports.
+    private typealias KeychainItemTypeID = @convention(c) () -> CFTypeID
+    private typealias KeychainItemCopyAccess = @convention(c) (
+        CFTypeRef, UnsafeMutablePointer<Unmanaged<SecAccess>?>) -> OSStatus
+    private typealias AccessCopyMatchingACLList = @convention(c) (SecAccess, CFTypeRef) -> Unmanaged<CFArray>?
+    private typealias ACLCopyContents = @convention(c) (
+        SecACL, UnsafeMutablePointer<Unmanaged<CFArray>?>, UnsafeMutablePointer<Unmanaged<CFString>?>,
+        UnsafeMutablePointer<SecKeychainPromptSelector>) -> OSStatus
     private typealias TrustedApplicationValidator = @convention(c) (SecTrustedApplication, UnsafePointer<CChar>) -> OSStatus
     private nonisolated(unsafe) static let securityFramework = dlopen(
         "/System/Library/Frameworks/Security.framework/Security", RTLD_NOW
