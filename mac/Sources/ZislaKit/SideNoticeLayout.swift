@@ -542,7 +542,7 @@ public struct SideNoticeLayoutEngine: Equatable, Sendable {
         }
         if Self.screenRecordingOperationNotice(for: notices, settings: settings) != nil {
             return (0, false, settings.collapsedProgressGlowEnabled, Layout.compactWingWidth, 0,
-                    thickness * 2 + 6 + CompactPillStatusPresentation.trailingInset, nil)
+                    thickness * 2 + 6 + CompactPillStatusPresentation.trailingInset * 2, nil)
         }
         let selectedPriority = Self.selectedCompactStatusPriority(for: notices, settings: settings)
         guard let selectedPriority else { return nil }

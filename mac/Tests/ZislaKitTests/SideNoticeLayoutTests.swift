@@ -62,7 +62,8 @@ struct SideNoticeLayoutTests {
         let idle = ScreenLayoutEngine(configuration: settings.islandScreenConfiguration).layout(for: screen)
         let notice = IslandNotice(id: "screen-recording-operation-export", title: "Output", progress: 0.43)
         let frame = try #require(engine.compactBarFrame(for: screen, notices: [notice], settings: settings))
-        #expect(frame.size == (edge.isVertical ? CGSize(width: 32, height: 82) : CGSize(width: 82, height: 32)))
+        #expect(frame.size == (edge.isVertical ? CGSize(width: 32, height: 94) : CGSize(width: 94, height: 32)),
+                "The two full-size slots and their 6pt gap must reserve both 12pt outer insets")
         #expect(frame == engine.compactBarFrame(for: idle, notices: [notice], settings: settings))
         #expect(idle.placementBounds.contains(frame))
         #expect(engine.compactBarFrame(for: screen, notices: [], settings: settings) == nil)

@@ -8,11 +8,14 @@ public enum CollapsedPetLayout {
 
     public static func containerSize(
         for compactBarSize: CGSize,
-        edge: IslandEdge = .top
+        edge: IslandEdge = .top,
+        style: IslandLayoutStyle = .notch
     ) -> CGSize {
+        let thickness = edge.isVertical ? compactBarSize.width : compactBarSize.height
+        let slotWidth = style == .pill ? thickness + outerGap * 2 : sideSlotWidth
         return CGSize(
-            width: compactBarSize.width + (edge.isVertical ? 0 : sideSlotWidth * 2),
-            height: compactBarSize.height + (edge.isVertical ? sideSlotWidth * 2 : 0)
+            width: compactBarSize.width + (edge.isVertical ? 0 : slotWidth * 2),
+            height: compactBarSize.height + (edge.isVertical ? slotWidth * 2 : 0)
         )
     }
 
@@ -22,7 +25,7 @@ public enum CollapsedPetLayout {
     ) -> CGRect {
         let compactBarFrame = compactBarFrame ?? layout.collapsedFrame
         let edge = layout.style == .pill ? layout.edge : .top
-        var size = containerSize(for: compactBarFrame.size, edge: edge)
+        var size = containerSize(for: compactBarFrame.size, edge: edge, style: layout.style)
         if layout.style == .pill {
             size.width = min(size.width, layout.screenFrame.width)
             size.height = min(size.height, layout.screenFrame.height)
@@ -49,9 +52,9 @@ public enum CollapsedPetLayout {
         let isVertical = layout.style == .pill && layout.edge.isVertical
         let thickness = isVertical ? bar.width : bar.height
         let inset = min(4, max(2, thickness * 0.1))
-        let size = min(maximumPetSize, max(0, thickness - inset * 2))
+        let size = layout.style == .pill ? thickness : min(maximumPetSize, max(0, thickness - inset * 2))
         guard size > 0 else { return nil }
-        let centerOffset = outerGap + maximumPetSize / 2
+        let centerOffset = outerGap + (layout.style == .pill ? size : maximumPetSize) / 2
         func candidate(for side: PetSide) -> CGRect {
             if isVertical {
                 return CGRect(
@@ -63,7 +66,7 @@ public enum CollapsedPetLayout {
             }
             return CGRect(
                 x: (side == .left ? bar.minX - centerOffset : bar.maxX + centerOffset) - size / 2,
-                y: bar.maxY - inset - size,
+                y: layout.style == .pill ? bar.midY - size / 2 : bar.maxY - inset - size,
                 width: size,
                 height: size
             )

@@ -200,9 +200,15 @@ struct IslandStatusIconStrip: View {
     let date: Date
 
     var body: some View {
-        iconContent
-            .foregroundStyle(.white)
-            .environment(\.layoutDirection, .leftToRight)
+        GeometryReader { geometry in
+            iconContent
+                .frame(width: geometry.size.width, height: geometry.size.height,
+                       alignment: edge.isVertical ? .top : .leading)
+                .clipped()
+        }
+        .padding(edge.isVertical ? .vertical : .horizontal, 8)
+        .foregroundStyle(.white)
+        .environment(\.layoutDirection, .leftToRight)
     }
 
     private var iconContent: some View {
@@ -215,7 +221,6 @@ struct IslandStatusIconStrip: View {
                 .help(icon.tooltip)
             }
         }
-        .padding(edge.isVertical ? .vertical : .horizontal, 3)
     }
 
     @ViewBuilder

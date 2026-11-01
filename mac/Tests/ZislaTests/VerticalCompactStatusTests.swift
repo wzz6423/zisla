@@ -11,8 +11,8 @@ struct VerticalCompactStatusTests {
         for text in ["20%", "25:00", "(1)", "[]", "12.5", "？，"] {
             let presentation = CompactPillStatusPresentation(priority: .transient,
                 notice: IslandNotice(id: "fixture", title: "fixture"), text: text)
-            #expect(presentation.length(thickness: 32, edge: .left) == 64,
-                    "\(text) fits one 14pt row with a 12pt clear end after the icon and gap")
+            #expect(presentation.length(thickness: 32, edge: .left) == 68,
+                    "\(text) fits one 14pt row between the icon and two 12pt outer insets")
             #expect(CompactPillStatusPresentation.verticalTextRows(text, availableWidth: 32,
                 availableHeight: 14).map(\.text) == [text])
         }
@@ -30,7 +30,7 @@ struct VerticalCompactStatusTests {
         }
         let presentation = CompactPillStatusPresentation(priority: .transient,
             notice: IslandNotice(id: "fixture", title: "fixture"), text: "12.34567890%")
-        #expect(presentation.length(thickness: 24, edge: .left) == 42 + CGFloat(rows.count) * 14)
+        #expect(presentation.length(thickness: 24, edge: .left) == 46 + CGFloat(rows.count) * 14)
     }
 
     @Test
@@ -191,8 +191,8 @@ struct VerticalCompactStatusTests {
         let first = CompactPillStatusContent.displayText(for: presentation, settings: settings, item: item, at: date)
         let next = CompactPillStatusContent.displayText(for: presentation, settings: settings, item: item, at: date.addingTimeInterval(10))
         #expect(first == "短" && next == "长一些的歌词")
-        #expect(presentation.length(thickness: 32, edge: .left, text: first) == 102)
-        #expect(presentation.length(thickness: 32, edge: .left, text: next) == 172)
+        #expect(presentation.length(thickness: 32, edge: .left, text: first) == 98)
+        #expect(presentation.length(thickness: 32, edge: .left, text: next) == 168)
         #expect(presentation.text == "旧歌词")
         var paused = item
         paused.isPlaying = false
@@ -229,7 +229,7 @@ struct VerticalCompactStatusTests {
             renderer.scale = 2
             let bitmap = NSBitmapImageRep(cgImage: try #require(renderer.cgImage))
             #expect(bitmap.pixelsWide == Int(size.width * 2) && bitmap.pixelsHigh == Int(size.height * 2))
-            let textStart = 38 * 2
+            let textStart = 42 * 2
             let lengthPixels = edge.isVertical ? bitmap.pixelsHigh : bitmap.pixelsWide
             var firstTextPixel: Int?
             for axis in textStart..<min(lengthPixels, textStart + 32) {
@@ -254,7 +254,7 @@ struct VerticalCompactStatusTests {
         #expect(presentation.priority == .transient)
         #expect(presentation.notice.symbolName == "exclamationmark.triangle.fill")
         #expect(presentation.text == "已保存")
-        #expect(presentation.length(thickness: 32, edge: .left) == 92)
+        #expect(presentation.length(thickness: 32, edge: .left) == 96)
         #expect(!presentation.showsWaveform && !presentation.isMedia)
     }
 
@@ -300,11 +300,46 @@ struct VerticalCompactStatusTests {
         }
     }
 
+    @Test(arguments: [IslandEdge.top, .bottom]) @MainActor
+    func waveformKeepsTheSameMeasuredGapAndEndInsetAsTheArtwork(edge: IslandEdge) throws {
+        let image = NSImage(size: NSSize(width: 24, height: 24), flipped: false) { rect in
+            NSColor.white.setFill()
+            rect.fill()
+            return true
+        }
+        let data = try #require(image.tiffRepresentation)
+        let notice = IslandNotice(id: "media-active-insets", title: "Music", artworkData: data)
+        let presentation = CompactPillStatusPresentation(priority: .media, notice: notice, text: "", showsWaveform: true)
+        let item = NowPlayingSnapshot(title: "fixture", artist: "fixture", album: nil, artworkData: data,
+            duration: 60, elapsedTime: 0, timestamp: .distantPast, isPlaying: false)
+        let length = presentation.length(thickness: 32, edge: edge)
+        let renderer = ImageRenderer(content: CompactPillStatusContent(presentation: presentation,
+            text: "", edge: edge, visualizationStyle: .waveform, item: item)
+            .frame(width: length, height: 32).background(.black))
+        renderer.scale = 2
+        let bitmap = NSBitmapImageRep(cgImage: try #require(renderer.cgImage))
+        var occupiedColumns: [Int] = []
+        for x in 0..<bitmap.pixelsWide {
+            for y in 0..<bitmap.pixelsHigh {
+                let color = try #require(bitmap.colorAt(x: x, y: y)?.usingColorSpace(.sRGB))
+                if min(color.redComponent, color.greenComponent, color.blueComponent) > 0.5 {
+                    occupiedColumns.append(x)
+                    break
+                }
+            }
+        }
+        #expect(occupiedColumns.first == 24)
+        #expect(occupiedColumns.contains(71) && occupiedColumns.contains(84),
+                "Artwork and waveform must keep the measured 6pt gap")
+        #expect(occupiedColumns.last == Int((length - 12) * 2) - 1,
+                "The waveform must end at the same 12pt inset as the artwork starts")
+    }
+
     @Test(arguments: IslandEdge.allCases)
     @MainActor
     func compactContentKeepsItsColoredIconAtTheStartAndTextWithinTheAdjacentColumn(edge: IslandEdge) throws {
         let icon = NSImage(size: NSSize(width: 24, height: 24), flipped: false) { rect in
-            NSColor.red.setFill()
+            NSColor(deviceRed: 1, green: 0, blue: 0, alpha: 1).setFill()
             rect.fill()
             return true
         }
@@ -334,16 +369,52 @@ struct VerticalCompactStatusTests {
             }
         }
         #expect(!iconBounds.isNull && !textBounds.isNull)
-        #expect(abs(iconBounds.midX - 16) < 1 && abs(iconBounds.midY - 16) < 1,
-                "The icon must stay centered in the first 32-point square")
         if edge.isVertical {
-            #expect(textBounds.minY >= 38 && textBounds.minY < 44)
+            #expect(abs(iconBounds.minY - 12) < 0.5 && abs(iconBounds.midX - 16) < 0.5,
+                    "The actual icon edge must begin 12pt from the vertical pill's end")
+            #expect(textBounds.minY >= 42 && textBounds.minY < 48)
             #expect(textBounds.height > textBounds.width * 2 && textBounds.maxX <= 32)
             #expect(size.height - textBounds.maxY >= 12, "Vertical content must leave a clear end below its last character")
         } else {
-            #expect(textBounds.minX >= 38 && textBounds.minX < 44)
+            #expect(abs(iconBounds.minX - 12) < 0.5 && abs(iconBounds.midY - 16) < 0.5,
+                    "The actual icon edge must begin 12pt from the horizontal pill's end")
+            #expect(textBounds.minX >= 42 && textBounds.minX < 48)
             #expect(textBounds.width > textBounds.height * 2 && textBounds.maxY <= 32)
             #expect(size.width - textBounds.maxX >= 12, "Horizontal content must leave a clear end after its last character")
         }
+    }
+
+    @Test(arguments: IslandEdge.allCases, [CGFloat(32), 48]) @MainActor
+    func compactIconsKeepTwelvePointInsetsAtBothEnds(edge: IslandEdge, thickness: CGFloat) throws {
+        let icon = NSImage(size: NSSize(width: 24, height: 24), flipped: false) { rect in
+            NSColor(deviceRed: 1, green: 0, blue: 0, alpha: 1).setFill()
+            rect.fill()
+            return true
+        }
+        let presentation = CompactPillStatusPresentation(priority: .mail,
+            notice: IslandNotice(id: "mail-insets", title: "fixture", artworkData: try #require(icon.tiffRepresentation)),
+            text: "")
+        let length = presentation.length(thickness: thickness, edge: edge)
+        #expect(length == thickness - 8 + 24, "An empty status reserves its actual icon and two 12pt insets")
+        let size = edge.isVertical ? CGSize(width: thickness, height: length) : CGSize(width: length, height: thickness)
+        let renderer = ImageRenderer(content: CompactPillStatusContent(presentation: presentation,
+            text: "", edge: edge, visualizationStyle: .waveform, item: nil)
+            .frame(width: size.width, height: size.height).background(.black))
+        renderer.scale = 2
+        let bitmap = NSBitmapImageRep(cgImage: try #require(renderer.cgImage))
+        var bounds = CGRect.null
+        for y in 0..<bitmap.pixelsHigh {
+            for x in 0..<bitmap.pixelsWide {
+                let color = try #require(bitmap.colorAt(x: x, y: y)?.usingColorSpace(.deviceRGB))
+                if color.redComponent > 0.6 && color.greenComponent < 0.2 && color.blueComponent < 0.2 {
+                    bounds = bounds.union(CGRect(x: CGFloat(x) / 2, y: CGFloat(y) / 2, width: 0.5, height: 0.5))
+                }
+            }
+        }
+        try #require(!bounds.isNull)
+        let start = edge.isVertical ? bounds.minY : bounds.minX
+        let end = length - (edge.isVertical ? bounds.maxY : bounds.maxX)
+        #expect(abs(start - 12) < 0.5 && abs(end - 12) < 0.5,
+                "Both visible icon edges must have the same 12pt margin, including the slot's former 4pt gap")
     }
 }

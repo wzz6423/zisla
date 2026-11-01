@@ -452,6 +452,8 @@ final class AppModel: ObservableObject {
     }
   }
   @Published var downloadDirectory = AppPaths.downloads
+  private let downloadDirectoryStore = ScreenRecordingOutputDirectoryStore(
+    bookmarkKey: "download-directory-bookmark", pathKey: nil)
   @Published var downloadState: DownloadUIState = .idle
   @Published private(set) var activeDownloads: [DownloadTaskSnapshot] = []
   @Published private(set) var downloadFormats: [DownloadFormat] = []
@@ -4441,6 +4443,11 @@ final class AppModel: ObservableObject {
     {
       UserDefaults.standard.set(bookmark, forKey: "download-directory-bookmark")
     }
+  }
+
+  func setDownloadDirectory(_ url: URL) throws {
+    try downloadDirectoryStore.setDirectory(url)
+    downloadDirectory = downloadDirectoryStore.directory
   }
 
   private static func downloadErrorText(_ error: Error) -> String {

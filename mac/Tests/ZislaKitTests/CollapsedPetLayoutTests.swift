@@ -4,6 +4,26 @@ import Testing
 @testable import ZislaKit
 
 struct CollapsedPetLayoutTests {
+    @Test(arguments: IslandEdge.allCases, [CGFloat(24), 32, 40])
+    func pillPetMatchesCurrentThicknessAndKeepsFourPointGap(edge: IslandEdge, thickness: CGFloat) throws {
+        let layout = pillLayout(edge: edge, pillSize: CGSize(width: 180, height: thickness))
+        let bar = layout.collapsedFrame
+        let container = CollapsedPetLayout.frame(for: layout)
+        for side in [PetSide.left, .right] {
+            let pet = try #require(CollapsedPetLayout.petFrame(for: layout, side: side))
+            #expect(pet.size == CGSize(width: thickness, height: thickness),
+                    "The pet must match the current pill thickness without an inset or a 24pt cap")
+            #expect(container.contains(pet), "The resized pet must fit inside its panel")
+            if edge.isVertical {
+                #expect(pet.midX == bar.midX)
+                #expect(side == .left ? pet.minY - bar.maxY == 4 : bar.minY - pet.maxY == 4)
+            } else {
+                #expect(pet.midY == bar.midY)
+                #expect(side == .left ? bar.minX - pet.maxX == 4 : pet.minX - bar.maxX == 4)
+            }
+        }
+    }
+
     @Test
     func containerAddsAStablePetSlotOnBothSides() {
         let size = CollapsedPetLayout.containerSize(for: CGSize(width: 240, height: 34))
@@ -12,7 +32,7 @@ struct CollapsedPetLayoutTests {
     }
 
     @Test
-    func panelFrameKeepsTheCollapsedIslandCentered() {
+    func panelFrameKeepsTheCollapsedIslandCentered() throws {
         let screen = ScreenSnapshot(
             displayID: 1,
             frame: CGRect(x: 0, y: 0, width: 1_512, height: 982),
@@ -27,6 +47,10 @@ struct CollapsedPetLayoutTests {
         #expect(frame.midX == layout.collapsedFrame.midX)
         #expect(frame.maxY == layout.collapsedFrame.maxY)
         #expect(frame.width == layout.collapsedFrame.width + 64)
+        let pet = try #require(CollapsedPetLayout.petFrame(for: layout, side: .left))
+        #expect(pet.size == CGSize(width: 24, height: 24), "Physical notches must preserve the existing pet size")
+        #expect(pet.maxY == layout.collapsedFrame.maxY - 3.2,
+                "Physical notches must preserve the existing top inset")
     }
 
     @Test
@@ -108,12 +132,13 @@ struct CollapsedPetLayoutTests {
         #expect(container.midY == bar.midY)
         #expect(container.minY == bar.minY - CollapsedPetLayout.sideSlotWidth)
         #expect(container.maxY == bar.maxY + CollapsedPetLayout.sideSlotWidth)
-        #expect(CollapsedPetLayout.containerSize(for: bar.size, edge: edge) == container.size)
+        #expect(CollapsedPetLayout.containerSize(for: bar.size, edge: edge, style: .pill) == container.size)
     }
 
     @Test(arguments: IslandEdge.allCases, [
-        (ScreenLayoutConfiguration().pillSize, CGFloat(19.2)),
-        (CGSize(width: 180, height: 32), CGFloat(24)),
+        (ScreenLayoutConfiguration().pillSize, CGFloat(24)),
+        (CGSize(width: 180, height: 32), CGFloat(32)),
+        (CGSize(width: 180, height: 40), CGFloat(40)),
     ])
     func pillPetFramesStayInsideNegativeCoordinateScreensAtCorners(
         edge: IslandEdge, sizing: (pillSize: CGSize, petSize: CGFloat)
@@ -157,9 +182,9 @@ struct CollapsedPetLayoutTests {
         let container = CollapsedPetLayout.frame(for: layout, compactBarFrame: bar)
         if edge.isVertical {
             #expect(container.width == bar.width)
-            #expect(container.height == bar.height + 64)
+            #expect(container.height == bar.height + (bar.width + 8) * 2)
         } else {
-            #expect(container.width == bar.width + 64)
+            #expect(container.width == bar.width + (bar.height + 8) * 2)
             #expect(container.height == bar.height)
         }
         #expect(container.contains(bar))

@@ -319,7 +319,7 @@ struct CompactStatusBarView: View {
                 CompactScreenRecordingOperationWing(notice: notice, side: .right, height: height,
                     usesTransparentBackground: true, usesCustomPillSlot: true)
             }
-            .padding(displayState.islandEdge.isVertical ? .bottom : .trailing,
+            .padding(displayState.islandEdge.isVertical ? .vertical : .horizontal,
                      CompactPillStatusPresentation.trailingInset)
         } else if let presentation = sizing?.customPillPresentation {
             let text = CompactPillStatusContent.displayText(

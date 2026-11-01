@@ -116,6 +116,8 @@ public enum TopTopology: Equatable, Sendable {
 }
 
 public struct ScreenLayoutConfiguration: Equatable, Sendable {
+    public static let quickActionRowWidth = ScreenLayoutConfiguration().expandedSize.width + 60
+
     /// Width of the simulated island and its fallback height when the menu bar
     /// depth is unavailable.
     public var simulatedIslandSize: CGSize
@@ -386,6 +388,7 @@ public struct ScreenLayoutEngine: Equatable, Sendable {
                 horizontalSize.width = max(horizontalSize.width, edge.isVertical ? iconSize.height : iconSize.width)
                 horizontalSize.height = max(horizontalSize.height, edge.isVertical ? iconSize.width : iconSize.height)
             }
+            horizontalSize.width = min(horizontalSize.width, ScreenLayoutConfiguration.quickActionRowWidth)
         }
         let size = CGSize(
             width: min(edge.isVertical ? horizontalSize.height : horizontalSize.width, bounds.width),
@@ -476,7 +479,7 @@ public struct ScreenLayoutEngine: Equatable, Sendable {
                                 physicalOcclusionFrame.width + SideNoticeLayoutEngine.compactStatusWingWidth * 2)
         } else if placementMode == .custom, let compactStatusLength {
             let thickness = edge.isVertical ? frame.width : frame.height
-            desiredLength = max(thickness, compactStatusLength)
+            desiredLength = min(ScreenLayoutConfiguration.quickActionRowWidth, max(thickness, compactStatusLength))
         } else {
             desiredLength = nil
         }

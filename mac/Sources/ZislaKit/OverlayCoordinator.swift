@@ -329,8 +329,6 @@ public final class OverlayCoordinator: NSObject {
             if changedDisplay, isVisible {
                 presentCurrentLayout()
             }
-            if layoutEngine.configuration.statusIconSize != nil,
-               reducer.state.visibility != .expanded, reducer.state.visibility != .pinned { return }
             endPointerEntryGrace()
             setPointerInside(true)
             return

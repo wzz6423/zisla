@@ -77,32 +77,52 @@ struct OverlayCoordinatorPlacementTests {
         #expect(!coordinator.isVisible)
     }
 
-    @Test(arguments: IslandEdge.allCases)
-    func statusIconsKeepTheIslandCollapsedOnHoverAndExplicitRevealStillWorks(edge: IslandEdge) throws {
-        let coordinator = OverlayCoordinator(contentView: NSView(),
+    @Test(arguments: IslandEdge.allCases, [CGFloat(24), 120])
+    func statusIconsExpandOnHoverAndExplicitRevealStillWorks(edge: IslandEdge, iconLength: CGFloat) throws {
+        let content = NSView()
+        let coordinator = OverlayCoordinator(contentView: content,
             layoutEngine: ScreenLayoutEngine(configuration: ScreenLayoutConfiguration(layoutStyle: .pill,
                 placement: IslandPlacement(mode: .custom, edge: edge))), collapseDelay: .zero)
         coordinator.screenSnapshotProvider = { [screen] }
         coordinator.start()
         defer { coordinator.stop() }
         coordinator.selectActiveDisplay(at: CGPoint(x: screen.frame.midX, y: screen.frame.midY))
+        coordinator.prewarmPanel()
+        let panel = try #require(content.window as? IslandPanel)
         var expanded = false
         coordinator.onVisibilityChanged = { expanded = $0 }
         coordinator.updateCompactStatus(expandsForDetailedStatus: false,
-            statusIconSize: edge.isVertical ? CGSize(width: 24, height: 120) : CGSize(width: 120, height: 24))
+            statusIconSize: edge.isVertical ? CGSize(width: 24, height: iconLength)
+                : CGSize(width: iconLength, height: 24))
         let layout = try #require(coordinator.activeLayout)
         let point = CGPoint(x: layout.collapsedFrame.midX, y: layout.collapsedFrame.midY)
+        let outside = CGPoint(x: screen.frame.minX - 100, y: screen.frame.minY - 100)
+        let expandedOnly = CGPoint(x: layout.expandedFrame.midX, y: layout.expandedFrame.midY)
+        #expect(!layout.containsTrigger(expandedOnly))
+        coordinator.handlePointer(at: expandedOnly)
+        #expect(!expanded, "Only the collapsed icon row may trigger hover expansion")
+        #expect(panel.ignoresMouseEvents)
         coordinator.handlePointer(at: point)
-        #expect(!expanded, "Hovering monitor icons must keep them visible in the collapsed island")
+        #expect(expanded, "Hovering aggregate or monitor icons must expand the island on every edge")
+        #expect(!panel.ignoresMouseEvents)
+        coordinator.handlePointer(at: expandedOnly)
+        #expect(expanded, "Entering the expanded surface must keep the island open")
+        coordinator.handlePointer(at: outside)
+        #expect(!expanded, "Leaving the island must collapse it immediately")
+        #expect(panel.ignoresMouseEvents)
+        coordinator.handlePointer(at: point)
+        #expect(expanded, "Reentering the status icon row must reopen the island")
+        coordinator.collapseImmediately()
+        #expect(!expanded)
+        coordinator.handlePointer(at: point)
+        #expect(!expanded, "An explicit collapse remains in effect until the pointer leaves")
+        coordinator.handlePointer(at: outside)
         coordinator.showExpanded(at: point)
         #expect(expanded, "Existing menu and monitor actions may explicitly open the island")
         coordinator.handlePointer(at: point)
         #expect(expanded)
-        coordinator.collapseImmediately()
-        coordinator.handlePointer(at: point)
-        #expect(!expanded)
-        let outside = CGPoint(x: screen.frame.minX - 100, y: screen.frame.minY - 100)
         coordinator.handlePointer(at: outside)
+        #expect(!expanded)
         coordinator.showExpanded(at: outside)
         coordinator.handlePointer(at: point)
         coordinator.handlePointer(at: outside)
@@ -111,12 +131,92 @@ struct OverlayCoordinatorPlacementTests {
         coordinator.handlePointer(at: point)
         coordinator.setPinned(false)
         #expect(expanded, "Unpinning while hovering an explicitly opened island must keep it open")
-        coordinator.collapseImmediately()
         coordinator.handlePointer(at: outside)
+        #expect(!expanded)
+        coordinator.setPinned(true)
+        coordinator.handlePointer(at: outside)
+        #expect(expanded, "A pinned island remains open outside the status icon row")
+        coordinator.setPinned(false)
+        #expect(!expanded, "Unpinning outside the island must collapse it")
         coordinator.updateCompactStatus(expandsForDetailedStatus: false)
         let idle = try #require(coordinator.activeLayout?.collapsedFrame)
         coordinator.handlePointer(at: CGPoint(x: idle.midX, y: idle.midY))
         #expect(expanded, "Removing all icons must restore the existing hover behavior")
+    }
+
+    @Test(arguments: IslandEdge.allCases)
+    func statusIconHoverRespectsInteractionSuspensionAndStop(edge: IslandEdge) throws {
+        let content = NSView()
+        let coordinator = OverlayCoordinator(contentView: content,
+            layoutEngine: ScreenLayoutEngine(configuration: ScreenLayoutConfiguration(layoutStyle: .pill,
+                placement: IslandPlacement(mode: .custom, edge: edge))), collapseDelay: .zero)
+        coordinator.screenSnapshotProvider = { [screen] }
+        coordinator.start()
+        defer { coordinator.stop() }
+        coordinator.selectActiveDisplay(at: CGPoint(x: screen.frame.midX, y: screen.frame.midY))
+        coordinator.prewarmPanel()
+        let panel = try #require(content.window as? IslandPanel)
+        coordinator.updateCompactStatus(expandsForDetailedStatus: false,
+            statusIconSize: edge.isVertical ? CGSize(width: 24, height: 120) : CGSize(width: 120, height: 24))
+        let layout = try #require(coordinator.activeLayout)
+        let point = CGPoint(x: layout.collapsedFrame.midX, y: layout.collapsedFrame.midY)
+        let outside = CGPoint(x: screen.frame.minX - 100, y: screen.frame.minY - 100)
+        var visibilityEvents: [Bool] = []
+        coordinator.onVisibilityChanged = { visibilityEvents.append($0) }
+
+        coordinator.setHoverActivationSuspended(true)
+        coordinator.handlePointer(at: point)
+        #expect(visibilityEvents.isEmpty, "Quick actions that own the hover trigger must suppress expansion")
+        #expect(!panel.isVisible)
+        coordinator.setHoverActivationSuspended(false)
+        coordinator.handlePointer(at: point)
+        #expect(!panel.ignoresMouseEvents, "Hover expansion resumes when the quick action releases the trigger")
+        coordinator.handlePointer(at: outside)
+
+        coordinator.setScreenLocked(true)
+        let lockedEvents = visibilityEvents
+        coordinator.handlePointer(at: point)
+        #expect(visibilityEvents == lockedEvents, "Locking must reject status icon hover activation")
+        #expect(!panel.isVisible)
+        coordinator.setScreenLocked(false)
+        coordinator.handlePointer(at: point)
+        #expect(!panel.ignoresMouseEvents, "Hover expansion resumes after unlocking")
+        coordinator.handlePointer(at: outside)
+
+        coordinator.setVoiceRecording(true, at: point)
+        let recordingEvents = visibilityEvents
+        coordinator.handlePointer(at: point)
+        #expect(visibilityEvents == recordingEvents, "Recording must reject status icon hover activation")
+        #expect(panel.ignoresMouseEvents)
+        coordinator.setVoiceRecording(false)
+        coordinator.handlePointer(at: point)
+        #expect(!panel.ignoresMouseEvents, "Hover expansion resumes after recording ends")
+        coordinator.handlePointer(at: outside)
+
+        coordinator.setScreenshotCaptureInProgress(true)
+        let captureEvents = visibilityEvents
+        coordinator.handlePointer(at: point)
+        #expect(visibilityEvents == captureEvents, "Live screen capture must preserve the collapsed presentation")
+        #expect(panel.ignoresMouseEvents)
+        coordinator.setScreenshotCaptureInProgress(false)
+        coordinator.handlePointer(at: point)
+        #expect(!panel.ignoresMouseEvents, "Hover expansion resumes after the frozen frame is ready")
+        coordinator.handlePointer(at: outside)
+
+        coordinator.setScreenshotActive(true)
+        coordinator.handlePointer(at: point)
+        #expect(!panel.isVisible, "The frozen screenshot overlay must keep the live island hidden")
+        coordinator.setScreenshotActive(false)
+        coordinator.handlePointer(at: outside)
+        coordinator.handlePointer(at: point)
+        #expect(!panel.ignoresMouseEvents)
+
+        coordinator.stop()
+        let stoppedEvents = visibilityEvents
+        coordinator.handlePointer(at: point)
+        #expect(visibilityEvents == stoppedEvents, "Stopping must reject status icon hover activation")
+        #expect(!coordinator.isVisible)
+        #expect(!panel.isVisible)
     }
 
     @Test

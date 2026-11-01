@@ -28,7 +28,8 @@ public struct CompactPillStatusPresentation: Equatable, Sendable {
 
     public func length(thickness: CGFloat, edge: IslandEdge, text: String? = nil) -> CGFloat {
         let text = (text ?? self.text).trimmingCharacters(in: .whitespacesAndNewlines)
-        let visualLength = (showsWaveform ? thickness * 2 + 6 : thickness) + Self.trailingInset
+        let iconSize = max(0, thickness - 8)
+        let visualLength = (showsWaveform ? iconSize * 2 + 6 : iconSize) + Self.trailingInset * 2
         guard !text.isEmpty else { return visualLength }
         let textLength: CGFloat
         if edge.isVertical {

@@ -3911,14 +3911,8 @@ struct SettingsView: View {
         panel.directoryURL = model.downloadDirectory
         WindowPlacement.prepareModal(panel, on: WindowPlacement.screenUnderMouse())
         guard panel.runModal() == .OK, let url = panel.url else { return }
-        model.downloadDirectory = url
-        if let bookmark = try? url.bookmarkData(
-            options: .withSecurityScope,
-            includingResourceValuesForKeys: nil,
-            relativeTo: nil
-        ) {
-            UserDefaults.standard.set(bookmark, forKey: "download-directory-bookmark")
-        }
+        do { try model.setDownloadDirectory(url) }
+        catch { model.transientMessage = error.localizedDescription }
     }
 
     private func brandIcon(named name: String) -> NSImage? {

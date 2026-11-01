@@ -9,6 +9,29 @@ import ZislaKit
 
 @MainActor
 struct ClipboardAssistantPlacementTests {
+    @Test(arguments: IslandEdge.allCases)
+    func customQuickActionsNeverExceedTheDefaultNotchRowLength(edge: IslandEdge) {
+        let controller = makeController(edge: edge)
+        defer { controller.dismiss(animated: false) }
+        let detection = ClipboardAssistantDetection(kind: .text, title: String(repeating: "长", count: 1000),
+            actions: [.copyText("fixture")])
+        var firstLength: CGFloat?
+        for expandedWidth: CGFloat in [240, 1600] {
+            controller.screenLayoutConfiguration.expandedSize.width = expandedWidth
+            let layout = controller.rowLayout(for: detection, on: screen, locale: chinese)
+            let length = edge.isVertical ? layout.collapsedFrame.height : layout.collapsedFrame.width
+            #expect(length <= 480)
+            if !edge.isVertical { #expect(length == 480) }
+            if let firstLength { #expect(length == firstLength) }
+            else { firstLength = length }
+            #expect(screen.frame.contains(layout.collapsedFrame))
+        }
+        controller.screenLayoutConfiguration = ScreenLayoutConfiguration()
+        let notch = controller.rowLayout(for: ClipboardAssistantDetection(kind: .text, title: "fixture"),
+            on: screen, locale: chinese)
+        #expect(notch.collapsedFrame.width == 480)
+    }
+
     @Test(arguments: [IslandEdge.top, .bottom, .left, .right])
     func customPromptsUseTheirNaturalLengthAndNeverReserveTheCamera(edge: IslandEdge) {
         let controller = makeController(edge: edge)
@@ -27,8 +50,8 @@ struct ClipboardAssistantPlacementTests {
                 "A custom pill must not retain a gap reserved for the camera")
         #expect(first.collapsedFrameInSurface == CGRect(origin: .zero, size: first.frame.size))
         #expect(screen.frame.contains(first.frame))
-        if edge.isVertical { #expect(first.frame.width == 24) }
-        else { #expect(first.frame.height == 24) }
+        if edge.isVertical { #expect(first.frame.width == 32) }
+        else { #expect(first.frame.height == 32) }
     }
 
     @Test
@@ -43,7 +66,7 @@ struct ClipboardAssistantPlacementTests {
                                                      actions: [.copyText("fixture")], fullContent: "line\nline")
         let baseWidth = controller.rowLayout(for: base, on: screen, locale: chinese).frame.width
         #expect(controller.rowLayout(for: detail, on: screen, locale: chinese).frame.width == baseWidth,
-                "The 24pt pill keeps the hidden subtitle out of its width budget")
+                "A short subtitle must not widen a row whose title and controls already fit")
         let tallBase = ClipboardAssistantToastView.compactLength(
             detection: base, thickness: 32, edge: .bottom, isLightweightMode: false,
             controlsWidth: 20, locale: chinese
@@ -146,7 +169,7 @@ struct ClipboardAssistantPlacementTests {
         #expect(controller.presentation.physicalNotchWidth == 0)
         #expect(layout.style == style)
         if style == .pill {
-            #expect(layout.edge == .left && layout.frame.width == 24)
+            #expect(layout.edge == .left && layout.frame.width == 32)
         } else {
             #expect(layout.frame.maxY == screen.frame.maxY && layout.frame.width == 480)
         }
@@ -265,7 +288,7 @@ struct ClipboardAssistantPlacementTests {
         controller.presentation.translation = .loading
         let loading = controller.rowLayout(for: detection, on: screen, locale: chinese)
         #expect(loading.frame == loading.collapsedFrame)
-        #expect(loading.frame.width == 24 && loading.frame.height < 250)
+        #expect(loading.frame.width == 32 && loading.frame.height < 250)
         controller.presentation.translation = .result(text: "完整翻译结果", copied: nil)
         let result = controller.rowLayout(for: detection, on: screen, locale: chinese)
         #expect(result.collapsedFrame == loading.collapsedFrame)

@@ -7,7 +7,7 @@ import ZislaKit
 
 extension ClipboardAssistantController {
     /// The clipboard assistant needs extra horizontal space for the content preview and trailing actions.
-    private static let islandRowWidth = ScreenLayoutConfiguration().expandedSize.width + 60
+    private static let islandRowWidth = ScreenLayoutConfiguration.quickActionRowWidth
 
     static func trailingControlsWidth(
         for detection: ClipboardAssistantDetection,

@@ -179,7 +179,7 @@ struct IslandParticleLogoTests {
         fixture.state.islandEdge = edge
         fixture.state.placementMode = .custom
         fixture.state.compactWingHeight = 32
-        let size = edge.isVertical ? CGSize(width: 32, height: 82) : CGSize(width: 82, height: 32)
+        let size = edge.isVertical ? CGSize(width: 32, height: 94) : CGSize(width: 94, height: 32)
         let idle = try pixels(fixture.view.statusBarContent(at: fixture.date).frame(width: size.width, height: size.height))
         var notice = IslandNotice(id: "screen-recording-operation-logo", title: "Output", symbolName: "film")
         var frames: [[UInt8]] = []
@@ -192,10 +192,12 @@ struct IslandParticleLogoTests {
             #expect(frame != idle, "Recording state must replace the idle mark")
             #expect(fixture.view.pausesCompactTimeline, "Recording status must not keep the idle particle clock running")
             let width = Int(size.width * 2)
-            let first = frame.indices.filter { edge.isVertical ? $0 / width < 64 : $0 % width < 64 }
-            let gap = frame.indices.filter { edge.isVertical ? (64..<76).contains($0 / width) : (64..<76).contains($0 % width) }
-            let second = frame.indices.filter { edge.isVertical ? (76..<140).contains($0 / width) : (76..<140).contains($0 % width) }
-            let end = frame.indices.filter { edge.isVertical ? $0 / width >= 140 : $0 % width >= 140 }
+            let start = frame.indices.filter { edge.isVertical ? $0 / width < 24 : $0 % width < 24 }
+            let first = frame.indices.filter { edge.isVertical ? (24..<88).contains($0 / width) : (24..<88).contains($0 % width) }
+            let gap = frame.indices.filter { edge.isVertical ? (88..<100).contains($0 / width) : (88..<100).contains($0 % width) }
+            let second = frame.indices.filter { edge.isVertical ? (100..<164).contains($0 / width) : (100..<164).contains($0 % width) }
+            let end = frame.indices.filter { edge.isVertical ? $0 / width >= 164 : $0 % width >= 164 }
+            #expect(start.allSatisfy { frame[$0] == 0 }, "Recording status must leave its initial 12pt clear")
             #expect(first.contains { frame[$0] > 0 })
             #expect(second.contains { frame[$0] > 0 }, "The progress or terminal indicator must remain visible in the second slot")
             #expect(gap.allSatisfy { frame[$0] == 0 }, "The two recording slots must keep their 6pt gap")
@@ -212,7 +214,7 @@ struct IslandParticleLogoTests {
                         .foregroundStyle(.white)
                         .frame(width: 32, height: 32, alignment: .trailing)
                 }
-                .padding(edge.isVertical ? .bottom : .trailing, 12)
+                .padding(edge.isVertical ? .vertical : .horizontal, 12)
                 .frame(width: size.width, height: size.height)
                 .clipShape(CompactIslandShape(layoutStyle: .pill)))
                 #expect(second.map { frame[$0] } == second.map { percentage[$0] },
@@ -235,7 +237,7 @@ struct IslandParticleLogoTests {
         fixture.state.islandEdge = edge
         fixture.state.placementMode = .custom
         fixture.state.compactWingHeight = 32
-        let size = edge.isVertical ? CGSize(width: 32, height: 82) : CGSize(width: 82, height: 32)
+        let size = edge.isVertical ? CGSize(width: 32, height: 94) : CGSize(width: 94, height: 32)
         let background = try pixels(IslandCollapsedMaterial(style: .liquidGlass)
             .frame(width: size.width, height: size.height)
             .clipShape(CompactIslandShape(layoutStyle: .pill))
@@ -244,7 +246,7 @@ struct IslandParticleLogoTests {
         let recording = try pixels(fixture.view.statusBarContent(at: fixture.date)
             .frame(width: size.width, height: size.height).background(.white))
         let width = Int(size.width * 2)
-        let samples = edge.isVertical ? [60 * width + 32, 136 * width + 32] : [60 * width + 32, 60 * width + 108]
+        let samples = edge.isVertical ? [84 * width + 32, 160 * width + 32] : [60 * width + 56, 60 * width + 132]
         for sample in samples {
             try #require(background[sample] > 0, "The fixture must expose the backing color to verify slot transparency")
             #expect(recording[sample] == background[sample], "Recording slots must preserve the existing glass crown without adding black wing backgrounds")

@@ -60,17 +60,19 @@ struct CompactPillStatusContent: View {
             let thickness = edge.isVertical ? proxy.size.width : proxy.size.height
             let iconSize = max(0, thickness - 8)
             let textLength = max(0, (edge.isVertical ? proxy.size.height : proxy.size.width)
-                - thickness - (presentation.showsWaveform ? thickness + 6 : 0) - 6
-                - CompactPillStatusPresentation.trailingInset)
+                - iconSize - (presentation.showsWaveform ? iconSize + 6 : 0) - 6
+                - CompactPillStatusPresentation.trailingInset * 2)
             let layout = edge.isVertical
                 ? AnyLayout(VStackLayout(spacing: 6))
                 : AnyLayout(HStackLayout(spacing: 6))
             layout {
                 statusIcon(size: iconSize)
-                    .frame(width: thickness, height: thickness)
+                    .frame(width: edge.isVertical ? thickness : iconSize,
+                           height: edge.isVertical ? iconSize : thickness)
                 if !text.isEmpty {
                     if edge.isVertical {
                         VerticalStatusText(text: text, availableWidth: thickness, availableHeight: textLength)
+                            .frame(width: thickness, height: textLength, alignment: .top)
                     } else {
                         MarqueeText(text, font: .system(size: 11, weight: .medium),
                                     textColor: .white, pointsPerSecond: TransientNoticeMetrics.pointsPerSecond,
@@ -82,10 +84,11 @@ struct CompactPillStatusContent: View {
                     MediaWaveformView(artworkData: item?.artworkData ?? presentation.notice.artworkData,
                                       width: iconSize, height: min(18, iconSize),
                                       isActive: item?.isPlaying ?? true)
-                        .frame(width: thickness, height: thickness)
+                        .frame(width: edge.isVertical ? thickness : iconSize,
+                               height: edge.isVertical ? iconSize : thickness)
                 }
             }
-            .padding(edge.isVertical ? .bottom : .trailing, CompactPillStatusPresentation.trailingInset)
+            .padding(edge.isVertical ? .vertical : .horizontal, CompactPillStatusPresentation.trailingInset)
             .frame(width: proxy.size.width, height: proxy.size.height)
         }
         .foregroundStyle(.white)

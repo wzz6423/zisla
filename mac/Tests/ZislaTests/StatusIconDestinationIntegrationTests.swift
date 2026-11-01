@@ -7,6 +7,47 @@ import ZislaCore
 @testable import Zisla
 
 struct StatusIconDestinationIntegrationTests {
+    @Test(arguments: IslandEdge.allCases) @MainActor
+    func oversizedStatusIconsKeepTheQuickActionLengthLimitAndBothEndInsets(edge: IslandEdge) async throws {
+        let fixture = try IconFixture(edge: edge)
+        defer { fixture.close() }
+        let image = NSImage(size: CGSize(width: 36, height: 36), flipped: false) { rect in
+            NSColor(deviceRed: 1, green: 0, blue: 0, alpha: 1).setFill()
+            rect.fill()
+            return true
+        }
+        let icons = [IslandStatusIcon(id: "combined", content: .combined(image), tooltip: "Monitor")]
+            + (0..<20).map { IslandStatusIcon(id: "cpu-\($0)",
+                content: .metric(.cpu, text: "20%", image: nil, style: .detailed), tooltip: "CPU") }
+        fixture.presenter.setStatusIcons(icons)
+        for dimension: CGFloat in [280, 900] {
+            let snapshot = ScreenSnapshot(displayID: 7,
+                frame: CGRect(x: 20000, y: 0, width: dimension, height: dimension),
+                visibleFrame: CGRect(x: 20000, y: 0, width: dimension, height: dimension))
+            let frame = try #require(fixture.presenter.compactFrame(for: snapshot, notices: []))
+            #expect((edge.isVertical ? frame.height : frame.width) == min(480, dimension - 16))
+            let bitmap = try await renderOffscreen(IslandStatusIconStrip(icons: icons, edge: edge, date: .distantPast), size: frame.size)
+            let scale = CGFloat(bitmap.pixelsWide) / frame.width
+            let axisLength = edge.isVertical ? bitmap.pixelsHigh : bitmap.pixelsWide
+            let crossLength = edge.isVertical ? bitmap.pixelsWide : bitmap.pixelsHigh
+            var endPixels = 0
+            var firstIconPixels = 0
+            for axis in 0..<axisLength {
+                for cross in 0..<crossLength {
+                    let color = try #require(bitmap.colorAt(x: edge.isVertical ? cross : axis,
+                        y: edge.isVertical ? axis : cross))
+                    if max(color.redComponent, color.greenComponent, color.blueComponent) > 0.5 {
+                        if axis < Int(8 * scale) || axis >= axisLength - Int(8 * scale) { endPixels += 1 }
+                        if axis < Int(44 * scale), color.redComponent > 0.5 && color.greenComponent < 0.2 { firstIconPixels += 1 }
+                    }
+                }
+            }
+            #expect(endPixels == 0, "Clipping long icon rows must preserve both 8pt outer insets")
+            #expect(firstIconPixels > 100, "The leading combined icon must remain visible at the fixed size")
+        }
+        #expect(fixture.presenter.compactConfiguration(for: [], at: .distantPast).statusIconSize != nil)
+    }
+
     @Test @MainActor
     func globalBindingPersistsWithoutChangingTheIndividualFeatureSelections() throws {
         let suite = "StatusIconDestinationIntegrationTests.\(UUID().uuidString)"
@@ -546,7 +587,7 @@ struct StatusIconDestinationIntegrationTests {
         fixture.presenter.setStatusIcons([IslandStatusIcon(id: "network", content: .metric(.network,
             text: String(repeating: "1", count: 1000), image: nil, style: .detailed), tooltip: "Network")])
         let frame = try #require(fixture.presenter.compactFrame(for: fixture.screen, notices: []))
-        #expect(frame.height == fixture.screen.frame.height - 16)
+        #expect(frame.height == ScreenLayoutConfiguration.quickActionRowWidth)
         #expect(fixture.screen.frame.contains(frame))
     }
 

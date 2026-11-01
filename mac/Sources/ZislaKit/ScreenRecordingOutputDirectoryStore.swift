@@ -4,18 +4,22 @@ import Foundation
 public final class ScreenRecordingOutputDirectoryStore {
     public private(set) var directory: URL
     private let defaults: UserDefaults
-    private static let bookmarkKey = "screen-recording-directory-bookmark"
-    private static let pathKey = "screen-recording-directory-path"
+    private let bookmarkKey: String
+    private let pathKey: String?
     private var scopedDirectory: URL?
 
-    public init(defaults: UserDefaults = .standard) {
+    public init(defaults: UserDefaults = .standard,
+                bookmarkKey: String = "screen-recording-directory-bookmark",
+                pathKey: String? = "screen-recording-directory-path") {
         self.defaults = defaults
+        self.bookmarkKey = bookmarkKey
+        self.pathKey = pathKey
         var stale = false
-        if let bookmark = defaults.data(forKey: Self.bookmarkKey),
+        if let bookmark = defaults.data(forKey: bookmarkKey),
            let resolved = try? URL(resolvingBookmarkData: bookmark,
                options: [.withSecurityScope, .withoutUI], relativeTo: nil, bookmarkDataIsStale: &stale) {
             directory = resolved.standardizedFileURL
-        } else if let path = defaults.string(forKey: Self.pathKey), !path.isEmpty {
+        } else if let pathKey, let path = defaults.string(forKey: pathKey), !path.isEmpty {
             directory = URL(fileURLWithPath: path, isDirectory: true).standardizedFileURL
         } else {
             directory = AppPaths.downloads
@@ -35,8 +39,8 @@ public final class ScreenRecordingOutputDirectoryStore {
             }
             let bookmark = try directory.bookmarkData(options: .withSecurityScope,
                 includingResourceValuesForKeys: nil, relativeTo: nil)
-            defaults.set(bookmark, forKey: Self.bookmarkKey)
-            defaults.set(directory.path, forKey: Self.pathKey)
+            defaults.set(bookmark, forKey: bookmarkKey)
+            if let pathKey { defaults.set(directory.path, forKey: pathKey) }
             scopedDirectory?.stopAccessingSecurityScopedResource()
             scopedDirectory = accessing ? directory : nil
             self.directory = directory
