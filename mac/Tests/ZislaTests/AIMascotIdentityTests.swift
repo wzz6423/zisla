@@ -35,6 +35,12 @@ struct AIMascotIdentityTests {
 
     @Test
     func mapsDesktopProvidersAndTheirActivityNotices() {
+        #expect(AIMascotIdentity(provider: .cursor, taskID: "cursor-session-example") == .cursor)
+        #expect(AIMascotIdentity(provider: .grokBot, taskID: "grok-bot-example") == .grokBot)
+        #expect(AIMascotIdentity(provider: .muse, taskID: "muse-example") == .muse)
+        #expect(AIMascotIdentity(noticeID: "ai-active-cursor-cursor-session-example") == .cursor)
+        #expect(AIMascotIdentity(noticeID: "ai-active-grok-bot-grok-bot-example") == .grokBot)
+        #expect(AIMascotIdentity(noticeID: "ai-active-muse-muse-example") == .muse)
         #expect(AIMascotIdentity(provider: .delta, taskID: "delta-thread-example") == .delta)
         #expect(AIMascotIdentity(provider: .orca, taskID: "orca-pane-example") == .orca)
         #expect(AIMascotIdentity(provider: .workbuddy, taskID: "workbuddy-session-example") == .workbuddy)

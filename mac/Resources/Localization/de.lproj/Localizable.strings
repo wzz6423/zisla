@@ -3110,3 +3110,10 @@
 "未知导入时间" = "Unbekannte Importzeit";
 "未知拍摄时间" = "Unbekannte Aufnahmezeit";
 "已跳过 %d 个重复素材" = "%d doppelte Medien übersprungen";
+
+"剩余额度" = "Verbleibendes Kontingent";
+"套餐额度" = "Tarifkontingent";
+"5 小时额度" = "5-Stunden-Kontingent";
+"每周额度" = "Wochenkontingent";
+"额度重置：%@" = "Kontingent zurückgesetzt: %@";
+"试用额度" = "Testkontingent";

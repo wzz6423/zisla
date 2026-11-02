@@ -99,6 +99,9 @@ enum AIMascotIdentity: String, CaseIterable, Identifiable {
     case harness
     case deepseekHarness
     case doubao
+    case cursor
+    case grokBot
+    case muse
 
     var id: Self { self }
 
@@ -141,6 +144,9 @@ enum AIMascotIdentity: String, CaseIterable, Identifiable {
         case .pi: self = .pi
         case .harness: self = .harness
         case .doubao: self = .doubao
+        case .cursor: self = .cursor
+        case .grokBot: self = .grokBot
+        case .muse: self = .muse
         }
     }
 
@@ -216,6 +222,9 @@ enum AIMascotIdentity: String, CaseIterable, Identifiable {
         case .harness: .harness
         case .deepseekHarness: nil
         case .doubao: .doubao
+        case .cursor: .cursor
+        case .grokBot: .grokBot
+        case .muse: .muse
         }
     }
 
@@ -225,7 +234,7 @@ enum AIMascotIdentity: String, CaseIterable, Identifiable {
     }
 
     fileprivate var usesMonochromeProviderAsset: Bool {
-        self == .grok || self == .gpt || self == .copilot || self == .opencode || self == .pi
+        self == .grok || self == .grokBot || self == .cursor || self == .gpt || self == .copilot || self == .opencode || self == .pi
     }
 
 }
@@ -306,7 +315,7 @@ struct AIMascotView: View {
                     NSWorkspace.shared.icon(forFile: $0.path)
                 }
             }
-        case .delta, .orca, .workbuddy, .workbuddyAI:
+        case .delta, .orca, .workbuddy, .workbuddyAI, .cursor, .grokBot:
             guard let provider = identity.provider else { return nil }
             return imageCache.image(for: "installed|desktop-\(provider.rawValue)") {
                 AIMascotLibrary.installedDesktopAgentApplicationURL(for: provider).map {

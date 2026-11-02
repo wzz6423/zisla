@@ -38,6 +38,8 @@ enum ProviderBrand {
         case .pi: Color(red: 0.95, green: 0.68, blue: 0.28)
         case .harness: Color(red: 0.90, green: 0.45, blue: 0.50)
         case .doubao: Color(red: 0.35, green: 0.72, blue: 1.00)
+        case .cursor, .grokBot: .primary
+        case .muse: Color(red: 0.02, green: 0.41, blue: 0.88)
         }
     }
 }

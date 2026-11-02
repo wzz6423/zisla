@@ -3108,3 +3108,10 @@
 "未知导入时间" = "Unknown import time";
 "未知拍摄时间" = "Unknown capture time";
 "已跳过 %d 个重复素材" = "Skipped %d duplicate media items";
+
+"剩余额度" = "Remaining quota";
+"套餐额度" = "Plan quota";
+"5 小时额度" = "5-hour quota";
+"每周额度" = "Weekly quota";
+"额度重置：%@" = "Quota resets: %@";
+"试用额度" = "Trial quota";
