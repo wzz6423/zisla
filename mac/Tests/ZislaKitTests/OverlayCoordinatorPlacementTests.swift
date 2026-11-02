@@ -366,7 +366,7 @@ struct OverlayCoordinatorPlacementTests {
         let original = try #require(coordinator.activeLayout)
         coordinator.updateCompactStatus(expandsForDetailedStatus: true, compactStatusLength: 32)
         let detailed = try #require(coordinator.activeLayout)
-        #expect(detailed.collapsedFrame.size == CGSize(width: 240, height: 40))
+        #expect(detailed.collapsedFrame.size == CGSize(width: 240, height: 32))
         #expect(detailed.collapsedFrame.midX == original.collapsedFrame.midX)
         #expect(detailed.collapsedFrame.midY == original.collapsedFrame.midY)
         coordinator.updateCompactStatus(expandsForDetailedStatus: false, compactStatusLength: 32)

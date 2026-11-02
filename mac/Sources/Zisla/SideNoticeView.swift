@@ -218,6 +218,7 @@ struct CompactStatusBarView: View {
 
                     } else {
                         compactStatusContent
+                            .padding(.horizontal, settingsStore.settings.islandLayoutStyle == .pill ? 10 : 0)
                     }
                 }
             }

@@ -118,7 +118,7 @@ public enum TopTopology: Equatable, Sendable {
 public struct ScreenLayoutConfiguration: Equatable, Sendable {
     public static let quickActionRowWidth = ScreenLayoutConfiguration().expandedSize.width + 60
     public static let cameraPillCenterWidth: CGFloat = 120
-    public static let cameraPillHeight: CGFloat = 40
+    public static let cameraPillHeight: CGFloat = 32
     public static let cameraPillMaximumWidth: CGFloat = 240
 
     /// Width of the simulated island and its fallback height when the menu bar
@@ -430,7 +430,9 @@ public struct ScreenLayoutEngine: Equatable, Sendable {
         }
 
         if isCamera {
-            anchor.origin.y = clampedOrigin(screen.frame.maxY - menuBarHeight / 2 - anchor.height / 2,
+            // Preserve the top edge of the previous 40pt pill while trimming its bottom.
+            let top = screen.frame.maxY - menuBarHeight / 2 + 20
+            anchor.origin.y = clampedOrigin(top - anchor.height,
                 length: anchor.height, minimum: bounds.minY, maximum: bounds.maxY)
         }
         anchor = Self.compactPillFrame(
