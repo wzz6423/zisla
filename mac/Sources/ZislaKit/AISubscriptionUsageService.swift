@@ -28,7 +28,7 @@ enum AISubscriptionUsageError: Error, Equatable {
     case historyLimitExceeded
 }
 
-/// Native adaptation of CodexBar's Cursor usage fetcher, Sand status and Muse plugin (MIT).
+/// Native adaptation of CodexBar's Cursor usage fetcher and Muse plugin (MIT).
 public final class AISubscriptionUsageService: AISubscriptionUsageDetecting {
     private let cursorCookie: @Sendable () throws -> String?
     private let museToken: @Sendable () throws -> String?
@@ -95,20 +95,13 @@ public final class AISubscriptionUsageService: AISubscriptionUsageDetecting {
         do {
             guard let credential = try cursorCookie() else { return .init() }
             cookie = credential
-        } catch { return .init(failedProviders: [.cursor, .grokBot], failedUsageProviders: [.cursor]) }
+        } catch { return .init(failedProviders: [.cursor], failedUsageProviders: [.cursor]) }
         return await withTaskGroup(of: AISubscriptionUsageRefresh.self) { group in
             group.addTask {
                 do {
                     let data = try await self.request("https://cursor.com/api/usage-summary", cookie: cookie)
                     return .init(quotas: try Self.cursorQuotas(data: data, now: self.now()))
                 } catch { return .init(failedProviders: [.cursor]) }
-            }
-            group.addTask {
-                do {
-                    let data = try await self.request("https://cursor.com/api/dashboard/get-sand-usage-status", cookie: cookie, body: [:])
-                    let status = try JSONDecoder().decode(CursorSandUsageStatus.self, from: data)
-                    return .init(quotas: status.quota(now: self.now()).map { [$0] } ?? [])
-                } catch { return .init(failedProviders: [.grokBot]) }
             }
             group.addTask {
                 do { return .init(usageSamples: try await self.cursorHistory(cookie: cookie)) }
@@ -319,25 +312,6 @@ public final class AISubscriptionUsageService: AISubscriptionUsageDetecting {
 
     private static func integer(_ value: Any?) -> Int? {
         number(value).flatMap { $0 < Double(Int.max) ? Int(exactly: $0) : nil }
-    }
-}
-
-/// Retains CodexBar's verified Sand response fields; an expired trial is not a paid allowance.
-struct CursorSandUsageStatus: Decodable, Sendable {
-    let nextResetTimestampUtc: String?
-    let usagePercent: Double?
-    let hasNonZeroIncludedLimit: Bool?
-    let includedLimitZero: Bool?
-    let sandTrialExpiresAt: String?
-
-    func quota(now: Date) -> AIQuotaSnapshot? {
-        let hasLimit = includedLimitZero.map { !$0 } ?? hasNonZeroIncludedLimit
-        let hasTrial = hasLimit != true && AISubscriptionUsageService.date(sandTrialExpiresAt).map { $0 > now } == true
-        guard hasLimit == true || hasTrial, let usagePercent, usagePercent.isFinite, usagePercent >= 0 else { return nil }
-        let resetsAt = hasTrial ? nil : AISubscriptionUsageService.date(nextResetTimestampUtc)
-        if let resetsAt, resetsAt <= now { return nil }
-        return .init(provider: .grokBot, window: hasTrial ? .trial : .weekly, usedPercent: min(100, usagePercent),
-            resetsAt: resetsAt, checkedAt: now)
     }
 }
 

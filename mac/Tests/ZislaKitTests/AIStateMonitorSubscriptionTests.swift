@@ -8,9 +8,9 @@ struct AIStateMonitorSubscriptionTests {
         #expect(AIStateMonitor.defaultActivityDetectors().contains { $0 is CursorSessionActivityDetector })
     }
 
-    @Test @MainActor func defaultActivityDetectorsIncludeGrokBotSeparatelyFromGrokCLI() {
+    @Test @MainActor func defaultActivityDetectorsExcludeUnavailableGrokBotAndRetainGrokCLI() {
         let detectors = AIStateMonitor.defaultActivityDetectors()
-        #expect(detectors.contains { $0 is GrokBotSessionActivityDetector })
+        #expect(!detectors.contains { String(describing: type(of: $0)) == "GrokBotSessionActivityDetector" })
         #expect(detectors.contains { $0 is GrokSessionActivityDetector })
     }
 
@@ -21,7 +21,7 @@ struct AIStateMonitorSubscriptionTests {
         let sample = AIUsageSample(sourceID: "fixture-remote", provider: .cursor, timestamp: currentTime, inputTokens: 10, outputTokens: 5)
         let quota = AIQuotaSnapshot(provider: .cursor, window: .plan, usedPercent: 20, resetsAt: nil, checkedAt: currentTime)
         let subscription = SubscriptionGate(result: .init(quotas: [quota], usageSamples: [sample],
-            failedProviders: [.grokBot], failedUsageProviders: [.muse]))
+            failedProviders: [.muse], failedUsageProviders: [.cursor]))
         let task = AIProgressTask(id: "fixture-active", provider: .cursor, title: "fixture", progress: nil, updatedAt: currentTime)
         let activity = SubscriptionActivityFixture(task: task)
         let monitor = AIStateMonitor(directoryURL: root, activityDetectors: [activity],
@@ -33,7 +33,7 @@ struct AIStateMonitorSubscriptionTests {
         #expect(await subscription.calls == 1)
         await subscription.release()
         #expect(await waitFor { monitor.quotas == [quota] })
-        #expect(monitor.failedQuotaProviders == [.grokBot] && monitor.failedUsageProviders == [.muse])
+        #expect(monitor.failedQuotaProviders == [.muse] && monitor.failedUsageProviders == [.cursor])
         let repository = AIStateRepository(directoryURL: root)
         #expect(await waitFor { (try? repository.load().usageSamples.reduce(0) { $0 + $1.totalTokens }) == 15 })
         monitor.loadUsageHistory()

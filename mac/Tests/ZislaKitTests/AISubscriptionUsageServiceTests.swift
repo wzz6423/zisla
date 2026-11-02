@@ -7,28 +7,28 @@ import Testing
 struct AISubscriptionUsageServiceTests {
     private let now = Date(timeIntervalSince1970: 1_910_000_000)
     private let summary = #"{"individualUsage":{"plan":{"totalPercentUsed":0.36}},"billingCycleEnd":"2031-01-01T00:00:00Z"}"#
-    private let sand = #"{"usagePercent":25,"includedLimitZero":false,"nextResetTimestampUtc":"2031-01-01T00:00:00Z"}"#
     private let muse = #"{"is_subs_active":true,"require_payment":false,"subs_usage":{"window":{"window_duration_mins":300,"used_percent":40,"resets_at":2000000000},"weekly":{"used_percent":12.5,"resets_at":2000000010}}}"#
 
     @Test func refreshUsesVendorContractsAndKeepsCredentialsOutOfResults() async throws {
         SubscriptionURLProtocol.configure(responses: [
             "/api/usage-summary": [.json(summary)],
-            "/api/dashboard/get-sand-usage-status": [.json(sand)],
             "/api/dashboard/get-filtered-usage-events": [.json(history([event(input: 10, output: 20)], count: 1))],
             "/muse-code/key": [.json(muse)],
         ])
         let service = makeService()
         let result = await service.subscriptionUsage()
         #expect(result.failedProviders.isEmpty && result.failedUsageProviders.isEmpty)
-        #expect(result.quotas.count == 4)
+        #expect(result.quotas.count == 3)
         #expect(result.quotas.first { $0.provider == .cursor }?.usedPercent == 0.36)
-        #expect(result.quotas.first { $0.provider == .grokBot }?.remainingPercent == 75)
+        #expect(result.quotas.allSatisfy { $0.provider != .grokBot })
+        #expect(result.usageSamples.allSatisfy { $0.provider == .cursor })
         let sample = try #require(result.usageSamples.first)
         #expect(sample.inputTokens == 17 && sample.outputTokens == 20 && sample.totalTokens == 37)
         #expect(sample.timestamp == Date(timeIntervalSince1970: 1_909_999_990))
         #expect(!(sample.sourceID ?? "").contains("fixture-cookie"))
         let requests = SubscriptionURLProtocol.requests
-        #expect(requests.count == 4)
+        #expect(requests.count == 3)
+        #expect(!requests.contains { $0.url?.path == "/api/dashboard/get-sand-usage-status" })
         for request in requests where request.url?.host == "cursor.com" {
             #expect(request.value(forHTTPHeaderField: "Cookie") == "fixture-cookie")
             #expect(request.value(forHTTPHeaderField: "Origin") == "https://cursor.com")
@@ -53,7 +53,7 @@ struct AISubscriptionUsageServiceTests {
         #expect(absent.quotas.isEmpty && absent.failedProviders.isEmpty)
         #expect(SubscriptionURLProtocol.requests.isEmpty)
         let invalid = await makeService(cursor: { throw AISubscriptionUsageError.invalidCredentials }, muse: { nil }).subscriptionUsage()
-        #expect(invalid.failedProviders == [.cursor, .grokBot])
+        #expect(invalid.failedProviders == [.cursor])
         #expect(invalid.failedUsageProviders == [.cursor])
         #expect(SubscriptionURLProtocol.requests.isEmpty)
     }
@@ -62,13 +62,12 @@ struct AISubscriptionUsageServiceTests {
     func independentEndpointFailureDoesNotDiscardHealthySources(status: Int) async {
         SubscriptionURLProtocol.configure(responses: [
             "/api/usage-summary": [.json(summary)],
-            "/api/dashboard/get-sand-usage-status": [.init(status: status, body: "private-server-body")],
             "/api/dashboard/get-filtered-usage-events": [.json("{}")],
-            "/muse-code/key": [.json(muse)],
+            "/muse-code/key": [.init(status: status, body: "private-server-body")],
         ])
         let result = await makeService().subscriptionUsage()
-        #expect(result.failedProviders == [.grokBot])
-        #expect(result.quotas.count == 3 && result.failedUsageProviders.isEmpty)
+        #expect(result.failedProviders == [.muse])
+        #expect(result.quotas.map(\.provider) == [.cursor] && result.failedUsageProviders.isEmpty)
         #expect(!String(describing: result).contains("private-server-body"))
         #expect(!String(describing: result).contains("fixture-token"))
     }
@@ -76,14 +75,13 @@ struct AISubscriptionUsageServiceTests {
     @Test func timeoutAndIncompleteHistoryAreVisibleWithoutFailingQuota() async {
         SubscriptionURLProtocol.configure(responses: [
             "/api/usage-summary": [.json(summary)],
-            "/api/dashboard/get-sand-usage-status": [.json(sand)],
             "/api/dashboard/get-filtered-usage-events": [.json(history([event(input: 1, output: 2)], count: 2))],
             "/muse-code/key": [.init(error: .timedOut)],
         ])
         let result = await makeService().subscriptionUsage()
         #expect(result.failedProviders == [.muse])
         #expect(result.failedUsageProviders == [.cursor])
-        #expect(result.usageSamples.isEmpty && result.quotas.count == 2)
+        #expect(result.usageSamples.isEmpty && result.quotas.count == 1)
     }
 
     @Test func paginationRequiresTerminalPageAndStableAuthoritativeCount() async {
@@ -97,7 +95,6 @@ struct AISubscriptionUsageServiceTests {
         ] {
             SubscriptionURLProtocol.configure(responses: [
                 "/api/usage-summary": [.json(summary)],
-                "/api/dashboard/get-sand-usage-status": [.json(sand)],
                 "/api/dashboard/get-filtered-usage-events": pages.map { .json($0) },
             ])
             let result = await makeService(muse: { nil }, maximumPages: 3, pageSize: 1).subscriptionUsage()
@@ -108,7 +105,7 @@ struct AISubscriptionUsageServiceTests {
             }
         }
         SubscriptionURLProtocol.configure(responses: [
-            "/api/usage-summary": [.json(summary)], "/api/dashboard/get-sand-usage-status": [.json(sand)],
+            "/api/usage-summary": [.json(summary)],
             "/api/dashboard/get-filtered-usage-events": [.json(history([first], count: 1))],
         ])
         let capped = await makeService(muse: { nil }, maximumPages: 1, pageSize: 1).subscriptionUsage()
@@ -118,12 +115,11 @@ struct AISubscriptionUsageServiceTests {
     @Test func unexpectedResponseURLCannotPublishCredentialedData() async {
         SubscriptionURLProtocol.configure(responses: [
             "/api/usage-summary": [.init(body: summary, responseURL: "https://untrusted.example/api/usage-summary")],
-            "/api/dashboard/get-sand-usage-status": [.json(sand)],
             "/api/dashboard/get-filtered-usage-events": [.json("{}")],
         ])
         let result = await makeService(muse: { nil }).subscriptionUsage()
         #expect(result.failedProviders == [.cursor])
-        #expect(result.quotas.map(\.provider) == [.grokBot])
+        #expect(result.quotas.isEmpty)
     }
 
     @Test func cursorAllowanceFallbacksAndStaleResponsesAreValidated() throws {
@@ -162,17 +158,6 @@ struct AISubscriptionUsageServiceTests {
                 try AISubscriptionUsageService.museQuotas(data: Data(invalid.utf8), now: now)
             }
         }
-    }
-
-    @Test func sandTrialIsNotAWeeklyRenewalAndExplicitZeroLimitWins() throws {
-        let trial = try JSONDecoder().decode(CursorSandUsageStatus.self, from: Data(
-            #"{"usagePercent":25,"includedLimitZero":true,"hasNonZeroIncludedLimit":true,"sandTrialExpiresAt":"2031-01-01T00:00:00Z","nextResetTimestampUtc":"2031-01-01T00:00:00Z"}"#.utf8))
-        #expect(trial.quota(now: now)?.resetsAt == nil)
-        #expect(trial.quota(now: now)?.window == .trial)
-        #expect(trial.quota(now: Date(timeIntervalSince1970: 2_000_000_000)) == nil)
-        let unavailable = try JSONDecoder().decode(CursorSandUsageStatus.self, from: Data(
-            #"{"usagePercent":0,"includedLimitZero":true,"hasAvailableUsage":true}"#.utf8))
-        #expect(unavailable.quota(now: now) == nil)
     }
 
     @Test func cursorSamplesKeepAccountTimeAndStableIdentityAndRejectOverflow() throws {
@@ -224,11 +209,10 @@ struct AISubscriptionUsageServiceTests {
     @Test func exhaustedHistoryBudgetAndCancelledRefreshDoNotIssueHistoryRequests() async {
         SubscriptionURLProtocol.configure(responses: [
             "/api/usage-summary": [.json(summary)],
-            "/api/dashboard/get-sand-usage-status": [.json(sand)],
         ])
         let exhausted = await makeService(muse: { nil }, historyDuration: .zero).subscriptionUsage()
         #expect(exhausted.failedUsageProviders == [.cursor] && exhausted.usageSamples.isEmpty)
-        #expect(SubscriptionURLProtocol.requests.count == 2)
+        #expect(SubscriptionURLProtocol.requests.count == 1)
         #expect(SubscriptionURLProtocol.requests.allSatisfy { $0.url?.path.contains("get-filtered") != true })
         SubscriptionURLProtocol.configure(responses: [:])
         let task = Task {

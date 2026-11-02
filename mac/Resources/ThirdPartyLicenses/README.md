@@ -94,14 +94,14 @@ Zisla implements these workflows in Swift using its own project model and
 existing AI settings. No upstream application, Electron runtime, or remote
 build dependency is bundled.
 
-Cursor account usage, Grok Bot (Sand) quota, Muse Code usage and credentials,
+Cursor account usage, Muse Code usage and credentials,
 and Chromium Safe Storage decoding are adapted from CodexBar:
 
 https://github.com/steipete/CodexBar
 
 Pinned revision: `d253dd1137242889804326a89972dfa21cda4722`.
 Relevant sources are `CursorAppAuth.swift`, `CursorUsageEventsFetcher.swift`,
-`CursorStatusProbe+UsageSummary.swift`, `CursorSandUsage.swift`,
+`CursorStatusProbe+UsageSummary.swift`,
 `MuseLocalUsageReader.swift`, `MuseCredentials.swift`, the `muse.ts` provider
 plugin, `ChromiumSafeStorage.swift`, and `KeychainAccessPreflight.swift`.
 Copyright (c) 2026 Peter Steinberger. Licensed under the MIT License.
@@ -115,16 +115,6 @@ Pinned revision: `9586c5518398d43b34cc73af70b237324d953d39`.
 Relevant sources are `docs/sources/cursor.md` and
 `crates/chat-stasher/src/activity.rs`. Licensed under the Apache License 2.0.
 See `ChatStasher-LICENSE.txt` in this directory.
-
-Grok Bot client replica discovery and Base32 filename encoding are adapted
-from Vibe Replay:
-
-https://github.com/tuo-lei/vibe-replay
-
-Pinned revision: `6ab70213c04712c18f082c8123da77aa4c8389a8`.
-Relevant sources are `packages/provider-grok-bot/src/grok-bot/config.ts`,
-`replica.ts`, and `base32.ts`. Copyright (c) 2026 Tuo Lei.
-Licensed under the MIT License. See `VibeReplay-LICENSE.txt` in this directory.
 
 These adaptations retain native macOS metadata and account quota reading.
 They use Zisla's existing read-only SQLite, incremental JSONL reader, usage
