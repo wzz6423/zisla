@@ -3143,3 +3143,10 @@
 "截图与录屏" = "Ekran görüntüleri ve kayıt";
 "推荐与反馈更新" = "Öneriler, geri bildirim ve güncellemeler";
 "反馈更新" = "Geri bildirim ve güncellemeler";
+
+"剩余额度" = "Kalan kota";
+"套餐额度" = "Plan kotası";
+"5 小时额度" = "5 saatlik kota";
+"每周额度" = "Haftalık kota";
+"额度重置：%@" = "Kota sıfırlanır: %@";
+"试用额度" = "Deneme kotası";

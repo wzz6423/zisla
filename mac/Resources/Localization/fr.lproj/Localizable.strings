@@ -3139,3 +3139,10 @@
 "截图与录屏" = "Captures et enregistrements";
 "推荐与反馈更新" = "Recommandations, retours et mises à jour";
 "反馈更新" = "Retours et mises à jour";
+
+"剩余额度" = "Quota restant";
+"套餐额度" = "Quota du forfait";
+"5 小时额度" = "Quota de 5 heures";
+"每周额度" = "Quota hebdomadaire";
+"额度重置：%@" = "Réinitialisation du quota : %@";
+"试用额度" = "Quota d’essai";

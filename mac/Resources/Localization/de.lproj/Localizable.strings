@@ -3144,3 +3144,10 @@
 "截图与录屏" = "Screenshots und Bildschirmaufnahmen";
 "推荐与反馈更新" = "Empfehlungen, Feedback und Updates";
 "反馈更新" = "Feedback und Updates";
+
+"剩余额度" = "Verbleibendes Kontingent";
+"套餐额度" = "Tarifkontingent";
+"5 小时额度" = "5-Stunden-Kontingent";
+"每周额度" = "Wochenkontingent";
+"额度重置：%@" = "Kontingent zurückgesetzt: %@";
+"试用额度" = "Testkontingent";

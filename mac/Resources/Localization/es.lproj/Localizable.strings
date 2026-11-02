@@ -3143,3 +3143,10 @@
 "截图与录屏" = "Capturas y grabaciones de pantalla";
 "推荐与反馈更新" = "Recomendaciones, comentarios y actualizaciones";
 "反馈更新" = "Comentarios y actualizaciones";
+
+"剩余额度" = "Cuota restante";
+"套餐额度" = "Cuota del plan";
+"5 小时额度" = "Cuota de 5 horas";
+"每周额度" = "Cuota semanal";
+"额度重置：%@" = "La cuota se restablece: %@";
+"试用额度" = "Cuota de prueba";

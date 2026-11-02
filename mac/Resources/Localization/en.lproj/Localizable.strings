@@ -3142,3 +3142,10 @@
 "截图与录屏" = "Screenshots & Recording";
 "推荐与反馈更新" = "Recommendations, Feedback & Updates";
 "反馈更新" = "Feedback & Updates";
+
+"剩余额度" = "Remaining quota";
+"套餐额度" = "Plan quota";
+"5 小时额度" = "5-hour quota";
+"每周额度" = "Weekly quota";
+"额度重置：%@" = "Quota resets: %@";
+"试用额度" = "Trial quota";

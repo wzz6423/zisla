@@ -3143,3 +3143,10 @@
 "截图与录屏" = "Tangkapan dan perekaman layar";
 "推荐与反馈更新" = "Rekomendasi, umpan balik, dan pembaruan";
 "反馈更新" = "Umpan balik dan pembaruan";
+
+"剩余额度" = "Kuota tersisa";
+"套餐额度" = "Kuota paket";
+"5 小时额度" = "Kuota 5 jam";
+"每周额度" = "Kuota mingguan";
+"额度重置：%@" = "Kuota direset: %@";
+"试用额度" = "Kuota uji coba";

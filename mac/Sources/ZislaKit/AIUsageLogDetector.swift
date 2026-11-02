@@ -46,6 +46,7 @@ public final class AIUsageLogDetector: AIUsageDetecting {
     public let grokSessionsDirectory: URL
     public let qwenProjectsDirectory: URL
     public let piSessionsDirectory: URL
+    public let museSessionsDirectory: URL
     public let qoderRoots: [URL]
     public let copilotUsageLogRoots: [URL]
     public let maxFilesPerProvider: Int
@@ -80,6 +81,7 @@ public final class AIUsageLogDetector: AIUsageDetecting {
         grokSessionsDirectory: URL? = nil,
         qwenProjectsDirectory: URL? = nil,
         piSessionsDirectory: URL? = nil,
+        museSessionsDirectory: URL? = nil,
         qoderRoots: [URL]? = nil,
         copilotUsageLogRoots: [URL]? = nil,
         maxFilesPerProvider: Int = .max,
@@ -103,6 +105,7 @@ public final class AIUsageLogDetector: AIUsageDetecting {
             ?? home.appendingPathComponent(".qwen/projects", isDirectory: true)
         self.piSessionsDirectory = piSessionsDirectory
             ?? home.appendingPathComponent(".pi/agent/sessions", isDirectory: true)
+        self.museSessionsDirectory = museSessionsDirectory ?? MuseUsageParser.defaultSessionsDirectory(home: home)
         self.qoderRoots = qoderRoots
             ?? QoderSessionActivityDetector.defaultConfigRoots(home: home, fileManager: fileManager)
         self.copilotUsageLogRoots = copilotUsageLogRoots ?? [
@@ -197,6 +200,7 @@ public final class AIUsageLogDetector: AIUsageDetecting {
             provider: .pi,
             root: piSessionsDirectory
         ))
+        result.append(contentsOf: candidates(provider: .muse, root: museSessionsDirectory))
         for root in qoderRoots {
             result.append(contentsOf: candidates(provider: .coder, root: root))
         }
@@ -290,7 +294,9 @@ public final class AIUsageLogDetector: AIUsageDetecting {
             return true
         case .pi:
             return url.lastPathComponent.hasSuffix(".jsonl")
-        case .kimi, .zcode, .zed, .trae, .opencode, .harness, .doubao, .delta, .orca, .workbuddy, .workbuddyAI:
+        case .muse:
+            return url.lastPathComponent == "session.jsonl"
+        case .kimi, .zcode, .zed, .trae, .opencode, .harness, .doubao, .delta, .orca, .workbuddy, .workbuddyAI, .cursor, .grokBot:
             return false
         case .codex, .claude, .qwen, .gpt:
             return true
@@ -381,13 +387,13 @@ public final class AIUsageLogDetector: AIUsageDetecting {
         case .grok:
             var parserState = ParserState()
             samples = roots.flatMap { parseRoot(from: $0, candidate: candidate, parserState: &parserState) }
-        case .gemini, .qwen, .coder, .gpt, .copilot, .pi:
+        case .gemini, .qwen, .coder, .gpt, .copilot, .pi, .muse:
             var parserState = ParserState()
             samples = roots.flatMap { parseRoot(from: $0, candidate: candidate, parserState: &parserState) }
             if parserState.copilotHasDetailedUsage {
                 samples.removeAll(where: isCopilotShutdownSummary)
             }
-        case .kimi, .zcode, .zed, .trae, .opencode, .harness, .doubao, .delta, .orca, .workbuddy, .workbuddyAI:
+        case .kimi, .zcode, .zed, .trae, .opencode, .harness, .doubao, .delta, .orca, .workbuddy, .workbuddyAI, .cursor, .grokBot:
             return []
         }
         return Array(samples.suffix(maxSamplesPerFile))
@@ -508,7 +514,9 @@ public final class AIUsageLogDetector: AIUsageDetecting {
             return parseCopilot(root, candidate: candidate, parserState: &parserState)
         case .pi:
             return parsePi(root, candidate: candidate).map { [$0] } ?? []
-        case .kimi, .zcode, .zed, .trae, .opencode, .harness, .doubao, .delta, .orca, .workbuddy, .workbuddyAI:
+        case .muse:
+            return MuseUsageParser.sample(from: root).map { [$0] } ?? []
+        case .kimi, .zcode, .zed, .trae, .opencode, .harness, .doubao, .delta, .orca, .workbuddy, .workbuddyAI, .cursor, .grokBot:
             return []
         }
     }
