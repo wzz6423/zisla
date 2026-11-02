@@ -53,3 +53,8 @@ which serves its official icon straight from `douyin.com`.
 Platforms without a bundled asset fall back to the site's own favicon, fetched at runtime from that
 site and cached under `Application Support/favicons/`. Product names and logos remain trademarks of
 their respective owners; they are used here only to identify a download's source.
+
+`cursor.svg` and `muse.svg` are the unmodified provider icons from CodexBar at
+revision `d253dd1137242889804326a89972dfa21cda4722`, distributed under the MIT
+License. See `../ThirdPartyLicenses/CodexBar-LICENSE.txt`.
+Source: https://github.com/steipete/CodexBar/tree/d253dd1137242889804326a89972dfa21cda4722

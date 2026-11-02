@@ -291,6 +291,12 @@ public enum VoiceLexicon: String, Codable, CaseIterable, Identifiable, Sendable,
             ["Harnext", "Harnext CLI"]
         case .doubao:
             ["豆包", "Doubao"]
+        case .cursor:
+            ["Cursor Agent"]
+        case .grokBot:
+            ["Grok Bot"]
+        case .muse:
+            ["Muse Code"]
         }
     }
 

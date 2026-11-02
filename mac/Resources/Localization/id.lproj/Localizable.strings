@@ -3109,3 +3109,10 @@
 "未知导入时间" = "Waktu impor tidak diketahui";
 "未知拍摄时间" = "Waktu pengambilan tidak diketahui";
 "已跳过 %d 个重复素材" = "%d media duplikat dilewati";
+
+"剩余额度" = "Kuota tersisa";
+"套餐额度" = "Kuota paket";
+"5 小时额度" = "Kuota 5 jam";
+"每周额度" = "Kuota mingguan";
+"额度重置：%@" = "Kuota direset: %@";
+"试用额度" = "Kuota uji coba";

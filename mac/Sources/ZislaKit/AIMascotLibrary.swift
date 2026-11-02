@@ -165,6 +165,8 @@ public enum AIMascotLibrary {
         case .orca: identifier = "com.stablyai.orca"; name = "Orca"
         case .workbuddy: identifier = "com.workbuddy.workbuddy"; name = "WorkBuddy"
         case .workbuddyAI: identifier = "com.workbuddy.workbuddy-ai"; name = "WorkBuddy AI"
+        case .cursor: identifier = "com.todesktop.230313mzl4w4u92"; name = "Cursor"
+        case .grokBot: identifier = "com.anysphere.sand"; name = "Grok Bot"
         default: return nil
         }
         return installedApplicationURL(
@@ -220,6 +222,9 @@ public enum AIMascotLibrary {
         case .pi: "pi.svg"
         case .harness: "workbuddy.icns"
         case .doubao: "doubao.png"
+        case .cursor: "cursor.svg"
+        case .grokBot: "grok.svg"
+        case .muse: "muse.svg"
         }
     }
 
@@ -265,6 +270,9 @@ public enum AIMascotLibrary {
         case .pi: "Pi"
         case .harness: "harnext"
         case .doubao: "豆包"
+        case .cursor: "Cursor"
+        case .grokBot: "Grok Bot"
+        case .muse: "Muse Code"
         }
     }
 

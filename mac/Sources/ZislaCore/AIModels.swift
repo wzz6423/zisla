@@ -22,6 +22,9 @@ public enum AIProvider: String, Codable, CaseIterable, Sendable {
     case orca
     case workbuddy
     case workbuddyAI = "workbuddy-ai"
+    case cursor
+    case grokBot = "grok-bot"
+    case muse
 
     /// Normalises case and common aliases; returns nil for unknown tokens, letting the caller report the error.
     public init?(token: String) {
@@ -67,8 +70,40 @@ public enum AIProvider: String, Codable, CaseIterable, Sendable {
             self = .workbuddy
         case "workbuddy-ai", "workbuddyai", "workbuddy ai":
             self = .workbuddyAI
+        case "cursor", "cursor-agent", "cursor-ide":
+            self = .cursor
+        case "grok-bot", "grok bot", "grokbot", "sand":
+            self = .grokBot
+        case "muse", "muse-code", "meta-muse-code":
+            self = .muse
         default: return nil
         }
+    }
+}
+
+public enum AIQuotaWindow: String, Sendable {
+    case plan
+    case fiveHours
+    case weekly
+    case trial
+}
+
+public struct AIQuotaSnapshot: Equatable, Sendable, Identifiable {
+    public var provider: AIProvider
+    public var window: AIQuotaWindow
+    public var usedPercent: Double
+    public var resetsAt: Date?
+    public var checkedAt: Date
+
+    public var id: String { "\(provider.rawValue)-\(window.rawValue)" }
+    public var remainingPercent: Double { max(0, 100 - usedPercent) }
+
+    public init(provider: AIProvider, window: AIQuotaWindow, usedPercent: Double, resetsAt: Date?, checkedAt: Date) {
+        self.provider = provider
+        self.window = window
+        self.usedPercent = usedPercent
+        self.resetsAt = resetsAt
+        self.checkedAt = checkedAt
     }
 }
 

@@ -12,6 +12,8 @@ struct AIMascotLibraryTests {
             (.orca, "com.stablyai.orca", "Orca", "orca.icns"),
             (.workbuddy, "com.workbuddy.workbuddy", "WorkBuddy", "workbuddy.icns"),
             (.workbuddyAI, "com.workbuddy.workbuddy-ai", "WorkBuddy AI", "workbuddy-ai.icns"),
+            (.cursor, "com.todesktop.230313mzl4w4u92", "Cursor", "cursor.svg"),
+            (.grokBot, "com.anysphere.sand", "Grok Bot", "grok.svg"),
         ]
         // Fixture paths must not infer directoryness from applications installed on the host.
         let applications = URL(fileURLWithPath: "/fixture/Applications", isDirectory: true)
@@ -217,6 +219,9 @@ struct AIMascotLibraryTests {
         #expect(AIMascotLibrary.providerAssetName(for: .doubao) == "doubao.png")
         #expect(AIMascotLibrary.providerAssetName(for: .zcode) == "zcode.icns")
         #expect(AIMascotLibrary.providerAssetName(for: .zed) == "zed.icns")
+        #expect(AIMascotLibrary.providerAssetName(for: .cursor) == "cursor.svg")
+        #expect(AIMascotLibrary.providerAssetName(for: .grokBot) == "grok.svg")
+        #expect(AIMascotLibrary.providerAssetName(for: .muse) == "muse.svg")
     }
 
     @Test
