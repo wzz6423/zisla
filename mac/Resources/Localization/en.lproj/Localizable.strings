@@ -3133,6 +3133,7 @@
 "Liquid Glass" = "Liquid Glass";
 
 "图标显示位置" = "Icon Display Location";
+"机器监控状态显示位置" = "System Monitor Status Display Location";
 "状态栏" = "Menu Bar";
 "灵动岛" = "Dynamic Island";
 "常驻监控图标" = "Persistent Monitor Icons";

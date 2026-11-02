@@ -1231,6 +1231,7 @@ struct FeatureSettingsCompatibilityTests {
             .browserDownload,
             .focusCountdown,
             .toolboxReminder,
+            .systemMonitor,
         ]
 
         let decoded = try JSONDecoder().decode(
@@ -1260,6 +1261,7 @@ struct FeatureSettingsCompatibilityTests {
             .focusMode,
             .toolboxReminder,
             .updateAvailable,
+            .systemMonitor,
         ])
     }
 

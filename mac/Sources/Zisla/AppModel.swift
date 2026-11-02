@@ -478,6 +478,7 @@ final class AppModel: ObservableObject {
   @Published private(set) var mailComposeRequest: MailComposeRequest?
   @Published var collapsedIslandSize = CGSize(width: 240, height: 34)
   @Published var islandScreenLayout: ScreenOverlayLayout?
+  @Published var islandHasSystemMonitorIcons = false
   var onChooseIslandPlacement: (() -> Void)?
   var islandEdge: IslandEdge {
     guard settingsStore.settings.islandLayoutStyle == .pill else { return .top }

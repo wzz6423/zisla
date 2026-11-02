@@ -3135,6 +3135,7 @@
 "Liquid Glass" = "Liquid Glass";
 
 "图标显示位置" = "Symbolposition";
+"机器监控状态显示位置" = "Anzeigeposition des Systemmonitorstatus";
 "状态栏" = "Menüleiste";
 "灵动岛" = "Dynamic Island";
 "常驻监控图标" = "Dauerhafte Überwachungssymbole";

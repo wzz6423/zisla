@@ -391,6 +391,52 @@ struct SideNoticeLayoutTests {
     }
 
     @Test
+    func monitorPriorityRequiresLiveIslandContentAndRespectsUserOrder() {
+        var settings = FeatureSettings.default
+        settings.islandLayoutStyle = .pill
+        settings.islandPlacement = IslandPlacement(mode: .custom, edge: .left)
+        settings.statusIconDestination = .island
+        let notices = [IslandNotice(id: "media-active-left", title: "Music"),
+                       IslandNotice(id: "browser-download-left", title: "Download")]
+        #expect(SideNoticeLayoutEngine.selectedCompactStatusPriority(for: notices,
+            settings: settings, systemMonitorAvailable: true) == .browserDownload)
+        settings.compactStatusPriority = CompactStatusPriority.normalized([.systemMonitor, .media])
+        #expect(SideNoticeLayoutEngine.selectedCompactStatusPriority(for: notices,
+            settings: settings, systemMonitorAvailable: true) == .systemMonitor)
+        #expect(SideNoticeLayoutEngine.selectedCompactStatusPriority(for: notices,
+            settings: settings) == .media)
+        #expect(SideNoticeLayoutEngine.selectedCompactStatusPriority(for: [],
+            settings: settings, systemMonitorAvailable: true) == .systemMonitor)
+        #expect(SideNoticeLayoutEngine.selectedCompactStatusPriority(for: [], settings: settings) == nil)
+
+        settings.systemMonitorEnabled = false
+        #expect(SideNoticeLayoutEngine.selectedCompactStatusPriority(for: notices,
+            settings: settings, systemMonitorAvailable: true) == .media)
+        settings.systemMonitorEnabled = true
+        settings.statusIconDestination = .menuBar
+        #expect(SideNoticeLayoutEngine.selectedCompactStatusPriority(for: notices,
+            settings: settings, systemMonitorAvailable: true) == .media)
+        settings.statusIconDestination = .island
+        settings.islandPlacement = IslandPlacement()
+        #expect(SideNoticeLayoutEngine.selectedCompactStatusPriority(for: notices,
+            settings: settings, systemMonitorAvailable: true) == .media)
+    }
+
+    @Test
+    func timeSensitiveNoticesOverrideMonitorPriority() {
+        var settings = FeatureSettings.default
+        settings.islandLayoutStyle = .pill
+        settings.islandPlacement = IslandPlacement(mode: .custom, edge: .left)
+        settings.statusIconDestination = .island
+        settings.compactStatusPriority = CompactStatusPriority.normalized([.systemMonitor])
+        for notice in [IslandNotice(id: "focus-transition", title: "Focus"),
+                       IslandNotice(id: LowBatteryNoticeController.noticeID, title: "Battery")] {
+            #expect(SideNoticeLayoutEngine.selectedCompactStatusPriority(for: [notice],
+                settings: settings, systemMonitorAvailable: true) == .transient)
+        }
+    }
+
+    @Test
     func focusCountdownUsesCompactContentAlongsideMediaAndAI() {
         let media = IslandNotice(id: "media-active-left", title: "正在播放", side: .left)
         let countdown = IslandNotice(

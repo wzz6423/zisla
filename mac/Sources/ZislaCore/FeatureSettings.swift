@@ -608,6 +608,7 @@ public enum CompactStatusPriority: String, Codable, CaseIterable, Sendable, Equa
     case aiActivity
     case media
     case focusMode
+    case systemMonitor
 
     public static let defaultOrder: [Self] = [
         .transient,
@@ -620,6 +621,7 @@ public enum CompactStatusPriority: String, Codable, CaseIterable, Sendable, Equa
         .media,
         .toolboxReminder,
         .updateAvailable,
+        .systemMonitor,
     ]
 
     public var title: String {
@@ -634,6 +636,7 @@ public enum CompactStatusPriority: String, Codable, CaseIterable, Sendable, Equa
         case .aiActivity: "AI 活动"
         case .media: "正在播放"
         case .focusMode: "专注模式"
+        case .systemMonitor: "系统监控"
         }
     }
 

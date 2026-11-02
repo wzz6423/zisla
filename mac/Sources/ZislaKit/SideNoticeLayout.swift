@@ -169,7 +169,8 @@ public struct SideNoticeLayoutEngine: Equatable, Sendable {
     /// user's normal collapsed-status ordering until the transient notice expires.
     public static func selectedCompactStatusPriority(
         for notices: [IslandNotice],
-        settings: FeatureSettings
+        settings: FeatureSettings,
+        systemMonitorAvailable: Bool = false
     ) -> CompactStatusPriority? {
         if notices.contains(where: {
             $0.id.hasPrefix("focus-transition") || LowBatteryNoticeController.isLowBatteryNotice($0)
@@ -178,7 +179,9 @@ public struct SideNoticeLayoutEngine: Equatable, Sendable {
         }
         let priorities = CompactStatusPriority.normalized(settings.compactStatusPriority)
         return priorities.first {
-            compactStatusIsAvailable($0, notices: notices)
+            compactStatusIsAvailable($0, notices: notices,
+                systemMonitorAvailable: systemMonitorAvailable && settings.systemMonitorEnabled
+                    && settings.effectiveStatusIconDestination == .island)
         }
     }
 
@@ -607,6 +610,7 @@ public struct SideNoticeLayoutEngine: Equatable, Sendable {
         case .media: notices.first { $0.id.hasPrefix("media-active-") }
             ?? notices.first { $0.id.hasPrefix("background-sound-") }
         case .focusMode: notices.first { $0.id.hasPrefix("focus-mode-") }
+        case .systemMonitor: nil
         }
         let aiCount = selectedPriority == .aiActivity ? notices.count { $0.id.hasPrefix("ai-active-") } : 0
         let text: String
@@ -655,7 +659,8 @@ public struct SideNoticeLayoutEngine: Equatable, Sendable {
 
     private static func compactStatusIsAvailable(
         _ priority: CompactStatusPriority,
-        notices: [IslandNotice]
+        notices: [IslandNotice],
+        systemMonitorAvailable: Bool
     ) -> Bool {
         return switch priority {
         case .transient:
@@ -680,6 +685,8 @@ public struct SideNoticeLayoutEngine: Equatable, Sendable {
             }
         case .focusMode:
             notices.contains { $0.id.hasPrefix("focus-mode-") }
+        case .systemMonitor:
+            systemMonitorAvailable
         }
     }
 

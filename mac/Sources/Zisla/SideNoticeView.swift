@@ -20,6 +20,7 @@ final class SideNoticeDisplayState: ObservableObject {
     /// other display hides it so the collapsed pill (and the pet slot) stays in its normal place.
     @Published var hidesVoiceProcessingIndicator = false
     @Published var statusIcons: [IslandStatusIcon] = []
+    @Published var systemMonitorAvailable = false
 }
 
 private enum CompactStatusMetrics {
@@ -446,7 +447,8 @@ struct CompactStatusBarView: View {
     var selectedCompactStatusPriority: CompactStatusPriority? {
         SideNoticeLayoutEngine.selectedCompactStatusPriority(
             for: presentationNotices,
-            settings: settingsStore.settings
+            settings: settingsStore.settings,
+            systemMonitorAvailable: displayState.systemMonitorAvailable
         )
     }
 
@@ -694,7 +696,7 @@ struct CompactStatusBarView: View {
                     )
                 }
             }
-        case nil:
+        case .systemMonitor, nil:
             EmptyView()
         }
     }

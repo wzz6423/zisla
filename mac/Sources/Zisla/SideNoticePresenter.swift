@@ -23,6 +23,9 @@ final class SideNoticePresenter {
     private var isPlacementSelectionActive = false
     private var transientMessage: String?
     private var statusIcons: [IslandStatusIcon] = []
+    private var availableStatusIcons: [IslandStatusIcon] {
+        statusIcons.filter { !$0.isSystemMonitor || settingsStore.settings.systemMonitorEnabled }
+    }
     var onCompactLayoutChanged: ((CGDirectDisplayID, Bool, CGFloat?, CGSize?) -> Void)?
     private var isStopped = false
     private let now: () -> Date
@@ -206,6 +209,7 @@ final class SideNoticePresenter {
                 lastPhysicalSnapshot: &panels.lastPhysicalSnapshot
             )
             let displayState = panels.displayState
+            displayState.systemMonitorAvailable = availableStatusIcons.contains(where: \.isSystemMonitor)
             displayState.hidesVoiceProcessingIndicator = hidesVoiceProcessingIndicator(
                 on: snapshot.displayID
             )
@@ -219,7 +223,7 @@ final class SideNoticePresenter {
             let configuration = compactConfiguration(
                 for: compactNotices, at: date, statusHidden: displayState.compactStatusHidden
             )
-            displayState.statusIcons = configuration.statusIconSize == nil ? [] : statusIcons
+            displayState.statusIcons = configuration.statusIconSize == nil ? [] : availableStatusIcons
             onCompactLayoutChanged?(snapshot.displayID, configuration.expandsForDetailedStatus,
                                     configuration.compactStatusLength, configuration.statusIconSize)
             if hidesPanels {
@@ -324,11 +328,18 @@ final class SideNoticePresenter {
                 edge: configuration.placement.edge, text: text
             )
         }
-        if settingsStore.settings.effectiveStatusIconDestination == .island, sizing == nil,
+        let selectedPriority = SideNoticeLayoutEngine.selectedCompactStatusPriority(
+            for: statusHidden ? [] : notices, settings: settingsStore.settings,
+            systemMonitorAvailable: availableStatusIcons.contains(where: \.isSystemMonitor)
+        )
+        if settingsStore.settings.effectiveStatusIconDestination == .island,
+           sizing == nil || (selectedPriority == .systemMonitor && sizing?.customPillPresentation?.priority != nil),
            !suppression.isVoiceRecording, !suppression.isTransientNoticePresented,
            resultSweep.current == nil {
-            configuration.statusIconSize = IslandStatusIconLayout.size(icons: statusIcons,
+            configuration.statusIconSize = IslandStatusIconLayout.size(icons: availableStatusIcons,
                                                                        edge: configuration.placement.edge)
+            configuration.expandsForDetailedStatus = false
+            configuration.compactStatusLength = nil
         }
         return configuration
     }

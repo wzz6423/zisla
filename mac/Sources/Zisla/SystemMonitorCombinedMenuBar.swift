@@ -107,6 +107,11 @@ struct IslandStatusIcon: Identifiable {
     let content: Content
     let tooltip: String
 
+    var isSystemMonitor: Bool {
+        if case .application = content { return false }
+        return true
+    }
+
     func size(edge: IslandEdge) -> CGSize {
         switch content {
         case .application:

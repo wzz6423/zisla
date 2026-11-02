@@ -334,6 +334,20 @@ struct SettingsView: View {
                     .pickerStyle(.menu)
                     .disabled(!settingsStore.settings.mediaEnabled)
                 }
+                rowDivider
+                settingRow(symbol: "menubar.rectangle", title: "机器监控状态显示位置", detail: "") {
+                    IslandOutlinedPicker(
+                        selection: Binding(get: { settingsStore.settings.effectiveStatusIconDestination },
+                                           set: { settingsStore.settings.statusIconDestination = $0 }),
+                        options: settingsStore.settings.supportsStatusIconsInIsland
+                            ? Array(StatusIconDestination.allCases) : [.menuBar],
+                        title: { $0.menuTitle },
+                        selectionID: "status-icon-destination-selection",
+                        fontSize: 9,
+                        width: 128,
+                        height: 28
+                    )
+                }
                 if model.settingsStore.settings.systemMonitorEnabled {
                     rowDivider
                     settingRow(
@@ -1252,20 +1266,6 @@ struct SettingsView: View {
                     rowDivider
                     featureToggle("显示 zisla 图标", detail: "关闭后不影响已启用的监控图标", symbol: "app.badge", keyPath: \.menuBarAppIconEnabled)
                     rowDivider
-                    settingRow(symbol: "menubar.rectangle", title: "图标显示位置", detail: "") {
-                        IslandOutlinedPicker(
-                            selection: Binding(get: { settingsStore.settings.effectiveStatusIconDestination },
-                                               set: { settingsStore.settings.statusIconDestination = $0 }),
-                            options: settingsStore.settings.supportsStatusIconsInIsland
-                                ? Array(StatusIconDestination.allCases) : [.menuBar],
-                            title: { $0.menuTitle },
-                            selectionID: "status-icon-destination-selection",
-                            fontSize: 9,
-                            width: 128,
-                            height: 28
-                        )
-                    }
-                    rowDivider
                     featureToggle(AppLocalization.text("始终置顶"), detail: "收起时保持在其他窗口和菜单栏图标上方", symbol: "rectangle.topthird.inset.filled", keyPath: \.islandCollapsedOnTop)
                     rowDivider
                     featureToggle(AppLocalization.text("提示条进度光效"), detail: AppLocalization.text("在收起态提示条边沿显示播放、下载和自动关闭进度"), symbol: "chart.bar.fill", keyPath: \.collapsedProgressGlowEnabled)
@@ -1439,7 +1439,8 @@ struct SettingsView: View {
             }
 
             settingsGroup("收起态展示优先级") {
-                let priorities = model.settingsStore.settings.compactStatusPriority
+                let priorities = Self.compactStatusPriorities(settings: settingsStore.settings,
+                    hasSystemMonitorIcons: model.islandHasSystemMonitorIcons)
                 ForEach(Array(priorities.enumerated()), id: \.element) { index, priority in
                     if index > 0 { rowDivider }
                     reorderSettingRow(
@@ -3609,6 +3610,13 @@ struct SettingsView: View {
         return selected.count == 1 && selected.contains(accountName)
     }
 
+    static func compactStatusPriorities(settings: FeatureSettings, hasSystemMonitorIcons: Bool) -> [CompactStatusPriority] {
+        settings.compactStatusPriority.filter {
+            $0 != .systemMonitor || (hasSystemMonitorIcons && settings.systemMonitorEnabled
+                && settings.effectiveStatusIconDestination == .island)
+        }
+    }
+
     private func moveCompactStatusPriority(_ priority: CompactStatusPriority, to destination: CompactStatusPriority) {
         var priorities = model.settingsStore.settings.compactStatusPriority
         guard priority != destination,
@@ -3708,6 +3716,7 @@ struct SettingsView: View {
         case .aiActivity: "sparkles"
         case .media: "music.note"
         case .focusMode: "moon.fill"
+        case .systemMonitor: "gauge.with.dots.needle.67percent"
         }
     }
 

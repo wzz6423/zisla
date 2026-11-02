@@ -3130,6 +3130,7 @@
 "Liquid Glass" = "Liquid Glass";
 
 "图标显示位置" = "Emplacement des icônes";
+"机器监控状态显示位置" = "Emplacement d’affichage de l’état du moniteur système";
 "状态栏" = "Barre de menus";
 "灵动岛" = "Dynamic Island";
 "常驻监控图标" = "Icônes de surveillance permanentes";

@@ -8,6 +8,155 @@ import ZislaCore
 
 struct StatusIconDestinationIntegrationTests {
     @Test(arguments: IslandEdge.allCases) @MainActor
+    func monitorOrderChangesTheVisibleLayoutAndRestoresTheSameReadings(edge: IslandEdge) throws {
+        let fixture = try IconFixture(edge: edge)
+        defer { fixture.close() }
+        fixture.settings.settings.sideNoticesEnabled = true
+        fixture.settings.settings.mediaCompactStyle = .detailed
+        let icons = [IslandStatusIcon(id: "cpu", content: .metric(.cpu, text: "20%", image: nil, style: .detailed), tooltip: "CPU")]
+        let media = IslandNotice(id: "media-active-left", title: "Music", detail: "Track")
+        let download = IslandNotice(id: "browser-download-left", title: "Download", progress: 0.5)
+        fixture.presenter.setStatusIcons(icons)
+        let monitor = fixture.presenter.compactConfiguration(for: [], at: .distantPast)
+        #expect(monitor.statusIconSize == IslandStatusIconLayout.size(icons: icons, edge: edge))
+        #expect(fixture.presenter.compactConfiguration(for: [media, download], at: .distantPast).statusIconSize == nil)
+        fixture.settings.settings.compactStatusPriority = CompactStatusPriority.normalized([.systemMonitor])
+        #expect(fixture.presenter.compactConfiguration(for: [media], at: .distantPast) == monitor)
+        #expect(fixture.presenter.compactConfiguration(for: [media, download], at: .distantPast) == monitor)
+        let frame = try #require(fixture.presenter.compactFrame(for: fixture.screen, notices: [media, download]))
+        #expect(frame.size == monitor.statusIconSize)
+        fixture.settings.settings.compactStatusPriority = CompactStatusPriority.normalized([.media, .systemMonitor])
+        let playback = fixture.presenter.compactConfiguration(for: [media, download], at: .distantPast)
+        #expect(playback.statusIconSize == nil && playback.expandsForDetailedStatus)
+        #expect(fixture.presenter.compactConfiguration(for: [media, download], at: .distantPast, statusHidden: true) == monitor)
+        fixture.presenter.setStatusIcons([])
+        #expect(fixture.presenter.compactConfiguration(for: [media, download], at: .distantPast) == playback)
+        #expect(fixture.presenter.compactConfiguration(for: [], at: .distantPast).statusIconSize == nil)
+        fixture.presenter.setStatusIcons(icons)
+        #expect(fixture.presenter.compactConfiguration(for: [], at: .distantPast) == monitor)
+        fixture.settings.settings.systemMonitorEnabled = false
+        #expect(fixture.presenter.compactConfiguration(for: [], at: .distantPast).statusIconSize == nil)
+        #expect(fixture.presenter.compactConfiguration(for: [media, download], at: .distantPast) == playback)
+        fixture.settings.settings.systemMonitorEnabled = true
+        fixture.settings.settings.statusIconDestination = .menuBar
+        #expect(fixture.presenter.compactConfiguration(for: [], at: .distantPast).statusIconSize == nil)
+        fixture.settings.settings.statusIconDestination = .island
+        #expect(fixture.presenter.compactConfiguration(for: [], at: .distantPast) == monitor)
+    }
+
+    @Test @MainActor
+    func monitorPriorityKeepsSpecialTakeoversAndTheApplicationOnlyFallback() throws {
+        let fixture = try IconFixture(edge: .left)
+        defer { fixture.close() }
+        fixture.settings.settings.sideNoticesEnabled = true
+        fixture.settings.settings.compactStatusPriority = CompactStatusPriority.normalized([.systemMonitor])
+        let application = IslandStatusIcon(id: "app", content: .application, tooltip: "zisla")
+        let monitor = IslandStatusIcon(id: "cpu", content: .metric(.cpu, text: "20%", image: nil, style: .detailed), tooltip: "CPU")
+        #expect(!application.isSystemMonitor && monitor.isSystemMonitor)
+        fixture.presenter.setStatusIcons([application, monitor])
+        let idle = fixture.presenter.compactConfiguration(for: [], at: .distantPast)
+        let media = IslandNotice(id: "media-active-left", title: "Music")
+        for notice in [IslandNotice(id: "voice-processing-left", title: "Voice"),
+                       IslandNotice(id: "screen-recording-operation-left", title: "Recording"),
+                       IslandNotice(id: "focus-transition", title: "Focus"),
+                       IslandNotice(id: LowBatteryNoticeController.noticeID, title: "Battery")] {
+            #expect(fixture.presenter.compactConfiguration(for: [media, notice], at: .distantPast).statusIconSize == nil)
+        }
+        fixture.presenter.setVoiceRecording(true)
+        #expect(fixture.presenter.compactConfiguration(for: [media], at: .distantPast).statusIconSize == nil)
+        fixture.presenter.setVoiceRecording(false)
+        fixture.presenter.setTransientNoticePresented(true, message: "Saved")
+        #expect(fixture.presenter.compactConfiguration(for: [media], at: .distantPast).statusIconSize == nil)
+        fixture.presenter.setTransientNoticePresented(false)
+        #expect(fixture.presenter.compactConfiguration(for: [media], at: .distantPast) == idle)
+        fixture.sweep.receive(previous: .running,
+            task: AIProgressTask(id: "monitor-priority", provider: .codex, title: "Test", progress: nil,
+                status: .succeeded, updatedAt: .distantPast),
+            observedSince: .distantFuture, settings: fixture.settings.settings)
+        #expect(fixture.sweep.current != nil)
+        #expect(fixture.presenter.compactConfiguration(for: [media], at: .distantPast).statusIconSize == nil)
+        fixture.sweep.cancel()
+        #expect(fixture.presenter.compactConfiguration(for: [media], at: .distantPast) == idle)
+        fixture.settings.settings.systemMonitorEnabled = false
+        #expect(fixture.presenter.compactConfiguration(for: [], at: .distantPast).statusIconSize
+            == IslandStatusIconLayout.size(icons: [application], edge: .left))
+        fixture.settings.settings.systemMonitorEnabled = true
+        fixture.presenter.setStatusIcons([application])
+        #expect(fixture.presenter.compactConfiguration(for: [media], at: .distantPast).statusIconSize == nil)
+    }
+
+    @Test @MainActor
+    func monitorRowsUseActualRoutedContentAndKeepTheConfiguredOrderWhenHidden() throws {
+        var settings = FeatureSettings.default
+        settings.islandLayoutStyle = .pill
+        settings.islandPlacement = IslandPlacement(mode: .custom, edge: .left)
+        settings.statusIconDestination = .island
+        let original = settings.compactStatusPriority
+        let application = IslandStatusIcon(id: "app", content: .application, tooltip: "zisla")
+        let monitor = IslandStatusIcon(id: "cpu", content: .metric(.cpu, text: "--", image: nil, style: .detailed), tooltip: "CPU")
+        let stacked = IslandStatusIcon(id: "stacked", content: .stacked(image: nil,
+            readings: [.init(metric: .cpu, text: "--")]), tooltip: "CPU")
+        let combined = IslandStatusIcon(id: "combined", content: .combined(nil), tooltip: "Monitor")
+        for icons in [[], [application], [monitor], [stacked], [combined], [application, monitor]] as [[IslandStatusIcon]] {
+            let rows = SettingsView.compactStatusPriorities(settings: settings,
+                hasSystemMonitorIcons: icons.contains(where: \.isSystemMonitor))
+            #expect(rows.contains(.systemMonitor) == icons.contains(where: \.isSystemMonitor))
+            #expect(rows.filter { $0 != .systemMonitor } == original.filter { $0 != .systemMonitor })
+        }
+        #expect(SettingsView.compactStatusPriorities(settings: settings, hasSystemMonitorIcons: true).last == .systemMonitor)
+        settings.compactStatusPriority = CompactStatusPriority.normalized([.systemMonitor, .media])
+        #expect(SettingsView.compactStatusPriorities(settings: settings, hasSystemMonitorIcons: true).first == .systemMonitor)
+        let custom = settings.compactStatusPriority
+        settings.systemMonitorEnabled = false
+        #expect(!SettingsView.compactStatusPriorities(settings: settings, hasSystemMonitorIcons: true).contains(.systemMonitor))
+        settings.systemMonitorEnabled = true
+        settings.statusIconDestination = .menuBar
+        #expect(!SettingsView.compactStatusPriorities(settings: settings, hasSystemMonitorIcons: true).contains(.systemMonitor))
+        settings.statusIconDestination = .island
+        settings.islandPlacement = IslandPlacement()
+        #expect(!SettingsView.compactStatusPriorities(settings: settings, hasSystemMonitorIcons: true).contains(.systemMonitor))
+        settings.islandPlacement = IslandPlacement(mode: .custom, edge: .left)
+        #expect(SettingsView.compactStatusPriorities(settings: settings, hasSystemMonitorIcons: true) == custom)
+        #expect(settings.compactStatusPriority == custom)
+    }
+
+    @Test @MainActor
+    func compactViewUsesThePresenterMonitorAvailabilityWhenActivitiesAreQueued() throws {
+        let fixture = try IconFixture(edge: .left)
+        defer { fixture.close() }
+        fixture.settings.settings.compactStatusPriority = CompactStatusPriority.normalized([.systemMonitor])
+        fixture.queue.enqueue(IslandNotice(id: "media-active-left", title: "Music"), expiresAfter: nil)
+        let state = SideNoticeDisplayState()
+        let view = CompactStatusBarView(queue: fixture.queue, displayState: state, media: fixture.media,
+            browserDownloads: fixture.downloads, settingsStore: fixture.settings, resultSweep: fixture.sweep,
+            onStatusHidden: {})
+        #expect(view.selectedCompactStatusPriority == .media)
+        state.systemMonitorAvailable = true
+        #expect(view.selectedCompactStatusPriority == .systemMonitor)
+        #expect(state.statusIcons.isEmpty)
+        state.systemMonitorAvailable = false
+        #expect(view.selectedCompactStatusPriority == .media)
+    }
+
+    @Test
+    func monitorPriorityTitleUsesExistingTranslations() throws {
+        let root = URL(fileURLWithPath: #filePath).deletingLastPathComponent()
+            .deletingLastPathComponent().deletingLastPathComponent()
+        let key = CompactStatusPriority.systemMonitor.title
+        #expect(key == "系统监控")
+        #expect(AppLanguage.allCases.count == 17)
+        for language in AppLanguage.allCases {
+            let url = root.appendingPathComponent("Resources/Localization/\(language.rawValue).lproj/Localizable.strings")
+            let table = try #require(NSDictionary(contentsOf: url) as? [String: String])
+            let translated = try #require(table[key], "\(language.rawValue) missing \(key)")
+            #expect(!translated.isEmpty)
+            #expect(AppLocalization.string(key, locale: language.locale) == translated)
+        }
+        #expect(AppLocalization.string(key, language: .english) == "System Monitor")
+        #expect(AppLocalization.string(key, language: .arabic) == "مراقب النظام")
+    }
+
+    @Test(arguments: IslandEdge.allCases) @MainActor
     func oversizedStatusIconsKeepTheQuickActionLengthLimitAndBothEndInsets(edge: IslandEdge) async throws {
         let fixture = try IconFixture(edge: edge)
         defer { fixture.close() }
@@ -48,8 +197,8 @@ struct StatusIconDestinationIntegrationTests {
         #expect(fixture.presenter.compactConfiguration(for: [], at: .distantPast).statusIconSize != nil)
     }
 
-    @Test @MainActor
-    func globalBindingPersistsWithoutChangingTheIndividualFeatureSelections() throws {
+    @Test(arguments: [true, false]) @MainActor
+    func globalBindingPersistsWithoutChangingTheIndividualFeatureSelections(systemMonitorEnabled: Bool) throws {
         let suite = "StatusIconDestinationIntegrationTests.\(UUID().uuidString)"
         let defaults = try #require(UserDefaults(suiteName: suite))
         let store = FeatureSettingsStore(defaults: defaults, persistenceDelay: .seconds(60), defaultUpdateChannel: .release)
@@ -63,6 +212,7 @@ struct StatusIconDestinationIntegrationTests {
         store.settings.systemMonitorMenuBarBottomRow = [.cpu, .memory]
         store.settings.systemMonitorMenuBarCombinedIconEnabled = true
         store.settings.menuBarAppIconEnabled = true
+        store.settings.systemMonitorEnabled = systemMonitorEnabled
         let original = store.settings
         let binding = Binding(get: { store.settings }, set: { store.settings = $0 })
         for destination in StatusIconDestination.allCases {
@@ -111,8 +261,18 @@ struct StatusIconDestinationIntegrationTests {
         let source = try String(contentsOf: root.appendingPathComponent("Sources/Zisla/SettingsView.swift"), encoding: .utf8)
         #expect(source.components(separatedBy: "status-icon-destination-selection").count == 2)
         #expect(source.contains("settingsStore.settings.effectiveStatusIconDestination"))
-        let keys = ["图标显示位置", "常驻监控图标", "关闭后不影响已启用的监控图标"]
-            + StatusIconDestination.allCases.map(\.menuTitle)
+        let row = try NSRegularExpression(pattern: #"settingRow\(symbol:\s*"menubar\.rectangle",\s*title:\s*"([^"]+)",\s*detail:\s*""\)\s*\{\s*IslandOutlinedPicker\([\s\S]*?selectionID:\s*"status-icon-destination-selection""#)
+        let matches = row.matches(in: source, range: NSRange(source.startIndex..., in: source))
+        #expect(matches.count == 1)
+        let match = try #require(matches.first)
+        let titleRange = try #require(Range(match.range(at: 1), in: source))
+        let title = String(source[titleRange])
+        let expectedTitle = "机器监控状态显示位置"
+        #expect(title == expectedTitle)
+        let keys = Set([title, expectedTitle, "常驻监控图标", "关闭后不影响已启用的监控图标"]
+            + StatusIconDestination.allCases.map(\.menuTitle))
+        let englishURL = root.appendingPathComponent("Resources/Localization/en.lproj/Localizable.strings")
+        let english = try #require(NSDictionary(contentsOf: englishURL) as? [String: String])
         #expect(AppLanguage.allCases.count == 17)
         for language in AppLanguage.allCases {
             let url = root.appendingPathComponent("Resources/Localization/\(language.rawValue).lproj/Localizable.strings")
@@ -120,23 +280,69 @@ struct StatusIconDestinationIntegrationTests {
             let table = try #require(NSDictionary(contentsOf: url) as? [String: String])
             for key in keys {
                 let value = try #require(table[key], "\(language.rawValue) missing \(key)")
-                #expect(!value.isEmpty)
+                #expect(!value.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+                #expect(!value.contains("%"), "Destination labels must not add format placeholders")
                 let expression = try NSRegularExpression(pattern: "^\\s*\"" + NSRegularExpression.escapedPattern(for: key) + "\"\\s*=", options: .anchorsMatchLines)
                 #expect(expression.numberOfMatches(in: source, range: NSRange(source.startIndex..., in: source)) == 1)
                 #expect(AppLocalization.string(key, locale: language.locale) == value)
+                if language != .simplifiedChinese {
+                    #expect(value != key, "\(language.rawValue) did not translate \(key)")
+                }
+                if key == expectedTitle, language != .english, language != .simplifiedChinese,
+                   language != .traditionalChinese {
+                    #expect(value != english[key], "\(language.rawValue) copied the English destination label")
+                }
             }
         }
         #expect(AppLocalization.string("状态栏", locale: Locale(identifier: "en")) == "Menu Bar")
         #expect(AppLocalization.string("灵动岛", locale: Locale(identifier: "ar")) == "الجزيرة الديناميكية")
+        #expect(AppLocalization.string(expectedTitle, locale: Locale(identifier: "en")) == "System Monitor Status Display Location")
+        #expect(AppLocalization.string(expectedTitle, locale: Locale(identifier: "zh-Hant")) == "機器監控狀態顯示位置")
+        #expect(AppLocalization.string(expectedTitle, locale: Locale(identifier: "ar")) == "موضع عرض حالة مراقب النظام")
     }
 
     @Test
-    func iconDestinationAndExistingMonitorSearchesReachTheirVisibleRows() {
-        let settings = FeatureSettings.default
-        let locale = Locale(identifier: "zh-Hans")
-        #expect(SettingsSearchIndex.results(for: "图标显示位置", settings: settings, locale: locale).contains {
-            $0.section == .features && $0.anchor == .row("图标显示位置")
-        })
+    func destinationControlBelongsToInfoAndRemainsOutsideConditionalMonitorOptions() throws {
+        let root = URL(fileURLWithPath: #filePath).deletingLastPathComponent()
+            .deletingLastPathComponent().deletingLastPathComponent()
+        let source = try String(contentsOf: root.appendingPathComponent("Sources/Zisla/SettingsView.swift"), encoding: .utf8)
+        let workflowStart = try #require(source.range(of: "    private var workflowContent: some View {"))
+        let featuresStart = try #require(source.range(of: "    private var featuresContent: some View {"))
+        let keyboardStart = try #require(source.range(of: "    private var keyboardSoundContent: some View {"))
+        let workflow = String(source[workflowStart.lowerBound..<featuresStart.lowerBound])
+        let features = String(source[featuresStart.lowerBound..<keyboardStart.lowerBound])
+        #expect(workflow.components(separatedBy: "status-icon-destination-selection").count == 2)
+        #expect(!features.contains("status-icon-destination-selection"))
+        #expect(!features.contains("图标显示位置"))
+        #expect(!features.contains("机器监控状态显示位置"))
+        let destination = try #require(workflow.range(of: "title: \"机器监控状态显示位置\""))
+        let monitorOptions = try #require(workflow.range(of: "if model.settingsStore.settings.systemMonitorEnabled {"))
+        #expect(destination.lowerBound < monitorOptions.lowerBound)
+    }
+
+    @Test(arguments: AppLanguage.allCases)
+    func iconDestinationAndExistingMonitorSearchesReachTheirVisibleRows(language: AppLanguage) {
+        var settings = FeatureSettings.default
+        settings.mediaEnabled = true
+        let locale = language.locale
+        let title = "机器监控状态显示位置"
+        let localizedTitle = AppLocalization.string(title, locale: locale)
+        #expect(SettingsSearchAnchor.row(title).localized(locale: locale) == .row(localizedTitle))
+        for enabled in [true, false] {
+            settings.systemMonitorEnabled = enabled
+            let items = SettingsSearchIndex.items(settings: settings)
+            #expect(items.filter { $0.title == title }.count == 1)
+            #expect(!items.contains { $0.title == "图标显示位置" })
+            let matches = SettingsSearchIndex.results(for: localizedTitle, settings: settings, locale: locale)
+            #expect(matches.first?.section == .info)
+            #expect(matches.first?.anchor == .row(title))
+            for query in [title, "状态栏", "灵动岛"].map({ AppLocalization.string($0, locale: locale) }) {
+                #expect(SettingsSearchIndex.results(for: query, settings: settings, locale: locale).contains {
+                    $0.section == .info && $0.title == title && $0.anchor == .row(title)
+                })
+            }
+        }
+        settings.systemMonitorEnabled = true
         for query in ["常驻监控图标", "菜单栏常驻"] {
             #expect(SettingsSearchIndex.results(for: query, settings: settings, locale: locale).contains {
                 $0.section == .info && $0.anchor == .row("常驻监控图标")
@@ -357,13 +563,36 @@ struct StatusIconDestinationIntegrationTests {
         fixture.queue.enqueue(IslandNotice(id: "ai-active-test", title: "Codex"), expiresAfter: nil)
         fixture.presenter.setStatusIcons(icons)
         #expect(state.statusIcons.isEmpty)
+        #expect(state.systemMonitorAvailable)
+        #expect(host.rootView.content.selectedCompactStatusPriority == .aiActivity)
         #expect(host.window?.ignoresMouseEvents == false, "Activities keep their existing swipe interaction")
+        fixture.settings.settings.compactStatusPriority = CompactStatusPriority.normalized([.systemMonitor])
+        fixture.presenter.setStatusIcons(icons)
+        #expect(state.statusIcons.map(\.id) == ["cpu"])
+        #expect(host.rootView.content.selectedCompactStatusPriority == .systemMonitor)
+        #expect(host.window?.frame.size == size)
+        #expect(host.window?.ignoresMouseEvents == true)
+        fixture.settings.settings.compactStatusPriority = CompactStatusPriority.normalized([.aiActivity, .systemMonitor])
+        fixture.presenter.setStatusIcons(icons)
+        #expect(state.statusIcons.isEmpty)
+        fixture.settings.settings.systemMonitorEnabled = false
+        fixture.presenter.setStatusIcons(icons)
+        #expect(!state.systemMonitorAvailable)
+        #expect(host.rootView.content.selectedCompactStatusPriority == .aiActivity)
+        fixture.settings.settings.systemMonitorEnabled = true
         fixture.queue.removeAll()
         fixture.presenter.setStatusIcons(icons)
         #expect(state.statusIcons.map(\.id) == ["cpu"])
         #expect(host.window?.ignoresMouseEvents == true)
+        let applicationIcon = IslandStatusIcon(id: "app", content: .application, tooltip: "zisla")
+        fixture.settings.settings.systemMonitorEnabled = false
+        fixture.presenter.setStatusIcons([applicationIcon] + icons)
+        #expect(state.statusIcons.map(\.id) == ["app"])
+        #expect(!state.systemMonitorAvailable)
+        fixture.settings.settings.systemMonitorEnabled = true
         fixture.presenter.setStatusIcons([])
         #expect(state.statusIcons.isEmpty)
+        #expect(!state.systemMonitorAvailable)
         #expect(host.window?.frame.size == CGSize(width: 24, height: 24))
         fixture.presenter.stop()
         #expect(host.window?.isVisible != true)
