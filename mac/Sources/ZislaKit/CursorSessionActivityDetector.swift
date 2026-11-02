@@ -71,6 +71,19 @@ public final class CursorSessionActivityDetector: AIActivityDetecting {
                 AND updated <= \(currentTime.timeIntervalSince1970 * 1_000)
                 ORDER BY updated DESC LIMIT \(maxSessions)
                 """, limit: maxSessions)
+            let headers = DesktopAIStorage.rows(at: database, sql: """
+                SELECT \(fields) FROM composerHeaders c
+                WHERE json_valid(c.value) AND json_extract(c.value, '$.type') = 'head'
+                AND COALESCE(json_extract(c.value, '$.composerId'), '') != ''
+                AND (json_extract(c.value, '$.status') IS NULL
+                     OR json_extract(c.value, '$.status') = 'generating')
+                AND json_extract(c.value, '$.unfinishedRunAt') >= \(cutoff.timeIntervalSince1970 * 1_000)
+                AND json_extract(c.value, '$.unfinishedRunAt') <= \(currentTime.timeIntervalSince1970 * 1_000)
+                AND COALESCE(json_extract(c.value, '$.isArchived'), 0) = 0
+                AND COALESCE(json_extract(c.value, '$.isDraft'), 0) = 0
+                AND updated <= \(currentTime.timeIntervalSince1970 * 1_000)
+                ORDER BY updated DESC LIMIT \(maxSessions)
+                """, limit: maxSessions)
             let legacy = DesktopAIStorage.rows(at: database, sql: """
                 SELECT \(fields) FROM ItemTable i,
                 json_each(CASE WHEN NOT json_valid(i.value) THEN '[]'
@@ -88,7 +101,7 @@ public final class CursorSessionActivityDetector: AIActivityDetecting {
                 AND updated <= \(currentTime.timeIntervalSince1970 * 1_000)
                 ORDER BY updated DESC LIMIT \(maxSessions)
                 """, limit: maxSessions)
-            for row in global + legacy {
+            for row in headers + global + legacy {
                 guard let id = row["id"] as? String, !id.isEmpty,
                       let updated = DesktopAIStorage.milliseconds(row["updated"]) else { continue }
                 let taskID = "cursor-session-" + DesktopAIStorage.identity([id])

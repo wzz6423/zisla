@@ -93,6 +93,123 @@ struct CursorSessionActivityDetectorTests {
         #expect(try detector.activeTasks().map(\.title) == ["valid"])
     }
 
+    @Test func canonicalHeaderDetectsSerializedRunningTurnAndClearsAfterCompletion() throws {
+        let root = try fixtureRoot()
+        defer { try? FileManager.default.removeItem(at: root) }
+        let database = root.appendingPathComponent("globalStorage/state.vscdb")
+        try execute("CREATE TABLE cursorDiskKV (key TEXT PRIMARY KEY, value TEXT)", at: database)
+        try execute("CREATE TABLE composerHeaders (composerId TEXT PRIMARY KEY, value TEXT)", at: database)
+        try insert(composer("canonical", ["status": "aborted", "unfinishedRunAt": 1_909_999_990_000]),
+            key: "composerData:canonical", at: database)
+        var header: [String: Any] = [
+            "type": "head", "composerId": "canonical", "name": "canonical", "isDraft": false,
+            "createdAt": 1_909_999_950_000, "lastUpdatedAt": 1_909_999_990_000,
+            "unfinishedRunAt": 1_909_999_990_000, "hasBlockingPendingActions": false,
+        ]
+        try insert(header, key: "canonical", table: "composerHeaders", at: database)
+        let detector = CursorSessionActivityDetector(userDirectory: root, isApplicationRunning: { true }, now: { now })
+        let before = try Data(contentsOf: database)
+        let task = try #require(detector.activeTasks().first)
+        #expect(task.provider == .cursor && task.title == "canonical" && task.status == .running)
+        #expect(task.startedAt == Date(timeIntervalSince1970: 1_909_999_990))
+        #expect(task.detail == nil && task.sessionURL == nil)
+        #expect(try Data(contentsOf: database) == before)
+        let closed = CursorSessionActivityDetector(userDirectory: root, isApplicationRunning: { false }, now: { now })
+        #expect(try closed.activeTasks().isEmpty)
+        header["hasBlockingPendingActions"] = true
+        try execute("DELETE FROM composerHeaders", at: database)
+        try insert(header, key: "canonical", table: "composerHeaders", at: database)
+        #expect(try detector.activeTasks().first?.status == .blocked)
+        header.removeValue(forKey: "unfinishedRunAt")
+        header["lastUpdatedAt"] = 1_909_999_999_000
+        try execute("DELETE FROM composerHeaders", at: database)
+        try insert(header, key: "canonical", table: "composerHeaders", at: database)
+        #expect(try detector.activeTasks().isEmpty)
+        #expect(try CursorSessionActivityDetector(userDirectory: root, isApplicationRunning: { true }, now: { now })
+            .activeTasks().isEmpty)
+    }
+
+    @Test func canonicalHeadersFilterInvalidInactiveAndInvisibleRowsBeforeLimit() throws {
+        let root = try fixtureRoot()
+        defer { try? FileManager.default.removeItem(at: root) }
+        let database = root.appendingPathComponent("globalStorage/state.vscdb")
+        try execute("CREATE TABLE composerHeaders (composerId TEXT PRIMARY KEY, value TEXT)", at: database)
+        let examples: [(String, [String: Any])] = [
+            ("active", ["lastUpdatedAt": 1_909_999_980_000]),
+            ("blocked", ["hasBlockingPendingActions": true, "lastUpdatedAt": 1_909_999_990_000]),
+            ("archived", ["isArchived": true]),
+            ("draft", ["isDraft": true]),
+            ("completed", ["status": "completed"]),
+            ("aborted", ["status": "aborted"]),
+            ("stale-marker", ["unfinishedRunAt": 1_909_000_000_000]),
+            ("future-marker", ["unfinishedRunAt": 1_911_000_000_000]),
+            ("zero-marker", ["unfinishedRunAt": 0]),
+            ("boolean-marker", ["unfinishedRunAt": true]),
+            ("string-marker", ["unfinishedRunAt": "1909999990000"]),
+            ("stale-update", ["lastUpdatedAt": 1_909_000_000_000]),
+            ("future-update", ["lastUpdatedAt": 1_911_000_000_000]),
+            ("wrong-type", ["type": "full"]),
+            ("", [:]),
+        ]
+        for (id, values) in examples {
+            try insert(composer(id, ["type": "head", "unfinishedRunAt": 1_909_999_980_000,
+                "lastUpdatedAt": 1_909_999_999_000].merging(values) { _, new in new }),
+                key: id, table: "composerHeaders", at: database)
+        }
+        try execute("INSERT INTO composerHeaders VALUES ('broken','{')", at: database)
+        try insert(composer("idle", ["type": "head"]), key: "idle", table: "composerHeaders", at: database)
+        let before = try Data(contentsOf: database)
+        let detector = CursorSessionActivityDetector(userDirectory: root, maxSessions: 2,
+            isApplicationRunning: { true }, now: { now })
+        let tasks = try detector.activeTasks()
+        #expect(tasks.map(\.title) == ["blocked", "active"])
+        #expect(tasks.map(\.status) == [.blocked, .running])
+        #expect(try Data(contentsOf: database) == before)
+    }
+
+    @Test @MainActor func canonicalHeaderWALUpdatesPublishAndRemoveMonitorTasks() async throws {
+        let root = try fixtureRoot()
+        defer { try? FileManager.default.removeItem(at: root) }
+        let databaseURL = root.appendingPathComponent("globalStorage/state.vscdb")
+        try execute("PRAGMA journal_mode=WAL; CREATE TABLE composerHeaders (composerId TEXT PRIMARY KEY, value TEXT)",
+            at: databaseURL)
+        var database: OpaquePointer?
+        #expect(sqlite3_open(databaseURL.path, &database) == SQLITE_OK)
+        defer { sqlite3_close(database) }
+        var header: [String: Any] = [
+            "type": "head", "composerId": "watched", "name": "watched", "isDraft": false,
+            "createdAt": 1_909_999_950_000, "lastUpdatedAt": 1_909_999_990_000,
+        ]
+        try insert(header, key: "watched", table: "composerHeaders", at: databaseURL)
+        let detector = CursorSessionActivityDetector(userDirectory: root, isApplicationRunning: { true }, now: { now })
+        let monitor = AIStateMonitor(directoryURL: root.appendingPathComponent("monitor"), activityDetectors: [detector],
+            detectorRefreshInterval: 86_400, now: { now })
+        defer { monitor.stop() }
+        monitor.start()
+        #expect(detector.activityFileURLs.contains(URL(fileURLWithPath: databaseURL.path + "-wal")))
+        header["unfinishedRunAt"] = 1_909_999_990_000
+        try execute("DELETE FROM composerHeaders", at: databaseURL)
+        try insert(header, key: "watched", table: "composerHeaders", at: databaseURL)
+        for _ in 0..<200 where monitor.state.tasks.isEmpty {
+            try await Task.sleep(for: .milliseconds(10))
+        }
+        let task = try #require(monitor.state.tasks.first)
+        #expect(task.provider == .cursor && task.title == "watched" && task.status == .running)
+        header.removeValue(forKey: "unfinishedRunAt")
+        try execute("DELETE FROM composerHeaders", at: databaseURL)
+        try insert(header, key: "watched", table: "composerHeaders", at: databaseURL)
+        for _ in 0..<200 where !monitor.state.tasks.isEmpty {
+            try await Task.sleep(for: .milliseconds(10))
+        }
+        #expect(monitor.state.tasks.isEmpty)
+        #expect(monitor.state.usageSamples.isEmpty && monitor.errorDescription == nil)
+        monitor.stop()
+        header["unfinishedRunAt"] = 1_909_999_990_000
+        try execute("DELETE FROM composerHeaders", at: databaseURL)
+        try insert(header, key: "watched", table: "composerHeaders", at: databaseURL)
+        #expect(monitor.state.tasks.isEmpty)
+    }
+
     private func composer(_ id: String, _ values: [String: Any]) -> [String: Any] {
         ["composerId": id, "name": id, "lastUpdatedAt": 1_909_999_990_000,
          "createdAt": 1_909_999_950_000, "modelConfig": ["modelName": "fixture-model"],
