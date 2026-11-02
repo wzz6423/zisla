@@ -62,7 +62,10 @@ enum SettingsSearchIndex {
             items.append(SettingsSearchItem(section: section, title: title, anchor: anchor, keywords: keywords))
         }
 
-        rows(.general, ["界面语言", "界面外观", "灵动岛样式", "刘海背景"])
+        rows(.general, ["界面语言", "界面外观", "灵动岛样式", "灵动岛展开材质", "灵动岛收起材质"])
+        if settings.islandLayoutStyle == .pill {
+            rows(.general, ["灵动岛位置"])
+        }
         entry(.general, "登录时启动", anchor: .row("登录时启动"), keywords: ["开机或登录后自动在后台运行", "需要系统批准"])
 
         rows(.features, [
@@ -83,9 +86,10 @@ enum SettingsSearchIndex {
             entry(.pdfTools, operation.title, anchor: .pdfOperation(operation), keywords: [operation.detail])
         }
 
-        rows(.info, ["播放来源", "歌词与歌曲信息", "收起态音乐样式", "活动展示", "专注模式展示"])
+        rows(.info, ["播放来源", "歌词与歌曲信息", "收起态音乐样式", "音乐动效", "活动展示", "专注模式展示"])
+        entry(.info, "机器监控状态显示位置", anchor: .row("机器监控状态显示位置"), keywords: ["状态栏", "灵动岛"])
         if settings.systemMonitorEnabled {
-            entry(.info, "菜单栏常驻", anchor: .row("菜单栏常驻"), keywords: ["独立"])
+            entry(.info, "常驻监控图标", anchor: .row("常驻监控图标"), keywords: ["独立", "菜单栏常驻"])
             if settings.systemMonitorMenuBarLayout.individualEnabled {
                 rows(.info, ["监控样式"] + SystemMonitorMenuBarMetric.allCases.map(\.menuTitle))
             }

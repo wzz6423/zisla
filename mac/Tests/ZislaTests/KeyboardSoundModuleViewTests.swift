@@ -1,13 +1,160 @@
 import AVFAudio
+import AppKit
 import Foundation
 import CoreGraphics
+import SwiftUI
 import Testing
+import ZislaCore
+import ZislaKit
 
 @testable import Zisla
 @testable import KeyboardKit
 
 @Suite(.serialized)
 struct KeyboardSoundModuleViewTests {
+    @Test(.serialized, arguments: [AppLanguage.simplifiedChinese, .english, .arabic])
+    @MainActor
+    func keyboardMenusAndSwitchesKeepNativeMediumHeight(language: AppLanguage) async throws {
+        let previousArguments = UserDefaults.standard.volatileDomain(forName: UserDefaults.argumentDomain)
+        var arguments = previousArguments
+        arguments[AppLocalization.defaultsKey] = language.rawValue
+        UserDefaults.standard.setVolatileDomain(arguments, forName: UserDefaults.argumentDomain)
+        defer {
+            UserDefaults.standard.setVolatileDomain(previousArguments, forName: UserDefaults.argumentDomain)
+            L10n.configure(for: .system)
+        }
+        let directory = FileManager.default.temporaryDirectory
+            .appendingPathComponent("zisla-keyboard-control-size-\(UUID().uuidString)", isDirectory: true)
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let suite = "KeyboardControlSize.\(UUID().uuidString)"
+        let defaults = try #require(UserDefaults(suiteName: suite))
+        defer { defaults.removePersistentDomain(forName: suite) }
+        for key in ["enabled", "pointerSoundEnabled", "typingStatsEnabled", "launchAtLoginEnabled"] {
+            defaults.set(false, forKey: key)
+        }
+        let releaseAccessibility = EnhancedAccessibilityTestScope.acquire()
+        defer { releaseAccessibility() }
+        let previousAppearance = NSApplication.shared.appearance
+        defer { NSApplication.shared.appearance = previousAppearance }
+        let model = KeyboardAppModel(
+            settings: AppSettings(defaults: defaults),
+            permission: InputMonitoringPermissionManager(defaults: defaults),
+            updates: UpdateController(client: GitHubReleaseClient { _ in
+                throw GitHubReleaseClientError.invalidResponse
+            }, defaults: defaults),
+            soundPackLibrary: SoundPackLibrary(rootURL: directory.appendingPathComponent("packs"), bundledPackRootURL: nil),
+            typingStats: TypingStatsModel(persistence: TypingStatsStore(databaseURL: directory.appendingPathComponent("stats.sqlite3"))),
+            startsServices: false
+        )
+        defer { model.stop() }
+        let host = NSHostingView(rootView: VStack(spacing: 0) {
+            HStack {
+                Picker("Reference", selection: Binding.constant(0)) { Text("Medium").tag(0) }
+                    .labelsHidden().pickerStyle(.menu).controlSize(.regular)
+                    .accessibilityIdentifier("reference-menu")
+                Toggle("Reference", isOn: .constant(true))
+                    .labelsHidden().toggleStyle(.switch).controlSize(.regular)
+                    .accessibilityIdentifier("reference-switch")
+            }
+            MenuBarView(model: model)
+        }
+        .environment(\.locale, language.locale)
+        .environment(\.layoutDirection, language.isRightToLeft ? .rightToLeft : .leftToRight))
+        host.sizingOptions = []
+        let panel = NSPanel(contentRect: .init(x: -100_000, y: -100_000, width: 360, height: 920),
+            styleMask: [.borderless, .nonactivatingPanel], backing: .buffered, defer: false)
+        panel.isReleasedWhenClosed = false
+        panel.contentView = host
+        defer { panel.contentView = nil; panel.close() }
+        for _ in 0..<4 {
+            host.layoutSubtreeIfNeeded()
+            await withCheckedContinuation { continuation in DispatchQueue.main.async { continuation.resume() } }
+        }
+        let controls = accessibilityObjects(host)
+        let referenceMenuObject = controls.first {
+            value($0, "accessibilityIdentifier") as? String == "reference-menu"
+        }
+        let referenceMenu = try #require(referenceMenuObject as? any NSAccessibilityElementProtocol)
+        let referenceSwitchObject = controls.first {
+            value($0, "accessibilityIdentifier") as? String == "reference-switch"
+        }
+        let referenceSwitch = try #require(referenceSwitchObject as? any NSAccessibilityElementProtocol)
+        #expect(referenceMenu.accessibilityFrame().height > 0 && referenceSwitch.accessibilityFrame().height > 0)
+        let menus = controls.filter {
+            value($0, "accessibilityRole") as? String == NSAccessibility.Role.popUpButton.rawValue
+                && value($0, "accessibilityIdentifier") as? String != "reference-menu"
+        }
+        #expect(menus.count == 4, "The production keyboard menu must expose sound, pointer sound, language and appearance selectors")
+        for menu in menus {
+            let element = try #require(menu as? any NSAccessibilityElementProtocol)
+            #expect(abs(element.accessibilityFrame().height - referenceMenu.accessibilityFrame().height) < 0.5,
+                "Every keyboard selector must match the native medium height")
+        }
+        let switches = controls.filter {
+            value($0, "accessibilitySubrole") as? String == "AXToggle"
+                && value($0, "accessibilityIdentifier") as? String != "reference-switch"
+        }.compactMap { $0 as? any NSAccessibilityElementProtocol }
+        #expect(switches.count == 4)
+        for control in switches {
+            #expect(abs(control.accessibilityFrame().height - referenceSwitch.accessibilityFrame().height) < 0.5)
+        }
+        #expect(model.monitoringState == .stopped)
+        #expect(!FileManager.default.fileExists(atPath: directory.appendingPathComponent("stats.sqlite3").path))
+        #expect(!panel.isVisible && !panel.isKeyWindow)
+    }
+
+    @Test(arguments: [false, true]) @MainActor
+    func existingSoundMenusKeepMediumHeightInsideCompactEditorRows(perKey: Bool) async throws {
+        let directory = FileManager.default.temporaryDirectory
+            .appendingPathComponent("zisla-sound-editor-controls-\(UUID().uuidString)", isDirectory: true)
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let library = SoundPackLibrary(rootURL: directory.appendingPathComponent("packs"), bundledPackRootURL: nil)
+        let editor = SoundPackEditorModel(library: library, initialSelectionID: "fixture",
+            temporaryCacheParentURL: directory, onLibraryDidChange: { _ in }, previewAudioAt: { _ in })
+        await editor.createBlank()
+        if perKey {
+            editor.mappingMode = .perKey
+            for phase in [KeySoundPhase.press, .release] {
+                editor.setExistingAsset(SoundPackAssetID("fixture"), slot: .key(editor.selectedKeyID), phase: phase)
+            }
+        }
+        let release = EnhancedAccessibilityTestScope.acquire()
+        defer { release() }
+        let host = NSHostingView(rootView: VStack {
+            Menu(AppLocalization.text("已有音频")) { Button("Fixture") {} }
+                .controlSize(.regular).accessibilityIdentifier("reference-sound-menu")
+            SoundPackEditorView(editor: editor)
+        })
+        host.sizingOptions = []
+        let panel = NSPanel(contentRect: .init(x: -100_000, y: -100_000, width: 1_240, height: 900),
+            styleMask: [.borderless, .nonactivatingPanel], backing: .buffered, defer: false)
+        panel.isReleasedWhenClosed = false
+        panel.contentView = host
+        defer { panel.contentView = nil; panel.close() }
+        for _ in 0..<4 {
+            host.layoutSubtreeIfNeeded()
+            await withCheckedContinuation { continuation in DispatchQueue.main.async { continuation.resume() } }
+        }
+        let menus = accessibilityObjects(host).filter {
+            value($0, "accessibilityRole") as? String == NSAccessibility.Role.menuButton.rawValue
+        }
+        let referenceObject = menus.first { value($0, "accessibilityIdentifier") as? String == "reference-sound-menu" }
+        let reference = try #require(referenceObject as? any NSAccessibilityElementProtocol)
+        let referenceWidth = reference.accessibilityFrame().width
+        let choices = menus.filter {
+            value($0, "accessibilityIdentifier") as? String != "reference-sound-menu"
+                && abs((($0 as? any NSAccessibilityElementProtocol)?.accessibilityFrame().width ?? 0) - referenceWidth) < 3
+        }
+        #expect(choices.count == 2)
+        for choice in choices {
+            let element = try #require(choice as? any NSAccessibilityElementProtocol)
+            #expect(abs(element.accessibilityFrame().height - reference.accessibilityFrame().height) < 0.5,
+                    "Imported-audio selectors must remain medium sized in both mapping modes")
+        }
+        #expect(!panel.isVisible && !editor.isWorking)
+        #expect(await editor.prepareForClosing())
+    }
+
     @Test
     @MainActor
     func idleKeyboardServicesDoNotConstructAudioEngine() throws {
@@ -249,4 +396,11 @@ struct KeyboardSoundModuleViewTests {
         #expect(KeyboardTypingStatsDashboardView.timelineAxisTicks(buckets: buckets, width: 0).isEmpty)
     }
 
+    @MainActor private func accessibilityObjects(_ object: NSObject) -> [NSObject] {
+        [object] + (value(object, "accessibilityChildren") as? [NSObject] ?? []).flatMap(accessibilityObjects)
+    }
+
+    @MainActor private func value(_ object: NSObject, _ key: String) -> Any? {
+        object.responds(to: NSSelectorFromString(key)) ? object.value(forKey: key) : nil
+    }
 }

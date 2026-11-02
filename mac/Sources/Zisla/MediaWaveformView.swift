@@ -54,8 +54,8 @@ struct MediaWaveformView: View {
     tint = Self.tintColor(for: artworkData)
   }
 
-  static func tintColor(for artworkData: Data?) -> Color {
-    ArtworkWaveformColor.color(from: artworkData)
+  static func tintColor(for artworkData: Data?, sampleBottomEdge: Bool = false) -> Color {
+    ArtworkWaveformColor.color(from: artworkData, sampleBottomEdge: sampleBottomEdge)
   }
 
   var body: some View {
@@ -128,10 +128,16 @@ private enum ArtworkWaveformColor {
     cache.countLimit = 32
     return cache
   }()
+  private static let bottomEdgeCache: NSCache<NSData, NSColor> = {
+    let cache = NSCache<NSData, NSColor>()
+    cache.countLimit = 32
+    return cache
+  }()
 
-  static func color(from data: Data?) -> Color {
+  static func color(from data: Data?, sampleBottomEdge: Bool) -> Color {
     guard let data else { return fallback }
     let key = data as NSData
+    let cache = sampleBottomEdge ? bottomEdgeCache : Self.cache
     if let cached = cache.object(forKey: key) {
       return Color(nsColor: cached)
     }
@@ -145,7 +151,8 @@ private enum ArtworkWaveformColor {
     let stepY = max(1, representation.pixelsHigh / 10)
     var selected: (color: NSColor, score: CGFloat)?
 
-    for y in stride(from: stepY / 2, to: representation.pixelsHigh, by: stepY) {
+    let firstRow = sampleBottomEdge ? representation.pixelsHigh * 3 / 4 : stepY / 2
+    for y in stride(from: firstRow, to: representation.pixelsHigh, by: stepY) {
       for x in stride(from: stepX / 2, to: representation.pixelsWide, by: stepX) {
         guard
           let color = representation.colorAt(x: x, y: y)?

@@ -80,7 +80,6 @@ struct AIAgentModuleView: View {
             Toggle("", isOn: channelEnabledBinding(channel.id))
                 .labelsHidden()
                 .toggleStyle(.switch)
-                .controlSize(.mini)
                 .accessibilityLabel(AppLocalization.text("启用远端模型"))
             Picker(AppLocalization.text("协议"), selection: channelProtocolBinding(channel.id)) {
                 ForEach(Self.configurableRemoteProtocols, id: \.self) { proto in
@@ -674,7 +673,6 @@ private struct AILocalModelConfigurationRow: View {
                 Toggle("", isOn: Binding(get: { model.isEnabled }, set: { value in update { $0.isEnabled = value } }))
                     .labelsHidden()
                     .toggleStyle(.switch)
-                    .controlSize(.mini)
                     .accessibilityLabel(AppLocalization.text("启用本地模型"))
                 Picker(AppLocalization.text("本地服务"), selection: Binding(
                     get: { model.endpoint.kind },

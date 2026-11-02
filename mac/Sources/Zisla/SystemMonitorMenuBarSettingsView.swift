@@ -25,6 +25,7 @@ struct SystemMonitorMenuBarSettingsView: View {
                 AppLocalizedText("合并")
             }
             .toggleStyle(.switch)
+            .controlSize(.regular)
             if settingsStore.settings.systemMonitorMenuBarLayout.stackedEnabled {
                 VStack(alignment: .leading, spacing: 12) {
                     let selection = rows
@@ -42,6 +43,7 @@ struct SystemMonitorMenuBarSettingsView: View {
                             }
                         }
                         .labelsHidden()
+                        .controlSize(.regular)
                         .fixedSize()
                     }
                     AppLocalizedText("普通指标可选2或4项；网络或风扇可选2或3项；两者同时显示时仅可选2项")
@@ -67,6 +69,7 @@ struct SystemMonitorMenuBarSettingsView: View {
                                         AppLocalizedText(metric.menuTitle).tag(metric)
                                     }
                                 }
+                                .controlSize(.regular)
                                 .accessibilityIdentifier("system-monitor-row-\(rowIndex)-metric-\(metricIndex)")
                             }
                         }
@@ -80,6 +83,7 @@ struct SystemMonitorMenuBarSettingsView: View {
                 AppLocalizedText("合并状态图标")
             }
             .toggleStyle(.switch)
+            .controlSize(.regular)
             AppLocalizedText("电量环、Wi-Fi 与实时指标合并显示；点击打开系统监控")
                 .font(.system(size: 9))
                 .foregroundStyle(.secondary)
@@ -94,23 +98,28 @@ struct SystemMonitorMenuBarSettingsView: View {
                             }
                         }
                         .labelsHidden()
+                        .controlSize(.regular)
                     }
                     Toggle(isOn: $settingsStore.settings.systemMonitorMenuBarCombinedIconAppearance.showsBatteryPercentage) {
                         AppLocalizedText("显示电池百分比")
                     }
                     .toggleStyle(.switch)
+                    .controlSize(.regular)
                     Toggle(isOn: $settingsStore.settings.systemMonitorMenuBarCombinedIconAppearance.showsChargingIndicator) {
                         AppLocalizedText("显示充电标记")
                     }
                     .toggleStyle(.switch)
+                    .controlSize(.regular)
                     Toggle(isOn: $settingsStore.settings.systemMonitorMenuBarCombinedIconAppearance.showsPercentageWhenConnected) {
                         AppLocalizedText("接通电源时显示百分比")
                     }
                     .toggleStyle(.switch)
+                    .controlSize(.regular)
                     Toggle(isOn: $settingsStore.settings.systemMonitorMenuBarCombinedIconAppearance.usesStatusColors) {
                         AppLocalizedText("电量状态颜色")
                     }
                     .toggleStyle(.switch)
+                    .controlSize(.regular)
                     HStack {
                         AppLocalizedText("底部指示样式")
                         Spacer()
@@ -120,6 +129,7 @@ struct SystemMonitorMenuBarSettingsView: View {
                             }
                         }
                         .labelsHidden()
+                        .controlSize(.regular)
                     }
                     HStack {
                         AppLocalizedText("电量环粗细")
@@ -130,6 +140,7 @@ struct SystemMonitorMenuBarSettingsView: View {
                             }
                         }
                         .labelsHidden()
+                        .controlSize(.regular)
                     }
                     HStack {
                         AppLocalizedText("图标大小")
@@ -160,12 +171,14 @@ struct SystemMonitorMenuBarSettingsView: View {
                         AppLocalizedText("连接时短暂显示耳机图标")
                     }
                     .toggleStyle(.switch)
+                    .controlSize(.regular)
                     if settingsStore.settings.systemMonitorMenuBarHeadphoneOptions.replacesNetworkIcon {
                         VStack(alignment: .leading, spacing: 12) {
                             Toggle(isOn: $settingsStore.settings.systemMonitorMenuBarHeadphoneOptions.prioritizesNetworkErrors) {
                                 AppLocalizedText("优先显示网络错误")
                             }
                             .toggleStyle(.switch)
+                            .controlSize(.regular)
                             HStack {
                                 AppLocalizedText("耳机图标大小")
                                 Spacer()
@@ -182,6 +195,7 @@ struct SystemMonitorMenuBarSettingsView: View {
                             AppLocalizedText("蓝牙音量颜色")
                         }
                         .toggleStyle(.switch)
+                        .controlSize(.regular)
                         AppLocalizedText("仅底部指标选择音量时生效")
                             .font(.system(size: 9))
                             .foregroundStyle(.secondary)

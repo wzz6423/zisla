@@ -674,6 +674,7 @@ private struct SoundPackPhaseAssignmentCard: View {
                         }
                     }
                 }
+                .controlSize(.regular)
 
                 if assetID != nil {
                     Button(AppLocalization.text("清除")) {
@@ -770,6 +771,7 @@ private struct SoundPackPerKeyEditor: View {
                             }
                         }
                     }
+                    .controlSize(.regular)
                 }
                 .controlSize(.small)
             } else {

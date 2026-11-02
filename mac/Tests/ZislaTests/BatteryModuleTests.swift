@@ -67,19 +67,19 @@ struct BatteryModuleTests {
             #expect(module.layout == IslandModuleLayout.system)
         }
 
-        #expect(IslandModuleLayout.system.islandSize.height == 546)
-        #expect(IslandModuleLayout.system.panelSize.height == 550)
+        #expect(IslandModuleLayout.system.islandSize.height == 554)
+        #expect(IslandModuleLayout.system.panelSize.height == 558)
         #expect(IslandModuleLayout.resolved(for: .battery, dashboardCardCount: 0) == IslandModuleLayout.system)
     }
 
     @Test
     func aiModuleUsesItsCompactHeightWithoutChangingCPUHeight() {
         #expect(IslandModule.aiMonitor.layout == IslandModuleLayout.ai)
-        #expect(IslandModuleLayout.ai.islandSize.height == 495)
-        #expect(IslandModuleLayout.ai.panelSize.height == 499)
+        #expect(IslandModuleLayout.ai.islandSize.height == 503)
+        #expect(IslandModuleLayout.ai.panelSize.height == 507)
         #expect(IslandModuleLayout.ai.islandSize.height < IslandModuleLayout.system.islandSize.height)
-        #expect(IslandModuleLayout.system.islandSize.height == 546)
-        #expect(IslandModuleLayout.system.panelSize.height == 550)
+        #expect(IslandModuleLayout.system.islandSize.height == 554)
+        #expect(IslandModuleLayout.system.panelSize.height == 558)
     }
 
     @Test(arguments: [false, true]) @MainActor

@@ -278,7 +278,6 @@ struct SettingsView: View {
                     }
                     .labelsHidden()
                     .pickerStyle(.menu)
-                    .controlSize(.small)
                     .keepsIntrinsicWidth()
                     .disabled(!model.settingsStore.settings.mediaEnabled)
                 }
@@ -297,7 +296,6 @@ struct SettingsView: View {
                     )
                     .labelsHidden()
                     .toggleStyle(.switch)
-                    .controlSize(.small)
                     .disabled(!model.settingsStore.settings.mediaEnabled)
                 }
                 rowDivider
@@ -319,16 +317,43 @@ struct SettingsView: View {
                     }
                     .labelsHidden()
                     .pickerStyle(.menu)
-                    .controlSize(.small)
                     .keepsIntrinsicWidth()
                     .disabled(!model.settingsStore.settings.mediaEnabled)
+                }
+                rowDivider
+                settingRow(symbol: "waveform", title: "音乐动效", detail: "音浪或随音乐节奏呼吸的专辑光晕") {
+                    Picker("", selection: Binding(
+                        get: { settingsStore.settings.mediaVisualizationStyle },
+                        set: { settingsStore.settings.mediaVisualizationStyle = $0 }
+                    )) {
+                        ForEach(MediaVisualizationStyle.allCases, id: \.self) { style in
+                            AppLocalizedText(style.title).tag(style)
+                        }
+                    }
+                    .labelsHidden()
+                    .pickerStyle(.menu)
+                    .disabled(!settingsStore.settings.mediaEnabled)
+                }
+                rowDivider
+                settingRow(symbol: "menubar.rectangle", title: "机器监控状态显示位置", detail: "") {
+                    IslandOutlinedPicker(
+                        selection: Binding(get: { settingsStore.settings.effectiveStatusIconDestination },
+                                           set: { settingsStore.settings.statusIconDestination = $0 }),
+                        options: settingsStore.settings.supportsStatusIconsInIsland
+                            ? Array(StatusIconDestination.allCases) : [.menuBar],
+                        title: { $0.menuTitle },
+                        selectionID: "status-icon-destination-selection",
+                        fontSize: 9,
+                        width: 128,
+                        height: 28
+                    )
                 }
                 if model.settingsStore.settings.systemMonitorEnabled {
                     rowDivider
                     settingRow(
                         symbol: "menubar.rectangle",
-                        title: "菜单栏常驻",
-                        detail: "选择一项或多项；点击任一指标直达系统监控"
+                        title: "常驻监控图标",
+                        detail: ""
                     ) {
                         EmptyView()
                     }
@@ -338,7 +363,6 @@ struct SettingsView: View {
                     }
                     .toggleStyle(.switch)
                     .font(.system(size: 10))
-                    .controlSize(.small)
                     .frame(maxWidth: .infinity, alignment: .leading)
                     .padding(.leading, 4)
                     .padding(.vertical, 6)
@@ -374,7 +398,6 @@ struct SettingsView: View {
                                 Toggle("", isOn: systemMonitorMenuBarBinding(for: metric))
                                     .labelsHidden()
                                     .toggleStyle(.switch)
-                                    .controlSize(.small)
                             }
                         }
                     }
@@ -396,7 +419,6 @@ struct SettingsView: View {
                         )
                         .labelsHidden()
                         .toggleStyle(.switch)
-                        .controlSize(.small)
                     }
                 }
             }
@@ -601,7 +623,6 @@ struct SettingsView: View {
                         }
                         .labelsHidden()
                         .pickerStyle(.menu)
-                        .controlSize(.small)
                         .keepsIntrinsicWidth()
                     }
                     rowDivider
@@ -621,7 +642,6 @@ struct SettingsView: View {
                         ))
                         .labelsHidden()
                         .toggleStyle(.switch)
-                        .controlSize(.small)
                     }
                     if model.settingsStore.settings.clipboardAssistantMouseGestureEnabled
                         && !model.assistantAccessibilityGranted {
@@ -667,7 +687,6 @@ struct SettingsView: View {
                         }
                         .labelsHidden()
                         .pickerStyle(.menu)
-                        .controlSize(.small)
                         .keepsIntrinsicWidth()
                     }
                     rowDivider
@@ -696,7 +715,6 @@ struct SettingsView: View {
                         }
                         .labelsHidden()
                         .pickerStyle(.menu)
-                        .controlSize(.small)
                         .keepsIntrinsicWidth()
                     }
                     if model.settingsStore.settings.clipboardAssistantSearchEngine == .custom {
@@ -781,7 +799,6 @@ struct SettingsView: View {
                         ))
                         .labelsHidden()
                         .toggleStyle(.switch)
-                        .controlSize(.small)
                     }
                     if model.settingsStore.settings.contextNotesEnabled {
                         rowDivider
@@ -842,7 +859,6 @@ struct SettingsView: View {
                             ))
                             .labelsHidden()
                             .toggleStyle(.switch)
-                            .controlSize(.small)
                         }
                         if let groups = Self.clipboardAssistantExampleGroups[kind] {
                             clipboardAssistantExamples(groups)
@@ -1248,7 +1264,7 @@ struct SettingsView: View {
                 settingsGroup("灵动岛与下载展示") {
                     featureToggle("鼠标移入展开", detail: "鼠标进入屏幕顶部感应区时显示", symbol: "cursorarrow.motionlines", keyPath: \.hoverActivationEnabled)
                     rowDivider
-                    featureToggle("显示 zisla 图标", detail: "关闭后不影响已启用的菜单栏监控项", symbol: "app.badge", keyPath: \.menuBarAppIconEnabled)
+                    featureToggle("显示 zisla 图标", detail: "关闭后不影响已启用的监控图标", symbol: "app.badge", keyPath: \.menuBarAppIconEnabled)
                     rowDivider
                     featureToggle(AppLocalization.text("始终置顶"), detail: "收起时保持在其他窗口和菜单栏图标上方", symbol: "rectangle.topthird.inset.filled", keyPath: \.islandCollapsedOnTop)
                     rowDivider
@@ -1290,7 +1306,6 @@ struct SettingsView: View {
                         }
                         .labelsHidden()
                         .pickerStyle(.menu)
-                        .controlSize(.small)
                         .keepsIntrinsicWidth()
 
                         IconButton(
@@ -1375,7 +1390,6 @@ struct SettingsView: View {
                         )
                         .labelsHidden()
                         .toggleStyle(.switch)
-                        .controlSize(.small)
                     }
                 }
                 rowDivider
@@ -1397,7 +1411,6 @@ struct SettingsView: View {
                     }
                     .labelsHidden()
                     .pickerStyle(.menu)
-                    .controlSize(.small)
                     .keepsIntrinsicWidth()
                     .disabled(!model.settingsStore.settings.sideNoticesEnabled)
                 }
@@ -1420,14 +1433,14 @@ struct SettingsView: View {
                     }
                     .labelsHidden()
                     .pickerStyle(.menu)
-                    .controlSize(.small)
                     .keepsIntrinsicWidth()
                     .disabled(!model.settingsStore.settings.sideNoticesEnabled)
                 }
             }
 
             settingsGroup("收起态展示优先级") {
-                let priorities = model.settingsStore.settings.compactStatusPriority
+                let priorities = Self.compactStatusPriorities(settings: settingsStore.settings,
+                    hasSystemMonitorIcons: model.islandHasSystemMonitorIcons)
                 ForEach(Array(priorities.enumerated()), id: \.element) { index, priority in
                     if index > 0 { rowDivider }
                     reorderSettingRow(
@@ -1495,7 +1508,6 @@ struct SettingsView: View {
                             )
                             .labelsHidden()
                             .toggleStyle(.switch)
-                            .controlSize(.small)
                             .disabled(!model.settingsStore.settings.sideNoticesEnabled)
                         }
                     }
@@ -1588,7 +1600,6 @@ struct SettingsView: View {
                     }
                     .labelsHidden()
                     .pickerStyle(.menu)
-                    .controlSize(.small)
                     .keepsIntrinsicWidth()
                 }
                 rowDivider
@@ -1606,7 +1617,6 @@ struct SettingsView: View {
                     )
                     .labelsHidden()
                     .toggleStyle(.switch)
-                    .controlSize(.small)
                 }
                 if let configuration = model.selectedVoiceModelConfiguration {
                     rowDivider
@@ -1669,7 +1679,6 @@ struct SettingsView: View {
                     )
                     .labelsHidden()
                     .toggleStyle(.switch)
-                    .controlSize(.small)
                 }
                 rowDivider
                 settingRow(
@@ -1690,7 +1699,6 @@ struct SettingsView: View {
                     }
                     .labelsHidden()
                     .pickerStyle(.menu)
-                    .controlSize(.small)
                     .keepsIntrinsicWidth()
                 }
                 rowDivider
@@ -1716,7 +1724,6 @@ struct SettingsView: View {
                         Toggle("", isOn: voiceLexiconBinding(for: lexicon))
                             .labelsHidden()
                             .toggleStyle(.switch)
-                            .controlSize(.small)
                     }
                 }
                 rowDivider
@@ -1978,7 +1985,6 @@ struct SettingsView: View {
                         }
                         .labelsHidden()
                         .pickerStyle(.menu)
-                        .controlSize(.small)
                         .keepsIntrinsicWidth()
                     }
                     rowDivider
@@ -2066,7 +2072,6 @@ struct SettingsView: View {
                     }
                     .labelsHidden()
                     .pickerStyle(.menu)
-                    .controlSize(.small)
                     .keepsIntrinsicWidth()
                     .disabled(!model.settingsStore.settings.petEnabled)
                 }
@@ -2088,7 +2093,6 @@ struct SettingsView: View {
                     }
                     .labelsHidden()
                     .pickerStyle(.menu)
-                    .controlSize(.small)
                     .keepsIntrinsicWidth()
                     .disabled(!model.settingsStore.settings.petEnabled)
                 }
@@ -2462,9 +2466,46 @@ struct SettingsView: View {
             }
 
             settingsGroup("灵动岛样式") {
+                settingRow(symbol: "capsule", title: "灵动岛样式", detail: "选择贴边刘海或悬浮药丸") {
+                    Picker("", selection: Binding(
+                        get: { settingsStore.settings.islandLayoutStyle },
+                        set: { settingsStore.settings.islandLayoutStyle = $0 }
+                    )) {
+                        AppLocalizedText("刘海模式").tag(IslandLayoutStyle.notch)
+                        AppLocalizedText("灵动岛模式").tag(IslandLayoutStyle.pill)
+                    }
+                    .labelsHidden()
+                    .pickerStyle(.menu)
+                }
+                if settingsStore.settings.islandLayoutStyle == .pill {
+                    rowDivider
+                    settingRow(symbol: "viewfinder", title: "灵动岛位置", detail: "摄像头位置居中对齐菜单栏；其他位置可拖动到屏幕四边") {
+                        HStack(spacing: 8) {
+                            Picker("", selection: Binding(
+                                get: { settingsStore.settings.islandPlacement.mode },
+                                set: { mode in
+                                    if mode == .custom {
+                                        model.onChooseIslandPlacement?()
+                                    } else {
+                                        settingsStore.settings.islandPlacement = IslandPlacement()
+                                    }
+                                }
+                            )) {
+                                AppLocalizedText("摄像头位置").tag(IslandPlacementMode.camera)
+                                AppLocalizedText("其他位置").tag(IslandPlacementMode.custom)
+                            }
+                            .labelsHidden()
+                            .pickerStyle(.menu)
+                            if settingsStore.settings.islandPlacement.mode == .custom {
+                                Button(AppLocalization.text("调整位置")) { model.onChooseIslandPlacement?() }
+                            }
+                        }
+                    }
+                }
+                rowDivider
                 settingRow(
                     symbol: "rectangle.on.rectangle.angled",
-                    title: "灵动岛样式",
+                    title: "灵动岛展开材质",
                     detail: "",
                     detailLineLimit: nil
                 ) {
@@ -2478,7 +2519,7 @@ struct SettingsView: View {
                 rowDivider
                 settingRow(
                     symbol: "rectangle.topthird.inset.filled",
-                    title: "刘海背景",
+                    title: "灵动岛收起材质",
                     detail: ""
                 ) {
                     IslandNotchBackgroundPicker(
@@ -3055,7 +3096,6 @@ struct SettingsView: View {
                 )
                 .labelsHidden()
                 .toggleStyle(.switch)
-                .controlSize(.small)
             }
             rowDivider
             settingRow(
@@ -3157,7 +3197,6 @@ struct SettingsView: View {
             ))
             .labelsHidden()
             .toggleStyle(.switch)
-            .controlSize(.small)
         }
     }
 
@@ -3503,7 +3542,6 @@ struct SettingsView: View {
             }
             .labelsHidden()
             .pickerStyle(.menu)
-            .controlSize(.small)
             .keepsIntrinsicWidth()
         }
         rowDivider
@@ -3537,7 +3575,6 @@ struct SettingsView: View {
                     Toggle("", isOn: mailAccountBinding(for: account.id, availableAccounts: accounts))
                         .labelsHidden()
                         .toggleStyle(.switch)
-                        .controlSize(.small)
                         .disabled(isOnlySelectedMailAccount(account.id))
                 }
             }
@@ -3571,6 +3608,13 @@ struct SettingsView: View {
     private func isOnlySelectedMailAccount(_ accountName: String) -> Bool {
         let selected = model.settingsStore.settings.mailAccountNames
         return selected.count == 1 && selected.contains(accountName)
+    }
+
+    static func compactStatusPriorities(settings: FeatureSettings, hasSystemMonitorIcons: Bool) -> [CompactStatusPriority] {
+        settings.compactStatusPriority.filter {
+            $0 != .systemMonitor || (hasSystemMonitorIcons && settings.systemMonitorEnabled
+                && settings.effectiveStatusIconDestination == .island)
+        }
     }
 
     private func moveCompactStatusPriority(_ priority: CompactStatusPriority, to destination: CompactStatusPriority) {
@@ -3672,6 +3716,7 @@ struct SettingsView: View {
         case .aiActivity: "sparkles"
         case .media: "music.note"
         case .focusMode: "moon.fill"
+        case .systemMonitor: "gauge.with.dots.needle.67percent"
         }
     }
 
@@ -3875,14 +3920,8 @@ struct SettingsView: View {
         panel.directoryURL = model.downloadDirectory
         WindowPlacement.prepareModal(panel, on: WindowPlacement.screenUnderMouse())
         guard panel.runModal() == .OK, let url = panel.url else { return }
-        model.downloadDirectory = url
-        if let bookmark = try? url.bookmarkData(
-            options: .withSecurityScope,
-            includingResourceValuesForKeys: nil,
-            relativeTo: nil
-        ) {
-            UserDefaults.standard.set(bookmark, forKey: "download-directory-bookmark")
-        }
+        do { try model.setDownloadDirectory(url) }
+        catch { model.transientMessage = error.localizedDescription }
     }
 
     private func brandIcon(named name: String) -> NSImage? {
@@ -4340,8 +4379,10 @@ enum SettingsSectionGroup: CaseIterable, Identifiable, Hashable {
     case basics
     case sound
     case files
+    case capture
     case aiAndVoice
-    case networkAndOthers
+    case others
+    case recommendationsAndUpdates
 
     var id: Self { self }
 
@@ -4350,9 +4391,15 @@ enum SettingsSectionGroup: CaseIterable, Identifiable, Hashable {
         case .basics: "基础功能"
         case .sound: "声音"
         case .files: "文件"
+        case .capture: "截图与录屏"
         case .aiAndVoice: "AI 与语音"
-        case .networkAndOthers: "网络与其他"
+        case .others: "其他"
+        case .recommendationsAndUpdates: "推荐与反馈更新"
         }
+    }
+
+    func title(settings: FeatureSettings) -> String {
+        self == .recommendationsAndUpdates && !settings.recommendedToolsEnabled ? "反馈更新" : title
     }
 }
 
@@ -4381,9 +4428,11 @@ enum SettingsSection: String, CaseIterable, Identifiable {
         switch self {
         case .general, .features, .info: .basics
         case .keyboardSound: .sound
-        case .clipboardAssistant, .screenshot, .pdfTools, .recording, .download: .files
+        case .pdfTools: .files
+        case .screenshot, .recording: .capture
         case .ai, .voice: .aiAndVoice
-        case .mail, .weather, .networkProxy, .pet, .recommendations, .updates: .networkAndOthers
+        case .clipboardAssistant, .download, .mail, .weather, .networkProxy, .pet: .others
+        case .recommendations, .updates: .recommendationsAndUpdates
         }
     }
 
@@ -4521,7 +4570,7 @@ struct SettingsSidebar: View {
                         let sections = visibleSections.filter { $0.group == group }
                         if !sections.isEmpty {
                             VStack(alignment: .leading, spacing: 5) {
-                                AppLocalizedText(group.title)
+                                AppLocalizedText(group.title(settings: settings))
                                     .font(.system(size: 11, weight: .medium))
                                     .foregroundStyle(.secondary)
                                     .padding(.horizontal, 10)

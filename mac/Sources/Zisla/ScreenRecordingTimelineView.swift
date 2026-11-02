@@ -27,7 +27,7 @@ struct ScreenRecordingTimelineView: View {
                             ForEach(Array(project.edits.segments.enumerated()), id: \.element.id) { index, segment in
                                 Text(AppLocalization.text("片段 %d", index + 1)).tag(Optional(segment.id))
                             }
-                        }.labelsHidden().frame(maxWidth: .infinity)
+                        }.labelsHidden().controlSize(.regular).frame(maxWidth: .infinity)
                             .accessibilityIdentifier("screenRecording.selectedSegment")
                         if let index = project.edits.segments.firstIndex(where: {
                             $0.id == (selectedSegmentID ?? project.edits.segments.first?.id)
@@ -42,7 +42,7 @@ struct ScreenRecordingTimelineView: View {
                                     ForEach([0.25, 0.5, 0.75, 1, 1.25, 1.5, 2, 4, 8], id: \.self) { speed in
                                         Text(speed.formatted() + "×").tag(speed)
                                     }
-                                }.labelsHidden().frame(width: 100)
+                                }.labelsHidden().controlSize(.regular).frame(width: 100)
                             }
                             Divider()
                             HStack(spacing: 14) {

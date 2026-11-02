@@ -256,7 +256,7 @@ struct AIResultSweepTests {
         background: Color = .black
     ) throws -> [NSColor] {
         let renderer = ImageRenderer(content: AIResultSweepBand(
-            status: status, progress: progress, reduceMotion: reduceMotion
+            status: status, progress: progress, edge: .top, reduceMotion: reduceMotion
         ).frame(width: CGFloat(width), height: 34).background(background))
         let bitmap = NSBitmapImageRep(cgImage: try #require(renderer.cgImage))
         return try (0..<width).map {

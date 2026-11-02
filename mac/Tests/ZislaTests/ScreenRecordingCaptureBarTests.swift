@@ -1,6 +1,7 @@
 import AppKit
 import AVFoundation
 import Testing
+import SwiftUI
 import ZislaCore
 import ZislaKit
 
@@ -70,6 +71,52 @@ struct ScreenRecordingCaptureBarTests {
         #expect(controller.hostingView.window?.isVisible == false)
         await model.capture.cancel()
         #expect(model.capture.phase == .idle && model.capture.cameraPreviewState == .idle)
+    }
+
+    @MainActor
+    @Test
+    func captureSourceUsesMediumTextInsideItsToolbarSlot() async throws {
+        let release = EnhancedAccessibilityTestScope.acquire()
+        defer { release() }
+        var dependencies = ScreenRecordingCaptureDependencies.live
+        dependencies.loadSources = { [.init(id: 1, name: "Display", mode: .display,
+            frame: .init(x: 0, y: 0, width: 1_920, height: 1_080))] }
+        dependencies.loadDevices = { .init() }
+        let model = ScreenRecordingStudioModel(capture: .init(dependencies: dependencies))
+        await model.loadSources()
+        defer { model.shutdown() }
+        let controller = ScreenRecordingCaptureBarController(model: model, languageStore: AppLanguageStore(),
+            selectRegion: {}, start: {}, openStudio: {}, cancel: {})
+        defer { controller.shutdown() }
+        for _ in 0..<4 {
+            controller.hostingView.layoutSubtreeIfNeeded()
+            await withCheckedContinuation { continuation in DispatchQueue.main.async { continuation.resume() } }
+        }
+        var source: (any NSAccessibilityElementProtocol)?
+        func visit(_ object: NSObject) {
+            if object.responds(to: NSSelectorFromString("accessibilityIdentifier")),
+               object.value(forKey: "accessibilityIdentifier") as? String == "screenRecording.captureSource" {
+                source = object as? any NSAccessibilityElementProtocol
+            }
+            if object.responds(to: NSSelectorFromString("accessibilityChildren")) {
+                for child in object.value(forKey: "accessibilityChildren") as? [NSObject] ?? [] { visit(child) }
+            }
+        }
+        visit(controller.hostingView)
+        let sourceElement = try #require(source)
+        let frame = controller.hostingView.convert(
+            try #require(controller.hostingView.window).convertFromScreen(sourceElement.accessibilityFrame()), from: nil)
+        let reference = NSHostingView(rootView: Menu {} label: {
+            HStack(spacing: 4) {
+                Text("Display").font(.system(size: 13)).lineLimit(1).truncationMode(.middle)
+                Image(systemName: "chevron.down").font(.system(size: 8, weight: .semibold))
+            }.frame(height: ScreenshotToolbarLayout.controlHeight)
+        }.menuStyle(.borderlessButton).menuIndicator(.hidden)
+            .fixedSize(horizontal: true, vertical: false))
+        #expect(abs(frame.width - reference.fittingSize.width) <= 0.5,
+                "The source label must keep the native medium text size within its unchanged toolbar slot")
+        #expect(frame.height == reference.fittingSize.height)
+        #expect(!model.isRecording && controller.hostingView.window?.isVisible == false)
     }
 
     @MainActor

@@ -1,5 +1,6 @@
 import AppKit
 import CoreGraphics
+import ZislaCore
 
 public struct ScreenInsets: Equatable, Sendable {
     public var top: CGFloat
@@ -115,6 +116,11 @@ public enum TopTopology: Equatable, Sendable {
 }
 
 public struct ScreenLayoutConfiguration: Equatable, Sendable {
+    public static let quickActionRowWidth = ScreenLayoutConfiguration().expandedSize.width + 60
+    public static let cameraPillCenterWidth: CGFloat = 120
+    public static let cameraPillHeight: CGFloat = 32
+    public static let cameraPillMaximumWidth: CGFloat = 240
+
     /// Width of the simulated island and its fallback height when the menu bar
     /// depth is unavailable.
     public var simulatedIslandSize: CGSize
@@ -122,19 +128,40 @@ public struct ScreenLayoutConfiguration: Equatable, Sendable {
     public var transferDragTriggerSize: CGSize
     public var horizontalMargin: CGFloat
     public var notchTriggerHorizontalPadding: CGFloat
+    public var layoutStyle: IslandLayoutStyle
+    public var placement: IslandPlacement
+    public var pillSize: CGSize
+    public var edgeInset: CGFloat
+    public var expandsForDetailedStatus: Bool
+    public var compactStatusLength: CGFloat?
+    public var statusIconSize: CGSize?
 
     public init(
         simulatedIslandSize: CGSize = CGSize(width: 240, height: 34),
         expandedSize: CGSize = CGSize(width: 420, height: 180),
         transferDragTriggerSize: CGSize = CGSize(width: 320, height: 48),
         horizontalMargin: CGFloat = 12,
-        notchTriggerHorizontalPadding: CGFloat = 24
+        notchTriggerHorizontalPadding: CGFloat = 24,
+        layoutStyle: IslandLayoutStyle = .notch,
+        placement: IslandPlacement = IslandPlacement(),
+        pillSize: CGSize = CGSize(width: 80, height: 24),
+        edgeInset: CGFloat = 8,
+        expandsForDetailedStatus: Bool = false,
+        compactStatusLength: CGFloat? = nil,
+        statusIconSize: CGSize? = nil
     ) {
         self.simulatedIslandSize = simulatedIslandSize
         self.expandedSize = expandedSize
         self.transferDragTriggerSize = transferDragTriggerSize
         self.horizontalMargin = horizontalMargin
         self.notchTriggerHorizontalPadding = notchTriggerHorizontalPadding
+        self.layoutStyle = layoutStyle
+        self.placement = placement
+        self.pillSize = pillSize
+        self.edgeInset = edgeInset
+        self.expandsForDetailedStatus = expandsForDetailedStatus
+        self.compactStatusLength = compactStatusLength
+        self.statusIconSize = statusIconSize
     }
 }
 
@@ -146,9 +173,62 @@ public struct ScreenOverlayLayout: Equatable, Identifiable, Sendable {
     public let triggerFrame: CGRect
     public let transferDragTriggerFrame: CGRect
     public let expandedFrame: CGRect
+    public let style: IslandLayoutStyle
+    public let edge: IslandEdge
+    public let physicalOcclusionFrame: CGRect?
+    public let placementBounds: CGRect
+    public let placementMode: IslandPlacementMode
 
     public var id: CGDirectDisplayID { displayID }
     public var collapsedFrame: CGRect { topology.anchorFrame }
+
+    public var centerOcclusionWidth: CGFloat {
+        guard let physicalOcclusionFrame else { return 0 }
+        let intersection = collapsedFrame.intersection(physicalOcclusionFrame)
+        return intersection.isEmpty ? 0 : intersection.width
+    }
+
+    public var collapsedFrameInExpanded: CGRect {
+        collapsedFrame.offsetBy(dx: -expandedFrame.minX, dy: -expandedFrame.minY)
+    }
+
+    public var collapsedFrameInExpandedTopLeading: CGRect {
+        CGRect(
+            x: collapsedFrame.minX - expandedFrame.minX,
+            y: expandedFrame.maxY - collapsedFrame.maxY,
+            width: collapsedFrame.width,
+            height: collapsedFrame.height
+        )
+    }
+
+    public init(
+        displayID: CGDirectDisplayID,
+        screenFrame: CGRect,
+        topBarHeight: CGFloat,
+        topology: TopTopology,
+        triggerFrame: CGRect,
+        transferDragTriggerFrame: CGRect,
+        expandedFrame: CGRect,
+        style: IslandLayoutStyle = .notch,
+        edge: IslandEdge = .top,
+        physicalOcclusionFrame: CGRect? = nil,
+        placementBounds: CGRect? = nil,
+        placementMode: IslandPlacementMode = .camera
+    ) {
+        self.displayID = displayID
+        self.screenFrame = screenFrame
+        self.topBarHeight = topBarHeight
+        self.topology = topology
+        self.triggerFrame = triggerFrame
+        self.transferDragTriggerFrame = transferDragTriggerFrame
+        self.expandedFrame = expandedFrame
+        self.style = style
+        self.edge = edge
+        self.physicalOcclusionFrame = physicalOcclusionFrame
+            ?? (topology.hasPhysicalNotch ? topology.anchorFrame : nil)
+        self.placementBounds = placementBounds ?? screenFrame
+        self.placementMode = placementMode
+    }
 
     public func containsTrigger(_ point: CGPoint) -> Bool {
         point.x >= triggerFrame.minX && point.x <= triggerFrame.maxX
@@ -174,6 +254,9 @@ public struct ScreenLayoutEngine: Equatable, Sendable {
     }
 
     public func layout(for screen: ScreenSnapshot) -> ScreenOverlayLayout {
+        if configuration.layoutStyle == .pill {
+            return pillLayout(for: screen)
+        }
         let topology = topology(for: screen)
         let anchor = topology.anchorFrame
         let triggerAnchor: CGRect
@@ -257,6 +340,256 @@ public struct ScreenLayoutEngine: Equatable, Sendable {
     ) -> ScreenOverlayLayout? {
         guard hasSupportedPayload else { return nil }
         return layouts.first { $0.containsTransferDragTrigger(point) }
+    }
+
+    public func placement(
+        nearest point: CGPoint,
+        on screen: ScreenSnapshot,
+        preferredEdge: IslandEdge = .top
+    ) -> IslandPlacement {
+        let frame = screen.frame
+        let x = min(frame.maxX, max(frame.minX, point.x))
+        let y = min(frame.maxY, max(frame.minY, point.y))
+        let distances: [(IslandEdge, CGFloat)] = [
+            (.top, hypot(point.x - x, point.y - frame.maxY)),
+            (.bottom, hypot(point.x - x, point.y - frame.minY)),
+            (.left, hypot(point.x - frame.minX, point.y - y)),
+            (.right, hypot(point.x - frame.maxX, point.y - y)),
+        ]
+        let nearestDistance = distances.map(\.1).min()!
+        let candidates = distances.filter { abs($0.1 - nearestDistance) < 0.001 }
+        let edge = candidates.first { $0.0 == preferredEdge }?.0 ?? candidates[0].0
+        let length = edge.isVertical ? frame.height : frame.width
+        let position = edge.isVertical ? y - frame.minY : x - frame.minX
+        var placement = IslandPlacement(
+            mode: .custom,
+            edge: edge,
+            offset: Double(position / length)
+        )
+        var engine = self
+        engine.configuration.layoutStyle = .pill
+        engine.configuration.placement = placement
+        let layout = engine.layout(for: screen)
+        let thickness = edge.isVertical ? layout.collapsedFrame.width : layout.collapsedFrame.height
+        let centerFrame = CGRect(origin: point, size: .zero)
+        let gap = Self.clampedInwardDistance(
+            Self.edgeDistance(of: centerFrame, in: frame, edge: edge) - thickness / 2,
+            thickness: thickness, edge: edge, bounds: layout.placementBounds, screenFrame: frame)
+        let minimumGap = Self.edgeDistance(of: layout.placementBounds, in: frame, edge: edge)
+        placement.inwardDistance = gap == minimumGap ? 0 : Double(gap)
+        return placement
+    }
+
+    private func pillLayout(for screen: ScreenSnapshot) -> ScreenOverlayLayout {
+        let isCamera = configuration.placement.mode == .camera
+        let edge = isCamera ? .top : configuration.placement.edge
+        let offset = isCamera ? 0.5 : configuration.placement.offset
+        let inset = isCamera ? 2 : finiteNonnegative(configuration.edgeInset, fallback: 8)
+        let menuBarHeight = min(screen.frame.height, screen.topBarHeight > 0 ? screen.topBarHeight : 24)
+        let occlusion = physicalNotchFrame(for: screen)
+        var horizontalSize = CGSize(
+            width: finiteNonnegative(configuration.pillSize.width, fallback: 80),
+            height: finiteNonnegative(configuration.pillSize.height, fallback: 24)
+        )
+        if isCamera {
+            horizontalSize.height = ScreenLayoutConfiguration.cameraPillHeight
+        } else {
+            horizontalSize.width = horizontalSize.height
+            if let iconSize = configuration.statusIconSize {
+                horizontalSize.width = max(horizontalSize.width, edge.isVertical ? iconSize.height : iconSize.width)
+                horizontalSize.height = max(horizontalSize.height, edge.isVertical ? iconSize.width : iconSize.height)
+            }
+            horizontalSize.width = min(horizontalSize.width, ScreenLayoutConfiguration.quickActionRowWidth)
+        }
+        let thickness = !isCamera && configuration.compactStatusLength != nil
+            ? max(horizontalSize.height, CompactPillStatusPresentation.minimumThickness) : horizontalSize.height
+        let shortLength = edge.isVertical ? screen.frame.width : screen.frame.height
+        // The inset must fit within three times the thickness left after both screen margins are removed.
+        let shortInset = min(inset, thickness * 3, shortLength * 3 / 7)
+        let bounds = screen.frame.insetBy(
+            dx: edge.isVertical ? shortInset : min(inset, screen.frame.width / 2),
+            dy: edge.isVertical ? min(inset, screen.frame.height / 2) : min(shortInset, screen.frame.height / 2)
+        )
+        let size = CGSize(
+            width: min(edge.isVertical ? horizontalSize.height : horizontalSize.width, bounds.width),
+            height: min(edge.isVertical ? horizontalSize.width : horizontalSize.height, bounds.height)
+        )
+        let centerX = screen.frame.minX + screen.frame.width * offset
+        let centerY = screen.frame.minY + screen.frame.height * offset
+        var anchor = CGRect(
+            x: clampedOrigin(centerX - size.width / 2, length: size.width, minimum: bounds.minX, maximum: bounds.maxX),
+            y: clampedOrigin(centerY - size.height / 2, length: size.height, minimum: bounds.minY, maximum: bounds.maxY),
+            width: size.width,
+            height: size.height
+        )
+        switch edge {
+        case .top: anchor.origin.y = bounds.maxY - size.height
+        case .bottom: anchor.origin.y = bounds.minY
+        case .left: anchor.origin.x = bounds.minX
+        case .right: anchor.origin.x = bounds.maxX - size.width
+        }
+
+        if isCamera {
+            // Preserve the top edge of the previous 40pt pill while trimming its bottom.
+            let top = screen.frame.maxY - menuBarHeight / 2 + 20
+            anchor.origin.y = clampedOrigin(top - anchor.height,
+                length: anchor.height, minimum: bounds.minY, maximum: bounds.maxY)
+        }
+        anchor = Self.compactPillFrame(
+            anchor, edge: edge, bounds: bounds,
+            center: edge.isVertical ? centerY : centerX,
+            physicalOcclusionFrame: occlusion, placementMode: configuration.placement.mode,
+            screenFrame: screen.frame, inwardDistance: CGFloat(configuration.placement.inwardDistance),
+            expandsForDetailedStatus: configuration.expandsForDetailedStatus,
+            compactStatusLength: configuration.compactStatusLength
+        )
+
+        let transferSize = edge.isVertical
+            ? CGSize(width: configuration.transferDragTriggerSize.height, height: configuration.transferDragTriggerSize.width)
+            : configuration.transferDragTriggerSize
+        var expandedFrame = inwardFrame(size: configuration.expandedSize, from: anchor, edge: edge, in: bounds)
+        if edge.isVertical {
+            if anchor.midY >= screen.frame.midY {
+                expandedFrame.size.height = min(expandedFrame.height, anchor.maxY - bounds.minY)
+                expandedFrame.origin.y = anchor.maxY - expandedFrame.height
+            } else {
+                expandedFrame.size.height = min(expandedFrame.height, bounds.maxY - anchor.minY)
+                expandedFrame.origin.y = anchor.minY
+            }
+        }
+        return ScreenOverlayLayout(
+            displayID: screen.displayID,
+            screenFrame: screen.frame,
+            topBarHeight: screen.topBarHeight,
+            topology: .simulated(frame: anchor),
+            triggerFrame: anchor,
+            transferDragTriggerFrame: inwardFrame(size: transferSize, from: anchor, edge: edge, in: bounds),
+            expandedFrame: expandedFrame,
+            style: .pill,
+            edge: edge,
+            physicalOcclusionFrame: occlusion,
+            placementBounds: bounds,
+            placementMode: configuration.placement.mode
+        )
+    }
+
+    static func compactPillFrame(
+        _ initial: CGRect,
+        edge: IslandEdge,
+        bounds: CGRect,
+        center: CGFloat,
+        physicalOcclusionFrame: CGRect?,
+        placementMode: IslandPlacementMode,
+        screenFrame: CGRect,
+        inwardDistance: CGFloat,
+        expandsForDetailedStatus: Bool,
+        compactStatusLength: CGFloat? = nil
+    ) -> CGRect {
+        var frame = initial
+        if placementMode == .custom, compactStatusLength != nil {
+            if edge.isVertical {
+                frame.size.width = min(bounds.width, max(frame.width, CompactPillStatusPresentation.minimumThickness))
+            } else {
+                frame.size.height = min(bounds.height, max(frame.height, CompactPillStatusPresentation.minimumThickness))
+            }
+        }
+        let desiredLength: CGFloat?
+        if placementMode == .camera {
+            let minimumLength = max(ScreenLayoutConfiguration.cameraPillCenterWidth,
+                physicalOcclusionFrame?.width ?? 0) + SideNoticeLayoutEngine.compactStatusWingWidth * 2
+            let contentLength = expandsForDetailedStatus ? ScreenLayoutConfiguration.cameraPillMaximumWidth
+                : compactStatusLength.map { min(ScreenLayoutConfiguration.cameraPillMaximumWidth, max(minimumLength, $0)) }
+                    ?? frame.width
+            desiredLength = max(minimumLength, contentLength)
+        } else if placementMode == .custom, let compactStatusLength {
+            let thickness = edge.isVertical ? frame.width : frame.height
+            desiredLength = min(ScreenLayoutConfiguration.quickActionRowWidth, max(thickness, compactStatusLength))
+        } else {
+            desiredLength = nil
+        }
+        if let desiredLength {
+            if edge.isVertical {
+                let length = min(bounds.height, desiredLength)
+                frame.origin.y = min(bounds.maxY - length, max(bounds.minY, center - length / 2))
+                frame.size.height = length
+            } else {
+                let length = min(bounds.width, desiredLength)
+                frame.origin.x = min(bounds.maxX - length, max(bounds.minX, center - length / 2))
+                frame.size.width = length
+            }
+        }
+        if placementMode == .custom {
+            let thickness = edge.isVertical ? frame.width : frame.height
+            let gap = Self.clampedInwardDistance(inwardDistance, thickness: thickness,
+                edge: edge, bounds: bounds, screenFrame: screenFrame)
+            switch edge {
+            case .top: frame.origin.y = screenFrame.maxY - gap - frame.height
+            case .bottom: frame.origin.y = screenFrame.minY + gap
+            case .left: frame.origin.x = screenFrame.minX + gap
+            case .right: frame.origin.x = screenFrame.maxX - gap - frame.width
+            }
+        }
+        if placementMode == .custom, edge == .top, let physicalOcclusionFrame,
+           frame.intersects(physicalOcclusionFrame) {
+            // The reserved screen region may cover more than the camera aperture.
+            let depth = screenFrame.maxY - physicalOcclusionFrame.minY
+            let clearance = min(Self.edgeDistance(of: bounds, in: screenFrame, edge: edge),
+                max(0, frame.height * 3 - depth))
+            let top = min(bounds.maxY, max(bounds.minY, physicalOcclusionFrame.minY - clearance))
+            frame.size.height = min(frame.height, top - bounds.minY)
+            frame.origin.y = top - frame.height
+        }
+        return frame
+    }
+
+    private func inwardFrame(size: CGSize, from anchor: CGRect, edge: IslandEdge, in bounds: CGRect) -> CGRect {
+        var width = min(max(anchor.width, size.width), bounds.width)
+        var height = min(max(anchor.height, size.height), bounds.height)
+        switch edge {
+        case .top: height = min(height, anchor.maxY - bounds.minY)
+        case .bottom: height = min(height, bounds.maxY - anchor.minY)
+        case .left: width = min(width, bounds.maxX - anchor.minX)
+        case .right: width = min(width, anchor.maxX - bounds.minX)
+        }
+        var frame = CGRect(
+            x: clampedOrigin(anchor.midX - width / 2, length: width, minimum: bounds.minX, maximum: bounds.maxX),
+            y: clampedOrigin(anchor.midY - height / 2, length: height, minimum: bounds.minY, maximum: bounds.maxY),
+            width: width,
+            height: height
+        )
+        switch edge {
+        case .top: frame.origin.y = anchor.maxY - height
+        case .bottom: frame.origin.y = anchor.minY
+        case .left: frame.origin.x = anchor.minX
+        case .right: frame.origin.x = anchor.maxX - width
+        }
+        return frame
+    }
+
+    static func edgeDistance(of frame: CGRect, in screenFrame: CGRect, edge: IslandEdge) -> CGFloat {
+        switch edge {
+        case .top: screenFrame.maxY - frame.maxY
+        case .bottom: frame.minY - screenFrame.minY
+        case .left: frame.minX - screenFrame.minX
+        case .right: screenFrame.maxX - frame.maxX
+        }
+    }
+
+    private static func clampedInwardDistance(
+        _ distance: CGFloat, thickness: CGFloat, edge: IslandEdge, bounds: CGRect, screenFrame: CGRect
+    ) -> CGFloat {
+        let minimum = edgeDistance(of: bounds, in: screenFrame, edge: edge)
+        let screenLength = edge.isVertical ? screenFrame.width : screenFrame.height
+        let maximum = min(thickness * 3, screenLength - thickness - minimum)
+        return min(maximum, max(minimum, distance))
+    }
+
+    private func clampedOrigin(_ value: CGFloat, length: CGFloat, minimum: CGFloat, maximum: CGFloat) -> CGFloat {
+        min(maximum - length, max(minimum, value))
+    }
+
+    private func finiteNonnegative(_ value: CGFloat, fallback: CGFloat) -> CGFloat {
+        value.isFinite ? max(0, value) : fallback
     }
 
     private func topology(for screen: ScreenSnapshot) -> TopTopology {

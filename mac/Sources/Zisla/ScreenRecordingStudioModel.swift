@@ -52,6 +52,7 @@ final class ScreenRecordingStudioModel: ObservableObject {
     @Published var subtitleLanguage: AppLanguage = .simplifiedChinese
     private let appModel: AppModel?
     private let outputDirectoryStore: ScreenRecordingOutputDirectoryStore
+    private let setDownloadDirectory: ((URL) throws -> Void)?
     private let renderPreview: (ScreenRecordingProject, URL, Double) async throws -> CGImage
     private let presentExportPanel: (NSSavePanel, @escaping (URL?) -> Void) -> Void
     private var outputPanel: NSSavePanel?
@@ -80,6 +81,8 @@ final class ScreenRecordingStudioModel: ObservableObject {
          transcriber: ScreenRecordingTranscriber = ScreenRecordingTranscriber(),
          projectStore: ScreenRecordingProjectStore? = nil,
          outputDirectoryStore: ScreenRecordingOutputDirectoryStore = ScreenRecordingOutputDirectoryStore(),
+         downloadDirectoryPublisher: AnyPublisher<URL, Never>? = nil,
+         setDownloadDirectory: ((URL) throws -> Void)? = nil,
          renderPreview: ((ScreenRecordingProject, URL, Double) async throws -> CGImage)? = nil,
          presentExportPanel: @escaping (NSSavePanel, @escaping (URL?) -> Void) -> Void = { panel, completion in
              panel.begin { response in completion(response == .OK ? panel.url : nil) }
@@ -98,6 +101,9 @@ final class ScreenRecordingStudioModel: ObservableObject {
         self.exporter = exporter
         self.transcriber = transcriber
         self.outputDirectoryStore = outputDirectoryStore
+        self.setDownloadDirectory = setDownloadDirectory ?? appModel.map { model in
+            { try model.setDownloadDirectory($0) }
+        }
         self.presentExportPanel = presentExportPanel
         self.notices = notices ?? appModel?.notices ?? SideNoticeQueue()
         self.writeProjectFiles = writeProjectFiles
@@ -127,6 +133,10 @@ final class ScreenRecordingStudioModel: ObservableObject {
         selectedAIModel = appModel?.settingsStore.settings.voiceModelConfiguration
         subtitleLanguage = appModel?.languageStore.language ?? .simplifiedChinese
         let notifyError = onError ?? { [weak appModel] message in appModel?.transientMessage = message }
+        let directoryPublisher = downloadDirectoryPublisher ?? appModel?.$downloadDirectory.eraseToAnyPublisher()
+        directoryPublisher?.sink { [weak self] directory in
+            self?.recordingOutputDirectory = directory
+        }.store(in: &cancellables)
         $errorMessage.removeDuplicates().compactMap { $0 }
             .sink(receiveValue: notifyError).store(in: &cancellables)
         capture.$phase.combineLatest(capture.$elapsed)
@@ -241,8 +251,11 @@ final class ScreenRecordingStudioModel: ObservableObject {
 
     func setRecordingOutputDirectory(_ url: URL) throws {
         guard !isRecording, !isBusy, !exporter.isExporting else { return }
-        try outputDirectoryStore.setDirectory(url)
-        recordingOutputDirectory = outputDirectoryStore.directory
+        if let setDownloadDirectory { try setDownloadDirectory(url) }
+        else {
+            try outputDirectoryStore.setDirectory(url)
+            recordingOutputDirectory = outputDirectoryStore.directory
+        }
     }
 
     func selectMode(_ mode: RecordingCaptureMode) {

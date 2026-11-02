@@ -4,6 +4,7 @@ import ZislaCore
 
 @MainActor
 public final class SideNoticeQueue: ObservableObject {
+    public nonisolated static let defaultCapacityPerSide = 3
     @Published public private(set) var left: [IslandNotice] = []
     @Published public private(set) var right: [IslandNotice] = []
 
@@ -12,7 +13,7 @@ public final class SideNoticeQueue: ObservableObject {
     private let capacityPerSide: Int
     private let expirySleeper: @Sendable (Duration) async throws -> Void
 
-    public convenience init(capacityPerSide: Int = 3) {
+    public convenience init(capacityPerSide: Int = SideNoticeQueue.defaultCapacityPerSide) {
         self.init(
             capacityPerSide: capacityPerSide,
             expirySleeper: { try await Task.sleep(for: $0) }

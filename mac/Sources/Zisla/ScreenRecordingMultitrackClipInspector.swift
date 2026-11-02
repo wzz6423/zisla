@@ -46,6 +46,7 @@ struct ScreenRecordingMultitrackClipInspector: View {
                             Text(speed.formatted() + "×").tag(speed)
                         }
                     }
+                    .controlSize(.regular)
                     Toggle(AppLocalization.text("音频"), isOn: Binding(get: { model.selectedTimelineClip?.audioEnabled ?? clip.audioEnabled },
                         set: { enabled in model.updateTimelineClip(clip.id) { $0.audioEnabled = enabled } }))
                     ScreenRecordingParameterRow(title: AppLocalization.text("音量"), value: number(clip, \.volume),
@@ -62,6 +63,7 @@ struct ScreenRecordingMultitrackClipInspector: View {
                         Text(track.title(at: index)).tag(track.id)
                     }
                 }
+                .controlSize(.regular)
                 .accessibilityIdentifier("screenRecording.clipTrack")
                 if case let .annotation(id) = clip.content {
                     Button(AppLocalization.text("标注内容")) {

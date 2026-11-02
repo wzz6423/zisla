@@ -6,6 +6,53 @@ import ZislaCore
 @testable import Zisla
 
 struct AIResultSweepAppearanceTests {
+    @Test(arguments: IslandEdge.allCases, [AIProgressStatus.succeeded, .failed, .error]) @MainActor
+    func lightFollowsThePhysicalPillAxis(edge: IslandEdge, status: AIProgressStatus) throws {
+        let width = edge.isVertical ? 34 : 250
+        let height = edge.isVertical ? 250 : 34
+        var centers: [Double] = []
+        for progress in [0.25, 0.5, 0.75] {
+            let pixels = try dominantPixels(renderedBand(
+                status: status, progress: progress, width: width, height: height, edge: edge
+            ), status: status)
+            let total = pixels.reduce(0, +)
+            try #require(total > 0)
+            centers.append(pixels.indices.reduce(0.0) {
+                $0 + Double(edge.isVertical ? $1 / width : $1 % width) * pixels[$1]
+            } / total)
+        }
+        #expect(centers[1] - centers[0] > 45 && centers[2] - centers[1] > 45,
+                "光带必须沿药丸长轴移动：左右侧从上往下，顶部和底部从左往右")
+    }
+
+    @Test(arguments: [IslandEdge.left, .right], [AIProgressStatus.succeeded, .failed, .error]) @MainActor
+    func verticalReducedMotionStaysCenteredAndFinishedFramesAreClear(
+        edge: IslandEdge, status: AIProgressStatus
+    ) throws {
+        let width = 34
+        let height = 250
+        let still = try dominantPixels(renderedBand(
+            status: status, progress: 0.25, width: width, height: height, edge: edge, reduceMotion: true
+        ), status: status)
+        let later = try dominantPixels(renderedBand(
+            status: status, progress: 0.75, width: width, height: height, edge: edge, reduceMotion: true
+        ), status: status)
+        #expect(zip(still, later).allSatisfy { abs($0 - $1) < 0.01 },
+                "减少动态效果时光带不能沿竖直轴移动")
+        for y in 0..<height {
+            let row = Array(still[y * width..<(y + 1) * width])
+            #expect(row.max()! - row.min()! < 0.01, "静止光带不能残留粒子纹理")
+        }
+        #expect(still[height / 2 * width + width / 2] > still[height / 4 * width + width / 2] * 1.5,
+                "静止光带必须以药丸竖直中心为亮芯")
+        for progress in [0.0, 1.0] {
+            let pixels = try dominantPixels(renderedBand(
+                status: status, progress: progress, width: width, height: height, edge: edge
+            ), status: status)
+            #expect(pixels.max()! < 0.01, "开始与结束边界不能残留扫光")
+        }
+    }
+
     @Test @MainActor
     func resultColorsRemainDeepWithAVisibleGradient() throws {
         for status: AIProgressStatus in [.succeeded, .failed] {
@@ -154,10 +201,11 @@ struct AIResultSweepAppearanceTests {
 
     @MainActor
     private func renderedBand(
-        status: AIProgressStatus, progress: Double, width: Int, height: Int, reduceMotion: Bool = false
+        status: AIProgressStatus, progress: Double, width: Int, height: Int,
+        edge: IslandEdge = .top, reduceMotion: Bool = false
     ) throws -> NSBitmapImageRep {
         let renderer = ImageRenderer(content: AIResultSweepBand(
-            status: status, progress: progress, reduceMotion: reduceMotion
+            status: status, progress: progress, edge: edge, reduceMotion: reduceMotion
         ).frame(width: CGFloat(width), height: CGFloat(height)).background(.black))
         return NSBitmapImageRep(cgImage: try #require(renderer.cgImage))
     }

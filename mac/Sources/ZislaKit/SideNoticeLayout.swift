@@ -140,7 +140,7 @@ public struct SideNoticeLayoutEngine: Equatable, Sendable {
             + CGFloat(max(0, digitCount - 2)) * compactStatusAdditionalDigitWidth
     }
 
-    private enum Layout {
+    enum Layout {
         static let compactWingWidth = SideNoticeLayoutEngine.compactStatusWingWidth
         /// Countdown expanded bar aligned to the simulated 240 pt island width for notch-less devices,
         /// ensuring `HH:MM:SS` is not squeezed by the notch's corner radii and masks.
@@ -169,7 +169,8 @@ public struct SideNoticeLayoutEngine: Equatable, Sendable {
     /// user's normal collapsed-status ordering until the transient notice expires.
     public static func selectedCompactStatusPriority(
         for notices: [IslandNotice],
-        settings: FeatureSettings
+        settings: FeatureSettings,
+        systemMonitorAvailable: Bool = false
     ) -> CompactStatusPriority? {
         if notices.contains(where: {
             $0.id.hasPrefix("focus-transition") || LowBatteryNoticeController.isLowBatteryNotice($0)
@@ -178,7 +179,9 @@ public struct SideNoticeLayoutEngine: Equatable, Sendable {
         }
         let priorities = CompactStatusPriority.normalized(settings.compactStatusPriority)
         return priorities.first {
-            compactStatusIsAvailable($0, notices: notices)
+            compactStatusIsAvailable($0, notices: notices,
+                systemMonitorAvailable: systemMonitorAvailable && settings.systemMonitorEnabled
+                    && settings.effectiveStatusIconDestination == .island)
         }
     }
 
@@ -391,6 +394,12 @@ public struct SideNoticeLayoutEngine: Equatable, Sendable {
             settings: settings,
             browserDownloadCount: browserDownloadCount
         ) else { return nil }
+        if settings.islandLayoutStyle == .pill {
+            var configuration = settings.islandScreenConfiguration
+            configuration.expandsForDetailedStatus = sizing.expandsForDetailedStatus
+            configuration.compactStatusLength = sizing.customPillLength
+            return ScreenLayoutEngine(configuration: configuration).layout(for: screen).collapsedFrame
+        }
         return compactBarFrame(
             for: screen,
             sideExtension: sizing.sideExtension,
@@ -423,6 +432,18 @@ public struct SideNoticeLayoutEngine: Equatable, Sendable {
         compactWingWidth: CGFloat = Layout.compactWingWidth,
         minimumSimulatedHeight: CGFloat = 0
     ) -> CGRect {
+        if layout.style == .pill {
+            return ScreenLayoutEngine.compactPillFrame(
+                layout.collapsedFrame, edge: layout.edge, bounds: layout.placementBounds,
+                center: layout.edge.isVertical ? layout.collapsedFrame.midY : layout.collapsedFrame.midX,
+                physicalOcclusionFrame: layout.physicalOcclusionFrame,
+                placementMode: layout.placementMode,
+                screenFrame: layout.screenFrame,
+                inwardDistance: ScreenLayoutEngine.edgeDistance(
+                    of: layout.collapsedFrame, in: layout.screenFrame, edge: layout.edge),
+                expandsForDetailedStatus: expandsForDetailedMedia
+            )
+        }
         let anchor = layout.topology.anchorFrame
         let baseWidth: CGFloat
         if layout.topology.hasPhysicalNotch {
@@ -465,11 +486,33 @@ public struct SideNoticeLayoutEngine: Equatable, Sendable {
         settings: FeatureSettings,
         browserDownloadCount: Int = 0
     ) -> CGRect? {
+        if settings.effectiveStatusIconDestination == .island { return layout.collapsedFrame }
         guard let sizing = compactBarSizing(
             for: notices,
             settings: settings,
             browserDownloadCount: browserDownloadCount
         ) else { return nil }
+        if layout.style == .pill {
+            let initial = layout.collapsedFrame
+            let center: CGFloat
+            if layout.placementMode == .custom {
+                center = layout.edge.isVertical
+                    ? layout.screenFrame.minY + layout.screenFrame.height * settings.islandPlacement.offset
+                    : layout.screenFrame.minX + layout.screenFrame.width * settings.islandPlacement.offset
+            } else {
+                center = initial.midX
+            }
+            return ScreenLayoutEngine.compactPillFrame(
+                initial, edge: layout.edge, bounds: layout.placementBounds,
+                center: center,
+                physicalOcclusionFrame: layout.physicalOcclusionFrame,
+                placementMode: layout.placementMode,
+                screenFrame: layout.screenFrame,
+                inwardDistance: CGFloat(settings.islandPlacement.inwardDistance),
+                expandsForDetailedStatus: sizing.expandsForDetailedStatus,
+                compactStatusLength: sizing.customPillLength
+            )
+        }
         return compactBarFrame(
             for: layout,
             sideExtension: sizing.sideExtension,
@@ -480,22 +523,31 @@ public struct SideNoticeLayoutEngine: Equatable, Sendable {
         )
     }
 
-    private func compactBarSizing(
+    public func compactBarSizing(
         for notices: [IslandNotice],
         settings: FeatureSettings,
-        browserDownloadCount: Int
+        browserDownloadCount: Int = 0
     ) -> (
         sideExtension: CGFloat,
         expandsForDetailedStatus: Bool,
         progressGlowEnabled: Bool,
         compactWingWidth: CGFloat,
-        minimumSimulatedHeight: CGFloat
+        minimumSimulatedHeight: CGFloat,
+        customPillLength: CGFloat,
+        customPillPresentation: CompactPillStatusPresentation?
     )? {
-        if notices.contains(where: { $0.id.hasPrefix("voice-processing-") }) {
-            return (0, false, false, Layout.compactWingWidth, 0)
+        let thickness = settings.islandLayoutStyle == .pill && settings.islandPlacement.mode == .custom
+            ? max(CGFloat(settings.islandPillHeight), CompactPillStatusPresentation.minimumThickness)
+            : CGFloat(settings.islandPillHeight)
+        if let notice = notices.first(where: { $0.id.hasPrefix("voice-processing-") }) {
+            let presentation = CompactPillStatusPresentation(priority: nil, notice: notice,
+                text: notice.detail ?? "")
+            return (0, false, false, Layout.compactWingWidth, 0,
+                    presentation.length(thickness: thickness, edge: settings.islandPlacement.edge), presentation)
         }
         if Self.screenRecordingOperationNotice(for: notices, settings: settings) != nil {
-            return (0, false, settings.collapsedProgressGlowEnabled, Layout.compactWingWidth, 0)
+            return (0, false, settings.collapsedProgressGlowEnabled, Layout.compactWingWidth, 0,
+                    thickness * 2 + 6 + CompactPillStatusPresentation.trailingInset * 2, nil)
         }
         let selectedPriority = Self.selectedCompactStatusPriority(for: notices, settings: settings)
         guard let selectedPriority else { return nil }
@@ -548,18 +600,69 @@ public struct SideNoticeLayoutEngine: Equatable, Sendable {
         default:
             Layout.compactWingWidth
         }
+        let selectedNotice: IslandNotice? = switch selectedPriority {
+        case .transient: displayedTransientNotice
+        case .updateAvailable: notices.first { $0.id.hasPrefix("update-available-") }
+        case .mail: notices.filter { $0.id.hasPrefix("mail-notification-") }.max { $0.createdAt < $1.createdAt }
+        case .videoDownload: notices.first { $0.id.hasPrefix("video-download-") }
+        case .browserDownload: notices.first { $0.id.hasPrefix("browser-download-") }
+        case .focusCountdown: notices.first { $0.id.hasPrefix("focus-countdown-") }
+        case .toolboxReminder: notices.first { $0.id.hasPrefix("toolbox-reminder-") }
+        case .aiActivity: notices.first { $0.id.hasPrefix("ai-active-") }
+        case .media: notices.first { $0.id.hasPrefix("media-active-") }
+            ?? notices.first { $0.id.hasPrefix("background-sound-") }
+        case .focusMode: notices.first { $0.id.hasPrefix("focus-mode-") }
+        case .systemMonitor: nil
+        }
+        let aiCount = selectedPriority == .aiActivity ? notices.count { $0.id.hasPrefix("ai-active-") } : 0
+        let text: String
+        switch selectedPriority {
+        case .aiActivity:
+            text = aiCount > 999 ? "999+" : String(aiCount)
+        case .media:
+            text = settings.mediaCompactStyle == .detailed && settings.mediaShowLyricsAndInfo
+                ? selectedNotice?.metadata?["compactLyric"] ?? "" : ""
+        case .mail:
+            text = settings.mailCompactStyle == .detailed
+                ? [selectedNotice?.title, selectedNotice?.detail].compactMap { $0 }.joined(separator: " ") : ""
+        case .browserDownload, .videoDownload:
+            if let progress = selectedNotice?.progress, progress.isFinite {
+                text = "\(Int(min(1, max(0, progress)) * 100))%"
+            } else {
+                text = selectedNotice?.detail ?? ""
+            }
+        case .transient:
+            let batteries = selectedNotice?.batteryLevels?.compactMap { battery in
+                battery.level.map { "\(battery.label) \($0)%" }
+            }.joined(separator: " ") ?? ""
+            let detail = batteries.isEmpty ? selectedNotice?.detail ?? "" : batteries
+            text = selectedNotice?.style == .headphone
+                ? [selectedNotice?.title ?? "", detail].filter { !$0.isEmpty }.joined(separator: " ")
+                : detail
+        default:
+            text = selectedNotice?.detail ?? ""
+        }
+        let presentation = selectedNotice.map {
+            CompactPillStatusPresentation(priority: selectedPriority, notice: $0, text: text,
+                aiCount: aiCount,
+                showsWaveform: selectedPriority == .media && $0.id.hasPrefix("media-active-")
+                    && settings.mediaVisualizationStyle == .waveform)
+        }
         return (
             sideExtension,
             expandsForDetailedStatus,
             progressGlowEnabled,
             compactWingWidth,
-            displaysHeadphone ? Layout.defaultCompactWingHeight + 2 : 0
+            displaysHeadphone ? Layout.defaultCompactWingHeight + 2 : 0,
+            presentation?.length(thickness: thickness, edge: settings.islandPlacement.edge) ?? thickness,
+            presentation
         )
     }
 
     private static func compactStatusIsAvailable(
         _ priority: CompactStatusPriority,
-        notices: [IslandNotice]
+        notices: [IslandNotice],
+        systemMonitorAvailable: Bool
     ) -> Bool {
         return switch priority {
         case .transient:
@@ -584,6 +687,8 @@ public struct SideNoticeLayoutEngine: Equatable, Sendable {
             }
         case .focusMode:
             notices.contains { $0.id.hasPrefix("focus-mode-") }
+        case .systemMonitor:
+            systemMonitorAvailable
         }
     }
 
@@ -617,9 +722,48 @@ public struct SideNoticeLayoutEngine: Equatable, Sendable {
     public func frame(
         side: NoticeSide,
         presentation: SideNoticePresentation,
-        screen: ScreenSnapshot
+        screen: ScreenSnapshot,
+        configuration: ScreenLayoutConfiguration = ScreenLayoutConfiguration()
     ) -> CGRect {
         guard presentation.panelSize != .zero else { return .zero }
+        if configuration.layoutStyle == .pill {
+            guard !presentation.ordinaryNotices.isEmpty else { return .zero }
+            let layout = ScreenLayoutEngine(configuration: configuration).layout(for: screen)
+            let anchor = layout.collapsedFrame
+            let bounds = screen.frame.insetBy(dx: Layout.screenMargin, dy: Layout.screenMargin)
+            let size = presentation.panelSize
+            let width: CGFloat
+            let height: CGFloat
+            let x: CGFloat
+            let y: CGFloat
+            if layout.edge.isVertical {
+                let capacity = CGFloat(SideNoticeQueue.defaultCapacityPerSide)
+                let maximumHeight = capacity * Layout.ordinaryRowHeight + (capacity - 1) * Layout.rowSpacing
+                let slotHeight = min(maximumHeight, (bounds.height - Layout.rowSpacing) / 2)
+                let totalHeight = slotHeight * 2 + Layout.rowSpacing
+                let origin = min(bounds.maxY - totalHeight, max(bounds.minY, anchor.midY - totalHeight / 2))
+                let inwardWidth = layout.edge == .left
+                    ? bounds.maxX - anchor.maxX - Layout.ordinaryTopGap
+                    : anchor.minX - Layout.ordinaryTopGap - bounds.minX
+                width = min(size.width, inwardWidth)
+                height = min(size.height, slotHeight)
+                x = layout.edge == .left ? anchor.maxX + Layout.ordinaryTopGap : anchor.minX - Layout.ordinaryTopGap - width
+                y = side == .left ? origin + totalHeight - height : origin
+            } else {
+                let slotWidth = min(Layout.ordinaryWidth, (bounds.width - Layout.rowSpacing) / 2)
+                let totalWidth = slotWidth * 2 + Layout.rowSpacing
+                let origin = min(bounds.maxX - totalWidth, max(bounds.minX, anchor.midX - totalWidth / 2))
+                let inwardHeight = layout.edge == .top
+                    ? anchor.minY - Layout.ordinaryTopGap - bounds.minY
+                    : bounds.maxY - anchor.maxY - Layout.ordinaryTopGap
+                width = min(size.width, slotWidth)
+                height = min(size.height, inwardHeight)
+                x = side == .left ? origin + slotWidth - width : origin + slotWidth + Layout.rowSpacing
+                y = layout.edge == .top ? anchor.minY - Layout.ordinaryTopGap - height : anchor.maxY + Layout.ordinaryTopGap
+            }
+            guard width > 0, height > 0 else { return .zero }
+            return CGRect(x: x, y: y, width: width, height: height)
+        }
         let layout = ScreenLayoutEngine().layout(for: screen)
         let anchor = layout.topology.anchorFrame
         if presentation.hasCompactContent,

@@ -15,6 +15,7 @@ struct ScreenRecordingCaptionsView: View {
                         Text(language.nativeDisplayName).tag(language)
                     }
                 }
+                .controlSize(.regular)
             } actions: {
                 ViewThatFits(in: .horizontal) {
                     HStack { generateButton; exportButton }

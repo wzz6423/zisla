@@ -139,7 +139,7 @@ struct ShelfModuleView: View {
                                               onSave: { model.saveShelfContextNote() },
                                               onClose: { noteEditor.close() },
                                               onCopyScreenshot: { model.copyContextNoteScreenshot($0) },
-                                              onOpenScreenshot: { screenshot in
+                                              onOpenScreenshot: { [model] screenshot in
                                                   noteEditor.screenshotPreview.present(screenshot, onCopy: { [weak model] png in
                                                       model?.copyContextNoteScreenshot(png)
                                                   }, onSave: { [weak model] png in
