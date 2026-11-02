@@ -21,12 +21,12 @@ struct OverlayCoordinatorPlacementTests {
         coordinator.onCollapsedSizeChanged = { sizes.append($0) }
         coordinator.selectActiveDisplay(at: CGPoint(x: screen.frame.midX, y: screen.frame.midY))
         coordinator.updatePlacement(layoutStyle: .pill,
-            placement: IslandPlacement(mode: .custom, edge: .left),
+            placement: IslandPlacement(mode: .custom, edge: .left, inwardDistance: 48),
             pillSize: CGSize(width: 220, height: 40), edgeInset: 12)
         let layout = try #require(coordinator.activeLayout)
         #expect(layout.edge == .left)
         #expect(layout.collapsedFrame.size == CGSize(width: 40, height: 40))
-        #expect(layout.collapsedFrame.minX == screen.frame.minX + 12)
+        #expect(layout.collapsedFrame.minX == screen.frame.minX + 48)
         #expect(changes.count == 2)
         #expect(changes.last! == layout)
         #expect(content.window == nil)
@@ -34,7 +34,7 @@ struct OverlayCoordinatorPlacementTests {
         let sizeCount = sizes.count
 
         coordinator.updatePlacement(layoutStyle: .pill,
-            placement: IslandPlacement(mode: .custom, edge: .left))
+            placement: IslandPlacement(mode: .custom, edge: .left, inwardDistance: 48))
         #expect(changes.count == 2)
         #expect(sizes.count == sizeCount, "An unchanged placement does not restart its collapsed resize")
         coordinator.refreshScreens()
@@ -82,7 +82,7 @@ struct OverlayCoordinatorPlacementTests {
         let content = NSView()
         let coordinator = OverlayCoordinator(contentView: content,
             layoutEngine: ScreenLayoutEngine(configuration: ScreenLayoutConfiguration(layoutStyle: .pill,
-                placement: IslandPlacement(mode: .custom, edge: edge))), collapseDelay: .zero)
+                placement: IslandPlacement(mode: .custom, edge: edge, inwardDistance: 40))), collapseDelay: .zero)
         coordinator.screenSnapshotProvider = { [screen] }
         coordinator.start()
         defer { coordinator.stop() }
@@ -95,6 +95,7 @@ struct OverlayCoordinatorPlacementTests {
             statusIconSize: edge.isVertical ? CGSize(width: 24, height: iconLength)
                 : CGSize(width: iconLength, height: 24))
         let layout = try #require(coordinator.activeLayout)
+        #expect(ScreenLayoutEngine.edgeDistance(of: layout.collapsedFrame, in: screen.frame, edge: edge) == 40)
         let point = CGPoint(x: layout.collapsedFrame.midX, y: layout.collapsedFrame.midY)
         let outside = CGPoint(x: screen.frame.minX - 100, y: screen.frame.minY - 100)
         let expandedOnly = CGPoint(x: layout.expandedFrame.midX, y: layout.expandedFrame.midY)
@@ -149,7 +150,7 @@ struct OverlayCoordinatorPlacementTests {
         let content = NSView()
         let coordinator = OverlayCoordinator(contentView: content,
             layoutEngine: ScreenLayoutEngine(configuration: ScreenLayoutConfiguration(layoutStyle: .pill,
-                placement: IslandPlacement(mode: .custom, edge: edge))), collapseDelay: .zero)
+                placement: IslandPlacement(mode: .custom, edge: edge, inwardDistance: 40))), collapseDelay: .zero)
         coordinator.screenSnapshotProvider = { [screen] }
         coordinator.start()
         defer { coordinator.stop() }
@@ -354,7 +355,7 @@ struct OverlayCoordinatorPlacementTests {
     }
 
     @Test
-    func cameraStatusUpdatesDetailsWithoutUsingTheCustomNaturalLength() throws {
+    func cameraStatusUpdatesUseTheShortDetailLimitAndRestoreTheDefault() throws {
         let content = NSView()
         let coordinator = OverlayCoordinator(contentView: content,
             layoutEngine: ScreenLayoutEngine(configuration: ScreenLayoutConfiguration(layoutStyle: .pill)))
@@ -365,7 +366,7 @@ struct OverlayCoordinatorPlacementTests {
         let original = try #require(coordinator.activeLayout)
         coordinator.updateCompactStatus(expandsForDetailedStatus: true, compactStatusLength: 32)
         let detailed = try #require(coordinator.activeLayout)
-        #expect(detailed.collapsedFrame.width == 380)
+        #expect(detailed.collapsedFrame.size == CGSize(width: 240, height: 40))
         #expect(detailed.collapsedFrame.midX == original.collapsedFrame.midX)
         #expect(detailed.collapsedFrame.midY == original.collapsedFrame.midY)
         coordinator.updateCompactStatus(expandsForDetailedStatus: false, compactStatusLength: 32)

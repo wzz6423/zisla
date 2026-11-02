@@ -390,8 +390,11 @@ struct StatusIconDestinationIntegrationTests {
             }
             #expect(icons.first?.size(edge: .left) == CGSize(width: 36, height: 36))
             let stackedIcon = try #require(icons.first { $0.id == "status-icon-stacked" })
-            let expectedStackedHeight = readings.reduce(CGFloat(8)) { $0 + IslandStatusIcon.readingSize($1.text).height }
-            #expect(stackedIcon.size(edge: .left) == CGSize(width: 32, height: expectedStackedHeight))
+            let image = try #require(stacked.button?.image)
+            for edge in IslandEdge.allCases {
+                #expect(stackedIcon.size(edge: edge) == CGSize(width: image.size.width, height: 24),
+                        "Merged monitors must retain the menu bar image's width and both horizontal rows")
+            }
             let withoutCombined = IslandStatusIconRouting.update(destination: .island, application: application,
                 metrics: titles, stacked: stacked, readings: readings, combined: nil, style: style)
             #expect(withoutCombined.map(\.id) == ["status-icon-application"]
@@ -625,6 +628,52 @@ struct StatusIconDestinationIntegrationTests {
         #expect(changed == 0, "Compact and stacked images must preserve their original readings and image orientation")
     }
 
+    @Test(arguments: IslandEdge.allCases, SystemMonitorMenuBarDisplayStyle.allCases) @MainActor
+    func stackedImagesKeepTheSameMenuBarRowsOnEveryEdge(edge: IslandEdge, style: SystemMonitorMenuBarDisplayStyle) async throws {
+        let rows = style == .compact ? ["C 14%", "G 30%"] : ["CPU 14%", "GPU 30%"]
+        let image = try #require(SystemMonitorMenuBarImageRenderer.stacked(rows: rows, style: style))
+        let item = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
+        item.isVisible = false
+        item.button?.image = image
+        defer { NSStatusBar.system.removeStatusItem(item) }
+        let icons = IslandStatusIconRouting.update(destination: .island, application: nil,
+            metrics: [], stacked: item, readings: [.init(metric: .cpu, text: "14%"), .init(metric: .gpu, text: "30%")],
+            combined: nil, style: style)
+        let icon = try #require(icons.first)
+        let size = try #require(IslandStatusIconLayout.size(icons: icons, edge: edge))
+        let expectedSize = edge.isVertical ? CGSize(width: image.size.width + 8, height: 40)
+            : CGSize(width: image.size.width + 16, height: 32)
+        #expect(icon.size(edge: edge) == CGSize(width: image.size.width, height: 24))
+        #expect(size == expectedSize)
+        if case let .stacked(routedImage, _) = icon.content { #expect(routedImage === image) }
+        else { Issue.record("The merged status item must remain one stacked image") }
+        let actual = try await renderOffscreen(IslandStatusIconStrip(icons: icons, edge: edge, date: .distantPast)
+            .environment(\.layoutDirection, .rightToLeft), size: expectedSize)
+        let expected = try await renderOffscreen(Image(nsImage: image).renderingMode(.template)
+            .frame(width: image.size.width, height: 24)
+            .padding(edge.isVertical ? .vertical : .horizontal, 8)
+            .padding(edge.isVertical ? .horizontal : .vertical, 4)
+            .foregroundStyle(.white), size: expectedSize)
+        var changed = 0
+        var foregroundPixels = 0
+        for y in 0..<actual.pixelsHigh {
+            for x in 0..<actual.pixelsWide {
+                let a = try #require(actual.colorAt(x: x, y: y))
+                let b = try #require(expected.colorAt(x: x, y: y))
+                if abs(a.redComponent - b.redComponent) > 0.02
+                    || abs(a.greenComponent - b.greenComponent) > 0.02
+                    || abs(a.blueComponent - b.blueComponent) > 0.02 { changed += 1 }
+                if min(a.redComponent, a.greenComponent, a.blueComponent) > 0.5 { foregroundPixels += 1 }
+            }
+        }
+        #expect(changed == 0, "Both configured menu bar rows must remain horizontal and preserve their template pixels")
+        #expect(foregroundPixels > 10, "Merged monitor labels and readings must stay visible on the black island")
+        #expect(item.button?.image === image && image.isTemplate && image.accessibilityDescription == rows.joined(separator: ", "))
+        #expect(IslandStatusIconRouting.update(destination: .menuBar, application: nil, metrics: [],
+            stacked: item, readings: [], combined: nil, style: style).isEmpty)
+        #expect(item.isVisible && item.button?.image === image)
+    }
+
     @Test @MainActor
     func hiddenPlaybackDoesNotDrawItsProgressOverTheMonitorIcons() async throws {
         let fixture = try IconFixture(edge: .left)
@@ -704,6 +753,7 @@ struct StatusIconDestinationIntegrationTests {
     func combinedIconSizeAndCoordinatorUpdatesUseTheSameCollapsedFrame(edge: IslandEdge) throws {
         let fixture = try IconFixture(edge: edge)
         defer { fixture.close() }
+        fixture.settings.settings.islandPlacement.inwardDistance = 120
         let coordinator = OverlayCoordinator(contentView: NSView(),
             layoutEngine: ScreenLayoutEngine(configuration: fixture.settings.settings.islandScreenConfiguration))
         defer { coordinator.stop() }
@@ -722,14 +772,43 @@ struct StatusIconDestinationIntegrationTests {
             let thickness = edge.isVertical ? frame.width : frame.height
             let expectedThickness = max(CGFloat(24), CGFloat(pointSize) + 8)
             #expect(thickness == expectedThickness)
+            #expect(ScreenLayoutEngine.edgeDistance(of: frame, in: fixture.screen.frame, edge: edge)
+                == min(120, expectedThickness * 3))
             #expect(coordinator.activeLayout?.collapsedFrame == frame)
             coordinator.updateCompactStatus(expandsForDetailedStatus: false)
             #expect(coordinator.activeLayout?.collapsedFrame.size == CGSize(width: 24, height: 24))
+            #expect(ScreenLayoutEngine.edgeDistance(of: try #require(coordinator.activeLayout).collapsedFrame,
+                in: fixture.screen.frame, edge: edge) == 72)
             fixture.presenter.publishCompactLayout(on: fixture.screen.displayID)
             #expect(coordinator.activeLayout?.collapsedFrame == frame, "A screen switch must republish the current icon dimensions")
+            fixture.settings.settings.sideNoticesEnabled = true
+            fixture.queue.enqueue(IslandNotice(id: "ai-active-placement", title: "Codex"), expiresAfter: nil)
+            fixture.presenter.publishCompactLayout(on: fixture.screen.displayID)
+            let activity = try #require(coordinator.activeLayout).collapsedFrame
+            #expect((edge.isVertical ? activity.width : activity.height) == 32)
+            #expect(ScreenLayoutEngine.edgeDistance(of: activity, in: fixture.screen.frame, edge: edge) == 96)
+            fixture.queue.removeAll()
+            fixture.presenter.publishCompactLayout(on: fixture.screen.displayID)
+            #expect(coordinator.activeLayout?.collapsedFrame == frame)
+            #expect(fixture.settings.settings.islandPlacement.inwardDistance == 120)
         }
+        let stackedImage = try #require(SystemMonitorMenuBarImageRenderer.stacked(
+            rows: ["C 20%", "M 2 GB/8 GB"], style: .compact))
+        let stacked = IslandStatusIcon(id: "stacked", content: .stacked(image: stackedImage,
+            readings: [.init(metric: .cpu, text: "20%"), .init(metric: .memory, text: "2 GB/8 GB")]), tooltip: "Monitors")
+        fixture.presenter.setStatusIcons([stacked])
+        let stackedFrame = try #require(coordinator.activeLayout).collapsedFrame
+        let stackedThickness = edge.isVertical ? stackedFrame.width : stackedFrame.height
+        #expect(stackedThickness == (edge.isVertical ? stackedImage.size.width + 8 : 32))
+        #expect(ScreenLayoutEngine.edgeDistance(of: stackedFrame, in: fixture.screen.frame, edge: edge)
+            == min(120, stackedThickness * 3))
+        #expect(fixture.presenter.compactFrame(for: fixture.screen, notices: []) == stackedFrame)
         fixture.presenter.setStatusIcons([])
         #expect(coordinator.activeLayout?.collapsedFrame.size == CGSize(width: 24, height: 24))
+        #expect(ScreenLayoutEngine.edgeDistance(of: try #require(coordinator.activeLayout).collapsedFrame,
+            in: fixture.screen.frame, edge: edge) == 72)
+        fixture.settings.flushPendingChanges()
+        #expect(FeatureSettingsStore(defaults: fixture.defaults).settings.islandPlacement.inwardDistance == 120)
     }
 
     @Test @MainActor

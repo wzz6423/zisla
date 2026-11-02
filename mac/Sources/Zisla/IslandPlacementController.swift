@@ -72,7 +72,8 @@ final class IslandPlacementController {
         configuration.placement = IslandPlacement(
             mode: .custom,
             edge: initialPlacement.mode == .camera ? .top : initialPlacement.edge,
-            offset: initialPlacement.mode == .camera ? 0.5 : initialPlacement.offset
+            offset: initialPlacement.mode == .camera ? 0.5 : initialPlacement.offset,
+            inwardDistance: initialPlacement.mode == .camera ? 0 : initialPlacement.inwardDistance
         )
         engine = ScreenLayoutEngine(configuration: configuration)
         selection = configuration.placement
@@ -130,13 +131,7 @@ final class IslandPlacementController {
         self.selection = placement
         selectedDisplayID = screen.displayID
         engine.configuration.placement = placement
-        let size = engine.layout(for: screen).collapsedFrame.size
-        previewFrame = CGRect(
-            x: center.x - size.width / 2,
-            y: center.y - size.height / 2,
-            width: size.width,
-            height: size.height
-        )
+        previewFrame = engine.layout(for: screen).collapsedFrame
         updateViews()
     }
 
@@ -144,9 +139,6 @@ final class IslandPlacementController {
         guard dragOffset != nil else { return }
         drag(to: point)
         dragOffset = nil
-        if let screen = screens.first(where: { $0.displayID == selectedDisplayID }) {
-            previewFrame = engine.layout(for: screen).collapsedFrame
-        }
         updateViews()
     }
 

@@ -184,7 +184,8 @@ struct ClipboardAssistantPlacementTests {
         let layout = controller.rowLayout(for: detection, on: screen, locale: chinese)
         #expect(layout.edge == .top && layout.placementMode == .camera)
         #expect(layout.frame.midX == screen.frame.midX)
-        #expect(layout.frame.midY == screen.frame.maxY - screen.topBarHeight / 2)
+        #expect(layout.frame.midY == min(screen.frame.maxY - 22, screen.frame.maxY - screen.topBarHeight / 2))
+        #expect(layout.rowHeight == 40)
         #expect(controller.presentation.physicalNotchWidth == 185)
         let wings = ClipboardAssistantToastView.physicalNotchSideWidth(
             totalWidth: layout.frame.width, notchWidth: controller.presentation.physicalNotchWidth

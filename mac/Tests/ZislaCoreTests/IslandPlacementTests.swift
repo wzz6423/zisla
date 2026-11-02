@@ -43,12 +43,33 @@ struct IslandPlacementTests {
     }
 
     @Test
+    func inwardDistancesRecoverIndependentlyAndRetainUnclampedRequests() throws {
+        for value in [nil, "null", "false", #""invalid""#, "-4", "0", "28", "10000"] {
+            let field = value.map { #", "inwardDistance":\#($0)"# } ?? ""
+            let payload = #"{"mode":"custom","edge":"right","offset":0.7\#(field)}"#
+            let decoded = try JSONDecoder().decode(IslandPlacement.self, from: Data(payload.utf8))
+            #expect(decoded.mode == .custom && decoded.edge == .right && decoded.offset == 0.7)
+            #expect(decoded.inwardDistance == max(0, value.flatMap(Double.init) ?? 0))
+            #expect(try JSONDecoder().decode(IslandPlacement.self, from: JSONEncoder().encode(decoded)) == decoded)
+        }
+        for input: Double in [-1, 0, 28, 10000, .nan, .infinity, -.infinity] {
+            var placement = IslandPlacement(mode: .custom, edge: .left, inwardDistance: input)
+            let expected = input.isFinite ? max(0, input) : 0
+            #expect(placement.inwardDistance == expected)
+            placement.inwardDistance = input
+            #expect(placement.inwardDistance == expected)
+            #expect(try JSONDecoder().decode(IslandPlacement.self, from: JSONEncoder().encode(placement)) == placement)
+        }
+    }
+
+    @Test
     func edgesAndModesRoundTripWithoutChangingPlacement() throws {
         for mode in IslandPlacementMode.allCases {
             for edge in IslandEdge.allCases {
                 #expect(edge.isVertical == [.left, .right].contains(edge))
                 for step in 0...20 {
-                    let original = IslandPlacement(mode: mode, edge: edge, offset: Double(step) / 20)
+                    let original = IslandPlacement(mode: mode, edge: edge, offset: Double(step) / 20,
+                        inwardDistance: Double(step) * 20)
                     let data = try JSONEncoder().encode(original)
                     #expect(try JSONDecoder().decode(IslandPlacement.self, from: data) == original)
                 }
@@ -67,13 +88,16 @@ struct IslandPlacementTests {
             seed = seed &* 6364136223846793005 &+ 1442695040888963407
             let original = IslandPlacement(mode: IslandPlacementMode.allCases[Int(seed % 2)],
                 edge: IslandEdge.allCases[Int((seed >> 8) % 4)],
-                offset: Double(seed >> 16) / Double(UInt64.max >> 16) * 5 - 2)
+                offset: Double(seed >> 16) / Double(UInt64.max >> 16) * 5 - 2,
+                inwardDistance: Double(seed % 1_000) - 100)
             let encoded = try JSONEncoder().encode(original)
             let decoded = try JSONDecoder().decode(IslandPlacement.self, from: encoded)
             #expect(decoded == original)
             #expect(decoded.offset.isFinite && (0...1).contains(decoded.offset))
+            #expect(decoded.inwardDistance.isFinite && decoded.inwardDistance >= 0)
             var changed = decoded
             changed.offset = decoded.offset + 2
+            changed.inwardDistance += 500
             #expect(original == decoded)
             #expect(changed.offset == 1)
         }

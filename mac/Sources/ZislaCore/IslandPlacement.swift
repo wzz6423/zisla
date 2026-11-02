@@ -28,15 +28,20 @@ public struct IslandPlacement: Codable, Equatable, Sendable {
     public var offset: Double {
         didSet { offset = Self.clampedOffset(offset) }
     }
+    public var inwardDistance: Double {
+        didSet { inwardDistance = Self.validInwardDistance(inwardDistance) }
+    }
 
     public init(
         mode: IslandPlacementMode = .camera,
         edge: IslandEdge = .top,
-        offset: Double = 0.5
+        offset: Double = 0.5,
+        inwardDistance: Double = 0
     ) {
         self.mode = mode
         self.edge = edge
         self.offset = Self.clampedOffset(offset)
+        self.inwardDistance = Self.validInwardDistance(inwardDistance)
     }
 
     public init(from decoder: Decoder) throws {
@@ -44,11 +49,16 @@ public struct IslandPlacement: Codable, Equatable, Sendable {
         self.init(
             mode: (try? container.decodeIfPresent(IslandPlacementMode.self, forKey: .mode)) ?? .camera,
             edge: (try? container.decodeIfPresent(IslandEdge.self, forKey: .edge)) ?? .top,
-            offset: (try? container.decodeIfPresent(Double.self, forKey: .offset)) ?? 0.5
+            offset: (try? container.decodeIfPresent(Double.self, forKey: .offset)) ?? 0.5,
+            inwardDistance: (try? container.decode(Double.self, forKey: .inwardDistance)) ?? 0
         )
     }
 
     private static func clampedOffset(_ value: Double) -> Double {
         value.isFinite ? min(1, max(0, value)) : 0.5
+    }
+
+    private static func validInwardDistance(_ value: Double) -> Double {
+        value.isFinite ? max(0, value) : 0
     }
 }

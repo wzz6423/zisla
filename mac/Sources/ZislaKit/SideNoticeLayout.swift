@@ -438,7 +438,9 @@ public struct SideNoticeLayoutEngine: Equatable, Sendable {
                 center: layout.edge.isVertical ? layout.collapsedFrame.midY : layout.collapsedFrame.midX,
                 physicalOcclusionFrame: layout.physicalOcclusionFrame,
                 placementMode: layout.placementMode,
-                edgeInset: layout.screenFrame.maxY - layout.placementBounds.maxY,
+                screenFrame: layout.screenFrame,
+                inwardDistance: ScreenLayoutEngine.edgeDistance(
+                    of: layout.collapsedFrame, in: layout.screenFrame, edge: layout.edge),
                 expandsForDetailedStatus: expandsForDetailedMedia
             )
         }
@@ -491,10 +493,9 @@ public struct SideNoticeLayoutEngine: Equatable, Sendable {
             browserDownloadCount: browserDownloadCount
         ) else { return nil }
         if layout.style == .pill {
-            var initial = layout.collapsedFrame
+            let initial = layout.collapsedFrame
             let center: CGFloat
             if layout.placementMode == .custom {
-                if layout.edge == .top { initial.origin.y = layout.placementBounds.maxY - initial.height }
                 center = layout.edge.isVertical
                     ? layout.screenFrame.minY + layout.screenFrame.height * settings.islandPlacement.offset
                     : layout.screenFrame.minX + layout.screenFrame.width * settings.islandPlacement.offset
@@ -506,7 +507,8 @@ public struct SideNoticeLayoutEngine: Equatable, Sendable {
                 center: center,
                 physicalOcclusionFrame: layout.physicalOcclusionFrame,
                 placementMode: layout.placementMode,
-                edgeInset: layout.screenFrame.maxY - layout.placementBounds.maxY,
+                screenFrame: layout.screenFrame,
+                inwardDistance: CGFloat(settings.islandPlacement.inwardDistance),
                 expandsForDetailedStatus: sizing.expandsForDetailedStatus,
                 compactStatusLength: sizing.customPillLength
             )

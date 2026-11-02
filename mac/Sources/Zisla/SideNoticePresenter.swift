@@ -234,7 +234,9 @@ final class SideNoticePresenter {
             displayState.islandEdge = screenLayout.edge
             displayState.placementMode = screenLayout.placementMode
             displayState.compactBarCenterInset = screenLayout.style == .pill
-                ? screenLayout.centerOcclusionWidth : screenLayout.topology.hasPhysicalNotch
+                ? (screenLayout.placementMode == .camera
+                    ? max(ScreenLayoutConfiguration.cameraPillCenterWidth, screenLayout.centerOcclusionWidth)
+                    : screenLayout.centerOcclusionWidth) : screenLayout.topology.hasPhysicalNotch
                     ? screenLayout.collapsedFrame.width : 0
             let compactBarFrame = compactFrame(for: snapshot, notices: compactNotices, at: date,
                                                statusHidden: displayState.compactStatusHidden)

@@ -6,6 +6,252 @@ import ZislaCore
 
 struct IslandPlacementLayoutTests {
     @Test(arguments: IslandEdge.allCases)
+    func inwardPlacementFollowsTheGapAndClampsAtThreeTimesThickness(edge: IslandEdge) throws {
+        for requestedGap in [0.0, 28, 72, 200] {
+            let payload = #"{"mode":"custom","edge":"\#(edge.rawValue)","inwardDistance":\#(requestedGap)}"#
+            let placement = try JSONDecoder().decode(IslandPlacement.self, from: Data(payload.utf8))
+            let layout = ScreenLayoutEngine(configuration: ScreenLayoutConfiguration(
+                expandedSize: CGSize(width: 10_000, height: 10_000),
+                transferDragTriggerSize: CGSize(width: 10_000, height: 10_000),
+                layoutStyle: .pill, placement: placement)).layout(for: screen)
+            let pill = layout.collapsedFrame
+            let expectedGap = CGFloat(min(72, max(8, requestedGap)))
+            switch edge {
+            case .top: #expect(screen.frame.maxY - pill.maxY == expectedGap)
+            case .bottom: #expect(pill.minY - screen.frame.minY == expectedGap)
+            case .left: #expect(pill.minX - screen.frame.minX == expectedGap)
+            case .right: #expect(screen.frame.maxX - pill.maxX == expectedGap)
+            }
+            #expect(pill.size == CGSize(width: 24, height: 24))
+            #expect(layout.triggerFrame == pill)
+            #expect(layout.placementBounds.contains(layout.expandedFrame))
+            #expect(layout.expandedFrame.contains(pill))
+            #expect(layout.placementBounds.contains(layout.transferDragTriggerFrame))
+            #expect(layout.transferDragTriggerFrame.contains(pill))
+        }
+    }
+
+    @Test(arguments: IslandEdge.allCases)
+    func inwardLimitsUseTheCurrentActivityAndMonitorThickness(edge: IslandEdge) {
+        for requestedGap: CGFloat in [28, 90, 120, 10_000] {
+            var configuration = ScreenLayoutConfiguration(layoutStyle: .pill,
+                placement: IslandPlacement(mode: .custom, edge: edge, offset: 0.25,
+                    inwardDistance: Double(requestedGap)))
+            for source in ["idle", "activity", "monitor", "idle"] {
+                configuration.compactStatusLength = source == "activity" ? 480 : nil
+                configuration.statusIconSize = source == "monitor"
+                    ? (edge.isVertical ? CGSize(width: 40, height: 480) : CGSize(width: 480, height: 40)) : nil
+                let layout = ScreenLayoutEngine(configuration: configuration).layout(for: screen)
+                let thickness: CGFloat = source == "idle" ? 24 : source == "activity" ? 32 : 40
+                let frame = layout.collapsedFrame
+                let gap = ScreenLayoutEngine.edgeDistance(of: frame, in: screen.frame, edge: edge)
+                #expect((edge.isVertical ? frame.width : frame.height) == thickness)
+                #expect(gap == min(thickness * 3, requestedGap))
+                #expect(configuration.placement.inwardDistance == Double(requestedGap))
+                #expect((edge.isVertical ? frame.midY : frame.midX)
+                    == (edge.isVertical ? screen.frame.minY + screen.frame.height * 0.25
+                        : screen.frame.minX + screen.frame.width * 0.25))
+                #expect(layout.placementBounds.contains(layout.expandedFrame))
+                #expect(layout.expandedFrame.contains(frame))
+            }
+        }
+        let activity = ScreenLayoutEngine(configuration: ScreenLayoutConfiguration(layoutStyle: .pill,
+            placement: IslandPlacement(mode: .custom, edge: edge),
+            pillSize: CGSize(width: 80, height: 16), edgeInset: 64, compactStatusLength: 120)).layout(for: screen)
+        #expect(ScreenLayoutEngine.edgeDistance(of: activity.collapsedFrame, in: screen.frame, edge: edge) == 64,
+                "A configured inset within the current activity's limit must remain unchanged")
+    }
+
+    @Test(arguments: IslandEdge.allCases)
+    func inwardLimitsKeepTheLongAxisInsetAndRespectSmallDisplays(edge: IslandEdge) {
+        for shortLength: CGFloat in [0, 10, 20, 80, 1_000] {
+            for thickness: CGFloat in [0, 16, 24, 40] {
+                for edgeInset: CGFloat in [0, 8, 64] {
+                    let size = edge.isVertical ? CGSize(width: shortLength, height: 1_000)
+                        : CGSize(width: 1_000, height: shortLength)
+                    let snapshot = ScreenSnapshot(displayID: 99,
+                        frame: CGRect(x: -3_000, y: -2_000, width: size.width, height: size.height),
+                        visibleFrame: CGRect(x: -3_000, y: -2_000, width: size.width, height: size.height))
+                    for requestedGap in [0.0, 10_000] {
+                        let layout = ScreenLayoutEngine(configuration: ScreenLayoutConfiguration(
+                            expandedSize: CGSize(width: 10_000, height: 10_000),
+                            layoutStyle: .pill,
+                            placement: IslandPlacement(mode: .custom, edge: edge, inwardDistance: requestedGap),
+                            pillSize: CGSize(width: 80, height: thickness), edgeInset: edgeInset)).layout(for: snapshot)
+                        let frame = layout.collapsedFrame
+                        let actualThickness = edge.isVertical ? frame.width : frame.height
+                        let gap = ScreenLayoutEngine.edgeDistance(of: frame, in: snapshot.frame, edge: edge)
+                        #expect(gap >= 0 && gap <= actualThickness * 3 + 0.000001)
+                        #expect(frame.minX >= snapshot.frame.minX && frame.maxX <= snapshot.frame.maxX + 0.000001)
+                        #expect(frame.minY >= snapshot.frame.minY && frame.maxY <= snapshot.frame.maxY + 0.000001)
+                        #expect(frame.minX >= layout.placementBounds.minX - 0.000001
+                            && frame.maxX <= layout.placementBounds.maxX + 0.000001)
+                        #expect(frame.minY >= layout.placementBounds.minY - 0.000001
+                            && frame.maxY <= layout.placementBounds.maxY + 0.000001)
+                        #expect(layout.expandedFrame.minX >= layout.placementBounds.minX - 0.000001
+                            && layout.expandedFrame.maxX <= layout.placementBounds.maxX + 0.000001)
+                        #expect(layout.expandedFrame.minY >= layout.placementBounds.minY - 0.000001
+                            && layout.expandedFrame.maxY <= layout.placementBounds.maxY + 0.000001)
+                        #expect(layout.expandedFrame.minX >= snapshot.frame.minX
+                            && layout.expandedFrame.maxX <= snapshot.frame.maxX + 0.000001)
+                        #expect(layout.expandedFrame.minY >= snapshot.frame.minY
+                            && layout.expandedFrame.maxY <= snapshot.frame.maxY + 0.000001)
+                        #expect((edge.isVertical ? layout.placementBounds.minY - snapshot.frame.minY
+                            : layout.placementBounds.minX - snapshot.frame.minX) == edgeInset)
+                    }
+                }
+            }
+        }
+    }
+
+    @Test(arguments: IslandEdge.allCases)
+    func nearestPlacementMeasuresTheGapFromThePillOuterEdge(edge: IslandEdge) {
+        for thickness: CGFloat in [24, 32, 40] {
+            for requestedGap: CGFloat in [0, 8, 28, thickness * 3, 10_000] {
+                let distance = requestedGap + thickness / 2
+                let target: CGPoint
+                switch edge {
+                case .top: target = CGPoint(x: screen.frame.midX, y: screen.frame.maxY - min(distance, 300))
+                case .bottom: target = CGPoint(x: screen.frame.midX, y: screen.frame.minY + min(distance, 300))
+                case .left: target = CGPoint(x: screen.frame.minX + min(distance, 300), y: screen.frame.midY)
+                case .right: target = CGPoint(x: screen.frame.maxX - min(distance, 300), y: screen.frame.midY)
+                }
+                var engine = ScreenLayoutEngine(configuration: ScreenLayoutConfiguration(layoutStyle: .notch,
+                    placement: IslandPlacement(mode: .camera),
+                    statusIconSize: edge.isVertical ? CGSize(width: thickness, height: 180)
+                        : CGSize(width: 180, height: thickness)))
+                let placement = engine.placement(nearest: target, on: screen, preferredEdge: edge)
+                engine.configuration.layoutStyle = .pill
+                engine.configuration.placement = placement
+                let layout = engine.layout(for: screen)
+                let expectedGap = min(thickness * 3, max(8, requestedGap))
+                #expect(placement.edge == edge)
+                #expect(placement.inwardDistance == (expectedGap == 8 ? 0 : Double(expectedGap)))
+                #expect(ScreenLayoutEngine.edgeDistance(of: layout.collapsedFrame, in: screen.frame, edge: edge) == expectedGap)
+            }
+        }
+    }
+
+    @Test(arguments: IslandEdge.allCases)
+    func activityLayoutEntrypointsPreserveTheRequestedInwardAnchor(edge: IslandEdge) throws {
+        let notices = [IslandNotice(id: "toolbox-reminder-long", title: "Keep awake", detail: String(repeating: "长", count: 50))]
+        let engine = SideNoticeLayoutEngine()
+        for requestedGap in [28.0, 90, 120] {
+            let settings = FeatureSettings(islandLayoutStyle: .pill,
+                islandPlacement: IslandPlacement(mode: .custom, edge: edge, offset: 0.75, inwardDistance: requestedGap))
+            let idle = ScreenLayoutEngine(configuration: settings.islandScreenConfiguration).layout(for: screen)
+            var configuration = settings.islandScreenConfiguration
+            configuration.compactStatusLength = try #require(engine.compactBarSizing(for: notices, settings: settings)).customPillLength
+            let active = ScreenLayoutEngine(configuration: configuration).layout(for: screen)
+            #expect(ScreenLayoutEngine.edgeDistance(of: idle.collapsedFrame, in: screen.frame, edge: edge)
+                == CGFloat(min(72, requestedGap)))
+            #expect(ScreenLayoutEngine.edgeDistance(of: active.collapsedFrame, in: screen.frame, edge: edge)
+                == CGFloat(min(96, requestedGap)))
+            #expect(engine.compactBarFrame(for: screen, notices: notices, settings: settings) == active.collapsedFrame)
+            #expect(engine.compactBarFrame(for: idle, notices: notices, settings: settings) == active.collapsedFrame)
+            #expect(engine.compactBarFrame(for: active, notices: notices, settings: settings) == active.collapsedFrame)
+            #expect(engine.compactBarFrame(for: idle) == idle.collapsedFrame)
+            #expect(engine.compactBarFrame(for: active) == active.collapsedFrame)
+            let presentation = engine.presentation(for: [IslandNotice(title: "Detail")], compactWingsEnabled: false)
+            for side in [NoticeSide.left, .right] {
+                let ordinary = engine.frame(side: side, presentation: presentation, screen: screen, configuration: configuration)
+                #expect(ordinary == .zero || screen.frame.contains(ordinary))
+                #expect(!ordinary.intersects(active.collapsedFrame))
+            }
+        }
+    }
+
+    @Test
+    func topOcclusionClearanceRespectsTheLimitUnlessTheHardwareItselfIsDeeper() {
+        for depth: CGFloat in [44, 100] {
+            let snapshot = ScreenSnapshot(displayID: 4,
+                frame: CGRect(x: 0, y: 0, width: 1_512, height: 982),
+                visibleFrame: CGRect(x: 0, y: 0, width: 1_512, height: 982 - depth),
+                safeAreaInsets: ScreenInsets(top: depth),
+                auxiliaryTopLeftArea: CGRect(x: 0, y: 982 - depth, width: 656, height: depth),
+                auxiliaryTopRightArea: CGRect(x: 856, y: 982 - depth, width: 656, height: depth))
+            let layout = ScreenLayoutEngine(configuration: ScreenLayoutConfiguration(layoutStyle: .pill,
+                placement: IslandPlacement(mode: .custom, edge: .top), edgeInset: 32)).layout(for: snapshot)
+            #expect(snapshot.frame.maxY - layout.collapsedFrame.maxY == (depth == 44 ? 72 : 100))
+            #expect(!layout.collapsedFrame.intersects(layout.physicalOcclusionFrame!))
+            #expect(layout.placementBounds.contains(layout.expandedFrame))
+        }
+    }
+
+    @Test
+    func inwardRequestsDoNotMoveCameraOrNotchLayouts() {
+        for style in IslandLayoutStyle.allCases {
+            for edge in IslandEdge.allCases {
+                for mode in IslandPlacementMode.allCases where style == .notch || mode == .camera {
+                    var configuration = ScreenLayoutConfiguration(layoutStyle: style,
+                        placement: IslandPlacement(mode: mode, edge: edge, offset: 0.2))
+                    let original = ScreenLayoutEngine(configuration: configuration).layout(for: screen)
+                    configuration.placement.inwardDistance = 10_000
+                    #expect(ScreenLayoutEngine(configuration: configuration).layout(for: screen) == original)
+                }
+            }
+        }
+        let snapshot = ScreenSnapshot(displayID: 1,
+            frame: CGRect(x: 10, y: 20, width: 80, height: 10),
+            visibleFrame: CGRect(x: 10, y: 20, width: 80, height: 10))
+        let camera = ScreenLayoutEngine(configuration: ScreenLayoutConfiguration(layoutStyle: .pill)).layout(for: snapshot)
+        #expect(camera.placementBounds == snapshot.frame.insetBy(dx: 2, dy: 2))
+        #expect(camera.collapsedFrame.size == CGSize(width: 76, height: 6))
+    }
+
+    @Test(arguments: [CGFloat(24), 34, 44])
+    func cameraCompactDefaultsKeepAShortCenterAndThickerFrame(menuBarHeight: CGFloat) {
+        var snapshot = screen
+        snapshot.visibleFrame.size.height = snapshot.frame.height - menuBarHeight
+        let layout = ScreenLayoutEngine(configuration: ScreenLayoutConfiguration(layoutStyle: .pill)).layout(for: snapshot)
+        #expect(layout.collapsedFrame.size == CGSize(width: 200, height: 40))
+        #expect(layout.collapsedFrame.midX == snapshot.frame.midX)
+        #expect(layout.collapsedFrame.maxY <= snapshot.frame.maxY - 2)
+        #expect(layout.collapsedFrame.midY == min(snapshot.frame.maxY - 22, snapshot.frame.maxY - menuBarHeight / 2))
+        #expect(layout.placementBounds.contains(layout.collapsedFrame))
+        #expect(layout.expandedFrame.contains(layout.collapsedFrame))
+    }
+
+    @Test
+    func cameraStatusLengthKeepsTheDefaultAndCapsDetailedContentWithoutChangingQuickActions() {
+        for length: CGFloat in [0, 60, 200, 201, 239, 240, 241, 10_000, .infinity, .nan] {
+            let layout = ScreenLayoutEngine(configuration: ScreenLayoutConfiguration(layoutStyle: .pill,
+                compactStatusLength: length)).layout(for: screen)
+            let expected = length.isNaN ? 200 : min(240, max(200, length))
+            #expect(layout.collapsedFrame.size == CGSize(width: expected, height: 40))
+            #expect(layout.placementBounds.contains(layout.collapsedFrame))
+        }
+        let detailed = ScreenLayoutEngine(configuration: ScreenLayoutConfiguration(layoutStyle: .pill,
+            expandsForDetailedStatus: true)).layout(for: screen)
+        #expect(detailed.collapsedFrame.size == CGSize(width: 240, height: 40))
+        let quickAction = ScreenLayoutEngine(configuration: ScreenLayoutConfiguration(layoutStyle: .pill,
+            pillSize: CGSize(width: 480, height: 24))).layout(for: screen)
+        #expect(quickAction.collapsedFrame.size == CGSize(width: 480, height: 40))
+        #expect(quickAction.expandedFrame.contains(quickAction.collapsedFrame))
+    }
+
+    @Test(arguments: [CGFloat(16), 120, 200, 400])
+    func cameraWidthPreservesBothVisibleWingsAroundARealCutout(reservedWidth: CGFloat) {
+        let snapshot = ScreenSnapshot(displayID: 4,
+            frame: CGRect(x: 0, y: 0, width: 1512, height: 982),
+            visibleFrame: CGRect(x: 0, y: 0, width: 1512, height: 938),
+            safeAreaInsets: ScreenInsets(top: 44),
+            auxiliaryTopLeftArea: CGRect(x: 0, y: 938, width: 756 - reservedWidth / 2, height: 44),
+            auxiliaryTopRightArea: CGRect(x: 756 + reservedWidth / 2, y: 938, width: 756 - reservedWidth / 2, height: 44))
+        for length in [nil, CGFloat(60), 10_000] {
+            let layout = ScreenLayoutEngine(configuration: ScreenLayoutConfiguration(layoutStyle: .pill,
+                compactStatusLength: length)).layout(for: snapshot)
+            let baseWidth: CGFloat = length == 10_000 ? 240 : 200
+            #expect(layout.collapsedFrame.width == max(baseWidth, reservedWidth + 80))
+            #expect(layout.collapsedFrame.height == 40)
+            #expect(layout.collapsedFrame.midY == snapshot.frame.maxY - 22)
+            #expect(layout.centerOcclusionWidth == reservedWidth)
+            #expect((layout.collapsedFrame.width - layout.centerOcclusionWidth) / 2 >= 40)
+            #expect(layout.placementBounds.contains(layout.collapsedFrame))
+        }
+    }
+
+    @Test(arguments: IslandEdge.allCases)
     func customCompactLongAxisStopsAtTheQuickActionRowLength(edge: IslandEdge) {
         for source in ["activity", "icons"] {
             for expanded in [CGSize(width: 200, height: 100), CGSize(width: 1600, height: 1200)] {
@@ -282,17 +528,17 @@ struct IslandPlacementLayoutTests {
         #expect(layout.style == .pill)
         #expect(layout.edge == .top)
         #expect(layout.collapsedFrame.midX == snapshot.frame.midX)
-        #expect(layout.collapsedFrame.midY == snapshot.frame.maxY - menuBarHeight / 2)
-        #expect(layout.collapsedFrame.height == min(32, menuBarHeight - 4))
+        #expect(layout.collapsedFrame.midY == min(snapshot.frame.maxY - 22, snapshot.frame.maxY - menuBarHeight / 2))
+        #expect(layout.collapsedFrame.height == 40)
         #expect(layout.collapsedFrame.maxY <= snapshot.frame.maxY - 2)
-        #expect(layout.collapsedFrame.minY >= snapshot.visibleFrame.maxY + 2)
+        #expect(snapshot.frame.insetBy(dx: 2, dy: 2).contains(layout.collapsedFrame))
         #expect(layout.expandedFrame.maxY == layout.collapsedFrame.maxY)
         #expect(layout.expandedFrame.contains(layout.collapsedFrame))
         #expect(layout.centerOcclusionWidth == 0)
     }
 
     @Test
-    func cameraIdlePillDoesNotInflateToTheReservedScreenRegion() {
+    func cameraIdlePillKeepsVisibleWingsAroundTheReservedScreenRegion() {
         let snapshot = ScreenSnapshot(displayID: 4,
             frame: CGRect(x: -1512, y: 200, width: 1512, height: 982),
             visibleFrame: CGRect(x: -1512, y: 200, width: 1512, height: 938),
@@ -305,14 +551,15 @@ struct IslandPlacementLayoutTests {
         )).layout(for: snapshot)
         #expect(layout.collapsedFrame.midX == -756)
         #expect(layout.collapsedFrame.midY == 1160)
-        #expect(layout.collapsedFrame.width == 180)
-        #expect(layout.centerOcclusionWidth == 180)
+        #expect(layout.collapsedFrame.width == 280)
+        #expect(layout.collapsedFrame.height == 40)
+        #expect(layout.centerOcclusionWidth == 200)
         #expect(layout.physicalOcclusionFrame == CGRect(x: -856, y: 1138, width: 200, height: 44))
         #expect(!layout.topology.hasPhysicalNotch, "A software pill retains its capsule style even around a reserved camera region")
     }
 
     @Test(arguments: [CGFloat(16), CGFloat(200)])
-    func cameraContentReservesVisibleWingsOnlyWhilePresent(reservedWidth: CGFloat) throws {
+    func cameraContentAndIdleUseTheSameVisibleWings(reservedWidth: CGFloat) throws {
         let halfScreen: CGFloat = 756
         let snapshot = ScreenSnapshot(displayID: 4,
             frame: CGRect(x: 0, y: 0, width: 1512, height: 982),
@@ -325,7 +572,7 @@ struct IslandPlacementLayoutTests {
         let engine = SideNoticeLayoutEngine()
         let configuration = settings.islandScreenConfiguration
         let idle = ScreenLayoutEngine(configuration: configuration).layout(for: snapshot)
-        #expect(idle.collapsedFrame.width == configuration.pillSize.width)
+        #expect(idle.collapsedFrame.width == max(200, reservedWidth + 80))
         #expect(engine.compactBarFrame(for: snapshot, notices: [], settings: settings) == nil)
         for notice in [IslandNotice(id: "media-active-test", title: "Music"),
                        IslandNotice(id: "ai-active-test", title: "Codex")] {
@@ -333,7 +580,7 @@ struct IslandPlacementLayoutTests {
             var activeConfiguration = configuration
             activeConfiguration.compactStatusLength = sizing.customPillLength
             let active = ScreenLayoutEngine(configuration: activeConfiguration).layout(for: snapshot)
-            #expect(active.collapsedFrame.width == max(configuration.pillSize.width, reservedWidth + 80))
+            #expect(active.collapsedFrame.width == max(200, reservedWidth + 80))
             #expect((active.collapsedFrame.width - active.centerOcclusionWidth) / 2 >= 40)
             #expect(active.collapsedFrame.midX == idle.collapsedFrame.midX)
             #expect(active.collapsedFrame.midY == idle.collapsedFrame.midY)
@@ -363,7 +610,7 @@ struct IslandPlacementLayoutTests {
         for (snapshot, layout) in zip(snapshots, engine.layouts(for: snapshots)) {
             #expect(layout.displayID == snapshot.displayID)
             #expect(layout.collapsedFrame.midX == snapshot.frame.midX)
-            #expect(layout.collapsedFrame.midY == snapshot.frame.maxY - snapshot.topBarHeight / 2)
+            #expect(layout.collapsedFrame.midY == min(snapshot.frame.maxY - 22, snapshot.frame.maxY - snapshot.topBarHeight / 2))
         }
     }
 
@@ -399,9 +646,9 @@ struct IslandPlacementLayoutTests {
         let engine = ScreenLayoutEngine(configuration: ScreenLayoutConfiguration(layoutStyle: .pill))
         for (snapshot, menuBarHeight) in snapshots {
             let layout = engine.layout(for: snapshot)
-            #expect(layout.collapsedFrame.midY == frame.maxY - menuBarHeight / 2)
-            #expect(layout.collapsedFrame.height == min(24, menuBarHeight - 4))
-            #expect(layout.collapsedFrame.width == 80)
+            #expect(layout.collapsedFrame.midY == min(frame.maxY - 22, frame.maxY - menuBarHeight / 2))
+            #expect(layout.collapsedFrame.height == 40)
+            #expect(layout.collapsedFrame.width == 200)
             #expect(layout.physicalOcclusionFrame == nil)
             #expect(layout.centerOcclusionWidth == 0, "Safe area alone cannot measure a camera cutout")
         }
@@ -522,7 +769,8 @@ struct IslandPlacementLayoutTests {
         )).layout(for: snapshot)
         #expect(layout.collapsedFrame.midX == snapshot.frame.midX)
         #expect(layout.collapsedFrame.midY == 1160)
-        #expect(layout.collapsedFrame.width == 520)
+        #expect(layout.collapsedFrame.width == 280)
+        #expect(layout.collapsedFrame.height == 40)
         #expect(layout.centerOcclusionWidth == 200)
         #expect(layout.triggerFrame == layout.collapsedFrame)
         #expect(layout.expandedFrame.contains(layout.collapsedFrame))
@@ -907,7 +1155,8 @@ struct IslandPlacementLayoutTests {
                 #expect(engine.compactBarFrame(for: snapshot, notices: [music], settings: settings) == actual.collapsedFrame)
                 #expect(engine.compactBarFrame(for: idle, notices: [music], settings: settings) == actual.collapsedFrame)
                 #expect(engine.compactBarFrame(for: actual, notices: [music], settings: settings) == actual.collapsedFrame)
-                #expect(actual.collapsedFrame.midY == snapshot.frame.maxY - snapshot.topBarHeight / 2)
+                #expect(actual.collapsedFrame.midY == min(snapshot.frame.maxY - 22,
+                    snapshot.frame.maxY - snapshot.topBarHeight / 2))
             }
         }
     }

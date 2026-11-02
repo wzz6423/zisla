@@ -6,6 +6,78 @@ import ZislaKit
 
 @MainActor
 struct IslandPlacementControllerTests {
+    @Test(arguments: IslandEdge.allCases)
+    func draggingClampsThePreviewBeforeMouseRelease(edge: IslandEdge) throws {
+        let fixture = Fixture()
+        fixture.show(initial: IslandPlacement(mode: .custom, edge: edge))
+        let initial = try #require(fixture.controller.previewFrame)
+        #expect(fixture.controller.beginDragging(at: CGPoint(x: initial.midX, y: initial.midY)))
+        let screen = fixture.screens[0].frame
+        let target: CGPoint
+        switch edge {
+        case .top: target = CGPoint(x: screen.midX, y: screen.maxY - 212)
+        case .bottom: target = CGPoint(x: screen.midX, y: screen.minY + 212)
+        case .left: target = CGPoint(x: screen.minX + 212, y: screen.midY)
+        case .right: target = CGPoint(x: screen.maxX - 212, y: screen.midY)
+        }
+        fixture.controller.drag(to: target)
+        let limited = try #require(fixture.controller.previewFrame)
+        switch edge {
+        case .top: #expect(screen.maxY - limited.maxY == 72)
+        case .bottom: #expect(limited.minY - screen.minY == 72)
+        case .left: #expect(limited.minX - screen.minX == 72)
+        case .right: #expect(screen.maxX - limited.maxX == 72)
+        }
+        #expect(fixture.committed.isEmpty)
+        fixture.controller.endDragging(at: target)
+        #expect(fixture.controller.previewFrame == limited)
+        fixture.controller.confirm()
+        let saved = try #require(fixture.committed.first)
+        fixture.show(initial: saved)
+        #expect(fixture.controller.previewFrame == limited)
+        fixture.controller.cancel()
+        #expect(fixture.observer == nil)
+    }
+
+    @Test(arguments: IslandEdge.allCases)
+    func draggingKeepsTheGripAndFollowsEveryAllowedGap(edge: IslandEdge) throws {
+        for thickness: CGFloat in [24, 32, 40] {
+            let fixture = Fixture()
+            let configuration = ScreenLayoutConfiguration(pillSize: CGSize(width: 80, height: thickness))
+            fixture.show(initial: IslandPlacement(mode: .custom, edge: edge), configuration: configuration)
+            let initial = try #require(fixture.controller.previewFrame)
+            let gripOffset = edge.isVertical ? CGPoint(x: thickness / 4, y: 0)
+                : CGPoint(x: 0, y: thickness / 4)
+            #expect(fixture.controller.beginDragging(at: CGPoint(x: initial.midX + gripOffset.x,
+                y: initial.midY + gripOffset.y)))
+            let screen = fixture.screens[0].frame
+            for requestedGap: CGFloat in [0, 8, 28, thickness * 3, thickness * 3 + 40, 28] {
+                let center: CGPoint
+                switch edge {
+                case .top: center = CGPoint(x: screen.midX + 50, y: screen.maxY - requestedGap - thickness / 2)
+                case .bottom: center = CGPoint(x: screen.midX + 50, y: screen.minY + requestedGap + thickness / 2)
+                case .left: center = CGPoint(x: screen.minX + requestedGap + thickness / 2, y: screen.midY + 50)
+                case .right: center = CGPoint(x: screen.maxX - requestedGap - thickness / 2, y: screen.midY + 50)
+                }
+                fixture.controller.drag(to: CGPoint(x: center.x + gripOffset.x, y: center.y + gripOffset.y))
+                let actual = try #require(fixture.controller.previewFrame)
+                let expectedGap = min(thickness * 3, max(8, requestedGap))
+                switch edge {
+                case .top: #expect(screen.maxY - actual.maxY == expectedGap)
+                case .bottom: #expect(actual.minY - screen.minY == expectedGap)
+                case .left: #expect(actual.minX - screen.minX == expectedGap)
+                case .right: #expect(screen.maxX - actual.maxX == expectedGap)
+                }
+                #expect((edge.isVertical ? actual.midY : actual.midX) == (edge.isVertical ? center.y : center.x))
+                #expect(fixture.controller.selection?.inwardDistance == (expectedGap == 8 ? 0 : Double(expectedGap)))
+                #expect(fixture.committed.isEmpty)
+            }
+            fixture.controller.cancel()
+            #expect(fixture.committed.isEmpty && fixture.cancelled == 1)
+            #expect(fixture.observer == nil && fixture.controller.windowCount == 0)
+        }
+    }
+
     @Test
     func draggingUpdatesOnlyTheDraftUntilConfirmation() throws {
         let fixture = Fixture()
@@ -19,12 +91,12 @@ struct IslandPlacementControllerTests {
         #expect(fixture.committed.isEmpty)
         fixture.controller.endDragging(at: destination)
         let snapped = try #require(fixture.controller.previewFrame)
-        #expect(snapped.minX == fixture.screens[0].frame.minX + 8)
+        #expect(snapped.minX == fixture.screens[0].frame.minX + 28)
         #expect(snapped.size == CGSize(width: 24, height: 24))
         #expect(fixture.committed.isEmpty)
 
         fixture.controller.confirm()
-        #expect(fixture.committed == [IslandPlacement(mode: .custom, edge: .left, offset: 0.5)])
+        #expect(fixture.committed == [IslandPlacement(mode: .custom, edge: .left, offset: 0.5, inwardDistance: 28)])
         #expect(fixture.cancelled == 0)
         #expect(!fixture.controller.isSelecting)
         #expect(fixture.controller.windowCount == 0)
@@ -33,7 +105,7 @@ struct IslandPlacementControllerTests {
     }
 
     @Test
-    func releasingAtTheCenterStillSnapsToAnEdge() throws {
+    func releasingAtTheCenterKeepsTheDraftAtTheMaximumInwardDistance() throws {
         let fixture = Fixture()
         fixture.show(initial: IslandPlacement(mode: .custom, edge: .bottom))
         let frame = try #require(fixture.controller.previewFrame)
@@ -41,7 +113,8 @@ struct IslandPlacementControllerTests {
         let center = CGPoint(x: fixture.screens[0].frame.midX, y: fixture.screens[0].frame.midY)
         fixture.controller.endDragging(at: center)
         #expect(fixture.controller.selection?.edge == .bottom)
-        #expect(fixture.controller.previewFrame?.minY == fixture.screens[0].frame.minY + 8)
+        #expect(fixture.controller.previewFrame?.minY == fixture.screens[0].frame.minY + 72)
+        #expect(fixture.controller.selection?.inwardDistance == 72)
         fixture.controller.cancel()
     }
 
@@ -63,12 +136,12 @@ struct IslandPlacementControllerTests {
     @Test
     func returnCommitsOnceAndCancelOperationKeepsTheSavedValue() throws {
         let fixture = Fixture()
-        fixture.show(initial: IslandPlacement(mode: .custom, edge: .right, offset: 0.7))
+        fixture.show(initial: IslandPlacement(mode: .custom, edge: .right, offset: 0.7, inwardDistance: 36))
         let window = try #require(fixture.presented.first as? IslandPlacementWindow)
         window.keyDown(with: try keyEvent(code: 36, characters: "\r", window: window))
         window.cancelOperation(nil)
         fixture.controller.confirm()
-        #expect(fixture.committed == [IslandPlacement(mode: .custom, edge: .right, offset: 0.7)])
+        #expect(fixture.committed == [IslandPlacement(mode: .custom, edge: .right, offset: 0.7, inwardDistance: 36)])
         #expect(fixture.cancelled == 0)
     }
 
@@ -101,7 +174,8 @@ struct IslandPlacementControllerTests {
         #expect(fixture.controller.beginDragging(at: grip))
         fixture.controller.drag(to: CGPoint(x: grip.x + 100, y: grip.y - 100))
         #expect(fixture.controller.previewFrame?.midX == frame.midX + 100)
-        #expect(fixture.controller.previewFrame?.midY == frame.midY - 100)
+        #expect(fixture.controller.previewFrame?.maxY == fixture.screens[0].frame.maxY - 72)
+        #expect(fixture.controller.selection?.inwardDistance == 72)
         fixture.controller.cancel()
     }
 
@@ -151,21 +225,21 @@ struct IslandPlacementControllerTests {
     @Test
     func cameraPlacementStartsASeparateTopCenterDraft() {
         let fixture = Fixture()
-        fixture.show(initial: IslandPlacement(mode: .camera, edge: .right, offset: 0.1))
+        fixture.show(initial: IslandPlacement(mode: .camera, edge: .right, offset: 0.1, inwardDistance: 64))
         #expect(fixture.controller.selection == IslandPlacement(mode: .custom, edge: .top, offset: 0.5))
         #expect(fixture.committed.isEmpty)
         fixture.controller.cancel()
     }
 
     @Test
-    func confirmationDuringDraggingCommitsOnlyTheSnappedEdge() throws {
+    func confirmationDuringDraggingCommitsThePreviewedInwardDistance() throws {
         let fixture = Fixture()
         fixture.show()
         let frame = try #require(fixture.controller.previewFrame)
         #expect(fixture.controller.beginDragging(at: CGPoint(x: frame.midX, y: frame.midY)))
         fixture.controller.drag(to: CGPoint(x: fixture.screens[0].frame.maxX - 40, y: 450))
         fixture.controller.confirm()
-        #expect(fixture.committed == [IslandPlacement(mode: .custom, edge: .right, offset: 0.5)])
+        #expect(fixture.committed == [IslandPlacement(mode: .custom, edge: .right, offset: 0.5, inwardDistance: 28)])
         #expect(!fixture.controller.isSelecting)
         #expect(fixture.controller.windowCount == 0)
         #expect(fixture.observer == nil)
@@ -262,8 +336,9 @@ struct IslandPlacementControllerTests {
             removeObserver: { [weak self] _ in self?.observer = nil }
         ))
 
-        func show(initial: IslandPlacement = IslandPlacement()) {
-            controller.show(initialPlacement: initial,
+        func show(initial: IslandPlacement = IslandPlacement(),
+                  configuration: ScreenLayoutConfiguration = ScreenLayoutConfiguration()) {
+            controller.show(initialPlacement: initial, configuration: configuration,
                 completion: { [unowned self] in committed.append($0) },
                 onCancel: { [unowned self] in cancelled += 1 })
         }

@@ -1,5 +1,6 @@
 import AppKit
 import Foundation
+import SwiftUI
 import Testing
 import ZislaCore
 import ZislaKit
@@ -8,6 +9,127 @@ import ZislaKit
 
 @MainActor
 struct SideNoticePresenterPillTests {
+    @Test
+    func cameraDetailedMediaKeepsTheShortCenterClearForLongTitlesAndLyrics() async throws {
+        let fixture = try Fixture(edge: .top)
+        defer { fixture.close() }
+        fixture.settings.settings.islandPlacement = IslandPlacement()
+        fixture.settings.settings.islandNotchBackground = .black
+        fixture.settings.settings.mediaCompactStyle = .detailed
+        fixture.settings.settings.mediaShowLyricsAndInfo = true
+        let title = String(repeating: "Long title ", count: 30)
+        let notice = IslandNotice(id: "media-active-camera", title: title, side: .left)
+        fixture.media.publishSnapshot(NowPlayingSnapshot(title: title, artist: "Artist", album: nil,
+            artworkData: nil, duration: 60, elapsedTime: 0, timestamp: fixture.date, isPlaying: true,
+            lyrics: SyncedLyrics(lines: [.init(time: 0, text: String(repeating: "Lyrics ", count: 30))])))
+        fixture.queue.enqueue(notice, expiresAfter: nil)
+        let state = SideNoticeDisplayState()
+        state.placementMode = .camera
+        state.islandEdge = .top
+        state.compactWingHeight = 40
+        state.compactBarCenterInset = 120
+        let view = CompactStatusBarView(queue: fixture.queue, displayState: state, media: fixture.media,
+            browserDownloads: fixture.downloads, settingsStore: fixture.settings, resultSweep: fixture.sweep,
+            onStatusHidden: {})
+        let bitmap = try await renderOffscreen(view.statusBarContent(at: fixture.date), size: CGSize(width: 240, height: 40))
+        let scale = CGFloat(bitmap.pixelsWide) / 240
+        var centerPixels = 0
+        for x in Int(60 * scale)..<Int(180 * scale) {
+            for y in 0..<bitmap.pixelsHigh {
+                let color = try #require(bitmap.colorAt(x: x, y: y))
+                if max(color.redComponent, color.greenComponent, color.blueComponent) > 0.4 { centerPixels += 1 }
+            }
+        }
+        #expect(centerPixels == 0, "Long media text must not overflow the camera slot in a 240pt detailed pill")
+    }
+
+    @Test(arguments: [CGFloat(0), 16, 200])
+    func cameraPanelsReserveTheShortCenterAndKeepTheExistingTwoWings(reservedWidth: CGFloat) async throws {
+        let fixture = try Fixture(edge: .top)
+        defer { fixture.close() }
+        fixture.settings.settings.islandPlacement = IslandPlacement()
+        fixture.settings.settings.islandNotchBackground = .black
+        fixture.screen.visibleFrame.size.height = fixture.screen.frame.height - 44
+        if reservedWidth > 0 {
+            let frame = fixture.screen.frame
+            fixture.screen.safeAreaInsets = ScreenInsets(top: 44)
+            fixture.screen.auxiliaryTopLeftArea = CGRect(x: frame.minX, y: frame.maxY - 44,
+                width: frame.width / 2 - reservedWidth / 2, height: 44)
+            fixture.screen.auxiliaryTopRightArea = CGRect(x: frame.midX + reservedWidth / 2, y: frame.maxY - 44,
+                width: frame.width / 2 - reservedWidth / 2, height: 44)
+        }
+        fixture.presenter.setScreenLocked(false)
+        let host = try #require(NSApp.windows.compactMap {
+            $0.contentView as? NSHostingView<AppLanguageEnvironment<CompactStatusBarView>>
+        }.first { $0.rootView.content.settingsStore === fixture.settings })
+        let state = host.rootView.content.displayState
+        let centerWidth = max(120, reservedWidth)
+        #expect(state.compactBarCenterInset == centerWidth)
+        #expect(host.window?.frame.size == CGSize(width: centerWidth + 80, height: 40))
+        for count in [1, 2, 3] {
+            fixture.queue.removeAll()
+            for index in 0..<count {
+                fixture.queue.enqueue(IslandNotice(id: "ai-active-openai-\(index)", title: "OpenAI"), expiresAfter: nil)
+            }
+            fixture.presenter.setDisplayIDs([7])
+            fixture.presenter.setStatusIcons([])
+            #expect(state.compactBarCenterInset == centerWidth)
+            #expect(host.window?.frame.size == CGSize(width: centerWidth + 80, height: 40))
+            let bitmap = try await renderOffscreen(host.rootView.content.statusBarContent(at: fixture.date),
+                size: CGSize(width: centerWidth + 80, height: 40))
+            let wingWidth = Int(40 * CGFloat(bitmap.pixelsWide) / (centerWidth + 80))
+            var wingPixels = [0, 0]
+            var centerPixels = 0
+            for x in 0..<bitmap.pixelsWide {
+                for y in 0..<bitmap.pixelsHigh {
+                    let color = try #require(bitmap.colorAt(x: x, y: y))
+                    if max(color.redComponent, color.greenComponent, color.blueComponent) > 0.4 {
+                        if x < wingWidth { wingPixels[0] += 1 }
+                        else if x >= bitmap.pixelsWide - wingWidth { wingPixels[1] += 1 }
+                        else { centerPixels += 1 }
+                    }
+                }
+            }
+            #expect(wingPixels.allSatisfy { $0 > 10 }, "The icon and task count must stay in their original two wings")
+            #expect(centerPixels == 0, "The short camera slot must remain clear between both wings")
+        }
+        fixture.settings.settings.islandPlacement = IslandPlacement(mode: .custom, edge: .left)
+        fixture.presenter.setStatusIcons([])
+        #expect(state.compactBarCenterInset == 0)
+        #expect(try #require(host.window).frame.width == 32)
+        fixture.settings.settings.islandLayoutStyle = .notch
+        fixture.presenter.setStatusIcons([])
+        #expect(state.compactBarCenterInset == reservedWidth)
+    }
+
+    @Test
+    func cameraNormalActivitiesKeepTheShortDefaultBeforeAndAfterDetails() throws {
+        let fixture = try Fixture(edge: .top)
+        defer { fixture.close() }
+        fixture.settings.settings.islandPlacement = IslandPlacement()
+        fixture.settings.settings.mediaCompactStyle = .compact
+        let idle = try #require(fixture.presenter.compactFrame(for: fixture.screen, notices: [], at: fixture.date))
+        #expect(idle.size == CGSize(width: 200, height: 40))
+        let ai = (0..<3).map { IslandNotice(id: "ai-active-codex-\($0)", title: "Codex") }
+        let ordinary = [IslandNotice(id: "media-active-camera", title: "Music"),
+                        IslandNotice(id: "browser-download-camera", title: "Download", progress: 0.4),
+                        IslandNotice(id: "video-download-camera", title: "Download", progress: 0.4),
+                        IslandNotice(id: "voice-processing-camera", title: "Voice", detail: "Processing"),
+                        IslandNotice(id: "screen-recording-operation-camera", title: "Recording", progress: 0.4)]
+        for notices in [Array(ai.prefix(1)), Array(ai.prefix(2)), ai] + ordinary.map({ [$0] }) {
+            #expect(try #require(fixture.presenter.compactFrame(for: fixture.screen, notices: notices,
+                at: fixture.date)) == idle)
+        }
+        fixture.settings.settings.mediaCompactStyle = .detailed
+        let long = try #require(fixture.presenter.compactFrame(for: fixture.screen,
+            notices: [ordinary[0]], at: fixture.date))
+        #expect(long.size == CGSize(width: 240, height: 40))
+        #expect(long.midX == idle.midX && long.midY == idle.midY)
+        #expect(try #require(fixture.presenter.compactFrame(for: fixture.screen, notices: [], at: fixture.date)) == idle)
+        #expect(try #require(fixture.presenter.compactFrame(for: fixture.screen, notices: [ordinary[0]],
+            at: fixture.date, statusHidden: true)) == idle)
+    }
+
     @Test(arguments: IslandEdge.allCases)
     func eachLiveLyricUsesItsNaturalFrameAndReturnsFromLongToShortWithoutACache(edge: IslandEdge) throws {
         let fixture = try Fixture(edge: edge)
@@ -40,7 +162,7 @@ struct SideNoticePresenterPillTests {
     }
 
     @Test
-    func cameraDetailsAndNotchFramesPreserveTheirExistingSizingRules() throws {
+    func cameraDetailsUseTheShorterFrameAndNotchSizingStaysUnchanged() throws {
         let fixture = try Fixture(edge: .top)
         defer { fixture.close() }
         let notice = IslandNotice(id: "media-active-left", title: "Music", side: .left)
@@ -48,8 +170,8 @@ struct SideNoticePresenterPillTests {
         fixture.settings.settings.islandPlacement = IslandPlacement()
         let camera = try #require(fixture.presenter.compactFrame(for: fixture.screen, notices: [notice], at: fixture.date))
         #expect(camera.midX == fixture.screen.frame.midX)
-        #expect(camera.midY == fixture.screen.frame.maxY - fixture.screen.topBarHeight / 2)
-        #expect(camera.width >= 380)
+        #expect(camera.midY == fixture.screen.frame.maxY - 22)
+        #expect(camera.size == CGSize(width: 240, height: 40))
         fixture.settings.settings.islandLayoutStyle = .notch
         #expect(fixture.presenter.compactFrame(for: fixture.screen, notices: [notice], at: fixture.date)
             == SideNoticeLayoutEngine().compactBarFrame(for: fixture.screen, notices: [notice], settings: fixture.settings.settings))
@@ -69,7 +191,7 @@ struct SideNoticePresenterPillTests {
         let idleConfiguration = fixture.presenter.compactConfiguration(for: [], at: fixture.date)
         #expect(idleConfiguration.compactStatusLength == nil)
         let idle = try #require(fixture.presenter.compactFrame(for: snapshot, notices: [], at: fixture.date))
-        #expect(idle.width == CGFloat(fixture.settings.settings.islandPillWidth))
+        #expect(idle.size == CGSize(width: 280, height: 40))
         let notice = IslandNotice(id: "ai-active-test", title: "Codex")
         let active = try #require(fixture.presenter.compactFrame(for: snapshot, notices: [notice], at: fixture.date))
         #expect(active.width == 280)
@@ -231,7 +353,7 @@ struct SideNoticePresenterPillTests {
         let queue = SideNoticeQueue()
         let sweep = AIResultSweepController()
         let date = Date(timeIntervalSince1970: 100)
-        let screen = ScreenSnapshot(displayID: 7,
+        var screen = ScreenSnapshot(displayID: 7,
             frame: CGRect(x: -1800, y: -240, width: 1800, height: 1100),
             visibleFrame: CGRect(x: -1800, y: -240, width: 1800, height: 1076))
         lazy var presenter = SideNoticePresenter(queue: queue, resultSweep: sweep, media: media,
@@ -253,5 +375,27 @@ struct SideNoticePresenterPillTests {
             settings.flushPendingChanges()
             defaults.removePersistentDomain(forName: suiteName)
         }
+    }
+
+    private func renderOffscreen(_ content: some View, size: CGSize) async throws -> NSBitmapImageRep {
+        let host = NSHostingView(rootView: content.frame(width: size.width, height: size.height)
+            .background(.black))
+        host.sizingOptions = []
+        let window = NSWindow(contentRect: CGRect(origin: CGPoint(x: 20_000, y: 0), size: size),
+            styleMask: .borderless, backing: .buffered, defer: false)
+        window.isReleasedWhenClosed = false
+        window.alphaValue = 0
+        window.contentView = host
+        window.orderFrontRegardless()
+        defer { window.close() }
+        host.layoutSubtreeIfNeeded()
+        host.displayIfNeeded()
+        await withCheckedContinuation { continuation in
+            DispatchQueue.main.async { continuation.resume() }
+        }
+        let bitmap = try #require(host.bitmapImageRepForCachingDisplay(in: host.bounds))
+        host.cacheDisplay(in: host.bounds, to: bitmap)
+        #expect(host.bounds.size == size && window.alphaValue == 0)
+        return try #require(bitmap.converting(to: .sRGB, renderingIntent: .default))
     }
 }

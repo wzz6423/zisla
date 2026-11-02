@@ -91,9 +91,9 @@ struct SideNoticeLayoutTests {
             let ownedFrame = try #require(engine.compactBarFrame(for: idle, notices: [notice], settings: settings))
             #expect(ownedFrame == screenFrame, "Camera status must use the same frame regardless of its layout entrypoint")
             #expect(ownedFrame.midX == screen.frame.midX, "Saved custom offsets cannot move a camera-aligned activity")
-            #expect(ownedFrame.height == 24)
-            #expect(ownedFrame.width == (detailedMedia ? (physical ? 520 : 380) : (physical ? 280 : 80)))
-            #expect(idle.collapsedFrame.size == CGSize(width: 80, height: 24))
+            #expect(ownedFrame.height == 40)
+            #expect(ownedFrame.width == (physical ? 280 : detailedMedia ? 240 : 200))
+            #expect(idle.collapsedFrame.size == CGSize(width: physical ? 280 : 200, height: 40))
             #expect(engine.compactBarFrame(for: screen, notices: [], settings: settings) == nil)
             #expect(engine.compactBarFrame(for: idle, notices: [], settings: settings) == nil)
         }

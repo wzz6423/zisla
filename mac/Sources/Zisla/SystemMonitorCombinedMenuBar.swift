@@ -120,11 +120,7 @@ struct IslandStatusIcon: Identifiable {
             if edge.isVertical { return Self.readingSize(text) }
             if style == .compact, let image { return CGSize(width: image.size.width, height: 24) }
             return CGSize(width: 24 + Self.textWidth(text), height: 24)
-        case let .stacked(image, readings):
-            if edge.isVertical {
-                return CGSize(width: 32, height: readings.reduce(0) { $0 + Self.readingSize($1.text).height }
-                    + CGFloat(readings.dropFirst().count) * 8)
-            }
+        case let .stacked(image, _):
             return CGSize(width: image?.size.width ?? 24, height: 24)
         case let .combined(image):
             return image?.size ?? CGSize(width: 24, height: 24)
@@ -244,15 +240,9 @@ struct IslandStatusIconStrip: View {
                     Text(text).font(.system(size: 12, weight: .medium)).monospacedDigit()
                 }
             }
-        case let .stacked(image, readings):
-            if edge.isVertical {
-                VStack(spacing: 8) {
-                    ForEach(Array(readings.enumerated()), id: \.offset) { _, reading in
-                        readingView(metric: reading.metric, text: reading.text)
-                    }
-                }
-            } else if let image {
-                Image(nsImage: image).renderingMode(.template)
+        case let .stacked(image, _):
+            if let image {
+                Image(nsImage: image).renderingMode(.template).frame(height: 24)
             } else {
                 Text("--").font(.system(size: 12, design: .monospaced))
             }
