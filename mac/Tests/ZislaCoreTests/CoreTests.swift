@@ -2885,11 +2885,11 @@ struct FeatureSettingsTests {
     }
 
     @Test
-    func petDefaultsToEnabledPandaOnTheLeft() {
+    func petDefaultsToEnabledChiikawaOnTheLeft() {
         let settings = FeatureSettings.default
 
         #expect(settings.petEnabled)
-        #expect(settings.petID == "panda")
+        #expect(settings.petID == "chiikawa")
         #expect(settings.petSide == .left)
     }
 

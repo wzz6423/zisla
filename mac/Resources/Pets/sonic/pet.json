@@ -1,0 +1,9 @@
+{
+  "id": "sonic",
+  "displayName": "索尼克",
+  "description": "A Sonic-like blue hedgehog pixel pet with green eyes, white gloves, spiky blue quills, tan muzzle and belly, and red shoes.",
+  "spritePath": "sprite.png",
+  "frameWidth": 128,
+  "frames": 7,
+  "fps": 6
+}

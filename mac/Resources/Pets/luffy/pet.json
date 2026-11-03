@@ -1,0 +1,9 @@
+{
+  "id": "luffy",
+  "displayName": "路飞",
+  "description": "A tiny straw-hat pirate captain pet with a red vest, blue shorts, and cheerful rubbery energy.",
+  "spritePath": "sprite.png",
+  "frameWidth": 128,
+  "frames": 6,
+  "fps": 6
+}

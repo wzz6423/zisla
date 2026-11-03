@@ -977,7 +977,7 @@ public struct FeatureSettings: Codable, Equatable, Sendable {
         activityNoticeDisplayIDs: Set<UInt32> = [],
         appearanceMode: AppearanceMode = .system,
         petEnabled: Bool = true,
-        petID: String = "panda",
+        petID: String = "chiikawa",
         petSide: PetSide = .left,
         mediaShowLyricsAndInfo: Bool = true,
         mediaCompactStyle: MediaCompactStyle = .compact,
@@ -1558,6 +1558,12 @@ public struct FeatureSettings: Codable, Equatable, Sendable {
         ) ?? defaults.appearanceMode
         petEnabled = try container.decodeIfPresent(Bool.self, forKey: .petEnabled) ?? defaults.petEnabled
         petID = try container.decodeIfPresent(String.self, forKey: .petID) ?? defaults.petID
+        if [
+            "cow", "dog", "duck", "frog", "horse", "monkey", "owl",
+            "panda", "parrot", "penguin", "pig", "rabbit", "sloth", "whale",
+        ].contains(petID) {
+            petID = defaults.petID
+        }
         petSide = try container.decodeIfPresent(PetSide.self, forKey: .petSide) ?? defaults.petSide
         mediaShowLyricsAndInfo = try container.decodeIfPresent(Bool.self, forKey: .mediaShowLyricsAndInfo) ?? defaults.mediaShowLyricsAndInfo
         mediaCompactStyle = try container.decodeIfPresent(

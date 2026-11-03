@@ -1,0 +1,9 @@
+{
+  "id": "leafeon",
+  "displayName": "叶伊布",
+  "description": "Leafeon is a calm and dependable desktop companion. It stays with you while you work, waits patiently for tasks to finish, and curiously checks in when it’s time to review the results. Whether it’s running around or taking a quiet rest, Leafeon brings a little nature and energy to your workspace.\n\n叶伊布是一只安静又可靠的桌面伙伴。它会陪你工作、等待任务完成，也会在你检查成果时好奇地凑过来。偶尔跑跑跳跳，偶尔趴下休息，让忙碌的桌面多一点自然和活力。",
+  "spritePath": "sprite.png",
+  "frameWidth": 128,
+  "frames": 6,
+  "fps": 6
+}

@@ -1,0 +1,9 @@
+{
+  "id": "boba",
+  "displayName": "奶茶水獭",
+  "description": "A tiny otter sipping bubble tea while keeping you company in Codex.",
+  "spritePath": "sprite.png",
+  "frameWidth": 128,
+  "frames": 7,
+  "fps": 6
+}

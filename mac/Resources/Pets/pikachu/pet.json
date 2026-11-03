@@ -1,0 +1,9 @@
+{
+  "id": "pikachu",
+  "displayName": "皮卡丘",
+  "description": "一只勇敢的小型黄色电气鼠 Codex 宠物，戴着红白训练师帽。",
+  "spritePath": "sprite.png",
+  "frameWidth": 128,
+  "frames": 6,
+  "fps": 6
+}

@@ -1,0 +1,9 @@
+{
+  "id": "cinnamoroll",
+  "displayName": "玉桂狗",
+  "description": "Github : LxNx-Hn // A tiny Cinnamonroll pixel pet for gentle coding sessions.",
+  "spritePath": "sprite.png",
+  "frameWidth": 128,
+  "frames": 6,
+  "fps": 6
+}

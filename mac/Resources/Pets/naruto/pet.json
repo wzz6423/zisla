@@ -1,0 +1,9 @@
+{
+  "id": "naruto",
+  "displayName": "漩涡鸣人",
+  "description": "A restless chibi Shippuden shinobi pet with blond spikes, whisker marks, orange-black outfit, and stubborn never-give-up energy.",
+  "spritePath": "sprite.png",
+  "frameWidth": 128,
+  "frames": 6,
+  "fps": 6
+}

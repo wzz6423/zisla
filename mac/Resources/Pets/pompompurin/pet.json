@@ -1,0 +1,9 @@
+{
+  "id": "pompompurin",
+  "displayName": "布丁狗",
+  "description": "A cheerful pudding-dog desktop companion for PetDex.",
+  "spritePath": "sprite.png",
+  "frameWidth": 128,
+  "frames": 6,
+  "fps": 6
+}

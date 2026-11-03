@@ -1,0 +1,9 @@
+{
+  "id": "snoopy",
+  "displayName": "史努比",
+  "description": "A tiny black-and-white beagle with a red collar for calm coding sessions.",
+  "spritePath": "sprite.png",
+  "frameWidth": 128,
+  "frames": 6,
+  "fps": 6
+}

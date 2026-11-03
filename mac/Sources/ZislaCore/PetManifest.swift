@@ -2,12 +2,8 @@ import Foundation
 
 /// Metadata for a desktop pet: a single (or horizontally-laid-out) pixel sprite sheet.
 ///
-/// To keep the binary size extremely small, the app uses **CC0 pixel animals**
-/// (Kenney Animal Pack Redux) — one small PNG per pet, embedded in `Resources/Pets/<id>/`.
-///
-/// Animation does not rely on a frame atlas; instead `PetSpriteView` drives a
-/// procedural idle (gentle bob + breathing feel + click-jump), keeping each asset
-/// in the KB range.
+/// Built-in artwork is bundled in `Resources/Pets/<id>/`; sources and rights
+/// are recorded in `Resources/Pets/CREDITS.md`.
 ///
 /// Bundle layout:
 /// ```
