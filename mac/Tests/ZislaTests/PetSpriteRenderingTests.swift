@@ -9,7 +9,7 @@ import ZislaKit
 @MainActor
 struct PetSpriteRenderingTests {
     @Test(arguments: [CGSize(width: 182, height: 136), CGSize(width: 137, height: 184), CGSize(width: 136, height: 136)])
-    func animatedSpritesFillSquareAtCollapsedAndExpandedSizes(sourceSize: CGSize) throws {
+    func animatedSpritesPreserveAspectAtCollapsedAndExpandedSizes(sourceSize: CGSize) throws {
         let sprite = PetSprite(image: try image(size: sourceSize))
         for size: CGFloat in [24, 32, 40, 56] {
             let host = NSHostingView(rootView: PetSpriteView(sprite: sprite, activity: .idle, size: size)
@@ -28,20 +28,20 @@ struct PetSpriteRenderingTests {
                     bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue))
                 context.scaleBy(x: scale, y: scale)
                 layer.render(in: context)
-                try expectSquare(NSBitmapImageRep(cgImage: #require(context.makeImage())), side: pixels)
+                try expectAspect(NSBitmapImageRep(cgImage: #require(context.makeImage())), side: pixels, sourceSize: sourceSize)
             }
         }
     }
 
     @Test(arguments: [CGSize(width: 182, height: 136), CGSize(width: 137, height: 184), CGSize(width: 136, height: 136)])
-    func reducedMotionSpritesFillTheSameSquare(sourceSize: CGSize) throws {
+    func reducedMotionSpritesPreserveTheSameAspect(sourceSize: CGSize) throws {
         let sprite = PetSprite(image: try image(size: sourceSize))
         for size: CGFloat in [24, 32, 40, 56] {
             let renderer = ImageRenderer(content: PetSpriteView(sprite: sprite, activity: .idle, size: size)
                 .environment(\._accessibilityReduceMotion, true))
             for scale: CGFloat in [1, 2] {
                 renderer.scale = scale
-                try expectSquare(NSBitmapImageRep(cgImage: #require(renderer.cgImage)), side: Int(size * scale))
+                try expectAspect(NSBitmapImageRep(cgImage: #require(renderer.cgImage)), side: Int(size * scale), sourceSize: sourceSize)
             }
         }
     }
@@ -62,12 +62,35 @@ struct PetSpriteRenderingTests {
         return view.subviews.lazy.compactMap { spriteLayer(in: $0) }.first
     }
 
-    private func expectSquare(_ bitmap: NSBitmapImageRep, side: Int) throws {
+    private func expectAspect(_ bitmap: NSBitmapImageRep, side: Int, sourceSize: CGSize) throws {
         #expect(bitmap.pixelsWide == side && bitmap.pixelsHigh == side)
-        for (x, y) in [(0, 0), (side - 1, 0), (0, side - 1), (side - 1, side - 1)] {
-            let color = try #require(bitmap.colorAt(x: x, y: y)?.usingColorSpace(.deviceRGB))
-            #expect(color.alphaComponent > 0.99, "All source corners must reach the square viewport without letterboxing")
+        var minX = side, minY = side, maxX = -1, maxY = -1
+        for y in 0..<side {
+            for x in 0..<side {
+                let color = try #require(bitmap.colorAt(x: x, y: y))
+                if color.alphaComponent > 0.5 {
+                    minX = min(minX, x)
+                    minY = min(minY, y)
+                    maxX = max(maxX, x)
+                    maxY = max(maxY, y)
+                }
+            }
         }
+        try #require(maxX >= minX && maxY >= minY, "The pet must render visible pixels")
+        let scale = CGFloat(side) / max(sourceSize.width, sourceSize.height)
+        let renderedSize = CGSize(width: maxX - minX + 1, height: maxY - minY + 1)
+        let expectedSize = CGSize(width: sourceSize.width * scale, height: sourceSize.height * scale)
+        let inset = CGPoint(x: (CGFloat(side) - expectedSize.width) / 2,
+                            y: (CGFloat(side) - expectedSize.height) / 2)
+        // Each edge rounds independently to physical pixels.
+        #expect(abs(CGFloat(minX) - inset.x) <= 1
+                && abs(CGFloat(maxX + 1) - inset.x - expectedSize.width) <= 1,
+                "Pet width must preserve source proportions: rendered \(renderedSize), expected \(expectedSize), viewport \(side)px")
+        #expect(abs(CGFloat(minY) - inset.y) <= 1
+                && abs(CGFloat(maxY + 1) - inset.y - expectedSize.height) <= 1,
+                "Pet height must preserve source proportions: rendered \(renderedSize), expected \(expectedSize), viewport \(side)px")
+        #expect(abs(minX + maxX + 1 - side) <= 1 && abs(minY + maxY + 1 - side) <= 1,
+                "The sprite must remain centered inside its square viewport")
         let center = try #require(bitmap.colorAt(x: side / 2, y: side / 2))
         #expect(center.alphaComponent == 0, "Transparent sprite pixels must remain transparent")
     }

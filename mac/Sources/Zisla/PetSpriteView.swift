@@ -68,6 +68,7 @@ struct PetSpriteView: View {
     Image(nsImage: image)
       .interpolation(.none)  // Pixel art: preserve hard edges when scaling up
       .resizable()
+      .scaledToFit()
   }
 
   private func triggerTapFeedback() {
@@ -133,7 +134,7 @@ private final class PetSpriteLayerView: NSView {
     super.init(frame: .zero)
     wantsLayer = true
     layer?.backgroundColor = NSColor.clear.cgColor
-    spriteLayer.contentsGravity = .resize
+    spriteLayer.contentsGravity = .resizeAspect
     spriteLayer.magnificationFilter = .nearest
     spriteLayer.minificationFilter = .nearest
     layer?.addSublayer(spriteLayer)
