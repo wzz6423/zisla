@@ -61,7 +61,7 @@ struct PetSpriteRenderingTests {
             placement: IslandPlacement(mode: .custom, edge: edge),
             statusIconSize: edge.isVertical ? CGSize(width: 40, height: 120) : CGSize(width: 120, height: 32))).layout(for: screen)
         let bar = layout.collapsedFrame
-        let height = edge.isVertical ? bar.width : bar.height
+        let height: CGFloat = 24
         let width = height * 182 / 136
         let container = CollapsedPetLayout.frame(for: layout, petAspectRatio: 182 / 136)
         let content = CollapsedPetView.pillPet(sprite: sprite, behavior: PetBehaviorController(),

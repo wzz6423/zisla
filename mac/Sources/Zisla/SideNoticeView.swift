@@ -1123,7 +1123,7 @@ private final class HeadphoneConnectionAnimationView: NSView {
     }
 }
 
-private struct HeadphoneGlyph: View {
+struct HeadphoneGlyph: View {
     var productID: UInt32?
     var isPresented: Bool
     var isSingleUnit: Bool
@@ -1303,7 +1303,7 @@ struct CompactHeadphoneConnectionBar: View {
     }
 }
 
-private extension IslandNotice {
+extension IslandNotice {
     var headphoneProductID: UInt32? {
         metadata?[HeadphoneConnection.productIDMetadataKey].flatMap(UInt32.init)
     }

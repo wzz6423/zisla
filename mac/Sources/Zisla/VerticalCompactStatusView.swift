@@ -36,6 +36,8 @@ struct CompactPillStatusContent: View {
     let visualizationStyle: MediaVisualizationStyle
     let item: NowPlayingSnapshot?
 
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
     nonisolated static func transientPresentation(message: String) -> CompactPillStatusPresentation {
         CompactPillStatusPresentation(priority: .transient,
             notice: IslandNotice(id: "app-transient", title: message, symbolName: "exclamationmark.triangle.fill"),
@@ -108,6 +110,14 @@ struct CompactPillStatusContent: View {
             )
         } else if presentation.priority == .aiActivity {
             AIMascotView(identity: AIMascotIdentity(noticeID: presentation.notice.id), size: size)
+        } else if presentation.notice.style == .headphone {
+            HeadphoneGlyph(
+                productID: presentation.notice.headphoneProductID,
+                isPresented: !reduceMotion,
+                isSingleUnit: presentation.notice.symbolName == "headphones",
+                reduceMotion: reduceMotion
+            )
+            .frame(width: size, height: size)
         } else if let image = MediaArtworkImageCache.image(from: presentation.notice.artworkData) {
             Image(nsImage: image).resizable().scaledToFit().frame(width: size, height: size)
         } else {

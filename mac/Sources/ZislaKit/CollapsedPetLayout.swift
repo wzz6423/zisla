@@ -13,8 +13,9 @@ public enum CollapsedPetLayout {
         petAspectRatio: CGFloat = 1
     ) -> CGSize {
         let thickness = edge.isVertical ? compactBarSize.width : compactBarSize.height
-        let petWidth = thickness * petAspectRatio
-        let slotWidth = style == .pill ? (edge.isVertical ? thickness : petWidth) + outerGap * 2 : sideSlotWidth
+        let height = min(thickness, maximumPetSize)
+        let petWidth = height * petAspectRatio
+        let slotWidth = style == .pill ? (edge.isVertical ? height : petWidth) + outerGap * 2 : sideSlotWidth
         return CGSize(
             width: (style == .pill && edge.isVertical ? max(compactBarSize.width, petWidth) : compactBarSize.width)
                 + (edge.isVertical ? 0 : slotWidth * 2),
@@ -57,7 +58,8 @@ public enum CollapsedPetLayout {
         let isVertical = layout.style == .pill && layout.edge.isVertical
         let thickness = isVertical ? bar.width : bar.height
         let inset = min(4, max(2, thickness * 0.1))
-        let height = layout.style == .pill ? thickness : min(maximumPetSize, max(0, thickness - inset * 2))
+        let height = layout.style == .pill ? min(thickness, maximumPetSize)
+            : min(maximumPetSize, max(0, thickness - inset * 2))
         let width = layout.style == .pill ? height * petAspectRatio : height
         guard height > 0, width > 0 else { return nil }
         let centerOffset = outerGap + (layout.style == .pill ? (isVertical ? height : width) : maximumPetSize) / 2

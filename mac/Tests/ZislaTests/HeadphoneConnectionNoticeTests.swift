@@ -8,6 +8,51 @@ import ZislaKit
 @testable import Zisla
 
 struct HeadphoneConnectionNoticeTests {
+    @Test(arguments: IslandEdge.allCases, [false, true]) @MainActor
+    func customCompactConnectionUsesTheExistingHeadphoneGlyph(edge: IslandEdge, reduceMotion: Bool) throws {
+        for symbol in [nil, "headphones"] as [String?] {
+            for metadata in [nil, [HeadphoneConnection.productIDMetadataKey: "invalid"],
+                [HeadphoneConnection.productIDMetadataKey: String(UInt32.max)]] as [[String: String]?] {
+                let notice = IslandNotice(id: "headphone-connection", title: "AirPods Pro", style: .headphone,
+                    symbolName: symbol, metadata: metadata)
+                let presentation = CompactPillStatusPresentation(priority: .transient, notice: notice, text: "")
+                let size = edge.isVertical ? CGSize(width: 32, height: 48) : CGSize(width: 48, height: 32)
+                func bitmap(_ content: some View) throws -> NSBitmapImageRep {
+                    let renderer = ImageRenderer(content: content
+                        .frame(width: size.width, height: size.height)
+                        .background(.black)
+                        .environment(\._accessibilityReduceMotion, reduceMotion)
+                        .transaction { $0.disablesAnimations = true })
+                    renderer.scale = 2
+                    return NSBitmapImageRep(cgImage: try #require(renderer.cgImage))
+                }
+                let actual = try bitmap(CompactPillStatusContent(presentation: presentation, text: "",
+                    edge: edge, visualizationStyle: .waveform, item: nil))
+                let expected = try bitmap(HeadphoneGlyph(productID: notice.headphoneProductID, isPresented: !reduceMotion,
+                    isSingleUnit: symbol == "headphones", reduceMotion: reduceMotion)
+                    .frame(width: 24, height: 24)
+                    .frame(width: edge.isVertical ? 32 : 24, height: edge.isVertical ? 24 : 32)
+                    .padding(edge.isVertical ? .vertical : .horizontal, 12))
+                var differences = 0
+                var foreground = 0
+                for y in 0..<actual.pixelsHigh {
+                    for x in 0..<actual.pixelsWide {
+                        let a = try #require(actual.colorAt(x: x, y: y)?.usingColorSpace(.sRGB))
+                        let b = try #require(expected.colorAt(x: x, y: y)?.usingColorSpace(.sRGB))
+                        let redDifference = abs(a.redComponent - b.redComponent)
+                        let greenDifference = abs(a.greenComponent - b.greenComponent)
+                        let blueDifference = abs(a.blueComponent - b.blueComponent)
+                        if max(redDifference, greenDifference, blueDifference) > 0.01 { differences += 1 }
+                        if max(a.redComponent, a.greenComponent, a.blueComponent) > 0.25 { foreground += 1 }
+                    }
+                }
+                #expect(foreground > 10, "A connection without a system asset must retain a visible headphone icon")
+                #expect(differences == 0,
+                    "The custom pill must reuse the headphone glyph for \(edge), symbol \(symbol ?? "nil"), metadata \(String(describing: metadata)), reduceMotion \(reduceMotion)")
+            }
+        }
+    }
+
     @Test @MainActor
     func externalCompactHeadphoneRingsRemainInsideThePanel() throws {
         let notice = Self.headphoneNotice()
@@ -78,7 +123,10 @@ struct HeadphoneConnectionNoticeTests {
             bluetoothUIServiceResourcesURL: animationResources
         )
 
-        let asset = try #require(locator.asset(for: 0x2027))
+        let notice = IslandNotice(id: "headphone-connection", title: "AirPods Pro", style: .headphone,
+            metadata: [HeadphoneConnection.productIDMetadataKey: String(0x2027)])
+        #expect(notice.headphoneProductID == 0x2027)
+        let asset = try #require(locator.asset(for: notice.headphoneProductID))
         #expect(asset.imageURL.lastPathComponent == "B788.icns")
         #expect(asset.animationURL?.lastPathComponent == "Banner-PID-8231-Loop.mov")
         #expect(locator.asset(for: nil) == nil)
