@@ -1,4 +1,5 @@
 import AppKit
+import SwiftUI
 import Testing
 import ZislaCore
 @testable import ZislaKit
@@ -371,5 +372,41 @@ struct OverlayCoordinatorPlacementTests {
         #expect(detailed.collapsedFrame.midY == original.collapsedFrame.midY)
         coordinator.updateCompactStatus(expandsForDetailedStatus: false, compactStatusLength: 32)
         #expect(coordinator.activeLayout?.collapsedFrame == original.collapsedFrame)
+    }
+
+    @Test(arguments: IslandEdge.allCases)
+    func persistentPetContentFollowsStatusThicknessWithoutReplacingItsPanel(edge: IslandEdge) throws {
+        let content = NSHostingView(rootView: Color.red.frame(width: 24, height: 24))
+        content.sizingOptions = []
+        let ratio = CGFloat(182) / 136
+        let coordinator = OverlayCoordinator(contentView: NSView(),
+            layoutEngine: ScreenLayoutEngine(configuration: ScreenLayoutConfiguration(layoutStyle: .pill,
+                placement: IslandPlacement(mode: .custom, edge: edge))),
+            persistentContentViewProvider: { layout in
+                let height = edge.isVertical ? layout.collapsedFrame.width : layout.collapsedFrame.height
+                content.rootView = Color.red.frame(width: height * ratio, height: height)
+                return content
+            },
+            persistentPanelFrameProvider: { CollapsedPetLayout.frame(for: $0, petAspectRatio: ratio) },
+            persistentContentViewUpdater: { _, layout in
+                let height = edge.isVertical ? layout.collapsedFrame.width : layout.collapsedFrame.height
+                content.rootView = Color.red.frame(width: height * ratio, height: height)
+            })
+        coordinator.screenSnapshotProvider = { [screen] }
+        coordinator.updateScreens([screen])
+        defer { coordinator.stop() }
+        let panel = try #require(content.window)
+        func expectHeight(_ height: CGFloat) throws {
+            let image = try #require(ImageRenderer(content: content.rootView).cgImage)
+            #expect(image.height == Int(height), "Persistent content must render at the current island thickness")
+            #expect(abs(CGFloat(image.width) - height * ratio) < 1)
+            #expect(content.window === panel, "Updating pet size must reuse its persistent panel")
+        }
+        try expectHeight(24)
+        coordinator.updateCompactStatus(expandsForDetailedStatus: false,
+            statusIconSize: edge.isVertical ? CGSize(width: 40, height: 120) : CGSize(width: 120, height: 32))
+        try expectHeight(edge.isVertical ? 40 : 32)
+        coordinator.updateCompactStatus(expandsForDetailedStatus: false)
+        try expectHeight(24)
     }
 }

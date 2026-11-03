@@ -44,6 +44,7 @@ public final class OverlayCoordinator: NSObject {
     private let contentView: NSView
     private let persistentContentViewProvider: ((ScreenOverlayLayout) -> NSView?)?
     private let persistentPanelFrameProvider: ((ScreenOverlayLayout) -> CGRect)?
+    private let persistentContentViewUpdater: ((NSView, ScreenOverlayLayout) -> Void)?
     private var layoutEngine: ScreenLayoutEngine
     private var lastReportedActiveLayout: ScreenOverlayLayout?
     private let collapseDelay: Duration
@@ -107,7 +108,8 @@ public final class OverlayCoordinator: NSObject {
         collapseDelay: Duration = .zero,
         pointerEntryGrace: Duration = .seconds(2),
         persistentContentViewProvider: ((ScreenOverlayLayout) -> NSView?)? = nil,
-        persistentPanelFrameProvider: ((ScreenOverlayLayout) -> CGRect)? = nil
+        persistentPanelFrameProvider: ((ScreenOverlayLayout) -> CGRect)? = nil,
+        persistentContentViewUpdater: ((NSView, ScreenOverlayLayout) -> Void)? = nil
     ) {
         self.contentView = contentView
         self.layoutEngine = layoutEngine
@@ -115,6 +117,7 @@ public final class OverlayCoordinator: NSObject {
         self.pointerEntryGrace = pointerEntryGrace
         self.persistentContentViewProvider = persistentContentViewProvider
         self.persistentPanelFrameProvider = persistentPanelFrameProvider
+        self.persistentContentViewUpdater = persistentContentViewUpdater
         super.init()
     }
 
@@ -986,6 +989,9 @@ public final class OverlayCoordinator: NSObject {
             let panel: IslandPanel
             let isNewPanel: Bool
             if let existingPanel = persistentPanels[layout.displayID] {
+                if let contentView = existingPanel.contentView {
+                    persistentContentViewUpdater?(contentView, layout)
+                }
                 panel = existingPanel
                 isNewPanel = false
             } else {

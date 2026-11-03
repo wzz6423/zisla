@@ -539,7 +539,7 @@ struct IslandRootView: View {
                 sprite: sprite,
                 behavior: petController.behavior,
                 side: model.settingsStore.settings.petSide,
-                size: ExpandedPetLayout.size
+                size: CGSize(width: ExpandedPetLayout.size, height: ExpandedPetLayout.size)
             )
             .padding(.top, ExpandedPetLayout.topInset)
             .padding(
@@ -764,13 +764,8 @@ struct CollapsedPetView: View {
                         browserDownloadCount: model.settingsStore.settings.showsBrowserDownloadProgress
                             ? model.browserDownloads.snapshots.count : 0
                     )
-                    let container = CollapsedPetLayout.frame(for: screenLayout, compactBarFrame: compactFrame)
-                    if let frame = CollapsedPetLayout.petFrame(for: screenLayout, compactBarFrame: compactFrame,
-                                                               side: model.settingsStore.settings.petSide) {
-                        IslandPetView(sprite: sprite, behavior: petController.behavior,
-                                      side: model.settingsStore.settings.petSide, size: frame.width)
-                            .position(x: frame.midX - container.minX, y: container.maxY - frame.midY)
-                    }
+                    Self.pillPet(sprite: sprite, behavior: petController.behavior, layout: screenLayout,
+                                 compactBarFrame: compactFrame, side: model.settingsStore.settings.petSide)
                 } else {
                 let horizontalInset = CollapsedPetLayout.outerGap
                 let verticalInset = min(4, max(2, proxy.size.height * 0.1))
@@ -787,7 +782,7 @@ struct CollapsedPetView: View {
                     sprite: sprite,
                     behavior: petController.behavior,
                     side: side,
-                    size: size
+                    size: CGSize(width: size, height: size)
                 )
                 .padding(
                     side == .right ? .trailing : .leading,
@@ -804,6 +799,17 @@ struct CollapsedPetView: View {
         }
     }
 
+    @ViewBuilder
+    static func pillPet(sprite: PetSprite, behavior: PetBehaviorController, layout: ScreenOverlayLayout,
+                        compactBarFrame: CGRect?, side: PetSide) -> some View {
+        let aspectRatio = sprite.frameSize.width / sprite.frameSize.height
+        let container = CollapsedPetLayout.frame(for: layout, compactBarFrame: compactBarFrame, petAspectRatio: aspectRatio)
+        if let frame = CollapsedPetLayout.petFrame(for: layout, compactBarFrame: compactBarFrame,
+                                                  petAspectRatio: aspectRatio, side: side) {
+            IslandPetView(sprite: sprite, behavior: behavior, side: side, size: frame.size)
+                .position(x: frame.midX - container.minX, y: container.maxY - frame.midY)
+        }
+    }
 }
 
 struct VoiceTranscriptionView: View {

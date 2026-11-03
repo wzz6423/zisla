@@ -11,7 +11,7 @@ import SwiftUI
 struct PetSpriteView: View {
   var sprite: PetSprite
   var activity: PetBehaviorController.Activity
-  var size: CGFloat
+  var size: CGSize
 
   @Environment(\.accessibilityReduceMotion) private var reduceMotion
   @State private var tapPulse: CGFloat = 1
@@ -21,11 +21,11 @@ struct PetSpriteView: View {
   /// Bob amplitude varies by activity: more energetic when working, subdued when failed or waiting.
   private var bobAmplitude: CGFloat {
     switch activity {
-    case .idle: size * 0.04
-    case .working: size * 0.07
-    case .failed: size * 0.015
-    case .waiting: size * 0.02
-    case .succeeded: size * 0.11
+    case .idle: size.height * 0.04
+    case .working: size.height * 0.07
+    case .failed: size.height * 0.015
+    case .waiting: size.height * 0.02
+    case .succeeded: size.height * 0.11
     }
   }
 
@@ -55,7 +55,7 @@ struct PetSpriteView: View {
         .scaleEffect(tapPulse)
       }
     }
-    .frame(width: size, height: size)
+    .frame(width: size.width, height: size.height)
     .contentShape(Rectangle())
     .onDisappear {
       tapResetTask?.cancel()
@@ -225,7 +225,7 @@ private final class PetSpriteLayerView: NSView {
 /// Full pet view that wires together the behavior controller and sprite renderer.
 struct PetCompanionView: View {
   var sprite: PetSprite
-  var size: CGFloat
+  var size: CGSize
   var behavior: PetBehaviorController
 
   var body: some View {
