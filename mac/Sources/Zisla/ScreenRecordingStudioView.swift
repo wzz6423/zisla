@@ -192,6 +192,15 @@ struct ScreenRecordingStudioView: View {
                 .accessibilityIdentifier("screenRecording.playbackPosition")
             Text(Self.clock(time) + " / " + Self.clock(duration))
                 .font(.system(size: 11, design: .monospaced)).monospacedDigit().fixedSize()
+            Picker(AppLocalization.text("画布比例"), selection: Binding(get: {
+                model.project?.edits.canvasAspectRatio ?? .original
+            }, set: { ratio in model.update { $0.edits.canvasAspectRatio = ratio } })) {
+                ForEach(RecordingCanvasAspectRatio.allCases, id: \.self) { ratio in
+                    Text(AppLocalization.text(ratio.title)).tag(ratio)
+                }
+            }
+            .labelsHidden().fixedSize()
+            .accessibilityIdentifier("screenRecording.canvasAspectRatio")
         }
         .padding(.horizontal, 16).frame(height: 34).disabled(!model.canEdit)
     }

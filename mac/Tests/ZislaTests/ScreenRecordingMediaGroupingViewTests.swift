@@ -153,7 +153,7 @@ struct ScreenRecordingMediaGroupingViewTests {
     }
 }
 
-@MainActor private final class MenuSelection: NSObject {
+@MainActor final class MenuSelection: NSObject {
     let title: String
     var titles: [String] = []
     private var selected = false

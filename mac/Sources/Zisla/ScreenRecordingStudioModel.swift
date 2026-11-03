@@ -110,7 +110,7 @@ final class ScreenRecordingStudioModel: ObservableObject {
         self.recordingOutputDirectory = projectStore?.root ?? outputDirectoryStore.directory
         self.renderPreview = renderPreview ?? { project, directory, time in
             try await exporter.preview(project: project, directory: directory, sourceTime: time,
-                maximumSize: CGSize(width: 1_200, height: 800))
+                maximumSize: RecordingExportRenderer.maximumPreviewSize)
         }
         self.aiCompletion = aiCompletion ?? appModel.map { appModel in
             { project, instruction, reference in
