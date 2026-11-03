@@ -1,0 +1,9 @@
+{
+  "id": "scarf-hamster",
+  "displayName": "围巾仓鼠",
+  "description": "系着绿围巾、背着小挎包的圆脸仓鼠。",
+  "spritePath": "sprite.png",
+  "frameWidth": 128,
+  "frames": 6,
+  "fps": 6
+}

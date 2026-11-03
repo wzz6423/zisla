@@ -1,0 +1,9 @@
+{
+  "id": "corgi",
+  "displayName": "柯基",
+  "description": "短腿大耳朵的橘白小柯基。",
+  "spritePath": "sprite.png",
+  "frameWidth": 128,
+  "frames": 6,
+  "fps": 6
+}

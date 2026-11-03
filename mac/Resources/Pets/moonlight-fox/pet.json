@@ -1,0 +1,9 @@
+{
+  "id": "moonlight-fox",
+  "displayName": "月光狐",
+  "description": "带着蓝紫色点缀的白色小狐狸。",
+  "spritePath": "sprite.png",
+  "frameWidth": 128,
+  "frames": 6,
+  "fps": 6
+}

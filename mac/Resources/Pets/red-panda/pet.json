@@ -1,0 +1,9 @@
+{
+  "id": "red-panda",
+  "displayName": "小熊猫",
+  "description": "圆脸和蓬松条纹尾巴的小熊猫。",
+  "spritePath": "sprite.png",
+  "frameWidth": 128,
+  "frames": 6,
+  "fps": 6
+}

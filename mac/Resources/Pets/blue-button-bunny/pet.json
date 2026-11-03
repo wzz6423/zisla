@@ -1,0 +1,9 @@
+{
+  "id": "blue-button-bunny",
+  "displayName": "纽扣兔",
+  "description": "穿着白毛衣、有着纽扣眼睛的蓝色布偶兔。",
+  "spritePath": "sprite.png",
+  "frameWidth": 128,
+  "frames": 6,
+  "fps": 6
+}

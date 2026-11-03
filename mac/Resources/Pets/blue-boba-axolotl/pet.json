@@ -1,0 +1,9 @@
+{
+  "id": "blue-boba-axolotl",
+  "displayName": "奶茶六角龙",
+  "description": "捧着珍珠奶茶的蓝色六角龙。",
+  "spritePath": "sprite.png",
+  "frameWidth": 128,
+  "frames": 6,
+  "fps": 6
+}

@@ -1,0 +1,9 @@
+{
+  "id": "box-capybara",
+  "displayName": "抱箱水豚",
+  "description": "抱着小箱子的淡定水豚。",
+  "spritePath": "sprite.png",
+  "frameWidth": 128,
+  "frames": 7,
+  "fps": 6
+}

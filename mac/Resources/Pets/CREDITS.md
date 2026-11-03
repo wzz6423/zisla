@@ -40,3 +40,23 @@
 | `naruto` | 漩涡鸣人 | Narek-Khachikyan | [Petdex](https://petdex.dev/pets/naruto) | [图集](https://assets.petdex.dev/community/naruto/spritesheet.webp) |
 | `luffy` | 路飞 | Oleg S. | [Petdex](https://petdex.dev/pets/luffy) | [图集](https://assets.petdex.dev/pets/luffy-12e2064f59b6/sprite.webp) |
 | `jinx` | 金克丝 | douglas-strey | [Petdex](https://petdex.dev/pets/jinx) | [图集](https://assets.petdex.dev/pets/jinx-f1ced31d99c9/sprite.webp) |
+| `orange-capybara` | 橘子水豚 | yjcys | [Petdex](https://petdex.dev/pets/capy) | [图集](https://assets.petdex.dev/pets/capy-c8b8801eb785/sprite.webp) |
+| `coffee-capybara` | 咖啡水豚 | davidrichard1111 | [Petdex](https://petdex.dev/pets/cappy) | [图集](https://assets.petdex.dev/pets/cappy-4d0bf2d145fc/sprite.webp) |
+| `box-capybara` | 抱箱水豚 | railly | [Petdex](https://petdex.dev/pets/cache-capy) | [图集](https://assets.petdex.dev/curated/cache-capy/sprite-v2.webp) |
+| `mallow-cat` | 灰白猫 | Aidil | [Petdex](https://petdex.dev/pets/mallow) | [图集](https://assets.petdex.dev/pets/mallow-e2413d735bce/sprite.webp) |
+| `orange-tabby` | 橘猫 | railly | [Petdex](https://petdex.dev/pets/sunny) | [图集](https://assets.petdex.dev/pets/sunny-464003b06e2c/sprite.webp) |
+| `calico-cat` | 三花猫 | 619824146 | [Petdex](https://petdex.dev/pets/calico-cat) | [图集](https://assets.petdex.dev/pets/calico-cat-a6b80a170b35/sprite.webp) |
+| `shiba-inu` | 柴犬 | jackhanyuan | [Petdex](https://petdex.dev/pets/shiba-3) | [图集](https://assets.petdex.dev/pets/shiba-5c59a0af1316/sprite.webp) |
+| `corgi` | 柯基 | shmilyxi | [Petdex](https://petdex.dev/pets/nemo-corgi) | [图集](https://assets.petdex.dev/pets/nemo-corgi-6681d0ce6fdc/sprite.webp) |
+| `golden-retriever` | 金毛 | Prem S. | [Petdex](https://petdex.dev/pets/golden-retriever) | [图集](https://assets.petdex.dev/pets/golden-retriever-fcdbff377324/sprite.webp) |
+| `lop-rabbit` | 垂耳兔 | OliveWind | [Petdex](https://petdex.dev/pets/rabbit) | [图集](https://assets.petdex.dev/pets/rabbit-0cc3c354b19f/sprite.webp) |
+| `byte-bunny` | 键帽兔 | railly | [Petdex](https://petdex.dev/pets/byte-bunny) | [图集](https://assets.petdex.dev/curated/byte-bunny/spritesheet.webp) |
+| `blue-button-bunny` | 纽扣兔 | b2ekwxmo | [Petdex](https://petdex.dev/pets/blue-button-bunny) | [图集](https://assets.petdex.dev/pets/blue-button-bunny-c6704a37a2f7/sprite.webp) |
+| `red-panda` | 小熊猫 | pp33pant | [Petdex](https://petdex.dev/pets/red-panda) | [图集](https://assets.petdex.dev/pets/red-panda-92e0542b04d2/sprite.webp) |
+| `scarf-hamster` | 围巾仓鼠 | indigocloud6 | [Petdex](https://petdex.dev/pets/scarf-hamster) | [图集](https://assets.petdex.dev/pets/scarf-hamster-5d998406c663/sprite.webp) |
+| `penguin-chick` | 企鹅宝宝 | Nobita D. | [Petdex](https://petdex.dev/pets/penguin-chick) | [图集](https://assets.petdex.dev/pets/penguin-chick-30034f1536e7/sprite.webp) |
+| `blue-boba-axolotl` | 奶茶六角龙 | tedtschopp | [Petdex](https://petdex.dev/pets/blue-boba-axolotl) | [图集](https://assets.petdex.dev/pets/blue-boba-axolotl-95e9366e6389/sprite.webp) |
+| `milk-tea-koala` | 奶茶考拉 | Wenxiang Z. | [Petdex](https://petdex.dev/pets/milk-tea-koala) | [图集](https://assets.petdex.dev/pets/milk-tea-koala-bcf6ec42fe8d/sprite.webp) |
+| `mellow-otter` | 软萌水獭 | winkpist95 | [Petdex](https://petdex.dev/pets/otterumells) | [图集](https://assets.petdex.dev/pets/otterumells-7bed64d7a134/sprite.webp) |
+| `moonlight-fox` | 月光狐 | norbertbodziony | [Petdex](https://petdex.dev/pets/nightly-fox) | [图集](https://assets.petdex.dev/pets/nightly-fox-5ae264c16f21/sprite.webp) |
+| `hedgehog` | 小刺猬 | daviddao | [Petdex](https://petdex.dev/pets/hedgehog) | [图集](https://assets.petdex.dev/pets/hedgehog-6327930213ab/sprite.webp) |

@@ -37,7 +37,13 @@ struct PetSettingsTests {
         #expect(restored.petSide == .right)
     }
 
-    @Test(arguments: ["bear", "chick", "chiikawa", "kirby", "pikachu", "toothless", "boba"])
+    @Test(arguments: [
+        "bear", "chick", "chiikawa", "kirby", "pikachu", "toothless", "boba",
+        "orange-capybara", "coffee-capybara", "box-capybara", "mallow-cat", "orange-tabby",
+        "calico-cat", "shiba-inu", "corgi", "golden-retriever", "lop-rabbit", "byte-bunny",
+        "blue-button-bunny", "red-panda", "scarf-hamster", "penguin-chick", "blue-boba-axolotl",
+        "milk-tea-koala", "mellow-otter", "moonlight-fox", "hedgehog",
+    ])
     func retainedAndNewSelectionsRoundTrip(id: String) throws {
         let settings = FeatureSettings(petEnabled: false, petID: id, petSide: .right)
         let restored = try JSONDecoder().decode(

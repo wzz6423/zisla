@@ -1,0 +1,9 @@
+{
+  "id": "coffee-capybara",
+  "displayName": "咖啡水豚",
+  "description": "捧着咖啡杯的暖棕色水豚。",
+  "spritePath": "sprite.png",
+  "frameWidth": 128,
+  "frames": 6,
+  "fps": 6
+}

@@ -7,12 +7,18 @@ import ZislaCore
 @MainActor
 struct PetLibraryTests {
     @Test
-    func catalogRetainsChickAndBearAndReplacesOtherAnimals() throws {
+    func catalogRetainsChickAndBearAndIncludesCharactersAndNewAnimals() throws {
         let entries = PetLibrary.entries()
         let ids = Set(entries.map(\.id))
-        #expect(entries.count == 26)
+        #expect(entries.count == 46)
         #expect(ids.count == entries.count)
         #expect(ids.isSuperset(of: ["chick", "bear", "chiikawa", "kirby", "pikachu", "toothless"]))
+        #expect(ids.isSuperset(of: [
+            "orange-capybara", "coffee-capybara", "box-capybara", "mallow-cat", "orange-tabby",
+            "calico-cat", "shiba-inu", "corgi", "golden-retriever", "lop-rabbit", "byte-bunny",
+            "blue-button-bunny", "red-panda", "scarf-hamster", "penguin-chick", "blue-boba-axolotl",
+            "milk-tea-koala", "mellow-otter", "moonlight-fox", "hedgehog",
+        ]))
         #expect(ids.isDisjoint(with: [
             "cow", "dog", "duck", "frog", "horse", "monkey", "owl",
             "panda", "parrot", "penguin", "pig", "rabbit", "sloth", "whale",
@@ -88,6 +94,9 @@ struct PetLibraryTests {
         #expect(AppLocalization.string("吉伊卡哇", language: .english) == "Chiikawa")
         #expect(AppLocalization.string("吉伊卡哇", language: .japanese) == "ちいかわ")
         #expect(AppLocalization.string("吉伊卡哇", language: .arabic) == "تشيكاوا")
+        #expect(AppLocalization.string("橘子水豚", language: .english) == "Orange Capybara")
+        #expect(AppLocalization.string("橘子水豚", language: .japanese) == "みかんカピバラ")
+        #expect(AppLocalization.string("橘子水豚", language: .arabic) == "كابيبارا مع برتقالة")
     }
 
     private static func pixels(in image: NSImage) throws -> Data {

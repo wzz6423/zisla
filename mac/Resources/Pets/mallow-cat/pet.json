@@ -1,0 +1,9 @@
+{
+  "id": "mallow-cat",
+  "displayName": "灰白猫",
+  "description": "金色眼睛、白色爪子的灰白猫。",
+  "spritePath": "sprite.png",
+  "frameWidth": 128,
+  "frames": 6,
+  "fps": 6
+}

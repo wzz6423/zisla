@@ -1,0 +1,9 @@
+{
+  "id": "penguin-chick",
+  "displayName": "企鹅宝宝",
+  "description": "灰色绒毛、黑白小脸的帝企鹅宝宝。",
+  "spritePath": "sprite.png",
+  "frameWidth": 128,
+  "frames": 6,
+  "fps": 6
+}

@@ -1,0 +1,9 @@
+{
+  "id": "shiba-inu",
+  "displayName": "柴犬",
+  "description": "橘色毛发、奶油色脸颊的小柴犬。",
+  "spritePath": "sprite.png",
+  "frameWidth": 128,
+  "frames": 6,
+  "fps": 6
+}
