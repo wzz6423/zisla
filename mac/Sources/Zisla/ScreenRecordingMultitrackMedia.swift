@@ -231,7 +231,7 @@ extension ScreenRecordingExporter {
         try Task.checkCancellation()
         let original = try RecordingExportRenderer.outputSize(source: CGSize(width: project.width, height: project.height),
             edits: project.edits, resolution: .source)
-        let scale = min(1, 1_280 / max(original.width, original.height))
+        let scale = min(1, RecordingExportRenderer.maximumPreviewSize.width / max(original.width, original.height))
         let size = CGSize(width: max(2, floor(original.width * scale / 2) * 2),
             height: max(2, floor(original.height * scale / 2) * 2))
         let composition = AVMutableVideoComposition()
@@ -248,7 +248,7 @@ extension ScreenRecordingExporter {
     }
 
     func multitrackPreview(project: ScreenRecordingProject, directory: URL, time: Double,
-                           maximumSize: CGSize = .init(width: 1_200, height: 800)) async throws -> RecordingMultitrackPreviewScene {
+                           maximumSize: CGSize = RecordingExportRenderer.maximumPreviewSize) async throws -> RecordingMultitrackPreviewScene {
         try project.validate()
         guard let timeline = project.timeline, time.isFinite, time >= 0, time <= timeline.duration,
               maximumSize.width >= 2, maximumSize.height >= 2 else { throw ScreenRecordingExportError.invalidConfiguration }

@@ -88,7 +88,7 @@ final class ScreenRecordingExporter: ObservableObject {
         let item = AVPlayerItem(asset: composition)
         let original = try RecordingExportRenderer.outputSize(source: media.sourceSize, edits: project.edits,
                                                               resolution: .source)
-        let scale = min(1, 1_280 / max(original.width, original.height))
+        let scale = min(1, RecordingExportRenderer.maximumPreviewSize.width / max(original.width, original.height))
         let size = CGSize(width: max(2, (original.width * scale / 2).rounded(.down) * 2),
                           height: max(2, (original.height * scale / 2).rounded(.down) * 2))
         let videoComposition = AVMutableVideoComposition()

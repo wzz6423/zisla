@@ -1,4 +1,5 @@
 import AppKit
+import AVFoundation
 import CoreImage
 import Testing
 import ZislaCore
@@ -8,6 +9,79 @@ import ZislaKit
 
 @MainActor
 struct ScreenRecordingCanvasPreviewTests {
+    @Test(.serialized, arguments: [false, true], [
+        (CGSize(width: 1_920, height: 1_080), CGSize(width: 1_920, height: 1_080)),
+        (CGSize(width: 3_840, height: 2_160), CGSize(width: 1_920, height: 1_080)),
+        (CGSize(width: 640, height: 480), CGSize(width: 640, height: 480)),
+        (CGSize(width: 1_080, height: 1_920), CGSize(width: 1_080, height: 1_920)),
+        (CGSize(width: 2_048, height: 2_048), CGSize(width: 1_920, height: 1_920)),
+    ])
+    func studioPreviewKeepsFullHDDetailWithBoundedPixelsAndPlaybackRate(
+        multitrack: Bool, dimensions: (source: CGSize, expected: CGSize)
+    ) async throws {
+        let media = try RecordingMultitrackTestFixture()
+        defer { media.remove() }
+        _ = try await media.createVideo(size: dimensions.source, duration: 0.125)
+        var project = ScreenRecordingProject(name: "Preview quality", videoFile: "screen.mp4", duration: 0.125,
+            width: Int(dimensions.source.width), height: Int(dimensions.source.height))
+        project.edits.background = .none
+        project.edits.showCursor = false
+        project.edits.clickEffects = false
+        if multitrack { project.timeline = RecordingMultitrackTimeline.migrating(project) }
+
+        let exporter = ScreenRecordingExporter()
+        let model = ScreenRecordingStudioModel(exporter: exporter, projectStore: media.store)
+        defer { model.shutdown() }
+        model.install(project, directory: media.directory)
+        await model.previewTask?.value
+        #expect(model.errorMessage == nil)
+        let paused = try #require(model.canvasPreview)
+        #expect(CGSize(width: paused.width, height: paused.height) == dimensions.expected,
+            "Paused editing must retain Full HD detail while capping large sources and preserving small ones")
+
+        let item = try await exporter.playbackItem(project: project, directory: media.directory)
+        let composition = try #require(item.videoComposition)
+        #expect(composition.renderSize == dimensions.expected,
+            "Playback and paused editing must use the same bounded preview resolution")
+        #expect(composition.frameDuration == CMTime(value: 1, timescale: 30))
+        let generator = AVAssetImageGenerator(asset: item.asset)
+        generator.videoComposition = composition
+        let frame = try await generator.image(at: .zero).image
+        #expect(CGSize(width: frame.width, height: frame.height) == dimensions.expected)
+        #expect(model.project == project)
+        #expect(model.exportConfiguration.resolution == .fullHD)
+        #expect(try media.files() == ["screen.mp4"], "Previewing must not create proxy files or change source media")
+    }
+
+    @Test(.serialized, arguments: [false, true])
+    func croppedPortraitCanvasKeepsTheSameAspectInPausedPreviewAndPlayback(multitrack: Bool) async throws {
+        let media = try RecordingMultitrackTestFixture()
+        defer { media.remove() }
+        _ = try await media.createVideo(size: .init(width: 1_920, height: 1_080), duration: 0.125)
+        var project = ScreenRecordingProject(name: "Cropped portrait", videoFile: "screen.mp4", duration: 0.125,
+            width: 1_920, height: 1_080)
+        project.edits.background = .none
+        project.edits.showCursor = false
+        project.edits.clickEffects = false
+        project.edits.crop = .init(x: 0.25, y: 0, width: 0.5, height: 1)
+        project.edits.canvasAspectRatio = .portrait
+        if multitrack { project.timeline = RecordingMultitrackTimeline.migrating(project) }
+
+        let exporter = ScreenRecordingExporter()
+        let model = ScreenRecordingStudioModel(exporter: exporter, projectStore: media.store)
+        defer { model.shutdown() }
+        model.install(project, directory: media.directory)
+        await model.previewTask?.value
+        #expect(model.errorMessage == nil)
+        let paused = try #require(model.canvasPreview)
+        #expect(CGSize(width: paused.width, height: paused.height) == CGSize(width: 608, height: 1_080),
+            "Preview quality must retain the cropped canvas aspect and even pixel dimensions")
+        let item = try await exporter.playbackItem(project: project, directory: media.directory)
+        #expect(item.videoComposition?.renderSize == CGSize(width: 608, height: 1_080))
+        #expect(model.project == project)
+        #expect(try media.files() == ["screen.mp4"])
+    }
+
     @Test
     func previewExtractsOneCleanFrameAndAddsExactlyTheSameOverlaysAsExport() async throws {
         let root = FileManager.default.temporaryDirectory.appendingPathComponent("zisla-canvas-preview-\(UUID())")

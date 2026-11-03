@@ -57,6 +57,43 @@ struct ScreenRecordingMultitrackUITests {
         let naturalExport = NSHostingView(rootView: Button(AppLocalization.text("导出录屏")) {})
         #expect(frames[4].width + 0.5 >= naturalExport.fittingSize.width,
             "The export button must show its complete translation")
+        let playback = try #require(element("screenRecording.playTimeline", in: host))
+        let slider = try #require(element("screenRecording.playbackPosition", in: host))
+        let clock = try #require(labelled("00:00 / 00:02", in: host) as? any NSAccessibilityElementProtocol)
+        let ratio = try #require(element("screenRecording.canvasAspectRatio", in: host))
+        let transportFrames = [playback, slider, clock, ratio].map {
+            host.convert(window.convertFromScreen($0.accessibilityFrame()), from: nil)
+        }
+        for (first, next) in zip(transportFrames, transportFrames.dropFirst()) {
+            #expect(language.isRightToLeft ? first.minX >= next.maxX : first.maxX <= next.minX,
+                "The ratio menu must follow the playback time without overlapping the scrubber")
+        }
+        for frame in transportFrames {
+            #expect(frame.width > 0 && frame.height > 0 && host.bounds.insetBy(dx: -0.5, dy: -0.5).contains(frame),
+                "Playback and aspect ratio controls must fit the minimum-width studio")
+        }
+        #expect(!objects(in: host).contains { object in
+            guard object.responds(to: NSSelectorFromString("accessibilityRole")),
+                  object.value(forKey: "accessibilityRole") as? String == NSAccessibility.Role.staticText.rawValue else { return false }
+            return ["accessibilityLabel", "accessibilityValue"].contains { key in
+                object.responds(to: NSSelectorFromString(key)) && object.value(forKey: key) as? String == AppLocalization.text("画布比例")
+            }
+        }, "The transport menu must show its selected ratio without an extra visible label")
+        let naturalRatio = NSHostingView(rootView: Picker(AppLocalization.text("画布比例"), selection: Binding.constant(RecordingCanvasAspectRatio.original)) {
+            ForEach(RecordingCanvasAspectRatio.allCases, id: \.self) { value in
+                Text(AppLocalization.text(value.title)).tag(value)
+            }
+        }.labelsHidden().fixedSize()
+            .accessibilityIdentifier("fixture.canvasAspectRatio")
+            .environment(\.locale, language.locale)
+            .environment(\.layoutDirection, language.isRightToLeft ? .rightToLeft : .leftToRight))
+        naturalRatio.sizingOptions = []
+        let ratioWindow = mount(naturalRatio, width: 200, height: 34)
+        defer { ratioWindow.contentView = nil; ratioWindow.close() }
+        await settle(naturalRatio)
+        let naturalWidth = try #require(element("fixture.canvasAspectRatio", in: naturalRatio)).accessibilityFrame().width
+        #expect(transportFrames[3].width + 0.5 >= naturalWidth,
+            "The aspect ratio menu must show its complete selected translation")
         #expect(try #require((export as? NSObject)?.value(forKey: "isAccessibilityEnabled") as? Bool))
         #expect(model.project?.timeline == nil && !model.isDirty && !model.canUndo)
         let add = try #require(element("screenRecording.multitrackAddTrack", in: host))
@@ -112,7 +149,8 @@ struct ScreenRecordingMultitrackUITests {
         await settle(host)
         #expect(panels.count == 1 && model.isChoosingFile && model.operationTask == nil)
         #expect(panels.first?.accessoryView is NSHostingView<ScreenRecordingExportSettingsView>)
-        for identifier in ["screenRecording.projectMenu", "screenRecording.undo", "screenRecording.redo", "screenRecording.export"] {
+        for identifier in ["screenRecording.projectMenu", "screenRecording.undo", "screenRecording.redo", "screenRecording.export",
+                           "screenRecording.canvasAspectRatio"] {
             let control = try #require(element(identifier, in: host) as? NSObject)
             let enabled = try #require(control.value(forKey: "isAccessibilityEnabled") as? Bool)
             #expect(!enabled, "Output destination selection must disable \(identifier)")
@@ -128,6 +166,73 @@ struct ScreenRecordingMultitrackUITests {
         #expect(model.project == edited && model.isDirty && model.canUndo && !model.isChoosingFile)
         #expect(model.canExport && model.operationTask == nil && panels.first?.accessoryView == nil)
         #expect(try fixture.files() == files, "Cancelling export must leave the project files untouched")
+        #expect(NSScreen.screens.allSatisfy { !$0.frame.intersects(window.frame) } && !window.isKeyWindow)
+    }
+
+    @Test(arguments: [AppLanguage.simplifiedChinese, .english, .arabic], [false, true])
+    func transportAspectRatioPickerSharesCanvasSettingsWithUndoAndKeepsSourceMedia(
+        _ language: AppLanguage, _ multitrack: Bool
+    ) async throws {
+        let previous = UserDefaults.standard.volatileDomain(forName: UserDefaults.argumentDomain)
+        var arguments = previous
+        arguments[AppLocalization.defaultsKey] = language.rawValue
+        UserDefaults.standard.setVolatileDomain(arguments, forName: UserDefaults.argumentDomain)
+        defer { UserDefaults.standard.setVolatileDomain(previous, forName: UserDefaults.argumentDomain) }
+        let fixture = try RecordingMultitrackTestFixture()
+        let model = try fixture.model()
+        defer { model.shutdown(); fixture.remove() }
+        let sourceURL = try await fixture.createVideo()
+        let source = try Data(contentsOf: sourceURL)
+        var project = fixture.project()
+        if multitrack { project.timeline = .migrating(project) }
+        model.install(project, directory: fixture.directory)
+        let releaseAccessibility = EnhancedAccessibilityTestScope.acquire()
+        defer { releaseAccessibility() }
+        let host = NSHostingView(rootView: ScreenRecordingStudioView(model: model,
+            languageStore: AppLanguageStore(), prepareCapture: {}))
+        host.sizingOptions = []
+        let window = mount(host, width: 960, height: 800)
+        defer { window.contentView = nil; window.close() }
+        await settle(host)
+        model.inspectorTab = 1
+        await settle(host)
+        let pickerID = "screenRecording.canvasAspectRatio"
+        #expect((try #require(element(pickerID, in: host)) as? NSObject)?.value(forKey: "accessibilityValue") as? String
+            == AppLocalization.text("原始比例"))
+        for ratio in [RecordingCanvasAspectRatio.landscape, .portrait, .standard, .square, .original] {
+            let before = try #require(model.project)
+            var expected = before
+            expected.edits.canvasAspectRatio = ratio
+            try chooseCanvasRatio(ratio, in: host)
+            await settle(host)
+            #expect(model.project == expected && model.isDirty && model.canUndo)
+            let values = objects(in: host).compactMap { object -> String? in
+                guard object.responds(to: NSSelectorFromString("accessibilityRole")),
+                      object.value(forKey: "accessibilityRole") as? String == NSAccessibility.Role.popUpButton.rawValue,
+                      object.responds(to: NSSelectorFromString("accessibilityValue")) else { return nil }
+                return object.value(forKey: "accessibilityValue") as? String
+            }
+            #expect(values.filter { $0 == AppLocalization.text(ratio.title) }.count >= 2,
+                "The transport menu and existing canvas effects picker must show the same ratio")
+            let decoded = try JSONDecoder().decode(ScreenRecordingProject.self, from: JSONEncoder().encode(expected))
+            #expect(decoded == expected, "The selected ratio must use the existing project format")
+            let preview = try await model.exporter.preview(project: expected, directory: fixture.directory,
+                sourceTime: 0.5, maximumSize: .init(width: 256, height: 256))
+            let size = try RecordingExportRenderer.outputSize(source: .init(width: project.width, height: project.height),
+                edits: expected.edits, resolution: .source)
+            #expect(CGSize(width: preview.width, height: preview.height) == size,
+                "The selected canvas ratio must reach the shared preview and export geometry")
+            model.undo()
+            await settle(host)
+            #expect(model.project == before && model.canRedo)
+            #expect((try #require(element(pickerID, in: host)) as? NSObject)?.value(forKey: "accessibilityValue") as? String
+                == AppLocalization.text((before.edits.canvasAspectRatio ?? .original).title))
+            model.redo()
+            await settle(host)
+            #expect(model.project == expected && !model.canRedo)
+        }
+        #expect(try Data(contentsOf: sourceURL) == source && fixture.files() == ["screen.mp4"],
+            "Canvas ratio changes must not crop or rewrite the source recording")
         #expect(NSScreen.screens.allSatisfy { !$0.frame.intersects(window.frame) } && !window.isKeyWindow)
     }
 
@@ -451,6 +556,21 @@ struct ScreenRecordingMultitrackUITests {
         let action = NSSelectorFromString("accessibilityPerformPress")
         try #require(object.responds(to: action))
         object.performSelector(onMainThread: action, with: nil, waitUntilDone: true)
+    }
+
+    private func chooseCanvasRatio(_ ratio: RecordingCanvasAspectRatio, in host: NSView) throws {
+        let picker = try #require(element("screenRecording.canvasAspectRatio", in: host) as? NSObject)
+        let action = NSSelectorFromString("accessibilityPerformPress")
+        try #require(picker.responds(to: action))
+        let selection = MenuSelection(title: AppLocalization.text(ratio.title))
+        NotificationCenter.default.addObserver(selection, selector: #selector(MenuSelection.began(_:)),
+            name: NSMenu.didBeginTrackingNotification, object: nil)
+        defer { NotificationCenter.default.removeObserver(selection) }
+        let selected = selection.waitForSelection {
+            picker.performSelector(onMainThread: action, with: nil, waitUntilDone: true)
+        }
+        #expect(selection.titles == RecordingCanvasAspectRatio.allCases.map { AppLocalization.text($0.title) })
+        try #require(selected, "The native ratio menu must select the requested option")
     }
 }
 

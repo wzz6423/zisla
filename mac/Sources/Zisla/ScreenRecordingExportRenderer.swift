@@ -148,6 +148,8 @@ final class RecordingExportRenderer {
         } else { cameraBorder = nil }
     }
 
+    static let maximumPreviewSize = CGSize(width: 1_920, height: 1_920)
+
     static func outputSize(source: CGSize, edits: RecordingEdits,
                            resolution: RecordingExportResolution) throws -> CGSize {
         let crop = edits.crop ?? RecordingRect(x: 0, y: 0, width: 1, height: 1)
