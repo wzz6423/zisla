@@ -21,6 +21,40 @@ final class SideNoticeDisplayState: ObservableObject {
     @Published var hidesVoiceProcessingIndicator = false
     @Published var statusIcons: [IslandStatusIcon] = []
     @Published var systemMonitorAvailable = false
+    @Published var compactLayout: CompactStatusBarLayout?
+}
+
+struct CompactStatusBarLayout: Equatable {
+    let frame: CGRect
+    let panelFrame: CGRect
+    let animation: Animation?
+}
+
+struct CompactStatusBarSurface<Content: View>: View, Animatable {
+    var frame: CGRect
+    let panelFrame: CGRect
+    private let content: (CGSize) -> Content
+
+    init(frame: CGRect, panelFrame: CGRect, @ViewBuilder content: @escaping (CGSize) -> Content) {
+        self.frame = frame
+        self.panelFrame = panelFrame
+        self.content = content
+    }
+
+    nonisolated var animatableData: AnimatablePair<AnimatablePair<CGFloat, CGFloat>, AnimatablePair<CGFloat, CGFloat>> {
+        get { .init(.init(frame.origin.x, frame.origin.y), .init(frame.width, frame.height)) }
+        set {
+            frame = CGRect(x: newValue.first.first, y: newValue.first.second,
+                           width: newValue.second.first, height: newValue.second.second)
+        }
+    }
+
+    var body: some View {
+        // Screen coordinates keep the animation continuous when its window grows or tightens.
+        content(frame.size)
+            .position(x: frame.midX - panelFrame.minX, y: panelFrame.maxY - frame.midY)
+            .transaction { $0.animation = nil }
+    }
 }
 
 private enum CompactStatusMetrics {
@@ -185,6 +219,7 @@ struct CompactStatusBarView: View {
 
     @Environment(\.accessibilityReduceTransparency) private var reduceTransparency
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @Environment(\.layoutDirection) private var layoutDirection
 
     private var height: CGFloat { displayState.compactWingHeight }
 
@@ -207,57 +242,70 @@ struct CompactStatusBarView: View {
     @ViewBuilder
     func statusBarContent(at date: Date) -> some View {
         GeometryReader { geometry in
-            ZStack {
-                if !displayState.statusIcons.isEmpty {
-                    IslandStatusIconStrip(icons: displayState.statusIcons, edge: displayState.islandEdge, date: date)
-                } else if usesCustomPill, displayState.compactStatusHidden, resultSweep.current == nil {
-                    IslandParticleLogo(side: min(18, height), time: date.timeIntervalSinceReferenceDate)
-                } else if !displayState.compactStatusHidden || resultSweep.current != nil {
-                    if usesCustomPill {
-                        customStatusContent(at: date)
-
-                    } else {
-                        compactStatusContent
-                            .padding(.horizontal, settingsStore.settings.islandLayoutStyle == .pill ? 10 : 0)
-                    }
-                }
-            }
-            .frame(width: geometry.size.width, height: geometry.size.height)
-            .background(compactStatusBackground)
-            .overlay { AIResultSweepOverlay(controller: resultSweep, edge: displayState.islandEdge) }
-            .overlay {
-                if displayState.statusIcons.isEmpty, settingsStore.settings.collapsedProgressGlowEnabled,
-                   let progress = compactProgress(at: date) {
-                    CollapsedProgressGlow(
-                        progress: progress,
-                        tint: compactProgressTint,
-                        layoutStyle: settingsStore.settings.islandLayoutStyle
-                    )
-                }
-            }
-            .clipShape(CompactIslandShape(layoutStyle: settingsStore.settings.islandLayoutStyle))
-            .contentShape(CompactIslandShape(layoutStyle: settingsStore.settings.islandLayoutStyle))
-            // NSHostingView's safe area can push the SwiftUI content down by a few
-            // points when the panel sits under the physical notch or the auto-hide
-            // menu bar. Ignoring the top safe area keeps the bar flush with the
-            // panel's top edge (which itself is anchored to screen.frame.maxY).
-            .ignoresSafeArea(edges: .top)
-            .environment(\.colorScheme, .dark)
-            .environment(\.mediaVisualizationStyle, settingsStore.settings.mediaVisualizationStyle)
-            .simultaneousGesture(
-                DragGesture(minimumDistance: CompactStatusBarSwipeRecognizer.minimumDistance)
-                    .onEnded { gesture in
-                        let vertical = displayState.islandEdge.isVertical
-                        guard CompactStatusBarSwipeRecognizer.hidesStatusContent(
-                            startLocation: vertical ? CGPoint(x: gesture.startLocation.y, y: gesture.startLocation.x) : gesture.startLocation,
-                            translation: vertical ? CGSize(width: gesture.translation.height, height: gesture.translation.width) : gesture.translation,
-                            containerWidth: vertical ? geometry.size.height : geometry.size.width
-                        ) else { return }
-                        displayState.compactStatusHidden = true
-                        onStatusHidden()
-                    }
+            let layout = displayState.compactLayout ?? CompactStatusBarLayout(
+                frame: CGRect(origin: .zero, size: geometry.size),
+                panelFrame: CGRect(origin: .zero, size: geometry.size), animation: nil
             )
+            CompactStatusBarSurface(frame: layout.frame, panelFrame: layout.panelFrame) { size in
+                compactSurfaceContent(size: size, at: date)
+                    .environment(\.layoutDirection, layoutDirection)
+            }
+            .animation(reduceMotion ? nil : layout.animation, value: layout.frame)
+            .environment(\.layoutDirection, .leftToRight)
         }
+    }
+
+    private func compactSurfaceContent(size: CGSize, at date: Date) -> some View {
+        ZStack {
+            if !displayState.statusIcons.isEmpty {
+                IslandStatusIconStrip(icons: displayState.statusIcons, edge: displayState.islandEdge, date: date)
+            } else if usesCustomPill, displayState.compactStatusHidden, resultSweep.current == nil {
+                IslandParticleLogo(side: min(18, height), time: date.timeIntervalSinceReferenceDate)
+            } else if !displayState.compactStatusHidden || resultSweep.current != nil {
+                if usesCustomPill {
+                    customStatusContent(at: date)
+
+                } else {
+                    compactStatusContent
+                        .padding(.horizontal, settingsStore.settings.islandLayoutStyle == .pill ? 10 : 0)
+                }
+            }
+        }
+        .frame(width: size.width, height: size.height)
+        .background(compactStatusBackground)
+        .overlay { AIResultSweepOverlay(controller: resultSweep, edge: displayState.islandEdge) }
+        .overlay {
+            if displayState.statusIcons.isEmpty, settingsStore.settings.collapsedProgressGlowEnabled,
+               let progress = compactProgress(at: date) {
+                CollapsedProgressGlow(
+                    progress: progress,
+                    tint: compactProgressTint,
+                    layoutStyle: settingsStore.settings.islandLayoutStyle
+                )
+            }
+        }
+        .clipShape(CompactIslandShape(layoutStyle: settingsStore.settings.islandLayoutStyle))
+        .contentShape(CompactIslandShape(layoutStyle: settingsStore.settings.islandLayoutStyle))
+        // NSHostingView's safe area can push the SwiftUI content down by a few
+        // points when the panel sits under the physical notch or the auto-hide
+        // menu bar. Ignoring the top safe area keeps the bar flush with the
+        // panel's top edge (which itself is anchored to screen.frame.maxY).
+        .ignoresSafeArea(edges: .top)
+        .environment(\.colorScheme, .dark)
+        .environment(\.mediaVisualizationStyle, settingsStore.settings.mediaVisualizationStyle)
+        .simultaneousGesture(
+            DragGesture(minimumDistance: CompactStatusBarSwipeRecognizer.minimumDistance)
+                .onEnded { gesture in
+                    let vertical = displayState.islandEdge.isVertical
+                    guard CompactStatusBarSwipeRecognizer.hidesStatusContent(
+                        startLocation: vertical ? CGPoint(x: gesture.startLocation.y, y: gesture.startLocation.x) : gesture.startLocation,
+                        translation: vertical ? CGSize(width: gesture.translation.height, height: gesture.translation.width) : gesture.translation,
+                        containerWidth: vertical ? size.height : size.width
+                    ) else { return }
+                    displayState.compactStatusHidden = true
+                    onStatusHidden()
+                }
+        )
     }
 
     private var isPlaybackProgressActive: Bool {

@@ -29,6 +29,8 @@ final class SideNoticePresenter {
     var onCompactLayoutChanged: ((CGDirectDisplayID, Bool, CGFloat?, CGSize?) -> Void)?
     private var isStopped = false
     private let now: () -> Date
+    private let reduceMotion: () -> Bool
+    private let waitForCompactResize: (Duration) async throws -> Void
     /// Display where the last voice recording happened; the post-recording processing indicator stays scoped to it.
     private var voiceProcessingDisplayID: UInt32?
 
@@ -42,6 +44,8 @@ final class SideNoticePresenter {
         displayIDs: Set<UInt32> = [],
         isScreenLocked: Bool = false,
         now: @escaping () -> Date = Date.init,
+        reduceMotion: @escaping () -> Bool = { NSWorkspace.shared.accessibilityDisplayShouldReduceMotion },
+        waitForCompactResize: @escaping (Duration) async throws -> Void = { try await Task.sleep(for: $0) },
         screenSnapshotProvider: @escaping @MainActor () -> [ScreenSnapshot] = {
             NSScreen.screens.compactMap(ScreenSnapshot.init(screen:))
         }
@@ -54,6 +58,8 @@ final class SideNoticePresenter {
         self.languageStore = languageStore
         self.screenSnapshotProvider = screenSnapshotProvider
         self.now = now
+        self.reduceMotion = reduceMotion
+        self.waitForCompactResize = waitForCompactResize
         configuredDisplayIDs = displayIDs
         suppression.isScreenLocked = isScreenLocked
         queue.$left
@@ -424,31 +430,78 @@ final class SideNoticePresenter {
         if displayState.hidesVoiceProcessingIndicator {
             compactNotices = Self.noticesWithoutVoiceProcessing(compactNotices)
         }
-        guard settingsStore.settings.islandLayoutStyle == .pill || resultSweep.current != nil || (
+        let showsCompactBar = settingsStore.settings.islandLayoutStyle == .pill || resultSweep.current != nil || (
             !displayState.compactStatusHidden && compactNotices.contains(where: Self.isCompactNotice)
         )
-        else {
-            panels.compactBar?.orderOut(nil)
+        guard showsCompactBar || panels.compactBar?.isVisible == true else {
+            panels.hideCompactBar()
             return
         }
-        guard let currentFrame = compactFrame(for: snapshot, notices: compactNotices, at: date,
-                                             statusHidden: displayState.compactStatusHidden) else {
-            panels.compactBar?.orderOut(nil)
+        let configuration = settingsStore.settings.islandScreenConfiguration
+        let layout = ScreenLayoutEngine(configuration: configuration).layout(for: snapshot)
+        guard let frame = showsCompactBar
+            ? compactFrame(for: snapshot, notices: compactNotices, at: date,
+                           statusHidden: displayState.compactStatusHidden)
+            : layout.collapsedFrame else {
+            panels.hideCompactBar()
             return
         }
-        let frame = currentFrame
-        let topology = ScreenLayoutEngine(configuration: settingsStore.settings.islandScreenConfiguration).layout(for: snapshot).topology
-        if topology.hasPhysicalNotch {
-            displayState.compactBarCenterInset = topology.anchorFrame.width
+        if layout.topology.hasPhysicalNotch {
+            displayState.compactBarCenterInset = layout.topology.anchorFrame.width
         }
         let panel = ensureCompactBarPanel(in: panels)
+        if !panel.isVisible {
+            let anchor = layout.collapsedFrame
+            let canvas = reduceMotion() ? frame : anchor.union(frame)
+            displayState.compactLayout = CompactStatusBarLayout(frame: anchor, panelFrame: canvas, animation: nil)
+            panel.setFrame(canvas, display: true)
+            panel.contentView?.layoutSubtreeIfNeeded()
+            panels.compactConfiguration = configuration
+            panels.compactScreenFrame = snapshot.frame
+        }
         panel.ignoresMouseEvents = !displayState.statusIcons.isEmpty
         panel.level = isScreenshotActive ? IslandPanel.onBottomLevel : IslandPanel.onTopLevel
         if settingsStore.settings.islandLayoutStyle == .pill && !settingsStore.settings.islandCollapsedOnTop {
             panel.level = IslandPanel.onBottomLevel
         }
-        if panel.frame != frame {
-            panel.setFrame(frame, display: true)
+        if displayState.compactLayout?.frame != frame
+            || panels.compactConfiguration != configuration || panels.compactScreenFrame != snapshot.frame
+            || presentsNewCompactStatus {
+            panels.compactResizeTask?.cancel()
+            panels.compactResizeTask = nil
+            let animated = !reduceMotion()
+                && panels.compactConfiguration == configuration
+                && panels.compactScreenFrame == snapshot.frame
+            if !showsCompactBar && !animated {
+                panels.hideCompactBar()
+                return
+            }
+            let panelFrame = animated ? panel.frame.union(frame) : frame
+            let previous = displayState.compactLayout?.frame ?? panel.frame
+            let isGrowing = displayState.islandEdge.isVertical
+                ? frame.height > previous.height : frame.width > previous.width
+            displayState.compactLayout = CompactStatusBarLayout(
+                frame: frame, panelFrame: panelFrame,
+                animation: animated ? (isGrowing ? ZislaMotion.islandReveal : ZislaMotion.islandRecycle) : nil
+            )
+            panels.compactConfiguration = configuration
+            panels.compactScreenFrame = snapshot.frame
+            if panel.frame != panelFrame { panel.setFrame(panelFrame, display: true) }
+            if panelFrame != frame || !showsCompactBar {
+                panels.compactResizeTask = Task { @MainActor [weak panels, weak panel, waitForCompactResize] in
+                    try? await waitForCompactResize(ZislaMotion.islandRecycleSettleDelay)
+                    guard !Task.isCancelled, let panels, let panel else { return }
+                    guard showsCompactBar else {
+                        panels.hideCompactBar()
+                        return
+                    }
+                    panels.displayState.compactLayout = CompactStatusBarLayout(
+                        frame: frame, panelFrame: frame, animation: nil
+                    )
+                    panel.setFrame(frame, display: true)
+                    panels.compactResizeTask = nil
+                }
+            }
         }
         if Self.shouldOrderPanelFront(
             isVisible: panel.isVisible,
@@ -621,10 +674,20 @@ private final class DisplayPanels {
     var left: IslandPanel?
     var right: IslandPanel?
     var compactBar: IslandPanel?
+    var compactConfiguration: ScreenLayoutConfiguration?
+    var compactScreenFrame: CGRect?
+    var compactResizeTask: Task<Void, Never>?
+
+    func hideCompactBar() {
+        compactResizeTask?.cancel()
+        compactResizeTask = nil
+        compactBar?.orderOut(nil)
+        displayState.compactLayout = nil
+    }
 
     func orderOut() {
         left?.orderOut(nil)
         right?.orderOut(nil)
-        compactBar?.orderOut(nil)
+        hideCompactBar()
     }
 }
