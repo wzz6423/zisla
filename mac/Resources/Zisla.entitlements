@@ -7,7 +7,7 @@
   This file is intended for the Developer ID + notarization
   path, NOT for Mac App Store submission. The app loads the private MediaRemote
   framework for Now Playing metadata; private frameworks are incompatible with the
-  strict App Sandbox, so MAS submission is not supported. See README "系统限制".
+  strict App Sandbox, so MAS submission is not supported. See the README's system limitations section.
 
   Scripts/build-app.sh applies this file when CODE_SIGN_IDENTITY names a
   Developer ID or Apple Development certificate.

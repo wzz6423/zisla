@@ -54,7 +54,7 @@ struct IslandDashboardViewLayoutTests {
         let headerTop = IslandRootView.contentTopInset(layoutStyle: .pill, screenLayout: layout)
         #expect(headerTop - layout.collapsedFrame.height == 12,
                 "The expanded header must keep the requested gap below the camera-aligned row")
-        #expect(headerTop == thickness + 12)
+        #expect(headerTop == 44, "Camera rows keep their fixed 32pt height regardless of the configured pill size")
         #expect(IslandRootView.contentTopInset(layoutStyle: .notch, screenLayout: layout) == 16,
                 "The original notch layout uses the shared lowered header inset")
     }
@@ -124,7 +124,7 @@ struct IslandDashboardViewLayoutTests {
         #expect(sizes == [CGSize(width: 776, height: 512)])
         let camera = cameraLayout(thickness: 24)
         screen.send(camera)
-        #expect(sizes.last == CGSize(width: 776, height: 532))
+        #expect(sizes.last == CGSize(width: 776, height: 540))
         var configuration = ScreenLayoutConfiguration(expandedSize: CGSize(width: 900, height: 700), layoutStyle: .pill)
         let union = ScreenLayoutEngine(configuration: configuration).layout(for: cameraScreen)
         screen.send(union)
@@ -133,16 +133,17 @@ struct IslandDashboardViewLayoutTests {
         #expect(sizes.count == 2, "Panel-frame feedback and activity width cannot restart the same resize")
         screen.send(cameraLayout(thickness: 32))
         #expect(sizes.last == CGSize(width: 776, height: 540))
+        #expect(sizes.count == 2, "Configured pill heights cannot resize the fixed-height camera row")
         screen.send(nil)
         #expect(sizes.last == CGSize(width: 776, height: 512))
         presentation.send((.shelf, true, false, 0))
         #expect(sizes.last == IslandModuleLayout.mirror.panelSize)
         screen.send(camera)
-        #expect(sizes.count == 5, "A camera change cannot alter the full-frame mirror")
+        #expect(sizes.count == 4, "A camera change cannot alter the full-frame mirror")
         presentation.send((.shelf, false, true, 0))
         #expect(sizes.last == IslandModuleLayout.teleprompter.panelSize)
         presentation.send((.shelf, false, false, 0))
-        #expect(sizes.last == CGSize(width: 776, height: 532))
+        #expect(sizes.last == CGSize(width: 776, height: 540))
         let count = sizes.count
         subscription.cancel()
         screen.send(nil)
@@ -176,11 +177,11 @@ struct IslandDashboardViewLayoutTests {
         defer { subscription.cancel(); coordinator.stop() }
         coordinator.updateScreens([cameraScreen, other], repositionVisiblePanel: false, refreshPersistentPanels: false)
         coordinator.selectActiveDisplay(at: CGPoint(x: cameraScreen.frame.midX, y: cameraScreen.frame.midY))
-        #expect(sizes == [CGSize(width: 776, height: 512), CGSize(width: 776, height: 532)])
+        #expect(sizes == [CGSize(width: 776, height: 512), CGSize(width: 776, height: 540)])
         coordinator.selectActiveDisplay(at: CGPoint(x: other.frame.midX, y: other.frame.midY))
         #expect(coordinator.activeLayout?.expandedFrame.height == 512)
         coordinator.selectActiveDisplay(at: CGPoint(x: cameraScreen.frame.midX, y: cameraScreen.frame.midY))
-        #expect(coordinator.activeLayout?.expandedFrame.height == 532)
+        #expect(coordinator.activeLayout?.expandedFrame.height == 540)
         let count = sizes.count
         coordinator.updateScreens([cameraScreen, other], repositionVisiblePanel: false, refreshPersistentPanels: false)
         #expect(sizes.count == count)
@@ -191,8 +192,9 @@ struct IslandDashboardViewLayoutTests {
     func recordingKeepsTheLatestScreenBudgetWithoutResizingItsCompactSurface() async throws {
         var delegate: AppDelegate? = AppDelegate()
         weak var weakDelegate = delegate
+        let camera = cameraLayout(thickness: 24)
         let compact = IslandModuleLayout.compactSurface(
-            collapsedSize: CGSize(width: 80, height: 24), overflowWidth: 80, edge: .top
+            collapsedSize: camera.collapsedFrame.size, overflowWidth: camera.collapsedFrame.width, edge: camera.edge
         ).panelSize
         let coordinator = OverlayCoordinator(contentView: NSView(), layoutEngine: ScreenLayoutEngine(
             configuration: ScreenLayoutConfiguration(expandedSize: compact, layoutStyle: .pill)

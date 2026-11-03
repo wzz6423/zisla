@@ -4,7 +4,7 @@ import Testing
 @testable import ZislaKit
 
 /// The catalog indexes installed application names so copied text like "Safari"
-/// or "访达" can offer a launch action. Tests build throwaway `.app` bundles
+/// or a localized Finder name can offer a launch action. Tests build throwaway `.app` bundles
 /// instead of relying on the host machine's application set.
 struct InstalledApplicationCatalogTests {
     @Test
