@@ -378,6 +378,208 @@ struct SideNoticePresenterPillTests {
         #expect(fixture.presenter.compactConfiguration(for: notices, at: fixture.date) == notch)
     }
 
+    @Test(arguments: [IslandLayoutStyle.pill, .notch])
+    func shorteningACollapsedBarKeepsThePreviousDrawingAreaUntilTheFoldFinishes(style: IslandLayoutStyle) throws {
+        let fixture = try Fixture(edge: .top)
+        defer { fixture.close() }
+        fixture.settings.settings.islandLayoutStyle = style
+        fixture.settings.settings.islandNotchBackground = .black
+        fixture.settings.settings.collapsedProgressGlowEnabled = false
+        fixture.settings.settings.mediaCompactStyle = .detailed
+        fixture.screen = ScreenSnapshot(displayID: 7,
+            frame: CGRect(x: 20_000, y: 0, width: 1800, height: 1100),
+            visibleFrame: CGRect(x: 20_000, y: 0, width: 1800, height: 1076))
+        fixture.media.publishSnapshot(NowPlayingSnapshot(title: "A longer media title", artist: "Artist", album: nil,
+            artworkData: nil, duration: 60, elapsedTime: 0, timestamp: fixture.date, isPlaying: true))
+        let notice = IslandNotice(id: "media-active-resize", title: "Music", side: .left)
+        fixture.queue.enqueue(notice, expiresAfter: nil)
+        fixture.presenter.setScreenLocked(false)
+        let host = try #require(NSApp.windows.compactMap {
+            $0.contentView as? NSHostingView<AppLanguageEnvironment<CompactStatusBarView>>
+        }.first { $0.rootView.content.settingsStore === fixture.settings })
+        let panel = try #require(host.window)
+        panel.alphaValue = 0
+        host.layoutSubtreeIfNeeded()
+        let previous = panel.frame
+
+        fixture.settings.settings.mediaCompactStyle = .compact
+        fixture.presenter.setStatusIcons([])
+        let target = try #require(fixture.presenter.compactFrame(for: fixture.screen, notices: [notice], at: fixture.date))
+
+        #expect(previous.width > target.width)
+        #expect(panel.frame.contains(previous), "Shrinking the window immediately clips the visible recycle animation")
+        #expect(host.rootView.content.displayState.compactLayout?.animation == ZislaMotion.islandRecycle)
+        #expect(!panel.isKeyWindow)
+    }
+
+    @Test(arguments: [IslandLayoutStyle.pill, .notch], [false, true])
+    func continuousCollapsedResizingUsesRevealThenRecycleAndSettlesOnTheNewestFrame(
+        style: IslandLayoutStyle, physicalNotch: Bool
+    ) async throws {
+        let fixture = try Fixture(edge: .top)
+        defer { fixture.close() }
+        fixture.settings.settings.islandLayoutStyle = style
+        if physicalNotch { fixture.screen = Self.notchedScreen }
+        let host = try activeHost(fixture)
+        let state = host.rootView.content.displayState
+        let panel = try #require(host.window)
+        let ai = IslandNotice(id: "ai-active-resize", title: "Codex")
+        fixture.queue.enqueue(ai, expiresAfter: nil)
+        fixture.presenter.setStatusIcons([])
+        let short = try #require(state.compactLayout).frame
+        host.layoutSubtreeIfNeeded()
+
+        fixture.settings.settings.mediaCompactStyle = .detailed
+        fixture.queue.removeAll()
+        fixture.queue.enqueue(IslandNotice(id: "media-active-resize", title: "Music"), expiresAfter: nil)
+        fixture.media.publishSnapshot(NowPlayingSnapshot(title: "A longer media title", artist: "Artist", album: nil,
+            artworkData: nil, duration: 60, elapsedTime: 0, timestamp: fixture.date, isPlaying: true))
+        fixture.presenter.setStatusIcons([])
+        let long = try #require(state.compactLayout).frame
+        #expect(long.width > short.width)
+        #expect(state.compactLayout?.animation == ZislaMotion.islandReveal)
+        #expect(panel.frame.contains(short) && panel.frame.contains(long))
+
+        fixture.settings.settings.mediaCompactStyle = .compact
+        fixture.presenter.setStatusIcons([])
+        let final = try #require(state.compactLayout).frame
+        #expect(final.width < long.width)
+        #expect(state.compactLayout?.animation == ZislaMotion.islandRecycle)
+        #expect(panel.frame.contains(long))
+        try await fixture.resizeClock.finishPendingResize()
+        #expect(panel.frame == final)
+        #expect(!panel.isKeyWindow)
+    }
+
+    @Test
+    func theFirstNotchStatusRevealsFromItsIdleAnchor() throws {
+        let fixture = try Fixture(edge: .top)
+        defer { fixture.close() }
+        fixture.settings.settings.islandLayoutStyle = .notch
+        fixture.screen = Self.notchedScreen
+        let host = try activeHost(fixture)
+        let layout = try #require(host.rootView.content.displayState.compactLayout)
+        let idle = ScreenLayoutEngine(configuration: fixture.settings.settings.islandScreenConfiguration)
+            .layout(for: fixture.screen).collapsedFrame
+        #expect(layout.frame.width > idle.width)
+        #expect(layout.animation == ZislaMotion.islandReveal,
+                "The first status needs a rendered idle baseline so its wings can grow out of the notch")
+        #expect(layout.panelFrame.contains(idle) && layout.panelFrame.contains(layout.frame))
+    }
+
+    @Test
+    func theLastNotchStatusRecyclesBeforeItsPanelIsRemovedAndCanBeInterrupted() async throws {
+        let fixture = try Fixture(edge: .top)
+        defer { fixture.close() }
+        fixture.settings.settings.islandLayoutStyle = .notch
+        fixture.screen = Self.notchedScreen
+        let host = try activeHost(fixture)
+        let panel = try #require(host.window)
+        fixture.queue.enqueue(IslandNotice(id: "ai-active-first", title: "Codex"), expiresAfter: nil)
+        fixture.presenter.setStatusIcons([])
+        let active = try #require(host.rootView.content.displayState.compactLayout).frame
+        fixture.queue.removeAll()
+        fixture.presenter.setStatusIcons([])
+        #expect(panel.isVisible, "The last status must fold back into the notch before its panel is hidden")
+        #expect(host.rootView.content.displayState.compactLayout?.animation == ZislaMotion.islandRecycle)
+
+        try await fixture.resizeClock.waitForPendingResize()
+        fixture.queue.enqueue(IslandNotice(id: "ai-active-next", title: "Codex"), expiresAfter: nil)
+        fixture.presenter.setStatusIcons([])
+        fixture.resizeClock.advance()
+        for _ in 0..<10 { await Task.yield() }
+        #expect(panel.isVisible && panel.frame == active, "A stale recycle task cannot remove a new status")
+        fixture.queue.removeAll()
+        fixture.presenter.setStatusIcons([])
+        try await fixture.resizeClock.finishPendingResize()
+        #expect(!panel.isVisible)
+        #expect(host.rootView.content.displayState.compactLayout == nil)
+    }
+
+    @Test(arguments: [IslandLayoutStyle.pill, .notch])
+    func reducedMotionResizesImmediatelyWithoutADeferredWindowChange(style: IslandLayoutStyle) async throws {
+        let fixture = try Fixture(edge: .top)
+        defer { fixture.close() }
+        fixture.settings.settings.islandLayoutStyle = style
+        let host = try activeHost(fixture)
+        let panel = try #require(host.window)
+        fixture.queue.enqueue(IslandNotice(id: "media-active-resize", title: "Music"), expiresAfter: nil)
+        fixture.settings.settings.mediaCompactStyle = .detailed
+        fixture.media.publishSnapshot(NowPlayingSnapshot(title: "A longer media title", artist: "Artist", album: nil,
+            artworkData: nil, duration: 60, elapsedTime: 0, timestamp: fixture.date, isPlaying: true))
+        fixture.presenter.setStatusIcons([])
+        fixture.reducesMotion = true
+        fixture.settings.settings.mediaCompactStyle = .compact
+        fixture.presenter.setStatusIcons([])
+        let target = try #require(host.rootView.content.displayState.compactLayout).frame
+        #expect(panel.frame == target)
+        #expect(host.rootView.content.displayState.compactLayout?.animation == nil)
+        fixture.resizeClock.advance()
+        for _ in 0..<10 { await Task.yield() }
+        #expect(panel.frame == target)
+        #expect(fixture.resizeClock.waiters.isEmpty)
+    }
+
+    @Test
+    func movingToAnotherScreenOrPlacementDoesNotAnimateAcrossTheDesktop() throws {
+        let fixture = try Fixture(edge: .top)
+        defer { fixture.close() }
+        let host = try activeHost(fixture)
+        let panel = try #require(host.window)
+        fixture.settings.settings.islandPlacement = IslandPlacement(mode: .custom, edge: .right, offset: 0.7)
+        fixture.presenter.setStatusIcons([])
+        var layout = try #require(host.rootView.content.displayState.compactLayout)
+        #expect(layout.animation == nil && panel.frame == layout.frame,
+                "Changing an edge is a reposition, not a collapsed length change")
+        fixture.screen.frame.origin.x -= 1800
+        fixture.screen.visibleFrame.origin.x -= 1800
+        fixture.presenter.setStatusIcons([])
+        layout = try #require(host.rootView.content.displayState.compactLayout)
+        #expect(layout.animation == nil && panel.frame == layout.frame,
+                "Moving the display cannot interpolate through unrelated screen coordinates")
+    }
+
+    @Test
+    func stoppingDuringAResizeCancelsThePendingPanelChange() async throws {
+        let fixture = try Fixture(edge: .top)
+        defer { fixture.close() }
+        let host = try activeHost(fixture)
+        let panel = try #require(host.window)
+        fixture.queue.enqueue(IslandNotice(id: "media-active-resize", title: "Music"), expiresAfter: nil)
+        fixture.settings.settings.mediaCompactStyle = .detailed
+        fixture.media.publishSnapshot(NowPlayingSnapshot(title: "A longer media title", artist: "Artist", album: nil,
+            artworkData: nil, duration: 60, elapsedTime: 0, timestamp: fixture.date, isPlaying: true))
+        fixture.presenter.setStatusIcons([])
+        fixture.settings.settings.mediaCompactStyle = .compact
+        fixture.presenter.setStatusIcons([])
+        try await fixture.resizeClock.waitForPendingResize()
+        fixture.presenter.stop()
+        let stopped = panel.frame
+        fixture.resizeClock.advance()
+        for _ in 0..<10 { await Task.yield() }
+        #expect(!panel.isVisible && panel.frame == stopped)
+        #expect(host.rootView.content.displayState.compactLayout == nil)
+    }
+
+    private static let notchedScreen = ScreenSnapshot(displayID: 7,
+        frame: CGRect(x: 20_000, y: 0, width: 1800, height: 1100),
+        visibleFrame: CGRect(x: 20_000, y: 0, width: 1800, height: 1056),
+        safeAreaInsets: ScreenInsets(top: 44),
+        auxiliaryTopLeftArea: CGRect(x: 20_000, y: 1056, width: 840, height: 44),
+        auxiliaryTopRightArea: CGRect(x: 20_960, y: 1056, width: 840, height: 44))
+
+    private func activeHost(_ fixture: Fixture) throws -> NSHostingView<AppLanguageEnvironment<CompactStatusBarView>> {
+        fixture.queue.enqueue(IslandNotice(id: "ai-active-initial", title: "Codex"), expiresAfter: nil)
+        fixture.presenter.setScreenLocked(false)
+        let host = try #require(NSApp.windows.compactMap {
+            $0.contentView as? NSHostingView<AppLanguageEnvironment<CompactStatusBarView>>
+        }.first { $0.rootView.content.settingsStore === fixture.settings })
+        host.window?.alphaValue = 0
+        host.layoutSubtreeIfNeeded()
+        fixture.queue.removeAll()
+        return host
+    }
+
     @MainActor
     private final class Fixture {
         let suiteName = "Zisla.PillPresenter.\(UUID().uuidString)"
@@ -389,12 +591,16 @@ struct SideNoticePresenterPillTests {
         let queue = SideNoticeQueue()
         let sweep = AIResultSweepController()
         let date = Date(timeIntervalSince1970: 100)
+        var reducesMotion = false
+        let resizeClock = ResizeClock()
         var screen = ScreenSnapshot(displayID: 7,
             frame: CGRect(x: -1800, y: -240, width: 1800, height: 1100),
             visibleFrame: CGRect(x: -1800, y: -240, width: 1800, height: 1076))
         lazy var presenter = SideNoticePresenter(queue: queue, resultSweep: sweep, media: media,
             browserDownloads: downloads, settingsStore: settings, languageStore: language,
-            isScreenLocked: true, now: { [unowned self] in date }, screenSnapshotProvider: { [unowned self] in [screen] })
+            isScreenLocked: true, now: { [unowned self] in date }, reduceMotion: { [unowned self] in reducesMotion },
+            waitForCompactResize: { [resizeClock] in try await resizeClock.wait(for: $0) },
+            screenSnapshotProvider: { [unowned self] in [screen] })
 
         init(edge: IslandEdge) throws {
             defaults = try #require(UserDefaults(suiteName: suiteName))
@@ -406,10 +612,40 @@ struct SideNoticePresenterPillTests {
 
         func close() {
             presenter.stop()
+            resizeClock.advance()
             queue.removeAll()
             sweep.cancel()
             settings.flushPendingChanges()
             defaults.removePersistentDomain(forName: suiteName)
+        }
+    }
+
+    @MainActor
+    private final class ResizeClock {
+        var waiters: [CheckedContinuation<Void, Error>] = []
+
+        func wait(for duration: Duration) async throws {
+            try Task.checkCancellation()
+            #expect(duration == ZislaMotion.islandRecycleSettleDelay)
+            try await withCheckedThrowingContinuation { waiters.append($0) }
+        }
+
+        func advance() {
+            let pending = waiters
+            waiters.removeAll()
+            for waiter in pending { waiter.resume() }
+        }
+
+        func waitForPendingResize() async throws {
+            let deadline = ContinuousClock.now + .seconds(1)
+            while waiters.isEmpty && ContinuousClock.now < deadline { await Task.yield() }
+            try #require(!waiters.isEmpty, "The resize must wait until the visible animation has settled")
+        }
+
+        func finishPendingResize() async throws {
+            try await waitForPendingResize()
+            advance()
+            for _ in 0..<10 { await Task.yield() }
         }
     }
 
