@@ -2,15 +2,15 @@
 reviews:
   high_level_summary_instructions: >-
     Write the summary in English under one heading, ## Summary by CodeRabbit.
-    Include one fenced mermaid block starting with flowchart TD to explain the
-    changed behavior or data flow, including CI and configuration changes.
+    Below that heading, include only bullets describing changed code and one
+    fenced mermaid block starting with flowchart TD to explain the changed
+    behavior or data flow, including CI and configuration changes.
     Use stable alphanumeric node IDs with square-bracketed, double-quoted labels,
     for example A["PR opened"] --> B["Run checks"]. Connect previously defined
     nodes using their IDs, for example A --> B. Keep the diagram inside the
     CodeRabbit-managed summary in the PR description and preserve the original
-    description and all seven template sections. Use the existing ## Validation
-    entries as the sole source of validation status and test execution evidence,
-    preserving their recorded statuses and evidence.
+    description and all seven template sections. Keep test execution statuses
+    and evidence exclusively in the author's original ## Validation section.
   auto_review:
     drafts: true
     base_branches:
