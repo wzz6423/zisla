@@ -65,7 +65,8 @@ struct MarqueeText: View {
                     if let scrollProgress, !repeats {
                         marqueeLabel
                             .fixedSize(horizontal: true, vertical: false)
-                            .offset(x: scrollOffset(for: scrollProgress))
+                            .modifier(ScrollingOffset(progress: CGFloat(scrollProgress),
+                                                      travel: scrollTravel, direction: scrollDirection))
                     } else {
                         Group {
                             if repeats {
@@ -78,7 +79,8 @@ struct MarqueeText: View {
                             }
                         }
                         .fixedSize(horizontal: true, vertical: false)
-                        .offset(x: scrollOffset(for: Double(automaticScrollProgress)))
+                        .modifier(ScrollingOffset(progress: automaticScrollProgress,
+                                                  travel: scrollTravel, direction: scrollDirection))
                     }
                 }
                 .frame(width: max(0, containerWidth), alignment: .leading)
@@ -151,15 +153,6 @@ struct MarqueeText: View {
             .lineLimit(1)
     }
 
-    private func scrollOffset(for progress: Double) -> CGFloat {
-        let travel = scrollTravel
-        let clampedProgress = CGFloat(min(max(progress, 0), 1))
-        return switch scrollDirection {
-        case .left: -travel * clampedProgress
-        case .right: travel * (clampedProgress - 1)
-        }
-    }
-
     private var scrollTravel: CGFloat {
         repeats ? textWidth + gap : max(0, textWidth - containerWidth)
     }
@@ -186,6 +179,26 @@ struct MarqueeText: View {
     private func updateContainerWidth(_ width: CGFloat) {
         guard abs(containerWidth - width) > 0.5 else { return }
         containerWidth = width
+    }
+
+    private struct ScrollingOffset: ViewModifier, Animatable {
+        var progress: CGFloat
+        let travel: CGFloat
+        let direction: MarqueeScrollDirection
+
+        nonisolated var animatableData: CGFloat {
+            get { progress }
+            set { progress = newValue }
+        }
+
+        func body(content: Content) -> some View {
+            let progress = min(max(progress, 0), 1)
+            let offset = switch direction {
+            case .left: -travel * progress
+            case .right: travel * (progress - 1)
+            }
+            content.offset(x: offset)
+        }
     }
 
     private struct AutomaticAnimationIdentity: Hashable {

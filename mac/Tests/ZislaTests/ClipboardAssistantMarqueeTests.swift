@@ -26,51 +26,53 @@ struct ClipboardAssistantMarqueeTests {
         let layout = controller.rowLayout(for: detection, on: screen, locale: locale(direction))
         let viewport = textViewport(layout: layout, direction: direction,
             notchWidth: controller.presentation.physicalNotchWidth)
-        #expect(layout.frame == layout.collapsedFrame)
-        #expect(layout.frame.width == ScreenLayoutConfiguration.quickActionRowWidth)
-        var samples: [NSBitmapImageRep] = []
-        var controls: [[UInt8]] = []
-        for progress in [0.0, 0.5, 1] {
-            let actual = try await render(ClipboardAssistantToastView(
-                presentation: controller.presentation, controller: controller), size: layout.frame.size,
-                progress: progress, direction: direction)
-            let expected = try await render(referenceHeader(width: viewport.width, direction: direction)
-                .environment(\.layoutDirection, direction)
-                .frame(width: viewport.width, height: viewport.height)
-                .position(x: viewport.midX, y: viewport.midY)
-                .environment(\.layoutDirection, .leftToRight), size: layout.frame.size,
-                progress: progress, direction: direction)
-            let delta = differences(try pixels(actual, in: viewport), try pixels(expected, in: viewport))
-            #expect(delta == 0,
-                "The \(placement) header at \(progress) must show the corresponding full-size text window")
-            let columns = try inkColumns(actual, in: viewport)
-            #expect(columns.first.map { $0 <= 4 } == true
-                && columns.last.map { $0 >= Int(viewport.width) - 5 } == true,
-                "Overflowing content must occupy the first viewport instead of sliding in from an empty row")
-            let controlsRect = CGRect(x: direction == .leftToRight ? layout.frame.width - 34 : 14,
-                y: 0, width: 20, height: layout.rowHeight)
-            controls.append(try pixels(actual, in: controlsRect))
-            if controller.presentation.physicalNotchWidth > 0 {
-                let sideWidth = ClipboardAssistantToastView.physicalNotchSideWidth(
-                    totalWidth: layout.frame.width, notchWidth: controller.presentation.physicalNotchWidth)
-                let center = CGRect(x: sideWidth, y: 0,
-                    width: controller.presentation.physicalNotchWidth, height: layout.rowHeight)
-                #expect(try pixels(actual, in: center).allSatisfy { $0 < 10 },
-                    "Scrolling text and its width probe must never enter the hardware cutout")
+        for renderScale in [CGFloat(1), 2] {
+            #expect(layout.frame == layout.collapsedFrame)
+            #expect(layout.frame.width == ScreenLayoutConfiguration.quickActionRowWidth)
+            var samples: [NSBitmapImageRep] = []
+            var controls: [[UInt8]] = []
+            for progress in [0.0, 0.5, 1] {
+                let actual = try await render(ClipboardAssistantToastView(
+                    presentation: controller.presentation, controller: controller), size: layout.frame.size,
+                    progress: progress, direction: direction, renderScale: renderScale)
+                let expected = try await render(referenceHeader(width: viewport.width, direction: direction, progress: progress)
+                    .environment(\.layoutDirection, direction)
+                    .frame(width: viewport.width, height: viewport.height)
+                    .position(x: viewport.midX, y: viewport.midY)
+                    .environment(\.layoutDirection, .leftToRight), size: layout.frame.size,
+                    progress: progress, direction: direction, renderScale: renderScale)
+                let delta = differences(try pixels(actual, in: viewport), try pixels(expected, in: viewport))
+                #expect(delta == 0,
+                    "The \(placement) header at \(progress) must show the corresponding full-size text window")
+                let columns = try inkColumns(actual, in: viewport)
+                #expect(columns.first.map { $0 <= 4 } == true
+                    && columns.last.map { $0 >= Int(viewport.width) - 5 } == true,
+                    "Overflowing content must occupy the first viewport instead of sliding in from an empty row")
+                let controlsRect = CGRect(x: direction == .leftToRight ? layout.frame.width - 34 : 14,
+                    y: 0, width: 20, height: layout.rowHeight)
+                controls.append(try pixels(actual, in: controlsRect))
+                if controller.presentation.physicalNotchWidth > 0 {
+                    let sideWidth = ClipboardAssistantToastView.physicalNotchSideWidth(
+                        totalWidth: layout.frame.width, notchWidth: controller.presentation.physicalNotchWidth)
+                    let center = CGRect(x: sideWidth, y: 0,
+                        width: controller.presentation.physicalNotchWidth, height: layout.rowHeight)
+                    #expect(try pixels(actual, in: center).allSatisfy { $0 < 10 },
+                        "Scrolling text and its width probe must never enter the hardware cutout")
+                }
+                #expect(controller.presentation.detection == detection && controller.presentation.translation == nil)
+                #expect(controller.presentation.layout == layout && !controller.isMoreActionsPresented)
+                samples.append(actual)
             }
-            #expect(controller.presentation.detection == detection && controller.presentation.translation == nil)
-            #expect(controller.presentation.layout == layout && !controller.isMoreActionsPresented)
-            samples.append(actual)
+            for y in [CGFloat(0), viewport.height / 2] {
+                let line = CGRect(x: viewport.minX, y: y, width: viewport.width, height: viewport.height / 2)
+                #expect(differences(try pixels(samples[0], in: line), try pixels(samples[1], in: line)) > 30)
+                #expect(differences(try pixels(samples[1], in: line), try pixels(samples[2], in: line)) > 30,
+                    "Both the title and detail must continue to their ending rather than remain truncated")
+            }
+            #expect(controls[0].contains { $0 > 64 })
+            #expect(differences(controls[0], controls[1]) == 0 && differences(controls[1], controls[2]) == 0,
+                "The close control must remain stationary and visible throughout the text scroll")
         }
-        for y in [CGFloat(0), viewport.height / 2] {
-            let line = CGRect(x: viewport.minX, y: y, width: viewport.width, height: viewport.height / 2)
-            #expect(differences(try pixels(samples[0], in: line), try pixels(samples[1], in: line)) > 30)
-            #expect(differences(try pixels(samples[1], in: line), try pixels(samples[2], in: line)) > 30,
-                "Both the title and detail must continue to their ending rather than remain truncated")
-        }
-        #expect(controls[0].contains { $0 > 64 })
-        #expect(differences(controls[0], controls[1]) == 0 && differences(controls[1], controls[2]) == 0,
-            "The close control must remain stationary and visible throughout the text scroll")
     }
 
     @Test(arguments: [IslandEdge.left, .right], [LayoutDirection.leftToRight, .rightToLeft])
@@ -85,23 +87,24 @@ struct ClipboardAssistantMarqueeTests {
         let layout = controller.rowLayout(for: detection, on: screen, locale: locale(direction))
         let viewport = CGRect(x: 4, y: 40, width: 24, height: 168)
         #expect(layout.frame.size == CGSize(width: 32, height: 242))
-        var samples: [[UInt8]] = []
-        for progress in [0.0, 0.5, 1] {
-            let actual = try await render(ClipboardAssistantToastView(
-                presentation: controller.presentation, controller: controller), size: layout.frame.size,
-                progress: progress, direction: direction)
-            let expected = try await render(VerticalStatusText(text: title, availableHeight: viewport.height,
-                scrollProgress: progress).foregroundStyle(.white.opacity(0.85)), size: viewport.size,
-                progress: progress, direction: direction)
-            let sample = try pixels(actual, in: viewport)
-            #expect(differences(sample, try pixels(expected)) == 0,
-                "A side quick action must scroll its complete upright text within the original 168pt viewport")
-            #expect(sample.contains { $0 > 64 })
-            samples.append(sample)
-            #expect(controller.presentation.layout == layout && controller.presentation.physicalNotchWidth == 0)
-            #expect(controller.presentation.detection == detection)
+        for renderScale in [CGFloat(1), 2] {
+            var samples: [[UInt8]] = []
+            for progress in [0.0, 0.5, 1] {
+                let actual = try await render(ClipboardAssistantToastView(
+                    presentation: controller.presentation, controller: controller), size: layout.frame.size,
+                    progress: progress, direction: direction, renderScale: renderScale)
+                let expected = try await render(ReferenceVerticalWindow(text: title, size: viewport.size), size: viewport.size,
+                    progress: progress, direction: direction, renderScale: renderScale)
+                let sample = try pixels(actual, in: viewport)
+                #expect(differences(sample, try pixels(expected)) == 0,
+                    "A side quick action must scroll its complete upright text within the original 168pt viewport")
+                #expect(sample.contains { $0 > 64 })
+                samples.append(sample)
+                #expect(controller.presentation.layout == layout && controller.presentation.physicalNotchWidth == 0)
+                #expect(controller.presentation.detection == detection)
+            }
+            #expect(differences(samples[0], samples[1]) > 30 && differences(samples[1], samples[2]) > 30)
         }
-        #expect(differences(samples[0], samples[1]) > 30 && differences(samples[1], samples[2]) > 30)
     }
 
     @Test(arguments: [(IslandLayoutStyle.pill, IslandEdge.bottom), (.pill, .right), (.notch, .top)],
@@ -171,7 +174,7 @@ struct ClipboardAssistantMarqueeTests {
             controller: controller).environment(\.locale, language.locale), size: layout.frame.size,
             progress: 0, direction: direction)
         let expected = try await render(referenceLine(text, width: viewport.width, fontSize: 12,
-            weight: .medium, opacity: 0.92, direction: direction)
+            weight: .medium, opacity: 0.92, direction: direction, progress: 0)
             .frame(width: viewport.width, height: viewport.height, alignment: .leading)
             .environment(\.locale, language.locale).environment(\.layoutDirection, direction)
             .position(x: viewport.midX, y: viewport.midY).environment(\.layoutDirection, .leftToRight),
@@ -215,29 +218,24 @@ struct ClipboardAssistantMarqueeTests {
             y: 0, width: width, height: layout.rowHeight)
     }
 
-    private func referenceHeader(width: CGFloat, direction: LayoutDirection) -> some View {
+    private func referenceHeader(width: CGFloat, direction: LayoutDirection, progress: Double) -> some View {
         VStack(alignment: .leading, spacing: 2) {
             referenceLine(title, width: width, fontSize: 12, weight: .medium,
-                opacity: 0.92, direction: direction)
+                opacity: 0.92, direction: direction, progress: progress)
             referenceLine(detail, width: width, fontSize: 9.5, weight: .regular,
-                opacity: 0.55, direction: direction)
+                opacity: 0.55, direction: direction, progress: progress)
         }
     }
 
     private func referenceLine(_ text: String, width: CGFloat, fontSize: CGFloat,
-        weight: NSFont.Weight, opacity: Double, direction: LayoutDirection) -> some View {
-        let textWidth = (text as NSString).size(withAttributes: [
-            .font: NSFont.systemFont(ofSize: fontSize, weight: weight)
-        ]).width
-        let travel = max(0, textWidth - width)
-        return ReferenceTextWindow(text: text, width: width, fontSize: fontSize,
-            weight: weight == .medium ? .medium : .regular, opacity: opacity,
-            beginning: direction == .leftToRight ? 0 : -travel,
-            end: direction == .leftToRight ? -travel : 0)
+        weight: NSFont.Weight, opacity: Double, direction: LayoutDirection, progress: Double) -> some View {
+        ReferenceTextWindow(text: text, width: width, fontSize: fontSize,
+            weight: weight == .medium ? .medium : .regular, opacity: opacity, direction: direction,
+            progress: CGFloat(progress))
     }
 
     private func render(_ content: some View, size: CGSize, progress: Double,
-        direction: LayoutDirection, reduceMotion: Bool = false) async throws -> NSBitmapImageRep {
+        direction: LayoutDirection, reduceMotion: Bool = false, renderScale: CGFloat? = nil) async throws -> NSBitmapImageRep {
         let host = NSHostingView(rootView: content.frame(width: size.width, height: size.height)
             .background(.black).environment(\.locale, locale(direction))
             .environment(\.layoutDirection, direction)
@@ -248,8 +246,9 @@ struct ClipboardAssistantMarqueeTests {
                 }
             })
         host.sizingOptions = []
-        let window = NSWindow(contentRect: CGRect(origin: CGPoint(x: 20_000, y: 0), size: size),
+        let window = RasterPanel(contentRect: CGRect(origin: CGPoint(x: 20_000, y: 0), size: size),
             styleMask: .borderless, backing: .buffered, defer: false)
+        window.renderScale = renderScale
         window.isReleasedWhenClosed = false
         window.contentView = host
         defer { window.contentView = nil; window.close() }
@@ -261,6 +260,8 @@ struct ClipboardAssistantMarqueeTests {
                 DispatchQueue.main.async { continuation.resume() }
             }
         }
+        #expect(CGFloat(bitmap.pixelsWide) / size.width == window.backingScaleFactor
+            && CGFloat(bitmap.pixelsHigh) / size.height == window.backingScaleFactor)
         #expect(host.bounds.size == size && window.frame.size == size,
             "Text scrolling must keep the host and window at their original dimensions")
         #expect(!window.isVisible)
@@ -269,35 +270,47 @@ struct ClipboardAssistantMarqueeTests {
         return converted
     }
 
+    private struct ReferenceVerticalWindow: View {
+        let text: String
+        let size: CGSize
+        @State private var progress: CGFloat = 0
+
+        var body: some View {
+            VStack(spacing: 1) {
+                ForEach(Array(text.enumerated()), id: \.offset) { _, character in
+                    Text(String(character)).font(.system(size: 11, weight: .medium)).frame(height: 13)
+                }
+            }
+            .fixedSize(horizontal: false, vertical: true)
+            .offset(y: -max(0, CGFloat(text.count) * 14 - 1 - size.height) * progress)
+            .frame(width: size.width, height: size.height, alignment: .top).clipped()
+            .foregroundStyle(.white.opacity(0.85))
+            .task {
+                withAnimation(.linear(duration: 1)) { progress = 1 }
+            }
+        }
+    }
+
     private struct ReferenceTextWindow: View {
         let text: String
         let width: CGFloat
         let fontSize: CGFloat
         let weight: Font.Weight
         let opacity: Double
-        let end: CGFloat
-        @State private var offset: CGFloat
-
-        init(text: String, width: CGFloat, fontSize: CGFloat, weight: Font.Weight,
-            opacity: Double, beginning: CGFloat, end: CGFloat) {
-            self.text = text
-            self.width = width
-            self.fontSize = fontSize
-            self.weight = weight
-            self.opacity = opacity
-            self.end = end
-            _offset = State(initialValue: beginning)
-        }
+        let direction: LayoutDirection
+        let progress: CGFloat
+        @Environment(\.displayScale) private var displayScale
 
         var body: some View {
+            let naturalWidth = (text as NSString).size(withAttributes: [
+                .font: NSFont.systemFont(ofSize: fontSize, weight: weight == .medium ? .medium : .regular)
+            ]).width
+            let travel = max(0, ceil(naturalWidth * displayScale) / displayScale - width)
             Text(text).font(.system(size: fontSize)).fontWeight(weight)
                 .foregroundStyle(.white.opacity(opacity))
                 .lineLimit(1).fixedSize(horizontal: true, vertical: false)
-                .offset(x: offset)
+                .offset(x: direction == .leftToRight ? -travel * progress : travel * (progress - 1))
                 .frame(width: width, alignment: .leading).clipped()
-                .task {
-                    withAnimation(.linear(duration: 1)) { offset = end }
-                }
         }
     }
 
@@ -332,6 +345,11 @@ struct ClipboardAssistantMarqueeTests {
     private func differences(_ first: [UInt8], _ second: [UInt8]) -> Int {
         #expect(first.count == second.count)
         return zip(first, second).filter { abs(Int($0) - Int($1)) > 3 }.count
+    }
+
+    private final class RasterPanel: NSPanel {
+        var renderScale: CGFloat?
+        override var backingScaleFactor: CGFloat { renderScale ?? super.backingScaleFactor }
     }
 
     private struct FrozenProgress: CustomAnimation {

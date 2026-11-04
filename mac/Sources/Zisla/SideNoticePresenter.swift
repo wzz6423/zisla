@@ -335,7 +335,7 @@ final class SideNoticePresenter {
             )
             configuration.compactStatusLength = presentation.length(
                 thickness: max(configuration.pillSize.height, CompactPillStatusPresentation.minimumThickness),
-                edge: configuration.placement.edge, text: text
+                edge: configuration.placement.edge, text: text, item: media.snapshot
             )
         }
         let selectedPriority = SideNoticeLayoutEngine.selectedCompactStatusPriority(
@@ -449,13 +449,14 @@ final class SideNoticePresenter {
             panels.hideCompactBar()
             return
         }
+        let targetPanelFrame = frame.integral
         if layout.topology.hasPhysicalNotch {
             displayState.compactBarCenterInset = layout.topology.anchorFrame.width
         }
         let panel = ensureCompactBarPanel(in: panels)
         if !panel.isVisible {
             let anchor = layout.collapsedFrame
-            let canvas = reduceMotion() ? frame : anchor.union(frame)
+            let canvas = reduceMotion() ? targetPanelFrame : anchor.union(frame).integral
             displayState.compactLayout = CompactStatusBarLayout(frame: anchor, panelFrame: canvas, animation: nil)
             panel.setFrame(canvas, display: true)
             panel.contentView?.layoutSubtreeIfNeeded()
@@ -479,7 +480,7 @@ final class SideNoticePresenter {
                 panels.hideCompactBar()
                 return
             }
-            let panelFrame = animated ? panel.frame.union(frame) : frame
+            let panelFrame = animated ? panel.frame.union(frame).integral : targetPanelFrame
             let previous = displayState.compactLayout?.frame ?? panel.frame
             let isGrowing = displayState.islandEdge.isVertical
                 ? frame.height > previous.height : frame.width > previous.width
@@ -490,7 +491,7 @@ final class SideNoticePresenter {
             panels.compactConfiguration = configuration
             panels.compactScreenFrame = snapshot.frame
             if panel.frame != panelFrame { panel.setFrame(panelFrame, display: true) }
-            if panelFrame != frame || !showsCompactBar {
+            if panelFrame != targetPanelFrame || !showsCompactBar {
                 panels.compactResizeTask = Task { @MainActor [weak panels, weak panel, waitForCompactResize] in
                     try? await waitForCompactResize(ZislaMotion.islandRecycleSettleDelay)
                     guard !Task.isCancelled, let panels, let panel else { return }
@@ -499,9 +500,9 @@ final class SideNoticePresenter {
                         return
                     }
                     panels.displayState.compactLayout = CompactStatusBarLayout(
-                        frame: frame, panelFrame: frame, animation: nil
+                        frame: frame, panelFrame: targetPanelFrame, animation: nil
                     )
-                    panel.setFrame(frame, display: true)
+                    panel.setFrame(targetPanelFrame, display: true)
                     panels.compactResizeTask = nil
                 }
             }

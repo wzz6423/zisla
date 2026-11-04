@@ -94,6 +94,10 @@ struct CompactPillStatusContent: View {
     ) -> String {
         if presentation.isMedia, settings.mediaCompactStyle == .detailed,
            settings.mediaShowLyricsAndInfo, let item {
+            if !item.isVideo {
+                return item.lyrics?.currentLine(at: item.elapsedTime(at: date) ?? 0)?
+                    .trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+            }
             return MediaTextFormatting.lyricLine(item, lyrics: item.lyrics, date: date)
         }
         return presentation.text
@@ -108,9 +112,12 @@ struct CompactPillStatusContent: View {
         GeometryReader { proxy in
             let thickness = edge.isVertical ? proxy.size.width : proxy.size.height
             let iconSize = max(0, thickness - 8)
-            let textLength = max(0, (edge.isVertical ? proxy.size.height : proxy.size.width)
+            let textBudget = max(0, (edge.isVertical ? proxy.size.height : proxy.size.width)
                 - iconSize - (presentation.showsWaveform ? iconSize + 6 : 0) - 6
                 - CompactPillStatusPresentation.trailingInset * 2)
+            let identityLength = min(textBudget, presentation.mediaIdentityLength(
+                thickness: thickness, edge: edge, text: text, item: item))
+            let textLength = max(0, textBudget - identityLength - (identityLength > 0 && !text.isEmpty ? 6 : 0))
             let layout = edge.isVertical
                 ? AnyLayout(VStackLayout(spacing: 6))
                 : AnyLayout(HStackLayout(spacing: 6))
@@ -118,6 +125,14 @@ struct CompactPillStatusContent: View {
                 statusIcon(size: iconSize)
                     .frame(width: edge.isVertical ? thickness : iconSize,
                            height: edge.isVertical ? iconSize : thickness)
+                if let item, identityLength > 0 {
+                    mediaIdentity(item, length: identityLength, thickness: thickness)
+                        .frame(width: edge.isVertical ? thickness : identityLength,
+                               height: edge.isVertical ? identityLength : thickness)
+                }
+                if presentation.showsWaveform, identityLength > 0 {
+                    waveform(size: iconSize, thickness: thickness)
+                }
                 if !text.isEmpty {
                     if edge.isVertical {
                         VerticalStatusText(text: text, availableWidth: thickness, availableHeight: textLength,
@@ -130,12 +145,8 @@ struct CompactPillStatusContent: View {
                             .frame(width: textLength, height: thickness, alignment: .leading)
                     }
                 }
-                if presentation.showsWaveform {
-                    MediaWaveformView(artworkData: item?.artworkData ?? presentation.notice.artworkData,
-                                      width: iconSize, height: min(18, iconSize),
-                                      isActive: item?.isPlaying ?? true)
-                        .frame(width: edge.isVertical ? thickness : iconSize,
-                               height: edge.isVertical ? iconSize : thickness)
+                if presentation.showsWaveform, identityLength == 0 {
+                    waveform(size: iconSize, thickness: thickness)
                 }
             }
             .padding(edge.isVertical ? .vertical : .horizontal, CompactPillStatusPresentation.trailingInset)
@@ -143,8 +154,42 @@ struct CompactPillStatusContent: View {
         }
         .foregroundStyle(.white)
         .accessibilityElement(children: .ignore)
-        .accessibilityLabel([presentation.notice.title, text].filter { !$0.isEmpty }.joined(separator: " "))
-        .help([presentation.notice.title, text].filter { !$0.isEmpty }.joined(separator: " "))
+        .accessibilityLabel(accessibilityDescription)
+        .help(accessibilityDescription)
+    }
+
+    private var accessibilityDescription: String {
+        let identity = presentation.showsMediaIdentity && item?.isVideo == false
+            ? item.map(MediaTextFormatting.titleArtistText) : nil
+        return [identity ?? presentation.notice.title, text].filter { !$0.isEmpty }.joined(separator: " ")
+    }
+
+    @ViewBuilder
+    private func mediaIdentity(_ item: NowPlayingSnapshot, length: CGFloat, thickness: CGFloat) -> some View {
+        if edge.isVertical {
+            let artist = item.artist.trimmingCharacters(in: .whitespacesAndNewlines)
+            let width = artist.isEmpty ? thickness : thickness / 2
+            HStack(spacing: 0) {
+                VerticalStatusText(text: item.title, availableWidth: width,
+                    availableHeight: length, scrollsAutomatically: true)
+                    .frame(width: width, height: length, alignment: .top)
+                if !artist.isEmpty {
+                    VerticalStatusText(text: artist, availableWidth: width,
+                        availableHeight: length, scrollsAutomatically: true)
+                        .frame(width: width, height: length, alignment: .top)
+                        .opacity(0.62)
+                }
+            }
+        } else {
+            CompactMediaIdentityText(item: item)
+        }
+    }
+
+    private func waveform(size: CGFloat, thickness: CGFloat) -> some View {
+        MediaWaveformView(artworkData: item?.artworkData ?? presentation.notice.artworkData,
+            width: size, height: min(18, size), isActive: item?.isPlaying ?? true)
+            .frame(width: edge.isVertical ? thickness : size,
+                   height: edge.isVertical ? size : thickness)
     }
 
     @ViewBuilder

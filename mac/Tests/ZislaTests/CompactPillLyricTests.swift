@@ -21,30 +21,40 @@ struct CompactPillLyricTests {
         #expect(length == 222 && length <= ScreenLayoutConfiguration.quickActionRowWidth)
         let size = edge.isVertical ? CGSize(width: 32, height: length) : CGSize(width: length, height: 32)
         let viewport = textViewport(edge: edge, length: length)
-        var samples: [[UInt8]] = []
-        for elapsed in [0.0, 20, 40] {
-            let actual = try await render(CompactPillStatusContent(presentation: presentation,
-                text: longLyric, edge: edge, visualizationStyle: .waveform, item: item,
-                date: date.addingTimeInterval(elapsed)), size: size, reduceMotion: reduceMotion)
-            let reference = try await render(referenceText(longLyric, edge: edge,
-                size: viewport.size, progress: elapsed / 40), size: viewport.size,
-                reduceMotion: reduceMotion)
-            let samplePixels = try pixels(actual, in: viewport)
-            #expect(differences(samplePixels, try pixels(reference)) == 0,
-                    "The lyric at \(elapsed)s must use its timestamp window inside the original \(size) frame")
-            #expect(samplePixels.contains { $0 > 128 }, "A lyric viewport must never scroll in from an empty frame")
-            let occupied = try inkPositions(actual, in: viewport, vertically: edge.isVertical)
-            #expect(occupied.first.map { $0 <= 4 } == true
-                && occupied.last.map { $0 >= Int(edge.isVertical ? viewport.height : viewport.width) - 5 } == true,
-                "The lyric must fill its viewport immediately instead of entering from outside the island")
-            let endInset = edge.isVertical ? CGRect(x: 0, y: length - 12, width: 32, height: 12)
-                : CGRect(x: length - 12, y: 0, width: 12, height: 32)
-            #expect(try pixels(actual, in: endInset).allSatisfy { $0 < 10 },
-                    "Overflowing lyric rows must stay inside their viewport and leave the end inset clear")
-            samples.append(samplePixels)
+        for renderScale in [CGFloat(1), 2] {
+            var samples: [[UInt8]] = []
+            for elapsed in [0.0, 20, 40] {
+                let actual = try await render(CompactPillStatusContent(presentation: presentation,
+                    text: longLyric, edge: edge, visualizationStyle: .waveform, item: item,
+                    date: date.addingTimeInterval(elapsed)), size: size, reduceMotion: reduceMotion, renderScale: renderScale)
+                let reference = try await render(referenceText(longLyric, edge: edge,
+                    size: viewport.size, progress: elapsed / 40), size: viewport.size,
+                    reduceMotion: reduceMotion, renderScale: renderScale)
+                let samplePixels = try pixels(actual, in: viewport)
+                #expect(differences(samplePixels, try pixels(reference)) == 0,
+                        "The lyric at \(elapsed)s must use its timestamp window inside the original \(size) frame")
+                #expect(samplePixels.contains { $0 > 128 }, "A lyric viewport must never scroll in from an empty frame")
+                let occupied = try inkPositions(actual, in: viewport, vertically: edge.isVertical)
+                if edge.isVertical {
+                    #expect(occupied.first.map { $0 < 14 } == true
+                        && occupied.last.map { $0 >= Int(viewport.height) - 14 } == true,
+                        "The first and last text rows must be visible throughout the lyric window")
+                } else {
+                    let referencePositions = try inkPositions(reference,
+                        in: CGRect(origin: .zero, size: viewport.size), vertically: false)
+                    #expect(!occupied.isEmpty && occupied.first == referencePositions.first
+                        && occupied.last == referencePositions.last,
+                        "The complete lyric window must preserve the reference glyph bearings")
+                }
+                let endInset = edge.isVertical ? CGRect(x: 0, y: length - 12, width: 32, height: 12)
+                    : CGRect(x: length - 12, y: 0, width: 12, height: 32)
+                #expect(try pixels(actual, in: endInset).allSatisfy { $0 < 10 },
+                        "Overflowing lyric rows must stay inside their viewport and leave the end inset clear")
+                samples.append(samplePixels)
+            }
+            #expect(differences(samples[0], samples[1]) > 30)
+            #expect(differences(samples[1], samples[2]) > 30)
         }
-        #expect(differences(samples[0], samples[1]) > 30)
-        #expect(differences(samples[1], samples[2]) > 30)
     }
 
     @Test(arguments: [CGFloat(1), 2])
@@ -180,20 +190,21 @@ struct CompactPillLyricTests {
                 "Ordinary status callers must retain their existing bounded ellipsis")
     }
 
-    @Test(arguments: [0.0, 0.5, 1])
-    func automaticVerticalTextFillsItsViewportAndStopsAtTheTail(progress: Double) async throws {
+    @Test(arguments: [0.0, 0.5, 1], [CGFloat(1), 2])
+    func automaticVerticalTextFillsItsViewportAndStopsAtTheTail(progress: Double, renderScale: CGFloat) async throws {
         let size = CGSize(width: 32, height: 168)
         var animations: [Animation] = []
         let actual = try await render(VerticalStatusText(text: longLyric, availableWidth: 32,
             availableHeight: size.height, scrollsAutomatically: true).foregroundStyle(.white),
-            size: size, animationProgress: progress, onAnimation: { animations.append($0) })
+            size: size, renderScale: renderScale, animationProgress: progress, onAnimation: { animations.append($0) })
         let reference = try await render(referenceVerticalRows(longLyric.map(String.init),
-            size: size, progress: progress), size: size)
+            size: size, progress: progress, animated: true), size: size, renderScale: renderScale)
         #expect(differences(try pixels(actual), try pixels(reference)) == 0,
                 "Automatic vertical text must show its known head, middle and tail windows")
         let occupied = try inkPositions(actual, in: CGRect(origin: .zero, size: size), vertically: true)
-        #expect(occupied.first.map { $0 <= 4 } == true && occupied.last.map { $0 >= 163 } == true,
-                "Every scrolling sample must fill the viewport without an entering or trailing blank gap")
+        #expect(!occupied.isEmpty && occupied.first.map { $0 < 14 } == true
+            && occupied.last.map { $0 >= Int(size.height) - 14 } == true,
+            "The first and last text rows must remain visible throughout the automatic scroll")
         let travel = Double(longLyric.count * 14 - 1) - Double(size.height)
         #expect(animations.contains(.linear(duration: travel / 32)),
                 "The one-pass vertical animation must use the shared 32pt/s reading speed")
@@ -247,8 +258,8 @@ struct CompactPillLyricTests {
         #expect(animations.isEmpty)
     }
 
-    @Test
-    func verticalScrollResetsForChangedContentAndViewportAndCancelsWhenDisabled() async throws {
+    @Test(arguments: [CGFloat(1), 2])
+    func verticalScrollResetsForChangedContentAndViewportAndCancelsWhenDisabled(renderScale: CGFloat) async throws {
         let size = CGSize(width: 32, height: 168)
         func content(_ text: String, width: CGFloat = 32, height: CGFloat = 168, automatic: Bool = true,
             reduceMotion: Bool = false, progress: Double? = nil, sample: Double = 0.5) -> some View {
@@ -266,16 +277,17 @@ struct CompactPillLyricTests {
         }
         let host = NSHostingView(rootView: content(longLyric))
         host.sizingOptions = []
-        let window = NSWindow(contentRect: CGRect(origin: CGPoint(x: 20_000, y: 0), size: size),
+        let window = RasterPanel(contentRect: CGRect(origin: CGPoint(x: 20_000, y: 0), size: size),
             styleMask: .borderless, backing: .buffered, defer: false)
+        window.renderScale = renderScale
         window.isReleasedWhenClosed = false
         window.contentView = host
         defer { window.contentView = nil; window.close() }
         func assertVisibleRows(_ rows: [String], width: CGFloat = 32, height: CGFloat = 168, progress: Double,
-            message: String) async throws {
+            animated: Bool = true, message: String) async throws {
             let reference = try await render(referenceVerticalRows(rows,
-                size: CGSize(width: width, height: height), progress: progress)
-                .frame(width: size.width, height: size.height, alignment: .top), size: size)
+                size: CGSize(width: width, height: height), progress: progress, animated: animated)
+                .frame(width: size.width, height: size.height, alignment: .top), size: size, renderScale: renderScale)
             let actual = try await sample(host, size: size)
             #expect(differences(try pixels(actual), try pixels(reference)) == 0, "\(message)")
             #expect(host.bounds.size == size && window.frame.size == size && !window.isVisible)
@@ -289,7 +301,7 @@ struct CompactPillLyricTests {
         try await assertVisibleRows(replacement.map(String.init), height: 84, progress: 0.5,
             message: "Changing the viewport starts a fresh pass for the new travel")
         host.rootView = content(replacement, height: 84, progress: 0.75)
-        try await assertVisibleRows(replacement.map(String.init), height: 84, progress: 0.75,
+        try await assertVisibleRows(replacement.map(String.init), height: 84, progress: 0.75, animated: false,
             message: "External progress cancels the automatic position")
         host.rootView = content(replacement, height: 84, sample: 0)
         try await assertVisibleRows(replacement.map(String.init), height: 84, progress: 0,
@@ -390,7 +402,8 @@ struct CompactPillLyricTests {
         settings.settings.mediaVisualizationStyle = .glow
         settings.settings.collapsedProgressGlowEnabled = false
         let media = NowPlayingService()
-        media.publishSnapshot(snapshot(text: longLyric))
+        let item = snapshot(text: longLyric)
+        media.publishSnapshot(item)
         let notice = IslandNotice(id: "media-active-lyric-clock", title: "Track")
         queue.enqueue(notice, expiresAfter: nil)
         let state = SideNoticeDisplayState()
@@ -402,9 +415,18 @@ struct CompactPillLyricTests {
             resultSweep: sweep, onStatusHidden: {})
         let presentation = try #require(SideNoticeLayoutEngine().compactBarSizing(
             for: [notice], settings: settings.settings)?.customPillPresentation)
-        let length = presentation.length(thickness: 32, edge: edge, text: longLyric)
+        let length = presentation.length(thickness: 32, edge: edge, text: longLyric, item: item)
         let size = edge.isVertical ? CGSize(width: 32, height: length) : CGSize(width: length, height: 32)
-        let viewport = textViewport(edge: edge, length: length)
+        let identityLength = presentation.mediaIdentityLength(thickness: 32, edge: edge,
+            text: longLyric, item: item)
+        var viewport = textViewport(edge: edge, length: length)
+        if edge.isVertical {
+            viewport.origin.y += identityLength + 6
+            viewport.size.height -= identityLength + 6
+        } else {
+            viewport.origin.x += identityLength + 6
+            viewport.size.width -= identityLength + 6
+        }
         let sampledDate = date.addingTimeInterval(20)
         let actual = try await render(view.statusBarContent(at: sampledDate), size: size, reduceMotion: true)
         let reference = try await render(referenceText(longLyric, edge: edge,
@@ -440,17 +462,40 @@ struct CompactPillLyricTests {
     }
 
     private func referenceVerticalRows(_ rows: [String], size: CGSize, progress: Double,
-        scrolling: Bool = true) -> some View {
-        VStack(spacing: 1) {
-            ForEach(Array(rows.enumerated()), id: \.offset) { _, row in
-                Text(row).font(.system(size: 11, weight: .medium))
-                    .rotationEffect(.degrees(["（", "）"].contains(row) ? 90 : 0)).frame(height: 13)
+        scrolling: Bool = true, animated: Bool = false) -> some View {
+        VerticalTextReference(rows: rows, size: size, progress: progress, scrolling: scrolling, animated: animated)
+    }
+
+    private struct VerticalTextReference: View {
+        let rows: [String]
+        let size: CGSize
+        let progress: Double
+        let scrolling: Bool
+        let animated: Bool
+        @State private var animatedProgress: CGFloat = 0
+
+        var body: some View {
+            VStack(spacing: 1) {
+                ForEach(Array(rows.enumerated()), id: \.offset) { _, row in
+                    Text(row).font(.system(size: 11, weight: .medium))
+                        .rotationEffect(.degrees(["（", "）"].contains(row) ? 90 : 0)).frame(height: 13)
+                }
+            }
+            .fixedSize(horizontal: false, vertical: true)
+            .offset(y: -max(0, CGFloat(rows.count) * 14 - 1 - size.height)
+                * (animated ? animatedProgress : CGFloat(progress)))
+            .frame(width: size.width, height: size.height, alignment: scrolling ? .top : .center).clipped()
+            .foregroundStyle(.white)
+            .task {
+                guard animated else { return }
+                withAnimation(.linear(duration: 1)) { animatedProgress = 1 }
+            }
+            .transaction { transaction in
+                if animated, transaction.animation != nil, !transaction.disablesAnimations {
+                    transaction.animation = Animation(FrozenProgress(progress: progress))
+                }
             }
         }
-        .fixedSize(horizontal: false, vertical: true)
-        .offset(y: -max(0, CGFloat(rows.count) * 14 - 1 - size.height) * CGFloat(progress))
-        .frame(width: size.width, height: size.height, alignment: scrolling ? .top : .center).clipped()
-        .foregroundStyle(.white)
     }
 
     private func render(_ content: some View, size: CGSize, reduceMotion: Bool = false,

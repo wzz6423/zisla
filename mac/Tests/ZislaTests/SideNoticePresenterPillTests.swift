@@ -538,6 +538,60 @@ struct SideNoticePresenterPillTests {
         #expect(fixture.presenter.compactConfiguration(for: notices, at: fixture.date) == notch)
     }
 
+    @Test
+    func headphoneTextFillsEachViewportDuringTheRealPanelReveal() async throws {
+        let fixture = try Fixture(edge: .top)
+        defer { fixture.close() }
+        fixture.screen.frame.origin.x = 20_000
+        fixture.screen.visibleFrame.origin.x = 20_000
+        fixture.settings.settings.islandNotchBackground = .black
+        fixture.settings.settings.collapsedProgressGlowEnabled = false
+        let host = try activeHost(fixture)
+        let panel = try #require(host.window)
+        let notice = IslandNotice(id: "headphone-connection-fill", title: String(repeating: "█", count: 100),
+            createdAt: fixture.date, style: .headphone,
+            batteryLevels: [NoticeBatteryLevel(label: "左", level: 100)])
+        fixture.queue.enqueue(notice, expiresAfter: nil)
+        fixture.presenter.setStatusIcons([])
+        var samples: [String] = []
+        var incomplete = 0
+        func advanceFrame() {
+            RunLoop.main.run(mode: .default, before: Date().addingTimeInterval(1.0 / 120))
+        }
+        for _ in 0..<60 {
+            advanceFrame()
+            host.layoutSubtreeIfNeeded()
+            let bitmap = try #require(host.bitmapImageRepForCachingDisplay(in: host.bounds))
+            host.cacheDisplay(in: host.bounds, to: bitmap)
+            let scale = CGFloat(bitmap.pixelsWide) / host.bounds.width
+            let center = bitmap.pixelsHigh / 2
+            let background = try (0..<bitmap.pixelsWide).filter { x in
+                try #require(bitmap.colorAt(x: x, y: center)?.usingColorSpace(.sRGB)).alphaComponent > 0.9
+            }
+            let leading = try #require(background.first)
+            let trailing = try #require(background.last)
+            let textLeading = leading + Int(42 * scale)
+            let textTrailing = trailing - Int(12 * scale)
+            guard textTrailing > textLeading else { continue }
+            let occupied = try (textLeading..<textTrailing).filter { x in
+                try (0..<bitmap.pixelsHigh).contains { y in
+                    try #require(bitmap.colorAt(x: x, y: y)?.usingColorSpace(.sRGB)).redComponent > 0.3
+                }
+            }
+            let headGap = occupied.first.map { CGFloat($0 - textLeading) / scale } ?? .infinity
+            let tailGap = occupied.last.map { CGFloat(textTrailing - $0) / scale } ?? .infinity
+            let filledFraction = CGFloat(occupied.count) / CGFloat(textTrailing - textLeading)
+            if headGap > 4 || tailGap > 4 || filledFraction < 0.95 { incomplete += 1 }
+            samples.append("\(CGFloat(trailing - leading) / scale):\(headGap),\(tailGap),\(filledFraction)")
+            await withCheckedContinuation { continuation in
+                DispatchQueue.main.async { continuation.resume() }
+            }
+        }
+        #expect(!samples.isEmpty && incomplete == 0,
+            "Every revealed headphone viewport must begin filled; width:head-gap,tail-gap samples: \(samples)")
+        #expect(panel.alphaValue == 0 && NSScreen.screens.allSatisfy { !$0.frame.intersects(panel.frame) })
+    }
+
     @Test(arguments: [IslandLayoutStyle.pill, .notch])
     func shorteningACollapsedBarKeepsThePreviousDrawingAreaUntilTheFoldFinishes(style: IslandLayoutStyle) throws {
         let fixture = try Fixture(edge: .top)
@@ -570,6 +624,63 @@ struct SideNoticePresenterPillTests {
         #expect(panel.frame.contains(previous), "Shrinking the window immediately clips the visible recycle animation")
         #expect(host.rootView.content.displayState.compactLayout?.animation == ZislaMotion.islandRecycle)
         #expect(!panel.isKeyWindow)
+    }
+
+    @Test(arguments: IslandEdge.allCases)
+    func fractionalMediaFramesStayInsideTheNativeCanvasThroughEveryResize(edge: IslandEdge) async throws {
+        let fixture = try Fixture(edge: edge)
+        defer { fixture.close() }
+        fixture.screen = ScreenSnapshot(displayID: 7,
+            frame: CGRect(x: 20_000, y: 0, width: 1800, height: 1100),
+            visibleFrame: CGRect(x: 20_000, y: 0, width: 1800, height: 1076))
+        fixture.settings.settings.islandPlacement.offset = 0.537
+        fixture.settings.settings.mediaCompactStyle = .detailed
+        fixture.settings.settings.mediaVisualizationStyle = .glow
+        var item = NowPlayingSnapshot(title: "Track", artist: "Artist", album: nil, artworkData: nil,
+            duration: 60, elapsedTime: 0, timestamp: fixture.date, isPlaying: true,
+            lyrics: SyncedLyrics(lines: []))
+        fixture.media.publishSnapshot(item)
+        fixture.queue.enqueue(IslandNotice(id: "media-active-canvas", title: "Music"), expiresAfter: nil)
+        fixture.presenter.setScreenLocked(false)
+        let host = try #require(NSApp.windows.compactMap {
+            $0.contentView as? NSHostingView<AppLanguageEnvironment<CompactStatusBarView>>
+        }.first { $0.rootView.content.settingsStore === fixture.settings })
+        let panel = try #require(host.window)
+        panel.alphaValue = 0
+        let state = host.rootView.content.displayState
+        let initial = try #require(state.compactLayout)
+        #expect(initial.frame != initial.frame.integral, "The fixture must exercise a fractional visual frame")
+        #expect(panel.frame.contains(initial.frame), "The first native canvas must contain the complete visual frame")
+        #expect(initial.panelFrame == panel.frame && panel.frame == initial.frame.integral)
+
+        item.title = String(repeating: "Long title ", count: 40)
+        fixture.media.publishSnapshot(item)
+        fixture.presenter.setStatusIcons([])
+        let grown = try #require(state.compactLayout)
+        #expect(panel.frame.contains(initial.frame) && panel.frame.contains(grown.frame))
+        #expect(grown.panelFrame == panel.frame)
+
+        item.title = "Track"
+        fixture.media.publishSnapshot(item)
+        fixture.presenter.setStatusIcons([])
+        let shrinking = try #require(state.compactLayout)
+        #expect(panel.frame.contains(grown.frame) && panel.frame.contains(shrinking.frame))
+        try await fixture.resizeClock.finishPendingResize()
+        let settled = try #require(state.compactLayout)
+        #expect(settled.frame == initial.frame, "Canvas alignment must preserve the visual position and size")
+        #expect(panel.frame.contains(settled.frame))
+        #expect(settled.panelFrame == panel.frame && panel.frame == settled.frame.integral)
+
+        fixture.reducesMotion = true
+        fixture.settings.settings.islandPlacement.offset = 0.419
+        fixture.presenter.setStatusIcons([])
+        let immediate = try #require(state.compactLayout)
+        #expect(immediate.animation == nil)
+        #expect(panel.frame.contains(immediate.frame))
+        #expect(immediate.panelFrame == panel.frame && panel.frame == immediate.frame.integral)
+        fixture.resizeClock.advance()
+        for _ in 0..<10 { await Task.yield() }
+        #expect(fixture.resizeClock.waiters.isEmpty && panel.frame == immediate.frame.integral)
     }
 
     @Test(arguments: [IslandLayoutStyle.pill, .notch], [false, true])

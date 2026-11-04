@@ -709,7 +709,9 @@ public struct SideNoticeLayoutEngine: Equatable, Sendable {
             CompactPillStatusPresentation(priority: selectedPriority, notice: $0, text: text,
                 aiCount: aiCount,
                 showsWaveform: selectedPriority == .media && $0.id.hasPrefix("media-active-")
-                    && settings.mediaVisualizationStyle == .waveform)
+                    && settings.mediaVisualizationStyle == .waveform,
+                showsMediaIdentity: selectedPriority == .media && $0.id.hasPrefix("media-active-")
+                    && settings.mediaCompactStyle == .detailed && settings.mediaShowLyricsAndInfo)
         }
         return (
             sideExtension,

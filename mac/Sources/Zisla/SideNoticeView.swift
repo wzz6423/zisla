@@ -377,7 +377,7 @@ struct CompactStatusBarView: View {
                 for: presentation, settings: settingsStore.settings, item: media.snapshot, at: date
             )
             let length = presentation.length(
-                thickness: height, edge: displayState.islandEdge, text: text
+                thickness: height, edge: displayState.islandEdge, text: text, item: media.snapshot
             )
             CompactPillStatusContent(
                 presentation: presentation, text: text, edge: displayState.islandEdge,
@@ -1757,6 +1757,20 @@ private struct CompactBackgroundSoundWing: View {
     }
 }
 
+struct CompactMediaIdentityText: View {
+    let item: NowPlayingSnapshot
+
+    var body: some View {
+        let artist = item.artist.trimmingCharacters(in: .whitespacesAndNewlines)
+        VStack(alignment: .leading, spacing: 1) {
+            MarqueeText(item.title, font: .system(size: 10.5, weight: .semibold), textColor: .white)
+            if !artist.isEmpty {
+                MarqueeText(artist, font: .system(size: 8.5, weight: .medium), textColor: .white.opacity(0.62))
+            }
+        }
+    }
+}
+
 /// Compact music detail bar: split around a physical notch, or rendered as one continuous row on other displays.
 struct DetailedMediaBar: View {
     private static let maximumContentWidth: CGFloat = 160
@@ -1801,7 +1815,7 @@ struct DetailedMediaBar: View {
     private var trackIdentity: some View {
         HStack(spacing: 7) {
             artwork
-            trackText
+            CompactMediaIdentityText(item: item)
                 .frame(maxWidth: .infinity, alignment: .leading)
         }
         .padding(.leading, CompactStatusMetrics.horizontalContentInset)
@@ -1811,29 +1825,12 @@ struct DetailedMediaBar: View {
     private var inlineMediaBar: some View {
         HStack(spacing: 7) {
             artwork
-            trackText
+            CompactMediaIdentityText(item: item)
                 .frame(width: Self.inlineTrackWidth, alignment: .leading)
             lyricLine
                 .frame(maxWidth: .infinity, alignment: .leading)
         }
         .padding(.horizontal, CompactStatusMetrics.horizontalContentInset)
-    }
-
-    private var trackText: some View {
-        VStack(alignment: .leading, spacing: 1) {
-            MarqueeText(
-                item.title,
-                font: .system(size: 10.5, weight: .semibold),
-                textColor: .white
-            )
-            if !artist.isEmpty {
-                MarqueeText(
-                    artist,
-                    font: .system(size: 8.5, weight: .medium),
-                    textColor: .white.opacity(0.62)
-                )
-            }
-        }
     }
 
     private var lyricsSection: some View {
@@ -1903,10 +1900,6 @@ struct DetailedMediaBar: View {
             }
             .frame(maxWidth: .infinity, alignment: .trailing)
         }
-    }
-
-    private var artist: String {
-        item.artist.trimmingCharacters(in: .whitespacesAndNewlines)
     }
 
     private var artworkSize: CGFloat {

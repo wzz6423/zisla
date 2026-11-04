@@ -7,14 +7,15 @@ import ZislaKit
 
 @MainActor
 struct CompactStatusBarAnimationTests {
-    @Test(arguments: ["AirPods Pro Left 100% Right 97% Case 98%", "AirPods", ""], [false, true])
+    @Test(arguments: ["AirPods Pro Left 100% Right 97% Case 98%", "AirPods", "", String(repeating: "天", count: 30)], [false, true])
     func statusTextKeepsItsOwnScrollAnimationInsideTheSurface(text: String, reduceMotion: Bool) async throws {
         let size = CGSize(width: 120, height: 32)
         let frame = CGRect(origin: .zero, size: size)
+        var animations: [Animation] = []
         func host(progress: Double?, staticReference: Bool = false) -> NSHostingView<some View> {
             NSHostingView(rootView: CompactStatusBarSurface(frame: frame, panelFrame: frame) { _ in
                 let marquee = MarqueeText(text, font: .system(size: 11, weight: .medium), textColor: .white,
-                    pointsPerSecond: 120, repeats: false, scrollProgress: progress)
+                    pointsPerSecond: TransientNoticeMetrics.pointsPerSecond, repeats: false, scrollProgress: progress)
                 Group {
                     if staticReference {
                         marquee.marqueeLabel
@@ -26,7 +27,10 @@ struct CompactStatusBarAnimationTests {
                 }
                 .frame(width: size.width, height: size.height)
                 .transaction { transaction in
-                    if transaction.animation != nil { transaction.animation = Animation(FrozenProgress()) }
+                    if let animation = transaction.animation {
+                        animations.append(animation)
+                        transaction.animation = Animation(FrozenProgress())
+                    }
                 }
             }
             .frame(width: size.width, height: size.height)
@@ -74,6 +78,14 @@ struct CompactStatusBarAnimationTests {
             if matches { break }
         }
         #expect(matches, "Status text must retain its own animation and honor Reduce Motion; head/half/tail pixel differences: \(referenceDifferences)")
+        if !reduceMotion, text == String(repeating: "天", count: 30) {
+            let scale = windows[0].backingScaleFactor
+            let width = ceil((text as NSString).size(withAttributes: [
+                .font: NSFont.systemFont(ofSize: 11, weight: .regular)
+            ]).width * scale) / scale
+            #expect(animations.contains(.linear(duration: Double(width - size.width) / 32)),
+                "Automatic text must retain its 32pt/s reading speed inside the island surface: \(animations)")
+        }
         #expect(windows.allSatisfy { !$0.isVisible })
     }
 
