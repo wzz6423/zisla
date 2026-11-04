@@ -7,6 +7,27 @@ import XCTest
 
 @MainActor
 struct ClipboardSystemTranslationBridgeTests {
+    @available(macOS 15.0, *)
+    @Test
+    func automaticTranslationIncludesTheInstalledSystemProvider() async throws {
+        let bridge = ClipboardSystemTranslationBridge()
+        let requested = XCTestExpectation(description: "Automatic translation requested the system provider")
+        let observation = bridge.$request.sink { request in
+            if request != nil { requested.fulfill() }
+        }
+        defer { observation.cancel() }
+        let task = Task {
+            try await bridge.autoTranslate("Complete OCR text\nSecond line", targetLanguage: "ja", service: .init(providers: []))
+        }
+        #expect(await XCTWaiter.fulfillment(of: [requested], timeout: 3) == .completed)
+        let request = try #require(bridge.request)
+        #expect(request.text == "Complete OCR text\nSecond line")
+        #expect(request.targetLanguage == "ja")
+        bridge.complete(id: request.id, result: .success("System translation\nSecond line"))
+        #expect(try await task.value == "System translation\nSecond line")
+        #expect(bridge.request == nil)
+    }
+
     @Test
     func replacementCancelsTheOldRequestAndIgnoresDuplicateOrOutOfOrderResults() async throws {
         let bridge = ClipboardSystemTranslationBridge()

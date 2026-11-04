@@ -557,17 +557,11 @@ final class ClipboardAssistantController: ObservableObject {
         translationSourceIsCurrent = isSourceCurrent
         windowPresenter(self, detection)
         let systemTranslation = systemTranslation
-        var additionalProviders: [ClipboardTranslationService.Provider] = []
-        if #available(macOS 15.0, *) {
-            additionalProviders.append { text, language in
-                try await systemTranslation.translate(text, targetLanguage: language)
-            }
-        }
         translationTask = Task { @MainActor [weak self] in
             let translation: ClipboardTranslationPresentation
             do {
-                let result = try await service.translate(
-                    text, targetLanguage: targetLanguage, additionalProviders: additionalProviders
+                let result = try await systemTranslation.autoTranslate(
+                    text, targetLanguage: targetLanguage, service: service
                 )
                 translation = .result(text: result, copied: nil)
             } catch {

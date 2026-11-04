@@ -2,6 +2,7 @@ import AppKit
 import SwiftUI
 import Testing
 import Vision
+import XCTest
 import ZislaCore
 @testable import ZislaKit
 @testable import Zisla
@@ -9,7 +10,7 @@ import ZislaCore
 @MainActor
 @Suite(.serialized)
 struct ScreenshotRecognitionTests {
-    @Test(arguments: [ScreenshotRecognitionMode.text, .table])
+    @Test(arguments: [ScreenshotRecognitionMode.text, .table, .translate])
     func cancellationBeforeQueuedTaskStartsDoesNotOpenDialogsOrChangeStatus(mode: ScreenshotRecognitionMode) async throws {
         let model = ScreenshotEditorModel(image: try makeImage())
         let task = try #require(model.recognize(mode, chooseTableDestination: {
@@ -33,6 +34,240 @@ struct ScreenshotRecognitionTests {
         model.image = try makeImage()
         #expect(model.statusMessage == "existing editor status")
         #expect(!model.isRecognizing)
+    }
+
+    @Test(arguments: AppLanguage.allCases)
+    func translationUsesRecognizedTextAndTheQuickActionsTargetLanguage(language: AppLanguage) async throws {
+        let model = ScreenshotEditorModel(image: try makeImage())
+        let source = "First line\nSecond line + & <text>"
+        let translated = "  Translated line\nSecond translated line  "
+        var result: String?
+        let task = try #require(model.recognize(.translate,
+            targetLanguage: language.translateTargetCode,
+            translationService: .init(providers: [{ text, target in
+                #expect(text == source)
+                #expect(target == language.translateTargetCode)
+                return translated
+            }]),
+            recognizeImage: { _, _ in Self.fragments(source) }
+        ) { text, _ in result = text })
+        await task.value
+        #expect(result == translated)
+        #expect(model.statusMessage == nil)
+        #expect(!model.isRecognizing)
+    }
+
+    @Test(arguments: ["empty", "failure", "invalid image"])
+    func unsuccessfulOCRNeverStartsTranslation(outcome: String) async throws {
+        let model = ScreenshotEditorModel(image: outcome == "invalid image" ? NSImage() : try makeImage())
+        let task = try #require(model.recognize(.translate,
+            translationService: .init(providers: [{ _, _ in
+                Issue.record("Unsuccessful OCR must not send text to translation providers")
+                return "unexpected"
+            }]),
+            recognizeImage: { _, _ in
+                if outcome == "failure" { throw RecognitionFailure() }
+                if outcome == "invalid image" { Issue.record("Invalid image must not reach Vision") }
+                return []
+            }
+        ) { _, _ in Issue.record("Unsuccessful OCR must not present a translation") })
+        await task.value
+        #expect(!model.isRecognizing)
+        #expect(model.statusMessage != nil)
+    }
+
+    @Test
+    func failedTranslationReportsFailureAndAllowsRetry() async throws {
+        let model = ScreenshotEditorModel(image: try makeImage())
+        let failed = try #require(model.recognize(.translate,
+            translationService: .init(providers: [{ _, _ in throw URLError(.notConnectedToInternet) }],
+                waitForTimeout: {}),
+            recognizeImage: { _, _ in Self.fragments("source") }
+        ) { _, _ in Issue.record("A failed translation must not present or copy the OCR source") })
+        await failed.value
+        #expect(model.statusMessage == AppLocalization.text("翻译失败，请重试或使用浏览器翻译"))
+        #expect(!model.isRecognizing)
+        var result: String?
+        let retry = try #require(model.recognize(.translate,
+            translationService: .init(providers: [{ _, _ in "recovered translation" }]),
+            recognizeImage: { _, _ in Self.fragments("source") }
+        ) { text, _ in result = text })
+        await retry.value
+        #expect(result == "recovered translation")
+        #expect(!model.isRecognizing)
+        #expect(model.statusMessage == nil)
+    }
+
+    @Test(arguments: ["close", "replace", "cancel"])
+    func cancellationDuringTranslationDiscardsLateResultsAndReleasesTheProvider(action: String) async throws {
+        let fixture = try Fixture(image: makeImage())
+        defer { fixture.close() }
+        let model = fixture.model
+        let gate = TranslationGate()
+        let task = try #require(model.recognize(.translate,
+            translationService: .init(providers: [{ _, _ in await gate.translate() }]),
+            recognizeImage: { _, _ in Self.fragments("source") }
+        ) { _, _ in Issue.record("Cancelled translation must not present or copy a result") })
+        #expect(await XCTWaiter.fulfillment(of: [gate.started], timeout: 3) == .completed)
+        #expect(model.isRecognizing)
+        #expect(model.statusMessage == AppLocalization.text("正在翻译…"))
+        let duplicate = model.recognize(.translate) { _, _ in
+            Issue.record("Repeated clicks must share the in-flight translation")
+        }
+        #expect(duplicate == nil)
+        switch action {
+        case "close": fixture.controller.close()
+        case "replace": model.image = try makeImage()
+        default: model.cancelRecognition()
+        }
+        model.statusMessage = "new capture status"
+        let completed = XCTestExpectation(description: "Cancelled translation finished promptly")
+        let completion = Task {
+            await task.value
+            completed.fulfill()
+        }
+        #expect(await XCTWaiter.fulfillment(of: [completed, gate.cancelled], timeout: 3) == .completed)
+        await gate.finish("late translation")
+        await completion.value
+        #expect(await XCTWaiter.fulfillment(of: [gate.returned], timeout: 3) == .completed)
+        #expect(model.statusMessage == "new capture status")
+        #expect(!model.isRecognizing)
+    }
+
+    @Test
+    func replacingTheCaptureAfterAProviderWinsCannotPresentItsQueuedTranslation() async throws {
+        let model = ScreenshotEditorModel(image: try makeImage())
+        let output = AsyncStream<String>.makeStream()
+        defer { output.continuation.finish() }
+        let providerStarted = XCTestExpectation(description: "Translation provider started")
+        let timeoutStarted = XCTestExpectation(description: "Translation timeout started")
+        let providerWon = DispatchSemaphore(value: 0)
+        let service = ClipboardTranslationService(providers: [{ _, _ in
+            providerStarted.fulfill()
+            for await text in output.stream { return text }
+            throw CancellationError()
+        }], waitForTimeout: {
+            try await withTaskCancellationHandler {
+                timeoutStarted.fulfill()
+                try await Task.sleep(for: .seconds(60))
+            } onCancel: {
+                providerWon.signal()
+            }
+        })
+        let task = try #require(model.recognize(.translate, translationService: service,
+            recognizeImage: { _, _ in Self.fragments("old screenshot") }
+        ) { _, _ in Issue.record("A winning translation queued before capture replacement must be discarded") })
+        #expect(await XCTWaiter.fulfillment(of: [providerStarted, timeoutStarted], timeout: 3) == .completed)
+        output.continuation.yield("old translation")
+        // Keep the main actor occupied until the service has returned its winning result.
+        let winner = { providerWon.wait(timeout: .now() + 3) }()
+        #expect(winner == .success)
+        model.image = try makeImage()
+        model.statusMessage = "replacement capture"
+        await task.value
+        #expect(model.statusMessage == "replacement capture")
+        #expect(!model.isRecognizing)
+    }
+
+    @Test(arguments: [ScreenshotRecognitionMode.text, .translate], [false, true])
+    func OCRAndTranslationShareTheResultDialogAndOnlyTranslationCopiesAutomatically(
+        mode: ScreenshotRecognitionMode, copiesSuccessfully: Bool
+    ) async throws {
+        _ = NSApplication.shared
+        let model = ScreenshotEditorModel(image: try makeImage())
+        let alert = PresentationProbeAlert()
+        alert.response = .alertSecondButtonReturn
+        alert.window.isReleasedWhenClosed = false
+        alert.window.alphaValue = 0
+        defer { alert.window.close() }
+        let text = "  Complete result\nSecond line  "
+        var copies: [String] = []
+        alert.onPresent = {
+            #expect(copies == (mode == .translate ? [text] : []))
+        }
+        let task = try #require(model.recognize(mode,
+            translationService: .init(providers: [{ _, _ in text }]),
+            recognizeImage: { _, _ in Self.fragments(text) }
+        ) { result, operation in
+            model.presentRecognitionResult(result, mode: mode, operation: operation, alert: alert) {
+                copies.append($0)
+                return copiesSuccessfully
+            }
+        })
+        await task.value
+        await withCheckedContinuation { continuation in
+            RunLoop.main.perform(inModes: [.common]) { continuation.resume() }
+        }
+        #expect(alert.wasPresented)
+        #expect(alert.messageText == AppLocalization.text(mode.title))
+        #expect(alert.buttons.map(\.title) == [AppLocalization.text("复制"), AppLocalization.text("关闭")])
+        #expect(alert.buttons[1].keyEquivalent == "\u{1b}")
+        let container = try #require(alert.accessoryView as? NSVisualEffectView)
+        let scroll = try #require(container.subviews.first as? NSScrollView)
+        let textView = try #require(scroll.documentView as? NSTextView)
+        #expect(container.frame.width == 480)
+        #expect(container.material == .sidebar)
+        #expect(container.layer?.cornerRadius == 8)
+        #expect(textView.string == text)
+        #expect(textView.isSelectable && !textView.isEditable)
+        #expect(scroll.hasVerticalScroller && !scroll.hasHorizontalScroller)
+        if mode == .translate {
+            #expect(model.statusMessage == (copiesSuccessfully
+                ? AppLocalization.text("%@，结果已复制", AppLocalization.text(mode.title))
+                : AppLocalization.text("无法写入剪贴板")))
+        } else {
+            #expect(copies.isEmpty)
+            #expect(model.statusMessage == nil)
+        }
+    }
+
+    @Test(arguments: [ScreenshotRecognitionMode.text, .translate])
+    func theSharedCopyButtonWritesTheCompleteResult(mode: ScreenshotRecognitionMode) async throws {
+        let model = ScreenshotEditorModel(image: try makeImage())
+        let alert = PresentationProbeAlert()
+        alert.window.isReleasedWhenClosed = false
+        alert.window.alphaValue = 0
+        defer { alert.window.close() }
+        let text = "Full result\nLine two + & <text>"
+        var copies: [String] = []
+        let task = try #require(model.recognize(mode,
+            translationService: .init(providers: [{ text, _ in text }]),
+            recognizeImage: { _, _ in Self.fragments(text) }
+        ) { text, operation in
+            model.presentRecognitionResult(text, mode: mode, operation: operation, alert: alert) {
+                copies.append($0)
+                return true
+            }
+        })
+        await task.value
+        await withCheckedContinuation { continuation in
+            RunLoop.main.perform(inModes: [.common]) { continuation.resume() }
+        }
+        #expect(copies == Array(repeating: text, count: mode == .translate ? 2 : 1))
+        #expect(model.statusMessage == AppLocalization.text("%@，结果已复制", AppLocalization.text(mode.title)))
+    }
+
+    @Test(arguments: [ScreenshotRecognitionMode.text, .translate])
+    func cancelledResultsCannotCopyOrOpenTheSharedDialog(mode: ScreenshotRecognitionMode) async throws {
+        let model = ScreenshotEditorModel(image: try makeImage())
+        let alert = PresentationProbeAlert()
+        alert.window.isReleasedWhenClosed = false
+        defer { alert.window.close() }
+        let task = try #require(model.recognize(mode,
+            translationService: .init(providers: [{ text, _ in text }]),
+            recognizeImage: { _, _ in Self.fragments("stale result") }
+        ) { text, operation in
+            model.presentRecognitionResult(text, mode: mode, operation: operation, alert: alert) { _ in
+                Issue.record("A result invalidated before presentation must not change the clipboard")
+                return true
+            }
+            model.cancelRecognition()
+        })
+        await task.value
+        await withCheckedContinuation { continuation in
+            RunLoop.main.perform(inModes: [.common]) { continuation.resume() }
+        }
+        #expect(!alert.wasPresented)
     }
 
     @Test
@@ -500,10 +735,35 @@ struct ScreenshotRecognitionTests {
     private final class PresentationProbeAlert: NSAlert {
         var wasPresented = false
         var onPresent: (() -> Void)?
+        var response = NSApplication.ModalResponse.alertFirstButtonReturn
         override func runModal() -> NSApplication.ModalResponse {
             wasPresented = true
             onPresent?()
-            return .alertFirstButtonReturn
+            return response
+        }
+    }
+
+    private actor TranslationGate {
+        nonisolated let started = XCTestExpectation(description: "Translation provider started")
+        nonisolated let cancelled = XCTestExpectation(description: "Translation provider cancelled")
+        nonisolated let returned = XCTestExpectation(description: "Late translation returned")
+        private var continuation: CheckedContinuation<String, Never>?
+
+        func translate() async -> String {
+            defer { returned.fulfill() }
+            return await withTaskCancellationHandler {
+                await withCheckedContinuation {
+                    continuation = $0
+                    started.fulfill()
+                }
+            } onCancel: {
+                cancelled.fulfill()
+            }
+        }
+
+        func finish(_ text: String) {
+            continuation?.resume(returning: text)
+            continuation = nil
         }
     }
 

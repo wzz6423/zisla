@@ -13,6 +13,20 @@ final class ClipboardSystemTranslationBridge: ObservableObject {
     @Published private(set) var request: Request?
     private var continuation: CheckedContinuation<String, any Error>?
 
+    func autoTranslate(
+        _ text: String,
+        targetLanguage: String,
+        service: ClipboardTranslationService
+    ) async throws -> String {
+        var additionalProviders: [ClipboardTranslationService.Provider] = []
+        if #available(macOS 15.0, *) {
+            additionalProviders.append { [self] text, language in
+                try await translate(text, targetLanguage: language)
+            }
+        }
+        return try await service.translate(text, targetLanguage: targetLanguage, additionalProviders: additionalProviders)
+    }
+
     func translate(_ text: String, targetLanguage: String) async throws -> String {
         let id = UUID()
         return try await withTaskCancellationHandler {
