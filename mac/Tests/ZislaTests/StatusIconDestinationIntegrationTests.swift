@@ -7,6 +7,153 @@ import ZislaCore
 @testable import Zisla
 
 struct StatusIconDestinationIntegrationTests {
+    @Test(arguments: IslandEdge.allCases, MediaCompactStyle.allCases.flatMap { style in [false, true].map { (style, $0) } }) @MainActor
+    func theCompactSurfaceRendersMonitorAndPlaybackTogetherWithoutPausingLyrics(
+        edge: IslandEdge, playback: (MediaCompactStyle, Bool)
+    ) async throws {
+        let (style, crowded) = playback
+        let fixture = try IconFixture(edge: edge)
+        defer { fixture.close() }
+        fixture.settings.settings.sideNoticesEnabled = true
+        fixture.settings.settings.islandShowMoreInformation = true
+        fixture.settings.settings.mediaCompactStyle = style
+        let artwork = NSImage(size: CGSize(width: 24, height: 24), flipped: false) { rect in
+            NSColor.blue.setFill()
+            rect.fill()
+            return true
+        }
+        let monitor = NSImage(size: CGSize(width: 24, height: 24), flipped: false) { rect in
+            NSColor.red.setFill()
+            rect.fill()
+            return true
+        }
+        let filler = NSImage(size: CGSize(width: 24, height: 24), flipped: false) { rect in
+            NSColor.white.setFill()
+            rect.fill()
+            return true
+        }
+        let icons = (0..<(crowded ? 12 : 1)).map {
+            IslandStatusIcon(id: "combined-\($0)", content: .combined($0 == 0 ? monitor : filler), tooltip: "Combined")
+        }
+        let date = Date(timeIntervalSince1970: 100)
+        let item = NowPlayingSnapshot(title: "Song", artist: "Artist", album: nil,
+            artworkData: artwork.tiffRepresentation, duration: 60, elapsedTime: 0,
+            timestamp: date, isPlaying: true,
+            lyrics: SyncedLyrics(lines: [.init(time: 0, text: "Lyrics")]))
+        fixture.media.publishSnapshot(item)
+        let notices = [IslandNotice(id: "ai-active-openai", title: "AI"),
+                       IslandNotice(id: "media-active-left", title: "Song", artworkData: item.artworkData),
+                       IslandNotice(id: "toolbox-reminder-awake", title: "Awake", detail: "30:00")]
+        for notice in notices { fixture.queue.enqueue(notice, expiresAfter: nil) }
+        let layout = try #require(FloatingIslandInformationLayout(notices: notices, icons: icons,
+            settings: fixture.settings.settings, item: item, at: date))
+        if crowded { #expect(layout.primaryLength > ScreenLayoutConfiguration.quickActionRowWidth) }
+        let state = SideNoticeDisplayState()
+        state.islandEdge = edge
+        state.placementMode = .custom
+        state.statusIcons = icons
+        state.compactWingHeight = edge.isVertical ? layout.size.width : layout.size.height
+        var reportedLengths: [CGFloat] = []
+        let view = CompactStatusBarView(queue: fixture.queue, displayState: state, media: fixture.media,
+            browserDownloads: fixture.downloads, settingsStore: fixture.settings, resultSweep: fixture.sweep,
+            onStatusHidden: {}, onCompactLengthChanged: { reportedLengths.append($0) })
+        #expect(view.pausesCompactTimeline == (style != .detailed),
+                "Detailed lyrics must keep advancing even while AI wins the normal priority")
+        let bitmap = try await renderOffscreen(view.statusBarContent(at: date)
+            .environment(\._accessibilityReduceMotion, true), size: layout.size)
+        #expect(reportedLengths.last == (edge.isVertical ? layout.size.height : layout.size.width),
+                "The surface must report its measured length to keep the panel geometry synchronized")
+        var monitorPixels = 0
+        var artworkPixels = 0
+        var statusPixels = 0
+        var monitorBounds = CGRect.null
+        var artworkBounds = CGRect.null
+        for y in 0..<bitmap.pixelsHigh {
+            for x in 0..<bitmap.pixelsWide {
+                let color = try #require(bitmap.colorAt(x: x, y: y)?.usingColorSpace(.deviceRGB))
+                let point = CGRect(x: x, y: y, width: 1, height: 1)
+                if color.redComponent > 0.8 && color.blueComponent < 0.2 {
+                    monitorPixels += 1
+                    monitorBounds = monitorBounds.union(point)
+                }
+                if color.blueComponent > 0.8 && color.redComponent < 0.2 {
+                    artworkPixels += 1
+                    artworkBounds = artworkBounds.union(point)
+                }
+                if min(color.redComponent, color.greenComponent, color.blueComponent) > 0.7 { statusPixels += 1 }
+            }
+        }
+        #expect(monitorPixels > 100, "The monitor icon must stay visible while AI and music are active")
+        #expect(artworkPixels > 100, "The playback row must render alongside the monitor icon")
+        #expect(statusPixels > 10, "The task count and awake status must render alongside both colored icons")
+        if style == .detailed {
+            #expect(edge.isVertical ? artworkBounds.minX > monitorBounds.maxX : artworkBounds.minY > monitorBounds.maxY,
+                    "Detailed playback must occupy its own row or column")
+        } else {
+            #expect(abs(edge.isVertical ? artworkBounds.midX - monitorBounds.midX : artworkBounds.midY - monitorBounds.midY) < 2,
+                    "Compact playback must share the monitor row or column")
+        }
+        fixture.media.stop()
+    }
+
+    @Test @MainActor
+    func moreInformationYieldsToVoiceMessagesAndResultSweeps() throws {
+        let fixture = try IconFixture(edge: .top)
+        defer { fixture.close() }
+        fixture.settings.settings.sideNoticesEnabled = true
+        fixture.settings.settings.islandShowMoreInformation = true
+        fixture.presenter.setStatusIcons([IslandStatusIcon(id: "cpu", content: .metric(.cpu,
+            text: "20%", image: nil, style: .detailed), tooltip: "CPU")])
+        let notices = [IslandNotice(id: "ai-active-openai", title: "AI")]
+        let combined = fixture.presenter.compactConfiguration(for: notices, at: .distantPast)
+        #expect(combined.statusIconSize != nil)
+        fixture.presenter.setVoiceRecording(true)
+        #expect(fixture.presenter.compactConfiguration(for: notices, at: .distantPast).statusIconSize == nil)
+        fixture.presenter.setVoiceRecording(false)
+        fixture.presenter.setTransientNoticePresented(true)
+        #expect(fixture.presenter.compactConfiguration(for: notices, at: .distantPast).statusIconSize == nil)
+        fixture.presenter.setTransientNoticePresented(false)
+        #expect(fixture.presenter.compactConfiguration(for: notices, at: .distantPast) == combined)
+        fixture.sweep.receive(previous: .running,
+            task: AIProgressTask(id: "information", provider: .codex, title: "Test", progress: nil,
+                status: .succeeded, updatedAt: .distantPast),
+            observedSince: .distantFuture, settings: fixture.settings.settings)
+        #expect(fixture.sweep.current != nil)
+        #expect(fixture.presenter.compactConfiguration(for: notices, at: .distantPast).statusIconSize == nil)
+        fixture.sweep.cancel()
+        #expect(fixture.presenter.compactConfiguration(for: notices, at: .distantPast) == combined)
+    }
+
+    @Test(arguments: IslandEdge.allCases) @MainActor
+    func moreInformationKeepsMonitorAIPlaybackAndAwakeStatusTogether(edge: IslandEdge) throws {
+        let fixture = try IconFixture(edge: edge)
+        defer { fixture.close() }
+        fixture.settings.settings.sideNoticesEnabled = true
+        fixture.settings.settings.mediaCompactStyle = .detailed
+        var payload = try #require(JSONSerialization.jsonObject(with: JSONEncoder().encode(fixture.settings.settings)) as? [String: Any])
+        payload["islandShowMoreInformation"] = true
+        fixture.settings.settings = try JSONDecoder().decode(FeatureSettings.self,
+            from: JSONSerialization.data(withJSONObject: payload))
+        let icons = [IslandStatusIcon(id: "cpu", content: .metric(.cpu, text: "20%", image: nil, style: .detailed), tooltip: "CPU")]
+        fixture.presenter.setStatusIcons(icons)
+        let notices = [
+            IslandNotice(id: "ai-active-openai", title: "AI"),
+            IslandNotice(id: "media-active-left", title: "Music"),
+            IslandNotice(id: "toolbox-reminder-awake", title: "Awake", detail: "30:00"),
+        ]
+        let combined = fixture.presenter.compactConfiguration(for: notices, at: .distantPast)
+        let size = try #require(combined.statusIconSize, "More information must reserve the combined content size")
+        let iconSize = try #require(IslandStatusIconLayout.size(icons: icons, edge: edge))
+        let firstThickness = max(32, edge.isVertical ? iconSize.width : iconSize.height)
+        #expect((edge.isVertical ? size.width : size.height) == firstThickness + 32,
+                "Detailed playback needs a second row alongside the persistent first row")
+        let frame = try #require(fixture.presenter.compactFrame(for: fixture.screen, notices: notices, at: .distantPast))
+        #expect(frame.size == size)
+        #expect(fixture.screen.frame.contains(frame))
+        let hidden = fixture.presenter.compactConfiguration(for: notices, at: .distantPast, statusHidden: true)
+        #expect(hidden.statusIconSize == IslandStatusIconLayout.size(icons: icons, edge: edge))
+    }
+
     @Test(arguments: IslandEdge.allCases) @MainActor
     func monitorOrderChangesTheVisibleLayoutAndRestoresTheSameReadings(edge: IslandEdge) throws {
         let fixture = try IconFixture(edge: edge)

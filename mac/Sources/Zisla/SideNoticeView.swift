@@ -257,7 +257,16 @@ struct CompactStatusBarView: View {
 
     private func compactSurfaceContent(size: CGSize, at date: Date) -> some View {
         ZStack {
-            if !displayState.statusIcons.isEmpty {
+            if let information = FloatingIslandInformationLayout(
+                notices: displayState.compactStatusHidden ? [] : presentationNotices,
+                icons: displayState.statusIcons, settings: settingsStore.settings, item: media.snapshot, at: date
+            ) {
+                FloatingIslandInformationView(layout: information,
+                    visualizationStyle: settingsStore.settings.mediaVisualizationStyle, item: media.snapshot, date: date)
+                    .onChange(of: information.size, initial: true) { _, size in
+                        onCompactLengthChanged(displayState.islandEdge.isVertical ? size.height : size.width)
+                    }
+            } else if !displayState.statusIcons.isEmpty {
                 IslandStatusIconStrip(icons: displayState.statusIcons, edge: displayState.islandEdge, date: date)
             } else if usesCustomPill, displayState.compactStatusHidden, resultSweep.current == nil {
                 IslandParticleLogo(side: min(18, height), time: date.timeIntervalSinceReferenceDate)
@@ -347,7 +356,8 @@ struct CompactStatusBarView: View {
     }
 
     private var showsCustomLyrics: Bool {
-        usesCustomPill && selectedCompactStatusPriority == .media
+        usesCustomPill && (selectedCompactStatusPriority == .media
+            || (settingsStore.settings.islandShowMoreInformation && mediaNotice != nil))
             && settingsStore.settings.mediaCompactStyle == .detailed
             && settingsStore.settings.mediaShowLyricsAndInfo
             && media.snapshot?.isPlaying == true

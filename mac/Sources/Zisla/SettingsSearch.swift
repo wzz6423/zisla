@@ -87,6 +87,10 @@ enum SettingsSearchIndex {
         }
 
         rows(.info, ["播放来源", "歌词与歌曲信息", "收起态音乐样式", "音乐动效", "活动展示", "专注模式展示"])
+        if settings.supportsStatusIconsInIsland {
+            entry(.info, "展示更多信息", anchor: .row("展示更多信息"),
+                  keywords: ["同时展示监控、AI、音乐与状态提示，详细音乐另起一行"])
+        }
         entry(.info, "机器监控状态显示位置", anchor: .row("机器监控状态显示位置"), keywords: ["状态栏", "灵动岛"])
         if settings.systemMonitorEnabled {
             entry(.info, "常驻监控图标", anchor: .row("常驻监控图标"), keywords: ["独立", "菜单栏常驻"])
