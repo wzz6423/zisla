@@ -39,7 +39,7 @@ struct IslandDashboardViewLayoutTests {
         #expect(layout.panelSize.height == layout.islandSize.height + 4)
     }
 
-    @Test(arguments: [CGFloat(24), 32])
+    @Test(arguments: [CGFloat(24), 32, 48])
     func cameraHeaderClearsTheActualCollapsedRowByTwelvePoints(thickness: CGFloat) {
         let screen = ScreenSnapshot(displayID: 7,
             frame: CGRect(x: 0, y: 0, width: 1512, height: 982),
@@ -54,7 +54,8 @@ struct IslandDashboardViewLayoutTests {
         let headerTop = IslandRootView.contentTopInset(layoutStyle: .pill, screenLayout: layout)
         #expect(headerTop - layout.collapsedFrame.height == 12,
                 "The expanded header must keep the requested gap below the camera-aligned row")
-        #expect(headerTop == 44, "Camera rows keep their fixed 32pt height regardless of the configured pill size")
+        #expect(headerTop == ScreenLayoutConfiguration.cameraPillHeight + 12,
+                "Camera rows keep their fixed height regardless of the configured pill size")
         #expect(IslandRootView.contentTopInset(layoutStyle: .notch, screenLayout: layout) == 16,
                 "The original notch layout uses the shared lowered header inset")
     }
@@ -133,7 +134,7 @@ struct IslandDashboardViewLayoutTests {
         #expect(sizes.count == 2, "Panel-frame feedback and activity width cannot restart the same resize")
         screen.send(cameraLayout(thickness: 32))
         #expect(sizes.last == CGSize(width: 776, height: 540))
-        #expect(sizes.count == 2, "Configured pill heights cannot resize the fixed-height camera row")
+        #expect(sizes.count == 2, "Camera mode keeps its fixed row height when the configured pill height changes")
         screen.send(nil)
         #expect(sizes.last == CGSize(width: 776, height: 512))
         presentation.send((.shelf, true, false, 0))
@@ -193,16 +194,17 @@ struct IslandDashboardViewLayoutTests {
         var delegate: AppDelegate? = AppDelegate()
         weak var weakDelegate = delegate
         let camera = cameraLayout(thickness: 24)
-        let compact = IslandModuleLayout.compactSurface(
+        let requestedCompact = IslandModuleLayout.compactSurface(
             collapsedSize: camera.collapsedFrame.size, overflowWidth: camera.collapsedFrame.width, edge: camera.edge
         ).panelSize
         let coordinator = OverlayCoordinator(contentView: NSView(), layoutEngine: ScreenLayoutEngine(
-            configuration: ScreenLayoutConfiguration(expandedSize: compact, layoutStyle: .pill)
+            configuration: ScreenLayoutConfiguration(expandedSize: requestedCompact, layoutStyle: .pill)
         ))
         coordinator.screenSnapshotProvider = { [cameraScreen] }
         coordinator.updateScreens([cameraScreen], repositionVisiblePanel: false, refreshPersistentPanels: false)
         coordinator.selectActiveDisplay(at: CGPoint(x: cameraScreen.frame.midX, y: cameraScreen.frame.midY))
         defer { coordinator.stop() }
+        let compact = try #require(coordinator.activeLayout?.expandedFrame.size)
         for height: CGFloat in [532, 540, 512] {
             delegate?.updateExpandedPanelSize(
                 CGSize(width: 776, height: height), duringVoiceRecording: true, coordinator: coordinator
