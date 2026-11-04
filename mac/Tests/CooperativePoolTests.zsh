@@ -49,8 +49,7 @@ __attribute__((used)) static struct { const void *replacement; const void *origi
     __attribute__((section("__DATA,__interpose"))) = {limited_global_queue, dispatch_get_global_queue};
 ''')
 library = temporary / "LimitedPool.dylib"
-architecture = subprocess.check_output(["xcrun", "lipo", "-archs", str(host)], text=True).strip()
-subprocess.run([str(swift.parent / "clang"), "-dynamiclib", "-arch", architecture, "-fblocks", "-isysroot", sdk,
+subprocess.run([str(swift.parent / "clang"), "-dynamiclib", "-fblocks", "-isysroot", sdk,
     str(source), "-o", str(library)], check=True)
 environment = dict(os.environ,
     DYLD_FRAMEWORK_PATH=os.pathsep.join(str(platform / "Developer/Library" / directory)
@@ -68,7 +67,8 @@ for index, pattern in enumerate(filters):
         process = subprocess.Popen(["zsh", str(root / "Scripts/swift-test.sh"), "--runner", "/usr/bin/env",
             *(f"{key}={value}" for key, value in environment.items() if key.startswith("DYLD_")),
             str(host), "--test-bundle-path", str(bundle), "--filter", pattern],
-            env=environment, stdout=output, stderr=subprocess.STDOUT, start_new_session=True)
+            env={key: value for key, value in environment.items() if not key.startswith("DYLD_")},
+            stdout=output, stderr=subprocess.STDOUT, start_new_session=True)
         try:
             result = process.wait(timeout=20)
         except subprocess.TimeoutExpired:
