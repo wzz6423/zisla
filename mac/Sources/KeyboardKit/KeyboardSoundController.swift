@@ -249,6 +249,10 @@ public final class KeyboardSoundController: ObservableObject {
         refreshPublishedState()
     }
 
+    public func dailyBriefingTyping(on date: Date) async throws -> DailyBriefingTyping {
+        try await model.typingStats.dailyBriefingTyping(on: date)
+    }
+
     public func stop() {
         model.stop()
     }

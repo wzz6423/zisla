@@ -478,6 +478,45 @@ struct TypingStatsModelTests {
         #expect(!model.isLoadingReport)
     }
 
+    @Test
+    func dailyBriefingFlushesBufferedCharactersAndReadsTheRequestedDay() async throws {
+        let directory = FileManager.default.temporaryDirectory
+            .appendingPathComponent("TypingBriefingTests-\(UUID().uuidString)", isDirectory: true)
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let now = now
+        let store = TypingStatsStore(databaseURL: directory.appendingPathComponent("typing.sqlite"), nowProvider: { now })
+        let model = TypingStatsModel(persistence: store)
+        recordKey(in: model)
+        recordKey(in: model)
+        let report = try await model.dailyBriefingTyping(on: now)
+        #expect(report.characters == 2)
+        #expect(report.topApplication == "Editor")
+        #expect(report.peakHour == Calendar.current.component(.hour, from: now))
+        let empty = try await model.dailyBriefingTyping(on: now.addingTimeInterval(-86400))
+        #expect(empty.characters == 0)
+        #expect(empty.topApplication == nil)
+        #expect(empty.peakHour == nil)
+    }
+
+    @Test
+    func dailyBriefingSurfacesFailedFlushAndRetryPreservesCharacters() async throws {
+        let directory = FileManager.default.temporaryDirectory
+            .appendingPathComponent("TypingBriefingFailureTests-\(UUID().uuidString)", isDirectory: true)
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let now = now
+        let store = TypingStatsStore(databaseURL: directory.appendingPathComponent("typing.sqlite"), nowProvider: { now })
+        let persistence = FailingTypingStatsPersistence(store: store)
+        let model = TypingStatsModel(persistence: persistence)
+        recordKey(in: model)
+        await persistence.setFailures(record: true)
+        await #expect(throws: (any Error).self) { try await model.dailyBriefingTyping(on: now) }
+        await persistence.setFailures()
+        let report = try await model.dailyBriefingTyping(on: now)
+        #expect(report.characters == 1)
+        await persistence.setFailures(report: true)
+        await #expect(throws: (any Error).self) { try await model.dailyBriefingTyping(on: now) }
+    }
+
     private func recordKey(in model: TypingStatsModel) {
         model.recordKeyDown(
             keyCode: 0,

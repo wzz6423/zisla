@@ -1,5 +1,6 @@
 import Combine
 import Foundation
+import ZislaCore
 
 @MainActor
 final class TypingStatsReadStatus: ObservableObject {
@@ -107,6 +108,17 @@ final class TypingStatsModel: ObservableObject {
         guard timelineRange != range else { return }
         timelineRange = range
         Task { await refresh(for: .overview, showsActivity: true) }
+    }
+
+    func dailyBriefingTyping(on date: Date) async throws -> DailyBriefingTyping {
+        guard await flushPending() else { throw CocoaError(.fileWriteUnknown) }
+        let report = try await persistence.loadReport(range: TypingDateRange(startDate: date, endDate: date))
+        return DailyBriefingTyping(
+            characters: report.metrics.characterCount,
+            topApplication: report.applications.max(by: { $0.characterCount < $1.characterCount })?
+                .application.displayName,
+            peakHour: report.metrics.busiestHour?.hour
+        )
     }
 
     /// O(1) hot-path aggregation. No database work or detached task is created per event.

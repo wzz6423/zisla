@@ -448,6 +448,8 @@ struct SettingsView: View {
             }
             if input.selection == .features {
                 settingsGroup("媒体与文件") {
+                    featureToggle("每日简报", detail: "", symbol: "doc.richtext", keyPath: \.dailyBriefing.enabled)
+                    rowDivider
                     featureToggle("媒体播放", detail: "", symbol: "play.square.fill", keyPath: \.mediaEnabled)
                     rowDivider
                     featureToggle(
@@ -1355,6 +1357,9 @@ struct SettingsView: View {
 
     private var infoContent: some View {
         VStack(alignment: .leading, spacing: 20) {
+            settingsGroup("每日简报") {
+                DailyBriefingSettingsView(model: model)
+            }
             workflowContent
 
             settingsGroup("信息与通知") {
@@ -4525,7 +4530,7 @@ enum SettingsSection: String, CaseIterable, Identifiable {
             return settings.screenRecordingEnabled
         case .info:
             return settings.mediaEnabled || settings.systemMonitorEnabled
-                || settings.lockScreenInfoEnabled || settings.sideNoticesEnabled
+                || settings.lockScreenInfoEnabled || settings.sideNoticesEnabled || settings.dailyBriefing.enabled
         case .mail:
             return settings.mailEnabled
         case .ai:
