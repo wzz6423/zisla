@@ -21,8 +21,8 @@ results = test_root / "results"
 results.mkdir()
 tools = test_root / "bin"
 tools.mkdir()
-helper = test_root / "toolchain/usr/libexec/swift/pm/swiftpm-testing-helper"
-helper.parent.mkdir(parents=True)
+compiler = test_root / "toolchain/usr/bin/swiftc"
+compiler.parent.mkdir(parents=True)
 for name in ("Combined", "Duplicate"):
     binary = test_root / "build" / (name + ".xctest") / "Contents/MacOS" / name
     binary.parent.mkdir(parents=True)
@@ -190,9 +190,27 @@ with open(output, "w") as events:
             events.write(json.dumps({"kind": "event", "payload": {"kind": kind, "testID": test}, "version": 0}) + "\n")
     events.write(json.dumps({"kind": "event", "payload": {"kind": "runEnded"}, "version": 0}) + "\n")
 """
-for executable in (tools / "swift", helper):
-    executable.write_text(fake.replace("#!/usr/bin/env python3", "#!" + sys.executable, 1))
-    executable.chmod(0o755)
+(tools / "swift").write_text(fake.replace("#!/usr/bin/env python3", "#!" + sys.executable, 1))
+(tools / "swift").chmod(0o755)
+compiler.write_text("#!" + sys.executable + "\n" + """
+from pathlib import Path
+import os
+import sys
+root = Path(os.environ["SWIFT_TEST_FIXTURE_ROOT"])
+args = sys.argv[1:]
+assert args[:3] == ["-swift-version", "6", "-parse-as-library"]
+assert Path(args[3]).name == "SwiftTestingHost.swift"
+assert args[4:6] == ["-F", str(root / "platform/Developer/Library/Frameworks")]
+assert args[6:8] == ["-sdk", str(root / "sdk")]
+assert args[8] == "-o"
+if os.environ["SWIFT_TEST_MODE"] == "host-build-failure":
+    sys.exit(8)
+host = Path(args[9])
+assert host.name == "swift-testing-host" and str(root / "results") in str(host)
+host.write_text((root / "bin/swift").read_text())
+host.chmod(0o755)
+""")
+compiler.chmod(0o755)
 (tools / "xcrun").write_text("""#!/usr/bin/env python3
 import os
 from pathlib import Path
@@ -201,6 +219,8 @@ root = Path(os.environ["SWIFT_TEST_FIXTURE_ROOT"])
 args = sys.argv[1:]
 if args == ["--find", "swift"]:
     print(root / "toolchain/usr/bin/swift")
+elif args == ["--sdk", "macosx", "--show-sdk-path"]:
+    print(root / "sdk")
 else:
     assert args == ["--sdk", "macosx", "--show-sdk-platform-path"]
     print(root / "platform")
@@ -265,6 +285,7 @@ def run_case(mode, status, selected, workers=None, arguments=(), target="Fixture
     return records
 
 run_case("success", 0, expected)
+run_case("host-build-failure", 8, [])
 run_case("success", 0, expected + ["OtherTests.First/test()"], target="FixtureTests,OtherTests")
 run_case("success", 1, [], target="FixtureTests,MissingTests")
 run_case("success", 1, [], target="FixtureTests,")
