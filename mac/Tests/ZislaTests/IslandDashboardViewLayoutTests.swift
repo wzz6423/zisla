@@ -39,7 +39,7 @@ struct IslandDashboardViewLayoutTests {
         #expect(layout.panelSize.height == layout.islandSize.height + 4)
     }
 
-    @Test(arguments: [CGFloat(24), 32])
+    @Test(arguments: [CGFloat(24), 32, 48])
     func cameraHeaderClearsTheActualCollapsedRowByTwelvePoints(thickness: CGFloat) {
         let screen = ScreenSnapshot(displayID: 7,
             frame: CGRect(x: 0, y: 0, width: 1512, height: 982),
@@ -54,9 +54,7 @@ struct IslandDashboardViewLayoutTests {
         let headerTop = IslandRootView.contentTopInset(layoutStyle: .pill, screenLayout: layout)
         #expect(headerTop - layout.collapsedFrame.height == 12,
                 "The expanded header must keep the requested gap below the camera-aligned row")
-        #expect(layout.collapsedFrame.height == 32,
-                "Camera placement keeps its fixed height regardless of the custom pill preference")
-        #expect(headerTop == 44)
+        #expect(headerTop == ScreenLayoutConfiguration.cameraPillHeight + 12)
         #expect(IslandRootView.contentTopInset(layoutStyle: .notch, screenLayout: layout) == 16,
                 "The original notch layout uses the shared lowered header inset")
     }
@@ -135,7 +133,7 @@ struct IslandDashboardViewLayoutTests {
         #expect(sizes.count == 2, "Panel-frame feedback and activity width cannot restart the same resize")
         screen.send(cameraLayout(thickness: 32))
         #expect(sizes.last == CGSize(width: 776, height: 540))
-        #expect(sizes.count == 2, "The custom pill height cannot resize fixed camera placement")
+        #expect(sizes.count == 2, "Camera mode keeps its fixed row height when the configured pill height changes")
         screen.send(nil)
         #expect(sizes.last == CGSize(width: 776, height: 512))
         presentation.send((.shelf, true, false, 0))
@@ -194,19 +192,17 @@ struct IslandDashboardViewLayoutTests {
     func recordingKeepsTheLatestScreenBudgetWithoutResizingItsCompactSurface() async throws {
         var delegate: AppDelegate? = AppDelegate()
         weak var weakDelegate = delegate
-        let camera = cameraLayout(thickness: 24)
-        let compact = IslandModuleLayout.compactSurface(
-            collapsedSize: camera.collapsedFrame.size,
-            overflowWidth: camera.collapsedFrame.width, edge: camera.edge
+        let requestedCompact = IslandModuleLayout.compactSurface(
+            collapsedSize: CGSize(width: 80, height: 24), overflowWidth: 80, edge: .top
         ).panelSize
         let coordinator = OverlayCoordinator(contentView: NSView(), layoutEngine: ScreenLayoutEngine(
-            configuration: ScreenLayoutConfiguration(expandedSize: compact, layoutStyle: .pill)
+            configuration: ScreenLayoutConfiguration(expandedSize: requestedCompact, layoutStyle: .pill)
         ))
         coordinator.screenSnapshotProvider = { [cameraScreen] }
         coordinator.updateScreens([cameraScreen], repositionVisiblePanel: false, refreshPersistentPanels: false)
         coordinator.selectActiveDisplay(at: CGPoint(x: cameraScreen.frame.midX, y: cameraScreen.frame.midY))
         defer { coordinator.stop() }
-        #expect(coordinator.activeLayout?.expandedFrame.size == compact)
+        let compact = try #require(coordinator.activeLayout?.expandedFrame.size)
         for height: CGFloat in [532, 540, 512] {
             delegate?.updateExpandedPanelSize(
                 CGSize(width: 776, height: height), duringVoiceRecording: true, coordinator: coordinator

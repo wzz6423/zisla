@@ -9,6 +9,13 @@ import ZislaKit
 @MainActor
 @Suite(.serialized)
 struct ScreenRecordingMultitrackUITests {
+    init() {
+        // Native menus stop the current run loop to deliver events; AppKit must own that loop.
+        RunLoop.main.perform(inModes: [.common]) {
+            MainActor.assumeIsolated { NSApplication.shared.run() }
+        }
+    }
+
     @Test(arguments: [AppLanguage.simplifiedChinese, .english, .arabic], [960.0, 1_280.0])
     func studioShowsTheLibraryUniversalTracksAndKeepsOutputControlsInTheToolbar(_ language: AppLanguage, _ width: Double) async throws {
         let previousArguments = UserDefaults.standard.volatileDomain(forName: UserDefaults.argumentDomain)
