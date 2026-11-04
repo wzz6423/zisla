@@ -8,6 +8,8 @@ import ZislaKit
 @testable import Zisla
 
 @MainActor
+// Pixel velocity sampling needs an uncontended AppKit run loop, beyond MainActor isolation.
+@Suite(.serialized)
 struct SideNoticePresenterPillTests {
     @Test(arguments: [IslandLayoutStyle.pill, .notch])
     func cameraAIContentMovesTenPointsInwardWithoutResizingTheIcons(style: IslandLayoutStyle) async throws {
@@ -592,6 +594,64 @@ struct SideNoticePresenterPillTests {
         #expect(panel.alphaValue == 0 && NSScreen.screens.allSatisfy { !$0.frame.intersects(panel.frame) })
     }
 
+    @Test
+    func headphoneTextKeepsAConstantReadingSpeedWhileThePanelReveals() async throws {
+        let fixture = try Fixture(edge: .top)
+        defer { fixture.close() }
+        fixture.screen.frame.origin.x = 20_000
+        fixture.screen.visibleFrame.origin.x = 20_000
+        fixture.settings.settings.islandNotchBackground = .black
+        fixture.settings.settings.collapsedProgressGlowEnabled = false
+        let host = try activeHost(fixture)
+        let panel = try #require(host.window)
+        let notice = IslandNotice(id: "headphone-connection-speed", title: String(repeating: "█    ", count: 20),
+            createdAt: fixture.date, style: .headphone,
+            batteryLevels: [NoticeBatteryLevel(label: "左", level: 100)])
+        fixture.queue.enqueue(notice, expiresAfter: nil)
+        fixture.presenter.setStatusIcons([])
+        let result = try await readingSpeeds(host) { _ in }
+        let speeds = result.speeds
+        #expect(speeds.count >= 6, "The real panel must provide at least six independent velocity windows")
+        #expect(speeds.allSatisfy { abs($0 - 32) <= 8 },
+            "Each 250ms window must move at 32pt/s relative to the expanding text viewport; observed speeds: \(speeds)")
+        #expect(abs(result.slope - 32) <= 1 && result.residual <= 1.5,
+            "The complete trajectory must be linear at 32pt/s; slope \(result.slope), residual \(result.residual)")
+        #expect(panel.alphaValue == 0 && NSScreen.screens.allSatisfy { !$0.frame.intersects(panel.frame) })
+    }
+
+    @Test(arguments: [false, true])
+    func velocitySamplerDistinguishesConstantAndVaryingExternalProgress(varies: Bool) async throws {
+        let clock = ReadingClock()
+        let text = String(repeating: "█    ", count: 100)
+        let host = NSHostingView(rootView: ReadingClockText(clock: clock, text: text))
+        host.sizingOptions = []
+        let window = NSWindow(contentRect: CGRect(x: 20_000, y: 0, width: 222, height: 32),
+            styleMask: .borderless, backing: .buffered, defer: false)
+        window.isReleasedWhenClosed = false
+        window.contentView = host
+        defer { window.contentView = nil; window.close() }
+        let scale = window.backingScaleFactor
+        let textWidth = ceil((text as NSString).size(withAttributes: [
+            .font: NSFont.systemFont(ofSize: 11, weight: .regular)
+        ]).width * scale) / scale
+        let result = try await readingSpeeds(host) { elapsed in
+            let distance = elapsed * 32 + (varies ? 10 * sin(elapsed * 2 * .pi) : 0)
+            clock.progress = distance / Double(textWidth - 168)
+        }
+        let speeds = result.speeds
+        #expect(speeds.count >= 6)
+        if varies {
+            #expect(speeds.contains { abs($0 - 32) > 8 },
+                "The pixel sampler must detect an intentionally nonuniform driver: \(speeds)")
+        } else {
+            #expect(speeds.allSatisfy { abs($0 - 32) <= 8 },
+                "The same offscreen sampler must read a known 32pt/s external driver: \(speeds)")
+            #expect(abs(result.slope - 32) <= 1 && result.residual <= 1.5,
+                "Linear calibration slope \(result.slope), residual \(result.residual)")
+        }
+        #expect(!window.isVisible)
+    }
+
     @Test(arguments: [IslandLayoutStyle.pill, .notch])
     func shorteningACollapsedBarKeepsThePreviousDrawingAreaUntilTheFoldFinishes(style: IslandLayoutStyle) throws {
         let fixture = try Fixture(edge: .top)
@@ -830,6 +890,112 @@ struct SideNoticePresenterPillTests {
         for _ in 0..<10 { await Task.yield() }
         #expect(!panel.isVisible && panel.frame == stopped)
         #expect(host.rootView.content.displayState.compactLayout == nil)
+    }
+
+    private func readingSpeeds(_ host: NSView, beforeFrame: @MainActor (Double) throws -> Void) async throws
+        -> (speeds: [Double], slope: Double, residual: Double) {
+        let clock = ContinuousClock()
+        let started = clock.now
+        var previousPhase: CGFloat?
+        var period: CGFloat?
+        var displacement: CGFloat = 0
+        var anchor: (time: Double, displacement: CGFloat)?
+        var motionOrigin: (time: Double, displacement: CGFloat)?
+        var speeds: [Double] = []
+        var positions: [(time: Double, distance: Double)] = []
+        func advanceFrame() {
+            RunLoop.main.run(mode: .default, before: Date().addingTimeInterval(1.0 / 120))
+        }
+        while started.duration(to: clock.now) < .seconds(2.5) {
+            let updateTime = started.duration(to: clock.now).components
+            try beforeFrame(Double(updateTime.seconds) + Double(updateTime.attoseconds) / 1e18)
+            // Yield a frame cadence so AppKit can commit; elapsed time still comes from the monotonic clock.
+            try await Task.sleep(for: .milliseconds(16))
+            advanceFrame()
+            host.layoutSubtreeIfNeeded()
+            let bitmap = try #require(host.bitmapImageRepForCachingDisplay(in: host.bounds))
+            host.cacheDisplay(in: host.bounds, to: bitmap)
+            let duration = started.duration(to: clock.now).components
+            let time = Double(duration.seconds) + Double(duration.attoseconds) / 1e18
+            let scale = CGFloat(bitmap.pixelsWide) / host.bounds.width
+            let center = bitmap.pixelsHigh / 2
+            let background = try (0..<bitmap.pixelsWide).filter { x in
+                try #require(bitmap.colorAt(x: x, y: center)?.usingColorSpace(.sRGB)).alphaComponent > 0.9
+            }
+            let leading = try #require(background.first) + Int(42 * scale)
+            let trailing = try #require(background.last) - Int(12 * scale)
+            var edges: [CGFloat] = []
+            var previousInk = true
+            if trailing > leading {
+                for x in leading..<trailing {
+                    let ink = try (0..<bitmap.pixelsHigh).contains { y in
+                        try #require(bitmap.colorAt(x: x, y: y)?.usingColorSpace(.sRGB)).redComponent > 0.3
+                    }
+                    if ink && !previousInk { edges.append(CGFloat(x - leading) / scale) }
+                    previousInk = ink
+                }
+            }
+            if edges.count >= 2 {
+                if period == nil { period = (edges.last! - edges[0]) / CGFloat(edges.count - 1) }
+                let phase = edges[0]
+                if let previousPhase, let period {
+                    var movement = previousPhase - phase
+                    // Unwrap the pattern so a marker crossing the clip does not look like reverse motion.
+                    if movement < -period / 2 { movement += period }
+                    if movement > period / 2 { movement -= period }
+                    displacement += movement
+                }
+                previousPhase = phase
+                if anchor == nil {
+                    if let origin = motionOrigin, displacement > origin.displacement {
+                        if displacement - origin.displacement >= 1 {
+                            anchor = origin
+                            positions.append((origin.time, Double(origin.displacement)))
+                        }
+                    } else {
+                        motionOrigin = (time, displacement)
+                    }
+                }
+                if let checkpoint = anchor {
+                    positions.append((time, Double(displacement)))
+                    if time - checkpoint.time >= 0.25 {
+                        speeds.append(Double(displacement - checkpoint.displacement) / (time - checkpoint.time))
+                        anchor = (time, displacement)
+                    }
+                }
+            }
+            await withCheckedContinuation { continuation in
+                DispatchQueue.main.async { continuation.resume() }
+            }
+        }
+        try #require(positions.count >= 2, "The text must begin a measurable forward pass")
+        let count = Double(positions.count)
+        let meanTime = positions.reduce(0) { $0 + $1.time } / count
+        let meanDistance = positions.reduce(0) { $0 + $1.distance } / count
+        let covariance = positions.reduce(0) { $0 + ($1.time - meanTime) * ($1.distance - meanDistance) }
+        let variance = positions.reduce(0) { $0 + pow($1.time - meanTime, 2) }
+        let slope = covariance / variance
+        let residual = positions.map { abs($0.distance - meanDistance - slope * ($0.time - meanTime)) }.max()!
+        return (speeds, slope, residual)
+    }
+
+    @MainActor
+    private final class ReadingClock: ObservableObject {
+        @Published var progress: Double = 0
+    }
+
+    private struct ReadingClockText: View {
+        @ObservedObject var clock: ReadingClock
+        let text: String
+
+        var body: some View {
+            MarqueeText(text, font: .system(size: 11, weight: .medium), textColor: .white,
+                repeats: false, scrollProgress: clock.progress)
+                .frame(width: 168, height: 32)
+                .padding(.leading, 42)
+                .padding(.trailing, 12)
+                .background(.black)
+        }
     }
 
     private static let notchedScreen = ScreenSnapshot(displayID: 7,

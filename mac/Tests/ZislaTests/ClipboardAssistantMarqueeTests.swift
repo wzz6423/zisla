@@ -305,11 +305,13 @@ struct ClipboardAssistantMarqueeTests {
             let naturalWidth = (text as NSString).size(withAttributes: [
                 .font: NSFont.systemFont(ofSize: fontSize, weight: weight == .medium ? .medium : .regular)
             ]).width
-            let travel = max(0, ceil(naturalWidth * displayScale) / displayScale - width)
+            let textWidth = ceil(naturalWidth * displayScale) / displayScale
+            let travel = max(0, textWidth - width)
+            let distance = min(textWidth * progress, travel)
             Text(text).font(.system(size: fontSize)).fontWeight(weight)
                 .foregroundStyle(.white.opacity(opacity))
                 .lineLimit(1).fixedSize(horizontal: true, vertical: false)
-                .offset(x: direction == .leftToRight ? -travel * progress : travel * (progress - 1))
+                .offset(x: direction == .leftToRight ? -distance : distance - travel)
                 .frame(width: width, alignment: .leading).clipped()
         }
     }

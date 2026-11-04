@@ -11,25 +11,33 @@ struct CompactStatusBarAnimationTests {
     func statusTextKeepsItsOwnScrollAnimationInsideTheSurface(text: String, reduceMotion: Bool) async throws {
         let size = CGSize(width: 120, height: 32)
         let frame = CGRect(origin: .zero, size: size)
-        var animations: [Animation] = []
-        func host(progress: Double?, staticReference: Bool = false) -> NSHostingView<some View> {
+        func host(progress: Double?, reference: Bool = false) -> NSHostingView<some View> {
             NSHostingView(rootView: CompactStatusBarSurface(frame: frame, panelFrame: frame) { _ in
                 let marquee = MarqueeText(text, font: .system(size: 11, weight: .medium), textColor: .white,
                     pointsPerSecond: TransientNoticeMetrics.pointsPerSecond, repeats: false, scrollProgress: progress)
                 Group {
-                    if staticReference {
-                        marquee.marqueeLabel
-                            .truncationMode(.tail)
+                    if reference {
+                        if reduceMotion {
+                            marquee.marqueeLabel
+                                .truncationMode(.tail)
+                                .frame(maxWidth: .infinity, alignment: .leading)
+                        } else {
+                            ViewThatFits(in: .horizontal) {
+                                marquee.marqueeLabel.fixedSize(horizontal: true, vertical: false)
+                                marquee.marqueeLabel.fixedSize(horizontal: true, vertical: false)
+                                    .offset(x: -32)
+                                    .frame(width: size.width, alignment: .leading).clipped()
+                            }
                             .frame(maxWidth: .infinity, alignment: .leading)
+                        }
                     } else {
                         marquee
                     }
                 }
                 .frame(width: size.width, height: size.height)
                 .transaction { transaction in
-                    if let animation = transaction.animation {
-                        animations.append(animation)
-                        transaction.animation = Animation(FrozenProgress())
+                    if transaction.animation != nil {
+                        transaction.animation = Animation(FrozenDistance(distance: 32))
                     }
                 }
             }
@@ -38,7 +46,7 @@ struct CompactStatusBarAnimationTests {
             .environment(\._accessibilityReduceMotion, reduceMotion))
         }
         let actual = host(progress: nil)
-        let expected = host(progress: 0.5, staticReference: reduceMotion)
+        let expected = host(progress: 0, reference: true)
         let head = host(progress: 0)
         let tail = host(progress: 1)
         let windows = [actual, expected, head, tail].map { content in
@@ -78,14 +86,6 @@ struct CompactStatusBarAnimationTests {
             if matches { break }
         }
         #expect(matches, "Status text must retain its own animation and honor Reduce Motion; head/half/tail pixel differences: \(referenceDifferences)")
-        if !reduceMotion, text == String(repeating: "天", count: 30) {
-            let scale = windows[0].backingScaleFactor
-            let width = ceil((text as NSString).size(withAttributes: [
-                .font: NSFont.systemFont(ofSize: 11, weight: .regular)
-            ]).width * scale) / scale
-            #expect(animations.contains(.linear(duration: Double(width - size.width) / 32)),
-                "Automatic text must retain its 32pt/s reading speed inside the island surface: \(animations)")
-        }
         #expect(windows.allSatisfy { !$0.isVisible })
     }
 
@@ -217,6 +217,14 @@ struct CompactStatusBarAnimationTests {
             }
         }
         return bounds
+    }
+
+    private struct FrozenDistance: CustomAnimation {
+        let distance: Double
+
+        func animate<V: VectorArithmetic>(value: V, time: TimeInterval, context: inout AnimationContext<V>) -> V? {
+            value.scaled(by: min(1, distance / sqrt(value.magnitudeSquared)))
+        }
     }
 
     private struct FrozenProgress: CustomAnimation {

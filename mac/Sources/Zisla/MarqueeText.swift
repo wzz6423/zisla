@@ -56,7 +56,7 @@ struct MarqueeText: View {
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var textWidth: CGFloat = 0
     @State private var containerWidth: CGFloat = 0
-    @State private var automaticScrollProgress: CGFloat = 0
+    @State private var automaticScrollDistance: CGFloat = 0
 
     var body: some View {
         ZStack(alignment: .leading) {
@@ -65,7 +65,7 @@ struct MarqueeText: View {
                     if let scrollProgress, !repeats {
                         marqueeLabel
                             .fixedSize(horizontal: true, vertical: false)
-                            .modifier(ScrollingOffset(progress: CGFloat(scrollProgress),
+                            .modifier(ScrollingOffset(distance: scrollTravel * CGFloat(scrollProgress),
                                                       travel: scrollTravel, direction: scrollDirection))
                     } else {
                         Group {
@@ -79,7 +79,7 @@ struct MarqueeText: View {
                             }
                         }
                         .fixedSize(horizontal: true, vertical: false)
-                        .modifier(ScrollingOffset(progress: automaticScrollProgress,
+                        .modifier(ScrollingOffset(distance: automaticScrollDistance,
                                                   travel: scrollTravel, direction: scrollDirection))
                     }
                 }
@@ -104,16 +104,18 @@ struct MarqueeText: View {
             var transaction = Transaction(animation: nil)
             transaction.disablesAnimations = true
             withTransaction(transaction) {
-                automaticScrollProgress = 0
+                automaticScrollDistance = 0
             }
             guard needsScroll, scrollProgress == nil, pointsPerSecond > 0 else { return }
 
             await Task.yield()
             guard !Task.isCancelled else { return }
-            let duration = max(0.01, Double(scrollTravel) / pointsPerSecond)
+            // Viewport changes must not change the animation's distance-per-second scale.
+            let distance = textWidth + (repeats ? gap : 0)
+            let duration = max(0.01, Double(distance) / pointsPerSecond)
             let animation = Animation.linear(duration: duration)
             withAnimation(repeats ? animation.repeatForever(autoreverses: false) : animation) {
-                automaticScrollProgress = 1
+                automaticScrollDistance = distance
             }
         }
         .overlay(alignment: .leading) {
@@ -161,7 +163,7 @@ struct MarqueeText: View {
         AutomaticAnimationIdentity(
             text: text,
             textWidth: textWidth,
-            containerWidth: containerWidth,
+            needsScroll: needsScroll,
             pointsPerSecond: pointsPerSecond,
             gap: gap,
             direction: scrollDirection,
@@ -182,20 +184,20 @@ struct MarqueeText: View {
     }
 
     private struct ScrollingOffset: ViewModifier, Animatable {
-        var progress: CGFloat
+        var distance: CGFloat
         let travel: CGFloat
         let direction: MarqueeScrollDirection
 
         nonisolated var animatableData: CGFloat {
-            get { progress }
-            set { progress = newValue }
+            get { distance }
+            set { distance = newValue }
         }
 
         func body(content: Content) -> some View {
-            let progress = min(max(progress, 0), 1)
+            let distance = min(max(distance, 0), travel)
             let offset = switch direction {
-            case .left: -travel * progress
-            case .right: travel * (progress - 1)
+            case .left: -distance
+            case .right: distance - travel
             }
             content.offset(x: offset)
         }
@@ -204,7 +206,7 @@ struct MarqueeText: View {
     private struct AutomaticAnimationIdentity: Hashable {
         let text: String
         let textWidth: CGFloat
-        let containerWidth: CGFloat
+        let needsScroll: Bool
         let pointsPerSecond: Double
         let gap: CGFloat
         let direction: MarqueeScrollDirection
