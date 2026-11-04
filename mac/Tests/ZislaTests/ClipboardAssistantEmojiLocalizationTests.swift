@@ -4,8 +4,8 @@ import ZislaCore
 
 @testable import Zisla
 
-/// Emoji 名称识别新增文案：任一语言缺 key 都会让界面静默退回中文原文，
-/// 因此逐语言核对资源，让漏翻译时测试先失败。
+/// Missing emoji-recognition keys silently fall back to Chinese in any language,
+/// so each language's resources are checked to catch missing translations.
 struct ClipboardAssistantEmojiLocalizationTests {
     private static let keys = ["Emoji 名称", "复制 Emoji"]
 

@@ -1032,11 +1032,106 @@ struct SideNoticeLayoutTests {
         ))
 
         #expect(focusTransitionFrame.width == 240)
-        #expect(headphoneFrame.width == 380)
-        #expect(headphoneFrame.width == focusTransitionFrame.width + 140)
+        #expect(headphoneFrame.width > focusTransitionFrame.width)
+        #expect(headphoneFrame.width < 380, "A short device name must not keep the old fixed-width wings")
         #expect(petAnchorFrame == headphoneFrame)
         #expect(latestFocusFrame == focusTransitionFrame)
-        #expect(simulatedHeadphoneFrame.width == engine.compactBarFrame(for: simulated).width)
+        #expect(simulatedHeadphoneFrame.width < engine.compactBarFrame(for: simulated).width)
+    }
+
+    @Test(arguments: [false, true], [IslandLayoutStyle.notch, .pill])
+    func headphoneNamesExpandTheCompactFrameOnlyWhileTheNoticeIsSelected(physical: Bool, style: IslandLayoutStyle) throws {
+        let screen = physical ? physicalNotchScreen() : ScreenSnapshot(displayID: 7,
+            frame: CGRect(x: 1_512, y: -120, width: 1_440, height: 900),
+            visibleFrame: CGRect(x: 1_512, y: -120, width: 1_440, height: 876))
+        let referenceDate = Date(timeIntervalSinceReferenceDate: 0)
+        let short = IslandNotice(id: "headphone-short", title: "AirPods", createdAt: referenceDate,
+            style: .headphone, batteryLevels: [
+                NoticeBatteryLevel(label: "左", level: 100),
+                NoticeBatteryLevel(label: "右", level: 98),
+                NoticeBatteryLevel(label: "盒", level: 99),
+            ])
+        var long = short
+        long.title = "三年后的 AirPods Pro 第二代"
+        let settings = FeatureSettings(islandLayoutStyle: style)
+        let idle = ScreenLayoutEngine(configuration: settings.islandScreenConfiguration).layout(for: screen)
+        let shortFrame = try #require(engine.compactBarFrame(for: screen, notices: [short], settings: settings))
+        let longFrame = try #require(engine.compactBarFrame(for: screen, notices: [long], settings: settings))
+        #expect(longFrame.width > shortFrame.width,
+            "A longer headphone name must receive more space before the label is scaled or truncated")
+        #expect(longFrame.maxY == shortFrame.maxY)
+        #expect(longFrame.height == shortFrame.height)
+        #expect(longFrame.midX == idle.collapsedFrame.midX)
+        #expect(longFrame == engine.compactBarFrame(for: idle, notices: [long], settings: settings))
+        let focus = IslandNotice(id: "focus-transition", title: "Work",
+            createdAt: referenceDate.addingTimeInterval(1))
+        #expect(engine.compactBarFrame(for: screen, notices: [long, focus], settings: settings)
+            == engine.compactBarFrame(for: screen, notices: [focus], settings: settings),
+            "A queued headphone notice must not keep another status wide")
+        let voice = IslandNotice(id: "voice-processing-left", title: "Processing")
+        #expect(engine.compactBarFrame(for: screen, notices: [long, voice], settings: settings)
+            == engine.compactBarFrame(for: screen, notices: [voice], settings: settings))
+        var mediaFirst = settings
+        mediaFirst.compactStatusPriority = [.media, .transient]
+        let media = IslandNotice(id: "media-active-fixture", title: "Music")
+        #expect(engine.compactBarFrame(for: screen, notices: [long, media], settings: mediaFirst)
+            == engine.compactBarFrame(for: screen, notices: [media], settings: mediaFirst))
+        #expect(engine.compactBarFrame(for: screen, notices: [], settings: settings) == nil)
+    }
+
+    @Test
+    func emptyHeadphoneIdentityStillFitsThreeBatteryRingsOutsideTheNotch() throws {
+        let screen = physicalNotchScreen()
+        let notice = IslandNotice(id: "headphone-empty", title: "", detail: "", style: .headphone,
+            batteryLevels: (0..<3).map { NoticeBatteryLevel(label: String($0), level: 100) })
+        let frame = try #require(engine.compactBarFrame(for: screen, notices: [notice], settings: FeatureSettings()))
+        let anchor = ScreenLayoutEngine().layout(for: screen).topology.anchorFrame
+        let wingWidth = (frame.width - anchor.width) / 2
+        #expect(wingWidth >= 20 * 3 + 4 * 2 + 6,
+            "Missing identity text cannot let the battery row overlap the physical notch")
+        #expect(wingWidth < 80, "An empty name must not reserve a minimum text column")
+        #expect(frame == engine.compactBarFrame(for: ScreenLayoutEngine().layout(for: screen),
+            notices: [notice], settings: FeatureSettings()))
+    }
+
+    @Test(arguments: [false, true])
+    func headphoneStyleDoesNotExpandAnUnrelatedSelectedStatus(physical: Bool) throws {
+        let screen = physical ? physicalNotchScreen() : ScreenSnapshot(displayID: 7,
+            frame: CGRect(x: 0, y: 0, width: 1_440, height: 900),
+            visibleFrame: CGRect(x: 0, y: 0, width: 1_440, height: 876))
+        var settings = FeatureSettings()
+        settings.compactStatusPriority = [.aiActivity, .transient]
+        let normal = IslandNotice(id: "ai-active-fixture", title: String(repeating: "长", count: 100))
+        var headphoneStyled = normal
+        headphoneStyled.style = .headphone
+        let expected = try #require(engine.compactBarFrame(for: screen, notices: [normal], settings: settings))
+        #expect(engine.compactBarFrame(for: screen, notices: [headphoneStyled], settings: settings) == expected,
+            "A notice's style cannot override the configured selected status")
+        #expect(engine.compactBarFrame(for: ScreenLayoutEngine().layout(for: screen),
+            notices: [headphoneStyled], settings: settings) == expected)
+    }
+
+    @Test(arguments: [false, true], [IslandLayoutStyle.notch, .pill])
+    func headphoneNamesRemainBoundedByTheScreenAndExistingCompactLimit(physical: Bool, style: IslandLayoutStyle) throws {
+        let notice = IslandNotice(id: "headphone-long", title: String(repeating: "长", count: 1_000),
+            style: .headphone)
+        for screenWidth in [CGFloat(180), 320, 1_512] {
+            let screen = ScreenSnapshot(displayID: 42,
+                frame: CGRect(x: -screenWidth, y: -200, width: screenWidth, height: 982),
+                visibleFrame: CGRect(x: -screenWidth, y: -200, width: screenWidth, height: 950),
+                safeAreaInsets: ScreenInsets(top: physical ? 32 : 0),
+                auxiliaryTopLeftArea: physical ? CGRect(x: -screenWidth, y: 750,
+                    width: screenWidth / 2 - 40, height: 32) : nil,
+                auxiliaryTopRightArea: physical ? CGRect(x: -screenWidth / 2 + 40, y: 750,
+                    width: screenWidth / 2 - 40, height: 32) : nil)
+            let settings = FeatureSettings(islandLayoutStyle: style)
+            let frame = try #require(engine.compactBarFrame(for: screen, notices: [notice], settings: settings))
+            #expect(frame.width <= min(screenWidth, ScreenLayoutConfiguration.quickActionRowWidth),
+                "Even a very long device name must not expand beyond the existing compact layout limit")
+            #expect(screen.frame.contains(frame))
+            #expect(frame == engine.compactBarFrame(for: ScreenLayoutEngine(configuration: settings.islandScreenConfiguration).layout(for: screen),
+                notices: [notice], settings: settings))
+        }
     }
 
     @Test
@@ -1056,7 +1151,7 @@ struct SideNoticeLayoutTests {
                 #expect(actual.height == max(36, menuHeight))
                 #expect(actual.maxY == screenFrame.maxY)
                 #expect(actual.midX == idle.midX)
-                #expect(actual.width == idle.width)
+                #expect(actual.width < idle.width, "The short connection row must tighten its unused horizontal space")
                 #expect(actual == overlay)
                 #expect(idle.height == menuHeight)
             }
@@ -1085,7 +1180,8 @@ struct SideNoticeLayoutTests {
         let physicalHeadphone = try #require(engine.compactBarFrame(for: physical, notices: [headphone], settings: FeatureSettings()))
         #expect(physicalHeadphone.height == physicalIdle.height)
         #expect(physicalHeadphone.maxY == physicalIdle.maxY)
-        #expect(physicalHeadphone.width == 380)
+        #expect(physicalHeadphone.width > physicalIdle.width)
+        #expect(physicalHeadphone.width < 380)
     }
 
     @Test

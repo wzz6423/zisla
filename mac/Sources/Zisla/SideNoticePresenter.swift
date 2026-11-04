@@ -26,7 +26,7 @@ final class SideNoticePresenter {
     private var availableStatusIcons: [IslandStatusIcon] {
         statusIcons.filter { !$0.isSystemMonitor || settingsStore.settings.systemMonitorEnabled }
     }
-    var onCompactLayoutChanged: ((CGDirectDisplayID, Bool, CGFloat?, CGSize?) -> Void)?
+    var onCompactLayoutChanged: ((CGDirectDisplayID, Bool, CGFloat?, CGFloat?, CGSize?) -> Void)?
     private var isStopped = false
     private let now: () -> Date
     private let reduceMotion: () -> Bool
@@ -231,7 +231,8 @@ final class SideNoticePresenter {
             )
             displayState.statusIcons = configuration.statusIconSize == nil ? [] : availableStatusIcons
             onCompactLayoutChanged?(snapshot.displayID, configuration.expandsForDetailedStatus,
-                                    configuration.compactStatusLength, configuration.statusIconSize)
+                                    configuration.compactStatusLength, configuration.compactStatusSideWidth,
+                                    configuration.statusIconSize)
             if hidesPanels {
                 panels.orderOut()
                 continue
@@ -326,6 +327,7 @@ final class SideNoticePresenter {
         )
         configuration.expandsForDetailedStatus = sizing?.expandsForDetailedStatus == true
         configuration.compactStatusLength = sizing?.customPillLength
+        configuration.compactStatusSideWidth = sizing?.compactStatusSideWidth
         if configuration.layoutStyle == .pill, configuration.placement.mode == .custom,
            let presentation = sizing?.customPillPresentation {
             let text = CompactPillStatusContent.displayText(
@@ -333,7 +335,7 @@ final class SideNoticePresenter {
             )
             configuration.compactStatusLength = presentation.length(
                 thickness: max(configuration.pillSize.height, CompactPillStatusPresentation.minimumThickness),
-                edge: configuration.placement.edge, text: text
+                edge: configuration.placement.edge, text: text, item: media.snapshot
             )
         }
         let selectedPriority = SideNoticeLayoutEngine.selectedCompactStatusPriority(
@@ -415,6 +417,7 @@ final class SideNoticePresenter {
             for: notices, at: now(), statusHidden: displayState?.compactStatusHidden == true
         )
         onCompactLayoutChanged?(displayID, configuration.expandsForDetailedStatus, configuration.compactStatusLength,
+                                configuration.compactStatusSideWidth,
                                 configuration.statusIconSize)
     }
 
@@ -446,13 +449,14 @@ final class SideNoticePresenter {
             panels.hideCompactBar()
             return
         }
+        let targetPanelFrame = frame.integral
         if layout.topology.hasPhysicalNotch {
             displayState.compactBarCenterInset = layout.topology.anchorFrame.width
         }
         let panel = ensureCompactBarPanel(in: panels)
         if !panel.isVisible {
             let anchor = layout.collapsedFrame
-            let canvas = reduceMotion() ? frame : anchor.union(frame)
+            let canvas = reduceMotion() ? targetPanelFrame : anchor.union(frame).integral
             displayState.compactLayout = CompactStatusBarLayout(frame: anchor, panelFrame: canvas, animation: nil)
             panel.setFrame(canvas, display: true)
             panel.contentView?.layoutSubtreeIfNeeded()
@@ -476,7 +480,7 @@ final class SideNoticePresenter {
                 panels.hideCompactBar()
                 return
             }
-            let panelFrame = animated ? panel.frame.union(frame) : frame
+            let panelFrame = animated ? panel.frame.union(frame).integral : targetPanelFrame
             let previous = displayState.compactLayout?.frame ?? panel.frame
             let isGrowing = displayState.islandEdge.isVertical
                 ? frame.height > previous.height : frame.width > previous.width
@@ -487,7 +491,7 @@ final class SideNoticePresenter {
             panels.compactConfiguration = configuration
             panels.compactScreenFrame = snapshot.frame
             if panel.frame != panelFrame { panel.setFrame(panelFrame, display: true) }
-            if panelFrame != frame || !showsCompactBar {
+            if panelFrame != targetPanelFrame || !showsCompactBar {
                 panels.compactResizeTask = Task { @MainActor [weak panels, weak panel, waitForCompactResize] in
                     try? await waitForCompactResize(ZislaMotion.islandRecycleSettleDelay)
                     guard !Task.isCancelled, let panels, let panel else { return }
@@ -496,9 +500,9 @@ final class SideNoticePresenter {
                         return
                     }
                     panels.displayState.compactLayout = CompactStatusBarLayout(
-                        frame: frame, panelFrame: frame, animation: nil
+                        frame: frame, panelFrame: targetPanelFrame, animation: nil
                     )
-                    panel.setFrame(frame, display: true)
+                    panel.setFrame(targetPanelFrame, display: true)
                     panels.compactResizeTask = nil
                 }
             }

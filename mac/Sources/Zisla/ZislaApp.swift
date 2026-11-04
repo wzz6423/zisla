@@ -456,27 +456,21 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
             pillSize: CGSize(width: model.settingsStore.settings.islandPillWidth, height: model.settingsStore.settings.islandPillHeight),
             edgeInset: model.settingsStore.settings.islandEdgeInset
         ))
+        let persistentPetRootView = { (layout: ScreenOverlayLayout) in
+            AppLanguageEnvironment(languageStore: model.languageStore, content: CollapsedPetView(
+                model: model, petController: petController,
+                isOnPhysicalNotch: layout.topology.hasPhysicalNotch, screenLayout: layout
+            ))
+        }
         let coordinator = OverlayCoordinator(
             contentView: hostingView,
             layoutEngine: engine,
-            persistentContentViewProvider: { [weak petController] layout in
-                guard let petController else { return nil }
-                let persistentPetView = CollapsedPetView(
-                    model: model,
-                    petController: petController,
-                    isOnPhysicalNotch: layout.topology.hasPhysicalNotch,
-                    screenLayout: layout
-                )
-                let persistentPetHostingView = NSHostingView(
-                    rootView: AppLanguageEnvironment(
-                        languageStore: model.languageStore,
-                        content: persistentPetView
-                    )
-                )
+            persistentContentViewProvider: { layout in
+                let persistentPetHostingView = NSHostingView(rootView: persistentPetRootView(layout))
                 persistentPetHostingView.sizingOptions = []
                 return persistentPetHostingView
             },
-            persistentPanelFrameProvider: { [weak self] layout in
+            persistentPanelFrameProvider: { [weak self, weak petController] layout in
                 let notices = PersistentPetNoticePolicy.notices(
                     model.aiResultSweep.presentationNotices(from: model.notices.left + model.notices.right),
                     isVoiceRecording: model.voiceInput.isCapturingInput,
@@ -491,8 +485,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
                         settings: model.settingsStore.settings,
                         browserDownloadCount: model.settingsStore.settings.showsBrowserDownloadProgress
                             ? model.browserDownloads.snapshots.count : 0
-                    )
+                    ),
+                    petAspectRatio: petController?.sprite.map { $0.frameSize.width / $0.frameSize.height } ?? 1
                 )
+            },
+            persistentContentViewUpdater: { contentView, layout in
+                let hostingView = contentView as! NSHostingView<AppLanguageEnvironment<CollapsedPetView>>
+                hostingView.rootView = persistentPetRootView(layout)
             }
         )
         coordinator.onVisibilityChanged = { [weak self] visible in
@@ -670,9 +669,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
             displayIDs: model.settingsStore.settings.activityNoticeDisplayIDs,
             isScreenLocked: lockScreenOverlayController.isScreenLocked
         )
-        noticePresenter?.onCompactLayoutChanged = { [weak coordinator] displayID, expanded, length, iconSize in
+        noticePresenter?.onCompactLayoutChanged = { [weak coordinator] displayID, expanded, length, sideWidth, iconSize in
             guard coordinator?.activeDisplayID == displayID else { return }
             coordinator?.updateCompactStatus(expandsForDetailedStatus: expanded, compactStatusLength: length,
+                                             compactStatusSideWidth: sideWidth,
                                               statusIconSize: iconSize)
         }
         configureMainMenu()
@@ -821,6 +821,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
 
         Publishers.MergeMany(
             model.settingsStore.$settings.map { _ in () }.eraseToAnyPublisher(),
+            petController.$sprite.map { _ in () }.eraseToAnyPublisher(),
             model.notices.$left.map { _ in () }.eraseToAnyPublisher(),
             model.notices.$right.map { _ in () }.eraseToAnyPublisher(),
             model.aiResultSweep.$current.map { _ in () }.eraseToAnyPublisher(),

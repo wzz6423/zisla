@@ -3545,8 +3545,8 @@ final class ScreenshotToolbarDragHandleView: NSView {
 
 enum ScreenshotToolbarLayout {
     static let controlCount = 19
-    /// Chinese fits every toolbar label in a 60pt cell (widest: 取消置顶 at 40pt). The same words run
-    /// 61–145pt in other languages, and growing every equal cell to fit would push the rail beyond
+    /// Chinese fits every toolbar label in a 60pt cell (widest: the Chinese "Unpin" label at 40pt).
+    /// The same words run 61–145pt in other languages, and growing every equal cell to fit would push the rail beyond
     /// the viewport and clip tools away. Those languages drop to icons only —
     /// every button already carries the full wording in `.help`.
     static var controlWidth: CGFloat { showsControlTitles ? 60 : 34 }
@@ -3599,7 +3599,7 @@ enum ScreenshotToolbarLayout {
     }
 
     /// The obscure panel's strength labels share a 36pt column, which every Chinese wording fits
-    /// (widest: 模糊度 at 33pt). Translations run to 89pt (de "Weichzeichnung"), so widen the column
+    /// (widest: the Chinese blur label at 33pt). Translations run to 89pt for German, so widen the column
     /// by the overflow only: Chinese keeps its 36pt and the popover grows instead of truncating.
     static var obscureStrengthLabelWidth: CGFloat {
         obscureStrengthLabelWidth(for: AppLocalization.currentLanguage)
@@ -7113,8 +7113,8 @@ enum ScreenshotPinnedLayout {
     static let dragHandleWidth = ScreenshotToolbarLayout.dragHandleWidth
     static let buttonWidth: CGFloat = 46
     static let scaleLabelWidth: CGFloat = 32
-    /// Chinese "透明度" (27pt) fits the 98pt baseline, but translations run to 67pt (ru
-    /// "Прозрачность") and would squeeze the 54pt slider out of the row. Widen the pill by exactly
+    /// The Chinese opacity label (27pt) fits the 98pt baseline, but the Russian translation runs to 67pt
+    /// and would squeeze the 54pt slider out of the row. Widen the pill by exactly
     /// the overflow so the Chinese layout keeps its original 98pt.
     static var opacityControlWidth: CGFloat {
         opacityControlWidth(for: AppLocalization.currentLanguage)

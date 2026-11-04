@@ -248,6 +248,42 @@ struct IslandPlacementLayoutTests {
         #expect(quickAction.expandedFrame.contains(quickAction.collapsedFrame))
     }
 
+    @Test(arguments: [CGFloat(0), 80, 200])
+    func cameraHeadphoneSidesUseTheirContentBudgetAndRestoreOrdinaryStatus(reservedWidth: CGFloat) throws {
+        let frame = CGRect(x: -1512, y: 200, width: 1512, height: 982)
+        let snapshot = ScreenSnapshot(displayID: 4, frame: frame,
+            visibleFrame: CGRect(x: frame.minX, y: frame.minY, width: frame.width, height: frame.height - 44),
+            safeAreaInsets: ScreenInsets(top: 44),
+            auxiliaryTopLeftArea: reservedWidth > 0 ? CGRect(x: frame.minX, y: frame.maxY - 44,
+                width: frame.width / 2 - reservedWidth / 2, height: 44) : nil,
+            auxiliaryTopRightArea: reservedWidth > 0 ? CGRect(x: frame.midX + reservedWidth / 2,
+                y: frame.maxY - 44, width: frame.width / 2 - reservedWidth / 2, height: 44) : nil)
+        let settings = FeatureSettings(islandLayoutStyle: .pill)
+        let notice = IslandNotice(id: "headphone-camera", title: "AirPods Pro", style: .headphone)
+        let sizing = try #require(SideNoticeLayoutEngine().compactBarSizing(for: [notice], settings: settings))
+        let sideWidth = try #require(sizing.compactStatusSideWidth)
+        var configuration = settings.islandScreenConfiguration
+        let idle = ScreenLayoutEngine(configuration: configuration).layout(for: snapshot)
+        configuration.compactStatusLength = sizing.customPillLength
+        configuration.compactStatusSideWidth = sideWidth
+        let active = ScreenLayoutEngine(configuration: configuration).layout(for: snapshot)
+        #expect(active.collapsedFrame.width == max(120, reservedWidth) + sideWidth * 2)
+        #expect(active.collapsedFrame.midX == idle.collapsedFrame.midX)
+        #expect(active.collapsedFrame.maxY == idle.collapsedFrame.maxY)
+        #expect(active.collapsedFrame.height == idle.collapsedFrame.height)
+        #expect(active.triggerFrame == active.collapsedFrame)
+        #expect(active.placementBounds.contains(active.collapsedFrame))
+        configuration.compactStatusSideWidth = 10_000
+        let bounded = ScreenLayoutEngine(configuration: configuration).layout(for: snapshot)
+        #expect(bounded.collapsedFrame.width == ScreenLayoutConfiguration.quickActionRowWidth)
+        #expect(bounded.placementBounds.contains(bounded.collapsedFrame))
+        configuration.compactStatusSideWidth = nil
+        configuration.compactStatusLength = 10_000
+        let restored = ScreenLayoutEngine(configuration: configuration).layout(for: snapshot)
+        #expect(restored.collapsedFrame.width == max(240, reservedWidth + 80),
+            "Clearing headphone sides must restore the ordinary camera status budget")
+    }
+
     @Test(arguments: [CGFloat(16), 120, 200, 400])
     func cameraWidthPreservesBothVisibleWingsAroundARealCutout(reservedWidth: CGFloat) {
         let snapshot = ScreenSnapshot(displayID: 4,

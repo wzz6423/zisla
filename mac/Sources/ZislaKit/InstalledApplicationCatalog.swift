@@ -17,7 +17,7 @@ public struct InstalledApplication: Equatable, Sendable {
     }
 }
 
-/// Indexes locally installed applications so copied names like "Safari" or "访达"
+/// Indexes locally installed applications so copied names like "Safari" or a localized Finder name
 /// can offer a launch action. Scanning runs on a background queue and publishes
 /// snapshots through `start(onUpdate:)`. Between scans the app directories are
 /// watched cheaply via top-level modification dates, so newly installed or

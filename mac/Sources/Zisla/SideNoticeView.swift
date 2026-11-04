@@ -53,7 +53,7 @@ struct CompactStatusBarSurface<Content: View>: View, Animatable {
         // Screen coordinates keep the animation continuous when its window grows or tightens.
         content(frame.size)
             .position(x: frame.midX - panelFrame.minX, y: panelFrame.maxY - frame.midY)
-            .transaction { $0.animation = nil }
+            .animation(nil, value: panelFrame)
     }
 }
 
@@ -267,7 +267,8 @@ struct CompactStatusBarView: View {
 
                 } else {
                     compactStatusContent
-                        .padding(.horizontal, settingsStore.settings.islandLayoutStyle == .pill ? 10 : 0)
+                        .padding(.horizontal, settingsStore.settings.islandLayoutStyle == .pill
+                            && !(selectedCompactStatusPriority == .transient && transientNotice?.style == .headphone) ? 10 : 0)
                 }
             }
         }
@@ -376,12 +377,12 @@ struct CompactStatusBarView: View {
                 for: presentation, settings: settingsStore.settings, item: media.snapshot, at: date
             )
             let length = presentation.length(
-                thickness: height, edge: displayState.islandEdge, text: text
+                thickness: height, edge: displayState.islandEdge, text: text, item: media.snapshot
             )
             CompactPillStatusContent(
                 presentation: presentation, text: text, edge: displayState.islandEdge,
                 visualizationStyle: settingsStore.settings.mediaVisualizationStyle,
-                item: presentation.isMedia ? media.snapshot : nil
+                item: presentation.isMedia ? media.snapshot : nil, date: date
             )
             .onChange(of: length, initial: true) { _, value in onCompactLengthChanged(value) }
         } else if resultSweep.current == nil {
@@ -954,6 +955,7 @@ private struct HeadphoneConnectionNotice: View {
                 levels: notice.batteryLevels ?? [],
                 isSingleUnit: isSingleUnit
             )
+            .frame(width: 64, alignment: .trailing)
 
             Button(action: onDismiss) {
                 Image(systemName: "xmark")
@@ -1123,7 +1125,7 @@ private final class HeadphoneConnectionAnimationView: NSView {
     }
 }
 
-private struct HeadphoneGlyph: View {
+struct HeadphoneGlyph: View {
     var productID: UInt32?
     var isPresented: Bool
     var isSingleUnit: Bool
@@ -1165,12 +1167,11 @@ private struct HeadphoneBatteryLevels: View {
     var isSingleUnit = false
 
     var body: some View {
-        HStack(spacing: 4) {
+        HStack(spacing: CompactHeadphoneConnectionLayout.batterySpacing) {
             ForEach(displayedLevels) { level in
                 HeadphoneBatteryRing(level: level)
             }
         }
-        .frame(width: 64, alignment: .trailing)
     }
 
     private var displayedLevels: [NoticeBatteryLevel] {
@@ -1239,8 +1240,8 @@ struct CompactHeadphoneConnectionBar: View {
             if reservedCenterWidth > 0 {
                 HStack(spacing: 0) {
                     headphoneIdentity
-                        .padding(.leading, 10)
-                        .padding(.trailing, 4)
+                        .padding(.leading, CompactHeadphoneConnectionLayout.outerInset)
+                        .padding(.trailing, CompactHeadphoneConnectionLayout.centerInset)
                         .frame(width: sideWidth, height: height, alignment: .leading)
 
                     Spacer(minLength: 0)
@@ -1250,11 +1251,11 @@ struct CompactHeadphoneConnectionBar: View {
                         levels: notice.batteryLevels ?? [],
                         isSingleUnit: isSingleUnit
                     )
-                        .padding(.trailing, 10)
+                        .padding(.trailing, CompactHeadphoneConnectionLayout.outerInset)
                         .frame(width: sideWidth, height: height, alignment: .trailing)
                 }
             } else {
-                HStack(spacing: 8) {
+                HStack(spacing: CompactHeadphoneConnectionLayout.identitySpacing) {
                     headphoneIdentity
 
                     HeadphoneBatteryLevels(
@@ -1262,7 +1263,7 @@ struct CompactHeadphoneConnectionBar: View {
                         isSingleUnit: isSingleUnit
                     )
                 }
-                .padding(.horizontal, 10)
+                .padding(.horizontal, CompactHeadphoneConnectionLayout.outerInset)
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -1275,14 +1276,14 @@ struct CompactHeadphoneConnectionBar: View {
     }
 
     private var headphoneIdentity: some View {
-        HStack(spacing: 8) {
+        HStack(spacing: CompactHeadphoneConnectionLayout.identitySpacing) {
             HeadphoneGlyph(
                 productID: notice.headphoneProductID,
                 isPresented: isPresented,
                 isSingleUnit: isSingleUnit,
                 reduceMotion: reduceMotion
             )
-                .frame(width: 42, height: height)
+                .frame(width: CompactHeadphoneConnectionLayout.glyphWidth, height: height)
 
             VStack(alignment: .leading, spacing: 1) {
                 Text(notice.title)
@@ -1303,7 +1304,7 @@ struct CompactHeadphoneConnectionBar: View {
     }
 }
 
-private extension IslandNotice {
+extension IslandNotice {
     var headphoneProductID: UInt32? {
         metadata?[HeadphoneConnection.productIDMetadataKey].flatMap(UInt32.init)
     }
@@ -1756,6 +1757,20 @@ private struct CompactBackgroundSoundWing: View {
     }
 }
 
+struct CompactMediaIdentityText: View {
+    let item: NowPlayingSnapshot
+
+    var body: some View {
+        let artist = item.artist.trimmingCharacters(in: .whitespacesAndNewlines)
+        VStack(alignment: .leading, spacing: 1) {
+            MarqueeText(item.title, font: .system(size: 10.5, weight: .semibold), textColor: .white)
+            if !artist.isEmpty {
+                MarqueeText(artist, font: .system(size: 8.5, weight: .medium), textColor: .white.opacity(0.62))
+            }
+        }
+    }
+}
+
 /// Compact music detail bar: split around a physical notch, or rendered as one continuous row on other displays.
 struct DetailedMediaBar: View {
     private static let maximumContentWidth: CGFloat = 160
@@ -1800,7 +1815,7 @@ struct DetailedMediaBar: View {
     private var trackIdentity: some View {
         HStack(spacing: 7) {
             artwork
-            trackText
+            CompactMediaIdentityText(item: item)
                 .frame(maxWidth: .infinity, alignment: .leading)
         }
         .padding(.leading, CompactStatusMetrics.horizontalContentInset)
@@ -1810,29 +1825,12 @@ struct DetailedMediaBar: View {
     private var inlineMediaBar: some View {
         HStack(spacing: 7) {
             artwork
-            trackText
+            CompactMediaIdentityText(item: item)
                 .frame(width: Self.inlineTrackWidth, alignment: .leading)
             lyricLine
                 .frame(maxWidth: .infinity, alignment: .leading)
         }
         .padding(.horizontal, CompactStatusMetrics.horizontalContentInset)
-    }
-
-    private var trackText: some View {
-        VStack(alignment: .leading, spacing: 1) {
-            MarqueeText(
-                item.title,
-                font: .system(size: 10.5, weight: .semibold),
-                textColor: .white
-            )
-            if !artist.isEmpty {
-                MarqueeText(
-                    artist,
-                    font: .system(size: 8.5, weight: .medium),
-                    textColor: .white.opacity(0.62)
-                )
-            }
-        }
     }
 
     private var lyricsSection: some View {
@@ -1902,10 +1900,6 @@ struct DetailedMediaBar: View {
             }
             .frame(maxWidth: .infinity, alignment: .trailing)
         }
-    }
-
-    private var artist: String {
-        item.artist.trimmingCharacters(in: .whitespacesAndNewlines)
     }
 
     private var artworkSize: CGFloat {

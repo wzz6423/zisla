@@ -134,6 +134,7 @@ public struct ScreenLayoutConfiguration: Equatable, Sendable {
     public var edgeInset: CGFloat
     public var expandsForDetailedStatus: Bool
     public var compactStatusLength: CGFloat?
+    public var compactStatusSideWidth: CGFloat? = nil
     public var statusIconSize: CGSize?
 
     public init(
@@ -441,7 +442,8 @@ public struct ScreenLayoutEngine: Equatable, Sendable {
             physicalOcclusionFrame: occlusion, placementMode: configuration.placement.mode,
             screenFrame: screen.frame, inwardDistance: CGFloat(configuration.placement.inwardDistance),
             expandsForDetailedStatus: configuration.expandsForDetailedStatus,
-            compactStatusLength: configuration.compactStatusLength
+            compactStatusLength: configuration.compactStatusLength,
+            compactStatusSideWidth: configuration.compactStatusSideWidth
         )
 
         let transferSize = edge.isVertical
@@ -483,7 +485,8 @@ public struct ScreenLayoutEngine: Equatable, Sendable {
         screenFrame: CGRect,
         inwardDistance: CGFloat,
         expandsForDetailedStatus: Bool,
-        compactStatusLength: CGFloat? = nil
+        compactStatusLength: CGFloat? = nil,
+        compactStatusSideWidth: CGFloat? = nil
     ) -> CGRect {
         var frame = initial
         if placementMode == .custom, compactStatusLength != nil {
@@ -495,12 +498,16 @@ public struct ScreenLayoutEngine: Equatable, Sendable {
         }
         let desiredLength: CGFloat?
         if placementMode == .camera {
-            let minimumLength = max(ScreenLayoutConfiguration.cameraPillCenterWidth,
-                physicalOcclusionFrame?.width ?? 0) + SideNoticeLayoutEngine.compactStatusWingWidth * 2
-            let contentLength = expandsForDetailedStatus ? ScreenLayoutConfiguration.cameraPillMaximumWidth
-                : compactStatusLength.map { min(ScreenLayoutConfiguration.cameraPillMaximumWidth, max(minimumLength, $0)) }
-                    ?? frame.width
-            desiredLength = max(minimumLength, contentLength)
+            let centerWidth = max(ScreenLayoutConfiguration.cameraPillCenterWidth, physicalOcclusionFrame?.width ?? 0)
+            if let compactStatusSideWidth {
+                desiredLength = min(ScreenLayoutConfiguration.quickActionRowWidth, centerWidth + compactStatusSideWidth * 2)
+            } else {
+                let minimumLength = centerWidth + SideNoticeLayoutEngine.compactStatusWingWidth * 2
+                let contentLength = expandsForDetailedStatus ? ScreenLayoutConfiguration.cameraPillMaximumWidth
+                    : compactStatusLength.map { min(ScreenLayoutConfiguration.cameraPillMaximumWidth, max(minimumLength, $0)) }
+                        ?? frame.width
+                desiredLength = max(minimumLength, contentLength)
+            }
         } else if placementMode == .custom, let compactStatusLength {
             let thickness = edge.isVertical ? frame.width : frame.height
             desiredLength = min(ScreenLayoutConfiguration.quickActionRowWidth, max(thickness, compactStatusLength))
