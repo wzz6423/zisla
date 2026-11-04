@@ -15,6 +15,7 @@ reviews:
     drafts: true
     base_branches:
       - "^publish-v.*$"
+      - "^codex/ci-and-pr-review$"
   tools:
     github-checks:
       enabled: false

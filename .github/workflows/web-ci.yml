@@ -5,6 +5,7 @@ on:
     branches:
       - main
       - "publish-v*"
+      - "codex/ci-and-pr-review"
   push:
     branches:
       - main
