@@ -73,6 +73,15 @@ jobs:
         run: zsh Tests/CooperativePoolTests.zsh
       - name: Run isolated Swift suites
         run: |
+          (
+            while sleep 30; do
+              while IFS= read -r process_id; do
+                sample "$process_id" 1 || true
+              done < <(pgrep -f '[s]wift-testing-host.*--filter.*ScreenRecordingAudioOnlyExportTests')
+            done
+          ) &
+          diagnostic_pid=$!
+          trap 'kill "$diagnostic_pid" 2>/dev/null || true' EXIT
           zsh Scripts/swift-test-suites.sh ZislaKitTests,ZislaTests --skip-build
       - name: Remove test artifacts
         if: always()
