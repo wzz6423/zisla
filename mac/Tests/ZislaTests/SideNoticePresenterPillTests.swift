@@ -493,7 +493,9 @@ struct SideNoticePresenterPillTests {
         let view = CompactStatusBarView(queue: fixture.queue, displayState: state, media: fixture.media,
             browserDownloads: fixture.downloads, settingsStore: fixture.settings, resultSweep: fixture.sweep,
             onStatusHidden: {})
-        let actual = try await renderOffscreen(view.statusBarContent(at: fixture.date)
+        let actual = try await renderOffscreen(AppLanguageEnvironment(languageStore: fixture.language,
+            content: view.statusBarContent(at: fixture.date))
+            .environment(\.locale, Locale(identifier: "en-US"))
             .environment(\._accessibilityReduceMotion, true).transaction { $0.disablesAnimations = true },
             size: layout.collapsedFrame.size)
         let expected = try await renderOffscreen(CompactHeadphoneConnectionBar(notice: notice,
@@ -602,8 +604,13 @@ struct SideNoticePresenterPillTests {
         fixture.screen.visibleFrame.origin.x = 20_000
         fixture.settings.settings.islandNotchBackground = .black
         fixture.settings.settings.collapsedProgressGlowEnabled = false
-        let host = try activeHost(fixture)
-        let panel = try #require(host.window)
+        let originalHost = try activeHost(fixture)
+        let panel = try #require(originalHost.window)
+        let host = NSHostingView(rootView: originalHost.rootView
+            .environment(\._accessibilityReduceMotion, false))
+        host.sizingOptions = []
+        panel.contentView = host
+        host.layoutSubtreeIfNeeded()
         let notice = IslandNotice(id: "headphone-connection-speed", title: String(repeating: "█    ", count: 20),
             createdAt: fixture.date, style: .headphone,
             batteryLevels: [NoticeBatteryLevel(label: "左", level: 100)])
@@ -634,9 +641,15 @@ struct SideNoticePresenterPillTests {
         let textWidth = ceil((text as NSString).size(withAttributes: [
             .font: NSFont.systemFont(ofSize: 11, weight: .regular)
         ]).width * scale) / scale
+        var frame = 0
         let result = try await readingSpeeds(host) { elapsed in
             let distance = elapsed * 32 + (varies ? 10 * sin(elapsed * 2 * .pi) : 0)
             clock.progress = distance / Double(textWidth - 168)
+            frame += 1
+            if frame.isMultiple(of: 4) {
+                // A delayed commit must not change the timestamp of the driven position.
+                Thread.sleep(forTimeInterval: 0.1)
+            }
         }
         let speeds = result.speeds
         #expect(speeds.count >= 6)
@@ -907,16 +920,15 @@ struct SideNoticePresenterPillTests {
             RunLoop.main.run(mode: .default, before: Date().addingTimeInterval(1.0 / 120))
         }
         while started.duration(to: clock.now) < .seconds(2.5) {
-            let updateTime = started.duration(to: clock.now).components
-            try beforeFrame(Double(updateTime.seconds) + Double(updateTime.attoseconds) / 1e18)
-            // Yield a frame cadence so AppKit can commit; elapsed time still comes from the monotonic clock.
             try await Task.sleep(for: .milliseconds(16))
             advanceFrame()
+            // Drive and timestamp the same frame after yielding, before snapshot work can delay it.
+            let duration = started.duration(to: clock.now).components
+            let time = Double(duration.seconds) + Double(duration.attoseconds) / 1e18
+            try beforeFrame(time)
             host.layoutSubtreeIfNeeded()
             let bitmap = try #require(host.bitmapImageRepForCachingDisplay(in: host.bounds))
             host.cacheDisplay(in: host.bounds, to: bitmap)
-            let duration = started.duration(to: clock.now).components
-            let time = Double(duration.seconds) + Double(duration.attoseconds) / 1e18
             let scale = CGFloat(bitmap.pixelsWide) / host.bounds.width
             let center = bitmap.pixelsHigh / 2
             let background = try (0..<bitmap.pixelsWide).filter { x in
