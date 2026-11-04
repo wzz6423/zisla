@@ -53,7 +53,7 @@ struct CompactStatusBarSurface<Content: View>: View, Animatable {
         // Screen coordinates keep the animation continuous when its window grows or tightens.
         content(frame.size)
             .position(x: frame.midX - panelFrame.minX, y: panelFrame.maxY - frame.midY)
-            .transaction { $0.animation = nil }
+            .animation(nil, value: panelFrame)
     }
 }
 
@@ -267,7 +267,8 @@ struct CompactStatusBarView: View {
 
                 } else {
                     compactStatusContent
-                        .padding(.horizontal, settingsStore.settings.islandLayoutStyle == .pill ? 10 : 0)
+                        .padding(.horizontal, settingsStore.settings.islandLayoutStyle == .pill
+                            && !(selectedCompactStatusPriority == .transient && transientNotice?.style == .headphone) ? 10 : 0)
                 }
             }
         }
@@ -381,7 +382,7 @@ struct CompactStatusBarView: View {
             CompactPillStatusContent(
                 presentation: presentation, text: text, edge: displayState.islandEdge,
                 visualizationStyle: settingsStore.settings.mediaVisualizationStyle,
-                item: presentation.isMedia ? media.snapshot : nil
+                item: presentation.isMedia ? media.snapshot : nil, date: date
             )
             .onChange(of: length, initial: true) { _, value in onCompactLengthChanged(value) }
         } else if resultSweep.current == nil {
@@ -954,6 +955,7 @@ private struct HeadphoneConnectionNotice: View {
                 levels: notice.batteryLevels ?? [],
                 isSingleUnit: isSingleUnit
             )
+            .frame(width: 64, alignment: .trailing)
 
             Button(action: onDismiss) {
                 Image(systemName: "xmark")
@@ -1165,12 +1167,11 @@ private struct HeadphoneBatteryLevels: View {
     var isSingleUnit = false
 
     var body: some View {
-        HStack(spacing: 4) {
+        HStack(spacing: CompactHeadphoneConnectionLayout.batterySpacing) {
             ForEach(displayedLevels) { level in
                 HeadphoneBatteryRing(level: level)
             }
         }
-        .frame(width: 64, alignment: .trailing)
     }
 
     private var displayedLevels: [NoticeBatteryLevel] {
@@ -1239,8 +1240,8 @@ struct CompactHeadphoneConnectionBar: View {
             if reservedCenterWidth > 0 {
                 HStack(spacing: 0) {
                     headphoneIdentity
-                        .padding(.leading, 10)
-                        .padding(.trailing, 4)
+                        .padding(.leading, CompactHeadphoneConnectionLayout.outerInset)
+                        .padding(.trailing, CompactHeadphoneConnectionLayout.centerInset)
                         .frame(width: sideWidth, height: height, alignment: .leading)
 
                     Spacer(minLength: 0)
@@ -1250,11 +1251,11 @@ struct CompactHeadphoneConnectionBar: View {
                         levels: notice.batteryLevels ?? [],
                         isSingleUnit: isSingleUnit
                     )
-                        .padding(.trailing, 10)
+                        .padding(.trailing, CompactHeadphoneConnectionLayout.outerInset)
                         .frame(width: sideWidth, height: height, alignment: .trailing)
                 }
             } else {
-                HStack(spacing: 8) {
+                HStack(spacing: CompactHeadphoneConnectionLayout.identitySpacing) {
                     headphoneIdentity
 
                     HeadphoneBatteryLevels(
@@ -1262,7 +1263,7 @@ struct CompactHeadphoneConnectionBar: View {
                         isSingleUnit: isSingleUnit
                     )
                 }
-                .padding(.horizontal, 10)
+                .padding(.horizontal, CompactHeadphoneConnectionLayout.outerInset)
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -1275,14 +1276,14 @@ struct CompactHeadphoneConnectionBar: View {
     }
 
     private var headphoneIdentity: some View {
-        HStack(spacing: 8) {
+        HStack(spacing: CompactHeadphoneConnectionLayout.identitySpacing) {
             HeadphoneGlyph(
                 productID: notice.headphoneProductID,
                 isPresented: isPresented,
                 isSingleUnit: isSingleUnit,
                 reduceMotion: reduceMotion
             )
-                .frame(width: 42, height: height)
+                .frame(width: CompactHeadphoneConnectionLayout.glyphWidth, height: height)
 
             VStack(alignment: .leading, spacing: 1) {
                 Text(notice.title)

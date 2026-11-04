@@ -304,12 +304,15 @@ public final class OverlayCoordinator: NSObject {
     }
 
     public func updateCompactStatus(expandsForDetailedStatus: Bool, compactStatusLength: CGFloat? = nil,
+                                    compactStatusSideWidth: CGFloat? = nil,
                                     statusIconSize: CGSize? = nil) {
         guard layoutEngine.configuration.expandsForDetailedStatus != expandsForDetailedStatus
             || layoutEngine.configuration.compactStatusLength != compactStatusLength
+            || layoutEngine.configuration.compactStatusSideWidth != compactStatusSideWidth
             || layoutEngine.configuration.statusIconSize != statusIconSize else { return }
         layoutEngine.configuration.expandsForDetailedStatus = expandsForDetailedStatus
         layoutEngine.configuration.compactStatusLength = compactStatusLength
+        layoutEngine.configuration.compactStatusSideWidth = compactStatusSideWidth
         layoutEngine.configuration.statusIconSize = statusIconSize
         refreshScreens()
         if !isVisible, let layout = activeLayout {

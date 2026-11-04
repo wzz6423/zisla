@@ -7,7 +7,7 @@ import ZislaKit
 @testable import Zisla
 
 @MainActor
-@Suite(.serialized)
+@Suite(.serialized, RecordingStudioRunLoopScope())
 struct ScreenRecordingMultitrackUITests {
     @Test(arguments: [AppLanguage.simplifiedChinese, .english, .arabic], [960.0, 1_280.0])
     func studioShowsTheLibraryUniversalTracksAndKeepsOutputControlsInTheToolbar(_ language: AppLanguage, _ width: Double) async throws {
@@ -571,6 +571,59 @@ struct ScreenRecordingMultitrackUITests {
         }
         #expect(selection.titles == RecordingCanvasAspectRatio.allCases.map { AppLocalization.text($0.title) })
         try #require(selected, "The native ratio menu must select the requested option")
+    }
+}
+
+private struct RecordingStudioRunLoopScope: SuiteTrait, TestScoping {
+    func provideScope(for test: Test, testCase: Test.Case?, performing function: @Sendable () async throws -> Void) async throws {
+        try await withoutActuallyEscaping(function) { operation in
+            let task = await MainActor.run {
+                var completed = false
+                return Task { @MainActor in
+                    await withCheckedContinuation { start in
+                        RunLoop.main.perform(inModes: [.default]) {
+                            MainActor.assumeIsolated {
+                                start.resume()
+                                // Native menu wakeups stop the current loop; keep SwiftPM's outer loop alive until the suite finishes.
+                                while !completed {
+                                    RunLoop.main.run(mode: .default, before: .distantFuture)
+                                }
+                            }
+                        }
+                    }
+                    defer { completed = true }
+                    try await operation()
+                }
+            }
+            try await task.value
+        }
+    }
+}
+
+@MainActor
+@Suite(.serialized)
+struct RecordingStudioRunLoopScopeTests {
+    @Test(arguments: [false, true])
+    func aNativeWakeupKeepsTheTestContextRunsTheOperationOnceAndPropagatesErrors(_ shouldThrow: Bool) async throws {
+        enum ProbeError: Error { case expected }
+        let test = try #require(Test.current)
+        let testCase = Test.Case.current
+        var invocations = 0
+        var receivedExpectedError = false
+        do {
+            try await RecordingStudioRunLoopScope().provideScope(for: test, testCase: testCase) {
+                await MainActor.run {
+                    invocations += 1
+                    CFRunLoopStop(CFRunLoopGetCurrent())
+                }
+                await withCheckedContinuation { continuation in DispatchQueue.main.async { continuation.resume() } }
+                #expect(Test.current?.id == test.id && Test.Case.current != nil)
+                if shouldThrow { throw ProbeError.expected }
+            }
+        } catch ProbeError.expected {
+            receivedExpectedError = true
+        }
+        #expect(invocations == 1 && receivedExpectedError == shouldThrow)
     }
 }
 

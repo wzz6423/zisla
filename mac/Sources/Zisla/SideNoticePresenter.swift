@@ -26,7 +26,7 @@ final class SideNoticePresenter {
     private var availableStatusIcons: [IslandStatusIcon] {
         statusIcons.filter { !$0.isSystemMonitor || settingsStore.settings.systemMonitorEnabled }
     }
-    var onCompactLayoutChanged: ((CGDirectDisplayID, Bool, CGFloat?, CGSize?) -> Void)?
+    var onCompactLayoutChanged: ((CGDirectDisplayID, Bool, CGFloat?, CGFloat?, CGSize?) -> Void)?
     private var isStopped = false
     private let now: () -> Date
     private let reduceMotion: () -> Bool
@@ -231,7 +231,8 @@ final class SideNoticePresenter {
             )
             displayState.statusIcons = configuration.statusIconSize == nil ? [] : availableStatusIcons
             onCompactLayoutChanged?(snapshot.displayID, configuration.expandsForDetailedStatus,
-                                    configuration.compactStatusLength, configuration.statusIconSize)
+                                    configuration.compactStatusLength, configuration.compactStatusSideWidth,
+                                    configuration.statusIconSize)
             if hidesPanels {
                 panels.orderOut()
                 continue
@@ -326,6 +327,7 @@ final class SideNoticePresenter {
         )
         configuration.expandsForDetailedStatus = sizing?.expandsForDetailedStatus == true
         configuration.compactStatusLength = sizing?.customPillLength
+        configuration.compactStatusSideWidth = sizing?.compactStatusSideWidth
         if configuration.layoutStyle == .pill, configuration.placement.mode == .custom,
            let presentation = sizing?.customPillPresentation {
             let text = CompactPillStatusContent.displayText(
@@ -415,6 +417,7 @@ final class SideNoticePresenter {
             for: notices, at: now(), statusHidden: displayState?.compactStatusHidden == true
         )
         onCompactLayoutChanged?(displayID, configuration.expandsForDetailedStatus, configuration.compactStatusLength,
+                                configuration.compactStatusSideWidth,
                                 configuration.statusIconSize)
     }
 

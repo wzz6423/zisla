@@ -7,6 +7,76 @@ import ZislaKit
 
 @MainActor
 struct CompactStatusBarAnimationTests {
+    @Test(arguments: ["AirPods Pro Left 100% Right 97% Case 98%", "AirPods", ""], [false, true])
+    func statusTextKeepsItsOwnScrollAnimationInsideTheSurface(text: String, reduceMotion: Bool) async throws {
+        let size = CGSize(width: 120, height: 32)
+        let frame = CGRect(origin: .zero, size: size)
+        func host(progress: Double?, staticReference: Bool = false) -> NSHostingView<some View> {
+            NSHostingView(rootView: CompactStatusBarSurface(frame: frame, panelFrame: frame) { _ in
+                let marquee = MarqueeText(text, font: .system(size: 11, weight: .medium), textColor: .white,
+                    pointsPerSecond: 120, repeats: false, scrollProgress: progress)
+                Group {
+                    if staticReference {
+                        marquee.marqueeLabel
+                            .truncationMode(.tail)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                    } else {
+                        marquee
+                    }
+                }
+                .frame(width: size.width, height: size.height)
+                .transaction { transaction in
+                    if transaction.animation != nil { transaction.animation = Animation(FrozenProgress()) }
+                }
+            }
+            .frame(width: size.width, height: size.height)
+            .background(.black)
+            .environment(\._accessibilityReduceMotion, reduceMotion))
+        }
+        let actual = host(progress: nil)
+        let expected = host(progress: 0.5, staticReference: reduceMotion)
+        let head = host(progress: 0)
+        let tail = host(progress: 1)
+        let windows = [actual, expected, head, tail].map { content in
+            let window = NSWindow(contentRect: frame, styleMask: [.borderless], backing: .buffered, defer: false)
+            window.isReleasedWhenClosed = false
+            content.sizingOptions = []
+            window.contentView = content
+            return window
+        }
+        defer { windows.forEach { $0.contentView = nil; $0.close() } }
+        func pixels(_ host: NSView) throws -> [UInt8] {
+            host.layoutSubtreeIfNeeded()
+            let bitmap = try #require(host.bitmapImageRepForCachingDisplay(in: host.bounds))
+            host.cacheDisplay(in: host.bounds, to: bitmap)
+            var pixels: [UInt8] = []
+            for y in 0..<bitmap.pixelsHigh {
+                for x in 0..<bitmap.pixelsWide {
+                    let red = try #require(bitmap.colorAt(x: x, y: y)?.usingColorSpace(.sRGB)).redComponent
+                    pixels.append(UInt8((red * 255).rounded()))
+                }
+            }
+            return pixels
+        }
+        var matches = false
+        var referenceDifferences = [Int.max, Int.max, Int.max]
+        for _ in 0..<20 {
+            await withCheckedContinuation { continuation in
+                DispatchQueue.main.async { continuation.resume() }
+            }
+            let rendered = try pixels(actual)
+            let reference = try pixels(expected)
+            matches = zip(rendered, reference).allSatisfy { abs(Int($0) - Int($1)) <= 3 }
+                && (text.isEmpty || reference.contains { $0 > 64 })
+            referenceDifferences = try [head, expected, tail].map { sample in
+                zip(rendered, try pixels(sample)).filter { abs(Int($0) - Int($1)) > 3 }.count
+            }
+            if matches { break }
+        }
+        #expect(matches, "Status text must retain its own animation and honor Reduce Motion; head/half/tail pixel differences: \(referenceDifferences)")
+        #expect(windows.allSatisfy { !$0.isVisible })
+    }
+
     @Test(arguments: IslandLayoutStyle.allCases, IslandEdge.allCases)
     func collapsedOutlinePassesThroughAnIntermediateFrameWithoutScalingItsContent(
         style: IslandLayoutStyle, edge: IslandEdge

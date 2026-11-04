@@ -197,6 +197,47 @@ struct SideNoticePresenterPillTests {
         #expect(compact.compactStatusLength == 48)
     }
 
+    @Test(arguments: IslandEdge.allCases, [MediaVisualizationStyle.waveform, .glow])
+    func lyricPlaybackProgressKeepsTheCurrentLineFrameAndCapsLongLines(
+        edge: IslandEdge, visualizationStyle: MediaVisualizationStyle
+    ) throws {
+        let fixture = try Fixture(edge: edge)
+        defer { fixture.close() }
+        fixture.settings.settings.mediaCompactStyle = .detailed
+        fixture.settings.settings.mediaShowLyricsAndInfo = true
+        fixture.settings.settings.mediaVisualizationStyle = visualizationStyle
+        let notice = IslandNotice(id: "media-active-progress", title: "Music",
+            metadata: ["compactLyric": "旧内容"])
+        let lyrics = SyncedLyrics(lines: [.init(time: 0, text: "短"),
+            .init(time: 10, text: String(repeating: "长", count: 100)),
+            .init(time: 20, text: String(repeating: "长", count: 1000)), .init(time: 30, text: "短")])
+        let snapshot = NowPlayingSnapshot(title: "Track", artist: "Artist", album: nil, artworkData: nil,
+            duration: 40, elapsedTime: 0, timestamp: fixture.date, isPlaying: true, lyrics: lyrics)
+        fixture.media.publishSnapshot(snapshot)
+        let short = try #require(fixture.presenter.compactFrame(for: fixture.screen, notices: [notice], at: fixture.date))
+        let long = try #require(fixture.presenter.compactFrame(for: fixture.screen, notices: [notice],
+            at: fixture.date.addingTimeInterval(10)))
+        let maximumLength: CGFloat = visualizationStyle == .waveform ? 252 : 222
+        #expect((edge.isVertical ? long.height : long.width) == maximumLength)
+        #expect(maximumLength <= ScreenLayoutConfiguration.quickActionRowWidth)
+        #expect((edge.isVertical ? short.height : short.width) < maximumLength)
+        #expect(short.midX == long.midX && short.midY == long.midY)
+        for elapsed in [0.0, 2.5, 5, 7.5, 9.999] {
+            #expect(fixture.presenter.compactFrame(for: fixture.screen, notices: [notice],
+                at: fixture.date.addingTimeInterval(elapsed)) == short,
+                "A short lyric's playback progress cannot resize the island")
+        }
+        for elapsed in [10.0, 12.5, 15, 17.5, 19.999, 20, 25, 29.999] {
+            let sampledDate = fixture.date.addingTimeInterval(elapsed)
+            #expect(fixture.presenter.compactFrame(for: fixture.screen, notices: [notice], at: sampledDate) == long,
+                    "Long lyrics may only move inside the bounded frame")
+            #expect(fixture.presenter.compactConfiguration(for: [notice], at: sampledDate).compactStatusLength == maximumLength)
+        }
+        #expect(fixture.presenter.compactFrame(for: fixture.screen, notices: [notice],
+            at: fixture.date.addingTimeInterval(30)) == short,
+            "Switching back to a short line restores its natural length")
+    }
+
     @Test
     func cameraDetailsUseTheShorterFrameAndNotchSizingStaysUnchanged() throws {
         let fixture = try Fixture(edge: .top)
@@ -296,7 +337,7 @@ struct SideNoticePresenterPillTests {
         fixture.queue.enqueue(IslandNotice(id: "voice-processing-left", title: "语音", detail: "整理中"), expiresAfter: nil)
         fixture.presenter.setVoiceProcessingDisplayID(7)
         var dimensions: [UInt32: CGFloat?] = [:]
-        fixture.presenter.onCompactLayoutChanged = { displayID, _, length, _ in dimensions[displayID] = length }
+        fixture.presenter.onCompactLayoutChanged = { displayID, _, length, _, _ in dimensions[displayID] = length }
         fixture.presenter.publishCompactLayout(on: 7)
         fixture.presenter.publishCompactLayout(on: 8)
         #expect(try #require(dimensions[7] ?? nil) > 24)
@@ -307,7 +348,7 @@ struct SideNoticePresenterPillTests {
     func stoppingThePresenterPreventsQueuedStateChangesFromRecreatingPanels() async throws {
         let fixture = try Fixture(edge: .right)
         var published = 0
-        fixture.presenter.onCompactLayoutChanged = { _, _, _, _ in published += 1 }
+        fixture.presenter.onCompactLayoutChanged = { _, _, _, _, _ in published += 1 }
         fixture.presenter.stop()
         fixture.queue.enqueue(IslandNotice(id: "ai-active-fixture", title: "Fixture"), expiresAfter: nil)
         for _ in 0..<6 { await Task.yield() }
@@ -332,9 +373,10 @@ struct SideNoticePresenterPillTests {
             published += 1
             if let displayID = layout?.displayID { fixture.presenter.publishCompactLayout(on: displayID) }
         }
-        fixture.presenter.onCompactLayoutChanged = { displayID, details, length, iconSize in
+        fixture.presenter.onCompactLayoutChanged = { displayID, details, length, sideWidth, iconSize in
             guard coordinator.activeDisplayID == displayID else { return }
-            coordinator.updateCompactStatus(expandsForDetailedStatus: details, compactStatusLength: length, statusIconSize: iconSize)
+            coordinator.updateCompactStatus(expandsForDetailedStatus: details, compactStatusLength: length,
+                                            compactStatusSideWidth: sideWidth, statusIconSize: iconSize)
         }
         fixture.queue.enqueue(IslandNotice(id: "voice-processing-left", title: "语音", detail: "正在处理"), expiresAfter: nil)
         fixture.presenter.setVoiceProcessingDisplayID(7)
@@ -350,6 +392,124 @@ struct SideNoticePresenterPillTests {
         fixture.presenter.publishCompactLayout(on: 7)
         #expect(coordinator.activeLayout?.collapsedFrame.size == CGSize(width: 24, height: 24),
                 "A notification from another display cannot change the current animation anchor")
+    }
+
+    @Test
+    func cameraHeadphoneLayoutFollowsItsNoticeAcrossScreensAndRestoresThePreviousStatus() throws {
+        let fixture = try Fixture(edge: .top)
+        defer { fixture.close() }
+        fixture.settings.settings.islandPlacement = IslandPlacement()
+        fixture.screen = Self.notchedScreen
+        fixture.screen.auxiliaryTopLeftArea?.size.width = 820
+        fixture.screen.auxiliaryTopRightArea?.origin.x = 20_980
+        fixture.screen.auxiliaryTopRightArea?.size.width = 820
+        let other = ScreenSnapshot(displayID: 8,
+            frame: CGRect(x: 22_000, y: 0, width: 1440, height: 900),
+            visibleFrame: CGRect(x: 22_000, y: 0, width: 1440, height: 876))
+        let coordinator = OverlayCoordinator(contentView: NSView(),
+            layoutEngine: ScreenLayoutEngine(configuration: fixture.settings.settings.islandScreenConfiguration))
+        coordinator.screenSnapshotProvider = { [fixture.screen, other] }
+        defer { coordinator.stop() }
+        coordinator.updateScreens([fixture.screen, other])
+        var published = 0
+        coordinator.onActiveLayoutChanged = { layout in
+            published += 1
+            if let displayID = layout?.displayID { fixture.presenter.publishCompactLayout(on: displayID) }
+        }
+        fixture.presenter.onCompactLayoutChanged = { displayID, details, length, sideWidth, iconSize in
+            guard coordinator.activeDisplayID == displayID else { return }
+            coordinator.updateCompactStatus(expandsForDetailedStatus: details, compactStatusLength: length,
+                                            compactStatusSideWidth: sideWidth, statusIconSize: iconSize)
+        }
+        var notice = IslandNotice(id: "headphone-connection-camera", title: "AirPods Pro", createdAt: fixture.date,
+            style: .headphone, batteryLevels: [NoticeBatteryLevel(label: "耳机", level: 100)])
+        fixture.queue.enqueue(notice, expiresAfter: nil)
+        let configuration = fixture.presenter.compactConfiguration(for: [notice], at: fixture.date)
+        #expect(configuration.compactStatusSideWidth != nil)
+        #expect(fixture.presenter.compactConfiguration(for: [notice], at: fixture.date, statusHidden: true).compactStatusSideWidth == nil)
+        coordinator.selectActiveDisplay(at: CGPoint(x: fixture.screen.frame.midX, y: fixture.screen.frame.midY))
+        let expected = try #require(fixture.presenter.compactFrame(for: fixture.screen, notices: [notice], at: fixture.date))
+        #expect(coordinator.activeLayout?.collapsedFrame == expected,
+            "The pet and hover anchor must use the same earphone content width as its overlay")
+        let sizing = try #require(SideNoticeLayoutEngine().compactBarSizing(for: [notice], settings: fixture.settings.settings))
+        #expect(configuration.compactStatusSideWidth == sizing.compactStatusSideWidth)
+        let shortWidth = expected.width
+        let activeLayoutChanged = coordinator.onActiveLayoutChanged
+        coordinator.onActiveLayoutChanged = nil
+        coordinator.updateCompactStatus(expandsForDetailedStatus: configuration.expandsForDetailedStatus,
+            compactStatusLength: configuration.compactStatusLength,
+            compactStatusSideWidth: try #require(configuration.compactStatusSideWidth) + 8)
+        #expect(coordinator.activeLayout?.collapsedFrame.width == shortWidth + 16,
+            "A changed side budget must invalidate the coordinator's layout even when its text length is unchanged")
+        fixture.presenter.setStatusIcons([])
+        #expect(coordinator.activeLayout?.collapsedFrame == expected,
+            "Publishing a panel update must restore the notice's measured side budget")
+        coordinator.updateCompactStatus(expandsForDetailedStatus: configuration.expandsForDetailedStatus,
+            compactStatusLength: configuration.compactStatusLength,
+            compactStatusSideWidth: try #require(configuration.compactStatusSideWidth) + 8)
+        fixture.presenter.publishCompactLayout(on: fixture.screen.displayID)
+        #expect(coordinator.activeLayout?.collapsedFrame == expected)
+        coordinator.onActiveLayoutChanged = activeLayoutChanged
+        coordinator.selectActiveDisplay(at: CGPoint(x: other.frame.midX, y: other.frame.midY))
+        let external = try #require(fixture.presenter.compactFrame(for: other, notices: [notice], at: fixture.date))
+        #expect(coordinator.activeLayout?.collapsedFrame == external)
+        #expect(shortWidth - external.width == 40,
+            "Each screen must supply its own measured camera clearance")
+        fixture.queue.removeAll()
+        notice.title = "三年后的 AirPods Pro 第二代"
+        fixture.queue.enqueue(notice, expiresAfter: nil)
+        fixture.presenter.publishCompactLayout(on: other.displayID)
+        #expect(try #require(coordinator.activeLayout).collapsedFrame.width > external.width)
+        #expect(published < 12, "Layout callbacks must settle after a content or screen change")
+        let focus = IslandNotice(id: "focus-transition-camera", title: "Work", createdAt: fixture.date.addingTimeInterval(1))
+        fixture.queue.enqueue(focus, expiresAfter: nil)
+        fixture.presenter.publishCompactLayout(on: other.displayID)
+        #expect(fixture.presenter.compactConfiguration(for: [notice, focus], at: fixture.date).compactStatusSideWidth == nil)
+        #expect(coordinator.activeLayout?.collapsedFrame
+            == fixture.presenter.compactFrame(for: other, notices: [focus], at: fixture.date))
+        #expect(fixture.presenter.compactConfiguration(for: [], at: fixture.date).compactStatusSideWidth == nil)
+    }
+
+    @Test(arguments: [false, true])
+    func cameraHeadphoneSurfaceKeepsItsFullNameAndSixPointOuterMargins(physical: Bool) async throws {
+        let fixture = try Fixture(edge: .top)
+        defer { fixture.close() }
+        fixture.settings.settings.islandPlacement = IslandPlacement()
+        fixture.settings.settings.islandNotchBackground = .black
+        fixture.settings.settings.collapsedProgressGlowEnabled = false
+        if physical { fixture.screen = Self.notchedScreen }
+        let notice = IslandNotice(id: "headphone-connection-camera", title: "AirPods Pro", detail: "已连接",
+            createdAt: fixture.date, style: .headphone, batteryLevels: [NoticeBatteryLevel(label: "左", level: 100)])
+        fixture.queue.enqueue(notice, expiresAfter: nil)
+        let configuration = fixture.presenter.compactConfiguration(for: [notice], at: fixture.date)
+        let layout = ScreenLayoutEngine(configuration: configuration).layout(for: fixture.screen)
+        let centerInset = max(120, layout.centerOcclusionWidth)
+        let state = SideNoticeDisplayState()
+        state.placementMode = .camera
+        state.compactWingHeight = layout.collapsedFrame.height
+        state.compactBarCenterInset = centerInset
+        let view = CompactStatusBarView(queue: fixture.queue, displayState: state, media: fixture.media,
+            browserDownloads: fixture.downloads, settingsStore: fixture.settings, resultSweep: fixture.sweep,
+            onStatusHidden: {})
+        let actual = try await renderOffscreen(view.statusBarContent(at: fixture.date)
+            .environment(\._accessibilityReduceMotion, true).transaction { $0.disablesAnimations = true },
+            size: layout.collapsedFrame.size)
+        let expected = try await renderOffscreen(CompactHeadphoneConnectionBar(notice: notice,
+            height: layout.collapsedFrame.height, centerInset: centerInset)
+            .background(.black)
+            .clipShape(CompactIslandShape(layoutStyle: .pill))
+            .environment(\.colorScheme, .dark).environment(\.locale, fixture.language.language.locale)
+            .environment(\._accessibilityReduceMotion, true).transaction { $0.disablesAnimations = true },
+            size: layout.collapsedFrame.size)
+        var differences = 0
+        for y in 0..<actual.pixelsHigh {
+            for x in 0..<actual.pixelsWide {
+                let value = try #require(actual.colorAt(x: x, y: y))
+                let reference = try #require(expected.colorAt(x: x, y: y))
+                if abs(value.redComponent - reference.redComponent) > 0.02 { differences += 1 }
+            }
+        }
+        #expect(differences == 0, "Camera surfaces must use the headphone row's six-point margins without another padding layer")
     }
 
     @Test(arguments: IslandEdge.allCases)

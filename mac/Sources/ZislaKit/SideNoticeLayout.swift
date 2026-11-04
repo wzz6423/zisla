@@ -1,3 +1,4 @@
+import AppKit
 import CoreGraphics
 import ZislaCore
 
@@ -126,6 +127,43 @@ public struct CompactBarContourMetrics: Equatable, Sendable {
         bottomRadius = min(12, height * 0.4)
         topWidth = max(0, width - topInset * 2)
         bottomWidth = width
+    }
+}
+
+public struct CompactHeadphoneConnectionLayout {
+    public static let outerInset: CGFloat = 6
+    public static let centerInset: CGFloat = 4
+    public static let glyphWidth: CGFloat = 42
+    public static let identitySpacing: CGFloat = 8
+    public static let batterySpacing: CGFloat = 4
+    public static let batteryRingWidth: CGFloat = 20
+
+    public let identityWidth: CGFloat
+    public let batteryWidth: CGFloat
+
+    public init(notice: IslandNotice, locale: Locale = AppLocalization.currentLanguage.locale) {
+        let titleWidth = ceil((notice.title as NSString).size(withAttributes: [
+            .font: NSFont.systemFont(ofSize: 10, weight: .semibold)
+        ]).width)
+        let detail = AppLocalization.string(notice.detail ?? "已连接", locale: locale)
+        let detailWidth = ceil((detail as NSString).size(withAttributes: [
+            .font: NSFont.systemFont(ofSize: 8, weight: .medium)
+        ]).width)
+        identityWidth = Self.glyphWidth + Self.identitySpacing + max(titleWidth, detailWidth)
+        let levels = notice.batteryLevels ?? []
+        let batteryCount = notice.symbolName == "headphones" ? 1 : levels.isEmpty ? 2 : min(3, levels.count)
+        batteryWidth = CGFloat(batteryCount) * Self.batteryRingWidth
+            + CGFloat(batteryCount - 1) * Self.batterySpacing
+    }
+
+    public var sideWidth: CGFloat {
+        max(identityWidth, batteryWidth) + Self.outerInset + Self.centerInset
+    }
+
+    public func length(centerWidth: CGFloat) -> CGFloat {
+        let desiredWidth = centerWidth > 0 ? centerWidth + sideWidth * 2
+            : identityWidth + Self.identitySpacing + batteryWidth + Self.outerInset * 2
+        return min(ScreenLayoutConfiguration.quickActionRowWidth, desiredWidth)
     }
 }
 
@@ -334,7 +372,8 @@ public struct SideNoticeLayoutEngine: Equatable, Sendable {
             for: screen,
             sideExtension: extendsForFocusCountdown ? Layout.compactBarSideExtension : 0,
             expandsForDetailedMedia: expandsForDetailedMedia,
-            progressGlowEnabled: false
+            progressGlowEnabled: false,
+            compactPresentation: nil
         )
     }
 
@@ -343,6 +382,7 @@ public struct SideNoticeLayoutEngine: Equatable, Sendable {
         sideExtension: CGFloat,
         expandsForDetailedMedia: Bool,
         progressGlowEnabled: Bool,
+        compactPresentation: CompactPillStatusPresentation?,
         compactWingWidth: CGFloat = Layout.compactWingWidth,
         minimumSimulatedHeight: CGFloat = 0
     ) -> CGRect {
@@ -371,7 +411,15 @@ public struct SideNoticeLayoutEngine: Equatable, Sendable {
                 : anchor.width
             height = min(screen.frame.height, max(anchor.height, minimumSimulatedHeight))
         }
-        let width = min(screen.frame.width, baseWidth)
+        let contentWidth: CGFloat
+        if let compactPresentation, compactPresentation.priority == .transient,
+           compactPresentation.notice.style == .headphone {
+            contentWidth = CompactHeadphoneConnectionLayout(notice: compactPresentation.notice)
+                .length(centerWidth: topology.hasPhysicalNotch ? anchor.width : 0)
+        } else {
+            contentWidth = baseWidth
+        }
+        let width = min(screen.frame.width, contentWidth)
         let idealX = anchor.midX - width / 2
         let x = min(max(screen.frame.minX, idealX), screen.frame.maxX - width)
         let topEdge = topology.hasPhysicalNotch ? screen.frame.maxY : anchor.maxY
@@ -398,6 +446,7 @@ public struct SideNoticeLayoutEngine: Equatable, Sendable {
             var configuration = settings.islandScreenConfiguration
             configuration.expandsForDetailedStatus = sizing.expandsForDetailedStatus
             configuration.compactStatusLength = sizing.customPillLength
+            configuration.compactStatusSideWidth = sizing.compactStatusSideWidth
             return ScreenLayoutEngine(configuration: configuration).layout(for: screen).collapsedFrame
         }
         return compactBarFrame(
@@ -405,6 +454,7 @@ public struct SideNoticeLayoutEngine: Equatable, Sendable {
             sideExtension: sizing.sideExtension,
             expandsForDetailedMedia: sizing.expandsForDetailedStatus,
             progressGlowEnabled: sizing.progressGlowEnabled,
+            compactPresentation: sizing.customPillPresentation,
             compactWingWidth: sizing.compactWingWidth,
             minimumSimulatedHeight: sizing.minimumSimulatedHeight
         )
@@ -420,7 +470,8 @@ public struct SideNoticeLayoutEngine: Equatable, Sendable {
             for: layout,
             sideExtension: extendsForFocusCountdown ? Layout.compactBarSideExtension : 0,
             expandsForDetailedMedia: expandsForDetailedMedia,
-            progressGlowEnabled: false
+            progressGlowEnabled: false,
+            compactPresentation: nil
         )
     }
 
@@ -429,6 +480,7 @@ public struct SideNoticeLayoutEngine: Equatable, Sendable {
         sideExtension: CGFloat,
         expandsForDetailedMedia: Bool,
         progressGlowEnabled: Bool,
+        compactPresentation: CompactPillStatusPresentation?,
         compactWingWidth: CGFloat = Layout.compactWingWidth,
         minimumSimulatedHeight: CGFloat = 0
     ) -> CGRect {
@@ -458,7 +510,15 @@ public struct SideNoticeLayoutEngine: Equatable, Sendable {
                 ? Layout.compactBarMediaDetailSimulatedWidth
                 : anchor.width
         }
-        let width = min(layout.screenFrame.width, baseWidth)
+        let contentWidth: CGFloat
+        if let compactPresentation, compactPresentation.priority == .transient,
+           compactPresentation.notice.style == .headphone {
+            contentWidth = CompactHeadphoneConnectionLayout(notice: compactPresentation.notice)
+                .length(centerWidth: layout.topology.hasPhysicalNotch ? anchor.width : 0)
+        } else {
+            contentWidth = baseWidth
+        }
+        let width = min(layout.screenFrame.width, contentWidth)
         let x = min(
             max(layout.screenFrame.minX, anchor.midX - width / 2),
             layout.screenFrame.maxX - width
@@ -510,7 +570,8 @@ public struct SideNoticeLayoutEngine: Equatable, Sendable {
                 screenFrame: layout.screenFrame,
                 inwardDistance: CGFloat(settings.islandPlacement.inwardDistance),
                 expandsForDetailedStatus: sizing.expandsForDetailedStatus,
-                compactStatusLength: sizing.customPillLength
+                compactStatusLength: sizing.customPillLength,
+                compactStatusSideWidth: sizing.compactStatusSideWidth
             )
         }
         return compactBarFrame(
@@ -518,6 +579,7 @@ public struct SideNoticeLayoutEngine: Equatable, Sendable {
             sideExtension: sizing.sideExtension,
             expandsForDetailedMedia: sizing.expandsForDetailedStatus,
             progressGlowEnabled: sizing.progressGlowEnabled,
+            compactPresentation: sizing.customPillPresentation,
             compactWingWidth: sizing.compactWingWidth,
             minimumSimulatedHeight: sizing.minimumSimulatedHeight
         )
@@ -534,6 +596,7 @@ public struct SideNoticeLayoutEngine: Equatable, Sendable {
         compactWingWidth: CGFloat,
         minimumSimulatedHeight: CGFloat,
         customPillLength: CGFloat,
+        compactStatusSideWidth: CGFloat?,
         customPillPresentation: CompactPillStatusPresentation?
     )? {
         let thickness = settings.islandLayoutStyle == .pill && settings.islandPlacement.mode == .custom
@@ -543,11 +606,11 @@ public struct SideNoticeLayoutEngine: Equatable, Sendable {
             let presentation = CompactPillStatusPresentation(priority: nil, notice: notice,
                 text: notice.detail ?? "")
             return (0, false, false, Layout.compactWingWidth, 0,
-                    presentation.length(thickness: thickness, edge: settings.islandPlacement.edge), presentation)
+                    presentation.length(thickness: thickness, edge: settings.islandPlacement.edge), nil, presentation)
         }
         if Self.screenRecordingOperationNotice(for: notices, settings: settings) != nil {
             return (0, false, settings.collapsedProgressGlowEnabled, Layout.compactWingWidth, 0,
-                    thickness * 2 + 6 + CompactPillStatusPresentation.trailingInset * 2, nil)
+                    thickness * 2 + 6 + CompactPillStatusPresentation.trailingInset * 2, nil, nil)
         }
         let selectedPriority = Self.selectedCompactStatusPriority(for: notices, settings: settings)
         guard let selectedPriority else { return nil }
@@ -655,6 +718,8 @@ public struct SideNoticeLayoutEngine: Equatable, Sendable {
             compactWingWidth,
             displaysHeadphone ? Layout.defaultCompactWingHeight + 2 : 0,
             presentation?.length(thickness: thickness, edge: settings.islandPlacement.edge) ?? thickness,
+            displaysHeadphone && settings.islandLayoutStyle == .pill && settings.islandPlacement.mode == .camera
+                ? displayedTransientNotice.map { CompactHeadphoneConnectionLayout(notice: $0).sideWidth } : nil,
             presentation
         )
     }

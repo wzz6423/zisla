@@ -669,9 +669,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
             displayIDs: model.settingsStore.settings.activityNoticeDisplayIDs,
             isScreenLocked: lockScreenOverlayController.isScreenLocked
         )
-        noticePresenter?.onCompactLayoutChanged = { [weak coordinator] displayID, expanded, length, iconSize in
+        noticePresenter?.onCompactLayoutChanged = { [weak coordinator] displayID, expanded, length, sideWidth, iconSize in
             guard coordinator?.activeDisplayID == displayID else { return }
             coordinator?.updateCompactStatus(expandsForDetailedStatus: expanded, compactStatusLength: length,
+                                             compactStatusSideWidth: sideWidth,
                                               statusIconSize: iconSize)
         }
         configureMainMenu()

@@ -7,25 +7,66 @@ struct VerticalStatusText: View {
     let text: String
     let availableWidth: CGFloat
     let availableHeight: CGFloat
+    let scrollProgress: Double?
+    let scrollsAutomatically: Bool
 
-    init(text: String, availableWidth: CGFloat = 24, availableHeight: CGFloat) {
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @State private var automaticScrollProgress: CGFloat = 0
+
+    init(text: String, availableWidth: CGFloat = 24, availableHeight: CGFloat,
+         scrollProgress: Double? = nil, scrollsAutomatically: Bool = false) {
         self.text = text
         self.availableWidth = availableWidth
         self.availableHeight = availableHeight
+        self.scrollProgress = scrollProgress
+        self.scrollsAutomatically = scrollsAutomatically
     }
 
     var body: some View {
-        VStack(spacing: 1) {
-            ForEach(Array(CompactPillStatusPresentation.verticalTextRows(text, availableWidth: availableWidth,
-                availableHeight: availableHeight).enumerated()), id: \.offset) { _, row in
+        let usesScrolling = scrollProgress != nil || scrollsAutomatically
+        let rows = CompactPillStatusPresentation.verticalTextRows(text, availableWidth: availableWidth,
+            availableHeight: usesScrolling ? CGFloat(text.count) * 14 : availableHeight)
+        let travel = max(0, CGFloat(rows.count) * 14 - 1 - availableHeight)
+        let content = VStack(spacing: 1) {
+            ForEach(Array(rows.enumerated()), id: \.offset) { _, row in
                 Text(row.text)
                     .font(.system(size: 11, weight: .medium))
                     .rotationEffect(.degrees(row.rotatesClockwise ? 90 : 0))
                     .frame(height: 13)
             }
         }
+        Group {
+            if usesScrolling {
+                content
+                    .fixedSize(horizontal: false, vertical: true)
+                    .offset(y: -travel * CGFloat(min(max(scrollProgress ?? Double(automaticScrollProgress), 0), 1)))
+                    .frame(width: availableWidth, height: availableHeight, alignment: .top)
+                    .clipped()
+            } else {
+                content
+            }
+        }
+        .task {
+            automaticScrollProgress = 0
+            guard scrollsAutomatically, !reduceMotion else { return }
+            withAnimation(.linear(duration: Double(travel) / TransientNoticeMetrics.pointsPerSecond)) {
+                automaticScrollProgress = 1
+            }
+        }
+        .id(AutomaticAnimationIdentity(text: text, width: availableWidth, height: availableHeight,
+            scrollsAutomatically: scrollsAutomatically, usesExternalProgress: scrollProgress != nil,
+            reduceMotion: reduceMotion))
         .accessibilityElement(children: .ignore)
         .accessibilityLabel(text)
+    }
+
+    private struct AutomaticAnimationIdentity: Hashable {
+        let text: String
+        let width: CGFloat
+        let height: CGFloat
+        let scrollsAutomatically: Bool
+        let usesExternalProgress: Bool
+        let reduceMotion: Bool
     }
 }
 
@@ -35,6 +76,7 @@ struct CompactPillStatusContent: View {
     let edge: IslandEdge
     let visualizationStyle: MediaVisualizationStyle
     let item: NowPlayingSnapshot?
+    let date: Date
 
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
@@ -57,6 +99,11 @@ struct CompactPillStatusContent: View {
         return presentation.text
     }
 
+    private var lyricScrollProgress: Double? {
+        guard presentation.isMedia, let item, !item.isVideo, let lyrics = item.lyrics else { return nil }
+        return lyrics.currentLineProgress(at: item.elapsedTime(at: date) ?? 0, duration: item.duration) ?? 0
+    }
+
     var body: some View {
         GeometryReader { proxy in
             let thickness = edge.isVertical ? proxy.size.width : proxy.size.height
@@ -73,12 +120,13 @@ struct CompactPillStatusContent: View {
                            height: edge.isVertical ? iconSize : thickness)
                 if !text.isEmpty {
                     if edge.isVertical {
-                        VerticalStatusText(text: text, availableWidth: thickness, availableHeight: textLength)
+                        VerticalStatusText(text: text, availableWidth: thickness, availableHeight: textLength,
+                                           scrollProgress: lyricScrollProgress)
                             .frame(width: thickness, height: textLength, alignment: .top)
                     } else {
                         MarqueeText(text, font: .system(size: 11, weight: .medium),
                                     textColor: .white, pointsPerSecond: TransientNoticeMetrics.pointsPerSecond,
-                                    repeats: false)
+                                    repeats: false, scrollProgress: lyricScrollProgress)
                             .frame(width: textLength, height: thickness, alignment: .leading)
                     }
                 }

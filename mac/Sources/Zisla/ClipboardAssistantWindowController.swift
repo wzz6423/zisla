@@ -1239,7 +1239,8 @@ struct ClipboardAssistantToastView: View {
             leadingAccessory(detection)
 
             if let verticalTextHeight {
-                VerticalStatusText(text: loc(detection.title), availableHeight: verticalTextHeight)
+                VerticalStatusText(text: loc(detection.title), availableHeight: verticalTextHeight,
+                                   scrollsAutomatically: true)
             } else {
                 Group {
                     if detection.contextNoteAddedAt != nil {
@@ -1249,17 +1250,15 @@ struct ClipboardAssistantToastView: View {
                             .accessibilityLabel(detection.title)
                     } else {
                         VStack(alignment: .leading, spacing: 2) {
-                            Text(AppLocalization.text(detection.title))
-                                .font(.system(size: 12, weight: .medium))
-                                .foregroundStyle(.white.opacity(0.92))
-                                .fitsSingleLine()
-                                .truncationMode(.middle)
+                            MarqueeText(loc(detection.title), font: .system(size: 12),
+                                        textColor: .white.opacity(0.92), fontWeight: .medium,
+                                        scrollDirection: layoutDirection == .rightToLeft ? .right : .left,
+                                        repeats: false)
                             if detailIsVisible, let detailText = Self.detailText(detection.detail, locale: locale) {
-                                Text(detailText)
-                                    .font(.system(size: 9.5, weight: .regular))
-                                    .foregroundStyle(.white.opacity(0.55))
-                                    .fitsSingleLine()
-                                    .truncationMode(.middle)
+                                MarqueeText(detailText, font: .system(size: 9.5),
+                                            textColor: .white.opacity(0.55),
+                                            scrollDirection: layoutDirection == .rightToLeft ? .right : .left,
+                                            repeats: false)
                             }
                         }
                     }

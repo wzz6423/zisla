@@ -187,7 +187,7 @@ struct IslandRootView: View {
                                 if let frame = pillCollapsedFrame(in: renderedSurfaceSize, panelSize: proxy.size, direction: layoutDirection) {
                                     CompactPillStatusContent(presentation: presentation, text: presentation.text,
                                         edge: model.islandEdge, visualizationStyle: settingsStore.settings.mediaVisualizationStyle,
-                                        item: nil)
+                                        item: nil, date: .now)
                                         .frame(width: frame.width, height: frame.height)
                                         .position(x: frame.midX, y: frame.midY)
                                 }
