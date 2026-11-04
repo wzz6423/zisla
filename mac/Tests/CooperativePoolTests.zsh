@@ -49,7 +49,8 @@ __attribute__((used)) static struct { const void *replacement; const void *origi
     __attribute__((section("__DATA,__interpose"))) = {limited_global_queue, dispatch_get_global_queue};
 ''')
 library = temporary / "LimitedPool.dylib"
-subprocess.run([str(swift.parent / "clang"), "-dynamiclib", "-fblocks", "-isysroot", sdk,
+architecture = subprocess.check_output(["xcrun", "lipo", "-archs", str(host)], text=True).strip()
+subprocess.run([str(swift.parent / "clang"), "-dynamiclib", "-arch", architecture, "-fblocks", "-isysroot", sdk,
     str(source), "-o", str(library)], check=True)
 environment = dict(os.environ,
     DYLD_FRAMEWORK_PATH=os.pathsep.join(str(platform / "Developer/Library" / directory)
