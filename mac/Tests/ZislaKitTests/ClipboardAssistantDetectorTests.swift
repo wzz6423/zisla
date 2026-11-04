@@ -1095,7 +1095,7 @@ struct ClipboardAssistantCurrencyDetectionTests {
 
     @Test
     func crossCurrencyConversionsWithAmbiguousPreferredTarget() {
-        // "100元" with a CNY preference converts nothing: source equals the default target,
+        // An amount in yuan with a CNY preference converts nothing: source equals the default target,
         // so the value must not read as a conversion.
         #expect(detection("100元")?.kind != .conversion)
         // Naming a different target still works.

@@ -587,7 +587,7 @@ public enum ClipboardAssistantDetector {
             return completedConversion(prefixed, targetToken: targetToken, preferred: preferred)
         }
 
-        // Suffix token form: "100$", "100 dollar", "100dollar", "100CNY", "100元".
+        // Suffix token form: "100$", "100 dollar", "100dollar", "100CNY", or 100 with a localized yuan token.
         guard let (amount, amountText, token) = parseSuffixedCurrencyAmount(head, locale: locale),
               let source = resolveCurrencyToken(token, preferred: preferred) else {
             return nil

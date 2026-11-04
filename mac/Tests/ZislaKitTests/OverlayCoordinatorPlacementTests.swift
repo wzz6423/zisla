@@ -1,4 +1,5 @@
 import AppKit
+import SwiftUI
 import Testing
 import ZislaCore
 @testable import ZislaKit
@@ -371,5 +372,60 @@ struct OverlayCoordinatorPlacementTests {
         #expect(detailed.collapsedFrame.midY == original.collapsedFrame.midY)
         coordinator.updateCompactStatus(expandsForDetailedStatus: false, compactStatusLength: 32)
         #expect(coordinator.activeLayout?.collapsedFrame == original.collapsedFrame)
+    }
+
+    @Test(arguments: IslandEdge.allCases)
+    func persistentPetContentRepositionsWithoutResizingOrReplacingItsPanel(edge: IslandEdge) throws {
+        let content = NSHostingView(rootView: AnyView(Color.clear))
+        content.sizingOptions = []
+        let ratio = CGFloat(182) / 136
+        func petContent(for layout: ScreenOverlayLayout) -> AnyView {
+            let container = CollapsedPetLayout.frame(for: layout, petAspectRatio: ratio)
+            let pet = CollapsedPetLayout.petFrame(for: layout, petAspectRatio: ratio, side: .right)!
+            return AnyView(Color.red.frame(width: pet.width, height: pet.height)
+                .position(x: pet.midX - container.minX, y: container.maxY - pet.midY)
+                .frame(width: container.width, height: container.height))
+        }
+        let coordinator = OverlayCoordinator(contentView: NSView(),
+            layoutEngine: ScreenLayoutEngine(configuration: ScreenLayoutConfiguration(layoutStyle: .pill,
+                placement: IslandPlacement(mode: .custom, edge: edge))),
+            persistentContentViewProvider: { layout in
+                content.rootView = petContent(for: layout)
+                return content
+            },
+            persistentPanelFrameProvider: { CollapsedPetLayout.frame(for: $0, petAspectRatio: ratio) },
+            persistentContentViewUpdater: { _, layout in
+                content.rootView = petContent(for: layout)
+            })
+        coordinator.screenSnapshotProvider = { [screen] }
+        coordinator.updateScreens([screen])
+        defer { coordinator.stop() }
+        let panel = try #require(content.window)
+        func expectPlacement() throws {
+            let layout = try #require(coordinator.layouts.first)
+            let container = CollapsedPetLayout.frame(for: layout, petAspectRatio: ratio)
+            let pet = try #require(CollapsedPetLayout.petFrame(for: layout, petAspectRatio: ratio, side: .right))
+            let bitmap = NSBitmapImageRep(cgImage: try #require(ImageRenderer(content: content.rootView).cgImage))
+            var pixels = CGRect.null
+            for y in 0..<bitmap.pixelsHigh {
+                for x in 0..<bitmap.pixelsWide where (bitmap.colorAt(x: x, y: y)?.alphaComponent ?? 0) > 0.5 {
+                    pixels = pixels.union(CGRect(x: x, y: y, width: 1, height: 1))
+                }
+            }
+            #expect(pixels.height == 24 && abs(pixels.width - 24 * ratio) < 1,
+                    "An alignment update must preserve the previous pet size")
+            #expect(abs(pixels.midX - (pet.midX - container.minX)) <= 0.5)
+            #expect(abs(pixels.midY - (container.maxY - pet.midY)) <= 0.5,
+                    "The pet must follow the current bar center after its status row changes")
+            #expect(abs(panel.frame.minX - container.minX) < 1 && abs(panel.frame.maxX - container.maxX) < 1)
+            #expect(abs(panel.frame.minY - container.minY) < 1 && abs(panel.frame.maxY - container.maxY) < 1)
+            #expect(content.window === panel, "Updating pet placement must reuse its persistent panel")
+        }
+        try expectPlacement()
+        coordinator.updateCompactStatus(expandsForDetailedStatus: false,
+            statusIconSize: edge.isVertical ? CGSize(width: 40, height: 120) : CGSize(width: 120, height: 32))
+        try expectPlacement()
+        coordinator.updateCompactStatus(expandsForDetailedStatus: false)
+        try expectPlacement()
     }
 }

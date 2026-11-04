@@ -223,7 +223,7 @@ struct VerticalCompactStatusTests {
             let length = presentation.length(thickness: 32, edge: edge)
             let size = edge.isVertical ? CGSize(width: 32, height: length) : CGSize(width: length, height: 32)
             let renderer = ImageRenderer(content: CompactPillStatusContent(presentation: presentation,
-                text: presentation.text, edge: edge, visualizationStyle: .waveform, item: nil)
+                text: presentation.text, edge: edge, visualizationStyle: .waveform, item: nil, date: .now)
                 .frame(width: size.width, height: size.height)
                 .background(.black))
             renderer.scale = 2
@@ -276,7 +276,7 @@ struct VerticalCompactStatusTests {
             let length = presentation.length(thickness: 32, edge: edge)
             let size = edge.isVertical ? CGSize(width: 32, height: length) : CGSize(width: length, height: 32)
             let renderer = ImageRenderer(content: CompactPillStatusContent(presentation: presentation,
-                text: presentation.text, edge: edge, visualizationStyle: .waveform, item: nil)
+                text: presentation.text, edge: edge, visualizationStyle: .waveform, item: nil, date: .now)
                 .frame(width: size.width, height: size.height).background(.black))
             renderer.scale = 2
             let bitmap = NSBitmapImageRep(cgImage: try #require(renderer.cgImage))
@@ -314,7 +314,7 @@ struct VerticalCompactStatusTests {
             duration: 60, elapsedTime: 0, timestamp: .distantPast, isPlaying: false)
         let length = presentation.length(thickness: 32, edge: edge)
         let renderer = ImageRenderer(content: CompactPillStatusContent(presentation: presentation,
-            text: "", edge: edge, visualizationStyle: .waveform, item: item)
+            text: "", edge: edge, visualizationStyle: .waveform, item: item, date: .now)
             .frame(width: length, height: 32).background(.black))
         renderer.scale = 2
         let bitmap = NSBitmapImageRep(cgImage: try #require(renderer.cgImage))
@@ -349,7 +349,7 @@ struct VerticalCompactStatusTests {
         let length = presentation.length(thickness: 32, edge: edge)
         let size = edge.isVertical ? CGSize(width: 32, height: length) : CGSize(width: length, height: 32)
         let renderer = ImageRenderer(content: CompactPillStatusContent(presentation: presentation,
-            text: presentation.text, edge: edge, visualizationStyle: .waveform, item: nil)
+            text: presentation.text, edge: edge, visualizationStyle: .waveform, item: nil, date: .now)
             .environment(\.layoutDirection, .leftToRight)
             .frame(width: size.width, height: size.height).background(.black))
         renderer.scale = 2
@@ -398,7 +398,7 @@ struct VerticalCompactStatusTests {
         #expect(length == thickness - 8 + 24, "An empty status reserves its actual icon and two 12pt insets")
         let size = edge.isVertical ? CGSize(width: thickness, height: length) : CGSize(width: length, height: thickness)
         let renderer = ImageRenderer(content: CompactPillStatusContent(presentation: presentation,
-            text: "", edge: edge, visualizationStyle: .waveform, item: nil)
+            text: "", edge: edge, visualizationStyle: .waveform, item: nil, date: .now)
             .frame(width: size.width, height: size.height).background(.black))
         renderer.scale = 2
         let bitmap = NSBitmapImageRep(cgImage: try #require(renderer.cgImage))

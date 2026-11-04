@@ -198,13 +198,14 @@ export const latestRelease = {
 export interface ChangelogEntry {
   version: string;
   date: string;
-  /** GitHub release 的 Highlights，统一以英文原文展示，不随界面语言切换。 */
+  /** GitHub release highlights stay in their original English regardless of the UI language. */
   notes: readonly string[];
 }
 
 /**
- * 发版历史，倒序排列，首项即当前版本。notes 取自各版本 GitHub release 的 Highlights，
- * 统一以英文原文展示（11 版 × 17 语翻译不可维护）；v0.1.8/v0.1.0 无 Highlights 段，取其正文概述。
+ * Release history, newest first. Notes use the original English GitHub release highlights
+ * because maintaining translations for 11 releases in 17 languages is impractical.
+ * v0.1.8/v0.1.0 have no Highlights section, so their body summaries are used instead.
  */
 export const changelogEntries: readonly ChangelogEntry[] = [
   {

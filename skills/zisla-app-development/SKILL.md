@@ -122,6 +122,7 @@ description: 此技能用于开发、修复、重构或评审 zisla 应用及其
 
 ## 提交 PR 与署名契约
 
+- 与开发者的对话使用中文；commit message 的标题和正文、PR 的标题和正文必须使用英文。项目名、命令、路径和 `Co-authored-by` 等结构化字段保留原值；不得为满足该要求翻译用户可见文案、本地化字符串或测试夹具。
 - 由 AI 参与产出的每个 commit 都必须带 `Co-authored-by: Name <email>` trailer，并与 PR 正文 `AI Attribution` 里声明的 agent 一致。GitHub 只承认这条 trailer 作为非账号作者的共同署名，`PR Automation` 会逐条比对 commit，缺失即失败。
 - PR 正文使用 `.github/PULL_REQUEST_TEMPLATE.md` 的七节：`- Project:` 保留模板给出的项目名，`- Type:` 与标题类型一致，`Related Issue` 写 `Closes #N` 或 `None`，`- Agent:` 写实际 agent 或 `None`。
 - PR 正文可只使用文字，不需要图片、截图或封面；界面变更用文字记录实际验证结果。

@@ -54,7 +54,8 @@ struct IslandDashboardViewLayoutTests {
         let headerTop = IslandRootView.contentTopInset(layoutStyle: .pill, screenLayout: layout)
         #expect(headerTop - layout.collapsedFrame.height == 12,
                 "The expanded header must keep the requested gap below the camera-aligned row")
-        #expect(headerTop == ScreenLayoutConfiguration.cameraPillHeight + 12)
+        #expect(headerTop == ScreenLayoutConfiguration.cameraPillHeight + 12,
+                "Camera rows keep their fixed height regardless of the configured pill size")
         #expect(IslandRootView.contentTopInset(layoutStyle: .notch, screenLayout: layout) == 16,
                 "The original notch layout uses the shared lowered header inset")
     }
@@ -192,8 +193,9 @@ struct IslandDashboardViewLayoutTests {
     func recordingKeepsTheLatestScreenBudgetWithoutResizingItsCompactSurface() async throws {
         var delegate: AppDelegate? = AppDelegate()
         weak var weakDelegate = delegate
+        let camera = cameraLayout(thickness: 24)
         let requestedCompact = IslandModuleLayout.compactSurface(
-            collapsedSize: CGSize(width: 80, height: 24), overflowWidth: 80, edge: .top
+            collapsedSize: camera.collapsedFrame.size, overflowWidth: camera.collapsedFrame.width, edge: camera.edge
         ).panelSize
         let coordinator = OverlayCoordinator(contentView: NSView(), layoutEngine: ScreenLayoutEngine(
             configuration: ScreenLayoutConfiguration(expandedSize: requestedCompact, layoutStyle: .pill)

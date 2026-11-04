@@ -10,7 +10,7 @@ struct IslandPetView: View {
     var sprite: PetSprite?
     var behavior: PetBehaviorController
     var side: PetSide
-    var size: CGFloat = 56
+    var size = CGSize(width: 56, height: 56)
 
     var body: some View {
         ZStack {
@@ -18,11 +18,11 @@ struct IslandPetView: View {
                 PetCompanionView(sprite: sprite, size: size, behavior: behavior)
             } else {
                 Image(systemName: "pawprint.fill")
-                    .font(.system(size: size * 0.5, weight: .semibold))
+                    .font(.system(size: size.height * 0.5, weight: .semibold))
                     .foregroundStyle(.white.opacity(0.5))
             }
         }
-        .frame(width: size, height: size)
+        .frame(width: size.width, height: size.height)
         .accessibilityHidden(true)
     }
 }

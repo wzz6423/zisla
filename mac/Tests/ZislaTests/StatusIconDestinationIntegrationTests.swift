@@ -537,6 +537,7 @@ struct StatusIconDestinationIntegrationTests {
     @Test(arguments: IslandEdge.allCases) @MainActor
     func theCompactPanelPublishesIconsAndRestoresThemAfterAnActivity(edge: IslandEdge) async throws {
         let fixture = try IconFixture(edge: edge)
+        fixture.reducesMotion = true
         defer { fixture.close() }
         let application = NSApplication.shared
         let existingWindows = Set(application.windows.map(ObjectIdentifier.init))
@@ -760,9 +761,10 @@ struct StatusIconDestinationIntegrationTests {
         coordinator.screenSnapshotProvider = { [fixture] in [fixture.screen] }
         coordinator.updateScreens([fixture.screen])
         coordinator.selectActiveDisplay(at: CGPoint(x: fixture.screen.frame.midX, y: fixture.screen.frame.midY))
-        fixture.presenter.onCompactLayoutChanged = { displayID, detailed, length, size in
+        fixture.presenter.onCompactLayoutChanged = { displayID, detailed, length, sideWidth, size in
             guard coordinator.activeDisplayID == displayID else { return }
-            coordinator.updateCompactStatus(expandsForDetailedStatus: detailed, compactStatusLength: length, statusIconSize: size)
+            coordinator.updateCompactStatus(expandsForDetailedStatus: detailed, compactStatusLength: length,
+                                            compactStatusSideWidth: sideWidth, statusIconSize: size)
         }
         for pointSize in [16.0, 36.0] {
             let image = try #require(SystemMonitorMenuBarImageRenderer.combinedIcon(battery: nil, wifi: .off, level: nil,
@@ -909,11 +911,12 @@ struct StatusIconDestinationIntegrationTests {
         let sweep = AIResultSweepController()
         let media = NowPlayingService(loadLyrics: { _, _, _ in LyricsSearchResult(lyrics: nil, artistName: nil) })
         let downloads = BrowserDownloadMonitor(directories: [], eventPaths: [])
+        var reducesMotion = false
         let screen = ScreenSnapshot(displayID: 7, frame: CGRect(x: 20000, y: 0, width: 1440, height: 900),
             visibleFrame: CGRect(x: 20000, y: 0, width: 1440, height: 876))
         lazy var presenter = SideNoticePresenter(queue: queue, resultSweep: sweep, media: media,
             browserDownloads: downloads, settingsStore: settings, languageStore: language, isScreenLocked: true,
-            reduceMotion: { true },
+            reduceMotion: { [unowned self] in reducesMotion },
             screenSnapshotProvider: { [unowned self] in [screen] })
 
         init(edge: IslandEdge) throws {

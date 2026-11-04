@@ -240,7 +240,7 @@ public enum VoiceTranscriptPostProcessor {
                 counts[key, default: 0] += 1
             }
         }
-        // Only model versions use this guard; spoken list markers such as 第一 may legitimately become 1、.
+        // Only model versions use this guard; spoken Chinese list markers may legitimately become numeric markers.
         let modelNumerals = try! NSRegularExpression(
             pattern: #"(?<![A-Za-z0-9])(?:Gemma|Qwen)\s*([零〇一二两三四五六七八九十百千万亿]+(?:点[零〇一二两三四五六七八九]+)?)"#,
             options: [.caseInsensitive]

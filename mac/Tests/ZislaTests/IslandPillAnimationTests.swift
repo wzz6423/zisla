@@ -139,7 +139,7 @@ struct IslandPillAnimationTests {
                 layoutStyle: .pill, collapsedFrame: physical, edge: edge
             ) {
                 CompactPillStatusContent(presentation: presentation, text: presentation.text,
-                    edge: edge, visualizationStyle: .waveform, item: nil)
+                    edge: edge, visualizationStyle: .waveform, item: nil, date: .now)
                     .frame(width: frame.width, height: frame.height)
                     .position(x: frame.midX, y: frame.midY)
             }

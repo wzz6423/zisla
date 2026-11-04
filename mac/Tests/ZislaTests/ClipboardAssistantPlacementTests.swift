@@ -54,6 +54,36 @@ struct ClipboardAssistantPlacementTests {
         else { #expect(first.frame.height == 32) }
     }
 
+    @Test(arguments: [IslandEdge.top, .bottom])
+    func anOverflowingDetailUsesTheExistingCapInsteadOfExpandingThePromptForever(edge: IslandEdge) {
+        let controller = makeController(edge: edge)
+        defer { controller.dismiss(animated: false) }
+        controller.screenLayoutConfiguration.pillSize.height = 32
+        let short = ClipboardAssistantDetection(kind: .text, title: "短", detail: .path("路径"))
+        let natural = controller.rowLayout(for: short, on: screen, locale: chinese)
+        #expect(natural.frame.width < ScreenLayoutConfiguration.quickActionRowWidth)
+        var capped: ClipboardAssistantController.RowLayout?
+        for count in [100, 10_000] {
+            let detection = ClipboardAssistantDetection(kind: .text, title: "短",
+                detail: .path(String(repeating: "路径", count: count)))
+            let layout = controller.rowLayout(for: detection, on: screen, locale: chinese)
+            #expect(layout.frame.width == ScreenLayoutConfiguration.quickActionRowWidth)
+            #expect(layout.frame == layout.collapsedFrame && screen.frame.contains(layout.frame))
+            #expect(controller.presentation.physicalNotchWidth == 0)
+            if let capped { #expect(layout == capped) }
+            else { capped = layout }
+        }
+        let narrow = ScreenSnapshot(displayID: 2,
+            frame: CGRect(x: -300, y: -400, width: 300, height: 600),
+            visibleFrame: CGRect(x: -300, y: -400, width: 300, height: 576))
+        let huge = ClipboardAssistantDetection(kind: .text, title: "短",
+            detail: .path(String(repeating: "路径", count: 10_000)))
+        let constrained = controller.rowLayout(for: huge, on: narrow, locale: chinese)
+        #expect(constrained.frame.width <= ScreenLayoutConfiguration.quickActionRowWidth)
+        #expect(narrow.frame.contains(constrained.frame),
+            "The existing row cap must also respect a display narrower than that cap")
+    }
+
     @Test
     func theCustomPromptIncludesDetailControlsAndShortcutsInItsNaturalWidth() {
         let controller = makeController(edge: .bottom)
