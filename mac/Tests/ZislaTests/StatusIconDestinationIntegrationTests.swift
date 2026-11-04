@@ -913,6 +913,7 @@ struct StatusIconDestinationIntegrationTests {
             visibleFrame: CGRect(x: 20000, y: 0, width: 1440, height: 876))
         lazy var presenter = SideNoticePresenter(queue: queue, resultSweep: sweep, media: media,
             browserDownloads: downloads, settingsStore: settings, languageStore: language, isScreenLocked: true,
+            reduceMotion: { true },
             screenSnapshotProvider: { [unowned self] in [screen] })
 
         init(edge: IslandEdge) throws {

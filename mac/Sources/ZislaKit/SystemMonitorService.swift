@@ -3988,9 +3988,12 @@ public final class SystemMonitorService: ObservableObject {
         }
         if !didLoadHardware {
             didLoadHardware = true
-            hardware = await Task.detached(priority: .utility) {
-                readHardwareInfo()
-            }.value
+            // system_profiler can block; leave cooperative workers available to resume other tasks.
+            hardware = await withCheckedContinuation { continuation in
+                DispatchQueue.global(qos: .utility).async {
+                    continuation.resume(returning: readHardwareInfo())
+                }
+            }
         }
 
         let memory = payload.memory ?? MemoryMetrics(
