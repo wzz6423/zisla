@@ -606,8 +606,9 @@ struct SideNoticePresenterPillTests {
         fixture.settings.settings.collapsedProgressGlowEnabled = false
         let originalHost = try activeHost(fixture)
         let panel = try #require(originalHost.window)
-        let host = NSHostingView(rootView: originalHost.rootView
-            .environment(\._accessibilityReduceMotion, false))
+        let clock = ReadingClock()
+        let host = NSHostingView(rootView: ReadingAnimationClock(clock: clock,
+            content: originalHost.rootView.environment(\._accessibilityReduceMotion, false)))
         host.sizingOptions = []
         panel.contentView = host
         host.layoutSubtreeIfNeeded()
@@ -616,7 +617,7 @@ struct SideNoticePresenterPillTests {
             batteryLevels: [NoticeBatteryLevel(label: "左", level: 100)])
         fixture.queue.enqueue(notice, expiresAfter: nil)
         fixture.presenter.setStatusIcons([])
-        let result = try await readingSpeeds(host) { _ in }
+        let result = try await readingSpeeds(host) { clock.progress = $0 }
         let speeds = result.speeds
         #expect(speeds.count >= 6, "The real panel must provide at least six independent velocity windows")
         #expect(speeds.allSatisfy { abs($0 - 32) <= 8 },
@@ -641,15 +642,9 @@ struct SideNoticePresenterPillTests {
         let textWidth = ceil((text as NSString).size(withAttributes: [
             .font: NSFont.systemFont(ofSize: 11, weight: .regular)
         ]).width * scale) / scale
-        var frame = 0
         let result = try await readingSpeeds(host) { elapsed in
             let distance = elapsed * 32 + (varies ? 10 * sin(elapsed * 2 * .pi) : 0)
             clock.progress = distance / Double(textWidth - 168)
-            frame += 1
-            if frame.isMultiple(of: 4) {
-                // A delayed commit must not change the timestamp of the driven position.
-                Thread.sleep(forTimeInterval: 0.1)
-            }
         }
         let speeds = result.speeds
         #expect(speeds.count >= 6)
@@ -907,8 +902,6 @@ struct SideNoticePresenterPillTests {
 
     private func readingSpeeds(_ host: NSView, beforeFrame: @MainActor (Double) throws -> Void) async throws
         -> (speeds: [Double], slope: Double, residual: Double) {
-        let clock = ContinuousClock()
-        let started = clock.now
         var previousPhase: CGFloat?
         var period: CGFloat?
         var displacement: CGFloat = 0
@@ -916,16 +909,15 @@ struct SideNoticePresenterPillTests {
         var motionOrigin: (time: Double, displacement: CGFloat)?
         var speeds: [Double] = []
         var positions: [(time: Double, distance: Double)] = []
-        func advanceFrame() {
-            RunLoop.main.run(mode: .default, before: Date().addingTimeInterval(1.0 / 120))
-        }
-        while started.duration(to: clock.now) < .seconds(2.5) {
-            try await Task.sleep(for: .milliseconds(16))
-            advanceFrame()
-            // Drive and timestamp the same frame after yielding, before snapshot work can delay it.
-            let duration = started.duration(to: clock.now).components
-            let time = Double(duration.seconds) + Double(duration.attoseconds) / 1e18
+        // Frame time keeps slow commits from shifting pixels or consuming velocity windows.
+        for frame in 0...50 {
+            let time = Double(frame) / 20
             try beforeFrame(time)
+            if frame == 0 { try await Task.sleep(for: .milliseconds(800)) }
+            if (frame + 1).isMultiple(of: 4) { try await Task.sleep(for: .milliseconds(100)) }
+            await withCheckedContinuation { continuation in
+                DispatchQueue.main.async { continuation.resume() }
+            }
             host.layoutSubtreeIfNeeded()
             let bitmap = try #require(host.bitmapImageRepForCachingDisplay(in: host.bounds))
             host.cacheDisplay(in: host.bounds, to: bitmap)
@@ -976,9 +968,6 @@ struct SideNoticePresenterPillTests {
                     }
                 }
             }
-            await withCheckedContinuation { continuation in
-                DispatchQueue.main.async { continuation.resume() }
-            }
         }
         try #require(positions.count >= 2, "The text must begin a measurable forward pass")
         let count = Double(positions.count)
@@ -994,6 +983,32 @@ struct SideNoticePresenterPillTests {
     @MainActor
     private final class ReadingClock: ObservableObject {
         @Published var progress: Double = 0
+    }
+
+    private struct ReadingAnimationClock<Content: View>: View {
+        @ObservedObject var clock: ReadingClock
+        let content: Content
+
+        var body: some View {
+            let sampleTime = clock.progress
+            content
+                .environment(\.sampledReadingTime, sampleTime)
+                .transaction { transaction in
+                    if let animation = transaction.animation {
+                        transaction.animation = Animation(SampledReadingAnimation(base: animation, startedAt: sampleTime))
+                    }
+                }
+        }
+    }
+
+    private struct SampledReadingAnimation: CustomAnimation {
+        let base: Animation
+        let startedAt: TimeInterval
+
+        func animate<V: VectorArithmetic>(value: V, time: TimeInterval, context: inout AnimationContext<V>) -> V? {
+            let elapsed = context.environment.sampledReadingTime - startedAt
+            return base.animate(value: value, time: elapsed, context: &context)
+        }
     }
 
     private struct ReadingClockText: View {
@@ -1134,5 +1149,16 @@ struct SideNoticePresenterPillTests {
         host.cacheDisplay(in: host.bounds, to: bitmap)
         #expect(host.bounds.size == size && window.alphaValue == 0)
         return try #require(bitmap.converting(to: .sRGB, renderingIntent: .default))
+    }
+}
+
+private enum SampledReadingTimeKey: EnvironmentKey {
+    static let defaultValue: TimeInterval = 0
+}
+
+private extension EnvironmentValues {
+    var sampledReadingTime: TimeInterval {
+        get { self[SampledReadingTimeKey.self] }
+        set { self[SampledReadingTimeKey.self] = newValue }
     }
 }
