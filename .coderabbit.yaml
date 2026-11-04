@@ -1,0 +1,15 @@
+# yaml-language-server: $schema=https://coderabbit.ai/integrations/schema.v2.json
+reviews:
+  high_level_summary_instructions: >-
+    Write the summary in English and include one fenced mermaid flowchart
+    explaining the changed behavior or data flow, including CI and configuration
+    changes. Use double-quoted node labels. Keep the diagram inside the
+    CodeRabbit-managed summary in the PR description and preserve the original
+    description and all seven template sections.
+  auto_review:
+    drafts: true
+    base_branches:
+      - "^publish-v.*$"
+  tools:
+    github-checks:
+      enabled: false

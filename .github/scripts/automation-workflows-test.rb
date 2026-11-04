@@ -142,6 +142,29 @@ class AutomationWorkflowsTest < Minitest::Test
     assert_equal 7, status.exitstatus
   end
 
+  def test_web_checks_have_scripts_and_reject_missing_or_failing_checks
+    scripts = JSON.parse(File.read(File.join(ROOT, 'web/package.json'))).fetch('scripts')
+    { 'Lint' => 'lint', 'Test' => 'test' }.each do |name, script|
+      check = step('web-ci', name)
+      assert_equal "npm run #{script}", check.fetch('run')
+      refute_empty scripts.fetch(script)
+
+      File.write(File.join(@directory, 'package.json'), JSON.generate(scripts: {}))
+      output, status = run_step(check, 'NPM_CONFIG_CACHE' => File.join(@directory, 'npm-cache'))
+      refute status.success?, output
+      assert_includes output, 'Missing script:'
+
+      File.write(File.join(@directory, 'package.json'), JSON.generate(scripts: { script => 'node -e "process.exit(7)"' }))
+      output, status = run_step(check, 'NPM_CONFIG_CACHE' => File.join(@directory, 'npm-cache'))
+      assert_equal 7, status.exitstatus, output
+
+      File.write(File.join(@directory, 'package.json'), JSON.generate(scripts: { script => 'node -e "console.log(\'fixture check ran\')"' }))
+      output, status = run_step(check, 'NPM_CONFIG_CACHE' => File.join(@directory, 'npm-cache'))
+      assert status.success?, output
+      assert_includes output, 'fixture check ran'
+    end
+  end
+
   def test_web_codeql_excludes_only_generated_sparkle_relocation_maps
     workflow = YAML.load_file(File.join(ROOT, '.github/workflows/web-ci.yml'))
     initialization = workflow.fetch('jobs').fetch('build').fetch('steps').find do |entry|
