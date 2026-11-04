@@ -1724,6 +1724,7 @@ final class ScreenshotEditorModel: ObservableObject {
     @Published var mosaicBlurStrength: CGFloat = 0
     @Published var statusMessage: String?
     @Published private(set) var isRecognizing = false
+    let systemTranslation = ClipboardSystemTranslationBridge()
     @Published private(set) var isExtracting = false
     @Published private(set) var hasExtractedImage = false
     @Published private(set) var extractionMode: ScreenshotExtractionMode?
@@ -1769,6 +1770,7 @@ final class ScreenshotEditorModel: ObservableObject {
     /// row away just as well as the truth, so the previous step is what tells the two apart.
     private var lastLongCaptureNewContent: Int?
     private var recognitionOperation: ScreenshotRecognitionOperation?
+    private var recognitionTask: Task<Void, Never>?
     private var extractionOperation: ScreenshotExtractionOperation?
     private var extractionSource: ExtractionSource?
     private var cornerRadiusAdjustmentHasUndoPoint: Bool?
@@ -1994,6 +1996,8 @@ final class ScreenshotEditorModel: ObservableObject {
     @discardableResult
     func recognize(
         _ mode: ScreenshotRecognitionMode,
+        targetLanguage: String = AppLocalization.currentLanguage.translateTargetCode,
+        translationService: ClipboardTranslationService = .live(),
         chooseTableDestination: @escaping @MainActor () async -> URL? = { nil },
         recognizeImage: @escaping @Sendable (CGImage, ScreenshotRecognitionOperation) async throws -> [ScreenshotRecognizedFragment] = {
             try await ScreenshotRecognitionWarmUp.shared.recognize($0, operation: $1)
@@ -2005,7 +2009,7 @@ final class ScreenshotEditorModel: ObservableObject {
         recognitionOperation = operation
         isRecognizing = true
 
-        return Task {
+        recognitionTask = Task {
             defer {
                 if isCurrentRecognition(operation) { isRecognizing = false }
             }
@@ -2030,7 +2034,7 @@ final class ScreenshotEditorModel: ObservableObject {
                     let fragments = try await recognizeImage(cgImage, operation)
                     try operation.checkCancellation()
                     switch mode {
-                    case .text:
+                    case .text, .translate:
                         return .success(ScreenshotRecognitionFormatter.plainText(from: fragments))
                     case .table:
                         let table = ScreenshotRecognitionFormatter.table(from: fragments, image: cgImage)
@@ -2055,16 +2059,105 @@ final class ScreenshotEditorModel: ObservableObject {
                 if let tableURL {
                     statusMessage = AppLocalization.text("表格已保存：%@", tableURL.lastPathComponent)
                 } else {
+                    var result = text
+                    if case .translate = mode {
+                        statusMessage = AppLocalization.text("正在翻译…")
+                        do {
+                            result = try await systemTranslation.autoTranslate(
+                                text, targetLanguage: targetLanguage, service: translationService
+                            )
+                        } catch {
+                            guard isCurrentRecognition(operation) else { return }
+                            statusMessage = AppLocalization.text("翻译失败，请重试或使用浏览器翻译")
+                            return
+                        }
+                        guard isCurrentRecognition(operation) else { return }
+                    }
                     statusMessage = nil
-                    presentText(text, operation)
+                    presentText(result, operation)
                 }
             }
+        }
+        return recognitionTask
+    }
+
+    func presentRecognitionResult(
+        _ text: String,
+        mode: ScreenshotRecognitionMode,
+        operation: ScreenshotRecognitionOperation,
+        alert: NSAlert = NSAlert(),
+        copyText: @escaping @MainActor (String) -> Bool = { ClipboardHistoryPasteboard.write(.text($0)) }
+    ) {
+        let result = text
+        alert.messageText = AppLocalization.text(mode.title)
+        let contentWidth: CGFloat = 480
+        let textView = NSTextView(frame: NSRect(x: 0, y: 0, width: contentWidth, height: 0))
+        textView.string = result
+        textView.isEditable = false
+        textView.isSelectable = true
+        textView.drawsBackground = false
+        textView.isHorizontallyResizable = false
+        textView.textContainer?.containerSize = NSSize(
+            width: contentWidth,
+            height: .greatestFiniteMagnitude
+        )
+        textView.textContainer?.widthTracksTextView = true
+
+        let textContainer = textView.textContainer
+        textView.layoutManager?.ensureLayout(for: textContainer!)
+        let textHeight = (textView.layoutManager?.usedRect(for: textContainer!).height ?? 0)
+            + textView.textContainerInset.height * 2
+        textView.frame.size.height = textHeight
+
+        let visibleHeight = NSApp.keyWindow?.screen?.visibleFrame.height
+            ?? NSScreen.main?.visibleFrame.height
+            ?? 800
+        let scrollView = NSScrollView(frame: NSRect(
+            x: 0,
+            y: 0,
+            width: contentWidth,
+            height: min(max(textHeight, 120), max(120, visibleHeight - 220))
+        ))
+        scrollView.documentView = textView
+        scrollView.drawsBackground = false
+        scrollView.hasVerticalScroller = true
+        scrollView.hasHorizontalScroller = false
+        scrollView.autohidesScrollers = true
+        scrollView.borderType = .noBorder
+        scrollView.scrollerStyle = .overlay
+        ThinScrollChrome.apply(to: scrollView)
+
+        let resultContainer = NSVisualEffectView(frame: scrollView.frame)
+        resultContainer.material = .sidebar
+        resultContainer.blendingMode = .withinWindow
+        resultContainer.state = .active
+        resultContainer.appearance = NSAppearance(named: .aqua)
+        resultContainer.wantsLayer = true
+        resultContainer.layer?.cornerRadius = 8
+        resultContainer.layer?.masksToBounds = true
+        scrollView.frame = resultContainer.bounds.insetBy(dx: 1, dy: 1)
+        scrollView.autoresizingMask = [.width, .height]
+        resultContainer.addSubview(scrollView)
+        alert.accessoryView = resultContainer
+        let copyResult: @MainActor () -> Void = {
+            self.statusMessage = copyText(result)
+                ? AppLocalization.text("%@，结果已复制", AppLocalization.text(mode.title))
+                : AppLocalization.text("无法写入剪贴板")
+        }
+        ScreenshotDialogPresentation.present(alert, shouldPresent: {
+            self.isCurrentRecognition(operation)
+        }, onPresent: {
+            if case .translate = mode { copyResult() }
+        }) { response in
+            guard response == .alertFirstButtonReturn else { return }
+            copyResult()
         }
     }
 
     func cancelRecognition() {
         recognitionOperation?.cancel()
         recognitionOperation = nil
+        recognitionTask?.cancel()
         if isRecognizing { statusMessage = nil }
         isRecognizing = false
     }
@@ -3617,11 +3710,13 @@ struct ScreenshotToolbarDragDots: View {
 enum ScreenshotRecognitionMode: Sendable {
     case text
     case table
+    case translate
 
     var title: String {
         switch self {
         case .text: "识图完成"
         case .table: "表格识别完成"
+        case .translate: "翻译完成"
         }
     }
 }
@@ -4666,6 +4761,7 @@ enum ScreenshotDialogPresentation {
     static func present(
         _ alert: NSAlert,
         shouldPresent: @escaping @MainActor () -> Bool = { true },
+        onPresent: @escaping @MainActor () -> Void = {},
         completionHandler: @escaping @MainActor (NSApplication.ModalResponse) -> Void
     ) {
         // Entering a modal loop from a main-queue callback prevents later main-queue work from running.
@@ -4683,6 +4779,7 @@ enum ScreenshotDialogPresentation {
                 }
                 defer { NotificationCenter.default.removeObserver(observer) }
                 NSApp.activate(ignoringOtherApps: true)
+                onPresent()
                 let response = alert.runModal()
                 guard shouldPresent() else { return }
                 completionHandler(response)
@@ -4942,6 +5039,11 @@ struct ScreenshotEditorView: View {
         }
         .onChange(of: model.mosaicBlurStrength) { _, newValue in
             applyObscureBlurStrength(newValue, ifSelectedRegionUses: .pixelate)
+        }
+        .background {
+            if #available(macOS 15.0, *) {
+                ClipboardSystemTranslationView(bridge: model.systemTranslation)
+            }
         }
     }
 
@@ -6663,6 +6765,9 @@ struct ScreenshotEditorView: View {
             Button { recognize(.text) } label: {
                 Label(AppLocalization.text("识图 / OCR"), systemImage: "text.viewfinder")
             }
+            Button { recognize(.translate) } label: {
+                Label(AppLocalization.text("翻译并复制"), systemImage: "character.bubble")
+            }
             Button { recognize(.table) } label: {
                 Label(AppLocalization.text("表格识别"), systemImage: "tablecells")
             }
@@ -6768,68 +6873,7 @@ struct ScreenshotEditorView: View {
                 chooseTableDestination { continuation.resume(returning: $0) }
             }
         }) { text, operation in
-            let result = text
-            let alert = NSAlert()
-            alert.messageText = AppLocalization.text(mode.title)
-            let contentWidth: CGFloat = 480
-            let textView = NSTextView(frame: NSRect(x: 0, y: 0, width: contentWidth, height: 0))
-            textView.string = result
-            textView.isEditable = false
-            textView.isSelectable = true
-            textView.drawsBackground = false
-            textView.isHorizontallyResizable = false
-            textView.textContainer?.containerSize = NSSize(
-                width: contentWidth,
-                height: .greatestFiniteMagnitude
-            )
-            textView.textContainer?.widthTracksTextView = true
-
-            let textContainer = textView.textContainer
-            textView.layoutManager?.ensureLayout(for: textContainer!)
-            let textHeight = (textView.layoutManager?.usedRect(for: textContainer!).height ?? 0)
-                + textView.textContainerInset.height * 2
-            textView.frame.size.height = textHeight
-
-            let visibleHeight = NSApp.keyWindow?.screen?.visibleFrame.height
-                ?? NSScreen.main?.visibleFrame.height
-                ?? 800
-            let scrollView = NSScrollView(frame: NSRect(
-                x: 0,
-                y: 0,
-                width: contentWidth,
-                height: min(max(textHeight, 120), max(120, visibleHeight - 220))
-            ))
-            scrollView.documentView = textView
-            scrollView.drawsBackground = false
-            scrollView.hasVerticalScroller = true
-            scrollView.hasHorizontalScroller = false
-            scrollView.autohidesScrollers = true
-            scrollView.borderType = .noBorder
-            scrollView.scrollerStyle = .overlay
-            ThinScrollChrome.apply(to: scrollView)
-
-            let resultContainer = NSVisualEffectView(frame: scrollView.frame)
-            resultContainer.material = .sidebar
-            resultContainer.blendingMode = .withinWindow
-            resultContainer.state = .active
-            resultContainer.appearance = NSAppearance(named: .aqua)
-            resultContainer.wantsLayer = true
-            resultContainer.layer?.cornerRadius = 8
-            resultContainer.layer?.masksToBounds = true
-            scrollView.frame = resultContainer.bounds.insetBy(dx: 1, dy: 1)
-            scrollView.autoresizingMask = [.width, .height]
-            resultContainer.addSubview(scrollView)
-            alert.accessoryView = resultContainer
-            let handleResponse: @MainActor (NSApplication.ModalResponse) -> Void = { response in
-                guard response == .alertFirstButtonReturn else { return }
-                let pasteboard = NSPasteboard.general
-                pasteboard.clearContents()
-                pasteboard.setString(result, forType: .string)
-                model.statusMessage = AppLocalization.text("%@，结果已复制", AppLocalization.text(mode.title))
-            }
-            ScreenshotDialogPresentation.present(alert, shouldPresent: {
-                model.isCurrentRecognition(operation)
-            }, completionHandler: handleResponse)
+            model.presentRecognitionResult(text, mode: mode, operation: operation)
         }
     }
 }
