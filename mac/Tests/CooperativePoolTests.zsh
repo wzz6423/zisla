@@ -56,7 +56,14 @@ environment = dict(os.environ,
         for directory in ("Frameworks", "PrivateFrameworks")),
     DYLD_LIBRARY_PATH=str(platform / "Developer/usr/lib"), DYLD_INSERT_LIBRARIES=str(library),
     HOME=str(temporary), CFFIXED_USER_HOME=str(temporary), TMPDIR=str(temporary) + "/")
-bundle = binary_directory / "ZislaKitTests.xctest/Contents/MacOS/ZislaKitTests"
+for candidate in sorted(binary_directory.glob("*.xctest")):
+    bundle = candidate / "Contents/MacOS" / candidate.stem
+    tests = subprocess.check_output([str(host), "--test-bundle-path", str(bundle), "--list-tests"],
+        env=environment, text=True)
+    if any(test.startswith("ZislaKitTests.") for test in tests.splitlines()):
+        break
+else:
+    sys.exit("No ZislaKitTests test bundle found")
 filters = (
     r"^ZislaKitTests.SystemMonitorServiceTests/(?:inFlightSamplesCannotWriteAcrossHistoryLifecycleChanges|concurrentSampleRequestsShareOneInFlightTask)",
     r"^ZislaKitTests.DownloadServiceTests/serviceRunsSeparateDownloadTasksConcurrently",
