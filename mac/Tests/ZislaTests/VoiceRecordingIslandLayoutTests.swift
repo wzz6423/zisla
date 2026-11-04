@@ -64,11 +64,12 @@ struct VoiceRecordingIslandLayoutTests {
 
     @Test(arguments: IslandEdge.allCases)
     func compactRecordingExpandsBesideThePillAndKeepsItsIconArea(edge: IslandEdge) {
-        let collapsed = edge.isVertical ? CGSize(width: 32, height: 70) : CGSize(width: 70, height: 32)
-        let layout = IslandModuleLayout.compactSurface(collapsedSize: collapsed, overflowWidth: 70, edge: edge)
-        let expected = edge.isVertical ? CGSize(width: 320, height: 80) : CGSize(width: 70, height: 52)
+        let collapsed = edge.isVertical ? CGSize(width: 32, height: 70) : CGSize(width: 120, height: 32)
+        let layout = IslandModuleLayout.compactSurface(collapsedSize: collapsed, overflowWidth: 120, edge: edge,
+            locale: AppLanguage.simplifiedChinese.locale)
+        let expected = edge.isVertical ? CGSize(width: 320, height: 80) : CGSize(width: 120, height: 52)
         #expect(layout.islandSize == expected)
-        #expect(layout.panelSize == (edge.isVertical ? expected : CGSize(width: 70, height: 56)))
+        #expect(layout.panelSize == (edge.isVertical ? expected : CGSize(width: 120, height: 56)))
         let geometry = VoiceRecordingIslandGeometry(collapsedSize: collapsed, availableSize: layout.islandSize, edge: edge)
         let icon = geometry.topRowFrame
         let text = geometry.transcriptRowFrame
@@ -126,7 +127,8 @@ struct VoiceRecordingIslandLayoutTests {
         let geometry = VoiceRecordingIslandGeometry(collapsedSize: CGSize(width: 32, height: 32),
             availableSize: CGSize(width: 180, height: 52))
         func iconSpan(adjacent: Bool) throws -> Int {
-            let renderer = ImageRenderer(content: VoiceTranscriptionView(voiceInput: VoiceInputController(),
+            let renderer = ImageRenderer(content: VoiceTranscriptionView(isRecording: false, transcript: "",
+                errorDescription: nil,
                 geometry: geometry, keepsIconsAdjacent: adjacent)
                 .frame(width: 180, height: 52).background(.black))
             renderer.scale = 1

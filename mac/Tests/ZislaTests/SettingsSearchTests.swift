@@ -6,6 +6,13 @@ import ZislaKit
 @testable import Zisla
 
 struct SettingsSearchTests {
+    @Test(arguments: AppLanguage.allCases)
+    func userCareOptInIsSearchableBeforeEnablingIt(language: AppLanguage) {
+        let title = AppLocalization.string("用户关怀", language: language)
+        let matches = results(title, settings: FeatureSettings(userCareEnabled: false), locale: language.locale)
+        #expect(matches.contains { $0.section == .features && $0.title == "用户关怀" && $0.anchor == .row("用户关怀") })
+    }
+
     @Test(arguments: ["", " \n\t\u{3000}", "没有这个设置xyz", ".*", "[invalid]"])
     func emptyAndUnmatchedQueriesHaveNoResults(query: String) {
         #expect(results(query).isEmpty)

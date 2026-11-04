@@ -28,6 +28,8 @@ struct MarqueeText: View {
     var repeats = true
     var scrollProgress: Double?
     var clipsOverflowWhenStatic = false
+    /// Fallback fonts can draw diacritics beyond their nominal line box.
+    var viewportHeight: CGFloat?
 
     init(
         _ text: String,
@@ -39,7 +41,8 @@ struct MarqueeText: View {
         scrollDirection: MarqueeScrollDirection = .left,
         repeats: Bool = true,
         scrollProgress: Double? = nil,
-        clipsOverflowWhenStatic: Bool = false
+        clipsOverflowWhenStatic: Bool = false,
+        viewportHeight: CGFloat? = nil
     ) {
         self.text = text
         self.font = font
@@ -51,9 +54,11 @@ struct MarqueeText: View {
         self.repeats = repeats
         self.scrollProgress = scrollProgress
         self.clipsOverflowWhenStatic = clipsOverflowWhenStatic
+        self.viewportHeight = viewportHeight
     }
 
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @Environment(\.layoutDirection) private var layoutDirection
     @State private var textWidth: CGFloat = 0
     @State private var containerWidth: CGFloat = 0
     @State private var automaticScrollDistance: CGFloat = 0
@@ -83,13 +88,15 @@ struct MarqueeText: View {
                                                   travel: scrollTravel, direction: scrollDirection))
                     }
                 }
-                .frame(width: max(0, containerWidth), alignment: .leading)
+                .frame(width: max(0, containerWidth), height: viewportHeight, alignment: .leading)
                 .clipped()
+                // Explicit rightward scrolling needs physical coordinates because SwiftUI mirrors RTL offsets.
+                .environment(\.layoutDirection, scrollDirection == .right ? .leftToRight : layoutDirection)
             } else {
                 if clipsOverflowWhenStatic {
                     marqueeLabel
                         .fixedSize(horizontal: true, vertical: false)
-                        .frame(width: max(0, containerWidth), alignment: .leading)
+                        .frame(width: max(0, containerWidth), height: viewportHeight, alignment: .leading)
                         .clipped()
                 } else {
                     marqueeLabel
@@ -99,6 +106,7 @@ struct MarqueeText: View {
             }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
+        .frame(height: viewportHeight)
         .clipped()
         .task(id: automaticAnimationIdentity) {
             var transaction = Transaction(animation: nil)
@@ -153,6 +161,7 @@ struct MarqueeText: View {
             .fontWeight(fontWeight)
             .foregroundColor(textColor)
             .lineLimit(1)
+            .environment(\.layoutDirection, layoutDirection)
     }
 
     private var scrollTravel: CGFloat {

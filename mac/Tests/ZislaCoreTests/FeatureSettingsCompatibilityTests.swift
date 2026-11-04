@@ -3,6 +3,28 @@ import Testing
 @testable import ZislaCore
 
 struct FeatureSettingsCompatibilityTests {
+    @Test
+    func userCareRequiresOptInForNewAndLegacySettings() throws {
+        #expect(!FeatureSettings.default.userCareEnabled)
+        for json in ["{}", #"{"userCareEnabled":null,"petEnabled":false}"#] {
+            let settings = try JSONDecoder().decode(FeatureSettings.self, from: Data(json.utf8))
+            #expect(!settings.userCareEnabled)
+        }
+        for enabled in [false, true] {
+            let settings = FeatureSettings(userCareEnabled: enabled)
+            let restored = try JSONDecoder().decode(FeatureSettings.self, from: JSONEncoder().encode(settings))
+            #expect(restored == settings)
+            #expect(restored.userCareEnabled == enabled)
+        }
+    }
+
+    @Test(arguments: [#""true""#, "1", "[]", "{}"])
+    func userCareRejectsInvalidSettingValues(value: String) {
+        #expect(throws: DecodingError.self) {
+            try JSONDecoder().decode(FeatureSettings.self, from: Data("{\"userCareEnabled\":\(value)}".utf8))
+        }
+    }
+
     private static let previousScreenshotToolHotkeys: [String: VoiceInputHotkeyPreset] = [
         "rectangle": .init(keyCode: 23, carbonModifiers: 0x1000, keyDisplayName: "5"),
         "ellipse": .init(keyCode: 22, carbonModifiers: 0x1000, keyDisplayName: "6"),

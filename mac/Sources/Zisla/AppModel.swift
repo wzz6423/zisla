@@ -189,15 +189,20 @@ struct IslandModuleLayout: Equatable {
     panelSize: CGSize(width: 240, height: 58)
   )
 
-  static func compactSurface(collapsedSize: CGSize, overflowWidth: CGFloat, edge: IslandEdge) -> IslandModuleLayout {
+  static func compactSurface(
+    collapsedSize: CGSize, overflowWidth: CGFloat, edge: IslandEdge,
+    locale: Locale = AppLocalization.currentLanguage.locale
+  ) -> IslandModuleLayout {
     if edge.isVertical {
       let size = CGSize(width: 320, height: max(80, collapsedSize.height))
       return IslandModuleLayout(islandSize: size, panelSize: size)
     }
     let height = collapsedSize.height + VoiceRecordingIslandGeometry.transcriptRowHeight
+    let textWidth = TransientNoticeMetrics.textWidth(of: AppLocalization.string("正在聆听…", locale: locale))
+    let width = max(70, overflowWidth, ceil(textWidth) + TransientNoticeMetrics.rowHorizontalPadding * 2)
     return IslandModuleLayout(
-      islandSize: CGSize(width: max(70, overflowWidth), height: height),
-      panelSize: CGSize(width: max(70, overflowWidth), height: height + 4)
+      islandSize: CGSize(width: width, height: height),
+      panelSize: CGSize(width: width, height: height + 4)
     )
   }
   /// Mirror uses a square panel so the camera preview maintains its natural aspect ratio without cropping.
@@ -546,6 +551,10 @@ final class AppModel: ObservableObject {
   let backgroundSounds = SystemBackgroundSoundService()
   let battery = BatteryMonitor()
   private lazy var lowBatteryNotice = LowBatteryNoticeController(queue: notices)
+  var userCarePresentationAllowed: () -> Bool = { false }
+  private lazy var userCare = UserCareService(queue: notices) { [weak self] in
+    self?.userCarePresentationAllowed() == true
+  }
   let networkBattery = NetworkBatteryMonitor()
   let focusMode = FocusModeMonitor()
   let quickNotes = QuickNotesService()
@@ -1127,6 +1136,7 @@ final class AppModel: ObservableObject {
 
   func stop() {
     headphoneTransientLifecycleActive = false
+    userCare.stop()
     aiResultSweep.cancel()
     windowPreview.stop()
     settingsStore.flushPendingChanges()
@@ -3087,6 +3097,7 @@ final class AppModel: ObservableObject {
       stopsWhenUnused: settings.systemBackgroundSoundStopsWhenUnused
     )
     consumeBackgroundSoundPlayback()
+    userCare.apply(settings: settings)
     if settings.sideNoticesEnabled {
       focusMode.start()
     } else {

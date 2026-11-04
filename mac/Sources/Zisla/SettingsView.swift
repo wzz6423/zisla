@@ -978,6 +978,14 @@ struct SettingsView: View {
                     rowDivider
                     featureToggle("工具箱提醒", detail: "在收起态提示番茄钟、亮屏和清洁状态", symbol: "bell.fill", keyPath: \.toolboxReminderEnabled)
                         .disabled(!model.settingsStore.settings.toolboxEnabled || !model.settingsStore.settings.sideNoticesEnabled)
+                    rowDivider
+                    featureToggle(
+                        "用户关怀",
+                        detail: "连续使用 45 分钟后，温柔提醒休息、喝水和走动",
+                        symbol: "heart.fill",
+                        keyPath: \.userCareEnabled
+                    )
+                    .disabled(!model.settingsStore.settings.sideNoticesEnabled)
                 }
 
                 settingsGroup("AI 与语音") {

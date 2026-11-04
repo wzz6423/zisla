@@ -17,6 +17,7 @@ struct IslandRootView: View {
 
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @Environment(\.layoutDirection) private var layoutDirection
+    @Environment(\.locale) private var locale
     @StateObject private var dropState = IslandDropState()
     @StateObject private var cleanupPanelPresentation = SystemCleanupPanelPresentationState()
     @StateObject private var historyPanelPresentation = SystemMetricsHistoryPanelPresentationState()
@@ -176,7 +177,9 @@ struct IslandRootView: View {
                     VStack(spacing: 0) {
                         if voiceInput.isCapturingInput {
                             VoiceTranscriptionView(
-                                voiceInput: voiceInput,
+                                isRecording: voiceInput.isRecording,
+                                transcript: voiceInput.transcript,
+                                errorDescription: voiceInput.errorDescription,
                                 geometry: voiceRecordingGeometry,
                                 keepsIconsAdjacent: settingsStore.settings.islandLayoutStyle == .pill
                                     && settingsStore.settings.islandPlacement.mode == .custom
@@ -630,7 +633,8 @@ struct IslandRootView: View {
             return IslandModuleLayout.compactSurface(
                 collapsedSize: model.collapsedIslandSize,
                 overflowWidth: model.collapsedOverflowWidth,
-                edge: model.islandEdge
+                edge: model.islandEdge,
+                locale: locale
             )
         }
         guard let activeModule else { return .standard }
@@ -813,10 +817,14 @@ struct CollapsedPetView: View {
 }
 
 struct VoiceTranscriptionView: View {
-    @ObservedObject var voiceInput: VoiceInputController
+    let isRecording: Bool
+    let transcript: String
+    let errorDescription: String?
     let geometry: VoiceRecordingIslandGeometry
     let keepsIconsAdjacent: Bool
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @Environment(\.layoutDirection) private var layoutDirection
+    @Environment(\.locale) private var locale
 
     var body: some View {
         let iconLayout = geometry.edge.isVertical
@@ -826,8 +834,8 @@ struct VoiceTranscriptionView: View {
             iconLayout {
                 Image(systemName: "mic.fill")
                     .font(.system(size: 13, weight: .semibold))
-                    .foregroundStyle(voiceInput.isRecording ? Color.zislaError : .white.opacity(0.45))
-                    .accessibilityLabel(voiceInput.isRecording ? AppLocalization.text("正在录音") : AppLocalization.text("正在准备录音"))
+                    .foregroundStyle(isRecording ? Color.zislaError : .white.opacity(0.45))
+                    .accessibilityLabel(isRecording ? AppLocalization.text("正在录音") : AppLocalization.text("正在准备录音"))
 
                 if !keepsIconsAdjacent { Spacer(minLength: 12) }
 
@@ -853,11 +861,14 @@ struct VoiceTranscriptionView: View {
                 font: .system(size: 10.5),
                 textColor: .white.opacity(0.72),
                 fontWeight: .medium,
+                scrollDirection: layoutDirection == .rightToLeft ? .right : .left,
                 repeats: false,
-                scrollProgress: 1,
-                clipsOverflowWhenStatic: true
+                scrollProgress: followsTranscript ? 1 : nil,
+                clipsOverflowWhenStatic: followsTranscript,
+                viewportHeight: geometry.transcriptRowFrame.height
             )
-                .padding(.horizontal, 12)
+                .environment(\.layoutDirection, layoutDirection)
+                .padding(.horizontal, TransientNoticeMetrics.rowHorizontalPadding)
                 .frame(
                     width: geometry.transcriptRowFrame.width,
                     height: geometry.transcriptRowFrame.height,
@@ -866,23 +877,31 @@ struct VoiceTranscriptionView: View {
                 .position(x: geometry.transcriptRowFrame.midX, y: geometry.transcriptRowFrame.midY)
         }
         .frame(width: geometry.surfaceSize.width, height: geometry.surfaceSize.height)
+        // Row frames use screen coordinates while each label retains its reading direction.
+        .environment(\.layoutDirection, .leftToRight)
+    }
+
+    private var followsTranscript: Bool {
+        errorDescription == nil && isRecording
+            && !transcript.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
     }
 
     private var transcriptOrPlaceholder: String {
-        if let error = voiceInput.errorDescription { return error }
+        if let errorDescription { return errorDescription }
         // Only a live take may put text here. The surface opens on the keypress, so while the engine
         // spins up the row stays a bare ellipsis rather than claiming to listen.
-        guard voiceInput.isRecording else { return "…" }
-        let text = voiceInput.transcript.trimmingCharacters(in: .whitespacesAndNewlines)
-        return text.isEmpty ? AppLocalization.text("正在聆听…") : text
+        guard isRecording else { return "…" }
+        let text = transcript.trimmingCharacters(in: .whitespacesAndNewlines)
+        return text.isEmpty ? AppLocalization.string("正在聆听…", locale: locale) : text
     }
 }
 
 /// Mirrors `VoiceTranscriptionView`: the collapsed pill keeps a warning glyph while the message
 /// scrolls in the row protruding underneath it.
-private struct TransientNoticeView: View {
+struct TransientNoticeView: View {
     let message: String
     let geometry: VoiceRecordingIslandGeometry
+    @Environment(\.layoutDirection) private var layoutDirection
 
     var body: some View {
         ZStack {
@@ -906,8 +925,11 @@ private struct TransientNoticeView: View {
                 textColor: .white.opacity(0.82),
                 fontWeight: TransientNoticeMetrics.fontWeight,
                 pointsPerSecond: TransientNoticeMetrics.pointsPerSecond,
-                repeats: false
+                scrollDirection: layoutDirection == .rightToLeft ? .right : .left,
+                repeats: false,
+                viewportHeight: geometry.transcriptRowFrame.height
             )
+                .environment(\.layoutDirection, layoutDirection)
                 .padding(.horizontal, TransientNoticeMetrics.rowHorizontalPadding)
                 .frame(
                     width: geometry.transcriptRowFrame.width,
@@ -917,6 +939,7 @@ private struct TransientNoticeView: View {
                 .position(x: geometry.transcriptRowFrame.midX, y: geometry.transcriptRowFrame.midY)
         }
         .frame(width: geometry.surfaceSize.width, height: geometry.surfaceSize.height)
+        .environment(\.layoutDirection, .leftToRight)
         .accessibilityElement(children: .combine)
         .accessibilityLabel(message)
     }

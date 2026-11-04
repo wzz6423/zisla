@@ -669,6 +669,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
             displayIDs: model.settingsStore.settings.activityNoticeDisplayIDs,
             isScreenLocked: lockScreenOverlayController.isScreenLocked
         )
+        model.userCarePresentationAllowed = { [weak self] in
+            self?.noticePresenter?.canPresentUserCareNotice == true
+        }
         noticePresenter?.onCompactLayoutChanged = { [weak coordinator] displayID, expanded, length, sideWidth, iconSize in
             guard coordinator?.activeDisplayID == displayID else { return }
             coordinator?.updateCompactStatus(expandsForDetailedStatus: expanded, compactStatusLength: length,

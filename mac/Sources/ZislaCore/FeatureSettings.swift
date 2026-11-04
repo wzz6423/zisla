@@ -820,6 +820,7 @@ public struct FeatureSettings: Codable, Equatable, Sendable {
     public var contextNotesEnabled: Bool
     public var contextNoteHoldHotkey: VoiceInputHotkeyPreset
     public var sideNoticesEnabled: Bool
+    public var userCareEnabled: Bool
     /// Whether collapsed notice bars show their playback, download, or dismissal progress glow.
     public var collapsedProgressGlowEnabled: Bool
     public var aiTaskResultSweepEnabled: Bool
@@ -965,6 +966,7 @@ public struct FeatureSettings: Codable, Equatable, Sendable {
         contextNotesEnabled: Bool = false,
         contextNoteHoldHotkey: VoiceInputHotkeyPreset = VoiceInputHotkeyPreset(keyCode: 55, carbonModifiers: 0x0100, keyDisplayName: "Command"),
         sideNoticesEnabled: Bool = true,
+        userCareEnabled: Bool = false,
         collapsedProgressGlowEnabled: Bool = true,
         aiTaskResultSweepEnabled: Bool = true,
         compactStatusPriority: [CompactStatusPriority] = CompactStatusPriority.defaultOrder,
@@ -1099,6 +1101,7 @@ public struct FeatureSettings: Codable, Equatable, Sendable {
         self.contextNotesEnabled = contextNotesEnabled
         self.contextNoteHoldHotkey = contextNoteHoldHotkey
         self.sideNoticesEnabled = sideNoticesEnabled
+        self.userCareEnabled = userCareEnabled
         self.collapsedProgressGlowEnabled = collapsedProgressGlowEnabled
         self.aiTaskResultSweepEnabled = aiTaskResultSweepEnabled
         self.compactStatusPriority = CompactStatusPriority.normalized(compactStatusPriority)
@@ -1251,6 +1254,7 @@ public struct FeatureSettings: Codable, Equatable, Sendable {
         case contextNotesEnabled
         case contextNoteHoldHotkey
         case sideNoticesEnabled
+        case userCareEnabled
         case collapsedProgressGlowEnabled
         case aiTaskResultSweepEnabled
         case compactStatusPriority
@@ -1523,6 +1527,7 @@ public struct FeatureSettings: Codable, Equatable, Sendable {
         contextNotesEnabled = try container.decodeIfPresent(Bool.self, forKey: .contextNotesEnabled) ?? defaults.contextNotesEnabled
         contextNoteHoldHotkey = try container.decodeIfPresent(VoiceInputHotkeyPreset.self, forKey: .contextNoteHoldHotkey) ?? defaults.contextNoteHoldHotkey
         sideNoticesEnabled = try container.decodeIfPresent(Bool.self, forKey: .sideNoticesEnabled) ?? defaults.sideNoticesEnabled
+        userCareEnabled = try container.decodeIfPresent(Bool.self, forKey: .userCareEnabled) ?? defaults.userCareEnabled
         collapsedProgressGlowEnabled = try container.decodeIfPresent(
             Bool.self,
             forKey: .collapsedProgressGlowEnabled

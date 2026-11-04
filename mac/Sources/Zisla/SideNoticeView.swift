@@ -1372,7 +1372,7 @@ private struct MessageAppIcon: View {
     }
 }
 
-private struct MessageScrollingText: View {
+struct MessageScrollingText: View {
     var text: String
     var reduceMotion: Bool
 
@@ -1401,7 +1401,7 @@ private struct MessageScrollingText: View {
                             }
                         )
                         .offset(x: textWidth <= available ? 0 : offset)
-                        .frame(width: available, alignment: .leading)
+                        .frame(width: available, height: geo.size.height, alignment: .leading)
                         .clipped()
                 }
             }
@@ -1422,18 +1422,22 @@ private struct MessageScrollingText: View {
         }
         .frame(height: 20)
         .clipped()
-        .mask(
-            LinearGradient(
-                stops: [
-                    .init(color: .clear, location: 0),
-                    .init(color: .black, location: 0.04),
-                    .init(color: .black, location: 0.96),
-                    .init(color: .clear, location: 1),
-                ],
-                startPoint: .leading,
-                endPoint: .trailing
-            )
-        )
+        .mask {
+            if !reduceMotion && textWidth > containerWidth {
+                LinearGradient(
+                    stops: [
+                        .init(color: .clear, location: 0),
+                        .init(color: .black, location: 0.04),
+                        .init(color: .black, location: 0.96),
+                        .init(color: .clear, location: 1),
+                    ],
+                    startPoint: .leading,
+                    endPoint: .trailing
+                )
+            } else {
+                Rectangle()
+            }
+        }
     }
 
     private func startScrollIfNeeded() {

@@ -21,6 +21,9 @@ final class SideNoticePresenter {
     private var suppression = SideNoticeSuppression()
     private var isScreenshotActive = false
     private var isPlacementSelectionActive = false
+    var canPresentUserCareNotice: Bool {
+        !isStopped && !isScreenshotActive && !isPlacementSelectionActive && !suppression.hidesNotices
+    }
     private var transientMessage: String?
     private var statusIcons: [IslandStatusIcon] = []
     private var availableStatusIcons: [IslandStatusIcon] {
@@ -196,6 +199,9 @@ final class SideNoticePresenter {
     private func updatePanels(rejoiningActiveSpace: Bool = false) {
         guard !isStopped else { return }
         let hidesPanels = isScreenshotActive || isPlacementSelectionActive || suppression.hidesNotices
+        if hidesPanels {
+            hideAllPanels()
+        }
         let snapshots = screenSnapshotProvider()
         guard !snapshots.isEmpty else {
             hideAllPanels()
@@ -657,6 +663,9 @@ final class SideNoticePresenter {
     }
 
     private func hideAllPanels() {
+        if (queue.left + queue.right).contains(where: { $0.id == UserCareService.noticeID }) {
+            queue.remove(id: UserCareService.noticeID)
+        }
         for panels in panelsByDisplayID.values {
             panels.orderOut()
         }
