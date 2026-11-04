@@ -1,0 +1,9 @@
+{
+  "id": "usagi",
+  "displayName": "乌萨奇",
+  "description": "A tiny cream rabbit companion based on the provided Usagi reference.",
+  "spritePath": "sprite.png",
+  "frameWidth": 128,
+  "frames": 6,
+  "fps": 6
+}

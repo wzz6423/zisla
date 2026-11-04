@@ -1,0 +1,9 @@
+{
+  "id": "lop-rabbit",
+  "displayName": "垂耳兔",
+  "description": "有着长长垂耳的蓝色小兔。",
+  "spritePath": "sprite.png",
+  "frameWidth": 128,
+  "frames": 6,
+  "fps": 6
+}

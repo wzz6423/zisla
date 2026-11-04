@@ -1,0 +1,9 @@
+{
+  "id": "golden-retriever",
+  "displayName": "金毛",
+  "description": "温暖金色毛发的笑脸小金毛。",
+  "spritePath": "sprite.png",
+  "frameWidth": 128,
+  "frames": 6,
+  "fps": 6
+}

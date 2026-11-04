@@ -1,0 +1,9 @@
+{
+  "id": "orange-capybara",
+  "displayName": "橘子水豚",
+  "description": "头顶小橘子的圆润水豚。",
+  "spritePath": "sprite.png",
+  "frameWidth": 128,
+  "frames": 6,
+  "fps": 6
+}

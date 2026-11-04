@@ -68,6 +68,9 @@ jobs:
         if: matrix.shard == 0
         run: |
           zsh Scripts/swift-test.sh --skip-build --filter '^ZislaCoreTests\.'
+      - name: Check blocking I/O with two cooperative workers
+        if: matrix.shard == 0
+        run: zsh Tests/CooperativePoolTests.zsh
       - name: Run isolated Swift suites
         run: |
           zsh Scripts/swift-test-suites.sh ZislaKitTests,ZislaTests --skip-build

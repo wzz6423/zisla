@@ -1,0 +1,9 @@
+{
+  "id": "hachiware",
+  "displayName": "小八",
+  "description": "A tiny Hachiware-inspired desktop pet with white and blue cat markings, bright eyes, and cheerful expressions.",
+  "spritePath": "sprite.png",
+  "frameWidth": 128,
+  "frames": 6,
+  "fps": 6
+}

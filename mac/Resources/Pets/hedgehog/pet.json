@@ -1,0 +1,9 @@
+{
+  "id": "hedgehog",
+  "displayName": "小刺猬",
+  "description": "戴着小吊坠、背着棕色尖刺的小刺猬。",
+  "spritePath": "sprite.png",
+  "frameWidth": 128,
+  "frames": 6,
+  "fps": 6
+}

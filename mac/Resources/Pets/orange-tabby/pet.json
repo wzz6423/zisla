@@ -1,0 +1,9 @@
+{
+  "id": "orange-tabby",
+  "displayName": "橘猫",
+  "description": "睡眼惺忪的橘白虎斑猫。",
+  "spritePath": "sprite.png",
+  "frameWidth": 128,
+  "frames": 6,
+  "fps": 6
+}

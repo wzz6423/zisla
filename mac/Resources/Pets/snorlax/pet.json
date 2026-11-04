@@ -1,0 +1,9 @@
+{
+  "id": "snorlax",
+  "displayName": "卡比兽",
+  "description": "贪睡贪吃苹果的卡比兽",
+  "spritePath": "sprite.png",
+  "frameWidth": 128,
+  "frames": 6,
+  "fps": 6
+}

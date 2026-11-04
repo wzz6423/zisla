@@ -1,0 +1,9 @@
+{
+  "id": "kirby",
+  "displayName": "卡比",
+  "description": "A Kirby-themed pink pet with clean padded Codex frames.",
+  "spritePath": "sprite.png",
+  "frameWidth": 128,
+  "frames": 8,
+  "fps": 6
+}

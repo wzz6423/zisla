@@ -1,0 +1,9 @@
+{
+  "id": "anya",
+  "displayName": "阿尼亚",
+  "description": "A tiny Anya Forger inspired telepath girl mascot from Spy x Family, made as a Codex digital pet with rich cute expressions and lively actions.",
+  "spritePath": "sprite.png",
+  "frameWidth": 128,
+  "frames": 6,
+  "fps": 6
+}

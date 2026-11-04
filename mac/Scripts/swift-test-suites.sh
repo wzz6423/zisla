@@ -89,8 +89,12 @@ with tempfile.TemporaryDirectory(prefix="zisla-swift-test-suites.") as temporary
     build_arguments = [argument for argument in arguments if argument != "--skip-build"]
     binary_directory = Path(capture(["swift", "build", *build_arguments, "--show-bin-path"]).strip())
     swift = Path(capture(["xcrun", "--find", "swift"]).strip())
-    helper = swift.parent.parent / "libexec/swift/pm/swiftpm-testing-helper"
     platform = Path(capture(["xcrun", "--sdk", "macosx", "--show-sdk-platform-path"]).strip())
+    sdk = capture(["xcrun", "--sdk", "macosx", "--show-sdk-path"]).strip()
+    host = scratch / "swift-testing-host"
+    capture([str(swift.parent / "swiftc"), "-swift-version", "6", "-parse-as-library",
+        str(Path(root) / "Scripts/SwiftTestingHost.swift"),
+        "-F", str(platform / "Developer/Library/Frameworks"), "-sdk", sdk, "-o", str(host)])
     environment = dict(os.environ,
         DYLD_FRAMEWORK_PATH=os.pathsep.join(str(platform / "Developer/Library" / directory)
             for directory in ("Frameworks", "PrivateFrameworks")),
@@ -99,7 +103,7 @@ with tempfile.TemporaryDirectory(prefix="zisla-swift-test-suites.") as temporary
     discovered = set()
     for bundle in sorted(binary_directory.glob("*.xctest")):
         binary = bundle / "Contents/MacOS" / bundle.stem
-        command = [str(helper), "--test-bundle-path", str(binary), "--testing-library", "swift-testing"]
+        command = [str(host), "--test-bundle-path", str(binary), "--testing-library", "swift-testing"]
         tests = selected_tests(capture(command + ["--list-tests"], environment))
         for suite in {test.split("/")[0] for test in tests}:
             if suite in suites:
@@ -168,7 +172,7 @@ with tempfile.TemporaryDirectory(prefix="zisla-swift-test-suites.") as temporary
                 suite_environment = dict(environment, HOME=str(work / "home"),
                     CFFIXED_USER_HOME=str(work / "home"), TMPDIR=str(work / "tmp") + "/")
                 output = (work / "output.log").open("w")
-                # SwiftPM locks its scratch path even with --skip-build; the helper only loads the built bundle.
+                # SwiftPM locks its scratch path even with --skip-build; the host only loads the built bundle.
                 # SIP strips DYLD variables when zsh starts, so restore them after the system shell handoff.
                 process = subprocess.Popen(
                     ["zsh", str(Path(root) / "Scripts/swift-test.sh"), "--runner", "/usr/bin/env",

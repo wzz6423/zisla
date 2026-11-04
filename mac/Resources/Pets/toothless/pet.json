@@ -1,0 +1,9 @@
+{
+  "id": "toothless",
+  "displayName": "没牙仔",
+  "description": "Cleaner Night Fury-inspired in-place dragon pet art test.",
+  "spritePath": "sprite.png",
+  "frameWidth": 128,
+  "frames": 6,
+  "fps": 6
+}

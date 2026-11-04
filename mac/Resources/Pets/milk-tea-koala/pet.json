@@ -1,0 +1,9 @@
+{
+  "id": "milk-tea-koala",
+  "displayName": "奶茶考拉",
+  "description": "拿着珍珠奶茶、挥着小爪子的灰色考拉。",
+  "spritePath": "sprite.png",
+  "frameWidth": 128,
+  "frames": 7,
+  "fps": 6
+}

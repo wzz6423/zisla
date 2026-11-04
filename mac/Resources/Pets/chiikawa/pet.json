@@ -1,0 +1,9 @@
+{
+  "id": "chiikawa",
+  "displayName": "吉伊卡哇",
+  "description": "A tiny white Chiikawa-inspired desktop pet with round ears, black bean eyes, pink cheeks, and shy soft expressions.",
+  "spritePath": "sprite.png",
+  "frameWidth": 128,
+  "frames": 6,
+  "fps": 6
+}

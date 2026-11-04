@@ -1,0 +1,9 @@
+{
+  "id": "calico-cat",
+  "displayName": "三花猫",
+  "description": "蜷着尾巴休息的黑橘白三花猫。",
+  "spritePath": "sprite.png",
+  "frameWidth": 128,
+  "frames": 6,
+  "fps": 6
+}

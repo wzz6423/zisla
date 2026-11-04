@@ -1,0 +1,9 @@
+{
+  "id": "mellow-otter",
+  "displayName": "软萌水獭",
+  "description": "坐着露出小爪子、神情悠闲的水獭。",
+  "spritePath": "sprite.png",
+  "frameWidth": 128,
+  "frames": 6,
+  "fps": 6
+}

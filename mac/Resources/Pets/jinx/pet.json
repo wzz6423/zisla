@@ -1,0 +1,9 @@
+{
+  "id": "jinx",
+  "displayName": "金克丝",
+  "description": "Jinx em estilo pet Codex, dançando o loop elástico inspirado no Jake.",
+  "spritePath": "sprite.png",
+  "frameWidth": 128,
+  "frames": 6,
+  "fps": 6
+}

@@ -1,0 +1,9 @@
+{
+  "id": "gudetama",
+  "displayName": "蛋黄哥",
+  "description": "Egg yolk",
+  "spritePath": "sprite.png",
+  "frameWidth": 128,
+  "frames": 6,
+  "fps": 6
+}

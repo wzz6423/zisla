@@ -1,0 +1,9 @@
+{
+  "id": "kuromi",
+  "displayName": "库洛米",
+  "description": "Github : LxNx-Hn // A tiny Kuromi pixel pet for playful coding sessions.",
+  "spritePath": "sprite.png",
+  "frameWidth": 128,
+  "frames": 6,
+  "fps": 6
+}

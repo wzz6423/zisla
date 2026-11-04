@@ -788,9 +788,12 @@ public actor DownloadService {
     }
 
     private nonisolated static func waitForExit(_ process: ProcessBox) async -> Int32 {
-        await Task.detached(priority: .utility) {
-            process.waitUntilExit()
-        }.value
+        // Pipe readers and process waits must leave cooperative workers free for cancellation and events.
+        await withCheckedContinuation { continuation in
+            DispatchQueue.global(qos: .utility).async {
+                continuation.resume(returning: process.waitUntilExit())
+            }
+        }
     }
 
     private nonisolated static func drain(
@@ -801,7 +804,7 @@ public actor DownloadService {
             var pending = Data()
             var diagnostic = BoundedData(limit: 128 * 1_024)
             do {
-                while let chunk = try fileHandle.read(upToCount: 32 * 1_024), !chunk.isEmpty {
+                while let chunk = try await fileHandle.read(upToCount: 32 * 1_024), !chunk.isEmpty {
                     diagnostic.append(chunk)
                     pending.append(chunk)
                     while let newline = pending.firstIndex(of: 0x0A) {
@@ -832,7 +835,7 @@ public actor DownloadService {
             var data = Data()
             var isTruncated = false
             do {
-                while let chunk = try fileHandle.read(upToCount: 32 * 1_024), !chunk.isEmpty {
+                while let chunk = try await fileHandle.read(upToCount: 32 * 1_024), !chunk.isEmpty {
                     let remaining = limit - data.count
                     if remaining > 0 {
                         data.append(chunk.prefix(remaining))
@@ -900,8 +903,13 @@ private final class FileHandleBox: @unchecked Sendable {
         self.fileHandle = fileHandle
     }
 
-    func read(upToCount count: Int) throws -> Data? {
-        try fileHandle.read(upToCount: count)
+    // A pipe can stay open until a different task completes; never block its cooperative worker.
+    func read(upToCount count: Int) async throws -> Data? {
+        try await withCheckedThrowingContinuation { continuation in
+            DispatchQueue.global(qos: .utility).async { [fileHandle] in
+                continuation.resume(with: Result { try fileHandle.read(upToCount: count) })
+            }
+        }
     }
 }
 

@@ -7,8 +7,8 @@ import ZislaCore
 /// Built-in pets live at bundle resource `Resources/Pets/<id>/` (in development, `#filePath`
 /// is used to locate the source root; in a packaged build, `Bundle.main` is used).
 ///
-/// This app does not support user imports or network installation: all pets are pre-bundled CC0
-/// pixel animals, and users can only choose from the built-in list in Settings.
+/// Pets are pre-bundled, and users choose from the built-in list in Settings.
+/// Artwork sources and rights are recorded in `Resources/Pets/CREDITS.md`.
 public enum PetLibrary {
     /// Slug list of pets bundled in the app: scans subdirectories of `Resources/Pets/` that contain a valid `pet.json`.
     ///

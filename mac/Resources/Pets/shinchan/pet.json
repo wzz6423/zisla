@@ -1,0 +1,9 @@
+{
+  "id": "shinchan",
+  "displayName": "蜡笔小新",
+  "description": "A tiny mischievous kindergarten-boy companion in a red shirt and yellow shorts.",
+  "spritePath": "sprite.png",
+  "frameWidth": 128,
+  "frames": 6,
+  "fps": 6
+}

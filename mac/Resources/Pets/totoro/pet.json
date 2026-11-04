@@ -1,0 +1,9 @@
+{
+  "id": "totoro",
+  "displayName": "龙猫",
+  "description": "A pointy-eared chinchilla digital pet inspired by the reference.",
+  "spritePath": "sprite.png",
+  "frameWidth": 128,
+  "frames": 6,
+  "fps": 6
+}

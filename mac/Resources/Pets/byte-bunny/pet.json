@@ -1,0 +1,9 @@
+{
+  "id": "byte-bunny",
+  "displayName": "键帽兔",
+  "description": "戴着蓝色领巾、带着小键帽的白兔。",
+  "spritePath": "sprite.png",
+  "frameWidth": 128,
+  "frames": 6,
+  "fps": 6
+}
