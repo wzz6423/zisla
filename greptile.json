@@ -1,6 +1,0 @@
-{
-  "autoReview": ["open", "push", "rebase"],
-  "triggerOnDrafts": true,
-  "shouldUpdateDescription": true,
-  "includeSequenceDiagram": true
-}
