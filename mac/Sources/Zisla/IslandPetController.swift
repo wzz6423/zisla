@@ -7,7 +7,6 @@ import SwiftUI
 ///
 /// No separate panel; `IslandRootView` renders the pet beside the expanded island and inside the collapsed island.
 ///
-/// Pet sprites are bundled resources (compiled into the app); user import and network install are not supported.
 /// Behavior follows AI task state: active → working, failed → failed, completed → succeeded.
 @MainActor
 final class IslandPetController: ObservableObject {
@@ -48,9 +47,9 @@ final class IslandPetController: ObservableObject {
             return
         }
         let petID = settings.petID
-        if petID != loadedPetID {
+        if petID != loadedPetID || sprite == nil {
             loadedPetID = petID
-            sprite = PetLibrary.loadSprite(for: petID)
+            sprite = PetLibrary.loadSelectedSprite(for: petID)
         }
         updateActivityFromAI()
     }

@@ -3200,3 +3200,12 @@
 "软萌水獭" = "Berang-berang Santai";
 "月光狐" = "Rubah Cahaya Bulan";
 "小刺猬" = "Landak Mini";
+
+/* User pet import */
+"导入宠物" = "Impor hewan peliharaan";
+"宠物名称" = "Nama hewan peliharaan";
+"支持图片和视频，动画最长 30 秒，文件最大 100 MB。" = "Mendukung gambar dan video. Animasi maksimal 30 detik dan berkas maksimal 100 MB.";
+"宠物名称须为 1–80 个字符。" = "Nama hewan peliharaan harus berisi 1–80 karakter.";
+"无法读取此图片或视频，请选择系统支持的媒体文件。" = "Gambar atau video ini tidak dapat dibaca. Pilih berkas media yang didukung sistem Anda.";
+"宠物动画不能超过 30 秒。" = "Animasi hewan peliharaan tidak boleh melebihi 30 detik.";
+"宠物文件不能超过 100 MB。" = "Berkas hewan peliharaan tidak boleh melebihi 100 MB.";

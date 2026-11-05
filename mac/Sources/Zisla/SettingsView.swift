@@ -32,6 +32,7 @@ struct SettingsView: View {
     @State private var voiceHotkeyValidationMessage: String?
     @State private var assistantHotkeyValidationMessage: String?
     @State private var expandedClipboardAssistantKind: ClipboardAssistantKind?
+    @State private var petImportSource: PetImportSource?
 
     init(model: AppModel) {
         self.model = model
@@ -73,6 +74,11 @@ struct SettingsView: View {
         }
         .onChange(of: settingsStore.settings) { _, _ in
             ensureSelectionIsVisible()
+        }
+        .sheet(item: $petImportSource) { source in
+            PetImportView(sourceURL: source.url) { entry in
+                model.settingsStore.settings.petID = entry.id
+            }
         }
         .alert(
             pendingRecommendedToolAction?.title ?? "",
@@ -2062,7 +2068,10 @@ struct SettingsView: View {
                     Picker(
                         "",
                         selection: Binding(
-                            get: { model.settingsStore.settings.petID },
+                            get: {
+                                let id = model.settingsStore.settings.petID
+                                return petEntries.contains { $0.id == id } ? id : FeatureSettings.default.petID
+                            },
                             set: { model.settingsStore.settings.petID = $0 }
                         )
                     ) {
@@ -2074,6 +2083,16 @@ struct SettingsView: View {
                     .pickerStyle(.menu)
                     .keepsIntrinsicWidth()
                     .disabled(!model.settingsStore.settings.petEnabled)
+                }
+                rowDivider
+                settingRow(
+                    symbol: "square.and.arrow.down",
+                    title: "导入宠物",
+                    detail: "支持图片和视频，动画最长 30 秒，文件最大 100 MB。"
+                ) {
+                    Button(AppLocalization.text("选择文件"), action: choosePetMedia)
+                        .controlSize(.small)
+                        .keepsIntrinsicWidth()
                 }
                 rowDivider
                 settingRow(
@@ -2102,6 +2121,18 @@ struct SettingsView: View {
 
     private var petEntries: [PetLibrary.Entry] {
         PetLibrary.entries()
+    }
+
+    private func choosePetMedia() {
+        let panel = NSOpenPanel()
+        panel.canChooseDirectories = false
+        panel.canChooseFiles = true
+        panel.allowsMultipleSelection = false
+        panel.allowedContentTypes = [.image, .movie]
+        panel.prompt = AppLocalization.text("选择文件")
+        WindowPlacement.prepareModal(panel, on: WindowPlacement.screenUnderMouse())
+        guard panel.runModal() == .OK, let url = panel.url else { return }
+        petImportSource = PetImportSource(url: url)
     }
 
     private func systemMonitorMenuBarBinding(
@@ -3940,6 +3971,11 @@ struct SettingsView: View {
             .compactMap(NSImage.init(contentsOf:))
             .first
     }
+}
+
+private struct PetImportSource: Identifiable {
+    let url: URL
+    var id: URL { url }
 }
 
 private struct ActivityNoticeDisplay: Identifiable {

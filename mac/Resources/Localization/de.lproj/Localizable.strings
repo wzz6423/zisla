@@ -3201,3 +3201,12 @@
 "软萌水獭" = "Gemütlicher Otter";
 "月光狐" = "Mondlichtfuchs";
 "小刺猬" = "Kleiner Igel";
+
+/* User pet import */
+"导入宠物" = "Haustier importieren";
+"宠物名称" = "Name des Haustiers";
+"支持图片和视频，动画最长 30 秒，文件最大 100 MB。" = "Bilder und Videos werden unterstützt. Animationen bis 30 Sekunden, Dateien bis 100 MB.";
+"宠物名称须为 1–80 个字符。" = "Haustiernamen müssen 1–80 Zeichen enthalten.";
+"无法读取此图片或视频，请选择系统支持的媒体文件。" = "Dieses Bild oder Video kann nicht gelesen werden. Wähle eine vom System unterstützte Mediendatei.";
+"宠物动画不能超过 30 秒。" = "Haustieranimationen dürfen nicht länger als 30 Sekunden sein.";
+"宠物文件不能超过 100 MB。" = "Haustierdateien dürfen nicht größer als 100 MB sein.";

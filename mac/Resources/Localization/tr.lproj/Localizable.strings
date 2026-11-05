@@ -3200,3 +3200,12 @@
 "软萌水獭" = "Sakin su samuru";
 "月光狐" = "Ay ışığı tilkisi";
 "小刺猬" = "Minik kirpi";
+
+/* User pet import */
+"导入宠物" = "Evcil hayvan içe aktar";
+"宠物名称" = "Evcil hayvan adı";
+"支持图片和视频，动画最长 30 秒，文件最大 100 MB。" = "Görseller ve videolar desteklenir. Animasyonlar en fazla 30 saniye, dosyalar en fazla 100 MB olabilir.";
+"宠物名称须为 1–80 个字符。" = "Evcil hayvan adı 1–80 karakter içermelidir.";
+"无法读取此图片或视频，请选择系统支持的媒体文件。" = "Bu görsel veya video okunamıyor. Sisteminizin desteklediği bir medya dosyası seçin.";
+"宠物动画不能超过 30 秒。" = "Evcil hayvan animasyonları 30 saniyeyi aşamaz.";
+"宠物文件不能超过 100 MB。" = "Evcil hayvan dosyaları 100 MB boyutunu aşamaz.";

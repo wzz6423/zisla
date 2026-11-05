@@ -3200,3 +3200,12 @@
 "软萌水獭" = "Nutria tranquila";
 "月光狐" = "Zorro a la luz de la luna";
 "小刺猬" = "Pequeño erizo";
+
+/* User pet import */
+"导入宠物" = "Importar mascota";
+"宠物名称" = "Nombre de la mascota";
+"支持图片和视频，动画最长 30 秒，文件最大 100 MB。" = "Admite imágenes y vídeos. Animaciones de hasta 30 segundos y archivos de hasta 100 MB.";
+"宠物名称须为 1–80 个字符。" = "El nombre de la mascota debe tener entre 1 y 80 caracteres.";
+"无法读取此图片或视频，请选择系统支持的媒体文件。" = "No se puede leer esta imagen o vídeo. Elige un archivo multimedia compatible con el sistema.";
+"宠物动画不能超过 30 秒。" = "Las animaciones de mascotas no pueden superar los 30 segundos.";
+"宠物文件不能超过 100 MB。" = "Los archivos de mascotas no pueden superar los 100 MB.";
