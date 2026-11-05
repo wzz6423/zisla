@@ -1,4 +1,14 @@
+import AppKit
 import SwiftUI
+
+@MainActor
+enum SettingsControlMetrics {
+    static func height(for size: NSControl.ControlSize) -> CGFloat {
+        let cell = NSButtonCell(textCell: "")
+        cell.controlSize = size
+        return cell.cellSize.height
+    }
+}
 
 struct SettingsTintedBackground: View {
     var tint: Color = .accentColor
@@ -25,7 +35,7 @@ struct SettingsTintedButtonStyle: ButtonStyle {
             .font(.system(size: controlSize == .small ? 11 : 13, weight: .medium))
             .foregroundStyle(Color.accentColor)
             .padding(.horizontal, 9)
-            .padding(.vertical, 5)
+            .frame(height: SettingsControlMetrics.height(for: controlSize == .small ? .small : .regular))
             .background(SettingsTintedBackground())
             .opacity(isEnabled ? 1 : 0.5)
     }

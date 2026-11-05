@@ -27,6 +27,12 @@ struct ScreenRecordingOutputDirectorySettingsTests {
         defer { fixture.close() }
         await fixture.settle()
         #expect(try fixture.path() == fixture.root.path(percentEncoded: false))
+        let reference = NSHostingView(rootView: Picker("", selection: Binding.constant(0)) {
+            Text("Reference").tag(0)
+        }.labelsHidden().pickerStyle(.menu))
+        let choose = try #require(fixture.element("screenRecording.chooseSaveDirectory") as? any NSAccessibilityElementProtocol)
+        #expect(reference.fittingSize.height > 0)
+        #expect(abs(choose.accessibilityFrame().height - reference.fittingSize.height) < 0.5)
         let custom = fixture.root.appendingPathComponent("Custom directory", isDirectory: true)
         try FileManager.default.createDirectory(at: custom, withIntermediateDirectories: false)
         try fixture.model.setRecordingOutputDirectory(custom)
@@ -117,7 +123,7 @@ struct ScreenRecordingOutputDirectorySettingsTests {
             return try #require(element.value(forKey: "accessibilityEnabled") as? Bool)
         }
 
-        private func element(_ identifier: String) -> NSObject? {
+        func element(_ identifier: String) -> NSObject? {
             func visit(_ object: NSObject) -> NSObject? {
                 if object.responds(to: NSSelectorFromString("accessibilityIdentifier")),
                    object.value(forKey: "accessibilityIdentifier") as? String == identifier { return object }

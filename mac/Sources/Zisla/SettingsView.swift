@@ -33,6 +33,8 @@ struct SettingsView: View {
     @State private var assistantHotkeyValidationMessage: String?
     @State private var expandedClipboardAssistantKind: ClipboardAssistantKind?
     @State private var petImportSource: PetImportSource?
+    @State private var isPetRemovalConfirmationPresented = false
+    @State private var petRemovalError: String?
 
     init(model: AppModel) {
         self.model = model
@@ -351,7 +353,7 @@ struct SettingsView: View {
                         selectionID: "status-icon-destination-selection",
                         fontSize: 9,
                         width: 128,
-                        height: 28
+                        height: SettingsControlMetrics.height(for: .regular)
                     )
                 }
                 if model.settingsStore.settings.systemMonitorEnabled {
@@ -390,7 +392,7 @@ struct SettingsView: View {
                                 selectionID: "system-monitor-menu-bar-display-style-selection",
                                 fontSize: 9,
                                 width: 128,
-                                height: 28
+                                height: SettingsControlMetrics.height(for: .regular)
                             )
                         }
                         ForEach(SystemMonitorMenuBarMetric.allCases, id: \.self) { metric in
@@ -605,7 +607,6 @@ struct SettingsView: View {
                                 } label: {
                                     AppLocalizedText("去授权")
                                 }
-                                .controlSize(.small)
                                 .keepsIntrinsicWidth()
                             }
                         }
@@ -665,7 +666,6 @@ struct SettingsView: View {
                             } label: {
                                 AppLocalizedText("去授权")
                             }
-                            .controlSize(.small)
                             .keepsIntrinsicWidth()
                         }
                     }
@@ -742,7 +742,7 @@ struct SettingsView: View {
                                 )
                             )
                             .textFieldStyle(.roundedBorder)
-                            .font(.system(size: 10, design: .monospaced))
+                            .font(.system(.body, design: .monospaced))
                             .frame(width: 220)
                             .accessibilityLabel(AppLocalization.text("自定义搜索网址"))
                         }
@@ -768,7 +768,6 @@ struct SettingsView: View {
                                 AppLocalizedText("添加")
                             }
                         }
-                        .controlSize(.small)
                         .keepsIntrinsicWidth()
                     }
                     ForEach(assistantBlacklistEntries, id: \.bundleIdentifier) { entry in
@@ -824,7 +823,6 @@ struct SettingsView: View {
                                 } label: {
                                     AppLocalizedText("重置")
                                 }
-                                .controlSize(.small)
                             }
                             .keepsIntrinsicWidth()
                         }
@@ -835,7 +833,6 @@ struct SettingsView: View {
                         settingRow(symbol: "lock.shield", title: "辅助功能",
                                    detail: "需要辅助功能权限来识别窗口和网页", isNested: true) {
                             Button { model.openAssistantAccessibilitySettings() } label: { AppLocalizedText("去授权") }
-                                .controlSize(.small)
                         }
                     }
                     ForEach(ClipboardAssistantKind.allCases, id: \.self) { kind in
@@ -902,7 +899,6 @@ struct SettingsView: View {
                                         )
                                     }
                                 }
-                                .menuStyle(.borderlessButton)
                                 .fixedSize()
 
                                 IconButton(
@@ -1079,7 +1075,6 @@ struct SettingsView: View {
                         rowDivider
                         settingRow(symbol: "rectangle.stack", title: "录屏工作室", detail: "") {
                             Button(AppLocalization.text("打开")) { model.presentScreenRecording() }
-                                .controlSize(.small)
                         }
                         if let recordingModel = model.screenRecordingSettingsModel?() {
                             rowDivider
@@ -1101,7 +1096,7 @@ struct SettingsView: View {
                             Button(AppLocalization.text("恢复默认快捷键")) {
                                 model.settingsStore.settings.screenRecordingHotkeys.removeAll()
                                 recordingHotkeyValidationMessage = nil
-                            }.controlSize(.small)
+                            }
                         }
                         if let message = recordingHotkeyValidationMessage ?? currentRecordingHotkeyConflict {
                             rowDivider
@@ -1114,7 +1109,6 @@ struct SettingsView: View {
                             rowDivider
                             settingRow(symbol: "lock.shield", title: "输入监控", detail: "单独修饰键需要监听全局键盘事件") {
                                 Button(AppLocalization.text("打开设置")) { model.openVoiceInputInputMonitoringSettings() }
-                                    .controlSize(.small)
                             }
                         }
                     }
@@ -1213,7 +1207,6 @@ struct SettingsView: View {
                                     Button(AppLocalization.text("打开设置")) {
                                         model.openVoiceInputInputMonitoringSettings()
                                     }
-                                    .controlSize(.small)
                                     .keepsIntrinsicWidth()
                                 }
                             }
@@ -1360,7 +1353,6 @@ struct SettingsView: View {
                             .keepsIntrinsicWidth()
                     } else {
                         Button(AppLocalization.text("打开设置")) { model.keyboardSound.openInputMonitoringSettings() }
-                            .controlSize(.small)
                             .keepsIntrinsicWidth()
                     }
                 }
@@ -1415,7 +1407,6 @@ struct SettingsView: View {
                             )
                         )
                         .textFieldStyle(.roundedBorder)
-                        .font(.system(size: 11))
                         .frame(width: 170)
                     }
                     rowDivider
@@ -1682,7 +1673,6 @@ struct SettingsView: View {
                                 }
                             }
                             .buttonStyle(.bordered)
-                            .controlSize(.small)
                             .keepsIntrinsicWidth()
                             .disabled(model.voiceModelDiscoveryState.isTesting)
                         }
@@ -1781,7 +1771,6 @@ struct SettingsView: View {
                             .frame(width: 150)
                             .onSubmit(addCustomVoiceHotword)
                         Button(AppLocalization.text("添加"), action: addCustomVoiceHotword)
-                            .controlSize(.small)
                             .keepsIntrinsicWidth()
                             .disabled(
                                 customVoiceHotword.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
@@ -2084,7 +2073,6 @@ struct SettingsView: View {
                                 Button(AppLocalization.text("打开设置")) {
                                     model.openVoiceInputInputMonitoringSettings()
                                 }
-                                .controlSize(.small)
                                 .keepsIntrinsicWidth()
                             }
                         }
@@ -2095,7 +2083,8 @@ struct SettingsView: View {
     }
 
     private var petContent: some View {
-        VStack(alignment: .leading, spacing: 20) {
+        let entries = petEntries
+        return VStack(alignment: .leading, spacing: 20) {
             settingsGroup("宠物") {
                 settingRow(
                     symbol: "shippingbox.fill",
@@ -2107,12 +2096,12 @@ struct SettingsView: View {
                         selection: Binding(
                             get: {
                                 let id = model.settingsStore.settings.petID
-                                return petEntries.contains { $0.id == id } ? id : FeatureSettings.default.petID
+                                return entries.contains { $0.id == id } ? id : FeatureSettings.default.petID
                             },
                             set: { model.settingsStore.settings.petID = $0 }
                         )
                     ) {
-                        ForEach(petEntries, id: \.id) { entry in
+                        ForEach(entries, id: \.id) { entry in
                             Text(petDisplayLabel(entry)).tag(entry.id)
                         }
                     }
@@ -2120,6 +2109,33 @@ struct SettingsView: View {
                     .pickerStyle(.menu)
                     .keepsIntrinsicWidth()
                     .disabled(!model.settingsStore.settings.petEnabled)
+                    if let entry = entries.first(where: { $0.id == model.settingsStore.settings.petID }),
+                       entry.origin == .imported {
+                        Button(AppLocalization.text("移除"), role: .destructive) {
+                            petRemovalError = nil
+                            isPetRemovalConfirmationPresented = true
+                        }
+                        .keepsIntrinsicWidth()
+                        .alert(
+                            AppLocalization.text("删除“%@”？", entry.manifest.displayName),
+                            isPresented: $isPetRemovalConfirmationPresented
+                        ) {
+                            Button(AppLocalization.text("取消"), role: .cancel) {}
+                            Button(AppLocalization.text("移除"), role: .destructive) {
+                                do {
+                                    try Self.removeSelectedPet(settings: &model.settingsStore.settings)
+                                } catch {
+                                    petRemovalError = error.localizedDescription
+                                }
+                            }
+                        }
+                    }
+                }
+                if let petRemovalError {
+                    Text(AppLocalization.text("操作失败：%@", petRemovalError))
+                        .font(.caption)
+                        .foregroundStyle(Color.zislaError)
+                        .textSelection(.enabled)
                 }
                 rowDivider
                 settingRow(
@@ -2128,7 +2144,6 @@ struct SettingsView: View {
                     detail: "支持图片和视频，动画最长 30 秒，文件最大 100 MB。"
                 ) {
                     Button(AppLocalization.text("选择文件"), action: choosePetMedia)
-                        .controlSize(.small)
                         .keepsIntrinsicWidth()
                 }
                 rowDivider
@@ -2158,6 +2173,15 @@ struct SettingsView: View {
 
     private var petEntries: [PetLibrary.Entry] {
         PetLibrary.entries()
+    }
+
+    static func removeSelectedPet(
+        settings: inout FeatureSettings,
+        userPetsDirectory: URL = PetLibrary.userPetsDirectory,
+        fileManager: FileManager = .default
+    ) throws {
+        try PetLibrary.removeImportedPet(id: settings.petID, userPetsDirectory: userPetsDirectory, fileManager: fileManager)
+        settings.petID = FeatureSettings.default.petID
     }
 
     private func choosePetMedia() {
@@ -2686,7 +2710,6 @@ struct SettingsView: View {
                 ) {
                     Button(AppLocalization.text("选择默认下载目录")) { chooseDownloadDirectory() }
                         .buttonStyle(.bordered)
-                        .controlSize(.small)
                         .keepsIntrinsicWidth()
                 }
             }
@@ -2731,7 +2754,6 @@ struct SettingsView: View {
                     Task { await model.managedTools.install(tool) }
                 }
                 .buttonStyle(.bordered)
-                .controlSize(.small)
                 .keepsIntrinsicWidth()
                 .disabled(state.isBusy)
                 .help(
@@ -3003,7 +3025,6 @@ struct SettingsView: View {
                         Label(AppLocalization.text("刷新"), systemImage: "arrow.clockwise")
                     }
                     .buttonStyle(.bordered)
-                    .controlSize(.small)
                     .keepsIntrinsicWidth()
                 }
             }
@@ -3081,7 +3102,7 @@ struct SettingsView: View {
                         selectionID: "update-channel-selection",
                         fontSize: 9,
                         width: 150,
-                        height: 28
+                        height: SettingsControlMetrics.height(for: .regular)
                     )
                 }
             }
@@ -3107,7 +3128,6 @@ struct SettingsView: View {
                             )
                         }
                         .buttonStyle(SettingsTintedButtonStyle())
-                        .controlSize(.small)
                     }
 
                     HStack(spacing: 8) {
@@ -3629,7 +3649,6 @@ struct SettingsView: View {
                     Task { await model.refreshMail() }
                 }
                 .buttonStyle(.bordered)
-                .controlSize(.small)
                 .keepsIntrinsicWidth()
             }
         } else {

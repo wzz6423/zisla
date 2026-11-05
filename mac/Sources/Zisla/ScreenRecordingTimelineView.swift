@@ -78,7 +78,7 @@ struct ScreenRecordingTimelineView: View {
     private var restoreButton: some View {
         Button(AppLocalization.text("恢复完整素材")) {
             model.update { $0.edits.segments = [.init(start: 0, end: $0.duration)] }
-        }.controlSize(.small)
+        }
     }
 
     private var segmentSelection: Binding<UUID?> {

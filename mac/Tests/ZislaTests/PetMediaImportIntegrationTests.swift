@@ -8,6 +8,8 @@ import ZislaKit
 
 @MainActor
 struct PetMediaImportIntegrationTests {
+    private let removalFileManager = PetRemovalFileManager()
+
     @Test(arguments: ["mp4", "mov"])
     func videoContainersProducePlayableOwnedPetSprites(container: String) async throws {
         let fixture = try RecordingMultitrackTestFixture()
@@ -36,6 +38,45 @@ struct PetMediaImportIntegrationTests {
         #expect(try RecordingMultitrackTestFixture.pixel(first, x: 32, y: 24)[0] > 200)
         #expect(try RecordingMultitrackTestFixture.pixel(last, x: 32, y: 24)[2] > 200)
         #expect(try FileManager.default.contentsOfDirectory(atPath: pets.path) == [entry.id])
+
+        var settings = FeatureSettings(petEnabled: false, petID: entry.id, petSide: .right)
+        var expected = settings
+        expected.petID = FeatureSettings.default.petID
+        try SettingsView.removeSelectedPet(settings: &settings, userPetsDirectory: pets, fileManager: removalFileManager)
+        #expect(settings == expected)
+        #expect(try FileManager.default.contentsOfDirectory(atPath: pets.path).isEmpty)
+        #expect(PetLibrary.loadSprite(for: entry.id, userPetsDirectory: pets) == nil)
+        let fallback = try #require(PetLibrary.loadSelectedSprite(for: settings.petID, userPetsDirectory: pets))
+        let builtin = try #require(PetLibrary.loadSprite(for: FeatureSettings.default.petID, userPetsDirectory: pets))
+        #expect(fallback.image.tiffRepresentation == builtin.image.tiffRepresentation)
+    }
+
+    @Test
+    func failedPetRemovalPreservesSettingsAndAllowsRetry() async throws {
+        let fixture = try RecordingMultitrackTestFixture()
+        defer { fixture.remove() }
+        let source = try await fixture.createVideo(duration: 1)
+        let pets = fixture.root.appendingPathComponent("pets/user_pets")
+        let entry = try await PetMediaImporter.importPet(from: source, name: "Retained", directory: pets)
+        var settings = FeatureSettings(petID: entry.id, petSide: .right)
+        let before = settings
+        try FileManager.default.setAttributes([.posixPermissions: 0o555], ofItemAtPath: pets.path)
+        defer { try? FileManager.default.setAttributes([.posixPermissions: 0o755], ofItemAtPath: pets.path) }
+
+        #expect(throws: (any Error).self) {
+            try SettingsView.removeSelectedPet(settings: &settings, userPetsDirectory: pets, fileManager: removalFileManager)
+        }
+        #expect(settings == before)
+        #expect(PetLibrary.entry(for: entry.id, userPetsDirectory: pets) == entry)
+        #expect(PetLibrary.loadSprite(for: entry.id, userPetsDirectory: pets) != nil)
+        #expect(FileManager.default.fileExists(atPath: source.path))
+
+        try FileManager.default.setAttributes([.posixPermissions: 0o755], ofItemAtPath: pets.path)
+        try SettingsView.removeSelectedPet(settings: &settings, userPetsDirectory: pets, fileManager: removalFileManager)
+        #expect(settings.petID == FeatureSettings.default.petID)
+        #expect(settings.petSide == before.petSide)
+        #expect(settings.petEnabled == before.petEnabled)
+        #expect(try FileManager.default.contentsOfDirectory(atPath: pets.path).isEmpty)
     }
 
     @Test(arguments: [30.0, 30.25])
@@ -74,15 +115,19 @@ struct PetMediaImportIntegrationTests {
     @Test(arguments: AppLanguage.allCases)
     func petImportStringsResolveInEveryLanguage(language: AppLanguage) throws {
         let package = URL(fileURLWithPath: #filePath).deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent()
+        let settingsSource = try String(contentsOf: package.appendingPathComponent("Sources/Zisla/SettingsView.swift"), encoding: .utf8)
+        let petContent = try #require(settingsSource.range(of: "private var petContent:"))
+        let petEntries = try #require(settingsSource.range(of: "private var petEntries:"))
         let sources = try ["Zisla/PetImportView.swift", "ZislaKit/PetMediaImporter.swift"].map {
             try String(contentsOf: package.appendingPathComponent("Sources/" + $0), encoding: .utf8)
-        }.joined(separator: "\n")
-        let expression = try NSRegularExpression(pattern: #"AppLocalization\.text\("([^"]+)""#)
+        }.joined(separator: "\n") + String(settingsSource[petContent.lowerBound..<petEntries.lowerBound])
+        let expression = try NSRegularExpression(pattern: #"AppLocalization\.(?:text|format)\("([^"]+)""#)
         let keys = Set(expression.matches(in: sources, range: NSRange(sources.startIndex..., in: sources)).compactMap {
             Range($0.range(at: 1), in: sources).map { String(sources[$0]) }
         })
-        #expect(keys.count == 8)
+        #expect(keys.count == 14)
         #expect(AppLanguage.allCases.count == 17)
+        let placeholders = try NSRegularExpression(pattern: #"%(?:\d+\$)?(?:ld|@)"#)
         let localization = package.appendingPathComponent("Resources/Localization")
         let table = try #require(NSDictionary(contentsOf: localization.appendingPathComponent(language.rawValue + ".lproj/Localizable.strings")) as? [String: String])
         let english = try #require(NSDictionary(contentsOf: localization.appendingPathComponent("en.lproj/Localizable.strings")) as? [String: String])
@@ -90,11 +135,28 @@ struct PetMediaImportIntegrationTests {
             let value = try #require(table[key], "Missing \(key) in \(language.rawValue)")
             #expect(!value.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
             #expect(AppLocalization.string(key, language: language) == value)
+            let expectedPlaceholders = placeholders.matches(in: key, range: NSRange(key.startIndex..., in: key)).map {
+                (key as NSString).substring(with: $0.range)
+            }.sorted()
+            let actualPlaceholders = placeholders.matches(in: value, range: NSRange(value.startIndex..., in: value)).map {
+                (value as NSString).substring(with: $0.range)
+            }.sorted()
+            #expect(actualPlaceholders == expectedPlaceholders, "Mismatched placeholders for \(key) in \(language.rawValue)")
             if language != .english, language != .simplifiedChinese, language != .traditionalChinese {
                 #expect(value != english[key])
             }
         }
         #expect(AppLocalization.string("导入宠物", language: .english) == "Import Pet")
         #expect(AppLocalization.string("导入宠物", language: .arabic) == "استيراد حيوان أليف")
+        #expect(AppLocalization.string("移除", language: .english) == "Remove")
+    }
+}
+
+private final class PetRemovalFileManager: FileManager, @unchecked Sendable {
+    override func trashItem(at url: URL, resultingItemURL _: AutoreleasingUnsafeMutablePointer<NSURL?>?) throws {
+        let trash = url.deletingLastPathComponent().deletingLastPathComponent().appendingPathComponent("trash", isDirectory: true)
+        try createDirectory(at: trash, withIntermediateDirectories: true)
+        let destination = trash.appendingPathComponent(url.lastPathComponent)
+        try moveItem(at: url, to: destination)
     }
 }

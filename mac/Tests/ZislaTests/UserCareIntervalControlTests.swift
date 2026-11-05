@@ -111,6 +111,32 @@ struct UserCareIntervalControlTests {
         #expect(fixture.fields().count == 3)
     }
 
+    @Test(arguments: AppLanguage.allCases)
+    func inputsAndSaveMatchNativeControlHeightWithoutCommitting(language: AppLanguage) async throws {
+        let fixture = Fixture(language: language)
+        defer { fixture.close() }
+        await fixture.layout()
+        let reference = NSHostingView(rootView: Picker("", selection: Binding.constant(0)) {
+            Text(AppLocalization.string("保存", language: language)).tag(0)
+        }.labelsHidden().pickerStyle(.menu)
+            .environment(\.locale, language.locale)
+            .environment(\.layoutDirection, language.isRightToLeft ? .rightToLeft : .leftToRight))
+        let expectedHeight = reference.fittingSize.height
+        let save = try #require(fixture.saveButton() as? any NSAccessibilityElementProtocol)
+        #expect(expectedHeight > 0)
+        #expect(abs(save.accessibilityFrame().height - expectedHeight) < 0.5)
+        let fields = fixture.fields()
+        #expect(fields.count == 3)
+        for field in fields {
+            let frame = field.convert(field.bounds, to: fixture.host)
+            #expect(abs(frame.height - expectedHeight) < 0.5,
+                    "Duration inputs and Save must keep the native settings control height")
+            #expect(fixture.host.bounds.insetBy(dx: -0.5, dy: -0.5).contains(frame))
+        }
+        #expect(fixture.input.interval == 2_700 && fixture.input.commits.isEmpty)
+        #expect(!fixture.window.isVisible)
+    }
+
     private final class Input: ObservableObject {
         @Published var interval: TimeInterval = 2_700
         var commits: [TimeInterval] = []
@@ -217,7 +243,7 @@ struct UserCareIntervalControlTests {
             return descendants(host)
         }
 
-        private func saveButton() throws -> NSObject {
+        func saveButton() throws -> NSObject {
             try #require(accessibilityObjects().first { object in
                 object.responds(to: NSSelectorFromString("accessibilityIdentifier"))
                     && object.value(forKey: "accessibilityIdentifier") as? String == "user-care-save"

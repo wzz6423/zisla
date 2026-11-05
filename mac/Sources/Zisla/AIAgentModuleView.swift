@@ -92,7 +92,7 @@ struct AIAgentModuleView: View {
             .accessibilityLabel(AppLocalization.text("协议"))
             TextField("URL", text: channelURLBinding(channel.id))
                 .textFieldStyle(.roundedBorder)
-                .font(.system(size: 10, design: .monospaced))
+                .font(.system(.body, design: .monospaced))
                 .frame(minWidth: 140)
                 .layoutPriority(1)
             SecureField("Key", text: channelSecretBinding(channel.id))
@@ -691,7 +691,7 @@ private struct AILocalModelConfigurationRow: View {
                     set: { value in update { $0.endpoint.baseURL = value } }
                 ))
                 .textFieldStyle(.roundedBorder)
-                .font(.system(size: 10, design: .monospaced))
+                .font(.system(.body, design: .monospaced))
                 .frame(minWidth: 140, maxWidth: 180)
                 .accessibilityLabel(AppLocalization.text("URL / IP:端口"))
                 SecureField(AppLocalization.text("API Key（可选）"), text: Binding(
@@ -780,7 +780,6 @@ private struct AILocalModelConfigurationRow: View {
                         discoverModels(action: .startServer)
                     }
                     .buttonStyle(.bordered)
-                    .controlSize(.small)
                     .disabled(!model.isEnabled || discovery.isLoading || credentialError != nil)
                 }
             }

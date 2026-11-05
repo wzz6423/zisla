@@ -8,6 +8,8 @@ import ZislaCore
 
 @MainActor
 struct PetMediaImporterTests {
+    private let removalFileManager = PetRemovalFileManager()
+
     @Test(arguments: [UTType.png, .jpeg, .tiff, .bmp])
     func stillImagesCopyAndRoundTripWithoutDependingOnTheSource(type: UTType) async throws {
         let fixture = try Fixture()
@@ -120,6 +122,72 @@ struct PetMediaImporterTests {
         #expect(first.manifest.displayName == second.manifest.displayName)
         #expect(Set(try fixture.children()) == [first.id, second.id])
         #expect(FileManager.default.fileExists(atPath: source.path))
+    }
+
+    @Test
+    func removingImportedPetTrashesOnlyItsOwnedDirectory() async throws {
+        let fixture = try Fixture()
+        defer { fixture.remove() }
+        let source = try fixture.image()
+        let original = try Data(contentsOf: source)
+        let removed = try await PetMediaImporter.importPet(from: source, name: "Same name", directory: fixture.pets)
+        let retained = try await PetMediaImporter.importPet(from: source, name: "Same name", directory: fixture.pets)
+
+        try PetLibrary.removeImportedPet(id: removed.id, userPetsDirectory: fixture.pets, fileManager: removalFileManager)
+
+        #expect(try fixture.children() == [retained.id])
+        #expect(PetLibrary.entry(for: removed.id, userPetsDirectory: fixture.pets) == nil)
+        #expect(PetLibrary.loadSprite(for: removed.id, userPetsDirectory: fixture.pets) == nil)
+        #expect(PetLibrary.entry(for: retained.id, userPetsDirectory: fixture.pets) == retained)
+        #expect(PetLibrary.loadSprite(for: retained.id, userPetsDirectory: fixture.pets) != nil)
+        #expect(try Data(contentsOf: source) == original)
+        let trashed = fixture.root.appendingPathComponent("pets/trash/" + removed.id)
+        #expect(try Data(contentsOf: trashed.appendingPathComponent("original." + source.pathExtension)) == original)
+        #expect(PetLibrary.loadSprite(for: removed.manifest, in: trashed) != nil)
+        #expect(PetLibrary.entry(for: FeatureSettings.default.petID, userPetsDirectory: fixture.pets)?.origin == .builtin)
+        #expect(throws: (any Error).self) {
+            try PetLibrary.removeImportedPet(id: removed.id, userPetsDirectory: fixture.pets, fileManager: removalFileManager)
+        }
+        #expect(try fixture.children() == [retained.id])
+    }
+
+    @Test(arguments: ["", "chiikawa", "../outside", "user-not-a-uuid"])
+    func removalRejectsNonImportedIDsWithoutDeletingFiles(id: String) async throws {
+        let fixture = try Fixture()
+        defer { fixture.remove() }
+        let imported = try await PetMediaImporter.importPet(from: fixture.image(), name: "Retained", directory: fixture.pets)
+        let builtinNamedDirectory = fixture.pets.appendingPathComponent("chiikawa", isDirectory: true)
+        try FileManager.default.createDirectory(at: builtinNamedDirectory, withIntermediateDirectories: false)
+        let outside = fixture.root.appendingPathComponent("pets/outside")
+        try Data("retained".utf8).write(to: outside)
+        let before = try fixture.children()
+
+        #expect(throws: (any Error).self) {
+            try PetLibrary.removeImportedPet(id: id, userPetsDirectory: fixture.pets, fileManager: removalFileManager)
+        }
+
+        #expect(try fixture.children() == before)
+        #expect(PetLibrary.entry(for: imported.id, userPetsDirectory: fixture.pets) == imported)
+        #expect(try String(contentsOf: outside, encoding: .utf8) == "retained")
+    }
+
+    @Test
+    func removalRejectsSymbolicLinksWithoutDeletingTheirTargets() async throws {
+        let fixture = try Fixture()
+        defer { fixture.remove() }
+        let owned = fixture.root.appendingPathComponent("owned")
+        let entry = try await PetMediaImporter.importPet(from: fixture.image(), name: "Linked", directory: owned)
+        try FileManager.default.createDirectory(at: fixture.pets, withIntermediateDirectories: true)
+        let link = fixture.pets.appendingPathComponent(entry.id)
+        try FileManager.default.createSymbolicLink(at: link, withDestinationURL: owned.appendingPathComponent(entry.id))
+
+        #expect(throws: (any Error).self) {
+            try PetLibrary.removeImportedPet(id: entry.id, userPetsDirectory: fixture.pets, fileManager: removalFileManager)
+        }
+
+        #expect(try link.resourceValues(forKeys: [.isSymbolicLinkKey]).isSymbolicLink == true)
+        #expect(PetLibrary.entry(for: entry.id, userPetsDirectory: owned) == entry)
+        #expect(PetLibrary.loadSprite(for: entry.id, userPetsDirectory: owned) != nil)
     }
 
     @Test(arguments: ["sprite.png", "pet.json", "whole-library"])
@@ -251,5 +319,14 @@ struct PetMediaImporterTests {
             let cgImage = try #require(image.cgImage(forProposedRect: nil, context: nil, hints: nil))
             return try #require(NSBitmapImageRep(cgImage: cgImage).colorAt(x: x, y: y)?.usingColorSpace(.deviceRGB))
         }
+    }
+}
+
+private final class PetRemovalFileManager: FileManager, @unchecked Sendable {
+    override func trashItem(at url: URL, resultingItemURL _: AutoreleasingUnsafeMutablePointer<NSURL?>?) throws {
+        let trash = url.deletingLastPathComponent().deletingLastPathComponent().appendingPathComponent("trash", isDirectory: true)
+        try createDirectory(at: trash, withIntermediateDirectories: true)
+        let destination = trash.appendingPathComponent(url.lastPathComponent)
+        try moveItem(at: url, to: destination)
     }
 }

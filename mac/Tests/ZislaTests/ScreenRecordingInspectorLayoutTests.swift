@@ -9,6 +9,29 @@ import ZislaKit
 @MainActor
 @Suite(.serialized)
 struct ScreenRecordingInspectorLayoutTests {
+    @Test(arguments: AppLanguage.allCases, [ControlSize.small, .regular])
+    func tintedActionsMatchNativeControlHeights(language: AppLanguage, size: ControlSize) {
+        let title = AppLocalization.string("移除", language: language)
+        let reference = NSHostingView(rootView: Picker("", selection: Binding.constant(0)) {
+            Text(title).tag(0)
+        }.labelsHidden().pickerStyle(.menu).controlSize(size)
+            .environment(\.locale, language.locale)
+            .environment(\.layoutDirection, language.isRightToLeft ? .rightToLeft : .leftToRight))
+        let text = NSHostingView(rootView: Button(title) {}
+            .buttonStyle(SettingsTintedButtonStyle()).controlSize(size)
+            .environment(\.locale, language.locale)
+            .environment(\.layoutDirection, language.isRightToLeft ? .rightToLeft : .leftToRight))
+        let icon = NSHostingView(rootView: Button {} label: {
+            Label(title, systemImage: "arrow.clockwise")
+        }.buttonStyle(SettingsTintedButtonStyle()).controlSize(size)
+            .environment(\.locale, language.locale)
+            .environment(\.layoutDirection, language.isRightToLeft ? .rightToLeft : .leftToRight))
+        let expectedHeight = reference.fittingSize.height
+        #expect(expectedHeight > 0)
+        #expect(abs(text.fittingSize.height - expectedHeight) < 0.5)
+        #expect(abs(icon.fittingSize.height - expectedHeight) < 0.5)
+    }
+
     @Test(arguments: AppLanguage.allCases, [296.0, 366.0])
     func preciseInputsKeepCompactWidthsInsideTheInspector(language: AppLanguage, width: Double) async throws {
         let releaseAccessibility = EnhancedAccessibilityTestScope.acquire()
@@ -159,7 +182,8 @@ struct ScreenRecordingInspectorLayoutTests {
             get: { expanded }, set: { expanded = $0 })) {
                 TextField("Value", text: .constant("Body")).accessibilityIdentifier("body")
             } actions: {
-                Button("Add") { count += 1 }.accessibilityIdentifier("headerAction").disabled(disabled)
+                Button("Add") { count += 1 }.buttonStyle(SettingsTintedButtonStyle())
+                    .accessibilityIdentifier("headerAction").disabled(disabled)
             }
         let fixture = Fixture(section.frame(width: 296), language: .english)
         defer { fixture.window.close() }
@@ -231,10 +255,12 @@ struct ScreenRecordingInspectorLayoutTests {
                 role: .staticText))
         }
         let frames = [fixture.frame(primary), fixture.frame(secondary)]
+        #expect(abs(frames[0].height - frames[1].height) < 0.5,
+                "Adjacent header actions must keep the same control height")
         let naturalPrimary = NSHostingView(rootView: Button(AppLocalization.string(titles.0, language: language)) {}
             .buttonStyle(SettingsTintedButtonStyle()).controlSize(layout.panel == .timeline ? .regular : .small))
         let naturalSecondary = NSHostingView(rootView: Button(AppLocalization.string(titles.1, language: language)) {}
-            .controlSize(.small))
+            .controlSize(layout.panel == .timeline ? .regular : .small))
         for (frame, naturalWidth) in zip(frames, [naturalPrimary.fittingSize.width, naturalSecondary.fittingSize.width]) {
             #expect(frame.width + 0.5 >= naturalWidth, "Both header actions must show their complete translations")
             #expect(frame.maxY <= fixture.frame(content).minY)
