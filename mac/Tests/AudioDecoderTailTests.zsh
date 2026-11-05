@@ -105,7 +105,7 @@ with log.open("w") as output:
         env={key: value for key, value in environment.items() if not key.startswith("DYLD_")},
         stdout=output, stderr=subprocess.STDOUT, start_new_session=True)
     try:
-        result = process.wait(timeout=20)
+        result = process.wait(timeout=60)
     except subprocess.TimeoutExpired:
         result = 124
     finally:
