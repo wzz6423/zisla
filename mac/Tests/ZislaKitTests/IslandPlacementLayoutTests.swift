@@ -137,7 +137,7 @@ struct IslandPlacementLayoutTests {
         let notices = [IslandNotice(id: "toolbox-reminder-long", title: "Keep awake", detail: String(repeating: "长", count: 50))]
         let engine = SideNoticeLayoutEngine()
         for requestedGap in [28.0, 90, 120] {
-            let settings = FeatureSettings(islandLayoutStyle: .pill,
+            let settings = FeatureSettings(statusIconDestination: .menuBar, islandLayoutStyle: .pill,
                 islandPlacement: IslandPlacement(mode: .custom, edge: edge, offset: 0.75, inwardDistance: requestedGap))
             let idle = ScreenLayoutEngine(configuration: settings.islandScreenConfiguration).layout(for: screen)
             var configuration = settings.islandScreenConfiguration
@@ -1139,7 +1139,7 @@ struct IslandPlacementLayoutTests {
             IslandNotice(id: "toolbox-reminder-long", title: "Keep awake", detail: String(repeating: "长", count: 100)),
         ]
         for offset in [0.0, 1.0] {
-            let settings = FeatureSettings(islandLayoutStyle: .pill,
+            let settings = FeatureSettings(statusIconDestination: .menuBar, islandLayoutStyle: .pill,
                 islandPlacement: IslandPlacement(mode: .custom, edge: edge, offset: offset))
             let idle = ScreenLayoutEngine(configuration: settings.islandScreenConfiguration).layout(for: screen)
             for notice in notices {
@@ -1168,7 +1168,7 @@ struct IslandPlacementLayoutTests {
             safeAreaInsets: ScreenInsets(top: 44),
             auxiliaryTopLeftArea: CGRect(x: 0, y: 938, width: 656, height: 44),
             auxiliaryTopRightArea: CGRect(x: 856, y: 938, width: 656, height: 44))
-        var settings = FeatureSettings(islandLayoutStyle: .pill,
+        var settings = FeatureSettings(statusIconDestination: .menuBar, islandLayoutStyle: .pill,
             islandPlacement: IslandPlacement(mode: .custom, edge: .top, offset: 550.0 / 1512))
         settings.mediaCompactStyle = .detailed
         settings.mediaShowLyricsAndInfo = true

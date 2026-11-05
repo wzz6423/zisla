@@ -125,6 +125,7 @@ struct CompactMediaIdentityTests {
         let defaults = try #require(UserDefaults(suiteName: suiteName))
         let store = FeatureSettingsStore(defaults: defaults)
         store.settings = settings(edge: edge, style: .detailed, visualization: visualization)
+        store.settings.islandShowMoreInformation = false
         let media = NowPlayingService(loadLyrics: { _, _, _ in
             LyricsSearchResult(lyrics: nil, artistName: nil)
         }, initialRemoteSnapshot: snapshot(lyrics: nil))

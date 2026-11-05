@@ -588,7 +588,16 @@ struct IslandRootView: View {
               !model.isTeleprompterPresented else {
             return .top
         }
-        return model.settingsStore.settings.petSide == .right ? .topLeading : .topTrailing
+        return Self.notchAlignment(
+            petSide: model.settingsStore.settings.petSide,
+            usesCompactSurface: voiceInput.isCapturingInput || showsCompactTransientNotice
+        )
+    }
+
+    nonisolated static func notchAlignment(petSide: PetSide, usesCompactSurface: Bool) -> Alignment {
+        // Compact rows have no pet slot but can still occupy the previous module's wider panel.
+        guard !usesCompactSurface else { return .top }
+        return petSide == .right ? .topLeading : .topTrailing
     }
 
     nonisolated static func pillAlignment(

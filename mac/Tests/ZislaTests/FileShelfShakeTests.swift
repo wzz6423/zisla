@@ -474,7 +474,8 @@ struct FileShelfShakeControllerTests {
 
     @Test(arguments: [false, true], [false, true])
     func shakeRequiresBothSwitchesWhileShelfOnlyRequiresItsParent(shelfEnabled: Bool, shakeEnabled: Bool) throws {
-        let fixture = try Fixture(settings: FeatureSettings(fileShelfEnabled: shelfEnabled, fileShelfShakeEnabled: shakeEnabled))
+        let fixture = try Fixture(settings: FeatureSettings(fileShelfEnabled: shelfEnabled,
+            fileShelfShakeEnabled: shakeEnabled, contextNotesEnabled: false))
         defer { fixture.close() }
         #expect(IslandModule.shelf.isEnabled(in: fixture.settings.settings) == shelfEnabled)
         #expect(fixture.controller.isMonitoring == (shelfEnabled && shakeEnabled))

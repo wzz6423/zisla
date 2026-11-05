@@ -57,7 +57,7 @@ struct SideNoticeLayoutTests {
     func recordingOperationsUseTwoAdjacentSlotsInCustomPills(edge: IslandEdge) throws {
         let screen = ScreenSnapshot(displayID: 42, frame: CGRect(x: -1600, y: -200, width: 1600, height: 1000),
             visibleFrame: CGRect(x: -1600, y: -200, width: 1600, height: 976))
-        var settings = FeatureSettings(islandLayoutStyle: .pill,
+        var settings = FeatureSettings(statusIconDestination: .menuBar, islandLayoutStyle: .pill,
             islandPlacement: IslandPlacement(mode: .custom, edge: edge, offset: 0.75))
         let idle = ScreenLayoutEngine(configuration: settings.islandScreenConfiguration).layout(for: screen)
         let notice = IslandNotice(id: "screen-recording-operation-export", title: "Output", progress: 0.43)
