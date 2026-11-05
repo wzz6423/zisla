@@ -144,21 +144,24 @@ class AutomationWorkflowsTest < Minitest::Test
 
   def test_web_checks_have_scripts_and_reject_missing_or_failing_checks
     scripts = JSON.parse(File.read(File.join(ROOT, 'web/package.json'))).fetch('scripts')
+    package_path = File.join(@directory, 'web/package.json')
+    FileUtils.mkdir_p(File.dirname(package_path))
     { 'Lint' => 'lint', 'Test' => 'test' }.each do |name, script|
       check = step('web-ci', name)
       assert_equal "npm run #{script}", check.fetch('run')
+      assert_equal 'web', check.fetch('working-directory')
       refute_empty scripts.fetch(script)
 
-      File.write(File.join(@directory, 'package.json'), JSON.generate(scripts: {}))
+      File.write(package_path, JSON.generate(scripts: {}))
       output, status = run_step(check, 'NPM_CONFIG_CACHE' => File.join(@directory, 'npm-cache'))
       refute status.success?, output
       assert_includes output, 'Missing script:'
 
-      File.write(File.join(@directory, 'package.json'), JSON.generate(scripts: { script => 'node -e "process.exit(7)"' }))
+      File.write(package_path, JSON.generate(scripts: { script => 'node -e "process.exit(7)"' }))
       output, status = run_step(check, 'NPM_CONFIG_CACHE' => File.join(@directory, 'npm-cache'))
       assert_equal 7, status.exitstatus, output
 
-      File.write(File.join(@directory, 'package.json'), JSON.generate(scripts: { script => 'node -e "console.log(\'fixture check ran\')"' }))
+      File.write(package_path, JSON.generate(scripts: { script => 'node -e "console.log(\'fixture check ran\')"' }))
       output, status = run_step(check, 'NPM_CONFIG_CACHE' => File.join(@directory, 'npm-cache'))
       assert status.success?, output
       assert_includes output, 'fixture check ran'
@@ -707,6 +710,7 @@ class AutomationWorkflowsTest < Minitest::Test
   end
 
   def run_step(step, env = {})
+    directory = File.join(@directory, step.fetch('working-directory', '.'))
     Open3.capture2e({
       'PATH' => "#{@directory}/bin:#{ENV.fetch('PATH')}",
       'CAPTURE' => File.join(@directory, 'calls.jsonl'),
@@ -717,7 +721,7 @@ class AutomationWorkflowsTest < Minitest::Test
       'DEFAULT_BRANCH' => 'main',
       'PR_AUTHOR' => 'contributor',
       'PR_NUMBER' => '153'
-    }.merge(env), 'bash', '-c', step.fetch('run'), chdir: @directory)
+    }.merge(env), 'bash', '-c', step.fetch('run'), chdir: directory)
   end
 
   def calls
