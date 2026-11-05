@@ -46,7 +46,7 @@ struct AgendaModuleView: View {
                     LazyVStack(spacing: 2) {
                         ForEach(model.weatherLocations.locations) { location in
                             if let weather = model.weatherSnapshot(for: location.id) {
-                                weatherRow(weather)
+                                Self.weatherRow(weather)
                             }
                         }
                     }
@@ -59,7 +59,7 @@ struct AgendaModuleView: View {
         }
     }
 
-    private func weatherRow(_ weather: WeatherSnapshot) -> some View {
+    static func weatherRow(_ weather: WeatherSnapshot) -> some View {
         VStack(alignment: .leading, spacing: 3) {
             HStack(spacing: 7) {
                 Image(systemName: weather.condition.symbolName)
@@ -70,7 +70,9 @@ struct AgendaModuleView: View {
                     Text(weather.locationName ?? AppLocalization.text("当前位置"))
                         .font(.system(size: 9.5, weight: .semibold))
                         .fitsSingleLine()
-                    Text(AppLocalization.text("%@ · 体感 %.0f°", weather.condition.summary, weather.apparentTemperature))
+                    Text(weather.apparentTemperature.map {
+                        AppLocalization.text("%@ · 体感 %.0f°", weather.condition.summary, $0)
+                    } ?? weather.condition.summary)
                         .font(.system(size: 8.5))
                         .foregroundStyle(.secondary)
                         .fitsSingleLine()
@@ -90,20 +92,41 @@ struct AgendaModuleView: View {
                 }
             }
 
-            HStack(spacing: 7) {
-                weatherMetric(symbol: "sunrise.fill", value: displayTime(weather.sunrise))
-                weatherMetric(symbol: "sunset.fill", value: displayTime(weather.sunset))
+            if !weather.sunrise.isEmpty || !weather.sunset.isEmpty {
+                HStack(spacing: 7) {
+                    if !weather.sunrise.isEmpty {
+                        weatherMetric(symbol: "sunrise.fill", value: displayTime(weather.sunrise))
+                    }
+                    if !weather.sunset.isEmpty {
+                        weatherMetric(symbol: "sunset.fill", value: displayTime(weather.sunset))
+                    }
+                }
             }
 
             HStack(spacing: 7) {
-                weatherMetric(
-                    symbol: "cloud.rain.fill",
-                    value: AppLocalization.text("当前 %@ mm", weather.currentPrecipitation.formatted(.number.precision(.fractionLength(1))))
-                )
-                weatherMetric(
-                    symbol: "calendar",
-                    value: AppLocalization.text("今日 %ld%% / %@ mm", weather.precipitationProbability, weather.precipitationSum.formatted(.number.precision(.fractionLength(1))))
-                )
+                if let precipitation = weather.currentPrecipitation {
+                    weatherMetric(
+                        symbol: "cloud.rain.fill",
+                        value: AppLocalization.text("当前 %@ mm", precipitation.formatted(.number.precision(.fractionLength(1))))
+                    )
+                }
+                if let probability = weather.precipitationProbability, let sum = weather.precipitationSum {
+                    weatherMetric(
+                        symbol: "calendar",
+                        value: AppLocalization.text("今日 %ld%% / %@ mm", probability, sum.formatted(.number.precision(.fractionLength(1))))
+                    )
+                }
+            }
+
+            if let source = weather.source, let sourceURL = weather.sourceURL {
+                HStack(spacing: 4) {
+                    Link(source, destination: sourceURL)
+                    if let licenseURL = weather.licenseURL {
+                        Link("CC BY 4.0", destination: licenseURL)
+                    }
+                }
+                .font(.system(size: 8))
+                .foregroundStyle(.secondary)
             }
 
             if !weather.officialAlerts.isEmpty {
@@ -130,23 +153,23 @@ struct AgendaModuleView: View {
         .padding(.vertical, 3)
     }
 
-    private func weatherMetric(symbol: String, value: String) -> some View {
+    private static func weatherMetric(symbol: String, value: String) -> some View {
         Label(value, systemImage: symbol)
             .font(.system(size: 8, weight: .medium))
             .foregroundStyle(.secondary)
             .fitsSingleLine()
     }
 
-    private func temperatureRange(for weather: WeatherSnapshot) -> String? {
+    private static func temperatureRange(for weather: WeatherSnapshot) -> String? {
         guard let minimum = weather.temperatureMin, let maximum = weather.temperatureMax else { return nil }
         return String(format: "%.0f°–%.0f°", minimum, maximum)
     }
 
-    private func displayTime(_ value: String) -> String {
+    private static func displayTime(_ value: String) -> String {
         String(value.split(separator: "T").last ?? Substring(value))
     }
 
-    private func weatherAlertColor(_ severity: WeatherAlert.Severity) -> Color {
+    private static func weatherAlertColor(_ severity: WeatherAlert.Severity) -> Color {
         switch severity {
         case .minor: .yellow
         case .moderate: .orange
@@ -154,7 +177,7 @@ struct AgendaModuleView: View {
         }
     }
 
-    private func weatherAlertDetail(_ alert: WeatherAlert) -> String {
+    private static func weatherAlertDetail(_ alert: WeatherAlert) -> String {
         let updatedAt = alert.updatedAt.formatted(date: .omitted, time: .shortened)
         var details = [
             alert.source,

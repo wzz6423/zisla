@@ -25,6 +25,18 @@ struct ChinaWeatherAlertServiceTests {
         #expect(stationID == "101110101")
     }
 
+    @Test(arguments: ["Shanghai", "shanghai", "SHANGHAI"])
+    func matchesEnglishStationCityWithoutChoosingAChineseNamesake(query: String) throws {
+        let data = Data(#"([{"ref":"101020200~shanghai~闵行~Minhang~闵行~Minhang~21~201100~MH~上海"},{"ref":"101020100~shanghai~上海~Shanghai~上海~Shanghai~21~200000~SH~上海"}])"#.utf8)
+        #expect(try ChinaWeatherAlertService.stationID(in: data, query: query, locationName: query) == "101020100")
+    }
+
+    @Test
+    func sameNamedStationsAreDisambiguatedByTheTrailingProvinceField() throws {
+        let data = Data(#"([{"ref":"101060110~jilin~朝阳~Chaoyang~朝阳~Chaoyang~431~130000~CYQ~吉林"},{"ref":"101071201~liaoning~朝阳~Chaoyang~朝阳~Chaoyang~421~122000~CY~辽宁"}])"#.utf8)
+        #expect(try ChinaWeatherAlertService.stationID(in: data, query: "朝阳", locationName: "辽宁省朝阳市") == "101071201")
+    }
+
     @Test
     func parsesOfficialAlertWithoutInventingExpiry() throws {
         let data = Data(

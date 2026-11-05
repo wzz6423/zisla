@@ -256,6 +256,62 @@ struct WeatherLocationStoreTests {
         let reloaded = WeatherLocationStore(storageURL: url, defaults: defaults)
         #expect(reloaded.locations.map(\.displayName) == ["当前位置", "东京", "伦敦", "北京"])
     }
+    @Test
+    func countryCodeSurvivesStorageAndLegacyFilesRemainReadable() throws {
+        let url = tempURL()
+        defer { try? FileManager.default.removeItem(at: url) }
+        let store = WeatherLocationStore(storageURL: url, defaults: makeDefaults())
+        store.addSaved(name: "上海", coordinate: GeoCoordinate(latitude: 31.2, longitude: 121.4), isoCountryCode: "CN")
+        store.updateCurrent(name: "伦敦", coordinate: GeoCoordinate(latitude: 51.5, longitude: 0), isoCountryCode: "GB")
+        store.addSaved(name: "上海市", coordinate: GeoCoordinate(latitude: 31.2, longitude: 121.4))
+        let reloaded = WeatherLocationStore(storageURL: url, defaults: makeDefaults())
+        #expect(reloaded.locations.map(\.isoCountryCode) == ["GB", "CN"])
+        let legacy = Data(#"[{"id":"old","kind":"saved","displayName":"上海","latitude":31.2,"longitude":121.4}]"#.utf8)
+        let decoded = try JSONDecoder().decode([WeatherLocation].self, from: legacy)
+        #expect(decoded.first?.isoCountryCode == nil)
+        #expect(decoded.first?.coordinate == GeoCoordinate(latitude: 31.2, longitude: 121.4))
+    }
+
+    @Test
+    func deduplicatingLoadedLocationsRetainsTheKnownCountryCode() throws {
+        let url = tempURL()
+        defer { try? FileManager.default.removeItem(at: url) }
+        let entries = [
+            WeatherLocation.saved(id: "first", displayName: "旧上海", coordinate: GeoCoordinate(latitude: 31.2, longitude: 121.4)),
+            WeatherLocation.saved(id: "second", displayName: "上海", coordinate: GeoCoordinate(latitude: 31.2, longitude: 121.4), isoCountryCode: "CN"),
+            WeatherLocation.saved(id: "third", displayName: "上海市", coordinate: GeoCoordinate(latitude: 31.2, longitude: 121.4)),
+        ]
+        try JSONEncoder().encode(entries).write(to: url)
+        let store = WeatherLocationStore(storageURL: url, defaults: makeDefaults())
+        #expect(store.locations.last?.displayName == "上海市")
+        #expect(store.locations.last?.isoCountryCode == "CN")
+        let explicitNull = Data(#"[{"id":"legacy","kind":"saved","displayName":"上海","latitude":31.2,"longitude":121.4,"isoCountryCode":null}]"#.utf8)
+        #expect(try JSONDecoder().decode([WeatherLocation].self, from: explicitNull).first?.isoCountryCode == nil)
+    }
+
+    @Test
+    func refreshFailureRetainsOnlySnapshotsForExistingUnchangedCoordinates() {
+        let url = tempURL()
+        defer { try? FileManager.default.removeItem(at: url) }
+        let store = WeatherLocationStore(storageURL: url, defaults: makeDefaults())
+        store.updateCurrent(name: "当前位置", coordinate: GeoCoordinate(latitude: 31.2, longitude: 0))
+        store.addSaved(name: "东京", coordinate: GeoCoordinate(latitude: 35.7, longitude: 0))
+        let tokyoID = store.locations.first { $0.kind == .saved }!.id
+        let current = WeatherSnapshot.stub(name: "当前位置", latitude: 31.2)
+        let tokyo = WeatherSnapshot.stub(name: "东京", latitude: 35.7)
+        let previous = [WeatherLocation.currentID: current, tokyoID: tokyo, "removed": tokyo]
+        #expect(store.mergingSnapshots([:], retaining: previous) == [WeatherLocation.currentID: current, tokyoID: tokyo])
+        var refreshed = tokyo
+        refreshed.temperature = 25
+        #expect(store.mergingSnapshots([tokyoID: refreshed], retaining: previous)[tokyoID]?.temperature == 25)
+        store.updateCurrent(name: "已移动", coordinate: GeoCoordinate(latitude: 41, longitude: 0))
+        #expect(store.mergingSnapshots([:], retaining: previous)[WeatherLocation.currentID] == nil)
+        let staleResponse = WeatherSnapshot.stub(name: "旧坐标", latitude: 31.2)
+        #expect(store.mergingSnapshots([WeatherLocation.currentID: staleResponse], retaining: previous)[WeatherLocation.currentID] == nil)
+        store.remove(id: tokyoID)
+        #expect(store.mergingSnapshots([tokyoID: refreshed], retaining: previous).isEmpty)
+    }
+
 }
 
 private extension WeatherSnapshot {

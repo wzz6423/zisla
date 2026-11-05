@@ -7,11 +7,13 @@ public struct GeoLocation: Equatable, Sendable {
     public var latitude: Double
     public var longitude: Double
     public var displayName: String
+    public var isoCountryCode: String?
 
-    public init(latitude: Double, longitude: Double, displayName: String) {
+    public init(latitude: Double, longitude: Double, displayName: String, isoCountryCode: String? = nil) {
         self.latitude = latitude
         self.longitude = longitude
         self.displayName = displayName
+        self.isoCountryCode = isoCountryCode
     }
 }
 
@@ -53,6 +55,7 @@ public struct GeocodedPlace: Equatable, Sendable {
     public var subAdministrativeArea: String?
     public var administrativeArea: String?
     public var country: String?
+    public var isoCountryCode: String?
 
     public init(
         latitude: Double,
@@ -61,7 +64,8 @@ public struct GeocodedPlace: Equatable, Sendable {
         locality: String? = nil,
         subAdministrativeArea: String? = nil,
         administrativeArea: String? = nil,
-        country: String? = nil
+        country: String? = nil,
+        isoCountryCode: String? = nil
     ) {
         self.latitude = latitude
         self.longitude = longitude
@@ -70,6 +74,7 @@ public struct GeocodedPlace: Equatable, Sendable {
         self.subAdministrativeArea = subAdministrativeArea
         self.administrativeArea = administrativeArea
         self.country = country
+        self.isoCountryCode = isoCountryCode
     }
 
     init(placemark: CLPlacemark) {
@@ -81,6 +86,7 @@ public struct GeocodedPlace: Equatable, Sendable {
         self.subAdministrativeArea = placemark.subAdministrativeArea
         self.administrativeArea = placemark.administrativeArea
         self.country = placemark.country
+        self.isoCountryCode = placemark.isoCountryCode
     }
 
     /// Assembles a UI-friendly region name: prefers city/district, uses province to disambiguate when needed, falls back to name/country/coordinates.
@@ -143,7 +149,8 @@ public struct WeatherLocationService: Sendable {
             displayName: place?.displayName(
                 latitude: coordinate.latitude,
                 longitude: coordinate.longitude
-            ) ?? String(format: "%.4f, %.4f", coordinate.latitude, coordinate.longitude)
+            ) ?? String(format: "%.4f, %.4f", coordinate.latitude, coordinate.longitude),
+            isoCountryCode: place?.isoCountryCode
         )
     }
 
@@ -156,7 +163,8 @@ public struct WeatherLocationService: Sendable {
         return GeoLocation(
             latitude: place.latitude,
             longitude: place.longitude,
-            displayName: place.displayName(latitude: place.latitude, longitude: place.longitude)
+            displayName: place.displayName(latitude: place.latitude, longitude: place.longitude),
+            isoCountryCode: place.isoCountryCode
         )
     }
 }

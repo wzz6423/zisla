@@ -1400,7 +1400,8 @@ final class AppModel: ObservableObject {
               coordinate: GeoCoordinate(
                 latitude: current.latitude,
                 longitude: current.longitude
-              )
+              ),
+              isoCountryCode: current.isoCountryCode
             )
             requests.append((configured.id, current))
           } catch is CancellationError {
@@ -1414,7 +1415,8 @@ final class AppModel: ObservableObject {
                   GeoLocation(
                     latitude: coordinate.latitude,
                     longitude: coordinate.longitude,
-                    displayName: configured.displayName
+                    displayName: configured.displayName,
+                    isoCountryCode: configured.isoCountryCode
                   )
                 ))
             }
@@ -1427,7 +1429,8 @@ final class AppModel: ObservableObject {
               GeoLocation(
                 latitude: coordinate.latitude,
                 longitude: coordinate.longitude,
-                displayName: configured.displayName
+                displayName: configured.displayName,
+                isoCountryCode: configured.isoCountryCode
               )
             ))
         }
@@ -1441,7 +1444,8 @@ final class AppModel: ObservableObject {
               let snapshot = try await weatherService.fetch(
                 latitude: request.location.latitude,
                 longitude: request.location.longitude,
-                locationName: request.location.displayName
+                locationName: request.location.displayName,
+                isoCountryCode: request.location.isoCountryCode
               )
               return (request.id, snapshot, nil)
             } catch {
@@ -1456,8 +1460,10 @@ final class AppModel: ObservableObject {
       }
 
       guard !Task.isCancelled else { return }
-      weatherSnapshotsByLocationID = snapshots
-      let ordered = weatherLocations.orderedSnapshots(snapshots)
+      weatherSnapshotsByLocationID = weatherLocations.mergingSnapshots(
+        snapshots, retaining: weatherSnapshotsByLocationID
+      )
+      let ordered = weatherLocations.orderedSnapshots(weatherSnapshotsByLocationID)
       if ordered.isEmpty {
         let message = firstError ?? AppLocalization.text("没有可用的天气数据")
         weatherLocationState = .failed(message)
@@ -1497,7 +1503,8 @@ final class AppModel: ObservableObject {
           coordinate: GeoCoordinate(
             latitude: location.latitude,
             longitude: location.longitude
-          )
+          ),
+          isoCountryCode: location.isoCountryCode
         )
         guard !Task.isCancelled else { return }
         self?.weatherLocationState = .ready(location.displayName)
