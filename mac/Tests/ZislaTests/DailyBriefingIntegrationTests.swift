@@ -263,7 +263,7 @@ struct DailyBriefingIntegrationTests {
                 keys.insert(String(source[keyRange]))
             }
         }
-        #expect(keys.count >= 36)
+        #expect(keys.count == 35)
         #expect(AppLanguage.allCases.count == 17)
         for language in AppLanguage.allCases {
             let tableURL = root.appendingPathComponent("Resources/Localization/\(language.rawValue).lproj/Localizable.strings")

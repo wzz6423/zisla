@@ -9,7 +9,7 @@ struct DailyBriefingSettingsView: View {
     @ObservedObject private var controller: DailyBriefingController
     @Environment(\.locale) private var locale
     @State private var thumbnails: [DailyBriefingTemplate: NSImage] = [:]
-    @State private var previewTemplate: DailyBriefingTemplate?
+    @State private var previewWindowController: DailyBriefingPreviewWindowController?
     @State private var previewError: String?
 
     init(model: AppModel) {
@@ -65,7 +65,7 @@ struct DailyBriefingSettingsView: View {
             }
 
             HStack(spacing: 12) {
-                Button { previewTemplate = settingsStore.settings.dailyBriefing.template } label: {
+                Button { showPreview() } label: {
                     Label(AppLocalization.string("预览", locale: locale), systemImage: "arrow.up.left.and.arrow.down.right")
                 }
                 Spacer()
@@ -89,9 +89,13 @@ struct DailyBriefingSettingsView: View {
         .font(.system(size: 11))
         .padding(.vertical, 8)
         .task(id: language) { await renderThumbnails() }
-        .sheet(item: $previewTemplate) { template in
-            DailyBriefingPreview(template: template, language: language)
-        }
+    }
+
+    private func showPreview() {
+        let preview = previewWindowController ?? DailyBriefingPreviewWindowController()
+        previewWindowController = preview
+        preview.update(template: settingsStore.settings.dailyBriefing.template, language: language)
+        preview.showWindow(nil)
     }
 
     private var exportTime: Binding<Date> {
@@ -156,33 +160,47 @@ struct DailyBriefingSettingsView: View {
     }
 }
 
-private struct DailyBriefingPreview: View {
+@MainActor
+final class DailyBriefingPreviewWindowController: NSWindowController {
+    init() {
+        let window = NSWindow(
+            contentRect: NSRect(x: 0, y: 0, width: 600, height: 760),
+            styleMask: [.titled, .closable, .miniaturizable, .resizable],
+            backing: .buffered,
+            defer: false
+        )
+        window.contentMinSize = NSSize(width: 360, height: 320)
+        window.center()
+        super.init(window: window)
+    }
+
+    @available(*, unavailable)
+    required init?(coder: NSCoder) { nil }
+
+    func update(template: DailyBriefingTemplate, language: AppLanguage) {
+        window?.title = AppLocalization.string("每日简报", language: language)
+            + " · " + AppLocalization.string(template.title, language: language)
+        window?.contentView = NSHostingView(rootView: DailyBriefingPreview(template: template, language: language))
+    }
+}
+
+struct DailyBriefingPreview: View {
     let template: DailyBriefingTemplate
     let language: AppLanguage
-    @Environment(\.dismiss) private var dismiss
     @State private var image: NSImage?
     @State private var error: String?
 
     var body: some View {
-        VStack(spacing: 16) {
-            HStack {
-                AppLocalizedText("示例数据")
-                Spacer()
-                Button { dismiss() } label: { AppLocalizedText("关闭") }
-                    .keyboardShortcut(.cancelAction)
-            }
-            ScrollView {
-                if let image {
-                    Image(nsImage: image).resizable().scaledToFit()
-                } else if let error {
-                    Text(error).foregroundStyle(Color.zislaError)
-                } else {
-                    ProgressView()
-                }
+        ScrollView {
+            if let image {
+                Image(nsImage: image).resizable().scaledToFit()
+            } else if let error {
+                Text(error).foregroundStyle(Color.zislaError)
+            } else {
+                ProgressView()
             }
         }
-        .padding(20)
-        .frame(width: 600, height: 760)
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
         .task {
             do {
                 let rendered = try DailyBriefingRenderer.image(report: .example(), template: template, language: language, scale: 1)
