@@ -142,6 +142,32 @@ class AutomationWorkflowsTest < Minitest::Test
     assert_equal 7, status.exitstatus
   end
 
+  def test_web_checks_have_scripts_and_reject_missing_or_failing_checks
+    scripts = JSON.parse(File.read(File.join(ROOT, 'web/package.json'))).fetch('scripts')
+    package_path = File.join(@directory, 'web/package.json')
+    FileUtils.mkdir_p(File.dirname(package_path))
+    { 'Lint' => 'lint', 'Test' => 'test' }.each do |name, script|
+      check = step('web-ci', name)
+      assert_equal "npm run #{script}", check.fetch('run')
+      assert_equal 'web', check.fetch('working-directory')
+      refute_empty scripts.fetch(script)
+
+      File.write(package_path, JSON.generate(scripts: {}))
+      output, status = run_step(check, 'NPM_CONFIG_CACHE' => File.join(@directory, 'npm-cache'))
+      refute status.success?, output
+      assert_includes output, 'Missing script:'
+
+      File.write(package_path, JSON.generate(scripts: { script => 'node -e "process.exit(7)"' }))
+      output, status = run_step(check, 'NPM_CONFIG_CACHE' => File.join(@directory, 'npm-cache'))
+      assert_equal 7, status.exitstatus, output
+
+      File.write(package_path, JSON.generate(scripts: { script => 'node -e "console.log(\'fixture check ran\')"' }))
+      output, status = run_step(check, 'NPM_CONFIG_CACHE' => File.join(@directory, 'npm-cache'))
+      assert status.success?, output
+      assert_includes output, 'fixture check ran'
+    end
+  end
+
   def test_web_codeql_excludes_only_generated_sparkle_relocation_maps
     workflow = YAML.load_file(File.join(ROOT, '.github/workflows/web-ci.yml'))
     initialization = workflow.fetch('jobs').fetch('build').fetch('steps').find do |entry|
@@ -205,8 +231,8 @@ class AutomationWorkflowsTest < Minitest::Test
 
   def test_swift_suite_budget_leaves_time_after_the_recorded_runner_timeout
     job = YAML.load_file(File.join(ROOT, '.github/workflows/swift-tests.yml')).fetch('jobs').fetch('test-suites')
-    # Job 122664290119 reached 20 minutes while its isolated suites were still running.
-    assert_operator job.fetch('timeout-minutes') * 60, :>=, 20 * 60 + 5 * 60
+    # Job 126661163650 exceeded 30 minutes while its isolated suites were still running.
+    assert_operator job.fetch('timeout-minutes') * 60, :>=, 30 * 60 + 5 * 60
   end
 
   def test_issue_timeline_tracks_close_and_reopen_without_losing_edits
@@ -684,6 +710,7 @@ class AutomationWorkflowsTest < Minitest::Test
   end
 
   def run_step(step, env = {})
+    directory = File.join(@directory, step.fetch('working-directory', '.'))
     Open3.capture2e({
       'PATH' => "#{@directory}/bin:#{ENV.fetch('PATH')}",
       'CAPTURE' => File.join(@directory, 'calls.jsonl'),
@@ -694,7 +721,7 @@ class AutomationWorkflowsTest < Minitest::Test
       'DEFAULT_BRANCH' => 'main',
       'PR_AUTHOR' => 'contributor',
       'PR_NUMBER' => '153'
-    }.merge(env), 'bash', '-c', step.fetch('run'), chdir: @directory)
+    }.merge(env), 'bash', '-c', step.fetch('run'), chdir: directory)
   end
 
   def calls

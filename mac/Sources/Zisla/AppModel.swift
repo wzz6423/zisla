@@ -4197,16 +4197,18 @@ final class AppModel: ObservableObject {
     refreshToolboxReminderNotice()
   }
 
+  nonisolated static func shouldPresentToolboxReminder(settings: FeatureSettings, hasMedia: Bool) -> Bool {
+    settings.toolboxEnabled && settings.toolboxReminderEnabled && settings.sideNoticesEnabled
+      && (!hasMedia || (settings.supportsStatusIconsInIsland && settings.islandShowMoreInformation))
+  }
+
   private func refreshToolboxReminderNotice() {
     let settings = settingsStore.settings
     guard !isPomodoroCountdownActive else {
       clearToolboxReminderNotices()
       return
     }
-    guard settings.toolboxEnabled,
-      settings.toolboxReminderEnabled,
-      settings.sideNoticesEnabled,
-      media.snapshot == nil,
+    guard Self.shouldPresentToolboxReminder(settings: settings, hasMedia: media.snapshot != nil),
       let content = ToolboxReminder.content(
         isScreenCleaning: screenCleaning.isScreenCleaning,
         isKeyboardCleaning: screenCleaning.isKeyboardCleaning,

@@ -663,6 +663,37 @@ public struct SideNoticeLayoutEngine: Equatable, Sendable {
         default:
             Layout.compactWingWidth
         }
+        let presentation = compactPillPresentation(for: selectedPriority, notices: notices, settings: settings)
+        return (
+            sideExtension,
+            expandsForDetailedStatus,
+            progressGlowEnabled,
+            compactWingWidth,
+            displaysHeadphone ? Layout.defaultCompactWingHeight + 2 : 0,
+            presentation?.length(thickness: thickness, edge: settings.islandPlacement.edge) ?? thickness,
+            displaysHeadphone && settings.islandLayoutStyle == .pill && settings.islandPlacement.mode == .camera
+                ? displayedTransientNotice.map { CompactHeadphoneConnectionLayout(notice: $0).sideWidth } : nil,
+            presentation
+        )
+    }
+
+    public func compactPillPresentations(
+        for notices: [IslandNotice], settings: FeatureSettings
+    ) -> [CompactPillStatusPresentation] {
+        CompactStatusPriority.normalized(settings.compactStatusPriority).compactMap {
+            compactPillPresentation(for: $0, notices: notices, settings: settings)
+        }
+    }
+
+    private func compactPillPresentation(
+        for selectedPriority: CompactStatusPriority, notices: [IslandNotice], settings: FeatureSettings
+    ) -> CompactPillStatusPresentation? {
+        let displayedTransientNotice = notices
+            .filter {
+                $0.id.hasPrefix("focus-transition") || $0.style == .headphone
+                    || LowBatteryNoticeController.isLowBatteryNotice($0)
+            }
+            .max { $0.createdAt < $1.createdAt }
         let selectedNotice: IslandNotice? = switch selectedPriority {
         case .transient: displayedTransientNotice
         case .updateAvailable: notices.first { $0.id.hasPrefix("update-available-") }
@@ -705,7 +736,7 @@ public struct SideNoticeLayoutEngine: Equatable, Sendable {
         default:
             text = selectedNotice?.detail ?? ""
         }
-        let presentation = selectedNotice.map {
+        return selectedNotice.map {
             CompactPillStatusPresentation(priority: selectedPriority, notice: $0, text: text,
                 aiCount: aiCount,
                 showsWaveform: selectedPriority == .media && $0.id.hasPrefix("media-active-")
@@ -713,17 +744,6 @@ public struct SideNoticeLayoutEngine: Equatable, Sendable {
                 showsMediaIdentity: selectedPriority == .media && $0.id.hasPrefix("media-active-")
                     && settings.mediaCompactStyle == .detailed && settings.mediaShowLyricsAndInfo)
         }
-        return (
-            sideExtension,
-            expandsForDetailedStatus,
-            progressGlowEnabled,
-            compactWingWidth,
-            displaysHeadphone ? Layout.defaultCompactWingHeight + 2 : 0,
-            presentation?.length(thickness: thickness, edge: settings.islandPlacement.edge) ?? thickness,
-            displaysHeadphone && settings.islandLayoutStyle == .pill && settings.islandPlacement.mode == .camera
-                ? displayedTransientNotice.map { CompactHeadphoneConnectionLayout(notice: $0).sideWidth } : nil,
-            presentation
-        )
     }
 
     private static func compactStatusIsAvailable(

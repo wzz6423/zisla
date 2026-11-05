@@ -90,6 +90,10 @@ enum SettingsSearchIndex {
         if settings.userCareEnabled {
             entry(.info, "关怀提醒间隔", anchor: .row("关怀提醒间隔"), keywords: ["用户关怀", "小时", "分钟", "秒"])
         }
+        if settings.supportsStatusIconsInIsland {
+            entry(.info, "展示更多信息", anchor: .row("展示更多信息"),
+                  keywords: ["同时展示监控、AI、音乐与状态提示，详细音乐另起一行"])
+        }
         entry(.info, "机器监控状态显示位置", anchor: .row("机器监控状态显示位置"), keywords: ["状态栏", "灵动岛"])
         if settings.systemMonitorEnabled {
             entry(.info, "常驻监控图标", anchor: .row("常驻监控图标"), keywords: ["独立", "菜单栏常驻"])

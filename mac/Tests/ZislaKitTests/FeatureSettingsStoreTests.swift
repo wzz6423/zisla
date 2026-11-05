@@ -5,6 +5,52 @@ import Testing
 @testable import ZislaKit
 
 struct FeatureSettingsStoreTests {
+    @Test(arguments: IslandEdge.allCases) @MainActor
+    func rememberedCustomPlacementSurvivesStoreRecreationAndReset(edge: IslandEdge) throws {
+        let suiteName = "Zisla.IslandPlacement.\(UUID().uuidString)"
+        let defaults = try #require(UserDefaults(suiteName: suiteName))
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+        let store = FeatureSettingsStore(defaults: defaults)
+        #expect(store.settings.islandPlacement(for: .custom) == nil)
+        let custom = IslandPlacement(mode: .custom, edge: edge, offset: 0.73, inwardDistance: 32)
+        store.settings.islandLayoutStyle = .pill
+        store.settings.islandPlacement = custom
+        store.settings.islandPlacement = try #require(store.settings.islandPlacement(for: .camera))
+        store.flushPendingChanges()
+
+        let restored = FeatureSettingsStore(defaults: defaults)
+        #expect(restored.settings.islandPlacement == IslandPlacement())
+        #expect(restored.settings.islandPlacement(for: .custom) == custom)
+        restored.settings.islandLayoutStyle = .notch
+        restored.settings.islandLayoutStyle = .pill
+        restored.settings.islandPlacement = try #require(restored.settings.islandPlacement(for: .custom))
+        restored.flushPendingChanges()
+        #expect(FeatureSettingsStore(defaults: defaults).settings.islandPlacement == custom)
+
+        restored.reset()
+        restored.flushPendingChanges()
+        let reset = FeatureSettingsStore(defaults: defaults)
+        #expect(reset.settings.islandPlacement == IslandPlacement())
+        #expect(reset.settings.islandPlacement(for: .custom) == nil)
+    }
+
+    @Test @MainActor
+    func moreInformationPersistsAcrossRelaunchAndResetRestoresItsDefault() throws {
+        let suite = "Zisla.FloatingIslandInformation.\(UUID().uuidString)"
+        let defaults = try #require(UserDefaults(suiteName: suite))
+        defer { defaults.removePersistentDomain(forName: suite) }
+        let store = FeatureSettingsStore(defaults: defaults, persistenceDelay: .seconds(60))
+        #expect(!store.settings.islandShowMoreInformation)
+        store.settings.islandShowMoreInformation = true
+        store.flushPendingChanges()
+        let reloaded = FeatureSettingsStore(defaults: defaults, persistenceDelay: .seconds(60))
+        #expect(reloaded.settings.islandShowMoreInformation)
+        #expect(reloaded.settings == store.settings)
+        reloaded.reset()
+        reloaded.flushPendingChanges()
+        #expect(!FeatureSettingsStore(defaults: defaults).settings.islandShowMoreInformation)
+    }
+
     @Test @MainActor
     func customUserCareIntervalPersistsAcrossDisablingAndResetRestoresTheDefault() throws {
         let suiteName = "Zisla.UserCareInterval.\(UUID().uuidString)"

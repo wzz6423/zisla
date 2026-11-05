@@ -6,6 +6,16 @@ import ZislaKit
 @testable import Zisla
 
 struct SettingsSearchTests {
+    @Test(arguments: [false, true], [false, true])
+    func careAndFloatingInformationSearchEntriesFollowTheirOwnControls(careEnabled: Bool, customPlacement: Bool) {
+        var settings = FeatureSettings(userCareEnabled: careEnabled)
+        settings.islandLayoutStyle = .pill
+        settings.islandPlacement = IslandPlacement(mode: customPlacement ? .custom : .camera)
+        let items = SettingsSearchIndex.items(settings: settings)
+        #expect(items.contains { $0.title == "关怀提醒间隔" } == careEnabled)
+        #expect(items.contains { $0.title == "展示更多信息" } == customPlacement)
+    }
+
     @Test(arguments: AppLanguage.allCases)
     func careIntervalSearchReachesTheInformationPageWhenOtherInfoFeaturesAreOff(language: AppLanguage) {
         var settings = FeatureSettings(userCareEnabled: true)
