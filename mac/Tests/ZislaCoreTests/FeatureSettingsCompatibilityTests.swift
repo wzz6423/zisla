@@ -3,6 +3,60 @@ import Testing
 @testable import ZislaCore
 
 struct FeatureSettingsCompatibilityTests {
+    @Test
+    func userCareIntervalUsesLegacyDefaultAndRoundTripsSecondPrecision() throws {
+        for json in ["{}", #"{"userCareEnabled":true}"#, #"{"userCareReminderInterval":null}"#] {
+            let settings = try JSONDecoder().decode(FeatureSettings.self, from: Data(json.utf8))
+            #expect(settings.userCareReminderInterval == 2_700)
+        }
+        for interval in [1.0, 5, 30, 2_700, 359_999] {
+            let settings = FeatureSettings(userCareEnabled: true, userCareReminderInterval: interval)
+            let restored = try JSONDecoder().decode(FeatureSettings.self, from: JSONEncoder().encode(settings))
+            #expect(restored == settings)
+            #expect(restored.userCareReminderInterval == interval)
+        }
+    }
+
+    @Test(arguments: [(0.0, 1.0), (-100, 1), (1.9, 1), (360_000, 359_999), (Double(Int.max), 359_999)] as [(Double, Double)])
+    func numericUserCareIntervalsAreBoundedWithoutReturningToFortyFiveMinutes(raw: Double, expected: Double) throws {
+        let payload = try JSONSerialization.data(withJSONObject: [
+            "userCareReminderInterval": raw, "userCareEnabled": true, "petEnabled": false,
+        ])
+        let decoded = try JSONDecoder().decode(FeatureSettings.self, from: payload)
+        #expect(decoded.userCareReminderInterval == expected)
+        #expect(decoded.userCareEnabled)
+        #expect(!decoded.petEnabled)
+    }
+
+    @Test(arguments: [#""5""#, "[]", "{}", "true"])
+    func userCareIntervalRejectsNonnumericSettings(value: String) {
+        #expect(throws: DecodingError.self) {
+            try JSONDecoder().decode(FeatureSettings.self, from: Data("{\"userCareReminderInterval\":\(value)}".utf8))
+        }
+    }
+
+    @Test
+    func userCareRequiresOptInForNewAndLegacySettings() throws {
+        #expect(!FeatureSettings.default.userCareEnabled)
+        for json in ["{}", #"{"userCareEnabled":null,"petEnabled":false}"#] {
+            let settings = try JSONDecoder().decode(FeatureSettings.self, from: Data(json.utf8))
+            #expect(!settings.userCareEnabled)
+        }
+        for enabled in [false, true] {
+            let settings = FeatureSettings(userCareEnabled: enabled)
+            let restored = try JSONDecoder().decode(FeatureSettings.self, from: JSONEncoder().encode(settings))
+            #expect(restored == settings)
+            #expect(restored.userCareEnabled == enabled)
+        }
+    }
+
+    @Test(arguments: [#""true""#, "1", "[]", "{}"])
+    func userCareRejectsInvalidSettingValues(value: String) {
+        #expect(throws: DecodingError.self) {
+            try JSONDecoder().decode(FeatureSettings.self, from: Data("{\"userCareEnabled\":\(value)}".utf8))
+        }
+    }
+
     private static let previousScreenshotToolHotkeys: [String: VoiceInputHotkeyPreset] = [
         "rectangle": .init(keyCode: 23, carbonModifiers: 0x1000, keyDisplayName: "5"),
         "ellipse": .init(keyCode: 22, carbonModifiers: 0x1000, keyDisplayName: "6"),

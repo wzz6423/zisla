@@ -24,6 +24,7 @@ APP_DIRECTORY="$TEST_TEMPORARY_ROOT/app"
 APP="$APP_DIRECTORY/zisla-debug.app"
 APP_BINARY="$APP/Contents/MacOS/zisla"
 LAUNCH_AGENT="$TEST_TEMPORARY_ROOT/LaunchAgents/$SERVICE_LABEL.plist"
+SERVICE_LOCK="$TEST_TEMPORARY_ROOT/service.lock"
 OUT_LOG="$TEST_TEMPORARY_ROOT/logs/stdout.log"
 ERROR_LOG="$TEST_TEMPORARY_ROOT/logs/stderr.log"
 
@@ -50,7 +51,7 @@ PYTHON
 
 [[ "$#" == 1 && "$1" == run ]] || exit 1
 print -r -- "script first=${ZISLA_FIRST-unset} signing=${SIGNING_MODE-unset}" >> "$CAPTURE_FILE"
-start_service
+run_service_command "$@"
 SCRIPT
 
 cat > "$TEST_ROOT/mac/Scripts/build-app.sh" <<'SCRIPT'

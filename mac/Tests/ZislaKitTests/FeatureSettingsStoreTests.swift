@@ -5,6 +5,95 @@ import Testing
 @testable import ZislaKit
 
 struct FeatureSettingsStoreTests {
+    @Test(arguments: IslandEdge.allCases) @MainActor
+    func rememberedCustomPlacementSurvivesStoreRecreationAndReset(edge: IslandEdge) throws {
+        let suiteName = "Zisla.IslandPlacement.\(UUID().uuidString)"
+        let defaults = try #require(UserDefaults(suiteName: suiteName))
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+        let store = FeatureSettingsStore(defaults: defaults)
+        #expect(store.settings.islandPlacement(for: .custom) == nil)
+        let custom = IslandPlacement(mode: .custom, edge: edge, offset: 0.73, inwardDistance: 32)
+        store.settings.islandLayoutStyle = .pill
+        store.settings.islandPlacement = custom
+        store.settings.islandPlacement = try #require(store.settings.islandPlacement(for: .camera))
+        store.flushPendingChanges()
+
+        let restored = FeatureSettingsStore(defaults: defaults)
+        #expect(restored.settings.islandPlacement == IslandPlacement())
+        #expect(restored.settings.islandPlacement(for: .custom) == custom)
+        restored.settings.islandLayoutStyle = .notch
+        restored.settings.islandLayoutStyle = .pill
+        restored.settings.islandPlacement = try #require(restored.settings.islandPlacement(for: .custom))
+        restored.flushPendingChanges()
+        #expect(FeatureSettingsStore(defaults: defaults).settings.islandPlacement == custom)
+
+        restored.reset()
+        restored.flushPendingChanges()
+        let reset = FeatureSettingsStore(defaults: defaults)
+        #expect(reset.settings.islandPlacement == IslandPlacement())
+        #expect(reset.settings.islandPlacement(for: .custom) == nil)
+    }
+
+    @Test @MainActor
+    func moreInformationPersistsAcrossRelaunchAndResetRestoresItsDefault() throws {
+        let suite = "Zisla.FloatingIslandInformation.\(UUID().uuidString)"
+        let defaults = try #require(UserDefaults(suiteName: suite))
+        defer { defaults.removePersistentDomain(forName: suite) }
+        let store = FeatureSettingsStore(defaults: defaults, persistenceDelay: .seconds(60))
+        #expect(!store.settings.islandShowMoreInformation)
+        store.settings.islandShowMoreInformation = true
+        store.flushPendingChanges()
+        let reloaded = FeatureSettingsStore(defaults: defaults, persistenceDelay: .seconds(60))
+        #expect(reloaded.settings.islandShowMoreInformation)
+        #expect(reloaded.settings == store.settings)
+        reloaded.reset()
+        reloaded.flushPendingChanges()
+        #expect(!FeatureSettingsStore(defaults: defaults).settings.islandShowMoreInformation)
+    }
+
+    @Test @MainActor
+    func customUserCareIntervalPersistsAcrossDisablingAndResetRestoresTheDefault() throws {
+        let suiteName = "Zisla.UserCareInterval.\(UUID().uuidString)"
+        let defaults = try #require(UserDefaults(suiteName: suiteName))
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+        let store = FeatureSettingsStore(defaults: defaults)
+        store.settings.userCareEnabled = true
+        store.settings.userCareReminderInterval = 3_723
+        store.flushPendingChanges()
+        let restored = FeatureSettingsStore(defaults: defaults)
+        #expect(restored.settings.userCareEnabled)
+        #expect(restored.settings.userCareReminderInterval == 3_723)
+        restored.settings.userCareEnabled = false
+        restored.flushPendingChanges()
+        let disabled = FeatureSettingsStore(defaults: defaults)
+        #expect(disabled.settings.userCareReminderInterval == 3_723)
+        disabled.reset()
+        disabled.flushPendingChanges()
+        #expect(FeatureSettingsStore(defaults: defaults).settings.userCareReminderInterval == 2_700)
+    }
+
+    @Test @MainActor
+    func userCareOptInPersistsAndResetRestoresOptOut() throws {
+        let suiteName = "Zisla.UserCareSettings.\(UUID().uuidString)"
+        let defaults = try #require(UserDefaults(suiteName: suiteName))
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+        defaults.set(Data(#"{"petEnabled":false,"sideNoticesEnabled":false}"#.utf8), forKey: "feature-settings-v1")
+
+        let store = FeatureSettingsStore(defaults: defaults)
+        #expect(!store.settings.userCareEnabled)
+        #expect(!store.settings.petEnabled)
+        #expect(!store.settings.sideNoticesEnabled)
+        store.settings.userCareEnabled = true
+        store.flushPendingChanges()
+        let restored = FeatureSettingsStore(defaults: defaults)
+        #expect(restored.settings.userCareEnabled)
+        #expect(!restored.settings.sideNoticesEnabled)
+        restored.reset()
+        #expect(!restored.settings.userCareEnabled)
+        restored.flushPendingChanges()
+        #expect(!FeatureSettingsStore(defaults: defaults).settings.userCareEnabled)
+    }
+
     @Test @MainActor
     func screenshotEditorHotkeysPersistAndMigrationMarkerIsWrittenOnLoad() throws {
         let suiteName = "Zisla.ScreenshotHotkeys.\(UUID().uuidString)"

@@ -196,6 +196,9 @@ final class SideNoticePresenter {
     private func updatePanels(rejoiningActiveSpace: Bool = false) {
         guard !isStopped else { return }
         let hidesPanels = isScreenshotActive || isPlacementSelectionActive || suppression.hidesNotices
+        if hidesPanels {
+            hideAllPanels()
+        }
         let snapshots = screenSnapshotProvider()
         guard !snapshots.isEmpty else {
             hideAllPanels()
@@ -318,6 +321,14 @@ final class SideNoticePresenter {
             configuration.compactStatusLength = CompactPillStatusContent.transientPresentation(message: transientMessage)
                 .length(thickness: max(configuration.pillSize.height, CompactPillStatusPresentation.minimumThickness),
                         edge: configuration.placement.edge)
+            return configuration
+        }
+        if let information = FloatingIslandInformationLayout(
+            notices: statusHidden ? [] : notices, icons: availableStatusIcons,
+            settings: settingsStore.settings, item: media.snapshot, at: date
+        ), !suppression.isVoiceRecording, !suppression.isTransientNoticePresented,
+           resultSweep.current == nil {
+            configuration.statusIconSize = information.size
             return configuration
         }
         let sizing = layoutEngine.compactBarSizing(

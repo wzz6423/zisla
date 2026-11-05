@@ -68,6 +68,7 @@ private enum CompactStatusMetrics {
 
 private struct CompactNotchBackground: View {
     var style: IslandNotchBackground
+    let cornerRadius: CGFloat?
 
     @ViewBuilder
     var body: some View {
@@ -77,7 +78,7 @@ private struct CompactNotchBackground: View {
         case .frosted:
             VisualEffectBackground(alphaValue: 0.92, material: .popover)
         case .liquidGlass:
-            IslandCollapsedMaterial(style: .liquidGlass)
+            IslandCollapsedMaterial(style: .liquidGlass, cornerRadius: cornerRadius)
         }
     }
 }
@@ -256,8 +257,22 @@ struct CompactStatusBarView: View {
     }
 
     private func compactSurfaceContent(size: CGSize, at date: Date) -> some View {
-        ZStack {
-            if !displayState.statusIcons.isEmpty {
+        let information = FloatingIslandInformationLayout(
+            notices: displayState.compactStatusHidden ? [] : presentationNotices,
+            icons: displayState.statusIcons, settings: settingsStore.settings, item: media.snapshot, at: date
+        )
+        let pillCornerRadius: CGFloat? = information?.secondary == nil
+            ? nil : VoiceRecordingIslandGeometry.bottomCornerRadius
+        let shape = CompactIslandShape(layoutStyle: settingsStore.settings.islandLayoutStyle,
+                                       pillCornerRadius: pillCornerRadius)
+        return ZStack {
+            if let information {
+                FloatingIslandInformationView(layout: information,
+                    visualizationStyle: settingsStore.settings.mediaVisualizationStyle, item: media.snapshot, date: date)
+                    .onChange(of: information.size, initial: true) { _, size in
+                        onCompactLengthChanged(displayState.islandEdge.isVertical ? size.height : size.width)
+                    }
+            } else if !displayState.statusIcons.isEmpty {
                 IslandStatusIconStrip(icons: displayState.statusIcons, edge: displayState.islandEdge, date: date)
             } else if usesCustomPill, displayState.compactStatusHidden, resultSweep.current == nil {
                 IslandParticleLogo(side: min(18, height), time: date.timeIntervalSinceReferenceDate)
@@ -273,7 +288,7 @@ struct CompactStatusBarView: View {
             }
         }
         .frame(width: size.width, height: size.height)
-        .background(compactStatusBackground)
+        .background(compactStatusBackground(cornerRadius: pillCornerRadius))
         .overlay { AIResultSweepOverlay(controller: resultSweep, edge: displayState.islandEdge) }
         .overlay {
             if displayState.statusIcons.isEmpty, settingsStore.settings.collapsedProgressGlowEnabled,
@@ -281,12 +296,13 @@ struct CompactStatusBarView: View {
                 CollapsedProgressGlow(
                     progress: progress,
                     tint: compactProgressTint,
-                    layoutStyle: settingsStore.settings.islandLayoutStyle
+                    layoutStyle: settingsStore.settings.islandLayoutStyle,
+                    pillCornerRadius: pillCornerRadius
                 )
             }
         }
-        .clipShape(CompactIslandShape(layoutStyle: settingsStore.settings.islandLayoutStyle))
-        .contentShape(CompactIslandShape(layoutStyle: settingsStore.settings.islandLayoutStyle))
+        .clipShape(shape)
+        .contentShape(shape)
         // NSHostingView's safe area can push the SwiftUI content down by a few
         // points when the panel sits under the physical notch or the auto-hide
         // menu bar. Ignoring the top safe area keeps the bar flush with the
@@ -347,7 +363,8 @@ struct CompactStatusBarView: View {
     }
 
     private var showsCustomLyrics: Bool {
-        usesCustomPill && selectedCompactStatusPriority == .media
+        usesCustomPill && (selectedCompactStatusPriority == .media
+            || (settingsStore.settings.islandShowMoreInformation && mediaNotice != nil))
             && settingsStore.settings.mediaCompactStyle == .detailed
             && settingsStore.settings.mediaShowLyricsAndInfo
             && media.snapshot?.isPlaying == true
@@ -391,16 +408,11 @@ struct CompactStatusBarView: View {
     }
 
     @ViewBuilder
-    private var compactStatusBackground: some View {
-        compactStatusBackgroundFill
-    }
-
-    @ViewBuilder
-    private var compactStatusBackgroundFill: some View {
+    private func compactStatusBackground(cornerRadius: CGFloat?) -> some View {
         if reduceTransparency {
             Color.black
         } else {
-            CompactNotchBackground(style: settingsStore.settings.islandNotchBackground)
+            CompactNotchBackground(style: settingsStore.settings.islandNotchBackground, cornerRadius: cornerRadius)
         }
     }
 
@@ -1372,7 +1384,7 @@ private struct MessageAppIcon: View {
     }
 }
 
-private struct MessageScrollingText: View {
+struct MessageScrollingText: View {
     var text: String
     var reduceMotion: Bool
 
@@ -1401,7 +1413,7 @@ private struct MessageScrollingText: View {
                             }
                         )
                         .offset(x: textWidth <= available ? 0 : offset)
-                        .frame(width: available, alignment: .leading)
+                        .frame(width: available, height: geo.size.height, alignment: .leading)
                         .clipped()
                 }
             }
@@ -1422,18 +1434,22 @@ private struct MessageScrollingText: View {
         }
         .frame(height: 20)
         .clipped()
-        .mask(
-            LinearGradient(
-                stops: [
-                    .init(color: .clear, location: 0),
-                    .init(color: .black, location: 0.04),
-                    .init(color: .black, location: 0.96),
-                    .init(color: .clear, location: 1),
-                ],
-                startPoint: .leading,
-                endPoint: .trailing
-            )
-        )
+        .mask {
+            if !reduceMotion && textWidth > containerWidth {
+                LinearGradient(
+                    stops: [
+                        .init(color: .clear, location: 0),
+                        .init(color: .black, location: 0.04),
+                        .init(color: .black, location: 0.96),
+                        .init(color: .clear, location: 1),
+                    ],
+                    startPoint: .leading,
+                    endPoint: .trailing
+                )
+            } else {
+                Rectangle()
+            }
+        }
     }
 
     private func startScrollIfNeeded() {

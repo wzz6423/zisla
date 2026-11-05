@@ -821,6 +821,10 @@ public struct FeatureSettings: Codable, Equatable, Sendable {
     public var contextNotesEnabled: Bool
     public var contextNoteHoldHotkey: VoiceInputHotkeyPreset
     public var sideNoticesEnabled: Bool
+    public var userCareEnabled: Bool
+    public var userCareReminderInterval: TimeInterval {
+        didSet { userCareReminderInterval = UserCareInterval.normalized(userCareReminderInterval) }
+    }
     /// Whether collapsed notice bars show their playback, download, or dismissal progress glow.
     public var collapsedProgressGlowEnabled: Bool
     public var aiTaskResultSweepEnabled: Bool
@@ -846,8 +850,19 @@ public struct FeatureSettings: Codable, Equatable, Sendable {
     /// Display style for the collapsed Dynamic Island when music is playing.
     public var mediaCompactStyle: MediaCompactStyle
     public var mediaVisualizationStyle: MediaVisualizationStyle
+    public var islandShowMoreInformation: Bool
     public var islandLayoutStyle: IslandLayoutStyle
-    public var islandPlacement: IslandPlacement
+    public var islandPlacement: IslandPlacement {
+        didSet {
+            if islandPlacement.mode == .custom {
+                lastCustomIslandPlacement = islandPlacement
+            }
+        }
+    }
+    public private(set) var lastCustomIslandPlacement: IslandPlacement?
+    public func islandPlacement(for mode: IslandPlacementMode) -> IslandPlacement? {
+        mode == .camera ? IslandPlacement() : lastCustomIslandPlacement
+    }
     public private(set) var islandPillWidth: Double
     public private(set) var islandPillHeight: Double
     public var islandEdgeInset: Double {
@@ -967,6 +982,8 @@ public struct FeatureSettings: Codable, Equatable, Sendable {
         contextNotesEnabled: Bool = false,
         contextNoteHoldHotkey: VoiceInputHotkeyPreset = VoiceInputHotkeyPreset(keyCode: 55, carbonModifiers: 0x0100, keyDisplayName: "Command"),
         sideNoticesEnabled: Bool = true,
+        userCareEnabled: Bool = false,
+        userCareReminderInterval: TimeInterval = UserCareInterval.defaultSeconds,
         collapsedProgressGlowEnabled: Bool = true,
         aiTaskResultSweepEnabled: Bool = true,
         compactStatusPriority: [CompactStatusPriority] = CompactStatusPriority.defaultOrder,
@@ -984,6 +1001,7 @@ public struct FeatureSettings: Codable, Equatable, Sendable {
         mediaShowLyricsAndInfo: Bool = true,
         mediaCompactStyle: MediaCompactStyle = .compact,
         mediaVisualizationStyle: MediaVisualizationStyle = .waveform,
+        islandShowMoreInformation: Bool = false,
         islandLayoutStyle: IslandLayoutStyle = .notch,
         islandPlacement: IslandPlacement = IslandPlacement(),
         islandPillWidth: Double = 180,
@@ -1102,6 +1120,8 @@ public struct FeatureSettings: Codable, Equatable, Sendable {
         self.contextNotesEnabled = contextNotesEnabled
         self.contextNoteHoldHotkey = contextNoteHoldHotkey
         self.sideNoticesEnabled = sideNoticesEnabled
+        self.userCareEnabled = userCareEnabled
+        self.userCareReminderInterval = UserCareInterval.normalized(userCareReminderInterval)
         self.collapsedProgressGlowEnabled = collapsedProgressGlowEnabled
         self.aiTaskResultSweepEnabled = aiTaskResultSweepEnabled
         self.compactStatusPriority = CompactStatusPriority.normalized(compactStatusPriority)
@@ -1119,8 +1139,10 @@ public struct FeatureSettings: Codable, Equatable, Sendable {
         self.mediaShowLyricsAndInfo = mediaShowLyricsAndInfo
         self.mediaCompactStyle = mediaCompactStyle
         self.mediaVisualizationStyle = mediaVisualizationStyle
+        self.islandShowMoreInformation = islandShowMoreInformation
         self.islandLayoutStyle = islandLayoutStyle
         self.islandPlacement = islandPlacement
+        self.lastCustomIslandPlacement = islandPlacement.mode == .custom ? islandPlacement : nil
         self.islandPillWidth = 80
         self.islandPillHeight = 24
         self.islandEdgeInset = Self.islandDimension(islandEdgeInset, range: 0...64, fallback: 8)
@@ -1255,6 +1277,8 @@ public struct FeatureSettings: Codable, Equatable, Sendable {
         case contextNotesEnabled
         case contextNoteHoldHotkey
         case sideNoticesEnabled
+        case userCareEnabled
+        case userCareReminderInterval
         case collapsedProgressGlowEnabled
         case aiTaskResultSweepEnabled
         case compactStatusPriority
@@ -1272,8 +1296,10 @@ public struct FeatureSettings: Codable, Equatable, Sendable {
         case mediaShowLyricsAndInfo
         case mediaCompactStyle
         case mediaVisualizationStyle
+        case islandShowMoreInformation
         case islandLayoutStyle
         case islandPlacement
+        case lastCustomIslandPlacement
         case islandPillWidth
         case islandPillHeight
         case islandEdgeInset
@@ -1528,6 +1554,11 @@ public struct FeatureSettings: Codable, Equatable, Sendable {
         contextNotesEnabled = try container.decodeIfPresent(Bool.self, forKey: .contextNotesEnabled) ?? defaults.contextNotesEnabled
         contextNoteHoldHotkey = try container.decodeIfPresent(VoiceInputHotkeyPreset.self, forKey: .contextNoteHoldHotkey) ?? defaults.contextNoteHoldHotkey
         sideNoticesEnabled = try container.decodeIfPresent(Bool.self, forKey: .sideNoticesEnabled) ?? defaults.sideNoticesEnabled
+        userCareEnabled = try container.decodeIfPresent(Bool.self, forKey: .userCareEnabled) ?? defaults.userCareEnabled
+        userCareReminderInterval = UserCareInterval.normalized(
+            try container.decodeIfPresent(TimeInterval.self, forKey: .userCareReminderInterval)
+                ?? defaults.userCareReminderInterval
+        )
         collapsedProgressGlowEnabled = try container.decodeIfPresent(
             Bool.self,
             forKey: .collapsedProgressGlowEnabled
@@ -1577,10 +1608,18 @@ public struct FeatureSettings: Codable, Equatable, Sendable {
         ) ?? defaults.mediaCompactStyle
         mediaVisualizationStyle = try container.decodeIfPresent(MediaVisualizationStyle.self, forKey: .mediaVisualizationStyle)
             ?? defaults.mediaVisualizationStyle
+        islandShowMoreInformation = (try? container.decode(Bool.self, forKey: .islandShowMoreInformation))
+            ?? defaults.islandShowMoreInformation
         islandLayoutStyle = try container.decodeIfPresent(IslandLayoutStyle.self, forKey: .islandLayoutStyle)
             ?? defaults.islandLayoutStyle
         islandPlacement = try container.decodeIfPresent(IslandPlacement.self, forKey: .islandPlacement)
             ?? defaults.islandPlacement
+        if islandPlacement.mode == .custom {
+            lastCustomIslandPlacement = islandPlacement
+        } else {
+            let savedPlacement = try container.decodeIfPresent(IslandPlacement.self, forKey: .lastCustomIslandPlacement)
+            lastCustomIslandPlacement = savedPlacement?.mode == .custom ? savedPlacement : nil
+        }
         islandPillWidth = defaults.islandPillWidth
         islandPillHeight = defaults.islandPillHeight
         islandEdgeInset = Self.islandDimension(

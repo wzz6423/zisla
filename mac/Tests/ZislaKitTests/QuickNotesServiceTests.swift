@@ -1,3 +1,4 @@
+import Combine
 import Foundation
 import Testing
 
@@ -160,6 +161,8 @@ struct QuickNotesServiceTests {
     func savesSeparateNotesWithoutCancellingTheirDebounce() async throws {
         let writes = ControlledNoteWrites()
         let service = makeService(writes: writes, saveDelay: .milliseconds(1))
+        var events: [QuickNotesService.SaveEvent] = []
+        service.onNoteSaved = { events.append($0) }
 
         service.scheduleSave(id: "first", html: "first body")
         service.scheduleSave(id: "second", html: "second body")
@@ -168,7 +171,10 @@ struct QuickNotesServiceTests {
         let calls = await writes.calls
         #expect(bothWritesStarted)
         #expect(Set(calls.map(\.id)) == ["first", "second"])
+        #expect(events.isEmpty)
         await writes.resolveAll()
+        await waitForSavingToFinish(service)
+        #expect(events == [.updated, .updated])
     }
 
     @Test
@@ -195,6 +201,8 @@ struct QuickNotesServiceTests {
     func skipsSupersededPendingWriteAfterAnOlderWriteFinishes() async throws {
         let writes = ControlledNoteWrites()
         let service = makeService(writes: writes, saveDelay: .milliseconds(20))
+        var events: [QuickNotesService.SaveEvent] = []
+        service.onNoteSaved = { events.append($0) }
 
         service.scheduleSave(id: "note", html: "old")
         let firstWriteStarted = await writes.waitForCallCount(1)
@@ -212,7 +220,10 @@ struct QuickNotesServiceTests {
         #expect(callCountAfterFirstWrite == 1)
         #expect(latestWriteStarted)
         #expect(calls[1].html == "latest")
+        #expect(events.isEmpty, "A superseded successful write must not report the current edit as saved")
         await writes.resolveAll()
+        await waitForSavingToFinish(service)
+        #expect(events == [.updated])
     }
 
     @Test
@@ -224,6 +235,8 @@ struct QuickNotesServiceTests {
             deletes: deletes,
             saveDelay: .milliseconds(20)
         )
+        var events: [QuickNotesService.SaveEvent] = []
+        service.onNoteSaved = { events.append($0) }
 
         service.scheduleSave(id: "note", html: "stale")
         await service.delete(id: "note")
@@ -231,6 +244,7 @@ struct QuickNotesServiceTests {
 
         #expect(await writes.callCount == 0)
         #expect(await deletes.calls == ["note"])
+        #expect(events.isEmpty)
     }
 
     @Test
@@ -242,6 +256,8 @@ struct QuickNotesServiceTests {
             deletes: deletes,
             saveDelay: .milliseconds(1)
         )
+        var events: [QuickNotesService.SaveEvent] = []
+        service.onNoteSaved = { events.append($0) }
 
         service.scheduleSave(id: "note", html: "stale")
         #expect(await writes.waitForCallCount(1))
@@ -255,6 +271,7 @@ struct QuickNotesServiceTests {
         await deletes.resolveAll()
         await deletion.value
         #expect(await deletes.calls == ["note"])
+        #expect(events.isEmpty, "A write finishing during deletion must not emit a saved event")
     }
 
     @Test
@@ -552,11 +569,14 @@ struct QuickNotesServiceTests {
         )
         service.applyFetchedNotes([existing])
         service.select(id: existing.id)
+        var events: [QuickNotesService.SaveEvent] = []
+        service.onNoteSaved = { events.append($0) }
 
         #expect(await service.create(html: "<div><br></div>", title: existing.title))
         #expect(service.selectedID == createdID)
         #expect(service.notes.first?.id == createdID)
         #expect(await service.loadNote()?.plainText == createdID)
+        #expect(events == [.created])
     }
 
     @Test
@@ -574,10 +594,111 @@ struct QuickNotesServiceTests {
         )
         service.applyFetchedNotes([existing])
         service.select(id: existing.id)
+        var events: [QuickNotesService.SaveEvent] = []
+        service.onNoteSaved = { events.append($0) }
 
         #expect(!(await service.create(html: "<div><br></div>")))
         #expect(service.selectedID == existing.id)
         #expect(service.notes.map(\.id) == [existing.id])
+        #expect(events.isEmpty)
+    }
+
+    @Test(arguments: ["", "<div><br></div>"])
+    func creationReportsPersistedSuccessBeforeAFailedListRefresh(html: String) async throws {
+        let suiteName = "Zisla.QuickNotesServiceTests.\(UUID().uuidString)"
+        let defaults = try #require(UserDefaults(suiteName: suiteName))
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+        var events: [QuickNotesService.SaveEvent] = []
+        let service = QuickNotesService(
+            welcomeDismissalDefaults: defaults,
+            operations: QuickNotesService.Operations(
+                listNotes: {
+                    #expect(events == [.created], "The persisted note must be reported before refreshing its list")
+                    return .failure(.failed("list refresh failed"))
+                },
+                readNote: { _ in .success(.init(plainText: "", bodyHTML: html)) },
+                writeNote: { _, _ in .success(()) },
+                createNote: { _, _ in .success("persisted-note") },
+                deleteNote: { _ in .success(()) }
+            )
+        )
+        service.onNoteSaved = { events.append($0) }
+
+        #expect(await service.create(html: html))
+        #expect(events == [.created])
+        #expect(service.selectedID == "persisted-note")
+        #expect(service.errorMessage == "list refresh failed")
+    }
+
+    @Test(arguments: ["", "<div><br></div>", "<div><b>format change</b></div>"])
+    func successfulActualWritesReportEmptyAndRepeatedContent(html: String) async {
+        let writes = ControlledNoteWrites()
+        let service = makeService(writes: writes, saveDelay: .zero)
+        var events: [QuickNotesService.SaveEvent] = []
+        service.onNoteSaved = { events.append($0) }
+
+        #expect(events.isEmpty)
+        for count in 1...2 {
+            service.scheduleSave(id: "note", html: html)
+            #expect(await writes.waitForCallCount(count))
+            #expect(events.count == count - 1, "Scheduling alone must not report success")
+            await writes.resolveNext()
+            await waitForSavingToFinish(service)
+            #expect(events.count == count && events.last == .updated)
+        }
+    }
+
+    @Test
+    func failedLatestSaveDoesNotReportSuccessAndCanBeRetried() async {
+        let writes = ControlledNoteWrites()
+        let service = makeService(writes: writes, saveDelay: .zero)
+        var events: [QuickNotesService.SaveEvent] = []
+        service.onNoteSaved = { events.append($0) }
+
+        service.scheduleSave(id: "note", html: "retry this edit")
+        #expect(await writes.waitForCallCount(1))
+        await writes.resolveNext(with: .failure(.failed("write failed")))
+        await waitForSavingToFinish(service)
+        #expect(events.isEmpty && service.errorMessage == "write failed")
+
+        service.scheduleSave(id: "note", html: "retry this edit")
+        #expect(await writes.waitForCallCount(2))
+        await writes.resolveNext()
+        await waitForSavingToFinish(service)
+        #expect(events == [.updated])
+    }
+
+    @Test
+    func cancellationSuppressesAnInFlightSuccessfulWrite() async {
+        let writes = ControlledNoteWrites()
+        let service = makeService(writes: writes, saveDelay: .zero)
+        var events: [QuickNotesService.SaveEvent] = []
+        service.onNoteSaved = { events.append($0) }
+
+        service.scheduleSave(id: "note", html: "cancelled edit")
+        #expect(await writes.waitForCallCount(1))
+        service.cancelPendingSave()
+        await writes.resolveNext()
+        await waitForSavingToFinish(service)
+        #expect(events.isEmpty)
+    }
+
+    @Test
+    func debouncedEditsReportOnlyTheFinalPersistedBody() async {
+        let writes = ControlledNoteWrites()
+        let service = makeService(writes: writes, saveDelay: .milliseconds(1))
+        var events: [QuickNotesService.SaveEvent] = []
+        service.onNoteSaved = { events.append($0) }
+
+        service.scheduleSave(id: "note", html: "first edit")
+        service.scheduleSave(id: "note", html: "second edit")
+        service.scheduleSave(id: "note", html: "final edit")
+        #expect(await writes.waitForCallCount(1))
+        #expect(await writes.calls == [.init(id: "note", html: "final edit")])
+        #expect(events.isEmpty)
+        await writes.resolveNext()
+        await waitForSavingToFinish(service)
+        #expect(events == [.updated])
     }
 
     private func makeService(
@@ -619,6 +740,12 @@ struct QuickNotesServiceTests {
             try? await Task.sleep(for: .milliseconds(5))
         }
         return false
+    }
+
+    private func waitForSavingToFinish(_ service: QuickNotesService) async {
+        for await saving in service.$isSaving.values {
+            if !saving { return }
+        }
     }
 }
 
@@ -739,9 +866,9 @@ private actor ControlledNoteWrites {
         return false
     }
 
-    func resolveNext() {
+    func resolveNext(with result: Result<Void, NotesAppError> = .success(())) {
         guard !continuations.isEmpty else { return }
-        continuations.removeFirst().resume(returning: .success(()))
+        continuations.removeFirst().resume(returning: result)
     }
 
     func resolveAll() {

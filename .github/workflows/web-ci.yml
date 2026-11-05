@@ -85,12 +85,12 @@ jobs:
       - name: Lint
         if: steps.check-web.outputs.exists == 'true'
         working-directory: web
-        run: npm run lint --if-present
+        run: npm run lint
 
       - name: Test
         if: steps.check-web.outputs.exists == 'true'
         working-directory: web
-        run: npm run test --if-present
+        run: npm run test
 
       - name: Build
         if: steps.check-web.outputs.exists == 'true'

@@ -13,7 +13,7 @@ struct TransientNoticeScrollingTests {
     @Test
     func compactNoticeScrollsItselfInsteadOfHoldingAFixedPosition() throws {
         let notice = try Self.islandSlice(
-            from: "private struct TransientNoticeView",
+            from: "struct TransientNoticeView",
             to: "@MainActor\nprivate final class IslandDropState"
         )
 

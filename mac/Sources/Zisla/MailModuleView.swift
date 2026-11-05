@@ -477,7 +477,8 @@ struct MailPaginationContainer<Content: View>: View {
             }
         }
         // Loading placeholders and recycled lazy rows must not cancel a page already in flight.
-        .task(id: request) {
+        // Capture the task's request before SwiftUI can replace the state with a newer one.
+        .task(id: request) { [request] in
             guard request != nil else { return }
             await mail.loadMore()
         }

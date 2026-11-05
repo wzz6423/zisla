@@ -980,6 +980,13 @@ struct SettingsView: View {
                     rowDivider
                     featureToggle("工具箱提醒", detail: "在收起态提示番茄钟、亮屏和清洁状态", symbol: "bell.fill", keyPath: \.toolboxReminderEnabled)
                         .disabled(!model.settingsStore.settings.toolboxEnabled || !model.settingsStore.settings.sideNoticesEnabled)
+                    rowDivider
+                    featureToggle(
+                        "用户关怀",
+                        detail: "温柔提醒休息、喝水和走动",
+                        symbol: "heart.fill",
+                        keyPath: \.userCareEnabled
+                    )
                 }
 
                 settingsGroup("AI 与语音") {
@@ -1357,10 +1364,35 @@ struct SettingsView: View {
 
     private var infoContent: some View {
         VStack(alignment: .leading, spacing: 20) {
+            if settingsStore.settings.supportsStatusIconsInIsland {
+                settingsGroup("灵动岛模式") {
+                    featureToggle(
+                        "展示更多信息",
+                        detail: "同时展示监控、AI、音乐与状态提示，详细音乐另起一行",
+                        symbol: "rectangle.stack",
+                        keyPath: \.islandShowMoreInformation
+                    )
+                }
+            }
             settingsGroup("每日简报") {
                 DailyBriefingSettingsView(model: model)
             }
             workflowContent
+
+            if model.settingsStore.settings.userCareEnabled {
+                settingsGroup("用户关怀") {
+                    settingRow(
+                        symbol: "heart.fill",
+                        title: "关怀提醒间隔",
+                        detail: "小时 0–99，分、秒 0–59，总时长至少 1 秒"
+                    ) {
+                        UserCareIntervalControl(interval: Binding(
+                            get: { model.settingsStore.settings.userCareReminderInterval },
+                            set: { model.settingsStore.settings.userCareReminderInterval = $0 }
+                        ))
+                    }
+                }
+            }
 
             settingsGroup("信息与通知") {
                 if model.settingsStore.settings.lockScreenInfoEnabled {
@@ -2489,10 +2521,10 @@ struct SettingsView: View {
                             Picker("", selection: Binding(
                                 get: { settingsStore.settings.islandPlacement.mode },
                                 set: { mode in
-                                    if mode == .custom {
-                                        model.onChooseIslandPlacement?()
+                                    if let placement = settingsStore.settings.islandPlacement(for: mode) {
+                                        settingsStore.settings.islandPlacement = placement
                                     } else {
-                                        settingsStore.settings.islandPlacement = IslandPlacement()
+                                        model.onChooseIslandPlacement?()
                                     }
                                 }
                             )) {
@@ -4530,7 +4562,8 @@ enum SettingsSection: String, CaseIterable, Identifiable {
             return settings.screenRecordingEnabled
         case .info:
             return settings.mediaEnabled || settings.systemMonitorEnabled
-                || settings.lockScreenInfoEnabled || settings.sideNoticesEnabled || settings.dailyBriefing.enabled
+                || settings.lockScreenInfoEnabled || settings.sideNoticesEnabled
+                || settings.userCareEnabled || settings.dailyBriefing.enabled
         case .mail:
             return settings.mailEnabled
         case .ai:
