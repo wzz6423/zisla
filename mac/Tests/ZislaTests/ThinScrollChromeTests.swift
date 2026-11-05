@@ -356,13 +356,24 @@ struct ThinScrollChromeTests {
         window.isReleasedWhenClosed = false
         window.contentView = host
         defer { window.contentView = nil; window.close() }
-        for _ in 0..<8 {
+        var scrollView: NSScrollView?
+        let deadline = ContinuousClock.now.advanced(by: .seconds(5))
+        repeat {
             host.layoutSubtreeIfNeeded()
+            scrollView = descendants(in: host).compactMap { $0 as? NSScrollView }.first
+            if let scrollView {
+                scrollView.tile()
+                scrollView.reflectScrolledClipView(scrollView.contentView)
+                if let scroller = scrollView.verticalScroller as? ThinScroller,
+                   scrollView.scrollerStyle == .legacy,
+                   scroller.knobProportion > 0, scroller.knobProportion < 1,
+                   !scroller.isHidden { break }
+            }
             await withCheckedContinuation { continuation in
                 DispatchQueue.main.async { continuation.resume() }
             }
-        }
-        let scroll = try #require(descendants(in: host).compactMap { $0 as? NSScrollView }.first)
+        } while ContinuousClock.now < deadline
+        let scroll = try #require(scrollView)
         let scroller = try #require(scroll.verticalScroller as? ThinScroller)
         #expect(scroll.scrollerStyle == .legacy)
         #expect(scroller.knobProportion > 0 && scroller.knobProportion < 1)
