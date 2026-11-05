@@ -79,6 +79,7 @@ enum ScreenRecordingAudioOnlyExporter {
             }
         }
         audibleRanges.sort { $0.lowerBound < $1.lowerBound }
+        let readEnd = min(total, audibleRanges.reduce(0) { max($0, $1.upperBound) })
         var rangeIndex = 0
         var position: Int64 = 0
         func silence(until end: Int64) throws {
@@ -92,7 +93,7 @@ enum ScreenRecordingAudioOnlyExporter {
             }
         }
         var index = 0
-        while position < total, let sample = output.copyNextSampleBuffer() {
+        while position < readEnd, let sample = output.copyNextSampleBuffer() {
             try Task.checkCancellation()
             try checkpoint(.audioSample(index))
             let start = Int64((sample.presentationTimeStamp.seconds * 48_000).rounded())
@@ -128,9 +129,9 @@ enum ScreenRecordingAudioOnlyExporter {
             await progress(Double(position) / Double(total))
             index += 1
         }
-        // Do not wait for a spectral decoder's EOF after the requested timeline has been written.
+        // The spectral decoder can stall in trailing empty ranges; append their silence below.
         let status = reader.status
-        guard status == .completed || (position == total && status == .reading) else {
+        guard status == .completed || (position >= readEnd && status == .reading) else {
             throw ScreenRecordingExportError.unavailableMedia
         }
         // Empty time ranges can be omitted by AVAssetReader; keep the edited timeline's full duration.

@@ -23,7 +23,7 @@ subprocess.run([str(swift.parent / "swiftc"), "-swift-version", "6", "-parse-as-
     str(root / "Scripts/SwiftTestingHost.swift"), "-F", str(platform / "Developer/Library/Frameworks"),
     "-sdk", sdk, "-o", str(host)], check=True)
 
-# The injected stall affects only this host, after it receives the requested audio duration.
+# The injected stall affects only this host, after the last audible composition segment.
 source = temporary / "DecoderTail.m"
 source.write_text(r'''#import <AVFoundation/AVFoundation.h>
 #import <objc/runtime.h>
@@ -34,6 +34,21 @@ static const void *readerKey = &readerKey;
 static const void *positionKey = &positionKey;
 static BOOL (*originalStart)(id, SEL);
 static CMSampleBufferRef (*originalRead)(id, SEL);
+
+static double lastAudibleFrame(AVAssetReader *reader) {
+    double end = 0;
+    for (AVAssetReaderOutput *output in reader.outputs) {
+        if (![output isKindOfClass:[AVAssetReaderAudioMixOutput class]]) continue;
+        for (AVAssetTrack *track in [(AVAssetReaderAudioMixOutput *)output audioTracks]) {
+            for (AVAssetTrackSegment *segment in track.segments) {
+                if (!segment.isEmpty) {
+                    end = MAX(end, CMTimeGetSeconds(CMTimeRangeGetEnd(segment.timeMapping.target)) * 48000);
+                }
+            }
+        }
+    }
+    return end;
+}
 
 static BOOL startReading(id reader, SEL command) {
     for (AVAssetReaderOutput *output in [reader outputs]) {
@@ -48,7 +63,7 @@ static BOOL startReading(id reader, SEL command) {
 static CMSampleBufferRef nextSample(id output, SEL command) {
     AVAssetReader *reader = objc_getAssociatedObject(output, readerKey);
     NSNumber *position = objc_getAssociatedObject(output, positionKey);
-    if (reader && [position longLongValue] >= llround(CMTimeGetSeconds(reader.timeRange.duration) * 48000)) {
+    if (reader && [position longLongValue] >= llround(lastAudibleFrame(reader))) {
         fputs("Zisla regression: stalled decoder EOF\n", stderr);
         fflush(stderr);
         dispatch_semaphore_wait(dispatch_semaphore_create(0), DISPATCH_TIME_FOREVER);
@@ -58,7 +73,7 @@ static CMSampleBufferRef nextSample(id output, SEL command) {
         int64_t end = llround(CMTimeGetSeconds(CMSampleBufferGetPresentationTimeStamp(sample)) * 48000)
             + CMSampleBufferGetNumSamples(sample);
         objc_setAssociatedObject(output, positionKey, @(end), OBJC_ASSOCIATION_RETAIN_NONATOMIC);
-        if (end >= llround(CMTimeGetSeconds(reader.timeRange.duration) * 48000)) {
+        if (end >= llround(lastAudibleFrame(reader))) {
             fputs("Zisla regression: decoder EOF stall armed\n", stderr);
         }
     }
