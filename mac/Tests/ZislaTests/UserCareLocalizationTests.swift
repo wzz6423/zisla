@@ -3,6 +3,8 @@ import Foundation
 import Testing
 import ZislaCore
 
+@testable import Zisla
+
 struct UserCareLocalizationTests {
     @Test(arguments: AppLanguage.allCases)
     func everyLanguageContainsAndRendersAllUserCareCopy(language: AppLanguage) throws {
@@ -57,6 +59,14 @@ struct UserCareLocalizationTests {
             == "人，休息好啦，我陪你繼續～ (๑•̀ㅂ•́)و✧")
         #expect(UserCareReminder.breathe.localizedMessage(petEnabled: false, language: .arabic)
             == "تنفّس ببطء وامنح نفسك بعض المساحة. 🌿")
+        #expect(UserCareReminder.eyeDrops.localizedMessage(petEnabled: false, language: .english)
+            == "If you use eye drops, follow your clinician's directions. 💧")
+        #expect(UserCareReminder.eyeDrops.localizedMessage(petEnabled: true, language: .english)
+            == "Human, if you use eye drops, follow your clinician's directions. 💧")
+        #expect(UserCareReminder.noteCreated.localizedMessage(petEnabled: true, language: .traditionalChinese)
+            == "人，我記住了，記得回來看看～ 📝")
+        #expect(UserCareReminder.noteUpdated.localizedMessage(petEnabled: false, language: .japanese)
+            == "更新したよ。また見に来てね。 📌")
         for reminder in UserCareReminder.allCases {
             #expect(reminder.localizationKey(petEnabled: true).hasPrefix("人，"))
             #expect(!reminder.localizationKey(petEnabled: false).hasPrefix("人，"))
@@ -65,16 +75,22 @@ struct UserCareLocalizationTests {
 
     @MainActor
     @Test(arguments: AppLanguage.allCases)
-    func existingMessageScrollCanReachEveryReminderWithinItsSixSecondLifetime(language: AppLanguage) {
-        let font = NSFont.systemFont(ofSize: 11, weight: .medium)
-        let availableWidth: CGFloat = 252 - 22 - 8 - 24
+    func transientIslandBudgetCanReadEveryHealthAndEventMessage(language: AppLanguage) {
+        let geometry = VoiceRecordingIslandGeometry(
+            collapsedSize: CGSize(width: 240, height: 34),
+            surfaceSize: CGSize(width: 240, height: 54)
+        )
+        let rowWidth = geometry.transcriptRowFrame.width
+        let availableWidth = rowWidth - TransientNoticeMetrics.rowHorizontalPadding * 2
         for reminder in UserCareReminder.allCases {
             for petEnabled in [false, true] {
                 let value = reminder.localizedMessage(petEnabled: petEnabled, language: language)
-                let textWidth = (value as NSString).size(withAttributes: [.font: font]).width
-                let travel = max(0, textWidth - availableWidth + 16)
-                let duration = max(3, Double(travel) / 90)
-                #expect(duration <= 6, "\(language.rawValue) reminder needs \(duration) seconds to reveal its final words")
+                let travel = max(0, TransientNoticeMetrics.textWidth(of: value) - availableWidth)
+                let pass = Duration.seconds(Double(travel) / TransientNoticeMetrics.pointsPerSecond)
+                let duration = TransientNoticeMetrics.displayDuration(for: value, rowWidth: rowWidth)
+                #expect(duration > pass, "\(language.rawValue) message must finish scrolling before dismissal: \(value)")
+                #expect(duration >= .seconds(TransientNoticeMetrics.minimumSeconds))
+                #expect(duration <= .seconds(TransientNoticeMetrics.maximumSeconds))
             }
         }
     }

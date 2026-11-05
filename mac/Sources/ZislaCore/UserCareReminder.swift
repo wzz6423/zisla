@@ -5,6 +5,8 @@ public enum UserCareReminder: CaseIterable, Equatable, Sendable {
     case water
     case walk
     case eyes
+    case blink
+    case eyeDrops
     case lunch
     case nap
     case bedtime
@@ -14,6 +16,8 @@ public enum UserCareReminder: CaseIterable, Equatable, Sendable {
     case breathe
     case focusCompleted
     case restCompleted
+    case noteCreated
+    case noteUpdated
 
     public func localizationKey(petEnabled: Bool) -> String {
         switch (self, petEnabled) {
@@ -25,6 +29,10 @@ public enum UserCareReminder: CaseIterable, Equatable, Sendable {
         case (.walk, true): "人，起来走走，带我转一圈吧。"
         case (.eyes, false): "看看远处，让眼睛放松一下吧。"
         case (.eyes, true): "人，看看远处，也看看我吧。"
+        case (.blink, false): "轻轻眨眨眼，让眼睛歇一会儿吧。"
+        case (.blink, true): "人，轻轻眨眨眼，陪我放松一下吧。"
+        case (.eyeDrops, false): "有在用眼药水的话，记得按医嘱使用哦。"
+        case (.eyeDrops, true): "人，有在用眼药水的话，记得按医嘱使用哦。"
         case (.lunch, false): "到午间了，记得吃饭，也休息一会儿。"
         case (.lunch, true): "人，到午间了，吃点东西，陪我歇一会儿吧。"
         case (.nap, false): "午间小憩一会儿，下午再慢慢忙吧。"
@@ -43,6 +51,10 @@ public enum UserCareReminder: CaseIterable, Equatable, Sendable {
         case (.focusCompleted, true): "人，时间到啦，该休息了～"
         case (.restCompleted, false): "休息结束啦，按自己的节奏继续吧～"
         case (.restCompleted, true): "人，休息好啦，我陪你继续～"
+        case (.noteCreated, false): "我记住了，记得回来看看～"
+        case (.noteCreated, true): "人，我记住了，记得回来看看～"
+        case (.noteUpdated, false): "更新好了，记得回来看看～"
+        case (.noteUpdated, true): "人，更新好了，记得回来看看～"
         }
     }
 
@@ -50,13 +62,15 @@ public enum UserCareReminder: CaseIterable, Equatable, Sendable {
         let body = AppLocalization.string(localizationKey(petEnabled: petEnabled), language: language)
         let decoration = switch self {
         case .rest, .focusCompleted: "🍵"
-        case .water: "💧"
+        case .water, .eyeDrops: "💧"
         case .walk, .posture, .breathe: "🌿"
-        case .eyes: "👀"
+        case .eyes, .blink: "👀"
         case .lunch: "🍚"
         case .nap: "💤"
         case .bedtime, .tomorrow: "🌙"
         case .stretch, .restCompleted: petEnabled ? "(๑•̀ㅂ•́)و✧" : "🌿"
+        case .noteCreated: "📝"
+        case .noteUpdated: "📌"
         }
         return "\(body) \(decoration)"
     }
@@ -67,7 +81,7 @@ public struct UserCareSchedule: Sendable {
     public static let naturalBreakInterval: TimeInterval = 5 * 60
 
     private var activeSince: TimeInterval?
-    private var nextReminderIndex = 0
+    private var lastReminder: UserCareReminder?
     public private(set) var interval: TimeInterval
 
     public init(interval: TimeInterval = UserCareInterval.defaultSeconds) {
@@ -96,7 +110,8 @@ public struct UserCareSchedule: Sendable {
         at uptime: TimeInterval,
         isActive: Bool,
         idleSeconds: TimeInterval?,
-        localHour: Int
+        localHour: Int,
+        chooseIndex: (Range<Int>) -> Int = { Int.random(in: $0) }
     ) -> UserCareReminder? {
         guard isActive, let idleSeconds,
               idleSeconds >= 0, idleSeconds < Self.naturalBreakInterval else {
@@ -111,16 +126,17 @@ public struct UserCareSchedule: Sendable {
 
         // A delayed tick consumes one interval, so hidden or suspended time cannot build a backlog.
         self.activeSince = uptime
-        let reminders: [UserCareReminder]
+        var reminders: [UserCareReminder] = [
+            .rest, .water, .walk, .eyes, .posture, .stretch, .breathe, .blink, .eyeDrops,
+        ]
         if (12..<14).contains(localHour) {
-            reminders = [.lunch, .nap]
+            reminders += [.lunch, .nap]
         } else if localHour >= 23 || localHour < 6 {
-            reminders = [.bedtime, .tomorrow]
-        } else {
-            reminders = [.rest, .water, .walk, .eyes, .posture, .stretch, .breathe]
+            reminders += [.bedtime, .tomorrow]
         }
-        let reminder = reminders[nextReminderIndex % reminders.count]
-        nextReminderIndex = (nextReminderIndex + 1) % reminders.count
+        let candidates = reminders.filter { $0 != lastReminder }
+        let reminder = candidates[chooseIndex(candidates.indices)]
+        lastReminder = reminder
         return reminder
     }
 }

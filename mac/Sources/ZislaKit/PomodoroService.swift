@@ -228,7 +228,6 @@ public final class PomodoroService: ObservableObject {
     /// When "mute notifications" is on, Pomodoro completion signals are suppressed; synced by `AppModel` from settings.
     public var notificationsMuted = false
     public var userCareEnabled = false
-    public var petEnabled = false
     public var onUserCareReminder: ((UserCareReminder) -> Void)?
 
     public static let focusCountdownNoticeIDPrefix = "focus-countdown-"
@@ -425,6 +424,10 @@ public final class PomodoroService: ObservableObject {
         } else {
             PomodoroCompletionSoundPlayer.shared.play()
         }
+        if userCareEnabled {
+            onUserCareReminder?(mode == .focus ? .focusCompleted : .restCompleted)
+            return
+        }
         let content = UNMutableNotificationContent()
         let language = self.language()
         switch mode {
@@ -435,11 +438,6 @@ public final class PomodoroService: ObservableObject {
         case .rest:
             content.title = AppLocalization.string("休息结束", language: language)
             content.body = AppLocalization.string("开始下一段专注", language: language)
-        }
-        if userCareEnabled {
-            let reminder: UserCareReminder = mode == .focus ? .focusCompleted : .restCompleted
-            content.title = reminder.localizedMessage(petEnabled: petEnabled, language: language)
-            onUserCareReminder?(reminder)
         }
         let request = UNNotificationRequest(
             identifier: "zisla.pomodoro.\(UUID().uuidString)",

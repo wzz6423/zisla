@@ -475,9 +475,13 @@ final class AppModel: ObservableObject {
     }
   }
   @Published var transientMessage: String? {
-    didSet { scheduleTransientMessageDismissal() }
+    didSet {
+      userCareFeedback.messageDidChange()
+      scheduleTransientMessageDismissal()
+    }
   }
 
+  private var userCareFeedback = UserCareFeedback()
   private var transientMessageDismissTask: Task<Void, Never>?
   var hasActiveDownloads: Bool { !activeDownloadIDs.isEmpty }
   @Published private(set) var mailComposeRequest: MailComposeRequest?
@@ -552,9 +556,11 @@ final class AppModel: ObservableObject {
   let battery = BatteryMonitor()
   private lazy var lowBatteryNotice = LowBatteryNoticeController(queue: notices)
   var userCarePresentationAllowed: () -> Bool = { false }
-  private lazy var userCare = UserCareService(queue: notices) { [weak self] in
-    self?.userCarePresentationAllowed() == true
-  }
+  private lazy var userCare = UserCareService(
+    presentationAllowed: { [weak self] in self?.canPresentUserCareMessage == true },
+    onReminder: { [weak self] in _ = self?.presentUserCareMessage($0) },
+    onClear: { [weak self] in self?.clearUserCareMessage(routineOnly: $0) }
+  )
   let networkBattery = NetworkBatteryMonitor()
   let focusMode = FocusModeMonitor()
   let quickNotes = QuickNotesService()
@@ -718,11 +724,12 @@ final class AppModel: ObservableObject {
     }
     pomodoro.onUserCareReminder = { [weak self] reminder in
       guard let self else { return }
-      Self.presentPomodoroCareReminder(
-        reminder,
-        settings: self.settingsStore.settings,
-        presentationAllowed: self.userCarePresentationAllowed(),
-        queue: self.notices
+      self.presentUserCareMessage(reminder)
+    }
+    quickNotes.onNoteSaved = { [weak self] event in
+      _ = self?.presentUserCareMessage(
+        event == .created ? .noteCreated : .noteUpdated,
+        throttlesNoteUpdates: event == .updated
       )
     }
     restoreDownloadDirectory()
@@ -746,6 +753,7 @@ final class AppModel: ObservableObject {
     }
     voiceInput.onRecordingWillStart = { [weak self] in
       guard let self else { return }
+      self.clearUserCareMessage()
       let processIdentifier = Self.frontmostVoiceInputTargetProcessIdentifier()
       voiceInputTargetProcessIdentifier = processIdentifier
       voiceInputTarget = processIdentifier.flatMap(VoiceTranscriptDelivery.captureTarget(for:))
@@ -826,6 +834,9 @@ final class AppModel: ObservableObject {
       publisher
         .sink { [weak self] in
           Task { @MainActor [weak self] in
+            if let self, self.screenCleaning.isScreenCleaning || self.screenCleaning.isKeyboardCleaning {
+              self.clearUserCareMessage()
+            }
             self?.refreshFocusCountdownNotice()
             self?.refreshToolboxReminderNotice()
           }
@@ -1568,6 +1579,7 @@ final class AppModel: ObservableObject {
 
   func presentMirror() {
     guard !isMirrorPresented else { return }
+    clearUserCareMessage()
     wasPinnedBeforeMirror = isPinned
     isPinned = true
     isMirrorPresented = true
@@ -1581,6 +1593,7 @@ final class AppModel: ObservableObject {
 
   func presentTeleprompter() {
     guard !isTeleprompterPresented else { return }
+    clearUserCareMessage()
     teleprompterPresentationPoint = NSEvent.mouseLocation
     wasPinnedBeforeTeleprompter = isPinned
     isPinned = true
@@ -1657,8 +1670,17 @@ final class AppModel: ObservableObject {
     let screenshotError = contextNoteEditor.draft?.screenshotError
     guard let item = contextNoteEditor.save(in: shelf) else { return }
     onContextNoteSaved?(item)
-    transientMessage = screenshotError.map { AppLocalization.text("已保存便签") + " · " + $0 }
-      ?? (isNew ? AppLocalization.text("已加入 %ld 个项目", 1) : AppLocalization.text("已保存便签"))
+    contextNoteDidSave(isNew: isNew, screenshotError: screenshotError)
+  }
+
+  func contextNoteDidSave(isNew: Bool, screenshotError: String?) {
+    if let screenshotError {
+      transientMessage = AppLocalization.text("已保存便签") + " · " + screenshotError
+    } else if settingsStore.settings.userCareEnabled {
+      presentUserCareMessage(isNew ? .noteCreated : .noteUpdated)
+    } else {
+      transientMessage = isNew ? AppLocalization.text("已加入 %ld 个项目", 1) : AppLocalization.text("已保存便签")
+    }
   }
 
   func copyContextNoteText(_ text: String) {
@@ -2503,7 +2525,9 @@ final class AppModel: ObservableObject {
     }
     Task {
       if await quickNotes.create(markdown: content) {
-        transientMessage = AppLocalization.text("已创建随记")
+        if !settingsStore.settings.userCareEnabled {
+          transientMessage = AppLocalization.text("已创建随记")
+        }
         selectModule(.quickNotes)
       }
     }
@@ -3059,7 +3083,6 @@ final class AppModel: ObservableObject {
     )
     pomodoro.notificationsMuted = settings.notificationsMuted
     pomodoro.userCareEnabled = settings.userCareEnabled
-    pomodoro.petEnabled = settings.petEnabled
     configureUpdatePolling(enabled: settings.updateChecksEnabled)
     managedTools.setAutomaticUpdatesEnabled(
       settings.recommendedToolsEnabled && settings.recommendedToolsAutomaticUpdatesEnabled
@@ -4225,25 +4248,35 @@ final class AppModel: ObservableObject {
     }
   }
 
-  static func presentPomodoroCareReminder(
-    _ reminder: UserCareReminder,
-    settings: FeatureSettings,
-    presentationAllowed: Bool,
-    queue: SideNoticeQueue,
-    language: AppLanguage = AppLocalization.currentLanguage
-  ) {
-    guard settings.userCareEnabled, settings.sideNoticesEnabled,
-      !settings.notificationsMuted, presentationAllowed
-    else { return }
-    queue.enqueue(
-      IslandNotice(
-        id: UserCareService.noticeID,
-        title: reminder.localizedMessage(petEnabled: settings.petEnabled, language: language),
-        side: .right,
-        style: .message
-      ),
-      expiresAfter: 6
-    )
+  private var canPresentUserCareMessage: Bool {
+    userCarePresentationAllowed()
+      && !voiceInput.isCapturingInput
+      && clipboardAssistant.presentation.detection == nil
+      && !isMirrorPresented && !isTeleprompterPresented
+      && !screenCleaning.isScreenCleaning && !screenCleaning.isKeyboardCleaning
+  }
+
+  @discardableResult
+  func presentUserCareMessage(_ reminder: UserCareReminder, throttlesNoteUpdates: Bool = false) -> Bool {
+    let uptime = ProcessInfo.processInfo.systemUptime
+    guard let message = userCareFeedback.message(
+      for: reminder,
+      settings: settingsStore.settings,
+      presentationAllowed: canPresentUserCareMessage,
+      currentMessage: transientMessage,
+      uptime: uptime,
+      language: languageStore.language,
+      throttlesNoteUpdates: throttlesNoteUpdates
+    ) else { return false }
+    transientMessage = message
+    // The shared setter revokes ownership even when another message repeats the same text.
+    userCareFeedback.didPresent(reminder, at: uptime)
+    return true
+  }
+
+  func clearUserCareMessage(routineOnly: Bool = false) {
+    guard userCareFeedback.dismiss(routineOnly: routineOnly) else { return }
+    transientMessage = nil
   }
 
   static func shouldPresentPomodoroCountdown(

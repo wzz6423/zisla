@@ -985,7 +985,6 @@ struct SettingsView: View {
                         symbol: "heart.fill",
                         keyPath: \.userCareEnabled
                     )
-                    .disabled(!model.settingsStore.settings.sideNoticesEnabled)
                 }
 
                 settingsGroup("AI 与语音") {

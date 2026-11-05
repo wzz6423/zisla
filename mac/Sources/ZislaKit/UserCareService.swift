@@ -16,7 +16,6 @@ struct UserCareActivity {
 
 @MainActor
 public final class UserCareService {
-    public nonisolated static let noticeID = "user-care-reminder"
     static let pollingInterval: TimeInterval = 30
 
     private enum Interruption: Hashable, Sendable {
@@ -26,11 +25,12 @@ public final class UserCareService {
         case lock
     }
 
-    private let queue: SideNoticeQueue
+    private let onReminder: (UserCareReminder) -> Void
+    private let onClear: (_ routineOnly: Bool) -> Void
+    private let chooseIndex: (Range<Int>) -> Int
     private let uptime: () -> TimeInterval
     private let now: () -> Date
     private let calendar: () -> Calendar
-    private let language: () -> AppLanguage
     private let activity: () -> UserCareActivity?
     private let presentationAllowed: () -> Bool
     private let workspaceCenter: NotificationCenter
@@ -41,15 +41,18 @@ public final class UserCareService {
     private var interruptions: Set<Interruption> = []
     private var observationID: UUID?
     private var schedule = UserCareSchedule()
-    private var petEnabled = false
 
-    public convenience init(queue: SideNoticeQueue, presentationAllowed: @escaping () -> Bool) {
+    public convenience init(
+        presentationAllowed: @escaping () -> Bool,
+        onReminder: @escaping (UserCareReminder) -> Void,
+        onClear: @escaping (_ routineOnly: Bool) -> Void
+    ) {
         self.init(
-            queue: queue,
+            onReminder: onReminder,
+            onClear: onClear,
             uptime: { ProcessInfo.processInfo.systemUptime },
             now: Date.init,
             calendar: { .autoupdatingCurrent },
-            language: { AppLocalization.currentLanguage },
             activity: Self.currentActivity,
             presentationAllowed: presentationAllowed,
             workspaceCenter: NSWorkspace.shared.notificationCenter,
@@ -58,24 +61,26 @@ public final class UserCareService {
     }
 
     init(
-        queue: SideNoticeQueue,
+        onReminder: @escaping (UserCareReminder) -> Void,
+        onClear: @escaping (_ routineOnly: Bool) -> Void,
         uptime: @escaping () -> TimeInterval,
         now: @escaping () -> Date,
         calendar: @escaping () -> Calendar,
-        language: @escaping () -> AppLanguage,
         activity: @escaping () -> UserCareActivity?,
         presentationAllowed: @escaping () -> Bool,
         workspaceCenter: NotificationCenter,
         distributedCenter: NotificationCenter,
+        chooseIndex: @escaping (Range<Int>) -> Int = { Int.random(in: $0) },
         timerFactory: @escaping (TimeInterval, @escaping @Sendable (Timer) -> Void) -> Timer = {
             Timer(timeInterval: $0, repeats: true, block: $1)
         }
     ) {
-        self.queue = queue
+        self.onReminder = onReminder
+        self.onClear = onClear
+        self.chooseIndex = chooseIndex
         self.uptime = uptime
         self.now = now
         self.calendar = calendar
-        self.language = language
         self.activity = activity
         self.presentationAllowed = presentationAllowed
         self.workspaceCenter = workspaceCenter
@@ -88,8 +93,7 @@ public final class UserCareService {
     }
 
     public func apply(settings: FeatureSettings) {
-        petEnabled = settings.petEnabled
-        guard settings.userCareEnabled && settings.sideNoticesEnabled else {
+        guard settings.userCareEnabled else {
             stop()
             return
         }
@@ -97,7 +101,7 @@ public final class UserCareService {
             schedule.setInterval(settings.userCareReminderInterval)
             timer?.invalidate()
             timer = nil
-            clearNotice()
+            onClear(true)
         }
         if observationID == nil {
             observationID = UUID()
@@ -134,7 +138,7 @@ public final class UserCareService {
         observers.removeAll()
         interruptions.removeAll()
         schedule.reset()
-        clearNotice()
+        onClear(false)
     }
 
     func refresh() {
@@ -142,7 +146,7 @@ public final class UserCareService {
         defer { scheduleNextTick() }
         guard let activity = activity() else {
             schedule.reset()
-            clearNotice()
+            onClear(true)
             return
         }
         let date = now()
@@ -151,22 +155,16 @@ public final class UserCareService {
             at: uptime(),
             isActive: active,
             idleSeconds: activity.idleSeconds,
-            localHour: calendar().component(.hour, from: date)
+            localHour: calendar().component(.hour, from: date),
+            chooseIndex: chooseIndex
         )
-        guard schedule.isWorking, presentationAllowed() else {
-            clearNotice()
+        let allowed = presentationAllowed()
+        guard schedule.isWorking, allowed else {
+            onClear(active && allowed)
             return
         }
         guard let reminder else { return }
-        queue.enqueue(
-            IslandNotice(
-                id: Self.noticeID,
-                title: reminder.localizedMessage(petEnabled: petEnabled, language: language()),
-                createdAt: date,
-                style: .message
-            ),
-            expiresAfter: 6
-        )
+        onReminder(reminder)
     }
 
     private func scheduleNextTick() {
@@ -193,18 +191,11 @@ public final class UserCareService {
                     self.interruptions.remove(interruption)
                 }
                 self.schedule.reset()
-                self.clearNotice()
+                self.onClear(false)
                 self.refresh()
             }
         }
         observers.append((center, observer))
-    }
-
-    private func clearNotice() {
-        if queue.left.contains(where: { $0.id == Self.noticeID })
-            || queue.right.contains(where: { $0.id == Self.noticeID }) {
-            queue.remove(id: Self.noticeID)
-        }
     }
 
     private static func currentActivity() -> UserCareActivity? {

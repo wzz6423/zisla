@@ -24,4 +24,26 @@ struct UserCareMessageTests {
         #expect(UserCareReminder.water.localizedMessage(petEnabled: false, language: .english)
             == "Have a sip of water. Take your time. 💧")
     }
+
+    @Test
+    func notesUseTheirOwnCreationAndUpdateVoicesAndDecorations() {
+        #expect(UserCareReminder.noteCreated.localizedMessage(petEnabled: false, language: .simplifiedChinese)
+            == "我记住了，记得回来看看～ 📝")
+        #expect(UserCareReminder.noteCreated.localizedMessage(petEnabled: true, language: .simplifiedChinese)
+            == "人，我记住了，记得回来看看～ 📝")
+        #expect(UserCareReminder.noteUpdated.localizedMessage(petEnabled: false, language: .simplifiedChinese)
+            == "更新好了，记得回来看看～ 📌")
+        #expect(UserCareReminder.noteUpdated.localizedMessage(petEnabled: true, language: .simplifiedChinese)
+            == "人，更新好了，记得回来看看～ 📌")
+    }
+
+    @Test
+    func eyeDropCopyIsConditionalAndDefersToTheExistingPrescription() {
+        #expect(UserCareReminder.eyeDrops.localizationKey(petEnabled: false)
+            == "有在用眼药水的话，记得按医嘱使用哦。")
+        #expect(UserCareReminder.eyeDrops.localizationKey(petEnabled: true)
+            == "人，有在用眼药水的话，记得按医嘱使用哦。")
+        #expect(UserCareReminder.blink.localizedMessage(petEnabled: false, language: .simplifiedChinese)
+            == "轻轻眨眨眼，让眼睛歇一会儿吧。 👀")
+    }
 }

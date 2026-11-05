@@ -22,10 +22,11 @@ struct SettingsSearchTests {
         #expect(!SettingsSearchIndex.items(settings: settings).contains { $0.title == "关怀提醒间隔" })
     }
 
-    @Test(arguments: AppLanguage.allCases)
-    func userCareOptInIsSearchableBeforeEnablingIt(language: AppLanguage) {
+    @Test(arguments: AppLanguage.allCases, [false, true])
+    func userCareOptInIsSearchableBeforeEnablingIt(language: AppLanguage, sideNoticesEnabled: Bool) {
         let title = AppLocalization.string("用户关怀", language: language)
-        let matches = results(title, settings: FeatureSettings(userCareEnabled: false), locale: language.locale)
+        let matches = results(title, settings: FeatureSettings(sideNoticesEnabled: sideNoticesEnabled,
+            userCareEnabled: false), locale: language.locale)
         #expect(matches.contains { $0.section == .features && $0.title == "用户关怀" && $0.anchor == .row("用户关怀") })
     }
 

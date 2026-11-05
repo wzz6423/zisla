@@ -41,9 +41,9 @@ struct UserCareIntervalTests {
     func schedulingDeadlineTracksResetAndDeliveryWithoutAnotherFullPeriod() {
         var schedule = UserCareSchedule(interval: 5)
         #expect(schedule.timeUntilReminder(at: 100) == 5)
-        _ = schedule.update(at: 100, isActive: true, idleSeconds: 0, localHour: 10)
+        _ = schedule.update(at: 100, isActive: true, idleSeconds: 0, localHour: 10, chooseIndex: { $0.lowerBound })
         #expect(abs(schedule.timeUntilReminder(at: 104.995) - 0.005) < 0.000_001)
-        #expect(schedule.update(at: 105, isActive: true, idleSeconds: 0, localHour: 10) == .rest)
+        #expect(schedule.update(at: 105, isActive: true, idleSeconds: 0, localHour: 10, chooseIndex: { $0.lowerBound }) == .rest)
         #expect(schedule.timeUntilReminder(at: 105) == 5)
         schedule.reset()
         #expect(schedule.timeUntilReminder(at: 500) == 5)
@@ -52,9 +52,9 @@ struct UserCareIntervalTests {
     @Test(arguments: [0.005, 8_191.995, 1_048_575.005])
     func fractionalUptimeFiresAtTheSameAbsoluteDeadlineUsedForScheduling(start: TimeInterval) {
         var schedule = UserCareSchedule(interval: 1)
-        _ = schedule.update(at: start, isActive: true, idleSeconds: 0, localHour: 10)
+        _ = schedule.update(at: start, isActive: true, idleSeconds: 0, localHour: 10, chooseIndex: { $0.lowerBound })
         let deadline = start + 1
         #expect(schedule.timeUntilReminder(at: deadline) == 0)
-        #expect(schedule.update(at: deadline, isActive: true, idleSeconds: 0, localHour: 10) == .rest)
+        #expect(schedule.update(at: deadline, isActive: true, idleSeconds: 0, localHour: 10, chooseIndex: { $0.lowerBound }) == .rest)
     }
 }
