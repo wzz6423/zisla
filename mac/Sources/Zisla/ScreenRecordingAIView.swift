@@ -16,13 +16,13 @@ struct ScreenRecordingAIView: View {
                 }
                 .controlSize(.regular)
                 TextEditor(text: $model.aiInstruction)
-                    .thinScrollChrome()
                     .font(.system(size: 12)).scrollContentBackground(.hidden)
                     .padding(6).frame(height: 110)
                     .background(Color.fillControl, in: RoundedRectangle(cornerRadius: 6))
                     .overlay(RoundedRectangle(cornerRadius: 6).stroke(Color.dividerSubtle, lineWidth: 1))
                     .accessibilityLabel(AppLocalization.text("剪辑指令"))
                     .accessibilityIdentifier("screenRecording.aiInstruction")
+                    .thinScrollChrome()
             } actions: {
                 Button(AppLocalization.text("生成剪辑方案"), action: model.requestAIEdit)
                     .buttonStyle(SettingsTintedButtonStyle())
