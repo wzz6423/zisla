@@ -3297,3 +3297,12 @@
 "展示更多信息" = "Show More Information";
 
 "同时展示监控、AI、音乐与状态提示，详细音乐另起一行" = "Show monitoring, AI, music, and status together, with detailed music on a separate row";
+
+/* User pet import */
+"导入宠物" = "Import Pet";
+"宠物名称" = "Pet name";
+"支持图片和视频，动画最长 30 秒，文件最大 100 MB。" = "Supports images and videos. Animations up to 30 seconds. Files up to 100 MB.";
+"宠物名称须为 1–80 个字符。" = "Pet names must contain 1–80 characters.";
+"无法读取此图片或视频，请选择系统支持的媒体文件。" = "Cannot read this image or video. Choose a media file supported by your system.";
+"宠物动画不能超过 30 秒。" = "Pet animations cannot exceed 30 seconds.";
+"宠物文件不能超过 100 MB。" = "Pet files cannot exceed 100 MB.";

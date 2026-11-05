@@ -54,7 +54,7 @@ struct PetSettingsTests {
         #expect(restored.petSide == .right)
     }
 
-    @Test(arguments: ["", "custom-pet", "future-pet"])
+    @Test(arguments: ["", "custom-pet", "future-pet", "user-d6c8b8b6-6c02-4e42-8784-23e6b41c6053"])
     func unrelatedIdentifiersAreNotRewritten(id: String) throws {
         let data = try JSONSerialization.data(withJSONObject: ["petID": id])
         let settings = try JSONDecoder().decode(FeatureSettings.self, from: data)

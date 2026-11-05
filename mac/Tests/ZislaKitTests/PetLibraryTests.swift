@@ -6,9 +6,12 @@ import ZislaCore
 
 @MainActor
 struct PetLibraryTests {
+    private let userPetsDirectory = FileManager.default.temporaryDirectory
+        .appendingPathComponent("zisla-builtin-pets-\(UUID())", isDirectory: true)
+
     @Test
     func catalogRetainsChickAndBearAndIncludesCharactersAndNewAnimals() throws {
-        let entries = PetLibrary.entries()
+        let entries = PetLibrary.entries(userPetsDirectory: userPetsDirectory)
         let ids = Set(entries.map(\.id))
         #expect(entries.count == 46)
         #expect(ids.count == entries.count)
@@ -25,7 +28,7 @@ struct PetLibraryTests {
         ]))
         #expect(ids.contains(FeatureSettings.default.petID))
         for id in PetLibrary.builtinPetIDs {
-            let entry = try #require(PetLibrary.entry(for: id))
+            let entry = try #require(PetLibrary.entry(for: id, userPetsDirectory: userPetsDirectory))
             #expect(entry.id == id)
             #expect(entry.origin == .builtin)
             #expect(!entry.manifest.displayName.isEmpty)
@@ -34,8 +37,8 @@ struct PetLibraryTests {
 
     @Test
     func everySpriteLoadsAndAnimationFramesStayVisible() throws {
-        for entry in PetLibrary.entries() {
-            let sprite = try #require(PetLibrary.loadSprite(for: entry.id), "Cannot load \(entry.id)")
+        for entry in PetLibrary.entries(userPetsDirectory: userPetsDirectory) {
+            let sprite = try #require(PetLibrary.loadSprite(for: entry.id, userPetsDirectory: userPetsDirectory), "Cannot load \(entry.id)")
             if ["bear", "chick"].contains(entry.id) {
                 #expect(sprite.frames == 1)
                 continue
@@ -65,8 +68,8 @@ struct PetLibraryTests {
 
     @Test
     func missingOrCorruptSpritesFailWithoutInventingAPet() throws {
-        #expect(PetLibrary.entry(for: "missing-pet") == nil)
-        #expect(PetLibrary.loadSprite(for: "missing-pet") == nil)
+        #expect(PetLibrary.entry(for: "missing-pet", userPetsDirectory: userPetsDirectory) == nil)
+        #expect(PetLibrary.loadSprite(for: "missing-pet", userPetsDirectory: userPetsDirectory) == nil)
         let directory = FileManager.default.temporaryDirectory
             .appendingPathComponent("zisla-pet-tests-\(UUID().uuidString)", isDirectory: true)
         try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
@@ -84,7 +87,7 @@ struct PetLibraryTests {
         for language in AppLanguage.allCases {
             let path = root.appendingPathComponent("\(language.rawValue).lproj/Localizable.strings")
             let table = try #require(NSDictionary(contentsOf: path) as? [String: String])
-            for entry in PetLibrary.entries() {
+            for entry in PetLibrary.entries(userPetsDirectory: userPetsDirectory) {
                 let key = entry.manifest.displayName
                 let translation = try #require(table[key], "Missing \(key) in \(language.rawValue)")
                 #expect(!translation.isEmpty)

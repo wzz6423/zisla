@@ -2,14 +2,17 @@ import AppKit
 import Foundation
 import ZislaCore
 
-/// Pet library: enumerates built-in (app-bundled) pixel pets and loads their sprites.
+/// Enumerates bundled and user-imported pets and loads their sprites.
 ///
 /// Built-in pets live at bundle resource `Resources/Pets/<id>/` (in development, `#filePath`
 /// is used to locate the source root; in a packaged build, `Bundle.main` is used).
 ///
-/// Pets are pre-bundled, and users choose from the built-in list in Settings.
 /// Artwork sources and rights are recorded in `Resources/Pets/CREDITS.md`.
 public enum PetLibrary {
+    public static var userPetsDirectory: URL {
+        AppPaths.applicationSupport.appendingPathComponent("pets/user_pets", isDirectory: true)
+    }
+
     /// Slug list of pets bundled in the app: scans subdirectories of `Resources/Pets/` that contain a valid `pet.json`.
     ///
     /// This way "however many pets are bundled, that many appear" — no hardcoding needed here.
@@ -44,7 +47,7 @@ public enum PetLibrary {
         }
     }
 
-    public static func entries() -> [Entry] {
+    public static func entries(userPetsDirectory: URL = userPetsDirectory) -> [Entry] {
         var seen = Set<String>()
         var result: [Entry] = []
         for id in builtinPetIDs {
@@ -54,19 +57,53 @@ public enum PetLibrary {
             seen.insert(id)
             result.append(Entry(manifest: manifest, origin: .builtin))
         }
+        let directories = (try? FileManager.default.contentsOfDirectory(
+            at: userPetsDirectory, includingPropertiesForKeys: [.isSymbolicLinkKey], options: .skipsHiddenFiles
+        )) ?? []
+        for directory in directories.sorted(by: { $0.lastPathComponent < $1.lastPathComponent }) {
+            guard let manifest = importedManifest(in: directory), !seen.contains(manifest.id) else { continue }
+            seen.insert(manifest.id)
+            result.append(Entry(manifest: manifest, origin: .imported))
+        }
         return result
     }
 
-    public static func entry(for id: String) -> Entry? {
-        entries().first { $0.id == id }
+    public static func entry(for id: String, userPetsDirectory: URL = userPetsDirectory) -> Entry? {
+        entries(userPetsDirectory: userPetsDirectory).first { $0.id == id }
     }
 
-    /// Loads the sprite for a built-in pet.
     @MainActor
-    public static func loadSprite(for id: String) -> PetSprite? {
+    public static func loadSprite(for id: String, userPetsDirectory: URL = userPetsDirectory) -> PetSprite? {
+        if isImportedID(id) {
+            let directory = userPetsDirectory.appendingPathComponent(id, isDirectory: true)
+            guard let manifest = importedManifest(in: directory) else { return nil }
+            return loadSprite(for: manifest, in: directory)
+        }
         guard let dir = builtinDirectory(for: id),
               let manifest = loadManifest(at: dir) else { return nil }
         return loadSprite(for: manifest, in: dir)
+    }
+
+    @MainActor
+    public static func loadSelectedSprite(for id: String, userPetsDirectory: URL = userPetsDirectory) -> PetSprite? {
+        loadSprite(for: id, userPetsDirectory: userPetsDirectory)
+            ?? loadSprite(for: FeatureSettings.default.petID, userPetsDirectory: userPetsDirectory)
+    }
+
+    private static func isImportedID(_ id: String) -> Bool {
+        id.hasPrefix("user-") && UUID(uuidString: String(id.dropFirst(5))) != nil
+    }
+
+    private static func importedManifest(in directory: URL) -> PetManifest? {
+        guard isImportedID(directory.lastPathComponent),
+              (try? directory.resourceValues(forKeys: [.isSymbolicLinkKey]).isSymbolicLink) == false,
+              let manifest = loadManifest(at: directory), manifest.id == directory.lastPathComponent,
+              manifest.spritePath == "sprite.png",
+              let width = manifest.frameWidth, (1...PetMediaImporter.maximumDimension).contains(width),
+              let frames = manifest.frames, (1...Int(PetMediaImporter.maximumDuration * PetMediaImporter.frameRate)).contains(frames),
+              let fps = manifest.fps, fps.isFinite, fps > 0, fps <= PetMediaImporter.frameRate,
+              FileManager.default.fileExists(atPath: directory.appendingPathComponent("sprite.png").path) else { return nil }
+        return manifest
     }
 
     @MainActor

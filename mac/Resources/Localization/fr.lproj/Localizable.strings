@@ -3294,3 +3294,12 @@
 "展示更多信息" = "Afficher plus d’informations";
 
 "同时展示监控、AI、音乐与状态提示，详细音乐另起一行" = "Afficher la surveillance, l’IA, la musique et les états ensemble, avec les détails musicaux sur une ligne distincte";
+
+/* User pet import */
+"导入宠物" = "Importer un animal";
+"宠物名称" = "Nom de l’animal";
+"支持图片和视频，动画最长 30 秒，文件最大 100 MB。" = "Images et vidéos prises en charge. Animations de 30 secondes et fichiers de 100 Mo maximum.";
+"宠物名称须为 1–80 个字符。" = "Le nom de l’animal doit contenir entre 1 et 80 caractères.";
+"无法读取此图片或视频，请选择系统支持的媒体文件。" = "Impossible de lire cette image ou vidéo. Choisissez un fichier multimédia pris en charge par votre système.";
+"宠物动画不能超过 30 秒。" = "Les animations des animaux ne peuvent pas dépasser 30 secondes.";
+"宠物文件不能超过 100 MB。" = "Les fichiers des animaux ne peuvent pas dépasser 100 Mo.";
