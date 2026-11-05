@@ -133,6 +133,47 @@ struct FloatingIslandInformationTests {
         #expect(layout.primary.count == 3)
     }
 
+    @Test(arguments: [IslandEdge.top, .left])
+    func informationRowsStayInsideTheAnimatedViewport(edge: IslandEdge) throws {
+        var settings = settings(edge: edge)
+        settings.mediaCompactStyle = .detailed
+        let item = NowPlayingSnapshot(title: "A long song title", artist: "Artist", album: nil, artworkData: nil,
+            duration: 60, elapsedTime: 0, timestamp: date, isPlaying: false,
+            lyrics: SyncedLyrics(lines: [.init(time: 0, text: "A long lyric line that fills the available row")]))
+        let layout = try #require(FloatingIslandInformationLayout(notices: notices, icons: icons(),
+            settings: settings, item: item, at: date))
+        let viewportLength = 96
+        let viewport = edge.isVertical ? CGSize(width: layout.size.width, height: CGFloat(viewportLength))
+            : CGSize(width: CGFloat(viewportLength), height: layout.size.height)
+        let canvas = edge.isVertical ? CGSize(width: viewport.width, height: 300)
+            : CGSize(width: 300, height: viewport.height)
+        let renderer = ImageRenderer(content: FloatingIslandInformationView(layout: layout,
+            visualizationStyle: .waveform, item: item, date: date)
+            .frame(width: viewport.width, height: viewport.height)
+            .frame(width: canvas.width, height: canvas.height, alignment: .topLeading)
+            .environment(\._accessibilityReduceMotion, true)
+            .environment(\.layoutDirection, .leftToRight)
+            .background(.black))
+        renderer.scale = 1
+        let bitmap = NSBitmapImageRep(cgImage: try #require(renderer.cgImage))
+        var insidePixels = 0
+        var outsidePixels = 0
+        for y in 0..<bitmap.pixelsHigh {
+            for x in 0..<bitmap.pixelsWide {
+                let color = try #require(bitmap.colorAt(x: x, y: y)?.usingColorSpace(.deviceRGB))
+                if max(color.redComponent, color.greenComponent, color.blueComponent) > 0.2 {
+                    if (edge.isVertical ? y : x) >= viewportLength {
+                        outsidePixels += 1
+                    } else {
+                        insidePixels += 1
+                    }
+                }
+            }
+        }
+        #expect(insidePixels > 10)
+        #expect(outsidePixels == 0, "Leading-aligned rows must fit the current animated viewport")
+    }
+
     @Test(arguments: AppLanguage.allCases)
     func informationSwitchIsLocalizedAndSearchableInTheInformationPage(language: AppLanguage) throws {
         let root = URL(fileURLWithPath: #filePath).deletingLastPathComponent()

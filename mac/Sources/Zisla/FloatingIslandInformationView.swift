@@ -82,13 +82,19 @@ struct FloatingIslandInformationView: View {
                 primaryRow
                     .scaleEffect(x: layout.edge.isVertical ? 1 : min(1, length / layout.primaryLength),
                                  y: layout.edge.isVertical ? min(1, length / layout.primaryLength) : 1)
+                    .frame(width: layout.edge.isVertical ? layout.primaryThickness : min(length, layout.primaryLength),
+                           height: layout.edge.isVertical ? min(length, layout.primaryLength) : layout.primaryThickness)
                     .frame(width: layout.edge.isVertical ? layout.primaryThickness : length,
-                           height: layout.edge.isVertical ? length : layout.primaryThickness)
+                           height: layout.edge.isVertical ? length : layout.primaryThickness,
+                           alignment: layout.edge.isVertical ? .top : .leading)
                 if let secondary = layout.secondary {
                     CompactPillStatusContent(presentation: secondary.presentation, text: secondary.text,
                         edge: layout.edge, visualizationStyle: visualizationStyle, item: item, date: date)
+                        .frame(width: layout.edge.isVertical ? CompactPillStatusPresentation.minimumThickness : min(length, secondary.length),
+                               height: layout.edge.isVertical ? min(length, secondary.length) : CompactPillStatusPresentation.minimumThickness)
                         .frame(width: layout.edge.isVertical ? CompactPillStatusPresentation.minimumThickness : length,
-                               height: layout.edge.isVertical ? length : CompactPillStatusPresentation.minimumThickness)
+                               height: layout.edge.isVertical ? length : CompactPillStatusPresentation.minimumThickness,
+                               alignment: layout.edge.isVertical ? .top : .leading)
                 }
             }
             .frame(width: geometry.size.width, height: geometry.size.height)

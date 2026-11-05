@@ -39,7 +39,8 @@ struct StatusIconDestinationIntegrationTests {
         let item = NowPlayingSnapshot(title: "Song", artist: "Artist", album: nil,
             artworkData: artwork.tiffRepresentation, duration: 60, elapsedTime: 0,
             timestamp: date, isPlaying: true,
-            lyrics: SyncedLyrics(lines: [.init(time: 0, text: "Lyrics")]))
+            lyrics: SyncedLyrics(lines: [.init(time: 0,
+                text: crowded ? "" : "A long lyric line that needs the full music row width")]))
         fixture.media.publishSnapshot(item)
         let notices = [IslandNotice(id: "ai-active-openai", title: "AI"),
                        IslandNotice(id: "media-active-left", title: "Song", artworkData: item.artworkData),
@@ -60,7 +61,8 @@ struct StatusIconDestinationIntegrationTests {
         #expect(view.pausesCompactTimeline == (style != .detailed),
                 "Detailed lyrics must keep advancing even while AI wins the normal priority")
         let bitmap = try await renderOffscreen(view.statusBarContent(at: date)
-            .environment(\._accessibilityReduceMotion, true), size: layout.size)
+            .environment(\._accessibilityReduceMotion, true)
+            .environment(\.layoutDirection, .leftToRight), size: layout.size)
         #expect(reportedLengths.last == (edge.isVertical ? layout.size.height : layout.size.width),
                 "The surface must report its measured length to keep the panel geometry synchronized")
         var monitorPixels = 0
@@ -86,7 +88,16 @@ struct StatusIconDestinationIntegrationTests {
         #expect(monitorPixels > 100, "The monitor icon must stay visible while AI and music are active")
         #expect(artworkPixels > 100, "The playback row must render alongside the monitor icon")
         #expect(statusPixels > 10, "The task count and awake status must render alongside both colored icons")
+        let length = edge.isVertical ? layout.size.height : layout.size.width
+        let pixelScale = CGFloat(edge.isVertical ? bitmap.pixelsHigh : bitmap.pixelsWide) / length
+        let rowScale = min(1, length / layout.primaryLength)
+        let monitorStart = edge.isVertical ? monitorBounds.minY : monitorBounds.minX
+        #expect(abs(monitorStart / pixelScale - 8 * rowScale) <= 1,
+                "The monitor row must begin at its leading inset even when the music row is wider or the row is scaled")
         if style == .detailed {
+            let artworkStart = edge.isVertical ? artworkBounds.minY : artworkBounds.minX
+            #expect(abs(artworkStart / pixelScale - CompactPillStatusPresentation.trailingInset) <= 1,
+                    "Short detailed music must begin at its leading inset instead of centering under the monitor row")
             #expect(edge.isVertical ? artworkBounds.minX > monitorBounds.maxX : artworkBounds.minY > monitorBounds.maxY,
                     "Detailed playback must occupy its own row or column")
         } else {
