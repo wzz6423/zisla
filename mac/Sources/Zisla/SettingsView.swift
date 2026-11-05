@@ -2484,10 +2484,10 @@ struct SettingsView: View {
                             Picker("", selection: Binding(
                                 get: { settingsStore.settings.islandPlacement.mode },
                                 set: { mode in
-                                    if mode == .custom {
-                                        model.onChooseIslandPlacement?()
+                                    if let placement = settingsStore.settings.islandPlacement(for: mode) {
+                                        settingsStore.settings.islandPlacement = placement
                                     } else {
-                                        settingsStore.settings.islandPlacement = IslandPlacement()
+                                        model.onChooseIslandPlacement?()
                                     }
                                 }
                             )) {
