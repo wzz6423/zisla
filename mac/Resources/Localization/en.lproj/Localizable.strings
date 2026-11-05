@@ -3208,6 +3208,8 @@
 "森林" = "Forest";
 "暖阳" = "Sunrise";
 "终端" = "Terminal";
+"海盐" = "Sea Salt";
+"樱花" = "Cherry Blossom";
 "本机使用时间" = "Time on this Mac";
 "首次使用" = "First activity";
 "最后使用" = "Last activity";
@@ -3223,18 +3225,11 @@
 "功率峰值" = "Peak system power";
 "电量范围" = "Battery range";
 "风扇峰值" = "Peak fan speed";
-"本机时长来自系统屏幕使用时间" = "Mac usage from system Screen Time";
-"本机时长来自 Zisla 活跃记录" = "Mac usage from Zisla activity sampling";
-"仅含已记录或已同步的数据。工作与娱乐按应用分类，浏览器归入其他。未获取的指标不计为零。" = "Includes recorded or synced data. Work and leisure follow app categories. Browsers count as other. Missing metrics remain unavailable.";
-"记录时段" = "Recording window";
 "截至" = "As of";
 "简报导出或记录失败" = "Briefing export or recording failed";
-"开启后记录本机活跃情况，按所选时间导出 PNG 到下载目录。休眠或退出后，下次运行补导已记录的日期。" = "Records Mac activity while enabled and exports a PNG to the download folder at the selected time. Recorded days missed during sleep or exit are exported on the next run.";
 "导出时间" = "Export time";
 "读取系统屏幕使用时间" = "Read system Screen Time";
-"系统数据需要完全磁盘访问及跨设备共享。不可用时使用 Zisla 本机记录。" = "System data requires Full Disk Access and Share Across Devices. Zisla uses its local activity record when unavailable.";
 "完全磁盘访问" = "Full Disk Access";
-"输入字符需开启本地输入统计并授予输入监控权限。记录仅保存在本机，保留最近 35 份日记录。" = "Character counts require local typing statistics and Input Monitoring permission. The latest 35 daily records stay on this Mac.";
 "简报模板" = "Briefing template";
 "示例数据" = "Sample data";
 "导出今日简报" = "Export today’s briefing";

@@ -28,9 +28,6 @@ struct DailyBriefingSettingsView: View {
             .toggleStyle(.switch)
             .settingsSearchAnchor(.row(AppLocalization.string("每日简报", locale: locale)))
 
-            AppLocalizedText("开启后记录本机活跃情况，按所选时间导出 PNG 到下载目录。休眠或退出后，下次运行补导已记录的日期。")
-                .font(.caption).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
-
             HStack {
                 AppLocalizedText("导出时间")
                 Spacer()
@@ -40,32 +37,18 @@ struct DailyBriefingSettingsView: View {
             }
             .disabled(!settingsStore.settings.dailyBriefing.enabled)
 
-            HStack(alignment: .top) {
-                AppLocalizedText("下载目录")
-                Spacer(minLength: 12)
-                Text(model.downloadDirectory.path(percentEncoded: false))
-                    .foregroundStyle(.secondary).textSelection(.enabled).multilineTextAlignment(.trailing)
-            }
-            .font(.caption)
+            HStack(spacing: 12) {
+                Toggle(isOn: $settingsStore.settings.dailyBriefing.readsSystemScreenTime) {
+                    AppLocalizedText("读取系统屏幕使用时间")
+                }
+                .toggleStyle(.switch)
+                .disabled(!settingsStore.settings.dailyBriefing.enabled)
 
-            Toggle(isOn: $settingsStore.settings.dailyBriefing.readsSystemScreenTime) {
-                AppLocalizedText("读取系统屏幕使用时间")
-            }
-            .toggleStyle(.switch)
-            .disabled(!settingsStore.settings.dailyBriefing.enabled)
-
-            HStack(alignment: .top, spacing: 12) {
-                AppLocalizedText("系统数据需要完全磁盘访问及跨设备共享。不可用时使用 Zisla 本机记录。")
-                    .font(.caption).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
-                Spacer(minLength: 0)
                 Button {
                     NSWorkspace.shared.open(URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_AllFiles")!)
                 } label: { AppLocalizedText("完全磁盘访问") }
                 .controlSize(.small)
             }
-
-            AppLocalizedText("输入字符需开启本地输入统计并授予输入监控权限。记录仅保存在本机，保留最近 35 份日记录。")
-                .font(.caption).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
 
             Divider()
             HStack {

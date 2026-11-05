@@ -148,7 +148,6 @@ final class DailyBriefingController: ObservableObject {
     }
 
     static func applySystemUsage(_ intervals: [ScreenTimeUsageInterval], to report: inout DailyBriefingReport) {
-        report.usesSystemScreenTime = true
         report.day.hourlySeconds = Array(repeating: 0, count: 24)
         report.day.applications = [:]
         report.day.firstActivity = intervals.map(\.start).min()

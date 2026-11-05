@@ -118,14 +118,19 @@ struct DailyBriefingIntegrationTests {
         let date = report.calendar.date(bySettingHour: 10, minute: 30, second: 0, of: report.day.date)!
         let listening = report.day.listeningSeconds
         let power = report.day.peakPower
+        let observedFrom = report.day.observedFrom
+        let observedThrough = report.day.observedThrough
         DailyBriefingController.applySystemUsage([
             .init(deviceID: "local", bundleID: "com.example.uninstalled", start: date, end: date.addingTimeInterval(3600))
         ], to: &report)
-        #expect(report.usesSystemScreenTime)
         #expect(report.day.activeSeconds == 3600)
         #expect(report.day.hourlySeconds[10] == 1800)
         #expect(report.day.hourlySeconds[11] == 1800)
         #expect(report.day.applications["com.example.uninstalled"]?.name == "com.example.uninstalled")
+        #expect(report.day.firstActivity == date)
+        #expect(report.day.lastActivity == date.addingTimeInterval(3600))
+        #expect(report.day.observedFrom == observedFrom)
+        #expect(report.day.observedThrough == observedThrough)
         #expect(report.day.listeningSeconds == listening)
         #expect(report.day.peakPower == power)
         #expect(report.day.expansionCount == 42)
@@ -153,6 +158,51 @@ struct DailyBriefingIntegrationTests {
         #expect(image.dataProvider?.data != nil)
     }
 
+    @Test
+    func newLightTemplatesHaveDistinctBackgroundsAndLayouts() throws {
+        let report = DailyBriefingReport.example(at: Date(timeIntervalSince1970: 1_800_000_000))
+        var heights: [Int] = []
+        let backgrounds = try [DailyBriefingTemplate.minimal, .coastal, .blossom].map { template in
+            let image = try DailyBriefingRenderer.image(report: report, template: template, language: .english, scale: 0.1)
+            heights.append(image.height)
+            let bitmap = NSBitmapImageRep(cgImage: image)
+            return try #require(bitmap.colorAt(x: 0, y: 0)?.usingColorSpace(.sRGB))
+        }
+        #expect(Set(heights).count == 3)
+        let minimal = backgrounds[0]
+        let coastal = backgrounds[1]
+        let blossom = backgrounds[2]
+        #expect(coastal.redComponent > 0.9 && coastal.greenComponent > 0.9 && coastal.blueComponent > 0.9)
+        #expect(blossom.redComponent > 0.9 && blossom.greenComponent > 0.9 && blossom.blueComponent > 0.9)
+        #expect(coastal.blueComponent - coastal.redComponent > 0.04)
+        #expect(blossom.redComponent - blossom.greenComponent > 0.04)
+        #expect(coastal.redComponent < blossom.redComponent - 0.04)
+        #expect(coastal.redComponent < minimal.redComponent - 0.04)
+        #expect(blossom.greenComponent < minimal.greenComponent - 0.04)
+    }
+
+    @Test(arguments: [DailyBriefingTemplate.coastal, .blossom])
+    func newTemplatesUseTheirMatchingChartAccents(template: DailyBriefingTemplate) throws {
+        let report = DailyBriefingReport.example(at: Date(timeIntervalSince1970: 1_800_000_000))
+        let image = try DailyBriefingRenderer.image(report: report, template: template, language: .english, scale: 0.25)
+        let bitmap = NSBitmapImageRep(cgImage: image)
+        var foundAccent = false
+        for y in 0..<bitmap.pixelsHigh {
+            for x in 0..<bitmap.pixelsWide {
+                let color = try #require(bitmap.colorAt(x: x, y: y)?.usingColorSpace(.sRGB))
+                let matches = template == .coastal
+                    ? color.blueComponent - color.redComponent > 0.3
+                    : color.redComponent - color.greenComponent > 0.25
+                if matches {
+                    foundAccent = true
+                    break
+                }
+            }
+            if foundAccent { break }
+        }
+        #expect(foundAccent, "The template must render its blue or rose chart accent")
+    }
+
     @Test(arguments: DailyBriefingTemplate.allCases)
     func exportIsARealPNGAndHandlesEmptyStatistics(template: DailyBriefingTemplate) throws {
         let report = DailyBriefingReport(day: DailyBriefingDay(date: Date(timeIntervalSince1970: 1_800_000_000), calendar: DailyBriefingDay.calendar),
@@ -171,12 +221,40 @@ struct DailyBriefingIntegrationTests {
     }
 
     @Test
+    func settingsAndPostersOmitRemovedExplanationsAndDownloadPath() throws {
+        let root = URL(fileURLWithPath: #filePath).deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent()
+        let settings = try String(contentsOf: root.appendingPathComponent("Sources/Zisla/DailyBriefingSettingsView.swift"), encoding: .utf8)
+        for key in [
+            "开启后记录本机活跃情况，按所选时间导出 PNG 到下载目录。休眠或退出后，下次运行补导已记录的日期。",
+            "系统数据需要完全磁盘访问及跨设备共享。不可用时使用 Zisla 本机记录。",
+            "输入字符需开启本地输入统计并授予输入监控权限。记录仅保存在本机，保留最近 35 份日记录。",
+            "下载目录",
+        ] {
+            #expect(!settings.contains("\"\(key)\""), "Removed settings text must stay hidden: \(key)")
+        }
+        #expect(!settings.contains("model.downloadDirectory"))
+        #expect(settings.contains(#"AppLocalizedText("完全磁盘访问")"#))
+        #expect(settings.contains("x-apple.systempreferences:com.apple.preference.security?Privacy_AllFiles"))
+
+        let poster = try String(contentsOf: root.appendingPathComponent("Sources/Zisla/DailyBriefingPoster.swift"), encoding: .utf8)
+        for key in [
+            "本机时长来自系统屏幕使用时间",
+            "本机时长来自 Zisla 活跃记录",
+            "仅含已记录或已同步的数据。工作与娱乐按应用分类，浏览器归入其他。未获取的指标不计为零。",
+            "记录时段",
+        ] {
+            #expect(!poster.contains("\"\(key)\""), "Removed poster text must stay hidden: \(key)")
+        }
+        #expect(poster.contains(#"localized("截至")"#))
+        #expect(poster.contains("time(report.generatedAt)"))
+    }
+
+    @Test
     func everyRuntimeKeyHasAllSeventeenTranslations() throws {
         let root = URL(fileURLWithPath: #filePath).deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent()
         let pattern = #"(?:localized|metric|category|AppLocalizedText|AppLocalization\.string)\("([^"]+)""#
         let regex = try NSRegularExpression(pattern: pattern)
         var keys = Set(DailyBriefingTemplate.allCases.map(\.title))
-        keys.formUnion(["本机时长来自系统屏幕使用时间", "本机时长来自 Zisla 活跃记录"])
         for file in ["DailyBriefingPoster.swift", "DailyBriefingSettingsView.swift", "DailyBriefingController.swift"] {
             let source = try String(contentsOf: root.appendingPathComponent("Sources/Zisla/" + file), encoding: .utf8)
             let range = NSRange(source.startIndex..., in: source)
@@ -185,7 +263,7 @@ struct DailyBriefingIntegrationTests {
                 keys.insert(String(source[keyRange]))
             }
         }
-        #expect(keys.count >= 40)
+        #expect(keys.count >= 36)
         #expect(AppLanguage.allCases.count == 17)
         for language in AppLanguage.allCases {
             let tableURL = root.appendingPathComponent("Resources/Localization/\(language.rawValue).lproj/Localizable.strings")
@@ -199,5 +277,9 @@ struct DailyBriefingIntegrationTests {
         }
         #expect(AppLocalization.string("每日简报", language: .english) == "Daily Briefing")
         #expect(AppLocalization.string("每日简报", language: .arabic) == "التقرير اليومي")
+        #expect(AppLocalization.string(DailyBriefingTemplate.coastal.title, language: .english) == "Sea Salt")
+        #expect(AppLocalization.string(DailyBriefingTemplate.blossom.title, language: .english) == "Cherry Blossom")
+        #expect(AppLocalization.string(DailyBriefingTemplate.coastal.title, language: .arabic) == "ملح البحر")
+        #expect(AppLocalization.string(DailyBriefingTemplate.blossom.title, language: .arabic) == "أزهار الكرز")
     }
 }

@@ -1,7 +1,7 @@
 import Foundation
 
 public enum DailyBriefingTemplate: String, Codable, CaseIterable, Identifiable, Sendable {
-    case minimal, paper, midnight, forest, sunrise, terminal
+    case minimal, paper, forest, sunrise, coastal, blossom, midnight, terminal
 
     public var id: Self { self }
 
@@ -13,6 +13,8 @@ public enum DailyBriefingTemplate: String, Codable, CaseIterable, Identifiable, 
         case .forest: "森林"
         case .sunrise: "暖阳"
         case .terminal: "终端"
+        case .coastal: "海盐"
+        case .blossom: "樱花"
         }
     }
 }

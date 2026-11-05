@@ -8,7 +8,6 @@ struct DailyBriefingReport: Sendable {
     var generatedAt: Date
     var typing: DailyBriefingTyping?
     var allDeviceSeconds: TimeInterval?
-    var usesSystemScreenTime = false
     var calendar = DailyBriefingDay.calendar
 
     static func example(at date: Date = Date()) -> Self {
@@ -50,6 +49,8 @@ struct DailyBriefingPoster: View {
         case .forest: Color(red: 0.92, green: 0.95, blue: 0.90)
         case .sunrise: Color(red: 1, green: 0.95, blue: 0.88)
         case .terminal: Color(red: 0.055, green: 0.12, blue: 0.14)
+        case .coastal: Color(red: 0.92, green: 0.97, blue: 0.99)
+        case .blossom: Color(red: 1, green: 0.94, blue: 0.96)
         }
     }
     private var accent: Color {
@@ -60,6 +61,8 @@ struct DailyBriefingPoster: View {
         case .forest: Color(red: 0.20, green: 0.40, blue: 0.29)
         case .sunrise: Color(red: 0.80, green: 0.30, blue: 0.14)
         case .terminal: Color(red: 0.41, green: 0.90, blue: 0.73)
+        case .coastal: Color(red: 0.19, green: 0.45, blue: 0.63)
+        case .blossom: Color(red: 0.68, green: 0.34, blue: 0.46)
         }
     }
 
@@ -131,6 +134,25 @@ struct DailyBriefingPoster: View {
             categories
             metrics(columns: 2)
             activityChart
+        case .coastal:
+            hero.padding(28).background(Color.white.opacity(0.72), in: RoundedRectangle(cornerRadius: 20))
+            HStack(alignment: .top, spacing: 32) {
+                VStack(alignment: .leading, spacing: 32) {
+                    activityChart
+                    categories
+                }
+                .frame(maxWidth: .infinity)
+                metrics(columns: 2).frame(maxWidth: .infinity)
+            }
+        case .blossom:
+            hero.padding(28).background(Color.white.opacity(0.72), in: RoundedRectangle(cornerRadius: 28))
+            metrics(columns: 4)
+                .padding(24)
+                .background(accent.opacity(0.06), in: RoundedRectangle(cornerRadius: 24))
+            HStack(alignment: .top, spacing: 40) {
+                activityChart
+                categories.frame(width: 240)
+            }
         }
     }
 
@@ -224,18 +246,11 @@ struct DailyBriefingPoster: View {
     }
 
     private var footer: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            Text(localized(report.usesSystemScreenTime ? "本机时长来自系统屏幕使用时间" : "本机时长来自 Zisla 活跃记录"))
-                .font(.system(size: 15, weight: .medium))
-            Text(localized("仅含已记录或已同步的数据。工作与娱乐按应用分类，浏览器归入其他。未获取的指标不计为零。"))
-                .font(.system(size: 14)).fixedSize(horizontal: false, vertical: true)
-            HStack {
-                Text(localized("记录时段") + "  " + time(report.day.observedFrom) + " – " + time(report.day.observedThrough))
-                Spacer()
-                Text(localized("截至") + "  " + time(report.generatedAt))
-            }
-            .font(.system(size: 13).monospacedDigit())
+        HStack {
+            Spacer()
+            Text(localized("截至") + "  " + time(report.generatedAt))
         }
+        .font(.system(size: 13).monospacedDigit())
         .foregroundStyle(ink.opacity(0.6))
         .padding(.top, 24)
         .overlay(alignment: .top) { Rectangle().fill(ink.opacity(0.18)).frame(height: 1) }

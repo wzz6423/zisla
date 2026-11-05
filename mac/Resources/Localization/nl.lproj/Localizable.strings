@@ -3209,6 +3209,8 @@
 "森林" = "Bos";
 "暖阳" = "Zonsopgang";
 "终端" = "Terminal";
+"海盐" = "Zeezout";
+"樱花" = "Kersenbloesem";
 "本机使用时间" = "Tijd op deze Mac";
 "首次使用" = "Eerste activiteit";
 "最后使用" = "Laatste activiteit";
@@ -3224,18 +3226,11 @@
 "功率峰值" = "Piekvermogen";
 "电量范围" = "Batterijbereik";
 "风扇峰值" = "Hoogste ventilatorsnelheid";
-"本机时长来自系统屏幕使用时间" = "Mac-gebruik uit Schermtijd";
-"本机时长来自 Zisla 活跃记录" = "Mac-gebruik uit Zisla-activiteitsmetingen";
-"仅含已记录或已同步的数据。工作与娱乐按应用分类，浏览器归入其他。未获取的指标不计为零。" = "Bevat vastgelegde of gesynchroniseerde gegevens. Werk en ontspanning volgen appcategorieën. Browsers vallen onder Overig. Ontbrekende metingen blijven niet beschikbaar.";
-"记录时段" = "Registratieperiode";
 "截至" = "Tot";
 "简报导出或记录失败" = "Exporteren of vastleggen van overzicht mislukt";
-"开启后记录本机活跃情况，按所选时间导出 PNG 到下载目录。休眠或退出后，下次运行补导已记录的日期。" = "Legt Mac-activiteit vast en exporteert op het gekozen tijdstip een PNG naar de downloadmap. Vastgelegde dagen die tijdens sluimerstand of afsluiten zijn gemist, worden bij de volgende start geëxporteerd.";
 "导出时间" = "Exporttijd";
 "读取系统屏幕使用时间" = "Schermtijd van het systeem lezen";
-"系统数据需要完全磁盘访问及跨设备共享。不可用时使用 Zisla 本机记录。" = "Systeemgegevens vereisen volledige schijftoegang en delen tussen apparaten. Anders gebruikt Zisla het lokale activiteitenlog.";
 "完全磁盘访问" = "Volledige schijftoegang";
-"输入字符需开启本地输入统计并授予输入监控权限。记录仅保存在本机，保留最近 35 份日记录。" = "Tekenaantallen vereisen lokale typstatistieken en toestemming voor invoercontrole. De laatste 35 dagregistraties blijven op deze Mac.";
 "简报模板" = "Overzichtsjabloon";
 "示例数据" = "Voorbeeldgegevens";
 "导出今日简报" = "Dagoverzicht exporteren";

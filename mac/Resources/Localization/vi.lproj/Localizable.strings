@@ -3209,6 +3209,8 @@
 "森林" = "Rừng";
 "暖阳" = "Bình minh";
 "终端" = "Thiết bị đầu cuối";
+"海盐" = "Muối biển";
+"樱花" = "Hoa anh đào";
 "本机使用时间" = "Thời gian trên máy Mac này";
 "首次使用" = "Hoạt động đầu tiên";
 "最后使用" = "Hoạt động cuối cùng";
@@ -3224,18 +3226,11 @@
 "功率峰值" = "Công suất cao nhất";
 "电量范围" = "Khoảng mức pin";
 "风扇峰值" = "Tốc độ quạt cao nhất";
-"本机时长来自系统屏幕使用时间" = "Thời gian Mac từ Thời gian sử dụng của hệ thống";
-"本机时长来自 Zisla 活跃记录" = "Thời gian Mac từ mẫu hoạt động Zisla";
-"仅含已记录或已同步的数据。工作与娱乐按应用分类，浏览器归入其他。未获取的指标不计为零。" = "Chỉ gồm dữ liệu đã ghi hoặc đồng bộ. Công việc và giải trí theo danh mục ứng dụng, trình duyệt thuộc mục khác. Chỉ số thiếu vẫn hiển thị chưa có dữ liệu.";
-"记录时段" = "Khoảng thời gian ghi";
 "截至" = "Tính đến";
 "简报导出或记录失败" = "Không thể xuất hoặc ghi bản tin";
-"开启后记录本机活跃情况，按所选时间导出 PNG 到下载目录。休眠或退出后，下次运行补导已记录的日期。" = "Ghi hoạt động Mac khi bật và xuất PNG vào thư mục tải xuống theo giờ đã chọn. Các ngày đã ghi bị lỡ khi máy ngủ hoặc thoát ứng dụng sẽ được xuất ở lần chạy tiếp theo.";
 "导出时间" = "Giờ xuất";
 "读取系统屏幕使用时间" = "Đọc Thời gian sử dụng của hệ thống";
-"系统数据需要完全磁盘访问及跨设备共享。不可用时使用 Zisla 本机记录。" = "Dữ liệu hệ thống cần quyền Truy cập toàn bộ ổ đĩa và Chia sẻ trên các thiết bị. Khi không có, Zisla dùng bản ghi cục bộ.";
 "完全磁盘访问" = "Truy cập toàn bộ ổ đĩa";
-"输入字符需开启本地输入统计并授予输入监控权限。记录仅保存在本机，保留最近 35 份日记录。" = "Số ký tự cần bật thống kê nhập cục bộ và quyền Giám sát đầu vào. 35 bản ghi hằng ngày gần nhất chỉ lưu trên máy Mac này.";
 "简报模板" = "Mẫu bản tin";
 "示例数据" = "Dữ liệu mẫu";
 "导出今日简报" = "Xuất bản tin hôm nay";

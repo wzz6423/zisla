@@ -3209,6 +3209,8 @@
 "森林" = "Floresta";
 "暖阳" = "Amanhecer";
 "终端" = "Terminal";
+"海盐" = "Sal marinho";
+"樱花" = "Flor de cerejeira";
 "本机使用时间" = "Tempo neste Mac";
 "首次使用" = "Primeira atividade";
 "最后使用" = "Última atividade";
@@ -3224,18 +3226,11 @@
 "功率峰值" = "Potência máxima";
 "电量范围" = "Faixa de bateria";
 "风扇峰值" = "Velocidade máxima da ventoinha";
-"本机时长来自系统屏幕使用时间" = "Uso do Mac pelo Tempo de Uso";
-"本机时长来自 Zisla 活跃记录" = "Uso do Mac por amostragem do Zisla";
-"仅含已记录或已同步的数据。工作与娱乐按应用分类，浏览器归入其他。未获取的指标不计为零。" = "Inclui dados registrados ou sincronizados. Trabalho e lazer seguem a categoria do app. Navegadores entram em Outros. Métricas ausentes ficam indisponíveis.";
-"记录时段" = "Período registrado";
 "截至" = "Até";
 "简报导出或记录失败" = "Falha ao exportar ou registrar o resumo";
-"开启后记录本机活跃情况，按所选时间导出 PNG 到下载目录。休眠或退出后，下次运行补导已记录的日期。" = "Registra a atividade do Mac e exporta um PNG para a pasta de downloads no horário escolhido. Dias registrados pendentes durante repouso ou encerramento são exportados na próxima execução.";
 "导出时间" = "Horário de exportação";
 "读取系统屏幕使用时间" = "Ler Tempo de Uso do sistema";
-"系统数据需要完全磁盘访问及跨设备共享。不可用时使用 Zisla 本机记录。" = "Os dados do sistema exigem Acesso Total ao Disco e Compartilhar entre Dispositivos. Se indisponíveis, o Zisla usa seu registro local.";
 "完全磁盘访问" = "Acesso Total ao Disco";
-"输入字符需开启本地输入统计并授予输入监控权限。记录仅保存在本机，保留最近 35 份日记录。" = "A contagem exige estatísticas locais de digitação e permissão de Monitoramento de Entrada. Os últimos 35 registros diários ficam neste Mac.";
 "简报模板" = "Modelo do resumo";
 "示例数据" = "Dados de exemplo";
 "导出今日简报" = "Exportar resumo de hoje";

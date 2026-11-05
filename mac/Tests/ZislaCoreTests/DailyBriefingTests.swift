@@ -14,7 +14,7 @@ struct DailyBriefingTests {
         let legacy = try JSONDecoder().decode(FeatureSettings.self, from: Data("{}".utf8))
         #expect(!legacy.dailyBriefing.enabled)
         #expect(legacy.dailyBriefing.minuteOfDay == 1320)
-        #expect(DailyBriefingTemplate.allCases.count == 6)
+        #expect(DailyBriefingTemplate.allCases.count == 8)
         for template in DailyBriefingTemplate.allCases {
             var settings = legacy
             settings.dailyBriefing = .init(enabled: true, minuteOfDay: 1385, template: template, readsSystemScreenTime: false)
@@ -22,6 +22,19 @@ struct DailyBriefingTests {
             #expect(restored.dailyBriefing == settings.dailyBriefing)
             #expect(restored.mediaEnabled == legacy.mediaEnabled)
         }
+    }
+
+    @Test
+    func templatesGroupLightStylesBeforeDarkStyles() {
+        let rawValues = DailyBriefingTemplate.allCases.map(\.rawValue)
+        #expect(rawValues == ["minimal", "paper", "forest", "sunrise", "coastal", "blossom", "midnight", "terminal"])
+        #expect(Array(rawValues.suffix(2)) == ["midnight", "terminal"])
+    }
+
+    @Test(arguments: ["minimal", "paper", "midnight", "forest", "sunrise", "terminal"])
+    func legacyTemplateRawValuesRemainDecodable(rawValue: String) throws {
+        let settings = try JSONDecoder().decode(DailyBriefingSettings.self, from: Data("{\"template\":\"\(rawValue)\"}".utf8))
+        #expect(settings.template.rawValue == rawValue)
     }
 
     @Test(arguments: [-900, 0, 1439, 9000])
