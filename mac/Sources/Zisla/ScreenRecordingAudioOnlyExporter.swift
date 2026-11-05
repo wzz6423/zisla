@@ -71,7 +71,7 @@ enum ScreenRecordingAudioOnlyExporter {
             for segment in track.segments where !segment.isEmpty {
                 let range = segment.timeMapping.target
                 let start = Int64((range.start.seconds * 48_000).rounded())
-                let end = Int64((range.end.seconds * 48_000).rounded())
+                let end = Int64((range.end.seconds * 48_000).rounded(.down))
                 audibleRanges.append(start..<end)
             }
         }
