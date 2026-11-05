@@ -69,6 +69,7 @@ enum SettingsSearchIndex {
         entry(.general, "登录时启动", anchor: .row("登录时启动"), keywords: ["开机或登录后自动在后台运行", "需要系统批准"])
 
         rows(.features, [
+            "每日简报",
             "显示推荐工具", "媒体播放", "Mac 未使用时关闭背景音", "中转站", "晃动唤出中转窗口",
             "链接下载", "剪贴板历史", "剪贴板链接检测", "快捷操作", "日历日程", "天气", "邮件",
             "侧翼通知", "锁屏信息", "专注倒计时", "工具箱提醒", "用户关怀", "AI 进度与用量", "AI 任务结果扫光",
@@ -86,6 +87,9 @@ enum SettingsSearchIndex {
             entry(.pdfTools, operation.title, anchor: .pdfOperation(operation), keywords: [operation.detail])
         }
 
+        entry(.info, "每日简报", anchor: .group("每日简报"), keywords: ["简报模板", "简报内容", "导出时间", "读取系统屏幕使用时间"])
+        entry(.info, "简报内容", anchor: .row("简报内容"), keywords: DailyBriefingContent.allCases.map(\.title))
+        rows(.info, ["简报模板", "导出时间"])
         rows(.info, ["播放来源", "歌词与歌曲信息", "收起态音乐样式", "音乐动效", "活动展示", "专注模式展示"])
         if settings.userCareEnabled {
             entry(.info, "关怀提醒间隔", anchor: .row("关怀提醒间隔"), keywords: ["用户关怀", "小时", "分钟", "秒"])

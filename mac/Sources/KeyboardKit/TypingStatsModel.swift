@@ -1,5 +1,6 @@
 import Combine
 import Foundation
+import ZislaCore
 
 @MainActor
 final class TypingStatsReadStatus: ObservableObject {
@@ -92,6 +93,8 @@ final class TypingStatsModel: ObservableObject {
         self.persistence = persistence
     }
 
+    var onPhysicalKeyDown: (@MainActor (Date) -> Void)?
+
     deinit {
         scheduledFlushTask?.cancel()
     }
@@ -109,6 +112,17 @@ final class TypingStatsModel: ObservableObject {
         Task { await refresh(for: .overview, showsActivity: true) }
     }
 
+    func dailyBriefingTyping(on date: Date) async throws -> DailyBriefingTyping {
+        guard await flushPending() else { throw CocoaError(.fileWriteUnknown) }
+        let report = try await persistence.loadReport(range: TypingDateRange(startDate: date, endDate: date))
+        return DailyBriefingTyping(
+            characters: report.metrics.characterCount,
+            topApplication: report.applications.max(by: { $0.characterCount < $1.characterCount })?
+                .application.displayName,
+            peakHour: report.metrics.busiestHour?.hour
+        )
+    }
+
     /// O(1) hot-path aggregation. No database work or detached task is created per event.
     func recordKeyDown(
         keyCode: UInt16,
@@ -124,6 +138,7 @@ final class TypingStatsModel: ObservableObject {
         if !isRepeat {
             let key = PendingKeyPressKey(localDate: dateKey, keyCode: keyCode)
             pendingKeyPresses[key, default: 0] += 1
+            onPhysicalKeyDown?(occurredAt)
             didRecord = true
         }
 

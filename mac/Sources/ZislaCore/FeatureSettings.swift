@@ -727,6 +727,7 @@ public struct FeatureSettings: Codable, Equatable, Sendable {
     public var systemMonitorEnabled: Bool
     /// When enabled, System Monitor appends one sample per minute to a local history that the history window charts and can export as a spreadsheet.
     public var systemMetricsHistoryEnabled: Bool
+    public var dailyBriefing: DailyBriefingSettings
     /// Whether zisla should play the selected macOS background sound locally.
     public var systemBackgroundSoundEnabled: Bool
     /// The macOS background sound selected for local playback.
@@ -930,6 +931,7 @@ public struct FeatureSettings: Codable, Equatable, Sendable {
         videoDownloadIslandEnabled: Bool = true,
         systemMonitorEnabled: Bool = true,
         systemMetricsHistoryEnabled: Bool = true,
+        dailyBriefing: DailyBriefingSettings = DailyBriefingSettings(),
         systemBackgroundSoundEnabled: Bool = false,
         systemBackgroundSound: SystemBackgroundSound = .rain,
         systemBackgroundSoundStopsWhenUnused: Bool = true,
@@ -1051,6 +1053,7 @@ public struct FeatureSettings: Codable, Equatable, Sendable {
         self.videoDownloadIslandEnabled = videoDownloadIslandEnabled
         self.systemMonitorEnabled = systemMonitorEnabled
         self.systemMetricsHistoryEnabled = systemMetricsHistoryEnabled
+        self.dailyBriefing = dailyBriefing
         self.systemBackgroundSoundEnabled = systemBackgroundSoundEnabled
         self.systemBackgroundSound = systemBackgroundSound
         self.systemBackgroundSoundStopsWhenUnused = systemBackgroundSoundStopsWhenUnused
@@ -1220,6 +1223,7 @@ public struct FeatureSettings: Codable, Equatable, Sendable {
         case videoDownloadIslandEnabled
         case systemMonitorEnabled
         case systemMetricsHistoryEnabled
+        case dailyBriefing
         case systemBackgroundSoundEnabled
         case systemBackgroundSound
         case systemBackgroundSoundStopsWhenUnused
@@ -1366,6 +1370,7 @@ public struct FeatureSettings: Codable, Equatable, Sendable {
             Bool.self,
             forKey: .systemMetricsHistoryEnabled
         ) ?? defaults.systemMetricsHistoryEnabled
+        dailyBriefing = try container.decodeIfPresent(DailyBriefingSettings.self, forKey: .dailyBriefing) ?? defaults.dailyBriefing
         systemBackgroundSoundEnabled = try container.decodeIfPresent(
             Bool.self,
             forKey: .systemBackgroundSoundEnabled

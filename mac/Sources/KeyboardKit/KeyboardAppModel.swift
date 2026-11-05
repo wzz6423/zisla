@@ -16,6 +16,7 @@ final class KeyboardAppModel: ObservableObject {
     let updates: UpdateController
     let soundPackLibrary: SoundPackLibrary
     let typingStats: TypingStatsModel
+    var onBeforeTermination: (@MainActor () async -> Bool)?
     @Published private(set) var monitoringState: KeyboardMonitoringState = .stopped
     @Published private(set) var audioError: String?
     @Published private(set) var pointerSoundError: String?
@@ -318,11 +319,17 @@ final class KeyboardAppModel: ObservableObject {
     }
 
     /// Used both by the normal quit path and by the DIY editor's deferred quit path.
-    /// Failure to persist is reported in the statistics UI but must not trap the user in the app.
-    func flushTypingStatsBeforeTermination() async {
+    /// Host aggregates share the same final-flush decision as local keyboard statistics.
+    func flushTypingStatsBeforeTermination() async -> Bool {
         stopPermissionPolling()
         stopKeyboardMonitor()
-        _ = await typingStats.flushPending()
+        guard await typingStats.flushPending() else {
+            startKeyboardMonitor()
+            return false
+        }
+        let persisted = await onBeforeTermination?() ?? true
+        if !persisted { startKeyboardMonitor() }
+        return persisted
     }
 
     func stop() {
@@ -438,9 +445,9 @@ final class KeyboardAppModel: ObservableObject {
         isPreparingStatsTermination = true
         Task { @MainActor [weak self, weak application] in
             guard let self, let application else { return }
-            await flushTypingStatsBeforeTermination()
+            let persisted = await flushTypingStatsBeforeTermination()
             isPreparingStatsTermination = false
-            application.reply(toApplicationShouldTerminate: true)
+            application.reply(toApplicationShouldTerminate: persisted)
         }
         return .terminateLater
     }

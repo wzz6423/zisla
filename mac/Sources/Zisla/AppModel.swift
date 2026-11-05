@@ -510,6 +510,7 @@ final class AppModel: ObservableObject {
   @Published var isIslandVisible = false {
     didSet {
       guard oldValue != isIslandVisible else { return }
+      if isIslandVisible { dailyBriefing.recordExpansion() }
       if !isIslandVisible { contextNoteEditor.hide() }
       updateSpectrumMonitoring()
     }
@@ -576,6 +577,14 @@ final class AppModel: ObservableObject {
   let aiAgent = AIAgentWorkspace()
   /// Integrated keyboard sound engine and local typing statistics.
   let keyboardSound = KeyboardSoundController()
+  private(set) lazy var dailyBriefing = DailyBriefingController(
+    observation: { [unowned self] date in self.dailyBriefingObservation(at: date) },
+    typing: { [unowned self] date in
+      guard self.settingsStore.settings.keyboardTypingStatsEnabled,
+        self.keyboardSound.isInputMonitoringGranted else { return nil }
+      return try await self.keyboardSound.dailyBriefingTyping(on: date)
+    }
+  )
   /// Synchronous hook used by the app delegate to arm overlay focus protection before any
   /// recording-start cleanup can reorder windows.
   var onVoiceInputWillStart: (() -> Void)?
@@ -733,13 +742,29 @@ final class AppModel: ObservableObject {
       )
     }
     restoreDownloadDirectory()
+    languageStore.$language.dropFirst()
+      .sink { [weak self] language in
+        guard let self else { return }
+        self.dailyBriefing.configure(settings: self.settingsStore.settings.dailyBriefing,
+          directory: self.downloadDirectory, language: language)
+      }
+      .store(in: &cancellables)
     clipboardHistoryMonitor.onContentCaptured = { [weak self] content in
       guard let self else { return }
+      self.dailyBriefing.recordActivity(.clipboardCaptured)
       if self.settingsStore.settings.clipboardHistoryEnabled {
         _ = self.clipboardHistory.record(content)
       }
       self.handleCapturedClipboardContent(content)
     }
+    let recordActivity: DailyBriefingActivityHandler = { [weak self] activity, count, seconds, date in
+      self?.dailyBriefing.recordActivity(activity, count: count, focusSeconds: seconds, at: date)
+    }
+    shelf.onDailyBriefingActivity = recordActivity
+    pomodoro.onDailyBriefingActivity = recordActivity
+    quickNotes.onDailyBriefingActivity = recordActivity
+    keyboardSound.onPhysicalKeyDown = { [weak self] date in self?.dailyBriefing.recordKeyPress(at: date) }
+    keyboardSound.onBeforeTermination = { [weak self] in await self?.dailyBriefing.prepareToTerminate() ?? true }
     clipboardAssistant.onPerformAction = { [weak self] action in
       self?.performClipboardAssistantAction(action)
     }
@@ -817,6 +842,7 @@ final class AppModel: ObservableObject {
       aiAgent.objectWillChange,
       managedTools.objectWillChange,
       keyboardSound.objectWillChange,
+      dailyBriefing.objectWillChange,
     ]
     for publisher in childPublishers {
       publisher
@@ -1155,6 +1181,7 @@ final class AppModel: ObservableObject {
   }
 
   func stop() {
+    dailyBriefing.stop()
     headphoneTransientLifecycleActive = false
     userCare.stop()
     aiResultSweep.cancel()
@@ -1636,6 +1663,7 @@ final class AppModel: ObservableObject {
       transientMessage = AppLocalization.text("无法写入剪贴板")
       return
     }
+    dailyBriefing.recordActivity(.shelfItemsCopied, count: items.count)
     transientMessage = AppLocalization.text("已复制到剪贴板")
   }
 
@@ -1721,6 +1749,7 @@ final class AppModel: ObservableObject {
       transientMessage = AppLocalization.text("无法写入剪贴板")
       return
     }
+    dailyBriefing.recordActivity(.clipboardReused)
     transientMessage = AppLocalization.text("已复制到剪贴板")
   }
 
@@ -3063,6 +3092,8 @@ final class AppModel: ObservableObject {
   }
 
   private func apply(settings: FeatureSettings, requestWindowPreviewPermissions: Bool = false) {
+    dailyBriefing.configure(settings: settings.dailyBriefing, directory: downloadDirectory,
+      language: languageStore.language)
     if !settings.aiProgressEnabled || !settings.aiTaskResultSweepEnabled {
       aiResultSweep.cancel()
     }
@@ -3100,7 +3131,7 @@ final class AppModel: ObservableObject {
     }
     aiAgent.start()
     syncAIActivityPowerAssertion(aiMonitor.state)
-    if settings.mediaEnabled {
+    if settings.mediaEnabled || settings.dailyBriefing.enabled {
       media.start()
       updateSpectrumMonitoring()
       consumeMediaSnapshot(media.snapshot)
@@ -3120,7 +3151,7 @@ final class AppModel: ObservableObject {
     systemMonitor.setHistoryRecordingEnabled(
       (settings.systemMonitorEnabled || settings.batteryMonitorEnabled) && settings.systemMetricsHistoryEnabled
     )
-    if settings.systemMonitorEnabled || settings.batteryMonitorEnabled {
+    if settings.systemMonitorEnabled || settings.batteryMonitorEnabled || settings.dailyBriefing.enabled {
       systemMonitor.start()
     } else {
       systemMonitor.stop()
@@ -3164,7 +3195,7 @@ final class AppModel: ObservableObject {
       browserDownloads.stop()
       clearBrowserDownloadNotices()
     }
-    if settings.lockScreenInfoEnabled || settings.batteryMonitorEnabled || settings.systemMonitorEnabled {
+    if settings.lockScreenInfoEnabled || settings.batteryMonitorEnabled || settings.systemMonitorEnabled || settings.dailyBriefing.enabled {
       battery.start()
     } else {
       battery.stop()
@@ -4527,6 +4558,32 @@ final class AppModel: ObservableObject {
   func setDownloadDirectory(_ url: URL) throws {
     try downloadDirectoryStore.setDirectory(url)
     downloadDirectory = downloadDirectoryStore.directory
+    dailyBriefing.configure(settings: settingsStore.settings.dailyBriefing, directory: downloadDirectory,
+      language: languageStore.language)
+  }
+
+  private func dailyBriefingObservation(at date: Date) -> DailyBriefingObservation {
+    let application = NSWorkspace.shared.frontmostApplication
+    let bundle = application?.bundleURL.flatMap(Bundle.init(url:))
+    let session = CGSessionCopyCurrentDictionary() as? [String: Any]
+    let locked = session?["CGSSessionScreenIsLocked"] as? Bool ?? false
+    let idle = CGEventSource.secondsSinceLastEventType(.combinedSessionState,
+      eventType: CGEventType(rawValue: UInt32.max)!)
+    let hardware = systemMonitor.snapshot.map { snapshot in
+      let record = SystemMetricsRecord(snapshot: snapshot)
+      return DailyBriefingHardware(date: record.timestamp, powerWatts: record.systemPowerWatts,
+        batteryLevel: record.batteryLevel, fanRPM: record.fanRPMs.max())
+    }
+    return DailyBriefingObservation(
+      date: date,
+      applicationID: application?.bundleIdentifier ?? "unknown",
+      applicationName: application?.localizedName ?? AppLocalization.text("未知应用"),
+      category: DailyBriefingCategory(applicationCategory: bundle?.object(forInfoDictionaryKey: "LSApplicationCategoryType") as? String),
+      isActive: !locked && idle < 60 && application != nil,
+      isListening: media.isAvailable ? (media.snapshot.map { $0.isPlaying && !$0.isVideo } ?? false) : nil,
+      hardware: hardware,
+      recordsKeyPresses: keyboardSound.isTypingStatsRecording
+    )
   }
 
   private static func downloadErrorText(_ error: Error) -> String {
