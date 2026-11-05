@@ -86,6 +86,12 @@ struct MarqueeText: View {
                         .fixedSize(horizontal: true, vertical: false)
                         .modifier(ScrollingOffset(distance: automaticScrollDistance,
                                                   travel: scrollTravel, direction: scrollDirection))
+                        .transaction { transaction in
+                            if transaction.animation == nil, !transaction.disablesAnimations,
+                               let animation = transaction[AutomaticScrollAnimationKey.self] {
+                                transaction.animation = animation
+                            }
+                        }
                     }
                 }
                 .frame(width: max(0, containerWidth), height: viewportHeight, alignment: .leading)
@@ -122,7 +128,10 @@ struct MarqueeText: View {
             let distance = textWidth + (repeats ? gap : 0)
             let duration = max(0.01, Double(distance) / pointsPerSecond)
             let animation = Animation.linear(duration: duration)
-            withAnimation(repeats ? animation.repeatForever(autoreverses: false) : animation) {
+            let scrollingAnimation = repeats ? animation.repeatForever(autoreverses: false) : animation
+            transaction = Transaction(animation: scrollingAnimation)
+            transaction[AutomaticScrollAnimationKey.self] = scrollingAnimation
+            withTransaction(transaction) {
                 automaticScrollDistance = distance
             }
         }
@@ -210,6 +219,11 @@ struct MarqueeText: View {
             }
             content.offset(x: offset)
         }
+    }
+
+    // Collapsed island layout may clear animation while retaining the text's own transaction intent.
+    enum AutomaticScrollAnimationKey: TransactionKey {
+        static let defaultValue: Animation? = nil
     }
 
     private struct AutomaticAnimationIdentity: Hashable {
