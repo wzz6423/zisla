@@ -1072,6 +1072,7 @@ struct SideNoticePresenterPillTests {
             language = AppLanguageStore(defaults: defaults)
             settings.settings.islandLayoutStyle = .pill
             settings.settings.islandPlacement = IslandPlacement(mode: .custom, edge: edge)
+            settings.settings.islandShowMoreInformation = false
         }
 
         func close() {

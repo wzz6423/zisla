@@ -145,11 +145,12 @@ struct IslandParticleLogoTests {
             .allSatisfy { $0 == 0 })
     }
 
-    @Test(arguments: IslandEdge.allCases) @MainActor
-    func resultPlaybackReplacesTheIdleLogoEvenWhenStatusWasHidden(edge: IslandEdge) throws {
+    @Test(arguments: IslandEdge.allCases, [false, true]) @MainActor
+    func resultPlaybackReplacesTheIdleLogoEvenWhenStatusWasHidden(edge: IslandEdge, showsMoreInformation: Bool) throws {
         let fixture = try Fixture()
         defer { fixture.close() }
         fixture.settings.settings.islandPlacement = IslandPlacement(mode: .custom, edge: edge)
+        fixture.settings.settings.islandShowMoreInformation = showsMoreInformation
         fixture.state.islandEdge = edge
         fixture.state.placementMode = .custom
         let size = edge.isVertical ? CGSize(width: 24, height: 80) : CGSize(width: 80, height: 24)

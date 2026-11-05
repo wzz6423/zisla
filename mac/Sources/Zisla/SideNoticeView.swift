@@ -257,10 +257,10 @@ struct CompactStatusBarView: View {
     }
 
     private func compactSurfaceContent(size: CGSize, at date: Date) -> some View {
-        let information = FloatingIslandInformationLayout(
+        let information = resultSweep.current == nil ? FloatingIslandInformationLayout(
             notices: displayState.compactStatusHidden ? [] : presentationNotices,
             icons: displayState.statusIcons, settings: settingsStore.settings, item: media.snapshot, at: date
-        )
+        ) : nil
         let pillCornerRadius: CGFloat? = information?.secondary == nil
             ? nil : VoiceRecordingIslandGeometry.bottomCornerRadius
         let shape = CompactIslandShape(layoutStyle: settingsStore.settings.islandLayoutStyle,
