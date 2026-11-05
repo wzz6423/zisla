@@ -15,7 +15,7 @@ struct WeatherFallbackPresentationTests {
             temperature: 16,
             condition: WeatherCondition(code: 3, isDay: true),
             timezone: "UTC",
-            fetchedAt: Date(timeIntervalSince1970: 0),
+            fetchedAt: Date(timeIntervalSince1970: 86_400),
             coordinate: GeoCoordinate(latitude: 51, longitude: 0),
             locationName: "London",
             source: "MET Norway",
@@ -29,6 +29,7 @@ struct WeatherFallbackPresentationTests {
         #expect(!missing.contains("%"))
         #expect(!missing.contains("32"))
         #expect(!missing.contains("0°"))
+        #expect(missing.contains("1970"), "Retained forecasts must show the update date, not just the time")
 
         var complete = fallback
         complete.apparentTemperature = 32
@@ -61,7 +62,7 @@ struct WeatherFallbackPresentationTests {
     }
 
     @Test
-    func retainedWeatherShowsItsUpdateDateAndOmitsExpiredAlerts() throws {
+    func retainedWeatherOmitsExpiredAlertsWithoutChangingStoredData() throws {
         let date = try #require(ISO8601DateFormatter().date(from: "2026-11-05T10:30:00Z"))
         func alert(_ summary: String, expiresAt: Date?) -> WeatherAlert {
             WeatherAlert(
@@ -81,19 +82,43 @@ struct WeatherFallbackPresentationTests {
             timezone: "UTC", fetchedAt: date,
             coordinate: GeoCoordinate(latitude: 51, longitude: 0), locationName: "London"
         )
-        let visible = try recognizedText(in: snapshot, at: date)
-        #expect(visible.contains("2026"), "Retained forecasts must show the update date, not just the time")
-        #expect(!visible.contains("ExpiredWarning"))
-        #expect(!visible.contains("BoundaryWarning"))
-        #expect(visible.contains("ActiveWarning"))
-        #expect(visible.contains("UnknownWarning"))
-        let later = try recognizedText(in: snapshot, at: date.addingTimeInterval(2))
-        #expect(!later.contains("ActiveWarning"), "Alerts must expire even when no forecast refresh succeeds")
-        #expect(later.contains("UnknownWarning"))
+        var expected = snapshot
+        expected.officialAlerts = Array(snapshot.officialAlerts.suffix(2))
+        let visible = try renderedPixels(in: snapshot, at: date)
+        #expect(try visible == renderedPixels(in: expected, at: date),
+                "Expired and boundary alerts must not render while live and unknown-expiry alerts remain")
+        expected.officialAlerts = [snapshot.officialAlerts.last!]
+        let laterDate = date.addingTimeInterval(2)
+        let later = try renderedPixels(in: snapshot, at: laterDate)
+        #expect(try later == renderedPixels(in: expected, at: laterDate),
+                "Alerts must expire even when no forecast refresh succeeds")
+        expected.officialAlerts = []
+        #expect(try later != renderedPixels(in: expected, at: laterDate),
+                "The provider's unknown-expiry alert must stay visible")
         #expect(snapshot.officialAlerts.count == 4, "Rendering must leave the stored provider response unchanged")
     }
 
     private func recognizedText(in weather: WeatherSnapshot, at date: Date = Date()) throws -> String {
+        let cgImage = try renderedImage(in: weather, at: date)
+        let request = VNRecognizeTextRequest()
+        request.recognitionLevel = .accurate
+        request.recognitionLanguages = ["en-US"]
+        try VNImageRequestHandler(cgImage: cgImage).perform([request])
+        return (request.results ?? []).compactMap { $0.topCandidates(1).first?.string }.joined(separator: " ")
+    }
+
+    private func renderedPixels(in weather: WeatherSnapshot, at date: Date) throws -> Data {
+        let image = try renderedImage(in: weather, at: date)
+        let context = try #require(CGContext(
+            data: nil, width: image.width, height: image.height, bitsPerComponent: 8,
+            bytesPerRow: image.width * 4, space: CGColorSpaceCreateDeviceRGB(),
+            bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue
+        ))
+        context.draw(image, in: CGRect(x: 0, y: 0, width: image.width, height: image.height))
+        return Data(bytes: try #require(context.data), count: image.width * image.height * 4)
+    }
+
+    private func renderedImage(in weather: WeatherSnapshot, at date: Date) throws -> CGImage {
         let hosting = NSHostingView(rootView: AgendaModuleView.weatherRow(weather, at: date)
             .frame(width: 300)
             .padding(12)
@@ -117,11 +142,6 @@ struct WeatherFallbackPresentationTests {
         hosting.layoutSubtreeIfNeeded()
         let bitmap = try #require(hosting.bitmapImageRepForCachingDisplay(in: hosting.bounds))
         hosting.cacheDisplay(in: hosting.bounds, to: bitmap)
-        let cgImage = try #require(bitmap.cgImage)
-        let request = VNRecognizeTextRequest()
-        request.recognitionLevel = .accurate
-        request.recognitionLanguages = ["en-US"]
-        try VNImageRequestHandler(cgImage: cgImage).perform([request])
-        return (request.results ?? []).compactMap { $0.topCandidates(1).first?.string }.joined(separator: " ")
+        return try #require(bitmap.cgImage)
     }
 }
