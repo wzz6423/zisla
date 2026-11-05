@@ -3201,6 +3201,10 @@
 "月光狐" = "Raposa ao luar";
 "小刺猬" = "Pequeno ouriço";
 
+"展示更多信息" = "Mostrar mais informações";
+
+"同时展示监控、AI、音乐与状态提示，详细音乐另起一行" = "Mostrar monitoramento, IA, música e status juntos, com os detalhes da música em uma linha separada";
+
 /* User pet import */
 "导入宠物" = "Importar mascote";
 "宠物名称" = "Nome do mascote";

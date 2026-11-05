@@ -1361,6 +1361,16 @@ struct SettingsView: View {
 
     private var infoContent: some View {
         VStack(alignment: .leading, spacing: 20) {
+            if settingsStore.settings.supportsStatusIconsInIsland {
+                settingsGroup("灵动岛模式") {
+                    featureToggle(
+                        "展示更多信息",
+                        detail: "同时展示监控、AI、音乐与状态提示，详细音乐另起一行",
+                        symbol: "rectangle.stack",
+                        keyPath: \.islandShowMoreInformation
+                    )
+                }
+            }
             workflowContent
 
             settingsGroup("信息与通知") {
@@ -2515,10 +2525,10 @@ struct SettingsView: View {
                             Picker("", selection: Binding(
                                 get: { settingsStore.settings.islandPlacement.mode },
                                 set: { mode in
-                                    if mode == .custom {
-                                        model.onChooseIslandPlacement?()
+                                    if let placement = settingsStore.settings.islandPlacement(for: mode) {
+                                        settingsStore.settings.islandPlacement = placement
                                     } else {
-                                        settingsStore.settings.islandPlacement = IslandPlacement()
+                                        model.onChooseIslandPlacement?()
                                     }
                                 }
                             )) {

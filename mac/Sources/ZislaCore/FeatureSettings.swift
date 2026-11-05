@@ -845,8 +845,19 @@ public struct FeatureSettings: Codable, Equatable, Sendable {
     /// Display style for the collapsed Dynamic Island when music is playing.
     public var mediaCompactStyle: MediaCompactStyle
     public var mediaVisualizationStyle: MediaVisualizationStyle
+    public var islandShowMoreInformation: Bool
     public var islandLayoutStyle: IslandLayoutStyle
-    public var islandPlacement: IslandPlacement
+    public var islandPlacement: IslandPlacement {
+        didSet {
+            if islandPlacement.mode == .custom {
+                lastCustomIslandPlacement = islandPlacement
+            }
+        }
+    }
+    public private(set) var lastCustomIslandPlacement: IslandPlacement?
+    public func islandPlacement(for mode: IslandPlacementMode) -> IslandPlacement? {
+        mode == .camera ? IslandPlacement() : lastCustomIslandPlacement
+    }
     public private(set) var islandPillWidth: Double
     public private(set) var islandPillHeight: Double
     public var islandEdgeInset: Double {
@@ -982,6 +993,7 @@ public struct FeatureSettings: Codable, Equatable, Sendable {
         mediaShowLyricsAndInfo: Bool = true,
         mediaCompactStyle: MediaCompactStyle = .compact,
         mediaVisualizationStyle: MediaVisualizationStyle = .waveform,
+        islandShowMoreInformation: Bool = false,
         islandLayoutStyle: IslandLayoutStyle = .notch,
         islandPlacement: IslandPlacement = IslandPlacement(),
         islandPillWidth: Double = 180,
@@ -1116,8 +1128,10 @@ public struct FeatureSettings: Codable, Equatable, Sendable {
         self.mediaShowLyricsAndInfo = mediaShowLyricsAndInfo
         self.mediaCompactStyle = mediaCompactStyle
         self.mediaVisualizationStyle = mediaVisualizationStyle
+        self.islandShowMoreInformation = islandShowMoreInformation
         self.islandLayoutStyle = islandLayoutStyle
         self.islandPlacement = islandPlacement
+        self.lastCustomIslandPlacement = islandPlacement.mode == .custom ? islandPlacement : nil
         self.islandPillWidth = 80
         self.islandPillHeight = 24
         self.islandEdgeInset = Self.islandDimension(islandEdgeInset, range: 0...64, fallback: 8)
@@ -1268,8 +1282,10 @@ public struct FeatureSettings: Codable, Equatable, Sendable {
         case mediaShowLyricsAndInfo
         case mediaCompactStyle
         case mediaVisualizationStyle
+        case islandShowMoreInformation
         case islandLayoutStyle
         case islandPlacement
+        case lastCustomIslandPlacement
         case islandPillWidth
         case islandPillHeight
         case islandEdgeInset
@@ -1572,10 +1588,18 @@ public struct FeatureSettings: Codable, Equatable, Sendable {
         ) ?? defaults.mediaCompactStyle
         mediaVisualizationStyle = try container.decodeIfPresent(MediaVisualizationStyle.self, forKey: .mediaVisualizationStyle)
             ?? defaults.mediaVisualizationStyle
+        islandShowMoreInformation = (try? container.decode(Bool.self, forKey: .islandShowMoreInformation))
+            ?? defaults.islandShowMoreInformation
         islandLayoutStyle = try container.decodeIfPresent(IslandLayoutStyle.self, forKey: .islandLayoutStyle)
             ?? defaults.islandLayoutStyle
         islandPlacement = try container.decodeIfPresent(IslandPlacement.self, forKey: .islandPlacement)
             ?? defaults.islandPlacement
+        if islandPlacement.mode == .custom {
+            lastCustomIslandPlacement = islandPlacement
+        } else {
+            let savedPlacement = try container.decodeIfPresent(IslandPlacement.self, forKey: .lastCustomIslandPlacement)
+            lastCustomIslandPlacement = savedPlacement?.mode == .custom ? savedPlacement : nil
+        }
         islandPillWidth = defaults.islandPillWidth
         islandPillHeight = defaults.islandPillHeight
         islandEdgeInset = Self.islandDimension(

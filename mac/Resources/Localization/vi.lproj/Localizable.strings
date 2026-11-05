@@ -3201,6 +3201,10 @@
 "月光狐" = "Cáo ánh trăng";
 "小刺猬" = "Nhím nhỏ";
 
+"展示更多信息" = "Hiển thị thêm thông tin";
+
+"同时展示监控、AI、音乐与状态提示，详细音乐另起一行" = "Hiển thị giám sát, AI, nhạc và trạng thái cùng lúc, với chi tiết nhạc trên một hàng riêng";
+
 /* User pet import */
 "导入宠物" = "Nhập thú cưng";
 "宠物名称" = "Tên thú cưng";

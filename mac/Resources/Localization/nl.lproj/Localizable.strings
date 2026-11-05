@@ -3201,6 +3201,10 @@
 "月光狐" = "Maanlichtvos";
 "小刺猬" = "Klein egeltje";
 
+"展示更多信息" = "Meer informatie tonen";
+
+"同时展示监控、AI、音乐与状态提示，详细音乐另起一行" = "Toon monitoring, AI, muziek en status samen, met muziekdetails op een aparte rij";
+
 /* User pet import */
 "导入宠物" = "Huisdier importeren";
 "宠物名称" = "Naam van het huisdier";

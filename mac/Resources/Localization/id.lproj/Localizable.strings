@@ -3201,6 +3201,10 @@
 "月光狐" = "Rubah Cahaya Bulan";
 "小刺猬" = "Landak Mini";
 
+"展示更多信息" = "Tampilkan informasi lainnya";
+
+"同时展示监控、AI、音乐与状态提示，详细音乐另起一行" = "Tampilkan pemantauan, AI, musik, dan status bersamaan, dengan detail musik di baris terpisah";
+
 /* User pet import */
 "导入宠物" = "Impor hewan peliharaan";
 "宠物名称" = "Nama hewan peliharaan";

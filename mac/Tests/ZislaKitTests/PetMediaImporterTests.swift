@@ -57,6 +57,9 @@ struct PetMediaImporterTests {
             let entry = try await PetMediaImporter.importPet(from: source, name: "Boundary", directory: fixture.pets)
             #expect(try #require(entry.manifest.frames) <= 360)
             #expect(try #require(entry.manifest.fps) <= 12)
+            let sprite = try #require(PetLibrary.loadSprite(for: entry.id, userPetsDirectory: fixture.pets))
+            #expect(sprite.frames == entry.manifest.frames)
+            #expect(try fixture.pixel(sprite.frame(at: sprite.frames - 1), x: 64, y: 32).blueComponent > 0.9)
         }
     }
 
