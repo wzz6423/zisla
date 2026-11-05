@@ -6,6 +6,27 @@ import Testing
 
 struct FeatureSettingsStoreTests {
     @Test @MainActor
+    func customUserCareIntervalPersistsAcrossDisablingAndResetRestoresTheDefault() throws {
+        let suiteName = "Zisla.UserCareInterval.\(UUID().uuidString)"
+        let defaults = try #require(UserDefaults(suiteName: suiteName))
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+        let store = FeatureSettingsStore(defaults: defaults)
+        store.settings.userCareEnabled = true
+        store.settings.userCareReminderInterval = 3_723
+        store.flushPendingChanges()
+        let restored = FeatureSettingsStore(defaults: defaults)
+        #expect(restored.settings.userCareEnabled)
+        #expect(restored.settings.userCareReminderInterval == 3_723)
+        restored.settings.userCareEnabled = false
+        restored.flushPendingChanges()
+        let disabled = FeatureSettingsStore(defaults: defaults)
+        #expect(disabled.settings.userCareReminderInterval == 3_723)
+        disabled.reset()
+        disabled.flushPendingChanges()
+        #expect(FeatureSettingsStore(defaults: defaults).settings.userCareReminderInterval == 2_700)
+    }
+
+    @Test @MainActor
     func userCareOptInPersistsAndResetRestoresOptOut() throws {
         let suiteName = "Zisla.UserCareSettings.\(UUID().uuidString)"
         let defaults = try #require(UserDefaults(suiteName: suiteName))

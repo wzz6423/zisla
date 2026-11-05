@@ -981,7 +981,7 @@ struct SettingsView: View {
                     rowDivider
                     featureToggle(
                         "用户关怀",
-                        detail: "连续使用 45 分钟后，温柔提醒休息、喝水和走动",
+                        detail: "温柔提醒休息、喝水和走动",
                         symbol: "heart.fill",
                         keyPath: \.userCareEnabled
                     )
@@ -1364,6 +1364,21 @@ struct SettingsView: View {
     private var infoContent: some View {
         VStack(alignment: .leading, spacing: 20) {
             workflowContent
+
+            if model.settingsStore.settings.userCareEnabled {
+                settingsGroup("用户关怀") {
+                    settingRow(
+                        symbol: "heart.fill",
+                        title: "关怀提醒间隔",
+                        detail: "小时 0–99，分、秒 0–59，总时长至少 1 秒"
+                    ) {
+                        UserCareIntervalControl(interval: Binding(
+                            get: { model.settingsStore.settings.userCareReminderInterval },
+                            set: { model.settingsStore.settings.userCareReminderInterval = $0 }
+                        ))
+                    }
+                }
+            }
 
             settingsGroup("信息与通知") {
                 if model.settingsStore.settings.lockScreenInfoEnabled {
@@ -4533,7 +4548,7 @@ enum SettingsSection: String, CaseIterable, Identifiable {
             return settings.screenRecordingEnabled
         case .info:
             return settings.mediaEnabled || settings.systemMonitorEnabled
-                || settings.lockScreenInfoEnabled || settings.sideNoticesEnabled
+                || settings.lockScreenInfoEnabled || settings.sideNoticesEnabled || settings.userCareEnabled
         case .mail:
             return settings.mailEnabled
         case .ai:

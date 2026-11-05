@@ -3201,7 +3201,9 @@
 "月光狐" = "Rubah Cahaya Bulan";
 "小刺猬" = "Landak Mini";
 "用户关怀" = "Kepedulian pengguna";
-"连续使用 45 分钟后，温柔提醒休息、喝水和走动" = "Pengingat lembut untuk beristirahat, minum, dan bergerak setelah 45 menit penggunaan terus-menerus";
+"温柔提醒休息、喝水和走动" = "Pengingat lembut untuk beristirahat, minum, dan bergerak";
+"关怀提醒间隔" = "Jarak pengingat kepedulian";
+"小时 0–99，分、秒 0–59，总时长至少 1 秒" = "Jam 0–99, menit dan detik 0–59, total minimal 1 detik";
 "忙了一阵了，歇一会儿吧。" = "Kamu sudah sibuk cukup lama. Istirahat sebentar, ya.";
 "人，忙了一阵了，陪我歇一会儿吧。" = "Manusia, kamu sudah sibuk cukup lama. Istirahat sebentar bersamaku, ya.";
 "喝口水吧，慢慢来。" = "Minum sedikit air. Pelan-pelan saja.";
@@ -3218,3 +3220,13 @@
 "人，已经很晚了，我们早点休息吧。" = "Manusia, sudah larut. Ayo kita beristirahat.";
 "今天辛苦了，余下的事留给明天吧。" = "Kamu sudah bekerja keras hari ini. Sisanya untuk besok saja.";
 "人，今天辛苦了，明天我再陪你吧。" = "Manusia, kamu sudah bekerja keras hari ini. Besok aku akan menemanimu lagi.";
+"换个坐姿，坐得舒服一点吧。" = "Ubah posisi dudukmu agar lebih nyaman.";
+"人，换个舒服的坐姿吧。" = "Manusia, cari posisi duduk yang nyaman.";
+"放松肩颈，轻轻伸展一下吧。" = "Rilekskan bahu dan leher. Regangkan perlahan.";
+"人，放松肩颈，和我伸个懒腰吧。" = "Manusia, rilekskan bahu dan mereganglah bersamaku.";
+"慢慢呼吸，给自己一点空隙吧。" = "Bernapaslah perlahan. Beri dirimu sedikit ruang.";
+"人，慢慢呼吸，我陪着你。" = "Manusia, bernapaslah perlahan. Aku di sini.";
+"时间到啦，歇一会儿吧～" = "Waktunya habis. Istirahat sebentar, ya.";
+"人，时间到啦，该休息了～" = "Manusia, waktunya habis. Ayo istirahat sebentar.";
+"休息结束啦，按自己的节奏继续吧～" = "Istirahat selesai. Lanjutkan sesuai ritmemu.";
+"人，休息好啦，我陪你继续～" = "Manusia, istirahat selesai. Aku akan menemanimu.";

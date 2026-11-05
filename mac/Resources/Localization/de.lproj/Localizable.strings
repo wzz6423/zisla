@@ -3202,7 +3202,9 @@
 "月光狐" = "Mondlichtfuchs";
 "小刺猬" = "Kleiner Igel";
 "用户关怀" = "Wohlbefinden";
-"连续使用 45 分钟后，温柔提醒休息、喝水和走动" = "Nach 45 Minuten durchgehender Nutzung sanft an Pausen, Trinken und Bewegung erinnern";
+"温柔提醒休息、喝水和走动" = "Sanfte Erinnerungen an Pausen, Trinken und Bewegung";
+"关怀提醒间隔" = "Intervall der Wohlfühlerinnerungen";
+"小时 0–99，分、秒 0–59，总时长至少 1 秒" = "Stunden 0–99, Minuten und Sekunden 0–59, insgesamt mindestens 1 Sekunde";
 "忙了一阵了，歇一会儿吧。" = "Du hast eine Weile gearbeitet. Mach eine kleine Pause.";
 "人，忙了一阵了，陪我歇一会儿吧。" = "Mensch, du hast eine Weile gearbeitet. Mach mit mir eine kleine Pause.";
 "喝口水吧，慢慢来。" = "Trink einen Schluck Wasser. Lass dir Zeit.";
@@ -3219,3 +3221,13 @@
 "人，已经很晚了，我们早点休息吧。" = "Mensch, es wird spät. Lass uns bald schlafen gehen.";
 "今天辛苦了，余下的事留给明天吧。" = "Du hast heute viel geschafft. Lass den Rest für morgen liegen.";
 "人，今天辛苦了，明天我再陪你吧。" = "Mensch, du hast heute viel geschafft. Morgen bin ich wieder bei dir.";
+"换个坐姿，坐得舒服一点吧。" = "Ändere deine Sitzhaltung und mach es dir bequem.";
+"人，换个舒服的坐姿吧。" = "Mensch, such dir eine bequeme Sitzhaltung.";
+"放松肩颈，轻轻伸展一下吧。" = "Entspanne Schultern und Nacken. Dehne dich sanft.";
+"人，放松肩颈，和我伸个懒腰吧。" = "Mensch, entspann die Schultern und streck dich mit mir.";
+"慢慢呼吸，给自己一点空隙吧。" = "Atme langsam. Gönn dir einen kleinen Freiraum.";
+"人，慢慢呼吸，我陪着你。" = "Mensch, atme langsam. Ich bin bei dir.";
+"时间到啦，歇一会儿吧～" = "Die Zeit ist um. Mach eine kleine Pause.";
+"人，时间到啦，该休息了～" = "Mensch, die Zeit ist um. Lass uns kurz ausruhen.";
+"休息结束啦，按自己的节奏继续吧～" = "Die Pause ist vorbei. Mach in deinem Tempo weiter.";
+"人，休息好啦，我陪你继续～" = "Mensch, die Pause ist vorbei. Ich bleibe bei dir.";

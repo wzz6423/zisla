@@ -7,6 +7,22 @@ import ZislaKit
 
 struct SettingsSearchTests {
     @Test(arguments: AppLanguage.allCases)
+    func careIntervalSearchReachesTheInformationPageWhenOtherInfoFeaturesAreOff(language: AppLanguage) {
+        var settings = FeatureSettings(userCareEnabled: true)
+        settings.mediaEnabled = false
+        settings.systemMonitorEnabled = false
+        settings.lockScreenInfoEnabled = false
+        settings.sideNoticesEnabled = false
+        #expect(SettingsSection.info.isVisible(settings: settings))
+        let matches = results(AppLocalization.string("关怀提醒间隔", language: language), settings: settings, locale: language.locale)
+        #expect(matches.first?.section == .info)
+        #expect(matches.first?.anchor == .row("关怀提醒间隔"))
+        settings.userCareEnabled = false
+        #expect(!SettingsSection.info.isVisible(settings: settings))
+        #expect(!SettingsSearchIndex.items(settings: settings).contains { $0.title == "关怀提醒间隔" })
+    }
+
+    @Test(arguments: AppLanguage.allCases)
     func userCareOptInIsSearchableBeforeEnablingIt(language: AppLanguage) {
         let title = AppLocalization.string("用户关怀", language: language)
         let matches = results(title, settings: FeatureSettings(userCareEnabled: false), locale: language.locale)

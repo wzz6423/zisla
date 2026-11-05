@@ -227,6 +227,9 @@ public final class PomodoroService: ObservableObject {
     @Published public private(set) var focusCountdownRunID = UUID()
     /// When "mute notifications" is on, Pomodoro completion signals are suppressed; synced by `AppModel` from settings.
     public var notificationsMuted = false
+    public var userCareEnabled = false
+    public var petEnabled = false
+    public var onUserCareReminder: ((UserCareReminder) -> Void)?
 
     public static let focusCountdownNoticeIDPrefix = "focus-countdown-"
 
@@ -235,6 +238,7 @@ public final class PomodoroService: ObservableObject {
     private let notificationRequestHandler: ((UNNotificationRequest) -> Void)?
     private let completionSoundHandler: (() -> Void)?
     private let now: () -> Date
+    private let language: () -> AppLanguage
     private let defaults: UserDefaults
     private let focusDurationKey = "zisla.pomodoro.focusDuration"
     private let restDurationKey = "zisla.pomodoro.restDuration"
@@ -245,6 +249,7 @@ public final class PomodoroService: ObservableObject {
         notificationRequestHandler: ((UNNotificationRequest) -> Void)? = nil,
         defaults: UserDefaults = .standard,
         completionSoundHandler: (() -> Void)? = nil,
+        language: @escaping () -> AppLanguage = { AppLocalization.currentLanguage },
         now: @escaping () -> Date = Date.init
     ) {
         self.notificationCenter = notificationCenter
@@ -252,6 +257,7 @@ public final class PomodoroService: ObservableObject {
         self.notificationRequestHandler = notificationRequestHandler
         self.completionSoundHandler = completionSoundHandler
         self.now = now
+        self.language = language
         let savedFocus = defaults.object(forKey: focusDurationKey) as? TimeInterval
         let savedRest = defaults.object(forKey: restDurationKey) as? TimeInterval
         let focusDuration = PomodoroEngine.normalizedDuration(
@@ -420,14 +426,20 @@ public final class PomodoroService: ObservableObject {
             PomodoroCompletionSoundPlayer.shared.play()
         }
         let content = UNMutableNotificationContent()
+        let language = self.language()
         switch mode {
         case .focus:
-            content.title = AppLocalization.text("专注结束")
+            content.title = AppLocalization.string("专注结束", language: language)
             let restMinutes = max(1, Int(engine.restDuration / 60))
-            content.body = AppLocalization.text("休息 %ld 分钟吧", restMinutes)
+            content.body = AppLocalization.format("休息 %ld 分钟吧", locale: language.locale, [restMinutes])
         case .rest:
-            content.title = AppLocalization.text("休息结束")
-            content.body = AppLocalization.text("开始下一段专注")
+            content.title = AppLocalization.string("休息结束", language: language)
+            content.body = AppLocalization.string("开始下一段专注", language: language)
+        }
+        if userCareEnabled {
+            let reminder: UserCareReminder = mode == .focus ? .focusCompleted : .restCompleted
+            content.title = reminder.localizedMessage(petEnabled: petEnabled, language: language)
+            onUserCareReminder?(reminder)
         }
         let request = UNNotificationRequest(
             identifier: "zisla.pomodoro.\(UUID().uuidString)",

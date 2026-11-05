@@ -3201,7 +3201,9 @@
 "月光狐" = "Raposa ao luar";
 "小刺猬" = "Pequeno ouriço";
 "用户关怀" = "Bem-estar";
-"连续使用 45 分钟后，温柔提醒休息、喝水和走动" = "Após 45 minutos de uso contínuo, lembretes gentis para descansar, beber água e se movimentar";
+"温柔提醒休息、喝水和走动" = "Lembretes gentis para descansar, beber água e se movimentar";
+"关怀提醒间隔" = "Intervalo dos lembretes de bem-estar";
+"小时 0–99，分、秒 0–59，总时长至少 1 秒" = "Horas de 0 a 99, minutos e segundos de 0 a 59, pelo menos 1 segundo no total";
 "忙了一阵了，歇一会儿吧。" = "Você já trabalhou bastante. Faça uma pequena pausa.";
 "人，忙了一阵了，陪我歇一会儿吧。" = "Humano, você já trabalhou bastante. Faça uma pausinha comigo.";
 "喝口水吧，慢慢来。" = "Beba um gole de água. Vá com calma.";
@@ -3218,3 +3220,13 @@
 "人，已经很晚了，我们早点休息吧。" = "Humano, já está tarde. Vamos descansar.";
 "今天辛苦了，余下的事留给明天吧。" = "Você trabalhou muito hoje. Deixe o restante para amanhã.";
 "人，今天辛苦了，明天我再陪你吧。" = "Humano, você trabalhou muito hoje. Amanhã eu fico com você de novo.";
+"换个坐姿，坐得舒服一点吧。" = "Mude de posição e sente-se com mais conforto.";
+"人，换个舒服的坐姿吧。" = "Humano, encontre uma posição confortável.";
+"放松肩颈，轻轻伸展一下吧。" = "Relaxe os ombros e o pescoço. Alongue-se de leve.";
+"人，放松肩颈，和我伸个懒腰吧。" = "Humano, relaxe os ombros e se espreguice comigo.";
+"慢慢呼吸，给自己一点空隙吧。" = "Respire devagar. Dê um pouco de espaço a si mesmo.";
+"人，慢慢呼吸，我陪着你。" = "Humano, respire devagar. Estou aqui com você.";
+"时间到啦，歇一会儿吧～" = "O tempo acabou. Faça uma pequena pausa.";
+"人，时间到啦，该休息了～" = "Humano, o tempo acabou. Vamos descansar um pouco.";
+"休息结束啦，按自己的节奏继续吧～" = "A pausa terminou. Continue no seu ritmo.";
+"人，休息好啦，我陪你继续～" = "Humano, a pausa terminou. Vou te fazer companhia.";

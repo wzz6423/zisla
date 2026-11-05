@@ -9,6 +9,11 @@ public enum UserCareReminder: CaseIterable, Equatable, Sendable {
     case nap
     case bedtime
     case tomorrow
+    case posture
+    case stretch
+    case breathe
+    case focusCompleted
+    case restCompleted
 
     public func localizationKey(petEnabled: Bool) -> String {
         switch (self, petEnabled) {
@@ -28,23 +33,63 @@ public enum UserCareReminder: CaseIterable, Equatable, Sendable {
         case (.bedtime, true): "人，已经很晚了，我们早点休息吧。"
         case (.tomorrow, false): "今天辛苦了，余下的事留给明天吧。"
         case (.tomorrow, true): "人，今天辛苦了，明天我再陪你吧。"
+        case (.posture, false): "换个坐姿，坐得舒服一点吧。"
+        case (.posture, true): "人，换个舒服的坐姿吧。"
+        case (.stretch, false): "放松肩颈，轻轻伸展一下吧。"
+        case (.stretch, true): "人，放松肩颈，和我伸个懒腰吧。"
+        case (.breathe, false): "慢慢呼吸，给自己一点空隙吧。"
+        case (.breathe, true): "人，慢慢呼吸，我陪着你。"
+        case (.focusCompleted, false): "时间到啦，歇一会儿吧～"
+        case (.focusCompleted, true): "人，时间到啦，该休息了～"
+        case (.restCompleted, false): "休息结束啦，按自己的节奏继续吧～"
+        case (.restCompleted, true): "人，休息好啦，我陪你继续～"
         }
+    }
+
+    public func localizedMessage(petEnabled: Bool, language: AppLanguage) -> String {
+        let body = AppLocalization.string(localizationKey(petEnabled: petEnabled), language: language)
+        let decoration = switch self {
+        case .rest, .focusCompleted: "🍵"
+        case .water: "💧"
+        case .walk, .posture, .breathe: "🌿"
+        case .eyes: "👀"
+        case .lunch: "🍚"
+        case .nap: "💤"
+        case .bedtime, .tomorrow: "🌙"
+        case .stretch, .restCompleted: petEnabled ? "(๑•̀ㅂ•́)و✧" : "🌿"
+        }
+        return "\(body) \(decoration)"
     }
 }
 
 public struct UserCareSchedule: Sendable {
-    public static let reminderInterval: TimeInterval = 45 * 60
+    public static let reminderInterval: TimeInterval = UserCareInterval.defaultSeconds
     public static let naturalBreakInterval: TimeInterval = 5 * 60
 
     private var activeSince: TimeInterval?
     private var nextReminderIndex = 0
+    public private(set) var interval: TimeInterval
 
-    public init() {}
+    public init(interval: TimeInterval = UserCareInterval.defaultSeconds) {
+        self.interval = UserCareInterval.normalized(interval)
+    }
 
     public var isWorking: Bool { activeSince != nil }
 
     public mutating func reset() {
         activeSince = nil
+    }
+
+    public mutating func setInterval(_ interval: TimeInterval) {
+        let interval = UserCareInterval.normalized(interval)
+        guard self.interval != interval else { return }
+        self.interval = interval
+        reset()
+    }
+
+    public func timeUntilReminder(at uptime: TimeInterval) -> TimeInterval {
+        guard let activeSince else { return interval }
+        return max(0, activeSince + interval - uptime)
     }
 
     public mutating func update(
@@ -62,7 +107,7 @@ public struct UserCareSchedule: Sendable {
             self.activeSince = uptime
             return nil
         }
-        guard uptime - activeSince >= Self.reminderInterval else { return nil }
+        guard uptime >= activeSince + interval else { return nil }
 
         // A delayed tick consumes one interval, so hidden or suspended time cannot build a backlog.
         self.activeSince = uptime
@@ -72,10 +117,10 @@ public struct UserCareSchedule: Sendable {
         } else if localHour >= 23 || localHour < 6 {
             reminders = [.bedtime, .tomorrow]
         } else {
-            reminders = [.rest, .water, .walk, .eyes]
+            reminders = [.rest, .water, .walk, .eyes, .posture, .stretch, .breathe]
         }
         let reminder = reminders[nextReminderIndex % reminders.count]
-        nextReminderIndex = (nextReminderIndex + 1) % 4
+        nextReminderIndex = (nextReminderIndex + 1) % reminders.count
         return reminder
     }
 }

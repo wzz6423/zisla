@@ -716,6 +716,15 @@ final class AppModel: ObservableObject {
       settings.systemBackgroundSoundEnabled = false
       self.settingsStore.settings = settings
     }
+    pomodoro.onUserCareReminder = { [weak self] reminder in
+      guard let self else { return }
+      Self.presentPomodoroCareReminder(
+        reminder,
+        settings: self.settingsStore.settings,
+        presentationAllowed: self.userCarePresentationAllowed(),
+        queue: self.notices
+      )
+    }
     restoreDownloadDirectory()
     clipboardHistoryMonitor.onContentCaptured = { [weak self] content in
       guard let self else { return }
@@ -3049,6 +3058,8 @@ final class AppModel: ObservableObject {
       )
     )
     pomodoro.notificationsMuted = settings.notificationsMuted
+    pomodoro.userCareEnabled = settings.userCareEnabled
+    pomodoro.petEnabled = settings.petEnabled
     configureUpdatePolling(enabled: settings.updateChecksEnabled)
     managedTools.setAutomaticUpdatesEnabled(
       settings.recommendedToolsEnabled && settings.recommendedToolsAutomaticUpdatesEnabled
@@ -4212,6 +4223,27 @@ final class AppModel: ObservableObject {
     for id in toolboxReminderIDs where noticeExists(id: id) {
       notices.remove(id: id)
     }
+  }
+
+  static func presentPomodoroCareReminder(
+    _ reminder: UserCareReminder,
+    settings: FeatureSettings,
+    presentationAllowed: Bool,
+    queue: SideNoticeQueue,
+    language: AppLanguage = AppLocalization.currentLanguage
+  ) {
+    guard settings.userCareEnabled, settings.sideNoticesEnabled,
+      !settings.notificationsMuted, presentationAllowed
+    else { return }
+    queue.enqueue(
+      IslandNotice(
+        id: UserCareService.noticeID,
+        title: reminder.localizedMessage(petEnabled: settings.petEnabled, language: language),
+        side: .right,
+        style: .message
+      ),
+      expiresAfter: 6
+    )
   }
 
   static func shouldPresentPomodoroCountdown(

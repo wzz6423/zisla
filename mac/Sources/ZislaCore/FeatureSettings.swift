@@ -821,6 +821,9 @@ public struct FeatureSettings: Codable, Equatable, Sendable {
     public var contextNoteHoldHotkey: VoiceInputHotkeyPreset
     public var sideNoticesEnabled: Bool
     public var userCareEnabled: Bool
+    public var userCareReminderInterval: TimeInterval {
+        didSet { userCareReminderInterval = UserCareInterval.normalized(userCareReminderInterval) }
+    }
     /// Whether collapsed notice bars show their playback, download, or dismissal progress glow.
     public var collapsedProgressGlowEnabled: Bool
     public var aiTaskResultSweepEnabled: Bool
@@ -967,6 +970,7 @@ public struct FeatureSettings: Codable, Equatable, Sendable {
         contextNoteHoldHotkey: VoiceInputHotkeyPreset = VoiceInputHotkeyPreset(keyCode: 55, carbonModifiers: 0x0100, keyDisplayName: "Command"),
         sideNoticesEnabled: Bool = true,
         userCareEnabled: Bool = false,
+        userCareReminderInterval: TimeInterval = UserCareInterval.defaultSeconds,
         collapsedProgressGlowEnabled: Bool = true,
         aiTaskResultSweepEnabled: Bool = true,
         compactStatusPriority: [CompactStatusPriority] = CompactStatusPriority.defaultOrder,
@@ -1102,6 +1106,7 @@ public struct FeatureSettings: Codable, Equatable, Sendable {
         self.contextNoteHoldHotkey = contextNoteHoldHotkey
         self.sideNoticesEnabled = sideNoticesEnabled
         self.userCareEnabled = userCareEnabled
+        self.userCareReminderInterval = UserCareInterval.normalized(userCareReminderInterval)
         self.collapsedProgressGlowEnabled = collapsedProgressGlowEnabled
         self.aiTaskResultSweepEnabled = aiTaskResultSweepEnabled
         self.compactStatusPriority = CompactStatusPriority.normalized(compactStatusPriority)
@@ -1255,6 +1260,7 @@ public struct FeatureSettings: Codable, Equatable, Sendable {
         case contextNoteHoldHotkey
         case sideNoticesEnabled
         case userCareEnabled
+        case userCareReminderInterval
         case collapsedProgressGlowEnabled
         case aiTaskResultSweepEnabled
         case compactStatusPriority
@@ -1528,6 +1534,10 @@ public struct FeatureSettings: Codable, Equatable, Sendable {
         contextNoteHoldHotkey = try container.decodeIfPresent(VoiceInputHotkeyPreset.self, forKey: .contextNoteHoldHotkey) ?? defaults.contextNoteHoldHotkey
         sideNoticesEnabled = try container.decodeIfPresent(Bool.self, forKey: .sideNoticesEnabled) ?? defaults.sideNoticesEnabled
         userCareEnabled = try container.decodeIfPresent(Bool.self, forKey: .userCareEnabled) ?? defaults.userCareEnabled
+        userCareReminderInterval = UserCareInterval.normalized(
+            try container.decodeIfPresent(TimeInterval.self, forKey: .userCareReminderInterval)
+                ?? defaults.userCareReminderInterval
+        )
         collapsedProgressGlowEnabled = try container.decodeIfPresent(
             Bool.self,
             forKey: .collapsedProgressGlowEnabled

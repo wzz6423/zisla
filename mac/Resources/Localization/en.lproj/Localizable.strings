@@ -3200,7 +3200,9 @@
 "月光狐" = "Moonlight Fox";
 "小刺猬" = "Little Hedgehog";
 "用户关怀" = "Wellbeing";
-"连续使用 45 分钟后，温柔提醒休息、喝水和走动" = "Gentle reminders to rest, drink water, and move after 45 minutes of continuous use";
+"温柔提醒休息、喝水和走动" = "Gentle reminders to rest, drink water, and move";
+"关怀提醒间隔" = "Wellbeing reminder interval";
+"小时 0–99，分、秒 0–59，总时长至少 1 秒" = "Hours 0–99, minutes and seconds 0–59, at least 1 second in total";
 "忙了一阵了，歇一会儿吧。" = "You've been busy. Take a little break.";
 "人，忙了一阵了，陪我歇一会儿吧。" = "Human, you've been busy. Take a little break with me.";
 "喝口水吧，慢慢来。" = "Have a sip of water. Take your time.";
@@ -3217,3 +3219,13 @@
 "人，已经很晚了，我们早点休息吧。" = "Human, it's getting late. Let's get some rest.";
 "今天辛苦了，余下的事留给明天吧。" = "You've worked hard today. Leave the rest for tomorrow.";
 "人，今天辛苦了，明天我再陪你吧。" = "Human, you've worked hard today. I'll keep you company tomorrow.";
+"换个坐姿，坐得舒服一点吧。" = "Change your sitting position and get comfortable.";
+"人，换个舒服的坐姿吧。" = "Human, find a comfy sitting position.";
+"放松肩颈，轻轻伸展一下吧。" = "Relax your shoulders and neck. Stretch gently.";
+"人，放松肩颈，和我伸个懒腰吧。" = "Human, relax your shoulders and stretch with me.";
+"慢慢呼吸，给自己一点空隙吧。" = "Breathe slowly. Give yourself a little space.";
+"人，慢慢呼吸，我陪着你。" = "Human, breathe slowly. I am here with you.";
+"时间到啦，歇一会儿吧～" = "Time's up. Take a little break.";
+"人，时间到啦，该休息了～" = "Human, time's up. Let's rest a little.";
+"休息结束啦，按自己的节奏继续吧～" = "Your break is over. Continue at your own pace.";
+"人，休息好啦，我陪你继续～" = "Human, break's over. I'll keep you company.";

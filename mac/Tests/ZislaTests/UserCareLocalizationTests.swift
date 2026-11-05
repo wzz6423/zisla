@@ -6,9 +6,13 @@ import ZislaCore
 struct UserCareLocalizationTests {
     @Test(arguments: AppLanguage.allCases)
     func everyLanguageContainsAndRendersAllUserCareCopy(language: AppLanguage) throws {
-        let keys = Self.reminderKeys + ["用户关怀", "连续使用 45 分钟后，温柔提醒休息、喝水和走动"]
+        let careKeys = Self.reminderKeys + [
+            "用户关怀", "温柔提醒休息、喝水和走动", "关怀提醒间隔",
+            "小时 0–99，分、秒 0–59，总时长至少 1 秒",
+        ]
+        let keys = careKeys + ["小时", "分钟", "秒", "保存"]
         #expect(AppLanguage.allCases.count == 17)
-        #expect(Set(keys).count == 18)
+        #expect(Set(keys).count == keys.count)
         let table = try Self.table(language)
         let english = try Self.table(.english)
         for key in keys {
@@ -16,17 +20,23 @@ struct UserCareLocalizationTests {
             #expect(!value.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
             #expect(!value.contains("%"), "User care copy must not introduce format placeholders")
             #expect(AppLocalization.string(key, locale: language.locale) == value)
-            if language != .simplifiedChinese && language != .traditionalChinese {
+            if careKeys.contains(key) && language != .simplifiedChinese && language != .traditionalChinese {
                 #expect(value != key, "Untranslated Chinese in \(language.rawValue): \(key)")
             }
-            if language != .english && language != .simplifiedChinese && language != .traditionalChinese {
+            if careKeys.contains(key) && language != .english && language != .simplifiedChinese && language != .traditionalChinese {
                 #expect(value != english[key], "Copied English in \(language.rawValue): \(key)")
             }
         }
         for reminder in UserCareReminder.allCases {
-            let ordinary = AppLocalization.string(reminder.localizationKey(petEnabled: false), language: language)
-            let pet = AppLocalization.string(reminder.localizationKey(petEnabled: true), language: language)
+            let ordinary = reminder.localizedMessage(petEnabled: false, language: language)
+            let pet = reminder.localizedMessage(petEnabled: true, language: language)
             #expect(ordinary != pet, "Pet and ordinary voices must differ in \(language.rawValue)")
+            for petEnabled in [false, true] {
+                let body = try #require(table[reminder.localizationKey(petEnabled: petEnabled)])
+                let message = reminder.localizedMessage(petEnabled: petEnabled, language: language)
+                #expect(message.hasPrefix(body + " "), "The displayed message must use the selected locale and tone")
+                #expect(message.count > body.count + 1 && !message.contains("%"))
+            }
         }
     }
 
@@ -41,6 +51,12 @@ struct UserCareLocalizationTests {
             == "Human, have some water. I'll wait.")
         #expect(AppLocalization.string(UserCareReminder.bedtime.localizationKey(petEnabled: true), language: .arabic)
             == "يا صديقي الإنسان، تأخر الوقت. لنذهب ونرتاح.")
+        #expect(UserCareReminder.focusCompleted.localizedMessage(petEnabled: true, language: .english)
+            == "Human, time's up. Let's rest a little. 🍵")
+        #expect(UserCareReminder.restCompleted.localizedMessage(petEnabled: true, language: .traditionalChinese)
+            == "人，休息好啦，我陪你繼續～ (๑•̀ㅂ•́)و✧")
+        #expect(UserCareReminder.breathe.localizedMessage(petEnabled: false, language: .arabic)
+            == "تنفّس ببطء وامنح نفسك بعض المساحة. 🌿")
         for reminder in UserCareReminder.allCases {
             #expect(reminder.localizationKey(petEnabled: true).hasPrefix("人，"))
             #expect(!reminder.localizationKey(petEnabled: false).hasPrefix("人，"))
@@ -52,12 +68,14 @@ struct UserCareLocalizationTests {
     func existingMessageScrollCanReachEveryReminderWithinItsSixSecondLifetime(language: AppLanguage) {
         let font = NSFont.systemFont(ofSize: 11, weight: .medium)
         let availableWidth: CGFloat = 252 - 22 - 8 - 24
-        for key in Self.reminderKeys {
-            let value = AppLocalization.string(key, language: language)
-            let textWidth = (value as NSString).size(withAttributes: [.font: font]).width
-            let travel = max(0, textWidth - availableWidth + 16)
-            let duration = max(3, Double(travel) / 90)
-            #expect(duration <= 6, "\(language.rawValue) reminder needs \(duration) seconds to reveal its final words")
+        for reminder in UserCareReminder.allCases {
+            for petEnabled in [false, true] {
+                let value = reminder.localizedMessage(petEnabled: petEnabled, language: language)
+                let textWidth = (value as NSString).size(withAttributes: [.font: font]).width
+                let travel = max(0, textWidth - availableWidth + 16)
+                let duration = max(3, Double(travel) / 90)
+                #expect(duration <= 6, "\(language.rawValue) reminder needs \(duration) seconds to reveal its final words")
+            }
         }
     }
 

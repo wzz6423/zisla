@@ -93,28 +93,37 @@ public final class UserCareService {
             stop()
             return
         }
-        guard observationID == nil else { return }
-        let observationID = UUID()
-        self.observationID = observationID
-        observe(workspaceCenter, name: NSWorkspace.willSleepNotification, interruption: .sleep, began: true)
-        observe(workspaceCenter, name: NSWorkspace.didWakeNotification, interruption: .sleep, began: false)
-        observe(workspaceCenter, name: NSWorkspace.screensDidSleepNotification, interruption: .displaySleep, began: true)
-        observe(workspaceCenter, name: NSWorkspace.screensDidWakeNotification, interruption: .displaySleep, began: false)
-        observe(workspaceCenter, name: NSWorkspace.sessionDidResignActiveNotification, interruption: .inactiveSession, began: true)
-        observe(workspaceCenter, name: NSWorkspace.sessionDidBecomeActiveNotification, interruption: .inactiveSession, began: false)
-        observe(distributedCenter, name: Notification.Name("com.apple.screenIsLocked"), interruption: .lock, began: true)
-        observe(distributedCenter, name: Notification.Name("com.apple.screenIsUnlocked"), interruption: .lock, began: false)
+        if schedule.interval != settings.userCareReminderInterval {
+            schedule.setInterval(settings.userCareReminderInterval)
+            timer?.invalidate()
+            timer = nil
+            clearNotice()
+        }
+        if observationID == nil {
+            observationID = UUID()
+            observe(workspaceCenter, name: NSWorkspace.willSleepNotification, interruption: .sleep, began: true)
+            observe(workspaceCenter, name: NSWorkspace.didWakeNotification, interruption: .sleep, began: false)
+            observe(workspaceCenter, name: NSWorkspace.screensDidSleepNotification, interruption: .displaySleep, began: true)
+            observe(workspaceCenter, name: NSWorkspace.screensDidWakeNotification, interruption: .displaySleep, began: false)
+            observe(workspaceCenter, name: NSWorkspace.sessionDidResignActiveNotification, interruption: .inactiveSession, began: true)
+            observe(workspaceCenter, name: NSWorkspace.sessionDidBecomeActiveNotification, interruption: .inactiveSession, began: false)
+            observe(distributedCenter, name: Notification.Name("com.apple.screenIsLocked"), interruption: .lock, began: true)
+            observe(distributedCenter, name: Notification.Name("com.apple.screenIsUnlocked"), interruption: .lock, began: false)
+        }
 
-        let timer = timerFactory(Self.pollingInterval) { [weak self] _ in
+        guard timer == nil else { return }
+        refresh()
+        let timer = timerFactory(min(Self.pollingInterval, schedule.interval)) { [weak self] timer in
+            let timerID = ObjectIdentifier(timer)
             MainActor.assumeIsolated {
-                guard let self, self.observationID == observationID else { return }
+                guard let self, let activeTimer = self.timer,
+                      ObjectIdentifier(activeTimer) == timerID else { return }
                 self.refresh()
             }
         }
-        timer.tolerance = 5
         self.timer = timer
+        scheduleNextTick()
         RunLoop.main.add(timer, forMode: .common)
-        refresh()
     }
 
     public func stop() {
@@ -130,6 +139,7 @@ public final class UserCareService {
 
     func refresh() {
         guard observationID != nil else { return }
+        defer { scheduleNextTick() }
         guard let activity = activity() else {
             schedule.reset()
             clearNotice()
@@ -151,12 +161,20 @@ public final class UserCareService {
         queue.enqueue(
             IslandNotice(
                 id: Self.noticeID,
-                title: AppLocalization.string(reminder.localizationKey(petEnabled: petEnabled), language: language()),
+                title: reminder.localizedMessage(petEnabled: petEnabled, language: language()),
                 createdAt: date,
                 style: .message
             ),
             expiresAfter: 6
         )
+    }
+
+    private func scheduleNextTick() {
+        guard let timer else { return }
+        let remaining = schedule.timeUntilReminder(at: uptime())
+        let delay = min(Self.pollingInterval, remaining)
+        timer.fireDate = Date(timeIntervalSinceNow: delay)
+        timer.tolerance = min(5, remaining - delay)
     }
 
     private func observe(

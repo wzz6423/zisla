@@ -4,6 +4,29 @@ import Testing
 @testable import ZislaCore
 
 struct UserCareScheduleTests {
+    @Test(arguments: [1.0, 5, 30, 2_700])
+    func configuredIntervalsHonorTheirExactSecondBoundary(interval: TimeInterval) {
+        var schedule = UserCareSchedule(interval: interval)
+        #expect(schedule.update(at: 100, isActive: true, idleSeconds: 0, localHour: 10) == nil)
+        #expect(schedule.update(at: 100 + interval - 0.001, isActive: true, idleSeconds: 0, localHour: 10) == nil)
+        #expect(schedule.update(at: 100 + interval, isActive: true, idleSeconds: 0, localHour: 10) == .rest)
+        #expect(schedule.update(at: 100 + interval * 2, isActive: true, idleSeconds: 0, localHour: 10) == .water)
+    }
+
+    @Test
+    func changingTheIntervalResetsWorkButReapplyingTheSameIntervalDoesNot() {
+        var schedule = UserCareSchedule(interval: 5)
+        _ = schedule.update(at: 0, isActive: true, idleSeconds: 0, localHour: 10)
+        #expect(schedule.update(at: 4, isActive: true, idleSeconds: 0, localHour: 10) == nil)
+        schedule.setInterval(10)
+        #expect(!schedule.isWorking)
+        #expect(schedule.update(at: 4, isActive: true, idleSeconds: 0, localHour: 10) == nil)
+        schedule.setInterval(10)
+        #expect(schedule.isWorking)
+        #expect(schedule.update(at: 13.999, isActive: true, idleSeconds: 0, localHour: 10) == nil)
+        #expect(schedule.update(at: 14, isActive: true, idleSeconds: 0, localHour: 10) == .rest)
+    }
+
     @Test
     func requiresFortyFiveMinutesOfContinuousWork() {
         var schedule = UserCareSchedule()
@@ -81,7 +104,7 @@ struct UserCareScheduleTests {
     func rotatesAllGeneralRemindersAcrossNaturalBreaks() {
         var schedule = UserCareSchedule()
         var reminders: [UserCareReminder] = []
-        for index in 0..<8 {
+        for index in 0..<14 {
             let start = Double(index * 10_000)
             _ = schedule.update(at: start, isActive: true, idleSeconds: 0, localHour: 10)
             if let reminder = schedule.update(at: start + 2_700, isActive: true, idleSeconds: 0, localHour: 10) {
@@ -89,7 +112,8 @@ struct UserCareScheduleTests {
             }
             schedule.reset()
         }
-        #expect(reminders == [.rest, .water, .walk, .eyes, .rest, .water, .walk, .eyes])
+        let cycle: [UserCareReminder] = [.rest, .water, .walk, .eyes, .posture, .stretch, .breathe]
+        #expect(reminders == cycle + cycle)
     }
 
     @Test

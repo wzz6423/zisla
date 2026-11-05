@@ -8,6 +8,149 @@ import ZislaCore
 
 @MainActor
 struct UserCareServiceTests {
+    @Test(arguments: [1.0, 5, 30, 2_700])
+    func customIntervalsDriveBothTheTimerAndExactReminderBoundary(interval: TimeInterval) throws {
+        let fixture = UserCareFixture()
+        let service = fixture.makeService()
+        defer { service.stop() }
+        service.apply(settings: FeatureSettings(userCareEnabled: true, userCareReminderInterval: interval))
+        let timer = try #require(fixture.timers.first)
+        #expect(timer.timeInterval == min(30, interval))
+        #expect(timer.tolerance == (interval <= 30 ? 0 : 5))
+        fixture.uptime = interval - 0.001
+        service.refresh()
+        #expect(fixture.queue.right.isEmpty)
+        fixture.uptime = interval
+        service.refresh()
+        #expect(fixture.queue.right.count == 1)
+        fixture.queue.remove(id: UserCareService.noticeID)
+        fixture.uptime = interval * 2 - 0.001
+        service.refresh()
+        #expect(fixture.queue.right.isEmpty)
+        fixture.uptime = interval * 2
+        service.refresh()
+        #expect(fixture.queue.right.count == 1)
+    }
+
+    @Test(arguments: [1.0, 5])
+    func timerSetupLatencyAndEarlyTicksDoNotDelayByAnotherWholeInterval(interval: TimeInterval) throws {
+        let fixture = UserCareFixture()
+        fixture.timerSetupDelay = 0.005
+        let service = fixture.makeService()
+        defer { service.stop() }
+        let beforeStart = Date()
+        service.apply(settings: FeatureSettings(userCareEnabled: true, userCareReminderInterval: interval))
+        let afterStart = Date()
+        let timer = try #require(fixture.timers.first)
+        assertDeadline(timer, delay: interval - 0.005, before: beforeStart, after: afterStart)
+        fixture.uptime = interval + 0.005
+        fixture.callbacks[0](timer)
+        #expect(fixture.queue.right.count == 1, "The first tick must use the work baseline established before timer creation")
+        fixture.queue.remove(id: UserCareService.noticeID)
+        fixture.uptime = interval * 2
+        let beforeEarlyTick = Date()
+        fixture.callbacks[0](timer)
+        let afterEarlyTick = Date()
+        #expect(fixture.queue.right.isEmpty)
+        assertDeadline(timer, delay: 0.005, before: beforeEarlyTick, after: afterEarlyTick)
+        fixture.uptime += 0.005
+        fixture.callbacks[0](timer)
+        #expect(fixture.queue.right.count == 1)
+    }
+
+    @Test
+    func longerIntervalsScheduleTheRemainingSecondsInsteadOfRoundingUpToTheNextPoll() throws {
+        let fixture = UserCareFixture()
+        let service = fixture.makeService()
+        defer { service.stop() }
+        service.apply(settings: FeatureSettings(userCareEnabled: true, userCareReminderInterval: 31))
+        let timer = try #require(fixture.timers.first)
+        #expect(timer.tolerance == 1)
+        fixture.uptime = 30
+        let before = Date()
+        fixture.callbacks[0](timer)
+        let after = Date()
+        #expect(fixture.queue.right.isEmpty)
+        assertDeadline(timer, delay: 1, before: before, after: after)
+        #expect(timer.tolerance == 0)
+        fixture.uptime = 31
+        fixture.callbacks[0](timer)
+        #expect(fixture.queue.right.count == 1)
+    }
+
+    @Test
+    func changingTheIntervalClearsTheNoticeCancelsOldCallbacksAndStartsFromNow() {
+        let fixture = UserCareFixture()
+        let service = fixture.makeService()
+        defer { service.stop() }
+        service.apply(settings: FeatureSettings(userCareEnabled: true, userCareReminderInterval: 5))
+        fixture.uptime = 5
+        service.refresh()
+        #expect(fixture.queue.right.count == 1)
+        fixture.uptime = 6
+        service.apply(settings: FeatureSettings(userCareEnabled: true, userCareReminderInterval: 10))
+        #expect(fixture.queue.right.isEmpty)
+        #expect(fixture.timers.count == 2)
+        #expect(!fixture.timers[0].isValid)
+        #expect(fixture.workspace.handlers.count == 6)
+        #expect(fixture.workspace.removedObservers == 0)
+        let reads = fixture.reads
+        fixture.callbacks[0](fixture.timers[0])
+        #expect(fixture.reads == reads)
+        fixture.uptime = 15.999
+        service.refresh()
+        #expect(fixture.queue.right.isEmpty)
+        fixture.uptime = 16
+        fixture.callbacks[1](fixture.timers[1])
+        #expect(fixture.queue.right.first?.title == UserCareReminder.water.localizedMessage(petEnabled: true, language: .simplifiedChinese))
+    }
+
+    @Test
+    func unrelatedSettingsDoNotResetCustomIntervalProgress() {
+        let fixture = UserCareFixture()
+        let service = fixture.makeService()
+        defer { service.stop() }
+        service.apply(settings: FeatureSettings(userCareEnabled: true, userCareReminderInterval: 5))
+        fixture.uptime = 4
+        service.apply(settings: FeatureSettings(
+            userCareEnabled: true, userCareReminderInterval: 5, notificationsMuted: true, petEnabled: false
+        ))
+        #expect(fixture.timers.count == 1)
+        fixture.uptime = 5
+        fixture.callbacks[0](fixture.timers[0])
+        #expect(fixture.queue.right.first?.title == UserCareReminder.rest.localizedMessage(petEnabled: false, language: .simplifiedChinese))
+    }
+
+    @Test
+    func changingIntervalsDuringLockPreservesTheInterruptionAndRearmsOnUnlock() throws {
+        let fixture = UserCareFixture()
+        let service = fixture.makeService()
+        defer { service.stop() }
+        service.apply(settings: FeatureSettings(userCareEnabled: true, userCareReminderInterval: 5))
+        fixture.uptime = 4
+        fixture.distributed.post(name: .init("com.apple.screenIsLocked"), object: nil)
+        fixture.uptime = 100
+        service.apply(settings: FeatureSettings(userCareEnabled: true, userCareReminderInterval: 1))
+        fixture.uptime = 101
+        service.refresh()
+        #expect(fixture.queue.right.isEmpty)
+        fixture.uptime = 200.005
+        let before = Date()
+        fixture.distributed.post(name: .init("com.apple.screenIsUnlocked"), object: nil)
+        let after = Date()
+        let timer = try #require(fixture.timers.last)
+        assertDeadline(timer, delay: 1, before: before, after: after)
+        fixture.uptime = 201
+        let beforeEarlyTick = Date()
+        fixture.callbacks[1](timer)
+        let afterEarlyTick = Date()
+        #expect(fixture.queue.right.isEmpty)
+        assertDeadline(timer, delay: 0.005, before: beforeEarlyTick, after: afterEarlyTick)
+        fixture.uptime = 201.005
+        fixture.callbacks[1](timer)
+        #expect(fixture.queue.right.count == 1)
+    }
+
     @Test
     func disabledSettingsDoNotAcquireResourcesAndEnablingStartsFromNow() throws {
         let fixture = UserCareFixture()
@@ -31,7 +174,7 @@ struct UserCareServiceTests {
         #expect(fixture.queue.right.isEmpty)
         fixture.uptime += 1
         service.refresh()
-        #expect(fixture.queue.right.first?.title == "忙了一阵了，歇一会儿吧。")
+        #expect(fixture.queue.right.first?.title == "忙了一阵了，歇一会儿吧。 🍵")
         #expect(fixture.queue.right.first?.style == .message)
         #expect(fixture.queue.right.first?.side == .right)
     }
@@ -47,7 +190,7 @@ struct UserCareServiceTests {
         #expect(fixture.timers.count == 1)
         fixture.uptime = 2_700
         service.refresh()
-        #expect(fixture.queue.right.first?.title == "人，忙了一阵了，陪我歇一会儿吧。")
+        #expect(fixture.queue.right.first?.title == "人，忙了一阵了，陪我歇一会儿吧。 🍵")
         #expect(fixture.queue.right.first?.style == .message)
         #expect(fixture.queue.right.first?.id == UserCareService.noticeID)
     }
@@ -253,11 +396,11 @@ struct UserCareServiceTests {
         fixture.hour = 12
         fixture.uptime = 2_700
         service.refresh()
-        #expect(fixture.queue.right.first?.title == "到午间了，记得吃饭，也休息一会儿。")
+        #expect(fixture.queue.right.first?.title == "到午间了，记得吃饭，也休息一会儿。 🍚")
         fixture.hour = 23
         fixture.uptime += 2_700
         service.refresh()
-        #expect(fixture.queue.right.first?.title == "今天辛苦了，余下的事留给明天吧。")
+        #expect(fixture.queue.right.first?.title == "今天辛苦了，余下的事留给明天吧。 🌙")
     }
 
     @Test
@@ -269,7 +412,7 @@ struct UserCareServiceTests {
         fixture.timeZone = TimeZone(secondsFromGMT: 14 * 3_600)!
         fixture.uptime = 2_700
         service.refresh()
-        #expect(fixture.queue.right.first?.title == "已经很晚了，早点休息吧。")
+        #expect(fixture.queue.right.first?.title == "已经很晚了，早点休息吧。 🌙")
     }
 
     @Test(arguments: AppLanguage.allCases, [false, true])
@@ -281,9 +424,7 @@ struct UserCareServiceTests {
         service.apply(settings: FeatureSettings(userCareEnabled: true, petEnabled: petEnabled))
         fixture.uptime = 2_700
         service.refresh()
-        #expect(fixture.queue.right.first?.title == AppLocalization.string(
-            UserCareReminder.rest.localizationKey(petEnabled: petEnabled), language: language
-        ))
+        #expect(fixture.queue.right.first?.title == UserCareReminder.rest.localizedMessage(petEnabled: petEnabled, language: language))
         #expect(fixture.queue.right.first?.style == .message)
         #expect(fixture.queue.right.first?.side == .right)
         #expect(fixture.queue.right.first?.detail == nil)
@@ -340,6 +481,11 @@ struct UserCareServiceTests {
         #expect(fixture.reads == reads)
         #expect(fixture.queue.right.isEmpty)
     }
+
+    private func assertDeadline(_ timer: Timer, delay: TimeInterval, before: Date, after: Date) {
+        #expect(timer.fireDate.timeIntervalSince(before) >= delay - 0.000_01)
+        #expect(timer.fireDate.timeIntervalSince(after) <= delay + 0.000_01)
+    }
 }
 
 @MainActor
@@ -359,6 +505,7 @@ private final class UserCareFixture {
     var reads = 0
     var timers: [Timer] = []
     var callbacks: [@Sendable (Timer) -> Void] = []
+    var timerSetupDelay: TimeInterval = 0
     var timeZone = TimeZone(secondsFromGMT: 0)!
     var calendar: Calendar {
         var calendar = Calendar(identifier: .gregorian)
@@ -390,6 +537,7 @@ private final class UserCareFixture {
                 let timer = Timer(timeInterval: interval, repeats: true, block: callback)
                 self.timers.append(timer)
                 self.callbacks.append(callback)
+                self.uptime += self.timerSetupDelay
                 return timer
             }
         )
