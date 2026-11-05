@@ -15,7 +15,6 @@ struct ScreenRecordingOutputDirectorySettingsView: View {
                 .help(path)
                 .accessibilityIdentifier("screenRecording.settingsSaveDirectory")
             Button(AppLocalization.text("更改保存位置"), action: model.chooseRecordingOutputDirectory)
-                .controlSize(.small)
                 .disabled(model.isRecording || model.isBusy || model.isChoosingFile || model.exporter.isExporting)
                 .accessibilityIdentifier("screenRecording.chooseSaveDirectory")
         }

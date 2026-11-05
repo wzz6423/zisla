@@ -55,7 +55,6 @@ struct DailyBriefingSettingsView: View {
                 Button {
                     NSWorkspace.shared.open(URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_AllFiles")!)
                 } label: { AppLocalizedText("完全磁盘访问") }
-                .controlSize(.small)
             }
 
             Divider()

@@ -49,7 +49,6 @@ struct UserCareIntervalControl: View {
             Button(action: save) {
                 AppLocalizedText("保存")
             }
-            .controlSize(.small)
             .disabled(draft.interval == nil || draft.interval == interval)
             .accessibilityIdentifier("user-care-save")
         }
@@ -63,6 +62,7 @@ struct UserCareIntervalControl: View {
         HStack(spacing: 4) {
             TextField("", text: text)
                 .textFieldStyle(.roundedBorder)
+                .font(.body)
                 .multilineTextAlignment(.trailing)
                 .frame(width: 44)
                 .accessibilityLabel(AppLocalization.string(title, locale: locale))
