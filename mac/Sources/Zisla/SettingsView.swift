@@ -33,6 +33,8 @@ struct SettingsView: View {
     @State private var assistantHotkeyValidationMessage: String?
     @State private var expandedClipboardAssistantKind: ClipboardAssistantKind?
     @State private var petImportSource: PetImportSource?
+    @State private var isPetRemovalConfirmationPresented = false
+    @State private var petRemovalError: String?
 
     init(model: AppModel) {
         self.model = model
@@ -2095,7 +2097,8 @@ struct SettingsView: View {
     }
 
     private var petContent: some View {
-        VStack(alignment: .leading, spacing: 20) {
+        let entries = petEntries
+        return VStack(alignment: .leading, spacing: 20) {
             settingsGroup("宠物") {
                 settingRow(
                     symbol: "shippingbox.fill",
@@ -2107,12 +2110,12 @@ struct SettingsView: View {
                         selection: Binding(
                             get: {
                                 let id = model.settingsStore.settings.petID
-                                return petEntries.contains { $0.id == id } ? id : FeatureSettings.default.petID
+                                return entries.contains { $0.id == id } ? id : FeatureSettings.default.petID
                             },
                             set: { model.settingsStore.settings.petID = $0 }
                         )
                     ) {
-                        ForEach(petEntries, id: \.id) { entry in
+                        ForEach(entries, id: \.id) { entry in
                             Text(petDisplayLabel(entry)).tag(entry.id)
                         }
                     }
@@ -2120,6 +2123,34 @@ struct SettingsView: View {
                     .pickerStyle(.menu)
                     .keepsIntrinsicWidth()
                     .disabled(!model.settingsStore.settings.petEnabled)
+                    if let entry = entries.first(where: { $0.id == model.settingsStore.settings.petID }),
+                       entry.origin == .imported {
+                        Button(AppLocalization.text("移除"), role: .destructive) {
+                            petRemovalError = nil
+                            isPetRemovalConfirmationPresented = true
+                        }
+                        .controlSize(.small)
+                        .keepsIntrinsicWidth()
+                        .alert(
+                            AppLocalization.text("删除“%@”？", entry.manifest.displayName),
+                            isPresented: $isPetRemovalConfirmationPresented
+                        ) {
+                            Button(AppLocalization.text("取消"), role: .cancel) {}
+                            Button(AppLocalization.text("移除"), role: .destructive) {
+                                do {
+                                    try Self.removeSelectedPet(settings: &model.settingsStore.settings)
+                                } catch {
+                                    petRemovalError = error.localizedDescription
+                                }
+                            }
+                        }
+                    }
+                }
+                if let petRemovalError {
+                    Text(AppLocalization.text("操作失败：%@", petRemovalError))
+                        .font(.caption)
+                        .foregroundStyle(Color.zislaError)
+                        .textSelection(.enabled)
                 }
                 rowDivider
                 settingRow(
@@ -2158,6 +2189,15 @@ struct SettingsView: View {
 
     private var petEntries: [PetLibrary.Entry] {
         PetLibrary.entries()
+    }
+
+    static func removeSelectedPet(
+        settings: inout FeatureSettings,
+        userPetsDirectory: URL = PetLibrary.userPetsDirectory,
+        fileManager: FileManager = .default
+    ) throws {
+        try PetLibrary.removeImportedPet(id: settings.petID, userPetsDirectory: userPetsDirectory, fileManager: fileManager)
+        settings.petID = FeatureSettings.default.petID
     }
 
     private func choosePetMedia() {

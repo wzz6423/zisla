@@ -72,6 +72,18 @@ public enum PetLibrary {
         entries(userPetsDirectory: userPetsDirectory).first { $0.id == id }
     }
 
+    public static func removeImportedPet(
+        id: String,
+        userPetsDirectory: URL = userPetsDirectory,
+        fileManager: FileManager = .default
+    ) throws {
+        guard entry(for: id, userPetsDirectory: userPetsDirectory)?.origin == .imported else {
+            throw CocoaError(.fileNoSuchFile)
+        }
+        // Moving the directory intact avoids partially deleting a pet when removal fails.
+        try fileManager.trashItem(at: userPetsDirectory.appendingPathComponent(id, isDirectory: true), resultingItemURL: nil)
+    }
+
     @MainActor
     public static func loadSprite(for id: String, userPetsDirectory: URL = userPetsDirectory) -> PetSprite? {
         if isImportedID(id) {
