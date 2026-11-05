@@ -1,5 +1,6 @@
 import SwiftUI
 import ZislaCore
+import ZislaKit
 
 struct RecordingMultitrackClipDrag {
     enum Mode { case move, trimStart, trimEnd }
@@ -112,6 +113,7 @@ struct ScreenRecordingMultitrackTimelineView: View {
                         .frame(height: rulerHeight + CGFloat(max(1, timeline.tracks.count)) * rowHeight + 12)
                     }
                 }
+                .thinScrollChrome()
                 .frame(height: min(224, rulerHeight + CGFloat(max(1, timeline.tracks.count)) * rowHeight + 12))
             }
             .disabled(!model.canEdit)

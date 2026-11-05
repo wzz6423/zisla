@@ -70,7 +70,7 @@ struct SystemMonitorView: View {
             }
             .padding(12)
         }
-        .scrollIndicators(.hidden)
+        .thinScrollChrome()
         .onPreferenceChange(SystemColumnHeightPreferenceKey.self) { height in
             guard systemColumnHeight != height else { return }
             systemColumnHeight = height
@@ -1071,6 +1071,7 @@ private struct SystemCleanupSheet: View {
                         }
                     }
                     .listStyle(.inset)
+                    .thinScrollChrome()
                 }
             }
             .frame(minHeight: 235)

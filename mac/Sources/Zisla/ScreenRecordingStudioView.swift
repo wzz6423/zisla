@@ -70,6 +70,7 @@ struct ScreenRecordingStudioView: View {
                         }
                         .padding(12).frame(maxWidth: .infinity, alignment: .leading)
                     }
+                    .thinScrollChrome()
                 }
                 .frame(minWidth: 320, idealWidth: 340, maxWidth: 390)
                 .background(Color(nsColor: .windowBackgroundColor))

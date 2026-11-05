@@ -8,6 +8,33 @@ import XCTest
 @MainActor
 @Suite(.serialized)
 struct MailHTMLViewTests {
+    @Test(arguments: ["", "<p>Short message</p>", "<div style='height: 1200px'>Long message</div>"])
+    func messageScrollbarsStayThinWithoutChangingContentOrScrollPosition(html: String) async throws {
+        let webView = makeWebView()
+        defer { webView.stopLoading() }
+        try await load(html, in: webView)
+        let result = try #require(await webView.evaluateJavaScript("""
+            (() => {
+              const root = document.documentElement;
+              const bar = getComputedStyle(root, '::-webkit-scrollbar');
+              const track = getComputedStyle(root, '::-webkit-scrollbar-track');
+              const thumb = getComputedStyle(root, '::-webkit-scrollbar-thumb');
+              window.scrollTo(0, 150);
+              return { width: bar.width, track: track.backgroundColor,
+                       thumb: thumb.backgroundColor, radius: thumb.borderRadius,
+                       offset: window.scrollY, overflows: root.scrollHeight > window.innerHeight };
+            })()
+            """) as? [String: Any])
+        #expect(result["width"] as? String == "3px")
+        #expect(result["track"] as? String == "rgba(0, 0, 0, 0)")
+        #expect(result["thumb"] as? String == "rgba(128, 128, 128, 0.65)")
+        #expect(result["radius"] as? String == "1.5px")
+        let overflows = result["overflows"] as? Bool == true
+        #expect(result["offset"] as? Double == (overflows ? 150 : 0))
+        webView.setHTML(html)
+        #expect(try await webView.evaluateJavaScript("window.scrollY") as? Double == (overflows ? 150 : 0))
+    }
+
     @Test
     func rendersOriginalStylesTablesAndInlineImagesOnTransparentBackground() async throws {
         let webView = makeWebView()

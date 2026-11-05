@@ -28,6 +28,7 @@ struct FirstLaunchOnboardingView: View {
                     .padding(.vertical, clearance)
                     .frame(maxWidth: .infinity)
                 }
+                .thinScrollChrome()
                 VStack {
                     Spacer()
                     navigation

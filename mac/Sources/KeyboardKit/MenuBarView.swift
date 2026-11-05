@@ -74,6 +74,7 @@ struct MenuBarView: View {
                     }
                     .padding(14)
                 }
+                .thinScrollChrome()
                 .onAppear {
                     model.launchAtLogin.refresh()
                     DispatchQueue.main.async {

@@ -260,6 +260,7 @@ struct DailyBriefingPreview: View {
                 ProgressView()
             }
         }
+        .thinScrollChrome()
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .task {
             do {

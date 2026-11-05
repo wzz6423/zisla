@@ -725,6 +725,7 @@ private struct MailComposerView: View {
 
     private var bodyEditor: some View {
         TextEditor(text: $messageBody)
+            .thinScrollChrome()
             .font(.system(size: 12))
             .scrollContentBackground(.hidden)
             .padding(8)

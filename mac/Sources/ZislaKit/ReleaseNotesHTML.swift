@@ -56,6 +56,7 @@ public enum ReleaseNotesHTML {
             img { max-width: 100%; height: auto; border-radius: 8px; }
             figure { margin-inline: 0; }
             hr { border: 0; border-top: 1px solid var(--grid); margin: 1.5em 0; }
+            \(ThinScrollChrome.webStyle)
           </style>
         </head>
         <body><article>\(body)</article></body>

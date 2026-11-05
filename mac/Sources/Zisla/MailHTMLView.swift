@@ -1,5 +1,6 @@
 import SwiftUI
 import WebKit
+import ZislaKit
 
 struct MailHTMLView: NSViewRepresentable {
     let html: String
@@ -70,6 +71,7 @@ final class MailBodyWebView: WKWebView, WKNavigationDelegate {
             <!doctype html><html><head><meta charset="utf-8">
             <meta http-equiv="Content-Security-Policy" content="default-src 'none'; img-src data: https: http:; style-src 'unsafe-inline'; base-uri 'none'; form-action 'none'">
             <style>
+            \(ThinScrollChrome.webStyle)
             body { margin: 12px; font: 14px -apple-system, sans-serif; overflow-wrap: anywhere; }
             a { color: #4aa3ff; }
             img { max-width: 100%; height: auto; }

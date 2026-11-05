@@ -4,6 +4,7 @@ import Testing
 import ZislaCore
 
 @testable import Zisla
+@testable import ZislaKit
 
 @MainActor
 @Suite(.serialized)

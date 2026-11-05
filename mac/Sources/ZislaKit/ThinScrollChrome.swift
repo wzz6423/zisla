@@ -2,8 +2,8 @@ import AppKit
 import SwiftUI
 
 /// Narrows the native scroller behind SwiftUI's `ScrollView`.
-extension View {
-    func thinScrollChrome(visibleWhenScrollable: Bool = false) -> some View {
+public extension View {
+    func thinScrollChrome(visibleWhenScrollable: Bool = true) -> some View {
         background(ThinScrollChromeConfigurator(visibleWhenScrollable: visibleWhenScrollable))
     }
 }
@@ -23,6 +23,7 @@ private struct ThinScrollChromeConfigurator: NSViewRepresentable {
 @MainActor
 final class ThinScrollChromeHost: NSView {
     private weak var configuredScrollView: NSScrollView?
+    private var styleObservation: NSKeyValueObservation?
     private var pendingApply = false
     private let visibleWhenScrollable: Bool
 
@@ -65,10 +66,15 @@ final class ThinScrollChromeHost: NSView {
         guard let scrollView = nearestScrollView() else { return }
         if configuredScrollView === scrollView,
            isThinScroller(scrollView.verticalScroller),
-           isThinScroller(scrollView.horizontalScroller) {
+           isThinScroller(scrollView.horizontalScroller),
+           !visibleWhenScrollable || (scrollView.scrollerStyle == .legacy
+                && scrollView.autohidesScrollers && scrollView.hasVerticalScroller) {
             return
         }
         ThinScrollChrome.apply(to: scrollView, visibleWhenScrollable: visibleWhenScrollable)
+        styleObservation = scrollView.observe(\.scrollerStyle) { [weak self] _, _ in
+            MainActor.assumeIsolated { self?.scheduleApply() }
+        }
         configuredScrollView = scrollView
     }
 
@@ -77,12 +83,10 @@ final class ThinScrollChromeHost: NSView {
     }
 
     private func nearestScrollView() -> NSScrollView? {
-        if let scrollView = ancestor(ofType: NSScrollView.self) {
-            return scrollView
-        }
         // SwiftUI often attaches the background to a sibling of the ScrollView wrapper; walk up then scan downward.
         var node: NSView? = superview
         while let view = node {
+            if let scrollView = view as? NSScrollView { return scrollView }
             if let found = firstDescendant(ofType: NSScrollView.self, in: view) {
                 return found
             }
@@ -91,31 +95,38 @@ final class ThinScrollChromeHost: NSView {
         return nil
     }
 
-    private func ancestor<T: NSView>(ofType type: T.Type) -> T? {
-        var current: NSView? = superview
-        while let view = current {
-            if let match = view as? T { return match }
-            current = view.superview
-        }
-        return nil
-    }
-
     private func firstDescendant<T: NSView>(ofType type: T.Type, in root: NSView) -> T? {
         var queue = ArraySlice(root.subviews)
+        var nearest: T?
+        var largestOverlap: CGFloat = 0
         while let view = queue.popFirst() {
-            if let match = view as? T { return match }
-            queue.append(contentsOf: view.subviews)
+            if let match = view as? T {
+                let frame = convert(match.bounds, from: match)
+                let overlap = bounds.intersection(frame)
+                let area = overlap.width * overlap.height
+                if nearest == nil || area > largestOverlap {
+                    nearest = match
+                    largestOverlap = area
+                }
+            } else {
+                queue.append(contentsOf: view.subviews)
+            }
         }
-        return nil
+        return nearest
     }
 }
 
 @MainActor
-enum ThinScrollChrome {
+public enum ThinScrollChrome {
     /// Noticeably narrower than the system default width.
     static let width: CGFloat = 3
 
-    static func apply(to scrollView: NSScrollView, visibleWhenScrollable: Bool = false) {
+    public nonisolated static let webStyle = """
+        ::-webkit-scrollbar { width: 3px; }
+        ::-webkit-scrollbar-thumb { background: rgba(128,128,128,0.65); border-radius: 1.5px; }
+        """
+
+    public static func apply(to scrollView: NSScrollView, visibleWhenScrollable: Bool = true) {
         if visibleWhenScrollable {
             scrollView.scrollerStyle = .legacy
             scrollView.autohidesScrollers = true

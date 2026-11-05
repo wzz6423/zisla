@@ -261,6 +261,7 @@ private struct SoundPackSidebar: View {
                     }
                     .padding(8)
                 }
+                .thinScrollChrome()
             }
 
             KeyboardVisualStyle.separator.opacity(0.65).frame(height: 1)
@@ -458,6 +459,7 @@ private struct SoundPackInspector: View {
                 }
                 .padding(16)
             }
+            .thinScrollChrome()
 
             KeyboardVisualStyle.separator.opacity(0.65).frame(height: 1)
 

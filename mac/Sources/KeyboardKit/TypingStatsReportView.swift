@@ -134,6 +134,7 @@ struct TypingStatsHistoryView: View {
                 .frame(maxWidth: 1_080)
                 .frame(maxWidth: .infinity)
             }
+            .thinScrollChrome()
         }
         .task(id: request) {
             do {
@@ -485,7 +486,7 @@ struct TypingStatsHistoryView: View {
                         hasComparison: hasComparison
                     )
                 }
-                .scrollIndicators(.automatic)
+                .thinScrollChrome()
                 .frame(maxHeight: .infinity)
             }
         }
@@ -615,6 +616,7 @@ struct TypingStatsHistoryView: View {
                 applicationTable(report, applications: report.applications)
                     .padding(20)
             }
+            .thinScrollChrome()
         }
         .frame(minWidth: 680, idealWidth: 760, minHeight: 480, idealHeight: 560)
     }

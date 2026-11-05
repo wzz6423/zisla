@@ -94,6 +94,8 @@ struct ApplicationVolumeMixerModuleTests {
             (view as? NSScrollView).map { [$0] } ?? view.subviews.flatMap { scrollViews(in: $0) }
         }
         let scrollView = try #require(scrollViews(in: host).first)
+        #expect(scrollView.verticalScroller is ThinScroller)
+        #expect(scrollView.scrollerStyle == .legacy)
         let document = try #require(scrollView.documentView)
         #expect(abs(scrollView.frame.width - 728) <= 1)
         if hasFailure {

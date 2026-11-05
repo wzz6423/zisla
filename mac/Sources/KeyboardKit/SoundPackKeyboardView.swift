@@ -143,6 +143,7 @@ struct SoundPackKeyboardView: View, Equatable {
             .padding(20)
             .frame(maxWidth: .infinity, alignment: .top)
         }
+        .thinScrollChrome()
         .background(Color.clear)
     }
 }

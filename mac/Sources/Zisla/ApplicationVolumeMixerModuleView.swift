@@ -39,7 +39,7 @@ struct ApplicationVolumeMixerModuleView: View {
                             }
                         }
                     }
-                    .scrollIndicators(.hidden)
+                    .thinScrollChrome()
                 }
             }
         }

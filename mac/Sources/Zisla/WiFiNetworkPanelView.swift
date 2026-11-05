@@ -109,6 +109,7 @@ struct WiFiNetworkPanelView: View {
                     .font(.callout.weight(.semibold))
                 }
             }
+            .thinScrollChrome()
             .frame(maxHeight: 240)
             .fixedSize(horizontal: false, vertical: true)
         }

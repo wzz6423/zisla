@@ -513,6 +513,7 @@ private struct TypingStatsTodayView: View {
             .frame(maxWidth: 1_080)
             .frame(maxWidth: .infinity)
         }
+        .thinScrollChrome()
     }
 
     private func chartSummary(_ title: String, value: String) -> some View {
@@ -581,6 +582,7 @@ private struct TypingStatsAppsView: View {
             .frame(maxWidth: 1_080)
             .frame(maxWidth: .infinity)
         }
+        .thinScrollChrome()
     }
 }
 
