@@ -10,6 +10,36 @@ import ZislaKit
 @Suite(.serialized)
 struct RichNoteEditorTests {
     @Test
+    func overflowingNoteKeepsThinScrollbarsWithoutWritingBackOnScroll() async throws {
+        var changes = 0
+        let hosting = NSHostingView(rootView: RichNoteEditor(
+            html: "<div style='height: 1200px'><b>Fixture note</b></div>", command: nil,
+            isEditable: true, onChange: { _, _ in changes += 1 }
+        ))
+        let window = NSWindow(contentRect: CGRect(x: 0, y: 0, width: 320, height: 240),
+                              styleMask: .borderless, backing: .buffered, defer: false)
+        window.isReleasedWhenClosed = false
+        window.contentView = hosting
+        defer { window.contentView = nil; window.close() }
+        let webView = try await waitForWebView(in: hosting)
+        try await waitUntilEditorIsReady(in: webView)
+        let result = try #require(await webView.evaluateJavaScript("""
+            (() => {
+              const root = document.documentElement;
+              const bar = getComputedStyle(root, '::-webkit-scrollbar');
+              window.scrollTo(0, 150);
+              return { width: bar.width, offset: window.scrollY,
+                       text: document.querySelector('#editor b').textContent };
+            })()
+            """) as? [String: Any])
+        #expect(result["width"] as? String == "3px")
+        #expect(result["offset"] as? Double == 150)
+        #expect(result["text"] as? String == "Fixture note")
+        #expect(changes == 0, "Scrollbar styling and scrolling must not modify the Notes document")
+        #expect(!window.isVisible)
+    }
+
+    @Test
     func inputMethodReportsIslandWindowLevelWithoutChangingPanelOrdering() async throws {
         let hostingView = NSHostingView(rootView:
             RichNoteEditor(html: "<div><br></div>", command: nil, isEditable: true, onChange: { _, _ in })

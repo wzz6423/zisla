@@ -224,7 +224,7 @@ struct DownloadModuleView: View {
     @ViewBuilder
     private var downloadStatus: some View {
         if !model.activeDownloads.isEmpty {
-            ScrollView(.vertical, showsIndicators: false) {
+            ScrollView(.vertical) {
                 LazyVStack(alignment: .leading, spacing: 5) {
                     ForEach(model.activeDownloads) { task in
                         downloadTaskRow(task)
@@ -232,6 +232,7 @@ struct DownloadModuleView: View {
                 }
                 .padding(.vertical, 1)
             }
+            .thinScrollChrome()
         } else if model.isLoadingDownloadFormats {
             HStack(spacing: 8) {
                 ProgressView().controlSize(.small)

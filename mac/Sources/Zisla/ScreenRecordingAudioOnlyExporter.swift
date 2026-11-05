@@ -61,24 +61,25 @@ enum ScreenRecordingAudioOnlyExporter {
         output.alwaysCopiesSampleData = false
         guard reader.canAdd(output) else { throw ScreenRecordingExportError.unavailableMedia }
         reader.add(output)
-        reader.timeRange = .init(start: .zero, duration: CMTime(seconds: media.duration, preferredTimescale: 60_000))
         let file = try AVAudioFile(forWriting: url, settings: settings(format: format), commonFormat: .pcmFormatFloat32, interleaved: true)
         guard let buffer = AVAudioPCMBuffer(pcmFormat: file.processingFormat, frameCapacity: 4_096) else {
             throw ScreenRecordingExportError.cannotRender
         }
-        guard reader.startReading() else { throw ScreenRecordingExportError.unavailableMedia }
-        defer { reader.cancelReading() }
         let total = Int64((media.duration * 48_000).rounded())
         var audibleRanges: [Range<Int64>] = []
         for track in media.audioTracks {
             for segment in track.segments where !segment.isEmpty {
                 let range = segment.timeMapping.target
                 let start = Int64((range.start.seconds * 48_000).rounded())
-                let end = Int64((range.end.seconds * 48_000).rounded())
+                let end = Int64((range.end.seconds * 48_000).rounded(.down))
                 audibleRanges.append(start..<end)
             }
         }
         audibleRanges.sort { $0.lowerBound < $1.lowerBound }
+        let readEnd = min(total, audibleRanges.reduce(0) { max($0, $1.upperBound) })
+        reader.timeRange = .init(start: .zero, duration: CMTime(value: readEnd, timescale: 48_000))
+        guard reader.startReading() else { throw ScreenRecordingExportError.unavailableMedia }
+        defer { reader.cancelReading() }
         var rangeIndex = 0
         var position: Int64 = 0
         func silence(until end: Int64) throws {
@@ -92,7 +93,7 @@ enum ScreenRecordingAudioOnlyExporter {
             }
         }
         var index = 0
-        while let sample = output.copyNextSampleBuffer() {
+        while position < readEnd, let sample = output.copyNextSampleBuffer() {
             try Task.checkCancellation()
             try checkpoint(.audioSample(index))
             let start = Int64((sample.presentationTimeStamp.seconds * 48_000).rounded())
@@ -128,7 +129,11 @@ enum ScreenRecordingAudioOnlyExporter {
             await progress(Double(position) / Double(total))
             index += 1
         }
-        guard reader.status == .completed else { throw ScreenRecordingExportError.unavailableMedia }
+        // The spectral decoder can stall in trailing empty ranges; append their silence below.
+        let status = reader.status
+        guard status == .completed || (position >= readEnd && status == .reading) else {
+            throw ScreenRecordingExportError.unavailableMedia
+        }
         // Empty time ranges can be omitted by AVAssetReader; keep the edited timeline's full duration.
         try silence(until: total)
         await progress(1)

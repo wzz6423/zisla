@@ -161,6 +161,7 @@ public enum MarkdownHTMLRenderer {
     private static func document(wrapping body: String) -> String {
         let style = """
         <style>
+          \(ThinScrollChrome.webStyle)
           :root { color-scheme: dark; }
           body {
             background: transparent;

@@ -22,6 +22,7 @@ struct ScreenRecordingAIView: View {
                     .overlay(RoundedRectangle(cornerRadius: 6).stroke(Color.dividerSubtle, lineWidth: 1))
                     .accessibilityLabel(AppLocalization.text("剪辑指令"))
                     .accessibilityIdentifier("screenRecording.aiInstruction")
+                    .thinScrollChrome()
             } actions: {
                 Button(AppLocalization.text("生成剪辑方案"), action: model.requestAIEdit)
                     .buttonStyle(SettingsTintedButtonStyle())

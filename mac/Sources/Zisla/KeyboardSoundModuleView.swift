@@ -24,7 +24,7 @@ struct KeyboardSoundModuleView: View {
             }
             .padding(12)
         }
-        .scrollIndicators(.hidden)
+        .thinScrollChrome()
         .task(id: model.settingsStore.settings.keyboardTypingStatsEnabled) {
             guard model.settingsStore.settings.keyboardTypingStatsEnabled else { return }
             await model.keyboardSound.refreshTypingStats()

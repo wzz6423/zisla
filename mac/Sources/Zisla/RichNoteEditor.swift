@@ -478,6 +478,7 @@ struct RichNoteEditor: NSViewRepresentable {
         <meta name="viewport" content="width=device-width, initial-scale=1">
         <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'nonce-\(scriptNonce)'; style-src 'unsafe-inline'; img-src data: blob:; media-src data: blob:; font-src data:; connect-src 'none'; object-src 'none'; frame-src 'none'; base-uri 'none'; form-action 'none'">
         <style>
+          \(ThinScrollChrome.webStyle)
           :root { color-scheme: dark; background: transparent !important; }
           html, body { margin: 0; min-height: 100%; background: transparent !important; }
           body {

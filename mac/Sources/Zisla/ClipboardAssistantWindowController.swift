@@ -1499,6 +1499,7 @@ struct ClipboardAssistantToastView: View {
                 .padding(.horizontal, 14)
                 .padding(.vertical, 8)
         }
+        .thinScrollChrome()
         .frame(height: isExpanded ? nil : 0)
     }
 

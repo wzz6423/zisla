@@ -149,6 +149,7 @@ struct TypingStatsKeyboardView: View {
             .frame(maxWidth: 1_080)
             .frame(maxWidth: .infinity)
         }
+        .thinScrollChrome()
     }
 
     private func heatLegend(scale: TypingHeatmapScale) -> some View {

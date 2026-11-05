@@ -1,8 +1,12 @@
 import AppKit
 import SwiftUI
 import Testing
+import WebKit
+import XCTest
 
 @testable import Zisla
+@testable import ZislaKit
+@testable import KeyboardKit
 
 struct ThinScrollChromeTests {
     @Test(arguments: [
@@ -21,7 +25,7 @@ struct ThinScrollChromeTests {
         scrollView.scrollerStyle = configuration.style
         scrollView.hasVerticalScroller = !horizontal
         scrollView.hasHorizontalScroller = horizontal
-        ThinScrollChrome.apply(to: scrollView)
+        ThinScrollChrome.apply(to: scrollView, visibleWhenScrollable: false)
         scrollView.tile()
 
         let scroller = try #require(horizontal ? scrollView.horizontalScroller : scrollView.verticalScroller)
@@ -70,15 +74,15 @@ struct ThinScrollChromeTests {
         #expect(visibleCrossAxisPixels.count == 3, "All three points of the knob must visibly contrast with the background")
     }
 
-    @Test @MainActor
-    func swiftUIOverflowingGridRendersAThreePointKnob() async throws {
+    @Test(arguments: [NSAppearance.Name.aqua, .darkAqua], [LayoutDirection.leftToRight, .rightToLeft]) @MainActor
+    func swiftUIOverflowingGridRendersAThreePointKnob(appearanceName: NSAppearance.Name, direction: LayoutDirection) async throws {
         _ = NSApplication.shared
         let window = NSWindow(
             contentRect: NSRect(x: 0, y: 0, width: 320, height: 160),
             styleMask: .borderless, backing: .buffered, defer: false
         )
         window.isReleasedWhenClosed = false
-        window.appearance = NSAppearance(named: .darkAqua)
+        window.appearance = NSAppearance(named: appearanceName)
         defer { window.close() }
         let host = NSHostingView(rootView:
             ScrollView(.vertical) {
@@ -90,8 +94,10 @@ struct ThinScrollChromeTests {
                 .frame(maxWidth: .infinity)
             }
             .scrollIndicators(.visible)
-            .thinScrollChrome(visibleWhenScrollable: true)
-            .background(Color.black)
+            .thinScrollChrome()
+            .background(appearanceName == .darkAqua ? Color.black : Color.white)
+            .environment(\.colorScheme, appearanceName == .darkAqua ? .dark : .light)
+            .environment(\.layoutDirection, direction)
         )
         host.sizingOptions = []
         window.contentView = host
@@ -132,7 +138,8 @@ struct ThinScrollChromeTests {
         for y in 0..<bitmap.pixelsHigh {
             for x in Int(track.minX * scale)..<Int(track.maxX * scale) {
                 let color = try #require(bitmap.colorAt(x: x, y: y)?.usingColorSpace(.deviceRGB))
-                if color.redComponent * color.alphaComponent > 0.1 { visibleColumns.insert(x) }
+                let contrast = appearanceName == .darkAqua ? color.redComponent : 1 - color.redComponent
+                if contrast * color.alphaComponent > 0.1 { visibleColumns.insert(x) }
             }
         }
         #expect(visibleColumns.count == Int(3 * scale), "The hosted grid must render a visible 3pt knob, not just report an unhidden scroller")
@@ -146,7 +153,7 @@ struct ThinScrollChromeTests {
         scrollView.scrollerStyle = .overlay
         scrollView.hasVerticalScroller = false
 
-        ThinScrollChrome.apply(to: scrollView, visibleWhenScrollable: true)
+        ThinScrollChrome.apply(to: scrollView)
         scrollView.tile()
 
         let scroller = try #require(scrollView.verticalScroller)
@@ -173,5 +180,229 @@ struct ThinScrollChromeTests {
         #expect(scrollView.autohidesScrollers)
         #expect(scroller is ThinScroller)
         #expect(scroller.isHidden)
+    }
+
+    @Test @MainActor
+    func reappliesVisibleChromeAfterNativeScrollConfigurationChanges() throws {
+        let scrollView = NSScrollView(frame: NSRect(x: 0, y: 0, width: 120, height: 80))
+        let document = NSView(frame: NSRect(x: 0, y: 0, width: 100, height: 400))
+        scrollView.documentView = document
+        let host = ThinScrollChromeHost(visibleWhenScrollable: true)
+        document.addSubview(host)
+        host.applyIfNeeded()
+        #expect(scrollView.verticalScroller is ThinScroller)
+
+        scrollView.scrollerStyle = .overlay
+        scrollView.autohidesScrollers = false
+        scrollView.hasVerticalScroller = false
+        host.applyIfNeeded()
+        scrollView.tile()
+
+        #expect(scrollView.scrollerStyle == .legacy)
+        #expect(scrollView.autohidesScrollers)
+        #expect(scrollView.hasVerticalScroller)
+        #expect(scrollView.verticalScroller is ThinScroller)
+        #expect(scrollView.documentView === document)
+        #expect(document.frame.height == 400)
+    }
+
+    @Test @MainActor
+    func nativeStyleChangesRestoreTheThinScrollbarWithoutAnotherLayout() async throws {
+        let scroll = NSScrollView(frame: NSRect(x: 0, y: 0, width: 160, height: 80))
+        let document = NSView(frame: NSRect(x: 0, y: 0, width: 140, height: 400))
+        scroll.documentView = document
+        let host = ThinScrollChromeHost(visibleWhenScrollable: true)
+        document.addSubview(host)
+        host.applyIfNeeded()
+        for _ in 0..<4 {
+            await withCheckedContinuation { continuation in
+                DispatchQueue.main.async { continuation.resume() }
+            }
+        }
+        scroll.scrollerStyle = .overlay
+        for _ in 0..<8 {
+            await withCheckedContinuation { continuation in
+                DispatchQueue.main.async { continuation.resume() }
+            }
+            if scroll.scrollerStyle == .legacy { break }
+        }
+        #expect(scroll.scrollerStyle == .legacy)
+        #expect(scroll.verticalScroller is ThinScroller)
+        #expect(scroll.documentView === document)
+    }
+
+    @Test @MainActor
+    func nestedChromeConfiguresItsLocalScrollViewWithoutChangingTheOuterScroller() throws {
+        let outer = NSScrollView(frame: NSRect(x: 0, y: 0, width: 320, height: 240))
+        outer.hasVerticalScroller = true
+        outer.scrollerStyle = .overlay
+        let document = NSView(frame: NSRect(x: 0, y: 0, width: 300, height: 600))
+        outer.documentView = document
+        let wrapper = NSView(frame: NSRect(x: 0, y: 0, width: 280, height: 160))
+        document.addSubview(wrapper)
+        let inner = NSScrollView(frame: wrapper.bounds)
+        inner.hasVerticalScroller = true
+        inner.scrollerStyle = .overlay
+        inner.documentView = NSView(frame: NSRect(x: 0, y: 0, width: 260, height: 400))
+        wrapper.addSubview(inner)
+        let host = ThinScrollChromeHost(visibleWhenScrollable: true)
+        wrapper.addSubview(host)
+        let originalOuterScroller = try #require(outer.verticalScroller)
+
+        host.applyIfNeeded()
+        inner.tile()
+
+        #expect(inner.verticalScroller is ThinScroller)
+        #expect(inner.scrollerStyle == .legacy)
+        #expect(outer.verticalScroller === originalOuterScroller)
+        #expect(outer.scrollerStyle == .overlay)
+    }
+
+    @Test @MainActor
+    func movingTheConfiguratorBetweenScrollViewsPreservesOffsetsAndReleasesItAfterDetaching() throws {
+        let first = NSScrollView(frame: NSRect(x: 0, y: 0, width: 160, height: 80))
+        let second = NSScrollView(frame: first.frame)
+        for scroll in [first, second] {
+            scroll.documentView = NSView(frame: NSRect(x: 0, y: 0, width: 140, height: 400))
+            scroll.contentView.scroll(to: CGPoint(x: 0, y: 120))
+        }
+        let firstDocument = try #require(first.documentView)
+        let secondDocument = try #require(second.documentView)
+        weak var releasedHost: ThinScrollChromeHost?
+        try autoreleasepool {
+            let host = ThinScrollChromeHost(visibleWhenScrollable: true)
+            releasedHost = host
+            firstDocument.addSubview(host)
+            host.applyIfNeeded()
+            let firstScroller = try #require(first.verticalScroller)
+            let firstOffset = first.contentView.bounds.origin
+
+            secondDocument.addSubview(host)
+            let secondOffset = second.contentView.bounds.origin
+            host.applyIfNeeded()
+            #expect(second.verticalScroller is ThinScroller)
+            #expect(first.verticalScroller === firstScroller)
+            #expect(first.contentView.bounds.origin == firstOffset)
+            #expect(second.contentView.bounds.origin == secondOffset)
+            host.removeFromSuperview()
+        }
+        #expect(releasedHost == nil, "Deferred styling must not retain a detached page")
+        #expect(first.documentView === firstDocument && second.documentView === secondDocument)
+    }
+
+    @Test(arguments: [false, true]) @MainActor
+    func independentListOrTextEditorAndSummaryPanesKeepTheirOwnThinScrollbars(usesTextEditor: Bool) async throws {
+        let text = (0..<80).map { "Fixture line \($0)" }.joined(separator: "\n")
+        let host = NSHostingView(rootView: HStack {
+            Group {
+                if usesTextEditor {
+                    TextEditor(text: .constant(text))
+                        .thinScrollChrome()
+                } else {
+                    List(0..<80, id: \.self) { Text("Fixture row \($0)") }
+                        .thinScrollChrome()
+                }
+            }
+            ScrollView { Color.gray.frame(height: 800) }
+                .thinScrollChrome()
+        })
+        host.sizingOptions = []
+        let window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 480, height: 160),
+                              styleMask: .borderless, backing: .buffered, defer: false)
+        window.isReleasedWhenClosed = false
+        window.contentView = host
+        defer { window.contentView = nil; window.close() }
+        for _ in 0..<8 {
+            host.layoutSubtreeIfNeeded()
+            await withCheckedContinuation { continuation in
+                DispatchQueue.main.async { continuation.resume() }
+            }
+        }
+        let scrolls = descendants(in: host).compactMap { $0 as? NSScrollView }
+        #expect(scrolls.count == 2)
+        for scroll in scrolls {
+            let scroller = try #require(scroll.verticalScroller as? ThinScroller)
+            #expect(scroll.scrollerStyle == .legacy)
+            #expect(!scroller.isHidden)
+            let document = try #require(scroll.documentView)
+            scroll.contentView.scroll(to: CGPoint(x: 0, y: document.frame.height - scroll.contentView.bounds.height))
+            scroll.reflectScrolledClipView(scroll.contentView)
+            #expect(scroll.contentView.bounds.minY > 0)
+        }
+        if usesTextEditor {
+            #expect(descendants(in: host).compactMap { $0 as? NSTextView }.first?.string == text)
+        }
+        #expect(!window.isVisible)
+    }
+
+    @Test(arguments: [false, true]) @MainActor
+    func keyboardOverviewAndHeatmapUseThinScrollbars(heatmap: Bool) async throws {
+        let now = Date(timeIntervalSince1970: 1_900_000_000)
+        let snapshot = TypingStatsSnapshot(generatedAt: now, lastInputAt: nil,
+            today: TypingDaySummary(dateKey: "2030-03-17", date: now, characterCount: 0, peakCPS: 0,
+                activeMinuteBuckets: 0, activeSeconds: 0, topAppName: nil, lastUpdatedAt: nil),
+            timelineRange: .oneHour, recentBuckets: [], apps: [], recentAppTimelines: [], history: [],
+            todayKeyCounts: [:], allTimeKeyCounts: [:])
+        let host = NSHostingView(rootView: Group {
+            if heatmap {
+                TypingStatsKeyboardView(snapshot: snapshot)
+            } else {
+                TypingStatsOverviewView(snapshot: snapshot, selectedRange: .oneHour, onSelectRange: { _ in })
+            }
+        })
+        host.sizingOptions = []
+        let window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 820, height: 240),
+                              styleMask: .borderless, backing: .buffered, defer: false)
+        window.isReleasedWhenClosed = false
+        window.contentView = host
+        defer { window.contentView = nil; window.close() }
+        var scrollView: NSScrollView?
+        let deadline = ContinuousClock.now.advanced(by: .seconds(5))
+        repeat {
+            host.layoutSubtreeIfNeeded()
+            scrollView = descendants(in: host).compactMap { $0 as? NSScrollView }.first
+            if let scrollView {
+                scrollView.tile()
+                scrollView.reflectScrolledClipView(scrollView.contentView)
+                if let scroller = scrollView.verticalScroller as? ThinScroller,
+                   scrollView.scrollerStyle == .legacy,
+                   scroller.knobProportion > 0, scroller.knobProportion < 1,
+                   !scroller.isHidden { break }
+            }
+            await withCheckedContinuation { continuation in
+                DispatchQueue.main.async { continuation.resume() }
+            }
+        } while ContinuousClock.now < deadline
+        let scroll = try #require(scrollView)
+        let scroller = try #require(scroll.verticalScroller as? ThinScroller)
+        #expect(scroll.scrollerStyle == .legacy)
+        #expect(scroller.knobProportion > 0 && scroller.knobProportion < 1)
+        #expect(!scroller.isHidden)
+        #expect(!window.isVisible)
+    }
+
+    @Test(arguments: ["", "Short preview", String(repeating: "Preview paragraph\n\n", count: 80)], [false, true]) @MainActor
+    func markdownPreviewScrollbarsStayThinForEmptyShortAndOverflowingDocuments(source: String, releaseNotes: Bool) async throws {
+        let webView = WKWebView(frame: CGRect(x: 0, y: 0, width: 320, height: 240))
+        defer { webView.stopLoading() }
+        let finished = XCTestExpectation(description: "The local Markdown preview finishes loading")
+        let observation = webView.observe(\.isLoading, options: .new) { _, change in
+            if change.newValue == false { finished.fulfill() }
+        }
+        defer { observation.invalidate() }
+        let html = releaseNotes
+            ? ReleaseNotesHTML.document(markdown: source, language: .english)
+            : MarkdownHTMLRenderer.html(from: source)
+        webView.loadHTMLString(html, baseURL: nil)
+        try #require(await XCTWaiter.fulfillment(of: [finished], timeout: 10) == .completed)
+        let width = try await webView.evaluateJavaScript("getComputedStyle(document.documentElement, '::-webkit-scrollbar').width")
+        #expect(width as? String == "3px")
+        _ = try await webView.evaluateJavaScript("window.scrollTo(0, 150)")
+        #expect(try await webView.evaluateJavaScript("window.scrollY") as? Double == (source.count > 100 ? 150 : 0))
+    }
+
+    @MainActor
+    private func descendants(in view: NSView) -> [NSView] {
+        view.subviews.flatMap { [$0] + descendants(in: $0) }
     }
 }

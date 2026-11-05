@@ -143,6 +143,7 @@ struct TypingStatsOverviewView: View {
             .frame(maxWidth: 1_080)
             .frame(maxWidth: .infinity)
         }
+        .thinScrollChrome()
     }
 }
 

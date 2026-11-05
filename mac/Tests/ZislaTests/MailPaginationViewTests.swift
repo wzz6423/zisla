@@ -238,6 +238,19 @@ struct MailPaginationViewTests {
         } while Date() < deadline
         let host = try #require(pullHost, "SwiftUI must mount the native pull handler inside the mail list")
         let scrollView = try #require(host.enclosingScrollView)
+        let styleDeadline = Date().addingTimeInterval(2)
+        while Date() < styleDeadline {
+            hosting.layoutSubtreeIfNeeded()
+            if scrollView.verticalScroller is ThinScroller,
+               scrollView.scrollerStyle == .legacy {
+                break
+            }
+            await withCheckedContinuation { continuation in
+                DispatchQueue.main.async { continuation.resume() }
+            }
+        }
+        #expect(scrollView.verticalScroller is ThinScroller)
+        #expect(scrollView.scrollerStyle == .legacy)
         let document = try #require(scrollView.documentView)
         #expect(document.frame.height >= 160, "Empty inboxes must still offer a full-height pull target")
         #expect(scrollView.verticalScrollElasticity == .allowed)

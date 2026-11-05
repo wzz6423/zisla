@@ -251,6 +251,7 @@ struct ContextNoteDetailView: View {
                 .accessibilityLabel(AppLocalization.string("主动提醒", locale: locale))
             }
             TextEditor(text: $draft.text)
+                .thinScrollChrome()
                 .font(.system(size: 12))
                 .scrollContentBackground(.hidden)
                 .padding(6)

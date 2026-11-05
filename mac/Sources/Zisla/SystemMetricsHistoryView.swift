@@ -281,7 +281,7 @@ struct SystemMetricsHistoryContent: View {
                 }
                 .padding(.bottom, 4)
             }
-            .scrollIndicators(.hidden)
+            .thinScrollChrome()
         }
     }
 

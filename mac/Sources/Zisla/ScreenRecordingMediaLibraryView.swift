@@ -1,5 +1,6 @@
 import SwiftUI
 import ZislaCore
+import ZislaKit
 
 struct ScreenRecordingMediaLibraryView: View {
     @ObservedObject var model: ScreenRecordingStudioModel
@@ -53,6 +54,7 @@ struct ScreenRecordingMediaLibraryView: View {
                     ScreenRecordingRemovedMediaLibraryView(model: model)
                 }
             }
+            .thinScrollChrome()
             if model.mediaAssets.isEmpty {
                 Button(AppLocalization.text("导入素材"), action: model.importVideo)
                     .frame(maxWidth: .infinity)

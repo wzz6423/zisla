@@ -2,9 +2,9 @@ import AppKit
 import SwiftUI
 import Testing
 import ZislaCore
-import ZislaKit
 
 @testable import Zisla
+@testable import ZislaKit
 
 @MainActor
 @Suite(.serialized)
@@ -148,6 +148,15 @@ struct ScreenRecordingInspectorLayoutTests {
         let fixture = Fixture(ScreenRecordingAIView(model: model).frame(width: width), language: language)
         defer { fixture.window.close() }
         await fixture.settle()
+        var pendingViews = [fixture.host]
+        var editorScroll: NSScrollView?
+        while let view = pendingViews.popLast() {
+            if let editor = view as? NSTextView { editorScroll = editor.enclosingScrollView }
+            pendingViews.append(contentsOf: view.subviews)
+        }
+        let scroll = try #require(editorScroll)
+        #expect(scroll.verticalScroller is ThinScroller)
+        #expect(scroll.scrollerStyle == .legacy)
         let action = try #require(fixture.element("screenRecording.generateAIEdit"))
         let editor = try #require(fixture.element("screenRecording.aiInstruction"))
         let label = try #require((action as? NSObject)?.value(forKey: "accessibilityLabel") as? String)

@@ -337,6 +337,7 @@ struct ClipboardHistoryModuleView: View {
 
             ZStack(alignment: .topLeading) {
                 TextEditor(text: $draftText)
+                    .thinScrollChrome()
                     .font(.system(size: 12))
                     .scrollContentBackground(.hidden)
                     .focused($isDraftTextFocused)
