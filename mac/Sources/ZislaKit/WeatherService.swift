@@ -24,6 +24,8 @@ public struct WeatherSnapshot: Equatable, Sendable {
     public var sourceURL: URL?
     public var licenseURL: URL?
 
+    public var expiresAt: Date { fetchedAt.addingTimeInterval(3600) }
+
     public init(
         temperature: Double,
         temperatureMin: Double? = nil,

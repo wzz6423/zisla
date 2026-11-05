@@ -186,23 +186,36 @@ public final class WeatherLocationStore: ObservableObject {
     }
 
     public func orderedSnapshots(
-        _ snapshotsByLocationID: [String: WeatherSnapshot]
+        _ snapshotsByLocationID: [String: WeatherSnapshot],
+        at date: Date = Date()
     ) -> [WeatherSnapshot] {
-        locations.compactMap { snapshotsByLocationID[$0.id] }
+        locations.compactMap { snapshot(for: $0.id, in: snapshotsByLocationID, at: date) }
+    }
+
+    public func snapshot(
+        for locationID: String,
+        in snapshotsByLocationID: [String: WeatherSnapshot],
+        at date: Date = Date()
+    ) -> WeatherSnapshot? {
+        guard let snapshot = snapshotsByLocationID[locationID], snapshot.expiresAt > date else { return nil }
+        return snapshot
     }
 
     public func mergingSnapshots(
         _ refreshed: [String: WeatherSnapshot],
-        retaining previous: [String: WeatherSnapshot]
+        retaining previous: [String: WeatherSnapshot],
+        at date: Date = Date()
     ) -> [String: WeatherSnapshot] {
         var result: [String: WeatherSnapshot] = [:]
         for location in locations {
             guard let coordinate = location.coordinate else { continue }
             if let snapshot = refreshed[location.id],
+               snapshot.expiresAt > date,
                Self.coordinatesApproximatelyEqual(snapshot.coordinate, coordinate)
             {
                 result[location.id] = snapshot
             } else if let snapshot = previous[location.id],
+                      snapshot.expiresAt > date,
                       Self.coordinatesApproximatelyEqual(snapshot.coordinate, coordinate)
             {
                 result[location.id] = snapshot

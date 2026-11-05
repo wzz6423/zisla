@@ -445,7 +445,9 @@ final class AppModel: ObservableObject {
   }
 
   @Published var isPinned = false
-  @Published private(set) var weatherSnapshotsByLocationID: [String: WeatherSnapshot] = [:]
+  @Published private(set) var weatherSnapshotsByLocationID: [String: WeatherSnapshot] = [:] {
+    didSet { scheduleWeatherExpiry() }
+  }
   @Published var weatherLocationState: WeatherLocationUIState = .idle
   @Published var updateState: UpdateCheckState = .idle
   @Published private(set) var productUpdateAvailable = false
@@ -640,6 +642,7 @@ final class AppModel: ObservableObject {
   private var headphoneTransientTask: Task<Void, Never>?
   private var cancellables: Set<AnyCancellable> = []
   private var weatherTask: Task<Void, Never>?
+  private var weatherExpiryTask: Task<Void, Never>?
   private var updatePollingTask: Task<Void, Never>?
   private let updateFeedResolver = UpdateFeedResolver {
     UpdateFeedPreference(countryCode: await AppModel.countryCodeForCurrentIP())
@@ -1193,6 +1196,8 @@ final class AppModel: ObservableObject {
     clipboardHistory.flushPendingChanges()
     aiAgent.store.flushPendingChanges()
     weatherTask?.cancel()
+    weatherExpiryTask?.cancel()
+    weatherExpiryTask = nil
     updatePollingTask?.cancel()
     updateFeedResolver.cancel()
     voiceRecordingCleanupTask?.cancel()
@@ -1488,7 +1493,48 @@ final class AppModel: ObservableObject {
   }
 
   func weatherSnapshot(for locationID: String) -> WeatherSnapshot? {
-    weatherSnapshotsByLocationID[locationID]
+    weatherLocations.snapshot(for: locationID, in: weatherSnapshotsByLocationID)
+  }
+
+  private func scheduleWeatherExpiry() {
+    weatherExpiryTask?.cancel()
+    weatherExpiryTask = Self.weatherExpiryTask(
+      expirationDates: weatherSnapshotsByLocationID.values.map(\.expiresAt)
+    ) { [weak self] in
+      guard let self else { return }
+      Self.expireWeather(
+        snapshots: &self.weatherSnapshotsByLocationID, state: &self.weatherLocationState, at: Date()
+      )
+    }
+  }
+
+  static func expireWeather(
+    snapshots: inout [String: WeatherSnapshot],
+    state: inout WeatherLocationUIState,
+    at date: Date
+  ) {
+    snapshots = snapshots.filter { $0.value.expiresAt > date }
+    if snapshots.isEmpty, case .ready = state {
+      state = .failed(AppLocalization.text("没有可用的天气数据"))
+    }
+  }
+
+  static func weatherExpiryTask(
+    expirationDates: [Date],
+    now: @escaping () -> Date = Date.init,
+    sleeper: @escaping @Sendable (Duration) async throws -> Void = { try await Task.sleep(for: $0) },
+    onExpiry: @escaping @MainActor () -> Void
+  ) -> Task<Void, Never>? {
+    guard let date = expirationDates.min() else { return nil }
+    return Task {
+      do {
+        try await sleeper(.seconds(max(0, date.timeIntervalSince(now()))))
+      } catch {
+        return
+      }
+      guard !Task.isCancelled else { return }
+      onExpiry()
+    }
   }
 
   func selectWeatherLocation(named query: String) {

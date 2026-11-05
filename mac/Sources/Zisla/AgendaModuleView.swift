@@ -41,23 +41,37 @@ struct AgendaModuleView: View {
                     model.refreshWeather()
                 }
             }
-            if !model.weatherSnapshots.isEmpty {
-                TimelineView(.periodic(from: .now, by: 60)) { context in
-                    ScrollView(.vertical) {
-                        LazyVStack(spacing: 2) {
-                            ForEach(model.weatherLocations.locations) { location in
-                                if let weather = model.weatherSnapshot(for: location.id) {
-                                    Self.weatherRow(weather, at: context.date)
-                                }
-                            }
-                        }
-                    }
-                    .scrollIndicators(.visible)
-                    .thinScrollChrome()
-                }
-            } else {
-                weatherPlaceholder
+            TimelineView(.periodic(from: .now, by: 60)) { context in
+                Self.weatherContent(
+                    locations: model.weatherLocations,
+                    snapshotsByLocationID: model.weatherSnapshotsByLocationID,
+                    state: model.weatherLocationState,
+                    at: context.date
+                )
             }
+        }
+    }
+
+    @ViewBuilder
+    static func weatherContent(
+        locations: WeatherLocationStore,
+        snapshotsByLocationID: [String: WeatherSnapshot],
+        state: WeatherLocationUIState,
+        at date: Date
+    ) -> some View {
+        let snapshots = locations.orderedSnapshots(snapshotsByLocationID, at: date)
+        if snapshots.isEmpty {
+            weatherPlaceholder(state: state, hasExpiredWeather: !snapshotsByLocationID.isEmpty)
+        } else {
+            ScrollView(.vertical) {
+                LazyVStack(spacing: 2) {
+                    ForEach(Array(snapshots.enumerated()), id: \.offset) { _, weather in
+                        weatherRow(weather, at: date)
+                    }
+                }
+            }
+            .scrollIndicators(.visible)
+            .thinScrollChrome()
         }
     }
 
@@ -199,8 +213,8 @@ struct AgendaModuleView: View {
     }
 
     @ViewBuilder
-    private var weatherPlaceholder: some View {
-        switch model.weatherLocationState {
+    private static func weatherPlaceholder(state: WeatherLocationUIState, hasExpiredWeather: Bool) -> some View {
+        switch state {
         case .locating, .searching:
             ProgressView()
                 .controlSize(.small)
@@ -223,7 +237,10 @@ struct AgendaModuleView: View {
                 .controlSize(.mini)
             }
         case .idle, .ready:
-            Label(AppLocalization.text("等待刷新"), systemImage: "cloud.sun")
+            Label(
+                AppLocalization.text(hasExpiredWeather ? "无法获取天气" : "等待刷新"),
+                systemImage: hasExpiredWeather ? "cloud.slash" : "cloud.sun"
+            )
                 .font(.system(size: 10, weight: .medium))
                 .foregroundStyle(.secondary)
                 .frame(maxWidth: .infinity, maxHeight: .infinity)

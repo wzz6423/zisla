@@ -214,7 +214,7 @@ struct WeatherLocationStoreTests {
         let ordered = store.orderedSnapshots([
             tokyoID: tokyo,
             WeatherLocation.currentID: current,
-        ])
+        ], at: Date(timeIntervalSince1970: 0))
 
         #expect(ordered.map(\.locationName) == ["当前位置", "东京"])
     }
@@ -250,7 +250,7 @@ struct WeatherLocationStoreTests {
         let ordered = store.orderedSnapshots([
             WeatherLocation.currentID: .stub(name: "当前位置", latitude: 0),
             tokyoID: .stub(name: "东京", latitude: 35.7),
-        ])
+        ], at: Date(timeIntervalSince1970: 0))
         #expect(ordered.map(\.locationName) == ["当前位置", "东京"])
 
         let reloaded = WeatherLocationStore(storageURL: url, defaults: defaults)
@@ -300,16 +300,94 @@ struct WeatherLocationStoreTests {
         let current = WeatherSnapshot.stub(name: "当前位置", latitude: 31.2)
         let tokyo = WeatherSnapshot.stub(name: "东京", latitude: 35.7)
         let previous = [WeatherLocation.currentID: current, tokyoID: tokyo, "removed": tokyo]
-        #expect(store.mergingSnapshots([:], retaining: previous) == [WeatherLocation.currentID: current, tokyoID: tokyo])
+        let date = Date(timeIntervalSince1970: 0)
+        #expect(store.mergingSnapshots([:], retaining: previous, at: date) == [WeatherLocation.currentID: current, tokyoID: tokyo])
         var refreshed = tokyo
         refreshed.temperature = 25
-        #expect(store.mergingSnapshots([tokyoID: refreshed], retaining: previous)[tokyoID]?.temperature == 25)
+        #expect(store.mergingSnapshots([tokyoID: refreshed], retaining: previous, at: date)[tokyoID]?.temperature == 25)
         store.updateCurrent(name: "已移动", coordinate: GeoCoordinate(latitude: 41, longitude: 0))
-        #expect(store.mergingSnapshots([:], retaining: previous)[WeatherLocation.currentID] == nil)
+        #expect(store.mergingSnapshots([:], retaining: previous, at: date)[WeatherLocation.currentID] == nil)
         let staleResponse = WeatherSnapshot.stub(name: "旧坐标", latitude: 31.2)
-        #expect(store.mergingSnapshots([WeatherLocation.currentID: staleResponse], retaining: previous)[WeatherLocation.currentID] == nil)
+        #expect(store.mergingSnapshots([WeatherLocation.currentID: staleResponse], retaining: previous, at: date)[WeatherLocation.currentID] == nil)
         store.remove(id: tokyoID)
-        #expect(store.mergingSnapshots([tokyoID: refreshed], retaining: previous).isEmpty)
+        #expect(store.mergingSnapshots([tokyoID: refreshed], retaining: previous, at: date).isEmpty)
+    }
+
+    @Test(arguments: [0.0, 3599.0, 3600.0, 3601.0, 7200.0])
+    func weatherReadsAndRetentionStopAtOneHour(age: TimeInterval) {
+        let url = tempURL()
+        defer { try? FileManager.default.removeItem(at: url) }
+        let store = WeatherLocationStore(storageURL: url, defaults: makeDefaults())
+        store.updateCurrent(name: "London", coordinate: GeoCoordinate(latitude: 51, longitude: 0))
+        let snapshot = WeatherSnapshot.stub(name: "London", latitude: 51)
+        let previous = [WeatherLocation.currentID: snapshot]
+        let date = snapshot.fetchedAt.addingTimeInterval(age)
+        let expected = age < 3600 ? previous : [:]
+        #expect(store.mergingSnapshots([:], retaining: previous, at: date) == expected,
+                "Network failure must not retain weather at or beyond one hour")
+        #expect(store.mergingSnapshots(previous, retaining: [:], at: date) == expected,
+                "An already expired provider response must not reintroduce old weather")
+        #expect(store.orderedSnapshots(previous, at: date) == (age < 3600 ? [snapshot] : []),
+                "Displayed snapshots must expire without requiring another network refresh")
+        #expect(store.snapshot(for: WeatherLocation.currentID, in: previous, at: date) == (age < 3600 ? snapshot : nil),
+                "Single-location consumers must obey the same one-hour limit")
+        #expect(store.snapshot(for: "missing", in: previous, at: date) == nil)
+        #expect(previous[WeatherLocation.currentID] == snapshot, "Expiry checks must not mutate provider data")
+    }
+
+    @Test
+    func repeatedFailuresDoNotRenewWeatherAndAValidRefreshRestoresIt() throws {
+        let url = tempURL()
+        defer { try? FileManager.default.removeItem(at: url) }
+        let store = WeatherLocationStore(storageURL: url, defaults: makeDefaults())
+        store.updateCurrent(name: "London", coordinate: GeoCoordinate(latitude: 51, longitude: 0))
+        let snapshot = WeatherSnapshot.stub(name: "London", latitude: 51)
+        let persisted = try Data(contentsOf: url)
+        let originalLocations = store.locations
+        var retained = [WeatherLocation.currentID: snapshot]
+        for age in [900.0, 1800.0, 2700.0, 3599.0] {
+            retained = store.mergingSnapshots([:], retaining: retained, at: snapshot.fetchedAt.addingTimeInterval(age))
+            #expect(retained[WeatherLocation.currentID] == snapshot,
+                    "Repeated outages must keep the original update time and data")
+        }
+        let expiredAt = snapshot.fetchedAt.addingTimeInterval(3600)
+        retained = store.mergingSnapshots([:], retaining: retained, at: expiredAt)
+        #expect(retained.isEmpty)
+        #expect(store.orderedSnapshots(retained, at: expiredAt).isEmpty)
+        var recovered = snapshot
+        recovered.fetchedAt = expiredAt.addingTimeInterval(30)
+        recovered.temperature = 25
+        retained = store.mergingSnapshots([WeatherLocation.currentID: recovered], retaining: retained, at: recovered.fetchedAt)
+        #expect(store.orderedSnapshots(retained, at: recovered.fetchedAt) == [recovered],
+                "A successful forecast must recover after all retained data has expired")
+        #expect(store.locations == originalLocations)
+        #expect(try Data(contentsOf: url) == persisted, "Weather expiry must not change saved locations")
+    }
+
+    @Test
+    func partiallyExpiredWeatherPreservesLocationOrderAndFreshFallback() {
+        let url = tempURL()
+        defer { try? FileManager.default.removeItem(at: url) }
+        let store = WeatherLocationStore(storageURL: url, defaults: makeDefaults())
+        store.updateCurrent(name: "London", coordinate: GeoCoordinate(latitude: 51, longitude: 0))
+        store.addSaved(name: "Tokyo", coordinate: GeoCoordinate(latitude: 35.7, longitude: 0))
+        let tokyoID = store.locations.last!.id
+        let current = WeatherSnapshot.stub(name: "London", latitude: 51)
+        var tokyo = WeatherSnapshot.stub(name: "Tokyo", latitude: 35.7)
+        tokyo.fetchedAt = current.fetchedAt.addingTimeInterval(1800)
+        let previous = [WeatherLocation.currentID: current, tokyoID: tokyo]
+        let date = current.fetchedAt.addingTimeInterval(3600)
+        #expect(store.orderedSnapshots(previous, at: date) == [tokyo])
+        #expect(store.mergingSnapshots([:], retaining: previous, at: date) == [tokyoID: tokyo])
+        var expiredResponse = tokyo
+        expiredResponse.fetchedAt = current.fetchedAt
+        #expect(store.mergingSnapshots([tokyoID: expiredResponse], retaining: previous, at: date) == [tokyoID: tokyo],
+                "An expired refresh must fall back to the still-usable previous snapshot")
+        var refreshed = current
+        refreshed.fetchedAt = date
+        #expect(store.orderedSnapshots(
+            store.mergingSnapshots([WeatherLocation.currentID: refreshed], retaining: previous, at: date), at: date
+        ) == [refreshed, tokyo])
     }
 
 }
