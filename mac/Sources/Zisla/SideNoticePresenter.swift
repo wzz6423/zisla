@@ -196,6 +196,9 @@ final class SideNoticePresenter {
     private func updatePanels(rejoiningActiveSpace: Bool = false) {
         guard !isStopped else { return }
         let hidesPanels = isScreenshotActive || isPlacementSelectionActive || suppression.hidesNotices
+        if hidesPanels {
+            hideAllPanels()
+        }
         let snapshots = screenSnapshotProvider()
         guard !snapshots.isEmpty else {
             hideAllPanels()

@@ -189,15 +189,20 @@ struct IslandModuleLayout: Equatable {
     panelSize: CGSize(width: 240, height: 58)
   )
 
-  static func compactSurface(collapsedSize: CGSize, overflowWidth: CGFloat, edge: IslandEdge) -> IslandModuleLayout {
+  static func compactSurface(
+    collapsedSize: CGSize, overflowWidth: CGFloat, edge: IslandEdge,
+    locale: Locale = AppLocalization.currentLanguage.locale
+  ) -> IslandModuleLayout {
     if edge.isVertical {
       let size = CGSize(width: 320, height: max(80, collapsedSize.height))
       return IslandModuleLayout(islandSize: size, panelSize: size)
     }
     let height = collapsedSize.height + VoiceRecordingIslandGeometry.transcriptRowHeight
+    let textWidth = TransientNoticeMetrics.textWidth(of: AppLocalization.string("正在聆听…", locale: locale))
+    let width = max(70, overflowWidth, ceil(textWidth) + TransientNoticeMetrics.rowHorizontalPadding * 2)
     return IslandModuleLayout(
-      islandSize: CGSize(width: max(70, overflowWidth), height: height),
-      panelSize: CGSize(width: max(70, overflowWidth), height: height + 4)
+      islandSize: CGSize(width: width, height: height),
+      panelSize: CGSize(width: width, height: height + 4)
     )
   }
   /// Mirror uses a square panel so the camera preview maintains its natural aspect ratio without cropping.
@@ -470,9 +475,13 @@ final class AppModel: ObservableObject {
     }
   }
   @Published var transientMessage: String? {
-    didSet { scheduleTransientMessageDismissal() }
+    didSet {
+      userCareFeedback.messageDidChange()
+      scheduleTransientMessageDismissal()
+    }
   }
 
+  private var userCareFeedback = UserCareFeedback()
   private var transientMessageDismissTask: Task<Void, Never>?
   var hasActiveDownloads: Bool { !activeDownloadIDs.isEmpty }
   @Published private(set) var mailComposeRequest: MailComposeRequest?
@@ -546,6 +555,12 @@ final class AppModel: ObservableObject {
   let backgroundSounds = SystemBackgroundSoundService()
   let battery = BatteryMonitor()
   private lazy var lowBatteryNotice = LowBatteryNoticeController(queue: notices)
+  var userCarePresentationAllowed: () -> Bool = { false }
+  private lazy var userCare = UserCareService(
+    presentationAllowed: { [weak self] in self?.canPresentUserCareMessage == true },
+    onReminder: { [weak self] in _ = self?.presentUserCareMessage($0) },
+    onClear: { [weak self] in self?.clearUserCareMessage(routineOnly: $0) }
+  )
   let networkBattery = NetworkBatteryMonitor()
   let focusMode = FocusModeMonitor()
   let quickNotes = QuickNotesService()
@@ -707,6 +722,16 @@ final class AppModel: ObservableObject {
       settings.systemBackgroundSoundEnabled = false
       self.settingsStore.settings = settings
     }
+    pomodoro.onUserCareReminder = { [weak self] reminder in
+      guard let self else { return }
+      self.presentUserCareMessage(reminder)
+    }
+    quickNotes.onNoteSaved = { [weak self] event in
+      _ = self?.presentUserCareMessage(
+        event == .created ? .noteCreated : .noteUpdated,
+        throttlesNoteUpdates: event == .updated
+      )
+    }
     restoreDownloadDirectory()
     clipboardHistoryMonitor.onContentCaptured = { [weak self] content in
       guard let self else { return }
@@ -728,6 +753,7 @@ final class AppModel: ObservableObject {
     }
     voiceInput.onRecordingWillStart = { [weak self] in
       guard let self else { return }
+      self.clearUserCareMessage()
       let processIdentifier = Self.frontmostVoiceInputTargetProcessIdentifier()
       voiceInputTargetProcessIdentifier = processIdentifier
       voiceInputTarget = processIdentifier.flatMap(VoiceTranscriptDelivery.captureTarget(for:))
@@ -808,6 +834,9 @@ final class AppModel: ObservableObject {
       publisher
         .sink { [weak self] in
           Task { @MainActor [weak self] in
+            if let self, self.screenCleaning.isScreenCleaning || self.screenCleaning.isKeyboardCleaning {
+              self.clearUserCareMessage()
+            }
             self?.refreshFocusCountdownNotice()
             self?.refreshToolboxReminderNotice()
           }
@@ -1127,6 +1156,7 @@ final class AppModel: ObservableObject {
 
   func stop() {
     headphoneTransientLifecycleActive = false
+    userCare.stop()
     aiResultSweep.cancel()
     windowPreview.stop()
     settingsStore.flushPendingChanges()
@@ -1549,6 +1579,7 @@ final class AppModel: ObservableObject {
 
   func presentMirror() {
     guard !isMirrorPresented else { return }
+    clearUserCareMessage()
     wasPinnedBeforeMirror = isPinned
     isPinned = true
     isMirrorPresented = true
@@ -1562,6 +1593,7 @@ final class AppModel: ObservableObject {
 
   func presentTeleprompter() {
     guard !isTeleprompterPresented else { return }
+    clearUserCareMessage()
     teleprompterPresentationPoint = NSEvent.mouseLocation
     wasPinnedBeforeTeleprompter = isPinned
     isPinned = true
@@ -1638,8 +1670,17 @@ final class AppModel: ObservableObject {
     let screenshotError = contextNoteEditor.draft?.screenshotError
     guard let item = contextNoteEditor.save(in: shelf) else { return }
     onContextNoteSaved?(item)
-    transientMessage = screenshotError.map { AppLocalization.text("已保存便签") + " · " + $0 }
-      ?? (isNew ? AppLocalization.text("已加入 %ld 个项目", 1) : AppLocalization.text("已保存便签"))
+    contextNoteDidSave(isNew: isNew, screenshotError: screenshotError)
+  }
+
+  func contextNoteDidSave(isNew: Bool, screenshotError: String?) {
+    if let screenshotError {
+      transientMessage = AppLocalization.text("已保存便签") + " · " + screenshotError
+    } else if settingsStore.settings.userCareEnabled {
+      presentUserCareMessage(isNew ? .noteCreated : .noteUpdated)
+    } else {
+      transientMessage = isNew ? AppLocalization.text("已加入 %ld 个项目", 1) : AppLocalization.text("已保存便签")
+    }
   }
 
   func copyContextNoteText(_ text: String) {
@@ -2484,7 +2525,9 @@ final class AppModel: ObservableObject {
     }
     Task {
       if await quickNotes.create(markdown: content) {
-        transientMessage = AppLocalization.text("已创建随记")
+        if !settingsStore.settings.userCareEnabled {
+          transientMessage = AppLocalization.text("已创建随记")
+        }
         selectModule(.quickNotes)
       }
     }
@@ -3039,6 +3082,7 @@ final class AppModel: ObservableObject {
       )
     )
     pomodoro.notificationsMuted = settings.notificationsMuted
+    pomodoro.userCareEnabled = settings.userCareEnabled
     configureUpdatePolling(enabled: settings.updateChecksEnabled)
     managedTools.setAutomaticUpdatesEnabled(
       settings.recommendedToolsEnabled && settings.recommendedToolsAutomaticUpdatesEnabled
@@ -3087,6 +3131,7 @@ final class AppModel: ObservableObject {
       stopsWhenUnused: settings.systemBackgroundSoundStopsWhenUnused
     )
     consumeBackgroundSoundPlayback()
+    userCare.apply(settings: settings)
     if settings.sideNoticesEnabled {
       focusMode.start()
     } else {
@@ -4203,6 +4248,37 @@ final class AppModel: ObservableObject {
     for id in toolboxReminderIDs where noticeExists(id: id) {
       notices.remove(id: id)
     }
+  }
+
+  private var canPresentUserCareMessage: Bool {
+    userCarePresentationAllowed()
+      && !voiceInput.isCapturingInput
+      && clipboardAssistant.presentation.detection == nil
+      && !isMirrorPresented && !isTeleprompterPresented
+      && !screenCleaning.isScreenCleaning && !screenCleaning.isKeyboardCleaning
+  }
+
+  @discardableResult
+  func presentUserCareMessage(_ reminder: UserCareReminder, throttlesNoteUpdates: Bool = false) -> Bool {
+    let uptime = ProcessInfo.processInfo.systemUptime
+    guard let message = userCareFeedback.message(
+      for: reminder,
+      settings: settingsStore.settings,
+      presentationAllowed: canPresentUserCareMessage,
+      currentMessage: transientMessage,
+      uptime: uptime,
+      language: languageStore.language,
+      throttlesNoteUpdates: throttlesNoteUpdates
+    ) else { return false }
+    transientMessage = message
+    // The shared setter revokes ownership even when another message repeats the same text.
+    userCareFeedback.didPresent(reminder, at: uptime)
+    return true
+  }
+
+  func clearUserCareMessage(routineOnly: Bool = false) {
+    guard userCareFeedback.dismiss(routineOnly: routineOnly) else { return }
+    transientMessage = nil
   }
 
   static func shouldPresentPomodoroCountdown(

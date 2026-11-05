@@ -10,6 +10,11 @@ import ZislaCore
 /// Notes remains the storage backend for user content. The dismissible welcome item is local-only.
 @MainActor
 public final class QuickNotesService: ObservableObject {
+    public enum SaveEvent: Equatable, Sendable {
+        case created
+        case updated
+    }
+
     struct Operations {
         let listNotes: () async -> Result<[NotesAppBridge.NoteSummary], NotesAppError>
         let readNote: (String) async -> Result<NotesAppBridge.NoteContent, NotesAppError>
@@ -63,6 +68,7 @@ public final class QuickNotesService: ObservableObject {
     @Published public private(set) var isSaving = false
     @Published public private(set) var attachmentHydrationGeneration = 0
     @Published public var errorMessage: String?
+    public var onNoteSaved: ((SaveEvent) -> Void)?
 
     private struct NoteRevision: Equatable {
         let modifiedAt: Date?
@@ -569,6 +575,7 @@ public final class QuickNotesService: ObservableObject {
                         isPasswordProtected: notes[index].isPasswordProtected
                     )
                 }
+                onNoteSaved?(.updated)
             case .failure(let error):
                 errorMessage = error.message
             }
@@ -609,6 +616,8 @@ public final class QuickNotesService: ObservableObject {
             notes.removeAll { $0.id == id }
             notes.insert(summary, at: 0)
             selectedID = id
+            // The note is persisted even if the following list refresh fails.
+            onNoteSaved?(.created)
             await refresh()
             return true
         case .failure(let error):

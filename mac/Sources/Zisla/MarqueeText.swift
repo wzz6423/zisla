@@ -28,6 +28,8 @@ struct MarqueeText: View {
     var repeats = true
     var scrollProgress: Double?
     var clipsOverflowWhenStatic = false
+    /// Fallback fonts can draw diacritics beyond their nominal line box.
+    var viewportHeight: CGFloat?
 
     init(
         _ text: String,
@@ -39,7 +41,8 @@ struct MarqueeText: View {
         scrollDirection: MarqueeScrollDirection = .left,
         repeats: Bool = true,
         scrollProgress: Double? = nil,
-        clipsOverflowWhenStatic: Bool = false
+        clipsOverflowWhenStatic: Bool = false,
+        viewportHeight: CGFloat? = nil
     ) {
         self.text = text
         self.font = font
@@ -51,9 +54,11 @@ struct MarqueeText: View {
         self.repeats = repeats
         self.scrollProgress = scrollProgress
         self.clipsOverflowWhenStatic = clipsOverflowWhenStatic
+        self.viewportHeight = viewportHeight
     }
 
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @Environment(\.layoutDirection) private var layoutDirection
     @State private var textWidth: CGFloat = 0
     @State private var containerWidth: CGFloat = 0
     @State private var automaticScrollDistance: CGFloat = 0
@@ -81,15 +86,23 @@ struct MarqueeText: View {
                         .fixedSize(horizontal: true, vertical: false)
                         .modifier(ScrollingOffset(distance: automaticScrollDistance,
                                                   travel: scrollTravel, direction: scrollDirection))
+                        .transaction { transaction in
+                            if transaction.animation == nil, !transaction.disablesAnimations,
+                               let animation = transaction[AutomaticScrollAnimationKey.self] {
+                                transaction.animation = animation
+                            }
+                        }
                     }
                 }
-                .frame(width: max(0, containerWidth), alignment: .leading)
+                .frame(width: max(0, containerWidth), height: viewportHeight, alignment: .leading)
                 .clipped()
+                // Explicit rightward scrolling needs physical coordinates because SwiftUI mirrors RTL offsets.
+                .environment(\.layoutDirection, scrollDirection == .right ? .leftToRight : layoutDirection)
             } else {
                 if clipsOverflowWhenStatic {
                     marqueeLabel
                         .fixedSize(horizontal: true, vertical: false)
-                        .frame(width: max(0, containerWidth), alignment: .leading)
+                        .frame(width: max(0, containerWidth), height: viewportHeight, alignment: .leading)
                         .clipped()
                 } else {
                     marqueeLabel
@@ -99,6 +112,7 @@ struct MarqueeText: View {
             }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
+        .frame(height: viewportHeight)
         .clipped()
         .task(id: automaticAnimationIdentity) {
             var transaction = Transaction(animation: nil)
@@ -114,7 +128,10 @@ struct MarqueeText: View {
             let distance = textWidth + (repeats ? gap : 0)
             let duration = max(0.01, Double(distance) / pointsPerSecond)
             let animation = Animation.linear(duration: duration)
-            withAnimation(repeats ? animation.repeatForever(autoreverses: false) : animation) {
+            let scrollingAnimation = repeats ? animation.repeatForever(autoreverses: false) : animation
+            transaction = Transaction(animation: scrollingAnimation)
+            transaction[AutomaticScrollAnimationKey.self] = scrollingAnimation
+            withTransaction(transaction) {
                 automaticScrollDistance = distance
             }
         }
@@ -153,6 +170,7 @@ struct MarqueeText: View {
             .fontWeight(fontWeight)
             .foregroundColor(textColor)
             .lineLimit(1)
+            .environment(\.layoutDirection, layoutDirection)
     }
 
     private var scrollTravel: CGFloat {
@@ -201,6 +219,11 @@ struct MarqueeText: View {
             }
             content.offset(x: offset)
         }
+    }
+
+    // Collapsed island layout may clear animation while retaining the text's own transaction intent.
+    enum AutomaticScrollAnimationKey: TransactionKey {
+        static let defaultValue: Animation? = nil
     }
 
     private struct AutomaticAnimationIdentity: Hashable {

@@ -185,6 +185,23 @@ struct ClipboardAssistantMarqueeTests {
         #expect(controller.presentation.layout == layout && controller.presentation.detection == detection)
     }
 
+    @Test(arguments: [LayoutDirection.leftToRight, .rightToLeft], [0.0, 1])
+    func referenceTextWindowsAgreeWithIndependentLogicalEndpoints(
+        direction: LayoutDirection, progress: Double
+    ) async throws {
+        let text = "First words " + String(repeating: "middle words ", count: 8) + " last words"
+        let size = CGSize(width: 120, height: 32)
+        let actual = try await render(referenceLine(text, width: size.width, fontSize: 12,
+            weight: .medium, opacity: 0.92, direction: direction, progress: progress), size: size,
+            progress: progress, direction: direction)
+        let expected = try await render(Text(text).font(.system(size: 12)).fontWeight(.medium)
+            .foregroundStyle(.white.opacity(0.92)).lineLimit(1).fixedSize(horizontal: true, vertical: false)
+            .frame(width: size.width, height: size.height, alignment: progress == 0 ? .leading : .trailing)
+            .clipped(), size: size, progress: progress, direction: direction)
+        #expect(differences(try pixels(actual), try pixels(expected)) == 0,
+            "A reference window must agree with independent leading and trailing Text alignment")
+    }
+
     private func makeController(style: IslandLayoutStyle, edge: IslandEdge) -> ClipboardAssistantController {
         let controller = ClipboardAssistantController(windowPresenter: { _, _ in })
         controller.displayDuration = .never
@@ -230,8 +247,9 @@ struct ClipboardAssistantMarqueeTests {
     private func referenceLine(_ text: String, width: CGFloat, fontSize: CGFloat,
         weight: NSFont.Weight, opacity: Double, direction: LayoutDirection, progress: Double) -> some View {
         ReferenceTextWindow(text: text, width: width, fontSize: fontSize,
-            weight: weight == .medium ? .medium : .regular, opacity: opacity, direction: direction,
+            weight: weight == .medium ? .medium : .regular, opacity: opacity,
             progress: CGFloat(progress))
+            .environment(\.layoutDirection, direction)
     }
 
     private func render(_ content: some View, size: CGSize, progress: Double,
@@ -297,7 +315,6 @@ struct ClipboardAssistantMarqueeTests {
         let fontSize: CGFloat
         let weight: Font.Weight
         let opacity: Double
-        let direction: LayoutDirection
         let progress: CGFloat
         @Environment(\.displayScale) private var displayScale
 
@@ -311,7 +328,7 @@ struct ClipboardAssistantMarqueeTests {
             Text(text).font(.system(size: fontSize)).fontWeight(weight)
                 .foregroundStyle(.white.opacity(opacity))
                 .lineLimit(1).fixedSize(horizontal: true, vertical: false)
-                .offset(x: direction == .leftToRight ? -distance : distance - travel)
+                .offset(x: -distance)
                 .frame(width: width, alignment: .leading).clipped()
         }
     }

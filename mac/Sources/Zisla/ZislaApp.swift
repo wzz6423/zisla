@@ -542,6 +542,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
             let selector = self.islandPlacementController ?? IslandPlacementController()
             guard !selector.isSelecting else { return }
             self.islandPlacementController = selector
+            model.clearUserCareMessage()
             coordinator?.setHoverActivationSuspended(true)
             self.noticePresenter?.setPlacementSelectionActive(true)
             selector.show(
@@ -609,9 +610,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
             },
             onSaved: { [weak coordinator] _, point, screenshotError in
                 model.contextNoteEditor.hide()
-                model.transientMessage = screenshotError.map { AppLocalization.text("已保存便签") + " · " + $0 }
-                    ?? AppLocalization.text("已加入 %ld 个项目", 1)
-                coordinator?.setTransientNoticePresented(true, at: point)
+                model.contextNoteDidSave(isNew: true, screenshotError: screenshotError)
+                if model.transientMessage != nil {
+                    coordinator?.setTransientNoticePresented(true, at: point)
+                }
                 model.selectModule(.shelf)
             }
         )
@@ -635,6 +637,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
             self?.noticePresenter?.setScreenLocked(locked)
             model.clipboardAssistant.setScreenLocked(locked)
             if locked {
+                model.clearUserCareMessage()
                 self?.lidCloseController?.stop()
             } else {
                 self?.lidCloseController?.start()
@@ -646,6 +649,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
             coordinator.setVoiceRecording(true, at: NSEvent.mouseLocation)
         }
         model.clipboardAssistant.onPresentationChanged = { [weak self, weak coordinator] visible in
+            if visible { model.clearUserCareMessage() }
             coordinator?.setHoverActivationSuspended(visible)
             self?.noticePresenter?.setClipboardAssistantVisible(visible)
         }
@@ -669,6 +673,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
             displayIDs: model.settingsStore.settings.activityNoticeDisplayIDs,
             isScreenLocked: lockScreenOverlayController.isScreenLocked
         )
+        model.userCarePresentationAllowed = { [weak self, weak coordinator] in
+            guard let self else { return false }
+            return coordinator?.isRunning == true
+                && !self.isTerminating && !self.isScreenshotSessionActive
+                && self.lockScreenOverlayController?.isScreenLocked != true
+                && self.islandPlacementController?.isSelecting != true
+                && self.onboardingLifecycle?.isPresenting != true
+        }
         noticePresenter?.onCompactLayoutChanged = { [weak coordinator] displayID, expanded, length, sideWidth, iconSize in
             guard coordinator?.activeDisplayID == displayID else { return }
             coordinator?.updateCompactStatus(expandsForDetailedStatus: expanded, compactStatusLength: length,
@@ -717,7 +729,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
             .store(in: &cancellables)
 
         model.settingsStore.$settings
-            .map(\.hoverActivationEnabled)
+            .map { [$0.hoverActivationEnabled, $0.userCareEnabled] }
             .removeDuplicates()
             .sink { [weak self] _ in
                 Task { @MainActor [weak self] in
@@ -1040,7 +1052,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
             isPinned: model.isPinned || model.isMirrorPresented || model.isTeleprompterPresented
         )
         coordinator.setCollapsedOnTop(settings.islandCollapsedOnTop)
-        if policy.shouldRun {
+        if policy.shouldRun || settings.userCareEnabled {
             coordinator.start()
             coordinator.setOnboardingActive(policy.isOnboardingActive)
         } else {
@@ -1886,6 +1898,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
         contextNoteController?.setScreenshotActive(active)
         guard isScreenshotSessionActive != active else { return }
         isScreenshotSessionActive = active
+        if active { AppModel.shared.clearUserCareMessage() }
         if !active {
             setScreenshotLiveCaptureActive(false)
             setScreenshotFrozenPresentationActive(false)
