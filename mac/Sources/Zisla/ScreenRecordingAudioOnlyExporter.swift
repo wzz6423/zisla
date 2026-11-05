@@ -61,13 +61,10 @@ enum ScreenRecordingAudioOnlyExporter {
         output.alwaysCopiesSampleData = false
         guard reader.canAdd(output) else { throw ScreenRecordingExportError.unavailableMedia }
         reader.add(output)
-        reader.timeRange = .init(start: .zero, duration: CMTime(seconds: media.duration, preferredTimescale: 60_000))
         let file = try AVAudioFile(forWriting: url, settings: settings(format: format), commonFormat: .pcmFormatFloat32, interleaved: true)
         guard let buffer = AVAudioPCMBuffer(pcmFormat: file.processingFormat, frameCapacity: 4_096) else {
             throw ScreenRecordingExportError.cannotRender
         }
-        guard reader.startReading() else { throw ScreenRecordingExportError.unavailableMedia }
-        defer { reader.cancelReading() }
         let total = Int64((media.duration * 48_000).rounded())
         var audibleRanges: [Range<Int64>] = []
         for track in media.audioTracks {
@@ -80,6 +77,9 @@ enum ScreenRecordingAudioOnlyExporter {
         }
         audibleRanges.sort { $0.lowerBound < $1.lowerBound }
         let readEnd = min(total, audibleRanges.reduce(0) { max($0, $1.upperBound) })
+        reader.timeRange = .init(start: .zero, duration: CMTime(value: readEnd, timescale: 48_000))
+        guard reader.startReading() else { throw ScreenRecordingExportError.unavailableMedia }
+        defer { reader.cancelReading() }
         var rangeIndex = 0
         var position: Int64 = 0
         func silence(until end: Int64) throws {
