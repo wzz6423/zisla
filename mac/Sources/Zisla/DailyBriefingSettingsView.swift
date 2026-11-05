@@ -11,6 +11,12 @@ struct DailyBriefingSettingsView: View {
     @State private var thumbnails: [DailyBriefingTemplate: NSImage] = [:]
     @State private var previewWindowController: DailyBriefingPreviewWindowController?
     @State private var previewError: String?
+    @State private var contentExpanded = false
+
+    private struct PreviewRequest: Hashable {
+        let language: AppLanguage
+        let selectedContent: Set<DailyBriefingContent>
+    }
 
     init(model: AppModel) {
         self.model = model
@@ -19,8 +25,10 @@ struct DailyBriefingSettingsView: View {
     }
 
     private var language: AppLanguage { model.languageStore.language }
+    private var selectedContent: Set<DailyBriefingContent> { settingsStore.settings.dailyBriefing.selectedContent }
 
     var body: some View {
+        let request = PreviewRequest(language: language, selectedContent: selectedContent)
         VStack(alignment: .leading, spacing: 16) {
             Toggle(isOn: $settingsStore.settings.dailyBriefing.enabled) {
                 AppLocalizedText("每日简报")
@@ -49,6 +57,40 @@ struct DailyBriefingSettingsView: View {
                 } label: { AppLocalizedText("完全磁盘访问") }
                 .controlSize(.small)
             }
+
+            Divider()
+            DisclosureGroup(isExpanded: $contentExpanded) {
+                VStack(alignment: .leading, spacing: 16) {
+                    HStack(spacing: 12) {
+                        Spacer()
+                        Button { settingsStore.settings.dailyBriefing.selectedContent = DailyBriefingContent.defaultSelection } label: {
+                            AppLocalizedText("全选")
+                        }
+                        .disabled(selectedContent == DailyBriefingContent.defaultSelection)
+                        Button { settingsStore.settings.dailyBriefing.selectedContent = [] } label: {
+                            AppLocalizedText("取消全选")
+                        }
+                        .disabled(selectedContent.isEmpty)
+                    }
+                    .controlSize(.small)
+                    ForEach(DailyBriefingContentGroup.allCases) { group in
+                        VStack(alignment: .leading, spacing: 8) {
+                            AppLocalizedText(group.title).font(.caption.weight(.medium))
+                            LazyVGrid(columns: [GridItem(.adaptive(minimum: 180), alignment: .leading)], alignment: .leading, spacing: 8) {
+                                ForEach(group.contents) { content in
+                                    Toggle(isOn: contentBinding(content)) { AppLocalizedText(content.title) }
+                                        .toggleStyle(.checkbox)
+                                        .frame(maxWidth: .infinity, alignment: .leading)
+                                }
+                            }
+                        }
+                    }
+                }
+                .padding(.top, 12)
+            } label: {
+                AppLocalizedText("简报内容").font(.subheadline.weight(.medium))
+            }
+            .settingsSearchAnchor(.row(AppLocalization.string("简报内容", locale: locale)))
 
             Divider()
             HStack {
@@ -88,14 +130,31 @@ struct DailyBriefingSettingsView: View {
         }
         .font(.system(size: 11))
         .padding(.vertical, 8)
-        .task(id: language) { await renderThumbnails() }
+        .task(id: request) { await renderThumbnails(request) }
+        .onChange(of: request) { _, request in
+            previewWindowController?.update(template: settingsStore.settings.dailyBriefing.template,
+                language: request.language, selectedContent: request.selectedContent)
+        }
+        .onChange(of: settingsStore.settings.dailyBriefing.template) { _, template in
+            previewWindowController?.update(template: template, language: language, selectedContent: selectedContent)
+        }
     }
 
     private func showPreview() {
         let preview = previewWindowController ?? DailyBriefingPreviewWindowController()
         previewWindowController = preview
-        preview.update(template: settingsStore.settings.dailyBriefing.template, language: language)
+        preview.update(template: settingsStore.settings.dailyBriefing.template, language: language, selectedContent: selectedContent)
         preview.showWindow(nil)
+    }
+
+    private func contentBinding(_ content: DailyBriefingContent) -> Binding<Bool> {
+        Binding(
+            get: { selectedContent.contains(content) },
+            set: { selected in
+                if selected { settingsStore.settings.dailyBriefing.selectedContent.insert(content) }
+                else { settingsStore.settings.dailyBriefing.selectedContent.remove(content) }
+            }
+        )
     }
 
     private var exportTime: Binding<Date> {
@@ -142,13 +201,13 @@ struct DailyBriefingSettingsView: View {
         .accessibilityAddTraits(selected ? .isSelected : [])
     }
 
-    private func renderThumbnails() async {
-        let report = DailyBriefingReport.example()
+    private func renderThumbnails(_ request: PreviewRequest) async {
+        let report = DailyBriefingReport.example(selectedContent: request.selectedContent)
         do {
             var images: [DailyBriefingTemplate: NSImage] = [:]
             for template in DailyBriefingTemplate.allCases {
                 try Task.checkCancellation()
-                let image = try DailyBriefingRenderer.image(report: report, template: template, language: language, scale: 0.25)
+                let image = try DailyBriefingRenderer.image(report: report, template: template, language: request.language, scale: 0.25)
                 images[template] = NSImage(cgImage: image, size: .zero)
                 await Task.yield()
             }
@@ -177,16 +236,18 @@ final class DailyBriefingPreviewWindowController: NSWindowController {
     @available(*, unavailable)
     required init?(coder: NSCoder) { nil }
 
-    func update(template: DailyBriefingTemplate, language: AppLanguage) {
+    func update(template: DailyBriefingTemplate, language: AppLanguage,
+                selectedContent: Set<DailyBriefingContent> = DailyBriefingContent.defaultSelection) {
         window?.title = AppLocalization.string("每日简报", language: language)
             + " · " + AppLocalization.string(template.title, language: language)
-        window?.contentView = NSHostingView(rootView: DailyBriefingPreview(template: template, language: language))
+        window?.contentView = NSHostingView(rootView: DailyBriefingPreview(template: template, language: language, selectedContent: selectedContent))
     }
 }
 
 struct DailyBriefingPreview: View {
     let template: DailyBriefingTemplate
     let language: AppLanguage
+    var selectedContent: Set<DailyBriefingContent> = DailyBriefingContent.defaultSelection
     @State private var image: NSImage?
     @State private var error: String?
 
@@ -203,7 +264,7 @@ struct DailyBriefingPreview: View {
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .task {
             do {
-                let rendered = try DailyBriefingRenderer.image(report: .example(), template: template, language: language, scale: 1)
+                let rendered = try DailyBriefingRenderer.image(report: .example(selectedContent: selectedContent), template: template, language: language, scale: 1)
                 image = NSImage(cgImage: rendered, size: .zero)
             } catch { self.error = error.localizedDescription }
         }

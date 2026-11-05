@@ -8,21 +8,31 @@ struct DailyBriefingReport: Sendable {
     var generatedAt: Date
     var typing: DailyBriefingTyping?
     var allDeviceSeconds: TimeInterval?
+    var notificationCount: Int? = nil
+    var selectedContent: Set<DailyBriefingContent> = DailyBriefingContent.defaultSelection
     var calendar = DailyBriefingDay.calendar
 
-    static func example(at date: Date = Date()) -> Self {
+    static func example(at date: Date = Date(), selectedContent: Set<DailyBriefingContent> = DailyBriefingContent.defaultSelection) -> Self {
         let calendar = DailyBriefingDay.calendar
         let start = calendar.startOfDay(for: date)
         var day = DailyBriefingDay(date: date, calendar: calendar)
         day.firstActivity = start.addingTimeInterval(9 * 3600 + 12 * 60)
         day.lastActivity = start.addingTimeInterval(21 * 3600 + 36 * 60)
-        day.observedFrom = day.firstActivity
+        day.observedFrom = start.addingTimeInterval(9 * 3600)
         day.observedThrough = day.lastActivity
         day.hourlySeconds = [0, 0, 0, 0, 0, 0, 0, 0, 0, 1800, 3000, 2700, 900, 2100, 3300, 2700, 2400, 1800, 600, 900, 1500, 600, 0, 0]
         day.applications = [
-            "work": .init(name: "Xcode", category: .work, seconds: 17700),
-            "leisure": .init(name: "Music", category: .leisure, seconds: 4200),
-            "other": .init(name: "Safari", category: .other, seconds: 2400),
+            "com.apple.dt.Xcode": .init(name: "Xcode", category: .work, seconds: 11700),
+            "com.apple.Terminal": .init(name: "Terminal", category: .work, seconds: 3600),
+            "com.apple.Notes": .init(name: "Notes", category: .work, seconds: 2400),
+            "com.apple.Music": .init(name: "Music", category: .leisure, seconds: 2400),
+            "org.mozilla.firefox": .init(name: "Firefox", category: .leisure, seconds: 1200),
+            "com.apple.MobileSMS": .init(name: "Messages", category: .leisure, seconds: 600),
+            "com.apple.Safari": .init(name: "Safari", category: .other, seconds: 600),
+            "com.apple.finder": .init(name: "Finder", category: .other, seconds: 600),
+            "com.apple.Preview": .init(name: "Preview", category: .other, seconds: 600),
+            "com.apple.iCal": .init(name: "Calendar", category: .other, seconds: 300),
+            "com.apple.systempreferences": .init(name: "System Settings", category: .other, seconds: 300),
         ]
         day.listeningSeconds = 8100
         day.expansionCount = 42
@@ -30,7 +40,27 @@ struct DailyBriefingReport: Sendable {
         day.peakFan = .init(value: 2460, date: start.addingTimeInterval(14 * 3600 + 24 * 60))
         day.minimumBattery = 0.32
         day.maximumBattery = 1
-        return Self(day: day, generatedAt: day.lastActivity!, typing: .init(characters: 12846, topApplication: "Xcode", peakHour: 14), allDeviceSeconds: 31500)
+        var activity = DailyBriefingActivityTotals()
+        for (event, count) in [
+            (DailyBriefingActivity.clipboardCaptured, 34), (.clipboardReused, 12),
+            (.shelfItemsAdded, 9), (.shelfItemsCopied, 6), (.pomodoroStarted, 5),
+            (.noteCreated, 3), (.noteSaved, 7), (.noteDeleted, 1),
+            (.quickNoteCreated, 2), (.quickNoteSaved, 4), (.quickNoteDeleted, 1), (.unlocked, 8),
+        ] {
+            activity.record(event, count: count)
+        }
+        activity.record(.pomodoroCompleted, count: 3, focusSeconds: 4500)
+        day.activity = activity
+        day.hourlyKeyPresses = [nil, nil, nil, nil, nil, nil, nil, nil, nil, 1200, 1800, 1600, nil, 1700, 2300, 1900, 1500, 1200, 600, 700, 900, 500, nil, nil]
+        day.powerSamples = (0..<144).compactMap { index in
+            let sampleDate = start.addingTimeInterval(9 * 3600 + Double(index) * 300)
+            guard calendar.component(.hour, from: sampleDate) != 12 else { return nil }
+            let phase = Double(index)
+            let watts = 24 + 7 * sin(phase / 14) + 3 * cos(phase / 5)
+            return DailyBriefingPowerSample(date: sampleDate, averageWatts: watts)
+        }
+        return Self(day: day, generatedAt: day.lastActivity!, typing: .init(characters: 12846, topApplication: "Xcode", peakHour: 14),
+            allDeviceSeconds: 31500, notificationCount: 87, selectedContent: selectedContent)
     }
 }
 
@@ -38,6 +68,16 @@ struct DailyBriefingPoster: View {
     let report: DailyBriefingReport
     let template: DailyBriefingTemplate
     let language: AppLanguage
+    private(set) var displayedContent: Set<DailyBriefingContent> = []
+
+    init(report: DailyBriefingReport, template: DailyBriefingTemplate, language: AppLanguage) {
+        self.report = report
+        self.template = template
+        self.language = language
+        displayedContent = Set(DailyBriefingContent.allCases.filter {
+            report.selectedContent.contains($0) && hasData($0)
+        })
+    }
 
     private var locale: Locale { language.locale }
     private var ink: Color { template == .midnight || template == .terminal ? Color(white: 0.94) : Color(red: 0.13, green: 0.16, blue: 0.15) }
@@ -66,10 +106,101 @@ struct DailyBriefingPoster: View {
         }
     }
 
+    private struct MetricItem: Identifiable {
+        let id: DailyBriefingContent
+        let value: String
+    }
+
+    private static let primaryMetrics: [DailyBriefingContent] = [
+        .characters, .topTypingApplication, .peakTypingHour, .islandOpenings,
+        .listeningTime, .peakPower, .batteryRange, .peakFan,
+    ]
+    private var primaryMetricItems: [MetricItem] { metricItems(for: Self.primaryMetrics) }
+    private var additionalMetricItems: [MetricItem] {
+        metricItems(for: DailyBriefingContent.allCases.filter { $0.isDetailMetric && !Self.primaryMetrics.contains($0) })
+    }
+    private var hasHero: Bool { [DailyBriefingContent.localUsage, .firstActivity, .lastActivity, .allDevicesUsage].contains(where: displayedContent.contains) }
+    private var hasCategories: Bool { [DailyBriefingContent.workTime, .leisureTime, .otherTime].contains(where: displayedContent.contains) }
+    private var hasUsageData: Bool {
+        report.day.hourlySeconds.count == 24 && report.day.hourlySeconds.allSatisfy { $0.isFinite && $0 >= 0 }
+            && (report.day.observedFrom != nil || report.day.activeSeconds > 0)
+    }
+
+    private var keyPressChart: DailyBriefingKeyPressChart {
+        DailyBriefingKeyPressChart(hourlyCounts: report.day.hourlyKeyPresses, language: language, accent: accent, ink: ink)
+    }
+    private var powerChart: DailyBriefingPowerChart {
+        DailyBriefingPowerChart(samples: report.day.powerSamples, day: report.day.date, calendar: report.calendar,
+            language: language, accent: accent, ink: ink)
+    }
+
+    private func hasData(_ content: DailyBriefingContent) -> Bool {
+        switch content {
+        case .hourlyUsage: return hasUsageData
+        case .applicationUsage: return !DailyBriefingApplicationChart.rows(for: report.day.applications, language: language).isEmpty
+        case .keyPressTrend: return keyPressChart.hasData
+        case .powerTrend: return powerChart.hasData
+        default: return value(for: content) != nil
+        }
+    }
+
+    private func metricItems(for contents: [DailyBriefingContent]) -> [MetricItem] {
+        contents.compactMap { content in
+            guard displayedContent.contains(content), let value = value(for: content) else { return nil }
+            return MetricItem(id: content, value: value)
+        }
+    }
+
+    func value(for content: DailyBriefingContent) -> String? {
+        switch content {
+        case .localUsage: return hasUsageData ? durationValue(report.day.activeSeconds) : nil
+        case .firstActivity: return report.day.firstActivity.map(time)
+        case .lastActivity: return report.day.lastActivity.map(time)
+        case .allDevicesUsage: return durationValue(report.allDeviceSeconds)
+        case .workTime, .leisureTime, .otherTime:
+            guard hasUsageData, let category = content.category else { return nil }
+            return durationValue(report.day.seconds(in: category))
+        case .characters: return report.typing.map { $0.characters.formatted(.number.locale(locale)) }
+        case .topTypingApplication:
+            return report.typing?.topApplication.flatMap { $0.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? nil : $0 }
+        case .peakTypingHour:
+            return report.typing?.peakHour.flatMap {
+                report.calendar.date(bySettingHour: $0, minute: 0, second: 0, of: report.day.date)
+            }.map(time)
+        case .islandOpenings:
+            guard report.day.activity != nil || hasUsageData || report.day.expansionCount > 0 else { return nil }
+            return report.day.expansionCount.formatted(.number.locale(locale))
+        case .listeningTime: return durationValue(report.day.listeningSeconds)
+        case .peakPower: return report.day.peakPower.map { peak($0, unit: "W") }
+        case .batteryRange: return batteryRange
+        case .peakFan: return report.day.peakFan.map { peak($0, unit: "RPM") }
+        case .notificationCount: return report.notificationCount.map { $0.formatted(.number.locale(locale)) }
+        case .completedFocusTime: return durationValue(report.day.activity?.completedFocusSeconds)
+        case .hourlyUsage, .applicationUsage, .keyPressTrend, .powerTrend: return nil
+        default:
+            return content.activity.flatMap { event in
+                report.day.activity.map { $0.count(for: event).formatted(.number.locale(locale)) }
+            }
+        }
+    }
+
     var body: some View {
         VStack(alignment: .leading, spacing: 36) {
             header
             composition
+            if !additionalMetricItems.isEmpty {
+                metrics(additionalMetricItems, columns: template == .blossom ? 4 : 3)
+            }
+            if displayedContent.contains(.applicationUsage) {
+                DailyBriefingApplicationChart(applications: report.day.applications, language: language,
+                    accent: accent, ink: ink, formatDuration: duration)
+            }
+            if displayedContent.contains(.keyPressTrend) || displayedContent.contains(.powerTrend) {
+                HStack(alignment: .top, spacing: 40) {
+                    if displayedContent.contains(.keyPressTrend) { keyPressChart }
+                    if displayedContent.contains(.powerTrend) { powerChart }
+                }
+            }
             footer
         }
         .padding(56)
@@ -101,72 +232,92 @@ struct DailyBriefingPoster: View {
     private var composition: some View {
         switch template {
         case .minimal:
-            hero
-            activityChart
-            categories
-            metrics(columns: 3)
+            if hasHero { hero }
+            if displayedContent.contains(.hourlyUsage) { activityChart }
+            if hasCategories { categories }
+            if !primaryMetricItems.isEmpty { metrics(primaryMetricItems, columns: 3) }
         case .paper:
-            hero
-            HStack(alignment: .top, spacing: 40) {
-                categories
-                activityChart
-            }
-            metrics(columns: 2)
-        case .midnight:
-            hero.padding(28).background(accent.opacity(0.09), in: RoundedRectangle(cornerRadius: 24))
-            metrics(columns: 3)
-            activityChart
-            categories
-        case .forest:
-            HStack(alignment: .top, spacing: 32) {
-                hero
-                categories.frame(width: 240)
-            }
-            activityChart
-            metrics(columns: 2)
-        case .sunrise:
-            activityChart
-            hero
-            categories
-            metrics(columns: 3)
-        case .terminal:
-            hero
-            categories
-            metrics(columns: 2)
-            activityChart
-        case .coastal:
-            hero.padding(28).background(Color.white.opacity(0.72), in: RoundedRectangle(cornerRadius: 20))
-            HStack(alignment: .top, spacing: 32) {
-                VStack(alignment: .leading, spacing: 32) {
-                    activityChart
-                    categories
+            if hasHero { hero }
+            if hasCategories || displayedContent.contains(.hourlyUsage) {
+                HStack(alignment: .top, spacing: 40) {
+                    if hasCategories { categories }
+                    if displayedContent.contains(.hourlyUsage) { activityChart }
                 }
-                .frame(maxWidth: .infinity)
-                metrics(columns: 2).frame(maxWidth: .infinity)
+            }
+            if !primaryMetricItems.isEmpty { metrics(primaryMetricItems, columns: 2) }
+        case .midnight:
+            if hasHero { hero.padding(28).background(accent.opacity(0.09), in: RoundedRectangle(cornerRadius: 24)) }
+            if !primaryMetricItems.isEmpty { metrics(primaryMetricItems, columns: 3) }
+            if displayedContent.contains(.hourlyUsage) { activityChart }
+            if hasCategories { categories }
+        case .forest:
+            if hasHero || hasCategories {
+                HStack(alignment: .top, spacing: 32) {
+                    if hasHero { hero }
+                    if hasCategories { categories.frame(width: hasHero ? 240 : nil) }
+                }
+            }
+            if displayedContent.contains(.hourlyUsage) { activityChart }
+            if !primaryMetricItems.isEmpty { metrics(primaryMetricItems, columns: 2) }
+        case .sunrise:
+            if displayedContent.contains(.hourlyUsage) { activityChart }
+            if hasHero { hero }
+            if hasCategories { categories }
+            if !primaryMetricItems.isEmpty { metrics(primaryMetricItems, columns: 3) }
+        case .terminal:
+            if hasHero { hero }
+            if hasCategories { categories }
+            if !primaryMetricItems.isEmpty { metrics(primaryMetricItems, columns: 2) }
+            if displayedContent.contains(.hourlyUsage) { activityChart }
+        case .coastal:
+            if hasHero { hero.padding(28).background(Color.white.opacity(0.72), in: RoundedRectangle(cornerRadius: 20)) }
+            if displayedContent.contains(.hourlyUsage) || hasCategories || !primaryMetricItems.isEmpty {
+                HStack(alignment: .top, spacing: 32) {
+                    if displayedContent.contains(.hourlyUsage) || hasCategories {
+                        VStack(alignment: .leading, spacing: 32) {
+                            if displayedContent.contains(.hourlyUsage) { activityChart }
+                            if hasCategories { categories }
+                        }
+                        .frame(maxWidth: .infinity)
+                    }
+                    if !primaryMetricItems.isEmpty { metrics(primaryMetricItems, columns: 2).frame(maxWidth: .infinity) }
+                }
             }
         case .blossom:
-            hero.padding(28).background(Color.white.opacity(0.72), in: RoundedRectangle(cornerRadius: 28))
-            metrics(columns: 4)
-                .padding(24)
-                .background(accent.opacity(0.06), in: RoundedRectangle(cornerRadius: 24))
-            HStack(alignment: .top, spacing: 40) {
-                activityChart
-                categories.frame(width: 240)
+            if hasHero { hero.padding(28).background(Color.white.opacity(0.72), in: RoundedRectangle(cornerRadius: 28)) }
+            if !primaryMetricItems.isEmpty {
+                metrics(primaryMetricItems, columns: 4)
+                    .padding(24)
+                    .background(accent.opacity(0.06), in: RoundedRectangle(cornerRadius: 24))
+            }
+            if displayedContent.contains(.hourlyUsage) || hasCategories {
+                HStack(alignment: .top, spacing: 40) {
+                    if displayedContent.contains(.hourlyUsage) { activityChart }
+                    if hasCategories { categories.frame(width: displayedContent.contains(.hourlyUsage) ? 240 : nil) }
+                }
             }
         }
     }
 
     private var hero: some View {
         VStack(alignment: .leading, spacing: 20) {
-            Text(localized("本机使用时间")).font(.system(size: 21, weight: .medium)).foregroundStyle(ink.opacity(0.68))
-            Text(duration(report.day.activeSeconds)).font(.system(size: template == .forest ? 64 : 84, weight: .light))
-                .tracking(-2).lineLimit(1).minimumScaleFactor(0.55)
-            HStack(alignment: .top, spacing: 28) {
-                metric("首次使用", time(report.day.firstActivity))
-                metric("最后使用", time(report.day.lastActivity))
-                if template != .forest { metric("所有设备", report.allDeviceSeconds.map(duration) ?? localized("未获取")) }
+            if displayedContent.contains(.localUsage), let value = value(for: .localUsage) {
+                Text(localized("本机使用时间")).font(.system(size: 21, weight: .medium)).foregroundStyle(ink.opacity(0.68))
+                Text(value).font(.system(size: template == .forest ? 64 : 84, weight: .light))
+                    .tracking(-2).lineLimit(1).minimumScaleFactor(0.55)
             }
-            if template == .forest { metric("所有设备", report.allDeviceSeconds.map(duration) ?? localized("未获取")) }
+            let row = [DailyBriefingContent.firstActivity, .lastActivity, .allDevicesUsage]
+                .filter { displayedContent.contains($0) && (template != .forest || $0 != .allDevicesUsage) }
+            if !row.isEmpty {
+                HStack(alignment: .top, spacing: 28) {
+                    ForEach(row) { content in
+                        if let value = value(for: content) { metric(content.title, value) }
+                    }
+                }
+            }
+            if template == .forest, displayedContent.contains(.allDevicesUsage), let value = value(for: .allDevicesUsage) {
+                metric(DailyBriefingContent.allDevicesUsage.title, value)
+            }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
     }
@@ -198,18 +349,21 @@ struct DailyBriefingPoster: View {
 
     private var categories: some View {
         VStack(alignment: .leading, spacing: 16) {
-            category("工作", seconds: report.day.seconds(in: .work), opacity: 1)
-            category("休闲娱乐", seconds: report.day.seconds(in: .leisure), opacity: 0.65)
-            category("其他", seconds: report.day.seconds(in: .other), opacity: 0.35)
+            ForEach([DailyBriefingContent.workTime, .leisureTime, .otherTime].filter(displayedContent.contains)) { content in
+                if let category = content.category, let value = value(for: content) {
+                    categoryRow(content.title, value: value, seconds: report.day.seconds(in: category),
+                        opacity: category == .work ? 1 : category == .leisure ? 0.65 : 0.35)
+                }
+            }
         }
     }
 
-    private func category(_ title: String, seconds: Double, opacity: Double) -> some View {
+    private func categoryRow(_ title: String, value: String, seconds: Double, opacity: Double) -> some View {
         VStack(spacing: 8) {
             HStack {
                 Text(localized(title))
                 Spacer(minLength: 12)
-                Text(duration(seconds)).monospacedDigit()
+                Text(value).monospacedDigit()
             }
             .font(.system(size: 17))
             GeometryReader { geometry in
@@ -221,18 +375,9 @@ struct DailyBriefingPoster: View {
         }
     }
 
-    private func metrics(columns: Int) -> some View {
-        LazyVGrid(columns: Array(repeating: GridItem(.flexible(), alignment: .leading), count: columns), alignment: .leading, spacing: 24) {
-            metric("输入字符", report.typing.map { $0.characters.formatted(.number.locale(locale)) } ?? localized("未获取"))
-            metric("输入最多的应用", report.typing?.topApplication ?? "—")
-            metric("输入高峰", report.typing?.peakHour.map { hour in
-                time(report.calendar.date(bySettingHour: hour, minute: 0, second: 0, of: report.day.date))
-            } ?? "—")
-            metric("展开次数", report.day.expansionCount.formatted(.number.locale(locale)))
-            metric("听歌时长", report.day.listeningSeconds.map(duration) ?? localized("未获取"))
-            metric("功率峰值", peak(report.day.peakPower, unit: "W"))
-            metric("电量范围", batteryRange)
-            metric("风扇峰值", peak(report.day.peakFan, unit: "RPM"))
+    private func metrics(_ items: [MetricItem], columns: Int) -> some View {
+        LazyVGrid(columns: Array(repeating: GridItem(.flexible(), alignment: .leading), count: min(columns, items.count)), alignment: .leading, spacing: 24) {
+            ForEach(items) { item in metric(item.id.title, item.value) }
         }
     }
 
@@ -256,20 +401,18 @@ struct DailyBriefingPoster: View {
         .overlay(alignment: .top) { Rectangle().fill(ink.opacity(0.18)).frame(height: 1) }
     }
 
-    private var batteryRange: String {
-        guard let low = report.day.minimumBattery, let high = report.day.maximumBattery else { return localized("未获取") }
+    private var batteryRange: String? {
+        guard let low = report.day.minimumBattery, let high = report.day.maximumBattery else { return nil }
         return low.formatted(.percent.precision(.fractionLength(0)).locale(locale)) + " – " + high.formatted(.percent.precision(.fractionLength(0)).locale(locale))
     }
 
-    private func peak(_ peak: DailyBriefingPeak?, unit: String) -> String {
-        guard let peak else { return localized("未获取") }
+    private func peak(_ peak: DailyBriefingPeak, unit: String) -> String {
         return peak.value.formatted(.number.precision(.fractionLength(unit == "W" ? 1 : 0)).locale(locale)) + " \(unit)\n" + time(peak.date)
     }
 
     private func localized(_ key: String) -> String { AppLocalization.string(key, language: language) }
 
-    private func time(_ date: Date?) -> String {
-        guard let date else { return "—" }
+    private func time(_ date: Date) -> String {
         return date.formatted(Date.FormatStyle(date: .omitted, time: .shortened, locale: locale, calendar: report.calendar, timeZone: report.calendar.timeZone))
     }
 
@@ -280,7 +423,12 @@ struct DailyBriefingPoster: View {
         formatter.calendar = calendar
         formatter.allowedUnits = [.hour, .minute]
         formatter.unitsStyle = .short
-        return formatter.string(from: max(0, seconds)) ?? "—"
+        return formatter.string(from: seconds)!
+    }
+
+    private func durationValue(_ seconds: TimeInterval?) -> String? {
+        guard let seconds, seconds.isFinite, seconds >= 0 else { return nil }
+        return duration(seconds)
     }
 }
 

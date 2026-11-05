@@ -190,9 +190,14 @@ final class SoundPackEditorWindowController: NSWindowController, NSWindowDelegat
                     return
                 }
             }
-            let cleaned = await self.editor.prepareForClosing()
+            var cleaned = await self.editor.prepareForClosing()
             if cleaned {
-                await self.appModel?.flushTypingStatsBeforeTermination()
+                cleaned = await self.appModel?.flushTypingStatsBeforeTermination() ?? true
+                // Cleanup consumed the editor's session assets, so a rejected quit must close that session.
+                if !cleaned {
+                    self.allowsNextClose = true
+                    self.window?.performClose(nil)
+                }
             }
             self.isPreparingTermination = false
             application.reply(toApplicationShouldTerminate: cleaned)

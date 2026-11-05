@@ -87,7 +87,8 @@ enum SettingsSearchIndex {
             entry(.pdfTools, operation.title, anchor: .pdfOperation(operation), keywords: [operation.detail])
         }
 
-        entry(.info, "每日简报", anchor: .group("每日简报"), keywords: ["简报模板", "导出时间", "读取系统屏幕使用时间"])
+        entry(.info, "每日简报", anchor: .group("每日简报"), keywords: ["简报模板", "简报内容", "导出时间", "读取系统屏幕使用时间"])
+        entry(.info, "简报内容", anchor: .row("简报内容"), keywords: DailyBriefingContent.allCases.map(\.title))
         rows(.info, ["简报模板", "导出时间"])
         rows(.info, ["播放来源", "歌词与歌曲信息", "收起态音乐样式", "音乐动效", "活动展示", "专注模式展示"])
         entry(.info, "机器监控状态显示位置", anchor: .row("机器监控状态显示位置"), keywords: ["状态栏", "灵动岛"])

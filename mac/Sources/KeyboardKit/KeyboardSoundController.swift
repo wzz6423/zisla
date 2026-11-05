@@ -184,6 +184,21 @@ public final class KeyboardSoundController: ObservableObject {
 
     public var selectedKeyboardProfileID: String { model.settings.selectedProfileID }
 
+    public var isTypingStatsRecording: Bool {
+        model.settings.isTypingStatsEnabled && model.permission.isGranted && model.monitoringState == .running
+            && !model.typingStats.isRecordingSuspended && !model.typingStats.isClearing
+    }
+
+    public var onPhysicalKeyDown: (@MainActor (Date) -> Void)? {
+        get { model.typingStats.onPhysicalKeyDown }
+        set { model.typingStats.onPhysicalKeyDown = newValue }
+    }
+
+    public var onBeforeTermination: (@MainActor () async -> Bool)? {
+        get { model.onBeforeTermination }
+        set { model.onBeforeTermination = newValue }
+    }
+
     public func apply(
         enabled: Bool,
         keyboardProfileID: String,

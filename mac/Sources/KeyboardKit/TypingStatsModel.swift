@@ -93,6 +93,8 @@ final class TypingStatsModel: ObservableObject {
         self.persistence = persistence
     }
 
+    var onPhysicalKeyDown: (@MainActor (Date) -> Void)?
+
     deinit {
         scheduledFlushTask?.cancel()
     }
@@ -136,6 +138,7 @@ final class TypingStatsModel: ObservableObject {
         if !isRepeat {
             let key = PendingKeyPressKey(localDate: dateKey, keyCode: keyCode)
             pendingKeyPresses[key, default: 0] += 1
+            onPhysicalKeyDown?(occurredAt)
             didRecord = true
         }
 

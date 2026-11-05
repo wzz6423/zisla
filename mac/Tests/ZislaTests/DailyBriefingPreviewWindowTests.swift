@@ -35,6 +35,7 @@ struct DailyBriefingPreviewWindowTests {
         let content = NSHostingController(rootView: DailyBriefingPreview(template: .minimal, language: .english))
         let size = content.sizeThatFits(in: viewport)
 
+        #expect(content.rootView.selectedContent == DailyBriefingContent.defaultSelection)
         #expect(size.width == viewport.width)
         #expect(size.height == viewport.height)
     }
@@ -54,7 +55,22 @@ struct DailyBriefingPreviewWindowTests {
             let content = try #require(window.contentView as? NSHostingView<DailyBriefingPreview>)
             #expect(content.rootView.template == template)
             #expect(content.rootView.language == language)
+            #expect(content.rootView.selectedContent == DailyBriefingContent.defaultSelection)
             #expect(window.sheetParent == nil)
+        }
+    }
+
+    @Test
+    func selectedContentsRefreshInTheExistingNativeWindow() throws {
+        let controller = DailyBriefingPreviewWindowController()
+        let window = try #require(controller.window)
+        defer { window.contentView = nil; controller.close() }
+        let selections: [Set<DailyBriefingContent>] = [[], [.applicationUsage], [.powerTrend, .noteSaved], DailyBriefingContent.defaultSelection]
+        for selection in selections {
+            controller.update(template: .coastal, language: .arabic, selectedContent: selection)
+            #expect(controller.window === window)
+            let content = try #require(window.contentView as? NSHostingView<DailyBriefingPreview>)
+            #expect(content.rootView.selectedContent == selection)
         }
     }
 
@@ -88,7 +104,18 @@ struct DailyBriefingPreviewWindowTests {
         #expect(!source.contains(#"AppLocalizedText("关闭")"#))
         #expect(source.contains("previewWindowController ?? DailyBriefingPreviewWindowController()"))
         #expect(source.contains("previewWindowController = preview"))
-        #expect(source.contains("preview.update(template: settingsStore.settings.dailyBriefing.template, language: language)"))
+        #expect(source.contains("preview.update(template: settingsStore.settings.dailyBriefing.template, language: language, selectedContent: selectedContent)"))
         #expect(source.contains("preview.showWindow(nil)"))
+        #expect(source.contains(".task(id: request) { await renderThumbnails(request) }"))
+        #expect(source.contains(".onChange(of: request)"))
+        #expect(source.contains(".onChange(of: settingsStore.settings.dailyBriefing.template)"))
+        #expect(source.contains(".example(selectedContent: request.selectedContent)"))
+        #expect(source.contains(".example(selectedContent: selectedContent)"))
+        #expect(source.contains("Toggle(isOn: contentBinding(content))"))
+        #expect(source.contains("get: { selectedContent.contains(content) }"))
+        #expect(source.contains("selectedContent.insert(content)"))
+        #expect(source.contains("selectedContent.remove(content)"))
+        #expect(source.contains("selectedContent = DailyBriefingContent.defaultSelection"))
+        #expect(source.contains("selectedContent = []"))
     }
 }

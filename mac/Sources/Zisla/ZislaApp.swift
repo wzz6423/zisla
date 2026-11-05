@@ -629,6 +629,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
         }
         model.onContextNoteSaved = { [weak self] item in self?.contextNoteController?.didSaveNote(item) }
         lockScreenOverlayController.onScreenLockedChanged = { [weak self, weak coordinator] locked in
+            model.dailyBriefing.setScreenLocked(locked)
             coordinator?.setScreenLocked(locked)
             self?.fileShelfShakeController?.setScreenLocked(locked)
             self?.contextNoteController?.setScreenLocked(locked)

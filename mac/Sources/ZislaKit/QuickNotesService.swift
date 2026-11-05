@@ -10,6 +10,7 @@ import ZislaCore
 /// Notes remains the storage backend for user content. The dismissible welcome item is local-only.
 @MainActor
 public final class QuickNotesService: ObservableObject {
+    public var onDailyBriefingActivity: DailyBriefingActivityHandler?
     struct Operations {
         let listNotes: () async -> Result<[NotesAppBridge.NoteSummary], NotesAppError>
         let readNote: (String) async -> Result<NotesAppBridge.NoteContent, NotesAppError>
@@ -555,6 +556,9 @@ public final class QuickNotesService: ObservableObject {
         guard activeSaveGenerationByID[id] == generation else { return }
         activeSaveGenerationByID[id] = nil
         activeSaveTasksByID[id] = nil
+        if case .success = result {
+            onDailyBriefingActivity?(.quickNoteSaved, 1, 0, Date())
+        }
 
         if saveGenerationByID[id] == generation {
             switch result {
@@ -599,6 +603,7 @@ public final class QuickNotesService: ObservableObject {
         isSaving = false
         switch result {
         case .success(let id):
+            onDailyBriefingActivity?(.quickNoteCreated, 1, 0, Date())
             invalidateRefresh()
             let summary = NotesAppBridge.NoteSummary(
                 id: id,
@@ -637,6 +642,7 @@ public final class QuickNotesService: ObservableObject {
         if case .failure(let error) = result {
             errorMessage = error.message
         } else {
+            onDailyBriefingActivity?(.quickNoteDeleted, 1, 0, Date())
             invalidateRefresh()
         }
         await refresh()

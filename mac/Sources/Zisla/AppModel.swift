@@ -726,11 +726,20 @@ final class AppModel: ObservableObject {
       .store(in: &cancellables)
     clipboardHistoryMonitor.onContentCaptured = { [weak self] content in
       guard let self else { return }
+      self.dailyBriefing.recordActivity(.clipboardCaptured)
       if self.settingsStore.settings.clipboardHistoryEnabled {
         _ = self.clipboardHistory.record(content)
       }
       self.handleCapturedClipboardContent(content)
     }
+    let recordActivity: DailyBriefingActivityHandler = { [weak self] activity, count, seconds, date in
+      self?.dailyBriefing.recordActivity(activity, count: count, focusSeconds: seconds, at: date)
+    }
+    shelf.onDailyBriefingActivity = recordActivity
+    pomodoro.onDailyBriefingActivity = recordActivity
+    quickNotes.onDailyBriefingActivity = recordActivity
+    keyboardSound.onPhysicalKeyDown = { [weak self] date in self?.dailyBriefing.recordKeyPress(at: date) }
+    keyboardSound.onBeforeTermination = { [weak self] in await self?.dailyBriefing.prepareToTerminate() ?? true }
     clipboardAssistant.onPerformAction = { [weak self] action in
       self?.performClipboardAssistantAction(action)
     }
@@ -1622,6 +1631,7 @@ final class AppModel: ObservableObject {
       transientMessage = AppLocalization.text("无法写入剪贴板")
       return
     }
+    dailyBriefing.recordActivity(.shelfItemsCopied, count: items.count)
     transientMessage = AppLocalization.text("已复制到剪贴板")
   }
 
@@ -1698,6 +1708,7 @@ final class AppModel: ObservableObject {
       transientMessage = AppLocalization.text("无法写入剪贴板")
       return
     }
+    dailyBriefing.recordActivity(.clipboardReused)
     transientMessage = AppLocalization.text("已复制到剪贴板")
   }
 
@@ -4492,7 +4503,8 @@ final class AppModel: ObservableObject {
       category: DailyBriefingCategory(applicationCategory: bundle?.object(forInfoDictionaryKey: "LSApplicationCategoryType") as? String),
       isActive: !locked && idle < 60 && application != nil,
       isListening: media.isAvailable ? (media.snapshot.map { $0.isPlaying && !$0.isVideo } ?? false) : nil,
-      hardware: hardware
+      hardware: hardware,
+      recordsKeyPresses: keyboardSound.isTypingStatsRecording
     )
   }
 

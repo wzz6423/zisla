@@ -227,6 +227,7 @@ public final class PomodoroService: ObservableObject {
     @Published public private(set) var focusCountdownRunID = UUID()
     /// When "mute notifications" is on, Pomodoro completion signals are suppressed; synced by `AppModel` from settings.
     public var notificationsMuted = false
+    public var onDailyBriefingActivity: DailyBriefingActivityHandler?
 
     public static let focusCountdownNoticeIDPrefix = "focus-countdown-"
 
@@ -315,9 +316,12 @@ public final class PomodoroService: ObservableObject {
     }
 
     public func start() {
+        let startsFocus = engine.mode == .focus && engine.phase == .idle
         let startsRun = engine.phase != .running
+        let date = now()
         requestNotificationAuthorizationIfNeeded()
-        engine.start(at: now())
+        engine.start(at: date)
+        if startsFocus { onDailyBriefingActivity?(.pomodoroStarted, 1, 0, date) }
         if startsRun {
             focusCountdownRunID = UUID()
         }
@@ -377,7 +381,12 @@ public final class PomodoroService: ObservableObject {
 
     func tick() {
         let completedMode = engine.mode
-        if engine.completeIfNeeded(at: now()) {
+        let completedDuration = engine.duration(for: completedMode)
+        let date = now()
+        if engine.completeIfNeeded(at: date) {
+            if completedMode == .focus {
+                onDailyBriefingActivity?(.pomodoroCompleted, 1, completedDuration, date)
+            }
             stopTimer()
             notifyCompletion(of: completedMode)
             refreshDisplay()

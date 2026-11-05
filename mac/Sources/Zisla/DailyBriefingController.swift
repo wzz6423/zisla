@@ -20,6 +20,9 @@ final class DailyBriefingController: ObservableObject {
     private var loopTask: Task<Void, Never>?
     private var isTicking = false
     private var isSuspended = false
+    private var isScreenLocked = false
+    private var pendingActivities: [String: DailyBriefingActivityBatch] = [:]
+    private var activityFlushTask: Task<Void, Error>?
     private var cancellables: Set<AnyCancellable> = []
 
     init(
@@ -66,13 +69,16 @@ final class DailyBriefingController: ObservableObject {
         self.settings = settings
         self.directory = directory
         self.language = language
-        guard changed else { return }
+        guard changed || settings.enabled && loopTask?.isCancelled == true else { return }
         let previous = loopTask
         previous?.cancel()
         guard startsTimer else { return }
         loopTask = Task { [weak self, store] in
             await previous?.value
-            do { try await store.suspend() } catch { self?.record(error) }
+            do {
+                try await self?.flushActivities()
+                try await store.suspend()
+            } catch { self?.record(error) }
             guard !Task.isCancelled, self?.settings.enabled == true else { return }
             while !Task.isCancelled {
                 await self?.tick(at: Date())
@@ -87,9 +93,81 @@ final class DailyBriefingController: ObservableObject {
         configure(settings: disabled, directory: directory, language: language)
     }
 
+    func prepareToTerminate() async -> Bool {
+        loopTask?.cancel()
+        await loopTask?.value
+        do {
+            try await store.suspend()
+            try await flushActivities()
+            settings.enabled = false
+            return true
+        } catch {
+            record(error)
+            configure(settings: settings, directory: directory, language: language)
+            return false
+        }
+    }
+
     func suspend() async {
         isSuspended = true
-        do { try await store.suspend() } catch { record(error) }
+        do {
+            try await flushActivities()
+            try await store.suspend()
+        } catch { record(error) }
+    }
+
+    func recordActivity(_ activity: DailyBriefingActivity, count: Int = 1, focusSeconds: TimeInterval = 0, at date: Date = Date()) {
+        guard settings.enabled else { return }
+        var batch = DailyBriefingActivityBatch(date: date, calendar: DailyBriefingDay.calendar)
+        guard batch.activity.record(activity, count: count, focusSeconds: focusSeconds) else { return }
+        enqueue(batch)
+    }
+
+    func recordKeyPress(at date: Date) {
+        guard settings.enabled else { return }
+        let calendar = DailyBriefingDay.calendar
+        var batch = DailyBriefingActivityBatch(date: date, calendar: calendar)
+        batch.recordKeyPress(hour: calendar.component(.hour, from: date))
+        enqueue(batch)
+    }
+
+    func setScreenLocked(_ locked: Bool, at date: Date = Date()) {
+        if isScreenLocked, !locked { recordActivity(.unlocked, at: date) }
+        isScreenLocked = locked
+    }
+
+    private func enqueue(_ batch: DailyBriefingActivityBatch) {
+        do {
+            if var combined = pendingActivities[batch.key] {
+                try combined.merge(batch)
+                pendingActivities[batch.key] = combined
+            } else {
+                pendingActivities[batch.key] = batch
+            }
+        } catch { record(error) }
+    }
+
+    private func flushActivities() async throws {
+        while !pendingActivities.isEmpty || activityFlushTask != nil {
+            if let task = activityFlushTask {
+                try await task.value
+                continue
+            }
+            let batches = Array(pendingActivities.values)
+            pendingActivities.removeAll(keepingCapacity: true)
+            let task = Task { @MainActor [weak self, store] in
+                do {
+                    try await store.recordActivities(batches, calendar: DailyBriefingDay.calendar)
+                    self?.activityFlushTask = nil
+                } catch {
+                    for batch in batches { self?.enqueue(batch) }
+                    self?.activityFlushTask = nil
+                    throw error
+                }
+            }
+            activityFlushTask = task
+            try await task.value
+        }
     }
 
     func recordExpansion(at date: Date = Date()) {
@@ -105,6 +183,7 @@ final class DailyBriefingController: ObservableObject {
         isTicking = true
         defer { isTicking = false }
         do {
+            try await flushActivities()
             try await store.observe(observation(now), calendar: DailyBriefingDay.calendar)
             let pending = try await store.pendingExports(at: now, settings: settings, calendar: DailyBriefingDay.calendar)
             for day in pending {
@@ -119,6 +198,7 @@ final class DailyBriefingController: ObservableObject {
     func exportToday(at now: Date = Date()) async {
         guard settings.enabled, !isExporting else { return }
         do {
+            try await flushActivities()
             let day = try await store.day(at: now, calendar: DailyBriefingDay.calendar)
             try await exportDay(day, now: now, scheduled: false)
         } catch is CancellationError {
@@ -137,7 +217,14 @@ final class DailyBriefingController: ObservableObject {
         let typing = try? await typing(day.date)
         try Task.checkCancellation()
         guard settings.enabled else { throw CancellationError() }
-        var report = DailyBriefingReport(day: day, generatedAt: end, typing: typing, allDeviceSeconds: screenTime.allDeviceSeconds)
+        var report = DailyBriefingReport(
+            day: day,
+            generatedAt: end,
+            typing: typing,
+            allDeviceSeconds: screenTime.allDeviceSeconds,
+            notificationCount: screenTime.notificationCount,
+            selectedContent: settings.selectedContent
+        )
         if let intervals = screenTime.local, !intervals.isEmpty {
             Self.applySystemUsage(intervals, to: &report)
         }

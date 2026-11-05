@@ -42,10 +42,16 @@ public struct ScreenTimeUsageInterval: Equatable, Sendable {
 public struct DailyBriefingScreenTimeResult: Sendable {
     public var local: [ScreenTimeUsageInterval]?
     public var remote: [ScreenTimeUsageInterval]?
+    public var notificationCount: Int?
 
-    public init(local: [ScreenTimeUsageInterval]? = nil, remote: [ScreenTimeUsageInterval]? = nil) {
+    public init(
+        local: [ScreenTimeUsageInterval]? = nil,
+        remote: [ScreenTimeUsageInterval]? = nil,
+        notificationCount: Int? = nil
+    ) {
         self.local = local
         self.remote = remote
+        self.notificationCount = notificationCount
     }
 
     public var allDeviceSeconds: TimeInterval? {
@@ -64,12 +70,25 @@ public struct DailyBriefingScreenTimeReader: Sendable {
     public func read(within range: DateInterval) -> DailyBriefingScreenTimeResult {
         // Each source can be denied independently by TCC or change format after a system update.
         // A missing source stays nil, so the report cannot turn missing data into zero usage.
-        let local = try? readLocal(within: range)
+        let local = try? withLocalDatabase { database in
+            DailyBriefingScreenTimeResult(
+                local: try Self.readLocalUsage(database, within: range),
+                notificationCount: try? Self.readNotificationCount(database, within: range)
+            )
+        }
         let remote = try? readRemote(within: range)
-        return DailyBriefingScreenTimeResult(local: local, remote: remote)
+        return DailyBriefingScreenTimeResult(
+            local: local?.local,
+            remote: remote,
+            notificationCount: local?.notificationCount
+        )
     }
 
     func readLocal(within range: DateInterval) throws -> [ScreenTimeUsageInterval] {
+        try withLocalDatabase { try Self.readLocalUsage($0, within: range) }
+    }
+
+    private func withLocalDatabase<Value>(_ read: (OpaquePointer?) throws -> Value) throws -> Value {
         let source = library.appendingPathComponent("Application Support/Knowledge/knowledgeC.db")
         let temporary = FileManager.default.temporaryDirectory.appendingPathComponent("zisla-screentime-\(UUID().uuidString)")
         try FileManager.default.createDirectory(at: temporary, withIntermediateDirectories: true)
@@ -90,6 +109,10 @@ public struct DailyBriefingScreenTimeReader: Sendable {
             throw CocoaError(.fileReadCorruptFile)
         }
         defer { sqlite3_close(database) }
+        return try read(database)
+    }
+
+    private static func readLocalUsage(_ database: OpaquePointer?, within range: DateInterval) throws -> [ScreenTimeUsageInterval] {
         let query = """
             SELECT o.ZVALUESTRING, o.ZSTARTDATE, o.ZENDDATE
             FROM ZOBJECT o LEFT JOIN ZSOURCE s ON s.Z_PK = o.ZSOURCE
@@ -119,6 +142,25 @@ public struct DailyBriefingScreenTimeReader: Sendable {
         }
         guard status == SQLITE_DONE else { throw CocoaError(.fileReadCorruptFile) }
         return ScreenTimeUsageInterval.normalized(intervals, within: range)
+    }
+
+    private static func readNotificationCount(_ database: OpaquePointer?, within range: DateInterval) throws -> Int? {
+        // SUM preserves NULL when there is no local receipt history to establish coverage.
+        let query = """
+            SELECT SUM(CASE WHEN o.ZSTARTDATE >= ? AND o.ZSTARTDATE < ? THEN 1 ELSE 0 END)
+            FROM ZOBJECT o LEFT JOIN ZSOURCE s ON s.Z_PK = o.ZSOURCE
+            WHERE o.ZSTREAMNAME = '/notification/usage' AND o.ZVALUESTRING = 'Receive'
+              AND s.ZDEVICEID IS NULL AND typeof(o.ZSTARTDATE) IN ('integer', 'real')
+            """
+        var statement: OpaquePointer?
+        guard sqlite3_prepare_v2(database, query, -1, &statement, nil) == SQLITE_OK else {
+            throw CocoaError(.fileReadCorruptFile)
+        }
+        defer { sqlite3_finalize(statement) }
+        sqlite3_bind_double(statement, 1, range.start.timeIntervalSinceReferenceDate)
+        sqlite3_bind_double(statement, 2, range.end.timeIntervalSinceReferenceDate)
+        guard sqlite3_step(statement) == SQLITE_ROW else { throw CocoaError(.fileReadCorruptFile) }
+        return sqlite3_column_type(statement, 0) == SQLITE_NULL ? nil : Int(sqlite3_column_int64(statement, 0))
     }
 
     func readRemote(within range: DateInterval) throws -> [ScreenTimeUsageInterval] {

@@ -139,6 +139,7 @@ public struct FileShelfItem: Identifiable, Equatable {
 public final class FileShelfStore: ObservableObject {
     @Published public private(set) var items: [FileShelfItem] = []
     @Published public fileprivate(set) var errorDescription: String?
+    public var onDailyBriefingActivity: DailyBriefingActivityHandler?
 
     private struct StoredItem: Codable {
         var id: UUID
@@ -185,6 +186,7 @@ public final class FileShelfStore: ObservableObject {
         let item = screenshotItem(id: record.id, addedAt: record.addedAt, metadata: record.metadata)
         shelfOrder[record.id] = record.shelfOrder
         items.append(item)
+        onDailyBriefingActivity?(.shelfItemsAdded, 1, 0, Date())
         errorDescription = nil
         do { _ = try cacheScreenshot(record) }
         catch { errorDescription = error.localizedDescription }
@@ -320,6 +322,7 @@ public final class FileShelfStore: ObservableObject {
             return 0
         }
         items += additions
+        onDailyBriefingActivity?(.shelfItemsAdded, additions.count, 0, Date())
         errorDescription = failure
         return additions.count
     }
@@ -344,6 +347,9 @@ public final class FileShelfStore: ObservableObject {
                 return nil
             }
             items.append(item)
+            let date = Date()
+            onDailyBriefingActivity?(.shelfItemsAdded, 1, 0, date)
+            onDailyBriefingActivity?(.noteCreated, 1, 0, date)
             return item
         } catch {
             errorDescription = error.localizedDescription
@@ -383,6 +389,7 @@ public final class FileShelfStore: ObservableObject {
                 return nil
             }
             items = candidates
+            onDailyBriefingActivity?(.noteSaved, 1, 0, Date())
             do {
                 try FileManager.default.removeItem(at: original.url)
             } catch {
@@ -426,6 +433,8 @@ public final class FileShelfStore: ObservableObject {
         }
         guard persist(remaining) else { return }
         items = remaining
+        let removedNotes = removed.filter { $0.noteLocation != nil }.count
+        if removedNotes > 0 { onDailyBriefingActivity?(.noteDeleted, removedNotes, 0, Date()) }
         removed.forEach(removeManagedFile)
     }
 
@@ -450,6 +459,8 @@ public final class FileShelfStore: ObservableObject {
         errorDescription = cacheError
         let removed = items
         items = []
+        let removedNotes = removed.filter { $0.noteLocation != nil }.count
+        if removedNotes > 0 { onDailyBriefingActivity?(.noteDeleted, removedNotes, 0, Date()) }
         removed.forEach(removeManagedFile)
     }
 
@@ -492,6 +503,7 @@ public final class FileShelfStore: ObservableObject {
                 return 0
             }
             items.append(item)
+            onDailyBriefingActivity?(.shelfItemsAdded, 1, 0, Date())
             return 1
         } catch {
             errorDescription = error.localizedDescription
@@ -510,6 +522,7 @@ public final class FileShelfStore: ObservableObject {
                 return 0
             }
             items.append(item)
+            onDailyBriefingActivity?(.shelfItemsAdded, 1, 0, Date())
             return 1
         } catch {
             errorDescription = error.localizedDescription

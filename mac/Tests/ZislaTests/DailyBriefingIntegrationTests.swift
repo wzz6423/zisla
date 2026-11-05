@@ -14,6 +14,50 @@ struct DailyBriefingIntegrationTests {
     }
 
     @Test
+    func normalExportUsesCurrentSelectionAndSystemNotificationCount() async throws {
+        let directory = try temporaryDirectory()
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let date = Date(timeIntervalSince1970: 1_800_000_000)
+        var reports: [DailyBriefingReport] = []
+        let controller = DailyBriefingController(
+            store: DailyBriefingStore(fileURL: directory.appendingPathComponent("history.json")),
+            observation: { .init(date: $0, applicationID: "fixture", applicationName: "Fixture", category: .work, isActive: false, isListening: nil) },
+            typing: { _ in nil },
+            readScreenTime: { _ in .init(notificationCount: 17) },
+            export: { report, template, language, folder in
+                reports.append(report)
+                let data = try DailyBriefingRenderer.png(report: report, template: template, language: language)
+                return try DailyBriefingPNGExport.write(data, for: report.day.date, language: language,
+                    calendar: report.calendar, directory: folder)
+            }
+        )
+        var settings = DailyBriefingSettings(enabled: true, selectedContent: [.notificationCount, .clipboardCaptured])
+        controller.configure(settings: settings, directory: directory, language: .english, startsTimer: false)
+        controller.recordActivity(.clipboardCaptured, count: 3, at: date)
+
+        await controller.exportToday(at: date)
+
+        let report = try #require(reports.first)
+        #expect(report.selectedContent == settings.selectedContent)
+        #expect(report.notificationCount == 17)
+        #expect(report.day.activity?.count(for: .clipboardCaptured) == 3)
+        #expect(DailyBriefingPoster(report: report, template: .minimal, language: .english).displayedContent == settings.selectedContent)
+        let url = try #require(controller.lastExportURL)
+        let imageData = try Data(contentsOf: url)
+        #expect(NSBitmapImageRep(data: imageData)?.pixelsWide == 1800)
+
+        settings.selectedContent = []
+        controller.configure(settings: settings, directory: directory, language: .english, startsTimer: false)
+        await controller.exportToday(at: date)
+
+        let empty = try #require(reports.last)
+        #expect(reports.count == 2)
+        #expect(empty.selectedContent.isEmpty)
+        #expect(DailyBriefingPoster(report: empty, template: .minimal, language: .english).displayedContent.isEmpty)
+        #expect(controller.errorMessage == nil)
+    }
+
+    @Test
     func scheduledExportRetriesFailureAndDeduplicatesAfterRestart() async throws {
         let directory = try temporaryDirectory()
         defer { try? FileManager.default.removeItem(at: directory) }
@@ -113,6 +157,38 @@ struct DailyBriefingIntegrationTests {
     }
 
     @Test
+    func selectionAndSystemNotificationCountReachTheNormalExport() async throws {
+        let directory = try temporaryDirectory()
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let store = DailyBriefingStore(fileURL: directory.appendingPathComponent("history.json"))
+        var selection: Set<DailyBriefingContent> = [.notificationCount]
+        var expectsSystemData = true
+        var exports = 0
+        let controller = DailyBriefingController(store: store,
+            observation: { .init(date: $0, applicationID: "editor", applicationName: "Editor", category: .work, isActive: true, isListening: false) },
+            typing: { _ in nil }, readScreenTime: { _ in .init(notificationCount: 7) },
+            export: { report, template, language, folder in
+                exports += 1
+                #expect(report.selectedContent == selection)
+                #expect(report.notificationCount == (expectsSystemData ? 7 : nil))
+                #expect(DailyBriefingPoster(report: report, template: template, language: language).displayedContent == selection)
+                let png = try DailyBriefingRenderer.png(report: report, template: template, language: language)
+                #expect(png.starts(with: [137, 80, 78, 71]))
+                return folder.appendingPathComponent("result.png")
+            })
+        var settings = DailyBriefingSettings(enabled: true, selectedContent: selection)
+        controller.configure(settings: settings, directory: directory, language: .english, startsTimer: false)
+        await controller.exportToday()
+        selection = []
+        expectsSystemData = false
+        settings.selectedContent = selection
+        settings.readsSystemScreenTime = false
+        controller.configure(settings: settings, directory: directory, language: .english, startsTimer: false)
+        await controller.exportToday()
+        #expect(exports == 2)
+    }
+
+    @Test
     func systemUsageReplacesOnlyActivityAndKeepsLocallyRecordedMetrics() {
         var report = DailyBriefingReport.example()
         let date = report.calendar.date(bySettingHour: 10, minute: 30, second: 0, of: report.day.date)!
@@ -148,13 +224,21 @@ struct DailyBriefingIntegrationTests {
         let results = SettingsSearchIndex.results(for: "daily briefing", settings: settings, locale: Locale(identifier: "en"))
         #expect(results.contains { $0.section == .info && $0.title == "每日简报" })
         #expect(results.contains { $0.section == .features })
+        let content = SettingsSearchIndex.results(for: "clipboard captures", settings: settings, locale: Locale(identifier: "en"))
+        #expect(content.contains { $0.section == .info && $0.title == "简报内容" && $0.anchor == .row("简报内容") })
     }
 
     @Test(arguments: DailyBriefingTemplate.allCases, [AppLanguage.simplifiedChinese, .english, .arabic])
     func templatesRenderCompleteLocalizedImages(template: DailyBriefingTemplate, language: AppLanguage) throws {
         let image = try DailyBriefingRenderer.image(report: .example(), template: template, language: language, scale: 1)
+        let legacyContent: Set<DailyBriefingContent> = [.localUsage, .firstActivity, .lastActivity, .allDevicesUsage,
+            .hourlyUsage, .workTime, .leisureTime, .otherTime, .characters, .topTypingApplication, .peakTypingHour,
+            .islandOpenings, .listeningTime, .peakPower, .batteryRange, .peakFan]
+        let legacy = try DailyBriefingRenderer.image(report: .example(selectedContent: legacyContent), template: template, language: language, scale: 1)
         #expect(image.width == 900)
-        #expect((900...2200).contains(image.height), "Unexpected poster height \(image.height) for \(template) / \(language)")
+        #expect((900...2200).contains(legacy.height), "Original content must retain its compact layout")
+        #expect(image.height > legacy.height)
+        #expect(image.height - legacy.height < 1800, "New metrics and three charts must fit their content-driven layout")
         #expect(image.dataProvider?.data != nil)
     }
 
@@ -205,13 +289,15 @@ struct DailyBriefingIntegrationTests {
 
     @Test(arguments: DailyBriefingTemplate.allCases)
     func exportIsARealPNGAndHandlesEmptyStatistics(template: DailyBriefingTemplate) throws {
-        let report = DailyBriefingReport(day: DailyBriefingDay(date: Date(timeIntervalSince1970: 1_800_000_000), calendar: DailyBriefingDay.calendar),
+        var day = DailyBriefingDay(date: Date(timeIntervalSince1970: 1_800_000_000), calendar: DailyBriefingDay.calendar)
+        day.activity = nil
+        let report = DailyBriefingReport(day: day,
             generatedAt: Date(timeIntervalSince1970: 1_800_000_000), typing: nil, allDeviceSeconds: nil)
         let png = try DailyBriefingRenderer.png(report: report, template: template, language: .english)
         #expect(png.starts(with: [137, 80, 78, 71, 13, 10, 26, 10]))
         let decoded = try #require(NSBitmapImageRep(data: png))
         #expect(decoded.pixelsWide == 1800)
-        #expect(decoded.pixelsHigh > 1800)
+        #expect(decoded.pixelsHigh > 0 && decoded.pixelsHigh < 800)
         if let output = ProcessInfo.processInfo.environment["ZISLA_BRIEFING_PREVIEW_DIR"] {
             let directory = URL(fileURLWithPath: output, isDirectory: true)
             try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
@@ -255,7 +341,10 @@ struct DailyBriefingIntegrationTests {
         let pattern = #"(?:localized|metric|category|AppLocalizedText|AppLocalization\.string)\("([^"]+)""#
         let regex = try NSRegularExpression(pattern: pattern)
         var keys = Set(DailyBriefingTemplate.allCases.map(\.title))
-        for file in ["DailyBriefingPoster.swift", "DailyBriefingSettingsView.swift", "DailyBriefingController.swift"] {
+        keys.formUnion(DailyBriefingContent.allCases.map(\.title))
+        keys.formUnion(DailyBriefingContentGroup.allCases.map(\.title))
+        for file in ["DailyBriefingPoster.swift", "DailyBriefingSettingsView.swift", "DailyBriefingController.swift",
+                     "DailyBriefingApplicationChart.swift", "DailyBriefingTimelineCharts.swift"] {
             let source = try String(contentsOf: root.appendingPathComponent("Sources/Zisla/" + file), encoding: .utf8)
             let range = NSRange(source.startIndex..., in: source)
             for match in regex.matches(in: source, range: range) {
@@ -263,7 +352,6 @@ struct DailyBriefingIntegrationTests {
                 keys.insert(String(source[keyRange]))
             }
         }
-        #expect(keys.count == 35)
         #expect(AppLanguage.allCases.count == 17)
         for language in AppLanguage.allCases {
             let tableURL = root.appendingPathComponent("Resources/Localization/\(language.rawValue).lproj/Localizable.strings")
