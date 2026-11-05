@@ -6,6 +6,7 @@ SERVICE_LABEL="dev.wzz.zisla.debug"
 USER_ID="$(id -u)"
 SERVICE_DOMAIN="gui/$USER_ID"
 SERVICE_TARGET="$SERVICE_DOMAIN/$SERVICE_LABEL"
+SERVICE_LOCK="$HOME/Library/Caches/$SERVICE_LABEL.lock"
 APP_DIRECTORY="$ROOT/dist"
 APP="$APP_DIRECTORY/zisla-debug.app"
 APP_BINARY="$APP/Contents/MacOS/zisla"
@@ -190,17 +191,27 @@ function start_service() {
   print -r -- "zisla 调试服务已启动（PID $pid）。停止请执行：make stop"
 }
 
-if [[ "${ZSH_EVAL_CONTEXT:-}" != *:file ]]; then
+function run_service_command() {
   case "${1:-}" in
-    run)
-      start_service
-      ;;
-    stop)
-      stop_service
+    run|stop)
+      zmodload zsh/system
+      mkdir -p "${SERVICE_LOCK:h}"
+      # Keep a stable inode while other worktrees are waiting for the service.
+      touch "$SERVICE_LOCK"
+      zsystem flock "$SERVICE_LOCK"
+      if [[ "$1" == run ]]; then
+        start_service
+      else
+        stop_service
+      fi
       ;;
     *)
       print -u2 -r -- "用法：$0 {run|stop}"
       exit 64
       ;;
   esac
+}
+
+if [[ "${ZSH_EVAL_CONTEXT:-}" != *:file ]]; then
+  run_service_command "$@"
 fi
