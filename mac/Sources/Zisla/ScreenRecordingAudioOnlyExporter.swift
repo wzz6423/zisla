@@ -92,7 +92,7 @@ enum ScreenRecordingAudioOnlyExporter {
             }
         }
         var index = 0
-        while let sample = output.copyNextSampleBuffer() {
+        while position < total, let sample = output.copyNextSampleBuffer() {
             try Task.checkCancellation()
             try checkpoint(.audioSample(index))
             let start = Int64((sample.presentationTimeStamp.seconds * 48_000).rounded())
@@ -128,7 +128,11 @@ enum ScreenRecordingAudioOnlyExporter {
             await progress(Double(position) / Double(total))
             index += 1
         }
-        guard reader.status == .completed else { throw ScreenRecordingExportError.unavailableMedia }
+        // Do not wait for a spectral decoder's EOF after the requested timeline has been written.
+        let status = reader.status
+        guard status == .completed || (position == total && status == .reading) else {
+            throw ScreenRecordingExportError.unavailableMedia
+        }
         // Empty time ranges can be omitted by AVAssetReader; keep the edited timeline's full duration.
         try silence(until: total)
         await progress(1)

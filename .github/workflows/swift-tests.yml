@@ -71,6 +71,9 @@ jobs:
       - name: Check blocking I/O with two cooperative workers
         if: matrix.shard == 0
         run: zsh Tests/CooperativePoolTests.zsh
+      - name: Check audio exports with a stalled decoder EOF
+        if: matrix.shard == 0
+        run: zsh Tests/AudioDecoderTailTests.zsh
       - name: Run isolated Swift suites
         run: |
           zsh Scripts/swift-test-suites.sh ZislaKitTests,ZislaTests --skip-build
