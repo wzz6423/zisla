@@ -165,6 +165,35 @@ struct WeatherFallbackTests {
         #expect(ForecastURLProtocol.requests.count == 1)
     }
 
+    @Test(arguments: AppLanguage.allCases)
+    func forecastErrorsUseTheSelectedInterfaceLanguage(language: AppLanguage) throws {
+        let defaults = UserDefaults.standard
+        let previous = defaults.object(forKey: AppLocalization.defaultsKey)
+        defer {
+            if let previous {
+                defaults.set(previous, forKey: AppLocalization.defaultsKey)
+            } else {
+                defaults.removeObject(forKey: AppLocalization.defaultsKey)
+            }
+        }
+        defaults.set(language.rawValue, forKey: AppLocalization.defaultsKey)
+        let packageRoot = URL(fileURLWithPath: #filePath).deletingLastPathComponent()
+            .deletingLastPathComponent().deletingLastPathComponent()
+        let table = try #require(NSDictionary(contentsOf: packageRoot.appendingPathComponent(
+            "Resources/Localization/\(language.rawValue).lproj/Localizable.strings"
+        )) as? [String: String])
+        let errors: [(WeatherServiceError, String)] = [
+            (.invalidCoordinates, "天气位置坐标无效"),
+            (.invalidResponse, "天气服务返回了无效响应"),
+            (.responseTooLarge, "天气响应超过大小限制"),
+        ]
+        for (error, key) in errors {
+            let translated = try #require(table[key])
+            #expect(!translated.isEmpty)
+            #expect(error.localizedDescription == translated)
+        }
+    }
+
     @Test(arguments: [Double.nan, Double.infinity, 91, -91])
     func invalidCoordinatesStartNoNetwork(latitude: Double) async {
         ForecastURLProtocol.reset([])

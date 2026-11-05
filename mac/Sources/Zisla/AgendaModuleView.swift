@@ -42,25 +42,28 @@ struct AgendaModuleView: View {
                 }
             }
             if !model.weatherSnapshots.isEmpty {
-                ScrollView(.vertical) {
-                    LazyVStack(spacing: 2) {
-                        ForEach(model.weatherLocations.locations) { location in
-                            if let weather = model.weatherSnapshot(for: location.id) {
-                                Self.weatherRow(weather)
+                TimelineView(.periodic(from: .now, by: 60)) { context in
+                    ScrollView(.vertical) {
+                        LazyVStack(spacing: 2) {
+                            ForEach(model.weatherLocations.locations) { location in
+                                if let weather = model.weatherSnapshot(for: location.id) {
+                                    Self.weatherRow(weather, at: context.date)
+                                }
                             }
                         }
                     }
+                    .scrollIndicators(.visible)
+                    .thinScrollChrome()
                 }
-                .scrollIndicators(.visible)
-                .thinScrollChrome()
             } else {
                 weatherPlaceholder
             }
         }
     }
 
-    static func weatherRow(_ weather: WeatherSnapshot) -> some View {
-        VStack(alignment: .leading, spacing: 3) {
+    static func weatherRow(_ weather: WeatherSnapshot, at date: Date = Date()) -> some View {
+        let activeAlerts = weather.officialAlerts.filter { $0.expiresAt.map { $0 > date } ?? true }
+        return VStack(alignment: .leading, spacing: 3) {
             HStack(spacing: 7) {
                 Image(systemName: weather.condition.symbolName)
                     .symbolRenderingMode(.multicolor)
@@ -129,8 +132,13 @@ struct AgendaModuleView: View {
                 .foregroundStyle(.secondary)
             }
 
-            if !weather.officialAlerts.isEmpty {
-                ForEach(weather.officialAlerts) { alert in
+            Text(AppLocalization.text("更新于 %@", weather.fetchedAt.formatted(date: .numeric, time: .shortened)))
+                .font(.system(size: 8))
+                .foregroundStyle(.secondary)
+                .fitsSingleLine()
+
+            if !activeAlerts.isEmpty {
+                ForEach(activeAlerts) { alert in
                     Link(destination: alert.detailsURL) {
                         Label(
                             "\(alert.severity.localizedTitle) · \(alert.summary)",

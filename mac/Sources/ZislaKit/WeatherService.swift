@@ -74,9 +74,9 @@ public enum WeatherServiceError: Error, LocalizedError, Equatable, Sendable {
 
     public var errorDescription: String? {
         switch self {
-        case .invalidCoordinates: "天气位置坐标无效"
-        case .invalidResponse: "天气服务返回了无效响应"
-        case .responseTooLarge: "天气响应超过大小限制"
+        case .invalidCoordinates: AppLocalization.text("天气位置坐标无效")
+        case .invalidResponse: AppLocalization.text("天气服务返回了无效响应")
+        case .responseTooLarge: AppLocalization.text("天气响应超过大小限制")
         }
     }
 }

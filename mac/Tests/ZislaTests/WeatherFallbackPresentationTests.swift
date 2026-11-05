@@ -53,22 +53,56 @@ struct WeatherFallbackPresentationTests {
         let table = try #require(NSDictionary(contentsOf: packageRoot.appendingPathComponent(
             "Resources/Localization/\(language.rawValue).lproj/Localizable.strings"
         )) as? [String: String])
-        let key = "中国天气网（中国气象局）"
-        let value = try #require(table[key])
-        #expect(!value.isEmpty)
-        #expect(AppLocalization.string(key, locale: language.locale) == value)
+        for key in ["中国天气网（中国气象局）", "更新于 %@"] {
+            let value = try #require(table[key])
+            #expect(!value.isEmpty)
+            #expect(AppLocalization.string(key, locale: language.locale) == value)
+        }
     }
 
-    private func recognizedText(in weather: WeatherSnapshot) throws -> String {
-        let hosting = NSHostingView(rootView: AgendaModuleView.weatherRow(weather)
+    @Test
+    func retainedWeatherShowsItsUpdateDateAndOmitsExpiredAlerts() throws {
+        let date = try #require(ISO8601DateFormatter().date(from: "2026-11-05T10:30:00Z"))
+        func alert(_ summary: String, expiresAt: Date?) -> WeatherAlert {
+            WeatherAlert(
+                severity: .moderate, source: "Weather provider", summary: summary, region: nil,
+                detailsURL: URL(string: "https://example.com/\(summary)")!,
+                updatedAt: date.addingTimeInterval(-3600), expiresAt: expiresAt
+            )
+        }
+        let snapshot = WeatherSnapshot(
+            temperature: 16, condition: WeatherCondition(code: 3, isDay: true),
+            officialAlerts: [
+                alert("ExpiredWarning", expiresAt: date.addingTimeInterval(-1)),
+                alert("BoundaryWarning", expiresAt: date),
+                alert("ActiveWarning", expiresAt: date.addingTimeInterval(1)),
+                alert("UnknownWarning", expiresAt: nil),
+            ],
+            timezone: "UTC", fetchedAt: date,
+            coordinate: GeoCoordinate(latitude: 51, longitude: 0), locationName: "London"
+        )
+        let visible = try recognizedText(in: snapshot, at: date)
+        #expect(visible.contains("2026"), "Retained forecasts must show the update date, not just the time")
+        #expect(!visible.contains("ExpiredWarning"))
+        #expect(!visible.contains("BoundaryWarning"))
+        #expect(visible.contains("ActiveWarning"))
+        #expect(visible.contains("UnknownWarning"))
+        let later = try recognizedText(in: snapshot, at: date.addingTimeInterval(2))
+        #expect(!later.contains("ActiveWarning"), "Alerts must expire even when no forecast refresh succeeds")
+        #expect(later.contains("UnknownWarning"))
+        #expect(snapshot.officialAlerts.count == 4, "Rendering must leave the stored provider response unchanged")
+    }
+
+    private func recognizedText(in weather: WeatherSnapshot, at date: Date = Date()) throws -> String {
+        let hosting = NSHostingView(rootView: AgendaModuleView.weatherRow(weather, at: date)
             .frame(width: 300)
             .padding(12)
             .background(Color.white)
             .environment(\.colorScheme, .light)
             .scaleEffect(4, anchor: .topLeading)
-            .frame(width: 1296, height: 600, alignment: .topLeading))
+            .frame(width: 1296, height: 1000, alignment: .topLeading))
         let window = NSPanel(
-            contentRect: NSRect(x: -100_000, y: -100_000, width: 1296, height: 600),
+            contentRect: NSRect(x: -100_000, y: -100_000, width: 1296, height: 1000),
             styleMask: [.borderless, .nonactivatingPanel], backing: .buffered, defer: false
         )
         window.isReleasedWhenClosed = false
