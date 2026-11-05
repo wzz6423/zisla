@@ -68,6 +68,7 @@ private enum CompactStatusMetrics {
 
 private struct CompactNotchBackground: View {
     var style: IslandNotchBackground
+    let cornerRadius: CGFloat?
 
     @ViewBuilder
     var body: some View {
@@ -77,7 +78,7 @@ private struct CompactNotchBackground: View {
         case .frosted:
             VisualEffectBackground(alphaValue: 0.92, material: .popover)
         case .liquidGlass:
-            IslandCollapsedMaterial(style: .liquidGlass)
+            IslandCollapsedMaterial(style: .liquidGlass, cornerRadius: cornerRadius)
         }
     }
 }
@@ -256,11 +257,16 @@ struct CompactStatusBarView: View {
     }
 
     private func compactSurfaceContent(size: CGSize, at date: Date) -> some View {
-        ZStack {
-            if let information = FloatingIslandInformationLayout(
-                notices: displayState.compactStatusHidden ? [] : presentationNotices,
-                icons: displayState.statusIcons, settings: settingsStore.settings, item: media.snapshot, at: date
-            ) {
+        let information = FloatingIslandInformationLayout(
+            notices: displayState.compactStatusHidden ? [] : presentationNotices,
+            icons: displayState.statusIcons, settings: settingsStore.settings, item: media.snapshot, at: date
+        )
+        let pillCornerRadius: CGFloat? = information?.secondary == nil
+            ? nil : VoiceRecordingIslandGeometry.bottomCornerRadius
+        let shape = CompactIslandShape(layoutStyle: settingsStore.settings.islandLayoutStyle,
+                                       pillCornerRadius: pillCornerRadius)
+        return ZStack {
+            if let information {
                 FloatingIslandInformationView(layout: information,
                     visualizationStyle: settingsStore.settings.mediaVisualizationStyle, item: media.snapshot, date: date)
                     .onChange(of: information.size, initial: true) { _, size in
@@ -282,7 +288,7 @@ struct CompactStatusBarView: View {
             }
         }
         .frame(width: size.width, height: size.height)
-        .background(compactStatusBackground)
+        .background(compactStatusBackground(cornerRadius: pillCornerRadius))
         .overlay { AIResultSweepOverlay(controller: resultSweep, edge: displayState.islandEdge) }
         .overlay {
             if displayState.statusIcons.isEmpty, settingsStore.settings.collapsedProgressGlowEnabled,
@@ -290,12 +296,13 @@ struct CompactStatusBarView: View {
                 CollapsedProgressGlow(
                     progress: progress,
                     tint: compactProgressTint,
-                    layoutStyle: settingsStore.settings.islandLayoutStyle
+                    layoutStyle: settingsStore.settings.islandLayoutStyle,
+                    pillCornerRadius: pillCornerRadius
                 )
             }
         }
-        .clipShape(CompactIslandShape(layoutStyle: settingsStore.settings.islandLayoutStyle))
-        .contentShape(CompactIslandShape(layoutStyle: settingsStore.settings.islandLayoutStyle))
+        .clipShape(shape)
+        .contentShape(shape)
         // NSHostingView's safe area can push the SwiftUI content down by a few
         // points when the panel sits under the physical notch or the auto-hide
         // menu bar. Ignoring the top safe area keeps the bar flush with the
@@ -401,16 +408,11 @@ struct CompactStatusBarView: View {
     }
 
     @ViewBuilder
-    private var compactStatusBackground: some View {
-        compactStatusBackgroundFill
-    }
-
-    @ViewBuilder
-    private var compactStatusBackgroundFill: some View {
+    private func compactStatusBackground(cornerRadius: CGFloat?) -> some View {
         if reduceTransparency {
             Color.black
         } else {
-            CompactNotchBackground(style: settingsStore.settings.islandNotchBackground)
+            CompactNotchBackground(style: settingsStore.settings.islandNotchBackground, cornerRadius: cornerRadius)
         }
     }
 

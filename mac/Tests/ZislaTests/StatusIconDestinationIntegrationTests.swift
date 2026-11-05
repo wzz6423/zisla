@@ -7,6 +7,113 @@ import ZislaCore
 @testable import Zisla
 
 struct StatusIconDestinationIntegrationTests {
+    @Test(arguments: IslandEdge.allCases, MediaCompactStyle.allCases) @MainActor
+    func twoRowInformationUsesTheVoiceInputCornerRadius(edge: IslandEdge, style: MediaCompactStyle) async throws {
+        let fixture = try IconFixture(edge: edge)
+        defer {
+            fixture.media.stop()
+            fixture.close()
+        }
+        fixture.settings.settings.sideNoticesEnabled = true
+        fixture.settings.settings.islandShowMoreInformation = true
+        fixture.settings.settings.mediaCompactStyle = style
+        fixture.settings.settings.collapsedProgressGlowEnabled = false
+        let date = Date(timeIntervalSince1970: 100)
+        let item = NowPlayingSnapshot(title: "Song", artist: "Artist", album: nil, artworkData: nil,
+            duration: 60, elapsedTime: 0, timestamp: date, isPlaying: true)
+        fixture.media.publishSnapshot(item)
+        let icons = [IslandStatusIcon(id: "combined", content: .combined(nil), tooltip: "Combined")]
+        let notices = [IslandNotice(id: "ai-active-openai", title: "AI"),
+                       IslandNotice(id: "media-active-left", title: "Song")]
+        for notice in notices { fixture.queue.enqueue(notice, expiresAfter: nil) }
+        let layout = try #require(FloatingIslandInformationLayout(notices: notices, icons: icons,
+            settings: fixture.settings.settings, item: item, at: date))
+        let state = SideNoticeDisplayState()
+        state.islandEdge = edge
+        state.placementMode = .custom
+        state.statusIcons = icons
+        state.compactWingHeight = edge.isVertical ? layout.size.width : layout.size.height
+        let view = CompactStatusBarView(queue: fixture.queue, displayState: state, media: fixture.media,
+            browserDownloads: fixture.downloads, settingsStore: fixture.settings, resultSweep: fixture.sweep,
+            onStatusHidden: {})
+        let bitmap = try await renderOffscreen(view.statusBarContent(at: date)
+            .environment(\._accessibilityReduceMotion, true).background(.white), size: layout.size)
+        let radius = style == .detailed ? VoiceRecordingIslandGeometry.bottomCornerRadius
+            : min(layout.size.width, layout.size.height) / 2
+        let expected = RoundedRectangle(cornerRadius: radius, style: style == .detailed ? .continuous : .circular)
+        let rect = CGRect(origin: .zero, size: layout.size)
+        let inside = expected.inset(by: 1).path(in: rect)
+        let outside = expected.inset(by: -1).path(in: rect)
+        let scale = CGFloat(bitmap.pixelsWide) / layout.size.width
+        var probes = 0
+        for x in [CGFloat(2.5), 4.5] {
+            for y in stride(from: CGFloat(2.5), through: 29.5, by: 3) {
+                let point = CGPoint(x: x, y: y)
+                let color = try #require(bitmap.colorAt(x: Int(x * scale), y: Int(y * scale))?.usingColorSpace(.deviceRGB))
+                if inside.contains(point) {
+                    #expect(max(color.redComponent, color.greenComponent, color.blueComponent) < 0.15,
+                            "The two-row shell must fill the tighter voice-input contour")
+                    probes += 1
+                } else if !outside.contains(point) {
+                    #expect(min(color.redComponent, color.greenComponent, color.blueComponent) > 0.85,
+                            "The shell must leave the area outside its selected contour clear")
+                    probes += 1
+                }
+            }
+        }
+        #expect(probes > 10)
+        if #available(macOS 26.0, *) {
+            fixture.settings.settings.islandNotchBackground = .liquidGlass
+            var nativeRadii: [CGFloat] = []
+            _ = try await renderOffscreen(view.statusBarContent(at: date)
+                .environment(\._accessibilityReduceTransparency, false), size: layout.size) { host in
+                    var pending = [host]
+                    while let current = pending.popLast() {
+                        if let glass = current as? NSGlassEffectView { nativeRadii.append(glass.cornerRadius) }
+                        pending.append(contentsOf: current.subviews)
+                    }
+                }
+            #expect(nativeRadii.contains(style == .detailed ? VoiceRecordingIslandGeometry.bottomCornerRadius : 16))
+        }
+        if style == .detailed {
+            fixture.settings.settings.islandNotchBackground = .black
+            fixture.settings.settings.collapsedProgressGlowEnabled = true
+            fixture.settings.settings.compactStatusPriority = CompactStatusPriority.normalized([.media])
+            state.statusIcons = []
+            let completed = NowPlayingSnapshot(title: "Song", artist: "Artist", album: nil, artworkData: nil,
+                duration: 60, elapsedTime: 60, timestamp: date, isPlaying: true)
+            fixture.media.publishSnapshot(completed)
+            let progressLayout = try #require(FloatingIslandInformationLayout(notices: notices, icons: [],
+                settings: fixture.settings.settings, item: completed, at: date))
+            let actual = try await renderOffscreen(view.statusBarContent(at: date)
+                .environment(\._accessibilityReduceMotion, true)
+                .environment(\._accessibilityReduceTransparency, true), size: progressLayout.size)
+            let reference = CompactIslandShape(layoutStyle: .pill,
+                pillCornerRadius: VoiceRecordingIslandGeometry.bottomCornerRadius)
+            let expected = try await renderOffscreen(reference.inset(by: CollapsedProgress.outlineInset)
+                .trim(from: 0, to: 1)
+                .stroke(MediaWaveformView.tintColor(for: nil), style: StrokeStyle(lineWidth: 1, lineCap: .round, lineJoin: .round))
+                .clipShape(reference).environment(\.colorScheme, .dark), size: progressLayout.size)
+            let scale = CGFloat(actual.pixelsWide) / progressLayout.size.width
+            var mismatches: [String] = []
+            var progressPixels = 0
+            // The vertical provider icon starts 4pt from the edge, so sample only the perimeter before it.
+            for y in 0..<Int(32 * scale) {
+                for x in 0..<Int(3 * scale) {
+                    let actualColor = try #require(actual.colorAt(x: x, y: y)?.usingColorSpace(.deviceRGB))
+                    let expectedColor = try #require(expected.colorAt(x: x, y: y)?.usingColorSpace(.deviceRGB))
+                    if abs(actualColor.greenComponent - expectedColor.greenComponent) > 0.05 {
+                        mismatches.append("\(x),\(y): \(actualColor.greenComponent) vs \(expectedColor.greenComponent)")
+                    }
+                    if expectedColor.greenComponent > 0.1 { progressPixels += 1 }
+                }
+            }
+            #expect(progressPixels > 0)
+            #expect(mismatches.isEmpty,
+                    "Playback progress must follow the same tighter corners as the two-row surface: \(mismatches)")
+        }
+    }
+
     @Test(arguments: IslandEdge.allCases, MediaCompactStyle.allCases.flatMap { style in [false, true].map { (style, $0) } }) @MainActor
     func theCompactSurfaceRendersMonitorAndPlaybackTogetherWithoutPausingLyrics(
         edge: IslandEdge, playback: (MediaCompactStyle, Bool)
@@ -1013,7 +1120,8 @@ struct StatusIconDestinationIntegrationTests {
     }
 
     @MainActor
-    private func renderOffscreen(_ content: some View, size: CGSize) async throws -> NSBitmapImageRep {
+    private func renderOffscreen(_ content: some View, size: CGSize,
+                                 inspect: (NSView) -> Void = { _ in }) async throws -> NSBitmapImageRep {
         let host = NSHostingView(rootView: content.frame(width: size.width, height: size.height).background(.black))
         host.sizingOptions = []
         let window = NSWindow(contentRect: CGRect(origin: CGPoint(x: 20000, y: 0), size: size),
@@ -1030,6 +1138,7 @@ struct StatusIconDestinationIntegrationTests {
         }
         let cachedBitmap = try #require(host.bitmapImageRepForCachingDisplay(in: host.bounds))
         host.cacheDisplay(in: host.bounds, to: cachedBitmap)
+        inspect(host)
         #expect(host.bounds.size == size && window.alphaValue == 0)
         return try #require(cachedBitmap.converting(to: .sRGB, renderingIntent: .default))
     }

@@ -3,14 +3,15 @@ import ZislaCore
 
 struct IslandCollapsedMaterial: View {
     let style: IslandNotchBackground
+    var cornerRadius: CGFloat? = nil
     @Environment(\.accessibilityReduceTransparency) private var reduceTransparency
 
     var body: some View {
-        Self.rendering(style: style, reduceTransparency: reduceTransparency)
+        Self.rendering(style: style, reduceTransparency: reduceTransparency, cornerRadius: cornerRadius)
     }
 
     @ViewBuilder
-    static func rendering(style: IslandNotchBackground, reduceTransparency: Bool) -> some View {
+    static func rendering(style: IslandNotchBackground, reduceTransparency: Bool, cornerRadius: CGFloat? = nil) -> some View {
         if reduceTransparency || style == .black {
             Color.black
         } else if style == .frosted {
@@ -18,7 +19,7 @@ struct IslandCollapsedMaterial: View {
         } else {
             ZStack {
                 if #available(macOS 26.0, *) {
-                    NativeLiquidGlassShell(isCollapsed: false, material: .clear, cornerRadius: 16)
+                    NativeLiquidGlassShell(isCollapsed: false, material: .clear, cornerRadius: cornerRadius ?? 16)
                 } else {
                     VisualEffectBackground(alphaValue: 0.92, material: .popover)
                 }
