@@ -35,6 +35,23 @@ struct FeatureSettingsStoreTests {
     }
 
     @Test @MainActor
+    func moreInformationPersistsAcrossRelaunchAndResetRestoresItsDefault() throws {
+        let suite = "Zisla.FloatingIslandInformation.\(UUID().uuidString)"
+        let defaults = try #require(UserDefaults(suiteName: suite))
+        defer { defaults.removePersistentDomain(forName: suite) }
+        let store = FeatureSettingsStore(defaults: defaults, persistenceDelay: .seconds(60))
+        #expect(!store.settings.islandShowMoreInformation)
+        store.settings.islandShowMoreInformation = true
+        store.flushPendingChanges()
+        let reloaded = FeatureSettingsStore(defaults: defaults, persistenceDelay: .seconds(60))
+        #expect(reloaded.settings.islandShowMoreInformation)
+        #expect(reloaded.settings == store.settings)
+        reloaded.reset()
+        reloaded.flushPendingChanges()
+        #expect(!FeatureSettingsStore(defaults: defaults).settings.islandShowMoreInformation)
+    }
+
+    @Test @MainActor
     func screenshotEditorHotkeysPersistAndMigrationMarkerIsWrittenOnLoad() throws {
         let suiteName = "Zisla.ScreenshotHotkeys.\(UUID().uuidString)"
         let defaults = try #require(UserDefaults(suiteName: suiteName))

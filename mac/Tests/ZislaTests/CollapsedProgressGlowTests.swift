@@ -8,6 +8,37 @@ import ZislaKit
 
 struct CollapsedProgressGlowTests {
     @Test
+    func customPillCornersReuseTheVoiceSilhouetteAndKeepInsetProgressClosed() throws {
+        let radius = VoiceRecordingIslandGeometry.bottomCornerRadius
+        for size in [CGSize(width: 220, height: 64), CGSize(width: 64, height: 220)] {
+            let rect = CGRect(origin: CGPoint(x: 7, y: 11), size: size)
+            let shape = CompactIslandShape(layoutStyle: .pill, pillCornerRadius: radius)
+            for inset in [CGFloat(0), CollapsedProgress.outlineInset] {
+                let path = shape.inset(by: inset).path(in: rect)
+                let expected = IslandSilhouette(topCornerRadius: radius, bottomCornerRadius: radius,
+                                               insetAmount: inset).path(in: rect)
+                let bounds = rect.insetBy(dx: inset, dy: inset)
+                #expect(path.boundingRect == bounds)
+                let points = Self.flattened(path)
+                #expect(try #require(points.first) == CGPoint(x: bounds.midX, y: bounds.minY))
+                #expect(points.first == points.last)
+                for y in stride(from: rect.minY + 0.5, through: rect.maxY, by: 3) {
+                    for x in stride(from: rect.minX + 0.5, through: rect.maxX, by: 3) {
+                        let point = CGPoint(x: x, y: y)
+                        #expect(path.contains(point) == expected.contains(point))
+                    }
+                }
+                #expect(rect.contains(path.strokedPath(StrokeStyle(lineWidth: 1)).boundingRect) || inset == 0)
+            }
+            #expect(CompactIslandShape(pillCornerRadius: radius).path(in: rect).cgPath
+                == CompactIslandShape().path(in: rect).cgPath)
+        }
+        #expect(CompactIslandShape(layoutStyle: .pill, pillCornerRadius: radius).path(in: .zero).isEmpty)
+        #expect(CompactIslandShape(layoutStyle: .pill, pillCornerRadius: radius).inset(by: 2)
+            .path(in: CGRect(x: 0, y: 0, width: 2, height: 2)).isEmpty)
+    }
+
+    @Test
     func nativeContoursKeepTheirClosedPathContractAndRecoverWhenTheSdkOmitsAnExactTopPoint() {
         let rect = CGRect(x: 10, y: 20, width: 70, height: 32)
         let path = CompactIslandShape(layoutStyle: .pill).path(in: rect)

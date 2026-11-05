@@ -845,6 +845,7 @@ public struct FeatureSettings: Codable, Equatable, Sendable {
     /// Display style for the collapsed Dynamic Island when music is playing.
     public var mediaCompactStyle: MediaCompactStyle
     public var mediaVisualizationStyle: MediaVisualizationStyle
+    public var islandShowMoreInformation: Bool
     public var islandLayoutStyle: IslandLayoutStyle
     public var islandPlacement: IslandPlacement {
         didSet {
@@ -992,6 +993,7 @@ public struct FeatureSettings: Codable, Equatable, Sendable {
         mediaShowLyricsAndInfo: Bool = true,
         mediaCompactStyle: MediaCompactStyle = .compact,
         mediaVisualizationStyle: MediaVisualizationStyle = .waveform,
+        islandShowMoreInformation: Bool = false,
         islandLayoutStyle: IslandLayoutStyle = .notch,
         islandPlacement: IslandPlacement = IslandPlacement(),
         islandPillWidth: Double = 180,
@@ -1126,6 +1128,7 @@ public struct FeatureSettings: Codable, Equatable, Sendable {
         self.mediaShowLyricsAndInfo = mediaShowLyricsAndInfo
         self.mediaCompactStyle = mediaCompactStyle
         self.mediaVisualizationStyle = mediaVisualizationStyle
+        self.islandShowMoreInformation = islandShowMoreInformation
         self.islandLayoutStyle = islandLayoutStyle
         self.islandPlacement = islandPlacement
         self.lastCustomIslandPlacement = islandPlacement.mode == .custom ? islandPlacement : nil
@@ -1279,6 +1282,7 @@ public struct FeatureSettings: Codable, Equatable, Sendable {
         case mediaShowLyricsAndInfo
         case mediaCompactStyle
         case mediaVisualizationStyle
+        case islandShowMoreInformation
         case islandLayoutStyle
         case islandPlacement
         case lastCustomIslandPlacement
@@ -1584,6 +1588,8 @@ public struct FeatureSettings: Codable, Equatable, Sendable {
         ) ?? defaults.mediaCompactStyle
         mediaVisualizationStyle = try container.decodeIfPresent(MediaVisualizationStyle.self, forKey: .mediaVisualizationStyle)
             ?? defaults.mediaVisualizationStyle
+        islandShowMoreInformation = (try? container.decode(Bool.self, forKey: .islandShowMoreInformation))
+            ?? defaults.islandShowMoreInformation
         islandLayoutStyle = try container.decodeIfPresent(IslandLayoutStyle.self, forKey: .islandLayoutStyle)
             ?? defaults.islandLayoutStyle
         islandPlacement = try container.decodeIfPresent(IslandPlacement.self, forKey: .islandPlacement)

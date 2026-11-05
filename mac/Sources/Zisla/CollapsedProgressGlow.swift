@@ -44,6 +44,7 @@ enum CollapsedProgress {
 
 struct CompactIslandShape: InsettableShape {
     var layoutStyle: IslandLayoutStyle = .notch
+    var pillCornerRadius: CGFloat? = nil
     var insetAmount: CGFloat = 0
 
     func path(in rect: CGRect) -> Path {
@@ -51,7 +52,15 @@ struct CompactIslandShape: InsettableShape {
         guard bounds.width > 0, bounds.height > 0 else { return Path() }
         let outline: Path
         if layoutStyle == .pill {
-            outline = Capsule().path(in: bounds)
+            if let pillCornerRadius {
+                outline = IslandSilhouette(
+                    topCornerRadius: pillCornerRadius,
+                    bottomCornerRadius: pillCornerRadius,
+                    insetAmount: insetAmount
+                ).path(in: rect)
+            } else {
+                outline = Capsule().path(in: bounds)
+            }
         } else {
             let contour = CompactBarContourMetrics(size: rect.size)
             let radius = max(0, min(contour.bottomRadius, rect.height / 2, rect.width / 2) - insetAmount)
@@ -140,22 +149,24 @@ struct CollapsedProgressGlow: View {
     var progress: Double
     var tint: Color = .green
     var layoutStyle: IslandLayoutStyle = .notch
+    var pillCornerRadius: CGFloat? = nil
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @Environment(\.accessibilityReduceTransparency) private var reduceTransparency
 
     var body: some View {
         Self.rendering(
             progress: progress, tint: tint, layoutStyle: layoutStyle,
-            reduceMotion: reduceMotion, reduceTransparency: reduceTransparency
+            reduceMotion: reduceMotion, reduceTransparency: reduceTransparency,
+            pillCornerRadius: pillCornerRadius
         )
     }
 
     static func rendering(
         progress: Double, tint: Color, layoutStyle: IslandLayoutStyle,
-        reduceMotion: Bool, reduceTransparency: Bool
+        reduceMotion: Bool, reduceTransparency: Bool, pillCornerRadius: CGFloat? = nil
     ) -> some View {
         let fraction = CollapsedProgress.normalized(progress) ?? 0
-        let outline = CompactIslandShape(layoutStyle: layoutStyle)
+        let outline = CompactIslandShape(layoutStyle: layoutStyle, pillCornerRadius: pillCornerRadius)
             .inset(by: CollapsedProgress.outlineInset)
             .trim(from: 0, to: fraction)
         return ZStack {

@@ -320,6 +320,14 @@ final class SideNoticePresenter {
                         edge: configuration.placement.edge)
             return configuration
         }
+        if let information = FloatingIslandInformationLayout(
+            notices: statusHidden ? [] : notices, icons: availableStatusIcons,
+            settings: settingsStore.settings, item: media.snapshot, at: date
+        ), !suppression.isVoiceRecording, !suppression.isTransientNoticePresented,
+           resultSweep.current == nil {
+            configuration.statusIconSize = information.size
+            return configuration
+        }
         let sizing = layoutEngine.compactBarSizing(
             for: statusHidden ? [] : notices, settings: settingsStore.settings,
             browserDownloadCount: settingsStore.settings.showsBrowserDownloadProgress

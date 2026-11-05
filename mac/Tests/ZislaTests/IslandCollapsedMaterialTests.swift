@@ -6,13 +6,15 @@ import ZislaCore
 
 @MainActor
 struct IslandCollapsedMaterialTests {
-    @Test(arguments: IslandNotchBackground.allCases, [false, true])
+    @Test(arguments: IslandNotchBackground.allCases,
+          [(false, nil), (true, nil), (false, 14), (true, 14)] as [(Bool, CGFloat?)])
     func collapsedMaterialUsesTheSelectedNativeSurfaceAndAccessibilityFallback(
-        style: IslandNotchBackground, reduceTransparency: Bool
+        style: IslandNotchBackground, configuration: (Bool, CGFloat?)
     ) async {
-        let host = NSHostingView(rootView: IslandCollapsedMaterial.rendering(
-            style: style, reduceTransparency: reduceTransparency
-        ).frame(width: 160, height: 32))
+        let (reduceTransparency, cornerRadius) = configuration
+        let host = NSHostingView(rootView: IslandCollapsedMaterial(style: style, cornerRadius: cornerRadius)
+            .environment(\._accessibilityReduceTransparency, reduceTransparency)
+            .frame(width: 160, height: 32))
         host.sizingOptions = []
         let window = NSWindow(contentRect: CGRect(x: -100_000, y: -100_000, width: 160, height: 32),
             styleMask: [.borderless], backing: .buffered, defer: false)
@@ -33,7 +35,7 @@ struct IslandCollapsedMaterialTests {
             let glass = views.compactMap { $0 as? NSGlassEffectView }
             #expect(glass.isEmpty == (reduceTransparency || style != .liquidGlass))
             if style == .liquidGlass && !reduceTransparency {
-                #expect(glass.contains { $0.style == .clear && $0.cornerRadius == 16 && $0.tintColor == nil })
+                #expect(glass.contains { $0.style == .clear && $0.cornerRadius == (cornerRadius ?? 16) && $0.tintColor == nil })
             }
         } else if style == .liquidGlass && !reduceTransparency {
             #expect(effects.contains { $0.material == .popover })

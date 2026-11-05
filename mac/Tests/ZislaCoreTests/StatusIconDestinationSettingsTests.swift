@@ -4,6 +4,26 @@ import Testing
 
 struct StatusIconDestinationSettingsTests {
     @Test
+    func moreInformationDefaultsOffAndMalformedValuesPreserveOtherSettings() throws {
+        let original = FeatureSettings(mediaEnabled: false, systemMonitorEnabled: false,
+            statusIconDestination: .island)
+        #expect(!FeatureSettings.default.islandShowMoreInformation)
+        var payload = try encoded(original)
+        payload.removeValue(forKey: "islandShowMoreInformation")
+        #expect(try JSONDecoder().decode(FeatureSettings.self,
+            from: JSONSerialization.data(withJSONObject: payload)) == original)
+        let invalidValues: [Any] = [NSNull(), "true", 1, [String](), [String: String]()]
+        for value in invalidValues {
+            payload["islandShowMoreInformation"] = value
+            #expect(try JSONDecoder().decode(FeatureSettings.self,
+                from: JSONSerialization.data(withJSONObject: payload)) == original)
+        }
+        var enabled = original
+        enabled.islandShowMoreInformation = true
+        #expect(try JSONDecoder().decode(FeatureSettings.self, from: JSONEncoder().encode(enabled)) == enabled)
+    }
+
+    @Test
     func legacyAndNullDestinationsKeepAllIconsInTheMenuBar() throws {
         for json in ["{}", #"{"statusIconDestination":null}"#] {
             let settings = try JSONDecoder().decode(FeatureSettings.self, from: Data(json.utf8))
