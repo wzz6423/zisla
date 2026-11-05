@@ -807,7 +807,7 @@ public struct AIAgentState: Codable, Equatable, Sendable {
         channelProbes: [AgentChannelProbe] = [],
         channelModelCatalogs: [AgentChannelModelCatalog] = [],
         cliStatuses: [AgentCLIStatus] = [],
-        cliAutoUpdateEnabled: Bool = true,
+        cliAutoUpdateEnabled: Bool = false,
         cliAutoUpdateOverrides: [String: Bool] = [:],
         skills: [AgentSkill] = [],
         skillSyncConfiguration: AgentSkillSyncConfiguration = AgentSkillSyncConfiguration(),
@@ -855,7 +855,7 @@ public struct AIAgentState: Codable, Equatable, Sendable {
         channelProbes = try container.decodeIfPresent([AgentChannelProbe].self, forKey: .channelProbes) ?? []
         channelModelCatalogs = try container.decodeIfPresent([AgentChannelModelCatalog].self, forKey: .channelModelCatalogs) ?? []
         cliStatuses = try container.decodeIfPresent([AgentCLIStatus].self, forKey: .cliStatuses) ?? []
-        cliAutoUpdateEnabled = try container.decodeIfPresent(Bool.self, forKey: .cliAutoUpdateEnabled) ?? true
+        cliAutoUpdateEnabled = try container.decodeIfPresent(Bool.self, forKey: .cliAutoUpdateEnabled) ?? false
         cliAutoUpdateOverrides = try container.decodeIfPresent([String: Bool].self, forKey: .cliAutoUpdateOverrides) ?? [:]
         skills = try container.decodeIfPresent([AgentSkill].self, forKey: .skills) ?? []
         skillSyncConfiguration = try container.decodeIfPresent(AgentSkillSyncConfiguration.self, forKey: .skillSyncConfiguration) ?? AgentSkillSyncConfiguration()

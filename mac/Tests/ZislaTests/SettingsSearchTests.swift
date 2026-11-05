@@ -23,6 +23,7 @@ struct SettingsSearchTests {
         settings.systemMonitorEnabled = false
         settings.lockScreenInfoEnabled = false
         settings.sideNoticesEnabled = false
+        settings.dailyBriefing.enabled = false
         #expect(SettingsSection.info.isVisible(settings: settings))
         let matches = results(AppLocalization.string("关怀提醒间隔", language: language), settings: settings, locale: language.locale)
         #expect(matches.first?.section == .info)

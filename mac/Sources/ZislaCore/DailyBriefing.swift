@@ -29,7 +29,7 @@ public struct DailyBriefingSettings: Codable, Equatable, Sendable {
     public var selectedContent: Set<DailyBriefingContent>
 
     public init(
-        enabled: Bool = false,
+        enabled: Bool = true,
         minuteOfDay: Int = 22 * 60,
         template: DailyBriefingTemplate = .minimal,
         readsSystemScreenTime: Bool = true,
@@ -49,7 +49,7 @@ public struct DailyBriefingSettings: Codable, Equatable, Sendable {
     public init(from decoder: Decoder) throws {
         let values = try decoder.container(keyedBy: CodingKeys.self)
         self.init(
-            enabled: try values.decodeIfPresent(Bool.self, forKey: .enabled) ?? false,
+            enabled: try values.decodeIfPresent(Bool.self, forKey: .enabled) ?? true,
             minuteOfDay: try values.decodeIfPresent(Int.self, forKey: .minuteOfDay) ?? 22 * 60,
             template: try values.decodeIfPresent(DailyBriefingTemplate.self, forKey: .template) ?? .minimal,
             readsSystemScreenTime: try values.decodeIfPresent(Bool.self, forKey: .readsSystemScreenTime) ?? true,

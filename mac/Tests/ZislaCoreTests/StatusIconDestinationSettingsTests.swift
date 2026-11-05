@@ -4,10 +4,10 @@ import Testing
 
 struct StatusIconDestinationSettingsTests {
     @Test
-    func moreInformationDefaultsOffAndMalformedValuesPreserveOtherSettings() throws {
+    func moreInformationDefaultsOnAndMalformedValuesPreserveOtherSettings() throws {
         let original = FeatureSettings(mediaEnabled: false, systemMonitorEnabled: false,
             statusIconDestination: .island)
-        #expect(!FeatureSettings.default.islandShowMoreInformation)
+        #expect(FeatureSettings.default.islandShowMoreInformation)
         var payload = try encoded(original)
         payload.removeValue(forKey: "islandShowMoreInformation")
         #expect(try JSONDecoder().decode(FeatureSettings.self,
@@ -18,17 +18,18 @@ struct StatusIconDestinationSettingsTests {
             #expect(try JSONDecoder().decode(FeatureSettings.self,
                 from: JSONSerialization.data(withJSONObject: payload)) == original)
         }
-        var enabled = original
-        enabled.islandShowMoreInformation = true
-        #expect(try JSONDecoder().decode(FeatureSettings.self, from: JSONEncoder().encode(enabled)) == enabled)
+        var disabled = original
+        disabled.islandShowMoreInformation = false
+        #expect(try JSONDecoder().decode(FeatureSettings.self, from: JSONEncoder().encode(disabled)) == disabled)
     }
 
     @Test
-    func legacyAndNullDestinationsKeepAllIconsInTheMenuBar() throws {
+    func legacyAndNullDestinationsPreferTheIslandWhenSupported() throws {
         for json in ["{}", #"{"statusIconDestination":null}"#] {
             let settings = try JSONDecoder().decode(FeatureSettings.self, from: Data(json.utf8))
             let destination = try encoded(settings)["statusIconDestination"] as? String
-            #expect(destination == "menuBar")
+            #expect(destination == "island")
+            #expect(settings.effectiveStatusIconDestination == .menuBar)
             #expect(settings == FeatureSettings.default)
         }
     }
@@ -71,7 +72,7 @@ struct StatusIconDestinationSettingsTests {
     }
 
     @Test
-    func invalidDestinationsUseTheMenuBarWithoutResettingOtherSettings() throws {
+    func invalidDestinationsUseTheDefaultWithoutResettingOtherSettings() throws {
         var original = FeatureSettings.default
         original.mediaEnabled = false
         original.systemMonitorEnabled = false
@@ -85,7 +86,7 @@ struct StatusIconDestinationSettingsTests {
             payload["statusIconDestination"] = invalid
             let settings = try JSONDecoder().decode(FeatureSettings.self, from: JSONSerialization.data(withJSONObject: payload))
             let destination = try encoded(settings)["statusIconDestination"] as? String
-            #expect(destination == "menuBar")
+            #expect(destination == "island")
             #expect(settings == original)
         }
     }
@@ -93,7 +94,7 @@ struct StatusIconDestinationSettingsTests {
     @Test
     func onlyCustomPillsCanUseIslandIconsWithoutDiscardingTheSavedChoice() {
         var settings = FeatureSettings.default
-        settings.statusIconDestination = .island
+        #expect(settings.statusIconDestination == .island)
         for style in IslandLayoutStyle.allCases {
             for mode in IslandPlacementMode.allCases {
                 settings.islandLayoutStyle = style
@@ -102,6 +103,21 @@ struct StatusIconDestinationSettingsTests {
                 #expect(settings.supportsStatusIconsInIsland == allowed)
                 #expect(settings.effectiveStatusIconDestination == (allowed ? .island : .menuBar))
                 #expect(settings.statusIconDestination == .island)
+            }
+        }
+    }
+
+    @Test(arguments: StatusIconDestination.allCases)
+    func headphoneConnectionAnimationIsAvailableOnlyWhenIconsUseTheMenuBar(destination: StatusIconDestination) throws {
+        var settings = FeatureSettings(statusIconDestination: destination)
+        for style in IslandLayoutStyle.allCases {
+            for mode in IslandPlacementMode.allCases {
+                settings.islandLayoutStyle = style
+                settings.islandPlacement.mode = mode
+                let usesIsland = destination == .island && style == .pill && mode == .custom
+                #expect(settings.supportsHeadphoneConnectionAnimation == !usesIsland)
+                #expect(settings.systemMonitorMenuBarHeadphoneOptions.replacesNetworkIcon)
+                #expect(try JSONDecoder().decode(FeatureSettings.self, from: JSONEncoder().encode(settings)) == settings)
             }
         }
     }

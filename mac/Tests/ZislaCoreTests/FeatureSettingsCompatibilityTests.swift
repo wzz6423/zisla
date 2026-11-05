@@ -36,11 +36,11 @@ struct FeatureSettingsCompatibilityTests {
     }
 
     @Test
-    func userCareRequiresOptInForNewAndLegacySettings() throws {
-        #expect(!FeatureSettings.default.userCareEnabled)
+    func userCareDefaultsOnForNewAndLegacySettingsAndPreservesSavedChoices() throws {
+        #expect(FeatureSettings.default.userCareEnabled)
         for json in ["{}", #"{"userCareEnabled":null,"petEnabled":false}"#] {
             let settings = try JSONDecoder().decode(FeatureSettings.self, from: Data(json.utf8))
-            #expect(!settings.userCareEnabled)
+            #expect(settings.userCareEnabled)
         }
         for enabled in [false, true] {
             let settings = FeatureSettings(userCareEnabled: enabled)
@@ -129,11 +129,11 @@ struct FeatureSettingsCompatibilityTests {
     }
 
     @Test
-    func windowPreviewsRemainOffForExistingSettingsUntilEnabled() throws {
-        #expect(!FeatureSettings().windowPreviewsEnabled)
+    func windowPreviewsDefaultOnForExistingSettingsAndPreserveSavedChoices() throws {
+        #expect(FeatureSettings().windowPreviewsEnabled)
         let legacy = Data(#"{"hoverActivationEnabled":true}"#.utf8)
         var settings = try JSONDecoder().decode(FeatureSettings.self, from: legacy)
-        #expect(!settings.windowPreviewsEnabled)
+        #expect(settings.windowPreviewsEnabled)
 
         for enabled in [true, false] {
             settings.windowPreviewsEnabled = enabled
@@ -553,16 +553,16 @@ struct FeatureSettingsCompatibilityTests {
         let decodedLegacy = try JSONDecoder().decode(FeatureSettings.self, from: legacy)
         #expect(decodedLegacy.systemMonitorMenuBarMetrics == [.cpu])
         #expect(decodedLegacy.systemMonitorMenuBarDisplayStyle == .compact)
-        #expect(!decodedLegacy.menuBarAppIconEnabled)
+        #expect(decodedLegacy.menuBarAppIconEnabled)
 
         var settings = FeatureSettings.default
         settings.systemMonitorMenuBarMetrics = [.gpu, .memory, .fan]
         settings.systemMonitorMenuBarDisplayStyle = .detailed
-        settings.menuBarAppIconEnabled = true
+        settings.menuBarAppIconEnabled = false
         let decoded = try JSONDecoder().decode(FeatureSettings.self, from: JSONEncoder().encode(settings))
         #expect(decoded.systemMonitorMenuBarMetrics == [.gpu, .memory, .fan])
         #expect(decoded.systemMonitorMenuBarDisplayStyle == .detailed)
-        #expect(decoded.menuBarAppIconEnabled)
+        #expect(!decoded.menuBarAppIconEnabled)
     }
 
     @Test

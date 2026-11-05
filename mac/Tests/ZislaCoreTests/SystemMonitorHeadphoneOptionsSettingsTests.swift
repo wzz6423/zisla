@@ -8,7 +8,7 @@ struct SystemMonitorHeadphoneOptionsSettingsTests {
         let object = try Self.object(FeatureSettings.default)
         let payload = try #require(object[Self.optionsKey] as? [String: Any])
         let options = try JSONDecoder().decode(SystemMonitorHeadphoneOptions.self, from: JSONSerialization.data(withJSONObject: payload))
-        #expect(!options.replacesNetworkIcon)
+        #expect(options.replacesNetworkIcon)
         #expect(options.prioritizesNetworkErrors)
         #expect(!options.usesVolumeColor)
         #expect(options.symbolScale == 1.45)

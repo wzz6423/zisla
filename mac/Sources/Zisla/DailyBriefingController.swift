@@ -14,7 +14,7 @@ final class DailyBriefingController: ObservableObject {
     private let typing: @MainActor (Date) async throws -> DailyBriefingTyping?
     private let readScreenTime: @Sendable (DateInterval) async -> DailyBriefingScreenTimeResult
     private let export: @MainActor (DailyBriefingReport, DailyBriefingTemplate, AppLanguage, URL) async throws -> URL
-    private var settings = DailyBriefingSettings()
+    private var settings = DailyBriefingSettings(enabled: false)
     private var language = AppLanguage.simplifiedChinese
     private var directory = AppPaths.downloads
     private var loopTask: Task<Void, Never>?

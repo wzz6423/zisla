@@ -155,7 +155,7 @@ struct UserCareServiceTests {
         let fixture = UserCareFixture()
         let service = fixture.makeService()
         defer { service.stop() }
-        service.apply(settings: FeatureSettings())
+        service.apply(settings: FeatureSettings(userCareEnabled: false))
         #expect(fixture.timers.isEmpty)
         #expect(fixture.workspace.handlers.isEmpty)
         #expect(fixture.distributed.handlers.isEmpty)

@@ -243,13 +243,13 @@ struct StatusIconDestinationIntegrationTests {
     }
 
     @Test(arguments: IslandEdge.allCases) @MainActor
-    func moreInformationKeepsMonitorAIPlaybackAndAwakeStatusTogether(edge: IslandEdge) throws {
+    func defaultMoreInformationKeepsMonitorAIPlaybackAndAwakeStatusTogether(edge: IslandEdge) throws {
         let fixture = try IconFixture(edge: edge)
         defer { fixture.close() }
         fixture.settings.settings.sideNoticesEnabled = true
         fixture.settings.settings.mediaCompactStyle = .detailed
         var payload = try #require(JSONSerialization.jsonObject(with: JSONEncoder().encode(fixture.settings.settings)) as? [String: Any])
-        payload["islandShowMoreInformation"] = true
+        payload.removeValue(forKey: "islandShowMoreInformation")
         fixture.settings.settings = try JSONDecoder().decode(FeatureSettings.self,
             from: JSONSerialization.data(withJSONObject: payload))
         let icons = [IslandStatusIcon(id: "cpu", content: .metric(.cpu, text: "20%", image: nil, style: .detailed), tooltip: "CPU")]
@@ -1194,6 +1194,7 @@ struct StatusIconDestinationIntegrationTests {
             settings.settings.islandPlacement = IslandPlacement(mode: .custom, edge: edge)
             settings.settings.statusIconDestination = .island
             settings.settings.sideNoticesEnabled = false
+            settings.settings.islandShowMoreInformation = false
             settings.settings.islandNotchBackground = .black
         }
 

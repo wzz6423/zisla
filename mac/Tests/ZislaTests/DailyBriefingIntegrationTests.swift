@@ -122,7 +122,7 @@ struct DailyBriefingIntegrationTests {
         #expect(attempts == 1)
         let pending = try await store.pendingExports(at: morning.addingTimeInterval(14 * 3600), settings: settings, calendar: calendar)
         #expect(pending.count == 1)
-        controller.configure(settings: .init(), directory: directory, language: .english, startsTimer: false)
+        controller.configure(settings: .init(enabled: false), directory: directory, language: .english, startsTimer: false)
         await controller.exportToday(at: morning)
         #expect(attempts == 1)
     }

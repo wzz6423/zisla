@@ -137,7 +137,7 @@ struct AIAgentServicesTests {
     }
 
     @Test
-    func cliAutoUpdateRunsByDefault() async throws {
+    func cliUpdatesAreReportedWithoutAutomaticInstallationByDefault() async throws {
         let (workspace, directory, updateMarker) = try makeCLIAutoUpdateWorkspace(latestVersion: { kind in
             kind == .codex ? "1.1.0" : nil
         })
@@ -149,15 +149,13 @@ struct AIAgentServicesTests {
         }
 
         workspace.start()
-        #expect(await waitForCLIUpdate(workspace, kind: .codex))
-        await waitForFile(at: updateMarker)
-        await waitForCLICommandRunToFinish(workspace)
+        await workspace.refreshCLIs()
 
-        #expect(store.state.isCLIAutoUpdateEnabled(for: .codex))
-        #expect(FileManager.default.fileExists(atPath: updateMarker.path))
-
-        workspace.setCLIAutoUpdateEnabled(false, for: .codex)
-        #expect(!store.state.isCLIAutoUpdateEnabled(for: .codex))
+        #expect(workspace.cliUpdates.map(\.kind) == [.codex])
+        #expect(AgentCLIKind.managedCases.allSatisfy { !store.state.isCLIAutoUpdateEnabled(for: $0) })
+        #expect(!FileManager.default.fileExists(atPath: updateMarker.path))
+        #expect(workspace.cliCommandProgress == nil)
+        #expect(store.state.skillSyncConfiguration.enabledDestinations.isEmpty)
     }
 
     @Test
@@ -192,6 +190,7 @@ struct AIAgentServicesTests {
             try? FileManager.default.removeItem(at: directory)
         }
         workspace.setCLIAutoUpdateEnabled(false, for: .codex)
+        workspace.setCLIAutoUpdateEnabled(true, for: .claude)
         workspace.start()
         await waitForFile(at: argumentsFile)
         await waitForCLICommandRunToFinish(workspace)
@@ -398,6 +397,7 @@ struct AIAgentServicesTests {
             workspace.store.flushPendingChanges()
             try? FileManager.default.removeItem(at: directory)
         }
+        workspace.setCLIAutoUpdateEnabled(true, for: .codex)
         workspace.start()
         await workspace.refreshCLIs()
 

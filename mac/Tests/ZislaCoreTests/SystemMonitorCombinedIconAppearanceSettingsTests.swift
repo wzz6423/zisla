@@ -62,8 +62,8 @@ struct SystemMonitorCombinedIconAppearanceSettingsTests {
         let appearance = SystemMonitorCombinedIconAppearance(iconSize: 36, indicatorStyle: .arc, wifiScale: 1.8)
         let settings = FeatureSettings(systemMonitorMenuBarCombinedIconAppearance: appearance)
         #expect(settings.systemMonitorMenuBarCombinedIconAppearance == appearance)
-        #expect(settings.systemMonitorMenuBarLayout == .individual)
-        #expect(!settings.systemMonitorMenuBarCombinedIconEnabled)
+        #expect(settings.systemMonitorMenuBarLayout == .stacked)
+        #expect(settings.systemMonitorMenuBarCombinedIconEnabled)
     }
 
     @Test
@@ -125,7 +125,7 @@ struct SystemMonitorCombinedIconAppearanceSettingsTests {
             let settings = try JSONDecoder().decode(FeatureSettings.self, from: input)
             #expect(settings.systemMonitorMenuBarCombinedIconAppearance.ringStrokeStyle == expected)
             #expect(settings.systemMonitorMenuBarCombinedIconAppearance.iconSize == 26)
-            #expect(settings.systemMonitorMenuBarLayout == .individual)
+            #expect(settings.systemMonitorMenuBarLayout == .stacked)
         }
     }
 
@@ -233,10 +233,10 @@ struct SystemMonitorCombinedIconAppearanceSettingsTests {
             let settings = try JSONDecoder().decode(FeatureSettings.self, from: Data(payload.utf8))
             #expect(settings.systemMonitorMenuBarCombinedIconMetric == .memory)
             #expect(settings.systemMonitorMenuBarCombinedIconAppearance == expected)
-            #expect(settings.systemMonitorMenuBarLayout == .individual)
+            #expect(settings.systemMonitorMenuBarLayout == .stacked)
             #expect(settings.systemMonitorMenuBarTopRow == [.cpu])
             #expect(settings.systemMonitorMenuBarBottomRow == [.gpu])
-            #expect(!settings.systemMonitorMenuBarCombinedIconEnabled)
+            #expect(settings.systemMonitorMenuBarCombinedIconEnabled)
         }
     }
 

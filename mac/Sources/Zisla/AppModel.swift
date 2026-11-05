@@ -3174,6 +3174,7 @@ final class AppModel: ObservableObject {
       options: settings.systemMonitorMenuBarHeadphoneOptions
     )
     reconcileHeadphoneTransient(devices: audioOutput.devices)
+    SystemMonitorHeadphoneTransient.updateConnectionNotices(settings: settings, queue: notices)
     if headphonePolicy {
       audioOutput.start()
     } else {
@@ -4112,14 +4113,18 @@ final class AppModel: ObservableObject {
   }
 
   private func reconcileHeadphoneTransient(devices: [AudioOutputDevice]) {
-    systemMonitorHeadphoneTransient.reconcile(enabled: headphoneTransientEnabled, devices: devices)
+    systemMonitorHeadphoneTransient.reconcile(
+      enabled: headphoneTransientEnabled, settings: settingsStore.settings, devices: devices
+    )
     if systemMonitorHeadphoneTransient.connection == nil {
       clearHeadphoneTransient()
     }
   }
 
   private func consumeHeadphoneConnection(_ connection: HeadphoneConnection) {
-    systemMonitorHeadphoneTransient.receive(connection, enabled: headphoneTransientEnabled)
+    systemMonitorHeadphoneTransient.receive(
+      connection, enabled: headphoneTransientEnabled, settings: settingsStore.settings
+    )
     if systemMonitorHeadphoneTransient.connection?.id == connection.id {
       headphoneTransientTask?.cancel()
       headphoneTransientTask = Task { @MainActor [weak self] in
@@ -4131,22 +4136,8 @@ final class AppModel: ObservableObject {
         self.headphoneTransientTask = nil
       }
     }
-    guard settingsStore.settings.sideNoticesEnabled else { return }
-    notices.enqueue(
-      IslandNotice(
-        id: "headphone-connection-\(connection.id.uuidString)",
-        title: connection.device.name,
-        detail: "已连接",
-        kind: .info,
-        side: .right,
-        style: .headphone,
-        symbolName: connection.device.isAirPodsMax ? "headphones" : nil,
-        batteryLevels: connection.battery?.noticeLevels,
-        metadata: connection.productID.map {
-          [HeadphoneConnection.productIDMetadataKey: String($0)]
-        }
-      ),
-      expiresAfter: SystemMonitorHeadphoneTransient.duration
+    SystemMonitorHeadphoneTransient.updateConnectionNotices(
+      settings: settingsStore.settings, queue: notices, connection: connection
     )
   }
 

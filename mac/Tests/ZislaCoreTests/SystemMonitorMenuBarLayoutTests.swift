@@ -99,10 +99,10 @@ struct SystemMonitorMenuBarLayoutTests {
     }
 
     @Test
-    func legacyMissingNullAndRawValuesKeepTheirOriginalModes() throws {
+    func missingAndNullLayoutsUseStackedWhileSavedModesArePreserved() throws {
         for (payload, expected) in [
-            ("{}", SystemMonitorMenuBarLayout.individual),
-            (#"{"systemMonitorMenuBarLayout":null}"#, .individual),
+            ("{}", SystemMonitorMenuBarLayout.stacked),
+            (#"{"systemMonitorMenuBarLayout":null}"#, .stacked),
             (#"{"systemMonitorMenuBarLayout":"individual"}"#, .individual),
             (#"{"systemMonitorMenuBarLayout":"stacked"}"#, .stacked),
         ] {
@@ -111,7 +111,7 @@ struct SystemMonitorMenuBarLayoutTests {
             #expect(settings.systemMonitorMenuBarLayout.individualEnabled == (expected == .individual))
             #expect(settings.systemMonitorMenuBarLayout.stackedEnabled == (expected == .stacked))
         }
-        #expect(FeatureSettings.default.systemMonitorMenuBarLayout == .individual)
+        #expect(FeatureSettings.default.systemMonitorMenuBarLayout == .stacked)
     }
 
     @Test

@@ -35,20 +35,20 @@ struct FeatureSettingsStoreTests {
     }
 
     @Test @MainActor
-    func moreInformationPersistsAcrossRelaunchAndResetRestoresItsDefault() throws {
+    func moreInformationOptOutPersistsAcrossRelaunchAndResetRestoresItsDefault() throws {
         let suite = "Zisla.FloatingIslandInformation.\(UUID().uuidString)"
         let defaults = try #require(UserDefaults(suiteName: suite))
         defer { defaults.removePersistentDomain(forName: suite) }
         let store = FeatureSettingsStore(defaults: defaults, persistenceDelay: .seconds(60))
-        #expect(!store.settings.islandShowMoreInformation)
-        store.settings.islandShowMoreInformation = true
+        #expect(store.settings.islandShowMoreInformation)
+        store.settings.islandShowMoreInformation = false
         store.flushPendingChanges()
         let reloaded = FeatureSettingsStore(defaults: defaults, persistenceDelay: .seconds(60))
-        #expect(reloaded.settings.islandShowMoreInformation)
+        #expect(!reloaded.settings.islandShowMoreInformation)
         #expect(reloaded.settings == store.settings)
         reloaded.reset()
         reloaded.flushPendingChanges()
-        #expect(!FeatureSettingsStore(defaults: defaults).settings.islandShowMoreInformation)
+        #expect(FeatureSettingsStore(defaults: defaults).settings.islandShowMoreInformation)
     }
 
     @Test @MainActor
@@ -73,25 +73,65 @@ struct FeatureSettingsStoreTests {
     }
 
     @Test @MainActor
-    func userCareOptInPersistsAndResetRestoresOptOut() throws {
+    func userCareOptOutPersistsAndResetRestoresTheEnabledDefault() throws {
         let suiteName = "Zisla.UserCareSettings.\(UUID().uuidString)"
         let defaults = try #require(UserDefaults(suiteName: suiteName))
         defer { defaults.removePersistentDomain(forName: suiteName) }
         defaults.set(Data(#"{"petEnabled":false,"sideNoticesEnabled":false}"#.utf8), forKey: "feature-settings-v1")
 
         let store = FeatureSettingsStore(defaults: defaults)
-        #expect(!store.settings.userCareEnabled)
+        #expect(store.settings.userCareEnabled)
         #expect(!store.settings.petEnabled)
         #expect(!store.settings.sideNoticesEnabled)
-        store.settings.userCareEnabled = true
+        store.settings.userCareEnabled = false
         store.flushPendingChanges()
         let restored = FeatureSettingsStore(defaults: defaults)
-        #expect(restored.settings.userCareEnabled)
+        #expect(!restored.settings.userCareEnabled)
         #expect(!restored.settings.sideNoticesEnabled)
         restored.reset()
-        #expect(!restored.settings.userCareEnabled)
+        #expect(restored.settings.userCareEnabled)
         restored.flushPendingChanges()
-        #expect(!FeatureSettingsStore(defaults: defaults).settings.userCareEnabled)
+        #expect(FeatureSettingsStore(defaults: defaults).settings.userCareEnabled)
+    }
+
+    @Test(arguments: ["missing", "empty", "null", "invalid"]) @MainActor
+    func nonInvasiveDefaultsApplyToNewLegacyAndInvalidStoresAndReset(source: String) throws {
+        let suiteName = "Zisla.NonInvasiveDefaults.\(UUID().uuidString)"
+        let defaults = try #require(UserDefaults(suiteName: suiteName))
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+        switch source {
+        case "empty": defaults.set(Data("{}".utf8), forKey: "feature-settings-v1")
+        case "null":
+            defaults.set(Data(#"{"dailyBriefing":{"enabled":null},"windowPreviewsEnabled":null,"contextNotesEnabled":null}"#.utf8), forKey: "feature-settings-v1")
+        case "invalid": defaults.set(Data("invalid".utf8), forKey: "feature-settings-v1")
+        default: break
+        }
+        let store = FeatureSettingsStore(defaults: defaults)
+        #expect(store.settings.dailyBriefing.enabled)
+        #expect(store.settings.windowPreviewsEnabled)
+        #expect(store.settings.contextNotesEnabled)
+        #expect(store.settings.menuBarAppIconEnabled)
+        #expect(store.settings.statusIconDestination == .island)
+        #expect(store.settings.systemMonitorMenuBarLayout == .stacked)
+        #expect(store.settings.systemMonitorMenuBarCombinedIconEnabled)
+        #expect(store.settings.systemMonitorMenuBarHeadphoneOptions.replacesNetworkIcon)
+        let enabled = store.settings
+        store.settings.dailyBriefing.enabled = false
+        store.settings.dailyBriefing.minuteOfDay = 1385
+        store.settings.windowPreviewsEnabled = false
+        store.settings.contextNotesEnabled = false
+        store.settings.menuBarAppIconEnabled = false
+        store.settings.statusIconDestination = .menuBar
+        store.settings.systemMonitorMenuBarLayout = .none
+        store.settings.systemMonitorMenuBarCombinedIconEnabled = false
+        store.settings.systemMonitorMenuBarHeadphoneOptions.replacesNetworkIcon = false
+        store.flushPendingChanges()
+        let restored = FeatureSettingsStore(defaults: defaults)
+        #expect(restored.settings == store.settings)
+        restored.reset()
+        #expect(restored.settings == enabled)
+        restored.flushPendingChanges()
+        #expect(FeatureSettingsStore(defaults: defaults).settings == enabled)
     }
 
     @Test @MainActor

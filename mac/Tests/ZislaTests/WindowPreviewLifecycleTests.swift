@@ -4,6 +4,7 @@ import CoreVideo
 import ScreenCaptureKit
 import Testing
 import VideoToolbox
+import ZislaCore
 
 @testable import Zisla
 
@@ -16,7 +17,7 @@ struct WindowPreviewLifecycleTests {
         let controller = WindowPreviewController(dependencies: system.dependencies())
         defer { controller.stop() }
 
-        controller.configure(enabled: true)
+        controller.configure(enabled: FeatureSettings.default.windowPreviewsEnabled)
         controller.configure(enabled: true, requestPermissions: true)
         #expect(system.permissionRequests == 0)
         #expect(system.monitors.isEmpty)

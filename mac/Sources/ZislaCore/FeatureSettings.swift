@@ -705,7 +705,6 @@ public enum IslandModuleOrder: String, Codable, CaseIterable, Sendable, Equatabl
     }
 }
 
-/// Feature module toggles default to on.
 public struct FeatureSettings: Codable, Equatable, Sendable {
     public var mediaEnabled: Bool
     public var mediaSource: MediaSourcePreference
@@ -755,6 +754,9 @@ public struct FeatureSettings: Codable, Equatable, Sendable {
     }
     public var effectiveStatusIconDestination: StatusIconDestination {
         supportsStatusIconsInIsland ? statusIconDestination : .menuBar
+    }
+    public var supportsHeadphoneConnectionAnimation: Bool {
+        effectiveStatusIconDestination == .menuBar
     }
     public var weatherEnabled: Bool
     public var lockScreenInfoEnabled: Bool
@@ -938,15 +940,15 @@ public struct FeatureSettings: Codable, Equatable, Sendable {
         batteryMonitorEnabled: Bool = true,
         systemMonitorMenuBarMetrics: Set<SystemMonitorMenuBarMetric> = [.cpu],
         systemMonitorMenuBarDisplayStyle: SystemMonitorMenuBarDisplayStyle = .compact,
-        systemMonitorMenuBarLayout: SystemMonitorMenuBarLayout = .individual,
+        systemMonitorMenuBarLayout: SystemMonitorMenuBarLayout = .stacked,
         systemMonitorMenuBarTopRow: [SystemMonitorMenuBarMetric] = [.cpu],
         systemMonitorMenuBarBottomRow: [SystemMonitorMenuBarMetric] = [.gpu],
-        systemMonitorMenuBarCombinedIconEnabled: Bool = false,
+        systemMonitorMenuBarCombinedIconEnabled: Bool = true,
         systemMonitorMenuBarCombinedIconMetric: SystemMonitorCombinedIconMetric = .memory,
         systemMonitorMenuBarCombinedIconAppearance: SystemMonitorCombinedIconAppearance = SystemMonitorCombinedIconAppearance(),
         systemMonitorMenuBarHeadphoneOptions: SystemMonitorHeadphoneOptions = SystemMonitorHeadphoneOptions(),
-        menuBarAppIconEnabled: Bool = false,
-        statusIconDestination: StatusIconDestination = .menuBar,
+        menuBarAppIconEnabled: Bool = true,
+        statusIconDestination: StatusIconDestination = .island,
         weatherEnabled: Bool = true,
         lockScreenInfoEnabled: Bool = true,
         lockScreenMessage: String = "",
@@ -979,10 +981,10 @@ public struct FeatureSettings: Codable, Equatable, Sendable {
         clipboardAssistantDisplayDuration: ClipboardAssistantDisplayDuration = .fiveSeconds,
         clipboardAssistantPromptsForImageSaveLocation: Bool = false,
         clipboardAssistantMouseGestureEnabled: Bool = false,
-        contextNotesEnabled: Bool = false,
+        contextNotesEnabled: Bool = true,
         contextNoteHoldHotkey: VoiceInputHotkeyPreset = VoiceInputHotkeyPreset(keyCode: 55, carbonModifiers: 0x0100, keyDisplayName: "Command"),
         sideNoticesEnabled: Bool = true,
-        userCareEnabled: Bool = false,
+        userCareEnabled: Bool = true,
         userCareReminderInterval: TimeInterval = UserCareInterval.defaultSeconds,
         collapsedProgressGlowEnabled: Bool = true,
         aiTaskResultSweepEnabled: Bool = true,
@@ -990,7 +992,7 @@ public struct FeatureSettings: Codable, Equatable, Sendable {
         moduleOrder: [IslandModuleOrder] = IslandModuleOrder.defaultOrder,
         notificationsMuted: Bool = false,
         hoverActivationEnabled: Bool = true,
-        windowPreviewsEnabled: Bool = false,
+        windowPreviewsEnabled: Bool = true,
         activityNoticeDisplayDuration: ActivityNoticeDisplayDuration = .threeSeconds,
         focusModeNoticeDisplayDuration: FocusModeNoticeDisplayDuration = .threeSeconds,
         activityNoticeDisplayIDs: Set<UInt32> = [],
@@ -1001,7 +1003,7 @@ public struct FeatureSettings: Codable, Equatable, Sendable {
         mediaShowLyricsAndInfo: Bool = true,
         mediaCompactStyle: MediaCompactStyle = .compact,
         mediaVisualizationStyle: MediaVisualizationStyle = .waveform,
-        islandShowMoreInformation: Bool = false,
+        islandShowMoreInformation: Bool = true,
         islandLayoutStyle: IslandLayoutStyle = .notch,
         islandPlacement: IslandPlacement = IslandPlacement(),
         islandPillWidth: Double = 180,
