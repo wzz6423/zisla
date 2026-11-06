@@ -344,19 +344,20 @@ struct SettingsView: View {
                     .pickerStyle(.menu)
                     .disabled(!settingsStore.settings.mediaEnabled)
                 }
-                rowDivider
-                settingRow(symbol: "menubar.rectangle", title: "机器监控状态显示位置", detail: "") {
-                    IslandOutlinedPicker(
-                        selection: Binding(get: { settingsStore.settings.effectiveStatusIconDestination },
-                                           set: { settingsStore.settings.statusIconDestination = $0 }),
-                        options: settingsStore.settings.supportsStatusIconsInIsland
-                            ? Array(StatusIconDestination.allCases) : [.menuBar],
-                        title: { $0.menuTitle },
-                        selectionID: "status-icon-destination-selection",
-                        fontSize: 9,
-                        width: 128,
-                        height: SettingsControlMetrics.height(for: .regular)
-                    )
+                if settingsStore.settings.supportsStatusIconsInIsland {
+                    rowDivider
+                    settingRow(symbol: "menubar.rectangle", title: "机器监控状态显示位置", detail: "") {
+                        IslandOutlinedPicker(
+                            selection: Binding(get: { settingsStore.settings.effectiveStatusIconDestination },
+                                               set: { settingsStore.settings.statusIconDestination = $0 }),
+                            options: Array(StatusIconDestination.allCases),
+                            title: { $0.menuTitle },
+                            selectionID: "status-icon-destination-selection",
+                            fontSize: 9,
+                            width: 128,
+                            height: SettingsControlMetrics.height(for: .regular)
+                        )
+                    }
                 }
                 if model.settingsStore.settings.systemMonitorEnabled {
                     rowDivider
