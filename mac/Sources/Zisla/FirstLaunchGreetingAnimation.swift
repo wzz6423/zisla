@@ -42,6 +42,7 @@ struct FirstLaunchGreetingAnimation: View {
     let timeline: FirstLaunchGreetingTimeline
     let startedAt: Date?
     let preferredLanguage: AppLanguage
+    var artworkForLanguage: (AppLanguage) -> FirstLaunchGreetingArtwork? = FirstLaunchGreetingArtwork.artwork
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @Environment(\.colorSchemeContrast) private var contrast
 
@@ -61,26 +62,35 @@ struct FirstLaunchGreetingAnimation: View {
         .accessibilityLabel(Text(AppLocalization.string("onboarding.hello", language: preferredLanguage)))
     }
 
+    @ViewBuilder
     private func greeting(_ frame: FirstLaunchGreetingTimeline.Frame) -> some View {
         let colors: [Color] = contrast == .increased ? [.primary, .primary] : [.accentColor, .zislaInfo, .accentColor]
-        let artwork = FirstLaunchGreetingArtwork.artwork(for: frame.language)
-        return Canvas { context, size in
-            let strokes = artwork.fittedStrokes(in: size)
-            for (index, stroke) in strokes.enumerated() {
-                let progress = artwork.strokeProgress(at: frame.progress, index: index)
-                context.stroke(
-                    stroke.trimmedPath(from: 0, to: progress),
-                    with: .linearGradient(
-                        Gradient(colors: colors),
-                        startPoint: CGPoint(x: 0, y: size.height * (1 - frame.progress)),
-                        endPoint: CGPoint(x: size.width, y: size.height * frame.progress)
-                    ),
-                    style: StrokeStyle(
-                        lineWidth: artwork.fittedLineWidth(in: size, baseWidth: contrast == .increased ? 6 : 5),
-                        lineCap: .round, lineJoin: .round
+        if let artwork = artworkForLanguage(frame.language) {
+            Canvas { context, size in
+                let strokes = artwork.fittedStrokes(in: size)
+                for (index, stroke) in strokes.enumerated() {
+                    let progress = artwork.strokeProgress(at: frame.progress, index: index)
+                    context.stroke(
+                        stroke.trimmedPath(from: 0, to: progress),
+                        with: .linearGradient(
+                            Gradient(colors: colors),
+                            startPoint: CGPoint(x: 0, y: size.height * (1 - frame.progress)),
+                            endPoint: CGPoint(x: size.width, y: size.height * frame.progress)
+                        ),
+                        style: StrokeStyle(
+                            lineWidth: artwork.fittedLineWidth(in: size, index: index, baseWidth: contrast == .increased ? 6 : 5),
+                            lineCap: .round, lineJoin: .round
+                        )
                     )
-                )
+                }
             }
+        } else {
+            Text(AppLocalization.string("onboarding.hello", language: frame.language))
+                .font(.system(size: 64, weight: .light, design: .rounded))
+                .foregroundStyle(colors[0])
+                .lineLimit(1)
+                .minimumScaleFactor(0.2)
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
         }
     }
 }
