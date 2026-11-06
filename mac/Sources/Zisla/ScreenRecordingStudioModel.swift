@@ -225,25 +225,6 @@ final class ScreenRecordingStudioModel: ObservableObject {
         }
     }
 
-    func chooseRecordingOutputDirectory() {
-        guard !isRecording, !isBusy, !isChoosingFile, !exporter.isExporting else { return }
-        let panel = NSOpenPanel()
-        panel.canChooseDirectories = true
-        panel.canChooseFiles = false
-        panel.allowsMultipleSelection = false
-        panel.canCreateDirectories = true
-        panel.directoryURL = recordingOutputDirectory
-        panel.message = AppLocalization.text("选择录屏保存目录")
-        isChoosingFile = true
-        panel.begin { [weak self] response in
-            guard let self else { return }
-            self.isChoosingFile = false
-            guard response == .OK, let url = panel.url else { return }
-            do { try self.setRecordingOutputDirectory(url); self.errorMessage = nil }
-            catch { self.errorMessage = error.localizedDescription }
-        }
-    }
-
     func setRecordingOutputDirectory(_ url: URL) throws {
         guard !isRecording, !isBusy, !exporter.isExporting else { return }
         if let setDownloadDirectory { try setDownloadDirectory(url) }
