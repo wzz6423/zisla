@@ -179,8 +179,8 @@ public struct SystemMetricsHistoryStats: Equatable, Sendable {
 public protocol SystemMetricsHistoryPersisting: Sendable {
     /// Every stored sample, oldest first.
     func loadRecords() -> [SystemMetricsRecord]
-    /// Stores one sample and drops the oldest ones beyond `capacity`.
-    func appendRecord(_ record: SystemMetricsRecord, capacity: Int)
+    /// Stores one sample; a `nil` capacity keeps all samples.
+    func appendRecord(_ record: SystemMetricsRecord, capacity: Int?)
     func removeAll()
 }
 
@@ -194,9 +194,8 @@ private struct SystemMetricsHistoryDatabaseError: LocalizedError {
 /// SQLite archive of the recorded samples.
 ///
 /// One row per sample in `metrics`, keyed by its timestamp, with the per-fan readings in a child
-/// table so the schema does not bake in a fan count. Recording is a single-row `INSERT` and the ring
-/// buffer is enforced in SQL, so nothing rewrites the whole archive the way an append-only text log
-/// has to once it overflows.
+/// table so the schema does not bake in a fan count. Recording is a single-row `INSERT`; an explicit
+/// capacity is enforced in SQL without rewriting the archive.
 public final class SystemMetricsHistoryDatabase: SystemMetricsHistoryPersisting, @unchecked Sendable {
     private let databaseURL: URL
     private let fileManager: FileManager
@@ -229,11 +228,11 @@ public final class SystemMetricsHistoryDatabase: SystemMetricsHistoryPersisting,
         }
     }
 
-    public func appendRecord(_ record: SystemMetricsRecord, capacity: Int) {
+    public func appendRecord(_ record: SystemMetricsRecord, capacity: Int?) {
         queue.sync {
             guard let database = connectionOrNil() else { return }
             // Recording is best effort: a full disk must never disturb the sampler.
-            try? write(record, capacity: max(1, capacity), to: database)
+            try? write(record, capacity: capacity.map { max(1, $0) }, to: database)
         }
     }
 
@@ -520,11 +519,13 @@ public final class SystemMetricsHistoryDatabase: SystemMetricsHistoryPersisting,
 
     // MARK: Writing
 
-    private func write(_ record: SystemMetricsRecord, capacity: Int, to database: OpaquePointer) throws {
+    private func write(_ record: SystemMetricsRecord, capacity: Int?, to database: OpaquePointer) throws {
         try execute("BEGIN IMMEDIATE TRANSACTION", on: database)
         do {
             try insert(record, into: database)
-            try prune(to: capacity, in: database)
+            if let capacity {
+                try prune(to: capacity, in: database)
+            }
             try execute("COMMIT", on: database)
         } catch {
             try? execute("ROLLBACK", on: database)
@@ -728,7 +729,7 @@ public final class LazySystemMetricsHistoryPersistence: SystemMetricsHistoryPers
         database().loadRecords()
     }
 
-    public func appendRecord(_ record: SystemMetricsRecord, capacity: Int) {
+    public func appendRecord(_ record: SystemMetricsRecord, capacity: Int?) {
         database().appendRecord(record, capacity: capacity)
     }
 
@@ -748,12 +749,11 @@ public final class LazySystemMetricsHistoryPersistence: SystemMetricsHistoryPers
 
 // MARK: - Store
 
-/// Ring buffer of samples over the SQLite archive: recording writes a single row and the archive
-/// trims itself in SQL, which keeps a long recording window affordable on SSD.
+/// Samples over the SQLite archive, retained until cleared unless a capacity is explicitly supplied.
 public final class SystemMetricsHistoryStore: @unchecked Sendable {
-    public static let defaultCapacity = 30 * 24 * 60
+    public static let defaultCapacity: Int? = nil
 
-    public let capacity: Int
+    public let capacity: Int?
     private let persistence: any SystemMetricsHistoryPersisting
     private let lock = NSLock()
     private var stored: [SystemMetricsRecord] = []
@@ -761,10 +761,10 @@ public final class SystemMetricsHistoryStore: @unchecked Sendable {
 
     public init(
         persistence: any SystemMetricsHistoryPersisting,
-        capacity: Int = SystemMetricsHistoryStore.defaultCapacity
+        capacity: Int? = SystemMetricsHistoryStore.defaultCapacity
     ) {
         self.persistence = persistence
-        self.capacity = max(1, capacity)
+        self.capacity = capacity.map { max(1, $0) }
     }
 
     public var records: [SystemMetricsRecord] {
@@ -790,9 +790,11 @@ public final class SystemMetricsHistoryStore: @unchecked Sendable {
         defer { lock.unlock() }
         loadIfNeededLocked()
         stored.append(record)
-        let overflow = stored.count - capacity
-        if overflow > 0 {
-            stored.removeFirst(overflow)
+        if let capacity {
+            let overflow = stored.count - capacity
+            if overflow > 0 {
+                stored.removeFirst(overflow)
+            }
         }
         persistence.appendRecord(record, capacity: capacity)
     }
@@ -809,7 +811,11 @@ public final class SystemMetricsHistoryStore: @unchecked Sendable {
         guard !isLoaded else { return }
         isLoaded = true
         let loaded = persistence.loadRecords().sorted { $0.timestamp < $1.timestamp }
-        stored = loaded.count > capacity ? Array(loaded.suffix(capacity)) : loaded
+        if let capacity, loaded.count > capacity {
+            stored = Array(loaded.suffix(capacity))
+        } else {
+            stored = loaded
+        }
     }
 }
 

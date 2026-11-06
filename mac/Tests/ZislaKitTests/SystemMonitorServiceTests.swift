@@ -386,6 +386,38 @@ private final class ControllableDateProvider: @unchecked Sendable {
 @MainActor
 struct SystemMonitorServiceTests {
     @Test
+    func defaultRecordingPreservesAllMergedHistoryAndBoundsChartPoints() async throws {
+        let sampleCount = 64_000
+        let seed = (0..<sampleCount).map { index in
+            SystemMetricsRecord(timestamp: Date(timeIntervalSince1970: Double(index) * 60))
+        }
+        let persistence = MemoryHistoryPersistence(seed: seed)
+        let now = Date(timeIntervalSince1970: Double(sampleCount) * 60)
+        let service = SystemMonitorService(
+            fileManager: MockFileManager(), dateProvider: { now },
+            publicIPProvider: StubPublicIPProvider(address: nil), hardwareInfoProvider: { .unavailable },
+            historyPersistence: persistence, isRecordingHistory: true
+        )
+
+        await service.loadHistoryStats()
+        #expect(service.historyStats.count == sampleCount)
+        #expect(service.historyStats.oldest == seed.first?.timestamp)
+
+        _ = await service.sampleOnce()
+
+        #expect(service.historyStats.count == sampleCount + 1)
+        #expect(service.historyStats.oldest == seed.first?.timestamp)
+        #expect(service.historyStats.newest == now)
+        #expect(persistence.loadRecords().count == sampleCount + 1)
+        let sections = await service.historySections(range: .all)
+        #expect(sections.flatMap(\.series).allSatisfy {
+            $0.points.count <= SystemMetricsHistorySeriesBuilder.maximumPoints
+        })
+        let oldestCPUPoint = try #require(sections.first { $0.id == "cpu" }?.series.first?.points.first)
+        #expect(oldestCPUPoint.date < seed[20_800].timestamp)
+    }
+
+    @Test
     func batteryHistoryUsesTheInjectedLiveSnapshotAndExistingRecordingSwitch() async throws {
         let persistence = MemoryHistoryPersistence()
         let clock = ControllableDateProvider(Date(timeIntervalSince1970: 1_000))

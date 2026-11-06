@@ -9,7 +9,7 @@ final class MemoryHistoryPersistence: SystemMetricsHistoryPersisting, @unchecked
     private let lock = NSLock()
     private var stored: [SystemMetricsRecord] = []
     private(set) var appendCount = 0
-    private(set) var appendedCapacities: [Int] = []
+    private(set) var appendedCapacities: [Int?] = []
     private(set) var removeAllCount = 0
 
     init(seed: [SystemMetricsRecord] = []) {
@@ -22,15 +22,17 @@ final class MemoryHistoryPersistence: SystemMetricsHistoryPersisting, @unchecked
         return stored
     }
 
-    func appendRecord(_ record: SystemMetricsRecord, capacity: Int) {
+    func appendRecord(_ record: SystemMetricsRecord, capacity: Int?) {
         lock.lock()
         defer { lock.unlock() }
         stored.append(record)
         appendCount += 1
         appendedCapacities.append(capacity)
-        let overflow = stored.count - max(1, capacity)
-        if overflow > 0 {
-            stored.removeFirst(overflow)
+        if let capacity {
+            let overflow = stored.count - max(1, capacity)
+            if overflow > 0 {
+                stored.removeFirst(overflow)
+            }
         }
     }
 
@@ -66,10 +68,12 @@ private final class BlockingHistoryPersistence: SystemMetricsHistoryPersisting, 
         return records
     }
 
-    func appendRecord(_ record: SystemMetricsRecord, capacity: Int) {
+    func appendRecord(_ record: SystemMetricsRecord, capacity: Int?) {
         condition.lock()
         stored.append(record)
-        stored = Array(stored.suffix(max(1, capacity)))
+        if let capacity {
+            stored = Array(stored.suffix(max(1, capacity)))
+        }
         condition.unlock()
     }
 
@@ -120,6 +124,30 @@ private func record(
 }
 
 struct SystemMetricsHistoryStoreTests {
+    @Test(arguments: [0, 1, 43_200, 64_000])
+    func defaultCapacityKeepsAllSamplesAcrossLoadingAppendingAndReloading(sampleCount: Int) {
+        let seed = (0..<sampleCount).map { record(at: Double($0) * 60) }
+        let persistence = MemoryHistoryPersistence(seed: Array(seed.reversed()))
+        let store = SystemMetricsHistoryStore(persistence: persistence)
+
+        #expect(store.stats.count == sampleCount)
+        #expect(store.stats.oldest == seed.first?.timestamp)
+        #expect(store.stats.newest == seed.last?.timestamp)
+
+        let appended = record(at: Double(sampleCount) * 60)
+        store.append(appended)
+
+        #expect(store.stats.count == sampleCount + 1)
+        #expect(store.records.first == (seed.first ?? appended))
+        #expect(store.records.last == appended)
+        #expect(persistence.loadRecords().count == sampleCount + 1)
+        let reopened = SystemMetricsHistoryStore(persistence: persistence)
+        #expect(reopened.stats == store.stats)
+        #expect(reopened.records.enumerated().allSatisfy { index, sample in
+            sample.timestamp.timeIntervalSince1970 == Double(index) * 60
+        })
+    }
+
     @Test
     func appendWritesOneSampleAtATimeUntilCapacity() {
         let persistence = MemoryHistoryPersistence()
@@ -161,10 +189,22 @@ struct SystemMetricsHistoryStoreTests {
         #expect(store.records.map(\.timestamp.timeIntervalSince1970) == [3, 5])
     }
 
-    @Test
-    func removeAllEmptiesTheArchive() {
+    @Test(arguments: [0, -1, Int.min])
+    func explicitNonPositiveCapacityKeepsOneSample(capacity: Int) {
+        let persistence = MemoryHistoryPersistence(seed: [record(at: 60), record(at: 120)])
+        let store = SystemMetricsHistoryStore(persistence: persistence, capacity: capacity)
+        #expect(store.records.map(\.timestamp.timeIntervalSince1970) == [120])
+
+        store.append(record(at: 180))
+
+        #expect(store.records.map(\.timestamp.timeIntervalSince1970) == [180])
+        #expect(persistence.loadRecords().map(\.timestamp.timeIntervalSince1970) == [180])
+    }
+
+    @Test(arguments: [nil, 8] as [Int?])
+    func removeAllEmptiesTheArchiveAndAllowsRecordingAgain(capacity: Int?) {
         let persistence = MemoryHistoryPersistence(seed: [record(at: 1)])
-        let store = SystemMetricsHistoryStore(persistence: persistence, capacity: 8)
+        let store = SystemMetricsHistoryStore(persistence: persistence, capacity: capacity)
         #expect(store.stats.count == 1)
 
         store.removeAll()
@@ -173,6 +213,10 @@ struct SystemMetricsHistoryStoreTests {
         #expect(store.stats == .empty)
         #expect(persistence.loadRecords().isEmpty)
         #expect(persistence.removeAllCount == 1)
+
+        store.append(record(at: 2))
+        #expect(store.records == [record(at: 2)])
+        #expect(persistence.loadRecords() == store.records)
     }
 }
 
@@ -315,11 +359,11 @@ struct SystemMetricsHistorySeriesBuilderTests {
     }
 
     @Test @MainActor
-    func defaultArchiveCapacityCoversThirtyDaysOfMinuteSamples() {
+    func defaultArchiveKeepsMinuteSamplesWithoutACapacityLimit() {
         let service = SystemMonitorService(historyPersistence: MemoryHistoryPersistence())
 
-        #expect(SystemMetricsHistoryStore.defaultCapacity == 30 * 24 * 60)
-        #expect(SystemMonitorService.defaultHistoryCapacity == 30 * 24 * 60)
+        #expect(SystemMetricsHistoryStore.defaultCapacity == nil)
+        #expect(SystemMonitorService.defaultHistoryCapacity == nil)
         #expect(service.historyRecordingInterval == 60)
     }
 
@@ -545,6 +589,99 @@ struct SystemMetricsHistoryExportTests {
 
 struct SystemMetricsHistoryDatabaseTests {
     @Test
+    func unlimitedDatabaseAndLazyPersistenceKeepSamplesUntilExplicitlyCleared() throws {
+        let url = try temporaryDatabaseURL()
+        defer { removeDatabase(at: url) }
+        let database = SystemMetricsHistoryDatabase(databaseURL: url)
+        let persistence = LazySystemMetricsHistoryPersistence(makeDatabase: { database })
+        for timestamp in [180.0, 60, 120] {
+            persistence.appendRecord(record(at: timestamp, fanRPMs: [1_000]), capacity: nil)
+        }
+        database.appendRecord(record(at: 120, fanRPMs: [2_000, 2_100]), capacity: nil)
+
+        let reloaded = persistence.loadRecords()
+        #expect(reloaded.map(\.timestamp.timeIntervalSince1970) == [60, 120, 180])
+        #expect(reloaded[0].fanRPMs == [1_000])
+        #expect(reloaded[1].fanRPMs == [2_000, 2_100])
+
+        persistence.removeAll()
+        #expect(database.loadRecords().isEmpty)
+        database.appendRecord(record(at: 240), capacity: nil)
+        #expect(SystemMetricsHistoryDatabase(databaseURL: url).loadRecords() == [record(at: 240)])
+    }
+
+    @Test(arguments: [0, -1, Int.min])
+    func explicitNonPositiveCapacityKeepsOneSample(capacity: Int) throws {
+        let url = try temporaryDatabaseURL()
+        defer { removeDatabase(at: url) }
+        let database = SystemMetricsHistoryDatabase(databaseURL: url)
+        for timestamp in [60.0, 120, 180] {
+            database.appendRecord(record(at: timestamp), capacity: capacity)
+        }
+
+        #expect(database.loadRecords().map(\.timestamp.timeIntervalSince1970) == [180])
+    }
+
+    @Test
+    func unlimitedAppendRollsBackFailedWritesWithoutLosingExistingSamples() throws {
+        let url = try temporaryDatabaseURL()
+        defer { removeDatabase(at: url) }
+        let database = SystemMetricsHistoryDatabase(databaseURL: url)
+        let original = record(at: 60, fanRPMs: [900])
+        database.appendRecord(original, capacity: nil)
+        var connection: OpaquePointer?
+        #expect(sqlite3_open(url.path, &connection) == SQLITE_OK)
+        let inspection = try #require(connection)
+        defer { sqlite3_close(inspection) }
+        #expect(sqlite3_exec(inspection, """
+            CREATE TRIGGER fail_fan_write BEFORE INSERT ON metric_fans
+            WHEN NEW.rpm = -1 BEGIN SELECT RAISE(ABORT, 'injected fan write failure'); END;
+            """, nil, nil, nil) == SQLITE_OK)
+
+        for timestamp in [120.0, 60] {
+            database.appendRecord(record(at: timestamp, fanRPMs: [-1]), capacity: nil)
+            #expect(database.loadRecords() == [original])
+            #expect(SystemMetricsHistoryDatabase(databaseURL: url).loadRecords() == [original])
+        }
+
+        #expect(sqlite3_exec(inspection, "DROP TRIGGER fail_fan_write", nil, nil, nil) == SQLITE_OK)
+        let recovered = record(at: 120, fanRPMs: [1_000])
+        database.appendRecord(recovered, capacity: nil)
+        #expect(SystemMetricsHistoryDatabase(databaseURL: url).loadRecords() == [original, recovered])
+    }
+
+    @Test
+    func defaultCapacityPreservesOversizedLegacyArchiveWhenRecordingAndReopening() throws {
+        let url = try temporaryDatabaseURL()
+        defer { removeDatabase(at: url) }
+        let sampleCount = 64_000
+        try createLegacyDatabase(at: url, sampleCount: sampleCount)
+        let store = SystemMetricsHistoryStore(
+            persistence: SystemMetricsHistoryDatabase(databaseURL: url)
+        )
+
+        #expect(store.stats.count == sampleCount)
+        #expect(store.stats.oldest?.timeIntervalSince1970 == 1_000)
+        #expect(store.stats.newest?.timeIntervalSince1970 == 1_000 + Double(sampleCount - 1) * 60)
+
+        let appended = record(
+            at: 1_000 + Double(sampleCount) * 60,
+            fanRPMs: [1_200, 1_400], batteryLevel: 0.8, systemPowerWatts: 24
+        )
+        store.append(appended)
+
+        let reopened = SystemMetricsHistoryStore(
+            persistence: SystemMetricsHistoryDatabase(databaseURL: url)
+        )
+        #expect(reopened.stats.count == sampleCount + 1)
+        #expect(reopened.stats.oldest?.timeIntervalSince1970 == 1_000)
+        #expect(reopened.records.last == appended)
+        #expect(reopened.records.enumerated().allSatisfy { index, sample in
+            sample.timestamp.timeIntervalSince1970 == 1_000 + Double(index) * 60
+        })
+    }
+
+    @Test
     func oldRecordsDecodeWithMissingBatteryFields() throws {
         let encoded = try JSONEncoder().encode(record(at: 100))
         var object = try #require(JSONSerialization.jsonObject(with: encoded) as? [String: Any])
@@ -753,7 +890,9 @@ struct SystemMetricsHistoryDatabaseTests {
         #expect(permissions & 0o777 == 0o600)
     }
 
-    private func createLegacyDatabase(at url: URL, additionalColumns: [String] = []) throws {
+    private func createLegacyDatabase(
+        at url: URL, additionalColumns: [String] = [], sampleCount: Int = 1
+    ) throws {
         var connection: OpaquePointer?
         #expect(sqlite3_open(url.path, &connection) == SQLITE_OK)
         let legacy = try #require(connection)
@@ -771,11 +910,17 @@ struct SystemMetricsHistoryDatabaseTests {
             network_received_bytes INTEGER NOT NULL, network_sent_bytes INTEGER NOT NULL
             \(additionalColumns.map { ", " + $0 }.joined())
         );
+        WITH RECURSIVE samples(sample_index) AS (
+            SELECT 0
+            UNION ALL
+            SELECT sample_index + 1 FROM samples WHERE sample_index + 1 < \(sampleCount)
+        )
         INSERT INTO metrics (
             timestamp, cpu_usage, cpu_user, cpu_system, cpu_idle,
             memory_used_bytes, memory_total_bytes, memory_pressure_ratio, disk_used_bytes, disk_total_bytes,
             network_receive_bytes_per_second, network_send_bytes_per_second, network_received_bytes, network_sent_bytes
-        ) VALUES (1000, 0.25, 0.2, 0.05, 0.75, 8000, 16000, 0.1, 100, 200, 10, 20, 0, 0);
+        ) SELECT 1000 + sample_index * 60, 0.25, 0.2, 0.05, 0.75,
+                 8000, 16000, 0.1, 100, 200, 10, 20, 0, 0 FROM samples;
         """
         #expect(sqlite3_exec(legacy, schema, nil, nil, nil) == SQLITE_OK)
     }
