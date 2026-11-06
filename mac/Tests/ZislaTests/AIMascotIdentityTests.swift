@@ -27,6 +27,28 @@ struct AIMascotIdentityTests {
         #expect(AIMascotIdentity(noticeID: "update-available-cli-dsh-left") == .deepseekHarness)
     }
 
+    @Test(arguments: AgentCLIKind.allCases)
+    func updateNoticesKeepTheCorrespondingCLIBrand(kind: AgentCLIKind) {
+        let expected: AIMascotIdentity = switch kind {
+        case .claude: .claude
+        case .codex: .codex
+        case .gemini: .gemini
+        case .grok: .grok
+        case .opencode: .opencode
+        case .kimi: .kimi
+        case .qwen: .qwen
+        case .qoder: .coder
+        case .glm: .zcode
+        case .copilot: .copilot
+        case .dsh: .deepseekHarness
+        case .pi: .pi
+        }
+        for side in ["left", "right"] {
+            #expect(AIMascotIdentity(noticeID: "update-available-cli-\(kind.rawValue)-\(side)") == expected,
+                    "\(kind.displayName) must keep its own logo on either side of the update notice")
+        }
+    }
+
     @Test
     func mapsZedProviderAndActivityNotice() {
         #expect(AIMascotIdentity(provider: .zed, taskID: "zed-thread-1") == .zed)

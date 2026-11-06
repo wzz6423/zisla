@@ -30,10 +30,11 @@ public struct CompactPillStatusPresentation: Equatable, Sendable {
     }
 
     public func length(thickness: CGFloat, edge: IslandEdge, text: String? = nil,
-        item: NowPlayingSnapshot? = nil) -> CGFloat {
+        item: NowPlayingSnapshot? = nil, leadingInset: CGFloat = trailingInset) -> CGFloat {
         let text = (text ?? self.text).trimmingCharacters(in: .whitespacesAndNewlines)
         let iconSize = max(0, thickness - 8)
-        let visualLength = (showsWaveform ? iconSize * 2 + 6 : iconSize) + Self.trailingInset * 2
+        let visualLength = (showsWaveform || priority == .updateAvailable ? iconSize * 2 + 6 : iconSize)
+            + Self.trailingInset + leadingInset
         let identityLength = mediaIdentityLength(thickness: thickness, edge: edge, text: text, item: item)
         let lyricLength = Self.textLength(text, availableWidth: thickness, edge: edge,
             font: NSFont.systemFont(ofSize: 11, weight: .medium))

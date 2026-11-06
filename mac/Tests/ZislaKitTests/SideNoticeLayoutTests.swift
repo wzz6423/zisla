@@ -342,6 +342,32 @@ struct SideNoticeLayoutTests {
         #expect(presentation.panelSize == CGSize(width: 40, height: 34))
     }
 
+    @Test(arguments: IslandEdge.allCases)
+    func customUpdateStatusReservesBothTheIdentityAndUpgradeSlots(edge: IslandEdge) throws {
+        let notices = [
+            IslandNotice(id: "update-available-cli-codex-left", title: "Codex", side: .left,
+                         style: .status, symbolName: "sparkles"),
+            IslandNotice(id: "update-available-cli-codex-right", title: "查看更新", side: .right,
+                         style: .status, symbolName: "arrow.up.circle"),
+        ]
+        let settings = FeatureSettings(islandLayoutStyle: .pill,
+            islandPlacement: IslandPlacement(mode: .custom, edge: edge))
+        let sizing = try #require(engine.compactBarSizing(for: notices, settings: settings))
+        let presentation = try #require(sizing.customPillPresentation)
+        #expect(presentation.priority == .updateAvailable && presentation.text.isEmpty)
+        #expect(engine.compactPillPresentations(for: notices, settings: settings).count == 1,
+                "The left and right notices represent one update, not two update pairs")
+        for (thickness, expected) in [(CGFloat(0), CGFloat(30)), (8, 30), (32, 78), (48, 110)] {
+            #expect(presentation.length(thickness: thickness, edge: edge) == expected,
+                    "An update needs two icon slots, their gap and the existing outer insets")
+        }
+        #expect(sizing.customPillLength == presentation.length(thickness: 32, edge: edge))
+        #expect(engine.compactBarSizing(for: [], settings: settings) == nil)
+        #expect(engine.compactPillPresentations(for: [], settings: settings).isEmpty)
+        #expect(notices[0].symbolName == "sparkles" && notices[1].symbolName == "arrow.up.circle",
+                "Rendering must preserve the original notices")
+    }
+
     @Test
     func transientFocusAndHeadphoneNoticesDoNotRenderAsOrdinaryRows() {
         let focusTransition = IslandNotice(

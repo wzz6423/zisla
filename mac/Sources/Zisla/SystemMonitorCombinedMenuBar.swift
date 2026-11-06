@@ -146,13 +146,14 @@ enum IslandStatusIconRouting {
         stacked: NSStatusItem?,
         readings: [IslandStatusIcon.Reading],
         combined: NSStatusItem?,
-        style: SystemMonitorMenuBarDisplayStyle
+        style: SystemMonitorMenuBarDisplayStyle,
+        islandAppIconEnabled: Bool = true
     ) -> [IslandStatusIcon] {
         let items = [application, stacked, combined].compactMap { $0 } + metrics.map { $0.1 }
         items.forEach { $0.isVisible = destination == .menuBar }
         guard destination == .island else { return [] }
         var icons: [IslandStatusIcon] = []
-        if application != nil {
+        if islandAppIconEnabled {
             icons.append(IslandStatusIcon(id: "status-icon-application", content: .application, tooltip: "zisla"))
         }
         if let combined {
@@ -216,7 +217,9 @@ struct IslandStatusIconStrip: View {
         let layout = edge.isVertical ? AnyLayout(VStackLayout(spacing: 8)) : AnyLayout(HStackLayout(spacing: 8))
         return layout {
             ForEach(icons) { icon in
+                let size = icon.size(edge: edge)
                 iconView(icon)
+                .frame(width: size.width, height: size.height)
                 .accessibilityLabel(icon.tooltip)
                 .accessibilityIdentifier(icon.id)
                 .help(icon.tooltip)

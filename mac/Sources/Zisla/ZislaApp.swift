@@ -1388,7 +1388,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
             }
         let icons = IslandStatusIconRouting.update(destination: settings.effectiveStatusIconDestination,
             application: statusItem, metrics: metrics, stacked: mergedMonitorStatusItem, readings: readings,
-            combined: combinedMonitorStatusItem, style: settings.systemMonitorMenuBarDisplayStyle)
+            combined: combinedMonitorStatusItem, style: settings.systemMonitorMenuBarDisplayStyle,
+            islandAppIconEnabled: settings.islandAppIconEnabled)
         AppModel.shared.islandHasSystemMonitorIcons = icons.contains(where: \.isSystemMonitor)
         noticePresenter?.setStatusIcons(icons)
     }

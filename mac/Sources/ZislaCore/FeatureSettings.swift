@@ -748,6 +748,7 @@ public struct FeatureSettings: Codable, Equatable, Sendable {
     public var systemMonitorMenuBarHeadphoneOptions: SystemMonitorHeadphoneOptions
     /// Whether to show Zisla's menu bar icon separately; does not affect monitor status items.
     public var menuBarAppIconEnabled: Bool
+    public var islandAppIconEnabled: Bool
     public var statusIconDestination: StatusIconDestination
     public var supportsStatusIconsInIsland: Bool {
         islandLayoutStyle == .pill && islandPlacement.mode == .custom
@@ -948,6 +949,7 @@ public struct FeatureSettings: Codable, Equatable, Sendable {
         systemMonitorMenuBarCombinedIconAppearance: SystemMonitorCombinedIconAppearance = SystemMonitorCombinedIconAppearance(),
         systemMonitorMenuBarHeadphoneOptions: SystemMonitorHeadphoneOptions = SystemMonitorHeadphoneOptions(),
         menuBarAppIconEnabled: Bool = true,
+        islandAppIconEnabled: Bool = true,
         statusIconDestination: StatusIconDestination = .island,
         weatherEnabled: Bool = true,
         lockScreenInfoEnabled: Bool = true,
@@ -1070,6 +1072,7 @@ public struct FeatureSettings: Codable, Equatable, Sendable {
         self.systemMonitorMenuBarCombinedIconAppearance = systemMonitorMenuBarCombinedIconAppearance
         self.systemMonitorMenuBarHeadphoneOptions = systemMonitorMenuBarHeadphoneOptions
         self.menuBarAppIconEnabled = menuBarAppIconEnabled
+        self.islandAppIconEnabled = islandAppIconEnabled
         self.statusIconDestination = statusIconDestination
         self.weatherEnabled = weatherEnabled
         self.lockScreenInfoEnabled = lockScreenInfoEnabled
@@ -1240,6 +1243,7 @@ public struct FeatureSettings: Codable, Equatable, Sendable {
         case systemMonitorMenuBarCombinedIconAppearance
         case systemMonitorMenuBarHeadphoneOptions
         case menuBarAppIconEnabled
+        case islandAppIconEnabled
         case statusIconDestination
         case weatherEnabled
         case lockScreenInfoEnabled
@@ -1426,6 +1430,8 @@ public struct FeatureSettings: Codable, Equatable, Sendable {
             Bool.self,
             forKey: .menuBarAppIconEnabled
         ) ?? defaults.menuBarAppIconEnabled
+        islandAppIconEnabled = (try? container.decode(Bool.self, forKey: .islandAppIconEnabled))
+            ?? defaults.islandAppIconEnabled
         // A malformed destination must not make the store reset unrelated preferences.
         statusIconDestination = (try? container.decode(StatusIconDestination.self, forKey: .statusIconDestination))
             ?? defaults.statusIconDestination

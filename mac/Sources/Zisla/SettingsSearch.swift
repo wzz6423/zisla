@@ -95,6 +95,7 @@ enum SettingsSearchIndex {
             entry(.info, "关怀提醒间隔", anchor: .row("关怀提醒间隔"), keywords: ["用户关怀", "小时", "分钟", "秒"])
         }
         if settings.supportsStatusIconsInIsland {
+            rows(.info, ["显示应用标识"])
             entry(.info, "展示更多信息", anchor: .row("展示更多信息"),
                   keywords: ["同时展示监控、AI、音乐与状态提示，详细音乐另起一行"])
         }
