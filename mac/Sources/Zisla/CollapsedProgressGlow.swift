@@ -148,10 +148,10 @@ struct CompactIslandShape: InsettableShape {
 private struct CollapsedProgressTrack: Shape {
     var layoutStyle: IslandLayoutStyle
     var pillCornerRadius: CGFloat?
-    var isPlayback: Bool
+    var usesBottomTrack: Bool
 
     func path(in rect: CGRect) -> Path {
-        if isPlayback && layoutStyle == .notch {
+        if usesBottomTrack && layoutStyle == .notch {
             let bounds = rect.insetBy(dx: CollapsedProgress.outlineInset, dy: CollapsedProgress.outlineInset)
             return Path { path in
                 path.move(to: CGPoint(x: bounds.minX, y: bounds.maxY))
@@ -169,7 +169,7 @@ struct CollapsedProgressGlow: View {
     var tint: Color = .green
     var layoutStyle: IslandLayoutStyle = .notch
     var pillCornerRadius: CGFloat? = nil
-    var isPlayback = false
+    var usesBottomTrack = false
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @Environment(\.accessibilityReduceTransparency) private var reduceTransparency
 
@@ -177,18 +177,18 @@ struct CollapsedProgressGlow: View {
         Self.rendering(
             progress: progress, tint: tint, layoutStyle: layoutStyle,
             reduceMotion: reduceMotion, reduceTransparency: reduceTransparency,
-            pillCornerRadius: pillCornerRadius, isPlayback: isPlayback
+            pillCornerRadius: pillCornerRadius, usesBottomTrack: usesBottomTrack
         )
     }
 
     static func rendering(
         progress: Double, tint: Color, layoutStyle: IslandLayoutStyle,
         reduceMotion: Bool, reduceTransparency: Bool, pillCornerRadius: CGFloat? = nil,
-        isPlayback: Bool
+        usesBottomTrack: Bool
     ) -> some View {
         let fraction = CollapsedProgress.normalized(progress) ?? 0
         let outline = CollapsedProgressTrack(layoutStyle: layoutStyle, pillCornerRadius: pillCornerRadius,
-                                             isPlayback: isPlayback)
+                                             usesBottomTrack: usesBottomTrack)
             .trim(from: 0, to: fraction)
         return ZStack {
             outline.stroke(

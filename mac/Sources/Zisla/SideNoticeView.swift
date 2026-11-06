@@ -298,7 +298,7 @@ struct CompactStatusBarView: View {
                     tint: compactProgressTint(for: progressPriority),
                     layoutStyle: settingsStore.settings.islandLayoutStyle,
                     pillCornerRadius: pillCornerRadius,
-                    isPlayback: selectedCompactStatusPriority == .media && recordingOperationNotice == nil
+                    usesBottomTrack: selectedCompactStatusPriority == .media && recordingOperationNotice == nil
                 )
             }
         }

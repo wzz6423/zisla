@@ -975,23 +975,10 @@ struct ClipboardAssistantToastView: View {
                 }
                 .overlay {
                     TimelineView(.animation(minimumInterval: 1.0 / 30.0, paused: !isDismissalProgressActive)) { context in
-                        if !isExpanded, presentation.progressGlowEnabled,
-                           let progress = controller.dismissalProgress(at: context.date) {
-                            Group {
-                                if style == .pill {
-                                    CollapsedProgressGlow(progress: progress, layoutStyle: .pill)
-                                } else {
-                                    CollapsedProgressGlow(progress: progress)
-                                        .clipShape(IslandSilhouette(
-                                            topCornerRadius: 0,
-                                            bottomCornerRadius: VoiceRecordingIslandGeometry.bottomCornerRadius
-                                        ))
-                                }
-                            }
-                                .frame(width: collapsed.width, height: collapsed.height)
-                                .position(x: collapsed.midX, y: collapsed.midY)
-                                .allowsHitTesting(false)
-                        }
+                        dismissalProgressOverlay(
+                            progress: controller.dismissalProgress(at: context.date),
+                            style: style, collapsedFrame: collapsed
+                        )
                     }
                 }
                 .transition(.opacity.combined(with: .move(edge: edge == .bottom ? .bottom : .top)))
@@ -1004,6 +991,28 @@ struct ClipboardAssistantToastView: View {
             if #available(macOS 15.0, *) {
                 ClipboardSystemTranslationView(bridge: controller.systemTranslation)
             }
+        }
+    }
+
+    @ViewBuilder
+    func dismissalProgressOverlay(
+        progress: Double?, style: IslandLayoutStyle, collapsedFrame: CGRect
+    ) -> some View {
+        if !isExpanded, presentation.progressGlowEnabled, let progress {
+            Group {
+                if style == .pill {
+                    CollapsedProgressGlow(progress: progress, layoutStyle: .pill)
+                } else {
+                    CollapsedProgressGlow(progress: progress, usesBottomTrack: true)
+                        .clipShape(IslandSilhouette(
+                            topCornerRadius: 0,
+                            bottomCornerRadius: VoiceRecordingIslandGeometry.bottomCornerRadius
+                        ))
+                }
+            }
+            .frame(width: collapsedFrame.width, height: collapsedFrame.height)
+            .position(x: collapsedFrame.midX, y: collapsedFrame.midY)
+            .allowsHitTesting(false)
         }
     }
 
