@@ -647,13 +647,14 @@ struct StatusIconDestinationIntegrationTests {
             let icons = IslandStatusIconRouting.update(destination: .island, application: application,
                 metrics: titles, stacked: stacked, readings: readings, combined: combined, style: style)
             #expect(items.allSatisfy { !$0.isVisible })
-            #expect(icons.map(\.id) == ["status-icon-combined", "status-icon-application"]
+            #expect(icons.map(\.id) == ["status-icon-application", "status-icon-combined"]
                 + SystemMonitorMenuBarMetric.allCases.map { "status-icon-\($0.rawValue)" }
                 + ["status-icon-stacked"])
             for icon in icons {
                 if case let .metric(_, text, _, _) = icon.content { #expect(text == "--") }
             }
-            #expect(icons.first?.size(edge: .left) == CGSize(width: 36, height: 36))
+            let combinedIcon = try #require(icons.first { $0.id == "status-icon-combined" })
+            #expect(combinedIcon.size(edge: .left) == CGSize(width: 36, height: 36))
             let stackedIcon = try #require(icons.first { $0.id == "status-icon-stacked" })
             let image = try #require(stacked.button?.image)
             for edge in IslandEdge.allCases {
@@ -676,6 +677,55 @@ struct StatusIconDestinationIntegrationTests {
         }
         #expect(IslandStatusIconRouting.update(destination: .island, application: nil, metrics: [],
             stacked: nil, readings: [], combined: nil, style: .compact).isEmpty)
+    }
+
+    @Test(arguments: IslandEdge.allCases, [LayoutDirection.leftToRight, .rightToLeft]) @MainActor
+    func routedLogoRendersBeforeTheCombinedIconAndStackedReadings(edge: IslandEdge, direction: LayoutDirection) async throws {
+        let application = NSStatusBar.system.statusItem(withLength: NSStatusItem.squareLength)
+        let combined = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
+        let stacked = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
+        let items = [application, combined, stacked]
+        items.forEach { $0.isVisible = false }
+        defer { items.forEach { NSStatusBar.system.removeStatusItem($0) } }
+        let image = NSImage(size: CGSize(width: 36, height: 36), flipped: false) { rect in
+            NSColor.red.setFill()
+            rect.fill()
+            return true
+        }
+        combined.button?.image = image
+        let readings = [IslandStatusIcon.Reading(metric: .cpu, text: "14%"),
+                        IslandStatusIcon.Reading(metric: .gpu, text: "0%")]
+        stacked.button?.image = SystemMonitorMenuBarImageRenderer.stacked(rows: ["C 14%", "G 0%"], style: .compact)
+        let icons = IslandStatusIconRouting.update(destination: .island, application: application,
+            metrics: [], stacked: stacked, readings: readings, combined: combined, style: .compact)
+        let size = try #require(IslandStatusIconLayout.size(icons: icons, edge: edge))
+        let bitmap = try await renderOffscreen(IslandStatusIconStrip(icons: icons, edge: edge, date: .distantPast)
+            .environment(\.layoutDirection, direction)
+            .environment(\._accessibilityReduceMotion, true), size: size)
+        var combinedBounds = CGRect.null
+        for y in 0..<bitmap.pixelsHigh {
+            for x in 0..<bitmap.pixelsWide {
+                let color = try #require(bitmap.colorAt(x: x, y: y))
+                if color.redComponent > 0.5 && color.greenComponent < 0.2 {
+                    combinedBounds = combinedBounds.union(CGRect(x: x, y: y, width: 1, height: 1))
+                }
+            }
+        }
+        #expect(!combinedBounds.isNull, "The combined status icon must remain visible")
+        var logoPixels = 0
+        var readingPixels = 0
+        for y in 0..<bitmap.pixelsHigh {
+            for x in 0..<bitmap.pixelsWide {
+                let color = try #require(bitmap.colorAt(x: x, y: y))
+                guard min(color.redComponent, color.greenComponent, color.blueComponent) > 0.1 else { continue }
+                if edge.isVertical ? CGFloat(y) < combinedBounds.minY : CGFloat(x) < combinedBounds.minX { logoPixels += 1 }
+                if edge.isVertical ? CGFloat(y) >= combinedBounds.maxY : CGFloat(x) >= combinedBounds.maxX { readingPixels += 1 }
+            }
+        }
+        #expect(logoPixels > 10, "The logo must render first on every edge, including RTL languages")
+        #expect(readingPixels > 10, "Both stacked readings must remain after the combined status icon")
+        #expect(items.allSatisfy { !$0.isVisible })
+        #expect(combined.button?.image === image && image.size == CGSize(width: 36, height: 36))
     }
 
     @Test @MainActor

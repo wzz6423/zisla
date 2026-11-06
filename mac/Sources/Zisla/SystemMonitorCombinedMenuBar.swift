@@ -152,14 +152,14 @@ enum IslandStatusIconRouting {
         items.forEach { $0.isVisible = destination == .menuBar }
         guard destination == .island else { return [] }
         var icons: [IslandStatusIcon] = []
+        if application != nil {
+            icons.append(IslandStatusIcon(id: "status-icon-application", content: .application, tooltip: "zisla"))
+        }
         if let combined {
             icons.append(IslandStatusIcon(id: "status-icon-combined", content: .combined(combined.button?.image),
                 tooltip: (combined.button?.toolTip ?? "zisla")
                     .replacingOccurrences(of: AppLocalization.text("点击打开系统监控"), with: "")
                     .trimmingCharacters(in: .whitespacesAndNewlines)))
-        }
-        if application != nil {
-            icons.append(IslandStatusIcon(id: "status-icon-application", content: .application, tooltip: "zisla"))
         }
         for (metric, item, title) in metrics {
             let text = style == .detailed
