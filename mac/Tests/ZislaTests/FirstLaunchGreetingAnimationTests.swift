@@ -1,3 +1,4 @@
+import AppKit
 import SwiftUI
 import Testing
 import ZislaCore
@@ -82,17 +83,17 @@ struct FirstLaunchGreetingAnimationTests {
         }
     }
 
-    @Test(arguments: AppLanguage.allCases)
-    func originalStrokesFitSmallAndLargeLayouts(language: AppLanguage) {
-        let artwork = FirstLaunchGreetingArtwork.artwork(for: language)
+    @Test
+    func penStrokesFitSmallLargeAndEmptyLayouts() {
+        let artwork = Self.sampleArtwork
         #expect(!artwork.strokes.isEmpty)
         #expect(artwork.strokeLengths.allSatisfy { $0.isFinite && $0 > 0 })
         for size in [CGSize(width: 80, height: 56), CGSize(width: 240, height: 120), CGSize(width: 640, height: 180)] {
             let bounds = CGRect(origin: .zero, size: size)
             let fitted = artwork.fittedStrokes(in: size)
             #expect(fitted.count == artwork.strokes.count)
-            let radius = artwork.fittedLineWidth(in: size, baseWidth: 6) / 2
-            for stroke in fitted {
+            for (index, stroke) in fitted.enumerated() {
+                let radius = artwork.fittedLineWidth(in: size, index: index, baseWidth: 6) / 2
                 #expect(!stroke.isEmpty)
                 let points = Self.samples(stroke)
                 #expect(!points.isEmpty)
@@ -108,107 +109,7 @@ struct FirstLaunchGreetingAnimationTests {
         }
         for size in [CGSize.zero, CGSize(width: 12, height: 120), CGSize(width: 240, height: 12)] {
             #expect(artwork.fittedStrokes(in: size).isEmpty)
-            #expect(artwork.fittedLineWidth(in: size, baseWidth: 5) == 0)
-        }
-    }
-
-    @Test(arguments: AppLanguage.allCases)
-    func penCurvesHaveContinuousTangentsAndCurvatureIncludingClosedLoops(language: AppLanguage) {
-        let artwork = FirstLaunchGreetingArtwork.artwork(for: language)
-        for stroke in artwork.strokes {
-            var current = CGPoint.zero
-            var start = CGPoint.zero
-            var firstTangent: CGPoint?
-            var lastTangent: CGPoint?
-            var firstBend: CGPoint?
-            var lastBend: CGPoint?
-            stroke.cgPath.applyWithBlock { pointer in
-                let element = pointer.pointee
-                switch element.type {
-                case .moveToPoint:
-                    current = element.points[0]
-                    start = current
-                case .addCurveToPoint:
-                    let incoming = CGPoint(x: element.points[0].x - current.x, y: element.points[0].y - current.y)
-                    let bend = CGPoint(
-                        x: element.points[1].x - 2 * element.points[0].x + current.x,
-                        y: element.points[1].y - 2 * element.points[0].y + current.y
-                    )
-                    if let lastTangent {
-                        #expect(hypot(incoming.x - lastTangent.x, incoming.y - lastTangent.y) < 0.001)
-                    } else {
-                        firstTangent = incoming
-                    }
-                    if let lastBend {
-                        #expect(hypot(bend.x - lastBend.x, bend.y - lastBend.y) < 0.001)
-                    } else {
-                        firstBend = bend
-                    }
-                    current = element.points[2]
-                    lastTangent = CGPoint(x: current.x - element.points[1].x, y: current.y - element.points[1].y)
-                    lastBend = CGPoint(
-                        x: current.x - 2 * element.points[1].x + element.points[0].x,
-                        y: current.y - 2 * element.points[1].y + element.points[0].y
-                    )
-                default:
-                    Issue.record("Greeting pen strokes must use smooth cubic curves")
-                }
-            }
-            if current == start, let firstTangent, let lastTangent {
-                #expect(hypot(firstTangent.x, firstTangent.y) > 0.1, "Closed greeting loops must keep the pen moving through the join")
-                #expect(hypot(firstTangent.x - lastTangent.x, firstTangent.y - lastTangent.y) < 0.001)
-            }
-            if current == start, let firstBend, let lastBend {
-                #expect(hypot(firstBend.x - lastBend.x, firstBend.y - lastBend.y) < 0.001)
-            }
-        }
-    }
-
-    @Test(arguments: [AppLanguage.english, .german, .simplifiedChinese, .traditionalChinese])
-    func openingLongStrokesHaveNaturalHandwrittenBows(language: AppLanguage) throws {
-        let artwork = FirstLaunchGreetingArtwork.artwork(for: language)
-        let indices = language == .english ? [0, 1] : language == .german ? [0] : [1, 9, 12]
-        for index in indices {
-            let points = Self.samples(artwork.strokes[index])
-            let start = try #require(points.first)
-            let end = try #require(points.last)
-            let dx = end.x - start.x
-            let dy = end.y - start.y
-            let deviations = points.map { abs(dx * ($0.y - start.y) - dy * ($0.x - start.x)) / hypot(dx, dy) }
-            #expect(try #require(deviations.max()) > 2, "Long greeting strokes should bow rather than look ruled")
-        }
-    }
-
-    @Test(arguments: [AppLanguage.english, .german])
-    func openingLatinAscendersLoopBeforeReturningToTheBaseline(language: AppLanguage) throws {
-        let artwork = FirstLaunchGreetingArtwork.artwork(for: language)
-        for index in [4, 5] {
-            let points = Self.samples(artwork.strokes[index])
-            #expect(try #require(points.first).y > 100)
-            #expect(try #require(points.last).y > 100)
-            let upper = points.filter { $0.y < 82 }
-            let left = try #require(upper.map(\.x).min())
-            let right = try #require(upper.map(\.x).max())
-            #expect(right - left > 10, "Cursive ascenders need an open loop instead of a straight stem")
-        }
-    }
-
-    @Test(arguments: [AppLanguage.simplifiedChinese, .traditionalChinese])
-    func chineseHooksStayRounderThanTheHighContrastPen(language: AppLanguage) {
-        let artwork = FirstLaunchGreetingArtwork.artwork(for: language)
-        for stroke in artwork.strokes {
-            let points = Self.samples(stroke)
-            for index in 1..<(points.count - 1) {
-                let a = points[index - 1]
-                let b = points[index]
-                let c = points[index + 1]
-                let cross = abs((b.x - a.x) * (c.y - a.y) - (b.y - a.y) * (c.x - a.x))
-                if cross > 0.000001 {
-                    let radius = hypot(b.x - a.x, b.y - a.y)
-                        * hypot(c.x - b.x, c.y - b.y) * hypot(c.x - a.x, c.y - a.y) / (2 * cross)
-                    #expect(radius > 3, "Chinese hooks must not tighten inside the high-contrast pen's half-width")
-                }
-            }
+            #expect(artwork.fittedLineWidth(in: size, index: 0, baseWidth: 5) == 0)
         }
     }
 
@@ -218,51 +119,47 @@ struct FirstLaunchGreetingAnimationTests {
             .english: "Hello", .simplifiedChinese: "你好", .traditionalChinese: "你好",
             .german: "hallo", .spanish: "Hola", .french: "Bonjour", .brazilianPortuguese: "Olá",
             .indonesian: "Halo", .korean: "안녕하세요", .italian: "Ciao", .dutch: "Hallo",
-            .russian: "Здравствуйте", .arabic: "مرحبًا", .turkish: "Merhaba",
+            .russian: "привет", .arabic: "مرحبًا", .turkish: "Merhaba",
             .vietnamese: "Xin chào", .thai: "สวัสดี", .japanese: "こんにちは",
         ]
         #expect(Set(expected.keys) == Set(AppLanguage.allCases))
         for (language, text) in expected {
             #expect(AppLocalization.string("onboarding.hello", language: language) == text)
-            let artwork = FirstLaunchGreetingArtwork.artwork(for: language)
-            for index in artwork.strokes.indices {
-                #expect(artwork.strokeProgress(at: 0, index: index) == 0)
-                #expect(artwork.strokeProgress(at: 1, index: index) == 1)
-            }
         }
-        let english = FirstLaunchGreetingArtwork.artwork(for: .english)
-        let german = FirstLaunchGreetingArtwork.artwork(for: .german)
-        #expect(english.strokes[0] != german.strokes[0])
-        #expect(english.strokes[0] == FirstLaunchGreetingArtwork.artwork(for: .dutch).strokes[0])
-        #expect(english.strokes[3] != FirstLaunchGreetingArtwork.artwork(for: .dutch).strokes[3])
     }
 
-    @Test
-    func latinAccentsAndTheVietnameseWordGapRemainVisible() throws {
-        let portuguese = FirstLaunchGreetingArtwork.artwork(for: .brazilianPortuguese)
-        let acute = try #require(portuguese.strokes.last)
-        let acutePoints = Self.samples(acute)
-        let acuteStart = try #require(acutePoints.first)
-        let acuteEnd = try #require(acutePoints.last)
-        #expect(acuteEnd.x > acuteStart.x)
-        #expect(acuteEnd.y < acuteStart.y)
-        #expect(acute.boundingRect.maxY < 65)
-        let vietnamese = FirstLaunchGreetingArtwork.artwork(for: .vietnamese)
-        let graveStrokes = vietnamese.strokes.filter { stroke in
-            let bounds = stroke.boundingRect
-            return bounds.maxY <= 62 && bounds.width > 8 && bounds.height > 8
+    @Test(arguments: AppLanguage.allCases) @MainActor
+    func unavailableSystemLetteringRendersTheLocalizedGreeting(language: AppLanguage) throws {
+        let view = FirstLaunchGreetingAnimation(
+            timeline: FirstLaunchGreetingTimeline(preferredLanguage: language),
+            startedAt: nil, preferredLanguage: language, artworkForLanguage: { _ in nil }
+        )
+        let reference = Text(AppLocalization.string("onboarding.hello", language: language))
+            .font(.system(size: 64, weight: .light, design: .rounded))
+            .foregroundStyle(Color.accentColor)
+            .lineLimit(1)
+            .minimumScaleFactor(0.2)
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+        func pixels(_ content: some View) throws -> [UInt8] {
+            let renderer = ImageRenderer(content: content.frame(width: 240, height: 120)
+                .background(.white)
+                .accentColor(.blue)
+                .environment(\.colorScheme, .light)
+                .environment(\.layoutDirection, language.isRightToLeft ? .rightToLeft : .leftToRight))
+            let bitmap = NSBitmapImageRep(cgImage: try #require(renderer.cgImage))
+            var result: [UInt8] = []
+            for y in 0..<bitmap.pixelsHigh {
+                for x in 0..<bitmap.pixelsWide {
+                    let color = try #require(bitmap.colorAt(x: x, y: y)?.usingColorSpace(.sRGB))
+                    result.append(UInt8((color.redComponent * 255).rounded()))
+                }
+            }
+            return result
         }
-        #expect(graveStrokes.count == 1)
-        let grave = try #require(graveStrokes.first)
-        let gravePoints = Self.samples(grave)
-        let graveStart = try #require(gravePoints.first)
-        let graveEnd = try #require(gravePoints.last)
-        #expect(graveEnd.x > graveStart.x)
-        #expect(graveEnd.y > graveStart.y)
-        let points = vietnamese.strokes.flatMap(Self.samples)
-        #expect(points.contains { (150...165).contains($0.x) })
-        #expect(!points.contains { (180...205).contains($0.x) })
-        #expect(points.contains { (220...245).contains($0.x) })
+        let actual = try pixels(view)
+        let expected = try pixels(reference)
+        #expect(actual.contains { $0 < 128 }, "Missing system resources must leave a visible greeting")
+        #expect(actual == expected, "The fallback must use the requested locale, including Russian and Arabic")
     }
 
     @Test
@@ -275,7 +172,7 @@ struct FirstLaunchGreetingAnimationTests {
             path.move(to: CGPoint(x: 10, y: 0))
             path.addCurve(to: CGPoint(x: 110, y: 0), control1: CGPoint(x: 40, y: 0), control2: CGPoint(x: 80, y: 0))
         }
-        let artwork = FirstLaunchGreetingArtwork(strokes: [short, long], size: CGSize(width: 120, height: 30))
+        let artwork = FirstLaunchGreetingArtwork(strokes: [short, long], size: CGSize(width: 120, height: 30), lineWidths: [5, 5])
         #expect(abs(artwork.strokeLengths[0] - 10) < 0.001)
         #expect(abs(artwork.strokeLengths[1] - 100) < 0.001)
         #expect(abs(artwork.strokeProgress(at: 5.0 / 110, index: 0) - 0.5) < 0.001)
@@ -289,9 +186,9 @@ struct FirstLaunchGreetingAnimationTests {
         #expect(artwork.strokeProgress(at: 2, index: 1) == 1)
     }
 
-    @Test(arguments: AppLanguage.allCases)
-    func writingProgressIsMonotoneAndEveryStrokeCompletesBeforeFade(language: AppLanguage) {
-        let artwork = FirstLaunchGreetingArtwork.artwork(for: language)
+    @Test
+    func writingProgressIsMonotoneAndEveryStrokeCompletesBeforeFade() {
+        let artwork = Self.sampleArtwork
         var previous = Array(repeating: CGFloat.zero, count: artwork.strokes.count)
         for step in 0...240 {
             let progress = CGFloat(step) / 240
@@ -306,12 +203,13 @@ struct FirstLaunchGreetingAnimationTests {
             }
         }
         #expect(previous.allSatisfy { $0 == 1 })
-        let timeline = FirstLaunchGreetingTimeline(preferredLanguage: language)
-        let index = timeline.languages.firstIndex(of: language)!
-        let hold = timeline.frame(at: (Double(index) + 0.8) * timeline.wordDuration)
-        #expect(hold.language == language)
-        #expect(hold.progress == 1)
-        #expect(hold.opacity == 1)
+        let timeline = FirstLaunchGreetingTimeline(preferredLanguage: .english)
+        for (index, language) in timeline.languages.enumerated() {
+            let hold = timeline.frame(at: (Double(index) + 0.8) * timeline.wordDuration)
+            #expect(hold.language == language)
+            #expect(hold.progress == 1)
+            #expect(hold.opacity == 1)
+        }
     }
 
     @Test
@@ -335,58 +233,21 @@ struct FirstLaunchGreetingAnimationTests {
         }
     }
 
-    @Test
-    func nonLatinInkCoversEveryCharacterAndItsDistinctiveMarks() {
-        let cells: [(AppLanguage, [ClosedRange<CGFloat>])] = [
-            (.japanese, [18...75, 95...165, 178...248, 273...335, 358...442]),
-            (.korean, [12...94, 115...183, 210...302, 310...396, 415...490]),
-            (.russian, [20...75, 86...148, 159...207, 217...268, 278...325, 335...380,
-                        390...441, 451...498, 508...558, 568...617, 627...678, 688...735]),
-            (.thai, [12...70, 82...136, 156...214, 232...289]),
-        ]
-        for (language, ranges) in cells {
-            let points = FirstLaunchGreetingArtwork.artwork(for: language).strokes.flatMap(Self.samples)
-            for range in ranges {
-                let column = points.filter { range.contains($0.x) }
-                #expect(column.count > 10)
-                #expect(column.contains { $0.y < 85 })
-                #expect(column.contains { $0.y > 95 })
-            }
-        }
-        let landmarks: [(AppLanguage, [CGPoint])] = [
-            (.korean, [.init(x: 91, y: 54), .init(x: 158, y: 45), .init(x: 157, y: 63),
-                       .init(x: 225, y: 30), .init(x: 352, y: 75), .init(x: 440, y: 94), .init(x: 465, y: 93)]),
-            (.thai, [.init(x: 90, y: 45), .init(x: 130, y: 37), .init(x: 285, y: 25)]),
-            (.arabic, [.init(x: 355, y: 88), .init(x: 277, y: 132), .init(x: 206, y: 101),
-                       .init(x: 170, y: 121), .init(x: 118, y: 35), .init(x: 178, y: 61), .init(x: 177, y: 70)]),
-        ]
-        for (language, targets) in landmarks {
-            let points = FirstLaunchGreetingArtwork.artwork(for: language).strokes.flatMap(Self.samples)
-            for target in targets {
-                #expect(points.contains { hypot($0.x - target.x, $0.y - target.y) < 2 })
-            }
-        }
-    }
-
-    @Test
-    func arabicJoinsAndPenTravelRunRightToLeftWithoutMirroring() throws {
-        let artwork = FirstLaunchGreetingArtwork.artwork(for: .arabic)
-        let meem = Self.samples(artwork.strokes[0])
-        let ra = Self.samples(artwork.strokes[1])
-        let joinedHaBaAlif = Self.samples(artwork.strokes[2])
-        let start = try #require(joinedHaBaAlif.first)
-        let end = try #require(joinedHaBaAlif.last)
-        #expect(start.x > end.x)
-        #expect(meem.last == ra.first)
-        #expect(ra.last != joinedHaBaAlif.first)
-        for x in [CGFloat(130), 150, 170, 190, 210] {
-            #expect(joinedHaBaAlif.contains { abs($0.x - x) < 4 && (85...106).contains($0.y) })
-        }
-        let fitted = artwork.fittedStrokes(in: CGSize(width: 240, height: 100))
-        let fittedStart = try #require(Self.samples(fitted[2]).first)
-        let fittedEnd = try #require(Self.samples(fitted[2]).last)
-        #expect(fittedStart.x > fittedEnd.x)
-    }
+    private static let sampleArtwork = FirstLaunchGreetingArtwork(
+        strokes: [
+            Path { path in
+                path.move(to: CGPoint(x: 16, y: 148))
+                path.addCurve(to: CGPoint(x: 280, y: 16),
+                              control1: CGPoint(x: 16, y: 82), control2: CGPoint(x: 280, y: 82))
+            },
+            Path { path in
+                path.move(to: CGPoint(x: 150, y: 16))
+                path.addCurve(to: CGPoint(x: 150, y: 16),
+                              control1: CGPoint(x: 150, y: 16), control2: CGPoint(x: 150, y: 16))
+            },
+        ],
+        size: CGSize(width: 296, height: 164), lineWidths: [10, 14]
+    )
 
     private static func samples(_ path: Path) -> [CGPoint] {
         var result: [CGPoint] = []
