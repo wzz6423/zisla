@@ -799,7 +799,7 @@ struct StatusIconDestinationIntegrationTests {
     }
 
     @Test
-    func destinationControlBelongsToInfoAndRemainsOutsideConditionalMonitorOptions() throws {
+    func destinationControlHidesWithItsDividerAndRemainsOutsideConditionalMonitorOptions() throws {
         let root = URL(fileURLWithPath: #filePath).deletingLastPathComponent()
             .deletingLastPathComponent().deletingLastPathComponent()
         let source = try String(contentsOf: root.appendingPathComponent("Sources/Zisla/SettingsView.swift"), encoding: .utf8)
@@ -815,28 +815,40 @@ struct StatusIconDestinationIntegrationTests {
         let destination = try #require(workflow.range(of: "title: \"机器监控状态显示位置\""))
         let monitorOptions = try #require(workflow.range(of: "if model.settingsStore.settings.systemMonitorEnabled {"))
         #expect(destination.lowerBound < monitorOptions.lowerBound)
+        let conditionalRow = try NSRegularExpression(pattern: #"if settingsStore\.settings\.supportsStatusIconsInIsland\s*\{\s*rowDivider\s*settingRow\(symbol: "menubar\.rectangle", title: "机器监控状态显示位置", detail: ""\)\s*\{[\s\S]*?\n                \}\n                if model\.settingsStore\.settings\.systemMonitorEnabled"#)
+        #expect(conditionalRow.numberOfMatches(in: workflow, range: NSRange(workflow.startIndex..., in: workflow)) == 1,
+                "The destination row and its divider must be absent when only the menu bar is supported")
     }
 
     @Test(arguments: AppLanguage.allCases)
-    func iconDestinationAndExistingMonitorSearchesReachTheirVisibleRows(language: AppLanguage) {
+    func iconDestinationSearchFollowsEditableLayoutsAndPreservesMonitorSearches(language: AppLanguage) {
         var settings = FeatureSettings.default
         settings.mediaEnabled = true
         let locale = language.locale
         let title = "机器监控状态显示位置"
         let localizedTitle = AppLocalization.string(title, locale: locale)
         #expect(SettingsSearchAnchor.row(title).localized(locale: locale) == .row(localizedTitle))
-        for enabled in [true, false] {
-            settings.systemMonitorEnabled = enabled
-            let items = SettingsSearchIndex.items(settings: settings)
-            #expect(items.filter { $0.title == title }.count == 1)
-            #expect(!items.contains { $0.title == "图标显示位置" })
-            let matches = SettingsSearchIndex.results(for: localizedTitle, settings: settings, locale: locale)
-            #expect(matches.first?.section == .info)
-            #expect(matches.first?.anchor == .row(title))
-            for query in [title, "状态栏", "灵动岛"].map({ AppLocalization.string($0, locale: locale) }) {
-                #expect(SettingsSearchIndex.results(for: query, settings: settings, locale: locale).contains {
-                    $0.section == .info && $0.title == title && $0.anchor == .row(title)
-                })
+        for style in IslandLayoutStyle.allCases {
+            settings.islandLayoutStyle = style
+            for mode in IslandPlacementMode.allCases {
+                settings.islandPlacement.mode = mode
+                let editable = style == .pill && mode == .custom
+                for enabled in [true, false] {
+                    settings.systemMonitorEnabled = enabled
+                    let items = SettingsSearchIndex.items(settings: settings)
+                    #expect(items.filter { $0.title == title }.count == (editable ? 1 : 0))
+                    #expect(!items.contains { $0.title == "图标显示位置" })
+                    let matches = SettingsSearchIndex.results(for: localizedTitle, settings: settings, locale: locale)
+                    if editable {
+                        #expect(matches.first?.section == .info)
+                        #expect(matches.first?.anchor == .row(title))
+                    }
+                    for query in [title, "状态栏", "灵动岛"].map({ AppLocalization.string($0, locale: locale) }) {
+                        #expect(SettingsSearchIndex.results(for: query, settings: settings, locale: locale).contains {
+                            $0.section == .info && $0.title == title && $0.anchor == .row(title)
+                        } == editable)
+                    }
+                }
             }
         }
         settings.systemMonitorEnabled = true
