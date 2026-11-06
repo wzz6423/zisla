@@ -215,7 +215,7 @@ struct PermissionsSettingsViewTests {
         }
 
         func press(_ id: OnboardingPermissionID) async throws {
-            let button = try #require(button(id))
+            let button = try #require(self.button(id))
             try #require(try isEnabled(id))
             let action = NSSelectorFromString("accessibilityPerformPress")
             try #require(button.responds(to: action))
