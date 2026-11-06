@@ -10,6 +10,47 @@ import ZislaKit
 @Suite
 struct ScreenRecordingCaptureBarTests {
     @MainActor
+    @Test
+    func missingSourcesDirectUsersToPermissionsWithoutAnAuthorizationButton() async throws {
+        let release = EnhancedAccessibilityTestScope.acquire()
+        defer { release() }
+        var permissions: [ScreenRecordingPermission] = []
+        var sources: [RecordingCaptureSource] = []
+        var dependencies = ScreenRecordingCaptureDependencies.live
+        dependencies.loadSources = { sources }
+        dependencies.loadDevices = { .init() }
+        dependencies.requestPermission = { permissions.append($0); return false }
+        let model = ScreenRecordingStudioModel(capture: .init(dependencies: dependencies))
+        defer { model.shutdown() }
+        await model.loadSources()
+        let controller = ScreenRecordingCaptureBarController(model: model, languageStore: AppLanguageStore(),
+            selectRegion: {}, start: {}, openStudio: {}, cancel: {})
+        defer { controller.shutdown() }
+        func elements(_ object: NSObject) -> [NSObject] {
+            let children = object.responds(to: NSSelectorFromString("accessibilityChildren"))
+                ? object.value(forKey: "accessibilityChildren") as? [NSObject] ?? [] : []
+            return [object] + children.flatMap(elements)
+        }
+        for _ in 0..<4 {
+            controller.hostingView.layoutSubtreeIfNeeded()
+            await withCheckedContinuation { continuation in DispatchQueue.main.async { continuation.resume() } }
+        }
+        let controls = elements(controller.hostingView).compactMap { $0 as? any NSAccessibilityElementProtocol }
+        #expect(!controls.contains { $0.accessibilityIdentifier?() == "screenRecording.requestScreenAccess" })
+        #expect(elements(controller.hostingView).contains {
+            $0.responds(to: NSSelectorFromString("accessibilityLabel"))
+                && $0.value(forKey: "accessibilityLabel") as? String == AppLocalization.text("请在设置的“权限”页面管理授权。")
+        })
+        #expect(permissions.isEmpty)
+        sources = [.init(id: 1, name: "Display", mode: .display,
+            frame: .init(x: 0, y: 0, width: 1920, height: 1080))]
+        await model.loadSources()
+        #expect(model.availableSources == sources)
+        #expect(permissions.isEmpty)
+        #expect(controller.hostingView.window?.isVisible == false)
+    }
+
+    @MainActor
     @Test(arguments: [false, true], [RecordingPhase.idle, .recording, .paused])
     func captureBarOmitsCameraRadiusControls(cameraEnabled: Bool, phase: RecordingPhase) async throws {
         let releaseAccessibility = EnhancedAccessibilityTestScope.acquire()

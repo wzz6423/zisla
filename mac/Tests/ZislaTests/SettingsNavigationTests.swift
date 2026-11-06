@@ -101,6 +101,7 @@ struct SettingsNavigationTests {
             "天气",
             "网络",
             "宠物",
+            "权限",
             "推荐",
             "反馈与更新",
         ])
@@ -286,7 +287,7 @@ struct SettingsNavigationTests {
     @Test
     func sidebarGroupsSeparatePDFAndCaptureAndCollectTheOtherPages() {
         #expect(SettingsSectionGroup.allCases.map(\.title) == [
-            "基础功能", "声音", "文件", "截图与录屏", "AI 与语音", "其他", "推荐与反馈更新",
+            "基础功能", "声音", "文件", "截图与录屏", "AI 与语音", "其他", "权限", "推荐与反馈更新",
         ])
         #expect(SettingsSection.allCases.filter { $0.group == .basics } == [.general, .features, .info])
         #expect(SettingsSection.allCases.filter { $0.group == .sound } == [.keyboardSound])

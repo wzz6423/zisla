@@ -97,7 +97,7 @@ struct FirstLaunchOnboardingView: View {
     private var permissions: some View {
         VStack(alignment: .leading, spacing: 20) {
             heading("onboarding.permissions.title", body: "onboarding.permissions.body")
-            FirstLaunchOnboardingPermissionsView(session: session, coordinator: session.permissions)
+            PermissionListView(performAction: session.performPermissionAction, coordinator: session.permissions)
         }
     }
 
@@ -206,62 +206,5 @@ struct FirstLaunchOnboardingView: View {
 
     private func localized(_ key: String) -> String {
         AppLocalization.string(key, locale: locale)
-    }
-}
-
-private struct FirstLaunchOnboardingPermissionsView: View {
-    let session: FirstLaunchOnboardingSession
-    @ObservedObject var coordinator: OnboardingPermissionCoordinator
-    @Environment(\.locale) private var locale
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            ForEach(coordinator.permissions) { item in
-                VStack(alignment: .leading, spacing: 10) {
-                    AppLocalizedText(item.titleKey)
-                        .font(.headline)
-                        .accessibilityAddTraits(.isHeader)
-                    AppLocalizedText(item.bodyKey)
-                        .foregroundStyle(.secondary)
-                        .fixedSize(horizontal: false, vertical: true)
-                    ViewThatFits(in: .horizontal) {
-                        HStack { status(item); Spacer(); action(item) }
-                        VStack(alignment: .leading, spacing: 8) { status(item); action(item) }
-                    }
-                }
-                .padding(16)
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .background(Color.fillControl, in: RoundedRectangle(cornerRadius: 12))
-            }
-        }
-    }
-
-    private func status(_ item: OnboardingPermissionItem) -> some View {
-        HStack(spacing: 6) {
-            if item.status == .requesting {
-                ProgressView().controlSize(.small)
-                    .accessibilityHidden(true)
-            } else if item.status == .granted {
-                Image(systemName: "checkmark.circle.fill")
-                    .foregroundStyle(Color.zislaSuccess)
-                    .accessibilityHidden(true)
-            }
-            AppLocalizedText(item.status.localizationKey)
-        }
-        .font(.callout)
-    }
-
-    @ViewBuilder
-    private func action(_ item: OnboardingPermissionItem) -> some View {
-        if item.status != .granted {
-            Button(AppLocalization.string(item.actionKey, locale: locale)) {
-                session.performPermissionAction(item)
-            }
-            .disabled(coordinator.requesting != nil)
-            .accessibilityLabel(Text(
-                AppLocalization.string(item.actionKey, locale: locale) + " · " +
-                    AppLocalization.string(item.titleKey, locale: locale)
-            ))
-        }
     }
 }

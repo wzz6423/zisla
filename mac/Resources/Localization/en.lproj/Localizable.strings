@@ -2749,7 +2749,7 @@
 "onboarding.permission.system_audio.title" = "System Audio";
 "onboarding.permission.system_audio.body" = "For music visualizations. Enable audio recording in System Settings; macOS may confirm again when you first use it.";
 "onboarding.permission.full_disk_access.title" = "Full Disk Access";
-"onboarding.permission.full_disk_access.body" = "Needed only for local mail indexes or browser cookies. Enable in System Settings if you use these features.";
+"onboarding.permission.full_disk_access.body" = "Used to read system Screen Time, local mail indexes, or browser cookies. Enable in System Settings as needed.";
 "荧光笔" = "Highlighter";
 "保留左右标记" = "Keep end markers";
 "提取" = "Extract";
@@ -3308,3 +3308,7 @@
 "无法读取此图片或视频，请选择系统支持的媒体文件。" = "Cannot read this image or video. Choose a media file supported by your system.";
 "宠物动画不能超过 30 秒。" = "Pet animations cannot exceed 30 seconds.";
 "宠物文件不能超过 100 MB。" = "Pet files cannot exceed 100 MB.";
+
+"权限" = "Permissions";
+"管理 zisla 使用的系统权限。" = "Manage the system permissions used by zisla.";
+"请在设置的“权限”页面管理授权。" = "Manage access on the Permissions page in Settings.";

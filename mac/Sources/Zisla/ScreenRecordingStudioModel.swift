@@ -225,11 +225,6 @@ final class ScreenRecordingStudioModel: ObservableObject {
         }
     }
 
-    func requestScreenAccess() {
-        _ = CGRequestScreenCaptureAccess()
-        Task { await loadSources() }
-    }
-
     func chooseRecordingOutputDirectory() {
         guard !isRecording, !isBusy, !isChoosingFile, !exporter.isExporting else { return }
         let panel = NSOpenPanel()

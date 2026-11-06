@@ -125,16 +125,10 @@ struct WiFiNetworkPanelView: View {
                 .font(.callout)
                 .foregroundStyle(.secondary)
                 .fixedSize(horizontal: false, vertical: true)
-            if controller.authorization == .notDetermined {
-                Button(AppLocalization.text("允许访问位置")) {
-                    controller.requestLocationAuthorization()
-                }
-                .disabled(controller.isBusy)
-            } else {
-                Button(AppLocalization.text("打开定位设置")) {
-                    _ = controller.openSettings(.location)
-                }
-            }
+            AppLocalizedText("请在设置的“权限”页面管理授权。")
+                .font(.callout)
+                .foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
         }
     }
 

@@ -296,14 +296,9 @@ struct DownloadModuleView: View {
                         Spacer()
                     }
                     if DownloadFailureDiagnostics.requiresBrowserCookieAccess(message) {
-                        Button {
-                            let url = URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_AllFiles")!
-                            NSWorkspace.shared.open(url)
-                        } label: {
-                            Label(AppLocalization.text("授权磁盘访问"), systemImage: "externaldrive.badge.checkmark")
-                        }
-                        .buttonStyle(.bordered)
-                        .controlSize(.mini)
+                        AppLocalizedText("请在设置的“权限”页面管理授权。")
+                            .font(.system(size: 10))
+                            .foregroundStyle(.secondary)
                     } else if model.downloadNeedsBrowserCookies {
                         Button {
                             model.retryDownloadWithBrowserCookies()

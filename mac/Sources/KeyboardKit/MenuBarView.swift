@@ -152,21 +152,10 @@ struct MenuBarView: View {
                 .font(.caption2)
                 .foregroundStyle(.orange)
                 .fixedSize(horizontal: false, vertical: true)
-            HStack {
-                Button(AppLocalization.text("请求授权")) {
-                    model.requestInputMonitoring()
-                    if !permission.isGranted {
-                        model.openInputMonitoringSettings()
-                    }
-                    dismiss()
-                }
-                    .buttonStyle(.borderedProminent)
-                Button(AppLocalization.text("打开系统设置")) {
-                    model.openInputMonitoringSettings()
-                    dismiss()
-                }
-                    .buttonStyle(.bordered)
-            }
+            Text(L10n.tr("请在设置的“权限”页面管理授权。"))
+                .font(.caption)
+                .foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
         }
         .padding(12)
         .frame(maxWidth: .infinity, alignment: .leading)

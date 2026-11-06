@@ -2750,7 +2750,7 @@
 "onboarding.permission.system_audio.title" = "Audio Sistem";
 "onboarding.permission.system_audio.body" = "Untuk visualisasi musik. Aktifkan perekaman audio di Pengaturan Sistem; macOS dapat meminta konfirmasi saat pertama kali digunakan.";
 "onboarding.permission.full_disk_access.title" = "Akses Disk Penuh";
-"onboarding.permission.full_disk_access.body" = "Hanya diperlukan untuk indeks email lokal atau cookie browser. Aktifkan di Pengaturan Sistem jika Anda menggunakan fitur ini.";
+"onboarding.permission.full_disk_access.body" = "Digunakan untuk membaca Durasi Layar sistem, indeks email lokal, atau cookie browser. Aktifkan di Pengaturan Sistem sesuai kebutuhan.";
 "荧光笔" = "Pena penyorot";
 "保留左右标记" = "Pertahankan penanda di kedua ujung";
 "提取" = "Ekstrak";
@@ -3309,3 +3309,7 @@
 "无法读取此图片或视频，请选择系统支持的媒体文件。" = "Gambar atau video ini tidak dapat dibaca. Pilih berkas media yang didukung sistem Anda.";
 "宠物动画不能超过 30 秒。" = "Animasi hewan peliharaan tidak boleh melebihi 30 detik.";
 "宠物文件不能超过 100 MB。" = "Berkas hewan peliharaan tidak boleh melebihi 100 MB.";
+
+"权限" = "Izin";
+"管理 zisla 使用的系统权限。" = "Kelola izin sistem yang digunakan zisla.";
+"请在设置的“权限”页面管理授权。" = "Kelola akses di halaman Izin dalam pengaturan.";

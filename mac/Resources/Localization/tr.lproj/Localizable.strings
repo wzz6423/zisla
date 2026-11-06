@@ -2750,7 +2750,7 @@
 "onboarding.permission.system_audio.title" = "Sistem Sesi";
 "onboarding.permission.system_audio.body" = "Müzik görselleştirmeleri için kullanılır. Sistem Ayarları’nda ses kaydını etkinleştirin; macOS ilk kullanımda onay isteyebilir.";
 "onboarding.permission.full_disk_access.title" = "Tam Disk Erişimi";
-"onboarding.permission.full_disk_access.body" = "Yalnızca yerel posta dizinleri veya tarayıcı çerezleri için gereklidir. Bu özellikleri kullanıyorsanız Sistem Ayarları’nda etkinleştirin.";
+"onboarding.permission.full_disk_access.body" = "Sistemin Ekran Süresi verilerini, yerel posta dizinlerini veya tarayıcı çerezlerini okumak için kullanılır. Gerektiğinde Sistem Ayarları’nda etkinleştirin.";
 "荧光笔" = "Fosforlu kalem";
 "保留左右标记" = "Uç işaretlerini koru";
 "提取" = "Ayıkla";
@@ -3309,3 +3309,7 @@
 "无法读取此图片或视频，请选择系统支持的媒体文件。" = "Bu görsel veya video okunamıyor. Sisteminizin desteklediği bir medya dosyası seçin.";
 "宠物动画不能超过 30 秒。" = "Evcil hayvan animasyonları 30 saniyeyi aşamaz.";
 "宠物文件不能超过 100 MB。" = "Evcil hayvan dosyaları 100 MB boyutunu aşamaz.";
+
+"权限" = "İzinler";
+"管理 zisla 使用的系统权限。" = "zisla’nın kullandığı sistem izinlerini yönetin.";
+"请在设置的“权限”页面管理授权。" = "Erişimi ayarlardaki İzinler sayfasından yönetin.";
