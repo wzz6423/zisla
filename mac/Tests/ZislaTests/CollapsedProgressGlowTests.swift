@@ -9,6 +9,78 @@ import ZislaCore
 struct CollapsedProgressGlowTests {
     @Test(arguments: [0.25, 0.5, 1.0])
     @MainActor
+    func notchDismissalFillsFromLeftToRightOnlyAtTheBottom(progress: Double) throws {
+        let pixels = try Self.dismissalPixels(progress: progress, style: .notch)
+
+        #expect(pixels[..<(180 * 31)].allSatisfy { $0 < 0.02 },
+                "Notch quick-action countdowns must leave the top and side edges clear")
+        #expect(Self.lit(pixels, width: 180, x: 22...26, y: 31...33))
+        if progress < 1 {
+            let unfilled = Int(180 * progress) + 4
+            #expect(!Self.lit(pixels, width: 180, x: unfilled...179, y: 31...33),
+                    "The countdown must stop at the elapsed fraction of the bottom track")
+        }
+    }
+
+    @Test(arguments: [CGSize(width: 180, height: 34), CGSize(width: 34, height: 180)])
+    @MainActor
+    func pillDismissalKeepsTheClockwiseOutlineInBothOrientations(size: CGSize) throws {
+        let full = try Self.dismissalPixels(progress: 1, style: .pill, size: size)
+        let half = try Self.dismissalPixels(progress: 0.5, style: .pill, size: size)
+        let width = Int(size.width)
+        let height = Int(size.height)
+        let middleX = width / 2
+        let middleY = height / 2
+
+        #expect(Self.lit(full, width: width, x: middleX - 2...middleX + 2, y: 0...4))
+        #expect(Self.lit(full, width: width, x: middleX - 2...middleX + 2, y: height - 5...height - 1))
+        #expect(Self.lit(full, width: width, x: 0...4, y: middleY - 2...middleY + 2))
+        #expect(Self.lit(full, width: width, x: width - 5...width - 1, y: middleY - 2...middleY + 2))
+        #expect(!Self.lit(full, width: width, x: middleX - 3...middleX + 3, y: middleY - 3...middleY + 3))
+        #expect(Self.lit(half, width: width, x: width - 5...width - 1, y: middleY - 2...middleY + 2))
+        #expect(!Self.lit(half, width: width, x: 0...4, y: middleY - 2...middleY + 2))
+    }
+
+    @Test(arguments: [Double?.none, 0, -1, Double.nan, Double.infinity, -Double.infinity])
+    @MainActor
+    func unavailableAndInvalidDismissalPaintNoProgress(progress: Double?) throws {
+        for style in IslandLayoutStyle.allCases {
+            #expect(try Self.dismissalPixels(progress: progress, style: style).allSatisfy { $0 == 0 })
+        }
+    }
+
+    @Test(arguments: IslandLayoutStyle.allCases)
+    @MainActor
+    func disabledDismissalGlowPaintsNoProgress(style: IslandLayoutStyle) throws {
+        #expect(try Self.dismissalPixels(progress: 1, style: style, enabled: false).allSatisfy { $0 == 0 })
+    }
+
+    @Test(arguments: IslandLayoutStyle.allCases)
+    @MainActor
+    func expandedQuickActionsPaintNoDismissalProgress(style: IslandLayoutStyle) throws {
+        #expect(try Self.dismissalPixels(progress: 1, style: style, expanded: true).allSatisfy { $0 == 0 })
+    }
+
+    @Test(arguments: IslandLayoutStyle.allCases)
+    @MainActor
+    func dismissalProgressStaysInsideTheCollapsedFrame(style: IslandLayoutStyle) throws {
+        let controller = ClipboardAssistantController(windowPresenter: { _, _ in })
+        let collapsed = CGRect(x: 20, y: 10, width: 180, height: 34)
+        let renderer = ImageRenderer(content: ClipboardAssistantToastView(presentation: controller.presentation, controller: controller)
+            .dismissalProgressOverlay(progress: 1, style: style, collapsedFrame: collapsed)
+            .frame(width: 220, height: 64).background(.black))
+        renderer.scale = 1
+        let pixels = try Self.pixelValues(NSBitmapImageRep(cgImage: #require(renderer.cgImage)))
+
+        #expect(pixels[..<(220 * 10)].allSatisfy { $0 == 0 })
+        #expect(pixels[(220 * 44)...].allSatisfy { $0 == 0 })
+        #expect(Self.lit(pixels, width: 220, x: 108...112, y: 41...43))
+        #expect(!Self.lit(pixels, width: 220, x: 0...19, y: 10...43))
+        #expect(!Self.lit(pixels, width: 220, x: 200...219, y: 10...43))
+    }
+
+    @Test(arguments: [0.25, 0.5, 1.0])
+    @MainActor
     func notchPlaybackFillsFromLeftToRightOnlyAtTheBottom(progress: Double) throws {
         let size = CGSize(width: 180, height: 34)
         let pixels = try Self.playbackPixels(progress: progress, style: .notch, placement: IslandPlacement())
@@ -87,8 +159,8 @@ struct CollapsedProgressGlowTests {
         for size in [CGSize(width: 220, height: 64), CGSize(width: 64, height: 220)] {
             let radius = VoiceRecordingIslandGeometry.bottomCornerRadius
             let pixels = try Self.rendered(progress: 1, style: .pill, size: size,
-                                           isPlayback: true, pillCornerRadius: radius)
-            let capsule = try Self.rendered(progress: 1, style: .pill, size: size, isPlayback: true)
+                                           usesBottomTrack: true, pillCornerRadius: radius)
+            let capsule = try Self.rendered(progress: 1, style: .pill, size: size, usesBottomTrack: true)
             #expect(Self.lit(pixels, width: Int(size.width), x: 18...22, y: 0...1),
                     "The progress must follow the smaller corners of an expanded information pill")
             #expect(!Self.lit(capsule, width: Int(size.width), x: 18...22, y: 0...1))
@@ -110,7 +182,7 @@ struct CollapsedProgressGlowTests {
     @Test(arguments: [CGSize(width: 2, height: 34), CGSize(width: 34, height: 2), CGSize(width: 2, height: 2)])
     @MainActor
     func undersizedNotchPlaybackDoesNotDrawOutsideTheInsetBounds(size: CGSize) throws {
-        let renderer = ImageRenderer(content: CollapsedProgressGlow(progress: 1, isPlayback: true)
+        let renderer = ImageRenderer(content: CollapsedProgressGlow(progress: 1, usesBottomTrack: true)
             .frame(width: size.width, height: size.height).background(.black))
         renderer.scale = 1
         let pixels = try Self.pixelValues(NSBitmapImageRep(cgImage: #require(renderer.cgImage)))
@@ -387,24 +459,25 @@ struct CollapsedProgressGlowTests {
 
     @Test(arguments: [0.0, -1, Double.nan, Double.infinity, -Double.infinity], [false, true])
     @MainActor
-    func zeroAndInvalidProgressPaintNoStroke(progress: Double, isPlayback: Bool) throws {
+    func zeroAndInvalidProgressPaintNoStroke(progress: Double, usesBottomTrack: Bool) throws {
         for style in IslandLayoutStyle.allCases {
             let pixels = try Self.rendered(progress: progress, style: style, size: CGSize(width: 180, height: 34),
-                                           isPlayback: isPlayback)
+                                           usesBottomTrack: usesBottomTrack)
             #expect(pixels.allSatisfy { $0 == 0 })
         }
     }
 
     @Test(arguments: [false, true]) @MainActor
-    func overcompleteProgressMatchesACompleteOutline(isPlayback: Bool) throws {
-        #expect(try Self.rendered(progress: 2, isPlayback: isPlayback) == Self.rendered(progress: 1, isPlayback: isPlayback))
+    func overcompleteProgressMatchesACompleteOutline(usesBottomTrack: Bool) throws {
+        #expect(try Self.rendered(progress: 2, usesBottomTrack: usesBottomTrack)
+            == Self.rendered(progress: 1, usesBottomTrack: usesBottomTrack))
     }
 
     @Test(arguments: [false, true]) @MainActor
-    func accessibilityModesPreserveProgressGeometryAndOpaqueContrast(isPlayback: Bool) throws {
-        let normal = try Self.rendered(progress: 0.5, isPlayback: isPlayback)
-        let reducedMotion = try Self.rendered(progress: 0.5, reduceMotion: true, isPlayback: isPlayback)
-        let opaque = try Self.rendered(progress: 0.5, reduceTransparency: true, isPlayback: isPlayback)
+    func accessibilityModesPreserveProgressGeometryAndOpaqueContrast(usesBottomTrack: Bool) throws {
+        let normal = try Self.rendered(progress: 0.5, usesBottomTrack: usesBottomTrack)
+        let reducedMotion = try Self.rendered(progress: 0.5, reduceMotion: true, usesBottomTrack: usesBottomTrack)
+        let opaque = try Self.rendered(progress: 0.5, reduceTransparency: true, usesBottomTrack: usesBottomTrack)
 
         #expect(normal == reducedMotion)
         #expect(zip(opaque, normal).allSatisfy { $0 + 0.001 >= $1 },
@@ -415,13 +488,13 @@ struct CollapsedProgressGlowTests {
     }
 
     @Test(arguments: [false, true]) @MainActor
-    func progressRetainsItsSelectedTint(isPlayback: Bool) throws {
+    func progressRetainsItsSelectedTint(usesBottomTrack: Bool) throws {
         let renderer = ImageRenderer(content: CollapsedProgressGlow(progress: 1,
-            tint: Color(.displayP3, red: 1, green: 0, blue: 0), isPlayback: isPlayback)
+            tint: Color(.displayP3, red: 1, green: 0, blue: 0), usesBottomTrack: usesBottomTrack)
             .frame(width: 180, height: 34).background(.black))
         renderer.scale = 1
         let bitmap = NSBitmapImageRep(cgImage: try #require(renderer.cgImage))
-        let color = try #require(bitmap.colorAt(x: 90, y: isPlayback ? 32 : 1)?.usingColorSpace(.deviceRGB))
+        let color = try #require(bitmap.colorAt(x: 90, y: usesBottomTrack ? 32 : 1)?.usingColorSpace(.deviceRGB))
 
         #expect(color.redComponent > 0.5)
         #expect(color.greenComponent < 0.05 && color.blueComponent < 0.05)
@@ -459,6 +532,28 @@ struct CollapsedProgressGlowTests {
     private static let sizes = [
         CGSize(width: 180, height: 34), CGSize(width: 34, height: 180), CGSize(width: 34, height: 34),
     ]
+
+    @MainActor
+    private static func dismissalPixels(
+        progress: Double?, style: IslandLayoutStyle, size: CGSize = CGSize(width: 180, height: 34),
+        enabled: Bool = true, expanded: Bool = false
+    ) throws -> [Double] {
+        let controller = ClipboardAssistantController(windowPresenter: { _, _ in })
+        controller.screenAtPoint = { _ in nil }
+        controller.presentation.progressGlowEnabled = enabled
+        if expanded {
+            let detection = ClipboardAssistantDetection(kind: .filePath, title: "File", fullContent: String(repeating: "x", count: 80))
+            controller.presentation.detection = detection
+            controller.toggleExpansion(detection)
+            #expect(controller.isExpanded)
+        }
+        let renderer = ImageRenderer(content: ClipboardAssistantToastView(presentation: controller.presentation, controller: controller)
+            .dismissalProgressOverlay(progress: progress, style: style, collapsedFrame: CGRect(origin: .zero, size: size))
+            .transaction { $0.disablesAnimations = true }
+            .frame(width: size.width, height: size.height).background(.black))
+        renderer.scale = 1
+        return try Self.pixelValues(NSBitmapImageRep(cgImage: #require(renderer.cgImage)))
+    }
 
     @MainActor
     private static func playbackPixels(
@@ -560,13 +655,13 @@ struct CollapsedProgressGlowTests {
     @MainActor
     private static func rendered(
         progress: Double, style: IslandLayoutStyle = .notch, size: CGSize = CGSize(width: 180, height: 34),
-        reduceMotion: Bool = false, reduceTransparency: Bool = false, isPlayback: Bool = false,
+        reduceMotion: Bool = false, reduceTransparency: Bool = false, usesBottomTrack: Bool = false,
         pillCornerRadius: CGFloat? = nil
     ) throws -> [Double] {
         let renderer = ImageRenderer(content: CollapsedProgressGlow.rendering(
             progress: progress, tint: .green, layoutStyle: style,
             reduceMotion: reduceMotion, reduceTransparency: reduceTransparency,
-            pillCornerRadius: pillCornerRadius, isPlayback: isPlayback
+            pillCornerRadius: pillCornerRadius, usesBottomTrack: usesBottomTrack
         )
             .frame(width: size.width, height: size.height)
             .clipShape(CompactIslandShape(layoutStyle: style, pillCornerRadius: pillCornerRadius))
