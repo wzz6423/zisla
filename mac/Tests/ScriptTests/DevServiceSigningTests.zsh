@@ -131,7 +131,7 @@ function service_is_loaded() { return 1 }
 function matching_app_pids() { print -r -- "4242" }
 function collect_matching_pids() { print -r -- "4242" }
 function wait_for_processes_to_exit() { return 0 }
-function osascript() { print -r -- "quit" >> "$events_file" }
+function osascript() { print -r -- "quit $*" >> "$events_file" }
 function kill() { print -r -- "kill $*" >> "$events_file" }
 function rm() { return 0 }
 function rmdir() { return 0 }
@@ -142,6 +142,14 @@ expect_contains \
   "$stop_events" \
   "quit" \
   "stopping the debug service requests graceful app termination"
+expect_contains \
+  "$stop_events" \
+  'tell application (item 1 of argv) to quit' \
+  "graceful quit resolves both regular and fresh bundle identities by app path"
+expect_contains \
+  "$stop_events" \
+  "$APP" \
+  "graceful quit targets only the managed app path"
 expect_not_contains \
   "$stop_events" \
   "kill -TERM" \

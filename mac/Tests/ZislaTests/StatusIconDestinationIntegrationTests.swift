@@ -7,6 +7,105 @@ import ZislaCore
 @testable import Zisla
 
 struct StatusIconDestinationIntegrationTests {
+    @Test(arguments: IslandEdge.allCases, [LayoutDirection.leftToRight, .rightToLeft]) @MainActor
+    func customUpdatesRenderTheCLIBrandAndUpgradeSymbolWithOrWithoutMonitoring(
+        edge: IslandEdge, direction: LayoutDirection
+    ) async throws {
+        let fixture = try IconFixture(edge: edge)
+        defer { fixture.close() }
+        fixture.settings.settings.sideNoticesEnabled = true
+        fixture.settings.settings.collapsedProgressGlowEnabled = false
+        let monitor = NSImage(size: CGSize(width: 24, height: 24), flipped: false) { rect in
+            NSColor.red.setFill()
+            rect.fill()
+            return true
+        }
+        let icons = [IslandStatusIcon(id: "combined", content: .combined(monitor), tooltip: "Combined")]
+        let brands: [(String, AIMascotIdentity)] = [
+            ("claude", .claude), ("codex", .codex), ("gemini", .gemini),
+            ("qoder", .coder), ("glm", .zcode), ("pi", .pi),
+        ]
+        let state = SideNoticeDisplayState()
+        state.islandEdge = edge
+        state.placementMode = .custom
+        state.compactWingHeight = 32
+        let view = CompactStatusBarView(queue: fixture.queue, displayState: state, media: fixture.media,
+            browserDownloads: fixture.downloads, settingsStore: fixture.settings, resultSweep: fixture.sweep,
+            onStatusHidden: {})
+        for (kind, identity) in brands {
+            let left = IslandNotice(id: "update-available-cli-\(kind)-left", title: identity.displayName,
+                side: .left, style: .status, symbolName: "sparkles")
+            let right = IslandNotice(id: "update-available-cli-\(kind)-right", title: "查看更新",
+                side: .right, style: .status, symbolName: "arrow.up.circle")
+            fixture.queue.enqueue(left, expiresAfter: nil)
+            fixture.queue.enqueue(right, expiresAfter: nil)
+            for moreInformation in [false, true] {
+                fixture.settings.settings.islandShowMoreInformation = moreInformation
+                state.statusIcons = moreInformation ? icons : []
+                let iconSize = moreInformation ? try #require(IslandStatusIconLayout.size(icons: icons, edge: edge)) : .zero
+                let iconLength = edge.isVertical ? iconSize.height : iconSize.width
+                let statusLength: CGFloat = moreInformation ? 66 : 78
+                let length = iconLength + statusLength
+                let size = edge.isVertical ? CGSize(width: 32, height: length) : CGSize(width: length, height: 32)
+                let row = edge.isVertical ? AnyLayout(VStackLayout(spacing: 0)) : AnyLayout(HStackLayout(spacing: 0))
+                let pair = edge.isVertical ? AnyLayout(VStackLayout(spacing: 6)) : AnyLayout(HStackLayout(spacing: 6))
+                let reference = row {
+                    if moreInformation {
+                        IslandStatusIconStrip(icons: icons, edge: edge, date: .distantPast)
+                            .frame(width: iconSize.width, height: iconSize.height)
+                    }
+                    pair {
+                        AIMascotView(identity: identity, size: min(20, 32 * 0.62))
+                            .frame(width: edge.isVertical ? 32 : 24, height: edge.isVertical ? 24 : 32)
+                        Image(systemName: "arrow.up.circle")
+                            .font(.system(size: 14, weight: .semibold))
+                            .foregroundStyle(.cyan)
+                            .frame(width: edge.isVertical ? 32 : 24, height: edge.isVertical ? 24 : 32)
+                    }
+                    .padding(edge.isVertical ? .top : .leading, moreInformation ? 0 : 12)
+                    .padding(edge.isVertical ? .bottom : .trailing, 12)
+                    .frame(width: edge.isVertical ? 32 : statusLength, height: edge.isVertical ? statusLength : 32)
+                }
+                .frame(width: size.width, height: size.height)
+                .background(.black)
+                .clipShape(CompactIslandShape(layoutStyle: .pill))
+                .environment(\.colorScheme, .dark)
+                .environment(\.layoutDirection, direction)
+                let expected = try await renderOffscreen(reference, size: size)
+                let actual = try await renderOffscreen(view
+                    .environment(\.layoutDirection, direction)
+                    .environment(\._accessibilityReduceMotion, true), size: size)
+                #expect(actual.pixelsWide == expected.pixelsWide && actual.pixelsHigh == expected.pixelsHigh)
+                var changed = 0
+                var upgradePixels = 0
+                let updateStart = edge.isVertical || direction == .leftToRight ? iconLength : 0
+                let upgradeStart = edge.isVertical || direction == .leftToRight
+                    ? updateStart + (moreInformation ? 0 : 12) + 30 : 12
+                let scale = CGFloat(actual.pixelsWide) / size.width
+                for y in 0..<actual.pixelsHigh {
+                    for x in 0..<actual.pixelsWide {
+                        let a = try #require(actual.colorAt(x: x, y: y)?.usingColorSpace(.sRGB))
+                        let b = try #require(expected.colorAt(x: x, y: y)?.usingColorSpace(.sRGB))
+                        if max(abs(a.redComponent - b.redComponent), abs(a.greenComponent - b.greenComponent),
+                               abs(a.blueComponent - b.blueComponent)) > 0.02 { changed += 1 }
+                        let axis = CGFloat(edge.isVertical ? y : x) / scale
+                        if axis >= upgradeStart && axis < upgradeStart + 24,
+                           min(a.redComponent, a.greenComponent, a.blueComponent) > 0.2 {
+                            upgradePixels += 1
+                        }
+                    }
+                }
+                #expect(changed == 0,
+                        "\(kind) must render its logo and the notch's upgrade icon on \(edge), RTL=\(direction == .rightToLeft), monitoring=\(moreInformation); changed pixels: \(changed)")
+                #expect(upgradePixels > 5,
+                        "The upgrade arrow must remain visible next to \(kind) on \(edge), RTL=\(direction == .rightToLeft), monitoring=\(moreInformation)")
+            }
+            #expect(fixture.queue.left == [left] && fixture.queue.right == [right],
+                    "Rendering an update must not consume or change either notice")
+            fixture.queue.removeAll()
+        }
+    }
+
     @Test(arguments: IslandEdge.allCases, MediaCompactStyle.allCases) @MainActor
     func twoRowInformationUsesTheVoiceInputCornerRadius(edge: IslandEdge, style: MediaCompactStyle) async throws {
         let fixture = try IconFixture(edge: edge)
@@ -243,13 +342,13 @@ struct StatusIconDestinationIntegrationTests {
     }
 
     @Test(arguments: IslandEdge.allCases) @MainActor
-    func moreInformationKeepsMonitorAIPlaybackAndAwakeStatusTogether(edge: IslandEdge) throws {
+    func defaultMoreInformationKeepsMonitorAIPlaybackAndAwakeStatusTogether(edge: IslandEdge) throws {
         let fixture = try IconFixture(edge: edge)
         defer { fixture.close() }
         fixture.settings.settings.sideNoticesEnabled = true
         fixture.settings.settings.mediaCompactStyle = .detailed
         var payload = try #require(JSONSerialization.jsonObject(with: JSONEncoder().encode(fixture.settings.settings)) as? [String: Any])
-        payload["islandShowMoreInformation"] = true
+        payload.removeValue(forKey: "islandShowMoreInformation")
         fixture.settings.settings = try JSONDecoder().decode(FeatureSettings.self,
             from: JSONSerialization.data(withJSONObject: payload))
         let icons = [IslandStatusIcon(id: "cpu", content: .metric(.cpu, text: "20%", image: nil, style: .detailed), tooltip: "CPU")]
@@ -647,13 +746,14 @@ struct StatusIconDestinationIntegrationTests {
             let icons = IslandStatusIconRouting.update(destination: .island, application: application,
                 metrics: titles, stacked: stacked, readings: readings, combined: combined, style: style)
             #expect(items.allSatisfy { !$0.isVisible })
-            #expect(icons.map(\.id) == ["status-icon-combined", "status-icon-application"]
+            #expect(icons.map(\.id) == ["status-icon-application", "status-icon-combined"]
                 + SystemMonitorMenuBarMetric.allCases.map { "status-icon-\($0.rawValue)" }
                 + ["status-icon-stacked"])
             for icon in icons {
                 if case let .metric(_, text, _, _) = icon.content { #expect(text == "--") }
             }
-            #expect(icons.first?.size(edge: .left) == CGSize(width: 36, height: 36))
+            let combinedIcon = try #require(icons.first { $0.id == "status-icon-combined" })
+            #expect(combinedIcon.size(edge: .left) == CGSize(width: 36, height: 36))
             let stackedIcon = try #require(icons.first { $0.id == "status-icon-stacked" })
             let image = try #require(stacked.button?.image)
             for edge in IslandEdge.allCases {
@@ -675,7 +775,56 @@ struct StatusIconDestinationIntegrationTests {
             })
         }
         #expect(IslandStatusIconRouting.update(destination: .island, application: nil, metrics: [],
-            stacked: nil, readings: [], combined: nil, style: .compact).isEmpty)
+            stacked: nil, readings: [], combined: nil, style: .compact, islandAppIconEnabled: false).isEmpty)
+    }
+
+    @Test(arguments: IslandEdge.allCases, [LayoutDirection.leftToRight, .rightToLeft]) @MainActor
+    func routedLogoRendersBeforeTheCombinedIconAndStackedReadings(edge: IslandEdge, direction: LayoutDirection) async throws {
+        let application = NSStatusBar.system.statusItem(withLength: NSStatusItem.squareLength)
+        let combined = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
+        let stacked = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
+        let items = [application, combined, stacked]
+        items.forEach { $0.isVisible = false }
+        defer { items.forEach { NSStatusBar.system.removeStatusItem($0) } }
+        let image = NSImage(size: CGSize(width: 36, height: 36), flipped: false) { rect in
+            NSColor.red.setFill()
+            rect.fill()
+            return true
+        }
+        combined.button?.image = image
+        let readings = [IslandStatusIcon.Reading(metric: .cpu, text: "14%"),
+                        IslandStatusIcon.Reading(metric: .gpu, text: "0%")]
+        stacked.button?.image = SystemMonitorMenuBarImageRenderer.stacked(rows: ["C 14%", "G 0%"], style: .compact)
+        let icons = IslandStatusIconRouting.update(destination: .island, application: application,
+            metrics: [], stacked: stacked, readings: readings, combined: combined, style: .compact)
+        let size = try #require(IslandStatusIconLayout.size(icons: icons, edge: edge))
+        let bitmap = try await renderOffscreen(IslandStatusIconStrip(icons: icons, edge: edge, date: .distantPast)
+            .environment(\.layoutDirection, direction)
+            .environment(\._accessibilityReduceMotion, true), size: size)
+        var combinedBounds = CGRect.null
+        for y in 0..<bitmap.pixelsHigh {
+            for x in 0..<bitmap.pixelsWide {
+                let color = try #require(bitmap.colorAt(x: x, y: y))
+                if color.redComponent > 0.5 && color.greenComponent < 0.2 {
+                    combinedBounds = combinedBounds.union(CGRect(x: x, y: y, width: 1, height: 1))
+                }
+            }
+        }
+        #expect(!combinedBounds.isNull, "The combined status icon must remain visible")
+        var logoPixels = 0
+        var readingPixels = 0
+        for y in 0..<bitmap.pixelsHigh {
+            for x in 0..<bitmap.pixelsWide {
+                let color = try #require(bitmap.colorAt(x: x, y: y))
+                guard min(color.redComponent, color.greenComponent, color.blueComponent) > 0.1 else { continue }
+                if edge.isVertical ? CGFloat(y) < combinedBounds.minY : CGFloat(x) < combinedBounds.minX { logoPixels += 1 }
+                if edge.isVertical ? CGFloat(y) >= combinedBounds.maxY : CGFloat(x) >= combinedBounds.maxX { readingPixels += 1 }
+            }
+        }
+        #expect(logoPixels > 10, "The logo must render first on every edge, including RTL languages")
+        #expect(readingPixels > 10, "Both stacked readings must remain after the combined status icon")
+        #expect(items.allSatisfy { !$0.isVisible })
+        #expect(combined.button?.image === image && image.size == CGSize(width: 36, height: 36))
     }
 
     @Test @MainActor
@@ -687,7 +836,8 @@ struct StatusIconDestinationIntegrationTests {
         for style in SystemMonitorMenuBarDisplayStyle.allCases {
             let title = style == .detailed ? "Network ↓12 MB/s ↑7 MB/s" : "↓12 MB/s"
             let icons = IslandStatusIconRouting.update(destination: .island, application: nil,
-                metrics: [(.network, item, title)], stacked: nil, readings: [], combined: nil, style: style)
+                metrics: [(.network, item, title)], stacked: nil, readings: [], combined: nil, style: style,
+                islandAppIconEnabled: false)
             guard case let .metric(metric, text, _, selectedStyle) = try #require(icons.first).content else {
                 Issue.record("The selected network metric must remain an individual icon")
                 return
@@ -707,7 +857,8 @@ struct StatusIconDestinationIntegrationTests {
         let tooltip = "CPU: 20%\n\(action)"
         item.button?.toolTip = tooltip
         let icons = IslandStatusIconRouting.update(destination: .island, application: nil,
-            metrics: [(.cpu, item, "20%")], stacked: item, readings: [], combined: item, style: .detailed)
+            metrics: [(.cpu, item, "20%")], stacked: item, readings: [], combined: item, style: .detailed,
+            islandAppIconEnabled: false)
         #expect(icons.count == 3)
         #expect(icons.allSatisfy { $0.tooltip == "CPU: 20%" })
         #expect(item.button?.toolTip == tooltip, "Moving an icon must preserve its original menu bar behavior")
@@ -781,7 +932,8 @@ struct StatusIconDestinationIntegrationTests {
         item.button?.toolTip = nil
         let readings = [IslandStatusIcon.Reading(metric: .cpu, text: "20%")]
         let icons = IslandStatusIconRouting.update(destination: .island, application: nil,
-            metrics: [(.cpu, item, "20%")], stacked: item, readings: readings, combined: item, style: .compact)
+            metrics: [(.cpu, item, "20%")], stacked: item, readings: readings, combined: item, style: .compact,
+            islandAppIconEnabled: false)
         #expect(icons.map(\.tooltip) == ["zisla", "20%", "20%"])
         for icon in icons {
             let size = try #require(IslandStatusIconLayout.size(icons: [icon], edge: edge))
@@ -904,7 +1056,7 @@ struct StatusIconDestinationIntegrationTests {
         defer { NSStatusBar.system.removeStatusItem(item) }
         let icons = IslandStatusIconRouting.update(destination: .island, application: nil,
             metrics: [], stacked: item, readings: [.init(metric: .cpu, text: "14%"), .init(metric: .gpu, text: "30%")],
-            combined: nil, style: style)
+            combined: nil, style: style, islandAppIconEnabled: false)
         let icon = try #require(icons.first)
         let size = try #require(IslandStatusIconLayout.size(icons: icons, edge: edge))
         let expectedSize = edge.isVertical ? CGSize(width: image.size.width + 8, height: 40)
@@ -1120,7 +1272,7 @@ struct StatusIconDestinationIntegrationTests {
     }
 
     @MainActor
-    private func renderOffscreen(_ content: some View, size: CGSize,
+    func renderOffscreen(_ content: some View, size: CGSize,
                                  inspect: (NSView) -> Void = { _ in }) async throws -> NSBitmapImageRep {
         let host = NSHostingView(rootView: content.frame(width: size.width, height: size.height).background(.black))
         host.sizingOptions = []
@@ -1169,7 +1321,7 @@ struct StatusIconDestinationIntegrationTests {
     }
 
     @MainActor
-    private final class IconFixture {
+    final class IconFixture {
         let suite = "StatusIconPresentation.\(UUID().uuidString)"
         let defaults: UserDefaults
         let settings: FeatureSettingsStore
@@ -1194,6 +1346,7 @@ struct StatusIconDestinationIntegrationTests {
             settings.settings.islandPlacement = IslandPlacement(mode: .custom, edge: edge)
             settings.settings.statusIconDestination = .island
             settings.settings.sideNoticesEnabled = false
+            settings.settings.islandShowMoreInformation = false
             settings.settings.islandNotchBackground = .black
         }
 

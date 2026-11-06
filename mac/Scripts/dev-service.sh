@@ -116,7 +116,8 @@ function stop_service() {
   app_pids=("${(@f)$(matching_app_pids)}")
   [[ ${#app_pids[@]} -eq 1 && -z "${app_pids[1]}" ]] && app_pids=()
   if (( ${#app_pids[@]} > 0 )); then
-    osascript -e 'tell application id "dev.wzz.zisla.debug" to quit' >/dev/null 2>&1 || true
+    osascript -e 'on run argv' -e 'tell application (item 1 of argv) to quit' -e 'end run' \
+      "$APP" >/dev/null 2>&1 || true
   fi
 
   if ! wait_for_processes_to_exit; then
@@ -161,12 +162,22 @@ function start_service() {
   local pid
   local dev_identity
   local first_launch=0
+  local profile_directory=""
+  local debug_bundle_identifier="$SERVICE_LABEL"
 
   [[ "${ZISLA_FIRST:-}" == "1" ]] && first_launch=1
 
   dev_identity="$(resolve_dev_code_sign_identity)"
+  if [[ "${ZISLA_FRESH_START:-}" == "1" ]]; then
+    profile_directory="$(mktemp -d "${SERVICE_LOCK:h}/zisla-debug-fresh.XXXXXX")"
+    # A separate home alone still shares UserDefaults.standard through cfprefsd.
+    debug_bundle_identifier="$SERVICE_LABEL.fresh.${profile_directory##*.}"
+    first_launch=1
+    print -r -- "首次默认值测试目录：$profile_directory"
+  fi
   stop_service
-  DEBUG_BUILD=true OUTPUT_DIRECTORY="$APP_DIRECTORY" CODE_SIGN_IDENTITY="$dev_identity" SIGNING_MODE=dev \
+  DEBUG_BUILD=true ZISLA_DEBUG_BUNDLE_ID="$debug_bundle_identifier" \
+    OUTPUT_DIRECTORY="$APP_DIRECTORY" CODE_SIGN_IDENTITY="$dev_identity" SIGNING_MODE=dev \
     "$ROOT/Scripts/build-app.sh"
   [[ -x "$APP_BINARY" ]] || fail "构建未生成 zisla-debug.app 可执行文件"
 
@@ -178,6 +189,9 @@ function start_service() {
   plutil -insert ProgramArguments.0 -string "$APP_BINARY" "$LAUNCH_AGENT"
   plutil -insert EnvironmentVariables -dictionary "$LAUNCH_AGENT"
   plutil -insert EnvironmentVariables.ZISLA_FIRST -string "$first_launch" "$LAUNCH_AGENT"
+  if [[ -n "$profile_directory" ]]; then
+    plutil -insert EnvironmentVariables.CFFIXED_USER_HOME -string "$profile_directory" "$LAUNCH_AGENT"
+  fi
   plutil -insert ProcessType -string Interactive "$LAUNCH_AGENT"
   plutil -insert RunAtLoad -bool true "$LAUNCH_AGENT"
   plutil -insert KeepAlive -bool true "$LAUNCH_AGENT"

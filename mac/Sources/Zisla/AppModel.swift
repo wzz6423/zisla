@@ -445,7 +445,9 @@ final class AppModel: ObservableObject {
   }
 
   @Published var isPinned = false
-  @Published private(set) var weatherSnapshotsByLocationID: [String: WeatherSnapshot] = [:]
+  @Published private(set) var weatherSnapshotsByLocationID: [String: WeatherSnapshot] = [:] {
+    didSet { scheduleWeatherExpiry() }
+  }
   @Published var weatherLocationState: WeatherLocationUIState = .idle
   @Published var updateState: UpdateCheckState = .idle
   @Published private(set) var productUpdateAvailable = false
@@ -640,6 +642,7 @@ final class AppModel: ObservableObject {
   private var headphoneTransientTask: Task<Void, Never>?
   private var cancellables: Set<AnyCancellable> = []
   private var weatherTask: Task<Void, Never>?
+  private var weatherExpiryTask: Task<Void, Never>?
   private var updatePollingTask: Task<Void, Never>?
   private let updateFeedResolver = UpdateFeedResolver {
     UpdateFeedPreference(countryCode: await AppModel.countryCodeForCurrentIP())
@@ -1193,6 +1196,8 @@ final class AppModel: ObservableObject {
     clipboardHistory.flushPendingChanges()
     aiAgent.store.flushPendingChanges()
     weatherTask?.cancel()
+    weatherExpiryTask?.cancel()
+    weatherExpiryTask = nil
     updatePollingTask?.cancel()
     updateFeedResolver.cancel()
     voiceRecordingCleanupTask?.cancel()
@@ -1400,7 +1405,8 @@ final class AppModel: ObservableObject {
               coordinate: GeoCoordinate(
                 latitude: current.latitude,
                 longitude: current.longitude
-              )
+              ),
+              isoCountryCode: current.isoCountryCode
             )
             requests.append((configured.id, current))
           } catch is CancellationError {
@@ -1414,7 +1420,8 @@ final class AppModel: ObservableObject {
                   GeoLocation(
                     latitude: coordinate.latitude,
                     longitude: coordinate.longitude,
-                    displayName: configured.displayName
+                    displayName: configured.displayName,
+                    isoCountryCode: configured.isoCountryCode
                   )
                 ))
             }
@@ -1427,7 +1434,8 @@ final class AppModel: ObservableObject {
               GeoLocation(
                 latitude: coordinate.latitude,
                 longitude: coordinate.longitude,
-                displayName: configured.displayName
+                displayName: configured.displayName,
+                isoCountryCode: configured.isoCountryCode
               )
             ))
         }
@@ -1441,7 +1449,8 @@ final class AppModel: ObservableObject {
               let snapshot = try await weatherService.fetch(
                 latitude: request.location.latitude,
                 longitude: request.location.longitude,
-                locationName: request.location.displayName
+                locationName: request.location.displayName,
+                isoCountryCode: request.location.isoCountryCode
               )
               return (request.id, snapshot, nil)
             } catch {
@@ -1456,8 +1465,10 @@ final class AppModel: ObservableObject {
       }
 
       guard !Task.isCancelled else { return }
-      weatherSnapshotsByLocationID = snapshots
-      let ordered = weatherLocations.orderedSnapshots(snapshots)
+      weatherSnapshotsByLocationID = weatherLocations.mergingSnapshots(
+        snapshots, retaining: weatherSnapshotsByLocationID
+      )
+      let ordered = weatherLocations.orderedSnapshots(weatherSnapshotsByLocationID)
       if ordered.isEmpty {
         let message = firstError ?? AppLocalization.text("没有可用的天气数据")
         weatherLocationState = .failed(message)
@@ -1482,7 +1493,48 @@ final class AppModel: ObservableObject {
   }
 
   func weatherSnapshot(for locationID: String) -> WeatherSnapshot? {
-    weatherSnapshotsByLocationID[locationID]
+    weatherLocations.snapshot(for: locationID, in: weatherSnapshotsByLocationID)
+  }
+
+  private func scheduleWeatherExpiry() {
+    weatherExpiryTask?.cancel()
+    weatherExpiryTask = Self.weatherExpiryTask(
+      expirationDates: weatherSnapshotsByLocationID.values.map(\.expiresAt)
+    ) { [weak self] in
+      guard let self else { return }
+      Self.expireWeather(
+        snapshots: &self.weatherSnapshotsByLocationID, state: &self.weatherLocationState, at: Date()
+      )
+    }
+  }
+
+  static func expireWeather(
+    snapshots: inout [String: WeatherSnapshot],
+    state: inout WeatherLocationUIState,
+    at date: Date
+  ) {
+    snapshots = snapshots.filter { $0.value.expiresAt > date }
+    if snapshots.isEmpty, case .ready = state {
+      state = .failed(AppLocalization.text("没有可用的天气数据"))
+    }
+  }
+
+  static func weatherExpiryTask(
+    expirationDates: [Date],
+    now: @escaping () -> Date = Date.init,
+    sleeper: @escaping @Sendable (Duration) async throws -> Void = { try await Task.sleep(for: $0) },
+    onExpiry: @escaping @MainActor () -> Void
+  ) -> Task<Void, Never>? {
+    guard let date = expirationDates.min() else { return nil }
+    return Task {
+      do {
+        try await sleeper(.seconds(max(0, date.timeIntervalSince(now()))))
+      } catch {
+        return
+      }
+      guard !Task.isCancelled else { return }
+      onExpiry()
+    }
   }
 
   func selectWeatherLocation(named query: String) {
@@ -1497,7 +1549,8 @@ final class AppModel: ObservableObject {
           coordinate: GeoCoordinate(
             latitude: location.latitude,
             longitude: location.longitude
-          )
+          ),
+          isoCountryCode: location.isoCountryCode
         )
         guard !Task.isCancelled else { return }
         self?.weatherLocationState = .ready(location.displayName)
@@ -3174,6 +3227,7 @@ final class AppModel: ObservableObject {
       options: settings.systemMonitorMenuBarHeadphoneOptions
     )
     reconcileHeadphoneTransient(devices: audioOutput.devices)
+    SystemMonitorHeadphoneTransient.updateConnectionNotices(settings: settings, queue: notices)
     if headphonePolicy {
       audioOutput.start()
     } else {
@@ -4112,14 +4166,18 @@ final class AppModel: ObservableObject {
   }
 
   private func reconcileHeadphoneTransient(devices: [AudioOutputDevice]) {
-    systemMonitorHeadphoneTransient.reconcile(enabled: headphoneTransientEnabled, devices: devices)
+    systemMonitorHeadphoneTransient.reconcile(
+      enabled: headphoneTransientEnabled, settings: settingsStore.settings, devices: devices
+    )
     if systemMonitorHeadphoneTransient.connection == nil {
       clearHeadphoneTransient()
     }
   }
 
   private func consumeHeadphoneConnection(_ connection: HeadphoneConnection) {
-    systemMonitorHeadphoneTransient.receive(connection, enabled: headphoneTransientEnabled)
+    systemMonitorHeadphoneTransient.receive(
+      connection, enabled: headphoneTransientEnabled, settings: settingsStore.settings
+    )
     if systemMonitorHeadphoneTransient.connection?.id == connection.id {
       headphoneTransientTask?.cancel()
       headphoneTransientTask = Task { @MainActor [weak self] in
@@ -4131,22 +4189,8 @@ final class AppModel: ObservableObject {
         self.headphoneTransientTask = nil
       }
     }
-    guard settingsStore.settings.sideNoticesEnabled else { return }
-    notices.enqueue(
-      IslandNotice(
-        id: "headphone-connection-\(connection.id.uuidString)",
-        title: connection.device.name,
-        detail: "已连接",
-        kind: .info,
-        side: .right,
-        style: .headphone,
-        symbolName: connection.device.isAirPodsMax ? "headphones" : nil,
-        batteryLevels: connection.battery?.noticeLevels,
-        metadata: connection.productID.map {
-          [HeadphoneConnection.productIDMetadataKey: String($0)]
-        }
-      ),
-      expiresAfter: SystemMonitorHeadphoneTransient.duration
+    SystemMonitorHeadphoneTransient.updateConnectionNotices(
+      settings: settingsStore.settings, queue: notices, connection: connection
     )
   }
 

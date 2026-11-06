@@ -23,6 +23,33 @@ struct DailyBriefingActivityIntegrationTests {
             export: { report, _, _, directory in export(report); return directory.appendingPathComponent("fixture.png") })
     }
 
+    @Test(.timeLimit(.minutes(1)))
+    func defaultSettingsStartTheAutomaticLoopOnlyAfterConfiguration() async throws {
+        let directory = try directory()
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let file = directory.appendingPathComponent("history.json")
+        let store = DailyBriefingStore(fileURL: file)
+        let (stream, continuation) = AsyncStream<Date>.makeStream()
+        defer { continuation.finish() }
+        var observations = stream.makeAsyncIterator()
+        var count = 0
+        let controller = controller(store: store, onObserve: {
+            count += 1
+            continuation.yield($0)
+        })
+        defer { controller.stop() }
+        await controller.tick(at: Date())
+        controller.recordActivity(.clipboardCaptured)
+        #expect(count == 0)
+        #expect(!FileManager.default.fileExists(atPath: file.path))
+        controller.configure(settings: FeatureSettings.default.dailyBriefing, directory: directory, language: .english)
+        try #require(await observations.next())
+        controller.configure(settings: FeatureSettings.default.dailyBriefing, directory: directory, language: .english)
+        #expect(await controller.prepareToTerminate())
+        #expect(count == 1, "Repeated configuration must not create another automatic loop")
+        #expect(FileManager.default.fileExists(atPath: file.path))
+    }
+
     @Test
     func enabledEventsAndPhysicalKeysAreBatchedBeforeNormalExport() async throws {
         let directory = try directory()

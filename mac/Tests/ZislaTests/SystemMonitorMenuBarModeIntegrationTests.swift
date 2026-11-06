@@ -11,6 +11,7 @@ struct SystemMonitorMenuBarModeIntegrationTests {
     @Test @MainActor
     func nestedToggleBindingsAllowAllModesAndPreserveSelections() {
         var settings = FeatureSettings.default
+        settings.systemMonitorMenuBarLayout = .individual
         settings.systemMonitorEnabled = true
         settings.systemMonitorMenuBarMetrics = [.memory, .fan]
         settings.systemMonitorMenuBarTopRow = [.network, .cpu]

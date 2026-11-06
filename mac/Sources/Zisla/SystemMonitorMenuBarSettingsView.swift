@@ -166,29 +166,31 @@ struct SystemMonitorMenuBarSettingsView: View {
                             .frame(width: 150)
                             .accessibilityLabel(AppLocalization.text("电量文字大小"))
                     }
-                    Divider()
-                    Toggle(isOn: $settingsStore.settings.systemMonitorMenuBarHeadphoneOptions.replacesNetworkIcon) {
-                        AppLocalizedText("连接时短暂显示耳机图标")
-                    }
-                    .toggleStyle(.switch)
-                    .controlSize(.regular)
-                    if settingsStore.settings.systemMonitorMenuBarHeadphoneOptions.replacesNetworkIcon {
-                        VStack(alignment: .leading, spacing: 12) {
-                            Toggle(isOn: $settingsStore.settings.systemMonitorMenuBarHeadphoneOptions.prioritizesNetworkErrors) {
-                                AppLocalizedText("优先显示网络错误")
-                            }
-                            .toggleStyle(.switch)
-                            .controlSize(.regular)
-                            HStack {
-                                AppLocalizedText("耳机图标大小")
-                                Spacer()
-                                Slider(value: $settingsStore.settings.systemMonitorMenuBarHeadphoneOptions.symbolScale,
-                                       in: SystemMonitorHeadphoneOptions.symbolScaleRange, step: 0.05)
-                                    .frame(width: 150)
-                                    .accessibilityLabel(AppLocalization.text("耳机图标大小"))
-                            }
+                    if settingsStore.settings.supportsHeadphoneConnectionAnimation {
+                        Divider()
+                        Toggle(isOn: $settingsStore.settings.systemMonitorMenuBarHeadphoneOptions.replacesNetworkIcon) {
+                            AppLocalizedText("连接时短暂显示耳机图标")
                         }
-                        .padding(.leading, 20)
+                        .toggleStyle(.switch)
+                        .controlSize(.regular)
+                        if settingsStore.settings.systemMonitorMenuBarHeadphoneOptions.replacesNetworkIcon {
+                            VStack(alignment: .leading, spacing: 12) {
+                                Toggle(isOn: $settingsStore.settings.systemMonitorMenuBarHeadphoneOptions.prioritizesNetworkErrors) {
+                                    AppLocalizedText("优先显示网络错误")
+                                }
+                                .toggleStyle(.switch)
+                                .controlSize(.regular)
+                                HStack {
+                                    AppLocalizedText("耳机图标大小")
+                                    Spacer()
+                                    Slider(value: $settingsStore.settings.systemMonitorMenuBarHeadphoneOptions.symbolScale,
+                                           in: SystemMonitorHeadphoneOptions.symbolScaleRange, step: 0.05)
+                                        .frame(width: 150)
+                                        .accessibilityLabel(AppLocalization.text("耳机图标大小"))
+                                }
+                            }
+                            .padding(.leading, 20)
+                        }
                     }
                     if settingsStore.settings.systemMonitorMenuBarCombinedIconMetric == .volume {
                         Toggle(isOn: $settingsStore.settings.systemMonitorMenuBarHeadphoneOptions.usesVolumeColor) {

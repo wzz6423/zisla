@@ -18,6 +18,7 @@ public final class FirstLaunchOnboardingState {
     ) {
         self.defaults = defaults
         isDebugBundle = bundleIdentifier == "dev.wzz.zisla.debug"
+            || bundleIdentifier?.hasPrefix("dev.wzz.zisla.debug.fresh.") == true
         forceDebugPresentation = environment["ZISLA_FIRST"] == "1"
         self.hasExistingInstallation = hasExistingInstallation
     }

@@ -3,6 +3,22 @@ import Testing
 @testable import ZislaCore
 
 struct WeatherDetailsTests {
+    @Test(arguments: [0, 1, 2], [Bool?.none, .some(false), .some(true)])
+    func conditionsRetainKnownDaylightAndUseNeutralSymbolsWhenUnknown(code: Int, isDay: Bool?) {
+        let condition = WeatherCondition(code: code, isDay: isDay)
+        let expected: String
+        switch (code, isDay) {
+        case (0, .some(false)): expected = "moon.stars.fill"
+        case (1, .some(false)): expected = "moon.fill"
+        case (2, .some(false)): expected = "cloud.moon.fill"
+        case (2, .some(true)): expected = "cloud.sun.fill"
+        case (2, .none): expected = "cloud.fill"
+        case (_, .some(true)): expected = "sun.max.fill"
+        default: expected = "sparkles"
+        }
+        #expect(condition.symbolName == expected)
+    }
+
     @Test
     func openMeteoResponseDecodesDailyWeatherDetails() throws {
         let json = """

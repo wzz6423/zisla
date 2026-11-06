@@ -232,7 +232,7 @@ struct CompactStatusBarView: View {
     }
 
     var pausesCompactTimeline: Bool {
-        let showsIdleLogo = resultSweep.current == nil
+        let showsIdleLogo = settingsStore.settings.islandAppIconEnabled && resultSweep.current == nil
             && (displayState.statusIcons.contains { if case .application = $0.content { return true }; return false }
                 || (displayState.statusIcons.isEmpty && usesCustomPill && (displayState.compactStatusHidden
                     || (selectedCompactStatusPriority == nil && recordingOperationNotice == nil))))
@@ -257,10 +257,10 @@ struct CompactStatusBarView: View {
     }
 
     private func compactSurfaceContent(size: CGSize, at date: Date) -> some View {
-        let information = FloatingIslandInformationLayout(
+        let information = resultSweep.current == nil ? FloatingIslandInformationLayout(
             notices: displayState.compactStatusHidden ? [] : presentationNotices,
             icons: displayState.statusIcons, settings: settingsStore.settings, item: media.snapshot, at: date
-        )
+        ) : nil
         let pillCornerRadius: CGFloat? = information?.secondary == nil
             ? nil : VoiceRecordingIslandGeometry.bottomCornerRadius
         let shape = CompactIslandShape(layoutStyle: settingsStore.settings.islandLayoutStyle,
@@ -274,7 +274,8 @@ struct CompactStatusBarView: View {
                     }
             } else if !displayState.statusIcons.isEmpty {
                 IslandStatusIconStrip(icons: displayState.statusIcons, edge: displayState.islandEdge, date: date)
-            } else if usesCustomPill, displayState.compactStatusHidden, resultSweep.current == nil {
+            } else if usesCustomPill, displayState.compactStatusHidden, resultSweep.current == nil,
+                      settingsStore.settings.islandAppIconEnabled {
                 IslandParticleLogo(side: min(18, height), time: date.timeIntervalSinceReferenceDate)
             } else if !displayState.compactStatusHidden || resultSweep.current != nil {
                 if usesCustomPill {
@@ -402,7 +403,7 @@ struct CompactStatusBarView: View {
                 item: presentation.isMedia ? media.snapshot : nil, date: date
             )
             .onChange(of: length, initial: true) { _, value in onCompactLengthChanged(value) }
-        } else if resultSweep.current == nil {
+        } else if resultSweep.current == nil, settingsStore.settings.islandAppIconEnabled {
             IslandParticleLogo(side: min(18, height), time: date.timeIntervalSinceReferenceDate)
         }
     }
@@ -1525,7 +1526,7 @@ private struct CompactVoiceProcessingWing: View {
     }
 }
 
-private struct CompactUpdateWing: View {
+struct CompactUpdateWing: View {
     var notice: IslandNotice
     var side: NoticeSide
     var height: CGFloat

@@ -6,6 +6,55 @@ import ZislaKit
 @testable import Zisla
 
 struct VerticalCompactStatusTests {
+    @Test(.serialized, arguments: AppLanguage.allCases) @MainActor
+    func updateStatusExposesTheSameLocalizedTooltipAsTheNotch(language: AppLanguage) async throws {
+        let releaseAccessibility = EnhancedAccessibilityTestScope.acquire()
+        defer { releaseAccessibility() }
+        let previousLanguage = UserDefaults.standard.object(forKey: AppLocalization.defaultsKey)
+        UserDefaults.standard.set(language.rawValue, forKey: AppLocalization.defaultsKey)
+        defer {
+            if let previousLanguage { UserDefaults.standard.set(previousLanguage, forKey: AppLocalization.defaultsKey) }
+            else { UserDefaults.standard.removeObject(forKey: AppLocalization.defaultsKey) }
+        }
+        let key = "%@有可用更新"
+        let root = URL(fileURLWithPath: #filePath).deletingLastPathComponent()
+            .deletingLastPathComponent().deletingLastPathComponent()
+        let table = try #require(NSDictionary(contentsOf: root.appendingPathComponent(
+            "Resources/Localization/\(language.rawValue).lproj/Localizable.strings")) as? [String: String])
+        let translation = try #require(table[key])
+        #expect(translation.contains("%@"))
+        #expect(AppLocalization.string(key, language: language) == translation)
+        let expected = String(format: translation, locale: language.locale, "Codex")
+        let presentation = CompactPillStatusPresentation(priority: .updateAvailable,
+            notice: IslandNotice(id: "update-available-cli-codex-left", title: "Codex", symbolName: "sparkles"), text: "")
+        let host = NSHostingView(rootView: CompactPillStatusContent(presentation: presentation,
+            text: "", edge: .top, visualizationStyle: .waveform, item: nil, date: .distantPast)
+            .frame(width: 78, height: 32).background(.black).environment(\.colorScheme, .dark))
+        host.sizingOptions = []
+        let window = NSWindow(contentRect: CGRect(x: 20000, y: 0, width: 78, height: 32),
+            styleMask: .borderless, backing: .buffered, defer: false)
+        window.isReleasedWhenClosed = false
+        window.alphaValue = 0
+        window.contentView = host
+        window.orderFrontRegardless()
+        defer { window.close() }
+        host.layoutSubtreeIfNeeded()
+        await withCheckedContinuation { continuation in DispatchQueue.main.async { continuation.resume() } }
+        var labels: [String] = []
+        func visit(_ object: NSObject) {
+            for key in ["accessibilityLabel", "accessibilityHelp"] {
+                if object.responds(to: NSSelectorFromString(key)), let value = object.value(forKey: key) as? String {
+                    labels.append(value)
+                }
+            }
+            if object.responds(to: NSSelectorFromString("accessibilityChildren")) {
+                for child in object.value(forKey: "accessibilityChildren") as? [NSObject] ?? [] { visit(child) }
+            }
+        }
+        visit(host)
+        #expect(labels.contains(expected), "The update status must announce and explain the available update in \(language.rawValue): \(labels)")
+    }
+
     @Test
     func shortNumbersUseOneLineOfTheNaturalVerticalLength() {
         for text in ["20%", "25:00", "(1)", "[]", "12.5", "？，"] {

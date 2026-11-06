@@ -1,5 +1,6 @@
 #!/bin/zsh
 set -euo pipefail
+unset ZISLA_DEBUG_BUNDLE_ID
 
 ROOT="${0:A:h:h:h}"
 TEMPORARY_ROOT="$(mktemp -d "${TMPDIR%/}/zisla-build-app-toolchain-tests.XXXXXX")"
@@ -287,6 +288,52 @@ for app in "$TEMPORARY_ROOT/output/zisla.app" "$DEBUG_APP"; do
       exit 1
     }
 done
+
+function build_profile_fixture() {
+  PATH="$FAKE_BIN:$PATH" \
+    FAKE_CAPTURE_FILE="$TEMPORARY_ROOT/profile-build.txt" \
+    FAKE_CODESIGN_CAPTURE_FILE="$CODESIGN_CAPTURE_FILE" \
+    FAKE_CODESIGN_STATE_FILE="$CODESIGN_STATE_FILE" \
+    FAKE_CLT_DEVELOPER="$CLT_DEVELOPER" \
+    FAKE_XCODE_APP="$XCODE_APP" \
+    ZISLA_DEBUG_BUNDLE_ID="$1" \
+    DEBUG_BUILD="$2" \
+    BUILD_ARCHITECTURES=arm64 \
+    CODE_SIGN_IDENTITY=- \
+    SIGNING_MODE=adhoc \
+    OUTPUT_DIRECTORY="$TEMPORARY_ROOT/profile-output" \
+    "$TEST_ROOT/Scripts/build-app.sh"
+}
+
+for bundle in '' dev.wzz.zisla.debug dev.wzz.zisla.debug.fresh.profile-1; do
+  build_profile_fixture "$bundle" true >/dev/null
+  [[ "$(plutil -extract CFBundleIdentifier raw -o - "$TEMPORARY_ROOT/profile-output/zisla-debug.app/Contents/Info.plist")" == "${bundle:-dev.wzz.zisla.debug}" ]] || {
+    print -u2 -r -- "FAIL: debug profile identity '$bundle' was not rendered"
+    exit 1
+  }
+done
+for bundle in dev.wzz.zisla dev.wzz.zisla.debug.fresh. 'dev.wzz.zisla.debug.fresh.a/../../escape' \
+    'dev.wzz.zisla.debug.fresh.a&b' 'dev.wzz.zisla.debug.fresh.1;touch marker'; do
+  rm -f "$TEMPORARY_ROOT/profile-build.txt"
+  previous_profile="$(<"$TEMPORARY_ROOT/profile-output/zisla-debug.app/Contents/Info.plist")"
+  if output="$(build_profile_fixture "$bundle" true 2>&1)"; then
+    print -u2 -r -- "FAIL: invalid debug profile identity '$bundle' was accepted"
+    exit 1
+  fi
+  [[ "$output" == *"ZISLA_DEBUG_BUNDLE_ID must identify a regular or fresh debug build"* && \
+    ! -e "$TEMPORARY_ROOT/profile-build.txt" && \
+    "$(<"$TEMPORARY_ROOT/profile-output/zisla-debug.app/Contents/Info.plist")" == "$previous_profile" ]] || {
+    print -u2 -r -- "FAIL: invalid profile identity must fail before building or changing the existing app"
+    exit 1
+  }
+done
+build_profile_fixture dev.wzz.zisla.debug.fresh.profile-1 false >/dev/null
+[[ "$(plutil -extract CFBundleIdentifier raw -o - "$TEMPORARY_ROOT/profile-output/zisla.app/Contents/Info.plist")" == dev.wzz.zisla && \
+  "$(plutil -extract ZislaApplicationSupportDirectory raw -o - "$TEMPORARY_ROOT/profile-output/zisla.app/Contents/Info.plist")" == zisla ]] || {
+  print -u2 -r -- "FAIL: fresh debug identity must not affect release builds or data paths"
+  exit 1
+}
+print -r -- "PASS: 9 build-app fresh profile cases"
 
 function expect_version() {
   local version="$1"

@@ -8,6 +8,39 @@ import ZislaKit
 @testable import Zisla
 
 struct SystemMonitorHeadphoneOptionsIntegrationTests {
+    @Test(arguments: AppLanguage.allCases) @MainActor
+    func connectionControlsHideForIslandIconsAndReturnWithTheirStoredChoice(language: AppLanguage) throws {
+        let suite = "Zisla.HeadphoneRouting.\(UUID().uuidString)"
+        let defaults = try #require(UserDefaults(suiteName: suite))
+        defer { defaults.removePersistentDomain(forName: suite) }
+        let store = FeatureSettingsStore(defaults: defaults, persistenceDelay: .seconds(60))
+        defer { store.flushPendingChanges() }
+        let original = store.settings.systemMonitorMenuBarHeadphoneOptions
+        func renderedHeight() -> CGFloat {
+            NSHostingView(rootView: SystemMonitorMenuBarSettingsView(settingsStore: store)
+                .environment(\.locale, language.locale)
+                .environment(\.layoutDirection, language.isRightToLeft ? .rightToLeft : .leftToRight)
+                .frame(width: 560).fixedSize(horizontal: false, vertical: true)).fittingSize.height
+        }
+        let visibleHeight = renderedHeight()
+        let query = AppLocalization.string("连接时短暂显示耳机图标", language: language)
+        #expect(!SettingsSearchIndex.results(for: query, settings: store.settings, locale: language.locale).isEmpty)
+        store.settings.islandLayoutStyle = .pill
+        store.settings.islandPlacement.mode = .custom
+        #expect(renderedHeight() < visibleHeight)
+        #expect(SettingsSearchIndex.results(for: query, settings: store.settings, locale: language.locale).isEmpty)
+        #expect(store.settings.systemMonitorMenuBarHeadphoneOptions == original)
+        store.settings.statusIconDestination = .menuBar
+        #expect(renderedHeight() == visibleHeight)
+        #expect(!SettingsSearchIndex.results(for: query, settings: store.settings, locale: language.locale).isEmpty)
+        store.settings.statusIconDestination = .island
+        store.settings.islandPlacement.mode = .camera
+        #expect(renderedHeight() == visibleHeight)
+        #expect(store.settings.systemMonitorMenuBarHeadphoneOptions == original)
+        store.flushPendingChanges()
+        #expect(FeatureSettingsStore(defaults: defaults).settings == store.settings)
+    }
+
     @Test(arguments: [false, true]) @MainActor
     func volumeControlsHideAndReturnWithoutChangingTheirStoredChoice(usesVolumeColor: Bool) throws {
         let suite = "SystemMonitorHeadphoneOptionsIntegrationTests.\(UUID().uuidString)"

@@ -39,9 +39,9 @@ struct ContextNoteLocationTests {
     }
 
     @Test
-    func settingIsOptInAndCompatibleWithExistingPreferences() throws {
-        #expect(!FeatureSettings.default.contextNotesEnabled)
-        #expect(try !JSONDecoder().decode(FeatureSettings.self, from: Data("{}".utf8)).contextNotesEnabled)
+    func settingDefaultsOnAndPreservesExistingPreferences() throws {
+        #expect(FeatureSettings.default.contextNotesEnabled)
+        #expect(try JSONDecoder().decode(FeatureSettings.self, from: Data("{}".utf8)).contextNotesEnabled)
         for enabled in [true, false] {
             var settings = FeatureSettings.default
             settings.contextNotesEnabled = enabled

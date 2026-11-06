@@ -151,9 +151,11 @@ struct SettingsNavigationTests {
         var settings = FeatureSettings(
             mediaEnabled: false,
             systemMonitorEnabled: false,
+            dailyBriefing: DailyBriefingSettings(enabled: false),
             lockScreenInfoEnabled: false,
             mailEnabled: false,
-            sideNoticesEnabled: false
+            sideNoticesEnabled: false,
+            userCareEnabled: false
         )
         #expect(!SettingsSection.info.isVisible(settings: settings))
 
@@ -175,9 +177,11 @@ struct SettingsNavigationTests {
         var settings = FeatureSettings(
             mediaEnabled: otherInfoFeaturesEnabled,
             systemMonitorEnabled: otherInfoFeaturesEnabled,
+            dailyBriefing: DailyBriefingSettings(enabled: otherInfoFeaturesEnabled),
             lockScreenInfoEnabled: otherInfoFeaturesEnabled,
             mailEnabled: false,
-            sideNoticesEnabled: otherInfoFeaturesEnabled
+            sideNoticesEnabled: otherInfoFeaturesEnabled,
+            userCareEnabled: otherInfoFeaturesEnabled
         )
         #expect(!mailSection.isVisible(settings: settings))
         #expect(SettingsSection.info.isVisible(settings: settings) == otherInfoFeaturesEnabled)
@@ -361,9 +365,11 @@ struct SettingsNavigationTests {
         var settings = FeatureSettings(
             mediaEnabled: false,
             systemMonitorEnabled: false,
+            dailyBriefing: DailyBriefingSettings(enabled: false),
             lockScreenInfoEnabled: false,
             mailEnabled: false,
-            sideNoticesEnabled: false
+            sideNoticesEnabled: false,
+            userCareEnabled: false
         )
         #expect(!SettingsSection.info.isVisible(settings: settings))
 

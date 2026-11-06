@@ -347,7 +347,7 @@ struct AIAgentStoreTests {
         #expect(!restored.state.isCLIAutoUpdateEnabled(for: .codex))
         #expect(restored.state.isCLIAutoUpdateEnabled(for: .claude))
         #expect(!restored.state.isCLIAutoUpdateEnabled(for: .qwen))
-        #expect(restored.state.isCLIAutoUpdateEnabled(for: .gemini))
+        #expect(!restored.state.isCLIAutoUpdateEnabled(for: .gemini))
         #expect(restored.state.cliStatuses.isEmpty)
         #expect(store.persistenceError == nil)
     }

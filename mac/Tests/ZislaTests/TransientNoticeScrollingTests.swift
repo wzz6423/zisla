@@ -1,5 +1,8 @@
+import AppKit
 import Foundation
+import SwiftUI
 import Testing
+import ZislaCore
 
 @testable import Zisla
 @testable import ZislaKit
@@ -10,6 +13,39 @@ import Testing
 /// reader only ever saw its last few words. The dismissal timer was a fixed four seconds, which is shorter
 /// than the pass a long error needs.
 struct TransientNoticeScrollingTests {
+    @Test(arguments: [PetSide.left, .right], [LayoutDirection.leftToRight, .rightToLeft])
+    @MainActor
+    func compactNotchNoticeStaysCenteredInThePreviousModulePanel(
+        petSide: PetSide, direction: LayoutDirection
+    ) throws {
+        let panel = CGSize(width: 788, height: 512)
+        let geometry = VoiceRecordingIslandGeometry(
+            collapsedSize: CGSize(width: 200, height: 34),
+            availableSize: CGSize(width: 264, height: 54)
+        )
+        let alignment = IslandRootView.notchAlignment(petSide: petSide, usesCompactSurface: true)
+        let renderer = ImageRenderer(content: TransientNoticeView(message: "废纸篓已经是空的", geometry: geometry)
+            .background(Color.black)
+            .frame(width: panel.width, height: panel.height, alignment: alignment)
+            .environment(\.layoutDirection, direction)
+            .transaction { $0.disablesAnimations = true })
+        renderer.scale = 1
+        let bitmap = NSBitmapImageRep(cgImage: try #require(renderer.cgImage))
+        let row = Int(geometry.surfaceSize.height / 2)
+        let visible = try (0..<bitmap.pixelsWide).filter { x in
+            try #require(bitmap.colorAt(x: x, y: row)).alphaComponent > 0.9
+        }
+        let left = try #require(visible.first)
+        let right = try #require(visible.last)
+        #expect(right - left + 1 == Int(geometry.surfaceSize.width))
+        #expect(CGFloat(left + right + 1) / 2 == panel.width / 2,
+                "The compact error row must remain centered on the notch when the module panel is wider")
+        #expect(alignment == .top)
+        #expect(IslandRootView.notchAlignment(petSide: petSide, usesCompactSurface: false)
+                == (petSide == .right ? .topLeading : .topTrailing),
+                "Returning to the full module must restore its reserved pet slot alignment")
+    }
+
     @Test
     func compactNoticeScrollsItselfInsteadOfHoldingAFixedPosition() throws {
         let notice = try Self.islandSlice(

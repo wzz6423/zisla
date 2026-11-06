@@ -170,9 +170,9 @@ enum AIMascotIdentity: String, CaseIterable, Identifiable {
             self = .kimi
         } else if id.contains("qwen") {
             self = .qwen
-        } else if id.contains("coder") {
+        } else if id.contains("coder") || id.hasPrefix("update-available-cli-qoder-") {
             self = .coder
-        } else if id.contains("zcode") {
+        } else if id.contains("zcode") || id.hasPrefix("update-available-cli-glm-") {
             self = .zcode
         } else if id.contains("zed") {
             self = .zed
@@ -180,7 +180,7 @@ enum AIMascotIdentity: String, CaseIterable, Identifiable {
             self = .trae
         } else if id.contains("opencode") {
             self = .opencode
-        } else if id == "pi" || id.contains("pi-coding") {
+        } else if id == "pi" || id.contains("pi-coding") || id.hasPrefix("update-available-cli-pi-") {
             self = .pi
         } else if id.contains("dsh") || id.contains("deepseek-harness") {
             self = .deepseekHarness

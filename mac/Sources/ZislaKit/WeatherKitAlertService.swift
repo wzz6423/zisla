@@ -132,7 +132,7 @@ public actor ChinaWeatherAlertService: OfficialWeatherAlertProviding {
         return try await fetchAlerts(stationID: stationID, region: locationName)
     }
 
-    private func fetchStationID(locationName: String) async throws -> String {
+    func fetchStationID(locationName: String) async throws -> String {
         for query in Self.searchQueries(for: locationName) {
             guard var components = URLComponents(string: "https://toy1.weather.com.cn/search") else {
                 throw ChinaWeatherAlertServiceError.invalidResponse
@@ -180,7 +180,10 @@ public actor ChinaWeatherAlertService: OfficialWeatherAlertProviding {
         let entries = try JSONDecoder().decode([ChinaWeatherSearchEntry].self, from: Data(json.utf8))
         let stations = entries.compactMap(ChinaWeatherStation.init)
         let normalizedQuery = normalizedPlaceName(query)
-        let exactMatches = stations.filter { normalizedPlaceName($0.city) == normalizedQuery }
+        let exactMatches = stations.filter {
+            normalizedPlaceName($0.city) == normalizedQuery
+                || $0.englishCity.caseInsensitiveCompare(normalizedQuery) == .orderedSame
+        }
         if let provinceMatch = exactMatches.first(where: { locationName.contains($0.province) }) {
             return provinceMatch.id
         }
@@ -238,9 +241,29 @@ public actor ChinaWeatherAlertService: OfficialWeatherAlertProviding {
             .replacingOccurrences(of: "市", with: "")
     }
 
-    private static func assignedJSONObject(named variable: String, in source: String) throws -> String {
-        guard let variableRange = source.range(of: variable),
-              let objectStart = source[variableRange.upperBound...].firstIndex(of: "{")
+    static func assignedJSONObject(named variable: String, in source: String) throws -> String {
+        let pattern = #"(?:^|;)\s*var\s+"# + NSRegularExpression.escapedPattern(for: variable) + #"(?:[0-9]{9})?\s*=\s*\{"#
+        var searchable = Array(source.utf16)
+        var quoted = false
+        var escaped = false
+        for index in searchable.indices {
+            let character = searchable[index]
+            if quoted {
+                if escaped { escaped = false }
+                else if character == 92 { escaped = true }
+                else if character == 34 { quoted = false }
+                searchable[index] = 32
+            } else if character == 34 {
+                quoted = true
+                searchable[index] = 32
+            }
+        }
+        // Preserve UTF-16 offsets while excluding assignments embedded in JSON strings.
+        let masked = String(decoding: searchable, as: UTF16.self)
+        let expression = try NSRegularExpression(pattern: pattern)
+        guard let match = expression.firstMatch(in: masked, range: NSRange(location: 0, length: searchable.count)),
+              let assignment = Range(match.range, in: source),
+              let objectStart = source[assignment].lastIndex(of: "{")
         else {
             throw ChinaWeatherAlertServiceError.invalidResponse
         }
@@ -301,6 +324,7 @@ private struct ChinaWeatherSearchEntry: Decodable {
 private struct ChinaWeatherStation {
     let id: String
     let city: String
+    let englishCity: String
     let province: String
 
     init?(_ entry: ChinaWeatherSearchEntry) {
@@ -313,7 +337,8 @@ private struct ChinaWeatherStation {
         }
         id = components[0]
         city = components[2]
-        province = components[8]
+        englishCity = components[3]
+        province = components.last!
     }
 }
 

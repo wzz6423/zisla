@@ -77,6 +77,7 @@ struct CompactPillStatusContent: View {
     let visualizationStyle: MediaVisualizationStyle
     let item: NowPlayingSnapshot?
     let date: Date
+    var leadingInset: CGFloat = CompactPillStatusPresentation.trailingInset
 
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
@@ -114,7 +115,7 @@ struct CompactPillStatusContent: View {
             let iconSize = max(0, thickness - 8)
             let textBudget = max(0, (edge.isVertical ? proxy.size.height : proxy.size.width)
                 - iconSize - (presentation.showsWaveform ? iconSize + 6 : 0) - 6
-                - CompactPillStatusPresentation.trailingInset * 2)
+                - CompactPillStatusPresentation.trailingInset - leadingInset)
             let identityLength = min(textBudget, presentation.mediaIdentityLength(
                 thickness: thickness, edge: edge, text: text, item: item))
             let textLength = max(0, textBudget - identityLength - (identityLength > 0 && !text.isEmpty ? 6 : 0))
@@ -122,9 +123,18 @@ struct CompactPillStatusContent: View {
                 ? AnyLayout(VStackLayout(spacing: 6))
                 : AnyLayout(HStackLayout(spacing: 6))
             layout {
-                statusIcon(size: iconSize)
-                    .frame(width: edge.isVertical ? thickness : iconSize,
-                           height: edge.isVertical ? iconSize : thickness)
+                if presentation.priority == .updateAvailable {
+                    ForEach([NoticeSide.left, .right], id: \.self) { side in
+                        CompactUpdateWing(notice: presentation.notice, side: side, height: thickness,
+                            usesTransparentBackground: true)
+                            .frame(width: edge.isVertical ? thickness : iconSize,
+                                   height: edge.isVertical ? iconSize : thickness)
+                    }
+                } else {
+                    statusIcon(size: iconSize)
+                        .frame(width: edge.isVertical ? thickness : iconSize,
+                               height: edge.isVertical ? iconSize : thickness)
+                }
                 if let item, identityLength > 0 {
                     mediaIdentity(item, length: identityLength, thickness: thickness)
                         .frame(width: edge.isVertical ? thickness : identityLength,
@@ -149,7 +159,8 @@ struct CompactPillStatusContent: View {
                     waveform(size: iconSize, thickness: thickness)
                 }
             }
-            .padding(edge.isVertical ? .vertical : .horizontal, CompactPillStatusPresentation.trailingInset)
+            .padding(edge.isVertical ? .top : .leading, leadingInset)
+            .padding(edge.isVertical ? .bottom : .trailing, CompactPillStatusPresentation.trailingInset)
             .frame(width: proxy.size.width, height: proxy.size.height)
         }
         .foregroundStyle(.white)
@@ -159,6 +170,9 @@ struct CompactPillStatusContent: View {
     }
 
     private var accessibilityDescription: String {
+        if presentation.priority == .updateAvailable {
+            return AppLocalization.text("%@有可用更新", presentation.notice.title)
+        }
         let identity = presentation.showsMediaIdentity && item?.isVideo == false
             ? item.map(MediaTextFormatting.titleArtistText) : nil
         return [identity ?? presentation.notice.title, text].filter { !$0.isEmpty }.joined(separator: " ")

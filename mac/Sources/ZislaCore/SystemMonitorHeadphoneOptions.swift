@@ -9,7 +9,7 @@ public struct SystemMonitorHeadphoneOptions: Equatable, Codable, Sendable {
     public static let symbolScaleRange: ClosedRange<Double> = 1...1.8
 
     public init(
-        replacesNetworkIcon: Bool = false,
+        replacesNetworkIcon: Bool = true,
         prioritizesNetworkErrors: Bool = true,
         usesVolumeColor: Bool = false,
         symbolScale: Double = 1.45

@@ -2,15 +2,16 @@
 
 LOCAL_SIGNING_ENV := SIGNING_MODE=dev
 ZISLA_FIRST ?= 0
+ZISLA_FRESH_START ?= 0
 
 run:
-	@ZISLA_FIRST="$(ZISLA_FIRST)" $(LOCAL_SIGNING_ENV) mac/Scripts/dev-service.sh run
+	@ZISLA_FIRST="$(ZISLA_FIRST)" ZISLA_FRESH_START="$(ZISLA_FRESH_START)" $(LOCAL_SIGNING_ENV) mac/Scripts/dev-service.sh run
 
 stop:
 	@mac/Scripts/dev-service.sh stop
 
 update:
-	@ZISLA_FIRST="$(ZISLA_FIRST)" $(LOCAL_SIGNING_ENV) mac/Scripts/dev-service.sh run
+	@ZISLA_FIRST="$(ZISLA_FIRST)" ZISLA_FRESH_START="$(ZISLA_FRESH_START)" $(LOCAL_SIGNING_ENV) mac/Scripts/dev-service.sh run
 
 build-package:
 	@mac/Scripts/build-package.sh

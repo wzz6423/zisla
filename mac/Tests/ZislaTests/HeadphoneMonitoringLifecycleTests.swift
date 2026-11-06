@@ -5,14 +5,14 @@ import ZislaCore
 
 struct HeadphoneMonitoringLifecycleTests {
     @Test
-    func defaultMonitorDoesNotStartAudioOrBatteryMonitoring() {
+    func defaultMonitorEnablesHeadphoneConnectionMonitoring() {
         let options = SystemMonitorHeadphoneOptions()
-        #expect(!options.replacesNetworkIcon)
+        #expect(options.replacesNetworkIcon)
         #expect(!options.usesVolumeColor)
         let policy = AppModel.headphoneMonitoringPolicy(
             sideNoticesEnabled: false, systemMonitorEnabled: true, options: options
         )
-        #expect(!policy)
+        #expect(policy)
     }
 
     @Test

@@ -4,35 +4,35 @@ import Testing
 
 struct SystemMonitorMenuBarSettingsTests {
     @Test
-    func newSettingsKeepIndividualIconsAndConfiguredDefaults() {
+    func newSettingsEnableStackedMetricsAndTheMemoryCombinedIcon() {
         let settings = FeatureSettings()
         #expect(settings == FeatureSettings.default)
-        #expect(settings.systemMonitorMenuBarLayout == .individual)
+        #expect(settings.systemMonitorMenuBarLayout == .stacked)
         #expect(settings.systemMonitorMenuBarTopRow == [.cpu])
         #expect(settings.systemMonitorMenuBarBottomRow == [.gpu])
-        #expect(!settings.systemMonitorMenuBarCombinedIconEnabled)
+        #expect(settings.systemMonitorMenuBarCombinedIconEnabled)
         #expect(settings.systemMonitorMenuBarCombinedIconMetric == .memory)
         #expect(settings.systemMonitorMenuBarMetrics == [.cpu])
         #expect(settings.systemMonitorMenuBarDisplayStyle == .compact)
-        #expect(!settings.menuBarAppIconEnabled)
+        #expect(settings.menuBarAppIconEnabled)
     }
 
     @Test
-    func legacyJSONKeepsIndividualIconsAndExistingSelection() throws {
+    func legacyJSONDefaultsToStackedMetricsAndPreservesExistingSelections() throws {
         for payload in [
             "{}",
             #"{"systemMonitorMenuBarMetrics":["gpu","memory","fan"],"systemMonitorMenuBarDisplayStyle":"detailed","menuBarAppIconEnabled":true}"#,
         ] {
             let settings = try JSONDecoder().decode(FeatureSettings.self, from: Data(payload.utf8))
-            #expect(settings.systemMonitorMenuBarLayout == .individual)
+            #expect(settings.systemMonitorMenuBarLayout == .stacked)
             #expect(settings.systemMonitorMenuBarTopRow == [.cpu])
             #expect(settings.systemMonitorMenuBarBottomRow == [.gpu])
-            #expect(!settings.systemMonitorMenuBarCombinedIconEnabled)
+            #expect(settings.systemMonitorMenuBarCombinedIconEnabled)
             #expect(settings.systemMonitorMenuBarCombinedIconMetric == .memory)
             if payload == "{}" {
                 #expect(settings.systemMonitorMenuBarMetrics == [.cpu])
                 #expect(settings.systemMonitorMenuBarDisplayStyle == .compact)
-                #expect(!settings.menuBarAppIconEnabled)
+                #expect(settings.menuBarAppIconEnabled)
             } else {
                 #expect(settings.systemMonitorMenuBarMetrics == [.gpu, .memory, .fan])
                 #expect(settings.systemMonitorMenuBarDisplayStyle == .detailed)

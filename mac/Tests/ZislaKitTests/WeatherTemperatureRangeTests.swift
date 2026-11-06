@@ -18,7 +18,7 @@ struct WeatherTemperatureRangeTests {
             alertProvider: StubOfficialWeatherAlertProvider()
         )
 
-        let snapshot = try await service.fetch(latitude: 31.2, longitude: 121.4)
+        let snapshot = try await service.fetch(latitude: 31.2, longitude: 121.4, isoCountryCode: "GB")
 
         let request = try #require(WeatherServiceURLProtocol.lastRequest)
         let dailyQuery = try #require(

@@ -27,7 +27,11 @@ esac
 
 if [[ "$DEBUG_BUILD" == "true" ]]; then
   APP_NAME="zisla-debug"
-  BUNDLE_ID="dev.wzz.zisla.debug"
+  BUNDLE_ID="${ZISLA_DEBUG_BUNDLE_ID:-dev.wzz.zisla.debug}"
+  [[ "$BUNDLE_ID" == "dev.wzz.zisla.debug" || "$BUNDLE_ID" =~ ^dev\.wzz\.zisla\.debug\.fresh\.[A-Za-z0-9-]+$ ]] || {
+    echo "error: ZISLA_DEBUG_BUNDLE_ID must identify a regular or fresh debug build" >&2
+    exit 1
+  }
   APP_SUPPORT_DIRECTORY="zisla-debug"
   ICON_FILE="AppIconNight"
 else

@@ -51,17 +51,20 @@ struct FirstLaunchOnboardingStateTests {
             defaults.set(completed, forKey: FirstLaunchOnboardingState.completedKey)
             defaults.set("preserved", forKey: "unrelated")
             let before = defaults.dictionaryRepresentation() as NSDictionary
-            let state = FirstLaunchOnboardingState(defaults: defaults, bundleIdentifier: "dev.wzz.zisla.debug", environment: ["ZISLA_FIRST": value], hasExistingInstallation: true)
-            #expect(state.shouldPresent == (value == "1"))
-            state.recordStarted()
-            state.recordCompleted()
-            #expect(before == defaults.dictionaryRepresentation() as NSDictionary)
+            for bundle in ["dev.wzz.zisla.debug", "dev.wzz.zisla.debug.fresh.profile-1"] {
+                let state = FirstLaunchOnboardingState(defaults: defaults, bundleIdentifier: bundle, environment: ["ZISLA_FIRST": value], hasExistingInstallation: true)
+                #expect(state.shouldPresent == (value == "1"))
+                state.recordStarted()
+                state.recordCompleted()
+                #expect(before == defaults.dictionaryRepresentation() as NSDictionary)
+            }
         }
     }
 
-    @Test func debugWithoutOverrideNeverPresents() {
+    @Test(arguments: ["dev.wzz.zisla.debug", "dev.wzz.zisla.debug.fresh.profile-1"])
+    func debugWithoutOverrideNeverPresents(bundle: String) {
         withDefaults { defaults in
-            let state = FirstLaunchOnboardingState(defaults: defaults, bundleIdentifier: "dev.wzz.zisla.debug", environment: [:], hasExistingInstallation: false)
+            let state = FirstLaunchOnboardingState(defaults: defaults, bundleIdentifier: bundle, environment: [:], hasExistingInstallation: false)
             #expect(!state.shouldPresent)
             state.recordStarted()
             state.recordCompleted()
@@ -73,10 +76,13 @@ struct FirstLaunchOnboardingStateTests {
     @Test(arguments: ["0", "", "invalid", "1"])
     func releaseIgnoresOverride(value: String) {
         withDefaults { defaults in
-            let state = FirstLaunchOnboardingState(defaults: defaults, bundleIdentifier: "dev.wzz.zisla", environment: ["ZISLA_FIRST": value], hasExistingInstallation: false)
-            #expect(state.shouldPresent)
-            state.recordCompleted()
-            #expect(!state.shouldPresent)
+            for bundle in ["dev.wzz.zisla", "dev.wzz.zisla.debugger", "dev.wzz.zisla.debug.fresh-other"] {
+                defaults.removeObject(forKey: FirstLaunchOnboardingState.completedKey)
+                let state = FirstLaunchOnboardingState(defaults: defaults, bundleIdentifier: bundle, environment: ["ZISLA_FIRST": value], hasExistingInstallation: false)
+                #expect(state.shouldPresent)
+                state.recordCompleted()
+                #expect(!state.shouldPresent)
+            }
         }
     }
 }

@@ -10,9 +10,9 @@ struct DailyBriefingTests {
     }
 
     @Test
-    func legacySettingsRemainOptInAndRoundTripAllTemplates() throws {
+    func legacySettingsDefaultOnAndRoundTripAllTemplates() throws {
         let legacy = try JSONDecoder().decode(FeatureSettings.self, from: Data("{}".utf8))
-        #expect(!legacy.dailyBriefing.enabled)
+        #expect(legacy.dailyBriefing.enabled)
         #expect(legacy.dailyBriefing.minuteOfDay == 1320)
         #expect(DailyBriefingTemplate.allCases.count == 8)
         for template in DailyBriefingTemplate.allCases {
@@ -22,6 +22,17 @@ struct DailyBriefingTests {
             #expect(restored.dailyBriefing == settings.dailyBriefing)
             #expect(restored.mediaEnabled == legacy.mediaEnabled)
         }
+    }
+
+    @Test(arguments: ["{}", #"{"dailyBriefing":null}"#, #"{"dailyBriefing":{}}"#,
+                      #"{"dailyBriefing":{"enabled":null,"minuteOfDay":1385}}"#])
+    func missingAndNullBriefingPreferencesEnableTheDailySchedule(payload: String) throws {
+        #expect(DailyBriefingSettings().enabled)
+        let settings = try JSONDecoder().decode(FeatureSettings.self, from: Data(payload.utf8))
+        #expect(settings.dailyBriefing.enabled)
+        if payload.contains("1385") { #expect(settings.dailyBriefing.minuteOfDay == 1385) }
+        let disabled = DailyBriefingSettings(enabled: false, minuteOfDay: 1385, template: .forest, readsSystemScreenTime: false)
+        #expect(try JSONDecoder().decode(DailyBriefingSettings.self, from: JSONEncoder().encode(disabled)) == disabled)
     }
 
     @Test

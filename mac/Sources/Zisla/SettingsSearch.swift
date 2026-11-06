@@ -95,6 +95,7 @@ enum SettingsSearchIndex {
             entry(.info, "关怀提醒间隔", anchor: .row("关怀提醒间隔"), keywords: ["用户关怀", "小时", "分钟", "秒"])
         }
         if settings.supportsStatusIconsInIsland {
+            rows(.info, ["显示应用标识"])
             entry(.info, "展示更多信息", anchor: .row("展示更多信息"),
                   keywords: ["同时展示监控、AI、音乐与状态提示，详细音乐另起一行"])
         }
@@ -108,8 +109,9 @@ enum SettingsSearchIndex {
             entry(.info, "合并状态图标", anchor: .group("settings-search-monitor-layout"), keywords: [
                 "底部指标", "显示电池百分比", "显示充电标记", "接通电源时显示百分比", "电量状态颜色",
                 "底部指示样式", "电量环粗细", "图标大小", "Wi-Fi 大小", "电量文字大小",
-                "连接时短暂显示耳机图标", "优先显示网络错误", "耳机图标大小", "蓝牙音量颜色",
-            ])
+                "蓝牙音量颜色",
+            ] + (settings.supportsHeadphoneConnectionAnimation
+                ? ["连接时短暂显示耳机图标", "优先显示网络错误", "耳机图标大小"] : []))
             entry(.info, "记录历史", anchor: .row("记录历史"), keywords: ["按分钟记录 CPU、GPU、内存、硬盘、风扇与网络，可随时查看趋势并导出表格"])
         }
         if settings.lockScreenInfoEnabled {

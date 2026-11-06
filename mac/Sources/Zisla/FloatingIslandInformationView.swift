@@ -9,6 +9,7 @@ struct FloatingIslandInformationLayout {
         let presentation: CompactPillStatusPresentation
         let text: String
         let length: CGFloat
+        let leadingInset: CGFloat
         var id: String { presentation.notice.id }
     }
 
@@ -44,12 +45,17 @@ struct FloatingIslandInformationLayout {
             primary = [media]
             secondary = nil
         }
-        func status(_ presentation: CompactPillStatusPresentation, thickness: CGFloat) -> Status {
+        func status(_ presentation: CompactPillStatusPresentation, thickness: CGFloat,
+                    leadingInset: CGFloat = CompactPillStatusPresentation.trailingInset) -> Status {
             let text = CompactPillStatusContent.displayText(for: presentation, settings: settings, item: item, at: date)
             return Status(presentation: presentation, text: text,
-                length: presentation.length(thickness: thickness, edge: edge, text: text, item: item))
+                length: presentation.length(thickness: thickness, edge: edge, text: text, item: item,
+                    leadingInset: leadingInset), leadingInset: leadingInset)
         }
-        let primaryStatuses = primary.map { status($0, thickness: thickness) }
+        let primaryStatuses = primary.enumerated().map { index, presentation in
+            status(presentation, thickness: thickness,
+                leadingInset: icons.isEmpty && index == 0 ? CompactPillStatusPresentation.trailingInset : 0)
+        }
         let secondaryStatus = secondary.map { status($0, thickness: CompactPillStatusPresentation.minimumThickness) }
         let iconLength = edge.isVertical ? iconSize?.height ?? 0 : iconSize?.width ?? 0
         let primaryLength = primaryStatuses.reduce(iconLength) { $0 + $1.length }
@@ -111,7 +117,8 @@ struct FloatingIslandInformationView: View {
             }
             ForEach(layout.primary) { status in
                 CompactPillStatusContent(presentation: status.presentation, text: status.text, edge: layout.edge,
-                    visualizationStyle: visualizationStyle, item: status.presentation.isMedia ? item : nil, date: date)
+                    visualizationStyle: visualizationStyle, item: status.presentation.isMedia ? item : nil,
+                    date: date, leadingInset: status.leadingInset)
                     .frame(width: layout.edge.isVertical ? layout.primaryThickness : status.length,
                            height: layout.edge.isVertical ? status.length : layout.primaryThickness)
             }

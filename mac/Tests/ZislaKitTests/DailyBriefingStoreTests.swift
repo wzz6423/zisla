@@ -85,7 +85,7 @@ struct DailyBriefingStoreTests {
     }
 
     @Test
-    func scheduleIsOptInAndDeduplicatedAcrossRestarts() async throws {
+    func disabledScheduleDoesNotExportAndEnabledScheduleDeduplicatesAcrossRestarts() async throws {
         let directory = try temporaryDirectory()
         defer { try? FileManager.default.removeItem(at: directory) }
         let file = directory.appendingPathComponent("history.json")
@@ -93,7 +93,7 @@ struct DailyBriefingStoreTests {
         let morning = calendar.date(from: DateComponents(year: 2026, month: 11, day: 4, hour: 9))!
         let due = DailyBriefingSettings(enabled: true).exportDate(on: morning, calendar: calendar)
         try await store.observe(observation(morning), calendar: calendar)
-        let disabled = try await store.pendingExports(at: due, settings: .init(), calendar: calendar)
+        let disabled = try await store.pendingExports(at: due, settings: .init(enabled: false), calendar: calendar)
         let early = try await store.pendingExports(at: due.addingTimeInterval(-1), settings: .init(enabled: true), calendar: calendar)
         #expect(disabled.isEmpty)
         #expect(early.isEmpty)

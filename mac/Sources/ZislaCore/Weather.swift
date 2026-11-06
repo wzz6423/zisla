@@ -59,17 +59,17 @@ public struct WeatherCondition: Equatable, Sendable {
     public let summary: String
     public let symbolName: String
 
-    public init(code: Int, isDay: Bool) {
+    public init(code: Int, isDay: Bool?) {
         switch code {
         case 0:
             summary = AppLocalization.text("晴")
-            symbolName = isDay ? "sun.max.fill" : "moon.stars.fill"
+            symbolName = isDay.map { $0 ? "sun.max.fill" : "moon.stars.fill" } ?? "sparkles"
         case 1:
             summary = AppLocalization.text("晴间少云")
-            symbolName = isDay ? "sun.max.fill" : "moon.fill"
+            symbolName = isDay.map { $0 ? "sun.max.fill" : "moon.fill" } ?? "sparkles"
         case 2:
             summary = AppLocalization.text("多云")
-            symbolName = isDay ? "cloud.sun.fill" : "cloud.moon.fill"
+            symbolName = isDay.map { $0 ? "cloud.sun.fill" : "cloud.moon.fill" } ?? "cloud.fill"
         case 3:
             summary = AppLocalization.text("阴")
             symbolName = "cloud.fill"

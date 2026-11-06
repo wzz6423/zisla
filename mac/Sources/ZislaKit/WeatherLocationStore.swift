@@ -14,46 +14,53 @@ public struct WeatherLocation: Identifiable, Codable, Equatable, Sendable {
     public var kind: WeatherLocationKind
     public var displayName: String
     public var coordinate: GeoCoordinate?
+    public var isoCountryCode: String?
 
     public init(
         id: String,
         kind: WeatherLocationKind,
         displayName: String,
-        coordinate: GeoCoordinate?
+        coordinate: GeoCoordinate?,
+        isoCountryCode: String? = nil
     ) {
         self.id = id
         self.kind = kind
         self.displayName = displayName
         self.coordinate = coordinate
+        self.isoCountryCode = isoCountryCode
     }
 
     public static func current(
         displayName: String = "当前位置",
-        coordinate: GeoCoordinate? = nil
+        coordinate: GeoCoordinate? = nil,
+        isoCountryCode: String? = nil
     ) -> WeatherLocation {
         WeatherLocation(
             id: currentID,
             kind: .current,
             displayName: displayName,
-            coordinate: coordinate
+            coordinate: coordinate,
+            isoCountryCode: isoCountryCode
         )
     }
 
     public static func saved(
         id: String = UUID().uuidString,
         displayName: String,
-        coordinate: GeoCoordinate
+        coordinate: GeoCoordinate,
+        isoCountryCode: String? = nil
     ) -> WeatherLocation {
         WeatherLocation(
             id: id,
             kind: .saved,
             displayName: displayName,
-            coordinate: coordinate
+            coordinate: coordinate,
+            isoCountryCode: isoCountryCode
         )
     }
 
     private enum CodingKeys: String, CodingKey {
-        case id, kind, displayName, latitude, longitude
+        case id, kind, displayName, latitude, longitude, isoCountryCode
     }
 
     public init(from decoder: Decoder) throws {
@@ -61,6 +68,7 @@ public struct WeatherLocation: Identifiable, Codable, Equatable, Sendable {
         id = try container.decode(String.self, forKey: .id)
         kind = try container.decode(WeatherLocationKind.self, forKey: .kind)
         displayName = try container.decode(String.self, forKey: .displayName)
+        isoCountryCode = try container.decodeIfPresent(String.self, forKey: .isoCountryCode)
         if container.contains(.latitude), container.contains(.longitude),
            let latitude = try container.decodeIfPresent(Double.self, forKey: .latitude),
            let longitude = try container.decodeIfPresent(Double.self, forKey: .longitude)
@@ -76,6 +84,7 @@ public struct WeatherLocation: Identifiable, Codable, Equatable, Sendable {
         try container.encode(id, forKey: .id)
         try container.encode(kind, forKey: .kind)
         try container.encode(displayName, forKey: .displayName)
+        try container.encodeIfPresent(isoCountryCode, forKey: .isoCountryCode)
         try container.encodeIfPresent(coordinate?.latitude, forKey: .latitude)
         try container.encodeIfPresent(coordinate?.longitude, forKey: .longitude)
     }
@@ -111,7 +120,7 @@ public final class WeatherLocationStore: ObservableObject {
         load()
     }
 
-    public func addSaved(name: String, coordinate: GeoCoordinate) {
+    public func addSaved(name: String, coordinate: GeoCoordinate, isoCountryCode: String? = nil) {
         let trimmed = name.trimmingCharacters(in: .whitespacesAndNewlines)
         let displayName = trimmed.isEmpty ? AppLocalization.text("未命名地点") : trimmed
 
@@ -120,26 +129,28 @@ public final class WeatherLocationStore: ObservableObject {
         }) {
             locations[index].displayName = displayName
             locations[index].coordinate = coordinate
+            locations[index].isoCountryCode = isoCountryCode ?? locations[index].isoCountryCode
             normalize()
             persist()
             return
         }
 
-        locations.append(.saved(displayName: displayName, coordinate: coordinate))
+        locations.append(.saved(displayName: displayName, coordinate: coordinate, isoCountryCode: isoCountryCode))
         normalize()
         persist()
     }
 
-    public func updateCurrent(name: String, coordinate: GeoCoordinate?) {
+    public func updateCurrent(name: String, coordinate: GeoCoordinate?, isoCountryCode: String? = nil) {
         let trimmed = name.trimmingCharacters(in: .whitespacesAndNewlines)
         let displayName = trimmed.isEmpty ? "当前位置" : trimmed
         if let index = locations.firstIndex(where: { $0.kind == .current }) {
             locations[index].displayName = displayName
             locations[index].coordinate = coordinate
             locations[index].id = WeatherLocation.currentID
+            locations[index].isoCountryCode = isoCountryCode
         } else {
             locations.insert(
-                .current(displayName: displayName, coordinate: coordinate),
+                .current(displayName: displayName, coordinate: coordinate, isoCountryCode: isoCountryCode),
                 at: 0
             )
         }
@@ -175,9 +186,42 @@ public final class WeatherLocationStore: ObservableObject {
     }
 
     public func orderedSnapshots(
-        _ snapshotsByLocationID: [String: WeatherSnapshot]
+        _ snapshotsByLocationID: [String: WeatherSnapshot],
+        at date: Date = Date()
     ) -> [WeatherSnapshot] {
-        locations.compactMap { snapshotsByLocationID[$0.id] }
+        locations.compactMap { snapshot(for: $0.id, in: snapshotsByLocationID, at: date) }
+    }
+
+    public func snapshot(
+        for locationID: String,
+        in snapshotsByLocationID: [String: WeatherSnapshot],
+        at date: Date = Date()
+    ) -> WeatherSnapshot? {
+        guard let snapshot = snapshotsByLocationID[locationID], snapshot.expiresAt > date else { return nil }
+        return snapshot
+    }
+
+    public func mergingSnapshots(
+        _ refreshed: [String: WeatherSnapshot],
+        retaining previous: [String: WeatherSnapshot],
+        at date: Date = Date()
+    ) -> [String: WeatherSnapshot] {
+        var result: [String: WeatherSnapshot] = [:]
+        for location in locations {
+            guard let coordinate = location.coordinate else { continue }
+            if let snapshot = refreshed[location.id],
+               snapshot.expiresAt > date,
+               Self.coordinatesApproximatelyEqual(snapshot.coordinate, coordinate)
+            {
+                result[location.id] = snapshot
+            } else if let snapshot = previous[location.id],
+                      snapshot.expiresAt > date,
+                      Self.coordinatesApproximatelyEqual(snapshot.coordinate, coordinate)
+            {
+                result[location.id] = snapshot
+            }
+        }
+        return result
     }
 
     private func load() {
@@ -238,6 +282,7 @@ public final class WeatherLocationStore: ObservableObject {
             }) {
                 saved[existingIndex].displayName = item.displayName
                 saved[existingIndex].coordinate = coordinate
+                saved[existingIndex].isoCountryCode = item.isoCountryCode ?? saved[existingIndex].isoCountryCode
                 continue
             }
             var copy = item

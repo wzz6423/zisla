@@ -62,7 +62,8 @@ struct WeatherLocationServiceTests {
             latitude: 31.2304,
             longitude: 121.4737,
             locality: "上海市",
-            administrativeArea: "上海市"
+            administrativeArea: "上海市",
+            isoCountryCode: "CN"
         )
         let service = makeService(geocoder: StubGeocoder(geocodeResult: .success([place])))
 
@@ -71,6 +72,7 @@ struct WeatherLocationServiceTests {
         #expect(result.latitude == 31.2304)
         #expect(result.longitude == 121.4737)
         #expect(result.displayName == "上海市")
+        #expect(result.isoCountryCode == "CN")
     }
 
     @Test
@@ -79,7 +81,8 @@ struct WeatherLocationServiceTests {
             latitude: 0,
             longitude: 0,
             locality: "海淀区",
-            administrativeArea: "北京市"
+            administrativeArea: "北京市",
+            isoCountryCode: "CN"
         )
         let service = makeService(
             geocoder: StubGeocoder(reverseResult: .success([place])),
@@ -94,6 +97,7 @@ struct WeatherLocationServiceTests {
         #expect(result.displayName == "北京市海淀区")
         #expect(result.latitude == 39.9)
         #expect(result.longitude == 116.3)
+        #expect(result.isoCountryCode == "CN")
     }
 
     @Test
@@ -108,6 +112,7 @@ struct WeatherLocationServiceTests {
         let result = try await service.currentLocation()
 
         #expect(result.displayName == "12.3456, 65.4321")
+        #expect(result.isoCountryCode == nil)
     }
 
     @Test

@@ -1364,6 +1364,8 @@ struct SettingsView: View {
         VStack(alignment: .leading, spacing: 20) {
             if settingsStore.settings.supportsStatusIconsInIsland {
                 settingsGroup("灵动岛模式") {
+                    featureToggle("显示应用标识", detail: "", symbol: "app.badge", keyPath: \.islandAppIconEnabled)
+                    rowDivider
                     featureToggle(
                         "展示更多信息",
                         detail: "同时展示监控、AI、音乐与状态提示，详细音乐另起一行",
@@ -4618,7 +4620,7 @@ enum SettingsSection: String, CaseIterable, Identifiable {
         case .info:
             return settings.mediaEnabled || settings.systemMonitorEnabled
                 || settings.lockScreenInfoEnabled || settings.sideNoticesEnabled
-                || settings.userCareEnabled || settings.dailyBriefing.enabled
+                || settings.userCareEnabled || settings.dailyBriefing.enabled || settings.supportsStatusIconsInIsland
         case .mail:
             return settings.mailEnabled
         case .ai:
