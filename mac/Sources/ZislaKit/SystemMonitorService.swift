@@ -3611,7 +3611,6 @@ public final class SystemMonitorService: ObservableObject {
     public let samplingInterval: TimeInterval
     /// Minimum distance between two persisted samples; sampling itself keeps running faster for the live waveforms.
     public var historyRecordingInterval: TimeInterval { historyRecorder.recordingInterval }
-    /// One minute apart for a month: dense enough to see a trend, small enough to stay bounded.
     public static let defaultHistoryCapacity = SystemMetricsHistoryStore.defaultCapacity
 
     private static let publicIPRefreshInterval: TimeInterval = 10 * 60
@@ -3657,7 +3656,7 @@ public final class SystemMonitorService: ObservableObject {
         postCleanupDiskRefreshDelay: Duration = .seconds(30),
         diskCapacityRefreshInterval: TimeInterval = 20,
         historyPersistence: (any SystemMetricsHistoryPersisting)? = nil,
-        historyCapacity: Int = SystemMonitorService.defaultHistoryCapacity,
+        historyCapacity: Int? = SystemMonitorService.defaultHistoryCapacity,
         historyRecordingInterval: TimeInterval = 60,
         isRecordingHistory: Bool = false,
         batterySnapshotProvider: @escaping () -> BatterySnapshot? = { nil }
