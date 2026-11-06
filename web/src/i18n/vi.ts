@@ -4,10 +4,10 @@ export const vi = createCatalog({
   meta: {
     documentTitle: 'zisla · Không gian làm việc động',
     description:
-      'zisla là không gian làm việc động nguyên bản cho macOS. Gom tác vụ AI, phương tiện, tệp và lịch vào một nơi, cùng âm thanh bàn phím, thống kê gõ, chú thích ảnh chụp và thao tác nhanh.',
+      'zisla là không gian macOS cho tác vụ AI, báo cáo hằng ngày và biên tập bản ghi, với thú cưng tùy chỉnh, ảnh chụp và quyền ở một nơi.',
     ogTitle: 'zisla · Đưa mọi thứ đang diễn ra đến nơi bạn có thể thấy',
     ogDescription:
-      'Từ tác vụ AI và phương tiện đến âm thanh bàn phím, thống kê gõ, thao tác nhanh, chú thích ảnh chụp và công cụ desktop — không gian macOS nguyên bản chỉ xuất hiện khi bạn cần.',
+      'Theo dõi tác vụ AI và ngày của bạn, ghi và biên tập trên Mac, nhập thú cưng và quản lý quyền ở một nơi.',
   },
   tagline: 'Không gian làm việc động nguyên bản cho macOS',
   header: {
@@ -75,16 +75,19 @@ export const vi = createCatalog({
       dashboard: { name: 'Trang chính', caption: 'Thẻ động chỉ xuất hiện khi có phiên tập trung, tác vụ AI hoặc lượt tải đang chạy; khi không có gì xảy ra, chúng không chiếm chỗ.', points: ['Xuất hiện khi cần', 'Tiến trình trực tiếp', 'Bố cục tự điều chỉnh'] },
       shelf: { name: 'Kệ', caption: 'Kéo tệp, âm thanh, video hoặc liên kết vào dải trên cùng để lưu vào kệ, mở trong Finder hoặc gọi menu Chia sẻ của macOS.', points: ['Kéo lên trên để lưu', 'Mở trong Finder', 'Menu Chia sẻ hệ thống'] },
       clipboard: { name: 'Clipboard', caption: 'Xem lịch sử clipboard trong đảo và lọc theo ảnh, URL, đường dẫn hoặc loại tệp và xem thời gian mỗi mục được sao chép. Gửi mục vào Ghi chú nhanh, ghim làm yêu thích hoặc xóa.', points: ['Lịch sử trong đảo', 'Lọc theo loại', 'Ghi chú nhanh và yêu thích'] },
-      aiMonitor: { name: 'Trình theo dõi AI', caption: 'Tự động phát hiện hoạt động từ CLI, ứng dụng desktop và IDE được hỗ trợ, rồi hiển thị tác vụ, trạng thái, xu hướng token và bản đồ đóng góp. Chỉ phân tích sự kiện có cấu trúc, không đọc nội dung trò chuyện.', points: ['Gộp tác vụ từ nhiều công cụ', 'Xu hướng tiêu thụ token', 'Không đọc prompt hay câu trả lời'] },
-      keyboardSound: { name: 'Âm thanh bàn phím', caption: 'Phát 20 âm thanh bàn phím cơ tích hợp cho phím bấm toàn hệ thống, có âm lượng và biến thiên cao độ tự nhiên. Bật thống kê gõ cục bộ để xem tổng quan, xu hướng, lịch sử, dòng thời gian ứng dụng và bản đồ phím F1-F12.', points: ['20 âm thanh tích hợp', 'Âm thanh nhả phím và biến thiên cao độ', 'Thống kê tùy chọn'] },
+      aiMonitor: { name: 'Trình theo dõi AI', caption: 'Tự động phát hiện hoạt động từ CLI, ứng dụng desktop và IDE được hỗ trợ, rồi hiển thị tác vụ, trạng thái, xu hướng token và bản đồ đóng góp. Chỉ phân tích sự kiện có cấu trúc, không đọc nội dung trò chuyện. Bổ sung phát hiện tác vụ Cursor cùng số liệu sử dụng và hạn mức đăng ký có thể đọc được của Cursor và Muse Code. Tác vụ Cursor vẫn hiển thị khi công cụ chạy lâu.', points: ['Gộp tác vụ từ nhiều công cụ', 'Xu hướng tiêu thụ token', 'Không đọc prompt hay câu trả lời'] },
+      keyboardSound: { name: 'Âm thanh bàn phím', caption: 'Phát 20 âm thanh bàn phím cơ tích hợp cho phím bấm toàn hệ thống, có âm lượng và biến thiên cao độ tự nhiên. Bật thống kê gõ cục bộ để xem tổng quan, xu hướng, lịch sử, dòng thời gian ứng dụng và bản đồ phím F1-F12. Tổng nhập giọng nói, thời gian đọc chính tả, tốc độ và thời gian tiết kiệm cũng có trên bảng bàn phím. Cấu hình mới bật âm thanh và thống kê; có thể tắt riêng.', points: ['20 âm thanh tích hợp', 'Âm thanh nhả phím và biến thiên cao độ', 'Thống kê bật tắt riêng'] },
       download: { name: 'Trình tải xuống', caption: 'Dán liên kết hoặc để zisla nhận liên kết từ clipboard khi bật. Chọn video hoặc âm thanh và tải vào thư mục mặc định hay thư mục bạn chọn. Liên kết được hỗ trợ hiển thị nguồn, tiến trình trực tiếp và trạng thái hoàn tất.', points: ['Chế độ video / âm thanh', 'Thư mục mặc định hoặc tùy chỉnh', 'Nguồn và tiến trình trực tiếp'] },
       agenda: { name: 'Lịch và thời tiết', caption: 'Hiển thị thời tiết tại vị trí hiện tại và tối đa sáu địa điểm bạn chọn. Xem, thêm, xóa sự kiện và lời nhắc, rồi đánh dấu lời nhắc đã xong.', points: ['Thẻ thời tiết nhiều nơi', 'Lịch và việc cần làm', 'Hoàn tất lời nhắc bằng một chạm'] },
-      mail: { name: 'Mail', caption: 'Đọc các tài khoản Mail đã bật, hiển thị hộp thư đến và cho phép đánh dấu, trả lời, soạn hoặc chuyển thư vào Thùng rác trong đảo, kèm hướng dẫn rõ ràng khi thiếu quyền.', points: ['Tài khoản Mail', 'Trả lời và soạn trong đảo', 'Hướng dẫn quyền minh bạch'] },
+      mail: { name: 'Mail', caption: 'Đọc các tài khoản Mail đã bật, hiển thị hộp thư đến và cho phép đánh dấu, trả lời, soạn hoặc chuyển thư vào Thùng rác trong đảo, kèm hướng dẫn rõ ràng khi thiếu quyền. Chọn tệp khi soạn thư để đính kèm vào thư.', points: ['Tài khoản Mail', 'Trả lời và soạn trong đảo', 'Hướng dẫn quyền minh bạch'] },
       quickNotes: { name: 'Ghi chú nhanh', caption: 'Dùng ứng dụng Ghi chú của hệ thống để xem, sửa, tạo và xóa ghi chú với bản xem trước Markdown trực tiếp, và nhảy thẳng đến chín ghi chú đầu tiên bằng Command+1 đến 9. Bản nháp tự động được ghi lại.', points: ['Dữ liệu nằm trong Ghi chú', 'Trình soạn Markdown', 'Tự động lưu bản nháp'] },
-      pdf: { name: 'Công cụ PDF', caption: 'Mười bốn thao tác ngay trên máy: hợp nhất, tách, xoay, cắt, chuyển đổi ảnh và tệp Office, kết xuất ảnh, trích xuất văn bản, thêm watermark và số trang, mã hóa, xóa mật khẩu và sửa metadata.', points: ['14 công cụ trên máy', 'Hợp nhất theo thứ tự bạn muốn', 'Không có dữ liệu rời khỏi Mac'] },
+      volumeMixer: {
+        name: 'Bộ trộn âm lượng theo ứng dụng',
+        caption: 'Điều chỉnh âm lượng và tắt tiếng riêng cho từng ứng dụng đang phát âm thanh. Cần macOS 14.4 trở lên và quyền ghi âm thanh hệ thống.',
+        points: ['Âm lượng từng ứng dụng', 'Tắt tiếng riêng', 'macOS 14.4+'],
+      },
       toolbox: { name: 'Tiện ích', caption: 'Đếm giờ tập trung, giữ màn hình sáng, dọn màn hình và bàn phím (chặn cả F1-F12), teleprompter, gương và Thùng rác trong một trang.', points: ['Đếm giờ tập trung', 'Chặn F1-F12 khi dọn dẹp', 'Teleprompter và gương'] },
-      system: { name: 'Trạng thái hệ thống', caption: 'Kiểm tra CPU, GPU, bộ nhớ, ổ đĩa, mạng và quạt; đọc nhiệt độ NVMe SMART khi phần cứng hỗ trợ, ghi lại lịch sử theo phút để xem biểu đồ theo bất kỳ khoảng thời gian nào và xuất ra .xlsx. Quét bộ nhớ đệm ứng dụng, bộ nhớ đệm người dùng Apple, nhật ký và tệp tùy chọn còn sót. Kiểm tra các mục đã chọn, chuyển vào Thùng rác rồi xem kết quả.', points: ['Theo dõi cấp chip', 'Biểu đồ lịch sử và xuất .xlsx', 'Kiểm tra trước khi chuyển vào Thùng rác'] },
-      battery: { name: 'Pin', caption: 'Xem mức sạc, tình trạng, số chu kỳ, nhiệt độ và dung lượng của Mac này, cùng mức pin của các thiết bị lân cận mà hệ thống cung cấp.', points: ['Chỉ số sức khỏe Mac', 'Thời gian còn lại', 'Pin thiết bị lân cận'] },
+      system: { name: 'Trạng thái hệ thống', caption: 'Kiểm tra CPU, GPU, bộ nhớ, ổ đĩa, mạng và quạt; đọc nhiệt độ NVMe SMART khi phần cứng hỗ trợ, ghi lại lịch sử theo phút để xem biểu đồ theo bất kỳ khoảng thời gian nào và xuất ra .xlsx. Quét bộ nhớ đệm ứng dụng, bộ nhớ đệm người dùng Apple, nhật ký và tệp tùy chọn còn sót. Kiểm tra các mục đã chọn, chuyển vào Thùng rác rồi xem kết quả. Xem mức sạc, tình trạng, số chu kỳ, nhiệt độ và dung lượng của Mac này, cùng mức pin của các thiết bị lân cận mà hệ thống cung cấp. Địa chỉ IPv4 và IPv6 công khai được hiển thị riêng.', points: ['Theo dõi cấp chip', 'Biểu đồ lịch sử và xuất .xlsx', 'Kiểm tra trước khi chuyển vào Thùng rác'] },
     },
   },
   extensions: {
@@ -96,19 +99,55 @@ export const vi = createCatalog({
     summaryLede: 'Các khả năng dùng thường xuyên, mỗi khả năng ở đúng vị trí tự nhiên.',
     summaryNote: 'Xem trước cửa sổ, chụp màn hình và Thao tác nhanh luôn dễ truy cập; ứng dụng đề xuất giúp bạn tìm thêm công cụ cho máy tính.',
     features: {
+      floatingIsland: {
+        title: 'Đảo nổi thích ứng với bố cục',
+        description: 'Dùng vị trí camera hoặc chọn vị trí ở cạnh màn hình. Vị trí tùy chỉnh được nhớ khi đổi chế độ. Bố cục gọn ngang và dọc thay đổi chiều dài theo biểu tượng trạng thái, tác vụ AI, tải xuống và phương tiện, có tùy chọn hiển thị thêm thông tin.',
+        detail: 'Vị trí tùy chỉnh · Biểu tượng trạng thái thường trực · Thông tin thích ứng',
+      },
+      dailyBriefing: {
+        title: 'Một ngày trong báo cáo hằng ngày',
+        description: 'Chọn từ tám mẫu, chọn dữ liệu sử dụng, nhập liệu, hệ thống và hoạt động zisla rồi xem trước. Xuất PNG thủ công hoặc vào giờ hằng ngày đã chọn. Lịch sử Thời gian sử dụng chỉ dùng khi được bật và có sẵn; dữ liệu thiếu không hiển thị thành số 0 đã đo.',
+        detail: '8 mẫu · Chọn nội dung · Xem trước và xuất PNG theo lịch',
+      },
+      userCare: {
+        title: 'Nhắc chăm sóc khi làm việc',
+        description: 'Đặt khoảng nhắc nghỉ, uống nước, vận động và nghỉ mắt. Thông điệp phù hợp thời điểm trong ngày. Nghỉ tự nhiên, khóa và ngủ đặt lại bộ đếm. Hoàn tất tập trung và thao tác ghi chú có thể hiển thị phản hồi ngắn. Bật hoặc tắt trong Cài đặt.',
+        detail: 'Khoảng nhắc tùy chỉnh · Thông điệp theo giờ · Tôn trọng nhàn rỗi và ngủ',
+      },
+      contextNotes: {
+        title: 'Ghi chú gắn với vị trí',
+        description: 'Lưu ghi chú có thể sửa cho trang web, cửa sổ ứng dụng hoặc màn hình nền và thấy khi quay lại. Đính kèm ảnh cửa sổ, quản lý trên kệ và đặt nhắc lặp lại từ một giờ đến ba ngày hoặc tắt nhắc.',
+        detail: 'Ghi chú vị trí · Ảnh cửa sổ · Nhắc lặp lại',
+      },
+      recording: {
+        title: 'Ghi và biên tập trong studio',
+        description: 'Ghi màn hình, cửa sổ hoặc vùng với âm thanh hệ thống, micrô và camera tùy chọn. Biên tập video, âm thanh, ảnh và chữ trên nhiều rãnh, thêm hoạt ảnh, thu phóng và phụ đề rồi xem trước rõ nét. Chọn tỷ lệ gốc, 16:9, 9:16, 1:1 hoặc 4:3. Xuất video, GIF, Live Photo hoặc âm thanh; một số định dạng cần FFmpeg. Đề xuất AI tùy chọn được xem trước rồi mới áp dụng.',
+        detail: 'Biên tập nhiều rãnh · Tỷ lệ và xem trước · Video, GIF, Live Photo và âm thanh',
+      },
+      permissions: {
+        title: 'Quyền hệ thống ở một nơi',
+        description: 'Xem trạng thái tại Cài đặt → Quyền, bắt đầu yêu cầu được hỗ trợ hoặc mở trang hệ thống tương ứng. Màn hình chào lần đầu dùng cùng danh sách và chỉ rõ quyền phải đặt thủ công.',
+        detail: 'Trạng thái quyền · Yêu cầu và liên kết · Dùng chung với màn hình chào',
+      },
+      pdf: {
+        title: 'Công cụ PDF',
+        description: 'Có trong Cài đặt, ngoài danh sách mô-đun của đảo. Mười bốn thao tác ngay trên máy: hợp nhất, tách, xoay, cắt, chuyển đổi ảnh và tệp Office, kết xuất ảnh, trích xuất văn bản, thêm watermark và số trang, mã hóa, xóa mật khẩu và sửa metadata.',
+        detail: '14 công cụ trên máy · Hợp nhất theo thứ tự bạn muốn · Không có dữ liệu rời khỏi Mac',
+      },
+
       windowPreviews: {
         title: 'Xem trước cửa sổ, nhấp để chuyển',
         description:
-          'Xem trước cửa sổ từ Dock hoặc khi chuyển bằng Command-Tab, rồi nhấp vào thẻ để kích hoạt cửa sổ đó. Mặc định tắt; hãy bật trong Cài đặt và cấp các quyền cần thiết.',
-        detail: 'Dock và Command-Tab · Nhấp để chuyển cửa sổ · Mặc định tắt',
+          'Xem trước cửa sổ từ Dock hoặc khi dùng Command-Tab, rồi bấm thẻ để kích hoạt cửa sổ. Cấu hình mới bật tính năng này; quản lý tính năng và quyền trong Cài đặt.',
+        detail: 'Dock và Command-Tab · Bấm để chuyển cửa sổ · Có thể cấu hình',
       },
-      capture: { title: 'Ảnh chụp, ảnh cuộn và ghim', description: 'Chụp hoặc ghim một phần màn hình bằng phím tắt toàn cục, thêm chú thích, ghép ảnh cuộn và nhận dạng hoặc xuất bảng. Chú thích đang sửa vẫn được giữ khi xuất. Tùy chỉnh phím tắt chụp màn hình, ghim ảnh, chụp cuộn và công cụ chú thích. Cài đặt kiểm tra xung đột với chụp ảnh, nhập giọng nói và Thao tác nhanh; dùng riêng phím bổ trợ cần quyền Giám sát đầu vào.', detail: 'Phím tắt tùy chỉnh · Kiểm tra xung đột · Giữ chú thích khi xuất' },
+      capture: { title: 'Ảnh chụp, ảnh cuộn và ghim', description: 'Chụp, ghim hoặc ghép ảnh cuộn bằng phím tắt tùy chỉnh. Tô sáng vùng, trích phần ảnh, bo góc và giữ chú thích khi xuất. Nhận dạng và sao chép chữ, dịch rồi sao chép kết quả hoặc xuất bảng sang .xlsx. Lưu ảnh trên kệ. Cài đặt kiểm tra xung đột với nhập giọng nói và Thao tác nhanh.', detail: 'Tô sáng và trích xuất · Nhận dạng, dịch và sao chép · Bo góc và .xlsx' },
       voice: { title: 'Nhập giọng nói và làm sạch', description: 'Nhấn phím để bật/tắt hoặc giữ để nói với tính năng nhận dạng giọng nói của hệ thống, từ vựng chuyên ngành và từ tùy chỉnh. Có thể dùng Ollama, LM Studio hoặc mô hình từ xa để sửa bản chép lời mà vẫn giữ nguyên ý nghĩa và định dạng các mục được liệt kê rõ ràng.', detail: 'Hai chế độ ghi âm · Từ vựng và từ nóng · Làm sạch tùy chọn' },
-      media: { title: 'Phương tiện và âm thanh nền hệ thống', description: 'Điều khiển nội dung đang phát từ đầu đảo hoặc chọn âm thanh nền macOS. Âm thanh có thể tự dừng khi khóa màn hình, bật trình bảo vệ hoặc màn hình ngủ.', detail: 'Điều khiển phát · Lời bài hát đồng bộ · Tự dừng âm thanh' },
+      media: { title: 'Phương tiện và âm thanh nền hệ thống', description: 'Điều khiển nội dung đang phát từ đầu đảo hoặc chọn âm thanh nền macOS. Âm thanh có thể tự dừng khi khóa màn hình, bật trình bảo vệ hoặc màn hình ngủ. Chọn dạng sóng hoặc quầng sáng bìa; tiến trình phát cũng xuất hiện ở bố cục gọn và đảo nổi.', detail: 'Điều khiển phát · Lời bài hát đồng bộ · Tự dừng âm thanh' },
       browserDownloads: { title: 'Tiến trình tải xuống trình duyệt', description: 'Phát hiện tải xuống từ Safari, Chrome, Edge, Firefox, Brave, Vivaldi, Opera và Arc, hiển thị nguồn và tiến trình trực tiếp ở trên.', detail: '8 trình duyệt · Nhận dạng nguồn · Thông báo hoàn tất' },
-      copyAssistant: { title: 'Thao tác nhanh và bước tiếp theo', description: 'Khi bật, văn bản, liên kết, tệp hoặc ảnh đã sao chép được xem trước trong thanh riêng, kèm đề xuất mở, hiện trong Finder, tìm kiếm, dịch, tính toán hoặc lưu chỉ sau khi bạn xác nhận. Mở thư mục chứa tệp qua Thao tác nhanh sau khi tải bằng trình duyệt hoặc nhận qua AirDrop. Hỗ trợ thư mục tải mặc định và tự chọn của Chrome, với công tắc riêng so với hiển thị tiến trình tải.', detail: 'Bật tùy chọn · Nhận dạng cục bộ · Command+N mặc định' },
+      copyAssistant: { title: 'Thao tác nhanh và bước tiếp theo', description: 'Khi bật, văn bản, liên kết, tệp hoặc ảnh đã sao chép được xem trước trong thanh riêng, kèm đề xuất mở, hiện trong Finder, tìm kiếm, dịch, tính toán hoặc lưu chỉ sau khi bạn xác nhận. Mở thư mục chứa tệp qua Thao tác nhanh sau khi tải bằng trình duyệt hoặc nhận qua AirDrop. Hỗ trợ thư mục tải mặc định và tự chọn của Chrome, với công tắc riêng so với hiển thị tiến trình tải. Địa chỉ IP có thao tác tra cứu và mở liên kết riêng. Chuyển đổi nhận biết đơn vị tiền tệ nhỏ; danh mục gồm Emoji 18.0.', detail: 'Bật tùy chọn · Nhận dạng cục bộ · Command+N mặc định' },
       aiManagement: { title: 'Quản lý CLI và Skills AI', description: 'Phát hiện, cài đặt, cập nhật và gỡ CLI AI trong Cài đặt, đồng thời xem và quản lý Skills cục bộ để ít phải chuyển giữa các terminal.', detail: 'Phát hiện và cài đặt · Cập nhật và gỡ · Skills cục bộ' },
-      pet: { title: 'Thú cưng trong đảo', description: 'Chọn thú cưng tích hợp và đặt ở bên trái hoặc phải đảo. Tắt bất cứ lúc nào.', detail: 'Nhân vật tích hợp · Trái hoặc phải · Bật khi cần' },
+      pet: { title: 'Thú cưng trong đảo', description: 'Chọn từ danh mục động vật và nhân vật mở rộng, hoặc nhập ảnh, ảnh động hay video được hỗ trợ rồi đặt tên. Đặt thú cưng ở hai bên đảo và xóa thú cưng đã nhập trong Cài đặt. Hoạt ảnh tối đa 30 giây, tệp tối đa 100 MB.', detail: 'Danh mục mở rộng · Nhập ảnh và video · Xóa thú cưng tùy chỉnh' },
       lockScreen: { title: 'Thông tin màn hình khóa', description: 'Tùy chọn hiển thị ngày, trạng thái và nội dung đang phát trên màn hình khóa macOS. Đây là lớp phủ riêng, không xuất hiện trong danh sách hay băng chuyền mô-đun của đảo.', detail: 'Lớp phủ riêng · Tùy chọn bật · Không chiếm tiêu điểm' },
       recommendedTools: {
         title: 'Ứng dụng đề xuất',
@@ -152,7 +191,7 @@ export const vi = createCatalog({
   download: {
     eyebrow: 'SẴN SÀNG KHI BẠN SẴN SÀNG',
     title: 'Tải zisla',
-    copy: 'Dành cho Mac Apple Silicon. Phiên bản, kiến trúc khác và checksum có trên trang phát hành. Sau khi cài đặt, Sparkle xác minh chữ ký trước rồi tải, cài và khởi động lại thủ công hoặc tự động theo cài đặt; bản cập nhật giữ nguyên các quyền đã cấp. Nếu một bản phát hành không cần thiết, hãy bỏ qua và zisla sẽ không nhắc lại.',
+    copy: 'Dành cho Mac Apple Silicon. Phiên bản, kiến trúc khác và checksum có trên trang phát hành. Sau khi cài đặt, Sparkle xác minh chữ ký trước rồi tải, cài và khởi động lại thủ công hoặc tự động theo cài đặt; bản cập nhật giữ nguyên các quyền đã cấp. Nếu một bản phát hành không cần thiết, hãy bỏ qua và zisla sẽ không nhắc lại. Đọc ghi chú phiên bản trước khi cài đặt và sau khi khởi động lại.',
     primaryCta: 'Tải xuống',
     primaryCtaAriaLabel: 'Tải zisla',
     releaseCta: 'Xem bản phát hành',
@@ -169,6 +208,18 @@ export const vi = createCatalog({
     },
   },
   changelog: {
+    releaseNotes: {
+      'v0.1.20': [
+        'Chọn từ tám mẫu, chọn dữ liệu sử dụng, nhập liệu, hệ thống và hoạt động zisla rồi xem trước. Xuất PNG thủ công hoặc vào giờ hằng ngày đã chọn. Lịch sử Thời gian sử dụng chỉ dùng khi được bật và có sẵn; dữ liệu thiếu không hiển thị thành số 0 đã đo.',
+        'Đặt khoảng nhắc nghỉ, uống nước, vận động và nghỉ mắt. Thông điệp phù hợp thời điểm trong ngày. Nghỉ tự nhiên, khóa và ngủ đặt lại bộ đếm. Hoàn tất tập trung và thao tác ghi chú có thể hiển thị phản hồi ngắn. Bật hoặc tắt trong Cài đặt. Lưu ghi chú có thể sửa cho trang web, cửa sổ ứng dụng hoặc màn hình nền và thấy khi quay lại. Đính kèm ảnh cửa sổ, quản lý trên kệ và đặt nhắc lặp lại từ một giờ đến ba ngày hoặc tắt nhắc.',
+        'Dùng vị trí camera hoặc chọn vị trí ở cạnh màn hình. Vị trí tùy chỉnh được nhớ khi đổi chế độ. Bố cục gọn ngang và dọc thay đổi chiều dài theo biểu tượng trạng thái, tác vụ AI, tải xuống và phương tiện, có tùy chọn hiển thị thêm thông tin. Chọn dạng sóng hoặc quầng sáng bìa; tiến trình phát cũng xuất hiện ở bố cục gọn và đảo nổi.',
+        'Chọn từ danh mục động vật và nhân vật mở rộng, hoặc nhập ảnh, ảnh động hay video được hỗ trợ rồi đặt tên. Đặt thú cưng ở hai bên đảo và xóa thú cưng đã nhập trong Cài đặt. Hoạt ảnh tối đa 30 giây, tệp tối đa 100 MB.',
+        'Ghi màn hình, cửa sổ hoặc vùng với âm thanh hệ thống, micrô và camera tùy chọn. Biên tập video, âm thanh, ảnh và chữ trên nhiều rãnh, thêm hoạt ảnh, thu phóng và phụ đề rồi xem trước rõ nét. Chọn tỷ lệ gốc, 16:9, 9:16, 1:1 hoặc 4:3. Xuất video, GIF, Live Photo hoặc âm thanh; một số định dạng cần FFmpeg. Đề xuất AI tùy chọn được xem trước rồi mới áp dụng.',
+        'Chụp, ghim hoặc ghép ảnh cuộn bằng phím tắt tùy chỉnh. Tô sáng vùng, trích phần ảnh, bo góc và giữ chú thích khi xuất. Nhận dạng và sao chép chữ, dịch rồi sao chép kết quả hoặc xuất bảng sang .xlsx. Lưu ảnh trên kệ. Cài đặt kiểm tra xung đột với nhập giọng nói và Thao tác nhanh.',
+        'Bổ sung phát hiện tác vụ Cursor cùng số liệu sử dụng và hạn mức đăng ký có thể đọc được của Cursor và Muse Code. Tác vụ Cursor vẫn hiển thị khi công cụ chạy lâu. Địa chỉ IP có thao tác tra cứu và mở liên kết riêng. Chuyển đổi nhận biết đơn vị tiền tệ nhỏ; danh mục gồm Emoji 18.0.',
+        'Điều chỉnh âm lượng và tắt tiếng riêng cho từng ứng dụng đang phát âm thanh. Cần macOS 14.4 trở lên và quyền ghi âm thanh hệ thống. Có trong Cài đặt, ngoài danh sách mô-đun của đảo. Xem trạng thái tại Cài đặt → Quyền, bắt đầu yêu cầu được hỗ trợ hoặc mở trang hệ thống tương ứng. Màn hình chào lần đầu dùng cùng danh sách và chỉ rõ quyền phải đặt thủ công. Tổng nhập giọng nói, thời gian đọc chính tả, tốc độ và thời gian tiết kiệm cũng có trên bảng bàn phím. Cấu hình mới bật âm thanh và thống kê; có thể tắt riêng. Chọn tệp khi soạn thư để đính kèm vào thư. Đọc ghi chú phiên bản trước khi cài đặt và sau khi khởi động lại.',
+      ],
+    },
     eyebrow: 'Nhật ký thay đổi',
     title: 'Những thay đổi trong mỗi bản phát hành zisla: tính năng mới, cải tiến và sửa lỗi.',
     lede: 'Những thay đổi trong mỗi bản phát hành zisla: tính năng mới, cải tiến và sửa lỗi.',
@@ -193,25 +244,7 @@ export const vi = createCatalog({
       copyAssistant: { question: 'Thao tác nhanh có mở hoặc tải lên nội dung tôi sao chép không?', answer: 'Không. Nhận dạng và xem trước diễn ra trên Mac, bước tiếp theo chỉ chạy sau khi bạn xác nhận.' },
       permissions: {
         question: 'zisla cần những quyền hệ thống nào?',
-        answer: `
-      <p>zisla không yêu cầu mọi quyền ngay lần đầu khởi chạy. macOS chỉ hiển thị từng yêu cầu khi bạn bật và thực sự dùng tính năng tương ứng:</p>
-      <ul>
-        <li><strong>Lịch và Lời nhắc:</strong> được yêu cầu riêng khi bạn mở mô-đun lịch, để đọc, tạo và quản lý sự kiện lịch cùng lời nhắc có ngày.</li>
-        <li><strong>Dịch vụ định vị:</strong> được yêu cầu khi bạn chọn thời tiết cho vị trí hiện tại. zisla chỉ lấy vị trí một lần và không theo dõi liên tục. Thêm thành phố thủ công không cần quyền định vị.</li>
-        <li><strong>Micrô và Nhận dạng giọng nói:</strong> được yêu cầu khi bạn bắt đầu nhập bằng giọng nói. Âm thanh chỉ được thu trong lúc bạn chủ động ghi âm và chỉ bản ghi đó được chuyển thành văn bản.</li>
-        <li><strong>Trợ năng:</strong> cần để tự động chèn bản chép lời vào ứng dụng hiện tại, sao chép nhanh bằng cử chỉ chuột, làm sạch bàn phím và điều khiển một số trình phát được hỗ trợ. Quyền này giúp tìm các ô nhập không phải ô mật khẩu hoặc gửi những phím hệ thống cần thiết.</li>
-        <li><strong>Giám sát đầu vào:</strong> dùng cho âm thanh bàn phím, thống kê gõ cục bộ tùy chọn và các kích hoạt toàn cục như một phím bổ trợ đơn lẻ hoặc nút bên chuột. Chỉ các sự kiện toàn cục mà những tính năng này cần mới được theo dõi; phím tắt toàn cục thông thường không cần quyền này.</li>
-        <li><strong>Ghi màn hình và Ghi âm thanh hệ thống:</strong> cần cho ảnh chụp màn hình, chỉnh sửa ảnh chụp và dạng sóng của âm thanh hệ thống đang phát. Ảnh chụp đọc hình ảnh trên màn hình; dạng sóng chỉ phân tích mức âm thanh hệ thống hiện tại và không lưu hay tải âm thanh lên.</li>
-        <li><strong>Camera:</strong> chỉ dùng khi cửa sổ gương đang mở.</li>
-        <li><strong>Bluetooth:</strong> chỉ dùng khi mô-đun pin đang mở, để đọc mức pin do các thiết bị đã kết nối hoặc ghép đôi công bố.</li>
-        <li><strong>Tự động hóa:</strong> lần đầu bạn dùng Ghi chú nhanh, Mail, dọn màn hình nền hoặc điều khiển trực tiếp trình phát được hỗ trợ, macOS sẽ hỏi riêng liệu zisla có thể điều khiển Ghi chú, Mail, Finder hoặc ứng dụng đó hay không. Ghi chú nhanh đọc và ghi vào Ghi chú; Mail có thể đọc, soạn, trả lời, đánh dấu và xóa thư.</li>
-        <li><strong>Toàn quyền truy cập ổ đĩa:</strong> chỉ cần khi Mail không chạy mà zisla vẫn phải đọc chỉ mục thư cục bộ để hiển thị tài khoản, người gửi, chủ đề, bản xem trước, dấu thời gian và trạng thái đã đọc.</li>
-        <li><strong>Thông báo:</strong> được yêu cầu khi bạn bật bộ hẹn giờ Pomodoro, chỉ để hiển thị thông báo cục bộ và phát một âm báo khi bộ hẹn giờ kết thúc.</li>
-      </ul>
-      <p><strong>Quyền thư mục không phải là toàn quyền truy cập ổ đĩa:</strong> với các thư mục kệ, nhập/xuất hoặc tải xuống bạn chọn trong bộ chọn tệp của hệ thống, zisla chỉ được truy cập thư mục đó, không được đọc toàn bộ ổ đĩa.</p>
-      <p><strong>Âm thanh bàn phím và thống kê gõ:</strong> cả hai đều tắt theo mặc định, và sự kiện bàn phím toàn cục chỉ được theo dõi sau khi bạn bật một trong hai. Khi bật âm thanh bàn phím, sự kiện phím chỉ dùng để phát âm thanh; khi bật thống kê gõ, chỉ dữ liệu tổng hợp — số ký tự, mã phím vật lý, dấu thời gian và ứng dụng ở phía trước — được lưu, không bao giờ lưu nội dung bạn đã gõ. Bạn có thể tắt từng tính năng riêng trong Cài đặt; sau đó sẽ không ghi thêm dữ liệu. Dữ liệu đã lưu vẫn nằm trong tệp cơ sở dữ liệu cục bộ mà bạn có thể tự xóa.</p>
-      <p>Bạn có thể tắt tính năng trong cài đặt ứng dụng hoặc thu hồi quyền bất cứ lúc nào tại Cài đặt hệ thống → Quyền riêng tư &amp; Bảo mật. Thu hồi một quyền chỉ tắt tính năng liên quan và không ảnh hưởng các mô-đun khác. Tên mục có thể hơi khác giữa các phiên bản macOS.</p>
-    `.trim(),
+        answer: '<p>Cài đặt → Quyền tập hợp trạng thái, yêu cầu và liên kết tới Cài đặt hệ thống. Một số quyền cần cấu hình thủ công. Bạn chọn yêu cầu cần bắt đầu; màn hình chào lần đầu cũng có các điều khiển này.</p><p>Ghi màn hình và âm thanh hệ thống, micrô và camera dùng cho chụp, ghi, bộ trộn và gương tùy tính năng. Nhập giọng nói còn dùng nhận dạng lời nói. Lịch, Nhắc nhở, Vị trí, Bluetooth và Tự động hóa dùng cho chức năng liên quan. Thêm thành phố thời tiết thủ công không cần vị trí.</p><p>Cấu hình mới bật âm thanh bàn phím và thống kê, có thể tắt riêng. Sự kiện phím toàn cục cần giám sát đầu vào. Thống kê chỉ lưu số lượng, mã phím, thời gian và tên ứng dụng, không lưu nội dung đã gõ. Trợ năng hỗ trợ chèn văn bản, cử chỉ, vệ sinh và điều khiển cửa sổ.</p><p>Quyền truy cập toàn bộ ổ đĩa có thể cần cho chỉ mục thư cục bộ và lịch sử Thời gian sử dụng của báo cáo hằng ngày. Trình chọn tệp cấp quyền vào thư mục đã chọn. Tắt tính năng trong zisla hoặc thu hồi quyền ở Cài đặt hệ thống → Quyền riêng tư &amp; Bảo mật.</p>',
       },
       localVoice: {
         question: 'Làm thế nào để dùng mô hình cục bộ chỉnh sửa bản chép lời?',

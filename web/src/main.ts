@@ -800,7 +800,7 @@ const renderSite = (locale: SiteLocale, preserveScroll = false) => {
       const isLatest = index === 0;
       const page = Math.floor(index / changelogPageSize) + 1;
       const releasePage = repositoryLinks.github + '/releases/tag/' + release.version;
-      const notesMarkup = release.notes
+      const notesMarkup = (content.changelog.releaseNotes[release.version] ?? release.notes)
         .map(
           (note) =>
             '<li class="changelog-note"><span class="changelog-note-mark" aria-hidden="true">+</span><span class="changelog-note-text">' +

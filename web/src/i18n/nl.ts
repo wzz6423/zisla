@@ -4,10 +4,10 @@ export const nl = createCatalog({
   meta: {
     documentTitle: 'zisla · Dynamische werkruimte',
     description:
-      'zisla is een native dynamische werkruimte voor macOS. Houd AI-taken, media, bestanden en je agenda bij elkaar, met toetsenbordgeluiden, typestatistieken, schermaantekeningen en snelle acties.',
+      'zisla is een native macOS-werkruimte voor AI-taken, dagoverzichten en opnames bewerken, met eigen dieren, schermafbeeldingen en centrale toestemmingen.',
     ogTitle: 'zisla · Zet wat er gebeurt waar je het kunt zien',
     ogDescription:
-      'Van AI-taken en media tot toetsenbordgeluiden, typestatistieken, schermaantekeningen en desktoptools: een native macOS-werkruimte die verschijnt wanneer je haar nodig hebt.',
+      'Houd AI-taken en uw dag in beeld, neem op en bewerk op uw Mac, importeer een eigen dier en beheer toestemmingen op één plek.',
   },
   tagline: 'Native dynamische werkruimte voor macOS',
   header: {
@@ -95,14 +95,14 @@ export const nl = createCatalog({
       aiMonitor: {
         name: 'AI-monitor',
         caption:
-          'Detecteert activiteit van ondersteunde AI-CLI’s, desktopapps en IDE’s en toont taken, status, tokentrends en een bijdrageheatmap. Alleen gestructureerde gebeurtenissen worden gelezen; gesprekken nooit.',
+          'Detecteert activiteit van ondersteunde AI-CLI’s, desktopapps en IDE’s en toont taken, status, tokentrends en een bijdrageheatmap. Alleen gestructureerde gebeurtenissen worden gelezen; gesprekken nooit. Taakdetectie voor Cursor en numeriek gebruik met beschikbare abonnementsquota voor Cursor en Muse Code zijn toegevoegd; lange tooltaken in Cursor blijven zichtbaar.',
         points: ['Taken uit tools samengevoegd', 'Trends in tokenverbruik', 'Leest geen prompts of antwoorden'],
       },
       keyboardSound: {
         name: 'Toetsenbordgeluiden',
         caption:
-          'Speelt 20 ingebouwde mechanische toetsenbordgeluiden af voor globale toetsaanslagen, met instelbaar volume en natuurlijke toonvariatie. Schakel lokale typestatistieken in voor overzicht, trends, geschiedenis, app-tijdlijn en een heatmap met F1-F12.',
-        points: ['20 ingebouwde geluiden', 'Loslaatgeluid en toonvariatie', 'Typestatistieken optioneel'],
+          'Speelt 20 ingebouwde mechanische toetsenbordgeluiden af voor globale toetsaanslagen, met instelbaar volume en natuurlijke toonvariatie. Schakel lokale typestatistieken in voor overzicht, trends, geschiedenis, app-tijdlijn en een heatmap met F1-F12. Spraaktotalen, dicteerduur, snelheid en bespaarde tijd staan ook in het toetsenborddashboard. Nieuwe configuraties schakelen geluiden en typstatistieken in; beide zijn apart uit te zetten.',
+        points: ['20 ingebouwde geluiden', 'Loslaatgeluid en toonvariatie', 'Typstatistieken apart schakelbaar'],
       },
       download: {
         name: 'Downloader',
@@ -119,7 +119,7 @@ export const nl = createCatalog({
       mail: {
         name: 'Mail',
         caption:
-          'Leest ingeschakelde Mail-accounts, toont de inbox en laat je berichten markeren, beantwoorden, opstellen en naar de prullenmand verplaatsen in het eiland, met duidelijke uitleg als een machtiging ontbreekt.',
+          'Leest ingeschakelde Mail-accounts, toont de inbox en laat je berichten markeren, beantwoorden, opstellen en naar de prullenmand verplaatsen in het eiland, met duidelijke uitleg als een machtiging ontbreekt. Kies tijdens het schrijven bestanden om als bijlagen toe te voegen.',
         points: ['Mail-accounts', 'Antwoorden en opstellen in het eiland', 'Heldere machtigingsuitleg'],
       },
       quickNotes: {
@@ -128,11 +128,10 @@ export const nl = createCatalog({
           'Gebruikt de systeemapp Notities om notities te bekijken, bewerken, maken en verwijderen met live Markdown-voorbeeld, en met Command+1 tot 9 meteen naar de eerste negen notities te springen. Concepten worden automatisch teruggeschreven.',
         points: ['Gegevens in Notities', 'Markdown-editor', 'Concepten automatisch opgeslagen'],
       },
-      pdf: {
-        name: 'PDF-tools',
-        caption:
-          'Veertien bewerkingen op je Mac: samenvoegen, splitsen, draaien, bijsnijden, afbeeldingen en Office-bestanden converteren, renderen, tekst exporteren, watermerken en paginanummers toevoegen, versleutelen, wachtwoord verwijderen en metadata bewerken.',
-        points: ['14 lokale tools', 'Samenvoegen in eigen volgorde', 'Niets verlaat je Mac'],
+      volumeMixer: {
+        name: 'Volumemixer per app',
+        caption: 'Pas het volume en dempen apart aan voor apps die geluid afspelen. Vereist macOS 14.4 of nieuwer en toestemming voor opname van systeemaudio.',
+        points: ['Volume per toepassing', 'Apart dempen', 'macOS 14.4+'],
       },
       toolbox: {
         name: 'Hulpprogramma’s',
@@ -143,14 +142,8 @@ export const nl = createCatalog({
       system: {
         name: 'Systeemstatus',
         caption:
-          'Controleer CPU, GPU, geheugen, schijf, netwerk en ventilatoren; lees de NVMe-SMART-temperatuur wanneer de hardware die aanbiedt, houd een minuutsgewijze geschiedenis bij die je voor elke periode als grafiek bekijkt en als .xlsx exporteert. Scan appcaches, Apple-gebruikerscaches, logboeken en achtergebleven voorkeurenbestanden. Controleer de selectie, verplaats deze naar de prullenmand en bekijk het resultaat.',
+          'Controleer CPU, GPU, geheugen, schijf, netwerk en ventilatoren; lees de NVMe-SMART-temperatuur wanneer de hardware die aanbiedt, houd een minuutsgewijze geschiedenis bij die je voor elke periode als grafiek bekijkt en als .xlsx exporteert. Scan appcaches, Apple-gebruikerscaches, logboeken en achtergebleven voorkeurenbestanden. Controleer de selectie, verplaats deze naar de prullenmand en bekijk het resultaat. Bekijk lading, gezondheid, cycli, temperatuur en capaciteit van deze Mac, plus batterijniveaus van nabije apparaten die het systeem deelt. Openbare IPv4- en IPv6-adressen worden apart weergegeven.',
         points: ['Monitoring op chipniveau', 'Geschiedenisgrafieken en .xlsx-export', 'Controleren vóór verplaatsen naar prullenmand'],
-      },
-      battery: {
-        name: 'Batterij',
-        caption:
-          'Bekijk lading, gezondheid, cycli, temperatuur en capaciteit van deze Mac, plus batterijniveaus van nabije apparaten die het systeem deelt.',
-        points: ['Gezondheidsgegevens van deze Mac', 'Resterende tijd', 'Batterij van nabije apparaten'],
       },
     },
   },
@@ -165,17 +158,53 @@ export const nl = createCatalog({
     summaryNote:
       'Venstervoorbeelden, opnamen en snelle acties zijn binnen handbereik; aanbevolen apps helpen je meer hulpmiddelen voor je bureaublad te ontdekken.',
     features: {
+      floatingIsland: {
+        title: 'Een zwevend eiland dat zich aanpast',
+        description: 'Gebruik de camerapositie of kies een plek aan een schermrand. De eigen positie blijft bewaard bij het wisselen van modus. Horizontale en verticale compacte weergaven passen hun lengte aan pictogrammen, AI-taken, downloads en media aan en kunnen meer informatie tonen.',
+        detail: 'Eigen positie · Blijvende statuspictogrammen · Aanpasbare informatie',
+      },
+      dailyBriefing: {
+        title: 'Uw dag in een dagoverzicht',
+        description: 'Kies uit acht sjablonen, selecteer gebruiks-, typ-, systeem- en zisla-activiteitsgegevens en bekijk de voorvertoning. Exporteer een PNG handmatig of dagelijks op een gekozen tijd. Schermtijdgeschiedenis wordt gebruikt als deze is ingeschakeld en beschikbaar; ontbrekende gegevens gelden niet als gemeten nul.',
+        detail: '8 sjablonen · Inhoud kiezen · Voorvertoning en geplande PNG-export',
+      },
+      userCare: {
+        title: 'Herinneringen tijdens het werk',
+        description: 'Stel een interval in voor pauzes, water, beweging en rust voor de ogen. Berichten volgen het tijdstip. Natuurlijke pauzes, vergrendelen en sluimerstand resetten de tijdmeting. Voltooide focus en notitiehandelingen kunnen korte feedback tonen. In Instellingen aan of uit te zetten.',
+        detail: 'Instelbaar interval · Berichten per tijdstip · Houdt rekening met inactiviteit en sluimeren',
+      },
+      contextNotes: {
+        title: 'Notities op de juiste plek',
+        description: 'Bewaar een bewerkbare notitie voor een webpagina, appvenster of bureaublad en zie die bij terugkeer. Voeg een vensterafbeelding toe, beheer notities op de plank en stel herhalingen van één uur tot drie dagen in, of zet ze uit.',
+        detail: 'Plaatsgebonden notities · Vensterafbeeldingen · Terugkerende herinneringen',
+      },
+      recording: {
+        title: 'Opnemen en bewerken in de studio',
+        description: 'Neem scherm, venster of gebied op met optionele systeemaudio, microfoon en camera. Bewerk video, audio, afbeeldingen en tekst op meerdere sporen, voeg animaties, zoom en ondertitels toe en bekijk een scherpe voorvertoning. Kies origineel, 16:9, 9:16, 1:1 of 4:3. Exporteer video, GIF, Live Photo of audio; sommige formaten vereisen FFmpeg. Optionele AI-plannen worden bekeken voor toepassing.',
+        detail: 'Meersporenbewerking · Verhoudingen en voorvertoning · Video, GIF, Live Photo en audio',
+      },
+      permissions: {
+        title: 'Systeemtoestemmingen op één plek',
+        description: 'Bekijk status in Instellingen → Toestemmingen, start ondersteunde aanvragen of open de juiste systeempagina. Het eerste welkomstscherm gebruikt dezelfde lijst en markeert handmatige instellingen.',
+        detail: 'Toestemmingsstatus · Aanvragen en links · Gedeeld met het welkom',
+      },
+      pdf: {
+        title: 'PDF-tools',
+        description: 'Beschikbaar in Instellingen, buiten de modulecarrousel van het eiland. Veertien bewerkingen op je Mac: samenvoegen, splitsen, draaien, bijsnijden, afbeeldingen en Office-bestanden converteren, renderen, tekst exporteren, watermerken en paginanummers toevoegen, versleutelen, wachtwoord verwijderen en metadata bewerken.',
+        detail: '14 lokale tools · Samenvoegen in eigen volgorde · Niets verlaat je Mac',
+      },
+
       windowPreviews: {
         title: 'Bekijk een venster, wissel met een klik',
         description:
-          'Bekijk vensters vanuit het Dock of tijdens het wisselen met Command-Tab en klik op een kaart om het venster te activeren. Standaard uitgeschakeld; zet het aan in Instellingen en geef de benodigde toestemmingen.',
-        detail: 'Dock en Command-Tab · Wissel vensters met een klik · Standaard uit',
+          'Bekijk vensters vanuit het Dock of met Command-Tab en klik op een kaart om dat venster te activeren. Nieuwe configuraties schakelen dit in; beheer de functie en toestemming in Instellingen.',
+        detail: 'Dock en Command-Tab · Klik om te wisselen · Instelbaar',
       },
       capture: {
         title: 'Schermafbeeldingen, scrollcaptures en vastzetten',
         description:
-          'Maak of pin een deel van het scherm met een globale sneltoets, annoteer, voeg een scrollcapture samen en herken of exporteer tabellen. Bewerkte tekstannotaties blijven behouden bij export. Pas sneltoetsen voor schermafdrukken, vastzetten, scrollende opnamen en annotaties aan. Instellingen controleren conflicten met opnamen, spraakinvoer en snelle acties; alleen een modificatietoets gebruiken vereist toestemming voor invoerbewaking.',
-        detail: 'Eigen sneltoetsen · Controle op conflicten · Annotaties blijven behouden bij export',
+          'Maak, zet vast of voeg scrollende schermafbeeldingen samen met eigen sneltoetsen. Markeer gebieden, haal afbeeldingsdelen eruit, rond hoeken af en behoud annotaties bij export. Herken en kopieer tekst, vertaal en kopieer het resultaat of exporteer herkende tabellen als .xlsx. Bewaar afbeeldingen op de plank. Instellingen controleren conflicten met spraak en snelle acties.',
+        detail: 'Markeren en extraheren · Herkennen, vertalen en kopiëren · Ronde hoeken en .xlsx',
       },
       voice: {
         title: 'Spraakinvoer en opschonen',
@@ -186,7 +215,7 @@ export const nl = createCatalog({
       media: {
         title: 'Media en omgevingsgeluiden',
         description:
-          'Bedien wat er speelt bovenaan het eiland of kies een omgevingsgeluid van macOS. Het kan stoppen wanneer het scherm vergrendelt, de schermbeveiliging start of het scherm slaapt.',
+          'Bedien wat er speelt bovenaan het eiland of kies een omgevingsgeluid van macOS. Het kan stoppen wanneer het scherm vergrendelt, de schermbeveiliging start of het scherm slaapt. Kies een golfvorm of hoesgloed; de afspeelvoortgang staat ook in compacte en zwevende weergaven.',
         detail: 'Afspeelbediening · Gesynchroniseerde songteksten · Automatisch stoppen',
       },
       browserDownloads: {
@@ -198,7 +227,7 @@ export const nl = createCatalog({
       copyAssistant: {
         title: 'Snelle acties en volgende stappen',
         description:
-          'Na inschakelen worden gekopieerde tekst, links, bestanden of afbeeldingen in een aparte balk getoond, met opties om te openen, in Finder te tonen, te zoeken, vertalen, berekenen of opslaan — alleen na jouw bevestiging. Open de bestandsmap via snelle acties na een browserdownload of AirDrop-overdracht. Ondersteunt standaard en zelfgekozen Chrome-downloadmappen, met een aparte schakelaar naast de downloadvoortgang.',
+          'Na inschakelen worden gekopieerde tekst, links, bestanden of afbeeldingen in een aparte balk getoond, met opties om te openen, in Finder te tonen, te zoeken, vertalen, berekenen of opslaan — alleen na jouw bevestiging. Open de bestandsmap via snelle acties na een browserdownload of AirDrop-overdracht. Ondersteunt standaard en zelfgekozen Chrome-downloadmappen, met een aparte schakelaar naast de downloadvoortgang. IP-adressen hebben aparte acties voor opzoeken en links openen. Conversies herkennen kleine munteenheden; de catalogus bevat Emoji 18.0.',
         detail: 'Optionele schakelaar · Lokale herkenning · Command+N standaard',
       },
       aiManagement: {
@@ -209,8 +238,8 @@ export const nl = createCatalog({
       },
       pet: {
         title: 'Huisdier in het eiland',
-        description: 'Kies een ingebouwd huisdier en plaats het links of rechts van het eiland. Zet het uit wanneer je wilt.',
-        detail: 'Ingebouwde figuren · Links of rechts · Alleen wanneer gewenst',
+        description: 'Kies uit de uitgebreide dieren- en personagecatalogus of importeer een ondersteunde afbeelding, animatie of video met een eigen naam. Plaats het dier aan een kant van het eiland en verwijder geïmporteerde dieren in Instellingen. Animaties tot 30 seconden en bestanden tot 100 MB.',
+        detail: 'Uitgebreide catalogus · Afbeeldingen en video importeren · Eigen dieren verwijderen',
       },
       lockScreen: {
         title: 'Informatie op het vergrendelscherm',
@@ -265,7 +294,7 @@ export const nl = createCatalog({
     eyebrow: 'KLAAR WANNEER JIJ KLAAR BENT',
     title: 'zisla downloaden',
     copy:
-      'Voor Macs met Apple Silicon. Versies, andere architecturen en checksums staan op de releasepagina. Na installatie controleert Sparkle eerst de handtekening en downloadt, installeert en herstart het handmatig of automatisch volgens je instellingen; updates behouden de al verleende machtigingen. Sla je een versie over, dan wordt die niet meer gemeld.',
+      'Voor Macs met Apple Silicon. Versies, andere architecturen en checksums staan op de releasepagina. Na installatie controleert Sparkle eerst de handtekening en downloadt, installeert en herstart het handmatig of automatisch volgens je instellingen; updates behouden de al verleende machtigingen. Sla je een versie over, dan wordt die niet meer gemeld. Lees versienotities vóór installatie en na het herstarten.',
     primaryCta: 'Download',
     primaryCtaAriaLabel: 'zisla downloaden',
     releaseCta: 'Release bekijken',
@@ -282,6 +311,18 @@ export const nl = createCatalog({
     },
   },
   changelog: {
+    releaseNotes: {
+      'v0.1.20': [
+        'Kies uit acht sjablonen, selecteer gebruiks-, typ-, systeem- en zisla-activiteitsgegevens en bekijk de voorvertoning. Exporteer een PNG handmatig of dagelijks op een gekozen tijd. Schermtijdgeschiedenis wordt gebruikt als deze is ingeschakeld en beschikbaar; ontbrekende gegevens gelden niet als gemeten nul.',
+        'Stel een interval in voor pauzes, water, beweging en rust voor de ogen. Berichten volgen het tijdstip. Natuurlijke pauzes, vergrendelen en sluimerstand resetten de tijdmeting. Voltooide focus en notitiehandelingen kunnen korte feedback tonen. In Instellingen aan of uit te zetten. Bewaar een bewerkbare notitie voor een webpagina, appvenster of bureaublad en zie die bij terugkeer. Voeg een vensterafbeelding toe, beheer notities op de plank en stel herhalingen van één uur tot drie dagen in, of zet ze uit.',
+        'Gebruik de camerapositie of kies een plek aan een schermrand. De eigen positie blijft bewaard bij het wisselen van modus. Horizontale en verticale compacte weergaven passen hun lengte aan pictogrammen, AI-taken, downloads en media aan en kunnen meer informatie tonen. Kies een golfvorm of hoesgloed; de afspeelvoortgang staat ook in compacte en zwevende weergaven.',
+        'Kies uit de uitgebreide dieren- en personagecatalogus of importeer een ondersteunde afbeelding, animatie of video met een eigen naam. Plaats het dier aan een kant van het eiland en verwijder geïmporteerde dieren in Instellingen. Animaties tot 30 seconden en bestanden tot 100 MB.',
+        'Neem scherm, venster of gebied op met optionele systeemaudio, microfoon en camera. Bewerk video, audio, afbeeldingen en tekst op meerdere sporen, voeg animaties, zoom en ondertitels toe en bekijk een scherpe voorvertoning. Kies origineel, 16:9, 9:16, 1:1 of 4:3. Exporteer video, GIF, Live Photo of audio; sommige formaten vereisen FFmpeg. Optionele AI-plannen worden bekeken voor toepassing.',
+        'Maak, zet vast of voeg scrollende schermafbeeldingen samen met eigen sneltoetsen. Markeer gebieden, haal afbeeldingsdelen eruit, rond hoeken af en behoud annotaties bij export. Herken en kopieer tekst, vertaal en kopieer het resultaat of exporteer herkende tabellen als .xlsx. Bewaar afbeeldingen op de plank. Instellingen controleren conflicten met spraak en snelle acties.',
+        'Taakdetectie voor Cursor en numeriek gebruik met beschikbare abonnementsquota voor Cursor en Muse Code zijn toegevoegd; lange tooltaken in Cursor blijven zichtbaar. IP-adressen hebben aparte acties voor opzoeken en links openen. Conversies herkennen kleine munteenheden; de catalogus bevat Emoji 18.0.',
+        'Pas het volume en dempen apart aan voor apps die geluid afspelen. Vereist macOS 14.4 of nieuwer en toestemming voor opname van systeemaudio. Beschikbaar in Instellingen, buiten de modulecarrousel van het eiland. Bekijk status in Instellingen → Toestemmingen, start ondersteunde aanvragen of open de juiste systeempagina. Het eerste welkomstscherm gebruikt dezelfde lijst en markeert handmatige instellingen. Spraaktotalen, dicteerduur, snelheid en bespaarde tijd staan ook in het toetsenborddashboard. Nieuwe configuraties schakelen geluiden en typstatistieken in; beide zijn apart uit te zetten. Kies tijdens het schrijven bestanden om als bijlagen toe te voegen. Lees versienotities vóór installatie en na het herstarten.',
+      ],
+    },
     eyebrow: 'Wijzigingslog',
     title: 'Wat er in elke zisla-release is veranderd: nieuwe functies, verbeteringen en oplossingen.',
     lede: 'Wat er in elke zisla-release is veranderd: nieuwe functies, verbeteringen en oplossingen.',
@@ -306,25 +347,7 @@ export const nl = createCatalog({
       copyAssistant: { question: 'Openen of uploaden snelle acties wat ik kopieer?', answer: 'Nee. Herkenning en voorbeeldweergave gebeuren op je Mac; een volgende stap wordt pas na jouw bevestiging uitgevoerd.' },
       permissions: {
         question: 'Welke systeemmachtigingen heeft zisla nodig?',
-        answer: `
-      <p>zisla vraagt niet bij de eerste start om alle machtigingen tegelijk. macOS toont elke vraag pas wanneer je de bijbehorende functie inschakelt en echt gebruikt:</p>
-      <ul>
-        <li><strong>Agenda's en Herinneringen:</strong> afzonderlijk gevraagd wanneer je de agendamodule opent, om agenda-afspraken en herinneringen met een datum te lezen, maken en beheren.</li>
-        <li><strong>Locatievoorzieningen:</strong> gevraagd wanneer je het weer voor je huidige locatie kiest. zisla bepaalt je locatie één keer en volgt je niet voortdurend. Handmatig een stad toevoegen vereist geen locatiemachtiging.</li>
-        <li><strong>Microfoon en spraakherkenning:</strong> gevraagd wanneer je spraakinvoer start. Audio wordt alleen opgenomen terwijl je actief opneemt, en alleen die opname wordt getranscribeerd.</li>
-        <li><strong>Toegankelijkheid:</strong> nodig om een transcript automatisch in de huidige app te plaatsen, snel te kopiëren met een muisgebaar, het toetsenbord schoon te maken en sommige ondersteunde spelers te bedienen. De machtiging wordt gebruikt om invoervelden die geen wachtwoordvelden zijn te vinden of de vereiste systeemtoetsen te versturen.</li>
-        <li><strong>Invoercontrole:</strong> gebruikt voor toetsenbordgeluiden, optionele lokale typestatistieken en globale triggers zoals één losse modificatietoets of een muisknop aan de zijkant. Alleen de globale gebeurtenissen die deze functies nodig hebben worden gevolgd; gewone globale sneltoetsen hebben dit niet nodig.</li>
-        <li><strong>Schermopname en opname van systeemgeluid:</strong> nodig voor screenshots, het bewerken ervan en de golfvorm van afgespeeld systeemgeluid. Screenshots lezen het schermbeeld; de golfvorm analyseert alleen het huidige geluidsniveau en slaat geen audio op en verstuurt die ook niet.</li>
-        <li><strong>Camera:</strong> alleen gebruikt zolang het spiegelvenster open is.</li>
-        <li><strong>Bluetooth:</strong> alleen gebruikt zolang de batterijmodule open is, om het batterijniveau te lezen dat verbonden of gekoppelde apparaten publiceren.</li>
-        <li><strong>Automatisering:</strong> wanneer je Snelle notities, Mail, het opruimen van het bureaublad of directe bediening van een ondersteunde speler voor het eerst gebruikt, vraagt macOS afzonderlijk of zisla Notities, Mail, Finder of die app mag bedienen. Snelle notities leest en schrijft in Notities; Mail kan berichten lezen, opstellen, beantwoorden, markeren en verwijderen.</li>
-        <li><strong>Volledige schijftoegang:</strong> alleen nodig wanneer Mail niet actief is en zisla toch de lokale mailindex moet lezen om accounts, afzenders, onderwerpen, voorbeelden, tijdstippen en leesstatus te tonen.</li>
-        <li><strong>Meldingen:</strong> gevraagd wanneer je de Pomodoro-timer inschakelt, uitsluitend om een lokale melding te tonen en één waarschuwingsgeluid af te spelen wanneer die afloopt.</li>
-      </ul>
-      <p><strong>Mappen zijn geen volledige schijftoegang:</strong> voor de opslag-, import/export- of downloadmappen die je in de systeemkiezer selecteert, krijgt zisla alleen toegang tot die map, nooit leesrechten voor de hele schijf.</p>
-      <p><strong>Toetsenbordgeluiden en typestatistieken:</strong> beide staan standaard uit en globale toetsenbordgebeurtenissen worden pas gevolgd wanneer één van beide is ingeschakeld. Met toetsenbordgeluiden worden toetsaanslagen uitsluitend gebruikt om geluid af te spelen; met typestatistieken worden alleen geaggregeerde gegevens opgeslagen — tekentaantallen, fysieke toetscodes, tijdstippen en de app op de voorgrond — nooit wat je hebt getypt. Je kunt beide opties afzonderlijk uitschakelen in Instellingen; daarna wordt niets meer vastgelegd. Eerder opgeslagen gegevens blijven in een lokaal databasebestand staan dat je zelf kunt verwijderen.</p>
-      <p>Je kunt een functie uitschakelen in de instellingen van de app of een machtiging op elk moment intrekken via Systeeminstellingen → Privacy en beveiliging. Het intrekken van één machtiging schakelt alleen de bijbehorende functie uit en laat andere modules ongemoeid. Namen van onderdelen kunnen per macOS-versie iets verschillen.</p>
-    `.trim(),
+        answer: '<p>Instellingen → Toestemmingen bundelt status, aanvragen en links naar Systeeminstellingen. Sommige toestemmingen moeten handmatig worden ingesteld. U kiest welke aanvragen starten; het eerste welkomstscherm biedt dezelfde bediening.</p><p>Schermopname, systeemaudio, microfoon en camera ondersteunen opname, mixer en spiegel waar nodig. Dictaat gebruikt ook spraakherkenning. Agenda’s, Herinneringen, Locatie, Bluetooth en Automatisering horen bij hun functies. Een weerstad handmatig toevoegen vereist geen locatie.</p><p>Nieuwe configuraties schakelen toetsenbordgeluid en typstatistieken in; beide zijn apart uit te zetten. Globale toetsen vereisen invoermonitoring. Statistieken bewaren aantallen, toetscodes, tijden en appnamen, nooit uw ingevoerde tekst. Toegankelijkheid dient voor invoegen, gebaren, reinigen en vensterbediening.</p><p>Volledige schijftoegang kan nodig zijn voor de lokale mailindex en Schermtijdgeschiedenis van dagoverzichten. De bestandskiezer geeft toegang tot de gekozen map. Schakel functies uit in zisla of trek toestemming in via Systeeminstellingen → Privacy en beveiliging.</p>',
       },
       localVoice: {
         question: 'Hoe gebruik ik een lokaal model om spraaktranscripties te corrigeren?',

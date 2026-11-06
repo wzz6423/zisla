@@ -4,10 +4,10 @@ export const tr = createCatalog({
   meta: {
     documentTitle: 'zisla · Dinamik çalışma alanı',
     description:
-      'zisla, macOS için yerel ve dinamik bir çalışma alanıdır. AI görevlerini, medyayı, dosyaları ve gündeminizi klavye sesleri, yazma istatistikleri, ekran görüntüsü açıklamaları ve hızlı eylemlerle tek yerde tutar.',
+      'zisla, AI görevleri, günlük özetler ve kayıt düzenleme için yerel macOS çalışma alanıdır; özel hayvanlar, ekran görüntüleri ve izinler tek yerdedir.',
     ogTitle: 'zisla · Olan biteni görebileceğiniz yere taşıyın',
     ogDescription:
-      'AI görevlerinden ve medya oynatmadan klavye seslerine, yazma istatistiklerine, hızlı eylemlere, ekran görüntüsü açıklamalarına ve masaüstü araçlarına kadar — yalnızca gerektiğinde görünen yerel bir macOS çalışma alanı.',
+      'AI görevlerini ve gününüzü görün, Mac’te kaydedip düzenleyin, özel hayvanınızı aktarın ve izinleri tek yerden yönetin.',
   },
   tagline: 'Yerel macOS dinamik çalışma alanı',
   header: {
@@ -76,16 +76,19 @@ export const tr = createCatalog({
       dashboard: { name: 'Ana sayfa', caption: 'Canlı kartlar yalnızca odak oturumu, AI görevi veya indirme çalışırken görünür; hiçbir şey olmadığında yer kaplamaz.', points: ['İhtiyaç olduğunda görünür', 'Canlı ilerleme', 'Düzen otomatik uyarlanır'] },
       shelf: { name: 'Raf', caption: 'Dosyaları, sesleri, videoları veya bağlantıları ekranın üstündeki tetikleme şeridine sürükleyerek rafa bırakın, Finder\'da gösterin ya da macOS paylaşım menüsünü açın.', points: ['Saklamak için üste sürükleyin', 'Finder\'da göster', 'Sistem paylaşım menüsü'] },
       clipboard: { name: 'Pano', caption: 'Pano geçmişine ada içinden göz atın ve görüntü, URL, yol veya dosya türüne göre filtreleyin ve her öğenin ne zaman kopyalandığını görün. Bir öğeyi Hızlı Notlar\'a gönderin, favorilere ekleyin ya da silin.', points: ['Ada içinde geçmiş', 'Türe göre filtreleme', 'Hızlı Notlar ve favoriler'] },
-      aiMonitor: { name: 'AI izleyici', caption: 'Desteklenen AI CLI\'larının, masaüstü uygulamalarının ve IDE\'lerin etkinliğini otomatik olarak algılar; görevleri, durumu, toplam token eğilimlerini ve katkı ısı haritasını gösterir. Yalnızca yapılandırılmış olayları işler, konuşma metnini okumaz.', points: ['Araçlar arası görev özeti', 'Token kullanım eğilimleri', 'İstemleri veya yanıtları okumaz'] },
-      keyboardSound: { name: 'Klavye sesleri', caption: 'Global tuş vuruşları için ayarlanabilir ses ve doğal perde değişimiyle 20 yerleşik mekanik klavye sesi çalar; destekleyen seslerde tuş bırakma sesleri de bulunur. Yerel yazma istatistiklerini açarak bugünün özetini, eğilimleri, geçmişi, uygulama zaman çizelgesini ve F1-F12 tuşlarını içeren tuş ısı haritasını görün.', points: ['20 yerleşik ses', 'Tuş bırakma sesleri ve perde değişimi', 'Yazma istatistikleri isteğe bağlı'] },
+      aiMonitor: { name: 'AI izleyici', caption: 'Desteklenen AI CLI\'larının, masaüstü uygulamalarının ve IDE\'lerin etkinliğini otomatik olarak algılar; görevleri, durumu, toplam token eğilimlerini ve katkı ısı haritasını gösterir. Yalnızca yapılandırılmış olayları işler, konuşma metnini okumaz. Cursor görev algılama ve Cursor ile Muse Code için sayısal kullanım ile mevcut abonelik kotaları eklenir. Cursor görevleri uzun araç çalışmaları sırasında görünür kalır.', points: ['Araçlar arası görev özeti', 'Token kullanım eğilimleri', 'İstemleri veya yanıtları okumaz'] },
+      keyboardSound: { name: 'Klavye sesleri', caption: 'Global tuş vuruşları için ayarlanabilir ses ve doğal perde değişimiyle 20 yerleşik mekanik klavye sesi çalar; destekleyen seslerde tuş bırakma sesleri de bulunur. Yerel yazma istatistiklerini açarak bugünün özetini, eğilimleri, geçmişi, uygulama zaman çizelgesini ve F1-F12 tuşlarını içeren tuş ısı haritasını görün. Ses toplamı, dikte süresi, hız ve kazanılan zaman klavye panosunda da yer alır. Yeni yapılandırmalar sesleri ve yazma istatistiklerini açar; ayrı kapatılabilir.', points: ['20 yerleşik ses', 'Tuş bırakma sesleri ve perde değişimi', 'İstatistikler ayrı açılıp kapanır'] },
       download: { name: 'İndirici', caption: 'Bir bağlantı yapıştırın veya etkinleştirdikten sonra zisla\'nın panodan bağlantıları almasına izin verin. Video ya da ses seçip varsayılan klasöre veya istediğiniz bir klasöre indirin. Desteklenen bağlantılar kaynak simgesini, canlı ilerlemeyi ve tamamlanma durumunu gösterir.', points: ['Video / ses modları', 'Varsayılan veya özel klasör', 'Kaynak simgesi ve canlı ilerleme'] },
       agenda: { name: 'Gündem ve hava durumu', caption: 'Mevcut konumunuzun yanı sıra seçtiğiniz en fazla altı yerin hava durumunu gösterir. Takvim etkinliklerini ve anımsatıcıları görüntüleyin, ekleyin, silin ve anımsatıcıları tamamlandı olarak işaretleyin.', points: ['Birden çok yer için hava durumu kartları', 'Takvim ve yapılacaklar', 'Anımsatıcıyı tek dokunuşla tamamlayın'] },
-      mail: { name: 'Mail', caption: 'Mail\'de etkinleştirdiğiniz hesapları okur. Gelen kutusunu kontrol edin, iletileri okundu olarak işaretleyin, yanıtlayın, yazın ve adanın içinden Çöp Sepeti\'ne taşıyın; izin eksikse açık yönlendirme gösterir.', points: ['Mail hesapları', 'Ada içinde yanıtla ve yaz', 'Açık izin yönlendirmesi'] },
+      mail: { name: 'Mail', caption: 'Mail\'de etkinleştirdiğiniz hesapları okur. Gelen kutusunu kontrol edin, iletileri okundu olarak işaretleyin, yanıtlayın, yazın ve adanın içinden Çöp Sepeti\'ne taşıyın; izin eksikse açık yönlendirme gösterir. İleti yazarken eklemek için dosya seçebilirsiniz.', points: ['Mail hesapları', 'Ada içinde yanıtla ve yaz', 'Açık izin yönlendirmesi'] },
       quickNotes: { name: 'Hızlı Notlar', caption: 'Sistem Notlar uygulamasını temel alır: notları canlı Markdown önizlemesiyle görüntüleyin, düzenleyin, oluşturun ve silin, Command+1 ila 9 ile ilk dokuz nota doğrudan geçin. Taslaklar otomatik olarak Notlar\'a geri yazılır.', points: ['Veriler Notlar\'da', 'Markdown düzenleyici', 'Taslaklar otomatik kaydedilir'] },
-      pdf: { name: 'PDF araçları', caption: 'Mac\'inizde çalışan on dört işlem: birleştirme, bölme, döndürme, kırpma, görüntü ve Office dosyalarını dönüştürme, görüntü olarak oluşturma, metin çıkarma, metin veya görüntü filigranı ekleme, sayfa numarası ekleme, şifreleme, parolayı kaldırma ve meta verileri düzenleme.', points: ['Cihazda çalışan 14 araç', 'Kendi sıranızla birleştirin', 'Hiçbir şey Mac\'inizden çıkmaz'] },
+      volumeMixer: {
+        name: 'Uygulama ses düzeyi mikseri',
+        caption: 'Ses çalan uygulamaların sesini ve sessize alınmasını ayrı ayarlayın. macOS 14.4 veya sonrası ve sistem sesi kaydı izni gerekir.',
+        points: ['Uygulama başına ses', 'Ayrı sessize alma', 'macOS 14.4+'],
+      },
       toolbox: { name: 'Yardımcı araçlar', caption: 'Odak sayacı, ekranı uyanık tutma, ekran temizleme, çalışırken F1-F12 dahil tuşları engelleyen klavye temizleme, teleprompter, ayna ve Çöp Sepeti tek sayfada.', points: ['Odak sayacı', 'Temizleme sırasında F1-F12 engellenir', 'Teleprompter ve ayna'] },
-      system: { name: 'Sistem durumu', caption: 'CPU, GPU, bellek, disk, ağ ve fan durumunu kontrol edin; donanım bildirdiğinde NVMe SMART sıcaklığını okuyun, herhangi bir zaman aralığı için grafik olarak görüntülenebilen ve .xlsx olarak dışa aktarılabilen dakikalık geçmişi kaydedin. Uygulama önbelleklerini, Apple kullanıcı önbelleklerini, günlükleri ve artık tercih dosyalarını tarayın. Seçilen öğeleri inceleyip Çöp Sepeti’ne taşıyın ve sonuçları görün.', points: ['Çip düzeyinde izleme', 'Geçmiş grafikleri ve .xlsx dışa aktarma', 'Çöp Sepeti’ne taşımadan önce inceleyin'] },
-      battery: { name: 'Pil', caption: 'Bu Mac\'in şarj, sağlık, döngü sayısı, sıcaklık ve kapasite gibi ayrıntılı ölçümlerini ve sistemin bildirdiği yakındaki cihazların pil seviyelerini görün.', points: ['Bu Mac için sağlık ölçümleri', 'Kalan süre', 'Yakındaki cihazların pili'] },
+      system: { name: 'Sistem durumu', caption: 'CPU, GPU, bellek, disk, ağ ve fan durumunu kontrol edin; donanım bildirdiğinde NVMe SMART sıcaklığını okuyun, herhangi bir zaman aralığı için grafik olarak görüntülenebilen ve .xlsx olarak dışa aktarılabilen dakikalık geçmişi kaydedin. Uygulama önbelleklerini, Apple kullanıcı önbelleklerini, günlükleri ve artık tercih dosyalarını tarayın. Seçilen öğeleri inceleyip Çöp Sepeti’ne taşıyın ve sonuçları görün. Bu Mac\'in şarj, sağlık, döngü sayısı, sıcaklık ve kapasite gibi ayrıntılı ölçümlerini ve sistemin bildirdiği yakındaki cihazların pil seviyelerini görün. Genel IPv4 ve IPv6 adresleri ayrı gösterilir.', points: ['Çip düzeyinde izleme', 'Geçmiş grafikleri ve .xlsx dışa aktarma', 'Çöp Sepeti’ne taşımadan önce inceleyin'] },
     },
   },
   extensions: {
@@ -97,19 +100,55 @@ export const tr = createCatalog({
     summaryLede: 'Sık kullanılan özellikler, her biri doğal yerinde.',
     summaryNote: 'Pencere önizlemeleri, çekim ve Hızlı Eylemler elinizin altında; önerilen uygulamalarla daha fazla masaüstü aracı keşfedin.',
     features: {
+      floatingIsland: {
+        title: 'Düzene uyum sağlayan yüzen ada',
+        description: 'Kamera konumunu kullanın veya ekran kenarında özel bir konum seçin. Mod değiştirildiğinde özel konum hatırlanır. Yatay ve dikey kompakt düzenler uzunluklarını durum simgeleri, AI görevleri, indirmeler ve medyaya göre ayarlar; daha fazla bilgi gösterilebilir.',
+        detail: 'Özel konum · Kalıcı durum simgeleri · Uyarlanan bilgiler',
+      },
+      dailyBriefing: {
+        title: 'Gününüz bir günlük özette',
+        description: 'Sekiz şablondan seçin; kullanım, yazma, sistem ve zisla etkinlik verilerini belirleyip önizleyin. PNG’yi elle veya günlük seçilen saatte dışa aktarın. Ekran Süresi geçmişi açık ve kullanılabilir olduğunda kullanılır; eksik veriler ölçülen sıfır sayılmaz.',
+        detail: '8 şablon · İçerik seçimi · Önizleme ve zamanlı PNG aktarma',
+      },
+      userCare: {
+        title: 'Çalışırken bakım hatırlatmaları',
+        description: 'Mola, su, hareket ve göz dinlendirme aralığını ayarlayın. İletiler günün saatine uyar. Doğal molalar, kilit ve uyku sayacı sıfırlar. Odak bitişi ve not eylemleri kısa geri bildirim gösterebilir. Ayarlar’dan açıp kapatın.',
+        detail: 'Ayarlanabilir aralık · Saate göre iletiler · Boşta kalma ve uykuya uyar',
+      },
+      contextNotes: {
+        title: 'Konuma bağlı notlar',
+        description: 'Web sayfası, uygulama penceresi veya masaüstüne düzenlenebilir not kaydedin ve dönünce görün. Pencere görüntüsü ekleyin, rafta yönetin ve bir saatten üç güne tekrarlanan hatırlatmalar ayarlayın ya da kapatın.',
+        detail: 'Konum notları · Pencere görüntüleri · Tekrarlanan hatırlatmalar',
+      },
+      recording: {
+        title: 'Stüdyoda kaydedin ve düzenleyin',
+        description: 'Ekran, pencere veya bölgeyi isteğe bağlı sistem sesi, mikrofon ve kamerayla kaydedin. Çoklu izlerde video, ses, görüntü ve metin düzenleyin; animasyon, yakınlaştırma ve altyazı ekleyip net önizlemeyi görün. Özgün oran, 16:9, 9:16, 1:1 veya 4:3 seçin. Video, GIF, Live Photo veya ses aktarın; bazı biçimler FFmpeg gerektirir. İsteğe bağlı AI önerileri uygulanmadan önce önizlenir.',
+        detail: 'Çoklu iz düzenleme · Oranlar ve önizleme · Video, GIF, Live Photo ve ses',
+      },
+      permissions: {
+        title: 'Sistem izinleri tek yerde',
+        description: 'Ayarlar → İzinler bölümünde durumu inceleyin, desteklenen istekleri başlatın veya ilgili sistem sayfasını açın. İlk karşılama aynı listeyi kullanır ve elle ayarlanacak izinleri belirtir.',
+        detail: 'İzin durumu · İstekler ve bağlantılar · Karşılamayla ortak',
+      },
+      pdf: {
+        title: 'PDF araçları',
+        description: 'Ada modül karuselinin dışında, Ayarlar’da kullanılabilir. Mac\'inizde çalışan on dört işlem: birleştirme, bölme, döndürme, kırpma, görüntü ve Office dosyalarını dönüştürme, görüntü olarak oluşturma, metin çıkarma, metin veya görüntü filigranı ekleme, sayfa numarası ekleme, şifreleme, parolayı kaldırma ve meta verileri düzenleme.',
+        detail: 'Cihazda çalışan 14 araç · Kendi sıranızla birleştirin · Hiçbir şey Mac\'inizden çıkmaz',
+      },
+
       windowPreviews: {
         title: 'Pencereye bakın, tıklayıp geçin',
         description:
-          'Dock üzerinden veya Command-Tab ile geçiş yaparken pencereleri önizleyin, ardından kartı tıklayıp pencereyi etkinleştirin. Varsayılan olarak kapalıdır; Ayarlar’dan açıp gerekli izinleri verin.',
-        detail: 'Dock ve Command-Tab · Tıklayarak pencere değiştirin · Varsayılan olarak kapalı',
+          'Dock veya Command-Tab üzerinden pencereleri önizleyin, etkinleştirmek için karta tıklayın. Yeni yapılandırmalar bu özelliği açar; özelliği ve izinlerini Ayarlar’dan yönetin.',
+        detail: 'Dock ve Command-Tab · Tıklayarak geçiş · Ayarlanabilir',
       },
-      capture: { title: 'Ekran görüntüleri, kaydırmalı yakalama ve sabitleme', description: 'Global bir kısayolla ekranın bir bölümünü yakalayın veya sabitleyin; açıklama ekleyin, kaydırmalı görüntüyü birleştirin ve tabloları tanıyıp dışa aktarın. Hâlâ düzenlediğiniz metin açıklamaları dışa aktarırken korunur. Ekran görüntüsü, sabitleme, kaydırmalı çekim ve açıklama araçlarının kısayollarını özelleştirin. Ayarlar; çekim, sesle giriş ve Hızlı Eylemler arasındaki çakışmaları denetler. Tek başına değiştirici tuş kullanmak Giriş İzleme izni gerektirir.', detail: 'Özel kısayollar · Çakışma denetimi · Açıklamalar dışa aktarımda korunur' },
+      capture: { title: 'Ekran görüntüleri, kaydırmalı yakalama ve sabitleme', description: 'Özelleştirilebilir kısayollarla ekran görüntüsü alın, sabitleyin veya kaydırmalı görüntüleri birleştirin. Vurgulayın, görüntü bölgelerini çıkarın, köşeleri yuvarlayın ve dışa aktarırken açıklamaları koruyun. Metni tanıyıp kopyalayın, çevirip sonucu kopyalayın veya tabloları .xlsx olarak aktarın. Görüntüleri rafa alın. Ayarlar ses ve Hızlı Eylem çakışmalarını denetler.', detail: 'Vurgulama ve çıkarma · Tanıma, çeviri ve kopyalama · Yuvarlak köşeler ve .xlsx' },
       voice: { title: 'Sesli giriş ve temizleme', description: 'Sistemin konuşma tanımasını, alan sözlüklerini ve özel sözcükleri kullanarak kayıt için bir tuşla geçiş yapın veya konuşmak için tuşu basılı tutun. İsterseniz Ollama, LM Studio ya da uzak bir modelle anlamı koruyarak dökümü düzeltin ve açıkça sıraladığınız maddeleri biçimlendirin.', detail: 'İki kayıt modu · Sözlükler ve etkin sözcükler · İsteğe bağlı model temizleme' },
-      media: { title: 'Medya ve sistem ortam sesleri', description: 'Çalan içeriği adanın üstünden kontrol edin veya bir macOS sistem ortam sesi seçin. Ekran kilitlendiğinde, ekran koruyucu başladığında ya da ekran uykuya geçtiğinde otomatik olarak durabilir.', detail: 'Oynatma denetimi · Eşzamanlı şarkı sözleri · Ortam sesi otomatik durur' },
+      media: { title: 'Medya ve sistem ortam sesleri', description: 'Çalan içeriği adanın üstünden kontrol edin veya bir macOS sistem ortam sesi seçin. Ekran kilitlendiğinde, ekran koruyucu başladığında ya da ekran uykuya geçtiğinde otomatik olarak durabilir. Dalga biçimi veya kapak parıltısını seçin; oynatma ilerlemesi kompakt ve yüzen görünümlerde de yer alır.', detail: 'Oynatma denetimi · Eşzamanlı şarkı sözleri · Ortam sesi otomatik durur' },
       browserDownloads: { title: 'Tarayıcı indirme ilerlemesi', description: 'Safari, Chrome, Edge, Firefox, Brave, Vivaldi, Opera ve Arc indirmelerini algılar; kaynaklarını ve canlı ilerlemeyi ekranın üstünde gösterir.', detail: '8 tarayıcı · Kaynak algılama · Tamamlanma bildirimi' },
-      copyAssistant: { title: 'Hızlı Eylemler ve akıllı sonraki adımlar', description: 'Etkinleştirildiğinde kopyalanan metin, bağlantı, dosya veya görüntü ayrı bir üst çubukta önizlenir; açma, Finder\'da gösterme, arama, çevirme, hesaplama veya kaydetme gibi sonraki adımlar yalnızca onayınızdan sonra gerçekleştirilir. Tarayıcı indirmesi veya AirDrop aktarımı bittikten sonra Hızlı Eylemler ile dosyanın klasörünü açın. Chrome’un varsayılan ve seçilen indirme klasörleri desteklenir; indirme ilerlemesinden bağımsız açılıp kapatılır.', detail: 'İsteğe bağlı anahtar · Cihazda tanıma · Varsayılan Command+N' },
+      copyAssistant: { title: 'Hızlı Eylemler ve akıllı sonraki adımlar', description: 'Etkinleştirildiğinde kopyalanan metin, bağlantı, dosya veya görüntü ayrı bir üst çubukta önizlenir; açma, Finder\'da gösterme, arama, çevirme, hesaplama veya kaydetme gibi sonraki adımlar yalnızca onayınızdan sonra gerçekleştirilir. Tarayıcı indirmesi veya AirDrop aktarımı bittikten sonra Hızlı Eylemler ile dosyanın klasörünü açın. Chrome’un varsayılan ve seçilen indirme klasörleri desteklenir; indirme ilerlemesinden bağımsız açılıp kapatılır. IP adreslerinde sorgulama ve bağlantı açma ayrı eylemlerdir. Dönüşüm yerel küçük para birimlerini tanır; katalog Emoji 18.0 içerir.', detail: 'İsteğe bağlı anahtar · Cihazda tanıma · Varsayılan Command+N' },
       aiManagement: { title: 'AI CLI ve Skills yönetimi', description: 'Ayarlar\'dan popüler AI CLI\'larını algılayın, kurun, güncelleyin ve kaldırın; yerel Skills\'leri inceleyip yönetin, böylece terminaller ve araçlar arasında daha az geçiş yapın.', detail: 'Algıla ve kur · Güncelle ve kaldır · Yerel Skills' },
-      pet: { title: 'Ada evcil hayvanı', description: 'Yerleşik evcil hayvanlardan birini seçin ve adanın soluna veya sağına yerleştirin. İstediğiniz zaman kapatın.', detail: 'Yerleşik karakterler · Sol veya sağ · İstediğinizde açın' },
+      pet: { title: 'Ada evcil hayvanı', description: 'Genişletilmiş hayvan ve karakter kataloğundan seçin ya da desteklenen görüntü, animasyon veya videoyu adlandırarak içe aktarın. Adanın iki yanına yerleştirin ve içe aktarılanları Ayarlar’dan kaldırın. Animasyonlar en fazla 30 saniye, dosyalar en fazla 100 MB olabilir.', detail: 'Genişletilmiş katalog · Görüntü ve video içe aktarma · Özel hayvanları kaldırma' },
       lockScreen: { title: 'Kilit ekranı bilgileri', description: 'Tarihi, durumu ve çalan içeriği isteğe bağlı olarak macOS kilit ekranında gösterin. Bu ayrı bir kilit ekranı katmanıdır; ada modül listesinde veya döngüsünde görünmez.', detail: 'Ayrı kilit ekranı katmanı · İsteğe bağlı · Odağı almaz' },
       recommendedTools: {
         title: 'Önerilen uygulamalar',
@@ -157,7 +196,7 @@ export const tr = createCatalog({
   download: {
     eyebrow: 'SİZ HAZIR OLDUĞUNUZDA HAZIR',
     title: 'zisla indir',
-    copy: 'Apple Silicon Mac\'ler içindir. Sürümler, diğer mimariler ve sağlama toplamları sürüm sayfasındadır. Kurulumdan sonra zisla, seçtiğiniz güncelleme kanalında yeni sürümleri kontrol edebilir: Sparkle önce imzayı doğrular, ardından ayarlarınıza göre elle veya otomatik olarak indirir, kurar ve yeniden başlatır; güncellemeler zaten verilmiş izinleri korur. İlgilenmediğiniz bir sürümü atlayın, bir daha hatırlatmaz.',
+    copy: 'Apple Silicon Mac\'ler içindir. Sürümler, diğer mimariler ve sağlama toplamları sürüm sayfasındadır. Kurulumdan sonra zisla, seçtiğiniz güncelleme kanalında yeni sürümleri kontrol edebilir: Sparkle önce imzayı doğrular, ardından ayarlarınıza göre elle veya otomatik olarak indirir, kurar ve yeniden başlatır; güncellemeler zaten verilmiş izinleri korur. İlgilenmediğiniz bir sürümü atlayın, bir daha hatırlatmaz. Kurulumdan önce ve yeniden başlattıktan sonra sürüm notlarını okuyun.',
     primaryCta: 'İndir',
     primaryCtaAriaLabel: 'zisla indir',
     releaseCta: 'Sürümü görüntüle',
@@ -174,6 +213,18 @@ export const tr = createCatalog({
     },
   },
   changelog: {
+    releaseNotes: {
+      'v0.1.20': [
+        'Sekiz şablondan seçin; kullanım, yazma, sistem ve zisla etkinlik verilerini belirleyip önizleyin. PNG’yi elle veya günlük seçilen saatte dışa aktarın. Ekran Süresi geçmişi açık ve kullanılabilir olduğunda kullanılır; eksik veriler ölçülen sıfır sayılmaz.',
+        'Mola, su, hareket ve göz dinlendirme aralığını ayarlayın. İletiler günün saatine uyar. Doğal molalar, kilit ve uyku sayacı sıfırlar. Odak bitişi ve not eylemleri kısa geri bildirim gösterebilir. Ayarlar’dan açıp kapatın. Web sayfası, uygulama penceresi veya masaüstüne düzenlenebilir not kaydedin ve dönünce görün. Pencere görüntüsü ekleyin, rafta yönetin ve bir saatten üç güne tekrarlanan hatırlatmalar ayarlayın ya da kapatın.',
+        'Kamera konumunu kullanın veya ekran kenarında özel bir konum seçin. Mod değiştirildiğinde özel konum hatırlanır. Yatay ve dikey kompakt düzenler uzunluklarını durum simgeleri, AI görevleri, indirmeler ve medyaya göre ayarlar; daha fazla bilgi gösterilebilir. Dalga biçimi veya kapak parıltısını seçin; oynatma ilerlemesi kompakt ve yüzen görünümlerde de yer alır.',
+        'Genişletilmiş hayvan ve karakter kataloğundan seçin ya da desteklenen görüntü, animasyon veya videoyu adlandırarak içe aktarın. Adanın iki yanına yerleştirin ve içe aktarılanları Ayarlar’dan kaldırın. Animasyonlar en fazla 30 saniye, dosyalar en fazla 100 MB olabilir.',
+        'Ekran, pencere veya bölgeyi isteğe bağlı sistem sesi, mikrofon ve kamerayla kaydedin. Çoklu izlerde video, ses, görüntü ve metin düzenleyin; animasyon, yakınlaştırma ve altyazı ekleyip net önizlemeyi görün. Özgün oran, 16:9, 9:16, 1:1 veya 4:3 seçin. Video, GIF, Live Photo veya ses aktarın; bazı biçimler FFmpeg gerektirir. İsteğe bağlı AI önerileri uygulanmadan önce önizlenir.',
+        'Özelleştirilebilir kısayollarla ekran görüntüsü alın, sabitleyin veya kaydırmalı görüntüleri birleştirin. Vurgulayın, görüntü bölgelerini çıkarın, köşeleri yuvarlayın ve dışa aktarırken açıklamaları koruyun. Metni tanıyıp kopyalayın, çevirip sonucu kopyalayın veya tabloları .xlsx olarak aktarın. Görüntüleri rafa alın. Ayarlar ses ve Hızlı Eylem çakışmalarını denetler.',
+        'Cursor görev algılama ve Cursor ile Muse Code için sayısal kullanım ile mevcut abonelik kotaları eklenir. Cursor görevleri uzun araç çalışmaları sırasında görünür kalır. IP adreslerinde sorgulama ve bağlantı açma ayrı eylemlerdir. Dönüşüm yerel küçük para birimlerini tanır; katalog Emoji 18.0 içerir.',
+        'Ses çalan uygulamaların sesini ve sessize alınmasını ayrı ayarlayın. macOS 14.4 veya sonrası ve sistem sesi kaydı izni gerekir. Ada modül karuselinin dışında, Ayarlar’da kullanılabilir. Ayarlar → İzinler bölümünde durumu inceleyin, desteklenen istekleri başlatın veya ilgili sistem sayfasını açın. İlk karşılama aynı listeyi kullanır ve elle ayarlanacak izinleri belirtir. Ses toplamı, dikte süresi, hız ve kazanılan zaman klavye panosunda da yer alır. Yeni yapılandırmalar sesleri ve yazma istatistiklerini açar; ayrı kapatılabilir. İleti yazarken eklemek için dosya seçebilirsiniz. Kurulumdan önce ve yeniden başlattıktan sonra sürüm notlarını okuyun.',
+      ],
+    },
     eyebrow: 'Değişiklik günlüğü',
     title: 'Her zisla sürümündeki değişiklikler: yeni özellikler, iyileştirmeler ve düzeltmeler.',
     lede: 'Her zisla sürümündeki değişiklikler: yeni özellikler, iyileştirmeler ve düzeltmeler.',
@@ -198,25 +249,7 @@ export const tr = createCatalog({
       copyAssistant: { question: 'Hızlı Eylemler kopyaladıklarımı açar veya yükler mi?', answer: 'Hayır. Etkinleştirildiğinde tanıma ve önizleme tamamen Mac\'inizde gerçekleşir; zisla sonraki adımı yalnızca tıkladığınızda veya hızlı kısayola bastığınızda yürütür.' },
       permissions: {
         question: 'zisla hangi sistem izinlerine ihtiyaç duyar?',
-        answer: `
-      <p>zisla ilk açılışta tüm izinleri birden istemez. macOS her isteği yalnızca ilgili özelliği açıp gerçekten kullandığınızda gösterir:</p>
-      <ul>
-        <li><strong>Takvimler ve Anımsatıcılar:</strong> gündem modülünü açtığınızda ayrı ayrı istenir; takvim etkinliklerini ve tarihli anımsatıcıları okumak, oluşturmak ve yönetmek için kullanılır.</li>
-        <li><strong>Konum Servisleri:</strong> mevcut konumunuzun hava durumunu seçtiğinizde istenir. zisla konumu bir kez alır, sürekli takip etmez. Şehri elle eklemek konum izni gerektirmez.</li>
-        <li><strong>Mikrofon ve Konuşma Tanıma:</strong> sesli girişi başlattığınızda istenir. Ses yalnızca etkin kayıt sırasında alınır ve yalnızca o kayıt yazıya dökülür.</li>
-        <li><strong>Erişilebilirlik:</strong> dökümü etkin uygulamaya eklemek, fare hareketiyle hızlı kopyalama, klavye temizleme ve desteklenen bazı oynatıcıları denetlemek için gereklidir.</li>
-        <li><strong>Girdi İzleme:</strong> klavye sesleri, isteğe bağlı yerel yazma istatistikleri ve tek başına değiştirici tuş veya fare yan düğmesi gibi global tetikleyiciler için kullanılır.</li>
-        <li><strong>Ekran Kaydı ve Sistem Sesi Kaydı:</strong> ekran görüntüleri, ekran görüntüsü düzenleme ve sistem sesi dalga biçimi için gereklidir. Dalga biçimi yalnızca anlık ses seviyesini analiz eder; ses kaydetmez veya yüklemez.</li>
-        <li><strong>Kamera:</strong> yalnızca ayna penceresi açıkken kullanılır.</li>
-        <li><strong>Bluetooth:</strong> yalnızca pil modülü açıkken bağlı veya eşleştirilmiş cihazların bildirdiği pil seviyesini okumak için kullanılır.</li>
-        <li><strong>Otomasyon:</strong> Hızlı Notlar, Mail, masaüstü düzenleme veya desteklenen bir oynatıcıyı doğrudan denetleme ilk kez kullanıldığında macOS ayrı ayrı sorar.</li>
-        <li><strong>Tam Disk Erişimi:</strong> yalnızca Mail çalışmıyorken yerel posta dizinini okumak gerektiğinde kullanılır.</li>
-        <li><strong>Bildirimler:</strong> Pomodoro sayacını açtığınızda istenir ve yalnızca sayaç bittiğinde yerel bir bildirim gösterip tek bir uyarı sesi çalmak için kullanılır.</li>
-      </ul>
-      <p><strong>Klasörler Tam Disk Erişimi değildir:</strong> sistem dosya seçicisinden seçtiğiniz raf, içe/dışa aktarma veya indirme klasörleri için zisla yalnızca o klasöre erişir.</p>
-      <p><strong>Klavye sesleri ve yazma istatistikleri:</strong> ikisi de varsayılan olarak kapalıdır. Açıldığında yalnızca gereken global olaylar izlenir; yazdığınız metin hiçbir zaman saklanmaz. Ayarlardan iki özelliği ayrı ayrı kapatabilirsiniz.</p>
-      <p>İlgili özelliği uygulama ayarlarından kapatabilir veya izni istediğiniz zaman Sistem Ayarları → Gizlilik ve Güvenlik bölümünden iptal edebilirsiniz. Bir izni iptal etmek yalnızca ilgili özelliği devre dışı bırakır.</p>
-    `.trim(),
+        answer: '<p>Ayarlar → İzinler durumları, istekleri ve Sistem Ayarları bağlantılarını birleştirir. Bazı izinler elle ayarlanır. Başlatılacak istekleri siz seçersiniz; ilk karşılama ekranında aynı denetimler vardır.</p><p>Ekran ve sistem sesi kaydı, mikrofon ve kamera ilgili çekim, kayıt, mikser ve ayna özelliklerinde kullanılır. Dikte ayrıca konuşma tanıma kullanır. Takvim, Anımsatıcılar, Konum, Bluetooth ve Otomasyon ilgili işlevlere hizmet eder. Hava durumu şehrini elle eklemek konum gerektirmez.</p><p>Yeni yapılandırmalar klavye seslerini ve istatistikleri açar; ayrı kapatılabilir. Genel tuş olayları giriş izleme gerektirir. İstatistikler yalnızca sayıları, tuş kodlarını, saatleri ve uygulama adlarını saklar; yazılan metni saklamaz. Erişilebilirlik ekleme, hareketler, temizlik ve pencere kontrolüne hizmet eder.</p><p>Yerel posta dizini ve günlük özetlerdeki Ekran Süresi geçmişi Tam Disk Erişimi gerektirebilir. Dosya seçici seçilen klasöre erişim verir. zisla’da özellikleri kapatın veya Sistem Ayarları → Gizlilik ve Güvenlik bölümünden izinleri kaldırın.</p>',
       },
       localVoice: {
         question: 'Ses dökümünü düzenlemek için yerel modeli nasıl kullanırım?',

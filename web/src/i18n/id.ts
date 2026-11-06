@@ -4,10 +4,10 @@ export const id = createCatalog({
   meta: {
     documentTitle: 'zisla · Ruang kerja dinamis',
     description:
-      'zisla adalah ruang kerja dinamis native untuk macOS. Satukan tugas AI, media, berkas, dan agenda, lengkap dengan suara keyboard, statistik mengetik, anotasi tangkapan layar, dan tindakan cepat.',
+      'zisla adalah ruang kerja macOS native untuk tugas AI, ringkasan harian dan edit rekaman, dengan hewan kustom, tangkapan layar dan izin di satu tempat.',
     ogTitle: 'zisla · Letakkan apa yang terjadi di tempat yang dapat Anda lihat',
     ogDescription:
-      'Dari tugas AI dan media hingga suara keyboard, statistik mengetik, tindakan cepat, anotasi tangkapan layar, dan alat desktop: ruang kerja macOS native yang muncul saat diperlukan.',
+      'Lihat tugas AI dan kegiatan harian, rekam dan edit di Mac, impor hewan sendiri dan kelola izin di satu tempat.',
   },
   tagline: 'Ruang kerja dinamis native untuk macOS',
   header: {
@@ -75,16 +75,19 @@ export const id = createCatalog({
       dashboard: { name: 'Beranda', caption: 'Kartu dinamis hanya muncul saat sesi fokus, tugas AI, atau unduhan berlangsung; saat tidak ada aktivitas, tidak ada ruang yang terpakai.', points: ['Muncul sesuai kebutuhan', 'Progres langsung', 'Tata letak menyesuaikan'] },
       shelf: { name: 'Rak', caption: 'Seret berkas, audio, video, atau tautan ke bilah atas untuk menyimpannya di rak, menampilkannya di Finder, atau membuka menu Bagikan macOS.', points: ['Seret ke atas untuk menyimpan', 'Tampilkan di Finder', 'Menu Bagikan sistem'] },
       clipboard: { name: 'Clipboard', caption: 'Jelajahi riwayat clipboard di dalam pulau, filter berdasarkan gambar, URL, jalur, atau jenis berkas, dan lihat kapan setiap entri disalin. Kirim item ke Catatan cepat, jadikan favorit, atau hapus.', points: ['Riwayat di dalam pulau', 'Filter berdasarkan jenis', 'Catatan cepat dan favorit'] },
-      aiMonitor: { name: 'Monitor AI', caption: 'Mendeteksi aktivitas CLI, aplikasi desktop, dan IDE yang didukung, lalu menampilkan tugas, status, tren token, dan peta kontribusi. Hanya peristiwa terstruktur yang dianalisis; isi percakapan tidak dibaca.', points: ['Tugas dari berbagai alat', 'Tren pemakaian token', 'Tidak membaca prompt atau balasan'] },
-      keyboardSound: { name: 'Suara keyboard', caption: 'Memutar 20 suara keyboard mekanis bawaan untuk penekanan tombol global, dengan volume dan variasi nada yang dapat diatur. Aktifkan statistik mengetik lokal untuk melihat ringkasan, tren, riwayat, lini masa aplikasi, dan peta tombol F1-F12.', points: ['20 suara bawaan', 'Suara lepas dan variasi nada', 'Statistik opsional'] },
+      aiMonitor: { name: 'Monitor AI', caption: 'Mendeteksi aktivitas CLI, aplikasi desktop, dan IDE yang didukung, lalu menampilkan tugas, status, tren token, dan peta kontribusi. Hanya peristiwa terstruktur yang dianalisis; isi percakapan tidak dibaca. Deteksi tugas Cursor ditambahkan bersama penggunaan numerik dan kuota langganan yang tersedia untuk Cursor dan Muse Code. Tugas Cursor tetap terlihat selama alat berjalan lama.', points: ['Tugas dari berbagai alat', 'Tren pemakaian token', 'Tidak membaca prompt atau balasan'] },
+      keyboardSound: { name: 'Suara keyboard', caption: 'Memutar 20 suara keyboard mekanis bawaan untuk penekanan tombol global, dengan volume dan variasi nada yang dapat diatur. Aktifkan statistik mengetik lokal untuk melihat ringkasan, tren, riwayat, lini masa aplikasi, dan peta tombol F1-F12. Total suara, durasi dikte, kecepatan dan waktu yang dihemat juga ada di dasbor keyboard. Konfigurasi baru mengaktifkan suara dan statistik, yang bisa dimatikan terpisah.', points: ['20 suara bawaan', 'Suara lepas dan variasi nada', 'Statistik bisa diubah terpisah'] },
       download: { name: 'Pengunduh', caption: 'Tempel tautan atau biarkan zisla mengenali tautan dari clipboard setelah diaktifkan. Pilih video atau audio dan unduh ke folder default atau folder pilihan. Tautan yang didukung menampilkan sumber, progres langsung, dan status selesai.', points: ['Mode video / audio', 'Folder default atau khusus', 'Sumber dan progres langsung'] },
       agenda: { name: 'Agenda dan cuaca', caption: 'Menampilkan cuaca di lokasi Anda dan hingga enam tempat pilihan. Lihat, tambah, dan hapus acara kalender serta pengingat, lalu tandai pengingat sebagai selesai.', points: ['Kartu cuaca beberapa tempat', 'Kalender dan tugas', 'Selesaikan pengingat sekali ketuk'] },
-      mail: { name: 'Mail', caption: 'Membaca akun Mail yang diaktifkan, menampilkan kotak masuk, dan memungkinkan Anda menandai, membalas, menulis, serta memindahkan pesan ke Sampah di dalam pulau, dengan panduan jelas jika izin belum tersedia.', points: ['Akun Mail', 'Balas dan tulis di dalam pulau', 'Panduan izin transparan'] },
+      mail: { name: 'Mail', caption: 'Membaca akun Mail yang diaktifkan, menampilkan kotak masuk, dan memungkinkan Anda menandai, membalas, menulis, serta memindahkan pesan ke Sampah di dalam pulau, dengan panduan jelas jika izin belum tersedia. Pilih berkas saat menulis untuk dilampirkan ke pesan.', points: ['Akun Mail', 'Balas dan tulis di dalam pulau', 'Panduan izin transparan'] },
       quickNotes: { name: 'Catatan cepat', caption: 'Menggunakan aplikasi Catatan sistem untuk melihat, mengedit, membuat, dan menghapus catatan dengan pratinjau Markdown langsung, serta melompat langsung ke sembilan catatan pertama dengan Command+1 hingga 9. Draf ditulis kembali secara otomatis.', points: ['Data berada di Catatan', 'Editor Markdown', 'Draf tersimpan otomatis'] },
-      pdf: { name: 'Alat PDF', caption: 'Empat belas operasi di perangkat: gabungkan, pisahkan, putar, pangkas, konversi gambar dan Office, render ke gambar, ekstrak teks, tambahkan watermark dan nomor halaman, enkripsi, hapus kata sandi, dan edit metadata.', points: ['14 alat di perangkat', 'Gabungkan sesuai urutan Anda', 'Tidak ada yang meninggalkan Mac'] },
+      volumeMixer: {
+        name: 'Mixer volume per aplikasi',
+        caption: 'Atur volume dan bisukan secara terpisah untuk aplikasi yang memutar audio. Memerlukan macOS 14.4 atau lebih baru dan izin perekaman audio sistem.',
+        points: ['Volume per aplikasi', 'Bisukan terpisah', 'macOS 14.4+'],
+      },
       toolbox: { name: 'Utilitas', caption: 'Penghitung fokus, menjaga layar tetap aktif, pembersihan layar dan keyboard (termasuk memblokir F1-F12), teleprompter, cermin, dan Sampah dalam satu halaman.', points: ['Penghitung fokus', 'Blokir F1-F12 saat membersihkan', 'Teleprompter dan cermin'] },
-      system: { name: 'Status sistem', caption: 'Periksa CPU, GPU, memori, disk, jaringan, dan kipas; baca suhu NVMe SMART jika didukung perangkat keras, simpan riwayat per menit yang bisa dilihat sebagai grafik untuk rentang waktu apa pun dan diekspor ke .xlsx. Pindai cache aplikasi, cache pengguna Apple, log, dan berkas preferensi yang tertinggal. Tinjau pilihan, pindahkan ke Sampah, lalu lihat hasilnya.', points: ['Pemantauan tingkat chip', 'Grafik riwayat dan ekspor .xlsx', 'Tinjau sebelum memindahkan ke Sampah'] },
-      battery: { name: 'Baterai', caption: 'Lihat pengisian, kesehatan, siklus, suhu, dan kapasitas Mac ini, serta tingkat baterai perangkat sekitar yang dibagikan sistem.', points: ['Metrik kesehatan Mac', 'Sisa waktu', 'Baterai perangkat sekitar'] },
+      system: { name: 'Status sistem', caption: 'Periksa CPU, GPU, memori, disk, jaringan, dan kipas; baca suhu NVMe SMART jika didukung perangkat keras, simpan riwayat per menit yang bisa dilihat sebagai grafik untuk rentang waktu apa pun dan diekspor ke .xlsx. Pindai cache aplikasi, cache pengguna Apple, log, dan berkas preferensi yang tertinggal. Tinjau pilihan, pindahkan ke Sampah, lalu lihat hasilnya. Lihat pengisian, kesehatan, siklus, suhu, dan kapasitas Mac ini, serta tingkat baterai perangkat sekitar yang dibagikan sistem. Alamat IPv4 dan IPv6 publik ditampilkan secara terpisah.', points: ['Pemantauan tingkat chip', 'Grafik riwayat dan ekspor .xlsx', 'Tinjau sebelum memindahkan ke Sampah'] },
     },
   },
   extensions: {
@@ -96,19 +99,55 @@ export const id = createCatalog({
     summaryLede: 'Kemampuan yang sering dipakai, masing-masing di tempat yang alami.',
     summaryNote: 'Pratinjau jendela, tangkapan layar, dan Tindakan Cepat mudah dijangkau; aplikasi rekomendasi membantu Anda menemukan lebih banyak alat desktop.',
     features: {
+      floatingIsland: {
+        title: 'Pulau mengambang yang menyesuaikan tata letak',
+        description: 'Gunakan posisi kamera atau pilih posisi sendiri di tepi layar. Posisi kustom diingat saat berganti mode. Tata letak ringkas horizontal dan vertikal menyesuaikan panjang berdasarkan ikon status, tugas AI, unduhan dan media, dengan opsi menampilkan lebih banyak informasi.',
+        detail: 'Posisi kustom · Ikon status tetap · Informasi adaptif',
+      },
+      dailyBriefing: {
+        title: 'Hari Anda dalam ringkasan harian',
+        description: 'Pilih dari delapan templat, tentukan data penggunaan, pengetikan, sistem dan aktivitas zisla, lalu lihat pratinjau. Ekspor PNG secara manual atau pada waktu harian pilihan. Riwayat Durasi Layar dipakai saat aktif dan tersedia; data yang hilang tidak dianggap nol terukur.',
+        detail: '8 templat · Pilih isi · Pratinjau dan ekspor PNG terjadwal',
+      },
+      userCare: {
+        title: 'Pengingat saat bekerja',
+        description: 'Atur interval untuk istirahat, minum, bergerak dan mengistirahatkan mata. Pesan menyesuaikan waktu. Jeda alami, kunci layar dan tidur mereset waktu. Selesai fokus dan tindakan catatan bisa menampilkan umpan balik singkat. Aktifkan atau matikan di Pengaturan.',
+        detail: 'Interval dapat diatur · Pesan sesuai waktu · Menghormati jeda dan tidur',
+      },
+      contextNotes: {
+        title: 'Catatan yang terikat tempat',
+        description: 'Simpan catatan yang bisa diedit untuk halaman web, jendela aplikasi atau desktop dan lihat saat kembali. Lampirkan tangkapan jendela, kelola catatan di rak, dan atur pengingat berulang dari satu jam hingga tiga hari atau matikan.',
+        detail: 'Catatan lokasi · Tangkapan jendela · Pengingat berulang',
+      },
+      recording: {
+        title: 'Rekam dan edit di studio',
+        description: 'Rekam layar, jendela atau area dengan audio sistem, mikrofon dan kamera opsional. Edit video, audio, gambar dan teks di banyak trek, tambahkan animasi, zoom dan subtitle serta lihat pratinjau tajam. Pilih rasio asli, 16:9, 9:16, 1:1 atau 4:3. Ekspor video, GIF, Live Photo atau audio; beberapa format memerlukan FFmpeg. Usulan AI opsional dipratinjau sebelum diterapkan.',
+        detail: 'Edit multitrack · Rasio dan pratinjau · Video, GIF, Live Photo dan audio',
+      },
+      permissions: {
+        title: 'Izin sistem di satu tempat',
+        description: 'Tinjau status di Pengaturan → Izin, mulai permintaan yang didukung atau buka halaman sistem terkait. Sambutan pertama memakai daftar yang sama dan menandai izin yang harus diatur manual.',
+        detail: 'Status izin · Permintaan dan tautan · Sama dengan sambutan',
+      },
+      pdf: {
+        title: 'Alat PDF',
+        description: 'Tersedia di Pengaturan, di luar karusel modul pulau. Empat belas operasi di perangkat: gabungkan, pisahkan, putar, pangkas, konversi gambar dan Office, render ke gambar, ekstrak teks, tambahkan watermark dan nomor halaman, enkripsi, hapus kata sandi, dan edit metadata.',
+        detail: '14 alat di perangkat · Gabungkan sesuai urutan Anda · Tidak ada yang meninggalkan Mac',
+      },
+
       windowPreviews: {
         title: 'Lihat jendela, klik untuk beralih',
         description:
-          'Pratinjau jendela dari Dock atau saat beralih dengan Command-Tab, lalu klik kartu untuk mengaktifkan jendelanya. Nonaktif secara default; aktifkan di Pengaturan dan berikan izin yang diperlukan.',
-        detail: 'Dock dan Command-Tab · Klik untuk beralih jendela · Nonaktif secara default',
+          'Pratinjau jendela dari Dock atau dengan Command-Tab, lalu klik kartu untuk mengaktifkan jendela. Konfigurasi baru mengaktifkan fitur ini; kelola fitur dan izinnya di Pengaturan.',
+        detail: 'Dock dan Command-Tab · Klik untuk beralih · Dapat diatur',
       },
-      capture: { title: 'Tangkapan, tangkapan gulir, dan pin', description: 'Tangkap atau pin bagian layar dengan pintasan global, beri anotasi, gabungkan tangkapan gulir, serta kenali atau ekspor tabel. Anotasi teks yang masih diedit tetap tersimpan saat ekspor. Sesuaikan pintasan tangkapan layar, penyematan, tangkapan bergulir, dan alat anotasi. Pengaturan memeriksa konflik dengan tangkapan, input suara, dan Tindakan Cepat; pemicu dengan tombol pengubah saja memerlukan izin Pemantauan Input.', detail: 'Pintasan khusus · Pemeriksaan konflik · Anotasi dipertahankan saat ekspor' },
+      capture: { title: 'Tangkapan, tangkapan gulir, dan pin', description: 'Tangkap, sematkan atau gabungkan tangkapan bergulir dengan pintasan yang dapat disesuaikan. Sorot area, ekstrak bagian gambar, bulatkan sudut dan pertahankan anotasi saat ekspor. Kenali dan salin teks, terjemahkan lalu salin hasilnya, atau ekspor tabel ke .xlsx. Simpan tangkapan di rak. Pengaturan memeriksa konflik dengan suara dan Tindakan Cepat.', detail: 'Sorot dan ekstrak · Pengenalan, terjemahan dan salin · Sudut bulat dan .xlsx' },
       voice: { title: 'Input suara dan pembersihan', description: 'Tekan tombol untuk beralih atau tahan untuk berbicara dengan pengenalan suara sistem, kosakata khusus bidang, dan kata khusus Anda. Jika diinginkan, gunakan Ollama, LM Studio, atau model jarak jauh untuk mengoreksi transkrip tanpa mengubah maknanya dan memformat hal-hal yang disebutkan sebagai daftar secara jelas.', detail: 'Dua mode rekaman · Kosakata dan kata khusus · Pembersihan opsional' },
-      media: { title: 'Media dan suara latar sistem', description: 'Kendalikan pemutaran dari bagian atas pulau atau pilih suara latar macOS. Suara dapat berhenti saat layar terkunci, screensaver dimulai, atau layar tidur.', detail: 'Kontrol pemutaran · Lirik tersinkron · Berhenti otomatis' },
+      media: { title: 'Media dan suara latar sistem', description: 'Kendalikan pemutaran dari bagian atas pulau atau pilih suara latar macOS. Suara dapat berhenti saat layar terkunci, screensaver dimulai, atau layar tidur. Pilih gelombang suara atau cahaya sampul; progres pemutaran juga muncul dalam tata letak ringkas dan mengambang.', detail: 'Kontrol pemutaran · Lirik tersinkron · Berhenti otomatis' },
       browserDownloads: { title: 'Progres unduhan browser', description: 'Mendeteksi unduhan Safari, Chrome, Edge, Firefox, Brave, Vivaldi, Opera, dan Arc, lalu menampilkan sumber serta progres langsung di atas.', detail: '8 browser · Deteksi sumber · Pemberitahuan selesai' },
-      copyAssistant: { title: 'Tindakan Cepat dan langkah berikutnya', description: 'Setelah diaktifkan, teks, tautan, berkas, atau gambar yang disalin dipratinjau di bilah terpisah dengan saran buka, tampilkan di Finder, cari, terjemahkan, hitung, atau simpan—hanya setelah Anda mengonfirmasi. Buka folder berkas melalui Tindakan Cepat setelah unduhan browser atau transfer AirDrop. Mendukung folder unduhan bawaan dan pilihan di Chrome, dengan sakelar terpisah dari tampilan progres unduhan.', detail: 'Sakelar opsional · Pengenalan lokal · Command+N sebagai default' },
+      copyAssistant: { title: 'Tindakan Cepat dan langkah berikutnya', description: 'Setelah diaktifkan, teks, tautan, berkas, atau gambar yang disalin dipratinjau di bilah terpisah dengan saran buka, tampilkan di Finder, cari, terjemahkan, hitung, atau simpan—hanya setelah Anda mengonfirmasi. Buka folder berkas melalui Tindakan Cepat setelah unduhan browser atau transfer AirDrop. Mendukung folder unduhan bawaan dan pilihan di Chrome, dengan sakelar terpisah dari tampilan progres unduhan. Alamat IP memiliki tindakan pencarian dan membuka tautan terpisah. Konversi mengenali satuan mata uang kecil; katalog mencakup Emoji 18.0.', detail: 'Sakelar opsional · Pengenalan lokal · Command+N sebagai default' },
       aiManagement: { title: 'Pengelolaan CLI AI dan Skills', description: 'Deteksi, pasang, perbarui, dan hapus CLI AI dari Pengaturan, serta tinjau dan kelola Skills lokal agar lebih jarang berpindah terminal.', detail: 'Deteksi dan pasang · Perbarui dan hapus · Skills lokal' },
-      pet: { title: 'Hewan peliharaan pulau', description: 'Pilih hewan bawaan dan letakkan di sisi kiri atau kanan pulau. Matikan kapan saja.', detail: 'Karakter bawaan · Kiri atau kanan · Aktif sesuai kebutuhan' },
+      pet: { title: 'Hewan peliharaan pulau', description: 'Pilih dari katalog hewan dan karakter yang diperluas, atau impor gambar, animasi atau video yang didukung dan beri nama. Letakkan di salah satu sisi pulau dan hapus hewan impor di Pengaturan. Animasi maksimal 30 detik, berkas maksimal 100 MB.', detail: 'Katalog diperluas · Impor gambar dan video · Hapus hewan kustom' },
       lockScreen: { title: 'Informasi layar terkunci', description: 'Tampilkan tanggal, status, dan media yang sedang diputar di layar terkunci macOS secara opsional. Ini adalah overlay terpisah dan tidak muncul di daftar atau karusel modul pulau.', detail: 'Overlay terpisah · Pilihan pengguna · Tidak mengambil fokus' },
       recommendedTools: {
         title: 'Aplikasi rekomendasi',
@@ -152,7 +191,7 @@ export const id = createCatalog({
   download: {
     eyebrow: 'SIAP SAAT ANDA SIAP',
     title: 'Unduh zisla',
-    copy: 'Untuk Mac Apple Silicon. Versi, arsitektur lain, dan checksum tersedia di halaman rilis. Setelah memasang, Sparkle memverifikasi tanda tangan terlebih dahulu, lalu mengunduh, memasang, dan memulai ulang sesuai pengaturan Anda; pembaruan mempertahankan izin yang sudah diberikan. Jika ada rilis yang tidak Anda butuhkan, lewati saja dan tidak akan diingatkan lagi.',
+    copy: 'Untuk Mac Apple Silicon. Versi, arsitektur lain, dan checksum tersedia di halaman rilis. Setelah memasang, Sparkle memverifikasi tanda tangan terlebih dahulu, lalu mengunduh, memasang, dan memulai ulang sesuai pengaturan Anda; pembaruan mempertahankan izin yang sudah diberikan. Jika ada rilis yang tidak Anda butuhkan, lewati saja dan tidak akan diingatkan lagi. Baca catatan rilis sebelum pemasangan dan setelah mulai ulang.',
     primaryCta: 'Unduh',
     primaryCtaAriaLabel: 'Unduh zisla',
     releaseCta: 'Lihat rilis',
@@ -169,6 +208,18 @@ export const id = createCatalog({
     },
   },
   changelog: {
+    releaseNotes: {
+      'v0.1.20': [
+        'Pilih dari delapan templat, tentukan data penggunaan, pengetikan, sistem dan aktivitas zisla, lalu lihat pratinjau. Ekspor PNG secara manual atau pada waktu harian pilihan. Riwayat Durasi Layar dipakai saat aktif dan tersedia; data yang hilang tidak dianggap nol terukur.',
+        'Atur interval untuk istirahat, minum, bergerak dan mengistirahatkan mata. Pesan menyesuaikan waktu. Jeda alami, kunci layar dan tidur mereset waktu. Selesai fokus dan tindakan catatan bisa menampilkan umpan balik singkat. Aktifkan atau matikan di Pengaturan. Simpan catatan yang bisa diedit untuk halaman web, jendela aplikasi atau desktop dan lihat saat kembali. Lampirkan tangkapan jendela, kelola catatan di rak, dan atur pengingat berulang dari satu jam hingga tiga hari atau matikan.',
+        'Gunakan posisi kamera atau pilih posisi sendiri di tepi layar. Posisi kustom diingat saat berganti mode. Tata letak ringkas horizontal dan vertikal menyesuaikan panjang berdasarkan ikon status, tugas AI, unduhan dan media, dengan opsi menampilkan lebih banyak informasi. Pilih gelombang suara atau cahaya sampul; progres pemutaran juga muncul dalam tata letak ringkas dan mengambang.',
+        'Pilih dari katalog hewan dan karakter yang diperluas, atau impor gambar, animasi atau video yang didukung dan beri nama. Letakkan di salah satu sisi pulau dan hapus hewan impor di Pengaturan. Animasi maksimal 30 detik, berkas maksimal 100 MB.',
+        'Rekam layar, jendela atau area dengan audio sistem, mikrofon dan kamera opsional. Edit video, audio, gambar dan teks di banyak trek, tambahkan animasi, zoom dan subtitle serta lihat pratinjau tajam. Pilih rasio asli, 16:9, 9:16, 1:1 atau 4:3. Ekspor video, GIF, Live Photo atau audio; beberapa format memerlukan FFmpeg. Usulan AI opsional dipratinjau sebelum diterapkan.',
+        'Tangkap, sematkan atau gabungkan tangkapan bergulir dengan pintasan yang dapat disesuaikan. Sorot area, ekstrak bagian gambar, bulatkan sudut dan pertahankan anotasi saat ekspor. Kenali dan salin teks, terjemahkan lalu salin hasilnya, atau ekspor tabel ke .xlsx. Simpan tangkapan di rak. Pengaturan memeriksa konflik dengan suara dan Tindakan Cepat.',
+        'Deteksi tugas Cursor ditambahkan bersama penggunaan numerik dan kuota langganan yang tersedia untuk Cursor dan Muse Code. Tugas Cursor tetap terlihat selama alat berjalan lama. Alamat IP memiliki tindakan pencarian dan membuka tautan terpisah. Konversi mengenali satuan mata uang kecil; katalog mencakup Emoji 18.0.',
+        'Atur volume dan bisukan secara terpisah untuk aplikasi yang memutar audio. Memerlukan macOS 14.4 atau lebih baru dan izin perekaman audio sistem. Tersedia di Pengaturan, di luar karusel modul pulau. Tinjau status di Pengaturan → Izin, mulai permintaan yang didukung atau buka halaman sistem terkait. Sambutan pertama memakai daftar yang sama dan menandai izin yang harus diatur manual. Total suara, durasi dikte, kecepatan dan waktu yang dihemat juga ada di dasbor keyboard. Konfigurasi baru mengaktifkan suara dan statistik, yang bisa dimatikan terpisah. Pilih berkas saat menulis untuk dilampirkan ke pesan. Baca catatan rilis sebelum pemasangan dan setelah mulai ulang.',
+      ],
+    },
     eyebrow: 'Catatan perubahan',
     title: 'Perubahan di setiap rilis zisla: fitur baru, peningkatan, dan perbaikan.',
     lede: 'Perubahan di setiap rilis zisla: fitur baru, peningkatan, dan perbaikan.',
@@ -193,25 +244,7 @@ export const id = createCatalog({
       copyAssistant: { question: 'Apakah tindakan cepat membuka atau mengunggah yang saya salin?', answer: 'Tidak. Pengenalan dan pratinjau terjadi di Mac, dan langkah berikutnya dijalankan hanya setelah konfirmasi Anda.' },
       permissions: {
         question: 'Izin sistem apa yang diperlukan zisla?',
-        answer: `
-      <p>zisla tidak meminta semua izin saat pertama kali dijalankan. macOS hanya menampilkan setiap permintaan ketika Anda mengaktifkan dan benar-benar menggunakan fitur yang sesuai:</p>
-      <ul>
-        <li><strong>Kalender dan Pengingat:</strong> diminta secara terpisah saat Anda membuka modul agenda, untuk membaca, membuat, dan mengelola acara kalender serta pengingat bertanggal.</li>
-        <li><strong>Layanan Lokasi:</strong> diminta saat Anda memilih cuaca untuk lokasi saat ini. zisla mengambil lokasi satu kali dan tidak melacak Anda terus-menerus. Menambahkan kota secara manual tidak memerlukan izin lokasi.</li>
-        <li><strong>Mikrofon dan Pengenalan Ucapan:</strong> diminta saat Anda memulai input suara. Audio hanya direkam selama Anda aktif merekam, dan hanya rekaman itu yang ditranskripsikan.</li>
-        <li><strong>Aksesibilitas:</strong> diperlukan untuk memasukkan transkrip secara otomatis ke aplikasi yang sedang digunakan, menyalin dengan cepat melalui gestur mouse, membersihkan keyboard, dan mengendalikan pemutar yang didukung. Izin ini digunakan untuk menemukan kolom input yang bukan kolom kata sandi atau mengirim tombol sistem yang diperlukan.</li>
-        <li><strong>Pemantauan Input:</strong> digunakan untuk suara keyboard, statistik pengetikan lokal opsional, dan pemicu global seperti satu tombol pengubah atau tombol samping mouse. Hanya peristiwa global yang diperlukan fitur tersebut yang dipantau; pintasan global biasa tidak memerlukannya.</li>
-        <li><strong>Perekaman Layar dan Perekaman Audio Sistem:</strong> diperlukan untuk tangkapan layar, pengeditan tangkapan layar, dan bentuk gelombang audio sistem yang sedang diputar. Tangkapan layar membaca gambar layar; bentuk gelombang hanya menganalisis tingkat audio sistem saat ini dan tidak pernah menyimpan atau mengunggah audio.</li>
-        <li><strong>Kamera:</strong> digunakan hanya saat jendela cermin terbuka.</li>
-        <li><strong>Bluetooth:</strong> digunakan hanya saat modul baterai terbuka, untuk membaca tingkat baterai yang diumumkan perangkat yang terhubung atau dipasangkan.</li>
-        <li><strong>Otomasi:</strong> saat pertama kali menggunakan Catatan Cepat, Mail, pembersihan desktop, atau kendali langsung atas pemutar yang didukung, macOS bertanya secara terpisah apakah zisla boleh mengendalikan Catatan, Mail, Finder, atau aplikasi tersebut. Catatan Cepat membaca dan menulis di Catatan; Mail dapat membaca, menulis, membalas, menandai, dan menghapus pesan.</li>
-        <li><strong>Akses Disk Penuh:</strong> hanya diperlukan ketika Mail tidak sedang berjalan dan zisla tetap perlu membaca indeks mail lokal untuk menampilkan akun, pengirim, subjek, pratinjau, waktu, dan status telah dibaca.</li>
-        <li><strong>Pemberitahuan:</strong> diminta saat Anda mengaktifkan timer Pomodoro, semata-mata untuk menampilkan pemberitahuan lokal dan memutar satu bunyi peringatan saat timer selesai.</li>
-      </ul>
-      <p><strong>Folder bukan Akses Disk Penuh:</strong> untuk folder rak, impor/ekspor, atau unduhan yang Anda pilih di pemilih file sistem, zisla hanya mendapat akses ke folder tersebut, bukan hak membaca seluruh disk.</p>
-      <p><strong>Suara keyboard dan statistik pengetikan:</strong> keduanya nonaktif secara default, dan peristiwa keyboard global hanya dipantau setelah salah satunya diaktifkan. Saat suara keyboard aktif, peristiwa tombol hanya digunakan untuk memutar suara; saat statistik pengetikan aktif, yang disimpan hanya data agregat — jumlah karakter, kode tombol fisik, waktu, dan aplikasi terdepan — bukan apa yang Anda ketik. Anda dapat menonaktifkan masing-masing fitur di Pengaturan; setelah itu tidak ada data baru yang dicatat. Data yang sudah tersimpan tetap berada dalam file basis data lokal yang dapat Anda hapus sendiri.</p>
-      <p>Anda dapat menonaktifkan fitur di pengaturan aplikasi, atau mencabut izin kapan saja melalui Pengaturan Sistem → Privasi &amp; Keamanan. Mencabut satu izin hanya menonaktifkan fitur terkait dan tidak memengaruhi modul lain. Nama item dapat sedikit berbeda di berbagai versi macOS.</p>
-    `.trim(),
+        answer: '<p>Pengaturan → Izin menyatukan status, permintaan dan tautan ke Pengaturan Sistem. Beberapa izin harus diatur manual. Anda memilih permintaan yang dimulai; layar sambutan pertama juga menyediakan kontrol yang sama.</p><p>Perekaman layar dan audio sistem, mikrofon serta kamera dipakai untuk tangkapan, rekaman, mixer dan cermin sesuai fitur. Dikte juga memakai pengenalan ucapan. Kalender, Pengingat, Lokasi, Bluetooth dan Otomatisasi mendukung fitur terkait. Menambah kota cuaca manual tidak memerlukan lokasi.</p><p>Konfigurasi baru mengaktifkan suara keyboard dan statistik, yang bisa dimatikan terpisah. Kejadian tombol global memerlukan pemantauan input. Statistik menyimpan jumlah, kode tombol, waktu dan nama aplikasi, bukan teks yang diketik. Aksesibilitas dipakai untuk penyisipan, gestur, pembersihan dan kontrol jendela.</p><p>Akses Disk Penuh mungkin diperlukan untuk indeks surel lokal dan riwayat Durasi Layar dalam ringkasan harian. Pemilih berkas memberi akses ke folder yang dipilih. Matikan fitur di zisla atau cabut izin di Pengaturan Sistem → Privasi &amp; Keamanan.</p>',
       },
       localVoice: {
         question: 'Bagaimana cara memakai model lokal untuk merapikan transkrip suara?',

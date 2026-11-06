@@ -4,10 +4,10 @@ export const en: SiteContent = {
   meta: {
     documentTitle: 'zisla · Dynamic workspace',
     description:
-      'zisla is a native dynamic workspace for macOS. Keep AI tasks such as Zed Agent, media, files and your agenda in one place, with keyboard sounds, typing stats, screenshot annotation and Quick Actions.',
+      'zisla is a native macOS workspace for AI tasks, daily briefings and recording, with custom pets, screenshots and permissions in one place.',
     ogTitle: 'zisla · Put what is happening where you can see it',
     ogDescription:
-      'From AI tasks such as Zed Agent and media playback to keyboard sounds, typing stats, Quick Actions, screenshot annotation and desktop tools — a native macOS workspace that appears only when you need it.',
+      'Keep AI tasks and daily activity in view, record and edit on your Mac, import your own pet and manage permissions from one place.',
   },
   tagline: 'Native macOS dynamic workspace',
   header: {
@@ -94,7 +94,7 @@ export const en: SiteContent = {
       aiMonitor: {
         name: 'AI monitor',
         caption:
-          'Aggregates tasks and status from AI CLIs, desktop apps and IDEs, including Delta, Orca, WorkBuddy and WorkBuddy AI. Cumulative token trends and a contribution heatmap use reliable numeric usage where available, without parsing prompt or reply text.',
+          'Aggregates tasks and status from AI CLIs, desktop apps and IDEs, including Delta, Orca, WorkBuddy and WorkBuddy AI. Cumulative token trends and a contribution heatmap use reliable numeric usage where available, without parsing prompt or reply text. Cursor task detection is added, while Cursor and Muse Code provide numeric usage and available subscription quotas; Cursor tasks stay visible during long tool runs.',
         points: [
           'Tasks aggregated across tools',
           'Token consumption trends',
@@ -104,8 +104,8 @@ export const en: SiteContent = {
       keyboardSound: {
         name: 'Keyboard sounds',
         caption:
-          'Plays 20 built-in mechanical keyboard voices for global key presses, with adjustable volume and natural pitch variation, plus release sounds where the voice supports them. Turn on local typing stats to see today at a glance, typing trends, history, an app timeline and a per-key heatmap that includes F1-F12.',
-        points: ['20 built-in voices', 'Release sounds and pitch variation', 'Typing stats optional'],
+          'Plays 20 built-in mechanical keyboard voices for global key presses, with adjustable volume and natural pitch variation, plus release sounds where the voice supports them. Turn on local typing stats to see today at a glance, typing trends, history, an app timeline and a per-key heatmap that includes F1-F12. Voice totals, dictation duration, speed and saved time share the keyboard dashboard. New configurations enable sounds and typing stats; each can be disabled separately.',
+        points: ['20 built-in voices', 'Release sounds and pitch variation', 'Typing stats can be switched separately'],
       },
       download: {
         name: 'Downloader',
@@ -122,7 +122,7 @@ export const en: SiteContent = {
       mail: {
         name: 'Mail',
         caption:
-          'Reads the accounts you have enabled in Mail. Check the inbox, mark messages as read, reply, compose and move to Trash inside the island, with clear guidance whenever a permission is missing.',
+          'Reads the accounts you have enabled in Mail. Check the inbox, mark messages as read, reply, compose and move to Trash inside the island, with clear guidance whenever a permission is missing. Choose files while composing to attach them to the message.',
         points: ['Mail accounts', 'Reply and compose in the island', 'Transparent permission guidance'],
       },
       quickNotes: {
@@ -131,11 +131,10 @@ export const en: SiteContent = {
           'Backed by the system Notes app: view, edit, create and delete notes with live Markdown preview, and jump straight to the first nine notes with Command+1 through 9. Drafts are written back to Notes automatically.',
         points: ['Data lives in Notes', 'Markdown editor', 'Drafts saved back automatically'],
       },
-      pdf: {
-        name: 'PDF tools',
-        caption:
-          'Fourteen operations that all run on your Mac: merge, split, rotate, crop, convert images and Office files, render to images, extract text, add text or image watermarks, add page numbers, encrypt, remove a password and edit metadata.',
-        points: ['14 on-device tools', 'Merge in your own order', 'Nothing leaves your Mac'],
+      volumeMixer: {
+        name: 'Application volume mixer',
+        caption: 'Adjust volume and mute separately for apps that are playing audio. Available on macOS 14.4 or later, with System Audio Recording permission.',
+        points: ['Volume per app', 'Mute separately', 'macOS 14.4+'],
       },
       toolbox: {
         name: 'Utilities',
@@ -146,14 +145,8 @@ export const en: SiteContent = {
       system: {
         name: 'System status',
         caption:
-          'Check CPU, GPU, memory, disk, network and fan status, read NVMe SMART temperature where the hardware reports it, keep a minute-level history you can chart for any time range and export as .xlsx. Scan app caches, Apple user caches, logs and leftover preference files, then review and move selected items to Trash with visible results.',
+          'Check CPU, GPU, memory, disk, network and fan status, read NVMe SMART temperature where the hardware reports it, keep a minute-level history you can chart for any time range and export as .xlsx. Scan app caches, Apple user caches, logs and leftover preference files, then review and move selected items to Trash with visible results. See detailed metrics for this Mac — charge, health, cycle count, temperature and capacity — plus the battery level of nearby devices the system exposes. Public IPv4 and IPv6 addresses are displayed separately.',
         points: ['Chip-level monitoring', 'History charts and .xlsx export', 'Review before moving to Trash'],
-      },
-      battery: {
-        name: 'Battery',
-        caption:
-          'See detailed metrics for this Mac — charge, health, cycle count, temperature and capacity — plus the battery level of nearby devices the system exposes.',
-        points: ['Health metrics for this Mac', 'Time remaining', 'Nearby device battery'],
       },
     },
   },
@@ -167,17 +160,53 @@ export const en: SiteContent = {
     summaryNote:
       'Window previews, capture and Quick Actions each stay within reach; recommended apps help you discover more desktop tools.',
     features: {
+      floatingIsland: {
+        title: 'A floating island that follows your layout',
+        description: 'Use the camera position or choose a custom position along a screen edge. Your custom placement is remembered when switching modes. Compact horizontal and vertical layouts adapt their length to status icons, AI tasks, downloads and media, with an option to show more information.',
+        detail: 'Custom placement · Persistent status icons · Adaptive information',
+      },
+      dailyBriefing: {
+        title: 'Your day, in a daily briefing',
+        description: 'Choose from eight templates, select usage, typing, system and zisla activity metrics, and preview the layout. Export a PNG manually or at a chosen daily time. System Screen Time history is used when enabled and available; unavailable data is not presented as measured zero.',
+        detail: '8 templates · Select content · Preview and scheduled PNG export',
+      },
+      userCare: {
+        title: 'Care reminders while you work',
+        description: 'Set a reminder interval for breaks, water, movement and eye rest, with messages adapted to the time of day. Timing resets after natural breaks, locking or sleep. Focus completion and note actions can also show brief feedback in the island. Turn care reminders on or off in Settings.',
+        detail: 'Adjustable interval · Time-aware messages · Respects idle and sleep',
+      },
+      contextNotes: {
+        title: 'Notes tied to where you are',
+        description: 'Save an editable note for a webpage, app window or desktop, and see it when you return. Attach an app-window screenshot, manage notes on the shelf and set recurring reminders from one hour to three days, or turn reminders off.',
+        detail: 'Location notes · Window screenshots · Recurring reminders',
+      },
+      recording: {
+        title: 'Record and edit in the recording studio',
+        description: 'Record a display, window or region with optional system audio, microphone and camera. Edit video, audio, images and text across tracks, add animations, zooms and captions, and review a sharp live preview. Choose original, 16:9, 9:16, 1:1 or 4:3 canvas ratios. Export video, GIF, Live Photo or audio; some formats require FFmpeg. Optional AI edits are previewed before you apply them.',
+        detail: 'Multitrack editing · Canvas ratios and preview · Video, GIF, Live Photo and audio',
+      },
+      permissions: {
+        title: 'System permissions in one place',
+        description: 'Review permission status in Settings → Permissions, start supported requests or open the relevant System Settings page. The same permission list is available during first-launch onboarding; manual permissions are labelled accordingly.',
+        detail: 'Permission status · Requests and settings links · Shared with onboarding',
+      },
+      pdf: {
+        title: 'PDF tools',
+        description: 'Available in Settings rather than the island module carousel. Fourteen operations that all run on your Mac: merge, split, rotate, crop, convert images and Office files, render to images, extract text, add text or image watermarks, add page numbers, encrypt, remove a password and edit metadata.',
+        detail: '14 on-device tools · Merge in your own order · Nothing leaves your Mac',
+      },
+
       windowPreviews: {
         title: 'Preview a window. Click to switch.',
         description:
-          'Preview windows from the Dock or while switching with Command-Tab, then click a card to activate its window. Off by default; enable it in Settings and grant the required permissions.',
-        detail: 'Dock and Command-Tab · Click to switch windows · Off by default',
+          'Preview windows from the Dock or while switching with Command-Tab, then click a card to activate its window. New configurations enable this feature; manage it and its permissions in Settings.',
+        detail: 'Dock and Command-Tab · Click to switch windows · Configurable in Settings',
       },
       capture: {
         title: 'Screenshots, scrolling captures and pinning',
         description:
-          'Capture or pin part of the screen with a global shortcut, preserving window framing; then annotate, stitch a scrolling capture, and recognise or export tables. Annotations you are still editing are preserved when you export. Customize shortcuts for screenshots, pinning, scrolling captures and annotation tools. Settings check conflicts with capture, voice input and Quick Actions; modifier-only triggers need Input Monitoring permission.',
-        detail: 'Custom shortcuts · Conflict checks · Unfinished annotations kept on export',
+          'Capture, pin or stitch scrolling screenshots with configurable shortcuts. Highlight areas, extract image regions, round corners and preserve annotations on export. Recognise text and copy it, translate recognised text and copy the result, or export recognised tables as .xlsx. Stash screenshots on the shelf. Shortcut settings check conflicts with voice input and Quick Actions.',
+        detail: 'Highlight and extract · OCR, translation and copy · Rounded corners and .xlsx',
       },
       voice: {
         title: 'Voice input and cleanup',
@@ -188,7 +217,7 @@ export const en: SiteContent = {
       media: {
         title: 'Media and system ambient sounds',
         description:
-          'Control what is playing from the top of the island, or pick a macOS system ambient sound. It can stop by itself when the screen locks, the screen saver starts or the display sleeps.',
+          'Control what is playing from the top of the island, or pick a macOS system ambient sound. It can stop by itself when the screen locks, the screen saver starts or the display sleeps. Choose a waveform or artwork glow; playback progress also appears in compact and floating layouts.',
         detail: 'Playback control · Synced lyrics · Ambient sound stops automatically',
       },
       browserDownloads: {
@@ -200,7 +229,7 @@ export const en: SiteContent = {
       copyAssistant: {
         title: 'Quick Actions and smart next steps',
         description:
-          'Once enabled, copied text, links, files or images are previewed in a separate bar at the top of the screen. It recognises links, locally installed app names and emoji names, and can convert copied currency amounts at current exchange rates; every next step is carried out only after you confirm. Open the containing folder through Quick Actions after a browser download or AirDrop transfer. Supports default and chosen Chrome download folders, with a separate switch from download progress.',
+          'Once enabled, copied text, links, files or images are previewed in a separate bar at the top of the screen. It recognises links, locally installed app names and emoji names, and can convert copied currency amounts at current exchange rates; every next step is carried out only after you confirm. Open the containing folder through Quick Actions after a browser download or AirDrop transfer. Supports default and chosen Chrome download folders, with a separate switch from download progress. IP addresses have separate lookup and open-link actions. Currency conversion recognises local minor units, and the emoji catalogue includes Emoji 18.0.',
         detail: 'On-device recognition · Live currency conversion · Command+N by default',
       },
       aiManagement: {
@@ -212,8 +241,8 @@ export const en: SiteContent = {
       pet: {
         title: 'Island pet',
         description:
-          'Pick one of the built-in pets and place it on the left or right side of the island. Turn it off whenever you like.',
-        detail: 'Built-in characters · Left or right · On when you want it',
+          'Choose from the expanded built-in animal and character catalogue, or import a supported image, animated image or video as a named pet. Place it on either side of the island and remove imported pets in Settings. Imports support animations up to 30 seconds and files up to 100 MB.',
+        detail: 'Expanded catalogue · Image and video import · Remove custom pets',
       },
       lockScreen: {
         title: 'Lock screen information',
@@ -284,7 +313,7 @@ export const en: SiteContent = {
   download: {
     eyebrow: 'READY WHEN YOU ARE',
     title: 'Download zisla',
-    copy: 'For Apple silicon Macs. Versions, other architectures and checksums are on the release page. After installing, zisla can check for new versions on your chosen update channel: Sparkle verifies the signature first, then downloads, installs and restarts manually or automatically according to your settings, and updates keep the permissions you have already granted. The Updates settings also link directly to the issue tracker for feedback. If a release does not concern you, skip it and zisla will not bring it up again.',
+    copy: 'For Apple silicon Macs. Versions, other architectures and checksums are on the release page. After installing, zisla can check for new versions on your chosen update channel: Sparkle verifies the signature first, then downloads, installs and restarts manually or automatically according to your settings, and updates keep the permissions you have already granted. The Updates settings also link directly to the issue tracker for feedback. If a release does not concern you, skip it and zisla will not bring it up again. Read release notes before installing an update and after restarting.',
     primaryCta: 'Download',
     primaryCtaAriaLabel: 'Download',
     releaseCta: 'View release',
@@ -304,6 +333,18 @@ export const en: SiteContent = {
     },
   },
   changelog: {
+    releaseNotes: {
+      'v0.1.20': [
+        'Daily briefings offer eight templates, selectable usage, typing, system and zisla activity content, previews, and manual or scheduled local PNG export. Optional system Screen Time history is included only when available.',
+        'Contextual care reminders have an adjustable interval, time-of-day messages and feedback for focus and note actions. Idle, lock and sleep reset timing. Location notes can attach app-window screenshots and repeat reminders from one hour to three days.',
+        'Floating islands support remembered custom placement, adaptive horizontal and vertical compact layouts, persistent status icons and more-information mode. Media gains waveform or artwork-glow styles with playback progress across layouts.',
+        'The expanded pet catalogue includes more animals and characters. Import images, animations or videos as pets, name them and remove custom entries; animations are limited to 30 seconds and source files to 100 MB.',
+        'Recording Studio captures displays, windows or regions with optional system audio, microphone and camera. Multitrack video, audio, image and text editing adds animations, captions, zooms, sharper previews and five canvas ratios, with video, GIF, Live Photo and audio export. Optional AI proposals require applying the previewed plan.',
+        'Screenshots add highlighting, region extraction and rounded corners. Text recognition can copy text or translate and copy it; table recognition exports .xlsx. Capture and recording reliability, including recording audio, is improved.',
+        'AI monitoring adds Cursor task detection and numeric usage plus available subscription quotas for Cursor and Muse Code. Long Cursor tool runs remain visible. Clipboard actions separate IP lookup from opening links, recognise currency minor units and use Emoji 18.0 names.',
+        'Application volume and mute controls replace PDF tools in the island; PDF tools move to Settings and battery information joins system status. Permissions are centralised in Settings. New configurations enable keyboard sounds, typing stats, window previews and care reminders; voice totals appear on the keyboard dashboard. Mail can attach selected files, and updates show release notes before installation and after restart.',
+      ],
+    },
     eyebrow: 'Changelog',
     title: 'What changed in each zisla release: new features, improvements, and fixes.',
     lede: 'What changed in each zisla release: new features, improvements, and fixes.',
@@ -340,25 +381,7 @@ export const en: SiteContent = {
       },
       permissions: {
         question: 'Which system permissions does zisla need?',
-        answer: `
-      <p>zisla does not ask for every permission at first launch. macOS shows each prompt only when you turn on and actually use the matching feature:</p>
-      <ul>
-        <li><strong>Calendars and Reminders:</strong> requested separately when you open the agenda module, to read, create and manage calendar events and dated reminders.</li>
-        <li><strong>Location Services:</strong> requested when you choose weather for your current location. zisla takes a single location fix and does not track you continuously. Adding a city manually needs no location permission.</li>
-        <li><strong>Microphone and Speech Recognition:</strong> requested when you start voice input. Audio is captured only while you are actively recording, and only that recording is transcribed.</li>
-        <li><strong>Accessibility:</strong> needed to insert a transcript into the current app automatically, for mouse-gesture quick copy, for keyboard cleaning and for controlling some supported players. It is used to locate non-password input fields or send the required system keys.</li>
-        <li><strong>Input Monitoring:</strong> used for keyboard sounds, the optional local typing stats, and global triggers such as a lone modifier key or a mouse side button. It listens only for the global events those features need — ordinary global shortcuts do not require it.</li>
-        <li><strong>Screen Recording and System Audio Recording:</strong> needed for screenshots, screenshot editing and the waveform for system audio playback. Screenshots read the screen image; the waveform only analyses current system audio levels and never stores or uploads audio.</li>
-        <li><strong>Camera:</strong> used only while the mirror window is open.</li>
-        <li><strong>Bluetooth:</strong> used only while the battery module is open, to read the battery level that connected or paired devices publish.</li>
-        <li><strong>Automation:</strong> the first time you use Quick Notes, Mail, desktop tidy-up or direct control of a supported player, macOS asks separately whether zisla may control Notes, Mail, Finder or that app. Quick Notes reads and writes Notes; Mail can read, compose, reply, flag and delete messages.</li>
-        <li><strong>Full Disk Access:</strong> needed only when Mail is not running and zisla still has to read the local mail index to show accounts, senders, subjects, previews, timestamps and read state.</li>
-        <li><strong>Notifications:</strong> requested when you enable the Pomodoro timer, purely to show a local notification and play one alert sound when it ends.</li>
-      </ul>
-      <p><strong>Folders are not Full Disk Access:</strong> for the shelf, import/export or download folders you pick in the system file picker, zisla receives access to that folder only, never read access to the whole disk.</p>
-      <p><strong>Keyboard sounds and typing stats:</strong> both are off by default, and global keyboard events are only observed once one of them is on. With keyboard sounds on, key events are used solely to play a sound; with typing stats on, only aggregate data — character counts, physical key codes, timestamps and the frontmost app — is stored, never what you typed. You can turn each off separately in Settings, after which nothing more is recorded. Data already stored stays in a local database file that you are free to delete.</p>
-      <p>You can turn a feature off in the app's settings, or revoke a permission at any time in System Settings → Privacy &amp; Security. Revoking one permission only disables the related feature and leaves other modules untouched. Item names differ slightly between macOS versions.</p>
-    `.trim(),
+        answer: '<p>Settings → Permissions brings system permission status, requests and links to System Settings together. Some permissions require manual setup. You choose which requests to start; the welcome screen also offers permission controls.</p><p>Screen Recording, System Audio Recording, microphone and camera access support capture, recording, the volume mixer and the mirror as applicable. Voice input additionally uses Speech Recognition. Calendars, Reminders, Location, Bluetooth and Automation support their related features. Adding a weather city manually needs no location permission.</p><p>New configurations enable keyboard sounds and typing stats, with separate switches. Input Monitoring is required for global key events; stats store counts, key codes, timestamps and app names, never the text you type. Accessibility supports insertion, gestures, cleaning and window controls.</p><p>Full Disk Access may be needed for the local mail index and system Screen Time history used by daily briefings. A folder chosen in the system file picker grants access to that folder. You can disable features in zisla or revoke permissions in System Settings → Privacy &amp; Security.</p>',
       },
       localVoice: {
         question: 'How do I use a local model for voice cleanup?',

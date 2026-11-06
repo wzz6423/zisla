@@ -4,10 +4,10 @@ export const fr: SiteContent = {
   meta: {
     documentTitle: 'zisla · Espace de travail dynamique',
     description:
-      'zisla est un espace de travail dynamique et natif pour macOS. Regroupez les tâches IA comme Zed Agent, les médias, les fichiers et votre agenda, avec les sons de clavier, les statistiques de saisie, l’annotation de captures et les actions rapides.',
+      'zisla est un espace macOS natif pour les tâches IA, les bilans quotidiens et le montage, avec compagnons personnalisés, captures et autorisations réunis.',
     ogTitle: 'zisla · Mettez ce qui se passe là où vous pouvez le voir',
     ogDescription:
-      'Des tâches IA comme Zed Agent et de la lecture multimédia jusqu’aux sons de clavier, aux statistiques de saisie, à les actions rapides, à l’annotation de captures et aux outils de bureau : un espace de travail macOS natif qui n’apparaît que lorsque vous en avez besoin.',
+      'Gardez vos tâches IA et votre journée en vue, enregistrez et montez sur Mac, importez votre compagnon et gérez les autorisations au même endroit.',
   },
   tagline: 'Espace de travail dynamique natif pour macOS',
   header: {
@@ -98,7 +98,7 @@ export const fr: SiteContent = {
       aiMonitor: {
         name: 'Suivi IA',
         caption:
-          'Détecte automatiquement l’activité des CLI IA, apps de bureau et IDE pris en charge et affiche les tâches, l’état, l’évolution cumulée des tokens et une carte thermique des contributions. Seuls les événements structurés sont analysés, jamais le texte des conversations.',
+          'Détecte automatiquement l’activité des CLI IA, apps de bureau et IDE pris en charge et affiche les tâches, l’état, l’évolution cumulée des tokens et une carte thermique des contributions. Seuls les événements structurés sont analysés, jamais le texte des conversations. La détection des tâches Cursor est ajoutée, avec l’usage numérique et les quotas d’abonnement disponibles de Cursor et Muse Code ; les longues exécutions d’outils Cursor restent visibles.',
         points: [
           'Tâches agrégées entre outils',
           'Évolution de la consommation de tokens',
@@ -108,11 +108,11 @@ export const fr: SiteContent = {
       keyboardSound: {
         name: 'Sons de clavier',
         caption:
-          'Joue 20 sonorités de clavier mécanique intégrées à chaque frappe globale, avec volume réglable et variation naturelle de hauteur, plus un son de relâchement pour les sonorités qui le prévoient. Avec les statistiques de saisie locales activées, vous consultez dans l’île le résumé du jour, les tendances, l’historique, la chronologie par app et une carte thermique par touche incluant F1-F12.',
+          'Joue 20 sonorités de clavier mécanique intégrées à chaque frappe globale, avec volume réglable et variation naturelle de hauteur, plus un son de relâchement pour les sonorités qui le prévoient. Avec les statistiques de saisie locales activées, vous consultez dans l’île le résumé du jour, les tendances, l’historique, la chronologie par app et une carte thermique par touche incluant F1-F12. Les totaux vocaux, la durée de dictée, la vitesse et le temps économisé figurent aussi sur le tableau de bord du clavier. Les nouvelles configurations activent les sons et les statistiques, avec des interrupteurs séparés.',
         points: [
           '20 sonorités intégrées',
           'Son de relâchement et variation de hauteur',
-          'Statistiques facultatives',
+          'Statistiques activables séparément',
         ],
       },
       download: {
@@ -138,7 +138,7 @@ export const fr: SiteContent = {
       mail: {
         name: 'Mail',
         caption:
-          'Lit les comptes activés dans Mail. Consultez la boîte de réception, marquez comme lu, répondez, rédigez et placez dans la corbeille depuis l’île, avec des indications claires dès qu’une autorisation manque.',
+          'Lit les comptes activés dans Mail. Consultez la boîte de réception, marquez comme lu, répondez, rédigez et placez dans la corbeille depuis l’île, avec des indications claires dès qu’une autorisation manque. Choisissez des fichiers à joindre lors de la rédaction.',
         points: ['Comptes de Mail', 'Répondre et rédiger dans l’île', 'Autorisations expliquées'],
       },
       quickNotes: {
@@ -151,11 +151,10 @@ export const fr: SiteContent = {
           'Brouillons réenregistrés seuls',
         ],
       },
-      pdf: {
-        name: 'Outils PDF',
-        caption:
-          'Quatorze opérations entièrement locales : fusionner, diviser, faire pivoter, recadrer, convertir des images et fichiers Office, convertir en images, exporter le texte, ajouter un filigrane texte ou image, numéroter les pages, chiffrer, supprimer un mot de passe et modifier les métadonnées.',
-        points: ['14 outils locaux', 'Fusion dans votre ordre', 'Rien ne quitte votre Mac'],
+      volumeMixer: {
+        name: 'Mixeur de volume par application',
+        caption: 'Réglez séparément le volume et la sourdine des apps qui diffusent du son. Nécessite macOS 14.4 ou ultérieur et l’autorisation d’enregistrement audio du système.',
+        points: ['Volume par app', 'Sourdine séparée', 'macOS 14.4+'],
       },
       toolbox: {
         name: 'Utilitaires',
@@ -170,18 +169,12 @@ export const fr: SiteContent = {
       system: {
         name: 'État du système',
         caption:
-          'Consultez l’état du processeur, du GPU, de la mémoire, du disque, du réseau et des ventilateurs, lisez la température NVMe SMART quand le matériel la publie, conservez un historique à la minute consultable sur n’importe quelle période et exportable en .xlsx. Analysez les caches des apps et de l’utilisateur Apple, les journaux et les fichiers de préférences résiduels, puis vérifiez la sélection avant de l’envoyer à la Corbeille et consultez le résultat.',
+          'Consultez l’état du processeur, du GPU, de la mémoire, du disque, du réseau et des ventilateurs, lisez la température NVMe SMART quand le matériel la publie, conservez un historique à la minute consultable sur n’importe quelle période et exportable en .xlsx. Analysez les caches des apps et de l’utilisateur Apple, les journaux et les fichiers de préférences résiduels, puis vérifiez la sélection avant de l’envoyer à la Corbeille et consultez le résultat. Consultez les indicateurs détaillés de ce Mac — charge, état, cycles, température et capacité — et le niveau de batterie des appareils proches que le système expose. Les adresses IPv4 et IPv6 publiques sont affichées séparément.',
         points: [
           'Surveillance au niveau de la puce',
           'Graphiques d’historique et export .xlsx',
           'Vérifier avant de mettre à la Corbeille',
         ],
-      },
-      battery: {
-        name: 'Batterie',
-        caption:
-          'Consultez les indicateurs détaillés de ce Mac — charge, état, cycles, température et capacité — et le niveau de batterie des appareils proches que le système expose.',
-        points: ['Indicateurs de ce Mac', 'Autonomie restante', 'Batterie des appareils proches'],
       },
     },
   },
@@ -195,17 +188,53 @@ export const fr: SiteContent = {
     summaryNote:
       'Aperçus de fenêtres, captures et actions rapides restent à portée de main ; les apps recommandées permettent de découvrir d’autres outils de bureau.',
     features: {
+      floatingIsland: {
+        title: 'Une île flottante adaptée à votre disposition',
+        description: 'Utilisez la position de la caméra ou choisissez un emplacement sur un bord de l’écran. La position personnalisée est conservée entre les modes. Les présentations compactes horizontales et verticales adaptent leur longueur aux icônes, tâches IA, téléchargements et médias, avec une option pour afficher plus d’informations.',
+        detail: 'Position personnalisée · Icônes persistantes · Informations adaptatives',
+      },
+      dailyBriefing: {
+        title: 'Le bilan de votre journée',
+        description: 'Choisissez parmi huit modèles, sélectionnez les données d’utilisation, de saisie, du système et d’activité zisla, puis prévisualisez le résultat. Exportez un PNG manuellement ou à une heure quotidienne choisie. L’historique Temps d’écran est utilisé quand il est activé et disponible ; une donnée absente n’est pas présentée comme un zéro mesuré.',
+        detail: '8 modèles · Contenu au choix · Aperçu et export PNG programmé',
+      },
+      userCare: {
+        title: 'Des rappels pendant le travail',
+        description: 'Réglez l’intervalle des rappels de pause, d’hydratation, de mouvement et de repos des yeux. Les messages suivent l’heure de la journée ; les pauses naturelles, le verrouillage et la veille réinitialisent le compteur. La fin d’une séance et les actions sur les notes peuvent aussi afficher un bref retour. Activez ou désactivez ces rappels dans les réglages.',
+        detail: 'Intervalle réglable · Messages selon l’heure · Respect de l’inactivité et de la veille',
+      },
+      contextNotes: {
+        title: 'Des notes liées à un lieu',
+        description: 'Enregistrez une note modifiable pour une page web, une fenêtre ou le bureau et retrouvez-la en y revenant. Joignez une capture de fenêtre, gérez les notes dans l’étagère et programmez des rappels répétés d’une heure à trois jours, ou désactivez-les.',
+        detail: 'Notes contextuelles · Captures de fenêtres · Rappels récurrents',
+      },
+      recording: {
+        title: 'Enregistrer et monter dans le studio',
+        description: 'Enregistrez un écran, une fenêtre ou une zone avec son système, microphone et caméra facultatifs. Montez vidéos, sons, images et textes sur plusieurs pistes ; ajoutez animations, zooms et sous-titres avec un aperçu net. Choisissez le format original, 16:9, 9:16, 1:1 ou 4:3. Exportez vidéo, GIF, Live Photo ou audio ; certains formats nécessitent FFmpeg. Les propositions IA facultatives sont prévisualisées avant application.',
+        detail: 'Montage multipiste · Formats et aperçu · Vidéo, GIF, Live Photo et audio',
+      },
+      permissions: {
+        title: 'Les autorisations au même endroit',
+        description: 'Consultez les états dans Réglages → Autorisations, lancez les demandes prises en charge ou ouvrez la page système correspondante. L’accueil initial utilise la même liste et indique les réglages manuels.',
+        detail: 'État des autorisations · Demandes et liens · Commun avec l’accueil',
+      },
+      pdf: {
+        title: 'Outils PDF',
+        description: 'Accessible dans les réglages, en dehors du carrousel de l’île. Quatorze opérations entièrement locales : fusionner, diviser, faire pivoter, recadrer, convertir des images et fichiers Office, convertir en images, exporter le texte, ajouter un filigrane texte ou image, numéroter les pages, chiffrer, supprimer un mot de passe et modifier les métadonnées.',
+        detail: '14 outils locaux · Fusion dans votre ordre · Rien ne quitte votre Mac',
+      },
+
       windowPreviews: {
         title: 'Voir une fenêtre, cliquer pour y passer',
         description:
-          'Prévisualisez les fenêtres depuis le Dock ou avec Command-Tab, puis cliquez sur une carte pour activer sa fenêtre. Désactivé par défaut : activez la fonction dans les réglages et accordez les autorisations nécessaires.',
-        detail: 'Dock et Command-Tab · Changer de fenêtre en un clic · Désactivé par défaut',
+          'Prévisualisez les fenêtres depuis le Dock ou avec Command-Tab, puis cliquez sur une carte pour activer la fenêtre. Les nouvelles configurations activent cette fonction ; gérez-la et ses autorisations dans les réglages.',
+        detail: 'Dock et Command-Tab · Changer de fenêtre en un clic · Réglable',
       },
       capture: {
         title: 'Captures, captures défilantes et épinglage',
         description:
-          'Capturez ou épinglez une zone de l’écran avec un raccourci global, en conservant l’encadrement des fenêtres ; puis annotez, assemblez une capture défilante, reconnaissez ou exportez des tableaux. Les annotations non terminées sont conservées à l’export. Personnalisez les raccourcis de capture, d’épinglage, de capture défilante et d’annotation. Les réglages détectent les conflits avec la capture, la saisie vocale et les actions rapides ; une touche de modification seule nécessite l’autorisation de surveillance de l’entrée.',
-        detail: 'Raccourcis personnalisés · Détection des conflits · Annotations conservées à l’export',
+          'Capturez, épinglez ou assemblez des captures défilantes avec des raccourcis personnalisables. Surlignez, extrayez des zones d’image, arrondissez les coins et conservez les annotations à l’export. Reconnaissez et copiez du texte, traduisez-le puis copiez le résultat, ou exportez les tableaux reconnus en .xlsx. Rangez les captures dans l’étagère. Les réglages vérifient les conflits avec la dictée et les actions rapides.',
+        detail: 'Surlignage et extraction · Reconnaissance, traduction et copie · Coins arrondis et .xlsx',
       },
       voice: {
         title: 'Dictée et mise en forme',
@@ -216,7 +245,7 @@ export const fr: SiteContent = {
       media: {
         title: 'Médias et sons d’ambiance du système',
         description:
-          'Pilotez la lecture en cours depuis le haut de l’île, ou choisissez un son d’ambiance macOS. La lecture peut s’arrêter d’elle-même au verrouillage, au lancement de l’économiseur d’écran ou à la veille de l’écran.',
+          'Pilotez la lecture en cours depuis le haut de l’île, ou choisissez un son d’ambiance macOS. La lecture peut s’arrêter d’elle-même au verrouillage, au lancement de l’économiseur d’écran ou à la veille de l’écran. Choisissez une forme d’onde ou une lueur autour de la pochette ; la progression est aussi visible dans les présentations compactes et flottantes.',
         detail: 'Contrôle de lecture · Paroles synchronisées · Arrêt automatique',
       },
       browserDownloads: {
@@ -228,7 +257,7 @@ export const fr: SiteContent = {
       copyAssistant: {
         title: 'Actions rapides et étapes suivantes',
         description:
-          'Une fois activé, le texte, les liens, les fichiers ou les images copiés s’affichent dans une barre distincte en haut de l’écran. Il reconnaît les liens, les noms d’apps installées localement et les noms d’émojis, et peut convertir les montants copiés aux taux de change en temps réel ; chaque étape suivante n’est exécutée qu’après votre confirmation. Ouvrez le dossier d’un fichier via les actions rapides après un téléchargement ou un transfert AirDrop. Les dossiers Chrome par défaut ou choisis sont pris en charge, avec une activation indépendante de la progression des téléchargements.',
+          'Une fois activé, le texte, les liens, les fichiers ou les images copiés s’affichent dans une barre distincte en haut de l’écran. Il reconnaît les liens, les noms d’apps installées localement et les noms d’émojis, et peut convertir les montants copiés aux taux de change en temps réel ; chaque étape suivante n’est exécutée qu’après votre confirmation. Ouvrez le dossier d’un fichier via les actions rapides après un téléchargement ou un transfert AirDrop. Les dossiers Chrome par défaut ou choisis sont pris en charge, avec une activation indépendante de la progression des téléchargements. Les adresses IP disposent d’actions distinctes pour la recherche et l’ouverture du lien. Les conversions reconnaissent les unités monétaires mineures et le catalogue utilise Emoji 18.0.',
         detail: 'Reconnaissance locale · Conversion aux taux en temps réel · Command+N par défaut',
       },
       aiManagement: {
@@ -240,8 +269,8 @@ export const fr: SiteContent = {
       pet: {
         title: 'Mascotte de l’île',
         description:
-          'Choisissez une mascotte intégrée et placez-la à gauche ou à droite de l’île. Désactivez-la quand vous voulez.',
-        detail: 'Personnages intégrés · Gauche ou droite · Activée au besoin',
+          'Choisissez dans le catalogue enrichi d’animaux et de personnages, ou importez une image, une animation ou une vidéo compatible et nommez votre compagnon. Placez-le d’un côté de l’île et supprimez les compagnons importés dans les réglages. Animations de 30 secondes maximum, fichiers de 100 MB maximum.',
+        detail: 'Catalogue enrichi · Import d’images et vidéos · Suppression des compagnons personnalisés',
       },
       lockScreen: {
         title: 'Informations sur l’écran verrouillé',
@@ -312,7 +341,7 @@ export const fr: SiteContent = {
   download: {
     eyebrow: 'DISPONIBLE QUAND VOUS VOULEZ',
     title: 'Télécharger zisla',
-    copy: 'Pour les Mac Apple silicon. Versions, autres architectures et sommes de contrôle sont sur la page de publication. Après installation, zisla peut chercher les nouvelles versions sur le canal choisi : Sparkle vérifie d’abord la signature, puis télécharge, installe et redémarre manuellement ou automatiquement selon vos réglages, et les mises à jour conservent les permissions déjà accordées. Les réglages de mise à jour proposent aussi un lien direct vers les issues GitHub pour vos retours. Si une version ne vous concerne pas, ignorez-la : zisla ne la rappellera plus.',
+    copy: 'Pour les Mac Apple silicon. Versions, autres architectures et sommes de contrôle sont sur la page de publication. Après installation, zisla peut chercher les nouvelles versions sur le canal choisi : Sparkle vérifie d’abord la signature, puis télécharge, installe et redémarre manuellement ou automatiquement selon vos réglages, et les mises à jour conservent les permissions déjà accordées. Les réglages de mise à jour proposent aussi un lien direct vers les issues GitHub pour vos retours. Si une version ne vous concerne pas, ignorez-la : zisla ne la rappellera plus. Consultez les notes de version avant l’installation et après le redémarrage.',
     primaryCta: 'Télécharger',
     primaryCtaAriaLabel: 'Télécharger',
     releaseCta: 'Voir la publication',
@@ -332,6 +361,18 @@ export const fr: SiteContent = {
     },
   },
   changelog: {
+    releaseNotes: {
+      'v0.1.20': [
+        'Choisissez parmi huit modèles, sélectionnez les données d’utilisation, de saisie, du système et d’activité zisla, puis prévisualisez le résultat. Exportez un PNG manuellement ou à une heure quotidienne choisie. L’historique Temps d’écran est utilisé quand il est activé et disponible ; une donnée absente n’est pas présentée comme un zéro mesuré.',
+        'Réglez l’intervalle des rappels de pause, d’hydratation, de mouvement et de repos des yeux. Les messages suivent l’heure de la journée ; les pauses naturelles, le verrouillage et la veille réinitialisent le compteur. La fin d’une séance et les actions sur les notes peuvent aussi afficher un bref retour. Activez ou désactivez ces rappels dans les réglages. Enregistrez une note modifiable pour une page web, une fenêtre ou le bureau et retrouvez-la en y revenant. Joignez une capture de fenêtre, gérez les notes dans l’étagère et programmez des rappels répétés d’une heure à trois jours, ou désactivez-les.',
+        'Utilisez la position de la caméra ou choisissez un emplacement sur un bord de l’écran. La position personnalisée est conservée entre les modes. Les présentations compactes horizontales et verticales adaptent leur longueur aux icônes, tâches IA, téléchargements et médias, avec une option pour afficher plus d’informations. Choisissez une forme d’onde ou une lueur autour de la pochette ; la progression est aussi visible dans les présentations compactes et flottantes.',
+        'Choisissez dans le catalogue enrichi d’animaux et de personnages, ou importez une image, une animation ou une vidéo compatible et nommez votre compagnon. Placez-le d’un côté de l’île et supprimez les compagnons importés dans les réglages. Animations de 30 secondes maximum, fichiers de 100 MB maximum.',
+        'Enregistrez un écran, une fenêtre ou une zone avec son système, microphone et caméra facultatifs. Montez vidéos, sons, images et textes sur plusieurs pistes ; ajoutez animations, zooms et sous-titres avec un aperçu net. Choisissez le format original, 16:9, 9:16, 1:1 ou 4:3. Exportez vidéo, GIF, Live Photo ou audio ; certains formats nécessitent FFmpeg. Les propositions IA facultatives sont prévisualisées avant application.',
+        'Capturez, épinglez ou assemblez des captures défilantes avec des raccourcis personnalisables. Surlignez, extrayez des zones d’image, arrondissez les coins et conservez les annotations à l’export. Reconnaissez et copiez du texte, traduisez-le puis copiez le résultat, ou exportez les tableaux reconnus en .xlsx. Rangez les captures dans l’étagère. Les réglages vérifient les conflits avec la dictée et les actions rapides.',
+        'La détection des tâches Cursor est ajoutée, avec l’usage numérique et les quotas d’abonnement disponibles de Cursor et Muse Code ; les longues exécutions d’outils Cursor restent visibles. Les adresses IP disposent d’actions distinctes pour la recherche et l’ouverture du lien. Les conversions reconnaissent les unités monétaires mineures et le catalogue utilise Emoji 18.0.',
+        'Réglez séparément le volume et la sourdine des apps qui diffusent du son. Nécessite macOS 14.4 ou ultérieur et l’autorisation d’enregistrement audio du système. Accessible dans les réglages, en dehors du carrousel de l’île. Consultez les états dans Réglages → Autorisations, lancez les demandes prises en charge ou ouvrez la page système correspondante. L’accueil initial utilise la même liste et indique les réglages manuels. Les totaux vocaux, la durée de dictée, la vitesse et le temps économisé figurent aussi sur le tableau de bord du clavier. Les nouvelles configurations activent les sons et les statistiques, avec des interrupteurs séparés. Choisissez des fichiers à joindre lors de la rédaction. Consultez les notes de version avant l’installation et après le redémarrage.',
+      ],
+    },
     eyebrow: 'Journal des modifications',
     title: 'Les changements de chaque version de zisla : nouveautés, améliorations et corrections.',
     lede: 'Les changements de chaque version de zisla : nouveautés, améliorations et corrections.',
@@ -368,25 +409,7 @@ export const fr: SiteContent = {
       },
       permissions: {
         question: 'De quelles autorisations système zisla a-t-il besoin ?',
-        answer: `
-      <p>zisla ne demande pas toutes les autorisations au premier lancement. macOS affiche chaque demande seulement quand vous activez et utilisez réellement la fonction concernée :</p>
-      <ul>
-        <li><strong>Calendrier et Rappels :</strong> demandés séparément à l’ouverture du module agenda, pour lire, créer et gérer les événements de calendrier et les rappels datés.</li>
-        <li><strong>Service de localisation :</strong> demandé quand vous choisissez la météo de votre position actuelle. zisla relève la position une seule fois et ne vous suit pas en continu. Ajouter une ville à la main n’exige aucune autorisation de localisation.</li>
-        <li><strong>Microphone et reconnaissance vocale :</strong> demandés au démarrage de la dictée. Le son n’est capté que pendant l’enregistrement, et seule cette prise est transcrite.</li>
-        <li><strong>Accessibilité :</strong> nécessaire pour insérer automatiquement une transcription dans l’app active, pour la copie rapide par geste de souris, pour le nettoyage du clavier et pour piloter certains lecteurs pris en charge. Elle sert à repérer les champs de saisie non protégés par mot de passe ou à envoyer les touches système requises.</li>
-        <li><strong>Surveillance de la saisie :</strong> utilisée pour les sons de clavier, les statistiques de saisie locales facultatives et les déclencheurs globaux comme une touche de modification seule ou un bouton latéral de souris. Seuls les événements globaux nécessaires à ces fonctions sont observés ; les raccourcis globaux ordinaires n’en ont pas besoin.</li>
-        <li><strong>Enregistrement de l’écran et enregistrement audio du système :</strong> nécessaires aux captures, à leur édition et à l’affichage de la forme d’onde de l’audio système. Les captures lisent l’image de l’écran ; la forme d’onde analyse seulement le niveau audio courant et n’enregistre ni n’envoie aucun contenu sonore.</li>
-        <li><strong>Appareil photo :</strong> utilisé uniquement pendant que la fenêtre du miroir est ouverte.</li>
-        <li><strong>Bluetooth :</strong> utilisé uniquement pendant que le module batterie est ouvert, pour lire le niveau de charge publié par les appareils connectés ou associés.</li>
-        <li><strong>Automatisation :</strong> à la première utilisation des notes rapides, de Mail, du rangement du bureau ou du pilotage direct d’un lecteur pris en charge, macOS demande séparément si zisla peut contrôler Notes, Mail, le Finder ou l’app concernée. Les notes rapides lisent et écrivent dans Notes ; Mail permet de lire, rédiger, répondre, marquer et supprimer des messages.</li>
-        <li><strong>Accès complet au disque :</strong> nécessaire seulement quand Mail n’est pas lancé et que zisla doit tout de même lire l’index local des messages pour afficher comptes, expéditeurs, objets, extraits, horodatages et état de lecture.</li>
-        <li><strong>Notifications :</strong> demandées à l’activation du minuteur Pomodoro, uniquement pour afficher une notification locale et jouer un seul son d’alerte à la fin du minuteur.</li>
-      </ul>
-      <p><strong>Un dossier n’est pas un accès complet au disque :</strong> pour les dossiers de dépôt, d’import/export ou de téléchargement choisis dans le sélecteur de fichiers du système, zisla n’obtient l’accès qu’à ce dossier, jamais la lecture du disque entier.</p>
-      <p><strong>Sons de clavier et statistiques de saisie :</strong> les deux sont désactivés par défaut, et les événements clavier globaux ne sont observés qu’après activation de l’un d’eux. Avec les sons de clavier, les événements de touche servent uniquement à jouer un son ; avec les statistiques, seules des données agrégées sont conservées — nombre de caractères, codes de touches physiques, horodatages et app au premier plan — jamais ce que vous avez tapé. Vous pouvez désactiver chaque option séparément dans les réglages, et plus rien n’est alors enregistré. Les données déjà conservées restent dans un fichier de base local que vous pouvez supprimer.</p>
-      <p>Vous pouvez désactiver la fonction dans les réglages de l’app, ou révoquer une autorisation à tout moment dans Réglages Système → Confidentialité et sécurité. Révoquer une autorisation désactive seulement la fonction associée et laisse les autres modules intacts. Le nom des éléments varie légèrement selon la version de macOS.</p>
-    `.trim(),
+        answer: '<p>Réglages → Autorisations regroupe les états, les demandes et les liens vers les Réglages Système. Certaines autorisations nécessitent une configuration manuelle. Vous choisissez les demandes à lancer ; l’accueil initial propose aussi ces commandes.</p><p>L’enregistrement de l’écran et du son système, le microphone et la caméra servent aux captures, à l’enregistrement, au mixeur et au miroir selon la fonction. La dictée utilise aussi la reconnaissance vocale. Calendriers, Rappels, Localisation, Bluetooth et Automatisation servent aux fonctions associées. Ajouter une ville météo manuellement ne nécessite pas la localisation.</p><p>Les nouvelles configurations activent sons du clavier et statistiques, désactivables séparément. La surveillance de l’entrée est nécessaire pour les événements globaux. Les statistiques gardent uniquement comptes, codes de touches, dates et noms d’apps, jamais le texte saisi. L’accessibilité sert à l’insertion, aux gestes, au nettoyage et aux fenêtres.</p><p>L’accès complet au disque peut être nécessaire pour l’index local du courrier et l’historique Temps d’écran des bilans quotidiens. Le sélecteur de fichiers accorde l’accès au dossier choisi. Désactivez les fonctions dans zisla ou révoquez les autorisations dans Réglages Système → Confidentialité et sécurité.</p>',
       },
       localVoice: {
         question: 'Comment utiliser un modèle local pour corriger une transcription vocale ?',

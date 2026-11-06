@@ -43,10 +43,9 @@ export const showcaseModuleIds = [
   'agenda',
   'mail',
   'quickNotes',
-  'pdf',
+  'volumeMixer',
   'toolbox',
   'system',
-  'battery',
 ] as const;
 export type ShowcaseModuleId = (typeof showcaseModuleIds)[number];
 
@@ -65,34 +64,47 @@ export const showcaseModuleGroups: readonly {
   { id: 'mail', group: 'daily' },
   { id: 'quickNotes', group: 'daily' },
   { id: 'system', group: 'daily' },
-  { id: 'battery', group: 'daily' },
-  { id: 'pdf', group: 'tools' },
+  { id: 'volumeMixer', group: 'tools' },
   { id: 'toolbox', group: 'tools' },
 ];
 
 export const crossModuleFeatureIds = [
+  'floatingIsland',
+  'dailyBriefing',
+  'userCare',
+  'contextNotes',
   'windowPreviews',
   'capture',
+  'recording',
   'voice',
   'media',
   'browserDownloads',
   'copyAssistant',
   'aiManagement',
   'pet',
+  'pdf',
+  'permissions',
   'lockScreen',
   'recommendedTools',
 ] as const;
 export type CrossModuleFeatureId = (typeof crossModuleFeatureIds)[number];
 
 export const crossModuleFeatureIcons: Record<CrossModuleFeatureId, string> = {
+  floatingIsland: 'monitor',
+  dailyBriefing: 'image',
+  userCare: 'sun',
+  contextNotes: 'app-window',
   windowPreviews: 'app-window',
   capture: 'image',
+  recording: 'monitor',
   voice: 'mic',
   media: 'waves',
   browserDownloads: 'download',
   copyAssistant: 'copy',
   aiManagement: 'bot',
   pet: 'sparkles',
+  pdf: 'image',
+  permissions: 'shield',
   lockScreen: 'lock',
   recommendedTools: 'external-link',
 };
@@ -163,6 +175,8 @@ export const supportedAITools = (): readonly string[] => [
   'Orca',
   'Pi',
   'Zed Agent',
+  'Cursor',
+  'Muse Code',
 ];
 
 export const repositoryLinks = {
@@ -198,13 +212,13 @@ export const latestRelease = {
 export interface ChangelogEntry {
   version: string;
   date: string;
-  /** GitHub release highlights stay in their original English regardless of the UI language. */
+  /** Historical notes keep the original GitHub wording; catalogs can supply translations. */
   notes: readonly string[];
 }
 
 /**
- * Release history, newest first. Notes use the original English GitHub release highlights
- * because maintaining translations for 11 releases in 17 languages is impractical.
+ * Release history, newest first. Historical notes keep the original GitHub wording;
+ * locale catalogs can supply translated release notes.
  * v0.1.8/v0.1.0 have no Highlights section, so their body summaries are used instead.
  */
 export const changelogEntries: readonly ChangelogEntry[] = [
@@ -551,6 +565,7 @@ export interface SiteContent {
     notes: Record<DownloadNoteId, DownloadNoteCopy>;
   };
   changelog: {
+    releaseNotes: Record<string, readonly string[]>;
     eyebrow: string;
     title: string;
     lede: string;
