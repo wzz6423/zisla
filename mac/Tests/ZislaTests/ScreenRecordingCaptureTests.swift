@@ -421,6 +421,33 @@ struct ScreenRecordingCaptureTests {
     }
 
     @Test
+    func microphoneFinishFailureImmediatelyCancelsAStalledScreenWriter() async throws {
+        let disk = try CaptureTestDisk()
+        defer { disk.remove() }
+        let files = try ScreenRecordingCaptureFiles(directory: disk.url)
+        let screen = CaptureTestAssets()
+        screen.finishHeld = true
+        let microphone = CaptureTestAssets()
+        microphone.finishError = .diskFull
+        let failures = CaptureTestErrors()
+        let writer = ScreenRecordingCaptureWriter(files: files, configuration: .init(systemAudio: false, microphone: true),
+                                                  width: 16, height: 16, finishTimeout: 0, onFailure: failures.append,
+                                                  factory: { _, kind, _ in
+            CaptureTestAssetWriter(assets: kind == .microphone ? microphone : screen)
+        })
+        writer.receive(try syntheticVideo(time: 100, kind: .screen))
+        writer.receive(try syntheticAudio(time: 100, kind: .microphone))
+        await writer.seal(at: 101)
+        await #expect(throws: CaptureTestError.diskFull) { try await writer.finish() }
+        #expect(failures.values == [.diskFull], "The stalled screen must not replace the microphone failure with a timeout")
+        #expect(screen.released && microphone.released)
+        screen.releaseFinishes(.success(()))
+        await writer.flush()
+        await #expect(throws: CaptureTestError.diskFull) { try await writer.finish() }
+        #expect(files.discard() == nil)
+    }
+
+    @Test
     func syntheticNativeWriterPublishesReadableVideoWithoutCapturingTheScreen() async throws {
         let disk = try CaptureTestDisk()
         defer { disk.remove() }
@@ -795,6 +822,309 @@ struct ScreenRecordingCaptureTests {
     }
 
     @Test
+    func saturatedVideoIngressKeepsEverySystemAndMicrophonePacket() async throws {
+        let disk = try CaptureTestDisk()
+        defer { disk.remove() }
+        let files = try ScreenRecordingCaptureFiles(directory: disk.url)
+        let assets = CaptureTestAssets()
+        let entered = ScreenRecordingCaptureStartGate()
+        let release = DispatchSemaphore(value: 0)
+        assets.appendBlock = (entered, release)
+        let writer = ScreenRecordingCaptureWriter(files: files, configuration: .init(systemAudio: true, microphone: true),
+                                                  width: 16, height: 16, onFailure: { _ in }, factory: assets.make)
+        writer.receive(try syntheticVideo(time: 100, kind: .screen))
+        _ = try await entered.wait(timeout: 2)
+        let frame = try syntheticVideo(time: 101, kind: .screen)
+        let system = try syntheticAudio(time: 100, kind: .systemAudio)
+        let microphone = try syntheticAudio(time: 100, kind: .microphone)
+        for index in 0..<100 {
+            let time = 100 + Double(index) / 64
+            writer.receive(.init(buffer: frame.buffer, kind: .screen, hostTime: time + 0.001))
+            writer.receive(.init(buffer: system.buffer, kind: .systemAudio, hostTime: time))
+            writer.receive(.init(buffer: microphone.buffer, kind: .microphone, hostTime: time))
+        }
+        release.signal()
+        await writer.seal(at: 102)
+        #expect(try await writer.finish() == 2)
+        let expected = (0..<100).map { Double($0) / 64 }
+        #expect(assets.times(.systemAudio) == expected, "Video saturation must preserve all system audio timestamps")
+        #expect(assets.times(.microphone) == expected, "Video saturation must preserve all microphone timestamps")
+        #expect(assets.times(.screen).count <= 33)
+        #expect(files.discard() == nil)
+    }
+
+    @Test
+    func ingressAndPreEpochAudioShareOneBoundedReservation() async throws {
+        let disk = try CaptureTestDisk()
+        defer { disk.remove() }
+        let files = try ScreenRecordingCaptureFiles(directory: disk.url)
+        let assets = CaptureTestAssets()
+        let failure = ScreenRecordingCaptureStartGate()
+        let writer = ScreenRecordingCaptureWriter(files: files, configuration: .init(systemAudio: true, microphone: true),
+                                                  width: 16, height: 16, onFailure: { failure.resolve(.failure($0)) }, factory: assets.make)
+        let packet = try syntheticAudio(time: 100, kind: .microphone)
+        for index in 0..<ScreenRecordingCaptureAudioBacklog.sampleLimit {
+            writer.receive(.init(buffer: packet.buffer, kind: .microphone, hostTime: 100 + Double(index) / 100))
+            await writer.flush()
+        }
+        writer.receive(.init(buffer: packet.buffer, kind: .systemAudio, hostTime: 110))
+        await writer.flush()
+        await #expect(throws: ScreenRecordingCaptureError.writerUnavailable) { try await failure.wait(timeout: 2) }
+        writer.receive(try syntheticVideo(time: 100, kind: .screen))
+        await writer.seal(at: 110)
+        await #expect(throws: ScreenRecordingCaptureError.writerUnavailable) { try await writer.finish() }
+        #expect(assets.times(.microphone).isEmpty)
+        #expect(assets.times(.systemAudio).isEmpty)
+        #expect(files.discard() == nil)
+    }
+
+    @Test
+    func preEpochAudioByteBudgetIncludesAllRetainedPayload() async throws {
+        let disk = try CaptureTestDisk()
+        defer { disk.remove() }
+        let files = try ScreenRecordingCaptureFiles(directory: disk.url)
+        let assets = CaptureTestAssets()
+        let failures = ScreenRecordingCaptureStartGate()
+        let writer = ScreenRecordingCaptureWriter(files: files, configuration: .init(systemAudio: false, microphone: true),
+                                                  width: 16, height: 16, onFailure: { failures.resolve(.failure($0)) }, factory: assets.make)
+        let packet = try syntheticAudio(time: 100, kind: .microphone)
+        var block: CMBlockBuffer?
+        let length = ScreenRecordingCaptureAudioBacklog.byteLimit
+        #expect(CMBlockBufferCreateWithMemoryBlock(allocator: kCFAllocatorDefault, memoryBlock: nil, blockLength: length,
+                                                  blockAllocator: kCFAllocatorDefault, customBlockSource: nil,
+                                                  offsetToData: 0, dataLength: length, flags: 0, blockBufferOut: &block) == noErr)
+        var timing = CMSampleTimingInfo(duration: CMTime(value: 1, timescale: 48_000),
+                                        presentationTimeStamp: CMTime(value: 100, timescale: 1), decodeTimeStamp: .invalid)
+        var size = 2
+        var sample: CMSampleBuffer?
+        #expect(CMSampleBufferCreateReady(allocator: kCFAllocatorDefault, dataBuffer: try #require(block),
+                                          formatDescription: packet.buffer.formatDescription, sampleCount: 480,
+                                          sampleTimingEntryCount: 1, sampleTimingArray: &timing,
+                                          sampleSizeEntryCount: 1, sampleSizeArray: &size, sampleBufferOut: &sample) == noErr)
+        writer.receive(.init(buffer: try #require(sample), kind: .microphone, hostTime: 100))
+        await writer.flush()
+        writer.receive(try syntheticAudio(time: 100.01, kind: .microphone))
+        await writer.flush()
+        await #expect(throws: ScreenRecordingCaptureError.writerUnavailable) { try await failures.wait(timeout: 2) }
+        await writer.seal(at: 101)
+        await #expect(throws: ScreenRecordingCaptureError.writerUnavailable) { try await writer.finish() }
+        #expect(files.discard() == nil)
+    }
+
+    @Test
+    func preEpochAudioIsNotEvictedByTheCameraRingBuffer() async throws {
+        let disk = try CaptureTestDisk()
+        defer { disk.remove() }
+        let files = try ScreenRecordingCaptureFiles(directory: disk.url)
+        let assets = CaptureTestAssets()
+        let writer = ScreenRecordingCaptureWriter(files: files, configuration: .init(systemAudio: true, microphone: true, camera: true),
+                                                  width: 16, height: 16, onFailure: { _ in }, factory: assets.make)
+        for index in 0..<32 {
+            let time = 100 + Double(index) / 64
+            writer.receive(try syntheticAudio(time: time, kind: .systemAudio))
+            writer.receive(try syntheticAudio(time: time, kind: .microphone))
+            writer.receive(try syntheticVideo(time: time, kind: .camera))
+            await writer.flush()
+        }
+        writer.receive(try syntheticVideo(time: 100, kind: .screen))
+        await writer.seal(at: 101)
+        #expect(try await writer.finish() == 1)
+        let expected = (0..<32).map { Double($0) / 64 }
+        #expect(assets.times(.systemAudio) == expected)
+        #expect(assets.times(.microphone) == expected)
+        #expect(assets.times(.camera).count == 16)
+        #expect(files.discard() == nil)
+    }
+
+    @Test(arguments: [ScreenRecordingSampleKind.systemAudio, .microphone])
+    func rejectedAudioCannotSilentlyPublishAMissingPacket(kind: ScreenRecordingSampleKind) async throws {
+        let disk = try CaptureTestDisk()
+        defer { disk.remove() }
+        let files = try ScreenRecordingCaptureFiles(directory: disk.url)
+        let assets = CaptureTestAssets()
+        let failures = ScreenRecordingCaptureStartGate()
+        let writer = ScreenRecordingCaptureWriter(files: files, configuration: .init(systemAudio: true, microphone: true),
+                                                  width: 16, height: 16, onFailure: { failures.resolve(.failure($0)) }, factory: assets.make)
+        writer.receive(try syntheticVideo(time: 100, kind: .screen))
+        await writer.flush()
+        assets.ready = false
+        writer.receive(try syntheticAudio(time: 100, kind: kind))
+        await writer.flush()
+        await #expect(throws: ScreenRecordingCaptureError.writerUnavailable) { try await failures.wait(timeout: 2) }
+        await writer.seal(at: 101)
+        await #expect(throws: ScreenRecordingCaptureError.writerUnavailable) { try await writer.finish() }
+        #expect(assets.released)
+        #expect(assets.times(kind).isEmpty)
+        #expect(files.discard() == nil)
+    }
+
+    @Test
+    func nativeStopReleasesVideoInterleavingBeforeDrainingAcceptedAudio() async throws {
+        let disk = try CaptureTestDisk()
+        defer { disk.remove() }
+        let files = try ScreenRecordingCaptureFiles(directory: disk.url)
+        let readiness = CaptureTestNativeReadiness()
+        let writer = try await readiness.makeWriter(files: files, firstSample: syntheticVideo(time: 0, kind: .screen))
+        try await readiness.append(syntheticVideo(time: 0, kind: .screen), to: writer)
+        for index in 0..<3 {
+            try await readiness.append(syntheticAudio(time: Double(index) / 100, kind: .systemAudio), to: writer)
+        }
+        try await readiness.finish(writer, at: 1.0 / 30)
+        try files.publish([files.screenName])
+        let asset = AVURLAsset(url: disk.url.appendingPathComponent(files.screenName))
+        let track = try #require(try await asset.loadTracks(withMediaType: .audio).first)
+        #expect(readiness.marked == [.screen, .systemAudio])
+        let reader = try AVAssetReader(asset: asset)
+        let output = AVAssetReaderTrackOutput(track: track, outputSettings: [AVFormatIDKey: kAudioFormatLinearPCM,
+                                                                           AVLinearPCMIsFloatKey: true,
+                                                                           AVLinearPCMBitDepthKey: 32,
+                                                                           AVLinearPCMIsNonInterleaved: false])
+        reader.add(output)
+        #expect(reader.startReading())
+        var frames = 0
+        while let sample = output.copyNextSampleBuffer() { frames += sample.numSamples }
+        #expect(reader.status == .completed)
+        #expect(frames >= 1_440, "All three accepted 480-frame packets must survive the stop-time interleaving drain: \(frames)")
+    }
+
+    @Test
+    func nativeReadinessEventReleasesAFullAudioQueueBeforeAnotherPacketArrives() async throws {
+        let disk = try CaptureTestDisk()
+        defer { disk.remove() }
+        let files = try ScreenRecordingCaptureFiles(directory: disk.url)
+        let readiness = CaptureTestNativeReadiness()
+        readiness.waitsForVideoFinish = false
+        readiness.audioReady = false
+        let writer = try await readiness.makeWriter(files: files, firstSample: syntheticVideo(time: 0, kind: .screen))
+        try await readiness.append(syntheticVideo(time: 0, kind: .screen), to: writer)
+        for index in 0..<ScreenRecordingCaptureAudioBacklog.sampleLimit {
+            try await readiness.append(syntheticAudio(time: Double(index) / 100, kind: .systemAudio), to: writer)
+        }
+        try await readiness.resumeAudioOnReadinessEvent()
+        try await readiness.append(syntheticAudio(time: 5.12, kind: .systemAudio), to: writer)
+        try await readiness.finish(writer, at: 5.13)
+        try files.publish([files.screenName])
+        let asset = AVURLAsset(url: disk.url.appendingPathComponent(files.screenName))
+        #expect(try await asset.loadTracks(withMediaType: .audio).count == 1)
+        #expect(abs(try await asset.load(.duration).seconds - 5.13) < 0.05)
+    }
+
+    @Test
+    func nativeAudioTimeoutRetainsItsOriginalErrorAndReleasesTheWriter() async throws {
+        let disk = try CaptureTestDisk()
+        defer { disk.remove() }
+        let files = try ScreenRecordingCaptureFiles(directory: disk.url)
+        let readiness = CaptureTestNativeReadiness()
+        readiness.waitsForVideoFinish = false
+        readiness.audioReady = false
+        let writer = try await readiness.makeWriter(files: files, firstSample: syntheticVideo(time: 0, kind: .screen), timeout: 0)
+        try await readiness.append(syntheticVideo(time: 0, kind: .screen), to: writer)
+        try await readiness.append(syntheticAudio(time: 0, kind: .systemAudio), to: writer)
+        await #expect(throws: ScreenRecordingCaptureError.saveFailed(AppLocalization.text("录屏文件写入超时"))) {
+            try await readiness.failure.wait(timeout: 2)
+        }
+        await #expect(throws: ScreenRecordingCaptureError.writerUnavailable) {
+            try await readiness.append(syntheticAudio(time: 0.01, kind: .systemAudio), to: writer)
+        }
+        await readiness.cancel(writer)
+        #expect(!FileManager.default.fileExists(atPath: files.url(for: files.screenName).path))
+        #expect(files.discard() == nil)
+    }
+
+    @Test
+    func cancellationDuringNativeAudioDrainPreventsLaterWrites() async throws {
+        let disk = try CaptureTestDisk()
+        defer { disk.remove() }
+        let files = try ScreenRecordingCaptureFiles(directory: disk.url)
+        let readiness = CaptureTestNativeReadiness()
+        readiness.waitsForVideoFinish = false
+        readiness.audioReady = false
+        let native = try await readiness.makeWriter(files: files, firstSample: syntheticVideo(time: 0, kind: .screen))
+        try await readiness.append(syntheticVideo(time: 0, kind: .screen), to: native)
+        try await readiness.append(syntheticAudio(time: 0, kind: .systemAudio), to: native)
+        await readiness.beginFinish(native, at: 1.0 / 30)
+        await readiness.cancel(native)
+        await #expect(throws: ScreenRecordingCaptureError.writerUnavailable) {
+            try await readiness.append(syntheticAudio(time: 0.01, kind: .systemAudio), to: native)
+        }
+        #expect(!FileManager.default.fileExists(atPath: files.url(for: files.screenName).path))
+        #expect(files.discard() == nil)
+    }
+
+    @Test
+    func cancellationInsideNativeAudioDrainDoesNotFinishRemainingInputs() async throws {
+        let disk = try CaptureTestDisk()
+        defer { disk.remove() }
+        let files = try ScreenRecordingCaptureFiles(directory: disk.url)
+        let readiness = CaptureTestNativeReadiness()
+        readiness.waitsForVideoFinish = false
+        readiness.audioReady = false
+        let writer = try await readiness.makeWriter(files: files, firstSample: syntheticVideo(time: 0, kind: .screen))
+        try await readiness.append(syntheticVideo(time: 0, kind: .screen), to: writer)
+        try await readiness.append(syntheticAudio(time: 0, kind: .systemAudio), to: writer)
+        await readiness.cancelDuringNextDrain(writer, at: 1.0 / 30)
+        #expect(readiness.marked.isEmpty, "Cancellation while draining must not mark the remaining video input as finished")
+        await #expect(throws: ScreenRecordingCaptureError.writerUnavailable) {
+            try await readiness.append(syntheticAudio(time: 0.01, kind: .systemAudio), to: writer)
+        }
+        #expect(!FileManager.default.fileExists(atPath: files.url(for: files.screenName).path))
+        #expect(files.discard() == nil)
+    }
+
+    @Test
+    func cancellingAWriterUnblocksEveryConcurrentFinishAndKeepsLateCallbacksIgnored() async throws {
+        let disk = try CaptureTestDisk()
+        defer { disk.remove() }
+        let files = try ScreenRecordingCaptureFiles(directory: disk.url)
+        let assets = CaptureTestAssets()
+        assets.finishHeld = true
+        let entered = ScreenRecordingCaptureStartGate()
+        assets.finishEntered = entered
+        let writer = ScreenRecordingCaptureWriter(files: files, configuration: .init(systemAudio: false), width: 16, height: 16,
+                                                  onFailure: { _ in }, factory: assets.make)
+        writer.receive(try syntheticVideo(time: 100, kind: .screen))
+        await writer.seal(at: 101)
+        let first = Task { try await writer.finish() }
+        _ = try await entered.wait(timeout: 2)
+        let second = Task { try await writer.finish() }
+        await writer.cancel()
+        await #expect(throws: CancellationError.self) { try await first.value }
+        await #expect(throws: CancellationError.self) { try await second.value }
+        assets.releaseFinishes(.success(()))
+        await writer.cancel()
+        writer.receive(try syntheticVideo(time: 101, kind: .screen))
+        await writer.flush()
+        #expect(assets.times(.screen) == [0])
+        #expect(assets.released)
+        #expect(files.discard() == nil)
+    }
+
+    @Test
+    func concurrentWriterFinishesReturnOneResultWithoutFinishingAssetsTwice() async throws {
+        let disk = try CaptureTestDisk()
+        defer { disk.remove() }
+        let files = try ScreenRecordingCaptureFiles(directory: disk.url)
+        let assets = CaptureTestAssets()
+        assets.finishHeld = true
+        let entered = ScreenRecordingCaptureStartGate()
+        assets.finishEntered = entered
+        let writer = ScreenRecordingCaptureWriter(files: files, configuration: .init(systemAudio: false), width: 16, height: 16,
+                                                  onFailure: { _ in }, factory: assets.make)
+        writer.receive(try syntheticVideo(time: 100, kind: .screen))
+        await writer.seal(at: 101)
+        let first = Task { try await writer.finish() }
+        _ = try await entered.wait(timeout: 2)
+        let second = Task { try await writer.finish() }
+        await writer.flush()
+        assets.releaseFinishes(.success(()))
+        #expect(try await first.value == 1)
+        #expect(try await second.value == 1)
+        #expect(try await writer.finish() == 1)
+        #expect(assets.finishTimes == [1])
+        #expect(files.discard() == nil)
+    }
+
+    @Test
     func fileCleanupFailureIsVisibleAndCanBeRetriedWithoutTouchingExistingData() throws {
         let disk = try CaptureTestDisk()
         defer { disk.remove() }
@@ -1011,10 +1341,12 @@ private final class CaptureTestAssets: @unchecked Sendable {
     private let lock = NSLock()
     private var storage: [ScreenRecordingSampleKind: [Double]] = [:]
     private var finishes: [Double] = []
+    private var finishCallbacks: [@Sendable (Result<Void, Error>) -> Void] = []
     private var cancelled = false
     var appendError: CaptureTestError?
     var finishError: CaptureTestError?
     var finishHeld = false
+    var finishEntered: ScreenRecordingCaptureStartGate?
     var ready = true
     var appendBlock: (ScreenRecordingCaptureStartGate, DispatchSemaphore)?
 
@@ -1043,6 +1375,22 @@ private final class CaptureTestAssets: @unchecked Sendable {
         finishes.append(time)
         return finishError.map { .failure($0) } ?? .success(())
     }
+    func finish(at time: Double, completion: @escaping @Sendable (Result<Void, Error>) -> Void) {
+        if finishHeld {
+            lock.lock()
+            finishes.append(time)
+            finishCallbacks.append(completion)
+            lock.unlock()
+        } else { completion(finish(at: time)) }
+        finishEntered?.resolve(.success(time))
+    }
+    func releaseFinishes(_ result: Result<Void, Error>) {
+        lock.lock()
+        let callbacks = finishCallbacks
+        finishCallbacks.removeAll()
+        lock.unlock()
+        for callback in callbacks { callback(result) }
+    }
     func cancel() { lock.lock(); cancelled = true; lock.unlock() }
 }
 
@@ -1051,7 +1399,111 @@ private final class CaptureTestAssetWriter: ScreenRecordingCaptureAssetWriter {
     init(assets: CaptureTestAssets) { self.assets = assets }
     func append(_ sample: CMSampleBuffer, kind: ScreenRecordingSampleKind) throws -> Bool { try assets.append(sample, kind: kind) }
     func finish(at time: Double, completion: @escaping @Sendable (Result<Void, Error>) -> Void) {
-        if !assets.finishHeld { completion(assets.finish(at: time)) }
+        assets.finish(at: time, completion: completion)
     }
     func cancel() { assets.cancel() }
+}
+
+private final class CaptureTestNativeReadiness: @unchecked Sendable {
+    let queue = DispatchQueue(label: "dev.wzz.zisla.tests.capture-readiness")
+    private let lock = NSLock()
+    private var finished: [ScreenRecordingSampleKind] = []
+    var waitsForVideoFinish = true
+    var audioReady = true
+    var onAudioReady: (() -> Void)?
+    weak var audioInput: AVAssetWriterInput?
+    let failure = ScreenRecordingCaptureStartGate()
+    var marked: [ScreenRecordingSampleKind] { lock.lock(); defer { lock.unlock() }; return finished }
+
+    func ready(_ kind: ScreenRecordingSampleKind, _ input: AVAssetWriterInput) -> Bool {
+        lock.lock()
+        if kind.isAudio { audioInput = input }
+        let unblocked = !kind.isAudio || audioReady && (!waitsForVideoFinish || finished.contains(.screen))
+        lock.unlock()
+        if kind.isAudio, unblocked, let onAudioReady {
+            self.onAudioReady = nil
+            onAudioReady()
+            return true
+        }
+        return unblocked && input.isReadyForMoreMediaData
+    }
+
+    func markFinished(_ kind: ScreenRecordingSampleKind, _ input: AVAssetWriterInput) {
+        input.markAsFinished()
+        lock.lock()
+        finished.append(kind)
+        lock.unlock()
+    }
+
+    func makeWriter(files: ScreenRecordingCaptureFiles, firstSample: ScreenRecordingCaptureSample,
+                    timeout: Double = 2) async throws -> ScreenRecordingNativeAssetWriter {
+        try await withCheckedThrowingContinuation { continuation in
+            queue.async {
+                do {
+                    let native = try ScreenRecordingNativeAssetWriter(url: files.url(for: files.screenName), kind: .screen,
+                                                                       firstSample: firstSample.buffer, width: 16, height: 16,
+                                                                       systemAudio: true, frameRate: 30, finishQueue: self.queue,
+                                                                       finishTimeout: timeout, onFailure: { self.failure.resolve(.failure($0)) },
+                                                                       ready: self.ready, markFinished: self.markFinished)
+                    continuation.resume(returning: native)
+                } catch { continuation.resume(throwing: error) }
+            }
+        }
+    }
+
+    func append(_ sample: ScreenRecordingCaptureSample, to writer: ScreenRecordingNativeAssetWriter) async throws {
+        try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Void, Error>) in
+            queue.async {
+                do {
+                    guard try writer.append(sample.buffer, kind: sample.kind) else { throw ScreenRecordingCaptureError.writerUnavailable }
+                    continuation.resume()
+                } catch { continuation.resume(throwing: error) }
+            }
+        }
+    }
+
+    func finish(_ writer: ScreenRecordingNativeAssetWriter, at time: Double) async throws {
+        let result = ScreenRecordingCaptureStartGate()
+        queue.async { writer.finish(at: time) { result.resolve($0.map { 0 }) } }
+        _ = try await result.wait(timeout: 2)
+    }
+
+    func resumeAudioOnReadinessEvent() async throws {
+        try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Void, Error>) in
+            queue.async {
+                do {
+                    let input = try #require(self.audioInput)
+                    // Emit the SDK's readiness notification without creating real disk or CPU contention.
+                    input.willChangeValue(forKey: "readyForMoreMediaData")
+                    self.audioReady = true
+                    input.didChangeValue(forKey: "readyForMoreMediaData")
+                    continuation.resume()
+                } catch { continuation.resume(throwing: error) }
+            }
+        }
+    }
+
+    func cancelDuringNextDrain(_ writer: ScreenRecordingNativeAssetWriter, at time: Double) async {
+        await withCheckedContinuation { continuation in
+            queue.async {
+                self.audioReady = true
+                self.onAudioReady = { writer.cancel() }
+                writer.finish(at: time) { _ in Issue.record("Cancelled native finish must not produce a late result") }
+                continuation.resume()
+            }
+        }
+    }
+
+    func beginFinish(_ writer: ScreenRecordingNativeAssetWriter, at time: Double) async {
+        await withCheckedContinuation { continuation in
+            queue.async {
+                writer.finish(at: time) { _ in }
+                continuation.resume()
+            }
+        }
+    }
+
+    func cancel(_ writer: ScreenRecordingNativeAssetWriter) async {
+        await withCheckedContinuation { continuation in queue.async { writer.cancel(); continuation.resume() } }
+    }
 }

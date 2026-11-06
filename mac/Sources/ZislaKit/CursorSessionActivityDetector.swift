@@ -4,11 +4,18 @@ import ZislaCore
 
 /// Adapted from chat-stasher's Cursor reader (Apache-2.0); only indexed metadata is selected.
 public final class CursorSessionActivityDetector: AIActivityDetecting {
+    private struct ObservedRun: Hashable {
+        let database: URL
+        let composerID: String
+        let unfinished: Double
+    }
+
     public let userDirectory: URL
     public let maxSessions: Int
     private let recencyThreshold: TimeInterval
     private let now: () -> Date
     private let isApplicationRunning: () -> Bool
+    private var observedRuns: Set<ObservedRun> = []
 
     public init(
         userDirectory: URL = CursorSessionActivityDetector.defaultUserDirectory(),
@@ -45,11 +52,19 @@ public final class CursorSessionActivityDetector: AIActivityDetecting {
     }
 
     public func activeTasks() throws -> [AIProgressTask] {
-        guard isApplicationRunning() else { return [] }
+        guard isApplicationRunning() else {
+            observedRuns.removeAll()
+            return []
+        }
         let currentTime = now()
         let cutoff = currentTime.addingTimeInterval(-recencyThreshold)
         var tasks: [String: AIProgressTask] = [:]
+        var observedCandidates: [String: ObservedRun] = [:]
         for database in databases {
+            let retainedHeaders = observedRuns.filter { $0.database == database }.reduce("0") { filter, run in
+                let identity = run.composerID.utf8.map { String(format: "%02X", $0) }.joined()
+                return "\(filter) OR (hex(json_extract(c.value, '$.composerId')) = '\(identity)' AND unfinished = \(run.unfinished))"
+            }
             let fields = """
                 json_extract(c.value, '$.composerId') AS id,
                 json_extract(c.value, '$.name') AS name,
@@ -72,12 +87,14 @@ public final class CursorSessionActivityDetector: AIActivityDetecting {
                 ORDER BY updated DESC LIMIT \(maxSessions)
                 """, limit: maxSessions)
             let headers = DesktopAIStorage.rows(at: database, sql: """
-                SELECT \(fields) FROM composerHeaders c
+                SELECT \(fields), 1 AS header FROM composerHeaders c
                 WHERE json_valid(c.value) AND json_extract(c.value, '$.type') = 'head'
                 AND COALESCE(json_extract(c.value, '$.composerId'), '') != ''
                 AND (json_extract(c.value, '$.status') IS NULL
                      OR json_extract(c.value, '$.status') = 'generating')
-                AND json_extract(c.value, '$.unfinishedRunAt') >= \(cutoff.timeIntervalSince1970 * 1_000)
+                AND json_type(c.value, '$.unfinishedRunAt') IN ('integer', 'real')
+                AND unfinished > 0
+                AND (unfinished >= \(cutoff.timeIntervalSince1970 * 1_000) OR (\(retainedHeaders)))
                 AND json_extract(c.value, '$.unfinishedRunAt') <= \(currentTime.timeIntervalSince1970 * 1_000)
                 AND COALESCE(json_extract(c.value, '$.isArchived'), 0) = 0
                 AND COALESCE(json_extract(c.value, '$.isDraft'), 0) = 0
@@ -104,6 +121,13 @@ public final class CursorSessionActivityDetector: AIActivityDetecting {
             for row in headers + global + legacy {
                 guard let id = row["id"] as? String, !id.isEmpty,
                       let updated = DesktopAIStorage.milliseconds(row["updated"]) else { continue }
+                let run: ObservedRun?
+                if (row["header"] as? NSNumber)?.boolValue == true, let marker = row["unfinished"] as? NSNumber {
+                    run = ObservedRun(database: database, composerID: id, unfinished: marker.doubleValue)
+                } else {
+                    run = nil
+                }
+                let wasObserved = run.map { observedRuns.contains($0) } == true
                 let taskID = "cursor-session-" + DesktopAIStorage.identity([id])
                 let task = AIProgressTask(
                     id: taskID, provider: .cursor,
@@ -113,11 +137,23 @@ public final class CursorSessionActivityDetector: AIActivityDetecting {
                     updatedAt: updated, startedAt: DesktopAIStorage.milliseconds(row["unfinished"])
                         ?? DesktopAIStorage.milliseconds(row["created"])
                 )
-                if tasks[taskID].map({ $0.updatedAt >= updated }) != true { tasks[taskID] = task }
+                if tasks[taskID].map({ $0.updatedAt >= task.updatedAt }) != true {
+                    tasks[taskID] = task
+                    observedCandidates[taskID] = wasObserved || updated >= cutoff ? run : nil
+                }
             }
         }
-        return Array(tasks.values.sorted {
+        let result = Array(tasks.values.sorted {
             $0.updatedAt != $1.updatedAt ? $0.updatedAt > $1.updatedAt : $0.id < $1.id
-        }.prefix(maxSessions))
+        }.prefix(maxSessions)).map { task in
+            var task = task
+            if let run = observedCandidates[task.id], observedRuns.contains(run) {
+                // Observation time prevents TTL expiry without changing metadata selection.
+                task.updatedAt = currentTime
+            }
+            return task
+        }
+        observedRuns = Set(result.compactMap { observedCandidates[$0.id] })
+        return result
     }
 }

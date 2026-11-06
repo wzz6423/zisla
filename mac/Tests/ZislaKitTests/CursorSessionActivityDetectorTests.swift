@@ -167,6 +167,242 @@ struct CursorSessionActivityDetectorTests {
         #expect(try Data(contentsOf: database) == before)
     }
 
+    @Test @MainActor func retainsObservedHeaderPastRecencyWindowUntilRunMarkerClears() throws {
+        let root = try fixtureRoot()
+        defer { try? FileManager.default.removeItem(at: root) }
+        let database = root.appendingPathComponent("globalStorage/state.vscdb")
+        try execute("CREATE TABLE composerHeaders (composerId TEXT PRIMARY KEY, value TEXT)", at: database)
+        var header = composer("long-running", ["type": "head", "unfinishedRunAt": 1_909_999_990_000])
+        try insert(header, key: "long-running", table: "composerHeaders", at: database)
+        let before = try Data(contentsOf: database)
+        var currentTime = now
+        let detector = CursorSessionActivityDetector(userDirectory: root,
+            isApplicationRunning: { true }, now: { currentTime })
+        let monitor = AIStateMonitor(directoryURL: root.appendingPathComponent("monitor"),
+            activityDetectors: [detector], now: { currentTime })
+        defer { monitor.stop() }
+        monitor.reload()
+        let initial = try #require(monitor.state.tasks.first)
+        #expect(initial.updatedAt == Date(timeIntervalSince1970: 1_909_999_990))
+
+        currentTime = now.addingTimeInterval(31 * 60)
+        monitor.reload()
+        let retained = try #require(monitor.state.tasks.first)
+        #expect(retained.id == initial.id && retained.status == .running)
+        #expect(retained.startedAt == initial.startedAt && retained.updatedAt == currentTime)
+        #expect(try CursorSessionActivityDetector(userDirectory: root,
+            isApplicationRunning: { true }, now: { currentTime }).activeTasks().isEmpty)
+        #expect(try Data(contentsOf: database) == before)
+
+        header.removeValue(forKey: "unfinishedRunAt")
+        header["lastUpdatedAt"] = currentTime.timeIntervalSince1970 * 1_000
+        try execute("DELETE FROM composerHeaders", at: database)
+        try insert(header, key: "long-running", table: "composerHeaders", at: database)
+        monitor.reload()
+        #expect(monitor.state.tasks.isEmpty)
+        header["unfinishedRunAt"] = 1_909_999_990_000
+        try execute("DELETE FROM composerHeaders", at: database)
+        try insert(header, key: "long-running", table: "composerHeaders", at: database)
+        #expect(try detector.activeTasks().isEmpty)
+    }
+
+    @Test func rememberedHeaderMarkerReplacementRequiresARecentNewRun() throws {
+        let root = try fixtureRoot()
+        defer { try? FileManager.default.removeItem(at: root) }
+        let database = root.appendingPathComponent("globalStorage/state.vscdb")
+        try execute("CREATE TABLE composerHeaders (composerId TEXT PRIMARY KEY, value TEXT)", at: database)
+        var header = composer("replace", ["type": "head", "unfinishedRunAt": 1_909_999_990_000])
+        try insert(header, key: "replace", table: "composerHeaders", at: database)
+        var currentTime = now
+        let detector = CursorSessionActivityDetector(userDirectory: root,
+            isApplicationRunning: { true }, now: { currentTime })
+        #expect(try detector.activeTasks().count == 1)
+        currentTime = now.addingTimeInterval(31 * 60)
+        header["unfinishedRunAt"] = 1_909_999_980_000
+        header["lastUpdatedAt"] = currentTime.timeIntervalSince1970 * 1_000
+        try execute("DELETE FROM composerHeaders", at: database)
+        try insert(header, key: "replace", table: "composerHeaders", at: database)
+        #expect(try detector.activeTasks().isEmpty)
+        header["unfinishedRunAt"] = 1_909_999_990_000
+        try execute("DELETE FROM composerHeaders", at: database)
+        try insert(header, key: "replace", table: "composerHeaders", at: database)
+        #expect(try detector.activeTasks().isEmpty)
+
+        let freshMarker = currentTime.addingTimeInterval(-1).timeIntervalSince1970 * 1_000
+        header["unfinishedRunAt"] = freshMarker
+        try execute("DELETE FROM composerHeaders", at: database)
+        try insert(header, key: "replace", table: "composerHeaders", at: database)
+        let task = try #require(detector.activeTasks().first)
+        #expect(task.startedAt == currentTime.addingTimeInterval(-1))
+        currentTime = currentTime.addingTimeInterval(31 * 60)
+        #expect(try detector.activeTasks().first?.startedAt == task.startedAt)
+    }
+
+    @Test func invalidOrInactiveHeadersClearRememberedRunsWithoutResurrection() throws {
+        let mutations: [(String, [String: Any])] = [
+            ("completed", ["status": "completed"]),
+            ("aborted", ["status": "aborted"]),
+            ("archived", ["isArchived": true]),
+            ("draft", ["isDraft": true]),
+            ("wrong-type", ["type": "full"]),
+            ("future-marker", ["unfinishedRunAt": 1_911_000_000_000]),
+            ("future-update", ["lastUpdatedAt": 1_911_000_000_000]),
+            ("boolean-marker", ["unfinishedRunAt": true]),
+            ("string-marker", ["unfinishedRunAt": "1909999990000"]),
+        ]
+        for (name, values) in mutations {
+            let root = try fixtureRoot()
+            defer { try? FileManager.default.removeItem(at: root) }
+            let database = root.appendingPathComponent("globalStorage/state.vscdb")
+            try execute("CREATE TABLE composerHeaders (composerId TEXT PRIMARY KEY, value TEXT)", at: database)
+            let header = composer(name, ["type": "head", "unfinishedRunAt": 1_909_999_990_000])
+            try insert(header, key: name, table: "composerHeaders", at: database)
+            var currentTime = now
+            let detector = CursorSessionActivityDetector(userDirectory: root,
+                isApplicationRunning: { true }, now: { currentTime })
+            #expect(try detector.activeTasks().count == 1)
+            currentTime = now.addingTimeInterval(31 * 60)
+            try execute("DELETE FROM composerHeaders", at: database)
+            try insert(header.merging(values) { _, new in new }, key: name, table: "composerHeaders", at: database)
+            #expect(try detector.activeTasks().isEmpty, "Must discard remembered \(name) header")
+            try execute("DELETE FROM composerHeaders", at: database)
+            try insert(header, key: name, table: "composerHeaders", at: database)
+            #expect(try detector.activeTasks().isEmpty, "Must not resurrect \(name) header")
+        }
+    }
+
+    @Test func missingOrCorruptedHeadersAndApplicationExitClearRememberedRuns() throws {
+        for failure in ["missing", "corrupted", "application-exit"] {
+            let root = try fixtureRoot()
+            defer { try? FileManager.default.removeItem(at: root) }
+            let database = root.appendingPathComponent("globalStorage/state.vscdb")
+            try execute("CREATE TABLE composerHeaders (composerId TEXT PRIMARY KEY, value TEXT)", at: database)
+            let header = composer("recover", ["type": "head", "unfinishedRunAt": 1_909_999_990_000])
+            try insert(header, key: "recover", table: "composerHeaders", at: database)
+            let before = try Data(contentsOf: database)
+            var currentTime = now
+            var running = true
+            let detector = CursorSessionActivityDetector(userDirectory: root,
+                isApplicationRunning: { running }, now: { currentTime })
+            #expect(try detector.activeTasks().count == 1)
+            currentTime = now.addingTimeInterval(31 * 60)
+            switch failure {
+            case "missing": try FileManager.default.removeItem(at: database)
+            case "corrupted": try Data("invalid database".utf8).write(to: database)
+            default: running = false
+            }
+            #expect(try detector.activeTasks().isEmpty, "Must clear remembered run after \(failure)")
+            if failure == "missing" { #expect(!FileManager.default.fileExists(atPath: database.path)) }
+            if failure == "corrupted" { #expect(try Data(contentsOf: database) == Data("invalid database".utf8)) }
+            running = true
+            try before.write(to: database)
+            #expect(try detector.activeTasks().isEmpty, "Must not resurrect old run after \(failure)")
+        }
+    }
+
+    @Test func onlyRemembersHeadersWithFreshInitialUpdates() throws {
+        let root = try fixtureRoot()
+        defer { try? FileManager.default.removeItem(at: root) }
+        let database = root.appendingPathComponent("globalStorage/state.vscdb")
+        try execute("CREATE TABLE composerHeaders (composerId TEXT PRIMARY KEY, value TEXT)", at: database)
+        try insert(composer("stale-update", ["type": "head", "unfinishedRunAt": 1_909_999_990_000,
+            "lastUpdatedAt": 1_909_000_000_000]), key: "stale-update", table: "composerHeaders", at: database)
+        var currentTime = now
+        let detector = CursorSessionActivityDetector(userDirectory: root,
+            isApplicationRunning: { true }, now: { currentTime })
+        #expect(try detector.activeTasks().count == 1)
+        currentTime = now.addingTimeInterval(31 * 60)
+        #expect(try detector.activeTasks().isEmpty)
+    }
+
+    @Test func rememberedHeadersStayWithinReturnedSessionLimitAndOriginalDatabase() throws {
+        for (secondDatabase, sameComposer) in [(false, false), (true, true), (true, false)] {
+            let root = try fixtureRoot()
+            defer { try? FileManager.default.removeItem(at: root) }
+            let first = root.appendingPathComponent("globalStorage/state.vscdb")
+            let second = secondDatabase ? root.appendingPathComponent("workspaceStorage/fixture/state.vscdb") : first
+            try execute("CREATE TABLE composerHeaders (composerId TEXT PRIMARY KEY, value TEXT)", at: first)
+            if secondDatabase {
+                try execute("CREATE TABLE composerHeaders (composerId TEXT PRIMARY KEY, value TEXT)", at: second)
+            }
+            let id = "quote' OR 1=1 --"
+            try insert(composer(id, ["type": "head", "unfinishedRunAt": 1_909_999_990_000]),
+                key: "selected", table: "composerHeaders", at: first)
+            try insert(composer(sameComposer ? id : "unselected", ["type": "head",
+                "unfinishedRunAt": 1_909_999_990_000, "lastUpdatedAt": 1_909_999_980_000]),
+                key: "unselected", table: "composerHeaders", at: second)
+            var currentTime = now
+            let detector = CursorSessionActivityDetector(userDirectory: root, maxSessions: 1,
+                isApplicationRunning: { true }, now: { currentTime })
+            #expect(try detector.activeTasks().map(\.title) == [id])
+            currentTime = now.addingTimeInterval(31 * 60)
+            #expect(try detector.activeTasks().map(\.title) == [id])
+            try execute("DELETE FROM composerHeaders WHERE composerId = 'selected'", at: first)
+            #expect(try detector.activeTasks().isEmpty)
+        }
+    }
+
+    @Test func newHeaderDisplacesAnOlderRememberedTaskAtSessionLimit() throws {
+        let root = try fixtureRoot()
+        defer { try? FileManager.default.removeItem(at: root) }
+        let database = root.appendingPathComponent("globalStorage/state.vscdb")
+        try execute("CREATE TABLE composerHeaders (composerId TEXT PRIMARY KEY, value TEXT)", at: database)
+        try insert(composer("old", ["type": "head", "unfinishedRunAt": 1_909_999_990_000]),
+            key: "old", table: "composerHeaders", at: database)
+        var currentTime = now
+        let detector = CursorSessionActivityDetector(userDirectory: root, maxSessions: 1,
+            isApplicationRunning: { true }, now: { currentTime })
+        #expect(try detector.activeTasks().map(\.title) == ["old"])
+        currentTime = now.addingTimeInterval(31 * 60)
+        #expect(try detector.activeTasks().map(\.title) == ["old"])
+        let freshMarker = currentTime.addingTimeInterval(-1).timeIntervalSince1970 * 1_000
+        try insert(composer("new", ["type": "head", "unfinishedRunAt": freshMarker,
+            "lastUpdatedAt": freshMarker]), key: "new", table: "composerHeaders", at: database)
+        #expect(try detector.activeTasks().map(\.title) == ["new"])
+        try execute("DELETE FROM composerHeaders WHERE composerId = 'new'", at: database)
+        #expect(try detector.activeTasks().isEmpty)
+    }
+
+    @Test func newerComposerMetadataWinsOverRememberedHeaderObservationTime() throws {
+        for secondDatabase in [false, true] {
+            let root = try fixtureRoot()
+            defer { try? FileManager.default.removeItem(at: root) }
+            let global = root.appendingPathComponent("globalStorage/state.vscdb")
+            let full = secondDatabase ? root.appendingPathComponent("workspaceStorage/fixture/state.vscdb") : global
+            try execute("CREATE TABLE composerHeaders (composerId TEXT PRIMARY KEY, value TEXT)", at: global)
+            try insert(composer("same", ["type": "head", "unfinishedRunAt": 1_909_999_990_000]),
+                key: "same", table: "composerHeaders", at: global)
+            try execute("CREATE TABLE cursorDiskKV (key TEXT PRIMARY KEY, value TEXT)", at: full)
+            var currentTime = now
+            let detector = CursorSessionActivityDetector(userDirectory: root,
+                isApplicationRunning: { true }, now: { currentTime })
+            #expect(try detector.activeTasks().map(\.title) == ["same"])
+            currentTime = now.addingTimeInterval(31 * 60)
+            let updated = currentTime.addingTimeInterval(-1)
+            try insert(composer("same", ["status": "generating", "name": "newest",
+                "unfinishedRunAt": 1_909_999_990_000, "lastUpdatedAt": updated.timeIntervalSince1970 * 1_000]),
+                key: "composerData:same", at: full)
+            let task = try #require(detector.activeTasks().first)
+            #expect(task.title == "newest" && task.updatedAt == updated)
+            try execute("DELETE FROM cursorDiskKV", at: full)
+            #expect(try detector.activeTasks().isEmpty)
+        }
+    }
+
+    @Test func headerRunMarkersMustBePositiveNumbersEvenInsideRecencyWindow() throws {
+        let root = try fixtureRoot()
+        defer { try? FileManager.default.removeItem(at: root) }
+        let database = root.appendingPathComponent("globalStorage/state.vscdb")
+        try execute("CREATE TABLE composerHeaders (composerId TEXT PRIMARY KEY, value TEXT)", at: database)
+        for (id, marker) in [("valid", 1 as Any), ("boolean", true as Any), ("zero", 0 as Any), ("string", "1" as Any)] {
+            try insert(composer(id, ["type": "head", "unfinishedRunAt": marker, "lastUpdatedAt": 2_000]),
+                key: id, table: "composerHeaders", at: database)
+        }
+        let detector = CursorSessionActivityDetector(userDirectory: root,
+            isApplicationRunning: { true }, now: { Date(timeIntervalSince1970: 2) })
+        #expect(try detector.activeTasks().map(\.title) == ["valid"])
+    }
+
     @Test @MainActor func canonicalHeaderWALUpdatesPublishAndRemoveMonitorTasks() async throws {
         let root = try fixtureRoot()
         defer { try? FileManager.default.removeItem(at: root) }
