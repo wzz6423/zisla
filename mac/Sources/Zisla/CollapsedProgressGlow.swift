@@ -145,11 +145,31 @@ struct CompactIslandShape: InsettableShape {
     }
 }
 
+private struct CollapsedProgressTrack: Shape {
+    var layoutStyle: IslandLayoutStyle
+    var pillCornerRadius: CGFloat?
+    var isPlayback: Bool
+
+    func path(in rect: CGRect) -> Path {
+        if isPlayback && layoutStyle == .notch {
+            let bounds = rect.insetBy(dx: CollapsedProgress.outlineInset, dy: CollapsedProgress.outlineInset)
+            return Path { path in
+                path.move(to: CGPoint(x: bounds.minX, y: bounds.maxY))
+                path.addLine(to: CGPoint(x: bounds.maxX, y: bounds.maxY))
+            }
+        }
+        return CompactIslandShape(layoutStyle: layoutStyle, pillCornerRadius: pillCornerRadius)
+            .inset(by: CollapsedProgress.outlineInset)
+            .path(in: rect)
+    }
+}
+
 struct CollapsedProgressGlow: View {
     var progress: Double
     var tint: Color = .green
     var layoutStyle: IslandLayoutStyle = .notch
     var pillCornerRadius: CGFloat? = nil
+    var isPlayback = false
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @Environment(\.accessibilityReduceTransparency) private var reduceTransparency
 
@@ -157,17 +177,18 @@ struct CollapsedProgressGlow: View {
         Self.rendering(
             progress: progress, tint: tint, layoutStyle: layoutStyle,
             reduceMotion: reduceMotion, reduceTransparency: reduceTransparency,
-            pillCornerRadius: pillCornerRadius
+            pillCornerRadius: pillCornerRadius, isPlayback: isPlayback
         )
     }
 
     static func rendering(
         progress: Double, tint: Color, layoutStyle: IslandLayoutStyle,
-        reduceMotion: Bool, reduceTransparency: Bool, pillCornerRadius: CGFloat? = nil
+        reduceMotion: Bool, reduceTransparency: Bool, pillCornerRadius: CGFloat? = nil,
+        isPlayback: Bool
     ) -> some View {
         let fraction = CollapsedProgress.normalized(progress) ?? 0
-        let outline = CompactIslandShape(layoutStyle: layoutStyle, pillCornerRadius: pillCornerRadius)
-            .inset(by: CollapsedProgress.outlineInset)
+        let outline = CollapsedProgressTrack(layoutStyle: layoutStyle, pillCornerRadius: pillCornerRadius,
+                                             isPlayback: isPlayback)
             .trim(from: 0, to: fraction)
         return ZStack {
             outline.stroke(
