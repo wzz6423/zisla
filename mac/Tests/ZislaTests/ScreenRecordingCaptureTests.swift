@@ -988,6 +988,28 @@ struct ScreenRecordingCaptureTests {
     }
 
     @Test
+    func nativeReadinessEventReleasesAFullAudioQueueBeforeAnotherPacketArrives() async throws {
+        let disk = try CaptureTestDisk()
+        defer { disk.remove() }
+        let files = try ScreenRecordingCaptureFiles(directory: disk.url)
+        let readiness = CaptureTestNativeReadiness()
+        readiness.waitsForVideoFinish = false
+        readiness.audioReady = false
+        let writer = try await readiness.makeWriter(files: files, firstSample: syntheticVideo(time: 0, kind: .screen))
+        try await readiness.append(syntheticVideo(time: 0, kind: .screen), to: writer)
+        for index in 0..<ScreenRecordingCaptureAudioBacklog.sampleLimit {
+            try await readiness.append(syntheticAudio(time: Double(index) / 100, kind: .systemAudio), to: writer)
+        }
+        try await readiness.resumeAudioOnReadinessEvent()
+        try await readiness.append(syntheticAudio(time: 5.12, kind: .systemAudio), to: writer)
+        try await readiness.finish(writer, at: 5.13)
+        try files.publish([files.screenName])
+        let asset = AVURLAsset(url: disk.url.appendingPathComponent(files.screenName))
+        #expect(try await asset.loadTracks(withMediaType: .audio).count == 1)
+        #expect(abs(try await asset.load(.duration).seconds - 5.13) < 0.05)
+    }
+
+    @Test
     func nativeAudioTimeoutRetainsItsOriginalErrorAndReleasesTheWriter() async throws {
         let disk = try CaptureTestDisk()
         defer { disk.remove() }
@@ -1389,11 +1411,13 @@ private final class CaptureTestNativeReadiness: @unchecked Sendable {
     var waitsForVideoFinish = true
     var audioReady = true
     var onAudioReady: (() -> Void)?
+    weak var audioInput: AVAssetWriterInput?
     let failure = ScreenRecordingCaptureStartGate()
     var marked: [ScreenRecordingSampleKind] { lock.lock(); defer { lock.unlock() }; return finished }
 
     func ready(_ kind: ScreenRecordingSampleKind, _ input: AVAssetWriterInput) -> Bool {
         lock.lock()
+        if kind.isAudio { audioInput = input }
         let unblocked = !kind.isAudio || audioReady && (!waitsForVideoFinish || finished.contains(.screen))
         lock.unlock()
         if kind.isAudio, unblocked, let onAudioReady {
@@ -1442,6 +1466,21 @@ private final class CaptureTestNativeReadiness: @unchecked Sendable {
         let result = ScreenRecordingCaptureStartGate()
         queue.async { writer.finish(at: time) { result.resolve($0.map { 0 }) } }
         _ = try await result.wait(timeout: 2)
+    }
+
+    func resumeAudioOnReadinessEvent() async throws {
+        try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Void, Error>) in
+            queue.async {
+                do {
+                    let input = try #require(self.audioInput)
+                    // Emit the SDK's readiness notification without creating real disk or CPU contention.
+                    input.willChangeValue(forKey: "readyForMoreMediaData")
+                    self.audioReady = true
+                    input.didChangeValue(forKey: "readyForMoreMediaData")
+                    continuation.resume()
+                } catch { continuation.resume(throwing: error) }
+            }
+        }
     }
 
     func cancelDuringNextDrain(_ writer: ScreenRecordingNativeAssetWriter, at time: Double) async {
