@@ -222,7 +222,7 @@ struct ContextNoteScreenshotWindowTests {
         let message: String? = await withCheckedContinuation { continuation in
             controller.present(screenshot, onCopy: { _ in Issue.record("Saving must not copy") }, onSave: { png in
                 #expect(png == screenshot.png)
-                ScreenshotImageExport.presentSavePanel(for: png, panel: fixture.panel,
+                ScreenshotImageExport.presentSavePanel(for: png, directory: fixture.directory, panel: fixture.panel,
                     systemPreferences: fixture.preferences, themeNotifications: fixture.notifications) {
                     continuation.resume(returning: $0)
                 }

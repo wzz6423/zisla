@@ -9,6 +9,29 @@ import ZislaCore
 @Suite(.serialized)
 struct ScreenshotImageExportTests {
     @Test
+    func savePanelsFollowDownloadDirectoryChangesInsteadOfRememberingThePreviousFolder() async throws {
+        let fixture = try Fixture()
+        defer { fixture.close() }
+        for name in ["Initial downloads", "Updated downloads"] {
+            let directory = fixture.directory.appendingPathComponent(name, isDirectory: true)
+            try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: false)
+            fixture.panel.directoryURL = fixture.directory
+            let message: String? = await withCheckedContinuation { continuation in
+                ScreenshotImageExport.presentSavePanel(for: Self.png, directory: directory, panel: fixture.panel,
+                    systemPreferences: fixture.preferences, themeNotifications: fixture.notifications) {
+                    continuation.resume(returning: $0)
+                }
+                #expect(fixture.panel.directoryURL?.standardizedFileURL == directory.standardizedFileURL,
+                        "Every save must start in the current shared download directory")
+                fixture.panel.respond(.cancel)
+            }
+            #expect(message == nil)
+            #expect(try FileManager.default.contentsOfDirectory(atPath: directory.path).isEmpty,
+                    "Cancelling must not create a screenshot in the selected download directory")
+        }
+    }
+
+    @Test
     func savePanelAppearsAboveScreenshotBeforeTheEditorCloses() async throws {
         _ = NSApplication.shared
         let fixture = try Fixture()
@@ -24,7 +47,7 @@ struct ScreenshotImageExportTests {
         defer { screenshot.close() }
 
         let message: String? = await withCheckedContinuation { continuation in
-            ScreenshotImageExport.presentSavePanel(for: Self.png, panel: fixture.panel,
+            ScreenshotImageExport.presentSavePanel(for: Self.png, directory: fixture.directory, panel: fixture.panel,
                 systemPreferences: fixture.preferences, themeNotifications: fixture.notifications) {
                 continuation.resume(returning: $0)
             }
@@ -59,7 +82,7 @@ struct ScreenshotImageExportTests {
         #expect(NSApp.keyWindow === island)
 
         let message: String? = await withCheckedContinuation { continuation in
-            ScreenshotImageExport.presentSavePanel(for: Self.png, panel: fixture.panel,
+            ScreenshotImageExport.presentSavePanel(for: Self.png, directory: fixture.directory, panel: fixture.panel,
                 systemPreferences: fixture.preferences, themeNotifications: fixture.notifications) {
                 continuation.resume(returning: $0)
             }
@@ -85,7 +108,7 @@ struct ScreenshotImageExportTests {
         let fixture = try Fixture()
         defer { fixture.close() }
         let message: String? = await withCheckedContinuation { continuation in
-            ScreenshotImageExport.presentSavePanel(for: Self.png, panel: fixture.panel,
+            ScreenshotImageExport.presentSavePanel(for: Self.png, directory: fixture.directory, panel: fixture.panel,
                 systemPreferences: fixture.preferences, themeNotifications: fixture.notifications) {
                 continuation.resume(returning: $0)
             }
@@ -113,7 +136,7 @@ struct ScreenshotImageExportTests {
             ? fixture.directory.appendingPathComponent("missing/screenshot.png") : destination
         let response: NSApplication.ModalResponse = outcome == "cancel" ? .cancel : outcome == "abort" ? .abort : .OK
         let message: String? = await withCheckedContinuation { continuation in
-            ScreenshotImageExport.presentSavePanel(for: Self.png, panel: fixture.panel,
+            ScreenshotImageExport.presentSavePanel(for: Self.png, directory: fixture.directory, panel: fixture.panel,
                 systemPreferences: fixture.preferences, themeNotifications: fixture.notifications) {
                 continuation.resume(returning: $0)
             }
