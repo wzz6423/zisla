@@ -136,17 +136,26 @@ struct FirstLaunchGreetingArtwork {
     private static func path(_ points: [CGPoint]) -> Path {
         let last = points.count - 1
         let isClosed = points[0] == points[last]
+        // A uniform cubic B-spline keeps curvature continuous instead of tightening turns at each sample.
+        let knots = isClosed
+            ? [points[last - 1]] + points + [points[1], points[2]]
+            : [points[0], points[0]] + points + [points[last], points[last]]
         return Path { path in
-            path.move(to: points[0])
-            for index in 0..<last {
-                let a = points[index]
-                let b = points[index + 1]
-                let previous = points[index > 0 ? index - 1 : (isClosed ? last - 1 : 0)]
-                let next = points[index + 2 <= last ? index + 2 : (isClosed ? 1 : last)]
+            for index in 0..<(knots.count - 3) {
+                let previous = knots[index]
+                let a = knots[index + 1]
+                let b = knots[index + 2]
+                let next = knots[index + 3]
+                if index == 0 {
+                    path.move(to: CGPoint(
+                        x: (previous.x + 4 * a.x + b.x) / 6,
+                        y: (previous.y + 4 * a.y + b.y) / 6
+                    ))
+                }
                 path.addCurve(
-                    to: b,
-                    control1: CGPoint(x: a.x + (b.x - previous.x) / 6, y: a.y + (b.y - previous.y) / 6),
-                    control2: CGPoint(x: b.x - (next.x - a.x) / 6, y: b.y - (next.y - a.y) / 6)
+                    to: CGPoint(x: (a.x + 4 * b.x + next.x) / 6, y: (a.y + 4 * b.y + next.y) / 6),
+                    control1: CGPoint(x: (2 * a.x + b.x) / 3, y: (2 * a.y + b.y) / 3),
+                    control2: CGPoint(x: (a.x + 2 * b.x) / 3, y: (a.y + 2 * b.y) / 3)
                 )
             }
         }
@@ -181,16 +190,19 @@ struct FirstLaunchGreetingArtwork {
         let width: CGFloat
         switch letter {
         case "H":
-            coordinates = [[8, 28, 6, 68, 3, 110], [57, 26, 52, 67, 49, 110], [6, 72, 29, 69, 53, 67]]
+            coordinates = [[10, 28, 14, 47, 8, 72, 4, 94, 6, 110],
+                           [57, 27, 60, 48, 54, 73, 49, 97, 52, 110],
+                           [6, 72, 22, 75, 39, 72, 54, 68]]
             width = 70
         case "h":
-            coordinates = [[8, 110, 12, 64, 15, 27], [10, 83, 26, 64, 42, 70, 42, 100, 49, 110]]
+            coordinates = [[8, 110, 10, 80, 14, 55, 22, 31, 16, 26, 8, 43, 8, 72, 10, 97, 12, 110],
+                           [10, 83, 26, 64, 42, 70, 42, 100, 49, 110]]
             width = 61
         case "e", "е":
             coordinates = [[6, 88, 29, 83, 40, 72, 27, 64, 9, 75, 6, 98, 23, 111, 44, 102]]
             width = 56
         case "l":
-            coordinates = [[15, 28, 11, 58, 7, 91, 9, 108, 21, 109]]
+            coordinates = [[4, 96, 12, 77, 24, 43, 24, 28, 17, 26, 10, 44, 6, 77, 8, 99, 14, 110, 25, 107]]
             width = 33
         case "o":
             coordinates = [[35, 68, 19, 64, 6, 80, 7, 102, 23, 111, 39, 98, 42, 79, 35, 68]]
@@ -265,19 +277,19 @@ struct FirstLaunchGreetingArtwork {
     }
 
     private static let chinese = drawing([
-        [57, 28, 47, 45, 33, 63, 18, 78],
-        [38, 59, 37, 101, 36, 140],
-        [98, 28, 87, 49, 75, 67],
-        [89, 48, 127, 46, 151, 47, 150, 57, 141, 71],
-        [114, 66, 114, 105, 111, 134, 103, 140, 93, 132],
-        [81, 90, 72, 106, 62, 120],
-        [139, 89, 151, 104, 163, 121],
-        [232, 37, 224, 68, 221, 94, 238, 109, 265, 130],
-        [269, 52, 260, 83, 244, 110, 215, 139],
-        [210, 86, 246, 84, 282, 82],
-        [295, 45, 326, 44, 350, 46, 346, 55, 326, 69],
-        [324, 66, 328, 83, 328, 111, 326, 135, 310, 143],
-        [288, 94, 326, 91, 365, 87],
+        [57, 28, 53, 42, 40, 61, 25, 74, 18, 78],
+        [38, 59, 35, 80, 35, 110, 39, 138],
+        [98, 28, 96, 43, 85, 60, 75, 67],
+        [89, 48, 110, 46, 135, 42, 153, 48, 151, 59, 141, 71],
+        [114, 66, 117, 91, 116, 119, 112, 138, 102, 142, 93, 132],
+        [81, 90, 77, 104, 69, 115, 62, 120],
+        [139, 89, 149, 96, 158, 109, 163, 121],
+        [232, 37, 228, 57, 220, 82, 219, 96, 239, 111, 257, 122, 265, 130],
+        [269, 52, 267, 71, 257, 93, 241, 116, 223, 134, 215, 139],
+        [210, 86, 230, 88, 250, 86, 267, 82, 282, 82],
+        [295, 45, 318, 41, 342, 41, 350, 49, 341, 60, 326, 69],
+        [324, 66, 334, 83, 331, 104, 330, 125, 324, 140, 310, 143],
+        [288, 94, 308, 97, 327, 94, 346, 88, 365, 87],
     ], width: 386, height: 174)
 
     private static let japanese = drawing([

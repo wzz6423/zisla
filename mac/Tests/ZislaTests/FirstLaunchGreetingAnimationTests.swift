@@ -113,13 +113,15 @@ struct FirstLaunchGreetingAnimationTests {
     }
 
     @Test(arguments: AppLanguage.allCases)
-    func penCurvesMeetWithoutSharpCornersIncludingClosedLoops(language: AppLanguage) {
+    func penCurvesHaveContinuousTangentsAndCurvatureIncludingClosedLoops(language: AppLanguage) {
         let artwork = FirstLaunchGreetingArtwork.artwork(for: language)
         for stroke in artwork.strokes {
             var current = CGPoint.zero
             var start = CGPoint.zero
             var firstTangent: CGPoint?
             var lastTangent: CGPoint?
+            var firstBend: CGPoint?
+            var lastBend: CGPoint?
             stroke.cgPath.applyWithBlock { pointer in
                 let element = pointer.pointee
                 switch element.type {
@@ -128,19 +130,84 @@ struct FirstLaunchGreetingAnimationTests {
                     start = current
                 case .addCurveToPoint:
                     let incoming = CGPoint(x: element.points[0].x - current.x, y: element.points[0].y - current.y)
+                    let bend = CGPoint(
+                        x: element.points[1].x - 2 * element.points[0].x + current.x,
+                        y: element.points[1].y - 2 * element.points[0].y + current.y
+                    )
                     if let lastTangent {
                         #expect(hypot(incoming.x - lastTangent.x, incoming.y - lastTangent.y) < 0.001)
                     } else {
                         firstTangent = incoming
                     }
+                    if let lastBend {
+                        #expect(hypot(bend.x - lastBend.x, bend.y - lastBend.y) < 0.001)
+                    } else {
+                        firstBend = bend
+                    }
                     current = element.points[2]
                     lastTangent = CGPoint(x: current.x - element.points[1].x, y: current.y - element.points[1].y)
+                    lastBend = CGPoint(
+                        x: current.x - 2 * element.points[1].x + element.points[0].x,
+                        y: current.y - 2 * element.points[1].y + element.points[0].y
+                    )
                 default:
                     Issue.record("Greeting pen strokes must use smooth cubic curves")
                 }
             }
             if current == start, let firstTangent, let lastTangent {
+                #expect(hypot(firstTangent.x, firstTangent.y) > 0.1, "Closed greeting loops must keep the pen moving through the join")
                 #expect(hypot(firstTangent.x - lastTangent.x, firstTangent.y - lastTangent.y) < 0.001)
+            }
+            if current == start, let firstBend, let lastBend {
+                #expect(hypot(firstBend.x - lastBend.x, firstBend.y - lastBend.y) < 0.001)
+            }
+        }
+    }
+
+    @Test(arguments: [AppLanguage.english, .german, .simplifiedChinese, .traditionalChinese])
+    func openingLongStrokesHaveNaturalHandwrittenBows(language: AppLanguage) throws {
+        let artwork = FirstLaunchGreetingArtwork.artwork(for: language)
+        let indices = language == .english ? [0, 1] : language == .german ? [0] : [1, 9, 12]
+        for index in indices {
+            let points = Self.samples(artwork.strokes[index])
+            let start = try #require(points.first)
+            let end = try #require(points.last)
+            let dx = end.x - start.x
+            let dy = end.y - start.y
+            let deviations = points.map { abs(dx * ($0.y - start.y) - dy * ($0.x - start.x)) / hypot(dx, dy) }
+            #expect(try #require(deviations.max()) > 2, "Long greeting strokes should bow rather than look ruled")
+        }
+    }
+
+    @Test(arguments: [AppLanguage.english, .german])
+    func openingLatinAscendersLoopBeforeReturningToTheBaseline(language: AppLanguage) throws {
+        let artwork = FirstLaunchGreetingArtwork.artwork(for: language)
+        for index in [4, 5] {
+            let points = Self.samples(artwork.strokes[index])
+            #expect(try #require(points.first).y > 100)
+            #expect(try #require(points.last).y > 100)
+            let upper = points.filter { $0.y < 82 }
+            let left = try #require(upper.map(\.x).min())
+            let right = try #require(upper.map(\.x).max())
+            #expect(right - left > 10, "Cursive ascenders need an open loop instead of a straight stem")
+        }
+    }
+
+    @Test(arguments: [AppLanguage.simplifiedChinese, .traditionalChinese])
+    func chineseHooksStayRounderThanTheHighContrastPen(language: AppLanguage) {
+        let artwork = FirstLaunchGreetingArtwork.artwork(for: language)
+        for stroke in artwork.strokes {
+            let points = Self.samples(stroke)
+            for index in 1..<(points.count - 1) {
+                let a = points[index - 1]
+                let b = points[index]
+                let c = points[index + 1]
+                let cross = abs((b.x - a.x) * (c.y - a.y) - (b.y - a.y) * (c.x - a.x))
+                if cross > 0.000001 {
+                    let radius = hypot(b.x - a.x, b.y - a.y)
+                        * hypot(c.x - b.x, c.y - b.y) * hypot(c.x - a.x, c.y - a.y) / (2 * cross)
+                    #expect(radius > 3, "Chinese hooks must not tighten inside the high-contrast pen's half-width")
+                }
             }
         }
     }
