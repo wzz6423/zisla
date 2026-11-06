@@ -106,6 +106,139 @@ struct StatusIconDestinationIntegrationTests {
         }
     }
 
+    @Test(arguments: IslandEdge.allCases,
+          MediaCompactStyle.allCases.flatMap { style in [false, true].map { (style, $0) } }) @MainActor
+    func moreInformationKeepsPlaybackProgressAlongTheWholeOutlineDespiteAIAndIcons(
+        edge: IslandEdge, playback: (MediaCompactStyle, Bool)
+    ) async throws {
+        let (style, hasIcons) = playback
+        let fixture = try IconFixture(edge: edge)
+        defer { fixture.media.publishSnapshot(nil); fixture.close() }
+        fixture.settings.settings.sideNoticesEnabled = true
+        fixture.settings.settings.islandShowMoreInformation = true
+        fixture.settings.settings.islandNotchBackground = .black
+        fixture.settings.settings.mediaCompactStyle = style
+        fixture.settings.settings.mediaVisualizationStyle = .glow
+        let artwork = NSImage(size: CGSize(width: 24, height: 24), flipped: false) { rect in
+            NSColor.blue.setFill()
+            rect.fill()
+            return true
+        }
+        let date = Date(timeIntervalSince1970: 100)
+        let item = NowPlayingSnapshot(title: "Song", artist: "Artist", album: nil,
+            artworkData: artwork.tiffRepresentation, duration: 100, elapsedTime: 100,
+            timestamp: date, isPlaying: true)
+        let notices = [IslandNotice(id: "ai-active-progress", title: "AI"),
+                       IslandNotice(id: "media-active-progress", title: "Song", artworkData: item.artworkData)]
+        for notice in notices { fixture.queue.enqueue(notice, expiresAfter: nil) }
+        fixture.media.publishSnapshot(item)
+        let icons = hasIcons ? [IslandStatusIcon(id: "cpu", content: .metric(.cpu, text: "31%",
+            image: nil, style: .detailed), tooltip: "CPU")] : []
+        let layout = try #require(FloatingIslandInformationLayout(notices: notices, icons: icons,
+            settings: fixture.settings.settings, item: item, at: date))
+        let state = SideNoticeDisplayState()
+        state.islandEdge = edge
+        state.placementMode = .custom
+        state.statusIcons = icons
+        state.compactWingHeight = edge.isVertical ? layout.size.width : layout.size.height
+        let view = CompactStatusBarView(queue: fixture.queue, displayState: state, media: fixture.media,
+            browserDownloads: fixture.downloads, settingsStore: fixture.settings,
+            resultSweep: fixture.sweep, onStatusHidden: {})
+        #expect(view.selectedCompactStatusPriority == .aiActivity)
+        #expect(!view.pausesCompactTimeline,
+                "Visible playback progress must advance even when AI owns the normal priority")
+        func render(enabled: Bool, elapsed: Double) async throws -> NSBitmapImageRep {
+            fixture.settings.settings.collapsedProgressGlowEnabled = enabled
+            var snapshot = item
+            snapshot.elapsedTime = elapsed
+            fixture.media.publishSnapshot(snapshot)
+            return try await renderOffscreen(view.statusBarContent(at: date)
+                .environment(\._accessibilityReduceMotion, true)
+                .transaction { $0.disablesAnimations = true }, size: layout.size)
+        }
+        let baseline = try await render(enabled: false, elapsed: 100)
+        let full = try await render(enabled: true, elapsed: 100)
+        let half = try await render(enabled: true, elapsed: 50)
+        let width = full.pixelsWide
+        let height = full.pixelsHigh
+        let scale = CGFloat(width) / layout.size.width
+        let margin = Int(4 * scale)
+        let middleX = width / 2
+        let middleY = height / 2
+        #expect(try blueProgress(full, baseline: baseline, x: middleX - 2...middleX + 2, y: 0...margin))
+        #expect(try blueProgress(full, baseline: baseline, x: middleX - 2...middleX + 2, y: height - margin...height - 1))
+        #expect(try blueProgress(full, baseline: baseline, x: 0...margin, y: middleY - 2...middleY + 2))
+        #expect(try blueProgress(full, baseline: baseline, x: width - margin...width - 1, y: middleY - 2...middleY + 2))
+        #expect(try blueProgress(half, baseline: baseline, x: width - margin...width - 1, y: middleY - 2...middleY + 2))
+        #expect(try !blueProgress(half, baseline: baseline, x: 0...margin, y: middleY - 2...middleY + 2))
+        #expect(fixture.queue.left + fixture.queue.right == notices)
+    }
+
+    @Test(arguments: ["information-disabled", "notifications-disabled", "status-hidden", "progress-disabled",
+                      "paused", "missing-snapshot", "missing-duration", "invalid-duration", "zero-progress", "result-sweep"])
+    @MainActor
+    func hiddenOrUnavailableInformationPlaybackDoesNotPaintProgress(scenario: String) async throws {
+        let fixture = try IconFixture(edge: .top)
+        defer { fixture.media.publishSnapshot(nil); fixture.close() }
+        fixture.settings.settings.sideNoticesEnabled = true
+        fixture.settings.settings.islandShowMoreInformation = true
+        fixture.settings.settings.mediaCompactStyle = .compact
+        fixture.settings.settings.mediaVisualizationStyle = .glow
+        fixture.settings.settings.islandAppIconEnabled = false
+        let date = Date(timeIntervalSince1970: 100)
+        let sweep = AIResultSweepController(now: { date })
+        defer { sweep.cancel() }
+        let notices = [IslandNotice(id: "ai-active-hidden", title: "AI"),
+                       IslandNotice(id: "media-active-hidden", title: "Song")]
+        for notice in notices { fixture.queue.enqueue(notice, expiresAfter: nil) }
+        let state = SideNoticeDisplayState()
+        state.placementMode = .custom
+        state.statusIcons = [IslandStatusIcon(id: "cpu", content: .metric(.cpu, text: "31%",
+            image: nil, style: .detailed), tooltip: "CPU")]
+        var snapshot = NowPlayingSnapshot(title: "Song", artist: "Artist", album: nil, artworkData: nil,
+            duration: 100, elapsedTime: 50, timestamp: date, isPlaying: true)
+        switch scenario {
+        case "information-disabled": fixture.settings.settings.islandShowMoreInformation = false
+        case "notifications-disabled": fixture.settings.settings.sideNoticesEnabled = false
+        case "status-hidden": state.compactStatusHidden = true
+        case "progress-disabled": fixture.settings.settings.collapsedProgressGlowEnabled = false
+        case "paused": snapshot.isPlaying = false
+        case "missing-duration": snapshot.duration = nil
+        case "invalid-duration": snapshot.duration = .nan
+        case "zero-progress": snapshot.elapsedTime = 0
+        case "result-sweep":
+            sweep.receive(previous: .running,
+                task: AIProgressTask(id: "hidden", provider: .codex, title: "AI", progress: nil,
+                    status: .succeeded, updatedAt: date),
+                observedSince: date, settings: fixture.settings.settings)
+            #expect(sweep.current != nil)
+        default: break
+        }
+        fixture.media.publishSnapshot(scenario == "missing-snapshot" ? nil : snapshot)
+        let view = CompactStatusBarView(queue: fixture.queue, displayState: state, media: fixture.media,
+            browserDownloads: fixture.downloads, settingsStore: fixture.settings,
+            resultSweep: sweep, onStatusHidden: {})
+        #expect(view.pausesCompactTimeline == (scenario != "zero-progress"),
+                "A track at zero progress must keep its clock running; hidden or unavailable progress must pause")
+        func render(enabled: Bool) async throws -> NSBitmapImageRep {
+            fixture.settings.settings.collapsedProgressGlowEnabled = enabled
+            return try await renderOffscreen(view.statusBarContent(at: date)
+                .environment(\._accessibilityReduceMotion, true)
+                .transaction { $0.disablesAnimations = true }, size: CGSize(width: 200, height: 34))
+        }
+        let baseline = try await render(enabled: false)
+        let actual = try await render(enabled: scenario != "progress-disabled")
+        var changed = 0
+        for y in 0..<actual.pixelsHigh {
+            for x in 0..<actual.pixelsWide {
+                let color = try #require(actual.colorAt(x: x, y: y)?.usingColorSpace(.deviceRGB))
+                let previous = try #require(baseline.colorAt(x: x, y: y)?.usingColorSpace(.deviceRGB))
+                if abs(color.greenComponent - previous.greenComponent) > 0.02 { changed += 1 }
+            }
+        }
+        #expect(changed == 0, "\(scenario) must keep progress hidden without modifying the visible content")
+    }
+
     @Test(arguments: IslandEdge.allCases, MediaCompactStyle.allCases) @MainActor
     func twoRowInformationUsesTheVoiceInputCornerRadius(edge: IslandEdge, style: MediaCompactStyle) async throws {
         let fixture = try IconFixture(edge: edge)
@@ -264,8 +397,8 @@ struct StatusIconDestinationIntegrationTests {
         let view = CompactStatusBarView(queue: fixture.queue, displayState: state, media: fixture.media,
             browserDownloads: fixture.downloads, settingsStore: fixture.settings, resultSweep: fixture.sweep,
             onStatusHidden: {}, onCompactLengthChanged: { reportedLengths.append($0) })
-        #expect(view.pausesCompactTimeline == (style != .detailed),
-                "Detailed lyrics must keep advancing even while AI wins the normal priority")
+        #expect(!view.pausesCompactTimeline,
+                "Visible playback progress and detailed lyrics must keep advancing while AI wins the normal priority")
         let bitmap = try await renderOffscreen(view.statusBarContent(at: date)
             .environment(\._accessibilityReduceMotion, true)
             .environment(\.layoutDirection, .leftToRight), size: layout.size)
@@ -1269,6 +1402,23 @@ struct StatusIconDestinationIntegrationTests {
         fixture.presenter.stop()
         fixture.presenter.setStatusIcons([])
         #expect(fixture.presenter.compactConfiguration(for: [], at: .now).statusIconSize == nil)
+    }
+
+    @MainActor
+    private func blueProgress(_ actual: NSBitmapImageRep, baseline: NSBitmapImageRep,
+                              x: ClosedRange<Int>, y: ClosedRange<Int>) throws -> Bool {
+        for row in y {
+            for column in x {
+                let color = try #require(actual.colorAt(x: column, y: row)?.usingColorSpace(.deviceRGB))
+                let previous = try #require(baseline.colorAt(x: column, y: row)?.usingColorSpace(.deviceRGB))
+                if color.blueComponent > previous.blueComponent + 0.2,
+                   color.blueComponent > color.redComponent + 0.2,
+                   color.blueComponent > color.greenComponent + 0.2 {
+                    return true
+                }
+            }
+        }
+        return false
     }
 
     @MainActor
