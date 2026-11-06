@@ -903,6 +903,159 @@ struct MailServiceTests {
         #expect(scripts[3].contains("reply targetMessage"))
     }
 
+    @Test(arguments: [false, true], [
+        [String](),
+        ["invoice.pdf"],
+        ["报告 100%.pdf", "quote\" and \\ path.txt", "line\nbreak.txt", "x\" & error \"injected.txt"],
+    ]) @MainActor
+    func attachmentScriptsSendEverySelectedFileAndPreserveTheBody(isReply: Bool, fileNames: [String]) throws {
+        let directory = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let urls = fileNames.map { directory.appendingPathComponent($0) }
+        let data = Data("Attachment fixture".utf8)
+        for url in urls { try data.write(to: url) }
+        let body = "第一行\n第二行包含 \"引号\" 和 \\ 路径"
+        let message = MailService.messages(from: makeMailServiceSnapshot(account: "work", messageID: 42).messages)[0]
+        let source = isReply
+            ? MailService.replyScript(message: message, body: body, attachmentURLs: urls)
+            : MailService.composeScript(fromAddress: "work@example.com", to: ["alice@example.com"],
+                                        subject: "Files", body: body, attachmentURLs: urls)
+        let script = try #require(NSAppleScript(source: source))
+        var error: NSDictionary?
+        #expect(script.compileAndReturnError(&error), "Attachment scripts must compile against Mail's real dictionary")
+        #expect(error == nil)
+
+        let result = try executeMailAttachmentFixture(source, isReply: isReply)
+
+        #expect(result.atIndex(1)?.booleanValue == true)
+        let paths = try #require(result.atIndex(2))
+        let attachedURLs = (0..<paths.numberOfItems).compactMap { paths.atIndex($0 + 1)?.stringValue }
+            .map { URL(fileURLWithPath: $0).resolvingSymlinksInPath() }
+        #expect(attachedURLs == urls.map { $0.resolvingSymlinksInPath() },
+                "Every selected file must be attached before send, including literal special characters")
+        #expect(result.atIndex(3)?.stringValue == body + (isReply ? "\r\rOriginal body" : ""),
+                "Attachments must not replace or append file-name placeholders to the message body")
+        #expect(result.atIndex(4)?.int32Value == 0)
+        for url in urls { #expect(try Data(contentsOf: url) == data, "Sending must leave source files unchanged") }
+    }
+
+    @Test(arguments: [false, true]) @MainActor
+    func missingAttachmentStopsTheScriptBeforeSending(isReply: Bool) throws {
+        let directory = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let existing = directory.appendingPathComponent("exists.txt")
+        let missing = directory.appendingPathComponent("removed.pdf")
+        try Data("Keep this file".utf8).write(to: existing)
+        let message = MailService.messages(from: makeMailServiceSnapshot(account: "work", messageID: 42).messages)[0]
+        let source = isReply
+            ? MailService.replyScript(message: message, body: "Body", attachmentURLs: [existing, missing])
+            : MailService.composeScript(fromAddress: nil, to: ["alice@example.com"], subject: "Files",
+                                        body: "Body", attachmentURLs: [existing, missing])
+
+        let result = try executeMailAttachmentFixture(source, isReply: isReply)
+
+        #expect(result.atIndex(1)?.booleanValue == false, "An unreadable attachment must prevent send")
+        #expect(result.atIndex(2)?.numberOfItems == 1)
+        let attachedPath = try #require(result.atIndex(2)?.atIndex(1)?.stringValue)
+        #expect(URL(fileURLWithPath: attachedPath).resolvingSymlinksInPath() == existing.resolvingSymlinksInPath())
+        #expect(result.atIndex(4)?.int32Value == -1700, "A missing file must fail alias coercion before send")
+        #expect(try String(contentsOf: existing, encoding: .utf8) == "Keep this file")
+        #expect(!FileManager.default.fileExists(atPath: missing.path))
+    }
+
+    @Test(arguments: [false, true], [false, true]) @MainActor
+    func attachmentOperationsForwardFilesAndReleaseMutationState(isReply: Bool, fails: Bool) async throws {
+        let urls = [URL(fileURLWithPath: "/fixture/report.pdf"), URL(fileURLWithPath: "/fixture/photo.png")]
+        var mutationScripts: [String] = []
+        var refreshes = 0
+        let service = MailService(
+            commandRunner: { source, expectsSnapshot in
+                if expectsSnapshot {
+                    refreshes += 1
+                    return .success(.snapshot(makeMailServiceSnapshot(account: "work", messageID: 42, hasMore: true)))
+                }
+                mutationScripts.append(source)
+                return fails ? .failure(.failed("Attachment file not found (-43)")) : .success(.succeeded)
+            },
+            indexReader: MailIndexReader(databaseURL: URL(fileURLWithPath: "/does/not/exist")),
+            mailRunning: { true }
+        )
+        await service.refresh(checkForNewMail: false)
+        let messages = service.messages
+        let generation = service.paginationGeneration
+        let message = try #require(messages.first)
+
+        let result = isReply
+            ? await service.reply(to: message, body: "Body", attachmentURLs: urls)
+            : await service.send(fromAddress: "work@example.com", to: "alice@example.com, bob@example.com",
+                                 subject: "Files", body: "Body", attachmentURLs: urls)
+
+        #expect(result == (fails ? .failed("Attachment file not found (-43)") : .success))
+        let source = try #require(mutationScripts.first)
+        for url in urls {
+            #expect(source.contains("file name:(POSIX file \(MailService.appleScriptString(url.path)) as alias)"),
+                    "The public send/reply operation must pass each selected URL to Mail")
+        }
+        #expect(service.messages == messages)
+        #expect(service.canLoadMore)
+        #expect(service.paginationGeneration == generation + (fails ? 0 : 1))
+        #expect(refreshes == (fails ? 1 : 2), "A failed attachment operation must not refresh as if it was sent")
+        #expect(!service.isMutating, "Both successful and failed operations must release the mutation state")
+    }
+
+    @Test(arguments: [false, true]) @MainActor
+    func attachmentFreeOperationsKeepExistingPublicCalls(isReply: Bool) async throws {
+        var mutationSource = ""
+        let service = MailService(
+            commandRunner: { source, expectsSnapshot in
+                if expectsSnapshot { return .success(.snapshot(makeMailServiceSnapshot(account: "work", messageID: 42))) }
+                mutationSource = source
+                return .success(.succeeded)
+            },
+            indexReader: MailIndexReader(databaseURL: URL(fileURLWithPath: "/does/not/exist")),
+            mailRunning: { true }
+        )
+        let message = MailService.messages(from: makeMailServiceSnapshot(account: "work", messageID: 42).messages)[0]
+        let result = isReply
+            ? await service.reply(to: message, body: "Body")
+            : await service.send(fromAddress: nil, to: "alice@example.com", subject: "No files", body: "Body")
+
+        #expect(result == .success)
+        #expect(!mutationSource.contains("make new attachment"))
+        let fixture = try executeMailAttachmentFixture(mutationSource, isReply: isReply)
+        #expect(fixture.atIndex(1)?.booleanValue == true)
+        #expect(fixture.atIndex(2)?.numberOfItems == 0)
+    }
+
+    @Test(arguments: [false, true], [true, false]) @MainActor
+    func attachmentsDoNotBypassBodyValidationOrLaunchMail(isReply: Bool, isMailRunning: Bool) async {
+        var requestedSources: [String] = []
+        let service = MailService(
+            commandRunner: { source, _ in
+                requestedSources.append(source)
+                return .success(.succeeded)
+            },
+            indexReader: MailIndexReader(databaseURL: URL(fileURLWithPath: "/does/not/exist")),
+            mailRunning: { isMailRunning }
+        )
+        let message = MailService.messages(from: makeMailServiceSnapshot(account: "work", messageID: 42).messages)[0]
+        let urls = [URL(fileURLWithPath: "/fixture/report.pdf")]
+        let body = isMailRunning ? " \n\t " : "Body"
+        let result = isReply
+            ? await service.reply(to: message, body: body, attachmentURLs: urls)
+            : await service.send(fromAddress: nil, to: "alice@example.com", subject: "Files", body: body,
+                                 attachmentURLs: urls)
+
+        let expected = isMailRunning
+            ? (isReply ? "回复内容不能为空" : "邮件正文不能为空")
+            : MailService.mailUnavailableMessage(isRunning: false)!
+        #expect(result == .failed(expected))
+        #expect(requestedSources.isEmpty, "Invalid input or a closed Mail.app must not issue any script")
+        #expect(!service.isMutating)
+    }
+
     @Test @MainActor
     func inboxScriptIncludesAllAccountsButOnlyReadsSelectedInboxes() {
         let script = MailService.inboxScript(accountNames: ["工作邮箱", "个人邮箱"])
@@ -1233,6 +1386,47 @@ struct MailServiceTests {
         )
         #expect(MailService.mailUnavailableMessage(isRunning: true) == nil)
     }
+}
+
+@MainActor
+private func executeMailAttachmentFixture(_ source: String, isReply: Bool) throws -> NSAppleEventDescriptor {
+    // Replace Mail's object access and commands only; keep content edits, alias resolution and send order.
+    let target = isReply ? "replyMessage" : "outgoingMessage"
+    let lines = try source.split(separator: "\n").map { rawLine -> String in
+        let line = rawLine.trimmingCharacters(in: .whitespaces)
+        if line.hasPrefix("tell ") || line == "end tell" { return "" }
+        if line.hasPrefix("set targetAccount to ") { return "" }
+        if line.hasPrefix("set targetMessage to ") { return "set targetMessage to {content:\"Original body\"}" }
+        if line.hasPrefix("make new attachment ") {
+            #expect(line.contains("at end of content of \(target)"), "Attachments must belong to the message being sent")
+            let start = try #require(line.range(of: "{file name:"))
+            return "set end of attachedPaths to POSIX path of " + line[start.upperBound..<line.index(before: line.endIndex)]
+        }
+        if line == "send" || line == "send replyMessage" { return "set wasSent to true" }
+        return line
+            .replacingOccurrences(of: "make new outgoing message with properties ", with: "")
+            .replacingOccurrences(of: "set sender of outgoingMessage to ", with: "set fixtureSender to ")
+            .replacingOccurrences(of: "make new to recipient at end of to recipients with properties ", with: "set end of fixtureRecipients to ")
+            .replacingOccurrences(of: "reply targetMessage", with: "{content:content of targetMessage}")
+    }.joined(separator: "\n")
+    let script = try #require(NSAppleScript(source: """
+        using terms from application "Mail"
+            set attachedPaths to {}
+            set fixtureRecipients to {}
+            set wasSent to false
+            set failureNumber to 0
+            try
+                \(lines)
+            on error number errorNumber
+                set failureNumber to errorNumber
+            end try
+            return {wasSent, attachedPaths, content of \(target), failureNumber}
+        end using terms from
+        """))
+    var error: NSDictionary?
+    let result = script.executeAndReturnError(&error)
+    #expect(error == nil, "The local Mail fixture must execute without accessing Mail.app")
+    return result
 }
 
 private actor MailOperationQueueTestGate {

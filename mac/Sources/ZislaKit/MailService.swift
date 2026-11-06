@@ -274,7 +274,8 @@ public final class MailService: ObservableObject {
         fromAddress: String?,
         to recipients: String,
         subject: String,
-        body: String
+        body: String,
+        attachmentURLs: [URL] = []
     ) async -> MailOperationResult {
         let addresses = recipients
             .split(separator: ",")
@@ -288,15 +289,16 @@ public final class MailService: ObservableObject {
             fromAddress: fromAddress,
             to: addresses,
             subject: subject,
-            body: body
+            body: body,
+            attachmentURLs: attachmentURLs
         ))
     }
 
-    public func reply(to message: MailMessage, body: String) async -> MailOperationResult {
+    public func reply(to message: MailMessage, body: String, attachmentURLs: [URL] = []) async -> MailOperationResult {
         guard !body.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
             return .failed(AppLocalization.text("回复内容不能为空"))
         }
-        return await perform(Self.replyScript(message: message, body: body))
+        return await perform(Self.replyScript(message: message, body: body, attachmentURLs: attachmentURLs))
     }
 
     static func accounts(from rows: [MailScriptAccount]) -> [MailAccount] {
@@ -466,7 +468,8 @@ public final class MailService: ObservableObject {
         fromAddress: String?,
         to recipients: [String],
         subject: String,
-        body: String
+        body: String,
+        attachmentURLs: [URL] = []
     ) -> String {
         let recipientsScript = recipients.map {
             "make new to recipient at end of to recipients with properties {address:\(appleScriptString($0))}"
@@ -474,25 +477,33 @@ public final class MailService: ObservableObject {
         let senderScript = fromAddress.map {
             "set sender of outgoingMessage to \(appleScriptString($0))"
         } ?? ""
+        let attachmentsScript = attachmentURLs.map {
+            "make new attachment at end of content of outgoingMessage with properties {file name:(POSIX file \(appleScriptString($0.path)) as alias)}"
+        }.joined(separator: "\n            ")
         return """
         tell application "Mail"
             set outgoingMessage to make new outgoing message with properties {subject:\(appleScriptString(subject)), content:\(appleScriptString(body)), visible:false}
             \(senderScript)
             tell outgoingMessage
                 \(recipientsScript)
+                \(attachmentsScript)
                 send
             end tell
         end tell
         """
     }
 
-    static func replyScript(message: MailMessage, body: String) -> String {
-        """
+    static func replyScript(message: MailMessage, body: String, attachmentURLs: [URL] = []) -> String {
+        let attachmentsScript = attachmentURLs.map {
+            "make new attachment at end of content of replyMessage with properties {file name:(POSIX file \(appleScriptString($0.path)) as alias)}"
+        }.joined(separator: "\n    ")
+        return """
         tell application "Mail"
             set targetAccount to first account whose name is \(appleScriptString(message.accountName))
             set targetMessage to first message of \(accountInbox("targetAccount")) whose id is \(message.messageID)
             set replyMessage to reply targetMessage
             set content of replyMessage to \(appleScriptString(body)) & return & return & content of replyMessage
+            \(attachmentsScript)
             send replyMessage
         end tell
         """

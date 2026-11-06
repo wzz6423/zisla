@@ -1595,16 +1595,20 @@ final class AppModel: ObservableObject {
     fromAddress: String?,
     to recipients: String,
     subject: String,
-    body: String
+    body: String,
+    attachmentURLs: [URL]
   ) async -> Bool {
     reportMailOperation(
-      await mail.send(fromAddress: fromAddress, to: recipients, subject: subject, body: body),
+      await mail.send(fromAddress: fromAddress, to: recipients, subject: subject, body: body, attachmentURLs: attachmentURLs),
       successMessage: AppLocalization.text("邮件已发送")
     )
   }
 
-  func replyToMail(_ message: MailMessage, body: String) async -> Bool {
-    reportMailOperation(await mail.reply(to: message, body: body), successMessage: AppLocalization.text("回复已发送"))
+  func replyToMail(_ message: MailMessage, body: String, attachmentURLs: [URL]) async -> Bool {
+    reportMailOperation(
+      await mail.reply(to: message, body: body, attachmentURLs: attachmentURLs),
+      successMessage: AppLocalization.text("回复已发送")
+    )
   }
 
   func takeMailComposeRequest() -> MailComposeRequest? {
