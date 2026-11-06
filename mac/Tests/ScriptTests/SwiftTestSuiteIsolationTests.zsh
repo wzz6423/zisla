@@ -460,54 +460,6 @@ with socket.socket(socket.AF_INET) as coordinator:
             pass
 checks += 1
 
-for mode in ("timeout", "timeout-orphan"):
-    capture = test_root / (mode + ".jsonl")
-    connections = []
-    with socket.socket(socket.AF_INET) as coordinator:
-        coordinator.bind(("127.0.0.1", 0))
-        coordinator.listen()
-        coordinator.settimeout(5)
-        address = str(coordinator.getsockname()[1])
-        with (test_root / (mode + ".log")).open("w") as output:
-            process = subprocess.Popen(command, stdout=output, stderr=subprocess.STDOUT,
-                env=dict(environment, SWIFT_TEST_MODE=mode, SWIFT_TEST_CAPTURE=str(capture),
-                    SWIFT_TEST_WORKERS="3", SWIFT_TEST_SUITE_TIMEOUT="1", SWIFT_TEST_COORDINATOR=address))
-            try:
-                for _ in range(3):
-                    connection, _ = coordinator.accept()
-                    record = json.loads(connection.makefile().readline())
-                    connections.append((connection, record))
-                initial_log = (test_root / (mode + ".log")).read_text()
-                for _, record in connections:
-                    name = record["selected"][0].split("/")[0]
-                    assert f"Swift suite started: {name} (pid={record['group']})" in initial_log, "A blocked suite and process group must be named before it completes"
-                suite = initial_log.split("Swift suite started: ", 1)[1].split(" (pid=", 1)[0]
-                actual_status = process.wait(timeout=10)
-                log = (test_root / (mode + ".log")).read_text()
-                assert actual_status == 124, f"{mode}: expected timeout exit 124, got {actual_status}\n{log}"
-                assert f"Swift suite timed out after 1 seconds: {suite}" in log, "Timeout must name the stuck suite"
-                assert "LAST TEST: waiting for an injected media dependency" in log, "Timeout discarded the last test output"
-                for connection, _ in connections:
-                    connection.settimeout(1)
-                    assert connection.recv(1) == b"", "Timed-out suite or parallel child survived cancellation"
-                check_cleanup(read_records(capture))
-            finally:
-                if process.poll() is None:
-                    process.terminate()
-                    process.wait(timeout=10)
-                for connection, record in connections:
-                    connection.close()
-                    try:
-                        os.killpg(record["group"], signal.SIGKILL)
-                    except (ProcessLookupError, PermissionError):
-                        pass
-                    if "child_pid" in record:
-                        try:
-                            os.kill(record["child_pid"], signal.SIGKILL)
-                        except ProcessLookupError:
-                            pass
-    checks += 1
-
 clock_tools = test_root / "clock-bin"
 clock_tools.mkdir()
 clock_python = clock_tools / "python3"
@@ -524,20 +476,27 @@ source = sys.stdin.read()
 clock = socket.create_connection(("127.0.0.1", int(os.environ["SWIFT_TEST_CLOCK_COORDINATOR"])))
 clock.sendall(b'{"clock":0}\n')
 clock.setblocking(False)
+# Arm the deadline after workers are ready while keeping cancellation's grace period ticking.
 elapsed = 0
+real_monotonic = time.monotonic
+advanced_at = None
 def monotonic():
-    global elapsed
+    global elapsed, advanced_at
     if select.select([clock], [], [], 0)[0]:
         elapsed = int(clock.recv(32))
+        advanced_at = real_monotonic()
         clock.sendall(('{"clock":' + str(elapsed) + '}\n').encode())
-    return elapsed
+    return elapsed + (real_monotonic() - advanced_at if advanced_at is not None else 0)
 time.monotonic = monotonic
 sys.argv = sys.argv[1:]
 exec(compile(source, "swift-test-suites.sh", "exec"))
 """)
 clock_python.chmod(0o755)
-for elapsed, expected_status in ((221, 0), (600, 124)):
-    capture = test_root / ("long-budget-" + str(elapsed) + ".jsonl")
+for mode, elapsed, expected_status in (("long-budget", 221, 0), ("long-budget", 600, 124),
+                                      ("timeout", 1, 124), ("timeout-orphan", 1, 124)):
+    capture = test_root / (mode + "-" + str(elapsed) + ".jsonl")
+    connections = []
+    workers = 1 if mode == "long-budget" else 3
     with socket.socket(socket.AF_INET) as coordinator:
         coordinator.bind(("127.0.0.1", 0))
         coordinator.listen()
@@ -545,32 +504,52 @@ for elapsed, expected_status in ((221, 0), (600, 124)):
         address = str(coordinator.getsockname()[1])
         process = subprocess.Popen(command, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True,
             env=dict(environment, PATH=str(clock_tools) + ":" + environment["PATH"],
-                SWIFT_TEST_MODE="long-budget", SWIFT_TEST_CAPTURE=str(capture), SWIFT_TEST_WORKERS="1",
+                SWIFT_TEST_MODE=mode, SWIFT_TEST_CAPTURE=str(capture), SWIFT_TEST_WORKERS=str(workers),
+                SWIFT_TEST_SUITE_TIMEOUT="600" if mode == "long-budget" else "1",
                 SWIFT_TEST_COORDINATOR=address, SWIFT_TEST_CLOCK_COORDINATOR=address,
                 SWIFT_TEST_RUNNER_ROOT=str(root)))
         clock, _ = coordinator.accept()
         clock.settimeout(5)
         ticks = clock.makefile()
         assert json.loads(ticks.readline()) == {"clock": 0}
-        connection, _ = coordinator.accept()
-        json.loads(connection.makefile().readline())
         try:
+            for _ in range(workers):
+                connection, _ = coordinator.accept()
+                record = json.loads(connection.makefile().readline())
+                connections.append((connection, record))
             clock.sendall(str(elapsed).encode())
             assert json.loads(ticks.readline()) == {"clock": elapsed}
             if expected_status == 0:
-                connection.sendall(b"+")
+                connections[0][0].sendall(b"+")
             output, _ = process.communicate(timeout=10)
-            assert process.returncode == expected_status, f"Default budget at {elapsed}s: expected {expected_status}, got {process.returncode}\n{output}"
+            assert process.returncode == expected_status, f"{mode} at {elapsed}s: expected {expected_status}, got {process.returncode}\n{output}"
             if expected_status == 124:
-                assert "Swift suite timed out after 600 seconds: FixtureTests.Long" in output
-            connection.settimeout(1)
-            assert connection.recv(1) == b"", "Default budget left a test host running"
+                suite = output.split("Swift suite started: ", 1)[1].split(" (pid=", 1)[0]
+                assert f"Swift suite timed out after {elapsed} seconds: {suite}" in output
+            if mode != "long-budget":
+                for _, record in connections:
+                    suite = record["selected"][0].split("/")[0]
+                    assert f"Swift suite started: {suite} (pid={record['group']})" in output, "A blocked suite and process group must be named before it completes"
+                assert "LAST TEST: waiting for an injected media dependency" in output, "Timeout discarded the last test output"
+            for connection, _ in connections:
+                connection.settimeout(1)
+                assert connection.recv(1) == b"", "Timeout or completion left a test host or parallel child running"
             check_cleanup(read_records(capture))
         finally:
             if process.poll() is None:
                 process.terminate()
                 process.wait(timeout=10)
-            connection.close()
+            for connection, record in connections:
+                connection.close()
+                try:
+                    os.killpg(record["group"], signal.SIGKILL)
+                except (ProcessLookupError, PermissionError):
+                    pass
+                if "child_pid" in record:
+                    try:
+                        os.kill(record["child_pid"], signal.SIGKILL)
+                    except ProcessLookupError:
+                        pass
             ticks.close()
             clock.close()
     checks += 1
