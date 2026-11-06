@@ -841,24 +841,16 @@ private struct MailComposerView: View {
     private func send() {
         isSending = true
         Task {
-            var body = messageBody
-
-            // Append attachment path info to the body (AppleScript send doesn't support attachments directly;
-            // using text as a placeholder for now — can be upgraded to Mail.app's attachment API later)
-            if !attachmentURLs.isEmpty {
-                let fileNames = attachmentURLs.map { $0.lastPathComponent }.joined(separator: ", ")
-                body += "\n\n---\n" + AppLocalization.text("附件：%@", fileNames)
-            }
-
             let sent: Bool
             if let replyTarget {
-                sent = await model.replyToMail(replyTarget, body: body)
+                sent = await model.replyToMail(replyTarget, body: messageBody, attachmentURLs: attachmentURLs)
             } else {
                 sent = await model.sendMail(
                     fromAddress: selectedIdentity?.address,
                     to: recipients,
                     subject: subject,
-                    body: body
+                    body: messageBody,
+                    attachmentURLs: attachmentURLs
                 )
             }
             isSending = false
