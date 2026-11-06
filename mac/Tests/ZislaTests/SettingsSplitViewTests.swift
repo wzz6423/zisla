@@ -288,24 +288,24 @@ struct SettingsSplitViewTests {
             #expect(!sidebarWindow.isVisible)
         }
 
-        try await expectHeadings(["基础功能", "其他"])
+        try await expectHeadings(["基础功能", "其他", "权限"])
         settings.pdfToolsEnabled = true
-        try await expectHeadings(["基础功能", "文件", "其他"])
+        try await expectHeadings(["基础功能", "文件", "其他", "权限"])
         settings.pdfToolsEnabled = false
         settings.screenshotEnabled = true
-        try await expectHeadings(["基础功能", "截图与录屏", "其他"])
+        try await expectHeadings(["基础功能", "截图与录屏", "其他", "权限"])
         settings.screenshotEnabled = false
         settings.screenRecordingEnabled = true
-        try await expectHeadings(["基础功能", "截图与录屏", "其他"])
+        try await expectHeadings(["基础功能", "截图与录屏", "其他", "权限"])
         settings.screenRecordingEnabled = false
         settings.updateChecksEnabled = true
-        try await expectHeadings(["基础功能", "其他", "反馈更新"])
+        try await expectHeadings(["基础功能", "其他", "权限", "反馈更新"])
         settings.recommendedToolsEnabled = true
-        try await expectHeadings(["基础功能", "其他", "推荐与反馈更新"])
+        try await expectHeadings(["基础功能", "其他", "权限", "推荐与反馈更新"])
         settings.updateChecksEnabled = false
-        try await expectHeadings(["基础功能", "其他", "推荐与反馈更新"])
+        try await expectHeadings(["基础功能", "其他", "权限", "推荐与反馈更新"])
         settings.recommendedToolsEnabled = false
-        try await expectHeadings(["基础功能", "其他"])
+        try await expectHeadings(["基础功能", "其他", "权限"])
     }
 
     private struct SidebarPage: View {

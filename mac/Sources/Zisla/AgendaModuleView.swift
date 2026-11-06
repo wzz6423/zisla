@@ -228,13 +228,9 @@ struct AgendaModuleView: View {
                     .font(.system(size: 9))
                     .foregroundStyle(.secondary)
                     .lineLimit(2)
-                Button(AppLocalization.text("定位设置")) {
-                    NSWorkspace.shared.open(URL(
-                        string: "x-apple.systempreferences:com.apple.preference.security?Privacy_LocationServices"
-                    )!)
-                }
-                .buttonStyle(.bordered)
-                .controlSize(.mini)
+                AppLocalizedText("请在设置的“权限”页面管理授权。")
+                    .font(.system(size: 9))
+                    .foregroundStyle(.secondary)
             }
         case .idle, .ready:
             Label(
@@ -261,16 +257,6 @@ struct AgendaModuleView: View {
                     }
                     .buttonStyle(.plain)
                     .help(AppLocalization.text("新增日程或提醒"))
-                }
-                if !calendar.hasFullAgendaAccess {
-                    Button(action: handleAuthorizationAction) {
-                        Image(systemName: "lock.open.fill")
-                            .font(.system(size: 9, weight: .semibold))
-                            .frame(width: 20, height: 20)
-                    }
-                    .buttonStyle(.plain)
-                    .foregroundStyle(Color.zislaWarning)
-                    .help(AppLocalization.text("授权日历与提醒事项"))
                 }
                 Text(selection.selectedDay, format: .dateTime.month(.abbreviated).day())
                     .font(.system(size: 10, weight: .medium))
@@ -450,37 +436,13 @@ struct AgendaModuleView: View {
             Label(AppLocalization.text("需要日历权限"), systemImage: "calendar.badge.exclamationmark")
                 .font(.system(size: 10, weight: .semibold))
                 .foregroundStyle(Color.zislaWarning)
-            Text(calendar.authorizationStatus == .notDetermined
-                || calendar.reminderAuthorizationStatus == .notDetermined
-                ? AppLocalization.text("允许后即可显示日历事件与计划提醒")
-                : AppLocalization.text("请在系统设置中允许访问日历和提醒事项"))
+            AppLocalizedText("请在设置的“权限”页面管理授权。")
                 .font(.system(size: 9))
                 .foregroundStyle(.secondary)
                 .multilineTextAlignment(.center)
-                .lineLimit(2)
-            Button(calendar.hasUndeterminedAccess ? AppLocalization.text("授权日历") : AppLocalization.text("打开系统设置")) {
-                handleAuthorizationAction()
-            }
-            .buttonStyle(.bordered)
-            .controlSize(.small)
+                .fixedSize(horizontal: false, vertical: true)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
-    }
-
-    private func handleAuthorizationAction() {
-        if calendar.hasUndeterminedAccess {
-            Task { await calendar.requestAccess() }
-        } else {
-            openCalendarSettings()
-        }
-    }
-
-    private func openCalendarSettings() {
-        let pane = calendar.hasEventAccess ? "Privacy_Reminders" : "Privacy_Calendars"
-        guard let url = URL(
-            string: "x-apple.systempreferences:com.apple.preference.security?\(pane)"
-        ) else { return }
-        NSWorkspace.shared.open(url)
     }
 
     private func eventColor(_ event: CalendarEventSnapshot) -> Color {

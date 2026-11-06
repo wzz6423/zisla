@@ -281,12 +281,11 @@ struct ScreenRecordingCaptureBar: View {
 
     @ViewBuilder private func sourcePicker(width: CGFloat) -> some View {
         if model.availableSources.isEmpty {
-            Button(action: model.requestScreenAccess) {
-                Image(systemName: "lock.shield").frame(width: width, height: ScreenshotToolbarLayout.controlHeight)
-            }
-            .buttonStyle(.plain).help(AppLocalization.text("授权屏幕录制"))
-            .accessibilityLabel(AppLocalization.text("授权屏幕录制"))
-            .accessibilityIdentifier("screenRecording.requestScreenAccess")
+            Image(systemName: "lock.shield")
+                .frame(width: width, height: ScreenshotToolbarLayout.controlHeight)
+                .foregroundStyle(.secondary)
+                .help(AppLocalization.text("请在设置的“权限”页面管理授权。"))
+                .accessibilityLabel(AppLocalization.text("请在设置的“权限”页面管理授权。"))
         } else {
             Menu {
                 ForEach(model.availableSources) { source in

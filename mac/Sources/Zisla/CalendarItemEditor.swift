@@ -16,30 +16,10 @@ enum CalendarItemEditor {
             availableKinds.append((AppLocalization.text("提醒事项"), .reminder))
         }
         guard !availableKinds.isEmpty else {
-            guard requestAuthorization(calendar: calendar) else { return }
-            if calendar.hasUndeterminedAccess {
-                await calendar.requestAccess()
-                if calendar.hasEventAccess || (allowsReminders && calendar.hasReminderAccess) {
-                    await present(calendar: calendar, draft: draft, allowsReminders: allowsReminders, onError: onError)
-                } else {
-                    onError(calendar.errorDescription ?? AppLocalization.text("需要日历权限"))
-                }
-            } else {
-                NSWorkspace.shared.open(URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_Calendars")!)
-            }
+            onError(AppLocalization.text("请在设置的“权限”页面管理授权。"))
             return
         }
         presentAuthorized(calendar: calendar, draft: draft, availableKinds: availableKinds, onError: onError)
-    }
-
-    private static func requestAuthorization(calendar: CalendarService) -> Bool {
-        let alert = NSAlert()
-        alert.messageText = AppLocalization.text("需要日历权限")
-        alert.informativeText = AppLocalization.text("请在系统设置中允许访问日历和提醒事项")
-        alert.addButton(withTitle: AppLocalization.text(calendar.hasUndeterminedAccess ? "授权日历" : "打开系统设置"))
-        alert.addButton(withTitle: AppLocalization.text("取消"))
-        WindowPlacement.prepareModal(alert.window, on: WindowPlacement.screenUnderMouse())
-        return alert.runModal() == .alertFirstButtonReturn
     }
 
     private static func presentAuthorized(

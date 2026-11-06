@@ -2750,7 +2750,7 @@
 "onboarding.permission.system_audio.title" = "Systeemaudio";
 "onboarding.permission.system_audio.body" = "Voor muziekvisualisaties. Sta audio-opname toe in Systeeminstellingen; macOS kan bij het eerste gebruik opnieuw om bevestiging vragen.";
 "onboarding.permission.full_disk_access.title" = "Volledige schijftoegang";
-"onboarding.permission.full_disk_access.body" = "Alleen nodig voor lokale e-mailindexen of browsercookies. Schakel dit in Systeeminstellingen in als u deze functies gebruikt.";
+"onboarding.permission.full_disk_access.body" = "Voor het lezen van de schermtijd van het systeem, lokale e-mailindexen of browsercookies. Schakel dit indien nodig in Systeeminstellingen in.";
 "荧光笔" = "Markeerstift";
 "保留左右标记" = "Markeringen aan de uiteinden behouden";
 "提取" = "Uitsnijden";
@@ -3309,3 +3309,7 @@
 "无法读取此图片或视频，请选择系统支持的媒体文件。" = "Deze afbeelding of video kan niet worden gelezen. Kies een mediabestand dat door je systeem wordt ondersteund.";
 "宠物动画不能超过 30 秒。" = "Huisdieranimaties mogen niet langer dan 30 seconden zijn.";
 "宠物文件不能超过 100 MB。" = "Huisdierbestanden mogen niet groter dan 100 MB zijn.";
+
+"权限" = "Machtigingen";
+"管理 zisla 使用的系统权限。" = "Beheer de systeemmachtigingen die zisla gebruikt.";
+"请在设置的“权限”页面管理授权。" = "Beheer de toegang op de pagina Machtigingen in de instellingen.";

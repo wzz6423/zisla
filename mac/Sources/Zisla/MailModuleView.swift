@@ -154,25 +154,13 @@ struct MailModuleView: View {
                                 .foregroundStyle(.secondary)
                                 .lineLimit(5)
                                 .multilineTextAlignment(.center)
-                            HStack(spacing: 8) {
-                                Button(AppLocalization.text("重新读取")) { Task { await model.refreshMail() } }
-                                    .buttonStyle(.bordered)
-                                    .controlSize(.mini)
-                                Button {
-                                    if mail.needsMailIndexAccess {
-                                        openFullDiskAccessSettings()
-                                    } else {
-                                        openAutomationSettings()
-                                    }
-                                } label: {
-                                    Label(
-                                        mail.needsMailIndexAccess ? AppLocalization.text("授权磁盘访问") : AppLocalization.text("打开系统设置"),
-                                        systemImage: mail.needsMailIndexAccess ? "externaldrive.badge.checkmark" : "gear"
-                                    )
-                                }
-                                .buttonStyle(.borderedProminent)
+                            AppLocalizedText("请在设置的“权限”页面管理授权。")
+                                .font(.islandMicro())
+                                .foregroundStyle(.secondary)
+                                .multilineTextAlignment(.center)
+                            Button(AppLocalization.text("重新读取")) { Task { await model.refreshMail() } }
+                                .buttonStyle(.bordered)
                                 .controlSize(.mini)
-                            }
                         }
                         .frame(maxWidth: .infinity, maxHeight: .infinity)
                     } else if visibleMessages.isEmpty {
@@ -443,17 +431,6 @@ struct MailModuleView: View {
         WindowPlacement.prepareModal(alert.window, on: WindowPlacement.screenUnderMouse())
         guard alert.runModal() == .alertFirstButtonReturn else { return }
         Task { await model.deleteMail(message) }
-    }
-
-    /// Opens the "Privacy & Security → Automation" page in System Settings to guide the user to authorize Mail.app access.
-    private func openAutomationSettings() {
-        let url = URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_Automation")!
-        NSWorkspace.shared.open(url)
-    }
-
-    private func openFullDiskAccessSettings() {
-        let url = URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_AllFiles")!
-        NSWorkspace.shared.open(url)
     }
 }
 

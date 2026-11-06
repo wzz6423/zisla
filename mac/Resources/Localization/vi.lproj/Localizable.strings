@@ -2750,7 +2750,7 @@
 "onboarding.permission.system_audio.title" = "Âm thanh hệ thống";
 "onboarding.permission.system_audio.body" = "Để hiển thị hình ảnh theo nhạc. Bật quyền ghi âm thanh trong Cài đặt hệ thống; macOS có thể yêu cầu xác nhận khi dùng lần đầu.";
 "onboarding.permission.full_disk_access.title" = "Truy cập toàn bộ ổ đĩa";
-"onboarding.permission.full_disk_access.body" = "Chỉ cần cho chỉ mục thư cục bộ hoặc cookie của trình duyệt. Bật trong Cài đặt hệ thống nếu bạn dùng những tính năng này.";
+"onboarding.permission.full_disk_access.body" = "Dùng để đọc thời gian sử dụng màn hình của hệ thống, chỉ mục thư cục bộ hoặc cookie của trình duyệt. Bật trong Cài đặt hệ thống khi cần.";
 "荧光笔" = "Bút tô sáng";
 "保留左右标记" = "Giữ dấu ở hai đầu";
 "提取" = "Tách ảnh";
@@ -3309,3 +3309,7 @@
 "无法读取此图片或视频，请选择系统支持的媒体文件。" = "Không thể đọc hình ảnh hoặc video này. Hãy chọn tệp phương tiện được hệ thống hỗ trợ.";
 "宠物动画不能超过 30 秒。" = "Hoạt ảnh thú cưng không được dài quá 30 giây.";
 "宠物文件不能超过 100 MB。" = "Tệp thú cưng không được vượt quá 100 MB.";
+
+"权限" = "Quyền";
+"管理 zisla 使用的系统权限。" = "Quản lý các quyền hệ thống mà zisla sử dụng.";
+"请在设置的“权限”页面管理授权。" = "Quản lý quyền truy cập trên trang Quyền trong phần cài đặt.";

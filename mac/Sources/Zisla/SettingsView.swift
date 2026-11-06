@@ -258,6 +258,8 @@ struct SettingsView: View {
             networkProxyContent
         case .weather:
             weatherContent
+        case .permissions:
+            PermissionsSettingsView()
         case .updates:
             updatesContent
         case .recommendations:
@@ -584,33 +586,6 @@ struct SettingsView: View {
                             .foregroundStyle(Color.zislaWarning)
                             .frame(maxWidth: .infinity, minHeight: 34, alignment: .leading)
                     }
-                    if clipboardAssistantTriggersRequireInputMonitoring {
-                        rowDivider
-                        settingRow(
-                            symbol: "lock.shield",
-                            title: "输入监控",
-                            detail: "单独修饰键或鼠标侧键需要监听全局事件",
-                            isNested: true
-                        ) {
-                            if model.voiceInputInputMonitoringAccessGranted {
-                                Label {
-                                    AppLocalizedText("已授权")
-                                } icon: {
-                                    Image(systemName: "checkmark.circle.fill")
-                                        .foregroundStyle(.green)
-                                }
-                                .font(.caption)
-                                .keepsIntrinsicWidth()
-                            } else {
-                                Button {
-                                    model.openVoiceInputInputMonitoringSettings()
-                                } label: {
-                                    AppLocalizedText("去授权")
-                                }
-                                .keepsIntrinsicWidth()
-                            }
-                        }
-                    }
                     rowDivider
                     settingRow(
                         symbol: "computermouse",
@@ -642,32 +617,10 @@ struct SettingsView: View {
                     ) {
                         Toggle("", isOn: Binding(
                             get: { model.settingsStore.settings.clipboardAssistantMouseGestureEnabled },
-                            set: { enabled in
-                                model.settingsStore.settings.clipboardAssistantMouseGestureEnabled = enabled
-                                if enabled, !model.assistantAccessibilityGranted {
-                                    AccessibilityPermission.promptIfNeeded()
-                                }
-                            }
+                            set: { model.settingsStore.settings.clipboardAssistantMouseGestureEnabled = $0 }
                         ))
                         .labelsHidden()
                         .toggleStyle(.switch)
-                    }
-                    if model.settingsStore.settings.clipboardAssistantMouseGestureEnabled
-                        && !model.assistantAccessibilityGranted {
-                        rowDivider
-                        settingRow(
-                            symbol: "lock.shield",
-                            title: "辅助功能",
-                            detail: "模拟 Command-C 复制选中内容需要辅助功能权限",
-                            isNested: true
-                        ) {
-                            Button {
-                                model.openAssistantAccessibilitySettings()
-                            } label: {
-                                AppLocalizedText("去授权")
-                            }
-                            .keepsIntrinsicWidth()
-                        }
                     }
                     rowDivider
                     featureToggle(
@@ -799,10 +752,7 @@ struct SettingsView: View {
                     ) {
                         Toggle("", isOn: Binding(
                             get: { model.settingsStore.settings.contextNotesEnabled },
-                            set: { enabled in
-                                model.settingsStore.settings.contextNotesEnabled = enabled
-                                if enabled { AccessibilityPermission.promptIfNeeded() }
-                            }
+                            set: { model.settingsStore.settings.contextNotesEnabled = $0 }
                         ))
                         .labelsHidden()
                         .toggleStyle(.switch)
@@ -827,13 +777,6 @@ struct SettingsView: View {
                             .keepsIntrinsicWidth()
                         }
                         .padding(.leading, 20)
-                    }
-                    if model.settingsStore.settings.contextNotesEnabled && !model.assistantAccessibilityGranted {
-                        rowDivider
-                        settingRow(symbol: "lock.shield", title: "辅助功能",
-                                   detail: "需要辅助功能权限来识别窗口和网页", isNested: true) {
-                            Button { model.openAssistantAccessibilitySettings() } label: { AppLocalizedText("去授权") }
-                        }
                     }
                     ForEach(ClipboardAssistantKind.allCases, id: \.self) { kind in
                         rowDivider
@@ -1103,14 +1046,6 @@ struct SettingsView: View {
                             Label(message, systemImage: "exclamationmark.triangle.fill")
                                 .font(.caption).foregroundStyle(Color.zislaWarning)
                         }
-                        if RecordingShortcutAction.allCases.contains(where: {
-                            model.settingsStore.settings.screenRecordingHotkey(for: $0).requiresInputMonitoring
-                        }) {
-                            rowDivider
-                            settingRow(symbol: "lock.shield", title: "输入监控", detail: "单独修饰键需要监听全局键盘事件") {
-                                Button(AppLocalization.text("打开设置")) { model.openVoiceInputInputMonitoringSettings() }
-                            }
-                        }
                     }
                 }
             }
@@ -1189,27 +1124,6 @@ struct SettingsView: View {
                                 .font(.system(size: 10))
                                 .foregroundStyle(Color.zislaWarning)
                                 .frame(maxWidth: .infinity, minHeight: 34, alignment: .leading)
-                        }
-                        if screenshotHotkeysRequireInputMonitoring {
-                            rowDivider
-                            settingRow(
-                                symbol: "lock.shield",
-                                title: "输入监控",
-                                detail: "单独修饰键需要监听全局键盘事件",
-                                isNested: true
-                            ) {
-                                if model.voiceInputInputMonitoringAccessGranted {
-                                    Label(AppLocalization.text("已授权"), systemImage: "checkmark.circle.fill")
-                                        .foregroundStyle(.green)
-                                        .font(.caption)
-                                        .keepsIntrinsicWidth()
-                                } else {
-                                    Button(AppLocalization.text("打开设置")) {
-                                        model.openVoiceInputInputMonitoringSettings()
-                                    }
-                                    .keepsIntrinsicWidth()
-                                }
-                            }
                         }
                     }
                 }
@@ -1342,20 +1256,8 @@ struct SettingsView: View {
                     .disabled(!model.settingsStore.settings.keyboardEnabled)
             }
 
-            settingsGroup("统计与权限") {
+            settingsGroup("输入统计") {
                 featureToggle("记录本地输入统计", detail: "仅保存字符数、按键次数、应用与时间聚合，不保存输入内容", symbol: "chart.bar.xaxis", keyPath: \.keyboardTypingStatsEnabled)
-                rowDivider
-                settingRow(symbol: "lock.shield", title: "输入监控权限", detail: model.keyboardSound.monitoringStateText) {
-                    if model.keyboardSound.isInputMonitoringGranted {
-                        Label(AppLocalization.text("已授权"), systemImage: "checkmark.circle.fill")
-                            .foregroundStyle(.green)
-                            .font(.caption)
-                            .keepsIntrinsicWidth()
-                    } else {
-                        Button(AppLocalization.text("打开设置")) { model.keyboardSound.openInputMonitoringSettings() }
-                            .keepsIntrinsicWidth()
-                    }
-                }
             }
         }
     }
@@ -2058,27 +1960,6 @@ struct SettingsView: View {
                             .foregroundStyle(Color.zislaWarning)
                             .frame(maxWidth: .infinity, minHeight: 34, alignment: .leading)
                     }
-                    if model.settingsStore.settings.voiceInputHotkeyPreset.requiresInputMonitoring {
-                        rowDivider
-                        settingRow(
-                            symbol: "lock.shield",
-                            title: "输入监控",
-                            detail: "左右侧修饰键需要监听全局键盘事件",
-                            isNested: true
-                        ) {
-                            if model.voiceInputInputMonitoringAccessGranted {
-                                Label(AppLocalization.text("已授权"), systemImage: "checkmark.circle.fill")
-                                    .foregroundStyle(.green)
-                                    .font(.caption)
-                                    .keepsIntrinsicWidth()
-                            } else {
-                                Button(AppLocalization.text("打开设置")) {
-                                    model.openVoiceInputInputMonitoringSettings()
-                                }
-                                .keepsIntrinsicWidth()
-                            }
-                        }
-                    }
                 }
             }
         }
@@ -2342,13 +2223,6 @@ struct SettingsView: View {
     private func screenshotConflictMessage(actionName: String, conflict: ScreenshotHotkeyAction) -> String {
         AppLocalization.text("%@快捷键与%@冲突，未保存",
             AppLocalization.text(actionName), AppLocalization.text(conflict.name))
-    }
-
-    private var screenshotHotkeysRequireInputMonitoring: Bool {
-        let settings = model.settingsStore.settings
-        return settings.screenshotEnabled
-            && (settings.screenshotHotkey.requiresInputMonitoring
-                || settings.screenshotLongHotkey.requiresInputMonitoring)
     }
 
     private var currentScreenshotHotkeyConflict: String? {
@@ -3453,13 +3327,6 @@ struct SettingsView: View {
         return loc("未配置；点击右侧录制")
     }
 
-    private var clipboardAssistantTriggersRequireInputMonitoring: Bool {
-        model.settingsStore.settings.clipboardAssistantTriggerConfiguration.hotkey?.requiresInputMonitoring == true
-            || model.settingsStore.settings.clipboardAssistantDismissConfiguration.hotkey?.requiresInputMonitoring == true
-            || model.settingsStore.settings.clipboardAssistantMouseButton != nil
-            || model.settingsStore.settings.clipboardAssistantMouseGestureEnabled
-    }
-
     private var clipboardAssistantDismissHotkeyDetail: String {
         guard let hotkey = model.settingsStore.settings.clipboardAssistantDismissConfiguration.hotkey else {
             return loc("未配置；点击右侧录制")
@@ -4476,6 +4343,7 @@ enum SettingsSectionGroup: CaseIterable, Identifiable, Hashable {
     case capture
     case aiAndVoice
     case others
+    case permissions
     case recommendationsAndUpdates
 
     var id: Self { self }
@@ -4488,6 +4356,7 @@ enum SettingsSectionGroup: CaseIterable, Identifiable, Hashable {
         case .capture: "截图与录屏"
         case .aiAndVoice: "AI 与语音"
         case .others: "其他"
+        case .permissions: "权限"
         case .recommendationsAndUpdates: "推荐与反馈更新"
         }
     }
@@ -4513,6 +4382,7 @@ enum SettingsSection: String, CaseIterable, Identifiable {
     case weather
     case networkProxy
     case pet
+    case permissions
     case recommendations
     case updates
 
@@ -4526,6 +4396,7 @@ enum SettingsSection: String, CaseIterable, Identifiable {
         case .screenshot, .recording: .capture
         case .ai, .voice: .aiAndVoice
         case .clipboardAssistant, .download, .mail, .weather, .networkProxy, .pet: .others
+        case .permissions: .permissions
         case .recommendations, .updates: .recommendationsAndUpdates
         }
     }
@@ -4552,6 +4423,7 @@ enum SettingsSection: String, CaseIterable, Identifiable {
         case .download: "下载"
         case .networkProxy: "网络"
         case .weather: "天气"
+        case .permissions: "权限"
         case .updates: "反馈与更新"
         case .recommendations: "推荐"
         }
@@ -4574,6 +4446,7 @@ enum SettingsSection: String, CaseIterable, Identifiable {
         case .download: "arrow.down.circle.fill"
         case .networkProxy: "network"
         case .weather: "cloud.sun.fill"
+        case .permissions: "lock.shield"
         case .updates: "arrow.up.circle"
         case .recommendations: "sparkles"
         }
@@ -4596,6 +4469,7 @@ enum SettingsSection: String, CaseIterable, Identifiable {
         case .download: "管理下载目录、下载通知与所需组件。"
         case .networkProxy: "配置本地代理，用于更新、安装、下载与 GitHub 访问。"
         case .weather: "管理天气显示、地点和刷新。"
+        case .permissions: "管理 zisla 使用的系统权限。"
         case .updates: "提交问题反馈、管理版本检查与自动更新。"
         case .recommendations: "一键下载和更新精选效率、网络、开发与桌面工具。"
         }
@@ -4603,7 +4477,7 @@ enum SettingsSection: String, CaseIterable, Identifiable {
 
     func isVisible(settings: FeatureSettings) -> Bool {
         switch self {
-        case .general, .features, .networkProxy:
+        case .general, .features, .networkProxy, .permissions:
             return true
         case .recommendations:
             return settings.recommendedToolsEnabled

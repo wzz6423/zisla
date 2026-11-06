@@ -2746,7 +2746,7 @@
 "onboarding.permission.system_audio.title" = "Audio système";
 "onboarding.permission.system_audio.body" = "Pour visualiser la musique. Autorisez l’enregistrement audio dans les Réglages Système ; macOS peut demander une confirmation lors de la première utilisation.";
 "onboarding.permission.full_disk_access.title" = "Accès complet au disque";
-"onboarding.permission.full_disk_access.body" = "Nécessaire uniquement pour les index de courrier locaux ou les cookies du navigateur. Activez-le dans les Réglages Système si vous utilisez ces fonctions.";
+"onboarding.permission.full_disk_access.body" = "Permet de lire le temps d’écran du système, les index de courrier locaux ou les cookies du navigateur. Activez-le dans les Réglages Système selon vos besoins.";
 "荧光笔" = "Surligneur";
 "保留左右标记" = "Conserver les repères aux extrémités";
 "提取" = "Extraire";
@@ -3305,3 +3305,7 @@
 "无法读取此图片或视频，请选择系统支持的媒体文件。" = "Impossible de lire cette image ou vidéo. Choisissez un fichier multimédia pris en charge par votre système.";
 "宠物动画不能超过 30 秒。" = "Les animations des animaux ne peuvent pas dépasser 30 secondes.";
 "宠物文件不能超过 100 MB。" = "Les fichiers des animaux ne peuvent pas dépasser 100 Mo.";
+
+"权限" = "Autorisations";
+"管理 zisla 使用的系统权限。" = "Gérez les autorisations système utilisées par zisla.";
+"请在设置的“权限”页面管理授权。" = "Gérez les accès sur la page Autorisations des réglages.";

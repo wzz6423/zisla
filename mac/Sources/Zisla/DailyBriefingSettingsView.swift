@@ -45,17 +45,11 @@ struct DailyBriefingSettingsView: View {
             }
             .disabled(!settingsStore.settings.dailyBriefing.enabled)
 
-            HStack(spacing: 12) {
-                Toggle(isOn: $settingsStore.settings.dailyBriefing.readsSystemScreenTime) {
-                    AppLocalizedText("读取系统屏幕使用时间")
-                }
-                .toggleStyle(.switch)
-                .disabled(!settingsStore.settings.dailyBriefing.enabled)
-
-                Button {
-                    NSWorkspace.shared.open(URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_AllFiles")!)
-                } label: { AppLocalizedText("完全磁盘访问") }
+            Toggle(isOn: $settingsStore.settings.dailyBriefing.readsSystemScreenTime) {
+                AppLocalizedText("读取系统屏幕使用时间")
             }
+            .toggleStyle(.switch)
+            .disabled(!settingsStore.settings.dailyBriefing.enabled)
 
             Divider()
             DisclosureGroup(isExpanded: $contentExpanded) {

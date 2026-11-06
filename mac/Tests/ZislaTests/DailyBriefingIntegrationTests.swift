@@ -319,8 +319,8 @@ struct DailyBriefingIntegrationTests {
             #expect(!settings.contains("\"\(key)\""), "Removed settings text must stay hidden: \(key)")
         }
         #expect(!settings.contains("model.downloadDirectory"))
-        #expect(settings.contains(#"AppLocalizedText("完全磁盘访问")"#))
-        #expect(settings.contains("x-apple.systempreferences:com.apple.preference.security?Privacy_AllFiles"))
+        #expect(!settings.contains(#"AppLocalizedText("完全磁盘访问")"#))
+        #expect(!settings.contains("x-apple.systempreferences:com.apple.preference.security?Privacy_AllFiles"))
 
         let poster = try String(contentsOf: root.appendingPathComponent("Sources/Zisla/DailyBriefingPoster.swift"), encoding: .utf8)
         for key in [

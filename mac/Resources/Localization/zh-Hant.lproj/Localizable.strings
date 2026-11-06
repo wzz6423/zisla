@@ -2749,7 +2749,7 @@
 "onboarding.permission.system_audio.title" = "系統音訊";
 "onboarding.permission.system_audio.body" = "用於顯示音樂波形。請在系統設定中開啟音訊錄製，首次使用時 macOS 可能再次確認。";
 "onboarding.permission.full_disk_access.title" = "完整磁碟存取";
-"onboarding.permission.full_disk_access.body" = "僅在使用本機郵件索引或瀏覽器 Cookies 時需要，可在系統設定中依需要開啟。";
+"onboarding.permission.full_disk_access.body" = "用於讀取系統螢幕使用時間、本機郵件索引或瀏覽器 Cookies，可在系統設定中依需要開啟。";
 "荧光笔" = "螢光筆";
 "保留左右标记" = "保留左右標記";
 "提取" = "擷取";
@@ -3308,3 +3308,7 @@
 "无法读取此图片或视频，请选择系统支持的媒体文件。" = "無法讀取此圖片或影片，請選擇系統支援的媒體檔案。";
 "宠物动画不能超过 30 秒。" = "寵物動畫不能超過 30 秒。";
 "宠物文件不能超过 100 MB。" = "寵物檔案不能超過 100 MB。";
+
+"权限" = "權限";
+"管理 zisla 使用的系统权限。" = "管理 zisla 使用的系統權限。";
+"请在设置的“权限”页面管理授权。" = "請在設定的「權限」頁面管理授權。";
