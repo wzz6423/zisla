@@ -118,7 +118,7 @@ export const fr: SiteContent = {
       download: {
         name: 'Téléchargeur',
         caption:
-          'Collez un lien ou laissez zisla repérer les liens du presse-papiers une fois l’option activée. Choisissez un format vidéo ou audio disponible et utilisez les Cookies d’un navigateur installé lorsqu’un téléchargement Douyin les nécessite. Enregistrez dans le dossier par défaut ou celui de votre choix, avec l’icône de la source, la progression en temps réel et l’état final.',
+          'Collez un lien ou laissez zisla repérer les liens du presse-papiers une fois l’option activée. Choisissez un format vidéo ou audio disponible et utilisez les Cookies d’un navigateur installé lorsqu’un téléchargement Douyin les nécessite. Enregistrez dans le dossier par défaut ou celui de votre choix, avec l’icône de la source, la progression en temps réel et l’état final. Téléchargements, enregistrements et captures d’écran partagent cet emplacement.',
         points: [
           'Choisir les formats vidéo ou audio disponibles',
           'Cookies de navigateur pour Douyin',
@@ -169,7 +169,7 @@ export const fr: SiteContent = {
       system: {
         name: 'État du système',
         caption:
-          'Consultez l’état du processeur, du GPU, de la mémoire, du disque, du réseau et des ventilateurs, lisez la température NVMe SMART quand le matériel la publie, conservez un historique à la minute consultable sur n’importe quelle période et exportable en .xlsx. Analysez les caches des apps et de l’utilisateur Apple, les journaux et les fichiers de préférences résiduels, puis vérifiez la sélection avant de l’envoyer à la Corbeille et consultez le résultat. Consultez les indicateurs détaillés de ce Mac — charge, état, cycles, température et capacité — et le niveau de batterie des appareils proches que le système expose. Les adresses IPv4 et IPv6 publiques sont affichées séparément.',
+          'Consultez l’état du processeur, du GPU, de la mémoire, du disque, du réseau et des ventilateurs, lisez la température NVMe SMART quand le matériel la publie, conservez un historique à la minute consultable sur n’importe quelle période et exportable en .xlsx. Analysez les caches des apps et de l’utilisateur Apple, les journaux et les fichiers de préférences résiduels, puis vérifiez la sélection avant de l’envoyer à la Corbeille et consultez le résultat. Consultez les indicateurs détaillés de ce Mac — charge, état, cycles, température et capacité — et le niveau de batterie des appareils proches que le système expose. Les adresses IPv4 et IPv6 publiques sont affichées séparément. L’historique est conservé par défaut jusqu’à ce que vous l’effaciez.',
         points: [
           'Surveillance au niveau de la puce',
           'Graphiques d’historique et export .xlsx',
@@ -210,7 +210,7 @@ export const fr: SiteContent = {
       },
       recording: {
         title: 'Enregistrer et monter dans le studio',
-        description: 'Enregistrez un écran, une fenêtre ou une zone avec son système, microphone et caméra facultatifs. Montez vidéos, sons, images et textes sur plusieurs pistes ; ajoutez animations, zooms et sous-titres avec un aperçu net. Choisissez le format original, 16:9, 9:16, 1:1 ou 4:3. Exportez vidéo, GIF, Live Photo ou audio ; certains formats nécessitent FFmpeg. Les propositions IA facultatives sont prévisualisées avant application.',
+        description: 'Enregistrez un écran, une fenêtre ou une zone avec son système, microphone et caméra facultatifs. Montez vidéos, sons, images et textes sur plusieurs pistes ; ajoutez animations, zooms et sous-titres avec un aperçu net. Choisissez le format original, 16:9, 9:16, 1:1 ou 4:3. Exportez vidéo, GIF, Live Photo ou audio ; certains formats nécessitent FFmpeg. Les propositions IA facultatives sont prévisualisées avant application. Les enregistrements utilisent l’emplacement défini dans les réglages de téléchargement.',
         detail: 'Montage multipiste · Formats et aperçu · Vidéo, GIF, Live Photo et audio',
       },
       permissions: {
@@ -233,7 +233,7 @@ export const fr: SiteContent = {
       capture: {
         title: 'Captures, captures défilantes et épinglage',
         description:
-          'Capturez, épinglez ou assemblez des captures défilantes avec des raccourcis personnalisables. Surlignez, extrayez des zones d’image, arrondissez les coins et conservez les annotations à l’export. Reconnaissez et copiez du texte, traduisez-le puis copiez le résultat, ou exportez les tableaux reconnus en .xlsx. Rangez les captures dans l’étagère. Les réglages vérifient les conflits avec la dictée et les actions rapides.',
+          'Capturez, épinglez ou assemblez des captures défilantes avec des raccourcis personnalisables. Surlignez, extrayez des zones d’image, arrondissez les coins et conservez les annotations à l’export. Reconnaissez et copiez du texte, traduisez-le puis copiez le résultat, ou exportez les tableaux reconnus en .xlsx. Rangez les captures dans l’étagère. Les réglages vérifient les conflits avec la dictée et les actions rapides. La boîte de dialogue d’enregistrement s’ouvre dans le dossier de téléchargement actuel.',
         detail: 'Surlignage et extraction · Reconnaissance, traduction et copie · Coins arrondis et .xlsx',
       },
       voice: {
@@ -362,6 +362,12 @@ export const fr: SiteContent = {
   },
   changelog: {
     releaseNotes: {
+      'v0.1.21': [
+        'La surveillance système conserve par défaut tout l’historique à la minute, existant et nouveau, jusqu’à son effacement manuel. Les graphiques par période et l’export .xlsx restent disponibles.',
+        'Téléchargements, enregistrements et captures d’écran partagent un emplacement. Les captures s’enregistrent depuis le dossier de téléchargement actuel ; le réglage d’emplacement propre aux enregistrements, qui faisait doublon, a été supprimé.',
+        'L’emplacement d’affichage des états et son entrée de recherche n’apparaissent que pour les pilules positionnées librement. La ligne est masquée si une encoche ou une pilule à la caméra ne peut utiliser que la barre des menus.',
+        'Le compte à rebours des actions rapides utilise une barre de progression en bas dans les dispositions avec encoche. Les pilules conservent la progression sur tout le pourtour.',
+      ],
       'v0.1.20': [
         'Choisissez parmi huit modèles, sélectionnez les données d’utilisation, de saisie, du système et d’activité zisla, puis prévisualisez le résultat. Exportez un PNG manuellement ou à une heure quotidienne choisie. L’historique Temps d’écran est utilisé quand il est activé et disponible ; une donnée absente n’est pas présentée comme un zéro mesuré.',
         'Réglez l’intervalle des rappels de pause, d’hydratation, de mouvement et de repos des yeux. Les messages suivent l’heure de la journée ; les pauses naturelles, le verrouillage et la veille réinitialisent le compteur. La fin d’une séance et les actions sur les notes peuvent aussi afficher un bref retour. Activez ou désactivez ces rappels dans les réglages. Enregistrez une note modifiable pour une page web, une fenêtre ou le bureau et retrouvez-la en y revenant. Joignez une capture de fenêtre, gérez les notes dans l’étagère et programmez des rappels répétés d’une heure à trois jours, ou désactivez-les.',

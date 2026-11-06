@@ -107,7 +107,7 @@ export const es = createCatalog({
       download: {
         name: 'Descargador',
         caption:
-          'Pega un enlace o deja que zisla lo detecte en el portapapeles al activarlo. Elige vídeo o audio y descarga en la carpeta predeterminada o en otra. Los enlaces compatibles muestran icono de origen, progreso en vivo y estado final.',
+          'Pega un enlace o deja que zisla lo detecte en el portapapeles al activarlo. Elige vídeo o audio y descarga en la carpeta predeterminada o en otra. Los enlaces compatibles muestran icono de origen, progreso en vivo y estado final. Descargas, grabaciones y capturas comparten esta ubicación de guardado.',
         points: ['Modos vídeo / audio', 'Carpeta predeterminada o propia', 'Origen y progreso en vivo'],
       },
       agenda: {
@@ -142,7 +142,7 @@ export const es = createCatalog({
       system: {
         name: 'Estado del sistema',
         caption:
-          'Consulta CPU, GPU, memoria, disco, red y ventiladores; lee la temperatura SMART de NVMe cuando el hardware la ofrece, guarda un historial por minuto que puedes graficar para cualquier periodo y exportar a .xlsx. Analiza cachés de apps y de usuario de Apple, registros y archivos de preferencias residuales. Revisa los elementos, mueve los seleccionados a la Papelera y consulta los resultados. Consulta carga, salud, ciclos, temperatura y capacidad de este Mac, además del nivel de batería de los dispositivos cercanos que expone el sistema. Las direcciones IPv4 e IPv6 públicas se muestran por separado.',
+          'Consulta CPU, GPU, memoria, disco, red y ventiladores; lee la temperatura SMART de NVMe cuando el hardware la ofrece, guarda un historial por minuto que puedes graficar para cualquier periodo y exportar a .xlsx. Analiza cachés de apps y de usuario de Apple, registros y archivos de preferencias residuales. Revisa los elementos, mueve los seleccionados a la Papelera y consulta los resultados. Consulta carga, salud, ciclos, temperatura y capacidad de este Mac, además del nivel de batería de los dispositivos cercanos que expone el sistema. Las direcciones IPv4 e IPv6 públicas se muestran por separado. El historial se conserva de forma predeterminada hasta que lo borres.',
         points: ['Monitorización a nivel de chip', 'Gráficas de historial y exportación .xlsx', 'Revisa antes de mover a la Papelera'],
       },
     },
@@ -180,7 +180,7 @@ export const es = createCatalog({
       },
       recording: {
         title: 'Graba y edita en el estudio',
-        description: 'Graba pantalla, ventana o región con audio del sistema, micrófono y cámara opcionales. Edita vídeo, audio, imágenes y texto en varias pistas, añade animaciones, zooms y subtítulos y revisa una vista previa nítida. Elige proporción original, 16:9, 9:16, 1:1 o 4:3. Exporta vídeo, GIF, Live Photo o audio; algunos formatos requieren FFmpeg. Las propuestas de IA opcionales se revisan antes de aplicarlas.',
+        description: 'Graba pantalla, ventana o región con audio del sistema, micrófono y cámara opcionales. Edita vídeo, audio, imágenes y texto en varias pistas, añade animaciones, zooms y subtítulos y revisa una vista previa nítida. Elige proporción original, 16:9, 9:16, 1:1 o 4:3. Exporta vídeo, GIF, Live Photo o audio; algunos formatos requieren FFmpeg. Las propuestas de IA opcionales se revisan antes de aplicarlas. Las grabaciones usan la ubicación definida en los ajustes de descarga.',
         detail: 'Edición multipista · Proporciones y vista previa · Vídeo, GIF, Live Photo y audio',
       },
       permissions: {
@@ -203,7 +203,7 @@ export const es = createCatalog({
       capture: {
         title: 'Capturas, capturas con desplazamiento y fijado',
         description:
-          'Captura, fija o une capturas con desplazamiento usando atajos personalizables. Resalta, extrae zonas de imagen, redondea esquinas y conserva anotaciones al exportar. Reconoce y copia texto, tradúcelo y copia el resultado, o exporta tablas reconocidas como .xlsx. Guarda capturas en la bandeja. Los ajustes comprueban conflictos con voz y acciones rápidas.',
+          'Captura, fija o une capturas con desplazamiento usando atajos personalizables. Resalta, extrae zonas de imagen, redondea esquinas y conserva anotaciones al exportar. Reconoce y copia texto, tradúcelo y copia el resultado, o exporta tablas reconocidas como .xlsx. Guarda capturas en la bandeja. Los ajustes comprueban conflictos con voz y acciones rápidas. El diálogo de guardado se abre en la carpeta de descarga actual.',
         detail: 'Resaltar y extraer · Reconocer, traducir y copiar · Esquinas redondas y .xlsx',
       },
       voice: {
@@ -325,6 +325,12 @@ export const es = createCatalog({
   },
   changelog: {
     releaseNotes: {
+      'v0.1.21': [
+        'La monitorización del sistema conserva de forma predeterminada todo el historial por minuto, tanto existente como nuevo, hasta que lo borres. Siguen disponibles las gráficas por periodo y la exportación .xlsx.',
+        'Descargas, grabaciones y capturas comparten una ubicación. Los diálogos para guardar capturas se abren en la carpeta de descarga actual; se ha eliminado el ajuste duplicado de ubicación de las grabaciones.',
+        'La ubicación de los indicadores de estado y su entrada de búsqueda solo aparecen en las píldoras con posición personalizada. La fila se oculta en diseños con muesca o píldoras junto a la cámara cuando solo pueden usar la barra de menús.',
+        'La cuenta atrás de las acciones rápidas usa una barra de progreso inferior en los diseños con muesca. Las píldoras conservan el progreso en todo el contorno.',
+      ],
       'v0.1.20': [
         'Elige entre ocho plantillas, selecciona métricas de uso, escritura, sistema y actividad zisla, y revisa la vista previa. Exporta un PNG manualmente o a una hora diaria. El historial de Tiempo de Uso se incluye si está activado y disponible; los datos ausentes no se presentan como un cero medido.',
         'Ajusta el intervalo de descansos, agua, movimiento y reposo de la vista. Los mensajes se adaptan a la hora del día. Las pausas naturales, el bloqueo y el reposo reinician el contador. Al terminar una sesión o editar notas puede aparecer una respuesta breve. Actívalo o desactívalo en Ajustes. Guarda una nota editable para una web, ventana o escritorio y recupérala al volver. Adjunta una captura de ventana, gestiona las notas en la bandeja y configura recordatorios recurrentes de una hora a tres días, o desactívalos.',

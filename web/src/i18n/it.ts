@@ -107,7 +107,7 @@ export const it = createCatalog({
       download: {
         name: 'Downloader',
         caption:
-          'Incolla un link o lascia che zisla lo riconosca dagli appunti quando è attivo. Scegli video o audio e scarica nella cartella predefinita o in una tua. I link supportati mostrano origine, progresso in tempo reale e stato finale.',
+          'Incolla un link o lascia che zisla lo riconosca dagli appunti quando è attivo. Scegli video o audio e scarica nella cartella predefinita o in una tua. I link supportati mostrano origine, progresso in tempo reale e stato finale. Download, registrazioni e schermate condividono questa posizione di salvataggio.',
         points: ['Modalità video / audio', 'Cartella predefinita o personalizzata', 'Origine e progresso in tempo reale'],
       },
       agenda: {
@@ -142,7 +142,7 @@ export const it = createCatalog({
       system: {
         name: 'Stato del sistema',
         caption:
-          'Controlla CPU, GPU, memoria, disco, rete e ventole; leggi la temperatura SMART NVMe quando l’hardware la espone, registra uno storico al minuto che puoi graficare per qualsiasi intervallo ed esportare in .xlsx. Analizza cache delle app e dell’utente Apple, log e file di preferenze residui. Controlla gli elementi, sposta quelli selezionati nel Cestino e consulta i risultati. Visualizza carica, salute, cicli, temperatura e capacità del Mac, oltre al livello della batteria dei dispositivi vicini esposto dal sistema. Gli indirizzi IPv4 e IPv6 pubblici sono mostrati separatamente.',
+          'Controlla CPU, GPU, memoria, disco, rete e ventole; leggi la temperatura SMART NVMe quando l’hardware la espone, registra uno storico al minuto che puoi graficare per qualsiasi intervallo ed esportare in .xlsx. Analizza cache delle app e dell’utente Apple, log e file di preferenze residui. Controlla gli elementi, sposta quelli selezionati nel Cestino e consulta i risultati. Visualizza carica, salute, cicli, temperatura e capacità del Mac, oltre al livello della batteria dei dispositivi vicini esposto dal sistema. Gli indirizzi IPv4 e IPv6 pubblici sono mostrati separatamente. La cronologia viene conservata per impostazione predefinita finché non la cancelli.',
         points: ['Monitoraggio a livello di chip', 'Grafici dello storico ed export .xlsx', 'Controlla prima di spostare nel Cestino'],
       },
     },
@@ -180,7 +180,7 @@ export const it = createCatalog({
       },
       recording: {
         title: 'Registra e monta nello studio',
-        description: 'Registra schermo, finestra o area con audio del sistema, microfono e fotocamera opzionali. Modifica video, audio, immagini e testo su più tracce, aggiungi animazioni, zoom e sottotitoli e controlla un’anteprima nitida. Scegli proporzioni originali, 16:9, 9:16, 1:1 o 4:3. Esporta video, GIF, Live Photo o audio; alcuni formati richiedono FFmpeg. Le proposte IA opzionali si controllano prima di applicarle.',
+        description: 'Registra schermo, finestra o area con audio del sistema, microfono e fotocamera opzionali. Modifica video, audio, immagini e testo su più tracce, aggiungi animazioni, zoom e sottotitoli e controlla un’anteprima nitida. Scegli proporzioni originali, 16:9, 9:16, 1:1 o 4:3. Esporta video, GIF, Live Photo o audio; alcuni formati richiedono FFmpeg. Le proposte IA opzionali si controllano prima di applicarle. Le registrazioni usano la posizione definita nelle impostazioni dei download.',
         detail: 'Montaggio multitraccia · Proporzioni e anteprima · Video, GIF, Live Photo e audio',
       },
       permissions: {
@@ -203,7 +203,7 @@ export const it = createCatalog({
       capture: {
         title: 'Schermate, catture lunghe e fissaggio',
         description:
-          'Cattura, fissa o unisci schermate a scorrimento con scorciatoie personalizzabili. Evidenzia, estrai aree di immagine, arrotonda gli angoli e conserva le annotazioni all’esportazione. Riconosci e copia il testo, traducilo e copia il risultato oppure esporta tabelle riconosciute in .xlsx. Conserva le catture sullo scaffale. Le impostazioni verificano i conflitti con voce e azioni rapide.',
+          'Cattura, fissa o unisci schermate a scorrimento con scorciatoie personalizzabili. Evidenzia, estrai aree di immagine, arrotonda gli angoli e conserva le annotazioni all’esportazione. Riconosci e copia il testo, traducilo e copia il risultato oppure esporta tabelle riconosciute in .xlsx. Conserva le catture sullo scaffale. Le impostazioni verificano i conflitti con voce e azioni rapide. La finestra di salvataggio si apre nella cartella dei download attuale.',
         detail: 'Evidenziazione ed estrazione · Riconosci, traduci e copia · Angoli arrotondati e .xlsx',
       },
       voice: {
@@ -325,6 +325,12 @@ export const it = createCatalog({
   },
   changelog: {
     releaseNotes: {
+      'v0.1.21': [
+        'Il monitoraggio del sistema conserva per impostazione predefinita tutta la cronologia al minuto, esistente e nuova, finché non la cancelli. Restano disponibili i grafici per qualsiasi periodo e l’esportazione .xlsx.',
+        'Download, registrazioni e schermate condividono una posizione. Le finestre per salvare le schermate si aprono nella cartella dei download attuale; l’impostazione duplicata della posizione delle registrazioni è stata rimossa.',
+        'La posizione degli indicatori di stato e la relativa voce di ricerca compaiono solo per le pillole con posizione personalizzata. La riga è nascosta nei layout con notch o nelle pillole sulla fotocamera quando è disponibile solo la barra dei menu.',
+        'Il conto alla rovescia delle azioni rapide usa una barra di avanzamento inferiore nei layout con notch. Le pillole mantengono l’avanzamento lungo tutto il perimetro.',
+      ],
       'v0.1.20': [
         'Scegli tra otto modelli e seleziona dati di utilizzo, digitazione, sistema e attività zisla. Controlla l’anteprima ed esporta un PNG manualmente o ogni giorno all’ora scelta. La cronologia Tempo di utilizzo è inclusa se attiva e disponibile; i dati mancanti non sono mostrati come uno zero misurato.',
         'Regola l’intervallo per pause, acqua, movimento e riposo degli occhi. I messaggi seguono l’ora del giorno. Pause naturali, blocco e stop azzerano il conteggio. Completare una sessione o lavorare sulle note può mostrare un breve riscontro. Attiva o disattiva nelle Impostazioni. Salva una nota modificabile per una pagina, una finestra o la scrivania e ritrovala al ritorno. Allega una cattura della finestra, gestisci le note sullo scaffale e imposta promemoria ricorrenti da un’ora a tre giorni, oppure disattivali.',

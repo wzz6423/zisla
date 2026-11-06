@@ -85,7 +85,7 @@ const strings = (value, path) => {
 const updatedStrings = (content) => [
   ...changedFeatureIds.flatMap((id) => strings(content.extensions.features[id], `extensions.features.${id}`)),
   ...strings(content.showcase.modules.volumeMixer, 'showcase.modules.volumeMixer'),
-  ...['aiMonitor', 'keyboardSound', 'mail', 'system'].map((id) =>
+  ...['aiMonitor', 'keyboardSound', 'mail', 'system', 'download'].map((id) =>
     [`showcase.modules.${id}.caption`, content.showcase.modules[id].caption]),
   ['showcase.modules.keyboardSound.points.2', content.showcase.modules.keyboardSound.points[2]],
   ...['windowPreviews', 'capture', 'pet'].flatMap((id) =>
@@ -98,6 +98,7 @@ const updatedStrings = (content) => [
   ['download.copy', content.download.copy],
   ['faq.items.permissions.answer', content.faq.items.permissions.answer],
   ...strings(content.changelog.releaseNotes['v0.1.20'], 'changelog.releaseNotes.v0.1.20'),
+  ...strings(content.changelog.releaseNotes['v0.1.21'], 'changelog.releaseNotes.v0.1.21'),
 ];
 
 test('every supported locale has its own name, Open Graph tag, and direction', () => {
@@ -187,7 +188,11 @@ for (const locale of siteLocales) {
       }
     }
     assert.equal(content.changelog.releaseNotes['v0.1.20'].length, 8);
+    assert.equal(content.changelog.releaseNotes['v0.1.21'].length, 4);
     const rendered = renderInMemory(locale);
+    for (const note of content.changelog.releaseNotes['v0.1.21']) {
+      assert.ok(rendered.html.includes(note), `${locale}: current release note is rendered`);
+    }
     assert.equal((rendered.html.match(/class="workflow-module reveal-step"/g) ?? []).length, 12);
     assert.equal((rendered.html.match(/class="extension-item reveal-step"/g) ?? []).length, 17);
     for (const id of changedFeatureIds) {
@@ -204,18 +209,38 @@ for (const locale of siteLocales) {
 }
 
 test('release notes render by version while historical wording remains available', () => {
-  const prepared = { version: 'v0.1.20', date: '2026-11-06', notes: ['ENGLISH FALLBACK SENTINEL'] };
+  const prepared = { version: 'v0.1.21', date: '2026-11-06', notes: ['ENGLISH FALLBACK SENTINEL'] };
   const historical = { version: 'v0.1.19', date: '2026-10-15', notes: ['HISTORICAL NOTE SENTINEL'] };
   const rendered = renderInMemory('zh-Hans', [prepared, historical]);
-  for (const note of site.getSiteContent('zh-Hans').changelog.releaseNotes['v0.1.20']) {
+  for (const note of site.getSiteContent('zh-Hans').changelog.releaseNotes['v0.1.21']) {
     assert.ok(rendered.html.includes(note), 'prepared Chinese release note is rendered');
   }
   assert.ok(!rendered.html.includes('ENGLISH FALLBACK SENTINEL'));
   assert.ok(rendered.html.includes('HISTORICAL NOTE SENTINEL'), 'historical notes retain their original wording');
   const current = renderInMemory('zh-Hans', [historical]);
-  assert.ok(!current.html.includes(site.getSiteContent('zh-Hans').changelog.releaseNotes['v0.1.20'][0]),
+  assert.ok(!current.html.includes(site.getSiteContent('zh-Hans').changelog.releaseNotes['v0.1.21'][0]),
     'prepared notes do not replace the currently published release');
   const metadataOnly = renderInMemory('zh-Hans', [{ ...prepared, notes: [] }]);
-  assert.ok(metadataOnly.html.includes(site.getSiteContent('zh-Hans').changelog.releaseNotes['v0.1.20'][0]),
+  assert.ok(metadataOnly.html.includes(site.getSiteContent('zh-Hans').changelog.releaseNotes['v0.1.21'][0]),
     'a release entry can use its catalog notes without duplicating English source notes');
+});
+
+
+test('latest release downloads and README match the newest changelog entry', () => {
+  const latest = site.changelogEntries[0];
+  assert.equal(site.latestRelease.version, latest.version);
+  assert.equal(site.latestRelease.date, latest.date);
+  const releasePage = `https://github.com/wzz6423/zisla/releases/tag/${latest.version}`;
+  const downloadRoot = `https://github.com/wzz6423/zisla/releases/download/${latest.version}/`;
+  assert.equal(site.latestRelease.releasePage, releasePage);
+  for (const key of ['dmg', 'zip', 'checksum', 'universalDmg', 'universalZip', 'intelDmg', 'intelZip']) {
+    const url = site.latestRelease[key];
+    assert.ok(url.startsWith(downloadRoot), key);
+    assert.ok(url.includes(`/zisla-${latest.version}-macOS-`), key);
+  }
+  const readme = readFileSync(new URL('../README.md', import.meta.url), 'utf8');
+  assert.ok(readme.includes(releasePage));
+  for (const url of readme.match(/https:\/\/github\.com\/wzz6423\/zisla\/releases\/(?:tag|download)\/v[^\s]+/g)) {
+    assert.ok(url.startsWith(releasePage) || url.startsWith(downloadRoot), url);
+  }
 });

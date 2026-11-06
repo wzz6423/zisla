@@ -107,7 +107,7 @@ export const nl = createCatalog({
       download: {
         name: 'Downloader',
         caption:
-          'Plak een link of laat zisla links uit het klembord herkennen zodra de functie is ingeschakeld. Kies video of audio en download naar de standaardmap of een map naar keuze. Ondersteunde links tonen bron, live voortgang en voltooiingsstatus.',
+          'Plak een link of laat zisla links uit het klembord herkennen zodra de functie is ingeschakeld. Kies video of audio en download naar de standaardmap of een map naar keuze. Ondersteunde links tonen bron, live voortgang en voltooiingsstatus. Downloads, opnamen en schermafbeeldingen delen deze opslaglocatie.',
         points: ['Video- / audiomodi', 'Standaard- of eigen map', 'Bron en live voortgang'],
       },
       agenda: {
@@ -142,7 +142,7 @@ export const nl = createCatalog({
       system: {
         name: 'Systeemstatus',
         caption:
-          'Controleer CPU, GPU, geheugen, schijf, netwerk en ventilatoren; lees de NVMe-SMART-temperatuur wanneer de hardware die aanbiedt, houd een minuutsgewijze geschiedenis bij die je voor elke periode als grafiek bekijkt en als .xlsx exporteert. Scan appcaches, Apple-gebruikerscaches, logboeken en achtergebleven voorkeurenbestanden. Controleer de selectie, verplaats deze naar de prullenmand en bekijk het resultaat. Bekijk lading, gezondheid, cycli, temperatuur en capaciteit van deze Mac, plus batterijniveaus van nabije apparaten die het systeem deelt. Openbare IPv4- en IPv6-adressen worden apart weergegeven.',
+          'Controleer CPU, GPU, geheugen, schijf, netwerk en ventilatoren; lees de NVMe-SMART-temperatuur wanneer de hardware die aanbiedt, houd een minuutsgewijze geschiedenis bij die je voor elke periode als grafiek bekijkt en als .xlsx exporteert. Scan appcaches, Apple-gebruikerscaches, logboeken en achtergebleven voorkeurenbestanden. Controleer de selectie, verplaats deze naar de prullenmand en bekijk het resultaat. Bekijk lading, gezondheid, cycli, temperatuur en capaciteit van deze Mac, plus batterijniveaus van nabije apparaten die het systeem deelt. Openbare IPv4- en IPv6-adressen worden apart weergegeven. De geschiedenis blijft standaard bewaard totdat je die wist.',
         points: ['Monitoring op chipniveau', 'Geschiedenisgrafieken en .xlsx-export', 'Controleren vóór verplaatsen naar prullenmand'],
       },
     },
@@ -180,7 +180,7 @@ export const nl = createCatalog({
       },
       recording: {
         title: 'Opnemen en bewerken in de studio',
-        description: 'Neem scherm, venster of gebied op met optionele systeemaudio, microfoon en camera. Bewerk video, audio, afbeeldingen en tekst op meerdere sporen, voeg animaties, zoom en ondertitels toe en bekijk een scherpe voorvertoning. Kies origineel, 16:9, 9:16, 1:1 of 4:3. Exporteer video, GIF, Live Photo of audio; sommige formaten vereisen FFmpeg. Optionele AI-plannen worden bekeken voor toepassing.',
+        description: 'Neem scherm, venster of gebied op met optionele systeemaudio, microfoon en camera. Bewerk video, audio, afbeeldingen en tekst op meerdere sporen, voeg animaties, zoom en ondertitels toe en bekijk een scherpe voorvertoning. Kies origineel, 16:9, 9:16, 1:1 of 4:3. Exporteer video, GIF, Live Photo of audio; sommige formaten vereisen FFmpeg. Optionele AI-plannen worden bekeken voor toepassing. Opnamen gebruiken de opslaglocatie uit de downloadinstellingen.',
         detail: 'Meersporenbewerking · Verhoudingen en voorvertoning · Video, GIF, Live Photo en audio',
       },
       permissions: {
@@ -203,7 +203,7 @@ export const nl = createCatalog({
       capture: {
         title: 'Schermafbeeldingen, scrollcaptures en vastzetten',
         description:
-          'Maak, zet vast of voeg scrollende schermafbeeldingen samen met eigen sneltoetsen. Markeer gebieden, haal afbeeldingsdelen eruit, rond hoeken af en behoud annotaties bij export. Herken en kopieer tekst, vertaal en kopieer het resultaat of exporteer herkende tabellen als .xlsx. Bewaar afbeeldingen op de plank. Instellingen controleren conflicten met spraak en snelle acties.',
+          'Maak, zet vast of voeg scrollende schermafbeeldingen samen met eigen sneltoetsen. Markeer gebieden, haal afbeeldingsdelen eruit, rond hoeken af en behoud annotaties bij export. Herken en kopieer tekst, vertaal en kopieer het resultaat of exporteer herkende tabellen als .xlsx. Bewaar afbeeldingen op de plank. Instellingen controleren conflicten met spraak en snelle acties. Het opslagvenster opent in de huidige downloadmap.',
         detail: 'Markeren en extraheren · Herkennen, vertalen en kopiëren · Ronde hoeken en .xlsx',
       },
       voice: {
@@ -312,6 +312,12 @@ export const nl = createCatalog({
   },
   changelog: {
     releaseNotes: {
+      'v0.1.21': [
+        'De systeembewaking bewaart standaard alle bestaande en nieuwe geschiedenis per minuut totdat je die wist. Grafieken voor elke periode en export naar .xlsx blijven beschikbaar.',
+        'Downloads, opnamen en schermafbeeldingen delen één opslaglocatie. Het opslagvenster voor schermafbeeldingen opent in de huidige downloadmap; de dubbele instelling voor de opslaglocatie van opnamen is verwijderd.',
+        'De locatie voor statusindicatoren en de bijbehorende zoekvermelding verschijnen alleen bij pillen met een aangepaste positie. De rij is verborgen bij inkepingen of pillen op de camerapositie wanneer alleen de menubalk beschikbaar is.',
+        'De aftelling van snelle acties gebruikt een voortgangsbalk onderaan bij inkepingslayouts. Pillen houden de voortgang langs de volledige omtrek.',
+      ],
       'v0.1.20': [
         'Kies uit acht sjablonen, selecteer gebruiks-, typ-, systeem- en zisla-activiteitsgegevens en bekijk de voorvertoning. Exporteer een PNG handmatig of dagelijks op een gekozen tijd. Schermtijdgeschiedenis wordt gebruikt als deze is ingeschakeld en beschikbaar; ontbrekende gegevens gelden niet als gemeten nul.',
         'Stel een interval in voor pauzes, water, beweging en rust voor de ogen. Berichten volgen het tijdstip. Natuurlijke pauzes, vergrendelen en sluimerstand resetten de tijdmeting. Voltooide focus en notitiehandelingen kunnen korte feedback tonen. In Instellingen aan of uit te zetten. Bewaar een bewerkbare notitie voor een webpagina, appvenster of bureaublad en zie die bij terugkeer. Voeg een vensterafbeelding toe, beheer notities op de plank en stel herhalingen van één uur tot drie dagen in, of zet ze uit.',

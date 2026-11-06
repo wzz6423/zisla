@@ -110,7 +110,7 @@ export const en: SiteContent = {
       download: {
         name: 'Downloader',
         caption:
-          'Paste a link, or let zisla pick links up from the clipboard once enabled. Choose an available video or audio format, and use Cookies from an installed browser when a Douyin download needs them. Download to the default or a folder of your choice, with a source icon, live progress and a completion state.',
+          'Paste a link, or let zisla pick links up from the clipboard once enabled. Choose an available video or audio format, and use Cookies from an installed browser when a Douyin download needs them. Download to the default or a folder of your choice, with a source icon, live progress and a completion state. Downloads, recordings and screenshots share this save location.',
         points: ['Choose video or audio formats', 'Douyin browser Cookies', 'Source icon and live progress'],
       },
       agenda: {
@@ -145,7 +145,7 @@ export const en: SiteContent = {
       system: {
         name: 'System status',
         caption:
-          'Check CPU, GPU, memory, disk, network and fan status, read NVMe SMART temperature where the hardware reports it, keep a minute-level history you can chart for any time range and export as .xlsx. Scan app caches, Apple user caches, logs and leftover preference files, then review and move selected items to Trash with visible results. See detailed metrics for this Mac — charge, health, cycle count, temperature and capacity — plus the battery level of nearby devices the system exposes. Public IPv4 and IPv6 addresses are displayed separately.',
+          'Check CPU, GPU, memory, disk, network and fan status, read NVMe SMART temperature where the hardware reports it, keep a minute-level history you can chart for any time range and export as .xlsx. Scan app caches, Apple user caches, logs and leftover preference files, then review and move selected items to Trash with visible results. See detailed metrics for this Mac — charge, health, cycle count, temperature and capacity — plus the battery level of nearby devices the system exposes. Public IPv4 and IPv6 addresses are displayed separately. History is kept by default until you clear it.',
         points: ['Chip-level monitoring', 'History charts and .xlsx export', 'Review before moving to Trash'],
       },
     },
@@ -182,7 +182,7 @@ export const en: SiteContent = {
       },
       recording: {
         title: 'Record and edit in the recording studio',
-        description: 'Record a display, window or region with optional system audio, microphone and camera. Edit video, audio, images and text across tracks, add animations, zooms and captions, and review a sharp live preview. Choose original, 16:9, 9:16, 1:1 or 4:3 canvas ratios. Export video, GIF, Live Photo or audio; some formats require FFmpeg. Optional AI edits are previewed before you apply them.',
+        description: 'Record a display, window or region with optional system audio, microphone and camera. Edit video, audio, images and text across tracks, add animations, zooms and captions, and review a sharp live preview. Choose original, 16:9, 9:16, 1:1 or 4:3 canvas ratios. Export video, GIF, Live Photo or audio; some formats require FFmpeg. Optional AI edits are previewed before you apply them. Recording files use the save location in download settings.',
         detail: 'Multitrack editing · Canvas ratios and preview · Video, GIF, Live Photo and audio',
       },
       permissions: {
@@ -205,7 +205,7 @@ export const en: SiteContent = {
       capture: {
         title: 'Screenshots, scrolling captures and pinning',
         description:
-          'Capture, pin or stitch scrolling screenshots with configurable shortcuts. Highlight areas, extract image regions, round corners and preserve annotations on export. Recognise text and copy it, translate recognised text and copy the result, or export recognised tables as .xlsx. Stash screenshots on the shelf. Shortcut settings check conflicts with voice input and Quick Actions.',
+          'Capture, pin or stitch scrolling screenshots with configurable shortcuts. Highlight areas, extract image regions, round corners and preserve annotations on export. Recognise text and copy it, translate recognised text and copy the result, or export recognised tables as .xlsx. Stash screenshots on the shelf. Shortcut settings check conflicts with voice input and Quick Actions. The save dialog opens in the current download folder.',
         detail: 'Highlight and extract · OCR, translation and copy · Rounded corners and .xlsx',
       },
       voice: {
@@ -334,6 +334,12 @@ export const en: SiteContent = {
   },
   changelog: {
     releaseNotes: {
+      'v0.1.21': [
+        'System monitoring keeps all existing and new minute-level history by default until you clear it. Charts for any time range and .xlsx export remain available.',
+        'Downloads, recordings and screenshots share one save location. Screenshot save dialogs open in the current download folder; the duplicate recording save-location setting is removed.',
+        'Status Display Location and its search entry appear only for custom-positioned pill layouts. The row is hidden when notch or camera-positioned pill layouts can only use the menu bar.',
+        'Quick Actions countdowns use a bottom progress track in notch layouts. Pill layouts retain progress around the full perimeter.',
+      ],
       'v0.1.20': [
         'Daily briefings offer eight templates, selectable usage, typing, system and zisla activity content, previews, and manual or scheduled local PNG export. Optional system Screen Time history is included only when available.',
         'Contextual care reminders have an adjustable interval, time-of-day messages and feedback for focus and note actions. Idle, lock and sleep reset timing. Location notes can attach app-window screenshots and repeat reminders from one hour to three days.',

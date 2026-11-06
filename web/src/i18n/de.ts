@@ -113,7 +113,7 @@ export const de: SiteContent = {
       download: {
         name: 'Downloader',
         caption:
-          'Füge einen Link ein oder lass zisla nach dem Aktivieren Links aus der Zwischenablage erkennen. Wähle ein verfügbares Video- oder Audioformat und nutze Cookies eines installierten Browsers, wenn ein Douyin-Download sie benötigt. Speichere im Standardordner oder einem eigenen, mit Quellsymbol, Fortschritt in Echtzeit und Abschlussstatus.',
+          'Füge einen Link ein oder lass zisla nach dem Aktivieren Links aus der Zwischenablage erkennen. Wähle ein verfügbares Video- oder Audioformat und nutze Cookies eines installierten Browsers, wenn ein Douyin-Download sie benötigt. Speichere im Standardordner oder einem eigenen, mit Quellsymbol, Fortschritt in Echtzeit und Abschlussstatus. Downloads, Aufnahmen und Screenshots teilen diesen Speicherort.',
         points: [
           'Verfügbare Video- oder Audioformate wählen',
           'Browser-Cookies für Douyin',
@@ -156,7 +156,7 @@ export const de: SiteContent = {
       system: {
         name: 'Systemstatus',
         caption:
-          'Sieh den Status von CPU, GPU, Speicher, Datenträger, Netzwerk und Lüftern, lies die NVMe-SMART-Temperatur, wo die Hardware sie meldet, zeichne einen minütlichen Verlauf auf, der sich für jeden Zeitraum als Diagramm zeigen und als .xlsx exportieren lässt. Scanne App-Caches, Apple-Benutzercaches, Protokolle und verbliebene Einstellungsdateien. Prüfe die Auswahl, verschiebe sie in den Papierkorb und sieh dir das Ergebnis an. Sieh detaillierte Werte dieses Mac – Ladung, Zustand, Ladezyklen, Temperatur und Kapazität – und dazu den Ladestand nahegelegener Geräte, soweit das System ihn bereitstellt. Öffentliche IPv4- und IPv6-Adressen werden getrennt angezeigt.',
+          'Sieh den Status von CPU, GPU, Speicher, Datenträger, Netzwerk und Lüftern, lies die NVMe-SMART-Temperatur, wo die Hardware sie meldet, zeichne einen minütlichen Verlauf auf, der sich für jeden Zeitraum als Diagramm zeigen und als .xlsx exportieren lässt. Scanne App-Caches, Apple-Benutzercaches, Protokolle und verbliebene Einstellungsdateien. Prüfe die Auswahl, verschiebe sie in den Papierkorb und sieh dir das Ergebnis an. Sieh detaillierte Werte dieses Mac – Ladung, Zustand, Ladezyklen, Temperatur und Kapazität – und dazu den Ladestand nahegelegener Geräte, soweit das System ihn bereitstellt. Öffentliche IPv4- und IPv6-Adressen werden getrennt angezeigt. Der Verlauf bleibt standardmäßig erhalten, bis du ihn löschst.',
         points: [
           'Überwachung bis zum Chip',
           'Verlaufsdiagramme und .xlsx-Export',
@@ -197,7 +197,7 @@ export const de: SiteContent = {
       },
       recording: {
         title: 'Aufnehmen und bearbeiten im Studio',
-        description: 'Nehmen Sie Bildschirm, Fenster oder Bereich mit optionalem Systemaudio, Mikrofon und Kamera auf. Bearbeiten Sie Video, Audio, Bilder und Text auf mehreren Spuren, ergänzen Sie Animationen, Zooms und Untertitel und prüfen Sie eine scharfe Vorschau. Wählen Sie Original, 16:9, 9:16, 1:1 oder 4:3. Exportieren Sie Video, GIF, Live Photo oder Audio; manche Formate benötigen FFmpeg. Optionale KI-Vorschläge werden vor der Anwendung geprüft.',
+        description: 'Nehmen Sie Bildschirm, Fenster oder Bereich mit optionalem Systemaudio, Mikrofon und Kamera auf. Bearbeiten Sie Video, Audio, Bilder und Text auf mehreren Spuren, ergänzen Sie Animationen, Zooms und Untertitel und prüfen Sie eine scharfe Vorschau. Wählen Sie Original, 16:9, 9:16, 1:1 oder 4:3. Exportieren Sie Video, GIF, Live Photo oder Audio; manche Formate benötigen FFmpeg. Optionale KI-Vorschläge werden vor der Anwendung geprüft. Aufnahmen verwenden den Speicherort aus den Download-Einstellungen.',
         detail: 'Mehrspurbearbeitung · Seitenverhältnisse und Vorschau · Video, GIF, Live Photo und Audio',
       },
       permissions: {
@@ -220,7 +220,7 @@ export const de: SiteContent = {
       capture: {
         title: 'Bildschirmfotos, Scroll-Aufnahmen und Anheften',
         description:
-          'Erstellen, anheften oder verbinden Sie scrollende Screenshots mit eigenen Kurzbefehlen. Markieren Sie Bereiche, extrahieren Sie Bildteile, runden Sie Ecken ab und behalten Sie Anmerkungen beim Export. Erkennen und kopieren Sie Text, übersetzen und kopieren Sie ihn oder exportieren Sie erkannte Tabellen als .xlsx. Legen Sie Screenshots in der Ablage ab. Kurzbefehle werden auf Konflikte mit Spracheingabe und Schnellaktionen geprüft.',
+          'Erstellen, anheften oder verbinden Sie scrollende Screenshots mit eigenen Kurzbefehlen. Markieren Sie Bereiche, extrahieren Sie Bildteile, runden Sie Ecken ab und behalten Sie Anmerkungen beim Export. Erkennen und kopieren Sie Text, übersetzen und kopieren Sie ihn oder exportieren Sie erkannte Tabellen als .xlsx. Legen Sie Screenshots in der Ablage ab. Kurzbefehle werden auf Konflikte mit Spracheingabe und Schnellaktionen geprüft. Der Speicherdialog öffnet sich im aktuellen Download-Ordner.',
         detail: 'Markieren und extrahieren · Erkennen, übersetzen und kopieren · Runde Ecken und .xlsx',
       },
       voice: {
@@ -349,6 +349,12 @@ export const de: SiteContent = {
   },
   changelog: {
     releaseNotes: {
+      'v0.1.21': [
+        'Die Systemüberwachung behält standardmäßig den gesamten vorhandenen und neuen minütlichen Verlauf, bis er manuell gelöscht wird. Diagramme für beliebige Zeiträume und der .xlsx-Export bleiben verfügbar.',
+        'Downloads, Aufnahmen und Screenshots teilen einen Speicherort. Der Speicherdialog für Screenshots öffnet sich im aktuellen Download-Ordner; die doppelte Speicherort-Einstellung für Aufnahmen wurde entfernt.',
+        'Die Einstellung für den Statusanzeigeort und ihr Sucheintrag erscheinen nur bei frei positionierten Pillenlayouts. Bei Notch- oder Kameraposition bleibt die Zeile verborgen, wenn nur die Menüleiste verfügbar ist.',
+        'Der Countdown der Schnellaktionen verwendet im Notch-Layout einen unteren Fortschrittsbalken. Pillenlayouts behalten die Fortschrittsanzeige entlang des gesamten Randes.',
+      ],
       'v0.1.20': [
         'Wählen Sie aus acht Vorlagen und bestimmen Sie Nutzungs-, Tipp-, System- und zisla-Aktivitätsdaten. Prüfen Sie die Vorschau und exportieren Sie ein PNG manuell oder täglich zur gewählten Zeit. Der Bildschirmzeitverlauf wird nur bei Aktivierung und Verfügbarkeit verwendet; fehlende Daten gelten nicht als gemessene Null.',
         'Stellen Sie das Intervall für Pausen, Trinken, Bewegung und Augenruhe ein. Meldungen berücksichtigen die Tageszeit. Natürliche Pausen, Sperren und Ruhezustand setzen die Zeitmessung zurück. Fokusabschluss und Notizaktionen können kurze Rückmeldungen zeigen. In den Einstellungen aktivierbar. Speichern Sie eine bearbeitbare Notiz zu einer Webseite, einem App-Fenster oder dem Schreibtisch und sehen Sie sie bei der Rückkehr. Hängen Sie Fensterbilder an, verwalten Sie Notizen in der Ablage und setzen Sie wiederkehrende Erinnerungen von einer Stunde bis drei Tagen oder schalten Sie sie aus.',

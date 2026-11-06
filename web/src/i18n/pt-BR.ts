@@ -107,7 +107,7 @@ export const ptBR = createCatalog({
       download: {
         name: 'Downloader',
         caption:
-          'Cole um link ou deixe o zisla identificá-lo no clipboard quando ativado. Escolha vídeo ou áudio e baixe para a pasta padrão ou outra de sua escolha. Links compatíveis exibem ícone de origem, progresso ao vivo e estado final.',
+          'Cole um link ou deixe o zisla identificá-lo no clipboard quando ativado. Escolha vídeo ou áudio e baixe para a pasta padrão ou outra de sua escolha. Links compatíveis exibem ícone de origem, progresso ao vivo e estado final. Downloads, gravações e capturas de tela compartilham este local de salvamento.',
         points: ['Modos vídeo / áudio', 'Pasta padrão ou personalizada', 'Origem e progresso ao vivo'],
       },
       agenda: {
@@ -142,7 +142,7 @@ export const ptBR = createCatalog({
       system: {
         name: 'Estado do sistema',
         caption:
-          'Veja CPU, GPU, memória, disco, rede e ventoinhas; leia a temperatura SMART de NVMe quando o hardware informar, guarde um histórico por minuto que você pode grafar em qualquer período e exportar como .xlsx. Analise caches de apps e de usuário da Apple, registros e arquivos de preferências residuais. Revise a seleção, mova os itens para o Lixo e confira os resultados. Veja carga, saúde, ciclos, temperatura e capacidade deste Mac, além do nível de bateria de dispositivos próximos exposto pelo sistema. Os endereços IPv4 e IPv6 públicos são exibidos separadamente.',
+          'Veja CPU, GPU, memória, disco, rede e ventoinhas; leia a temperatura SMART de NVMe quando o hardware informar, guarde um histórico por minuto que você pode grafar em qualquer período e exportar como .xlsx. Analise caches de apps e de usuário da Apple, registros e arquivos de preferências residuais. Revise a seleção, mova os itens para o Lixo e confira os resultados. Veja carga, saúde, ciclos, temperatura e capacidade deste Mac, além do nível de bateria de dispositivos próximos exposto pelo sistema. Os endereços IPv4 e IPv6 públicos são exibidos separadamente. O histórico é mantido por padrão até você apagá-lo.',
         points: ['Monitoramento no nível do chip', 'Gráficos de histórico e exportação .xlsx', 'Revise antes de mover para o Lixo'],
       },
     },
@@ -180,7 +180,7 @@ export const ptBR = createCatalog({
       },
       recording: {
         title: 'Grave e edite no estúdio',
-        description: 'Grave tela, janela ou região com áudio do sistema, microfone e câmera opcionais. Edite vídeos, áudio, imagens e texto em várias faixas, adicione animações, zooms e legendas e confira uma prévia nítida. Escolha proporção original, 16:9, 9:16, 1:1 ou 4:3. Exporte vídeo, GIF, Live Photo ou áudio; alguns formatos exigem FFmpeg. Propostas opcionais de IA são revisadas antes de aplicar.',
+        description: 'Grave tela, janela ou região com áudio do sistema, microfone e câmera opcionais. Edite vídeos, áudio, imagens e texto em várias faixas, adicione animações, zooms e legendas e confira uma prévia nítida. Escolha proporção original, 16:9, 9:16, 1:1 ou 4:3. Exporte vídeo, GIF, Live Photo ou áudio; alguns formatos exigem FFmpeg. Propostas opcionais de IA são revisadas antes de aplicar. As gravações usam o local definido nos ajustes de download.',
         detail: 'Edição multifaixa · Proporções e prévia · Vídeo, GIF, Live Photo e áudio',
       },
       permissions: {
@@ -203,7 +203,7 @@ export const ptBR = createCatalog({
       capture: {
         title: 'Capturas, rolagem e fixação',
         description:
-          'Capture, fixe ou una capturas com rolagem usando atalhos personalizáveis. Destaque áreas, extraia partes da imagem, arredonde cantos e preserve anotações ao exportar. Reconheça e copie texto, traduza e copie o resultado ou exporte tabelas reconhecidas como .xlsx. Guarde capturas na prateleira. Os ajustes verificam conflitos com voz e Ações Rápidas.',
+          'Capture, fixe ou una capturas com rolagem usando atalhos personalizáveis. Destaque áreas, extraia partes da imagem, arredonde cantos e preserve anotações ao exportar. Reconheça e copie texto, traduza e copie o resultado ou exporte tabelas reconhecidas como .xlsx. Guarde capturas na prateleira. Os ajustes verificam conflitos com voz e Ações Rápidas. A caixa de diálogo de salvamento abre na pasta de download atual.',
         detail: 'Destaque e extração · Reconhecimento, tradução e cópia · Cantos arredondados e .xlsx',
       },
       voice: {
@@ -325,6 +325,12 @@ export const ptBR = createCatalog({
   },
   changelog: {
     releaseNotes: {
+      'v0.1.21': [
+        'O monitoramento do sistema mantém por padrão todo o histórico por minuto, existente e novo, até você apagá-lo. Os gráficos por período e a exportação .xlsx continuam disponíveis.',
+        'Downloads, gravações e capturas de tela compartilham um local. O diálogo para salvar capturas abre na pasta de download atual; o ajuste duplicado de local das gravações foi removido.',
+        'O local de exibição dos indicadores de status e sua entrada de busca aparecem apenas nas pílulas com posição personalizada. A linha fica oculta em layouts com recorte ou pílulas na câmera quando só podem usar a barra de menus.',
+        'A contagem regressiva das Ações Rápidas usa uma barra de progresso inferior nos layouts com recorte. As pílulas mantêm o progresso por todo o contorno.',
+      ],
       'v0.1.20': [
         'Escolha entre oito modelos, selecione dados de uso, digitação, sistema e atividade zisla e confira a prévia. Exporte um PNG manualmente ou em um horário diário. O histórico de Tempo de Uso entra quando ativado e disponível; dados ausentes não são apresentados como zero medido.',
         'Ajuste o intervalo para pausas, água, movimento e descanso dos olhos. As mensagens acompanham o horário do dia. Pausas naturais, bloqueio e repouso reiniciam a contagem. Concluir o foco ou trabalhar com notas pode mostrar um retorno breve. Ative ou desative nos Ajustes. Salve uma nota editável para uma página, janela ou mesa e veja-a ao voltar. Anexe uma captura de janela, gerencie as notas na prateleira e configure lembretes recorrentes de uma hora a três dias, ou desative-os.',
