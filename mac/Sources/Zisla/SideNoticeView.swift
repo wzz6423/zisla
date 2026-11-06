@@ -257,10 +257,8 @@ struct CompactStatusBarView: View {
     }
 
     private func compactSurfaceContent(size: CGSize, at date: Date) -> some View {
-        let information = resultSweep.current == nil ? FloatingIslandInformationLayout(
-            notices: displayState.compactStatusHidden ? [] : presentationNotices,
-            icons: displayState.statusIcons, settings: settingsStore.settings, item: media.snapshot, at: date
-        ) : nil
+        let information = compactInformation(at: date)
+        let progressPriority = compactProgressPriority(for: information)
         let pillCornerRadius: CGFloat? = information?.secondary == nil
             ? nil : VoiceRecordingIslandGeometry.bottomCornerRadius
         let shape = CompactIslandShape(layoutStyle: settingsStore.settings.islandLayoutStyle,
@@ -292,11 +290,12 @@ struct CompactStatusBarView: View {
         .background(compactStatusBackground(cornerRadius: pillCornerRadius))
         .overlay { AIResultSweepOverlay(controller: resultSweep, edge: displayState.islandEdge) }
         .overlay {
-            if displayState.statusIcons.isEmpty, settingsStore.settings.collapsedProgressGlowEnabled,
-               let progress = compactProgress(at: date) {
+            if displayState.statusIcons.isEmpty || information != nil,
+               settingsStore.settings.collapsedProgressGlowEnabled,
+               let progress = compactProgress(at: date, priority: progressPriority) {
                 CollapsedProgressGlow(
                     progress: progress,
-                    tint: compactProgressTint,
+                    tint: compactProgressTint(for: progressPriority),
                     layoutStyle: settingsStore.settings.islandLayoutStyle,
                     pillCornerRadius: pillCornerRadius,
                     isPlayback: selectedCompactStatusPriority == .media && recordingOperationNotice == nil
@@ -328,8 +327,9 @@ struct CompactStatusBarView: View {
     }
 
     private var isPlaybackProgressActive: Bool {
+        let information = compactInformation(at: .now)
         guard settingsStore.settings.collapsedProgressGlowEnabled,
-              selectedCompactStatusPriority == .media,
+              compactProgressPriority(for: information) == .media,
               mediaNotice != nil,
               let snapshot = media.snapshot else {
             return false
@@ -337,10 +337,27 @@ struct CompactStatusBarView: View {
         return CollapsedProgress.playbackFraction(for: snapshot, at: .now) != nil
     }
 
-    private func compactProgress(at date: Date) -> Double? {
+    private func compactInformation(at date: Date) -> FloatingIslandInformationLayout? {
+        guard resultSweep.current == nil else { return nil }
+        return FloatingIslandInformationLayout(
+            notices: displayState.compactStatusHidden ? [] : presentationNotices,
+            icons: displayState.statusIcons, settings: settingsStore.settings, item: media.snapshot, at: date
+        )
+    }
+
+    private func compactProgressPriority(for information: FloatingIslandInformationLayout?) -> CompactStatusPriority? {
+        guard let information else { return selectedCompactStatusPriority }
+        if information.secondary?.presentation.isMedia == true
+            || information.primary.contains(where: { $0.presentation.isMedia }) {
+            return .media
+        }
+        return selectedCompactStatusPriority
+    }
+
+    private func compactProgress(at date: Date, priority: CompactStatusPriority?) -> Double? {
         guard settingsStore.settings.collapsedProgressGlowEnabled else { return nil }
         if let recordingOperationNotice { return recordingOperationNotice.progress }
-        switch selectedCompactStatusPriority {
+        switch priority {
         case .media:
             guard mediaNotice != nil, let snapshot = media.snapshot else { return nil }
             return CollapsedProgress.playbackFraction(for: snapshot, at: date)
@@ -353,9 +370,9 @@ struct CompactStatusBarView: View {
         }
     }
 
-    private var compactProgressTint: Color {
+    private func compactProgressTint(for priority: CompactStatusPriority?) -> Color {
         if recordingOperationNotice != nil { return .green }
-        guard selectedCompactStatusPriority == .media else { return .green }
+        guard priority == .media else { return .green }
         let artworkData = detailedMediaItem?.artworkData ?? mediaNotice?.artworkData
         return MediaWaveformView.tintColor(for: artworkData)
     }
