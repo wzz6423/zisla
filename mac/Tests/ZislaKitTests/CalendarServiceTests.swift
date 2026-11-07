@@ -424,6 +424,7 @@ struct CalendarServiceTests {
         #expect(recorder.reminderCompletionUpdates.map(\.isCompleted) == [true, false])
         #expect(recorder.deletedItems.map(\.kind) == [.event, .reminder])
         #expect(recorder.deletedItems.map(\.identifier) == ["event-source", "reminder-source"])
+        #expect(recorder.deletedItems.map(\.startDate) == [now, now])
     }
 
     @Test @MainActor
@@ -458,13 +459,226 @@ struct CalendarServiceTests {
     @Test @MainActor
     func deletingEventUsesEventIdentifierLookup() throws {
         let store = EventStoreDeletionSpy()
+        store.identifierEvent = try store.makeEvent(startDate: Date(timeIntervalSince1970: 1_000))
         let commands = CalendarMutationCommands.live(store: store)
 
-        try commands.delete(.event, "event-source")
+        try commands.delete(.event, "event-source", Date(timeIntervalSince1970: 1_000))
 
         #expect(store.requestedEventIdentifier == "event-source")
         #expect(store.requestedCalendarItemIdentifier == nil)
-        #expect(store.removedEvent != nil)
+        #expect(store.removedEvent === store.identifierEvent)
+    }
+
+    @Test @MainActor
+    func deletingRepeatedEventDeletesSelectedOccurrence() throws {
+        let store = EventStoreDeletionSpy()
+        let firstDate = Date(timeIntervalSince1970: 1_000_000)
+        let first = try store.makeEvent(startDate: firstDate)
+        let selectedDate = firstDate.addingTimeInterval(86_400)
+        let selected = try store.makeEvent(startDate: selectedDate)
+        store.identifierEvent = first
+        store.matchingEvents = [first, selected]
+        let service = CalendarService(store: store, mutations: .live(store: store))
+        let item = CalendarEventSnapshot(
+            id: "event-row-second-day",
+            title: "Daily meeting",
+            startDate: selectedDate,
+            endDate: selected.endDate,
+            isAllDay: false,
+            calendarTitle: "Work",
+            sourceIdentifier: "event-source"
+        )
+
+        try service.delete(item)
+
+        #expect(store.removedEvent === selected, "Deleting tomorrow's occurrence must preserve today's occurrence")
+        #expect(store.removedEvent?.startDate == selectedDate)
+        #expect(store.removedEventSpan == .thisEvent)
+        #expect(store.removalCommitted == true)
+    }
+
+    @Test @MainActor
+    func deletingMissingOccurrenceNeverDeletesNearbyOrUnrelatedEvents() throws {
+        let store = EventStoreDeletionSpy()
+        let selectedDate = Date(timeIntervalSince1970: 1_000_000)
+        store.identifierEvent = try store.makeEvent(startDate: selectedDate.addingTimeInterval(-86_400))
+        store.matchingEvents = [
+            try store.makeEvent(startDate: selectedDate, identifier: "other-series"),
+            try store.makeEvent(startDate: selectedDate.addingTimeInterval(-60)),
+        ]
+        let commands = CalendarMutationCommands.live(store: store)
+
+        #expect(throws: CalendarMutationError.itemNotFound) {
+            try commands.delete(.event, "event-source", selectedDate)
+        }
+        #expect(store.removedEvent == nil, "A stale selection must not delete a nearby occurrence or another series")
+    }
+
+    @Test @MainActor
+    func deletingEventRejectsWrongIdentifierFromDirectLookup() throws {
+        let store = EventStoreDeletionSpy()
+        let selectedDate = Date(timeIntervalSince1970: 1_000_000)
+        store.identifierEvent = try store.makeEvent(startDate: selectedDate, identifier: "other-series")
+        let commands = CalendarMutationCommands.live(store: store)
+
+        #expect(throws: CalendarMutationError.itemNotFound) {
+            try commands.delete(.event, "event-source", selectedDate)
+        }
+        #expect(store.removedEvent == nil)
+    }
+
+    @Test @MainActor
+    func deletingEventWithNoMatchesFailsWithoutMutation() {
+        let store = EventStoreDeletionSpy()
+        let commands = CalendarMutationCommands.live(store: store)
+
+        #expect(throws: CalendarMutationError.itemNotFound) {
+            try commands.delete(.event, "missing-event", Date(timeIntervalSince1970: 1_000_000))
+        }
+        #expect(store.removedEvent == nil)
+    }
+
+    @Test(arguments: [false, true]) @MainActor
+    func deletingMovedOccurrenceUsesCurrentStartDate(hasDetachedIdentifier: Bool) throws {
+        let store = EventStoreDeletionSpy()
+        let firstDate = Date(timeIntervalSince1970: 1_000_000)
+        let originalDate = firstDate.addingTimeInterval(86_400)
+        let movedDate = originalDate.addingTimeInterval(7_200)
+        let identifier = hasDetachedIdentifier ? "detached-event" : "event-source"
+        let selected = try store.makeEvent(startDate: movedDate, identifier: identifier)
+        selected.fixtureOccurrenceDate = originalDate
+        selected.fixtureIsDetached = true
+        store.identifierEvent = try store.makeEvent(startDate: firstDate)
+        store.matchingEvents = [
+            try store.makeEvent(startDate: movedDate, identifier: "unrelated-event"),
+            selected,
+        ]
+        let commands = CalendarMutationCommands.live(store: store)
+
+        try commands.delete(.event, identifier, movedDate)
+
+        #expect(store.removedEvent === selected)
+        #expect(store.removedEvent?.startDate == movedDate)
+        #expect(store.removedEventSpan == .thisEvent)
+    }
+
+    @Test @MainActor
+    func deletingRepeatedAllDayEventIncludesMidnightOccurrence() throws {
+        let store = EventStoreDeletionSpy()
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = try #require(TimeZone(identifier: "Asia/Shanghai"))
+        let selectedDate = try #require(calendar.date(from: DateComponents(year: 2026, month: 11, day: 7)))
+        let first = try store.makeEvent(startDate: selectedDate.addingTimeInterval(-86_400))
+        first.isAllDay = true
+        first.endDate = selectedDate
+        let selected = try store.makeEvent(startDate: selectedDate)
+        selected.isAllDay = true
+        selected.endDate = selectedDate.addingTimeInterval(86_400)
+        store.identifierEvent = first
+        store.matchingEvents = [first, selected]
+        let commands = CalendarMutationCommands.live(store: store)
+
+        try commands.delete(.event, "event-source", selectedDate)
+
+        #expect(store.removedEvent === selected)
+        #expect(store.removedEvent?.isAllDay == true)
+    }
+
+    @Test @MainActor
+    func deletingRepeatedPointEventIncludesExactOccurrence() throws {
+        let store = EventStoreDeletionSpy()
+        let selectedDate = Date(timeIntervalSince1970: 1_000_000)
+        let selected = try store.makeEvent(startDate: selectedDate)
+        selected.endDate = selectedDate
+        store.identifierEvent = try store.makeEvent(startDate: selectedDate.addingTimeInterval(-86_400))
+        store.matchingEvents = [selected]
+        let commands = CalendarMutationCommands.live(store: store)
+
+        try commands.delete(.event, "event-source", selectedDate)
+
+        #expect(store.removedEvent === selected)
+    }
+
+    @Test @MainActor
+    func deletingEventCanResolveOccurrenceWithoutIdentifierLookup() throws {
+        let store = EventStoreDeletionSpy()
+        let selectedDate = Date(timeIntervalSince1970: 1_000_000)
+        let selected = try store.makeEvent(startDate: selectedDate)
+        store.matchingEvents = [selected]
+        let commands = CalendarMutationCommands.live(store: store)
+
+        try commands.delete(.event, "event-source", selectedDate)
+
+        #expect(store.removedEvent === selected)
+    }
+
+    @Test @MainActor
+    func deletingEventRetainsCalendarItemLookupFallback() throws {
+        let store = EventStoreDeletionSpy()
+        let selectedDate = Date(timeIntervalSince1970: 1_000_000)
+        let selected = try store.makeEvent(startDate: selectedDate)
+        store.identifierCalendarItem = selected
+        let commands = CalendarMutationCommands.live(store: store)
+
+        try commands.delete(.event, "event-source", selectedDate)
+
+        #expect(store.removedEvent === selected)
+    }
+
+    @Test @MainActor
+    func deletingEventPropagatesStoreFailureWithoutMutation() throws {
+        let store = EventStoreDeletionSpy()
+        let selectedDate = Date(timeIntervalSince1970: 1_000_000)
+        store.identifierEvent = try store.makeEvent(startDate: selectedDate)
+        store.removalError = CalendarMutationError.calendarUnavailable
+        let service = CalendarService(store: store, mutations: .live(store: store))
+        let item = CalendarEventSnapshot(
+            id: "event-row",
+            title: "Meeting",
+            startDate: selectedDate,
+            endDate: selectedDate.addingTimeInterval(3_600),
+            isAllDay: false,
+            calendarTitle: "Work",
+            sourceIdentifier: "event-source"
+        )
+
+        #expect(throws: CalendarMutationError.calendarUnavailable) { try service.delete(item) }
+        #expect(store.removedEvent == nil)
+    }
+
+    @Test @MainActor
+    func deletingReminderKeepsIdentifierBasedBehavior() throws {
+        let store = EventStoreDeletionSpy()
+        let reminder = EKReminder(eventStore: store)
+        reminder.dueDateComponents = DateComponents(year: 2026, month: 11, day: 8)
+        store.identifierCalendarItem = reminder
+        let commands = CalendarMutationCommands.live(store: store)
+
+        try commands.delete(.reminder, "reminder-source", Date(timeIntervalSince1970: 1_000_000))
+
+        #expect(store.removedReminder === reminder)
+        #expect(store.requestedEventIdentifier == nil)
+        #expect(store.removedEvent == nil)
+        #expect(store.removalCommitted == true)
+    }
+
+    @Test(arguments: [nil, ""]) @MainActor
+    func deletingItemWithoutSourceIdentifierRejectsMutation(identifier: String?) {
+        let recorder = CalendarMutationRecorder()
+        let service = CalendarService(store: EKEventStore(), mutations: recorder.commands)
+        let selectedDate = Date(timeIntervalSince1970: 1_000_000)
+        let item = CalendarEventSnapshot(
+            id: "event-row",
+            title: "Meeting",
+            startDate: selectedDate,
+            endDate: selectedDate.addingTimeInterval(3_600),
+            isAllDay: false,
+            calendarTitle: "Work",
+            sourceIdentifier: identifier
+        )
+
+        #expect(throws: CalendarMutationError.missingSourceIdentifier) { try service.delete(item) }
+        #expect(recorder.deletedItems.isEmpty)
     }
 
 }
@@ -474,7 +688,7 @@ private final class CalendarMutationRecorder {
     var createdEvent: (title: String, start: Date, end: Date, isAllDay: Bool)?
     var createdReminder: (title: String, dueDate: Date, isAllDay: Bool)?
     var reminderCompletionUpdates: [(identifier: String, isCompleted: Bool)] = []
-    var deletedItems: [(kind: CalendarItemKind, identifier: String)] = []
+    var deletedItems: [(kind: CalendarItemKind, identifier: String, startDate: Date)] = []
 
     var commands: CalendarMutationCommands {
         CalendarMutationCommands(
@@ -484,8 +698,8 @@ private final class CalendarMutationRecorder {
             createReminder: { [weak self] title, dueDate, isAllDay in
                 self?.createdReminder = (title, dueDate, isAllDay)
             },
-            delete: { [weak self] kind, identifier in
-                self?.deletedItems.append((kind, identifier))
+            delete: { [weak self] kind, identifier, startDate in
+                self?.deletedItems.append((kind, identifier, startDate))
             },
             setReminderCompleted: { [weak self] identifier, isCompleted in
                 self?.reminderCompletionUpdates.append((identifier, isCompleted))
@@ -497,19 +711,68 @@ private final class CalendarMutationRecorder {
 private final class EventStoreDeletionSpy: EKEventStore {
     var requestedEventIdentifier: String?
     var requestedCalendarItemIdentifier: String?
+    var identifierEvent: EKEvent?
+    var identifierCalendarItem: EKCalendarItem?
+    var matchingEvents: [EKEvent] = []
+    var removalError: Error?
     var removedEvent: EKEvent?
+    var removedEventSpan: EKSpan?
+    var removedReminder: EKReminder?
+    var removalCommitted: Bool?
+
+    func makeEvent(startDate: Date, identifier: String = "event-source") throws -> DeletionEvent {
+        // Swift does not inherit EventKit's factory initializer for subclasses.
+        let event = try #require(DeletionEvent.perform(
+            NSSelectorFromString("eventWithEventStore:"), with: self
+        )?.takeUnretainedValue() as? DeletionEvent)
+        event.fixtureIdentifier = identifier
+        event.fixtureOccurrenceDate = nil
+        event.fixtureIsDetached = false
+        event.startDate = startDate
+        event.endDate = startDate.addingTimeInterval(3_600)
+        return event
+    }
 
     override func event(withIdentifier identifier: String) -> EKEvent? {
         requestedEventIdentifier = identifier
-        return EKEvent(eventStore: self)
+        return identifierEvent
     }
 
     override func calendarItem(withIdentifier identifier: String) -> EKCalendarItem? {
         requestedCalendarItemIdentifier = identifier
-        return nil
+        return identifierCalendarItem
+    }
+
+    override func predicateForEvents(withStart start: Date, end: Date, calendars: [EKCalendar]?) -> NSPredicate {
+        NSPredicate { item, _ in
+            guard let event = item as? EKEvent else { return false }
+            return event.startDate < end && event.endDate > start
+        }
+    }
+
+    override func events(matching predicate: NSPredicate) -> [EKEvent] {
+        matchingEvents.filter { predicate.evaluate(with: $0) }
     }
 
     override func remove(_ event: EKEvent, span: EKSpan, commit: Bool) throws {
+        if let removalError { throw removalError }
         removedEvent = event
+        removedEventSpan = span
+        removalCommitted = commit
     }
+
+    override func remove(_ reminder: EKReminder, commit: Bool) throws {
+        removedReminder = reminder
+        removalCommitted = commit
+    }
+}
+
+private final class DeletionEvent: EKEvent {
+    var fixtureIdentifier = "event-source"
+    var fixtureOccurrenceDate: Date?
+    var fixtureIsDetached = false
+
+    override var eventIdentifier: String! { fixtureIdentifier }
+    override var occurrenceDate: Date! { fixtureOccurrenceDate ?? startDate }
+    override var isDetached: Bool { fixtureIsDetached }
 }

@@ -633,6 +633,8 @@
 "飞机" = "Uçak";
 "首页" = "Ana sayfa";
 "7 天" = "7 gün";
+"自动删除剪贴板历史" = "Pano geçmişini otomatik sil";
+"按所选周期删除过期历史，常用项目继续保留" = "Seçilen süreyi aşan geçmişi sil; favoriler korunur";
 "上一页" = "Önceki";
 "下一页" = "Sonraki";
 "不可用" = "Kullanılamaz";
@@ -3314,3 +3316,18 @@
 "权限" = "İzinler";
 "管理 zisla 使用的系统权限。" = "zisla’nın kullandığı sistem izinlerini yönetin.";
 "请在设置的“权限”页面管理授权。" = "Erişimi ayarlardaki İzinler sayfasından yönetin.";
+"自动清理系统垃圾" = "Sistem gereksiz dosyalarını otomatik temizle";
+"按所选间隔移入废纸篓，不会永久删除" = "Öğeleri seçilen aralıkta Çöp Sepeti’ne taşı; kalıcı olarak silme";
+"清理范围" = "Temizleme kapsamı";
+"仅可信" = "Yalnızca güvenilir öğeler";
+"全部（包含需人工复核）" = "Tümü (incelenmesi gerekenler dahil)";
+"默认保存位置" = "Varsayılan Kayıt Konumları";
+"分别设置各类内容的默认保存位置。" = "Her içerik türü için varsayılan kayıt konumunu ayarlayın.";
+"管理下载所需组件。" = "İndirmeler için gereken bileşenleri yönetin.";
+"更改 %@ 的保存位置" = "%@ için kayıt konumunu değiştir";
+
+"本地优先的原生笔记应用" = "Yerel depolamayı önceliklendiren platforma özgü not uygulaması";
+
+"保存手写备忘录需要辅助功能权限" = "El yazısı notları kaydetmek için Erişilebilirlik izni gerekir";
+"备忘录内容已变化，请重新打开后编辑" = "Not değişti. Düzenlemeden önce yeniden açın";
+"无法保存手写备忘录的文本，请在备忘录中打开后重试" = "El yazısı nottaki metin kaydedilemedi. Notlar’da açıp yeniden deneyin";

@@ -11,6 +11,52 @@ struct ManagedToolServiceTests {
         #expect(ManagedTool(rawValue: "openScreen") == .openScreen)
     }
 
+    @Test
+    func quietMDIsAFirstClassDesktopRecommendation() throws {
+        let tool = try #require(ManagedTool(rawValue: "quietMD"))
+        #expect(tool.displayName == "Quiet.md")
+        #expect(tool.recommendationGroup == .desktopApplication)
+        #expect(tool.installationSource == .githubRelease(repository: "s1dashu/quiet-md"))
+        #expect(tool.executableName == "quiet_md")
+        #expect(tool.usesNativeApplicationVersion)
+        #expect(ManagedToolService.externalPaths(for: tool) == [
+            "/Applications/quiet.md.app/Contents/MacOS/quiet_md"
+        ])
+        let tools = ManagedTool.allCases
+        let index = try #require(tools.firstIndex(of: tool))
+        #expect(tools[index - 1] == .markdownPreview)
+    }
+
+    @Test
+    func quietMDMatchesOnlyTheAvailableMacOSArchive() throws {
+        #if arch(arm64)
+        #expect(ManagedTool.quietMD.matchesAsset(name: "quiet-md-0.1.7-macos-arm64.zip"))
+        let release = try ManagedToolService.parseRelease(
+            releaseJSON(tag: "v0.1.7", assets: [
+                "quiet-md-0.1.7-windows-x64-setup.exe",
+                "quiet-md-0.1.7-macos-arm64.zip.sha256",
+                "quiet-md-0.1.7-macos-arm64.zip",
+            ]), tool: .quietMD
+        )
+        #expect(release.version == "0.1.7")
+        #expect(release.assetURL.lastPathComponent == "quiet-md-0.1.7-macos-arm64.zip")
+        #else
+        #expect(!ManagedTool.quietMD.matchesAsset(name: "quiet-md-0.1.7-macos-arm64.zip"))
+        #endif
+        for name in ["", "quiet-md-0.1.7-windows-x64-setup.exe", "quiet-md-0.1.7-macos-x64.zip",
+                     "quiet-md-0.1.7-macos-arm64.zip.sha256", "other-macos-arm64.zip"] {
+            #expect(!ManagedTool.quietMD.matchesAsset(name: name))
+        }
+    }
+
+    @Test(arguments: ["{}", #"{"tag_name":"v0.1.7","assets":[]}"#,
+        #"{"tag_name":"v0.1.7","assets":[{"name":"quiet-md-0.1.7-macos-arm64.zip","browser_download_url":"https://evil.example/quiet.zip"}]}"#])
+    func quietMDRejectsUnavailableOrUntrustedReleases(payload: String) {
+        #expect(throws: ManagedToolError.self) {
+            try ManagedToolService.parseRelease(Data(payload.utf8), tool: .quietMD)
+        }
+    }
+
     private func releaseJSON(tag: String, assets: [String]) -> Data {
         let assetObjects = assets.map { name in
             """
@@ -192,12 +238,12 @@ struct ManagedToolServiceTests {
         ))
     }
 
-    @Test(arguments: [true, false])
-    func dockDoorReadsAppVersionWithoutLaunchingExecutable(hasVersion: Bool) async throws {
+    @Test(arguments: [true, false], [ManagedTool.dockDoor, .quietMD])
+    func desktopApplicationReadsAppVersionWithoutLaunchingExecutable(hasVersion: Bool, tool: ManagedTool) async throws {
         let root = FileManager.default.temporaryDirectory
             .appendingPathComponent("zisla-dockdoor-version-\(UUID().uuidString)", isDirectory: true)
-        let contents = root.appendingPathComponent("DockDoor.app/Contents", isDirectory: true)
-        let executable = contents.appendingPathComponent("MacOS/DockDoor")
+        let contents = root.appendingPathComponent("\(tool.displayName).app/Contents", isDirectory: true)
+        let executable = contents.appendingPathComponent("MacOS/\(tool.executableName)")
         defer { try? FileManager.default.removeItem(at: root) }
         try FileManager.default.createDirectory(
             at: executable.deletingLastPathComponent(),
@@ -205,7 +251,7 @@ struct ManagedToolServiceTests {
         )
         var info = [
             "CFBundleIdentifier": "zisla.tests.dockdoor.\(UUID().uuidString)",
-            "CFBundleExecutable": "DockDoor",
+            "CFBundleExecutable": tool.executableName,
             "CFBundlePackageType": "APPL",
         ]
         if hasVersion { info["CFBundleShortVersionString"] = "1.18.3" }
@@ -214,7 +260,7 @@ struct ManagedToolServiceTests {
         try Data("#!/bin/sh\ntouch \"$0.started\"\necho 99.0.0\n".utf8).write(to: executable)
         try FileManager.default.setAttributes([.posixPermissions: 0o755], ofItemAtPath: executable.path)
 
-        let version = await ManagedToolService.readVersion(of: .dockDoor, at: executable)
+        let version = await ManagedToolService.readVersion(of: tool, at: executable)
 
         #expect(version == (hasVersion ? "1.18.3" : nil))
         #expect(!FileManager.default.fileExists(atPath: executable.path + ".started"))
@@ -222,7 +268,7 @@ struct ManagedToolServiceTests {
 
     @Test
     func desktopApplicationPurposesHaveTranslationsInEveryLanguage() throws {
-        for key in [ManagedTool.zshell.purpose, ManagedTool.dockDoor.purpose, ManagedTool.openScreen.purpose] {
+        for key in [ManagedTool.zshell.purpose, ManagedTool.dockDoor.purpose, ManagedTool.openScreen.purpose, ManagedTool.quietMD.purpose] {
             for language in AppLanguage.allCases {
                 let tableURL = Self.localizationURL
                     .appendingPathComponent("\(language.rawValue).lproj", isDirectory: true)
@@ -279,7 +325,7 @@ struct ManagedToolServiceTests {
             (.openScreen, .homebrewCask(name: "getopenscreen/openscreen/openscreen"), "Openscreen"),
         ]
 
-        #expect(ManagedTool.allCases.count == 47)
+        #expect(ManagedTool.allCases.count == 48)
         #expect(ManagedTool(rawValue: "kero") == nil)
         for (tool, source, executableName) in expected {
             #expect(tool.installationSource == source)
@@ -298,7 +344,7 @@ struct ManagedToolServiceTests {
         #expect(count(.networkAndData) == 7)
         #expect(count(.developmentToolchain) == 21)
         #expect(count(.utility) == 3)
-        #expect(count(.desktopApplication) == 5)
+        #expect(count(.desktopApplication) == 6)
     }
 
     @Test

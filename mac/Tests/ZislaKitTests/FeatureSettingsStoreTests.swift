@@ -32,6 +32,29 @@ struct FeatureSettingsStoreTests {
         #expect(FeatureSettingsStore(defaults: defaults).settings.systemMonitorEnabled)
     }
 
+    @Test @MainActor
+    func automaticSystemCleanupChoicesPersistAndResetWithoutChangingVoiceCleanup() throws {
+        let suite = "Zisla.SystemCleanupSettings.\(UUID().uuidString)"
+        let defaults = try #require(UserDefaults(suiteName: suite))
+        defer { defaults.removePersistentDomain(forName: suite) }
+        let store = FeatureSettingsStore(defaults: defaults)
+        store.settings.systemCleanupPolicy = .thirtyDays
+        store.settings.systemCleanupScope = .all
+        store.settings.voiceRecordingCleanupPolicy = .sevenDays
+        store.settings.systemMonitorEnabled = false
+        store.flushPendingChanges()
+        let restored = FeatureSettingsStore(defaults: defaults)
+        #expect(restored.settings == store.settings)
+        #expect(restored.settings.systemCleanupPolicy == .thirtyDays)
+        #expect(restored.settings.systemCleanupScope == .all)
+        #expect(restored.settings.voiceRecordingCleanupPolicy == .sevenDays)
+        restored.reset()
+        restored.flushPendingChanges()
+        let reset = FeatureSettingsStore(defaults: defaults)
+        #expect(reset.settings.systemCleanupPolicy == .never)
+        #expect(reset.settings.systemCleanupScope == .trustedOnly)
+    }
+
     @Test(arguments: IslandEdge.allCases) @MainActor
     func rememberedCustomPlacementSurvivesStoreRecreationAndReset(edge: IslandEdge) throws {
         let suiteName = "Zisla.IslandPlacement.\(UUID().uuidString)"

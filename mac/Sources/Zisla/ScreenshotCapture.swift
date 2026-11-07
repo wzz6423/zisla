@@ -1220,10 +1220,12 @@ struct ScreenshotSelectionSizeBadge: View {
     }
 
     var badgeSize: CGSize {
-        let textSize = (label as NSString).size(withAttributes: [
-            .font: NSFont.monospacedSystemFont(ofSize: 12, weight: .medium),
-        ])
-        return CGSize(width: textSize.width + 20, height: textSize.height + 12)
+        // The readout uses monospaced glyphs; avoid CoreText's throwing attributed-string measurement.
+        let font = NSFont.monospacedSystemFont(ofSize: 12, weight: .medium)
+        return CGSize(
+            width: ceil(font.maximumAdvancement.width * CGFloat(label.utf16.count)) + 20,
+            height: ceil(font.ascender - font.descender) + 12
+        )
     }
 
     var body: some View {

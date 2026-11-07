@@ -3,16 +3,23 @@ import SwiftUI
 
 /// Narrows the native scroller behind SwiftUI's `ScrollView`.
 public extension View {
-    func thinScrollChrome(visibleWhenScrollable: Bool = true) -> some View {
-        background(ThinScrollChromeConfigurator(visibleWhenScrollable: visibleWhenScrollable))
+    func thinScrollChrome(
+        visibleWhenScrollable: Bool = true,
+        scrollerStyle: NSScroller.Style = .legacy
+    ) -> some View {
+        background(ThinScrollChromeConfigurator(
+            visibleWhenScrollable: visibleWhenScrollable,
+            scrollerStyle: scrollerStyle
+        ))
     }
 }
 
 private struct ThinScrollChromeConfigurator: NSViewRepresentable {
     let visibleWhenScrollable: Bool
+    let scrollerStyle: NSScroller.Style
 
     func makeNSView(context: Context) -> ThinScrollChromeHost {
-        ThinScrollChromeHost(visibleWhenScrollable: visibleWhenScrollable)
+        ThinScrollChromeHost(visibleWhenScrollable: visibleWhenScrollable, scrollerStyle: scrollerStyle)
     }
 
     func updateNSView(_ nsView: ThinScrollChromeHost, context: Context) {
@@ -26,9 +33,11 @@ final class ThinScrollChromeHost: NSView {
     private var styleObservation: NSKeyValueObservation?
     private var pendingApply = false
     private let visibleWhenScrollable: Bool
+    private let scrollerStyle: NSScroller.Style
 
-    init(visibleWhenScrollable: Bool) {
+    init(visibleWhenScrollable: Bool, scrollerStyle: NSScroller.Style = .legacy) {
         self.visibleWhenScrollable = visibleWhenScrollable
+        self.scrollerStyle = scrollerStyle
         super.init(frame: .zero)
         isHidden = true
     }
@@ -67,11 +76,15 @@ final class ThinScrollChromeHost: NSView {
         if configuredScrollView === scrollView,
            isThinScroller(scrollView.verticalScroller),
            isThinScroller(scrollView.horizontalScroller),
-           !visibleWhenScrollable || (scrollView.scrollerStyle == .legacy
+           !visibleWhenScrollable || (scrollView.scrollerStyle == scrollerStyle
                 && scrollView.autohidesScrollers && scrollView.hasVerticalScroller) {
             return
         }
-        ThinScrollChrome.apply(to: scrollView, visibleWhenScrollable: visibleWhenScrollable)
+        ThinScrollChrome.apply(
+            to: scrollView,
+            visibleWhenScrollable: visibleWhenScrollable,
+            scrollerStyle: scrollerStyle
+        )
         styleObservation = scrollView.observe(\.scrollerStyle) { [weak self] _, _ in
             MainActor.assumeIsolated { self?.scheduleApply() }
         }
@@ -126,9 +139,13 @@ public enum ThinScrollChrome {
         ::-webkit-scrollbar-thumb { background: rgba(128,128,128,0.65); border-radius: 1.5px; }
         """
 
-    public static func apply(to scrollView: NSScrollView, visibleWhenScrollable: Bool = true) {
+    public static func apply(
+        to scrollView: NSScrollView,
+        visibleWhenScrollable: Bool = true,
+        scrollerStyle: NSScroller.Style = .legacy
+    ) {
         if visibleWhenScrollable {
-            scrollView.scrollerStyle = .legacy
+            scrollView.scrollerStyle = scrollerStyle
             scrollView.autohidesScrollers = true
             scrollView.hasVerticalScroller = true
         }

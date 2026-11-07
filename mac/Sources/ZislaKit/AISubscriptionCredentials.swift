@@ -5,7 +5,7 @@ import Foundation
 import LocalAuthentication
 import Security
 
-/// Adapted from CodexBar's CursorAppAuth, MuseCredentials and ChromiumSafeStorage (MIT).
+/// Adapted from CodexBar's CursorAppAuth and ChromiumSafeStorage (MIT).
 struct AISubscriptionCredentials: Sendable {
     let home: URL
     var environment: [String: String] = ProcessInfo.processInfo.environment
@@ -54,26 +54,6 @@ struct AISubscriptionCredentials: Sendable {
             throw AISubscriptionUsageError.invalidCredentials
         }
         return "WorkosCursorSessionToken=\(userID)%3A%3A\(token)"
-    }
-
-    func museToken() throws -> String? {
-        let authFile = environment["MUSE_AUTH_PATH"].flatMap { $0.hasPrefix("/") ? URL(fileURLWithPath: $0) : nil }
-            ?? home.appendingPathComponent(".config/muse/auth.json")
-        let auth = DesktopAIStorage.json(at: authFile)
-        let meta = (auth?["providers"] as? [String: Any])?["meta"] as? [String: Any]
-        guard let meta else { return nil }
-        let inline = (meta["access_token"] as? String).flatMap { $0.isEmpty ? nil : $0 }
-        var token = inline
-        if token == nil, (meta["mechanism"] as? String)?.lowercased() == "oauth",
-           let data = keychainRead("ai.meta.dev.credentials", "meta"),
-           let payload = try? JSONSerialization.jsonObject(with: data) as? [String: Any] {
-            token = payload["access_token"] as? String
-        }
-        guard let token, token.hasPrefix("dca:"), token.utf8.count > 4, token.utf8.count <= 16 * 1_024,
-              token.unicodeScalars.allSatisfy({ (0x21...0x7E).contains($0.value) }) else {
-            throw AISubscriptionUsageError.invalidCredentials
-        }
-        return token
     }
 
     static func decryptCursorToken(_ encrypted: Data, password: String) -> String? {

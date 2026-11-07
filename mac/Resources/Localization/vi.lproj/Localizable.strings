@@ -633,6 +633,8 @@
 "飞机" = "Máy bay";
 "首页" = "Trang chủ";
 "7 天" = "7 ngày";
+"自动删除剪贴板历史" = "Tự động xóa lịch sử bảng nhớ tạm";
+"按所选周期删除过期历史，常用项目继续保留" = "Xóa lịch sử đã quá thời hạn đã chọn; các mục yêu thích được giữ lại";
 "上一页" = "Trước";
 "下一页" = "Sau";
 "不可用" = "Không khả dụng";
@@ -3314,3 +3316,18 @@
 "权限" = "Quyền";
 "管理 zisla 使用的系统权限。" = "Quản lý các quyền hệ thống mà zisla sử dụng.";
 "请在设置的“权限”页面管理授权。" = "Quản lý quyền truy cập trên trang Quyền trong phần cài đặt.";
+"自动清理系统垃圾" = "Tự động dọn tệp rác hệ thống";
+"按所选间隔移入废纸篓，不会永久删除" = "Chuyển các mục vào Thùng rác theo khoảng thời gian đã chọn, không xóa vĩnh viễn";
+"清理范围" = "Phạm vi dọn dẹp";
+"仅可信" = "Chỉ các mục đáng tin cậy";
+"全部（包含需人工复核）" = "Tất cả (kể cả các mục cần xem xét)";
+"默认保存位置" = "Vị trí lưu mặc định";
+"分别设置各类内容的默认保存位置。" = "Đặt vị trí lưu mặc định cho từng loại nội dung.";
+"管理下载所需组件。" = "Quản lý các thành phần cần thiết để tải xuống.";
+"更改 %@ 的保存位置" = "Đổi vị trí lưu cho %@";
+
+"本地优先的原生笔记应用" = "Ứng dụng ghi chú gốc ưu tiên lưu trữ cục bộ";
+
+"保存手写备忘录需要辅助功能权限" = "Cần quyền Trợ năng để lưu ghi chú viết tay";
+"备忘录内容已变化，请重新打开后编辑" = "Ghi chú đã thay đổi. Mở lại trước khi chỉnh sửa";
+"无法保存手写备忘录的文本，请在备忘录中打开后重试" = "Không thể lưu văn bản trong ghi chú viết tay. Mở trong Ghi chú rồi thử lại";

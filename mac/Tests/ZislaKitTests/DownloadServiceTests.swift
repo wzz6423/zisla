@@ -1227,6 +1227,7 @@ private enum DownloadServiceTestError: Error, Sendable {
 
 private actor StubBilibiliHTTPClient: BilibiliHTTPClient {
     private let directory: URL
+    private(set) var requestedAPIURLs: [URL] = []
     private(set) var requestedMediaURLs: [URL] = []
 
     init(directory: URL) {
@@ -1234,6 +1235,7 @@ private actor StubBilibiliHTTPClient: BilibiliHTTPClient {
     }
 
     func data(for request: URLRequest) async throws -> BilibiliHTTPDataResponse {
+        requestedAPIURLs.append(try #require(request.url))
         let data: Data
         if request.url?.path == "/x/web-interface/view" {
             data = Data(#"{"code":0,"message":"OK","data":{"title":"A/B Test","cid":123,"bvid":"BV1d2N16KEh6"}}"#.utf8)
@@ -1302,4 +1304,244 @@ private func shellSingleQuoted(_ string: String) -> String {
 private func jsonEscaped(_ string: String) -> String {
     string.replacingOccurrences(of: "\\", with: "\\\\")
         .replacingOccurrences(of: "\"", with: "\\\"")
+}
+
+private let bilibiliURLsWithoutNativeSupport = [
+    "https://b23.tv/abcdef",
+    "https://www.bilibili.com/video/av123456",
+    "https://www.bilibili.com/bangumi/play/ep123456",
+    "https://www.bilibili.com/video/BVshort",
+    "https://www.bilibili.com/video/?bvid=BV1d2N16KEh6",
+    "https://example.com/video/BV1d2N16KEh6",
+    "https://www.bilibili.com.evil.example/video/BV1d2N16KEh6",
+    "https://www.bilibili.com@evil.example/video/BV1d2N16KEh6",
+]
+
+@Suite(.serialized)
+struct BilibiliDownloadRoutingTests {
+    @Test(arguments: bilibiliURLsWithoutNativeSupport, [false, true])
+    func unsupportedNativeURLsUseYTDLP(urlString: String, hasFFmpeg: Bool) async throws {
+        try await expectYTDLPDownload(urlString: urlString, hasFFmpeg: hasFFmpeg)
+    }
+
+    @Test(arguments: [
+        "https://www.bilibili.com/video/BV1d2N16KEh6",
+        "https://b23.tv/abcdef",
+    ])
+    func selectedBilibiliFormatsStayOnYTDLP(urlString: String) async throws {
+        let selection = try #require(DownloadFormatSelection(formatID: "137", audioFormatID: "140"))
+        try await expectYTDLPDownload(
+            urlString: urlString,
+            hasFFmpeg: true,
+            formatSelection: selection
+        )
+    }
+
+    @Test(arguments: bilibiliURLsWithoutNativeSupport)
+    func unsupportedNativeURLsPreserveResolverFailure(urlString: String) async throws {
+        let directory = kitTemporaryDirectory()
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let tasksDirectory = directory.appendingPathComponent("Tasks", isDirectory: true)
+        let outputDirectory = directory.appendingPathComponent("Downloads", isDirectory: true)
+        let client = StubBilibiliHTTPClient(directory: directory)
+        let service = DownloadService(
+            resolver: YTDLPResolver(
+                bundleURL: directory.appendingPathComponent("Empty.app"),
+                managedToolsDirectory: directory.appendingPathComponent("ManagedTools", isDirectory: true),
+                externalYTDLPCandidates: [],
+                externalFFmpegCandidates: []
+            ),
+            temporaryRootDirectory: tasksDirectory,
+            mediaMuxer: RecordingMediaMuxer(),
+            bilibiliDownloader: BilibiliDirectDownloader(httpClient: client),
+            browserCookieSourceProvider: { [] }
+        )
+        let request = try DownloadRequest(
+            urlString: urlString,
+            mode: .video,
+            outputDirectory: outputDirectory
+        )
+        let taskID = UUID()
+
+        for _ in 0..<2 {
+            await #expect(throws: YTDLPResolverError.self) {
+                try await service.download(request, taskID: taskID)
+            }
+        }
+
+        #expect(await client.requestedAPIURLs.isEmpty)
+        #expect(await client.requestedMediaURLs.isEmpty)
+        #expect(try FileManager.default.contentsOfDirectory(atPath: tasksDirectory.path).isEmpty)
+        #expect(try FileManager.default.contentsOfDirectory(atPath: outputDirectory.path).isEmpty)
+    }
+
+    @Test(arguments: Array(bilibiliURLsWithoutNativeSupport.prefix(3)), [
+        "ERROR: HTTP Error 412: Precondition Failed",
+        "ERROR: Requested format is not available",
+    ])
+    func unsupportedNativeURLsPreserveYTDLPFailure(urlString: String, diagnostic: String) async throws {
+        let directory = kitTemporaryDirectory()
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let executable = directory.appendingPathComponent("tools/yt-dlp")
+        let invocationMarker = directory.appendingPathComponent("yt-dlp-invoked")
+        let tasksDirectory = directory.appendingPathComponent("Tasks", isDirectory: true)
+        let outputDirectory = directory.appendingPathComponent("Downloads", isDirectory: true)
+        let script = """
+        #!/bin/sh
+        /usr/bin/touch \(shellSingleQuoted(invocationMarker.path))
+        /usr/bin/printf '%s\\n' \(shellSingleQuoted(diagnostic)) >&2
+        exit 1
+        """
+        try writeExecutable(script, to: executable)
+        let client = StubBilibiliHTTPClient(directory: directory)
+        let service = DownloadService(
+            resolver: YTDLPResolver(
+                bundleURL: directory.appendingPathComponent("Empty.app"),
+                managedToolsDirectory: directory.appendingPathComponent("ManagedTools", isDirectory: true),
+                externalYTDLPCandidates: [executable],
+                externalFFmpegCandidates: []
+            ),
+            temporaryRootDirectory: tasksDirectory,
+            mediaMuxer: RecordingMediaMuxer(),
+            bilibiliDownloader: BilibiliDirectDownloader(httpClient: client),
+            browserCookieSourceProvider: { [] }
+        )
+        let request = try DownloadRequest(
+            urlString: urlString,
+            mode: .video,
+            outputDirectory: outputDirectory
+        )
+
+        await #expect(throws: DownloadServiceError.processFailed(
+            exitCode: 1,
+            diagnostic: DownloadFailureDiagnostics.actionableMessage(
+                rawDiagnostic: diagnostic,
+                urlString: request.urlString
+            )
+        )) {
+            try await service.download(request)
+        }
+
+        #expect(FileManager.default.fileExists(atPath: invocationMarker.path))
+        #expect(await client.requestedAPIURLs.isEmpty)
+        #expect(await client.requestedMediaURLs.isEmpty)
+        #expect(try FileManager.default.contentsOfDirectory(atPath: tasksDirectory.path).isEmpty)
+        #expect(try FileManager.default.contentsOfDirectory(atPath: outputDirectory.path).isEmpty)
+    }
+
+    @Test(arguments: [false, true])
+    func selectedBVFormatsRequireTheRequestedTools(ytDLPAvailable: Bool) async throws {
+        let directory = kitTemporaryDirectory()
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let executable = directory.appendingPathComponent("tools/yt-dlp")
+        let invocationMarker = directory.appendingPathComponent("yt-dlp-invoked")
+        if ytDLPAvailable {
+            try writeExecutable(
+                "#!/bin/sh\n/usr/bin/touch \(shellSingleQuoted(invocationMarker.path))\nexit 0\n",
+                to: executable
+            )
+        }
+        let backend = RecordingBilibiliDownloader()
+        let tasksDirectory = directory.appendingPathComponent("Tasks", isDirectory: true)
+        let outputDirectory = directory.appendingPathComponent("Downloads", isDirectory: true)
+        let service = DownloadService(
+            resolver: YTDLPResolver(
+                bundleURL: directory.appendingPathComponent("Empty.app"),
+                managedToolsDirectory: directory.appendingPathComponent("ManagedTools", isDirectory: true),
+                externalYTDLPCandidates: ytDLPAvailable ? [executable] : [],
+                externalFFmpegCandidates: []
+            ),
+            temporaryRootDirectory: tasksDirectory,
+            bilibiliDownloader: backend,
+            browserCookieSourceProvider: { [] }
+        )
+        let selection = try #require(DownloadFormatSelection(formatID: "137", audioFormatID: "140"))
+        let request = try DownloadRequest(
+            urlString: "https://www.bilibili.com/video/BV1d2N16KEh6",
+            mode: .video,
+            outputDirectory: outputDirectory,
+            formatSelection: selection
+        )
+
+        if ytDLPAvailable {
+            await #expect(throws: DownloadServiceError.formatSelectionRequiresFFmpeg) {
+                try await service.download(request)
+            }
+        } else {
+            await #expect(throws: YTDLPResolverError.self) {
+                try await service.download(request)
+            }
+        }
+
+        #expect(await backend.requestedURL == nil)
+        #expect(!FileManager.default.fileExists(atPath: invocationMarker.path))
+        #expect(try FileManager.default.contentsOfDirectory(atPath: tasksDirectory.path).isEmpty)
+        #expect(try FileManager.default.contentsOfDirectory(atPath: outputDirectory.path).isEmpty)
+    }
+
+    private func expectYTDLPDownload(
+        urlString: String,
+        hasFFmpeg: Bool,
+        formatSelection: DownloadFormatSelection? = nil
+    ) async throws {
+        let directory = kitTemporaryDirectory()
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let executable = directory.appendingPathComponent("tools/yt-dlp")
+        let ffmpeg = directory.appendingPathComponent("tools/ffmpeg")
+        let argumentsFile = directory.appendingPathComponent("arguments.txt")
+        let outputDirectory = directory.appendingPathComponent("Downloads", isDirectory: true)
+        let outputFile = outputDirectory.appendingPathComponent("result.mp4")
+        let tasksDirectory = directory.appendingPathComponent("Tasks", isDirectory: true)
+        let taskID = UUID()
+        let taskDirectory = tasksDirectory.appendingPathComponent(taskID.uuidString)
+        let reportedFile = hasFFmpeg ? outputFile : taskDirectory.appendingPathComponent("result.18.mp4")
+        let payload = hasFFmpeg
+            ? "\(YTDLPOutputParser.sentinel){\"event\":\"completed\",\"filepath\":\"\(jsonEscaped(reportedFile.path))\"}"
+            : "\(YTDLPOutputParser.sentinel){\"event\":\"component\",\"filepath\":\"\(jsonEscaped(reportedFile.path))\",\"format_id\":\"18\",\"vcodec\":\"avc1\",\"acodec\":\"mp4a\"}"
+        let script = """
+        #!/bin/sh
+        /usr/bin/printf '%s\\n' "$@" > \(shellSingleQuoted(argumentsFile.path))
+        /usr/bin/printf '%s' 'yt-dlp-media' > \(shellSingleQuoted(reportedFile.path))
+        /usr/bin/printf '%s\\n' \(shellSingleQuoted(payload))
+        """
+        try writeExecutable(script, to: executable)
+        if hasFFmpeg {
+            try writeExecutable("#!/bin/sh\nexit 0\n", to: ffmpeg)
+        }
+        let client = StubBilibiliHTTPClient(directory: directory)
+        let service = DownloadService(
+            resolver: YTDLPResolver(
+                bundleURL: directory.appendingPathComponent("Empty.app"),
+                managedToolsDirectory: directory.appendingPathComponent("ManagedTools", isDirectory: true),
+                externalYTDLPCandidates: [executable],
+                externalFFmpegCandidates: hasFFmpeg ? [ffmpeg] : []
+            ),
+            temporaryRootDirectory: tasksDirectory,
+            mediaMuxer: RecordingMediaMuxer(),
+            bilibiliDownloader: BilibiliDirectDownloader(httpClient: client),
+            browserCookieSourceProvider: { [] }
+        )
+        let request = try DownloadRequest(
+            urlString: urlString,
+            mode: .video,
+            outputDirectory: outputDirectory,
+            formatSelection: formatSelection
+        )
+
+        let result = try await service.download(request, taskID: taskID)
+        let arguments = try String(contentsOf: argumentsFile, encoding: .utf8)
+            .split(whereSeparator: \.isNewline)
+            .map(String.init)
+
+        #expect(result.fileURL == outputFile.standardizedFileURL)
+        #expect(try String(contentsOf: result.fileURL, encoding: .utf8) == "yt-dlp-media")
+        #expect(Array(arguments.suffix(2)) == ["--", request.urlString])
+        if let formatSelection {
+            let formatFlagIndex = try #require(arguments.firstIndex(of: "-f"))
+            #expect(arguments[formatFlagIndex + 1] == formatSelection.ytDLPExpression)
+        }
+        #expect(await client.requestedAPIURLs.isEmpty)
+        #expect(await client.requestedMediaURLs.isEmpty)
+        #expect(try FileManager.default.contentsOfDirectory(atPath: tasksDirectory.path).isEmpty)
+    }
 }

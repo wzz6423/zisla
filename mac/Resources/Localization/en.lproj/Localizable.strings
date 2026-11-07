@@ -636,6 +636,8 @@
 "飞机" = "Airplane";
 "首页" = "Home";
 "7 天" = "7 days";
+"自动删除剪贴板历史" = "Auto-delete clipboard history";
+"按所选周期删除过期历史，常用项目继续保留" = "Delete expired history after the selected period; favorites are kept";
 "上一页" = "Previous";
 "下一页" = "Next";
 "不可用" = "Unavailable";
@@ -3313,3 +3315,18 @@
 "权限" = "Permissions";
 "管理 zisla 使用的系统权限。" = "Manage the system permissions used by zisla.";
 "请在设置的“权限”页面管理授权。" = "Manage access on the Permissions page in Settings.";
+"自动清理系统垃圾" = "Automatically clean system junk";
+"按所选间隔移入废纸篓，不会永久删除" = "Move items to the Trash at the selected interval; never delete permanently";
+"清理范围" = "Cleanup scope";
+"仅可信" = "Trusted only";
+"全部（包含需人工复核）" = "All (including items requiring review)";
+"默认保存位置" = "Default Save Locations";
+"分别设置各类内容的默认保存位置。" = "Set the default save location for each type of content.";
+"管理下载所需组件。" = "Manage components required for downloads.";
+"更改 %@ 的保存位置" = "Change save location for %@";
+
+"本地优先的原生笔记应用" = "Local-first native notes app";
+
+"保存手写备忘录需要辅助功能权限" = "Accessibility access is required to save handwritten notes";
+"备忘录内容已变化，请重新打开后编辑" = "The note has changed. Reopen it before editing";
+"无法保存手写备忘录的文本，请在备忘录中打开后重试" = "Could not save text in the handwritten note. Open it in Notes and try again";

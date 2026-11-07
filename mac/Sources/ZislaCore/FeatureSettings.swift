@@ -536,6 +536,18 @@ public enum VoiceRecordingCleanupPolicy: String, Codable, CaseIterable, Sendable
     }
 }
 
+public enum SystemCleanupScope: String, Codable, CaseIterable, Sendable, Equatable, Hashable {
+    case trustedOnly
+    case all
+
+    public var menuTitle: String {
+        switch self {
+        case .trustedOnly: "仅可信"
+        case .all: "全部（包含需人工复核）"
+        }
+    }
+}
+
 public enum ScreenshotHotkeyDefaults {
     public static let currentVersion = 2
     public static let capture = VoiceInputHotkeyPreset(
@@ -724,6 +736,8 @@ public struct FeatureSettings: Codable, Equatable, Sendable {
     /// Whether to show the source platform logo and percentage in the collapsed Dynamic Island while the native downloader is active.
     public var videoDownloadIslandEnabled: Bool
     public var systemMonitorEnabled: Bool
+    public var systemCleanupPolicy: VoiceRecordingCleanupPolicy
+    public var systemCleanupScope: SystemCleanupScope
     /// When enabled, System Monitor appends one sample per minute to a local history that the history window charts and can export as a spreadsheet.
     public var systemMetricsHistoryEnabled: Bool
     public var dailyBriefing: DailyBriefingSettings
@@ -781,6 +795,7 @@ public struct FeatureSettings: Codable, Equatable, Sendable {
     public var networkProxyEnabled: Bool
     /// Whether to save clipboard text and images locally; users can disable it in Settings if concerned about sensitive content.
     public var clipboardHistoryEnabled: Bool
+    public var clipboardHistoryCleanupPolicy: VoiceRecordingCleanupPolicy
     /// Whether to detect downloadable links in clipboard; users can disable it in Settings.
     public var clipboardDetectionEnabled: Bool
     /// Whether copying shows the assistant toast with a recognized result and next-step action.
@@ -931,6 +946,8 @@ public struct FeatureSettings: Codable, Equatable, Sendable {
         browserDownloadIslandEnabled: Bool = true,
         videoDownloadIslandEnabled: Bool = true,
         systemMonitorEnabled: Bool = true,
+        systemCleanupPolicy: VoiceRecordingCleanupPolicy = .never,
+        systemCleanupScope: SystemCleanupScope = .trustedOnly,
         systemMetricsHistoryEnabled: Bool = true,
         dailyBriefing: DailyBriefingSettings = DailyBriefingSettings(),
         systemBackgroundSoundEnabled: Bool = false,
@@ -964,6 +981,7 @@ public struct FeatureSettings: Codable, Equatable, Sendable {
         networkProxyURL: String = "",
         networkProxyEnabled: Bool = false,
         clipboardHistoryEnabled: Bool = true,
+        clipboardHistoryCleanupPolicy: VoiceRecordingCleanupPolicy = .never,
         clipboardDetectionEnabled: Bool = true,
         clipboardAssistantEnabled: Bool = true,
         downloadCompletionFolderActionEnabled: Bool = true,
@@ -1053,6 +1071,8 @@ public struct FeatureSettings: Codable, Equatable, Sendable {
         self.browserDownloadIslandEnabled = browserDownloadIslandEnabled
         self.videoDownloadIslandEnabled = videoDownloadIslandEnabled
         self.systemMonitorEnabled = systemMonitorEnabled
+        self.systemCleanupPolicy = systemCleanupPolicy
+        self.systemCleanupScope = systemCleanupScope
         self.systemMetricsHistoryEnabled = systemMetricsHistoryEnabled
         self.dailyBriefing = dailyBriefing
         self.systemBackgroundSoundEnabled = systemBackgroundSoundEnabled
@@ -1086,6 +1106,7 @@ public struct FeatureSettings: Codable, Equatable, Sendable {
         self.networkProxyURL = networkProxyURL
         self.networkProxyEnabled = networkProxyEnabled
         self.clipboardHistoryEnabled = clipboardHistoryEnabled
+        self.clipboardHistoryCleanupPolicy = clipboardHistoryCleanupPolicy
         self.clipboardDetectionEnabled = clipboardDetectionEnabled
         self.clipboardAssistantEnabled = clipboardAssistantEnabled
         self.downloadCompletionFolderActionEnabled = downloadCompletionFolderActionEnabled
@@ -1223,6 +1244,8 @@ public struct FeatureSettings: Codable, Equatable, Sendable {
         case browserDownloadIslandEnabled
         case videoDownloadIslandEnabled
         case systemMonitorEnabled
+        case systemCleanupPolicy
+        case systemCleanupScope
         case systemMetricsHistoryEnabled
         case dailyBriefing
         case systemBackgroundSoundEnabled
@@ -1256,6 +1279,7 @@ public struct FeatureSettings: Codable, Equatable, Sendable {
         case networkProxyURL
         case networkProxyEnabled
         case clipboardHistoryEnabled
+        case clipboardHistoryCleanupPolicy
         case clipboardDetectionEnabled
         case clipboardAssistantEnabled
         case downloadCompletionFolderActionEnabled
@@ -1367,6 +1391,12 @@ public struct FeatureSettings: Codable, Equatable, Sendable {
             forKey: .videoDownloadIslandEnabled
         ) ?? defaults.videoDownloadIslandEnabled
         systemMonitorEnabled = try container.decodeIfPresent(Bool.self, forKey: .systemMonitorEnabled) ?? defaults.systemMonitorEnabled
+        systemCleanupPolicy = try container.decodeIfPresent(
+            VoiceRecordingCleanupPolicy.self, forKey: .systemCleanupPolicy
+        ) ?? defaults.systemCleanupPolicy
+        systemCleanupScope = try container.decodeIfPresent(
+            SystemCleanupScope.self, forKey: .systemCleanupScope
+        ) ?? defaults.systemCleanupScope
         systemMetricsHistoryEnabled = try container.decodeIfPresent(
             Bool.self,
             forKey: .systemMetricsHistoryEnabled
@@ -1451,6 +1481,10 @@ public struct FeatureSettings: Codable, Equatable, Sendable {
         networkProxyEnabled = try container.decodeIfPresent(Bool.self, forKey: .networkProxyEnabled)
             ?? (!networkProxyURL.isEmpty)
         clipboardHistoryEnabled = try container.decodeIfPresent(Bool.self, forKey: .clipboardHistoryEnabled) ?? defaults.clipboardHistoryEnabled
+        clipboardHistoryCleanupPolicy = try container.decodeIfPresent(
+            VoiceRecordingCleanupPolicy.self,
+            forKey: .clipboardHistoryCleanupPolicy
+        ) ?? defaults.clipboardHistoryCleanupPolicy
         clipboardDetectionEnabled = try container.decodeIfPresent(Bool.self, forKey: .clipboardDetectionEnabled) ?? defaults.clipboardDetectionEnabled
         clipboardAssistantEnabled = try container.decodeIfPresent(
             Bool.self,

@@ -79,12 +79,14 @@ public enum NotesAppBridge {
         public let isPasswordProtected: Bool
         public let tags: [String]
         public let attachments: [NoteAttachment]
+        public let requiresNativeTextEditing: Bool
 
         public init(
             plainText: String,
             bodyHTML: String,
             isPasswordProtected: Bool = false,
-            attachments: [NoteAttachment] = []
+            attachments: [NoteAttachment] = [],
+            requiresNativeTextEditing: Bool = false
         ) {
             self.plainText = plainText
             self.bodyHTML = bodyHTML
@@ -92,6 +94,7 @@ public enum NotesAppBridge {
             self.isPasswordProtected = isPasswordProtected
             tags = NotesAppBridge.tags(in: plainText)
             self.attachments = attachments
+            self.requiresNativeTextEditing = requiresNativeTextEditing
         }
 
         public var hasReadOnlyMetadata: Bool {
@@ -191,18 +194,26 @@ public enum NotesAppBridge {
     // MARK: - Read
 
     public static func readNote(id: String) async -> Result<NoteContent, NotesAppError> {
+        await readNote(id: id, runScript: runAppleScriptReturningStrings)
+    }
+
+    static func readNote(
+        id: String,
+        runScript: (String) async -> Result<[String], NotesAppError>
+    ) async -> Result<NoteContent, NotesAppError> {
         let script = """
         tell application "Notes"
             set n to (note id \(escapeForAppleScript(id)))
             if password protected of n then
-                return {"", "", "true"}
+                return {"", "", "true", "0"}
             end if
-            return {plaintext of n, body of n, "false"}
+            return {plaintext of n, body of n, "false", (count attachments of n) as text}
         end tell
         """
-        switch await runAppleScriptReturningStrings(script) {
+        switch await runScript(script) {
         case .success(let values):
-            guard values.count == 3 else {
+            guard values.count == 4, let attachmentCount = Int(values[3]), attachmentCount >= 0,
+                  ["true", "false"].contains(values[2].lowercased()) else {
                 return .failure(.failed(AppLocalization.text("读取备忘录内容失败")))
             }
             let isPasswordProtected = values[2].lowercased() == "true"
@@ -216,7 +227,8 @@ public enum NotesAppBridge {
             return .success(NoteContent(
                 plainText: values[0],
                 bodyHTML: values[1],
-                isPasswordProtected: isPasswordProtected
+                isPasswordProtected: isPasswordProtected,
+                requiresNativeTextEditing: values[0].filter { $0 == "\u{FFFC}" }.count > attachmentCount
             ))
         case .failure(let error):
             return .failure(error)
@@ -331,6 +343,12 @@ public enum NotesAppBridge {
         return await runAppleScriptVoid(script)
     }
 
+    public static func writeNativeText(id: String, edit: NotesNativeTextEdit) async -> Result<Void, NotesAppError> {
+        await nativeTextWriter.write(noteID: id, edit: edit)
+    }
+
+    private static let nativeTextWriter = NotesNativeTextWriter()
+
     // MARK: - Create
 
     public static func createNote(title: String, markdown: String) async -> Result<String, NotesAppError> {
@@ -388,6 +406,23 @@ public enum NotesAppBridge {
         end tell
         """
         return await runAppleScriptVoid(script)
+    }
+
+    static func selectedNoteID() async -> String? {
+        await selectedNoteID(runScript: runAppleScriptReturningStrings)
+    }
+
+    static func selectedNoteID(runScript: (String) async -> Result<[String], NotesAppError>) async -> String? {
+        let script = """
+        tell application "Notes"
+            if (count of selection) is not 1 then return {""}
+            return {id of item 1 of selection}
+        end tell
+        """
+        if case .success(let values) = await runScript(script), values.count == 1, !values[0].isEmpty {
+            return values[0]
+        }
+        return nil
     }
 
     /// Shows an attachment in the system Notes app. Quick Note does not provide write, delete, or rename operations for attachments.

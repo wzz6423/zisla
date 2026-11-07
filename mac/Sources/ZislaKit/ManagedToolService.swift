@@ -7,6 +7,7 @@ public final class ManagedToolService: ObservableObject {
     @Published public private(set) var states: [ManagedTool: ManagedToolState] = [:]
 
     private let toolsDirectory: URL
+    private let applicationsDirectory: URL
     private let bundleURL: URL
     private var session: URLSession
     private var releaseLoader: (String) async throws -> Data
@@ -29,6 +30,8 @@ public final class ManagedToolService: ObservableObject {
 
     public init(
         toolsDirectory: URL = AppPaths.managedTools,
+        applicationsDirectory: URL = FileManager.default.homeDirectoryForCurrentUser
+            .appendingPathComponent("Applications", isDirectory: true),
         bundleURL: URL = Bundle.main.bundleURL,
         session: URLSession = .shared,
         defaults: UserDefaults = .standard,
@@ -41,6 +44,7 @@ public final class ManagedToolService: ObservableObject {
         }
     ) {
         self.toolsDirectory = toolsDirectory
+        self.applicationsDirectory = applicationsDirectory
         self.bundleURL = bundleURL
         self.session = session
         self.usesDefaultReleaseLoader = releaseLoader == nil
@@ -119,7 +123,13 @@ public final class ManagedToolService: ObservableObject {
     /// The downloaded build wins, otherwise clicking "Update" would be pointless.
     public func resolvedExecutable(for tool: ManagedTool) -> (url: URL, location: ManagedToolState.Location)? {
         if let executableResolver { return executableResolver(tool) }
-        if !tool.usesHomebrew {
+        if let bundleName = tool.applicationBundleName {
+            let executable = applicationsDirectory.appendingPathComponent(bundleName)
+                .appendingPathComponent("Contents/MacOS/\(tool.executableName)")
+            if let trusted = trustedExecutable(executable) {
+                return (trusted, .external(executable.path))
+            }
+        } else if !tool.usesHomebrew {
             let managed = toolsDirectory.appendingPathComponent(tool.executableName, isDirectory: false)
             if let trusted = trustedExecutable(managed) {
                 return (trusted, .managed)
@@ -166,6 +176,9 @@ public final class ManagedToolService: ObservableObject {
                 "/opt/homebrew/bin/mdp",
                 "/Applications/Markdown Preview.app/Contents/Resources/bin/markdown-preview",
             ]
+        }
+        if tool == .quietMD {
+            return ["/Applications/quiet.md.app/Contents/MacOS/quiet_md"]
         }
         if tool == .keka {
             return [
@@ -268,7 +281,11 @@ public final class ManagedToolService: ObservableObject {
         let appURL = URL(fileURLWithPath: String(
             executableURL.pathComponents.prefix(appIndex + 1).joined(separator: "/")
         ))
-        return Bundle(url: appURL)?.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String
+        // Bundle caches Info.plist across replacements, so an update must read the current file.
+        guard let data = try? Data(contentsOf: appURL.appendingPathComponent("Contents/Info.plist")),
+              let info = try? PropertyListSerialization.propertyList(from: data, format: nil) as? [String: Any]
+        else { return nil }
+        return info["CFBundleShortVersionString"] as? String
     }
 
     /// Normalize a version by trimming whitespace and stripping a leading v.
@@ -500,7 +517,10 @@ public final class ManagedToolService: ObservableObject {
             }
             switch tool.installationSource {
             case .githubRelease(let repository):
-                try await installGitHubRelease(tool, repository: repository)
+                try await installGitHubRelease(
+                    tool, repository: repository,
+                    updatingExisting: tool.applicationBundleName == nil ? nil : resolvedExecutable(for: tool)?.url
+                )
             case .homebrewCask(let caskName):
                 try await installHomebrewCask(tool, caskName: caskName)
             case .homebrewFormula(let formulaName):
@@ -555,9 +575,9 @@ public final class ManagedToolService: ObservableObject {
         defer { try? FileManager.default.removeItem(at: downloaded.deletingLastPathComponent()) }
 
         states[tool]?.phase = .installing
-        let (_, version) = try await install(downloaded, as: tool, updatingExisting: updatingExisting)
+        let (executable, version) = try await install(downloaded, as: tool, updatingExisting: updatingExisting)
         states[tool]?.installedVersion = version
-        states[tool]?.location = .managed
+        states[tool]?.location = tool.applicationBundleName == nil ? .managed : .external(executable.path)
         refreshedInstalledVersions.insert(tool)
         persistCachedStates()
     }
@@ -722,6 +742,11 @@ public final class ManagedToolService: ObservableObject {
     }
 
     private func install(_ executable: URL, as tool: ManagedTool, updatingExisting: URL? = nil) async throws -> (URL, String) {
+        if let bundleName = tool.applicationBundleName {
+            return try await installApplicationArchive(
+                executable, as: tool, bundleName: bundleName, updatingExisting: updatingExisting
+            )
+        }
         let fileManager = FileManager.default
         try fileManager.createDirectory(at: toolsDirectory, withIntermediateDirectories: true)
         let destination = toolsDirectory.appendingPathComponent(
@@ -757,6 +782,75 @@ public final class ManagedToolService: ObservableObject {
             throw ManagedToolError.notExecutable(destination.lastPathComponent)
         }
         return (trusted, version)
+    }
+
+    static func validateApplicationArchive(entries: String, details: String, bundleName: String) throws {
+        let paths = entries.split(whereSeparator: \.isNewline)
+        guard !paths.isEmpty, paths.allSatisfy({ path in
+            let components = path.split(separator: "/")
+            return !path.contains("\\")
+                && !components.contains("..") && !components.contains(".")
+                && path.hasPrefix(bundleName + "/")
+        }) else {
+            throw ManagedToolError.notExecutable(bundleName)
+        }
+        let lines = details.split(whereSeparator: \.isNewline)
+        let sizeField = lines.last?.components(separatedBy: ", ")
+            .first { $0.hasSuffix(" bytes uncompressed") }
+        guard !lines.contains(where: { $0.hasPrefix("l") }),
+              let size = sizeField?.split(separator: " ").first.flatMap({ Int($0) }),
+              size <= maximumDownloadBytes
+        else {
+            throw ManagedToolError.notExecutable(bundleName)
+        }
+    }
+
+    private func installApplicationArchive(
+        _ archive: URL, as tool: ManagedTool, bundleName: String, updatingExisting: URL?
+    ) async throws -> (URL, String) {
+        guard case .success(let entries) = await Self.runProcess(
+            URL(fileURLWithPath: "/usr/bin/zipinfo"), arguments: ["-1", archive.path], timeout: 30
+        ), case .success(let details) = await Self.runProcess(
+            URL(fileURLWithPath: "/usr/bin/zipinfo"), arguments: ["-l", archive.path], timeout: 30
+        ) else {
+            throw ManagedToolError.notExecutable(tool.displayName)
+        }
+        try Self.validateApplicationArchive(entries: entries, details: details, bundleName: bundleName)
+
+        let fileManager = FileManager.default
+        let destination = updatingExisting?.deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent()
+            ?? applicationsDirectory.appendingPathComponent(bundleName, isDirectory: true)
+        try fileManager.createDirectory(at: destination.deletingLastPathComponent(), withIntermediateDirectories: true)
+        let staging = destination.deletingLastPathComponent().appendingPathComponent(".quiet-md-\(UUID().uuidString)", isDirectory: true)
+        try fileManager.createDirectory(at: staging, withIntermediateDirectories: true)
+        defer { try? fileManager.removeItem(at: staging) }
+        guard case .success = await Self.runProcess(
+            URL(fileURLWithPath: "/usr/bin/ditto"), arguments: ["-x", "-k", archive.path, staging.path], timeout: 60
+        ) else {
+            throw ManagedToolError.notExecutable(tool.displayName)
+        }
+        let application = staging.appendingPathComponent(bundleName, isDirectory: true)
+        let executable = application.appendingPathComponent("Contents/MacOS/\(tool.executableName)")
+        guard Bundle(url: application)?.bundleIdentifier == "com.s1dashu.quietmd",
+              trustedExecutable(executable) != nil,
+              let version = await Self.readVersion(of: tool, at: executable),
+              case .success = await Self.runProcess(
+                URL(fileURLWithPath: "/usr/bin/codesign"),
+                arguments: ["--verify", "--deep", "--strict", application.path], timeout: 30
+              )
+        else {
+            throw ManagedToolError.notExecutable(tool.displayName)
+        }
+        try Task.checkCancellation()
+        if let updatingExisting {
+            guard resolvedExecutable(for: tool)?.url == updatingExisting else { throw CancellationError() }
+        }
+        if fileManager.fileExists(atPath: destination.path) {
+            _ = try fileManager.replaceItemAt(destination, withItemAt: application)
+        } else {
+            try fileManager.moveItem(at: application, to: destination)
+        }
+        return (destination.appendingPathComponent("Contents/MacOS/\(tool.executableName)"), version)
     }
 
     static func runProcess(

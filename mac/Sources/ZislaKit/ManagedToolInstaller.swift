@@ -72,6 +72,7 @@ public enum ManagedTool: String, CaseIterable, Identifiable, Sendable {
     case openScreen
     case kaku
     case markdownPreview
+    case quietMD
     case zshell
     case dockDoor
 
@@ -124,6 +125,7 @@ public enum ManagedTool: String, CaseIterable, Identifiable, Sendable {
         case .openScreen: "OpenScreen"
         case .kaku: "Kaku"
         case .markdownPreview: "Markdown Preview"
+        case .quietMD: "Quiet.md"
         case .zshell: "Zshell"
         case .dockDoor: "DockDoor"
         }
@@ -176,6 +178,7 @@ public enum ManagedTool: String, CaseIterable, Identifiable, Sendable {
         case .openScreen: "录屏与视频编辑"
         case .kaku: "面向 AI 编码的终端"
         case .markdownPreview: "Markdown 预览"
+        case .quietMD: "本地优先的原生笔记应用"
         case .zshell: "原生 macOS 终端工作区"
         case .dockDoor: "Dock 窗口预览与应用切换"
         }
@@ -229,6 +232,7 @@ public enum ManagedTool: String, CaseIterable, Identifiable, Sendable {
         case .openScreen: "Openscreen"
         case .kaku: "kaku"
         case .markdownPreview: "mdp"
+        case .quietMD: "quiet_md"
         case .zshell: "zshell"
         case .dockDoor: "DockDoor"
         }
@@ -281,6 +285,7 @@ public enum ManagedTool: String, CaseIterable, Identifiable, Sendable {
         case .openScreen: .homebrewCask(name: "getopenscreen/openscreen/openscreen")
         case .kaku: .homebrewCask(name: "tw93/tap/kakuku")
         case .markdownPreview: .homebrewCask(name: "markdown-preview")
+        case .quietMD: .githubRelease(repository: "s1dashu/quiet-md")
         case .zshell: .homebrewCask(name: "wzz6423/tap/zshell")
         case .dockDoor: .homebrewCask(name: "dockdoor")
         }
@@ -308,14 +313,14 @@ public enum ManagedTool: String, CaseIterable, Identifiable, Sendable {
             .developmentToolchain
         case .ytDLP, .libreOffice, .keka:
             .utility
-        case .openScreen, .kaku, .markdownPreview, .zshell, .dockDoor:
+        case .openScreen, .kaku, .markdownPreview, .quietMD, .zshell, .dockDoor:
             .desktopApplication
         }
     }
 
     var usesNativeApplicationVersion: Bool {
         switch self {
-        case .openScreen, .kaku, .markdownPreview, .keka, .zshell, .dockDoor: true
+        case .openScreen, .kaku, .markdownPreview, .quietMD, .keka, .zshell, .dockDoor: true
         default: false
         }
     }
@@ -323,6 +328,10 @@ public enum ManagedTool: String, CaseIterable, Identifiable, Sendable {
     var usesHomebrewCask: Bool {
         if case .homebrewCask = installationSource { return true }
         return false
+    }
+
+    var applicationBundleName: String? {
+        self == .quietMD ? "quiet.md.app" : nil
     }
 
     var usesHomebrewFormula: Bool {
@@ -388,6 +397,12 @@ public enum ManagedTool: String, CaseIterable, Identifiable, Sendable {
         switch self {
         case .ytDLP:
             return name == "yt-dlp_macos"
+        case .quietMD:
+            #if arch(arm64)
+            return name.hasPrefix("quiet-md-") && name.hasSuffix("-macos-arm64.zip")
+            #else
+            return false
+            #endif
         default: return false
         }
     }
