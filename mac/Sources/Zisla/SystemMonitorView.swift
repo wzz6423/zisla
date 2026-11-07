@@ -70,7 +70,7 @@ struct SystemMonitorView: View {
             }
             .padding(12)
         }
-        .thinScrollChrome()
+        .thinScrollChrome(scrollerStyle: .overlay)
         .onPreferenceChange(SystemColumnHeightPreferenceKey.self) { height in
             guard systemColumnHeight != height else { return }
             systemColumnHeight = height
