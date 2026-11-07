@@ -3313,3 +3313,7 @@
 "权限" = "İzinler";
 "管理 zisla 使用的系统权限。" = "zisla’nın kullandığı sistem izinlerini yönetin.";
 "请在设置的“权限”页面管理授权。" = "Erişimi ayarlardaki İzinler sayfasından yönetin.";
+
+"保存手写备忘录需要辅助功能权限" = "El yazısı notları kaydetmek için Erişilebilirlik izni gerekir";
+"备忘录内容已变化，请重新打开后编辑" = "Not değişti. Düzenlemeden önce yeniden açın";
+"无法保存手写备忘录的文本，请在备忘录中打开后重试" = "El yazısı nottaki metin kaydedilemedi. Notlar’da açıp yeniden deneyin";
