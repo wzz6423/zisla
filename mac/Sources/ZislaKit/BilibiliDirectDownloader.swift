@@ -58,17 +58,47 @@ public struct BilibiliDirectDownloader: BilibiliDownloading, Sendable {
         guard let bvid = Self.bvid(from: urlString) else {
             throw BilibiliDirectDownloaderError.invalidVideoURL
         }
+        let pageItems = URLComponents(string: urlString)?.queryItems?.filter { $0.name == "p" } ?? []
+        let page: Int
+        if pageItems.isEmpty {
+            page = 1
+        } else {
+            guard pageItems.count == 1,
+                  let value = pageItems[0].value,
+                  value.utf8.allSatisfy({ (48...57).contains($0) }),
+                  let requestedPage = Int(value), requestedPage > 0
+            else {
+                throw BilibiliDirectDownloaderError.invalidVideoURL
+            }
+            page = requestedPage
+        }
         let referer = "https://www.bilibili.com/video/\(bvid)/"
         let view: ViewData = try await fetchAPI(
             endpoint: "/x/web-interface/view",
             queryItems: [URLQueryItem(name: "bvid", value: bvid)],
             referer: referer
         )
+        let cid: Int64
+        if let pages = view.pages {
+            let matchingPages = pages.filter { $0.page == page }
+            guard matchingPages.count == 1 else {
+                throw BilibiliDirectDownloaderError.invalidVideoURL
+            }
+            cid = matchingPages[0].cid
+        } else {
+            guard page == 1 else {
+                throw BilibiliDirectDownloaderError.invalidVideoURL
+            }
+            cid = view.cid
+        }
+        guard cid > 0 else {
+            throw BilibiliDirectDownloaderError.invalidVideoURL
+        }
         let play: PlayData = try await fetchAPI(
             endpoint: "/x/player/playurl",
             queryItems: [
                 URLQueryItem(name: "bvid", value: bvid),
-                URLQueryItem(name: "cid", value: String(view.cid)),
+                URLQueryItem(name: "cid", value: String(cid)),
                 URLQueryItem(name: "qn", value: "127"),
                 URLQueryItem(name: "fnval", value: "4048"),
                 URLQueryItem(name: "fourk", value: "1"),
@@ -255,6 +285,12 @@ private struct APIEnvelope<Value: Decodable>: Decodable {
 private struct ViewData: Decodable {
     let title: String
     let cid: Int64
+    let pages: [Page]?
+
+    struct Page: Decodable {
+        let page: Int
+        let cid: Int64
+    }
 }
 
 private struct PlayData: Decodable {
