@@ -220,7 +220,9 @@ enum RecordingExportJob {
             let writer = try RecordingExportGIFWriter(url: temporary, size: size, frameRate: schedule.frameRate,
                                                        duration: timeline.duration,
                                                        preserveGrayscale: project.edits.showCursor && project.edits.cursorTrail == true
-                                                           && !project.pointers.isEmpty)
+                                                           && !project.pointers.isEmpty
+                                                           && project.edits.effectiveCursorTrailColor.red == project.edits.effectiveCursorTrailColor.green
+                                                           && project.edits.effectiveCursorTrailColor.green == project.edits.effectiveCursorTrailColor.blue)
             for index in 0..<schedule.frameCount {
                 try Task.checkCancellation()
                 try checkpoint(.frame(index))

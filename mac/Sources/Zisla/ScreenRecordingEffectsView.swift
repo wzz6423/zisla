@@ -36,6 +36,11 @@ struct ScreenRecordingEffectsView: View {
                 Toggle(AppLocalization.text("点击效果"), isOn: editBinding(\.clickEffects, default: true))
                 Toggle(AppLocalization.text("鼠标轨迹"), isOn: optionalEditBinding(\.cursorTrail, default: false))
                     .accessibilityIdentifier("screenRecording.cursorTrail")
+                if model.project?.edits.cursorTrail == true {
+                    ScreenRecordingColorPicker(title: "轨迹颜色", selection: optionalEditBinding(\.cursorTrailColor,
+                        default: model.project!.edits.effectiveCursorTrailColor))
+                        .accessibilityIdentifier("screenRecording.cursorTrailColor")
+                }
                 Toggle(AppLocalization.text("自动缩放"), isOn: editBinding(\.autoZoom, default: false))
             }
             ScreenRecordingInspectorSection(AppLocalization.text("裁切画面"), symbol: "crop", expanded: false) {

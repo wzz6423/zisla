@@ -241,6 +241,7 @@ public struct RecordingEdits: Codable, Equatable, Sendable {
     public var showCursor: Bool
     public var clickEffects: Bool
     public var cursorTrail: Bool?
+    public var cursorTrailColor: RecordingColor?
     public var autoZoom: Bool
     public var cameraPosition: RecordingCameraPosition
     public var cameraSize: Double
@@ -268,11 +269,13 @@ public struct RecordingEdits: Codable, Equatable, Sendable {
     public var effectiveCameraBorder: Bool { cameraBorder ?? false }
     public var effectiveScreenAudioVolume: Double { screenAudioVolume ?? 1 }
     public var effectiveMicrophoneVolume: Double { microphoneVolume ?? 1 }
+    public var effectiveCursorTrailColor: RecordingColor { cursorTrailColor ?? .init(red: 1, green: 1, blue: 1) }
 
     public init(segments: [RecordingSegment] = [], zoomClips: [RecordingZoom] = [],
                 background: RecordingBackground = .gradient, padding: Double = 0,
                 cornerRadius: Double = 0, shadow: Double = 0, cursorSize: Double = 1.5,
-                showCursor: Bool = true, clickEffects: Bool = true, cursorTrail: Bool? = nil, autoZoom: Bool = false,
+                showCursor: Bool = true, clickEffects: Bool = true, cursorTrail: Bool? = nil,
+                cursorTrailColor: RecordingColor? = nil, autoZoom: Bool = false,
                 cameraPosition: RecordingCameraPosition = .bottomRight, cameraSize: Double = 0.25,
                 cameraMirrored: Bool = true, cameraRound: Bool = true,
                 cameraAspectRatio: RecordingCameraAspectRatio? = nil, cameraCornerRadius: Double? = nil,
@@ -290,6 +293,7 @@ public struct RecordingEdits: Codable, Equatable, Sendable {
         self.showCursor = showCursor
         self.clickEffects = clickEffects
         self.cursorTrail = cursorTrail
+        self.cursorTrailColor = cursorTrailColor
         self.autoZoom = autoZoom
         self.cameraPosition = cameraPosition
         self.cameraSize = cameraSize
@@ -458,6 +462,7 @@ public struct ScreenRecordingProject: Codable, Equatable, Identifiable, Sendable
               (0...1).contains(edits.effectiveScreenAudioVolume),
               (0...1).contains(edits.effectiveMicrophoneVolume),
               edits.backgroundColor?.isValid != false,
+              edits.cursorTrailColor?.isValid != false,
               edits.annotations.map({ annotations in
                   annotations.count <= RecordingAnnotation.maximumCount
                       && Set(annotations.map(\.id)).count == annotations.count

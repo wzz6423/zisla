@@ -199,7 +199,7 @@ final class RecordingExportRenderer {
         if project.edits.showCursor, project.edits.cursorTrail == true,
            let trail = try Self.trailImage(effects.trail(at: sourceTime, slice: slice), sourceTime: sourceTime,
                 source: normalized.extent.size, viewport: viewport, screen: screenRect, fill: screenRect == canvas,
-                lineWidth: cursor.extent.height * 0.08) {
+                lineWidth: cursor.extent.height * 0.08, color: project.edits.effectiveCursorTrailColor) {
             visible = trail.composited(over: visible).cropped(to: viewport)
         }
         if project.edits.clickEffects {
@@ -346,25 +346,55 @@ final class RecordingExportRenderer {
     }
 
     private static func trailImage(_ samples: [RecordingPointer], sourceTime: Double, source: CGSize,
-                                   viewport: CGRect, screen: CGRect, fill: Bool, lineWidth: Double) throws -> CIImage? {
+                                   viewport: CGRect, screen: CGRect, fill: Bool, lineWidth: Double,
+                                   color: RecordingColor) throws -> CIImage? {
         let transform = fitTransform(from: viewport, to: screen, fill: fill)
-        let points = samples.map { CGPoint(x: $0.x * source.width, y: (1 - $0.y) * source.height).applying(transform) }
-        let segments = zip(points.indices, points.indices.dropFirst())
+        let moving = samples.reduce(into: [RecordingPointer]()) { result, sample in
+            if result.last?.x != sample.x || result.last?.y != sample.y { result.append(sample) }
+        }
+        let points = moving.map { CGPoint(x: $0.x * source.width, y: (1 - $0.y) * source.height).applying(transform) }
         let bounds = points.reduce(CGRect.null) { $0.union(CGRect(origin: $1, size: .zero)) }
             .insetBy(dx: -lineWidth, dy: -lineWidth).intersection(screen).integral
         guard !bounds.isEmpty else { return nil }
         let context = try bitmap(size: bounds.size)
         context.translateBy(x: -bounds.minX, y: -bounds.minY)
-        for (start, end) in segments {
-            let opacity = 1 - (sourceTime - samples[end].time) / RecordingExportEffectTrack.trailDuration
-            context.setLineWidth(lineWidth * opacity)
-            context.setStrokeColor(CGColor(gray: 1, alpha: opacity))
-            context.move(to: points[start])
-            context.addLine(to: points[end])
-            context.strokePath()
+        context.setLineCap(.round)
+        for index in points.indices {
+            let point = points[index]
+            let previous = points[max(0, index - 1)]
+            let next = points[min(points.count - 1, index + 1)]
+            let start = CGPoint(x: (previous.x + point.x) / 2, y: (previous.y + point.y) / 2)
+            let end = CGPoint(x: (point.x + next.x) / 2, y: (point.y + next.y) / 2)
+            guard start != point || point != end else { continue }
+            let startTime = (moving[max(0, index - 1)].time + moving[index].time) / 2
+            let endTime = (moving[index].time + moving[min(moving.count - 1, index + 1)].time) / 2
+            var from = start
+            // Split the curve to keep taper and fade continuous without replacing the bend with straight chords.
+            for step in 1...2 {
+                let fraction = Double(step) / 2
+                let inverse = 1 - fraction
+                let to = CGPoint(x: inverse * inverse * start.x + 2 * inverse * fraction * point.x + fraction * fraction * end.x,
+                    y: inverse * inverse * start.y + 2 * inverse * fraction * point.y + fraction * fraction * end.y)
+                let previousFraction = Double(step - 1) / 2
+                let control = CGPoint(x: from.x + ((1 - previousFraction) * (point.x - start.x) + previousFraction * (end.x - point.x)) / 2,
+                    y: from.y + ((1 - previousFraction) * (point.y - start.y) + previousFraction * (end.y - point.y)) / 2)
+                let time = startTime + (endTime - startTime) * fraction
+                let opacity = 1 - (sourceTime - time) / RecordingExportEffectTrack.trailDuration
+                context.setLineWidth(lineWidth * opacity)
+                context.setStrokeColor(CGColor(gray: opacity, alpha: 1))
+                context.move(to: from)
+                context.addQuadCurve(to: to, control: control)
+                context.strokePath()
+                from = to
+            }
         }
+        let mask = try bitmapImage(context)
+        let tint = CIImage(color: CIColor(red: color.red, green: color.green, blue: color.blue)).cropped(to: mask.extent)
         // Rasterize at output resolution so zoomed trails do not become subpixel source strokes.
-        return try bitmapImage(context).transformed(by: .init(translationX: bounds.minX, y: bounds.minY))
+        return tint.applyingFilter("CIBlendWithMask", parameters: [
+            kCIInputBackgroundImageKey: CIImage(color: .clear).cropped(to: mask.extent),
+            kCIInputMaskImageKey: mask,
+        ]).transformed(by: .init(translationX: bounds.minX, y: bounds.minY))
             .transformed(by: transform.inverted())
     }
 

@@ -148,14 +148,35 @@ struct ScreenRecordingInspectorLayoutTests {
         #expect(label == AppLocalization.string("鼠标轨迹", language: language))
         #expect(model.project == project && !model.isDirty && !model.canUndo,
             "Presenting the cursor controls must not enable the trail or mark the project dirty")
+        #expect(fixture.element("screenRecording.cursorTrailColor") == nil,
+            "The color picker must stay hidden until the trail is enabled")
         try fixture.press(toggle)
         await model.previewTask?.value
         await fixture.settle()
         #expect(model.project?.edits.cursorTrail == true && model.canUndo && model.isDirty)
+        let picker = try #require(fixture.element("screenRecording.cursorTrailColor"))
+        #expect(fixture.textValues().contains(AppLocalization.string("轨迹颜色", language: language)))
+        #expect(fixture.host.bounds.insetBy(dx: -0.5, dy: -0.5).contains(fixture.frame(picker)),
+            "The localized trail color control must fit inside the narrow inspector")
+        #expect(model.project?.edits.cursorTrailColor == nil,
+            "Presenting the color picker must not save the default white color")
+        let well = try #require(fixture.colorWells().first)
+        let color = RecordingColor(red: 0.2, green: 0.7, blue: 0.4)
+        well.color = NSColor(srgbRed: color.red, green: color.green, blue: color.blue, alpha: 1)
+        try #require(well.sendAction(well.action, to: well.target))
+        await model.previewTask?.value
+        await fixture.settle()
+        #expect(model.project?.edits.cursorTrailColor == color,
+            "Changing the native color well must update the trail through the inspector binding")
+        model.undo()
+        await model.previewTask?.value
+        await fixture.settle()
+        #expect(model.project?.edits.cursorTrailColor == nil && model.project?.edits.cursorTrail == true)
         model.undo()
         await model.previewTask?.value
         await fixture.settle()
         #expect(model.project == project)
+        #expect(fixture.element("screenRecording.cursorTrailColor") == nil)
         #expect(!fixture.window.isVisible, "The isolated inspector test must never display a user-facing window")
     }
 
@@ -479,6 +500,12 @@ struct ScreenRecordingInspectorLayoutTests {
             let view = view ?? host
             if let field = view as? NSTextField, field.isEditable { return [field] }
             return view.subviews.flatMap { editableFields(in: $0) }
+        }
+
+        func colorWells(in view: NSView? = nil) -> [NSColorWell] {
+            let view = view ?? host
+            if let well = view as? NSColorWell { return [well] }
+            return view.subviews.flatMap { colorWells(in: $0) }
         }
 
         func menuFrames() -> [CGRect] {

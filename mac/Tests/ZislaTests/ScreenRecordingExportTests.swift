@@ -577,8 +577,10 @@ struct ScreenRecordingExportTests {
         defer { fixture.remove() }
         _ = try await fixture.createVideo(colors: [.init(red: 0.17, green: 0.17, blue: 0.17)])
         let pointer = RecordingPointer(time: 0, x: 0.5, y: 0.5)
-        let configurations: [(Bool?, Bool, [RecordingPointer])] = [
-            (nil, true, [pointer]), (false, true, [pointer]), (true, false, [pointer]), (true, true, []),
+        let configurations: [(Bool?, Bool, [RecordingPointer], RecordingColor?)] = [
+            (nil, true, [pointer], nil), (false, true, [pointer], nil), (true, false, [pointer], nil), (true, true, [], nil),
+            (true, true, [pointer], .init(red: 0, green: 0.5, blue: 0.5)),
+            (true, true, [pointer], .init(red: 0.5, green: 0.5, blue: 0)),
         ]
         for multitrack in [false, true] {
             for (index, configuration) in configurations.enumerated() {
@@ -587,6 +589,7 @@ struct ScreenRecordingExportTests {
                 project.edits.cursorTrail = configuration.0
                 project.edits.showCursor = configuration.1
                 project.pointers = configuration.2
+                project.edits.cursorTrailColor = configuration.3
                 if multitrack { project.timeline = .migrating(project) }
                 let destination = fixture.root.appendingPathComponent("palette-\(multitrack)-\(index).gif")
                 try await ScreenRecordingExporter().export(project: project, directory: fixture.directory, to: destination,
@@ -597,7 +600,7 @@ struct ScreenRecordingExportTests {
                     #expect(data[offset] == UInt8(((paletteIndex >> 5) & 7) * 255 / 7)
                         && data[offset + 1] == UInt8(((paletteIndex >> 2) & 7) * 255 / 7)
                         && data[offset + 2] == UInt8((paletteIndex & 3) * 255 / 3),
-                        "Hidden, disabled, and metadata-free trails must retain the existing GIF palette")
+                        "Hidden, disabled, metadata-free, and colored trails must retain the existing GIF palette")
                 }
             }
         }
