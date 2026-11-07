@@ -3593,6 +3593,19 @@ public enum SystemDiskCleanup {
 
 // MARK: - Service
 
+private final class SystemMetricsHistoryRequest: @unchecked Sendable {
+    private let lock = NSLock()
+    private var cancelled = false
+
+    var isCancelled: Bool {
+        lock.withLock { cancelled }
+    }
+
+    func cancel() {
+        lock.withLock { cancelled = true }
+    }
+}
+
 /// SwiftUI-facing system sampling and safe cleanup service; experimental readings are read-only and can be explicitly degraded.
 @MainActor
 public final class SystemMonitorService: ObservableObject {
@@ -3642,8 +3655,10 @@ public final class SystemMonitorService: ObservableObject {
     private var cachedGPUMetrics: GPUMetrics?
     private var cachedSensorSample: AppleSMCSensorSample?
     private let historyStore: SystemMetricsHistoryStore
+    private let historyQueue = DispatchQueue(label: "com.zisla.system-metrics-history.store", qos: .utility)
     private var historyRecorder: SystemMetricsHistoryRecorder
     private var historyGeneration: UInt = 0
+    private var pendingHistoryRecord: SystemMetricsHistoryRequest?
 
     public init(
         samplingInterval: TimeInterval = 1.5,
@@ -4054,7 +4069,7 @@ public final class SystemMonitorService: ObservableObject {
         snapshot = snap
         history.append(cpu: cpu, gpu: gpu, network: payload.network)
         if recordingGeneration == historyGeneration {
-            recordHistoryIfNeeded(snapshot: snap, now: now)
+            await recordHistoryIfNeeded(snapshot: snap, now: now)
         }
         Task { [weak self] in
             await Task.yield()
@@ -4067,28 +4082,71 @@ public final class SystemMonitorService: ObservableObject {
 
     /// Appends the sample to the persisted history once the recording interval has elapsed; the
     /// live waveforms keep sampling at `samplingInterval` regardless.
-    private func recordHistoryIfNeeded(snapshot: SystemMetricsSnapshot, now: Date) {
+    private func recordHistoryIfNeeded(snapshot: SystemMetricsSnapshot, now: Date) async {
         guard isRecordingHistory, historyRecorder.shouldRecord(at: now) else { return }
-        historyStore.append(SystemMetricsRecord(snapshot: snapshot))
+        let store = historyStore
+        let record = SystemMetricsRecord(snapshot: snapshot)
+        let previousRecorder = historyRecorder
+        let request = SystemMetricsHistoryRequest()
+        pendingHistoryRecord = request
+        defer { pendingHistoryRecord = nil }
+        // Reserve the interval before suspending, and restore it only when no write was submitted.
         historyRecorder.markRecorded(at: now)
-        historyStats = historyStore.stats
+        await withTaskCancellationHandler {
+            await withCheckedContinuation { continuation in
+                historyQueue.async {
+                    let stats = store.append(record, isCancelled: { request.isCancelled })
+                    // Main-queue completions preserve the same order as the history operations.
+                    DispatchQueue.main.async {
+                        MainActor.assumeIsolated {
+                            if let stats, !request.isCancelled {
+                                self.historyStats = stats
+                            }
+                            if stats == nil, self.historyRecorder.lastRecord == now {
+                                self.historyRecorder = previousRecorder
+                            }
+                            continuation.resume()
+                        }
+                    }
+                }
+            }
+        } onCancel: {
+            request.cancel()
+        }
     }
 
     public func setHistoryRecordingEnabled(_ enabled: Bool) {
         guard enabled != isRecordingHistory else { return }
         isRecordingHistory = enabled
+        pendingHistoryRecord?.cancel()
         historyGeneration &+= 1
         // Reset the gate so the next sample is recorded immediately after enabling.
         historyRecorder.reset()
         Task { await loadHistoryStats() }
     }
 
-    /// Parses the history log off the main thread; the card and the history window only need the summary.
+    /// Loads the summary on the same background queue as recording and clearing.
     public func loadHistoryStats() async {
         let store = historyStore
-        let stats = await Task.detached(priority: .utility) { store.stats }.value
-        guard !Task.isCancelled else { return }
-        historyStats = stats
+        let generation = historyGeneration
+        let request = SystemMetricsHistoryRequest()
+        await withTaskCancellationHandler {
+            await withCheckedContinuation { continuation in
+                historyQueue.async {
+                    let stats = store.stats
+                    DispatchQueue.main.async {
+                        MainActor.assumeIsolated {
+                            if generation == self.historyGeneration, !request.isCancelled {
+                                self.historyStats = stats
+                            }
+                            continuation.resume()
+                        }
+                    }
+                }
+            }
+        } onCancel: {
+            request.cancel()
+        }
     }
 
     public func historySections(
@@ -4097,29 +4155,41 @@ public final class SystemMonitorService: ObservableObject {
     ) async -> [SystemMetricsChartSection] {
         let store = historyStore
         let now = dateProvider()
-        return await Task.detached(priority: .utility) {
+        let generation = historyGeneration
+        let records = await withCheckedContinuation { continuation in
+            historyQueue.async {
+                continuation.resume(returning: store.records)
+            }
+        }
+        let sections = await Task.detached(priority: .utility) {
             SystemMetricsHistorySeriesBuilder.sections(
-                records: store.records,
+                records: records,
                 range: range,
                 now: now,
                 maximumPoints: maximumPoints
             )
         }.value
+        guard generation == historyGeneration, !Task.isCancelled else { return [] }
+        return sections
     }
 
     public func exportHistoryWorkbook(now: Date = Date()) async -> Data {
         let store = historyStore
+        let records = await withCheckedContinuation { continuation in
+            historyQueue.async {
+                continuation.resume(returning: store.records)
+            }
+        }
         return await Task.detached(priority: .utility) {
-            SystemMetricsHistoryExport.workbookData(
-                records: store.records,
-                modificationDate: now
-            )
+            SystemMetricsHistoryExport.workbookData(records: records, modificationDate: now)
         }.value
     }
 
     public func clearHistory() {
         historyGeneration &+= 1
-        historyStore.removeAll()
+        pendingHistoryRecord?.cancel()
+        let store = historyStore
+        historyQueue.async { store.removeAll() }
         historyRecorder.reset()
         historyStats = .empty
     }

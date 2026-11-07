@@ -1,3 +1,4 @@
+import Combine
 import Darwin
 import Foundation
 import Testing
@@ -385,6 +386,230 @@ private final class ControllableDateProvider: @unchecked Sendable {
 
 @MainActor
 struct SystemMonitorServiceTests {
+    @Test(arguments: [BlockingHistoryPersistence.Operation.load, .append])
+    func historyPersistenceKeepsMainActorResponsiveAndSampleCompletionOrdered(
+        operation: BlockingHistoryPersistence.Operation
+    ) async {
+        let persistence = BlockingHistoryPersistence(blockedOperation: operation)
+        defer { persistence.release() }
+        let now = Date(timeIntervalSince1970: 1_000)
+        let service = SystemMonitorService(
+            fileManager: MockFileManager(), dateProvider: { now },
+            publicIPProvider: StubPublicIPProvider(address: nil), privateIPv4AddressProvider: { nil },
+            hardwareInfoProvider: { .unavailable },
+            historyPersistence: persistence, isRecordingHistory: true
+        )
+        var firstReturned = false
+        let first = Task { @MainActor in
+            let snapshot = await service.sampleOnce()
+            firstReturned = true
+            return snapshot
+        }
+        for await _ in persistence.operationStarted { break }
+
+        #expect(persistence.mainThreadOperations.isEmpty)
+        #expect(!firstReturned)
+        #expect(service.snapshot?.sampledAt == now)
+        let (secondStarted, continuation) = AsyncStream<Void>.makeStream()
+        let second = Task { @MainActor in
+            continuation.yield(())
+            continuation.finish()
+            return await service.sampleOnce()
+        }
+        for await _ in secondStarted { break }
+        #expect(!firstReturned)
+
+        persistence.release()
+        let (firstSnapshot, secondSnapshot) = await (first.value, second.value)
+        #expect(firstSnapshot == secondSnapshot)
+        #expect(persistence.appendCount == 1)
+        #expect(service.historyStats.count == 1)
+        #expect(persistence.loadRecords().count == 1)
+    }
+
+    @Test
+    func clearingHistoryReturnsWhilePersistenceIsBlockedAndOrdersTheNextRead() async {
+        let persistence = BlockingHistoryPersistence(
+            seed: [SystemMetricsRecord(timestamp: Date(timeIntervalSince1970: 60))],
+            blockedOperation: .clear
+        )
+        defer { persistence.release() }
+        let service = SystemMonitorService(historyPersistence: persistence)
+        await service.loadHistoryStats()
+        #expect(service.historyStats.count == 1)
+
+        service.clearHistory()
+        #expect(service.historyStats == .empty)
+        for await _ in persistence.operationStarted { break }
+        #expect(persistence.mainThreadOperations.isEmpty)
+        var readReturned = false
+        let (readStarted, continuation) = AsyncStream<Void>.makeStream()
+        let read = Task { @MainActor in
+            continuation.yield(())
+            continuation.finish()
+            await service.loadHistoryStats()
+            readReturned = true
+        }
+        for await _ in readStarted { break }
+        #expect(!readReturned)
+
+        persistence.release()
+        await read.value
+        #expect(persistence.loadRecords().isEmpty)
+        #expect(service.historyStats == .empty)
+    }
+
+    @Test(arguments: ["stop", "cancel", "disable", "reenable", "clear"])
+    func historyLifecycleChangesCancelRecordsStillLoadingTheArchive(action: String) async {
+        let persistence = BlockingHistoryPersistence()
+        defer { persistence.release() }
+        let now = Date(timeIntervalSince1970: 1_000)
+        let service = SystemMonitorService(
+            fileManager: MockFileManager(), dateProvider: { now },
+            publicIPProvider: StubPublicIPProvider(address: nil), privateIPv4AddressProvider: { nil },
+            hardwareInfoProvider: { .unavailable },
+            historyPersistence: persistence, isRecordingHistory: true
+        )
+        let pending = Task { @MainActor in await service.sampleOnce() }
+        for await _ in persistence.operationStarted { break }
+        switch action {
+        case "stop": service.stop()
+        case "cancel": pending.cancel()
+        case "disable": service.setHistoryRecordingEnabled(false)
+        case "reenable":
+            service.setHistoryRecordingEnabled(false)
+            service.setHistoryRecordingEnabled(true)
+        default: service.clearHistory()
+        }
+        #expect(persistence.mainThreadOperations.isEmpty)
+        persistence.release()
+        _ = await pending.value
+        await service.loadHistoryStats()
+
+        #expect(persistence.persistedRecords.isEmpty)
+        #expect(persistence.appendCount == 0)
+        #expect(service.historyStats == .empty)
+        service.setHistoryRecordingEnabled(true)
+        await service.sampleOnce()
+        #expect(persistence.persistedRecords.map(\.timestamp) == [now])
+        #expect(service.historyStats.count == 1)
+    }
+
+    @Test(arguments: ["stop", "cancel", "disable", "reenable", "clear"])
+    func historyLifecycleChangesRespectWritesAlreadySubmittedToPersistence(action: String) async {
+        let original = SystemMetricsRecord(timestamp: Date(timeIntervalSince1970: 60))
+        let persistence = BlockingHistoryPersistence(seed: [original], blockedOperation: .append)
+        defer { persistence.release() }
+        let now = Date(timeIntervalSince1970: 1_000)
+        let service = SystemMonitorService(
+            fileManager: MockFileManager(), dateProvider: { now },
+            publicIPProvider: StubPublicIPProvider(address: nil), privateIPv4AddressProvider: { nil },
+            hardwareInfoProvider: { .unavailable },
+            historyPersistence: persistence, isRecordingHistory: true
+        )
+        await service.loadHistoryStats()
+        var publishedCounts: [Int] = []
+        let subscription = service.$historyStats.sink { publishedCounts.append($0.count) }
+        defer { subscription.cancel() }
+        let pending = Task { @MainActor in await service.sampleOnce() }
+        for await _ in persistence.operationStarted { break }
+        switch action {
+        case "stop": service.stop()
+        case "cancel": pending.cancel()
+        case "disable": service.setHistoryRecordingEnabled(false)
+        case "reenable":
+            service.setHistoryRecordingEnabled(false)
+            service.setHistoryRecordingEnabled(true)
+        default:
+            service.clearHistory()
+            publishedCounts.removeAll()
+        }
+        #expect(persistence.mainThreadOperations.isEmpty)
+        persistence.release()
+        _ = await pending.value
+        if action == "stop" || action == "cancel" {
+            #expect(service.historyStats.count == 1)
+        }
+        await service.loadHistoryStats()
+        #expect(persistence.appendCount == 1)
+
+        if action == "clear" {
+            #expect(persistence.persistedRecords.isEmpty)
+            #expect(service.historyStats == .empty)
+            #expect(publishedCounts.allSatisfy { $0 == 0 })
+            await service.sampleOnce()
+            #expect(persistence.persistedRecords.map(\.timestamp) == [now])
+            #expect(service.historyStats.count == 1)
+        } else {
+            #expect(persistence.persistedRecords.map(\.timestamp) == [original.timestamp, now])
+            #expect(service.historyStats.count == 2)
+        }
+    }
+
+    @Test
+    func cancellingBeforeHistorySubmissionRestoresThePreviousRecordingInterval() async {
+        let persistence = MemoryHistoryPersistence()
+        let clock = ControllableDateProvider(Date(timeIntervalSince1970: 1_000))
+        let service = SystemMonitorService(
+            fileManager: MockFileManager(), dateProvider: { clock.now() },
+            publicIPProvider: StubPublicIPProvider(address: nil), privateIPv4AddressProvider: { nil },
+            hardwareInfoProvider: { .unavailable },
+            historyPersistence: persistence, isRecordingHistory: true
+        )
+        await service.sampleOnce()
+        clock.advance(by: 60)
+        var pending: Task<SystemMetricsSnapshot, Never>?
+        let subscription = service.$snapshot.sink { snapshot in
+            if snapshot?.sampledAt == clock.now() { pending?.cancel() }
+        }
+        pending = Task { @MainActor in await service.sampleOnce() }
+        _ = await pending?.value
+        subscription.cancel()
+        #expect(persistence.loadRecords().count == 1)
+
+        clock.advance(by: -40)
+        await service.sampleOnce()
+        #expect(persistence.loadRecords().count == 1)
+        clock.advance(by: 40)
+        await service.sampleOnce()
+        #expect(persistence.loadRecords().map(\.timestamp.timeIntervalSince1970) == [1_000, 1_060])
+        #expect(service.historyStats.count == 2)
+    }
+
+    @Test
+    func cancelledRecordCompletionDoesNotRestoreTheGateAfterReenablingHistory() async {
+        let persistence = MemoryHistoryPersistence()
+        let clock = ControllableDateProvider(Date(timeIntervalSince1970: 1_000))
+        let service = SystemMonitorService(
+            fileManager: MockFileManager(), dateProvider: { clock.now() },
+            publicIPProvider: StubPublicIPProvider(address: nil), privateIPv4AddressProvider: { nil },
+            hardwareInfoProvider: { .unavailable },
+            historyPersistence: persistence, isRecordingHistory: true
+        )
+        await service.sampleOnce()
+        clock.advance(by: 60)
+        var pending: Task<SystemMetricsSnapshot, Never>?
+        let subscription = service.$snapshot.sink { snapshot in
+            guard snapshot?.sampledAt == clock.now() else { return }
+            pending?.cancel()
+            DispatchQueue.main.async {
+                MainActor.assumeIsolated {
+                    service.setHistoryRecordingEnabled(false)
+                    service.setHistoryRecordingEnabled(true)
+                }
+            }
+        }
+        pending = Task { @MainActor in await service.sampleOnce() }
+        _ = await pending?.value
+        subscription.cancel()
+        #expect(persistence.loadRecords().count == 1)
+
+        clock.advance(by: -40)
+        await service.sampleOnce()
+        #expect(persistence.loadRecords().map(\.timestamp.timeIntervalSince1970) == [1_000, 1_020])
+        #expect(service.historyStats.count == 2)
+    }
+
     @Test
     func defaultRecordingPreservesAllMergedHistoryAndBoundsChartPoints() async throws {
         let sampleCount = 64_000
