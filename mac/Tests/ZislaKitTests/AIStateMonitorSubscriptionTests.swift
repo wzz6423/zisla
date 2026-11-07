@@ -45,6 +45,62 @@ struct AIStateMonitorSubscriptionTests {
         #expect(try repository.load().usageSamples.reduce(0) { $0 + $1.totalTokens } == 15)
     }
 
+    @Test @MainActor func backgroundCursorAndMuseUsageJoinsOtherProvidersInOneDailyTotal() async throws {
+        let root = FileManager.default.temporaryDirectory.appendingPathComponent("zisla-daily-background-usage-\(UUID())")
+        defer { try? FileManager.default.removeItem(at: root) }
+        let now = Date(timeIntervalSince1970: 1_910_000_000)
+        let calendar = Calendar.current
+        let sessions = root.appendingPathComponent("muse")
+        try FileManager.default.createDirectory(at: sessions, withIntermediateDirectories: true)
+        let event: [String: Any] = [
+            "schema_version": 1, "record_type": "event", "payload_type": "runtime.session",
+            "payload_schema_version": 1, "recorded_at": Int64(now.timeIntervalSince1970 * 1_000_000),
+            "id": "fixture-muse", "payload": ["event": ["kind": "model_completed",
+                "usage": ["input_tokens": 100, "output_tokens": 20, "cache_read_tokens": 30]]],
+        ]
+        try (JSONSerialization.data(withJSONObject: event) + Data([10]))
+            .write(to: sessions.appendingPathComponent("session.jsonl"))
+        let repository = AIStateRepository(directoryURL: root.appendingPathComponent("zisla"))
+        try repository.recordUsage(AIUsageSample(provider: .claude, timestamp: now, inputTokens: 3, outputTokens: 2))
+        let localUsage = AIUsageLogDetector(museSessionsDirectory: sessions, scanInterval: 0, enabledProviders: [.muse])
+        let subscription = SubscriptionGate(result: .init(usageSamples: [
+            AIUsageSample(sourceID: "fixture-cursor", provider: .cursor, timestamp: now, inputTokens: 10, outputTokens: 5),
+        ]))
+        let monitor = AIStateMonitor(directoryURL: repository.directoryURL, activityDetectors: [],
+            usageDetectors: [localUsage], subscriptionUsageDetector: subscription, now: { now })
+        defer { monitor.stop() }
+
+        monitor.reload(includeUsageSamples: false)
+        #expect(try repository.load().usageSamples.map(\.totalTokens) == [125])
+        monitor.refresh()
+        #expect(await subscription.waitForCalls(1))
+        await subscription.release()
+        #expect(await waitFor { (try? repository.load().usageSamples.map(\.totalTokens)) == [140] })
+        #expect(monitor.usageHistoryState == .idle && monitor.state.usageSamples.isEmpty,
+            "Background collection must persist consumption without loading panel history")
+        let stored = try repository.load().usageSamples
+        #expect(stored.count == 1, "All providers must contribute to one daily total")
+        let daily = try #require(stored.first)
+        #expect(daily.timestamp == calendar.startOfDay(for: now))
+        #expect(daily.inputTokens == 113 && daily.outputTokens == 27)
+
+        monitor.reload(includeUsageSamples: false)
+        #expect(try repository.load().usageSamples == stored, "Repeated local scans must not double-count consumption")
+        monitor.loadUsageHistory()
+        #expect(await waitFor { monitor.usageHistoryState == .loaded && monitor.state.usageSamples == stored })
+        let trend = AIUsageAnalytics.dailyUsageSeries(samples: monitor.state.usageSamples,
+            endingAt: now, days: 1, calendar: calendar)
+        #expect(trend.map(\.totalTokens) == [140])
+        let today = AIUsageAnalytics.contributionCalendar(samples: monitor.state.usageSamples,
+            endingAt: now, weeks: 1, calendar: calendar).flatMap { $0 }.compactMap { $0 }.first {
+                calendar.isDate($0.date, inSameDayAs: now)
+            }
+        #expect(today?.tokens == 140)
+        monitor.unloadUsageHistory()
+        #expect(monitor.state.usageSamples.isEmpty)
+        #expect(try repository.load().usageSamples == stored)
+    }
+
     @Test @MainActor func stopCancelsPendingFetchAndPreventsLatePublicationOrPersistence() async throws {
         let root = FileManager.default.temporaryDirectory.appendingPathComponent("zisla-subscription-cancel-\(UUID())")
         defer { try? FileManager.default.removeItem(at: root) }
