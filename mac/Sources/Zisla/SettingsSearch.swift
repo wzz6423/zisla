@@ -164,7 +164,12 @@ enum SettingsSearchIndex {
         rows(.mail, ["新邮件展示"])
         entry(.mail, "邮件账户", anchor: .group("邮件"))
         rows(.keyboardSound, ["键盘音色", "键盘音量", "播放键盘回弹音", "自然音高变化", "记录本地输入统计"])
-        rows(.download, ["默认下载目录", ManagedTool.ytDLP.displayName, ManagedTool.libreOffice.displayName])
+        rows(.download, [ManagedTool.ytDLP.displayName, ManagedTool.libreOffice.displayName])
+        for location in SaveLocation.allCases {
+            entry(.saveLocations, location.title, anchor: .row(location.title),
+                  keywords: ["默认保存位置", "更改保存位置"]
+                    + (location == .download ? ["默认下载目录", "下载目录"] : []))
+        }
         entry(.weather, "地点", anchor: .group("地点"), keywords: ["城市、区县或地区", "搜索地区"])
         rows(.weather, ["天气数据"])
         rows(.networkProxy, ["代理链接", "启用本地代理", "代理状态"])

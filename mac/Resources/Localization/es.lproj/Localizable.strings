@@ -3318,5 +3318,9 @@
 "清理范围" = "Alcance de la limpieza";
 "仅可信" = "Solo elementos fiables";
 "全部（包含需人工复核）" = "Todos (incluidos los que requieren revisión)";
+"默认保存位置" = "Ubicaciones de guardado predeterminadas";
+"分别设置各类内容的默认保存位置。" = "Establecer la ubicación de guardado predeterminada para cada tipo de contenido.";
+"管理下载所需组件。" = "Gestionar los componentes necesarios para las descargas.";
+"更改 %@ 的保存位置" = "Cambiar la ubicación de guardado de %@";
 
 "本地优先的原生笔记应用" = "Aplicación nativa de notas que prioriza el almacenamiento local";

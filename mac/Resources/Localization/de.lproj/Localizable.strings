@@ -3319,5 +3319,9 @@
 "清理范围" = "Bereinigungsumfang";
 "仅可信" = "Nur vertrauenswürdige Einträge";
 "全部（包含需人工复核）" = "Alle (einschließlich zu prüfender Einträge)";
+"默认保存位置" = "Standard-Speicherorte";
+"分别设置各类内容的默认保存位置。" = "Den Standard-Speicherort für jeden Inhaltstyp festlegen.";
+"管理下载所需组件。" = "Die für Downloads erforderlichen Komponenten verwalten.";
+"更改 %@ 的保存位置" = "Speicherort für %@ ändern";
 
 "本地优先的原生笔记应用" = "Native Notiz-App mit vorrangig lokaler Speicherung";

@@ -3318,5 +3318,9 @@
 "清理范围" = "Bereik van opruimen";
 "仅可信" = "Alleen vertrouwde onderdelen";
 "全部（包含需人工复核）" = "Alles (inclusief onderdelen die controle vereisen)";
+"默认保存位置" = "Standaardopslaglocaties";
+"分别设置各类内容的默认保存位置。" = "Stel de standaardopslaglocatie in voor elk type inhoud.";
+"管理下载所需组件。" = "Beheer de onderdelen die nodig zijn voor downloads.";
+"更改 %@ 的保存位置" = "Opslaglocatie voor %@ wijzigen";
 
 "本地优先的原生笔记应用" = "Native notitie-app die lokale opslag vooropstelt";

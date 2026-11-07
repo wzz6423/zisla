@@ -3318,5 +3318,9 @@
 "清理范围" = "Cakupan pembersihan";
 "仅可信" = "Hanya item tepercaya";
 "全部（包含需人工复核）" = "Semua (termasuk yang perlu ditinjau)";
+"默认保存位置" = "Lokasi Penyimpanan Default";
+"分别设置各类内容的默认保存位置。" = "Atur lokasi penyimpanan default untuk setiap jenis konten.";
+"管理下载所需组件。" = "Kelola komponen yang diperlukan untuk unduhan.";
+"更改 %@ 的保存位置" = "Ubah lokasi penyimpanan untuk %@";
 
 "本地优先的原生笔记应用" = "Aplikasi catatan native yang mengutamakan penyimpanan lokal";
