@@ -4656,7 +4656,7 @@ struct SettingsSidebar: View {
         } label: {
             HStack(spacing: 10) {
                 Image(systemName: section.symbol)
-                    .font(.system(size: 15, weight: .medium))
+                    .font(.system(size: section == .keyboardSound ? 13 : 15, weight: .medium))
                     .foregroundStyle(.white)
                     .frame(width: 24, height: 24)
                     .background(section.iconColor, in: RoundedRectangle(cornerRadius: 6, style: .continuous))
@@ -4670,15 +4670,10 @@ struct SettingsSidebar: View {
             .contentShape(Rectangle())
         }
         .buttonStyle(PressableStyle(hoverScale: 1.018, pressedScale: 0.965))
-        .foregroundStyle(input.selection == section ? Color.white : Color.primary)
+        .foregroundStyle(input.selection == section ? Color.accentColor : Color.primary)
         .background {
             if input.selection == section {
-                RoundedRectangle(cornerRadius: 8, style: .continuous)
-                    .fill(Color(nsColor: .selectedContentBackgroundColor))
-                    .overlay {
-                        RoundedRectangle(cornerRadius: 8, style: .continuous)
-                            .fill(.black.opacity(0.08))
-                    }
+                SettingsTintedBackground(cornerRadius: 8)
                     .matchedGeometryEffect(id: "settings-section-selection", in: sectionSelectionNamespace)
             }
         }
