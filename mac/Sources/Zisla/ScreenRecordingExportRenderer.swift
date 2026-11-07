@@ -10,6 +10,7 @@ struct RecordingExportZoomState: Equatable, Sendable {
 }
 
 struct RecordingExportEffectTrack {
+    static let trailDuration = 0.6
     private let pointers: [RecordingPointer]
     private let clicks: [RecordingPointer]
     private let manualZooms: [RecordingZoom]
@@ -51,6 +52,16 @@ struct RecordingExportEffectTrack {
                                         key: \.time)
         let upper = recordingUpperBound(clicks, value: time, key: \.time)
         return clicks[lower..<upper]
+    }
+
+    func trail(at time: Double, slice: RecordingExportSlice?) -> [RecordingPointer] {
+        let start = max(time - Self.trailDuration, slice?.sourceStart ?? 0)
+        // A fixed sample budget keeps dense and week-long pointer tracks bounded per frame.
+        return (0...36).compactMap { index in
+            let sampleTime = start + (time - start) * Double(index) / 36
+            guard let point = pointer(at: sampleTime, slice: slice) else { return nil }
+            return RecordingPointer(time: sampleTime, x: point.x, y: point.y)
+        }
     }
 
     func zoom(at time: Double) -> RecordingExportZoomState {
@@ -185,6 +196,12 @@ final class RecordingExportRenderer {
         let zoom = effects.zoom(at: sourceTime)
         let viewport = Self.viewport(crop: crop, zoom: zoom, source: normalized.extent.size)
         var visible = normalized.cropped(to: viewport)
+        if project.edits.showCursor, project.edits.cursorTrail == true,
+           let trail = try Self.trailImage(effects.trail(at: sourceTime, slice: slice), sourceTime: sourceTime,
+                source: normalized.extent.size, viewport: viewport, screen: screenRect, fill: screenRect == canvas,
+                lineWidth: cursor.extent.height * 0.18) {
+            visible = trail.composited(over: visible).cropped(to: viewport)
+        }
         if project.edits.clickEffects {
             for click in effects.recentClicks(at: sourceTime, slice: slice) {
                 let location = CGPoint(x: click.x * normalized.extent.width,
@@ -245,14 +262,18 @@ final class RecordingExportRenderer {
     }
 
     static func fit(_ image: CIImage, from source: CGRect, to rect: CGRect, fill: Bool) -> CIImage {
+        let transform = fitTransform(from: source, to: rect, fill: fill)
+        return image.transformed(by: transform).cropped(to: rect)
+    }
+
+    private static func fitTransform(from source: CGRect, to rect: CGRect, fill: Bool) -> CGAffineTransform {
         let scaleX = rect.width / source.width
         let scaleY = rect.height / source.height
         let scale = fill ? max(scaleX, scaleY) : min(scaleX, scaleY)
         // Keep the fractional viewport in one transform because Core Image rounds intermediate extents outward.
-        let transform = CGAffineTransform(a: scale, b: 0, c: 0, d: scale,
+        return CGAffineTransform(a: scale, b: 0, c: 0, d: scale,
                                           tx: rect.midX - source.midX * scale,
                                           ty: rect.midY - source.midY * scale)
-        return image.transformed(by: transform).cropped(to: rect)
     }
 
     private static func masked(_ image: CIImage, mask: CIImage, canvas: CGRect) -> CIImage {
@@ -322,6 +343,29 @@ final class RecordingExportRenderer {
         context.strokeEllipse(in: CGRect(x: 2, y: 2, width: side - 4, height: side - 4))
         return try bitmapImage(context).transformed(by: CGAffineTransform(translationX: center.x - side / 2,
                                                                          y: center.y - side / 2))
+    }
+
+    private static func trailImage(_ samples: [RecordingPointer], sourceTime: Double, source: CGSize,
+                                   viewport: CGRect, screen: CGRect, fill: Bool, lineWidth: Double) throws -> CIImage? {
+        let transform = fitTransform(from: viewport, to: screen, fill: fill)
+        let points = samples.map { CGPoint(x: $0.x * source.width, y: (1 - $0.y) * source.height).applying(transform) }
+        let segments = zip(points.indices, points.indices.dropFirst())
+        let bounds = points.reduce(CGRect.null) { $0.union(CGRect(origin: $1, size: .zero)) }
+            .insetBy(dx: -lineWidth, dy: -lineWidth).intersection(screen).integral
+        guard !bounds.isEmpty else { return nil }
+        let context = try bitmap(size: bounds.size)
+        context.translateBy(x: -bounds.minX, y: -bounds.minY)
+        context.setLineWidth(lineWidth)
+        for (start, end) in segments {
+            let opacity = 1 - (sourceTime - samples[end].time) / RecordingExportEffectTrack.trailDuration
+            context.setStrokeColor(CGColor(red: 0.2, green: 0.75, blue: 1, alpha: opacity))
+            context.move(to: points[start])
+            context.addLine(to: points[end])
+            context.strokePath()
+        }
+        // Rasterize at output resolution so zoomed trails do not become subpixel source strokes.
+        return try bitmapImage(context).transformed(by: .init(translationX: bounds.minX, y: bounds.minY))
+            .transformed(by: transform.inverted())
     }
 
     static func annotationImage(_ annotation: RecordingAnnotation, canvas: CGRect,

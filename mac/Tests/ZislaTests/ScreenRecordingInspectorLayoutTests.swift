@@ -122,6 +122,43 @@ struct ScreenRecordingInspectorLayoutTests {
         #expect(!fixture.window.isVisible && !reference.window.isVisible)
     }
 
+    @Test(arguments: [AppLanguage.simplifiedChinese, .english, .arabic])
+    func cursorTrailToggleEditsTheProjectWithoutChangingItsDefaultOnPresentation(_ language: AppLanguage) async throws {
+        let previous = UserDefaults.standard.volatileDomain(forName: UserDefaults.argumentDomain)
+        var arguments = previous
+        arguments[AppLocalization.defaultsKey] = language.rawValue
+        UserDefaults.standard.setVolatileDomain(arguments, forName: UserDefaults.argumentDomain)
+        defer { UserDefaults.standard.setVolatileDomain(previous, forName: UserDefaults.argumentDomain) }
+        let media = try RecordingMultitrackTestFixture()
+        let model = try media.model()
+        defer { model.shutdown(); media.remove() }
+        let project = media.project()
+        model.install(project, directory: media.directory)
+        await model.previewTask?.value
+        let release = EnhancedAccessibilityTestScope.acquire()
+        defer { release() }
+        let fixture = Fixture(ScreenRecordingEffectsView(model: model).frame(width: 296), language: language)
+        defer { fixture.window.contentView = nil; fixture.window.close() }
+        await fixture.settle()
+        let disclosure = try #require(fixture.control(AppLocalization.text("光标"), role: .disclosureTriangle))
+        try fixture.press(disclosure)
+        await fixture.settle()
+        let toggle = try #require(fixture.element("screenRecording.cursorTrail"))
+        let label = try #require((toggle as? NSObject)?.value(forKey: "accessibilityLabel") as? String)
+        #expect(label == AppLocalization.string("鼠标轨迹", language: language))
+        #expect(model.project == project && !model.isDirty && !model.canUndo,
+            "Presenting the cursor controls must not enable the trail or mark the project dirty")
+        try fixture.press(toggle)
+        await model.previewTask?.value
+        await fixture.settle()
+        #expect(model.project?.edits.cursorTrail == true && model.canUndo && model.isDirty)
+        model.undo()
+        await model.previewTask?.value
+        await fixture.settle()
+        #expect(model.project == project)
+        #expect(!fixture.window.isVisible, "The isolated inspector test must never display a user-facing window")
+    }
+
     @Test
     func collapsedSectionsLeaveThePreviewSpaceForTheTimeline() async {
         let expanded = Fixture(section(expanded: true), language: .english)

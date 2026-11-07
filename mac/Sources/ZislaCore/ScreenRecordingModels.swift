@@ -240,6 +240,7 @@ public struct RecordingEdits: Codable, Equatable, Sendable {
     public var cursorSize: Double
     public var showCursor: Bool
     public var clickEffects: Bool
+    public var cursorTrail: Bool?
     public var autoZoom: Bool
     public var cameraPosition: RecordingCameraPosition
     public var cameraSize: Double
@@ -271,7 +272,7 @@ public struct RecordingEdits: Codable, Equatable, Sendable {
     public init(segments: [RecordingSegment] = [], zoomClips: [RecordingZoom] = [],
                 background: RecordingBackground = .gradient, padding: Double = 0,
                 cornerRadius: Double = 0, shadow: Double = 0, cursorSize: Double = 1.5,
-                showCursor: Bool = true, clickEffects: Bool = true, autoZoom: Bool = false,
+                showCursor: Bool = true, clickEffects: Bool = true, cursorTrail: Bool? = nil, autoZoom: Bool = false,
                 cameraPosition: RecordingCameraPosition = .bottomRight, cameraSize: Double = 0.25,
                 cameraMirrored: Bool = true, cameraRound: Bool = true,
                 cameraAspectRatio: RecordingCameraAspectRatio? = nil, cameraCornerRadius: Double? = nil,
@@ -288,6 +289,7 @@ public struct RecordingEdits: Codable, Equatable, Sendable {
         self.cursorSize = cursorSize
         self.showCursor = showCursor
         self.clickEffects = clickEffects
+        self.cursorTrail = cursorTrail
         self.autoZoom = autoZoom
         self.cameraPosition = cameraPosition
         self.cameraSize = cameraSize

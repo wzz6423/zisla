@@ -7,6 +7,40 @@ struct ScreenRecordingModelsTests {
         .init(name: "Demo", videoFile: "screen.mp4", duration: 12, width: 1_920, height: 1_080)
     }
 
+    @Test(arguments: [nil, false, true] as [Bool?])
+    func cursorTrailChoiceRoundTripsWithoutChangingOtherEdits(_ choice: Bool?) throws {
+        var source = project()
+        source.edits.cursorTrail = choice
+        let decoded = try JSONDecoder().decode(ScreenRecordingProject.self, from: JSONEncoder().encode(source))
+        try decoded.validate()
+        #expect(decoded == source, "Saving and reopening must preserve the trail choice and all other edits")
+    }
+
+    @Test
+    func legacyProjectWithoutCursorTrailLoadsWithTheEffectDisabled() throws {
+        var source = project()
+        source.edits.cursorTrail = true
+        var legacy = try #require(JSONSerialization.jsonObject(with: JSONEncoder().encode(source)) as? [String: Any])
+        var edits = try #require(legacy["edits"] as? [String: Any])
+        edits.removeValue(forKey: "cursorTrail")
+        legacy["edits"] = edits
+        let decoded = try JSONDecoder().decode(ScreenRecordingProject.self,
+            from: JSONSerialization.data(withJSONObject: legacy))
+        source.edits.cursorTrail = nil
+        try decoded.validate()
+        #expect(decoded == source, "Older manifests must load without a version bump or enabled trail")
+    }
+
+    @Test(arguments: [#""true""#, "1", "[false]"])
+    func invalidCursorTrailValuesAreRejected(_ literal: String) throws {
+        var document = try #require(JSONSerialization.jsonObject(with: JSONEncoder().encode(project())) as? [String: Any])
+        var edits = try #require(document["edits"] as? [String: Any])
+        edits["cursorTrail"] = try JSONSerialization.jsonObject(with: Data(literal.utf8), options: .fragmentsAllowed)
+        document["edits"] = edits
+        let data = try JSONSerialization.data(withJSONObject: document)
+        #expect(throws: DecodingError.self) { try JSONDecoder().decode(ScreenRecordingProject.self, from: data) }
+    }
+
     @Test(arguments: [false, true])
     func newProjectPreservesFullSourceAndRoundTrips(fromRecording: Bool) throws {
         let source = fromRecording
