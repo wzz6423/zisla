@@ -89,13 +89,13 @@ export const es = createCatalog({
       clipboard: {
         name: 'Portapapeles',
         caption:
-          'Consulta el historial del portapapeles dentro de la isla y filtra por imagen, URL, ruta o tipo de archivo y mira cuándo se copió cada entrada. Envía una entrada a Notas rápidas, márcala como favorita o elimínala.',
+          'Consulta el historial del portapapeles dentro de la isla y filtra por imagen, URL, ruta o tipo de archivo y mira cuándo se copió cada entrada. Envía una entrada a Notas rápidas, márcala como favorita o elimínala. Puedes borrar automáticamente el historial de más de 7, 15 o 30 días conservando los favoritos. El borrado automático está desactivado de forma predeterminada.',
         points: ['Historial dentro de la isla', 'Filtrado por tipo', 'Notas rápidas y favoritos'],
       },
       aiMonitor: {
         name: 'Monitor de IA',
         caption:
-          'Detecta automáticamente actividad de CLI, apps de escritorio e IDE compatibles y muestra tareas, estado, tendencias de tokens y un mapa de contribuciones. Solo analiza eventos estructurados y nunca lee conversaciones. Se añade detección de tareas de Cursor, junto con uso numérico y cuotas de suscripción disponibles de Cursor y Muse Code; las ejecuciones largas de herramientas en Cursor siguen visibles.',
+          'Detecta automáticamente actividad de CLI, apps de escritorio e IDE compatibles y muestra tareas, estado, tendencias de tokens y un mapa de contribuciones. Solo analiza eventos estructurados y nunca lee conversaciones. Se añade detección de tareas de Cursor, junto con uso diario numérico, sin mostrar cuotas restantes de Cursor y Muse Code; las ejecuciones largas de herramientas en Cursor siguen visibles.',
         points: ['Tareas agrupadas entre herramientas', 'Tendencias de consumo de tokens', 'Nunca lee prompts ni respuestas'],
       },
       keyboardSound: {
@@ -107,7 +107,7 @@ export const es = createCatalog({
       download: {
         name: 'Descargador',
         caption:
-          'Pega un enlace o deja que zisla lo detecte en el portapapeles al activarlo. Elige vídeo o audio y descarga en la carpeta predeterminada o en otra. Los enlaces compatibles muestran icono de origen, progreso en vivo y estado final. Descargas, grabaciones y capturas comparten esta ubicación de guardado.',
+          'Pega un enlace o deja que zisla lo detecte en el portapapeles al activarlo. Elige vídeo o audio y descarga en la carpeta predeterminada o en otra. Los enlaces compatibles muestran icono de origen, progreso en vivo y estado final. Elige la carpeta de descargas en Ajustes → Ubicación de guardado, separada de capturas y grabaciones. Los enlaces Bilibili descargan la parte elegida.',
         points: ['Modos vídeo / audio', 'Carpeta predeterminada o propia', 'Origen y progreso en vivo'],
       },
       agenda: {
@@ -125,7 +125,7 @@ export const es = createCatalog({
       quickNotes: {
         name: 'Notas rápidas',
         caption:
-          'Usa la app Notas del sistema para ver, editar, crear y eliminar notas con vista previa Markdown en vivo, y saltar directamente a las primeras nueve notas con Command+1 a 9. Los borradores se escriben de nuevo en Notas automáticamente.',
+          'Usa la app Notas del sistema para ver, editar, crear y eliminar notas con vista previa Markdown en vivo, y saltar directamente a las primeras nueve notas con Command+1 a 9. Los borradores se escriben de nuevo en Notas automáticamente. Previsualiza adjuntos manuscritos y edita el texto anterior o posterior conservando los originales.',
         points: ['Datos en Notas', 'Editor Markdown', 'Borradores guardados automáticamente'],
       },
       volumeMixer: {
@@ -142,7 +142,7 @@ export const es = createCatalog({
       system: {
         name: 'Estado del sistema',
         caption:
-          'Consulta CPU, GPU, memoria, disco, red y ventiladores; lee la temperatura SMART de NVMe cuando el hardware la ofrece, guarda un historial por minuto que puedes graficar para cualquier periodo y exportar a .xlsx. Analiza cachés de apps y de usuario de Apple, registros y archivos de preferencias residuales. Revisa los elementos, mueve los seleccionados a la Papelera y consulta los resultados. Consulta carga, salud, ciclos, temperatura y capacidad de este Mac, además del nivel de batería de los dispositivos cercanos que expone el sistema. Las direcciones IPv4 e IPv6 públicas se muestran por separado. El historial se conserva de forma predeterminada hasta que lo borres.',
+          'Consulta CPU, GPU, memoria, disco, red, ventiladores y temperatura NVMe SMART disponible. Grafica el historial por minuto de cualquier período o expórtalo como .xlsx; se conserva hasta que lo borres. Revisa la carga, salud, ciclos, temperatura y capacidad de la batería del Mac y los niveles de dispositivos cercanos, con IPv4 e IPv6 públicas separadas. Revisa cachés, registros, preferencias residuales y carpetas de trabajo de IA sin sesiones conservadas antes de moverlas a la Papelera. La limpieza opcional se ejecuta cada 7, 15 o 30 días para elementos fiables o todos los elementos procesables, incluidos los que requieren revisión; viene desactivada.',
         points: ['Monitorización a nivel de chip', 'Gráficas de historial y exportación .xlsx', 'Revisa antes de mover a la Papelera'],
       },
     },
@@ -165,7 +165,7 @@ export const es = createCatalog({
       },
       dailyBriefing: {
         title: 'Tu día en un informe diario',
-        description: 'Elige entre ocho plantillas, selecciona métricas de uso, escritura, sistema y actividad zisla, y revisa la vista previa. Exporta un PNG manualmente o a una hora diaria. El historial de Tiempo de Uso se incluye si está activado y disponible; los datos ausentes no se presentan como un cero medido.',
+        description: 'Elige entre ocho plantillas, selecciona métricas de uso, escritura, sistema y actividad zisla, y revisa la vista previa. Exporta un PNG manualmente o a una hora diaria. El historial de Tiempo de Uso se incluye si está activado y disponible; los datos ausentes no se presentan como un cero medido. Elige una carpeta de exportación independiente en Ajustes → Ubicación de guardado.',
         detail: '8 plantillas · Contenido a elegir · Vista previa y exportación PNG programada',
       },
       userCare: {
@@ -180,8 +180,8 @@ export const es = createCatalog({
       },
       recording: {
         title: 'Graba y edita en el estudio',
-        description: 'Graba pantalla, ventana o región con audio del sistema, micrófono y cámara opcionales. Edita vídeo, audio, imágenes y texto en varias pistas, añade animaciones, zooms y subtítulos y revisa una vista previa nítida. Elige proporción original, 16:9, 9:16, 1:1 o 4:3. Exporta vídeo, GIF, Live Photo o audio; algunos formatos requieren FFmpeg. Las propuestas de IA opcionales se revisan antes de aplicarlas. Las grabaciones usan la ubicación definida en los ajustes de descarga.',
-        detail: 'Edición multipista · Proporciones y vista previa · Vídeo, GIF, Live Photo y audio',
+        description: 'Graba una pantalla, ventana o zona con audio del sistema, micrófono y cámara opcionales. Edita vídeo, audio, imágenes y texto en varias pistas con animaciones, zooms y subtítulos. Ajusta suavizado de piel, brillo, afinamiento de cara y cuerpo, efectos de voz y estelas suaves del cursor en el color elegido. Reproduce el montaje en el estudio. Elige proporción original, 16:9, 9:16, 1:1 o 4:3; exporta vídeo, GIF, Live Photo o audio. Algunos formatos necesitan FFmpeg. Revisa las propuestas opcionales de IA antes de aplicarlas. La carpeta de grabación se elige por separado en Ajustes → Ubicación de guardado.',
+        detail: 'Efectos de retrato y voz · Estelas de cursor en color · Reproducción y exportación multipista',
       },
       permissions: {
         title: 'Permisos del sistema en un lugar',
@@ -203,7 +203,7 @@ export const es = createCatalog({
       capture: {
         title: 'Capturas, capturas con desplazamiento y fijado',
         description:
-          'Captura, fija o une capturas con desplazamiento usando atajos personalizables. Resalta, extrae zonas de imagen, redondea esquinas y conserva anotaciones al exportar. Reconoce y copia texto, tradúcelo y copia el resultado, o exporta tablas reconocidas como .xlsx. Guarda capturas en la bandeja. Los ajustes comprueban conflictos con voz y acciones rápidas. El diálogo de guardado se abre en la carpeta de descarga actual.',
+          'Captura, fija o une capturas con desplazamiento usando atajos personalizables. Resalta, extrae zonas de imagen, redondea esquinas y conserva anotaciones al exportar. Reconoce y copia texto, tradúcelo y copia el resultado, o exporta tablas reconocidas como .xlsx. Guarda capturas en la bandeja. Los ajustes comprueban conflictos con voz y acciones rápidas. El diálogo se abre en la carpeta de capturas de Ajustes → Ubicación de guardado. Las capturas fijadas permanecen al volver a capturar.',
         detail: 'Resaltar y extraer · Reconocer, traducir y copiar · Esquinas redondas y .xlsx',
       },
       voice: {
@@ -227,7 +227,7 @@ export const es = createCatalog({
       copyAssistant: {
         title: 'Acciones rápidas y siguientes pasos',
         description:
-          'Al activarlo, previsualiza texto, enlaces, archivos o imágenes copiados en una barra independiente y propone abrir, mostrar en Finder, buscar, traducir, calcular o guardar, solo después de tu confirmación. Abre la carpeta del archivo mediante acciones rápidas tras una descarga del navegador o una transferencia AirDrop. Admite las carpetas de Chrome predeterminadas y elegidas, con un interruptor independiente del progreso de descarga. Las IP tienen acciones separadas para consultar y abrir el enlace. La conversión reconoce unidades monetarias menores y el catálogo incluye Emoji 18.0.',
+          'Al activarlo, previsualiza texto, enlaces, archivos o imágenes copiados en una barra independiente y propone abrir, mostrar en Finder, buscar, traducir, calcular o guardar, solo después de tu confirmación. Abre la carpeta del archivo mediante acciones rápidas tras una descarga del navegador o una transferencia AirDrop. Admite las carpetas de Chrome predeterminadas y elegidas, con un interruptor independiente del progreso de descarga. Las IP tienen acciones separadas para consultar y abrir el enlace. La conversión reconoce unidades monetarias menores y el catálogo incluye Emoji 18.0. El texto y las imágenes guardados usan la carpeta independiente de Acciones rápidas en Ajustes → Ubicación de guardado.',
         detail: 'Activación opcional · Reconocimiento local · Command+N por defecto',
       },
       aiManagement: {
@@ -250,7 +250,7 @@ export const es = createCatalog({
       recommendedTools: {
         title: 'Apps recomendadas',
         description:
-          'Descubre OpenScreen para grabar la pantalla y editar vídeos, y DockDoor para previsualizar ventanas del Dock y cambiar de app. Son aplicaciones de terceros que se instalan por separado.',
+          'Descubre OpenScreen para grabación y edición de vídeo, DockDoor para previsualizar ventanas y cambiar de app, y Quiet.md para notas locales. Son apps de terceros que se instalan por separado.',
         detail: 'Descubre herramientas de escritorio · Apps de terceros · Instalación aparte',
       },
     },
@@ -325,6 +325,17 @@ export const es = createCatalog({
   },
   changelog: {
     releaseNotes: {
+      'v0.1.22': [
+        'El estudio añade suavizado de piel, brillo, afinamiento de cara y cuerpo, preajustes de voz regulables y monitorización opcional del micrófono. Ajusta los efectos antes de grabar y durante la edición.',
+        'Las estelas suaves del cursor permiten elegir el color. La reproducción en el estudio muestra el resultado editado con sus pistas, efectos y audio.',
+        'Ajustes → Ubicación de guardado separa descargas, capturas, grabaciones, Acciones rápidas y resúmenes diarios. La actualización conserva las ubicaciones anteriores y luego cada carpeta se cambia de forma independiente.',
+        'La limpieza opcional mueve elementos a la Papelera cada 7, 15 o 30 días. Elige elementos fiables o todos los procesables, incluidos los que requieren revisión; viene desactivada. La limpieza de disco añade revisión de carpetas de IA sin sesiones conservadas, protegiendo sesiones guardadas y carpetas nuevas.',
+        'El historial del portapapeles puede borrar automáticamente entradas de más de 7, 15 o 30 días conservando favoritos. El borrado automático viene desactivado.',
+        'Notas rápidas previsualiza adjuntos manuscritos y permite editar el texto anterior o posterior mediante Notas, conservando los adjuntos originales.',
+        'El monitor de IA oculta las cuotas restantes y conserva el uso diario, con mejoras en el desplazamiento de gráficos y etiquetas de meses. Los ajustes de batería se reúnen en Estado del sistema.',
+        'Quiet.md se incorpora a las apps recomendadas para notas locales, con instalación y gestión desde Ajustes.',
+        'Bilibili respeta la parte de vídeo elegida y admite más formatos de enlace. La eliminación del calendario afecta a la ocurrencia recurrente seleccionada. Las capturas fijadas permanecen entre capturas, con etiquetas de herramientas más claras e indicadores de tamaño más fiables.',
+      ],
       'v0.1.21': [
         'La monitorización del sistema conserva de forma predeterminada todo el historial por minuto, tanto existente como nuevo, hasta que lo borres. Siguen disponibles las gráficas por periodo y la exportación .xlsx.',
         'Descargas, grabaciones y capturas comparten una ubicación. Los diálogos para guardar capturas se abren en la carpeta de descarga actual; se ha eliminado el ajuste duplicado de ubicación de las grabaciones.',
@@ -403,7 +414,7 @@ export const es = createCatalog({
       },
       storage: {
         question: '¿Dónde guarda zisla sus datos?',
-        answer: 'Los datos locales están en ~/Library/Application Support/zisla/. Las estadísticas de escritura se guardan aparte en ~/Library/Application Support/zisla/typing-stats.sqlite3. Notas rápidas usa Notas.',
+        answer: 'Los datos locales están en ~/Library/Application Support/zisla/. Las estadísticas de escritura se guardan aparte en ~/Library/Application Support/zisla/typing-stats.sqlite3. Notas rápidas usa Notas. Ajustes → Ubicación de guardado ofrece carpetas independientes para descargas, capturas, grabaciones, Acciones rápidas y resúmenes diarios. Al actualizar conservan la carpeta compartida anterior y después puedes cambiarlas por separado.',
       },
     },
   },

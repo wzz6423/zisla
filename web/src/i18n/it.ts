@@ -89,13 +89,13 @@ export const it = createCatalog({
       clipboard: {
         name: 'Appunti',
         caption:
-          'Sfoglia la cronologia degli appunti nell’isola e filtra per immagine, URL, percorso o tipo di file e guarda quando ogni elemento è stato copiato. Invia un elemento a Note rapide, fissalo tra i preferiti o eliminalo.',
+          'Sfoglia la cronologia degli appunti nell’isola e filtra per immagine, URL, percorso o tipo di file e guarda quando ogni elemento è stato copiato. Invia un elemento a Note rapide, fissalo tra i preferiti o eliminalo. Puoi eliminare automaticamente la cronologia più vecchia di 7, 15 o 30 giorni mantenendo i preferiti. L’eliminazione automatica è disattivata inizialmente.',
         points: ['Cronologia nell’isola', 'Filtro per tipo', 'Note rapide e preferiti'],
       },
       aiMonitor: {
         name: 'Monitor IA',
         caption:
-          'Rileva automaticamente l’attività di CLI, app desktop e IDE supportati, mostrando attività, stato, tendenze dei token e una mappa dei contributi. Analizza solo eventi strutturati e non legge le conversazioni. Sono aggiunti il rilevamento delle attività Cursor e l’utilizzo numerico con quote di abbonamento disponibili di Cursor e Muse Code; le lunghe esecuzioni degli strumenti di Cursor restano visibili.',
+          'Rileva automaticamente l’attività di CLI, app desktop e IDE supportati, mostrando attività, stato, tendenze dei token e una mappa dei contributi. Analizza solo eventi strutturati e non legge le conversazioni. Sono aggiunti il rilevamento delle attività Cursor e l’utilizzo giornaliero numerico, senza mostrare quote residue di Cursor e Muse Code; le lunghe esecuzioni degli strumenti di Cursor restano visibili.',
         points: ['Attività aggregate tra gli strumenti', 'Tendenze del consumo di token', 'Non legge prompt o risposte'],
       },
       keyboardSound: {
@@ -107,7 +107,7 @@ export const it = createCatalog({
       download: {
         name: 'Downloader',
         caption:
-          'Incolla un link o lascia che zisla lo riconosca dagli appunti quando è attivo. Scegli video o audio e scarica nella cartella predefinita o in una tua. I link supportati mostrano origine, progresso in tempo reale e stato finale. Download, registrazioni e schermate condividono questa posizione di salvataggio.',
+          'Incolla un link o lascia che zisla lo riconosca dagli appunti quando è attivo. Scegli video o audio e scarica nella cartella predefinita o in una tua. I link supportati mostrano origine, progresso in tempo reale e stato finale. Scegli la cartella dei download in Impostazioni → Posizione di salvataggio, separata da schermate e registrazioni. I link Bilibili scaricano la parte scelta.',
         points: ['Modalità video / audio', 'Cartella predefinita o personalizzata', 'Origine e progresso in tempo reale'],
       },
       agenda: {
@@ -125,7 +125,7 @@ export const it = createCatalog({
       quickNotes: {
         name: 'Note rapide',
         caption:
-          'Usa l’app Note di sistema per visualizzare, modificare, creare ed eliminare note con anteprima Markdown dal vivo, e passare direttamente alle prime nove note con Command+1 a 9. Le bozze vengono riscritte automaticamente in Note.',
+          'Usa l’app Note di sistema per visualizzare, modificare, creare ed eliminare note con anteprima Markdown dal vivo, e passare direttamente alle prime nove note con Command+1 a 9. Le bozze vengono riscritte automaticamente in Note. Visualizza gli allegati manoscritti e modifica il testo prima o dopo di essi preservando gli originali.',
         points: ['Dati nelle Note', 'Editor Markdown', 'Bozze salvate automaticamente'],
       },
       volumeMixer: {
@@ -142,7 +142,7 @@ export const it = createCatalog({
       system: {
         name: 'Stato del sistema',
         caption:
-          'Controlla CPU, GPU, memoria, disco, rete e ventole; leggi la temperatura SMART NVMe quando l’hardware la espone, registra uno storico al minuto che puoi graficare per qualsiasi intervallo ed esportare in .xlsx. Analizza cache delle app e dell’utente Apple, log e file di preferenze residui. Controlla gli elementi, sposta quelli selezionati nel Cestino e consulta i risultati. Visualizza carica, salute, cicli, temperatura e capacità del Mac, oltre al livello della batteria dei dispositivi vicini esposto dal sistema. Gli indirizzi IPv4 e IPv6 pubblici sono mostrati separatamente. La cronologia viene conservata per impostazione predefinita finché non la cancelli.',
+          'Controlla CPU, GPU, memoria, disco, rete, ventole e temperatura NVMe SMART disponibile. Visualizza lo storico al minuto per qualsiasi periodo o esporta .xlsx; rimane finché non lo cancelli. Consulta carica, salute, cicli, temperatura e capacità della batteria del Mac e i livelli dei dispositivi vicini, con IPv4 e IPv6 pubblici separati. Controlla cache, log, preferenze residue e cartelle di lavoro IA senza sessioni conservate prima di spostarle nel Cestino. La pulizia opzionale interviene ogni 7, 15 o 30 giorni per elementi attendibili o tutti quelli gestibili, compresi quelli da verificare; inizialmente è disattivata.',
         points: ['Monitoraggio a livello di chip', 'Grafici dello storico ed export .xlsx', 'Controlla prima di spostare nel Cestino'],
       },
     },
@@ -165,7 +165,7 @@ export const it = createCatalog({
       },
       dailyBriefing: {
         title: 'La tua giornata in un resoconto',
-        description: 'Scegli tra otto modelli e seleziona dati di utilizzo, digitazione, sistema e attività zisla. Controlla l’anteprima ed esporta un PNG manualmente o ogni giorno all’ora scelta. La cronologia Tempo di utilizzo è inclusa se attiva e disponibile; i dati mancanti non sono mostrati come uno zero misurato.',
+        description: 'Scegli tra otto modelli e seleziona dati di utilizzo, digitazione, sistema e attività zisla. Controlla l’anteprima ed esporta un PNG manualmente o ogni giorno all’ora scelta. La cronologia Tempo di utilizzo è inclusa se attiva e disponibile; i dati mancanti non sono mostrati come uno zero misurato. Scegli una cartella di esportazione indipendente in Impostazioni → Posizione di salvataggio.',
         detail: '8 modelli · Contenuti a scelta · Anteprima ed esportazione PNG programmata',
       },
       userCare: {
@@ -180,8 +180,8 @@ export const it = createCatalog({
       },
       recording: {
         title: 'Registra e monta nello studio',
-        description: 'Registra schermo, finestra o area con audio del sistema, microfono e fotocamera opzionali. Modifica video, audio, immagini e testo su più tracce, aggiungi animazioni, zoom e sottotitoli e controlla un’anteprima nitida. Scegli proporzioni originali, 16:9, 9:16, 1:1 o 4:3. Esporta video, GIF, Live Photo o audio; alcuni formati richiedono FFmpeg. Le proposte IA opzionali si controllano prima di applicarle. Le registrazioni usano la posizione definita nelle impostazioni dei download.',
-        detail: 'Montaggio multitraccia · Proporzioni e anteprima · Video, GIF, Live Photo e audio',
+        description: 'Registra schermo, finestra o area con audio del sistema, microfono e fotocamera opzionali. Modifica video, audio, immagini e testo su più tracce con animazioni, zoom e sottotitoli. Regola levigatura della pelle, luminosità, snellimento di viso e corpo, effetti vocali e scie fluide del cursore nel colore scelto. Riproduci il montaggio nello studio. Scegli proporzioni originali, 16:9, 9:16, 1:1 o 4:3; esporta video, GIF, Live Photo o audio. Alcuni formati richiedono FFmpeg. Controlla le proposte IA opzionali prima di applicarle. La cartella delle registrazioni si imposta separatamente in Impostazioni → Posizione di salvataggio.',
+        detail: 'Effetti ritratto e voce · Scie colorate del cursore · Riproduzione ed export multitraccia',
       },
       permissions: {
         title: 'Permessi del sistema in un unico posto',
@@ -203,7 +203,7 @@ export const it = createCatalog({
       capture: {
         title: 'Schermate, catture lunghe e fissaggio',
         description:
-          'Cattura, fissa o unisci schermate a scorrimento con scorciatoie personalizzabili. Evidenzia, estrai aree di immagine, arrotonda gli angoli e conserva le annotazioni all’esportazione. Riconosci e copia il testo, traducilo e copia il risultato oppure esporta tabelle riconosciute in .xlsx. Conserva le catture sullo scaffale. Le impostazioni verificano i conflitti con voce e azioni rapide. La finestra di salvataggio si apre nella cartella dei download attuale.',
+          'Cattura, fissa o unisci schermate a scorrimento con scorciatoie personalizzabili. Evidenzia, estrai aree di immagine, arrotonda gli angoli e conserva le annotazioni all’esportazione. Riconosci e copia il testo, traducilo e copia il risultato oppure esporta tabelle riconosciute in .xlsx. Conserva le catture sullo scaffale. Le impostazioni verificano i conflitti con voce e azioni rapide. La finestra si apre nella cartella delle schermate definita in Impostazioni → Posizione di salvataggio. Le schermate fissate restano al loro posto nelle catture successive.',
         detail: 'Evidenziazione ed estrazione · Riconosci, traduci e copia · Angoli arrotondati e .xlsx',
       },
       voice: {
@@ -227,7 +227,7 @@ export const it = createCatalog({
       copyAssistant: {
         title: 'Azioni rapide e passi successivi',
         description:
-          'Quando è attivo, mostra l’anteprima di testo, link, file o immagini copiati in una barra separata e propone apertura, Finder, ricerca, traduzione, calcolo o salvataggio solo dopo la tua conferma. Apri la cartella del file con le azioni rapide dopo un download del browser o un trasferimento AirDrop. Supporta le cartelle predefinite e scelte in Chrome, con un interruttore indipendente dall’avanzamento dei download. Gli IP hanno azioni separate per la ricerca e l’apertura dei link. Le conversioni riconoscono le unità monetarie minori e il catalogo include Emoji 18.0.',
+          'Quando è attivo, mostra l’anteprima di testo, link, file o immagini copiati in una barra separata e propone apertura, Finder, ricerca, traduzione, calcolo o salvataggio solo dopo la tua conferma. Apri la cartella del file con le azioni rapide dopo un download del browser o un trasferimento AirDrop. Supporta le cartelle predefinite e scelte in Chrome, con un interruttore indipendente dall’avanzamento dei download. Gli IP hanno azioni separate per la ricerca e l’apertura dei link. Le conversioni riconoscono le unità monetarie minori e il catalogo include Emoji 18.0. Testo e immagini salvati usano la cartella indipendente delle azioni rapide in Impostazioni → Posizione di salvataggio.',
         detail: 'Attivazione opzionale · Riconoscimento locale · Command+N predefinito',
       },
       aiManagement: {
@@ -250,7 +250,7 @@ export const it = createCatalog({
       recommendedTools: {
         title: 'App consigliate',
         description:
-          'Scopri OpenScreen per registrare lo schermo e montare video e DockDoor per le anteprime delle finestre nel Dock e il cambio di app. Sono app di terze parti da installare separatamente.',
+          'Scopri OpenScreen per registrazione e montaggio video, DockDoor per anteprime delle finestre e cambio di app, e Quiet.md per note locali. Sono app di terze parti da installare separatamente.',
         detail: 'Scopri strumenti per il desktop · App di terze parti · Installazione separata',
       },
     },
@@ -325,6 +325,17 @@ export const it = createCatalog({
   },
   changelog: {
     releaseNotes: {
+      'v0.1.22': [
+        'Lo studio aggiunge levigatura della pelle, luminosità, snellimento di viso e corpo, preset vocali regolabili e monitoraggio opzionale del microfono. Gli effetti si regolano prima di registrare e durante il montaggio.',
+        'Le scie fluide del cursore consentono di scegliere il colore. La riproduzione nello studio mostra il montaggio con tracce, effetti e audio.',
+        'Impostazioni → Posizione di salvataggio separa download, schermate, registrazioni, azioni rapide e resoconti giornalieri. L’aggiornamento mantiene le posizioni precedenti, poi ogni cartella può essere cambiata indipendentemente.',
+        'La pulizia opzionale sposta gli elementi nel Cestino ogni 7, 15 o 30 giorni. Scegli elementi attendibili o tutti quelli gestibili, compresi quelli da verificare; inizialmente è disattivata. La pulizia disco aggiunge cartelle di lavoro IA senza sessioni conservate, proteggendo le sessioni mantenute e le cartelle nuove.',
+        'La cronologia degli appunti può eliminare automaticamente voci più vecchie di 7, 15 o 30 giorni mantenendo i preferiti. L’eliminazione automatica è inizialmente disattivata.',
+        'Note rapide visualizza gli allegati manoscritti e permette di modificare il testo prima o dopo tramite Note, preservando gli allegati originali.',
+        'Il monitor IA nasconde le quote residue, mantiene l’utilizzo giornaliero e migliora lo scorrimento dei grafici e le etichette dei mesi. Le impostazioni batteria sono raggruppate in Stato del sistema.',
+        'Quiet.md si aggiunge alle app consigliate per note locali, con installazione e gestione nelle impostazioni.',
+        'Bilibili rispetta la parte video selezionata e gestisce più formati di link. La cancellazione del calendario riguarda l’occorrenza ricorrente scelta. Le schermate fissate restano nelle catture successive, con etichette più chiare e indicatori di dimensioni più affidabili.',
+      ],
       'v0.1.21': [
         'Il monitoraggio del sistema conserva per impostazione predefinita tutta la cronologia al minuto, esistente e nuova, finché non la cancelli. Restano disponibili i grafici per qualsiasi periodo e l’esportazione .xlsx.',
         'Download, registrazioni e schermate condividono una posizione. Le finestre per salvare le schermate si aprono nella cartella dei download attuale; l’impostazione duplicata della posizione delle registrazioni è stata rimossa.',
@@ -403,7 +414,7 @@ export const it = createCatalog({
       },
       storage: {
         question: 'Dove salva i dati zisla?',
-        answer: 'I dati locali sono in ~/Library/Application Support/zisla/. Le statistiche di digitazione sono in ~/Library/Application Support/zisla/typing-stats.sqlite3. Note rapide usa l’app Note.',
+        answer: 'I dati locali sono in ~/Library/Application Support/zisla/. Le statistiche di digitazione sono in ~/Library/Application Support/zisla/typing-stats.sqlite3. Note rapide usa l’app Note. Impostazioni → Posizione di salvataggio offre cartelle indipendenti per download, schermate, registrazioni, azioni rapide e resoconti giornalieri. L’aggiornamento conserva la precedente cartella condivisa, poi ciascuna può essere cambiata separatamente.',
       },
     },
   },

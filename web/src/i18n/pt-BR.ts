@@ -89,13 +89,13 @@ export const ptBR = createCatalog({
       clipboard: {
         name: 'Clipboard',
         caption:
-          'Consulte o histórico do clipboard dentro da ilha e filtre por imagem, URL, caminho ou tipo de arquivo e veja quando cada item foi copiado. Envie um item para Notas rápidas, fixe-o como favorito ou exclua-o.',
+          'Consulte o histórico do clipboard dentro da ilha e filtre por imagem, URL, caminho ou tipo de arquivo e veja quando cada item foi copiado. Envie um item para Notas rápidas, fixe-o como favorito ou exclua-o. Você pode excluir automaticamente o histórico com mais de 7, 15 ou 30 dias e manter os favoritos. A exclusão automática vem desativada.',
         points: ['Histórico dentro da ilha', 'Filtro por tipo', 'Notas rápidas e favoritos'],
       },
       aiMonitor: {
         name: 'Monitor de IA',
         caption:
-          'Detecta atividade de CLIs, apps de desktop e IDEs compatíveis e mostra tarefas, estado, tendências acumuladas de tokens e um mapa de contribuições. Analisa apenas eventos estruturados e nunca lê conversas. Há detecção de tarefas do Cursor, além de uso numérico e cotas de assinatura disponíveis do Cursor e Muse Code; execuções longas de ferramentas no Cursor continuam visíveis.',
+          'Detecta atividade de CLIs, apps de desktop e IDEs compatíveis e mostra tarefas, estado, tendências acumuladas de tokens e um mapa de contribuições. Analisa apenas eventos estruturados e nunca lê conversas. Há detecção de tarefas do Cursor, além de uso diário numérico, sem exibir cotas restantes do Cursor e Muse Code; execuções longas de ferramentas no Cursor continuam visíveis.',
         points: ['Tarefas agregadas entre ferramentas', 'Tendências de consumo de tokens', 'Nunca lê prompts ou respostas'],
       },
       keyboardSound: {
@@ -107,7 +107,7 @@ export const ptBR = createCatalog({
       download: {
         name: 'Downloader',
         caption:
-          'Cole um link ou deixe o zisla identificá-lo no clipboard quando ativado. Escolha vídeo ou áudio e baixe para a pasta padrão ou outra de sua escolha. Links compatíveis exibem ícone de origem, progresso ao vivo e estado final. Downloads, gravações e capturas de tela compartilham este local de salvamento.',
+          'Cole um link ou deixe o zisla identificá-lo no clipboard quando ativado. Escolha vídeo ou áudio e baixe para a pasta padrão ou outra de sua escolha. Links compatíveis exibem ícone de origem, progresso ao vivo e estado final. Escolha a pasta de downloads em Ajustes → Local de salvamento, separada de capturas e gravações. Links Bilibili baixam a parte selecionada.',
         points: ['Modos vídeo / áudio', 'Pasta padrão ou personalizada', 'Origem e progresso ao vivo'],
       },
       agenda: {
@@ -125,7 +125,7 @@ export const ptBR = createCatalog({
       quickNotes: {
         name: 'Notas rápidas',
         caption:
-          'Usa o app Notas do sistema para ver, editar, criar e excluir notas com prévia Markdown ao vivo, e ir direto às primeiras nove notas com Command+1 a 9. Os rascunhos são gravados de volta automaticamente.',
+          'Usa o app Notas do sistema para ver, editar, criar e excluir notas com prévia Markdown ao vivo, e ir direto às primeiras nove notas com Command+1 a 9. Os rascunhos são gravados de volta automaticamente. Veja anexos manuscritos e edite o texto antes ou depois deles preservando os originais.',
         points: ['Dados nas Notas', 'Editor Markdown', 'Rascunhos salvos automaticamente'],
       },
       volumeMixer: {
@@ -142,7 +142,7 @@ export const ptBR = createCatalog({
       system: {
         name: 'Estado do sistema',
         caption:
-          'Veja CPU, GPU, memória, disco, rede e ventoinhas; leia a temperatura SMART de NVMe quando o hardware informar, guarde um histórico por minuto que você pode grafar em qualquer período e exportar como .xlsx. Analise caches de apps e de usuário da Apple, registros e arquivos de preferências residuais. Revise a seleção, mova os itens para o Lixo e confira os resultados. Veja carga, saúde, ciclos, temperatura e capacidade deste Mac, além do nível de bateria de dispositivos próximos exposto pelo sistema. Os endereços IPv4 e IPv6 públicos são exibidos separadamente. O histórico é mantido por padrão até você apagá-lo.',
+          'Confira CPU, GPU, memória, disco, rede, ventoinhas e temperatura NVMe SMART disponível. Veja o histórico por minuto em qualquer período ou exporte .xlsx; ele fica salvo até você apagá-lo. Consulte carga, saúde, ciclos, temperatura e capacidade da bateria do Mac e os níveis de dispositivos próximos, com IPv4 e IPv6 públicos separados. Revise caches, registros, preferências residuais e pastas de trabalho de IA sem sessões mantidas antes de movê-los ao Lixo. A limpeza opcional acontece a cada 7, 15 ou 30 dias para itens confiáveis ou todos os itens processáveis, incluindo os que exigem revisão; vem desativada.',
         points: ['Monitoramento no nível do chip', 'Gráficos de histórico e exportação .xlsx', 'Revise antes de mover para o Lixo'],
       },
     },
@@ -165,7 +165,7 @@ export const ptBR = createCatalog({
       },
       dailyBriefing: {
         title: 'Seu dia em um relatório diário',
-        description: 'Escolha entre oito modelos, selecione dados de uso, digitação, sistema e atividade zisla e confira a prévia. Exporte um PNG manualmente ou em um horário diário. O histórico de Tempo de Uso entra quando ativado e disponível; dados ausentes não são apresentados como zero medido.',
+        description: 'Escolha entre oito modelos, selecione dados de uso, digitação, sistema e atividade zisla e confira a prévia. Exporte um PNG manualmente ou em um horário diário. O histórico de Tempo de Uso entra quando ativado e disponível; dados ausentes não são apresentados como zero medido. Escolha uma pasta de exportação independente em Ajustes → Local de salvamento.',
         detail: '8 modelos · Conteúdo à escolha · Prévia e exportação PNG agendada',
       },
       userCare: {
@@ -180,8 +180,8 @@ export const ptBR = createCatalog({
       },
       recording: {
         title: 'Grave e edite no estúdio',
-        description: 'Grave tela, janela ou região com áudio do sistema, microfone e câmera opcionais. Edite vídeos, áudio, imagens e texto em várias faixas, adicione animações, zooms e legendas e confira uma prévia nítida. Escolha proporção original, 16:9, 9:16, 1:1 ou 4:3. Exporte vídeo, GIF, Live Photo ou áudio; alguns formatos exigem FFmpeg. Propostas opcionais de IA são revisadas antes de aplicar. As gravações usam o local definido nos ajustes de download.',
-        detail: 'Edição multifaixa · Proporções e prévia · Vídeo, GIF, Live Photo e áudio',
+        description: 'Grave tela, janela ou região com áudio do sistema, microfone e câmera opcionais. Edite vídeo, áudio, imagens e texto em várias faixas com animações, zooms e legendas. Ajuste suavização da pele, brilho, afinamento de rosto e corpo, efeitos de voz e rastros suaves do cursor na cor escolhida. Reproduza a edição no estúdio. Escolha proporção original, 16:9, 9:16, 1:1 ou 4:3; exporte vídeo, GIF, Live Photo ou áudio. Alguns formatos exigem FFmpeg. Revise propostas opcionais de IA antes de aplicar. A pasta de gravação é definida separadamente em Ajustes → Local de salvamento.',
+        detail: 'Efeitos de retrato e voz · Rastros coloridos do cursor · Reprodução e exportação multifaixa',
       },
       permissions: {
         title: 'Permissões do sistema em um lugar',
@@ -203,7 +203,7 @@ export const ptBR = createCatalog({
       capture: {
         title: 'Capturas, rolagem e fixação',
         description:
-          'Capture, fixe ou una capturas com rolagem usando atalhos personalizáveis. Destaque áreas, extraia partes da imagem, arredonde cantos e preserve anotações ao exportar. Reconheça e copie texto, traduza e copie o resultado ou exporte tabelas reconhecidas como .xlsx. Guarde capturas na prateleira. Os ajustes verificam conflitos com voz e Ações Rápidas. A caixa de diálogo de salvamento abre na pasta de download atual.',
+          'Capture, fixe ou una capturas com rolagem usando atalhos personalizáveis. Destaque áreas, extraia partes da imagem, arredonde cantos e preserve anotações ao exportar. Reconheça e copie texto, traduza e copie o resultado ou exporte tabelas reconhecidas como .xlsx. Guarde capturas na prateleira. Os ajustes verificam conflitos com voz e Ações Rápidas. A caixa de diálogo abre na pasta de capturas definida em Ajustes → Local de salvamento. Capturas fixadas permanecem ao capturar novamente.',
         detail: 'Destaque e extração · Reconhecimento, tradução e cópia · Cantos arredondados e .xlsx',
       },
       voice: {
@@ -227,7 +227,7 @@ export const ptBR = createCatalog({
       copyAssistant: {
         title: 'Ações rápidas e próximos passos',
         description:
-          'Quando ativado, mostra uma prévia de textos, links, arquivos ou imagens copiados em uma barra separada e sugere abrir, mostrar no Finder, buscar, traduzir, calcular ou salvar, somente após sua confirmação. Abra a pasta do arquivo pelas ações rápidas após um download do navegador ou uma transferência AirDrop. Aceita pastas padrão e escolhidas no Chrome, com ativação independente do progresso dos downloads. IPs têm ações separadas para consulta e abertura do link. A conversão reconhece subunidades monetárias e o catálogo inclui Emoji 18.0.',
+          'Quando ativado, mostra uma prévia de textos, links, arquivos ou imagens copiados em uma barra separada e sugere abrir, mostrar no Finder, buscar, traduzir, calcular ou salvar, somente após sua confirmação. Abra a pasta do arquivo pelas ações rápidas após um download do navegador ou uma transferência AirDrop. Aceita pastas padrão e escolhidas no Chrome, com ativação independente do progresso dos downloads. IPs têm ações separadas para consulta e abertura do link. A conversão reconhece subunidades monetárias e o catálogo inclui Emoji 18.0. Textos e imagens salvos usam a pasta independente de Ações rápidas em Ajustes → Local de salvamento.',
         detail: 'Ativação opcional · Reconhecimento local · Command+N por padrão',
       },
       aiManagement: {
@@ -250,7 +250,7 @@ export const ptBR = createCatalog({
       recommendedTools: {
         title: 'Apps recomendados',
         description:
-          'Conheça OpenScreen para gravação de tela e edição de vídeo e DockDoor para prévias de janelas no Dock e alternância de apps. São aplicativos de terceiros instalados separadamente.',
+          'Conheça OpenScreen para gravação e edição de vídeo, DockDoor para prévias de janelas e alternância de apps, e Quiet.md para notas locais. São apps de terceiros instalados separadamente.',
         detail: 'Descubra ferramentas para o desktop · Apps de terceiros · Instalação separada',
       },
     },
@@ -325,6 +325,17 @@ export const ptBR = createCatalog({
   },
   changelog: {
     releaseNotes: {
+      'v0.1.22': [
+        'O estúdio adiciona suavização da pele, brilho, afinamento de rosto e corpo, predefinições de voz ajustáveis e monitoração opcional do microfone. Os efeitos podem ser ajustados antes de gravar e durante a edição.',
+        'Rastros suaves do cursor permitem escolher a cor. A reprodução no estúdio mostra o resultado editado com faixas, efeitos e áudio.',
+        'Ajustes → Local de salvamento separa downloads, capturas, gravações, Ações rápidas e relatórios diários. Os locais antigos são mantidos na atualização e cada pasta pode ser alterada de forma independente.',
+        'A limpeza opcional move itens ao Lixo a cada 7, 15 ou 30 dias. Escolha itens confiáveis ou todos os processáveis, incluindo os que exigem revisão; vem desativada. A limpeza de disco também permite revisar pastas de IA sem sessões mantidas, protegendo sessões conservadas e pastas novas.',
+        'O histórico do clipboard pode excluir entradas com mais de 7, 15 ou 30 dias automaticamente e manter favoritos. A exclusão automática vem desativada.',
+        'Notas rápidas mostra anexos manuscritos e permite editar o texto antes ou depois pelo app Notas, preservando os anexos originais.',
+        'O monitor de IA oculta cotas restantes, mantém o uso diário e melhora a rolagem de gráficos e os rótulos de meses. Os ajustes de bateria ficam em Estado do sistema.',
+        'Quiet.md entra nas recomendações para notas locais, com instalação e gerenciamento em Ajustes.',
+        'Bilibili baixa a parte selecionada do vídeo e aceita mais formatos de links. A exclusão no calendário afeta a ocorrência recorrente selecionada. Capturas fixadas permanecem entre novas capturas, com rótulos mais claros e indicadores de tamanho mais confiáveis.',
+      ],
       'v0.1.21': [
         'O monitoramento do sistema mantém por padrão todo o histórico por minuto, existente e novo, até você apagá-lo. Os gráficos por período e a exportação .xlsx continuam disponíveis.',
         'Downloads, gravações e capturas de tela compartilham um local. O diálogo para salvar capturas abre na pasta de download atual; o ajuste duplicado de local das gravações foi removido.',
@@ -403,7 +414,7 @@ export const ptBR = createCatalog({
       },
       storage: {
         question: 'Onde o zisla armazena os dados?',
-        answer: 'Os dados locais ficam em ~/Library/Application Support/zisla/. Estatísticas de digitação ficam separadas em ~/Library/Application Support/zisla/typing-stats.sqlite3. Notas rápidas usa o app Notas.',
+        answer: 'Os dados locais ficam em ~/Library/Application Support/zisla/. Estatísticas de digitação ficam separadas em ~/Library/Application Support/zisla/typing-stats.sqlite3. Notas rápidas usa o app Notas. Ajustes → Local de salvamento oferece pastas independentes para downloads, capturas, gravações, Ações rápidas e relatórios diários. A atualização mantém a pasta compartilhada anterior; depois cada uma pode ser alterada separadamente.',
       },
     },
   },

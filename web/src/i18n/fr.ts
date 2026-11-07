@@ -92,13 +92,13 @@ export const fr: SiteContent = {
       clipboard: {
         name: 'Presse-papiers',
         caption:
-          'Consultez l’historique du presse-papiers dans la Dynamic Island et filtrez par image, URL, chemin et type de fichier, et voyez quand chaque élément a été copié. Envoyez un élément vers les notes rapides, épinglez-le en favori ou supprimez-le.',
+          'Consultez l’historique du presse-papiers dans la Dynamic Island et filtrez par image, URL, chemin et type de fichier, et voyez quand chaque élément a été copié. Envoyez un élément vers les notes rapides, épinglez-le en favori ou supprimez-le. Vous pouvez supprimer automatiquement l’historique de plus de 7, 15 ou 30 jours en conservant les favoris. La suppression automatique est désactivée par défaut.',
         points: ['Historique dans l’île', 'Filtre par type', 'Notes rapides et favoris'],
       },
       aiMonitor: {
         name: 'Suivi IA',
         caption:
-          'Détecte automatiquement l’activité des CLI IA, apps de bureau et IDE pris en charge et affiche les tâches, l’état, l’évolution cumulée des tokens et une carte thermique des contributions. Seuls les événements structurés sont analysés, jamais le texte des conversations. La détection des tâches Cursor est ajoutée, avec l’usage numérique et les quotas d’abonnement disponibles de Cursor et Muse Code ; les longues exécutions d’outils Cursor restent visibles.',
+          'Détecte automatiquement l’activité des CLI IA, apps de bureau et IDE pris en charge et affiche les tâches, l’état, l’évolution cumulée des tokens et une carte thermique des contributions. Seuls les événements structurés sont analysés, jamais le texte des conversations. La détection des tâches Cursor est ajoutée, avec l’usage quotidien chiffré, sans afficher les quotas restants de Cursor et Muse Code ; les longues exécutions d’outils Cursor restent visibles.',
         points: [
           'Tâches agrégées entre outils',
           'Évolution de la consommation de tokens',
@@ -118,7 +118,7 @@ export const fr: SiteContent = {
       download: {
         name: 'Téléchargeur',
         caption:
-          'Collez un lien ou laissez zisla repérer les liens du presse-papiers une fois l’option activée. Choisissez un format vidéo ou audio disponible et utilisez les Cookies d’un navigateur installé lorsqu’un téléchargement Douyin les nécessite. Enregistrez dans le dossier par défaut ou celui de votre choix, avec l’icône de la source, la progression en temps réel et l’état final. Téléchargements, enregistrements et captures d’écran partagent cet emplacement.',
+          'Collez un lien ou laissez zisla repérer les liens du presse-papiers une fois l’option activée. Choisissez un format vidéo ou audio disponible et utilisez les Cookies d’un navigateur installé lorsqu’un téléchargement Douyin les nécessite. Enregistrez dans le dossier par défaut ou celui de votre choix, avec l’icône de la source, la progression en temps réel et l’état final. Choisissez le dossier de téléchargement dans Réglages → Emplacement de sauvegarde, indépendamment des captures et enregistrements. Les liens Bilibili téléchargent la partie choisie.',
         points: [
           'Choisir les formats vidéo ou audio disponibles',
           'Cookies de navigateur pour Douyin',
@@ -144,7 +144,7 @@ export const fr: SiteContent = {
       quickNotes: {
         name: 'Notes rapides',
         caption:
-          'Adossé à l’app Notes du système : consultez, modifiez, créez et supprimez des notes avec un aperçu Markdown en direct, et rejoignez d’un geste les neuf premières notes avec Command+1 à 9. Les brouillons sont réécrits dans Notes automatiquement.',
+          'Adossé à l’app Notes du système : consultez, modifiez, créez et supprimez des notes avec un aperçu Markdown en direct, et rejoignez d’un geste les neuf premières notes avec Command+1 à 9. Les brouillons sont réécrits dans Notes automatiquement. Prévisualisez les pièces jointes manuscrites et modifiez le texte qui les précède ou les suit en conservant les originaux.',
         points: [
           'Les données restent dans Notes',
           'Éditeur Markdown',
@@ -169,7 +169,7 @@ export const fr: SiteContent = {
       system: {
         name: 'État du système',
         caption:
-          'Consultez l’état du processeur, du GPU, de la mémoire, du disque, du réseau et des ventilateurs, lisez la température NVMe SMART quand le matériel la publie, conservez un historique à la minute consultable sur n’importe quelle période et exportable en .xlsx. Analysez les caches des apps et de l’utilisateur Apple, les journaux et les fichiers de préférences résiduels, puis vérifiez la sélection avant de l’envoyer à la Corbeille et consultez le résultat. Consultez les indicateurs détaillés de ce Mac — charge, état, cycles, température et capacité — et le niveau de batterie des appareils proches que le système expose. Les adresses IPv4 et IPv6 publiques sont affichées séparément. L’historique est conservé par défaut jusqu’à ce que vous l’effaciez.',
+          'Suivez CPU, GPU, mémoire, disque, réseau, ventilateurs et température NVMe SMART disponible. Affichez l’historique à la minute sur la période voulue ou exportez-le en .xlsx ; il reste conservé jusqu’à votre suppression. Consultez la charge, la santé, les cycles, la température et la capacité de la batterie du Mac et les niveaux des appareils proches, avec IPv4 et IPv6 publiques distinctes. Vérifiez caches, journaux, préférences résiduelles et dossiers de travail IA sans session conservée avant de les déplacer à la Corbeille. Le nettoyage facultatif intervient tous les 7, 15 ou 30 jours : éléments fiables seuls ou tous les éléments traitables, y compris ceux à vérifier. Il est désactivé par défaut.',
         points: [
           'Surveillance au niveau de la puce',
           'Graphiques d’historique et export .xlsx',
@@ -195,7 +195,7 @@ export const fr: SiteContent = {
       },
       dailyBriefing: {
         title: 'Le bilan de votre journée',
-        description: 'Choisissez parmi huit modèles, sélectionnez les données d’utilisation, de saisie, du système et d’activité zisla, puis prévisualisez le résultat. Exportez un PNG manuellement ou à une heure quotidienne choisie. L’historique Temps d’écran est utilisé quand il est activé et disponible ; une donnée absente n’est pas présentée comme un zéro mesuré.',
+        description: 'Choisissez parmi huit modèles, sélectionnez les données d’utilisation, de saisie, du système et d’activité zisla, puis prévisualisez le résultat. Exportez un PNG manuellement ou à une heure quotidienne choisie. L’historique Temps d’écran est utilisé quand il est activé et disponible ; une donnée absente n’est pas présentée comme un zéro mesuré. Choisissez un dossier d’export indépendant dans Réglages → Emplacement de sauvegarde.',
         detail: '8 modèles · Contenu au choix · Aperçu et export PNG programmé',
       },
       userCare: {
@@ -210,8 +210,8 @@ export const fr: SiteContent = {
       },
       recording: {
         title: 'Enregistrer et monter dans le studio',
-        description: 'Enregistrez un écran, une fenêtre ou une zone avec son système, microphone et caméra facultatifs. Montez vidéos, sons, images et textes sur plusieurs pistes ; ajoutez animations, zooms et sous-titres avec un aperçu net. Choisissez le format original, 16:9, 9:16, 1:1 ou 4:3. Exportez vidéo, GIF, Live Photo ou audio ; certains formats nécessitent FFmpeg. Les propositions IA facultatives sont prévisualisées avant application. Les enregistrements utilisent l’emplacement défini dans les réglages de téléchargement.',
-        detail: 'Montage multipiste · Formats et aperçu · Vidéo, GIF, Live Photo et audio',
+        description: 'Enregistrez un écran, une fenêtre ou une zone avec son système, microphone et caméra facultatifs. Montez vidéos, sons, images et textes sur plusieurs pistes, avec animations, zooms et sous-titres. Réglez le lissage de la peau, la luminosité, l’affinement du visage et du corps, les effets vocaux et des traînées fluides du curseur dans la couleur choisie. Lisez le montage dans le studio. Formats : original, 16:9, 9:16, 1:1 ou 4:3 ; export vidéo, GIF, Live Photo ou audio, avec FFmpeg pour certains formats. Prévisualisez les propositions IA facultatives avant application. Le dossier d’enregistrement se règle séparément dans Réglages → Emplacement de sauvegarde.',
+        detail: 'Effets de portrait et de voix · Traînées colorées du curseur · Lecture et export multipistes',
       },
       permissions: {
         title: 'Les autorisations au même endroit',
@@ -233,7 +233,7 @@ export const fr: SiteContent = {
       capture: {
         title: 'Captures, captures défilantes et épinglage',
         description:
-          'Capturez, épinglez ou assemblez des captures défilantes avec des raccourcis personnalisables. Surlignez, extrayez des zones d’image, arrondissez les coins et conservez les annotations à l’export. Reconnaissez et copiez du texte, traduisez-le puis copiez le résultat, ou exportez les tableaux reconnus en .xlsx. Rangez les captures dans l’étagère. Les réglages vérifient les conflits avec la dictée et les actions rapides. La boîte de dialogue d’enregistrement s’ouvre dans le dossier de téléchargement actuel.',
+          'Capturez, épinglez ou assemblez des captures défilantes avec des raccourcis personnalisables. Surlignez, extrayez des zones d’image, arrondissez les coins et conservez les annotations à l’export. Reconnaissez et copiez du texte, traduisez-le puis copiez le résultat, ou exportez les tableaux reconnus en .xlsx. Rangez les captures dans l’étagère. Les réglages vérifient les conflits avec la dictée et les actions rapides. La boîte de dialogue s’ouvre dans le dossier de captures défini dans Réglages → Emplacement de sauvegarde. Les captures épinglées restent en place lors d’une nouvelle capture.',
         detail: 'Surlignage et extraction · Reconnaissance, traduction et copie · Coins arrondis et .xlsx',
       },
       voice: {
@@ -257,7 +257,7 @@ export const fr: SiteContent = {
       copyAssistant: {
         title: 'Actions rapides et étapes suivantes',
         description:
-          'Une fois activé, le texte, les liens, les fichiers ou les images copiés s’affichent dans une barre distincte en haut de l’écran. Il reconnaît les liens, les noms d’apps installées localement et les noms d’émojis, et peut convertir les montants copiés aux taux de change en temps réel ; chaque étape suivante n’est exécutée qu’après votre confirmation. Ouvrez le dossier d’un fichier via les actions rapides après un téléchargement ou un transfert AirDrop. Les dossiers Chrome par défaut ou choisis sont pris en charge, avec une activation indépendante de la progression des téléchargements. Les adresses IP disposent d’actions distinctes pour la recherche et l’ouverture du lien. Les conversions reconnaissent les unités monétaires mineures et le catalogue utilise Emoji 18.0.',
+          'Une fois activé, le texte, les liens, les fichiers ou les images copiés s’affichent dans une barre distincte en haut de l’écran. Il reconnaît les liens, les noms d’apps installées localement et les noms d’émojis, et peut convertir les montants copiés aux taux de change en temps réel ; chaque étape suivante n’est exécutée qu’après votre confirmation. Ouvrez le dossier d’un fichier via les actions rapides après un téléchargement ou un transfert AirDrop. Les dossiers Chrome par défaut ou choisis sont pris en charge, avec une activation indépendante de la progression des téléchargements. Les adresses IP disposent d’actions distinctes pour la recherche et l’ouverture du lien. Les conversions reconnaissent les unités monétaires mineures et le catalogue utilise Emoji 18.0. Les textes et images enregistrés utilisent le dossier indépendant des actions rapides dans Réglages → Emplacement de sauvegarde.',
         detail: 'Reconnaissance locale · Conversion aux taux en temps réel · Command+N par défaut',
       },
       aiManagement: {
@@ -281,7 +281,7 @@ export const fr: SiteContent = {
       recommendedTools: {
         title: 'Apps recommandées',
         description:
-          'Découvrez notamment OpenScreen pour la capture vidéo et le montage, et DockDoor pour les aperçus de fenêtres du Dock et le changement d’app. Ces applications tierces s’installent séparément.',
+          'Découvrez OpenScreen pour la capture vidéo et le montage, DockDoor pour les aperçus de fenêtres et le changement d’app, et Quiet.md pour les notes locales. Ces applications tierces s’installent séparément.',
         detail: 'Découvrir des outils de bureau · Apps tierces · Installation séparée',
       },
     },
@@ -362,6 +362,17 @@ export const fr: SiteContent = {
   },
   changelog: {
     releaseNotes: {
+      'v0.1.22': [
+        'Le studio ajoute lissage de la peau, luminosité, affinement du visage et du corps, préréglages vocaux ajustables et écoute facultative du microphone. Les effets se règlent avant l’enregistrement et pendant le montage.',
+        'Les traînées fluides du curseur ont une couleur au choix. La lecture dans le studio restitue le montage avec ses pistes, effets et sons.',
+        'Réglages → Emplacement de sauvegarde sépare téléchargements, captures, enregistrements, actions rapides et bilans quotidiens. La mise à jour conserve les anciens emplacements, puis chaque dossier peut être changé indépendamment.',
+        'Le nettoyage facultatif déplace les fichiers inutiles à la Corbeille tous les 7, 15 ou 30 jours. Choisissez les éléments fiables ou tous les éléments traitables, y compris ceux à vérifier ; il est désactivé par défaut. L’analyse ajoute les dossiers de travail IA sans session conservée, en protégeant les sessions conservées et les dossiers récents.',
+        'L’historique du presse-papiers peut supprimer automatiquement les entrées de plus de 7, 15 ou 30 jours tout en conservant les favoris. Cette option est désactivée par défaut.',
+        'Les notes rapides prévisualisent les pièces jointes manuscrites et permettent de modifier le texte avant ou après via Notes, en conservant les pièces jointes originales.',
+        'Le suivi IA masque les quotas d’abonnement restants, garde l’usage quotidien et améliore le défilement des graphiques et les libellés des mois. Les réglages de batterie rejoignent l’état du système.',
+        'Quiet.md rejoint les apps recommandées pour les notes locales, avec installation et gestion dans les réglages.',
+        'Bilibili télécharge la partie choisie et accepte davantage de liens. La suppression dans le calendrier vise l’occurrence récurrente choisie. Les captures épinglées restent visibles entre captures, avec des libellés d’outils plus lisibles et des badges de taille plus fiables.',
+      ],
       'v0.1.21': [
         'La surveillance système conserve par défaut tout l’historique à la minute, existant et nouveau, jusqu’à son effacement manuel. Les graphiques par période et l’export .xlsx restent disponibles.',
         'Téléchargements, enregistrements et captures d’écran partagent un emplacement. Les captures s’enregistrent depuis le dossier de téléchargement actuel ; le réglage d’emplacement propre aux enregistrements, qui faisait doublon, a été supprimé.',
@@ -447,7 +458,7 @@ export const fr: SiteContent = {
       storage: {
         question: 'Où zisla stocke-t-il ses données ?',
         answer:
-          'Les données locales se trouvent dans ~/Library/Application Support/zisla/. Les statistiques de saisie sont conservées à part dans ~/Library/Application Support/zisla/typing-stats.sqlite3. Les notes rapides utilisent l’app Notes du système.',
+          'Les données locales se trouvent dans ~/Library/Application Support/zisla/. Les statistiques de saisie sont conservées à part dans ~/Library/Application Support/zisla/typing-stats.sqlite3. Les notes rapides utilisent l’app Notes du système. Réglages → Emplacement de sauvegarde propose des dossiers indépendants pour téléchargements, captures, enregistrements, actions rapides et bilans quotidiens. À la mise à jour, chacun conserve le dossier partagé précédent, puis peut être changé séparément.',
       },
     },
   },

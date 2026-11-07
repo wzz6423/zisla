@@ -88,13 +88,13 @@ export const en: SiteContent = {
       clipboard: {
         name: 'Clipboard',
         caption:
-          'Browse clipboard history inside the island, filter by image, URL, path and file type, and see when each entry was copied. Send an entry to Quick Notes, pin it as a favourite, or delete it.',
+          'Browse clipboard history inside the island, filter by image, URL, path and file type, and see when each entry was copied. Send an entry to Quick Notes, pin it as a favourite, or delete it. Optionally delete history older than 7, 15 or 30 days while keeping favourites; automatic deletion is off by default.',
         points: ['History inside the island', 'Filter by type', 'Quick Notes and favourites'],
       },
       aiMonitor: {
         name: 'AI monitor',
         caption:
-          'Aggregates tasks and status from AI CLIs, desktop apps and IDEs, including Delta, Orca, WorkBuddy and WorkBuddy AI. Cumulative token trends and a contribution heatmap use reliable numeric usage where available, without parsing prompt or reply text. Cursor task detection is added, while Cursor and Muse Code provide numeric usage and available subscription quotas; Cursor tasks stay visible during long tool runs.',
+          'Aggregates tasks and status from AI CLIs, desktop apps and IDEs, including Delta, Orca, WorkBuddy and WorkBuddy AI. Cumulative token trends and a contribution heatmap use reliable numeric usage where available, without parsing prompt or reply text. Cursor task detection is added, while Cursor and Muse Code provide daily numeric usage with remaining allowances hidden; Cursor tasks stay visible during long tool runs.',
         points: [
           'Tasks aggregated across tools',
           'Token consumption trends',
@@ -110,7 +110,7 @@ export const en: SiteContent = {
       download: {
         name: 'Downloader',
         caption:
-          'Paste a link, or let zisla pick links up from the clipboard once enabled. Choose an available video or audio format, and use Cookies from an installed browser when a Douyin download needs them. Download to the default or a folder of your choice, with a source icon, live progress and a completion state. Downloads, recordings and screenshots share this save location.',
+          'Paste a link, or let zisla pick links up from the clipboard once enabled. Choose an available video or audio format, and use Cookies from an installed browser when a Douyin download needs them. Download to the default or a folder of your choice, with a source icon, live progress and a completion state. Set the download folder in Settings → Save Location independently of screenshots and recordings. Bilibili links download the selected part.',
         points: ['Choose video or audio formats', 'Douyin browser Cookies', 'Source icon and live progress'],
       },
       agenda: {
@@ -128,7 +128,7 @@ export const en: SiteContent = {
       quickNotes: {
         name: 'Quick Notes',
         caption:
-          'Backed by the system Notes app: view, edit, create and delete notes with live Markdown preview, and jump straight to the first nine notes with Command+1 through 9. Drafts are written back to Notes automatically.',
+          'Backed by the system Notes app: view, edit, create and delete notes with live Markdown preview, and jump straight to the first nine notes with Command+1 through 9. Drafts are written back to Notes automatically. Preview handwritten attachments and edit the text before or after them while preserving the originals.',
         points: ['Data lives in Notes', 'Markdown editor', 'Drafts saved back automatically'],
       },
       volumeMixer: {
@@ -145,7 +145,7 @@ export const en: SiteContent = {
       system: {
         name: 'System status',
         caption:
-          'Check CPU, GPU, memory, disk, network and fan status, read NVMe SMART temperature where the hardware reports it, keep a minute-level history you can chart for any time range and export as .xlsx. Scan app caches, Apple user caches, logs and leftover preference files, then review and move selected items to Trash with visible results. See detailed metrics for this Mac — charge, health, cycle count, temperature and capacity — plus the battery level of nearby devices the system exposes. Public IPv4 and IPv6 addresses are displayed separately. History is kept by default until you clear it.',
+          'Monitor CPU, GPU, memory, disk, network, fans and available NVMe SMART temperature. Chart minute-level history for any time range or export .xlsx; history stays until you clear it. Check this Mac’s battery charge, health, cycle count, temperature and capacity and nearby device levels, with separate public IPv4 and IPv6. Review caches, logs, preference leftovers and orphaned AI session workspaces before moving items to Trash. Optional cleanup runs every 7, 15 or 30 days, with trusted-only or all actionable items, including those requiring review; it is off by default.',
         points: ['Chip-level monitoring', 'History charts and .xlsx export', 'Review before moving to Trash'],
       },
     },
@@ -167,7 +167,7 @@ export const en: SiteContent = {
       },
       dailyBriefing: {
         title: 'Your day, in a daily briefing',
-        description: 'Choose from eight templates, select usage, typing, system and zisla activity metrics, and preview the layout. Export a PNG manually or at a chosen daily time. System Screen Time history is used when enabled and available; unavailable data is not presented as measured zero.',
+        description: 'Choose from eight templates, select usage, typing, system and zisla activity metrics, and preview the layout. Export a PNG manually or at a chosen daily time. System Screen Time history is used when enabled and available; unavailable data is not presented as measured zero. Choose a separate export folder in Settings → Save Location.',
         detail: '8 templates · Select content · Preview and scheduled PNG export',
       },
       userCare: {
@@ -182,8 +182,8 @@ export const en: SiteContent = {
       },
       recording: {
         title: 'Record and edit in the recording studio',
-        description: 'Record a display, window or region with optional system audio, microphone and camera. Edit video, audio, images and text across tracks, add animations, zooms and captions, and review a sharp live preview. Choose original, 16:9, 9:16, 1:1 or 4:3 canvas ratios. Export video, GIF, Live Photo or audio; some formats require FFmpeg. Optional AI edits are previewed before you apply them. Recording files use the save location in download settings.',
-        detail: 'Multitrack editing · Canvas ratios and preview · Video, GIF, Live Photo and audio',
+        description: 'Record a display, window or region with optional system audio, microphone and camera. Edit video, audio, images and text across tracks with animations, zooms and captions. Adjust portrait smoothing, brightness, face and body slimming, choose voice effects, and add smooth cursor trails in your colour. Play the edited result in the studio. Choose original, 16:9, 9:16, 1:1 or 4:3; export video, GIF, Live Photo or audio, with FFmpeg needed for some formats. Preview optional AI edits before applying them. Recording has its own folder in Settings → Save Location.',
+        detail: 'Portrait and voice effects · Coloured cursor trails · Multitrack playback and export',
       },
       permissions: {
         title: 'System permissions in one place',
@@ -205,7 +205,7 @@ export const en: SiteContent = {
       capture: {
         title: 'Screenshots, scrolling captures and pinning',
         description:
-          'Capture, pin or stitch scrolling screenshots with configurable shortcuts. Highlight areas, extract image regions, round corners and preserve annotations on export. Recognise text and copy it, translate recognised text and copy the result, or export recognised tables as .xlsx. Stash screenshots on the shelf. Shortcut settings check conflicts with voice input and Quick Actions. The save dialog opens in the current download folder.',
+          'Capture, pin or stitch scrolling screenshots with configurable shortcuts. Highlight areas, extract image regions, round corners and preserve annotations on export. Recognise text and copy it, translate recognised text and copy the result, or export recognised tables as .xlsx. Stash screenshots on the shelf. Shortcut settings check conflicts with voice input and Quick Actions. The save dialog opens in the screenshot folder set in Settings → Save Location. Pinned screenshots stay in place when capturing again.',
         detail: 'Highlight and extract · OCR, translation and copy · Rounded corners and .xlsx',
       },
       voice: {
@@ -229,7 +229,7 @@ export const en: SiteContent = {
       copyAssistant: {
         title: 'Quick Actions and smart next steps',
         description:
-          'Once enabled, copied text, links, files or images are previewed in a separate bar at the top of the screen. It recognises links, locally installed app names and emoji names, and can convert copied currency amounts at current exchange rates; every next step is carried out only after you confirm. Open the containing folder through Quick Actions after a browser download or AirDrop transfer. Supports default and chosen Chrome download folders, with a separate switch from download progress. IP addresses have separate lookup and open-link actions. Currency conversion recognises local minor units, and the emoji catalogue includes Emoji 18.0.',
+          'Once enabled, copied text, links, files or images are previewed in a separate bar at the top of the screen. It recognises links, locally installed app names and emoji names, and can convert copied currency amounts at current exchange rates; every next step is carried out only after you confirm. Open the containing folder through Quick Actions after a browser download or AirDrop transfer. Supports default and chosen Chrome download folders, with a separate switch from download progress. IP addresses have separate lookup and open-link actions. Currency conversion recognises local minor units, and the emoji catalogue includes Emoji 18.0. Saved text and images use the separate Quick Actions folder in Settings → Save Location.',
         detail: 'On-device recognition · Live currency conversion · Command+N by default',
       },
       aiManagement: {
@@ -253,7 +253,7 @@ export const en: SiteContent = {
       recommendedTools: {
         title: 'Recommended apps',
         description:
-          'Discover tools such as OpenScreen for screen recording and video editing, and DockDoor for Dock window previews and app switching. These are third-party apps installed separately.',
+          'Discover OpenScreen for screen recording and video editing, DockDoor for window previews and app switching, and Quiet.md for local notes. These third-party apps are installed separately.',
         detail: 'Discover desktop tools · Third-party apps · Separate installation',
       },
     },
@@ -334,6 +334,17 @@ export const en: SiteContent = {
   },
   changelog: {
     releaseNotes: {
+      'v0.1.22': [
+        'Recording Studio adds portrait smoothing, brightening, face and body slimming, adjustable voice presets and optional microphone monitoring. Effects can be adjusted during setup and editing.',
+        'Smooth cursor trails have a selectable colour. Studio playback shows the edited result, including its tracks, effects and audio.',
+        'Settings → Save Location separates downloads, screenshots, recordings, Quick Actions and daily briefings. Existing locations are preserved on upgrade, then each folder can be changed independently.',
+        'Optional system junk cleanup runs every 7, 15 or 30 days and moves items to Trash. Choose trusted items or all actionable items, including those requiring review; it is off by default. Disk cleanup also adds orphaned AI session workspace review, protecting retained sessions and newly created workspaces.',
+        'Clipboard history can automatically delete entries older than 7, 15 or 30 days while preserving favourites. Automatic deletion is off by default.',
+        'Quick Notes previews handwritten attachments and supports editing the text before or after them through Notes while preserving the original attachments.',
+        'AI monitoring hides remaining subscription allowances while keeping daily usage and improves chart scrolling and month labels. Battery monitoring settings are grouped under System Status.',
+        'Quiet.md joins recommended desktop apps for local notes, with installation and management in Settings.',
+        'Bilibili downloads honour the selected video part and handle more link formats. Calendar deletion targets the selected recurring occurrence. Pinned screenshots stay visible across repeated captures, with clearer tool labels and more reliable size badges.',
+      ],
       'v0.1.21': [
         'System monitoring keeps all existing and new minute-level history by default until you clear it. Charts for any time range and .xlsx export remain available.',
         'Downloads, recordings and screenshots share one save location. Screenshot save dialogs open in the current download folder; the duplicate recording save-location setting is removed.',
@@ -419,7 +430,7 @@ export const en: SiteContent = {
       storage: {
         question: 'Where does zisla store its data?',
         answer:
-          'Local data lives in ~/Library/Application Support/zisla/. Typing stats are kept separately in ~/Library/Application Support/zisla/typing-stats.sqlite3. Quick Notes uses the system Notes app.',
+          'Local data lives in ~/Library/Application Support/zisla/. Typing stats are kept separately in ~/Library/Application Support/zisla/typing-stats.sqlite3. Quick Notes uses the system Notes app. Settings → Save Location provides independent folders for downloads, screenshots, recordings, Quick Actions and daily briefings. On upgrade, each inherits the previous shared folder and can then be changed separately.',
       },
     },
   },

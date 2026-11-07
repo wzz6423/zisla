@@ -87,13 +87,13 @@ export const de: SiteContent = {
       clipboard: {
         name: 'Zwischenablage',
         caption:
-          'Sieh den Verlauf der Zwischenablage in der Dynamic Island und filtere nach Bild, URL, Pfad und Dateityp und sieh, wann jeder Eintrag kopiert wurde. Einträge lassen sich an die Kurznotizen senden, als Favorit anheften oder löschen.',
+          'Sieh den Verlauf der Zwischenablage in der Dynamic Island und filtere nach Bild, URL, Pfad und Dateityp und sieh, wann jeder Eintrag kopiert wurde. Einträge lassen sich an die Kurznotizen senden, als Favorit anheften oder löschen. Optional wird Verlauf gelöscht, der älter als 7, 15 oder 30 Tage ist; Favoriten bleiben erhalten. Automatisches Löschen ist standardmäßig aus.',
         points: ['Verlauf in der Island', 'Filter nach Typ', 'Kurznotizen und Favoriten'],
       },
       aiMonitor: {
         name: 'KI-Überblick',
         caption:
-          'Erkennt automatisch Aktivität unterstützter KI-CLIs, Desktop-Apps und IDEs und zeigt Aufgaben, Status, den Verlauf verbrauchter Tokens und eine Beitrags-Heatmap. Ausgewertet werden nur strukturierte Ereignisse, niemals Gesprächstext. Die Aufgabenerkennung für Cursor sowie numerische Nutzung und verfügbare Abonnementkontingente für Cursor und Muse Code sind ergänzt. Lange Werkzeugläufe in Cursor bleiben sichtbar.',
+          'Erkennt automatisch Aktivität unterstützter KI-CLIs, Desktop-Apps und IDEs und zeigt Aufgaben, Status, den Verlauf verbrauchter Tokens und eine Beitrags-Heatmap. Ausgewertet werden nur strukturierte Ereignisse, niemals Gesprächstext. Die Aufgabenerkennung für Cursor sowie tägliche numerische Nutzung ohne Anzeige verbleibender Kontingente für Cursor und Muse Code sind ergänzt. Lange Werkzeugläufe in Cursor bleiben sichtbar.',
         points: [
           'Aufgaben aus mehreren Werkzeugen',
           'Verlauf des Token-Verbrauchs',
@@ -113,7 +113,7 @@ export const de: SiteContent = {
       download: {
         name: 'Downloader',
         caption:
-          'Füge einen Link ein oder lass zisla nach dem Aktivieren Links aus der Zwischenablage erkennen. Wähle ein verfügbares Video- oder Audioformat und nutze Cookies eines installierten Browsers, wenn ein Douyin-Download sie benötigt. Speichere im Standardordner oder einem eigenen, mit Quellsymbol, Fortschritt in Echtzeit und Abschlussstatus. Downloads, Aufnahmen und Screenshots teilen diesen Speicherort.',
+          'Füge einen Link ein oder lass zisla nach dem Aktivieren Links aus der Zwischenablage erkennen. Wähle ein verfügbares Video- oder Audioformat und nutze Cookies eines installierten Browsers, wenn ein Douyin-Download sie benötigt. Speichere im Standardordner oder einem eigenen, mit Quellsymbol, Fortschritt in Echtzeit und Abschlussstatus. Wähle den Downloadordner unter Einstellungen → Speicherort unabhängig von Screenshots und Aufnahmen. Bilibili-Links laden den ausgewählten Videoteil.',
         points: [
           'Verfügbare Video- oder Audioformate wählen',
           'Browser-Cookies für Douyin',
@@ -135,7 +135,7 @@ export const de: SiteContent = {
       quickNotes: {
         name: 'Kurznotizen',
         caption:
-          'Basiert auf der System-App Notizen: Notizen ansehen, bearbeiten, neu anlegen und löschen, mit Markdown-Vorschau in Echtzeit – und mit Command+1 bis 9 direkt zu den ersten neun Notizen springen. Entwürfe werden automatisch nach Notizen zurückgeschrieben.',
+          'Basiert auf der System-App Notizen: Notizen ansehen, bearbeiten, neu anlegen und löschen, mit Markdown-Vorschau in Echtzeit – und mit Command+1 bis 9 direkt zu den ersten neun Notizen springen. Entwürfe werden automatisch nach Notizen zurückgeschrieben. Handschriftliche Anhänge lassen sich ansehen und der Text davor oder danach bearbeiten, während die Originale erhalten bleiben.',
         points: ['Daten liegen in Notizen', 'Markdown-Editor', 'Entwürfe automatisch gesichert'],
       },
       volumeMixer: {
@@ -156,7 +156,7 @@ export const de: SiteContent = {
       system: {
         name: 'Systemstatus',
         caption:
-          'Sieh den Status von CPU, GPU, Speicher, Datenträger, Netzwerk und Lüftern, lies die NVMe-SMART-Temperatur, wo die Hardware sie meldet, zeichne einen minütlichen Verlauf auf, der sich für jeden Zeitraum als Diagramm zeigen und als .xlsx exportieren lässt. Scanne App-Caches, Apple-Benutzercaches, Protokolle und verbliebene Einstellungsdateien. Prüfe die Auswahl, verschiebe sie in den Papierkorb und sieh dir das Ergebnis an. Sieh detaillierte Werte dieses Mac – Ladung, Zustand, Ladezyklen, Temperatur und Kapazität – und dazu den Ladestand nahegelegener Geräte, soweit das System ihn bereitstellt. Öffentliche IPv4- und IPv6-Adressen werden getrennt angezeigt. Der Verlauf bleibt standardmäßig erhalten, bis du ihn löschst.',
+          'Prüfe CPU, GPU, Speicher, Datenträger, Netzwerk, Lüfter und verfügbare NVMe-SMART-Temperaturen. Zeige den minütlichen Verlauf für jeden Zeitraum oder exportiere .xlsx; der Verlauf bleibt bis zum manuellen Löschen erhalten. Sieh Ladung, Batteriezustand, Ladezyklen, Temperatur und Kapazität des Mac und nahe Geräte, mit getrennten öffentlichen IPv4- und IPv6-Adressen. Prüfe Caches, Protokolle, Einstellungsreste und KI-Arbeitsordner ohne gespeicherte Sitzung vor dem Verschieben in den Papierkorb. Optionale Bereinigung läuft alle 7, 15 oder 30 Tage für vertrauenswürdige oder alle bearbeitbaren Einträge, einschließlich prüfpflichtiger; standardmäßig ist sie aus.',
         points: [
           'Überwachung bis zum Chip',
           'Verlaufsdiagramme und .xlsx-Export',
@@ -182,7 +182,7 @@ export const de: SiteContent = {
       },
       dailyBriefing: {
         title: 'Ihr Tag als Tagesbericht',
-        description: 'Wählen Sie aus acht Vorlagen und bestimmen Sie Nutzungs-, Tipp-, System- und zisla-Aktivitätsdaten. Prüfen Sie die Vorschau und exportieren Sie ein PNG manuell oder täglich zur gewählten Zeit. Der Bildschirmzeitverlauf wird nur bei Aktivierung und Verfügbarkeit verwendet; fehlende Daten gelten nicht als gemessene Null.',
+        description: 'Wählen Sie aus acht Vorlagen und bestimmen Sie Nutzungs-, Tipp-, System- und zisla-Aktivitätsdaten. Prüfen Sie die Vorschau und exportieren Sie ein PNG manuell oder täglich zur gewählten Zeit. Der Bildschirmzeitverlauf wird nur bei Aktivierung und Verfügbarkeit verwendet; fehlende Daten gelten nicht als gemessene Null. Wählen Sie einen eigenen Exportordner unter Einstellungen → Speicherort.',
         detail: '8 Vorlagen · Inhalte wählen · Vorschau und geplanter PNG-Export',
       },
       userCare: {
@@ -197,8 +197,8 @@ export const de: SiteContent = {
       },
       recording: {
         title: 'Aufnehmen und bearbeiten im Studio',
-        description: 'Nehmen Sie Bildschirm, Fenster oder Bereich mit optionalem Systemaudio, Mikrofon und Kamera auf. Bearbeiten Sie Video, Audio, Bilder und Text auf mehreren Spuren, ergänzen Sie Animationen, Zooms und Untertitel und prüfen Sie eine scharfe Vorschau. Wählen Sie Original, 16:9, 9:16, 1:1 oder 4:3. Exportieren Sie Video, GIF, Live Photo oder Audio; manche Formate benötigen FFmpeg. Optionale KI-Vorschläge werden vor der Anwendung geprüft. Aufnahmen verwenden den Speicherort aus den Download-Einstellungen.',
-        detail: 'Mehrspurbearbeitung · Seitenverhältnisse und Vorschau · Video, GIF, Live Photo und Audio',
+        description: 'Nehmen Sie Bildschirm, Fenster oder Bereich mit optionalem Systemaudio, Mikrofon und Kamera auf. Bearbeiten Sie Video, Audio, Bilder und Text auf mehreren Spuren mit Animationen, Zooms und Untertiteln. Passen Sie Hautglättung, Helligkeit, Gesichts- und Körperform sowie Stimmeffekte an und ergänzen Sie sanfte Cursorspuren in eigener Farbe. Spielen Sie das Ergebnis im Studio ab. Wählen Sie Original, 16:9, 9:16, 1:1 oder 4:3; exportieren Sie Video, GIF, Live Photo oder Audio. Manche Formate benötigen FFmpeg. Prüfen Sie optionale KI-Vorschläge vor der Anwendung. Der Aufnahmeordner wird unter Einstellungen → Speicherort separat gewählt.',
+        detail: 'Porträt- und Stimmeffekte · Farbige Cursorspuren · Mehrspurwiedergabe und Export',
       },
       permissions: {
         title: 'Systemberechtigungen an einem Ort',
@@ -220,7 +220,7 @@ export const de: SiteContent = {
       capture: {
         title: 'Bildschirmfotos, Scroll-Aufnahmen und Anheften',
         description:
-          'Erstellen, anheften oder verbinden Sie scrollende Screenshots mit eigenen Kurzbefehlen. Markieren Sie Bereiche, extrahieren Sie Bildteile, runden Sie Ecken ab und behalten Sie Anmerkungen beim Export. Erkennen und kopieren Sie Text, übersetzen und kopieren Sie ihn oder exportieren Sie erkannte Tabellen als .xlsx. Legen Sie Screenshots in der Ablage ab. Kurzbefehle werden auf Konflikte mit Spracheingabe und Schnellaktionen geprüft. Der Speicherdialog öffnet sich im aktuellen Download-Ordner.',
+          'Erstellen, anheften oder verbinden Sie scrollende Screenshots mit eigenen Kurzbefehlen. Markieren Sie Bereiche, extrahieren Sie Bildteile, runden Sie Ecken ab und behalten Sie Anmerkungen beim Export. Erkennen und kopieren Sie Text, übersetzen und kopieren Sie ihn oder exportieren Sie erkannte Tabellen als .xlsx. Legen Sie Screenshots in der Ablage ab. Kurzbefehle werden auf Konflikte mit Spracheingabe und Schnellaktionen geprüft. Der Speicherdialog öffnet sich im Screenshotordner unter Einstellungen → Speicherort. Angeheftete Screenshots bleiben bei weiteren Aufnahmen erhalten.',
         detail: 'Markieren und extrahieren · Erkennen, übersetzen und kopieren · Runde Ecken und .xlsx',
       },
       voice: {
@@ -244,7 +244,7 @@ export const de: SiteContent = {
       copyAssistant: {
         title: 'Schnellaktionen und nächste Schritte',
         description:
-          'Nach dem Aktivieren erscheinen kopierter Text, Links, Dateien oder Bilder in einer eigenen Leiste am oberen Bildschirmrand. Er erkennt Links, Namen lokal installierter Apps und Emoji-Namen und kann kopierte Geldbeträge zu aktuellen Wechselkursen umrechnen; alle nächsten Schritte führt er erst nach deiner Bestätigung aus. Öffne nach einem Browserdownload oder AirDrop-Empfang den Zielordner über Schnellaktionen. Unterstützt die standardmäßigen und selbst gewählten Chrome-Downloadordner, unabhängig von der Anzeige des Downloadfortschritts. IP-Abfragen und das Öffnen von Links sind getrennte Aktionen. Währungsumrechnungen erkennen lokale Untereinheiten; der Emoji-Katalog enthält Emoji 18.0.',
+          'Nach dem Aktivieren erscheinen kopierter Text, Links, Dateien oder Bilder in einer eigenen Leiste am oberen Bildschirmrand. Er erkennt Links, Namen lokal installierter Apps und Emoji-Namen und kann kopierte Geldbeträge zu aktuellen Wechselkursen umrechnen; alle nächsten Schritte führt er erst nach deiner Bestätigung aus. Öffne nach einem Browserdownload oder AirDrop-Empfang den Zielordner über Schnellaktionen. Unterstützt die standardmäßigen und selbst gewählten Chrome-Downloadordner, unabhängig von der Anzeige des Downloadfortschritts. IP-Abfragen und das Öffnen von Links sind getrennte Aktionen. Währungsumrechnungen erkennen lokale Untereinheiten; der Emoji-Katalog enthält Emoji 18.0. Gespeicherte Texte und Bilder verwenden den separaten Schnellaktionenordner unter Einstellungen → Speicherort.',
         detail: 'Lokale Erkennung · Live-Wechselkursumrechnung · Standard Command+N',
       },
       aiManagement: {
@@ -268,7 +268,7 @@ export const de: SiteContent = {
       recommendedTools: {
         title: 'Empfohlene Apps',
         description:
-          'Entdecke OpenScreen für Bildschirmaufnahmen und Videoschnitt sowie DockDoor für Fenstervorschauen im Dock und App-Wechsel. Diese Anwendungen von Drittanbietern werden separat installiert.',
+          'Entdecke OpenScreen für Bildschirmaufnahmen und Videoschnitt, DockDoor für Fenstervorschauen und App-Wechsel sowie Quiet.md für lokale Notizen. Diese Drittanbieter-Apps werden separat installiert.',
         detail: 'Desktop-Werkzeuge entdecken · Drittanbieter-Apps · Separate Installation',
       },
     },
@@ -349,6 +349,17 @@ export const de: SiteContent = {
   },
   changelog: {
     releaseNotes: {
+      'v0.1.22': [
+        'Das Aufnahmestudio ergänzt Hautglättung, Aufhellung, Gesichts- und Körperkorrektur, einstellbare Stimmvorlagen und optionales Mikrofon-Monitoring. Die Effekte lassen sich vor der Aufnahme und beim Bearbeiten einstellen.',
+        'Sanfte Cursorspuren haben eine frei wählbare Farbe. Die Studiowiedergabe zeigt das bearbeitete Ergebnis mit Spuren, Effekten und Audio.',
+        'Einstellungen → Speicherort trennt Downloads, Screenshots, Aufnahmen, Schnellaktionen und Tagesberichte. Beim Update bleiben bisherige Speicherorte erhalten und können danach unabhängig geändert werden.',
+        'Optionale Systembereinigung verschiebt Einträge alle 7, 15 oder 30 Tage in den Papierkorb. Wählbar sind vertrauenswürdige oder alle bearbeitbaren Einträge, einschließlich prüfpflichtiger; standardmäßig ist sie aus. KI-Arbeitsordner ohne gespeicherte Sitzung können geprüft werden, während gespeicherte Sitzungen und neue Ordner geschützt bleiben.',
+        'Zwischenablageverlauf kann Einträge über 7, 15 oder 30 Tage automatisch löschen und Favoriten behalten. Automatisches Löschen ist standardmäßig aus.',
+        'Kurznotizen zeigen handschriftliche Anhänge und erlauben das Bearbeiten des Texts davor oder danach über Notizen, während die Originalanhänge erhalten bleiben.',
+        'Die KI-Überwachung blendet verbleibende Abonnementkontingente aus und behält tägliche Nutzung. Diagrammscrollen und Monatsbeschriftungen sind verbessert. Batterieeinstellungen sind unter Systemstatus zusammengefasst.',
+        'Quiet.md für lokale Notizen gehört zu den empfohlenen Desktop-Apps und lässt sich in den Einstellungen installieren und verwalten.',
+        'Bilibili lädt den ausgewählten Videoteil und unterstützt mehr Linkformate. Kalenderlöschen betrifft das ausgewählte wiederkehrende Vorkommen. Angeheftete Screenshots bleiben bei weiteren Aufnahmen sichtbar; Werkzeugbeschriftungen und Größenanzeigen sind zuverlässiger.',
+      ],
       'v0.1.21': [
         'Die Systemüberwachung behält standardmäßig den gesamten vorhandenen und neuen minütlichen Verlauf, bis er manuell gelöscht wird. Diagramme für beliebige Zeiträume und der .xlsx-Export bleiben verfügbar.',
         'Downloads, Aufnahmen und Screenshots teilen einen Speicherort. Der Speicherdialog für Screenshots öffnet sich im aktuellen Download-Ordner; die doppelte Speicherort-Einstellung für Aufnahmen wurde entfernt.',
@@ -434,7 +445,7 @@ export const de: SiteContent = {
       storage: {
         question: 'Wo speichert zisla seine Daten?',
         answer:
-          'Lokale Daten liegen in ~/Library/Application Support/zisla/. Die Tippstatistik wird getrennt in ~/Library/Application Support/zisla/typing-stats.sqlite3 gespeichert. Kurznotizen nutzen die System-App Notizen.',
+          'Lokale Daten liegen in ~/Library/Application Support/zisla/. Die Tippstatistik wird getrennt in ~/Library/Application Support/zisla/typing-stats.sqlite3 gespeichert. Kurznotizen nutzen die System-App Notizen. Einstellungen → Speicherort verwaltet eigene Ordner für Downloads, Screenshots, Aufnahmen, Schnellaktionen und Tagesberichte. Beim Update übernehmen sie den bisherigen gemeinsamen Ordner und lassen sich danach separat ändern.',
       },
     },
   },

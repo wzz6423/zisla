@@ -89,13 +89,13 @@ export const nl = createCatalog({
       clipboard: {
         name: 'Klembord',
         caption:
-          'Bekijk de klembordgeschiedenis in het eiland en filter op afbeelding, URL, pad of bestandstype en zie wanneer elk item is gekopieerd. Stuur een item naar Snelle notities, maak het favoriet of verwijder het.',
+          'Bekijk de klembordgeschiedenis in het eiland en filter op afbeelding, URL, pad of bestandstype en zie wanneer elk item is gekopieerd. Stuur een item naar Snelle notities, maak het favoriet of verwijder het. Je kunt geschiedenis ouder dan 7, 15 of 30 dagen automatisch verwijderen en favorieten behouden. Automatisch verwijderen staat standaard uit.',
         points: ['Geschiedenis in het eiland', 'Filteren op type', 'Snelle notities en favorieten'],
       },
       aiMonitor: {
         name: 'AI-monitor',
         caption:
-          'Detecteert activiteit van ondersteunde AI-CLI’s, desktopapps en IDE’s en toont taken, status, tokentrends en een bijdrageheatmap. Alleen gestructureerde gebeurtenissen worden gelezen; gesprekken nooit. Taakdetectie voor Cursor en numeriek gebruik met beschikbare abonnementsquota voor Cursor en Muse Code zijn toegevoegd; lange tooltaken in Cursor blijven zichtbaar.',
+          'Detecteert activiteit van ondersteunde AI-CLI’s, desktopapps en IDE’s en toont taken, status, tokentrends en een bijdrageheatmap. Alleen gestructureerde gebeurtenissen worden gelezen; gesprekken nooit. Taakdetectie voor Cursor en dagelijks numeriek gebruik zonder resterende quota te tonen voor Cursor en Muse Code zijn toegevoegd; lange tooltaken in Cursor blijven zichtbaar.',
         points: ['Taken uit tools samengevoegd', 'Trends in tokenverbruik', 'Leest geen prompts of antwoorden'],
       },
       keyboardSound: {
@@ -107,7 +107,7 @@ export const nl = createCatalog({
       download: {
         name: 'Downloader',
         caption:
-          'Plak een link of laat zisla links uit het klembord herkennen zodra de functie is ingeschakeld. Kies video of audio en download naar de standaardmap of een map naar keuze. Ondersteunde links tonen bron, live voortgang en voltooiingsstatus. Downloads, opnamen en schermafbeeldingen delen deze opslaglocatie.',
+          'Plak een link of laat zisla links uit het klembord herkennen zodra de functie is ingeschakeld. Kies video of audio en download naar de standaardmap of een map naar keuze. Ondersteunde links tonen bron, live voortgang en voltooiingsstatus. Kies de downloadmap onder Instellingen → Opslaglocatie, los van schermafbeeldingen en opnamen. Bilibili-links downloaden het gekozen videodeel.',
         points: ['Video- / audiomodi', 'Standaard- of eigen map', 'Bron en live voortgang'],
       },
       agenda: {
@@ -125,7 +125,7 @@ export const nl = createCatalog({
       quickNotes: {
         name: 'Snelle notities',
         caption:
-          'Gebruikt de systeemapp Notities om notities te bekijken, bewerken, maken en verwijderen met live Markdown-voorbeeld, en met Command+1 tot 9 meteen naar de eerste negen notities te springen. Concepten worden automatisch teruggeschreven.',
+          'Gebruikt de systeemapp Notities om notities te bekijken, bewerken, maken en verwijderen met live Markdown-voorbeeld, en met Command+1 tot 9 meteen naar de eerste negen notities te springen. Concepten worden automatisch teruggeschreven. Bekijk handgeschreven bijlagen en bewerk de tekst ervoor of erna, met behoud van de originelen.',
         points: ['Gegevens in Notities', 'Markdown-editor', 'Concepten automatisch opgeslagen'],
       },
       volumeMixer: {
@@ -142,7 +142,7 @@ export const nl = createCatalog({
       system: {
         name: 'Systeemstatus',
         caption:
-          'Controleer CPU, GPU, geheugen, schijf, netwerk en ventilatoren; lees de NVMe-SMART-temperatuur wanneer de hardware die aanbiedt, houd een minuutsgewijze geschiedenis bij die je voor elke periode als grafiek bekijkt en als .xlsx exporteert. Scan appcaches, Apple-gebruikerscaches, logboeken en achtergebleven voorkeurenbestanden. Controleer de selectie, verplaats deze naar de prullenmand en bekijk het resultaat. Bekijk lading, gezondheid, cycli, temperatuur en capaciteit van deze Mac, plus batterijniveaus van nabije apparaten die het systeem deelt. Openbare IPv4- en IPv6-adressen worden apart weergegeven. De geschiedenis blijft standaard bewaard totdat je die wist.',
+          'Controleer CPU, GPU, geheugen, schijf, netwerk, ventilatoren en beschikbare NVMe-SMART-temperatuur. Toon de geschiedenis per minuut voor elke periode of exporteer .xlsx; deze blijft tot je haar wist. Bekijk lading, batterijconditie, laadcycli, temperatuur en capaciteit van de Mac en niveaus van nabije apparaten, met aparte openbare IPv4 en IPv6. Controleer caches, logboeken, achtergebleven voorkeuren en AI-werkmappen zonder bewaarde sessie voordat je ze naar de prullenmand verplaatst. Optionele opruiming werkt elke 7, 15 of 30 dagen voor vertrouwde of alle verwerkbare items, inclusief items die controle vereisen; standaard uit.',
         points: ['Monitoring op chipniveau', 'Geschiedenisgrafieken en .xlsx-export', 'Controleren vóór verplaatsen naar prullenmand'],
       },
     },
@@ -165,7 +165,7 @@ export const nl = createCatalog({
       },
       dailyBriefing: {
         title: 'Uw dag in een dagoverzicht',
-        description: 'Kies uit acht sjablonen, selecteer gebruiks-, typ-, systeem- en zisla-activiteitsgegevens en bekijk de voorvertoning. Exporteer een PNG handmatig of dagelijks op een gekozen tijd. Schermtijdgeschiedenis wordt gebruikt als deze is ingeschakeld en beschikbaar; ontbrekende gegevens gelden niet als gemeten nul.',
+        description: 'Kies uit acht sjablonen, selecteer gebruiks-, typ-, systeem- en zisla-activiteitsgegevens en bekijk de voorvertoning. Exporteer een PNG handmatig of dagelijks op een gekozen tijd. Schermtijdgeschiedenis wordt gebruikt als deze is ingeschakeld en beschikbaar; ontbrekende gegevens gelden niet als gemeten nul. Kies een aparte exportmap onder Instellingen → Opslaglocatie.',
         detail: '8 sjablonen · Inhoud kiezen · Voorvertoning en geplande PNG-export',
       },
       userCare: {
@@ -180,8 +180,8 @@ export const nl = createCatalog({
       },
       recording: {
         title: 'Opnemen en bewerken in de studio',
-        description: 'Neem scherm, venster of gebied op met optionele systeemaudio, microfoon en camera. Bewerk video, audio, afbeeldingen en tekst op meerdere sporen, voeg animaties, zoom en ondertitels toe en bekijk een scherpe voorvertoning. Kies origineel, 16:9, 9:16, 1:1 of 4:3. Exporteer video, GIF, Live Photo of audio; sommige formaten vereisen FFmpeg. Optionele AI-plannen worden bekeken voor toepassing. Opnamen gebruiken de opslaglocatie uit de downloadinstellingen.',
-        detail: 'Meersporenbewerking · Verhoudingen en voorvertoning · Video, GIF, Live Photo en audio',
+        description: 'Neem scherm, venster of gebied op met optionele systeemaudio, microfoon en camera. Bewerk video, audio, afbeeldingen en tekst op meerdere sporen met animaties, zoom en ondertitels. Pas huidverzachting, helderheid, versmalling van gezicht en lichaam, stemeffecten en vloeiende cursorsporen in je eigen kleur aan. Speel de bewerking af in de studio. Kies origineel, 16:9, 9:16, 1:1 of 4:3; exporteer video, GIF, Live Photo of audio. Sommige formaten vereisen FFmpeg. Bekijk optionele AI-plannen voordat je ze toepast. De opnamemap kies je apart onder Instellingen → Opslaglocatie.',
+        detail: 'Portret- en stemeffecten · Gekleurde cursorsporen · Meersporenweergave en export',
       },
       permissions: {
         title: 'Systeemtoestemmingen op één plek',
@@ -203,7 +203,7 @@ export const nl = createCatalog({
       capture: {
         title: 'Schermafbeeldingen, scrollcaptures en vastzetten',
         description:
-          'Maak, zet vast of voeg scrollende schermafbeeldingen samen met eigen sneltoetsen. Markeer gebieden, haal afbeeldingsdelen eruit, rond hoeken af en behoud annotaties bij export. Herken en kopieer tekst, vertaal en kopieer het resultaat of exporteer herkende tabellen als .xlsx. Bewaar afbeeldingen op de plank. Instellingen controleren conflicten met spraak en snelle acties. Het opslagvenster opent in de huidige downloadmap.',
+          'Maak, zet vast of voeg scrollende schermafbeeldingen samen met eigen sneltoetsen. Markeer gebieden, haal afbeeldingsdelen eruit, rond hoeken af en behoud annotaties bij export. Herken en kopieer tekst, vertaal en kopieer het resultaat of exporteer herkende tabellen als .xlsx. Bewaar afbeeldingen op de plank. Instellingen controleren conflicten met spraak en snelle acties. Het opslagvenster opent in de screenshotmap onder Instellingen → Opslaglocatie. Vastgezette afbeeldingen blijven bij nieuwe captures staan.',
         detail: 'Markeren en extraheren · Herkennen, vertalen en kopiëren · Ronde hoeken en .xlsx',
       },
       voice: {
@@ -227,7 +227,7 @@ export const nl = createCatalog({
       copyAssistant: {
         title: 'Snelle acties en volgende stappen',
         description:
-          'Na inschakelen worden gekopieerde tekst, links, bestanden of afbeeldingen in een aparte balk getoond, met opties om te openen, in Finder te tonen, te zoeken, vertalen, berekenen of opslaan — alleen na jouw bevestiging. Open de bestandsmap via snelle acties na een browserdownload of AirDrop-overdracht. Ondersteunt standaard en zelfgekozen Chrome-downloadmappen, met een aparte schakelaar naast de downloadvoortgang. IP-adressen hebben aparte acties voor opzoeken en links openen. Conversies herkennen kleine munteenheden; de catalogus bevat Emoji 18.0.',
+          'Na inschakelen worden gekopieerde tekst, links, bestanden of afbeeldingen in een aparte balk getoond, met opties om te openen, in Finder te tonen, te zoeken, vertalen, berekenen of opslaan — alleen na jouw bevestiging. Open de bestandsmap via snelle acties na een browserdownload of AirDrop-overdracht. Ondersteunt standaard en zelfgekozen Chrome-downloadmappen, met een aparte schakelaar naast de downloadvoortgang. IP-adressen hebben aparte acties voor opzoeken en links openen. Conversies herkennen kleine munteenheden; de catalogus bevat Emoji 18.0. Opgeslagen tekst en afbeeldingen gebruiken de aparte map voor snelle acties onder Instellingen → Opslaglocatie.',
         detail: 'Optionele schakelaar · Lokale herkenning · Command+N standaard',
       },
       aiManagement: {
@@ -250,7 +250,7 @@ export const nl = createCatalog({
       recommendedTools: {
         title: 'Aanbevolen apps',
         description:
-          'Ontdek OpenScreen voor schermopnamen en videobewerking en DockDoor voor venstervoorbeelden in het Dock en wisselen tussen apps. Dit zijn apart te installeren apps van andere ontwikkelaars.',
+          'Ontdek OpenScreen voor schermopnamen en videobewerking, DockDoor voor venstervoorbeelden en appwissels en Quiet.md voor lokale notities. Deze apps van andere ontwikkelaars installeer je apart.',
         detail: 'Ontdek bureaubladtools · Apps van derden · Aparte installatie',
       },
     },
@@ -312,6 +312,17 @@ export const nl = createCatalog({
   },
   changelog: {
     releaseNotes: {
+      'v0.1.22': [
+        'De studio voegt huidverzachting, helderheid, versmalling van gezicht en lichaam, verstelbare stempresets en optionele microfoonmonitoring toe. Effecten zijn vóór opname en tijdens bewerken aanpasbaar.',
+        'Vloeiende cursorsporen hebben een kleur naar keuze. De studio speelt het bewerkte resultaat af met sporen, effecten en audio.',
+        'Instellingen → Opslaglocatie scheidt downloads, schermafbeeldingen, opnamen, snelle acties en dagoverzichten. De update behoudt bestaande locaties; daarna is elke map afzonderlijk aanpasbaar.',
+        'Optionele systeemopruiming verplaatst items elke 7, 15 of 30 dagen naar de prullenmand. Kies vertrouwde of alle verwerkbare items, inclusief items die controle vereisen; standaard uit. Schijfopruiming voegt AI-werkmappen zonder bewaarde sessie toe voor controle en beschermt bewaarde sessies en nieuwe mappen.',
+        'Klembordgeschiedenis kan items ouder dan 7, 15 of 30 dagen automatisch verwijderen en favorieten behouden. Automatisch verwijderen staat standaard uit.',
+        'Snelle notities toont handgeschreven bijlagen en laat tekst ervoor of erna via Notities bewerken, met behoud van originele bijlagen.',
+        'AI-monitoring verbergt resterende abonnementsquota, houdt dagelijks gebruik bij en verbetert grafiekscrollen en maandlabels. Batterijinstellingen staan onder Systeemstatus.',
+        'Quiet.md voor lokale notities hoort bij de aanbevolen apps en is via Instellingen te installeren en beheren.',
+        'Bilibili downloadt het gekozen videodeel en verwerkt meer linkformaten. Kalenderverwijdering richt zich op het gekozen herhalingsmoment. Vastgezette afbeeldingen blijven tussen captures zichtbaar; gereedschapslabels en maatbadges zijn betrouwbaarder.',
+      ],
       'v0.1.21': [
         'De systeembewaking bewaart standaard alle bestaande en nieuwe geschiedenis per minuut totdat je die wist. Grafieken voor elke periode en export naar .xlsx blijven beschikbaar.',
         'Downloads, opnamen en schermafbeeldingen delen één opslaglocatie. Het opslagvenster voor schermafbeeldingen opent in de huidige downloadmap; de dubbele instelling voor de opslaglocatie van opnamen is verwijderd.',
@@ -370,7 +381,7 @@ export const nl = createCatalog({
       network: { question: 'Gaat zisla online?', answer: 'Weer, ondertekende updatecontroles, downloads die je start en optionele externe spraakbewerking gebruiken indien nodig het netwerk. Linkherkenning gebeurt lokaal. Een lokaal model corrigeert de tekst na de transcriptie; de spraakherkenning van Apple kan nog steeds het netwerk gebruiken, afhankelijk van de taal en de systeemondersteuning.' },
       multiDisplay: { question: 'Ondersteunt zisla meerdere schermen?', answer: 'Ja: meerdere schermen, Spaces en gewone apps op volledig scherm; uitklappen neemt nooit de focus.' },
       intel: { question: 'Kan ik zisla op een Intel-Mac gebruiken?', answer: 'Er kan een Intel-build bestaan, maar compatibiliteit is niet gegarandeerd. De huidige ondersteunde configuratie is Apple Silicon.' },
-      storage: { question: 'Waar slaat zisla gegevens op?', answer: 'Lokale gegevens staan in ~/Library/Application Support/zisla/. Typestatistieken staan apart in ~/Library/Application Support/zisla/typing-stats.sqlite3. Snelle notities gebruikt de systeemapp Notities.' },
+      storage: { question: 'Waar slaat zisla gegevens op?', answer: 'Lokale gegevens staan in ~/Library/Application Support/zisla/. Typestatistieken staan apart in ~/Library/Application Support/zisla/typing-stats.sqlite3. Snelle notities gebruikt de systeemapp Notities. Instellingen → Opslaglocatie biedt aparte mappen voor downloads, schermafbeeldingen, opnamen, snelle acties en dagoverzichten. Na een update behouden ze de oude gedeelde map; daarna kun je ze afzonderlijk wijzigen.' },
     },
   },
   developers: {
