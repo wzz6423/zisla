@@ -238,9 +238,10 @@ public actor DownloadService {
         }
         defer { try? fileManager.removeItem(at: taskTemporaryDirectory) }
 
-        if request.mode == .video,
-           request.formatSelection == nil,
-           DownloadFailureDiagnostics.isBilibiliURL(request.urlString) {
+        let canUseBilibiliNativeDownloader = request.mode == .video
+            && request.formatSelection == nil
+            && BilibiliDirectDownloader.supportsURL(request.urlString)
+        if canUseBilibiliNativeDownloader {
             return try await downloadBilibiliVideo(
                 request,
                 taskID: taskID,
@@ -252,10 +253,7 @@ public actor DownloadService {
         do {
             tools = try resolver.resolve()
         } catch let resolverError {
-            guard request.mode == .video,
-                  request.formatSelection == nil,
-                  DownloadFailureDiagnostics.isBilibiliURL(request.urlString)
-            else {
+            guard canUseBilibiliNativeDownloader else {
                 throw resolverError
             }
             do {
@@ -339,8 +337,7 @@ public actor DownloadService {
             if browserCookieAccessIsDenied(request.browserCookieSource, diagnostic: diagnostic) {
                 throw DownloadServiceError.browserCookieAccessDenied
             }
-            if request.mode == .video,
-               request.formatSelection == nil,
+            if canUseBilibiliNativeDownloader,
                DownloadFailureDiagnostics.shouldUseBilibiliNativeFallback(
                    rawDiagnostic: diagnostic,
                    urlString: request.urlString
