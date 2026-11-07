@@ -3,16 +3,11 @@ import Foundation
 import ZislaCore
 
 public struct AISubscriptionUsageRefresh: Sendable {
-    public var quotas: [AIQuotaSnapshot]
     public var usageSamples: [AIUsageSample]
-    public var failedProviders: Set<AIProvider>
     public var failedUsageProviders: Set<AIProvider>
 
-    public init(quotas: [AIQuotaSnapshot] = [], usageSamples: [AIUsageSample] = [],
-                failedProviders: Set<AIProvider> = [], failedUsageProviders: Set<AIProvider> = []) {
-        self.quotas = quotas
+    public init(usageSamples: [AIUsageSample] = [], failedUsageProviders: Set<AIProvider> = []) {
         self.usageSamples = usageSamples
-        self.failedProviders = failedProviders
         self.failedUsageProviders = failedUsageProviders
     }
 }
@@ -28,10 +23,9 @@ enum AISubscriptionUsageError: Error, Equatable {
     case historyLimitExceeded
 }
 
-/// Native adaptation of CodexBar's Cursor usage fetcher and Muse plugin (MIT).
+/// Native adaptation of CodexBar's Cursor usage fetcher (MIT).
 public final class AISubscriptionUsageService: AISubscriptionUsageDetecting {
     private let cursorCookie: @Sendable () throws -> String?
-    private let museToken: @Sendable () throws -> String?
     private let session: URLSession
     private let now: @Sendable () -> Date
     private let maximumHistoryPages: Int
@@ -46,13 +40,12 @@ public final class AISubscriptionUsageService: AISubscriptionUsageDetecting {
         let credentials = AISubscriptionCredentials(home: home)
         self.init(
             cursorCookie: { try credentials.cursorCookie(now: now()) },
-            museToken: { try credentials.museToken() }, configuration: configuration, now: now
+            configuration: configuration, now: now
         )
     }
 
     init(
         cursorCookie: @escaping @Sendable () throws -> String?,
-        museToken: @escaping @Sendable () throws -> String?,
         configuration: URLSessionConfiguration = .ephemeral,
         maximumHistoryPages: Int = 200,
         pageSize: Int = 1_000,
@@ -60,7 +53,6 @@ public final class AISubscriptionUsageService: AISubscriptionUsageDetecting {
         now: @escaping @Sendable () -> Date = Date.init
     ) {
         self.cursorCookie = cursorCookie
-        self.museToken = museToken
         configuration.httpShouldSetCookies = false
         configuration.httpCookieStorage = nil
         configuration.urlCache = nil
@@ -76,75 +68,23 @@ public final class AISubscriptionUsageService: AISubscriptionUsageDetecting {
     deinit { session.invalidateAndCancel() }
 
     public func subscriptionUsage() async -> AISubscriptionUsageRefresh {
-        await withTaskGroup(of: AISubscriptionUsageRefresh.self) { group in
-            group.addTask { await self.cursorUsage() }
-            group.addTask { await self.museUsage() }
-            var result = AISubscriptionUsageRefresh()
-            for await update in group {
-                result.quotas += update.quotas
-                result.usageSamples += update.usageSamples
-                result.failedProviders.formUnion(update.failedProviders)
-                result.failedUsageProviders.formUnion(update.failedUsageProviders)
-            }
-            return result
-        }
-    }
-
-    private func cursorUsage() async -> AISubscriptionUsageRefresh {
-        let cookie: String
         do {
-            guard let credential = try cursorCookie() else { return .init() }
-            cookie = credential
-        } catch { return .init(failedProviders: [.cursor], failedUsageProviders: [.cursor]) }
-        return await withTaskGroup(of: AISubscriptionUsageRefresh.self) { group in
-            group.addTask {
-                do {
-                    let data = try await self.request("https://cursor.com/api/usage-summary", cookie: cookie)
-                    return .init(quotas: try Self.cursorQuotas(data: data, now: self.now()))
-                } catch { return .init(failedProviders: [.cursor]) }
-            }
-            group.addTask {
-                do { return .init(usageSamples: try await self.cursorHistory(cookie: cookie)) }
-                catch { return .init(failedUsageProviders: [.cursor]) }
-            }
-            var result = AISubscriptionUsageRefresh()
-            for await update in group {
-                result.quotas += update.quotas
-                result.usageSamples += update.usageSamples
-                result.failedProviders.formUnion(update.failedProviders)
-                result.failedUsageProviders.formUnion(update.failedUsageProviders)
-            }
-            return result
-        }
+            guard let cookie = try cursorCookie() else { return .init() }
+            return .init(usageSamples: try await cursorHistory(cookie: cookie))
+        } catch { return .init(failedUsageProviders: [.cursor]) }
     }
 
-    private func museUsage() async -> AISubscriptionUsageRefresh {
-        do {
-            guard let token = try museToken() else { return .init() }
-            let data = try await request("https://api.meta.ai/muse-code/key", bearer: token, body: [:])
-            return .init(quotas: try Self.museQuotas(data: data, now: now()))
-        } catch { return .init(failedProviders: [.muse]) }
-    }
-
-    private func request(_ endpoint: String, cookie: String? = nil, bearer: String? = nil, body: [String: Any]? = nil) async throws -> Data {
+    private func request(_ endpoint: String, cookie: String, body: [String: Any]) async throws -> Data {
         try Task.checkCancellation()
         var request = URLRequest(url: URL(string: endpoint)!)
         request.timeoutInterval = 15
         request.setValue("application/json", forHTTPHeaderField: "Accept")
-        if let cookie {
-            request.setValue(cookie, forHTTPHeaderField: "Cookie")
-            request.setValue("https://cursor.com", forHTTPHeaderField: "Origin")
-            request.setValue("https://cursor.com/dashboard", forHTTPHeaderField: "Referer")
-        }
-        if let bearer {
-            request.setValue("Bearer \(bearer)", forHTTPHeaderField: "Authorization")
-            request.setValue("1.0.0", forHTTPHeaderField: "x-api-version")
-        }
-        if let body {
-            request.httpMethod = "POST"
-            request.setValue("application/json", forHTTPHeaderField: "Content-Type")
-            request.httpBody = try JSONSerialization.data(withJSONObject: body)
-        }
+        request.setValue(cookie, forHTTPHeaderField: "Cookie")
+        request.setValue("https://cursor.com", forHTTPHeaderField: "Origin")
+        request.setValue("https://cursor.com/dashboard", forHTTPHeaderField: "Referer")
+        request.httpMethod = "POST"
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.httpBody = try JSONSerialization.data(withJSONObject: body)
         let (data, response) = try await session.data(for: request)
         try Task.checkCancellation()
         guard let response = response as? HTTPURLResponse, response.url == request.url else {
@@ -247,59 +187,6 @@ public final class AISubscriptionUsageService: AISubscriptionUsageDetecting {
             }
         }
         return samples.values.sorted { ($0.sourceID ?? "") < ($1.sourceID ?? "") }
-    }
-
-    static func cursorQuotas(data: Data, now: Date) throws -> [AIQuotaSnapshot] {
-        guard let root = try JSONSerialization.jsonObject(with: data) as? [String: Any] else {
-            throw AISubscriptionUsageError.invalidResponse
-        }
-        let individual = root["individualUsage"] as? [String: Any]
-        let plan = individual?["plan"] as? [String: Any]
-        let overall = individual?["overall"] as? [String: Any]
-        let pooled = (root["teamUsage"] as? [String: Any])?["pooled"] as? [String: Any]
-        let percent = number(plan?["totalPercentUsed"]) ?? {
-            for allowance in [plan, overall, pooled] {
-                if let used = number(allowance?["used"]), let limit = number(allowance?["limit"]), limit > 0 {
-                    return used / limit * 100
-                }
-            }
-            return nil
-        }()
-        guard let percent else {
-            if root["isUnlimited"] as? Bool == true { return [] }
-            throw AISubscriptionUsageError.invalidResponse
-        }
-        let reset = date(root["billingCycleEnd"] as? String)
-        if let reset, reset <= now { throw AISubscriptionUsageError.invalidResponse }
-        return [.init(provider: .cursor, window: .plan, usedPercent: min(100, percent),
-            resetsAt: reset, checkedAt: now)]
-    }
-
-    static func museQuotas(data: Data, now: Date) throws -> [AIQuotaSnapshot] {
-        guard let root = try JSONSerialization.jsonObject(with: data) as? [String: Any],
-              root["is_subs_active"] as? Bool == true,
-              root["require_payment"] == nil || root["require_payment"] as? Bool == false else {
-            throw AISubscriptionUsageError.invalidResponse
-        }
-        guard let usage = root["subs_usage"] as? [String: Any] else { return [] }
-        guard let window = usage["window"] as? [String: Any], integer(window["window_duration_mins"]) == 300 else {
-            throw AISubscriptionUsageError.invalidResponse
-        }
-        return try [("window", AIQuotaWindow.fiveHours), ("weekly", .weekly)].map { key, window in
-            guard let value = usage[key] as? [String: Any], let percent = number(value["used_percent"]) else {
-                throw AISubscriptionUsageError.invalidResponse
-            }
-            let resetsAt = number(value["resets_at"]).flatMap { $0 > 0 && $0 < 253_402_300_800 ? Date(timeIntervalSince1970: $0) : nil }
-            if let resetsAt, resetsAt <= now { throw AISubscriptionUsageError.invalidResponse }
-            return .init(provider: .muse, window: window, usedPercent: min(100, percent), resetsAt: resetsAt, checkedAt: now)
-        }
-    }
-
-    static func date(_ value: String?) -> Date? {
-        guard let value else { return nil }
-        let formatter = ISO8601DateFormatter()
-        formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
-        return formatter.date(from: value) ?? ISO8601DateFormatter().date(from: value)
     }
 
     private static func number(_ value: Any?) -> Double? {
