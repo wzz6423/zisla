@@ -21,6 +21,7 @@ public final class QuickNotesService: ObservableObject {
         let readNote: (String) async -> Result<NotesAppBridge.NoteContent, NotesAppError>
         let readAttachments: (String) async -> Result<[NotesAppBridge.NoteAttachment], NotesAppError>
         let writeNote: (String, String) async -> Result<Void, NotesAppError>
+        let writeNativeText: (String, NotesNativeTextEdit) async -> Result<Void, NotesAppError>
         let createNote: (String, String) async -> Result<String, NotesAppError>
         let deleteNote: (String) async -> Result<Void, NotesAppError>
 
@@ -30,12 +31,16 @@ public final class QuickNotesService: ObservableObject {
             readAttachments: @escaping (String) async -> Result<[NotesAppBridge.NoteAttachment], NotesAppError> = { _ in .success([]) },
             writeNote: @escaping (String, String) async -> Result<Void, NotesAppError>,
             createNote: @escaping (String, String) async -> Result<String, NotesAppError>,
-            deleteNote: @escaping (String) async -> Result<Void, NotesAppError>
+            deleteNote: @escaping (String) async -> Result<Void, NotesAppError>,
+            writeNativeText: @escaping (String, NotesNativeTextEdit) async -> Result<Void, NotesAppError> = { _, _ in
+                .failure(.failed(AppLocalization.text("无法保存手写备忘录的文本，请在备忘录中打开后重试")))
+            }
         ) {
             self.listNotes = listNotes
             self.readNote = readNote
             self.readAttachments = readAttachments
             self.writeNote = writeNote
+            self.writeNativeText = writeNativeText
             self.createNote = createNote
             self.deleteNote = deleteNote
         }
@@ -127,7 +132,13 @@ public final class QuickNotesService: ObservableObject {
     private var saveGenerationByID: [String: Int] = [:]
     private var activeSaveGenerationByID: [String: Int] = [:]
     private var activeSaveTasksByID: [String: Task<Void, Never>] = [:]
-    private var pendingSaveByID: [String: (generation: Int, html: String)] = [:]
+    private enum SaveContent {
+        case html(String)
+        case nativeText(NotesNativeTextEdit)
+    }
+
+    private var pendingSaveByID: [String: (generation: Int, content: SaveContent)] = [:]
+    private var nativeTextSaveState: [String: (original: String, saved: String)] = [:]
     private var deletingNoteIDs: Set<String> = []
 
     public init(welcomeDismissalDefaults: UserDefaults = .standard) {
@@ -137,7 +148,8 @@ public final class QuickNotesService: ObservableObject {
             readAttachments: { await NotesAppBridge.readAttachments(noteID: $0) },
             writeNote: { id, html in await NotesAppBridge.writeNote(id: id, html: html) },
             createNote: { title, html in await NotesAppBridge.createNote(title: title, html: html) },
-            deleteNote: { await NotesAppBridge.deleteNote(id: $0) }
+            deleteNote: { await NotesAppBridge.deleteNote(id: $0) },
+            writeNativeText: { await NotesAppBridge.writeNativeText(id: $0, edit: $1) }
         )
         self.welcomeDismissalDefaults = welcomeDismissalDefaults
         saveDelay = .milliseconds(800)
@@ -365,6 +377,9 @@ public final class QuickNotesService: ObservableObject {
         switch result {
         case .success(let content):
             guard content.isPasswordProtected == revision.isPasswordProtected else { return nil }
+            if activeSaveGenerationByID[id] == nil, let state = nativeTextSaveState[id], state.saved != content.plainText {
+                nativeTextSaveState[id] = nil
+            }
             let content = contentWithCachedAttachments(for: id, revision: revision, content: content)
             if revision.canCache {
                 cachedNoteContents[id] = CachedNoteContent(content: content, revision: revision)
@@ -384,6 +399,14 @@ public final class QuickNotesService: ObservableObject {
 
     /// Debounced write-back of rich-text body.
     public func scheduleSave(id: String, html: String) {
+        scheduleSave(id: id, content: .html(html))
+    }
+
+    public func scheduleSave(id: String, nativeText: NotesNativeTextEdit) {
+        scheduleSave(id: id, content: .nativeText(nativeText))
+    }
+
+    private func scheduleSave(id: String, content: SaveContent) {
         guard !isBuiltInWelcomeNote(id: id), !deletingNoteIDs.contains(id) else { return }
         let generation = (saveGenerationByID[id] ?? 0) &+ 1
         saveGenerationByID[id] = generation
@@ -395,7 +418,7 @@ public final class QuickNotesService: ObservableObject {
             guard let self else { return }
             try? await Task.sleep(for: self.saveDelay)
             if Task.isCancelled { return }
-            self.enqueueSave(id: id, html: html, generation: generation)
+            self.enqueueSave(id: id, content: content, generation: generation)
         }
     }
 
@@ -454,7 +477,8 @@ public final class QuickNotesService: ObservableObject {
             plainText: content.plainText,
             bodyHTML: content.bodyHTML,
             isPasswordProtected: content.isPasswordProtected,
-            attachments: cached.attachments
+            attachments: cached.attachments,
+            requiresNativeTextEditing: content.requiresNativeTextEditing
         )
     }
 
@@ -495,7 +519,8 @@ public final class QuickNotesService: ObservableObject {
                 plainText: cached.content.plainText,
                 bodyHTML: cached.content.bodyHTML,
                 isPasswordProtected: cached.content.isPasswordProtected,
-                attachments: attachments
+                attachments: attachments,
+                requiresNativeTextEditing: cached.content.requiresNativeTextEditing
             ),
             revision: revision
         )
@@ -536,23 +561,45 @@ public final class QuickNotesService: ObservableObject {
         isLoadingNote = remaining > 0
     }
 
-    private func enqueueSave(id: String, html: String, generation: Int) {
+    private func enqueueSave(id: String, content: SaveContent, generation: Int) {
         guard saveGenerationByID[id] == generation else { return }
         saveTasksByID[id] = nil
         guard !deletingNoteIDs.contains(id), activeSaveGenerationByID[id] == nil else {
-            pendingSaveByID[id] = (generation, html)
+            pendingSaveByID[id] = (generation, content)
             return
         }
-        startSave(id: id, html: html, generation: generation)
+        startSave(id: id, content: content, generation: generation)
     }
 
-    private func startSave(id: String, html: String, generation: Int) {
+    private func startSave(id: String, content: SaveContent, generation: Int) {
         guard !deletingNoteIDs.contains(id) else { return }
         activeSaveGenerationByID[id] = generation
         isSaving = true
         let task = Task { [weak self] in
             guard let self else { return }
-            let result = await self.operations.writeNote(id, html)
+            let result: Result<Void, NotesAppError>
+            switch content {
+            case .html(let html):
+                result = await self.operations.writeNote(id, html)
+            case .nativeText(let edit):
+                let state = self.nativeTextSaveState[id]
+                let expectedText: String
+                if let state, state.original == edit.originalPlainText {
+                    expectedText = state.saved
+                } else {
+                    expectedText = edit.originalPlainText
+                }
+                let currentEdit = NotesNativeTextEdit(
+                    originalPlainText: expectedText,
+                    imageSources: edit.imageSources,
+                    prefix: edit.prefix,
+                    suffix: edit.suffix
+                )
+                result = await self.operations.writeNativeText(id, currentEdit)
+                if case .success = result {
+                    self.nativeTextSaveState[id] = (edit.originalPlainText, currentEdit.updatedPlainText)
+                }
+            }
             self.finishSave(id: id, generation: generation, result: result)
         }
         activeSaveTasksByID[id] = task
@@ -569,6 +616,7 @@ public final class QuickNotesService: ObservableObject {
         if saveGenerationByID[id] == generation {
             switch result {
             case .success:
+                errorMessage = nil
                 cachedNoteContents[id] = nil
                 invalidateRefresh()
                 if let index = notes.firstIndex(where: { $0.id == id }) {
@@ -588,7 +636,7 @@ public final class QuickNotesService: ObservableObject {
         if let pendingSave = pendingSaveByID.removeValue(forKey: id),
            saveGenerationByID[id] == pendingSave.generation,
            !deletingNoteIDs.contains(id) {
-            startSave(id: id, html: pendingSave.html, generation: pendingSave.generation)
+            startSave(id: id, content: pendingSave.content, generation: pendingSave.generation)
         } else {
             isSaving = !activeSaveGenerationByID.isEmpty
         }

@@ -1,10 +1,13 @@
+import Darwin
 import Foundation
 
 struct IncrementalJSONLReader {
     struct State {
         var offset: UInt64
         fileprivate var observedStartOffset: UInt64
-        fileprivate var observedHash: UInt64
+        fileprivate var observedHead = Data()
+        fileprivate var observedTail = Data()
+        fileprivate var fileIdentity: FileIdentity?
         fileprivate var pending = Data()
         fileprivate var needsLeadingBoundaryCheck: Bool
         fileprivate var discardingCurrentLine = false
@@ -22,8 +25,12 @@ struct IncrementalJSONLReader {
     static let defaultInitialTailBytes = 1_024 * 1_024
     static let defaultChunkBytes = 256 * 1_024
     static let defaultMaximumLineBytes = 256 * 1_024
-    private static let fnvOffsetBasis: UInt64 = 0xcbf29ce484222325
-    private static let fnvPrime: UInt64 = 0x100000001b3
+    private static let verificationBytesPerEdge = 4 * 1_024
+
+    fileprivate struct FileIdentity: Equatable {
+        var device: dev_t
+        var inode: ino_t
+    }
 
     let initialTailBytes: Int
     let chunkBytes: Int
@@ -45,32 +52,31 @@ struct IncrementalJSONLReader {
         return State(
             offset: offset,
             observedStartOffset: offset,
-            observedHash: Self.fnvOffsetBasis,
             needsLeadingBoundaryCheck: offset > 0
         )
     }
 
-    /// Checks that the bytes already reflected in a cached parser state have not been replaced in place.
-    func hasUnchangedReadPrefix(at url: URL, state: State) -> Bool {
+    /// Checks the read interval's edges and any pending line, with a budget independent of file growth.
+    /// Older edits that preserve both edges are outside this bounded check.
+    func hasUnchangedReadPrefix(
+        at url: URL,
+        state: State,
+        onChunk: ((Data) -> Void)? = nil
+    ) -> Bool {
         guard state.observedStartOffset <= state.offset else { return false }
         guard state.observedStartOffset < state.offset else { return true }
         guard let handle = try? FileHandle(forReadingFrom: url) else { return false }
         defer { try? handle.close() }
 
         do {
-            try handle.seek(toOffset: state.observedStartOffset)
-            var offset = state.observedStartOffset
-            var hash = Self.fnvOffsetBasis
-            while offset < state.offset {
-                let remaining = state.offset - offset
-                let requested = requestedByteCount(for: remaining)
-                guard let chunk = try handle.read(upToCount: requested), chunk.count == requested else {
-                    return false
-                }
-                hash = Self.fnvHash(chunk, seed: hash)
-                offset += UInt64(chunk.count)
-            }
-            return hash == state.observedHash
+            guard try Self.fileIdentity(of: handle) == state.fileIdentity,
+                  try matches(state.observedHead, at: state.observedStartOffset,
+                              handle: handle, onChunk: onChunk) else { return false }
+
+            // The entire pending line must match before an append can safely complete it.
+            let trailing = state.pending.count > state.observedTail.count ? state.pending : state.observedTail
+            return try matches(trailing, at: state.offset - UInt64(trailing.count),
+                               handle: handle, onChunk: onChunk)
         } catch {
             return false
         }
@@ -90,6 +96,9 @@ struct IncrementalJSONLReader {
 
         let handle = try FileHandle(forReadingFrom: url)
         defer { try? handle.close() }
+        if state.fileIdentity == nil {
+            state.fileIdentity = try Self.fileIdentity(of: handle)
+        }
         if state.needsLeadingBoundaryCheck {
             try handle.seek(toOffset: state.offset - 1)
             let previous = try handle.read(upToCount: 1)
@@ -105,7 +114,13 @@ struct IncrementalJSONLReader {
                 break
             }
             state.offset += UInt64(chunk.count)
-            state.observedHash = Self.fnvHash(chunk, seed: state.observedHash)
+            state.observedHead.append(contentsOf: chunk.prefix(
+                Self.verificationBytesPerEdge - state.observedHead.count
+            ))
+            var tail = Data()
+            tail.append(contentsOf: state.observedTail.suffix(max(0, Self.verificationBytesPerEdge - chunk.count)))
+            tail.append(contentsOf: chunk.suffix(Self.verificationBytesPerEdge))
+            state.observedTail = tail
             onChunk?(chunk)
             try consume(chunk, state: &state, body: body)
         }
@@ -165,12 +180,32 @@ struct IncrementalJSONLReader {
         Int(min(remaining, UInt64(chunkBytes)))
     }
 
-    private static func fnvHash(_ data: Data, seed: UInt64) -> UInt64 {
-        var hash = seed
-        for byte in data {
-            hash ^= UInt64(byte)
-            hash &*= fnvPrime
+    private func matches(
+        _ expected: Data,
+        at offset: UInt64,
+        handle: FileHandle,
+        onChunk: ((Data) -> Void)?
+    ) throws -> Bool {
+        try handle.seek(toOffset: offset)
+        var index = expected.startIndex
+        while index < expected.endIndex {
+            let requested = min(chunkBytes, expected.endIndex - index)
+            guard let chunk = try handle.read(upToCount: requested) else {
+                return false
+            }
+            onChunk?(chunk)
+            let next = index + requested
+            guard chunk.elementsEqual(expected[index..<next]) else { return false }
+            index = next
         }
-        return hash
+        return true
+    }
+
+    private static func fileIdentity(of handle: FileHandle) throws -> FileIdentity {
+        var info = stat()
+        guard fstat(handle.fileDescriptor, &info) == 0 else {
+            throw NSError(domain: NSPOSIXErrorDomain, code: Int(errno))
+        }
+        return FileIdentity(device: info.st_dev, inode: info.st_ino)
     }
 }

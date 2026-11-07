@@ -9,6 +9,85 @@ import Testing
 @MainActor
 struct QuickNotesServiceTests {
     @Test
+    func consecutiveNativeTextSavesUseTheLastSuccessfulTextWithoutWritingHTML() async throws {
+        let suiteName = "Zisla.QuickNotesServiceTests.\(UUID().uuidString)"
+        let defaults = try #require(UserDefaults(suiteName: suiteName))
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+        var savedText = "\u{FFFC}"
+        var originals: [String] = []
+        var htmlWrites = 0
+        let service = QuickNotesService(welcomeDismissalDefaults: defaults,
+            operations: .init(listNotes: { .success([]) }, readNote: { _ in .success(.init(plainText: savedText,
+                bodyHTML: "<img src='drawing'>", requiresNativeTextEditing: true)) },
+                writeNote: { _, _ in htmlWrites += 1; return .success(()) },
+                createNote: { _, _ in .success("created") }, deleteNote: { _ in .success(()) },
+                writeNativeText: { _, edit in
+                    originals.append(edit.originalPlainText)
+                    #expect(edit.originalPlainText == savedText)
+                    savedText = edit.updatedPlainText
+                    return .success(())
+                }), saveDelay: .zero)
+        service.applyFetchedNotes([.init(id: "note", title: "手写", modifiedAt: .now)])
+        service.select(id: "note")
+        let content = try #require(await service.loadNote())
+        #expect(content.requiresNativeTextEditing)
+        for suffix in ["备注", "备注更新", ""] {
+            service.scheduleSave(id: "note", nativeText: .init(originalPlainText: "\u{FFFC}", imageSources: ["drawing"], prefix: "标题\n", suffix: suffix))
+            for _ in 0..<100 {
+                if !service.isSaving, savedText == "标题\n\u{FFFC}" + suffix { break }
+                try await Task.sleep(for: .milliseconds(5))
+            }
+            #expect(savedText == "标题\n\u{FFFC}" + suffix)
+        }
+        #expect(originals == ["\u{FFFC}", "标题\n\u{FFFC}备注", "标题\n\u{FFFC}备注更新"])
+        #expect(htmlWrites == 0)
+        savedText = "\u{FFFC}"
+        service.applyFetchedNotes([.init(id: "note", title: "外部还原", modifiedAt: .now)])
+        #expect(await service.loadNote()?.plainText == "\u{FFFC}")
+        service.scheduleSave(id: "note", nativeText: .init(originalPlainText: "\u{FFFC}", imageSources: ["drawing"], prefix: "重新编辑", suffix: ""))
+        for _ in 0..<100 {
+            if !service.isSaving, savedText == "重新编辑\u{FFFC}" { break }
+            try await Task.sleep(for: .milliseconds(5))
+        }
+        #expect(originals.last == "\u{FFFC}", "Reopening an externally restored note must reset the saved-text baseline")
+    }
+
+    @Test
+    func failedNativeSaveKeepsTheOriginalRevisionForRetry() async throws {
+        let suiteName = "Zisla.QuickNotesServiceTests.\(UUID().uuidString)"
+        let defaults = try #require(UserDefaults(suiteName: suiteName))
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+        var originals: [String] = []
+        var shouldFail = true
+        let service = QuickNotesService(welcomeDismissalDefaults: defaults,
+            operations: .init(listNotes: { .success([]) }, readNote: { _ in .success(.init(plainText: "\u{FFFC}", bodyHTML: "<img src='drawing'>", requiresNativeTextEditing: true)) },
+                writeNote: { _, _ in Issue.record("Native save must not write HTML"); return .success(()) },
+                createNote: { _, _ in .success("created") }, deleteNote: { _ in .success(()) },
+                writeNativeText: { _, edit in
+                    originals.append(edit.originalPlainText)
+                    return shouldFail ? .failure(.failed("injected permission failure")) : .success(())
+                }), saveDelay: .zero)
+        service.applyFetchedNotes([.init(id: "note", title: "手写", modifiedAt: .now)])
+        service.select(id: "note")
+        _ = await service.loadNote()
+        let edit = NotesNativeTextEdit(originalPlainText: "\u{FFFC}", imageSources: ["drawing"], prefix: "标题", suffix: "")
+        service.scheduleSave(id: "note", nativeText: edit)
+        for _ in 0..<100 {
+            if service.errorMessage != nil { break }
+            try await Task.sleep(for: .milliseconds(5))
+        }
+        #expect(service.errorMessage == "injected permission failure")
+        shouldFail = false
+        service.scheduleSave(id: "note", nativeText: edit)
+        for _ in 0..<100 {
+            if originals.count == 2, !service.isSaving { break }
+            try await Task.sleep(for: .milliseconds(5))
+        }
+        #expect(originals == ["\u{FFFC}", "\u{FFFC}"])
+        #expect(service.errorMessage == nil, "A successful retry must dismiss the previous save error")
+    }
+
+    @Test
     func displaysBuiltInWelcomeWithoutAddingItToNotes() throws {
         let suiteName = "Zisla.QuickNotesServiceTests.\(UUID().uuidString)"
         let defaults = try #require(UserDefaults(suiteName: suiteName))
@@ -506,7 +585,7 @@ struct QuickNotesServiceTests {
             welcomeDismissalDefaults: UserDefaults(suiteName: "Zisla.QuickNotesServiceTests.\(UUID().uuidString)")!,
             operations: QuickNotesService.Operations(
                 listNotes: { .success([]) },
-                readNote: { _ in .success(.init(plainText: "正文", bodyHTML: "<div>正文</div>")) },
+                readNote: { _ in .success(.init(plainText: "正文\u{FFFC}", bodyHTML: "<div>正文</div><img src='drawing'>", requiresNativeTextEditing: true)) },
                 readAttachments: { id in await hydrator.readAttachments(noteID: id) },
                 writeNote: { _, _ in .success(()) },
                 createNote: { _, _ in .success("created") },
@@ -518,11 +597,14 @@ struct QuickNotesServiceTests {
 
         let initial = try #require(await service.loadNote())
         #expect(initial.attachments.isEmpty)
+        #expect(initial.requiresNativeTextEditing)
         #expect(await hydrator.waitForCallCount(1))
 
         let attachment = NotesAppBridge.NoteAttachment(id: "image", name: "image.png", contentIdentifier: "cid", url: "")
         await hydrator.resolveNext(with: [attachment])
         #expect(await waitForCachedAttachments(service, id: note.id, expected: [attachment]))
+        #expect(service.cachedContent(for: note.id)?.requiresNativeTextEditing == true)
+        #expect(await service.loadNote()?.requiresNativeTextEditing == true)
     }
 
     @Test

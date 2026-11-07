@@ -79,6 +79,6 @@ private final class DraftMutationRecorder {
                     isAllDay: allDay, location: location, notes: notes)
             },
             createReminder: { [self] title, _, _ in savedReminder = title },
-            delete: { _, _ in }, setReminderCompleted: { _, _ in })
+            delete: { _, _, _ in }, setReminderCompleted: { _, _ in })
     }
 }
