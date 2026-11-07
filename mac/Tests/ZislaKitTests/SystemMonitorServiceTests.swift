@@ -16,6 +16,7 @@ final class MockFileManager: SystemMonitorFileManaging, @unchecked Sendable {
     var fileAttributes: [String: [FileAttributeKey: Any]] = [:]
     var volumeCapacities: [String: (total: UInt64, available: UInt64)] = [:]
     var trashResults: [URL: Result<URL, Error>] = [:]
+    var beforeTrash: (@Sendable (URL) -> Void)?
     var homeDirectory: URL = URL(fileURLWithPath: "/Users/test")
     var temporaryDirectory: URL = URL(fileURLWithPath: "/private/var/folders/test/T")
     var searchPathResults: [FileManager.SearchPathDirectory: [URL]] = [:]
@@ -76,6 +77,7 @@ final class MockFileManager: SystemMonitorFileManaging, @unchecked Sendable {
     }
 
     func trashItem(at url: URL) throws -> URL {
+        beforeTrash?(url)
         if let result = trashResults[url] {
             return try result.get()
         }
@@ -335,6 +337,26 @@ private final class GatedPublicIPProvider: PublicIPProviding, @unchecked Sendabl
     }
 }
 
+private final class CleanupTrashGate: @unchecked Sendable {
+    let started: AsyncStream<Void>
+    private let continuation: AsyncStream<Void>.Continuation
+    private let semaphore = DispatchSemaphore(value: 0)
+
+    init() {
+        (started, continuation) = AsyncStream<Void>.makeStream()
+    }
+
+    func beginMove() {
+        continuation.yield(())
+        continuation.finish()
+        semaphore.wait()
+    }
+
+    func release() {
+        semaphore.signal()
+    }
+}
+
 private final class GatedHardwareInfoProvider: @unchecked Sendable {
     private let lock = NSLock()
     private var calls = 0
@@ -385,6 +407,54 @@ private final class ControllableDateProvider: @unchecked Sendable {
 
 @MainActor
 struct SystemMonitorServiceTests {
+    @Test
+    func cancellingTheServiceStopsAfterTheCurrentMoveAndSkipsDiskRefresh() async throws {
+        let mock = MockFileManager()
+        let first = mock.homeDirectory.appendingPathComponent("Library/Caches/com.example.first")
+        let second = mock.homeDirectory.appendingPathComponent("Library/Caches/com.example.second")
+        for file in [first, second] {
+            mock.existingPaths.insert(file.path)
+            mock.fileAttributes[file.path] = [.size: NSNumber(value: 4_096)]
+            mock.trashResults[file] = .success(mock.homeDirectory.appendingPathComponent(".Trash/\(file.lastPathComponent)"))
+        }
+        let gate = CleanupTrashGate()
+        mock.beforeTrash = { if $0 == first { gate.beginMove() } }
+        let service = SystemMonitorService(fileManager: mock,
+            publicIPProvider: StubPublicIPProvider(address: nil), hardwareInfoProvider: { .unavailable })
+        defer { service.stop() }
+        let candidates = [first, second].map {
+            DiskCleanupCandidate(url: $0, kind: .appCache, byteSize: 4_096, displayName: $0.lastPathComponent)
+        }
+        let task = Task { await service.trashSelected(candidates) }
+        for await _ in gate.started { break }
+        task.cancel()
+        gate.release()
+        let result = await task.value
+        #expect(result.successCount == 1, "Cancellation must leave the second candidate unmoved")
+        #expect(result.freedBytes == 4_096)
+        #expect(service.snapshot == nil, "Cancelled cleanup must not initiate a disk refresh")
+    }
+
+    @Test
+    func cancelledCleanupBatchDoesNotMoveMockFiles() async throws {
+        let mock = MockFileManager()
+        let cache = mock.homeDirectory.appendingPathComponent("Library/Caches/com.example.cache")
+        mock.existingPaths.insert(cache.path)
+        mock.fileAttributes[cache.path] = [.size: NSNumber(value: 4_096)]
+        mock.trashResults[cache] = .success(mock.homeDirectory.appendingPathComponent(".Trash/cache"))
+        let task = Task {
+            SystemDiskCleanup.trashSelected(candidates: [DiskCleanupCandidate(
+                url: cache, kind: .appCache, byteSize: 4_096, displayName: "Cache"
+            )], fileManager: mock)
+        }
+        task.cancel()
+        let result = await task.value
+        #expect(result.successCount == 0)
+        #expect(result.freedBytes == 0)
+        #expect(result.failures.isEmpty)
+        #expect(mock.existingPaths.contains(cache.path))
+    }
+
     @Test
     func defaultRecordingPreservesAllMergedHistoryAndBoundsChartPoints() async throws {
         let sampleCount = 64_000

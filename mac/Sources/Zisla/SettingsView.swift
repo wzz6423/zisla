@@ -254,6 +254,8 @@ struct SettingsView: View {
             petContent
         case .download:
             downloadContent
+        case .saveLocations:
+            saveLocationsContent
         case .networkProxy:
             networkProxyContent
         case .weather:
@@ -963,6 +965,41 @@ struct SettingsView: View {
                     featureToggle("应用音量混音器", detail: "", symbol: "slider.horizontal.3", keyPath: \.volumeMixerEnabled)
                     rowDivider
                     featureToggle("系统状态与清理", detail: "监控资源并安全清理缓存和日志", symbol: "gauge.with.dots.needle.67percent", keyPath: \.systemMonitorEnabled)
+                    if model.settingsStore.settings.systemMonitorEnabled {
+                        rowDivider
+                        settingRow(
+                            symbol: "calendar.badge.clock",
+                            title: "自动清理系统垃圾",
+                            detail: "按所选间隔移入废纸篓，不会永久删除",
+                            isNested: true
+                        ) {
+                            Picker(AppLocalization.string("自动清理系统垃圾", locale: locale), selection: Binding(
+                                get: { model.settingsStore.settings.systemCleanupPolicy },
+                                set: { model.settingsStore.settings.systemCleanupPolicy = $0 }
+                            )) {
+                                ForEach(VoiceRecordingCleanupPolicy.allCases, id: \.self) { policy in
+                                    AppLocalizedText(policy.menuTitle).tag(policy)
+                                }
+                            }
+                            .labelsHidden()
+                            .pickerStyle(.menu)
+                            .keepsIntrinsicWidth()
+                        }
+                        rowDivider
+                        settingRow(symbol: "line.3.horizontal.decrease.circle", title: "清理范围", detail: "", isNested: true) {
+                            Picker(AppLocalization.string("清理范围", locale: locale), selection: Binding(
+                                get: { model.settingsStore.settings.systemCleanupScope },
+                                set: { model.settingsStore.settings.systemCleanupScope = $0 }
+                            )) {
+                                ForEach(SystemCleanupScope.allCases, id: \.self) { scope in
+                                    AppLocalizedText(scope.menuTitle).tag(scope)
+                                }
+                            }
+                            .labelsHidden()
+                            .pickerStyle(.menu)
+                            .keepsIntrinsicWidth()
+                        }
+                    }
                     rowDivider
                     featureToggle("电池监控", detail: "", symbol: "battery.100percent", keyPath: \.batteryMonitorEnabled)
                     rowDivider
@@ -2571,20 +2608,31 @@ struct SettingsView: View {
         )
     }
 
-    private var downloadContent: some View {
-        VStack(alignment: .leading, spacing: 20) {
-            settingsGroup("下载目录") {
+    private var saveLocationsContent: some View {
+        settingsGroup("默认保存位置") {
+            ForEach(SaveLocation.allCases) { location in
+                if location != SaveLocation.allCases.first { rowDivider }
                 settingRow(
-                    symbol: "folder.fill",
-                    title: "默认下载目录",
-                    detail: model.downloadDirectory.path(percentEncoded: false)
+                    symbol: location.symbol,
+                    title: location.title,
+                    detail: model.saveLocations[location].path(percentEncoded: false),
+                    detailLineLimit: 2
                 ) {
-                    Button(AppLocalization.text("选择默认下载目录")) { chooseDownloadDirectory() }
+                    Button(AppLocalization.text("更改保存位置")) {
+                        do { try Self.chooseSaveDirectory(location, locations: model.saveLocations) }
+                        catch { model.transientMessage = error.localizedDescription }
+                    }
                         .buttonStyle(.bordered)
                         .keepsIntrinsicWidth()
+                        .accessibilityLabel(AppLocalization.format("更改 %@ 的保存位置", locale: locale,
+                            [AppLocalization.string(location.title, locale: locale)]))
                 }
             }
+        }
+    }
 
+    private var downloadContent: some View {
+        VStack(alignment: .leading, spacing: 20) {
             settingsGroup("组件") {
                 managedToolRow(.ytDLP, symbol: "terminal.fill")
                 rowDivider
@@ -3863,16 +3911,16 @@ struct SettingsView: View {
         model.selectWeatherLocation(named: input.weatherQuery)
     }
 
-    private func chooseDownloadDirectory() {
-        let panel = NSOpenPanel()
+    static func chooseSaveDirectory(_ location: SaveLocation, locations: SaveLocationStore,
+                                    panel: NSOpenPanel = NSOpenPanel()) throws {
         panel.canChooseFiles = false
         panel.canChooseDirectories = true
+        panel.canCreateDirectories = true
         panel.allowsMultipleSelection = false
-        panel.directoryURL = model.downloadDirectory
+        panel.directoryURL = locations[location]
         WindowPlacement.prepareModal(panel, on: WindowPlacement.screenUnderMouse())
         guard panel.runModal() == .OK, let url = panel.url else { return }
-        do { try model.setDownloadDirectory(url) }
-        catch { model.transientMessage = error.localizedDescription }
+        try locations.setDirectory(url, for: location)
     }
 
     private func brandIcon(named name: String) -> NSImage? {
@@ -4374,6 +4422,7 @@ enum SettingsSection: String, CaseIterable, Identifiable {
     case mail
     case keyboardSound
     case download
+    case saveLocations
     case weather
     case networkProxy
     case pet
@@ -4390,7 +4439,7 @@ enum SettingsSection: String, CaseIterable, Identifiable {
         case .pdfTools: .files
         case .screenshot, .recording: .capture
         case .ai, .voice: .aiAndVoice
-        case .clipboardAssistant, .download, .mail, .weather, .networkProxy, .pet: .others
+        case .clipboardAssistant, .download, .saveLocations, .mail, .weather, .networkProxy, .pet: .others
         case .permissions: .permissions
         case .recommendations, .updates: .recommendationsAndUpdates
         }
@@ -4416,6 +4465,7 @@ enum SettingsSection: String, CaseIterable, Identifiable {
         case .voice: "语音"
         case .pet: "宠物"
         case .download: "下载"
+        case .saveLocations: "保存位置"
         case .networkProxy: "网络"
         case .weather: "天气"
         case .permissions: "权限"
@@ -4439,6 +4489,7 @@ enum SettingsSection: String, CaseIterable, Identifiable {
         case .voice: "mic.fill"
         case .pet: "pawprint.fill"
         case .download: "arrow.down.circle.fill"
+        case .saveLocations: "folder.fill"
         case .networkProxy: "network"
         case .weather: "cloud.sun.fill"
         case .permissions: "lock.shield"
@@ -4461,7 +4512,8 @@ enum SettingsSection: String, CaseIterable, Identifiable {
         case .ai: "管理 AI CLI 与 Skills。"
         case .voice: "配置语音输入、整理模型与本机记录。"
         case .pet: "设置灵动岛内部的宠物形象。"
-        case .download: "管理下载目录、下载通知与所需组件。"
+        case .download: "管理下载所需组件。"
+        case .saveLocations: "分别设置各类内容的默认保存位置。"
         case .networkProxy: "配置本地代理，用于更新、安装、下载与 GitHub 访问。"
         case .weather: "管理天气显示、地点和刷新。"
         case .permissions: "管理 zisla 使用的系统权限。"
@@ -4472,7 +4524,7 @@ enum SettingsSection: String, CaseIterable, Identifiable {
 
     func isVisible(settings: FeatureSettings) -> Bool {
         switch self {
-        case .general, .features, .networkProxy, .permissions:
+        case .general, .features, .saveLocations, .networkProxy, .permissions:
             return true
         case .recommendations:
             return settings.recommendedToolsEnabled

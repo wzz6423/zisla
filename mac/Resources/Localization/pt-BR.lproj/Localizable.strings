@@ -3313,6 +3313,17 @@
 "权限" = "Permissões";
 "管理 zisla 使用的系统权限。" = "Gerencie as permissões do sistema usadas pelo zisla.";
 "请在设置的“权限”页面管理授权。" = "Gerencie o acesso na página Permissões dos ajustes.";
+"自动清理系统垃圾" = "Limpar automaticamente arquivos desnecessários do sistema";
+"按所选间隔移入废纸篓，不会永久删除" = "Mover itens para o Lixo no intervalo escolhido, sem excluir permanentemente";
+"清理范围" = "Itens a limpar";
+"仅可信" = "Somente itens confiáveis";
+"全部（包含需人工复核）" = "Todos (incluindo os que precisam de revisão)";
+"默认保存位置" = "Locais de salvamento padrão";
+"分别设置各类内容的默认保存位置。" = "Definir o local de salvamento padrão para cada tipo de conteúdo.";
+"管理下载所需组件。" = "Gerenciar os componentes necessários para downloads.";
+"更改 %@ 的保存位置" = "Alterar o local de salvamento de %@";
+
+"本地优先的原生笔记应用" = "Aplicativo nativo de notas que prioriza o armazenamento local";
 
 "保存手写备忘录需要辅助功能权限" = "É necessário acesso à acessibilidade para salvar notas manuscritas";
 "备忘录内容已变化，请重新打开后编辑" = "A nota foi alterada. Abra-a novamente antes de editar";

@@ -1,0 +1,75 @@
+import Combine
+import Foundation
+
+public enum SaveLocation: String, CaseIterable, Identifiable, Sendable {
+    case download
+    case screenshot
+    case recording
+    case quickActions
+    case dailyBriefing
+
+    public var id: Self { self }
+
+    public var title: String {
+        switch self {
+        case .download: "下载"
+        case .screenshot: "截图"
+        case .recording: "录屏"
+        case .quickActions: "快捷操作"
+        case .dailyBriefing: "每日简报"
+        }
+    }
+
+    public var symbol: String {
+        switch self {
+        case .download: "arrow.down.circle.fill"
+        case .screenshot: "camera.viewfinder"
+        case .recording: "record.circle"
+        case .quickActions: "sparkles.rectangle.stack"
+        case .dailyBriefing: "doc.richtext"
+        }
+    }
+
+    var bookmarkKey: String {
+        self == .download ? "download-directory-bookmark" : "save-location-\(rawValue)-bookmark"
+    }
+
+    var pathKey: String? {
+        self == .download ? nil : "save-location-\(rawValue)-path"
+    }
+}
+
+@MainActor
+public final class SaveLocationStore: ObservableObject {
+    @Published public private(set) var directories: [SaveLocation: URL]
+    private let stores: [SaveLocation: ScreenRecordingOutputDirectoryStore]
+
+    public init(defaults: UserDefaults = .standard) {
+        let download = ScreenRecordingOutputDirectoryStore(defaults: defaults,
+            bookmarkKey: SaveLocation.download.bookmarkKey, pathKey: nil)
+        var stores: [SaveLocation: ScreenRecordingOutputDirectoryStore] = [.download: download]
+        for location in SaveLocation.allCases where location != .download {
+            let pathKey = location.pathKey!
+            if defaults.object(forKey: location.bookmarkKey) == nil,
+               defaults.object(forKey: pathKey) == nil {
+                // Freeze the effective shared location once so later download changes stay independent.
+                if let bookmark = defaults.data(forKey: SaveLocation.download.bookmarkKey) {
+                    defaults.set(bookmark, forKey: location.bookmarkKey)
+                }
+                defaults.set(download.directory.path, forKey: pathKey)
+            }
+            stores[location] = ScreenRecordingOutputDirectoryStore(defaults: defaults,
+                bookmarkKey: location.bookmarkKey, pathKey: pathKey)
+        }
+        self.stores = stores
+        directories = stores.mapValues(\.directory)
+    }
+
+    public subscript(location: SaveLocation) -> URL { directories[location]! }
+
+    public func setDirectory(_ url: URL, for location: SaveLocation) throws {
+        let store = stores[location]!
+        try store.setDirectory(url)
+        directories[location] = store.directory
+    }
+}

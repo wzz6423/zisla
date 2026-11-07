@@ -3313,6 +3313,17 @@
 "权限" = "Machtigingen";
 "管理 zisla 使用的系统权限。" = "Beheer de systeemmachtigingen die zisla gebruikt.";
 "请在设置的“权限”页面管理授权。" = "Beheer de toegang op de pagina Machtigingen in de instellingen.";
+"自动清理系统垃圾" = "Overbodige systeembestanden automatisch opruimen";
+"按所选间隔移入废纸篓，不会永久删除" = "Verplaats onderdelen op het gekozen interval naar de prullenmand, zonder ze definitief te verwijderen";
+"清理范围" = "Bereik van opruimen";
+"仅可信" = "Alleen vertrouwde onderdelen";
+"全部（包含需人工复核）" = "Alles (inclusief onderdelen die controle vereisen)";
+"默认保存位置" = "Standaardopslaglocaties";
+"分别设置各类内容的默认保存位置。" = "Stel de standaardopslaglocatie in voor elk type inhoud.";
+"管理下载所需组件。" = "Beheer de onderdelen die nodig zijn voor downloads.";
+"更改 %@ 的保存位置" = "Opslaglocatie voor %@ wijzigen";
+
+"本地优先的原生笔记应用" = "Native notitie-app die lokale opslag vooropstelt";
 
 "保存手写备忘录需要辅助功能权限" = "Toegang tot toegankelijkheid is vereist om handgeschreven notities op te slaan";
 "备忘录内容已变化，请重新打开后编辑" = "De notitie is gewijzigd. Open deze opnieuw voordat je bewerkt";
