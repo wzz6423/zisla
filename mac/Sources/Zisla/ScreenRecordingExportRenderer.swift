@@ -88,9 +88,13 @@ final class RecordingExportRenderer {
     private let cameraMask: CIImage
     private let cameraBorder: CIImage?
     private let colorSpace = CGColorSpace(name: CGColorSpace.sRGB)!
+    private let portrait: RecordingPortraitProcessor
+    private let portraitLock = NSLock()
 
-    init(project: ScreenRecordingProject, size: CGSize, fitSource: Bool = false, context: CIContext? = nil) throws {
+    init(project: ScreenRecordingProject, size: CGSize, fitSource: Bool = false, context: CIContext? = nil,
+         portraitProcessor: RecordingPortraitProcessor = RecordingPortraitProcessor()) throws {
         self.project = project
+        portrait = portraitProcessor
         effects = RecordingExportEffectTrack(project: project)
         canvas = CGRect(origin: .zero, size: size)
         self.context = context ?? CIContext(options: [.cacheIntermediates: false, .workingColorSpace: CGColorSpace(name: CGColorSpace.sRGB)!])
@@ -176,7 +180,8 @@ final class RecordingExportRenderer {
     }
 
     func render(screen: CIImage, camera: CIImage?, sourceTime: Double,
-                slice: RecordingExportSlice? = nil, includeBackground: Bool = true) throws -> CIImage {
+                slice: RecordingExportSlice? = nil, includeBackground: Bool = true,
+                cameraEffects: RecordingPortraitEffects? = nil) throws -> CIImage {
         let normalized = Self.normalized(screen)
         let crop = CGRect(x: sourceCrop.x * normalized.extent.width,
                           y: (1 - sourceCrop.y - sourceCrop.height) * normalized.extent.height,
@@ -210,7 +215,13 @@ final class RecordingExportRenderer {
         if let shadow { scene = shadow.composited(over: scene) }
         scene = Self.masked(screenLayer, mask: screenMask, canvas: canvas).composited(over: scene)
         if project.edits.effectiveShowCamera, let camera {
-            var image = Self.normalized(camera)
+            portraitLock.lock()
+            let processed: CIImage
+            do {
+                processed = try portrait.apply(camera, effects: cameraEffects ?? project.edits.portraitEffects ?? .init(), sourceTime: sourceTime)
+                portraitLock.unlock()
+            } catch { portraitLock.unlock(); throw error }
+            var image = Self.normalized(processed)
             if project.edits.cameraMirrored {
                 image = image.transformed(by: CGAffineTransform(translationX: image.extent.width, y: 0)
                     .scaledBy(x: -1, y: 1))

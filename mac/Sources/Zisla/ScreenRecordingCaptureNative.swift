@@ -2,6 +2,7 @@ import AppKit
 import AVFoundation
 import CoreMedia
 import CoreVideo
+import CoreImage
 import ScreenCaptureKit
 import ZislaCore
 
@@ -24,6 +25,7 @@ final class ScreenRecordingNativeCapture: ScreenRecordingCaptureSession {
     private var cancelled = false
     private var width = 0
     private var height = 0
+    private var onMonitoringFailure: @Sendable (Error) -> Void = { _ in }
 
     init(configuration: RecordingCaptureConfiguration, directory: URL, onFailure: @escaping @Sendable (Error) -> Void) {
         self.configuration = configuration
@@ -88,6 +90,9 @@ final class ScreenRecordingNativeCapture: ScreenRecordingCaptureSession {
         camera = preview
     }
 
+    func setMicrophoneMonitoring(_ enabled: Bool) { writer?.setMicrophoneMonitoring(enabled) }
+    func setMonitoringFailureHandler(_ handler: @escaping @Sendable (Error) -> Void) { onMonitoringFailure = handler }
+
     func start() async throws -> Double {
         guard !cancelled else { throw CancellationError() }
         guard startTask == nil, writer == nil else { throw ScreenRecordingCaptureError.alreadyRecording }
@@ -124,12 +129,18 @@ final class ScreenRecordingNativeCapture: ScreenRecordingCaptureSession {
                 ScreenRecordingResult(videoFile: files.screenName,
                                       cameraFile: self.configuration.camera ? files.cameraName : nil,
                                       microphoneFile: self.configuration.microphone ? files.microphoneName : nil,
-                                      duration: duration, width: self.width, height: self.height, pointers: pointers),
+                                      duration: duration, width: self.width, height: self.height, pointers: pointers,
+                                      rawCameraFile: self.configuration.camera && self.configuration.portraitEffects.isEnabled ? files.rawCameraName : nil,
+                                      rawMicrophoneFile: self.configuration.microphone && self.configuration.voiceEffects.isEnabled ? files.rawMicrophoneName : nil,
+                                      portraitEffects: self.configuration.camera && self.configuration.portraitEffects.isEnabled ? self.configuration.portraitEffects : nil,
+                                      voiceEffects: self.configuration.microphone && self.configuration.voiceEffects.isEnabled ? self.configuration.voiceEffects : nil),
                 videoURL: files.url(for: files.screenName))
             try self.requireActive()
             var names = [files.screenName]
             if self.configuration.microphone { names.append(files.microphoneName) }
             if self.configuration.camera { names.append(files.cameraName) }
+            if self.configuration.camera && self.configuration.portraitEffects.isEnabled { names.append(files.rawCameraName) }
+            if self.configuration.microphone && self.configuration.voiceEffects.isEnabled { names.append(files.rawMicrophoneName) }
             do { try files.publish(names) } catch { throw ScreenRecordingCaptureError.saveFailed(error.localizedDescription) }
             self.writer = nil
             self.bridge = nil
@@ -206,7 +217,8 @@ final class ScreenRecordingNativeCapture: ScreenRecordingCaptureSession {
         height = dimensions.height
         let files = try ScreenRecordingCaptureFiles(directory: directory)
         self.files = files
-        let writer = ScreenRecordingCaptureWriter(files: files, configuration: configuration, width: width, height: height, onFailure: onFailure)
+        let writer = ScreenRecordingCaptureWriter(files: files, configuration: configuration, width: width, height: height,
+            onFailure: onFailure, onMonitoringFailure: onMonitoringFailure)
         self.writer = writer
         let bridge = ScreenRecordingCaptureBridge(writer: writer, onFailure: onFailure)
         self.bridge = bridge
@@ -475,6 +487,11 @@ nonisolated final class ScreenRecordingCameraCapture: NSObject, ScreenRecordingC
     private var bridge: ScreenRecordingCaptureBridge?
     private var clock: CMClock?
     private var observers: [NSObjectProtocol] = []
+    private let portrait = RecordingPortraitProcessor()
+    private let context = CIContext(options: [.cacheIntermediates: false])
+    private var portraitEffects = RecordingPortraitEffects()
+    private var onFrame: (@MainActor @Sendable (CGImage?) -> Void)?
+    private var previewDeliveryPending = false
 
     init(identifier: String?, onFailure: @escaping ScreenRecordingCameraFailureHandler) {
         self.identifier = identifier
@@ -484,6 +501,14 @@ nonisolated final class ScreenRecordingCameraCapture: NSObject, ScreenRecordingC
     func attach(to bridge: ScreenRecordingCaptureBridge) {
         lock.lock()
         self.bridge = bridge
+        lock.unlock()
+    }
+
+    func setPortraitEffects(_ effects: RecordingPortraitEffects,
+                            onFrame: (@MainActor @Sendable (CGImage?) -> Void)?) {
+        lock.lock()
+        portraitEffects = effects
+        self.onFrame = onFrame
         lock.unlock()
     }
 
@@ -526,8 +551,37 @@ nonisolated final class ScreenRecordingCameraCapture: NSObject, ScreenRecordingC
         lock.lock()
         let bridge = bridge
         let clock = clock
+        let effects = portraitEffects
+        let frameHandler = onFrame
+        let deliver = effects.isEnabled && !previewDeliveryPending && frameHandler != nil
+        if deliver { previewDeliveryPending = true }
         lock.unlock()
         if let bridge, let clock { bridge.receive(sampleBuffer, kind: .camera, clock: clock) }
+        if deliver, let frameHandler {
+            do {
+                guard let buffer = sampleBuffer.imageBuffer else { throw ScreenRecordingCaptureError.noCameraFrames }
+                let source = CIImage(cvPixelBuffer: buffer)
+                let scale = min(1, 640 / max(source.extent.width, source.extent.height))
+                let image = try portrait.apply(source.transformed(by: .init(scaleX: scale, y: scale)), effects: effects,
+                    sourceTime: sampleBuffer.presentationTimeStamp.seconds)
+                guard let frame = context.createCGImage(image, from: image.extent) else {
+                    throw ScreenRecordingCaptureError.writerUnavailable
+                }
+                Task { @MainActor [self] in
+                    frameHandler(frame)
+                    completePreviewDelivery()
+                }
+            } catch {
+                completePreviewDelivery()
+                Task { @MainActor [onFailure] in await onFailure(error) }
+            }
+        }
+    }
+
+    private func completePreviewDelivery() {
+        lock.lock()
+        previewDeliveryPending = false
+        lock.unlock()
     }
 
     nonisolated private func configure() throws {
@@ -552,6 +606,7 @@ nonisolated final class ScreenRecordingCameraCapture: NSObject, ScreenRecordingC
         lock.lock()
         bridge = nil
         clock = nil
+        onFrame = nil
         lock.unlock()
         for observer in observers { NotificationCenter.default.removeObserver(observer) }
         observers.removeAll()

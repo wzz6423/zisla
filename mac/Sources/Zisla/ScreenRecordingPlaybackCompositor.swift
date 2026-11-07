@@ -15,10 +15,12 @@ final class RecordingPlaybackInstruction: NSObject, AVVideoCompositionInstructio
     let cameraRanges: [CMTimeRange?]
     let timeline: RecordingExportTimeline
     let renderer: RecordingExportRenderer
+    private let voiceMedia: RecordingVoiceMedia
 
     init(project: ScreenRecordingProject, media: RecordingExportMedia,
          cameraTrackID: CMPersistentTrackID?, size: CGSize) throws {
         timeline = media.timeline
+        voiceMedia = media.voiceMedia
         timeRange = CMTimeRange(start: .zero, duration: CMTime(seconds: timeline.duration,
                                                             preferredTimescale: 60_000))
         screenTrackID = media.video.track.trackID

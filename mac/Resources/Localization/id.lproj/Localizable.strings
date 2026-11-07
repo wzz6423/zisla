@@ -3316,6 +3316,24 @@
 "权限" = "Izin";
 "管理 zisla 使用的系统权限。" = "Kelola izin sistem yang digunakan zisla.";
 "请在设置的“权限”页面管理授权。" = "Kelola akses di halaman Izin dalam pengaturan.";
+
+"人像效果" = "Efek Potret";
+"磨皮" = "Haluskan Kulit";
+"提亮" = "Cerahkan";
+"瘦脸" = "Rampingkan Wajah";
+"瘦身" = "Rampingkan Tubuh";
+"美声" = "Peningkatan Suara";
+"原声" = "Suara Asli";
+"自然" = "Alami";
+"温暖" = "Hangat";
+"清亮" = "Jernih";
+"播音" = "Penyiar";
+"效果强度" = "Kekuatan Efek";
+"恢复原始效果" = "Atur Ulang Efek";
+"监听麦克风" = "Pantau Mikrofon";
+"使用耳机监听以避免回声" = "Gunakan headphone saat memantau untuk menghindari gema";
+"麦克风监听已关闭：%@" = "Pemantauan mikrofon dinonaktifkan: %@";
+
 "自动清理系统垃圾" = "Bersihkan sampah sistem secara otomatis";
 "按所选间隔移入废纸篓，不会永久删除" = "Pindahkan item ke Sampah sesuai interval yang dipilih, tanpa menghapus permanen";
 "清理范围" = "Cakupan pembersihan";

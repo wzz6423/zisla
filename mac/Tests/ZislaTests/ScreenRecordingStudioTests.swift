@@ -1073,6 +1073,8 @@ private final class RecordingStudioTestSession: ScreenRecordingCaptureSession {
     var beforeCancel: (() async -> Void)?
     var beforeStop: ((URL) throws -> Void)?
 
+    func setMonitoringFailureHandler(_ handler: @escaping @Sendable (Error) -> Void) {}
+    func setMicrophoneMonitoring(_ enabled: Bool) {}
     func useCameraPreview(_ preview: any ScreenRecordingCameraPreviewSession) {}
 
     func start() async throws -> Double {

@@ -142,6 +142,7 @@ struct ScreenRecordingLocalizationTests {
         keys.formUnion(RecordingBackground.allCases.map(\.title))
         keys.formUnion(RecordingCameraPosition.allCases.map(\.title))
         keys.formUnion(RecordingCameraAspectRatio.allCases.map(\.title))
+        keys.formUnion(RecordingVoicePreset.allCases.map(\.title))
         keys.formUnion(RecordingExportResolution.allCases.map(\.title))
         keys.formUnion(RecordingExportContent.allCases.map(\.title))
         keys.formUnion(RecordingShortcutAction.allCases.map(\.title))

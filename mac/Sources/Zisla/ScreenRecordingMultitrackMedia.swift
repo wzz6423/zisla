@@ -21,10 +21,11 @@ final class RecordingMultitrackMedia {
     let adjustsSpeed: Bool
     private(set) var playbackClockTrackID: CMPersistentTrackID?
     private var carrier: URL?
+    private let voiceMedia: RecordingVoiceMedia
 
     private init(composition: AVMutableComposition, layers: [String: RecordingMultitrackVideoLayer],
                  videoTracks: [AVMutableCompositionTrack], audioTracks: [AVMutableCompositionTrack],
-                 audioMix: AVAudioMix, duration: Double, adjustsSpeed: Bool) {
+                 audioMix: AVAudioMix, duration: Double, adjustsSpeed: Bool, voiceMedia: RecordingVoiceMedia) {
         self.composition = composition
         self.layers = layers
         self.videoTracks = videoTracks
@@ -32,6 +33,7 @@ final class RecordingMultitrackMedia {
         self.audioMix = audioMix
         self.duration = duration
         self.adjustsSpeed = adjustsSpeed
+        self.voiceMedia = voiceMedia
     }
 
     deinit { if let carrier { try? FileManager.default.removeItem(at: carrier) } }
@@ -43,6 +45,7 @@ final class RecordingMultitrackMedia {
         let assets = Dictionary(uniqueKeysWithValues: timeline.assets.map { ($0.id, $0) })
         let tracks = Dictionary(uniqueKeysWithValues: timeline.tracks.map { ($0.id, $0) })
         let composition = AVMutableComposition()
+        let voiceMedia = RecordingVoiceMedia()
         var retained: [String: AVURLAsset] = [:]
         var videoSources: [String: AVAssetTrack] = [:]
         var audioSources: [String: AVAssetTrack] = [:]
@@ -70,7 +73,8 @@ final class RecordingMultitrackMedia {
             transforms[file] = transform
             return (track, range, transform)
         }
-        func appendAudio(_ file: String, clip: RecordingTimelineClip, volume: Double) async throws {
+        func appendAudio(_ file: String, clip: RecordingTimelineClip, volume: Double,
+                         effects: RecordingVoiceEffects = .init()) async throws {
             if silent.contains(file) { return }
             let track: AVAssetTrack
             let range: CMTimeRange
@@ -86,7 +90,13 @@ final class RecordingMultitrackMedia {
                 ranges["a" + file] = range
             }
             if max(clip.sourceStart, range.start.seconds) < min(clip.sourceEnd, range.end.seconds) {
-                audioEntries.append((clip, track, range, Float(volume)))
+                if effects.isEnabled {
+                    let processed = try await voiceMedia.asset(from: asset(file), effects: effects)
+                    guard let source = try await processed.loadTracks(withMediaType: .audio).first else {
+                        throw ScreenRecordingExportError.unavailableMedia
+                    }
+                    audioEntries.append((clip, source, try await RecordingExportMedia.availableRange(of: source), Float(volume)))
+                } else { audioEntries.append((clip, track, range, Float(volume))) }
             }
         }
         for clip in timeline.clips {
@@ -101,7 +111,7 @@ final class RecordingMultitrackMedia {
                         throw ScreenRecordingExportError.timelineOutsideMedia
                     }
                     videoEntries.append((clip, clip.id, source, range, transform))
-                    if case .recording = clip.content, project.edits.effectiveShowCamera, let cameraFile = project.cameraFile {
+                    if case .recording = clip.content, project.edits.effectiveShowCamera, let cameraFile = project.editingCameraFile {
                         let (camera, cameraRange, cameraTransform) = try await video(cameraFile)
                         if max(clip.sourceStart, cameraRange.start.seconds) < min(clip.sourceEnd, cameraRange.end.seconds) {
                             videoEntries.append((clip, clip.id + ".camera", camera, cameraRange, cameraTransform))
@@ -112,13 +122,17 @@ final class RecordingMultitrackMedia {
                     let recording: Bool
                     if case .recording = clip.content { recording = true } else { recording = false }
                     try await appendAudio(file, clip: clip,
-                        volume: clip.volume * (recording ? project.edits.effectiveScreenAudioVolume : 1))
-                    if recording, let microphone = project.microphoneFile {
-                        try await appendAudio(microphone, clip: clip, volume: clip.volume * project.edits.effectiveMicrophoneVolume)
+                        volume: clip.volume * (recording ? project.edits.effectiveScreenAudioVolume : 1),
+                        effects: recording ? .init() : clip.voiceEffects ?? .init())
+                    if recording, let microphone = project.editingMicrophoneFile {
+                        try await appendAudio(microphone, clip: clip, volume: clip.volume * project.edits.effectiveMicrophoneVolume,
+                            effects: clip.voiceEffects ?? project.edits.voiceEffects ?? .init())
                     }
                 }
             case let .audio(id):
-                if clip.audioEnabled && !track.isMuted { try await appendAudio(assets[id]!.file, clip: clip, volume: clip.volume) }
+                if clip.audioEnabled && !track.isMuted {
+                    try await appendAudio(assets[id]!.file, clip: clip, volume: clip.volume, effects: clip.voiceEffects ?? .init())
+                }
             case .image, .annotation, .caption: break
             }
         }
@@ -154,7 +168,7 @@ final class RecordingMultitrackMedia {
         mix.inputParameters = audioLanes.map { parameters[$0.trackID]! }
         withExtendedLifetime(retained) {}
         return .init(composition: composition, layers: layers, videoTracks: videoLanes, audioTracks: audioLanes,
-            audioMix: mix, duration: timeline.duration, adjustsSpeed: timeline.clips.contains { $0.speed != 1 })
+            audioMix: mix, duration: timeline.duration, adjustsSpeed: timeline.clips.contains { $0.speed != 1 }, voiceMedia: voiceMedia)
     }
 
     private static func lane(at start: Double, mediaType: AVMediaType, composition: AVMutableComposition,
@@ -291,7 +305,7 @@ extension ScreenRecordingExporter {
                 switch clip.content {
                 case let .recording(id), let .video(id):
                     frames[clip.id] = try await frame(assets[id]!.file, at: clip.sourceTime(at: visibleTime), optional: false)
-                    if case .recording = clip.content, project.edits.effectiveShowCamera, let camera = project.cameraFile {
+                    if case .recording = clip.content, project.edits.effectiveShowCamera, let camera = project.editingCameraFile {
                         frames[clip.id + ".camera"] = try await frame(camera, at: clip.sourceTime(at: visibleTime), optional: true)
                     }
                 case .image, .audio, .annotation, .caption: break

@@ -1,6 +1,7 @@
 import AppKit
 import AVFoundation
 import Combine
+import CoreImage
 import Testing
 import ZislaCore
 
@@ -8,6 +9,27 @@ import ZislaCore
 
 @Suite @MainActor
 struct ScreenRecordingCameraPreviewTests {
+    @Test
+    func disablingAndReenablingTheSameEffectRejectsFramesFromItsPreviousRevision() async throws {
+        let system = CameraPreviewTestSystem()
+        let service = ScreenRecordingService(dependencies: system.dependencies())
+        try await service.prepareCameraPreview(configuration: .init(camera: true))
+        let camera = try #require(system.cameras.first)
+        let effects = RecordingPortraitEffects(smoothing: 0.5)
+        service.setPortraitEffects(effects)
+        let old = try #require(camera.frameHandlers.last)
+        service.setPortraitEffects(.init())
+        service.setPortraitEffects(effects)
+        let frame = try #require(CIContext().createCGImage(CIImage(color: .red), from: .init(x: 0, y: 0, width: 8, height: 8)))
+        old(frame)
+        #expect(service.cameraPreviewImage == nil)
+        let current = try #require(camera.frameHandlers.last)
+        current(frame)
+        #expect(service.cameraPreviewImage === frame)
+        await service.stopCameraPreview()
+        current(frame)
+        #expect(service.cameraPreviewImage == nil)
+    }
     @Test
     func preparedCameraRemainsTheRecordingCameraAndReleasesAfterStop() async throws {
         let system = CameraPreviewTestSystem()
@@ -883,6 +905,8 @@ private final class CameraPreviewTestCapture: ScreenRecordingCaptureSession {
     var camera: (any ScreenRecordingCameraPreviewSession)?
     var started = false
     var cancelled = false
+    func setMonitoringFailureHandler(_ handler: @escaping @Sendable (Error) -> Void) {}
+    func setMicrophoneMonitoring(_ enabled: Bool) {}
     func useCameraPreview(_ preview: any ScreenRecordingCameraPreviewSession) { camera = preview }
     func start() async throws -> Double { started = true; return 100 }
     func setPaused(_ paused: Bool, atHostTime time: Double) async {}
@@ -904,6 +928,7 @@ private final class CameraPreviewTestCamera: ScreenRecordingCameraPreviewSession
     var running = false
     var released = false
     var stopGate: CameraPreviewTestLatch<Void>?
+    var frameHandlers: [@MainActor @Sendable (CGImage?) -> Void] = []
 
     init(identifier: String?, onFailure: @escaping ScreenRecordingCameraFailureHandler,
          error: CameraPreviewTestError?, gate: CameraPreviewTestLatch<Void>?) {
@@ -918,6 +943,9 @@ private final class CameraPreviewTestCamera: ScreenRecordingCameraPreviewSession
         if let error { throw error }
         if let gate { try await gate.wait() }
         running = true
+    }
+    func setPortraitEffects(_ effects: RecordingPortraitEffects, onFrame: (@MainActor @Sendable (CGImage?) -> Void)?) {
+        if let onFrame { frameHandlers.append(onFrame) }
     }
     func attach(to bridge: ScreenRecordingCaptureBridge) {}
     func stop() async {

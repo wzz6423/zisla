@@ -3316,6 +3316,24 @@
 "权限" = "Permisos";
 "管理 zisla 使用的系统权限。" = "Gestiona los permisos del sistema que utiliza zisla.";
 "请在设置的“权限”页面管理授权。" = "Gestiona el acceso en la página Permisos de los ajustes.";
+
+"人像效果" = "Efectos de retrato";
+"磨皮" = "Suavizar piel";
+"提亮" = "Iluminar";
+"瘦脸" = "Afinar rostro";
+"瘦身" = "Estilizar cuerpo";
+"美声" = "Mejorar voz";
+"原声" = "Voz original";
+"自然" = "Natural";
+"温暖" = "Cálida";
+"清亮" = "Clara";
+"播音" = "Locución";
+"效果强度" = "Intensidad del efecto";
+"恢复原始效果" = "Restablecer efectos";
+"监听麦克风" = "Escuchar micrófono";
+"使用耳机监听以避免回声" = "Usa auriculares para evitar el eco";
+"麦克风监听已关闭：%@" = "Se desactivó la escucha del micrófono: %@";
+
 "自动清理系统垃圾" = "Limpiar automáticamente los archivos innecesarios del sistema";
 "按所选间隔移入废纸篓，不会永久删除" = "Mover los elementos a la papelera en el intervalo elegido, sin eliminarlos definitivamente";
 "清理范围" = "Alcance de la limpieza";

@@ -586,6 +586,8 @@ struct ScreenRecordingClipShortcutTests {
 
     private final class RecordingSession: ScreenRecordingCaptureSession {
         var cancelled = false
+        func setMonitoringFailureHandler(_ handler: @escaping @Sendable (Error) -> Void) {}
+        func setMicrophoneMonitoring(_ enabled: Bool) {}
         func useCameraPreview(_ preview: any ScreenRecordingCameraPreviewSession) {}
         func start() async throws -> Double { 10 }
         func setPaused(_ paused: Bool, atHostTime time: Double) async {}

@@ -74,11 +74,16 @@ public struct RecordingCaptureConfiguration: Equatable, Sendable {
     public var microphoneID: String?
     public var cameraID: String?
     public var frameRate: Int
+    public var portraitEffects: RecordingPortraitEffects
+    public var voiceEffects: RecordingVoiceEffects
+    public var monitorMicrophone: Bool
 
     public init(mode: RecordingCaptureMode = .display, sourceID: UInt32 = 0,
                 region: RecordingRect? = nil, systemAudio: Bool = true,
                 microphone: Bool = false, camera: Bool = false,
-                microphoneID: String? = nil, cameraID: String? = nil, frameRate: Int = 30) {
+                microphoneID: String? = nil, cameraID: String? = nil, frameRate: Int = 30,
+                portraitEffects: RecordingPortraitEffects = .init(), voiceEffects: RecordingVoiceEffects = .init(),
+                monitorMicrophone: Bool = false) {
         self.mode = mode
         self.sourceID = sourceID
         self.region = region
@@ -88,6 +93,9 @@ public struct RecordingCaptureConfiguration: Equatable, Sendable {
         self.microphoneID = microphoneID
         self.cameraID = cameraID
         self.frameRate = frameRate
+        self.portraitEffects = portraitEffects
+        self.voiceEffects = voiceEffects
+        self.monitorMicrophone = monitorMicrophone
     }
 }
 
@@ -113,16 +121,26 @@ public struct ScreenRecordingResult: Equatable, Sendable {
     public var videoFile: String
     public var cameraFile: String?
     public var microphoneFile: String?
+    public var rawCameraFile: String?
+    public var rawMicrophoneFile: String?
+    public var portraitEffects: RecordingPortraitEffects?
+    public var voiceEffects: RecordingVoiceEffects?
     public var duration: Double
     public var width: Int
     public var height: Int
     public var pointers: [RecordingPointer]
 
     public init(videoFile: String, cameraFile: String? = nil, microphoneFile: String? = nil,
-                duration: Double, width: Int, height: Int, pointers: [RecordingPointer] = []) {
+                duration: Double, width: Int, height: Int, pointers: [RecordingPointer] = [],
+                rawCameraFile: String? = nil, rawMicrophoneFile: String? = nil,
+                portraitEffects: RecordingPortraitEffects? = nil, voiceEffects: RecordingVoiceEffects? = nil) {
         self.videoFile = videoFile
         self.cameraFile = cameraFile
         self.microphoneFile = microphoneFile
+        self.rawCameraFile = rawCameraFile
+        self.rawMicrophoneFile = rawMicrophoneFile
+        self.portraitEffects = portraitEffects
+        self.voiceEffects = voiceEffects
         self.duration = duration
         self.width = width
         self.height = height
@@ -256,6 +274,8 @@ public struct RecordingEdits: Codable, Equatable, Sendable {
     public var canvasAspectRatio: RecordingCanvasAspectRatio?
     public var backgroundColor: RecordingColor?
     public var annotations: [RecordingAnnotation]?
+    public var portraitEffects: RecordingPortraitEffects?
+    public var voiceEffects: RecordingVoiceEffects?
 
     public var effectiveCameraAspectRatio: RecordingCameraAspectRatio {
         cameraAspectRatio ?? (cameraRound ? .square : .standard)
@@ -278,7 +298,8 @@ public struct RecordingEdits: Codable, Equatable, Sendable {
                 cameraBorder: Bool? = nil,
                 showCamera: Bool? = nil, screenAudioVolume: Double? = nil, microphoneVolume: Double? = nil, showCaptions: Bool = true,
                 crop: RecordingRect? = nil, canvasAspectRatio: RecordingCanvasAspectRatio? = nil,
-                backgroundColor: RecordingColor? = nil, annotations: [RecordingAnnotation]? = nil) {
+                backgroundColor: RecordingColor? = nil, annotations: [RecordingAnnotation]? = nil,
+                portraitEffects: RecordingPortraitEffects? = nil, voiceEffects: RecordingVoiceEffects? = nil) {
         self.segments = segments
         self.zoomClips = zoomClips
         self.background = background
@@ -304,6 +325,8 @@ public struct RecordingEdits: Codable, Equatable, Sendable {
         self.canvasAspectRatio = canvasAspectRatio
         self.backgroundColor = backgroundColor
         self.annotations = annotations
+        self.portraitEffects = portraitEffects
+        self.voiceEffects = voiceEffects
     }
 }
 
@@ -382,6 +405,8 @@ public struct ScreenRecordingProject: Codable, Equatable, Identifiable, Sendable
     public var videoFile: String
     public var cameraFile: String?
     public var microphoneFile: String?
+    public var rawCameraFile: String?
+    public var rawMicrophoneFile: String?
     public var duration: Double
     public var width: Int
     public var height: Int
@@ -394,7 +419,7 @@ public struct ScreenRecordingProject: Codable, Equatable, Identifiable, Sendable
                 cameraFile: String? = nil, microphoneFile: String? = nil, duration: Double,
                 width: Int, height: Int, pointers: [RecordingPointer] = [],
                 edits: RecordingEdits? = nil, captions: [RecordingCaption] = [],
-                timeline: RecordingMultitrackTimeline? = nil) {
+                timeline: RecordingMultitrackTimeline? = nil, rawCameraFile: String? = nil, rawMicrophoneFile: String? = nil) {
         version = Self.currentVersion
         self.id = id
         self.name = name
@@ -402,6 +427,8 @@ public struct ScreenRecordingProject: Codable, Equatable, Identifiable, Sendable
         self.videoFile = videoFile
         self.cameraFile = cameraFile
         self.microphoneFile = microphoneFile
+        self.rawCameraFile = rawCameraFile
+        self.rawMicrophoneFile = rawMicrophoneFile
         self.duration = duration
         self.width = width
         self.height = height
@@ -414,19 +441,27 @@ public struct ScreenRecordingProject: Codable, Equatable, Identifiable, Sendable
     public init(result: ScreenRecordingResult, name: String) {
         self.init(name: name, videoFile: result.videoFile, cameraFile: result.cameraFile,
                   microphoneFile: result.microphoneFile, duration: result.duration,
-                  width: result.width, height: result.height, pointers: result.pointers)
+                  width: result.width, height: result.height, pointers: result.pointers,
+                  rawCameraFile: result.rawCameraFile, rawMicrophoneFile: result.rawMicrophoneFile)
+        edits.portraitEffects = result.portraitEffects
+        edits.voiceEffects = result.voiceEffects
     }
 
+    public var editingCameraFile: String? { rawCameraFile ?? cameraFile }
+    public var editingMicrophoneFile: String? { rawMicrophoneFile ?? microphoneFile }
     public var outputDuration: Double { timeline?.duration ?? edits.segments.reduce(0) { $0 + $1.outputDuration } }
     public var editingDuration: Double { max(duration, outputDuration) }
     public var mediaFiles: [String] {
-        Array(Set(([videoFile, cameraFile, microphoneFile].compactMap { $0 }
+        Array(Set(([videoFile, cameraFile, microphoneFile, rawCameraFile, rawMicrophoneFile].compactMap { $0 }
             + (timeline?.assets.map(\.file) ?? [])).filter { !$0.isEmpty })).sorted()
     }
 
     public func validate() throws {
         guard (1...Self.currentVersion).contains(version) else { throw ScreenRecordingProjectError.unsupportedVersion }
         guard timeline == nil || version >= 2 else { throw ScreenRecordingProjectError.invalidProject }
+        guard rawCameraFile.map(Self.isSafeMediaPath) != false, rawMicrophoneFile.map(Self.isSafeMediaPath) != false else {
+            throw ScreenRecordingProjectError.unsafeMediaPath
+        }
         let overlayDuration = timeline == nil ? editingDuration : 604_800
         guard duration.isFinite, duration > 0, duration <= 604_800,
               (1...16_384).contains(width), (1...16_384).contains(height),
@@ -455,6 +490,9 @@ public struct ScreenRecordingProject: Codable, Equatable, Identifiable, Sendable
               edits.cameraCornerRadius.map({ (0...0.5).contains($0) }) != false,
               (0...1).contains(edits.effectiveScreenAudioVolume),
               (0...1).contains(edits.effectiveMicrophoneVolume),
+              edits.portraitEffects?.isValid != false, edits.voiceEffects?.isValid != false,
+              rawCameraFile == nil || cameraFile != nil,
+              rawMicrophoneFile == nil || microphoneFile != nil,
               edits.backgroundColor?.isValid != false,
               edits.annotations.map({ annotations in
                   annotations.count <= RecordingAnnotation.maximumCount

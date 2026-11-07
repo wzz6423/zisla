@@ -3316,6 +3316,24 @@
 "权限" = "İzinler";
 "管理 zisla 使用的系统权限。" = "zisla’nın kullandığı sistem izinlerini yönetin.";
 "请在设置的“权限”页面管理授权。" = "Erişimi ayarlardaki İzinler sayfasından yönetin.";
+
+"人像效果" = "Portre Efektleri";
+"磨皮" = "Cilt Yumuşatma";
+"提亮" = "Aydınlatma";
+"瘦脸" = "Yüz İnceltme";
+"瘦身" = "Vücut İnceltme";
+"美声" = "Ses İyileştirme";
+"原声" = "Orijinal Ses";
+"自然" = "Doğal";
+"温暖" = "Sıcak";
+"清亮" = "Berrak";
+"播音" = "Yayın";
+"效果强度" = "Efekt Yoğunluğu";
+"恢复原始效果" = "Efektleri Sıfırla";
+"监听麦克风" = "Mikrofonu Dinle";
+"使用耳机监听以避免回声" = "Yankıyı önlemek için kulaklık kullanın";
+"麦克风监听已关闭：%@" = "Mikrofon dinleme kapatıldı: %@";
+
 "自动清理系统垃圾" = "Sistem gereksiz dosyalarını otomatik temizle";
 "按所选间隔移入废纸篓，不会永久删除" = "Öğeleri seçilen aralıkta Çöp Sepeti’ne taşı; kalıcı olarak silme";
 "清理范围" = "Temizleme kapsamı";

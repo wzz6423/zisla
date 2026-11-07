@@ -3316,6 +3316,24 @@
 "权限" = "Quyền";
 "管理 zisla 使用的系统权限。" = "Quản lý các quyền hệ thống mà zisla sử dụng.";
 "请在设置的“权限”页面管理授权。" = "Quản lý quyền truy cập trên trang Quyền trong phần cài đặt.";
+
+"人像效果" = "Hiệu ứng chân dung";
+"磨皮" = "Làm mịn da";
+"提亮" = "Làm sáng";
+"瘦脸" = "Làm thon mặt";
+"瘦身" = "Làm thon dáng";
+"美声" = "Cải thiện giọng nói";
+"原声" = "Giọng gốc";
+"自然" = "Tự nhiên";
+"温暖" = "Ấm áp";
+"清亮" = "Trong trẻo";
+"播音" = "Phát thanh";
+"效果强度" = "Cường độ hiệu ứng";
+"恢复原始效果" = "Đặt lại hiệu ứng";
+"监听麦克风" = "Nghe âm thanh micrô";
+"使用耳机监听以避免回声" = "Dùng tai nghe khi nghe kiểm tra để tránh tiếng vọng";
+"麦克风监听已关闭：%@" = "Đã tắt nghe âm thanh micrô: %@";
+
 "自动清理系统垃圾" = "Tự động dọn tệp rác hệ thống";
 "按所选间隔移入废纸篓，不会永久删除" = "Chuyển các mục vào Thùng rác theo khoảng thời gian đã chọn, không xóa vĩnh viễn";
 "清理范围" = "Phạm vi dọn dẹp";

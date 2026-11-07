@@ -156,7 +156,8 @@ final class ScreenRecordingCaptureBarController {
     var preferredSize: CGSize {
         // Model notifications can arrive before SwiftUI lays out the changed controls.
         hostingView.layoutSubtreeIfNeeded()
-        return CGSize(width: model.isRecording ? ScreenRecordingCaptureBarGeometry.recordingWidth + (model.configuration.camera ? 36 : 0)
+        return CGSize(width: model.isRecording ? ScreenRecordingCaptureBarGeometry.recordingWidth
+            + (model.configuration.camera || model.configuration.microphone ? 36 : 0)
             : hostingView.fittingSize.width,
             height: ScreenshotToolbarLayout.height)
     }
@@ -195,6 +196,7 @@ struct ScreenRecordingCaptureBar: View {
     let start: () -> Void
     let openStudio: () -> Void
     let cancel: () -> Void
+    @State private var showsPortraitEffects = false
 
     var body: some View {
         HStack(spacing: ScreenshotToolbarLayout.spacing) {
@@ -241,6 +243,24 @@ struct ScreenRecordingCaptureBar: View {
                     value: $model.configuration.microphone, identifier: "microphone")
                 inputButton("video", disabledSymbol: "video.slash", title: "摄像头",
                     value: $model.configuration.camera, identifier: "camera")
+                if model.configuration.camera || model.configuration.microphone {
+                    Button { showsPortraitEffects.toggle() } label: {
+                        Image(systemName: "person.crop.rectangle.badge.plus")
+                            .frame(width: 28, height: ScreenshotToolbarLayout.controlHeight)
+                    }
+                    .buttonStyle(.plain)
+                    .help(AppLocalization.text("人像效果"))
+                    .accessibilityLabel(AppLocalization.text("人像效果"))
+                    .accessibilityIdentifier("screenRecording.capturePortraitEffects")
+                    .popover(isPresented: $showsPortraitEffects) {
+                        VStack(alignment: .leading, spacing: 12) {
+                            Text(AppLocalization.text("人像效果")).font(.headline)
+                            ScreenRecordingPortraitControls(model: model, target: .capture,
+                                showsPortrait: model.configuration.camera, showsVoice: model.configuration.microphone)
+                        }
+                        .padding(16).frame(width: 280)
+                    }
+                }
                 optionsMenu
                 Button(action: start) {
                     Image(systemName: "record.circle.fill")
@@ -354,6 +374,7 @@ struct ScreenRecordingCaptureBar: View {
             cameraAspectRatioPicker
             Toggle(AppLocalization.text("摄像头边框"), isOn: $model.recordingCameraBorder)
                 .accessibilityIdentifier("screenRecording.cameraBorder")
+            if model.configuration.microphone { microphoneMonitorToggle }
         } label: {
             Image(systemName: "ellipsis.circle").font(.system(size: 14))
                 .frame(width: 28, height: ScreenshotToolbarLayout.controlHeight)
@@ -406,7 +427,7 @@ struct ScreenRecordingCaptureBar: View {
                     .font(.system(size: 13, weight: .medium, design: .monospaced)).monospacedDigit()
                     .accessibilityIdentifier("screenRecording.captureElapsed")
                 Spacer(minLength: 0)
-                if model.configuration.camera {
+                if model.configuration.camera || model.configuration.microphone {
                     recordingCameraOptionsMenu
                 }
                 Button(action: model.pause) {
@@ -440,6 +461,15 @@ struct ScreenRecordingCaptureBar: View {
                 }
             }
         }.padding(.horizontal, ScreenshotToolbarLayout.horizontalPadding).frame(height: ScreenshotToolbarLayout.height)
+    }
+
+    private var microphoneMonitorToggle: some View {
+        Toggle(AppLocalization.text("监听麦克风"), isOn: Binding(get: { model.capture.isMicrophoneMonitoring }, set: { enabled in
+            model.configuration.monitorMicrophone = enabled
+            model.capture.setMicrophoneMonitoring(enabled)
+        }))
+        .help(AppLocalization.text("使用耳机监听以避免回声"))
+        .accessibilityIdentifier("screenRecording.monitorMicrophone")
     }
 
     private var dragHandle: some View {

@@ -79,7 +79,7 @@ final class ScreenRecordingStudioController: NSWindowController, NSWindowDelegat
             window?.title = AppLocalization.text("录屏工作室")
         }.store(in: &subscriptions)
         model.$configuration
-            .removeDuplicates { $0.camera == $1.camera && $0.cameraID == $1.cameraID }
+            .removeDuplicates { $0.camera == $1.camera && $0.cameraID == $1.cameraID && $0.portraitEffects == $1.portraitEffects }
             .dropFirst().receive(on: RunLoop.main)
             .sink { [weak self] _ in self?.refreshCameraPreview() }
             .store(in: &subscriptions)

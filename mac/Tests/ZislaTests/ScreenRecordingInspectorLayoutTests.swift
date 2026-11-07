@@ -58,6 +58,133 @@ struct ScreenRecordingInspectorLayoutTests {
 
     enum MediumControlPanel: CaseIterable, Sendable { case ai, captions, effects, timeline, multitrack, media, export }
 
+    @Test(arguments: [AppLanguage.simplifiedChinese, .english, .arabic], [false, true])
+    func enhancementsStayOnTheEffectsPageWithVoiceUnderAudio(language: AppLanguage, multitrack: Bool) async throws {
+        let previous = UserDefaults.standard.volatileDomain(forName: UserDefaults.argumentDomain)
+        var arguments = previous
+        arguments[AppLocalization.defaultsKey] = language.rawValue
+        UserDefaults.standard.setVolatileDomain(arguments, forName: UserDefaults.argumentDomain)
+        defer { UserDefaults.standard.setVolatileDomain(previous, forName: UserDefaults.argumentDomain) }
+        let release = EnhancedAccessibilityTestScope.acquire()
+        defer { release() }
+        let recording = try RecordingMultitrackTestFixture()
+        let model = try recording.model()
+        defer { model.shutdown(); recording.remove() }
+        var project = recording.project()
+        project.cameraFile = "camera.mp4"
+        project.microphoneFile = "microphone.mp4"
+        project.edits.portraitEffects = .init(smoothing: 0.3)
+        project.edits.voiceEffects = .init(preset: .warm, amount: 0.6)
+        if multitrack { project.timeline = .migrating(project) }
+        model.install(project, directory: recording.directory)
+        let clip = Fixture(ScreenRecordingMultitrackClipInspector(model: model).frame(width: 296), language: language)
+        let effectsView = ScreenRecordingEffectsView(model: model)
+        let effects = Fixture(effectsView.frame(width: 296), language: language)
+        defer { clip.window.close(); effects.window.close() }
+        await clip.settle()
+        await effects.settle()
+        #expect(clip.control(AppLocalization.text("人像效果"), role: .disclosureTriangle) == nil)
+        for identifier in ["screenRecording.portrait.smoothing", "screenRecording.portrait.brightening",
+                           "screenRecording.portrait.faceSlimming", "screenRecording.portrait.bodySlimming",
+                           "screenRecording.voicePreset", "screenRecording.voiceAmount",
+                           "screenRecording.resetPortraitEffects", "screenRecording.resetVoiceEffects"] {
+            #expect(clip.element(identifier) == nil, "The clip page must not contain portrait or voice controls")
+        }
+        let portrait = try #require(effects.element("screenRecording.portrait.bodySlimming"))
+        #expect(effects.element("screenRecording.voicePreset") == nil, "Voice must live inside the collapsed audio section")
+        let audio = try #require(effects.control(AppLocalization.text("音频"), role: .disclosureTriangle))
+        try effects.press(audio)
+        await effects.settle()
+        let voice = try #require(effects.element("screenRecording.voicePreset"))
+        let amount = try #require(effects.element("screenRecording.voiceAmount"))
+        #expect(effects.textValues().contains(AppLocalization.text("美声")))
+        #expect(effects.frame(portrait).maxY < effects.frame(audio).minY)
+        #expect(effects.frame(audio).maxY < effects.frame(voice).minY)
+        for control in [voice, amount] {
+            #expect(effects.host.bounds.insetBy(dx: -0.5, dy: -0.5).contains(effects.frame(control)))
+        }
+        let controls = ScreenRecordingPortraitControls(model: model, target: effectsView.enhancementTarget.target,
+            showsPortrait: true, showsVoice: true)
+        try effects.press(try #require(effects.element("screenRecording.resetVoiceEffects")))
+        await effects.settle()
+        #expect(controls.voice == .init() && controls.portrait == project.edits.portraitEffects)
+        #expect(effects.element("screenRecording.voiceAmount") == nil)
+        model.undo()
+        await effects.settle()
+        #expect(model.project == project)
+        try effects.press(try #require(effects.element("screenRecording.resetPortraitEffects")))
+        await effects.settle()
+        #expect(controls.portrait == .init() && controls.voice == project.edits.voiceEffects)
+        model.undo()
+        #expect(model.project == project && !model.canUndo)
+        #expect(!clip.window.isVisible && !effects.window.isVisible)
+    }
+
+    enum EnhancementMedia: CaseIterable, Sendable { case video, silentVideo, image, audio }
+
+    @Test(arguments: [false, true])
+    func recordingWithoutAMicrophoneDoesNotOfferVoiceEffects(camera: Bool) async throws {
+        let release = EnhancedAccessibilityTestScope.acquire()
+        defer { release() }
+        let recording = try RecordingMultitrackTestFixture()
+        let model = try recording.model()
+        defer { model.shutdown(); recording.remove() }
+        var project = recording.project()
+        if camera { project.cameraFile = "camera.mp4" }
+        model.install(project, directory: recording.directory)
+        let fixture = Fixture(ScreenRecordingEffectsView(model: model).frame(width: 296), language: .english)
+        defer { fixture.window.close() }
+        await fixture.settle()
+        #expect((fixture.element("screenRecording.portrait.smoothing") != nil) == camera)
+        try fixture.press(try #require(fixture.control(AppLocalization.text("音频"), role: .disclosureTriangle)))
+        await fixture.settle()
+        #expect(fixture.element("screenRecording.voicePreset") == nil)
+        #expect(fixture.element("screenRecording.resetVoiceEffects") == nil)
+        #expect(model.project == project && !model.canUndo)
+        #expect(!fixture.window.isVisible)
+    }
+
+    @Test(arguments: EnhancementMedia.allCases)
+    func importedEnhancementsRemainEditableOnTheEffectsPage(media: EnhancementMedia) async throws {
+        let release = EnhancedAccessibilityTestScope.acquire()
+        defer { release() }
+        let recording = try RecordingMultitrackTestFixture()
+        let model = try recording.model()
+        defer { model.shutdown(); recording.remove() }
+        var project = recording.project()
+        project.videoFile = ""
+        project.edits.segments = []
+        let kind: RecordingMediaKind = media == .image ? .image : media == .audio ? .audio : .video
+        let asset = RecordingMediaAsset(name: "Imported", file: "imported.mp4", kind: kind, duration: 2,
+            width: 64, height: 48, hasAudio: media == .audio || media == .video)
+        let track = RecordingTimelineTrack()
+        var timeline = RecordingMultitrackTimeline(assets: [asset], tracks: [track])
+        let added = timeline.addAssetClip(asset.id, at: 0, trackID: track.id)
+        let id = try #require(added)
+        project.timeline = timeline
+        model.install(project, directory: recording.directory)
+        let fixture = Fixture(ScreenRecordingEffectsView(model: model).frame(width: 296), language: .english)
+        defer { fixture.window.close() }
+        await fixture.settle()
+        #expect((fixture.element("screenRecording.portrait.smoothing") != nil) == (media != .audio))
+        try fixture.press(try #require(fixture.control(AppLocalization.text("音频"), role: .disclosureTriangle)))
+        await fixture.settle()
+        #expect((fixture.element("screenRecording.voicePreset") != nil) == (media == .audio || media == .video))
+        let effectsView = ScreenRecordingEffectsView(model: model)
+        let controls = ScreenRecordingPortraitControls(model: model, target: effectsView.enhancementTarget.target,
+            showsPortrait: media != .audio, showsVoice: media == .audio || media == .video)
+        if media != .audio { controls.setPortrait(.init(brightening: 0.5)) }
+        if media == .audio || media == .video { controls.setVoice(.init(preset: .bright, amount: 0.4)) }
+        #expect(model.timeline?.clips.first { $0.id == id }?.portraitEffects == (media == .audio ? nil : .init(brightening: 0.5)))
+        #expect(model.timeline?.clips.first { $0.id == id }?.voiceEffects == (media == .audio || media == .video
+            ? .init(preset: .bright, amount: 0.4) : nil))
+        #expect(model.project?.edits == project.edits, "Imported clip adjustments must not change recording defaults")
+        model.selectTimelineTrack(track.id)
+        await fixture.settle()
+        #expect(fixture.element("screenRecording.portrait.smoothing") == nil && fixture.element("screenRecording.voicePreset") == nil)
+        #expect(!fixture.window.isVisible)
+    }
+
     @Test(arguments: AppLanguage.allCases, MediumControlPanel.allCases)
     func recordingMenusUseNativeMediumHeight(language: AppLanguage, panel: MediumControlPanel) async throws {
         let previous = UserDefaults.standard.volatileDomain(forName: UserDefaults.argumentDomain)
@@ -72,6 +199,7 @@ struct ScreenRecordingInspectorLayoutTests {
         defer { model.shutdown(); recording.remove() }
         var project = recording.project()
         project.cameraFile = "camera.mp4"
+        if panel == .effects { project.microphoneFile = "microphone.mp4" }
         project.timeline = panel == .multitrack ? .migrating(project) : nil
         model.install(project, directory: recording.directory)
         if let clip = project.timeline?.clips.first { model.selectTimelineClip(clip.id) }
@@ -86,7 +214,7 @@ struct ScreenRecordingInspectorLayoutTests {
             expectedCount = 1
         case .effects:
             view = AnyView(ScreenRecordingEffectsView(model: model))
-            expectedCount = 4
+            expectedCount = 5
         case .timeline:
             view = AnyView(ScreenRecordingTimelineView(model: model, selectedSegmentID: .constant(nil)))
             expectedCount = 2
@@ -107,9 +235,11 @@ struct ScreenRecordingInspectorLayoutTests {
         await reference.settle()
         await fixture.settle()
         if panel == .effects {
-            let disclosure = try #require(fixture.control(AppLocalization.text("摄像头叠加"), role: .disclosureTriangle))
-            try fixture.press(disclosure)
-            await fixture.settle()
+            for title in ["摄像头叠加", "音频"] {
+                let disclosure = try #require(fixture.control(AppLocalization.text(title), role: .disclosureTriangle))
+                try fixture.press(disclosure)
+                await fixture.settle()
+            }
         }
         let referenceHeight = try #require(reference.menuFrames().first).height
         let frames = fixture.menuFrames()

@@ -140,7 +140,7 @@ final class ScreenRecordingExporter: ObservableObject {
             generator.requestedTimeToleranceAfter = .zero
             let screen = try await generator.image(at: time).image
             let camera: CGImage?
-            if let file = project.cameraFile {
+            if let file = project.editingCameraFile {
                 let cameraAsset = AVURLAsset(url: try store.mediaURL(file, in: directory))
                 guard let cameraTrack = try await cameraAsset.loadTracks(withMediaType: .video).first else {
                     throw ScreenRecordingExportError.unavailableMedia
