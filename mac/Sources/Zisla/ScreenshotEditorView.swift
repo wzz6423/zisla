@@ -4874,6 +4874,7 @@ struct ScreenshotToolAttributesRow<Content: View>: View {
         HStack(spacing: 10) {
             content
         }
+        .keepsIntrinsicWidth()
         .padding(.horizontal, 12)
         .frame(height: ScreenshotToolbarLayout.height)
     }
