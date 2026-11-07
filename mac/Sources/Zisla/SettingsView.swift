@@ -147,7 +147,7 @@ struct SettingsView: View {
                         } label: {
                             HStack(spacing: 10) {
                                 Image(systemName: result.section.symbol)
-                                    .foregroundStyle(Color.accentColor)
+                                    .foregroundStyle(result.section.iconColor)
                                     .frame(width: 24)
                                 VStack(alignment: .leading, spacing: 3) {
                                     AppLocalizedText(result.title)
@@ -3152,7 +3152,7 @@ struct SettingsView: View {
         HStack(spacing: 10) {
             Image(systemName: "magnifyingglass")
                 .font(.system(size: 12, weight: .semibold))
-                .foregroundStyle(Color.accentColor)
+                .foregroundStyle(SettingsSection.weather.iconColor)
                 .frame(width: 24)
             HStack(spacing: 6) {
                 TextField(AppLocalization.text("城市、区县或地区"), text: $input.weatherQuery)
@@ -3770,9 +3770,9 @@ struct SettingsView: View {
         HStack(spacing: 10) {
             Image(systemName: symbol)
                 .font(.system(size: 15, weight: .medium))
-                .foregroundStyle(Color.accentColor)
+                .foregroundStyle(.white)
                 .frame(width: 32, height: 32)
-                .background(Color.accentColor.opacity(0.10), in: RoundedRectangle(cornerRadius: 8, style: .continuous))
+                .background(input.selection.iconColor(for: symbol), in: RoundedRectangle(cornerRadius: 8, style: .continuous))
             VStack(alignment: .leading, spacing: 2) {
                 AppLocalizedText(title)
                     .font(.system(size: 13, weight: .medium))
@@ -3810,7 +3810,7 @@ struct SettingsView: View {
                 .help(AppLocalization.text("拖动调整 %@ 的展示顺序", AppLocalization.text(title)))
             Image(systemName: symbol)
                 .font(.system(size: 12, weight: .semibold))
-                .foregroundStyle(Color.accentColor)
+                .foregroundStyle(input.selection.iconColor(for: symbol))
                 .frame(width: 24)
             AppLocalizedText(title)
                 .font(.system(size: 11, weight: .medium))
@@ -4519,6 +4519,64 @@ enum SettingsSection: String, CaseIterable, Identifiable {
         }
     }
 
+    var iconColor: Color {
+        switch self {
+        case .general, .features, .keyboardSound, .permissions: Color(nsColor: .systemGray)
+        case .info, .mail, .networkProxy: Color(nsColor: .systemBlue)
+        case .clipboardAssistant, .screenshot, .ai, .recommendations: Color(nsColor: .systemIndigo)
+        case .recording, .pdfTools, .voice: Color(nsColor: .systemRed)
+        case .download, .updates: Color(nsColor: .systemGreen)
+        case .weather: Color(nsColor: .systemCyan)
+        case .pet: Color(nsColor: .systemOrange)
+        }
+    }
+
+    func iconColor(for symbol: String) -> Color {
+        if let section = Self.allCases.first(where: { $0.symbol == symbol }) {
+            return section.iconColor
+        }
+        if self == .keyboardSound,
+           ["waveform", "speaker.wave.2", "arrow.uturn.backward", "waveform.path.ecg", "chart.bar.xaxis"].contains(symbol) {
+            return iconColor
+        }
+        switch symbol {
+        case "power", "power.circle.fill", "battery.100percent", "arrow.down.circle", "arrow.down.square.fill",
+             "square.and.arrow.down", "arrow.triangle.2.circlepath", "arrow.triangle.branch", "checkmark.seal.fill":
+            return Self.download.iconColor
+        case "calendar", "calendar.badge.clock", "bell.fill", "bell.badge.fill", "bell.slash.fill":
+            return Self.recording.iconColor
+        case "heart.fill", "music.note", "music.note.list", "play.square.fill",
+             "text.quote", "waveform", "speaker.wave.2":
+            return Self.voice.iconColor
+        case "folder", "folder.fill", "folder.badge.plus", "tray.full.fill", "tray.and.arrow.down":
+            return Self.mail.iconColor
+        case "clipboard", "clipboard.fill", "note.text", "wrench.and.screwdriver.fill", "wrench.and.screwdriver":
+            return Color(nsColor: .systemOrange)
+        case "camera.fill", "pin.fill", "sparkle":
+            return Self.screenshot.iconColor
+        case "doc.viewfinder":
+            return Self.pdfTools.iconColor
+        case "rectangle.stack":
+            return Self.recording.iconColor
+        case "doc.richtext", "terminal", "terminal.fill", "chevron.left.forwardslash.chevron.right", "hammer":
+            return Self.ai.iconColor
+        case "cpu", "chart.bar.fill", "chart.bar.xaxis", "chart.xyaxis.line",
+             "gauge.with.dots.needle.67percent", "waveform.path.ecg", "display":
+            return Self.info.iconColor
+        case "character.bubble", "envelope", "link":
+            return Self.mail.iconColor
+        case "capsule", "viewfinder", "menubar.rectangle", "macwindow.on.rectangle", "lock.display",
+             "rectangle.on.rectangle", "rectangle.on.rectangle.angled", "rectangle.topthird.inset.filled",
+             "rectangle.bottomhalf.inset.filled", "rectangle.compress.vertical", "rectangle.split.2x1",
+             "laptopcomputer.and.iphone", "keyboard", "computermouse", "hand.tap", "hand.draw.fill":
+            return Self.general.iconColor
+        case "shippingbox.fill":
+            return Self.pet.iconColor
+        default:
+            return iconColor
+        }
+    }
+
     var subtitle: String {
         switch self {
         case .general: "调整语言、外观、启动与展开方式。"
@@ -4671,9 +4729,10 @@ struct SettingsSidebar: View {
         } label: {
             HStack(spacing: 10) {
                 Image(systemName: section.symbol)
-                    .font(.system(size: 15, weight: .medium))
-                    .foregroundStyle(Color.accentColor)
-                    .frame(width: 21)
+                    .font(.system(size: section == .keyboardSound ? 13 : 15, weight: .medium))
+                    .foregroundStyle(.white)
+                    .frame(width: 24, height: 24)
+                    .background(section.iconColor, in: RoundedRectangle(cornerRadius: 6, style: .continuous))
                 AppLocalizedText(section.title)
                     .font(.system(size: 13, weight: .medium))
                     .fitsLines(2, minScale: 0.85)

@@ -161,10 +161,14 @@ struct SettingsSplitViewTests {
         }
     }
 
-    @Test(arguments: [ColorScheme.light, .dark])
-    func productionSidebarShowsOverflowScrollerWithoutOverlappingRowsAndHidesItWhenContentFits(colorScheme: ColorScheme) async throws {
+    @Test(arguments: [ColorScheme.light, .dark], [SettingsSection.general, .keyboardSound])
+    func productionSidebarShowsOverflowScrollerWithoutOverlappingRowsAndHidesItWhenContentFits(
+        colorScheme: ColorScheme, selection: SettingsSection
+    ) async throws {
         let fixture = Fixture()
         defer { fixture.close() }
+        fixture.input.select(selection)
+        fixture.state.height = 500
         fixture.state.colorScheme = colorScheme
         fixture.state.isEnabled = true
         await fixture.layout()
@@ -203,6 +207,44 @@ struct SettingsSplitViewTests {
         let sample = try #require(bitmap.colorAt(x: sampleX, y: rows[rows.count / 2])?.usingColorSpace(.deviceRGB))
         #expect(sample.alphaComponent < 0.5 || sample.blueComponent - sample.redComponent < 0.3,
                 "Selection must use a pale tint instead of an opaque accent fill in both appearances")
+        var accentTitlePixels = 0
+        for y in rows.dropFirst(Int(4 * scale)).dropLast(Int(4 * scale)) {
+            for x in Int(60 * scale)..<sampleX {
+                let color = try #require(bitmap.colorAt(x: x, y: y)?.usingColorSpace(.deviceRGB))
+                if color.alphaComponent > sample.alphaComponent + 0.3,
+                   color.blueComponent > color.redComponent + 0.3,
+                   color.blueComponent > color.greenComponent + 0.2 {
+                    accentTitlePixels += 1
+                }
+            }
+        }
+        var categoryColorPixels = 0
+        for y in 0..<bitmap.pixelsHigh where !selectedRowPixels.contains(y) {
+            for x in Int(22 * scale)..<Int(44 * scale) {
+                let color = try #require(bitmap.colorAt(x: x, y: y)?.usingColorSpace(.deviceRGB))
+                if color.redComponent > color.blueComponent + 0.08 || color.greenComponent > color.blueComponent + 0.08 {
+                    categoryColorPixels += 1
+                }
+            }
+        }
+        #expect(accentTitlePixels > 10, "The selected title must render the blue accent color on the pale background")
+        #expect(categoryColorPixels > 10, "Unselected category icons must include colors beyond the blue accent")
+
+        if selection == .keyboardSound {
+            var glyphColumns = Set<Int>()
+            for y in rows {
+                for x in Int(20 * scale)..<Int(48 * scale) {
+                    let color = try #require(bitmap.colorAt(x: x, y: y)?.usingColorSpace(.deviceRGB))
+                    if color.redComponent > 0.94 && color.greenComponent > 0.94 && color.blueComponent > 0.94 {
+                        glyphColumns.insert(x)
+                    }
+                }
+            }
+            let glyphLeftEdge = CGFloat(try #require(glyphColumns.min())) / scale
+            let glyphRightEdge = CGFloat(try #require(glyphColumns.max()) + 1) / scale
+            #expect(glyphLeftEdge >= 23 && glyphRightEdge <= 45,
+                    "The keyboard glyph must leave at least one point of space inside its 24-point tile")
+        }
 
         fixture.state.settings.keyboardEnabled = false
         fixture.state.settings.clipboardAssistantEnabled = false

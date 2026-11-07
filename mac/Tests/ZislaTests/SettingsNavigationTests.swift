@@ -1,10 +1,57 @@
+import AppKit
 import Foundation
+import SwiftUI
 import Testing
 import ZislaCore
 
 @testable import Zisla
 
 struct SettingsNavigationTests {
+    @Test(arguments: [ColorScheme.light, .dark]) @MainActor
+    func categoryIconsUseAppleSystemColors(colorScheme: ColorScheme) throws {
+        let appearance = try #require(NSAppearance(named: colorScheme == .dark ? .darkAqua : .aqua))
+        appearance.performAsCurrentDrawingAppearance {
+            var environment = EnvironmentValues()
+            environment.colorScheme = colorScheme
+            let systemColors: [NSColor] = [.systemGray, .systemBlue, .systemIndigo, .systemRed,
+                                          .systemGreen, .systemOrange, .systemCyan]
+            let allowedColors = systemColors.map { Color(nsColor: $0).resolve(in: environment) }
+            for category in SettingsSection.allCases {
+                let color = category.iconColor.resolve(in: environment)
+                #expect(allowedColors.contains(color),
+                        "The \(category.rawValue) icon must use Apple's unmodified system palette in \(colorScheme)")
+            }
+        }
+    }
+
+    @Test
+    func keyboardSoundRowsUseTheKeyboardCategoryColor() {
+        for symbol in ["waveform", "speaker.wave.2", "arrow.uturn.backward", "waveform.path.ecg", "chart.bar.xaxis"] {
+            #expect(SettingsSection.keyboardSound.iconColor(for: symbol) == SettingsSection.keyboardSound.iconColor,
+                    "The \(symbol) keyboard setting must keep the keyboard category color")
+        }
+    }
+
+    @Test
+    func settingIconsKeepTheirCategoryColorsAcrossPages() {
+        for page in SettingsSection.allCases {
+            for category in SettingsSection.allCases {
+                #expect(page.iconColor(for: category.symbol) == category.iconColor,
+                        "The \(category.rawValue) icon must keep its identity on the \(page.rawValue) page")
+            }
+            #expect(page.iconColor(for: "") == page.iconColor)
+            #expect(page.iconColor(for: "future.setting.symbol") == page.iconColor)
+            #expect(page.iconColor(for: "camera.fill") == SettingsSection.screenshot.iconColor)
+            #expect(page.iconColor(for: "doc.viewfinder") == SettingsSection.pdfTools.iconColor)
+            for symbol in ["power.circle.fill", "battery.100percent", "calendar", "music.note.list", "folder",
+                           "camera.fill", "doc.viewfinder", "rectangle.stack", "terminal.fill", "cpu",
+                           "character.bubble", "capsule", "shippingbox.fill"] {
+                #expect(page.iconColor(for: symbol) == SettingsSection.general.iconColor(for: symbol),
+                        "The \(symbol) setting must keep its semantic color across pages")
+            }
+        }
+    }
+
     @Test(arguments: [false, true], [false, true])
     func combinedMonitorNavigationFollowsTheSystemToggleWithLegacyBatterySettings(systemEnabled: Bool, batteryEnabled: Bool) throws {
         let data = try JSONSerialization.data(withJSONObject: [
