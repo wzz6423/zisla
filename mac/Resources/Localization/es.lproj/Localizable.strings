@@ -3313,5 +3313,9 @@
 "权限" = "Permisos";
 "管理 zisla 使用的系统权限。" = "Gestiona los permisos del sistema que utiliza zisla.";
 "请在设置的“权限”页面管理授权。" = "Gestiona el acceso en la página Permisos de los ajustes.";
+"默认保存位置" = "Ubicaciones de guardado predeterminadas";
+"分别设置各类内容的默认保存位置。" = "Establecer la ubicación de guardado predeterminada para cada tipo de contenido.";
+"管理下载所需组件。" = "Gestionar los componentes necesarios para las descargas.";
+"更改 %@ 的保存位置" = "Cambiar la ubicación de guardado de %@";
 
 "本地优先的原生笔记应用" = "Aplicación nativa de notas que prioriza el almacenamiento local";

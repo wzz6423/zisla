@@ -4810,7 +4810,7 @@ enum ScreenshotImageExport {
     /// - Parameter status: Receives the result message, or `nil` when the panel closes without writing a file.
     static func presentSavePanel(
         for data: Data,
-        directory: URL = AppModel.shared.downloadDirectory,
+        directory: URL = AppModel.shared.saveLocations[.screenshot],
         panel: NSSavePanel = NSSavePanel(),
         systemPreferences: UserDefaults = .standard,
         themeNotifications: NotificationCenter = DistributedNotificationCenter.default(),

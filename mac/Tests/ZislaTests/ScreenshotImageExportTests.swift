@@ -9,25 +9,31 @@ import ZislaCore
 @Suite(.serialized)
 struct ScreenshotImageExportTests {
     @Test
-    func savePanelsFollowDownloadDirectoryChangesInsteadOfRememberingThePreviousFolder() async throws {
+    func savePanelsFollowScreenshotDirectoryChangesInsteadOfRememberingThePreviousFolder() async throws {
         let fixture = try Fixture()
         defer { fixture.close() }
-        for name in ["Initial downloads", "Updated downloads"] {
+        let locations = SaveLocationStore(defaults: fixture.preferences)
+        let downloads = fixture.directory.appendingPathComponent("Downloads", isDirectory: true)
+        try FileManager.default.createDirectory(at: downloads, withIntermediateDirectories: false)
+        try locations.setDirectory(downloads, for: .download)
+        for name in ["Initial screenshots", "Updated screenshots"] {
             let directory = fixture.directory.appendingPathComponent(name, isDirectory: true)
             try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: false)
+            try locations.setDirectory(directory, for: .screenshot)
             fixture.panel.directoryURL = fixture.directory
             let message: String? = await withCheckedContinuation { continuation in
-                ScreenshotImageExport.presentSavePanel(for: Self.png, directory: directory, panel: fixture.panel,
+                ScreenshotImageExport.presentSavePanel(for: Self.png, directory: locations[.screenshot], panel: fixture.panel,
                     systemPreferences: fixture.preferences, themeNotifications: fixture.notifications) {
                     continuation.resume(returning: $0)
                 }
                 #expect(fixture.panel.directoryURL?.standardizedFileURL == directory.standardizedFileURL,
-                        "Every save must start in the current shared download directory")
+                        "Every save must start in the screenshot directory independently of downloads")
                 fixture.panel.respond(.cancel)
             }
             #expect(message == nil)
+            #expect(locations[.download].path == downloads.path)
             #expect(try FileManager.default.contentsOfDirectory(atPath: directory.path).isEmpty,
-                    "Cancelling must not create a screenshot in the selected download directory")
+                    "Cancelling must not create a screenshot in the selected directory")
         }
     }
 

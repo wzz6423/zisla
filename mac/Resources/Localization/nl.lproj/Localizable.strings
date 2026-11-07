@@ -3313,5 +3313,9 @@
 "权限" = "Machtigingen";
 "管理 zisla 使用的系统权限。" = "Beheer de systeemmachtigingen die zisla gebruikt.";
 "请在设置的“权限”页面管理授权。" = "Beheer de toegang op de pagina Machtigingen in de instellingen.";
+"默认保存位置" = "Standaardopslaglocaties";
+"分别设置各类内容的默认保存位置。" = "Stel de standaardopslaglocatie in voor elk type inhoud.";
+"管理下载所需组件。" = "Beheer de onderdelen die nodig zijn voor downloads.";
+"更改 %@ 的保存位置" = "Opslaglocatie voor %@ wijzigen";
 
 "本地优先的原生笔记应用" = "Native notitie-app die lokale opslag vooropstelt";

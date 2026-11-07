@@ -3313,5 +3313,9 @@
 "权限" = "Izin";
 "管理 zisla 使用的系统权限。" = "Kelola izin sistem yang digunakan zisla.";
 "请在设置的“权限”页面管理授权。" = "Kelola akses di halaman Izin dalam pengaturan.";
+"默认保存位置" = "Lokasi Penyimpanan Default";
+"分别设置各类内容的默认保存位置。" = "Atur lokasi penyimpanan default untuk setiap jenis konten.";
+"管理下载所需组件。" = "Kelola komponen yang diperlukan untuk unduhan.";
+"更改 %@ 的保存位置" = "Ubah lokasi penyimpanan untuk %@";
 
 "本地优先的原生笔记应用" = "Aplikasi catatan native yang mengutamakan penyimpanan lokal";
