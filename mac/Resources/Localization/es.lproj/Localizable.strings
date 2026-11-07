@@ -632,6 +632,8 @@
 "飞机" = "Avión";
 "首页" = "Inicio";
 "7 天" = "7 días";
+"自动删除剪贴板历史" = "Eliminar automáticamente el historial del portapapeles";
+"按所选周期删除过期历史，常用项目继续保留" = "Eliminar el historial caducado tras el periodo elegido; los favoritos se conservan";
 "上一页" = "Página anterior";
 "下一页" = "Página siguiente";
 "不可用" = "No disponible";

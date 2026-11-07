@@ -7,6 +7,14 @@ import ZislaKit
 
 struct SettingsSearchTests {
     @Test(arguments: AppLanguage.allCases)
+    func clipboardHistoryCleanupIsSearchableInEveryLanguage(language: AppLanguage) {
+        let title = AppLocalization.string("自动删除剪贴板历史", language: language)
+        let matches = results(title, settings: FeatureSettings.default, locale: language.locale)
+        #expect(matches.first?.section == .features)
+        #expect(matches.first?.anchor == .row("自动删除剪贴板历史"))
+    }
+
+    @Test(arguments: AppLanguage.allCases)
     func quietMDRecommendationIsSearchableByNameAndLocalizedPurpose(language: AppLanguage) {
         let queries = [ManagedTool.quietMD.displayName, AppLocalization.string(ManagedTool.quietMD.purpose, language: language)]
         for query in queries {

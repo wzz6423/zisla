@@ -1200,6 +1200,7 @@ final class AppModel: ObservableObject {
     managedTools.setAutomaticUpdatesEnabled(false)
     keyboardSound.stop()
     clipboardHistory.flushPendingChanges()
+    clipboardHistory.stopCleanup()
     aiAgent.store.flushPendingChanges()
     weatherTask?.cancel()
     weatherExpiryTask?.cancel()
@@ -3183,6 +3184,7 @@ final class AppModel: ObservableObject {
       settings.recommendedToolsEnabled && settings.recommendedToolsAutomaticUpdatesEnabled
     )
     configureVoiceRecordingCleanup(policy: settings.voiceRecordingCleanupPolicy)
+    clipboardHistory.configureCleanup(policy: settings.clipboardHistoryCleanupPolicy)
     if settings.aiProgressEnabled {
       aiMonitor.start()
       if selectedModule == .aiMonitor {

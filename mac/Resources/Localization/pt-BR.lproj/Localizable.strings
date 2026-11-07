@@ -632,6 +632,8 @@
 "飞机" = "Avião";
 "首页" = "Início";
 "7 天" = "7 dias";
+"自动删除剪贴板历史" = "Excluir automaticamente o histórico da área de transferência";
+"按所选周期删除过期历史，常用项目继续保留" = "Excluir o histórico vencido após o período escolhido; os favoritos são mantidos";
 "上一页" = "Página anterior";
 "下一页" = "Próxima página";
 "不可用" = "Indisponível";

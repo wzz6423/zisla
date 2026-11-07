@@ -628,6 +628,8 @@
 "飞机" = "Avion";
 "首页" = "Accueil";
 "7 天" = "7 jours";
+"自动删除剪贴板历史" = "Supprimer automatiquement l’historique du presse-papiers";
+"按所选周期删除过期历史，常用项目继续保留" = "Supprimer l’historique expiré après la période choisie ; les favoris sont conservés";
 "上一页" = "Page précédente";
 "下一页" = "Page suivante";
 "不可用" = "Indisponible";
