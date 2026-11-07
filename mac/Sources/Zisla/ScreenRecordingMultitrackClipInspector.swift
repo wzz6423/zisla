@@ -102,28 +102,11 @@ struct ScreenRecordingMultitrackClipInspector: View {
             if clip.content.trackKind != .audio {
                 ScreenRecordingClipAnimationInspector(model: model, clip: clip)
             }
-            let effects = effectsAvailability(clip)
-            if effects.portrait || effects.voice {
-                ScreenRecordingInspectorSection(AppLocalization.text("人像效果"), symbol: "person.crop.rectangle", expanded: false) {
-                    ScreenRecordingPortraitControls(model: model, target: .clip(clip.id),
-                        showsPortrait: effects.portrait, showsVoice: effects.voice)
-                }
-            }
         }
     }
 
     private func number(_ clip: RecordingTimelineClip, _ keyPath: WritableKeyPath<RecordingTimelineClip, Double>) -> Binding<Double> {
         Binding(get: { model.timeline?.clips.first { $0.id == clip.id }?[keyPath: keyPath] ?? clip[keyPath: keyPath] },
             set: { value in model.updateTimelineClip(clip.id) { $0[keyPath: keyPath] = value } })
-    }
-
-    func effectsAvailability(_ clip: RecordingTimelineClip) -> (portrait: Bool, voice: Bool) {
-        switch clip.content {
-        case .recording: (model.project?.editingCameraFile != nil, model.project?.editingMicrophoneFile != nil)
-        case let .video(id): (true, model.timeline?.assets.first { $0.id == id }?.hasAudio == true)
-        case .image: (true, false)
-        case .audio: (false, true)
-        default: (false, false)
-        }
     }
 }

@@ -29,6 +29,7 @@ struct ScreenRecordingPortraitControls: View {
                         Text(AppLocalization.text(preset.title)).tag(preset)
                     }
                 }
+                .controlSize(.regular)
                 .accessibilityIdentifier("screenRecording.voicePreset")
                 if voice.preset != .original {
                     ScreenRecordingParameterRow(title: AppLocalization.text("效果强度"), value: Binding(
@@ -48,7 +49,7 @@ struct ScreenRecordingPortraitControls: View {
                 if showsPortrait { setPortrait(.init()) }
                 if showsVoice { setVoice(.init()) }
             }
-            .accessibilityIdentifier("screenRecording.resetPortraitEffects")
+            .accessibilityIdentifier(showsPortrait ? "screenRecording.resetPortraitEffects" : "screenRecording.resetVoiceEffects")
             .disabled(!(showsPortrait && portrait.isEnabled) && !(showsVoice && voice.isEnabled))
         }
         .disabled(isDisabled)

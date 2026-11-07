@@ -106,6 +106,75 @@ struct ScreenRecordingPortraitControlsTests {
         #expect(model.project == original && !model.isDirty && !model.canUndo)
     }
 
+    @Test(arguments: [false, true])
+    func effectsPagePreservesLegacyDefaultsAndSelectedClipOverrides(multitrack: Bool) throws {
+        let fixture = try RecordingMultitrackTestFixture()
+        let model = try fixture.model()
+        defer { model.shutdown(); fixture.remove() }
+        var project = fixture.project()
+        project.cameraFile = "camera.mp4"
+        project.microphoneFile = "mic.mp4"
+        project.edits.portraitEffects = .init(smoothing: 0.3)
+        project.edits.voiceEffects = .init(preset: .warm, amount: 0.5)
+        project.edits.segments = [.init(start: 0, end: 1), .init(start: 1, end: 2)]
+        if multitrack { project.timeline = .migrating(project) }
+        model.install(project, directory: fixture.directory)
+        let first = try #require(model.timeline?.clips.first)
+        let second = try #require(model.timeline?.clips.last)
+        let view = ScreenRecordingEffectsView(model: model)
+        let controls = ScreenRecordingPortraitControls(model: model, target: view.enhancementTarget.target,
+            showsPortrait: true, showsVoice: true)
+        controls.setPortrait(.init(bodySlimming: 0.6))
+        controls.setVoice(.init(preset: .broadcast, amount: 0.8))
+        if multitrack {
+            #expect(model.timeline?.clips.first { $0.id == first.id }?.portraitEffects == .init(bodySlimming: 0.6))
+            #expect(model.timeline?.clips.first { $0.id == first.id }?.voiceEffects == .init(preset: .broadcast, amount: 0.8))
+            #expect(model.timeline?.clips.last == second && model.project?.edits == project.edits)
+        } else {
+            #expect(model.project?.timeline == nil)
+            #expect(model.project?.edits.portraitEffects == .init(bodySlimming: 0.6))
+            #expect(model.project?.edits.voiceEffects == .init(preset: .broadcast, amount: 0.8))
+        }
+        model.undo()
+        model.undo()
+        #expect(model.project == project && !model.canUndo)
+        model.selectTimelineTrack(first.trackID)
+        let global = ScreenRecordingPortraitControls(model: model, target: view.enhancementTarget.target,
+            showsPortrait: true, showsVoice: true)
+        global.setVoice(.init(preset: .natural, amount: 0.4))
+        #expect(model.project?.edits.voiceEffects == .init(preset: .natural, amount: 0.4))
+        #expect(model.timeline?.clips == RecordingMultitrackTimeline.migrating(project).clips)
+        model.undo()
+        #expect(model.project == project && !model.canUndo)
+    }
+
+    @Test func textSelectionsKeepRecordingEffectsAvailableWithoutChangingTextClips() throws {
+        let fixture = try RecordingMultitrackTestFixture()
+        let model = try fixture.model()
+        defer { model.shutdown(); fixture.remove() }
+        var project = fixture.project()
+        project.cameraFile = "camera.mp4"
+        project.microphoneFile = "microphone.mp4"
+        let caption = RecordingCaption(start: 0, end: 2, text: "Caption")
+        project.captions = [caption]
+        project.timeline = .migrating(project)
+        model.install(project, directory: fixture.directory)
+        let text = try #require(model.timeline?.clips.first { $0.content == .caption(caption.id) })
+        model.selectTimelineClip(text.id)
+        let view = ScreenRecordingEffectsView(model: model)
+        #expect(view.enhancementTarget.portrait && view.enhancementTarget.voice)
+        let controls = ScreenRecordingPortraitControls(model: model, target: view.enhancementTarget.target,
+            showsPortrait: true, showsVoice: true)
+        controls.setPortrait(.init(brightening: 0.4))
+        controls.setVoice(.init(preset: .warm, amount: 0.3))
+        #expect(model.project?.edits.portraitEffects == .init(brightening: 0.4))
+        #expect(model.project?.edits.voiceEffects == .init(preset: .warm, amount: 0.3))
+        #expect(model.timeline?.clips == project.timeline?.clips && model.project?.captions == project.captions)
+        model.undo()
+        model.undo()
+        #expect(model.project == project && !model.canUndo)
+    }
+
     @Test(arguments: AppLanguage.allCases)
     func portraitKeysAreTranslatedInEveryLanguage(_ language: AppLanguage) throws {
         let root = URL(fileURLWithPath: #filePath).deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent()
@@ -163,7 +232,7 @@ struct ScreenRecordingPortraitControlsTests {
         var project = fixture.project()
         project.timeline = .migrating(project)
         model.install(project, directory: fixture.directory)
-        let inspector = ScreenRecordingMultitrackClipInspector(model: model)
+        let inspector = ScreenRecordingEffectsView(model: model)
         let clip = try #require(model.timeline?.clips.first)
         #expect(inspector.effectsAvailability(clip).portrait == false && inspector.effectsAvailability(clip).voice == false)
         model.update { $0.cameraFile = "camera.mp4"; $0.microphoneFile = "mic.mp4" }

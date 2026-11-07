@@ -7,11 +7,12 @@ struct ScreenRecordingEffectsView: View {
     @State private var zoomSectionExpanded = false
 
     var body: some View {
+        let effects = enhancementTarget
         VStack(alignment: .leading, spacing: 12) {
-            if let project = model.project, project.cameraFile != nil || project.microphoneFile != nil {
+            if effects.portrait {
                 ScreenRecordingInspectorSection(AppLocalization.text("人像效果"), symbol: "person.crop.rectangle") {
-                    ScreenRecordingPortraitControls(model: model, target: .recording,
-                        showsPortrait: project.cameraFile != nil, showsVoice: project.microphoneFile != nil)
+                    ScreenRecordingPortraitControls(model: model, target: effects.target,
+                        showsPortrait: true, showsVoice: false)
                 }
             }
             ScreenRecordingInspectorSection(AppLocalization.text("画布"), symbol: "rectangle.on.rectangle") {
@@ -98,6 +99,10 @@ struct ScreenRecordingEffectsView: View {
                 if model.project?.microphoneFile != nil {
                     audioParameter("麦克风音量", value: optionalEditBinding(\.microphoneVolume, default: 1))
                 }
+                if effects.voice {
+                    ScreenRecordingPortraitControls(model: model, target: effects.target,
+                        showsPortrait: false, showsVoice: true)
+                }
             }
             if let project = model.project, project.cameraFile != nil {
                 ScreenRecordingInspectorSection(AppLocalization.text("摄像头叠加"), symbol: "web.camera", expanded: false) {
@@ -126,6 +131,24 @@ struct ScreenRecordingEffectsView: View {
             }
             ScreenRecordingAnnotationsView(model: model)
         }.disabled(!model.canEdit)
+    }
+
+    var enhancementTarget: (target: ScreenRecordingPortraitControls.Target, portrait: Bool, voice: Bool) {
+        if model.project?.timeline != nil, let clip = model.selectedTimelineClip {
+            let effects = effectsAvailability(clip)
+            if effects.portrait || effects.voice { return (.clip(clip.id), effects.portrait, effects.voice) }
+        }
+        return (.recording, model.project?.editingCameraFile != nil, model.project?.editingMicrophoneFile != nil)
+    }
+
+    func effectsAvailability(_ clip: RecordingTimelineClip) -> (portrait: Bool, voice: Bool) {
+        switch clip.content {
+        case .recording: (model.project?.editingCameraFile != nil, model.project?.editingMicrophoneFile != nil)
+        case let .video(id): (true, model.timeline?.assets.first { $0.id == id }?.hasAudio == true)
+        case .image: (true, false)
+        case .audio: (false, true)
+        default: (false, false)
+        }
     }
 
     private func editBinding<Value>(_ path: WritableKeyPath<RecordingEdits, Value>, default value: Value) -> Binding<Value> {
