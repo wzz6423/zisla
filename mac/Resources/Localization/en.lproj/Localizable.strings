@@ -3316,3 +3316,5 @@
 "分别设置各类内容的默认保存位置。" = "Set the default save location for each type of content.";
 "管理下载所需组件。" = "Manage components required for downloads.";
 "更改 %@ 的保存位置" = "Change save location for %@";
+
+"本地优先的原生笔记应用" = "Local-first native notes app";

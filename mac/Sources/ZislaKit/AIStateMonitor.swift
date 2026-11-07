@@ -71,8 +71,6 @@ public final class AIStateMonitor: ObservableObject {
     @Published public private(set) var state: AIState = .empty
     @Published public private(set) var errorDescription: String?
     @Published public private(set) var usageHistoryState: AIUsageHistoryState = .idle
-    @Published public private(set) var quotas: [AIQuotaSnapshot] = []
-    @Published public private(set) var failedQuotaProviders: Set<AIProvider> = []
     @Published public private(set) var failedUsageProviders: Set<AIProvider> = []
 
     private let repository: AIStateRepository
@@ -281,8 +279,6 @@ public final class AIStateMonitor: ObservableObject {
         subscriptionUsageTask?.cancel()
         subscriptionUsageTask = nil
         lastSubscriptionRefreshAt = .distantPast
-        quotas = []
-        failedQuotaProviders = []
         failedUsageProviders = []
         persistedReloadInFlight = false
         persistedReloadPending = false
@@ -391,8 +387,6 @@ public final class AIStateMonitor: ObservableObject {
             } onCancel: { work.cancel() }
             guard !Task.isCancelled, let self, self.refreshGeneration == generation else { return }
             defer { if self.refreshGeneration == generation { self.subscriptionUsageTask = nil } }
-            self.quotas = result.quotas.sorted { $0.id < $1.id }
-            self.failedQuotaProviders = result.failedProviders
             self.failedUsageProviders = result.failedUsageProviders
             if !result.usageSamples.isEmpty {
                 do {

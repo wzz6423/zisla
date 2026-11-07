@@ -3313,3 +3313,5 @@
 "分别设置各类内容的默认保存位置。" = "Définir l’emplacement de sauvegarde par défaut pour chaque type de contenu.";
 "管理下载所需组件。" = "Gérer les composants nécessaires aux téléchargements.";
 "更改 %@ 的保存位置" = "Changer l’emplacement de sauvegarde pour %@";
+
+"本地优先的原生笔记应用" = "Application de notes native privilégiant le stockage local";

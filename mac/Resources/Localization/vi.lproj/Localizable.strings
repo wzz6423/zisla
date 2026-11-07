@@ -3317,3 +3317,5 @@
 "分别设置各类内容的默认保存位置。" = "Đặt vị trí lưu mặc định cho từng loại nội dung.";
 "管理下载所需组件。" = "Quản lý các thành phần cần thiết để tải xuống.";
 "更改 %@ 的保存位置" = "Đổi vị trí lưu cho %@";
+
+"本地优先的原生笔记应用" = "Ứng dụng ghi chú gốc ưu tiên lưu trữ cục bộ";
