@@ -1762,9 +1762,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
         guard AppModel.shared.settingsStore.settings.screenshotEnabled else { return }
         guard screenshotSelectionController == nil else { return }
         let editors = [screenshotEditorController].compactMap { $0 } + additionalScreenshotEditors
-        if editors.contains(where: { !$0.isPinnedPresentation }) {
-            return
-        }
+        guard !ScreenshotHotkeyContext.isScreenshotSessionActive(
+            selecting: false,
+            editorPinnedStates: editors.map(\.isPinnedPresentation)
+        ) else { return }
         pendingScreenshotPin = pinAfterCapture
         let currentProcess = ProcessInfo.processInfo.processIdentifier
         let frontmostApplication = NSWorkspace.shared.frontmostApplication
@@ -1867,7 +1868,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
             } else {
                 self.additionalScreenshotEditors.append(editor)
             }
-            editor.onHotkeyContextChanged = { [weak self] in self?.updateScreenshotHotkeyContext() }
+            editor.onHotkeyContextChanged = { [weak self] in self?.endScreenshotSessionIfNeeded() }
             modalWindowSnapshot?.restore()
             editor.present()
             if shouldPin {
@@ -1916,10 +1917,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
 
     private func endScreenshotSessionIfNeeded() {
         updateScreenshotHotkeyContext()
-        guard screenshotSelectionController == nil,
-              screenshotEditorController == nil,
-              additionalScreenshotEditors.isEmpty
-        else { return }
+        guard isScreenshotSessionActive else { return }
+        let editors = [screenshotEditorController].compactMap { $0 } + additionalScreenshotEditors
+        guard !ScreenshotHotkeyContext.isScreenshotSessionActive(
+            selecting: screenshotSelectionController != nil,
+            editorPinnedStates: editors.map(\.isPinnedPresentation)
+        ) else { return }
         setScreenshotSessionActive(false)
         if isLidOverlaySuspendedForScreenshotSession {
             isLidOverlaySuspendedForScreenshotSession = false

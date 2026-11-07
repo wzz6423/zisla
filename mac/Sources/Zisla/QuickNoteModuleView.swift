@@ -203,6 +203,14 @@ struct QuickNoteModuleView: View {
                 .padding(.bottom, 2)
             }
 
+            if let error = service.errorMessage {
+                Text(error)
+                    .font(.islandMicro())
+                    .foregroundStyle(Color.zislaWarning)
+                    .textSelection(.enabled)
+                    .padding(.bottom, 4)
+            }
+
             editorPane
             .frame(maxWidth: .infinity, maxHeight: .infinity)
             .islandGlassSurface(
@@ -231,7 +239,7 @@ struct QuickNoteModuleView: View {
             Spacer(minLength: 6)
             RichNoteToolbar(command: $editorCommand)
                 .frame(maxWidth: .infinity)
-                .disabled(service.isBuiltInWelcomeNoteSelected)
+                .disabled(service.isBuiltInWelcomeNoteSelected || noteContent?.requiresNativeTextEditing == true)
             IconButton(symbol: "text.viewfinder", help: AppLocalization.text("发送到提词器"), size: .compact) {
                 model.sendQuickNoteToTeleprompter(draftPlainText)
             }
@@ -256,7 +264,15 @@ struct QuickNoteModuleView: View {
                     noteID: loadedNoteID,
                     command: service.isBuiltInWelcomeNoteSelected ? nil : editorCommand,
                     isEditable: !service.isBuiltInWelcomeNoteSelected,
-                    onCopy: model.quickNoteDidCopy
+                    onCopy: model.quickNoteDidCopy,
+                    nativeTextContent: noteContent,
+                    onNativeTextChange: { id, edit in
+                        guard let id else { return }
+                        service.scheduleSave(id: id, nativeText: edit)
+                        if id == loadedNoteID, id == service.selectedID {
+                            draftPlainText = edit.updatedPlainText
+                        }
+                    }
                 ) { id, html, plainText in
                     if let id, !service.isBuiltInWelcomeNote(id: id) {
                         service.scheduleSave(id: id, html: html)

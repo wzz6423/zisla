@@ -67,6 +67,7 @@
 "PDF 工具" = "Outils PDF";
 "合并、拆分、加密与转换 PDF" = "Fusionner, diviser, chiffrer et convertir des PDF";
 "系统状态与清理" = "Moniteur système et nettoyage";
+"监控系统资源与电池，并安全清理缓存和日志" = "Surveiller les ressources système et les batteries, et nettoyer les caches et les journaux en toute sécurité";
 "监控资源并安全清理缓存和日志" = "Surveiller les ressources et nettoyer en toute sécurité les caches et journaux";
 "显示 zisla 图标" = "Afficher l'icône zisla";
 "关闭后不影响已启用的菜单栏监控项" = "Ne pas affecter les éléments de surveillance de la barre de menus activés lorsque désactivé";
@@ -628,6 +629,8 @@
 "飞机" = "Avion";
 "首页" = "Accueil";
 "7 天" = "7 jours";
+"自动删除剪贴板历史" = "Supprimer automatiquement l’historique du presse-papiers";
+"按所选周期删除过期历史，常用项目继续保留" = "Supprimer l’historique expiré après la période choisie ; les favoris sont conservés";
 "上一页" = "Page précédente";
 "下一页" = "Page suivante";
 "不可用" = "Indisponible";
@@ -3323,3 +3326,7 @@
 "AI 会话工作目录" = "Dossiers de travail des sessions IA";
 "对应会话已删除；清理前请确认目录中的文件" = "Les sessions associées ont été supprimées ; vérifiez les fichiers avant le nettoyage";
 "会话仍保留或无法确认删除状态，已保留工作目录" = "La session est conservée ou sa suppression ne peut pas être vérifiée ; le dossier a été conservé";
+
+"保存手写备忘录需要辅助功能权限" = "L’accès à l’accessibilité est nécessaire pour enregistrer les notes manuscrites";
+"备忘录内容已变化，请重新打开后编辑" = "La note a changé. Rouvrez-la avant de la modifier";
+"无法保存手写备忘录的文本，请在备忘录中打开后重试" = "Impossible d’enregistrer le texte de la note manuscrite. Ouvrez-la dans Notes et réessayez";

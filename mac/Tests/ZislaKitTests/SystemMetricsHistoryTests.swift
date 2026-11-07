@@ -44,25 +44,46 @@ final class MemoryHistoryPersistence: SystemMetricsHistoryPersisting, @unchecked
     }
 }
 
-private final class BlockingHistoryPersistence: SystemMetricsHistoryPersisting, @unchecked Sendable {
+final class BlockingHistoryPersistence: SystemMetricsHistoryPersisting, @unchecked Sendable {
+    enum Operation: Sendable {
+        case load, append, clear
+    }
+
     private let condition = NSCondition()
     private var stored: [SystemMetricsRecord]
-    private var loadCanFinish = false
-    let loadStarted: AsyncStream<Void>
-    private let loadStartedContinuation: AsyncStream<Void>.Continuation
+    private let blockedOperation: Operation
+    private var operationCanFinish = false
+    private var events: [(operation: Operation, isMainThread: Bool)] = []
+    let operationStarted: AsyncStream<Void>
+    private let operationStartedContinuation: AsyncStream<Void>.Continuation
 
-    init(seed: [SystemMetricsRecord]) {
+    init(seed: [SystemMetricsRecord] = [], blockedOperation: Operation = .load) {
         stored = seed
-        (loadStarted, loadStartedContinuation) = AsyncStream<Void>.makeStream()
+        self.blockedOperation = blockedOperation
+        (operationStarted, operationStartedContinuation) = AsyncStream<Void>.makeStream()
+    }
+
+    var mainThreadOperations: [Operation] {
+        condition.lock()
+        defer { condition.unlock() }
+        return events.filter(\.isMainThread).map(\.operation)
+    }
+
+    var appendCount: Int {
+        condition.lock()
+        defer { condition.unlock() }
+        return events.filter { $0.operation == .append }.count
+    }
+
+    var persistedRecords: [SystemMetricsRecord] {
+        condition.lock()
+        defer { condition.unlock() }
+        return stored
     }
 
     func loadRecords() -> [SystemMetricsRecord] {
         condition.lock()
-        loadStartedContinuation.yield(())
-        loadStartedContinuation.finish()
-        while !loadCanFinish {
-            condition.wait()
-        }
+        waitIfNeeded(for: .load)
         let records = stored
         condition.unlock()
         return records
@@ -70,6 +91,7 @@ private final class BlockingHistoryPersistence: SystemMetricsHistoryPersisting, 
 
     func appendRecord(_ record: SystemMetricsRecord, capacity: Int?) {
         condition.lock()
+        waitIfNeeded(for: .append)
         stored.append(record)
         if let capacity {
             stored = Array(stored.suffix(max(1, capacity)))
@@ -79,15 +101,28 @@ private final class BlockingHistoryPersistence: SystemMetricsHistoryPersisting, 
 
     func removeAll() {
         condition.lock()
+        waitIfNeeded(for: .clear)
         stored = []
         condition.unlock()
     }
 
-    func releaseLoad() {
+    func release() {
         condition.lock()
-        loadCanFinish = true
+        operationCanFinish = true
         condition.broadcast()
         condition.unlock()
+    }
+
+    private func waitIfNeeded(for operation: Operation) {
+        events.append((operation, Thread.isMainThread))
+        guard operation == blockedOperation else { return }
+        operationStartedContinuation.yield(())
+        operationStartedContinuation.finish()
+        // The old synchronous implementation must fail the thread assertion without deadlocking.
+        guard !Thread.isMainThread else { return }
+        while !operationCanFinish {
+            condition.wait()
+        }
     }
 }
 
@@ -373,12 +408,58 @@ struct SystemMetricsHistorySeriesBuilderTests {
         let service = SystemMonitorService(historyPersistence: persistence)
         let load = Task { await service.loadHistoryStats() }
 
-        for await _ in persistence.loadStarted { break }
+        for await _ in persistence.operationStarted { break }
         load.cancel()
-        persistence.releaseLoad()
+        persistence.release()
         await load.value
 
         #expect(service.historyStats == .empty)
+    }
+
+    @Test(arguments: ["clear", "stop", "disable", "reenable"])
+    @MainActor
+    func historyLifecycleChangesInvalidateInFlightStatsLoads(action: String) async {
+        let persistence = BlockingHistoryPersistence(seed: [record(at: 60)])
+        defer { persistence.release() }
+        let service = SystemMonitorService(historyPersistence: persistence, isRecordingHistory: true)
+        let load = Task { await service.loadHistoryStats() }
+        for await _ in persistence.operationStarted { break }
+        switch action {
+        case "stop": service.stop()
+        case "disable": service.setHistoryRecordingEnabled(false)
+        case "reenable":
+            service.setHistoryRecordingEnabled(false)
+            service.setHistoryRecordingEnabled(true)
+        default: service.clearHistory()
+        }
+        persistence.release()
+        await load.value
+
+        if action == "clear" || action == "stop" {
+            #expect(service.historyStats == .empty)
+        }
+        await service.loadHistoryStats()
+        #expect(service.historyStats.count == (action == "clear" ? 0 : 1))
+    }
+
+    @Test(arguments: ["clear", "cancel"])
+    @MainActor
+    func invalidatedHistorySectionsReturnNoStalePoints(action: String) async {
+        let persistence = BlockingHistoryPersistence(seed: [record(at: 60)])
+        defer { persistence.release() }
+        let service = SystemMonitorService(historyPersistence: persistence)
+        let load = Task { await service.historySections(range: .all) }
+        for await _ in persistence.operationStarted { break }
+        if action == "clear" {
+            service.clearHistory()
+        } else {
+            load.cancel()
+        }
+        persistence.release()
+
+        #expect(await load.value == [])
+        let reloaded = await service.historySections(range: .all)
+        #expect(reloaded.isEmpty == (action == "clear"))
     }
 
     @Test
@@ -420,6 +501,26 @@ struct SystemMetricsHistorySeriesBuilderTests {
 
 struct SystemMetricsHistoryExportTests {
     private let now = Date(timeIntervalSince1970: 1_789_000_000)
+
+    @Test @MainActor
+    func exportSnapshotsFollowTheOrderOfClearingHistory() async throws {
+        let original = record(at: 60, cpuUsage: 0.42)
+        let persistence = BlockingHistoryPersistence(seed: [original])
+        defer { persistence.release() }
+        let service = SystemMonitorService(historyPersistence: persistence)
+        let beforeClear = Task { await service.exportHistoryWorkbook(now: now) }
+        for await _ in persistence.operationStarted { break }
+        service.clearHistory()
+        let afterClear = Task { await service.exportHistoryWorkbook(now: now) }
+        persistence.release()
+        let originalSheet = try #require(try Self.extract(await beforeClear.value)["xl/worksheets/sheet1.xml"])
+        let clearedSheet = try #require(try Self.extract(await afterClear.value)["xl/worksheets/sheet1.xml"])
+
+        #expect(originalSheet.components(separatedBy: "<row ").count - 1 == 2)
+        #expect(originalSheet.contains("<v>0.42</v>"))
+        #expect(clearedSheet.components(separatedBy: "<row ").count - 1 == 1)
+        #expect(!clearedSheet.contains("<v>0.42</v>"))
+    }
 
     @Test
     func workbookExportsMeasuredPowerAndLeavesMissingBatteryValuesBlank() throws {

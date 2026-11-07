@@ -5,32 +5,33 @@ import ZislaKit
 import SwiftUI
 
 struct AIProgressModuleView: View {
-    @ObservedObject var model: AppModel
     @ObservedObject private var monitor: AIStateMonitor
 
     /// Both columns push their content this far below the header. The trend chart's topmost
     /// Y-axis tick is drawn above its plot frame, so a tighter gap lets it collide with the title.
     private static let sectionSpacing: CGFloat = 12
 
-    init(model: AppModel) {
-        _model = ObservedObject(wrappedValue: model)
-        _monitor = ObservedObject(wrappedValue: model.aiMonitor)
+    init(monitor: AIStateMonitor) {
+        _monitor = ObservedObject(wrappedValue: monitor)
     }
 
     var body: some View {
-        HStack(alignment: .top, spacing: 12) {
-            runningTasks
+        GeometryReader { proxy in
+            HStack(alignment: .top, spacing: 12) {
+                runningTasks
+                    .frame(width: (proxy.size.width - 24) * 0.48)
+                    .frame(maxHeight: .infinity, alignment: .topLeading)
+
+                Hairline()
+
+                ScrollView(.vertical) {
+                    usageSummary(endingAt: .now)
+                }
+                .thinScrollChrome(scrollerStyle: .overlay)
                 .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-
-            Hairline()
-
-            ScrollView(.vertical) {
-                usageSummary(endingAt: .now)
             }
-                .thinScrollChrome()
-                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
         }
-        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
     }
 
     private var activeTasks: [AIProgressTask] {
@@ -381,7 +382,7 @@ private struct TaskProgressRow: View {
     }
 }
 
-private struct UsageHeatmap: View {
+struct UsageHeatmap: View {
     var weeks: [[ContributionDay?]]
 
     private let gap: CGFloat = 1.5
@@ -440,10 +441,14 @@ private struct UsageHeatmap: View {
                 HStack(alignment: .top, spacing: gap) {
                     ForEach(weeks.indices, id: \.self) { index in
                         let label = monthLabel(in: weeks[index])
+                        let remainingWidth = proxy.size.width - CGFloat(index) * (width + gap)
                         Text(label ?? "")
                             .font(.system(size: 9, weight: .semibold, design: .monospaced))
                             .foregroundStyle(.primary.opacity(0.75))
                             .fixedSize(horizontal: true, vertical: false)
+                            .alignmentGuide(.leading) { dimensions in
+                                max(0, dimensions.width - remainingWidth)
+                            }
                             .frame(width: width, alignment: .leading)
                             .opacity(label == nil ? 0 : 1)
                     }

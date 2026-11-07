@@ -71,6 +71,7 @@
 "PDF 工具" = "PDF Tools";
 "合并、拆分、加密与转换 PDF" = "Merge, split, encrypt, and convert PDFs";
 "系统状态与清理" = "System Monitor and Cleanup";
+"监控系统资源与电池，并安全清理缓存和日志" = "Monitor system resources and batteries, and safely clean caches and logs";
 "监控资源并安全清理缓存和日志" = "Monitor resources and safely clean caches and logs";
 "显示 zisla 图标" = "Show zisla Icon";
 "关闭后不影响已启用的菜单栏监控项" = "Does not affect enabled menu bar monitor items when off";
@@ -635,6 +636,8 @@
 "飞机" = "Airplane";
 "首页" = "Home";
 "7 天" = "7 days";
+"自动删除剪贴板历史" = "Auto-delete clipboard history";
+"按所选周期删除过期历史，常用项目继续保留" = "Delete expired history after the selected period; favorites are kept";
 "上一页" = "Previous";
 "下一页" = "Next";
 "不可用" = "Unavailable";
@@ -3326,3 +3329,7 @@
 "AI 会话工作目录" = "AI session workspaces";
 "对应会话已删除；清理前请确认目录中的文件" = "Associated sessions were deleted; review the files before cleaning";
 "会话仍保留或无法确认删除状态，已保留工作目录" = "The session is retained or its deletion cannot be verified; the workspace was kept";
+
+"保存手写备忘录需要辅助功能权限" = "Accessibility access is required to save handwritten notes";
+"备忘录内容已变化，请重新打开后编辑" = "The note has changed. Reopen it before editing";
+"无法保存手写备忘录的文本，请在备忘录中打开后重试" = "Could not save text in the handwritten note. Open it in Notes and try again";

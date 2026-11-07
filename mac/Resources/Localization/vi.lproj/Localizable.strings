@@ -67,6 +67,7 @@
 "PDF 工具" = "Công cụ PDF";
 "合并、拆分、加密与转换 PDF" = "Hợp nhất, tách, mã hóa và chuyển đổi PDF";
 "系统状态与清理" = "Giám sát Hệ thống và Dọn dẹp";
+"监控系统资源与电池，并安全清理缓存和日志" = "Giám sát tài nguyên hệ thống và pin, đồng thời dọn dẹp bộ nhớ đệm và nhật ký an toàn";
 "监控资源并安全清理缓存和日志" = "Giám sát tài nguyên và dọn dẹp bộ nhớ cache và nhật ký an toàn";
 "显示 zisla 图标" = "Hiển thị Biểu tượng zisla";
 "关闭后不影响已启用的菜单栏监控项" = "Không ảnh hưởng đến các mục giám sát thanh menu đã bật khi tắt";
@@ -632,6 +633,8 @@
 "飞机" = "Máy bay";
 "首页" = "Trang chủ";
 "7 天" = "7 ngày";
+"自动删除剪贴板历史" = "Tự động xóa lịch sử bảng nhớ tạm";
+"按所选周期删除过期历史，常用项目继续保留" = "Xóa lịch sử đã quá thời hạn đã chọn; các mục yêu thích được giữ lại";
 "上一页" = "Trước";
 "下一页" = "Sau";
 "不可用" = "Không khả dụng";
@@ -3327,3 +3330,7 @@
 "AI 会话工作目录" = "Thư mục làm việc của phiên AI";
 "对应会话已删除；清理前请确认目录中的文件" = "Các phiên liên quan đã bị xóa; hãy kiểm tra tệp trước khi dọn dẹp";
 "会话仍保留或无法确认删除状态，已保留工作目录" = "Phiên vẫn được giữ hoặc không thể xác minh việc xóa; thư mục làm việc đã được giữ lại";
+
+"保存手写备忘录需要辅助功能权限" = "Cần quyền Trợ năng để lưu ghi chú viết tay";
+"备忘录内容已变化，请重新打开后编辑" = "Ghi chú đã thay đổi. Mở lại trước khi chỉnh sửa";
+"无法保存手写备忘录的文本，请在备忘录中打开后重试" = "Không thể lưu văn bản trong ghi chú viết tay. Mở trong Ghi chú rồi thử lại";

@@ -67,6 +67,8 @@ struct RichNoteEditor: NSViewRepresentable {
     let noteID: String?
     let command: RichNoteEditorCommand?
     let isEditable: Bool
+    let nativeTextContent: NotesAppBridge.NoteContent?
+    let onNativeTextChange: ((String?, NotesNativeTextEdit) -> Void)?
     let onCopy: (() -> Void)?
     let pasteboard: any RichNotePasteboard
     let onChange: (String?, String, String) -> Void
@@ -80,6 +82,8 @@ struct RichNoteEditor: NSViewRepresentable {
         isEditable: Bool,
         onCopy: (() -> Void)? = nil,
         pasteboard: any RichNotePasteboard = NSPasteboard.general,
+        nativeTextContent: NotesAppBridge.NoteContent? = nil,
+        onNativeTextChange: ((String?, NotesNativeTextEdit) -> Void)? = nil,
         onChange: @escaping (String?, String, String) -> Void
     ) {
         self.html = html
@@ -88,6 +92,8 @@ struct RichNoteEditor: NSViewRepresentable {
         self.isEditable = isEditable
         self.onCopy = onCopy
         self.pasteboard = pasteboard
+        self.nativeTextContent = nativeTextContent
+        self.onNativeTextChange = onNativeTextChange
         self.onChange = onChange
     }
 
@@ -202,7 +208,7 @@ struct RichNoteEditor: NSViewRepresentable {
     }
 
     func makeCoordinator() -> Coordinator {
-        Coordinator(onChange: onChange, onCopy: onCopy, pasteboard: pasteboard, isEditable: isEditable)
+        Coordinator(onChange: onChange, onNativeTextChange: onNativeTextChange, onCopy: onCopy, pasteboard: pasteboard, isEditable: isEditable)
     }
 
     func makeNSView(context: Context) -> WKWebView {
@@ -223,12 +229,12 @@ struct RichNoteEditor: NSViewRepresentable {
         webView.setValue(false, forKey: "drawsBackground")
 
         context.coordinator.attach(webView)
-        context.coordinator.setDocument(noteID: noteID, html: html)
+        context.coordinator.setDocument(noteID: noteID, html: html, nativeTextContent: nativeTextContent)
         return webView
     }
 
     func updateNSView(_ webView: WKWebView, context: Context) {
-        context.coordinator.setDocument(noteID: noteID, html: html)
+        context.coordinator.setDocument(noteID: noteID, html: html, nativeTextContent: nativeTextContent)
         context.coordinator.setEditable(isEditable)
         if let command {
             context.coordinator.perform(command)
@@ -245,13 +251,16 @@ struct RichNoteEditor: NSViewRepresentable {
             let noteID: String?
             let html: String
             let token: Int
+            let nativeTextContent: NotesAppBridge.NoteContent?
         }
 
         private struct DocumentIdentity {
             let noteID: String?
+            let nativeTextContent: NotesAppBridge.NoteContent?
         }
 
         private let onChange: (String?, String, String) -> Void
+        private let onNativeTextChange: ((String?, NotesNativeTextEdit) -> Void)?
         private let onCopy: (() -> Void)?
         private let pasteboard: any RichNotePasteboard
         private weak var webView: WKWebView?
@@ -271,11 +280,13 @@ struct RichNoteEditor: NSViewRepresentable {
 
         init(
             onChange: @escaping (String?, String, String) -> Void,
+            onNativeTextChange: ((String?, NotesNativeTextEdit) -> Void)?,
             onCopy: (() -> Void)?,
             pasteboard: any RichNotePasteboard,
             isEditable: Bool
         ) {
             self.onChange = onChange
+            self.onNativeTextChange = onNativeTextChange
             self.onCopy = onCopy
             self.pasteboard = pasteboard
             self.isEditable = isEditable
@@ -285,11 +296,12 @@ struct RichNoteEditor: NSViewRepresentable {
             self.webView = webView
         }
 
-        func setDocument(noteID: String?, html: String) {
-            if let desiredDocument, desiredDocument.noteID == noteID, desiredDocument.html == html {
+        func setDocument(noteID: String?, html: String, nativeTextContent: NotesAppBridge.NoteContent?) {
+            if let desiredDocument, desiredDocument.noteID == noteID, desiredDocument.html == html,
+               desiredDocument.nativeTextContent == nativeTextContent {
                 return
             }
-            let document = Document(noteID: noteID, html: html, token: nextToken())
+            let document = Document(noteID: noteID, html: html, token: nextToken(), nativeTextContent: nativeTextContent)
             desiredDocument = document
             rememberIdentity(for: document)
             cancelPendingDocumentApply()
@@ -300,7 +312,7 @@ struct RichNoteEditor: NSViewRepresentable {
                 hasStartedInitialNavigation = true
                 initialNavigationDocument = document
                 webView.loadHTMLString(
-                    RichNoteEditor.document(initialHTML: html, initialToken: document.token, isEditable: isEditable),
+                    RichNoteEditor.document(initialHTML: html, initialToken: document.token, isEditable: isEditable, nativeTextContent: nativeTextContent),
                     baseURL: nil
                 )
             }
@@ -313,7 +325,7 @@ struct RichNoteEditor: NSViewRepresentable {
             applyRetryWorkItem = nil
             applyingDocumentToken = document.token
             webView.evaluateJavaScript(
-                "window.zisla.setHTML(\(RichNoteEditor.javaScriptLiteral(document.html)), \(document.token));"
+                "window.zisla.setHTML(\(RichNoteEditor.javaScriptLiteral(document.html)), \(document.token), \(RichNoteEditor.nativeTextConfiguration(document.nativeTextContent)));"
             ) { [weak self, weak webView] _, error in
                 guard let self, let webView else { return }
                 guard self.applyingDocumentToken == document.token else { return }
@@ -362,7 +374,7 @@ struct RichNoteEditor: NSViewRepresentable {
         }
 
         private func rememberIdentity(for document: Document) {
-            documentIdentities[document.token] = DocumentIdentity(noteID: document.noteID)
+            documentIdentities[document.token] = DocumentIdentity(noteID: document.noteID, nativeTextContent: document.nativeTextContent)
             documentIdentityOrder.append(document.token)
             while documentIdentityOrder.count > 8 {
                 documentIdentities.removeValue(forKey: documentIdentityOrder.removeFirst())
@@ -421,7 +433,17 @@ struct RichNoteEditor: NSViewRepresentable {
                   let token = payload["token"] as? Int,
                   let identity = documentIdentities[token]
             else { return }
-            let document = Document(noteID: identity.noteID, html: html, token: token)
+            if let content = identity.nativeTextContent, content.requiresNativeTextEditing {
+                guard let prefix = payload["prefix"] as? String, let suffix = payload["suffix"] as? String else { return }
+                onNativeTextChange?(identity.noteID, NotesNativeTextEdit(
+                    originalPlainText: content.plainText,
+                    imageSources: NotesNativeTextEdit.imageSources(in: content.bodyHTML),
+                    prefix: prefix,
+                    suffix: suffix
+                ))
+                return
+            }
+            let document = Document(noteID: identity.noteID, html: html, token: token, nativeTextContent: identity.nativeTextContent)
             if desiredDocument?.token == token {
                 desiredDocument = document
                 appliedDocument = document
@@ -467,7 +489,17 @@ struct RichNoteEditor: NSViewRepresentable {
         return result
     }
 
-    private static func document(initialHTML: String, initialToken: Int, isEditable: Bool) -> String {
+    private static func nativeTextConfiguration(_ content: NotesAppBridge.NoteContent?) -> String {
+        guard let content, content.requiresNativeTextEditing,
+              let first = content.plainText.firstIndex(of: "\u{FFFC}"),
+              let last = content.plainText.lastIndex(of: "\u{FFFC}") else { return "null" }
+        let prefix = String(content.plainText[..<first])
+        let suffix = String(content.plainText[content.plainText.index(after: last)...])
+        let protectedText = String(content.plainText[first...last])
+        return "{prefix: \(javaScriptLiteral(prefix)), suffix: \(javaScriptLiteral(suffix)), protectedText: \(javaScriptLiteral(protectedText))}"
+    }
+
+    private static func document(initialHTML: String, initialToken: Int, isEditable: Bool, nativeTextContent: NotesAppBridge.NoteContent?) -> String {
         let initial = javaScriptLiteral(initialHTML)
         let scriptNonce = UUID().uuidString
         return """
@@ -487,6 +519,9 @@ struct RichNoteEditor: NSViewRepresentable {
             line-height: 1.55;
           }
           #editor { box-sizing: border-box; min-height: 100vh; outline: none; padding: 4px 14px 20px; background: transparent !important; caret-color: transparent; }
+          #editor [data-zisla-native-text] { min-height: 20px; outline: none; white-space: pre-wrap; }
+          #editor [data-zisla-native-content] { user-select: none; -webkit-user-select: none; }
+          #editor [data-zisla-native-content] img { width: 100%; }
           #editor [data-zisla-default-font-size], #editor [data-zisla-unstyled-body] { font-size: 13px !important; }
           #editor > div, #editor > p, #editor li, #editor blockquote, #editor td, #editor th { white-space: pre-wrap; }
           #caret { background: rgba(255,255,255,0.92); border-radius: 0.5px; display: none; height: 14px; left: 0; pointer-events: none; position: fixed; top: 0; transform: translate3d(-9999px, -9999px, 0); width: 1px; z-index: 1; }
@@ -537,6 +572,8 @@ struct RichNoteEditor: NSViewRepresentable {
           let documentToken = initialDocumentToken;
           const sendTimers = new Map();
           let savedRange = null;
+          let nativeText = null;
+          let editable = \(isEditable);
 
           const escapeHTML = value => String(value).replace(/[&<>"']/g, char => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[char]));
           const normalizedBodyTextSelector = 'div, p, li, blockquote, td, th, span, font, b, strong, i, em, u, s, strike, a';
@@ -621,6 +658,7 @@ struct RichNoteEditor: NSViewRepresentable {
             });
           };
           const storedHTML = () => {
+            if (nativeText) return nativeText.html;
             const clone = editor.cloneNode(true);
             clone.querySelectorAll('[data-zisla-default-font-size], [data-zisla-unstyled-body]').forEach(node => {
               node.removeAttribute('data-zisla-default-font-size');
@@ -637,14 +675,27 @@ struct RichNoteEditor: NSViewRepresentable {
             if (!snapshot) return;
             window.webkit?.messageHandlers?.richNoteChanged?.postMessage(snapshot);
           };
+          const nativeFieldText = field => {
+            let text = field.innerText;
+            const last = field.lastChild;
+            // WebKit exports a final empty paragraph's caret placeholder as an extra newline.
+            if (last?.nodeType === Node.ELEMENT_NODE && last.matches('div, p') && !last.textContent && last.querySelector('br')) {
+              text = text.replace(/\\n$/, '');
+            }
+            return text;
+          };
           const scheduleEmit = () => {
             updateListContinuationStyle();
-            normalizeContent(editor);
+            if (!nativeText) normalizeContent(editor);
             const snapshot = {
               html: storedHTML(),
-              plainText: editor.innerText,
+              plainText: nativeText ? nativeFieldText(nativeText.prefix) + nativeText.protectedText + nativeFieldText(nativeText.suffix) : editor.innerText,
               token: documentToken
             };
+            if (nativeText) {
+              snapshot.prefix = nativeFieldText(nativeText.prefix);
+              snapshot.suffix = nativeFieldText(nativeText.suffix);
+            }
             clearTimeout(sendTimers.get(snapshot.token));
             sendTimers.set(snapshot.token, setTimeout(() => {
               sendTimers.delete(snapshot.token);
@@ -654,9 +705,10 @@ struct RichNoteEditor: NSViewRepresentable {
           const hideCaret = () => caret.classList.remove('is-visible');
           const updateCaret = () => {
             const selection = window.getSelection();
-            if (!editor.isContentEditable || !selection?.rangeCount || !selection.isCollapsed) return hideCaret();
+            if (!editable || !selection?.rangeCount || !selection.isCollapsed) return hideCaret();
             const range = selection.getRangeAt(0);
             if (range.startContainer === editor || !editor.contains(range.startContainer)) return hideCaret();
+            if (nativeText && !nativeText.prefix.contains(range.startContainer) && !nativeText.suffix.contains(range.startContainer)) return hideCaret();
             let rect = [...range.getClientRects()].find(candidate => candidate.height > 0);
             if (!rect) {
               const boundingRect = range.getBoundingClientRect();
@@ -682,7 +734,7 @@ struct RichNoteEditor: NSViewRepresentable {
             selection.addRange(savedRange);
             return true;
           };
-          const isEmptyBlock = node => node?.matches?.('div, p') && !node.textContent.trim() && [...node.children].every(child => child.tagName === 'BR' || !child.textContent.trim());
+          const isEmptyBlock = node => node?.matches?.('div, p') && !node.textContent.trim() && !node.querySelector('img, video, audio, svg, canvas, table, hr, input') && [...node.children].every(child => child.tagName === 'BR' || !child.textContent.trim());
           const sanitize = value => {
             const template = document.createElement('template');
             template.innerHTML = value || '';
@@ -739,23 +791,66 @@ struct RichNoteEditor: NSViewRepresentable {
             scheduleEmit();
           };
           const insertImage = (dataURL, alt) => insertHTML(`<figure><img src="${escapeHTML(dataURL)}" alt="${escapeHTML(alt)}"></figure><div><br></div>`);
+          const nativeSelectionField = () => {
+            const selection = window.getSelection();
+            if (!selection?.rangeCount) return null;
+            const range = selection.getRangeAt(0);
+            return [nativeText.prefix, nativeText.suffix].find(field => field.contains(range.startContainer) && field.contains(range.endContainer));
+          };
 
           window.zisla = {
             documentToken: () => documentToken,
-            setHTML: (value, token = documentToken) => {
+            setHTML: (value, token = documentToken, native = null) => {
               documentToken = Number(token);
+              nativeText = null;
               editor.innerHTML = sanitize(value);
               normalizeContent(editor);
               if (!editor.innerHTML.trim()) editor.innerHTML = '<div><br></div>';
+              if (native) {
+                const content = document.createElement('div');
+                content.dataset.zislaNativeContent = 'true';
+                content.contentEditable = 'false';
+                const images = [...editor.querySelectorAll('img')];
+                if (images.length) {
+                  const protectedRange = document.createRange();
+                  protectedRange.setStartBefore(images[0]);
+                  protectedRange.setEndAfter(images[images.length - 1]);
+                  content.append(protectedRange.cloneContents());
+                }
+                editor.replaceChildren();
+                const prefix = document.createElement('div');
+                const suffix = document.createElement('div');
+                for (const [field, text] of [[prefix, native.prefix], [suffix, native.suffix]]) {
+                  field.dataset.zislaNativeText = 'true';
+                  field.innerHTML = text.split('\\n').map(line => `<div>${line ? escapeHTML(line) : '<br>'}</div>`).join('');
+                }
+                editor.append(prefix, content, suffix);
+                nativeText = {prefix, suffix, protectedText: native.protectedText, html: value};
+              }
+              window.zisla.setEditable(editable);
               updateListContinuationStyle();
               scheduleCaretUpdate();
             },
             setEditable: value => {
-              editor.contentEditable = Boolean(value).toString();
+              editable = Boolean(value);
+              editor.contentEditable = (editable && !nativeText).toString();
               editor.spellcheck = Boolean(value);
+              if (nativeText) {
+                nativeText.prefix.contentEditable = String(editable);
+                nativeText.suffix.contentEditable = String(editable);
+              }
               scheduleCaretUpdate();
             },
             exec: (command, value) => {
+              if (nativeText) {
+                if (!editable || !['insertText', 'delete', 'forwardDelete', 'undo', 'redo'].includes(command)) return;
+                const field = nativeSelectionField();
+                if (!field) return;
+                field.focus();
+                document.execCommand(command, false, value ?? null);
+                scheduleEmit();
+                return;
+              }
               if (!editor.isContentEditable) return;
               editor.focus();
               document.execCommand(command, false, value ?? null);
@@ -822,8 +917,14 @@ struct RichNoteEditor: NSViewRepresentable {
             }
           };
 
+          editor.addEventListener('beforeinput', event => {
+            if (nativeText && (!editable || !nativeSelectionField())) event.preventDefault();
+          });
+          editor.addEventListener('cut', event => {
+            if (nativeText && !nativeSelectionField()) event.preventDefault();
+          });
           editor.addEventListener('input', () => {
-            if (editor.isContentEditable) {
+            if (editable) {
               scheduleEmit();
               scheduleCaretUpdate();
             }
@@ -873,6 +974,11 @@ struct RichNoteEditor: NSViewRepresentable {
           window.addEventListener('resize', scheduleCaretUpdate);
           window.addEventListener('scroll', scheduleCaretUpdate, true);
           editor.addEventListener('paste', async event => {
+            if (nativeText) {
+              event.preventDefault();
+              window.zisla.exec('insertText', event.clipboardData?.getData('text/plain') || '');
+              return;
+            }
             if (!editor.isContentEditable) return;
             const images = [...(event.clipboardData?.items || [])].filter(item => item.type.startsWith('image/'));
             if (!images.length) return;
@@ -890,6 +996,7 @@ struct RichNoteEditor: NSViewRepresentable {
           });
           editor.addEventListener('dragover', event => event.preventDefault());
           editor.addEventListener('drop', async event => {
+            if (nativeText) { event.preventDefault(); return; }
             if (!editor.isContentEditable) return;
             const images = [...(event.dataTransfer?.files || [])].filter(file => file.type.startsWith('image/'));
             if (!images.length) return;
@@ -903,7 +1010,7 @@ struct RichNoteEditor: NSViewRepresentable {
               insertImage(dataURL, file.name || l10n.imageAlt);
             }
           });
-          window.zisla.setHTML(\(initial));
+          window.zisla.setHTML(\(initial), initialDocumentToken, \(nativeTextConfiguration(nativeTextContent)));
           window.zisla.setEditable(\(isEditable));
         })();
         </script>

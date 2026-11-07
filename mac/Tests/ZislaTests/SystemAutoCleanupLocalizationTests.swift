@@ -32,7 +32,7 @@ struct SystemAutoCleanupLocalizationTests {
     func settingsUseLocalizedOptionsAndNestedSearchAnchors() throws {
         let source = try String(contentsOf: Self.packageRoot.appendingPathComponent("Sources/Zisla/SettingsView.swift"), encoding: .utf8)
         let start = try #require(source.range(of: "featureToggle(\"系统状态与清理\""))
-        let end = try #require(source.range(of: "featureToggle(\"电池监控\"", range: start.upperBound..<source.endIndex))
+        let end = try #require(source.range(of: "featureToggle(\"键盘音效\"", range: start.upperBound..<source.endIndex))
         let children = try #require(source.range(of: "if model.settingsStore.settings.systemMonitorEnabled {",
             range: start.upperBound..<end.lowerBound))
         let rows = String(source[children.lowerBound..<end.lowerBound])

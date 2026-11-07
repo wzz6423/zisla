@@ -1,3 +1,4 @@
+import CryptoKit
 import Dispatch
 import Foundation
 import SQLite3
@@ -21,21 +22,30 @@ enum ClipboardHistoryMutation: Sendable {
     case upsert(ClipboardHistoryItem, capacity: Int?)
     case remove(UUID)
     case removeHistory
+    case removeHistoryBefore(Date, generation: Int)
 }
 
 final class ClipboardHistoryDatabase: @unchecked Sendable {
-    private static let currentSchemaVersion = 4
+    private static let categorySchemaVersion = 4
+    private static let currentSchemaVersion = 5
 
     private let storageURL: URL
+    private let connectionObserver: (@Sendable (OpaquePointer) -> Void)?
     private let queue = DispatchQueue(
         label: "com.zisla.clipboard-history.database",
         qos: .utility
     )
     private let queueKey = DispatchSpecificKey<UInt8>()
     private var connection: OpaquePointer?
+    private let cleanupLock = NSLock()
+    private var cleanupGeneration = 0
 
-    init(storageURL: URL) {
+    init(
+        storageURL: URL,
+        connectionObserver: (@Sendable (OpaquePointer) -> Void)? = nil
+    ) {
         self.storageURL = storageURL
+        self.connectionObserver = connectionObserver
         queue.setSpecific(key: queueKey, value: 1)
     }
 
@@ -138,6 +148,13 @@ final class ClipboardHistoryDatabase: @unchecked Sendable {
         }
     }
 
+    func cancelCleanup() -> Int {
+        cleanupLock.withLock {
+            cleanupGeneration += 1
+            return cleanupGeneration
+        }
+    }
+
     private func database() throws -> OpaquePointer {
         if let connection { return connection }
 
@@ -160,6 +177,7 @@ final class ClipboardHistoryDatabase: @unchecked Sendable {
         }
 
         do {
+            connectionObserver?(opened)
             try restrictDatabaseFilePermissions()
             guard sqlite3_busy_timeout(opened, 1_000) == SQLITE_OK else {
                 throw ClipboardHistoryDatabaseError(
@@ -182,7 +200,15 @@ final class ClipboardHistoryDatabase: @unchecked Sendable {
                 """,
                 on: opened
             )
-            try migrateFileColumns(on: opened)
+            try execute("BEGIN IMMEDIATE TRANSACTION", on: opened)
+            do {
+                try migrateFileColumns(on: opened)
+                try migrateContentDigests(on: opened)
+                try execute("COMMIT", on: opened)
+            } catch {
+                try? execute("ROLLBACK", on: opened)
+                throw error
+            }
             try execute(
                 """
                 CREATE INDEX IF NOT EXISTS clipboard_history_display_order
@@ -237,6 +263,74 @@ final class ClipboardHistoryDatabase: @unchecked Sendable {
         try migratePathCategoriesIfNeeded(on: database)
     }
 
+    private func migrateContentDigests(on database: OpaquePointer) throws {
+        if try !columnNames(of: "clipboard_history", on: database).contains("content_digest") {
+            try execute("ALTER TABLE clipboard_history ADD COLUMN content_digest BLOB", on: database)
+        }
+        try execute(
+            """
+            CREATE INDEX IF NOT EXISTS clipboard_history_content_lookup
+            ON clipboard_history(content_type, content_digest)
+            """,
+            on: database
+        )
+        // Older writers omit the digest column, including when replacing content under an existing ID.
+        try execute(
+            """
+            CREATE TRIGGER IF NOT EXISTS clipboard_history_invalidate_digest
+            AFTER UPDATE OF content_type, text_value, image_data, file_url ON clipboard_history
+            WHEN NEW.content_digest IS OLD.content_digest
+              AND (NEW.content_type IS NOT OLD.content_type
+                OR NEW.text_value IS NOT OLD.text_value
+                OR NEW.image_data IS NOT OLD.image_data
+                OR NEW.file_url IS NOT OLD.file_url)
+            BEGIN
+                UPDATE clipboard_history SET content_digest = NULL WHERE rowid = NEW.rowid;
+            END
+            """,
+            on: database
+        )
+        try backfillMissingContentDigests(on: database)
+        try execute("PRAGMA user_version = \(Self.currentSchemaVersion)", on: database)
+    }
+
+    private func backfillMissingContentDigests(on database: OpaquePointer) throws {
+        let read = try prepare(
+            """
+            SELECT rowid, content_type, CASE content_type
+                WHEN 0 THEN text_value
+                WHEN 1 THEN image_data
+                WHEN 2 THEN file_url
+            END
+            FROM clipboard_history
+            WHERE content_type IN (0, 1, 2) AND content_digest IS NULL
+            """,
+            on: database
+        )
+        defer { sqlite3_finalize(read) }
+        let update = try prepare(
+            "UPDATE clipboard_history SET content_digest = ? WHERE rowid = ?",
+            on: database
+        )
+        defer { sqlite3_finalize(update) }
+        // Finish the indexed read before updating its key, retaining only one historical payload at a time.
+        while true {
+            let result = sqlite3_step(read)
+            if result == SQLITE_DONE { return }
+            try check(result, expected: SQLITE_ROW, database: database)
+            let rowID = sqlite3_column_int64(read, 0)
+            let data = sqlite3_column_int(read, 1) == 1
+                ? dataColumn(read, index: 2)
+                : Data((textColumn(read, index: 2) ?? "").utf8)
+            let digest = Data(SHA256.hash(data: data))
+            sqlite3_reset(read)
+            sqlite3_reset(update)
+            try bind(digest, to: update, index: 1, database: database)
+            try check(sqlite3_bind_int64(update, 2, rowID), database: database)
+            try check(sqlite3_step(update), expected: SQLITE_DONE, database: database)
+        }
+    }
+
     private func backfillMissingCategories(on database: OpaquePointer) throws {
         try execute(
             """
@@ -272,7 +366,7 @@ final class ClipboardHistoryDatabase: @unchecked Sendable {
     }
 
     private func migrateURLCategoriesIfNeeded(on database: OpaquePointer) throws {
-        guard try schemaVersion(on: database) < Self.currentSchemaVersion else { return }
+        guard try schemaVersion(on: database) < Self.categorySchemaVersion else { return }
         let urlIDs = try legacyCategoryIDs(matching: .url, on: database)
         if !urlIDs.isEmpty {
             let statement = try prepare(
@@ -292,7 +386,7 @@ final class ClipboardHistoryDatabase: @unchecked Sendable {
 
     private func migrateTextCategoriesIfNeeded(on database: OpaquePointer) throws {
         let version = try schemaVersion(on: database)
-        guard version < Self.currentSchemaVersion else { return }
+        guard version < Self.categorySchemaVersion else { return }
         try execute(
             """
             UPDATE clipboard_history
@@ -308,7 +402,7 @@ final class ClipboardHistoryDatabase: @unchecked Sendable {
     }
 
     private func migratePathCategoriesIfNeeded(on database: OpaquePointer) throws {
-        guard try schemaVersion(on: database) < Self.currentSchemaVersion else { return }
+        guard try schemaVersion(on: database) < Self.categorySchemaVersion else { return }
         let pathIDs = try legacyCategoryIDs(matching: .path, on: database)
         if !pathIDs.isEmpty {
             let statement = try prepare(
@@ -324,7 +418,7 @@ final class ClipboardHistoryDatabase: @unchecked Sendable {
                 try check(sqlite3_step(statement), expected: SQLITE_DONE, database: database)
             }
         }
-        try execute("PRAGMA user_version = \(Self.currentSchemaVersion)", on: database)
+        try execute("PRAGMA user_version = \(Self.categorySchemaVersion)", on: database)
     }
 
     private func legacyCategoryIDs(
@@ -595,15 +689,20 @@ final class ClipboardHistoryDatabase: @unchecked Sendable {
         guard !mutations.isEmpty else { return }
         let database = try database()
         try execute("BEGIN IMMEDIATE TRANSACTION", on: database)
+        // Order cancellation against commits without holding the lock while SQLite is busy.
+        cleanupLock.lock()
+        defer { cleanupLock.unlock() }
         do {
             for mutation in mutations {
                 switch mutation {
                 case .upsert(var item, let capacity):
-                    if try matchingItemIsPinned(item.content, excluding: item.id, in: database) {
+                    try backfillMissingContentDigests(on: database)
+                    let digest = contentDigest(item.content)
+                    if try matchingItemIsPinned(item.content, digest: digest, excluding: item.id, in: database) {
                         item.isPinned = true
                     }
-                    try deleteMatching(item.content, excluding: item.id, from: database)
-                    try upsert([item], into: database)
+                    try deleteMatching(item.content, digest: digest, excluding: item.id, from: database)
+                    try upsert(item, digest: digest, into: database)
                     if let capacity {
                         try trimHistory(to: capacity, in: database)
                     }
@@ -611,6 +710,18 @@ final class ClipboardHistoryDatabase: @unchecked Sendable {
                     try delete([id], from: database)
                 case .removeHistory:
                     try execute("DELETE FROM clipboard_history WHERE is_pinned = 0", on: database)
+                case .removeHistoryBefore(let cutoff, let generation):
+                    guard generation == cleanupGeneration else { continue }
+                    let statement = try prepare(
+                        "DELETE FROM clipboard_history WHERE is_pinned = 0 AND last_copied_at < ?",
+                        on: database
+                    )
+                    defer { sqlite3_finalize(statement) }
+                    try check(
+                        sqlite3_bind_double(statement, 1, cutoff.timeIntervalSinceReferenceDate),
+                        database: database
+                    )
+                    try check(sqlite3_step(statement), expected: SQLITE_DONE, database: database)
                 }
             }
             try execute("COMMIT", on: database)
@@ -696,16 +807,22 @@ final class ClipboardHistoryDatabase: @unchecked Sendable {
 
     private func matchingItemIsPinned(
         _ content: ClipboardHistoryContent,
+        digest: Data,
         excluding id: UUID,
         in database: OpaquePointer
     ) throws -> Bool {
         let statement = try prepare(
-            "SELECT is_pinned FROM clipboard_history WHERE id <> ? AND \(contentPredicate(content)) LIMIT 1",
+            """
+            SELECT is_pinned FROM clipboard_history INDEXED BY clipboard_history_content_lookup
+            WHERE id <> ? AND content_digest = ? AND \(contentPredicate(content)) AND is_pinned = 1
+            LIMIT 1
+            """,
             on: database
         )
         defer { sqlite3_finalize(statement) }
         try bind(id.uuidString, to: statement, index: 1, database: database)
-        try bind(content, to: statement, index: 2, database: database)
+        try bind(digest, to: statement, index: 2, database: database)
+        try bind(content, to: statement, index: 3, database: database)
         switch sqlite3_step(statement) {
         case SQLITE_ROW:
             return sqlite3_column_int(statement, 0) != 0
@@ -720,17 +837,33 @@ final class ClipboardHistoryDatabase: @unchecked Sendable {
 
     private func deleteMatching(
         _ content: ClipboardHistoryContent,
+        digest: Data,
         excluding id: UUID,
         from database: OpaquePointer
     ) throws {
         let statement = try prepare(
-            "DELETE FROM clipboard_history WHERE id <> ? AND \(contentPredicate(content))",
+            "DELETE FROM clipboard_history WHERE id <> ? AND content_digest = ? AND \(contentPredicate(content))",
             on: database
         )
         defer { sqlite3_finalize(statement) }
         try bind(id.uuidString, to: statement, index: 1, database: database)
-        try bind(content, to: statement, index: 2, database: database)
+        try bind(digest, to: statement, index: 2, database: database)
+        try bind(content, to: statement, index: 3, database: database)
         try check(sqlite3_step(statement), expected: SQLITE_DONE, database: database)
+    }
+
+    private func contentDigest(_ content: ClipboardHistoryContent) -> Data {
+        let data: Data
+        switch content {
+        case .text(let value):
+            // Match sqlite3_bind_text's existing NUL-terminated storage semantics.
+            data = Data(value.utf8.prefix { $0 != 0 })
+        case .image(let value):
+            data = value
+        case .file(let reference):
+            data = Data(reference.url.absoluteString.utf8)
+        }
+        return Data(SHA256.hash(data: data))
     }
 
     private func contentPredicate(_ content: ClipboardHistoryContent) -> String {
@@ -781,14 +914,13 @@ final class ClipboardHistoryDatabase: @unchecked Sendable {
         try check(sqlite3_step(statement), expected: SQLITE_DONE, database: database)
     }
 
-    private func upsert(_ items: [ClipboardHistoryItem], into database: OpaquePointer) throws {
-        guard !items.isEmpty else { return }
+    private func upsert(_ item: ClipboardHistoryItem, digest: Data, into database: OpaquePointer) throws {
         let statement = try prepare(
             """
             INSERT INTO clipboard_history (
                 id, content_type, text_value, image_data, last_copied_at, is_pinned,
-                file_url, file_display_name, file_bookmark, content_category
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                file_url, file_display_name, file_bookmark, content_category, content_digest
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             ON CONFLICT(id) DO UPDATE SET
                 content_type = excluded.content_type,
                 text_value = excluded.text_value,
@@ -798,43 +930,41 @@ final class ClipboardHistoryDatabase: @unchecked Sendable {
                 file_url = excluded.file_url,
                 file_display_name = excluded.file_display_name,
                 file_bookmark = excluded.file_bookmark,
-                content_category = excluded.content_category
+                content_category = excluded.content_category,
+                content_digest = excluded.content_digest
             """,
             on: database
         )
         defer { sqlite3_finalize(statement) }
 
-        for item in items {
-            sqlite3_reset(statement)
-            sqlite3_clear_bindings(statement)
-            try bind(item.id.uuidString, to: statement, index: 1, database: database)
-            switch item.content {
-            case .text(let value):
-                try check(sqlite3_bind_int(statement, 2, 0), database: database)
-                try bind(value, to: statement, index: 3, database: database)
-                try check(sqlite3_bind_null(statement, 4), database: database)
-                try bindFileNull(statement, database: database)
-            case .image(let data):
-                try check(sqlite3_bind_int(statement, 2, 1), database: database)
-                try check(sqlite3_bind_null(statement, 3), database: database)
-                try bind(data, to: statement, index: 4, database: database)
-                try bindFileNull(statement, database: database)
-            case .file(let reference):
-                try check(sqlite3_bind_int(statement, 2, 2), database: database)
-                try check(sqlite3_bind_null(statement, 3), database: database)
-                try check(sqlite3_bind_null(statement, 4), database: database)
-                try bind(reference.url.absoluteString, to: statement, index: 7, database: database)
-                try bind(reference.displayName, to: statement, index: 8, database: database)
-                try bind(reference.bookmark, to: statement, index: 9, database: database)
-            }
-            try check(
-                sqlite3_bind_double(statement, 5, item.lastCopiedAt.timeIntervalSinceReferenceDate),
-                database: database
-            )
-            try check(sqlite3_bind_int(statement, 6, item.isPinned ? 1 : 0), database: database)
-            try bind(item.category.rawValue, to: statement, index: 10, database: database)
-            try check(sqlite3_step(statement), expected: SQLITE_DONE, database: database)
+        try bind(item.id.uuidString, to: statement, index: 1, database: database)
+        switch item.content {
+        case .text(let value):
+            try check(sqlite3_bind_int(statement, 2, 0), database: database)
+            try bind(value, to: statement, index: 3, database: database)
+            try check(sqlite3_bind_null(statement, 4), database: database)
+            try bindFileNull(statement, database: database)
+        case .image(let data):
+            try check(sqlite3_bind_int(statement, 2, 1), database: database)
+            try check(sqlite3_bind_null(statement, 3), database: database)
+            try bind(data, to: statement, index: 4, database: database)
+            try bindFileNull(statement, database: database)
+        case .file(let reference):
+            try check(sqlite3_bind_int(statement, 2, 2), database: database)
+            try check(sqlite3_bind_null(statement, 3), database: database)
+            try check(sqlite3_bind_null(statement, 4), database: database)
+            try bind(reference.url.absoluteString, to: statement, index: 7, database: database)
+            try bind(reference.displayName, to: statement, index: 8, database: database)
+            try bind(reference.bookmark, to: statement, index: 9, database: database)
         }
+        try check(
+            sqlite3_bind_double(statement, 5, item.lastCopiedAt.timeIntervalSinceReferenceDate),
+            database: database
+        )
+        try check(sqlite3_bind_int(statement, 6, item.isPinned ? 1 : 0), database: database)
+        try bind(item.category.rawValue, to: statement, index: 10, database: database)
+        try bind(digest, to: statement, index: 11, database: database)
+        try check(sqlite3_step(statement), expected: SQLITE_DONE, database: database)
     }
 
     private func bindFileNull(_ statement: OpaquePointer, database: OpaquePointer) throws {

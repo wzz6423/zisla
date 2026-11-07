@@ -37,7 +37,7 @@ const camera = new THREE.PerspectiveCamera(
   45,
   window.innerWidth / window.innerHeight,
   0.1,
-  1000
+  2000
 );
 camera.position.z = 1200;
 
@@ -55,7 +55,7 @@ directionalLight.position.set(5, 5, 5);
 scene.add(directionalLight);
 
 // Island mesh
-function createIslandMesh(width: number, height: number): THREE.Mesh {
+function createIslandGeometry(width: number, height: number): THREE.ExtrudeGeometry {
   const shape = new THREE.Shape();
   const w = width / 2;
   const h = height / 2;
@@ -71,25 +71,25 @@ function createIslandMesh(width: number, height: number): THREE.Mesh {
   shape.lineTo(-w, -h + r);
   shape.quadraticCurveTo(-w, -h, -w + r, -h);
 
-  const geometry = new THREE.ExtrudeGeometry(shape, {
+  return new THREE.ExtrudeGeometry(shape, {
     depth: 10,
     bevelEnabled: true,
     bevelThickness: 2,
     bevelSize: 2,
     bevelSegments: 3,
   });
+}
 
-  const material = new THREE.MeshStandardMaterial({
+const island = new THREE.Mesh(
+  createIslandGeometry(ISLAND_WIDTH, ISLAND_HEIGHT_COLLAPSED),
+  new THREE.MeshStandardMaterial({
     color: 0x18181b,
     metalness: 0.3,
     roughness: 0.7,
-  });
-
-  return new THREE.Mesh(geometry, material);
-}
-
-const island = createIslandMesh(ISLAND_WIDTH, ISLAND_HEIGHT_COLLAPSED);
+  })
+);
 scene.add(island);
+let islandHeight = ISLAND_HEIGHT_COLLAPSED;
 
 // Module cards (4 quadrants when expanded)
 const modules: THREE.Mesh[] = [];
@@ -247,13 +247,12 @@ function updateIslandMorph(progress: number) {
     Math.min(progress * 2, 1)
   );
 
-  scene.remove(island);
-  const newIsland = createIslandMesh(ISLAND_WIDTH, currentHeight);
-  newIsland.position.copy(island.position);
-  newIsland.rotation.copy(island.rotation);
-  scene.add(newIsland);
-  island.geometry.dispose();
-  Object.assign(island, newIsland);
+  if (currentHeight !== islandHeight) {
+    const previousGeometry = island.geometry;
+    island.geometry = createIslandGeometry(ISLAND_WIDTH, currentHeight);
+    previousGeometry.dispose();
+    islandHeight = currentHeight;
+  }
 
   const isExpanded = currentHeight > ISLAND_HEIGHT_COLLAPSED + 50;
   modules.forEach((mod) => {

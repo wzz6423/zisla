@@ -1,27 +1,75 @@
+import AppKit
 import Foundation
+import SwiftUI
 import Testing
 import ZislaCore
 
 @testable import Zisla
 
 struct SettingsNavigationTests {
+    @Test(arguments: [ColorScheme.light, .dark]) @MainActor
+    func categoryIconsUseAppleSystemColors(colorScheme: ColorScheme) throws {
+        let appearance = try #require(NSAppearance(named: colorScheme == .dark ? .darkAqua : .aqua))
+        appearance.performAsCurrentDrawingAppearance {
+            var environment = EnvironmentValues()
+            environment.colorScheme = colorScheme
+            let systemColors: [NSColor] = [.systemGray, .systemBlue, .systemIndigo, .systemRed,
+                                          .systemGreen, .systemOrange, .systemCyan]
+            let allowedColors = systemColors.map { Color(nsColor: $0).resolve(in: environment) }
+            for category in SettingsSection.allCases {
+                let color = category.iconColor.resolve(in: environment)
+                #expect(allowedColors.contains(color),
+                        "The \(category.rawValue) icon must use Apple's unmodified system palette in \(colorScheme)")
+            }
+        }
+    }
+
+    @Test
+    func keyboardSoundRowsUseTheKeyboardCategoryColor() {
+        for symbol in ["waveform", "speaker.wave.2", "arrow.uturn.backward", "waveform.path.ecg", "chart.bar.xaxis"] {
+            #expect(SettingsSection.keyboardSound.iconColor(for: symbol) == SettingsSection.keyboardSound.iconColor,
+                    "The \(symbol) keyboard setting must keep the keyboard category color")
+        }
+    }
+
+    @Test
+    func settingIconsKeepTheirCategoryColorsAcrossPages() {
+        for page in SettingsSection.allCases {
+            for category in SettingsSection.allCases {
+                #expect(page.iconColor(for: category.symbol) == category.iconColor,
+                        "The \(category.rawValue) icon must keep its identity on the \(page.rawValue) page")
+            }
+            #expect(page.iconColor(for: "") == page.iconColor)
+            #expect(page.iconColor(for: "future.setting.symbol") == page.iconColor)
+            #expect(page.iconColor(for: "camera.fill") == SettingsSection.screenshot.iconColor)
+            #expect(page.iconColor(for: "doc.viewfinder") == SettingsSection.pdfTools.iconColor)
+            for symbol in ["power.circle.fill", "battery.100percent", "calendar", "music.note.list", "folder",
+                           "camera.fill", "doc.viewfinder", "rectangle.stack", "terminal.fill", "cpu",
+                           "character.bubble", "capsule", "shippingbox.fill"] {
+                #expect(page.iconColor(for: symbol) == SettingsSection.general.iconColor(for: symbol),
+                        "The \(symbol) setting must keep its semantic color across pages")
+            }
+        }
+    }
+
     @Test(arguments: [false, true], [false, true])
-    func combinedMonitorNavigationPreservesIndependentFeatureToggles(systemEnabled: Bool, batteryEnabled: Bool) {
-        var settings = FeatureSettings.default
-        settings.systemMonitorEnabled = systemEnabled
-        settings.batteryMonitorEnabled = batteryEnabled
+    func combinedMonitorNavigationFollowsTheSystemToggleWithLegacyBatterySettings(systemEnabled: Bool, batteryEnabled: Bool) throws {
+        let data = try JSONSerialization.data(withJSONObject: [
+            "systemMonitorEnabled": systemEnabled,
+            "batteryMonitorEnabled": batteryEnabled,
+        ])
+        var settings = try JSONDecoder().decode(FeatureSettings.self, from: data)
         settings.moduleOrder = [.battery, .mail, .system]
 
         let modules = IslandModule.enabledOrder(settings)
-        #expect(modules.contains(.system) == (systemEnabled || batteryEnabled))
-        #expect(IslandModule.battery.isEnabled(in: settings) == (systemEnabled || batteryEnabled))
+        #expect(modules.contains(.system) == systemEnabled)
+        #expect(IslandModule.battery.isEnabled(in: settings) == systemEnabled)
         #expect(!modules.contains(.battery))
         #expect(modules.filter { $0 == .system }.count <= 1)
-        if systemEnabled || batteryEnabled {
+        if systemEnabled {
             #expect(modules.first == .system)
         }
         #expect(settings.systemMonitorEnabled == systemEnabled)
-        #expect(settings.batteryMonitorEnabled == batteryEnabled)
     }
 
     @Test
@@ -30,6 +78,32 @@ struct SettingsNavigationTests {
         for module in IslandModule.allCases where module != .battery {
             #expect(module.navigationTarget == module)
         }
+    }
+
+    @Test
+    func combinedMonitorFeatureRowHasNoSeparateBatteryToggleAndIsLocalized() throws {
+        let source = try String(contentsOf: Self.settingsViewSourceURL, encoding: .utf8)
+        #expect(!source.contains(#"featureToggle("电池监控""#))
+        let row = try NSRegularExpression(pattern:
+            #"featureToggle\("系统状态与清理", detail: "([^"]+)", symbol: "[^"]+", keyPath: \\.systemMonitorEnabled\)"#)
+        let match = try #require(row.firstMatch(in: source, range: NSRange(source.startIndex..., in: source)))
+        let range = try #require(Range(match.range(at: 1), in: source))
+        let detail = String(source[range])
+        #expect(detail == "监控系统资源与电池，并安全清理缓存和日志")
+        let packageRoot = Self.settingsViewSourceURL.deletingLastPathComponent()
+            .deletingLastPathComponent().deletingLastPathComponent()
+        for language in AppLanguage.allCases {
+            let tableURL = packageRoot.appendingPathComponent("Resources/Localization/\(language.rawValue).lproj/Localizable.strings")
+            let table = try #require(NSDictionary(contentsOf: tableURL) as? [String: String])
+            for key in ["系统状态与清理", detail] {
+                let value = try #require(table[key], "\(language.rawValue) is missing \(key)")
+                #expect(!value.isEmpty)
+                #expect(AppLocalization.string(key, language: language) == value)
+                if language != .simplifiedChinese { #expect(value != key) }
+            }
+        }
+        #expect(AppLocalization.string(detail, language: .english)
+            == "Monitor system resources and batteries, and safely clean caches and logs")
     }
 
     @Test

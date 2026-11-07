@@ -67,6 +67,7 @@
 "PDF 工具" = "PDF-hulpmiddelen";
 "合并、拆分、加密与转换 PDF" = "Samenvoegen, splitsen, versleutelen en converteren van PDF's";
 "系统状态与清理" = "Systeemmonitor en opschonen";
+"监控系统资源与电池，并安全清理缓存和日志" = "Systeembronnen en batterijen bewaken en caches en logbestanden veilig opschonen";
 "监控资源并安全清理缓存和日志" = "Monitor bronnen en schoon veilig cache en logbestanden op";
 "显示 zisla 图标" = "Toon zisla-icoon";
 "关闭后不影响已启用的菜单栏监控项" = "Heeft geen invloed op ingeschakelde menubalk-monitoringitems wanneer uitgeschakeld";
@@ -632,6 +633,8 @@
 "飞机" = "Vliegtuig";
 "首页" = "Start";
 "7 天" = "7 dagen";
+"自动删除剪贴板历史" = "Klembordgeschiedenis automatisch verwijderen";
+"按所选周期删除过期历史，常用项目继续保留" = "Verwijder verlopen geschiedenis na de gekozen periode; favorieten blijven behouden";
 "上一页" = "Vorige pagina";
 "下一页" = "Volgende pagina";
 "不可用" = "Niet beschikbaar";
@@ -3327,3 +3330,7 @@
 "AI 会话工作目录" = "Werkmappen van AI-sessies";
 "对应会话已删除；清理前请确认目录中的文件" = "De bijbehorende sessies zijn verwijderd; controleer de bestanden voordat u opruimt";
 "会话仍保留或无法确认删除状态，已保留工作目录" = "De sessie is bewaard of de verwijdering kan niet worden bevestigd; de werkmap is behouden";
+
+"保存手写备忘录需要辅助功能权限" = "Toegang tot toegankelijkheid is vereist om handgeschreven notities op te slaan";
+"备忘录内容已变化，请重新打开后编辑" = "De notitie is gewijzigd. Open deze opnieuw voordat je bewerkt";
+"无法保存手写备忘录的文本，请在备忘录中打开后重试" = "De tekst in de handgeschreven notitie kon niet worden opgeslagen. Open deze in Notities en probeer het opnieuw";

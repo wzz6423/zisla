@@ -69,7 +69,7 @@ public struct CalendarEventSnapshot: Equatable, Identifiable, Sendable {
 struct CalendarMutationCommands {
     var createEvent: (String, Date, Date, Bool, String?, String?) throws -> Void
     var createReminder: (String, Date, Bool) throws -> Void
-    var delete: (CalendarItemKind, String) throws -> Void
+    var delete: (CalendarItemKind, String, Date) throws -> Void
     var setReminderCompleted: (String, Bool) throws -> Void
 
     static func live(store: EKEventStore) -> CalendarMutationCommands {
@@ -107,13 +107,29 @@ struct CalendarMutationCommands {
                 reminder.dueDateComponents = components
                 try store.save(reminder, commit: true)
             },
-            delete: { kind, identifier in
+            delete: { kind, identifier, startDate in
                 switch kind {
                 case .event:
-                    guard let event = store.event(withIdentifier: identifier)
+                    let sourceEvent = store.event(withIdentifier: identifier)
                         ?? store.calendarItem(withIdentifier: identifier) as? EKEvent
-                    else {
-                        throw CalendarMutationError.itemNotFound
+                    let event: EKEvent
+                    if let sourceEvent,
+                       sourceEvent.eventIdentifier == identifier,
+                       sourceEvent.startDate == startDate {
+                        event = sourceEvent
+                    } else {
+                        // Identifier lookup returns the first occurrence, so resolve the selected date before deleting.
+                        let predicate = store.predicateForEvents(
+                            withStart: startDate.addingTimeInterval(-1),
+                            end: startDate.addingTimeInterval(1),
+                            calendars: nil
+                        )
+                        guard let occurrence = store.events(matching: predicate).first(where: {
+                            $0.eventIdentifier == identifier && $0.startDate == startDate
+                        }) else {
+                            throw CalendarMutationError.itemNotFound
+                        }
+                        event = occurrence
                     }
                     try store.remove(event, span: .thisEvent, commit: true)
                 case .reminder:
@@ -327,7 +343,7 @@ public final class CalendarService: ObservableObject {
         guard let identifier = item.sourceIdentifier, !identifier.isEmpty else {
             throw CalendarMutationError.missingSourceIdentifier
         }
-        try mutations.delete(item.kind, identifier)
+        try mutations.delete(item.kind, identifier, item.startDate)
         events.removeAll { $0.id == item.id }
         scheduleRefresh()
     }
