@@ -225,7 +225,7 @@ struct IslandRootView: View {
                                         case .clipboard:
                                             ClipboardHistoryModuleView(model: model)
                                         case .aiMonitor:
-                                            AIProgressModuleView(model: model)
+                                            AIProgressModuleView(monitor: model.aiMonitor)
                                         case .download:
                                             DownloadModuleView(model: model)
                                         case .agenda:
