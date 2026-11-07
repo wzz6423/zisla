@@ -67,6 +67,7 @@
 "PDF 工具" = "Alat PDF";
 "合并、拆分、加密与转换 PDF" = "Gabung, pisah, enkripsi, dan konversi PDF";
 "系统状态与清理" = "Monitor Sistem dan Pembersihan";
+"监控系统资源与电池，并安全清理缓存和日志" = "Pantau sumber daya sistem dan baterai, serta bersihkan cache dan log dengan aman";
 "监控资源并安全清理缓存和日志" = "Pantau sumber daya dan bersihkan cache dan log dengan aman";
 "显示 zisla 图标" = "Tampilkan Ikon zisla";
 "关闭后不影响已启用的菜单栏监控项" = "Tidak memengaruhi item monitor menu bar yang diaktifkan saat dinonaktifkan";
@@ -632,6 +633,8 @@
 "飞机" = "Pesawat";
 "首页" = "Beranda";
 "7 天" = "7 hari";
+"自动删除剪贴板历史" = "Hapus riwayat papan klip secara otomatis";
+"按所选周期删除过期历史，常用项目继续保留" = "Hapus riwayat yang melewati jangka waktu pilihan; item favorit tetap disimpan";
 "上一页" = "Sebelumnya";
 "下一页" = "Berikutnya";
 "不可用" = "Tidak tersedia";
@@ -3330,3 +3333,19 @@
 "监听麦克风" = "Pantau Mikrofon";
 "使用耳机监听以避免回声" = "Gunakan headphone saat memantau untuk menghindari gema";
 "麦克风监听已关闭：%@" = "Pemantauan mikrofon dinonaktifkan: %@";
+
+"自动清理系统垃圾" = "Bersihkan sampah sistem secara otomatis";
+"按所选间隔移入废纸篓，不会永久删除" = "Pindahkan item ke Sampah sesuai interval yang dipilih, tanpa menghapus permanen";
+"清理范围" = "Cakupan pembersihan";
+"仅可信" = "Hanya item tepercaya";
+"全部（包含需人工复核）" = "Semua (termasuk yang perlu ditinjau)";
+"默认保存位置" = "Lokasi Penyimpanan Default";
+"分别设置各类内容的默认保存位置。" = "Atur lokasi penyimpanan default untuk setiap jenis konten.";
+"管理下载所需组件。" = "Kelola komponen yang diperlukan untuk unduhan.";
+"更改 %@ 的保存位置" = "Ubah lokasi penyimpanan untuk %@";
+
+"本地优先的原生笔记应用" = "Aplikasi catatan native yang mengutamakan penyimpanan lokal";
+
+"保存手写备忘录需要辅助功能权限" = "Akses Aksesibilitas diperlukan untuk menyimpan catatan tulisan tangan";
+"备忘录内容已变化，请重新打开后编辑" = "Catatan telah berubah. Buka kembali sebelum mengedit";
+"无法保存手写备忘录的文本，请在备忘录中打开后重试" = "Teks dalam catatan tulisan tangan tidak dapat disimpan. Buka di Catatan dan coba lagi";

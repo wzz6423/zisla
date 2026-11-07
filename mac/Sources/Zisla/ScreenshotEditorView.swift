@@ -4810,7 +4810,7 @@ enum ScreenshotImageExport {
     /// - Parameter status: Receives the result message, or `nil` when the panel closes without writing a file.
     static func presentSavePanel(
         for data: Data,
-        directory: URL = AppModel.shared.downloadDirectory,
+        directory: URL = AppModel.shared.saveLocations[.screenshot],
         panel: NSSavePanel = NSSavePanel(),
         systemPreferences: UserDefaults = .standard,
         themeNotifications: NotificationCenter = DistributedNotificationCenter.default(),
@@ -4874,6 +4874,7 @@ struct ScreenshotToolAttributesRow<Content: View>: View {
         HStack(spacing: 10) {
             content
         }
+        .keepsIntrinsicWidth()
         .padding(.horizontal, 12)
         .frame(height: ScreenshotToolbarLayout.height)
     }
@@ -7766,6 +7767,10 @@ final class ScreenshotEditorWindow: NSWindow {
 }
 
 enum ScreenshotHotkeyContext {
+    static func isScreenshotSessionActive(selecting: Bool, editorPinnedStates: [Bool]) -> Bool {
+        selecting || editorPinnedStates.contains(false)
+    }
+
     static func shouldSuspend(selecting: Bool, editors: [(pinned: Bool, key: Bool)]) -> Bool {
         selecting || editors.contains { !$0.pinned || $0.key }
     }
@@ -7776,11 +7781,18 @@ enum ScreenshotHotkeyContext {
         editors: [ScreenshotEditorWindowController],
         globalManagers: [GlobalHotkeyManager]
     ) {
+        let captureSuspended = isScreenshotSessionActive(
+            selecting: selecting,
+            editorPinnedStates: editors.map(\.isPinnedPresentation)
+        )
+        for manager in globalManagers {
+            manager.setSuspended(captureSuspended, reason: "screenshotEditor")
+        }
         let suspended = shouldSuspend(
             selecting: selecting,
             editors: editors.map { ($0.isPinnedPresentation, $0.window?.isKeyWindow == true) }
         )
-        for manager in globalManagers + editors.map(\.pinnedEscapeHotkeyManager) {
+        for manager in editors.map(\.pinnedEscapeHotkeyManager) {
             manager.setSuspended(suspended, reason: "screenshotEditor")
         }
     }
@@ -7964,6 +7976,10 @@ final class ScreenshotEditorWindowController: NSWindowController, NSWindowDelega
                 return hotkey.matches(keyCode: keyCode, modifierSides: modifierSides)
             }
             return true
+        }
+        if settings.screenshotEnabled, isPinnedPresentation,
+           matches(settings.screenshotHotkey) || matches(settings.screenshotLongHotkey) {
+            return false
         }
         if matches(settings.screenshotPinHotkey) {
             model.commitPendingTextDraft()

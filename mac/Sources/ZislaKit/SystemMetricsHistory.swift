@@ -786,9 +786,17 @@ public final class SystemMetricsHistoryStore: @unchecked Sendable {
     }
 
     public func append(_ record: SystemMetricsRecord) {
+        _ = append(record, isCancelled: { false })
+    }
+
+    func append(
+        _ record: SystemMetricsRecord,
+        isCancelled: () -> Bool
+    ) -> SystemMetricsHistoryStats? {
         lock.lock()
         defer { lock.unlock() }
         loadIfNeededLocked()
+        guard !isCancelled() else { return nil }
         stored.append(record)
         if let capacity {
             let overflow = stored.count - capacity
@@ -797,6 +805,11 @@ public final class SystemMetricsHistoryStore: @unchecked Sendable {
             }
         }
         persistence.appendRecord(record, capacity: capacity)
+        return SystemMetricsHistoryStats(
+            count: stored.count,
+            oldest: stored.first?.timestamp,
+            newest: stored.last?.timestamp
+        )
     }
 
     public func removeAll() {

@@ -52,7 +52,7 @@ final class ScreenRecordingStudioModel: ObservableObject {
     @Published var subtitleLanguage: AppLanguage = .simplifiedChinese
     private let appModel: AppModel?
     private let outputDirectoryStore: ScreenRecordingOutputDirectoryStore
-    private let setDownloadDirectory: ((URL) throws -> Void)?
+    private let saveLocations: SaveLocationStore?
     private let renderPreview: (ScreenRecordingProject, URL, Double) async throws -> CGImage
     private let presentExportPanel: (NSSavePanel, @escaping (URL?) -> Void) -> Void
     private var outputPanel: NSSavePanel?
@@ -81,8 +81,7 @@ final class ScreenRecordingStudioModel: ObservableObject {
          transcriber: ScreenRecordingTranscriber = ScreenRecordingTranscriber(),
          projectStore: ScreenRecordingProjectStore? = nil,
          outputDirectoryStore: ScreenRecordingOutputDirectoryStore = ScreenRecordingOutputDirectoryStore(),
-         downloadDirectoryPublisher: AnyPublisher<URL, Never>? = nil,
-         setDownloadDirectory: ((URL) throws -> Void)? = nil,
+         saveLocations: SaveLocationStore? = nil,
          renderPreview: ((ScreenRecordingProject, URL, Double) async throws -> CGImage)? = nil,
          presentExportPanel: @escaping (NSSavePanel, @escaping (URL?) -> Void) -> Void = { panel, completion in
              panel.begin { response in completion(response == .OK ? panel.url : nil) }
@@ -101,9 +100,7 @@ final class ScreenRecordingStudioModel: ObservableObject {
         self.exporter = exporter
         self.transcriber = transcriber
         self.outputDirectoryStore = outputDirectoryStore
-        self.setDownloadDirectory = setDownloadDirectory ?? appModel.map { model in
-            { try model.setDownloadDirectory($0) }
-        }
+        self.saveLocations = saveLocations ?? appModel?.saveLocations
         self.presentExportPanel = presentExportPanel
         self.notices = notices ?? appModel?.notices ?? SideNoticeQueue()
         self.writeProjectFiles = writeProjectFiles
@@ -133,7 +130,8 @@ final class ScreenRecordingStudioModel: ObservableObject {
         selectedAIModel = appModel?.settingsStore.settings.voiceModelConfiguration
         subtitleLanguage = appModel?.languageStore.language ?? .simplifiedChinese
         let notifyError = onError ?? { [weak appModel] message in appModel?.transientMessage = message }
-        let directoryPublisher = downloadDirectoryPublisher ?? appModel?.$downloadDirectory.eraseToAnyPublisher()
+        let directoryPublisher = self.saveLocations?.$directories
+            .map { $0[.recording]! }.eraseToAnyPublisher()
         directoryPublisher?.sink { [weak self] directory in
             self?.recordingOutputDirectory = directory
         }.store(in: &cancellables)
@@ -227,7 +225,7 @@ final class ScreenRecordingStudioModel: ObservableObject {
 
     func setRecordingOutputDirectory(_ url: URL) throws {
         guard !isRecording, !isBusy, !exporter.isExporting else { return }
-        if let setDownloadDirectory { try setDownloadDirectory(url) }
+        if let saveLocations { try saveLocations.setDirectory(url, for: .recording) }
         else {
             try outputDirectoryStore.setDirectory(url)
             recordingOutputDirectory = outputDirectoryStore.directory

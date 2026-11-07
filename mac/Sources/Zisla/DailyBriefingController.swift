@@ -27,6 +27,7 @@ final class DailyBriefingController: ObservableObject {
 
     init(
         store: DailyBriefingStore = DailyBriefingStore(),
+        saveLocations: SaveLocationStore? = nil,
         observation: @escaping (Date) -> DailyBriefingObservation,
         typing: @escaping @MainActor (Date) async throws -> DailyBriefingTyping?,
         readScreenTime: @escaping @Sendable (DateInterval) async -> DailyBriefingScreenTimeResult = { range in
@@ -47,6 +48,9 @@ final class DailyBriefingController: ObservableObject {
         self.typing = typing
         self.readScreenTime = readScreenTime
         self.export = export
+        saveLocations?.$directories.sink { [weak self] directories in
+            self?.directory = directories[.dailyBriefing]!
+        }.store(in: &cancellables)
         let center = NSWorkspace.shared.notificationCenter
         for name in [NSWorkspace.willSleepNotification, NSWorkspace.sessionDidResignActiveNotification] {
             center.publisher(for: name).sink { [weak self] _ in

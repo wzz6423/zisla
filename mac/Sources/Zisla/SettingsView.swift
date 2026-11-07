@@ -147,7 +147,7 @@ struct SettingsView: View {
                         } label: {
                             HStack(spacing: 10) {
                                 Image(systemName: result.section.symbol)
-                                    .foregroundStyle(Color.accentColor)
+                                    .foregroundStyle(result.section.iconColor)
                                     .frame(width: 24)
                                 VStack(alignment: .leading, spacing: 3) {
                                     AppLocalizedText(result.title)
@@ -254,6 +254,8 @@ struct SettingsView: View {
             petContent
         case .download:
             downloadContent
+        case .saveLocations:
+            saveLocationsContent
         case .networkProxy:
             networkProxyContent
         case .weather:
@@ -484,6 +486,29 @@ struct SettingsView: View {
                     featureToggle("链接下载", detail: "", symbol: "arrow.down.circle.fill", keyPath: \.downloaderEnabled)
                     rowDivider
                     featureToggle(AppLocalization.text("剪贴板历史"), detail: "仅本机保存文本和图片", symbol: "clipboard", keyPath: \.clipboardHistoryEnabled)
+                    rowDivider
+                    settingRow(
+                        symbol: "calendar.badge.clock",
+                        title: "自动删除剪贴板历史",
+                        detail: "按所选周期删除过期历史，常用项目继续保留",
+                        isNested: true
+                    ) {
+                        Picker(
+                            "",
+                            selection: Binding(
+                                get: { model.settingsStore.settings.clipboardHistoryCleanupPolicy },
+                                set: { model.settingsStore.settings.clipboardHistoryCleanupPolicy = $0 }
+                            )
+                        ) {
+                            ForEach(VoiceRecordingCleanupPolicy.allCases, id: \.self) { policy in
+                                Text(AppLocalization.text(policy.menuTitle)).tag(policy)
+                            }
+                        }
+                        .labelsHidden()
+                        .pickerStyle(.menu)
+                        .keepsIntrinsicWidth()
+                    }
+                    .disabled(!model.settingsStore.settings.clipboardHistoryEnabled)
                     rowDivider
                     featureToggle(AppLocalization.text("剪贴板链接检测"), detail: "", symbol: "clipboard.fill", keyPath: \.clipboardDetectionEnabled)
                 }
@@ -962,9 +987,42 @@ struct SettingsView: View {
                     rowDivider
                     featureToggle("应用音量混音器", detail: "", symbol: "slider.horizontal.3", keyPath: \.volumeMixerEnabled)
                     rowDivider
-                    featureToggle("系统状态与清理", detail: "监控资源并安全清理缓存和日志", symbol: "gauge.with.dots.needle.67percent", keyPath: \.systemMonitorEnabled)
-                    rowDivider
-                    featureToggle("电池监控", detail: "", symbol: "battery.100percent", keyPath: \.batteryMonitorEnabled)
+                    featureToggle("系统状态与清理", detail: "监控系统资源与电池，并安全清理缓存和日志", symbol: "gauge.with.dots.needle.67percent", keyPath: \.systemMonitorEnabled)
+                    if model.settingsStore.settings.systemMonitorEnabled {
+                        rowDivider
+                        settingRow(
+                            symbol: "calendar.badge.clock",
+                            title: "自动清理系统垃圾",
+                            detail: "按所选间隔移入废纸篓，不会永久删除",
+                            isNested: true
+                        ) {
+                            Picker(AppLocalization.string("自动清理系统垃圾", locale: locale), selection: Binding(
+                                get: { model.settingsStore.settings.systemCleanupPolicy },
+                                set: { model.settingsStore.settings.systemCleanupPolicy = $0 }
+                            )) {
+                                ForEach(VoiceRecordingCleanupPolicy.allCases, id: \.self) { policy in
+                                    AppLocalizedText(policy.menuTitle).tag(policy)
+                                }
+                            }
+                            .labelsHidden()
+                            .pickerStyle(.menu)
+                            .keepsIntrinsicWidth()
+                        }
+                        rowDivider
+                        settingRow(symbol: "line.3.horizontal.decrease.circle", title: "清理范围", detail: "", isNested: true) {
+                            Picker(AppLocalization.string("清理范围", locale: locale), selection: Binding(
+                                get: { model.settingsStore.settings.systemCleanupScope },
+                                set: { model.settingsStore.settings.systemCleanupScope = $0 }
+                            )) {
+                                ForEach(SystemCleanupScope.allCases, id: \.self) { scope in
+                                    AppLocalizedText(scope.menuTitle).tag(scope)
+                                }
+                            }
+                            .labelsHidden()
+                            .pickerStyle(.menu)
+                            .keepsIntrinsicWidth()
+                        }
+                    }
                     rowDivider
                     featureToggle("键盘音效", detail: "全局播放键盘音效并记录输入统计", symbol: "keyboard.badge.ellipsis", keyPath: \.keyboardEnabled)
                     rowDivider
@@ -2571,20 +2629,31 @@ struct SettingsView: View {
         )
     }
 
-    private var downloadContent: some View {
-        VStack(alignment: .leading, spacing: 20) {
-            settingsGroup("下载目录") {
+    private var saveLocationsContent: some View {
+        settingsGroup("默认保存位置") {
+            ForEach(SaveLocation.allCases) { location in
+                if location != SaveLocation.allCases.first { rowDivider }
                 settingRow(
-                    symbol: "folder.fill",
-                    title: "默认下载目录",
-                    detail: model.downloadDirectory.path(percentEncoded: false)
+                    symbol: location.symbol,
+                    title: location.title,
+                    detail: model.saveLocations[location].path(percentEncoded: false),
+                    detailLineLimit: 2
                 ) {
-                    Button(AppLocalization.text("选择默认下载目录")) { chooseDownloadDirectory() }
+                    Button(AppLocalization.text("更改保存位置")) {
+                        do { try Self.chooseSaveDirectory(location, locations: model.saveLocations) }
+                        catch { model.transientMessage = error.localizedDescription }
+                    }
                         .buttonStyle(.bordered)
                         .keepsIntrinsicWidth()
+                        .accessibilityLabel(AppLocalization.format("更改 %@ 的保存位置", locale: locale,
+                            [AppLocalization.string(location.title, locale: locale)]))
                 }
             }
+        }
+    }
 
+    private var downloadContent: some View {
+        VStack(alignment: .leading, spacing: 20) {
             settingsGroup("组件") {
                 managedToolRow(.ytDLP, symbol: "terminal.fill")
                 rowDivider
@@ -3083,7 +3152,7 @@ struct SettingsView: View {
         HStack(spacing: 10) {
             Image(systemName: "magnifyingglass")
                 .font(.system(size: 12, weight: .semibold))
-                .foregroundStyle(Color.accentColor)
+                .foregroundStyle(SettingsSection.weather.iconColor)
                 .frame(width: 24)
             HStack(spacing: 6) {
                 TextField(AppLocalization.text("城市、区县或地区"), text: $input.weatherQuery)
@@ -3701,9 +3770,9 @@ struct SettingsView: View {
         HStack(spacing: 10) {
             Image(systemName: symbol)
                 .font(.system(size: 15, weight: .medium))
-                .foregroundStyle(Color.accentColor)
+                .foregroundStyle(.white)
                 .frame(width: 32, height: 32)
-                .background(Color.accentColor.opacity(0.10), in: RoundedRectangle(cornerRadius: 8, style: .continuous))
+                .background(input.selection.iconColor(for: symbol), in: RoundedRectangle(cornerRadius: 8, style: .continuous))
             VStack(alignment: .leading, spacing: 2) {
                 AppLocalizedText(title)
                     .font(.system(size: 13, weight: .medium))
@@ -3741,7 +3810,7 @@ struct SettingsView: View {
                 .help(AppLocalization.text("拖动调整 %@ 的展示顺序", AppLocalization.text(title)))
             Image(systemName: symbol)
                 .font(.system(size: 12, weight: .semibold))
-                .foregroundStyle(Color.accentColor)
+                .foregroundStyle(input.selection.iconColor(for: symbol))
                 .frame(width: 24)
             AppLocalizedText(title)
                 .font(.system(size: 11, weight: .medium))
@@ -3863,16 +3932,16 @@ struct SettingsView: View {
         model.selectWeatherLocation(named: input.weatherQuery)
     }
 
-    private func chooseDownloadDirectory() {
-        let panel = NSOpenPanel()
+    static func chooseSaveDirectory(_ location: SaveLocation, locations: SaveLocationStore,
+                                    panel: NSOpenPanel = NSOpenPanel()) throws {
         panel.canChooseFiles = false
         panel.canChooseDirectories = true
+        panel.canCreateDirectories = true
         panel.allowsMultipleSelection = false
-        panel.directoryURL = model.downloadDirectory
+        panel.directoryURL = locations[location]
         WindowPlacement.prepareModal(panel, on: WindowPlacement.screenUnderMouse())
         guard panel.runModal() == .OK, let url = panel.url else { return }
-        do { try model.setDownloadDirectory(url) }
-        catch { model.transientMessage = error.localizedDescription }
+        try locations.setDirectory(url, for: location)
     }
 
     private func brandIcon(named name: String) -> NSImage? {
@@ -4374,6 +4443,7 @@ enum SettingsSection: String, CaseIterable, Identifiable {
     case mail
     case keyboardSound
     case download
+    case saveLocations
     case weather
     case networkProxy
     case pet
@@ -4390,7 +4460,7 @@ enum SettingsSection: String, CaseIterable, Identifiable {
         case .pdfTools: .files
         case .screenshot, .recording: .capture
         case .ai, .voice: .aiAndVoice
-        case .clipboardAssistant, .download, .mail, .weather, .networkProxy, .pet: .others
+        case .clipboardAssistant, .download, .saveLocations, .mail, .weather, .networkProxy, .pet: .others
         case .permissions: .permissions
         case .recommendations, .updates: .recommendationsAndUpdates
         }
@@ -4416,6 +4486,7 @@ enum SettingsSection: String, CaseIterable, Identifiable {
         case .voice: "语音"
         case .pet: "宠物"
         case .download: "下载"
+        case .saveLocations: "保存位置"
         case .networkProxy: "网络"
         case .weather: "天气"
         case .permissions: "权限"
@@ -4439,11 +4510,70 @@ enum SettingsSection: String, CaseIterable, Identifiable {
         case .voice: "mic.fill"
         case .pet: "pawprint.fill"
         case .download: "arrow.down.circle.fill"
+        case .saveLocations: "folder.fill"
         case .networkProxy: "network"
         case .weather: "cloud.sun.fill"
         case .permissions: "lock.shield"
         case .updates: "arrow.up.circle"
         case .recommendations: "sparkles"
+        }
+    }
+
+    var iconColor: Color {
+        switch self {
+        case .general, .features, .keyboardSound, .permissions: Color(nsColor: .systemGray)
+        case .info, .mail, .networkProxy: Color(nsColor: .systemBlue)
+        case .clipboardAssistant, .screenshot, .ai, .recommendations: Color(nsColor: .systemIndigo)
+        case .recording, .pdfTools, .voice: Color(nsColor: .systemRed)
+        case .download, .updates: Color(nsColor: .systemGreen)
+        case .weather: Color(nsColor: .systemCyan)
+        case .pet: Color(nsColor: .systemOrange)
+        }
+    }
+
+    func iconColor(for symbol: String) -> Color {
+        if let section = Self.allCases.first(where: { $0.symbol == symbol }) {
+            return section.iconColor
+        }
+        if self == .keyboardSound,
+           ["waveform", "speaker.wave.2", "arrow.uturn.backward", "waveform.path.ecg", "chart.bar.xaxis"].contains(symbol) {
+            return iconColor
+        }
+        switch symbol {
+        case "power", "power.circle.fill", "battery.100percent", "arrow.down.circle", "arrow.down.square.fill",
+             "square.and.arrow.down", "arrow.triangle.2.circlepath", "arrow.triangle.branch", "checkmark.seal.fill":
+            return Self.download.iconColor
+        case "calendar", "calendar.badge.clock", "bell.fill", "bell.badge.fill", "bell.slash.fill":
+            return Self.recording.iconColor
+        case "heart.fill", "music.note", "music.note.list", "play.square.fill",
+             "text.quote", "waveform", "speaker.wave.2":
+            return Self.voice.iconColor
+        case "folder", "folder.fill", "folder.badge.plus", "tray.full.fill", "tray.and.arrow.down":
+            return Self.mail.iconColor
+        case "clipboard", "clipboard.fill", "note.text", "wrench.and.screwdriver.fill", "wrench.and.screwdriver":
+            return Color(nsColor: .systemOrange)
+        case "camera.fill", "pin.fill", "sparkle":
+            return Self.screenshot.iconColor
+        case "doc.viewfinder":
+            return Self.pdfTools.iconColor
+        case "rectangle.stack":
+            return Self.recording.iconColor
+        case "doc.richtext", "terminal", "terminal.fill", "chevron.left.forwardslash.chevron.right", "hammer":
+            return Self.ai.iconColor
+        case "cpu", "chart.bar.fill", "chart.bar.xaxis", "chart.xyaxis.line",
+             "gauge.with.dots.needle.67percent", "waveform.path.ecg", "display":
+            return Self.info.iconColor
+        case "character.bubble", "envelope", "link":
+            return Self.mail.iconColor
+        case "capsule", "viewfinder", "menubar.rectangle", "macwindow.on.rectangle", "lock.display",
+             "rectangle.on.rectangle", "rectangle.on.rectangle.angled", "rectangle.topthird.inset.filled",
+             "rectangle.bottomhalf.inset.filled", "rectangle.compress.vertical", "rectangle.split.2x1",
+             "laptopcomputer.and.iphone", "keyboard", "computermouse", "hand.tap", "hand.draw.fill":
+            return Self.general.iconColor
+        case "shippingbox.fill":
+            return Self.pet.iconColor
+        default:
+            return iconColor
         }
     }
 
@@ -4461,7 +4591,8 @@ enum SettingsSection: String, CaseIterable, Identifiable {
         case .ai: "管理 AI CLI 与 Skills。"
         case .voice: "配置语音输入、整理模型与本机记录。"
         case .pet: "设置灵动岛内部的宠物形象。"
-        case .download: "管理下载目录、下载通知与所需组件。"
+        case .download: "管理下载所需组件。"
+        case .saveLocations: "分别设置各类内容的默认保存位置。"
         case .networkProxy: "配置本地代理，用于更新、安装、下载与 GitHub 访问。"
         case .weather: "管理天气显示、地点和刷新。"
         case .permissions: "管理 zisla 使用的系统权限。"
@@ -4472,7 +4603,7 @@ enum SettingsSection: String, CaseIterable, Identifiable {
 
     func isVisible(settings: FeatureSettings) -> Bool {
         switch self {
-        case .general, .features, .networkProxy, .permissions:
+        case .general, .features, .saveLocations, .networkProxy, .permissions:
             return true
         case .recommendations:
             return settings.recommendedToolsEnabled
@@ -4598,9 +4729,10 @@ struct SettingsSidebar: View {
         } label: {
             HStack(spacing: 10) {
                 Image(systemName: section.symbol)
-                    .font(.system(size: 15, weight: .medium))
-                    .foregroundStyle(Color.accentColor)
-                    .frame(width: 21)
+                    .font(.system(size: section == .keyboardSound ? 13 : 15, weight: .medium))
+                    .foregroundStyle(.white)
+                    .frame(width: 24, height: 24)
+                    .background(section.iconColor, in: RoundedRectangle(cornerRadius: 6, style: .continuous))
                 AppLocalizedText(section.title)
                     .font(.system(size: 13, weight: .medium))
                     .fitsLines(2, minScale: 0.85)

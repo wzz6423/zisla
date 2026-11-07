@@ -9,6 +9,55 @@ import XCTest
 @testable import KeyboardKit
 
 struct ThinScrollChromeTests {
+    @Test(arguments: [CGFloat(40), 400], [NSScroller.Style.legacy, .overlay]) @MainActor
+    func requestedScrollerStyleKeepsTheExpectedContentWidth(
+        documentHeight: CGFloat, style: NSScroller.Style
+    ) throws {
+        let scroll = NSScrollView(frame: CGRect(x: 0, y: 0, width: 160, height: 80))
+        let document = NSView(frame: CGRect(x: 0, y: 0, width: 160, height: documentHeight))
+        scroll.documentView = document
+
+        ThinScrollChrome.apply(to: scroll, scrollerStyle: style)
+        scroll.tile()
+
+        #expect(scroll.scrollerStyle == style)
+        #expect(scroll.verticalScroller is ThinScroller)
+        #expect(scroll.documentView === document)
+        if style == .overlay || documentHeight <= 80 {
+            #expect(scroll.contentView.frame.width == 160,
+                    "Overlay or hidden scrollbars must not reserve a horizontal gutter")
+        } else {
+            #expect(scroll.contentView.frame.width < 160,
+                    "Existing legacy scrollbars must retain their reserved gutter")
+        }
+    }
+
+    @Test @MainActor
+    func nativeStyleChangesRestoreOverlayChromeAndPreserveScrollPosition() async throws {
+        let scroll = NSScrollView(frame: CGRect(x: 0, y: 0, width: 160, height: 80))
+        let document = NSView(frame: CGRect(x: 0, y: 0, width: 160, height: 400))
+        scroll.documentView = document
+        let host = ThinScrollChromeHost(visibleWhenScrollable: true, scrollerStyle: .overlay)
+        document.addSubview(host)
+        host.applyIfNeeded()
+        scroll.contentView.scroll(to: CGPoint(x: 0, y: 120))
+        let offset = scroll.contentView.bounds.origin
+
+        scroll.scrollerStyle = .legacy
+        for _ in 0..<8 {
+            await withCheckedContinuation { continuation in
+                DispatchQueue.main.async { continuation.resume() }
+            }
+        }
+        scroll.tile()
+
+        #expect(scroll.scrollerStyle == .overlay)
+        #expect(scroll.contentView.frame.width == 160)
+        #expect(scroll.contentView.bounds.origin == offset)
+        #expect(scroll.documentView === document)
+        #expect(scroll.verticalScroller is ThinScroller)
+    }
+
     @Test(arguments: [
         (false, NSScroller.Style.legacy), (true, .legacy),
         (false, .overlay), (true, .overlay),

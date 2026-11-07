@@ -81,32 +81,6 @@ public enum AIProvider: String, Codable, CaseIterable, Sendable {
     }
 }
 
-public enum AIQuotaWindow: String, Sendable {
-    case plan
-    case fiveHours
-    case weekly
-    case trial
-}
-
-public struct AIQuotaSnapshot: Equatable, Sendable, Identifiable {
-    public var provider: AIProvider
-    public var window: AIQuotaWindow
-    public var usedPercent: Double
-    public var resetsAt: Date?
-    public var checkedAt: Date
-
-    public var id: String { "\(provider.rawValue)-\(window.rawValue)" }
-    public var remainingPercent: Double { max(0, 100 - usedPercent) }
-
-    public init(provider: AIProvider, window: AIQuotaWindow, usedPercent: Double, resetsAt: Date?, checkedAt: Date) {
-        self.provider = provider
-        self.window = window
-        self.usedPercent = usedPercent
-        self.resetsAt = resetsAt
-        self.checkedAt = checkedAt
-    }
-}
-
 public enum AIProgressStatus: String, Codable, Sendable {
     case queued
     case running

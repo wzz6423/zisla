@@ -67,6 +67,7 @@
 "PDF 工具" = "Strumenti PDF";
 "合并、拆分、加密与转换 PDF" = "Unisci, dividi, cripta e converti PDF";
 "系统状态与清理" = "Monitor Sistema e Pulizia";
+"监控系统资源与电池，并安全清理缓存和日志" = "Monitora le risorse di sistema e le batterie, e pulisci cache e registri in sicurezza";
 "监控资源并安全清理缓存和日志" = "Monitora risorse e pulisci in sicurezza cache e log";
 "显示 zisla 图标" = "Mostra Icona zisla";
 "关闭后不影响已启用的菜单栏监控项" = "Non influisce sugli elementi di monitoraggio della barra dei menu quando disattivato";
@@ -632,6 +633,8 @@
 "飞机" = "Aereo";
 "首页" = "Inizio";
 "7 天" = "7 giorni";
+"自动删除剪贴板历史" = "Elimina automaticamente la cronologia degli appunti";
+"按所选周期删除过期历史，常用项目继续保留" = "Elimina la cronologia scaduta dopo il periodo scelto; i preferiti vengono conservati";
 "上一页" = "Pagina precedente";
 "下一页" = "Pagina successiva";
 "不可用" = "Non disponibile";
@@ -3330,3 +3333,19 @@
 "监听麦克风" = "Ascolta il microfono";
 "使用耳机监听以避免回声" = "Usa le cuffie per evitare l’eco";
 "麦克风监听已关闭：%@" = "L’ascolto del microfono è stato disattivato: %@";
+
+"自动清理系统垃圾" = "Pulisci automaticamente i file inutili di sistema";
+"按所选间隔移入废纸篓，不会永久删除" = "Sposta gli elementi nel Cestino all’intervallo scelto, senza eliminarli definitivamente";
+"清理范围" = "Ambito della pulizia";
+"仅可信" = "Solo elementi affidabili";
+"全部（包含需人工复核）" = "Tutti (inclusi quelli da verificare)";
+"默认保存位置" = "Posizioni di salvataggio predefinite";
+"分别设置各类内容的默认保存位置。" = "Impostare la posizione di salvataggio predefinita per ogni tipo di contenuto.";
+"管理下载所需组件。" = "Gestire i componenti necessari per i download.";
+"更改 %@ 的保存位置" = "Cambia la posizione di salvataggio di %@";
+
+"本地优先的原生笔记应用" = "App nativa per le note che privilegia l’archiviazione locale";
+
+"保存手写备忘录需要辅助功能权限" = "Per salvare le note scritte a mano è necessario il permesso di accessibilità";
+"备忘录内容已变化，请重新打开后编辑" = "La nota è cambiata. Riaprila prima di modificarla";
+"无法保存手写备忘录的文本，请在备忘录中打开后重试" = "Impossibile salvare il testo della nota scritta a mano. Aprila in Note e riprova";

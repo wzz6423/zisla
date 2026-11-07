@@ -5,6 +5,56 @@ import Testing
 @testable import ZislaKit
 
 struct FeatureSettingsStoreTests {
+    @Test(arguments: [false, true], [false, true]) @MainActor
+    func combinedMonitorChoiceSurvivesLegacyLoadingRelaunchAndReset(systemEnabled: Bool, batteryEnabled: Bool) throws {
+        let suiteName = "Zisla.CombinedMonitor.\(UUID().uuidString)"
+        let defaults = try #require(UserDefaults(suiteName: suiteName))
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+        defaults.set(try JSONSerialization.data(withJSONObject: [
+            "systemMonitorEnabled": systemEnabled,
+            "batteryMonitorEnabled": batteryEnabled,
+            "mediaEnabled": false,
+        ]), forKey: "feature-settings-v1")
+
+        let store = FeatureSettingsStore(defaults: defaults)
+        #expect(store.settings.systemMonitorEnabled == systemEnabled)
+        #expect(!store.settings.mediaEnabled)
+        store.settings.systemMonitorEnabled.toggle()
+        store.flushPendingChanges()
+        let restored = FeatureSettingsStore(defaults: defaults)
+        #expect(restored.settings.systemMonitorEnabled == !systemEnabled)
+        #expect(!restored.settings.mediaEnabled)
+        let data = try #require(defaults.data(forKey: "feature-settings-v1"))
+        let object = try #require(JSONSerialization.jsonObject(with: data) as? [String: Any])
+        #expect(object["batteryMonitorEnabled"] == nil)
+        restored.reset()
+        restored.flushPendingChanges()
+        #expect(FeatureSettingsStore(defaults: defaults).settings.systemMonitorEnabled)
+    }
+
+    @Test @MainActor
+    func automaticSystemCleanupChoicesPersistAndResetWithoutChangingVoiceCleanup() throws {
+        let suite = "Zisla.SystemCleanupSettings.\(UUID().uuidString)"
+        let defaults = try #require(UserDefaults(suiteName: suite))
+        defer { defaults.removePersistentDomain(forName: suite) }
+        let store = FeatureSettingsStore(defaults: defaults)
+        store.settings.systemCleanupPolicy = .thirtyDays
+        store.settings.systemCleanupScope = .all
+        store.settings.voiceRecordingCleanupPolicy = .sevenDays
+        store.settings.systemMonitorEnabled = false
+        store.flushPendingChanges()
+        let restored = FeatureSettingsStore(defaults: defaults)
+        #expect(restored.settings == store.settings)
+        #expect(restored.settings.systemCleanupPolicy == .thirtyDays)
+        #expect(restored.settings.systemCleanupScope == .all)
+        #expect(restored.settings.voiceRecordingCleanupPolicy == .sevenDays)
+        restored.reset()
+        restored.flushPendingChanges()
+        let reset = FeatureSettingsStore(defaults: defaults)
+        #expect(reset.settings.systemCleanupPolicy == .never)
+        #expect(reset.settings.systemCleanupScope == .trustedOnly)
+    }
+
     @Test(arguments: IslandEdge.allCases) @MainActor
     func rememberedCustomPlacementSurvivesStoreRecreationAndReset(edge: IslandEdge) throws {
         let suiteName = "Zisla.IslandPlacement.\(UUID().uuidString)"

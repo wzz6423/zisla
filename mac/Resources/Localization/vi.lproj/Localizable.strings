@@ -67,6 +67,7 @@
 "PDF 工具" = "Công cụ PDF";
 "合并、拆分、加密与转换 PDF" = "Hợp nhất, tách, mã hóa và chuyển đổi PDF";
 "系统状态与清理" = "Giám sát Hệ thống và Dọn dẹp";
+"监控系统资源与电池，并安全清理缓存和日志" = "Giám sát tài nguyên hệ thống và pin, đồng thời dọn dẹp bộ nhớ đệm và nhật ký an toàn";
 "监控资源并安全清理缓存和日志" = "Giám sát tài nguyên và dọn dẹp bộ nhớ cache và nhật ký an toàn";
 "显示 zisla 图标" = "Hiển thị Biểu tượng zisla";
 "关闭后不影响已启用的菜单栏监控项" = "Không ảnh hưởng đến các mục giám sát thanh menu đã bật khi tắt";
@@ -632,6 +633,8 @@
 "飞机" = "Máy bay";
 "首页" = "Trang chủ";
 "7 天" = "7 ngày";
+"自动删除剪贴板历史" = "Tự động xóa lịch sử bảng nhớ tạm";
+"按所选周期删除过期历史，常用项目继续保留" = "Xóa lịch sử đã quá thời hạn đã chọn; các mục yêu thích được giữ lại";
 "上一页" = "Trước";
 "下一页" = "Sau";
 "不可用" = "Không khả dụng";
@@ -3330,3 +3333,19 @@
 "监听麦克风" = "Nghe âm thanh micrô";
 "使用耳机监听以避免回声" = "Dùng tai nghe khi nghe kiểm tra để tránh tiếng vọng";
 "麦克风监听已关闭：%@" = "Đã tắt nghe âm thanh micrô: %@";
+
+"自动清理系统垃圾" = "Tự động dọn tệp rác hệ thống";
+"按所选间隔移入废纸篓，不会永久删除" = "Chuyển các mục vào Thùng rác theo khoảng thời gian đã chọn, không xóa vĩnh viễn";
+"清理范围" = "Phạm vi dọn dẹp";
+"仅可信" = "Chỉ các mục đáng tin cậy";
+"全部（包含需人工复核）" = "Tất cả (kể cả các mục cần xem xét)";
+"默认保存位置" = "Vị trí lưu mặc định";
+"分别设置各类内容的默认保存位置。" = "Đặt vị trí lưu mặc định cho từng loại nội dung.";
+"管理下载所需组件。" = "Quản lý các thành phần cần thiết để tải xuống.";
+"更改 %@ 的保存位置" = "Đổi vị trí lưu cho %@";
+
+"本地优先的原生笔记应用" = "Ứng dụng ghi chú gốc ưu tiên lưu trữ cục bộ";
+
+"保存手写备忘录需要辅助功能权限" = "Cần quyền Trợ năng để lưu ghi chú viết tay";
+"备忘录内容已变化，请重新打开后编辑" = "Ghi chú đã thay đổi. Mở lại trước khi chỉnh sửa";
+"无法保存手写备忘录的文本，请在备忘录中打开后重试" = "Không thể lưu văn bản trong ghi chú viết tay. Mở trong Ghi chú rồi thử lại";

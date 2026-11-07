@@ -300,6 +300,220 @@ struct RichNoteEditorTests {
     }
 
     @Test
+    func preservesImageOnlyNotesAndImagesImmediatelyAfterTheTitle() async throws {
+        let image = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII="
+        for title in ["", "<h1>手写笔记</h1>"] {
+            try await withCopyEditor(
+                html: "\(title)<div><img src=\"\(image)\"></div><div><br></div>",
+                pasteboard: RejectingRichNotePasteboard(),
+                onCopy: {}
+            ) { webView, changes in
+                let sources = try #require(await webView.evaluateJavaScript(
+                    "[...document.querySelectorAll('#editor img')].map(image => image.getAttribute('src'))"
+                ) as? [String])
+                #expect(sources == [image], "An image-only paragraph is content, not a disposable blank line")
+                #expect(changes.changes.isEmpty, "Reading a handwriting preview must not save the note")
+            }
+        }
+    }
+
+    @Test
+    func editsBothSidesOfNativeHandwritingWithoutSavingHTMLOrChangingTheDrawing() async throws {
+        let image = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII="
+        let content = NotesAppBridge.NoteContent(plainText: "\u{FFFC}", bodyHTML: "<div><img src=\"\(image)\"></div>", requiresNativeTextEditing: true)
+        var edits: [NotesNativeTextEdit] = []
+        var htmlChanges = 0
+        let hosting = NSHostingView(rootView: RichNoteEditor(html: content.bodyHTML, noteID: "native", command: nil,
+            isEditable: true, nativeTextContent: content, onNativeTextChange: { id, edit in
+                #expect(id == "native")
+                edits.append(edit)
+            }, onChange: { _, _, _ in htmlChanges += 1 }).frame(width: 320, height: 240))
+        let window = NSWindow(contentRect: CGRect(x: 0, y: 0, width: 320, height: 240), styleMask: .borderless, backing: .buffered, defer: false)
+        window.isReleasedWhenClosed = false
+        window.contentView = hosting
+        defer { window.contentView = nil; window.close() }
+        let webView = try await waitForWebView(in: hosting)
+        try await waitUntilEditorIsReady(in: webView)
+        #expect(edits.isEmpty)
+        _ = try await webView.evaluateJavaScript("""
+            (() => { window.webkit.messageHandlers.richNoteChanged.postMessage({
+              html: '<div>invalid native payload</div>', token: window.zisla.documentToken()
+            }); return true; })()
+            """)
+        let result = try #require(await webView.evaluateJavaScript("""
+            (() => {
+              const editor = document.getElementById('editor');
+              const fields = editor.querySelectorAll('[data-zisla-native-text]');
+              const drawing = editor.querySelector('[data-zisla-native-content]');
+              const original = drawing.innerHTML;
+              const select = field => {
+                field.focus();
+                const range = document.createRange(); range.selectNodeContents(field); range.collapse(false);
+                const selection = window.getSelection(); selection.removeAllRanges(); selection.addRange(range);
+              };
+              select(fields[0]); window.zisla.exec('insertText', '标题\\n');
+              select(fields[1]); window.zisla.exec('insertText', '\\n结尾 👩‍💻');
+              const range = document.createRange(); range.selectNode(drawing);
+              const selection = window.getSelection(); selection.removeAllRanges(); selection.addRange(range);
+              window.zisla.exec('delete'); window.zisla.exec('bold'); window.zisla.block('h1');
+              range.setStart(fields[0], 0); range.setEnd(fields[1], fields[1].childNodes.length);
+              selection.removeAllRanges(); selection.addRange(range);
+              const input = new InputEvent('beforeinput', { bubbles: true, cancelable: true, inputType: 'deleteContentBackward' });
+              const cut = new ClipboardEvent('cut', { bubbles: true, cancelable: true });
+              const drop = new DragEvent('drop', { bubbles: true, cancelable: true });
+              fields[0].dispatchEvent(input); fields[0].dispatchEvent(cut); fields[0].dispatchEvent(drop);
+              return { unchanged: drawing.innerHTML === original, readonly: !drawing.isContentEditable,
+                       fields: [...fields].map(field => field.isContentEditable), source: drawing.querySelector('img').getAttribute('src'),
+                       protectedInput: input.defaultPrevented && cut.defaultPrevented && drop.defaultPrevented };
+            })()
+            """) as? [String: Any])
+        for _ in 0..<100 {
+            if !edits.isEmpty { break }
+            try await Task.sleep(for: .milliseconds(10))
+        }
+        let edit = try #require(edits.last)
+        #expect(edit.prefix == "标题\n")
+        #expect(edit.suffix == "\n结尾 👩‍💻")
+        #expect(edit.imageSources == [image])
+        #expect(edit.updatedPlainText == "标题\n\u{FFFC}\n结尾 👩‍💻")
+        #expect(htmlChanges == 0, "Native handwriting must never enter the destructive HTML save path")
+        #expect(result["unchanged"] as? Bool == true)
+        #expect(result["readonly"] as? Bool == true)
+        #expect(result["fields"] as? [Bool] == [true, true])
+        #expect(result["source"] as? String == image)
+        #expect(result["protectedInput"] as? Bool == true, "Selections across handwriting cannot be cut, replaced, or receive dropped content")
+    }
+
+    @Test
+    func nativeHandwritingPasteUsesOnlyPlainTextAndKeepsThePreview() async throws {
+        let content = NotesAppBridge.NoteContent(plainText: "前面\n\u{FFFC}\n后面", bodyHTML: "<div>前面</div><div><img src='data:image/png;base64,AAAA'></div><div>后面</div>", requiresNativeTextEditing: true)
+        var edit: NotesNativeTextEdit?
+        let hosting = NSHostingView(rootView: RichNoteEditor(html: content.bodyHTML, noteID: "native", command: nil,
+            isEditable: true, nativeTextContent: content, onNativeTextChange: { _, value in edit = value },
+            onChange: { _, _, _ in Issue.record("Native paste must not write HTML") }).frame(width: 320, height: 240))
+        let window = NSWindow(contentRect: CGRect(x: 0, y: 0, width: 320, height: 240), styleMask: .borderless, backing: .buffered, defer: false)
+        window.isReleasedWhenClosed = false
+        window.contentView = hosting
+        defer { window.contentView = nil; window.close() }
+        let webView = try await waitForWebView(in: hosting)
+        try await waitUntilEditorIsReady(in: webView)
+        let result = try #require(await webView.evaluateJavaScript("""
+            (() => {
+              const editor = document.getElementById('editor');
+              const field = editor.querySelector('[data-zisla-native-text]');
+              const fields = editor.querySelectorAll('[data-zisla-native-text]');
+              field.focus();
+              const range = document.createRange(); range.selectNodeContents(field); range.collapse(false);
+              const selection = window.getSelection(); selection.removeAllRanges(); selection.addRange(range);
+              const data = new DataTransfer(); data.setData('text/plain', '<b>粘贴</b>'); data.setData('text/html', '<img src="https://example.com">');
+              const event = new ClipboardEvent('paste', { bubbles: true, cancelable: true, clipboardData: data });
+              field.dispatchEvent(event);
+              window.zisla.setEditable(false);
+              const original = field.innerHTML;
+              window.zisla.exec('insertText', '不应插入');
+              return { prevented: event.defaultPrevented, imageCount: editor.querySelectorAll('img').length,
+                       fields: [...fields].map(field => field.isContentEditable), readonly: original === field.innerHTML };
+            })()
+            """) as? [String: Any])
+        for _ in 0..<100 {
+            if edit != nil { break }
+            try await Task.sleep(for: .milliseconds(10))
+        }
+        #expect(try #require(edit).prefix == "前面\n<b>粘贴</b>")
+        #expect(result["prevented"] as? Bool == true)
+        #expect(result["imageCount"] as? Int == 1)
+        #expect(result["fields"] as? [Bool] == [false, false])
+        #expect(result["readonly"] as? Bool == true)
+    }
+
+    @Test
+    func nativeTextKeepsBlankLinesUnicodeAndLiteralHTMLThroughEditingAndUndo() async throws {
+        let content = NotesAppBridge.NoteContent(plainText: "\u{FFFC}", bodyHTML: "<img src='data:image/png;base64,AAAA'>", requiresNativeTextEditing: true)
+        var edits: [NotesNativeTextEdit] = []
+        let hosting = NSHostingView(rootView: RichNoteEditor(html: content.bodyHTML, noteID: "native", command: nil,
+            isEditable: true, nativeTextContent: content, onNativeTextChange: { _, edit in edits.append(edit) },
+            onChange: { _, _, _ in Issue.record("Native text must not write HTML") }).frame(width: 320, height: 240))
+        let window = NSWindow(contentRect: CGRect(x: 0, y: 0, width: 320, height: 240), styleMask: .borderless, backing: .buffered, defer: false)
+        window.isReleasedWhenClosed = false
+        window.contentView = hosting
+        defer { window.contentView = nil; window.close() }
+        let webView = try await waitForWebView(in: hosting)
+        try await waitUntilEditorIsReady(in: webView)
+        for text in ["", "\n", "\n\n", "文字\n", "文字\n\n", "第一行\n\n第三行\n\n", "  <b>&👩‍💻 العربية\t"] {
+            let config = String(decoding: try JSONSerialization.data(withJSONObject: ["prefix": text, "suffix": text, "protectedText": "\u{FFFC}"]), as: UTF8.self)
+            let count = edits.count
+            _ = try await webView.evaluateJavaScript("""
+                (() => {
+                  window.zisla.setHTML("<img src='data:image/png;base64,AAAA'>", window.zisla.documentToken(), \(config));
+                  const field = document.querySelectorAll('[data-zisla-native-text]')[1]; field.focus();
+                  const range = document.createRange(); range.selectNodeContents(field); range.collapse(false);
+                  const selection = window.getSelection(); selection.removeAllRanges(); selection.addRange(range);
+                  window.zisla.exec('insertText', '!');
+                })()
+                """)
+            for _ in 0..<100 {
+                if edits.count > count { break }
+                try await Task.sleep(for: .milliseconds(10))
+            }
+            let edit = try #require(edits.last)
+            #expect(edit.prefix == text, "Editing the suffix must preserve every prefix character: \(String(reflecting: text))")
+            #expect(edit.suffix == text + "!", "Native text must round-trip literal text and blank lines")
+        }
+        let text = try #require(edits.last?.suffix)
+        let result = try #require(await webView.evaluateJavaScript("""
+            (() => {
+              const field = document.querySelectorAll('[data-zisla-native-text]')[1];
+              window.zisla.exec('undo'); const undone = field.innerText;
+              window.zisla.exec('redo'); return { undone, redone: field.innerText };
+            })()
+            """) as? [String: String])
+        #expect(result["undone"] == String(text.dropLast()))
+        #expect(result["redone"] == text)
+    }
+
+    @Test
+    func delayedNativeEditsKeepTheirNoteIdentityWhenSwitchingDocuments() async throws {
+        let first = NotesAppBridge.NoteContent(plainText: "前面\n\u{FFFC}\n后面", bodyHTML: "<img src='data:image/png;base64,AAAA'>", requiresNativeTextEditing: true)
+        let second = NotesAppBridge.NoteContent(plainText: "第二条\u{FFFC}", bodyHTML: first.bodyHTML, requiresNativeTextEditing: true)
+        var edits: [(String?, NotesNativeTextEdit)] = []
+        let coordinator = RichNoteEditor.Coordinator(onChange: { _, _, _ in Issue.record("Native callbacks must not write HTML") },
+            onNativeTextChange: { edits.append(($0, $1)) }, onCopy: nil,
+            pasteboard: RejectingRichNotePasteboard(), isEditable: true)
+        let configuration = WKWebViewConfiguration()
+        configuration.userContentController.add(coordinator, name: "richNoteChanged")
+        let webView = WKWebView(frame: CGRect(x: 0, y: 0, width: 320, height: 240), configuration: configuration)
+        webView.navigationDelegate = coordinator
+        coordinator.attach(webView)
+        defer { configuration.userContentController.removeScriptMessageHandler(forName: "richNoteChanged") }
+        coordinator.setDocument(noteID: "first", html: first.bodyHTML, nativeTextContent: first)
+        try await waitUntilEditorIsReady(in: webView)
+        _ = try await webView.evaluateJavaScript("""
+            (() => {
+              const field = document.querySelectorAll('[data-zisla-native-text]')[1]; field.focus();
+              const range = document.createRange(); range.selectNodeContents(field); range.collapse(false);
+              const selection = window.getSelection(); selection.removeAllRanges(); selection.addRange(range);
+              window.zisla.exec('insertText', '更新');
+            })()
+            """)
+        coordinator.setDocument(noteID: "second", html: second.bodyHTML, nativeTextContent: second)
+        for _ in 0..<100 {
+            if !edits.isEmpty { break }
+            try await Task.sleep(for: .milliseconds(10))
+        }
+        let edit = try #require(edits.first)
+        #expect(edit.0 == "first")
+        #expect(edit.1.originalPlainText == first.plainText)
+        #expect(edit.1.suffix == "\n后面更新")
+        #expect(try await editorText(in: webView).contains("第二条"))
+        coordinator.setDocument(noteID: "first", html: first.bodyHTML, nativeTextContent: first)
+        for _ in 0..<100 {
+            if try await editorText(in: webView).contains("前面") { break }
+            try await Task.sleep(for: .milliseconds(10))
+        }
+        #expect(try await editorText(in: webView).contains("前面"), "Notes with the same preview must still reload their own edge text")
+    }
+
+    @Test
     func restoresNotesAttachmentPlaceholderAsRenderableImage() throws {
         let content = NotesAppBridge.NoteContent(
             plainText: "正文\n￼\n结尾",

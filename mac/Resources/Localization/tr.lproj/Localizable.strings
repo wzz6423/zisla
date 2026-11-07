@@ -67,6 +67,7 @@
 "PDF 工具" = "PDF Araçları";
 "合并、拆分、加密与转换 PDF" = "PDF'leri birleştir, ayır, şifrele ve dönüştür";
 "系统状态与清理" = "Sistem İzleme ve Temizlik";
+"监控系统资源与电池，并安全清理缓存和日志" = "Sistem kaynaklarını ve pilleri izleyin, önbellekleri ve günlükleri güvenle temizleyin";
 "监控资源并安全清理缓存和日志" = "Kaynakları izle ve önbellek ile günlükleri güvenle temizle";
 "显示 zisla 图标" = "zisla Simgesini Göster";
 "关闭后不影响已启用的菜单栏监控项" = "Kapalıyken etkinleştirilmiş menü çubuğu izleme öğelerini etkilemez";
@@ -632,6 +633,8 @@
 "飞机" = "Uçak";
 "首页" = "Ana sayfa";
 "7 天" = "7 gün";
+"自动删除剪贴板历史" = "Pano geçmişini otomatik sil";
+"按所选周期删除过期历史，常用项目继续保留" = "Seçilen süreyi aşan geçmişi sil; favoriler korunur";
 "上一页" = "Önceki";
 "下一页" = "Sonraki";
 "不可用" = "Kullanılamaz";
@@ -3330,3 +3333,19 @@
 "监听麦克风" = "Mikrofonu Dinle";
 "使用耳机监听以避免回声" = "Yankıyı önlemek için kulaklık kullanın";
 "麦克风监听已关闭：%@" = "Mikrofon dinleme kapatıldı: %@";
+
+"自动清理系统垃圾" = "Sistem gereksiz dosyalarını otomatik temizle";
+"按所选间隔移入废纸篓，不会永久删除" = "Öğeleri seçilen aralıkta Çöp Sepeti’ne taşı; kalıcı olarak silme";
+"清理范围" = "Temizleme kapsamı";
+"仅可信" = "Yalnızca güvenilir öğeler";
+"全部（包含需人工复核）" = "Tümü (incelenmesi gerekenler dahil)";
+"默认保存位置" = "Varsayılan Kayıt Konumları";
+"分别设置各类内容的默认保存位置。" = "Her içerik türü için varsayılan kayıt konumunu ayarlayın.";
+"管理下载所需组件。" = "İndirmeler için gereken bileşenleri yönetin.";
+"更改 %@ 的保存位置" = "%@ için kayıt konumunu değiştir";
+
+"本地优先的原生笔记应用" = "Yerel depolamayı önceliklendiren platforma özgü not uygulaması";
+
+"保存手写备忘录需要辅助功能权限" = "El yazısı notları kaydetmek için Erişilebilirlik izni gerekir";
+"备忘录内容已变化，请重新打开后编辑" = "Not değişti. Düzenlemeden önce yeniden açın";
+"无法保存手写备忘录的文本，请在备忘录中打开后重试" = "El yazısı nottaki metin kaydedilemedi. Notlar’da açıp yeniden deneyin";

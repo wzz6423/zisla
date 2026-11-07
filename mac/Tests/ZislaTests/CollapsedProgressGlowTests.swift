@@ -133,24 +133,58 @@ struct CollapsedProgressGlowTests {
         #expect(Self.lit(pixels, width: 180, x: 150...154, y: 31...33))
     }
 
-    @Test
+    @Test(arguments: [0.25, 0.5, 1.0], [false, true])
     @MainActor
-    func recordingProgressKeepsItsOutlineWhileNotchMediaIsWaiting() throws {
-        let pixels = try Self.playbackPixels(progress: 0.5, style: .notch, placement: IslandPlacement(),
-                                             recordingProgress: 1)
-        #expect(Self.lit(pixels, width: 180, x: 88...92, y: 0...4))
-        #expect(Self.lit(pixels, width: 180, x: 0...4, y: 15...19))
-        #expect(Self.lit(pixels, width: 180, x: 175...179, y: 15...19))
+    func notchRecordingProgressFillsOnlyTheBottomWithAndWithoutMedia(progress: Double, includesMedia: Bool) throws {
+        let pixels = try Self.playbackPixels(progress: 0.1, style: .notch, placement: IslandPlacement(),
+                                             recordingProgress: progress, includesMedia: includesMedia)
+        #expect(pixels[..<(180 * 31)].allSatisfy { $0 < 0.02 },
+                "Notch exports must leave the top and side edges clear even when music is waiting")
+        let filledEnd = Int(180 * progress) - 5
+        #expect(Self.lit(pixels, width: 180, x: filledEnd - 2...filledEnd, y: 31...33),
+                "The bottom bar must use export progress instead of the waiting playback fraction")
+        if progress < 1 {
+            let unfilled = Int(180 * progress) + 4
+            #expect(!Self.lit(pixels, width: 180, x: unfilled...179, y: 31...33))
+        }
     }
 
-    @Test(arguments: ["browser-download-progress", "video-download-progress"])
+    @Test(arguments: ["browser-download-progress", "video-download-progress"], [0.25, 0.5, 1.0])
     @MainActor
-    func downloadProgressKeepsTheNotchOutline(noticeID: String) throws {
-        let pixels = try Self.playbackPixels(progress: 1, style: .notch, placement: IslandPlacement(),
+    func notchDownloadProgressFillsFromLeftToRightOnlyAtTheBottom(noticeID: String, progress: Double) throws {
+        let pixels = try Self.playbackPixels(progress: progress, style: .notch, placement: IslandPlacement(),
                                              downloadNoticeID: noticeID)
-        #expect(Self.lit(pixels, width: 180, x: 88...92, y: 0...4))
-        #expect(Self.lit(pixels, width: 180, x: 0...4, y: 15...19))
-        #expect(Self.lit(pixels, width: 180, x: 175...179, y: 15...19))
+        #expect(pixels[..<(180 * 31)].allSatisfy { $0 < 0.02 },
+                "Notch downloads must leave the top and side edges clear")
+        #expect(Self.lit(pixels, width: 180, x: 22...26, y: 31...33))
+        if progress < 1 {
+            let unfilled = Int(180 * progress) + 4
+            #expect(!Self.lit(pixels, width: 180, x: unfilled...179, y: 31...33))
+        }
+    }
+
+    @Test(arguments: ["screen-recording-operation-progress", "browser-download-progress", "video-download-progress"],
+          [IslandPlacement()] + IslandEdge.allCases.map { IslandPlacement(mode: .custom, edge: $0) })
+    @MainActor
+    func pillExportAndDownloadProgressKeepTheClockwiseOutline(noticeID: String, placement: IslandPlacement) throws {
+        let recording = noticeID.hasPrefix(ScreenRecordingOperationNotice.prefix)
+        let full = try Self.playbackPixels(progress: 1, style: .pill, placement: placement,
+            recordingProgress: recording ? 1 : nil, downloadNoticeID: recording ? nil : noticeID, includesMedia: false)
+        let half = try Self.playbackPixels(progress: 0.5, style: .pill, placement: placement,
+            recordingProgress: recording ? 0.5 : nil, downloadNoticeID: recording ? nil : noticeID, includesMedia: false)
+        let size = placement.edge.isVertical ? CGSize(width: 34, height: 180) : CGSize(width: 180, height: 34)
+        let width = Int(size.width)
+        let height = Int(size.height)
+        let middleX = width / 2
+        let middleY = height / 2
+
+        #expect(Self.lit(full, width: width, x: middleX - 2...middleX + 2, y: 0...4))
+        #expect(Self.lit(full, width: width, x: middleX - 2...middleX + 2, y: height - 5...height - 1))
+        #expect(Self.lit(full, width: width, x: 0...4, y: middleY - 2...middleY + 2))
+        #expect(Self.lit(full, width: width, x: width - 5...width - 1, y: middleY - 2...middleY + 2))
+        #expect(!Self.lit(full, width: width, x: middleX - 3...middleX + 3, y: middleY - 3...middleY + 3))
+        #expect(Self.lit(half, width: width, x: width - 5...width - 1, y: middleY - 2...middleY + 2))
+        #expect(!Self.lit(half, width: width, x: 0...4, y: middleY - 2...middleY + 2))
     }
 
     @Test
@@ -558,7 +592,7 @@ struct CollapsedProgressGlowTests {
     @MainActor
     private static func playbackPixels(
         progress: Double, style: IslandLayoutStyle, placement: IslandPlacement,
-        recordingProgress: Double? = nil, downloadNoticeID: String? = nil
+        recordingProgress: Double? = nil, downloadNoticeID: String? = nil, includesMedia: Bool = true
     ) throws -> [Double] {
         let suiteName = "Zisla.PlaybackProgress.\(UUID().uuidString)"
         let defaults = try #require(UserDefaults(suiteName: suiteName))
@@ -570,12 +604,16 @@ struct CollapsedProgressGlowTests {
         let date = Date(timeIntervalSince1970: 100)
         let media = NowPlayingService(loadLyrics: { _, _, _ in .init(lyrics: nil, artistName: nil) })
         defer { media.publishSnapshot(nil) }
-        media.publishSnapshot(NowPlayingSnapshot(title: "Track", artist: "Artist", album: nil, artworkData: nil,
-            duration: 100, elapsedTime: progress * 100, timestamp: date, isPlaying: true))
+        if includesMedia {
+            media.publishSnapshot(NowPlayingSnapshot(title: "Track", artist: "Artist", album: nil, artworkData: nil,
+                duration: 100, elapsedTime: progress * 100, timestamp: date, isPlaying: true))
+        }
         let queue = SideNoticeQueue()
         defer { queue.removeAll() }
-        queue.enqueue(IslandNotice(id: downloadNoticeID ?? "media-active-progress", title: "Track", side: .left,
-                                  progress: downloadNoticeID == nil ? nil : progress), expiresAfter: nil)
+        if includesMedia || downloadNoticeID != nil {
+            queue.enqueue(IslandNotice(id: downloadNoticeID ?? "media-active-progress", title: "Track", side: .left,
+                                      progress: downloadNoticeID == nil ? nil : progress), expiresAfter: nil)
+        }
         if let recordingProgress {
             queue.enqueue(IslandNotice(id: "screen-recording-operation-progress", title: "Recording",
                                       progress: recordingProgress), expiresAfter: nil)

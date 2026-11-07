@@ -71,15 +71,23 @@ enum SettingsSearchIndex {
         rows(.features, [
             "每日简报",
             "显示推荐工具", "媒体播放", "Mac 未使用时关闭背景音", "中转站", "晃动唤出中转窗口",
-            "链接下载", "剪贴板历史", "剪贴板链接检测", "快捷操作", "日历日程", "天气", "邮件",
+            "链接下载", "剪贴板历史", "自动删除剪贴板历史", "剪贴板链接检测", "快捷操作", "日历日程", "天气", "邮件",
             "侧翼通知", "锁屏信息", "专注倒计时", "工具箱提醒", "用户关怀", "AI 进度与用量", "AI 任务结果扫光",
-            "语音输入", "窗口预览", "小工具", "随记", "PDF 工具", "应用音量混音器", "系统状态与清理", "电池监控",
+            "语音输入", "窗口预览", "小工具", "随记", "PDF 工具", "应用音量混音器",
             "键盘音效", "合盖动画", "预览动画", "启用截图", "鼠标移入展开", "显示 zisla 图标",
             "始终置顶", "提示条进度光效", "浏览器下载进度", "原生下载进度", "静音 Zisla 通知",
             "宠物", "自动检查更新", "自动下载更新",
         ])
+        entry(.features, "系统状态与清理", anchor: .row("系统状态与清理"),
+              keywords: ["电池监控"])
         if settings.recommendedToolsEnabled {
             rows(.features, ["自动更新推荐工具"])
+        }
+        if settings.systemMonitorEnabled {
+            entry(.features, "自动清理系统垃圾", anchor: .row("自动清理系统垃圾"),
+                  keywords: ["系统状态与清理"] + VoiceRecordingCleanupPolicy.allCases.map(\.menuTitle))
+            entry(.features, "清理范围", anchor: .row("清理范围"),
+                  keywords: ["自动清理系统垃圾"] + SystemCleanupScope.allCases.map(\.menuTitle))
         }
         entry(.features, "工具", anchor: .group("工具"), keywords: ["恢复默认顺序"] + IslandModuleOrder.allCases.map(\.title))
 
@@ -158,7 +166,12 @@ enum SettingsSearchIndex {
         rows(.mail, ["新邮件展示"])
         entry(.mail, "邮件账户", anchor: .group("邮件"))
         rows(.keyboardSound, ["键盘音色", "键盘音量", "播放键盘回弹音", "自然音高变化", "记录本地输入统计"])
-        rows(.download, ["默认下载目录", ManagedTool.ytDLP.displayName, ManagedTool.libreOffice.displayName])
+        rows(.download, [ManagedTool.ytDLP.displayName, ManagedTool.libreOffice.displayName])
+        for location in SaveLocation.allCases {
+            entry(.saveLocations, location.title, anchor: .row(location.title),
+                  keywords: ["默认保存位置", "更改保存位置"]
+                    + (location == .download ? ["默认下载目录", "下载目录"] : []))
+        }
         entry(.weather, "地点", anchor: .group("地点"), keywords: ["城市、区县或地区", "搜索地区"])
         rows(.weather, ["天气数据"])
         rows(.networkProxy, ["代理链接", "启用本地代理", "代理状态"])

@@ -67,6 +67,7 @@
 "PDF 工具" = "PDF-Tools";
 "合并、拆分、加密与转换 PDF" = "PDFs zusammenführen, teilen, verschlüsseln und konvertieren";
 "系统状态与清理" = "Systemmonitor und Bereinigung";
+"监控系统资源与电池，并安全清理缓存和日志" = "Systemressourcen und Akkus überwachen sowie Caches und Protokolle sicher bereinigen";
 "监控资源并安全清理缓存和日志" = "Ressourcen überwachen und Caches sowie Protokolle sicher bereinigen";
 
 "显示 zisla 图标" = "zisla-Symbol anzeigen";
@@ -633,6 +634,8 @@
 "飞机" = "Flugzeug";
 "首页" = "Start";
 "7 天" = "7 Tage";
+"自动删除剪贴板历史" = "Zwischenablageverlauf automatisch löschen";
+"按所选周期删除过期历史，常用项目继续保留" = "Abgelaufenen Verlauf nach dem gewählten Zeitraum löschen; Favoriten bleiben erhalten";
 "上一页" = "Vorherige Seite";
 "下一页" = "Nächste Seite";
 "不可用" = "Nicht verfügbar";
@@ -3331,3 +3334,19 @@
 "监听麦克风" = "Mikrofon mithören";
 "使用耳机监听以避免回声" = "Kopfhörer zum Mithören verwenden, um Echo zu vermeiden";
 "麦克风监听已关闭：%@" = "Mikrofon-Mithören wurde deaktiviert: %@";
+
+"自动清理系统垃圾" = "Systemdatenmüll automatisch bereinigen";
+"按所选间隔移入废纸篓，不会永久删除" = "Im gewählten Intervall in den Papierkorb verschieben, ohne dauerhaftes Löschen";
+"清理范围" = "Bereinigungsumfang";
+"仅可信" = "Nur vertrauenswürdige Einträge";
+"全部（包含需人工复核）" = "Alle (einschließlich zu prüfender Einträge)";
+"默认保存位置" = "Standard-Speicherorte";
+"分别设置各类内容的默认保存位置。" = "Den Standard-Speicherort für jeden Inhaltstyp festlegen.";
+"管理下载所需组件。" = "Die für Downloads erforderlichen Komponenten verwalten.";
+"更改 %@ 的保存位置" = "Speicherort für %@ ändern";
+
+"本地优先的原生笔记应用" = "Native Notiz-App mit vorrangig lokaler Speicherung";
+
+"保存手写备忘录需要辅助功能权限" = "Zum Speichern handschriftlicher Notizen ist der Zugriff auf Bedienungshilfen erforderlich";
+"备忘录内容已变化，请重新打开后编辑" = "Die Notiz wurde geändert. Öffne sie vor dem Bearbeiten erneut";
+"无法保存手写备忘录的文本，请在备忘录中打开后重试" = "Der Text der handschriftlichen Notiz konnte nicht gespeichert werden. Öffne sie in Notizen und versuche es erneut";

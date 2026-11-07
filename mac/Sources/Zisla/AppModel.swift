@@ -115,7 +115,7 @@ extension IslandModule {
     case .quickNotes: settings.quickNotesEnabled
     case .volumeMixer: settings.volumeMixerEnabled
     case .toolbox: settings.toolboxEnabled
-    case .system, .battery: settings.systemMonitorEnabled || settings.batteryMonitorEnabled
+    case .system, .battery: settings.systemMonitorEnabled
     case .lockScreen: settings.lockScreenInfoEnabled
     case .keyboardSound: settings.keyboardEnabled
     }
@@ -458,9 +458,8 @@ final class AppModel: ObservableObject {
       selectedDownloadFormat = nil
     }
   }
-  @Published var downloadDirectory = AppPaths.downloads
-  private let downloadDirectoryStore = ScreenRecordingOutputDirectoryStore(
-    bookmarkKey: "download-directory-bookmark", pathKey: nil)
+  let saveLocations = SaveLocationStore()
+  var downloadDirectory: URL { saveLocations[.download] }
   @Published var downloadState: DownloadUIState = .idle
   @Published private(set) var activeDownloads: [DownloadTaskSnapshot] = []
   @Published private(set) var downloadFormats: [DownloadFormat] = []
@@ -555,6 +554,13 @@ final class AppModel: ObservableObject {
   private(set) lazy var systemMonitor = SystemMonitorService(batterySnapshotProvider: { [weak self] in
     self?.battery.snapshot
   })
+  private(set) lazy var systemAutoCleanup: SystemAutoCleanupService = {
+    let monitor = systemMonitor
+    return SystemAutoCleanupService(
+      scan: { await monitor.scanCleanupCandidates(kinds: $0, options: $1) },
+      trash: { await monitor.trashSelected($0) }
+    )
+  }()
   let backgroundSounds = SystemBackgroundSoundService()
   let battery = BatteryMonitor()
   private lazy var lowBatteryNotice = LowBatteryNoticeController(queue: notices)
@@ -580,6 +586,7 @@ final class AppModel: ObservableObject {
   /// Integrated keyboard sound engine and local typing statistics.
   let keyboardSound = KeyboardSoundController()
   private(set) lazy var dailyBriefing = DailyBriefingController(
+    saveLocations: saveLocations,
     observation: { [unowned self] date in self.dailyBriefingObservation(at: date) },
     typing: { [unowned self] date in
       guard self.settingsStore.settings.keyboardTypingStatsEnabled,
@@ -743,12 +750,11 @@ final class AppModel: ObservableObject {
         throttlesNoteUpdates: event == .updated
       )
     }
-    restoreDownloadDirectory()
     languageStore.$language.dropFirst()
       .sink { [weak self] language in
         guard let self else { return }
         self.dailyBriefing.configure(settings: self.settingsStore.settings.dailyBriefing,
-          directory: self.downloadDirectory, language: language)
+          directory: self.saveLocations[.dailyBriefing], language: language)
       }
       .store(in: &cancellables)
     clipboardHistoryMonitor.onContentCaptured = { [weak self] content in
@@ -845,6 +851,7 @@ final class AppModel: ObservableObject {
       managedTools.objectWillChange,
       keyboardSound.objectWillChange,
       dailyBriefing.objectWillChange,
+      saveLocations.objectWillChange,
     ]
     for publisher in childPublishers {
       publisher
@@ -900,11 +907,11 @@ final class AppModel: ObservableObject {
           let settings = self.settingsStore.settings
           self.lowBatteryNotice.update(
             snapshot: self.battery.snapshot,
-            enabled: settings.batteryMonitorEnabled && settings.sideNoticesEnabled
+            enabled: settings.systemMonitorEnabled && settings.sideNoticesEnabled
           )
           self.lowBatteryNotice.update(
             devices: self.networkBattery.devices,
-            enabled: settings.batteryMonitorEnabled && settings.sideNoticesEnabled
+            enabled: settings.systemMonitorEnabled && settings.sideNoticesEnabled
           )
         }
       }
@@ -1193,6 +1200,7 @@ final class AppModel: ObservableObject {
     managedTools.setAutomaticUpdatesEnabled(false)
     keyboardSound.stop()
     clipboardHistory.flushPendingChanges()
+    clipboardHistory.stopCleanup()
     aiAgent.store.flushPendingChanges()
     weatherTask?.cancel()
     weatherExpiryTask?.cancel()
@@ -1239,6 +1247,7 @@ final class AppModel: ObservableObject {
     screenCleaning.stopAll()
     cleaningPowerState = nil
     powerAssertions.releaseAll()
+    systemAutoCleanup.stop()
     systemMonitor.stop()
     battery.stop()
     networkBattery.stop()
@@ -1366,7 +1375,7 @@ final class AppModel: ObservableObject {
       if settings.aiProgressEnabled, module != .aiMonitor { self.aiMonitor.refresh() }
       if settings.weatherEnabled, weatherStale { self.refreshWeather() }
       if settings.systemMonitorEnabled { await self.systemMonitor.sampleOnce() }
-      if settings.lockScreenInfoEnabled || settings.batteryMonitorEnabled {
+      if settings.lockScreenInfoEnabled || settings.systemMonitorEnabled {
         self.battery.refresh()
       }
       if settings.mailEnabled, module == .mail { await self.mail.refresh(checkForNewMail: false) }
@@ -2510,7 +2519,7 @@ final class AppModel: ObservableObject {
     let destination: URL
     if settingsStore.settings.clipboardAssistantPromptsForImageSaveLocation {
       let panel = NSSavePanel()
-      panel.directoryURL = downloadDirectory
+      panel.directoryURL = saveLocations[.quickActions]
       panel.nameFieldStringValue = name
       panel.allowedContentTypes = [.png]
       panel.canCreateDirectories = true
@@ -2519,7 +2528,7 @@ final class AppModel: ObservableObject {
       guard panel.runModal() == .OK, let url = panel.url else { return }
       destination = url
     } else {
-      destination = downloadDirectory.appendingPathComponent(name)
+      destination = saveLocations[.quickActions].appendingPathComponent(name)
     }
 
     let directory = destination.deletingLastPathComponent()
@@ -2542,7 +2551,7 @@ final class AppModel: ObservableObject {
     let destination: URL
     if settingsStore.settings.clipboardAssistantPromptsForImageSaveLocation {
       let panel = NSSavePanel()
-      panel.directoryURL = downloadDirectory
+      panel.directoryURL = saveLocations[.quickActions]
       panel.nameFieldStringValue = name
       panel.allowedContentTypes = [.plainText]
       panel.canCreateDirectories = true
@@ -2551,7 +2560,7 @@ final class AppModel: ObservableObject {
       guard panel.runModal() == .OK, let url = panel.url else { return }
       destination = url
     } else {
-      destination = downloadDirectory.appendingPathComponent(name)
+      destination = saveLocations[.quickActions].appendingPathComponent(name)
     }
 
     let directory = destination.deletingLastPathComponent()
@@ -3148,7 +3157,7 @@ final class AppModel: ObservableObject {
   }
 
   private func apply(settings: FeatureSettings, requestWindowPreviewPermissions: Bool = false) {
-    dailyBriefing.configure(settings: settings.dailyBriefing, directory: downloadDirectory,
+    dailyBriefing.configure(settings: settings.dailyBriefing, directory: saveLocations[.dailyBriefing],
       language: languageStore.language)
     if !settings.aiProgressEnabled || !settings.aiTaskResultSweepEnabled {
       aiResultSweep.cancel()
@@ -3175,6 +3184,7 @@ final class AppModel: ObservableObject {
       settings.recommendedToolsEnabled && settings.recommendedToolsAutomaticUpdatesEnabled
     )
     configureVoiceRecordingCleanup(policy: settings.voiceRecordingCleanupPolicy)
+    clipboardHistory.configureCleanup(policy: settings.clipboardHistoryCleanupPolicy)
     if settings.aiProgressEnabled {
       aiMonitor.start()
       if selectedModule == .aiMonitor {
@@ -3205,9 +3215,10 @@ final class AppModel: ObservableObject {
       weatherSnapshotsByLocationID = [:]
     }
     systemMonitor.setHistoryRecordingEnabled(
-      (settings.systemMonitorEnabled || settings.batteryMonitorEnabled) && settings.systemMetricsHistoryEnabled
+      settings.systemMonitorEnabled && settings.systemMetricsHistoryEnabled
     )
-    if settings.systemMonitorEnabled || settings.batteryMonitorEnabled || settings.dailyBriefing.enabled {
+    systemAutoCleanup.apply(settings: settings)
+    if settings.systemMonitorEnabled || settings.dailyBriefing.enabled {
       systemMonitor.start()
     } else {
       systemMonitor.stop()
@@ -3252,20 +3263,20 @@ final class AppModel: ObservableObject {
       browserDownloads.stop()
       clearBrowserDownloadNotices()
     }
-    if settings.lockScreenInfoEnabled || settings.batteryMonitorEnabled || settings.systemMonitorEnabled || settings.dailyBriefing.enabled {
+    if settings.lockScreenInfoEnabled || settings.systemMonitorEnabled || settings.dailyBriefing.enabled {
       battery.start()
     } else {
       battery.stop()
     }
     lowBatteryNotice.update(
       snapshot: battery.snapshot,
-      enabled: settings.batteryMonitorEnabled && settings.sideNoticesEnabled
+      enabled: settings.systemMonitorEnabled && settings.sideNoticesEnabled
     )
     lowBatteryNotice.update(
       devices: networkBattery.devices,
-      enabled: settings.batteryMonitorEnabled && settings.sideNoticesEnabled
+      enabled: settings.systemMonitorEnabled && settings.sideNoticesEnabled
     )
-    if settings.batteryMonitorEnabled {
+    if settings.systemMonitorEnabled {
       networkBattery.start()
     } else {
       networkBattery.stop()
@@ -4575,38 +4586,8 @@ final class AppModel: ObservableObject {
     }
   }
 
-  private func restoreDownloadDirectory() {
-    guard let data = UserDefaults.standard.data(forKey: "download-directory-bookmark") else {
-      return
-    }
-    var stale = false
-    guard
-      let url = try? URL(
-        resolvingBookmarkData: data,
-        options: [.withSecurityScope, .withoutUI],
-        relativeTo: nil,
-        bookmarkDataIsStale: &stale
-      )
-    else {
-      return
-    }
-    downloadDirectory = url
-    if stale,
-      let bookmark = try? url.bookmarkData(
-        options: .withSecurityScope,
-        includingResourceValuesForKeys: nil,
-        relativeTo: nil
-      )
-    {
-      UserDefaults.standard.set(bookmark, forKey: "download-directory-bookmark")
-    }
-  }
-
   func setDownloadDirectory(_ url: URL) throws {
-    try downloadDirectoryStore.setDirectory(url)
-    downloadDirectory = downloadDirectoryStore.directory
-    dailyBriefing.configure(settings: settingsStore.settings.dailyBriefing, directory: downloadDirectory,
-      language: languageStore.language)
+    try saveLocations.setDirectory(url, for: .download)
   }
 
   private func dailyBriefingObservation(at date: Date) -> DailyBriefingObservation {
