@@ -3313,3 +3313,7 @@
 "权限" = "Permessi";
 "管理 zisla 使用的系统权限。" = "Gestisci i permessi di sistema utilizzati da zisla.";
 "请在设置的“权限”页面管理授权。" = "Gestisci l’accesso nella pagina Permessi delle impostazioni.";
+"默认保存位置" = "Posizioni di salvataggio predefinite";
+"分别设置各类内容的默认保存位置。" = "Impostare la posizione di salvataggio predefinita per ogni tipo di contenuto.";
+"管理下载所需组件。" = "Gestire i componenti necessari per i download.";
+"更改 %@ 的保存位置" = "Cambia la posizione di salvataggio di %@";

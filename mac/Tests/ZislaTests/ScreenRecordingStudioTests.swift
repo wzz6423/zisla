@@ -31,8 +31,7 @@ struct ScreenRecordingStudioTests {
 
     private func fixture(capture: ScreenRecordingService = ScreenRecordingService(),
                          outputDirectoryStore: ScreenRecordingOutputDirectoryStore = ScreenRecordingOutputDirectoryStore(),
-                         downloadDirectoryPublisher: AnyPublisher<URL, Never>? = nil,
-                         setDownloadDirectory: ((URL) throws -> Void)? = nil,
+                         saveLocations: SaveLocationStore? = nil,
                          aiCompletion: ((ScreenRecordingProject, String, AIModelConfigurationReference?) async throws -> String)? = nil,
                          preview: ((ScreenRecordingProject, URL, Double) async throws -> CGImage)? = nil,
                          onError: ((String) -> Void)? = nil) throws -> (ScreenRecordingStudioModel, URL, ScreenRecordingProject) {
@@ -44,7 +43,7 @@ struct ScreenRecordingStudioTests {
         let project = ScreenRecordingProject(name: "Demo", videoFile: "screen.mp4", duration: 10, width: 64, height: 48)
         try store.save(project, in: directory)
         let model = ScreenRecordingStudioModel(capture: capture, projectStore: store, outputDirectoryStore: outputDirectoryStore,
-            downloadDirectoryPublisher: downloadDirectoryPublisher, setDownloadDirectory: setDownloadDirectory,
+            saveLocations: saveLocations,
             renderPreview: preview ?? { _, _, _ in throw ScreenRecordingExportError.cannotRender },
             aiCompletion: aiCompletion, onError: onError)
         model.install(project, directory: directory)
@@ -668,7 +667,7 @@ struct ScreenRecordingStudioTests {
         #expect(restored.recordingOutputDirectory.path == custom.path)
     }
 
-    @Test func downloadDirectoryChangesKeepTheOpenProjectAndUpdateDefaultOutputPanels() throws {
+    @Test func recordingDirectoryChangesKeepTheOpenProjectAndUpdateDefaultOutputPanels() throws {
         let suite = "zisla-studio-download-directory-test-\(UUID())"
         let defaults = try #require(UserDefaults(suiteName: suite))
         defer { defaults.removePersistentDomain(forName: suite) }
@@ -683,15 +682,16 @@ struct ScreenRecordingStudioTests {
         }
         let outputStore = ScreenRecordingOutputDirectoryStore(defaults: defaults)
         try outputStore.setDirectory(legacy)
-        let subject = CurrentValueSubject<URL, Never>(downloads)
+        let locations = SaveLocationStore(defaults: defaults)
+        try locations.setDirectory(downloads, for: .recording)
         var panelDirectory: URL?
         let model = ScreenRecordingStudioModel(outputDirectoryStore: outputStore,
-            downloadDirectoryPublisher: subject.eraseToAnyPublisher(),
+            saveLocations: locations,
             renderPreview: { _, _, _ in throw ScreenRecordingExportError.cannotRender },
             presentExportPanel: { panel, completion in panelDirectory = panel.directoryURL; completion(nil) })
         defer { model.shutdown() }
         #expect(model.recordingOutputDirectory.path == downloads.path,
-                "The download directory must take priority over a legacy recording preference")
+                "The central recording directory must take priority over a legacy recording preference")
         let projectStore = ScreenRecordingProjectStore(root: legacy)
         let directory = try projectStore.createDirectory()
         try Data([1]).write(to: directory.appendingPathComponent("screen.mp4"))
@@ -699,12 +699,12 @@ struct ScreenRecordingStudioTests {
         try projectStore.save(project, in: directory)
         model.install(project, directory: directory)
 
-        subject.send(updated)
+        try locations.setDirectory(updated, for: .recording)
 
         #expect(model.recordingOutputDirectory.path == updated.path)
         #expect(model.projectStore.root.path == updated.path)
         #expect(model.directory == directory && model.project == project,
-                "Changing the shared default must leave the open project and media in place")
+                "Changing the recording default must leave the open project and media in place")
         try model.save()
         #expect(try projectStore.load(from: directory) == project)
         model.export()
@@ -714,18 +714,18 @@ struct ScreenRecordingStudioTests {
         #expect(panelDirectory?.path == updated.path)
         #expect(model.directory == directory && !model.isChoosingFile)
         #expect(outputStore.directory.path == legacy.path,
-                "Following downloads must not rewrite the legacy recording preference")
+                "Following the central recording location must not rewrite the legacy recording preference")
     }
 
-    @Test func downloadDirectoryChangesDuringCaptureKeepCurrentFilesAndApplyToTheNextRecording() async throws {
+    @Test func recordingDirectoryChangesDuringCaptureKeepCurrentFilesAndApplyToTheNextRecording() async throws {
         let suite = "zisla-studio-download-directory-test-\(UUID())"
         let defaults = try #require(UserDefaults(suiteName: suite))
         defer { defaults.removePersistentDomain(forName: suite) }
         let outputStore = ScreenRecordingOutputDirectoryStore(defaults: defaults)
         let session = RecordingStudioTestSession()
-        let subject = CurrentValueSubject<URL, Never>(AppPaths.downloads)
+        let locations = SaveLocationStore(defaults: defaults)
         let (model, root, original) = try fixture(capture: captureService(session), outputDirectoryStore: outputStore,
-            downloadDirectoryPublisher: subject.eraseToAnyPublisher())
+            saveLocations: locations)
         defer { model.shutdown(); try? FileManager.default.removeItem(at: root) }
         let originalDirectory = try #require(model.directory)
         let first = root.appendingPathComponent("first", isDirectory: true)
@@ -733,13 +733,13 @@ struct ScreenRecordingStudioTests {
         for directory in [first, second] {
             try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: false)
         }
-        subject.send(first)
+        try locations.setDirectory(first, for: .recording)
         model.start()
         await model.operationTask?.value
         let recordingDirectory = try #require(session.directory)
         #expect(recordingDirectory.deletingLastPathComponent().path == first.path)
 
-        subject.send(second)
+        try locations.setDirectory(second, for: .recording)
 
         #expect(model.isRecording)
         #expect(session.directory == recordingDirectory)
@@ -761,40 +761,40 @@ struct ScreenRecordingStudioTests {
         #expect(FileManager.default.fileExists(atPath: recordingDirectory.path))
     }
 
-    @Test func recordingDirectorySelectionUpdatesDownloadsAndRejectsInvalidLocationsWithoutSideEffects() throws {
-        let suite = "zisla-studio-download-directory-test-\(UUID())"
+    @Test func recordingDirectorySelectionKeepsDownloadsIndependentAndRejectsInvalidLocationsWithoutSideEffects() throws {
+        let suite = "zisla-studio-save-location-test-\(UUID())"
         let defaults = try #require(UserDefaults(suiteName: suite))
         defer { defaults.removePersistentDomain(forName: suite) }
-        let downloads = ScreenRecordingOutputDirectoryStore(defaults: defaults,
-            bookmarkKey: "download-directory-bookmark", pathKey: nil)
+        let locations = SaveLocationStore(defaults: defaults)
         let legacy = ScreenRecordingOutputDirectoryStore(defaults: defaults)
-        let subject = CurrentValueSubject<URL, Never>(downloads.directory)
         let (model, root, original) = try fixture(outputDirectoryStore: legacy,
-            downloadDirectoryPublisher: subject.eraseToAnyPublisher(),
-            setDownloadDirectory: { directory in
-                try downloads.setDirectory(directory)
-                subject.send(downloads.directory)
-            })
+            saveLocations: locations)
         defer { model.shutdown(); try? FileManager.default.removeItem(at: root) }
         let originalDirectory = try #require(model.directory)
-        let custom = root.appendingPathComponent("Custom download directory", isDirectory: true)
-        try FileManager.default.createDirectory(at: custom, withIntermediateDirectories: false)
+        let custom = root.appendingPathComponent("Custom recording directory", isDirectory: true)
+        let downloads = root.appendingPathComponent("Downloads", isDirectory: true)
+        for directory in [custom, downloads] {
+            try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: false)
+        }
+        try locations.setDirectory(downloads, for: .download)
+        let downloadBookmark = try #require(defaults.data(forKey: "download-directory-bookmark"))
+        #expect(model.recordingOutputDirectory == AppPaths.downloads,
+                "Changing downloads must not change the recording default")
         try model.setRecordingOutputDirectory(custom)
 
-        #expect(subject.value.path == custom.path && model.recordingOutputDirectory.path == custom.path)
+        #expect(locations[.recording].path == custom.path && model.recordingOutputDirectory.path == custom.path)
+        #expect(locations[.download].path == downloads.path)
         #expect(model.directory == originalDirectory && model.project == original)
-        let bookmark = try #require(defaults.data(forKey: "download-directory-bookmark"))
+        #expect(defaults.data(forKey: "download-directory-bookmark") == downloadBookmark)
         #expect(defaults.data(forKey: "screen-recording-directory-bookmark") == nil)
-        #expect(defaults.string(forKey: "screen-recording-directory-path") == nil)
-        #expect(ScreenRecordingOutputDirectoryStore(defaults: defaults,
-            bookmarkKey: "download-directory-bookmark", pathKey: nil).directory.path == custom.path)
+        #expect(SaveLocationStore(defaults: defaults)[.recording].path == custom.path)
 
         let file = root.appendingPathComponent("file")
         try Data([7]).write(to: file)
         for invalid in [file, root.appendingPathComponent("missing"), URL(string: "https://invalid.example/directory")!] {
             #expect(throws: (any Error).self) { try model.setRecordingOutputDirectory(invalid) }
-            #expect(subject.value.path == custom.path && model.recordingOutputDirectory.path == custom.path)
-            #expect(defaults.data(forKey: "download-directory-bookmark") == bookmark)
+            #expect(locations[.recording].path == custom.path && model.recordingOutputDirectory.path == custom.path)
+            #expect(defaults.data(forKey: "download-directory-bookmark") == downloadBookmark)
             #expect(model.directory == originalDirectory && model.project == original)
         }
         #expect(try Data(contentsOf: file) == Data([7]))
