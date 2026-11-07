@@ -554,6 +554,13 @@ final class AppModel: ObservableObject {
   private(set) lazy var systemMonitor = SystemMonitorService(batterySnapshotProvider: { [weak self] in
     self?.battery.snapshot
   })
+  private(set) lazy var systemAutoCleanup: SystemAutoCleanupService = {
+    let monitor = systemMonitor
+    return SystemAutoCleanupService(
+      scan: { await monitor.scanCleanupCandidates(kinds: $0, options: $1) },
+      trash: { await monitor.trashSelected($0) }
+    )
+  }()
   let backgroundSounds = SystemBackgroundSoundService()
   let battery = BatteryMonitor()
   private lazy var lowBatteryNotice = LowBatteryNoticeController(queue: notices)
@@ -1239,6 +1246,7 @@ final class AppModel: ObservableObject {
     screenCleaning.stopAll()
     cleaningPowerState = nil
     powerAssertions.releaseAll()
+    systemAutoCleanup.stop()
     systemMonitor.stop()
     battery.stop()
     networkBattery.stop()
@@ -3207,6 +3215,7 @@ final class AppModel: ObservableObject {
     systemMonitor.setHistoryRecordingEnabled(
       (settings.systemMonitorEnabled || settings.batteryMonitorEnabled) && settings.systemMetricsHistoryEnabled
     )
+    systemAutoCleanup.apply(settings: settings)
     if settings.systemMonitorEnabled || settings.batteryMonitorEnabled || settings.dailyBriefing.enabled {
       systemMonitor.start()
     } else {

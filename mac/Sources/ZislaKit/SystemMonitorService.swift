@@ -3501,6 +3501,7 @@ public enum SystemDiskCleanup {
         var failures: [DiskCleanupFailure] = []
 
         for candidate in candidates {
+            guard !Task.isCancelled else { break }
             guard candidate.isActionable else {
                 failures.append(
                     DiskCleanupFailure(
@@ -4164,9 +4165,15 @@ public final class SystemMonitorService: ObservableObject {
 
     public func trashSelected(_ candidates: [DiskCleanupCandidate]) async -> DiskCleanupResult {
         let fm = fileManager
-        let result = await Task.detached(priority: .utility) {
+        let task = Task.detached(priority: .utility) {
             SystemDiskCleanup.trashSelected(candidates: candidates, fileManager: fm)
-        }.value
+        }
+        let result = await withTaskCancellationHandler {
+            await task.value
+        } onCancel: {
+            task.cancel()
+        }
+        guard !Task.isCancelled else { return result }
         await refresh()
         if result.successCount > 0 {
             schedulePostCleanupDiskRefresh()

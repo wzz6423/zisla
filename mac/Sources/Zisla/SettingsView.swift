@@ -965,6 +965,41 @@ struct SettingsView: View {
                     featureToggle("应用音量混音器", detail: "", symbol: "slider.horizontal.3", keyPath: \.volumeMixerEnabled)
                     rowDivider
                     featureToggle("系统状态与清理", detail: "监控资源并安全清理缓存和日志", symbol: "gauge.with.dots.needle.67percent", keyPath: \.systemMonitorEnabled)
+                    if model.settingsStore.settings.systemMonitorEnabled {
+                        rowDivider
+                        settingRow(
+                            symbol: "calendar.badge.clock",
+                            title: "自动清理系统垃圾",
+                            detail: "按所选间隔移入废纸篓，不会永久删除",
+                            isNested: true
+                        ) {
+                            Picker(AppLocalization.string("自动清理系统垃圾", locale: locale), selection: Binding(
+                                get: { model.settingsStore.settings.systemCleanupPolicy },
+                                set: { model.settingsStore.settings.systemCleanupPolicy = $0 }
+                            )) {
+                                ForEach(VoiceRecordingCleanupPolicy.allCases, id: \.self) { policy in
+                                    AppLocalizedText(policy.menuTitle).tag(policy)
+                                }
+                            }
+                            .labelsHidden()
+                            .pickerStyle(.menu)
+                            .keepsIntrinsicWidth()
+                        }
+                        rowDivider
+                        settingRow(symbol: "line.3.horizontal.decrease.circle", title: "清理范围", detail: "", isNested: true) {
+                            Picker(AppLocalization.string("清理范围", locale: locale), selection: Binding(
+                                get: { model.settingsStore.settings.systemCleanupScope },
+                                set: { model.settingsStore.settings.systemCleanupScope = $0 }
+                            )) {
+                                ForEach(SystemCleanupScope.allCases, id: \.self) { scope in
+                                    AppLocalizedText(scope.menuTitle).tag(scope)
+                                }
+                            }
+                            .labelsHidden()
+                            .pickerStyle(.menu)
+                            .keepsIntrinsicWidth()
+                        }
+                    }
                     rowDivider
                     featureToggle("电池监控", detail: "", symbol: "battery.100percent", keyPath: \.batteryMonitorEnabled)
                     rowDivider
