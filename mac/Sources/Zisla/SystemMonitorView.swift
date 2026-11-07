@@ -1138,7 +1138,7 @@ private struct SystemCleanupSheet: View {
         return order.compactMap { kind in
             guard kind.safetyLevel != .analysisOnly else { return nil }
             let items = candidates
-                .filter { $0.kind == kind && ($0.safetyLevel != .analysisOnly || kind == .aiSessionWorkspace) }
+                .filter { $0.kind == kind && $0.safetyLevel != .analysisOnly }
                 .sorted { $0.byteSize > $1.byteSize }
             guard !items.isEmpty else { return nil }
             let total = items.reduce(UInt64(0)) { $0 + $1.byteSize }

@@ -24,8 +24,30 @@ struct AISessionWorkspaceCleanupTests {
         #expect(!candidates.contains { $0.url == retained || $0.url == archived })
     }
 
+    @Test(arguments: [false, true])
+    func codexEmptyWorkingDirectoriesKeepTheirDayWithoutBlockingDeletedDays(archived: Bool) throws {
+        let fixture = try Fixture()
+        defer { fixture.remove() }
+        let retained = fixture.workspace("Codex", "2026-05-25")
+        let orphans = ["2026-10-15", "2026-07-02", "2026-11-06", "2026-09-29"].map {
+            fixture.workspace("Codex", $0)
+        }
+        try fixture.codexDatabase(rows: [("no-workspace", "", "2026-05-25", archived)])
+
+        let candidates = fixture.scan()
+
+        #expect(Set(candidates.map(\.url)) == Set(orphans), "An empty cwd must not invalidate the retained-session inventory")
+        #expect(candidates.allSatisfy { $0.isActionable })
+        for orphan in orphans { fixture.files.trashResults[orphan] = .success(orphan) }
+        let result = SystemDiskCleanup.trashSelected(candidates: candidates, fileManager: fixture.files)
+        #expect(result.successCount == orphans.count)
+        #expect(result.failures.isEmpty)
+        #expect(Set(fixture.files.trashedURLs) == Set(orphans))
+        #expect(!AISessionWorkspaceCleanup(fileManager: fixture.files, referenceDate: fixture.referenceDate).canTrash(retained))
+    }
+
     @Test
-    func retainedAndUnverifiableWorkspacesAreVisibleButCannotBeSelected() throws {
+    func retainedAndUnverifiableWorkspacesAreHiddenAndCannotBeTrashed() throws {
         let fixture = try Fixture()
         defer { fixture.remove() }
         let retained = fixture.workspace("Codex", "2026-07-02")
@@ -33,13 +55,15 @@ struct AISessionWorkspaceCleanupTests {
         let unknown = fixture.workspace("ChatGPT", "2026-07-02")
         try fixture.codexDatabase(rows: [("retained", retained.path, "2026-07-02", true)])
 
-        let candidates = fixture.scan(includeProtected: true)
+        let candidates = fixture.scan()
 
-        #expect(Set(candidates.map(\.url)) == [retained, orphan, unknown])
-        #expect(candidates.filter(\.isActionable).map(\.url) == [orphan])
-        #expect(candidates.filter { !$0.isActionable }.allSatisfy { $0.safetyLevel == .analysisOnly && $0.detail != nil })
-        let result = SystemDiskCleanup.trashSelected(candidates: candidates.filter { !$0.isActionable }, fileManager: fixture.files)
+        #expect(candidates.map(\.url) == [orphan])
+        let protected = [retained, unknown].map {
+            DiskCleanupCandidate(url: $0, kind: .aiSessionWorkspace, byteSize: 4096, displayName: $0.lastPathComponent)
+        }
+        let result = SystemDiskCleanup.trashSelected(candidates: protected, fileManager: fixture.files)
         #expect(result.successCount == 0)
+        #expect(result.failures.count == protected.count)
         #expect(fixture.files.trashedURLs.isEmpty)
     }
 
@@ -111,6 +135,7 @@ struct AISessionWorkspaceCleanupTests {
         let fixture = try Fixture()
         defer { fixture.remove() }
         let day = fixture.workspace("Codex", "2026-07-02")
+        let orphan = fixture.workspace("Codex", "2026-07-06")
         try fixture.codexDatabase(rows: [("retained", day.path, "2026-07-02", false)])
         let output = day.appendingPathComponent("new-chat/output.txt")
         fixture.files.fileAttributes[output.path]?[.modificationDate] = Date(timeIntervalSince1970: 0)
@@ -120,8 +145,9 @@ struct AISessionWorkspaceCleanupTests {
             options: DiskCleanupScanOptions(largeFileThreshold: 1, oldFileAge: 0, referenceDate: fixture.referenceDate),
             onProgress: { snapshots.append($0) }
         )
-        #expect(candidates.allSatisfy { $0.kind == .aiSessionWorkspace && !$0.isActionable })
-        #expect(snapshots.values.allSatisfy { $0.allSatisfy { $0.kind == .aiSessionWorkspace && !$0.isActionable } })
+        #expect(candidates.map(\.url) == [orphan])
+        #expect(!snapshots.values.isEmpty)
+        #expect(snapshots.values.allSatisfy { $0.allSatisfy { $0.url == orphan && $0.kind == .aiSessionWorkspace && $0.isActionable } })
     }
 
     @Test
@@ -161,7 +187,7 @@ struct AISessionWorkspaceCleanupTests {
         fixture.jsonLog(".claude/projects/project/session.jsonl", "{broken\n")
 
         #expect(fixture.scan().map(\.url) == [orphan])
-        #expect(fixture.scan(includeProtected: true).contains { $0.url == unknown && !$0.isActionable })
+        #expect(!AISessionWorkspaceCleanup(fileManager: fixture.files, referenceDate: fixture.referenceDate).canTrash(unknown))
     }
 
     @Test(arguments: ["sessions", "archived_sessions"])
@@ -227,6 +253,35 @@ struct AISessionWorkspaceCleanupTests {
         #expect(fixture.scan().map(\.url) == [orphan])
     }
 
+    @Test(arguments: ["OpenCode", "ZCode", "WorkBuddy", "WorkBuddy AI"])
+    func emptyWorkingDirectoriesInOtherDatabasesStillProtectTheirSessionDay(tool: String) throws {
+        let fixture = try Fixture()
+        defer { fixture.remove() }
+        let retained = fixture.workspace(tool, "2026-07-02")
+        let orphan = fixture.workspace(tool, "2026-07-06")
+        let store = try #require(Self.databaseFixtures[tool])
+        let database = fixture.home.appendingPathComponent(store.path)
+        try FileManager.default.createDirectory(at: database.deletingLastPathComponent(), withIntermediateDirectories: true)
+        try fixture.sql(store.schema, at: database)
+        try fixture.sql(store.insert.replacingOccurrences(of: "$CWD", with: ""), at: database)
+        fixture.file(database, data: Data())
+
+        #expect(fixture.scan().map(\.url) == [orphan])
+        #expect(!AISessionWorkspaceCleanup(fileManager: fixture.files, referenceDate: fixture.referenceDate).canTrash(retained))
+    }
+
+    @Test(arguments: ["project", "./project", "../project", "~/project"])
+    func nonemptyRelativeDatabaseWorkingDirectoriesRemainUnverifiable(cwd: String) throws {
+        let fixture = try Fixture()
+        defer { fixture.remove() }
+        let day = fixture.workspace("Codex", "2026-07-02")
+        try fixture.codexDatabase(rows: [("invalid-path", cwd, "2026-07-06", false)])
+
+        #expect(fixture.scan().isEmpty)
+        #expect(!AISessionWorkspaceCleanup(fileManager: fixture.files, referenceDate: fixture.referenceDate).canTrash(day))
+        #expect(fixture.files.trashedURLs.isEmpty)
+    }
+
     @Test
     func anotherToolsRetainedWorkspaceReferenceProtectsTheCodexDay() throws {
         let fixture = try Fixture()
@@ -239,6 +294,40 @@ struct AISessionWorkspaceCleanupTests {
             """)
 
         #expect(fixture.scan().isEmpty)
+    }
+
+    @Test
+    func parentWorkingDirectoriesDoNotProtectUnreferencedDatedWorkspaces() throws {
+        let fixture = try Fixture()
+        defer { fixture.remove() }
+        let orphan = fixture.workspace("Codex", "2026-07-02")
+        let retained = fixture.workspace("Codex", "2026-07-06")
+        let referenced = fixture.workspace("Codex", "2026-07-16")
+        try fixture.codexDatabase(rows: [("retained", orphan.deletingLastPathComponent().path, "2026-07-06", true)])
+        fixture.jsonLog(".claude/projects/project/parent.jsonl", """
+            {"type":"user","sessionId":"home","cwd":"\(fixture.home.path)","timestamp":"2026-07-20T12:00:00Z"}
+
+            """)
+        fixture.jsonLog(".pi/agent/sessions/project/parent.jsonl", """
+            {"type":"session","id":"documents","cwd":"\(fixture.home.path)/Documents","timestamp":"2026-07-20T12:00:00Z"}
+
+            """)
+        fixture.jsonLog(".claude/projects/project/referenced.jsonl", """
+            {"type":"user","sessionId":"referenced","cwd":"\(referenced.path)/new-chat","timestamp":"2026-07-20T12:00:00Z"}
+
+            """)
+
+        let candidates = fixture.scan()
+
+        #expect(candidates.map(\.url) == [orphan], "Launching from a parent directory does not reference every dated workspace")
+        fixture.files.trashResults[orphan] = .success(orphan)
+        let result = SystemDiskCleanup.trashSelected(candidates: candidates, fileManager: fixture.files)
+        #expect(result.successCount == 1)
+        #expect(result.failures.isEmpty)
+        #expect(fixture.files.trashedURLs == [orphan])
+        let cleanup = AISessionWorkspaceCleanup(fileManager: fixture.files, referenceDate: fixture.referenceDate)
+        #expect(!cleanup.canTrash(retained))
+        #expect(!cleanup.canTrash(referenced))
     }
 
     @Test
@@ -354,7 +443,9 @@ struct AISessionWorkspaceCleanupTests {
             """)
 
         #expect(fixture.scan().isEmpty)
-        #expect(Set(fixture.scan(includeProtected: true).map(\.url)) == [day, orphan])
+        let cleanup = AISessionWorkspaceCleanup(fileManager: fixture.files, referenceDate: fixture.referenceDate)
+        #expect(!cleanup.canTrash(day))
+        #expect(!cleanup.canTrash(orphan))
     }
 
     @Test
@@ -370,7 +461,7 @@ struct AISessionWorkspaceCleanupTests {
 
         let cleanup = AISessionWorkspaceCleanup(fileManager: fixture.files, referenceDate: fixture.referenceDate, environment: ["CODEX_HOME": root.path])
 
-        #expect(cleanup.candidates().allSatisfy { !$0.isActionable })
+        #expect(cleanup.candidates().isEmpty)
         #expect(!cleanup.canTrash(day))
     }
 
@@ -619,7 +710,8 @@ struct AISessionWorkspaceCleanupTests {
         fixture.jsonLog(".qoder/logs/sessions/id/segments/0.jsonl", "{\"type\":\"session.config.loaded\",\"ts\":\"2026-07-06T12:00:00Z\",\"data\":{\"target_dir\":\"/project\"}}\n")
 
         #expect(fixture.scan().isEmpty)
-        #expect(Set(fixture.scan(includeProtected: true).map(\.url)) == [grok, kimi, qoder])
+        let cleanup = AISessionWorkspaceCleanup(fileManager: fixture.files, referenceDate: fixture.referenceDate)
+        for workspace in [grok, kimi, qoder] { #expect(!cleanup.canTrash(workspace)) }
     }
 
     @Test
@@ -866,9 +958,8 @@ struct AISessionWorkspaceCleanupTests {
             }
         }
 
-        func scan(includeProtected: Bool = false) -> [DiskCleanupCandidate] {
-            let candidates = SystemDiskCleanup.scanCandidates(fileManager: files, maxConcurrentScans: 1, options: DiskCleanupScanOptions(referenceDate: referenceDate))
-            return includeProtected ? candidates : candidates.filter(\.isActionable)
+        func scan() -> [DiskCleanupCandidate] {
+            SystemDiskCleanup.scanCandidates(fileManager: files, maxConcurrentScans: 1, options: DiskCleanupScanOptions(referenceDate: referenceDate))
         }
     }
 }

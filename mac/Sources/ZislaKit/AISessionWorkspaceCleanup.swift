@@ -101,16 +101,14 @@ struct AISessionWorkspaceCleanup: Sendable {
                 guard child.deletingLastPathComponent().standardizedFileURL.path == root.url.path,
                       Self.workspaceDay(child.lastPathComponent) != nil || UUID(uuidString: child.lastPathComponent) != nil,
                       !isSymbolicLink(root.url), !isSymbolicLink(child), isDirectory(child) else { return nil }
-                let canTrash = canTrashWorkspace(child, in: root)
+                guard canTrashWorkspace(child, in: root) else { return nil }
                 return DiskCleanupCandidate(
                     url: child.standardizedFileURL,
                     kind: .aiSessionWorkspace,
                     byteSize: SystemDiskCleanup.allocatedByteSize(of: child, fileManager: fileManager),
                     displayName: root.url.lastPathComponent + "/" + child.lastPathComponent,
-                    detail: AppLocalization.text(canTrash
-                        ? "对应会话已删除；清理前请确认目录中的文件"
-                        : "会话仍保留或无法确认删除状态，已保留工作目录"),
-                    safetyLevel: canTrash ? .requiresManualReview : .analysisOnly,
+                    detail: AppLocalization.text("对应会话已删除；清理前请确认目录中的文件"),
+                    safetyLevel: .requiresManualReview,
                     source: root.url.lastPathComponent
                 )
             }
@@ -174,8 +172,7 @@ struct AISessionWorkspaceCleanup: Sendable {
         return !sessions.contains { session in
             if let directory = session.directory {
                 let sessionURL = URL(fileURLWithPath: directory)
-                if SystemMonitorPathSafety.isURL(sessionURL, withinAllowedRoots: [url])
-                    || SystemMonitorPathSafety.isURL(url, withinAllowedRoots: [sessionURL]) { return true }
+                if SystemMonitorPathSafety.isURL(sessionURL, withinAllowedRoots: [url]) { return true }
             }
             guard session.provider == root.provider else { return false }
             if let day, session.days.contains(day) { return true }
@@ -214,6 +211,8 @@ struct AISessionWorkspaceCleanup: Sendable {
                     ?? (try? Date.ISO8601FormatStyle().parse(text)) {
             date = parsed
         } else { throw InventoryError.unavailable }
+        // Some tools persist sessions without a workspace as an empty cwd.
+        let directory = directory.flatMap { $0.isEmpty ? nil : $0 }
         if let directory, !directory.hasPrefix("/") { throw InventoryError.unavailable }
         return Session(provider: provider, id: id, directory: directory.map {
             SystemMonitorPathSafety.standardizedPath(URL(fileURLWithPath: $0))
