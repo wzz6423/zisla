@@ -4522,7 +4522,7 @@ enum SettingsSection: String, CaseIterable, Identifiable {
     var iconColor: Color {
         switch self {
         case .general, .features, .keyboardSound, .permissions: Color(nsColor: .systemGray)
-        case .info, .mail, .networkProxy: Color(nsColor: .systemBlue)
+        case .info, .mail, .saveLocations, .networkProxy: Color(nsColor: .systemBlue)
         case .clipboardAssistant, .screenshot, .ai, .recommendations: Color(nsColor: .systemIndigo)
         case .recording, .pdfTools, .voice: Color(nsColor: .systemRed)
         case .download, .updates: Color(nsColor: .systemGreen)
