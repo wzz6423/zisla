@@ -201,8 +201,35 @@ struct SettingsSplitViewTests {
         let sampleX = Int((rowRightEdge - 12) * scale)
         let rows = selectedRowPixels.sorted()
         let sample = try #require(bitmap.colorAt(x: sampleX, y: rows[rows.count / 2])?.usingColorSpace(.deviceRGB))
-        #expect(sample.alphaComponent < 0.5 || sample.blueComponent - sample.redComponent < 0.3,
-                "Selection must use a pale tint instead of an opaque accent fill in both appearances")
+        #expect(sample.alphaComponent > 0.95 && sample.blueComponent - sample.redComponent > 0.3,
+                "Selection must retain an opaque accent background in both appearances")
+        let contrastSample = try #require(sample.usingColorSpace(.sRGB))
+        let components = [contrastSample.redComponent, contrastSample.greenComponent, contrastSample.blueComponent].map { component in
+            component <= 0.04045 ? component / 12.92 : pow((component + 0.055) / 1.055, 2.4)
+        }
+        let luminance = components[0] * 0.2126 + components[1] * 0.7152 + components[2] * 0.0722
+        #expect(1.05 / (luminance + 0.05) >= 4.5, "Selected text needs at least 4.5:1 contrast against its background")
+        var whiteTitlePixels = 0
+        var categoryColorPixels = 0
+        for y in 0..<bitmap.pixelsHigh {
+            if selectedRowPixels.contains(y) {
+                for x in Int(60 * scale)..<sampleX {
+                    let color = try #require(bitmap.colorAt(x: x, y: y)?.usingColorSpace(.deviceRGB))
+                    if color.redComponent > 0.94 && color.greenComponent > 0.94 && color.blueComponent > 0.94 {
+                        whiteTitlePixels += 1
+                    }
+                }
+            } else {
+                for x in Int(22 * scale)..<Int(44 * scale) {
+                    let color = try #require(bitmap.colorAt(x: x, y: y)?.usingColorSpace(.deviceRGB))
+                    if color.redComponent > color.blueComponent + 0.08 || color.greenComponent > color.blueComponent + 0.08 {
+                        categoryColorPixels += 1
+                    }
+                }
+            }
+        }
+        #expect(whiteTitlePixels > 10, "The selected title must render white text on the accent fill")
+        #expect(categoryColorPixels > 10, "Unselected category icons must include colors beyond the blue accent")
 
         fixture.state.settings.keyboardEnabled = false
         fixture.state.settings.clipboardAssistantEnabled = false

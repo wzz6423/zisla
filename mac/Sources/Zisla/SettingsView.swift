@@ -147,7 +147,7 @@ struct SettingsView: View {
                         } label: {
                             HStack(spacing: 10) {
                                 Image(systemName: result.section.symbol)
-                                    .foregroundStyle(Color.accentColor)
+                                    .foregroundStyle(result.section.iconColor)
                                     .frame(width: 24)
                                 VStack(alignment: .leading, spacing: 3) {
                                     AppLocalizedText(result.title)
@@ -3083,7 +3083,7 @@ struct SettingsView: View {
         HStack(spacing: 10) {
             Image(systemName: "magnifyingglass")
                 .font(.system(size: 12, weight: .semibold))
-                .foregroundStyle(Color.accentColor)
+                .foregroundStyle(SettingsSection.weather.iconColor)
                 .frame(width: 24)
             HStack(spacing: 6) {
                 TextField(AppLocalization.text("城市、区县或地区"), text: $input.weatherQuery)
@@ -3701,9 +3701,9 @@ struct SettingsView: View {
         HStack(spacing: 10) {
             Image(systemName: symbol)
                 .font(.system(size: 15, weight: .medium))
-                .foregroundStyle(Color.accentColor)
+                .foregroundStyle(.white)
                 .frame(width: 32, height: 32)
-                .background(Color.accentColor.opacity(0.10), in: RoundedRectangle(cornerRadius: 8, style: .continuous))
+                .background(input.selection.iconColor(for: symbol), in: RoundedRectangle(cornerRadius: 8, style: .continuous))
             VStack(alignment: .leading, spacing: 2) {
                 AppLocalizedText(title)
                     .font(.system(size: 13, weight: .medium))
@@ -3741,7 +3741,7 @@ struct SettingsView: View {
                 .help(AppLocalization.text("拖动调整 %@ 的展示顺序", AppLocalization.text(title)))
             Image(systemName: symbol)
                 .font(.system(size: 12, weight: .semibold))
-                .foregroundStyle(Color.accentColor)
+                .foregroundStyle(input.selection.iconColor(for: symbol))
                 .frame(width: 24)
             AppLocalizedText(title)
                 .font(.system(size: 11, weight: .medium))
@@ -4447,6 +4447,61 @@ enum SettingsSection: String, CaseIterable, Identifiable {
         }
     }
 
+    var iconColor: Color {
+        switch self {
+        case .general, .features, .permissions: Color(red: 0.48, green: 0.48, blue: 0.50)
+        case .info, .weather: Color(red: 0, green: 0.55, blue: 0.70)
+        case .clipboardAssistant, .screenshot, .ai, .recommendations: .purple
+        case .recording, .pdfTools: .red
+        case .voice: .pink
+        case .mail, .networkProxy: .blue
+        case .keyboardSound: Color(red: 0.85, green: 0.42, blue: 0.03)
+        case .download, .updates: Color(red: 0.16, green: 0.60, blue: 0.27)
+        case .pet: .brown
+        }
+    }
+
+    func iconColor(for symbol: String) -> Color {
+        if let section = Self.allCases.first(where: { $0.symbol == symbol }) {
+            return section.iconColor
+        }
+        switch symbol {
+        case "power", "power.circle.fill", "battery.100percent", "arrow.down.circle", "arrow.down.square.fill",
+             "square.and.arrow.down", "arrow.triangle.2.circlepath", "arrow.triangle.branch", "checkmark.seal.fill":
+            return Self.download.iconColor
+        case "calendar", "calendar.badge.clock", "bell.fill", "bell.badge.fill", "bell.slash.fill":
+            return .red
+        case "heart.fill", "music.note", "music.note.list", "play.square.fill",
+             "text.quote", "waveform", "speaker.wave.2":
+            return .pink
+        case "folder", "folder.fill", "folder.badge.plus", "tray.full.fill", "tray.and.arrow.down",
+             "clipboard", "clipboard.fill", "note.text", "wrench.and.screwdriver.fill", "wrench.and.screwdriver":
+            return Self.keyboardSound.iconColor
+        case "camera.fill", "pin.fill", "sparkle":
+            return Self.screenshot.iconColor
+        case "doc.viewfinder":
+            return Self.pdfTools.iconColor
+        case "rectangle.stack":
+            return Self.recording.iconColor
+        case "doc.richtext", "terminal", "terminal.fill", "chevron.left.forwardslash.chevron.right", "hammer":
+            return .indigo
+        case "cpu", "chart.bar.fill", "chart.bar.xaxis", "chart.xyaxis.line",
+             "gauge.with.dots.needle.67percent", "waveform.path.ecg", "display":
+            return Self.info.iconColor
+        case "character.bubble", "envelope", "link":
+            return .blue
+        case "capsule", "viewfinder", "menubar.rectangle", "macwindow.on.rectangle", "lock.display",
+             "rectangle.on.rectangle", "rectangle.on.rectangle.angled", "rectangle.topthird.inset.filled",
+             "rectangle.bottomhalf.inset.filled", "rectangle.compress.vertical", "rectangle.split.2x1",
+             "laptopcomputer.and.iphone", "keyboard", "computermouse", "hand.tap", "hand.draw.fill":
+            return Self.general.iconColor
+        case "shippingbox.fill":
+            return Self.pet.iconColor
+        default:
+            return iconColor
+        }
+    }
+
     var subtitle: String {
         switch self {
         case .general: "调整语言、外观、启动与展开方式。"
@@ -4599,8 +4654,9 @@ struct SettingsSidebar: View {
             HStack(spacing: 10) {
                 Image(systemName: section.symbol)
                     .font(.system(size: 15, weight: .medium))
-                    .foregroundStyle(Color.accentColor)
-                    .frame(width: 21)
+                    .foregroundStyle(.white)
+                    .frame(width: 24, height: 24)
+                    .background(section.iconColor, in: RoundedRectangle(cornerRadius: 6, style: .continuous))
                 AppLocalizedText(section.title)
                     .font(.system(size: 13, weight: .medium))
                     .fitsLines(2, minScale: 0.85)
@@ -4611,10 +4667,15 @@ struct SettingsSidebar: View {
             .contentShape(Rectangle())
         }
         .buttonStyle(PressableStyle(hoverScale: 1.018, pressedScale: 0.965))
-        .foregroundStyle(input.selection == section ? Color.accentColor : Color.primary)
+        .foregroundStyle(input.selection == section ? Color.white : Color.primary)
         .background {
             if input.selection == section {
-                SettingsTintedBackground(cornerRadius: 8)
+                RoundedRectangle(cornerRadius: 8, style: .continuous)
+                    .fill(Color(nsColor: .selectedContentBackgroundColor))
+                    .overlay {
+                        RoundedRectangle(cornerRadius: 8, style: .continuous)
+                            .fill(.black.opacity(0.08))
+                    }
                     .matchedGeometryEffect(id: "settings-section-selection", in: sectionSelectionNamespace)
             }
         }

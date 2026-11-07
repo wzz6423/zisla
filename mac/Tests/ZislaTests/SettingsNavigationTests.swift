@@ -1,10 +1,47 @@
 import Foundation
+import SwiftUI
 import Testing
 import ZislaCore
 
 @testable import Zisla
 
 struct SettingsNavigationTests {
+    @Test(arguments: [ColorScheme.light, .dark])
+    func categoryIconColorsKeepWhiteGlyphsLegible(colorScheme: ColorScheme) {
+        var environment = EnvironmentValues()
+        environment.colorScheme = colorScheme
+        for category in SettingsSection.allCases {
+            let color = category.iconColor.resolve(in: environment)
+            let components = [color.red, color.green, color.blue].map { component -> Double in
+                let value = Double(component)
+                return value <= 0.04045 ? value / 12.92 : pow((value + 0.055) / 1.055, 2.4)
+            }
+            let luminance = components[0] * 0.2126 + components[1] * 0.7152 + components[2] * 0.0722
+            #expect(1.05 / (luminance + 0.05) >= 3,
+                    "The \(category.rawValue) icon needs at least 3:1 contrast against its white glyph in \(colorScheme)")
+        }
+    }
+
+    @Test
+    func settingIconsKeepTheirCategoryColorsAcrossPages() {
+        for page in SettingsSection.allCases {
+            for category in SettingsSection.allCases {
+                #expect(page.iconColor(for: category.symbol) == category.iconColor,
+                        "The \(category.rawValue) icon must keep its identity on the \(page.rawValue) page")
+            }
+            #expect(page.iconColor(for: "") == page.iconColor)
+            #expect(page.iconColor(for: "future.setting.symbol") == page.iconColor)
+            #expect(page.iconColor(for: "camera.fill") == SettingsSection.screenshot.iconColor)
+            #expect(page.iconColor(for: "doc.viewfinder") == SettingsSection.pdfTools.iconColor)
+            for symbol in ["power.circle.fill", "battery.100percent", "calendar", "music.note.list", "folder",
+                           "camera.fill", "doc.viewfinder", "rectangle.stack", "terminal.fill", "cpu",
+                           "character.bubble", "capsule", "shippingbox.fill"] {
+                #expect(page.iconColor(for: symbol) == SettingsSection.general.iconColor(for: symbol),
+                        "The \(symbol) setting must keep its semantic color across pages")
+            }
+        }
+    }
+
     @Test(arguments: [false, true], [false, true])
     func combinedMonitorNavigationPreservesIndependentFeatureToggles(systemEnabled: Bool, batteryEnabled: Bool) {
         var settings = FeatureSettings.default
