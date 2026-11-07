@@ -14,14 +14,12 @@ struct AIStateMonitorSubscriptionTests {
         #expect(detectors.contains { $0 is GrokSessionActivityDetector })
     }
 
-    @Test @MainActor func refreshPublishesIndependentQuotasAndDeduplicatesUsageWithoutBlockingActivity() async throws {
+    @Test @MainActor func refreshDeduplicatesTokenHistoryWithoutBlockingActivity() async throws {
         let root = FileManager.default.temporaryDirectory.appendingPathComponent("zisla-subscription-monitor-\(UUID())")
         defer { try? FileManager.default.removeItem(at: root) }
         var currentTime = Date(timeIntervalSince1970: 1_910_000_000)
         let sample = AIUsageSample(sourceID: "fixture-remote", provider: .cursor, timestamp: currentTime, inputTokens: 10, outputTokens: 5)
-        let quota = AIQuotaSnapshot(provider: .cursor, window: .plan, usedPercent: 20, resetsAt: nil, checkedAt: currentTime)
-        let subscription = SubscriptionGate(result: .init(quotas: [quota], usageSamples: [sample],
-            failedProviders: [.muse], failedUsageProviders: [.cursor]))
+        let subscription = SubscriptionGate(result: .init(usageSamples: [sample], failedUsageProviders: [.cursor]))
         let task = AIProgressTask(id: "fixture-active", provider: .cursor, title: "fixture", progress: nil, updatedAt: currentTime)
         let activity = SubscriptionActivityFixture(task: task)
         let monitor = AIStateMonitor(directoryURL: root, activityDetectors: [activity],
@@ -29,11 +27,10 @@ struct AIStateMonitorSubscriptionTests {
         defer { monitor.stop() }
         monitor.refresh()
         #expect(await waitFor { monitor.state.tasks.map(\.id) == [task.id] })
-        #expect(monitor.quotas.isEmpty)
+        #expect(monitor.failedUsageProviders.isEmpty)
         #expect(await subscription.calls == 1)
         await subscription.release()
-        #expect(await waitFor { monitor.quotas == [quota] })
-        #expect(monitor.failedQuotaProviders == [.muse] && monitor.failedUsageProviders == [.cursor])
+        #expect(await waitFor { monitor.failedUsageProviders == [.cursor] })
         let repository = AIStateRepository(directoryURL: root)
         #expect(await waitFor { (try? repository.load().usageSamples.reduce(0) { $0 + $1.totalTokens }) == 15 })
         monitor.loadUsageHistory()
@@ -43,7 +40,7 @@ struct AIStateMonitorSubscriptionTests {
         #expect(await subscription.calls == 1)
         currentTime = currentTime.addingTimeInterval(180)
         monitor.refresh()
-        #expect(await waitFor { monitor.quotas == [quota] && monitor.state.usageSamples.reduce(0) { $0 + $1.totalTokens } == 15 })
+        #expect(await waitFor { monitor.state.usageSamples.reduce(0) { $0 + $1.totalTokens } == 15 })
         #expect(await subscription.waitForCalls(2))
         #expect(try repository.load().usageSamples.reduce(0) { $0 + $1.totalTokens } == 15)
     }
@@ -52,9 +49,9 @@ struct AIStateMonitorSubscriptionTests {
         let root = FileManager.default.temporaryDirectory.appendingPathComponent("zisla-subscription-cancel-\(UUID())")
         defer { try? FileManager.default.removeItem(at: root) }
         let now = Date(timeIntervalSince1970: 1_910_000_000)
-        let quota = AIQuotaSnapshot(provider: .muse, window: .weekly, usedPercent: 50, resetsAt: nil, checkedAt: now)
-        let subscription = SubscriptionGate(result: .init(quotas: [quota], usageSamples: [
-            AIUsageSample(sourceID: "late", provider: .cursor, timestamp: now, inputTokens: 10, outputTokens: 1)]))
+        let subscription = SubscriptionGate(result: .init(usageSamples: [
+            AIUsageSample(sourceID: "late", provider: .cursor, timestamp: now, inputTokens: 10, outputTokens: 1)],
+            failedUsageProviders: [.cursor]))
         let monitor = AIStateMonitor(directoryURL: root, activityDetectors: [], subscriptionUsageDetector: subscription)
         monitor.refresh()
         #expect(await subscription.waitForCalls(1))
@@ -62,15 +59,15 @@ struct AIStateMonitorSubscriptionTests {
         await subscription.release()
         #expect(await subscription.waitForCompletion())
         try await Task.sleep(for: .milliseconds(40))
-        #expect(monitor.quotas.isEmpty && monitor.failedQuotaProviders.isEmpty && monitor.failedUsageProviders.isEmpty)
+        #expect(monitor.failedUsageProviders.isEmpty)
         #expect(await subscription.sawCancellation)
         let repository = AIStateRepository(directoryURL: root)
         #expect(try repository.load().usageSamples.isEmpty)
         monitor.refresh()
         #expect(await subscription.waitForCalls(2))
-        #expect(await waitFor { monitor.quotas == [quota] })
+        #expect(await waitFor { monitor.failedUsageProviders == [.cursor] })
         monitor.stop()
-        #expect(monitor.quotas.isEmpty)
+        #expect(monitor.failedUsageProviders.isEmpty)
     }
 
     @MainActor private func waitFor(_ condition: @MainActor () -> Bool) async -> Bool {

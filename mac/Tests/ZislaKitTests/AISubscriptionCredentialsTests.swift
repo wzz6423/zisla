@@ -48,28 +48,15 @@ struct AISubscriptionCredentialsTests {
         #expect(throws: AISubscriptionUsageError.invalidCredentials) { try denied.cursorCookie(now: now) }
     }
 
-    @Test func CLIFileFallbackAndMuseInlineOrOAuthFollowConfirmedSourcePaths() throws {
+    @Test func CLIFileFallbackFollowsConfirmedSourcePaths() throws {
         let root = try fixtureRoot()
         defer { try? FileManager.default.removeItem(at: root) }
         let missing = AISubscriptionCredentials(home: root, environment: [:], keychainRead: { _, _ in nil })
-        #expect(try missing.cursorCookie(now: now) == nil && missing.museToken() == nil)
+        #expect(try missing.cursorCookie(now: now) == nil)
         let config = root.appendingPathComponent("config")
         try write(["accessToken": token], at: config.appendingPathComponent("cursor/auth.json"))
         let cli = AISubscriptionCredentials(home: root, environment: ["XDG_CONFIG_HOME": config.path], keychainRead: { _, _ in nil })
         #expect(try cli.cursorCookie(now: now) != nil)
-        let auth = root.appendingPathComponent(".config/muse/auth.json")
-        try write(["providers": ["meta": ["access_token": "dca:fixture-inline"]]], at: auth)
-        #expect(try missing.museToken() == "dca:fixture-inline")
-        try write(["providers": ["meta": ["mechanism": "oauth", "access_token": ""]]], at: auth)
-        let oauth = AISubscriptionCredentials(home: root, environment: [:], keychainRead: { service, account in
-            service == "ai.meta.dev.credentials" && account == "meta" ? Data(#"{"access_token":"dca:fixture-oauth"}"#.utf8) : nil
-        })
-        #expect(try oauth.museToken() == "dca:fixture-oauth")
-        #expect(throws: AISubscriptionUsageError.invalidCredentials) { try missing.museToken() }
-        for invalid in ["dca:", "dca:token with space", "dca:token\r\n", "other:token"] {
-            try write(["providers": ["meta": ["access_token": invalid]]], at: auth)
-            #expect(throws: AISubscriptionUsageError.invalidCredentials) { try missing.museToken() }
-        }
     }
 
     @Test func keychainNoUIPreflightNeverReadsPayloadWhenLockedOrUntrusted() {
