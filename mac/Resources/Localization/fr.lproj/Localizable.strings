@@ -629,7 +629,7 @@
 "首页" = "Accueil";
 "7 天" = "7 jours";
 "自动删除剪贴板历史" = "Supprimer automatiquement l’historique du presse-papiers";
-"按所选周期删除过期历史，常用项目继续保留" = "Supprimer l’historique expiré après la période choisie ; les éléments épinglés sont conservés";
+"按所选周期删除过期历史，常用项目继续保留" = "Supprimer l’historique expiré après la période choisie ; les favoris sont conservés";
 "上一页" = "Page précédente";
 "下一页" = "Page suivante";
 "不可用" = "Indisponible";
@@ -3311,3 +3311,14 @@
 "权限" = "Autorisations";
 "管理 zisla 使用的系统权限。" = "Gérez les autorisations système utilisées par zisla.";
 "请在设置的“权限”页面管理授权。" = "Gérez les accès sur la page Autorisations des réglages.";
+"自动清理系统垃圾" = "Nettoyer automatiquement les fichiers inutiles du système";
+"按所选间隔移入废纸篓，不会永久删除" = "Déplacer les éléments vers la corbeille à l’intervalle choisi, sans suppression définitive";
+"清理范围" = "Éléments à nettoyer";
+"仅可信" = "Éléments fiables uniquement";
+"全部（包含需人工复核）" = "Tous (y compris ceux à vérifier)";
+"默认保存位置" = "Emplacements de sauvegarde par défaut";
+"分别设置各类内容的默认保存位置。" = "Définir l’emplacement de sauvegarde par défaut pour chaque type de contenu.";
+"管理下载所需组件。" = "Gérer les composants nécessaires aux téléchargements.";
+"更改 %@ 的保存位置" = "Changer l’emplacement de sauvegarde pour %@";
+
+"本地优先的原生笔记应用" = "Application de notes native privilégiant le stockage local";

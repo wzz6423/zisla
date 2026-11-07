@@ -21,7 +21,7 @@ enum ClipboardHistoryMutation: Sendable {
     case upsert(ClipboardHistoryItem, capacity: Int?)
     case remove(UUID)
     case removeHistory
-    case removeHistoryBefore(Date)
+    case removeHistoryBefore(Date, generation: Int)
 }
 
 final class ClipboardHistoryDatabase: @unchecked Sendable {
@@ -34,6 +34,8 @@ final class ClipboardHistoryDatabase: @unchecked Sendable {
     )
     private let queueKey = DispatchSpecificKey<UInt8>()
     private var connection: OpaquePointer?
+    private let cleanupLock = NSLock()
+    private var cleanupGeneration = 0
 
     init(storageURL: URL) {
         self.storageURL = storageURL
@@ -136,6 +138,13 @@ final class ClipboardHistoryDatabase: @unchecked Sendable {
     func flush(_ mutations: [ClipboardHistoryMutation]) throws {
         try queue.sync {
             try applyMutations(mutations)
+        }
+    }
+
+    func cancelCleanup() -> Int {
+        cleanupLock.withLock {
+            cleanupGeneration += 1
+            return cleanupGeneration
         }
     }
 
@@ -596,6 +605,9 @@ final class ClipboardHistoryDatabase: @unchecked Sendable {
         guard !mutations.isEmpty else { return }
         let database = try database()
         try execute("BEGIN IMMEDIATE TRANSACTION", on: database)
+        // Order cancellation against commits without holding the lock while SQLite is busy.
+        cleanupLock.lock()
+        defer { cleanupLock.unlock() }
         do {
             for mutation in mutations {
                 switch mutation {
@@ -612,7 +624,8 @@ final class ClipboardHistoryDatabase: @unchecked Sendable {
                     try delete([id], from: database)
                 case .removeHistory:
                     try execute("DELETE FROM clipboard_history WHERE is_pinned = 0", on: database)
-                case .removeHistoryBefore(let cutoff):
+                case .removeHistoryBefore(let cutoff, let generation):
+                    guard generation == cleanupGeneration else { continue }
                     let statement = try prepare(
                         "DELETE FROM clipboard_history WHERE is_pinned = 0 AND last_copied_at < ?",
                         on: database

@@ -22,6 +22,7 @@ public final class ClipboardHistoryStore: ObservableObject {
     private let persistenceDelay: Duration
     private let now: () -> Date
     private var cleanupPolicy: VoiceRecordingCleanupPolicy = .never
+    private var cleanupGeneration = 0
     private(set) var cleanupTimer: Timer?
     private var scope: ClipboardHistoryScope = .all
     private var searchText = ""
@@ -75,12 +76,13 @@ public final class ClipboardHistoryStore: ObservableObject {
         cleanupTimer?.invalidate()
         cleanupTimer = nil
         cleanupPolicy = .never
+        cleanupGeneration = database.cancelCleanup()
     }
 
     public func cleanupOldHistory(policy: VoiceRecordingCleanupPolicy, now: Date) {
         guard let days = policy.daysThreshold else { return }
         let cutoff = now.addingTimeInterval(-Double(days) * 24 * 60 * 60)
-        schedulePersistence(.removeHistoryBefore(cutoff))
+        schedulePersistence(.removeHistoryBefore(cutoff, generation: cleanupGeneration))
     }
 
     public var pinnedItems: [ClipboardHistoryItem] {

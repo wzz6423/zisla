@@ -157,6 +157,43 @@ struct DailyBriefingIntegrationTests {
     }
 
     @Test
+    func independentBriefingLocationChangesApplyToExportsWithoutFollowingDownloads() async throws {
+        let directory = try temporaryDirectory()
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let suite = "zisla-briefing-save-location-test-\(UUID())"
+        let defaults = try #require(UserDefaults(suiteName: suite))
+        defer { defaults.removePersistentDomain(forName: suite) }
+        let locations = SaveLocationStore(defaults: defaults)
+        let downloads = directory.appendingPathComponent("downloads", isDirectory: true)
+        let first = directory.appendingPathComponent("first", isDirectory: true)
+        let second = directory.appendingPathComponent("second", isDirectory: true)
+        for folder in [downloads, first, second] {
+            try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: false)
+        }
+        try locations.setDirectory(first, for: .dailyBriefing)
+        var exportedFolders: [URL] = []
+        let controller = DailyBriefingController(store: DailyBriefingStore(fileURL: directory.appendingPathComponent("history.json")),
+            saveLocations: locations,
+            observation: { .init(date: $0, applicationID: "editor", applicationName: "Editor", category: .work, isActive: false, isListening: nil) },
+            typing: { _ in nil }, readScreenTime: { _ in .init() },
+            export: { _, _, _, folder in exportedFolders.append(folder); return folder.appendingPathComponent("briefing.png") })
+        controller.configure(settings: .init(enabled: true, readsSystemScreenTime: false),
+            directory: locations[.dailyBriefing], language: .english, startsTimer: false)
+        let date = Date(timeIntervalSince1970: 1_800_000_000)
+
+        try locations.setDirectory(downloads, for: .download)
+        await controller.exportToday(at: date)
+        try locations.setDirectory(second, for: .dailyBriefing)
+        await controller.exportToday(at: date)
+
+        #expect(exportedFolders.map(\.path) == [first.path, second.path])
+        #expect(locations[.download].path == downloads.path)
+        #expect(controller.lastExportURL?.deletingLastPathComponent().path == second.path)
+        #expect(controller.errorMessage == nil)
+        #expect(try FileManager.default.contentsOfDirectory(atPath: downloads.path).isEmpty)
+    }
+
+    @Test
     func selectionAndSystemNotificationCountReachTheNormalExport() async throws {
         let directory = try temporaryDirectory()
         defer { try? FileManager.default.removeItem(at: directory) }

@@ -1115,6 +1115,128 @@ struct ClipboardHistoryStoreTests {
         #expect(store.errorDescription == nil)
     }
 
+    @Test(arguments: [VoiceRecordingCleanupPolicy.never, .fifteenDays, .thirtyDays])
+    func changingCleanupPolicyCancelsQueuedDeletionAndPreservesOtherChanges(policy: VoiceRecordingCleanupPolicy) async throws {
+        let directory = try makeDirectory()
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let storageURL = directory.appendingPathComponent("clipboard-history.sqlite")
+        let now = Date(timeIntervalSince1970: 2_000_000_000)
+        let retained = ClipboardHistoryItem(content: .text("ten days old"), lastCopiedAt: now.addingTimeInterval(-10 * 24 * 60 * 60))
+        let expired = ClipboardHistoryItem(content: .text("forty days old"), lastCopiedAt: now.addingTimeInterval(-40 * 24 * 60 * 60))
+        let removed = ClipboardHistoryItem(content: .text("manual removal"), lastCopiedAt: now)
+        let favorite = ClipboardHistoryItem(content: .text("favorite"), lastCopiedAt: .distantPast, isPinned: true)
+        let database = ClipboardHistoryDatabase(storageURL: storageURL)
+        try database.flush([retained, expired, removed, favorite].map { .upsert($0, capacity: nil) })
+        let store = ClipboardHistoryStore(storageURL: storageURL, persistenceDelay: .seconds(60), now: { now })
+        await store.waitUntilLoaded()
+        defer { store.stopCleanup(); store.flushPendingChanges() }
+
+        store.configureCleanup(policy: .sevenDays)
+        #expect(store.record(.text("pending copy")))
+        store.remove(id: removed.id)
+        store.configureCleanup(policy: policy)
+        store.flushPendingChanges()
+
+        let restored = ClipboardHistoryStore(storageURL: storageURL)
+        await restored.waitUntilLoaded()
+        var expected: Set<String> = ["ten days old", "favorite", "pending copy"]
+        if policy == .never { expected.insert("forty days old") }
+        #expect(Set(restored.items.map(\.content.previewText)) == expected)
+        #expect(restored.pinnedItems == [favorite])
+        #expect(store.errorDescription == nil)
+    }
+
+    @Test(arguments: [false, true])
+    func changingCleanupPolicyCancelsFailedDeletionBeforeRetry(asynchronous: Bool) async throws {
+        let directory = try makeDirectory()
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let storageURL = directory.appendingPathComponent("clipboard-history.sqlite")
+        let now = Date(timeIntervalSince1970: 2_000_000_000)
+        let old = ClipboardHistoryItem(content: .text("keep after disabling"), lastCopiedAt: .distantPast)
+        let database = ClipboardHistoryDatabase(storageURL: storageURL)
+        try database.flush([.upsert(old, capacity: nil)])
+        let store = ClipboardHistoryStore(storageURL: storageURL,
+            persistenceDelay: asynchronous ? .zero : .seconds(60), now: { now })
+        await store.waitUntilLoaded()
+        defer { store.stopCleanup(); store.flushPendingChanges() }
+        try executeSQL("""
+            CREATE TRIGGER reject_cleanup BEFORE DELETE ON clipboard_history
+            BEGIN SELECT RAISE(ABORT, 'injected cleanup failure'); END;
+            """, at: storageURL)
+        #expect(store.record(.text("pending copy")))
+        store.configureCleanup(policy: .sevenDays)
+        if asynchronous {
+            try await waitUntil { store.errorDescription?.contains("injected cleanup failure") == true }
+        } else {
+            store.flushPendingChanges()
+            #expect(store.errorDescription?.contains("injected cleanup failure") == true)
+        }
+
+        store.configureCleanup(policy: .never)
+        try executeSQL("DROP TRIGGER reject_cleanup", at: storageURL)
+        #expect(store.record(.text("copy after disabling")))
+        store.flushPendingChanges()
+
+        let restored = ClipboardHistoryStore(storageURL: storageURL)
+        await restored.waitUntilLoaded()
+        #expect(Set(restored.items.map(\.content.previewText)) == ["keep after disabling", "pending copy", "copy after disabling"])
+        #expect(store.errorDescription == nil)
+    }
+
+    @Test(arguments: [false, true])
+    func stoppingCleanupCancelsInFlightDeletionWhileTheDatabaseIsBusy(failingCopy: Bool) async throws {
+        let directory = try makeDirectory()
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let storageURL = directory.appendingPathComponent("clipboard-history.sqlite")
+        let now = Date(timeIntervalSince1970: 2_000_000_000)
+        let old = ClipboardHistoryItem(content: .text("keep while stopping"), lastCopiedAt: .distantPast)
+        let database = ClipboardHistoryDatabase(storageURL: storageURL)
+        try database.flush([.upsert(old, capacity: nil)])
+        let store = ClipboardHistoryStore(storageURL: storageURL, persistenceDelay: .seconds(60), now: { now })
+        await store.waitUntilLoaded()
+        defer { store.stopCleanup(); store.flushPendingChanges() }
+        if failingCopy {
+            try executeSQL("""
+                CREATE TRIGGER reject_copy BEFORE INSERT ON clipboard_history
+                BEGIN SELECT RAISE(ABORT, 'injected copy failure'); END;
+                """, at: storageURL)
+        }
+
+        var blockingDatabase: OpaquePointer?
+        let opened = sqlite3_open(storageURL.path, &blockingDatabase)
+        let blocker = try #require(blockingDatabase)
+        defer { sqlite3_close(blocker) }
+        #expect(opened == SQLITE_OK)
+        #expect(sqlite3_exec(blocker, "BEGIN IMMEDIATE", nil, nil, nil) == SQLITE_OK)
+        defer { sqlite3_exec(blocker, "ROLLBACK", nil, nil, nil) }
+
+        store.configureCleanup(policy: .sevenDays)
+        for index in 0..<512 {
+            #expect(store.record(.text("pending copy \(index)")))
+        }
+        store.stopCleanup()
+        #expect(sqlite3_exec(blocker, "ROLLBACK", nil, nil, nil) == SQLITE_OK)
+        if failingCopy {
+            try await waitUntil { store.errorDescription?.contains("injected copy failure") == true }
+            try executeSQL("DROP TRIGGER reject_copy", at: storageURL)
+        } else {
+            try await waitUntil { !store.isLoading && store.totalItemCount == 512 }
+        }
+        store.flushPendingChanges()
+
+        let restored = ClipboardHistoryStore(storageURL: storageURL, pageSize: 200)
+        await restored.waitUntilLoaded()
+        restored.loadFullHistory()
+        await restored.waitUntilLoaded()
+        #expect(restored.totalItemCount == 513, "Stopping cleanup must retain every pending copy and the old entry")
+        while restored.canLoadNextPage {
+            restored.loadNextPage()
+            await restored.waitUntilLoaded()
+        }
+        #expect(restored.items.contains { $0.id == old.id })
+        #expect(store.errorDescription == nil)
+    }
+
     @Test
     func changingAndStoppingCleanupCancelsTheTimerAndAllowsRestarting() async throws {
         let directory = try makeDirectory()

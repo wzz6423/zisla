@@ -6,7 +6,6 @@ import ZislaKit
 @testable import Zisla
 
 struct SettingsSearchTests {
-
     @Test(arguments: AppLanguage.allCases)
     func clipboardHistoryCleanupIsSearchableInEveryLanguage(language: AppLanguage) {
         let title = AppLocalization.string("自动删除剪贴板历史", language: language)
@@ -15,6 +14,16 @@ struct SettingsSearchTests {
         #expect(matches.first?.anchor == .row("自动删除剪贴板历史"))
     }
 
+    @Test(arguments: AppLanguage.allCases)
+    func quietMDRecommendationIsSearchableByNameAndLocalizedPurpose(language: AppLanguage) {
+        let queries = [ManagedTool.quietMD.displayName, AppLocalization.string(ManagedTool.quietMD.purpose, language: language)]
+        for query in queries {
+            let matches = results(query, locale: language.locale)
+            #expect(matches.contains { $0.section == .recommendations && $0.anchor == .row("Quiet.md") })
+            #expect(results(query, settings: FeatureSettings(recommendedToolsEnabled: false), locale: language.locale)
+                .allSatisfy { $0.anchor != .row("Quiet.md") })
+        }
+    }
 
     @Test(arguments: [false, true], [false, true])
     func careAndFloatingInformationSearchEntriesFollowTheirOwnControls(careEnabled: Bool, customPlacement: Bool) {
