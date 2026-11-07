@@ -233,7 +233,7 @@ struct ScreenRecordingExportTests {
                             .init(time: 3, x: 0.4, y: 0.5, kind: .rightClick)]
         let track = RecordingExportEffectTrack(project: project)
         #expect(track.zoom(at: 0).scale == 1)
-        #expect(track.zoom(at: 0.7).scale == 3)
+        #expect(track.zoom(at: 0.9).scale == 3)
         #expect(track.zoom(at: 2.99).scale > 1)
         #expect(track.zoom(at: 4).scale == 1)
         let pointer = try #require(track.pointer(at: 0.5, slice: nil))
@@ -248,6 +248,79 @@ struct ScreenRecordingExportTests {
         project.edits.autoZoom = false
         project.edits.zoomClips = []
         #expect(RecordingExportEffectTrack(project: project).zoom(at: 2.99).scale == 1)
+    }
+
+    @Test(arguments: [false, true])
+    func zoomEntersAndLeavesFocusGraduallyWithAFullScalePlateau(_ automatic: Bool) throws {
+        var project = Self.project(duration: 3)
+        if automatic {
+            project.edits.autoZoom = true
+            project.pointers = [.init(time: 0.4, x: 0.3, y: 0.4, kind: .leftClick)]
+        } else {
+            project.edits.zoomClips = [.init(time: 0, duration: 2.4, scale: 1.8, x: 0.3, y: 0.4)]
+        }
+        try project.validate()
+        let track = RecordingExportEffectTrack(project: project)
+        let early = track.zoom(at: 0.35)
+        #expect(early.scale > 1 && early.scale < 1.4,
+                "Zoom must still be entering focus after 0.35 seconds instead of snapping to full scale")
+        #expect(early.x == 0.3 && early.y == 0.4)
+        let rising = [0.05, 0.15, 0.35, 0.55, 0.75].map { track.zoom(at: $0).scale }
+        #expect(zip(rising, rising.dropFirst()).allSatisfy { $0 < $1 })
+        #expect(track.zoom(at: 0.05).scale - 1 < track.zoom(at: 0.45).scale - track.zoom(at: 0.4).scale,
+                "Zoom must leave the boundary more gently than the middle of its transition")
+        for time in [0.9, 1.2, 1.5] {
+            #expect(track.zoom(at: time).scale == 1.8, "Slower transitions must retain the authored full-scale hold")
+        }
+        #expect(abs(track.zoom(at: 2.05).scale - early.scale) < 0.000_000_001,
+                "Leaving focus must use the same gradual motion as entering focus")
+        #expect(track.zoom(at: 2.4) == .init(scale: 1, x: 0.5, y: 0.5))
+        _ = track.zoom(at: 1.2)
+        #expect(track.zoom(at: 0.35) == early, "Seeking must not depend on the preceding animation frame")
+    }
+
+    @Test(arguments: [0.06, 0.6, 1.5])
+    func shortZoomsKeepTheirPeakAndRemainWithinTheirInterval(_ duration: Double) throws {
+        var project = Self.project(duration: 3)
+        project.edits.zoomClips = [.init(time: 1, duration: duration, scale: 3, x: 0.2, y: 0.8)]
+        try project.validate()
+        let track = RecordingExportEffectTrack(project: project)
+        #expect(track.zoom(at: 0.99).scale == 1)
+        for fraction in [0.0, 0.05, 0.2, 0.5, 0.8, 0.95] {
+            let sample = track.zoom(at: 1 + duration * fraction)
+            #expect(sample.scale.isFinite && (1...3).contains(sample.scale))
+            #expect(sample.x == 0.2 && sample.y == 0.8)
+        }
+        #expect(track.zoom(at: 1 + duration / 2).scale == 3,
+                "Short clips must adapt their transition duration and retain the selected zoom factor")
+        #expect(abs(track.zoom(at: 1 + duration * 0.2).scale
+                - track.zoom(at: 1 + duration * 0.8).scale) < 0.000_000_001)
+        #expect(track.zoom(at: 1 + duration).scale == 1)
+    }
+
+    @Test(arguments: [0.25, 1, 4] as [Double])
+    func zoomedFramesUseTheSlowerSourceTimedTransitionAtEveryClipSpeed(_ speed: Double) throws {
+        var project = Self.project(duration: 3)
+        project.edits.zoomClips = [.init(time: 0, duration: 2.4, scale: 1.8)]
+        project.edits.segments = [.init(start: 0, end: 3, speed: speed)]
+        let timeline = try RecordingExportTimeline(project: project)
+        let slice = try #require(timeline.slices.first)
+        let size = CGSize(width: 160, height: 120)
+        let marker = Self.solid(red: 1, green: 0, blue: 0, size: .init(width: 8, height: 120))
+            .transformed(by: .init(translationX: 26, y: 0))
+        let screen = marker.composited(over: Self.solid(red: 0, green: 0, blue: 0, size: size))
+        let renderer = try RecordingExportRenderer(project: project, size: size)
+        let entering = try renderer.image(screen: screen, camera: nil,
+            sourceTime: slice.sourceTime(at: 0.25 / speed), slice: slice)
+        let plateau = try renderer.image(screen: screen, camera: nil,
+            sourceTime: slice.sourceTime(at: 1.2 / speed), slice: slice)
+        let leaving = try renderer.image(screen: screen, camera: nil,
+            sourceTime: slice.sourceTime(at: 2.15 / speed), slice: slice)
+        #expect(try Self.pixel(entering, x: 24, y: 60).red > 0.8,
+                "The slower entering zoom must keep the edge marker visible before reaching the focus crop")
+        #expect(try Self.pixel(plateau, x: 24, y: 60).red < 0.1)
+        #expect(try Self.pixel(leaving, x: 24, y: 60).red > 0.8,
+                "The same source-clock transition must restore the edge marker while leaving focus")
     }
 
     @Test
@@ -435,6 +508,100 @@ struct ScreenRecordingExportTests {
         let decodedPixels = try Self.digest(decoded)
         let sourcePixels = try Self.digest(image)
         #expect(decodedPixels == sourcePixels)
+    }
+
+    @Test
+    func gifWhiteFadeStaysNeutralAndPreservesPrimaryColors() throws {
+        let fixture = try RecordingMultitrackTestFixture()
+        defer { fixture.remove() }
+        let width = 256
+        let height = 16
+        let primaries: [[UInt8]] = [[255, 0, 0], [0, 255, 0], [0, 0, 255],
+            [255, 255, 0], [255, 0, 255], [0, 255, 255]]
+        var bytes = [UInt8](repeating: 255, count: width * height * 4)
+        for y in 0..<height {
+            for x in 0..<width {
+                let color = y < height / 2 ? [UInt8](repeating: UInt8(x), count: 3) : primaries[x % primaries.count]
+                let offset = (y * width + x) * 4
+                bytes[offset] = color[0]
+                bytes[offset + 1] = color[1]
+                bytes[offset + 2] = color[2]
+            }
+        }
+        let image = try bytes.withUnsafeMutableBytes { buffer in
+            let context = try #require(CGContext(data: buffer.baseAddress, width: width, height: height,
+                bitsPerComponent: 8, bytesPerRow: width * 4, space: CGColorSpace(name: CGColorSpace.sRGB)!,
+                bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue))
+            return try #require(context.makeImage())
+        }
+        let destination = fixture.root.appendingPathComponent("neutral.gif")
+        let writer = try RecordingExportGIFWriter(url: destination, size: .init(width: width, height: height),
+            frameRate: 12, preserveGrayscale: true)
+        try writer.append(image)
+        try writer.finish()
+        let data = try Data(contentsOf: destination)
+        for index in 0..<256 {
+            let red = (index >> 5) & 7
+            let green = (index >> 2) & 7
+            let blue = index & 3
+            if red != green || blue != red / 2 {
+                let offset = 13 + index * 3
+                #expect(data[offset] == UInt8(red * 255 / 7)
+                    && data[offset + 1] == UInt8(green * 255 / 7)
+                    && data[offset + 2] == UInt8(blue * 255 / 3),
+                    "Grayscale support must keep every non-neutral color palette entry")
+            }
+        }
+        let source = try #require(CGImageSourceCreateWithURL(destination as CFURL, nil))
+        let decoded = try #require(CGImageSourceCreateImageAtIndex(source, 0, nil))
+        var previous: UInt8 = 0
+        for x in 0..<width {
+            let pixel = try RecordingMultitrackTestFixture.pixel(decoded, x: x, y: 3)
+            #expect(pixel[0] == pixel[1] && pixel[1] == pixel[2],
+                "A fading white stroke must stay neutral throughout the gray ramp: \(pixel)")
+            #expect(pixel[0] >= previous && abs(Int(pixel[0]) - x) <= 32,
+                "The fade must preserve its monotonic brightness within one GIF palette step")
+            previous = pixel[0]
+        }
+        #expect(try RecordingMultitrackTestFixture.pixel(decoded, x: 0, y: 3) == [0, 0, 0])
+        #expect(try RecordingMultitrackTestFixture.pixel(decoded, x: 255, y: 3) == [255, 255, 255])
+        for x in primaries.indices {
+            #expect(try RecordingMultitrackTestFixture.pixel(decoded, x: x, y: 12) == primaries[x],
+                "Neutral fade support must preserve saturated screen colors")
+        }
+    }
+
+    @Test
+    func gifNeutralPaletteIsUsedOnlyForVisibleRecordedCursorTrails() async throws {
+        let fixture = try RecordingMultitrackTestFixture()
+        defer { fixture.remove() }
+        _ = try await fixture.createVideo(colors: [.init(red: 0.17, green: 0.17, blue: 0.17)])
+        let pointer = RecordingPointer(time: 0, x: 0.5, y: 0.5)
+        let configurations: [(Bool?, Bool, [RecordingPointer])] = [
+            (nil, true, [pointer]), (false, true, [pointer]), (true, false, [pointer]), (true, true, []),
+        ]
+        for multitrack in [false, true] {
+            for (index, configuration) in configurations.enumerated() {
+                var project = fixture.project()
+                project.edits.segments = [.init(start: 0, end: 0.25)]
+                project.edits.cursorTrail = configuration.0
+                project.edits.showCursor = configuration.1
+                project.pointers = configuration.2
+                if multitrack { project.timeline = .migrating(project) }
+                let destination = fixture.root.appendingPathComponent("palette-\(multitrack)-\(index).gif")
+                try await ScreenRecordingExporter().export(project: project, directory: fixture.directory, to: destination,
+                    configuration: .init(format: .gif, resolution: .source, frameRate: 4))
+                let data = try Data(contentsOf: destination)
+                for paletteIndex in 0..<256 {
+                    let offset = 13 + paletteIndex * 3
+                    #expect(data[offset] == UInt8(((paletteIndex >> 5) & 7) * 255 / 7)
+                        && data[offset + 1] == UInt8(((paletteIndex >> 2) & 7) * 255 / 7)
+                        && data[offset + 2] == UInt8((paletteIndex & 3) * 255 / 3),
+                        "Hidden, disabled, and metadata-free trails must retain the existing GIF palette")
+                }
+            }
+        }
+        #expect(try fixture.files() == ["screen.mp4"])
     }
 
     @Test

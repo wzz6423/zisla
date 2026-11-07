@@ -77,7 +77,7 @@ struct RecordingExportEffectTrack {
     }
 
     private func evaluate(_ zoom: RecordingZoom, at time: Double) -> RecordingExportZoomState {
-        let ramp = min(0.35, zoom.duration / 3)
+        let ramp = min(0.8, zoom.duration / 3)
         let progress = min(1, min((time - zoom.time) / ramp, (zoom.time + zoom.duration - time) / ramp))
         let eased = progress * progress * (3 - 2 * progress)
         return RecordingExportZoomState(scale: pow(zoom.scale, eased), x: zoom.x, y: zoom.y)
@@ -199,7 +199,7 @@ final class RecordingExportRenderer {
         if project.edits.showCursor, project.edits.cursorTrail == true,
            let trail = try Self.trailImage(effects.trail(at: sourceTime, slice: slice), sourceTime: sourceTime,
                 source: normalized.extent.size, viewport: viewport, screen: screenRect, fill: screenRect == canvas,
-                lineWidth: cursor.extent.height * 0.18) {
+                lineWidth: cursor.extent.height * 0.08) {
             visible = trail.composited(over: visible).cropped(to: viewport)
         }
         if project.edits.clickEffects {
@@ -355,10 +355,10 @@ final class RecordingExportRenderer {
         guard !bounds.isEmpty else { return nil }
         let context = try bitmap(size: bounds.size)
         context.translateBy(x: -bounds.minX, y: -bounds.minY)
-        context.setLineWidth(lineWidth)
         for (start, end) in segments {
             let opacity = 1 - (sourceTime - samples[end].time) / RecordingExportEffectTrack.trailDuration
-            context.setStrokeColor(CGColor(red: 0.2, green: 0.75, blue: 1, alpha: opacity))
+            context.setLineWidth(lineWidth * opacity)
+            context.setStrokeColor(CGColor(gray: 1, alpha: opacity))
             context.move(to: points[start])
             context.addLine(to: points[end])
             context.strokePath()

@@ -146,7 +146,10 @@ enum RecordingMultitrackExportJob {
                     checkpoint: checkpoint) { await progress(0.75 + $0 * 0.23) }
             }
         } else if configuration.format == .gif {
-            let writer = try RecordingExportGIFWriter(url: temporary, size: size, frameRate: schedule.frameRate, duration: media.duration)
+            let writer = try RecordingExportGIFWriter(url: temporary, size: size, frameRate: schedule.frameRate,
+                                                       duration: media.duration,
+                                                       preserveGrayscale: project.edits.showCursor && project.edits.cursorTrail == true
+                                                           && !project.pointers.isEmpty)
             for index in 0..<schedule.frameCount {
                 try Task.checkCancellation()
                 try checkpoint(.frame(index))

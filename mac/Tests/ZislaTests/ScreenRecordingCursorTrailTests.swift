@@ -14,7 +14,24 @@ struct ScreenRecordingCursorTrailTests {
     func movingPointerLeavesAVisibleTrailBehindTheCursor() throws {
         let image = try render(project(), at: 0.5)
         let trail = try RecordingMultitrackTestFixture.pixel(image, x: 160, y: 120)
-        #expect(trail[1] > 40 && trail[2] > 80, "Moving the cursor must leave a visible cyan trail behind its current position")
+        #expect(trail[0] > 40 && trail[0] == trail[1] && trail[1] == trail[2],
+            "Moving the cursor must leave a visible white trail with no color tint: \(trail)")
+    }
+
+    @Test
+    func defaultTrailIsThinAndGraduallyTapersTowardItsOldestEnd() throws {
+        let size = CGSize(width: 1_280, height: 960)
+        let thin = try render(project(), at: 0.5, size: size)
+        #expect(try visibleTrailRows(thin, x: 640, y: 480) <= 4,
+            "The default trail must occupy at most four antialiased rows at this output size")
+        var source = project()
+        source.edits.cursorSize = 4
+        let tapered = try render(source, at: 0.5, size: size)
+        let widths = try [256, 384, 512, 640, 768].map { try visibleTrailRows(tapered, x: $0, y: 480) }
+        #expect(widths[0] > 0 && widths[0] < widths[2] && widths[2] < widths[4],
+            "The oldest tail must be thinnest, with a wider middle and head: \(widths)")
+        #expect(zip(widths, widths.dropFirst()).allSatisfy { $0 <= $1 && $1 - $0 <= 2 },
+            "Width must increase gradually without an abrupt jump along the trail: \(widths)")
     }
 
     @Test(arguments: [nil, false] as [Bool?])
@@ -42,11 +59,13 @@ struct ScreenRecordingCursorTrailTests {
     @Test
     func trailWidthFollowsTheSelectedCursorSize() throws {
         var source = project()
+        let size = CGSize(width: 1_280, height: 960)
         source.edits.cursorSize = 4
-        let large = try RecordingMultitrackTestFixture.pixel(render(source, at: 0.5), x: 160, y: 122)
+        let large = try render(source, at: 0.5, size: size)
         source.edits.cursorSize = 0.5
-        let small = try RecordingMultitrackTestFixture.pixel(render(source, at: 0.5), x: 160, y: 122)
-        #expect(large[2] > 30 && small[2] == 0, "The trail width must follow cursor size without adding another setting")
+        let small = try render(source, at: 0.5, size: size)
+        #expect(try visibleTrailRows(large, x: 640, y: 480) > visibleTrailRows(small, x: 640, y: 480),
+            "The trail width must follow cursor size without adding another setting")
     }
 
     @Test
@@ -141,7 +160,8 @@ struct ScreenRecordingCursorTrailTests {
         source.edits.cornerRadius = 0.1
         let image = try render(source, at: 0.5)
         let trail = try RecordingMultitrackTestFixture.pixel(image, x: 160, y: 120)
-        #expect(trail[1] > 40 && trail[2] > 80, "Source-space trails must remain aligned after crop and zoom: \(trail)")
+        #expect(trail[0] > 40 && trail[0] == trail[1] && trail[1] == trail[2],
+            "The thin white trail must remain aligned after crop and zoom: \(trail)")
         #expect(try RecordingMultitrackTestFixture.pixel(image, x: 3, y: 120) == [255, 255, 255],
             "The trail must stay inside the video mask and not draw over the background")
         source.pointers = [.init(time: 0, x: 0.05, y: 0.05), .init(time: 0.5, x: 0.1, y: 0.05)]
@@ -194,7 +214,10 @@ struct ScreenRecordingCursorTrailTests {
         let playback = try #require(frames.first { abs($0.0 - 0.5) < 0.001 }?.1)
         let previewPixel = try RecordingMultitrackTestFixture.pixel(preview, x: 160, y: 120)
         let playbackPixel = try RecordingMultitrackTestFixture.pixel(playback, x: 160, y: 120)
-        #expect(previewPixel[2] > 80 && playbackPixel[2] > 80)
+        for pixel in [previewPixel, playbackPixel] {
+            #expect(pixel.allSatisfy { $0 > 40 } && pixel.max()! - pixel.min()! <= 10,
+                "Preview and playback must retain a visible white trail: \(pixel)")
+        }
         let playbackTail = try #require(frames.first { abs($0.0 - 1.5) < 0.001 }?.1)
         #expect(try RecordingMultitrackTestFixture.pixel(playbackTail, x: 160, y: 120)[2] < 10,
             "Continuous playback must fade the same section of the trail when the pointer stops")
@@ -216,7 +239,8 @@ struct ScreenRecordingCursorTrailTests {
             faded = try await images.image(at: .init(seconds: 1.5, preferredTimescale: 600)).image
         }
         let exportedPixel = try RecordingMultitrackTestFixture.pixel(exported, x: 160, y: 120)
-        #expect(exportedPixel[1] > 25 && exportedPixel[2] > 50, "The trail must survive the video and GIF encoders")
+        #expect(exportedPixel.allSatisfy { $0 > 25 } && exportedPixel.max()! - exportedPixel.min()! <= 10,
+            "The thin white trail must survive the video and GIF encoders: \(exportedPixel)")
         #expect(try RecordingMultitrackTestFixture.pixel(faded, x: 160, y: 120)[2] < 10,
             "Exported animation must also fade completely after motion stops")
         #expect(exporter.progress == 1 && !exporter.isExporting)
@@ -236,8 +260,8 @@ struct ScreenRecordingCursorTrailTests {
         return source
     }
 
-    private func render(_ source: ScreenRecordingProject, at time: Double, slice: RecordingExportSlice? = nil) throws -> CGImage {
-        let size = CGSize(width: 320, height: 240)
+    private func render(_ source: ScreenRecordingProject, at time: Double, slice: RecordingExportSlice? = nil,
+                        size: CGSize = .init(width: 320, height: 240)) throws -> CGImage {
         let screen = CIImage(color: .black).cropped(to: CGRect(origin: .zero, size: size))
         return try RecordingExportRenderer(project: source, size: size)
             .image(screen: screen, camera: nil, sourceTime: time, slice: slice)
@@ -245,5 +269,11 @@ struct ScreenRecordingCursorTrailTests {
 
     private func pixels(_ image: CGImage) throws -> Data {
         try #require(image.dataProvider?.data) as Data
+    }
+
+    private func visibleTrailRows(_ image: CGImage, x: Int, y: Int) throws -> Int {
+        try ((y - 12)...(y + 12)).filter {
+            try RecordingMultitrackTestFixture.pixel(image, x: x, y: $0)[2] > 5
+        }.count
     }
 }

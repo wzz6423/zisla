@@ -9,7 +9,7 @@ final class RecordingExportGIFWriter {
     private let duration: Double?
     private var frameIndex = 0
 
-    init(url: URL, size: CGSize, frameRate: Int, duration: Double? = nil) throws {
+    init(url: URL, size: CGSize, frameRate: Int, duration: Double? = nil, preserveGrayscale: Bool = false) throws {
         width = Int(size.width)
         height = Int(size.height)
         self.frameRate = frameRate
@@ -23,9 +23,14 @@ final class RecordingExportGIFWriter {
         header.append(contentsOf: Self.word(height))
         header.append(contentsOf: [0xF7, 0, 0])
         for index in 0..<256 {
-            header.append(UInt8(((index >> 5) & 7) * 255 / 7))
-            header.append(UInt8(((index >> 2) & 7) * 255 / 7))
-            header.append(UInt8((index & 3) * 255 / 3))
+            let red = (index >> 5) & 7
+            let green = (index >> 2) & 7
+            let blue = index & 3
+            header.append(UInt8(red * 255 / 7))
+            header.append(UInt8(green * 255 / 7))
+            // RGB332 otherwise tints white trails as their opacity fades through gray.
+            let neutral = preserveGrayscale && red == green && blue == red / 2
+            header.append(UInt8(neutral ? red * 255 / 7 : blue * 255 / 3))
         }
         header.append(contentsOf: [0x21, 0xFF, 0x0B])
         header.append(Data("NETSCAPE2.0".utf8))

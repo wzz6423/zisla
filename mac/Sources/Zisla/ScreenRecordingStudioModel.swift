@@ -1124,7 +1124,10 @@ final class ScreenRecordingStudioModel: ObservableObject {
         timelinePlayer?.pause()
         isShowingTimelinePlayback = false
         if player.rate == 0 {
-            if !isShowingSourcePlayback, project?.timeline != nil {
+            if currentTime >= sourceDuration {
+                currentTime = 0
+                player.seek(to: .zero, toleranceBefore: .zero, toleranceAfter: .zero)
+            } else if !isShowingSourcePlayback, project?.timeline != nil {
                 let clip = selectedTimelineClip
                 currentTime = clip?.content.assetID == selectedMediaAssetID ? clip?.sourceStart ?? 0 : 0
                 player.seek(to: CMTime(seconds: currentTime, preferredTimescale: 60_000))
@@ -1146,14 +1149,16 @@ final class ScreenRecordingStudioModel: ObservableObject {
 
     func playTimeline() {
         commitPendingCanvasText?()
+        guard canExport, let project, let directory else { return }
+        let reachedEnd = playbackTime >= project.outputDuration
         if isShowingTimelinePlayback {
             timelinePlayer?.pause()
             isShowingTimelinePlayback = false
             refreshPreview()
             return
         }
-        guard canExport, let project, let directory else { return }
-        let start = playbackTime < project.outputDuration ? playbackTime : 0
+        if reachedEnd { seekTimeline(to: 0) }
+        let start = playbackTime
         isBusy = true
         operationTask = Task { [weak self] in
             guard let self else { return }
@@ -1172,12 +1177,15 @@ final class ScreenRecordingStudioModel: ObservableObject {
                 timelineObserver = player.addPeriodicTimeObserver(forInterval: CMTime(seconds: 0.1, preferredTimescale: 600), queue: .main) { [weak self] time in
                     Task { @MainActor [weak self] in
                         guard let self, isShowingTimelinePlayback else { return }
-                        playbackTime = time.seconds
-                        if let slice = timeline?.slice(at: time.seconds) { currentTime = slice.sourceTime(at: time.seconds) }
-                        else { currentTime = time.seconds }
-                        if time.seconds >= project.outputDuration {
+                        let ended = time.seconds >= project.outputDuration
+                            || time.seconds >= item.duration.seconds
+                        playbackTime = ended ? project.outputDuration : time.seconds
+                        if let timeline {
+                            currentTime = timeline.slice(at: playbackTime)?.sourceTime(at: playbackTime)
+                                ?? timeline.slices.last!.sourceEnd
+                        } else { currentTime = playbackTime }
+                        if ended {
                             isShowingTimelinePlayback = false
-                            playbackTime = 0
                             refreshPreview()
                         }
                     }
