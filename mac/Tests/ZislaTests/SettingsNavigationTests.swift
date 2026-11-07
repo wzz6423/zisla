@@ -1,3 +1,4 @@
+import AppKit
 import Foundation
 import SwiftUI
 import Testing
@@ -6,19 +7,28 @@ import ZislaCore
 @testable import Zisla
 
 struct SettingsNavigationTests {
-    @Test(arguments: [ColorScheme.light, .dark])
-    func categoryIconColorsKeepWhiteGlyphsLegible(colorScheme: ColorScheme) {
-        var environment = EnvironmentValues()
-        environment.colorScheme = colorScheme
-        for category in SettingsSection.allCases {
-            let color = category.iconColor.resolve(in: environment)
-            let components = [color.red, color.green, color.blue].map { component -> Double in
-                let value = Double(component)
-                return value <= 0.04045 ? value / 12.92 : pow((value + 0.055) / 1.055, 2.4)
+    @Test(arguments: [ColorScheme.light, .dark]) @MainActor
+    func categoryIconsUseAppleSystemColors(colorScheme: ColorScheme) throws {
+        let appearance = try #require(NSAppearance(named: colorScheme == .dark ? .darkAqua : .aqua))
+        appearance.performAsCurrentDrawingAppearance {
+            var environment = EnvironmentValues()
+            environment.colorScheme = colorScheme
+            let systemColors: [NSColor] = [.systemGray, .systemBlue, .systemIndigo, .systemRed,
+                                          .systemGreen, .systemOrange, .systemCyan]
+            let allowedColors = systemColors.map { Color(nsColor: $0).resolve(in: environment) }
+            for category in SettingsSection.allCases {
+                let color = category.iconColor.resolve(in: environment)
+                #expect(allowedColors.contains(color),
+                        "The \(category.rawValue) icon must use Apple's unmodified system palette in \(colorScheme)")
             }
-            let luminance = components[0] * 0.2126 + components[1] * 0.7152 + components[2] * 0.0722
-            #expect(1.05 / (luminance + 0.05) >= 3,
-                    "The \(category.rawValue) icon needs at least 3:1 contrast against its white glyph in \(colorScheme)")
+        }
+    }
+
+    @Test
+    func keyboardSoundRowsUseTheKeyboardCategoryColor() {
+        for symbol in ["waveform", "speaker.wave.2", "arrow.uturn.backward", "waveform.path.ecg", "chart.bar.xaxis"] {
+            #expect(SettingsSection.keyboardSound.iconColor(for: symbol) == SettingsSection.keyboardSound.iconColor,
+                    "The \(symbol) keyboard setting must keep the keyboard category color")
         }
     }
 

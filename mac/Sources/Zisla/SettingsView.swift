@@ -4449,15 +4449,13 @@ enum SettingsSection: String, CaseIterable, Identifiable {
 
     var iconColor: Color {
         switch self {
-        case .general, .features, .permissions: Color(red: 0.48, green: 0.48, blue: 0.50)
-        case .info, .weather: Color(red: 0, green: 0.55, blue: 0.70)
-        case .clipboardAssistant, .screenshot, .ai, .recommendations: .purple
-        case .recording, .pdfTools: .red
-        case .voice: .pink
-        case .mail, .networkProxy: .blue
-        case .keyboardSound: Color(red: 0.85, green: 0.42, blue: 0.03)
-        case .download, .updates: Color(red: 0.16, green: 0.60, blue: 0.27)
-        case .pet: .brown
+        case .general, .features, .keyboardSound, .permissions: Color(nsColor: .systemGray)
+        case .info, .mail, .networkProxy: Color(nsColor: .systemBlue)
+        case .clipboardAssistant, .screenshot, .ai, .recommendations: Color(nsColor: .systemIndigo)
+        case .recording, .pdfTools, .voice: Color(nsColor: .systemRed)
+        case .download, .updates: Color(nsColor: .systemGreen)
+        case .weather: Color(nsColor: .systemCyan)
+        case .pet: Color(nsColor: .systemOrange)
         }
     }
 
@@ -4465,18 +4463,23 @@ enum SettingsSection: String, CaseIterable, Identifiable {
         if let section = Self.allCases.first(where: { $0.symbol == symbol }) {
             return section.iconColor
         }
+        if self == .keyboardSound,
+           ["waveform", "speaker.wave.2", "arrow.uturn.backward", "waveform.path.ecg", "chart.bar.xaxis"].contains(symbol) {
+            return iconColor
+        }
         switch symbol {
         case "power", "power.circle.fill", "battery.100percent", "arrow.down.circle", "arrow.down.square.fill",
              "square.and.arrow.down", "arrow.triangle.2.circlepath", "arrow.triangle.branch", "checkmark.seal.fill":
             return Self.download.iconColor
         case "calendar", "calendar.badge.clock", "bell.fill", "bell.badge.fill", "bell.slash.fill":
-            return .red
+            return Self.recording.iconColor
         case "heart.fill", "music.note", "music.note.list", "play.square.fill",
              "text.quote", "waveform", "speaker.wave.2":
-            return .pink
-        case "folder", "folder.fill", "folder.badge.plus", "tray.full.fill", "tray.and.arrow.down",
-             "clipboard", "clipboard.fill", "note.text", "wrench.and.screwdriver.fill", "wrench.and.screwdriver":
-            return Self.keyboardSound.iconColor
+            return Self.voice.iconColor
+        case "folder", "folder.fill", "folder.badge.plus", "tray.full.fill", "tray.and.arrow.down":
+            return Self.mail.iconColor
+        case "clipboard", "clipboard.fill", "note.text", "wrench.and.screwdriver.fill", "wrench.and.screwdriver":
+            return Color(nsColor: .systemOrange)
         case "camera.fill", "pin.fill", "sparkle":
             return Self.screenshot.iconColor
         case "doc.viewfinder":
@@ -4484,12 +4487,12 @@ enum SettingsSection: String, CaseIterable, Identifiable {
         case "rectangle.stack":
             return Self.recording.iconColor
         case "doc.richtext", "terminal", "terminal.fill", "chevron.left.forwardslash.chevron.right", "hammer":
-            return .indigo
+            return Self.ai.iconColor
         case "cpu", "chart.bar.fill", "chart.bar.xaxis", "chart.xyaxis.line",
              "gauge.with.dots.needle.67percent", "waveform.path.ecg", "display":
             return Self.info.iconColor
         case "character.bubble", "envelope", "link":
-            return .blue
+            return Self.mail.iconColor
         case "capsule", "viewfinder", "menubar.rectangle", "macwindow.on.rectangle", "lock.display",
              "rectangle.on.rectangle", "rectangle.on.rectangle.angled", "rectangle.topthird.inset.filled",
              "rectangle.bottomhalf.inset.filled", "rectangle.compress.vertical", "rectangle.split.2x1",
