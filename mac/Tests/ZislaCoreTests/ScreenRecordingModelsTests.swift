@@ -7,6 +7,91 @@ struct ScreenRecordingModelsTests {
         .init(name: "Demo", videoFile: "screen.mp4", duration: 12, width: 1_920, height: 1_080)
     }
 
+    @Test(arguments: [nil, false, true] as [Bool?])
+    func cursorTrailChoiceRoundTripsWithoutChangingOtherEdits(_ choice: Bool?) throws {
+        var source = project()
+        source.edits.cursorTrail = choice
+        let decoded = try JSONDecoder().decode(ScreenRecordingProject.self, from: JSONEncoder().encode(source))
+        try decoded.validate()
+        #expect(decoded == source, "Saving and reopening must preserve the trail choice and all other edits")
+    }
+
+    @Test
+    func legacyProjectWithoutCursorTrailLoadsWithTheEffectDisabled() throws {
+        var source = project()
+        source.edits.cursorTrail = true
+        var legacy = try #require(JSONSerialization.jsonObject(with: JSONEncoder().encode(source)) as? [String: Any])
+        var edits = try #require(legacy["edits"] as? [String: Any])
+        edits.removeValue(forKey: "cursorTrail")
+        legacy["edits"] = edits
+        let decoded = try JSONDecoder().decode(ScreenRecordingProject.self,
+            from: JSONSerialization.data(withJSONObject: legacy))
+        source.edits.cursorTrail = nil
+        try decoded.validate()
+        #expect(decoded == source, "Older manifests must load without a version bump or enabled trail")
+    }
+
+    @Test(arguments: [#""true""#, "1", "[false]"])
+    func invalidCursorTrailValuesAreRejected(_ literal: String) throws {
+        var document = try #require(JSONSerialization.jsonObject(with: JSONEncoder().encode(project())) as? [String: Any])
+        var edits = try #require(document["edits"] as? [String: Any])
+        edits["cursorTrail"] = try JSONSerialization.jsonObject(with: Data(literal.utf8), options: .fragmentsAllowed)
+        document["edits"] = edits
+        let data = try JSONSerialization.data(withJSONObject: document)
+        #expect(throws: DecodingError.self) { try JSONDecoder().decode(ScreenRecordingProject.self, from: data) }
+    }
+
+    @Test(arguments: [nil, RecordingColor(red: 0, green: 0, blue: 0),
+        .init(red: 1, green: 1, blue: 1), .init(red: 0.2, green: 0.7, blue: 0.4)] as [RecordingColor?])
+    func cursorTrailColorRoundTripsWithoutChangingOtherEdits(_ color: RecordingColor?) throws {
+        var source = project()
+        source.edits = RecordingEdits(segments: source.edits.segments, cursorTrail: true, cursorTrailColor: color)
+        #expect(source.edits.cursorTrailColor == color)
+        let decoded = try JSONDecoder().decode(ScreenRecordingProject.self, from: JSONEncoder().encode(source))
+        try decoded.validate()
+        #expect(decoded == source, "Saving must retain the chosen RGB color without changing other edits")
+        #expect(decoded.edits.effectiveCursorTrailColor == (color ?? .init(red: 1, green: 1, blue: 1)))
+    }
+
+    @Test(arguments: [false, true], [1, 2])
+    func missingOrNullCursorTrailColorLoadsWithTheWhiteDefault(_ explicitNull: Bool, _ version: Int) throws {
+        var source = project()
+        source.version = version
+        source.edits.cursorTrail = true
+        source.edits.cursorTrailColor = .init(red: 0.2, green: 0.7, blue: 0.4)
+        var document = try #require(JSONSerialization.jsonObject(with: JSONEncoder().encode(source)) as? [String: Any])
+        var edits = try #require(document["edits"] as? [String: Any])
+        if explicitNull { edits["cursorTrailColor"] = NSNull() }
+        else { edits.removeValue(forKey: "cursorTrailColor") }
+        document["edits"] = edits
+        let decoded = try JSONDecoder().decode(ScreenRecordingProject.self, from: JSONSerialization.data(withJSONObject: document))
+        source.edits.cursorTrailColor = nil
+        try decoded.validate()
+        #expect(decoded == source && decoded.version == version)
+        #expect(decoded.edits.effectiveCursorTrailColor == .init(red: 1, green: 1, blue: 1),
+            "Existing manifests must keep a white trail without writing a new color or migrating their version")
+    }
+
+    @Test(arguments: [Double.nan, .infinity, -.infinity, -0.001, 1.000_001])
+    func invalidCursorTrailColorComponentsAreRejected(_ component: Double) {
+        for color in [RecordingColor(red: component, green: 0, blue: 0),
+            .init(red: 0, green: component, blue: 0), .init(red: 0, green: 0, blue: component)] {
+            var source = project()
+            source.edits.cursorTrailColor = color
+            #expect(throws: ScreenRecordingProjectError.invalidProject) { try source.validate() }
+        }
+    }
+
+    @Test(arguments: [#""red""#, "1", #"{"red":true,"green":0,"blue":0}"#, #"{"red":1}"#])
+    func malformedCursorTrailColorFieldsAreRejected(_ literal: String) throws {
+        var document = try #require(JSONSerialization.jsonObject(with: JSONEncoder().encode(project())) as? [String: Any])
+        var edits = try #require(document["edits"] as? [String: Any])
+        edits["cursorTrailColor"] = try JSONSerialization.jsonObject(with: Data(literal.utf8), options: .fragmentsAllowed)
+        document["edits"] = edits
+        let data = try JSONSerialization.data(withJSONObject: document)
+        #expect(throws: DecodingError.self) { try JSONDecoder().decode(ScreenRecordingProject.self, from: data) }
+    }
+
     @Test(arguments: [false, true])
     func newProjectPreservesFullSourceAndRoundTrips(fromRecording: Bool) throws {
         let source = fromRecording

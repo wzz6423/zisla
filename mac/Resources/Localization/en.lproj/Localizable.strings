@@ -2936,6 +2936,8 @@
 "时间线" = "Timeline";
 "显示器" = "Display";
 "显示鼠标" = "Show Cursor";
+"鼠标轨迹" = "Cursor Trail";
+"轨迹颜色" = "Trail Color";
 "暂停录制" = "Pause Recording";
 "暂停或继续录制" = "Pause or Resume Recording";
 "暂停预览" = "Pause Preview";

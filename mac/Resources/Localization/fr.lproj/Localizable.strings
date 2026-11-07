@@ -2933,6 +2933,8 @@
 "时间线" = "Timeline";
 "显示器" = "Écran";
 "显示鼠标" = "Afficher le curseur";
+"鼠标轨迹" = "Traînée du curseur";
+"轨迹颜色" = "Couleur de la traînée";
 "暂停录制" = "Mettre l’enregistrement en pause";
 "暂停或继续录制" = "Mettre en pause ou reprendre l’enregistrement";
 "暂停预览" = "Mettre l’aperçu en pause";

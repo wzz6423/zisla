@@ -2937,6 +2937,8 @@
 "时间线" = "Tijdlijn";
 "显示器" = "Beeldscherm";
 "显示鼠标" = "Cursor tonen";
+"鼠标轨迹" = "Cursorspoor";
+"轨迹颜色" = "Spoorkleur";
 "暂停录制" = "Opname pauzeren";
 "暂停或继续录制" = "Opname pauzeren of hervatten";
 "暂停预览" = "Voorbeeld pauzeren";

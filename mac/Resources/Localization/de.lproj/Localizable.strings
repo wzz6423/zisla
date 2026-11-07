@@ -2938,6 +2938,8 @@
 "时间线" = "Zeitleiste";
 "显示器" = "Bildschirm";
 "显示鼠标" = "Mauszeiger anzeigen";
+"鼠标轨迹" = "Mauszeigerspur";
+"轨迹颜色" = "Spurfarbe";
 "暂停录制" = "Aufnahme pausieren";
 "暂停或继续录制" = "Aufnahme pausieren oder fortsetzen";
 "暂停预览" = "Vorschau pausieren";

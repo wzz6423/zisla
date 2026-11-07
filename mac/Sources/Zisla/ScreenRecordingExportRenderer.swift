@@ -10,6 +10,7 @@ struct RecordingExportZoomState: Equatable, Sendable {
 }
 
 struct RecordingExportEffectTrack {
+    static let trailDuration = 0.6
     private let pointers: [RecordingPointer]
     private let clicks: [RecordingPointer]
     private let manualZooms: [RecordingZoom]
@@ -53,6 +54,16 @@ struct RecordingExportEffectTrack {
         return clicks[lower..<upper]
     }
 
+    func trail(at time: Double, slice: RecordingExportSlice?) -> [RecordingPointer] {
+        let start = max(time - Self.trailDuration, slice?.sourceStart ?? 0)
+        // A fixed sample budget keeps dense and week-long pointer tracks bounded per frame.
+        return (0...36).compactMap { index in
+            let sampleTime = start + (time - start) * Double(index) / 36
+            guard let point = pointer(at: sampleTime, slice: slice) else { return nil }
+            return RecordingPointer(time: sampleTime, x: point.x, y: point.y)
+        }
+    }
+
     func zoom(at time: Double) -> RecordingExportZoomState {
         if let manual = activeZoom(manualZooms, at: time) { return evaluate(manual, at: time) }
         if let automatic = activeZoom(automaticZooms, at: time) { return evaluate(automatic, at: time) }
@@ -66,7 +77,7 @@ struct RecordingExportEffectTrack {
     }
 
     private func evaluate(_ zoom: RecordingZoom, at time: Double) -> RecordingExportZoomState {
-        let ramp = min(0.35, zoom.duration / 3)
+        let ramp = min(0.8, zoom.duration / 3)
         let progress = min(1, min((time - zoom.time) / ramp, (zoom.time + zoom.duration - time) / ramp))
         let eased = progress * progress * (3 - 2 * progress)
         return RecordingExportZoomState(scale: pow(zoom.scale, eased), x: zoom.x, y: zoom.y)
@@ -190,6 +201,12 @@ final class RecordingExportRenderer {
         let zoom = effects.zoom(at: sourceTime)
         let viewport = Self.viewport(crop: crop, zoom: zoom, source: normalized.extent.size)
         var visible = normalized.cropped(to: viewport)
+        if project.edits.showCursor, project.edits.cursorTrail == true,
+           let trail = try Self.trailImage(effects.trail(at: sourceTime, slice: slice), sourceTime: sourceTime,
+                source: normalized.extent.size, viewport: viewport, screen: screenRect, fill: screenRect == canvas,
+                lineWidth: cursor.extent.height * 0.08, color: project.edits.effectiveCursorTrailColor) {
+            visible = trail.composited(over: visible).cropped(to: viewport)
+        }
         if project.edits.clickEffects {
             for click in effects.recentClicks(at: sourceTime, slice: slice) {
                 let location = CGPoint(x: click.x * normalized.extent.width,
@@ -256,14 +273,18 @@ final class RecordingExportRenderer {
     }
 
     static func fit(_ image: CIImage, from source: CGRect, to rect: CGRect, fill: Bool) -> CIImage {
+        let transform = fitTransform(from: source, to: rect, fill: fill)
+        return image.transformed(by: transform).cropped(to: rect)
+    }
+
+    private static func fitTransform(from source: CGRect, to rect: CGRect, fill: Bool) -> CGAffineTransform {
         let scaleX = rect.width / source.width
         let scaleY = rect.height / source.height
         let scale = fill ? max(scaleX, scaleY) : min(scaleX, scaleY)
         // Keep the fractional viewport in one transform because Core Image rounds intermediate extents outward.
-        let transform = CGAffineTransform(a: scale, b: 0, c: 0, d: scale,
+        return CGAffineTransform(a: scale, b: 0, c: 0, d: scale,
                                           tx: rect.midX - source.midX * scale,
                                           ty: rect.midY - source.midY * scale)
-        return image.transformed(by: transform).cropped(to: rect)
     }
 
     private static func masked(_ image: CIImage, mask: CIImage, canvas: CGRect) -> CIImage {
@@ -333,6 +354,59 @@ final class RecordingExportRenderer {
         context.strokeEllipse(in: CGRect(x: 2, y: 2, width: side - 4, height: side - 4))
         return try bitmapImage(context).transformed(by: CGAffineTransform(translationX: center.x - side / 2,
                                                                          y: center.y - side / 2))
+    }
+
+    private static func trailImage(_ samples: [RecordingPointer], sourceTime: Double, source: CGSize,
+                                   viewport: CGRect, screen: CGRect, fill: Bool, lineWidth: Double,
+                                   color: RecordingColor) throws -> CIImage? {
+        let transform = fitTransform(from: viewport, to: screen, fill: fill)
+        let moving = samples.reduce(into: [RecordingPointer]()) { result, sample in
+            if result.last?.x != sample.x || result.last?.y != sample.y { result.append(sample) }
+        }
+        let points = moving.map { CGPoint(x: $0.x * source.width, y: (1 - $0.y) * source.height).applying(transform) }
+        let bounds = points.reduce(CGRect.null) { $0.union(CGRect(origin: $1, size: .zero)) }
+            .insetBy(dx: -lineWidth, dy: -lineWidth).intersection(screen).integral
+        guard !bounds.isEmpty else { return nil }
+        let context = try bitmap(size: bounds.size)
+        context.translateBy(x: -bounds.minX, y: -bounds.minY)
+        context.setLineCap(.round)
+        for index in points.indices {
+            let point = points[index]
+            let previous = points[max(0, index - 1)]
+            let next = points[min(points.count - 1, index + 1)]
+            let start = CGPoint(x: (previous.x + point.x) / 2, y: (previous.y + point.y) / 2)
+            let end = CGPoint(x: (point.x + next.x) / 2, y: (point.y + next.y) / 2)
+            guard start != point || point != end else { continue }
+            let startTime = (moving[max(0, index - 1)].time + moving[index].time) / 2
+            let endTime = (moving[index].time + moving[min(moving.count - 1, index + 1)].time) / 2
+            var from = start
+            // Split the curve to keep taper and fade continuous without replacing the bend with straight chords.
+            for step in 1...2 {
+                let fraction = Double(step) / 2
+                let inverse = 1 - fraction
+                let to = CGPoint(x: inverse * inverse * start.x + 2 * inverse * fraction * point.x + fraction * fraction * end.x,
+                    y: inverse * inverse * start.y + 2 * inverse * fraction * point.y + fraction * fraction * end.y)
+                let previousFraction = Double(step - 1) / 2
+                let control = CGPoint(x: from.x + ((1 - previousFraction) * (point.x - start.x) + previousFraction * (end.x - point.x)) / 2,
+                    y: from.y + ((1 - previousFraction) * (point.y - start.y) + previousFraction * (end.y - point.y)) / 2)
+                let time = startTime + (endTime - startTime) * fraction
+                let opacity = 1 - (sourceTime - time) / RecordingExportEffectTrack.trailDuration
+                context.setLineWidth(lineWidth * opacity)
+                context.setStrokeColor(CGColor(gray: opacity, alpha: 1))
+                context.move(to: from)
+                context.addQuadCurve(to: to, control: control)
+                context.strokePath()
+                from = to
+            }
+        }
+        let mask = try bitmapImage(context)
+        let tint = CIImage(color: CIColor(red: color.red, green: color.green, blue: color.blue)).cropped(to: mask.extent)
+        // Rasterize at output resolution so zoomed trails do not become subpixel source strokes.
+        return tint.applyingFilter("CIBlendWithMask", parameters: [
+            kCIInputBackgroundImageKey: CIImage(color: .clear).cropped(to: mask.extent),
+            kCIInputMaskImageKey: mask,
+        ]).transformed(by: .init(translationX: bounds.minX, y: bounds.minY))
+            .transformed(by: transform.inverted())
     }
 
     static func annotationImage(_ annotation: RecordingAnnotation, canvas: CGRect,
