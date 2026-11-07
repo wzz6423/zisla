@@ -9,6 +9,58 @@ import ZislaKit
 
 @Suite(.serialized)
 struct AIProgressModuleViewTests {
+    @Test(arguments: [(CGFloat(280), 23), (CGFloat(378), 23), (CGFloat(378), 22),
+        (CGFloat(378), 0), (CGFloat(378), 12)],
+        AppLanguage.allCases)
+    @MainActor
+    func heatmapMonthLabelsRemainFullyVisibleAtTheGridEdges(
+        scenario: (width: CGFloat, weekIndex: Int), language: AppLanguage
+    ) throws {
+        let previousArguments = UserDefaults.standard.volatileDomain(forName: UserDefaults.argumentDomain)
+        var arguments = previousArguments
+        arguments[AppLocalization.defaultsKey] = language.rawValue
+        UserDefaults.standard.setVolatileDomain(arguments, forName: UserDefaults.argumentDomain)
+        defer { UserDefaults.standard.setVolatileDomain(previousArguments, forName: UserDefaults.argumentDomain) }
+        let date = try #require(Calendar.current.date(from: DateComponents(year: 2026, month: 11, day: 1)))
+        var weeks = Array(repeating: Array<ContributionDay?>(repeating: nil, count: 7), count: 24)
+        weeks[scenario.weekIndex][0] = ContributionDay(date: date, tokens: 0)
+        let direction: LayoutDirection = language.isRightToLeft ? .rightToLeft : .leftToRight
+        let heatmap = ImageRenderer(content: UsageHeatmap(weeks: weeks)
+            .frame(width: scenario.width)
+            .clipped()
+            .background(.black)
+            .environment(\.colorScheme, .dark)
+            .environment(\.locale, language.locale)
+            .environment(\.layoutDirection, direction))
+        heatmap.scale = 2
+        let rendered = NSBitmapImageRep(cgImage: try #require(heatmap.cgImage))
+        let label = ImageRenderer(content: Text(AppLocalization.text("%ld月", 11))
+            .font(.system(size: 9, weight: .semibold, design: .monospaced))
+            .foregroundStyle(.primary.opacity(0.75))
+            .fixedSize(horizontal: true, vertical: false)
+            .frame(width: scenario.width, height: 13, alignment: .topLeading)
+            .background(.black)
+            .environment(\.colorScheme, .dark)
+            .environment(\.locale, language.locale)
+            .environment(\.layoutDirection, direction))
+        label.scale = 2
+        let reference = NSBitmapImageRep(cgImage: try #require(label.cgImage))
+        let labelTop = (scenario.width * 7 / 24 + 3) * heatmap.scale
+        let visible = textMetrics(in: rendered,
+            rows: Int(floor(labelTop))..<Int(ceil(labelTop + 13 * heatmap.scale)))
+        let full = textMetrics(in: reference, rows: 0..<reference.pixelsHigh)
+        try #require(full.weight > 0, "The reference must contain the complete month label")
+        #expect(visible.weight >= full.weight * 0.95,
+            "\(language.rawValue) month label in week \(scenario.weekIndex) must remain fully inside the grid")
+        if scenario.weekIndex == 0 || scenario.weekIndex == 12 {
+            let offset = Double(CGFloat(scenario.weekIndex) * (scenario.width + 1.5) / 24 * heatmap.scale)
+            let expectedCenter = full.horizontalMoment / full.weight
+                + (direction == .rightToLeft ? -offset : offset)
+            #expect(abs(visible.horizontalMoment / visible.weight - expectedCenter) < 2,
+                "Month labels with enough space must stay aligned with their week")
+        }
+    }
+
     @Test(arguments: [(CGFloat(560), 12, true), (CGFloat(752), 12, true), (CGFloat(980), 12, true),
         (CGFloat(752), 12, false), (CGFloat(752), 0, false)],
         [AppLanguage.simplifiedChinese, .english, .arabic])
@@ -147,6 +199,21 @@ struct AIProgressModuleViewTests {
         let lastLabelX = try labelCenter(near: lastLineX)
         #expect(abs(firstLabelX - Double(firstLineX)) < 10, "First date is not centered on its data point")
         #expect(abs(lastLabelX - Double(lastLineX)) < 10, "Last date is not centered on its data point")
+    }
+
+    @MainActor
+    private func textMetrics(in bitmap: NSBitmapImageRep, rows: Range<Int>) -> (weight: Double, horizontalMoment: Double) {
+        var weight = 0.0
+        var horizontalMoment = 0.0
+        for y in rows {
+            for x in 0..<bitmap.pixelsWide {
+                if let color = bitmap.colorAt(x: x, y: y)?.usingColorSpace(.deviceRGB) {
+                    weight += Double(color.redComponent)
+                    horizontalMoment += Double(x) * Double(color.redComponent)
+                }
+            }
+        }
+        return (weight, horizontalMoment)
     }
 
     @MainActor
