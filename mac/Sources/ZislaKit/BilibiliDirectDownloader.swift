@@ -185,6 +185,10 @@ public struct BilibiliDirectDownloader: BilibiliDownloading, Sendable {
         return request
     }
 
+    static func supportsURL(_ string: String) -> Bool {
+        DownloadFailureDiagnostics.isBilibiliURL(string) && bvid(from: string) != nil
+    }
+
     private static func bvid(from string: String) -> String? {
         guard let url = URL(string: string) else { return nil }
         return url.pathComponents.first(where: { component in
