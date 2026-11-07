@@ -120,8 +120,9 @@ struct MonitorIntegrationLocalizationTests {
             "Zisla/BatteryPowerModeButton", "Zisla/SignificantEnergyView", "Zisla/NetworkSwitchButton",
             "Zisla/SystemMonitorView", "Zisla/WiFiNetworkPanelView",
             "ZislaKit/WiFiNetworkService", "ZislaKit/SystemWiFiPanelController",
+            "ZislaKit/AISessionWorkspaceCleanup",
         ]
-        var keys: Set<String> = ["Wi-Fi"]
+        var keys: Set<String> = ["Wi-Fi", "会话仍保留或无法确认删除状态，已保留工作目录"]
         for file in files {
             let source = try String(contentsOf: packageRoot.appendingPathComponent("Sources/\(file).swift"), encoding: .utf8)
             for match in token.matches(in: source, range: NSRange(source.startIndex..., in: source)) {

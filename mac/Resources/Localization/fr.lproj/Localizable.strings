@@ -3323,6 +3323,9 @@
 "更改 %@ 的保存位置" = "Changer l’emplacement de sauvegarde pour %@";
 
 "本地优先的原生笔记应用" = "Application de notes native privilégiant le stockage local";
+"AI 会话工作目录" = "Dossiers de travail des sessions IA";
+"对应会话已删除；清理前请确认目录中的文件" = "Les sessions associées ont été supprimées ; vérifiez les fichiers avant le nettoyage";
+"会话仍保留或无法确认删除状态，已保留工作目录" = "La session est conservée ou sa suppression ne peut pas être vérifiée ; le dossier a été conservé";
 
 "保存手写备忘录需要辅助功能权限" = "L’accès à l’accessibilité est nécessaire pour enregistrer les notes manuscrites";
 "备忘录内容已变化，请重新打开后编辑" = "La note a changé. Rouvrez-la avant de la modifier";

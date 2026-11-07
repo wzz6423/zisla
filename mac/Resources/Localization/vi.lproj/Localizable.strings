@@ -3327,6 +3327,9 @@
 "更改 %@ 的保存位置" = "Đổi vị trí lưu cho %@";
 
 "本地优先的原生笔记应用" = "Ứng dụng ghi chú gốc ưu tiên lưu trữ cục bộ";
+"AI 会话工作目录" = "Thư mục làm việc của phiên AI";
+"对应会话已删除；清理前请确认目录中的文件" = "Các phiên liên quan đã bị xóa; hãy kiểm tra tệp trước khi dọn dẹp";
+"会话仍保留或无法确认删除状态，已保留工作目录" = "Phiên vẫn được giữ hoặc không thể xác minh việc xóa; thư mục làm việc đã được giữ lại";
 
 "保存手写备忘录需要辅助功能权限" = "Cần quyền Trợ năng để lưu ghi chú viết tay";
 "备忘录内容已变化，请重新打开后编辑" = "Ghi chú đã thay đổi. Mở lại trước khi chỉnh sửa";
