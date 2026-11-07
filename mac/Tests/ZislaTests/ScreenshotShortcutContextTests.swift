@@ -76,10 +76,245 @@ struct ScreenshotShortcutContextTests {
     }
 
     @Test
+    func focusedPinsAllowBothCaptureHotkeysAndSurviveSelectionAndEditorCancellation() async throws {
+        let suiteName = "Zisla.ScreenshotShortcutContext.\(UUID().uuidString)"
+        let defaults = try #require(UserDefaults(suiteName: suiteName))
+        let store = FeatureSettingsStore(defaults: defaults)
+        defer {
+            store.flushPendingChanges()
+            defaults.removePersistentDomain(forName: suiteName)
+        }
+        var closedEditors = 0
+        let pins = try (0..<2).map { index in
+            try syntheticEditor(settingsStore: store, keyWindow: index == 0 ? true : nil,
+                onClose: { closedEditors += 1 })
+        }
+        defer { pins.forEach { $0.close() } }
+        for pin in pins {
+            pin.setPinned(true)
+            let hosting = try #require(pin.window?.contentView as? NSHostingView<ScreenshotPinnedImageView>)
+            hosting.sizingOptions = []
+            pin.setPinnedScale(1.4)
+            pin.setPinnedOpacity(0.45)
+        }
+        let firstWindow = try #require(pins[0].window)
+        let views = try pins.map { try #require($0.window?.contentView) }
+        let frames = pins.map { $0.window?.frame }
+        try #require(firstWindow.isKeyWindow)
+        #expect(!firstWindow.isVisible, "Injected focus must not present a window")
+
+        let image = try #require((views[0] as? NSHostingView<ScreenshotPinnedImageView>)?.rootView.image)
+        let pixels = try #require(image.cgImage(forProposedRect: nil, context: nil, hints: nil))
+        let screen = try #require(NSScreen.screens.first)
+        let capture = GlobalHotkeyManager()
+        let longCapture = GlobalHotkeyManager()
+        let globals = [capture, longCapture]
+        let flags = UInt32(controlKey | optionKey | cmdKey | shiftKey)
+        let captureKeys = [UInt32(kVK_F17), UInt32(kVK_F18)]
+        let escapeKeys = [UInt32(kVK_F19), UInt32(kVK_F20)]
+        defer {
+            (globals + pins.map(\.pinnedEscapeHotkeyManager)).forEach { $0.unregister() }
+        }
+        for (pin, key) in zip(pins, escapeKeys) {
+            let result = pin.pinnedEscapeHotkeyManager.register(keyCode: key, modifiers: flags,
+                action: { [weak pin] in pin?.close() })
+            #expect(result == .registered)
+        }
+        var panels: [ScreenshotSelectionPanel] = []
+        let selection = ScreenshotSelectionController(
+            captureScreen: { _ in (image, pixels) },
+            presentPanels: { panels = $0 },
+            snapTargets: { _ in [] }
+        )
+        defer { selection.cancel() }
+        selection.onSelectionWillPresent = {
+            ScreenshotHotkeyContext.update(selecting: true, editors: pins, globalManagers: globals)
+        }
+        selection.onCancelled = {
+            ScreenshotHotkeyContext.update(selecting: false, editors: pins, globalManagers: globals)
+        }
+        var captureTask: Task<Void, Never>?
+        var requestedCapture: UInt32?
+        for (manager, key) in zip(globals, captureKeys) {
+            #expect(manager.register(keyCode: key, modifiers: flags, action: {
+                requestedCapture = key
+                captureTask = Task { await selection.start(on: [screen, screen]) }
+            }) == .registered)
+        }
+        ScreenshotHotkeyContext.update(selecting: false, editors: pins, globalManagers: globals)
+        #expect(globals.allSatisfy { !$0.isSuspended && $0.hasActiveRegistration },
+            "Focused pins must leave both capture registrations active")
+        #expect(pins.allSatisfy { $0.pinnedEscapeHotkeyManager.isSuspended },
+            "Focused pins must keep global Escape from claiming the local cancel key")
+
+        for key in captureKeys {
+            captureTask = nil
+            #expect(try sendHotkeyPressed(keyCode: key, modifiers: flags) == noErr)
+            await (try #require(captureTask)).value
+            #expect(requestedCapture == key)
+            #expect(selection.selectionWindowCount == 2)
+            #expect(globals.allSatisfy { $0.isSuspended && !$0.hasActiveRegistration })
+            for escapeKey in escapeKeys {
+                #expect(try sendHotkeyPressed(keyCode: escapeKey, modifiers: flags) == eventNotHandledErr)
+            }
+            let panel = try #require(panels.first)
+            panel.cancelOperation(nil)
+            #expect(selection.selectionWindowCount == 0)
+            #expect(panels.allSatisfy { $0.contentView == nil && !$0.isVisible })
+            #expect(globals.allSatisfy { !$0.isSuspended && $0.hasActiveRegistration })
+        }
+
+        let editor = try syntheticEditor(settingsStore: store, onClose: { closedEditors += 1 })
+        defer { editor.close() }
+        ScreenshotHotkeyContext.update(selecting: false, editors: pins + [editor], globalManagers: globals)
+        #expect(globals.allSatisfy { $0.isSuspended && !$0.hasActiveRegistration },
+            "A new unpinned editor must suspend capture even with older pins present")
+        let editorWindow = try #require(editor.window as? ScreenshotEditorWindow)
+        #expect(editorWindow.performKeyEquivalent(with: try event(window: editorWindow, key: "\u{1b}", code: 53)))
+        ScreenshotHotkeyContext.update(selecting: false, editors: pins, globalManagers: globals)
+        #expect(closedEditors == 1, "Escape must retire only the new editor")
+        #expect(globals.allSatisfy { !$0.isSuspended && $0.hasActiveRegistration })
+        for (index, pin) in pins.enumerated() {
+            #expect(pin.isPinnedPresentation && pin.window?.contentView === views[index])
+            #expect(pin.window?.frame == frames[index])
+            #expect(pin.pinnedScale == 1.4 && pin.pinnedOpacity == 0.45)
+        }
+    }
+
+    @Test(arguments: [
+        (global: "capture", local: "pin", defaults: true),
+        (global: "long", local: "stash", defaults: true),
+        (global: "capture", local: "pin", defaults: false),
+        (global: "capture", local: "stash", defaults: false),
+        (global: "long", local: "pin", defaults: false),
+        (global: "long", local: "stash", defaults: false),
+    ])
+    func pinnedLocalShortcutsYieldToConfiguredCaptureWithoutClosingOrStashing(
+        global: String, local: String, defaults: Bool
+    ) throws {
+        let suiteName = "Zisla.ScreenshotShortcutContext.\(UUID().uuidString)"
+        let userDefaults = try #require(UserDefaults(suiteName: suiteName))
+        let store = FeatureSettingsStore(defaults: userDefaults)
+        defer {
+            store.flushPendingChanges()
+            userDefaults.removePersistentDomain(forName: suiteName)
+        }
+        if !defaults {
+            store.settings.screenshotHotkey = .init(keyCode: UInt32(kVK_F17), carbonModifiers: 0x1B00, keyDisplayName: "F17")
+            store.settings.screenshotLongHotkey = .init(keyCode: UInt32(kVK_F18), carbonModifiers: 0x1B00, keyDisplayName: "F18")
+        }
+        let hotkey = global == "capture" ? store.settings.screenshotHotkey : store.settings.screenshotLongHotkey
+        if local == "pin" { store.settings.screenshotPinHotkey = hotkey }
+        else { store.settings.screenshotStashHotkey = hotkey }
+        var closeCount = 0
+        var stashedImages: [Data] = []
+        let controller = try syntheticEditor(settingsStore: store,
+            onStash: { data, _ in stashedImages.append(data) }, onClose: { closeCount += 1 })
+        defer { controller.close() }
+        controller.setPinned(true)
+        let window = try #require(controller.window as? ScreenshotEditorWindow)
+        let view = try #require(window.contentView)
+        let frame = window.frame
+        let consumed = controller.performEditorShortcut(keyCode: hotkey.keyCode, modifiers: hotkey.carbonModifiers)
+        #expect(!consumed)
+        let eventFlags: NSEvent.ModifierFlags = defaults ? .control : [.control, .option, .command, .shift]
+        #expect(!window.performKeyEquivalent(with: try event(window: window,
+            key: hotkey.keyDisplayName, code: UInt16(hotkey.keyCode), flags: eventFlags)))
+        #expect(controller.isPinnedPresentation && window.contentView === view)
+        #expect(window.frame == frame)
+        #expect(closeCount == 0 && stashedImages.isEmpty,
+            "Capture shortcuts must preserve the pin even when no global registration is available")
+    }
+
+    @Test(arguments: [
+        (context: "editor", action: "pin"), (context: "editor", action: "stash"),
+        (context: "disabled", action: "pin"), (context: "disabled", action: "stash"),
+        (context: "custom", action: "pin"), (context: "custom", action: "stash"),
+    ])
+    func editorDisabledAndNonconflictingLocalShortcutsKeepTheirExistingActions(context: String, action: String) throws {
+        let suiteName = "Zisla.ScreenshotShortcutContext.\(UUID().uuidString)"
+        let defaults = try #require(UserDefaults(suiteName: suiteName))
+        let store = FeatureSettingsStore(defaults: defaults)
+        defer {
+            store.flushPendingChanges()
+            defaults.removePersistentDomain(forName: suiteName)
+        }
+        if context == "disabled" { store.settings.screenshotEnabled = false }
+        if context == "custom" {
+            store.settings.screenshotHotkey = .init(keyCode: UInt32(kVK_F17), carbonModifiers: 0x1B00, keyDisplayName: "F17")
+            store.settings.screenshotLongHotkey = .init(keyCode: UInt32(kVK_F18), carbonModifiers: 0x1B00, keyDisplayName: "F18")
+        }
+        var closeCount = 0
+        var stashedImages: [Data] = []
+        let controller = try syntheticEditor(settingsStore: store,
+            onStash: { data, _ in stashedImages.append(data) }, onClose: { closeCount += 1 })
+        defer { controller.close() }
+        if context != "editor" { controller.setPinned(true) }
+        let window = try #require(controller.window as? ScreenshotEditorWindow)
+        let hotkey = action == "pin" ? store.settings.screenshotPinHotkey : store.settings.screenshotStashHotkey
+        #expect(window.performKeyEquivalent(with: try event(window: window,
+            key: hotkey.keyDisplayName, code: UInt16(hotkey.keyCode), flags: .control)))
+        if action == "pin" && context == "editor" {
+            #expect(controller.isPinnedPresentation && window.contentView != nil)
+            #expect(closeCount == 0 && stashedImages.isEmpty)
+        } else {
+            #expect(closeCount == 1 && window.contentView == nil)
+            #expect(stashedImages.count == (action == "stash" ? 1 : 0))
+            if let data = stashedImages.first { #expect(NSImage(data: data)?.size == CGSize(width: 40, height: 40)) }
+        }
+    }
+
+    @Test
+    func recordingAndUnavailableCaptureRegistrationsNeverFallBackToClosingPins() throws {
+        let suiteName = "Zisla.ScreenshotShortcutContext.\(UUID().uuidString)"
+        let defaults = try #require(UserDefaults(suiteName: suiteName))
+        let store = FeatureSettingsStore(defaults: defaults)
+        defer {
+            store.flushPendingChanges()
+            defaults.removePersistentDomain(forName: suiteName)
+        }
+        let hotkey = VoiceInputHotkeyPreset(keyCode: UInt32(kVK_F17), carbonModifiers: 0x1B00, keyDisplayName: "F17")
+        store.settings.screenshotHotkey = hotkey
+        store.settings.screenshotPinHotkey = hotkey
+        let controller = try syntheticEditor(settingsStore: store, keyWindow: true)
+        defer { controller.close() }
+        controller.setPinned(true)
+        let window = try #require(controller.window)
+        let content = try #require(window.contentView)
+        try #require(window.isKeyWindow)
+        let capture = GlobalHotkeyManager()
+        let occupied = GlobalHotkeyManager()
+        defer { capture.unregister(); occupied.unregister() }
+        var requestedCapture = false
+        #expect(capture.register(keyCode: hotkey.keyCode, modifiers: hotkey.carbonModifiers,
+            action: { requestedCapture = true }) == .registered)
+        let owner = GlobalHotkeyManager.beginRecording()
+        defer { GlobalHotkeyManager.endRecording(owner) }
+        ScreenshotHotkeyContext.update(selecting: false, editors: [controller], globalManagers: [capture])
+        #expect(capture.isSuspended && !capture.hasActiveRegistration)
+        #expect(try sendHotkeyPressed(keyCode: hotkey.keyCode, modifiers: hotkey.carbonModifiers) == eventNotHandledErr)
+        #expect(!controller.performEditorShortcut(keyCode: hotkey.keyCode, modifiers: hotkey.carbonModifiers))
+        GlobalHotkeyManager.endRecording(owner)
+        #expect(!capture.isSuspended && capture.hasActiveRegistration,
+            "Finishing hotkey recording must restore capture despite the pin's focus")
+        #expect(try sendHotkeyPressed(keyCode: hotkey.keyCode, modifiers: hotkey.carbonModifiers) == noErr)
+        #expect(requestedCapture)
+        capture.unregister()
+        #expect(occupied.register(keyCode: hotkey.keyCode, modifiers: hotkey.carbonModifiers, action: {}) == .registered)
+        #expect(capture.register(keyCode: hotkey.keyCode, modifiers: hotkey.carbonModifiers, action: {}) == .registrationFailed)
+        #expect(!capture.hasActiveRegistration)
+        #expect(!controller.performEditorShortcut(keyCode: hotkey.keyCode, modifiers: hotkey.carbonModifiers))
+        #expect(!controller.performEditorShortcut(keyCode: UInt32.max, modifiers: hotkey.carbonModifiers))
+        #expect(!controller.performEditorShortcut(keyCode: hotkey.keyCode, modifiers: UInt32(shiftKey)))
+        #expect(controller.isPinnedPresentation && window.contentView === content)
+    }
+
+    @Test
     func localPinAndStashRouteToExistingActionsAndFailureKeepsContext() throws {
         let suiteName = "Zisla.ScreenshotShortcutContext.\(UUID().uuidString)"
         let defaults = try #require(UserDefaults(suiteName: suiteName))
         let store = FeatureSettingsStore(defaults: defaults)
+        store.settings.screenshotStashHotkey = .init(keyCode: UInt32(kVK_F16), carbonModifiers: 0x1000, keyDisplayName: "F16")
         defer {
             store.flushPendingChanges()
             defaults.removePersistentDomain(forName: suiteName)
@@ -107,7 +342,7 @@ struct ScreenshotShortcutContextTests {
         let draft = ScreenshotAnnotation(kind: .text, rect: CGRect(x: 1, y: 1, width: 30, height: 20))
         model.add(draft)
         model.beginTextDraft(id: draft.id, text: "快捷键文字", isNew: true)
-        let stash = try event(window: window, key: "2", code: 19, flags: .control)
+        let stash = try event(window: window, key: "F16", code: UInt16(kVK_F16), flags: .control)
         #expect(window.performKeyEquivalent(with: stash))
         #expect(closeCount == 0)
         #expect(model.statusMessage == "暂存快捷键错误")
@@ -296,6 +531,40 @@ struct ScreenshotShortcutContextTests {
             charactersIgnoringModifiers: key, isARepeat: false, keyCode: code))
     }
 
+    private func syntheticEditor(
+        settingsStore: FeatureSettingsStore,
+        keyWindow: Bool? = nil,
+        onStash: @escaping (Data, ShelfScreenshotMetadata) throws -> Void = { _, _ in },
+        onClose: @escaping () -> Void = {}
+    ) throws -> ScreenshotEditorWindowController {
+        let context = try #require(CGContext(data: nil, width: 40, height: 40, bitsPerComponent: 8,
+            bytesPerRow: 160, space: CGColorSpaceCreateDeviceRGB(),
+            bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue))
+        context.setFillColor(CGColor(red: 0.2, green: 0.4, blue: 0.6, alpha: 1))
+        context.fill(CGRect(x: 0, y: 0, width: 40, height: 40))
+        let pixels = try #require(context.makeImage())
+        let image = NSImage(cgImage: pixels, size: CGSize(width: 40, height: 40))
+        let controller = ScreenshotEditorWindowController(image: image, screenImage: image,
+            screenCGImage: pixels, screen: nil, captureRect: CGRect(x: 0, y: 0, width: 40, height: 40),
+            capturedApplication: nil, settingsStore: settingsStore, onStash: onStash,
+            writeImageToPasteboard: { _ in false }, presentSavePanel: { _, _ in }, onClose: onClose)
+        controller.window?.alphaValue = 0
+        if let keyWindow {
+            let original = try #require(controller.window)
+            let replacement = ShortcutContextKeyWindow(contentRect: original.frame,
+                styleMask: .borderless, backing: .buffered, defer: false)
+            replacement.reportsKeyWindow = keyWindow
+            replacement.isReleasedWhenClosed = false
+            replacement.alphaValue = 0
+            replacement.contentView = original.contentView
+            replacement.delegate = controller
+            original.delegate = nil
+            controller.window = replacement
+            original.close()
+        }
+        return controller
+    }
+
     private func sendHotkeyPressed(keyCode: UInt32, modifiers: UInt32) throws -> OSStatus {
         var createdEvent: EventRef?
         #expect(CreateEvent(nil, OSType(kEventClassKeyboard), UInt32(kEventHotKeyPressed),
@@ -309,6 +578,12 @@ struct ScreenshotShortcutContextTests {
         } == noErr)
         return SendEventToEventTarget(event, GetApplicationEventTarget())
     }
+}
+
+@MainActor
+private final class ShortcutContextKeyWindow: NSWindow {
+    var reportsKeyWindow = false
+    override var isKeyWindow: Bool { reportsKeyWindow }
 }
 
 private struct ShortcutStashError: LocalizedError {
