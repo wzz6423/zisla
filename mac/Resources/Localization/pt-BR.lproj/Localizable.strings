@@ -67,6 +67,7 @@
 "PDF 工具" = "Ferramentas PDF";
 "合并、拆分、加密与转换 PDF" = "Mesclar, dividir, criptografar e converter PDFs";
 "系统状态与清理" = "Monitor e Limpeza do Sistema";
+"监控系统资源与电池，并安全清理缓存和日志" = "Monitorar recursos do sistema e baterias, e limpar caches e logs com segurança";
 "监控资源并安全清理缓存和日志" = "Monitorar recursos e limpar caches e logs com segurança";
 "显示 zisla 图标" = "Exibir ícone do zisla";
 "关闭后不影响已启用的菜单栏监控项" = "Não afeta itens de monitor na barra de menu quando desativado";

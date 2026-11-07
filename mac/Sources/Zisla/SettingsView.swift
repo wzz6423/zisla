@@ -962,9 +962,7 @@ struct SettingsView: View {
                     rowDivider
                     featureToggle("应用音量混音器", detail: "", symbol: "slider.horizontal.3", keyPath: \.volumeMixerEnabled)
                     rowDivider
-                    featureToggle("系统状态与清理", detail: "监控资源并安全清理缓存和日志", symbol: "gauge.with.dots.needle.67percent", keyPath: \.systemMonitorEnabled)
-                    rowDivider
-                    featureToggle("电池监控", detail: "", symbol: "battery.100percent", keyPath: \.batteryMonitorEnabled)
+                    featureToggle("系统状态与清理", detail: "监控系统资源与电池，并安全清理缓存和日志", symbol: "gauge.with.dots.needle.67percent", keyPath: \.systemMonitorEnabled)
                     rowDivider
                     featureToggle("键盘音效", detail: "全局播放键盘音效并记录输入统计", symbol: "keyboard.badge.ellipsis", keyPath: \.keyboardEnabled)
                     rowDivider

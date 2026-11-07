@@ -115,7 +115,7 @@ extension IslandModule {
     case .quickNotes: settings.quickNotesEnabled
     case .volumeMixer: settings.volumeMixerEnabled
     case .toolbox: settings.toolboxEnabled
-    case .system, .battery: settings.systemMonitorEnabled || settings.batteryMonitorEnabled
+    case .system, .battery: settings.systemMonitorEnabled
     case .lockScreen: settings.lockScreenInfoEnabled
     case .keyboardSound: settings.keyboardEnabled
     }
@@ -900,11 +900,11 @@ final class AppModel: ObservableObject {
           let settings = self.settingsStore.settings
           self.lowBatteryNotice.update(
             snapshot: self.battery.snapshot,
-            enabled: settings.batteryMonitorEnabled && settings.sideNoticesEnabled
+            enabled: settings.systemMonitorEnabled && settings.sideNoticesEnabled
           )
           self.lowBatteryNotice.update(
             devices: self.networkBattery.devices,
-            enabled: settings.batteryMonitorEnabled && settings.sideNoticesEnabled
+            enabled: settings.systemMonitorEnabled && settings.sideNoticesEnabled
           )
         }
       }
@@ -1366,7 +1366,7 @@ final class AppModel: ObservableObject {
       if settings.aiProgressEnabled, module != .aiMonitor { self.aiMonitor.refresh() }
       if settings.weatherEnabled, weatherStale { self.refreshWeather() }
       if settings.systemMonitorEnabled { await self.systemMonitor.sampleOnce() }
-      if settings.lockScreenInfoEnabled || settings.batteryMonitorEnabled {
+      if settings.lockScreenInfoEnabled || settings.systemMonitorEnabled {
         self.battery.refresh()
       }
       if settings.mailEnabled, module == .mail { await self.mail.refresh(checkForNewMail: false) }
@@ -3205,9 +3205,9 @@ final class AppModel: ObservableObject {
       weatherSnapshotsByLocationID = [:]
     }
     systemMonitor.setHistoryRecordingEnabled(
-      (settings.systemMonitorEnabled || settings.batteryMonitorEnabled) && settings.systemMetricsHistoryEnabled
+      settings.systemMonitorEnabled && settings.systemMetricsHistoryEnabled
     )
-    if settings.systemMonitorEnabled || settings.batteryMonitorEnabled || settings.dailyBriefing.enabled {
+    if settings.systemMonitorEnabled || settings.dailyBriefing.enabled {
       systemMonitor.start()
     } else {
       systemMonitor.stop()
@@ -3252,20 +3252,20 @@ final class AppModel: ObservableObject {
       browserDownloads.stop()
       clearBrowserDownloadNotices()
     }
-    if settings.lockScreenInfoEnabled || settings.batteryMonitorEnabled || settings.systemMonitorEnabled || settings.dailyBriefing.enabled {
+    if settings.lockScreenInfoEnabled || settings.systemMonitorEnabled || settings.dailyBriefing.enabled {
       battery.start()
     } else {
       battery.stop()
     }
     lowBatteryNotice.update(
       snapshot: battery.snapshot,
-      enabled: settings.batteryMonitorEnabled && settings.sideNoticesEnabled
+      enabled: settings.systemMonitorEnabled && settings.sideNoticesEnabled
     )
     lowBatteryNotice.update(
       devices: networkBattery.devices,
-      enabled: settings.batteryMonitorEnabled && settings.sideNoticesEnabled
+      enabled: settings.systemMonitorEnabled && settings.sideNoticesEnabled
     )
-    if settings.batteryMonitorEnabled {
+    if settings.systemMonitorEnabled {
       networkBattery.start()
     } else {
       networkBattery.stop()

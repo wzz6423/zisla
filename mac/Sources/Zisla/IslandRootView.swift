@@ -247,7 +247,7 @@ struct IslandRootView: View {
                                                 batteryMonitor: model.battery,
                                                 networkMonitor: model.networkBattery,
                                                 showsSystemMonitor: settingsStore.settings.systemMonitorEnabled,
-                                                showsBatteryMonitor: settingsStore.settings.batteryMonitorEnabled,
+                                                showsBatteryMonitor: settingsStore.settings.systemMonitorEnabled,
                                                 onCleanupRequested: cleanupPanelPresentation.present
                                             )
                                         case .lockScreen:
