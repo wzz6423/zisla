@@ -3345,6 +3345,9 @@
 "更改 %@ 的保存位置" = "Ubah lokasi penyimpanan untuk %@";
 
 "本地优先的原生笔记应用" = "Aplikasi catatan native yang mengutamakan penyimpanan lokal";
+"AI 会话工作目录" = "Folder kerja sesi AI";
+"对应会话已删除；清理前请确认目录中的文件" = "Sesi terkait telah dihapus; periksa file sebelum membersihkan";
+"会话仍保留或无法确认删除状态，已保留工作目录" = "Sesi masih disimpan atau penghapusannya tidak dapat diverifikasi; folder kerja dipertahankan";
 
 "保存手写备忘录需要辅助功能权限" = "Akses Aksesibilitas diperlukan untuk menyimpan catatan tulisan tangan";
 "备忘录内容已变化，请重新打开后编辑" = "Catatan telah berubah. Buka kembali sebelum mengedit";

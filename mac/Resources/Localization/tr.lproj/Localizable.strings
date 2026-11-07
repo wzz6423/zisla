@@ -3345,6 +3345,9 @@
 "更改 %@ 的保存位置" = "%@ için kayıt konumunu değiştir";
 
 "本地优先的原生笔记应用" = "Yerel depolamayı önceliklendiren platforma özgü not uygulaması";
+"AI 会话工作目录" = "Yapay zekâ oturumlarının çalışma klasörleri";
+"对应会话已删除；清理前请确认目录中的文件" = "İlgili oturumlar silindi; temizlemeden önce dosyaları gözden geçirin";
+"会话仍保留或无法确认删除状态，已保留工作目录" = "Oturum saklanıyor veya silindiği doğrulanamıyor; çalışma klasörü korundu";
 
 "保存手写备忘录需要辅助功能权限" = "El yazısı notları kaydetmek için Erişilebilirlik izni gerekir";
 "备忘录内容已变化，请重新打开后编辑" = "Not değişti. Düzenlemeden önce yeniden açın";
