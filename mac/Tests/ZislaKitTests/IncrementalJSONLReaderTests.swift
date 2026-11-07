@@ -475,7 +475,7 @@ private func tailLines(
         bytes = Array(bytes.dropFirst(newline + 1))
     }
     let fragments = bytes.split(separator: 0x0A, omittingEmptySubsequences: false)
-    let lines = fragments.dropLast().filter { !$0.isEmpty && $0.count <= maximumLineBytes }.map(Data.init)
+    let lines = fragments.dropLast().filter { !$0.isEmpty && $0.count <= maximumLineBytes }.map { Data($0) }
     let pendingBytes = fragments.last.map { $0.count <= maximumLineBytes ? $0.count : 0 } ?? 0
     return (lines, pendingBytes)
 }
