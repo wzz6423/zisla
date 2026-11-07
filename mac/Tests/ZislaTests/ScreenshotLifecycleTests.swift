@@ -3,9 +3,120 @@ import Foundation
 import Testing
 
 @testable import Zisla
+@testable import ZislaKit
 
 @Suite("Screenshot lifecycle")
 struct ScreenshotLifecycleTests {
+    @Test(arguments: [
+        (selecting: false, pins: [Bool](), active: false),
+        (selecting: true, pins: [], active: true),
+        (selecting: false, pins: [false], active: true),
+        (selecting: false, pins: [true], active: false),
+        (selecting: false, pins: [true, true], active: false),
+        (selecting: true, pins: [true, true], active: true),
+        (selecting: false, pins: [true, false, true], active: true),
+        (selecting: false, pins: [false, true, false], active: true),
+    ])
+    func screenshotSessionRequiresSelectionOrUnpinnedEditor(selecting: Bool, pins: [Bool], active: Bool) {
+        #expect(ScreenshotHotkeyContext.isScreenshotSessionActive(
+            selecting: selecting,
+            editorPinnedStates: pins
+        ) == active, "Retained pins must not keep the screenshot session frozen")
+    }
+
+    @Test @MainActor
+    func pinAndCloseEventsEndTheSessionOnlyAfterSelectionAndUnpinnedEditorsAreGone() throws {
+        let suiteName = "Zisla.ScreenshotLifecycle.\(UUID().uuidString)"
+        let defaults = try #require(UserDefaults(suiteName: suiteName))
+        let store = FeatureSettingsStore(defaults: defaults)
+        defer {
+            store.flushPendingChanges()
+            defaults.removePersistentDomain(forName: suiteName)
+        }
+        let pixels = try #require(Self.solidImage(width: 40, height: 40, color: (255, 255, 255)))
+        let image = NSImage(cgImage: pixels, size: CGSize(width: 40, height: 40))
+        var retainedEditors: [(id: Int, controller: ScreenshotEditorWindowController)] = []
+        var selecting = false
+        var sessionActive = true
+        var closedEditors = 0
+        let editors = (0..<3).map { id in
+            let controller = ScreenshotEditorWindowController(
+                image: image,
+                screenImage: image,
+                screenCGImage: pixels,
+                screen: nil,
+                captureRect: CGRect(x: 0, y: 0, width: 40, height: 40),
+                capturedApplication: nil,
+                settingsStore: store,
+                onStash: { _, _ in },
+                writeImageToPasteboard: { _ in false },
+                presentSavePanel: { _, _ in },
+                onClose: {
+                    closedEditors += 1
+                    retainedEditors.removeAll { $0.id == id }
+                    sessionActive = ScreenshotHotkeyContext.isScreenshotSessionActive(
+                        selecting: selecting,
+                        editorPinnedStates: retainedEditors.map { $0.controller.isPinnedPresentation }
+                    )
+                }
+            )
+            controller.window?.alphaValue = 0
+            controller.onHotkeyContextChanged = {
+                sessionActive = ScreenshotHotkeyContext.isScreenshotSessionActive(
+                    selecting: selecting,
+                    editorPinnedStates: retainedEditors.map { $0.controller.isPinnedPresentation }
+                )
+            }
+            retainedEditors.append((id, controller))
+            return controller
+        }
+        defer { editors.forEach { $0.close() } }
+        let firstWindow = try #require(editors[0].window)
+        let lastWindow = try #require(editors[2].window)
+
+        editors[0].setPinned(true)
+        #expect(sessionActive, "Another unpinned editor must keep the session active")
+        #expect(closedEditors == 0)
+        editors[2].setPinned(true)
+        #expect(sessionActive, "A remaining unpinned editor must still keep the session active")
+        editors[1].setPinned(true)
+        #expect(!sessionActive, "Pinning the last editor must end the frozen session immediately")
+        #expect(closedEditors == 0)
+        #expect(retainedEditors.count == 3)
+
+        selecting = true
+        sessionActive = true
+        editors[1].close()
+        #expect(sessionActive, "Closing a pin must not finish a pending selection")
+        #expect(closedEditors == 1)
+        editors[2].windowDidBecomeKey(Notification(name: NSWindow.didBecomeKeyNotification, object: lastWindow))
+        #expect(sessionActive, "A pin's focus event must not finish a pending selection")
+        selecting = false
+        sessionActive = ScreenshotHotkeyContext.isScreenshotSessionActive(
+            selecting: selecting,
+            editorPinnedStates: retainedEditors.map { $0.controller.isPinnedPresentation }
+        )
+        #expect(!sessionActive, "Cancelling selection with only pins must restore the live presentation")
+        #expect(retainedEditors.count == 2)
+        #expect(firstWindow.contentView != nil && lastWindow.contentView != nil)
+        #expect(editors[0].isPinnedPresentation && editors[2].isPinnedPresentation)
+
+        editors[0].windowDidBecomeKey(Notification(name: NSWindow.didBecomeKeyNotification, object: firstWindow))
+        #expect(!sessionActive, "Focusing a pin must not refreeze the screenshot session")
+        editors[0].windowDidResignKey(Notification(name: NSWindow.didResignKeyNotification, object: firstWindow))
+        #expect(!sessionActive)
+        editors[2].close()
+        #expect(!sessionActive)
+        #expect(retainedEditors.count == 1)
+        #expect(firstWindow.contentView != nil && editors[0].isPinnedPresentation)
+        editors[0].close()
+        editors[0].close()
+        #expect(!sessionActive && retainedEditors.isEmpty)
+        #expect(closedEditors == 3, "Duplicate close events must not retire another pin")
+        #expect(firstWindow.contentView == nil && lastWindow.contentView == nil)
+        #expect(!firstWindow.isVisible && !lastWindow.isVisible)
+    }
+
     @Test @MainActor
     func screenshotSelectionDismissesOnlyAnActiveModalSession() {
         var abortCount = 0

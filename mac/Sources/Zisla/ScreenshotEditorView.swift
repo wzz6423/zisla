@@ -7766,6 +7766,10 @@ final class ScreenshotEditorWindow: NSWindow {
 }
 
 enum ScreenshotHotkeyContext {
+    static func isScreenshotSessionActive(selecting: Bool, editorPinnedStates: [Bool]) -> Bool {
+        selecting || editorPinnedStates.contains(false)
+    }
+
     static func shouldSuspend(selecting: Bool, editors: [(pinned: Bool, key: Bool)]) -> Bool {
         selecting || editors.contains { !$0.pinned || $0.key }
     }
@@ -7776,11 +7780,18 @@ enum ScreenshotHotkeyContext {
         editors: [ScreenshotEditorWindowController],
         globalManagers: [GlobalHotkeyManager]
     ) {
+        let captureSuspended = isScreenshotSessionActive(
+            selecting: selecting,
+            editorPinnedStates: editors.map(\.isPinnedPresentation)
+        )
+        for manager in globalManagers {
+            manager.setSuspended(captureSuspended, reason: "screenshotEditor")
+        }
         let suspended = shouldSuspend(
             selecting: selecting,
             editors: editors.map { ($0.isPinnedPresentation, $0.window?.isKeyWindow == true) }
         )
-        for manager in globalManagers + editors.map(\.pinnedEscapeHotkeyManager) {
+        for manager in editors.map(\.pinnedEscapeHotkeyManager) {
             manager.setSuspended(suspended, reason: "screenshotEditor")
         }
     }
@@ -7964,6 +7975,10 @@ final class ScreenshotEditorWindowController: NSWindowController, NSWindowDelega
                 return hotkey.matches(keyCode: keyCode, modifierSides: modifierSides)
             }
             return true
+        }
+        if settings.screenshotEnabled, isPinnedPresentation,
+           matches(settings.screenshotHotkey) || matches(settings.screenshotLongHotkey) {
+            return false
         }
         if matches(settings.screenshotPinHotkey) {
             model.commitPendingTextDraft()
