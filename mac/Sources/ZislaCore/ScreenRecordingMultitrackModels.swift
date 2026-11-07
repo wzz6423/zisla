@@ -114,6 +114,8 @@ public struct RecordingTimelineClip: Codable, Equatable, Identifiable, Sendable 
     public var layout: RecordingRect
     public var volume: Double
     public var audioEnabled: Bool
+    public var portraitEffects: RecordingPortraitEffects?
+    public var voiceEffects: RecordingVoiceEffects?
     public var entranceAnimation: RecordingClipAnimation?
     public var exitAnimation: RecordingClipAnimation?
     public var transition: RecordingClipTransition?
@@ -122,6 +124,7 @@ public struct RecordingTimelineClip: Codable, Equatable, Identifiable, Sendable 
                 start: Double, sourceStart: Double = 0, sourceEnd: Double, speed: Double = 1,
                 layout: RecordingRect = .init(x: 0, y: 0, width: 1, height: 1),
                 volume: Double = 1, audioEnabled: Bool = true,
+                portraitEffects: RecordingPortraitEffects? = nil, voiceEffects: RecordingVoiceEffects? = nil,
                 entranceAnimation: RecordingClipAnimation? = nil, exitAnimation: RecordingClipAnimation? = nil,
                 transition: RecordingClipTransition? = nil) {
         self.id = id
@@ -134,6 +137,8 @@ public struct RecordingTimelineClip: Codable, Equatable, Identifiable, Sendable 
         self.layout = layout
         self.volume = volume
         self.audioEnabled = audioEnabled
+        self.portraitEffects = portraitEffects
+        self.voiceEffects = voiceEffects
         self.entranceAnimation = entranceAnimation
         self.exitAnimation = exitAnimation
         self.transition = transition
@@ -207,6 +212,7 @@ public struct RecordingMultitrackTimeline: Codable, Equatable, Sendable {
                   [clip.start, clip.sourceStart, clip.sourceEnd, clip.speed, clip.volume].allSatisfy(\.isFinite),
                   clip.start >= 0, clip.sourceStart >= 0, clip.sourceEnd > clip.sourceStart,
                   (0.1...8).contains(clip.speed), (0...1).contains(clip.volume), clip.layout.isNormalized,
+                  clip.portraitEffects?.isValid != false, clip.voiceEffects?.isValid != false,
                   clip.entranceAnimation?.isValid != false, clip.exitAnimation?.isValid != false,
                   clip.transition?.isValid != false, clip.exitAnimation?.kind != .typewriter
             else { throw ScreenRecordingProjectError.invalidProject }

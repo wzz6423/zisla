@@ -120,6 +120,7 @@ struct RecordingExportMedia {
     let audioVolumes: [Float]
     let sourceSize: CGSize
     let timeline: RecordingExportTimeline
+    let voiceMedia: RecordingVoiceMedia
 
     func audioMix(for tracks: [AVCompositionTrack]) -> AVAudioMix {
         let mix = AVMutableAudioMix()
@@ -139,6 +140,7 @@ struct RecordingExportMedia {
         let store = ScreenRecordingProjectStore(root: directory)
         let videoURL = try store.mediaURL(project.videoFile, in: directory)
         let asset = AVURLAsset(url: videoURL)
+        let voiceMedia = RecordingVoiceMedia()
         var sourceAssets = [asset]
         guard let sourceVideo = try await asset.loadTracks(withMediaType: .video).first else {
             throw ScreenRecordingExportError.unavailableMedia
@@ -155,7 +157,7 @@ struct RecordingExportMedia {
                                   timeline: timeline, mediaType: .video)
 
         let camera: RecordingExportMediaTrack?
-        if let cameraFile = project.cameraFile {
+        if let cameraFile = project.editingCameraFile {
             let cameraAsset = AVURLAsset(url: try store.mediaURL(cameraFile, in: directory))
             sourceAssets.append(cameraAsset)
             guard let sourceCamera = try await cameraAsset.loadTracks(withMediaType: .video).first else {
@@ -169,8 +171,9 @@ struct RecordingExportMedia {
         var audioSources = try await asset.loadTracks(withMediaType: .audio).prefix(1).map {
             (track: $0, volume: Float(project.edits.effectiveScreenAudioVolume))
         }
-        if let microphoneFile = project.microphoneFile {
-            let microphoneAsset = AVURLAsset(url: try store.mediaURL(microphoneFile, in: directory))
+        if let microphoneFile = project.editingMicrophoneFile {
+            let microphoneAsset = try await voiceMedia.asset(from: AVURLAsset(url: try store.mediaURL(microphoneFile, in: directory)),
+                effects: project.edits.voiceEffects ?? .init())
             sourceAssets.append(microphoneAsset)
             guard let sourceMicrophone = try await microphoneAsset.loadTracks(withMediaType: .audio).first else {
                 throw ScreenRecordingExportError.unavailableMedia
@@ -191,7 +194,7 @@ struct RecordingExportMedia {
         withExtendedLifetime(sourceAssets) {}
         return RecordingExportMedia(video: video, camera: camera, audioComposition: audioComposition,
                                     audioTracks: audioTracks, audioVolumes: audioSources.map { $0.volume },
-                                    sourceSize: sourceBounds.size, timeline: timeline)
+                                    sourceSize: sourceBounds.size, timeline: timeline, voiceMedia: voiceMedia)
     }
 
     static func availableRange(of track: AVAssetTrack) async throws -> CMTimeRange {

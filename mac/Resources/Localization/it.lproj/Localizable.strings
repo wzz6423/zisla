@@ -3313,3 +3313,20 @@
 "权限" = "Permessi";
 "管理 zisla 使用的系统权限。" = "Gestisci i permessi di sistema utilizzati da zisla.";
 "请在设置的“权限”页面管理授权。" = "Gestisci l’accesso nella pagina Permessi delle impostazioni.";
+
+"人像效果" = "Effetti ritratto";
+"磨皮" = "Levigatura della pelle";
+"提亮" = "Schiarimento";
+"瘦脸" = "Snellimento del viso";
+"瘦身" = "Snellimento del corpo";
+"美声" = "Miglioramento della voce";
+"原声" = "Voce originale";
+"自然" = "Naturale";
+"温暖" = "Calda";
+"清亮" = "Nitida";
+"播音" = "Annunciatore";
+"效果强度" = "Intensità dell’effetto";
+"恢复原始效果" = "Ripristina effetti";
+"监听麦克风" = "Ascolta il microfono";
+"使用耳机监听以避免回声" = "Usa le cuffie per evitare l’eco";
+"麦克风监听已关闭：%@" = "L’ascolto del microfono è stato disattivato: %@";

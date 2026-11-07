@@ -128,6 +128,8 @@ final class ScreenRecordingCaptureFiles: @unchecked Sendable {
     let screenName: String
     let microphoneName: String
     let cameraName: String
+    let rawCameraName: String
+    let rawMicrophoneName: String
     private let operations: ScreenRecordingCaptureFileOperations
     private var stagingExists = false
     private var published: [URL] = []
@@ -143,6 +145,8 @@ final class ScreenRecordingCaptureFiles: @unchecked Sendable {
         screenName = "screen-\(suffix).mp4"
         microphoneName = "microphone-\(suffix).mp4"
         cameraName = "camera-\(suffix).mp4"
+        rawCameraName = "camera-original-\(suffix).mp4"
+        rawMicrophoneName = "microphone-original-\(suffix).mp4"
         try operations.createDirectory(staging)
         stagingExists = true
     }

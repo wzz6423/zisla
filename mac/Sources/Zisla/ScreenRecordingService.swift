@@ -46,6 +46,8 @@ struct ScreenRecordingDeviceCatalog: Sendable {
 @MainActor
 protocol ScreenRecordingCaptureSession: AnyObject {
     func useCameraPreview(_ preview: any ScreenRecordingCameraPreviewSession)
+    func setMicrophoneMonitoring(_ enabled: Bool)
+    func setMonitoringFailureHandler(_ handler: @escaping @Sendable (Error) -> Void)
     func start() async throws -> Double
     func setPaused(_ paused: Bool, atHostTime time: Double) async
     func stop(atHostTime time: Double) async throws -> ScreenRecordingResult
@@ -58,6 +60,8 @@ protocol ScreenRecordingCameraPreviewSession: AnyObject {
     func start() async throws
     func attach(to bridge: ScreenRecordingCaptureBridge)
     func stop() async
+    func setPortraitEffects(_ effects: RecordingPortraitEffects,
+                            onFrame: (@MainActor @Sendable (CGImage?) -> Void)?)
 }
 
 enum ScreenRecordingCameraPreviewState: Equatable {
@@ -117,6 +121,10 @@ final class ScreenRecordingService: ObservableObject {
     @Published private(set) var microphones: [RecordingDevice] = []
     @Published private(set) var cameraPreviewSession: AVCaptureSession?
     @Published private(set) var cameraPreviewState: ScreenRecordingCameraPreviewState = .idle
+    @Published private(set) var cameraPreviewImage: CGImage?
+    @Published private(set) var isMicrophoneMonitoring = false
+    private var previewPortraitEffects = RecordingPortraitEffects()
+    private var portraitPreviewRevision: UInt64 = 0
 
     @MainActor private final class Run {
         var session: (any ScreenRecordingCaptureSession)?
@@ -152,6 +160,7 @@ final class ScreenRecordingService: ObservableObject {
 
     func prepareCameraPreview(configuration: RecordingCaptureConfiguration) async throws {
         guard run == nil else { return }
+        setPortraitEffects(configuration.portraitEffects)
         if configuration.camera {
             try await prepareCamera(identifier: configuration.cameraID, permissionGranted: false)
         } else {
@@ -162,6 +171,29 @@ final class ScreenRecordingService: ObservableObject {
     func stopCameraPreview() async {
         guard run == nil else { return }
         await releaseCameraPreview().value
+    }
+
+    func setPortraitEffects(_ effects: RecordingPortraitEffects) {
+        previewPortraitEffects = effects
+        if !effects.isEnabled { cameraPreviewImage = nil }
+        if let current = cameraRun, let session = current.session { configurePortraitPreview(session, current: current) }
+    }
+
+    func setMicrophoneMonitoring(_ enabled: Bool) {
+        guard let current = run, !current.invalidated, let session = current.session else { return }
+        isMicrophoneMonitoring = enabled
+        session.setMicrophoneMonitoring(enabled)
+    }
+
+    private func configurePortraitPreview(_ session: any ScreenRecordingCameraPreviewSession, current: CameraRun) {
+        portraitPreviewRevision &+= 1
+        let revision = portraitPreviewRevision
+        let effects = previewPortraitEffects
+        session.setPortraitEffects(previewPortraitEffects) { [weak self, weak current] image in
+            guard let self, let current, self.cameraRun === current,
+                  self.portraitPreviewRevision == revision, effects.isEnabled else { return }
+            self.cameraPreviewImage = image
+        }
     }
 
     private func prepareCamera(identifier: String?, permissionGranted: Bool) async throws {
@@ -193,6 +225,7 @@ final class ScreenRecordingService: ObservableObject {
                 }
             }
             current.session = session
+            self.configurePortraitPreview(session, current: current)
             try await session.start()
             try self.requireCamera(current)
             self.cameraPreviewSession = session.previewSession
@@ -220,6 +253,7 @@ final class ScreenRecordingService: ObservableObject {
         current?.startTask?.cancel()
         cameraRun = nil
         cameraPreviewSession = nil
+        cameraPreviewImage = nil
         cameraPreviewState = state
         let previous = cameraCleanupTask
         let task = Task {
@@ -256,6 +290,10 @@ final class ScreenRecordingService: ObservableObject {
     func start(configuration: RecordingCaptureConfiguration, directory: URL) async throws {
         guard phase == .idle, run == nil else { throw ScreenRecordingCaptureError.alreadyRecording }
         guard (1...120).contains(configuration.frameRate) else { throw ScreenRecordingCaptureError.invalidFrameRate }
+        guard configuration.portraitEffects.isValid, configuration.voiceEffects.isValid else {
+            throw ScreenRecordingExportError.invalidConfiguration
+        }
+        setPortraitEffects(configuration.portraitEffects)
         if configuration.mode == .region, configuration.region?.isValid != true {
             throw ScreenRecordingCaptureError.invalidRegion
         }
@@ -264,6 +302,7 @@ final class ScreenRecordingService: ObservableObject {
         run = current
         lastStopResult = nil
         errorMessage = nil
+        isMicrophoneMonitoring = configuration.microphone && configuration.monitorMicrophone
         elapsed = 0
         phase = .preparing
         let task = Task { [weak self, current] in
@@ -288,6 +327,13 @@ final class ScreenRecordingService: ObservableObject {
                 Task { @MainActor [weak self, weak current] in
                     guard let self, let current, self.run === current, !current.invalidated else { return }
                     await self.fail(current, with: error)
+                }
+            }
+            current.session!.setMonitoringFailureHandler { [weak self, weak current] error in
+                Task { @MainActor [weak self, weak current] in
+                    guard let self, let current, self.run === current, !current.invalidated else { return }
+                    self.isMicrophoneMonitoring = false
+                    self.errorMessage = AppLocalization.text("麦克风监听已关闭：%@", error.localizedDescription)
                 }
             }
             if let camera = self.cameraRun?.session { current.session!.useCameraPreview(camera) }
@@ -363,6 +409,7 @@ final class ScreenRecordingService: ObservableObject {
                 self.elapsed = result.duration
                 self.lastStopResult = .success(result)
                 self.run = nil
+                self.isMicrophoneMonitoring = false
                 self.phase = .idle
                 return result
             } catch {
@@ -387,6 +434,7 @@ final class ScreenRecordingService: ObservableObject {
     private func cleanup(_ current: Run) async -> Error? {
         if let task = current.cleanupTask { return await task.value }
         current.invalidated = true
+        isMicrophoneMonitoring = false
         current.cancelTick?()
         current.cancelTick = nil
         current.startTask?.cancel()

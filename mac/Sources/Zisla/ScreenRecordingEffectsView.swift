@@ -8,6 +8,12 @@ struct ScreenRecordingEffectsView: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
+            if let project = model.project, project.cameraFile != nil || project.microphoneFile != nil {
+                ScreenRecordingInspectorSection(AppLocalization.text("人像效果"), symbol: "person.crop.rectangle") {
+                    ScreenRecordingPortraitControls(model: model, target: .recording,
+                        showsPortrait: project.cameraFile != nil, showsVoice: project.microphoneFile != nil)
+                }
+            }
             ScreenRecordingInspectorSection(AppLocalization.text("画布"), symbol: "rectangle.on.rectangle") {
                 Picker(AppLocalization.text("画布比例"), selection: optionalEditBinding(\.canvasAspectRatio, default: .original)) {
                     ForEach(RecordingCanvasAspectRatio.allCases, id: \.self) { value in

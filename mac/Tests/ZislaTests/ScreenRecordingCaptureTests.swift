@@ -2,6 +2,7 @@ import AppKit
 import AVFoundation
 import CoreMedia
 import CoreVideo
+import Combine
 import Foundation
 import Testing
 import ZislaCore
@@ -10,6 +11,103 @@ import ZislaCore
 
 @Suite @MainActor
 struct ScreenRecordingCaptureTests {
+    @Test
+    func microphoneMonitoringFailureUpdatesControlsWithoutEndingRecordingAndIgnoresLateFailures() async throws {
+        let system = CaptureTestSystem()
+        system.session.firstFrame.resolve(.success(100))
+        let service = ScreenRecordingService(dependencies: system.dependencies())
+        var notices: [String] = []
+        let model = ScreenRecordingStudioModel(capture: service, onError: { notices.append($0) })
+        defer { model.shutdown() }
+        model.configuration = .init(microphone: true, monitorMicrophone: true)
+        try await service.start(configuration: model.configuration, directory: system.directory)
+        #expect(service.isMicrophoneMonitoring)
+        let closed = CaptureTestSignal()
+        let subscription = service.$isMicrophoneMonitoring.dropFirst().sink { enabled in
+            if !enabled { closed.signal() }
+        }
+        let failure = try #require(system.session.monitoringFailure)
+        failure(CaptureTestError.unavailable)
+        await closed.wait()
+        #expect(!service.isMicrophoneMonitoring && service.phase == .recording)
+        #expect(notices == [AppLocalization.text("麦克风监听已关闭：%@", CaptureTestError.unavailable.localizedDescription)])
+        #expect(!system.session.released && model.configuration.monitorMicrophone)
+        service.setMicrophoneMonitoring(true)
+        #expect(service.isMicrophoneMonitoring && system.session.monitoringEvents == [true])
+        service.setMicrophoneMonitoring(false)
+        #expect(!service.isMicrophoneMonitoring && system.session.monitoringEvents == [true, false])
+        service.setMicrophoneMonitoring(true)
+        #expect(service.isMicrophoneMonitoring && system.session.monitoringEvents == [true, false, true])
+        _ = try await service.stop()
+        #expect(!service.isMicrophoneMonitoring)
+        failure(CaptureTestError.diskFull)
+        await Task.yield()
+        #expect(service.phase == .idle && !service.isMicrophoneMonitoring && notices.count == 1)
+        service.setMicrophoneMonitoring(true)
+        #expect(!service.isMicrophoneMonitoring && system.session.monitoringEvents == [true, false, true])
+        withExtendedLifetime(subscription) {}
+    }
+
+    @Test
+    func monitoringFailureDuringCancellationCannotPublishANoticeOrReenableMonitoring() async throws {
+        let system = CaptureTestSystem()
+        system.session.firstFrame.resolve(.success(100))
+        system.session.cancelHeld = CaptureTestSignal()
+        let service = ScreenRecordingService(dependencies: system.dependencies())
+        try await service.start(configuration: .init(microphone: true, monitorMicrophone: true), directory: system.directory)
+        let failure = try #require(system.session.monitoringFailure)
+        let cancellation = Task { await service.cancel() }
+        await system.session.cancelEntered.wait()
+        #expect(service.phase == .finishing && !service.isMicrophoneMonitoring)
+        failure(CaptureTestError.unavailable)
+        await withCheckedContinuation { (continuation: CheckedContinuation<Void, Never>) in
+            DispatchQueue.main.async { continuation.resume() }
+        }
+        #expect(service.errorMessage == nil && !service.isMicrophoneMonitoring)
+        service.setMicrophoneMonitoring(true)
+        #expect(!service.isMicrophoneMonitoring && system.session.monitoringEvents.isEmpty)
+        system.session.cancelHeld?.signal()
+        await cancellation.value
+        #expect(service.phase == .idle && service.errorMessage == nil && !service.isMicrophoneMonitoring)
+    }
+
+    @Test
+    func microphoneMonitoringChangesNotifyTheStudioWithoutAPhaseOrClockChange() async throws {
+        let system = CaptureTestSystem()
+        system.session.firstFrame.resolve(.success(100))
+        let service = ScreenRecordingService(dependencies: system.dependencies())
+        let model = ScreenRecordingStudioModel(capture: service)
+        defer { model.shutdown() }
+        try await service.start(configuration: .init(microphone: true), directory: system.directory)
+        var changes = 0
+        let subscription = model.objectWillChange.sink { changes += 1 }
+        service.setMicrophoneMonitoring(true)
+        #expect(changes > 0 && service.phase == .recording && service.elapsed == 0)
+        let enabledChanges = changes
+        service.setMicrophoneMonitoring(false)
+        #expect(changes > enabledChanges && !service.isMicrophoneMonitoring)
+        _ = try await service.stop()
+        withExtendedLifetime(subscription) {}
+    }
+
+    @Test
+    func aMonitoringFailureQueuedWhenStopPublishesIdleCannotChangeTheFinishedRun() async throws {
+        let system = CaptureTestSystem()
+        system.session.firstFrame.resolve(.success(100))
+        let service = ScreenRecordingService(dependencies: system.dependencies())
+        try await service.start(configuration: .init(microphone: true, monitorMicrophone: true), directory: system.directory)
+        let failure = try #require(system.session.monitoringFailure)
+        let subscription = service.$phase.sink { phase in
+            if phase == .idle { failure(CaptureTestError.unavailable) }
+        }
+        _ = try await service.stop()
+        await withCheckedContinuation { (continuation: CheckedContinuation<Void, Never>) in
+            DispatchQueue.main.async { continuation.resume() }
+        }
+        #expect(service.phase == .idle && service.errorMessage == nil && !service.isMicrophoneMonitoring)
+        withExtendedLifetime(subscription) {}
+    }
+
     @Test
     func listingSourcesDoesNotRequestCameraOrMicrophoneAccess() async throws {
         let system = CaptureTestSystem()
@@ -188,6 +286,12 @@ struct ScreenRecordingCaptureTests {
         }
         await #expect(throws: ScreenRecordingCaptureError.invalidRegion) {
             try await service.start(configuration: .init(mode: .region), directory: system.directory)
+        }
+        await #expect(throws: ScreenRecordingExportError.invalidConfiguration) {
+            try await service.start(configuration: .init(portraitEffects: .init(brightening: .nan)), directory: system.directory)
+        }
+        await #expect(throws: ScreenRecordingExportError.invalidConfiguration) {
+            try await service.start(configuration: .init(voiceEffects: .init(preset: .warm, amount: 2)), directory: system.directory)
         }
         #expect(system.permissions.isEmpty)
         #expect(service.phase == .idle)
@@ -1253,6 +1357,7 @@ private final class CaptureTestSystem {
 private final class CaptureTestSession: ScreenRecordingCaptureSession {
     let startEntered = CaptureTestSignal()
     let stopEntered = CaptureTestSignal()
+    let cancelEntered = CaptureTestSignal()
     let firstFrame = CaptureTestLatch<Double>()
     let finish = CaptureTestLatch<ScreenRecordingResult>()
     var result = ScreenRecordingResult(videoFile: "synthetic.mp4", duration: 2, width: 16, height: 16)
@@ -1263,7 +1368,12 @@ private final class CaptureTestSession: ScreenRecordingCaptureSession {
     var returnsResultAfterCancellation = false
     var cancelError: CaptureTestError?
     var pauseEvents: [(paused: Bool, time: Double)] = []
+    var monitoringEvents: [Bool] = []
+    var monitoringFailure: (@Sendable (Error) -> Void)?
+    var cancelHeld: CaptureTestSignal?
 
+    func setMonitoringFailureHandler(_ handler: @escaping @Sendable (Error) -> Void) { monitoringFailure = handler }
+    func setMicrophoneMonitoring(_ enabled: Bool) { monitoringEvents.append(enabled) }
     func useCameraPreview(_ preview: any ScreenRecordingCameraPreviewSession) {}
 
     func start() async throws -> Double {
@@ -1279,6 +1389,8 @@ private final class CaptureTestSession: ScreenRecordingCaptureSession {
     }
     func cancel() async -> Error? {
         released = true
+        cancelEntered.signal()
+        await cancelHeld?.wait()
         firstFrame.resolve(.failure(CancellationError()))
         finish.resolve(returnsResultAfterCancellation ? .success(result) : .failure(CancellationError()))
         return cancelError
@@ -1289,6 +1401,7 @@ private final class CaptureTestSession: ScreenRecordingCaptureSession {
 private final class CaptureTestCameraPreview: ScreenRecordingCameraPreviewSession {
     let previewSession = AVCaptureSession()
     func start() async throws {}
+    func setPortraitEffects(_ effects: RecordingPortraitEffects, onFrame: (@MainActor @Sendable (CGImage?) -> Void)?) {}
     func attach(to bridge: ScreenRecordingCaptureBridge) {}
     func stop() async {}
 }

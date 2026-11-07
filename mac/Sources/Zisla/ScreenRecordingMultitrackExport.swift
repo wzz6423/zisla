@@ -16,12 +16,14 @@ final class RecordingLegacyExportFrames: RecordingExportFrameProviding {
     private let camera: RecordingExportFrameReader?
     private let renderer: RecordingExportRenderer
     private let timeline: RecordingExportTimeline
+    private let voiceMedia: RecordingVoiceMedia
     var canvas: CGRect { renderer.canvas }
     var context: CIContext { renderer.context }
 
     init(media: RecordingExportMedia, renderer: RecordingExportRenderer) throws {
         self.renderer = renderer
         timeline = media.timeline
+        voiceMedia = media.voiceMedia
         primary = try RecordingExportFrameReader(media: media.video)
         camera = try media.camera.map(RecordingExportFrameReader.init)
     }

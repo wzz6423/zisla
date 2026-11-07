@@ -1,4 +1,5 @@
 import AVFoundation
+import CoreImage
 import CoreMedia
 import CoreVideo
 import Foundation
@@ -88,6 +89,15 @@ final class ScreenRecordingCaptureWriter: @unchecked Sendable {
     private var state = State.accepting
     private var timeline = ScreenRecordingCaptureTimeline()
     private var assets: [ScreenRecordingSampleKind: any ScreenRecordingCaptureAssetWriter] = [:]
+    private var rawAssets: [ScreenRecordingSampleKind: any ScreenRecordingCaptureAssetWriter] = [:]
+    private let portrait: RecordingPortraitProcessor
+    private let voice = RecordingVoiceProcessor()
+    private let monitor: RecordingVoiceMonitor
+    private let onMonitoringFailure: @Sendable (Error) -> Void
+    private var monitorMicrophone: Bool
+    private let imageContext = CIContext(options: [.cacheIntermediates: false])
+    private var portraitPool: CVPixelBufferPool?
+    private var portraitSize: CGSize?
     private var lastTimes: [ScreenRecordingSampleKind: CMTime] = [:]
     private var buffered: [ScreenRecordingCaptureSample] = []
     private var terminalError: Error?
@@ -101,7 +111,9 @@ final class ScreenRecordingCaptureWriter: @unchecked Sendable {
     init(files: ScreenRecordingCaptureFiles, configuration: RecordingCaptureConfiguration,
          width: Int, height: Int, finishTimeout: Double = 15,
          onFailure: @escaping @Sendable (Error) -> Void,
-         factory: Factory? = nil) {
+         factory: Factory? = nil, portraitProcessor: RecordingPortraitProcessor = RecordingPortraitProcessor(),
+         monitor: RecordingVoiceMonitor = RecordingVoiceMonitor(),
+         onMonitoringFailure: @escaping @Sendable (Error) -> Void = { _ in }) {
         self.files = files
         self.configuration = configuration
         self.onFailure = onFailure
@@ -109,6 +121,11 @@ final class ScreenRecordingCaptureWriter: @unchecked Sendable {
         self.factory = factory
         self.width = width
         self.height = height
+        portrait = portraitProcessor
+        self.monitor = monitor
+        self.onMonitoringFailure = onMonitoringFailure
+        monitorMicrophone = configuration.monitorMicrophone
+        monitor.isEnabled = configuration.monitorMicrophone
     }
 
     func receive(_ sample: ScreenRecordingCaptureSample) {
@@ -153,11 +170,19 @@ final class ScreenRecordingCaptureWriter: @unchecked Sendable {
         try await firstFrame.wait(timeout: timeout)
     }
 
+    func setMicrophoneMonitoring(_ enabled: Bool) {
+        queue.async {
+            self.monitorMicrophone = enabled
+            self.monitor.isEnabled = enabled
+        }
+    }
+
     func setPaused(_ paused: Bool, at time: Double) async {
         await withCheckedContinuation { continuation in
             queue.async {
                 if self.state == .accepting {
-                    if paused { self.timeline.pause(at: time) } else { self.timeline.resume(at: time) }
+                    if paused { self.timeline.pause(at: time); self.monitor.stop() }
+                    else { self.timeline.resume(at: time); self.monitor.isEnabled = self.monitorMicrophone }
                 }
                 continuation.resume()
             }
@@ -171,6 +196,7 @@ final class ScreenRecordingCaptureWriter: @unchecked Sendable {
             queue.async {
                 if self.state == .accepting {
                     self.state = .sealed
+                    self.monitor.stop()
                     self.recordedDuration = max(self.timeline.elapsed(at: time), self.lastSampleEnd)
                     self.clearBuffered()
                 }
@@ -198,8 +224,8 @@ final class ScreenRecordingCaptureWriter: @unchecked Sendable {
                     self.resolveFinish(.failure(ScreenRecordingCaptureError.noCameraFrames)); return
                 }
                 self.state = .finishing
-                self.finishingCount = self.assets.count
-                for asset in self.assets.values {
+                self.finishingCount = self.assets.count + self.rawAssets.count
+                for asset in Array(self.assets.values) + Array(self.rawAssets.values) {
                     asset.finish(at: self.recordedDuration) { [weak self] result in
                         guard let self else { return }
                         self.queue.async {
@@ -229,11 +255,13 @@ final class ScreenRecordingCaptureWriter: @unchecked Sendable {
             ingressOpen = false
             queue.async {
                 self.state = .cancelled
+                self.monitor.stop()
                 self.finishDeadline?.cancel()
                 self.finishDeadline = nil
                 self.clearBuffered()
-                for asset in self.assets.values { asset.cancel() }
+                for asset in Array(self.assets.values) + Array(self.rawAssets.values) { asset.cancel() }
                 self.assets.removeAll()
+                self.rawAssets.removeAll()
                 self.firstFrame.resolve(.failure(CancellationError()))
                 if !self.finishWaiters.isEmpty { self.resolveFinish(.failure(CancellationError())) }
                 continuation.resume()
@@ -277,7 +305,37 @@ final class ScreenRecordingCaptureWriter: @unchecked Sendable {
             }
         }
         let retimed = try ScreenRecordingCaptureRetimer.copy(sample.buffer, presentationTime: presentationTime)
-        guard try assets[key]!.append(retimed, kind: sample.kind) else {
+        let enhanced: CMSampleBuffer
+        if sample.kind == .camera, configuration.portraitEffects.isEnabled {
+            enhanced = try enhanceCamera(retimed)
+        } else if sample.kind == .microphone, configuration.voiceEffects.isEnabled {
+            enhanced = try voice.process(retimed, effects: configuration.voiceEffects)
+        } else { enhanced = retimed }
+        if sample.kind == .microphone {
+            do { try monitor.append(enhanced) }
+            catch {
+                monitorMicrophone = false
+                monitor.stop()
+                onMonitoringFailure(error)
+            }
+        }
+        if enhanced !== retimed {
+            if rawAssets[key] == nil {
+                let name = key == .camera ? files.rawCameraName : files.rawMicrophoneName
+                if let factory { rawAssets[key] = try factory(files.url(for: name), key, retimed) }
+                else {
+                    rawAssets[key] = try ScreenRecordingNativeAssetWriter(url: files.url(for: name), kind: key,
+                        firstSample: retimed, width: width, height: height, systemAudio: false,
+                        frameRate: configuration.frameRate, finishQueue: queue, finishTimeout: finishTimeout,
+                        onFailure: { [weak self] in self?.fail($0) })
+                }
+            }
+            guard try rawAssets[key]!.append(retimed, kind: sample.kind) else {
+                if sample.kind.isAudio { throw ScreenRecordingCaptureError.writerUnavailable }
+                return false
+            }
+        }
+        guard try assets[key]!.append(enhanced, kind: sample.kind) else {
             if sample.kind.isAudio { throw ScreenRecordingCaptureError.writerUnavailable }
             return false
         }
@@ -296,6 +354,45 @@ final class ScreenRecordingCaptureWriter: @unchecked Sendable {
         return false
     }
 
+    private func enhanceCamera(_ sample: CMSampleBuffer) throws -> CMSampleBuffer {
+        guard let source = CMSampleBufferGetImageBuffer(sample) else { throw ScreenRecordingCaptureError.writerUnavailable }
+        let width = CVPixelBufferGetWidth(source)
+        let height = CVPixelBufferGetHeight(source)
+        let size = CGSize(width: width, height: height)
+        if portraitSize != size {
+            portraitPool = nil
+            guard CVPixelBufferPoolCreate(nil, nil, [
+                kCVPixelBufferPixelFormatTypeKey: kCVPixelFormatType_32BGRA,
+                kCVPixelBufferWidthKey: width, kCVPixelBufferHeightKey: height,
+                kCVPixelBufferIOSurfacePropertiesKey: [:],
+            ] as CFDictionary, &portraitPool) == kCVReturnSuccess else {
+                throw ScreenRecordingCaptureError.writerUnavailable
+            }
+            portraitSize = size
+        }
+        var output: CVPixelBuffer?
+        guard CVPixelBufferPoolCreatePixelBuffer(nil, portraitPool!, &output) == kCVReturnSuccess, let output else {
+            throw ScreenRecordingCaptureError.writerUnavailable
+        }
+        let image = try portrait.apply(CIImage(cvPixelBuffer: source), effects: configuration.portraitEffects,
+            sourceTime: sample.presentationTimeStamp.seconds)
+        imageContext.render(image, to: output, bounds: .init(x: 0, y: 0, width: width, height: height),
+            colorSpace: CGColorSpace(name: CGColorSpace.sRGB))
+        CVBufferPropagateAttachments(source, output)
+        var format: CMVideoFormatDescription?
+        guard CMVideoFormatDescriptionCreateForImageBuffer(allocator: kCFAllocatorDefault, imageBuffer: output,
+            formatDescriptionOut: &format) == noErr, let format else { throw ScreenRecordingCaptureError.writerUnavailable }
+        var timing = CMSampleTimingInfo(duration: sample.duration, presentationTimeStamp: sample.presentationTimeStamp,
+            decodeTimeStamp: sample.decodeTimeStamp)
+        var result: CMSampleBuffer?
+        guard CMSampleBufferCreateReadyWithImageBuffer(allocator: kCFAllocatorDefault, imageBuffer: output,
+            formatDescription: format, sampleTiming: &timing, sampleBufferOut: &result) == noErr, let result else {
+            throw ScreenRecordingCaptureError.writerUnavailable
+        }
+        CMPropagateAttachments(sample, destination: result)
+        return result
+    }
+
     private func releaseAudio(_ sample: ScreenRecordingCaptureSample) {
         ingressLock.lock()
         pendingAudioCount -= 1
@@ -311,11 +408,12 @@ final class ScreenRecordingCaptureWriter: @unchecked Sendable {
     private func fail(_ error: Error) {
         guard terminalError == nil, state != .cancelled, state != .finished else { return }
         terminalError = error
+        monitor.stop()
         ingressLock.lock()
         ingressOpen = false
         ingressLock.unlock()
         clearBuffered()
-        for asset in assets.values { asset.cancel() }
+        for asset in Array(assets.values) + Array(rawAssets.values) { asset.cancel() }
         firstFrame.resolve(.failure(error))
         if state == .finishing { resolveFinish(.failure(error)) }
         onFailure(error)

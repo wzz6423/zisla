@@ -139,8 +139,8 @@ final class ScreenRecordingStudioModel: ObservableObject {
         }.store(in: &cancellables)
         $errorMessage.removeDuplicates().compactMap { $0 }
             .sink(receiveValue: notifyError).store(in: &cancellables)
-        capture.$phase.combineLatest(capture.$elapsed)
-            .sink { [weak self] _, _ in self?.objectWillChange.send() }.store(in: &cancellables)
+        capture.$phase.combineLatest(capture.$elapsed, capture.$isMicrophoneMonitoring)
+            .sink { [weak self] _, _, _ in self?.objectWillChange.send() }.store(in: &cancellables)
         capture.$errorMessage.sink { [weak self] error in
             if let error { self?.errorMessage = error }
         }.store(in: &cancellables)

@@ -114,6 +114,8 @@ final class ScreenRecordingCameraPreviewController {
         capture.$cameraPreviewSession.combineLatest(capture.$cameraPreviewState).sink { [weak self] session, state in
             self?.refresh(session: session, state: state)
         }.store(in: &subscriptions)
+        capture.$cameraPreviewImage.sink { [weak self] image in self?.preview.update(image: image) }
+            .store(in: &subscriptions)
     }
 
     func present(configuration: RecordingEdits = .init(), screen: NSScreen? = nil) {
@@ -170,6 +172,7 @@ final class ScreenRecordingCameraPreviewView: NSView {
 
     private let previewLayer = AVCaptureVideoPreviewLayer()
     private let cameraLayer = CALayer()
+    private let processedLayer = CALayer()
     private let handlesLayer = CAShapeLayer()
     private let status = NSTextField(wrappingLabelWithString: "")
     private let spinner = NSProgressIndicator()
@@ -194,6 +197,9 @@ final class ScreenRecordingCameraPreviewView: NSView {
         layer?.addSublayer(cameraLayer)
         previewLayer.videoGravity = .resizeAspectFill
         cameraLayer.addSublayer(previewLayer)
+        processedLayer.contentsGravity = .resizeAspectFill
+        processedLayer.isHidden = true
+        cameraLayer.addSublayer(processedLayer)
         handlesLayer.fillColor = NSColor.white.cgColor
         handlesLayer.strokeColor = NSColor.black.withAlphaComponent(0.65).cgColor
         handlesLayer.lineWidth = 1
@@ -231,6 +237,7 @@ final class ScreenRecordingCameraPreviewView: NSView {
         let cameraFrame = bounds.insetBy(dx: inset, dy: inset)
         cameraLayer.frame = cameraFrame
         previewLayer.frame = cameraLayer.bounds
+        processedLayer.frame = cameraLayer.bounds
         handlesLayer.frame = bounds
         cameraLayer.cornerRadius = min(cameraFrame.width, cameraFrame.height) * cornerRadiusRatio
         cameraLayer.borderWidth = showsBorder ? min(cameraFrame.width, cameraFrame.height) * 0.01 : 0
@@ -298,6 +305,7 @@ final class ScreenRecordingCameraPreviewView: NSView {
         }
         cornerRadiusRatio = configuration.effectiveCameraCornerRadius
         showsBorder = configuration.effectiveCameraBorder
+        processedLayer.setAffineTransform(configuration.cameraMirrored ? .init(scaleX: -1, y: 1) : .identity)
         switch state {
         case .idle:
             spinner.stopAnimation(nil)
@@ -317,5 +325,14 @@ final class ScreenRecordingCameraPreviewView: NSView {
         needsLayout = true
     }
 
-    func detach() { previewLayer.session = nil }
+    func update(image: CGImage?) {
+        CATransaction.begin()
+        CATransaction.setDisableActions(true)
+        processedLayer.contents = image
+        processedLayer.isHidden = image == nil
+        previewLayer.isHidden = image != nil
+        CATransaction.commit()
+    }
+
+    func detach() { previewLayer.session = nil; update(image: nil) }
 }

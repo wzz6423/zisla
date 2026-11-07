@@ -385,6 +385,8 @@ struct ScreenRecordingCaptureBarTests {
 
 @MainActor
 private final class CaptureBarTestSession: ScreenRecordingCaptureSession {
+    func setMonitoringFailureHandler(_ handler: @escaping @Sendable (Error) -> Void) {}
+    func setMicrophoneMonitoring(_ enabled: Bool) {}
     func useCameraPreview(_ preview: any ScreenRecordingCameraPreviewSession) {}
     func start() async throws -> Double { 100 }
     func setPaused(_ paused: Bool, atHostTime time: Double) async {}
@@ -396,6 +398,7 @@ private final class CaptureBarTestSession: ScreenRecordingCaptureSession {
 private final class CaptureBarTestCameraPreview: ScreenRecordingCameraPreviewSession {
     let previewSession = AVCaptureSession()
     func start() async throws {}
+    func setPortraitEffects(_ effects: RecordingPortraitEffects, onFrame: (@MainActor @Sendable (CGImage?) -> Void)?) {}
     func attach(to bridge: ScreenRecordingCaptureBridge) {}
     func stop() async {}
 }

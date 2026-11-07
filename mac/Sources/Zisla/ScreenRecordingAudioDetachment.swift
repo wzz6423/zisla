@@ -28,15 +28,17 @@ enum ScreenRecordingAudioDetachment {
         let videoRanges = try await probe(store.mediaURL(asset.file, in: directory))
         try Task.checkCancellation()
         var sources = [(asset: asset, ranges: videoRanges,
-            volume: clip.volume * (isRecording ? project.edits.effectiveScreenAudioVolume : 1))]
-        if isRecording, let microphoneFile = project.microphoneFile {
+            volume: clip.volume * (isRecording ? project.edits.effectiveScreenAudioVolume : 1),
+            effects: isRecording ? RecordingVoiceEffects() : clip.voiceEffects ?? .init())]
+        if isRecording, let microphoneFile = project.editingMicrophoneFile {
             let ranges = try await probe(store.mediaURL(microphoneFile, in: directory))
             try Task.checkCancellation()
             if let end = ranges.map(\.upperBound).max() {
                 let microphone = timeline.assets.first(where: { $0.file == microphoneFile && $0.kind == .audio })
                     ?? RecordingMediaAsset(name: AppLocalization.text("麦克风"), file: microphoneFile,
                         kind: .audio, duration: end, hasAudio: true)
-                sources.append((microphone, ranges, clip.volume * project.edits.effectiveMicrophoneVolume))
+                sources.append((microphone, ranges, clip.volume * project.edits.effectiveMicrophoneVolume,
+                    clip.voiceEffects ?? project.edits.voiceEffects ?? .init()))
             }
         }
 
@@ -54,7 +56,8 @@ enum ScreenRecordingAudioDetachment {
             timeline.tracks.append(track)
             timeline.clips.append(.init(trackID: track.id, content: .audio(media.id),
                 start: clip.start + (start - clip.sourceStart) / clip.speed,
-                sourceStart: start, sourceEnd: end, speed: clip.speed, volume: source.volume))
+                sourceStart: start, sourceEnd: end, speed: clip.speed, volume: source.volume,
+                voiceEffects: source.effects.isEnabled ? source.effects : nil))
             detached = true
         }
         guard detached else { return nil }

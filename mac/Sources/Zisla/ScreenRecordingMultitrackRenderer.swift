@@ -103,11 +103,16 @@ final class RecordingMultitrackRenderer {
     private let annotations: [UUID: RecordingAnnotation]
     private let captions: [UUID: RecordingCaption]
     private var transparentCanvas: CIImage?
+    private var portraitProcessors: [String: RecordingPortraitProcessor] = [:]
+    private let portraitLock = NSLock()
+    private let makePortraitProcessor: () -> RecordingPortraitProcessor
 
     init(project: ScreenRecordingProject, directory: URL, size: CGSize,
-         imageStore: RecordingMediaImageStore? = nil) throws {
+         imageStore: RecordingMediaImageStore? = nil,
+         makePortraitProcessor: @escaping () -> RecordingPortraitProcessor = { RecordingPortraitProcessor() }) throws {
         guard let timeline = project.timeline else { throw ScreenRecordingProjectError.invalidProject }
         self.project = project
+        self.makePortraitProcessor = makePortraitProcessor
         canvas = CGRect(origin: .zero, size: size)
         index = RecordingTimelineClipIndex(timeline)
         images = imageStore ?? RecordingMediaImageStore(project: project, directory: directory)
@@ -117,7 +122,7 @@ final class RecordingMultitrackRenderer {
         var base = project
         base.edits.annotations = []
         base.edits.showCaptions = false
-        recording = try RecordingExportRenderer(project: base, size: size)
+        recording = try RecordingExportRenderer(project: base, size: size, portraitProcessor: makePortraitProcessor())
         context = recording.context
         base.pointers = []
         base.edits.zoomClips = []
@@ -179,8 +184,24 @@ final class RecordingMultitrackRenderer {
             let renderer = try isRecording ? recording : videoRenderer(for: clip.content.assetID!)
             let slice = RecordingExportSlice(index: 0, sourceStart: clip.sourceStart, sourceEnd: clip.sourceEnd,
                 speed: clip.speed, outputStart: clip.start, outputEnd: clip.end)
-            let rendered = try renderer.render(screen: frame, camera: frames[clip.id + ".camera"],
-                sourceTime: clip.sourceTime(at: time), slice: slice, includeBackground: false)
+            let portrait = clip.portraitEffects ?? .init()
+            var screen = frame
+            let camera = frames[clip.id + ".camera"]
+            if !isRecording, portrait.isEnabled {
+                portraitLock.lock()
+                do {
+                    let processor = portraitProcessors[clip.id] ?? makePortraitProcessor()
+                    if portraitProcessors[clip.id] == nil, portraitProcessors.count >= 16 {
+                        portraitProcessors.removeAll()
+                    }
+                    portraitProcessors[clip.id] = processor
+                    screen = try processor.apply(frame, effects: portrait, sourceTime: clip.sourceTime(at: time))
+                    portraitLock.unlock()
+                } catch { portraitLock.unlock(); throw error }
+            }
+            let rendered = try renderer.render(screen: screen, camera: camera,
+                sourceTime: clip.sourceTime(at: time), slice: slice, includeBackground: false,
+                cameraEffects: clip.portraitEffects)
             // Flatten before a transition filter. The render graph still contains an infinite
             // color image, which CIDissolveTransition would sample without ever finishing.
             image = try flatten(RecordingExportRenderer.fit(rendered, from: canvas, to: rect(clip.layout), fill: false))
@@ -188,7 +209,20 @@ final class RecordingMultitrackRenderer {
             let bounds = rect(clip.layout)
             let decodeSize = CGSize(width: max(1, bounds.width), height: max(1, bounds.height))
             let source = CIImage(cgImage: try images.image(for: id, maximumSize: decodeSize))
-            image = RecordingExportRenderer.fit(source, from: source.extent, to: bounds, fill: false)
+            let enhanced: CIImage
+            if let effects = clip.portraitEffects, effects.isEnabled {
+                portraitLock.lock()
+                do {
+                    let processor = portraitProcessors[clip.id] ?? makePortraitProcessor()
+                    if portraitProcessors[clip.id] == nil, portraitProcessors.count >= 16 {
+                        portraitProcessors.removeAll()
+                    }
+                    portraitProcessors[clip.id] = processor
+                    enhanced = try processor.apply(source, effects: effects, sourceTime: 0)
+                    portraitLock.unlock()
+                } catch { portraitLock.unlock(); throw error }
+            } else { enhanced = source }
+            image = RecordingExportRenderer.fit(enhanced, from: enhanced.extent, to: bounds, fill: false)
         case let .annotation(id):
             guard let annotation = annotations[id] else { throw ScreenRecordingProjectError.invalidProject }
             image = try RecordingExportRenderer.annotationImage(annotation, canvas: canvas,
