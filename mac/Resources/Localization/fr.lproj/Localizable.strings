@@ -3309,3 +3309,8 @@
 "权限" = "Autorisations";
 "管理 zisla 使用的系统权限。" = "Gérez les autorisations système utilisées par zisla.";
 "请在设置的“权限”页面管理授权。" = "Gérez les accès sur la page Autorisations des réglages.";
+"自动清理系统垃圾" = "Nettoyer automatiquement les fichiers inutiles du système";
+"按所选间隔移入废纸篓，不会永久删除" = "Déplacer les éléments vers la corbeille à l’intervalle choisi, sans suppression définitive";
+"清理范围" = "Éléments à nettoyer";
+"仅可信" = "Éléments fiables uniquement";
+"全部（包含需人工复核）" = "Tous (y compris ceux à vérifier)";

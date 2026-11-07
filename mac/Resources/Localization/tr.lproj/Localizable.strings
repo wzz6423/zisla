@@ -3313,3 +3313,8 @@
 "权限" = "İzinler";
 "管理 zisla 使用的系统权限。" = "zisla’nın kullandığı sistem izinlerini yönetin.";
 "请在设置的“权限”页面管理授权。" = "Erişimi ayarlardaki İzinler sayfasından yönetin.";
+"自动清理系统垃圾" = "Sistem gereksiz dosyalarını otomatik temizle";
+"按所选间隔移入废纸篓，不会永久删除" = "Öğeleri seçilen aralıkta Çöp Sepeti’ne taşı; kalıcı olarak silme";
+"清理范围" = "Temizleme kapsamı";
+"仅可信" = "Yalnızca güvenilir öğeler";
+"全部（包含需人工复核）" = "Tümü (incelenmesi gerekenler dahil)";

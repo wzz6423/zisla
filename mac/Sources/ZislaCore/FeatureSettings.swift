@@ -536,6 +536,18 @@ public enum VoiceRecordingCleanupPolicy: String, Codable, CaseIterable, Sendable
     }
 }
 
+public enum SystemCleanupScope: String, Codable, CaseIterable, Sendable, Equatable, Hashable {
+    case trustedOnly
+    case all
+
+    public var menuTitle: String {
+        switch self {
+        case .trustedOnly: "仅可信"
+        case .all: "全部（包含需人工复核）"
+        }
+    }
+}
+
 public enum ScreenshotHotkeyDefaults {
     public static let currentVersion = 2
     public static let capture = VoiceInputHotkeyPreset(
@@ -724,6 +736,8 @@ public struct FeatureSettings: Codable, Equatable, Sendable {
     /// Whether to show the source platform logo and percentage in the collapsed Dynamic Island while the native downloader is active.
     public var videoDownloadIslandEnabled: Bool
     public var systemMonitorEnabled: Bool
+    public var systemCleanupPolicy: VoiceRecordingCleanupPolicy
+    public var systemCleanupScope: SystemCleanupScope
     /// When enabled, System Monitor appends one sample per minute to a local history that the history window charts and can export as a spreadsheet.
     public var systemMetricsHistoryEnabled: Bool
     public var dailyBriefing: DailyBriefingSettings
@@ -933,6 +947,8 @@ public struct FeatureSettings: Codable, Equatable, Sendable {
         browserDownloadIslandEnabled: Bool = true,
         videoDownloadIslandEnabled: Bool = true,
         systemMonitorEnabled: Bool = true,
+        systemCleanupPolicy: VoiceRecordingCleanupPolicy = .never,
+        systemCleanupScope: SystemCleanupScope = .trustedOnly,
         systemMetricsHistoryEnabled: Bool = true,
         dailyBriefing: DailyBriefingSettings = DailyBriefingSettings(),
         systemBackgroundSoundEnabled: Bool = false,
@@ -1056,6 +1072,8 @@ public struct FeatureSettings: Codable, Equatable, Sendable {
         self.browserDownloadIslandEnabled = browserDownloadIslandEnabled
         self.videoDownloadIslandEnabled = videoDownloadIslandEnabled
         self.systemMonitorEnabled = systemMonitorEnabled
+        self.systemCleanupPolicy = systemCleanupPolicy
+        self.systemCleanupScope = systemCleanupScope
         self.systemMetricsHistoryEnabled = systemMetricsHistoryEnabled
         self.dailyBriefing = dailyBriefing
         self.systemBackgroundSoundEnabled = systemBackgroundSoundEnabled
@@ -1227,6 +1245,8 @@ public struct FeatureSettings: Codable, Equatable, Sendable {
         case browserDownloadIslandEnabled
         case videoDownloadIslandEnabled
         case systemMonitorEnabled
+        case systemCleanupPolicy
+        case systemCleanupScope
         case systemMetricsHistoryEnabled
         case dailyBriefing
         case systemBackgroundSoundEnabled
@@ -1372,6 +1392,12 @@ public struct FeatureSettings: Codable, Equatable, Sendable {
             forKey: .videoDownloadIslandEnabled
         ) ?? defaults.videoDownloadIslandEnabled
         systemMonitorEnabled = try container.decodeIfPresent(Bool.self, forKey: .systemMonitorEnabled) ?? defaults.systemMonitorEnabled
+        systemCleanupPolicy = try container.decodeIfPresent(
+            VoiceRecordingCleanupPolicy.self, forKey: .systemCleanupPolicy
+        ) ?? defaults.systemCleanupPolicy
+        systemCleanupScope = try container.decodeIfPresent(
+            SystemCleanupScope.self, forKey: .systemCleanupScope
+        ) ?? defaults.systemCleanupScope
         systemMetricsHistoryEnabled = try container.decodeIfPresent(
             Bool.self,
             forKey: .systemMetricsHistoryEnabled

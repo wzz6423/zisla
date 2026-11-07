@@ -81,6 +81,12 @@ enum SettingsSearchIndex {
         if settings.recommendedToolsEnabled {
             rows(.features, ["自动更新推荐工具"])
         }
+        if settings.systemMonitorEnabled {
+            entry(.features, "自动清理系统垃圾", anchor: .row("自动清理系统垃圾"),
+                  keywords: ["系统状态与清理"] + VoiceRecordingCleanupPolicy.allCases.map(\.menuTitle))
+            entry(.features, "清理范围", anchor: .row("清理范围"),
+                  keywords: ["自动清理系统垃圾"] + SystemCleanupScope.allCases.map(\.menuTitle))
+        }
         entry(.features, "工具", anchor: .group("工具"), keywords: ["恢复默认顺序"] + IslandModuleOrder.allCases.map(\.title))
 
         for operation in PDFToolOperation.allCases {
