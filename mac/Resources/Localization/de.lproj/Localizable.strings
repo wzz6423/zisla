@@ -3325,3 +3325,6 @@
 "更改 %@ 的保存位置" = "Speicherort für %@ ändern";
 
 "本地优先的原生笔记应用" = "Native Notiz-App mit vorrangig lokaler Speicherung";
+"AI 会话工作目录" = "Arbeitsordner der KI-Sitzungen";
+"对应会话已删除；清理前请确认目录中的文件" = "Die zugehörigen Sitzungen wurden gelöscht; prüfen Sie die Dateien vor der Bereinigung";
+"会话仍保留或无法确认删除状态，已保留工作目录" = "Die Sitzung ist noch vorhanden oder ihre Löschung kann nicht bestätigt werden; der Arbeitsordner wurde beibehalten";

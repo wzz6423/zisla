@@ -3324,3 +3324,6 @@
 "更改 %@ 的保存位置" = "Cambiar la ubicación de guardado de %@";
 
 "本地优先的原生笔记应用" = "Aplicación nativa de notas que prioriza el almacenamiento local";
+"AI 会话工作目录" = "Carpetas de trabajo de sesiones de IA";
+"对应会话已删除；清理前请确认目录中的文件" = "Las sesiones asociadas se eliminaron; revise los archivos antes de limpiar";
+"会话仍保留或无法确认删除状态，已保留工作目录" = "La sesión se conserva o no se puede verificar su eliminación; se conservó la carpeta de trabajo";

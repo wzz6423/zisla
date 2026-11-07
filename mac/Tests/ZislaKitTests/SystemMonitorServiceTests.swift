@@ -12,11 +12,13 @@ final class MockFileManager: SystemMonitorFileManaging, @unchecked Sendable {
     private var directoryReadCounts: [String: Int] = [:]
     var existingPaths: Set<String> = []
     var directoryContents: [String: [URL]] = [:]
+    var directoryErrors: [String: CocoaError.Code] = [:]
     var fileSystemAttributes: [String: [FileAttributeKey: Any]] = [:]
     var fileAttributes: [String: [FileAttributeKey: Any]] = [:]
     var volumeCapacities: [String: (total: UInt64, available: UInt64)] = [:]
     var trashResults: [URL: Result<URL, Error>] = [:]
     var beforeTrash: (@Sendable (URL) -> Void)?
+    var trashedURLs: [URL] = []
     var homeDirectory: URL = URL(fileURLWithPath: "/Users/test")
     var temporaryDirectory: URL = URL(fileURLWithPath: "/private/var/folders/test/T")
     var searchPathResults: [FileManager.SearchPathDirectory: [URL]] = [:]
@@ -46,6 +48,7 @@ final class MockFileManager: SystemMonitorFileManaging, @unchecked Sendable {
         directoryReadLock.lock()
         directoryReadCounts[url.path, default: 0] += 1
         directoryReadLock.unlock()
+        if let error = directoryErrors[url.path] { throw CocoaError(error) }
         return directoryContents[url.path] ?? []
     }
 
@@ -78,6 +81,7 @@ final class MockFileManager: SystemMonitorFileManaging, @unchecked Sendable {
 
     func trashItem(at url: URL) throws -> URL {
         beforeTrash?(url)
+        trashedURLs.append(url)
         if let result = trashResults[url] {
             return try result.get()
         }

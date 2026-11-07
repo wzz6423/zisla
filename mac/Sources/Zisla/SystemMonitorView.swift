@@ -1138,7 +1138,7 @@ private struct SystemCleanupSheet: View {
         return order.compactMap { kind in
             guard kind.safetyLevel != .analysisOnly else { return nil }
             let items = candidates
-                .filter { $0.kind == kind && $0.safetyLevel != .analysisOnly }
+                .filter { $0.kind == kind && ($0.safetyLevel != .analysisOnly || kind == .aiSessionWorkspace) }
                 .sorted { $0.byteSize > $1.byteSize }
             guard !items.isEmpty else { return nil }
             let total = items.reduce(UInt64(0)) { $0 + $1.byteSize }
@@ -1382,6 +1382,7 @@ private extension DiskCleanupKind {
         case .dockerData: "Docker 数据"
         case .virtualMachineData: "虚拟机数据"
         case .aiToolCache: "AI 工具缓存"
+        case .aiSessionWorkspace: "AI 会话工作目录"
         case .languagePack: "应用语言包"
         case .cloudStorageCache: "云存储数据"
         }
@@ -1412,6 +1413,7 @@ private extension DiskCleanupKind {
         case .dockerData: "shippingbox"
         case .virtualMachineData: "desktopcomputer"
         case .aiToolCache: "sparkles.square.fill"
+        case .aiSessionWorkspace: "folder.badge.person.crop"
         case .languagePack: "character.book.closed"
         case .cloudStorageCache: "icloud.and.arrow.down"
         }
@@ -1442,6 +1444,7 @@ private extension DiskCleanupKind {
         case .dockerData: .blue
         case .virtualMachineData: .gray
         case .aiToolCache: .mint
+        case .aiSessionWorkspace: .orange
         case .languagePack: .pink
         case .cloudStorageCache: .gray
         }

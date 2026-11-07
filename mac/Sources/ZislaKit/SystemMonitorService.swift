@@ -504,6 +504,7 @@ public enum DiskCleanupKind: String, Equatable, Sendable, CaseIterable {
     case dockerData
     case virtualMachineData
     case aiToolCache
+    case aiSessionWorkspace
     case languagePack
     case cloudStorageCache
 
@@ -514,7 +515,7 @@ public enum DiskCleanupKind: String, Equatable, Sendable, CaseIterable {
             .safeToClean
         case .log, .trash, .temporaryFiles, .crashReport, .diskImage, .largeFile, .duplicateFile,
              .mailDownloads, .unfinishedDownload, .iosBackup, .xcodeArchive, .applicationResidual,
-             .languagePack:
+             .languagePack, .aiSessionWorkspace:
             .requiresManualReview
         case .simulatorData, .timeMachineSnapshot, .dockerData, .virtualMachineData, .cloudStorageCache:
             .analysisOnly
@@ -546,6 +547,7 @@ public enum DiskCleanupKind: String, Equatable, Sendable, CaseIterable {
         case .dockerData: 82
         case .virtualMachineData: 81
         case .aiToolCache: 79
+        case .aiSessionWorkspace: 96
         case .languagePack: 78
         case .cloudStorageCache: 77
         case .unfinishedDownload: 76
@@ -579,12 +581,14 @@ public enum DiskCleanupError: Error, LocalizedError, Equatable, Sendable {
     case pathOutsideAllowedRoots
     case notAFileURL
     case analysisOnlyCandidate
+    case sessionWorkspaceProtected
 
     public var errorDescription: String? {
         switch self {
         case .pathOutsideAllowedRoots: "目标不在允许清理的用户目录内"
         case .notAFileURL: "仅支持本地文件路径"
         case .analysisOnlyCandidate: "该项目仅用于分析，不能移入废纸篓"
+        case .sessionWorkspaceProtected: AppLocalization.text("会话仍保留或无法确认删除状态，已保留工作目录")
         }
     }
 }
@@ -613,6 +617,7 @@ public protocol SystemMonitorFileManaging: Sendable {
     func removeItem(at url: URL) throws
     func createFile(atPath path: String, contents data: Data?) -> Bool
     func contents(atPath path: String) -> Data?
+    func readPrefix(at url: URL, maximumBytes: Int) -> Data?
     func sha256Digest(at url: URL) -> Data?
     /// Returns the volume's total capacity and available space (including purgeable space, matching macOS System Settings).
     /// The default implementation uses URLResourceValues; a test mock may return nil to fall back to attributesOfFileSystem.
@@ -620,6 +625,10 @@ public protocol SystemMonitorFileManaging: Sendable {
 }
 
 public extension SystemMonitorFileManaging {
+    func readPrefix(at url: URL, maximumBytes: Int) -> Data? {
+        contents(atPath: url.path).map { Data($0.prefix(maximumBytes)) }
+    }
+
     /// Test doubles may retain in-memory data; the production file manager streams reads to avoid loading large files into memory.
     func sha256Digest(at url: URL) -> Data? {
         guard let data = contents(atPath: url.path) else { return nil }
@@ -645,7 +654,7 @@ public extension SystemMonitorFileManaging {
     }
 }
 
-private final class DefaultSystemMonitorFileManager: SystemMonitorFileManaging, @unchecked Sendable {
+final class DefaultSystemMonitorFileManager: SystemMonitorFileManaging, @unchecked Sendable {
     private let fileManager: FileManager
 
     init(fileManager: FileManager = .default) {
@@ -654,6 +663,12 @@ private final class DefaultSystemMonitorFileManager: SystemMonitorFileManaging, 
 
     func fileExists(atPath path: String) -> Bool {
         fileManager.fileExists(atPath: path)
+    }
+
+    func readPrefix(at url: URL, maximumBytes: Int) -> Data? {
+        guard let handle = try? FileHandle(forReadingFrom: url) else { return nil }
+        defer { try? handle.close() }
+        return try? handle.read(upToCount: maximumBytes)
     }
 
     func urls(
@@ -2091,7 +2106,15 @@ public enum SystemDiskCleanup {
         options: DiskCleanupScanOptions = .default
     ) -> [DiskCleanupCandidate] {
         let requestedKinds = kinds.subtracting(excludedScanKinds)
+        let sessionWorkspaces = AISessionWorkspaceCleanup(
+            fileManager: fileManager, referenceDate: options.referenceDate ?? Date(),
+            checking: requestedKinds.contains(.aiSessionWorkspace) ? nil : []
+        )
         var tasks: [CleanupScanTask] = []
+
+        if requestedKinds.contains(.aiSessionWorkspace) {
+            tasks.append(CleanupScanTask { sessionWorkspaces.candidates() })
+        }
 
         if !requestedKinds.isDisjoint(with: [.appCache, .cache]) {
             tasks.append(CleanupScanTask {
@@ -2158,7 +2181,7 @@ public enum SystemDiskCleanup {
             tasks,
             workerLimit: scanWorkerLimit(requested: maxConcurrentScans)
         )
-        return deduplicateCandidates(result).sorted { $0.byteSize > $1.byteSize }
+        return sessionWorkspaces.filterCandidates(deduplicateCandidates(result)).sorted { $0.byteSize > $1.byteSize }
     }
 
     /// Publishes an accumulated candidate snapshot as each scan category completes.
@@ -2170,7 +2193,15 @@ public enum SystemDiskCleanup {
         onProgress: @escaping @Sendable ([DiskCleanupCandidate]) -> Void
     ) -> [DiskCleanupCandidate] {
         let requestedKinds = kinds.subtracting(excludedScanKinds)
+        let sessionWorkspaces = AISessionWorkspaceCleanup(
+            fileManager: fileManager, referenceDate: options.referenceDate ?? Date(),
+            checking: requestedKinds.contains(.aiSessionWorkspace) ? nil : []
+        )
         var tasks: [CleanupScanTask] = []
+
+        if requestedKinds.contains(.aiSessionWorkspace) {
+            tasks.append(CleanupScanTask { sessionWorkspaces.candidates() })
+        }
 
         if !requestedKinds.isDisjoint(with: [.appCache, .cache]) {
             tasks.append(CleanupScanTask {
@@ -2235,9 +2266,9 @@ public enum SystemDiskCleanup {
         let result = executeScanTasksWithProgress(
             tasks,
             workerLimit: scanWorkerLimit(requested: maxConcurrentScans),
-            onProgress: onProgress
+            onProgress: { onProgress(sessionWorkspaces.filterCandidates($0)) }
         )
-        return deduplicateCandidates(result).sorted { $0.byteSize > $1.byteSize }
+        return sessionWorkspaces.filterCandidates(deduplicateCandidates(result)).sorted { $0.byteSize > $1.byteSize }
     }
 
     private static func scanApplicationCaches(
@@ -3452,6 +3483,7 @@ public enum SystemDiskCleanup {
         sizeProvider: ((URL) -> UInt64)? = nil
     ) -> DiskCleanupResult {
         let roots = allowedRoots ?? SystemMonitorPathSafety.defaultAllowedRoots(fileManager: fileManager)
+        let sessionWorkspaces = AISessionWorkspaceCleanup(fileManager: fileManager, checking: urls)
         var success = 0
         var freed: UInt64 = 0
         var failures: [DiskCleanupFailure] = []
@@ -3462,6 +3494,10 @@ public enum SystemDiskCleanup {
                 continue
             }
             let standardized = url.standardizedFileURL
+            guard sessionWorkspaces.canTrash(standardized) else {
+                failures.append(DiskCleanupFailure(url: standardized, message: DiskCleanupError.sessionWorkspaceProtected.localizedDescription))
+                continue
+            }
             guard SystemMonitorPathSafety.isURL(standardized, withinAllowedRoots: roots) else {
                 failures.append(
                     DiskCleanupFailure(
@@ -3493,6 +3529,7 @@ public enum SystemDiskCleanup {
         fileManager: SystemMonitorFileManaging,
         sizeProvider: ((URL) -> UInt64)? = nil
     ) -> DiskCleanupResult {
+        let sessionWorkspaces = AISessionWorkspaceCleanup(fileManager: fileManager, checking: candidates.map(\.url))
         let installedResidualOwners = candidates.contains { $0.kind == .applicationResidual }
             ? installedBundleIdentifiers(fileManager: fileManager, home: fileManager.homeDirectoryForCurrentUser())
             : Set<String>()
@@ -3509,6 +3546,10 @@ public enum SystemDiskCleanup {
                         message: DiskCleanupError.analysisOnlyCandidate.localizedDescription
                     )
                 )
+                continue
+            }
+            guard sessionWorkspaces.canTrash(candidate.url, wholeWorkspaceOnly: candidate.kind == .aiSessionWorkspace) else {
+                failures.append(DiskCleanupFailure(url: candidate.url, message: DiskCleanupError.sessionWorkspaceProtected.localizedDescription))
                 continue
             }
             guard candidatePathIsEligibleForTrash(
@@ -3547,6 +3588,8 @@ public enum SystemDiskCleanup {
         let home = SystemMonitorPathSafety.standardizedPath(fileManager.homeDirectoryForCurrentUser())
 
         switch candidate.kind {
+        case .aiSessionWorkspace:
+            return true
         case .applicationResidual:
             guard !isSymbolicLink(candidate.url) else { return false }
             guard !installedResidualOwners.isEmpty else { return false }

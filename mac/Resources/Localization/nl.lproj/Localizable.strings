@@ -3324,3 +3324,6 @@
 "更改 %@ 的保存位置" = "Opslaglocatie voor %@ wijzigen";
 
 "本地优先的原生笔记应用" = "Native notitie-app die lokale opslag vooropstelt";
+"AI 会话工作目录" = "Werkmappen van AI-sessies";
+"对应会话已删除；清理前请确认目录中的文件" = "De bijbehorende sessies zijn verwijderd; controleer de bestanden voordat u opruimt";
+"会话仍保留或无法确认删除状态，已保留工作目录" = "De sessie is bewaard of de verwijdering kan niet worden bevestigd; de werkmap is behouden";
