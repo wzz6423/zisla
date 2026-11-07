@@ -45,6 +45,14 @@ struct QuickNoteExpandedView: View {
                     .padding(.horizontal, 12)
             }
 
+            if let error = service.errorMessage {
+                Text(error)
+                    .font(.islandMicro())
+                    .foregroundStyle(Color.zislaWarning)
+                    .textSelection(.enabled)
+                    .padding(.horizontal, 12)
+            }
+
             editorPane
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
         }
@@ -77,7 +85,7 @@ struct QuickNoteExpandedView: View {
         HStack(spacing: 0) {
             RichNoteToolbar(command: $editorCommand)
                 .frame(maxWidth: .infinity, alignment: .leading)
-                .disabled(service.isBuiltInWelcomeNoteSelected)
+                .disabled(service.isBuiltInWelcomeNoteSelected || noteContent?.requiresNativeTextEditing == true)
 
             if noteContent != nil {
                 Text(AppLocalization.text("%ld 字", draftPlainText.count))
@@ -126,7 +134,15 @@ struct QuickNoteExpandedView: View {
                     html: draftHTML,
                     noteID: loadedNoteID,
                     command: service.isBuiltInWelcomeNoteSelected ? nil : editorCommand,
-                    isEditable: !service.isBuiltInWelcomeNoteSelected
+                    isEditable: !service.isBuiltInWelcomeNoteSelected,
+                    nativeTextContent: noteContent,
+                    onNativeTextChange: { id, edit in
+                        guard let id else { return }
+                        service.scheduleSave(id: id, nativeText: edit)
+                        if id == loadedNoteID, id == service.selectedID {
+                            draftPlainText = edit.updatedPlainText
+                        }
+                    }
                 ) { id, html, plainText in
                     if let id, !service.isBuiltInWelcomeNote(id: id) {
                         service.scheduleSave(id: id, html: html)
