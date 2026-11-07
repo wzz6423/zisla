@@ -3,6 +3,44 @@ import Testing
 @testable import ZislaCore
 
 struct FeatureSettingsCompatibilityTests {
+    @Test(arguments: [false, true], [false, true])
+    func legacyBatteryChoiceDoesNotOverrideTheSystemMonitorToggle(systemEnabled: Bool, batteryEnabled: Bool) throws {
+        let data = try JSONSerialization.data(withJSONObject: [
+            "systemMonitorEnabled": systemEnabled,
+            "batteryMonitorEnabled": batteryEnabled,
+            "mediaEnabled": false,
+        ])
+        let settings = try JSONDecoder().decode(FeatureSettings.self, from: data)
+        #expect(settings.systemMonitorEnabled == systemEnabled)
+        #expect(!settings.mediaEnabled)
+        let encoded = try JSONEncoder().encode(settings)
+        let object = try #require(JSONSerialization.jsonObject(with: encoded) as? [String: Any])
+        #expect(object["batteryMonitorEnabled"] == nil)
+        #expect(try JSONDecoder().decode(FeatureSettings.self, from: encoded) == settings)
+    }
+
+    @Test(arguments: [
+        "{}",
+        #"{"batteryMonitorEnabled":false}"#,
+        #"{"systemMonitorEnabled":null,"batteryMonitorEnabled":false}"#,
+        #"{"systemMonitorEnabled":true,"batteryMonitorEnabled":"legacy"}"#,
+    ])
+    func combinedMonitorUsesTheSystemDefaultWithoutAnIndependentBatterySetting(json: String) throws {
+        let settings = try JSONDecoder().decode(FeatureSettings.self, from: Data(json.utf8))
+        #expect(settings.systemMonitorEnabled)
+        let encoded = try JSONEncoder().encode(settings)
+        let object = try #require(JSONSerialization.jsonObject(with: encoded) as? [String: Any])
+        #expect(object["batteryMonitorEnabled"] == nil)
+    }
+
+    @Test(arguments: [#""false""#, "[]", "{}"])
+    func combinedMonitorRejectsInvalidSystemToggleValues(value: String) {
+        #expect(throws: DecodingError.self) {
+            try JSONDecoder().decode(FeatureSettings.self,
+                from: Data("{\"systemMonitorEnabled\":\(value)}".utf8))
+        }
+    }
+
     @Test
     func userCareIntervalUsesLegacyDefaultAndRoundTripsSecondPrecision() throws {
         for json in ["{}", #"{"userCareEnabled":true}"#, #"{"userCareReminderInterval":null}"#] {

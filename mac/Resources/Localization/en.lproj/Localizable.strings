@@ -71,6 +71,7 @@
 "PDF 工具" = "PDF Tools";
 "合并、拆分、加密与转换 PDF" = "Merge, split, encrypt, and convert PDFs";
 "系统状态与清理" = "System Monitor and Cleanup";
+"监控系统资源与电池，并安全清理缓存和日志" = "Monitor system resources and batteries, and safely clean caches and logs";
 "监控资源并安全清理缓存和日志" = "Monitor resources and safely clean caches and logs";
 "显示 zisla 图标" = "Show zisla Icon";
 "关闭后不影响已启用的菜单栏监控项" = "Does not affect enabled menu bar monitor items when off";

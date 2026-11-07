@@ -747,8 +747,6 @@ public struct FeatureSettings: Codable, Equatable, Sendable {
     public var systemBackgroundSound: SystemBackgroundSound
     /// Whether playback stops when the Mac is locked, enters the screen saver, or sleeps.
     public var systemBackgroundSoundStopsWhenUnused: Bool
-    /// Battery monitor: independent toggle for the battery detail module and status tracking.
-    public var batteryMonitorEnabled: Bool
     /// When empty, no additional monitor status bar items are added.
     public var systemMonitorMenuBarMetrics: Set<SystemMonitorMenuBarMetric>
     /// Detailed mode retains the existing icon and horizontal readings; compact mode hides the icon and reduces font size.
@@ -955,7 +953,6 @@ public struct FeatureSettings: Codable, Equatable, Sendable {
         systemBackgroundSoundEnabled: Bool = false,
         systemBackgroundSound: SystemBackgroundSound = .rain,
         systemBackgroundSoundStopsWhenUnused: Bool = true,
-        batteryMonitorEnabled: Bool = true,
         systemMonitorMenuBarMetrics: Set<SystemMonitorMenuBarMetric> = [.cpu],
         systemMonitorMenuBarDisplayStyle: SystemMonitorMenuBarDisplayStyle = .compact,
         systemMonitorMenuBarLayout: SystemMonitorMenuBarLayout = .stacked,
@@ -1081,7 +1078,6 @@ public struct FeatureSettings: Codable, Equatable, Sendable {
         self.systemBackgroundSoundEnabled = systemBackgroundSoundEnabled
         self.systemBackgroundSound = systemBackgroundSound
         self.systemBackgroundSoundStopsWhenUnused = systemBackgroundSoundStopsWhenUnused
-        self.batteryMonitorEnabled = batteryMonitorEnabled
         self.systemMonitorMenuBarMetrics = systemMonitorMenuBarMetrics
         self.systemMonitorMenuBarDisplayStyle = systemMonitorMenuBarDisplayStyle
         self.systemMonitorMenuBarLayout = systemMonitorMenuBarLayout
@@ -1255,7 +1251,6 @@ public struct FeatureSettings: Codable, Equatable, Sendable {
         case systemBackgroundSoundEnabled
         case systemBackgroundSound
         case systemBackgroundSoundStopsWhenUnused
-        case batteryMonitorEnabled
         case systemMonitorMenuBarMetrics
         case systemMonitorMenuBarDisplayStyle
         case systemMonitorMenuBarLayout
@@ -1419,7 +1414,6 @@ public struct FeatureSettings: Codable, Equatable, Sendable {
             Bool.self,
             forKey: .systemBackgroundSoundStopsWhenUnused
         ) ?? defaults.systemBackgroundSoundStopsWhenUnused
-        batteryMonitorEnabled = try container.decodeIfPresent(Bool.self, forKey: .batteryMonitorEnabled) ?? defaults.batteryMonitorEnabled
         systemMonitorMenuBarMetrics = try container.decodeIfPresent(
             Set<SystemMonitorMenuBarMetric>.self,
             forKey: .systemMonitorMenuBarMetrics

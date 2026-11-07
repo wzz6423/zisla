@@ -6,22 +6,23 @@ import ZislaCore
 
 struct SettingsNavigationTests {
     @Test(arguments: [false, true], [false, true])
-    func combinedMonitorNavigationPreservesIndependentFeatureToggles(systemEnabled: Bool, batteryEnabled: Bool) {
-        var settings = FeatureSettings.default
-        settings.systemMonitorEnabled = systemEnabled
-        settings.batteryMonitorEnabled = batteryEnabled
+    func combinedMonitorNavigationFollowsTheSystemToggleWithLegacyBatterySettings(systemEnabled: Bool, batteryEnabled: Bool) throws {
+        let data = try JSONSerialization.data(withJSONObject: [
+            "systemMonitorEnabled": systemEnabled,
+            "batteryMonitorEnabled": batteryEnabled,
+        ])
+        var settings = try JSONDecoder().decode(FeatureSettings.self, from: data)
         settings.moduleOrder = [.battery, .mail, .system]
 
         let modules = IslandModule.enabledOrder(settings)
-        #expect(modules.contains(.system) == (systemEnabled || batteryEnabled))
-        #expect(IslandModule.battery.isEnabled(in: settings) == (systemEnabled || batteryEnabled))
+        #expect(modules.contains(.system) == systemEnabled)
+        #expect(IslandModule.battery.isEnabled(in: settings) == systemEnabled)
         #expect(!modules.contains(.battery))
         #expect(modules.filter { $0 == .system }.count <= 1)
-        if systemEnabled || batteryEnabled {
+        if systemEnabled {
             #expect(modules.first == .system)
         }
         #expect(settings.systemMonitorEnabled == systemEnabled)
-        #expect(settings.batteryMonitorEnabled == batteryEnabled)
     }
 
     @Test
@@ -30,6 +31,32 @@ struct SettingsNavigationTests {
         for module in IslandModule.allCases where module != .battery {
             #expect(module.navigationTarget == module)
         }
+    }
+
+    @Test
+    func combinedMonitorFeatureRowHasNoSeparateBatteryToggleAndIsLocalized() throws {
+        let source = try String(contentsOf: Self.settingsViewSourceURL, encoding: .utf8)
+        #expect(!source.contains(#"featureToggle("电池监控""#))
+        let row = try NSRegularExpression(pattern:
+            #"featureToggle\("系统状态与清理", detail: "([^"]+)", symbol: "[^"]+", keyPath: \\.systemMonitorEnabled\)"#)
+        let match = try #require(row.firstMatch(in: source, range: NSRange(source.startIndex..., in: source)))
+        let range = try #require(Range(match.range(at: 1), in: source))
+        let detail = String(source[range])
+        #expect(detail == "监控系统资源与电池，并安全清理缓存和日志")
+        let packageRoot = Self.settingsViewSourceURL.deletingLastPathComponent()
+            .deletingLastPathComponent().deletingLastPathComponent()
+        for language in AppLanguage.allCases {
+            let tableURL = packageRoot.appendingPathComponent("Resources/Localization/\(language.rawValue).lproj/Localizable.strings")
+            let table = try #require(NSDictionary(contentsOf: tableURL) as? [String: String])
+            for key in ["系统状态与清理", detail] {
+                let value = try #require(table[key], "\(language.rawValue) is missing \(key)")
+                #expect(!value.isEmpty)
+                #expect(AppLocalization.string(key, language: language) == value)
+                if language != .simplifiedChinese { #expect(value != key) }
+            }
+        }
+        #expect(AppLocalization.string(detail, language: .english)
+            == "Monitor system resources and batteries, and safely clean caches and logs")
     }
 
     @Test

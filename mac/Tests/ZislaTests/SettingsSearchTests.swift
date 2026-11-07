@@ -6,6 +6,17 @@ import ZislaKit
 @testable import Zisla
 
 struct SettingsSearchTests {
+    @Test(arguments: AppLanguage.allCases, [false, true])
+    func batterySearchTargetsTheCombinedMonitorToggle(language: AppLanguage, systemEnabled: Bool) {
+        let settings = FeatureSettings(systemMonitorEnabled: systemEnabled)
+        #expect(!SettingsSearchIndex.items(settings: settings).contains { $0.title == "电池监控" })
+        let matches = results(AppLocalization.string("电池监控", language: language),
+            settings: settings, locale: language.locale)
+        #expect(matches.contains {
+            $0.section == .features && $0.title == "系统状态与清理" && $0.anchor == .row("系统状态与清理")
+        })
+    }
+
     @Test(arguments: AppLanguage.allCases)
     func clipboardHistoryCleanupIsSearchableInEveryLanguage(language: AppLanguage) {
         let title = AppLocalization.string("自动删除剪贴板历史", language: language)

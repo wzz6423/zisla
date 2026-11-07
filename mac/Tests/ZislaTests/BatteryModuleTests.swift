@@ -38,11 +38,13 @@ struct BatteryModuleTests {
     @Test
     func batteryIsReachableThroughSystemMonitorWithoutSeparateNavigation() {
         var settings = FeatureSettings.default
-        settings.systemMonitorEnabled = false
-        settings.batteryMonitorEnabled = true
+        settings.systemMonitorEnabled = true
         let modules = IslandModule.enabledOrder(settings)
         #expect(modules.contains(.system))
         #expect(!modules.contains(.battery))
+        settings.systemMonitorEnabled = false
+        #expect(!IslandModule.enabledOrder(settings).contains(.system))
+        #expect(!IslandModule.battery.isEnabled(in: settings))
     }
 
     @Test
