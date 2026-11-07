@@ -632,6 +632,8 @@
 "飞机" = "Máy bay";
 "首页" = "Trang chủ";
 "7 天" = "7 ngày";
+"自动删除剪贴板历史" = "Tự động xóa lịch sử bảng nhớ tạm";
+"按所选周期删除过期历史，常用项目继续保留" = "Xóa lịch sử đã quá thời hạn đã chọn; các mục đã ghim được giữ lại";
 "上一页" = "Trước";
 "下一页" = "Sau";
 "不可用" = "Không khả dụng";

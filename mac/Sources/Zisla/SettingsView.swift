@@ -485,6 +485,29 @@ struct SettingsView: View {
                     rowDivider
                     featureToggle(AppLocalization.text("剪贴板历史"), detail: "仅本机保存文本和图片", symbol: "clipboard", keyPath: \.clipboardHistoryEnabled)
                     rowDivider
+                    settingRow(
+                        symbol: "calendar.badge.clock",
+                        title: "自动删除剪贴板历史",
+                        detail: "按所选周期删除过期历史，常用项目继续保留",
+                        isNested: true
+                    ) {
+                        Picker(
+                            "",
+                            selection: Binding(
+                                get: { model.settingsStore.settings.clipboardHistoryCleanupPolicy },
+                                set: { model.settingsStore.settings.clipboardHistoryCleanupPolicy = $0 }
+                            )
+                        ) {
+                            ForEach(VoiceRecordingCleanupPolicy.allCases, id: \.self) { policy in
+                                Text(AppLocalization.text(policy.menuTitle)).tag(policy)
+                            }
+                        }
+                        .labelsHidden()
+                        .pickerStyle(.menu)
+                        .keepsIntrinsicWidth()
+                    }
+                    .disabled(!model.settingsStore.settings.clipboardHistoryEnabled)
+                    rowDivider
                     featureToggle(AppLocalization.text("剪贴板链接检测"), detail: "", symbol: "clipboard.fill", keyPath: \.clipboardDetectionEnabled)
                 }
             }

@@ -632,6 +632,8 @@
 "飞机" = "Uçak";
 "首页" = "Ana sayfa";
 "7 天" = "7 gün";
+"自动删除剪贴板历史" = "Pano geçmişini otomatik sil";
+"按所选周期删除过期历史，常用项目继续保留" = "Seçilen süreyi aşan geçmişi sil; sabitlenmiş öğeler korunur";
 "上一页" = "Önceki";
 "下一页" = "Sonraki";
 "不可用" = "Kullanılamaz";

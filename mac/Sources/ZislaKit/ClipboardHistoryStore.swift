@@ -1,5 +1,6 @@
 import Combine
 import Foundation
+import ZislaCore
 
 @MainActor
 public final class ClipboardHistoryStore: ObservableObject {
@@ -19,6 +20,9 @@ public final class ClipboardHistoryStore: ObservableObject {
 
     private let database: ClipboardHistoryDatabase
     private let persistenceDelay: Duration
+    private let now: () -> Date
+    private var cleanupPolicy: VoiceRecordingCleanupPolicy = .never
+    private(set) var cleanupTimer: Timer?
     private var scope: ClipboardHistoryScope = .all
     private var searchText = ""
     private var category: FileShelfCategory = .all
@@ -35,14 +39,48 @@ public final class ClipboardHistoryStore: ObservableObject {
         capacity: Int? = nil,
         maxImageBytes: Int = 10 * 1024 * 1024,
         pageSize: Int = 20,
-        persistenceDelay: Duration = .seconds(1)
+        persistenceDelay: Duration = .seconds(1),
+        now: @escaping () -> Date = Date.init
     ) {
         database = ClipboardHistoryDatabase(storageURL: storageURL)
         self.capacity = capacity.map { max(1, $0) }
         self.maxImageBytes = max(1, maxImageBytes)
         self.pageSize = max(1, pageSize)
         self.persistenceDelay = persistenceDelay
+        self.now = now
         reload()
+    }
+
+    isolated deinit {
+        stopCleanup()
+    }
+
+    public func configureCleanup(policy: VoiceRecordingCleanupPolicy) {
+        guard cleanupPolicy != policy else { return }
+        stopCleanup()
+        cleanupPolicy = policy
+        guard let days = policy.daysThreshold else { return }
+        cleanupOldHistory(policy: policy, now: now())
+        let timer = Timer(timeInterval: Double(days) * 24 * 60 * 60, repeats: true) { [weak self] _ in
+            MainActor.assumeIsolated {
+                guard let self else { return }
+                self.cleanupOldHistory(policy: policy, now: self.now())
+            }
+        }
+        cleanupTimer = timer
+        RunLoop.main.add(timer, forMode: .common)
+    }
+
+    public func stopCleanup() {
+        cleanupTimer?.invalidate()
+        cleanupTimer = nil
+        cleanupPolicy = .never
+    }
+
+    public func cleanupOldHistory(policy: VoiceRecordingCleanupPolicy, now: Date) {
+        guard let days = policy.daysThreshold else { return }
+        let cutoff = now.addingTimeInterval(-Double(days) * 24 * 60 * 60)
+        schedulePersistence(.removeHistoryBefore(cutoff))
     }
 
     public var pinnedItems: [ClipboardHistoryItem] {
@@ -387,7 +425,7 @@ public final class ClipboardHistoryStore: ObservableObject {
     }
 
     private func persistenceCompatibleDate() -> Date {
-        Date(timeIntervalSinceReferenceDate: Date().timeIntervalSinceReferenceDate)
+        Date(timeIntervalSinceReferenceDate: now().timeIntervalSinceReferenceDate)
     }
 
     private func schedulePersistence(_ mutation: ClipboardHistoryMutation) {

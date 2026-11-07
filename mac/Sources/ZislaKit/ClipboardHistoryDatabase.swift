@@ -21,6 +21,7 @@ enum ClipboardHistoryMutation: Sendable {
     case upsert(ClipboardHistoryItem, capacity: Int?)
     case remove(UUID)
     case removeHistory
+    case removeHistoryBefore(Date)
 }
 
 final class ClipboardHistoryDatabase: @unchecked Sendable {
@@ -611,6 +612,17 @@ final class ClipboardHistoryDatabase: @unchecked Sendable {
                     try delete([id], from: database)
                 case .removeHistory:
                     try execute("DELETE FROM clipboard_history WHERE is_pinned = 0", on: database)
+                case .removeHistoryBefore(let cutoff):
+                    let statement = try prepare(
+                        "DELETE FROM clipboard_history WHERE is_pinned = 0 AND last_copied_at < ?",
+                        on: database
+                    )
+                    defer { sqlite3_finalize(statement) }
+                    try check(
+                        sqlite3_bind_double(statement, 1, cutoff.timeIntervalSinceReferenceDate),
+                        database: database
+                    )
+                    try check(sqlite3_step(statement), expected: SQLITE_DONE, database: database)
                 }
             }
             try execute("COMMIT", on: database)
