@@ -132,11 +132,16 @@ struct ScreenRecordingVoiceMediaTests {
         #expect(energy(preview) > 0.03, "Playback must use the audible raw microphone, not the silent recorded copy")
         let previewEnergy = energy(preview)
         let audioEnergy = energy(audio)
-        let videoEnergy = energy(video)
         #expect(abs(previewEnergy - audioEnergy) < 0.002,
             "Preview energy \(previewEnergy) and WAV energy \(audioEnergy) must match over \(preview.count)/\(audio.count) frames")
-        #expect(abs(videoEnergy - audioEnergy) < 0.01,
-            "MP4 energy \(videoEnergy) and WAV energy \(audioEnergy) must match over \(video.count)/\(audio.count) frames")
+        // Independent spectral decoders can emit different EOF tails; compare gain before those tails.
+        let videoWindow = Array(video.dropFirst(4_800).prefix(14_400))
+        let audioWindow = Array(audio.dropFirst(4_800).prefix(14_400))
+        try #require(videoWindow.count == 14_400 && audioWindow.count == 14_400, "Both exports must cover the same 0.1–0.4 second window")
+        let videoEnergy = energy(videoWindow)
+        let windowAudioEnergy = energy(audioWindow)
+        #expect(abs(videoEnergy - windowAudioEnergy) < 0.01,
+            "MP4 energy \(videoEnergy) and WAV energy \(windowAudioEnergy) must match before the spectral EOF tail")
         project.edits.voiceEffects = .init()
         let plain = try await exporter.playbackItem(project: project, directory: fixture.directory)
         let plainSamples = try await samples(plain.asset, mix: plain.audioMix)
