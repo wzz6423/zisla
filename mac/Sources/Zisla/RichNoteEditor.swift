@@ -686,7 +686,9 @@ struct RichNoteEditor: NSViewRepresentable {
                 return (boundary ? '\\n' : '') + read(child);
               }).join('');
               // A final BR keeps an empty caret line editable; it is not another text newline.
-              return node.matches?.('div, p') && node.lastChild?.nodeName === 'BR' ? text.slice(0, -1) : text;
+              let last = node.lastChild;
+              while (last?.nodeType === Node.ELEMENT_NODE && !last.matches('div, p') && last.lastChild) last = last.lastChild;
+              return node.matches?.('div, p') && last?.nodeName === 'BR' ? text.slice(0, -1) : text;
             };
             return read(field);
           };

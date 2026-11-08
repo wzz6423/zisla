@@ -495,6 +495,9 @@ struct RichNoteEditorTests {
             ("<div>首行</div>次行", "首行\n次行"),
             ("首行<div>次行</div>", "首行\n次行"),
             ("<div><span>首行<br></span>次行</div>", "首行\n次行"),
+            ("<div><span><br></span></div>", ""),
+            ("<div>首行</div><div><span><br></span></div>", "首行\n"),
+            ("<div>首行<div><br></div></div>", "首行\n"),
             ("<p>首行<br><br></p><p><span>次行 &amp; 👩‍💻</span></p>", "首行\n\n次行 & 👩‍💻"),
             ("<div>首行<div>次行</div>末行</div>", "首行\n次行\n末行"),
         ] {
