@@ -426,8 +426,8 @@ struct RichNoteEditorTests {
         #expect(result["readonly"] as? Bool == true)
     }
 
-    @Test
-    func nativeTextKeepsBlankLinesUnicodeAndLiteralHTMLThroughEditingAndUndo() async throws {
+    @Test(arguments: [false, true])
+    func nativeTextKeepsBlankLinesUnicodeAndLiteralHTMLThroughEditingAndUndo(_ exportsLayoutNewline: Bool) async throws {
         let content = NotesAppBridge.NoteContent(plainText: "\u{FFFC}", bodyHTML: "<img src='data:image/png;base64,AAAA'>", requiresNativeTextEditing: true)
         var edits: [NotesNativeTextEdit] = []
         let hosting = NSHostingView(rootView: RichNoteEditor(html: content.bodyHTML, noteID: "native", command: nil,
@@ -445,7 +445,18 @@ struct RichNoteEditorTests {
             _ = try await webView.evaluateJavaScript("""
                 (() => {
                   window.zisla.setHTML("<img src='data:image/png;base64,AAAA'>", window.zisla.documentToken(), \(config));
-                  const field = document.querySelectorAll('[data-zisla-native-text]')[1]; field.focus();
+                  const fields = document.querySelectorAll('[data-zisla-native-text]');
+                  if (\(exportsLayoutNewline)) {
+                    const innerText = Object.getOwnPropertyDescriptor(HTMLElement.prototype, 'innerText').get;
+                    for (const field of fields) {
+                      // Older WebKit includes a block's layout newline even when its DOM text is unchanged.
+                      Object.defineProperty(field, 'innerText', { get() {
+                        const text = innerText.call(this);
+                        return this.lastElementChild?.textContent ? text + '\\n' : text;
+                      }});
+                    }
+                  }
+                  const field = fields[1]; field.focus();
                   const range = document.createRange(); range.selectNodeContents(field); range.collapse(false);
                   const selection = window.getSelection(); selection.removeAllRanges(); selection.addRange(range);
                   window.zisla.exec('insertText', '!');
@@ -460,15 +471,51 @@ struct RichNoteEditorTests {
             #expect(edit.suffix == text + "!", "Native text must round-trip literal text and blank lines")
         }
         let text = try #require(edits.last?.suffix)
-        let result = try #require(await webView.evaluateJavaScript("""
-            (() => {
-              const field = document.querySelectorAll('[data-zisla-native-text]')[1];
-              window.zisla.exec('undo'); const undone = field.innerText;
-              window.zisla.exec('redo'); return { undone, redone: field.innerText };
-            })()
-            """) as? [String: String])
-        #expect(result["undone"] == String(text.dropLast()))
-        #expect(result["redone"] == text)
+        for (command, expected) in [("undo", String(text.dropLast())), ("redo", text)] {
+            let count = edits.count
+            _ = try await webView.evaluateJavaScript("window.zisla.exec('\(command)');")
+            for _ in 0..<100 {
+                if edits.count > count { break }
+                try await Task.sleep(for: .milliseconds(10))
+            }
+            #expect(try #require(edits.last).suffix == expected, "Undo and redo must save the exact native text")
+        }
+        let count = edits.count
+        _ = try await webView.evaluateJavaScript("""
+            document.execCommand('insertLineBreak', false, null);
+            window.zisla.exec('insertText', '结尾');
+            """)
+        for _ in 0..<100 {
+            if edits.count > count { break }
+            try await Task.sleep(for: .milliseconds(10))
+        }
+        #expect(try #require(edits.last).suffix == text + "\n结尾", "A keyboard line break must preserve its text newline")
+        for (html, expected) in [
+            ("首行<br>次行<br><br>", "首行\n次行\n"),
+            ("<div>首行</div>次行", "首行\n次行"),
+            ("首行<div>次行</div>", "首行\n次行"),
+            ("<div><span>首行<br></span>次行</div>", "首行\n次行"),
+            ("<div><span><br></span></div>", ""),
+            ("<div>首行</div><div><span><br></span></div>", "首行\n"),
+            ("<div>首行<div><br></div></div>", "首行\n"),
+            ("<p>首行<br><br></p><p><span>次行 &amp; 👩‍💻</span></p>", "首行\n\n次行 & 👩‍💻"),
+            ("<div>首行<div>次行</div>末行</div>", "首行\n次行\n末行"),
+        ] {
+            let markup = String(decoding: try JSONSerialization.data(withJSONObject: html, options: [.fragmentsAllowed]), as: UTF8.self)
+            let count = edits.count
+            _ = try await webView.evaluateJavaScript("""
+                (() => {
+                  const field = document.querySelectorAll('[data-zisla-native-text]')[1];
+                  field.innerHTML = \(markup);
+                  field.dispatchEvent(new Event('input', { bubbles: true }));
+                })()
+                """)
+            for _ in 0..<100 {
+                if edits.count > count { break }
+                try await Task.sleep(for: .milliseconds(10))
+            }
+            #expect(try #require(edits.last).suffix == expected, "Editable DOM line boundaries must preserve plain text: \(html)")
+        }
     }
 
     @Test

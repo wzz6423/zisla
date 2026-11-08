@@ -705,6 +705,7 @@ struct CollapsedProgressGlowTests {
             .clipShape(CompactIslandShape(layoutStyle: style, pillCornerRadius: pillCornerRadius))
             .background(.black))
         renderer.scale = 1
+        renderer.colorMode = .extendedLinear
         let bitmap = NSBitmapImageRep(cgImage: try #require(renderer.cgImage))
         #expect(bitmap.pixelsWide == Int(size.width) && bitmap.pixelsHigh == Int(size.height))
         return try pixelValues(bitmap)

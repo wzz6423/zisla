@@ -728,7 +728,7 @@ struct AISessionWorkspaceCleanupTests {
         try fixture.codexDatabase(rows: [(retainedID.lastPathComponent.lowercased(), "/project", "2026-07-06", true)])
 
         #expect(Set(fixture.scan().map(\.url)) == [temp, orphanID])
-        #expect(!AISessionWorkspaceCleanup(fileManager: fixture.files).canTrash(newID))
+        #expect(!AISessionWorkspaceCleanup(fileManager: fixture.files, referenceDate: fixture.referenceDate).canTrash(newID))
     }
 
     @Test(arguments: ["Gemini", "Qwen"])

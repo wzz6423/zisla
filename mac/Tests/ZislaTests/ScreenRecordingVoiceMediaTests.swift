@@ -127,10 +127,22 @@ struct ScreenRecordingVoiceMediaTests {
             configuration: .init(format: .mp4, resolution: .source, frameRate: 8))
         let video = try await samples(AVURLAsset(url: mp4))
         #expect(abs(try await playback.asset.load(.duration).seconds - 0.5) < 0.001)
+        #expect(preview.count == 24_000 && audio.count == 24_000, "Playback and WAV must retain the edited half-second")
         #expect(!preview.isEmpty && !audio.isEmpty && !video.isEmpty)
         #expect(energy(preview) > 0.03, "Playback must use the audible raw microphone, not the silent recorded copy")
-        #expect(abs(energy(preview) - energy(audio)) < 0.002)
-        #expect(abs(energy(video) - energy(audio)) < 0.01)
+        // Independent spectral decoders can emit different EOF tails; compare gain before those tails.
+        let previewWindow = Array(preview.dropFirst(4_800).prefix(14_400))
+        let audioWindow = Array(audio.dropFirst(4_800).prefix(14_400))
+        let videoWindow = Array(video.dropFirst(4_800).prefix(14_400))
+        try #require(previewWindow.count == 14_400 && audioWindow.count == 14_400 && videoWindow.count == 14_400,
+            "Playback and both exports must cover the same 0.1–0.4 second window")
+        let previewEnergy = energy(previewWindow)
+        let audioEnergy = energy(audioWindow)
+        #expect(abs(previewEnergy - audioEnergy) < 0.002,
+            "Preview energy \(previewEnergy) and WAV energy \(audioEnergy) must match before the spectral EOF tail")
+        let videoEnergy = energy(videoWindow)
+        #expect(abs(videoEnergy - audioEnergy) < 0.01,
+            "MP4 energy \(videoEnergy) and WAV energy \(audioEnergy) must match before the spectral EOF tail")
         project.edits.voiceEffects = .init()
         let plain = try await exporter.playbackItem(project: project, directory: fixture.directory)
         let plainSamples = try await samples(plain.asset, mix: plain.audioMix)
@@ -245,6 +257,7 @@ struct ScreenRecordingVoiceMediaTests {
         ])
         output.audioMix = mix
         output.audioTimePitchAlgorithm = .spectral
+        let count = Int((try await asset.load(.duration).seconds * 48_000).rounded())
         reader.add(output)
         try #require(reader.startReading(), "The authored voice track must decode")
         defer { reader.cancelReading(); withExtendedLifetime(asset) {} }
@@ -256,9 +269,17 @@ struct ScreenRecordingVoiceMediaTests {
                 CMBlockBufferCopyDataBytes(data, atOffset: 0, dataLength: data.dataLength, destination: bytes.baseAddress!)
             }
             try #require(status == noErr)
-            result.append(contentsOf: stride(from: 0, to: values.count, by: 2).map { values[$0] })
+            // Preserve decoder timestamps rather than shifting spectral startup delay into the audio.
+            let start = Int((sample.presentationTimeStamp.seconds * 48_000).rounded())
+            if start > result.count { result.append(contentsOf: repeatElement(0, count: min(count, start) - result.count)) }
+            let offset = max(0, result.count - start)
+            if offset < sample.numSamples {
+                result.append(contentsOf: stride(from: offset * 2, to: values.count, by: 2)
+                    .prefix(max(0, count - result.count)).map { values[$0] })
+            }
         }
         #expect(reader.status == .completed && reader.error == nil)
+        result.append(contentsOf: repeatElement(0, count: count - result.count))
         return result
     }
 }
