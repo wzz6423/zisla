@@ -406,19 +406,25 @@ struct AIAgentServicesTests {
         #expect(!FileManager.default.fileExists(atPath: argumentsFile.path))
     }
 
-    @Test
+    @Test(.timeLimit(.minutes(1)))
     func cliCommandProgressPersistsOutsideTheSettingsView() async throws {
-        let directory = FileManager.default.temporaryDirectory
-            .appendingPathComponent("zisla-cli-command-progress-\(UUID().uuidString)", isDirectory: true)
-        defer { try? FileManager.default.removeItem(at: directory) }
-        let workspace = AIAgentWorkspace(
-            store: AIAgentStore(storageURL: directory.appendingPathComponent("state.json")),
-            cliService: AIAgentCLIService(environment: ["PATH": "/usr/bin:/bin"], homeDirectory: directory),
-            cliUpdateService: AIAgentCLIUpdateService(loadLatestVersion: { _ in nil })
-        )
+        let (refreshStarted, started) = AsyncStream<Void>.makeStream()
+        let (resumeRefresh, resume) = AsyncStream<Void>.makeStream()
+        let (workspace, directory, _) = try makeCLIAutoUpdateWorkspace(latestVersion: { kind in
+            guard kind == .codex else { return nil }
+            started.finish()
+            for await _ in resumeRefresh {}
+            return nil
+        })
+        defer {
+            resume.finish()
+            workspace.stop()
+            workspace.store.flushPendingChanges()
+            try? FileManager.default.removeItem(at: directory)
+        }
         let command = AIAgentCLICommand(
             executableURL: URL(fileURLWithPath: "/bin/sh"),
-            arguments: ["-c", "sleep 0.15"]
+            arguments: ["-c", "exit 0"]
         )
 
         workspace.startCLICommands([command], title: "更新测试 CLI", kinds: [.codex])
@@ -426,9 +432,10 @@ struct AIAgentServicesTests {
         #expect(workspace.isRunningCLICommands)
         #expect(workspace.cliCommandProgress?.state == .running)
         #expect(workspace.cliCommandProgress?.completedCount == 0)
-        try await Task.sleep(for: .milliseconds(25))
+        for await _ in refreshStarted {}
         #expect(workspace.isRunningCLICommands)
-        await waitForCLICommandRunToFinish(workspace)
+        resume.finish()
+        await workspace.refreshCLIs()
 
         #expect(!workspace.isRunningCLICommands)
         #expect(workspace.cliCommandProgress?.state == .succeeded)
@@ -436,23 +443,21 @@ struct AIAgentServicesTests {
         #expect(workspace.cliCommandProgress?.detail == "已重新检测 CLI 版本")
     }
 
-    @Test
+    @Test(.timeLimit(.minutes(1)))
     func cliCommandProgressKeepsTheFailureDetail() async throws {
-        let directory = FileManager.default.temporaryDirectory
-            .appendingPathComponent("zisla-cli-command-failure-\(UUID().uuidString)", isDirectory: true)
-        defer { try? FileManager.default.removeItem(at: directory) }
-        let workspace = AIAgentWorkspace(
-            store: AIAgentStore(storageURL: directory.appendingPathComponent("state.json")),
-            cliService: AIAgentCLIService(environment: ["PATH": "/usr/bin:/bin"], homeDirectory: directory),
-            cliUpdateService: AIAgentCLIUpdateService(loadLatestVersion: { _ in nil })
-        )
+        let (workspace, directory, _) = try makeCLIAutoUpdateWorkspace(latestVersion: { _ in nil })
+        defer {
+            workspace.stop()
+            workspace.store.flushPendingChanges()
+            try? FileManager.default.removeItem(at: directory)
+        }
         let command = AIAgentCLICommand(
             executableURL: URL(fileURLWithPath: "/bin/sh"),
             arguments: ["-c", "echo upgrade-failed >&2; exit 9"]
         )
 
         workspace.startCLICommands([command], title: "更新测试 CLI", kinds: [.gemini])
-        await waitForCLICommandRunToFinish(workspace)
+        await workspace.refreshCLIs()
 
         #expect(workspace.cliCommandProgress?.state == .failed)
         #expect(workspace.cliCommandProgress?.detail == "upgrade-failed")
