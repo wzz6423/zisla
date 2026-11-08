@@ -130,8 +130,13 @@ struct ScreenRecordingVoiceMediaTests {
         #expect(preview.count == 24_000 && audio.count == 24_000, "Energy comparisons must cover the same edited half-second")
         #expect(!preview.isEmpty && !audio.isEmpty && !video.isEmpty)
         #expect(energy(preview) > 0.03, "Playback must use the audible raw microphone, not the silent recorded copy")
-        #expect(abs(energy(preview) - energy(audio)) < 0.002)
-        #expect(abs(energy(video) - energy(audio)) < 0.01)
+        let previewEnergy = energy(preview)
+        let audioEnergy = energy(audio)
+        let videoEnergy = energy(video)
+        #expect(abs(previewEnergy - audioEnergy) < 0.002,
+            "Preview energy \(previewEnergy) and WAV energy \(audioEnergy) must match over \(preview.count)/\(audio.count) frames")
+        #expect(abs(videoEnergy - audioEnergy) < 0.01,
+            "MP4 energy \(videoEnergy) and WAV energy \(audioEnergy) must match over \(video.count)/\(audio.count) frames")
         project.edits.voiceEffects = .init()
         let plain = try await exporter.playbackItem(project: project, directory: fixture.directory)
         let plainSamples = try await samples(plain.asset, mix: plain.audioMix)
@@ -246,6 +251,7 @@ struct ScreenRecordingVoiceMediaTests {
         ])
         output.audioMix = mix
         output.audioTimePitchAlgorithm = .spectral
+        let count = Int((try await asset.load(.duration).seconds * 48_000).rounded())
         reader.add(output)
         try #require(reader.startReading(), "The authored voice track must decode")
         defer { reader.cancelReading(); withExtendedLifetime(asset) {} }
@@ -257,11 +263,16 @@ struct ScreenRecordingVoiceMediaTests {
                 CMBlockBufferCopyDataBytes(data, atOffset: 0, dataLength: data.dataLength, destination: bytes.baseAddress!)
             }
             try #require(status == noErr)
-            result.append(contentsOf: stride(from: 0, to: values.count, by: 2).map { values[$0] })
+            // Preserve decoder timestamps rather than shifting spectral startup delay into the audio.
+            let start = Int((sample.presentationTimeStamp.seconds * 48_000).rounded())
+            if start > result.count { result.append(contentsOf: repeatElement(0, count: min(count, start) - result.count)) }
+            let offset = max(0, result.count - start)
+            if offset < sample.numSamples {
+                result.append(contentsOf: stride(from: offset * 2, to: values.count, by: 2)
+                    .prefix(max(0, count - result.count)).map { values[$0] })
+            }
         }
         #expect(reader.status == .completed && reader.error == nil)
-        // The spectral decoder can pad its last buffer beyond the edited timeline.
-        let count = Int((try await asset.load(.duration).seconds * 48_000).rounded())
-        return Array(result.prefix(count))
+        return result
     }
 }
