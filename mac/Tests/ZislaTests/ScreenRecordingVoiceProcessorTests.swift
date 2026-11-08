@@ -50,9 +50,9 @@ struct ScreenRecordingVoiceProcessorTests {
         let source = try Self.samples(sample)[0]
         let half = try Self.samples(RecordingVoiceProcessor().process(sample, effects: .init(preset: .warm, amount: 0.5)))[0]
         let full = try Self.samples(RecordingVoiceProcessor().process(sample, effects: .init(preset: .warm, amount: 1)))[0]
-        #expect(zip(zip(source, half), full).allSatisfy { pair, wet in
-            abs(Double(pair.1) - (Double(pair.0) + Double(wet)) / 2) < 0.000_001
-        })
+        let blended = zip(source, full).map { (Double($0) + Double($1)) / 2 }
+        let matchesBlend = zip(half, blended).allSatisfy { abs(Double($0) - $1) < 0.000_001 }
+        #expect(matchesBlend)
     }
 
     @Test func rumbleAndQuietNoiseDecreaseWhileBroadcastRaisesSpeechLevel() throws {

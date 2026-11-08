@@ -106,7 +106,10 @@ struct ScreenRecordingCursorTrailTests {
             let y = Int((0.233 + (Double(x) / 1_280 - 0.17) * (0.767 - 0.233) / (0.83 - 0.17)) * 960)
             return ((y - 5)...(y + 5)).map { Int(bytes[($0 * image.width + x) * 4]) }.reduce(0, +)
         }
-        let peaks = (1..<(energies.count - 1)).map { (energies[$0 - 1] + energies[$0] + energies[$0 + 1]) / 3 }
+        let peaks = (1..<(energies.count - 1)).map { index -> Int in
+            let neighbors = energies[index - 1] + energies[index + 1]
+            return (neighbors + energies[index]) / 3
+        }
         #expect(peaks.allSatisfy { $0 > 30 }, "A thin diagonal trail must remain connected across sample boundaries")
         let steps = zip(peaks, peaks.dropFirst()).map { abs($1 - $0) }
         let largestStep = steps.max()!
