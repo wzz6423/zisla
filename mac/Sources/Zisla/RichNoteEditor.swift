@@ -676,13 +676,19 @@ struct RichNoteEditor: NSViewRepresentable {
             window.webkit?.messageHandlers?.richNoteChanged?.postMessage(snapshot);
           };
           const nativeFieldText = field => {
-            let text = field.innerText;
-            const last = field.lastChild;
-            // WebKit exports a final empty paragraph's caret placeholder as an extra newline.
-            if (last?.nodeType === Node.ELEMENT_NODE && last.matches('div, p') && !last.textContent && last.querySelector('br')) {
-              text = text.replace(/\\n$/, '');
-            }
-            return text;
+            // Rendered innerText adds layout newlines differently across WebKit versions.
+            const read = node => {
+              if (node.nodeType === Node.TEXT_NODE) return node.textContent;
+              if (node.nodeName === 'BR') return '\\n';
+              const text = [...node.childNodes].map((child, index, children) => {
+                const previous = children[index - 1];
+                const boundary = previous && (child.matches?.('div, p') || previous.matches?.('div, p'));
+                return (boundary ? '\\n' : '') + read(child);
+              }).join('');
+              // A final BR keeps an empty caret line editable; it is not another text newline.
+              return node.matches?.('div, p') && node.lastChild?.nodeName === 'BR' ? text.slice(0, -1) : text;
+            };
+            return read(field);
           };
           const scheduleEmit = () => {
             updateListContinuationStyle();

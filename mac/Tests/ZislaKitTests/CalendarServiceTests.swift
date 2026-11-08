@@ -566,7 +566,7 @@ struct CalendarServiceTests {
     func deletingRepeatedAllDayEventIncludesMidnightOccurrence() throws {
         let store = EventStoreDeletionSpy()
         var calendar = Calendar(identifier: .gregorian)
-        calendar.timeZone = try #require(TimeZone(identifier: "Asia/Shanghai"))
+        calendar.timeZone = .current
         let selectedDate = try #require(calendar.date(from: DateComponents(year: 2026, month: 11, day: 7)))
         let first = try store.makeEvent(startDate: selectedDate.addingTimeInterval(-86_400))
         first.isAllDay = true

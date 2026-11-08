@@ -127,6 +127,7 @@ struct ScreenRecordingVoiceMediaTests {
             configuration: .init(format: .mp4, resolution: .source, frameRate: 8))
         let video = try await samples(AVURLAsset(url: mp4))
         #expect(abs(try await playback.asset.load(.duration).seconds - 0.5) < 0.001)
+        #expect(preview.count == 24_000 && audio.count == 24_000, "Energy comparisons must cover the same edited half-second")
         #expect(!preview.isEmpty && !audio.isEmpty && !video.isEmpty)
         #expect(energy(preview) > 0.03, "Playback must use the audible raw microphone, not the silent recorded copy")
         #expect(abs(energy(preview) - energy(audio)) < 0.002)
@@ -259,6 +260,8 @@ struct ScreenRecordingVoiceMediaTests {
             result.append(contentsOf: stride(from: 0, to: values.count, by: 2).map { values[$0] })
         }
         #expect(reader.status == .completed && reader.error == nil)
-        return result
+        // The spectral decoder can pad its last buffer beyond the edited timeline.
+        let count = Int((try await asset.load(.duration).seconds * 48_000).rounded())
+        return Array(result.prefix(count))
     }
 }
