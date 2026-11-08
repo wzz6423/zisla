@@ -273,6 +273,7 @@ struct ScreenRecordingVoiceMediaTests {
             }
         }
         #expect(reader.status == .completed && reader.error == nil)
+        result.append(contentsOf: repeatElement(0, count: count - result.count))
         return result
     }
 }
