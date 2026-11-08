@@ -12,13 +12,13 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "lucide": "^1.64.0",
-    "three": "^0.186.1"
+    "lucide": "^1.69.0",
+    "three": "^0.187.0"
   },
   "devDependencies": {
     "@types/node": "^26.6.6",
-    "@types/three": "^0.186.0",
+    "@types/three": "^0.187.0",
     "typescript": "^7.0.2",
-    "vite": "^8.3.5"
+    "vite": "^8.3.6"
   }
 }
