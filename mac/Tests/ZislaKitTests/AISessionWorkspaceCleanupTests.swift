@@ -190,6 +190,284 @@ struct AISessionWorkspaceCleanupTests {
         #expect(!AISessionWorkspaceCleanup(fileManager: fixture.files, referenceDate: fixture.referenceDate).canTrash(unknown))
     }
 
+    @Test(arguments: [false, true])
+    func incompleteTranscriptInventoriesRetainCrossToolWorkspaceReferences(brokenFirst: Bool) throws {
+        let fixture = try Fixture()
+        defer { fixture.remove() }
+        let retained = fixture.workspace("Codex", "2026-07-02")
+        let orphan = fixture.workspace("Codex", "2026-07-06")
+        let unknown = fixture.workspace("Claude Code", "2026-07-16")
+        try fixture.codexDatabase(rows: [])
+        let root = fixture.home.appendingPathComponent(".claude/projects/project")
+        let valid = root.appendingPathComponent("retained.jsonl")
+        let broken = root.appendingPathComponent("broken.jsonl")
+        fixture.file(valid, data: Data("{\"sessionId\":\"retained\",\"cwd\":\"\(retained.path)/new-chat\",\"timestamp\":\"2026-07-20T12:00:00Z\"}\n".utf8))
+        fixture.file(broken, data: Data("{broken\n".utf8))
+        fixture.files.directoryContents[root.path] = brokenFirst ? [broken, valid] : [valid, broken]
+
+        #expect(fixture.scan().map(\.url) == [orphan], "One damaged transcript must not erase a known cross-tool workspace reference")
+        let cleanup = AISessionWorkspaceCleanup(fileManager: fixture.files, referenceDate: fixture.referenceDate)
+        #expect(!cleanup.canTrash(retained))
+        #expect(!cleanup.canTrash(unknown), "A partial inventory still cannot establish deletion for its own tool")
+        let candidate = DiskCleanupCandidate(url: retained, kind: .aiSessionWorkspace, byteSize: 4096, displayName: retained.lastPathComponent)
+        fixture.files.trashResults[retained] = .success(retained)
+        #expect(SystemDiskCleanup.trashSelected(candidates: [candidate], fileManager: fixture.files).successCount == 0)
+        #expect(SystemDiskCleanup.trashSelected(urls: [retained], fileManager: fixture.files).successCount == 0)
+        #expect(fixture.files.trashedURLs.isEmpty)
+    }
+
+    @Test(arguments: [false, true])
+    func incompleteDatabaseInventoriesRetainCrossToolWorkspaceReferences(invalidFirst: Bool) throws {
+        let fixture = try Fixture()
+        defer { fixture.remove() }
+        let retained = fixture.workspace("Codex", "2026-07-02")
+        let orphan = fixture.workspace("Codex", "2026-07-06")
+        let unknown = fixture.workspace("WorkBuddy", "2026-07-16")
+        try fixture.codexDatabase(rows: [])
+        let database = fixture.home.appendingPathComponent(".workbuddy/workbuddy.db")
+        try FileManager.default.createDirectory(at: database.deletingLastPathComponent(), withIntermediateDirectories: true)
+        try fixture.sql("CREATE TABLE sessions(id TEXT, cwd TEXT, created_at INTEGER, deleted_at INTEGER)", at: database)
+        let valid = "('retained','\(retained.path)/new-chat',1784548800000,NULL)"
+        let invalid = "('invalid','/project',-1,NULL)"
+        try fixture.sql("INSERT INTO sessions VALUES \(invalidFirst ? invalid + "," + valid : valid + "," + invalid)", at: database)
+        fixture.file(database, data: Data())
+
+        #expect(fixture.scan().map(\.url) == [orphan], "One invalid database row must not erase a known cross-tool workspace reference")
+        let cleanup = AISessionWorkspaceCleanup(fileManager: fixture.files, referenceDate: fixture.referenceDate)
+        #expect(!cleanup.canTrash(retained))
+        #expect(!cleanup.canTrash(unknown))
+        let candidate = DiskCleanupCandidate(url: retained, kind: .aiSessionWorkspace, byteSize: 4096, displayName: retained.lastPathComponent)
+        fixture.files.trashResults[retained] = .success(retained)
+        #expect(SystemDiskCleanup.trashSelected(candidates: [candidate], fileManager: fixture.files).successCount == 0)
+        #expect(fixture.files.trashedURLs.isEmpty)
+    }
+
+    @Test(arguments: [false, true])
+    func damagedDatabasesDoNotHideOtherReadableStores(brokenFirst: Bool) throws {
+        let fixture = try Fixture()
+        defer { fixture.remove() }
+        let retained = fixture.workspace("Claude Code", "2026-07-02")
+        let orphan = fixture.workspace("Claude Code", "2026-07-06")
+        let unknown = fixture.workspace("Codex", "2026-07-16")
+        fixture.directory(fixture.home.appendingPathComponent(".claude/projects"))
+        try fixture.codexDatabase(rows: [("retained", retained.path, "2026-07-20", true)])
+        let root = fixture.home.appendingPathComponent(".codex")
+        let valid = root.appendingPathComponent("state_5.sqlite")
+        let broken = root.appendingPathComponent("state_9.sqlite")
+        try Data("damaged sqlite".utf8).write(to: broken)
+        fixture.file(broken, data: Data())
+        fixture.files.directoryContents[root.path] = brokenFirst ? [broken, valid] : [valid, broken]
+
+        #expect(fixture.scan().map(\.url) == [orphan], "A damaged database must not hide a cross-tool reference in another readable store")
+        let cleanup = AISessionWorkspaceCleanup(fileManager: fixture.files, referenceDate: fixture.referenceDate)
+        #expect(!cleanup.canTrash(retained))
+        #expect(!cleanup.canTrash(unknown))
+        fixture.files.trashResults[retained] = .success(retained)
+        #expect(SystemDiskCleanup.trashSelected(urls: [retained], fileManager: fixture.files).successCount == 0)
+        #expect(fixture.files.trashedURLs.isEmpty)
+    }
+
+    @Test(arguments: [false, true], [false, true])
+    func unreadableTranscriptStoresDoNotHideOtherReadableStores(brokenFirst: Bool, missingProjects: Bool) throws {
+        let fixture = try Fixture()
+        defer { fixture.remove() }
+        let retained = fixture.workspace("Codex", "2026-07-02")
+        let orphan = fixture.workspace("Codex", "2026-07-06")
+        let unknown = fixture.workspace("Qoder", "2026-07-16")
+        try fixture.codexDatabase(rows: [])
+        let valid = fixture.home.appendingPathComponent(".qoder-valid")
+        let broken = fixture.home.appendingPathComponent(".qoder-broken")
+        fixture.jsonLog(".qoder-valid/projects/project/session.jsonl", "{\"sessionId\":\"retained\",\"cwd\":\"\(retained.path)\",\"timestamp\":\"2026-07-20T12:00:00Z\"}\n")
+        fixture.directory(broken)
+        if !missingProjects {
+            fixture.directory(broken.appendingPathComponent("projects"))
+            fixture.files.directoryErrors[broken.appendingPathComponent("projects").path] = .fileReadNoPermission
+        }
+        fixture.files.directoryContents[fixture.home.path] = brokenFirst ? [broken, valid] : [valid, broken]
+
+        #expect(fixture.scan().map(\.url) == [orphan], "A denied transcript store must not hide a cross-tool reference in another readable store")
+        let cleanup = AISessionWorkspaceCleanup(fileManager: fixture.files, referenceDate: fixture.referenceDate)
+        #expect(!cleanup.canTrash(retained))
+        #expect(!cleanup.canTrash(unknown))
+        fixture.files.trashResults[retained] = .success(retained)
+        #expect(SystemDiskCleanup.trashSelected(urls: [retained], fileManager: fixture.files).successCount == 0)
+        #expect(fixture.files.trashedURLs.isEmpty)
+    }
+
+    @Test(arguments: [false, true])
+    func incompleteCopilotMetadataRetainsReadableWorkspaceReferences(brokenFirst: Bool) throws {
+        let fixture = try Fixture()
+        defer { fixture.remove() }
+        let retained = fixture.workspace("Codex", "2026-07-02")
+        let orphan = fixture.workspace("Codex", "2026-07-06")
+        let unknown = fixture.workspace("Copilot", "2026-07-16")
+        try fixture.codexDatabase(rows: [])
+        let root = fixture.home.appendingPathComponent(".copilot/session-state")
+        let valid = root.appendingPathComponent("valid")
+        let broken = root.appendingPathComponent("broken")
+        fixture.jsonLog(".copilot/session-state/valid/workspace.yaml", "id: retained\ncwd: \(retained.path)\ncreated_at: 2026-07-20T12:00:00Z\n")
+        fixture.jsonLog(".copilot/session-state/broken/workspace.yaml", "id: damaged\ncwd: /project\ncreated_at: invalid\n")
+        fixture.files.directoryContents[root.path] = brokenFirst ? [broken, valid] : [valid, broken]
+
+        #expect(fixture.scan().map(\.url) == [orphan])
+        let cleanup = AISessionWorkspaceCleanup(fileManager: fixture.files, referenceDate: fixture.referenceDate)
+        #expect(!cleanup.canTrash(retained))
+        #expect(!cleanup.canTrash(unknown))
+        fixture.files.trashResults[retained] = .success(retained)
+        #expect(SystemDiskCleanup.trashSelected(urls: [retained], fileManager: fixture.files).successCount == 0)
+        #expect(fixture.files.trashedURLs.isEmpty)
+    }
+
+    @Test(arguments: [false, true])
+    func damagedCursorSchemaDiscoveryKeepsOtherReadableWorkspaceReferences(brokenFirst: Bool) throws {
+        let fixture = try Fixture()
+        defer { fixture.remove() }
+        let retained = fixture.workspace("Codex", "2026-07-02")
+        let orphan = fixture.workspace("Codex", "2026-07-06")
+        let unknown = fixture.workspace("Cursor", "2026-07-16")
+        try fixture.codexDatabase(rows: [])
+        let root = fixture.home.appendingPathComponent("Library/Application Support/Cursor/User/workspaceStorage")
+        let valid = root.appendingPathComponent("valid")
+        let broken = root.appendingPathComponent("broken")
+        try FileManager.default.createDirectory(at: valid, withIntermediateDirectories: true)
+        try FileManager.default.createDirectory(at: broken, withIntermediateDirectories: true)
+        let database = valid.appendingPathComponent("state.vscdb")
+        try fixture.sql("CREATE TABLE composerHeaders(key TEXT, value TEXT); INSERT INTO composerHeaders VALUES ('retained','{\"composerId\":\"retained\",\"createdAt\":1784548800000,\"cwd\":\"\(retained.path)\"}')", at: database)
+        fixture.file(database, data: Data())
+        let damaged = broken.appendingPathComponent("state.vscdb")
+        try Data("damaged sqlite".utf8).write(to: damaged)
+        fixture.file(damaged, data: Data())
+        fixture.files.directoryContents[root.path] = brokenFirst ? [broken, valid] : [valid, broken]
+
+        #expect(fixture.scan().map(\.url) == [orphan])
+        let cleanup = AISessionWorkspaceCleanup(fileManager: fixture.files, referenceDate: fixture.referenceDate)
+        #expect(!cleanup.canTrash(retained))
+        #expect(!cleanup.canTrash(unknown))
+        fixture.files.trashResults[retained] = .success(retained)
+        #expect(SystemDiskCleanup.trashSelected(urls: [retained], fileManager: fixture.files).successCount == 0)
+        #expect(fixture.files.trashedURLs.isEmpty)
+    }
+
+    @Test(arguments: ["sessions", "archived_sessions"])
+    func compressedLegacyRolloutsDoNotHideReadableReferencesInOtherStores(compressedFolder: String) throws {
+        let fixture = try Fixture()
+        defer { fixture.remove() }
+        let retained = fixture.workspace("Claude Code", "2026-07-02")
+        let orphan = fixture.workspace("Claude Code", "2026-07-06")
+        let unknown = fixture.workspace("Codex", "2026-07-16")
+        fixture.directory(fixture.home.appendingPathComponent(".claude/projects"))
+        let readableFolder = compressedFolder == "sessions" ? "archived_sessions" : "sessions"
+        fixture.jsonLog(".codex/\(compressedFolder)/rollout-compressed.jsonl.zst", "compressed bytes")
+        fixture.jsonLog(".codex/\(readableFolder)/rollout-retained.jsonl", "{\"type\":\"session_meta\",\"payload\":{\"id\":\"retained\",\"cwd\":\"\(retained.path)\",\"timestamp\":\"2026-07-20T12:00:00Z\"}}\n")
+
+        #expect(fixture.scan().map(\.url) == [orphan])
+        let cleanup = AISessionWorkspaceCleanup(fileManager: fixture.files, referenceDate: fixture.referenceDate)
+        #expect(!cleanup.canTrash(retained))
+        #expect(!cleanup.canTrash(unknown))
+        fixture.files.trashResults[retained] = .success(retained)
+        #expect(SystemDiskCleanup.trashSelected(urls: [retained], fileManager: fixture.files).successCount == 0)
+        #expect(fixture.files.trashedURLs.isEmpty)
+    }
+
+    @Test(arguments: [false, true])
+    func copilotEventsWithMissingMetadataDoNotHideReadableWorkspaceReferences(cliMetadata: Bool) throws {
+        let fixture = try Fixture()
+        defer { fixture.remove() }
+        let retained = fixture.workspace("Codex", "2026-07-02")
+        let orphan = fixture.workspace("Codex", "2026-07-06")
+        let unknown = fixture.workspace("Copilot", "2026-07-16")
+        try fixture.codexDatabase(rows: [])
+        fixture.jsonLog(".copilot/session-state/unknown/events.jsonl", "{\"type\":\"session.start\"}\n")
+        if cliMetadata {
+            fixture.jsonLog(".copilot/session-state/valid/workspace.yaml", "id: retained\ncwd: \(retained.path)\ncreated_at: 2026-07-20T12:00:00Z\n")
+        } else {
+            let workspace = fixture.home.appendingPathComponent("Library/Application Support/Code/User/workspaceStorage/id")
+            fixture.file(workspace.appendingPathComponent("workspace.json"), data: try JSONSerialization.data(withJSONObject: ["folder": retained.absoluteString]))
+            fixture.file(workspace.appendingPathComponent("chatSessions/retained.jsonl"), data: try JSONSerialization.data(withJSONObject: [
+                "kind": 0, "v": ["sessionId": "retained", "creationDate": 1_784_548_800_000],
+            ]))
+        }
+
+        #expect(fixture.scan().map(\.url) == [orphan])
+        let cleanup = AISessionWorkspaceCleanup(fileManager: fixture.files, referenceDate: fixture.referenceDate)
+        #expect(!cleanup.canTrash(retained))
+        #expect(!cleanup.canTrash(unknown))
+        fixture.files.trashResults[retained] = .success(retained)
+        #expect(SystemDiskCleanup.trashSelected(urls: [retained], fileManager: fixture.files).successCount == 0)
+        #expect(fixture.files.trashedURLs.isEmpty)
+    }
+
+    @Test
+    func incompleteInventoriesRetainReferencesCollectedBeforeAStoreFailure() throws {
+        let fixture = try Fixture()
+        defer { fixture.remove() }
+        let retained = fixture.workspace("Codex", "2026-07-02")
+        let orphan = fixture.workspace("Codex", "2026-07-06")
+        let unknown = fixture.workspace("Grok", "2026-07-16")
+        try fixture.codexDatabase(rows: [])
+        fixture.jsonLog(".grok/sessions/project/id/summary.json", "{\"info\":{\"id\":\"retained\",\"cwd\":\"\(retained.path)\"},\"created_at\":\"2026-07-20T12:00:00Z\"}")
+        fixture.jsonLog(".grok/sessions/project/unknown/events.jsonl", "{\"type\":\"turn_ended\"}\n")
+
+        #expect(fixture.scan().map(\.url) == [orphan], "A later store failure must not discard references already collected")
+        let cleanup = AISessionWorkspaceCleanup(fileManager: fixture.files, referenceDate: fixture.referenceDate)
+        #expect(!cleanup.canTrash(retained))
+        #expect(!cleanup.canTrash(unknown))
+        fixture.files.trashResults[retained] = .success(retained)
+        #expect(SystemDiskCleanup.trashSelected(urls: [retained], fileManager: fixture.files).successCount == 0)
+        #expect(fixture.files.trashedURLs.isEmpty)
+    }
+
+    @Test(arguments: [1, 4])
+    func cleanupRevalidatesEachWorkspaceWithoutAnExtraInventoryScan(workspaceCount: Int) throws {
+        let fixture = try Fixture()
+        defer { fixture.remove() }
+        let workspaces = (2..<(2 + workspaceCount)).map { fixture.workspace("Codex", String(format: "2026-07-%02d", $0)) }
+        try fixture.codexDatabase(rows: [])
+        fixture.jsonLog(".claude/projects/project/session.jsonl", "{\"sessionId\":\"retained\",\"cwd\":\"/project\",\"timestamp\":\"2026-07-20T12:00:00Z\"}\n")
+        let candidates = workspaces.map {
+            fixture.files.trashResults[$0] = .success($0)
+            return DiskCleanupCandidate(url: $0, kind: .aiSessionWorkspace, byteSize: 4096, displayName: $0.lastPathComponent)
+        }
+        let inventoryRoot = fixture.home.appendingPathComponent(".claude/projects")
+        let reads = fixture.files.directoryReadCount(atPath: inventoryRoot.path)
+
+        let result = SystemDiskCleanup.trashSelected(candidates: candidates, fileManager: fixture.files, sizeProvider: { _ in 4096 })
+
+        #expect(result.successCount == workspaceCount)
+        #expect(result.freedBytes == UInt64(workspaceCount * 4096))
+        #expect(result.failures.isEmpty)
+        #expect(fixture.files.trashedURLs == workspaces)
+        #expect(fixture.files.directoryReadCount(atPath: inventoryRoot.path) - reads == workspaceCount,
+                "Each workspace needs one fresh inventory; an extra whole-batch inventory repeats all metadata I/O")
+    }
+
+    @Test(arguments: [false, true])
+    func cleanupRechecksRestoredSessionsBetweenTargets(rawURLs: Bool) throws {
+        let fixture = try Fixture()
+        defer { fixture.remove() }
+        let first = fixture.workspace("Codex", "2026-07-02")
+        let restored = fixture.workspace("Codex", "2026-07-06")
+        try fixture.codexDatabase(rows: [])
+        let log = fixture.home.appendingPathComponent(".claude/projects/project/session.jsonl")
+        fixture.file(log, data: Data("{\"sessionId\":\"retained\",\"cwd\":\"/project\",\"timestamp\":\"2026-07-20T12:00:00Z\"}\n".utf8))
+        let updated = Data("{\"sessionId\":\"retained\",\"cwd\":\"\(restored.path)/new-chat\",\"timestamp\":\"2026-07-20T12:00:00Z\"}\n".utf8)
+        let files = fixture.files
+        for url in [first, restored] { files.trashResults[url] = .success(url) }
+        files.beforeTrash = { url in
+            if url == first { files.fileContentsData[log.path] = updated }
+        }
+        let result = rawURLs
+            ? SystemDiskCleanup.trashSelected(urls: [first, restored], fileManager: files, sizeProvider: { _ in 4096 })
+            : SystemDiskCleanup.trashSelected(candidates: [first, restored].map {
+                DiskCleanupCandidate(url: $0, kind: .aiSessionWorkspace, byteSize: 4096, displayName: $0.lastPathComponent)
+            }, fileManager: files, sizeProvider: { _ in 4096 })
+
+        #expect(result.successCount == 1)
+        #expect(result.freedBytes == 4096)
+        #expect(result.failures.map(\.url) == [restored])
+        #expect(files.trashedURLs == [first], "A workspace restored during the batch must be rechecked before its own deletion")
+    }
+
     @Test(arguments: ["sessions", "archived_sessions"])
     func codexLegacyRolloutsKeepUnarchivedAndArchivedDays(folder: String) throws {
         let fixture = try Fixture()
