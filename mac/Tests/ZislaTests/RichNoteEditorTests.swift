@@ -426,95 +426,111 @@ struct RichNoteEditorTests {
         #expect(result["readonly"] as? Bool == true)
     }
 
-    @Test(arguments: [false, true])
-    func nativeTextKeepsBlankLinesUnicodeAndLiteralHTMLThroughEditingAndUndo(_ exportsLayoutNewline: Bool) async throws {
-        let content = NotesAppBridge.NoteContent(plainText: "\u{FFFC}", bodyHTML: "<img src='data:image/png;base64,AAAA'>", requiresNativeTextEditing: true)
-        var edits: [NotesNativeTextEdit] = []
-        let hosting = NSHostingView(rootView: RichNoteEditor(html: content.bodyHTML, noteID: "native", command: nil,
-            isEditable: true, nativeTextContent: content, onNativeTextChange: { _, edit in edits.append(edit) },
-            onChange: { _, _, _ in Issue.record("Native text must not write HTML") }).frame(width: 320, height: 240))
-        let window = NSWindow(contentRect: CGRect(x: 0, y: 0, width: 320, height: 240), styleMask: .borderless, backing: .buffered, defer: false)
-        window.isReleasedWhenClosed = false
-        window.contentView = hosting
-        defer { window.contentView = nil; window.close() }
-        let webView = try await waitForWebView(in: hosting)
-        try await waitUntilEditorIsReady(in: webView)
-        for text in ["", "\n", "\n\n", "文字\n", "文字\n\n", "第一行\n\n第三行\n\n", "  <b>&👩‍💻 العربية\t"] {
-            let config = String(decoding: try JSONSerialization.data(withJSONObject: ["prefix": text, "suffix": text, "protectedText": "\u{FFFC}"]), as: UTF8.self)
-            let count = edits.count
-            _ = try await webView.evaluateJavaScript("""
-                (() => {
-                  window.zisla.setHTML("<img src='data:image/png;base64,AAAA'>", window.zisla.documentToken(), \(config));
-                  const fields = document.querySelectorAll('[data-zisla-native-text]');
-                  if (\(exportsLayoutNewline)) {
-                    const innerText = Object.getOwnPropertyDescriptor(HTMLElement.prototype, 'innerText').get;
-                    for (const field of fields) {
-                      // Older WebKit includes a block's layout newline even when its DOM text is unchanged.
-                      Object.defineProperty(field, 'innerText', { get() {
-                        const text = innerText.call(this);
-                        return this.lastElementChild?.textContent ? text + '\\n' : text;
-                      }});
-                    }
-                  }
-                  const field = fields[1]; field.focus();
-                  const range = document.createRange(); range.selectNodeContents(field); range.collapse(false);
-                  const selection = window.getSelection(); selection.removeAllRanges(); selection.addRange(range);
-                  window.zisla.exec('insertText', '!');
-                })()
-                """)
-            for _ in 0..<100 {
-                if edits.count > count { break }
-                try await Task.sleep(for: .milliseconds(10))
-            }
-            let edit = try #require(edits.last)
+    @Test(.timeLimit(.minutes(1)), arguments: ["", "\n", "\n\n", "文字\n", "文字\n\n", "第一行\n\n第三行\n\n", "  <b>&👩‍💻 العربية\t"], [false, true])
+    func nativeTextKeepsBlankLinesUnicodeAndLiteralHTML(text: String, exportsLayoutNewline: Bool) async throws {
+        try await withNativeTextEditor(text: text, exportsLayoutNewline: exportsLayoutNewline) { webView, edits in
+            var iterator = edits.makeAsyncIterator()
+            try await insertAtNativeSuffixEnd("!", in: webView)
+            let edit = try #require(await iterator.next())
             #expect(edit.prefix == text, "Editing the suffix must preserve every prefix character: \(String(reflecting: text))")
             #expect(edit.suffix == text + "!", "Native text must round-trip literal text and blank lines")
         }
-        let text = try #require(edits.last?.suffix)
-        for (command, expected) in [("undo", String(text.dropLast())), ("redo", text)] {
-            let count = edits.count
-            _ = try await webView.evaluateJavaScript("window.zisla.exec('\(command)');")
-            for _ in 0..<100 {
-                if edits.count > count { break }
-                try await Task.sleep(for: .milliseconds(10))
+    }
+
+    @Test(.timeLimit(.minutes(1)), arguments: [false, true])
+    func nativeTextPreservesUndoRedoAndEditableDOMLineBoundaries(_ exportsLayoutNewline: Bool) async throws {
+        let original = "  <b>&👩‍💻 العربية\t"
+        try await withNativeTextEditor(text: original, exportsLayoutNewline: exportsLayoutNewline) { webView, edits in
+            var iterator = edits.makeAsyncIterator()
+            try await insertAtNativeSuffixEnd("!", in: webView)
+            let text = try #require(await iterator.next()).suffix
+            #expect(text == original + "!")
+            for (command, expected) in [("undo", original), ("redo", text)] {
+                _ = try await webView.evaluateJavaScript("window.zisla.exec('\(command)');")
+                #expect(try #require(await iterator.next()).suffix == expected, "Undo and redo must save the exact native text")
             }
-            #expect(try #require(edits.last).suffix == expected, "Undo and redo must save the exact native text")
+            _ = try await webView.evaluateJavaScript("""
+                document.execCommand('insertLineBreak', false, null);
+                window.zisla.exec('insertText', '结尾');
+                """)
+            #expect(try #require(await iterator.next()).suffix == text + "\n结尾", "A keyboard line break must preserve its text newline")
+            for (html, expected) in [
+                ("首行<br>次行<br><br>", "首行\n次行\n"),
+                ("<div>首行</div>次行", "首行\n次行"),
+                ("首行<div>次行</div>", "首行\n次行"),
+                ("<div><span>首行<br></span>次行</div>", "首行\n次行"),
+                ("<div><span><br></span></div>", ""),
+                ("<div>首行</div><div><span><br></span></div>", "首行\n"),
+                ("<div>首行<div><br></div></div>", "首行\n"),
+                ("<p>首行<br><br></p><p><span>次行 &amp; 👩‍💻</span></p>", "首行\n\n次行 & 👩‍💻"),
+                ("<div>首行<div>次行</div>末行</div>", "首行\n次行\n末行"),
+            ] {
+                let markup = String(decoding: try JSONSerialization.data(withJSONObject: html, options: [.fragmentsAllowed]), as: UTF8.self)
+                _ = try await webView.evaluateJavaScript("""
+                    (() => {
+                      const field = document.querySelectorAll('[data-zisla-native-text]')[1];
+                      field.innerHTML = \(markup);
+                      field.dispatchEvent(new Event('input', { bubbles: true }));
+                    })()
+                    """)
+                #expect(try #require(await iterator.next()).suffix == expected, "Editable DOM line boundaries must preserve plain text: \(html)")
+            }
         }
-        let count = edits.count
-        _ = try await webView.evaluateJavaScript("""
-            document.execCommand('insertLineBreak', false, null);
-            window.zisla.exec('insertText', '结尾');
-            """)
-        for _ in 0..<100 {
-            if edits.count > count { break }
-            try await Task.sleep(for: .milliseconds(10))
-        }
-        #expect(try #require(edits.last).suffix == text + "\n结尾", "A keyboard line break must preserve its text newline")
-        for (html, expected) in [
-            ("首行<br>次行<br><br>", "首行\n次行\n"),
-            ("<div>首行</div>次行", "首行\n次行"),
-            ("首行<div>次行</div>", "首行\n次行"),
-            ("<div><span>首行<br></span>次行</div>", "首行\n次行"),
-            ("<div><span><br></span></div>", ""),
-            ("<div>首行</div><div><span><br></span></div>", "首行\n"),
-            ("<div>首行<div><br></div></div>", "首行\n"),
-            ("<p>首行<br><br></p><p><span>次行 &amp; 👩‍💻</span></p>", "首行\n\n次行 & 👩‍💻"),
-            ("<div>首行<div>次行</div>末行</div>", "首行\n次行\n末行"),
-        ] {
-            let markup = String(decoding: try JSONSerialization.data(withJSONObject: html, options: [.fragmentsAllowed]), as: UTF8.self)
-            let count = edits.count
+    }
+
+    @Test(.timeLimit(.minutes(1)))
+    func nativeTextWaitsForDelayedCallbackWithoutReusingPreviousEdit() async throws {
+        try await withNativeTextEditor(text: "\n\n") { webView, edits in
+            var iterator = edits.makeAsyncIterator()
+            try await insertAtNativeSuffixEnd("!", in: webView)
+            let previous = try #require(await iterator.next())
+            #expect(previous.prefix == "\n\n")
+            #expect(previous.suffix == "\n\n!")
             _ = try await webView.evaluateJavaScript("""
                 (() => {
-                  const field = document.querySelectorAll('[data-zisla-native-text]')[1];
-                  field.innerHTML = \(markup);
-                  field.dispatchEvent(new Event('input', { bubbles: true }));
+                  const originalSet = window.setTimeout;
+                  const originalClear = window.clearTimeout;
+                  const held = new Map();
+                  let nextID = -1;
+                  window.setTimeout = (callback, delay, ...args) => {
+                    if (delay !== 80) return originalSet(callback, delay, ...args);
+                    const id = nextID--; held.set(id, () => callback(...args)); return id;
+                  };
+                  window.clearTimeout = id => held.has(id) ? held.delete(id) : originalClear(id);
+                  window.releaseNativeEmits = () => {
+                    window.setTimeout = originalSet;
+                    window.clearTimeout = originalClear;
+                    const callbacks = [...held.values()]; held.clear();
+                    callbacks.forEach(callback => callback());
+                    return callbacks.length;
+                  };
+                  window.zisla.setHTML("<img src='data:image/png;base64,AAAA'>", window.zisla.documentToken(),
+                    { prefix: '文字\\n', suffix: '文字\\n', protectedText: '\\uFFFC' });
                 })()
                 """)
-            for _ in 0..<100 {
-                if edits.count > count { break }
-                try await Task.sleep(for: .milliseconds(10))
+            try await insertAtNativeSuffixEnd("!", in: webView)
+
+            let started = AsyncStream<Void>.makeStream()
+            var received: NotesNativeTextEdit?
+            let pending = Task { @MainActor in
+                var iterator = edits.makeAsyncIterator()
+                started.continuation.yield()
+                let edit = await iterator.next()
+                received = edit
+                return edit
             }
-            #expect(try #require(edits.last).suffix == expected, "Editable DOM line boundaries must preserve plain text: \(html)")
+            defer { pending.cancel(); started.continuation.finish() }
+            var startIterator = started.stream.makeAsyncIterator()
+            _ = try #require(await startIterator.next())
+            #expect(received == nil, "A previous callback must not complete the pending edit")
+            #expect(try await webView.evaluateJavaScript("window.releaseNativeEmits()") as? Int == 1)
+            let edit = try #require(await withTaskCancellationHandler {
+                await pending.value
+            } onCancel: {
+                pending.cancel()
+            })
+            #expect(edit.prefix == "文字\n")
+            #expect(edit.suffix == "文字\n!")
         }
     }
 
@@ -1396,6 +1412,53 @@ struct RichNoteEditorTests {
             window: window
         )))
         #expect(try await editorText(in: webView) == "初始内容变更")
+    }
+
+    private func withNativeTextEditor(
+        text: String,
+        exportsLayoutNewline: Bool = false,
+        body: (WKWebView, AsyncStream<NotesNativeTextEdit>) async throws -> Void
+    ) async throws {
+        let content = NotesAppBridge.NoteContent(plainText: text + "\u{FFFC}" + text,
+            bodyHTML: "<img src='data:image/png;base64,AAAA'>", requiresNativeTextEditing: true)
+        let edits = AsyncStream<NotesNativeTextEdit>.makeStream()
+        let hosting = NSHostingView(rootView: RichNoteEditor(html: content.bodyHTML, noteID: "native", command: nil,
+            isEditable: true, pasteboard: RejectingRichNotePasteboard(), nativeTextContent: content,
+            onNativeTextChange: { _, edit in edits.continuation.yield(edit) },
+            onChange: { _, _, _ in Issue.record("Native text must not write HTML") }).frame(width: 320, height: 240))
+        let window = NSWindow(contentRect: CGRect(x: 0, y: 0, width: 320, height: 240), styleMask: .borderless, backing: .buffered, defer: false)
+        window.isReleasedWhenClosed = false
+        window.contentView = hosting
+        defer { edits.continuation.finish(); window.contentView = nil; window.close() }
+        let webView = try await waitForWebView(in: hosting)
+        try await waitUntilEditorIsReady(in: webView)
+        if exportsLayoutNewline {
+            _ = try await webView.evaluateJavaScript("""
+                (() => {
+                  const innerText = Object.getOwnPropertyDescriptor(HTMLElement.prototype, 'innerText').get;
+                  for (const field of document.querySelectorAll('[data-zisla-native-text]')) {
+                    // Older WebKit includes a block's layout newline even when its DOM text is unchanged.
+                    Object.defineProperty(field, 'innerText', { get() {
+                      const text = innerText.call(this);
+                      return this.lastElementChild?.textContent ? text + '\\n' : text;
+                    }});
+                  }
+                })()
+                """)
+        }
+        try await body(webView, edits.stream)
+    }
+
+    private func insertAtNativeSuffixEnd(_ text: String, in webView: WKWebView) async throws {
+        let value = String(decoding: try JSONSerialization.data(withJSONObject: text, options: [.fragmentsAllowed]), as: UTF8.self)
+        _ = try await webView.evaluateJavaScript("""
+            (() => {
+              const field = document.querySelectorAll('[data-zisla-native-text]')[1]; field.focus();
+              const range = document.createRange(); range.selectNodeContents(field); range.collapse(false);
+              const selection = window.getSelection(); selection.removeAllRanges(); selection.addRange(range);
+              window.zisla.exec('insertText', \(value));
+            })()
+            """)
     }
 
     private func withCopyEditor(
