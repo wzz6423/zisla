@@ -7,6 +7,46 @@ import ZislaCore
 @testable import Zisla
 
 struct StatusIconDestinationIntegrationTests {
+    @Test(arguments: IslandEdge.allCases) @MainActor
+    func pomodoroInformationRowsReceiveMouseEventsAndRestorePassiveIcons(edge: IslandEdge) throws {
+        let fixture = try IconFixture(edge: edge)
+        defer { fixture.close() }
+        fixture.reducesMotion = true
+        fixture.settings.settings.sideNoticesEnabled = true
+        fixture.settings.settings.islandShowMoreInformation = true
+        let icons = [IslandStatusIcon(id: "cpu", content: .metric(.cpu, text: "31%", image: nil,
+            style: .detailed), tooltip: "CPU")]
+        fixture.presenter.setStatusIcons(icons)
+        fixture.presenter.setScreenLocked(false)
+        let host = try #require(NSApplication.shared.windows.compactMap {
+            $0.contentView as? NSHostingView<AppLanguageEnvironment<CompactStatusBarView>>
+        }.first { $0.rootView.content.settingsStore === fixture.settings })
+        let state = host.rootView.content.displayState
+        #expect(host.window?.ignoresMouseEvents == true)
+        fixture.queue.enqueue(IslandNotice(id: "focus-countdown-mouse", title: "Focus", detail: "00:12:30"),
+            expiresAfter: nil)
+        fixture.presenter.setStatusIcons(icons)
+        #expect(state.statusIcons.map(\.id) == ["cpu"])
+        #expect(host.window?.ignoresMouseEvents == false,
+            "Visible Pomodoro buttons must receive mouse events alongside monitor icons")
+        state.compactStatusHidden = true
+        fixture.presenter.setStatusIcons(icons)
+        #expect(host.window?.ignoresMouseEvents == true)
+        state.compactStatusHidden = false
+        fixture.presenter.setStatusIcons(icons)
+        #expect(host.window?.ignoresMouseEvents == false)
+        fixture.settings.settings.sideNoticesEnabled = false
+        fixture.presenter.setStatusIcons(icons)
+        #expect(host.window?.ignoresMouseEvents == true)
+        fixture.settings.settings.sideNoticesEnabled = true
+        fixture.presenter.setStatusIcons(icons)
+        #expect(host.window?.ignoresMouseEvents == false)
+        fixture.queue.removeAll()
+        fixture.presenter.setStatusIcons(icons)
+        #expect(host.window?.ignoresMouseEvents == true,
+            "Removing the countdown must restore passive monitor icons")
+    }
+
     @Test(arguments: IslandEdge.allCases, [false, true]) @MainActor
     func pomodoroProgressRendersInCustomPillsAndInformationRows(edge: IslandEdge, moreInformation: Bool) async throws {
         let fixture = try IconFixture(edge: edge)

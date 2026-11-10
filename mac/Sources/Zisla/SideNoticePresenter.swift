@@ -477,7 +477,11 @@ final class SideNoticePresenter {
             panels.compactConfiguration = configuration
             panels.compactScreenFrame = snapshot.frame
         }
-        panel.ignoresMouseEvents = !displayState.statusIcons.isEmpty
+        let showsPomodoroControls = FloatingIslandInformationLayout(
+            notices: displayState.compactStatusHidden ? [] : compactNotices, icons: displayState.statusIcons,
+            settings: settingsStore.settings, item: media.snapshot, at: date
+        )?.primary.contains { $0.presentation.priority == .focusCountdown } == true
+        panel.ignoresMouseEvents = !displayState.statusIcons.isEmpty && !showsPomodoroControls
         panel.level = isScreenshotActive ? IslandPanel.onBottomLevel : IslandPanel.onTopLevel
         if settingsStore.settings.islandLayoutStyle == .pill && !settingsStore.settings.islandCollapsedOnTop {
             panel.level = IslandPanel.onBottomLevel
