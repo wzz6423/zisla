@@ -98,6 +98,11 @@ struct SettingsSearchTests {
     func findsSettingInTheRequestedLanguage(language: AppLanguage) {
         let title = AppLocalization.string("界面语言", language: language)
         #expect(results(title, locale: language.locale).contains { $0.section == .general && $0.title == "界面语言" })
+        let dependencyTitle = AppLocalization.string("依赖组件", language: language)
+        let dependencies = results(dependencyTitle, locale: language.locale)
+        #expect(Set(dependencies.map(\.section)) == [.download])
+        #expect(Set(dependencies.map(\.title)) == [ManagedTool.ytDLP.displayName, ManagedTool.libreOffice.displayName])
+        #expect(results(dependencyTitle, settings: FeatureSettings(downloaderEnabled: false), locale: language.locale).isEmpty)
     }
 
     @Test
