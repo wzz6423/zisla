@@ -143,6 +143,7 @@ struct SystemAutoCleanupServiceTests {
         #expect(fixture.timers.allSatisfy { !$0.isValid })
         #expect(fixture.defaults.object(forKey: "system-cleanup-last-run-v1") as? Date == fixture.date)
         #expect(fixture.defaults.object(forKey: "trash-cleanup-last-run-v1") as? Date == fixture.date)
+        #expect(fixture.defaults.object(forKey: "trash-cleanup-attempt-v1") == nil)
         for (timer, callback) in zip(fixture.timers, fixture.callbacks) {
             fixture.date = timer.fireDate
             callback(timer)
@@ -366,6 +367,7 @@ struct SystemAutoCleanupServiceTests {
         #expect(fixture.timers.isEmpty)
         #expect(service.trashCleanup.runIfDue() == nil)
         #expect(fixture.defaults.object(forKey: "trash-cleanup-last-run-v1") == nil)
+        #expect(fixture.defaults.object(forKey: "trash-cleanup-attempt-v1") == nil)
         #expect(fixture.emptiedCount == 0)
     }
 
@@ -540,6 +542,8 @@ struct SystemAutoCleanupServiceTests {
             == Date(timeIntervalSince1970: 1_800_000_000))
         #expect(fixture.defaults.object(forKey: "trash-cleanup-last-run-v1") as? Date
             == Date(timeIntervalSince1970: 1_800_000_000))
+        #expect(fixture.defaults.object(forKey: "trash-cleanup-attempt-v1") == nil,
+                "Canceling before execution must not reserve an irreversible operation")
         #expect(await task.value == nil)
         #expect(fixture.emptiedCount == 0)
         if releaseService { #expect(reference == nil) }
@@ -559,8 +563,10 @@ struct SystemAutoCleanupServiceTests {
         var settings = FeatureSettings(systemCleanupPolicy: .thirtyDays, trashCleanupPolicy: .sevenDays)
         service.apply(settings: settings)
         fixture.date.addTimeInterval(15 * 86_400)
+        let attemptedAt = fixture.date
         let original = try #require(service.trashCleanup.runIfDue())
         await gate.waitUntilScanning(1)
+        #expect(fixture.defaults.object(forKey: "trash-cleanup-attempt-v1") as? Date == attemptedAt)
         #expect(service.trashCleanup.runIfDue() == nil)
         switch change {
         case "stop": service.stop()
@@ -568,6 +574,12 @@ struct SystemAutoCleanupServiceTests {
         default: settings.trashCleanupPolicy = .fifteenDays
         }
         if change != "stop" { service.apply(settings: settings) }
+        #expect(service.trashCleanup.runIfDue() == nil)
+        if change == "interval" {
+            #expect(fixture.timers.last?.fireDate == attemptedAt.addingTimeInterval(15 * 86_400))
+            #expect(fixture.defaults.object(forKey: "trash-cleanup-attempt-v1") == nil)
+            fixture.date.addTimeInterval(15 * 86_400)
+        }
         let replacement = change == "interval" ? service.trashCleanup.runIfDue() : nil
         #expect((replacement != nil) == (change == "interval"))
         if replacement != nil { await gate.waitUntilScanning(2) }
@@ -575,9 +587,15 @@ struct SystemAutoCleanupServiceTests {
         #expect(await original.value == nil)
         if change == "never" {
             #expect(fixture.defaults.object(forKey: "trash-cleanup-last-run-v1") == nil)
+            #expect(fixture.defaults.object(forKey: "trash-cleanup-attempt-v1") == nil)
+        } else if change == "interval" {
+            #expect(fixture.defaults.object(forKey: "trash-cleanup-last-run-v1") as? Date == attemptedAt)
+            #expect(fixture.defaults.object(forKey: "trash-cleanup-attempt-v1") as? Date == fixture.date,
+                    "An obsolete completion cannot erase a replacement's reservation")
         } else {
             #expect(fixture.defaults.object(forKey: "trash-cleanup-last-run-v1") as? Date
                 == Date(timeIntervalSince1970: 1_800_000_000))
+            #expect(fixture.defaults.object(forKey: "trash-cleanup-attempt-v1") as? Date == attemptedAt)
         }
         #expect(fixture.defaults.object(forKey: "system-cleanup-last-run-v1") as? Date
             == Date(timeIntervalSince1970: 1_800_000_000))
@@ -587,7 +605,164 @@ struct SystemAutoCleanupServiceTests {
             #expect(await replacement.value != nil)
             #expect(service.trashCleanup.task == nil)
             #expect(fixture.defaults.object(forKey: "trash-cleanup-last-run-v1") as? Date == fixture.date)
+            #expect(fixture.defaults.object(forKey: "trash-cleanup-attempt-v1") == nil)
         }
+    }
+
+    @Test(arguments: [false, true])
+    func interruptedTrashEmptyingWaitsForAFullIntervalAfterRelaunch(releaseOriginalBeforeRelaunch: Bool) async throws {
+        let fixture = try SystemAutoCleanupFixture()
+        let gate = CleanupScanGate()
+        let originalService = fixture.makeService(emptyTrash: {
+            await gate.wait()
+            return .success(())
+        })
+        let settings = FeatureSettings(systemCleanupPolicy: .thirtyDays, trashCleanupPolicy: .sevenDays)
+        originalService.apply(settings: settings)
+        fixture.date.addTimeInterval(15 * 86_400)
+        let attemptedAt = fixture.date
+        let original = try #require(originalService.trashCleanup.runIfDue())
+        await gate.waitUntilScanning(1)
+        #expect(fixture.defaults.object(forKey: "trash-cleanup-attempt-v1") as? Date == attemptedAt,
+                "Reserve the attempt before the irreversible executor starts")
+        originalService.stop()
+        if releaseOriginalBeforeRelaunch {
+            await gate.releaseOne()
+            #expect(await original.value == nil)
+        }
+        fixture.date.addTimeInterval(30 * 86_400)
+        let service = fixture.makeService()
+        defer { service.stop() }
+        service.apply(settings: settings)
+        let recoveredAt = fixture.date
+        let timer = try #require(fixture.timers.last)
+        #expect(timer.fireDate == recoveredAt.addingTimeInterval(7 * 86_400))
+        #expect(fixture.defaults.object(forKey: "trash-cleanup-last-run-v1") as? Date == recoveredAt)
+        #expect(fixture.defaults.object(forKey: "trash-cleanup-attempt-v1") == nil)
+        #expect(fixture.defaults.object(forKey: "system-cleanup-last-run-v1") as? Date
+            == Date(timeIntervalSince1970: 1_800_000_000))
+        #expect(service.trashCleanup.runIfDue() == nil)
+        if !releaseOriginalBeforeRelaunch {
+            await gate.releaseOne()
+            #expect(await original.value == nil)
+            #expect(fixture.defaults.object(forKey: "trash-cleanup-last-run-v1") as? Date == recoveredAt)
+        }
+        let recoveredDeadline = timer.fireDate
+        service.stop()
+        let relaunched = fixture.makeService()
+        defer { relaunched.stop() }
+        relaunched.apply(settings: settings)
+        #expect(fixture.timers.last?.fireDate == recoveredDeadline,
+                "A recovered reservation must not defer every later relaunch")
+        fixture.date.addTimeInterval(7 * 86_400 - 0.001)
+        #expect(relaunched.trashCleanup.runIfDue() == nil)
+        #expect(fixture.emptiedCount == 0)
+        fixture.date.addTimeInterval(0.001)
+        #expect(await (try #require(relaunched.trashCleanup.runIfDue())).value != nil)
+        #expect(fixture.emptiedCount == 1)
+        #expect(fixture.defaults.object(forKey: "trash-cleanup-attempt-v1") == nil)
+    }
+
+    @Test(arguments: ["date", "invalid"], [false, true])
+    func persistedUncertainTrashAttemptsRecoverConservativelyOrDiscardWhenDisabled(marker: String, disabled: Bool) throws {
+        let fixture = try SystemAutoCleanupFixture()
+        let old = fixture.date.addingTimeInterval(-90 * 86_400)
+        fixture.defaults.set(old, forKey: "system-cleanup-last-run-v1")
+        fixture.defaults.set(old, forKey: "trash-cleanup-last-run-v1")
+        if marker == "date" {
+            fixture.defaults.set(old, forKey: "trash-cleanup-attempt-v1")
+        } else {
+            fixture.defaults.set("uncertain", forKey: "trash-cleanup-attempt-v1")
+        }
+        let service = fixture.makeService()
+        defer { service.stop() }
+        service.apply(settings: FeatureSettings(systemCleanupPolicy: .thirtyDays,
+            trashCleanupPolicy: disabled ? .never : .sevenDays))
+        #expect(fixture.defaults.object(forKey: "trash-cleanup-attempt-v1") == nil)
+        #expect(fixture.defaults.object(forKey: "system-cleanup-last-run-v1") as? Date == old)
+        if disabled {
+            #expect(fixture.defaults.object(forKey: "trash-cleanup-last-run-v1") == nil)
+            #expect(fixture.timers.count == 1)
+        } else {
+            #expect(fixture.defaults.object(forKey: "trash-cleanup-last-run-v1") as? Date == fixture.date)
+            #expect(fixture.timers.last?.fireDate == fixture.date.addingTimeInterval(7 * 86_400))
+            #expect(service.trashCleanup.runIfDue() == nil)
+            let timer = fixture.timers.last
+            service.apply(settings: FeatureSettings(systemCleanupPolicy: .thirtyDays, trashCleanupPolicy: .sevenDays))
+            #expect(fixture.timers.last === timer)
+        }
+        #expect(fixture.emptiedCount == 0)
+    }
+
+    @Test
+    func failedReservationPersistenceNeverSubmitsTrashEmptyingAndCanRecover() async throws {
+        let suite = "Zisla.TrashReservation.\(UUID().uuidString)"
+        let defaults = try #require(TrashReservationDefaults(suiteName: suite))
+        defer { defaults.removePersistentDomain(forName: suite) }
+        var date = Date(timeIntervalSince1970: 1_800_000_000)
+        var emptiedCount = 0
+        var failures: [DesktopOrganizerError] = []
+        let service = SystemAutoCleanupService(defaults: defaults, now: { date },
+            scan: { _, _ in [] },
+            trash: { _ in DiskCleanupResult(successCount: 0, freedBytes: 0, failures: []) },
+            emptyTrash: { emptiedCount += 1; return .success(()) },
+            onTrashReservationFailure: { failures.append($0) })
+        defer { service.stop() }
+        let settings = FeatureSettings(trashCleanupPolicy: .sevenDays)
+        service.apply(settings: settings)
+        date.addTimeInterval(7 * 86_400)
+        defaults.synchronizationAllowed = false
+        let failedTask = try #require(service.trashCleanup.runIfDue())
+        let result = try #require(await failedTask.value)
+        if case .failure(let error) = result {
+            #expect(error == .failed(CocoaError(.fileWriteUnknown).localizedDescription))
+            #expect(failures == [error])
+        } else { Issue.record("A failed durable reservation must be reported") }
+        #expect(emptiedCount == 0, "No irreversible operation is allowed before the reservation reaches storage")
+        #expect(service.trashCleanup.task == nil)
+        #expect(service.trashCleanup.runIfDue() == nil)
+        #expect(defaults.object(forKey: "trash-cleanup-attempt-v1") as? Date == date)
+        defaults.synchronizationAllowed = true
+        date.addTimeInterval(7 * 86_400)
+        #expect(await (try #require(service.trashCleanup.runIfDue())).value != nil)
+        #expect(emptiedCount == 1)
+        #expect(failures.count == 1)
+        #expect(defaults.object(forKey: "trash-cleanup-attempt-v1") == nil)
+    }
+
+    @Test(arguments: [false, true])
+    func uncertainReservationSurvivesAFailedRecoveryOrCompletionWrite(completed: Bool) async throws {
+        let suite = "Zisla.TrashReservationRecovery.\(UUID().uuidString)"
+        let defaults = try #require(TrashReservationDefaults(suiteName: suite))
+        defer { defaults.removePersistentDomain(forName: suite) }
+        var date = Date(timeIntervalSince1970: 1_800_000_000)
+        let service = SystemAutoCleanupService(defaults: defaults, now: { date },
+            scan: { _, _ in [] },
+            trash: { _ in DiskCleanupResult(successCount: 0, freedBytes: 0, failures: []) },
+            emptyTrash: {
+                defaults.synchronizationAllowed = false
+                return .success(())
+            })
+        defer { service.stop() }
+        let settings = FeatureSettings(trashCleanupPolicy: .sevenDays)
+        if completed {
+            service.apply(settings: settings)
+            date.addTimeInterval(7 * 86_400)
+            #expect(await (try #require(service.trashCleanup.runIfDue())).value != nil)
+        } else {
+            defaults.set(date.addingTimeInterval(-90 * 86_400), forKey: "trash-cleanup-attempt-v1")
+            defaults.synchronizationAllowed = false
+            service.apply(settings: settings)
+        }
+        #expect(defaults.object(forKey: "trash-cleanup-attempt-v1") != nil,
+                "Keep uncertainty until the next deadline is persisted")
+        service.stop()
+        defaults.synchronizationAllowed = true
+        date.addTimeInterval(86_400)
+        service.apply(settings: settings)
+        #expect(defaults.object(forKey: "trash-cleanup-attempt-v1") == nil)
+        #expect(defaults.object(forKey: "trash-cleanup-last-run-v1") as? Date == date)
+        #expect(service.trashCleanup.runIfDue() == nil)
     }
 
     @Test
@@ -605,6 +780,7 @@ struct SystemAutoCleanupServiceTests {
         } else { Issue.record("Permission denial must be returned") }
         #expect(fixture.emptiedCount == 1)
         #expect(service.trashCleanup.runIfDue() == nil)
+        #expect(fixture.defaults.object(forKey: "trash-cleanup-attempt-v1") == nil)
         #expect(fixture.timers.last?.fireDate == fixture.date.addingTimeInterval(7 * 86_400))
         fixture.emptyResult = .success(())
         fixture.date.addTimeInterval(7 * 86_400)
@@ -625,10 +801,12 @@ struct SystemAutoCleanupServiceTests {
         fixture.date.addTimeInterval(7 * 86_400)
         let task = try #require(service.trashCleanup.runIfDue())
         await gate.waitUntilScanning(1)
+        #expect(fixture.defaults.object(forKey: "trash-cleanup-attempt-v1") as? Date == fixture.date)
         fixture.date.addTimeInterval(30)
         await gate.releaseOne()
         #expect(await task.value != nil)
         #expect(fixture.timers.last?.fireDate == fixture.date.addingTimeInterval(7 * 86_400))
+        #expect(fixture.defaults.object(forKey: "trash-cleanup-attempt-v1") == nil)
     }
 
     @Test
@@ -725,5 +903,13 @@ private actor CleanupScanGate {
 
     func releaseOne() {
         pending.removeFirst().resume()
+    }
+}
+
+private final class TrashReservationDefaults: UserDefaults {
+    var synchronizationAllowed = true
+
+    override func synchronize() -> Bool {
+        synchronizationAllowed && super.synchronize()
     }
 }

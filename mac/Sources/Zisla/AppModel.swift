@@ -565,6 +565,9 @@ final class AppModel: ObservableObject {
           self?.transientMessage = error.message
         }
         return result
+      },
+      onTrashReservationFailure: { [weak self] error in
+        self?.transientMessage = error.message
       }
     )
   }()

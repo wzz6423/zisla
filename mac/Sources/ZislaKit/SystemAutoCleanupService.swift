@@ -17,6 +17,7 @@ public final class SystemAutoCleanupService {
         scan: @escaping (Set<DiskCleanupKind>, DiskCleanupScanOptions) async -> [DiskCleanupCandidate],
         trash: @escaping ([DiskCleanupCandidate]) async -> DiskCleanupResult,
         emptyTrash: @escaping () async -> Result<Void, DesktopOrganizerError> = { await DesktopOrganizer.emptyTrash() },
+        onTrashReservationFailure: @escaping (DesktopOrganizerError) -> Void = { _ in },
         timerFactory: @escaping (TimeInterval, @escaping @Sendable (Timer) -> Void) -> Timer = {
             Timer(timeInterval: $0, repeats: true, block: $1)
         }
@@ -27,7 +28,12 @@ public final class SystemAutoCleanupService {
         systemCleanup = CleanupSchedule(defaults: defaults, now: now,
             lastRunKey: "system-cleanup-last-run-v1", timerFactory: timerFactory)
         trashCleanup = CleanupSchedule(defaults: defaults, now: now,
-            lastRunKey: "trash-cleanup-last-run-v1", timerFactory: timerFactory)
+            lastRunKey: "trash-cleanup-last-run-v1", attemptKey: "trash-cleanup-attempt-v1",
+            reservationFailure: {
+                let error = DesktopOrganizerError.failed(CocoaError(.fileWriteUnknown).localizedDescription)
+                onTrashReservationFailure(error)
+                return .failure(error)
+            }, timerFactory: timerFactory)
     }
 
     isolated deinit {
@@ -77,6 +83,8 @@ final class CleanupSchedule<Outcome: Sendable> {
     private let now: () -> Date
     private let timerFactory: (TimeInterval, @escaping @Sendable (Timer) -> Void) -> Timer
     private let lastRunKey: String
+    private let attemptKey: String?
+    private let reservationFailure: (() -> Outcome)?
     private var policy: VoiceRecordingCleanupPolicy = .never
     private var timer: Timer?
     private var nextCleanupDate = Date.distantFuture
@@ -88,11 +96,15 @@ final class CleanupSchedule<Outcome: Sendable> {
         defaults: UserDefaults,
         now: @escaping () -> Date,
         lastRunKey: String,
+        attemptKey: String? = nil,
+        reservationFailure: (() -> Outcome)? = nil,
         timerFactory: @escaping (TimeInterval, @escaping @Sendable (Timer) -> Void) -> Timer
     ) {
         self.defaults = defaults
         self.now = now
         self.lastRunKey = lastRunKey
+        self.attemptKey = attemptKey
+        self.reservationFailure = reservationFailure
         self.timerFactory = timerFactory
     }
 
@@ -105,7 +117,12 @@ final class CleanupSchedule<Outcome: Sendable> {
 
         let interval = TimeInterval(days * 24 * 60 * 60)
         let lastRun: Date
-        if let saved = defaults.object(forKey: lastRunKey) as? Date {
+        if let attemptKey, defaults.object(forKey: attemptKey) != nil {
+            // An interrupted irreversible operation may have finished; wait a full interval from recovery.
+            lastRun = now()
+            defaults.set(lastRun, forKey: lastRunKey)
+            if defaults.synchronize() { defaults.removeObject(forKey: attemptKey) }
+        } else if let saved = defaults.object(forKey: lastRunKey) as? Date {
             lastRun = saved
         } else {
             lastRun = now()
@@ -138,6 +155,7 @@ final class CleanupSchedule<Outcome: Sendable> {
     func discardSchedule() {
         stop()
         defaults.removeObject(forKey: lastRunKey)
+        if let attemptKey { defaults.removeObject(forKey: attemptKey) }
     }
 
     @discardableResult
@@ -151,10 +169,20 @@ final class CleanupSchedule<Outcome: Sendable> {
             defer {
                 if self.generation == generation { self.task = nil }
             }
+            if let attemptKey {
+                defaults.set(referenceDate, forKey: attemptKey)
+                // This once-per-cycle barrier must finish before irreversible work can start.
+                guard defaults.synchronize() else {
+                    nextCleanupDate = now().addingTimeInterval(interval)
+                    timer.fireDate = nextCleanupDate
+                    return reservationFailure?()
+                }
+            }
             guard let result = await operation(referenceDate), !Task.isCancelled else { return nil }
             let completedAt = now()
             // Failed attempts also wait for the next interval instead of repeatedly retrying protected files.
             defaults.set(completedAt, forKey: lastRunKey)
+            if let attemptKey, defaults.synchronize() { defaults.removeObject(forKey: attemptKey) }
             nextCleanupDate = completedAt.addingTimeInterval(interval)
             timer.fireDate = nextCleanupDate
             return result
