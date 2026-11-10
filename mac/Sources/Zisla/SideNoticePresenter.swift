@@ -625,6 +625,7 @@ final class SideNoticePresenter {
 
     static func isCompactNotice(_ notice: IslandNotice) -> Bool {
         notice.id.hasPrefix("ai-active-")
+            || AIAccountBalanceNoticeController.isBalanceNotice(notice)
             || notice.id.hasPrefix("update-available-")
             || notice.id.hasPrefix("media-active-")
             || notice.id.hasPrefix("background-sound-")
@@ -642,6 +643,7 @@ final class SideNoticePresenter {
     private static func isTransientCompactNotice(_ notice: IslandNotice) -> Bool {
         notice.id.hasPrefix("focus-transition") || notice.style == .headphone
             || LowBatteryNoticeController.isLowBatteryNotice(notice)
+            || AIAccountBalance.isLowBalanceNotice(notice)
     }
 
     private func panel(for side: NoticeSide, in panels: DisplayPanels) -> IslandPanel? {

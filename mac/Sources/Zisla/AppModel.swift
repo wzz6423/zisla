@@ -564,6 +564,7 @@ final class AppModel: ObservableObject {
   let backgroundSounds = SystemBackgroundSoundService()
   let battery = BatteryMonitor()
   private lazy var lowBatteryNotice = LowBatteryNoticeController(queue: notices)
+  private lazy var accountBalanceNotice = AIAccountBalanceNoticeController(queue: notices)
   var userCarePresentationAllowed: () -> Bool = { false }
   private lazy var userCare = UserCareService(
     presentationAllowed: { [weak self] in self?.canPresentUserCareMessage == true },
@@ -588,6 +589,14 @@ final class AppModel: ObservableObject {
   private(set) lazy var dailyBriefing = DailyBriefingController(
     saveLocations: saveLocations,
     observation: { [unowned self] date in self.dailyBriefingObservation(at: date) },
+    aiAccountBalances: { [unowned self] in
+      let settings = self.settingsStore.settings
+      return self.aiMonitor.accountBalances.compactMap { balance in
+        var row = balance
+        row.providers = row.providers.filter { settings.aiAccountBalanceDisplayedProviders.contains($0) }
+        return row.providers.isEmpty ? nil : row
+      }
+    },
     typing: { [unowned self] date in
       guard self.settingsStore.settings.keyboardTypingStatsEnabled,
         self.keyboardSound.isInputMonitoringGranted else { return nil }
@@ -755,6 +764,8 @@ final class AppModel: ObservableObject {
         guard let self else { return }
         self.dailyBriefing.configure(settings: self.settingsStore.settings.dailyBriefing,
           directory: self.saveLocations[.dailyBriefing], language: language)
+        self.accountBalanceNotice.update(balances: self.aiMonitor.accountBalances,
+          settings: self.settingsStore.settings, language: language)
       }
       .store(in: &cancellables)
     clipboardHistoryMonitor.onContentCaptured = { [weak self] content in
@@ -897,6 +908,16 @@ final class AppModel: ObservableObject {
       .dropFirst()
       .sink { [weak self] state in
         Task { @MainActor [weak self] in self?.consumeAIState(state) }
+      }
+      .store(in: &cancellables)
+
+    aiMonitor.$accountBalances
+      .sink { [weak self] balances in
+        Task { @MainActor [weak self] in
+          guard let self else { return }
+          self.accountBalanceNotice.update(balances: balances, settings: self.settingsStore.settings,
+            language: self.languageStore.language)
+        }
       }
       .store(in: &cancellables)
 
@@ -3186,6 +3207,8 @@ final class AppModel: ObservableObject {
     configureVoiceRecordingCleanup(policy: settings.voiceRecordingCleanupPolicy)
     clipboardHistory.configureCleanup(policy: settings.clipboardHistoryCleanupPolicy)
     if settings.aiProgressEnabled {
+      aiMonitor.configureAccountBalanceProviders(settings.aiAccountBalanceMonitoredProviders,
+        qoderRegion: settings.aiAccountBalanceQoderRegion)
       aiMonitor.start()
       if selectedModule == .aiMonitor {
         aiMonitor.loadUsageHistory()
@@ -3195,6 +3218,7 @@ final class AppModel: ObservableObject {
       clearActiveAINotices()
       powerAssertions.setAIActivityActive(false)
     }
+    accountBalanceNotice.update(balances: aiMonitor.accountBalances, settings: settings, language: languageStore.language)
     aiAgent.start()
     syncAIActivityPowerAssertion(aiMonitor.state)
     if settings.mediaEnabled || settings.dailyBriefing.enabled {

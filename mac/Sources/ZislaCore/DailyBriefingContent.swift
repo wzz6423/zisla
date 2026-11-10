@@ -27,6 +27,7 @@ public enum DailyBriefingContent: String, Codable, CaseIterable, Hashable, Ident
     case islandOpenings, clipboardCaptured, clipboardReused, shelfItemsAdded, shelfItemsCopied
     case pomodoroStarted, pomodoroCompleted, completedFocusTime
     case noteCreated, noteSaved, noteDeleted, quickNoteCreated, quickNoteSaved, quickNoteDeleted
+    case aiAccountBalances
 
     public var id: Self { self }
     public static let defaultSelection = Set(allCases)
@@ -48,6 +49,8 @@ public enum DailyBriefingContent: String, Codable, CaseIterable, Hashable, Ident
         case .islandOpenings, .clipboardCaptured, .clipboardReused, .shelfItemsAdded, .shelfItemsCopied,
              .pomodoroStarted, .pomodoroCompleted, .completedFocusTime,
              .noteCreated, .noteSaved, .noteDeleted, .quickNoteCreated, .quickNoteSaved, .quickNoteDeleted:
+            .zisla
+        case .aiAccountBalances:
             .zisla
         }
     }
@@ -88,6 +91,7 @@ public enum DailyBriefingContent: String, Codable, CaseIterable, Hashable, Ident
         case .quickNoteCreated: "新建随记"
         case .quickNoteSaved: "保存随记"
         case .quickNoteDeleted: "删除随记"
+        case .aiAccountBalances: "账户剩余额度"
         }
     }
 
@@ -95,6 +99,8 @@ public enum DailyBriefingContent: String, Codable, CaseIterable, Hashable, Ident
         switch self {
         case .localUsage, .firstActivity, .lastActivity, .allDevicesUsage,
              .hourlyUsage, .applicationUsage, .workTime, .leisureTime, .otherTime, .keyPressTrend, .powerTrend:
+            false
+        case .aiAccountBalances:
             false
         default:
             true

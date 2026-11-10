@@ -12,6 +12,7 @@ final class DailyBriefingController: ObservableObject {
     private let store: DailyBriefingStore
     private let observation: (Date) -> DailyBriefingObservation
     private let typing: @MainActor (Date) async throws -> DailyBriefingTyping?
+    private let aiAccountBalances: @MainActor () -> [AIAccountBalance]
     private let readScreenTime: @Sendable (DateInterval) async -> DailyBriefingScreenTimeResult
     private let export: @MainActor (DailyBriefingReport, DailyBriefingTemplate, AppLanguage, URL) async throws -> URL
     private var settings = DailyBriefingSettings(enabled: false)
@@ -29,6 +30,7 @@ final class DailyBriefingController: ObservableObject {
         store: DailyBriefingStore = DailyBriefingStore(),
         saveLocations: SaveLocationStore? = nil,
         observation: @escaping (Date) -> DailyBriefingObservation,
+        aiAccountBalances: @escaping @MainActor () -> [AIAccountBalance] = { [] },
         typing: @escaping @MainActor (Date) async throws -> DailyBriefingTyping?,
         readScreenTime: @escaping @Sendable (DateInterval) async -> DailyBriefingScreenTimeResult = { range in
             await Task.detached(priority: .utility) { DailyBriefingScreenTimeReader().read(within: range) }.value
@@ -46,6 +48,7 @@ final class DailyBriefingController: ObservableObject {
         self.store = store
         self.observation = observation
         self.typing = typing
+        self.aiAccountBalances = aiAccountBalances
         self.readScreenTime = readScreenTime
         self.export = export
         saveLocations?.$directories.sink { [weak self] directories in
@@ -224,6 +227,7 @@ final class DailyBriefingController: ObservableObject {
         var report = DailyBriefingReport(
             day: day,
             generatedAt: end,
+            aiAccountBalances: aiAccountBalances(),
             typing: typing,
             allDeviceSeconds: screenTime.allDeviceSeconds,
             notificationCount: screenTime.notificationCount,

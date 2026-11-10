@@ -6,33 +6,53 @@ import SwiftUI
 
 struct AIProgressModuleView: View {
     @ObservedObject private var monitor: AIStateMonitor
+    var displayedBalanceProviders: Set<AIProvider>
+    var language: AppLanguage
 
     /// Both columns push their content this far below the header. The trend chart's topmost
     /// Y-axis tick is drawn above its plot frame, so a tighter gap lets it collide with the title.
     private static let sectionSpacing: CGFloat = 12
 
-    init(monitor: AIStateMonitor) {
+    init(monitor: AIStateMonitor, displayedBalanceProviders: Set<AIProvider> = Set(AIProvider.allCases),
+         language: AppLanguage = AppLocalization.currentLanguage) {
         _monitor = ObservedObject(wrappedValue: monitor)
+        self.displayedBalanceProviders = displayedBalanceProviders
+        self.language = language
     }
 
     var body: some View {
         GeometryReader { proxy in
-            HStack(alignment: .top, spacing: 12) {
-                runningTasks
-                    .frame(width: (proxy.size.width - 24) * 0.48)
-                    .frame(maxHeight: .infinity, alignment: .topLeading)
-
-                Hairline()
-
-                ScrollView(.vertical) {
-                    usageSummary(endingAt: .now)
+            ScrollView(.vertical) {
+                VStack(alignment: .leading, spacing: 16) {
+                    HStack(alignment: .top, spacing: 12) {
+                        runningTasks
+                            .frame(width: (proxy.size.width - 24) * 0.48,
+                                   height: Self.taskSectionHeight(taskCount: activeTasks.count, availableHeight: proxy.size.height), alignment: .top)
+                        Hairline()
+                        ScrollView(.vertical) {
+                            usageSummary(endingAt: .now).frame(maxWidth: .infinity, alignment: .topLeading)
+                        }
+                        .thinScrollChrome(scrollerStyle: .overlay)
+                        .frame(maxWidth: .infinity)
+                        .frame(height: Self.upperSectionHeight(availableHeight: proxy.size.height), alignment: .top)
+                    }
+                    .fixedSize(horizontal: false, vertical: true)
+                    AIAccountBalanceSection(balances: monitor.accountBalances,
+                        displayedProviders: displayedBalanceProviders, language: language)
                 }
-                .thinScrollChrome(scrollerStyle: .overlay)
-                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+                .frame(maxWidth: .infinity, alignment: .topLeading)
             }
+            .thinScrollChrome(scrollerStyle: .overlay)
             .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
         }
     }
+
+    static func taskSectionHeight(taskCount: Int, availableHeight: CGFloat) -> CGFloat {
+        let maximum = upperSectionHeight(availableHeight: availableHeight)
+        return min(maximum, 28 + CGFloat(min(6, max(1, taskCount))) * 54)
+    }
+
+    static func upperSectionHeight(availableHeight: CGFloat) -> CGFloat { min(360, max(140, availableHeight * 0.65)) }
 
     private var activeTasks: [AIProgressTask] {
         monitor.state.tasks

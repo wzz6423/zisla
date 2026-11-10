@@ -6,6 +6,7 @@ import ZislaKit
 struct DailyBriefingReport: Sendable {
     var day: DailyBriefingDay
     var generatedAt: Date
+    var aiAccountBalances: [AIAccountBalance] = []
     var typing: DailyBriefingTyping?
     var allDeviceSeconds: TimeInterval?
     var notificationCount: Int? = nil
@@ -59,8 +60,13 @@ struct DailyBriefingReport: Sendable {
             let watts = 24 + 7 * sin(phase / 14) + 3 * cos(phase / 5)
             return DailyBriefingPowerSample(date: sampleDate, averageWatts: watts)
         }
-        return Self(day: day, generatedAt: day.lastActivity!, typing: .init(characters: 12846, topApplication: "Xcode", peakHour: 14),
+        let accountBalance = AIAccountBalance(id: "example:claude", providers: [.claude], status: .available,
+            windows: [.init(id: "five_hour", kind: .fiveHours, remainingPercent: 70, durationSeconds: 18_000),
+                .init(id: "weekly", kind: .weekly, remainingPercent: 82, durationSeconds: 604_800)], updatedAt: day.lastActivity)
+        var report = Self(day: day, generatedAt: day.lastActivity!, typing: .init(characters: 12846, topApplication: "Xcode", peakHour: 14),
             allDeviceSeconds: 31500, notificationCount: 87, selectedContent: selectedContent)
+        report.aiAccountBalances = [accountBalance]
+        return report
     }
 }
 
@@ -136,6 +142,7 @@ struct DailyBriefingPoster: View {
 
     private func hasData(_ content: DailyBriefingContent) -> Bool {
         switch content {
+        case .aiAccountBalances: return report.aiAccountBalances.contains { $0.severity != nil && !$0.isDebug }
         case .hourlyUsage: return hasUsageData
         case .applicationUsage: return !DailyBriefingApplicationChart.rows(for: report.day.applications, language: language).isEmpty
         case .keyPressTrend: return keyPressChart.hasData
@@ -200,6 +207,9 @@ struct DailyBriefingPoster: View {
                     if displayedContent.contains(.keyPressTrend) { keyPressChart }
                     if displayedContent.contains(.powerTrend) { powerChart }
                 }
+            }
+            if displayedContent.contains(.aiAccountBalances) {
+                DailyBriefingAIAccountBalanceSection(balances: report.aiAccountBalances, language: language, ink: ink)
             }
             footer
         }

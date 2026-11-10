@@ -963,6 +963,57 @@ struct SettingsView: View {
                 settingsGroup("AI 与语音") {
                     featureToggle("AI 进度与用量", detail: "汇总桌面端与 CLI 工具的运行状态", symbol: "sparkles", keyPath: \.aiProgressEnabled)
                     rowDivider
+                    featureToggle("低额度提醒", detail: "剩余额度不高于 20% 时提醒，耗尽后也会提醒", symbol: "gauge.with.dots.needle.67percent", keyPath: \.aiAccountBalanceNoticeEnabled)
+                        .disabled(!model.settingsStore.settings.aiProgressEnabled)
+                    rowDivider
+                    settingRow(symbol: "rectangle.topthird.inset.filled", title: "收起态额度样式", detail: "完整样式最多显示两行真实额度") {
+                        Picker("", selection: Binding(
+                            get: { model.settingsStore.settings.aiAccountBalanceCompactStyle },
+                            set: { model.settingsStore.settings.aiAccountBalanceCompactStyle = $0 }
+                        )) {
+                            ForEach(MediaCompactStyle.allCases, id: \.self) { style in AppLocalizedText(style.title).tag(style) }
+                        }
+                        .labelsHidden().pickerStyle(.menu).keepsIntrinsicWidth()
+                    }
+                    rowDivider
+                    featureToggle("其他位置常驻额度", detail: "选择灵动岛其他位置时显示额度，多个账户自动轮播", symbol: "pin", keyPath: \.aiAccountBalancePinnedInCustomIsland)
+                        .disabled(!model.settingsStore.settings.aiProgressEnabled)
+                    rowDivider
+                    DisclosureGroup(AppLocalization.text("各供应商额度")) {
+                        ForEach(AIProvider.allCases, id: \.self) { provider in
+                            HStack(spacing: 14) {
+                                Text(AIAccountBalanceCatalog.providerName(provider)).frame(maxWidth: .infinity, alignment: .leading)
+                                Toggle(AppLocalization.text("监控额度"), isOn: balanceProviderBinding(provider, monitored: true))
+                                    .toggleStyle(.switch).fixedSize()
+                                Toggle(AppLocalization.text("展示额度"), isOn: balanceProviderBinding(provider, monitored: false))
+                                    .toggleStyle(.switch).fixedSize()
+                            }
+                            .font(.system(size: 11)).padding(.vertical, 4)
+                        }
+                    }
+                    .padding(.horizontal, 16).padding(.vertical, 10)
+                    .disabled(!model.settingsStore.settings.aiProgressEnabled)
+                    rowDivider
+                    DisclosureGroup(AppLocalization.text("网站额度凭据")) {
+                        AppLocalizedText("打开账户页，在开发者工具的 Network 中复制额度请求的 Cookie 请求头")
+                            .font(.system(size: 11)).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
+                        settingRow(symbol: "globe", title: "Qoder 监控地区", detail: "仅查询所选地区，已保存的其他地区凭据会保留") {
+                            Picker("", selection: Binding(
+                                get: { model.settingsStore.settings.aiAccountBalanceQoderRegion },
+                                set: { model.settingsStore.settings.aiAccountBalanceQoderRegion = $0 }
+                            )) {
+                                ForEach(AIAccountBalanceQoderRegion.allCases, id: \.self) { region in AppLocalizedText(region.title).tag(region) }
+                            }
+                            .labelsHidden().pickerStyle(.menu).keepsIntrinsicWidth()
+                        }
+                        ForEach(AIAccountBalanceWebsite.allCases) { website in
+                            AIAccountBalanceCookieInput(website: website, didChange: {
+                                model.aiMonitor.refreshAccountBalancesAfterCredentialChange()
+                            })
+                        }
+                    }
+                    .padding(.horizontal, 16).padding(.vertical, 10)
+                    rowDivider
                     featureToggle("AI 任务结果扫光", detail: "任务成功时绿色、失败时红色渐变光带从左向右扫过一次", symbol: "arrow.right", keyPath: \.aiTaskResultSweepEnabled)
                         .disabled(!model.settingsStore.settings.aiProgressEnabled)
                     rowDivider
@@ -3228,6 +3279,18 @@ struct SettingsView: View {
         }
     }
 
+    private func balanceProviderBinding(_ provider: AIProvider, monitored: Bool) -> Binding<Bool> {
+        Binding(get: {
+            let settings = model.settingsStore.settings
+            return (monitored ? settings.aiAccountBalanceMonitoredProviders : settings.aiAccountBalanceDisplayedProviders).contains(provider)
+        }, set: { enabled in
+            let path: WritableKeyPath<FeatureSettings, Set<AIProvider>> = monitored
+                ? \.aiAccountBalanceMonitoredProviders : \.aiAccountBalanceDisplayedProviders
+            if enabled { model.settingsStore.settings[keyPath: path].insert(provider) }
+            else { model.settingsStore.settings[keyPath: path].remove(provider) }
+        })
+    }
+
     private func lidClosePreviewRow() -> some View {
         settingRow(symbol: "play.circle", title: "预览动画", detail: "") {
             Button {
@@ -3734,6 +3797,7 @@ struct SettingsView: View {
         case .focusCountdown: "timer"
         case .toolboxReminder: "wrench.and.screwdriver.fill"
         case .aiActivity: "sparkles"
+        case .aiAccountBalance: "gauge.with.dots.needle.67percent"
         case .media: "music.note"
         case .focusMode: "moon.fill"
         case .systemMonitor: "gauge.with.dots.needle.67percent"

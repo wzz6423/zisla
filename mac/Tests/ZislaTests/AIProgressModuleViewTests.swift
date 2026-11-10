@@ -110,11 +110,15 @@ struct AIProgressModuleViewTests {
                 DispatchQueue.main.async { continuation.resume() }
             }
         }
-        let scrolls = descendants(in: host).compactMap { $0 as? NSScrollView }.sorted {
+        let allScrolls = descendants(in: host).compactMap { $0 as? NSScrollView }
+        let outer = try #require(allScrolls.max { $0.frame.width < $1.frame.width })
+        let scrolls = allScrolls.filter { $0 !== outer }.sorted {
             host.convert($0.bounds, from: $0).minX < host.convert($1.bounds, from: $1).minX
         }
         try #require(scrolls.count == (taskCount > 0 ? 2 : 1),
             "The usage scroll view must remain available when the task list is empty")
+        #expect(outer.hasVerticalScroller && outer.frame.height <= 160.5,
+            "The whole module must scroll to the balance section below both bounded columns")
         let summary = scrolls[taskCount == 0 || language.isRightToLeft ? 0 : 1]
         summary.scrollerStyle = .legacy
         for _ in 0..<4 {
@@ -143,6 +147,8 @@ struct AIProgressModuleViewTests {
         #expect(document.frame.height > summary.contentView.bounds.height,
             "The fixture must still exercise vertical overflow")
         #expect(summary.hasVerticalScroller)
+        #expect(summary.frame.height <= AIProgressModuleView.upperSectionHeight(availableHeight: 160) + 0.5,
+            "Long model history must scroll inside the upper right column")
         #expect(summary.horizontalScrollElasticity == .none,
             "Horizontal trackpad movement must not rubber-band the usage panel")
         #expect(monitor.state == initialState, "Laying out the panel must not alter AI state")

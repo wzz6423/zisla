@@ -35,6 +35,7 @@ struct CompactStatusPriorityTests {
             .focusCountdown,
             .focusMode,
             .aiActivity,
+            .aiAccountBalance,
             .media,
             .toolboxReminder,
             .updateAvailable,

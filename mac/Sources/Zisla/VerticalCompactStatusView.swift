@@ -111,6 +111,10 @@ struct CompactPillStatusContent: View {
 
     var body: some View {
         GeometryReader { proxy in
+            if presentation.isAccountBalance {
+                CompactAIAccountBalanceBar(notice: presentation.notice,
+                    height: edge.isVertical ? proxy.size.width : proxy.size.height, edge: edge)
+            } else {
             let thickness = edge.isVertical ? proxy.size.width : proxy.size.height
             let iconSize = max(0, thickness - 8)
             let textBudget = max(0, (edge.isVertical ? proxy.size.height : proxy.size.width)
@@ -162,6 +166,7 @@ struct CompactPillStatusContent: View {
             .padding(edge.isVertical ? .top : .leading, leadingInset)
             .padding(edge.isVertical ? .bottom : .trailing, CompactPillStatusPresentation.trailingInset)
             .frame(width: proxy.size.width, height: proxy.size.height)
+            }
         }
         .foregroundStyle(.white)
         .accessibilityElement(children: .ignore)

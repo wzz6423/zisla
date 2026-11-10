@@ -101,7 +101,7 @@ public enum CompactStatusVisibilityPolicy {
         }
         let hasFocusMode = notices.contains { $0.id.hasPrefix("focus-mode-") }
         let hasVoiceProcessing = notices.contains { $0.id.hasPrefix("voice-processing-") }
-        return hasVoiceProcessing
+        return hasVoiceProcessing || notices.contains { $0.id == AIAccountBalanceNoticeController.pinnedID }
             || (hasActivity && activityDuration == .always)
             || (hasFocusMode && focusDuration == .always)
     }
@@ -212,6 +212,7 @@ public struct SideNoticeLayoutEngine: Equatable, Sendable {
     ) -> CompactStatusPriority? {
         if notices.contains(where: {
             $0.id.hasPrefix("focus-transition") || LowBatteryNoticeController.isLowBatteryNotice($0)
+                || AIAccountBalance.isLowBalanceNotice($0)
         }) {
             return .transient
         }
@@ -276,6 +277,7 @@ public struct SideNoticeLayoutEngine: Equatable, Sendable {
                 && !$0.id.hasPrefix("focus-mode-")
                 && !$0.id.hasPrefix("focus-transition")
                 && !LowBatteryNoticeController.isLowBatteryNotice($0)
+                && !AIAccountBalanceNoticeController.isBalanceNotice($0)
                 && !$0.id.hasPrefix("mail-notification-")
                 && !$0.id.hasPrefix("toolbox-reminder-")
                 && !$0.id.hasPrefix("browser-download-")
@@ -614,19 +616,22 @@ public struct SideNoticeLayoutEngine: Equatable, Sendable {
         }
         let selectedPriority = Self.selectedCompactStatusPriority(for: notices, settings: settings)
         guard let selectedPriority else { return nil }
+        let selectedPresentation = compactPillPresentation(for: selectedPriority, notices: notices, settings: settings)
         let expandsForDetailedStatus = switch selectedPriority {
         case .media:
             settings.mediaCompactStyle == .detailed
                 && notices.contains { $0.id.hasPrefix("media-active-") }
         case .mail:
             settings.mailCompactStyle == .detailed
+        case .transient, .aiAccountBalance:
+            settings.aiAccountBalanceCompactStyle == .detailed && selectedPresentation?.isAccountBalance == true
         default:
             false
         }
         let displayedTransientNotice = notices
             .filter {
                 $0.id.hasPrefix("focus-transition") || $0.style == .headphone
-                    || LowBatteryNoticeController.isLowBatteryNotice($0)
+                    || LowBatteryNoticeController.isLowBatteryNotice($0) || AIAccountBalance.isLowBalanceNotice($0)
             }
             .max { $0.createdAt < $1.createdAt }
         let displaysHeadphone = selectedPriority == .transient
@@ -691,7 +696,7 @@ public struct SideNoticeLayoutEngine: Equatable, Sendable {
         let displayedTransientNotice = notices
             .filter {
                 $0.id.hasPrefix("focus-transition") || $0.style == .headphone
-                    || LowBatteryNoticeController.isLowBatteryNotice($0)
+                    || LowBatteryNoticeController.isLowBatteryNotice($0) || AIAccountBalance.isLowBalanceNotice($0)
             }
             .max { $0.createdAt < $1.createdAt }
         let selectedNotice: IslandNotice? = switch selectedPriority {
@@ -703,6 +708,8 @@ public struct SideNoticeLayoutEngine: Equatable, Sendable {
         case .focusCountdown: notices.first { $0.id.hasPrefix("focus-countdown-") }
         case .toolboxReminder: notices.first { $0.id.hasPrefix("toolbox-reminder-") }
         case .aiActivity: notices.first { $0.id.hasPrefix("ai-active-") }
+        case .aiAccountBalance: settings.islandPlacement.mode == .custom && settings.aiAccountBalancePinnedInCustomIsland
+            ? notices.first { $0.id == AIAccountBalanceNoticeController.pinnedID } : nil
         case .media: notices.first { $0.id.hasPrefix("media-active-") }
             ?? notices.first { $0.id.hasPrefix("background-sound-") }
         case .focusMode: notices.first { $0.id.hasPrefix("focus-mode-") }
@@ -768,6 +775,8 @@ public struct SideNoticeLayoutEngine: Equatable, Sendable {
             notices.contains { $0.id.hasPrefix("toolbox-reminder-") }
         case .aiActivity:
             notices.contains { $0.id.hasPrefix("ai-active-") }
+        case .aiAccountBalance:
+            notices.contains { $0.id == AIAccountBalanceNoticeController.pinnedID }
         case .media:
             notices.contains {
                 $0.id.hasPrefix("media-active-") || $0.id.hasPrefix("background-sound-")

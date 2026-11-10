@@ -457,7 +457,7 @@ struct CompactStatusBarView: View {
         presentationNotices
             .filter {
                 $0.id.hasPrefix("focus-transition") || $0.style == .headphone
-                    || LowBatteryNoticeController.isLowBatteryNotice($0)
+                    || LowBatteryNoticeController.isLowBatteryNotice($0) || AIAccountBalance.isLowBalanceNotice($0)
             }
             .max { $0.createdAt < $1.createdAt }
     }
@@ -576,6 +576,9 @@ struct CompactStatusBarView: View {
                         height: height,
                         centerInset: displayState.compactBarCenterInset
                     )
+                } else if AIAccountBalance.isLowBalanceNotice(transientNotice) {
+                    CompactAIAccountBalanceBar(notice: transientNotice, height: height,
+                        centerInset: displayState.compactBarCenterInset, edge: displayState.islandEdge)
                 } else if transientNotice.style == .headphone {
                     CompactHeadphoneConnectionBar(
                         notice: transientNotice,
@@ -776,6 +779,10 @@ struct CompactStatusBarView: View {
                         usesTransparentBackground: compactWingsUseTransparentBackground
                     )
                 }
+            }
+        case .aiAccountBalance:
+            if let notice = presentationNotices.first(where: { $0.id == AIAccountBalanceNoticeController.pinnedID }) {
+                CompactAIAccountBalanceBar(notice: notice, height: height, edge: displayState.islandEdge)
             }
         case .systemMonitor, nil:
             EmptyView()

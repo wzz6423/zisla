@@ -1,3 +1,4 @@
+import AppKit
 import Combine
 import Darwin
 import Foundation
@@ -72,11 +73,22 @@ public final class AIStateMonitor: ObservableObject {
     @Published public private(set) var errorDescription: String?
     @Published public private(set) var usageHistoryState: AIUsageHistoryState = .idle
     @Published public private(set) var failedUsageProviders: Set<AIProvider> = []
+    @Published public private(set) var accountBalances: [AIAccountBalance] = []
+    @Published public private(set) var isRefreshingAccountBalances = false
 
     private let repository: AIStateRepository
     private let activityDetectors: [any AIActivityDetecting]
     private let usageDetectors: [any AIUsageDetecting]
     private let subscriptionUsageDetector: (any AISubscriptionUsageDetecting)?
+    private let accountBalanceDetector: (any AIAccountBalanceDetecting)?
+    private let accountBalanceNotificationCenter: NotificationCenter
+    private var accountBalanceObservers: [NSObjectProtocol] = []
+    private var accountBalanceProviders = Set(AIProvider.allCases)
+    private var accountBalanceQoderRegion = AIAccountBalanceQoderRegion.global
+    private var accountBalanceTask: Task<Void, Never>?
+    private var accountBalanceGeneration: UInt64 = 0
+    private var lastAccountBalanceRefreshAt = Date.distantPast
+    private var accountBalanceSuspended = false
     private var subscriptionUsageTask: Task<Void, Never>?
     private var lastSubscriptionRefreshAt = Date.distantPast
     private var source: DispatchSourceFileSystemObject?
@@ -124,6 +136,7 @@ public final class AIStateMonitor: ObservableObject {
             activityDetectors: Self.defaultActivityDetectors(),
             usageDetectors: Self.defaultUsageDetectors(),
             subscriptionUsageDetector: AISubscriptionUsageService(),
+            accountBalanceDetector: AIAccountBalanceService(),
             activeTaskTTL: activeTaskTTL,
             now: now
         )
@@ -152,6 +165,8 @@ public final class AIStateMonitor: ObservableObject {
         activityDetectors: [any AIActivityDetecting],
         usageDetectors: [any AIUsageDetecting] = [],
         subscriptionUsageDetector: (any AISubscriptionUsageDetecting)? = nil,
+        accountBalanceDetector: (any AIAccountBalanceDetecting)? = nil,
+        accountBalanceNotificationCenter: NotificationCenter = NSWorkspace.shared.notificationCenter,
         activeTaskTTL: TimeInterval = AIStateMonitor.defaultActiveTaskTTL,
         detectorRefreshInterval: TimeInterval = AIStateMonitor.defaultDetectorRefreshInterval,
         usageRefreshInterval: TimeInterval = AIStateMonitor.defaultUsageRefreshInterval,
@@ -161,6 +176,8 @@ public final class AIStateMonitor: ObservableObject {
         self.activityDetectors = activityDetectors
         self.usageDetectors = usageDetectors
         self.subscriptionUsageDetector = subscriptionUsageDetector
+        self.accountBalanceDetector = accountBalanceDetector
+        self.accountBalanceNotificationCenter = accountBalanceNotificationCenter
         self.activeTaskTTL = max(0, activeTaskTTL)
         self.detectorRefreshInterval = max(1, detectorRefreshInterval)
         self.usageRefreshInterval = max(1, usageRefreshInterval)
@@ -212,6 +229,7 @@ public final class AIStateMonitor: ObservableObject {
     }
 
     public func start() {
+        guard source == nil else { return }
         stop()
         do {
             try FileManager.default.createDirectory(
@@ -246,6 +264,8 @@ public final class AIStateMonitor: ObservableObject {
             // loaded task snapshot, while usage log scans remain on the throttled timer.
             schedulePersistedReload(refreshDetectorsAfterLoad: true)
             scheduleSubscriptionUsageRefresh()
+            observeAccountBalanceLifecycle()
+            scheduleAccountBalanceRefresh()
 
             let pressureQueue = refreshQueue
             let memoryPressure = DispatchSource.makeMemoryPressureSource(
@@ -258,11 +278,12 @@ public final class AIStateMonitor: ObservableObject {
             memoryPressureSource = memoryPressure
             memoryPressure.resume()
 
-            if !activityDetectors.isEmpty || !usageDetectors.isEmpty || subscriptionUsageDetector != nil {
+            if !activityDetectors.isEmpty || !usageDetectors.isEmpty || subscriptionUsageDetector != nil || accountBalanceDetector != nil {
                 let timer = Timer(timeInterval: detectorRefreshInterval, repeats: true) { [weak self] _ in
                     Task { @MainActor [weak self] in
                         self?.scheduleDetectorRefresh(allowUsageScan: true)
                         self?.scheduleSubscriptionUsageRefresh()
+                        self?.scheduleAccountBalanceRefresh()
                     }
                 }
                 timer.tolerance = detectorRefreshInterval * 0.1
@@ -274,7 +295,18 @@ public final class AIStateMonitor: ObservableObject {
         }
     }
 
+    isolated deinit {
+        accountBalanceTask?.cancel()
+        accountBalanceObservers.forEach { accountBalanceNotificationCenter.removeObserver($0) }
+    }
+
     public func stop() {
+        cancelAccountBalanceRefresh()
+        accountBalanceObservers.forEach { accountBalanceNotificationCenter.removeObserver($0) }
+        accountBalanceObservers.removeAll()
+        accountBalanceSuspended = false
+        lastAccountBalanceRefreshAt = .distantPast
+        accountBalances = []
         refreshGeneration &+= 1
         subscriptionUsageTask?.cancel()
         subscriptionUsageTask = nil
@@ -367,11 +399,88 @@ public final class AIStateMonitor: ObservableObject {
 
     /// Schedules a background refresh for interactive paths, avoiding a full decode of large state files on the main thread.
     public func refresh() {
+        scheduleAccountBalanceRefresh()
         scheduleSubscriptionUsageRefresh()
         schedulePersistedReload(
             refreshDetectorsAfterLoad: true,
             refreshDetectorsWhenUnchanged: true
         )
+    }
+
+    public func configureAccountBalanceProviders(_ providers: Set<AIProvider>, qoderRegion: AIAccountBalanceQoderRegion = .global) {
+        guard accountBalanceProviders != providers || accountBalanceQoderRegion != qoderRegion else { return }
+        let regionChanged = accountBalanceQoderRegion != qoderRegion
+        accountBalanceProviders = providers
+        accountBalanceQoderRegion = qoderRegion
+        cancelAccountBalanceRefresh()
+        accountBalances = accountBalances.compactMap { balance in
+            if regionChanged && balance.providers.contains(.coder) { return nil }
+            var row = balance
+            row.providers = row.providers.filter { providers.contains($0) }
+            return row.providers.isEmpty ? nil : row
+        }
+        lastAccountBalanceRefreshAt = .distantPast
+        scheduleAccountBalanceRefresh()
+    }
+
+    public func refreshAccountBalancesAfterCredentialChange() {
+        cancelAccountBalanceRefresh()
+        lastAccountBalanceRefreshAt = .distantPast
+        scheduleAccountBalanceRefresh()
+    }
+
+    private func cancelAccountBalanceRefresh() {
+        accountBalanceGeneration &+= 1
+        accountBalanceTask?.cancel()
+        accountBalanceTask = nil
+        isRefreshingAccountBalances = false
+    }
+
+    private func observeAccountBalanceLifecycle() {
+        guard accountBalanceDetector != nil else { return }
+        for (name, suspended) in [(NSWorkspace.willSleepNotification, true), (NSWorkspace.didWakeNotification, false)] {
+            let token = accountBalanceNotificationCenter.addObserver(forName: name, object: nil, queue: .main) { [weak self] _ in
+                MainActor.assumeIsolated {
+                    guard let self else { return }
+                    self.accountBalanceSuspended = suspended
+                    self.cancelAccountBalanceRefresh()
+                    if !suspended {
+                        self.lastAccountBalanceRefreshAt = .distantPast
+                        self.scheduleAccountBalanceRefresh()
+                    }
+                }
+            }
+            accountBalanceObservers.append(token)
+        }
+    }
+
+    private func scheduleAccountBalanceRefresh() {
+        guard source != nil, !accountBalanceSuspended, !accountBalanceProviders.isEmpty,
+              let detector = accountBalanceDetector, accountBalanceTask == nil,
+              now().timeIntervalSince(lastAccountBalanceRefreshAt) >= usageRefreshInterval else { return }
+        lastAccountBalanceRefreshAt = now()
+        let generation = accountBalanceGeneration
+        let providers = accountBalanceProviders
+        let qoderRegion = accountBalanceQoderRegion
+        isRefreshingAccountBalances = true
+        accountBalanceTask = Task { [weak self] in
+            let work = Task.detached(priority: .utility) { try await detector.accountBalances(for: providers, qoderRegion: qoderRegion) }
+            let result = await withTaskCancellationHandler { await work.result } onCancel: { work.cancel() }
+            guard !Task.isCancelled, let self, self.accountBalanceGeneration == generation else { return }
+            self.accountBalanceTask = nil
+            self.isRefreshingAccountBalances = false
+            switch result {
+            case let .success(balances): self.accountBalances = balances
+            case .failure:
+                self.accountBalances = AIAccountBalanceCatalog.groups.compactMap { group in
+                    let selected = group.filter { providers.contains($0) }
+                    guard !selected.isEmpty else { return nil }
+                    var balance = AIAccountBalanceCatalog.placeholder(for: selected)
+                    if balance.status == .notSignedIn || balance.status == .additionalCredentialsRequired { balance.status = .unavailable }
+                    return balance
+                }
+            }
+        }
     }
 
     private func scheduleSubscriptionUsageRefresh() {

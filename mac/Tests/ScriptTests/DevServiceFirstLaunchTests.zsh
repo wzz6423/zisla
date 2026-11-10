@@ -41,6 +41,7 @@ function wait_for_service_to_run() { print -r -- "4242" }
 function launchctl() {
   [[ "$#" == 3 && "$1" == bootstrap && "$2" == "$SERVICE_DOMAIN" && "$3" == "$LAUNCH_AGENT" ]] || return 1
   python3 - "$LAUNCH_AGENT" "$APP_BINARY" "$APP/Contents/Info.plist" "$TEST_TEMPORARY_ROOT" >> "$CAPTURE_FILE" <<'PYTHON'
+import os
 import plistlib
 import sys
 from pathlib import Path
@@ -60,6 +61,10 @@ if home != "none":
     assert bundle == "dev.wzz.zisla.debug.fresh." + Path(home).suffix[1:], "Preferences and home must identify the same fresh launch"
     assert not any(Path(home).iterdir()), "Fresh launch must not copy existing data"
 assert agent["KeepAlive"] is True, "Automatic restarts must keep the same launch environment"
+if "TEST_EXPECT_AI_BALANCE" in os.environ:
+    expected_balance = os.environ["TEST_EXPECT_AI_BALANCE"]
+    actual_balance = agent["EnvironmentVariables"].get("ZISLA_DEBUG_AI_ACCOUNT_BALANCE")
+    assert actual_balance == (expected_balance or None), "The debug quota fixture must reach launchd exactly, or be removed when cleared"
 print(f"plist first={value} home={home} bundle={bundle}")
 PYTHON
 }
@@ -126,6 +131,34 @@ for target in run update; do
     expect_launch "$target normalizes '$invalid_value' to 0" "$invalid_value" 0 \
       env -u MAKEFLAGS -u MFLAGS -u ZISLA_FIRST make -C "$TEST_ROOT" "$target" "ZISLA_FIRST=$invalid_value"
   done
+done
+
+function expect_balance_launch() {
+  local description="$1"
+  local expected="$2"
+  shift 2
+  if ! env TEST_EXPECT_AI_BALANCE="$expected" "$@" >/dev/null; then
+    print -u2 -r -- "FAIL: $description"
+    exit 1
+  fi
+  [[ ! -e "$TEST_ROOT/SHOULD_NOT_EXIST" ]] || {
+    print -u2 -r -- "FAIL: a debug fixture must not execute shell substitutions"
+    exit 1
+  }
+  (( tests_run += 1 ))
+}
+
+for target in run update; do
+  expect_balance_launch "$target forwards environment quota" 'codex:20:10,claude:0' \
+    env -u MAKEFLAGS -u MFLAGS ZISLA_DEBUG_AI_ACCOUNT_BALANCE=codex:20:10,claude:0 make -C "$TEST_ROOT" "$target"
+  expect_balance_launch "$target forwards make quota" 'codex:10:70' \
+    env -u MAKEFLAGS -u MFLAGS -u ZISLA_DEBUG_AI_ACCOUNT_BALANCE make -C "$TEST_ROOT" "$target" ZISLA_DEBUG_AI_ACCOUNT_BALANCE=codex:10:70
+  expect_balance_launch "$target preserves literal fixture text" 'invalid; $(touch SHOULD_NOT_EXIST)' \
+    env -u MAKEFLAGS -u MFLAGS 'ZISLA_DEBUG_AI_ACCOUNT_BALANCE=invalid; $(touch SHOULD_NOT_EXIST)' make -C "$TEST_ROOT" "$target"
+  expect_balance_launch "$target clears a previous quota fixture" '' \
+    env -u MAKEFLAGS -u MFLAGS make -C "$TEST_ROOT" "$target" ZISLA_DEBUG_AI_ACCOUNT_BALANCE=
+  expect_balance_launch "$target defaults to real readings after fixture removal" '' \
+    env -u MAKEFLAGS -u MFLAGS -u ZISLA_DEBUG_AI_ACCOUNT_BALANCE make -C "$TEST_ROOT" "$target"
 done
 
 function expect_fresh_launch() {

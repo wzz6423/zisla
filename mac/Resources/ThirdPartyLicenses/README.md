@@ -122,3 +122,18 @@ repository, and monitor. Upstream UI, browser cookie scanning, billing
 changes, conversation export, and runtimes are not bundled. Keychain reads
 require a successful noninteractive access check. No remote build dependency
 is introduced.
+
+Native AI account balance credentials and quota parsing also use CodexBar at
+revision `7447bc77c2497323d9c41e40164ce705533493c8`, including its Claude, Codex,
+Copilot, Gemini, Kimi, Cursor, Zed, and Muse quota sources. The same MIT license
+in `CodexBar-LICENSE.txt` applies.
+
+Additional account quota schemas and endpoint mappings are adapted from:
+
+https://github.com/Javis603/token-monitor
+
+Pinned revision: `235a77c3fd3f63926a8fc50e879ada5a80029275`.
+Relevant sources are `src/shared/providers/{codex,copilot,grok,kimi,cursor,qoder,trae,zcode,zed,workbuddy,opencode,muse}`.
+Licensed under the MIT License. See `TokenMonitor-LICENSE.txt` in this directory.
+Zisla implements these mappings natively; browser credential scanning,
+upstream UI, automatic login, and remote build dependencies are not included.

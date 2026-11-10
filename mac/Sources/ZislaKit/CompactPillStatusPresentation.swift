@@ -18,6 +18,11 @@ public struct CompactPillStatusPresentation: Equatable, Sendable {
     public let showsWaveform: Bool
     public let showsMediaIdentity: Bool
     public var isMedia: Bool { priority == .media && notice.id.hasPrefix("media-active-") }
+    public var isAccountBalance: Bool { AIAccountBalanceNoticeController.isBalanceNotice(notice) }
+    public var accountBalanceLines: [String] {
+        guard isAccountBalance else { return [] }
+        return (0..<2).compactMap { notice.metadata?["quotaLine\($0)"] }
+    }
 
     public init(priority: CompactStatusPriority?, notice: IslandNotice, text: String,
          aiCount: Int = 0, showsWaveform: Bool = false, showsMediaIdentity: Bool = false) {
@@ -32,6 +37,15 @@ public struct CompactPillStatusPresentation: Equatable, Sendable {
     public func length(thickness: CGFloat, edge: IslandEdge, text: String? = nil,
         item: NowPlayingSnapshot? = nil, leadingInset: CGFloat = trailingInset) -> CGFloat {
         let text = (text ?? self.text).trimmingCharacters(in: .whitespacesAndNewlines)
+        if isAccountBalance {
+            let title = notice.metadata?["quotaProvider"] ?? notice.title
+            let values = accountBalanceLines
+            let lineWidth = edge.isVertical ? max(1, thickness / CGFloat(max(1, values.count))) : thickness
+            let valueLength = values.map { Self.textLength($0, availableWidth: lineWidth, edge: edge,
+                font: NSFont.systemFont(ofSize: values.count > 1 ? 9 : 11, weight: .medium)) }.max() ?? 0
+            let titleLength = Self.textLength(title, availableWidth: thickness, edge: edge, font: NSFont.systemFont(ofSize: 10, weight: .semibold))
+            return leadingInset + Self.trailingInset + min(Self.maximumTextLength, titleLength) + 10 + min(Self.maximumTextLength, valueLength)
+        }
         let iconSize = max(0, thickness - 8)
         let visualLength = (showsWaveform || priority == .updateAvailable ? iconSize * 2 + 6 : iconSize)
             + Self.trailingInset + leadingInset

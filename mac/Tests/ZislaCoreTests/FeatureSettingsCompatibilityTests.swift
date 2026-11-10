@@ -1348,6 +1348,7 @@ struct FeatureSettingsCompatibilityTests {
         settings.compactStatusPriority = [
             .media,
             .aiActivity,
+            .aiAccountBalance,
             .focusMode,
             .transient,
             .updateAvailable,
@@ -1384,6 +1385,7 @@ struct FeatureSettingsCompatibilityTests {
             .mail,
             .focusCountdown,
             .focusMode,
+            .aiAccountBalance,
             .toolboxReminder,
             .updateAvailable,
             .systemMonitor,
