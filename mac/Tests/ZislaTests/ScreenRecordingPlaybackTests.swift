@@ -36,11 +36,12 @@ struct ScreenRecordingPlaybackTests {
             await model.previewTask?.value
             model.playTimeline()
             await model.operationTask?.value
+            let position = try #require(model.activePlayer).currentTime().seconds
 
             #expect(model.isShowingTimelinePlayback && !model.isShowingSourcePlayback && !model.isBusy)
             #expect(try await playbackSources(#require(model.activePlayer?.currentItem)) == sources,
                 "Resuming an unchanged timeline must reuse its PCM and playback clock instead of processing the whole recording again")
-            #expect(abs(try #require(model.activePlayer).currentTime().seconds - start) < 0.05,
+            #expect(abs(position - start) < 0.05,
                 "Reused playback must seek to the edited output position")
             #expect(temporary.allSatisfy { FileManager.default.fileExists(atPath: $0.path) },
                 "Prepared audio must remain available while the timeline can resume")
