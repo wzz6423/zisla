@@ -8,8 +8,8 @@ import ZislaKit
 /// Preserve standard history controls and distinguish explicit requests from passive view updates.
 @Suite(.serialized)
 struct SystemMetricsHistoryPanelTests {
-    @Test @MainActor
     /// Uses a nonordering window to exercise the real coordinator without changing application focus.
+    @Test @MainActor
     func repeatedRequestsRaiseTheWindowOncePerClickAndDismissalCanReopen() throws {
         let state = SystemMetricsHistoryPanelPresentationState()
         let history = OrderingHistoryPanel(
@@ -88,9 +88,9 @@ struct SystemMetricsHistoryPanelTests {
         #expect(collapseRequests == 4)
     }
 
+    /// Exercises origin-dependent focus requests without ordering real application windows.
     @Test(arguments: ["settings", "island", "detached"])
     @MainActor
-    /// Exercises origin-dependent focus requests without ordering real application windows.
     func presentationTakesFocusOnlyFromSettings(origin: String) {
         let history = OrderingHistoryPanel(
             contentRect: CGRect(x: 0, y: 0, width: 720, height: 560),

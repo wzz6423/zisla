@@ -9,8 +9,8 @@ import ZislaKit
 
 @MainActor @Suite(.serialized)
 struct SystemMetricsHistorySettingsActionsTests {
-    @Test(arguments: [AppLanguage.simplifiedChinese, .english, .arabic], [false, true])
     /// Uses archived data with recording disabled so action availability cannot accidentally depend on the toggle.
+    @Test(arguments: [AppLanguage.simplifiedChinese, .english, .arabic], [false, true])
     func buttonsFollowArchivedHistoryWithoutChangingRecording(language: AppLanguage, empty: Bool) async throws {
         let persistence = SettingsHistoryPersistence(records: empty ? [] : [
             SystemMetricsRecord(timestamp: Date(timeIntervalSince1970: 60), cpuUsage: 0.42),
@@ -46,8 +46,8 @@ struct SystemMetricsHistorySettingsActionsTests {
         #expect(!fixture.window.isVisible)
     }
 
-    @Test
     /// Keeps the history content mounted to reproduce clearing from a separate settings entry point.
+    @Test
     func historyWindowReloadsAfterAnotherEntryPointClearsTheArchive() async throws {
         let releaseAccessibility = EnhancedAccessibilityTestScope.acquire()
         defer { releaseAccessibility() }
@@ -102,8 +102,8 @@ struct SystemMetricsHistorySettingsActionsTests {
         #expect(!window.isVisible)
     }
 
-    @Test(arguments: [false, true])
     /// Unzips the saved workbook to prove export includes the archive without changing recording state.
+    @Test(arguments: [false, true])
     func exportWritesAllArchivedRecordsWithoutEnablingRecording(empty: Bool) async throws {
         let directory = try temporaryDirectory()
         defer { try? FileManager.default.removeItem(at: directory) }

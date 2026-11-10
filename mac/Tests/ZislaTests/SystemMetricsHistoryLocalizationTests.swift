@@ -61,8 +61,8 @@ struct SystemMetricsHistoryLocalizationTests {
         #expect(japanese["风扇 %ld"] == "ファン %ld")
     }
 
-    @Test(arguments: AppLanguage.allCases)
     /// Verifies requested locales independently of the app's persisted language to catch silent fallback.
+    @Test(arguments: AppLanguage.allCases)
     func historyKeysResolveInRequestedLanguage(language: AppLanguage) throws {
         let table = try #require(Self.stringsTable(for: language))
         for key in try Self.historyKeys() {
