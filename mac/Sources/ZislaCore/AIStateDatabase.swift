@@ -129,15 +129,6 @@ final class AIStateDatabase {
                 )
                 """)
             try execute("CREATE INDEX IF NOT EXISTS detected_usage_daily_timestamp ON detected_usage_daily(timestamp)")
-            try execute("""
-                CREATE TABLE IF NOT EXISTS generic_usage_baselines (
-                    file_prefix TEXT NOT NULL,
-                    timestamp REAL NOT NULL,
-                    input_tokens INTEGER NOT NULL,
-                    output_tokens INTEGER NOT NULL,
-                    PRIMARY KEY(file_prefix, timestamp)
-                )
-                """)
             try migrateUsageToDailyTotalsIfNeeded()
             try migrateDetectedUsageCursorIfNeeded()
             try migrateDetectedUsageEventsIfNeeded()
@@ -599,7 +590,7 @@ final class AIStateDatabase {
         var rawDeltasByDay: [Date: AIUsageSample] = [:]
         var cursorDeltas: [AIUsageSample] = []
         var modelDays: Set<Date> = []
-        let ambiguousGenericDays = try prepareGenericUsageMigration(samples, using: lookup, modelDays: &modelDays)
+        let ambiguousGenericSources = try prepareGenericUsageMigration(samples, using: lookup, modelDays: &modelDays)
         for sample in samples {
             let sourceID = detectedUsageSourceID(for: sample)
             let normalized = AIUsageSample(
@@ -655,7 +646,7 @@ final class AIStateDatabase {
                     if sqlite3_changes(connection) > 0 { modelDays.insert(day) }
                 }
                 if inputDelta > 0 || outputDelta > 0 {
-                    let rawDelta = AIUsageSample(
+                    let delta = AIUsageSample(
                         sourceID: sourceID,
                         provider: existing.provider,
                         timestamp: updated.timestamp,
@@ -663,8 +654,6 @@ final class AIStateDatabase {
                         outputTokens: outputDelta,
                         model: normalized.model
                     )
-                    let delta = try reconcileGenericUsage(rawDelta, legacyPrefix: sample.legacySourceID,
-                        ambiguousDays: ambiguousGenericDays)
                     try addDetectedModelDelta(delta)
                     modelDays.insert(Calendar.current.startOfDay(for: delta.timestamp))
                     appendDetectedUsageDelta(delta, to: &rawDeltasByDay)
@@ -679,13 +668,12 @@ final class AIStateDatabase {
             sqlite3_clear_bindings(insert)
             try bind(normalized, to: insert)
             try stepDone(insert)
-            let delta = try reconcileGenericUsage(normalized, legacyPrefix: sample.legacySourceID,
-                ambiguousDays: ambiguousGenericDays)
-            try addDetectedModelDelta(delta)
+            guard !ambiguousGenericSources.contains(sourceID) else { continue }
+            try addDetectedModelDelta(normalized)
             modelDays.insert(Calendar.current.startOfDay(for: normalized.timestamp))
-            appendDetectedUsageDelta(delta, to: &rawDeltasByDay)
+            appendDetectedUsageDelta(normalized, to: &rawDeltasByDay)
             if legacyCursor.map({ normalized.timestamp > $0 }) ?? false {
-                cursorDeltas.append(delta)
+                cursorDeltas.append(normalized)
             }
         }
 
@@ -866,164 +854,236 @@ final class AIStateDatabase {
         try stepDone(daily)
     }
 
-    /// Bridges equal-token events within the same file while keeping their unverifiable model attribution unknown.
-    private func migrateGenericDetectedUsageEvent(for sample: AIUsageSample, legacyPrefix: String,
-        modelDays: inout Set<Date>) throws {
-        guard let filePrefix = genericFilePrefix(legacyPrefix) else { return }
-        let lookup = try prepare("""
-            SELECT source_id FROM detected_usage_events
-            WHERE source_id GLOB ? AND provider = ?
-                AND input_tokens = ? AND output_tokens = ?
-            ORDER BY CASE WHEN substr(source_id, 1, length(?)) = ? THEN 0 ELSE 1 END, source_id LIMIT 1
-            """)
-        defer { sqlite3_finalize(lookup) }
-        try bind(filePrefix + "entry-*-usage-[0-9]*", to: 1, in: lookup)
-        try bind(sample.provider.rawValue, to: 2, in: lookup)
-        try check(sqlite3_bind_int64(lookup, 3, Int64(AIUsageTokenMath.nonnegative(sample.inputTokens))))
-        try check(sqlite3_bind_int64(lookup, 4, Int64(AIUsageTokenMath.nonnegative(sample.outputTokens))))
-        try bind(legacyPrefix, to: 5, in: lookup)
-        try bind(legacyPrefix, to: 6, in: lookup)
-        guard try stepHasRow(lookup, fallback: AppLocalization.text("无法查询旧版检测到的 AI 用量记录")),
-              let legacyID = optionalText(at: 0, in: lookup) else { return }
-        let oldRows = try prepare("""
-            SELECT provider, timestamp, input_tokens, output_tokens, NULL, NULL
-            FROM detected_usage_daily WHERE source_id = ?
-            """)
-        defer { sqlite3_finalize(oldRows) }
-        try bind(legacyID, to: 1, in: oldRows)
-        var rows: [AIUsageSample] = []
-        while try stepHasRow(oldRows, fallback: AppLocalization.text("无法读取 AI 用量记录")) {
-            var row = try usageSample(from: oldRows, sourceID: sample.sourceID, columnOffset: 0)
-            row.model = nil
-            rows.append(row)
+    /// Archives unverifiable legacy model metadata while retaining the old day's numeric ledger.
+    private func archiveGenericUsage(_ samples: [AIUsageSample], modelDays: inout Set<Date>) throws {
+        for sample in samples {
+            guard let oldID = sample.sourceID else { continue }
+            let rows = try prepare("""
+                SELECT provider, timestamp, input_tokens, output_tokens, NULL, NULL
+                FROM detected_usage_daily WHERE source_id = ?
+                """)
+            defer { sqlite3_finalize(rows) }
+            try bind(oldID, to: 1, in: rows)
+            var history: [AIUsageSample] = []
+            while try stepHasRow(rows, fallback: AppLocalization.text("无法读取 AI 用量记录")) {
+                history.append(try usageSample(from: rows, sourceID: "zisla-legacy-generic:\(oldID)", columnOffset: 0))
+            }
+            let delete = try prepare("DELETE FROM detected_usage_daily WHERE source_id = ?")
+            defer { sqlite3_finalize(delete) }
+            try bind(oldID, to: 1, in: delete)
+            try stepDone(delete)
+            for row in history {
+                try addDetectedModelDelta(row)
+                modelDays.insert(row.timestamp)
+            }
+            let event = try prepare("""
+                INSERT INTO detected_usage_events(source_id, provider, timestamp, input_tokens, output_tokens, cost_usd, model)
+                SELECT ?, provider, timestamp, input_tokens, output_tokens, cost_usd, NULL
+                FROM detected_usage_events WHERE source_id = ?
+                ON CONFLICT(source_id) DO UPDATE SET
+                    timestamp = MAX(timestamp, excluded.timestamp),
+                    input_tokens = MAX(input_tokens, excluded.input_tokens),
+                    output_tokens = MAX(output_tokens, excluded.output_tokens), model = NULL
+                """)
+            defer { sqlite3_finalize(event) }
+            try bind("zisla-legacy-generic:\(oldID)", to: 1, in: event)
+            try bind(oldID, to: 2, in: event)
+            try stepDone(event)
+            let remove = try prepare("DELETE FROM detected_usage_events WHERE source_id = ?")
+            defer { sqlite3_finalize(remove) }
+            try bind(oldID, to: 1, in: remove)
+            try stepDone(remove)
         }
-        let delete = try prepare("DELETE FROM detected_usage_daily WHERE source_id = ?")
-        defer { sqlite3_finalize(delete) }
-        try bind(legacyID, to: 1, in: delete)
-        try stepDone(delete)
-        for row in rows {
-            try addDetectedModelDelta(row)
-            modelDays.insert(row.timestamp)
-        }
-        let update = try prepare("UPDATE detected_usage_events SET source_id = ?, model = ? WHERE source_id = ?")
-        defer { sqlite3_finalize(update) }
-        try bind(sample.sourceID, to: 1, in: update)
-        try bind(sample.model, to: 2, in: update)
-        try bind(legacyID, to: 3, in: update)
-        try stepDone(update)
     }
 
-    /// Removes the mutable document digest so legacy baselines survive appends and timestamp changes.
-    private func genericFilePrefix(_ legacyPrefix: String) -> String? {
-        legacyPrefix.range(of: "-entry-").map { String(legacyPrefix[..<$0.lowerBound]) + "-" }
-    }
-
-    /// Moves leftover legacy events into consumable baselines, merging later arrivals without blocking rescans.
+    /// Resolves the whole scan before any high-water mark advances, so input order cannot spend unrelated history.
     private func prepareGenericUsageMigration(_ samples: [AIUsageSample], using lookup: OpaquePointer?,
         modelDays: inout Set<Date>) throws -> Set<String> {
-        let generic = samples.filter { $0.legacySourceID != nil }
-        for sample in generic {
-            guard let sourceID = sample.sourceID, let prefix = sample.legacySourceID,
-                  try detectedUsageEvent(sourceID: sourceID, using: lookup) == nil else { continue }
-            try migrateGenericDetectedUsageEvent(for: sample, legacyPrefix: prefix, modelDays: &modelDays)
+        let generic = samples.filter { genericFileKey($0.legacySourceID) != nil }
+        let groups = Dictionary(grouping: generic) { sample in
+            genericFileKey(sample.legacySourceID)!
         }
         var ambiguous: Set<String> = []
-        for filePrefix in Set(generic.compactMap { $0.legacySourceID.flatMap(genericFilePrefix) }) {
+        var hashesRemaining = AIGenericUsageContext.maximumRecoveryHashes
+        for fileKey in groups.keys.sorted() {
+            let current = groups[fileKey]!.sorted { ($0.sourceID ?? "") < ($1.sourceID ?? "") }
+            let prefix = fileKey + "-entry-"
             let old = try prepare("""
                 SELECT source_id, provider, timestamp, input_tokens, output_tokens, cost_usd, model
-                FROM detected_usage_events WHERE source_id GLOB ? ORDER BY source_id
+                FROM detected_usage_events WHERE source_id >= ? AND source_id < ?
+                ORDER BY source_id
                 """)
             defer { sqlite3_finalize(old) }
-            try bind(filePrefix + "entry-*-usage-[0-9]*", to: 1, in: old)
-            var leftovers: [AIUsageSample] = []
+            try bind(prefix, to: 1, in: old)
+            try bind(fileKey + "-entry.", to: 2, in: old)
+            var legacy: [AIUsageSample] = []
             while try stepHasRow(old, fallback: AppLocalization.text("无法读取 AI 用量记录")) {
-                leftovers.append(try usageSample(from: old, sourceID: optionalText(at: 0, in: old), columnOffset: 1))
-            }
-            for total in AIUsageAnalytics.dailyUsageSamples(samples: leftovers, calendar: .current) {
-                let insert = try prepare("""
-                    INSERT INTO generic_usage_baselines(file_prefix,timestamp,input_tokens,output_tokens)
-                    VALUES(?,?,?,?)
-                    ON CONFLICT(file_prefix, timestamp) DO UPDATE SET
-                        input_tokens = generic_usage_baselines.input_tokens + excluded.input_tokens,
-                        output_tokens = generic_usage_baselines.output_tokens + excluded.output_tokens
-                    """)
-                defer { sqlite3_finalize(insert) }
-                try bind(filePrefix, to: 1, in: insert)
-                try check(sqlite3_bind_double(insert, 2, total.timestamp.timeIntervalSinceReferenceDate))
-                try check(sqlite3_bind_int64(insert, 3, Int64(total.inputTokens)))
-                try check(sqlite3_bind_int64(insert, 4, Int64(total.outputTokens)))
-                try stepDone(insert)
-                ambiguous.insert(filePrefix)
-            }
-            for sample in leftovers {
-                guard let oldID = sample.sourceID else { continue }
-                let rows = try prepare("""
-                    SELECT provider, timestamp, input_tokens, output_tokens, NULL, NULL
-                    FROM detected_usage_daily WHERE source_id = ?
-                    """)
-                defer { sqlite3_finalize(rows) }
-                try bind(oldID, to: 1, in: rows)
-                var historical: [AIUsageSample] = []
-                while try stepHasRow(rows, fallback: AppLocalization.text("无法读取 AI 用量记录")) {
-                    historical.append(try usageSample(from: rows, sourceID: "zisla-legacy-generic:\(oldID)", columnOffset: 0))
+                let sample = try usageSample(from: old, sourceID: optionalText(at: 0, in: old), columnOffset: 1)
+                if genericRootKey(sample.sourceID) != nil, current.contains(where: { $0.provider == sample.provider }) {
+                    legacy.append(sample)
                 }
-                let delete = try prepare("DELETE FROM detected_usage_daily WHERE source_id = ?")
-                defer { sqlite3_finalize(delete) }
-                try bind(oldID, to: 1, in: delete)
-                try stepDone(delete)
-                for row in historical {
-                    try addDetectedModelDelta(row)
-                    modelDays.insert(row.timestamp)
-                }
-                let remove = try prepare("DELETE FROM detected_usage_events WHERE source_id = ?")
-                defer { sqlite3_finalize(remove) }
-                try bind(oldID, to: 1, in: remove)
-                try stepDone(remove)
             }
+            guard !legacy.isEmpty else { continue }
+            var unresolved: Set<String> = []
+            for sample in current {
+                if let sourceID = sample.sourceID,
+                   try detectedUsageEvent(sourceID: sourceID, using: lookup) == nil {
+                    unresolved.insert(sourceID)
+                }
+            }
+            let roots = Dictionary(grouping: legacy) { sample in
+                genericRootKey(sample.sourceID)!
+            }
+            var matched: [String: AIUsageSample] = [:]
+            var conflicting: Set<String> = []
+            var verifiedRoots: Set<String> = []
+            for rootKey in roots.keys.sorted() {
+                let history = roots[rootKey]!
+                let exact = current.filter { candidate in
+                    candidate.legacySourceID == rootKey && unresolved.contains(candidate.sourceID ?? "")
+                        && history.allSatisfy { $0.provider == candidate.provider }
+                }
+                if history.count == exact.count && tokenMultiset(history) == tokenMultiset(exact) {
+                    for sample in exact {
+                        if let sourceID = sample.sourceID {
+                            if matched[sourceID] != nil { conflicting.insert(sourceID) }
+                            matched[sourceID] = sample
+                        }
+                    }
+                    verifiedRoots.insert(rootKey)
+                    continue
+                }
+                guard history.count == 1, let historical = history.first else { continue }
+                let candidates = current.filter {
+                    unresolved.contains($0.sourceID ?? "") && $0.provider == historical.provider
+                        && $0.genericContext != nil
+                }
+                guard candidates.count <= AIGenericUsageContext.maximumRecoveryCandidates else { continue }
+                var recovered: [AIUsageSample] = []
+                for candidate in candidates {
+                    if verifiesGenericContext(candidate, historical: historical, hashesRemaining: &hashesRemaining) {
+                        recovered.append(candidate)
+                    }
+                }
+                if hashesRemaining > 0, recovered.count == 1, let candidate = recovered.first, let sourceID = candidate.sourceID {
+                    var baseline = candidate
+                    baseline.inputTokens = historical.inputTokens
+                    baseline.outputTokens = historical.outputTokens
+                    if matched[sourceID] != nil { conflicting.insert(sourceID) }
+                    matched[sourceID] = baseline
+                    verifiedRoots.insert(rootKey)
+                }
+            }
+            for sourceID in conflicting { matched.removeValue(forKey: sourceID) }
+            try archiveGenericUsage(legacy, modelDays: &modelDays)
             let baseline = try prepare("""
-                SELECT timestamp FROM generic_usage_baselines WHERE file_prefix = ?
-                    AND (input_tokens > 0 OR output_tokens > 0)
+                INSERT INTO detected_usage_events(source_id, provider, timestamp, input_tokens, output_tokens, cost_usd, model)
+                VALUES(?,?,?,?,?,?,?)
                 """)
             defer { sqlite3_finalize(baseline) }
-            try bind(filePrefix, to: 1, in: baseline)
-            while try stepHasRow(baseline, fallback: AppLocalization.text("无法读取 AI 用量记录")) {
-                ambiguous.insert(filePrefix)
+            for sourceID in matched.keys.sorted() {
+                var value = matched[sourceID]!
+                value.model = current.first { $0.sourceID == sourceID }?.model
+                sqlite3_reset(baseline)
+                sqlite3_clear_bindings(baseline)
+                try bind(value, to: baseline)
+                try stepDone(baseline)
+                unresolved.remove(sourceID)
+            }
+            if verifiedRoots.count < roots.count || !conflicting.isEmpty {
+                ambiguous.formUnion(unresolved)
             }
         }
         return ambiguous
     }
 
-    /// Consumes ambiguous file baselines before emitting growth; a changed document cannot repeat old tokens.
-    private func reconcileGenericUsage(_ sample: AIUsageSample, legacyPrefix: String?, ambiguousDays: Set<String>) throws -> AIUsageSample {
-        guard let legacyPrefix, let filePrefix = genericFilePrefix(legacyPrefix) else { return sample }
-        guard ambiguousDays.contains(filePrefix) else { return sample }
-        let lookup = try prepare("""
-            SELECT timestamp,input_tokens,output_tokens FROM generic_usage_baselines
-            WHERE file_prefix = ? AND (input_tokens > 0 OR output_tokens > 0) ORDER BY timestamp
-            """)
-        defer { sqlite3_finalize(lookup) }
-        try bind(filePrefix, to: 1, in: lookup)
-        let update = try prepare("""
-            UPDATE generic_usage_baselines SET input_tokens = ?, output_tokens = ? WHERE file_prefix = ? AND timestamp = ?
-            """)
-        defer { sqlite3_finalize(update) }
-        var delta = sample
-        while try stepHasRow(lookup, fallback: AppLocalization.text("无法读取 AI 用量记录")) {
-            let timestamp = sqlite3_column_double(lookup, 0)
-            let input = tokenCount(at: 1, in: lookup)
-            let output = tokenCount(at: 2, in: lookup)
-            sqlite3_reset(update)
-            sqlite3_clear_bindings(update)
-            try check(sqlite3_bind_int64(update, 1, Int64(max(0, input - delta.inputTokens))))
-            try check(sqlite3_bind_int64(update, 2, Int64(max(0, output - delta.outputTokens))))
-            try bind(filePrefix, to: 3, in: update)
-            try check(sqlite3_bind_double(update, 4, timestamp))
-            try stepDone(update)
-            delta.inputTokens = max(0, delta.inputTokens - input)
-            delta.outputTokens = max(0, delta.outputTokens - output)
+    /// Accepts only the old provider/file/root delimiter shape, preventing malformed prefixes from grouping other events.
+    private func genericFileKey(_ prefix: String?) -> String? {
+        guard let prefix, prefix.hasSuffix("-usage-"), let entry = prefix.range(of: "-entry-"),
+              entry.lowerBound > prefix.startIndex,
+              let usage = prefix.range(of: "-usage-", options: .backwards),
+              entry.upperBound < usage.lowerBound else { return nil }
+        return String(prefix[..<entry.lowerBound])
+    }
+
+    /// The old traversal index establishes root membership only; it cannot identify a message inside that root.
+    private func genericRootKey(_ sourceID: String?) -> String? {
+        guard let sourceID, let usage = sourceID.range(of: "-usage-", options: .backwards),
+              !sourceID[usage.upperBound...].isEmpty,
+              sourceID[usage.upperBound...].allSatisfy({ $0.isNumber }),
+              genericFileKey(String(sourceID[..<usage.upperBound])) != nil else { return nil }
+        return String(sourceID[..<usage.upperBound])
+    }
+
+    /// Checks whole-root quantities without pairing messages through the old unordered traversal index.
+    private func tokenMultiset(_ samples: [AIUsageSample]) -> [String] {
+        samples.map { "\($0.inputTokens):\($0.outputTokens)" }.sorted()
+    }
+
+    /// Only a regenerated old root digest proves that a changed message owns a historical token baseline.
+    private func verifiesGenericContext(_ sample: AIUsageSample, historical: AIUsageSample,
+        hashesRemaining: inout Int) -> Bool {
+        guard hashesRemaining > 0, let context = sample.genericContext,
+              context.document.count <= AIGenericUsageContext.maximumDocumentBytes,
+              let root = try? JSONSerialization.jsonObject(with: context.document) as? [String: Any],
+              let historicalID = historical.sourceID,
+              let digestStart = historicalID.range(of: "-entry-"),
+              let digestEnd = historicalID.range(of: "-usage-", options: .backwards),
+              digestStart.upperBound <= digestEnd.lowerBound else { return false }
+        let digest = String(historicalID[digestStart.upperBound..<digestEnd.lowerBound])
+        let dates: [Any] = [
+            historical.timestamp.timeIntervalSince1970,
+            historical.timestamp.timeIntervalSince1970 * 1_000,
+            historical.timestamp.ISO8601Format(),
+            historical.timestamp.ISO8601Format(.init(includingFractionalSeconds: true))
+        ]
+        for date in dates {
+            for stripsMetadata in [false, true] {
+                for removesMessageDate in [false, true] {
+                    guard hashesRemaining > 0 else { return false }
+                    guard let recovered = recoveredGenericDocument(root, path: context.path, historical: historical,
+                        date: date, stripsMetadata: stripsMetadata, removesMessageDate: removesMessageDate),
+                          let data = try? JSONSerialization.data(withJSONObject: recovered, options: [.sortedKeys]) else { continue }
+                    hashesRemaining -= 1
+                    if AIUsageLogIdentity.digest(data) == digest { return true }
+                }
+            }
         }
-        delta.model = nil
-        return delta
+        return false
+    }
+
+    /// Removes appended siblings and restores only recorded numeric/date fields; unrelated message content stays untouched.
+    private func recoveredGenericDocument(_ value: Any, path: [AIGenericUsageContext.PathComponent],
+        historical: AIUsageSample, date: Any, stripsMetadata: Bool, removesMessageDate: Bool, isRoot: Bool = true) -> Any? {
+        guard let first = path.first else {
+            guard var usage = value as? [String: Any] else { return nil }
+            let inputKeys = ["input_tokens", "inputTokens", "prompt_tokens", "promptTokens", "promptTokenCount", "prompt_token_count"]
+            let outputKeys = ["output_tokens", "outputTokens", "completion_tokens", "completionTokens", "candidatesTokenCount", "candidates_token_count"]
+            for key in inputKeys where usage[key] != nil { usage[key] = historical.inputTokens }
+            for key in outputKeys where usage[key] != nil { usage[key] = historical.outputTokens }
+            return usage
+        }
+        switch first {
+        case let .index(index):
+            guard let values = value as? [Any], values.indices.contains(index),
+                  let recovered = recoveredGenericDocument(values[index], path: Array(path.dropFirst()),
+                    historical: historical, date: date, stripsMetadata: stripsMetadata,
+                    removesMessageDate: removesMessageDate, isRoot: false) else { return nil }
+            return [recovered]
+        case let .key(key):
+            guard var dictionary = value as? [String: Any], let child = dictionary[key],
+                  let recovered = recoveredGenericDocument(child, path: Array(path.dropFirst()),
+                    historical: historical, date: date, stripsMetadata: stripsMetadata,
+                    removesMessageDate: removesMessageDate, isRoot: false) else { return nil }
+            dictionary[key] = recovered
+            let dateKeys = ["timestamp", "ts", "created_at", "createdAt"]
+            for dateKey in dateKeys where dictionary[dateKey] != nil {
+                if removesMessageDate && !isRoot { dictionary.removeValue(forKey: dateKey) }
+                else { dictionary[dateKey] = date }
+            }
+            if stripsMetadata { dictionary.removeValue(forKey: "model") }
+            return dictionary
+        }
     }
 
     private func uniqueLegacyDetectedUsageSourceID(

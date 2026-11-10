@@ -166,6 +166,37 @@ public enum AIUsageTokenMath {
     }
 }
 
+/// Shared, bounded migration evidence excluded from encoding and cleared from the detector cache at the next scan.
+public struct AIGenericUsageContext: Sendable {
+    public enum PathComponent: Sendable {
+        case key(String), index(Int)
+    }
+
+    public static let maximumDocumentBytes = 64 * 1_024
+    public static let maximumEvidenceBytes = 256 * 1_024
+    public static let maximumRecoveryCandidates = 32
+    public static let maximumRecoveryHashes = 512
+
+    public let document: Data
+    public let path: [PathComponent]
+
+    public init(document: Data, path: [PathComponent]) {
+        self.document = document
+        self.path = path
+    }
+}
+
+public enum AIUsageLogIdentity {
+    public static func digest(_ data: Data) -> String {
+        var hash: UInt64 = 14_695_981_039_346_656_037
+        for byte in data {
+            hash ^= UInt64(byte)
+            hash &*= 1_099_511_628_211
+        }
+        return String(hash, radix: 16)
+    }
+}
+
 /// A daily AI usage aggregate. `cost` and `model` are optional.
 public struct AIUsageSample: Codable, Equatable, Sendable {
     /// Stable identifier for an internally maintained daily aggregate.
@@ -177,6 +208,11 @@ public struct AIUsageSample: Codable, Equatable, Sendable {
     public var costUSD: Double?
     public var model: String?
     public var legacySourceID: String?
+    public var genericContext: AIGenericUsageContext? = nil
+
+    private enum CodingKeys: String, CodingKey {
+        case sourceID, provider, timestamp, inputTokens, outputTokens, costUSD, model, legacySourceID
+    }
 
     public init(
         sourceID: String? = nil,
@@ -196,6 +232,13 @@ public struct AIUsageSample: Codable, Equatable, Sendable {
         self.costUSD = costUSD
         self.model = model
         self.legacySourceID = legacySourceID
+    }
+
+    /// Transient migration evidence must not change persisted-state equality or appear in encoded usage.
+    public static func == (lhs: Self, rhs: Self) -> Bool {
+        lhs.sourceID == rhs.sourceID && lhs.provider == rhs.provider && lhs.timestamp == rhs.timestamp
+            && lhs.inputTokens == rhs.inputTokens && lhs.outputTokens == rhs.outputTokens
+            && lhs.costUSD == rhs.costUSD && lhs.model == rhs.model && lhs.legacySourceID == rhs.legacySourceID
     }
 
     public var totalTokens: Int {

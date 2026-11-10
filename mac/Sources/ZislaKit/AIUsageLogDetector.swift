@@ -4,7 +4,7 @@ import ZislaCore
 import zstd
 
 /// Reads recorded token usage from the structured session logs of local AI tools.
-/// Only parses numeric usage fields; does not read or persist session content.
+/// Persists only usage metadata; bounded in-memory document evidence verifies legacy identities during upgrades.
 public final class AIUsageLogDetector: AIUsageDetecting {
     private struct TokenUsage {
         var input: Int
@@ -16,6 +16,7 @@ public final class AIUsageLogDetector: AIUsageDetecting {
         var model: String?
         var timestamp: Date
         var path: String
+        var location: [AIGenericUsageContext.PathComponent]
     }
 
     private struct Candidate {
@@ -68,6 +69,7 @@ public final class AIUsageLogDetector: AIUsageDetecting {
     private let scanInterval: TimeInterval
     private var cache: [String: CachedSamples] = [:]
     private var lastScanAt: Date = .distantPast
+    private var remainingEvidenceBytes = AIGenericUsageContext.maximumEvidenceBytes
 
     private static let contentHashOffset: UInt64 = 14_695_981_039_346_656_037
     private static let contentHashPrime: UInt64 = 1_099_511_628_211
@@ -144,12 +146,21 @@ public final class AIUsageLogDetector: AIUsageDetecting {
             return uniqueSamples(cache.values.flatMap(\.samples))
         }
         lastScanAt = now
+        remainingEvidenceBytes = AIGenericUsageContext.maximumEvidenceBytes
+        for key in cache.keys {
+            let storedSamples = cache[key]!.samples
+            cache[key]?.samples = storedSamples.map { sample in
+                var value = sample
+                value.genericContext = nil
+                return value
+            }
+        }
         let candidates = allCandidates()
         let keys = Set(candidates.map(cacheKey(for:)))
         cache = cache.filter { keys.contains($0.key) }
 
         var samples: [AIUsageSample] = []
-        for candidate in candidates {
+        for candidate in candidates.sorted(by: { cacheKey(for: $0) < cacheKey(for: $1) }) {
             let key = cacheKey(for: candidate)
             if let cached = cache[key],
                   cached.modificationDate == candidate.modificationDate,
@@ -172,8 +183,13 @@ public final class AIUsageLogDetector: AIUsageDetecting {
         var unique: [String: AIUsageSample] = [:]
         for sample in samples {
             guard let sourceID = sample.sourceID else { continue }
-            if let existing = unique[sourceID], existing.timestamp <= sample.timestamp {
-                continue
+            if let existing = unique[sourceID] {
+                if sample.legacySourceID != nil {
+                    guard sample.inputTokens >= existing.inputTokens, sample.outputTokens >= existing.outputTokens,
+                          sample.inputTokens > existing.inputTokens || sample.outputTokens > existing.outputTokens else { continue }
+                } else if existing.timestamp <= sample.timestamp {
+                    continue
+                }
             }
             unique[sourceID] = sample
         }
@@ -775,7 +791,17 @@ public final class AIUsageLogDetector: AIUsageDetecting {
     /// Uses stable message paths for new identities while retaining the old digest solely for migration.
     private func parseGeneric(_ root: [String: Any], candidate: Candidate, ordinal: Int) -> [AIUsageSample] {
         let rootIdentity = (root["id"] as? String) ?? "entry-\(ordinal)"
-        return usageContexts(in: root, model: nil, timestamp: candidate.modificationDate, path: rootIdentity).compactMap { context in
+        let document = try? JSONSerialization.data(withJSONObject: root, options: [.sortedKeys])
+        let legacyPrefix = sourceID(candidate, component: "entry-\(document.map(AIUsageLogIdentity.digest) ?? stableDigest(root))-usage-")
+        let evidence: Data?
+        if let document, document.count <= AIGenericUsageContext.maximumDocumentBytes,
+           document.count <= remainingEvidenceBytes {
+            evidence = document
+            remainingEvidenceBytes -= document.count
+        } else {
+            evidence = nil
+        }
+        return usageContexts(in: root, model: nil, timestamp: candidate.modificationDate, path: rootIdentity, location: []).compactMap { context in
             var result = sample(
                 provider: candidate.provider,
                 sourceID: sourceID(
@@ -787,7 +813,10 @@ public final class AIUsageLogDetector: AIUsageDetecting {
                 model: context.model,
                 includeCacheInputTokens: true
             )
-            result?.legacySourceID = sourceID(candidate, component: "entry-\(stableDigest(root))-usage-")
+            result?.legacySourceID = legacyPrefix
+            if let evidence {
+                result?.genericContext = AIGenericUsageContext(document: evidence, path: context.location)
+            }
             return result
         }
     }
@@ -876,7 +905,8 @@ public final class AIUsageLogDetector: AIUsageDetecting {
     }
 
     /// Inherits nearest model/date metadata and sorts dictionary traversal so sibling reordering cannot change identities.
-    private func usageContexts(in value: Any, model: String?, timestamp date: Date, path: String) -> [UsageContext] {
+    private func usageContexts(in value: Any, model: String?, timestamp date: Date, path: String,
+        location: [AIGenericUsageContext.PathComponent]) -> [UsageContext] {
         if let dictionary = value as? [String: Any] {
             let ownModel = AIUsageAnalytics.normalizedModel(dictionary["model"] as? String) ?? model
             let ownDate = timestamp(in: dictionary, fallback: date)
@@ -888,11 +918,11 @@ public final class AIUsageLogDetector: AIUsageDetecting {
                 "output_tokens", "outputTokens", "completion_tokens", "completionTokens",
                 "candidatesTokenCount", "candidates_token_count",
             ]).isEmpty {
-                result.append(UsageContext(usage: dictionary, model: ownModel, timestamp: ownDate, path: path))
+                result.append(UsageContext(usage: dictionary, model: ownModel, timestamp: ownDate, path: path, location: location))
             }
             for key in dictionary.keys.sorted() {
                 result.append(contentsOf: usageContexts(in: dictionary[key]!, model: ownModel,
-                    timestamp: ownDate, path: path + "/" + Data(key.utf8).base64EncodedString()))
+                    timestamp: ownDate, path: path + "/" + Data(key.utf8).base64EncodedString(), location: location + [.key(key)]))
             }
             return result
         }
@@ -900,7 +930,7 @@ public final class AIUsageLogDetector: AIUsageDetecting {
             return values.enumerated().flatMap { index, value in
                 let identity = ((value as? [String: Any])?["id"] as? String) ?? String(index)
                 return usageContexts(in: value, model: model, timestamp: date,
-                    path: path + "/" + Data(identity.utf8).base64EncodedString())
+                    path: path + "/" + Data(identity.utf8).base64EncodedString(), location: location + [.index(index)])
             }
         }
         return []
@@ -1050,27 +1080,13 @@ public final class AIUsageLogDetector: AIUsageDetecting {
     }
 
     private func stableDigest(_ value: String) -> String {
-        var hash: UInt64 = 14_695_981_039_346_656_037
-        for byte in value.utf8 {
-            hash ^= UInt64(byte)
-            hash &*= 1_099_511_628_211
-        }
-        return String(hash, radix: 16)
+        AIUsageLogIdentity.digest(Data(value.utf8))
     }
 
     private func stableDigest(_ value: [String: Any]) -> String {
         guard JSONSerialization.isValidJSONObject(value),
               let data = try? JSONSerialization.data(withJSONObject: value, options: [.sortedKeys])
         else { return stableDigest(String(describing: value)) }
-        return stableDigest(data)
-    }
-
-    private func stableDigest(_ data: Data) -> String {
-        var hash: UInt64 = 14_695_981_039_346_656_037
-        for byte in data {
-            hash ^= UInt64(byte)
-            hash &*= 1_099_511_628_211
-        }
-        return String(hash, radix: 16)
+        return AIUsageLogIdentity.digest(data)
     }
 }

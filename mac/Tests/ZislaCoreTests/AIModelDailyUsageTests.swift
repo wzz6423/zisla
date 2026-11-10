@@ -258,7 +258,8 @@ struct AIModelDailyUsageTests {
     }
 
     @Test
-    func laterLegacyGenericEventsMergeIntoAnExistingDayBaselineWithoutBlockingScans() throws {
+    /// Late legacy snapshots without message evidence must not block later scans or be consumed by another source.
+    func laterLegacyGenericEventsRemainIndependentOfTheCurrentHighWaterMark() throws {
         let root = directory()
         defer { try? FileManager.default.removeItem(at: root) }
         let repository = AIStateRepository(directoryURL: root)
@@ -270,17 +271,231 @@ struct AIModelDailyUsageTests {
         try repository.recordDetectedUsage([sample(prefix + "1", .gemini, nil, 30, 5)])
         current.inputTokens = 45
         current.outputTokens = 10
-        #expect(try repository.recordDetectedUsage([current]) == 0)
-        #expect(try repository.loadUsageSamples().first?.totalTokens == 155)
+        #expect(try repository.recordDetectedUsage([current]) == 1)
+        #expect(try repository.loadUsageSamples().first?.totalTokens == 198)
         #expect(try repository.recordDetectedUsage([current]) == 0)
         current.inputTokens = 140
         current.outputTokens = 30
         #expect(try repository.recordDetectedUsage([current]) == 1)
         let history = try repository.loadUsageHistory()
-        #expect(history.usageSamples.first?.totalTokens == 170)
-        #expect(history.modelUsageSamples.map(\.totalTokens).reduce(0, +) == 170)
+        #expect(history.usageSamples.first?.totalTokens == 313)
+        #expect(history.modelUsageSamples.map(\.totalTokens).reduce(0, +) == 313)
         #expect(try repository.recordDetectedUsage([current]) == 0)
         #expect(try repository.loadUsageHistory() == history)
+    }
+
+    @Test
+    func transientGenericEvidenceIsNotEncodedAndDoesNotChangeUsageEquality() throws {
+        var value = sample("evidence", .gemini, "model", 10, 2)
+        value.genericContext = AIGenericUsageContext(document: Data(#"{"content":"fixture-private-message"}"#.utf8), path: [.key("usage")])
+        let encoded = try JSONEncoder().encode(value)
+        let json = try #require(String(data: encoded, encoding: .utf8))
+        #expect(!json.contains("fixture-private-message"))
+        #expect(!json.contains("genericContext"))
+        #expect(try JSONDecoder().decode(AIUsageSample.self, from: encoded) == value)
+        #expect(try JSONDecoder().decode(AIUsageSample.self, from: encoded).genericContext == nil)
+    }
+
+    @Test(arguments: ["invalid", "-entry-no-file-usage-", "gemini-file-entry-bad", "gemini-file-usage-", ""])
+    func malformedGenericPrefixesNeverCrashOrConsumeAnotherEvent(prefix: String) throws {
+        let root = directory()
+        defer { try? FileManager.default.removeItem(at: root) }
+        let repository = AIStateRepository(directoryURL: root)
+        var value = sample("invalid-prefix", .gemini, "model", 10, 2)
+        value.legacySourceID = prefix
+        try repository.recordDetectedUsage([sample("gemini-file-entry-root-usage-x", .gemini, nil, 100, 20)])
+        #expect(try repository.recordDetectedUsage([value]) == 1)
+        #expect(try repository.loadUsageSamples().first?.totalTokens == 132)
+        #expect(try repository.recordDetectedUsage([value]) == 0)
+    }
+
+    @Test
+    func exactGenericRootProofNeverMatchesAnotherProvider() throws {
+        let root = directory()
+        defer { try? FileManager.default.removeItem(at: root) }
+        let repository = AIStateRepository(directoryURL: root)
+        let document = Data(#"{"timestamp":"2027-01-15T08:00:00Z","messages":[{"id":"old","usage":{"input_tokens":150,"output_tokens":20}}]}"#.utf8)
+        var value = sample("gemini-file-usage-v2-old", .gemini, "model", 150, 20)
+        value.legacySourceID = "gemini-file-entry-root-usage-"
+        value.genericContext = .init(document: document, path: [.key("messages"), .index(0), .key("usage")])
+        try repository.recordDetectedUsage([sample("gemini-file-entry-root-usage-0", .claude, nil, 150, 20)])
+        #expect(try repository.recordDetectedUsage([value]) == 1)
+        #expect(try repository.loadUsageSamples().first?.totalTokens == 340)
+        #expect(try repository.loadUsageHistory().modelUsageSamples.contains { $0.provider == .gemini && $0.totalTokens == 170 })
+    }
+
+    @Test(arguments: [30, 31])
+    func genericRecoveryHashBudgetRejectsAPartiallyExaminedCandidateSet(priorCandidates: Int) throws {
+        let root = directory()
+        defer { try? FileManager.default.removeItem(at: root) }
+        let repository = AIStateRepository(directoryURL: root)
+        let timestamp = try Date.ISO8601FormatStyle().parse("2026-11-08T00:00:00Z")
+        let canonical = Data(#"{"messages":[{"id":"old","usage":{"input_tokens":100,"output_tokens":20}}],"timestamp":"2026-11-08T00:00:00Z"}"#.utf8)
+        let digest = AIUsageLogIdentity.digest(canonical)
+        try repository.recordDetectedUsage(["a", "b"].map { file in
+            AIUsageSample(sourceID: "gemini-\(file)-entry-\(digest)-usage-0", provider: .gemini,
+                timestamp: timestamp, inputTokens: 100, outputTokens: 20)
+        })
+        let failedMessages = (0..<priorCandidates).map { index in
+            ["id": "unrelated-\(index)", "usage": ["input_tokens": 150, "output_tokens": 20]] as [String: Any]
+        }
+        let firstDocument = try JSONSerialization.data(withJSONObject:
+            ["timestamp": "2026-11-08T00:00:00Z", "messages": failedMessages], options: [.sortedKeys])
+        var current = (0..<priorCandidates).map { index -> AIUsageSample in
+            var value = AIUsageSample(sourceID: "gemini-a-usage-v2-\(index)", provider: .gemini,
+                timestamp: timestamp, inputTokens: 150, outputTokens: 20, model: "unrelated",
+                legacySourceID: "gemini-a-entry-current-usage-")
+            value.genericContext = .init(document: firstDocument, path: [.key("messages"), .index(index), .key("usage")])
+            return value
+        }
+        let secondDocument = Data(#"{"messages":[{"id":"old","usage":{"input_tokens":150,"output_tokens":20}},{"id":"new","usage":{"input_tokens":30,"output_tokens":5}}],"timestamp":"2026-11-08T00:00:00Z"}"#.utf8)
+        for index in 0..<2 {
+            var value = AIUsageSample(sourceID: "gemini-b-usage-v2-\(index)", provider: .gemini,
+                timestamp: timestamp, inputTokens: index == 0 ? 150 : 30, outputTokens: index == 0 ? 20 : 5,
+                model: index == 0 ? "current" : "fresh", legacySourceID: "gemini-b-entry-current-usage-")
+            value.genericContext = .init(document: secondDocument, path: [.key("messages"), .index(index), .key("usage")])
+            current.append(value)
+        }
+        let complete = priorCandidates == 30
+        #expect(try repository.recordDetectedUsage(current) == (complete ? 1 : 0))
+        #expect(try repository.loadUsageSamples().first?.totalTokens == (complete ? 325 : 240))
+        var growth = try #require(current.first { $0.model == "current" })
+        growth.inputTokens += 10
+        #expect(try repository.recordDetectedUsage([growth]) == 1)
+        #expect(try repository.loadUsageSamples().first?.totalTokens == (complete ? 335 : 250))
+        #expect(try repository.recordDetectedUsage(Array(current.reversed())) == 0)
+    }
+
+    @Test(arguments: [false, true])
+    func twoHistoricalRootsCannotAssignTheirBaselinesToTheSameCurrentMessage(reverse: Bool) throws {
+        let root = directory()
+        defer { try? FileManager.default.removeItem(at: root) }
+        let repository = AIStateRepository(directoryURL: root)
+        let timestamp = try Date.ISO8601FormatStyle().parse("2026-11-08T00:00:00Z")
+        let documents = [100, 110].map { input in
+            Data("{\"messages\":[{\"id\":\"old\",\"usage\":{\"input_tokens\":\(input),\"output_tokens\":20}}],\"timestamp\":\"2026-11-08T00:00:00Z\"}".utf8)
+        }
+        let history = documents.enumerated().map { index, document in
+            AIUsageSample(sourceID: "gemini-conflict-entry-\(AIUsageLogIdentity.digest(document))-usage-0",
+                provider: .gemini, timestamp: timestamp, inputTokens: index == 0 ? 100 : 110, outputTokens: 20)
+        }
+        try repository.recordDetectedUsage(reverse ? Array(history.reversed()) : history)
+        var value = AIUsageSample(sourceID: "gemini-conflict-usage-v2-old", provider: .gemini,
+            timestamp: timestamp, inputTokens: 150, outputTokens: 20, model: "current",
+            legacySourceID: "gemini-conflict-entry-current-usage-")
+        value.genericContext = .init(document: Data(#"{"messages":[{"id":"old","usage":{"input_tokens":150,"output_tokens":20}}],"timestamp":"2026-11-08T00:00:00Z"}"#.utf8),
+            path: [.key("messages"), .index(0), .key("usage")])
+        #expect(try repository.recordDetectedUsage([value]) == 0)
+        #expect(try repository.loadUsageSamples().first?.totalTokens == 250)
+        #expect(try repository.loadUsageHistory().modelUsageSamples.allSatisfy { $0.model == nil })
+        value.inputTokens += 10
+        #expect(try repository.recordDetectedUsage([value]) == 1)
+        #expect(try repository.loadUsageSamples().first?.totalTokens == 260)
+        #expect(try repository.loadUsageHistory().modelUsageSamples.contains { $0.model == "current" && $0.totalTokens == 10 })
+    }
+
+    @Test
+    func reappearingLegacySourcePreservesItsLedgerWithoutBlockingCurrentRescans() throws {
+        let root = directory()
+        defer { try? FileManager.default.removeItem(at: root) }
+        let repository = AIStateRepository(directoryURL: root)
+        let prefix = "gemini-reappeared-entry-root-usage-"
+        let old = sample(prefix + "0", .gemini, nil, 100, 20)
+        try repository.recordDetectedUsage([old])
+        var current = sample("gemini-reappeared-usage-v2-current", .gemini, "current", 150, 20)
+        current.legacySourceID = prefix
+        #expect(try repository.recordDetectedUsage([current]) == 0)
+        try repository.recordDetectedUsage([old])
+        let before = try repository.loadUsageHistory()
+        #expect(before.usageSamples.first?.totalTokens == 240)
+        #expect(try repository.recordDetectedUsage([current]) == 0)
+        #expect(try repository.loadUsageHistory() == before)
+        current.inputTokens += 10
+        #expect(try repository.recordDetectedUsage([current]) == 1)
+        #expect(try repository.loadUsageSamples().first?.totalTokens == 250)
+        #expect(try repository.loadUsageHistory().modelUsageSamples.contains { $0.model == "current" && $0.totalTokens == 10 })
+        #expect(try repository.recordDetectedUsage([current]) == 0)
+    }
+
+    @Test(arguments: ["seconds", "milliseconds", "iso", "fractional"])
+    func recoveryVerifiesSupportedHistoricalTimestampFormats(format: String) throws {
+        let root = directory()
+        defer { try? FileManager.default.removeItem(at: root) }
+        let repository = AIStateRepository(directoryURL: root)
+        let timestamp = try Date.ISO8601FormatStyle().parse("2026-11-08T00:00:00Z")
+        let date: Any = switch format {
+        case "seconds": timestamp.timeIntervalSince1970
+        case "milliseconds": timestamp.timeIntervalSince1970 * 1_000
+        case "fractional": timestamp.ISO8601Format(.init(includingFractionalSeconds: true))
+        default: timestamp.ISO8601Format()
+        }
+        let oldDocument = try JSONSerialization.data(withJSONObject:
+            ["timestamp": date, "messages": [["id": "old", "usage": ["input_tokens": 100, "output_tokens": 20]]]], options: [.sortedKeys])
+        try repository.recordDetectedUsage([AIUsageSample(
+            sourceID: "gemini-time-entry-\(AIUsageLogIdentity.digest(oldDocument))-usage-0", provider: .gemini,
+            timestamp: timestamp, inputTokens: 100, outputTokens: 20, model: "unreliable-old-model")])
+        var current = AIUsageSample(sourceID: "gemini-time-usage-v2-old", provider: .gemini,
+            timestamp: timestamp.addingTimeInterval(172_800), inputTokens: 150, outputTokens: 20,
+            model: "current", legacySourceID: "gemini-time-entry-current-usage-")
+        current.genericContext = .init(document: Data(#"{"messages":[{"id":"old","model":"current","timestamp":"2026-11-10T00:00:00Z","usage":{"input_tokens":150,"output_tokens":20}}],"timestamp":"2026-11-10T00:00:00Z"}"#.utf8),
+            path: [.key("messages"), .index(0), .key("usage")])
+        #expect(try repository.recordDetectedUsage([current]) == 1)
+        let history = try repository.loadUsageHistory()
+        #expect(history.usageSamples.map(\.totalTokens) == [120, 50])
+        #expect(history.modelUsageSamples.map(\.model) == [nil, "current"])
+        #expect(try repository.recordDetectedUsage([current]) == 0)
+    }
+
+    @Test(arguments: [32, 33])
+    func malformedEvidenceCannotBypassTheCompleteCandidateBudget(candidateCount: Int) throws {
+        let root = directory()
+        defer { try? FileManager.default.removeItem(at: root) }
+        let repository = AIStateRepository(directoryURL: root)
+        let timestamp = try Date.ISO8601FormatStyle().parse("2026-11-08T00:00:00Z")
+        let oldDocument = Data(#"{"id":"old","timestamp":"2026-11-08T00:00:00Z","usage":{"input_tokens":100,"output_tokens":20}}"#.utf8)
+        try repository.recordDetectedUsage([AIUsageSample(sourceID: "gemini-noise-entry-\(AIUsageLogIdentity.digest(oldDocument))-usage-0",
+            provider: .gemini, timestamp: timestamp, inputTokens: 100, outputTokens: 20)])
+        var current = AIUsageSample(sourceID: "gemini-noise-usage-v2-old", provider: .gemini,
+            timestamp: timestamp, inputTokens: 150, outputTokens: 20, model: "current",
+            legacySourceID: "gemini-noise-entry-current-usage-")
+        current.genericContext = .init(document: Data(#"{"id":"old","timestamp":"2026-11-08T00:00:00Z","usage":{"input_tokens":150,"output_tokens":20}}"#.utf8), path: [.key("usage")])
+        let damaged = (1..<candidateCount).map { index -> AIUsageSample in
+            var value = AIUsageSample(sourceID: "gemini-noise-usage-v2-invalid-\(index)", provider: .gemini,
+                timestamp: timestamp, inputTokens: 1, outputTokens: 0, model: "noise", legacySourceID: current.legacySourceID)
+            value.genericContext = .init(document: Data("{truncated-\(index)".utf8), path: [.key("usage")])
+            return value
+        }
+        #expect(try repository.recordDetectedUsage([current] + damaged) == (candidateCount == 32 ? 1 : 0))
+        #expect(try repository.loadUsageSamples().first?.totalTokens == (candidateCount == 32 ? 201 : 120))
+        current.inputTokens += 10
+        #expect(try repository.recordDetectedUsage([current]) == 1)
+        #expect(try repository.loadUsageSamples().first?.totalTokens == (candidateCount == 32 ? 211 : 130))
+    }
+
+    @Test(arguments: [65_536, 65_537])
+    func oversizedEvidenceCannotRecoverHistoryThroughDirectRepositoryInput(byteCount: Int) throws {
+        let root = directory()
+        defer { try? FileManager.default.removeItem(at: root) }
+        let repository = AIStateRepository(directoryURL: root)
+        let timestamp = try Date.ISO8601FormatStyle().parse("2026-11-08T00:00:00Z")
+        var document: [String: Any] = ["id": "old", "timestamp": "2026-11-08T00:00:00Z", "padding": "",
+            "usage": ["input_tokens": 100, "output_tokens": 20]]
+        let empty = try JSONSerialization.data(withJSONObject: document, options: [.sortedKeys])
+        document["padding"] = String(repeating: "p", count: byteCount - empty.count)
+        let oldDocument = try JSONSerialization.data(withJSONObject: document, options: [.sortedKeys])
+        #expect(oldDocument.count == byteCount)
+        try repository.recordDetectedUsage([AIUsageSample(sourceID: "gemini-bytes-entry-\(AIUsageLogIdentity.digest(oldDocument))-usage-0",
+            provider: .gemini, timestamp: timestamp, inputTokens: 100, outputTokens: 20)])
+        document["usage"] = ["input_tokens": 150, "output_tokens": 20]
+        var current = AIUsageSample(sourceID: "gemini-bytes-usage-v2-old", provider: .gemini,
+            timestamp: timestamp, inputTokens: 150, outputTokens: 20, model: "current",
+            legacySourceID: "gemini-bytes-entry-current-usage-")
+        current.genericContext = .init(document: try JSONSerialization.data(withJSONObject: document, options: [.sortedKeys]), path: [.key("usage")])
+        #expect(try repository.recordDetectedUsage([current]) == (byteCount == 65_536 ? 1 : 0))
+        #expect(try repository.loadUsageSamples().first?.totalTokens == (byteCount == 65_536 ? 170 : 120))
+        current.inputTokens += 10
+        #expect(try repository.recordDetectedUsage([current]) == 1)
+        #expect(try repository.loadUsageSamples().first?.totalTokens == (byteCount == 65_536 ? 180 : 130))
     }
 
     @Test
