@@ -91,7 +91,7 @@ struct AutomaticPowerModeSettingsTests {
         #expect(mode.rawValue == expectedValue)
         #expect(mode.menuTitle == expectedTitle)
         let data = try JSONEncoder().encode(mode)
-        #expect(String(decoding: data, as: UTF8.self) == String(expectedValue))
+        #expect(String(bytes: data, encoding: .utf8) == String(expectedValue))
         #expect(try JSONDecoder().decode(BatteryPowerMode.self, from: data) == mode)
     }
 }

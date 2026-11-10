@@ -53,7 +53,11 @@ public final class SystemAutoCleanupService {
             return await trash(selected)
         }
         let emptyTrash = emptyTrash
-        trashCleanup.apply(policy: settings.trashCleanupPolicy) { _ in await emptyTrash() }
+        if settings.trashCleanupPolicy == .never {
+            trashCleanup.discardSchedule()
+        } else {
+            trashCleanup.apply(policy: settings.trashCleanupPolicy) { _ in await emptyTrash() }
+        }
     }
 
     public func stop() {
@@ -90,10 +94,6 @@ final class CleanupSchedule<Outcome: Sendable> {
         self.now = now
         self.lastRunKey = lastRunKey
         self.timerFactory = timerFactory
-    }
-
-    isolated deinit {
-        stop()
     }
 
     func apply(policy: VoiceRecordingCleanupPolicy, operation: @escaping (Date) async -> Outcome?) {
@@ -133,6 +133,11 @@ final class CleanupSchedule<Outcome: Sendable> {
         task = nil
         operation = nil
         policy = .never
+    }
+
+    func discardSchedule() {
+        stop()
+        defaults.removeObject(forKey: lastRunKey)
     }
 
     @discardableResult

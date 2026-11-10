@@ -31,6 +31,10 @@ struct AutomaticPowerModeSettingsTests {
         #expect(rows.contains("AppLocalizedText(mode.menuTitle).tag(mode)"))
         #expect(rows.contains("keyPath: \\.lowBatteryPowerModeEnabled"))
         #expect(rows.contains(".disabled(!settingsStore.settings.systemMonitorEnabled || !settingsStore.settings.automaticPowerModeEnabled)"))
+        let hint = try NSRegularExpression(
+            pattern: #"if !settingsStore.settings.systemMonitorEnabled \|\| !settingsStore.settings.automaticPowerModeEnabled \{\s*AppLocalizedText\("请在“功能”中开启“系统状态与清理”及其下的“自动切换电源模式”"\)"#
+        )
+        #expect(hint.numberOfMatches(in: rows, range: NSRange(rows.startIndex..., in: rows)) == 1)
         #expect(rows.contains("手动更改电源模式后暂停自动切换，下次插电或脱电时恢复"))
         #expect(rows.contains("电量不高于20%时保持省电，插电也不切换；超过20%后恢复对应默认模式"))
         #expect(BatteryPowerMode.allCases.map(\.menuTitle) == ["自动", "省电", "高性能"])
@@ -64,6 +68,7 @@ struct AutomaticPowerModeSettingsTests {
             "自动切换电源模式", "插电默认模式", "脱电默认模式", "20%及以下固定省电",
             "电量不高于20%时保持省电，插电也不切换；超过20%后恢复对应默认模式",
             "手动更改电源模式后暂停自动切换，下次插电或脱电时恢复", "省电", "高性能",
+            "请在“功能”中开启“系统状态与清理”及其下的“自动切换电源模式”",
         ]
         #expect(newKeys.isSubset(of: keys))
         #expect(AppLanguage.allCases.count == 17)
@@ -98,6 +103,11 @@ struct AutomaticPowerModeSettingsTests {
         }
         if language == .arabic {
             #expect(table["自动切换电源模式"] == "تبديل أوضاع الطاقة تلقائيًا")
+        }
+        let hintText = try #require(table["请在“功能”中开启“系统状态与清理”及其下的“自动切换电源模式”"])
+        for key in ["功能", "系统状态与清理", "自动切换电源模式"] {
+            #expect(hintText.contains(AppLocalization.string(key, locale: language.locale)),
+                    "The setup hint must name the actual localized setting: \(key)")
         }
         #expect(AppLanguage.allCases.filter(\.isRightToLeft) == [.arabic])
     }

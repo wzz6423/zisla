@@ -6,7 +6,7 @@ import ZislaCore
 
 struct SystemAutoCleanupLocalizationTests {
     private static let keys = [
-        "自动清理系统垃圾", "按所选间隔移入废纸篓，不会永久删除", "清理范围",
+        "自动清理系统垃圾", "按所选间隔移入废纸篓；清空废纸篓后将永久删除", "清理范围",
     ] + SystemCleanupScope.allCases.map(\.menuTitle) + VoiceRecordingCleanupPolicy.allCases.map(\.menuTitle)
 
     @Test(arguments: AppLanguage.allCases)
@@ -47,6 +47,8 @@ struct SystemAutoCleanupLocalizationTests {
         #expect(rows.contains("AppLocalizedText(policy.menuTitle)"))
         #expect(rows.contains("AppLocalizedText(scope.menuTitle)"))
         #expect(AppLocalization.string("自动清理系统垃圾", language: .english) == "Automatically clean system junk")
+        #expect(AppLocalization.string("按所选间隔移入废纸篓；清空废纸篓后将永久删除", language: .english)
+            == "Move items to the Trash at the selected interval; emptying the Trash permanently deletes them")
         #expect(AppLocalization.string("仅可信", language: .arabic) == "العناصر الموثوقة فقط")
         #expect(AppLocalization.string("全部（包含需人工复核）", language: .traditionalChinese) == "全部（包含需人工複核）")
         #expect(AppLanguage.allCases.filter(\.isRightToLeft) == [.arabic])

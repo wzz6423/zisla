@@ -274,6 +274,12 @@ struct SettingsView: View {
     private var scheduledCleanupContent: some View {
         VStack(alignment: .leading, spacing: 20) {
             settingsGroup("电源模式") {
+                if !settingsStore.settings.systemMonitorEnabled || !settingsStore.settings.automaticPowerModeEnabled {
+                    AppLocalizedText("请在“功能”中开启“系统状态与清理”及其下的“自动切换电源模式”")
+                        .font(.system(size: 11))
+                        .foregroundStyle(.secondary)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                }
                 settingRow(
                     symbol: "powerplug.fill",
                     title: "插电默认模式",
@@ -327,7 +333,7 @@ struct SettingsView: View {
                     settingRow(
                         symbol: "calendar.badge.clock",
                         title: "自动清理系统垃圾",
-                        detail: "按所选间隔移入废纸篓，不会永久删除"
+                        detail: "按所选间隔移入废纸篓；清空废纸篓后将永久删除"
                     ) {
                         Picker(AppLocalization.string("自动清理系统垃圾", locale: locale), selection: Binding(
                             get: { model.settingsStore.settings.systemCleanupPolicy },

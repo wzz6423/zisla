@@ -55,6 +55,11 @@ public final class AutomaticPowerModeService: ObservableObject {
             }
             guard phase != nil else { return }
         }
+        if previous?.enabled == false, configuration.enabled {
+            phase?.blocked = false
+            error = nil
+            persistPhase()
+        }
         guard let snapshot, snapshot.level.isFinite, (0...1).contains(snapshot.level) else {
             request = nil
             pending = false
@@ -66,11 +71,6 @@ public final class AutomaticPowerModeService: ObservableObject {
             updateTask?.cancel()
             phase = Phase(source: source.rawValue, mode: nil, manualPaused: false, blocked: false)
             manualPaused = false
-            error = nil
-            persistPhase()
-        }
-        if previous?.enabled == false, configuration.enabled {
-            phase?.blocked = false
             error = nil
             persistPhase()
         }

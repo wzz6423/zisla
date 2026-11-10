@@ -312,7 +312,7 @@
 "可安全清理的缓存与日志当前为空" = "Caches e logs que podem ser limpos com segurança estão vazios";
 "展开" = "Expandir";
 "移入废纸篓" = "Mover para o Lixo";
-"zisla 不会永久删除这些内容。" = "zisla não excluirá permanentemente esses itens.";
+"本次操作将项目移入废纸篓；废纸篓之后可能被清空，届时将永久删除。" = "Esta ação move os itens para o Lixo. Se ele for esvaziado depois, os itens serão excluídos permanentemente.";
 
 /* Cleanup Categories */
 "应用缓存" = "Cache de Apps";
@@ -2321,7 +2321,7 @@
 "%ld 核" = "%ld núcleos";
 "%ld 核 · " = "%ld núcleos · ";
 "已整理系统内存 %@" = "%@ de memória do sistema compactados";
-"其中 %ld 项需人工复核。zisla 不会永久删除这些内容。" = "%ld deles precisam de revisão manual. O zisla nunca exclui nada permanentemente.";
+"其中 %ld 项需人工复核。本次操作将项目移入废纸篓；废纸篓之后可能被清空，届时将永久删除。" = "%ld deles precisam de revisão manual. Esta ação move os itens para o Lixo. Se ele for esvaziado depois, os itens serão excluídos permanentemente.";
 "取消选择%@" = "Desmarcar %@";
 "全选%@" = "Selecionar tudo em %@";
 "反选%@" = "Inverter a seleção em %@";
@@ -3337,7 +3337,7 @@
 "麦克风监听已关闭：%@" = "O monitoramento do microfone foi desativado: %@";
 
 "自动清理系统垃圾" = "Limpar automaticamente arquivos desnecessários do sistema";
-"按所选间隔移入废纸篓，不会永久删除" = "Mover itens para o Lixo no intervalo escolhido, sem excluir permanentemente";
+"按所选间隔移入废纸篓；清空废纸篓后将永久删除" = "Move os itens para o Lixo no intervalo escolhido; esvaziar o Lixo os exclui permanentemente";
 "清理范围" = "Itens a limpar";
 "仅可信" = "Somente itens confiáveis";
 "全部（包含需人工复核）" = "Todos (incluindo os que precisam de revisão)";
@@ -3368,3 +3368,5 @@
 "手动更改电源模式后暂停自动切换，下次插电或脱电时恢复" = "Alterar o modo de energia manualmente pausa a alternância automática até a próxima conexão ou desconexão da tomada";
 "省电" = "Economia de energia";
 "高性能" = "Alto desempenho";
+
+"请在“功能”中开启“系统状态与清理”及其下的“自动切换电源模式”" = "Em Recursos, ative Monitor e Limpeza do Sistema e, logo abaixo, Alternar modos de energia automaticamente";

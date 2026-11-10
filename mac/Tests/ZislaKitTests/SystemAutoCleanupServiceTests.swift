@@ -130,18 +130,26 @@ struct SystemAutoCleanupServiceTests {
     }
 
     @Test
-    func deinitializationReleasesTheTimer() throws {
+    func deinitializationReleasesBothTimersAndPreservesTheirSchedules() throws {
         let fixture = try SystemAutoCleanupFixture()
         var service: SystemAutoCleanupService? = fixture.makeService()
         weak let reference = service
-        service?.apply(settings: FeatureSettings(systemCleanupPolicy: .sevenDays))
-        let timer = try #require(fixture.timers.first)
+        weak let trashReference = service?.trashCleanup
+        service?.apply(settings: FeatureSettings(systemCleanupPolicy: .sevenDays, trashCleanupPolicy: .fifteenDays))
+        #expect(fixture.timers.count == 2)
         service = nil
         #expect(reference == nil)
-        #expect(!timer.isValid)
-        fixture.date = timer.fireDate
-        fixture.callbacks[0](timer)
+        #expect(trashReference == nil)
+        #expect(fixture.timers.allSatisfy { !$0.isValid })
+        #expect(fixture.defaults.object(forKey: "system-cleanup-last-run-v1") as? Date == fixture.date)
+        #expect(fixture.defaults.object(forKey: "trash-cleanup-last-run-v1") as? Date == fixture.date)
+        for (timer, callback) in zip(fixture.timers, fixture.callbacks) {
+            fixture.date = timer.fireDate
+            callback(timer)
+        }
+        #expect(fixture.options == nil)
         #expect(fixture.moved.isEmpty)
+        #expect(fixture.emptiedCount == 0)
     }
 
     @Test
@@ -174,6 +182,8 @@ struct SystemAutoCleanupServiceTests {
         } else {
             service?.stop()
         }
+        #expect(task.isCancelled)
+        #expect(fixture.timers.allSatisfy { !$0.isValid })
         #expect(await task.value == nil)
         #expect(fixture.options == nil)
         #expect(fixture.moved.isEmpty)
@@ -359,15 +369,18 @@ struct SystemAutoCleanupServiceTests {
         #expect(fixture.emptiedCount == 0)
     }
 
-    @Test(arguments: [false, true])
-    func savedTrashScheduleSurvivesRelaunchAndOverdueWorkRunsOnlyOnce(overdue: Bool) async throws {
+    @Test(arguments: [false, true], [false, true])
+    func savedTrashScheduleSurvivesRelaunchAndOverdueWorkRunsOnlyOnce(overdue: Bool, stopBeforeRelaunch: Bool) async throws {
         let fixture = try SystemAutoCleanupFixture()
-        var service = fixture.makeService()
-        service.apply(settings: FeatureSettings(trashCleanupPolicy: .sevenDays))
+        var original: SystemAutoCleanupService? = fixture.makeService()
+        original?.apply(settings: FeatureSettings(trashCleanupPolicy: .sevenDays))
         let deadline = try #require(fixture.timers.first).fireDate
-        service.stop()
+        if stopBeforeRelaunch { original?.stop() }
+        original = nil
+        #expect(fixture.timers.allSatisfy { !$0.isValid })
+        #expect(fixture.defaults.object(forKey: "trash-cleanup-last-run-v1") as? Date == fixture.date)
         fixture.date.addTimeInterval(overdue ? 90 * 86_400 : 3 * 86_400)
-        service = fixture.makeService()
+        let service = fixture.makeService()
         defer { service.stop() }
         service.apply(settings: FeatureSettings(trashCleanupPolicy: .sevenDays))
         let timer = try #require(fixture.timers.last)
@@ -439,31 +452,77 @@ struct SystemAutoCleanupServiceTests {
         #expect(!replacement.isValid)
         #expect(systemTimer.isValid)
         #expect(service.trashCleanup.runIfDue() == nil)
+        #expect(fixture.defaults.object(forKey: "trash-cleanup-last-run-v1") == nil)
         #expect(fixture.defaults.object(forKey: "system-cleanup-last-run-v1") as? Date
             == Date(timeIntervalSince1970: 1_800_000_000))
     }
 
-    @Test(arguments: [false, true])
-    func disablingAndReenablingTrashCleanupPreservesItsSavedDeadline(overdue: Bool) async throws {
+    @Test(arguments: [false, true], [false, true])
+    func disablingAndReenablingTrashCleanupStartsACompleteNewInterval(overdue: Bool, relaunch: Bool) async throws {
         let fixture = try SystemAutoCleanupFixture()
-        let service = fixture.makeService()
+        var service = fixture.makeService()
         defer { service.stop() }
+        let interval = TimeInterval(7 * 86_400)
         var settings = FeatureSettings(trashCleanupPolicy: .sevenDays)
         service.apply(settings: settings)
-        let deadline = try #require(fixture.timers.first).fireDate
+        let original = try #require(fixture.timers.first)
+        fixture.date.addTimeInterval(86_400)
         settings.trashCleanupPolicy = .never
         service.apply(settings: settings)
+        #expect(!original.isValid)
+        #expect(fixture.defaults.object(forKey: "trash-cleanup-last-run-v1") == nil)
+        #expect(service.trashCleanup.runIfDue() == nil)
         fixture.date.addTimeInterval(overdue ? 8 * 86_400 : 3 * 86_400)
+        if relaunch {
+            service.stop()
+            service = fixture.makeService()
+        }
+        service.apply(settings: settings)
+        #expect(fixture.timers.count == 1)
+        #expect(fixture.defaults.object(forKey: "trash-cleanup-last-run-v1") == nil)
         settings.trashCleanupPolicy = .sevenDays
         service.apply(settings: settings)
-        #expect(fixture.timers.last?.fireDate == deadline)
-        if overdue {
-            #expect(await (try #require(service.trashCleanup.runIfDue())).value != nil)
-            #expect(fixture.emptiedCount == 1)
-        } else {
-            #expect(service.trashCleanup.runIfDue() == nil)
-            #expect(fixture.emptiedCount == 0)
-        }
+        let timer = try #require(fixture.timers.last)
+        #expect(timer.fireDate == fixture.date.addingTimeInterval(interval))
+        #expect(timer.fireDate != original.fireDate)
+        #expect(fixture.defaults.object(forKey: "trash-cleanup-last-run-v1") as? Date == fixture.date)
+        #expect(service.trashCleanup.runIfDue() == nil)
+        #expect(fixture.emptiedCount == 0)
+        fixture.date.addTimeInterval(interval - 0.001)
+        #expect(service.trashCleanup.runIfDue() == nil)
+        fixture.date.addTimeInterval(0.001)
+        #expect(await (try #require(service.trashCleanup.runIfDue())).value != nil)
+        #expect(fixture.emptiedCount == 1)
+        #expect(timer.fireDate == fixture.date.addingTimeInterval(interval))
+    }
+
+    @Test
+    func launchingWithTrashCleanupDisabledDiscardsItsSavedScheduleAndKeepsSystemCleanup() throws {
+        let fixture = try SystemAutoCleanupFixture()
+        let saved = fixture.date.addingTimeInterval(-15 * 86_400)
+        fixture.defaults.set(saved, forKey: "system-cleanup-last-run-v1")
+        fixture.defaults.set(saved, forKey: "trash-cleanup-last-run-v1")
+        let service = fixture.makeService()
+        defer { service.stop() }
+        var settings = FeatureSettings(systemCleanupPolicy: .thirtyDays)
+        service.apply(settings: settings)
+        let systemTimer = try #require(fixture.timers.first)
+        #expect(fixture.timers.count == 1)
+        #expect(systemTimer.fireDate == saved.addingTimeInterval(30 * 86_400))
+        #expect(fixture.defaults.object(forKey: "system-cleanup-last-run-v1") as? Date == saved)
+        #expect(fixture.defaults.object(forKey: "trash-cleanup-last-run-v1") == nil)
+        #expect(service.trashCleanup.runIfDue() == nil)
+        fixture.date.addTimeInterval(2 * 86_400)
+        settings.trashCleanupPolicy = .sevenDays
+        service.apply(settings: settings)
+        #expect(fixture.timers.count == 2)
+        #expect(systemTimer.isValid)
+        #expect(systemTimer.fireDate == saved.addingTimeInterval(30 * 86_400))
+        #expect(fixture.timers.last?.fireDate == fixture.date.addingTimeInterval(7 * 86_400))
+        #expect(fixture.defaults.object(forKey: "system-cleanup-last-run-v1") as? Date == saved)
+        #expect(fixture.defaults.object(forKey: "trash-cleanup-last-run-v1") as? Date == fixture.date)
+        #expect(service.trashCleanup.runIfDue() == nil)
+        #expect(fixture.emptiedCount == 0)
     }
 
     @Test(arguments: [false, true])
@@ -476,6 +535,11 @@ struct SystemAutoCleanupServiceTests {
         let task = try #require(service?.trashCleanup.runIfDue())
         if releaseService { service = nil } else { service?.stop() }
         #expect(fixture.timers.allSatisfy { !$0.isValid })
+        #expect(task.isCancelled)
+        #expect(fixture.defaults.object(forKey: "system-cleanup-last-run-v1") as? Date
+            == Date(timeIntervalSince1970: 1_800_000_000))
+        #expect(fixture.defaults.object(forKey: "trash-cleanup-last-run-v1") as? Date
+            == Date(timeIntervalSince1970: 1_800_000_000))
         #expect(await task.value == nil)
         #expect(fixture.emptiedCount == 0)
         if releaseService { #expect(reference == nil) }
@@ -492,7 +556,7 @@ struct SystemAutoCleanupServiceTests {
             return .success(())
         })
         defer { service.stop() }
-        var settings = FeatureSettings(trashCleanupPolicy: .sevenDays)
+        var settings = FeatureSettings(systemCleanupPolicy: .thirtyDays, trashCleanupPolicy: .sevenDays)
         service.apply(settings: settings)
         fixture.date.addTimeInterval(15 * 86_400)
         let original = try #require(service.trashCleanup.runIfDue())
@@ -509,7 +573,13 @@ struct SystemAutoCleanupServiceTests {
         if replacement != nil { await gate.waitUntilScanning(2) }
         await gate.releaseOne()
         #expect(await original.value == nil)
-        #expect(fixture.defaults.object(forKey: "trash-cleanup-last-run-v1") as? Date
+        if change == "never" {
+            #expect(fixture.defaults.object(forKey: "trash-cleanup-last-run-v1") == nil)
+        } else {
+            #expect(fixture.defaults.object(forKey: "trash-cleanup-last-run-v1") as? Date
+                == Date(timeIntervalSince1970: 1_800_000_000))
+        }
+        #expect(fixture.defaults.object(forKey: "system-cleanup-last-run-v1") as? Date
             == Date(timeIntervalSince1970: 1_800_000_000))
         if let replacement {
             #expect(service.trashCleanup.task != nil)

@@ -266,6 +266,43 @@ struct AutomaticPowerModeServiceTests {
         #expect(fixture.batteryMode == .lowPower)
     }
 
+    @Test(arguments: [nil, Double.nan, Double.infinity, -0.1, 1.1] as [Double?])
+    func reenablingWithoutAValidSnapshotClearsTheFailureBeforeTheNextBatteryEvent(level: Double?) async throws {
+        let fixture = try PowerFixture()
+        fixture.changeStatus = -60005
+        var service = fixture.service()
+        var settings = FeatureSettings(automaticPowerModeEnabled: true, powerAdapterDefaultMode: .highPower)
+        service.apply(settings: settings, snapshot: fixture.snapshot())
+        await fixture.drain(service)
+        #expect(service.error == .authorizationDenied)
+        settings.automaticPowerModeEnabled = false
+        service.apply(settings: settings, snapshot: fixture.snapshot())
+        fixture.changeStatus = 0
+        let requestCount = fixture.requests.count
+        settings.automaticPowerModeEnabled = true
+        let unavailableSnapshot = level.map { level in
+            var snapshot = fixture.snapshot()
+            snapshot.level = level
+            return snapshot
+        }
+        service.apply(settings: settings, snapshot: unavailableSnapshot)
+        await fixture.drain(service)
+        #expect(service.error == nil)
+        #expect(fixture.requests.count == requestCount)
+        let data = try #require(fixture.defaults.data(forKey: "automatic-power-mode-phase-v1"))
+        let persisted = try #require(JSONSerialization.jsonObject(with: data) as? [String: Any])
+        #expect(persisted["blocked"] as? Bool == false)
+        service.stop()
+        service = fixture.service()
+        defer { service.stop() }
+        service.apply(settings: settings, snapshot: fixture.snapshot())
+        await fixture.drain(service)
+        #expect(fixture.currentMode == .highPower)
+        #expect(fixture.changes.count == 2)
+        #expect(!service.manualPaused)
+        #expect(service.error == nil)
+    }
+
     @Test(arguments: ["none", "unsupported", "read", "timeout", "source"])
     func missingCapabilitiesOrReadFailureNeverRequestAuthorization(failure: String) async throws {
         let fixture = try PowerFixture()
