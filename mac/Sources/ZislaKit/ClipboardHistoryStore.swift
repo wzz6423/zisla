@@ -27,6 +27,13 @@ public final class ClipboardHistoryStore: ObservableObject {
     private var scope: ClipboardHistoryScope = .all
     private var searchText = ""
     private var category: FileShelfCategory = .all
+    private var displayedQuery: (
+        scope: ClipboardHistoryScope,
+        searchText: String,
+        category: FileShelfCategory,
+        page: Int,
+        isHistoryExpanded: Bool
+    ) = (.all, "", .all, 0, false)
     private var loadTask: Task<Void, Never>?
     private var loadGeneration = 0
     private var persistenceTask: Task<Void, Never>?
@@ -113,6 +120,10 @@ public final class ClipboardHistoryStore: ObservableObject {
             && category == .all
     }
 
+    public var currentQuery: (scope: ClipboardHistoryScope, searchText: String, category: FileShelfCategory) {
+        (scope, searchText, category)
+    }
+
     public func waitUntilLoaded() async {
         while true {
             let generation = loadGeneration
@@ -124,7 +135,8 @@ public final class ClipboardHistoryStore: ObservableObject {
 
     public func updateQuery(scope: ClipboardHistoryScope, searchText: String, category: FileShelfCategory = .all) {
         let normalizedSearch = searchText.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard self.scope != scope || self.searchText != normalizedSearch || self.category != category else { return }
+        guard self.scope != scope || self.searchText != normalizedSearch || self.category != category
+            || !pendingMutations.isEmpty else { return }
         if scope == .history || !normalizedSearch.isEmpty || category != .all {
             isHistoryExpanded = true
         }
@@ -159,7 +171,7 @@ public final class ClipboardHistoryStore: ObservableObject {
     }
 
     public func loadFullHistory() {
-        guard isShowingHistoryPreview else { return }
+        guard isShowingHistoryPreview, errorDescription == nil || pendingMutations.isEmpty else { return }
         isHistoryExpanded = true
         currentPage = 0
         reload()
@@ -191,7 +203,7 @@ public final class ClipboardHistoryStore: ObservableObject {
             item = ClipboardHistoryItem(content: content, lastCopiedAt: now, isPinned: pinned)
         }
 
-        if currentPage == 0, matchesCurrentQuery(item) {
+        if displayedQuery.page == 0, matchesDisplayedQuery(item) {
             items.append(item)
             normalizeOrder()
             trimHistoryToCapacity()
@@ -207,7 +219,7 @@ public final class ClipboardHistoryStore: ObservableObject {
         items[index].isPinned = isPinned
         items[index].lastCopiedAt = persistenceCompatibleDate()
         let item = items[index]
-        if matchesCurrentQuery(item) {
+        if matchesDisplayedQuery(item) {
             normalizeOrder()
             trimHistoryToCapacity()
         } else {
@@ -226,7 +238,7 @@ public final class ClipboardHistoryStore: ObservableObject {
     public func removeAllHistory() {
         let previousCount = items.count
         items.removeAll { !$0.isPinned }
-        if scope == .history {
+        if displayedQuery.scope == .history {
             totalItemCount = 0
         } else {
             totalItemCount = max(0, totalItemCount - (previousCount - items.count))
@@ -269,9 +281,17 @@ public final class ClipboardHistoryStore: ObservableObject {
 
         loadTask = Task { [weak self] in
             await persistenceTask?.value
-            if let self, !self.pendingMutations.isEmpty {
-                self.isLoading = false
-                return
+            if let self {
+                guard !Task.isCancelled, loadGeneration == generation else { return }
+                if !pendingMutations.isEmpty {
+                    scope = displayedQuery.scope
+                    searchText = displayedQuery.searchText
+                    category = displayedQuery.category
+                    currentPage = displayedQuery.page
+                    isHistoryExpanded = displayedQuery.isHistoryExpanded
+                    isLoading = false
+                    return
+                }
             }
             do {
                 var page: ClipboardHistoryPage
@@ -315,6 +335,7 @@ public final class ClipboardHistoryStore: ObservableObject {
                     reload()
                     return
                 }
+                displayedQuery = (requestedScope, requestedSearch, requestedCategory, requestedPage, isHistoryExpanded)
                 items = cleanedItems(page.items).items
                 totalItemCount = page.totalCount
                 categoryCounts = page.categoryCounts
@@ -382,8 +403,8 @@ public final class ClipboardHistoryStore: ObservableObject {
         return updated
     }
 
-    private func matchesCurrentQuery(_ item: ClipboardHistoryItem) -> Bool {
-        switch scope {
+    private func matchesDisplayedQuery(_ item: ClipboardHistoryItem) -> Bool {
+        switch displayedQuery.scope {
         case .all:
             break
         case .pinned where !item.isPinned:
@@ -393,9 +414,9 @@ public final class ClipboardHistoryStore: ObservableObject {
         default:
             break
         }
-        guard category == .all || item.category == category else { return false }
-        return searchText.isEmpty
-            || item.content.previewText.localizedCaseInsensitiveContains(searchText)
+        guard displayedQuery.category == .all || item.category == displayedQuery.category else { return false }
+        return displayedQuery.searchText.isEmpty
+            || item.content.previewText.localizedCaseInsensitiveContains(displayedQuery.searchText)
     }
 
     private func normalizeOrder() {

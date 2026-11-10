@@ -9,7 +9,7 @@ import UniformTypeIdentifiers
 /// - `all`: everything (pinned + history); the default view, equivalent to showing both sections simultaneously.
 /// - `pinned`: favorites (pinned/starred items).
 /// - `history`: non-favorites (regular history items).
-private enum ClipboardFilter: String, CaseIterable, Identifiable {
+enum ClipboardFilter: String, CaseIterable, Identifiable {
     case all
     case pinned
     case history
@@ -269,16 +269,49 @@ struct ClipboardHistoryModuleView: View {
             }
         }
         .task(id: queryID) {
-            if !searchText.isEmpty {
-                try? await Task.sleep(for: .milliseconds(200))
-            }
-            guard !Task.isCancelled else { return }
-            store.updateQuery(scope: filter.scope, searchText: searchText, category: categoryFilter)
+            await Self.updateQuery(store: store, filter: $filter, categoryFilter: $categoryFilter, searchText: $searchText)
         }
         .onAppear { pageInput = displayedPageNumber }
         .onChange(of: store.currentPage) { _, _ in
             pageInput = displayedPageNumber
         }
+    }
+
+    static func updateQuery(
+        store: ClipboardHistoryStore,
+        filter: Binding<ClipboardFilter>,
+        categoryFilter: Binding<FileShelfCategory>,
+        searchText: Binding<String>
+    ) async {
+        let requestedFilter = filter.wrappedValue
+        let requestedCategory = categoryFilter.wrappedValue
+        let requestedSearch = searchText.wrappedValue
+        if !requestedSearch.isEmpty {
+            try? await Task.sleep(for: .milliseconds(200))
+        }
+        guard !Task.isCancelled, filter.wrappedValue == requestedFilter,
+              categoryFilter.wrappedValue == requestedCategory, searchText.wrappedValue == requestedSearch else { return }
+        let normalizedSearch = requestedSearch.trimmingCharacters(in: .whitespacesAndNewlines)
+        let current = store.currentQuery
+        if current.scope != requestedFilter.scope || current.category != requestedCategory
+            || current.searchText != normalizedSearch {
+            store.updateQuery(scope: requestedFilter.scope, searchText: requestedSearch, category: requestedCategory)
+        } else if !store.isLoading {
+            return
+        }
+        await store.waitUntilLoaded()
+        guard !Task.isCancelled, filter.wrappedValue == requestedFilter,
+              categoryFilter.wrappedValue == requestedCategory, searchText.wrappedValue == requestedSearch else { return }
+        let loaded = store.currentQuery
+        guard loaded.scope != requestedFilter.scope || loaded.category != requestedCategory
+            || loaded.searchText != normalizedSearch else { return }
+        switch loaded.scope {
+        case .all: filter.wrappedValue = .all
+        case .pinned: filter.wrappedValue = .pinned
+        case .history: filter.wrappedValue = .history
+        }
+        categoryFilter.wrappedValue = loaded.category
+        searchText.wrappedValue = loaded.searchText
     }
 
     @ViewBuilder
