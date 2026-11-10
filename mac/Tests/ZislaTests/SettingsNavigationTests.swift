@@ -223,7 +223,7 @@ struct SettingsNavigationTests {
     }
 
     @Test
-    func infoVisibilityIncludesMediaAndSystemMonitor() {
+    func infoKeepsModuleOrderVisibleWhenMediaAndSystemMonitorAreOff() {
         var settings = FeatureSettings(
             mediaEnabled: false,
             systemMonitorEnabled: false,
@@ -233,7 +233,7 @@ struct SettingsNavigationTests {
             sideNoticesEnabled: false,
             userCareEnabled: false
         )
-        #expect(!SettingsSection.info.isVisible(settings: settings))
+        #expect(SettingsSection.info.isVisible(settings: settings))
 
         settings.mediaEnabled = true
         #expect(SettingsSection.info.isVisible(settings: settings))
@@ -260,15 +260,15 @@ struct SettingsNavigationTests {
             userCareEnabled: otherInfoFeaturesEnabled
         )
         #expect(!mailSection.isVisible(settings: settings))
-        #expect(SettingsSection.info.isVisible(settings: settings) == otherInfoFeaturesEnabled)
+        #expect(SettingsSection.info.isVisible(settings: settings))
 
         settings.mailEnabled = true
         #expect(mailSection.isVisible(settings: settings))
-        #expect(SettingsSection.info.isVisible(settings: settings) == otherInfoFeaturesEnabled)
+        #expect(SettingsSection.info.isVisible(settings: settings))
 
         settings.mailEnabled = false
         #expect(!mailSection.isVisible(settings: settings))
-        #expect(SettingsSection.info.isVisible(settings: settings) == otherInfoFeaturesEnabled)
+        #expect(SettingsSection.info.isVisible(settings: settings))
     }
 
     @Test
@@ -389,6 +389,7 @@ struct SettingsNavigationTests {
     func groupedSettingsAndPDFLabelsUseEveryRequestedLanguage(language: AppLanguage) throws {
         let keys = Set(SettingsSectionGroup.allCases.map(\.title) + [
             "反馈更新",
+            "灵动岛功能顺序",
             SettingsSection.pdfTools.title,
             SettingsSection.pdfTools.subtitle,
             "仅影响 zisla 的窗口与面板，不会更改 macOS 外观。",
@@ -417,6 +418,7 @@ struct SettingsNavigationTests {
             }
         }
         if language == .english {
+            #expect(table["灵动岛功能顺序"] == "Dynamic Island Feature Order")
             #expect(table["截图与录屏"] == "Screenshots & Recording")
             #expect(table["推荐与反馈更新"] == "Recommendations, Feedback & Updates")
             #expect(table["反馈更新"] == "Feedback & Updates")
@@ -437,7 +439,7 @@ struct SettingsNavigationTests {
     }
 
     @Test
-    func infoVisibilityRetainsLockScreenAndSideNoticesButExcludesMail() {
+    func infoKeepsModuleOrderVisibleWhenLockScreenAndSideNoticesAreOff() {
         var settings = FeatureSettings(
             mediaEnabled: false,
             systemMonitorEnabled: false,
@@ -447,10 +449,10 @@ struct SettingsNavigationTests {
             sideNoticesEnabled: false,
             userCareEnabled: false
         )
-        #expect(!SettingsSection.info.isVisible(settings: settings))
+        #expect(SettingsSection.info.isVisible(settings: settings))
 
         settings.mailEnabled = true
-        #expect(!SettingsSection.info.isVisible(settings: settings))
+        #expect(SettingsSection.info.isVisible(settings: settings))
 
         settings.mailEnabled = false
         settings.lockScreenInfoEnabled = true
