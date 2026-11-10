@@ -313,6 +313,7 @@ public enum ClipboardAssistantActionKind: String, Codable, CaseIterable, Sendabl
 }
 
 public enum ClipboardAssistantActionOrder {
+    /// Provider lookups share the openURL kind; ordinary search needs its own entry to remain selectable.
     public static func defaults(for kind: ClipboardAssistantKind) -> [ClipboardAssistantActionKind] {
         switch kind {
         case .url: [.openURL, .openDownload, .addToQuickNote, .share]

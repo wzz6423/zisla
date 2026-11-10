@@ -92,6 +92,7 @@ extension ClipboardAssistantDetector {
     ]
     private static let flightIATAPrefixes = Dictionary(uniqueKeysWithValues: flightAwarePrefixes.map { ($0.value, $0.key) })
 
+    /// FlightAware needs an ICAO mapping; unmapped carriers must retain a single fallback search.
     private static func flightDetection(_ text: String, countryCode: String?) -> ClipboardAssistantDetection? {
         let labelled = ClipboardAssistantIdentifierPatterns.splitLabel(text, pattern: ClipboardAssistantIdentifierPatterns.flightLabel)
         guard let match = smartMatch(#"(?i)^([A-Z]{3}|[A-Z][A-Z0-9]|[0-9][A-Z])(\h*)(\p{Nd}{1,4})(?:便)?$"#, labelled.value) else { return nil }
@@ -127,6 +128,7 @@ extension ClipboardAssistantDetector {
         return ClipboardAssistantDetection(kind: .flight, title: number, actions: actions)
     }
 
+    /// Keeps existing provider-specific search terms to avoid adding duplicate ordinary searches.
     private static func trainDetection(_ text: String, countryCode: String?, now: Date) -> ClipboardAssistantDetection? {
         let labelled = ClipboardAssistantIdentifierPatterns.splitLabel(text, pattern: ClipboardAssistantIdentifierPatterns.trainLabel)
         let value = labelled.value.replacingOccurrences(of: #"\h+"#, with: " ", options: .regularExpression)
@@ -201,6 +203,7 @@ extension ClipboardAssistantDetector {
         )
     }
 
+    /// Carrier matching must not remove ordinary search or alter the original digits used for copying.
     static func trackingDetection(
         _ text: String, countryCode: String?, allowUnlabelledNumber: Bool = false
     ) -> ClipboardAssistantDetection? {

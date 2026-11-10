@@ -130,6 +130,7 @@ struct ClipboardAssistantNumericActionsTests {
         #expect(detection?.actions.contains { if case .openService = $0 { return true }; return false } != true)
     }
 
+    /// Newly available actions must follow saved choices so existing primary actions survive a store restart.
     @Test(arguments: [ClipboardAssistantActionKind.copyText, .addToQuickNote, .share])
     @MainActor
     func existingActionPreferenceSurvivesStoreReopen(_ primary: ClipboardAssistantActionKind) throws {

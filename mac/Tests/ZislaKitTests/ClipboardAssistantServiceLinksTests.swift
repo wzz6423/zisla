@@ -37,6 +37,7 @@ struct ClipboardAssistantServiceLinksTests {
         #expect(query(searchURL, "q") == search)
     }
 
+    /// Unmapped flights need one fallback search while still allowing an available Umetrip lookup to lead.
     @Test func flightsWithoutAnICAOMappingRetainASingleSearchAction() throws {
         for (text, country, number) in [("LA1234", "BR", "LA1234"), ("Flight ZZ123", "US", "ZZ123"),
                                         ("航班 ZZ123", "CN", "ZZ123")] {

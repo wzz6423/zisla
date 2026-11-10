@@ -10,6 +10,7 @@ struct ClipboardAssistantLookupSettingsTests {
         #expect(FeatureSettings.default.clipboardAssistantActionOrders[kind] == expected)
     }
 
+    /// A later search-first choice matches the former default, so only its persisted marker prevents remigration.
     @Test(arguments: [ClipboardAssistantKind.flight, .train])
     func formerSearchDefaultMigratesOnceAndLaterSearchChoicesSurviveRestart(_ kind: ClipboardAssistantKind) throws {
         let previousDefault: [ClipboardAssistantActionKind] = [.search, .openURL, .copyText, .addToQuickNote, .share]

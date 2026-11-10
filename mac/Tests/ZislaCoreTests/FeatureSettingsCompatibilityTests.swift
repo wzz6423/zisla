@@ -330,6 +330,7 @@ struct FeatureSettingsCompatibilityTests {
         ])
     }
 
+    /// Older payloads omit search; normalization must append it without replacing the first custom action.
     @Test(arguments: [ClipboardAssistantKind.flight, .train])
     func lookupActionPrioritiesSurviveUpgradeAndSettingsRoundTrip(_ kind: ClipboardAssistantKind) throws {
         let oldDefault: [ClipboardAssistantActionKind] = [.openURL, .copyText, .addToQuickNote, .share]

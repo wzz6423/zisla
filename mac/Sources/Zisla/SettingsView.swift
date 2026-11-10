@@ -3697,6 +3697,7 @@ struct SettingsView: View {
             ClipboardAssistantActionOrder.defaults(for: kind)
     }
 
+    /// Distinguishes provider lookups from web links without changing persisted action identities.
     static func clipboardAssistantActionTitle(
         _ action: ClipboardAssistantActionKind, for kind: ClipboardAssistantKind
     ) -> String {

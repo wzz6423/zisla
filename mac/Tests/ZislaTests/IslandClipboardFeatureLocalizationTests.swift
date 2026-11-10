@@ -5,6 +5,7 @@ import ZislaCore
 @testable import Zisla
 
 struct IslandClipboardFeatureLocalizationTests {
+    /// Catalog presence needs an assertion because missing translations silently fall back to the source key.
     @Test
     func everyLanguageContainsTheNewRuntimeLabels() throws {
         let interfaceKeys = [
@@ -67,6 +68,7 @@ struct IslandClipboardFeatureLocalizationTests {
         #expect(AppLocalization.string(key, language: .arabic) == "الاستعلام عن معلومات IP")
     }
 
+    /// Checks runtime results because source order is not part of the localized-label contract.
     @Test(arguments: AppLanguage.allCases) @MainActor
     func specializedLookupLabelsUseTheRequestedLocale(language: AppLanguage) throws {
         let translations: [AppLanguage: [String]] = [
@@ -92,12 +94,6 @@ struct IslandClipboardFeatureLocalizationTests {
         let kinds: [ClipboardAssistantKind] = [.flight, .train, .tracking]
         let keys = kinds.map { SettingsView.clipboardAssistantActionTitle(.openURL, for: $0) }
         #expect(keys == ["查询航班", "查询火车", "查询快递"])
-        let source = try String(contentsOf: packageRoot.appendingPathComponent("Sources/Zisla/SettingsView.swift"), encoding: .utf8)
-        let pattern = try NSRegularExpression(pattern: #"case \.(?:flight|train|tracking): \"(查询[^\"]+)\""#)
-        let runtimeKeys = pattern.matches(in: source, range: NSRange(source.startIndex..., in: source)).map {
-            String(source[Range($0.range(at: 1), in: source)!])
-        }
-        #expect(runtimeKeys == keys)
         let tableURL = packageRoot.appendingPathComponent(
             "Resources/Localization/\(language.rawValue).lproj/Localizable.strings"
         )
