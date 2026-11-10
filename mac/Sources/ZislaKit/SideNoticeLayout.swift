@@ -648,7 +648,7 @@ public struct SideNoticeLayoutEngine: Equatable, Sendable {
         let selectedStatusSupportsProgressGlow = switch selectedPriority {
         case .media:
             notices.contains { $0.id.hasPrefix("media-active-") }
-        case .browserDownload, .videoDownload:
+        case .browserDownload, .videoDownload, .focusCountdown:
             true
         default:
             false
@@ -671,8 +671,12 @@ public struct SideNoticeLayoutEngine: Equatable, Sendable {
             compactWingWidth,
             displaysHeadphone ? Layout.defaultCompactWingHeight + 2 : 0,
             presentation?.length(thickness: thickness, edge: settings.islandPlacement.edge) ?? thickness,
-            displaysHeadphone && settings.islandLayoutStyle == .pill && settings.islandPlacement.mode == .camera
-                ? displayedTransientNotice.map { CompactHeadphoneConnectionLayout(notice: $0).sideWidth } : nil,
+            settings.islandLayoutStyle == .pill && settings.islandPlacement.mode == .camera
+                ? selectedPriority == .focusCountdown
+                    ? Layout.compactWingWidth + Layout.compactBarSideExtension
+                    : displaysHeadphone
+                        ? displayedTransientNotice.map { CompactHeadphoneConnectionLayout(notice: $0).sideWidth } : nil
+                : nil,
             presentation
         )
     }

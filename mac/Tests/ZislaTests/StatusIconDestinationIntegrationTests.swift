@@ -7,6 +7,72 @@ import ZislaCore
 @testable import Zisla
 
 struct StatusIconDestinationIntegrationTests {
+    @Test(arguments: IslandEdge.allCases, [false, true]) @MainActor
+    func pomodoroProgressRendersInCustomPillsAndInformationRows(edge: IslandEdge, moreInformation: Bool) async throws {
+        let fixture = try IconFixture(edge: edge)
+        defer { fixture.close() }
+        fixture.settings.settings.sideNoticesEnabled = true
+        fixture.settings.settings.islandAppIconEnabled = false
+        fixture.settings.settings.islandShowMoreInformation = moreInformation
+        let date = Date(timeIntervalSince1970: 100)
+        let notice = IslandNotice(id: "focus-countdown-progress", title: "Focus", detail: "00:12:30", progress: 0.5)
+        fixture.queue.enqueue(notice, expiresAfter: nil)
+        let icons = moreInformation ? [IslandStatusIcon(id: "cpu", content: .metric(.cpu, text: "31%",
+            image: nil, style: .detailed), tooltip: "CPU")] : []
+        let state = SideNoticeDisplayState()
+        state.islandEdge = edge
+        state.placementMode = .custom
+        state.statusIcons = icons
+        state.compactWingHeight = 32
+        fixture.presenter.setStatusIcons(icons)
+        let configuration = fixture.presenter.compactConfiguration(for: [notice], at: date)
+        let size = ScreenLayoutEngine(configuration: configuration).layout(for: fixture.screen).collapsedFrame.size
+        let service = PomodoroService(notificationRequestHandler: { _ in }, defaults: fixture.defaults)
+        let view = CompactStatusBarView(queue: fixture.queue, displayState: state, media: fixture.media,
+            browserDownloads: fixture.downloads, settingsStore: fixture.settings, resultSweep: fixture.sweep,
+            pomodoro: service, onStatusHidden: {})
+        func render(_ progress: Double?, enabled: Bool, hidden: Bool = false) async throws -> NSBitmapImageRep {
+            fixture.settings.settings.collapsedProgressGlowEnabled = enabled
+            state.compactStatusHidden = hidden
+            var current = notice
+            current.progress = progress
+            fixture.queue.updateIfPresent(current)
+            return try await renderOffscreen(view.statusBarContent(at: date)
+                .environment(\._accessibilityReduceMotion, true)
+                .transaction { $0.disablesAnimations = true }, size: size)
+        }
+        let baseline = try await render(0.5, enabled: false)
+        let half = try await render(0.5, enabled: true)
+        let full = try await render(1, enabled: true)
+        let empty = try await render(nil, enabled: true)
+        func orangePixels(_ bitmap: NSBitmapImageRep, comparedWith baseline: NSBitmapImageRep) throws -> Int {
+            var count = 0
+            for y in 0..<bitmap.pixelsHigh {
+                for x in 0..<bitmap.pixelsWide {
+                    let color = try #require(bitmap.colorAt(x: x, y: y)?.usingColorSpace(.sRGB))
+                    let original = try #require(baseline.colorAt(x: x, y: y)?.usingColorSpace(.sRGB))
+                    if color.redComponent - original.redComponent > 0.04,
+                       color.greenComponent - original.greenComponent > 0.01,
+                       color.redComponent > color.blueComponent + 0.03 {
+                        count += 1
+                    }
+                }
+            }
+            return count
+        }
+        let halfPixels = try orangePixels(half, comparedWith: baseline)
+        #expect(halfPixels > 10, "The countdown must paint the shared progress track on \(edge)")
+        #expect(try orangePixels(full, comparedWith: baseline) > halfPixels)
+        #expect(try orangePixels(empty, comparedWith: baseline) == 0)
+        let zero = try await render(0, enabled: true)
+        #expect(try orangePixels(zero, comparedWith: baseline) == 0)
+        let hiddenBaseline = try await render(1, enabled: false, hidden: true)
+        let hidden = try await render(1, enabled: true, hidden: true)
+        #expect(try orangePixels(hidden, comparedWith: hiddenBaseline) == 0)
+        #expect(fixture.queue.left.isEmpty && fixture.queue.right.count == 1,
+            "Painting progress must preserve the countdown notice")
+    }
+
     @Test(arguments: IslandEdge.allCases, [LayoutDirection.leftToRight, .rightToLeft]) @MainActor
     func customUpdatesRenderTheCLIBrandAndUpgradeSymbolWithOrWithoutMonitoring(
         edge: IslandEdge, direction: LayoutDirection
@@ -31,7 +97,7 @@ struct StatusIconDestinationIntegrationTests {
         state.compactWingHeight = 32
         let view = CompactStatusBarView(queue: fixture.queue, displayState: state, media: fixture.media,
             browserDownloads: fixture.downloads, settingsStore: fixture.settings, resultSweep: fixture.sweep,
-            onStatusHidden: {})
+            pomodoro: PomodoroService(notificationRequestHandler: { _ in }, defaults: fixture.defaults), onStatusHidden: {})
         for (kind, identity) in brands {
             let left = IslandNotice(id: "update-available-cli-\(kind)-left", title: identity.displayName,
                 side: .left, style: .status, symbolName: "sparkles")
@@ -143,7 +209,7 @@ struct StatusIconDestinationIntegrationTests {
         state.compactWingHeight = edge.isVertical ? layout.size.width : layout.size.height
         let view = CompactStatusBarView(queue: fixture.queue, displayState: state, media: fixture.media,
             browserDownloads: fixture.downloads, settingsStore: fixture.settings,
-            resultSweep: fixture.sweep, onStatusHidden: {})
+            resultSweep: fixture.sweep, pomodoro: PomodoroService(notificationRequestHandler: { _ in }, defaults: fixture.defaults), onStatusHidden: {})
         #expect(view.selectedCompactStatusPriority == .aiActivity)
         #expect(!view.pausesCompactTimeline,
                 "Visible playback progress must advance even when AI owns the normal priority")
@@ -217,7 +283,7 @@ struct StatusIconDestinationIntegrationTests {
         fixture.media.publishSnapshot(scenario == "missing-snapshot" ? nil : snapshot)
         let view = CompactStatusBarView(queue: fixture.queue, displayState: state, media: fixture.media,
             browserDownloads: fixture.downloads, settingsStore: fixture.settings,
-            resultSweep: sweep, onStatusHidden: {})
+            resultSweep: sweep, pomodoro: PomodoroService(notificationRequestHandler: { _ in }, defaults: fixture.defaults), onStatusHidden: {})
         #expect(view.pausesCompactTimeline == (scenario != "zero-progress"),
                 "A track at zero progress must keep its clock running; hidden or unavailable progress must pause")
         func render(enabled: Bool) async throws -> NSBitmapImageRep {
@@ -267,7 +333,7 @@ struct StatusIconDestinationIntegrationTests {
         state.compactWingHeight = edge.isVertical ? layout.size.width : layout.size.height
         let view = CompactStatusBarView(queue: fixture.queue, displayState: state, media: fixture.media,
             browserDownloads: fixture.downloads, settingsStore: fixture.settings, resultSweep: fixture.sweep,
-            onStatusHidden: {})
+            pomodoro: PomodoroService(notificationRequestHandler: { _ in }, defaults: fixture.defaults), onStatusHidden: {})
         let bitmap = try await renderOffscreen(view.statusBarContent(at: date)
             .environment(\._accessibilityReduceMotion, true).background(.white), size: layout.size)
         let radius = style == .detailed ? VoiceRecordingIslandGeometry.bottomCornerRadius
@@ -396,7 +462,7 @@ struct StatusIconDestinationIntegrationTests {
         var reportedLengths: [CGFloat] = []
         let view = CompactStatusBarView(queue: fixture.queue, displayState: state, media: fixture.media,
             browserDownloads: fixture.downloads, settingsStore: fixture.settings, resultSweep: fixture.sweep,
-            onStatusHidden: {}, onCompactLengthChanged: { reportedLengths.append($0) })
+            pomodoro: PomodoroService(notificationRequestHandler: { _ in }, defaults: fixture.defaults), onStatusHidden: {}, onCompactLengthChanged: { reportedLengths.append($0) })
         #expect(!view.pausesCompactTimeline,
                 "Visible playback progress and detailed lyrics must keep advancing while AI wins the normal priority")
         let bitmap = try await renderOffscreen(view.statusBarContent(at: date)
@@ -626,7 +692,7 @@ struct StatusIconDestinationIntegrationTests {
         let state = SideNoticeDisplayState()
         let view = CompactStatusBarView(queue: fixture.queue, displayState: state, media: fixture.media,
             browserDownloads: fixture.downloads, settingsStore: fixture.settings, resultSweep: fixture.sweep,
-            onStatusHidden: {})
+            pomodoro: PomodoroService(notificationRequestHandler: { _ in }, defaults: fixture.defaults), onStatusHidden: {})
         #expect(view.selectedCompactStatusPriority == .media)
         state.systemMonitorAvailable = true
         #expect(view.selectedCompactStatusPriority == .systemMonitor)
@@ -1018,7 +1084,7 @@ struct StatusIconDestinationIntegrationTests {
         state.islandEdge = .left
         let view = CompactStatusBarView(queue: fixture.queue, displayState: state, media: fixture.media,
             browserDownloads: fixture.downloads, settingsStore: fixture.settings, resultSweep: fixture.sweep,
-            onStatusHidden: {})
+            pomodoro: PomodoroService(notificationRequestHandler: { _ in }, defaults: fixture.defaults), onStatusHidden: {})
         state.statusIcons = [IslandStatusIcon(id: "cpu", content: .metric(.cpu, text: "20%", image: nil, style: .detailed), tooltip: "CPU")]
         #expect(view.pausesCompactTimeline)
         state.statusIcons.append(IslandStatusIcon(id: "app", content: .application, tooltip: "zisla"))
@@ -1254,7 +1320,7 @@ struct StatusIconDestinationIntegrationTests {
         state.statusIcons = [IslandStatusIcon(id: "cpu", content: .metric(.cpu, text: "20%", image: nil, style: .detailed), tooltip: "CPU")]
         let size = try #require(IslandStatusIconLayout.size(icons: state.statusIcons, edge: .left))
         let view = CompactStatusBarView(queue: fixture.queue, displayState: state, media: fixture.media,
-            browserDownloads: fixture.downloads, settingsStore: fixture.settings, resultSweep: fixture.sweep, onStatusHidden: {})
+            browserDownloads: fixture.downloads, settingsStore: fixture.settings, resultSweep: fixture.sweep, pomodoro: PomodoroService(notificationRequestHandler: { _ in }, defaults: fixture.defaults), onStatusHidden: {})
         let actual = try await renderOffscreen(view.statusBarContent(at: date), size: size)
         let expected = try await renderOffscreen(IslandStatusIconStrip(icons: state.statusIcons, edge: .left, date: date)
             .clipShape(CompactIslandShape(layoutStyle: .pill)), size: size)
@@ -1496,6 +1562,7 @@ struct StatusIconDestinationIntegrationTests {
         let screen = ScreenSnapshot(displayID: 7, frame: CGRect(x: 20000, y: 0, width: 1440, height: 900),
             visibleFrame: CGRect(x: 20000, y: 0, width: 1440, height: 876))
         lazy var presenter = SideNoticePresenter(queue: queue, resultSweep: sweep, media: media,
+            pomodoro: PomodoroService(notificationRequestHandler: { _ in }, defaults: defaults),
             browserDownloads: downloads, settingsStore: settings, languageStore: language, isScreenLocked: true,
             reduceMotion: { [unowned self] in reducesMotion },
             screenSnapshotProvider: { [unowned self] in [screen] })

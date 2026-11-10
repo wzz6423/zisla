@@ -10,6 +10,7 @@ final class SideNoticePresenter {
     private let queue: SideNoticeQueue
     private let resultSweep: AIResultSweepController
     private let media: NowPlayingService
+    private let pomodoro: PomodoroService
     private let browserDownloads: BrowserDownloadMonitor
     private let settingsStore: FeatureSettingsStore
     private let languageStore: AppLanguageStore
@@ -38,6 +39,7 @@ final class SideNoticePresenter {
         queue: SideNoticeQueue,
         resultSweep: AIResultSweepController,
         media: NowPlayingService,
+        pomodoro: PomodoroService,
         browserDownloads: BrowserDownloadMonitor,
         settingsStore: FeatureSettingsStore,
         languageStore: AppLanguageStore,
@@ -53,6 +55,7 @@ final class SideNoticePresenter {
         self.queue = queue
         self.resultSweep = resultSweep
         self.media = media
+        self.pomodoro = pomodoro
         self.browserDownloads = browserDownloads
         self.settingsStore = settingsStore
         self.languageStore = languageStore
@@ -599,6 +602,7 @@ final class SideNoticePresenter {
             browserDownloads: browserDownloads,
             settingsStore: settingsStore,
             resultSweep: resultSweep,
+            pomodoro: pomodoro,
             onStatusHidden: { [weak self] in self?.updatePanels() },
             onCompactLengthChanged: { [weak self] _ in self?.updatePanels() }
         )

@@ -115,7 +115,9 @@ struct CompactPillStatusContent: View {
             let iconSize = max(0, thickness - 8)
             let textBudget = max(0, (edge.isVertical ? proxy.size.height : proxy.size.width)
                 - iconSize - (presentation.showsWaveform ? iconSize + 6 : 0) - 6
-                - CompactPillStatusPresentation.trailingInset - leadingInset)
+                - CompactPillStatusPresentation.trailingInset - leadingInset
+                - (presentation.priority == .focusCountdown
+                    ? CompactPillStatusPresentation.pomodoroControlsLength + 6 : 0))
             let identityLength = min(textBudget, presentation.mediaIdentityLength(
                 thickness: thickness, edge: edge, text: text, item: item))
             let textLength = max(0, textBudget - identityLength - (identityLength > 0 && !text.isEmpty ? 6 : 0))
@@ -158,13 +160,18 @@ struct CompactPillStatusContent: View {
                 if presentation.showsWaveform, identityLength == 0 {
                     waveform(size: iconSize, thickness: thickness)
                 }
+                if presentation.priority == .focusCountdown {
+                    CompactPomodoroControls(edge: edge)
+                        .frame(width: edge.isVertical ? thickness : CompactPillStatusPresentation.pomodoroControlsLength,
+                               height: edge.isVertical ? CompactPillStatusPresentation.pomodoroControlsLength : thickness)
+                }
             }
             .padding(edge.isVertical ? .top : .leading, leadingInset)
             .padding(edge.isVertical ? .bottom : .trailing, CompactPillStatusPresentation.trailingInset)
             .frame(width: proxy.size.width, height: proxy.size.height)
         }
         .foregroundStyle(.white)
-        .accessibilityElement(children: .ignore)
+        .accessibilityElement(children: presentation.priority == .focusCountdown ? .contain : .ignore)
         .accessibilityLabel(accessibilityDescription)
         .help(accessibilityDescription)
     }

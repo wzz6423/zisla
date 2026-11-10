@@ -158,7 +158,7 @@ struct CompactStatusBarAnimationTests {
             panelFrame: CGRect(x: 0, y: 0, width: 240, height: 52), animation: nil)
         let view = CompactStatusBarView(queue: SideNoticeQueue(), displayState: state,
             media: NowPlayingService(), browserDownloads: BrowserDownloadMonitor(), settingsStore: settings,
-            resultSweep: AIResultSweepController(), onStatusHidden: {})
+            resultSweep: AIResultSweepController(), pomodoro: PomodoroService(notificationRequestHandler: { _ in }, defaults: defaults), onStatusHidden: {})
         let renderer = ImageRenderer(content: view.statusBarContent(at: Date(timeIntervalSince1970: 100))
             .environment(\.layoutDirection, direction)
             .transaction { $0.disablesAnimations = true }
