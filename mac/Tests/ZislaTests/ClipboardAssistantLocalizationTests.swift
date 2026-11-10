@@ -181,6 +181,7 @@ struct ClipboardAssistantLocalizationTests {
         #expect(info[key] as? String == descriptions[.simplifiedChinese])
     }
 
+    /// Image and file examples describe clipboard payloads because copying a filename cannot create either type.
     @Test @MainActor
     func settingsExampleGroupsFollowTheirRecognitionControls() throws {
         let groups = SettingsView.clipboardAssistantExampleGroups
@@ -205,6 +206,8 @@ struct ClipboardAssistantLocalizationTests {
         ])
     }
 
+    /// Checks catalogs directly so localization fallback cannot hide a missing translation.
+    /// Foreign-language examples deliberately differ from the selected interface language.
     @Test @MainActor
     func settingsExampleTitlesAndLocalPhrasesTranslateEveryLanguage() throws {
         let groups = SettingsView.clipboardAssistantExampleGroups.values.flatMap { $0 }
@@ -279,6 +282,8 @@ struct ClipboardAssistantLocalizationTests {
         }
     }
 
+    /// Fixed UTC fixtures make date results independent of the machine's clock and time zone.
+    /// Restricting detection to the owning control prevents unrelated recognizers from making an example pass.
     @Test(arguments: AppLanguage.allCases) @MainActor
     func displayedSettingsExamplesUseTheirControlAndCorrectDateResult(language: AppLanguage) throws {
         let utc = try #require(TimeZone(secondsFromGMT: 0))
@@ -318,6 +323,8 @@ struct ClipboardAssistantLocalizationTests {
         }
     }
 
+    /// Competing recognizers catch examples that would be claimed by a different kind.
+    /// Application and shell fixtures keep classification independent of installed software.
     @Test(arguments: AppLanguage.allCases) @MainActor
     func displayedTextExamplesRecognizeTheirKindAndRespectDisabledControls(language: AppLanguage) throws {
         let utc = try #require(TimeZone(secondsFromGMT: 0))
@@ -360,6 +367,7 @@ struct ClipboardAssistantLocalizationTests {
         }
     }
 
+    /// In-memory media fixtures distinguish clipboard payloads from look-alike filenames without touching user files.
     @Test @MainActor
     func mediaUsageExamplesMatchImageAndFileContentWithoutTreatingFilenamesAsMedia() throws {
         let bitmap = try #require(NSBitmapImageRep(
@@ -383,6 +391,7 @@ struct ClipboardAssistantLocalizationTests {
         #expect(SettingsView.clipboardAssistantUsageExamples[.file]?.contains("Finder") == true)
     }
 
+    /// An offscreen, nonactivating host checks accessibility and copy callbacks without changing clipboard content or focus.
     @Test(.serialized, arguments: [AppLanguage.simplifiedChinese, .english, .arabic], [ClipboardAssistantKind.text, .conversion]) @MainActor
     func exampleRowsShowRelevantHeadingsAndCopyDisplayedContent(language: AppLanguage, kind: ClipboardAssistantKind) async throws {
         let groups = try #require(SettingsView.clipboardAssistantExampleGroups[kind])
@@ -405,6 +414,7 @@ struct ClipboardAssistantLocalizationTests {
         }
         var labels: [String] = []
         var buttons: [NSObject] = []
+        /// Collects both label and value text so assertions cover either accessibility representation.
         func visit(_ object: NSObject) {
             func value(_ key: String) -> Any? {
                 object.responds(to: NSSelectorFromString(key)) ? object.value(forKey: key) : nil

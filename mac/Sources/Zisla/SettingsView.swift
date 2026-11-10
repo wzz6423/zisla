@@ -3292,6 +3292,8 @@ struct SettingsView: View {
         }
     }
 
+    /// Single groups inherit their recognition-row title; only multiple groups need extra headings.
+    /// The copy callback receives the full localized text even when the row truncates its display.
     static func clipboardAssistantExamples(
         _ groups: [ClipboardAssistantExampleGroup],
         language: AppLanguage,

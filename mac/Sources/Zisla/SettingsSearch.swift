@@ -49,6 +49,7 @@ enum SettingsSearchIndex {
         return matches.sorted { matchesExactTitle($0) && !matchesExactTitle($1) }
     }
 
+    /// Keeps search anchors aligned with conditionally visible rows and sections so results can be navigated.
     static func items(settings: FeatureSettings) -> [SettingsSearchItem] {
         var items: [SettingsSearchItem] = []
 
