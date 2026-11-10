@@ -964,7 +964,8 @@ struct SettingsView: View {
                     featureToggle("AI 进度与用量", detail: "汇总桌面端与 CLI 工具的运行状态", symbol: "sparkles", keyPath: \.aiProgressEnabled)
                     rowDivider
                     featureToggle("低额度提醒", detail: "剩余额度不高于 20% 时提醒，耗尽后也会提醒", symbol: "gauge.with.dots.needle.67percent", keyPath: \.aiAccountBalanceNoticeEnabled)
-                        .disabled(!model.settingsStore.settings.aiProgressEnabled)
+                        .disabled(!model.settingsStore.settings.aiProgressEnabled
+                            || !model.settingsStore.settings.sideNoticesEnabled)
                     rowDivider
                     settingRow(symbol: "rectangle.topthird.inset.filled", title: "收起态额度样式", detail: "完整样式最多显示两行真实额度") {
                         Picker("", selection: Binding(
@@ -977,7 +978,8 @@ struct SettingsView: View {
                     }
                     rowDivider
                     featureToggle("其他位置常驻额度", detail: "选择灵动岛其他位置时显示额度，多个账户自动轮播", symbol: "pin", keyPath: \.aiAccountBalancePinnedInCustomIsland)
-                        .disabled(!model.settingsStore.settings.aiProgressEnabled)
+                        .disabled(!model.settingsStore.settings.aiProgressEnabled
+                            || !model.settingsStore.settings.sideNoticesEnabled)
                     rowDivider
                     DisclosureGroup(AppLocalization.text("各供应商额度")) {
                         ForEach(AIProvider.allCases, id: \.self) { provider in

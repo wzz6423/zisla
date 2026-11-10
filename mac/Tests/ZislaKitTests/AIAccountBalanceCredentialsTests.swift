@@ -124,6 +124,51 @@ struct AIAccountBalanceCredentialsTests {
         #expect(throws: AIAccountBalanceError.invalidResponse) { try source.load(for: .opencode, at: now) }
     }
 
+    /// Dotfile links may configure Zed, but malformed targets must fail before the fake native credential read.
+    @Test(arguments: ["regular", "directory", "oversize", "invalid", "custom-server", "custom-credentials"])
+    func zedLinkedSettingsRetainNativeLoginAndFailClosedForUnsafeTargets(kind: String) throws {
+        let root = FileManager.default.temporaryDirectory.appendingPathComponent("zisla-zed-settings-\(UUID())")
+        let home = root.appendingPathComponent("home"), dotfiles = root.appendingPathComponent("dotfiles")
+        let settings = home.appendingPathComponent(".config/zed/settings.json")
+        try FileManager.default.createDirectory(at: settings.deletingLastPathComponent(), withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: root) }
+        try FileManager.default.createDirectory(at: dotfiles, withIntermediateDirectories: true)
+        let target = dotfiles.appendingPathComponent("settings.json")
+        let data: Data?
+        let expectedError: AIAccountBalanceError?
+        switch kind {
+        case "directory": (data, expectedError) = (nil, .credentialsUnavailable)
+        case "oversize": (data, expectedError) = (Data(repeating: 0x20, count: 1_024 * 1_024 + 1), .credentialsUnavailable)
+        case "invalid": (data, expectedError) = (Data("{invalid".utf8), .invalidResponse)
+        case "custom-server":
+            (data, expectedError) = (Data(#"{"server_url":"https://untrusted.example"}"#.utf8), .unsupportedLogin)
+        case "custom-credentials":
+            (data, expectedError) = (Data(#"{"credentials_url":"https://untrusted.example"}"#.utf8), .unsupportedLogin)
+        default:
+            (data, expectedError) = (Data(#"{"server_url":"https://zed.dev","credentials_url":"https://zed.dev",}"#.utf8), nil)
+        }
+        if let data { try data.write(to: target) }
+        else { try FileManager.default.createDirectory(at: target, withIntermediateDirectories: true) }
+        try FileManager.default.createSymbolicLink(at: settings, withDestinationURL: target)
+        var source = AIAccountBalanceCredentials(home: home, environment: [:])
+        source.cursorCookie = { _ in nil }
+        source.websiteCookie = { _ in nil }
+        source.keychainRead = { service, internetPassword in
+            guard kind == "regular" else { Issue.record("Unsafe Zed settings must not read native credentials"); return nil }
+            #expect(service == "https://zed.dev" && internetPassword)
+            return .init(account: "fixture-zed", data: Data("fixture-zed-token".utf8))
+        }
+        if let expectedError {
+            #expect(throws: expectedError) { try source.load(for: .zed, at: now) }
+        } else {
+            let credential = try #require(try source.load(for: .zed, at: now))
+            #expect(credential.accountID == "fixture-zed" && credential.token == "fixture-zed-token")
+            #expect(!credential.isWebsiteCookie)
+        }
+        #expect(try FileManager.default.destinationOfSymbolicLink(atPath: settings.path) == target.path)
+        if let data { #expect(try Data(contentsOf: target) == data, "Reading linked settings must not change dotfiles") }
+    }
+
     /// Modern selections and sealed stores must supersede legacy provider hints and plaintext credential mirrors.
     @Test func zcodeSelectionUsesAuthoritativeRegistryAndNeverStaleEncryptedMirror() throws {
         let config = try JSONSerialization.data(withJSONObject: ["provider": ["builtin:zai-coding-plan": ["options": ["apiKey": "fixture-key"]]]])

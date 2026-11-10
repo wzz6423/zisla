@@ -42,7 +42,7 @@ public struct CompactPillStatusPresentation: Equatable, Sendable {
         if isAccountBalance {
             let title = notice.metadata?["quotaProvider"] ?? notice.title
             let values = accountBalanceLines
-            let lineWidth = edge.isVertical ? max(1, thickness / CGFloat(max(1, values.count))) : thickness
+            let lineWidth = edge.isVertical ? max(1, (thickness - 8) / CGFloat(max(1, values.count))) : thickness
             let valueLength = values.map { Self.textLength($0, availableWidth: lineWidth, edge: edge,
                 font: NSFont.systemFont(ofSize: values.count > 1 ? 9 : 11, weight: .medium)) }.max() ?? 0
             let titleLength = Self.textLength(title, availableWidth: thickness, edge: edge, font: NSFont.systemFont(ofSize: 10, weight: .semibold))

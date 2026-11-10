@@ -124,7 +124,14 @@ struct CompactAIAccountBalanceBar: View {
                 .frame(width: geometry.size.width, height: geometry.size.height)
             } else if edge.isVertical {
                 let contentHeight = max(0, geometry.size.height - 24)
-                let titleHeight = contentHeight * 0.25
+                let titleRows = CompactPillStatusPresentation.verticalTextRows(title, availableWidth: height - 8,
+                    availableHeight: CompactPillStatusPresentation.maximumTextLength)
+                let requiredValueHeight = lines.map {
+                    CGFloat(CompactPillStatusPresentation.verticalTextRows($0,
+                        availableWidth: (height - 8) / CGFloat(max(1, lines.count)),
+                        availableHeight: CompactPillStatusPresentation.maximumTextLength).count) * 14
+                }.max() ?? 0
+                let titleHeight = min(CGFloat(titleRows.count) * 14, max(0, contentHeight - 8 - requiredValueHeight))
                 let valueHeight = max(0, contentHeight - titleHeight - 8)
                 VStack(spacing: 8) {
                     VerticalStatusText(text: title, availableWidth: height - 8,

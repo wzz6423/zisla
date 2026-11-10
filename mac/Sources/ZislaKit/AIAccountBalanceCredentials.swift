@@ -199,7 +199,8 @@ struct AIAccountBalanceCredentials: Sendable {
                 credential.isWebsiteCookie = true
                 return credential
             }
-            let settings = try fileRead(home.appendingPathComponent(".config/zed/settings.json")).map(Self.zedSettings)
+            let settings = try fileRead(home.appendingPathComponent(".config/zed/settings.json")
+                .resolvingSymlinksInPath()).map(Self.zedSettings)
             if let server = settings?["server_url"] as? String, server != "https://zed.dev" {
                 throw AIAccountBalanceError.unsupportedLogin
             }

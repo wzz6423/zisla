@@ -410,6 +410,7 @@ final class SideNoticePresenter {
         }
         if CompactStatusVisibilityPolicy.mustRemainVisible(
             notices: notices,
+            selectedNotice: SideNoticeLayoutEngine().compactBarSizing(for: notices, settings: settings)?.customPillPresentation?.notice,
             activityDuration: settings.activityNoticeDisplayDuration,
             focusDuration: settings.focusModeNoticeDisplayDuration
         ) {

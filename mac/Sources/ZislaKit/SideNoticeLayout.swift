@@ -90,9 +90,10 @@ public struct SideNoticePresentation: Equatable, Sendable {
 }
 
 public enum CompactStatusVisibilityPolicy {
-    /// Persistent quota and voice processing stay visible independently of ordinary activity display durations.
+    /// Selected persistent quota and voice processing stay visible independently of ordinary activity display durations.
     public static func mustRemainVisible(
         notices: [IslandNotice],
+        selectedNotice: IslandNotice? = nil,
         activityDuration: ActivityNoticeDisplayDuration,
         focusDuration: FocusModeNoticeDisplayDuration
     ) -> Bool {
@@ -102,7 +103,7 @@ public enum CompactStatusVisibilityPolicy {
         }
         let hasFocusMode = notices.contains { $0.id.hasPrefix("focus-mode-") }
         let hasVoiceProcessing = notices.contains { $0.id.hasPrefix("voice-processing-") }
-        return hasVoiceProcessing || notices.contains { $0.id == AIAccountBalanceNoticeController.pinnedID }
+        return hasVoiceProcessing || selectedNotice?.id == AIAccountBalanceNoticeController.pinnedID
             || (hasActivity && activityDuration == .always)
             || (hasFocusMode && focusDuration == .always)
     }

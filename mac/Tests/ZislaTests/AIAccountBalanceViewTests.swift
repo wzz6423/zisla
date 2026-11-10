@@ -58,6 +58,89 @@ struct AIAccountBalanceViewTests {
         #expect(colored > 0)
     }
 
+    /// Exact reference pixels catch a truncated provider and lost quota rows at natural and constrained vertical lengths.
+    @Test(arguments: [IslandEdge.left, .right], [(CGFloat(32), false), (32, true), (34, false), (34, true)])
+    func verticalBalanceReservesMeasuredProviderRowsAndKeepsQuotaWhenConstrained(
+        edge: IslandEdge, configuration: (CGFloat, Bool)
+    ) throws {
+        let (thickness, rightToLeft) = configuration
+        let notice = IslandNotice(id: AIAccountBalanceNoticeController.pinnedID, title: "Claude", style: .status,
+            metadata: ["quotaProvider": "Claude", "quotaSeverity": "0", "quotaLine0": "5h 70%"])
+        let presentation = CompactPillStatusPresentation(priority: .aiAccountBalance, notice: notice, text: "")
+        let quotaRows = thickness == 32 ? ["5", "h", "70", "%"] : ["5", "h", "70%"]
+        #expect(presentation.length(thickness: thickness, edge: edge) == (thickness == 32 ? 174 : 160),
+            "Natural length must use the quota's rendered width, including its 8pt thickness inset")
+        func rows(_ values: [String]) -> some View {
+            VStack(spacing: 1) {
+                ForEach(Array(values.enumerated()), id: \.offset) { _, value in
+                    Text(verbatim: value).font(.system(size: 11, weight: .medium)).frame(height: 13)
+                }
+            }
+        }
+        for length in [presentation.length(thickness: thickness, edge: edge), CGFloat(88)] {
+            let titleHeight: CGFloat = length == 88 ? (thickness == 32 ? 0 : 14) : 84
+            let valueHeight = length - 24 - 8 - titleHeight
+            func render(_ content: some View) throws -> NSBitmapImageRep {
+                let renderer = ImageRenderer(content: content.frame(width: thickness, height: length)
+                    .background(.black).foregroundStyle(.white).environment(\.colorScheme, .dark)
+                    .environment(\.layoutDirection, rightToLeft ? .rightToLeft : .leftToRight))
+                renderer.scale = 2
+                return NSBitmapImageRep(cgImage: try #require(renderer.cgImage))
+            }
+            let actual = try render(CompactAIAccountBalanceBar(notice: notice, height: thickness, edge: edge))
+            let reference = try render(VStack(spacing: 8) {
+                rows(length == 88 ? (thickness == 32 ? [] : ["…"]) : ["C", "l", "a", "u", "d", "e"])
+                    .frame(height: titleHeight)
+                HStack(alignment: .top, spacing: 2) { rows(quotaRows).foregroundStyle(Color.primary) }.frame(height: valueHeight)
+            }.padding(.vertical, 12).frame(width: thickness, height: length))
+            #expect(actual.pixelsWide == Int(thickness * 2) && actual.pixelsHigh == Int(length * 2))
+            var changed = 0
+            for y in 0..<actual.pixelsHigh {
+                for x in 0..<actual.pixelsWide {
+                    let a = try #require(actual.colorAt(x: x, y: y)?.usingColorSpace(.sRGB))
+                    let b = try #require(reference.colorAt(x: x, y: y)?.usingColorSpace(.sRGB))
+                    if abs(a.redComponent - b.redComponent) > 0.01 { changed += 1 }
+                }
+            }
+            #expect(changed == 0, "At \(thickness)×\(length)pt, Claude must keep its measured title budget and complete quota")
+        }
+    }
+
+    /// A queued quota must not undo swipe-to-hide for the real selected media, mail, or ordinary transient.
+    @Test(arguments: ["media", "mail", "focus-transition", "headphone", "pinned", "voice", "camera"])
+    func queuedPinnedQuotaKeepsOnlyItsSelectedStatusVisible(kind: String) throws {
+        var settings = FeatureSettings(islandLayoutStyle: .pill,
+            islandPlacement: IslandPlacement(mode: kind == "camera" ? .camera : .custom, edge: .left))
+        settings.activityNoticeDisplayDuration = .threeSeconds
+        settings.focusModeNoticeDisplayDuration = .threeSeconds
+        settings.aiAccountBalancePinnedInCustomIsland = true
+        let pinned = IslandNotice(id: AIAccountBalanceNoticeController.pinnedID, title: "Quota", style: .status)
+        let selectedID: String?
+        let priority: CompactStatusPriority?
+        switch kind {
+        case "media": (selectedID, priority) = ("media-active-fixture", .media)
+        case "mail": (selectedID, priority) = ("mail-notification-fixture", .mail)
+        case "focus-transition": (selectedID, priority) = ("focus-transition-fixture", .transient)
+        case "headphone": (selectedID, priority) = ("headphone-fixture", .transient)
+        case "voice": (selectedID, priority) = ("voice-processing-fixture", nil)
+        case "camera": (selectedID, priority) = (nil, nil)
+        default: (selectedID, priority) = (pinned.id, .aiAccountBalance)
+        }
+        settings.compactStatusPriority = priority.map { [$0, .aiAccountBalance] } ?? [.aiAccountBalance]
+        let notices = [pinned] + (selectedID.flatMap { id in
+            id == pinned.id ? nil : IslandNotice(id: id, title: "Selected", style: kind == "headphone" ? .headphone : .status)
+        }.map { [$0] } ?? [])
+        let presentation = SideNoticeLayoutEngine().compactBarSizing(for: notices, settings: settings)?.customPillPresentation
+        #expect(presentation?.notice.id == selectedID, "The fixture must exercise the real \(kind) selection")
+        #expect(presentation?.priority == priority)
+        let state = SideNoticeDisplayState()
+        _ = SideNoticePresenter.updateCompactVisibility(notices: notices, settings: settings, displayState: state)
+        state.compactStatusHidden = true
+        #expect(!SideNoticePresenter.updateCompactVisibility(notices: notices, settings: settings, displayState: state))
+        #expect(state.compactStatusHidden == (kind != "pinned" && kind != "voice"),
+            "Only a selected pinned quota or voice processing may force visibility with short activity durations")
+    }
+
     /// A long model identity must consume extra vertical space instead of compressing values or overflowing a narrow RTL row.
     @Test func narrowRTLBalanceRowsWrapLongIdentityWithoutHorizontalOverflow() async throws {
         let window = AIAccountQuotaWindow(id: "model", kind: .model, remainingPercent: 10,
