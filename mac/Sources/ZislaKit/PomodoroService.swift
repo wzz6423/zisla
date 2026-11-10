@@ -230,6 +230,8 @@ public final class PomodoroService: ObservableObject {
     public var onDailyBriefingActivity: DailyBriefingActivityHandler?
     public var userCareEnabled = false
     public var onUserCareReminder: ((UserCareReminder) -> Void)?
+    public var completionPresentationAllowed: () -> Bool = { true }
+    public var onSuppressedCompletion: ((UserCareReminder) -> Void)?
 
     public static let focusCountdownNoticeIDPrefix = "focus-countdown-"
 
@@ -428,6 +430,10 @@ public final class PomodoroService: ObservableObject {
 
     private func notifyCompletion(of mode: PomodoroMode) {
         guard !notificationsMuted else { return }
+        guard completionPresentationAllowed() else {
+            onSuppressedCompletion?(mode == .focus ? .focusCompleted : .restCompleted)
+            return
+        }
         if let completionSoundHandler {
             completionSoundHandler()
         } else {

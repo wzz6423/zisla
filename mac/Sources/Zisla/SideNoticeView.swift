@@ -7,6 +7,8 @@ import SwiftUI
 
 @MainActor
 final class SideNoticeDisplayState: ObservableObject {
+    @Published var notificationScopeIdentifier = ""
+    @Published var showsScenarioReview = true
     @Published var islandEdge: IslandEdge = .top
     @Published var placementMode: IslandPlacementMode = .camera
     @Published var compactWingsEnabled = true
@@ -89,6 +91,7 @@ struct SideNoticeRootView: View {
     var side: NoticeSide
 
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @State private var showsScenarioReview = false
 
     var body: some View {
         let presentation = SideNoticeLayoutEngine().presentation(
@@ -167,10 +170,21 @@ struct SideNoticeRootView: View {
             }
 
             ForEach(presentation.ordinaryNotices) { notice in
-                NoticeRow(notice: notice, side: side) {
-                    queue.remove(id: notice.id)
+                Group {
+                    if notice.id.hasPrefix("scenario-review-") {
+                        NoticeRow(notice: notice, side: side) {
+                            queue.dismissScenarioReview(displayIdentifier: displayState.notificationScopeIdentifier)
+                        }
+                        .onTapGesture { showsScenarioReview = true }
+                        .accessibilityAction { showsScenarioReview = true }
+                        .popover(isPresented: $showsScenarioReview) {
+                            ScenarioNotificationReviewView(queue: queue, displayIdentifier: displayState.notificationScopeIdentifier)
+                        }
+                    } else {
+                        NoticeRow(notice: notice, side: side) { queue.remove(id: notice.id) }
+                            .onHover { queue.setHovered($0, id: notice.id) }
+                    }
                 }
-                .onHover { queue.setHovered($0, id: notice.id) }
                 .transition(
                     reduceMotion
                         ? .opacity
@@ -189,20 +203,27 @@ struct SideNoticeRootView: View {
     }
 
     private var notices: [IslandNotice] {
-        let own = side == .left ? queue.left : queue.right
+        var own = queue.presentationNotices(side == .left ? queue.left : queue.right,
+            displayIdentifier: displayState.notificationScopeIdentifier)
+        if side == .right, displayState.showsScenarioReview,
+           let review = queue.scenarioReviewNotice(displayIdentifier: displayState.notificationScopeIdentifier) {
+            own.append(review)
+        }
         return displayState.hidesVoiceProcessingIndicator
             ? own.filter { !$0.id.hasPrefix("voice-processing-") }
             : own
     }
 
     private var compactMediaNotice: IslandNotice? {
-        let own = side == .left ? queue.left : queue.right
-        let opposite = side == .left ? queue.right : queue.left
+        let own = queue.presentationNotices(side == .left ? queue.left : queue.right,
+            displayIdentifier: displayState.notificationScopeIdentifier)
+        let opposite = queue.presentationNotices(side == .left ? queue.right : queue.left,
+            displayIdentifier: displayState.notificationScopeIdentifier)
         return (own + opposite).first { $0.id.hasPrefix("media-active-") }
     }
 
     private var compactAINotices: [IslandNotice] {
-        (queue.left + queue.right)
+        queue.presentationNotices(queue.left + queue.right, displayIdentifier: displayState.notificationScopeIdentifier)
             .filter { $0.id.hasPrefix("ai-active-") }
             .sorted { $0.createdAt > $1.createdAt }
     }
@@ -223,6 +244,11 @@ struct CompactStatusBarView: View {
     @Environment(\.layoutDirection) private var layoutDirection
 
     private var height: CGFloat { displayState.compactWingHeight }
+    private var showsResultSweep: Bool {
+        guard let task = resultSweep.current?.task else { return false }
+        return queue.isScenarioNoticeVisible(IslandNotice(id: AIMascotLibrary.activeNoticeID(for: task),
+            title: task.title, kind: task.status.noticeKind), displayIdentifier: displayState.notificationScopeIdentifier)
+    }
 
     var body: some View {
         TimelineView(.animation(minimumInterval: reduceMotion ? 1 : 1.0 / 30.0,
@@ -232,7 +258,7 @@ struct CompactStatusBarView: View {
     }
 
     var pausesCompactTimeline: Bool {
-        let showsIdleLogo = settingsStore.settings.islandAppIconEnabled && resultSweep.current == nil
+        let showsIdleLogo = settingsStore.settings.islandAppIconEnabled && !showsResultSweep
             && (displayState.statusIcons.contains { if case .application = $0.content { return true }; return false }
                 || (displayState.statusIcons.isEmpty && usesCustomPill && (displayState.compactStatusHidden
                     || (selectedCompactStatusPriority == nil && recordingOperationNotice == nil))))
@@ -272,10 +298,10 @@ struct CompactStatusBarView: View {
                     }
             } else if !displayState.statusIcons.isEmpty {
                 IslandStatusIconStrip(icons: displayState.statusIcons, edge: displayState.islandEdge, date: date)
-            } else if usesCustomPill, displayState.compactStatusHidden, resultSweep.current == nil,
+            } else if usesCustomPill, displayState.compactStatusHidden, !showsResultSweep,
                       settingsStore.settings.islandAppIconEnabled {
                 IslandParticleLogo(side: min(18, height), time: date.timeIntervalSinceReferenceDate)
-            } else if !displayState.compactStatusHidden || resultSweep.current != nil {
+            } else if !displayState.compactStatusHidden || showsResultSweep {
                 if usesCustomPill {
                     customStatusContent(at: date)
 
@@ -288,7 +314,9 @@ struct CompactStatusBarView: View {
         }
         .frame(width: size.width, height: size.height)
         .background(compactStatusBackground(cornerRadius: pillCornerRadius))
-        .overlay { AIResultSweepOverlay(controller: resultSweep, edge: displayState.islandEdge) }
+        .overlay {
+            if showsResultSweep { AIResultSweepOverlay(controller: resultSweep, edge: displayState.islandEdge) }
+        }
         .overlay {
             if displayState.statusIcons.isEmpty || information != nil,
                settingsStore.settings.collapsedProgressGlowEnabled,
@@ -338,7 +366,7 @@ struct CompactStatusBarView: View {
     }
 
     private func compactInformation(at date: Date) -> FloatingIslandInformationLayout? {
-        guard resultSweep.current == nil else { return nil }
+        guard !showsResultSweep else { return nil }
         return FloatingIslandInformationLayout(
             notices: displayState.compactStatusHidden ? [] : presentationNotices,
             icons: displayState.statusIcons, settings: settingsStore.settings, item: media.snapshot, at: date
@@ -421,7 +449,7 @@ struct CompactStatusBarView: View {
                 item: presentation.isMedia ? media.snapshot : nil, date: date
             )
             .onChange(of: length, initial: true) { _, value in onCompactLengthChanged(value) }
-        } else if resultSweep.current == nil, settingsStore.settings.islandAppIconEnabled {
+        } else if !showsResultSweep, settingsStore.settings.islandAppIconEnabled {
             IslandParticleLogo(side: min(18, height), time: date.timeIntervalSinceReferenceDate)
         }
     }
@@ -440,7 +468,9 @@ struct CompactStatusBarView: View {
     }
 
     private var presentationNotices: [IslandNotice] {
-        let notices = resultSweep.presentationNotices(from: queue.left + queue.right)
+        let notices = queue.presentationNotices(showsResultSweep
+            ? resultSweep.presentationNotices(from: queue.left + queue.right) : queue.left + queue.right,
+            displayIdentifier: displayState.notificationScopeIdentifier)
         return displayState.hidesVoiceProcessingIndicator
             ? notices.filter { !$0.id.hasPrefix("voice-processing-") } : notices
     }

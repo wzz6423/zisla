@@ -121,6 +121,58 @@ struct PomodoroUserCareTests {
         #expect(fixture.requests.isEmpty && fixture.reminders.isEmpty && fixture.sounds == 1)
     }
 
+    @Test
+    func scenePolicySuppressesTheSoundAndBannerAndReportsOneReviewEvent() throws {
+        let fixture = try Fixture()
+        defer { fixture.close() }
+        var suppressed: [UserCareReminder] = []
+        fixture.service.completionPresentationAllowed = { false }
+        fixture.service.onSuppressedCompletion = { suppressed.append($0) }
+        fixture.service.start()
+        fixture.now += fixture.service.focusDuration
+        fixture.service.tick()
+        fixture.service.tick()
+        #expect(fixture.sounds == 0 && fixture.requests.isEmpty && fixture.reminders.isEmpty)
+        #expect(suppressed == [.focusCompleted])
+        fixture.service.notificationsMuted = true
+        fixture.service.start()
+        fixture.now += fixture.service.restDuration
+        fixture.service.tick()
+        #expect(suppressed == [.focusCompleted], "The existing global mute must discard completions before scenario handling")
+    }
+
+    @Test
+    func ownFocusCompletionPresentsAfterItsSceneEndsButAnOverlappingMeetingDefersIt() throws {
+        let fixture = try Fixture()
+        defer { fixture.close() }
+        let queue = SideNoticeQueue(now: { fixture.now })
+        defer { queue.removeAll() }
+        queue.configureNotificationScenarios(.init(enabled: true), displayIdentifiers: ["display"])
+        let subscription = fixture.service.$engine.sink { engine in
+            queue.setNotificationScenario(.focus, active: engine.mode == .focus && engine.phase != .idle)
+        }
+        fixture.service.completionPresentationAllowed = {
+            queue.notificationBehavior(for: .ordinary, displayIdentifier: "display") == .show
+        }
+        fixture.service.onSuppressedCompletion = { reminder in
+            queue.recordScenarioEvent(.init(id: "pomodoro-completion", title: String(describing: reminder)))
+            queue.releaseScenarioEventVisibility(id: "pomodoro-completion")
+        }
+        fixture.service.start()
+        #expect(queue.activeNotificationScenarios == [.focus])
+        fixture.now += fixture.service.focusDuration
+        fixture.service.tick()
+        #expect(queue.activeNotificationScenarios.isEmpty && fixture.sounds == 1 && fixture.requests.count == 1)
+        queue.setNotificationScenario(.meeting, active: true)
+        fixture.service.start()
+        fixture.now += fixture.service.restDuration
+        fixture.service.tick()
+        #expect(fixture.sounds == 1 && fixture.requests.count == 1)
+        queue.setNotificationScenario(.meeting, active: false)
+        #expect(queue.scenarioReview(displayIdentifier: "display").map(\.title) == ["restCompleted"])
+        withExtendedLifetime(subscription) {}
+    }
+
     @MainActor
     private final class Fixture {
         let suiteName = "Zisla.PomodoroCare.\(UUID().uuidString)"

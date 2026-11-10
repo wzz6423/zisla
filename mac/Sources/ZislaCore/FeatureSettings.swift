@@ -837,6 +837,7 @@ public struct FeatureSettings: Codable, Equatable, Sendable {
     public var contextNotesEnabled: Bool
     public var contextNoteHoldHotkey: VoiceInputHotkeyPreset
     public var sideNoticesEnabled: Bool
+    public var notificationScenarios: NotificationScenarioSettings
     public var userCareEnabled: Bool
     public var userCareReminderInterval: TimeInterval {
         didSet { userCareReminderInterval = UserCareInterval.normalized(userCareReminderInterval) }
@@ -1001,6 +1002,7 @@ public struct FeatureSettings: Codable, Equatable, Sendable {
         contextNotesEnabled: Bool = true,
         contextNoteHoldHotkey: VoiceInputHotkeyPreset = VoiceInputHotkeyPreset(keyCode: 55, carbonModifiers: 0x0100, keyDisplayName: "Command"),
         sideNoticesEnabled: Bool = true,
+        notificationScenarios: NotificationScenarioSettings = .init(),
         userCareEnabled: Bool = true,
         userCareReminderInterval: TimeInterval = UserCareInterval.defaultSeconds,
         collapsedProgressGlowEnabled: Bool = true,
@@ -1142,6 +1144,7 @@ public struct FeatureSettings: Codable, Equatable, Sendable {
         self.contextNotesEnabled = contextNotesEnabled
         self.contextNoteHoldHotkey = contextNoteHoldHotkey
         self.sideNoticesEnabled = sideNoticesEnabled
+        self.notificationScenarios = notificationScenarios
         self.userCareEnabled = userCareEnabled
         self.userCareReminderInterval = UserCareInterval.normalized(userCareReminderInterval)
         self.collapsedProgressGlowEnabled = collapsedProgressGlowEnabled
@@ -1302,6 +1305,7 @@ public struct FeatureSettings: Codable, Equatable, Sendable {
         case contextNotesEnabled
         case contextNoteHoldHotkey
         case sideNoticesEnabled
+        case notificationScenarios
         case userCareEnabled
         case userCareReminderInterval
         case collapsedProgressGlowEnabled
@@ -1590,6 +1594,8 @@ public struct FeatureSettings: Codable, Equatable, Sendable {
         contextNotesEnabled = try container.decodeIfPresent(Bool.self, forKey: .contextNotesEnabled) ?? defaults.contextNotesEnabled
         contextNoteHoldHotkey = try container.decodeIfPresent(VoiceInputHotkeyPreset.self, forKey: .contextNoteHoldHotkey) ?? defaults.contextNoteHoldHotkey
         sideNoticesEnabled = try container.decodeIfPresent(Bool.self, forKey: .sideNoticesEnabled) ?? defaults.sideNoticesEnabled
+        notificationScenarios = try container.decodeIfPresent(NotificationScenarioSettings.self, forKey: .notificationScenarios)
+            ?? defaults.notificationScenarios
         userCareEnabled = try container.decodeIfPresent(Bool.self, forKey: .userCareEnabled) ?? defaults.userCareEnabled
         userCareReminderInterval = UserCareInterval.normalized(
             try container.decodeIfPresent(TimeInterval.self, forKey: .userCareReminderInterval)

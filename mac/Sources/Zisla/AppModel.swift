@@ -531,6 +531,14 @@ final class AppModel: ObservableObject {
   let languageStore = AppLanguageStore()
   let aiMonitor = AIStateMonitor()
   let notices = SideNoticeQueue()
+  @Published var isManualMeetingScenarioActive = false {
+    didSet { refreshMeetingNotificationScenario() }
+  }
+  @Published private(set) var isCalendarMeetingScenarioActive = false
+  var notificationDisplayIdentifier: () -> String? = { nil }
+  private lazy var meetingNotificationScenario = MeetingNotificationScenario(queue: notices) { [weak self] active in
+    self?.isCalendarMeetingScenarioActive = active
+  }
   let aiResultSweep = AIResultSweepController()
   let media = NowPlayingService()
   let audioOutput = AudioOutputDeviceService()
@@ -672,6 +680,7 @@ final class AppModel: ObservableObject {
   private var wasPinnedBeforeMirror = false
   private var wasPinnedBeforeTeleprompter = false
   private var taskStatuses: [String: AIProgressStatus] = [:]
+  private var scenarioSweepNoticeID: String?
   private var activeAINoticeIDs: Set<String> = []
   /// AI notices shown during the current activity; once hidden by timeout, they are not re-queued within the same activity cycle.
   private var activityNoticeShownIDs: Set<String> = []
@@ -926,6 +935,12 @@ final class AppModel: ObservableObject {
       }
       .store(in: &cancellables)
 
+    calendar.$meetingEvents
+      .sink { [weak self] events in
+        self?.refreshMeetingNotificationScenario(events: events)
+      }
+      .store(in: &cancellables)
+
     Publishers.CombineLatest(backgroundSounds.$isPlaying, backgroundSounds.$playingSound)
       .removeDuplicates { lhs, rhs in
         lhs.0 == rhs.0 && lhs.1 == rhs.1
@@ -978,6 +993,7 @@ final class AppModel: ObservableObject {
     focusMode.$status
       .dropFirst()
       .sink { [weak self] status in
+        self?.refreshFocusNotificationScenario(status: status)
         Task { @MainActor [weak self] in
           self?.consumeFocusModeStatus(status, showsTransition: false)
         }
@@ -1006,6 +1022,48 @@ final class AppModel: ObservableObject {
         Task { @MainActor [weak self] in self?.refreshUpdateNotices() }
       }
       .store(in: &cancellables)
+
+    aiResultSweep.$current
+      .sink { [weak self] sweep in
+        guard let self else { return }
+        if let id = self.scenarioSweepNoticeID { self.notices.releaseScenarioEventVisibility(id: id) }
+        self.scenarioSweepNoticeID = sweep.map { AIMascotLibrary.activeNoticeID(for: $0.task) }
+        if let sweep {
+          self.notices.recordScenarioEvent(IslandNotice(id: AIMascotLibrary.activeNoticeID(for: sweep.task),
+            title: sweep.task.title, detail: sweep.task.detail, kind: sweep.task.status.noticeKind))
+        }
+      }
+      .store(in: &cancellables)
+
+    notices.$activeNotificationScenarios
+      .dropFirst()
+      .sink { [weak self] _ in
+        Task { @MainActor [weak self] in
+          guard let self, self.notices.notificationBehavior(for: .ordinary,
+            displayIdentifier: self.notificationDisplayIdentifier()) != .show else { return }
+          self.clearUserCareMessage()
+        }
+      }
+      .store(in: &cancellables)
+
+    pomodoro.$engine
+      .sink { [weak self] engine in
+        self?.notices.setNotificationScenario(.focus, active: self?.focusMode.status.isActive == true
+          || (engine.mode == .focus && engine.phase != .idle))
+      }
+      .store(in: &cancellables)
+    pomodoro.completionPresentationAllowed = { [weak self] in
+      guard let self else { return false }
+      return self.notices.notificationBehavior(for: .ordinary,
+        displayIdentifier: self.notificationDisplayIdentifier()) == .show
+    }
+    pomodoro.onSuppressedCompletion = { [weak self] reminder in
+      guard let self else { return }
+      self.notices.recordScenarioEvent(IslandNotice(id: "pomodoro-completion",
+        title: reminder.localizedMessage(petEnabled: self.settingsStore.settings.petEnabled,
+          language: self.languageStore.language), kind: .success))
+      self.notices.releaseScenarioEventVisibility(id: "pomodoro-completion")
+    }
 
     // Any source affecting the dashboard height. Pomodoro exposes `phase` as a computed property over
     // its engine, so it can only be observed via `objectWillChange`, which fires before the value lands.
@@ -1243,6 +1301,8 @@ final class AppModel: ObservableObject {
     clearHeadphoneTransient()
     audioOutput.stop()
     calendar.stop()
+    isManualMeetingScenarioActive = false
+    meetingNotificationScenario.stop()
     pomodoro.stop()
     screenCleaning.stopAll()
     cleaningPowerState = nil
@@ -3157,6 +3217,12 @@ final class AppModel: ObservableObject {
   }
 
   private func apply(settings: FeatureSettings, requestWindowPreviewPermissions: Bool = false) {
+    notices.configureNotificationScenarios(settings.notificationScenarios)
+    if notices.notificationBehavior(for: .ordinary, displayIdentifier: notificationDisplayIdentifier()) != .show {
+      clearUserCareMessage()
+    }
+    refreshFocusNotificationScenario()
+    refreshMeetingNotificationScenario(settings: settings.notificationScenarios)
     dailyBriefing.configure(settings: settings.dailyBriefing, directory: saveLocations[.dailyBriefing],
       language: languageStore.language)
     if !settings.aiProgressEnabled || !settings.aiTaskResultSweepEnabled {
@@ -3230,7 +3296,7 @@ final class AppModel: ObservableObject {
     )
     consumeBackgroundSoundPlayback()
     userCare.apply(settings: settings)
-    if settings.sideNoticesEnabled {
+    if settings.sideNoticesEnabled || settings.notificationScenarios.enabled {
       focusMode.start()
     } else {
       focusMode.stop()
@@ -3247,8 +3313,8 @@ final class AppModel: ObservableObject {
     } else {
       audioOutput.stop()
     }
-    if settings.calendarEnabled {
-      calendar.start()
+    if settings.calendarEnabled || (settings.notificationScenarios.enabled && settings.notificationScenarios.automaticallyDetectsMeetings) {
+      calendar.start(monitorAgenda: settings.calendarEnabled)
     } else {
       calendar.stop()
     }
@@ -4359,6 +4425,8 @@ final class AppModel: ObservableObject {
       language: languageStore.language,
       throttlesNoteUpdates: throttlesNoteUpdates
     ) else { return false }
+    if notices.suppressScenarioFeedback(IslandNotice(id: "user-care-" + String(describing: reminder), title: message),
+      displayIdentifier: notificationDisplayIdentifier()) { return false }
     transientMessage = message
     // The shared setter revokes ownership even when another message repeats the same text.
     userCareFeedback.didPresent(reminder, at: uptime)
@@ -4368,6 +4436,17 @@ final class AppModel: ObservableObject {
   func clearUserCareMessage(routineOnly: Bool = false) {
     guard userCareFeedback.dismiss(routineOnly: routineOnly) else { return }
     transientMessage = nil
+  }
+
+  private func refreshFocusNotificationScenario(status: FocusModeStatus? = nil) {
+    notices.setNotificationScenario(.focus, active: (status ?? focusMode.status).isActive
+      || (pomodoro.mode == .focus && pomodoro.phase != .idle))
+  }
+
+  private func refreshMeetingNotificationScenario(settings: NotificationScenarioSettings? = nil,
+                                                   events: [CalendarEventSnapshot]? = nil) {
+    meetingNotificationScenario.configure(settings: settings ?? settingsStore.settings.notificationScenarios,
+      manual: isManualMeetingScenarioActive, events: events ?? calendar.meetingEvents)
   }
 
   static func shouldPresentPomodoroCountdown(

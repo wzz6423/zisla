@@ -1429,6 +1429,8 @@ struct SettingsView: View {
                 }
             }
 
+            NotificationScenarioSettingsView(model: model, settingsStore: settingsStore)
+
             settingsGroup("收起态展示优先级") {
                 let priorities = Self.compactStatusPriorities(settings: settingsStore.settings,
                     hasSystemMonitorIcons: model.islandHasSystemMonitorIcons)

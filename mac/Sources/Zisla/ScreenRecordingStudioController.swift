@@ -83,6 +83,11 @@ final class ScreenRecordingStudioController: NSWindowController, NSWindowDelegat
             .dropFirst().receive(on: RunLoop.main)
             .sink { [weak self] _ in self?.refreshCameraPreview() }
             .store(in: &subscriptions)
+        model.capture.$phase
+            .sink { [weak appModel] phase in
+                appModel?.notices.setNotificationScenario(.screenRecording, active: phase != .idle)
+            }
+            .store(in: &subscriptions)
         model.$recordingCameraAspectRatio.dropFirst().receive(on: RunLoop.main)
             .sink { [weak self] _ in self?.updateCameraPreviewLayout() }
             .store(in: &subscriptions)

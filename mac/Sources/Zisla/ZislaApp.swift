@@ -682,6 +682,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
                 && self.islandPlacementController?.isSelecting != true
                 && self.onboardingLifecycle?.isPresenting != true
         }
+        model.notificationDisplayIdentifier = { [weak coordinator] in
+            guard let displayID = coordinator?.activeDisplayID else { return nil }
+            return ScreenSnapshot.notificationPolicyIdentifier(for: displayID) ?? "session:\(displayID)"
+        }
         noticePresenter?.onCompactLayoutChanged = { [weak coordinator] displayID, expanded, length, sideWidth, iconSize in
             guard coordinator?.activeDisplayID == displayID else { return }
             coordinator?.updateCompactStatus(expandsForDetailedStatus: expanded, compactStatusLength: length,

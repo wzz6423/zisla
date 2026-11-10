@@ -23,6 +23,7 @@ public struct ScreenInsets: Equatable, Sendable {
 
 public struct ScreenSnapshot: Equatable, Identifiable, Sendable {
     public let displayID: CGDirectDisplayID
+    public var notificationPolicyIdentifier: String?
     public var frame: CGRect
     public var visibleFrame: CGRect
     public var safeAreaInsets: ScreenInsets
@@ -32,6 +33,7 @@ public struct ScreenSnapshot: Equatable, Identifiable, Sendable {
     public var menuBarHeightFallback: CGFloat
 
     public var id: CGDirectDisplayID { displayID }
+    public var notificationScopeIdentifier: String { notificationPolicyIdentifier ?? "session:\(displayID)" }
 
     /// The depth reserved by the current screen's menu bar/top safe area.
     /// `visibleFrame` is the most reliable per-display value; some virtual or
@@ -59,12 +61,14 @@ public struct ScreenSnapshot: Equatable, Identifiable, Sendable {
         displayID: CGDirectDisplayID,
         frame: CGRect,
         visibleFrame: CGRect,
+        notificationPolicyIdentifier: String? = nil,
         safeAreaInsets: ScreenInsets = ScreenInsets(),
         auxiliaryTopLeftArea: CGRect? = nil,
         auxiliaryTopRightArea: CGRect? = nil,
         menuBarHeightFallback: CGFloat = 0
     ) {
         self.displayID = displayID
+        self.notificationPolicyIdentifier = notificationPolicyIdentifier
         self.frame = frame
         self.visibleFrame = visibleFrame
         self.safeAreaInsets = safeAreaInsets
@@ -85,6 +89,7 @@ public struct ScreenSnapshot: Equatable, Identifiable, Sendable {
             displayID: CGDirectDisplayID(number.uint32Value),
             frame: screen.frame,
             visibleFrame: screen.visibleFrame,
+            notificationPolicyIdentifier: Self.notificationPolicyIdentifier(for: number.uint32Value),
             safeAreaInsets: ScreenInsets(
                 top: insets.top,
                 left: insets.left,
@@ -95,6 +100,11 @@ public struct ScreenSnapshot: Equatable, Identifiable, Sendable {
             auxiliaryTopRightArea: screen.auxiliaryTopRightArea,
             menuBarHeightFallback: max(24, NSStatusBar.system.thickness)
         )
+    }
+
+    public static func notificationPolicyIdentifier(for displayID: CGDirectDisplayID) -> String? {
+        guard let identifier = CGDisplayCreateUUIDFromDisplayID(displayID)?.takeRetainedValue() else { return nil }
+        return CFUUIDCreateString(nil, identifier) as String
     }
 }
 

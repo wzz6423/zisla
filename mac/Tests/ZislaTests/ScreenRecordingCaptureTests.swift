@@ -6,11 +6,44 @@ import Combine
 import Foundation
 import Testing
 import ZislaCore
+import ZislaKit
 
 @testable import Zisla
 
 @Suite @MainActor
 struct ScreenRecordingCaptureTests {
+    @Test
+    func captureLifecycleKeepsTheNotificationSceneThroughPauseAndCleanupAndEndsOnFailure() async throws {
+        let system = CaptureTestSystem()
+        let service = ScreenRecordingService(dependencies: system.dependencies())
+        let queue = SideNoticeQueue()
+        defer { queue.removeAll() }
+        queue.configureNotificationScenarios(.init(enabled: true), displayIdentifiers: ["display"])
+        let subscription = service.$phase.sink { queue.setNotificationScenario(.screenRecording, active: $0 != .idle) }
+        let starting = Task { try await service.start(configuration: .init(), directory: system.directory) }
+        await system.session.startEntered.wait()
+        #expect(queue.activeNotificationScenarios == [.screenRecording])
+        system.session.firstFrame.resolve(.success(100))
+        try await starting.value
+        await service.togglePause()
+        #expect(service.phase == .paused && queue.activeNotificationScenarios == [.screenRecording])
+        queue.enqueue(.init(id: "notice", title: "During recording"), expiresAfter: nil)
+        system.session.cancelHeld = CaptureTestSignal()
+        let cancelling = Task { await service.cancel() }
+        await system.session.cancelEntered.wait()
+        #expect(service.phase == .finishing && queue.scenarioReview(displayIdentifier: "display").isEmpty)
+        system.session.cancelHeld?.signal()
+        await cancelling.value
+        #expect(queue.activeNotificationScenarios.isEmpty)
+        #expect(queue.scenarioReview(displayIdentifier: "display").map(\.id) == ["notice"])
+        system.denied = .screen
+        await #expect(throws: ScreenRecordingCaptureError.permission(.screen)) {
+            try await service.start(configuration: .init(), directory: system.directory)
+        }
+        #expect(queue.activeNotificationScenarios.isEmpty && service.phase == .idle)
+        withExtendedLifetime(subscription) {}
+    }
+
     @Test
     func microphoneMonitoringFailureUpdatesControlsWithoutEndingRecordingAndIgnoresLateFailures() async throws {
         let system = CaptureTestSystem()

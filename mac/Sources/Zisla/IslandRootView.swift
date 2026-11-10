@@ -150,7 +150,7 @@ struct IslandRootView: View {
                 notchBackground: settingsStore.settings.islandNotchBackground,
                 usesCompactGlassSurface: usesCompactSurface,
                 collapsedCenterOffsetX: collapsedCenterOffsetX,
-                resultSweep: model.aiResultSweep,
+                resultSweep: showsScenarioResultSweep ? model.aiResultSweep : nil,
                 layoutStyle: settingsStore.settings.islandLayoutStyle,
                 collapsedFrame: pillCollapsedFrame(in: renderedSurfaceSize, panelSize: proxy.size, direction: .leftToRight),
                 edge: model.islandEdge,
@@ -390,6 +390,14 @@ struct IslandRootView: View {
         .clipped()
         .ignoresSafeArea(edges: .top)
         .animation(reduceMotion ? nil : .snappy(duration: 0.2), value: showsTransferHints)
+    }
+
+    private var showsScenarioResultSweep: Bool {
+        guard let task = model.aiResultSweep.current?.task else { return false }
+        return model.notices.isScenarioNoticeVisible(IslandNotice(id: AIMascotLibrary.activeNoticeID(for: task),
+            title: task.title, kind: task.status.noticeKind),
+            displayIdentifier: model.islandScreenLayout.map { ScreenSnapshot.notificationPolicyIdentifier(for: $0.displayID)
+                ?? "session:\($0.displayID)" } ?? "")
     }
 
     private var toolRail: some View {

@@ -127,6 +127,11 @@ enum SettingsSearchIndex {
         }
         entry(.info, "收起态展示优先级", anchor: .group("收起态展示优先级"), keywords: ["恢复默认顺序"])
         entry(.info, "通知显示器", anchor: .group("通知显示器"), keywords: ["播放与 AI 活动通知显示在此屏幕"])
+        entry(.info, "场景通知策略", anchor: .group("场景通知策略"), keywords: ["专注与番茄钟", "会议场景", "录屏场景", "结束后回顾", "保留重要提示"])
+        rows(.info, ["启用场景通知策略"])
+        if settings.notificationScenarios.enabled {
+            rows(.info, ["按日历自动开启会议场景", "手动开启会议场景"])
+        }
 
         rows(.clipboardAssistant, [
             "关闭弹窗快捷键", "鼠标侧键", "轻量提醒模式",

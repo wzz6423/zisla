@@ -11,6 +11,106 @@ import ZislaKit
 // Pixel velocity sampling needs an uncontended AppKit run loop, beyond MainActor isolation.
 @Suite(.serialized)
 struct SideNoticePresenterPillTests {
+    @Test
+    func scenarioPolicyFiltersResultSweepAndCompactContentIndependentlyOnEachDisplay() throws {
+        let fixture = try Fixture(edge: .top)
+        defer { fixture.close() }
+        let settings = NotificationScenarioSettings(enabled: true,
+            displayOverrides: ["showing": .init(focus: .init(ordinary: .show))])
+        fixture.settings.settings.notificationScenarios = settings
+        fixture.queue.configureNotificationScenarios(settings, displayIdentifiers: ["quiet", "showing"])
+        fixture.queue.setNotificationScenario(.focus, active: true)
+        let running = IslandNotice(id: "ai-active-running", title: "Working")
+        let blocked = IslandNotice(id: "ai-active-blocked", title: "Waiting", kind: .warning)
+        fixture.queue.enqueue(running, expiresAfter: nil)
+        fixture.queue.enqueue(blocked, expiresAfter: nil)
+        #expect(fixture.presenter.compactPresentationNotices(on: "quiet").map(\.id) == [blocked.id])
+        #expect(fixture.presenter.compactPresentationNotices(on: "showing").map(\.id) == [running.id, blocked.id])
+        let completed = AIProgressTask(id: "completed", provider: .codex, title: "Done", progress: 1,
+            status: .succeeded, updatedAt: fixture.date)
+        fixture.sweep.receive(previous: .running, task: completed, observedSince: fixture.date, settings: fixture.settings.settings)
+        fixture.queue.recordScenarioEvent(.init(id: AIMascotLibrary.activeNoticeID(for: completed), title: completed.title, kind: .success))
+        #expect(!fixture.presenter.isResultSweepVisible(on: "quiet"))
+        #expect(fixture.presenter.isResultSweepVisible(on: "showing"))
+        let completedSweep = try #require(fixture.sweep.current)
+        fixture.sweep.finish(id: completedSweep.id)
+        fixture.queue.releaseScenarioEventVisibility(id: AIMascotLibrary.activeNoticeID(for: completed))
+        var failed = completed
+        failed.id = "failed"
+        failed.status = .failed
+        fixture.sweep.receive(previous: .running, task: failed, observedSince: fixture.date, settings: fixture.settings.settings)
+        fixture.queue.recordScenarioEvent(.init(id: AIMascotLibrary.activeNoticeID(for: failed), title: failed.title, kind: .error))
+        #expect(fixture.presenter.isResultSweepVisible(on: "quiet"))
+        #expect(fixture.presenter.isResultSweepVisible(on: "showing"))
+        let failedSweep = try #require(fixture.sweep.current)
+        fixture.sweep.finish(id: failedSweep.id)
+        fixture.queue.releaseScenarioEventVisibility(id: AIMascotLibrary.activeNoticeID(for: failed))
+        fixture.queue.remove(id: running.id)
+        fixture.queue.remove(id: blocked.id)
+        fixture.queue.setNotificationScenarios([])
+        #expect(fixture.queue.scenarioReview(displayIdentifier: "quiet").map(\.id) == [AIMascotLibrary.activeNoticeID(for: completed)])
+        #expect(fixture.queue.scenarioReview(displayIdentifier: "showing").isEmpty)
+    }
+
+    @Test
+    func lockedScreenshotAndVoiceSuppressionCannotClearAScenarioOrPublishItsReviewEarly() throws {
+        let fixture = try Fixture(edge: .top)
+        defer { fixture.close() }
+        let settings = NotificationScenarioSettings(enabled: true)
+        fixture.settings.settings.notificationScenarios = settings
+        fixture.presenter.setScreenLocked(true)
+        fixture.queue.configureNotificationScenarios(settings, displayIdentifiers: [fixture.screen.notificationScopeIdentifier])
+        fixture.queue.setNotificationScenario(.meeting, active: true)
+        fixture.queue.enqueue(.init(id: "saved", title: "Saved"), expiresAfter: nil)
+        fixture.presenter.setScreenshotActive(true)
+        fixture.presenter.setScreenshotActive(false)
+        fixture.presenter.setVoiceRecording(true)
+        fixture.presenter.setVoiceRecording(false)
+        fixture.presenter.setClipboardAssistantVisible(true)
+        fixture.presenter.setClipboardAssistantVisible(false)
+        #expect(fixture.queue.activeNotificationScenarios == [.meeting])
+        #expect(fixture.queue.scenarioReview(displayIdentifier: fixture.screen.notificationScopeIdentifier).isEmpty)
+        fixture.queue.setNotificationScenarios([])
+        #expect(fixture.queue.scenarioReview(displayIdentifier: fixture.screen.notificationScopeIdentifier).map(\.id) == ["saved"])
+        #expect(fixture.queue.presentationNotices(fixture.queue.right, displayIdentifier: fixture.screen.notificationScopeIdentifier).isEmpty)
+        fixture.presenter.stop()
+        fixture.queue.dismissScenarioReview(displayIdentifier: fixture.screen.notificationScopeIdentifier)
+        #expect(fixture.queue.scenarioReviewNotice(displayIdentifier: fixture.screen.notificationScopeIdentifier) == nil)
+    }
+
+    @Test
+    func unchangedScenarioConfigurationLetsThePresenterSettleWhileRealChangesStillRefresh() async throws {
+        let fixture = try Fixture(edge: .top)
+        defer { fixture.close() }
+        fixture.settings.settings.notificationScenarios = .init(enabled: true)
+        fixture.presenter.setDisplayIDs([fixture.screen.displayID])
+        try await Task.sleep(for: .milliseconds(30))
+        let initialReads = fixture.snapshotReads
+        try await Task.sleep(for: .milliseconds(30))
+        #expect(fixture.snapshotReads == initialReads && initialReads > 0)
+        fixture.queue.setNotificationScenario(.meeting, active: true)
+        try await Task.sleep(for: .milliseconds(30))
+        #expect(fixture.snapshotReads > initialReads)
+        #expect(fixture.queue.notificationBehavior(for: .ordinary,
+            displayIdentifier: fixture.screen.notificationScopeIdentifier) == .deferUntilEnd)
+        fixture.queue.enqueue(.init(id: "deferred", title: "Deferred"), expiresAfter: nil)
+        fixture.queue.setNotificationScenarios([])
+        try await Task.sleep(for: .milliseconds(30))
+        #expect(fixture.queue.scenarioReview(displayIdentifier: fixture.screen.notificationScopeIdentifier).map(\.id) == ["deferred"])
+        let endedReads = fixture.snapshotReads
+        try await Task.sleep(for: .milliseconds(30))
+        #expect(fixture.snapshotReads == endedReads)
+        fixture.settings.settings.notificationScenarios.rules.meeting.ordinary = .mute
+        fixture.queue.setNotificationScenario(.meeting, active: true)
+        try await Task.sleep(for: .milliseconds(30))
+        #expect(fixture.snapshotReads > endedReads)
+        #expect(fixture.queue.notificationBehavior(for: .ordinary,
+            displayIdentifier: fixture.screen.notificationScopeIdentifier) == .mute)
+        let changedReads = fixture.snapshotReads
+        try await Task.sleep(for: .milliseconds(30))
+        #expect(fixture.snapshotReads == changedReads)
+    }
+
     @Test(arguments: [IslandLayoutStyle.pill, .notch])
     func cameraAIContentMovesTenPointsInwardWithoutResizingTheIcons(style: IslandLayoutStyle) async throws {
         let fixture = try Fixture(edge: .top)
@@ -1055,6 +1155,7 @@ struct SideNoticePresenterPillTests {
         let queue = SideNoticeQueue()
         let sweep = AIResultSweepController()
         let date = Date(timeIntervalSince1970: 100)
+        var snapshotReads = 0
         var reducesMotion = false
         let resizeClock = ResizeClock()
         var screen = ScreenSnapshot(displayID: 7,
@@ -1064,7 +1165,7 @@ struct SideNoticePresenterPillTests {
             browserDownloads: downloads, settingsStore: settings, languageStore: language,
             isScreenLocked: true, now: { [unowned self] in date }, reduceMotion: { [unowned self] in reducesMotion },
             waitForCompactResize: { [resizeClock] in try await resizeClock.wait(for: $0) },
-            screenSnapshotProvider: { [unowned self] in [screen] })
+            screenSnapshotProvider: { [unowned self] in snapshotReads += 1; return [screen] })
 
         init(edge: IslandEdge) throws {
             defaults = try #require(UserDefaults(suiteName: suiteName))

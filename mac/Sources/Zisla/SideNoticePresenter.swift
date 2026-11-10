@@ -62,9 +62,8 @@ final class SideNoticePresenter {
         self.waitForCompactResize = waitForCompactResize
         configuredDisplayIDs = displayIDs
         suppression.isScreenLocked = isScreenLocked
-        queue.$left
-            .combineLatest(queue.$right)
-            .sink { [weak self] _, _ in
+        queue.objectWillChange
+            .sink { [weak self] in
                 Task { @MainActor [weak self] in
                     self?.updatePanels()
                 }
@@ -200,6 +199,8 @@ final class SideNoticePresenter {
             hideAllPanels()
         }
         let snapshots = screenSnapshotProvider()
+        queue.configureNotificationScenarios(settingsStore.settings.notificationScenarios,
+            displayIdentifiers: Set(snapshots.map(\.notificationScopeIdentifier)))
         guard !snapshots.isEmpty else {
             hideAllPanels()
             panelsByDisplayID.removeAll()
@@ -218,11 +219,13 @@ final class SideNoticePresenter {
                 lastPhysicalSnapshot: &panels.lastPhysicalSnapshot
             )
             let displayState = panels.displayState
+            displayState.notificationScopeIdentifier = snapshot.notificationScopeIdentifier
+            displayState.showsScenarioReview = settingsStore.settings.sideNoticesEnabled
             displayState.systemMonitorAvailable = availableStatusIcons.contains(where: \.isSystemMonitor)
             displayState.hidesVoiceProcessingIndicator = hidesVoiceProcessingIndicator(
                 on: snapshot.displayID
             )
-            var compactNotices = resultSweep.presentationNotices(from: queue.left + queue.right)
+            var compactNotices = compactPresentationNotices(on: snapshot.notificationScopeIdentifier)
             if displayState.hidesVoiceProcessingIndicator {
                 compactNotices = Self.noticesWithoutVoiceProcessing(compactNotices)
             }
@@ -230,7 +233,8 @@ final class SideNoticePresenter {
                 notices: compactNotices, settings: settingsStore.settings, displayState: displayState
             )
             let configuration = compactConfiguration(
-                for: compactNotices, at: date, statusHidden: displayState.compactStatusHidden
+                for: compactNotices, at: date, statusHidden: displayState.compactStatusHidden,
+                showsResultSweep: isResultSweepVisible(on: snapshot.notificationScopeIdentifier)
             )
             displayState.statusIcons = configuration.statusIconSize == nil ? [] : availableStatusIcons
             onCompactLayoutChanged?(snapshot.displayID, configuration.expandsForDetailedStatus,
@@ -263,7 +267,7 @@ final class SideNoticePresenter {
             )
             updatePanel(
                 side: .left,
-                notices: queue.left,
+                notices: queue.presentationNotices(queue.left, displayIdentifier: snapshot.notificationScopeIdentifier),
                 screen: snapshot,
                 panels: panels,
                 rejoiningActiveSpace: rejoiningActiveSpace,
@@ -272,7 +276,9 @@ final class SideNoticePresenter {
             )
             updatePanel(
                 side: .right,
-                notices: queue.right,
+                notices: queue.presentationNotices(queue.right, displayIdentifier: snapshot.notificationScopeIdentifier)
+                    + (settingsStore.settings.sideNoticesEnabled
+                        ? queue.scenarioReviewNotice(displayIdentifier: snapshot.notificationScopeIdentifier).map { [$0] } ?? [] : []),
                 screen: snapshot,
                 panels: panels,
                 rejoiningActiveSpace: rejoiningActiveSpace,
@@ -313,7 +319,7 @@ final class SideNoticePresenter {
     }
 
     func compactConfiguration(
-        for notices: [IslandNotice], at date: Date, statusHidden: Bool = false
+        for notices: [IslandNotice], at date: Date, statusHidden: Bool = false, showsResultSweep: Bool = true
     ) -> ScreenLayoutConfiguration {
         var configuration = settingsStore.settings.islandScreenConfiguration
         if configuration.layoutStyle == .pill, configuration.placement.mode == .custom,
@@ -327,7 +333,7 @@ final class SideNoticePresenter {
             notices: statusHidden ? [] : notices, icons: availableStatusIcons,
             settings: settingsStore.settings, item: media.snapshot, at: date
         ), !suppression.isVoiceRecording, !suppression.isTransientNoticePresented,
-           resultSweep.current == nil {
+           !(showsResultSweep && resultSweep.current != nil) {
             configuration.statusIconSize = information.size
             return configuration
         }
@@ -356,7 +362,7 @@ final class SideNoticePresenter {
         if settingsStore.settings.effectiveStatusIconDestination == .island,
            sizing == nil || (selectedPriority == .systemMonitor && sizing?.customPillPresentation?.priority != nil),
            !suppression.isVoiceRecording, !suppression.isTransientNoticePresented,
-           resultSweep.current == nil {
+           !(showsResultSweep && resultSweep.current != nil) {
             configuration.statusIconSize = IslandStatusIconLayout.size(icons: availableStatusIcons,
                                                                        edge: configuration.placement.edge)
             configuration.expandsForDetailedStatus = false
@@ -369,20 +375,23 @@ final class SideNoticePresenter {
         for snapshot: ScreenSnapshot, notices: [IslandNotice], at date: Date = .now,
         statusHidden: Bool = false
     ) -> CGRect? {
-        let configuration = compactConfiguration(for: notices, at: date, statusHidden: statusHidden)
+        let visibleNotices = queue.presentationNotices(notices, displayIdentifier: snapshot.notificationScopeIdentifier)
+        let showsResultSweep = isResultSweepVisible(on: snapshot.notificationScopeIdentifier)
+        let configuration = compactConfiguration(for: visibleNotices, at: date, statusHidden: statusHidden,
+            showsResultSweep: showsResultSweep)
         if settingsStore.settings.islandLayoutStyle == .pill {
             return ScreenLayoutEngine(configuration: configuration)
                 .layout(for: snapshot).collapsedFrame
         }
         return Self.resultSweepFrame(
             statusFrame: layoutEngine.compactBarFrame(
-                for: snapshot, notices: notices, settings: settingsStore.settings,
+                for: snapshot, notices: visibleNotices, settings: settingsStore.settings,
                 browserDownloadCount: settingsStore.settings.showsBrowserDownloadProgress
                     ? browserDownloads.snapshots.count : 0
             ),
             idleFrame: layoutEngine.compactBarFrame(for: snapshot),
             hasPhysicalNotch: ScreenLayoutEngine().layout(for: snapshot).topology.hasPhysicalNotch,
-            isSweeping: resultSweep.current != nil
+            isSweeping: showsResultSweep
         )
     }
 
@@ -420,12 +429,13 @@ final class SideNoticePresenter {
 
     func publishCompactLayout(on displayID: CGDirectDisplayID) {
         let displayState = panelsByDisplayID[displayID]?.displayState
-        var notices = resultSweep.presentationNotices(from: queue.left + queue.right)
+        var notices = compactPresentationNotices(on: displayState?.notificationScopeIdentifier ?? "session:\(displayID)")
         if hidesVoiceProcessingIndicator(on: displayID) {
             notices = Self.noticesWithoutVoiceProcessing(notices)
         }
         let configuration = compactConfiguration(
-            for: notices, at: now(), statusHidden: displayState?.compactStatusHidden == true
+            for: notices, at: now(), statusHidden: displayState?.compactStatusHidden == true,
+            showsResultSweep: isResultSweepVisible(on: displayState?.notificationScopeIdentifier ?? "session:\(displayID)")
         )
         onCompactLayoutChanged?(displayID, configuration.expandsForDetailedStatus, configuration.compactStatusLength,
                                 configuration.compactStatusSideWidth,
@@ -440,11 +450,12 @@ final class SideNoticePresenter {
         at date: Date
     ) {
         let displayState = panels.displayState
-        var compactNotices = resultSweep.presentationNotices(from: queue.left + queue.right)
+        var compactNotices = compactPresentationNotices(on: snapshot.notificationScopeIdentifier)
         if displayState.hidesVoiceProcessingIndicator {
             compactNotices = Self.noticesWithoutVoiceProcessing(compactNotices)
         }
-        let showsCompactBar = settingsStore.settings.islandLayoutStyle == .pill || resultSweep.current != nil || (
+        let showsCompactBar = settingsStore.settings.islandLayoutStyle == .pill
+            || isResultSweepVisible(on: snapshot.notificationScopeIdentifier) || (
             !displayState.compactStatusHidden && compactNotices.contains(where: Self.isCompactNotice)
         )
         guard showsCompactBar || panels.compactBar?.isVisible == true else {
@@ -525,6 +536,18 @@ final class SideNoticePresenter {
         ) {
             panel.orderFrontRegardless()
         }
+    }
+
+    func isResultSweepVisible(on displayIdentifier: String) -> Bool {
+        guard let task = resultSweep.current?.task else { return false }
+        return queue.isScenarioNoticeVisible(IslandNotice(id: AIMascotLibrary.activeNoticeID(for: task),
+            title: task.title, kind: task.status.noticeKind), displayIdentifier: displayIdentifier)
+    }
+
+    func compactPresentationNotices(on displayIdentifier: String) -> [IslandNotice] {
+        let notices = isResultSweepVisible(on: displayIdentifier)
+            ? resultSweep.presentationNotices(from: queue.left + queue.right) : queue.left + queue.right
+        return queue.presentationNotices(notices, displayIdentifier: displayIdentifier)
     }
 
     private func updatePanel(
