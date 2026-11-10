@@ -11,6 +11,7 @@ struct SettingsView: View {
     @StateObject private var input = SettingsInput()
     @StateObject private var launchAtLogin = LaunchAtLoginController()
     @StateObject private var networkProxyMonitor = NetworkProxyAvailabilityMonitor()
+    @StateObject private var historyPanelPresentation = SystemMetricsHistoryPanelPresentationState()
     @Environment(\.colorScheme) private var colorScheme
     @Environment(\.locale) private var locale
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
@@ -62,6 +63,12 @@ struct SettingsView: View {
             height: 680
         )
         .background(Color(nsColor: .windowBackgroundColor))
+        .background(
+            SystemMetricsHistoryPanelPresenter(
+                presentationState: historyPanelPresentation,
+                service: model.systemMonitor
+            )
+        )
         .onAppear {
             launchAtLogin.refresh()
             model.refreshVoiceInputInputMonitoringAccess()
@@ -433,6 +440,13 @@ struct SettingsView: View {
                         .labelsHidden()
                         .toggleStyle(.switch)
                     }
+                    SystemMetricsHistorySettingsActions(
+                        service: model.systemMonitor,
+                        onViewHistory: historyPanelPresentation.present
+                    )
+                    .padding(.leading, 46)
+                    .padding(.trailing, 4)
+                    .padding(.bottom, 8)
                 }
             }
         }

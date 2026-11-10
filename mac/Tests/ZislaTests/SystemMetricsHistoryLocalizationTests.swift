@@ -61,6 +61,15 @@ struct SystemMetricsHistoryLocalizationTests {
         #expect(japanese["风扇 %ld"] == "ファン %ld")
     }
 
+    @Test(arguments: AppLanguage.allCases)
+    func historyKeysResolveInRequestedLanguage(language: AppLanguage) throws {
+        let table = try #require(Self.stringsTable(for: language))
+        for key in try Self.historyKeys() {
+            let translation = try #require(table[key])
+            #expect(AppLocalization.string(key, locale: language.locale) == translation)
+        }
+    }
+
     /// Enums and chart models supply these keys indirectly, outside the scanned view call sites.
     private static func modelKeys() -> [String] {
         var keys = SystemMetricsHistoryRange.allCases.map(\.titleKey)
@@ -96,7 +105,7 @@ struct SystemMetricsHistoryLocalizationTests {
     ]
 
     private static func historyKeys() throws -> [String] {
-        let call = try NSRegularExpression(pattern: #"AppLocalization\.text\(([^()]*)\)"#)
+        let call = try NSRegularExpression(pattern: #"AppLocalization\.(?:text|string)\(([^()]*)\)"#)
         let literal = try NSRegularExpression(pattern: #""((?:[^"\\]|\\.)*)""#)
         var keys = Set(modelKeys())
 

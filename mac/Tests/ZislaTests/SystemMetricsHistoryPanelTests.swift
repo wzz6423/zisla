@@ -8,6 +8,33 @@ import ZislaKit
 /// Match the cleanup panel's standard controls and state-driven close behavior without elevating focus.
 @Suite(.serialized)
 struct SystemMetricsHistoryPanelTests {
+    @Test(arguments: ["settings", "island", "detached"])
+    @MainActor
+    func presentationTakesFocusOnlyFromSettings(origin: String) {
+        let history = OrderingHistoryPanel(
+            contentRect: CGRect(x: 0, y: 0, width: 720, height: 560),
+            styleMask: [.titled, .closable], backing: .buffered, defer: false
+        )
+        history.isReleasedWhenClosed = false
+        let host: NSWindow? = switch origin {
+        case "settings": SettingsWindow(
+            contentRect: .zero, styleMask: .titled, backing: .buffered, defer: false
+        )
+        case "island": NSPanel(
+            contentRect: .zero, styleMask: .borderless, backing: .buffered, defer: false
+        )
+        default: nil
+        }
+        host?.isReleasedWhenClosed = false
+        defer { history.close(); host?.close() }
+
+        history.present(over: host)
+
+        #expect(history.requestedKey == (origin == "settings"))
+        #expect(history.requestedOrderFront == (origin != "settings"))
+        #expect(!history.isVisible)
+    }
+
     @Test @MainActor
     func usesStandardWindowControlsAndRoutesClose() {
         let presentationState = SystemMetricsHistoryPanelPresentationState()
@@ -200,6 +227,20 @@ struct SystemMetricsHistoryPanelTests {
         let ticks = SystemMetricsChartAxis.dates(in: date...date)
 
         #expect(ticks == [date])
+    }
+
+    @MainActor
+    private final class OrderingHistoryPanel: SystemMetricsHistoryPanel {
+        var requestedKey = false
+        var requestedOrderFront = false
+
+        override func makeKeyAndOrderFront(_ sender: Any?) {
+            requestedKey = true
+        }
+
+        override func orderFront(_ sender: Any?) {
+            requestedOrderFront = true
+        }
     }
 
 }
