@@ -18,18 +18,24 @@ struct ScenarioNotificationQueueTests {
         #expect(queue.scenarioReviewNotice(displayIdentifier: "display") == nil)
     }
 
-    @Test
+    @Test(.timeLimit(.minutes(1)))
     func delayedTemporaryNoticesSurviveOrdinaryExpiryWithoutReplayingTheOriginalRow() async {
-        let gate = ScenarioExpiryGate()
+        let gate = ScenarioExpiryGate(expectedSleepers: 2)
         let queue = SideNoticeQueue(capacityPerSide: 3, expirySleeper: { _ in await gate.sleep() })
-        defer { queue.removeAll() }
+        defer { queue.removeAll(); Task { await gate.release() } }
         queue.configureNotificationScenarios(.init(enabled: true), displayIdentifiers: ["display"])
         queue.setNotificationScenarios([.focus])
         queue.enqueue(IslandNotice(id: "saved", title: "Saved"), expiresAfter: 1)
         queue.enqueue(IslandNotice(id: "media-active-expiring", title: "Music", side: .left), expiresAfter: 1)
+        let (expired, continuation) = AsyncStream<Void>.makeStream()
+        let subscription = queue.$left.combineLatest(queue.$right)
+            .filter { $0.0.isEmpty && $0.1.isEmpty }
+            .sink { _ in continuation.yield(()) }
+        defer { subscription.cancel(); continuation.finish() }
+        var expiration = expired.makeAsyncIterator()
         await gate.waitUntilSleeping()
         await gate.release()
-        for _ in 0..<20 where !queue.right.isEmpty || !queue.left.isEmpty { await Task.yield() }
+        #expect(await expiration.next() != nil)
         #expect(queue.right.isEmpty && queue.left.isEmpty, "Scenario filtering preserves the existing display duration")
         queue.setNotificationScenarios([])
         #expect(queue.scenarioReview(displayIdentifier: "display").map(\.title) == ["Saved"])
@@ -364,18 +370,29 @@ struct ScenarioNotificationQueueTests {
 private final class ScenarioTestClock { var date = Date(timeIntervalSince1970: 10_000) }
 
 private actor ScenarioExpiryGate {
-    private var sleeping: [CheckedContinuation<Void, Never>] = []
-    private var entered: [CheckedContinuation<Void, Never>] = []
+    private let expectedSleepers: Int
+    private var sleeping: [AsyncStream<Void>.Continuation] = []
+    private let entered = AsyncStream<Int>.makeStream()
+    private var released = false
+
+    init(expectedSleepers: Int = 1) { self.expectedSleepers = expectedSleepers }
+
     func sleep() async {
-        await withCheckedContinuation { continuation in
-            sleeping.append(continuation)
-            entered.forEach { $0.resume() }
-            entered.removeAll()
-        }
+        guard !released else { return }
+        let (stream, continuation) = AsyncStream<Void>.makeStream()
+        sleeping.append(continuation)
+        entered.continuation.yield(sleeping.count)
+        var iterator = stream.makeAsyncIterator()
+        await iterator.next()
     }
     func waitUntilSleeping() async {
-        if !sleeping.isEmpty { return }
-        await withCheckedContinuation { entered.append($0) }
+        if sleeping.count == expectedSleepers { return }
+        for await count in entered.stream where count == expectedSleepers { return }
     }
-    func release() { sleeping.forEach { $0.resume() }; sleeping.removeAll() }
+    func release() {
+        released = true
+        sleeping.forEach { $0.finish() }
+        sleeping.removeAll()
+        entered.continuation.finish()
+    }
 }

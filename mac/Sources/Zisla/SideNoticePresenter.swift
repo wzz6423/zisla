@@ -46,6 +46,9 @@ final class SideNoticePresenter {
         now: @escaping () -> Date = Date.init,
         reduceMotion: @escaping () -> Bool = { NSWorkspace.shared.accessibilityDisplayShouldReduceMotion },
         waitForCompactResize: @escaping (Duration) async throws -> Void = { try await Task.sleep(for: $0) },
+        schedulePanelUpdate: @escaping (@escaping @MainActor () -> Void) -> Void = { update in
+            Task { @MainActor in update() }
+        },
         screenSnapshotProvider: @escaping @MainActor () -> [ScreenSnapshot] = {
             NSScreen.screens.compactMap(ScreenSnapshot.init(screen:))
         }
@@ -64,28 +67,28 @@ final class SideNoticePresenter {
         suppression.isScreenLocked = isScreenLocked
         queue.objectWillChange
             .sink { [weak self] in
-                Task { @MainActor [weak self] in
+                schedulePanelUpdate { [weak self] in
                     self?.updatePanels()
                 }
             }
             .store(in: &cancellables)
         resultSweep.$current
             .sink { [weak self] _ in
-                Task { @MainActor [weak self] in self?.updatePanels() }
+                schedulePanelUpdate { [weak self] in self?.updatePanels() }
             }
             .store(in: &cancellables)
         browserDownloads.$snapshots
             .map(\.count)
             .removeDuplicates()
             .sink { [weak self] _ in
-                Task { @MainActor [weak self] in self?.updatePanels() }
+                schedulePanelUpdate { [weak self] in self?.updatePanels() }
             }
             .store(in: &cancellables)
         // A settings change can switch the winning compact status and its required width.
         settingsStore.$settings
             .removeDuplicates()
             .sink { [weak self] _ in
-                Task { @MainActor [weak self] in
+                schedulePanelUpdate { [weak self] in
                     self?.updatePanels()
                 }
             }

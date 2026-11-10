@@ -79,35 +79,35 @@ struct SideNoticePresenterPillTests {
     }
 
     @Test
-    func unchangedScenarioConfigurationLetsThePresenterSettleWhileRealChangesStillRefresh() async throws {
-        let fixture = try Fixture(edge: .top)
+    func unchangedScenarioConfigurationLetsThePresenterSettleWhileRealChangesStillRefresh() throws {
+        let fixture = try Fixture(edge: .top, controlsPanelUpdates: true)
         defer { fixture.close() }
         fixture.settings.settings.notificationScenarios = .init(enabled: true)
         fixture.presenter.setDisplayIDs([fixture.screen.displayID])
-        try await Task.sleep(for: .milliseconds(30))
+        try fixture.drainPanelUpdates()
         let initialReads = fixture.snapshotReads
-        try await Task.sleep(for: .milliseconds(30))
+        try fixture.drainPanelUpdates()
         #expect(fixture.snapshotReads == initialReads && initialReads > 0)
         fixture.queue.setNotificationScenario(.meeting, active: true)
-        try await Task.sleep(for: .milliseconds(30))
+        try fixture.drainPanelUpdates()
         #expect(fixture.snapshotReads > initialReads)
         #expect(fixture.queue.notificationBehavior(for: .ordinary,
             displayIdentifier: fixture.screen.notificationScopeIdentifier) == .deferUntilEnd)
         fixture.queue.enqueue(.init(id: "deferred", title: "Deferred"), expiresAfter: nil)
         fixture.queue.setNotificationScenarios([])
-        try await Task.sleep(for: .milliseconds(30))
+        try fixture.drainPanelUpdates()
         #expect(fixture.queue.scenarioReview(displayIdentifier: fixture.screen.notificationScopeIdentifier).map(\.id) == ["deferred"])
         let endedReads = fixture.snapshotReads
-        try await Task.sleep(for: .milliseconds(30))
+        try fixture.drainPanelUpdates()
         #expect(fixture.snapshotReads == endedReads)
         fixture.settings.settings.notificationScenarios.rules.meeting.ordinary = .mute
         fixture.queue.setNotificationScenario(.meeting, active: true)
-        try await Task.sleep(for: .milliseconds(30))
+        try fixture.drainPanelUpdates()
         #expect(fixture.snapshotReads > endedReads)
         #expect(fixture.queue.notificationBehavior(for: .ordinary,
             displayIdentifier: fixture.screen.notificationScopeIdentifier) == .mute)
         let changedReads = fixture.snapshotReads
-        try await Task.sleep(for: .milliseconds(30))
+        try fixture.drainPanelUpdates()
         #expect(fixture.snapshotReads == changedReads)
     }
 
@@ -1155,6 +1155,8 @@ struct SideNoticePresenterPillTests {
         let queue = SideNoticeQueue()
         let sweep = AIResultSweepController()
         let date = Date(timeIntervalSince1970: 100)
+        let controlsPanelUpdates: Bool
+        var pendingPanelUpdates: [@MainActor () -> Void] = []
         var snapshotReads = 0
         var reducesMotion = false
         let resizeClock = ResizeClock()
@@ -1165,9 +1167,14 @@ struct SideNoticePresenterPillTests {
             browserDownloads: downloads, settingsStore: settings, languageStore: language,
             isScreenLocked: true, now: { [unowned self] in date }, reduceMotion: { [unowned self] in reducesMotion },
             waitForCompactResize: { [resizeClock] in try await resizeClock.wait(for: $0) },
+            schedulePanelUpdate: { [unowned self] update in
+                if controlsPanelUpdates { pendingPanelUpdates.append(update) }
+                else { Task { @MainActor in update() } }
+            },
             screenSnapshotProvider: { [unowned self] in snapshotReads += 1; return [screen] })
 
-        init(edge: IslandEdge) throws {
+        init(edge: IslandEdge, controlsPanelUpdates: Bool = false) throws {
+            self.controlsPanelUpdates = controlsPanelUpdates
             defaults = try #require(UserDefaults(suiteName: suiteName))
             settings = FeatureSettingsStore(defaults: defaults)
             language = AppLanguageStore(defaults: defaults)
@@ -1178,11 +1185,21 @@ struct SideNoticePresenterPillTests {
 
         func close() {
             presenter.stop()
+            pendingPanelUpdates.removeAll()
             resizeClock.advance()
             queue.removeAll()
             sweep.cancel()
             settings.flushPendingChanges()
             defaults.removePersistentDomain(forName: suiteName)
+        }
+
+        func drainPanelUpdates() throws {
+            for _ in 0..<20 where !pendingPanelUpdates.isEmpty {
+                let updates = pendingPanelUpdates
+                pendingPanelUpdates.removeAll()
+                updates.forEach { $0() }
+            }
+            try #require(pendingPanelUpdates.isEmpty, "The real presenter must stop scheduling updates once scenario configuration is unchanged")
         }
     }
 
