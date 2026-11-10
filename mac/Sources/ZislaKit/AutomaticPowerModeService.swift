@@ -160,9 +160,8 @@ public final class AutomaticPowerModeService: ObservableObject {
     }
 
     private func recordCancelledChange(request: Request, changed: Bool) {
-        // A submitted pmset command can finish after cancellation; recognize its verified result before applying the latest rule.
-        guard changed, configuration?.enabled == true,
-              phase?.source == request.source.rawValue, phase?.manualPaused == false else { return }
+        // A submitted pmset command can finish after disabling or stopping; persist its result to avoid a false manual pause.
+        guard changed, phase?.source == request.source.rawValue, phase?.manualPaused == false else { return }
         phase?.mode = request.mode
         persistPhase()
     }

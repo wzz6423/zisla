@@ -465,6 +465,81 @@ struct AutomaticPowerModeServiceTests {
         }
     }
 
+    @Test(arguments: ["disable", "parent", "stop"], [false, true])
+    func completedAutomaticChangesRemainRecognizedAfterDisablingOrRestarting(
+        action: String, newDefault: Bool
+    ) async throws {
+        let fixture = try PowerFixture()
+        var service = fixture.service()
+        defer { service.stop() }
+        let gate = PowerCommandGate()
+        fixture.gate = gate
+        fixture.gatedArguments = ["-c", "powermode", "2"]
+        var settings = FeatureSettings(automaticPowerModeEnabled: true, powerAdapterDefaultMode: .highPower)
+        service.apply(settings: settings, snapshot: fixture.snapshot())
+        await gate.waitUntilStarted()
+        let original = try #require(service.updateTask)
+        if action == "stop" {
+            service.stop()
+        } else {
+            if action == "parent" { settings.systemMonitorEnabled = false }
+            else { settings.automaticPowerModeEnabled = false }
+            service.apply(settings: settings, snapshot: fixture.snapshot())
+        }
+        await gate.release()
+        await original.value
+        #expect(fixture.adapterMode == .highPower)
+        let data = try #require(fixture.defaults.data(forKey: "automatic-power-mode-phase-v1"))
+        let phase = try #require(JSONSerialization.jsonObject(with: data) as? [String: Any])
+        #expect(phase["mode"] as? Int == BatteryPowerMode.highPower.rawValue,
+                "An already submitted automatic change must remain recognized when its feature stops")
+        if action == "stop" { service = fixture.service() }
+        settings.systemMonitorEnabled = true
+        settings.automaticPowerModeEnabled = true
+        if newDefault { settings.powerAdapterDefaultMode = .lowPower }
+        service.apply(settings: settings, snapshot: fixture.snapshot())
+        await fixture.drain(service)
+        #expect(!service.manualPaused, "Completion of this app's automatic command is not a manual selection")
+        #expect(service.error == nil)
+        #expect(fixture.failures.isEmpty)
+        #expect(fixture.adapterMode == (newDefault ? .lowPower : .highPower))
+        #expect(fixture.changes.count == (newDefault ? 2 : 1))
+    }
+
+    @Test(arguments: ["disable", "stop"])
+    func externalManualChangesAfterAnAutomaticCompletionStillPauseOnResuming(action: String) async throws {
+        let fixture = try PowerFixture()
+        var service = fixture.service()
+        defer { service.stop() }
+        let gate = PowerCommandGate()
+        fixture.gate = gate
+        fixture.gatedArguments = ["-c", "powermode", "2"]
+        var settings = FeatureSettings(automaticPowerModeEnabled: true, powerAdapterDefaultMode: .highPower)
+        service.apply(settings: settings, snapshot: fixture.snapshot())
+        await gate.waitUntilStarted()
+        let original = try #require(service.updateTask)
+        if action == "stop" { service.stop() }
+        else {
+            settings.automaticPowerModeEnabled = false
+            service.apply(settings: settings, snapshot: fixture.snapshot())
+        }
+        await gate.release()
+        await original.value
+        fixture.adapterMode = .automatic
+        if action == "stop" { service = fixture.service() }
+        settings.automaticPowerModeEnabled = true
+        service.apply(settings: settings, snapshot: fixture.snapshot(level: 0.1))
+        await fixture.drain(service)
+        #expect(service.manualPaused, "A later external selection must still pause every automatic rule")
+        #expect(fixture.adapterMode == .automatic)
+        #expect(fixture.changes.count == 1)
+        fixture.source = .battery
+        service.apply(settings: settings, snapshot: fixture.snapshot(level: 0.1))
+        await fixture.drain(service)
+        #expect(!service.manualPaused)
+        #expect(fixture.batteryMode == .lowPower)
+    }
+
     @Test
     func repeatedSamplesDuringAnActiveCommandDoNotStartOverlappingRequests() async throws {
         let fixture = try PowerFixture()
