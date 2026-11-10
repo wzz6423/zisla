@@ -105,6 +105,18 @@ struct SettingsSearchTests {
         #expect(results(dependencyTitle, settings: FeatureSettings(downloaderEnabled: false), locale: language.locale).isEmpty)
     }
 
+    /// Renaming navigation must not invalidate existing search terms or bypass the feature toggle.
+    @Test(arguments: AppLanguage.allCases)
+    func legacyDownloadTitleStillFindsDependencyComponents(language: AppLanguage) {
+        for query in ["下载", AppLocalization.string("下载", language: language)] {
+            let dependencies = results(query, locale: language.locale).filter { $0.section == .download }
+            #expect(Set(dependencies.map(\.title)) == [ManagedTool.ytDLP.displayName, ManagedTool.libreOffice.displayName])
+            #expect(dependencies.allSatisfy { $0.anchor == .row($0.title) })
+            #expect(results(query, settings: FeatureSettings(downloaderEnabled: false), locale: language.locale)
+                .allSatisfy { $0.section != .download })
+        }
+    }
+
     @Test
     func requiresEveryQueryWordAcrossTitleAndCategory() {
         #expect(results("通用 \n 启动").map(\.title) == ["登录时启动"])

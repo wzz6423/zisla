@@ -4614,7 +4614,13 @@ final class AppModel: ObservableObject {
     )
   }
 
-  private static func downloadErrorText(_ error: Error) -> String {
+  /// Resolver messages are catalog keys; external diagnostics must remain verbatim to preserve support details.
+  static func downloadErrorText(
+    _ error: Error, locale: Locale = AppLocalization.currentLanguage.locale
+  ) -> String {
+    if error is YTDLPResolverError {
+      return AppLocalization.string(error.localizedDescription, locale: locale)
+    }
     guard let error = error as? DownloadServiceError else {
       return error.localizedDescription
     }

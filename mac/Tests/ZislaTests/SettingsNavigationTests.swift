@@ -386,6 +386,7 @@ struct SettingsNavigationTests {
         }
     }
 
+    /// Bundle lookup silently falls back to Chinese keys, so catalog presence and rendered values need separate assertions.
     @Test(arguments: AppLanguage.allCases)
     func groupedSettingsAndPDFLabelsUseEveryRequestedLanguage(language: AppLanguage) throws {
         let dependencyGuidance = try #require(YTDLPResolverError.executableNotFound(searched: []).errorDescription)
