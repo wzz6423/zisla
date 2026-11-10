@@ -186,6 +186,8 @@ struct CalendarServiceEnvironment {
     var makeTimer: (@escaping @Sendable () -> Void) -> Timer = { action in
         Timer.scheduledTimer(withTimeInterval: 60, repeats: true) { _ in action() }
     }
+    var sleep: @Sendable (Duration) async throws -> Void = { try await Task.sleep(for: $0) }
+    var authorizationPromptHost: () -> NSWindow? = { WindowPlacement.authorizationPromptHost() }
 
     static var live: Self {
         Self(authorizationStatus: EKEventStore.authorizationStatus(for:), now: Date.init,
@@ -215,9 +217,11 @@ public final class CalendarService: ObservableObject {
     private var meetingObservers: [(NotificationCenter, NSObjectProtocol)] = []
     private var meetingRefreshTimer: Timer?
     private var monitoringGeneration: UInt64 = 0
-    private var scheduledRefresh: Task<Void, Never>?
+    private(set) var scheduledRefresh: Task<Void, Never>?
     private var refreshGeneration: UInt64 = 0
+    private var agendaLifecycleGeneration: UInt64 = 0
     private var isRefreshing = false
+    private var monitorsAgenda = true
     /// Delayed refresh triggered by calendar changes continues querying the week the user is currently viewing.
     private var queryAnchorDate = Date()
 
@@ -239,7 +243,14 @@ public final class CalendarService: ObservableObject {
         stop()
     }
 
-    public func start() {
+    public func start(monitorAgenda: Bool = true) {
+        monitorsAgenda = monitorAgenda
+        if !monitorAgenda {
+            agendaLifecycleGeneration &+= 1
+            refreshGeneration &+= 1
+            scheduledRefresh?.cancel()
+            scheduledRefresh = nil
+        }
         guard storeChangedObserver == nil else { return }
         let generation = monitoringGeneration
         let enqueue = environment.enqueue
@@ -251,7 +262,7 @@ public final class CalendarService: ObservableObject {
             enqueue { @MainActor [weak self] in
                 guard let self, self.monitoringGeneration == generation else { return }
                 self.refreshMeetings()
-                self.scheduleRefresh()
+                if self.monitorsAgenda { self.scheduleRefresh() }
             }
         }
         for (center, name) in [
@@ -280,6 +291,7 @@ public final class CalendarService: ObservableObject {
 
     public func stop() {
         monitoringGeneration &+= 1
+        agendaLifecycleGeneration &+= 1
         refreshGeneration &+= 1
         scheduledRefresh?.cancel()
         scheduledRefresh = nil
@@ -310,12 +322,14 @@ public final class CalendarService: ObservableObject {
         refreshGeneration &+= 1
         let generation = refreshGeneration
         guard !isRefreshing else { return }
+        let lifecycleGeneration = agendaLifecycleGeneration
 
         isRefreshing = true
         isLoading = true
         do {
             updateAuthorizationStatuses()
-            try await requestUndeterminedAccess()
+            try await requestUndeterminedAccess(lifecycleGeneration: lifecycleGeneration)
+            try checkAgendaLifecycle(lifecycleGeneration)
             refreshMeetings()
 
             let readsEvents = Self.canReadEvents(authorizationStatus)
@@ -324,6 +338,7 @@ public final class CalendarService: ObservableObject {
                 completeRefresh(
                     with: [],
                     generation: generation,
+                    lifecycleGeneration: lifecycleGeneration,
                     errorDescription: AppLocalization.text("未授予日历或提醒事项访问权限")
                 )
                 return
@@ -339,6 +354,7 @@ public final class CalendarService: ObservableObject {
                 completeRefresh(
                     with: [],
                     generation: generation,
+                    lifecycleGeneration: lifecycleGeneration,
                     errorDescription: AppLocalization.text("无法计算日程查询范围")
                 )
                 return
@@ -360,16 +376,18 @@ public final class CalendarService: ObservableObject {
                     from: start,
                     to: end,
                     calendar: calendar,
-                    generation: generation
+                    generation: generation,
+                    lifecycleGeneration: lifecycleGeneration
                 )
                 return
             }
 
-            completeRefresh(with: nextItems, generation: generation)
+            completeRefresh(with: nextItems, generation: generation, lifecycleGeneration: lifecycleGeneration)
         } catch {
             completeRefresh(
                 with: [],
                 generation: generation,
+                lifecycleGeneration: lifecycleGeneration,
                 errorDescription: error.localizedDescription
             )
         }
@@ -386,10 +404,14 @@ public final class CalendarService: ObservableObject {
     }
 
     public func requestAccess() async {
+        let lifecycleGeneration = agendaLifecycleGeneration
         updateAuthorizationStatuses()
         do {
-            try await requestUndeterminedAccess()
+            try await requestUndeterminedAccess(lifecycleGeneration: lifecycleGeneration)
+            try checkAgendaLifecycle(lifecycleGeneration)
             await refresh(referenceDate: queryAnchorDate)
+        } catch is CancellationError {
+            return
         } catch {
             updateAuthorizationStatuses()
             errorDescription = error.localizedDescription
@@ -471,12 +493,18 @@ public final class CalendarService: ObservableObject {
             || reminderAuthorizationStatus == .notDetermined
     }
 
-    private func requestUndeterminedAccess() async throws {
+    private func checkAgendaLifecycle(_ generation: UInt64) throws {
+        try Task.checkCancellation()
+        guard generation == agendaLifecycleGeneration else { throw CancellationError() }
+    }
+
+    private func requestUndeterminedAccess(lifecycleGeneration: UInt64) async throws {
+        try checkAgendaLifecycle(lifecycleGeneration)
         guard authorizationStatus == .notDetermined
             || reminderAuthorizationStatus == .notDetermined
         else { return }
 
-        let authorizationHost = WindowPlacement.authorizationPromptHost()
+        let authorizationHost = environment.authorizationPromptHost()
         defer {
             authorizationHost?.orderOut(nil)
             authorizationHost?.close()
@@ -489,6 +517,7 @@ public final class CalendarService: ObservableObject {
             } catch {
                 firstError = error
             }
+            try checkAgendaLifecycle(lifecycleGeneration)
             authorizationStatus = environment.authorizationStatus(.event)
         }
         if reminderAuthorizationStatus == .notDetermined {
@@ -497,6 +526,7 @@ public final class CalendarService: ObservableObject {
             } catch {
                 if firstError == nil { firstError = error }
             }
+            try checkAgendaLifecycle(lifecycleGeneration)
             reminderAuthorizationStatus = environment.authorizationStatus(.reminder)
         }
         if let firstError { throw firstError }
@@ -507,18 +537,20 @@ public final class CalendarService: ObservableObject {
         from start: Date,
         to end: Date,
         calendar: Calendar,
-        generation: UInt64
+        generation: UInt64,
+        lifecycleGeneration: UInt64
     ) {
+        let enqueue = environment.enqueue
         let predicate = store.predicateForReminders(in: nil)
         store.fetchReminders(matching: predicate) { [weak self] reminders in
-            DispatchQueue.main.async {
+            enqueue { @MainActor [weak self] in
                 guard let self else { return }
                 let items = baseItems + Self.makeReminderSnapshots(
                     from: reminders ?? [],
                     calendar: calendar,
                     dueWithin: DateInterval(start: start, end: end)
                 )
-                self.completeRefresh(with: items, generation: generation)
+                self.completeRefresh(with: items, generation: generation, lifecycleGeneration: lifecycleGeneration)
             }
         }
     }
@@ -526,17 +558,21 @@ public final class CalendarService: ObservableObject {
     private func completeRefresh(
         with items: [CalendarEventSnapshot],
         generation: UInt64,
+        lifecycleGeneration: UInt64,
         errorDescription: String? = nil
     ) {
         defer {
             isRefreshing = false
             if generation == refreshGeneration {
                 isLoading = false
-            } else {
-                Task { @MainActor [weak self] in
-                    guard let self else { return }
+            } else if lifecycleGeneration == agendaLifecycleGeneration, monitorsAgenda {
+                scheduledRefresh = Task { @MainActor [weak self] in
+                    guard let self, self.agendaLifecycleGeneration == lifecycleGeneration,
+                          self.monitorsAgenda else { return }
                     await self.refresh(referenceDate: self.queryAnchorDate)
                 }
+            } else {
+                isLoading = false
             }
         }
         guard generation == refreshGeneration else { return }
@@ -727,15 +763,18 @@ public final class CalendarService: ObservableObject {
     }
 
     private func scheduleRefresh() {
-        guard storeChangedObserver != nil else { return }
+        guard storeChangedObserver != nil, monitorsAgenda else { return }
         scheduledRefresh?.cancel()
+        let sleep = environment.sleep
+        let monitoringGeneration = monitoringGeneration
         scheduledRefresh = Task { @MainActor [weak self] in
             do {
-                try await Task.sleep(for: Self.refreshDebounce)
+                try await sleep(Self.refreshDebounce)
             } catch {
                 return
             }
-            guard let self else { return }
+            guard !Task.isCancelled, let self, self.monitoringGeneration == monitoringGeneration,
+                  self.monitorsAgenda, self.storeChangedObserver != nil else { return }
             await self.refresh(referenceDate: self.queryAnchorDate)
         }
     }

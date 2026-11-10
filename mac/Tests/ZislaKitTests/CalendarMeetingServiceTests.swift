@@ -8,6 +8,200 @@ import ZislaCore
 
 @MainActor
 struct CalendarMeetingServiceTests {
+    @Test(arguments: [EKAuthorizationStatus.notDetermined, .denied])
+    func meetingOnlyMonitoringDoesNotRequestAgendaPermissionsAfterStoreChanges(status: EKAuthorizationStatus) async {
+        let fixture = MeetingCalendarFixture()
+        fixture.eventAccess = status; fixture.reminderAccess = .notDetermined
+        let service = fixture.service(controlAgendaSleep: true)
+        defer { service.stop(); fixture.sleeps.resumeAll() }
+        service.start(monitorAgenda: false)
+        fixture.center.post(name: .EKEventStoreChanged, object: fixture.store)
+        fixture.workspaceCenter.post(name: NSWorkspace.didWakeNotification, object: nil)
+        fixture.timer?.fire()
+        fixture.callbacks.deliver()
+        if let refresh = service.scheduledRefresh {
+            for await _ in fixture.sleeps.started { break }
+            fixture.sleeps.resume()
+            await refresh.value
+        }
+        #expect(fixture.store.queries.isEmpty)
+        #expect(fixture.store.eventPermissionRequests == 0)
+        #expect(fixture.store.reminderPermissionRequests == 0)
+        #expect(fixture.sleeps.delays.isEmpty)
+    }
+
+    @Test
+    func changingMonitoringModeCancelsAgendaRefreshAndCanResumeIt() async throws {
+        let fixture = MeetingCalendarFixture()
+        fixture.store.fixtures = [try fixture.event()]
+        let service = fixture.service(controlAgendaSleep: true)
+        defer { service.stop(); fixture.sleeps.resumeAll() }
+        service.start()
+        fixture.center.post(name: .EKEventStoreChanged, object: fixture.store)
+        fixture.callbacks.deliver()
+        let oldRefresh = try #require(service.scheduledRefresh)
+        for await _ in fixture.sleeps.started { break }
+        service.start(monitorAgenda: false)
+        fixture.eventAccess = .notDetermined; fixture.reminderAccess = .notDetermined
+        fixture.sleeps.resume()
+        await oldRefresh.value
+        #expect(fixture.store.eventPermissionRequests == 0)
+        #expect(fixture.store.reminderPermissionRequests == 0)
+        service.start(monitorAgenda: true)
+        fixture.center.post(name: .EKEventStoreChanged, object: fixture.store)
+        fixture.callbacks.deliver()
+        let newRefresh = try #require(service.scheduledRefresh)
+        for await _ in fixture.sleeps.started { break }
+        fixture.sleeps.resume()
+        await newRefresh.value
+        #expect(fixture.store.eventPermissionRequests == 1)
+        #expect(fixture.store.reminderPermissionRequests == 1)
+        #expect(service.errorDescription != nil)
+    }
+
+    @Test(arguments: ["stop", "restart", "meeting-only", "resume-agenda"])
+    func lateDebounceCannotRequestPermissionsAfterLifecycleChange(change: String) async throws {
+        let fixture = MeetingCalendarFixture()
+        fixture.eventAccess = .notDetermined; fixture.reminderAccess = .notDetermined
+        let service = fixture.service(controlAgendaSleep: true)
+        defer { service.stop(); fixture.sleeps.resumeAll() }
+        service.start()
+        fixture.center.post(name: .EKEventStoreChanged, object: fixture.store)
+        fixture.callbacks.deliver()
+        let refresh = try #require(service.scheduledRefresh)
+        for await _ in fixture.sleeps.started { break }
+        if change == "stop" || change == "restart" { service.stop() }
+        if change == "meeting-only" || change == "resume-agenda" { service.start(monitorAgenda: false) }
+        if change == "restart" || change == "resume-agenda" { service.start() }
+        fixture.sleeps.resume()
+        await refresh.value
+        #expect(fixture.store.eventPermissionRequests == 0)
+        #expect(fixture.store.reminderPermissionRequests == 0)
+        #expect(fixture.store.queries.isEmpty)
+    }
+
+    @Test
+    func replacedDebounceCannotRequestPermissionsButItsSuccessorCan() async throws {
+        let fixture = MeetingCalendarFixture()
+        fixture.eventAccess = .notDetermined; fixture.reminderAccess = .notDetermined
+        let service = fixture.service(controlAgendaSleep: true)
+        defer { service.stop(); fixture.sleeps.resumeAll() }
+        service.start()
+        fixture.center.post(name: .EKEventStoreChanged, object: fixture.store)
+        fixture.callbacks.deliver()
+        let oldRefresh = try #require(service.scheduledRefresh)
+        for await _ in fixture.sleeps.started { break }
+        fixture.center.post(name: .EKEventStoreChanged, object: fixture.store)
+        fixture.callbacks.deliver()
+        let newRefresh = try #require(service.scheduledRefresh)
+        for await _ in fixture.sleeps.started { break }
+        fixture.sleeps.resume()
+        await oldRefresh.value
+        #expect(fixture.store.eventPermissionRequests == 0)
+        #expect(fixture.store.reminderPermissionRequests == 0)
+        fixture.sleeps.resume()
+        await newRefresh.value
+        #expect(fixture.store.eventPermissionRequests == 1)
+        #expect(fixture.store.reminderPermissionRequests == 1)
+    }
+
+    @Test(arguments: ["stop", "restart", "meeting-only", "resume-agenda"])
+    func lateReminderCompletionCannotRestartAgendaOrRequestPermissions(change: String) async {
+        let fixture = MeetingCalendarFixture()
+        fixture.reminderAccess = .fullAccess
+        let service = fixture.service()
+        defer { service.stop() }
+        service.start()
+        await service.refresh(referenceDate: fixture.date)
+        #expect(service.isLoading)
+        if change == "stop" || change == "restart" { service.stop() }
+        if change == "meeting-only" || change == "resume-agenda" { service.start(monitorAgenda: false) }
+        if change == "restart" || change == "resume-agenda" { service.start() }
+        fixture.eventAccess = .notDetermined; fixture.reminderAccess = .notDetermined
+        let reads = fixture.store.queries.count
+        fixture.store.completeReminders()
+        fixture.callbacks.deliver()
+        if let refresh = service.scheduledRefresh { await refresh.value }
+        #expect(fixture.store.queries.count == reads)
+        #expect(fixture.store.eventPermissionRequests == 0)
+        #expect(fixture.store.reminderPermissionRequests == 0)
+        #expect(service.events.isEmpty)
+        #expect(!service.isLoading)
+    }
+
+    @Test
+    func overlappingExplicitRefreshWithoutMonitoringStillLoadsTheLatestWeek() async throws {
+        let fixture = MeetingCalendarFixture()
+        let first = try fixture.event()
+        let next = try fixture.event(id: "next-week", start: fixture.date.addingTimeInterval(21 * 86_400))
+        fixture.store.fixtures = [first, next]
+        fixture.reminderAccess = .fullAccess
+        let service = fixture.service()
+        defer { service.stop() }
+        await service.refresh(referenceDate: fixture.date)
+        await service.refresh(referenceDate: next.startDate)
+        fixture.reminderAccess = .denied
+        fixture.store.completeReminders()
+        fixture.callbacks.deliver()
+        let refresh = try #require(service.scheduledRefresh)
+        await refresh.value
+        #expect(service.events.map(\.sourceIdentifier) == ["next-week"])
+        #expect(service.meetingEvents.map(\.sourceIdentifier) == ["meeting"])
+        #expect(fixture.store.eventPermissionRequests == 0)
+        #expect(fixture.store.reminderPermissionRequests == 0)
+        #expect(!service.isLoading)
+    }
+
+    @Test(arguments: ["event", "reminder"], ["stop", "restart", "meeting-only", "resume-agenda", "cancel"])
+    func latePermissionResultDoesNotResumeRefreshOrRequestAnotherPermission(kind: String, change: String) async throws {
+        let fixture = MeetingCalendarFixture()
+        fixture.store.fixtures = [try fixture.event()]
+        fixture.eventAccess = kind == "event" ? .notDetermined : .fullAccess
+        fixture.reminderAccess = .notDetermined
+        fixture.store.permissionGate = fixture.sleeps
+        fixture.store.controlledPermissionKind = kind
+        let service = fixture.service()
+        defer { service.stop(); fixture.sleeps.resumeAll() }
+        service.start()
+        let refresh = Task { await service.refresh(referenceDate: fixture.date) }
+        for await _ in fixture.sleeps.started { break }
+        if change == "stop" || change == "restart" { service.stop() }
+        if change == "meeting-only" || change == "resume-agenda" { service.start(monitorAgenda: false) }
+        if change == "restart" || change == "resume-agenda" { service.start() }
+        if change == "cancel" { refresh.cancel() }
+        let meetings = service.meetingEvents
+        let reads = fixture.store.queries.count
+        fixture.eventAccess = .fullAccess; fixture.reminderAccess = .fullAccess
+        fixture.sleeps.resume()
+        await refresh.value
+        if let scheduled = service.scheduledRefresh { await scheduled.value }
+        #expect(service.meetingEvents == meetings)
+        #expect(fixture.store.queries.count == reads)
+        #expect(fixture.store.eventPermissionRequests == (kind == "event" ? 1 : 0))
+        #expect(fixture.store.reminderPermissionRequests == (kind == "reminder" ? 1 : 0))
+        #expect(!service.isLoading)
+    }
+
+    @Test(arguments: [false, true])
+    func explicitPermissionActionDoesNotResumeAfterLifecycleChange(restart: Bool) async {
+        let fixture = MeetingCalendarFixture()
+        fixture.eventAccess = .notDetermined; fixture.reminderAccess = .notDetermined
+        fixture.store.permissionGate = fixture.sleeps
+        let service = fixture.service()
+        defer { service.stop(); fixture.sleeps.resumeAll() }
+        let permission = Task { await service.requestAccess() }
+        for await _ in fixture.sleeps.started { break }
+        service.stop()
+        if restart { service.start() }
+        fixture.eventAccess = .fullAccess; fixture.reminderAccess = .fullAccess
+        fixture.sleeps.resume()
+        await permission.value
+        #expect(service.meetingEvents.isEmpty)
+        #expect(fixture.store.queries.isEmpty)
+        #expect(fixture.store.eventPermissionRequests == 1)
+        #expect(fixture.store.reminderPermissionRequests == 0)
+    }
+
     @Test(arguments: [EKAuthorizationStatus.notDetermined, .denied, .restricted, .writeOnly])
     func passiveMeetingMonitoringNeverRequestsOrReadsUnauthorizedEvents(status: EKAuthorizationStatus) {
         let fixture = MeetingCalendarFixture()
@@ -233,20 +427,25 @@ private final class MeetingCalendarFixture {
     let center = NotificationCenter()
     let workspaceCenter = NotificationCenter()
     let callbacks = MeetingCallbacks()
+    let sleeps = MeetingSleeps()
     var timer: Timer?
     var date = Date(timeIntervalSince1970: 1_000_000)
     var eventAccess = EKAuthorizationStatus.fullAccess
+    var reminderAccess = EKAuthorizationStatus.denied
 
-    func service() -> CalendarService {
+    func service(controlAgendaSleep: Bool = false) -> CalendarService {
         CalendarService(store: store, mutations: .live(store: store), environment: CalendarServiceEnvironment(
-            authorizationStatus: { [self] kind in kind == .event ? eventAccess : .denied },
+            authorizationStatus: { [self] kind in kind == .event ? eventAccess : reminderAccess },
             now: { [self] in date }, notificationCenter: center, workspaceNotificationCenter: workspaceCenter,
             enqueue: { [callbacks] in callbacks.append($0) },
             makeTimer: { [self] action in
                 let timer = Timer(timeInterval: 60, repeats: true) { _ in action() }
                 self.timer = timer
                 return timer
-            }))
+            }, sleep: { [sleeps] delay in
+                if controlAgendaSleep { await sleeps.sleep(delay) }
+                else { try await Task.sleep(for: delay) }
+            }, authorizationPromptHost: { nil }))
     }
 
     func calendar(identifier: String = "work") throws -> MeetingCalendar {
@@ -264,6 +463,38 @@ private final class MeetingCalendarFixture {
         event.calendar = try calendar()
         event.url = URL(string: "https://meet.google.com/abc-defg-hij")
         return event
+    }
+}
+
+private final class MeetingSleeps: @unchecked Sendable {
+    private let lock = NSLock()
+    private var continuations: [CheckedContinuation<Void, Never>] = []
+    private var recordedDelays: [Duration] = []
+    let started: AsyncStream<Void>
+    private let startedContinuation: AsyncStream<Void>.Continuation
+
+    init() {
+        let stream = AsyncStream<Void>.makeStream()
+        started = stream.stream; startedContinuation = stream.continuation
+    }
+
+    var delays: [Duration] { lock.withLock { recordedDelays } }
+
+    func sleep(_ delay: Duration) async {
+        await withCheckedContinuation { continuation in
+            lock.withLock { continuations.append(continuation); recordedDelays.append(delay) }
+            startedContinuation.yield(())
+        }
+    }
+
+    func resume() {
+        let pending = lock.withLock { continuations.isEmpty ? nil : continuations.removeFirst() }
+        pending?.resume()
+    }
+
+    func resumeAll() {
+        let pending = lock.withLock { let pending = continuations; continuations = []; return pending }
+        for continuation in pending { continuation.resume() }
     }
 }
 
@@ -306,7 +537,10 @@ private final class MeetingEventStore: EKEventStore {
     var fixtures: [EKEvent] = []
     var queries: [DateInterval] = []
     var eventPermissionRequests = 0
+    var permissionGate: MeetingSleeps?
+    var controlledPermissionKind = "event"
     var reminderPermissionRequests = 0
+    var reminderCompletion: (([EKReminder]?) -> Void)?
 
     override func predicateForEvents(withStart start: Date, end: Date, calendars: [EKCalendar]?) -> NSPredicate {
         queries.append(DateInterval(start: start, end: end))
@@ -318,6 +552,23 @@ private final class MeetingEventStore: EKEventStore {
 
     override func events(matching predicate: NSPredicate) -> [EKEvent] { fixtures.filter { predicate.evaluate(with: $0) } }
     override func refreshSourcesIfNecessary() {}
-    override func requestFullAccessToEvents() async throws -> Bool { eventPermissionRequests += 1; return false }
-    override func requestFullAccessToReminders() async throws -> Bool { reminderPermissionRequests += 1; return false }
+    override func predicateForReminders(in calendars: [EKCalendar]?) -> NSPredicate { NSPredicate(value: true) }
+    override func fetchReminders(matching predicate: NSPredicate, completion: @escaping ([EKReminder]?) -> Void) -> Any {
+        reminderCompletion = completion
+        return NSObject()
+    }
+    func completeReminders() {
+        let completion = reminderCompletion; reminderCompletion = nil
+        completion?([])
+    }
+    override func requestFullAccessToEvents() async throws -> Bool {
+        eventPermissionRequests += 1
+        if let permissionGate, controlledPermissionKind == "event" { await permissionGate.sleep(.zero) }
+        return false
+    }
+    override func requestFullAccessToReminders() async throws -> Bool {
+        reminderPermissionRequests += 1
+        if let permissionGate, controlledPermissionKind == "reminder" { await permissionGate.sleep(.zero) }
+        return false
+    }
 }
