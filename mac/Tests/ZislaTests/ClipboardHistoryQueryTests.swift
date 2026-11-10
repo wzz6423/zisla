@@ -1,3 +1,4 @@
+import AppKit
 import Combine
 import Foundation
 import SQLite3
@@ -38,6 +39,51 @@ struct ClipboardHistoryQueryTests {
             await fixture.controls.apply(to: fixture.store)
             #expect(startedLoads == completedLoads, "Restoring controls must not initiate another failed write")
         }
+    }
+
+    @Test(.serialized, arguments: [false, true])
+    func failedQueriesShowTheirErrorInTheModuleUntilRetrySucceeds(emptyHistory: Bool) async throws {
+        let fixture = try ClipboardQueryFixture()
+        defer { fixture.cleanup() }
+        await fixture.store.waitUntilLoaded()
+        try fixture.rejectRemovals()
+        if emptyHistory {
+            fixture.store.removeAllHistory()
+        } else {
+            fixture.store.remove(id: fixture.removed.id)
+        }
+        fixture.controls.filter = .history
+        fixture.controls.searchText = "missing"
+        fixture.controls.category = .text
+        await fixture.controls.apply(to: fixture.store)
+        let error = try #require(fixture.store.errorDescription)
+        #expect(fixture.controls.filter == .all && fixture.controls.searchText.isEmpty && fixture.controls.category == .all)
+        let expectedItems = emptyHistory ? [] : [fixture.kept]
+        #expect(fixture.store.items == expectedItems)
+
+        let releaseAccessibility = EnhancedAccessibilityTestScope.acquire()
+        defer { releaseAccessibility() }
+        let host = NSHostingView(rootView: ClipboardHistoryModuleView(
+            store: fixture.store,
+            copyItem: { _ in },
+            sendToQuickNote: { _ in }
+        ).frame(width: 360, height: 440))
+        host.sizingOptions = []
+        host.frame = NSRect(x: 0, y: 0, width: 360, height: 440)
+        await layout(host)
+
+        #expect(accessibilityText(in: host).contains(error), "A failed query must explain why its controls were restored")
+        #expect(fixture.store.items == expectedItems)
+        #expect(fixture.store.errorDescription == error)
+        try fixture.allowRemovals()
+        fixture.store.updateQuery(scope: .all, searchText: "")
+        await fixture.store.waitUntilLoaded()
+        await layout(host)
+
+        #expect(fixture.store.errorDescription == nil)
+        #expect(!accessibilityText(in: host).contains(error), "The error must disappear once the pending write succeeds")
+        #expect(fixture.store.items == expectedItems)
+        #expect(host.window == nil)
     }
 
     @Test
@@ -191,6 +237,22 @@ struct ClipboardHistoryQueryTests {
         }
         throw ClipboardQueryFixtureError()
     }
+
+    private func layout(_ host: NSView) async {
+        for _ in 0..<4 {
+            host.layoutSubtreeIfNeeded()
+            await withCheckedContinuation { continuation in DispatchQueue.main.async { continuation.resume() } }
+        }
+    }
+
+    private func accessibilityText(in object: NSObject) -> [String] {
+        let ownText = ["accessibilityValue", "accessibilityLabel"].compactMap { key in
+            object.responds(to: NSSelectorFromString(key)) ? object.value(forKey: key) as? String : nil
+        }
+        let children = object.responds(to: NSSelectorFromString("accessibilityChildren"))
+            ? object.value(forKey: "accessibilityChildren") as? [NSObject] ?? [] : []
+        return ownText + children.flatMap { accessibilityText(in: $0) }
+    }
 }
 
 @MainActor
@@ -243,6 +305,18 @@ private struct ClipboardQueryFixture {
             CREATE TRIGGER reject_removal BEFORE DELETE ON clipboard_history
             BEGIN SELECT RAISE(ABORT, 'injected query control failure'); END;
             """, nil, nil, nil) == SQLITE_OK else { throw ClipboardQueryFixtureError() }
+    }
+
+    func allowRemovals() throws {
+        var connection: OpaquePointer?
+        guard sqlite3_open(storageURL.path, &connection) == SQLITE_OK, let connection else {
+            sqlite3_close(connection)
+            throw ClipboardQueryFixtureError()
+        }
+        defer { sqlite3_close(connection) }
+        guard sqlite3_exec(connection, "DROP TRIGGER reject_removal", nil, nil, nil) == SQLITE_OK else {
+            throw ClipboardQueryFixtureError()
+        }
     }
 
     func blockWrites() throws -> OpaquePointer {

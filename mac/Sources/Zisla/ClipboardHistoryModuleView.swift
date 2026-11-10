@@ -74,9 +74,21 @@ struct ClipboardHistoryModuleView: View {
     )
 
     init(model: AppModel) {
-        _store = ObservedObject(wrappedValue: model.clipboardHistory)
-        copyItem = { model.copyClipboardHistoryItem($0) }
-        sendToQuickNote = { model.sendClipboardHistoryItemToQuickNote($0) }
+        self.init(
+            store: model.clipboardHistory,
+            copyItem: { model.copyClipboardHistoryItem($0) },
+            sendToQuickNote: { model.sendClipboardHistoryItemToQuickNote($0) }
+        )
+    }
+
+    init(
+        store: ClipboardHistoryStore,
+        copyItem: @escaping (ClipboardHistoryItem) -> Void,
+        sendToQuickNote: @escaping (ClipboardHistoryItem) -> Void
+    ) {
+        _store = ObservedObject(wrappedValue: store)
+        self.copyItem = copyItem
+        self.sendToQuickNote = sendToQuickNote
     }
 
     private var visibleItems: [ClipboardHistoryItem] {
@@ -162,6 +174,17 @@ struct ClipboardHistoryModuleView: View {
             .padding(.vertical, 6)
             .padding(.horizontal, 10)
             .padding(.top, 6)
+
+            if let error = store.errorDescription {
+                Text(error)
+                    .font(.islandMicro())
+                    .foregroundStyle(Color.zislaWarning)
+                    .lineLimit(2)
+                    .help(error)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(.horizontal, 10)
+                    .padding(.bottom, 6)
+            }
 
             Hairline()
 
