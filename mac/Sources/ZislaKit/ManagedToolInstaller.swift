@@ -43,6 +43,8 @@ public enum ManagedTool: String, CaseIterable, Identifiable, Sendable {
     case rclone
     case posting
     case poppler
+    case libvips
+    case libavif
     case wireshark
     case mysql
     case cmake
@@ -96,6 +98,8 @@ public enum ManagedTool: String, CaseIterable, Identifiable, Sendable {
         case .rclone: "rclone"
         case .posting: "Posting"
         case .poppler: "Poppler"
+        case .libvips: "libvips"
+        case .libavif: "libavif"
         case .wireshark: "Wireshark"
         case .mysql: "MySQL"
         case .cmake: "CMake"
@@ -149,6 +153,8 @@ public enum ManagedTool: String, CaseIterable, Identifiable, Sendable {
         case .rclone: "云存储同步"
         case .posting: "终端 API 客户端"
         case .poppler: "PDF 处理工具集"
+        case .libvips: "本地图片压缩与转换"
+        case .libavif: "AVIF 动画压缩与转换"
         case .wireshark: "网络数据包分析"
         case .mysql: "关系数据库与客户端"
         case .cmake: "跨平台构建配置"
@@ -203,6 +209,8 @@ public enum ManagedTool: String, CaseIterable, Identifiable, Sendable {
         case .rclone: "rclone"
         case .posting: "posting"
         case .poppler: "pdftotext"
+        case .libvips: "vips"
+        case .libavif: "avifenc"
         case .wireshark: "tshark"
         case .mysql: "mysql"
         case .cmake: "cmake"
@@ -256,6 +264,8 @@ public enum ManagedTool: String, CaseIterable, Identifiable, Sendable {
         case .rclone: .homebrewFormula(name: "rclone")
         case .posting: .homebrewFormula(name: "posting")
         case .poppler: .homebrewFormula(name: "poppler")
+        case .libvips: .homebrewFormula(name: "vips")
+        case .libavif: .homebrewFormula(name: "libavif")
         case .wireshark: .homebrewFormula(name: "wireshark")
         case .mysql: .homebrewFormula(name: "mysql")
         case .cmake: .homebrewFormula(name: "cmake")
@@ -311,7 +321,7 @@ public enum ManagedTool: String, CaseIterable, Identifiable, Sendable {
              .openJDK17, .maven, .groovy, .cocoaPods, .pyenv, .pipx, .uv, .pnpm, .tectonic,
              .packer, .ytt:
             .developmentToolchain
-        case .ytDLP, .libreOffice, .keka:
+        case .ytDLP, .libreOffice, .keka, .libvips, .libavif:
             .utility
         case .openScreen, .kaku, .markdownPreview, .quietMD, .zshell, .dockDoor:
             .desktopApplication

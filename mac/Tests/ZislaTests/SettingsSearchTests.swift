@@ -197,6 +197,34 @@ struct SettingsSearchTests {
         }
     }
 
+    @Test(arguments: AppLanguage.allCases)
+    func imageOperationsAreSearchableAndRespectTheirToggle(language: AppLanguage) {
+        var settings = FeatureSettings.default
+        for operation in ImageToolOperation.allCases {
+            let query = AppLocalization.string(operation.title, language: language)
+            let matches = results(query, settings: settings, locale: language.locale)
+            #expect(matches.contains { $0.section == .imageTools && $0.anchor == .imageOperation(operation) })
+        }
+        settings.imageToolsEnabled = false
+        #expect(!SettingsSection.imageTools.isVisible(settings: settings))
+        #expect(results("TinyPNG", settings: settings, locale: language.locale).allSatisfy { $0.section != .imageTools })
+        #expect(results(AppLocalization.string("图片工具", language: language), settings: settings, locale: language.locale)
+            .contains { $0.section == .features && $0.anchor == .row("图片工具") })
+    }
+
+    @Test(arguments: ImageToolOperation.allCases) @MainActor
+    func imageSearchSelectsTheRequestedOperation(operation: ImageToolOperation) {
+        let input = SettingsInput()
+        input.select(.imageTools, searchTarget: .imageOperation(operation))
+        #expect(input.selection == .imageTools)
+        #expect(input.selectedImageOperation == operation)
+        input.select(.pdfTools)
+        input.navigate(backward: true, settings: .default)
+        #expect(input.selectedImageOperation == operation)
+        input.select(.imageTools)
+        #expect(input.selectedImageOperation == .compress)
+    }
+
     @Test(arguments: PDFToolOperation.allCases)
     func pdfToolTitlesAndDescriptionsResolveToTheirOperation(operation: PDFToolOperation) {
         let matches = results(operation.title)

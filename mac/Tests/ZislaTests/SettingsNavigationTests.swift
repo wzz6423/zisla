@@ -167,6 +167,7 @@ struct SettingsNavigationTests {
             "截图",
             "录屏",
             "PDF 工具",
+            "图片工具",
             "AI",
             "语音",
             "邮件",
@@ -366,7 +367,7 @@ struct SettingsNavigationTests {
         ])
         #expect(SettingsSection.allCases.filter { $0.group == .basics } == [.general, .features, .info])
         #expect(SettingsSection.allCases.filter { $0.group == .sound } == [.keyboardSound])
-        #expect(SettingsSection.allCases.filter { $0.group == .files } == [.pdfTools])
+        #expect(SettingsSection.allCases.filter { $0.group == .files } == [.pdfTools, .imageTools])
         #expect(SettingsSection.allCases.filter { $0.group == .capture } == [.screenshot, .recording])
         #expect(SettingsSection.allCases.filter { $0.group == .aiAndVoice } == [.ai, .voice])
         #expect(SettingsSection.allCases.filter { $0.group == .others } == [.clipboardAssistant, .mail, .download, .saveLocations, .weather, .networkProxy, .pet])

@@ -242,6 +242,9 @@ struct SettingsView: View {
         case .pdfTools:
             PDFToolsModuleView(model: model, initialOperation: input.selectedPDFOperation)
                 .id(input.selectedPDFOperation)
+        case .imageTools:
+            ImageToolsModuleView(model: model, initialOperation: input.selectedImageOperation)
+                .id(input.selectedImageOperation)
         case .info:
             infoContent
         case .mail:
@@ -984,6 +987,8 @@ struct SettingsView: View {
                     featureToggle("随记", detail: "Markdown 随手记，可发送到系统备忘录", symbol: "note.text", keyPath: \.quickNotesEnabled)
                     rowDivider
                     featureToggle("PDF 工具", detail: "", symbol: "doc.text.fill", keyPath: \.pdfToolsEnabled)
+                    rowDivider
+                    featureToggle("图片工具", detail: "", symbol: "photo.stack.fill", keyPath: \.imageToolsEnabled)
                     rowDivider
                     featureToggle("应用音量混音器", detail: "", symbol: "slider.horizontal.3", keyPath: \.volumeMixerEnabled)
                     rowDivider
@@ -2658,6 +2663,10 @@ struct SettingsView: View {
                 managedToolRow(.ytDLP, symbol: "terminal.fill")
                 rowDivider
                 managedToolRow(.libreOffice, symbol: "doc.richtext")
+                rowDivider
+                managedToolRow(.libvips, symbol: "photo.stack.fill")
+                rowDivider
+                managedToolRow(.libavif, symbol: "photo.stack.fill")
             }
         }
         .task {
@@ -4438,6 +4447,7 @@ enum SettingsSection: String, CaseIterable, Identifiable {
     case screenshot
     case recording
     case pdfTools
+    case imageTools
     case ai
     case voice
     case mail
@@ -4457,7 +4467,7 @@ enum SettingsSection: String, CaseIterable, Identifiable {
         switch self {
         case .general, .features, .info: .basics
         case .keyboardSound: .sound
-        case .pdfTools: .files
+        case .pdfTools, .imageTools: .files
         case .screenshot, .recording: .capture
         case .ai, .voice: .aiAndVoice
         case .clipboardAssistant, .download, .saveLocations, .mail, .weather, .networkProxy, .pet: .others
@@ -4479,6 +4489,7 @@ enum SettingsSection: String, CaseIterable, Identifiable {
         case .clipboardAssistant: "快捷操作"
         case .screenshot: "截图"
         case .pdfTools: "PDF 工具"
+        case .imageTools: "图片工具"
         case .recording: "录屏"
         case .info: "信息"
         case .mail: "邮件"
@@ -4503,6 +4514,7 @@ enum SettingsSection: String, CaseIterable, Identifiable {
         case .clipboardAssistant: "sparkles.rectangle.stack"
         case .screenshot: "camera.viewfinder"
         case .pdfTools: "doc.text.fill"
+        case .imageTools: "photo.stack.fill"
         case .recording: "record.circle"
         case .info: "info.circle.fill"
         case .mail: "envelope.fill"
@@ -4523,7 +4535,7 @@ enum SettingsSection: String, CaseIterable, Identifiable {
         switch self {
         case .general, .features, .keyboardSound, .permissions: Color(nsColor: .systemGray)
         case .info, .mail, .saveLocations, .networkProxy: Color(nsColor: .systemBlue)
-        case .clipboardAssistant, .screenshot, .ai, .recommendations: Color(nsColor: .systemIndigo)
+        case .clipboardAssistant, .screenshot, .imageTools, .ai, .recommendations: Color(nsColor: .systemIndigo)
         case .recording, .pdfTools, .voice: Color(nsColor: .systemRed)
         case .download, .updates: Color(nsColor: .systemGreen)
         case .weather: Color(nsColor: .systemCyan)
@@ -4585,6 +4597,7 @@ enum SettingsSection: String, CaseIterable, Identifiable {
         case .clipboardAssistant: "复制、浏览器下载或 AirDrop 接收完成后显示下一步操作"
         case .screenshot: "启用截图、钉图与全局快捷键"
         case .pdfTools: "在设置中合并、拆分、加密与转换 PDF。"
+        case .imageTools: "在本机压缩、转换、缩放与批量导出图片。"
         case .recording: "录制屏幕、编辑视频与保存项目。"
         case .info: "配置媒体、系统监控、锁屏与通知显示。"
         case .mail: "读取已配置的 Mail.app 账户并提醒新邮件"
@@ -4615,6 +4628,8 @@ enum SettingsSection: String, CaseIterable, Identifiable {
             return settings.screenshotEnabled
         case .pdfTools:
             return settings.pdfToolsEnabled
+        case .imageTools:
+            return settings.imageToolsEnabled
         case .recording:
             return settings.screenRecordingEnabled
         case .info:
@@ -4835,6 +4850,11 @@ final class SettingsInput: ObservableObject {
     var selectedPDFOperation: PDFToolOperation {
         if case .pdfOperation(let operation) = searchTarget { return operation }
         return .merge
+    }
+
+    var selectedImageOperation: ImageToolOperation {
+        if case .imageOperation(let operation) = searchTarget { return operation }
+        return .compress
     }
 
     func select(_ section: SettingsSection, searchTarget: SettingsSearchAnchor? = nil) {
