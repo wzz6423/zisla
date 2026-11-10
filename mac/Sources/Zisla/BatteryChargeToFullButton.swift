@@ -41,6 +41,7 @@ struct BatteryChargeToFullButton: View {
                 .background(Color.blue, in: RoundedRectangle(cornerRadius: 5))
         }
         .buttonStyle(.plain)
+        .keepsIntrinsicWidth()
         .disabled(isRequesting)
     }
 }

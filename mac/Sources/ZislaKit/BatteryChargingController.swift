@@ -9,6 +9,7 @@ struct BatteryChargingState: Equatable, Sendable {
     var manualChargeLimitEnabled = false
     var optimizedChargingOnHold = false
 
+    /// Native limits can mark a held battery as charged below 100%, so `isCharged` is not a veto.
     func canChargeToFull(_ battery: BatterySnapshot?) -> Bool {
         guard let battery else { return false }
         return battery.isPluggedIn && !battery.isCharging && battery.level < 1
@@ -37,17 +38,10 @@ public final class BatteryChargingController: ObservableObject {
     private var refreshRevision = 0
 
     public convenience init() {
+        let session = PowerUIBatteryChargingSession()
         self.init(
-            readState: {
-                try await Task.detached(priority: .utility) {
-                    try PowerUIBatteryChargingClient().state()
-                }.value
-            },
-            requestCharge: {
-                try await Task.detached(priority: .userInitiated) {
-                    try PowerUIBatteryChargingClient().requestChargeToFull()
-                }.value
-            }
+            readState: { try await session.state() },
+            requestCharge: { try await session.requestChargeToFull() }
         )
     }
 
@@ -56,6 +50,7 @@ public final class BatteryChargingController: ObservableObject {
         self.requestCharge = requestCharge
     }
 
+    /// Refreshes eligibility without letting an older system reply replace a newer battery state.
     public func refresh(for battery: BatterySnapshot?) async {
         refreshRevision += 1
         let revision = refreshRevision
@@ -69,6 +64,7 @@ public final class BatteryChargingController: ObservableObject {
         canChargeToFull = state?.canChargeToFull(battery) == true
     }
 
+    /// Rechecks the live battery before the one-shot request; success means macOS accepted it.
     @discardableResult
     public func chargeToFull(battery: @MainActor () -> BatterySnapshot?) async -> Bool {
         guard canChargeToFull, !isRequesting else { return false }
@@ -91,6 +87,36 @@ public final class BatteryChargingController: ObservableObject {
     }
 }
 
+/// Keeps a private, non-Sendable PowerUI client off the main actor and serializes native calls.
+actor PowerUIBatteryChargingSession {
+    private let makeClient: @Sendable () throws -> PowerUIBatteryChargingClient
+    private var client: PowerUIBatteryChargingClient?
+
+    init(makeClient: @escaping @Sendable () throws -> PowerUIBatteryChargingClient = { try .init() }) {
+        self.makeClient = makeClient
+    }
+
+    func state() throws -> BatteryChargingState {
+        try withClient { try $0.state() }
+    }
+
+    func requestChargeToFull() throws {
+        try withClient { try $0.requestChargeToFull() }
+    }
+
+    /// Reuses successful connections, but discards failed ones so the next explicit operation can recover.
+    private func withClient<Result>(_ operation: (PowerUIBatteryChargingClient) throws -> Result) throws -> Result {
+        do {
+            let current = try client ?? makeClient()
+            client = current
+            return try operation(current)
+        } catch {
+            client = nil
+            throw error
+        }
+    }
+}
+
 struct PowerUIBatteryChargingClient {
     private static let frameworkLoaded = dlopen(
         "/System/Library/PrivateFrameworks/PowerUI.framework/PowerUI", RTLD_NOW | RTLD_LOCAL
@@ -98,6 +124,7 @@ struct PowerUIBatteryChargingClient {
 
     private let object: NSObject
 
+    /// Uses the native initializer's ownership convention while keeping private symbols optional.
     init() throws {
         let initializer = NSSelectorFromString("initWithClientName:")
         guard Self.frameworkLoaded,
@@ -113,6 +140,7 @@ struct PowerUIBatteryChargingClient {
         self.object = object
     }
 
+    /// Reads the native limit or legacy hold permission without changing charging preferences.
     func state() throws -> BatteryChargingState {
         let selector = NSSelectorFromString("smartChargingUIState:chargeLimit:chargingOverrideAllowed:withError:")
         if !object.responds(to: selector) {
@@ -152,9 +180,9 @@ struct PowerUIBatteryChargingClient {
         )
     }
 
+    /// Selects the system's temporary override; a refusal never falls back to a permanent setter.
     func requestChargeToFull() throws {
         let selectorName = try manualChargeLimitEnabled() ? "temporarilyDisableMCL:" : "temporarilyEnableCharging:"
-        // Match Control Center's one-shot override without changing saved charging preferences.
         let selector = NSSelectorFromString(selectorName)
         let method = try method(selector, encodings: ["B24@0:8^@16", "c24@0:8^@16"])
         typealias RequestCharge = @convention(c) (
@@ -166,6 +194,7 @@ struct PowerUIBatteryChargingClient {
         else { throw BatteryChargingError.requestFailed }
     }
 
+    /// Treats absent manual limits as legacy macOS, but rejects unknown native enum values.
     private func manualChargeLimitEnabled() throws -> Bool {
         let manualSelector = NSSelectorFromString("isMCLCurrentlyEnabled:")
         guard object.responds(to: manualSelector) else { return false }
@@ -180,6 +209,7 @@ struct PowerUIBatteryChargingClient {
         return enabled == 1
     }
 
+    /// Rejects ABI drift before casting an IMP to a function with pointer arguments.
     private func method(_ selector: Selector, encodings: [String]) throws -> Method {
         guard let method = class_getInstanceMethod(type(of: object), selector),
               let encoding = method_getTypeEncoding(method),

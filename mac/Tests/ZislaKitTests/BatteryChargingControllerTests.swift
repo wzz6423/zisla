@@ -251,12 +251,14 @@ private actor ChargingSystem {
     private var requestFails = false
     private var allowed = true
 
+    /// Injects read failures without involving the machine's charging service.
     func read() throws -> BatteryChargingState {
         reads += 1
         if readFails { throw BatteryChargingError.unavailable }
         return BatteryChargingState(chargeLimit: 80, chargingOverrideAllowed: allowed)
     }
 
+    /// Records submission before refusal to model errors that may follow native acceptance.
     func request() throws {
         requests += 1
         if requestFails { throw BatteryChargingError.requestFailed }
@@ -274,6 +276,7 @@ private actor StateGate {
 
     func holdNextRead() { shouldHold = true }
 
+    /// Suspends one read so tests can order unplugging and duplicate clicks without sleeps.
     func read() async -> BatteryChargingState {
         if shouldHold {
             shouldHold = false
@@ -286,6 +289,7 @@ private actor StateGate {
         return BatteryChargingState(chargeLimit: 80, chargingOverrideAllowed: true)
     }
 
+    /// Handshakes with the suspended read rather than depending on task scheduling speed.
     func waitUntilReading() async {
         if pendingRead != nil { return }
         await withCheckedContinuation { readingWaiter = $0 }
