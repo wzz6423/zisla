@@ -241,15 +241,18 @@ public final class MailService: ObservableObject {
         return result
     }
 
+    /// Mail.app cannot atomically update several inboxes; failures can accompany partial changes.
+    /// Only eligible accounts are targeted, including messages outside the loaded pages.
     public func markAllRead(accountName: String? = nil) async -> MailOperationResult {
         let accountNames = Set(activeAccounts.filter { accountName == nil || $0.id == accountName }.map(\.id))
-        guard !accountNames.isEmpty else { return .success }
-        let unreadIDs = Set(messages.filter { !$0.isRead && accountNames.contains($0.accountName) }.map(\.id))
-        let result = await perform(Self.markAllReadScript(accountNames: accountNames), refreshOnFailure: true)
-        if result == .success {
-            setReadLocally(unreadIDs, isRead: true)
+        guard !accountNames.isEmpty else {
+            return .failed(AppLocalization.text("尚未读取到系统 Mail.app 账户"))
         }
-        return result
+        return await perform(
+            Self.markAllReadScript(accountNames: accountNames),
+            refreshOnFailure: true,
+            markReadAccountNames: accountNames
+        )
     }
 
     public func markReadLocally(_ message: MailMessage) {
@@ -467,8 +470,10 @@ public final class MailService: ObservableObject {
                     set targetAccount to first account whose name is (targetAccountName as text)
                     set read status of (every message of \(accountInbox("targetAccount")) whose read status is false) to true
                 on error messageText number messageNumber
-                    set failureMessage to messageText
-                    set failureNumber to messageNumber
+                    if failureNumber is not in {-1743, -1744, -1745} then
+                        set failureMessage to messageText
+                        set failureNumber to messageNumber
+                    end if
                 end try
             end repeat
             if failureNumber is not 0 then error failureMessage number failureNumber
@@ -550,13 +555,21 @@ public final class MailService: ObservableObject {
         return "\"\(escaped)\""
     }
 
-    private func perform(_ script: String, refreshOnFailure: Bool = false) async -> MailOperationResult {
+    private func perform(
+        _ script: String,
+        refreshOnFailure: Bool = false,
+        markReadAccountNames: Set<String>? = nil
+    ) async -> MailOperationResult {
         guard mailRunning() else {
             return .failed(Self.mailUnavailableMessage(isRunning: false) ?? AppLocalization.text("Mail.app 当前未运行"))
         }
         return await mutationQueue.enqueue { [self] in
+            let unreadIDs = markReadAccountNames.map { names in
+                Set(messages.filter { !$0.isRead && names.contains($0.accountName) }.map(\.id))
+            }
             switch await self.commandRunner(script, false) {
             case .success:
+                if let unreadIDs { setReadLocally(unreadIDs, isRead: true) }
                 await self.refresh(checkForNewMail: false)
                 return .success
             case let .failure(error):

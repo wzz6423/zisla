@@ -14,15 +14,46 @@ struct MailMarkAllReadButtonTests {
         let mail = makeService { _, _ in .success(.snapshot(snapshot(isRead: true))) }
         await mail.refresh(checkForNewMail: false)
         var presses = 0
-        let fixture = Fixture(mail: mail, accountName: "work", language: language) { presses += 1 }
+        let fixture = Fixture(mail: mail, accountName: "work", language: language) { accountName in
+            #expect(accountName == "work")
+            presses += 1
+        }
         defer { fixture.close() }
         await fixture.layout()
         let button = try fixture.button()
         #expect(button.value(forKey: "accessibilityLabel") as? String == AppLocalization.string("全部标记为已读", language: language))
         #expect(try fixture.isEnabled(), "The first loaded page being read must not prevent marking older inbox messages")
         #expect(try fixture.press())
+        await fixture.layout()
         #expect(presses == 1)
         #expect(!fixture.window.isVisible)
+    }
+
+    @Test
+    func repeatedPressesBeforeTheTaskStartsSubmitOnlyOneBulkAction() async throws {
+        let mail = makeService { _, _ in .success(.snapshot(snapshot())) }
+        await mail.refresh(checkForNewMail: false)
+        let gate = MailMarkAllReadButtonTestGate()
+        let submitted = AsyncStream<Void>.makeStream()
+        defer { submitted.continuation.finish() }
+        var presses = 0
+        let fixture = Fixture(mail: mail, accountName: "work", language: .english) { _ in
+            presses += 1
+            submitted.continuation.yield()
+            await gate.wait()
+        }
+        defer { gate.open(); fixture.close() }
+        await fixture.layout()
+
+        _ = try fixture.press()
+        _ = try fixture.press()
+        for await _ in submitted.stream { break }
+        #expect(presses == 1, "Two events in the same run-loop turn must not start duplicate bulk writes")
+        await fixture.layout()
+        #expect(try !fixture.isEnabled())
+        gate.open()
+        await fixture.layout()
+        #expect(try fixture.isEnabled())
     }
 
     @Test(arguments: ["loading", "mutating", "missing", "empty"])
@@ -39,7 +70,7 @@ struct MailMarkAllReadButtonTests {
             return expectsSnapshot ? .success(.snapshot(snapshot())) : .success(.succeeded)
         }
         if state != "empty" { await mail.refresh(checkForNewMail: false) }
-        let fixture = Fixture(mail: mail, accountName: state == "missing" ? "missing" : "work", language: .english) {}
+        let fixture = Fixture(mail: mail, accountName: state == "missing" ? "missing" : "work", language: .english) { _ in }
         defer {
             shouldWait = false
             gate.open()
@@ -96,7 +127,7 @@ struct MailMarkAllReadButtonTests {
         let host: NSView
         let releaseAccessibility: @MainActor () -> Void
 
-        init(mail: MailService, accountName: String?, language: AppLanguage, action: @escaping () -> Void) {
+        init(mail: MailService, accountName: String?, language: AppLanguage, action: @escaping @MainActor (String?) async -> Void) {
             releaseAccessibility = EnhancedAccessibilityTestScope.acquire()
             window = NSPanel(
                 contentRect: CGRect(x: -100_000, y: -100_000, width: 32, height: 32),
@@ -163,8 +194,9 @@ struct MailMarkAllReadButtonTests {
         func press() throws -> Bool {
             let button = try button()
             let selector = NSSelectorFromString("accessibilityPerformPress")
-            let action = unsafeBitCast(button.method(for: selector), to: (@convention(c) (NSObject, Selector) -> Bool).self)
-            return action(button, selector)
+            try #require(button.responds(to: selector))
+            let action = unsafeBitCast(button.method(for: selector), to: (@convention(c) (NSObject, Selector) -> ObjCBool).self)
+            return action(button, selector).boolValue
         }
     }
 }
