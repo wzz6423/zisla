@@ -181,6 +181,56 @@ struct ShelfScreenshotStoreTests {
         }
     }
 
+    @Test(arguments: [false, true])
+    func unreadableJSONBlocksOnlyLegacyWritesWhileScreenshotsRemainUsable(incompatibleFormat: Bool) throws {
+        try withDirectory { directory in
+            let storage = directory.appendingPathComponent("shelf.json")
+            let png = try imageData()
+            let metadata = Self.metadata(width: 80, height: 40)
+            let (savedJSON, savedText, firstScreenshot) = try {
+                let original = FileShelfStore(storageURL: storage)
+                try #require(original.add(payloads: [.text("retain the legacy text")]) == 1)
+                let text = try #require(original.items.first)
+                let screenshot = try original.stashScreenshot(png: png, metadata: metadata)
+                return (try Data(contentsOf: storage), text, screenshot)
+            }()
+            let unreadableJSON = try incompatibleFormat
+                ? JSONSerialization.data(withJSONObject: ["schemaVersion": 2, "items": JSONSerialization.jsonObject(with: savedJSON)])
+                : Data(savedJSON.dropLast())
+            try unreadableJSON.write(to: storage)
+            let store = FileShelfStore(storageURL: storage)
+            #expect(store.errorDescription != nil)
+            #expect(store.items.map(\.id) == [firstScreenshot.id])
+            #expect(try store.screenshotData(id: firstScreenshot.id) == png)
+            #expect(try Data(contentsOf: store.screenshotFileURL(id: firstScreenshot.id)) == png)
+
+            let secondScreenshot = try store.stashScreenshot(png: png, metadata: metadata)
+            #expect(store.items.map(\.id) == [firstScreenshot.id, secondScreenshot.id])
+            #expect(store.add(payloads: [.text("must not overwrite after screenshot success")]) == 0)
+            #expect(store.errorDescription != nil)
+            #expect(try Data(contentsOf: storage) == unreadableJSON)
+            #expect(try FileManager.default.contentsOfDirectory(atPath: store.managedDirectory.path) == [savedText.id.uuidString])
+            store.remove(id: firstScreenshot.id)
+            #expect(store.items.map(\.id) == [secondScreenshot.id])
+            #expect(!FileManager.default.fileExists(atPath: firstScreenshot.url.path))
+            #expect(throws: CocoaError(.fileReadNoSuchFile)) { try store.screenshotData(id: firstScreenshot.id) }
+            #expect(FileShelfStore(storageURL: storage).items.map(\.id) == [secondScreenshot.id])
+
+            store.removeAll()
+            #expect(store.items.isEmpty)
+            #expect(store.errorDescription != nil)
+            #expect(try Data(contentsOf: storage) == unreadableJSON)
+            #expect(!FileManager.default.fileExists(atPath: secondScreenshot.url.path))
+            #expect(FileShelfStore(storageURL: storage).items.isEmpty)
+            #expect(try String(contentsOf: savedText.url, encoding: .utf8) == "retain the legacy text")
+            try savedJSON.write(to: storage)
+            let recovered = FileShelfStore(storageURL: storage)
+            #expect(recovered.items == [savedText])
+            #expect(recovered.errorDescription == nil)
+            #expect(recovered.add(payloads: [.text("save after reopening")]) == 1)
+        }
+    }
+
     @Test
     func failedDatabaseOpenDoesNotDamageLegacyShelfAndCreatesNoCard() throws {
         try withDirectory { directory in

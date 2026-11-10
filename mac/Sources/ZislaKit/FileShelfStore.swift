@@ -156,6 +156,7 @@ public final class FileShelfStore: ObservableObject {
     }
 
     private let storageURL: URL
+    private var loadErrorDescription: String?
     private let screenshotDatabase: ShelfScreenshotDatabase
     // Notes can be backdated, so insertion order must not depend on capture or creation dates.
     private var shelfOrder: [UUID: Int64] = [:]
@@ -657,8 +658,8 @@ public final class FileShelfStore: ObservableObject {
     }
 
     private func load() {
-        guard let data = try? Data(contentsOf: storageURL) else { return }
         do {
+            let data = try Data(contentsOf: storageURL)
             let stored = try JSONDecoder().decode([StoredItem].self, from: data)
             var loaded: [FileShelfItem] = []
             for (index, value) in stored.enumerated() {
@@ -699,22 +700,26 @@ public final class FileShelfStore: ObservableObject {
             }
             items = loaded
             errorDescription = nil
-            if loaded.count != stored.count || stored.contains(where: { record in
-                !items.contains(where: {
-                    $0.id == record.id &&
-                    $0.bookmarkData == record.bookmarkData &&
-                    $0.url == record.url
-                })
+            if loaded.count != stored.count || zip(stored, loaded).contains(where: { record, item in
+                item.bookmarkData != record.bookmarkData || item.url != record.url
             }) {
                 persist(items)
             }
+        } catch let error as CocoaError where error.code == .fileReadNoSuchFile {
+            return
         } catch {
-            errorDescription = error.localizedDescription
+            loadErrorDescription = error.localizedDescription
+            errorDescription = loadErrorDescription
         }
     }
 
     @discardableResult
     private func persist(_ items: [FileShelfItem]) -> Bool {
+        // An unread index may contain recoverable items; only a successful reopen can make it writable.
+        if let loadErrorDescription {
+            errorDescription = loadErrorDescription
+            return false
+        }
         do {
             try FileManager.default.createDirectory(at: storageURL.deletingLastPathComponent(), withIntermediateDirectories: true)
             let retainedIDs = Set(items.map(\.id))
