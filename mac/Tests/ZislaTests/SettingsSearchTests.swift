@@ -108,7 +108,7 @@ struct SettingsSearchTests {
     /// Renaming navigation must not invalidate existing search terms or bypass the feature toggle.
     @Test(arguments: AppLanguage.allCases)
     func legacyDownloadTitleStillFindsDependencyComponents(language: AppLanguage) {
-        for query in ["下载", AppLocalization.string("下载", language: language)] {
+        for query in ["下载", "Downloads", AppLocalization.string("下载", language: language)] {
             let dependencies = results(query, locale: language.locale).filter { $0.section == .download }
             #expect(Set(dependencies.map(\.title)) == [ManagedTool.ytDLP.displayName, ManagedTool.libreOffice.displayName])
             #expect(dependencies.allSatisfy { $0.anchor == .row($0.title) })
