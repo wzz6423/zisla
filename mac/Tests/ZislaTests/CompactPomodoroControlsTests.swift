@@ -13,9 +13,13 @@ struct CompactPomodoroControlsTests {
     ) async throws {
         let fixture = try Fixture(edge: edge, moreInformation: moreInformation)
         defer { fixture.close() }
+        fixture.base.settings.settings.collapsedProgressGlowEnabled = true
         fixture.service.start()
         fixture.now += 25
         fixture.service.tick()
+        var notice = try #require(fixture.base.queue.right.first)
+        notice.progress = 0.25
+        fixture.base.queue.updateIfPresent(notice)
         await fixture.layout()
         try fixture.press("pomodoro.toggleStartPause")
         await fixture.layout()
@@ -46,6 +50,10 @@ struct CompactPomodoroControlsTests {
         let fixture = try Fixture(edge: .top, moreInformation: false, language: language, camera: true, countdown: countdown)
         defer { fixture.close() }
         fixture.service.start()
+        fixture.base.settings.settings.collapsedProgressGlowEnabled = true
+        var notice = try #require(fixture.base.queue.right.first)
+        notice.progress = 0.25
+        fixture.base.queue.updateIfPresent(notice)
         await fixture.layout()
         let packageRoot = URL(fileURLWithPath: #filePath).deletingLastPathComponent()
             .deletingLastPathComponent().deletingLastPathComponent()
