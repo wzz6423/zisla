@@ -2476,6 +2476,11 @@
 "2026.10.28往前15天" = "15 giorni prima del 2026.10.28";
 "日期间隔" = "Intervallo tra date";
 "跨时区时间" = "Ora tra fusi orari";
+"会议 2026-11-20 14:30-15:30" = "Riunione 2026-11-20 14:30-15:30";
+"Hello! How are you today?" = "Hello! How are you today?";
+"这是一段普通文本，可以搜索或保存。" = "Testo da cercare o salvare.";
+"例如：复制截图或浏览器中的图片" = "Esempio: Copiare uno screenshot o un’immagine dal browser";
+"例如：在 Finder 中选中文件后按 ⌘C" = "Esempio: Selezionare un file nel Finder e premere ⌘C";
 "汇率获取失败" = "Impossibile recuperare il tasso di cambio";
 "闹钟通知未获允许，请在系统设置中开启通知。" = "Le notifiche della sveglia non sono consentite. Attivale in Impostazioni di Sistema.";
 "闹钟通知声音已关闭，请在系统设置中开启声音。" = "I suoni delle notifiche della sveglia sono disattivati. Attivali in Impostazioni di Sistema.";
