@@ -105,9 +105,42 @@ final class AIStateDatabase {
                     payload BLOB NOT NULL
                 )
             """)
+            try execute("""
+                CREATE TABLE IF NOT EXISTS model_usage_samples (
+                    timestamp REAL NOT NULL,
+                    provider TEXT NOT NULL,
+                    model TEXT NOT NULL,
+                    origin TEXT NOT NULL,
+                    input_tokens INTEGER NOT NULL,
+                    output_tokens INTEGER NOT NULL,
+                    PRIMARY KEY(timestamp, provider, model, origin)
+                )
+                """)
+            try execute("""
+                CREATE TABLE IF NOT EXISTS detected_usage_daily (
+                    source_id TEXT NOT NULL,
+                    provider TEXT NOT NULL,
+                    timestamp REAL NOT NULL,
+                    model TEXT NOT NULL,
+                    input_tokens INTEGER NOT NULL,
+                    output_tokens INTEGER NOT NULL,
+                    PRIMARY KEY(source_id, timestamp, model)
+                )
+                """)
+            try execute("CREATE INDEX IF NOT EXISTS detected_usage_daily_timestamp ON detected_usage_daily(timestamp)")
+            try execute("""
+                CREATE TABLE IF NOT EXISTS generic_usage_baselines (
+                    file_prefix TEXT NOT NULL,
+                    timestamp REAL NOT NULL,
+                    input_tokens INTEGER NOT NULL,
+                    output_tokens INTEGER NOT NULL,
+                    PRIMARY KEY(file_prefix, timestamp)
+                )
+                """)
             try migrateUsageToDailyTotalsIfNeeded()
             try migrateDetectedUsageCursorIfNeeded()
             try migrateDetectedUsageEventsIfNeeded()
+            try migrateModelUsageIfNeeded()
             try setPrivateFilePermissions(using: fileManager)
         } catch {
             close()
@@ -133,12 +166,20 @@ final class AIStateDatabase {
         AIState(
             tasks: try loadTasks(),
             usageSamples: includeUsageSamples ? try loadUsage() : [],
-            notices: try loadNotices()
+            notices: try loadNotices(),
+            modelUsageSamples: includeUsageSamples ? try loadModelUsage() : []
         )
     }
 
     func loadUsageSamples(startingAt startDate: Date? = nil) throws -> [AIUsageSample] {
         try loadUsage(startingAt: startDate)
+    }
+
+    func loadUsageHistory(startingAt startDate: Date?, endingBefore endDate: Date?) throws -> AIUsageHistory {
+        try transaction {
+            AIUsageHistory(usageSamples: try loadUsage(startingAt: startDate, endingBefore: endDate),
+                modelUsageSamples: try loadModelUsage(startingAt: startDate, endingBefore: endDate))
+        }
     }
 
     func upsertTask(_ task: AIProgressTask) throws {
@@ -175,14 +216,24 @@ final class AIStateDatabase {
     @discardableResult
     func recordUsage(_ samples: [AIUsageSample]) throws -> Int {
         guard !samples.isEmpty else { return 0 }
+        guard samples.allSatisfy({ $0.timestamp.timeIntervalSinceReferenceDate.isFinite }) else {
+            throw AIStateRepositoryError.corruptedState
+        }
         return try transaction {
-            try recordUsageDeltasInCurrentTransaction(samples)
+            let changed = try recordUsageDeltasInCurrentTransaction(
+                AIUsageAnalytics.dailyUsageSamples(samples: samples, calendar: .current))
+            try addModelUsage(AIUsageAnalytics.dailyModelUsageSamples(samples: samples), origin: "manual")
+            try trimModelUsage()
+            return changed
         }
     }
 
     @discardableResult
     func recordDetectedUsage(_ samples: [AIUsageSample]) throws -> Int {
         guard !samples.isEmpty else { return 0 }
+        guard samples.allSatisfy({ $0.timestamp.timeIntervalSinceReferenceDate.isFinite }) else {
+            throw AIStateRepositoryError.corruptedState
+        }
         return try transaction {
             try recordDetectedUsageInCurrentTransaction(samples)
         }
@@ -212,21 +263,15 @@ final class AIStateDatabase {
         return result
     }
 
-    private func loadUsage(startingAt startDate: Date? = nil) throws -> [AIUsageSample] {
-        let statement = try prepare(startDate == nil
-            ? """
+    private func loadUsage(startingAt startDate: Date? = nil, endingBefore endDate: Date? = nil) throws -> [AIUsageSample] {
+        let statement = try prepare("""
             SELECT source_id, provider, timestamp, input_tokens, output_tokens, cost_usd, model
-            FROM usage_samples ORDER BY position
-            """
-            : """
-            SELECT source_id, provider, timestamp, input_tokens, output_tokens, cost_usd, model
-            FROM usage_samples WHERE timestamp >= ? ORDER BY position
+            FROM usage_samples WHERE timestamp >= ? AND timestamp < ? ORDER BY position
             """
         )
         defer { sqlite3_finalize(statement) }
-        if let startDate {
-            try check(sqlite3_bind_double(statement, 1, startDate.timeIntervalSinceReferenceDate))
-        }
+        try check(sqlite3_bind_double(statement, 1, startDate?.timeIntervalSinceReferenceDate ?? -Double.greatestFiniteMagnitude))
+        try check(sqlite3_bind_double(statement, 2, endDate?.timeIntervalSinceReferenceDate ?? Double.greatestFiniteMagnitude))
         var result: [AIUsageSample] = []
         while try stepHasRow(statement, fallback: AppLocalization.text("无法读取 AI 用量记录")) {
             result.append(try usageSample(
@@ -236,6 +281,22 @@ final class AIStateDatabase {
             ))
         }
         return result
+    }
+
+    private func loadModelUsage(startingAt startDate: Date? = nil, endingBefore endDate: Date? = nil) throws -> [AIUsageSample] {
+        let statement = try prepare("""
+            SELECT provider, timestamp, input_tokens, output_tokens, NULL, NULLIF(model, '')
+            FROM model_usage_samples WHERE timestamp >= ? AND timestamp < ?
+            ORDER BY timestamp, provider, model, origin
+            """)
+        defer { sqlite3_finalize(statement) }
+        try check(sqlite3_bind_double(statement, 1, startDate?.timeIntervalSinceReferenceDate ?? -Double.greatestFiniteMagnitude))
+        try check(sqlite3_bind_double(statement, 2, endDate?.timeIntervalSinceReferenceDate ?? Double.greatestFiniteMagnitude))
+        var samples: [AIUsageSample] = []
+        while try stepHasRow(statement, fallback: AppLocalization.text("无法读取 AI 用量记录")) {
+            samples.append(try usageSample(from: statement, sourceID: nil, columnOffset: 0))
+        }
+        return AIUsageAnalytics.dailyModelUsageSamples(samples: samples)
     }
 
     private func migrateUsageToDailyTotalsIfNeeded() throws {
@@ -296,6 +357,121 @@ final class AIStateDatabase {
             """)
         guard try usageSchemaVersion() < 6 else { return }
         try setUsageSchemaVersion(6)
+    }
+
+    private func migrateModelUsageIfNeeded() throws {
+        guard try usageSchemaVersion() < 7 else { return }
+        try transaction {
+            try execute("DELETE FROM detected_usage_daily")
+            try execute("DELETE FROM model_usage_samples")
+            let statement = try prepare("""
+                SELECT source_id, provider, timestamp, input_tokens, output_tokens, cost_usd, model
+                FROM detected_usage_events ORDER BY timestamp, source_id
+                """)
+            defer { sqlite3_finalize(statement) }
+            var days: Set<Date> = []
+            while try stepHasRow(statement, fallback: AppLocalization.text("无法读取 AI 用量记录")) {
+                var sample = try usageSample(from: statement, sourceID: optionalText(at: 0, in: statement), columnOffset: 1)
+                if let sourceID = sample.sourceID, sourceID.contains("-entry-"), sourceID.contains("-usage-") {
+                    sample.model = nil
+                }
+                try addDetectedModelDelta(sample)
+                days.insert(Calendar.current.startOfDay(for: sample.timestamp))
+            }
+            for day in days.sorted() { try refreshDetectedModelUsage(at: day) }
+            try trimModelUsage()
+            try setUsageSchemaVersion(7)
+        }
+    }
+
+    private func addModelUsage(_ samples: [AIUsageSample], origin: String) throws {
+        let lookup = try prepare("""
+            SELECT input_tokens, output_tokens FROM model_usage_samples
+            WHERE timestamp = ? AND provider = ? AND model = ? AND origin = ?
+            """)
+        defer { sqlite3_finalize(lookup) }
+        let insert = try prepare("""
+            INSERT INTO model_usage_samples(timestamp, provider, model, origin, input_tokens, output_tokens)
+            VALUES(?, ?, ?, ?, ?, ?)
+            ON CONFLICT(timestamp, provider, model, origin) DO UPDATE SET
+                input_tokens = excluded.input_tokens, output_tokens = excluded.output_tokens
+            """)
+        defer { sqlite3_finalize(insert) }
+        for sample in samples where sample.totalTokens > 0 {
+            let day = Calendar.current.startOfDay(for: sample.timestamp)
+            let model = AIUsageAnalytics.normalizedModel(sample.model) ?? ""
+            sqlite3_reset(lookup)
+            sqlite3_clear_bindings(lookup)
+            try check(sqlite3_bind_double(lookup, 1, day.timeIntervalSinceReferenceDate))
+            try bind(sample.provider.rawValue, to: 2, in: lookup)
+            try bind(model, to: 3, in: lookup)
+            try bind(origin, to: 4, in: lookup)
+            let exists = try stepHasRow(lookup, fallback: AppLocalization.text("无法查询 AI 用量记录"))
+            let input = AIUsageTokenMath.adding(exists ? tokenCount(at: 0, in: lookup) : 0, sample.inputTokens)
+            let output = AIUsageTokenMath.adding(exists ? tokenCount(at: 1, in: lookup) : 0, sample.outputTokens)
+            sqlite3_reset(insert)
+            sqlite3_clear_bindings(insert)
+            try check(sqlite3_bind_double(insert, 1, day.timeIntervalSinceReferenceDate))
+            try bind(sample.provider.rawValue, to: 2, in: insert)
+            try bind(model, to: 3, in: insert)
+            try bind(origin, to: 4, in: insert)
+            try check(sqlite3_bind_int64(insert, 5, Int64(input)))
+            try check(sqlite3_bind_int64(insert, 6, Int64(output)))
+            try stepDone(insert)
+        }
+    }
+
+    private func addDetectedModelDelta(_ sample: AIUsageSample) throws {
+        guard sample.totalTokens > 0 else { return }
+        let model = AIUsageAnalytics.normalizedModel(sample.model) ?? ""
+        let day = Calendar.current.startOfDay(for: sample.timestamp)
+        let lookup = try prepare("""
+            SELECT input_tokens, output_tokens FROM detected_usage_daily
+            WHERE source_id = ? AND timestamp = ? AND model = ?
+            """)
+        defer { sqlite3_finalize(lookup) }
+        try bind(sample.sourceID, to: 1, in: lookup)
+        try check(sqlite3_bind_double(lookup, 2, day.timeIntervalSinceReferenceDate))
+        try bind(model, to: 3, in: lookup)
+        let exists = try stepHasRow(lookup, fallback: AppLocalization.text("无法查询 AI 用量记录"))
+        let input = AIUsageTokenMath.adding(exists ? tokenCount(at: 0, in: lookup) : 0, sample.inputTokens)
+        let output = AIUsageTokenMath.adding(exists ? tokenCount(at: 1, in: lookup) : 0, sample.outputTokens)
+        let insert = try prepare("""
+            INSERT INTO detected_usage_daily(source_id, provider, timestamp, model, input_tokens, output_tokens)
+            VALUES(?, ?, ?, ?, ?, ?)
+            ON CONFLICT(source_id, timestamp, model) DO UPDATE SET
+                input_tokens = excluded.input_tokens, output_tokens = excluded.output_tokens
+            """)
+        defer { sqlite3_finalize(insert) }
+        try bind(sample.sourceID, to: 1, in: insert)
+        try bind(sample.provider.rawValue, to: 2, in: insert)
+        try check(sqlite3_bind_double(insert, 3, day.timeIntervalSinceReferenceDate))
+        try bind(model, to: 4, in: insert)
+        try check(sqlite3_bind_int64(insert, 5, Int64(input)))
+        try check(sqlite3_bind_int64(insert, 6, Int64(output)))
+        try stepDone(insert)
+    }
+
+    private func refreshDetectedModelUsage(at day: Date) throws {
+        let delete = try prepare("DELETE FROM model_usage_samples WHERE timestamp = ? AND origin = 'detected'")
+        defer { sqlite3_finalize(delete) }
+        try check(sqlite3_bind_double(delete, 1, day.timeIntervalSinceReferenceDate))
+        try stepDone(delete)
+        let statement = try prepare("""
+            SELECT provider, timestamp, input_tokens, output_tokens, NULL, NULLIF(model, '')
+            FROM detected_usage_daily WHERE timestamp = ? ORDER BY source_id, model
+            """)
+        defer { sqlite3_finalize(statement) }
+        try check(sqlite3_bind_double(statement, 1, day.timeIntervalSinceReferenceDate))
+        var samples: [AIUsageSample] = []
+        while try stepHasRow(statement, fallback: AppLocalization.text("无法读取 AI 用量记录")) {
+            samples.append(try usageSample(from: statement, sourceID: nil, columnOffset: 0))
+        }
+        try addModelUsage(AIUsageAnalytics.dailyModelUsageSamples(samples: samples), origin: "detected")
+    }
+
+    private func trimModelUsage() throws {
+        try execute("DELETE FROM model_usage_samples WHERE timestamp NOT IN (SELECT timestamp FROM usage_samples)")
     }
 
     private func legacyDetectedUsageTotals() throws -> [DetectedUsageTotal] {
@@ -409,6 +585,8 @@ final class AIStateDatabase {
 
         var rawDeltasByDay: [Date: AIUsageSample] = [:]
         var cursorDeltas: [AIUsageSample] = []
+        var modelDays: Set<Date> = []
+        let ambiguousGenericDays = try prepareGenericUsageMigration(samples, using: lookup, modelDays: &modelDays)
         for sample in samples {
             let sourceID = detectedUsageSourceID(for: sample)
             let normalized = AIUsageSample(
@@ -418,7 +596,7 @@ final class AIStateDatabase {
                 inputTokens: AIUsageTokenMath.nonnegative(sample.inputTokens),
                 outputTokens: AIUsageTokenMath.nonnegative(sample.outputTokens),
                 costUSD: sample.costUSD,
-                model: sample.model
+                model: AIUsageAnalytics.normalizedModel(sample.model)
             )
 
             var existing = try detectedUsageEvent(sourceID: sourceID, using: lookup)
@@ -436,7 +614,8 @@ final class AIStateDatabase {
                 let updated = AIUsageSample(
                     sourceID: sourceID,
                     provider: existing.provider,
-                    timestamp: existing.timestamp,
+                    timestamp: inputDelta > 0 || outputDelta > 0
+                        ? max(existing.timestamp, normalized.timestamp) : existing.timestamp,
                     inputTokens: AIUsageTokenMath.adding(existing.inputTokens, inputDelta),
                     outputTokens: AIUsageTokenMath.adding(existing.outputTokens, outputDelta),
                     costUSD: existing.costUSD ?? normalized.costUSD,
@@ -446,14 +625,35 @@ final class AIStateDatabase {
                 sqlite3_clear_bindings(update)
                 try bindUpdate(updated, to: update)
                 try stepDone(update)
+                if existing.model == nil, let model = updated.model,
+                   normalized.timestamp == existing.timestamp, inputDelta == 0, outputDelta == 0 {
+                    let day = Calendar.current.startOfDay(for: existing.timestamp)
+                    let enrich = try prepare("""
+                        UPDATE detected_usage_daily SET model = ?
+                        WHERE source_id = ? AND model = '' AND timestamp = ?
+                            AND (SELECT COUNT(*) FROM detected_usage_daily WHERE source_id = ?) = 1
+                        """)
+                    defer { sqlite3_finalize(enrich) }
+                    try bind(model, to: 1, in: enrich)
+                    try bind(sourceID, to: 2, in: enrich)
+                    try check(sqlite3_bind_double(enrich, 3, day.timeIntervalSinceReferenceDate))
+                    try bind(sourceID, to: 4, in: enrich)
+                    try stepDone(enrich)
+                    if sqlite3_changes(connection) > 0 { modelDays.insert(day) }
+                }
                 if inputDelta > 0 || outputDelta > 0 {
-                    let delta = AIUsageSample(
+                    let rawDelta = AIUsageSample(
                         sourceID: sourceID,
                         provider: existing.provider,
-                        timestamp: existing.timestamp,
+                        timestamp: updated.timestamp,
                         inputTokens: inputDelta,
-                        outputTokens: outputDelta
+                        outputTokens: outputDelta,
+                        model: normalized.model
                     )
+                    let delta = try reconcileGenericUsage(rawDelta, legacyPrefix: sample.legacySourceID,
+                        ambiguousDays: ambiguousGenericDays)
+                    try addDetectedModelDelta(delta)
+                    modelDays.insert(Calendar.current.startOfDay(for: delta.timestamp))
                     appendDetectedUsageDelta(delta, to: &rawDeltasByDay)
                     if legacyCursor.map({ delta.timestamp > $0 }) ?? false {
                         cursorDeltas.append(delta)
@@ -466,9 +666,13 @@ final class AIStateDatabase {
             sqlite3_clear_bindings(insert)
             try bind(normalized, to: insert)
             try stepDone(insert)
-            appendDetectedUsageDelta(normalized, to: &rawDeltasByDay)
+            let delta = try reconcileGenericUsage(normalized, legacyPrefix: sample.legacySourceID,
+                ambiguousDays: ambiguousGenericDays)
+            try addDetectedModelDelta(delta)
+            modelDays.insert(Calendar.current.startOfDay(for: normalized.timestamp))
+            appendDetectedUsageDelta(delta, to: &rawDeltasByDay)
             if legacyCursor.map({ normalized.timestamp > $0 }) ?? false {
-                cursorDeltas.append(normalized)
+                cursorDeltas.append(delta)
             }
         }
 
@@ -485,6 +689,8 @@ final class AIStateDatabase {
         if legacyCursor != nil {
             try execute("DELETE FROM detected_usage_cursor")
         }
+        for day in modelDays.sorted() { try refreshDetectedModelUsage(at: day) }
+        try trimModelUsage()
         return changed
     }
 
@@ -534,16 +740,12 @@ final class AIStateDatabase {
     }
 
     private func detectedUsageEventTotal(at day: Date) throws -> DetectedUsageTotal {
-        guard let nextDay = Calendar.current.date(byAdding: .day, value: 1, to: day) else {
-            throw AIStateRepositoryError.storageFailure(AppLocalization.text("无法计算 AI 用量日期范围"))
-        }
         let statement = try prepare("""
             SELECT input_tokens, output_tokens
-            FROM detected_usage_events WHERE timestamp >= ? AND timestamp < ?
+            FROM detected_usage_daily WHERE timestamp = ?
             """)
         defer { sqlite3_finalize(statement) }
         try check(sqlite3_bind_double(statement, 1, day.timeIntervalSinceReferenceDate))
-        try check(sqlite3_bind_double(statement, 2, nextDay.timeIntervalSinceReferenceDate))
         var inputTokens = 0
         var outputTokens = 0
         while try stepHasRow(statement, fallback: AppLocalization.text("无法读取 AI 用量事件汇总")) {
@@ -642,6 +844,164 @@ final class AIStateDatabase {
         try bind(sourceID, to: 1, in: statement)
         try bind(legacySourceID, to: 2, in: statement)
         try stepDone(statement)
+        let daily = try prepare("UPDATE detected_usage_daily SET source_id = ? WHERE source_id = ?")
+        defer { sqlite3_finalize(daily) }
+        try bind(sourceID, to: 1, in: daily)
+        try bind(legacySourceID, to: 2, in: daily)
+        try stepDone(daily)
+    }
+
+    private func migrateGenericDetectedUsageEvent(for sample: AIUsageSample, legacyPrefix: String,
+        modelDays: inout Set<Date>) throws {
+        guard let filePrefix = genericFilePrefix(legacyPrefix) else { return }
+        let lookup = try prepare("""
+            SELECT source_id FROM detected_usage_events
+            WHERE source_id GLOB ? AND provider = ?
+                AND input_tokens = ? AND output_tokens = ?
+            ORDER BY CASE WHEN substr(source_id, 1, length(?)) = ? THEN 0 ELSE 1 END, source_id LIMIT 1
+            """)
+        defer { sqlite3_finalize(lookup) }
+        try bind(filePrefix + "entry-*-usage-[0-9]*", to: 1, in: lookup)
+        try bind(sample.provider.rawValue, to: 2, in: lookup)
+        try check(sqlite3_bind_int64(lookup, 3, Int64(AIUsageTokenMath.nonnegative(sample.inputTokens))))
+        try check(sqlite3_bind_int64(lookup, 4, Int64(AIUsageTokenMath.nonnegative(sample.outputTokens))))
+        try bind(legacyPrefix, to: 5, in: lookup)
+        try bind(legacyPrefix, to: 6, in: lookup)
+        guard try stepHasRow(lookup, fallback: AppLocalization.text("无法查询旧版检测到的 AI 用量记录")),
+              let legacyID = optionalText(at: 0, in: lookup) else { return }
+        let oldRows = try prepare("""
+            SELECT provider, timestamp, input_tokens, output_tokens, NULL, NULL
+            FROM detected_usage_daily WHERE source_id = ?
+            """)
+        defer { sqlite3_finalize(oldRows) }
+        try bind(legacyID, to: 1, in: oldRows)
+        var rows: [AIUsageSample] = []
+        while try stepHasRow(oldRows, fallback: AppLocalization.text("无法读取 AI 用量记录")) {
+            var row = try usageSample(from: oldRows, sourceID: sample.sourceID, columnOffset: 0)
+            row.model = nil
+            rows.append(row)
+        }
+        let delete = try prepare("DELETE FROM detected_usage_daily WHERE source_id = ?")
+        defer { sqlite3_finalize(delete) }
+        try bind(legacyID, to: 1, in: delete)
+        try stepDone(delete)
+        for row in rows {
+            try addDetectedModelDelta(row)
+            modelDays.insert(row.timestamp)
+        }
+        let update = try prepare("UPDATE detected_usage_events SET source_id = ?, model = ? WHERE source_id = ?")
+        defer { sqlite3_finalize(update) }
+        try bind(sample.sourceID, to: 1, in: update)
+        try bind(sample.model, to: 2, in: update)
+        try bind(legacyID, to: 3, in: update)
+        try stepDone(update)
+    }
+
+    private func genericFilePrefix(_ legacyPrefix: String) -> String? {
+        legacyPrefix.range(of: "-entry-").map { String(legacyPrefix[..<$0.lowerBound]) + "-" }
+    }
+
+    private func prepareGenericUsageMigration(_ samples: [AIUsageSample], using lookup: OpaquePointer?,
+        modelDays: inout Set<Date>) throws -> Set<String> {
+        let generic = samples.filter { $0.legacySourceID != nil }
+        for sample in generic {
+            guard let sourceID = sample.sourceID, let prefix = sample.legacySourceID,
+                  try detectedUsageEvent(sourceID: sourceID, using: lookup) == nil else { continue }
+            try migrateGenericDetectedUsageEvent(for: sample, legacyPrefix: prefix, modelDays: &modelDays)
+        }
+        var ambiguous: Set<String> = []
+        for filePrefix in Set(generic.compactMap { $0.legacySourceID.flatMap(genericFilePrefix) }) {
+            let old = try prepare("""
+                SELECT source_id, provider, timestamp, input_tokens, output_tokens, cost_usd, model
+                FROM detected_usage_events WHERE source_id GLOB ? ORDER BY source_id
+                """)
+            defer { sqlite3_finalize(old) }
+            try bind(filePrefix + "entry-*-usage-[0-9]*", to: 1, in: old)
+            var leftovers: [AIUsageSample] = []
+            while try stepHasRow(old, fallback: AppLocalization.text("无法读取 AI 用量记录")) {
+                leftovers.append(try usageSample(from: old, sourceID: optionalText(at: 0, in: old), columnOffset: 1))
+            }
+            for total in AIUsageAnalytics.dailyUsageSamples(samples: leftovers, calendar: .current) {
+                let insert = try prepare("""
+                    INSERT INTO generic_usage_baselines(file_prefix,timestamp,input_tokens,output_tokens)
+                    VALUES(?,?,?,?)
+                    """)
+                defer { sqlite3_finalize(insert) }
+                try bind(filePrefix, to: 1, in: insert)
+                try check(sqlite3_bind_double(insert, 2, total.timestamp.timeIntervalSinceReferenceDate))
+                try check(sqlite3_bind_int64(insert, 3, Int64(total.inputTokens)))
+                try check(sqlite3_bind_int64(insert, 4, Int64(total.outputTokens)))
+                try stepDone(insert)
+                ambiguous.insert(filePrefix)
+            }
+            for sample in leftovers {
+                guard let oldID = sample.sourceID else { continue }
+                let rows = try prepare("""
+                    SELECT provider, timestamp, input_tokens, output_tokens, NULL, NULL
+                    FROM detected_usage_daily WHERE source_id = ?
+                    """)
+                defer { sqlite3_finalize(rows) }
+                try bind(oldID, to: 1, in: rows)
+                var historical: [AIUsageSample] = []
+                while try stepHasRow(rows, fallback: AppLocalization.text("无法读取 AI 用量记录")) {
+                    historical.append(try usageSample(from: rows, sourceID: "zisla-legacy-generic:\(oldID)", columnOffset: 0))
+                }
+                let delete = try prepare("DELETE FROM detected_usage_daily WHERE source_id = ?")
+                defer { sqlite3_finalize(delete) }
+                try bind(oldID, to: 1, in: delete)
+                try stepDone(delete)
+                for row in historical {
+                    try addDetectedModelDelta(row)
+                    modelDays.insert(row.timestamp)
+                }
+                let remove = try prepare("DELETE FROM detected_usage_events WHERE source_id = ?")
+                defer { sqlite3_finalize(remove) }
+                try bind(oldID, to: 1, in: remove)
+                try stepDone(remove)
+            }
+            let baseline = try prepare("""
+                SELECT timestamp FROM generic_usage_baselines WHERE file_prefix = ?
+                    AND (input_tokens > 0 OR output_tokens > 0)
+                """)
+            defer { sqlite3_finalize(baseline) }
+            try bind(filePrefix, to: 1, in: baseline)
+            while try stepHasRow(baseline, fallback: AppLocalization.text("无法读取 AI 用量记录")) {
+                ambiguous.insert(filePrefix)
+            }
+        }
+        return ambiguous
+    }
+
+    private func reconcileGenericUsage(_ sample: AIUsageSample, legacyPrefix: String?, ambiguousDays: Set<String>) throws -> AIUsageSample {
+        guard let legacyPrefix, let filePrefix = genericFilePrefix(legacyPrefix) else { return sample }
+        guard ambiguousDays.contains(filePrefix) else { return sample }
+        let lookup = try prepare("""
+            SELECT timestamp,input_tokens,output_tokens FROM generic_usage_baselines
+            WHERE file_prefix = ? AND (input_tokens > 0 OR output_tokens > 0) ORDER BY timestamp
+            """)
+        defer { sqlite3_finalize(lookup) }
+        try bind(filePrefix, to: 1, in: lookup)
+        let update = try prepare("""
+            UPDATE generic_usage_baselines SET input_tokens = ?, output_tokens = ? WHERE file_prefix = ? AND timestamp = ?
+            """)
+        defer { sqlite3_finalize(update) }
+        var delta = sample
+        while try stepHasRow(lookup, fallback: AppLocalization.text("无法读取 AI 用量记录")) {
+            let timestamp = sqlite3_column_double(lookup, 0)
+            let input = tokenCount(at: 1, in: lookup)
+            let output = tokenCount(at: 2, in: lookup)
+            sqlite3_reset(update)
+            sqlite3_clear_bindings(update)
+            try check(sqlite3_bind_int64(update, 1, Int64(max(0, input - delta.inputTokens))))
+            try check(sqlite3_bind_int64(update, 2, Int64(max(0, output - delta.outputTokens))))
+            try bind(filePrefix, to: 3, in: update)
+            try check(sqlite3_bind_double(update, 4, timestamp))
+            try stepDone(update)
+            delta.inputTokens = max(0, delta.inputTokens - input)
+            delta.outputTokens = max(0, delta.outputTokens - output)
+        }
+        delta.model = nil
+        return delta
     }
 
     private func uniqueLegacyDetectedUsageSourceID(
@@ -773,7 +1133,8 @@ final class AIStateDatabase {
         columnOffset: Int32
     ) throws -> AIUsageSample {
         guard let providerText = optionalText(at: columnOffset, in: statement),
-              let provider = AIProvider(rawValue: providerText) else {
+              let provider = AIProvider(rawValue: providerText),
+              sqlite3_column_double(statement, columnOffset + 1).isFinite else {
             throw AIStateRepositoryError.corruptedState
         }
         return AIUsageSample(
@@ -846,6 +1207,7 @@ final class AIStateDatabase {
         defer { sqlite3_finalize(statement) }
         try check(sqlite3_bind_int64(statement, 1, Int64(maximumUsageSamples)))
         try stepDone(statement)
+        try trimModelUsage()
     }
 
     private func transaction<T>(_ body: () throws -> T) throws -> T {

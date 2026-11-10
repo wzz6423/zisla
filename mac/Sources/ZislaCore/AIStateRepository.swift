@@ -59,6 +59,12 @@ public struct AIStateRepository: Sendable {
         return try database.loadUsageSamples(startingAt: startDate)
     }
 
+    public func loadUsageHistory(startingAt startDate: Date? = nil, endingBefore endDate: Date? = nil) throws -> AIUsageHistory {
+        let database = try openDatabase()
+        try database.trimUsageIfNeeded()
+        return try database.loadUsageHistory(startingAt: startDate, endingBefore: endDate)
+    }
+
     public func upsert(_ task: AIProgressTask) throws {
         try openDatabase().upsertTask(task)
     }
@@ -91,9 +97,7 @@ public struct AIStateRepository: Sendable {
 
     @discardableResult
     public func recordUsage(_ samples: [AIUsageSample]) throws -> Int {
-        try openDatabase().recordUsage(
-            AIUsageAnalytics.dailyUsageSamples(samples: samples, calendar: .current)
-        )
+        try openDatabase().recordUsage(samples)
     }
 
     /// Deduplicates detected events by source and keeps the visible history aggregated by day.
@@ -104,7 +108,7 @@ public struct AIStateRepository: Sendable {
 
     public func stateRecordingUsage(_ samples: [AIUsageSample]) throws -> AIState {
         let database = try openDatabase()
-        _ = try database.recordUsage(AIUsageAnalytics.dailyUsageSamples(samples: samples, calendar: .current))
+        _ = try database.recordUsage(samples)
         return try database.load()
     }
 

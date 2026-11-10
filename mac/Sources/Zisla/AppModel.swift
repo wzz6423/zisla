@@ -592,6 +592,12 @@ final class AppModel: ObservableObject {
       guard self.settingsStore.settings.keyboardTypingStatsEnabled,
         self.keyboardSound.isInputMonitoringGranted else { return nil }
       return try await self.keyboardSound.dailyBriefingTyping(on: date)
+    },
+    readAIUsage: { range in
+      try await Task.detached(priority: .utility) {
+        try AIStateRepository(directoryURL: AppPaths.applicationSupport).loadUsageHistory(
+          startingAt: range.start, endingBefore: range.end)
+      }.value
     }
   )
   /// Synchronous hook used by the app delegate to arm overlay focus protection before any

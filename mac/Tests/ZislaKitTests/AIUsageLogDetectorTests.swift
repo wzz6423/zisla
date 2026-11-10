@@ -7,6 +7,215 @@ import zstd
 
 struct AIUsageLogDetectorTests {
     @Test
+    func codexUsageKeepsRecordedTurnModelsAcrossIncrementalReads() throws {
+        let root = temporaryDirectory(named: "usage-codex-model-context")
+        defer { try? FileManager.default.removeItem(at: root) }
+        let file = root.appendingPathComponent("sessions/rollout-models.jsonl")
+        try writeJSONL([
+            #"{"type":"turn_context","payload":{"model":"gpt-6.1-sol"}}"#,
+            codexTokenLine(timestamp: "2026-11-10T00:00:00Z", input: 100, output: 20),
+        ], to: file)
+        let detector = codexUsageDetector(codex: root.appendingPathComponent("sessions"),
+            empty: root.appendingPathComponent("empty"), scanInterval: 0)
+        #expect(try detector.usageSamples().map(\.model) == ["gpt-6.1-sol"])
+        try appendJSONL(#"{"type":"turn_context","payload":{"model":"gpt-6-astra"}}"#, to: file)
+        try appendJSONL(codexTokenLine(timestamp: "2026-11-10T00:01:00Z", input: 150, output: 30), to: file)
+        let samples = try detector.usageSamples()
+        #expect(samples.map(\.model) == ["gpt-6.1-sol", "gpt-6-astra"])
+        #expect(samples.map(\.totalTokens) == [120, 60])
+    }
+
+    @Test
+    func codexExplicitModelOverridesContextAndMissingContextStaysUnknown() throws {
+        let root = temporaryDirectory(named: "usage-codex-explicit-model")
+        defer { try? FileManager.default.removeItem(at: root) }
+        let file = root.appendingPathComponent("sessions/rollout-models.jsonl")
+        try writeJSONL([
+            codexTokenLine(timestamp: "2026-11-10T00:00:00Z", input: 100, output: 20),
+            #"{"type":"turn_context","payload":{"model":"context-model"}}"#,
+            #"{"timestamp":"2026-11-10T00:01:00Z","type":"event_msg","payload":{"type":"token_count","model":"explicit-model","info":{"last_token_usage":{"input_tokens":30,"output_tokens":5}}}}"#,
+            #"{"type":"turn_context","payload":{"model":"  "}}"#,
+            codexTokenLine(timestamp: "2026-11-10T00:02:00Z", input: 150, output: 30),
+        ], to: file)
+        let detector = codexUsageDetector(codex: root.appendingPathComponent("sessions"), empty: root.appendingPathComponent("empty"))
+        #expect(try detector.usageSamples().map(\.model) == [nil, "explicit-model", nil])
+    }
+
+    @Test
+    func grokMultipleModelUsageKeysDoNotAssignAllTokensToTheFirstModel() throws {
+        let root = temporaryDirectory(named: "usage-grok-multiple-models")
+        defer { try? FileManager.default.removeItem(at: root) }
+        try writeJSONL([
+            #"{"timestamp":1794268800,"method":"_x.ai/session/update","params":{"sessionId":"session","update":{"prompt_id":"one","usage":{"inputTokens":100,"outputTokens":20,"modelUsage":{"grok-4":{},"grok-5":{}}}}}}"#,
+        ], to: root.appendingPathComponent("grok/session/updates.jsonl"))
+        let detector = AIUsageLogDetector(grokSessionsDirectory: root.appendingPathComponent("grok"),
+            scanInterval: 0, enabledProviders: [.grok])
+        let samples = try detector.usageSamples()
+        #expect(samples.map(\.totalTokens) == [120])
+        #expect(samples.map(\.model) == [nil])
+    }
+
+    @Test
+    func seededDamagedCodexModelContextsNeverInventUsageOrPreventLaterValidEvents() throws {
+        let root = temporaryDirectory(named: "usage-codex-model-damage")
+        defer { try? FileManager.default.removeItem(at: root) }
+        let file = root.appendingPathComponent("sessions/rollout-models.jsonl")
+        var seed: UInt64 = 0xC0DE
+        var lines = [String]()
+        for _ in 0..<64 {
+            seed = seed &* 6_364_136_223_846_793_005 &+ 1
+            let bad = [#"{"type":"turn_context","payload":{"model":123}}"#,
+                #"{"type":"turn_context","payload":null}"#, "{truncated", #"{"usage":true}"#][Int(seed % 4)]
+            lines.append(bad)
+        }
+        lines.append(#"{"type":"turn_context","payload":{"model":"gpt-6.1-sol"}}"#)
+        lines.append(codexTokenLine(timestamp: "2026-11-10T00:00:00Z", input: 10, output: 2))
+        try writeJSONL(lines, to: file)
+        let detector = codexUsageDetector(codex: root.appendingPathComponent("sessions"), empty: root.appendingPathComponent("empty"))
+        #expect(try detector.usageSamples().map(\.totalTokens) == [12])
+        #expect(try detector.usageSamples().map(\.model) == ["gpt-6.1-sol"])
+    }
+
+    @Test
+    func geminiMessagesKeepTheirOwnRecordedModelAndDay() throws {
+        let root = temporaryDirectory(named: "usage-gemini-message-models")
+        defer { try? FileManager.default.removeItem(at: root) }
+        try writeJSON(#"{"timestamp":"2026-11-09T00:00:00Z","messages":[{"model":"gemini-pro","timestamp":"2026-11-09T23:59:00Z","tokens":{"input_tokens":100,"output_tokens":20}},{"model":"gemini-flash","timestamp":"2026-11-10T00:01:00Z","tokens":{"input_tokens":30,"output_tokens":5}}]}"#,
+            to: root.appendingPathComponent("session-models.json"))
+        let detector = AIUsageLogDetector(geminiSessionsDirectory: root, enabledProviders: [.gemini])
+        let samples = try detector.usageSamples()
+        #expect(samples.map(\.model) == ["gemini-pro", "gemini-flash"])
+        #expect(samples.map(\.totalTokens) == [120, 35])
+        #expect(samples[1].timestamp.timeIntervalSince(samples[0].timestamp) == 120)
+    }
+
+    @Test
+    func genericSiblingUsageRemainsStableAcrossFieldReorderingAndDetectorRecreation() throws {
+        let root = temporaryDirectory(named: "usage-generic-stable-siblings")
+        defer { try? FileManager.default.removeItem(at: root) }
+        let file = root.appendingPathComponent("logs/session-stable.json")
+        try writeJSON(#"{"timestamp":"2026-11-10T00:00:00Z","a":{"model":"model-a","usage":{"input_tokens":100,"output_tokens":20}},"b":{"model":"model-b","usage":{"input_tokens":30,"output_tokens":5}}}"#, to: file)
+        func detector() -> AIUsageLogDetector { AIUsageLogDetector(geminiSessionsDirectory: root.appendingPathComponent("logs"), enabledProviders: [.gemini]) }
+        let original = try detector().usageSamples()
+        let repository = AIStateRepository(directoryURL: root.appendingPathComponent("state"))
+        try repository.recordDetectedUsage(original)
+        try writeJSON(#"{"b":{"usage":{"output_tokens":5,"input_tokens":30},"model":"model-b"},"a":{"usage":{"output_tokens":20,"input_tokens":100},"model":"model-a"},"timestamp":"2026-11-10T00:00:00Z"}"#, to: file)
+        let reordered = try detector().usageSamples()
+        #expect(reordered == original)
+        #expect(try repository.recordDetectedUsage(reordered) == 0)
+        #expect(try repository.loadUsageSamples().first?.totalTokens == 155)
+        #expect(try repository.load().modelUsageSamples.map(\.model) == ["model-a", "model-b"])
+    }
+
+    @Test
+    func documentAppendAddsOnlyTheNewMessageInsteadOfRepeatingOldUsage() throws {
+        let root = temporaryDirectory(named: "usage-generic-document-append")
+        defer { try? FileManager.default.removeItem(at: root) }
+        let file = root.appendingPathComponent("logs/session-append.json")
+        let first = #"{"id":"a","model":"model-a","usage":{"input_tokens":100,"output_tokens":20}}"#
+        try writeJSON("{\"messages\":[\(first)]}", to: file)
+        func samples() throws -> [AIUsageSample] {
+            try AIUsageLogDetector(geminiSessionsDirectory: root.appendingPathComponent("logs"), enabledProviders: [.gemini]).usageSamples()
+        }
+        let repository = AIStateRepository(directoryURL: root.appendingPathComponent("state"))
+        try repository.recordDetectedUsage(samples())
+        try writeJSON("{\"messages\":[\(first),{\"id\":\"b\",\"model\":\"model-b\",\"usage\":{\"input_tokens\":30,\"output_tokens\":5}}]}", to: file)
+        try repository.recordDetectedUsage(samples())
+        #expect(try repository.loadUsageSamples().map(\.totalTokens).reduce(0, +) == 155)
+        #expect(try repository.load().modelUsageSamples.map(\.totalTokens).sorted() == [35, 120])
+    }
+
+    @Test(arguments: [true, false])
+    func separateGenericJSONLLinesDoNotCollapseEvenWithEqualTokens(sameModel: Bool) throws {
+        let root = temporaryDirectory(named: "usage-generic-jsonl-distinct")
+        defer { try? FileManager.default.removeItem(at: root) }
+        let file = root.appendingPathComponent("logs/session.jsonl")
+        let secondModel = sameModel ? "model-a" : "model-b"
+        try writeJSONL([
+            #"{"timestamp":"2026-11-10T00:00:00Z","model":"model-a","usage":{"input_tokens":10,"output_tokens":2}}"#,
+            "{\"timestamp\":\"2026-11-10T00:00:00Z\",\"model\":\"\(secondModel)\",\"usage\":{\"input_tokens\":10,\"output_tokens\":2}}",
+            #"{"timestamp":"2026-11-10T00:00:00Z","model":"model-a","usage":{"input_tokens":30,"output_tokens":5}}"#,
+        ], to: file)
+        let samples = try AIUsageLogDetector(qwenProjectsDirectory: root.appendingPathComponent("logs"), enabledProviders: [.qwen]).usageSamples()
+        #expect(samples.count == 3)
+        #expect(Set(samples.compactMap(\.sourceID)).count == 3)
+        #expect(samples.map(\.totalTokens).reduce(0, +) == 59)
+    }
+
+    @Test
+    func legacyGenericIndexSourcesKeepTotalsWithoutClaimingTheirOldModelAttribution() throws {
+        let root = temporaryDirectory(named: "usage-generic-legacy-index")
+        defer { try? FileManager.default.removeItem(at: root) }
+        try writeJSON(#"{"timestamp":"2026-11-10T00:00:00Z","a":{"model":"model-a","usage":{"input_tokens":100,"output_tokens":20}},"b":{"model":"model-b","usage":{"input_tokens":30,"output_tokens":5}}}"#,
+            to: root.appendingPathComponent("logs/session-legacy.json"))
+        let samples = try AIUsageLogDetector(geminiSessionsDirectory: root.appendingPathComponent("logs"), enabledProviders: [.gemini]).usageSamples()
+        let repository = AIStateRepository(directoryURL: root.appendingPathComponent("state"))
+        let legacy = samples.enumerated().map { index, sample in
+            AIUsageSample(sourceID: sample.legacySourceID! + String(1 - index), provider: sample.provider,
+                timestamp: sample.timestamp, inputTokens: sample.inputTokens, outputTokens: sample.outputTokens, model: "unreliable-old-model")
+        }
+        try repository.recordDetectedUsage(legacy)
+        #expect(try repository.recordDetectedUsage(samples) == 0)
+        #expect(try repository.recordDetectedUsage(samples) == 0)
+        let history = try repository.loadUsageHistory()
+        #expect(history.usageSamples.first?.totalTokens == 155)
+        #expect(history.modelUsageSamples.map(\.model) == [nil])
+        #expect(history.modelUsageSamples.first?.totalTokens == 155)
+    }
+
+    @Test(arguments: [true, false])
+    func legacyGenericDocumentsDoNotRepeatUsageWhenTheyChangeBeforeUpgrade(changedOldTokens: Bool) throws {
+        let root = temporaryDirectory(named: "usage-generic-legacy-append")
+        defer { try? FileManager.default.removeItem(at: root) }
+        let file = root.appendingPathComponent("logs/session-upgrade.json")
+        try writeJSON(#"{"timestamp":"2026-11-10T00:00:00Z","messages":[{"id":"old","model":"model-a","usage":{"input_tokens":100,"output_tokens":20}}]}"#, to: file)
+        func samples() throws -> [AIUsageSample] {
+            try AIUsageLogDetector(geminiSessionsDirectory: root.appendingPathComponent("logs"), enabledProviders: [.gemini]).usageSamples()
+        }
+        let old = try #require(samples().first)
+        let repository = AIStateRepository(directoryURL: root.appendingPathComponent("state"))
+        try repository.recordDetectedUsage([AIUsageSample(sourceID: old.legacySourceID! + "0", provider: old.provider,
+            timestamp: old.timestamp, inputTokens: old.inputTokens, outputTokens: old.outputTokens, model: "unreliable-first-model")])
+        let input = changedOldTokens ? 150 : 100
+        try writeJSON("{\"timestamp\":\"2026-11-10T00:00:00Z\",\"messages\":[{\"id\":\"old\",\"model\":\"model-a\",\"usage\":{\"input_tokens\":\(input),\"output_tokens\":20}},{\"id\":\"new\",\"model\":\"model-b\",\"usage\":{\"input_tokens\":30,\"output_tokens\":5}}]}", to: file)
+        try repository.recordDetectedUsage(samples())
+        #expect(try repository.loadUsageSamples().first?.totalTokens == input + 55)
+        #expect(try repository.recordDetectedUsage(samples()) == 0)
+        let history = try repository.loadUsageHistory()
+        #expect(history.modelUsageSamples.map(\.totalTokens).reduce(0, +) == input + 55)
+        #expect(history.modelUsageSamples.contains { $0.model == nil })
+        try writeJSON("{\"timestamp\":\"2026-11-10T00:00:00Z\",\"messages\":[{\"id\":\"old\",\"model\":\"model-a\",\"usage\":{\"input_tokens\":\(input + 10),\"output_tokens\":20}},{\"id\":\"new\",\"model\":\"model-b\",\"usage\":{\"input_tokens\":30,\"output_tokens\":5}}]}", to: file)
+        try repository.recordDetectedUsage(samples())
+        #expect(try repository.loadUsageSamples().first?.totalTokens == input + 65)
+        #expect(try repository.load().modelUsageSamples.contains { $0.model == "model-a" })
+    }
+
+    @Test
+    func legacyGenericFileBaselineSurvivesRootAndMessageDateChangesAcrossMidnight() throws {
+        let root = temporaryDirectory(named: "usage-generic-legacy-midnight")
+        defer { try? FileManager.default.removeItem(at: root) }
+        let file = root.appendingPathComponent("logs/session-midnight.json")
+        try writeJSON(#"{"timestamp":"2026-11-09T23:59:00Z","messages":[{"id":"old","usage":{"input_tokens":100,"output_tokens":20}}]}"#, to: file)
+        func samples() throws -> [AIUsageSample] {
+            try AIUsageLogDetector(geminiSessionsDirectory: root.appendingPathComponent("logs"), enabledProviders: [.gemini]).usageSamples()
+        }
+        let old = try #require(samples().first)
+        let repository = AIStateRepository(directoryURL: root.appendingPathComponent("state"))
+        let oldDay = Calendar.current.startOfDay(for: old.timestamp)
+        let legacyDate = oldDay.addingTimeInterval(-3600)
+        try repository.recordDetectedUsage([AIUsageSample(sourceID: old.legacySourceID! + "0", provider: old.provider,
+            timestamp: legacyDate, inputTokens: 100, outputTokens: 20)])
+        try writeJSON(#"{"timestamp":"2026-11-10T00:01:00Z","messages":[{"id":"old","timestamp":"2026-11-10T00:00:00Z","model":"model-a","usage":{"input_tokens":150,"output_tokens":20}},{"id":"new","timestamp":"2026-11-10T00:02:00Z","model":"model-b","usage":{"input_tokens":30,"output_tokens":5}}]}"#, to: file)
+        try repository.recordDetectedUsage(samples())
+        #expect(try repository.loadUsageSamples().map(\.totalTokens).reduce(0, +) == 205)
+        #expect(try repository.recordDetectedUsage(samples()) == 0)
+        let history = try repository.loadUsageHistory()
+        #expect(history.usageSamples.first?.totalTokens == 120)
+        #expect(history.modelUsageSamples.map(\.totalTokens).reduce(0, +) == 205)
+        #expect(history.modelUsageSamples.allSatisfy { $0.model == nil })
+    }
+
+    @Test
     func incrementalVerificationStaysBoundedForLargeUsageLogs() {
         let largeLogBytes = UInt64(80 * 1_024 * 1_024)
         #expect(AIUsageLogDetector.incrementalVerificationByteCount(
@@ -1114,6 +1323,7 @@ struct AIUsageLogDetectorTests {
         monitor.reload(includeUsageSamples: false)
 
         #expect(monitor.state.usageSamples.isEmpty)
+        #expect(monitor.state.modelUsageSamples.isEmpty)
         let summaries = AIUsageAnalytics.dailyAutomaticUsageSamples(samples: [sample])
         #expect(try AIStateRepository(directoryURL: directory).load().usageSamples == summaries)
 
@@ -1123,9 +1333,29 @@ struct AIUsageLogDetectorTests {
         }
 
         #expect(monitor.state.usageSamples == summaries)
+        #expect(monitor.state.modelUsageSamples == AIUsageAnalytics.dailyModelUsageSamples(samples: [sample]))
         monitor.unloadUsageHistory()
         #expect(monitor.state.usageSamples.isEmpty)
+        #expect(monitor.state.modelUsageSamples.isEmpty)
         #expect(try AIStateRepository(directoryURL: directory).load().usageSamples == summaries)
+    }
+
+    @Test @MainActor
+    func loadedModelHistoryRefreshesWhenUsageScanAddsOnlyAModelName() throws {
+        let root = temporaryDirectory(named: "usage-monitor-model-enrichment")
+        defer { try? FileManager.default.removeItem(at: root) }
+        let sample = AIUsageSample(sourceID: "enrichment", provider: .codex,
+            timestamp: Date(timeIntervalSince1970: 1_800_000_000), inputTokens: 10, outputTokens: 2)
+        let detector = MutableUsageDetector(samples: [sample])
+        let monitor = AIStateMonitor(directoryURL: root, activityDetectors: [], usageDetectors: [detector])
+        monitor.reload()
+        #expect(monitor.state.modelUsageSamples.first?.model == nil)
+        var enriched = sample
+        enriched.model = "gpt-6.1-sol"
+        detector.samples = [enriched]
+        monitor.reload()
+        #expect(monitor.state.modelUsageSamples.first?.model == "gpt-6.1-sol")
+        #expect(monitor.state.usageSamples.first?.totalTokens == 12)
     }
 
     @Test @MainActor

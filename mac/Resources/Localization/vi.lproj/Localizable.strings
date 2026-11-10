@@ -3354,3 +3354,10 @@
 "保存手写备忘录需要辅助功能权限" = "Cần quyền Trợ năng để lưu ghi chú viết tay";
 "备忘录内容已变化，请重新打开后编辑" = "Ghi chú đã thay đổi. Mở lại trước khi chỉnh sửa";
 "无法保存手写备忘录的文本，请在备忘录中打开后重试" = "Không thể lưu văn bản trong ghi chú viết tay. Mở trong Ghi chú rồi thử lại";
+
+"每日模型用量" = "Mức sử dụng mô hình hằng ngày";
+"暂无模型用量" = "Chưa có mức sử dụng mô hình";
+"未分类" = "Chưa phân loại";
+"未知模型" = "Mô hình không xác định";
+"输入 %@ · 输出 %@" = "Đầu vào %@ · Đầu ra %@";
+"AI 模型用量" = "Mức sử dụng mô hình AI";

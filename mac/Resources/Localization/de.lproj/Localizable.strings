@@ -3355,3 +3355,10 @@
 "保存手写备忘录需要辅助功能权限" = "Zum Speichern handschriftlicher Notizen ist der Zugriff auf Bedienungshilfen erforderlich";
 "备忘录内容已变化，请重新打开后编辑" = "Die Notiz wurde geändert. Öffne sie vor dem Bearbeiten erneut";
 "无法保存手写备忘录的文本，请在备忘录中打开后重试" = "Der Text der handschriftlichen Notiz konnte nicht gespeichert werden. Öffne sie in Notizen und versuche es erneut";
+
+"每日模型用量" = "Tägliche Modellnutzung";
+"暂无模型用量" = "Noch keine Modellnutzung";
+"未分类" = "Nicht zugeordnet";
+"未知模型" = "Unbekanntes Modell";
+"输入 %@ · 输出 %@" = "Eingabe %@ · Ausgabe %@";
+"AI 模型用量" = "KI-Modellnutzung";

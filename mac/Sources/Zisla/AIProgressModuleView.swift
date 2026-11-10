@@ -65,6 +65,8 @@ struct AIProgressModuleView: View {
             UsageTrendChart(series: series)
                 .frame(height: 128)
             UsageHeatmap(weeks: usageCalendar(endingAt: date))
+            DailyModelUsageList(days: AIUsageAnalytics.dailyModelUsage(history: AIUsageHistory(
+                usageSamples: monitor.state.usageSamples, modelUsageSamples: monitor.state.modelUsageSamples), endingAt: date))
         }
     }
 
@@ -98,6 +100,61 @@ struct AIProgressModuleView: View {
         }
     }
 
+}
+
+struct DailyModelUsageList: View {
+    var days: [AIDailyModelUsage]
+
+    var body: some View {
+        LazyVStack(alignment: .leading, spacing: 12) {
+            Label(AppLocalization.text("每日模型用量"), systemImage: "list.bullet.rectangle")
+                .font(.system(size: 11, weight: .semibold))
+            if days.isEmpty {
+                EmptyState(symbol: "chart.bar", title: AppLocalization.text("暂无模型用量"))
+            }
+            ForEach(days) { day in
+                VStack(alignment: .leading, spacing: 7) {
+                    ViewThatFits(in: .horizontal) {
+                        HStack {
+                            Text(day.date, format: .dateTime.year().month().day())
+                            Spacer(minLength: 4)
+                            Text("\(AIUsageAnalytics.formatTokenAxisValue(day.totalTokens)) Token")
+                        }
+                        VStack(alignment: .leading, spacing: 3) {
+                            Text(day.date, format: .dateTime.year().month().day())
+                            Text("\(AIUsageAnalytics.formatTokenAxisValue(day.totalTokens)) Token")
+                        }
+                    }
+                    .font(.islandMicro(weight: .semibold, design: .monospaced))
+                    ForEach(day.models) { model in
+                        VStack(alignment: .leading, spacing: 3) {
+                            Text(Self.modelName(model))
+                                .font(.system(size: 10, weight: .medium))
+                                .fixedSize(horizontal: false, vertical: true)
+                            Text(Self.tokenBreakdown(model))
+                                .font(.islandMicro(design: .monospaced))
+                                .foregroundStyle(.secondary)
+                                .fixedSize(horizontal: false, vertical: true)
+                        }
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                    }
+                    Hairline()
+                }
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
+    static func modelName(_ usage: AIModelUsage, language: AppLanguage? = nil) -> String {
+        let locale = (language ?? AppLocalization.currentLanguage).locale
+        guard let provider = usage.provider else { return AppLocalization.string("未分类", locale: locale) }
+        return provider.rawValue.uppercased() + " · " + (usage.model ?? AppLocalization.string("未知模型", locale: locale))
+    }
+
+    static func tokenBreakdown(_ usage: AIModelUsage, language: AppLanguage? = nil) -> String {
+        AppLocalization.format("输入 %@ · 输出 %@", locale: (language ?? AppLocalization.currentLanguage).locale,
+            [AIUsageAnalytics.formatTokenAxisValue(usage.inputTokens), AIUsageAnalytics.formatTokenAxisValue(usage.outputTokens)])
+    }
 }
 
 struct UsageTrendChart: View {

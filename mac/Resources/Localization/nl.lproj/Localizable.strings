@@ -3354,3 +3354,10 @@
 "保存手写备忘录需要辅助功能权限" = "Toegang tot toegankelijkheid is vereist om handgeschreven notities op te slaan";
 "备忘录内容已变化，请重新打开后编辑" = "De notitie is gewijzigd. Open deze opnieuw voordat je bewerkt";
 "无法保存手写备忘录的文本，请在备忘录中打开后重试" = "De tekst in de handgeschreven notitie kon niet worden opgeslagen. Open deze in Notities en probeer het opnieuw";
+
+"每日模型用量" = "Dagelijks modelgebruik";
+"暂无模型用量" = "Nog geen modelgebruik";
+"未分类" = "Niet ingedeeld";
+"未知模型" = "Onbekend model";
+"输入 %@ · 输出 %@" = "Invoer %@ · Uitvoer %@";
+"AI 模型用量" = "AI-modelgebruik";

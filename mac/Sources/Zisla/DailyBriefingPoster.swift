@@ -9,6 +9,7 @@ struct DailyBriefingReport: Sendable {
     var typing: DailyBriefingTyping?
     var allDeviceSeconds: TimeInterval?
     var notificationCount: Int? = nil
+    var aiUsage: AIDailyModelUsage? = nil
     var selectedContent: Set<DailyBriefingContent> = DailyBriefingContent.defaultSelection
     var calendar = DailyBriefingDay.calendar
 
@@ -60,7 +61,11 @@ struct DailyBriefingReport: Sendable {
             return DailyBriefingPowerSample(date: sampleDate, averageWatts: watts)
         }
         return Self(day: day, generatedAt: day.lastActivity!, typing: .init(characters: 12846, topApplication: "Xcode", peakHour: 14),
-            allDeviceSeconds: 31500, notificationCount: 87, selectedContent: selectedContent)
+            allDeviceSeconds: 31500, notificationCount: 87,
+            aiUsage: AIDailyModelUsage(date: start, inputTokens: 180_000, outputTokens: 32_000, models: [
+                AIModelUsage(provider: .codex, model: "gpt-6.1-sol", inputTokens: 120_000, outputTokens: 20_000),
+                AIModelUsage(provider: .claude, model: "claude-sonnet-4-5", inputTokens: 60_000, outputTokens: 12_000),
+            ]), selectedContent: selectedContent)
     }
 }
 
@@ -140,6 +145,7 @@ struct DailyBriefingPoster: View {
         case .applicationUsage: return !DailyBriefingApplicationChart.rows(for: report.day.applications, language: language).isEmpty
         case .keyPressTrend: return keyPressChart.hasData
         case .powerTrend: return powerChart.hasData
+        case .aiModelUsage: return report.aiUsage?.totalTokens ?? 0 > 0
         default: return value(for: content) != nil
         }
     }
@@ -176,7 +182,7 @@ struct DailyBriefingPoster: View {
         case .peakFan: return report.day.peakFan.map { peak($0, unit: "RPM") }
         case .notificationCount: return report.notificationCount.map { $0.formatted(.number.locale(locale)) }
         case .completedFocusTime: return durationValue(report.day.activity?.completedFocusSeconds)
-        case .hourlyUsage, .applicationUsage, .keyPressTrend, .powerTrend: return nil
+        case .hourlyUsage, .applicationUsage, .keyPressTrend, .powerTrend, .aiModelUsage: return nil
         default:
             return content.activity.flatMap { event in
                 report.day.activity.map { $0.count(for: event).formatted(.number.locale(locale)) }
@@ -194,6 +200,24 @@ struct DailyBriefingPoster: View {
             if displayedContent.contains(.applicationUsage) {
                 DailyBriefingApplicationChart(applications: report.day.applications, language: language,
                     accent: accent, ink: ink, formatDuration: duration)
+            }
+            if displayedContent.contains(.aiModelUsage), let usage = report.aiUsage {
+                VStack(alignment: .leading, spacing: 18) {
+                    HStack {
+                        Text(localized("AI 模型用量")).font(.system(size: 18, weight: .semibold))
+                        Spacer(minLength: 12)
+                        Text("\(AIUsageAnalytics.formatTokenAxisValue(usage.totalTokens)) Token").monospacedDigit()
+                    }
+                    ForEach(usage.models) { model in
+                        VStack(alignment: .leading, spacing: 6) {
+                            Text(DailyModelUsageList.modelName(model, language: language))
+                                .font(.system(size: 17, weight: .medium))
+                            Text(DailyModelUsageList.tokenBreakdown(model, language: language))
+                                .font(.system(size: 15).monospacedDigit()).foregroundStyle(ink.opacity(0.65))
+                        }
+                        .fixedSize(horizontal: false, vertical: true)
+                    }
+                }
             }
             if displayedContent.contains(.keyPressTrend) || displayedContent.contains(.powerTrend) {
                 HStack(alignment: .top, spacing: 40) {

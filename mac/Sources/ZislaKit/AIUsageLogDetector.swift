@@ -11,6 +11,13 @@ public final class AIUsageLogDetector: AIUsageDetecting {
         var output: Int
     }
 
+    private struct UsageContext {
+        var usage: [String: Any]
+        var model: String?
+        var timestamp: Date
+        var path: String
+    }
+
     private struct Candidate {
         var provider: AIProvider
         var url: URL
@@ -32,6 +39,8 @@ public final class AIUsageLogDetector: AIUsageDetecting {
 
     private struct ParserState {
         var codexPriorTotal: TokenUsage?
+        var codexModel: String?
+        var genericRootOrdinal = 0
         var grokPriorUsageBySession: [String: TokenUsage] = [:]
         var copilotHasDetailedUsage = false
     }
@@ -499,7 +508,12 @@ public final class AIUsageLogDetector: AIUsageDetecting {
     ) -> [AIUsageSample] {
         switch candidate.provider {
         case .codex:
-            return parseCodex(root, candidate: candidate, priorTotal: &parserState.codexPriorTotal).map { [$0] } ?? []
+            if root["type"] as? String == "turn_context" {
+                parserState.codexModel = (root["payload"] as? [String: Any]).flatMap(codexModel)
+                return []
+            }
+            return parseCodex(root, candidate: candidate, priorTotal: &parserState.codexPriorTotal,
+                model: parserState.codexModel).map { [$0] } ?? []
         case .claude:
             return parseClaude(root, candidate: candidate).map { [$0] } ?? []
         case .grok:
@@ -509,7 +523,9 @@ public final class AIUsageLogDetector: AIUsageDetecting {
                 priorUsageBySession: &parserState.grokPriorUsageBySession
             ).map { [$0] } ?? []
         case .gemini, .qwen, .coder, .gpt:
-            return parseGeneric(root, candidate: candidate)
+            let ordinal = parserState.genericRootOrdinal
+            parserState.genericRootOrdinal += 1
+            return parseGeneric(root, candidate: candidate, ordinal: ordinal)
         case .copilot:
             return parseCopilot(root, candidate: candidate, parserState: &parserState)
         case .pi:
@@ -537,7 +553,8 @@ public final class AIUsageLogDetector: AIUsageDetecting {
     private func parseCodex(
         _ root: [String: Any],
         candidate: Candidate,
-        priorTotal: inout TokenUsage?
+        priorTotal: inout TokenUsage?,
+        model: String?
     ) -> AIUsageSample? {
         guard root["type"] as? String == "event_msg",
               let payload = root["payload"] as? [String: Any],
@@ -575,9 +592,15 @@ public final class AIUsageLogDetector: AIUsageDetecting {
             inputTokens: current.input,
             outputTokens: current.output,
             costUSD: nil,
-            model: nil,
+            model: codexModel(payload) ?? codexModel(info) ?? model,
             permitsZero: permitsZero
         )
+    }
+
+    private func codexModel(_ fields: [String: Any]) -> String? {
+        AIUsageAnalytics.normalizedModel(fields["model"] as? String)
+            ?? AIUsageAnalytics.normalizedModel(fields["model_name"] as? String)
+            ?? AIUsageAnalytics.normalizedModel((fields["metadata"] as? [String: Any])?["model"] as? String)
     }
 
     private func parseClaude(_ root: [String: Any], candidate: Candidate) -> AIUsageSample? {
@@ -649,7 +672,8 @@ public final class AIUsageLogDetector: AIUsageDetecting {
             "inputTokens": max(0, current.input - prior.input),
             "outputTokens": max(0, current.output - prior.output),
         ]
-        let model = (usage["modelUsage"] as? [String: Any])?.keys.sorted().first
+        let models = (usage["modelUsage"] as? [String: Any])?.keys.sorted() ?? []
+        let model = models.count == 1 ? models[0] : nil
         return sample(
             provider: .grok,
             sourceID: grokUpdateSourceID(
@@ -744,19 +768,22 @@ public final class AIUsageLogDetector: AIUsageDetecting {
         )
     }
 
-    private func parseGeneric(_ root: [String: Any], candidate: Candidate) -> [AIUsageSample] {
-        usageDictionaries(in: root).enumerated().compactMap { usageIndex, usage in
-            sample(
+    private func parseGeneric(_ root: [String: Any], candidate: Candidate, ordinal: Int) -> [AIUsageSample] {
+        let rootIdentity = (root["id"] as? String) ?? "entry-\(ordinal)"
+        return usageContexts(in: root, model: nil, timestamp: candidate.modificationDate, path: rootIdentity).compactMap { context in
+            var result = sample(
                 provider: candidate.provider,
                 sourceID: sourceID(
                     candidate,
-                    component: "entry-\(stableDigest(root))-usage-\(usageIndex)"
+                    component: "usage-v2-\(stableDigest(context.path))"
                 ),
-                timestamp: timestamp(in: root, fallback: candidate.modificationDate),
-                usage: usage,
-                model: model(in: root),
+                timestamp: context.timestamp,
+                usage: context.usage,
+                model: context.model,
                 includeCacheInputTokens: true
             )
+            result?.legacySourceID = sourceID(candidate, component: "entry-\(stableDigest(root))-usage-")
+            return result
         }
     }
 
@@ -843,9 +870,11 @@ public final class AIUsageLogDetector: AIUsageDetecting {
         sample.provider == .copilot && (sample.sourceID?.contains("-shutdown-") ?? false)
     }
 
-    private func usageDictionaries(in value: Any) -> [[String: Any]] {
+    private func usageContexts(in value: Any, model: String?, timestamp date: Date, path: String) -> [UsageContext] {
         if let dictionary = value as? [String: Any] {
-            var result: [[String: Any]] = []
+            let ownModel = AIUsageAnalytics.normalizedModel(dictionary["model"] as? String) ?? model
+            let ownDate = timestamp(in: dictionary, fallback: date)
+            var result: [UsageContext] = []
             let keys = Set(dictionary.keys)
             if !keys.intersection([
                 "input_tokens", "inputTokens", "prompt_tokens", "promptTokens",
@@ -853,27 +882,22 @@ public final class AIUsageLogDetector: AIUsageDetecting {
                 "output_tokens", "outputTokens", "completion_tokens", "completionTokens",
                 "candidatesTokenCount", "candidates_token_count",
             ]).isEmpty {
-                result.append(dictionary)
+                result.append(UsageContext(usage: dictionary, model: ownModel, timestamp: ownDate, path: path))
             }
-            for value in dictionary.values {
-                result.append(contentsOf: usageDictionaries(in: value))
+            for key in dictionary.keys.sorted() {
+                result.append(contentsOf: usageContexts(in: dictionary[key]!, model: ownModel,
+                    timestamp: ownDate, path: path + "/" + Data(key.utf8).base64EncodedString()))
             }
             return result
         }
         if let values = value as? [Any] {
-            return values.flatMap(usageDictionaries(in:))
-        }
-        return []
-    }
-
-    private func model(in root: [String: Any]) -> String? {
-        if let model = root["model"] as? String { return model }
-        for value in root.values {
-            if let dictionary = value as? [String: Any], let model = model(in: dictionary) {
-                return model
+            return values.enumerated().flatMap { index, value in
+                let identity = ((value as? [String: Any])?["id"] as? String) ?? String(index)
+                return usageContexts(in: value, model: model, timestamp: date,
+                    path: path + "/" + Data(identity.utf8).base64EncodedString())
             }
         }
-        return nil
+        return []
     }
 
     private func timestamp(in root: [String: Any], fallback: Date) -> Date {

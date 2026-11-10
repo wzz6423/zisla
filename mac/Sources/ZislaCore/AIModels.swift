@@ -176,6 +176,7 @@ public struct AIUsageSample: Codable, Equatable, Sendable {
     public var outputTokens: Int
     public var costUSD: Double?
     public var model: String?
+    public var legacySourceID: String?
 
     public init(
         sourceID: String? = nil,
@@ -184,7 +185,8 @@ public struct AIUsageSample: Codable, Equatable, Sendable {
         inputTokens: Int,
         outputTokens: Int,
         costUSD: Double? = nil,
-        model: String? = nil
+        model: String? = nil,
+        legacySourceID: String? = nil
     ) {
         self.sourceID = sourceID
         self.provider = provider
@@ -193,10 +195,21 @@ public struct AIUsageSample: Codable, Equatable, Sendable {
         self.outputTokens = outputTokens
         self.costUSD = costUSD
         self.model = model
+        self.legacySourceID = legacySourceID
     }
 
     public var totalTokens: Int {
         AIUsageTokenMath.adding(inputTokens, outputTokens)
+    }
+}
+
+public struct AIUsageHistory: Equatable, Sendable {
+    public var usageSamples: [AIUsageSample]
+    public var modelUsageSamples: [AIUsageSample]
+
+    public init(usageSamples: [AIUsageSample] = [], modelUsageSamples: [AIUsageSample] = []) {
+        self.usageSamples = usageSamples
+        self.modelUsageSamples = modelUsageSamples
     }
 }
 
@@ -394,15 +407,28 @@ public struct AIState: Codable, Equatable, Sendable {
     public var tasks: [AIProgressTask]
     public var usageSamples: [AIUsageSample]
     public var notices: [IslandNotice]
+    public var modelUsageSamples: [AIUsageSample]
 
     public init(
         tasks: [AIProgressTask] = [],
         usageSamples: [AIUsageSample] = [],
-        notices: [IslandNotice] = []
+        notices: [IslandNotice] = [],
+        modelUsageSamples: [AIUsageSample] = []
     ) {
         self.tasks = tasks
         self.usageSamples = usageSamples
         self.notices = notices
+        self.modelUsageSamples = modelUsageSamples
+    }
+
+    private enum CodingKeys: String, CodingKey { case tasks, usageSamples, notices, modelUsageSamples }
+
+    public init(from decoder: Decoder) throws {
+        let values = try decoder.container(keyedBy: CodingKeys.self)
+        tasks = try values.decode([AIProgressTask].self, forKey: .tasks)
+        usageSamples = try values.decode([AIUsageSample].self, forKey: .usageSamples)
+        notices = try values.decode([IslandNotice].self, forKey: .notices)
+        modelUsageSamples = try values.decodeIfPresent([AIUsageSample].self, forKey: .modelUsageSamples) ?? []
     }
 
     public static let empty = AIState()

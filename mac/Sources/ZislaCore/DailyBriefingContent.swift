@@ -21,7 +21,7 @@ public enum DailyBriefingContentGroup: String, CaseIterable, Identifiable, Senda
 
 public enum DailyBriefingContent: String, Codable, CaseIterable, Hashable, Identifiable, Sendable {
     case localUsage, firstActivity, lastActivity, allDevicesUsage
-    case hourlyUsage, applicationUsage, workTime, leisureTime, otherTime, listeningTime
+    case hourlyUsage, applicationUsage, workTime, leisureTime, otherTime, listeningTime, aiModelUsage
     case characters, topTypingApplication, peakTypingHour, keyPressTrend
     case peakPower, batteryRange, peakFan, powerTrend, notificationCount, unlockCount
     case islandOpenings, clipboardCaptured, clipboardReused, shelfItemsAdded, shelfItemsCopied
@@ -39,7 +39,7 @@ public enum DailyBriefingContent: String, Codable, CaseIterable, Hashable, Ident
     public var group: DailyBriefingContentGroup {
         switch self {
         case .localUsage, .firstActivity, .lastActivity, .allDevicesUsage,
-             .hourlyUsage, .applicationUsage, .workTime, .leisureTime, .otherTime, .listeningTime:
+             .hourlyUsage, .applicationUsage, .workTime, .leisureTime, .otherTime, .listeningTime, .aiModelUsage:
             .usage
         case .characters, .topTypingApplication, .peakTypingHour, .keyPressTrend:
             .input
@@ -64,6 +64,7 @@ public enum DailyBriefingContent: String, Codable, CaseIterable, Hashable, Ident
         case .leisureTime: "休闲娱乐"
         case .otherTime: "其他"
         case .listeningTime: "听歌时长"
+        case .aiModelUsage: "AI 模型用量"
         case .characters: "输入字符"
         case .topTypingApplication: "输入最多的应用"
         case .peakTypingHour: "输入高峰"
@@ -94,7 +95,7 @@ public enum DailyBriefingContent: String, Codable, CaseIterable, Hashable, Ident
     public var isDetailMetric: Bool {
         switch self {
         case .localUsage, .firstActivity, .lastActivity, .allDevicesUsage,
-             .hourlyUsage, .applicationUsage, .workTime, .leisureTime, .otherTime, .keyPressTrend, .powerTrend:
+             .hourlyUsage, .applicationUsage, .workTime, .leisureTime, .otherTime, .aiModelUsage, .keyPressTrend, .powerTrend:
             false
         default:
             true

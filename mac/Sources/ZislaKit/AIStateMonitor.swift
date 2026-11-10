@@ -58,7 +58,7 @@ public final class AIStateMonitor: ObservableObject {
     }
 
     private enum UsageHistoryLoadResult: Sendable {
-        case samples([AIUsageSample])
+        case samples(AIUsageHistory)
         case corruptedState
         case failure(String)
     }
@@ -349,7 +349,8 @@ public final class AIStateMonitor: ObservableObject {
 
     /// Immediately releases historical samples that are no longer needed for the normal state display after leaving the AI panel.
     public func unloadUsageHistory() {
-        guard usageHistoryRequested || usageHistoryIsLoaded || usageHistoryLoadInFlight || !state.usageSamples.isEmpty else {
+        guard usageHistoryRequested || usageHistoryIsLoaded || usageHistoryLoadInFlight || !state.usageSamples.isEmpty
+            || !state.modelUsageSamples.isEmpty else {
             return
         }
         usageHistoryRequested = false
@@ -358,8 +359,9 @@ public final class AIStateMonitor: ObservableObject {
         usageHistoryLoadInFlight = false
         usageHistoryLoadPending = false
         usageHistoryState = .idle
-        let shouldRelieveMemory = !state.usageSamples.isEmpty
+        let shouldRelieveMemory = !state.usageSamples.isEmpty || !state.modelUsageSamples.isEmpty
         state.usageSamples.removeAll(keepingCapacity: false)
+        state.modelUsageSamples.removeAll(keepingCapacity: false)
         if shouldRelieveMemory {
             Self.scheduleAllocatorRelief(on: refreshQueue)
         }
@@ -391,7 +393,9 @@ public final class AIStateMonitor: ObservableObject {
             if !result.usageSamples.isEmpty {
                 do {
                     let changed = try await Task.detached(priority: .utility) {
-                        try repository.recordDetectedUsage(result.usageSamples) > 0
+                        let previous = repository.storageChangeToken()
+                        let count = try repository.recordDetectedUsage(result.usageSamples)
+                        return count > 0 || previous != repository.storageChangeToken()
                     }.value
                     guard self.refreshGeneration == generation else { return }
                     if changed, self.usageHistoryRequested { self.requestUsageHistoryLoad(force: true) }
@@ -426,7 +430,7 @@ public final class AIStateMonitor: ObservableObject {
         refreshQueue.async { [weak monitor] in
             let result: UsageHistoryLoadResult
             do {
-                result = .samples(try repository.loadUsageSamples(startingAt: usageHistoryStart))
+                result = .samples(try repository.loadUsageHistory(startingAt: usageHistoryStart))
             } catch AIStateRepositoryError.corruptedState {
                 result = .corruptedState
             } catch {
@@ -452,9 +456,12 @@ public final class AIStateMonitor: ObservableObject {
         guard refreshGeneration == monitorGeneration, usageHistoryRequested else { return }
 
         switch result {
-        case let .samples(samples):
-            if state.usageSamples != samples {
-                state.usageSamples = samples
+        case let .samples(history):
+            if state.usageSamples != history.usageSamples {
+                state.usageSamples = history.usageSamples
+            }
+            if state.modelUsageSamples != history.modelUsageSamples {
+                state.modelUsageSamples = history.modelUsageSamples
             }
             usageHistoryIsLoaded = true
             usageHistoryState = .loaded
@@ -621,6 +628,9 @@ public final class AIStateMonitor: ObservableObject {
             guard let self, self.refreshGeneration == generation else { return }
             self.persistedReloadInFlight = false
             self.applyPersisted(result, includesUsageSamples: includesUsageSamples)
+            if result.changedPersistedState, self.usageHistoryRequested {
+                self.requestUsageHistoryLoad(force: true)
+            }
             if refreshDetectorsAfterLoad,
                result.changedPersistedState || refreshDetectorsWhenUnchanged {
                 self.scheduleDetectorRefresh(allowUsageScan: false)
@@ -774,7 +784,9 @@ public final class AIStateMonitor: ObservableObject {
             let activityFileURLs = dependencies.activityDetectors.flatMap(\.activityFileURLs)
             var usageChanged = false
             if detectsUsage, usageScanComplete {
-                usageChanged = try dependencies.repository.recordDetectedUsage(automaticUsage) > 0
+                let previous = dependencies.repository.storageChangeToken()
+                let count = try dependencies.repository.recordDetectedUsage(automaticUsage)
+                usageChanged = count > 0 || previous != dependencies.repository.storageChangeToken()
                 if loadsUsageHistory {
                     if usageChanged {
                         var next = try dependencies.repository.load(includeUsageSamples: true)
@@ -837,8 +849,10 @@ public final class AIStateMonitor: ObservableObject {
             let keepsLoadedUsageSamples = keepsExistingUsageSamples || (includesUsageSamples && usageHistoryRequested)
             if keepsExistingUsageSamples {
                 next.usageSamples = state.usageSamples
+                next.modelUsageSamples = state.modelUsageSamples
             } else if !keepsLoadedUsageSamples {
                 next.usageSamples.removeAll(keepingCapacity: false)
+                next.modelUsageSamples.removeAll(keepingCapacity: false)
             }
             if next != state { state = next }
             if includesUsageSamples && usageHistoryRequested {

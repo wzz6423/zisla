@@ -39,6 +39,40 @@ public struct UsageBreakdownPoint: Equatable, Sendable {
     }
 }
 
+public struct AIModelUsage: Equatable, Sendable, Identifiable {
+    public var provider: AIProvider?
+    public var model: String?
+    public var inputTokens: Int
+    public var outputTokens: Int
+
+    public init(provider: AIProvider?, model: String?, inputTokens: Int, outputTokens: Int) {
+        self.provider = provider
+        self.model = model
+        self.inputTokens = AIUsageTokenMath.nonnegative(inputTokens)
+        self.outputTokens = AIUsageTokenMath.nonnegative(outputTokens)
+    }
+
+    public var totalTokens: Int { AIUsageTokenMath.adding(inputTokens, outputTokens) }
+    public var id: String { "\(provider?.rawValue ?? ""):\(Data((model ?? "").utf8).base64EncodedString())" }
+}
+
+public struct AIDailyModelUsage: Equatable, Sendable, Identifiable {
+    public var date: Date
+    public var inputTokens: Int
+    public var outputTokens: Int
+    public var models: [AIModelUsage]
+
+    public init(date: Date, inputTokens: Int, outputTokens: Int, models: [AIModelUsage]) {
+        self.date = date
+        self.inputTokens = AIUsageTokenMath.nonnegative(inputTokens)
+        self.outputTokens = AIUsageTokenMath.nonnegative(outputTokens)
+        self.models = models
+    }
+
+    public var totalTokens: Int { AIUsageTokenMath.adding(inputTokens, outputTokens) }
+    public var id: Date { date }
+}
+
 /// A sample point on the cumulative usage multi-series chart (total / input / output).
 public struct CumulativeUsagePoint: Equatable, Sendable {
     public var timestamp: Date
@@ -109,6 +143,67 @@ public enum ContributionIntensity: Int, Equatable, Sendable, CaseIterable, Compa
 }
 
 public enum AIUsageAnalytics {
+    private struct ModelDay: Hashable {
+        var date: Date
+        var provider: AIProvider
+        var model: String?
+    }
+
+    public static func normalizedModel(_ model: String?) -> String? {
+        model.flatMap {
+            let value = $0.trimmingCharacters(in: .whitespacesAndNewlines)
+            return value.isEmpty ? nil : value
+        }
+    }
+
+    public static func dailyModelUsageSamples(samples: [AIUsageSample], calendar: Calendar = .current) -> [AIUsageSample] {
+        var summaries: [ModelDay: AIUsageSample] = [:]
+        for sample in samples {
+            let key = ModelDay(date: calendar.startOfDay(for: sample.timestamp), provider: sample.provider,
+                model: normalizedModel(sample.model))
+            var summary = summaries[key] ?? AIUsageSample(provider: key.provider, timestamp: key.date,
+                inputTokens: 0, outputTokens: 0, model: key.model)
+            summary.inputTokens = AIUsageTokenMath.adding(summary.inputTokens, sample.inputTokens)
+            summary.outputTokens = AIUsageTokenMath.adding(summary.outputTokens, sample.outputTokens)
+            summaries[key] = summary
+        }
+        return summaries.values.sorted {
+            if $0.timestamp != $1.timestamp { return $0.timestamp < $1.timestamp }
+            if $0.provider != $1.provider { return $0.provider.rawValue < $1.provider.rawValue }
+            return ($0.model ?? "") < ($1.model ?? "")
+        }
+    }
+
+    public static func dailyModelUsage(history: AIUsageHistory, endingAt end: Date,
+        calendar: Calendar = .current) -> [AIDailyModelUsage] {
+        let totals = dailyUsageSamples(samples: history.usageSamples.filter { $0.timestamp <= end }, calendar: calendar)
+        let modelsByDay = Dictionary(grouping: dailyModelUsageSamples(
+            samples: history.modelUsageSamples.filter { $0.timestamp <= end }, calendar: calendar), by: \.timestamp)
+        return totals.compactMap { total in
+            guard total.totalTokens > 0 else { return nil }
+            var models = (modelsByDay[total.timestamp] ?? []).filter { $0.totalTokens > 0 }.map {
+                AIModelUsage(provider: $0.provider, model: $0.model,
+                    inputTokens: $0.inputTokens, outputTokens: $0.outputTokens)
+            }
+            let input = models.reduce(0) { AIUsageTokenMath.adding($0, $1.inputTokens) }
+            let output = models.reduce(0) { AIUsageTokenMath.adding($0, $1.outputTokens) }
+            if input > total.inputTokens || output > total.outputTokens {
+                models = [AIModelUsage(provider: nil, model: nil,
+                    inputTokens: total.inputTokens, outputTokens: total.outputTokens)]
+            } else if input < total.inputTokens || output < total.outputTokens {
+                // Old daily totals retained only the first model, so the missing split cannot be reconstructed.
+                models.append(AIModelUsage(provider: nil, model: nil,
+                    inputTokens: total.inputTokens - input, outputTokens: total.outputTokens - output))
+            }
+            models.sort {
+                if $0.totalTokens != $1.totalTokens { return $0.totalTokens > $1.totalTokens }
+                return $0.id < $1.id
+            }
+            return AIDailyModelUsage(date: total.timestamp, inputTokens: total.inputTokens,
+                outputTokens: total.outputTokens, models: models)
+        }.reversed()
+    }
+
     /// Prefix used by the provider-level automatic summaries written before schema version 3.
     public static let automaticUsageSummaryPrefix = "zisla-daily-usage:"
     /// Prefix used by the provider-level manual summaries written before schema version 3.

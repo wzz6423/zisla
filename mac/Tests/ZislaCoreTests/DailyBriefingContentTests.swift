@@ -7,10 +7,10 @@ struct DailyBriefingContentTests {
     @Test
     func contentsHaveStableUniqueIdentifiersAndCompleteGroups() {
         let contents = DailyBriefingContent.allCases
-        #expect(contents.count == 34)
+        #expect(contents.count == 35)
         #expect(contents.map(\.rawValue) == [
             "localUsage", "firstActivity", "lastActivity", "allDevicesUsage", "hourlyUsage", "applicationUsage",
-            "workTime", "leisureTime", "otherTime", "listeningTime", "characters", "topTypingApplication",
+            "workTime", "leisureTime", "otherTime", "listeningTime", "aiModelUsage", "characters", "topTypingApplication",
             "peakTypingHour", "keyPressTrend", "peakPower", "batteryRange", "peakFan", "powerTrend",
             "notificationCount", "unlockCount", "islandOpenings", "clipboardCaptured", "clipboardReused",
             "shelfItemsAdded", "shelfItemsCopied", "pomodoroStarted", "pomodoroCompleted", "completedFocusTime",
@@ -19,7 +19,7 @@ struct DailyBriefingContentTests {
         #expect(Set(contents.map(\.rawValue)).count == contents.count)
         #expect(Set(contents.map(\.title)).count == contents.count)
         #expect(DailyBriefingContentGroup.allCases.flatMap(\.contents) == contents)
-        #expect(DailyBriefingContentGroup.allCases.map { $0.contents.count } == [10, 4, 6, 14])
+        #expect(DailyBriefingContentGroup.allCases.map { $0.contents.count } == [11, 4, 6, 14])
         #expect(DailyBriefingContentGroup.allCases.allSatisfy { !$0.contents.isEmpty })
         #expect(contents.filter { $0.activity != nil }.count == 13)
         #expect(Set(contents.compactMap(\.activity)) == Set(DailyBriefingActivity.allCases))

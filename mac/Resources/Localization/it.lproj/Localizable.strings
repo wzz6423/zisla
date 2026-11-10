@@ -3354,3 +3354,10 @@
 "保存手写备忘录需要辅助功能权限" = "Per salvare le note scritte a mano è necessario il permesso di accessibilità";
 "备忘录内容已变化，请重新打开后编辑" = "La nota è cambiata. Riaprila prima di modificarla";
 "无法保存手写备忘录的文本，请在备忘录中打开后重试" = "Impossibile salvare il testo della nota scritta a mano. Aprila in Note e riprova";
+
+"每日模型用量" = "Utilizzo giornaliero dei modelli";
+"暂无模型用量" = "Nessun utilizzo dei modelli";
+"未分类" = "Non classificato";
+"未知模型" = "Modello sconosciuto";
+"输入 %@ · 输出 %@" = "Input %@ · Output %@";
+"AI 模型用量" = "Utilizzo dei modelli IA";
