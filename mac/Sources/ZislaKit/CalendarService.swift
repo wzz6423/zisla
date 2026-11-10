@@ -1,3 +1,4 @@
+import AppKit
 import Combine
 import EventKit
 import Foundation
@@ -39,6 +40,12 @@ public struct CalendarEventSnapshot: Equatable, Identifiable, Sendable {
     public var isCompleted: Bool
     public var sourceIdentifier: String?
     public var isProjectedOccurrence: Bool
+    public var eventURL: URL?
+    public var notes: String?
+    public var location: String?
+    public var isCancelled: Bool
+    public var isDeclined: Bool
+    public var eventIdentity: CalendarEventIdentity?
 
     public init(
         id: String,
@@ -50,7 +57,13 @@ public struct CalendarEventSnapshot: Equatable, Identifiable, Sendable {
         kind: CalendarItemKind = .event,
         isCompleted: Bool = false,
         sourceIdentifier: String? = nil,
-        isProjectedOccurrence: Bool = false
+        isProjectedOccurrence: Bool = false,
+        eventURL: URL? = nil,
+        notes: String? = nil,
+        location: String? = nil,
+        isCancelled: Bool = false,
+        isDeclined: Bool = false,
+        eventIdentity: CalendarEventIdentity? = nil
     ) {
         self.id = id
         self.title = title
@@ -62,6 +75,16 @@ public struct CalendarEventSnapshot: Equatable, Identifiable, Sendable {
         self.isCompleted = isCompleted
         self.sourceIdentifier = sourceIdentifier
         self.isProjectedOccurrence = isProjectedOccurrence
+        self.eventURL = eventURL
+        self.notes = notes
+        self.location = location
+        self.isCancelled = isCancelled
+        self.isDeclined = isDeclined
+        self.eventIdentity = eventIdentity
+    }
+
+    public var meetingURL: URL? {
+        MeetingLink.extract(eventURL: eventURL, notes: notes, location: location)
     }
 }
 
@@ -152,14 +175,34 @@ struct CalendarMutationCommands {
 }
 
 @MainActor
+struct CalendarServiceEnvironment {
+    var authorizationStatus: (EKEntityType) -> EKAuthorizationStatus
+    var now: () -> Date
+    var notificationCenter: NotificationCenter
+    var workspaceNotificationCenter: NotificationCenter
+    var enqueue: @Sendable (@escaping @MainActor @Sendable () -> Void) -> Void = { action in
+        Task { @MainActor in action() }
+    }
+    var makeTimer: (@escaping @Sendable () -> Void) -> Timer = { action in
+        Timer.scheduledTimer(withTimeInterval: 60, repeats: true) { _ in action() }
+    }
+
+    static var live: Self {
+        Self(authorizationStatus: EKEventStore.authorizationStatus(for:), now: Date.init,
+             notificationCenter: .default, workspaceNotificationCenter: NSWorkspace.shared.notificationCenter)
+    }
+}
+
+@MainActor
 public final class CalendarService: ObservableObject {
     public nonisolated static let weekDayCount = 7
     public nonisolated static let agendaWeekCount = 2
     private static let refreshDebounce: Duration = .milliseconds(180)
 
     @Published public private(set) var events: [CalendarEventSnapshot] = []
-    @Published public private(set) var authorizationStatus = EKEventStore.authorizationStatus(for: .event)
-    @Published public private(set) var reminderAuthorizationStatus = EKEventStore.authorizationStatus(for: .reminder)
+    @Published public private(set) var meetingEvents: [CalendarEventSnapshot] = []
+    @Published public private(set) var authorizationStatus: EKAuthorizationStatus
+    @Published public private(set) var reminderAuthorizationStatus: EKAuthorizationStatus
     @Published public private(set) var errorDescription: String?
     @Published public private(set) var isLoading = false
     @Published public private(set) var lastRefreshedAt: Date?
@@ -167,7 +210,11 @@ public final class CalendarService: ObservableObject {
     private let store: EKEventStore
     private var lastRefreshFinishedAt: Date?
     private let mutations: CalendarMutationCommands
+    private let environment: CalendarServiceEnvironment
     private var storeChangedObserver: NSObjectProtocol?
+    private var meetingObservers: [(NotificationCenter, NSObjectProtocol)] = []
+    private var meetingRefreshTimer: Timer?
+    private var monitoringGeneration: UInt64 = 0
     private var scheduledRefresh: Task<Void, Never>?
     private var refreshGeneration: UInt64 = 0
     private var isRefreshing = false
@@ -179,9 +226,13 @@ public final class CalendarService: ObservableObject {
         self.init(store: store, mutations: .live(store: store))
     }
 
-    init(store: EKEventStore, mutations: CalendarMutationCommands) {
+    init(store: EKEventStore, mutations: CalendarMutationCommands, environment: CalendarServiceEnvironment = .live) {
         self.store = store
         self.mutations = mutations
+        self.environment = environment
+        authorizationStatus = environment.authorizationStatus(.event)
+        reminderAuthorizationStatus = environment.authorizationStatus(.reminder)
+        queryAnchorDate = environment.now()
     }
 
     isolated deinit {
@@ -190,25 +241,68 @@ public final class CalendarService: ObservableObject {
 
     public func start() {
         guard storeChangedObserver == nil else { return }
-        storeChangedObserver = NotificationCenter.default.addObserver(
+        let generation = monitoringGeneration
+        let enqueue = environment.enqueue
+        storeChangedObserver = environment.notificationCenter.addObserver(
             forName: .EKEventStoreChanged,
             object: store,
             queue: .main
         ) { [weak self] _ in
-            Task { @MainActor [weak self] in
-                self?.scheduleRefresh()
+            enqueue { @MainActor [weak self] in
+                guard let self, self.monitoringGeneration == generation else { return }
+                self.refreshMeetings()
+                self.scheduleRefresh()
             }
         }
+        for (center, name) in [
+            (environment.workspaceNotificationCenter, NSWorkspace.didWakeNotification),
+            (environment.notificationCenter, NSNotification.Name.NSSystemClockDidChange),
+            (environment.notificationCenter, NSNotification.Name.NSSystemTimeZoneDidChange),
+            (environment.notificationCenter, NSNotification.Name.NSCalendarDayChanged),
+        ] {
+            let observer = center.addObserver(forName: name, object: nil, queue: .main) { [weak self] _ in
+                enqueue { @MainActor [weak self] in
+                    guard let self, self.monitoringGeneration == generation else { return }
+                    self.refreshMeetings()
+                }
+            }
+            meetingObservers.append((center, observer))
+        }
+        meetingRefreshTimer = environment.makeTimer { [weak self] in
+            enqueue { @MainActor [weak self] in
+                guard let self, self.monitoringGeneration == generation else { return }
+                self.refreshMeetings()
+            }
+        }
+        meetingRefreshTimer?.tolerance = 10
+        refreshMeetings()
     }
 
     public func stop() {
+        monitoringGeneration &+= 1
         refreshGeneration &+= 1
         scheduledRefresh?.cancel()
         scheduledRefresh = nil
+        meetingRefreshTimer?.invalidate()
+        meetingRefreshTimer = nil
+        for (center, observer) in meetingObservers { center.removeObserver(observer) }
+        meetingObservers.removeAll()
         if let storeChangedObserver {
-            NotificationCenter.default.removeObserver(storeChangedObserver)
+            environment.notificationCenter.removeObserver(storeChangedObserver)
             self.storeChangedObserver = nil
         }
+        meetingEvents = []
+    }
+
+    public func refreshMeetings() {
+        updateAuthorizationStatuses()
+        guard hasEventAccess else {
+            meetingEvents = []
+            return
+        }
+        let date = environment.now()
+        let predicate = store.predicateForEvents(withStart: date, end: date.addingTimeInterval(86_400), calendars: nil)
+        meetingEvents = MeetingWorkflow.meetings(in: store.events(matching: predicate).map(Self.makeEventSnapshot), at: date)
     }
 
     public func refresh(referenceDate: Date = Date()) async {
@@ -222,6 +316,7 @@ public final class CalendarService: ObservableObject {
         do {
             updateAuthorizationStatuses()
             try await requestUndeterminedAccess()
+            refreshMeetings()
 
             let readsEvents = Self.canReadEvents(authorizationStatus)
             let readsReminders = Self.canReadReminders(reminderAuthorizationStatus)
@@ -257,18 +352,7 @@ public final class CalendarService: ObservableObject {
                     end: end,
                     calendars: nil
                 )
-                nextItems += store.events(matching: predicate).map {
-                    let identifier = $0.eventIdentifier ?? "untitled"
-                    return CalendarEventSnapshot(
-                        id: "event:\(identifier):\($0.startDate.timeIntervalSince1970)",
-                        title: $0.title?.isEmpty == false ? $0.title : AppLocalization.text("未命名日程"),
-                        startDate: $0.startDate,
-                        endDate: $0.endDate,
-                        isAllDay: $0.isAllDay,
-                        calendarTitle: $0.calendar.title,
-                        sourceIdentifier: identifier
-                    )
-                }
+                nextItems += store.events(matching: predicate).map(Self.makeEventSnapshot)
             }
             if readsReminders {
                 fetchReminderSnapshots(
@@ -405,7 +489,7 @@ public final class CalendarService: ObservableObject {
             } catch {
                 firstError = error
             }
-            authorizationStatus = EKEventStore.authorizationStatus(for: .event)
+            authorizationStatus = environment.authorizationStatus(.event)
         }
         if reminderAuthorizationStatus == .notDetermined {
             do {
@@ -413,7 +497,7 @@ public final class CalendarService: ObservableObject {
             } catch {
                 if firstError == nil { firstError = error }
             }
-            reminderAuthorizationStatus = EKEventStore.authorizationStatus(for: .reminder)
+            reminderAuthorizationStatus = environment.authorizationStatus(.reminder)
         }
         if let firstError { throw firstError }
     }
@@ -602,9 +686,38 @@ public final class CalendarService: ObservableObject {
         }
     }
 
+    nonisolated static func makeEventSnapshot(_ event: EKEvent) -> CalendarEventSnapshot {
+        let identifier = event.eventIdentifier ?? event.calendarItemIdentifier
+        let externalIdentifier = event.calendarItemExternalIdentifier ?? event.calendarItemIdentifier
+        let identity = CalendarEventIdentity(
+            calendarIdentifier: event.calendar.calendarIdentifier,
+            eventIdentifier: externalIdentifier,
+            occurrenceDate: event.hasRecurrenceRules || event.isDetached ? event.occurrenceDate : nil
+        )
+        return CalendarEventSnapshot(
+            id: "event:\(identifier):\(event.startDate.timeIntervalSince1970)",
+            title: event.title?.isEmpty == false ? event.title : AppLocalization.text("未命名日程"),
+            startDate: event.startDate,
+            endDate: event.endDate,
+            isAllDay: event.isAllDay,
+            calendarTitle: event.calendar.title,
+            sourceIdentifier: identifier,
+            eventURL: event.url,
+            notes: event.notes,
+            location: event.location,
+            isCancelled: event.status == .canceled,
+            isDeclined: isDeclined(participants: event.attendees?.map { ($0.isCurrentUser, $0.participantStatus) } ?? []),
+            eventIdentity: identity
+        )
+    }
+
+    nonisolated static func isDeclined(participants: [(isCurrentUser: Bool, status: EKParticipantStatus)]) -> Bool {
+        participants.contains { $0.isCurrentUser && $0.status == .declined }
+    }
+
     private func updateAuthorizationStatuses() {
-        authorizationStatus = EKEventStore.authorizationStatus(for: .event)
-        reminderAuthorizationStatus = EKEventStore.authorizationStatus(for: .reminder)
+        authorizationStatus = environment.authorizationStatus(.event)
+        reminderAuthorizationStatus = environment.authorizationStatus(.reminder)
     }
 
     private func normalizedTitle(_ title: String) throws -> String {
