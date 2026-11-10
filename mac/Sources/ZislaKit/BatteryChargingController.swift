@@ -27,6 +27,7 @@ enum BatteryChargingError: Error, Equatable {
 @MainActor
 public final class BatteryChargingController: ObservableObject {
     @Published public private(set) var canChargeToFull = false
+    @Published public private(set) var canRetry = false
     @Published public private(set) var isRequesting = false
     @Published public var requestFailed = false
 
@@ -57,30 +58,41 @@ public final class BatteryChargingController: ObservableObject {
         guard !isRequesting else { return }
         guard let battery, battery.isPluggedIn, !battery.isCharging, battery.level < 1 else {
             canChargeToFull = false
+            canRetry = false
             return
         }
         let state = try? await readState()
         guard revision == refreshRevision else { return }
+        canRetry = state == nil && (canChargeToFull || canRetry)
         canChargeToFull = state?.canChargeToFull(battery) == true
     }
 
     /// Rechecks the live battery before the one-shot request; success means macOS accepted it.
     @discardableResult
     public func chargeToFull(battery: @MainActor () -> BatterySnapshot?) async -> Bool {
-        guard canChargeToFull, !isRequesting else { return false }
+        guard canChargeToFull || canRetry, !isRequesting else { return false }
         isRequesting = true
         refreshRevision += 1
         requestFailed = false
         canChargeToFull = false
+        canRetry = false
         defer { isRequesting = false }
+        var checkedState: BatteryChargingState?
         do {
             let state = try await readState()
+            checkedState = state
             canChargeToFull = state.canChargeToFull(battery())
             guard canChargeToFull else { throw BatteryChargingError.notOnHold }
             try await requestCharge()
             canChargeToFull = false
             return true
         } catch {
+            // The live snapshot may have changed while refreshes skipped a pending native request.
+            let current = battery()
+            canChargeToFull = checkedState?.canChargeToFull(current) == true
+            if let current, current.isPluggedIn, !current.isCharging, current.level < 1 {
+                canRetry = checkedState == nil
+            }
             requestFailed = true
             return false
         }

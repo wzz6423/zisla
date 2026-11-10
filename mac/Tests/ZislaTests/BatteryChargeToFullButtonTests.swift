@@ -57,7 +57,8 @@ struct BatteryChargeToFullButtonTests {
         #expect(abs(bounds.height - CGFloat(reference.pixelsHigh)) <= 1)
         let image = try #require(header.cgImage?.cropping(to: bounds))
         let actual = NSBitmapImageRep(cgImage: image)
-        guard actual.pixelsWide == reference.pixelsWide, actual.pixelsHigh == reference.pixelsHigh else { return }
+        try #require(actual.pixelsWide == reference.pixelsWide && actual.pixelsHigh == reference.pixelsHigh,
+                     "The pixel comparison must run at matching dimensions")
         var differentPixels = 0
         for y in 0..<actual.pixelsHigh {
             for x in 0..<actual.pixelsWide {

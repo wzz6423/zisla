@@ -8,7 +8,7 @@ struct BatteryChargeToFullButton: View {
 
     var body: some View {
         HStack(spacing: 0) {
-            if controller.canChargeToFull || controller.isRequesting {
+            if controller.canChargeToFull || controller.canRetry || controller.isRequesting {
                 Self.chargeButton(isRequesting: controller.isRequesting, locale: locale) {
                     Task {
                         await controller.chargeToFull { batteryMonitor.snapshot }

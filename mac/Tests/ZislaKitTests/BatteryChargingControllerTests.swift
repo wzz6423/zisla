@@ -71,13 +71,14 @@ struct BatteryChargingControllerTests {
     }
 
     @Test
-    func failedReadHidesTheButtonWithoutShowingAnOperationError() async {
+    func failedPollOffersARecheckWithoutClaimingTheBatteryIsEligible() async {
         let system = ChargingSystem()
         let controller = Self.controller(system)
         await controller.refresh(for: BatteryChargingStateTests.battery())
         await system.failReads()
         await controller.refresh(for: BatteryChargingStateTests.battery())
         #expect(!controller.canChargeToFull)
+        #expect(controller.canRetry)
         #expect(!controller.requestFailed)
         #expect(await system.requests == 0)
     }
@@ -97,15 +98,75 @@ struct BatteryChargingControllerTests {
     }
 
     @Test
-    func aFailedClickPreflightHidesStaleAvailabilityAndReportsTheFailure() async {
+    func aFailedClickPreflightPreservesARecheckAndReportsTheFailure() async {
         let system = ChargingSystem()
         let controller = Self.controller(system)
         await controller.refresh(for: BatteryChargingStateTests.battery())
         await system.failReads()
         #expect(await controller.chargeToFull { BatteryChargingStateTests.battery() } == false)
         #expect(!controller.canChargeToFull)
+        #expect(controller.canRetry)
         #expect(controller.requestFailed)
         #expect(!controller.isRequesting)
+        #expect(await system.requests == 0)
+    }
+
+    @Test
+    func retrySurvivesRepeatedReadFailuresWithoutWaitingForTheSnapshotToChange() async {
+        let system = ChargingSystem()
+        let controller = Self.controller(system)
+        await controller.refresh(for: BatteryChargingStateTests.battery())
+        await system.failReads()
+        for _ in 0..<2 {
+            #expect(await controller.chargeToFull { BatteryChargingStateTests.battery() } == false)
+            controller.requestFailed = false
+            await controller.refresh(for: BatteryChargingStateTests.battery())
+            #expect(controller.canRetry)
+            #expect(!controller.canChargeToFull)
+        }
+        #expect(await system.requests == 0)
+        await system.failReads(false)
+        #expect(await controller.chargeToFull { BatteryChargingStateTests.battery() })
+        #expect(await system.requests == 1)
+        #expect(!controller.canRetry)
+        #expect(!controller.canChargeToFull)
+        #expect(!controller.requestFailed)
+    }
+
+    @Test
+    func anUnconfirmedReadFailureCannotInventARetryAndKnownIneligibilityClearsIt() async {
+        let system = ChargingSystem()
+        let controller = Self.controller(system)
+        await system.failReads()
+        await controller.refresh(for: BatteryChargingStateTests.battery())
+        #expect(!controller.canRetry)
+        await system.failReads(false)
+        await controller.refresh(for: BatteryChargingStateTests.battery())
+        await system.failReads()
+        await controller.refresh(for: BatteryChargingStateTests.battery())
+        #expect(controller.canRetry)
+        await system.failReads(false)
+        await system.disallowOverride()
+        #expect(await controller.chargeToFull { BatteryChargingStateTests.battery() } == false)
+        #expect(!controller.canRetry)
+        #expect(!controller.canChargeToFull)
+        #expect(await system.requests == 0)
+    }
+
+    @Test
+    func disconnectingClearsARetryEvenWhileNativeReadsRemainUnavailable() async {
+        let system = ChargingSystem()
+        let controller = Self.controller(system)
+        var battery = BatteryChargingStateTests.battery()
+        await controller.refresh(for: battery)
+        await system.failReads()
+        await controller.refresh(for: battery)
+        #expect(controller.canRetry)
+        battery.isPluggedIn = false
+        await controller.refresh(for: battery)
+        #expect(!controller.canRetry)
+        #expect(!controller.canChargeToFull)
+        #expect(await controller.chargeToFull { battery } == false)
         #expect(await system.requests == 0)
     }
 
@@ -209,6 +270,38 @@ struct BatteryChargingControllerTests {
         #expect(await system.requests == 1)
     }
 
+    /// A poll can arrive while the native call is pending and must still govern the failed result.
+    @Test(arguments: ["unplugged", "charging", "full", "missing"], [false, true])
+    func completionReconcilesTheLiveBatteryAfterSkippedPendingRefreshes(change: String, succeeds: Bool) async {
+        let gate = StateGate()
+        let system = ChargingSystem()
+        await system.rejectRequests(!succeeds)
+        let controller = BatteryChargingController(
+            readState: { try await system.read() }, requestCharge: {
+                _ = await gate.read()
+                try await system.request()
+            }
+        )
+        var battery: BatterySnapshot? = BatteryChargingStateTests.battery()
+        await controller.refresh(for: battery)
+        await gate.holdNextRead()
+        let request = Task { await controller.chargeToFull { battery } }
+        await gate.waitUntilReading()
+        switch change {
+        case "unplugged": battery?.isPluggedIn = false
+        case "charging": battery?.isCharging = true
+        case "full": battery?.level = 1
+        default: battery = nil
+        }
+        await controller.refresh(for: battery)
+        await gate.resume()
+        #expect(await request.value == succeeds)
+        #expect(!controller.canChargeToFull, "Request completion must not retain an action for an ineligible battery")
+        #expect(!controller.canRetry)
+        #expect(!controller.isRequesting)
+        #expect(controller.requestFailed == !succeeds)
+    }
+
     @Test
     func rejectedRequestCanBeRetriedWithoutClaimingChargingStarted() async {
         let system = ChargingSystem()
@@ -264,7 +357,7 @@ private actor ChargingSystem {
         if requestFails { throw BatteryChargingError.requestFailed }
     }
 
-    func failReads() { readFails = true }
+    func failReads(_ fail: Bool = true) { readFails = fail }
     func disallowOverride() { allowed = false }
     func rejectRequests(_ reject: Bool) { requestFails = reject }
 }
