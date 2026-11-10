@@ -264,8 +264,15 @@ public final class ClipboardHistoryStore: ObservableObject {
         let isHistoryPreview = isShowingHistoryPreview
         let database = database
         isLoading = true
+        schedulePendingPersistence(immediately: true)
+        let persistenceTask = self.persistenceTask
 
         loadTask = Task { [weak self] in
+            await persistenceTask?.value
+            if let self, !self.pendingMutations.isEmpty {
+                self.isLoading = false
+                return
+            }
             do {
                 var page: ClipboardHistoryPage
                 if isHistoryPreview {
@@ -432,15 +439,19 @@ public final class ClipboardHistoryStore: ObservableObject {
 
     private func schedulePersistence(_ mutation: ClipboardHistoryMutation) {
         pendingMutations.append(mutation)
-        schedulePendingPersistence()
+        if isLoading {
+            reload()
+        } else {
+            schedulePendingPersistence()
+        }
     }
 
-    private func schedulePendingPersistence() {
+    private func schedulePendingPersistence(immediately: Bool = false) {
         guard !pendingMutations.isEmpty, inFlightPersistenceGeneration == nil else { return }
         persistenceTask?.cancel()
         persistenceGeneration += 1
         let generation = persistenceGeneration
-        if pendingMutations.count >= Self.maximumPendingMutations {
+        if immediately || pendingMutations.count >= Self.maximumPendingMutations {
             commitPendingMutations(generation: generation)
             return
         }
@@ -460,10 +471,14 @@ public final class ClipboardHistoryStore: ObservableObject {
         guard inFlightPersistenceGeneration == nil, persistenceGeneration == generation else { return }
         let mutations = takePendingMutations()
         guard !mutations.isEmpty else { return }
-        persistenceTask = nil
         inFlightMutations = mutations
         inFlightPersistenceGeneration = generation
+        let (completion, continuation) = AsyncStream<Void>.makeStream()
+        persistenceTask = Task {
+            for await _ in completion {}
+        }
         database.persist(mutations) { [weak self] errorDescription in
+            defer { continuation.finish() }
             guard let self, self.inFlightPersistenceGeneration == generation else { return }
             self.inFlightMutations.removeAll(keepingCapacity: true)
             self.inFlightPersistenceGeneration = nil
