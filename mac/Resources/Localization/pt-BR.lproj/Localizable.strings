@@ -3354,3 +3354,7 @@
 "保存手写备忘录需要辅助功能权限" = "É necessário acesso à acessibilidade para salvar notas manuscritas";
 "备忘录内容已变化，请重新打开后编辑" = "A nota foi alterada. Abra-a novamente antes de editar";
 "无法保存手写备忘录的文本，请在备忘录中打开后重试" = "Não foi possível salvar o texto da nota manuscrita. Abra-a no Notas e tente novamente";
+
+"查询航班" = "Consultar voo";
+"查询火车" = "Consultar trem";
+"查询快递" = "Rastrear encomenda";

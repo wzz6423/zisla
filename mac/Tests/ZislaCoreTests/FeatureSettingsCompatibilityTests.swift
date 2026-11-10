@@ -335,7 +335,7 @@ struct FeatureSettingsCompatibilityTests {
         let oldDefault: [ClipboardAssistantActionKind] = [.openURL, .copyText, .addToQuickNote, .share]
         let legacy = try JSONEncoder().encode(LegacySettings(clipboardAssistantActionOrders: [kind: oldDefault]))
         let upgraded = try JSONDecoder().decode(FeatureSettings.self, from: legacy)
-        #expect(upgraded.clipboardAssistantActionOrders[kind]?.first == .search)
+        #expect(upgraded.clipboardAssistantActionOrders[kind]?.first == .openURL)
 
         let custom: [ClipboardAssistantActionKind] = [.copyText, .openURL, .addToQuickNote, .share]
         let saved = try JSONEncoder().encode(LegacySettings(clipboardAssistantActionOrders: [kind: custom]))

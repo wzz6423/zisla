@@ -146,7 +146,7 @@ struct ClipboardAssistantNumericActionsTests {
         store.flushPendingChanges()
 
         let reopened = FeatureSettingsStore(defaults: defaults, defaultUpdateChannel: .release)
-        #expect(reopened.settings.clipboardAssistantActionOrders[.tracking] == order)
+        #expect(reopened.settings.clipboardAssistantActionOrders[.tracking] == order + [.search])
         let actions = ClipboardAssistantActionOrder.ordered(
             detection.actions + [.addToQuickNote, .share],
             for: detection.kind,
@@ -154,7 +154,7 @@ struct ClipboardAssistantNumericActionsTests {
         )
         #expect(actions.first?.kind == primary)
         var seen = Set<ClipboardAssistantActionKind>()
-        #expect(actions.compactMap(\.kind).filter { seen.insert($0).inserted } == order)
+        #expect(actions.compactMap(\.kind).filter { seen.insert($0).inserted } == order + [.search])
         #expect(actions.contains(.copyText(number)))
         #expect(actions.filter { $0.kind == .openURL } == detection.actions.filter { $0.kind == .openURL })
     }

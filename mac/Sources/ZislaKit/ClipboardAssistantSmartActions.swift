@@ -122,6 +122,7 @@ extension ClipboardAssistantDetector {
         default: nil
         }
         if let airline { actions.append(serviceAction(airline)) }
+        if icao != nil { actions.append(.search(number)) }
         actions.append(.copyText(carrier + match[3]))
         return ClipboardAssistantDetection(kind: .flight, title: number, actions: actions)
     }
@@ -193,6 +194,7 @@ extension ClipboardAssistantDetector {
         if let queryName { actions.append(.search((queryName.isEmpty ? "" : queryName + " ") + number)) }
         if let service { actions.append(serviceAction(service, number: number, now: now)) }
         if let official { actions.append(.openURL(URL(string: official)!)) }
+        if queryName == nil { actions.append(.search(number)) }
         actions.append(.copyText(stem + match[2] + match[3].uppercased()))
         return ClipboardAssistantDetection(
             kind: .train, title: number, actions: actions
@@ -244,6 +246,7 @@ extension ClipboardAssistantDetector {
         default: strongSF ? .sfExpress : (strongUPS ? .ups : (strongPostal && number.hasSuffix("US") ? .usps : nil))
         }
         if let carrier { actions.append(serviceAction(carrier, number: number)) }
+        actions.append(.search(number))
         actions.append(.copyText(copiedNumber))
         return ClipboardAssistantDetection(kind: .tracking, title: number, actions: actions)
     }
