@@ -130,11 +130,13 @@ struct BatteryLocalizationTests {
         "蓝牙", "已授权设备", "鼠标", "键盘", "触控板", "配件", "未知设备",
         "设备", "左", "右", "盒",
         "电池监控", "显示电池详细信息与健康状态",
+        "好",
     ]
 
     private static let localizedSourceFiles = [
         "BatteryLocalization.swift",
         "BatteryDetailView.swift",
+        "BatteryChargeToFullButton.swift",
         "LockScreenModuleView.swift",
         "LockScreenOverlayView.swift",
         "SideNoticeView.swift",

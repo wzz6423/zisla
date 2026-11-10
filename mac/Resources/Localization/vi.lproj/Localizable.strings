@@ -511,6 +511,8 @@
 "电池功率" = "Công suất pin";
 "本机 Mac" = "Mac này";
 "已充满" = "Đã sạc đầy";
+"立即充至100%" = "Sạc đến 100% ngay";
+"无法立即充至100%，请重试。" = "Không thể sạc đến 100% ngay. Vui lòng thử lại.";
 "充电中" = "Đang sạc";
 "电源已接通" = "Đã kết nối nguồn";
 "使用电池" = "Dùng pin";

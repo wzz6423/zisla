@@ -442,6 +442,8 @@
 "电池功率" = "Battery power";
 "本机 Mac" = "This Mac";
 "已充满" = "Fully charged";
+"立即充至100%" = "Charge to 100% Now";
+"无法立即充至100%，请重试。" = "Couldn't charge to 100% now. Please try again.";
 "充电中" = "Charging";
 "电源已接通" = "Power connected";
 "使用电池" = "On battery";

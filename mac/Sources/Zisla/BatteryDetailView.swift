@@ -617,6 +617,7 @@ struct BatteryDetailView: View {
                 )
                 Spacer(minLength: 8)
                 batteryHistoryView(for: battery)
+                BatteryChargeToFullButton(batteryMonitor: batteryMonitor)
                 Text(BatteryLocalization.summaryStatusText(battery, locale: locale))
                     .font(.system(size: 9, weight: .medium))
                     .foregroundStyle(.secondary)
