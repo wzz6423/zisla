@@ -3399,7 +3399,7 @@
 "请先安装 libvips 图片处理组件" = "Önce libvips görsel işleme bileşenini yükleyin";
 "无法读取本地图片：%@" = "Yerel görsel okunamadı: %@";
 "图片处理参数无效" = "Geçersiz görsel işleme seçenekleri";
-"图片超过处理上限（500 MB、2.56 亿像素或 1000 帧）" = "Görsel sınırları aşıyor (500 MB, 256 milyon piksel veya 1000 kare)";
+"图片超过处理上限（500 MB、SVG 20 MB、2.56 亿像素或 1000 帧）" = "Görsel sınırları aşıyor (500 MB, SVG 20 MB, 256 milyon piksel veya 1000 kare)";
 "图片处理失败：%@" = "Görsel işleme başarısız: %@";
 "此动画无法导出为 %@，请选择 PNG、WebP、AVIF 或 JPEG XL" = "Bu animasyon %@ olarak dışa aktarılamaz; PNG, WebP, AVIF veya JPEG XL seçin";
 "图片输出无效，未保存" = "Geçersiz görsel çıktısı; hiçbir şey kaydedilmedi";

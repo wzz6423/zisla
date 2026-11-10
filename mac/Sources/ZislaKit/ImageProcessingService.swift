@@ -21,7 +21,7 @@ public enum ImageProcessingError: LocalizedError, Equatable, Sendable {
         case .avifEngineUnavailable: AppLocalization.text("请先安装 libavif 动画处理组件")
         case let .invalidInput(url): AppLocalization.text("无法读取本地图片：%@", url.lastPathComponent)
         case .invalidOptions: AppLocalization.text("图片处理参数无效")
-        case .resourceLimit: AppLocalization.text("图片超过处理上限（500 MB、2.56 亿像素或 1000 帧）")
+        case .resourceLimit: AppLocalization.text("图片超过处理上限（500 MB、SVG 20 MB、2.56 亿像素或 1000 帧）")
         case let .processingFailed(message): AppLocalization.text("图片处理失败：%@", message)
         case let .animationUnsupported(format): AppLocalization.text("此动画无法导出为 %@，请选择 PNG、WebP、AVIF 或 JPEG XL", format.displayName)
         case .invalidOutput: AppLocalization.text("图片输出无效，未保存")
@@ -171,7 +171,7 @@ public struct ImageProcessingService: Sendable {
                         try Task.checkCancellation()
                         let output = work.appendingPathComponent("output").appendingPathExtension(format.fileExtension)
                         do {
-                            try await encode(source, summary: summary, format: format, options: options, output: output, work: work)
+                            try await encode(source, summary: summary, format: format, options: options, output: output, work: work, stableCrop: false)
                             var result = try await inspect(output)
                             guard result.format == format, result.frameCount == summary.frameCount,
                                   result.width == expected.0, result.height == expected.1 else {
@@ -229,14 +229,14 @@ public struct ImageProcessingService: Sendable {
             let raster = bytes.starts(with: [0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a])
                 || bytes.starts(with: [0xff, 0xd8, 0xff]) || bytes.starts(with: [0xff, 0x0a])
                 || bytes.starts(with: [0, 0, 0, 12, 0x4a, 0x58, 0x4c, 0x20, 0x0d, 0x0a, 0x87, 0x0a])
-                || (bytes.count >= 12 && String(decoding: bytes[0..<4], as: UTF8.self) == "RIFF" && String(decoding: bytes[8..<12], as: UTF8.self) == "WEBP")
-                || (bytes.count >= 12 && String(decoding: bytes[4..<8], as: UTF8.self) == "ftyp"
-                    && ["avif", "avis", "heic", "heix", "hevc", "hevx", "mif1", "msf1"].contains(String(decoding: bytes[8..<12], as: UTF8.self)))
+                || (bytes.count >= 12 && bytes[0..<4].elementsEqual("RIFF".utf8) && bytes[8..<12].elementsEqual("WEBP".utf8))
+                || (bytes.count >= 12 && bytes[4..<8].elementsEqual("ftyp".utf8)
+                    && ["avif", "avis", "heic", "heix", "hevc", "hevx", "mif1", "msf1"].contains { bytes[8..<12].elementsEqual($0.utf8) })
             guard raster else { throw ImageProcessingError.invalidInput(url) }
         }
         let summary: ImageFileSummary
-        // ImageIO only exposes the first JPEG XL frame on some macOS versions.
-        if url.pathExtension.lowercased() != "jxl", let source = CGImageSourceCreateWithURL(url as CFURL, [kCGImageSourceShouldCache: false] as CFDictionary),
+        // ImageIO can omit JPEG XL frames and does not identify SVG consistently across macOS versions.
+        if !["jxl", "svg"].contains(url.pathExtension.lowercased()), let source = CGImageSourceCreateWithURL(url as CFURL, [kCGImageSourceShouldCache: false] as CFDictionary),
            let properties = CGImageSourceCopyPropertiesAtIndex(source, 0, nil) as? [CFString: Any],
            let width = properties[kCGImagePropertyPixelWidth] as? Int,
            let height = properties[kCGImagePropertyPixelHeight] as? Int {
@@ -369,7 +369,7 @@ public struct ImageProcessingService: Sendable {
     }
 
     private func encode(_ source: URL, summary: ImageFileSummary, format: ImageOutputFormat,
-                        options: ImageProcessingOptions, output: URL, work: URL) async throws {
+                        options: ImageProcessingOptions, output: URL, work: URL, stableCrop: Bool) async throws {
         if format == .svg {
             guard summary.format == .svg, options.resize == nil else { throw ImageProcessingError.invalidOptions }
             let document = try Self.svgDocument(source)
@@ -394,7 +394,10 @@ public struct ImageProcessingService: Sendable {
         if let resize = options.resize {
             arguments = ["thumbnail", loader, image.path, String(resize.width ?? 150_000),
                          "--height=\(resize.height ?? 150_000)", "--size=down", "--fail-on=error"]
-            if resize.method == .cover || resize.method == .thumb { arguments.append("--crop=attention") }
+            if resize.method == .cover || resize.method == .thumb {
+                // Content-dependent crop windows can move between frames of the same animation.
+                arguments.append(stableCrop ? "--crop=centre" : "--crop=attention")
+            }
         } else {
             arguments = ["autorot", loader, image.path]
         }
@@ -463,7 +466,7 @@ public struct ImageProcessingService: Sendable {
             delays.append(Int((delay * 1_000).rounded()))
             let frameSummary = ImageFileSummary(width: summary.width, height: summary.height, frameCount: 1, fileSize: 0, format: .png, hasMetadata: false)
             let compressed = work.appendingPathComponent("frame-compressed.png")
-            try await encode(input, summary: frameSummary, format: .png, options: options, output: compressed, work: work)
+            try await encode(input, summary: frameSummary, format: .png, options: options, output: compressed, work: work, stableCrop: true)
             if let destination {
                 guard let compressedSource = CGImageSourceCreateWithURL(compressed as CFURL, nil),
                       let compressedFrame = CGImageSourceCreateImageAtIndex(compressedSource, 0, nil) else { throw ImageProcessingError.invalidOutput }
@@ -555,10 +558,14 @@ public struct ImageProcessingService: Sendable {
     }
 
     private static func svgDocument(_ url: URL) throws -> XMLDocument {
+        guard let size = try url.resourceValues(forKeys: [.fileSizeKey]).fileSize, size <= 20 * 1_024 * 1_024 else {
+            throw ImageProcessingError.resourceLimit
+        }
         let data = try Data(contentsOf: url)
         guard let text = String(data: data, encoding: .utf8) else { throw ImageProcessingError.invalidInput(url) }
         // Reject external XML entities before parsing; SVG must stay entirely local.
-        guard !text.uppercased().contains("<!DOCTYPE"), !text.uppercased().contains("<!ENTITY") else {
+        let upper = text.uppercased()
+        guard !upper.contains("<!DOCTYPE"), !upper.contains("<!ENTITY") else {
             throw ImageProcessingError.invalidInput(url)
         }
         let document = try XMLDocument(data: data, options: .nodeLoadExternalEntitiesNever)

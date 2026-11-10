@@ -327,6 +327,25 @@ struct ImageProcessingServiceTests {
     }
 
     @Test
+    func oversizedSVGIsRejectedBeforeParsingOrLaunchingARenderer() async throws {
+        let fixture = try Fixture()
+        defer { fixture.remove() }
+        let source = fixture.root.appendingPathComponent("large.svg")
+        try Data("<svg>".utf8).write(to: source)
+        let file = try FileHandle(forWritingTo: source)
+        try file.truncate(atOffset: 20 * 1_024 * 1_024 + 1)
+        try file.close()
+        let originalSize = try source.resourceValues(forKeys: [.fileSizeKey]).fileSize
+        let service = ImageProcessingService(executableURL: URL(fileURLWithPath: "/usr/bin/true")) { _, _, _, _ in
+            Issue.record("Oversized SVG must be rejected before rendering")
+            return AIAgentProcessOutput(status: 0, standardOutput: Data(), standardError: "", didTimeout: false)
+        }
+        await #expect(throws: ImageProcessingError.resourceLimit) { try await service.inspect(source) }
+        #expect(try source.resourceValues(forKeys: [.fileSizeKey]).fileSize == originalSize)
+        #expect(try FileManager.default.contentsOfDirectory(atPath: fixture.root.path) == [source.lastPathComponent])
+    }
+
+    @Test
     func resizeDimensionsRemainWithinBoundsForFixedInputCorpus() {
         for width in [1, 3, 79, 16000, 150000] {
             for height in [1, 8, 63, 2000] {

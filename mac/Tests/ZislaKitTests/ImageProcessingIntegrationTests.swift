@@ -90,6 +90,55 @@ struct ImageProcessingIntegrationTests {
         }
     }
 
+    @Test(arguments: [ImageResizeMethod.cover, .thumb])
+    func animatedCropsKeepTheSameWindowWhenEdgeDetailChanges(method: ImageResizeMethod) async throws {
+        let fixture = try ImageProcessingServiceTests.Fixture()
+        defer { fixture.remove() }
+        let source = fixture.root.appendingPathComponent("moving-detail.png")
+        let destination = try #require(CGImageDestinationCreateWithURL(source as CFURL, UTType.png.identifier as CFString, 2, nil))
+        for index in 0..<2 {
+            var pixels = [UInt8]()
+            for y in 0..<40 {
+                for x in 0..<120 {
+                    var pixel: [UInt8] = [0, 0, 0, 255]
+                    if (55..<65).contains(x), (12..<28).contains(y) { pixel = [255, 0, 0, 255] }
+                    if (index == 0 ? x < 35 : x >= 85), (3..<37).contains(y) {
+                        pixel = (x + y).isMultiple(of: 2) ? [0, 255, 0, 255] : [255, 255, 255, 255]
+                    }
+                    pixels += pixel
+                }
+            }
+            let provider = try #require(CGDataProvider(data: Data(pixels) as CFData))
+            let image = try #require(CGImage(width: 120, height: 40, bitsPerComponent: 8, bitsPerPixel: 32,
+                bytesPerRow: 120 * 4, space: CGColorSpaceCreateDeviceRGB(), bitmapInfo: CGBitmapInfo(rawValue: CGImageAlphaInfo.premultipliedLast.rawValue),
+                provider: provider, decode: nil, shouldInterpolate: false, intent: .defaultIntent))
+            CGImageDestinationAddImage(destination, image, [kCGImagePropertyPNGDictionary: [kCGImagePropertyAPNGDelayTime: 0.1]] as CFDictionary)
+        }
+        #expect(CGImageDestinationFinalize(destination))
+        let original = try Data(contentsOf: source)
+        let batch = try await service.process([source], options: .init(resize: .init(method: method, width: 40, height: 40)))
+        defer { try? FileManager.default.removeItem(at: batch.directoryURL) }
+        #expect(batch.failures.isEmpty, "\(batch.failures)")
+        let output = try #require(batch.items.first?.outputs.first)
+        let frames = try #require(CGImageSourceCreateWithURL(output.url as CFURL, nil))
+        #expect(CGImageSourceGetCount(frames) == 2)
+        var decoded: [[UInt8]] = []
+        for index in 0..<2 {
+            let image = try #require(CGImageSourceCreateImageAtIndex(frames, index, nil))
+            #expect(image.width == 40 && image.height == 40)
+            var pixels = [UInt8](repeating: 0, count: 40 * 40 * 4)
+            try pixels.withUnsafeMutableBytes { buffer in
+                let context = try #require(CGContext(data: buffer.baseAddress, width: 40, height: 40, bitsPerComponent: 8,
+                    bytesPerRow: 40 * 4, space: CGColorSpaceCreateDeviceRGB(), bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue))
+                context.draw(image, in: CGRect(x: 0, y: 0, width: 40, height: 40))
+            }
+            #expect(pixels[(20 * 40 + 20) * 4] > 220, "The stationary centre marker must stay inside every crop")
+            decoded.append(pixels)
+        }
+        #expect(decoded[0].elementsEqual(decoded[1]), "Changing detail outside the crop must not move the animation window")
+        #expect(try Data(contentsOf: source) == original)
+    }
+
     @Test
     func animationRoundTripsAcrossPNGWebPJPEGXLAndAVIFWithoutLosingFrames() async throws {
         let fixture = try ImageProcessingServiceTests.Fixture()

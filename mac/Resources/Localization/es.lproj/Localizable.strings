@@ -3399,7 +3399,7 @@
 "请先安装 libvips 图片处理组件" = "Instala primero el componente de procesamiento de imágenes libvips";
 "无法读取本地图片：%@" = "No se puede leer la imagen local: %@";
 "图片处理参数无效" = "Opciones de procesamiento de imagen no válidas";
-"图片超过处理上限（500 MB、2.56 亿像素或 1000 帧）" = "La imagen supera los límites (500 MB, 256 millones de píxeles o 1000 fotogramas)";
+"图片超过处理上限（500 MB、SVG 20 MB、2.56 亿像素或 1000 帧）" = "La imagen supera los límites (500 MB, SVG 20 MB, 256 millones de píxeles o 1000 fotogramas)";
 "图片处理失败：%@" = "Error al procesar la imagen: %@";
 "此动画无法导出为 %@，请选择 PNG、WebP、AVIF 或 JPEG XL" = "Esta animación no se puede exportar como %@; elige PNG, WebP, AVIF o JPEG XL";
 "图片输出无效，未保存" = "Salida de imagen no válida; no se guardó nada";
