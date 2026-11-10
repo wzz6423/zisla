@@ -423,6 +423,7 @@ public struct AIState: Codable, Equatable, Sendable {
 
     private enum CodingKeys: String, CodingKey { case tasks, usageSamples, notices, modelUsageSamples }
 
+    /// Keeps old state files readable by treating absent model history as empty.
     public init(from decoder: Decoder) throws {
         let values = try decoder.container(keyedBy: CodingKeys.self)
         tasks = try values.decode([AIProgressTask].self, forKey: .tasks)

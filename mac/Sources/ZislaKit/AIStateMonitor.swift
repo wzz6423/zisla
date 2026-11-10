@@ -376,6 +376,7 @@ public final class AIStateMonitor: ObservableObject {
         )
     }
 
+    /// Refreshes loaded history for metadata-only writes while rejecting results from an obsolete generation.
     private func scheduleSubscriptionUsageRefresh() {
         guard let detector = subscriptionUsageDetector, subscriptionUsageTask == nil,
               now().timeIntervalSince(lastSubscriptionRefreshAt) >= usageRefreshInterval else { return }
@@ -412,6 +413,7 @@ public final class AIStateMonitor: ObservableObject {
         scheduleDetectorRefresh(allowUsageScan: false)
     }
 
+    /// Coalesces forced reads and loads both ledgers off the main thread without reviving an unloaded panel.
     private func requestUsageHistoryLoad(force: Bool = false) {
         guard usageHistoryRequested else { return }
         if usageHistoryLoadInFlight {
@@ -446,6 +448,7 @@ public final class AIStateMonitor: ObservableObject {
         }
     }
 
+    /// Accepts only the current panel generation and retains the last valid snapshot when a read fails.
     private func applyUsageHistory(
         _ result: UsageHistoryLoadResult,
         historyGeneration: UInt64,
@@ -603,6 +606,7 @@ public final class AIStateMonitor: ObservableObject {
         }
     }
 
+    /// Reconciles tasks lazily; watcher changes refresh model history only while the AI panel requests it.
     private func schedulePersistedReload(
         refreshDetectorsAfterLoad: Bool = true,
         force: Bool = false,
@@ -758,6 +762,7 @@ public final class AIStateMonitor: ObservableObject {
         }
     }
 
+    /// Persists a complete usage scan and detects metadata writes before deciding whether loaded history is stale.
     private nonisolated static func detectState(
         using dependencies: RefreshDependencies,
         persistedTasks: [AIProgressTask],
@@ -836,6 +841,7 @@ public final class AIStateMonitor: ObservableObject {
         return tasks
     }
 
+    /// Preserves requested histories during task-only reloads and releases both arrays after panel exit.
     private func applyPersisted(
         _ result: PersistedRefreshResult,
         includesUsageSamples: Bool,

@@ -26,6 +26,7 @@ final class DailyBriefingController: ObservableObject {
     private var activityFlushTask: Task<Void, Error>?
     private var cancellables: Set<AnyCancellable> = []
 
+    /// Injects report inputs so exports remain isolated from live monitors.
     init(
         store: DailyBriefingStore = DailyBriefingStore(),
         saveLocations: SaveLocationStore? = nil,
@@ -212,6 +213,7 @@ final class DailyBriefingController: ObservableObject {
         } catch { record(error) }
     }
 
+    /// Exports one report snapshot; cancellation or disabled settings stop it before publication.
     private func exportDay(_ day: DailyBriefingDay, now: Date, scheduled: Bool) async throws {
         guard !isExporting else { return }
         isExporting = true

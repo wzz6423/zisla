@@ -56,6 +56,7 @@ struct AIUsageLogDetectorTests {
     }
 
     @Test
+    /// Corrupt turn context must not invent a model or hide later valid usage in the same log.
     func seededDamagedCodexModelContextsNeverInventUsageOrPreventLaterValidEvents() throws {
         let root = temporaryDirectory(named: "usage-codex-model-damage")
         defer { try? FileManager.default.removeItem(at: root) }
@@ -126,6 +127,7 @@ struct AIUsageLogDetectorTests {
     }
 
     @Test(arguments: [true, false])
+    /// Equal token counts and model names cannot identify an event; separate JSONL roots must retain distinct identities.
     func separateGenericJSONLLinesDoNotCollapseEvenWithEqualTokens(sameModel: Bool) throws {
         let root = temporaryDirectory(named: "usage-generic-jsonl-distinct")
         defer { try? FileManager.default.removeItem(at: root) }
@@ -164,6 +166,7 @@ struct AIUsageLogDetectorTests {
     }
 
     @Test(arguments: [true, false])
+    /// A changed document digest cannot repeat legacy totals; only later growth may use the now-stable model identity.
     func legacyGenericDocumentsDoNotRepeatUsageWhenTheyChangeBeforeUpgrade(changedOldTokens: Bool) throws {
         let root = temporaryDirectory(named: "usage-generic-legacy-append")
         defer { try? FileManager.default.removeItem(at: root) }
@@ -191,6 +194,7 @@ struct AIUsageLogDetectorTests {
     }
 
     @Test
+    /// A changed root timestamp cannot make previously counted generic usage appear on a second day.
     func legacyGenericFileBaselineSurvivesRootAndMessageDateChangesAcrossMidnight() throws {
         let root = temporaryDirectory(named: "usage-generic-legacy-midnight")
         defer { try? FileManager.default.removeItem(at: root) }
@@ -1303,6 +1307,7 @@ struct AIUsageLogDetectorTests {
     }
 
     @Test @MainActor
+    /// Background detection must persist attribution without retaining either history outside the AI panel.
     func monitorPersistsUsageWithoutRetainingHistory() async throws {
         let directory = temporaryDirectory(named: "usage-monitor-on-demand")
         defer { try? FileManager.default.removeItem(at: directory) }

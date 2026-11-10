@@ -59,6 +59,7 @@ public struct AIStateRepository: Sendable {
         return try database.loadUsageSamples(startingAt: startDate)
     }
 
+    /// Applies retention before returning one consistent aggregate/model snapshot for panels and briefings.
     public func loadUsageHistory(startingAt startDate: Date? = nil, endingBefore endDate: Date? = nil) throws -> AIUsageHistory {
         let database = try openDatabase()
         try database.trimUsageIfNeeded()
@@ -96,6 +97,7 @@ public struct AIStateRepository: Sendable {
     }
 
     @discardableResult
+    /// Uses the database transaction so manual totals and model attribution cannot commit independently.
     public func recordUsage(_ samples: [AIUsageSample]) throws -> Int {
         try openDatabase().recordUsage(samples)
     }
@@ -106,6 +108,7 @@ public struct AIStateRepository: Sendable {
         try openDatabase().recordDetectedUsage(samples)
     }
 
+    /// Reads the committed state only after the usage transaction succeeds.
     public func stateRecordingUsage(_ samples: [AIUsageSample]) throws -> AIState {
         let database = try openDatabase()
         _ = try database.recordUsage(samples)

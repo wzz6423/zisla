@@ -149,6 +149,7 @@ public enum AIUsageAnalytics {
         var model: String?
     }
 
+    /// Treats blank metadata as unknown instead of creating an empty model group.
     public static func normalizedModel(_ model: String?) -> String? {
         model.flatMap {
             let value = $0.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -156,6 +157,7 @@ public enum AIUsageAnalytics {
         }
     }
 
+    /// Keeps providers distinct and saturates daily sums even when two providers reuse the same model name.
     public static func dailyModelUsageSamples(samples: [AIUsageSample], calendar: Calendar = .current) -> [AIUsageSample] {
         var summaries: [ModelDay: AIUsageSample] = [:]
         for sample in samples {
@@ -174,6 +176,7 @@ public enum AIUsageAnalytics {
         }
     }
 
+    /// Makes the aggregate authoritative: unexplained or excessive model splits become unclassified usage.
     public static func dailyModelUsage(history: AIUsageHistory, endingAt end: Date,
         calendar: Calendar = .current) -> [AIDailyModelUsage] {
         let totals = dailyUsageSamples(samples: history.usageSamples.filter { $0.timestamp <= end }, calendar: calendar)

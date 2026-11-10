@@ -501,6 +501,7 @@ public final class AIUsageLogDetector: AIUsageDetecting {
         )
     }
 
+    /// Carries explicit Codex turn context between JSONL events and stable ordinals between generic roots.
     private func parseRoot(
         from root: [String: Any],
         candidate: Candidate,
@@ -550,6 +551,7 @@ public final class AIUsageLogDetector: AIUsageDetecting {
         }
     }
 
+    /// Uses recorded model context and cumulative deltas; a missing context remains unknown.
     private func parseCodex(
         _ root: [String: Any],
         candidate: Candidate,
@@ -597,6 +599,7 @@ public final class AIUsageLogDetector: AIUsageDetecting {
         )
     }
 
+    /// Normalizes only explicit model fields so surrounding unrelated strings cannot become model identities.
     private func codexModel(_ fields: [String: Any]) -> String? {
         AIUsageAnalytics.normalizedModel(fields["model"] as? String)
             ?? AIUsageAnalytics.normalizedModel(fields["model_name"] as? String)
@@ -645,6 +648,7 @@ public final class AIUsageLogDetector: AIUsageDetecting {
         )
     }
 
+    /// Attributes a cumulative delta only when the session names exactly one model.
     private func parseGrok(
         _ root: [String: Any],
         candidate: Candidate,
@@ -768,6 +772,7 @@ public final class AIUsageLogDetector: AIUsageDetecting {
         )
     }
 
+    /// Uses stable message paths for new identities while retaining the old digest solely for migration.
     private func parseGeneric(_ root: [String: Any], candidate: Candidate, ordinal: Int) -> [AIUsageSample] {
         let rootIdentity = (root["id"] as? String) ?? "entry-\(ordinal)"
         return usageContexts(in: root, model: nil, timestamp: candidate.modificationDate, path: rootIdentity).compactMap { context in
@@ -870,6 +875,7 @@ public final class AIUsageLogDetector: AIUsageDetecting {
         sample.provider == .copilot && (sample.sourceID?.contains("-shutdown-") ?? false)
     }
 
+    /// Inherits nearest model/date metadata and sorts dictionary traversal so sibling reordering cannot change identities.
     private func usageContexts(in value: Any, model: String?, timestamp date: Date, path: String) -> [UsageContext] {
         if let dictionary = value as? [String: Any] {
             let ownModel = AIUsageAnalytics.normalizedModel(dictionary["model"] as? String) ?? model

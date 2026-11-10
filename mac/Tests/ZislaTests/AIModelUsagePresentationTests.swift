@@ -10,6 +10,7 @@ struct AIModelUsagePresentationTests {
     private static let keys = ["每日模型用量", "暂无模型用量", "未分类", "未知模型", "输入 %@ · 输出 %@", "AI 模型用量"]
 
     @Test
+    /// Runtime lookups are asserted because missing localization keys silently fall back despite a successful build.
     func everyLanguageTranslatesRuntimeModelUsageKeysWithMatchingPlaceholders() throws {
         let package = URL(fileURLWithPath: #filePath).deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent()
         let source = try String(contentsOf: package.appendingPathComponent("Sources/Zisla/AIProgressModuleView.swift"), encoding: .utf8)
@@ -29,7 +30,7 @@ struct AIModelUsagePresentationTests {
         #expect(AppLocalization.string("未分类", language: .arabic) == "غير مصنّف")
     }
 
-    @Test
+    @Test @MainActor
     func unknownAndUnclassifiedDisplayDoNotPresentAnInventedProviderOrModel() {
         let unknown = AIModelUsage(provider: .zed, model: nil, inputTokens: 10, outputTokens: 2)
         let unclassified = AIModelUsage(provider: nil, model: nil, inputTokens: 5, outputTokens: 1)
@@ -39,6 +40,7 @@ struct AIModelUsagePresentationTests {
     }
 
     @Test @MainActor
+    /// Long identities and RTL must wrap within narrow island widths instead of expanding the panel.
     func modelRowsFitNarrowIslandWidthsWithLongNamesAndRTL() throws {
         let model = AIModelUsage(provider: .codex, model: String(repeating: "gpt-model-long-name-", count: 8),
             inputTokens: Int.max, outputTokens: 99_999)
@@ -57,6 +59,7 @@ struct AIModelUsagePresentationTests {
     }
 
     @Test @MainActor
+    /// The export must receive the selected day's totals without requesting usage when that section is disabled.
     func briefingReadsOnlySelectedUsageAndCarriesDailyTotalAndModelRowsToExport() async throws {
         let root = FileManager.default.temporaryDirectory.appendingPathComponent("zisla-model-briefing-\(UUID())")
         defer { try? FileManager.default.removeItem(at: root) }

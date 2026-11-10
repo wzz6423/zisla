@@ -145,12 +145,14 @@ struct DailyModelUsageList: View {
         .frame(maxWidth: .infinity, alignment: .leading)
     }
 
+    /// Names unknown models explicitly so retained aggregate history cannot imply a fabricated attribution.
     static func modelName(_ usage: AIModelUsage, language: AppLanguage? = nil) -> String {
         let locale = (language ?? AppLocalization.currentLanguage).locale
         guard let provider = usage.provider else { return AppLocalization.string("未分类", locale: locale) }
         return provider.rawValue.uppercased() + " · " + (usage.model ?? AppLocalization.string("未知模型", locale: locale))
     }
 
+    /// Uses the axis formatter for both counts so narrow rows agree with the trend's units.
     static func tokenBreakdown(_ usage: AIModelUsage, language: AppLanguage? = nil) -> String {
         AppLocalization.format("输入 %@ · 输出 %@", locale: (language ?? AppLocalization.currentLanguage).locale,
             [AIUsageAnalytics.formatTokenAxisValue(usage.inputTokens), AIUsageAnalytics.formatTokenAxisValue(usage.outputTokens)])

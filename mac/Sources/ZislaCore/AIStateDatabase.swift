@@ -14,6 +14,7 @@ final class AIStateDatabase {
     private let maximumUsageSamples: Int
     private var connection: OpaquePointer?
 
+    /// Creates the additive ledgers before older migrations can trim history, preserving existing daily totals.
     init(url: URL, maximumUsageSamples: Int) throws {
         self.url = url
         self.maximumUsageSamples = max(1, maximumUsageSamples)
@@ -162,6 +163,7 @@ final class AIStateDatabase {
         try trimUsage()
     }
 
+    /// Loads both histories together only when requested so normal task snapshots stay small.
     func load(includeUsageSamples: Bool = true) throws -> AIState {
         AIState(
             tasks: try loadTasks(),
@@ -175,6 +177,7 @@ final class AIStateDatabase {
         try loadUsage(startingAt: startDate)
     }
 
+    /// Reads aggregate and model rows in one transaction so concurrent writers cannot expose mismatched totals.
     func loadUsageHistory(startingAt startDate: Date?, endingBefore endDate: Date?) throws -> AIUsageHistory {
         try transaction {
             AIUsageHistory(usageSamples: try loadUsage(startingAt: startDate, endingBefore: endDate),
@@ -213,6 +216,7 @@ final class AIStateDatabase {
         try execute("DELETE FROM tasks")
     }
 
+    /// Commits manual daily totals and model rows atomically; a failed model write must roll back both.
     @discardableResult
     func recordUsage(_ samples: [AIUsageSample]) throws -> Int {
         guard !samples.isEmpty else { return 0 }
@@ -228,6 +232,7 @@ final class AIStateDatabase {
         }
     }
 
+    /// Rejects invalid timestamps before migration or deduplication can mutate the ledger.
     @discardableResult
     func recordDetectedUsage(_ samples: [AIUsageSample]) throws -> Int {
         guard !samples.isEmpty else { return 0 }
@@ -263,6 +268,7 @@ final class AIStateDatabase {
         return result
     }
 
+    /// Uses a half-open range so a briefing never includes the following day's aggregate.
     private func loadUsage(startingAt startDate: Date? = nil, endingBefore endDate: Date? = nil) throws -> [AIUsageSample] {
         let statement = try prepare("""
             SELECT source_id, provider, timestamp, input_tokens, output_tokens, cost_usd, model
@@ -283,6 +289,7 @@ final class AIStateDatabase {
         return result
     }
 
+    /// Combines manual and detected origins only after reading the same bounded date range.
     private func loadModelUsage(startingAt startDate: Date? = nil, endingBefore endDate: Date? = nil) throws -> [AIUsageSample] {
         let statement = try prepare("""
             SELECT provider, timestamp, input_tokens, output_tokens, NULL, NULLIF(model, '')
@@ -359,6 +366,7 @@ final class AIStateDatabase {
         try setUsageSchemaVersion(6)
     }
 
+    /// Backfills only surviving event metadata; old generic indices cannot prove their original model.
     private func migrateModelUsageIfNeeded() throws {
         guard try usageSchemaVersion() < 7 else { return }
         try transaction {
@@ -384,6 +392,7 @@ final class AIStateDatabase {
         }
     }
 
+    /// Keeps origins separate and saturates token sums so repeated manual increments cannot overflow.
     private func addModelUsage(_ samples: [AIUsageSample], origin: String) throws {
         let lookup = try prepare("""
             SELECT input_tokens, output_tokens FROM model_usage_samples
@@ -421,6 +430,7 @@ final class AIStateDatabase {
         }
     }
 
+    /// Splits each source by day and model so later cumulative updates never rewrite earlier usage.
     private func addDetectedModelDelta(_ sample: AIUsageSample) throws {
         guard sample.totalTokens > 0 else { return }
         let model = AIUsageAnalytics.normalizedModel(sample.model) ?? ""
@@ -452,6 +462,7 @@ final class AIStateDatabase {
         try stepDone(insert)
     }
 
+    /// Rebuilds a day's detected rows from its ledger after metadata enrichment or legacy identity changes.
     private func refreshDetectedModelUsage(at day: Date) throws {
         let delete = try prepare("DELETE FROM model_usage_samples WHERE timestamp = ? AND origin = 'detected'")
         defer { sqlite3_finalize(delete) }
@@ -470,6 +481,7 @@ final class AIStateDatabase {
         try addModelUsage(AIUsageAnalytics.dailyModelUsageSamples(samples: samples), origin: "detected")
     }
 
+    /// Drops model rows only after their aggregate day is removed, preserving the retained-history boundary.
     private func trimModelUsage() throws {
         try execute("DELETE FROM model_usage_samples WHERE timestamp NOT IN (SELECT timestamp FROM usage_samples)")
     }
@@ -562,6 +574,7 @@ final class AIStateDatabase {
         return inserted
     }
 
+    /// Advances cumulative high-water marks and emits only new daily deltas, including metadata-only updates.
     private func recordDetectedUsageInCurrentTransaction(_ samples: [AIUsageSample]) throws -> Int {
         let legacyCursor = try detectedUsageCursor()
         let lookup = try prepare("""
@@ -739,6 +752,7 @@ final class AIStateDatabase {
         return AIUsageAnalytics.dailyUsageSamples(samples: visible, calendar: .current)
     }
 
+    /// Uses daily deltas rather than cumulative event snapshots so growth across midnight stays on its new day.
     private func detectedUsageEventTotal(at day: Date) throws -> DetectedUsageTotal {
         let statement = try prepare("""
             SELECT input_tokens, output_tokens
@@ -826,6 +840,7 @@ final class AIStateDatabase {
         return try usageSample(from: statement, sourceID: sourceID, columnOffset: 0)
     }
 
+    /// Renames only an unambiguous old identity so rescans cannot claim a different source's history.
     private func migrateLegacyDetectedUsageEventIfNeeded(for sample: AIUsageSample) throws {
         guard let sourceID = sample.sourceID,
               let legacySourceID = try uniqueLegacyDetectedUsageSourceID(
@@ -851,6 +866,7 @@ final class AIStateDatabase {
         try stepDone(daily)
     }
 
+    /// Bridges equal-token events within the same file while keeping their unverifiable model attribution unknown.
     private func migrateGenericDetectedUsageEvent(for sample: AIUsageSample, legacyPrefix: String,
         modelDays: inout Set<Date>) throws {
         guard let filePrefix = genericFilePrefix(legacyPrefix) else { return }
@@ -897,10 +913,12 @@ final class AIStateDatabase {
         try stepDone(update)
     }
 
+    /// Removes the mutable document digest so legacy baselines survive appends and timestamp changes.
     private func genericFilePrefix(_ legacyPrefix: String) -> String? {
         legacyPrefix.range(of: "-entry-").map { String(legacyPrefix[..<$0.lowerBound]) + "-" }
     }
 
+    /// Moves leftover legacy events into consumable baselines, merging later arrivals without blocking rescans.
     private func prepareGenericUsageMigration(_ samples: [AIUsageSample], using lookup: OpaquePointer?,
         modelDays: inout Set<Date>) throws -> Set<String> {
         let generic = samples.filter { $0.legacySourceID != nil }
@@ -925,6 +943,9 @@ final class AIStateDatabase {
                 let insert = try prepare("""
                     INSERT INTO generic_usage_baselines(file_prefix,timestamp,input_tokens,output_tokens)
                     VALUES(?,?,?,?)
+                    ON CONFLICT(file_prefix, timestamp) DO UPDATE SET
+                        input_tokens = generic_usage_baselines.input_tokens + excluded.input_tokens,
+                        output_tokens = generic_usage_baselines.output_tokens + excluded.output_tokens
                     """)
                 defer { sqlite3_finalize(insert) }
                 try bind(filePrefix, to: 1, in: insert)
@@ -972,6 +993,7 @@ final class AIStateDatabase {
         return ambiguous
     }
 
+    /// Consumes ambiguous file baselines before emitting growth; a changed document cannot repeat old tokens.
     private func reconcileGenericUsage(_ sample: AIUsageSample, legacyPrefix: String?, ambiguousDays: Set<String>) throws -> AIUsageSample {
         guard let legacyPrefix, let filePrefix = genericFilePrefix(legacyPrefix) else { return sample }
         guard ambiguousDays.contains(filePrefix) else { return sample }
@@ -1127,6 +1149,7 @@ final class AIStateDatabase {
         }
     }
 
+    /// Validates stored providers and timestamps before exposing any persisted row as usage.
     private func usageSample(
         from statement: OpaquePointer?,
         sourceID: String?,
@@ -1196,6 +1219,7 @@ final class AIStateDatabase {
         try bind(sample.sourceID, to: 7, in: statement)
     }
 
+    /// Evicts aggregate days and their model display rows without dropping source high-water marks.
     private func trimUsage() throws {
         let statement = try prepare("""
             DELETE FROM usage_samples

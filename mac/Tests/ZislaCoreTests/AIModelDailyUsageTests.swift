@@ -26,6 +26,7 @@ struct AIModelDailyUsageTests {
     }
 
     @Test
+    /// A cumulative source must keep its previous day intact and charge only growth to the next day.
     func cumulativeGrowthAcrossMidnightRecordsOnlyTheNewDayDelta() throws {
         let root = directory()
         defer { try? FileManager.default.removeItem(at: root) }
@@ -177,6 +178,7 @@ struct AIModelDailyUsageTests {
     }
 
     @Test
+    /// Retention and half-open queries must keep model rows aligned with their authoritative aggregate day.
     func modelSummariesRemainBoundedByRetainedDaysAndSupportHalfOpenRanges() throws {
         let root = directory()
         defer { try? FileManager.default.removeItem(at: root) }
@@ -256,6 +258,32 @@ struct AIModelDailyUsageTests {
     }
 
     @Test
+    func laterLegacyGenericEventsMergeIntoAnExistingDayBaselineWithoutBlockingScans() throws {
+        let root = directory()
+        defer { try? FileManager.default.removeItem(at: root) }
+        let repository = AIStateRepository(directoryURL: root)
+        let prefix = "gemini-fixture-entry-root-usage-"
+        try repository.recordDetectedUsage([sample(prefix + "0", .gemini, nil, 100, 20)])
+        var current = sample("gemini-fixture-event-v2-message", .gemini, "current-model", 10, 2)
+        current.legacySourceID = prefix
+        #expect(try repository.recordDetectedUsage([current]) == 0)
+        try repository.recordDetectedUsage([sample(prefix + "1", .gemini, nil, 30, 5)])
+        current.inputTokens = 45
+        current.outputTokens = 10
+        #expect(try repository.recordDetectedUsage([current]) == 0)
+        #expect(try repository.loadUsageSamples().first?.totalTokens == 155)
+        #expect(try repository.recordDetectedUsage([current]) == 0)
+        current.inputTokens = 140
+        current.outputTokens = 30
+        #expect(try repository.recordDetectedUsage([current]) == 1)
+        let history = try repository.loadUsageHistory()
+        #expect(history.usageSamples.first?.totalTokens == 170)
+        #expect(history.modelUsageSamples.map(\.totalTokens).reduce(0, +) == 170)
+        #expect(try repository.recordDetectedUsage([current]) == 0)
+        #expect(try repository.loadUsageHistory() == history)
+    }
+
+    @Test
     func corruptedModelRowsAreRejectedWithoutChangingTheDailyTotal() throws {
         let root = directory()
         defer { try? FileManager.default.removeItem(at: root) }
@@ -296,6 +324,7 @@ struct AIModelDailyUsageTests {
         FileManager.default.temporaryDirectory.appendingPathComponent("zisla-model-usage-\(UUID())", isDirectory: true)
     }
 
+    /// Writes only isolated schema fixtures and surfaces setup failures before migration assertions run.
     private func sql(_ url: URL, _ query: String) throws {
         var database: OpaquePointer?
         #expect(sqlite3_open(url.path, &database) == SQLITE_OK)
