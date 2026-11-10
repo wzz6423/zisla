@@ -472,6 +472,7 @@ public final class AIStateMonitor: ObservableObject {
         let qoderRegion = accountBalanceQoderRegion
         isRefreshingAccountBalances = true
         accountBalanceTask = Task { [weak self] in
+            guard !Task.isCancelled else { return }
             let work = Task.detached(priority: .utility) { try await detector.accountBalances(for: providers, qoderRegion: qoderRegion) }
             let result = await withTaskCancellationHandler { await work.result } onCancel: { work.cancel() }
             guard !Task.isCancelled, let self, self.accountBalanceGeneration == generation else { return }

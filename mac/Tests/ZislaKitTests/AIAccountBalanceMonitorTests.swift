@@ -7,6 +7,29 @@ import Testing
 
 @MainActor
 struct AIAccountBalanceMonitorTests {
+    /// Cancelling before the main-actor refresh starts must prevent even an uncooperative detector from reading credentials.
+    @Test(arguments: [false, true])
+    func cancellationBeforeRefreshStartsDoesNotInvokeDetector(removeProviders: Bool) async throws {
+        let root = directory()
+        defer { try? FileManager.default.removeItem(at: root) }
+        let detector = ImmediateBalanceDetector()
+        let monitor = AIStateMonitor(directoryURL: root, activityDetectors: [], accountBalanceDetector: detector,
+            accountBalanceNotificationCenter: NotificationCenter(), detectorRefreshInterval: 3_600)
+        defer { monitor.stop() }
+        monitor.configureAccountBalanceProviders([.claude])
+        monitor.start()
+        #expect(monitor.isRefreshingAccountBalances)
+        if removeProviders {
+            monitor.configureAccountBalanceProviders([])
+        } else {
+            monitor.stop()
+        }
+        #expect(!monitor.isRefreshingAccountBalances && monitor.accountBalances.isEmpty)
+        #expect(try await !waitFor { await detector.callCount > 0 },
+            "A refresh cancelled before it starts must not invoke the account detector")
+        #expect(!monitor.isRefreshingAccountBalances && monitor.accountBalances.isEmpty)
+    }
+
     /// A fixed clock and held detector distinguish idempotent startup, quota throttling, and nonpersisted balance state.
     @Test func startupIsIdempotentRefreshIsThrottledAndHistoryUnloadKeepsBalances() async throws {
         let root = directory()
@@ -132,6 +155,15 @@ struct AIAccountBalanceMonitorTests {
             try await Task.sleep(for: .milliseconds(10))
         }
         return await condition()
+    }
+}
+
+private actor ImmediateBalanceDetector: AIAccountBalanceDetecting {
+    private(set) var callCount = 0
+
+    func accountBalances(for providers: Set<AIProvider>, qoderRegion: AIAccountBalanceQoderRegion) async throws -> [AIAccountBalance] {
+        callCount += 1
+        return []
     }
 }
 
