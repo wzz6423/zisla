@@ -3354,3 +3354,17 @@
 "保存手写备忘录需要辅助功能权限" = "Akses Aksesibilitas diperlukan untuk menyimpan catatan tulisan tangan";
 "备忘录内容已变化，请重新打开后编辑" = "Catatan telah berubah. Buka kembali sebelum mengedit";
 "无法保存手写备忘录的文本，请在备忘录中打开后重试" = "Teks dalam catatan tulisan tangan tidak dapat disimpan. Buka di Catatan dan coba lagi";
+
+"管理电源模式与系统垃圾、剪贴板历史和废纸篓的定时清理。" = "Kelola mode daya dan pembersihan terjadwal file sampah sistem, riwayat papan klip, dan Sampah.";
+"定时倾倒废纸篓" = "Kosongkan Sampah secara otomatis";
+"按所选间隔永久删除废纸篓中的所有项目，无法恢复" = "Hapus semua item di Sampah secara permanen pada interval yang dipilih. Tidak dapat dipulihkan";
+"启用定时倾倒废纸篓？" = "Aktifkan pengosongan Sampah otomatis?";
+
+"自动切换电源模式" = "Ganti mode daya secara otomatis";
+"插电默认模式" = "Mode default saat tersambung daya";
+"脱电默认模式" = "Mode default saat memakai baterai";
+"20%及以下固定省电" = "Selalu hemat daya pada 20% atau kurang";
+"电量不高于20%时保持省电，插电也不切换；超过20%后恢复对应默认模式" = "Pertahankan hemat daya pada 20% atau kurang meski tersambung daya; pulihkan mode default yang sesuai di atas 20%";
+"手动更改电源模式后暂停自动切换，下次插电或脱电时恢复" = "Mengubah mode daya secara manual menjeda pergantian otomatis hingga daya disambungkan atau dilepas berikutnya";
+"省电" = "Hemat daya";
+"高性能" = "Performa tinggi";

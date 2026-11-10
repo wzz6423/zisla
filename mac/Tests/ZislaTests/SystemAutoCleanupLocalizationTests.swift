@@ -29,13 +29,11 @@ struct SystemAutoCleanupLocalizationTests {
     }
 
     @Test
-    func settingsUseLocalizedOptionsAndNestedSearchAnchors() throws {
+    func scheduledCleanupPageUsesLocalizedOptionsAndScopeSearchAnchors() throws {
         let source = try String(contentsOf: Self.packageRoot.appendingPathComponent("Sources/Zisla/SettingsView.swift"), encoding: .utf8)
-        let start = try #require(source.range(of: "featureToggle(\"系统状态与清理\""))
-        let end = try #require(source.range(of: "featureToggle(\"键盘音效\"", range: start.upperBound..<source.endIndex))
-        let children = try #require(source.range(of: "if model.settingsStore.settings.systemMonitorEnabled {",
-            range: start.upperBound..<end.lowerBound))
-        let rows = String(source[children.lowerBound..<end.lowerBound])
+        let start = try #require(source.range(of: "settingsGroup(\"清理\")"))
+        let end = try #require(source.range(of: "title: \"定时倾倒废纸篓\"", range: start.upperBound..<source.endIndex))
+        let rows = String(source[start.lowerBound..<end.lowerBound])
         let titles = try NSRegularExpression(pattern: #"(?:title|detail): "([^"]+)""#)
             .matches(in: rows, range: NSRange(rows.startIndex..., in: rows))
             .compactMap { match -> String? in
@@ -43,7 +41,7 @@ struct SystemAutoCleanupLocalizationTests {
                 return String(rows[range])
             }
         #expect(Set(titles).isSubset(of: Set(Self.keys)))
-        #expect(rows.components(separatedBy: "isNested: true").count == 3)
+        #expect(rows.components(separatedBy: "isNested: true").count == 2)
         #expect(rows.contains("VoiceRecordingCleanupPolicy.allCases"))
         #expect(rows.contains("SystemCleanupScope.allCases"))
         #expect(rows.contains("AppLocalizedText(policy.menuTitle)"))
@@ -60,7 +58,7 @@ struct SystemAutoCleanupLocalizationTests {
         for key in ["自动清理系统垃圾", "清理范围"] {
             let matches = SettingsSearchIndex.results(for: AppLocalization.string(key, locale: language.locale),
                 settings: settings, locale: language.locale)
-            #expect(matches.contains { $0.section == .features && $0.title == key && $0.anchor == .row(key) } == enabled)
+            #expect(matches.contains { $0.section == .scheduledCleanup && $0.title == key && $0.anchor == .row(key) } == enabled)
         }
         let scopeMatches = SettingsSearchIndex.results(for: AppLocalization.string("仅可信", locale: language.locale),
             settings: settings, locale: language.locale)

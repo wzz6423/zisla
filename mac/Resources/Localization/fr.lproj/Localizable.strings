@@ -3350,3 +3350,17 @@
 "保存手写备忘录需要辅助功能权限" = "L’accès à l’accessibilité est nécessaire pour enregistrer les notes manuscrites";
 "备忘录内容已变化，请重新打开后编辑" = "La note a changé. Rouvrez-la avant de la modifier";
 "无法保存手写备忘录的文本，请在备忘录中打开后重试" = "Impossible d’enregistrer le texte de la note manuscrite. Ouvrez-la dans Notes et réessayez";
+
+"管理电源模式与系统垃圾、剪贴板历史和废纸篓的定时清理。" = "Gérez les modes d’alimentation et le nettoyage planifié des fichiers inutiles du système, de l’historique du presse-papiers et de la Corbeille.";
+"定时倾倒废纸篓" = "Vider automatiquement la Corbeille";
+"按所选间隔永久删除废纸篓中的所有项目，无法恢复" = "Supprime définitivement tous les éléments de la Corbeille à l’intervalle choisi. Cette action est irréversible";
+"启用定时倾倒废纸篓？" = "Activer le vidage automatique de la Corbeille ?";
+
+"自动切换电源模式" = "Changer automatiquement de mode d’alimentation";
+"插电默认模式" = "Mode par défaut sur secteur";
+"脱电默认模式" = "Mode par défaut sur batterie";
+"20%及以下固定省电" = "Économie d’énergie à 20% ou moins";
+"电量不高于20%时保持省电，插电也不切换；超过20%后恢复对应默认模式" = "Conserve l’économie d’énergie à 20% ou moins, même sur secteur ; rétablit le mode par défaut correspondant au-dessus de 20%";
+"手动更改电源模式后暂停自动切换，下次插电或脱电时恢复" = "Un changement manuel du mode d’alimentation suspend le changement automatique jusqu’au prochain branchement ou débranchement";
+"省电" = "Économie d’énergie";
+"高性能" = "Hautes performances";

@@ -3354,3 +3354,17 @@
 "保存手写备忘录需要辅助功能权限" = "Toegang tot toegankelijkheid is vereist om handgeschreven notities op te slaan";
 "备忘录内容已变化，请重新打开后编辑" = "De notitie is gewijzigd. Open deze opnieuw voordat je bewerkt";
 "无法保存手写备忘录的文本，请在备忘录中打开后重试" = "De tekst in de handgeschreven notitie kon niet worden opgeslagen. Open deze in Notities en probeer het opnieuw";
+
+"管理电源模式与系统垃圾、剪贴板历史和废纸篓的定时清理。" = "Beheer energiemodi en het gepland opruimen van systeembestanden, klembordgeschiedenis en de Prullenbak.";
+"定时倾倒废纸篓" = "Prullenbak automatisch legen";
+"按所选间隔永久删除废纸篓中的所有项目，无法恢复" = "Verwijdert alle onderdelen in de Prullenbak definitief met het gekozen interval. Dit kan niet ongedaan worden gemaakt";
+"启用定时倾倒废纸篓？" = "Automatisch legen van de Prullenbak inschakelen?";
+
+"自动切换电源模式" = "Energiemodi automatisch wisselen";
+"插电默认模式" = "Standaardmodus met netvoeding";
+"脱电默认模式" = "Standaardmodus op batterij";
+"20%及以下固定省电" = "Energie besparen bij 20% of minder";
+"电量不高于20%时保持省电，插电也不切换；超过20%后恢复对应默认模式" = "Behoudt energiebesparing bij 20% of minder, ook met netvoeding; herstelt de bijbehorende standaardmodus boven 20%";
+"手动更改电源模式后暂停自动切换，下次插电或脱电时恢复" = "Een handmatige wijziging van de energiemodus pauzeert automatisch wisselen tot de volgende aansluiting of ontkoppeling van de voeding";
+"省电" = "Energiebesparing";
+"高性能" = "Hoge prestaties";

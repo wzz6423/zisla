@@ -3355,3 +3355,17 @@
 "保存手写备忘录需要辅助功能权限" = "Zum Speichern handschriftlicher Notizen ist der Zugriff auf Bedienungshilfen erforderlich";
 "备忘录内容已变化，请重新打开后编辑" = "Die Notiz wurde geändert. Öffne sie vor dem Bearbeiten erneut";
 "无法保存手写备忘录的文本，请在备忘录中打开后重试" = "Der Text der handschriftlichen Notiz konnte nicht gespeichert werden. Öffne sie in Notizen und versuche es erneut";
+
+"管理电源模式与系统垃圾、剪贴板历史和废纸篓的定时清理。" = "Verwalten Sie Energiemodi und die geplante Bereinigung von Systemdatenmüll, Zwischenablageverlauf und Papierkorb.";
+"定时倾倒废纸篓" = "Papierkorb automatisch leeren";
+"按所选间隔永久删除废纸篓中的所有项目，无法恢复" = "Löscht alle Objekte im Papierkorb im gewählten Intervall endgültig. Dies kann nicht rückgängig gemacht werden";
+"启用定时倾倒废纸篓？" = "Automatisches Leeren des Papierkorbs aktivieren?";
+
+"自动切换电源模式" = "Energiemodi automatisch wechseln";
+"插电默认模式" = "Standardmodus am Netzteil";
+"脱电默认模式" = "Standardmodus im Batteriebetrieb";
+"20%及以下固定省电" = "Bei 20% oder weniger immer Strom sparen";
+"电量不高于20%时保持省电，插电也不切换；超过20%后恢复对应默认模式" = "Behält den Stromsparmodus bei 20% oder weniger auch am Netzteil bei; stellt über 20% den jeweiligen Standardmodus wieder her";
+"手动更改电源模式后暂停自动切换，下次插电或脱电时恢复" = "Ein manueller Wechsel des Energiemodus pausiert den automatischen Wechsel bis zum nächsten Anschließen oder Trennen des Netzteils";
+"省电" = "Stromsparmodus";
+"高性能" = "Hohe Leistung";

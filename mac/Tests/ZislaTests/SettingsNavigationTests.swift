@@ -173,6 +173,7 @@ struct SettingsNavigationTests {
             "键盘音效",
             "下载",
             "保存位置",
+            "系统状态与清理",
             "天气",
             "网络",
             "宠物",
@@ -369,7 +370,7 @@ struct SettingsNavigationTests {
         #expect(SettingsSection.allCases.filter { $0.group == .files } == [.pdfTools])
         #expect(SettingsSection.allCases.filter { $0.group == .capture } == [.screenshot, .recording])
         #expect(SettingsSection.allCases.filter { $0.group == .aiAndVoice } == [.ai, .voice])
-        #expect(SettingsSection.allCases.filter { $0.group == .others } == [.clipboardAssistant, .mail, .download, .saveLocations, .weather, .networkProxy, .pet])
+        #expect(SettingsSection.allCases.filter { $0.group == .others } == [.clipboardAssistant, .mail, .download, .saveLocations, .scheduledCleanup, .weather, .networkProxy, .pet])
         #expect(SettingsSection.allCases.filter { $0.group == .recommendationsAndUpdates } == [.recommendations, .updates])
     }
 

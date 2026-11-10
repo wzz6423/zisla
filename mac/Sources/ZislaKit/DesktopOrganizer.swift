@@ -95,8 +95,14 @@ public enum DesktopOrganizer {
         }
     }
 
-    /// Empties the Trash. Irreversible — the caller must obtain user confirmation first.
+    /// Empties the Trash after manual confirmation or explicit opt-in to scheduled emptying.
     public static func emptyTrash() async -> Result<Void, DesktopOrganizerError> {
+        await emptyTrash(execute: runAppleScriptVoid)
+    }
+
+    static func emptyTrash(
+        execute: (String) async -> Result<Void, DesktopOrganizerError>
+    ) async -> Result<Void, DesktopOrganizerError> {
         // With `warns before emptying` disabled, Finder skips its own second confirmation; Zisla handles that step itself.
         let script = """
         tell application "Finder"
@@ -104,11 +110,14 @@ public enum DesktopOrganizer {
             try
                 set warns before emptying of trash to false
                 empty trash
+            on error errorMessage number errorNumber
+                set warns before emptying of trash to warnsSetting
+                error errorMessage number errorNumber
             end try
             set warns before emptying of trash to warnsSetting
         end tell
         """
-        return await runAppleScriptVoid(script)
+        return await execute(script)
     }
 
     private static func runAppleScriptReturningString(

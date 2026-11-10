@@ -309,6 +309,271 @@ struct SystemAutoCleanupServiceTests {
         #expect(result.failures.map(\.url) == (scope == .all ? [log] : []))
         #expect(mock.existingPaths.contains(log.path))
     }
+
+    @Test(arguments: [VoiceRecordingCleanupPolicy.sevenDays, .fifteenDays, .thirtyDays])
+    func trashEmptyingWaitsForItsOwnIntervalAndRunsWithOtherFeaturesDisabled(policy: VoiceRecordingCleanupPolicy) async throws {
+        let fixture = try SystemAutoCleanupFixture()
+        let service = fixture.makeService()
+        defer { service.stop() }
+        let interval = TimeInterval(try #require(policy.daysThreshold) * 86_400)
+        var settings = FeatureSettings(systemMonitorEnabled: false,
+            systemCleanupPolicy: .sevenDays, trashCleanupPolicy: policy)
+        settings.clipboardHistoryEnabled = false
+        service.apply(settings: settings)
+        let timer = try #require(fixture.timers.first)
+        #expect(fixture.timers.count == 1)
+        #expect(timer.timeInterval == interval)
+        #expect(timer.fireDate == fixture.date.addingTimeInterval(interval))
+        #expect(fixture.emptiedCount == 0)
+        #expect(fixture.defaults.object(forKey: "system-cleanup-last-run-v1") == nil)
+        fixture.date.addTimeInterval(interval - 0.001)
+        #expect(service.trashCleanup.runIfDue() == nil)
+        fixture.date.addTimeInterval(0.001)
+        let task = try #require(service.trashCleanup.runIfDue())
+        #expect(service.trashCleanup.runIfDue() == nil)
+        let result = try #require(await task.value)
+        if case .failure(let error) = result { Issue.record("Unexpected emptying failure: \(error)") }
+        #expect(fixture.emptiedCount == 1)
+        #expect(fixture.options == nil)
+        #expect(fixture.moved.isEmpty)
+        #expect(service.trashCleanup.task == nil)
+        #expect(timer.fireDate == fixture.date.addingTimeInterval(interval))
+        #expect(fixture.defaults.object(forKey: "trash-cleanup-last-run-v1") as? Date == fixture.date)
+        #expect(service.trashCleanup.runIfDue() == nil)
+        fixture.date.addTimeInterval(interval)
+        fixture.callbacks[0](timer)
+        fixture.callbacks[0](timer)
+        #expect(await (try #require(service.trashCleanup.task)).value != nil)
+        #expect(fixture.emptiedCount == 2)
+    }
+
+    @Test
+    func trashEmptyingIsOffByDefaultAndDoesNotCreateAPersistedSchedule() throws {
+        let fixture = try SystemAutoCleanupFixture()
+        let service = fixture.makeService()
+        defer { service.stop() }
+        service.apply(settings: .default)
+        #expect(fixture.timers.isEmpty)
+        #expect(service.trashCleanup.runIfDue() == nil)
+        #expect(fixture.defaults.object(forKey: "trash-cleanup-last-run-v1") == nil)
+        #expect(fixture.emptiedCount == 0)
+    }
+
+    @Test(arguments: [false, true])
+    func savedTrashScheduleSurvivesRelaunchAndOverdueWorkRunsOnlyOnce(overdue: Bool) async throws {
+        let fixture = try SystemAutoCleanupFixture()
+        var service = fixture.makeService()
+        service.apply(settings: FeatureSettings(trashCleanupPolicy: .sevenDays))
+        let deadline = try #require(fixture.timers.first).fireDate
+        service.stop()
+        fixture.date.addTimeInterval(overdue ? 90 * 86_400 : 3 * 86_400)
+        service = fixture.makeService()
+        defer { service.stop() }
+        service.apply(settings: FeatureSettings(trashCleanupPolicy: .sevenDays))
+        let timer = try #require(fixture.timers.last)
+        #expect(timer.fireDate == deadline)
+        if overdue {
+            fixture.callbacks.last?(timer)
+            #expect(await (try #require(service.trashCleanup.task)).value != nil)
+            #expect(fixture.emptiedCount == 1)
+            #expect(timer.fireDate == fixture.date.addingTimeInterval(7 * 86_400))
+            fixture.callbacks.last?(timer)
+            #expect(service.trashCleanup.task == nil)
+        } else {
+            #expect(service.trashCleanup.runIfDue() == nil)
+            #expect(fixture.emptiedCount == 0)
+        }
+    }
+
+    @Test
+    func otherCleanupSettingsDoNotReplaceTheTrashTimer() throws {
+        let fixture = try SystemAutoCleanupFixture()
+        let service = fixture.makeService()
+        defer { service.stop() }
+        var settings = FeatureSettings(systemCleanupPolicy: .sevenDays, trashCleanupPolicy: .fifteenDays)
+        service.apply(settings: settings)
+        let trashTimer = try #require(fixture.timers.last)
+        let deadline = trashTimer.fireDate
+        fixture.date.addTimeInterval(86_400)
+        settings.systemCleanupScope = .all
+        settings.systemCleanupPolicy = .thirtyDays
+        settings.clipboardHistoryCleanupPolicy = .sevenDays
+        settings.voiceRecordingCleanupPolicy = .fifteenDays
+        service.apply(settings: settings)
+        #expect(fixture.timers.count == 3)
+        #expect(trashTimer.isValid)
+        #expect(trashTimer.fireDate == deadline)
+        settings.systemMonitorEnabled = false
+        service.apply(settings: settings)
+        #expect(fixture.timers.count == 3)
+        #expect(trashTimer.isValid)
+        #expect(trashTimer.fireDate == deadline)
+        #expect(fixture.emptiedCount == 0)
+    }
+
+    @Test
+    func trashPolicyChangesReplaceOnlyTheirTimerAndRejectStaleCallbacks() async throws {
+        let fixture = try SystemAutoCleanupFixture()
+        let service = fixture.makeService()
+        defer { service.stop() }
+        var settings = FeatureSettings(systemCleanupPolicy: .fifteenDays, trashCleanupPolicy: .thirtyDays)
+        service.apply(settings: settings)
+        let systemTimer = try #require(fixture.timers.first)
+        let original = try #require(fixture.timers.last)
+        let originalCallback = try #require(fixture.callbacks.last)
+        settings.trashCleanupPolicy = .sevenDays
+        service.apply(settings: settings)
+        let replacement = try #require(fixture.timers.last)
+        #expect(fixture.timers.count == 3)
+        #expect(!original.isValid)
+        #expect(systemTimer.isValid)
+        #expect(replacement.timeInterval == 7 * 86_400)
+        fixture.date = replacement.fireDate
+        originalCallback(original)
+        #expect(service.trashCleanup.task == nil)
+        fixture.callbacks.last?(replacement)
+        #expect(await (try #require(service.trashCleanup.task)).value != nil)
+        #expect(fixture.emptiedCount == 1)
+        settings.trashCleanupPolicy = .never
+        service.apply(settings: settings)
+        #expect(!replacement.isValid)
+        #expect(systemTimer.isValid)
+        #expect(service.trashCleanup.runIfDue() == nil)
+        #expect(fixture.defaults.object(forKey: "system-cleanup-last-run-v1") as? Date
+            == Date(timeIntervalSince1970: 1_800_000_000))
+    }
+
+    @Test(arguments: [false, true])
+    func disablingAndReenablingTrashCleanupPreservesItsSavedDeadline(overdue: Bool) async throws {
+        let fixture = try SystemAutoCleanupFixture()
+        let service = fixture.makeService()
+        defer { service.stop() }
+        var settings = FeatureSettings(trashCleanupPolicy: .sevenDays)
+        service.apply(settings: settings)
+        let deadline = try #require(fixture.timers.first).fireDate
+        settings.trashCleanupPolicy = .never
+        service.apply(settings: settings)
+        fixture.date.addTimeInterval(overdue ? 8 * 86_400 : 3 * 86_400)
+        settings.trashCleanupPolicy = .sevenDays
+        service.apply(settings: settings)
+        #expect(fixture.timers.last?.fireDate == deadline)
+        if overdue {
+            #expect(await (try #require(service.trashCleanup.runIfDue())).value != nil)
+            #expect(fixture.emptiedCount == 1)
+        } else {
+            #expect(service.trashCleanup.runIfDue() == nil)
+            #expect(fixture.emptiedCount == 0)
+        }
+    }
+
+    @Test(arguments: [false, true])
+    func stoppingQueuedTrashWorkCancelsItAndReleasesTimers(releaseService: Bool) async throws {
+        let fixture = try SystemAutoCleanupFixture()
+        var service: SystemAutoCleanupService? = fixture.makeService()
+        weak let reference = service
+        service?.apply(settings: FeatureSettings(systemCleanupPolicy: .sevenDays, trashCleanupPolicy: .sevenDays))
+        fixture.date.addTimeInterval(7 * 86_400)
+        let task = try #require(service?.trashCleanup.runIfDue())
+        if releaseService { service = nil } else { service?.stop() }
+        #expect(fixture.timers.allSatisfy { !$0.isValid })
+        #expect(await task.value == nil)
+        #expect(fixture.emptiedCount == 0)
+        if releaseService { #expect(reference == nil) }
+        fixture.callbacks.last?(try #require(fixture.timers.last))
+        #expect(fixture.emptiedCount == 0)
+    }
+
+    @Test(arguments: ["stop", "never", "interval"])
+    func cancellationDuringTrashEmptyingDoesNotCommitOrClearAReplacementTask(change: String) async throws {
+        let fixture = try SystemAutoCleanupFixture()
+        let gate = CleanupScanGate()
+        let service = fixture.makeService(emptyTrash: {
+            await gate.wait()
+            return .success(())
+        })
+        defer { service.stop() }
+        var settings = FeatureSettings(trashCleanupPolicy: .sevenDays)
+        service.apply(settings: settings)
+        fixture.date.addTimeInterval(15 * 86_400)
+        let original = try #require(service.trashCleanup.runIfDue())
+        await gate.waitUntilScanning(1)
+        #expect(service.trashCleanup.runIfDue() == nil)
+        switch change {
+        case "stop": service.stop()
+        case "never": settings.trashCleanupPolicy = .never
+        default: settings.trashCleanupPolicy = .fifteenDays
+        }
+        if change != "stop" { service.apply(settings: settings) }
+        let replacement = change == "interval" ? service.trashCleanup.runIfDue() : nil
+        #expect((replacement != nil) == (change == "interval"))
+        if replacement != nil { await gate.waitUntilScanning(2) }
+        await gate.releaseOne()
+        #expect(await original.value == nil)
+        #expect(fixture.defaults.object(forKey: "trash-cleanup-last-run-v1") as? Date
+            == Date(timeIntervalSince1970: 1_800_000_000))
+        if let replacement {
+            #expect(service.trashCleanup.task != nil)
+            await gate.releaseOne()
+            #expect(await replacement.value != nil)
+            #expect(service.trashCleanup.task == nil)
+            #expect(fixture.defaults.object(forKey: "trash-cleanup-last-run-v1") as? Date == fixture.date)
+        }
+    }
+
+    @Test
+    func trashPermissionFailureWaitsUntilTheNextIntervalAndCanRecover() async throws {
+        let fixture = try SystemAutoCleanupFixture()
+        fixture.emptyResult = .failure(.failed("Automation permission denied"))
+        let service = fixture.makeService()
+        defer { service.stop() }
+        service.apply(settings: FeatureSettings(trashCleanupPolicy: .sevenDays))
+        fixture.date.addTimeInterval(7 * 86_400)
+        let task = try #require(service.trashCleanup.runIfDue())
+        let result = try #require(await task.value)
+        if case .failure(let error) = result {
+            #expect(error == .failed("Automation permission denied"))
+        } else { Issue.record("Permission denial must be returned") }
+        #expect(fixture.emptiedCount == 1)
+        #expect(service.trashCleanup.runIfDue() == nil)
+        #expect(fixture.timers.last?.fireDate == fixture.date.addingTimeInterval(7 * 86_400))
+        fixture.emptyResult = .success(())
+        fixture.date.addTimeInterval(7 * 86_400)
+        #expect(await (try #require(service.trashCleanup.runIfDue())).value != nil)
+        #expect(fixture.emptiedCount == 2)
+    }
+
+    @Test
+    func trashEmptyingReschedulesFromCompletionRatherThanItsStart() async throws {
+        let fixture = try SystemAutoCleanupFixture()
+        let gate = CleanupScanGate()
+        let service = fixture.makeService(emptyTrash: {
+            await gate.wait()
+            return .success(())
+        })
+        defer { service.stop() }
+        service.apply(settings: FeatureSettings(trashCleanupPolicy: .sevenDays))
+        fixture.date.addTimeInterval(7 * 86_400)
+        let task = try #require(service.trashCleanup.runIfDue())
+        await gate.waitUntilScanning(1)
+        fixture.date.addTimeInterval(30)
+        await gate.releaseOne()
+        #expect(await task.value != nil)
+        #expect(fixture.timers.last?.fireDate == fixture.date.addingTimeInterval(7 * 86_400))
+    }
+
+    @Test
+    func anOverdueTrashScheduleRunsThroughTheMainRunLoopWithoutFinder() async throws {
+        let fixture = try SystemAutoCleanupFixture()
+        fixture.defaults.set(Date().addingTimeInterval(-8 * 86_400), forKey: "trash-cleanup-last-run-v1")
+        let completed = XCTestExpectation(description: "Overdue trash emptying runs on the main run loop")
+        let service = SystemAutoCleanupService(defaults: fixture.defaults,
+            scan: { _, _ in [] },
+            trash: { _ in DiskCleanupResult(successCount: 0, freedBytes: 0, failures: []) },
+            emptyTrash: { completed.fulfill(); return .success(()) })
+        defer { service.stop() }
+        service.apply(settings: FeatureSettings(systemMonitorEnabled: false, trashCleanupPolicy: .sevenDays))
+        #expect(await XCTWaiter.fulfillment(of: [completed], timeout: 2) == .completed)
+    }
 }
 
 @MainActor
@@ -323,6 +588,8 @@ private final class SystemAutoCleanupFixture {
     var kinds: Set<DiskCleanupKind> = []
     var options: DiskCleanupScanOptions?
     var result: DiskCleanupResult?
+    var emptiedCount = 0
+    var emptyResult: Result<Void, DesktopOrganizerError> = .success(())
 
     init() throws {
         defaults = try #require(UserDefaults(suiteName: suite))
@@ -334,13 +601,18 @@ private final class SystemAutoCleanupFixture {
 
     func makeService(
         scan: ((Set<DiskCleanupKind>, DiskCleanupScanOptions) async -> [DiskCleanupCandidate])? = nil,
-        trash: (([DiskCleanupCandidate]) async -> DiskCleanupResult)? = nil
+        trash: (([DiskCleanupCandidate]) async -> DiskCleanupResult)? = nil,
+        emptyTrash: (() async -> Result<Void, DesktopOrganizerError>)? = nil
     ) -> SystemAutoCleanupService {
         SystemAutoCleanupService(defaults: defaults, now: { self.date },
             scan: scan ?? { self.scan($0, options: $1) },
             trash: trash ?? {
                 self.moved = $0
                 return self.result ?? DiskCleanupResult(successCount: $0.count, freedBytes: 0, failures: [])
+            },
+            emptyTrash: emptyTrash ?? {
+                self.emptiedCount += 1
+                return self.emptyResult
             },
             timerFactory: { interval, callback in
                 let timer = Timer(timeInterval: interval, repeats: true, block: callback)

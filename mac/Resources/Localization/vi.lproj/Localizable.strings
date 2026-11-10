@@ -3354,3 +3354,17 @@
 "保存手写备忘录需要辅助功能权限" = "Cần quyền Trợ năng để lưu ghi chú viết tay";
 "备忘录内容已变化，请重新打开后编辑" = "Ghi chú đã thay đổi. Mở lại trước khi chỉnh sửa";
 "无法保存手写备忘录的文本，请在备忘录中打开后重试" = "Không thể lưu văn bản trong ghi chú viết tay. Mở trong Ghi chú rồi thử lại";
+
+"管理电源模式与系统垃圾、剪贴板历史和废纸篓的定时清理。" = "Quản lý chế độ nguồn và dọn dẹp theo lịch cho tệp rác hệ thống, lịch sử bảng nhớ tạm và Thùng rác.";
+"定时倾倒废纸篓" = "Tự động làm trống Thùng rác";
+"按所选间隔永久删除废纸篓中的所有项目，无法恢复" = "Xóa vĩnh viễn tất cả mục trong Thùng rác theo khoảng thời gian đã chọn. Không thể khôi phục";
+"启用定时倾倒废纸篓？" = "Bật tự động làm trống Thùng rác?";
+
+"自动切换电源模式" = "Tự động chuyển chế độ nguồn";
+"插电默认模式" = "Chế độ mặc định khi cắm sạc";
+"脱电默认模式" = "Chế độ mặc định khi dùng pin";
+"20%及以下固定省电" = "Luôn tiết kiệm điện ở mức 20% trở xuống";
+"电量不高于20%时保持省电，插电也不切换；超过20%后恢复对应默认模式" = "Giữ chế độ tiết kiệm điện ở mức 20% trở xuống kể cả khi cắm sạc; khôi phục chế độ mặc định tương ứng khi trên 20%";
+"手动更改电源模式后暂停自动切换，下次插电或脱电时恢复" = "Đổi chế độ nguồn thủ công sẽ tạm dừng chuyển tự động cho đến lần cắm hoặc rút sạc tiếp theo";
+"省电" = "Tiết kiệm điện";
+"高性能" = "Hiệu năng cao";

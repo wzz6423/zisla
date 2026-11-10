@@ -3353,3 +3353,17 @@
 "保存手写备忘录需要辅助功能权限" = "Accessibility access is required to save handwritten notes";
 "备忘录内容已变化，请重新打开后编辑" = "The note has changed. Reopen it before editing";
 "无法保存手写备忘录的文本，请在备忘录中打开后重试" = "Could not save text in the handwritten note. Open it in Notes and try again";
+
+"管理电源模式与系统垃圾、剪贴板历史和废纸篓的定时清理。" = "Manage power modes and scheduled cleanup of system junk, clipboard history, and the Trash.";
+"定时倾倒废纸篓" = "Automatically empty the Trash";
+"按所选间隔永久删除废纸篓中的所有项目，无法恢复" = "Permanently delete all items in the Trash at the selected interval; cannot be undone";
+"启用定时倾倒废纸篓？" = "Enable automatic Trash emptying?";
+
+"自动切换电源模式" = "Automatically switch power modes";
+"插电默认模式" = "Default mode when plugged in";
+"脱电默认模式" = "Default mode on battery";
+"20%及以下固定省电" = "Always use Low Power at 20% or less";
+"电量不高于20%时保持省电，插电也不切换；超过20%后恢复对应默认模式" = "Keep Low Power at 20% or less, even when plugged in; restore the corresponding default above 20%";
+"手动更改电源模式后暂停自动切换，下次插电或脱电时恢复" = "Changing the power mode manually pauses automatic switching until the next plug-in or unplug event";
+"省电" = "Low Power";
+"高性能" = "High Performance";

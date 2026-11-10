@@ -3354,3 +3354,17 @@
 "保存手写备忘录需要辅助功能权限" = "Per salvare le note scritte a mano è necessario il permesso di accessibilità";
 "备忘录内容已变化，请重新打开后编辑" = "La nota è cambiata. Riaprila prima di modificarla";
 "无法保存手写备忘录的文本，请在备忘录中打开后重试" = "Impossibile salvare il testo della nota scritta a mano. Aprila in Note e riprova";
+
+"管理电源模式与系统垃圾、剪贴板历史和废纸篓的定时清理。" = "Gestisci le modalità energetiche e la pulizia programmata dei file inutili del sistema, della cronologia degli appunti e del Cestino.";
+"定时倾倒废纸篓" = "Svuotare automaticamente il Cestino";
+"按所选间隔永久删除废纸篓中的所有项目，无法恢复" = "Elimina definitivamente tutti gli elementi del Cestino all’intervallo selezionato. L’operazione è irreversibile";
+"启用定时倾倒废纸篓？" = "Attivare lo svuotamento automatico del Cestino?";
+
+"自动切换电源模式" = "Cambia automaticamente modalità energetica";
+"插电默认模式" = "Modalità predefinita con alimentatore";
+"脱电默认模式" = "Modalità predefinita a batteria";
+"20%及以下固定省电" = "Risparmio energetico al 20% o meno";
+"电量不高于20%时保持省电，插电也不切换；超过20%后恢复对应默认模式" = "Mantiene il risparmio energetico al 20% o meno, anche con l’alimentatore; ripristina la modalità predefinita corrispondente oltre il 20%";
+"手动更改电源模式后暂停自动切换，下次插电或脱电时恢复" = "Cambiare manualmente la modalità energetica sospende il cambio automatico fino al prossimo collegamento o scollegamento dell’alimentatore";
+"省电" = "Risparmio energetico";
+"高性能" = "Prestazioni elevate";

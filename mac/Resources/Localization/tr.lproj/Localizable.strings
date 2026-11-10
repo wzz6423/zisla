@@ -3354,3 +3354,17 @@
 "保存手写备忘录需要辅助功能权限" = "El yazısı notları kaydetmek için Erişilebilirlik izni gerekir";
 "备忘录内容已变化，请重新打开后编辑" = "Not değişti. Düzenlemeden önce yeniden açın";
 "无法保存手写备忘录的文本，请在备忘录中打开后重试" = "El yazısı nottaki metin kaydedilemedi. Notlar’da açıp yeniden deneyin";
+
+"管理电源模式与系统垃圾、剪贴板历史和废纸篓的定时清理。" = "Güç modlarını ve sistem gereksiz dosyalarının, pano geçmişinin ve Çöp Kutusunun zamanlanmış temizliğini yönetin.";
+"定时倾倒废纸篓" = "Çöp Kutusunu otomatik boşalt";
+"按所选间隔永久删除废纸篓中的所有项目，无法恢复" = "Seçilen aralıkta Çöp Kutusundaki tüm öğeleri kalıcı olarak siler. Bu işlem geri alınamaz";
+"启用定时倾倒废纸篓？" = "Çöp Kutusunu otomatik boşaltma etkinleştirilsin mi?";
+
+"自动切换电源模式" = "Güç modlarını otomatik değiştir";
+"插电默认模式" = "Prize bağlıyken varsayılan mod";
+"脱电默认模式" = "Pildeyken varsayılan mod";
+"20%及以下固定省电" = "%20 ve altında daima güç tasarrufu";
+"电量不高于20%时保持省电，插电也不切换；超过20%后恢复对应默认模式" = "Prize bağlıyken bile %20 ve altında güç tasarrufunu korur; %20 üzerinde ilgili varsayılan modu geri yükler";
+"手动更改电源模式后暂停自动切换，下次插电或脱电时恢复" = "Güç modunu elle değiştirmek, güç bağlantısı bir sonraki kez takılana veya çıkarılana kadar otomatik geçişi duraklatır";
+"省电" = "Güç tasarrufu";
+"高性能" = "Yüksek performans";
