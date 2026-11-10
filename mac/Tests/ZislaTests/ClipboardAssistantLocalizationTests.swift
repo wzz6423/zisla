@@ -182,7 +182,7 @@ struct ClipboardAssistantLocalizationTests {
     @Test @MainActor
     func settingsExampleGroupsFollowTheirRecognitionControls() throws {
         let groups = SettingsView.clipboardAssistantExampleGroups
-        #expect(Set(groups.keys) == [.conversion, .dateTime])
+        #expect(Set(groups.keys) == [.conversion, .dateTime, .appCannotOpen])
         #expect(groups[.conversion]?.map(\.title) == ["单位换算", "金额换算", "汇率换算"])
         #expect(groups[.conversion]?[1].examples == ["1元 = ?角", "0.1角 = ?分", "1dollar = ?cent"])
         #expect(groups[.dateTime]?.map(\.title) == ["日期加减", "日期间隔", "跨时区时间"])

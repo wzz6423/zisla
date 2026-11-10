@@ -23,6 +23,7 @@ public enum ClipboardAssistantKind: String, Codable, CaseIterable, Sendable, Equ
     case shellCommand
     case nonSystemLanguageText = "chineseText"
     case app
+    case appCannotOpen
     case text
     case image
     case file
@@ -48,6 +49,7 @@ public enum ClipboardAssistantKind: String, Codable, CaseIterable, Sendable, Equ
         .shellCommand,
         .nonSystemLanguageText,
         .app,
+        .appCannotOpen,
         .text,
         .image,
         .file,
@@ -74,6 +76,7 @@ public enum ClipboardAssistantKind: String, Codable, CaseIterable, Sendable, Equ
         case .emojiName: "smiley"
         case .nonSystemLanguageText: "character.book.closed"
         case .app: "app"
+        case .appCannotOpen: "app.badge.checkmark"
         case .code: "chevron.left.forwardslash.chevron.right"
         case .shellCommand: "terminal"
         case .text: "text.quote"
@@ -283,6 +286,7 @@ public enum ClipboardAssistantActionKind: String, Codable, CaseIterable, Sendabl
     case runShellCommandInBackground
     case createCalendarEvent
     case openApp
+    case repairAndOpenApp
 
     public var symbolName: String {
         switch self {
@@ -308,6 +312,7 @@ public enum ClipboardAssistantActionKind: String, Codable, CaseIterable, Sendabl
         case .runShellCommandInBackground: "gearshape"
         case .createCalendarEvent: "calendar.badge.plus"
         case .openApp: "arrow.up.forward.app"
+        case .repairAndOpenApp: "app.badge.checkmark"
         }
     }
 }
@@ -333,6 +338,7 @@ public enum ClipboardAssistantActionOrder {
         case .code: [.saveText, .addToQuickNote, .sendToTeleprompter, .share]
         case .shellCommand: [.runShellCommand, .runShellCommandInBackground, .search, .saveText, .addToQuickNote, .sendToTeleprompter, .share]
         case .app: [.openApp, .search, .addToQuickNote, .share]
+        case .appCannotOpen: [.repairAndOpenApp]
         case .text: [.search, .saveText, .translate, .addToQuickNote, .sendToTeleprompter, .share]
         case .image: [.saveImage, .addToQuickNote, .share]
         }
@@ -431,6 +437,7 @@ public enum ClipboardAssistantAction: Equatable, Sendable {
     case createCalendarEvent(title: String, date: Date, isAllDay: Bool)
     case editCalendarEvent(ClipboardCalendarDraft)
     case openApp(bundleIdentifier: String, appName: String)
+    case repairAndOpenApp(URL)
 
     /// Stable identity used by SwiftUI to disambiguate buttons.
     public var identifier: String {
@@ -463,6 +470,7 @@ public enum ClipboardAssistantAction: Equatable, Sendable {
         case .createCalendarEvent: "createCalendarEvent"
         case .editCalendarEvent: "editCalendarEvent"
         case .openApp: "openApp"
+        case .repairAndOpenApp: "repairAndOpenApp"
         }
     }
 
@@ -493,6 +501,7 @@ public enum ClipboardAssistantAction: Equatable, Sendable {
         case .createCalendarEvent: .createCalendarEvent
         case .editCalendarEvent: .createCalendarEvent
         case .openApp: .openApp
+        case .repairAndOpenApp: .repairAndOpenApp
         }
     }
 }
@@ -515,6 +524,7 @@ public enum ClipboardAssistantDetail: Equatable, Sendable {
     case currencyRate(sourceCurrencyCode: String, targetCurrencyCode: String, rate: Double)
     case rgb(red: Double, green: Double, blue: Double, hex: String)
     case path(String)
+    case localizedMessage(String)
 }
 
 public struct ClipboardAssistantMoneyConversion: Equatable, Sendable {

@@ -514,6 +514,7 @@ final class AppModel: ObservableObject {
       if isIslandVisible { dailyBriefing.recordExpansion() }
       if !isIslandVisible { contextNoteEditor.hide() }
       updateSpectrumMonitoring()
+      applicationOpenRepairPresenter.flush()
     }
   }
   @Published var isExternalDragging = false
@@ -814,7 +815,10 @@ final class AppModel: ObservableObject {
 
     voiceInput.isCapturingInputPublisher
       .sink { [weak self] _ in
-        Task { @MainActor [weak self] in self?.updateSpectrumMonitoring() }
+        Task { @MainActor [weak self] in
+          self?.updateSpectrumMonitoring()
+          self?.applicationOpenRepairPresenter.flush()
+        }
       }
       .store(in: &cancellables)
 
@@ -1126,6 +1130,12 @@ final class AppModel: ObservableObject {
     if assistantAccessibilityGranted, settingsStore.settings.clipboardAssistantEnabled {
       applyAssistantMouseGesture()
     }
+    applicationOpenFailureMonitor.setEnabled(
+      settingsStore.settings.clipboardAssistantEnabled
+        && settingsStore.settings.applicationOpenFailureMonitoringEnabled
+        && (settingsStore.settings.clipboardAssistantEnabledKinds.isEmpty
+          || settingsStore.settings.clipboardAssistantEnabledKinds.contains(.appCannotOpen))
+    ) { [weak self] url in self?.applicationOpenRepairPresenter.receive([url], fromSystemAlert: true) }
   }
 
   /// Opens System Settings at the accessibility pane (and fires the system grant prompt).
@@ -1219,6 +1229,9 @@ final class AppModel: ObservableObject {
     detectedLinkTask?.cancel()
     translationTask?.cancel()
     clipboardServiceOpenTask?.cancel()
+    applicationOpenRepairTask?.cancel()
+    applicationOpenRepairPresenter.cancel()
+    applicationOpenFailureMonitor.stop()
     voiceModelDiscoveryTask?.cancel()
     voiceModelDiscoveryTask = nil
     voiceModelDiscoveryGeneration &+= 1
@@ -1833,6 +1846,17 @@ final class AppModel: ObservableObject {
   private var clipboardAssistantDetectionTask: Task<Void, Never>?
   private var currencyConversionTask: Task<Void, Never>?
   private var clipboardServiceOpenTask: Task<Void, Never>?
+  private lazy var applicationOpenRepairPresenter = ApplicationOpenRepairPresenter(
+    controller: clipboardAssistant,
+    settings: { [weak self] in self?.settingsStore.settings ?? .default },
+    canPresent: { [weak self] in self?.canPresentApplicationRepair == true }
+  )
+  private var applicationOpenRepairTask: Task<Void, Never>?
+  private let applicationOpenFailureMonitor = ApplicationOpenFailureMonitor()
+
+  private var canPresentApplicationRepair: Bool {
+    !isIslandVisible && !voiceInput.isRecording && !voiceInput.isPreparing
+  }
 
   private enum ClipboardAssistantPresentationResult {
     case presented
@@ -1994,7 +2018,7 @@ final class AppModel: ObservableObject {
           settings == settingsStore.settings,
           !voiceInput.isRecording, !voiceInput.isPreparing, !isIslandVisible else { return .ignored }
     guard var detection = result else { return .unavailable }
-    detection = augmentedClipboardAssistantDetection(
+    detection = Self.augmentedClipboardAssistantDetection(
       detection,
       content: content,
       sourceApplication: sourceApplication,
@@ -2033,16 +2057,16 @@ final class AppModel: ObservableObject {
     clipboardAssistantContent = nil
   }
 
-  /// Appends the universal actions every detection offers (quick note, sharing, blocking the
-  /// source app) and applies the user-configured action order. Kept in one place so the async
-  /// currency-conversion refresh can rebuild the detection identically.
-  private func augmentedClipboardAssistantDetection(
+  /// Keeps repair as a single explicit action; other detections retain the universal actions
+  /// and saved order when the async currency-conversion refresh rebuilds their presentation.
+  static func augmentedClipboardAssistantDetection(
     _ detection: ClipboardAssistantDetection,
     content: ClipboardHistoryContent,
     sourceApplication: NSRunningApplication?,
     orders: [ClipboardAssistantKind: [ClipboardAssistantActionKind]]
   ) -> ClipboardAssistantDetection {
     var detection = detection
+    if detection.kind == .appCannotOpen { return detection }
     detection.actions.append(.addToQuickNote)
     detection.actions.append(.share)
     if case .text = content,
@@ -2137,7 +2161,7 @@ final class AppModel: ObservableObject {
       )
       return
     }
-    let detection = augmentedClipboardAssistantDetection(
+    let detection = Self.augmentedClipboardAssistantDetection(
       result,
       content: content,
       sourceApplication: sourceApplication,
@@ -2247,6 +2271,20 @@ final class AppModel: ObservableObject {
       }
     case .openApp(let bundleIdentifier, _):
       openInstalledApplication(bundleIdentifier: bundleIdentifier)
+    case .repairAndOpenApp(let url):
+      guard applicationOpenRepairTask == nil else { return }
+      applicationOpenRepairTask = Task { [weak self] in
+        defer { self?.applicationOpenRepairTask = nil }
+        do {
+          try await ApplicationOpenRepairService().repairAndOpen(at: url)
+        } catch is CancellationError {
+          return
+        } catch let error as ApplicationOpenRepairError {
+          self?.transientMessage = self?.clipboardAssistantMessage(error.localizationKey)
+        } catch {
+          self?.transientMessage = self?.clipboardAssistantMessage("无法完成操作")
+        }
+      }
     case .openDownload(let url):
       setDownloadURL(url.absoluteString)
       selectModule(.download)
@@ -2668,9 +2706,12 @@ final class AppModel: ObservableObject {
       transientMessage = AppLocalization.text("已加入 %ld 个项目", count)
     }
     if count > 0 { selectModule(.shelf) }
+    let urls = payloads.compactMap { if case .file(let url) = $0 { url } else { nil } }
+    applicationOpenRepairPresenter.receive(urls)
   }
 
   func receiveShelfDropItems(_ items: [FileShelfDropItem]) {
+    let previousIDs = Set(shelf.items.map(\.id))
     shelf.receive(items) { [weak self] count in
       guard let self else { return }
       if let error = self.shelf.errorDescription {
@@ -2679,6 +2720,9 @@ final class AppModel: ObservableObject {
         self.transientMessage = AppLocalization.text("已加入 %ld 个项目", count)
       }
       if count > 0 { self.selectModule(.shelf) }
+      let directURLs = items.compactMap { if case .content(.file(let url)) = $0 { url } else { nil } }
+      let addedURLs = self.shelf.items.filter { !previousIDs.contains($0.id) && $0.text == nil }.map(\.url)
+      self.applicationOpenRepairPresenter.receive(directURLs + addedURLs)
     }
   }
 
@@ -3319,6 +3363,11 @@ final class AppModel: ObservableObject {
       clipboardAssistant.dismiss()
     }
     applyAssistantMouseGesture()
+    applicationOpenRepairPresenter.flush()
+    applicationOpenFailureMonitor.setEnabled(
+      settings.clipboardAssistantEnabled && settings.applicationOpenFailureMonitoringEnabled
+        && (settings.clipboardAssistantEnabledKinds.isEmpty || settings.clipboardAssistantEnabledKinds.contains(.appCannotOpen))
+    ) { [weak self] url in self?.applicationOpenRepairPresenter.receive([url], fromSystemAlert: true) }
     if !settings.downloaderEnabled, hasActiveDownloads {
       cancelAllDownloads()
     }

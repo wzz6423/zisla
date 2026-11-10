@@ -3354,3 +3354,26 @@
 "保存手写备忘录需要辅助功能权限" = "Cần quyền Trợ năng để lưu ghi chú viết tay";
 "备忘录内容已变化，请重新打开后编辑" = "Ghi chú đã thay đổi. Mở lại trước khi chỉnh sửa";
 "无法保存手写备忘录的文本，请在备忘录中打开后重试" = "Không thể lưu văn bản trong ghi chú viết tay. Mở trong Ghi chú rồi thử lại";
+
+"应用无法打开" = "Không thể mở ứng dụng";
+"解决并打开" = "Khắc phục và mở";
+"使用方法" = "Cách sử dụng";
+"1. 复制无法打开的 .app，或将它拖入中转站；检测到隔离标记时显示提醒。" = "1. Sao chép tệp .app không mở được hoặc kéo vào kệ. Thông báo xuất hiện khi phát hiện dấu cách ly.";
+"2. 确认应用来自可信来源后，点击“解决并打开”，移除隔离标记并尝试打开。" = "2. Xác nhận ứng dụng đến từ nguồn đáng tin cậy, rồi nhấp “Khắc phục và mở” để xóa dấu cách ly và thử mở ứng dụng.";
+"3. 镜像中的应用须先复制到应用程序或下载文件夹；签名损坏或安全评估拒绝时停止处理。" = "3. Trước tiên, sao chép ứng dụng từ ảnh đĩa vào thư mục Ứng dụng hoặc Tải về. Quá trình dừng nếu chữ ký bị hỏng hoặc đánh giá bảo mật từ chối ứng dụng.";
+"请选择完整的本地 .app 应用" = "Chọn gói .app cục bộ đầy đủ";
+"不能处理系统目录中的应用" = "Không thể xử lý ứng dụng trong thư mục hệ thống";
+"请先将应用复制到应用程序或下载文件夹" = "Trước tiên, sao chép ứng dụng vào thư mục Ứng dụng hoặc Tải về";
+"应用包含不支持的链接或特殊文件，请重新下载完整应用" = "Ứng dụng chứa liên kết không được hỗ trợ hoặc tệp đặc biệt. Hãy tải lại bản đầy đủ";
+"应用超出检查范围，无法处理" = "Ứng dụng vượt giới hạn kiểm tra và không thể xử lý";
+"无法读取应用，请检查文件和权限" = "Không thể đọc ứng dụng. Hãy kiểm tra tệp và quyền truy cập";
+"应用在检查后发生变化，请重新复制或拖入" = "Ứng dụng đã thay đổi sau khi kiểm tra. Hãy sao chép hoặc kéo lại";
+"应用签名校验失败，请从开发者处重新下载" = "Xác minh chữ ký ứng dụng thất bại. Hãy tải lại từ nhà phát triển";
+"应用未通过 macOS 安全评估，已停止处理" = "Ứng dụng không vượt qua đánh giá bảo mật của macOS. Quá trình đã dừng";
+"macOS 安全评估暂不可用，请稍后重试" = "Đánh giá bảo mật của macOS tạm thời không khả dụng. Hãy thử lại sau";
+"无法移除隔离标记，请检查写入权限" = "Không thể xóa dấu cách ly. Hãy kiểm tra quyền ghi";
+"系统未接受打开应用的请求" = "Hệ thống không chấp nhận yêu cầu mở ứng dụng";
+
+"系统打不开应用时提醒" = "Thông báo khi macOS không mở được ứng dụng";
+"需要辅助功能权限；通过系统窗口事件提醒，不定时扫描" = "Cần quyền Trợ năng; dùng sự kiện cửa sổ hệ thống mà không quét định kỳ";
+"4. 可开启“系统打不开应用时提醒”；无法确定应用路径时，请复制或拖入 .app。" = "4. Bạn có thể bật “Thông báo khi macOS không mở được ứng dụng”. Nếu không xác định được đường dẫn, hãy sao chép hoặc kéo .app vào Kệ.";

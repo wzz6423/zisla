@@ -3353,3 +3353,26 @@
 "保存手写备忘录需要辅助功能权限" = "Accessibility access is required to save handwritten notes";
 "备忘录内容已变化，请重新打开后编辑" = "The note has changed. Reopen it before editing";
 "无法保存手写备忘录的文本，请在备忘录中打开后重试" = "Could not save text in the handwritten note. Open it in Notes and try again";
+
+"应用无法打开" = "App Cannot Be Opened";
+"解决并打开" = "Fix and Open";
+"使用方法" = "How to Use";
+"1. 复制无法打开的 .app，或将它拖入中转站；检测到隔离标记时显示提醒。" = "1. Copy the .app that cannot be opened, or drag it into the Shelf. A prompt appears when a quarantine flag is detected.";
+"2. 确认应用来自可信来源后，点击“解决并打开”，移除隔离标记并尝试打开。" = "2. Confirm that the app is from a trusted source, then click “Fix and Open” to remove quarantine flags and try opening it.";
+"3. 镜像中的应用须先复制到应用程序或下载文件夹；签名损坏或安全评估拒绝时停止处理。" = "3. First copy apps from disk images to Applications or Downloads. Processing stops if the signature is damaged or the security assessment rejects the app.";
+"请选择完整的本地 .app 应用" = "Select a complete local .app bundle";
+"不能处理系统目录中的应用" = "Apps in system directories cannot be processed";
+"请先将应用复制到应用程序或下载文件夹" = "First copy the app to Applications or Downloads";
+"应用包含不支持的链接或特殊文件，请重新下载完整应用" = "The app contains unsupported links or special files. Download a complete copy again";
+"应用超出检查范围，无法处理" = "The app exceeds the inspection limits and cannot be processed";
+"无法读取应用，请检查文件和权限" = "Cannot read the app. Check its files and permissions";
+"应用在检查后发生变化，请重新复制或拖入" = "The app changed after inspection. Copy or drag it in again";
+"应用签名校验失败，请从开发者处重新下载" = "App signature verification failed. Download it again from the developer";
+"应用未通过 macOS 安全评估，已停止处理" = "The app failed the macOS security assessment. Processing stopped";
+"macOS 安全评估暂不可用，请稍后重试" = "The macOS security assessment is temporarily unavailable. Try again later";
+"无法移除隔离标记，请检查写入权限" = "Cannot remove quarantine flags. Check write permissions";
+"系统未接受打开应用的请求" = "The system did not accept the request to open the app";
+
+"系统打不开应用时提醒" = "Notify When macOS Cannot Open an App";
+"需要辅助功能权限；通过系统窗口事件提醒，不定时扫描" = "Requires Accessibility access; uses system window events without periodic scanning";
+"4. 可开启“系统打不开应用时提醒”；无法确定应用路径时，请复制或拖入 .app。" = "4. You can enable “Notify When macOS Cannot Open an App”. If its path cannot be identified, copy or drag in the .app.";
