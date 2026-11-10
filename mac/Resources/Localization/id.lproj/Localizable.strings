@@ -3354,3 +3354,5 @@
 "保存手写备忘录需要辅助功能权限" = "Akses Aksesibilitas diperlukan untuk menyimpan catatan tulisan tangan";
 "备忘录内容已变化，请重新打开后编辑" = "Catatan telah berubah. Buka kembali sebelum mengedit";
 "无法保存手写备忘录的文本，请在备忘录中打开后重试" = "Teks dalam catatan tulisan tangan tidak dapat disimpan. Buka di Catatan dan coba lagi";
+"全部标记为已读" = "Tandai semua sudah dibaca";
+"已将全部邮件标记为已读" = "Semua pesan telah ditandai sudah dibaca";

@@ -3354,3 +3354,5 @@
 "保存手写备忘录需要辅助功能权限" = "Se necesita permiso de accesibilidad para guardar notas manuscritas";
 "备忘录内容已变化，请重新打开后编辑" = "La nota ha cambiado. Vuelve a abrirla antes de editarla";
 "无法保存手写备忘录的文本，请在备忘录中打开后重试" = "No se pudo guardar el texto de la nota manuscrita. Ábrela en Notas e inténtalo de nuevo";
+"全部标记为已读" = "Marcar todo como leído";
+"已将全部邮件标记为已读" = "Todos los mensajes se han marcado como leídos";

@@ -110,6 +110,10 @@ struct MailModuleView: View {
                 }
                 accountMenu
                 Spacer(minLength: 2)
+                MailMarkAllReadButton(mail: mail, accountName: selectedAccountName) {
+                    let accountName = selectedAccountName
+                    Task { await model.markAllMailRead(accountName: accountName) }
+                }
                 IconButton(symbol: "square.and.pencil", help: AppLocalization.text("发邮件"), size: .compact) {
                     beginNewMessage()
                 }
@@ -431,6 +435,25 @@ struct MailModuleView: View {
         WindowPlacement.prepareModal(alert.window, on: WindowPlacement.screenUnderMouse())
         guard alert.runModal() == .alertFirstButtonReturn else { return }
         Task { await model.deleteMail(message) }
+    }
+}
+
+struct MailMarkAllReadButton: View {
+    @ObservedObject var mail: MailService
+    let accountName: String?
+    let action: () -> Void
+
+    @Environment(\.locale) private var locale
+
+    private var isDisabled: Bool {
+        mail.isLoading || mail.isMutating || !mail.activeAccounts.contains { accountName == nil || $0.id == accountName }
+    }
+
+    var body: some View {
+        IconButton(symbol: "checkmark.circle", help: AppLocalization.string("全部标记为已读", locale: locale), size: .compact, action: action)
+            .disabled(isDisabled)
+            .opacity(isDisabled ? 0.4 : 1)
+            .accessibilityLabel(AppLocalization.string("全部标记为已读", locale: locale))
     }
 }
 

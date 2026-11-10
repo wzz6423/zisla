@@ -236,18 +236,29 @@ public final class MailService: ObservableObject {
         case .success:
             markReadLocally(message)
         case .failed:
-            setReadLocally(message, isRead: message.isRead)
+            setReadLocally([message.id], isRead: message.isRead)
+        }
+        return result
+    }
+
+    public func markAllRead(accountName: String? = nil) async -> MailOperationResult {
+        let accountNames = Set(activeAccounts.filter { accountName == nil || $0.id == accountName }.map(\.id))
+        guard !accountNames.isEmpty else { return .success }
+        let unreadIDs = Set(messages.filter { !$0.isRead && accountNames.contains($0.accountName) }.map(\.id))
+        let result = await perform(Self.markAllReadScript(accountNames: accountNames), refreshOnFailure: true)
+        if result == .success {
+            setReadLocally(unreadIDs, isRead: true)
         }
         return result
     }
 
     public func markReadLocally(_ message: MailMessage) {
-        setReadLocally(message, isRead: true)
+        setReadLocally([message.id], isRead: true)
     }
 
-    private func setReadLocally(_ message: MailMessage, isRead: Bool) {
+    private func setReadLocally(_ messageIDs: Set<String>, isRead: Bool) {
         messages = messages.map { current in
-            guard current.id == message.id, current.isRead != isRead else { return current }
+            guard messageIDs.contains(current.id), current.isRead != isRead else { return current }
             return MailMessage(
                 accountName: current.accountName,
                 messageID: current.messageID,
@@ -444,6 +455,27 @@ public final class MailService: ObservableObject {
         """
     }
 
+    static func markAllReadScript(accountNames: Set<String>) -> String {
+        let names = accountNames.sorted().map(appleScriptString).joined(separator: ", ")
+        return """
+        tell application "Mail"
+            set targetAccountNames to {\(names)}
+            set failureMessage to ""
+            set failureNumber to 0
+            repeat with targetAccountName in targetAccountNames
+                try
+                    set targetAccount to first account whose name is (targetAccountName as text)
+                    set read status of (every message of \(accountInbox("targetAccount")) whose read status is false) to true
+                on error messageText number messageNumber
+                    set failureMessage to messageText
+                    set failureNumber to messageNumber
+                end try
+            end repeat
+            if failureNumber is not 0 then error failureMessage number failureNumber
+        end tell
+        """
+    }
+
     static func markJunkScript(message: MailMessage) -> String {
         """
         tell application "Mail"
@@ -518,7 +550,7 @@ public final class MailService: ObservableObject {
         return "\"\(escaped)\""
     }
 
-    private func perform(_ script: String) async -> MailOperationResult {
+    private func perform(_ script: String, refreshOnFailure: Bool = false) async -> MailOperationResult {
         guard mailRunning() else {
             return .failed(Self.mailUnavailableMessage(isRunning: false) ?? AppLocalization.text("Mail.app 当前未运行"))
         }
@@ -528,6 +560,7 @@ public final class MailService: ObservableObject {
                 await self.refresh(checkForNewMail: false)
                 return .success
             case let .failure(error):
+                if refreshOnFailure { await self.refresh(checkForNewMail: false) }
                 return .failed(Self.message(for: error))
             }
         }

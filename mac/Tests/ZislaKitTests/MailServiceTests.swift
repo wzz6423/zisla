@@ -6,6 +6,286 @@ import Testing
 @testable import ZislaKit
 
 struct MailServiceTests {
+    @Test(arguments: [nil, "work"] as [String?]) @MainActor
+    func markingAllReadIncludesOlderPagesAndRespectsEnabledAccountsAndTheFilter(accountName: String?) async throws {
+        let names = ["work", "personal", "disabled"]
+        var readAccounts: Set<String> = []
+        var mutationSources: [String] = []
+        let service = MailService(
+            commandRunner: { source, expectsSnapshot in
+                if !expectsSnapshot {
+                    mutationSources.append(source)
+                    readAccounts.formUnion(names.filter { source.contains(MailService.appleScriptString($0)) })
+                    return .success(.succeeded)
+                }
+                guard let bounds = mailServiceRequestBounds(source) else {
+                    Issue.record("The inbox script must contain pagination bounds")
+                    return .failure(.failed("Missing pagination bounds"))
+                }
+                let rows = (1...24).map { id in
+                    let name = id.isMultiple(of: 2) ? "personal" : "work"
+                    return MailScriptRow(
+                        accountName: name, messageID: String(id), sender: "sender@example.com",
+                        subject: "Message \(id)", body: "Body \(id)",
+                        receivedAt: Date(timeIntervalSince1970: Double(2_000 - id)),
+                        isRead: readAccounts.contains(name), htmlBody: "<p>Body \(id)</p>"
+                    )
+                }
+                return .success(.snapshot(MailSnapshot(
+                    accounts: names.map { MailScriptAccount(name: $0, emailAddresses: ["\($0)@example.com"]) },
+                    messages: Array(rows.dropFirst(bounds.offset).prefix(bounds.limit)),
+                    hasMore: bounds.offset + bounds.limit < rows.count
+                )))
+            },
+            indexReader: MailIndexReader(databaseURL: URL(fileURLWithPath: "/does/not/exist")),
+            mailRunning: { true }
+        )
+        service.start(accountNames: ["work", "personal"])
+        service.stop()
+        await service.refresh(checkForNewMail: false)
+        #expect(service.messages.count == 10)
+        #expect(service.canLoadMore)
+
+        #expect(await service.markAllRead(accountName: accountName) == .success)
+        #expect(readAccounts == (accountName == nil ? ["work", "personal"] : ["work"]))
+        #expect(mutationSources.count == 1, "Bulk marking must use one queued script rather than one write per loaded message")
+        #expect(mutationSources.allSatisfy { !$0.contains("check for new mail") })
+        await service.loadMore()
+        await service.loadMore()
+
+        #expect(service.messages.count == 24)
+        #expect(!service.canLoadMore)
+        for message in service.messages {
+            #expect(message.isRead == readAccounts.contains(message.accountName), "The filter must also apply beyond the first page")
+            #expect(message.body == "Body \(message.messageID)")
+            #expect(message.htmlBody == "<p>Body \(message.messageID)</p>")
+        }
+        #expect(!service.isMutating)
+    }
+
+    @Test @MainActor
+    func bulkReadWaitsForSuccessAndPreservesNewArrivalsAfterAStaleRefresh() async throws {
+        let started = MailOperationQueueTestGate()
+        let release = MailOperationQueueTestGate()
+        var didWrite = false
+        let service = MailService(
+            commandRunner: { _, expectsSnapshot in
+                if !expectsSnapshot {
+                    await started.signal()
+                    await release.wait()
+                    didWrite = true
+                    return .success(.succeeded)
+                }
+                let snapshot = makeMailServiceSnapshot(account: "work", messageID: 1, hasMore: true)
+                return .success(.snapshot(MailSnapshot(
+                    accounts: snapshot.accounts,
+                    messages: snapshot.messages + (didWrite ? makeMailServiceSnapshot(account: "work", messageID: 2).messages : []),
+                    hasMore: true
+                )))
+            },
+            indexReader: MailIndexReader(databaseURL: URL(fileURLWithPath: "/does/not/exist")),
+            mailRunning: { true }
+        )
+        await service.refresh(checkForNewMail: false)
+        let original = try #require(service.messages.first)
+        let pending = Task { await service.markAllRead() }
+        await started.wait()
+        #expect(service.isMutating)
+        #expect(service.messages == [original], "Unread badges must remain until Mail confirms the write")
+        await release.signal()
+        #expect(await pending.value == .success)
+        #expect(service.messages.first { $0.messageID == 1 }?.isRead == true)
+        #expect(service.messages.first { $0.messageID == 2 }?.isRead == false, "Mail arriving during the operation must retain its server read state")
+        #expect(service.canLoadMore)
+        #expect(!service.isMutating)
+    }
+
+    @Test(arguments: ["Injected inbox failure", "Not authorized to send Apple events (-1743)"]) @MainActor
+    func failedBulkReadRefreshesPartialChangesAndCanBeRetried(failure: String) async {
+        var attempts = 0
+        let service = MailService(
+            commandRunner: { _, expectsSnapshot in
+                if !expectsSnapshot {
+                    attempts += 1
+                    return attempts == 1 ? .failure(.failed(failure)) : .success(.succeeded)
+                }
+                return .success(.snapshot(MailSnapshot(
+                    accounts: ["personal", "work"].map { MailScriptAccount(name: $0, emailAddresses: []) },
+                    messages: ["personal", "work"].map { name in
+                        MailScriptRow(
+                            accountName: name, messageID: "1", sender: "sender@example.com",
+                            subject: "Fixture", body: "Body", receivedAt: .distantPast,
+                            isRead: name == "work" ? attempts > 0 : attempts > 1
+                        )
+                    }
+                )))
+            },
+            indexReader: MailIndexReader(databaseURL: URL(fileURLWithPath: "/does/not/exist")),
+            mailRunning: { true }
+        )
+        await service.refresh(checkForNewMail: false)
+
+        let result = await service.markAllRead()
+
+        if failure.contains("authorized") {
+            #expect(result == .failed(AppLocalization.text("需要授权 zisla 控制 Mail.app\n请打开「系统设置 → 隐私与安全性 → 自动化」，\n在列表中找到并开启 zisla 对 Mail 的访问权限")))
+        } else {
+            #expect(result == .failed(failure))
+        }
+        #expect(service.messages.first { $0.accountName == "work" }?.isRead == true)
+        #expect(service.messages.first { $0.accountName == "personal" }?.isRead == false)
+        #expect(!service.isMutating)
+        #expect(!service.isLoading)
+
+        #expect(await service.markAllRead() == .success)
+        #expect(service.unreadCount == 0)
+        #expect(!service.isMutating)
+    }
+
+    @Test @MainActor
+    func bulkReadDoesNotLaunchMailOrAlterReadFlagsWhenMailIsClosed() async {
+        var isRunning = true
+        var requests = 0
+        let service = MailService(
+            commandRunner: { _, _ in
+                requests += 1
+                return .success(.snapshot(makeMailServiceSnapshot(account: "work", messageID: 1)))
+            },
+            indexReader: MailIndexReader(databaseURL: URL(fileURLWithPath: "/does/not/exist")),
+            mailRunning: { isRunning }
+        )
+        await service.refresh(checkForNewMail: false)
+        let messages = service.messages
+        isRunning = false
+
+        #expect(await service.markAllRead() == .failed(MailService.mailUnavailableMessage(isRunning: false)!))
+        #expect(service.messages == messages)
+        #expect(requests == 1)
+        #expect(!service.isMutating)
+    }
+
+    @Test(arguments: ["disabled", "missing"]) @MainActor
+    func bulkReadCannotWriteToAnAccountOutsideTheEnabledSelection(accountName: String) async {
+        var requests = 0
+        let service = MailService(
+            commandRunner: { _, _ in
+                requests += 1
+                return .success(.snapshot(MailSnapshot(
+                    accounts: ["work", "disabled"].map { MailScriptAccount(name: $0, emailAddresses: []) },
+                    messages: makeMailServiceSnapshot(account: "work", messageID: 1).messages
+                )))
+            },
+            indexReader: MailIndexReader(databaseURL: URL(fileURLWithPath: "/does/not/exist")),
+            mailRunning: { true }
+        )
+        service.start(accountNames: ["work"])
+        service.stop()
+        await service.refresh(checkForNewMail: false)
+        let messages = service.messages
+
+        #expect(await service.markAllRead(accountName: accountName) == .success)
+        #expect(service.messages == messages)
+        #expect(requests == 1, "An empty eligible scope must never fall back to all accounts")
+    }
+
+    @Test @MainActor
+    func bulkReadWithNoAccountsIsANoOp() async {
+        let service = MailService(
+            commandRunner: { _, _ in
+                Issue.record("An empty account list must not invoke Mail automation")
+                return .failure(.failed("Unexpected command"))
+            },
+            indexReader: MailIndexReader(databaseURL: URL(fileURLWithPath: "/does/not/exist")),
+            mailRunning: { true }
+        )
+        #expect(await service.markAllRead() == .success)
+        #expect(service.messages.isEmpty)
+        #expect(!service.isMutating)
+    }
+
+    @Test @MainActor
+    func bulkReadSharesTheQueueWithIndividualMailOperations() async throws {
+        let started = MailOperationQueueTestGate()
+        let release = MailOperationQueueTestGate()
+        var events: [String] = []
+        let service = MailService(
+            commandRunner: { source, expectsSnapshot in
+                if expectsSnapshot {
+                    return .success(.snapshot(makeMailServiceSnapshot(account: "work", messageID: 1)))
+                }
+                if source.contains("set read status of targetMessage") {
+                    events.append("single-start")
+                    await started.signal()
+                    await release.wait()
+                    events.append("single-end")
+                } else {
+                    events.append("bulk")
+                }
+                return .success(.succeeded)
+            },
+            indexReader: MailIndexReader(databaseURL: URL(fileURLWithPath: "/does/not/exist")),
+            mailRunning: { true }
+        )
+        await service.refresh(checkForNewMail: false)
+        let message = try #require(service.messages.first)
+        let first = Task { await service.markRead(message) }
+        await started.wait()
+        let second = Task { await service.markAllRead() }
+        await release.signal()
+
+        #expect(await first.value == .success)
+        #expect(await second.value == .success)
+        #expect(events == ["single-start", "single-end", "bulk"])
+        #expect(!service.isMutating)
+    }
+
+    @Test(arguments: [Set<String>(), ["personal"], ["personal", "work"], ["missing"]], [false, true]) @MainActor
+    func bulkReadScriptContinuesAfterAnUnavailableInboxAndReportsFailure(accountNames: Set<String>, fails: Bool) throws {
+        let source = MailService.markAllReadScript(accountNames: accountNames)
+            .replacingOccurrences(of: "tell application \"Mail\"", with: "")
+            .replacingOccurrences(of: "end tell", with: "")
+            .replacingOccurrences(of: "set targetAccount to first account whose name is (targetAccountName as text)", with: """
+                set targetAccount to targetAccountName as text
+                if targetAccount is not in {"personal", "work"} then error "Account unavailable"
+                """)
+            .replacingOccurrences(of: "set read status of (every message of mailbox \"INBOX\" of targetAccount whose read status is false) to true", with: """
+                if targetAccount is "personal" and \(fails ? "true" : "false") then error "Injected inbox failure" number -1743
+                set end of changedAccounts to targetAccount
+                """)
+        let script = try #require(NSAppleScript(source: """
+            using terms from application "Mail"
+                set changedAccounts to {}
+                set failureCode to 0
+                try
+                    \(source)
+                on error number errorCode
+                    set failureCode to errorCode
+                end try
+                return {changedAccounts, failureCode}
+            end using terms from
+            """))
+        var error: NSDictionary?
+        let result = script.executeAndReturnError(&error)
+        #expect(error == nil, "The local fixture must not execute Mail.app object lookups")
+        let changed = try #require(result.atIndex(1))
+        let names = (1..<(changed.numberOfItems + 1)).compactMap { changed.atIndex($0)?.stringValue }
+        #expect(names == accountNames.sorted().filter { $0 == "work" || ($0 == "personal" && !fails) })
+        let expectedCode = accountNames.contains("missing") ? -2700 : (fails && accountNames.contains("personal") ? -1743 : 0)
+        let failureCode = try #require(result.atIndex(2)?.int32Value)
+        #expect(Int(failureCode) == expectedCode, "The Mail error code must survive partial success for permission failures")
+    }
+
+    @Test(arguments: ["work", "工作邮箱 \"A\" \\ Inbox", "Name\n\" & error \"Injected\" & \""]) @MainActor
+    func bulkReadScriptCompilesAndKeepsAccountNamesAsData(accountName: String) throws {
+        let source = MailService.markAllReadScript(accountNames: [accountName])
+        let script = try #require(NSAppleScript(source: source))
+        var error: NSDictionary?
+        #expect(script.compileAndReturnError(&error))
+        #expect(error == nil)
+        #expect(source.contains("set targetAccountNames to {\(MailService.appleScriptString(accountName))}"))
+        #expect(source.contains("every message of mailbox \"INBOX\" of targetAccount whose read status is false"))
+    }
+
     @Test @MainActor
     func manualRefreshRequestsNewMailInsteadOfOnlyRereadingTheInbox() async {
         let service = MailService(
