@@ -385,6 +385,7 @@ struct SettingsNavigationTests {
         }
     }
 
+    /// Missing or duplicate translations silently fall back, so verify catalogs as well as locale resolution.
     @Test(arguments: AppLanguage.allCases)
     func groupedSettingsAndPDFLabelsUseEveryRequestedLanguage(language: AppLanguage) throws {
         let keys = Set(SettingsSectionGroup.allCases.map(\.title) + [

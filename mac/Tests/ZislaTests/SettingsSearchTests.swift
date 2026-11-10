@@ -63,6 +63,7 @@ struct SettingsSearchTests {
         #expect(!SettingsSearchIndex.items(settings: settings).contains { $0.title == "关怀提醒间隔" })
     }
 
+    /// Ordering must remain discoverable by disabled module names without enabling information features.
     @Test(arguments: AppLanguage.allCases)
     func moduleOrderSearchReachesInformationWhenOtherInfoFeaturesAreOff(language: AppLanguage) {
         let settings = FeatureSettings(

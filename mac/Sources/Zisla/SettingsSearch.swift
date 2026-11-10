@@ -49,6 +49,7 @@ enum SettingsSearchIndex {
         return matches.sorted { matchesExactTitle($0) && !matchesExactTitle($1) }
     }
 
+    /// Ordering keywords use current toolbar modules so legacy aliases do not point to nonexistent entries.
     static func items(settings: FeatureSettings) -> [SettingsSearchItem] {
         var items: [SettingsSearchItem] = []
 

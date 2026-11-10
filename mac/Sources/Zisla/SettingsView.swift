@@ -4601,6 +4601,7 @@ enum SettingsSection: String, CaseIterable, Identifiable {
         }
     }
 
+    /// Information owns toolbar ordering even when every optional information feature is disabled.
     func isVisible(settings: FeatureSettings) -> Bool {
         switch self {
         case .general, .features, .info, .saveLocations, .networkProxy, .permissions:
