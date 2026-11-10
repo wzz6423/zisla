@@ -3370,3 +3370,5 @@
 "高性能" = "Hiệu năng cao";
 
 "请在“功能”中开启“系统状态与清理”及其下的“自动切换电源模式”" = "Trong Tính năng, bật Giám sát Hệ thống và Dọn dẹp rồi bật Tự động chuyển chế độ nguồn ở bên dưới";
+
+"无法保存定时倾倒废纸篓的记录，本次已跳过。" = "Không thể lưu bản ghi dọn sạch Thùng rác tự động. Đã bỏ qua lần này.";

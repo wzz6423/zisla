@@ -7,6 +7,7 @@ import ZislaCore
 struct SystemAutoCleanupLocalizationTests {
     private static let keys = [
         "自动清理系统垃圾", "按所选间隔移入废纸篓；清空废纸篓后将永久删除", "清理范围",
+        "无法保存定时倾倒废纸篓的记录，本次已跳过。",
     ] + SystemCleanupScope.allCases.map(\.menuTitle) + VoiceRecordingCleanupPolicy.allCases.map(\.menuTitle)
 
     @Test(arguments: AppLanguage.allCases)
@@ -52,6 +53,18 @@ struct SystemAutoCleanupLocalizationTests {
         #expect(AppLocalization.string("仅可信", language: .arabic) == "العناصر الموثوقة فقط")
         #expect(AppLocalization.string("全部（包含需人工复核）", language: .traditionalChinese) == "全部（包含需人工複核）")
         #expect(AppLanguage.allCases.filter(\.isRightToLeft) == [.arabic])
+    }
+
+    @Test
+    func reservationFailureExplainsThatScheduledTrashEmptyingWasSkipped() throws {
+        let source = try String(contentsOf: Self.packageRoot.appendingPathComponent("Sources/ZislaKit/SystemAutoCleanupService.swift"), encoding: .utf8)
+        let key = "无法保存定时倾倒废纸篓的记录，本次已跳过。"
+        #expect(source.contains("DesktopOrganizerError.failed(AppLocalization.text(\"\(key)\"))"))
+        #expect(!source.contains("CocoaError(.fileWriteUnknown).localizedDescription"))
+        #expect(AppLocalization.string(key, language: .english)
+            == "Could not save the automatic Trash emptying record. This run was skipped.")
+        #expect(AppLocalization.string(key, language: .traditionalChinese)
+            == "無法儲存定時清空垃圾桶的記錄，本次已略過。")
     }
 
     @Test(arguments: AppLanguage.allCases, [false, true])

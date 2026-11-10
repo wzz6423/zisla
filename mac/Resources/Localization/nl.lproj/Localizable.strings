@@ -3370,3 +3370,5 @@
 "高性能" = "Hoge prestaties";
 
 "请在“功能”中开启“系统状态与清理”及其下的“自动切换电源模式”" = "Schakel bij Functies Systeemmonitor en opschonen in, en daaronder Energiemodi automatisch wisselen";
+
+"无法保存定时倾倒废纸篓的记录，本次已跳过。" = "Het logboek voor automatisch legen van de prullenmand kon niet worden opgeslagen. Deze uitvoering is overgeslagen.";

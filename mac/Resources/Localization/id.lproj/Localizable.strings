@@ -3370,3 +3370,5 @@
 "高性能" = "Performa tinggi";
 
 "请在“功能”中开启“系统状态与清理”及其下的“自动切换电源模式”" = "Di Fitur, aktifkan Monitor Sistem dan Pembersihan serta opsi Ganti mode daya secara otomatis di bawahnya";
+
+"无法保存定时倾倒废纸篓的记录，本次已跳过。" = "Catatan pengosongan Tong Sampah otomatis tidak dapat disimpan. Proses kali ini dilewati.";

@@ -715,7 +715,7 @@ struct SystemAutoCleanupServiceTests {
         let failedTask = try #require(service.trashCleanup.runIfDue())
         let result = try #require(await failedTask.value)
         if case .failure(let error) = result {
-            #expect(error == .failed(CocoaError(.fileWriteUnknown).localizedDescription))
+            #expect(error == .failed(AppLocalization.text("无法保存定时倾倒废纸篓的记录，本次已跳过。")))
             #expect(failures == [error])
         } else { Issue.record("A failed durable reservation must be reported") }
         #expect(emptiedCount == 0, "No irreversible operation is allowed before the reservation reaches storage")

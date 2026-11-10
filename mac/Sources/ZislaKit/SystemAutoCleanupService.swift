@@ -30,7 +30,7 @@ public final class SystemAutoCleanupService {
         trashCleanup = CleanupSchedule(defaults: defaults, now: now,
             lastRunKey: "trash-cleanup-last-run-v1", attemptKey: "trash-cleanup-attempt-v1",
             reservationFailure: {
-                let error = DesktopOrganizerError.failed(CocoaError(.fileWriteUnknown).localizedDescription)
+                let error = DesktopOrganizerError.failed(AppLocalization.text("无法保存定时倾倒废纸篓的记录，本次已跳过。"))
                 onTrashReservationFailure(error)
                 return .failure(error)
             }, timerFactory: timerFactory)

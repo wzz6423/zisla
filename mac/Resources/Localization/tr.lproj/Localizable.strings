@@ -3370,3 +3370,5 @@
 "高性能" = "Yüksek performans";
 
 "请在“功能”中开启“系统状态与清理”及其下的“自动切换电源模式”" = "Özellikler bölümünde Sistem İzleme ve Temizlik seçeneğini ve onun altındaki Güç modlarını otomatik değiştir seçeneğini etkinleştirin";
+
+"无法保存定时倾倒废纸篓的记录，本次已跳过。" = "Çöp Sepetini otomatik boşaltma kaydı kaydedilemedi. Bu işlem atlandı.";

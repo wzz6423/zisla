@@ -3371,3 +3371,5 @@
 "高性能" = "Hohe Leistung";
 
 "请在“功能”中开启“系统状态与清理”及其下的“自动切换电源模式”" = "Aktivieren Sie unter Funktionen die Option Systemmonitor und Bereinigung sowie darunter Energiemodi automatisch wechseln";
+
+"无法保存定时倾倒废纸篓的记录，本次已跳过。" = "Der Eintrag zum automatischen Leeren des Papierkorbs konnte nicht gespeichert werden. Dieser Durchlauf wurde übersprungen.";
