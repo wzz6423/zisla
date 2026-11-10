@@ -4,6 +4,7 @@ import Testing
 
 @testable import ZislaKit
 
+@Suite(.serialized)
 @MainActor
 struct DesktopOrganizerTests {
     @Test
@@ -111,5 +112,171 @@ struct DesktopOrganizerTests {
         if case .failure(let error) = result {
             #expect(error == .failed("Automation permission denied"))
         } else { Issue.record("Automation failure must reach the caller") }
+    }
+
+    @Test(arguments: [false, true].flatMap { warns in
+        [false, true].flatMap { fails in [false, true].map { (warns, fails, $0) } }
+    })
+    func overlappingTrashRequestsRestoreWarningsInSubmissionOrder(
+        initiallyWarns: Bool, firstFails: Bool, cancelFirst: Bool
+    ) async {
+        let firstStarted = TrashOperationTestGate()
+        let releaseFirst = TrashOperationTestGate()
+        let secondSubmitted = TrashOperationTestGate()
+        let secondStarted = TrashOperationTestGate()
+        let releaseSecond = TrashOperationTestGate()
+        let thirdSubmitted = TrashOperationTestGate()
+        let fourthSubmitted = TrashOperationTestGate()
+        var warns = initiallyWarns
+        var events: [String] = []
+        let first = Task { @MainActor in
+            await DesktopOrganizer.emptyTrash(execute: { _ in
+                let saved = warns
+                warns = false
+                events.append("first-start")
+                firstStarted.signal()
+                await releaseFirst.wait()
+                warns = saved
+                events.append("first-end")
+                return firstFails ? .failure(.failed("Injected Finder failure")) : .success(())
+            })
+        }
+        await firstStarted.wait()
+        if cancelFirst { first.cancel() }
+        let second = Task { @MainActor in
+            secondSubmitted.signal()
+            return await DesktopOrganizer.emptyTrash(execute: { _ in
+                events.append("second-start")
+                #expect(warns == initiallyWarns, "A queued operation must see the restored Finder warning")
+                let saved = warns
+                warns = false
+                secondStarted.signal()
+                await releaseSecond.wait()
+                warns = saved
+                events.append("second-end")
+                return .success(())
+            })
+        }
+        await secondSubmitted.wait()
+        let third = Task { @MainActor in
+            thirdSubmitted.signal()
+            return await DesktopOrganizer.emptyTrash(execute: { _ in
+                events.append("third")
+                #expect(warns == initiallyWarns, "A queued request must observe the restored warning")
+                return .success(())
+            })
+        }
+        await thirdSubmitted.wait()
+        #expect(events == ["first-start"], "Cancellation cannot release an operation still running in Finder")
+        #expect(!warns)
+        releaseFirst.signal()
+        await secondStarted.wait()
+        let fourth = Task { @MainActor in
+            fourthSubmitted.signal()
+            return await DesktopOrganizer.emptyTrash(execute: { _ in
+                events.append("fourth")
+                #expect(warns == initiallyWarns, "A new request cannot bypass a resumed queue owner")
+                return .success(())
+            })
+        }
+        await fourthSubmitted.wait()
+        #expect(events == ["first-start", "first-end", "second-start"])
+        releaseSecond.signal()
+        if case .failure(let error) = await first.value {
+            #expect(firstFails)
+            #expect(error == .failed("Injected Finder failure"))
+        } else { #expect(!firstFails) }
+        if case .failure(let error) = await second.value { Issue.record("Queued operation failed: \(error)") }
+        if case .failure(let error) = await third.value { Issue.record("Third operation failed: \(error)") }
+        if case .failure(let error) = await fourth.value { Issue.record("Fourth operation failed: \(error)") }
+        #expect(events == ["first-start", "first-end", "second-start", "second-end", "third", "fourth"])
+        #expect(warns == initiallyWarns)
+    }
+
+    @Test(arguments: [false, true])
+    func cancelledQueuedTrashRequestSkipsFinderAndAllowsTheNextRequest(cancelFirst: Bool) async {
+        let firstStarted = TrashOperationTestGate()
+        let releaseFirst = TrashOperationTestGate()
+        let cancelledSubmitted = TrashOperationTestGate()
+        let lastSubmitted = TrashOperationTestGate()
+        var events: [String] = []
+        let first = Task { @MainActor in
+            await DesktopOrganizer.emptyTrash(execute: { _ in
+                events.append("first-start")
+                firstStarted.signal()
+                await releaseFirst.wait()
+                events.append("first-end")
+                return .success(())
+            })
+        }
+        await firstStarted.wait()
+        if cancelFirst { first.cancel() }
+        let cancelled = Task { @MainActor in
+            cancelledSubmitted.signal()
+            return await DesktopOrganizer.emptyTrash(execute: { _ in
+                events.append("cancelled")
+                return .success(())
+            })
+        }
+        await cancelledSubmitted.wait()
+        cancelled.cancel()
+        let last = Task { @MainActor in
+            lastSubmitted.signal()
+            return await DesktopOrganizer.emptyTrash(execute: { _ in
+                events.append("last")
+                return .success(())
+            })
+        }
+        await lastSubmitted.wait()
+        #expect(events == ["first-start"])
+        releaseFirst.signal()
+        _ = await first.value
+        if case .failure(let error) = await cancelled.value {
+            #expect(error == .failed(CocoaError(.userCancelled).localizedDescription))
+        } else { Issue.record("A cancelled queued request must not report successful deletion") }
+        if case .failure(let error) = await last.value { Issue.record("The next request failed: \(error)") }
+        #expect(events == ["first-start", "first-end", "last"])
+        let next = await DesktopOrganizer.emptyTrash(execute: { _ in
+            events.append("next")
+            return .success(())
+        })
+        if case .failure(let error) = next { Issue.record("Idle queue did not recover: \(error)") }
+        #expect(events.last == "next")
+    }
+
+    @Test
+    func alreadyCancelledTrashRequestNeverExecutesFinder() async {
+        let begin = TrashOperationTestGate()
+        var executed = false
+        let task = Task { @MainActor in
+            await begin.wait()
+            return await DesktopOrganizer.emptyTrash(execute: { _ in
+                executed = true
+                return .success(())
+            })
+        }
+        task.cancel()
+        begin.signal()
+        if case .failure(let error) = await task.value {
+            #expect(error == .failed(CocoaError(.userCancelled).localizedDescription))
+        } else { Issue.record("A cancelled request must not report successful deletion") }
+        #expect(!executed)
+    }
+}
+
+@MainActor
+private final class TrashOperationTestGate {
+    private var signaled = false
+    private var waiter: CheckedContinuation<Void, Never>?
+
+    func wait() async {
+        if signaled { return }
+        await withCheckedContinuation { waiter = $0 }
+    }
+
+    func signal() {
+        signaled = true
+        waiter?.resume()
+        waiter = nil
     }
 }
