@@ -75,6 +75,8 @@ final class ScreenRecordingStudioModel: ObservableObject {
     var hideWindow: (() -> Void)?
     var showWindow: (() -> Void)?
     var commitPendingCanvasText: (() -> Void)?
+    var onExportedFile: ((URL) -> Void)?
+    private var returnsExportsToShelf = false
 
     init(appModel: AppModel? = nil, capture: ScreenRecordingService = ScreenRecordingService(),
          exporter: ScreenRecordingExporter = ScreenRecordingExporter(),
@@ -96,6 +98,7 @@ final class ScreenRecordingStudioModel: ObservableObject {
          aiCompletion: ((ScreenRecordingProject, String, AIModelConfigurationReference?) async throws -> String)? = nil,
          onError: ((String) -> Void)? = nil) {
         self.appModel = appModel
+        self.onExportedFile = { [weak appModel] url in appModel?.addToShelf([url]) }
         self.capture = capture
         self.exporter = exporter
         self.transcriber = transcriber
@@ -369,9 +372,10 @@ final class ScreenRecordingStudioModel: ObservableObject {
         }
     }
 
-    func importMedia(_ urls: [URL]) {
+    @discardableResult
+    func importMedia(_ urls: [URL], returningExportsToShelf: Bool = false) -> Bool {
         commitPendingCanvasText?()
-        guard !urls.isEmpty, !isRecording, !isBusy, !isChoosingFile, !exporter.isExporting else { return }
+        guard !urls.isEmpty, !isRecording, !isBusy, !isChoosingFile, !exporter.isExporting else { return false }
         let original = project
         let originalDirectory = directory
         let store = projectStore
@@ -400,6 +404,10 @@ final class ScreenRecordingStudioModel: ObservableObject {
                     update { $0 = result.project }
                     guard project == result.project else { result.discard(); return }
                 }
+                if returningExportsToShelf { returnsExportsToShelf = true }
+                if let asset = result.project.timeline?.assets.first(where: { result.addedFiles.contains($0.file) }) {
+                    selectMediaAsset(asset.id)
+                }
                 prepared = nil
                 if result.duplicateCount > 0 {
                     notices.enqueue(.init(title: AppLocalization.text("已跳过 %d 个重复素材", result.duplicateCount),
@@ -411,6 +419,7 @@ final class ScreenRecordingStudioModel: ObservableObject {
                 if !(error is CancellationError) { errorMessage = error.localizedDescription }
             }
         }
+        return true
     }
 
     func save() throws {
@@ -496,6 +505,7 @@ final class ScreenRecordingStudioModel: ObservableObject {
                     guard outputNotice != nil else { return }
                     isDirty = false
                     try await exporter.export(project: project, directory: directory, to: url, configuration: configuration)
+                    if returnsExportsToShelf { onExportedFile?(url) }
                     finishOutputNotice()
                 } catch { finishOutputNotice(error: error) }
             }
@@ -1322,6 +1332,7 @@ final class ScreenRecordingStudioModel: ObservableObject {
     func dismissAIEdit() { pendingAIProject = nil; pendingAIBase = nil }
 
     private func clearProject() {
+        returnsExportsToShelf = false
         projectRevision += 1
         if isBusy {
             operationTask?.cancel()

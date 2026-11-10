@@ -61,14 +61,27 @@ struct ShelfItemInteractionTests {
         #expect(fixture.removes == 0)
     }
 
+    @Test(arguments: [CGPoint(x: 33, y: 37), CGPoint(x: 33, y: 66), CGPoint(x: 33, y: 79)])
+    func multiSelectionClicksDoNotOpenTheFileAndPreserveCardSize(point: CGPoint) throws {
+        let fixture = try Fixture(selecting: true)
+        defer { fixture.close() }
+        #expect(fixture.host.bounds.size == CGSize(width: 66, height: 84))
+        try fixture.click(at: point, count: 1)
+        #expect(fixture.selections == 1)
+        #expect(fixture.opens == 0 && fixture.removes == 0)
+        try fixture.click(at: point, count: 2)
+        #expect(fixture.opens == 0)
+    }
+
     @MainActor
     private final class Fixture {
         let panel: NSPanel
         let host: NSHostingView<ShelfItemView>
         var opens = 0
         var removes = 0
+        var selections = 0
 
-        init() throws {
+        init(selecting: Bool = false) throws {
             _ = NSApplication.shared
             panel = NSPanel(
                 contentRect: CGRect(x: -100_000, y: -100_000, width: 66, height: 84),
@@ -84,6 +97,7 @@ struct ShelfItemInteractionTests {
             ))
             host.rootView.onOpen = { [weak self] in self?.opens += 1 }
             host.rootView.onRemove = { [weak self] in self?.removes += 1 }
+            if selecting { host.rootView.onSelect = { [weak self] in self?.selections += 1 } }
             host.sizingOptions = []
             panel.contentView = host
             #expect(NSScreen.screens.allSatisfy { !$0.frame.intersects(panel.frame) })

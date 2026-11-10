@@ -3350,3 +3350,17 @@
 "保存手写备忘录需要辅助功能权限" = "L’accès à l’accessibilité est nécessaire pour enregistrer les notes manuscrites";
 "备忘录内容已变化，请重新打开后编辑" = "La note a changé. Rouvrez-la avant de la modifier";
 "无法保存手写备忘录的文本，请在备忘录中打开后重试" = "Impossible d’enregistrer le texte de la note manuscrite. Ouvrez-la dans Notes et réessayez";
+
+"多选" = "Sélectionner";
+"取消选择" = "Tout désélectionner";
+"操作" = "Actions";
+"已选择 %ld 个项目" = "%ld éléments sélectionnés";
+"选择顺序 %ld" = "Ordre de sélection %ld";
+"识图并发送到随记" = "Reconnaître le texte et envoyer aux notes rapides";
+"在录屏工作室中编辑" = "Modifier dans le studio d’enregistrement";
+"所选项目不支持此操作" = "Les éléments sélectionnés ne prennent pas en charge cette action";
+"文件已失效或无法读取：%@" = "Fichier indisponible ou illisible : %@";
+"无法写入随记，请检查备忘录权限后重试" = "Impossible d’écrire dans les notes rapides. Vérifiez les autorisations de Notes et réessayez";
+"录屏工作室当前不可用，请稍后重试" = "Le studio d’enregistrement est indisponible. Réessayez plus tard";
+"已发送到录屏工作室" = "Envoyé au studio d’enregistrement";
+"已取消操作" = "Action annulée";

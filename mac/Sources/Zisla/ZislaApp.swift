@@ -691,6 +691,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
         configureMainMenu()
         registerScreenshotHotkeys()
         model.onScreenRecordingRequested = { [weak self] in self?.showScreenRecording() }
+        model.onShelfVideosRequested = { [weak self] urls in
+            guard let self else { return false }
+            return recordingStudio().importShelfVideos(urls)
+        }
         registerRecordingHotkeys()
         startSystemScreenshotMonitoring()
         syncAppStatusItem()
@@ -1028,6 +1032,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
         screenRecordingController?.shutdown()
         screenRecordingController = nil
         runningModel.onScreenRecordingRequested = nil
+        runningModel.onShelfVideosRequested = nil
         setScreenshotSessionActive(false)
         screenshotSelectionController?.cancel()
         screenshotEditorController?.close()

@@ -3,6 +3,22 @@ import SwiftUI
 import ZislaCore
 
 @MainActor
+public final class FileShelfContextMenuItem: NSMenuItem {
+    private let handler: () -> Void
+
+    public init(title: String, enabled: Bool = true, handler: @escaping () -> Void) {
+        self.handler = handler
+        super.init(title: AppLocalization.text(title), action: #selector(invoke), keyEquivalent: "")
+        target = self
+        isEnabled = enabled
+    }
+
+    required init(coder: NSCoder) { fatalError("init(coder:) has not been implemented") }
+
+    @objc private func invoke() { handler() }
+}
+
+@MainActor
 public struct FileShelfDragSourceView: NSViewRepresentable {
     public typealias NSViewType = NSView
 
@@ -14,6 +30,9 @@ public struct FileShelfDragSourceView: NSViewRepresentable {
     private var onRemove: () -> Void
     private var onSave: (() -> Void)?
     private var preparePayload: (() -> TransferPasteboardPayload?)?
+    private var preparePayloads: (() -> [TransferPasteboardPayload])?
+    private var onSelect: (() -> Void)?
+    private var makeContextMenu: (() -> NSMenu)?
 
     public init(
         payload: TransferPasteboardPayload,
@@ -23,7 +42,10 @@ public struct FileShelfDragSourceView: NSViewRepresentable {
         onCopy: @escaping () -> Void,
         onRemove: @escaping () -> Void,
         onSave: (() -> Void)? = nil,
-        preparePayload: (() -> TransferPasteboardPayload?)? = nil
+        preparePayload: (() -> TransferPasteboardPayload?)? = nil,
+        preparePayloads: (() -> [TransferPasteboardPayload])? = nil,
+        onSelect: (() -> Void)? = nil,
+        makeContextMenu: (() -> NSMenu)? = nil
     ) {
         self.payload = payload
         self.image = image
@@ -33,6 +55,9 @@ public struct FileShelfDragSourceView: NSViewRepresentable {
         self.onRemove = onRemove
         self.onSave = onSave
         self.preparePayload = preparePayload
+        self.preparePayloads = preparePayloads
+        self.onSelect = onSelect
+        self.makeContextMenu = makeContextMenu
     }
 
     public func makeNSView(context: Context) -> NSView {
@@ -59,6 +84,9 @@ public struct FileShelfDragSourceView: NSViewRepresentable {
         view.onRemove = onRemove
         view.onSave = onSave
         view.preparePayload = preparePayload
+        view.preparePayloads = preparePayloads
+        view.onSelect = onSelect
+        view.makeContextMenu = makeContextMenu
     }
 }
 
@@ -71,6 +99,9 @@ final class FileShelfDraggingView: NSImageView, NSDraggingSource {
     var onRemove: (() -> Void)?
     var onSave: (() -> Void)?
     var preparePayload: (() -> TransferPasteboardPayload?)?
+    var preparePayloads: (() -> [TransferPasteboardPayload])?
+    var onSelect: (() -> Void)?
+    var makeContextMenu: (() -> NSMenu)?
     private var didBeginDragging = false
 
     var ignoresModifierKeys: Bool { true }
@@ -97,26 +128,36 @@ final class FileShelfDraggingView: NSImageView, NSDraggingSource {
     }
 
     override func mouseDragged(with event: NSEvent) {
-        guard !didBeginDragging, let payload else { return }
-        let preparedPayload: TransferPasteboardPayload
-        if let preparePayload {
-            guard let value = preparePayload() else { return }
-            preparedPayload = value
-        } else { preparedPayload = payload }
+        guard !didBeginDragging else { return }
+        let items = draggingItems()
+        guard !items.isEmpty else { return }
         didBeginDragging = true
+        beginDraggingSession(with: items, event: event, source: self)
+    }
 
-        let draggingItem = NSDraggingItem(pasteboardWriter: FileShelfPasteboard.pasteboardWriter(for: preparedPayload))
-        draggingItem.setDraggingFrame(bounds, contents: image)
-        beginDraggingSession(with: [draggingItem], event: event, source: self)
+    func draggingItems() -> [NSDraggingItem] {
+        let payloads: [TransferPasteboardPayload]
+        if let preparePayloads { payloads = preparePayloads() }
+        else if let preparePayload {
+            guard let value = preparePayload() else { return [] }
+            payloads = [value]
+        } else { payloads = payload.map { [$0] } ?? [] }
+        return payloads.map { payload in
+            let item = NSDraggingItem(pasteboardWriter: FileShelfPasteboard.pasteboardWriter(for: payload))
+            item.setDraggingFrame(bounds, contents: image)
+            return item
+        }
     }
 
     override func mouseUp(with event: NSEvent) {
-        if !didBeginDragging, event.clickCount == 2 {
-            onOpen?()
+        if !didBeginDragging {
+            if let onSelect { if event.clickCount == 1 { onSelect() } }
+            else if event.clickCount == 2 { onOpen?() }
         }
     }
 
     override func menu(for event: NSEvent) -> NSMenu? {
+        if let makeContextMenu { return makeContextMenu() }
         guard payload != nil else { return nil }
 
         let menu = NSMenu()

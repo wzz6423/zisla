@@ -3354,3 +3354,17 @@
 "保存手写备忘录需要辅助功能权限" = "Cần quyền Trợ năng để lưu ghi chú viết tay";
 "备忘录内容已变化，请重新打开后编辑" = "Ghi chú đã thay đổi. Mở lại trước khi chỉnh sửa";
 "无法保存手写备忘录的文本，请在备忘录中打开后重试" = "Không thể lưu văn bản trong ghi chú viết tay. Mở trong Ghi chú rồi thử lại";
+
+"多选" = "Chọn nhiều";
+"取消选择" = "Bỏ chọn tất cả";
+"操作" = "Thao tác";
+"已选择 %ld 个项目" = "Đã chọn %ld mục";
+"选择顺序 %ld" = "Thứ tự chọn %ld";
+"识图并发送到随记" = "Nhận dạng văn bản và gửi đến ghi chú nhanh";
+"在录屏工作室中编辑" = "Chỉnh sửa trong phòng thu màn hình";
+"所选项目不支持此操作" = "Các mục đã chọn không hỗ trợ thao tác này";
+"文件已失效或无法读取：%@" = "Tệp không khả dụng hoặc không đọc được: %@";
+"无法写入随记，请检查备忘录权限后重试" = "Không thể ghi vào ghi chú nhanh. Hãy kiểm tra quyền của ứng dụng Ghi chú rồi thử lại";
+"录屏工作室当前不可用，请稍后重试" = "Phòng thu màn hình hiện không khả dụng. Hãy thử lại sau";
+"已发送到录屏工作室" = "Đã gửi đến phòng thu màn hình";
+"已取消操作" = "Đã hủy thao tác";

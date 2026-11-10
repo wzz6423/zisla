@@ -14,6 +14,89 @@ import ZislaCore
 struct ScreenRecordingOperationTests {
     enum Action: CaseIterable { case save, copy, export }
 
+    @Test func shelfVideoImportPreservesExistingTimelineAndReturnsOnlySuccessfulExports() async throws {
+        let fixture = try Fixture()
+        defer { fixture.close() }
+        try await fixture.createVideo()
+        let input = fixture.directory.appendingPathComponent("screen.mp4")
+        let source = try Data(contentsOf: input)
+        let selected = fixture.root.appendingPathComponent("selected.mp4")
+        try await fixture.createVideo(at: selected, color: .blue)
+        let before = try #require(fixture.model.project)
+        var outputs: [URL] = []
+        fixture.model.onExportedFile = { outputs.append($0) }
+        #expect(fixture.model.importMedia([selected], returningExportsToShelf: true))
+        await fixture.model.operationTask?.value
+        let imported = try #require(fixture.model.project)
+        #expect(imported.id == before.id)
+        #expect(RecordingMultitrackTimeline.migrating(imported).clips.count == before.edits.segments.count)
+        #expect(fixture.model.directory == fixture.directory)
+        let asset = try #require(imported.timeline?.assets.last)
+        #expect(fixture.model.selectedMediaAssetID == asset.id)
+        #expect(fixture.model.addAssetToTimeline(asset.id) != nil)
+        #expect(outputs.isEmpty)
+        fixture.model.exportConfiguration = .init(format: .gif, resolution: .source, frameRate: 10)
+        try fixture.perform(.export)
+        await fixture.model.operationTask?.value
+        #expect(outputs == [fixture.destination])
+        #expect(FileManager.default.fileExists(atPath: try #require(outputs.first).path))
+        #expect(try Data(contentsOf: input) == source)
+        #expect(fixture.hideCount == 0)
+    }
+
+    @Test func failedShelfImportAndOrdinaryExportDoNotEnableResultReturn() async throws {
+        let fixture = try Fixture()
+        defer { fixture.close() }
+        try await fixture.createVideo()
+        let before = fixture.model.project
+        let files = try FileManager.default.contentsOfDirectory(atPath: fixture.directory.path).sorted()
+        var outputs: [URL] = []
+        fixture.model.onExportedFile = { outputs.append($0) }
+        #expect(fixture.model.importMedia([fixture.root.appendingPathComponent("missing.mp4")], returningExportsToShelf: true))
+        await fixture.model.operationTask?.value
+        #expect(fixture.model.project == before)
+        #expect(try FileManager.default.contentsOfDirectory(atPath: fixture.directory.path).sorted() == files)
+        #expect(fixture.model.errorMessage != nil)
+        #expect(!fixture.model.importMedia([], returningExportsToShelf: true))
+        fixture.model.exportConfiguration = .init(format: .gif, resolution: .source, frameRate: 10)
+        try fixture.perform(.export)
+        await fixture.model.operationTask?.value
+        #expect(outputs.isEmpty)
+        #expect(FileManager.default.fileExists(atPath: fixture.destination.path))
+    }
+
+    @Test func cancelledVideoImportDoesNotChangeProjectOrLeaveImportedCopies() async throws {
+        let fixture = try Fixture()
+        defer { fixture.close() }
+        try await fixture.createVideo()
+        let before = fixture.model.project
+        let files = try FileManager.default.contentsOfDirectory(atPath: fixture.directory.path).sorted()
+        #expect(fixture.model.importMedia([fixture.directory.appendingPathComponent("screen.mp4")], returningExportsToShelf: true))
+        #expect(!fixture.model.importMedia([fixture.directory.appendingPathComponent("screen.mp4")], returningExportsToShelf: true))
+        fixture.model.cancelOperation()
+        await fixture.model.operationTask?.value
+        #expect(fixture.model.project == before)
+        #expect(try FileManager.default.contentsOfDirectory(atPath: fixture.directory.path).sorted() == files)
+        #expect(!fixture.model.isBusy)
+    }
+
+    @Test func openingAnotherProjectClearsTheShelfExportDestination() async throws {
+        let fixture = try Fixture()
+        defer { fixture.close() }
+        try await fixture.createVideo()
+        let normalProject = try #require(fixture.model.project)
+        #expect(fixture.model.importMedia([fixture.directory.appendingPathComponent("screen.mp4")], returningExportsToShelf: true))
+        await fixture.model.operationTask?.value
+        var outputs: [URL] = []
+        fixture.model.onExportedFile = { outputs.append($0) }
+        fixture.model.install(normalProject, directory: fixture.directory)
+        fixture.model.exportConfiguration = .init(format: .gif, resolution: .source, frameRate: 10)
+        try fixture.perform(.export)
+        await fixture.model.operationTask?.value
+        #expect(outputs.isEmpty)
+        #expect(FileManager.default.fileExists(atPath: fixture.destination.path))
+    }
+
     @Test func savingPublishesBusyStateBeforeReturningToTheRunLoop() async throws {
         let fixture = try Fixture()
         defer { fixture.close() }
@@ -236,6 +319,10 @@ struct ScreenRecordingOperationTests {
         let fixture = try Fixture(exporter: exporter)
         defer { gate.resume(); fixture.close() }
         try await fixture.createVideo()
+        #expect(fixture.model.importMedia([fixture.directory.appendingPathComponent("screen.mp4")], returningExportsToShelf: true))
+        await fixture.model.operationTask?.value
+        var returned: [URL] = []
+        fixture.model.onExportedFile = { returned.append($0) }
         fixture.model.exportConfiguration = .init(format: .gif, resolution: .source, frameRate: 10)
         let original = Data("existing export".utf8)
         try original.write(to: fixture.destination)
@@ -244,6 +331,8 @@ struct ScreenRecordingOperationTests {
         if cancel { fixture.model.cancelOperation() }
         gate.resume()
         await fixture.model.operationTask?.value
+
+        #expect(returned.isEmpty, "Failed or cancelled exports must never return a stale file to the shelf")
 
         #expect(try Data(contentsOf: fixture.destination) == original)
         #expect(try FileManager.default.contentsOfDirectory(atPath: fixture.root.path)
@@ -473,9 +562,9 @@ struct ScreenRecordingOperationTests {
 
         func close() { model.shutdown(); notices.removeAll(); try? FileManager.default.removeItem(at: root) }
 
-        func createVideo() async throws {
-            let url = directory.appendingPathComponent("screen.mp4")
-            try FileManager.default.removeItem(at: url)
+        func createVideo(at destination: URL? = nil, color: CIColor = .red) async throws {
+            let url = destination ?? directory.appendingPathComponent("screen.mp4")
+            if FileManager.default.fileExists(atPath: url.path) { try FileManager.default.removeItem(at: url) }
             let writer = try AVAssetWriter(outputURL: url, fileType: .mp4)
             let input = AVAssetWriterInput(mediaType: .video, outputSettings: [
                 AVVideoCodecKey: AVVideoCodecType.h264, AVVideoWidthKey: 16, AVVideoHeightKey: 16,
@@ -492,7 +581,7 @@ struct ScreenRecordingOperationTests {
                 while !input.isReadyForMoreMediaData { await Task.yield() }
                 var buffer: CVPixelBuffer?
                 #expect(CVPixelBufferPoolCreatePixelBuffer(nil, try #require(adaptor.pixelBufferPool), &buffer) == kCVReturnSuccess)
-                context.render(CIImage(color: .red).cropped(to: CGRect(x: 0, y: 0, width: 16, height: 16)),
+                context.render(CIImage(color: color).cropped(to: CGRect(x: 0, y: 0, width: 16, height: 16)),
                                to: try #require(buffer))
                 #expect(adaptor.append(try #require(buffer), withPresentationTime: CMTime(value: Int64(frame), timescale: 6)))
             }

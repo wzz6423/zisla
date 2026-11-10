@@ -537,6 +537,7 @@ final class AppModel: ObservableObject {
   let applicationVolumes = ApplicationVolumeMixerService()
   let calendar = CalendarService()
   let shelf = FileShelfStore()
+  lazy var shelfContextActions = ShelfContextActions(shelf: shelf)
   @Published var selectedShelfCategory: FileShelfCategory = .all
   let contextNoteEditor = ContextNoteShelfEditor()
   var onBeginContextNote: (() -> Void)?
@@ -598,6 +599,7 @@ final class AppModel: ObservableObject {
   /// recording-start cleanup can reorder windows.
   var onVoiceInputWillStart: (() -> Void)?
   var onScreenRecordingRequested: (() -> Void)?
+  var onShelfVideosRequested: (([URL]) -> Bool)?
 
   /// Model discovery state: used by the settings page to show connection test results and the available model list.
   @Published var voiceModelDiscoveryState: VoiceModelDiscoveryState = .idle
@@ -1226,6 +1228,7 @@ final class AppModel: ObservableObject {
     voiceInputTargetProcessIdentifier = nil
     voiceInputTargetMouseLocation = nil
     voiceInput.cancel()
+    shelfContextActions.cancel()
     backgroundSounds.cancelAllDownloads()
     backgroundSounds.stopLifecycleMonitoring()
     backgroundSounds.stop()
@@ -1755,6 +1758,28 @@ final class AppModel: ObservableObject {
     } catch {
       transientMessage = error.localizedDescription
       return []
+    }
+  }
+
+  func performShelfContextAction(_ action: ShelfContextAction, items: [FileShelfItem]) {
+    let task = shelfContextActions.perform(action, items: items, createQuickNote: { [weak self] text in
+      guard let self else { return false }
+      let created = await quickNotes.create(markdown: text)
+      if created { selectModule(.quickNotes) }
+      return created
+    }, openStudio: { [weak self] urls in self?.onShelfVideosRequested?(urls) ?? false })
+    guard let task else {
+      transientMessage = shelfContextActions.message
+      return
+    }
+    Task { [weak self] in
+      await task.value
+      guard let self else { return }
+      transientMessage = shelfContextActions.message
+      if shelfContextActions.generatedItemID != nil {
+        selectedShelfCategory = .all
+        selectModule(.shelf)
+      }
     }
   }
 

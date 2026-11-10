@@ -3355,3 +3355,17 @@
 "保存手写备忘录需要辅助功能权限" = "Zum Speichern handschriftlicher Notizen ist der Zugriff auf Bedienungshilfen erforderlich";
 "备忘录内容已变化，请重新打开后编辑" = "Die Notiz wurde geändert. Öffne sie vor dem Bearbeiten erneut";
 "无法保存手写备忘录的文本，请在备忘录中打开后重试" = "Der Text der handschriftlichen Notiz konnte nicht gespeichert werden. Öffne sie in Notizen und versuche es erneut";
+
+"多选" = "Auswählen";
+"取消选择" = "Auswahl aufheben";
+"操作" = "Aktionen";
+"已选择 %ld 个项目" = "%ld Elemente ausgewählt";
+"选择顺序 %ld" = "Auswahlreihenfolge %ld";
+"识图并发送到随记" = "Text erkennen und an Schnellnotizen senden";
+"在录屏工作室中编辑" = "Im Aufnahmestudio bearbeiten";
+"所选项目不支持此操作" = "Die ausgewählten Elemente unterstützen diese Aktion nicht";
+"文件已失效或无法读取：%@" = "Datei nicht verfügbar oder nicht lesbar: %@";
+"无法写入随记，请检查备忘录权限后重试" = "Schnellnotiz konnte nicht erstellt werden. Prüfe die Berechtigungen für Notizen und versuche es erneut";
+"录屏工作室当前不可用，请稍后重试" = "Das Aufnahmestudio ist derzeit nicht verfügbar. Versuche es später erneut";
+"已发送到录屏工作室" = "An das Aufnahmestudio gesendet";
+"已取消操作" = "Aktion abgebrochen";

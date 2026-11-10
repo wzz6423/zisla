@@ -3354,3 +3354,17 @@
 "保存手写备忘录需要辅助功能权限" = "Akses Aksesibilitas diperlukan untuk menyimpan catatan tulisan tangan";
 "备忘录内容已变化，请重新打开后编辑" = "Catatan telah berubah. Buka kembali sebelum mengedit";
 "无法保存手写备忘录的文本，请在备忘录中打开后重试" = "Teks dalam catatan tulisan tangan tidak dapat disimpan. Buka di Catatan dan coba lagi";
+
+"多选" = "Pilih";
+"取消选择" = "Batalkan pilihan";
+"操作" = "Tindakan";
+"已选择 %ld 个项目" = "%ld item dipilih";
+"选择顺序 %ld" = "Urutan pilihan %ld";
+"识图并发送到随记" = "Kenali teks dan kirim ke catatan cepat";
+"在录屏工作室中编辑" = "Edit di studio perekaman";
+"所选项目不支持此操作" = "Item yang dipilih tidak mendukung tindakan ini";
+"文件已失效或无法读取：%@" = "File tidak tersedia atau tidak dapat dibaca: %@";
+"无法写入随记，请检查备忘录权限后重试" = "Tidak dapat menulis ke catatan cepat. Periksa izin aplikasi Catatan dan coba lagi";
+"录屏工作室当前不可用，请稍后重试" = "Studio perekaman sedang tidak tersedia. Coba lagi nanti";
+"已发送到录屏工作室" = "Dikirim ke studio perekaman";
+"已取消操作" = "Tindakan dibatalkan";
