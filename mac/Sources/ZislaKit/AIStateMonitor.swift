@@ -228,6 +228,7 @@ public final class AIStateMonitor: ObservableObject {
         ]
     }
 
+    /// Establishes one watcher lifecycle; persisted tasks load before their first activity-detector refresh.
     public func start() {
         guard source == nil else { return }
         stop()
@@ -300,6 +301,7 @@ public final class AIStateMonitor: ObservableObject {
         accountBalanceObservers.forEach { accountBalanceNotificationCenter.removeObserver($0) }
     }
 
+    /// Invalidates pending refresh generations before releasing observers, watchers, and timers.
     public func stop() {
         cancelAccountBalanceRefresh()
         accountBalanceObservers.forEach { accountBalanceNotificationCenter.removeObserver($0) }
@@ -407,6 +409,7 @@ public final class AIStateMonitor: ObservableObject {
         )
     }
 
+    /// Invalidates old provider/region work and removes stale selection immediately, before the next query completes.
     public func configureAccountBalanceProviders(_ providers: Set<AIProvider>, qoderRegion: AIAccountBalanceQoderRegion = .global) {
         guard accountBalanceProviders != providers || accountBalanceQoderRegion != qoderRegion else { return }
         let regionChanged = accountBalanceQoderRegion != qoderRegion
@@ -423,12 +426,14 @@ public final class AIStateMonitor: ObservableObject {
         scheduleAccountBalanceRefresh()
     }
 
+    /// Bypasses quota throttling after a saved credential change while preserving the running/awake boundary.
     public func refreshAccountBalancesAfterCredentialChange() {
         cancelAccountBalanceRefresh()
         lastAccountBalanceRefreshAt = .distantPast
         scheduleAccountBalanceRefresh()
     }
 
+    /// Advances the publication generation as cancellation alone cannot prevent a late detector completion.
     private func cancelAccountBalanceRefresh() {
         accountBalanceGeneration &+= 1
         accountBalanceTask?.cancel()
@@ -436,6 +441,7 @@ public final class AIStateMonitor: ObservableObject {
         isRefreshingAccountBalances = false
     }
 
+    /// Suspends quota reads during sleep and forces a fresh generation on wake without retaining the monitor.
     private func observeAccountBalanceLifecycle() {
         guard accountBalanceDetector != nil else { return }
         for (name, suspended) in [(NSWorkspace.willSleepNotification, true), (NSWorkspace.didWakeNotification, false)] {
@@ -454,6 +460,8 @@ public final class AIStateMonitor: ObservableObject {
         }
     }
 
+    /// Queries only while running, awake, selected, and past the throttle, with one quota task in flight.
+    /// Cancellation reaches detached work; only the captured configuration generation may publish ephemeral balances.
     private func scheduleAccountBalanceRefresh() {
         guard source != nil, !accountBalanceSuspended, !accountBalanceProviders.isEmpty,
               let detector = accountBalanceDetector, accountBalanceTask == nil,

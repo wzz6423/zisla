@@ -61,6 +61,7 @@ struct AIProgressModuleViewTests {
         }
     }
 
+    /// Native scroll geometry proves bounded upper columns and outer access to quota without mutating state or showing a window.
     @Test(arguments: [(CGFloat(560), 12, true), (CGFloat(752), 12, true), (CGFloat(980), 12, true),
         (CGFloat(752), 12, false), (CGFloat(752), 0, false)],
         [AppLanguage.simplifiedChinese, .english, .arabic])

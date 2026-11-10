@@ -6,6 +6,7 @@ import Testing
 struct AIAccountBalanceParserTests {
     let now = Date(timeIntervalSince1970: 1_910_000_000)
 
+    /// Provider fixtures assert actual percentages, units, durations, and zero allowance rather than mere parse success.
     @Test func publishedWindowsPercentagesAmountsAndZeroRemainDistinct() throws {
         let fixtures: [(AIProvider, String, [Double])] = [
             (.claude, #"{"five_hour":{"utilization":90},"seven_day":{"utilization":30}}"#, [10, 70]),
@@ -29,12 +30,14 @@ struct AIAccountBalanceParserTests {
         }
     }
 
+    /// Aggregate ratio pools must not gain another alert window from their monthly consumption breakdown.
     @Test func kimiRatioPoolsDoNotCountMonthlyCodeBreakdownAsIndependentQuota() throws {
         let windows = try parse(#"{"usages":{"limit_5h":{"used_ratio":0.9},"limit_7d":{"used_ratio":0.2},"limit_month_total":{"used_ratio":0.3},"limit_month_code":{"used_ratio":0.1}}}"#, .kimi)
         #expect(windows.map(\.remainingPercent) == [10, 80, 70])
         #expect(windows.first?.durationSeconds == 18_000)
     }
 
+    /// Feature-only quota remains valid, but its real duration and name must not occupy the canonical 5h summary slot.
     @Test func codexNamedFeaturesKeepIndependentRealDurationsAndWorkWithoutPrimaryQuota() throws {
         let response = #"{"rate_limit":null,"additional_rate_limits":[{"metered_feature":"spark","limit_name":"Codex Spark","rate_limit":{"primary_window":{"used_percent":90,"limit_window_seconds":18000},"secondary_window":{"used_percent":30,"limit_window_seconds":604800}}},{"metered_feature":"review","limit_name":"Review","rate_limit":{"primary_window":{"used_percent":50,"limit_window_seconds":3600}}},{"metered_feature":"empty","limit_name":"Empty","rate_limit":null}]}"#
         let windows = try parse(response, .codex)
@@ -48,6 +51,7 @@ struct AIAccountBalanceParserTests {
         #expect(!balance.compactLines(language: .simplifiedChinese).joined().contains("Review · 5h"))
     }
 
+    /// Ambiguous feature IDs, incomplete windows, and excessive entry counts must invalidate the whole response.
     @Test func codexAdditionalInvalidDuplicateMissingAndOverBudgetInputsFailClosed() throws {
         let rows = [#"{"metered_feature":"spark","limit_name":"Spark","rate_limit":{"primary_window":{"used_percent":"NaN","limit_window_seconds":18000}}}"#,
             #"{"limit_name":"Spark","rate_limit":{"primary_window":{"used_percent":1}}}"#,
@@ -63,6 +67,7 @@ struct AIAccountBalanceParserTests {
         #expect(throws: AIAccountBalanceError.noQuota) { try parse(#"{"additional_rate_limits":[]}"#, .codex) }
     }
 
+    /// Spend control is a credit allowance; a cap without usage cannot manufacture a healthy or exhausted reading.
     @Test func codexSpendControlUsesCreditsAndNeverFabricatesAbsentUsage() throws {
         let windows = try parse(#"{"spend_control":{"individual_limit":{"limit":100,"used":90,"reset_at":1910001000}}}"#, .codex)
         #expect(windows.first?.remaining == 10 && windows.first?.remainingPercent == 10 && windows.first?.unit == .credits)
@@ -71,6 +76,7 @@ struct AIAccountBalanceParserTests {
         #expect(throws: AIAccountBalanceError.invalidResponse) { try parse(#"{"spend_control":{"individual_limit":{"limit":100}}}"#, .codex) }
     }
 
+    /// Current snapshots outrank legacy counts, while 0/0 placeholders and invalid date-only resets cannot alert.
     @Test func copilotCurrentAndLegacyQuotasRejectPlaceholdersAndKeepResetDate() throws {
         let windows = try parse(#"{"quota_snapshots":{"premium_interactions":{"entitlement":100,"remaining":10,"percent_remaining":10},"chat":{"entitlement":0,"remaining":0}},"monthly_quotas":{"chat":50,"completions":200},"limited_user_quotas":{"chat":25,"completions":100},"quota_reset_date":"2030-08-01"}"#, .copilot)
         #expect(windows.map(\.id) == ["premium_interactions", "chat"])
@@ -82,6 +88,7 @@ struct AIAccountBalanceParserTests {
         #expect(throws: AIAccountBalanceError.invalidResponse) { try AIAccountBalanceParser.date("2030-02-30", acceptsDateOnly: true) }
     }
 
+    /// Website schemas must preserve credits versus cents, ignore absent Zed budgets, and reject partial totals.
     @Test func websiteQoderTraeAndZedBudgetsUseActualUnitsAndPartialRowsFail() throws {
         let qoder = try parse(#"{"data":{"totalQuota":{"quotaSummary":{"limitValue":100,"usedValue":90,"remainingValue":10}},"sharedQuota":{"quotaSummary":{"limitValue":100,"usedValue":20,"remainingValue":80}}}}"#, .coder)
         #expect(qoder.first?.remaining == 90 && qoder.first?.remainingPercent == 45 && qoder.first?.unit == .credits)
@@ -99,6 +106,7 @@ struct AIAccountBalanceParserTests {
         }
     }
 
+    /// Malformed or absent provider fields must fail instead of publishing a plausible zero-valued quota.
     @Test func malformedUnknownPartialAndMissingQuotasNeverBecomeZero() throws {
         let fixtures: [(AIProvider, String)] = [(.claude, #"{"five_hour":{"utilization":true}}"#),
             (.codex, #"{"rate_limit":{"primary_window":{"used_percent":101}}}"#),
@@ -115,6 +123,7 @@ struct AIAccountBalanceParserTests {
         }
     }
 
+    /// Exact-zero credits and explicit unlimited allowance remain distinct even without a percentage denominator.
     @Test func unlimitedAndBudgetWithoutPercentageDoNotFabricatePercentages() throws {
         let credits = try parse(#"{"credits":{"unlimited":false,"has_credits":true,"balance":"0"}}"#, .codex)
         #expect(credits.first?.remaining == 0 && credits.first?.remainingPercent == nil)
@@ -125,6 +134,7 @@ struct AIAccountBalanceParserTests {
         #expect(unlimited.first?.unlimited == true && unlimited.first?.severity == .normal)
     }
 
+    /// A unified account requires current-window observations even when legacy fields contain a tempting zero usage.
     @Test func unifiedCursorUsesPublishedCurrentWindowsInsteadOfStaleLegacyZero() throws {
         let root: [String: Any] = ["membershipType": "unified_pro", "limitType": "user",
             "individualUsage": ["plan": ["used": 0, "limit": 2000]]]
@@ -137,6 +147,7 @@ struct AIAccountBalanceParserTests {
         #expect(!windows.contains { $0.id == "plan" })
     }
 
+    /// A seeded bounded corpus makes JSON/frame rejection reproducible without unbounded random work or network input.
     @Test func boundedMalformedJSONAndGrokFramesFailClosedWithDeterministicCorpus() throws {
         var seed: UInt64 = 0x6a73756c61
         for _ in 0..<128 {
@@ -152,6 +163,7 @@ struct AIAccountBalanceParserTests {
         }
     }
 
+    /// Only the known descriptor path or a confirmed active protobuf default can become a remaining percentage.
     @Test func grokAcceptsOnlyDescriptorPercentageAndActiveImplicitZero() throws {
         let published = grpc(message(1, Data([13]) + floatBytes(90)))
         let windows = try AIAccountBalanceParser.parse(published, provider: .grok, now: now)
@@ -173,6 +185,7 @@ struct AIAccountBalanceParserTests {
         try AIAccountBalanceParser.parse(Data(text.utf8), provider: provider, now: now)
     }
     private func floatBytes(_ value: Float) -> Data { var bits = value.bitPattern.littleEndian; return withUnsafeBytes(of: &bits) { Data($0) } }
+    /// Emits protocol-width varints so frame fixtures exercise the production descriptor and length boundaries.
     private func varint(_ value: UInt64) -> Data {
         var value = value, bytes: [UInt8] = []
         repeat { var byte = UInt8(value & 0x7f); value >>= 7; if value > 0 { byte |= 0x80 }; bytes.append(byte) } while value > 0

@@ -4,6 +4,7 @@ import Testing
 @testable import ZislaKit
 
 struct AIAccountBalanceCookieStoreTests {
+    /// Region isolation and private database permissions must survive deleting one website credential.
     @Test func storesRegionsSeparatelyInPrivateDatabaseAndClearsOnlyChosenCookie() throws {
         let directory = FileManager.default.temporaryDirectory.appendingPathComponent("zisla-balance-cookie-\(UUID())")
         defer { try? FileManager.default.removeItem(at: directory) }
@@ -23,6 +24,7 @@ struct AIAccountBalanceCookieStoreTests {
         #expect((try FileManager.default.attributesOfItem(atPath: directory.path)[.posixPermissions] as? NSNumber)?.intValue == 0o700)
     }
 
+    /// Validation failures must preserve stored values, while unrelated browser cookies never enter Zed authentication.
     @Test func invalidCookiesHaveNoSideEffectsAndZedForwardsOnlyKnownSessionCookies() throws {
         let secrets = BalanceMemorySecrets()
         let store = AIAccountBalanceCookieStore(secrets: secrets)
@@ -36,6 +38,22 @@ struct AIAccountBalanceCookieStoreTests {
         #expect(!String(describing: AIAccountBalanceError.invalidCredentials).contains("private"))
     }
 
+    /// Browser-style trailing separators are accepted without relaxing validation of any nonempty cookie pair.
+    @Test func pastedCookiesIgnoreEmptySegmentsButRejectMalformedNonemptyParts() throws {
+        let secrets = BalanceMemorySecrets()
+        let store = AIAccountBalanceCookieStore(secrets: secrets)
+        for website in AIAccountBalanceWebsite.allCases {
+            try store.setCookie("Cookie: zed.session=fixture; ; c15t=consent; ", for: website)
+            #expect(try store.cookie(for: website) == "zed.session=fixture; c15t=consent")
+        }
+        let before = secrets.values
+        for value in ["; ; ", "session=fixture; broken;", "session=fixture; bad key=secret;", "session=fixture; empty=;"] {
+            #expect(throws: AIAccountBalanceError.invalidCredentials) { try store.setCookie(value, for: .qoder) }
+        }
+        #expect(secrets.values == before)
+    }
+
+    /// Persistence failure must remain visible for save, clear, and load instead of producing false success.
     @Test func storageFailuresPropagateWithoutOverwritingOrReportingSuccess() throws {
         let store = AIAccountBalanceCookieStore(secrets: FailingBalanceSecrets())
         #expect(throws: AIAgentSecretStoreError.storageFailed("fixture")) { try store.setCookie("session=fixture", for: .trae) }

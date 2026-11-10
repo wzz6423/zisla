@@ -31,6 +31,8 @@ public enum AIAccountQuotaSeverity: Int, Codable, Comparable, Sendable {
 
     public static func < (lhs: Self, rhs: Self) -> Bool { lhs.rawValue < rhs.rawValue }
 
+    /// Uses remaining allowance: zero is exhausted, with inclusive 10% critical and 20% warning thresholds.
+    /// Callers validate the percentage before constructing a severity.
     public init(remainingPercent: Double) {
         if remainingPercent == 0 { self = .exhausted }
         else if remainingPercent <= 10 { self = .critical }
@@ -92,6 +94,8 @@ public struct AIAccountQuotaWindow: Codable, Equatable, Sendable, Identifiable {
         self.unlimited = unlimited
     }
 
+    /// Requires a real remaining observation or explicit unlimited state, with finite nonnegative amounts.
+    /// Only an actual 18,000-second duration may be labeled as a five-hour window.
     public var isValid: Bool {
         !id.isEmpty && id.utf8.count <= 256
             && (remainingPercent.map { $0.isFinite && (0...100).contains($0) } ?? true)
@@ -104,12 +108,14 @@ public struct AIAccountQuotaWindow: Codable, Equatable, Sendable, Identifiable {
             && (kind != .fiveHours || durationSeconds == 18_000)
     }
 
+    /// Unlimited allowance stays healthy; an amount without a denominator triggers only an exact-zero alert.
     public var severity: AIAccountQuotaSeverity {
         if unlimited { return .normal }
         if let remainingPercent { return .init(remainingPercent: remainingPercent) }
         return remaining == 0 ? .exhausted : .normal
     }
 
+    /// Keeps provider feature names distinct while localizing known labels and retaining actual window kinds.
     public func label(language: AppLanguage) -> String {
         let title = AppLocalization.string(kind.title, language: language)
         if let nameKey { return AppLocalization.string(nameKey, language: language) }
@@ -117,6 +123,7 @@ public struct AIAccountQuotaWindow: Codable, Equatable, Sendable, Identifiable {
         return durationSeconds != nil && kind != .model ? name + " · " + title : name
     }
 
+    /// Displays the provider's amount unit when available; unknown percentages remain unknown.
     public func value(language: AppLanguage) -> String {
         if unlimited { return AppLocalization.string("不限额度", language: language) }
         if let remaining, unit != .percent {
@@ -156,6 +163,7 @@ public struct AIAccountBalance: Codable, Equatable, Sendable, Identifiable {
         self.isDebug = isDebug
     }
 
+    /// Any unavailable or invalid window disables alerts; valid independent windows use the worst severity.
     public var severity: AIAccountQuotaSeverity? {
         guard status == .available, !windows.isEmpty, windows.allSatisfy(\.isValid) else { return nil }
         return windows.map(\.severity).max()
@@ -168,6 +176,8 @@ public struct AIAccountBalance: Codable, Equatable, Sendable, Identifiable {
         return providers.contains(.gpt) ? title + " · " + AppLocalization.string("Codex 账户额度", language: language) : title
     }
 
+    /// Reserves the first of at most two lines for a canonical 5h or rolling window.
+    /// Additional feature windows keep their true names in the remaining summary and never replace that slot.
     public func compactLines(language: AppLanguage) -> [String] {
         guard severity != nil else { return [] }
         let short = windows.first { $0.kind == .fiveHours && !$0.id.hasPrefix("additional:") }
@@ -220,6 +230,7 @@ public enum AIAccountBalanceCatalog {
         case .muse: "Muse Code"
         }
     }
+    /// Shared-account aliases occupy one query group while keeping every provider selectable in the UI.
     public static var groups: [[AIProvider]] {
         var seen: Set<AIProvider> = []
         return AIProvider.allCases.compactMap { provider in
@@ -234,6 +245,7 @@ public enum AIAccountBalanceCatalog {
         }
     }
 
+    /// Classifies a nonempty account group without claiming a balance or requiring unsupported login access.
     public static func placeholder(for providers: [AIProvider]) -> AIAccountBalance {
         let provider = providers[0]
         let status: AIAccountBalanceStatus = switch provider {

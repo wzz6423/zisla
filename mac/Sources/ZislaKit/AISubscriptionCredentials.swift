@@ -115,6 +115,8 @@ struct AISubscriptionCredentials: Sendable {
 
     enum KeychainReadError: Error { case unavailable }
 
+    /// Preflights item access without authentication UI, then reads the account and payload together.
+    /// Missing items return nil; blocked access and malformed payloads remain distinct failures.
     static func readKeychainCredentialWithoutPrompt(
         service: String, account: String? = nil, internetPassword: Bool = false,
         copyMatching: (CFDictionary) -> (OSStatus, CFTypeRef?) = { query in

@@ -455,10 +455,7 @@ struct CompactStatusBarView: View {
 
     private var transientNotice: IslandNotice? {
         presentationNotices
-            .filter {
-                $0.id.hasPrefix("focus-transition") || $0.style == .headphone
-                    || LowBatteryNoticeController.isLowBatteryNotice($0) || AIAccountBalance.isLowBalanceNotice($0)
-            }
+            .filter(SideNoticeLayoutEngine.isTransientCompactNotice)
             .max { $0.createdAt < $1.createdAt }
     }
 

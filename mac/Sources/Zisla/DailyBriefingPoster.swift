@@ -13,6 +13,7 @@ struct DailyBriefingReport: Sendable {
     var selectedContent: Set<DailyBriefingContent> = DailyBriefingContent.defaultSelection
     var calendar = DailyBriefingDay.calendar
 
+    /// Uses deterministic fixture data so previews remain independent of local activity and accounts.
     static func example(at date: Date = Date(), selectedContent: Set<DailyBriefingContent> = DailyBriefingContent.defaultSelection) -> Self {
         let calendar = DailyBriefingDay.calendar
         let start = calendar.startOfDay(for: date)
@@ -140,6 +141,7 @@ struct DailyBriefingPoster: View {
             language: language, accent: accent, ink: ink)
     }
 
+    /// Suppresses empty sections so selecting a metric does not reserve blank poster space.
     private func hasData(_ content: DailyBriefingContent) -> Bool {
         switch content {
         case .aiAccountBalances: return report.aiAccountBalances.contains { $0.severity != nil && !$0.isDebug }

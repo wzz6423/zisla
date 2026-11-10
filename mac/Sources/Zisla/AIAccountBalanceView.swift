@@ -13,6 +13,7 @@ struct AIAccountBalanceSection: View {
     let displayedProviders: Set<AIProvider>
     let language: AppLanguage
 
+    /// Filters each shared-account alias without hiding the selected account's unavailable status.
     var displayedBalances: [AIAccountBalance] {
         balances.compactMap { balance in
             var row = balance
@@ -75,12 +76,14 @@ struct AIAccountBalanceSection: View {
             .monospacedDigit().foregroundStyle(window.severity.balanceColor).fixedSize()
     }
 
+    /// Omits the bar when the provider reports only an amount, preserving the absence of a percentage denominator.
     @ViewBuilder private func quotaProgress(_ window: AIAccountQuotaWindow) -> some View {
         if let fraction = window.remainingPercent {
             ProgressView(value: fraction, total: 100).tint(window.severity.balanceColor).frame(maxWidth: 100)
         }
     }
 
+    /// Displays only an observed reset timestamp instead of estimating one from a window label.
     @ViewBuilder private func quotaReset(_ window: AIAccountQuotaWindow) -> some View {
         if let reset = window.resetsAt {
             Text(AppLocalization.format("%@ 重置", locale: language.locale,

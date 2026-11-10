@@ -90,6 +90,7 @@ public struct SideNoticePresentation: Equatable, Sendable {
 }
 
 public enum CompactStatusVisibilityPolicy {
+    /// Persistent quota and voice processing stay visible independently of ordinary activity display durations.
     public static func mustRemainVisible(
         notices: [IslandNotice],
         activityDuration: ActivityNoticeDisplayDuration,
@@ -203,6 +204,13 @@ public struct SideNoticeLayoutEngine: Equatable, Sendable {
 
     public init() {}
 
+    /// Keeps transient selection and sizing consistent across the notch, pill, and presenter.
+    public static func isTransientCompactNotice(_ notice: IslandNotice) -> Bool {
+        notice.id.hasPrefix("focus-transition") || notice.style == .headphone
+            || LowBatteryNoticeController.isLowBatteryNotice(notice)
+            || AIAccountBalance.isLowBalanceNotice(notice)
+    }
+
     /// Focus transitions and battery warnings are time-sensitive events, so they take precedence over the
     /// user's normal collapsed-status ordering until the transient notice expires.
     public static func selectedCompactStatusPriority(
@@ -224,6 +232,7 @@ public struct SideNoticeLayoutEngine: Equatable, Sendable {
         }
     }
 
+    /// Separates compact statuses from ordinary side rows so persistent quota never consumes side-notice capacity.
     public func presentation(
         for notices: [IslandNotice],
         compactWingsEnabled: Bool = true,
@@ -587,6 +596,8 @@ public struct SideNoticeLayoutEngine: Equatable, Sendable {
         )
     }
 
+    /// Sizes the selected compact presentation; a queued balance cannot widen a newer unrelated transient.
+    /// Detailed quota shares the existing expansion path while headphone and camera-gap geometry remain independent.
     public func compactBarSizing(
         for notices: [IslandNotice],
         settings: FeatureSettings,
@@ -629,10 +640,7 @@ public struct SideNoticeLayoutEngine: Equatable, Sendable {
             false
         }
         let displayedTransientNotice = notices
-            .filter {
-                $0.id.hasPrefix("focus-transition") || $0.style == .headphone
-                    || LowBatteryNoticeController.isLowBatteryNotice($0) || AIAccountBalance.isLowBalanceNotice($0)
-            }
+            .filter(Self.isTransientCompactNotice)
             .max { $0.createdAt < $1.createdAt }
         let displaysHeadphone = selectedPriority == .transient
             && displayedTransientNotice?.style == .headphone
@@ -690,14 +698,12 @@ public struct SideNoticeLayoutEngine: Equatable, Sendable {
         }
     }
 
+    /// Selects the latest transient consistently with sizing and restricts persistent quota to custom placement.
     private func compactPillPresentation(
         for selectedPriority: CompactStatusPriority, notices: [IslandNotice], settings: FeatureSettings
     ) -> CompactPillStatusPresentation? {
         let displayedTransientNotice = notices
-            .filter {
-                $0.id.hasPrefix("focus-transition") || $0.style == .headphone
-                    || LowBatteryNoticeController.isLowBatteryNotice($0) || AIAccountBalance.isLowBalanceNotice($0)
-            }
+            .filter(Self.isTransientCompactNotice)
             .max { $0.createdAt < $1.createdAt }
         let selectedNotice: IslandNotice? = switch selectedPriority {
         case .transient: displayedTransientNotice
@@ -753,6 +759,7 @@ public struct SideNoticeLayoutEngine: Equatable, Sendable {
         }
     }
 
+    /// Resolves ordinary priority availability; urgent quota and battery alerts are selected before this ordering.
     private static func compactStatusIsAvailable(
         _ priority: CompactStatusPriority,
         notices: [IslandNotice],

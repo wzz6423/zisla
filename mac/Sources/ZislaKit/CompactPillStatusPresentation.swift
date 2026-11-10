@@ -34,6 +34,8 @@ public struct CompactPillStatusPresentation: Equatable, Sendable {
         self.showsMediaIdentity = showsMediaIdentity
     }
 
+    /// Measures quota identity and the longest summary line independently within existing text-length bounds.
+    /// Vertical edges divide the available thickness between quota lines instead of assuming horizontal text.
     public func length(thickness: CGFloat, edge: IslandEdge, text: String? = nil,
         item: NowPlayingSnapshot? = nil, leadingInset: CGFloat = trailingInset) -> CGFloat {
         let text = (text ?? self.text).trimmingCharacters(in: .whitespacesAndNewlines)

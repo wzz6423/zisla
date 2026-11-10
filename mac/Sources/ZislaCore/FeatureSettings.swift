@@ -939,6 +939,8 @@ public struct FeatureSettings: Codable, Equatable, Sendable {
     /// Whether closing a compatible MacBook lid plays the screen depth animation.
     public var lidCloseAnimationEnabled: Bool
 
+    /// Establishes new-install defaults while keeping quota monitoring and display selection independent.
+    /// Dimension and priority normalization preserve the existing placement constraints.
     public init(
         mediaEnabled: Bool = true,
         mediaSource: MediaSourcePreference = .automatic,
@@ -1388,6 +1390,7 @@ public struct FeatureSettings: Codable, Equatable, Sendable {
         case automaticUpdatesEnabled
     }
 
+    /// Preserves legacy settings through current defaults; unknown provider IDs are ignored, while explicit empty selections remain empty.
     public init(from decoder: Decoder) throws {
         let container = try decoder.container(keyedBy: CodingKeys.self)
         let defaults = FeatureSettings.default

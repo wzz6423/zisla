@@ -23,6 +23,8 @@ struct AIAccountBalanceCookieInput: View {
         .font(.system(size: 11)).padding(.vertical, 6)
     }
 
+    /// Runs credential storage off the main actor and refreshes quota only after a successful mutation.
+    /// Failures keep the entered value for correction and expose a generic status rather than storage details.
     private func save(removing: Bool) {
         let value = cookie
         let website = website

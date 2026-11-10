@@ -10,6 +10,8 @@ enum AIAccountGrokQuotaParser {
         var message: Data?
     }
 
+    /// Reads only descriptor-defined quota fields from one bounded, uncompressed gRPC-web payload.
+    /// Protobuf's omitted scalar zero is accepted only for a confirmed active period with a future reset.
     static func parse(_ data: Data, now: Date) throws -> [AIAccountQuotaWindow] {
         guard !data.isEmpty, data.count <= 1_024 * 1_024 else { throw AIAccountBalanceError.invalidResponse }
         let bytes = [UInt8](data)
@@ -56,29 +58,34 @@ enum AIAccountGrokQuotaParser {
         return [window]
     }
 
+    /// An absent timestamp is optional; a present timestamp without its seconds field is malformed.
     private static func timestamp(_ fields: [Field], number: UInt64) throws -> Date? {
         guard let nested = try optionalMessage(fields, number: number) else { return nil }
         guard let seconds = try unique(nested, number: 1)?.integer else { throw AIAccountBalanceError.invalidResponse }
         return try AIAccountBalanceParser.date(Double(seconds))
     }
 
+    /// Rejects duplicate scalar or message fields rather than choosing an ambiguous quota observation.
     private static func unique(_ fields: [Field], number: UInt64) throws -> Field? {
         let matches = fields.filter { $0.number == number }
         guard matches.count <= 1 else { throw AIAccountBalanceError.invalidResponse }
         return matches.first
     }
 
+    /// Distinguishes an absent message from a present field encoded with the wrong wire type.
     private static func optionalMessage(_ values: [Field], number: UInt64) throws -> [Field]? {
         guard let field = try unique(values, number: number) else { return nil }
         guard let data = field.message else { throw AIAccountBalanceError.invalidResponse }
         return try fields(data)
     }
 
+    /// Requires the descriptor's enclosing message before any nested number may be treated as quota.
     private static func message(_ values: [Field], number: UInt64) throws -> [Field] {
         guard let result = try optionalMessage(values, number: number) else { throw AIAccountBalanceError.invalidResponse }
         return result
     }
 
+    /// Bounds decoded fields and validates wire lengths without recursively interpreting unrelated payloads.
     private static func fields(_ data: Data) throws -> [Field] {
         let bytes = [UInt8](data)
         var index = 0, fields: [Field] = []
@@ -110,6 +117,7 @@ enum AIAccountGrokQuotaParser {
         return fields
     }
 
+    /// Refuses truncated or overflowing 64-bit varints before their values can index frame slices.
     private static func varint(_ bytes: [UInt8], index: inout Int) throws -> UInt64 {
         var result: UInt64 = 0
         for shift in stride(from: 0, through: 63, by: 7) {

@@ -3,6 +3,8 @@ import ZislaCore
 
 // Wire schemas from CodexBar 7447bc77 and token-monitor 235a77c3 (MIT).
 enum AIAccountBalanceParser {
+    /// Publishes only a complete provider schema with valid, unique windows within the shared 64-window bound.
+    /// Missing quota is an unavailable reading; it must never be interpreted as zero remaining allowance.
     static func parse(_ data: Data, provider: AIProvider, now: Date) throws -> [AIAccountQuotaWindow] {
         if provider == .grok { return try AIAccountGrokQuotaParser.parse(data, now: now) }
         let root = try AIAccountBalanceCredentials.object(data)
@@ -30,6 +32,8 @@ enum AIAccountBalanceParser {
         return windows
     }
 
+    /// Converts the provider's stated timestamp unit; absent resets stay absent rather than being guessed.
+    /// Date-only input is opt-in for Copilot and must round-trip as a valid UTC calendar date.
     static func date(_ value: Any?, milliseconds: Bool = false, acceptsDateOnly: Bool = false) throws -> Date? {
         guard let value, !(value is NSNull) else { return nil }
         let seconds: Double?
@@ -53,17 +57,20 @@ enum AIAccountBalanceParser {
         return Date(timeIntervalSince1970: seconds)
     }
 
+    /// Requires an observed nonnegative finite value so null, booleans, and missing usage cannot imply zero.
     static func number(_ value: Any?) throws -> Double {
         guard let number = AIAccountBalanceCredentials.number(value), number >= 0 else { throw AIAccountBalanceError.invalidResponse }
         return number
     }
 
+    /// Rejects out-of-range percentages before they can distort remaining-quota alert thresholds.
     static func percent(_ value: Any?) throws -> Double {
         let value = try number(value)
         guard value <= 100 else { throw AIAccountBalanceError.invalidResponse }
         return value
     }
 
+    /// Labels 5h only for an explicit 18,000-second window; unknown durations keep a neutral quota label.
     static func kind(duration: Double?) -> AIAccountQuotaKind {
         switch duration {
         case 18_000: .fiveHours
@@ -73,11 +80,13 @@ enum AIAccountBalanceParser {
         }
     }
 
+    /// Rejects a present malformed quota object instead of treating it as an optional absent window.
     private static func object(_ value: Any?) throws -> [String: Any] {
         guard let object = value as? [String: Any] else { throw AIAccountBalanceError.invalidResponse }
         return object
     }
 
+    /// Keeps Claude's independent weekly/model limits and converts enabled extra-spend cents to USD.
     private static func claude(_ root: [String: Any]) throws -> [AIAccountQuotaWindow] {
         var windows: [AIAccountQuotaWindow] = []
         for (key, kind, name) in [("five_hour", AIAccountQuotaKind.fiveHours, nil),
@@ -100,6 +109,8 @@ enum AIAccountBalanceParser {
         return windows
     }
 
+    /// Preserves nullable primary limits, independent named features, and credits as separate allowances.
+    /// Feature IDs are stable and bounded; spend control requires usage or a stated remaining percentage.
     private static func codex(_ root: [String: Any]) throws -> [AIAccountQuotaWindow] {
         var windows: [AIAccountQuotaWindow] = []
         if let raw = root["rate_limit"], !(raw is NSNull) {
@@ -149,6 +160,7 @@ enum AIAccountBalanceParser {
         return windows
     }
 
+    /// Uses actual window seconds and a feature prefix, avoiding fabricated 5h labels or colliding window IDs.
     private static func codexWindows(_ limits: [String: Any], prefix: String = "", name: String? = nil) throws -> [AIAccountQuotaWindow] {
         var windows: [AIAccountQuotaWindow] = []
         for key in ["primary_window", "secondary_window"] {
@@ -163,6 +175,7 @@ enum AIAccountBalanceParser {
         return windows
     }
 
+    /// Collapses duplicate model buckets to the most restrictive remaining fraction rather than summing limits.
     private static func gemini(_ root: [String: Any]) throws -> [AIAccountQuotaWindow] {
         guard let buckets = root["buckets"] as? [[String: Any]], buckets.count <= 128 else { throw AIAccountBalanceError.invalidResponse }
         var models: [String: AIAccountQuotaWindow] = [:]
@@ -180,6 +193,8 @@ enum AIAccountBalanceParser {
         return models.keys.sorted().compactMap { models[$0] }
     }
 
+    /// Prefers ratio-based quota pools without counting their monthly breakdown twice.
+    /// Legacy request limits retain their declared duration units and require observed consumption.
     private static func kimi(_ root: [String: Any]) throws -> [AIAccountQuotaWindow] {
         var windows: [AIAccountQuotaWindow] = []
         if let raw = root["usages"], !(raw is NSNull) {
@@ -218,6 +233,7 @@ enum AIAccountBalanceParser {
         return windows
     }
 
+    /// Derives request allowance from explicit remaining or used counts; a zero cap does not invent a percentage.
     private static func kimiDetail(_ detail: [String: Any], id: String, kind: AIAccountQuotaKind,
                                    duration: Double?) throws -> AIAccountQuotaWindow {
         let cap = try number(detail["limit"])
@@ -230,6 +246,8 @@ enum AIAccountBalanceParser {
             durationSeconds: duration)
     }
 
+    /// Unified plans require current-window data; legacy zero-usage placeholders cannot substitute.
+    /// Amounts retain USD units, and reported billing periods are checked against the sampling time.
     static func cursor(_ root: [String: Any], now: Date, sand: [String: Any]? = nil,
                        unified: [String: Any]? = nil) throws -> [AIAccountQuotaWindow] {
         let isUnified = (root["membershipType"] as? String)?.lowercased().hasPrefix("unified_") == true
@@ -277,6 +295,8 @@ enum AIAccountBalanceParser {
         return windows
     }
 
+    /// Reads known quota types conservatively and retains their real reset and duration units.
+    /// When both used and remaining are reported, the stricter observation determines remaining allowance.
     private static func zcode(_ root: [String: Any]) throws -> [AIAccountQuotaWindow] {
         guard let data = root["data"] as? [String: Any], let limits = data["limits"] as? [[String: Any]], limits.count <= 32 else {
             throw AIAccountBalanceError.invalidResponse
@@ -311,6 +331,8 @@ enum AIAccountBalanceParser {
         return windows
     }
 
+    /// Website spend limits are USD budgets; zero or null budgets do not imply exhausted model allowance.
+    /// Native login exposes only edit predictions, whose unlimited state remains separate from a percentage.
     private static func zed(_ root: [String: Any]) throws -> [AIAccountQuotaWindow] {
         if let current = root["current_usage"] as? [String: Any] {
             var windows: [AIAccountQuotaWindow] = []
@@ -339,6 +361,8 @@ enum AIAccountBalanceParser {
         return [amount(id: "edit_predictions", kind: .predictions, used: used, cap: try number(raw), unit: .requests)]
     }
 
+    /// Prefers current snapshots, ignores 0/0 placeholders, and fills only missing quotas from legacy fields.
+    /// Request counts and UTC reset dates remain explicit, including unlimited entitlements.
     private static func copilot(_ root: [String: Any]) throws -> [AIAccountQuotaWindow] {
         var windows: [AIAccountQuotaWindow] = []
         let reset = try date(root["quota_reset_date"], acceptsDateOnly: true)
@@ -380,6 +404,7 @@ enum AIAccountBalanceParser {
         return windows
     }
 
+    /// Combines complete personal and optional shared credit pools; a partial pool invalidates the reading.
     private static func qoder(_ root: [String: Any]) throws -> [AIAccountQuotaWindow] {
         let data = root["data"] as? [String: Any] ?? root
         var cap = 0.0, remaining = 0.0
@@ -400,6 +425,7 @@ enum AIAccountBalanceParser {
             remaining: remaining, limit: cap, unit: .credits, resetsAt: try date(data["nextResetAt"] ?? data["next_reset_at"]))]
     }
 
+    /// Accepts only TRAE's confirmed credits-billing schema, preserving expired-session and absent-quota failures.
     private static func trae(_ root: [String: Any]) throws -> [AIAccountQuotaWindow] {
         if AIAccountBalanceCredentials.number(root["code"]) == 1001 { throw AIAccountBalanceError.credentialsExpired }
         guard root["is_credits_billing"] as? Bool == true, let summary = root["usage_summary"] as? [String: Any] else {
@@ -409,6 +435,8 @@ enum AIAccountBalanceParser {
             cap: try number(summary["total_amount"]), unit: .credits)]
     }
 
+    /// Treats -1 as the explicit unlimited sentinel and sums only active, complete credit packages.
+    /// Inactive packages or missing fields cannot contribute fabricated remaining credits.
     private static func workbuddy(_ root: [String: Any]) throws -> [AIAccountQuotaWindow] {
         let data = (root["data"] as? [String: Any])?["data"] as? [String: Any] ?? root["data"] as? [String: Any] ?? root
         if let limitValue = data["limitNum"] ?? data["limit_num"] {
@@ -437,6 +465,7 @@ enum AIAccountBalanceParser {
             remaining: remaining, limit: total, unit: .credits)]
     }
 
+    /// Requires both rolling and weekly windows; an explicit rate-limited state means zero remaining allowance.
     private static func opencode(_ root: [String: Any]) throws -> [AIAccountQuotaWindow] {
         let usage = try object(root["usage"])
         var windows: [AIAccountQuotaWindow] = []
@@ -455,6 +484,7 @@ enum AIAccountBalanceParser {
         return windows
     }
 
+    /// Accepts the versioned CLI allowance schema and preserves millisecond resets and real window durations.
     private static func muse(_ root: [String: Any]) throws -> [AIAccountQuotaWindow] {
         guard AIAccountBalanceCredentials.number(root["schemaVersion"]) == 1, let allowance = root["allowance"] else {
             throw AIAccountBalanceError.invalidResponse
@@ -474,6 +504,7 @@ enum AIAccountBalanceParser {
         return windows
     }
 
+    /// Converts the stated amount scale and clamps overspend to zero; a zero cap leaves percentage unknown.
     private static func amount(id: String, kind: AIAccountQuotaKind, used: Double, cap: Double,
                                unit: AIAccountQuotaUnit, scale: Double = 1, reset: Date? = nil,
                                nameKey: String? = nil) -> AIAccountQuotaWindow {

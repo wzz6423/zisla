@@ -7,6 +7,7 @@ import Testing
 struct AIAccountBalanceServiceTests {
     private let now = Date(timeIntervalSince1970: 1_910_000_000)
 
+    /// Recorded requests prove shared-account deduplication, selected alias output, and secret-free public rows.
     @Test func sharedAliasesFetchOnceAndPublishOnlySelectedNamesWithoutSecrets() async throws {
         BalanceURLProtocol.configure(["/backend-api/wham/usage": [.json(#"{"rate_limit":{"primary_window":{"used_percent":90,"limit_window_seconds":18000}}}"#)],
             "/api/usage-summary": [.json(#"{"individualUsage":{"plan":{"used":900,"limit":1000}}}"#)]])
@@ -22,6 +23,7 @@ struct AIAccountBalanceServiceTests {
         #expect(BalanceURLProtocol.requests.count == 3)
     }
 
+    /// Forbidden-read seams prove disabled and debug paths stay isolated even when a fixture is invalid.
     @Test func disabledMissingUnsupportedAndDebugSourcesDoNoCredentialedRequests() async throws {
         BalanceURLProtocol.configure([:])
         let service = makeService(credentials: { _, _, _ in Issue.record("Disabled providers must not read credentials"); return nil })
@@ -43,6 +45,7 @@ struct AIAccountBalanceServiceTests {
         #expect(BalanceURLProtocol.requests.isEmpty)
     }
 
+    /// One provider's HTTP failure must preserve another provider's reading without exposing body text or secrets.
     @Test(arguments: [(401, AIAccountBalanceStatus.credentialsExpired), (403, .credentialsExpired), (429, .rateLimited), (503, .unavailable)])
     func failuresStayIsolatedSanitizedAndRecover(scenario: (status: Int, expected: AIAccountBalanceStatus)) async throws {
         BalanceURLProtocol.configure(["/api/oauth/usage": [.init(status: scenario.status, data: Data("private-body".utf8))],
@@ -56,6 +59,7 @@ struct AIAccountBalanceServiceTests {
         #expect(try await service.accountBalances(for: [.claude]).first?.windows.first?.remainingPercent == 100)
     }
 
+    /// Body and declared size, unexpected URL, timeout, and redirect-like responses must all invalidate quota.
     @Test func responseSizeURLAndNetworkFailuresCannotPublishPartialQuota() async throws {
         for response in [BalanceURLProtocol.Response(data: Data(repeating: 32, count: 1_024 * 1_024 + 1)),
             .init(data: Data("{}".utf8), contentLength: 1_024 * 1_024 + 1),
@@ -68,6 +72,7 @@ struct AIAccountBalanceServiceTests {
         }
     }
 
+    /// Request host/header/body assertions prove selected-region authentication and prevent an expired website from changing accounts.
     @Test func websiteRegionsAndCookieAuthenticationUseOnlyFixedHostsAndNeverFallback() async throws {
         let qoder = #"{"data":{"totalQuota":{"quotaSummary":{"limitValue":100,"usedValue":90}}}}"#
         BalanceURLProtocol.configure(["/api/v2/me/usages/big_model_credits": [.json(qoder), .json(qoder)],
@@ -93,6 +98,7 @@ struct AIAccountBalanceServiceTests {
         #expect(!BalanceURLProtocol.requests.contains { $0.url?.path == "/client/users/me" }, "An expired website session must not fall back to another account")
     }
 
+    /// Unified Cursor must use current endpoints; WorkBuddy's version fallback must not retry authentication failure.
     @Test func cursorUnifiedRequestsUseCurrentWindowsAndWorkBuddyFallbackRequires404() async throws {
         BalanceURLProtocol.configure(["/api/usage-summary": [.json(#"{"membershipType":"unified_pro","limitType":"user","individualUsage":{"plan":{"used":0,"limit":1000}}}"#)],
             "/api/dashboard/get-sand-usage-status": [.json(#"{"usagePercent":90,"hasNonZeroIncludedLimit":true}"#)],
@@ -108,6 +114,7 @@ struct AIAccountBalanceServiceTests {
         #expect(BalanceURLProtocol.requests.count == 1)
     }
 
+    /// Held request events expose the concurrency bound and make in-flight versus pre-start cancellation observable.
     @Test func groupedParallelRequestsAreBoundedAndCancellationPropagates() async throws {
         let (events, continuation) = AsyncStream<Int>.makeStream()
         BalanceURLProtocol.configure(["/api/oauth/usage": [.json(#"{"five_hour":{"utilization":0}}"#)],
@@ -140,6 +147,7 @@ struct AIAccountBalanceServiceTests {
         #expect(BalanceURLProtocol.requests.count == 1)
     }
 
+    /// Injected CLI bytes distinguish no login, malformed schema, and valid quota without launching a real process.
     @Test func museFailureMissingAndSchemaUseOnlyInjectedProcessData() async throws {
         BalanceURLProtocol.configure([:])
         for data in [nil, Data("{}".utf8), Data(#"{"schemaVersion":1,"allowance":{"window":{"usedPercent":100,"windowDurationMins":300}}}"#.utf8)] {
@@ -189,6 +197,8 @@ private final class BalanceURLProtocol: URLProtocol, @unchecked Sendable {
     }
     override class func canInit(with request: URLRequest) -> Bool { true }
     override class func canonicalRequest(for request: URLRequest) -> URLRequest { request }
+    /// Captures body streams before publishing request events, so tests inspect actual authentication payloads.
+    /// Held responses provide a deterministic seam for concurrency and cancellation instead of timing sleeps.
     override func startLoading() {
         var recordedRequest = request
         if let stream = request.httpBodyStream {
@@ -214,6 +224,7 @@ private final class BalanceURLProtocol: URLProtocol, @unchecked Sendable {
         event(count)
         if !hold { finish() }
     }
+    /// Completes each mock request once so cancellation cannot corrupt active-request bounds or deliver twice.
     private func finish() {
         guard Self.lock.withLock({ if finished { return false }; finished = true; Self.active -= 1; return true }) else { return }
         if let error = response.error { client?.urlProtocol(self, didFailWithError: URLError(error)); return }
@@ -224,6 +235,7 @@ private final class BalanceURLProtocol: URLProtocol, @unchecked Sendable {
         client?.urlProtocol(self, didLoad: response.data)
         client?.urlProtocolDidFinishLoading(self)
     }
+    /// Removes cancelled held requests so later fixture release cannot deliver their response.
     override func stopLoading() {
         Self.lock.withLock { if !finished { finished = true; Self.active -= 1 }; Self.pending.removeAll { $0 === self } }
     }

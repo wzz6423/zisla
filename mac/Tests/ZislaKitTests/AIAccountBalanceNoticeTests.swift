@@ -5,6 +5,22 @@ import Testing
 
 @MainActor
 struct AIAccountBalanceNoticeTests {
+    /// Every compact consumer must classify urgent events alike while leaving persistent quota in its own priority.
+    @Test func transientClassificationRecognizesAlertsWithoutIncludingPersistentBalance() {
+        for notice in [IslandNotice(id: "focus-transition-fixture", title: "Focus"),
+            IslandNotice(id: "headphone-fixture", title: "Audio", style: .headphone),
+            IslandNotice(id: "battery-low", title: "Battery"),
+            IslandNotice(id: "ai-balance-low-fixture", title: "Quota")] {
+            #expect(SideNoticeLayoutEngine.isTransientCompactNotice(notice))
+        }
+        for notice in [IslandNotice(id: AIAccountBalanceNoticeController.pinnedID, title: "Quota"),
+            IslandNotice(id: "media-active-fixture", title: "Media"),
+            IslandNotice(id: "ordinary-fixture", title: "Ordinary")] {
+            #expect(!SideNoticeLayoutEngine.isTransientCompactNotice(notice))
+        }
+    }
+
+    /// Polling and dismissal must not repeat one episode; escalation and recovery must remain observable transitions.
     @Test func remainingThresholdsEscalateToZeroOnceAndRecoveryRearms() throws {
         let queue = SideNoticeQueue()
         let notices = AIAccountBalanceNoticeController(queue: queue)
@@ -24,6 +40,7 @@ struct AIAccountBalanceNoticeTests {
         #expect(queue.left.count == 1)
     }
 
+    /// Display choice must not disable alerts, while monitoring and master toggles must clear and rearm episodes.
     @Test func displayedOffStillAlertsMonitoredOffClearsAndReenabledAlertRearms() {
         let queue = SideNoticeQueue()
         let notices = AIAccountBalanceNoticeController(queue: queue)
@@ -50,6 +67,7 @@ struct AIAccountBalanceNoticeTests {
         #expect(queue.left.count == 1)
     }
 
+    /// An unavailable poll neither fabricates exhaustion nor resets a dismissed episode for the same shared account.
     @Test func unavailableDoesNotFabricateZeroOrRearmSameEpisodeAndSharedAliasesUseSelection() throws {
         let queue = SideNoticeQueue(), controller = AIAccountBalanceNoticeController(queue: queue)
         defer { queue.removeAll() }
@@ -71,6 +89,7 @@ struct AIAccountBalanceNoticeTests {
         #expect(queue.left.count == 1)
     }
 
+    /// Amount-only exhaustion must be the limiting compact line even when every percentage window is healthy.
     @Test func compactModeIdentifiesExhaustedCreditsWhenPercentageWindowsAreHealthy() {
         let queue = SideNoticeQueue(), controller = AIAccountBalanceNoticeController(queue: queue)
         defer { queue.removeAll() }
@@ -81,6 +100,7 @@ struct AIAccountBalanceNoticeTests {
         #expect(queue.left.first?.metadata?["quotaLine0"] == "积分余额 0 积分")
     }
 
+    /// Fixed-time rotation covers all selected valid accounts while respecting placement and always-visible policy.
     @Test func persistentBalancesRequireCustomPlacementAndRotateAllValidSelectedAccounts() throws {
         let queue = SideNoticeQueue(), controller = AIAccountBalanceNoticeController(queue: queue)
         defer { queue.removeAll() }
@@ -105,6 +125,7 @@ struct AIAccountBalanceNoticeTests {
         #expect(queue.left.isEmpty)
     }
 
+    /// A queued detailed balance must not alter the geometry of a newer headphone or focus transient.
     @Test func queuedBalanceCannotExpandTheNewerUnrelatedTransientNotice() throws {
         var settings = FeatureSettings(aiAccountBalanceCompactStyle: .detailed)
         settings.compactStatusPriority = [.transient]
@@ -122,6 +143,7 @@ struct AIAccountBalanceNoticeTests {
         #expect(presentation?.notice.id == battery.id)
     }
 
+    /// An injected suspension point proves rotation cancellation and release without removing unrelated notices.
     @Test func disablingPinnedBalanceCancelsRotationAndDeinitClearsOnlyBalanceNotices() async throws {
         let queue = SideNoticeQueue(), clock = BalanceRotationClock()
         let ordinary = IslandNotice(id: "ordinary", title: "Fixture", side: .left)

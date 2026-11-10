@@ -7,6 +7,7 @@ import ZislaKit
 
 @MainActor
 struct DailyBriefingAIAccountBalanceTests {
+    /// Selection alone must not reserve poster space for absent, unavailable, or debug-only account quota.
     @Test func quotaIsIndependentSelectedAndDebugOrUnavailableDataDoesNotAllocateSection() throws {
         let date = Date(timeIntervalSince1970: 1_910_000_000)
         var report = DailyBriefingReport(day: DailyBriefingDay(date: date, calendar: DailyBriefingDay.calendar), generatedAt: date, typing: nil,
@@ -26,6 +27,7 @@ struct DailyBriefingAIAccountBalanceTests {
         #expect(DailyBriefingPoster(report: report, template: .minimal, language: .english).displayedContent.isEmpty)
     }
 
+    /// Historical export retains the current quota's sampling time so it cannot masquerade as that day's consumption.
     @Test func currentQuotaKeepsItsSamplingTimestampWhenExportingAnOlderDay() async throws {
         let root = FileManager.default.temporaryDirectory.appendingPathComponent("zisla-balance-briefing-\(UUID())")
         defer { try? FileManager.default.removeItem(at: root) }

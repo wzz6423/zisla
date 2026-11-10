@@ -31,11 +31,16 @@ public struct AIAccountBalanceCookieStore: Sendable {
         try secrets.secret(for: reference(website)).map { try Self.normalizedCookie($0, website: website) }
     }
 
+    /// Accepts one Cookie request header, tolerating its prefix and empty semicolon segments.
+    /// Control bytes and malformed nonempty pairs fail before storage; Zed forwards only known session cookies.
     static func normalizedCookie(_ value: String, website: AIAccountBalanceWebsite) throws -> String {
         var value = value.trimmingCharacters(in: .whitespaces)
         if value.lowercased().hasPrefix("cookie:") { value = String(value.dropFirst(7)).trimmingCharacters(in: .whitespaces) }
         _ = try AIAccountBalanceCredentials.header(value)
-        let pairs = try value.split(separator: ";", omittingEmptySubsequences: false).map { part -> (String, String) in
+        let parts = value.split(separator: ";", omittingEmptySubsequences: false)
+            .filter { !$0.trimmingCharacters(in: .whitespaces).isEmpty }
+        guard !parts.isEmpty else { throw AIAccountBalanceError.invalidCredentials }
+        let pairs = try parts.map { part -> (String, String) in
             guard let index = part.firstIndex(of: "=") else { throw AIAccountBalanceError.invalidCredentials }
             let name = part[..<index].trimmingCharacters(in: .whitespaces)
             let value = part[part.index(after: index)...].trimmingCharacters(in: .whitespaces)

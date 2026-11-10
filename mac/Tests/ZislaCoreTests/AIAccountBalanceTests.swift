@@ -3,12 +3,14 @@ import Testing
 @testable import ZislaCore
 
 struct AIAccountBalanceTests {
+    /// Boundary pairs distinguish inclusive remaining-quota thresholds from consumed-percentage thresholds.
     @Test(arguments: [(100.0, AIAccountQuotaSeverity.normal), (20.1, .normal), (20, .warning), (10.1, .warning),
                        (10, .critical), (0.1, .critical), (0, .exhausted)])
     func thresholdsUseRemainingQuota(percent: Double, expected: AIAccountQuotaSeverity) {
         #expect(AIAccountQuotaWindow(id: "quota", kind: .all, remainingPercent: percent).severity == expected)
     }
 
+    /// Invalid and unavailable observations must suppress both alert severity and the compact summary.
     @Test func unavailableAndMalformedReadingsCannotTriggerLowOrZeroAlerts() {
         for status in AIAccountBalanceStatus.allFixtureCases {
             let balance = AIAccountBalance(id: "fixture", providers: [.claude], status: status,
@@ -26,6 +28,7 @@ struct AIAccountBalanceTests {
         #expect(AIAccountQuotaWindow(id: "unknown", kind: .all).value(language: .english) == "—")
     }
 
+    /// Summary text must retain real window kinds and include extra quota without fabricating a 5h window.
     @Test func compactUsesOnlyRealWindowsAndAtMostTwoLines() {
         let all = AIAccountQuotaWindow(id: "weekly", kind: .weekly, remainingPercent: 70, durationSeconds: 604_800)
         var balance = AIAccountBalance(id: "fixture", providers: [.claude], status: .available, windows: [all])
@@ -51,6 +54,7 @@ struct AIAccountBalanceTests {
         #expect(AIAccountQuotaWindow(id: "unlimited", kind: .all, unlimited: true).severity == .normal)
     }
 
+    /// Legacy defaults, forward provider IDs, explicit empty display selection, and region choice have distinct meanings.
     @Test func settingsDefaultsUnknownProvidersAndChosenRegionRoundTrip() throws {
         let old = try JSONDecoder().decode(FeatureSettings.self, from: Data("{}".utf8))
         #expect(old.aiAccountBalanceMonitoredProviders == Set(AIProvider.allCases))

@@ -12,6 +12,7 @@ struct AIAccountBalanceCredential: Sendable {
     var isWebsiteCookie = false
     var headers: [String: String] = [:]
 
+    /// Separates provider, region, and account episodes without exposing a raw credential in row IDs.
     func identity(provider: AIProvider) -> String {
         DesktopAIStorage.identity([provider.rawValue, region ?? "", accountID ?? token])
     }
@@ -41,6 +42,9 @@ struct AIAccountBalanceCredentials: Sendable {
         cursorCookie = { try subscription.cursorCookie(now: $0) }
     }
 
+    /// Reads only the selected provider's established login source, without refreshing or writing credentials.
+    /// Explicit website or inline credentials remain authoritative; errors must not select another account.
+    /// Conflicting Copilot logins and unsupported hosts or encrypted sessions fail before any quota request.
     func load(for provider: AIProvider, at now: Date, qoderRegion: AIAccountBalanceQoderRegion = .global) throws -> AIAccountBalanceCredential? {
         switch provider {
         case .copilot:
@@ -211,6 +215,8 @@ struct AIAccountBalanceCredentials: Sendable {
         }
     }
 
+    /// Honors the selected coding-plan registry; a credentials store supersedes stale plaintext mirrors.
+    /// Sealed entries require the owning app's access and must not fall back to an older API key.
     private func zcodeCredential() throws -> AIAccountBalanceCredential? {
         let base = home.appendingPathComponent(".zcode/v2")
         guard let config = try json(base.appendingPathComponent("config.json")),
@@ -245,6 +251,7 @@ struct AIAccountBalanceCredentials: Sendable {
         throw AIAccountBalanceError.unsupportedLogin
     }
 
+    /// Accepts only absolute home overrides so relative environment values cannot redirect credential reads.
     private func directory(_ key: String, fallback: String) -> URL {
         if let path = environment[key], path.hasPrefix("/") { return URL(fileURLWithPath: path) }
         return home.appendingPathComponent(fallback)
@@ -254,6 +261,7 @@ struct AIAccountBalanceCredentials: Sendable {
         try fileRead(path).map(Self.object)
     }
 
+    /// Bounds credential headers to printable ASCII, rejecting control bytes before URLSession receives them.
     static func header(_ value: String) throws -> String {
         guard !value.isEmpty, value.utf8.count <= 32 * 1_024,
               value.unicodeScalars.allSatisfy({ (0x20...0x7e).contains($0.value) }) else {
@@ -262,6 +270,7 @@ struct AIAccountBalanceCredentials: Sendable {
         return value
     }
 
+    /// Validates authentication fields independently from the optional, bounded display name.
     private static func credential(token: String, accountID: String? = nil,
                                    name: String? = nil, region: String? = nil) throws -> AIAccountBalanceCredential {
         let token = try header(token)
@@ -272,6 +281,8 @@ struct AIAccountBalanceCredentials: Sendable {
         return .init(token: token, accountID: accountID, accountName: name, region: region)
     }
 
+    /// Decodes local JWT metadata and optionally checks expiry with a safety margin; this does not verify signatures.
+    /// Claims can identify an account but cannot establish authentication or authorize another host.
     static func claims(_ token: String, at now: Date, checkExpiration: Bool = true) throws -> [String: Any] {
         let token = try header(token)
         let parts = token.split(separator: ".", omittingEmptySubsequences: false)
@@ -288,6 +299,7 @@ struct AIAccountBalanceCredentials: Sendable {
         return claims
     }
 
+    /// Requires a bounded JSON object so malformed or oversized input cannot become a missing quota.
     static func object(_ data: Data) throws -> [String: Any] {
         guard data.count <= 1_024 * 1_024, let root = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else {
             throw AIAccountBalanceError.invalidResponse
@@ -295,6 +307,7 @@ struct AIAccountBalanceCredentials: Sendable {
         return root
     }
 
+    /// Reads the two host overrides from Zed's JSONC settings without interpreting unrelated configuration.
     private static func zedSettings(_ data: Data) throws -> [String: Any] {
         guard data.count <= 1_024 * 1_024 else { throw AIAccountBalanceError.invalidResponse }
         struct Settings: Decodable {
@@ -307,6 +320,7 @@ struct AIAccountBalanceCredentials: Sendable {
         return ["server_url": settings.server_url, "credentials_url": settings.credentials_url].compactMapValues { $0 }
     }
 
+    /// Rejects booleans and nonfinite values even though Foundation bridges JSON booleans as NSNumber.
     static func number(_ value: Any?) -> Double? {
         if let value = value as? NSNumber, CFGetTypeID(value) != CFBooleanGetTypeID() {
             return value.doubleValue.isFinite ? value.doubleValue : nil
@@ -315,6 +329,8 @@ struct AIAccountBalanceCredentials: Sendable {
         return nil
     }
 
+    /// Refuses final symlinks and nonregular files, using nonblocking open so a FIFO cannot stall polling.
+    /// The 1 MiB limit is enforced again while reading to cover file growth, and every descriptor is closed.
     static func readRegularFile(_ url: URL) throws -> Data? {
         let descriptor = open(url.path, O_RDONLY | O_NOFOLLOW | O_NONBLOCK | O_CLOEXEC)
         guard descriptor >= 0 else {

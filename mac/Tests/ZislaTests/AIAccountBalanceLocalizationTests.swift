@@ -24,6 +24,7 @@ struct AIAccountBalanceLocalizationTests {
             "%@ 积分": "%@ credits", "额外预算": "Extra budget"]
     ]
 
+    /// Runtime values must match every locale table, preserve placeholders, and keep Arabic layout direction explicit.
     @Test(arguments: AppLanguage.allCases)
     func allBalanceCopyRendersRequestedLanguageAndPreservesPlaceholders(language: AppLanguage) throws {
         let table = try self.table(language), english = try self.table(.english)
@@ -60,6 +61,7 @@ struct AIAccountBalanceLocalizationTests {
         #expect(AppLocalization.string("账户剩余额度", language: .arabic) == "الحصة المتبقية للحساب")
     }
 
+    /// Source discovery catches indirect parser and enum labels that could otherwise silently fall back to Chinese.
     @Test func runtimeBalanceCopyAndIndirectTitlesAreAllIncludedInTheLocaleContract() throws {
         let root = URL(fileURLWithPath: #filePath).deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent()
         let sourcePaths = ["Sources/ZislaCore/AIAccountBalance.swift", "Sources/ZislaKit/AIAccountBalanceParser.swift",

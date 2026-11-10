@@ -1013,6 +1013,7 @@ struct SettingsView: View {
                         }
                     }
                     .padding(.horizontal, 16).padding(.vertical, 10)
+                    .disabled(!model.settingsStore.settings.aiProgressEnabled)
                     rowDivider
                     featureToggle("AI 任务结果扫光", detail: "任务成功时绿色、失败时红色渐变光带从左向右扫过一次", symbol: "arrow.right", keyPath: \.aiTaskResultSweepEnabled)
                         .disabled(!model.settingsStore.settings.aiProgressEnabled)
@@ -3279,6 +3280,7 @@ struct SettingsView: View {
         }
     }
 
+    /// Keeps monitoring independent of display selection so hiding a row does not silently disable its alerts.
     private func balanceProviderBinding(_ provider: AIProvider, monitored: Bool) -> Binding<Bool> {
         Binding(get: {
             let settings = model.settingsStore.settings

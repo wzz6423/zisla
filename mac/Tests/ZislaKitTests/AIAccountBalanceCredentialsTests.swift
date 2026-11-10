@@ -9,6 +9,7 @@ import Testing
 struct AIAccountBalanceCredentialsTests {
     let now = Date(timeIntervalSince1970: 1_910_000_000)
 
+    /// Injected official login files prove provider selection and expiry-clock use without touching real accounts.
     @Test func confirmedCLIAuthPathsUseReadOnlyCredentialsAndClock() throws {
         let token = jwt(["exp": 2_000_000_000, "sub": "fixture-user", "email": "fixture@example.test"])
         let fixtures: [(AIProvider, String, [String: Any])] = [
@@ -36,6 +37,7 @@ struct AIAccountBalanceCredentialsTests {
         #expect(try source.load(for: .cursor, at: now)?.accountID == "fixture")
     }
 
+    /// Expiry, API-key login, header injection, and custom-host failures must stop before credentialed network work.
     @Test func expiredUnsupportedAndHeaderInjectionFailWithoutRefreshOrWriting() throws {
         for payload in [["exp": 1_910_000_030], ["exp": true], [:]] as [[String: Any]] {
             #expect(throws: AIAccountBalanceError.credentialsExpired) { try AIAccountBalanceCredentials.claims(jwt(payload), at: now) }
@@ -51,6 +53,7 @@ struct AIAccountBalanceCredentialsTests {
         #expect(throws: AIAccountBalanceError.unsupportedLogin) { try source.load(for: .kimi, at: now) }
     }
 
+    /// Multiple official app entries may share one login but must not silently select between different accounts.
     @Test func copilotOfficialAppSourceHasStablePrecedenceAndConflictingLoginsFail() throws {
         let apps = try JSONSerialization.data(withJSONObject: [
             "github.com:Ov23liV9UpD7Rnfnskm3": ["access_token": "fixture-second", "login": "same-user"],
@@ -75,6 +78,7 @@ struct AIAccountBalanceCredentialsTests {
         #expect(try source.load(for: .copilot, at: now)?.accountID == "legacy-user")
     }
 
+    /// A website or region decision is authoritative, including failure, so native fallback cannot select another account.
     @Test func qoderReadsOnlySelectedRegionAndZedWebsiteFailureDoesNotReadNativeLogin() throws {
         var source = makeSource()
         source.websiteCookie = { website in
@@ -91,6 +95,7 @@ struct AIAccountBalanceCredentialsTests {
         #expect(throws: AIAccountBalanceError.invalidCredentials) { try source.load(for: .zed, at: now) }
     }
 
+    /// Commented settings remain readable while host overrides and invalid inline auth cannot escape their source boundary.
     @Test func zedJSONCSettingsKeepTrustedHostAndInlineOpenCodeAuthNeverFallsBack() throws {
         var source = makeSource()
         let settings = Data("""
@@ -119,6 +124,7 @@ struct AIAccountBalanceCredentialsTests {
         #expect(throws: AIAccountBalanceError.invalidResponse) { try source.load(for: .opencode, at: now) }
     }
 
+    /// Modern selections and sealed stores must supersede legacy provider hints and plaintext credential mirrors.
     @Test func zcodeSelectionUsesAuthoritativeRegistryAndNeverStaleEncryptedMirror() throws {
         let config = try JSONSerialization.data(withJSONObject: ["provider": ["builtin:zai-coding-plan": ["options": ["apiKey": "fixture-key"]]]])
         let settings = try JSONSerialization.data(withJSONObject: ["providerFamilyConnectionSelections": ["zai": ["kind": "individual-coding-plan"]],
@@ -139,6 +145,7 @@ struct AIAccountBalanceCredentialsTests {
         #expect(throws: AIAccountBalanceError.unsupportedLogin) { try source.load(for: .zcode, at: now) }
     }
 
+    /// Realm-specific tenant headers, inaccessible encryption, and a logout marker must yield distinct login outcomes.
     @Test func workbuddyRealmsEncryptedSessionsAndLogoutAreDistinct() throws {
         let path = "/fixture/Library/Application Support/CodeBuddyExtension/Data/Public/auth/workbuddy-desktop-ai.info"
         let data = try JSONSerialization.data(withJSONObject: ["auth": ["accessToken": "fixture", "expiresAt": 2_000_000_000_000,
@@ -154,6 +161,7 @@ struct AIAccountBalanceCredentialsTests {
         #expect(try source.load(for: .workbuddyAI, at: now) == nil)
     }
 
+    /// Temporary-file probes cover unchanged contents, nonblocking FIFO rejection, and size bounds without user credential access.
     @Test func credentialFilesRejectLinksNonRegularAndOversizeAndCloseDescriptors() throws {
         let root = FileManager.default.temporaryDirectory.appendingPathComponent("zisla-balance-files-\(UUID())")
         try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
@@ -175,6 +183,7 @@ struct AIAccountBalanceCredentialsTests {
         #expect(throws: AIAccountBalanceError.credentialsUnavailable) { try AIAccountBalanceCredentials.readRegularFile(file) }
     }
 
+    /// An injected Keychain query proves no-UI preflight and matching account/payload reads without querying the real Keychain.
     @Test func keychainAccountAndPayloadReadKeepNoUIPreflightAndFailureClassification() throws {
         var calls = 0
         let result = try AISubscriptionCredentials.readKeychainCredentialWithoutPrompt(service: "https://zed.dev", internetPassword: true,

@@ -7,6 +7,7 @@ import ZislaKit
 
 @MainActor
 struct AIAccountBalanceViewTests {
+    /// Pixel regions prove camera clearance and both summary lines without treating an image render as device acceptance.
     @Test(arguments: [CGFloat(0), 80, 180], [false, true])
     func compactBalanceKeepsBothLinesOutsidePhysicalCameraGap(centerInset: CGFloat, rightToLeft: Bool) throws {
         let width = centerInset + 320
@@ -33,6 +34,7 @@ struct AIAccountBalanceViewTests {
         #expect(rightTop > 0 && rightBottom > 0, "The detailed compact style must render both quota lines")
     }
 
+    /// Offscreen rendering covers edge-dependent dimensions and nonempty quota content across LTR and RTL layouts.
     @Test(arguments: [IslandEdge.top, .bottom, .left, .right], [AppLanguage.simplifiedChinese, .english, .arabic])
     func customAndFloatingShapesRenderTwoQuotaLines(edge: IslandEdge, language: AppLanguage) throws {
         let thickness: CGFloat = 34, length: CGFloat = 300
@@ -56,6 +58,7 @@ struct AIAccountBalanceViewTests {
         #expect(colored > 0)
     }
 
+    /// A long model identity must consume extra vertical space instead of compressing values or overflowing a narrow RTL row.
     @Test func narrowRTLBalanceRowsWrapLongIdentityWithoutHorizontalOverflow() async throws {
         let window = AIAccountQuotaWindow(id: "model", kind: .model, remainingPercent: 10,
             resetsAt: Date(timeIntervalSince1970: 1_910_001_000), name: String(repeating: "gemini-long-model ", count: 6))
@@ -68,6 +71,7 @@ struct AIAccountBalanceViewTests {
         #expect(host.fittingSize.height > 70, "Long window identities must use additional lines instead of squeezing the quota value")
     }
 
+    /// Large task counts must saturate the bounded upper viewport so quota below it remains reachable by outer scrolling.
     @Test func boundedTaskViewportLeavesBalanceReachableAfterManyTasks() {
         for count in [0, 1, 6, 20, 1_000] {
             let height = AIProgressModuleView.taskSectionHeight(taskCount: count, availableHeight: 500)

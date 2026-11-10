@@ -730,6 +730,7 @@ final class AppModel: ObservableObject {
   /// Snapshot of locally installed applications used to resolve copied names.
   private var installedApplications: [InstalledApplication] = []
 
+  /// Wires observable services with weak ownership; quota publications and language changes update notices independently.
   private init() {
     let networkProxyURL = settingsStore.settings.networkProxyURL
     let networkProxyEnabled = settingsStore.settings.networkProxyEnabled
@@ -3177,6 +3178,7 @@ final class AppModel: ObservableObject {
     )
   }
 
+  /// Reconciles service lifecycles with settings; disabling AI stops pending quota work before notices are updated.
   private func apply(settings: FeatureSettings, requestWindowPreviewPermissions: Bool = false) {
     dailyBriefing.configure(settings: settings.dailyBriefing, directory: saveLocations[.dailyBriefing],
       language: languageStore.language)

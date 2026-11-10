@@ -12,6 +12,8 @@ public final class AIAccountBalanceService: AIAccountBalanceDetecting, @unchecke
     private let museUsage: @Sendable () async throws -> Data?
     private let debugBalances: @Sendable () -> [AIAccountBalance]?
 
+    /// Uses read-only login sources and a bounded Muse usage command with automatic updates disabled.
+    /// An explicit debug fixture isolates all account reads, including when the fixture is malformed.
     public convenience init(home: URL = FileManager.default.homeDirectoryForCurrentUser,
                             environment: [String: String] = ProcessInfo.processInfo.environment,
                             now: @escaping @Sendable () -> Date = Date.init) {
@@ -37,6 +39,7 @@ public final class AIAccountBalanceService: AIAccountBalanceDetecting, @unchecke
         })
     }
 
+    /// Isolates explicit authentication from ambient cookies and caches, and blocks redirects before credentials move.
     init(credentials: @escaping @Sendable (AIProvider, Date, AIAccountBalanceQoderRegion) throws -> AIAccountBalanceCredential?,
          configuration: URLSessionConfiguration = .ephemeral, now: @escaping @Sendable () -> Date = Date.init,
          museUsage: @escaping @Sendable () async throws -> Data? = { nil },
@@ -55,6 +58,8 @@ public final class AIAccountBalanceService: AIAccountBalanceDetecting, @unchecke
 
     deinit { session.invalidateAndCancel() }
 
+    /// Queries each selected shared account once with at most three groups in flight and stable result ordering.
+    /// Unselected groups never read credentials; provider failures become rows while cancellation propagates.
     public func accountBalances(for providers: Set<AIProvider>, qoderRegion: AIAccountBalanceQoderRegion = .global) async throws -> [AIAccountBalance] {
         try Task.checkCancellation()
         if let fixtures = debugBalances() {
@@ -85,6 +90,8 @@ public final class AIAccountBalanceService: AIAccountBalanceDetecting, @unchecke
         }
     }
 
+    /// Publishes a complete validated reading or a sanitized status, never partial windows or raw error text.
+    /// A cancelled query must escape the provider failure path instead of appearing as an unavailable balance.
     private func refresh(_ group: [AIProvider], selected: Set<AIProvider>, qoderRegion: AIAccountBalanceQoderRegion) async throws -> AIAccountBalance {
         let provider = group[0]
         var row = AIAccountBalanceCatalog.placeholder(for: group.filter { selected.contains($0) })
@@ -116,6 +123,8 @@ public final class AIAccountBalanceService: AIAccountBalanceDetecting, @unchecke
         }
     }
 
+    /// Uses fixed provider endpoints and the chosen realm; website authentication never falls back to native login.
+    /// WorkBuddy AI retries the same host's versioned endpoint only for its known 404 compatibility response.
     private func fetch(_ provider: AIProvider, credential: AIAccountBalanceCredential, now: Date) async throws -> [AIAccountQuotaWindow] {
         let data: Data
         switch provider {
@@ -204,6 +213,8 @@ public final class AIAccountBalanceService: AIAccountBalanceDetecting, @unchecke
         return try AIAccountBalanceParser.parse(data, provider: provider, now: now)
     }
 
+    /// Sends credentials only to an internal fixed endpoint with a 15-second timeout and a 1 MiB streaming limit.
+    /// The session blocks redirects, and an unexpected response URL or status invalidates the entire reading.
     private func request(_ endpoint: String, credential: AIAccountBalanceCredential, cookie: Bool = false,
                          headers: [String: String] = [:], body: [String: Any]? = nil, rawBody: Data? = nil) async throws -> Data {
         try Task.checkCancellation()
@@ -232,6 +243,7 @@ public final class AIAccountBalanceService: AIAccountBalanceDetecting, @unchecke
         return data
     }
 
+    /// Classifies expected failures without copying response bodies, credential paths, or secrets into UI text.
     private static func status(_ error: Error) -> AIAccountBalanceStatus {
         switch error {
         case AIAccountBalanceError.credentialsExpired, AIAccountBalanceError.httpStatus(401), AIAccountBalanceError.httpStatus(403): .credentialsExpired

@@ -26,6 +26,8 @@ public final class AIAccountBalanceNoticeController {
         queue.removeAll(withIDPrefix: "ai-balance-low-")
     }
 
+    /// Notifies once per low-quota episode and reissues escalation; healthy readings rearm an enabled episode.
+    /// Monitoring governs alerts independently of display selection; disabling alerts clears their episodes.
     public func update(balances: [AIAccountBalance], settings: FeatureSettings, language: AppLanguage,
                        at date: Date = Date()) {
         self.balances = balances
@@ -71,6 +73,7 @@ public final class AIAccountBalanceNoticeController {
         }
     }
 
+    /// Persistent quota requires custom placement and both monitoring and display selection for an alias.
     private var pinnedBalances: [AIAccountBalance] {
         guard settings.aiProgressEnabled, settings.sideNoticesEnabled, settings.islandPlacement.mode == .custom,
               settings.aiAccountBalancePinnedInCustomIsland else { return [] }
@@ -81,6 +84,7 @@ public final class AIAccountBalanceNoticeController {
         }.sorted { $0.id < $1.id }
     }
 
+    /// Rotates stable account IDs in five-second slots and removes the persistent notice when selection is empty.
     func updatePinned(at date: Date) {
         let rows = pinnedBalances
         guard !rows.isEmpty else { queue.remove(id: Self.pinnedID); return }
@@ -94,10 +98,13 @@ public final class AIAccountBalanceNoticeController {
         if !queue.updateIfPresent(notice) { queue.enqueue(notice, expiresAfter: nil) }
     }
 
+    /// Includes persistent quota for layout without treating it as a new transient low-balance episode.
     public nonisolated static func isBalanceNotice(_ notice: IslandNotice) -> Bool {
         AIAccountBalance.isLowBalanceNotice(notice) || notice.id == pinnedID
     }
 
+    /// Compact mode identifies the limiting window, including exhausted credits beside healthy percentages.
+    /// Detailed mode carries the bounded summary in metadata so every compact shape renders the same reading.
     private nonisolated static func notice(_ balance: AIAccountBalance, id: String, style: MediaCompactStyle,
                                           language: AppLanguage, createdAt: Date) -> IslandNotice {
         let provider = balance.providerTitle(language: language)
