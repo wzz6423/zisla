@@ -188,7 +188,7 @@ public final class FileShelfStore: ObservableObject {
         shelfOrder[record.id] = record.shelfOrder
         items.append(item)
         onDailyBriefingActivity?(.shelfItemsAdded, 1, 0, Date())
-        errorDescription = nil
+        errorDescription = loadErrorDescription
         do { _ = try cacheScreenshot(record) }
         catch { errorDescription = error.localizedDescription }
         return item
@@ -427,7 +427,7 @@ public final class FileShelfStore: ObservableObject {
                 try screenshotDatabase.remove(ids: [id])
                 shelfOrder[id] = nil
                 items = remaining
-                errorDescription = nil
+                errorDescription = loadErrorDescription
                 removeScreenshotCache(id: id)
             } catch { errorDescription = error.localizedDescription }
             return
@@ -440,7 +440,7 @@ public final class FileShelfStore: ObservableObject {
     }
 
     public func removeAll() {
-        errorDescription = nil
+        errorDescription = loadErrorDescription
         let screenshots = items.filter { $0.screenshotMetadata != nil }
         // Each store commits separately; failed commits must retain their cards.
         if !screenshots.isEmpty {
@@ -448,7 +448,7 @@ public final class FileShelfStore: ObservableObject {
                 try screenshotDatabase.remove(ids: screenshots.map(\.id))
                 for screenshot in screenshots { shelfOrder[screenshot.id] = nil }
                 items.removeAll { $0.screenshotMetadata != nil }
-                errorDescription = nil
+                errorDescription = loadErrorDescription
                 screenshots.forEach { removeScreenshotCache(id: $0.id) }
             } catch {
                 errorDescription = error.localizedDescription
