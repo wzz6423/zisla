@@ -8,14 +8,18 @@ import SwiftUI
 /// Drives the standalone history window from the island module, mirroring the disk-cleanup panel:
 /// the island is a floating panel, so an attached sheet would be misplaced.
 final class SystemMetricsHistoryPanelPresentationState: ObservableObject {
-    @Published private(set) var isPresented = false
+    @Published private(set) var requestID: UUID?
 
+    var isPresented: Bool { requestID != nil }
+
+    /// Creates a distinct request so another click can raise an already visible history window.
     func present() {
-        isPresented = true
+        requestID = UUID()
     }
 
+    /// Clearing the request prevents stale view updates from reopening a dismissed window.
     func dismiss() {
-        isPresented = false
+        requestID = nil
     }
 }
 
@@ -29,7 +33,7 @@ struct SystemMetricsHistoryPanelPresenter: NSViewRepresentable {
 
     func updateNSView(_ nsView: NSView, context: Context) {
         context.coordinator.update(
-            presenting: presentationState.isPresented,
+            requestID: presentationState.requestID,
             dismissPresentation: presentationState.dismiss,
             service: service,
             hostWindow: nsView.window
@@ -47,31 +51,44 @@ struct SystemMetricsHistoryPanelPresenter: NSViewRepresentable {
     @MainActor
     final class Coordinator {
         private var panel: SystemMetricsHistoryPanel?
+        private var handledRequestID: UUID?
         private var dismissPresentation: () -> Void = {}
         private var isAwaitingDismissalState = false
+        private let requestIslandCollapse: () -> Void
 
+        init(
+            panel: SystemMetricsHistoryPanel? = nil,
+            requestIslandCollapse: @escaping () -> Void = { AppModel.shared.islandCollapseRequested = true }
+        ) {
+            self.panel = panel
+            self.requestIslandCollapse = requestIslandCollapse
+        }
+
+        /// Raises repeated user requests even when visible, while passive updates respect dismissal and minimization.
         func update(
-            presenting: Bool,
+            requestID: UUID?,
             dismissPresentation: @escaping () -> Void,
             service: SystemMonitorService,
             hostWindow: NSWindow?
         ) {
             self.dismissPresentation = dismissPresentation
-            guard presenting else {
+            guard let requestID else {
                 isAwaitingDismissalState = false
                 dismiss()
                 return
             }
 
             let panel = panel ?? makePanel(service: service)
-            guard SystemCleanupPanel.shouldOrderFront(
+            let isNewRequest = requestID != handledRequestID
+            handledRequestID = requestID
+            guard isNewRequest || SystemCleanupPanel.shouldOrderFront(
                 isVisible: panel.isVisible,
                 isMiniaturized: panel.isMiniaturized,
                 isAwaitingDismissalState: isAwaitingDismissalState
             ) else { return }
             WindowPlacement.center(panel, on: hostWindow?.screen)
             panel.present(over: hostWindow)
-            AppModel.shared.islandCollapseRequested = true
+            requestIslandCollapse()
         }
 
         func dismiss() {
@@ -131,6 +148,7 @@ struct SystemMetricsHistoryPanelPresenter: NSViewRepresentable {
 class SystemMetricsHistoryPanel: NSWindow {
     var onCancel: () -> Void = {}
 
+    /// Relinquishes Settings' elevated key-window level while preserving the island's focus policy.
     func present(over hostWindow: NSWindow?) {
         if hostWindow is SettingsWindow {
             // Settings raises its level while key; hand over focus so the history window stays visible.

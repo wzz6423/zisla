@@ -62,6 +62,7 @@ struct SystemMetricsHistoryLocalizationTests {
     }
 
     @Test(arguments: AppLanguage.allCases)
+    /// Verifies requested locales independently of the app's persisted language to catch silent fallback.
     func historyKeysResolveInRequestedLanguage(language: AppLanguage) throws {
         let table = try #require(Self.stringsTable(for: language))
         for key in try Self.historyKeys() {
@@ -104,6 +105,7 @@ struct SystemMetricsHistoryLocalizationTests {
         "SystemMetricsHistoryView.swift",
     ]
 
+    /// Includes environment-localized settings actions alongside the existing history window's runtime keys.
     private static func historyKeys() throws -> [String] {
         let call = try NSRegularExpression(pattern: #"AppLocalization\.(?:text|string)\(([^()]*)\)"#)
         let literal = try NSRegularExpression(pattern: #""((?:[^"\\]|\\.)*)""#)

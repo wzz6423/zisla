@@ -10,6 +10,7 @@ import ZislaKit
 @MainActor @Suite(.serialized)
 struct SystemMetricsHistorySettingsActionsTests {
     @Test(arguments: [AppLanguage.simplifiedChinese, .english, .arabic], [false, true])
+    /// Uses archived data with recording disabled so action availability cannot accidentally depend on the toggle.
     func buttonsFollowArchivedHistoryWithoutChangingRecording(language: AppLanguage, empty: Bool) async throws {
         let persistence = SettingsHistoryPersistence(records: empty ? [] : [
             SystemMetricsRecord(timestamp: Date(timeIntervalSince1970: 60), cpuUsage: 0.42),
@@ -46,6 +47,7 @@ struct SystemMetricsHistorySettingsActionsTests {
     }
 
     @Test
+    /// Keeps the history content mounted to reproduce clearing from a separate settings entry point.
     func historyWindowReloadsAfterAnotherEntryPointClearsTheArchive() async throws {
         let releaseAccessibility = EnhancedAccessibilityTestScope.acquire()
         defer { releaseAccessibility() }
@@ -65,6 +67,7 @@ struct SystemMetricsHistorySettingsActionsTests {
         window.isReleasedWhenClosed = false
         window.contentView = host
         defer { window.contentView = nil; window.close() }
+        /// Reads semantic labels instead of chart internals while SwiftUI replaces the old content.
         func displayedText(_ key: String) -> Bool {
             func descendants(_ object: NSObject) -> [NSObject] {
                 let children = object.responds(to: NSSelectorFromString("accessibilityChildren"))
@@ -78,6 +81,7 @@ struct SystemMetricsHistorySettingsActionsTests {
                 }
             }
         }
+        /// Pumps layout until both the replacement and removal are visible; bounds the regression wait.
         func awaitText(_ key: String, removing staleKey: String? = nil) async {
             for _ in 0..<100 where !displayedText(key) || staleKey.map(displayedText) == true {
                 host.layoutSubtreeIfNeeded()
@@ -99,6 +103,7 @@ struct SystemMetricsHistorySettingsActionsTests {
     }
 
     @Test(arguments: [false, true])
+    /// Unzips the saved workbook to prove export includes the archive without changing recording state.
     func exportWritesAllArchivedRecordsWithoutEnablingRecording(empty: Bool) async throws {
         let directory = try temporaryDirectory()
         defer { try? FileManager.default.removeItem(at: directory) }
@@ -217,6 +222,7 @@ struct SystemMetricsHistorySettingsActionsTests {
             }
         }
 
+        /// Locates localized buttons by semantic role so the fixture also verifies accessible labels.
         func button(_ key: String) -> NSObject? {
             func descendants(_ object: NSObject) -> [NSObject] {
                 let children = object.responds(to: NSSelectorFromString("accessibilityChildren"))
@@ -266,6 +272,7 @@ private final class SettingsHistoryPersistence: SystemMetricsHistoryPersisting, 
         return records
     }
 
+    /// Honors persistence capacity under the same lock used by background history reads and clears.
     func appendRecord(_ record: SystemMetricsRecord, capacity: Int?) {
         lock.lock()
         defer { lock.unlock() }
