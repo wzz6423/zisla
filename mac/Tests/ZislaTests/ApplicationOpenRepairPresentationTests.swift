@@ -183,6 +183,33 @@ struct ApplicationOpenRepairPresentationTests {
     }
 
     @Test
+    func unrelatedShelfDropsPreserveQueuedRepairPrompts() async throws {
+        let fixture = try Fixture()
+        defer { fixture.remove() }
+        let unrelated: [[URL]] = [[], [fixture.directory.appendingPathComponent("readme.txt")],
+            [URL(string: "https://example.com/Other.app")!]]
+        for fromSystemAlert in [false, true] {
+            for urls in unrelated {
+                let controller = makeController()
+                let availability = PresentationAvailability()
+                var settings = FeatureSettings.default
+                settings.applicationOpenFailureMonitoringEnabled = true
+                let presenter = ApplicationOpenRepairPresenter(controller: controller, settings: { settings },
+                    canPresent: { availability.canPresent })
+                presenter.receive([fixture.app], fromSystemAlert: fromSystemAlert)
+                await presenter.task?.value
+                presenter.receive(urls)
+                await presenter.task?.value
+                #expect(controller.presentation.detection == nil)
+                availability.canPresent = true
+                presenter.flush()
+                #expect(controller.presentation.detection?.actions == [.repairAndOpenApp(fixture.app.standardizedFileURL)],
+                    "Unrelated drop \(urls) must preserve the queued repair prompt")
+            }
+        }
+    }
+
+    @Test
     func repairActionWaitsForAnExplicitClickAndFiresOnce() throws {
         let controller = makeController()
         let url = URL(fileURLWithPath: "/tmp/Example.app")

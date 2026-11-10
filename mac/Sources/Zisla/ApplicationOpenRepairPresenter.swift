@@ -22,6 +22,8 @@ final class ApplicationOpenRepairPresenter {
     }
 
     func receive(_ urls: [URL], fromSystemAlert: Bool = false) {
+        let urls = urls.filter { $0.isFileURL && $0.pathExtension.lowercased() == "app" }
+        guard !urls.isEmpty else { return }
         cancel()
         requiresSystemMonitoring = fromSystemAlert
         let settings = settings()

@@ -848,7 +848,9 @@ struct SettingsView: View {
                                         model.settingsStore.settings.applicationOpenFailureMonitoringEnabled = enabled
                                         if enabled {
                                             model.refreshAssistantAccessibility()
-                                            model.openAssistantAccessibilitySettings()
+                                            if !model.assistantAccessibilityGranted {
+                                                selectSettingsSection(.permissions, searchTarget: .row(OnboardingPermissionID.accessibility.titleKey))
+                                            }
                                         }
                                     }
                                 ))
@@ -858,7 +860,9 @@ struct SettingsView: View {
                             if model.settingsStore.settings.applicationOpenFailureMonitoringEnabled, !model.assistantAccessibilityGranted {
                                 rowDivider
                                 settingRow(symbol: "hand.raised", title: "辅助功能", detail: "", isNested: true) {
-                                    Button { model.openAssistantAccessibilitySettings() } label: { AppLocalizedText("打开系统设置") }
+                                    Button {
+                                        selectSettingsSection(.permissions, searchTarget: .row(OnboardingPermissionID.accessibility.titleKey))
+                                    } label: { AppLocalizedText("权限") }
                                 }
                             }
                         }

@@ -56,6 +56,7 @@ public struct ApplicationOpenRepairService: Sendable {
         self.removeQuarantine = removeQuarantine
     }
 
+    /// Checks quarantine flags without changing the bundle; directory traversal belongs off the main actor.
     public static func needsRepair(at input: URL) -> Bool {
         guard !Task.isCancelled else { return false }
         guard let url = try? ApplicationOpenRepairBundle.applicationURL(input) else { return false }
@@ -75,6 +76,7 @@ public struct ApplicationOpenRepairService: Sendable {
         return false
     }
 
+    /// Opens only after integrity and policy checks. A failure after partial flag removal requires a retry.
     public func repairAndOpen(at input: URL) async throws {
         let cancellation = ApplicationOpenRepairCancellation()
         try await withTaskCancellationHandler {

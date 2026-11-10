@@ -36,6 +36,7 @@ public final class ApplicationOpenFailureMonitor {
 
     isolated deinit { stop() }
 
+    /// Requires existing Accessibility access; only an unambiguous system-alert target reaches the callback.
     public func setEnabled(_ enabled: Bool, onApplication: @escaping (URL) -> Void) {
         guard enabled, dependencies.isTrusted() else { stop(); return }
         self.onApplication = onApplication
