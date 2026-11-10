@@ -2503,6 +2503,20 @@
 "快递单号" = "Volgnummers";
 "会议日程" = "Vergaderafspraken";
 "会议地点" = "Vergaderlocatie";
+
+"会议倒计时" = "Aftellen tot vergadering";
+"会议进行中" = "Vergadering bezig";
+"加入会议" = "Deelnemen aan vergadering";
+"加入会议：%@ · %@" = "Deelnemen aan vergadering: %@ · %@";
+"会议便签" = "Vergadernotities";
+"新建会议便签" = "Nieuwe vergadernotitie";
+"关联现有便签" = "Bestaande notitie koppelen";
+"取消便签关联" = "Notitie ontkoppelen";
+"会议已不可加入，请刷新日程" = "Deze vergadering is niet meer beschikbaar. Vernieuw je agenda.";
+"无法打开会议链接" = "De vergaderlink kan niet worden geopend";
+"无法关联会议便签" = "De vergadernotitie kan niet worden gekoppeld";
+"日历" = "Agenda";
+
 "日程备注" = "Afspraaknotities";
 "结束时间" = "Eindtijd";
 "百度地图" = "Baidu Maps";

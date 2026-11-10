@@ -2502,6 +2502,20 @@
 "快递单号" = "Tracking Numbers";
 "会议日程" = "Meeting Schedules";
 "会议地点" = "Meeting Location";
+
+"会议倒计时" = "Meeting Countdown";
+"会议进行中" = "Meeting in progress";
+"加入会议" = "Join Meeting";
+"加入会议：%@ · %@" = "Join meeting: %@ · %@";
+"会议便签" = "Meeting Notes";
+"新建会议便签" = "New Meeting Note";
+"关联现有便签" = "Link Existing Note";
+"取消便签关联" = "Unlink Note";
+"会议已不可加入，请刷新日程" = "This meeting is no longer available. Refresh your agenda.";
+"无法打开会议链接" = "Unable to open the meeting link";
+"无法关联会议便签" = "Unable to link the meeting note";
+"日历" = "Calendar";
+
 "日程备注" = "Event Notes";
 "结束时间" = "End Time";
 "百度地图" = "Baidu Maps";

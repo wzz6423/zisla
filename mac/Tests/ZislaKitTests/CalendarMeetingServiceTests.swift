@@ -266,6 +266,119 @@ struct CalendarMeetingServiceTests {
     }
 
     @Test
+    func resolveMeetingUsesTheCurrentLinkAfterRenamingAndRescheduling() throws {
+        let fixture = MeetingCalendarFixture()
+        let event = try fixture.event()
+        let snapshot = CalendarService.makeEventSnapshot(event)
+        event.title = "Renamed"; event.startDate = event.startDate.addingTimeInterval(3_600)
+        event.endDate = event.endDate.addingTimeInterval(3_600)
+        event.url = URL(string: "https://zoom.us/j/123456789")
+        fixture.store.identifierEvent = event
+        let service = fixture.service()
+        defer { service.stop() }
+        let current = try #require(service.resolveMeeting(snapshot))
+        #expect(current.meetingURL == event.url)
+        #expect(current.title == "Renamed")
+        #expect(current.startDate == event.startDate)
+        #expect(current.eventIdentity == snapshot.eventIdentity)
+        #expect(fixture.store.identifierLookups == [snapshot.sourceIdentifier])
+        #expect(fixture.store.queries.isEmpty)
+    }
+
+    @Test(arguments: ["deleted", "cancelled", "all-day", "ended", "unsafe-link", "wrong-calendar"])
+    func staleOrIneligibleMeetingsCannotBeResolvedForJoining(reason: String) throws {
+        let fixture = MeetingCalendarFixture()
+        let event = try fixture.event()
+        let snapshot = CalendarService.makeEventSnapshot(event)
+        switch reason {
+        case "cancelled": event.fixtureStatus = .canceled
+        case "all-day": event.isAllDay = true
+        case "ended": fixture.date = event.endDate
+        case "unsafe-link": event.url = URL(string: "https://meet.google.com.attacker.test/abc-defg-hij")
+        case "wrong-calendar": event.calendar = try fixture.calendar(identifier: "other")
+        default: break
+        }
+        fixture.store.identifierEvent = reason == "deleted" ? nil : event
+        fixture.store.fixtures = reason == "deleted" ? [] : [event]
+        let service = fixture.service()
+        defer { service.stop() }
+        #expect(service.resolveMeeting(snapshot) == nil)
+        #expect(fixture.store.identifierLookups == [snapshot.sourceIdentifier])
+        #expect(fixture.store.eventPermissionRequests == 0)
+        #expect(fixture.store.reminderPermissionRequests == 0)
+    }
+
+    @Test(arguments: [EKAuthorizationStatus.notDetermined, .denied, .restricted, .writeOnly])
+    func joiningDoesNotReadOrPromptAfterCalendarPermissionIsUnavailable(status: EKAuthorizationStatus) throws {
+        let fixture = MeetingCalendarFixture()
+        let snapshot = CalendarService.makeEventSnapshot(try fixture.event())
+        fixture.eventAccess = status
+        let service = fixture.service()
+        defer { service.stop() }
+        #expect(service.resolveMeeting(snapshot) == nil)
+        #expect(fixture.store.identifierLookups.isEmpty)
+        #expect(fixture.store.queries.isEmpty)
+        #expect(fixture.store.eventPermissionRequests == 0)
+        #expect(fixture.store.reminderPermissionRequests == 0)
+    }
+
+    @Test(arguments: ["identity", "source"])
+    func joiningWithoutTheOriginalIdentityOrSourceDoesNotReadTheStore(missing: String) throws {
+        let fixture = MeetingCalendarFixture()
+        var snapshot = CalendarService.makeEventSnapshot(try fixture.event())
+        if missing == "identity" { snapshot.eventIdentity = nil }
+        else { snapshot.sourceIdentifier = nil }
+        let service = fixture.service()
+        defer { service.stop() }
+        #expect(service.resolveMeeting(snapshot) == nil)
+        #expect(fixture.store.identifierLookups.isEmpty)
+        #expect(fixture.store.queries.isEmpty)
+    }
+
+    @Test
+    func repeatedOccurrenceIsResolvedByItsStableIdentityInsteadOfTheFirstEvent() throws {
+        let fixture = MeetingCalendarFixture()
+        let first = try fixture.event()
+        first.fixtureRecurring = true; first.fixtureOccurrence = first.startDate
+        let selected = try fixture.event(start: first.startDate.addingTimeInterval(86_400))
+        selected.fixtureRecurring = true; selected.fixtureOccurrence = selected.startDate
+        let snapshot = CalendarService.makeEventSnapshot(selected)
+        let originalOccurrence = selected.startDate!
+        selected.fixtureDetached = true; selected.fixtureRecurring = false
+        selected.startDate = originalOccurrence.addingTimeInterval(600)
+        selected.endDate = originalOccurrence.addingTimeInterval(4_200)
+        selected.url = URL(string: "https://meeting.tencent.com/dm/UpdatedMeeting")
+        fixture.store.identifierEvent = first
+        fixture.store.fixtures = [first, selected]
+        let service = fixture.service()
+        defer { service.stop() }
+        let current = try #require(service.resolveMeeting(snapshot))
+        #expect(current.eventIdentity == snapshot.eventIdentity)
+        #expect(current.eventIdentity?.occurrenceDate == originalOccurrence)
+        #expect(current.meetingURL == selected.url)
+        #expect(current.startDate == selected.startDate)
+        #expect(fixture.store.queries.last == DateInterval(start: snapshot.startDate.addingTimeInterval(-1),
+            end: snapshot.endDate.addingTimeInterval(1)))
+    }
+
+    @Test
+    func anUnlocatableMovedOccurrenceFailsWithoutJoiningAnotherOccurrence() throws {
+        let fixture = MeetingCalendarFixture()
+        let event = try fixture.event()
+        event.fixtureRecurring = true; event.fixtureOccurrence = event.startDate
+        let snapshot = CalendarService.makeEventSnapshot(event)
+        let other = try fixture.event(start: event.startDate.addingTimeInterval(86_400))
+        other.fixtureRecurring = true; other.fixtureOccurrence = other.startDate
+        fixture.store.identifierEvent = other
+        event.startDate = event.startDate.addingTimeInterval(3 * 86_400)
+        event.endDate = event.startDate.addingTimeInterval(3_600)
+        fixture.store.fixtures = [other, event]
+        let service = fixture.service()
+        defer { service.stop() }
+        #expect(service.resolveMeeting(snapshot) == nil)
+    }
+
+    @Test
     func cancelledAndAllDayEventsAreExcludedAtTheEventKitBoundary() throws {
         let fixture = MeetingCalendarFixture()
         let normal = try fixture.event(id: "normal")
@@ -536,11 +649,18 @@ private final class MeetingEvent: EKEvent {
 private final class MeetingEventStore: EKEventStore {
     var fixtures: [EKEvent] = []
     var queries: [DateInterval] = []
+    var identifierEvent: EKEvent?
+    var identifierLookups: [String] = []
     var eventPermissionRequests = 0
     var permissionGate: MeetingSleeps?
     var controlledPermissionKind = "event"
     var reminderPermissionRequests = 0
     var reminderCompletion: (([EKReminder]?) -> Void)?
+
+    override func event(withIdentifier identifier: String) -> EKEvent? {
+        identifierLookups.append(identifier)
+        return identifierEvent
+    }
 
     override func predicateForEvents(withStart start: Date, end: Date, calendars: [EKCalendar]?) -> NSPredicate {
         queries.append(DateInterval(start: start, end: end))

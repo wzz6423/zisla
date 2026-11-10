@@ -5,6 +5,20 @@ import Testing
 
 struct CompactStatusPriorityTests {
     @Test
+    func legacyMeetingInsertionKeepsTheUsersOtherPrioritiesAndCustomMeetingOrder() throws {
+        let old = CompactStatusPriority.defaultOrder.filter { $0 != .meeting }
+        let reversed = Array(old.reversed())
+        let normalized = CompactStatusPriority.normalized(reversed)
+        #expect(normalized.filter { $0 != .meeting } == reversed)
+        #expect(normalized.firstIndex(of: .meeting) == normalized.firstIndex(of: .focusCountdown)! - 1)
+        let custom = [.meeting, .media, .focusCountdown] + reversed.filter { $0 != .media && $0 != .focusCountdown }
+        #expect(CompactStatusPriority.normalized(custom) == custom)
+        #expect(CompactStatusPriority.normalized(normalized) == normalized)
+        let settings = FeatureSettings(compactStatusPriority: normalized)
+        #expect(try JSONDecoder().decode(FeatureSettings.self, from: JSONEncoder().encode(settings)) == settings)
+    }
+
+    @Test
     func machineMonitorIsAppendedToLegacyPriorityOrders() throws {
         #expect(CompactStatusPriority.defaultOrder.last?.rawValue == "systemMonitor")
         let data = Data(#"{"compactStatusPriority":["media","transient","media","aiActivity"]}"#.utf8)
@@ -32,6 +46,7 @@ struct CompactStatusPriorityTests {
             .videoDownload,
             .browserDownload,
             .mail,
+            .meeting,
             .focusCountdown,
             .focusMode,
             .aiActivity,

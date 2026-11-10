@@ -27,6 +27,7 @@ final class SideNoticePresenter {
         statusIcons.filter { !$0.isSystemMonitor || settingsStore.settings.systemMonitorEnabled }
     }
     var onCompactLayoutChanged: ((CGDirectDisplayID, Bool, CGFloat?, CGFloat?, CGSize?) -> Void)?
+    var onJoinMeeting: ((String) -> Void)?
     private var isStopped = false
     private let now: () -> Date
     private let reduceMotion: () -> Bool
@@ -600,7 +601,8 @@ final class SideNoticePresenter {
             settingsStore: settingsStore,
             resultSweep: resultSweep,
             onStatusHidden: { [weak self] in self?.updatePanels() },
-            onCompactLengthChanged: { [weak self] _ in self?.updatePanels() }
+            onCompactLengthChanged: { [weak self] _ in self?.updatePanels() },
+            onJoinMeeting: { [weak self] in self?.onJoinMeeting?($0) }
         )
         let hostingView = NSHostingView(
             rootView: AppLanguageEnvironment(languageStore: languageStore, content: rootView)
@@ -629,6 +631,7 @@ final class SideNoticePresenter {
             || notice.id.hasPrefix("media-active-")
             || notice.id.hasPrefix("background-sound-")
             || notice.id.hasPrefix("focus-countdown-")
+            || notice.id.hasPrefix(MeetingCountdown.noticePrefix)
             || notice.id.hasPrefix("focus-mode-")
             || notice.id.hasPrefix("mail-notification-")
             || isTransientCompactNotice(notice)

@@ -674,6 +674,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
             displayIDs: model.settingsStore.settings.activityNoticeDisplayIDs,
             isScreenLocked: lockScreenOverlayController.isScreenLocked
         )
+        noticePresenter?.onJoinMeeting = { model.joinMeetingNotice($0) }
         model.userCarePresentationAllowed = { [weak self, weak coordinator] in
             guard let self else { return false }
             return coordinator?.isRunning == true

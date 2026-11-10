@@ -317,6 +317,22 @@ public final class CalendarService: ObservableObject {
         meetingEvents = MeetingWorkflow.meetings(in: store.events(matching: predicate).map(Self.makeEventSnapshot), at: date)
     }
 
+    public func resolveMeeting(_ snapshot: CalendarEventSnapshot) -> CalendarEventSnapshot? {
+        updateAuthorizationStatuses()
+        guard hasEventAccess, let identity = snapshot.eventIdentity, let identifier = snapshot.sourceIdentifier else { return nil }
+        let date = environment.now()
+        if let event = store.event(withIdentifier: identifier) {
+            let current = Self.makeEventSnapshot(event)
+            if current.eventIdentity == identity {
+                return MeetingWorkflow.meetings(in: [current], at: date).first
+            }
+        }
+        let predicate = store.predicateForEvents(withStart: snapshot.startDate.addingTimeInterval(-1),
+            end: snapshot.endDate.addingTimeInterval(1), calendars: nil)
+        return MeetingWorkflow.meetings(in: store.events(matching: predicate).map(Self.makeEventSnapshot), at: date)
+            .first { $0.eventIdentity == identity }
+    }
+
     public func refresh(referenceDate: Date = Date()) async {
         queryAnchorDate = referenceDate
         refreshGeneration &+= 1

@@ -6,6 +6,50 @@ import Testing
 @testable import ZislaKit
 
 struct SideNoticeLayoutTests {
+    @Test @MainActor
+    func meetingCountdownUsesCompactPriorityAndCannotConsumeOrdinaryNoticeCapacity() throws {
+        let meeting = IslandNotice(id: "meeting-countdown-fixture-left", title: "Team", detail: "05:00",
+            side: .left, metadata: ["eventID": "fixture"])
+        var settings = FeatureSettings.default
+        let media = IslandNotice(id: "media-active-fixture", title: "Music")
+        #expect(SideNoticeLayoutEngine.selectedCompactStatusPriority(for: [media, meeting], settings: settings) == .meeting)
+        settings.compactStatusPriority = [.media] + settings.compactStatusPriority.filter { $0 != .media }
+        #expect(SideNoticeLayoutEngine.selectedCompactStatusPriority(for: [media, meeting], settings: settings) == .media)
+        #expect(CompactStatusVisibilityPolicy.mustRemainVisible(notices: [meeting], activityDuration: .threeSeconds,
+            focusDuration: .threeSeconds))
+        #expect(engine.presentation(for: [meeting], compactWingsEnabled: false).ordinaryNotices.isEmpty)
+        let presentation = try #require(engine.compactPillPresentations(for: [meeting], settings: settings).first)
+        #expect(presentation.priority == .meeting && presentation.notice == meeting && presentation.text == "05:00")
+        #expect(engine.compactBarSizing(for: [meeting], settings: settings)?.sideExtension == 40)
+        let queue = SideNoticeQueue(capacityPerSide: 1)
+        defer { queue.removeAll() }
+        queue.enqueue(meeting, expiresAfter: nil)
+        queue.enqueue(IslandNotice(id: "old", title: "Old", side: .left), expiresAfter: nil)
+        queue.enqueue(IslandNotice(id: "new", title: "New", side: .left), expiresAfter: nil)
+        #expect(queue.left.map(\.id) == [meeting.id, "new"])
+    }
+
+    @Test @MainActor
+    func meetingPillFramesStayWithinEveryEdgeAndPreserveTheHardwareNotch() throws {
+        let meeting = IslandNotice(id: "meeting-countdown-fixture", title: String(repeating: "Long title ", count: 100),
+            detail: "05:00", metadata: ["eventID": "fixture"])
+        for edge in IslandEdge.allCases {
+            let screen = physicalNotchScreen()
+            let settings = FeatureSettings(islandLayoutStyle: .pill,
+                islandPlacement: IslandPlacement(mode: .custom, edge: edge))
+            let frame = try #require(engine.compactBarFrame(for: screen, notices: [meeting], settings: settings))
+            #expect(screen.frame.contains(frame))
+            #expect((edge.isVertical ? frame.height : frame.width) <= 222)
+        }
+        let physical = physicalNotchScreen()
+        let settings = FeatureSettings(islandLayoutStyle: .notch)
+        let idle = engine.compactBarFrame(for: physical)
+        let frame = try #require(engine.compactBarFrame(for: physical, notices: [meeting], settings: settings))
+        #expect(frame.maxY == idle.maxY)
+        #expect(frame.midX == idle.midX)
+        #expect(frame.width == idle.width + 80)
+    }
+
     @Test
     func alwaysVisibleActivityAndFocusCannotBeDismissed() {
         let activity = IslandNotice(id: "ai-active-codex", title: "运行中", side: .left)

@@ -615,6 +615,7 @@ public enum CompactStatusPriority: String, Codable, CaseIterable, Sendable, Equa
     case mail
     case videoDownload
     case browserDownload
+    case meeting
     case focusCountdown
     case toolboxReminder
     case aiActivity
@@ -627,6 +628,7 @@ public enum CompactStatusPriority: String, Codable, CaseIterable, Sendable, Equa
         .videoDownload,
         .browserDownload,
         .mail,
+        .meeting,
         .focusCountdown,
         .focusMode,
         .aiActivity,
@@ -643,6 +645,7 @@ public enum CompactStatusPriority: String, Codable, CaseIterable, Sendable, Equa
         case .mail: "新邮件"
         case .videoDownload: "视频下载"
         case .browserDownload: "浏览器下载"
+        case .meeting: "会议倒计时"
         case .focusCountdown: "专注倒计时"
         case .toolboxReminder: "工具箱提醒"
         case .aiActivity: "AI 活动"
@@ -655,7 +658,12 @@ public enum CompactStatusPriority: String, Codable, CaseIterable, Sendable, Equa
     public static func normalized(_ priorities: [Self]) -> [Self] {
         var seen: Set<Self> = []
         let uniquePriorities = priorities.filter { seen.insert($0).inserted }
-        return uniquePriorities + defaultOrder.filter { !seen.contains($0) }
+        var result = uniquePriorities + defaultOrder.filter { !seen.contains($0) }
+        if !seen.contains(.meeting) {
+            result.removeAll { $0 == .meeting }
+            result.insert(.meeting, at: result.firstIndex(of: .focusCountdown)!)
+        }
+        return result
     }
 }
 

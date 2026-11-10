@@ -78,6 +78,7 @@ struct FloatingIslandInformationView: View {
     let visualizationStyle: MediaVisualizationStyle
     let item: NowPlayingSnapshot?
     let date: Date
+    var onJoinMeeting: (String) -> Void = { _ in }
 
     var body: some View {
         GeometryReader { geometry in
@@ -118,7 +119,7 @@ struct FloatingIslandInformationView: View {
             ForEach(layout.primary) { status in
                 CompactPillStatusContent(presentation: status.presentation, text: status.text, edge: layout.edge,
                     visualizationStyle: visualizationStyle, item: status.presentation.isMedia ? item : nil,
-                    date: date, leadingInset: status.leadingInset)
+                    date: date, leadingInset: status.leadingInset, onJoinMeeting: onJoinMeeting)
                     .frame(width: layout.edge.isVertical ? layout.primaryThickness : status.length,
                            height: layout.edge.isVertical ? status.length : layout.primaryThickness)
             }

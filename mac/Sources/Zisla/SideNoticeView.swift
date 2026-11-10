@@ -217,6 +217,7 @@ struct CompactStatusBarView: View {
     @ObservedObject var resultSweep: AIResultSweepController
     var onStatusHidden: () -> Void
     var onCompactLengthChanged: (CGFloat) -> Void = { _ in }
+    var onJoinMeeting: (String) -> Void = { _ in }
 
     @Environment(\.accessibilityReduceTransparency) private var reduceTransparency
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
@@ -266,7 +267,8 @@ struct CompactStatusBarView: View {
         return ZStack {
             if let information {
                 FloatingIslandInformationView(layout: information,
-                    visualizationStyle: settingsStore.settings.mediaVisualizationStyle, item: media.snapshot, date: date)
+                    visualizationStyle: settingsStore.settings.mediaVisualizationStyle, item: media.snapshot, date: date,
+                    onJoinMeeting: onJoinMeeting)
                     .onChange(of: information.size, initial: true) { _, size in
                         onCompactLengthChanged(displayState.islandEdge.isVertical ? size.height : size.width)
                     }
@@ -418,7 +420,8 @@ struct CompactStatusBarView: View {
             CompactPillStatusContent(
                 presentation: presentation, text: text, edge: displayState.islandEdge,
                 visualizationStyle: settingsStore.settings.mediaVisualizationStyle,
-                item: presentation.isMedia ? media.snapshot : nil, date: date
+                item: presentation.isMedia ? media.snapshot : nil, date: date,
+                onJoinMeeting: onJoinMeeting
             )
             .onChange(of: length, initial: true) { _, value in onCompactLengthChanged(value) }
         } else if resultSweep.current == nil, settingsStore.settings.islandAppIconEnabled {
@@ -491,6 +494,10 @@ struct CompactStatusBarView: View {
 
     private var focusCountdownNotice: IslandNotice? {
         presentationNotices.first { $0.id.hasPrefix("focus-countdown-") }
+    }
+
+    private var meetingNotice: IslandNotice? {
+        presentationNotices.first { $0.id.hasPrefix(MeetingCountdown.noticePrefix) }
     }
 
     private var focusModeNotice: IslandNotice? {
@@ -675,6 +682,13 @@ struct CompactStatusBarView: View {
         case .focusCountdown:
             if let focusCountdownNotice {
                 CompactFocusCountdownBar(notice: focusCountdownNotice, height: height)
+            }
+        case .meeting:
+            if let meetingNotice {
+                CompactMeetingCountdownBar(notice: meetingNotice, height: height,
+                    centerWidth: displayState.compactBarCenterInset) {
+                    if let id = meetingNotice.metadata?["eventID"] { onJoinMeeting(id) }
+                }
             }
         case .toolboxReminder:
             if let toolboxNotice {

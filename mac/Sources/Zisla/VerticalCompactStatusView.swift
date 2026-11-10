@@ -78,6 +78,7 @@ struct CompactPillStatusContent: View {
     let item: NowPlayingSnapshot?
     let date: Date
     var leadingInset: CGFloat = CompactPillStatusPresentation.trailingInset
+    var onJoinMeeting: (String) -> Void = { _ in }
 
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
@@ -110,6 +111,18 @@ struct CompactPillStatusContent: View {
     }
 
     var body: some View {
+        Group {
+            if presentation.priority == .meeting, let id = presentation.notice.metadata?["eventID"] {
+                Button { onJoinMeeting(id) } label: { content }
+                    .buttonStyle(.plain)
+                    .accessibilityLabel(AppLocalization.text("加入会议：%@ · %@", presentation.notice.title, text))
+            } else {
+                content
+            }
+        }
+    }
+
+    private var content: some View {
         GeometryReader { proxy in
             let thickness = edge.isVertical ? proxy.size.width : proxy.size.height
             let iconSize = max(0, thickness - 8)
@@ -239,6 +252,7 @@ struct CompactPillStatusContent: View {
         case .aiActivity: "sparkles"
         case .browserDownload, .videoDownload: "arrow.down.circle.fill"
         case .focusCountdown: "clock"
+        case .meeting: "video.fill"
         case .focusMode: "moon.fill"
         case .mail: "envelope.fill"
         case .updateAvailable: "arrow.down.app.fill"
