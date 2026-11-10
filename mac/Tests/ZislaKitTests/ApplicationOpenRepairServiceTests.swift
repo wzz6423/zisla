@@ -305,12 +305,16 @@ struct ApplicationOpenRepairServiceTests {
     func macOSProvenanceChangesDoNotBlockQuarantineOnlyRepair() async throws {
         let fixture = try Fixture()
         defer { fixture.remove() }
+        let url = try ApplicationOpenRepairBundle.applicationURL(fixture.app)
+        let before = try ApplicationOpenRepairBundle.capture(at: url, isCancelled: { false })
+        var systemUpdate = before
+        // macOS can ignore successful writes to this reserved attribute; inject the snapshot change directly.
+        systemUpdate.entries[0].attributes["com.apple.provenance"] = Data("system provenance".utf8)
+        #expect(before.matches(systemUpdate))
+        #expect(systemUpdate.matches(before))
         let runner = Runner()
-        try await ApplicationOpenRepairService(runCommand: runner.run, removeQuarantine: { descriptor in
-            #expect(fremovexattr(descriptor, "com.apple.quarantine", 0) == 0)
-            try Self.setAttribute("com.apple.provenance", value: Data("system provenance".utf8), at: fixture.app)
-        }).repairAndOpen(at: fixture.app)
-        #expect(Self.attribute("com.apple.provenance", at: fixture.app) == Data("system provenance".utf8))
+        try await ApplicationOpenRepairService(runCommand: runner.run).repairAndOpen(at: fixture.app)
+        #expect(Self.attribute("com.apple.provenance", at: fixture.app) == before.entries[0].attributes["com.apple.provenance"])
         #expect(Self.attribute("com.apple.quarantine", at: fixture.executable) == nil)
         #expect(await runner.openedPaths.count == 1)
     }
