@@ -213,6 +213,7 @@ struct SystemMetricsHistorySettingsActionsTests {
                 .environment(\.layoutDirection, language.isRightToLeft ? .rightToLeft : .leftToRight)
         }
 
+        /// Main-queue turns let SwiftUI finish its history task before accessibility assertions, without timed sleeps.
         func layout() async {
             for _ in 0..<10 {
                 host.layoutSubtreeIfNeeded()
