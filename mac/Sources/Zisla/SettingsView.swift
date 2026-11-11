@@ -249,6 +249,12 @@ struct SettingsView: View {
         case .pdfTools:
             PDFToolsModuleView(model: model, initialOperation: input.selectedPDFOperation)
                 .id(input.selectedPDFOperation)
+        case .imageTools:
+            ImageToolsModuleView(tools: model.managedTools, saveLocations: model.saveLocations,
+                                 settingsStore: settingsStore, store: input.imageTools,
+                                 recognition: input.imageRecognition,
+                                 operation: Binding(get: { input.selectedImageOperation }, set: { input.selectImageOperation($0) }),
+                                 pending: $input.imageOptions)
         case .audioTools:
             AudioToolsModuleView(initialOperation: input.selectedAudioOperation)
                 .id(input.selectedAudioOperation)
@@ -1143,6 +1149,8 @@ struct SettingsView: View {
                     featureToggle("随记", detail: "Markdown 随手记，可发送到系统备忘录", symbol: "note.text", keyPath: \.quickNotesEnabled)
                     rowDivider
                     featureToggle("PDF 工具", detail: "", symbol: "doc.text.fill", keyPath: \.pdfToolsEnabled)
+                    rowDivider
+                    featureToggle("图片工具", detail: "", symbol: "photo.stack.fill", keyPath: \.imageToolsEnabled)
                     rowDivider
                     featureToggle("音频工具", detail: "", symbol: "waveform.circle.fill", keyPath: \.audioToolsEnabled)
                     rowDivider
@@ -2795,6 +2803,10 @@ struct SettingsView: View {
                 managedToolRow(.ffmpeg, symbol: "waveform")
                 rowDivider
                 managedToolRow(.libreOffice, symbol: "doc.richtext")
+                rowDivider
+                managedToolRow(.libvips, symbol: "photo.stack.fill")
+                rowDivider
+                managedToolRow(.libavif, symbol: "photo.stack.fill")
             }
         }
         .task {
@@ -4697,6 +4709,7 @@ enum SettingsSection: String, CaseIterable, Identifiable {
     case screenshot
     case recording
     case pdfTools
+    case imageTools
     case audioTools
     case ai
     case voice
@@ -4718,7 +4731,7 @@ enum SettingsSection: String, CaseIterable, Identifiable {
         switch self {
         case .general, .features, .info: .basics
         case .keyboardSound: .sound
-        case .pdfTools, .audioTools: .files
+        case .pdfTools, .imageTools, .audioTools: .files
         case .screenshot, .recording: .capture
         case .ai, .voice: .aiAndVoice
         case .clipboardAssistant, .download, .saveLocations, .scheduledCleanup, .mail, .weather, .networkProxy, .pet: .others
@@ -4740,6 +4753,7 @@ enum SettingsSection: String, CaseIterable, Identifiable {
         case .clipboardAssistant: "快捷操作"
         case .screenshot: "截图"
         case .pdfTools: "PDF 工具"
+        case .imageTools: "图片工具"
         case .audioTools: "音频工具"
         case .recording: "录屏"
         case .info: "信息"
@@ -4766,6 +4780,7 @@ enum SettingsSection: String, CaseIterable, Identifiable {
         case .clipboardAssistant: "sparkles.rectangle.stack"
         case .screenshot: "camera.viewfinder"
         case .pdfTools: "doc.text.fill"
+        case .imageTools: "photo.stack.fill"
         case .audioTools: "waveform.circle.fill"
         case .recording: "record.circle"
         case .info: "info.circle.fill"
@@ -4788,7 +4803,7 @@ enum SettingsSection: String, CaseIterable, Identifiable {
         switch self {
         case .general, .features, .keyboardSound, .permissions: Color(nsColor: .systemGray)
         case .info, .mail, .saveLocations, .networkProxy: Color(nsColor: .systemBlue)
-        case .clipboardAssistant, .screenshot, .ai, .recommendations: Color(nsColor: .systemIndigo)
+        case .clipboardAssistant, .screenshot, .imageTools, .ai, .recommendations: Color(nsColor: .systemIndigo)
         case .recording, .pdfTools, .audioTools, .voice, .scheduledCleanup: Color(nsColor: .systemRed)
         case .download, .updates: Color(nsColor: .systemGreen)
         case .weather: Color(nsColor: .systemCyan)
@@ -4850,6 +4865,7 @@ enum SettingsSection: String, CaseIterable, Identifiable {
         case .clipboardAssistant: "复制、浏览器下载或 AirDrop 接收完成后显示下一步操作"
         case .screenshot: "启用截图、钉图与全局快捷键"
         case .pdfTools: "在设置中合并、拆分、加密与转换 PDF。"
+        case .imageTools: "在本机压缩、转换、缩放与批量导出图片。"
         case .audioTools: "转换、剪辑与处理本地音频。"
         case .recording: "录制屏幕、编辑视频与保存项目。"
         case .info: "配置媒体、系统监控、锁屏与通知显示。"
@@ -4883,6 +4899,8 @@ enum SettingsSection: String, CaseIterable, Identifiable {
             return settings.screenshotEnabled
         case .pdfTools:
             return settings.pdfToolsEnabled
+        case .imageTools:
+            return settings.imageToolsEnabled
         case .audioTools:
             return settings.audioToolsEnabled
         case .recording:
@@ -4896,7 +4914,7 @@ enum SettingsSection: String, CaseIterable, Identifiable {
         case .pet:
             return settings.petEnabled
         case .download:
-            return settings.downloaderEnabled
+            return settings.downloaderEnabled || settings.pdfToolsEnabled || settings.imageToolsEnabled
         case .weather:
             return settings.weatherEnabled
         case .updates:
@@ -5059,6 +5077,9 @@ struct SettingsSidebar: View {
 
 @MainActor
 final class SettingsInput: ObservableObject {
+    let imageTools = ImageToolsModel()
+    let imageRecognition = ImageToolsRecognitionModel()
+
     private struct Destination: Equatable {
         let section: SettingsSection
         let searchTarget: SettingsSearchAnchor?
@@ -5089,7 +5110,16 @@ final class SettingsInput: ObservableObject {
             if settingsQuery != oldValue { searchTarget = nil }
         }
     }
-    @Published var searchTarget: SettingsSearchAnchor?
+    @Published var searchTarget: SettingsSearchAnchor? {
+        didSet {
+            if case .imageOperation(let operation) = searchTarget {
+                selectImageOperation(operation)
+                if operation != selectedImageOperation { searchTarget = .imageOperation(selectedImageOperation) }
+            }
+        }
+    }
+    @Published private(set) var selectedImageOperation: ImageToolOperation = .compress
+    @Published var imageOptions = ImageToolsPendingOptions()
     @Published var pendingTrashCleanupPolicy: VoiceRecordingCleanupPolicy?
     private var history = [Destination(section: .general, searchTarget: nil, voicePage: nil)]
     private var historyIndex = 0
@@ -5102,6 +5132,17 @@ final class SettingsInput: ObservableObject {
     var selectedPDFOperation: PDFToolOperation {
         if case .pdfOperation(let operation) = searchTarget { return operation }
         return .merge
+    }
+
+    func selectImageOperation(_ operation: ImageToolOperation) {
+        guard operation != selectedImageOperation, !imageTools.isProcessing, !imageRecognition.isProcessing else { return }
+        imageTools.discardResults()
+        imageTools.discardEdits()
+        imageTools.message = nil
+        imageRecognition.clear()
+        selectedImageOperation = operation
+        searchTarget = .imageOperation(operation)
+        recordDestination()
     }
 
     var selectedAudioOperation: AudioToolOperation {

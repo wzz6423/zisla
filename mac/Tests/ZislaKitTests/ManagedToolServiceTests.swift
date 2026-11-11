@@ -141,6 +141,18 @@ struct ManagedToolServiceTests {
     }
 
     @Test
+    func imageToolsUseTheLibvipsHomebrewFormula() {
+        #expect(ManagedTool.libvips.installationSource == .homebrewFormula(name: "vips"))
+        #expect(ManagedTool.libvips.executableName == "vips")
+        #expect(ManagedTool.libvips.recommendationGroup == .utility)
+        #expect(ManagedToolService.externalPaths(for: .libvips).contains("/opt/homebrew/bin/vips"))
+        #expect(ManagedTool.libvips.normalizedInstalledVersion(from: "vips-8.18.7") == "8.18.7")
+        #expect(ManagedTool.libavif.installationSource == .homebrewFormula(name: "libavif"))
+        #expect(ManagedTool.libavif.executableName == "avifenc")
+        #expect(ManagedTool.libavif.recommendationGroup == .utility)
+    }
+
+    @Test
     func fzfUsesTheHomebrewFormulaAndExpectedExecutablePaths() {
         #expect(ManagedTool.fzf.installationSource == .homebrewFormula(name: "fzf"))
         #expect(ManagedTool.fzf.executableName == "fzf")
@@ -352,6 +364,8 @@ struct ManagedToolServiceTests {
             (.rclone, .homebrewFormula(name: "rclone"), "rclone"),
             (.posting, .homebrewFormula(name: "posting"), "posting"),
             (.poppler, .homebrewFormula(name: "poppler"), "pdftotext"),
+            (.libvips, .homebrewFormula(name: "vips"), "vips"),
+            (.libavif, .homebrewFormula(name: "libavif"), "avifenc"),
             (.wireshark, .homebrewFormula(name: "wireshark"), "tshark"),
             (.mysql, .homebrewFormula(name: "mysql"), "mysql"),
             (.cmake, .homebrewFormula(name: "cmake"), "cmake"),
@@ -379,7 +393,7 @@ struct ManagedToolServiceTests {
             (.openScreen, .homebrewCask(name: "getopenscreen/openscreen/openscreen"), "Openscreen"),
         ]
 
-        #expect(ManagedTool.allCases.count == 49)
+        #expect(ManagedTool.allCases.count == 51)
         #expect(ManagedTool(rawValue: "kero") == nil)
         for (tool, source, executableName) in expected {
             #expect(tool.installationSource == source)
@@ -397,7 +411,7 @@ struct ManagedToolServiceTests {
         #expect(count(.terminalEfficiency) == 11)
         #expect(count(.networkAndData) == 7)
         #expect(count(.developmentToolchain) == 21)
-        #expect(count(.utility) == 4)
+        #expect(count(.utility) == 6)
         #expect(count(.desktopApplication) == 6)
     }
 
