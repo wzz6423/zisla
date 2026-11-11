@@ -179,6 +179,29 @@ struct BatteryChargingControllerTests {
         #expect(!controller.requestFailed)
     }
 
+    @Test(arguments: ["eligible", "unplugged", "charging", "full", "missing", "disallowed", "read-failed"])
+    func explicitRecheckStillRequiresTheLiveBatteryAndNativePermission(_ scenario: String) async {
+        let system = ChargingSystem()
+        let controller = Self.controller(system)
+        var battery: BatterySnapshot? = BatteryChargingStateTests.battery()
+        switch scenario {
+        case "unplugged": battery?.isPluggedIn = false
+        case "charging": battery?.isCharging = true
+        case "full": battery?.level = 1
+        case "missing": battery = nil
+        case "disallowed": await system.disallowOverride()
+        case "read-failed": await system.failReads()
+        default: break
+        }
+        #expect(!controller.canChargeToFull)
+        let accepted = await controller.chargeToFull(recheckEligibility: true) { battery }
+        #expect(accepted == (scenario == "eligible"))
+        #expect(await system.requests == (scenario == "eligible" ? 1 : 0),
+                "A display override must never bypass the native charging preflight")
+        #expect(controller.requestFailed == !accepted)
+        #expect(!controller.isRequesting)
+    }
+
     @Test
     func irrelevantBatteryStatesDoNotReadOrChangeSystemChargingPolicy() async {
         let system = ChargingSystem()
@@ -241,6 +264,7 @@ struct BatteryChargingControllerTests {
         let first = Task { await controller.chargeToFull { BatteryChargingStateTests.battery() } }
         await gate.waitUntilReading()
         #expect(controller.isRequesting)
+        #expect(await controller.chargeToFull(recheckEligibility: true) { BatteryChargingStateTests.battery() } == false)
         #expect(await controller.chargeToFull { BatteryChargingStateTests.battery() } == false)
         await controller.refresh(for: BatteryChargingStateTests.battery())
         #expect(!controller.canChargeToFull)

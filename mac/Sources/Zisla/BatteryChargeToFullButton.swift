@@ -1,17 +1,30 @@
 import SwiftUI
+import ZislaCore
 import ZislaKit
 
 struct BatteryChargeToFullButton: View {
     @ObservedObject var batteryMonitor: BatteryMonitor
-    @StateObject private var controller = BatteryChargingController()
+    @StateObject private var controller: BatteryChargingController
     @Environment(\.locale) private var locale
+    private let debugShowsButton: Bool
+
+    init(
+        batteryMonitor: BatteryMonitor,
+        environment: [String: String] = ProcessInfo.processInfo.environment,
+        isDebugBuild: Bool = LegacyAppDataMigration.isDebugBuild,
+        controller: BatteryChargingController? = nil
+    ) {
+        self.batteryMonitor = batteryMonitor
+        _controller = StateObject(wrappedValue: controller ?? BatteryChargingController())
+        debugShowsButton = isDebugBuild && environment["ZISLA_DEBUG_SHOW_CHARGE_TO_FULL"] == "1"
+    }
 
     var body: some View {
         HStack(spacing: 0) {
-            if controller.canChargeToFull || controller.canRetry || controller.isRequesting {
+            if debugShowsButton || controller.canChargeToFull || controller.canRetry || controller.isRequesting {
                 Self.chargeButton(isRequesting: controller.isRequesting, locale: locale) {
                     Task {
-                        await controller.chargeToFull { batteryMonitor.snapshot }
+                        await controller.chargeToFull(recheckEligibility: debugShowsButton) { batteryMonitor.snapshot }
                         batteryMonitor.refresh()
                     }
                 }

@@ -69,8 +69,8 @@ public final class BatteryChargingController: ObservableObject {
 
     /// Rechecks the live battery before the one-shot request; success means macOS accepted it.
     @discardableResult
-    public func chargeToFull(battery: @MainActor () -> BatterySnapshot?) async -> Bool {
-        guard canChargeToFull || canRetry, !isRequesting else { return false }
+    public func chargeToFull(recheckEligibility: Bool = false, battery: @MainActor () -> BatterySnapshot?) async -> Bool {
+        guard canChargeToFull || canRetry || recheckEligibility, !isRequesting else { return false }
         isRequesting = true
         refreshRevision += 1
         requestFailed = false
