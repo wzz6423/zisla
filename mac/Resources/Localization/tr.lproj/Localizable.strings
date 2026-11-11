@@ -3365,10 +3365,8 @@
 "脱电默认模式" = "Pildeyken varsayılan mod";
 "20%及以下固定省电" = "%20 ve altında daima güç tasarrufu";
 "电量不高于20%时保持省电，插电也不切换；超过20%后恢复对应默认模式" = "Prize bağlıyken bile %20 ve altında güç tasarrufunu korur; %20 üzerinde ilgili varsayılan modu geri yükler";
-"手动更改电源模式后暂停自动切换，下次插电或脱电时恢复" = "Güç modunu elle değiştirmek, güç bağlantısı bir sonraki kez takılana veya çıkarılana kadar otomatik geçişi duraklatır";
 "省电" = "Güç tasarrufu";
 "高性能" = "Yüksek performans";
 
-"请在“功能”中开启“系统状态与清理”及其下的“自动切换电源模式”" = "Özellikler bölümünde Sistem İzleme ve Temizlik seçeneğini ve onun altındaki Güç modlarını otomatik değiştir seçeneğini etkinleştirin";
 
 "无法保存定时倾倒废纸篓的记录，本次已跳过。" = "Çöp Sepetini otomatik boşaltma kaydı kaydedilemedi. Bu işlem atlandı.";

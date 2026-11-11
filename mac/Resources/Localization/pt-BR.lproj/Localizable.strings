@@ -3365,10 +3365,8 @@
 "脱电默认模式" = "Modo padrão na bateria";
 "20%及以下固定省电" = "Poupar energia com 20% ou menos";
 "电量不高于20%时保持省电，插电也不切换；超过20%后恢复对应默认模式" = "Mantém a economia de energia com 20% ou menos, mesmo na tomada; restaura o modo padrão correspondente acima de 20%";
-"手动更改电源模式后暂停自动切换，下次插电或脱电时恢复" = "Alterar o modo de energia manualmente pausa a alternância automática até a próxima conexão ou desconexão da tomada";
 "省电" = "Economia de energia";
 "高性能" = "Alto desempenho";
 
-"请在“功能”中开启“系统状态与清理”及其下的“自动切换电源模式”" = "Em Recursos, ative Monitor e Limpeza do Sistema e, logo abaixo, Alternar modos de energia automaticamente";
 
 "无法保存定时倾倒废纸篓的记录，本次已跳过。" = "Não foi possível salvar o registro do esvaziamento automático da Lixeira. Esta execução foi ignorada.";

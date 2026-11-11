@@ -3365,10 +3365,8 @@
 "脱电默认模式" = "Modalità predefinita a batteria";
 "20%及以下固定省电" = "Risparmio energetico al 20% o meno";
 "电量不高于20%时保持省电，插电也不切换；超过20%后恢复对应默认模式" = "Mantiene il risparmio energetico al 20% o meno, anche con l’alimentatore; ripristina la modalità predefinita corrispondente oltre il 20%";
-"手动更改电源模式后暂停自动切换，下次插电或脱电时恢复" = "Cambiare manualmente la modalità energetica sospende il cambio automatico fino al prossimo collegamento o scollegamento dell’alimentatore";
 "省电" = "Risparmio energetico";
 "高性能" = "Prestazioni elevate";
 
-"请在“功能”中开启“系统状态与清理”及其下的“自动切换电源模式”" = "In Funzioni, attiva Monitor Sistema e Pulizia e, subito sotto, Cambia automaticamente modalità energetica";
 
 "无法保存定时倾倒废纸篓的记录，本次已跳过。" = "Impossibile salvare il registro dello svuotamento automatico del Cestino. Questa esecuzione è stata saltata.";

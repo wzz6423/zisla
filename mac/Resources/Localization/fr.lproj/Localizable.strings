@@ -3361,10 +3361,8 @@
 "脱电默认模式" = "Mode par défaut sur batterie";
 "20%及以下固定省电" = "Économie d’énergie à 20% ou moins";
 "电量不高于20%时保持省电，插电也不切换；超过20%后恢复对应默认模式" = "Conserve l’économie d’énergie à 20% ou moins, même sur secteur ; rétablit le mode par défaut correspondant au-dessus de 20%";
-"手动更改电源模式后暂停自动切换，下次插电或脱电时恢复" = "Un changement manuel du mode d’alimentation suspend le changement automatique jusqu’au prochain branchement ou débranchement";
 "省电" = "Économie d’énergie";
 "高性能" = "Hautes performances";
 
-"请在“功能”中开启“系统状态与清理”及其下的“自动切换电源模式”" = "Dans Fonctions, activez Moniteur système et nettoyage, puis Changer automatiquement de mode d’alimentation juste en dessous";
 
 "无法保存定时倾倒废纸篓的记录，本次已跳过。" = "Impossible d’enregistrer le suivi du vidage automatique de la Corbeille. Cette exécution a été ignorée.";

@@ -3365,10 +3365,8 @@
 "脱电默认模式" = "Mode default saat memakai baterai";
 "20%及以下固定省电" = "Selalu hemat daya pada 20% atau kurang";
 "电量不高于20%时保持省电，插电也不切换；超过20%后恢复对应默认模式" = "Pertahankan hemat daya pada 20% atau kurang meski tersambung daya; pulihkan mode default yang sesuai di atas 20%";
-"手动更改电源模式后暂停自动切换，下次插电或脱电时恢复" = "Mengubah mode daya secara manual menjeda pergantian otomatis hingga daya disambungkan atau dilepas berikutnya";
 "省电" = "Hemat daya";
 "高性能" = "Performa tinggi";
 
-"请在“功能”中开启“系统状态与清理”及其下的“自动切换电源模式”" = "Di Fitur, aktifkan Monitor Sistem dan Pembersihan serta opsi Ganti mode daya secara otomatis di bawahnya";
 
 "无法保存定时倾倒废纸篓的记录，本次已跳过。" = "Catatan pengosongan Tong Sampah otomatis tidak dapat disimpan. Proses kali ini dilewati.";

@@ -273,61 +273,52 @@ struct SettingsView: View {
 
     private var scheduledCleanupContent: some View {
         VStack(alignment: .leading, spacing: 20) {
-            settingsGroup("电源模式") {
-                if !settingsStore.settings.systemMonitorEnabled || !settingsStore.settings.automaticPowerModeEnabled {
-                    AppLocalizedText("请在“功能”中开启“系统状态与清理”及其下的“自动切换电源模式”")
-                        .font(.system(size: 11))
-                        .foregroundStyle(.secondary)
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                }
-                settingRow(
-                    symbol: "powerplug.fill",
-                    title: "插电默认模式",
-                    detail: ""
-                ) {
-                    Picker(AppLocalization.string("插电默认模式", locale: locale), selection: Binding(
-                        get: { settingsStore.settings.powerAdapterDefaultMode },
-                        set: { settingsStore.settings.powerAdapterDefaultMode = $0 }
-                    )) {
-                        ForEach(BatteryPowerMode.allCases, id: \.rawValue) { mode in
-                            AppLocalizedText(mode.menuTitle).tag(mode)
+            if settingsStore.settings.systemMonitorEnabled && settingsStore.settings.automaticPowerModeEnabled {
+                settingsGroup("电源模式") {
+                    settingRow(
+                        symbol: "powerplug.fill",
+                        title: "插电默认模式",
+                        detail: ""
+                    ) {
+                        Picker(AppLocalization.string("插电默认模式", locale: locale), selection: Binding(
+                            get: { settingsStore.settings.powerAdapterDefaultMode },
+                            set: { settingsStore.settings.powerAdapterDefaultMode = $0 }
+                        )) {
+                            ForEach(BatteryPowerMode.allCases, id: \.rawValue) { mode in
+                                AppLocalizedText(mode.menuTitle).tag(mode)
+                            }
                         }
+                        .labelsHidden()
+                        .pickerStyle(.menu)
+                        .keepsIntrinsicWidth()
                     }
-                    .labelsHidden()
-                    .pickerStyle(.menu)
-                    .keepsIntrinsicWidth()
-                }
-                rowDivider
-                settingRow(
-                    symbol: "battery.100percent",
-                    title: "脱电默认模式",
-                    detail: ""
-                ) {
-                    Picker(AppLocalization.string("脱电默认模式", locale: locale), selection: Binding(
-                        get: { settingsStore.settings.batteryDefaultMode },
-                        set: { settingsStore.settings.batteryDefaultMode = $0 }
-                    )) {
-                        ForEach(BatteryPowerMode.allCases, id: \.rawValue) { mode in
-                            AppLocalizedText(mode.menuTitle).tag(mode)
+                    rowDivider
+                    settingRow(
+                        symbol: "battery.100percent",
+                        title: "脱电默认模式",
+                        detail: ""
+                    ) {
+                        Picker(AppLocalization.string("脱电默认模式", locale: locale), selection: Binding(
+                            get: { settingsStore.settings.batteryDefaultMode },
+                            set: { settingsStore.settings.batteryDefaultMode = $0 }
+                        )) {
+                            ForEach(BatteryPowerMode.allCases, id: \.rawValue) { mode in
+                                AppLocalizedText(mode.menuTitle).tag(mode)
+                            }
                         }
+                        .labelsHidden()
+                        .pickerStyle(.menu)
+                        .keepsIntrinsicWidth()
                     }
-                    .labelsHidden()
-                    .pickerStyle(.menu)
-                    .keepsIntrinsicWidth()
+                    rowDivider
+                    featureToggle(
+                        "20%及以下固定省电",
+                        detail: "电量不高于20%时保持省电，插电也不切换；超过20%后恢复对应默认模式",
+                        symbol: "battery.25percent",
+                        keyPath: \.lowBatteryPowerModeEnabled
+                    )
                 }
-                rowDivider
-                featureToggle(
-                    "20%及以下固定省电",
-                    detail: "电量不高于20%时保持省电，插电也不切换；超过20%后恢复对应默认模式",
-                    symbol: "battery.25percent",
-                    keyPath: \.lowBatteryPowerModeEnabled
-                )
-                AppLocalizedText("手动更改电源模式后暂停自动切换，下次插电或脱电时恢复")
-                    .font(.system(size: 11))
-                    .foregroundStyle(.secondary)
-                    .frame(maxWidth: .infinity, alignment: .leading)
             }
-            .disabled(!settingsStore.settings.systemMonitorEnabled || !settingsStore.settings.automaticPowerModeEnabled)
             settingsGroup("清理") {
                 if model.settingsStore.settings.systemMonitorEnabled {
                     settingRow(
@@ -381,13 +372,10 @@ struct SettingsView: View {
                     .keepsIntrinsicWidth()
                 }
                 rowDivider
-                featureToggle("剪贴板历史", detail: "仅本机保存文本和图片", symbol: "clipboard", keyPath: \.clipboardHistoryEnabled)
-                rowDivider
                 settingRow(
                     symbol: "calendar.badge.clock",
                     title: "自动删除剪贴板历史",
-                    detail: "按所选周期删除过期历史，常用项目继续保留",
-                    isNested: true
+                    detail: "按所选周期删除过期历史，常用项目继续保留"
                 ) {
                     Picker(
                         AppLocalization.string("自动删除剪贴板历史", locale: locale),
@@ -637,6 +625,8 @@ struct SettingsView: View {
                     .disabled(!model.settingsStore.settings.fileShelfEnabled)
                     rowDivider
                     featureToggle("链接下载", detail: "", symbol: "arrow.down.circle.fill", keyPath: \.downloaderEnabled)
+                    rowDivider
+                    featureToggle("剪贴板历史", detail: "仅本机保存文本和图片", symbol: "clipboard", keyPath: \.clipboardHistoryEnabled)
                     rowDivider
                     featureToggle(AppLocalization.text("剪贴板链接检测"), detail: "", symbol: "clipboard.fill", keyPath: \.clipboardDetectionEnabled)
                 }

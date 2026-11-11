@@ -20,44 +20,49 @@ struct AutomaticPowerModeSettingsTests {
     }
 
     @Test
-    func detailedSettingsUseAllExistingPowerModesAndKeepTheManualOverrideExplanation() throws {
+    func detailedSettingsOnlyRenderWhenEnabledWithoutStandaloneExplanations() throws {
         let source = try Self.settingsSource()
-        let start = try #require(source.range(of: #"settingsGroup("电源模式")"#))
+        let start = try #require(source.range(of: "private var scheduledCleanupContent:"))
         let end = try #require(source.range(of: #"settingsGroup("清理")"#, range: start.upperBound..<source.endIndex))
         let rows = String(source[start.lowerBound..<end.lowerBound])
+        let visibility = try NSRegularExpression(
+            pattern: #"if settingsStore.settings.systemMonitorEnabled && settingsStore.settings.automaticPowerModeEnabled \{\s*settingsGroup\("电源模式"\)"#
+        )
+        #expect(visibility.numberOfMatches(in: rows, range: NSRange(rows.startIndex..., in: rows)) == 1)
         #expect(rows.contains("settingsStore.settings.powerAdapterDefaultMode = $0"))
         #expect(rows.contains("settingsStore.settings.batteryDefaultMode = $0"))
         #expect(rows.components(separatedBy: "ForEach(BatteryPowerMode.allCases").count == 3)
         #expect(rows.contains("AppLocalizedText(mode.menuTitle).tag(mode)"))
         #expect(rows.contains("keyPath: \\.lowBatteryPowerModeEnabled"))
-        #expect(rows.contains(".disabled(!settingsStore.settings.systemMonitorEnabled || !settingsStore.settings.automaticPowerModeEnabled)"))
-        let hint = try NSRegularExpression(
-            pattern: #"if !settingsStore.settings.systemMonitorEnabled \|\| !settingsStore.settings.automaticPowerModeEnabled \{\s*AppLocalizedText\("请在“功能”中开启“系统状态与清理”及其下的“自动切换电源模式”"\)"#
-        )
-        #expect(hint.numberOfMatches(in: rows, range: NSRange(rows.startIndex..., in: rows)) == 1)
-        #expect(rows.contains("手动更改电源模式后暂停自动切换，下次插电或脱电时恢复"))
+        #expect(!rows.contains("请在“功能”中开启“系统状态与清理”及其下的“自动切换电源模式”"))
+        #expect(!rows.contains("手动更改电源模式后暂停自动切换，下次插电或脱电时恢复"))
         #expect(rows.contains("电量不高于20%时保持省电，插电也不切换；超过20%后恢复对应默认模式"))
         #expect(BatteryPowerMode.allCases.map(\.menuTitle) == ["自动", "省电", "高性能"])
     }
 
     @Test(arguments: AppLanguage.allCases, [(false, false), (false, true), (true, false), (true, true)])
-    func automaticPowerControlsRemainSearchableBeforeTheyAreEnabled(language: AppLanguage, enabled: (Bool, Bool)) {
+    func automaticPowerSearchOnlyTargetsVisibleControlsAndAlwaysKeepsTheFeatureToggle(language: AppLanguage, enabled: (Bool, Bool)) {
         let settings = FeatureSettings(systemMonitorEnabled: enabled.0, automaticPowerModeEnabled: enabled.1)
+        let controlsVisible = enabled.0 && enabled.1
         #expect(SettingsSection.scheduledCleanup.isVisible(settings: settings))
         for (key, section) in [("自动切换电源模式", SettingsSection.features),
                                ("插电默认模式", .scheduledCleanup), ("脱电默认模式", .scheduledCleanup),
                                ("20%及以下固定省电", .scheduledCleanup)] {
             let query = AppLocalization.string(key, locale: language.locale)
             let matches = SettingsSearchIndex.results(for: query, settings: settings, locale: language.locale)
-            #expect(matches.first?.section == section)
-            #expect(matches.first?.anchor == .row(key))
+            if section == .features || controlsVisible {
+                #expect(matches.first?.section == section)
+                #expect(matches.first?.anchor == .row(key))
+            } else {
+                #expect(!matches.contains { $0.section == .scheduledCleanup && $0.anchor == .row(key) })
+            }
             #expect(SettingsSearchAnchor.row(key).localized(locale: language.locale) == .row(query))
         }
         for mode in BatteryPowerMode.allCases {
             let matches = SettingsSearchIndex.results(for: AppLocalization.string(mode.menuTitle, locale: language.locale),
                 settings: settings, locale: language.locale)
-            #expect(matches.contains { $0.section == .scheduledCleanup && $0.anchor == .row("插电默认模式") })
-            #expect(matches.contains { $0.section == .scheduledCleanup && $0.anchor == .row("脱电默认模式") })
+            #expect(matches.contains { $0.section == .scheduledCleanup && $0.anchor == .row("插电默认模式") } == controlsVisible)
+            #expect(matches.contains { $0.section == .scheduledCleanup && $0.anchor == .row("脱电默认模式") } == controlsVisible)
         }
     }
 
@@ -67,8 +72,7 @@ struct AutomaticPowerModeSettingsTests {
         let newKeys: Set<String> = [
             "自动切换电源模式", "插电默认模式", "脱电默认模式", "20%及以下固定省电",
             "电量不高于20%时保持省电，插电也不切换；超过20%后恢复对应默认模式",
-            "手动更改电源模式后暂停自动切换，下次插电或脱电时恢复", "省电", "高性能",
-            "请在“功能”中开启“系统状态与清理”及其下的“自动切换电源模式”",
+            "省电", "高性能",
         ]
         #expect(newKeys.isSubset(of: keys))
         #expect(AppLanguage.allCases.count == 17)
@@ -96,18 +100,15 @@ struct AutomaticPowerModeSettingsTests {
             }
         }
         if language == .english {
-            #expect(table["手动更改电源模式后暂停自动切换，下次插电或脱电时恢复"]
-                == "Changing the power mode manually pauses automatic switching until the next plug-in or unplug event")
             #expect(BatteryPowerMode.allCases.map { AppLocalization.string($0.menuTitle, locale: language.locale) }
                 == ["Automatic", "Low Power", "High Performance"])
         }
         if language == .arabic {
             #expect(table["自动切换电源模式"] == "تبديل أوضاع الطاقة تلقائيًا")
         }
-        let hintText = try #require(table["请在“功能”中开启“系统状态与清理”及其下的“自动切换电源模式”"])
-        for key in ["功能", "系统状态与清理", "自动切换电源模式"] {
-            #expect(hintText.contains(AppLocalization.string(key, locale: language.locale)),
-                    "The setup hint must name the actual localized setting: \(key)")
+        for key in ["请在“功能”中开启“系统状态与清理”及其下的“自动切换电源模式”",
+                    "手动更改电源模式后暂停自动切换，下次插电或脱电时恢复"] {
+            #expect(table[key] == nil, "Removed standalone explanations must not remain in localization catalogs")
         }
         #expect(AppLanguage.allCases.filter(\.isRightToLeft) == [.arabic])
     }

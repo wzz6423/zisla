@@ -3365,10 +3365,8 @@
 "脱电默认模式" = "Chế độ mặc định khi dùng pin";
 "20%及以下固定省电" = "Luôn tiết kiệm điện ở mức 20% trở xuống";
 "电量不高于20%时保持省电，插电也不切换；超过20%后恢复对应默认模式" = "Giữ chế độ tiết kiệm điện ở mức 20% trở xuống kể cả khi cắm sạc; khôi phục chế độ mặc định tương ứng khi trên 20%";
-"手动更改电源模式后暂停自动切换，下次插电或脱电时恢复" = "Đổi chế độ nguồn thủ công sẽ tạm dừng chuyển tự động cho đến lần cắm hoặc rút sạc tiếp theo";
 "省电" = "Tiết kiệm điện";
 "高性能" = "Hiệu năng cao";
 
-"请在“功能”中开启“系统状态与清理”及其下的“自动切换电源模式”" = "Trong Tính năng, bật Giám sát Hệ thống và Dọn dẹp rồi bật Tự động chuyển chế độ nguồn ở bên dưới";
 
 "无法保存定时倾倒废纸篓的记录，本次已跳过。" = "Không thể lưu bản ghi dọn sạch Thùng rác tự động. Đã bỏ qua lần này.";

@@ -13,9 +13,9 @@ struct ScheduledCleanupSettingsTests {
         #expect(SettingsSection.scheduledCleanup.isVisible(settings: settings))
         #expect(!SettingsSection.scheduledCleanup.prefersWideLayout)
         let items = SettingsSearchIndex.items(settings: settings)
-        let movedTitles: Set<String> = ["自动清理系统垃圾", "清理范围", "剪贴板历史", "自动删除剪贴板历史"]
+        let movedTitles: Set<String> = ["自动清理系统垃圾", "清理范围", "自动删除剪贴板历史"]
         #expect(items.filter { movedTitles.contains($0.title) }.allSatisfy { $0.section == .scheduledCleanup })
-        #expect(items.contains { $0.title == "剪贴板历史" })
+        #expect(items.filter { $0.title == "剪贴板历史" }.map(\.section) == [.features])
         #expect(items.contains { $0.title == "自动删除剪贴板历史" })
         #expect(items.contains { $0.title == "定时倾倒废纸篓" })
         #expect(items.contains { $0.title == "自动清理系统垃圾" } == systemEnabled)
@@ -23,12 +23,13 @@ struct ScheduledCleanupSettingsTests {
     }
 
     @Test(arguments: AppLanguage.allCases, [false, true])
-    func clipboardAndTrashSearchReachTheirRowsOnTheCleanupPage(language: AppLanguage, clipboardEnabled: Bool) {
+    func clipboardAndTrashSearchReachTheirRespectiveFeatureAndCleanupRows(language: AppLanguage, clipboardEnabled: Bool) {
         let settings = FeatureSettings(systemMonitorEnabled: false, clipboardHistoryEnabled: clipboardEnabled)
-        for key in ["剪贴板历史", "自动删除剪贴板历史", "定时倾倒废纸篓"] {
+        for (key, section) in [("剪贴板历史", SettingsSection.features),
+                               ("自动删除剪贴板历史", .scheduledCleanup), ("定时倾倒废纸篓", .scheduledCleanup)] {
             let matches = SettingsSearchIndex.results(for: AppLocalization.string(key, locale: language.locale),
                 settings: settings, locale: language.locale)
-            #expect(matches.first?.section == .scheduledCleanup)
+            #expect(matches.first?.section == section)
             #expect(matches.first?.anchor == .row(key))
         }
         let pageMatches = SettingsSearchIndex.results(
@@ -38,6 +39,26 @@ struct ScheduledCleanupSettingsTests {
         #expect(!pageMatches.isEmpty)
         #expect(pageMatches.contains { $0.section == .scheduledCleanup })
         #expect(pageMatches.contains { $0.section == .features && $0.title == "系统状态与清理" })
+    }
+
+    @Test
+    func clipboardHistoryToggleOnlyAppearsInFeaturesWhileCleanupKeepsTheInterval() throws {
+        let source = try String(contentsOf: Self.packageRoot.appendingPathComponent("Sources/Zisla/SettingsView.swift"), encoding: .utf8)
+        let cleanupStart = try #require(source.range(of: "private var scheduledCleanupContent:"))
+        let cleanupEnd = try #require(source.range(of: "private var workflowContent:", range: cleanupStart.upperBound..<source.endIndex))
+        let cleanup = String(source[cleanupStart.lowerBound..<cleanupEnd.lowerBound])
+        #expect(!cleanup.contains("keyPath: \\.clipboardHistoryEnabled"))
+        #expect(cleanup.contains("settings.clipboardHistoryCleanupPolicy = $0"))
+        let interval = try NSRegularExpression(
+            pattern: #"title: "自动删除剪贴板历史",\s*detail: "[^"]*"\s*\)"#
+        )
+        #expect(interval.numberOfMatches(in: cleanup, range: NSRange(cleanup.startIndex..., in: cleanup)) == 1)
+        let featureStart = try #require(source.range(of: "private var featuresContent:"))
+        let featureEnd = try #require(source.range(of: "if input.selection == .clipboardAssistant {", range: featureStart.upperBound..<source.endIndex))
+        let features = String(source[featureStart.lowerBound..<featureEnd.lowerBound])
+        let toggle = #"featureToggle("剪贴板历史", detail: "仅本机保存文本和图片", symbol: "clipboard", keyPath: \.clipboardHistoryEnabled)"#
+        #expect(features.contains(toggle))
+        #expect(source.components(separatedBy: toggle).count == 2)
     }
 
     @Test @MainActor
