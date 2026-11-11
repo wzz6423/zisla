@@ -2319,31 +2319,27 @@ struct SystemMonitorServiceTests {
     func defaultVolumeCapacityRefreshesCachedResourceValues() throws {
         let fileManager = FoundationVolumeCapacityFileManager()
         let foundation = FileManager.default
-        let volumeURL = foundation.temporaryDirectory
-        let fileURL = volumeURL.appendingPathComponent("zisla-capacity-\(UUID().uuidString)")
-        defer { try? foundation.removeItem(at: fileURL) }
-
-        let initial = try #require(fileManager.volumeCapacity(for: volumeURL))
-        #expect(foundation.createFile(atPath: fileURL.path, contents: nil))
-        let handle = try FileHandle(forWritingTo: fileURL)
-        let chunk = Data(repeating: 0x5A, count: 4 * 1024 * 1024)
-        for _ in 0..<16 {
-            try handle.write(contentsOf: chunk)
-        }
-        try handle.synchronize()
-        try handle.close()
-
-        let expected = try #require(
-            fileManager.volumeCapacity(for: URL(fileURLWithPath: volumeURL.path, isDirectory: true))
+        let volumeURL = foundation.temporaryDirectory.appendingPathComponent(
+            "zisla-capacity-\(UUID().uuidString)", isDirectory: true
         )
-        let refreshed = try #require(fileManager.volumeCapacity(for: volumeURL))
-        let decrease = initial.available >= expected.available ? initial.available - expected.available : 0
-        let staleDifference = refreshed.available >= expected.available
-            ? refreshed.available - expected.available
-            : expected.available - refreshed.available
+        try foundation.createDirectory(at: volumeURL, withIntermediateDirectories: false)
+        defer { try? foundation.removeItem(at: volumeURL) }
 
-        #expect(decrease >= 16 * 1024 * 1024)
-        #expect(staleDifference < 8 * 1024 * 1024)
+        #expect(try #require(fileManager.volumeCapacity(for: volumeURL)).total > 0)
+        let keys: Set<URLResourceKey> = [
+            .volumeTotalCapacityKey,
+            .volumeAvailableCapacityForImportantUsageKey,
+        ]
+        let initial = try volumeURL.resourceValues(forKeys: keys)
+        let total = try #require(initial.volumeTotalCapacity)
+        let available = try #require(initial.volumeAvailableCapacityForImportantUsage)
+        try foundation.removeItem(at: volumeURL)
+
+        // A removed directory makes stale URL values distinguishable without relying on disk-space fluctuations.
+        let cached = try volumeURL.resourceValues(forKeys: keys)
+        #expect(cached.volumeTotalCapacity == total)
+        #expect(cached.volumeAvailableCapacityForImportantUsage == available)
+        #expect(fileManager.volumeCapacity(for: volumeURL) == nil)
     }
 
     @Test
