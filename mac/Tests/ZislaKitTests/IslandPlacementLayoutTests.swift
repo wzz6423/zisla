@@ -898,7 +898,8 @@ struct IslandPlacementLayoutTests {
             #expect(presentation.text == text)
             #expect(presentation.showsWaveform == waveform)
             let length = sizing.customPillLength
-            let visualLength: CGFloat = waveform ? 78 : 48
+            let visualLength: CGFloat = (waveform ? 78 : 48)
+                + (presentation.priority == .focusCountdown ? CompactPillStatusPresentation.pomodoroControlsLength + 6 : 0)
             if text.isEmpty {
                 #expect(length == visualLength)
             } else if edge.isVertical {

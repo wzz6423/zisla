@@ -4399,7 +4399,7 @@ final class AppModel: ObservableObject {
     isScreenCleaning: Bool,
     isKeyboardCleaning: Bool
   ) -> Bool {
-    guard phase == .running,
+    guard phase != .idle,
       !isScreenCleaning,
       !isKeyboardCleaning
     else { return false }
@@ -4428,32 +4428,25 @@ final class AppModel: ObservableObject {
       return
     }
 
+    Self.refreshFocusCountdownNotices(for: pomodoro, in: notices)
+  }
+
+  static func refreshFocusCountdownNotices(for pomodoro: PomodoroService, in queue: SideNoticeQueue) {
     let notices = [
-      IslandNotice(
-        id: pomodoro.focusCountdownNoticeID(for: .left),
-        title: AppLocalization.text(pomodoro.mode.title),
-        detail: pomodoro.displayClockWithHours,
-        kind: .info,
-        side: .left
-      ),
-      IslandNotice(
-        id: pomodoro.focusCountdownNoticeID(for: .right),
-        title: AppLocalization.text(pomodoro.mode.title),
-        detail: pomodoro.displayClockWithHours,
-        kind: .info,
-        side: .right
-      ),
+      pomodoro.focusCountdownNotice(for: .left),
+      pomodoro.focusCountdownNotice(for: .right),
     ]
-    self.notices.removeAll(
-      withIDPrefix: focusCountdownNoticePrefix,
+    queue.removeAll(
+      withIDPrefix: PomodoroService.focusCountdownNoticeIDPrefix,
       except: Set(notices.map(\.id))
     )
     for notice in notices {
-      let existing = (notice.side == .left ? self.notices.left : self.notices.right)
+      let existing = (notice.side == .left ? queue.left : queue.right)
         .first { $0.id == notice.id }
-      guard existing?.title != notice.title || existing?.detail != notice.detail else { continue }
-      if !self.notices.updateIfPresent(notice) {
-        self.notices.enqueue(notice, expiresAfter: nil)
+      guard existing?.title != notice.title || existing?.detail != notice.detail
+        || existing?.progress != notice.progress else { continue }
+      if !queue.updateIfPresent(notice) {
+        queue.enqueue(notice, expiresAfter: nil)
       }
     }
   }
