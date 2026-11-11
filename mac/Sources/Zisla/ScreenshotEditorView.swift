@@ -5366,10 +5366,7 @@ struct ScreenshotEditorView: View {
                         ScreenshotTransparencyBackground()
                     }
                     if showsImage || model.annotations.contains(where: { $0.kind == .mosaic }) || mosaicDraft != nil {
-                        Image(nsImage: previewImage)
-                            .allowedDynamicRange(model.hdrEnabled ? .constrainedHigh : .standard)
-                            .resizable()
-                            .interpolation(.high)
+                        ScreenshotBackingImage(image: previewImage, preservesHDR: model.hdrEnabled)
                             .frame(width: geometry.renderedSize.width, height: geometry.renderedSize.height)
                             .position(
                                 x: geometry.origin.x + geometry.renderedSize.width / 2,
@@ -7336,12 +7333,8 @@ struct ScreenshotPinnedImageView: View {
         )
         VStack(spacing: toolbarVisible ? ScreenshotPinnedLayout.verticalSpacing : 0) {
             ZStack {
-                Image(nsImage: image)
-                    .allowedDynamicRange(.constrainedHigh)
-                    .resizable()
-                    .interpolation(.high)
+                ScreenshotBackingImage(image: image, preservesHDR: true, opacity: imageOpacity)
                     .frame(width: imageSize.width, height: imageSize.height)
-                    .opacity(Double(imageOpacity))
                     .allowsHitTesting(false)
 
                 ScreenshotPointerInteractionView(
@@ -7642,11 +7635,8 @@ private struct ScreenshotLongCapturePreviewView: View {
     @ObservedObject var model: ScreenshotEditorModel
 
     var body: some View {
-        Image(nsImage: model.displayImage)
-            .allowedDynamicRange(model.hdrEnabled ? .constrainedHigh : .standard)
-            .resizable()
-            .interpolation(.high)
-            .scaledToFit()
+        ScreenshotBackingImage(image: model.displayImage, preservesHDR: model.hdrEnabled)
+            .aspectRatio(model.displayImage.size.width / model.displayImage.size.height, contentMode: .fit)
             .padding(6)
             .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 6))
             .overlay {

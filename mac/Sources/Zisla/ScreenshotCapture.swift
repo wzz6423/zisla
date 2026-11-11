@@ -415,17 +415,77 @@ struct ScreenshotCaptureResult {
 
 struct ScreenshotBackingImage: NSViewRepresentable {
     let image: NSImage
+    var preservesHDR = false
+    var opacity: CGFloat = 1
 
-    func makeNSView(context: Context) -> NSImageView {
-        let imageView = NSImageView()
+    func makeNSView(context: Context) -> ScreenshotBackingImageView {
+        let imageView = ScreenshotBackingImageView()
         imageView.imageAlignment = .alignCenter
         imageView.imageFrameStyle = .none
         imageView.imageScaling = .scaleAxesIndependently
         return imageView
     }
 
-    func updateNSView(_ imageView: NSImageView, context: Context) {
-        imageView.image = image
+    func updateNSView(_ imageView: ScreenshotBackingImageView, context: Context) {
+        imageView.update(image: image, preservesHDR: preservesHDR, opacity: opacity)
+    }
+}
+
+@MainActor
+final class ScreenshotBackingImageView: NSImageView {
+    let hdrLayer = CALayer()
+    private var imageSize = CGSize.zero
+
+    override init(frame frameRect: NSRect) {
+        super.init(frame: frameRect)
+        wantsLayer = true
+        hdrLayer.contentsGravity = .resize
+        hdrLayer.isHidden = true
+        layer?.addSublayer(hdrLayer)
+    }
+
+    required init?(coder: NSCoder) { fatalError("init(coder:) has not been implemented") }
+
+    override var intrinsicContentSize: NSSize { imageSize }
+
+    override func layout() {
+        super.layout()
+        CATransaction.begin()
+        CATransaction.setDisableActions(true)
+        hdrLayer.frame = bounds
+        hdrLayer.contentsScale = window?.backingScaleFactor ?? 1
+        CATransaction.commit()
+    }
+
+    func update(image: NSImage, preservesHDR: Bool, opacity: CGFloat) {
+        imageSize = image.size
+        invalidateIntrinsicContentSize()
+        CATransaction.begin()
+        CATransaction.setDisableActions(true)
+        if preservesHDR, let cgImage = image.cgImage(forProposedRect: nil, context: nil, hints: nil),
+           ScreenshotImageRendering.isHDR(cgImage) {
+            self.image = nil
+            alphaValue = 1
+            hdrLayer.contents = cgImage
+            hdrLayer.opacity = Float(opacity)
+            hdrLayer.isHidden = false
+        } else {
+            self.image = image
+            alphaValue = opacity
+            hdrLayer.contents = nil
+            hdrLayer.isHidden = true
+        }
+        if #available(macOS 26.0, *) {
+            hdrLayer.preferredDynamicRange = hdrLayer.isHidden ? .standard : .high
+        } else {
+            hdrLayer.wantsExtendedDynamicRangeContent = !hdrLayer.isHidden
+        }
+        if #available(macOS 15.0, *) {
+            // Local-display captures are already mapped by WindowServer; another tone curve changes their appearance.
+            hdrLayer.toneMapMode = .never
+        }
+        CATransaction.commit()
+        needsLayout = true
     }
 }
 

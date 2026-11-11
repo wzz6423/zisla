@@ -14,6 +14,54 @@ import ZislaCore
 @Suite(.serialized)
 struct ScreenshotHDRTests {
     @Test
+    func nativePreviewPreservesTheDisplayReferredFrameWithoutAnotherToneCurve() throws {
+        let source = try Self.hdrGradient(headroom: 8)
+        let image = NSImage(cgImage: source, size: CGSize(width: 8, height: 8))
+        let view = ScreenshotBackingImageView(frame: CGRect(x: 0, y: 0, width: 32, height: 24))
+        view.update(image: image, preservesHDR: true, opacity: 1)
+        view.layoutSubtreeIfNeeded()
+        let layerContents = try #require(view.hdrLayer.contents)
+        let contents = layerContents as! CGImage
+        #expect(view.image == nil && !view.hdrLayer.isHidden)
+        #expect(view.hdrLayer.frame == view.bounds && view.intrinsicContentSize == image.size)
+        #expect(try Self.pixelValues(contents) == Self.pixelValues(source),
+            "A local-display capture's gray levels must reach the native layer unchanged")
+        if #available(macOS 15.0, *) {
+            #expect(view.hdrLayer.toneMapMode == .never,
+                "Local-display HDR captures must not receive a second content-dependent tone curve")
+        }
+        if #available(macOS 26.0, *) {
+            #expect(view.hdrLayer.preferredDynamicRange == .high)
+        } else {
+            #expect(view.hdrLayer.wantsExtendedDynamicRangeContent)
+        }
+        view.frame.size = CGSize(width: 80, height: 40)
+        view.layoutSubtreeIfNeeded()
+        #expect(view.hdrLayer.frame == view.bounds)
+        #expect(try Self.pixelValues(contents) == Self.pixelValues(source))
+    }
+
+    @Test
+    func nativePreviewHDRToggleReleasesThePreviousLayerAndKeepsOpacityOnTheImage() throws {
+        let source = try Self.hdrImage()
+        let image = NSImage(cgImage: source, size: CGSize(width: 32, height: 24))
+        let standard = NSImage(cgImage: try #require(ScreenshotImageRendering.sdrImage(from: source)), size: image.size)
+        let view = ScreenshotBackingImageView(frame: CGRect(origin: .zero, size: image.size))
+        view.update(image: image, preservesHDR: true, opacity: 0.6)
+        #expect(view.alphaValue == 1 && abs(view.hdrLayer.opacity - 0.6) < 0.001)
+        for (next, enabled) in [(image, false), (standard, true)] {
+            view.update(image: next, preservesHDR: enabled, opacity: 0.8)
+            #expect(view.image === next && view.hdrLayer.contents == nil && view.hdrLayer.isHidden)
+            #expect(view.alphaValue == 0.8)
+            if #available(macOS 26.0, *) { #expect(view.hdrLayer.preferredDynamicRange == .standard) }
+        }
+        view.update(image: image, preservesHDR: true, opacity: 1)
+        #expect(!view.hdrLayer.isHidden && view.hdrLayer.contents != nil && view.alphaValue == 1)
+        view.update(image: NSImage(size: .zero), preservesHDR: true, opacity: 1)
+        #expect(view.hdrLayer.contents == nil && view.hdrLayer.isHidden)
+    }
+
+    @Test
     func detachedFramesRetainHDRHighlightsAndContentHeadroom() throws {
         let source = try Self.hdrImage()
         let detached = try #require(ScreenshotCaptureService.detachedImage(from: source))
