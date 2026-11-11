@@ -121,21 +121,15 @@ final class AIUsageHistoryController: ObservableObject {
     func cancelExport() { exportTask?.cancel() }
 }
 
-final class AIUsageHistoryPanelPresentationState: ObservableObject {
-    @Published private(set) var isPresented = false
-    func present() { isPresented = true }
-    func dismiss() { isPresented = false }
-}
-
 struct AIUsageHistoryPanelPresenter: NSViewRepresentable {
-    @ObservedObject var presentationState: AIUsageHistoryPanelPresentationState
+    @ObservedObject var presentationState: SystemMetricsHistoryPanelPresentationState
     let controller: AIUsageHistoryController
     let languageStore: AppLanguageStore
 
     func makeNSView(context: Context) -> NSView { NSView(frame: .zero) }
 
     func updateNSView(_ nsView: NSView, context: Context) {
-        context.coordinator.update(presenting: presentationState.isPresented, dismiss: presentationState.dismiss,
+        context.coordinator.update(requestID: presentationState.requestID, dismiss: presentationState.dismiss,
             controller: controller, languageStore: languageStore, hostWindow: nsView.window)
     }
 
@@ -145,11 +139,14 @@ struct AIUsageHistoryPanelPresenter: NSViewRepresentable {
     @MainActor
     final class Coordinator {
         private var window: SystemMetricsHistoryPanel?
+        private var handledRequestID: UUID?
         private var awaitingDismissal = false
 
-        func update(presenting: Bool, dismiss: @escaping () -> Void, controller: AIUsageHistoryController,
+        init(window: SystemMetricsHistoryPanel? = nil) { self.window = window }
+
+        func update(requestID: UUID?, dismiss: @escaping () -> Void, controller: AIUsageHistoryController,
             languageStore: AppLanguageStore, hostWindow: NSWindow?) {
-            guard presenting else { awaitingDismissal = false; self.dismiss(); return }
+            guard let requestID else { awaitingDismissal = false; self.dismiss(); return }
             if window == nil {
                 let window = SystemMetricsHistoryPanel(contentRect: CGRect(x: 0, y: 0, width: 760, height: 640),
                     styleMask: [.titled, .closable, .miniaturizable, .resizable], backing: .buffered, defer: false)
@@ -161,17 +158,20 @@ struct AIUsageHistoryPanelPresenter: NSViewRepresentable {
                 window.minSize = CGSize(width: 620, height: 480)
                 window.contentView = NSHostingView(rootView: AppLanguageEnvironment(languageStore: languageStore,
                     content: AIUsageHistoryContent(controller: controller)))
-                window.onCancel = { [weak self, weak window] in
-                    self?.awaitingDismissal = true
-                    dismiss()
-                    window?.orderOut(nil)
-                }
                 self.window = window
             }
-            guard let window, SystemCleanupPanel.shouldOrderFront(isVisible: window.isVisible,
+            guard let window else { return }
+            window.onCancel = { [weak self, weak window] in
+                self?.awaitingDismissal = true
+                dismiss()
+                window?.orderOut(nil)
+            }
+            let isNewRequest = requestID != handledRequestID
+            handledRequestID = requestID
+            guard isNewRequest || SystemCleanupPanel.shouldOrderFront(isVisible: window.isVisible,
                 isMiniaturized: window.isMiniaturized, isAwaitingDismissalState: awaitingDismissal) else { return }
             WindowPlacement.center(window, on: hostWindow?.screen)
-            window.orderFront(nil)
+            window.present(over: hostWindow)
         }
 
         func dismiss() { window?.orderOut(nil); window = nil }

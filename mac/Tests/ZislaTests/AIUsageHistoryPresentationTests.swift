@@ -9,6 +9,54 @@ import ZislaKit
 
 @Suite(.serialized)
 struct AIUsageHistoryPresentationTests {
+    /// Explicit requests raise the AI report above Settings; passive refreshes preserve focus and minimization.
+    @Test @MainActor
+    func historyRequestsRaiseOncePerClickAndReopenAfterClose() throws {
+        let state = SystemMetricsHistoryPanelPresentationState()
+        let panel = OrderingAIHistoryPanel(contentRect: CGRect(x: -100_000, y: -100_000, width: 760, height: 640),
+            styleMask: [.titled, .closable], backing: .buffered, defer: false)
+        let host = SettingsWindow(contentRect: .zero, styleMask: .titled, backing: .buffered, defer: false)
+        panel.isReleasedWhenClosed = false
+        host.isReleasedWhenClosed = false
+        defer { panel.close(); host.close() }
+        let controller = AIUsageHistoryController(read: { AIUsageHistory() }, clear: {}, write: { _, _ in })
+        let languageStore = AppLanguageStore()
+        var coordinator = AIUsageHistoryPanelPresenter.Coordinator(window: panel)
+        func update() {
+            coordinator.update(requestID: state.requestID, dismiss: state.dismiss,
+                controller: controller, languageStore: languageStore, hostWindow: host)
+        }
+        state.present()
+        let first = try #require(state.requestID)
+        update()
+        #expect(panel.frontRequestCount == 1 && panel.requestedKey)
+        panel.reportsVisible = true
+        update()
+        #expect(panel.frontRequestCount == 1, "A passive refresh cannot retake focus")
+        state.present()
+        #expect(state.requestID != first)
+        update()
+        #expect(panel.frontRequestCount == 2, "A repeated click must raise an already visible report")
+        panel.reportsVisible = false
+        panel.reportsMiniaturized = true
+        update()
+        #expect(panel.frontRequestCount == 2, "Passive updates must preserve minimization")
+        state.present()
+        update()
+        #expect(panel.frontRequestCount == 3, "An explicit request must restore the minimized report")
+        panel.reportsMiniaturized = false
+        panel.reportsVisible = true
+        panel.onCancel()
+        #expect(state.requestID == nil && !panel.reportsVisible)
+        update()
+        #expect(panel.frontRequestCount == 3)
+        coordinator = AIUsageHistoryPanelPresenter.Coordinator(window: panel)
+        state.present()
+        update()
+        #expect(panel.frontRequestCount == 4 && panel.requestedKey)
+        #expect(!host.isVisible, "The test must not order a real Settings window")
+    }
+
     /// Short ranges must keep 12-point cells instead of stretching one week across the entire window width.
     @Test(arguments: [SystemMetricsHistoryRange.day, .week, .month, .all], [LayoutDirection.leftToRight, .rightToLeft])
     @MainActor
@@ -192,5 +240,18 @@ struct AIUsageHistoryPresentationTests {
     @MainActor
     private func descendants(_ view: NSView) -> [NSView] {
         view.subviews.flatMap { [$0] + descendants($0) }
+    }
+
+    @MainActor
+    private final class OrderingAIHistoryPanel: SystemMetricsHistoryPanel {
+        var frontRequestCount = 0
+        var requestedKey = false
+        var reportsVisible = false
+        var reportsMiniaturized = false
+        override var isVisible: Bool { reportsVisible }
+        override var isMiniaturized: Bool { reportsMiniaturized }
+        override func makeKeyAndOrderFront(_ sender: Any?) { requestedKey = true; frontRequestCount += 1 }
+        override func orderFront(_ sender: Any?) { frontRequestCount += 1 }
+        override func orderOut(_ sender: Any?) { reportsVisible = false }
     }
 }
