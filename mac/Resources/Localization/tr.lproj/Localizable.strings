@@ -2476,6 +2476,11 @@
 "2026.10.28往前15天" = "2026.10.28'den 15 gün önce";
 "日期间隔" = "Tarih Aralığı";
 "跨时区时间" = "Saat Dilimleri Arası Zaman";
+"会议 2026-11-20 14:30-15:30" = "Toplantı 2026-11-20 14:30-15:30";
+"Hello! How are you today?" = "Hello! How are you today?";
+"这是一段普通文本，可以搜索或保存。" = "Aranacak veya kaydedilecek düz metin.";
+"例如：复制截图或浏览器中的图片" = "Örnek: Bir ekran görüntüsünü veya tarayıcıdaki bir resmi kopyalayın";
+"例如：在 Finder 中选中文件后按 ⌘C" = "Örnek: Finder’da bir dosya seçip ⌘C tuşlarına basın";
 "汇率获取失败" = "Döviz kuru alınamadı";
 "闹钟通知未获允许，请在系统设置中开启通知。" = "Alarm bildirimlerine izin verilmemiş. Sistem Ayarları’ndan bildirimleri açın.";
 "闹钟通知声音已关闭，请在系统设置中开启声音。" = "Alarm bildirim sesleri kapalı. Sistem Ayarları’ndan sesleri açın.";

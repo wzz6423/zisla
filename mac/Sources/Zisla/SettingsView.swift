@@ -809,7 +809,7 @@ struct SettingsView: View {
                         settingRow(
                             symbol: kind.symbolName,
                             title: assistantKindTitle(kind),
-                            detail: "",
+                            detail: Self.clipboardAssistantUsageExamples[kind] ?? "",
                             isNested: true
                         ) {
                             Toggle("", isOn: Binding(
@@ -835,7 +835,7 @@ struct SettingsView: View {
                             .toggleStyle(.switch)
                         }
                         if let groups = Self.clipboardAssistantExampleGroups[kind] {
-                            clipboardAssistantExamples(groups)
+                            Self.clipboardAssistantExamples(groups, language: model.languageStore.language, onCopy: copySettingsText)
                         }
                     }
                 }
@@ -3292,15 +3292,23 @@ struct SettingsView: View {
         }
     }
 
-    private func clipboardAssistantExamples(_ groups: [ClipboardAssistantExampleGroup]) -> some View {
+    /// Single groups inherit their recognition-row title; only multiple groups need extra headings.
+    /// The copy callback receives the full localized text even when the row truncates its display.
+    static func clipboardAssistantExamples(
+        _ groups: [ClipboardAssistantExampleGroup],
+        language: AppLanguage,
+        onCopy: @escaping (String) -> Void
+    ) -> some View {
         VStack(alignment: .leading, spacing: 8) {
             Divider()
             ForEach(groups) { group in
                 VStack(alignment: .leading, spacing: 2) {
-                    AppLocalizedText(group.title)
-                        .font(.system(size: 10, weight: .medium))
-                        .foregroundStyle(.secondary)
-                    ForEach(group.localizedExamples(language: model.languageStore.language), id: \.self) { example in
+                    if groups.count > 1 {
+                        AppLocalizedText(group.title)
+                            .font(.system(size: 10, weight: .medium))
+                            .foregroundStyle(.secondary)
+                    }
+                    ForEach(group.localizedExamples(language: language), id: \.self) { example in
                         HStack(spacing: 6) {
                             Text(example)
                                 .font(.system(size: 9, design: .monospaced))
@@ -3309,10 +3317,10 @@ struct SettingsView: View {
                                 .lineLimit(1)
                                 .truncationMode(.middle)
                             Spacer(minLength: 0)
-                            IconButton(symbol: "doc.on.doc", help: loc("复制"), size: .compact) {
-                                copySettingsText(example)
+                            IconButton(symbol: "doc.on.doc", help: AppLocalization.string("复制", language: language), size: .compact) {
+                                onCopy(example)
                             }
-                            .accessibilityLabel(loc("复制"))
+                            .accessibilityLabel(AppLocalization.string("复制", language: language))
                         }
                         .padding(.leading, 12)
                     }
@@ -3342,6 +3350,27 @@ struct SettingsView: View {
     }
 
     static let clipboardAssistantExampleGroups: [ClipboardAssistantKind: [ClipboardAssistantExampleGroup]] = [
+        .url: [
+            ClipboardAssistantExampleGroup(title: "链接", examples: ["https://example.com", "example.com/docs"]),
+        ],
+        .ipAddress: [
+            ClipboardAssistantExampleGroup(title: "IP 地址", examples: ["192.0.2.1", "2001:db8::1"]),
+        ],
+        .filePath: [
+            ClipboardAssistantExampleGroup(title: "文件路径", examples: ["/Applications", "/System/Library"]),
+        ],
+        .email: [
+            ClipboardAssistantExampleGroup(title: "邮箱", examples: ["hello@example.com"]),
+        ],
+        .phone: [
+            ClipboardAssistantExampleGroup(title: "电话号码", examples: ["+1 201 555 0123"]),
+        ],
+        .color: [
+            ClipboardAssistantExampleGroup(title: "颜色值", examples: ["#FF5733", "rgb(255, 87, 51)"]),
+        ],
+        .math: [
+            ClipboardAssistantExampleGroup(title: "算式", examples: ["(2 + 3) * 4", "12 / 3"]),
+        ],
         .conversion: [
             ClipboardAssistantExampleGroup(
                 title: "单位换算",
@@ -3374,6 +3403,47 @@ struct SettingsView: View {
                 ]
             ),
         ],
+        .address: [
+            ClipboardAssistantExampleGroup(
+                title: "地址",
+                examples: ["10 Downing Street, London", "1600 Amphitheatre Parkway, Mountain View"]
+            ),
+        ],
+        .flight: [
+            ClipboardAssistantExampleGroup(title: "航班", examples: ["CA1234", "UA123"]),
+        ],
+        .train: [
+            ClipboardAssistantExampleGroup(title: "火车车次", examples: ["G123", "ICE 123"]),
+        ],
+        .tracking: [
+            ClipboardAssistantExampleGroup(title: "快递单号", examples: ["SF1234567890123", "1Z999AA10123456784"]),
+        ],
+        .meeting: [
+            ClipboardAssistantExampleGroup(title: "会议日程", examples: ["会议 2026-11-20 14:30-15:30"]),
+        ],
+        .emojiName: [
+            ClipboardAssistantExampleGroup(title: "Emoji 名称", examples: [":smile:", ":fire:", ":heart:"]),
+        ],
+        .code: [
+            ClipboardAssistantExampleGroup(title: "代码", examples: ["print(\"Hello, world!\")", "const answer = 42;"]),
+        ],
+        .shellCommand: [
+            ClipboardAssistantExampleGroup(title: "Shell 命令", examples: ["pwd", "ls -la", "git status"]),
+        ],
+        .nonSystemLanguageText: [
+            ClipboardAssistantExampleGroup(title: "非 Zisla 全局语言文本", examples: ["Hello! How are you today?"]),
+        ],
+        .app: [
+            ClipboardAssistantExampleGroup(title: "应用程序", examples: ["Safari", "TextEdit"]),
+        ],
+        .text: [
+            ClipboardAssistantExampleGroup(title: "文本", examples: ["这是一段普通文本，可以搜索或保存。"]),
+        ],
+    ]
+
+    static let clipboardAssistantUsageExamples: [ClipboardAssistantKind: String] = [
+        .image: "例如：复制截图或浏览器中的图片",
+        .file: "例如：在 Finder 中选中文件后按 ⌘C",
     ]
 
     private struct AssistantBlacklistEntry {

@@ -2475,6 +2475,11 @@
 "2026.10.28往前15天" = "2026.10.28 subtract 15days";
 "日期间隔" = "Date Interval";
 "跨时区时间" = "Cross-Time-Zone Time";
+"会议 2026-11-20 14:30-15:30" = "Meeting 2026-11-20 14:30-15:30";
+"Hello! How are you today?" = "你好，今天过得怎么样？";
+"这是一段普通文本，可以搜索或保存。" = "Plain text to search for or save.";
+"例如：复制截图或浏览器中的图片" = "Example: Copy a screenshot or an image from a browser";
+"例如：在 Finder 中选中文件后按 ⌘C" = "Example: Select a file in Finder and press ⌘C";
 "汇率获取失败" = "Couldn't fetch the exchange rate";
 "闹钟通知未获允许，请在系统设置中开启通知。" = "Alarm notifications are not allowed. Enable notifications in System Settings.";
 "闹钟通知声音已关闭，请在系统设置中开启声音。" = "Alarm notification sounds are turned off. Enable sounds in System Settings.";
