@@ -5,6 +5,109 @@ import Testing
 
 @Suite(.serialized)
 struct BilibiliDirectDownloaderLifecycleTests {
+    @Test(arguments: LifecycleWaitKind.allCases)
+    func cancelledWaitRejectsEvenAnAlreadySatisfiedCondition(kind: LifecycleWaitKind) async throws {
+        let client = LifecycleBilibiliHTTPClient()
+        let task = Task<Void, Error> {
+            withUnsafeCurrentTask { $0?.cancel() }
+            switch kind {
+            case .requests: try await client.waitForRequests(0)
+            case .paused: try await client.waitForPausedDownloads(0)
+            case .completed: try await client.waitForCompletedDownloads(0)
+            }
+        }
+
+        await #expect(throws: CancellationError.self) { try await task.value }
+    }
+
+    @Test(arguments: LifecycleWaitKind.allCases)
+    func anUnreachableConditionTimesOut(kind: LifecycleWaitKind) async throws {
+        let client = LifecycleBilibiliHTTPClient()
+
+        await #expect(throws: LifecycleWaitError.timedOut) {
+            switch kind {
+            case .requests: try await client.waitForRequests(1, timeout: .zero)
+            case .paused: try await client.waitForPausedDownloads(1, timeout: .zero)
+            case .completed: try await client.waitForCompletedDownloads(1, timeout: .zero)
+            }
+        }
+        #expect(await client.activeRequestCount == 0)
+    }
+
+    @Test
+    func aFailedWaitJoinsBeforeReturningToItsCaller() async throws {
+        try await LifecycleBilibiliHTTPClient().verifyWaitCleanup()
+    }
+
+    @Test(.timeLimit(.minutes(1)), arguments: LifecycleWaitKind.allCases, [false, true])
+    func failedWaitCancelsAndJoinsItsDownload(kind: LifecycleWaitKind, requiresRelease: Bool) async throws {
+        let directory = lifecycleTemporaryDirectory()
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let client = LifecycleBilibiliHTTPClient(ignoresCancellation: requiresRelease)
+        let muxer = LifecycleMediaMuxer()
+        let service = lifecycleDownloadService(directory: directory, client: client, muxer: muxer)
+        let output = directory.appendingPathComponent("Output")
+        let request = try DownloadRequest(urlString: lifecycleVideoURL, mode: .video, outputDirectory: output)
+        let task = Task { try await service.download(request) }
+        let watchdog = Task {
+            do {
+                try await Task.sleep(for: .seconds(20))
+            } catch {
+                return
+            }
+            Issue.record("Wait cleanup left a media download suspended")
+            task.cancel()
+            await client.releasePausedDownloads()
+        }
+
+        await #expect(throws: LifecycleWaitError.timedOut) {
+            try await withLifecycleDownload(task: task, client: client) {
+                try await client.waitForPausedDownloads(2)
+                switch kind {
+                case .requests: try await client.waitForRequests(3, timeout: .zero)
+                case .paused: try await client.waitForPausedDownloads(3, timeout: .zero)
+                case .completed: try await client.waitForCompletedDownloads(1, timeout: .zero)
+                }
+            }
+        }
+        watchdog.cancel()
+
+        #expect(await client.activeRequestCount == 0)
+        #expect(await client.pausedDownloadCount == 0)
+        #expect(await muxer.invocationCount == 0)
+        #expect(try FileManager.default.contentsOfDirectory(atPath: output.path).isEmpty)
+        #expect(try FileManager.default.contentsOfDirectory(
+            atPath: directory.appendingPathComponent("Tasks").path
+        ).isEmpty)
+        await #expect(throws: CancellationError.self) { try await task.value }
+        await watchdog.value
+    }
+
+    @Test(.timeLimit(.minutes(1)))
+    func cancellingTheWaitCancelsAndJoinsItsDownload() async throws {
+        let directory = lifecycleTemporaryDirectory()
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let client = LifecycleBilibiliHTTPClient()
+        let task = Task {
+            try await BilibiliDirectDownloader(httpClient: client).downloadComponents(
+                from: lifecycleVideoURL, to: directory
+            )
+        }
+        let waiter = Task {
+            try await withLifecycleDownload(task: task, client: client) {
+                try await client.waitForCompletedDownloads(1)
+            }
+        }
+        try await withLifecycleDownload(task: waiter, client: client) {
+            try await client.waitForPausedDownloads(2)
+            waiter.cancel()
+            await #expect(throws: CancellationError.self) { try await waiter.value }
+        }
+        #expect(await client.activeRequestCount == 0)
+        #expect(await client.pausedDownloadCount == 0)
+        await #expect(throws: CancellationError.self) { try await task.value }
+    }
+
     @Test(.timeLimit(.minutes(1)), arguments: LifecycleTrack.allCases, [false, true])
     func aFailedTrackCancelsItsPendingSibling(failingTrack: LifecycleTrack, transportFailure: Bool) async throws {
         let directory = lifecycleTemporaryDirectory()
@@ -77,22 +180,24 @@ struct BilibiliDirectDownloaderLifecycleTests {
             )
         }
 
-        await client.waitForPausedDownloads(2)
-        #expect(await client.activeRequestCount == 2)
-        await client.releasePausedDownloads(track: firstToFinish)
-        await client.waitForCompletedDownloads(1)
-        #expect(await client.activeRequestCount == 1)
-        #expect(await client.cancelledTracks.isEmpty)
-        await client.releasePausedDownloads(track: firstToFinish.other)
-        let components = try await task.value
+        try await withLifecycleDownload(task: task, client: client) {
+            try await client.waitForPausedDownloads(2)
+            #expect(await client.activeRequestCount == 2)
+            await client.releasePausedDownloads(track: firstToFinish)
+            try await client.waitForCompletedDownloads(1)
+            #expect(await client.activeRequestCount == 1)
+            #expect(await client.cancelledTracks.isEmpty)
+            await client.releasePausedDownloads(track: firstToFinish.other)
+            let components = try await task.value
 
-        #expect(components.map(\.kind) == [.video, .audio])
-        #expect(components.map(\.formatID) == ["32", "30280"])
-        #expect(try components.map { try String(contentsOf: $0.fileURL, encoding: .utf8) }
-                == ["/video.mp4", "/audio.m4a"])
-        #expect(await client.activeRequestCount == 0)
-        #expect(await client.maximumActiveRequestCount == 2)
-        #expect(await client.bytesWritten == 34)
+            #expect(components.map(\.kind) == [.video, .audio])
+            #expect(components.map(\.formatID) == ["32", "30280"])
+            #expect(try components.map { try String(contentsOf: $0.fileURL, encoding: .utf8) }
+                    == ["/video.mp4", "/audio.m4a"])
+            #expect(await client.activeRequestCount == 0)
+            #expect(await client.maximumActiveRequestCount == 2)
+            #expect(await client.bytesWritten == 34)
+        }
     }
 
     @Test
@@ -123,22 +228,24 @@ struct BilibiliDirectDownloaderLifecycleTests {
         let request = try DownloadRequest(urlString: lifecycleVideoURL, mode: .video, outputDirectory: output)
         let task = Task { try await service.download(request) }
 
-        await client.waitForPausedDownloads(2)
-        #expect(await client.failureCount == 1)
-        #expect(await client.activeRequestCount == 2)
-        #expect(await client.cancelledTracks.isEmpty)
-        await client.releasePausedDownloads()
-        let result = try await task.value
-        let requested = await client.requestedMediaURLs
+        try await withLifecycleDownload(task: task, client: client) {
+            try await client.waitForPausedDownloads(2)
+            #expect(await client.failureCount == 1)
+            #expect(await client.activeRequestCount == 2)
+            #expect(await client.cancelledTracks.isEmpty)
+            await client.releasePausedDownloads()
+            let result = try await task.value
+            let requested = await client.requestedMediaURLs
 
-        #expect(try String(contentsOf: result.fileURL, encoding: .utf8) == "/video.mp4|/audio.m4a")
-        #expect(requested.count == 3)
-        #expect(requested.filter { $0.deletingPathExtension().lastPathComponent == backupTrack.rawValue }
-                .map(\.host) == ["cdn.example", "backup.cdn.example"])
-        #expect(await client.cancelledTracks.isEmpty)
-        #expect(await client.activeRequestCount == 0)
-        #expect(await client.maximumActiveRequestCount == 2)
-        #expect(await muxer.invocationCount == 1)
+            #expect(try String(contentsOf: result.fileURL, encoding: .utf8) == "/video.mp4|/audio.m4a")
+            #expect(requested.count == 3)
+            #expect(requested.filter { $0.deletingPathExtension().lastPathComponent == backupTrack.rawValue }
+                    .map(\.host) == ["cdn.example", "backup.cdn.example"])
+            #expect(await client.cancelledTracks.isEmpty)
+            #expect(await client.activeRequestCount == 0)
+            #expect(await client.maximumActiveRequestCount == 2)
+            #expect(await muxer.invocationCount == 1)
+        }
         #expect(try FileManager.default.contentsOfDirectory(
             atPath: directory.appendingPathComponent("Tasks").path
         ).isEmpty)
@@ -156,13 +263,15 @@ struct BilibiliDirectDownloaderLifecycleTests {
         let taskID = UUID()
         let task = Task { try await service.download(request, taskID: taskID) }
 
-        await client.waitForPausedDownloads(2)
-        switch cancellation {
-        case 0: task.cancel()
-        case 1: await service.cancel(taskID: taskID)
-        default: await service.cancelAll()
+        try await withLifecycleDownload(task: task, client: client) {
+            try await client.waitForPausedDownloads(2)
+            switch cancellation {
+            case 0: task.cancel()
+            case 1: await service.cancel(taskID: taskID)
+            default: await service.cancelAll()
+            }
+            await #expect(throws: CancellationError.self) { try await task.value }
         }
-        await #expect(throws: CancellationError.self) { try await task.value }
 
         #expect(await client.cancelledTracks.sorted { $0.rawValue < $1.rawValue } == [.audio, .video])
         #expect(await client.activeRequestCount == 0)
@@ -228,6 +337,31 @@ enum LifecycleTrack: String, CaseIterable, Sendable {
     var other: Self { self == .video ? .audio : .video }
 }
 
+enum LifecycleWaitKind: CaseIterable, Sendable {
+    case requests
+    case paused
+    case completed
+}
+
+private enum LifecycleWaitError: Error, Equatable {
+    case timedOut
+}
+
+private func withLifecycleDownload<Value: Sendable>(
+    task: Task<Value, Error>,
+    client: isolated LifecycleBilibiliHTTPClient,
+    operation: () async throws -> Void
+) async throws {
+    do {
+        try await operation()
+    } catch {
+        task.cancel()
+        client.releasePausedDownloads()
+        _ = await task.result
+        throw error
+    }
+}
+
 private func lifecycleTemporaryDirectory() -> URL {
     FileManager.default.temporaryDirectory
         .appendingPathComponent("BilibiliLifecycleTests-\(UUID().uuidString)", isDirectory: true)
@@ -267,9 +401,10 @@ private actor LifecycleBilibiliHTTPClient: BilibiliHTTPClient {
     private var failingTrack: LifecycleTrack?
     private let transportFailure: Bool
     private let backupTrack: LifecycleTrack?
+    private let ignoresCancellation: Bool
     private var pausesDownloads: Bool
+    private var cleanupTaskCompleted = false
     private var pending: [UUID: (LifecycleTrack, CheckedContinuation<Void, Error>)] = [:]
-    private var observers: [CheckedContinuation<Void, Never>] = []
     private(set) var requestedMediaURLs: [URL] = []
     private(set) var cancelledTracks: [LifecycleTrack] = []
     private(set) var failureCount = 0
@@ -278,16 +413,41 @@ private actor LifecycleBilibiliHTTPClient: BilibiliHTTPClient {
     private(set) var maximumActiveRequestCount = 0
     private(set) var bytesWritten = 0
 
+    var pausedDownloadCount: Int { pending.count }
+
+    func verifyWaitCleanup() async throws {
+        // Actor isolation prevents the task from finishing until the cleanup joins it.
+        let task = Task<Void, Error> {
+            cleanupTaskCompleted = true
+            try Task.checkCancellation()
+        }
+        do {
+            try await withLifecycleDownload(task: task, client: self) {
+                let completedBeforeWait = self.cleanupTaskCompleted
+                #expect(!completedBeforeWait)
+                throw LifecycleWaitError.timedOut
+            }
+            Issue.record("The original wait error must propagate")
+        } catch {
+            #expect(error as? LifecycleWaitError == .timedOut)
+        }
+        let completedBeforeReturn = cleanupTaskCompleted
+        #expect(completedBeforeReturn, "Wait cleanup must join its task before returning")
+        await #expect(throws: CancellationError.self) { try await task.value }
+    }
+
     init(
         failingTrack: LifecycleTrack? = nil,
         transportFailure: Bool = false,
         backupTrack: LifecycleTrack? = nil,
-        pausesDownloads: Bool = true
+        pausesDownloads: Bool = true,
+        ignoresCancellation: Bool = false
     ) {
         self.failingTrack = failingTrack
         self.transportFailure = transportFailure
         self.backupTrack = backupTrack
         self.pausesDownloads = pausesDownloads
+        self.ignoresCancellation = ignoresCancellation
     }
 
     func data(for request: URLRequest) async throws -> BilibiliHTTPDataResponse {
@@ -315,17 +475,14 @@ private actor LifecycleBilibiliHTTPClient: BilibiliHTTPClient {
         requestedMediaURLs.append(url)
         activeRequestCount += 1
         maximumActiveRequestCount = max(maximumActiveRequestCount, activeRequestCount)
-        notifyObservers()
         defer {
             activeRequestCount -= 1
-            notifyObservers()
         }
         try write(Data("partial".utf8), to: destinationURL)
 
         if track == failingTrack || (track == backupTrack && url.host == "cdn.example") {
-            await waitForRequests(2)
+            try await waitForRequests(2)
             failureCount += 1
-            notifyObservers()
             if transportFailure { throw URLError(.cannotConnectToHost) }
             return BilibiliHTTPResponse(statusCode: 503)
         }
@@ -339,7 +496,6 @@ private actor LifecycleBilibiliHTTPClient: BilibiliHTTPClient {
                         continuation.resume(throwing: CancellationError())
                     } else {
                         pending[id] = (track, continuation)
-                        notifyObservers()
                     }
                 }
             } onCancel: {
@@ -349,32 +505,39 @@ private actor LifecycleBilibiliHTTPClient: BilibiliHTTPClient {
         try Task.checkCancellation()
         try write(Data(url.path.utf8), to: destinationURL)
         completedDownloadCount += 1
-        notifyObservers()
         return BilibiliHTTPResponse(statusCode: 200)
     }
 
-    func waitForRequests(_ count: Int) async {
+    func waitForRequests(_ count: Int, timeout: Duration = .seconds(3)) async throws {
+        try Task.checkCancellation()
+        let deadline = ContinuousClock.now + timeout
         while requestedMediaURLs.count < count {
-            await withCheckedContinuation { observers.append($0) }
+            guard ContinuousClock.now < deadline else { throw LifecycleWaitError.timedOut }
+            try await Task.sleep(for: .milliseconds(1))
         }
     }
 
-    func waitForPausedDownloads(_ count: Int) async {
+    func waitForPausedDownloads(_ count: Int, timeout: Duration = .seconds(3)) async throws {
+        try Task.checkCancellation()
+        let deadline = ContinuousClock.now + timeout
         while pending.count < count {
-            await withCheckedContinuation { observers.append($0) }
+            guard ContinuousClock.now < deadline else { throw LifecycleWaitError.timedOut }
+            try await Task.sleep(for: .milliseconds(1))
         }
     }
 
-    func waitForCompletedDownloads(_ count: Int) async {
+    func waitForCompletedDownloads(_ count: Int, timeout: Duration = .seconds(3)) async throws {
+        try Task.checkCancellation()
+        let deadline = ContinuousClock.now + timeout
         while completedDownloadCount < count {
-            await withCheckedContinuation { observers.append($0) }
+            guard ContinuousClock.now < deadline else { throw LifecycleWaitError.timedOut }
+            try await Task.sleep(for: .milliseconds(1))
         }
     }
 
     func releasePausedDownloads(track: LifecycleTrack? = nil) {
         let ids = pending.filter { track == nil || $0.value.0 == track }.map(\.key)
         ids.forEach { pending.removeValue(forKey: $0)?.1.resume() }
-        notifyObservers()
     }
 
     func prepareSuccessfulRetry() {
@@ -383,20 +546,14 @@ private actor LifecycleBilibiliHTTPClient: BilibiliHTTPClient {
     }
 
     private func cancel(id: UUID) {
+        guard !ignoresCancellation else { return }
         guard let (track, continuation) = pending.removeValue(forKey: id) else { return }
         cancelledTracks.append(track)
         continuation.resume(throwing: CancellationError())
-        notifyObservers()
     }
 
     private func write(_ data: Data, to url: URL) throws {
         try data.write(to: url)
         bytesWritten += data.count
-    }
-
-    private func notifyObservers() {
-        let waiting = observers
-        observers.removeAll()
-        waiting.forEach { $0.resume() }
     }
 }
