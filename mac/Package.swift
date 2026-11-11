@@ -136,8 +136,10 @@ let package = Package(
                     "-Xlinker", "14.0",
                     "-Xlinker", linkedSDKVersion,
                 ]),
-            ]
+            ],
+            plugins: [.plugin(name: "PortraitMetalPlugin")]
         ),
+        .plugin(name: "PortraitMetalPlugin", capability: .buildTool()),
         .executableTarget(
             name: "zislactl",
             dependencies: ["ZislaCore"]
