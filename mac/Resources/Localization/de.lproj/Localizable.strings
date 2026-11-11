@@ -3447,6 +3447,7 @@
 "水印位置" = "Wasserzeichenposition";
 "居中" = "Zentriert";
 
+"保留 HDR" = "HDR beibehalten";
 "小雨" = "Leichter Regen";
 "中雨" = "Mäßiger Regen";
 "大雨" = "Starker Regen";

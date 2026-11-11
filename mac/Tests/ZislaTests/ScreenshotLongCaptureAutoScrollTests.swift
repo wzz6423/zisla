@@ -300,13 +300,13 @@ struct ScreenshotLongCaptureAutoScrollTests {
             image: image, screenImage: image, screenCGImage: first, screen: screen,
             captureRect: CGRect(x: 0, y: 0, width: 48, height: 160), capturedApplication: nil,
             settingsStore: settings, onStash: { _, _ in }, writeImageToPasteboard: { _ in false },
-            presentSavePanel: { _, _ in }, captureScreen: { _ in
+            presentSavePanel: { _, _ in }, captureScreen: { _, _ in
                 frames += 1
                 if timing == "in flight" {
                     entered.continuation.yield()
                     for await _ in release.stream {}
                 }
-                return (NSImage(cgImage: last, size: screen.frame.size), last)
+                return (NSImage(cgImage: last, size: screen.frame.size), last, nil)
             }, scheduleLongCaptureWork: { delay, work in scheduled.append((delay, work)) },
             hasLongCaptureInputAccess: { true }, postLongCaptureEvent: { _, _ in posted += 1; return true }, onClose: {}
         )
@@ -370,10 +370,10 @@ struct ScreenshotLongCaptureAutoScrollTests {
             image: image, screenImage: image, screenCGImage: first, screen: screen,
             captureRect: CGRect(x: 0, y: 0, width: 48, height: 160), capturedApplication: .current,
             settingsStore: settings, onStash: { _, _ in }, writeImageToPasteboard: { _ in false },
-            presentSavePanel: { _, _ in }, captureScreen: { _ in
+            presentSavePanel: { _, _ in }, captureScreen: { _, _ in
                 let next = try #require(source.cropping(to: CGRect(
                     x: 0, y: CGFloat(offset), width: screen.frame.width, height: screen.frame.height)))
-                return (NSImage(cgImage: next, size: screen.frame.size), next)
+                return (NSImage(cgImage: next, size: screen.frame.size), next, nil)
             }, scheduleLongCaptureWork: { delay, work in
                 scheduled.append((delay, work))
                 captureQueue.continuation.yield()
@@ -477,7 +477,7 @@ struct ScreenshotLongCaptureAutoScrollTests {
             image: image, screenImage: image, screenCGImage: pixels, screen: screen,
             captureRect: CGRect(x: 0, y: 0, width: 48, height: 160), capturedApplication: nil,
             settingsStore: settings, onStash: { _, _ in }, writeImageToPasteboard: { _ in false },
-            presentSavePanel: { _, _ in }, captureScreen: { _ in (image, pixels) },
+            presentSavePanel: { _, _ in }, captureScreen: { _, _ in (image, pixels, nil) },
             scheduleLongCaptureWork: { delay, work in scheduled.append((delay, work)) },
             hasLongCaptureInputAccess: { inputAccess }, postLongCaptureEvent: { _, _ in false }, onClose: {}
         )
@@ -635,11 +635,11 @@ struct ScreenshotLongCaptureAutoScrollTests {
             screen: nil, captureRect: CGRect(origin: .zero, size: image.size), capturedApplication: nil,
             settingsStore: settings, onStash: { _, _ in }, writeImageToPasteboard: { _ in false },
             presentSavePanel: { _, _ in },
-            captureScreen: { _ in
+            captureScreen: { _, _ in
                 entered.continuation.yield(())
                 for await _ in release.stream {}
                 if fails { throw ScreenshotCaptureError.permissionRequired }
-                return (image, source)
+                return (image, source, nil)
             }, onClose: {}
         )
         controller.window?.alphaValue = 0

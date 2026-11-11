@@ -127,7 +127,7 @@ struct ImageToolsEditorTests {
         #expect(preview != original, "The regression begins with a successfully obscured preview")
         var dependencies = ScreenshotEditorModel.RenderingDependencies()
         switch stage {
-        case "bitmap": dependencies.makeBitmap = { _, _ in nil }
+        case "bitmap": dependencies.makeBitmap = { _, _, _ in nil }
         case "graphicsContext": dependencies.makeGraphicsContext = { _ in nil }
         case "maskContext": dependencies.makeMaskContext = { _, _ in nil }
         case "maskImage": dependencies.makeMaskImage = { _ in nil }
