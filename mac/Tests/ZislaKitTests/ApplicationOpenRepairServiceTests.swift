@@ -4,6 +4,106 @@ import Testing
 @testable import ZislaKit
 
 struct ApplicationOpenRepairServiceTests {
+    @Test(.enabled(if: ProcessInfo.processInfo.environment["ZISLA_RUN_APP_REPAIR_SYSTEM_TESTS"] == "1"),
+          .timeLimit(.minutes(2)), arguments: ["adhoc", "native"])
+    func systemCommandsRepairAndLaunchTheTemporaryAppWithoutResigning(signature: String) async throws {
+        let fixture = try await Self.systemFixture(signature: signature)
+        defer { fixture.remove() }
+        let executable = try Data(contentsOf: fixture.executable)
+        let resources = fixture.app.appendingPathComponent("Contents/_CodeSignature/CodeResources")
+        let signedResources = try? Data(contentsOf: resources)
+        let marker = Data("preserve".utf8)
+        try Self.setAttribute("dev.zisla.tests", value: marker, at: fixture.app)
+        #expect(ApplicationOpenRepairService.needsRepair(at: fixture.app))
+
+        try await ApplicationOpenRepairService().repairAndOpen(at: fixture.app)
+
+        #expect(!ApplicationOpenRepairService.needsRepair(at: fixture.app))
+        #expect(Self.attribute("com.apple.quarantine", at: fixture.app) == nil)
+        #expect(Self.attribute("com.apple.quarantine", at: fixture.executable) == nil)
+        #expect(Self.attribute("dev.zisla.tests", at: fixture.app) == marker)
+        #expect(try Data(contentsOf: fixture.executable) == executable)
+        #expect((try? Data(contentsOf: resources)) == signedResources)
+        let launched = fixture.directory.appendingPathComponent("launched")
+        let clock = ContinuousClock()
+        let deadline = clock.now.advanced(by: .seconds(5))
+        while !FileManager.default.fileExists(atPath: launched.path), clock.now < deadline {
+            try await Task.sleep(for: .milliseconds(20))
+        }
+        let pid = try #require(Int32(String(contentsOf: launched, encoding: .utf8)))
+        #expect(pid > 0, "The background fixture must execute after the real Launch Services request")
+        if signature == "adhoc" {
+            let verification = try await AIAgentProcessRunner.run(executableURL: URL(fileURLWithPath: "/usr/bin/codesign"),
+                arguments: ["--verify", "--strict", fixture.app.path], standardInput: Data(), timeout: 30)
+            #expect(!verification.didTimeout && verification.status == 0)
+        }
+        #expect(!FileManager.default.fileExists(atPath: fixture.directory.appendingPathComponent("marker").path))
+    }
+
+    #if arch(arm64)
+    @Test(.enabled(if: ProcessInfo.processInfo.environment["ZISLA_RUN_APP_REPAIR_SYSTEM_TESTS"] == "1"),
+          .timeLimit(.minutes(2)))
+    func unsignedArm64ExecutableReportsTheSystemLaunchFailure() async throws {
+        let fixture = try await Self.systemFixture(signature: "unsigned")
+        defer { fixture.remove() }
+        let executable = try Data(contentsOf: fixture.executable)
+        // Apple silicon requires a code signature even after quarantine is removed.
+        await #expect(throws: ApplicationOpenRepairError.openFailed) {
+            try await ApplicationOpenRepairService().repairAndOpen(at: fixture.app)
+        }
+        #expect(Self.attribute("com.apple.quarantine", at: fixture.app) == nil)
+        #expect(Self.attribute("com.apple.quarantine", at: fixture.executable) == nil)
+        #expect(try Data(contentsOf: fixture.executable) == executable)
+        #expect(!FileManager.default.fileExists(atPath: fixture.directory.appendingPathComponent("launched").path))
+    }
+    #endif
+
+    @Test(.enabled(if: ProcessInfo.processInfo.environment["ZISLA_RUN_APP_REPAIR_SYSTEM_TESTS"] == "1"),
+          .timeLimit(.minutes(2)))
+    func systemSignatureFailurePreservesQuarantineAndNeverLaunches() async throws {
+        let fixture = try await Self.systemFixture(signature: "adhoc")
+        defer { fixture.remove() }
+        try Data("changed".utf8).write(to: fixture.app.appendingPathComponent("Contents/Resources/sealed"))
+        await #expect(throws: ApplicationOpenRepairError.signatureInvalid) {
+            try await ApplicationOpenRepairService().repairAndOpen(at: fixture.app)
+        }
+        #expect(Self.attribute("com.apple.quarantine", at: fixture.app) != nil)
+        #expect(Self.attribute("com.apple.quarantine", at: fixture.executable) != nil)
+        #expect(!FileManager.default.fileExists(atPath: fixture.directory.appendingPathComponent("launched").path))
+    }
+
+    @Test(.enabled(if: ProcessInfo.processInfo.environment["ZISLA_RUN_APP_REPAIR_SYSTEM_TESTS"] == "1"),
+          .timeLimit(.minutes(2)))
+    func readOnlyDiskImageRejectsRepairWithoutChangingQuarantine() async throws {
+        let fixture = try Fixture()
+        defer { fixture.remove() }
+        let image = fixture.directory.deletingLastPathComponent().appendingPathComponent("repair-\(UUID().uuidString).dmg")
+        defer { try? FileManager.default.removeItem(at: image) }
+        let created = try await AIAgentProcessRunner.run(executableURL: URL(fileURLWithPath: "/usr/bin/hdiutil"),
+            arguments: ["create", "-srcfolder", fixture.directory.path, "-format", "UDRO", image.path],
+            standardInput: Data(), timeout: 30)
+        try #require(!created.didTimeout && created.status == 0, Comment(rawValue: created.standardError))
+        let mount = fixture.directory.appendingPathComponent("mounted")
+        try FileManager.default.createDirectory(at: mount, withIntermediateDirectories: false)
+        let attached = try await AIAgentProcessRunner.run(executableURL: URL(fileURLWithPath: "/usr/bin/hdiutil"),
+            arguments: ["attach", "-nobrowse", "-readonly", "-mountpoint", mount.path, image.path],
+            standardInput: Data(), timeout: 30)
+        defer {
+            do {
+                let detached = try AIAgentProcessRunner.runSynchronously(executableURL: URL(fileURLWithPath: "/usr/bin/hdiutil"),
+                    arguments: ["detach", mount.path], standardInput: Data(), timeout: 30)
+                #expect(!detached.didTimeout && detached.status == 0, Comment(rawValue: detached.standardError))
+            } catch { Issue.record(error) }
+        }
+        try #require(!attached.didTimeout && attached.status == 0, Comment(rawValue: attached.standardError))
+        let app = mount.appendingPathComponent(fixture.app.lastPathComponent)
+        let quarantine = try #require(Self.attribute("com.apple.quarantine", at: app))
+        await #expect(throws: ApplicationOpenRepairError.readOnly) {
+            try await ApplicationOpenRepairService().repairAndOpen(at: app)
+        }
+        #expect(Self.attribute("com.apple.quarantine", at: app) == quarantine)
+    }
+
     @Test
     func unsignedAppRemovesOnlyQuarantineAndOpens() async throws {
         let fixture = try Fixture()
@@ -558,6 +658,62 @@ struct ApplicationOpenRepairServiceTests {
         for key in ["output", "out\\u0070ut"] {
             let repeated = String(text.dropLast()) + ",\"" + key + "\":[]}"
             #expect(!ApplicationOpenRepairService.acceptsDistributionReport(Data(repeated.utf8), path: path))
+        }
+    }
+
+    private static func systemFixture(signature: String) async throws -> Fixture {
+        let fixture = try Fixture(name: "rejected; $(touch marker) ' \(signature) 应用.app")
+        do {
+            let resources = fixture.app.appendingPathComponent("Contents/Resources")
+            try FileManager.default.createDirectory(at: resources, withIntermediateDirectories: true)
+            try Data("original".utf8).write(to: resources.appendingPathComponent("sealed"))
+            let source = fixture.directory.appendingPathComponent("Probe.c")
+            try """
+            #include <mach-o/dyld.h>
+            #include <stdio.h>
+            #include <stdlib.h>
+            #include <string.h>
+            #include <unistd.h>
+            int main(void) {
+                char executable[4096];
+                unsigned int size = sizeof(executable);
+                if (_NSGetExecutablePath(executable, &size) != 0) return 10;
+                char resolved[4096];
+                if (!realpath(executable, resolved)) return 11;
+                char *slash = strrchr(resolved, '/');
+                if (!slash) return 12;
+                *slash = 0;
+                char marker[4096];
+                if (snprintf(marker, sizeof(marker), "%s/../../../launched", resolved) >= sizeof(marker)) return 13;
+                FILE *file = fopen(marker, "w");
+                if (!file) return 14;
+                fprintf(file, "%d", getpid());
+                return fclose(file) == 0 ? 0 : 15;
+            }
+            """.write(to: source, atomically: true, encoding: .utf8)
+            let info: [String: Any] = ["CFBundleExecutable": "Example", "CFBundlePackageType": "APPL",
+                "CFBundleIdentifier": "dev.zisla.tests.repair." + UUID().uuidString,
+                "CFBundleName": "Repair Probe", "CFBundleVersion": "1", "LSBackgroundOnly": true]
+            try PropertyListSerialization.data(fromPropertyList: info, format: .xml, options: 0)
+                .write(to: fixture.app.appendingPathComponent("Contents/Info.plist"))
+            let compile = try await AIAgentProcessRunner.run(executableURL: URL(fileURLWithPath: "/usr/bin/xcrun"),
+                arguments: ["clang", source.path, "-o", fixture.executable.path], standardInput: Data(),
+                environment: ["PATH": "/usr/bin:/bin:/usr/sbin:/sbin"], timeout: 30)
+            try #require(!compile.didTimeout && compile.status == 0, Comment(rawValue: compile.standardError))
+            if signature != "native" {
+                let arguments = signature == "unsigned" ? ["--remove-signature", fixture.executable.path]
+                    : ["--force", "--sign", "-", fixture.app.path]
+                let signing = try await AIAgentProcessRunner.run(executableURL: URL(fileURLWithPath: "/usr/bin/codesign"),
+                    arguments: arguments, standardInput: Data(), timeout: 30)
+                try #require(!signing.didTimeout && signing.status == 0, Comment(rawValue: signing.standardError))
+            }
+            for url in [fixture.app, fixture.executable] {
+                try setAttribute("com.apple.quarantine", value: Data("0081;00000000;ZislaTest;".utf8), at: url)
+            }
+            return fixture
+        } catch {
+            fixture.remove()
+            throw error
         }
     }
 

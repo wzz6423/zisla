@@ -19,6 +19,83 @@ struct ApplicationOpenRepairPresentationTests {
     }
 
     @Test
+    func copiedApplicationReachesTheSingleActionThroughTheClipboardMonitor() async throws {
+        let fixture = try Fixture()
+        defer { fixture.remove() }
+        let pasteboard = NSPasteboard(name: .init("dev.zisla.tests.repair.\(UUID().uuidString)"))
+        defer { pasteboard.releaseGlobally() }
+        var captured: [ClipboardHistoryContent] = []
+        let monitor = ClipboardHistoryMonitor(pasteboard: pasteboard) { captured.append($0) }
+        monitor.setEnabled(true)
+        defer { monitor.setEnabled(false) }
+        #expect(FileShelfPasteboard.writeFileURLs([fixture.app], to: pasteboard))
+        monitor.pollNow()
+        monitor.pollNow()
+        #expect(captured.count == 1)
+        let content = try #require(captured.first)
+        let detection = try #require(await ClipboardAssistantDetector.detectInBackground(
+            content: content, enabledKinds: Set(ClipboardAssistantKind.allCases)))
+        let result = AppModel.augmentedClipboardAssistantDetection(detection, content: content,
+            sourceApplication: NSRunningApplication.current, orders: FeatureSettings.default.clipboardAssistantActionOrders)
+        #expect(result.actions == [.repairAndOpenApp(fixture.app.standardizedFileURL)])
+        #expect(result.kind == .appCannotOpen)
+        #expect(getxattr(fixture.app.path, "com.apple.quarantine", nil, 0, 0, 0) > 0)
+    }
+
+    @Test
+    func nativeShelfDropKeepsTheAppAndQueuesItsRepairPrompt() async throws {
+        let fixture = try Fixture()
+        defer { fixture.remove() }
+        let pasteboard = NSPasteboard(name: .init("dev.zisla.tests.repair-drop.\(UUID().uuidString)"))
+        defer { pasteboard.releaseGlobally() }
+        let store = FileShelfStore(storageURL: fixture.directory.appendingPathComponent("shelf.json"))
+        let controller = makeController()
+        let availability = PresentationAvailability()
+        let presenter = ApplicationOpenRepairPresenter(controller: controller, settings: { .default },
+            canPresent: { availability.canPresent })
+        #expect(FileShelfPasteboard.writeFileURLs([fixture.app], to: pasteboard))
+        var added = 0
+        store.receive(TransferPasteboard.readShelfDropItems(from: pasteboard)) { count in
+            added = count
+            presenter.receive(store.items.map(\.url))
+        }
+        #expect(added == 1)
+        #expect(store.items.map(\.url) == [fixture.app.standardizedFileURL])
+        await presenter.task?.value
+        #expect(controller.presentation.detection == nil)
+        availability.canPresent = true
+        presenter.flush()
+        #expect(controller.presentation.detection?.actions == [.repairAndOpenApp(fixture.app.standardizedFileURL)])
+        #expect(getxattr(fixture.app.path, "com.apple.quarantine", nil, 0, 0, 0) > 0)
+    }
+
+    @Test
+    func promisedApplicationCopyKeepsQuarantineAndPromptsForTheManagedCopy() async throws {
+        let fixture = try Fixture()
+        defer { fixture.remove() }
+        let store = FileShelfStore(storageURL: fixture.directory.appendingPathComponent("shelf.json"))
+        let receiver = ApplicationPromiseReceiver(app: fixture.app)
+        let controller = makeController()
+        let presenter = ApplicationOpenRepairPresenter(controller: controller, settings: { .default }, canPresent: { true })
+        var added = 0
+        store.receive([.promise(receiver)]) { count in
+            added = count
+            presenter.receive(store.items.map(\.url))
+        }
+        #expect(added == 0 && controller.presentation.detection == nil)
+        try receiver.deliver()
+        #expect(added == 1)
+        let item = try #require(store.items.first)
+        #expect(item.isManaged && item.url != fixture.app.standardizedFileURL)
+        #expect(item.url.pathExtension == "app")
+        #expect(getxattr(item.url.path, "com.apple.quarantine", nil, 0, 0, 0) > 0)
+        await presenter.task?.value
+        #expect(controller.presentation.detection?.actions == [.repairAndOpenApp(item.url.standardizedFileURL)])
+        #expect(getxattr(fixture.app.path, "com.apple.quarantine", nil, 0, 0, 0) > 0)
+        #expect(!FileManager.default.fileExists(atPath: try #require(receiver.destination).path))
+    }
+
+    @Test
     func shelfDropWaitsForTheIslandToCollapseAndShowsOnce() async throws {
         let fixture = try Fixture()
         defer { fixture.remove() }
@@ -270,6 +347,27 @@ struct ApplicationOpenRepairPresentationTests {
         let controller = ClipboardAssistantController(windowPresenter: { _, _ in })
         controller.displayDuration = .never
         return controller
+    }
+
+    private final class ApplicationPromiseReceiver: NSFilePromiseReceiver, @unchecked Sendable {
+        private let app: URL
+        private var reader: ((URL, Error?) -> Void)?
+        private(set) var destination: URL?
+
+        init(app: URL) { self.app = app; super.init() }
+        required init?(pasteboardPropertyList propertyList: Any, ofType type: NSPasteboard.PasteboardType) { nil }
+        override var fileNames: [String] { [app.lastPathComponent] }
+        override func receivePromisedFiles(atDestination destinationDir: URL, options: [AnyHashable: Any] = [:],
+                                          operationQueue: OperationQueue, reader: @escaping (URL, Error?) -> Void) {
+            destination = destinationDir
+            self.reader = reader
+        }
+
+        func deliver() throws {
+            let url = try #require(destination).appendingPathComponent(app.lastPathComponent)
+            try FileManager.default.copyItem(at: app, to: url)
+            reader?(url, nil)
+        }
     }
 
     private struct Fixture {
