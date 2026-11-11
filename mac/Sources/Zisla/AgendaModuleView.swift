@@ -71,7 +71,7 @@ struct AgendaModuleView: View {
                 }
             }
             .scrollIndicators(.visible)
-            .thinScrollChrome()
+            .thinScrollChrome(scrollerStyle: .overlay)
         }
     }
 

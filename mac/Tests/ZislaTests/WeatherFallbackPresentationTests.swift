@@ -9,6 +9,73 @@ import ZislaCore
 
 @MainActor
 struct WeatherFallbackPresentationTests {
+    @Test(arguments: [AppLanguage.simplifiedChinese, .english, .arabic], [1, 7])
+    func weatherListKeepsTemperatureInsideTheViewportWithoutHorizontalScrolling(
+        language: AppLanguage, locationCount: Int
+    ) async throws {
+        let directory = FileManager.default.temporaryDirectory.appendingPathComponent("weather-layout-\(UUID())")
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let suite = "weather-layout-\(UUID())"
+        let defaults = try #require(UserDefaults(suiteName: suite))
+        defer { defaults.removePersistentDomain(forName: suite) }
+        let locations = WeatherLocationStore(storageURL: directory.appendingPathComponent("locations.json"), defaults: defaults)
+        let date = Date(timeIntervalSince1970: 86_400)
+        let name = language == .arabic ? "مدينة ذات اسم طويل لاختبار الطقس" : "甘肃省兰州市"
+        locations.updateCurrent(name: name, coordinate: GeoCoordinate(latitude: 36, longitude: 104))
+        for index in 1..<locationCount {
+            locations.addSaved(name: "\(name) \(index)", coordinate: GeoCoordinate(latitude: Double(index), longitude: 100))
+        }
+        let snapshots = Dictionary(uniqueKeysWithValues: locations.locations.map { location in
+            (location.id, WeatherSnapshot(
+                temperature: -12, temperatureMin: -18, temperatureMax: -1,
+                condition: WeatherCondition(code: 0, isDay: true), timezone: "UTC", fetchedAt: date,
+                coordinate: location.coordinate!, locationName: location.displayName,
+                source: AppLocalization.string("中国天气网（中国气象局）", language: language),
+                sourceURL: URL(string: "https://example.com/weather")
+            ))
+        })
+        let persisted = try Data(contentsOf: directory.appendingPathComponent("locations.json"))
+        let host = NSHostingView(rootView: AgendaModuleView.weatherContent(
+            locations: locations, snapshotsByLocationID: snapshots, state: .ready("\(locationCount)"), at: date
+        ).environment(\.locale, language.locale)
+            .environment(\.layoutDirection, language.isRightToLeft ? .rightToLeft : .leftToRight))
+        host.sizingOptions = []
+        let window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 184, height: 124),
+                              styleMask: .borderless, backing: .buffered, defer: false)
+        window.isReleasedWhenClosed = false
+        window.contentView = host
+        defer { window.contentView = nil; window.close() }
+        for _ in 0..<8 {
+            host.layoutSubtreeIfNeeded()
+            await withCheckedContinuation { continuation in
+                DispatchQueue.main.async { continuation.resume() }
+            }
+        }
+        func descendants(in view: NSView) -> [NSView] {
+            view.subviews.flatMap { [$0] + descendants(in: $0) }
+        }
+        let scroll = try #require(descendants(in: host).compactMap { $0 as? NSScrollView }.first)
+        let document = try #require(scroll.documentView)
+        #expect(document.frame.width <= scroll.contentView.bounds.width,
+                "Weather rows must fit the viewport, including the vertical scrollbar")
+        var shiftedBounds = scroll.contentView.bounds
+        shiftedBounds.origin.x += 24
+        #expect(abs(scroll.contentView.constrainBoundsRect(shiftedBounds).minX
+            - scroll.contentView.bounds.minX) < 0.5,
+                "A horizontal scroll gesture must not move weather or clip the temperature")
+        #expect(scroll.horizontalScrollElasticity == .none,
+                "Horizontal trackpad movement must not rubber-band the weather list")
+        if locationCount > 1 {
+            scroll.contentView.scroll(to: CGPoint(x: 0, y: document.frame.height - scroll.contentView.bounds.height))
+            scroll.reflectScrolledClipView(scroll.contentView)
+            #expect(scroll.contentView.bounds.minY > 0, "Additional cities must remain vertically scrollable")
+        }
+        #expect(try Data(contentsOf: directory.appendingPathComponent("locations.json")) == persisted)
+        #expect(locations.orderedSnapshots(snapshots, at: date).count == locationCount)
+        #expect(!window.isVisible)
+    }
+
     @Test
     func fallbackRowShowsAttributionAndDoesNotPresentUnknownMetricsAsZero() throws {
         let fallback = WeatherSnapshot(
