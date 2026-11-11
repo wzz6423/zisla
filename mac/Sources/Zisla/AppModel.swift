@@ -1301,9 +1301,10 @@ final class AppModel: ObservableObject {
     _ controller: DailyBriefingController,
     onMessage: @escaping (String) -> Void
   ) -> AnyCancellable {
-    controller.$lastExportURL
+    let success = controller.$lastExportURL
       .compactMap { $0 }
       .map { AppLocalization.text("已保存到 %@", $0.lastPathComponent) }
+    return success.merge(with: controller.$errorMessage.compactMap { $0 })
       .sink(receiveValue: onMessage)
   }
 

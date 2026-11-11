@@ -111,7 +111,7 @@ struct DailyBriefingSettingsView: View {
                 .disabled(!settingsStore.settings.dailyBriefing.enabled || controller.isExporting)
             }
 
-            if let error = controller.errorMessage ?? previewError {
+            if let error = previewError {
                 Text(error).font(.caption).foregroundStyle(Color.zislaError).textSelection(.enabled)
             }
         }

@@ -100,15 +100,16 @@ struct DailyBriefingIntegrationTests {
         #expect(attempts == 1)
         #expect(controller.errorMessage != nil)
         #expect(!controller.isExporting)
-        #expect(messages.isEmpty, "A failed scheduled export must not announce success")
+        let failure = try #require(controller.errorMessage)
+        #expect(messages == [failure], "A failed scheduled export must reach the island notice")
         await controller.tick(at: due.addingTimeInterval(30))
         #expect(attempts == 2)
         #expect(controller.errorMessage == nil)
         #expect(controller.lastExportURL?.lastPathComponent == "result.png")
-        #expect(messages == [AppLocalization.text("已保存到 %@", "result.png")])
+        #expect(messages == [failure, AppLocalization.text("已保存到 %@", "result.png")])
         await controller.tick(at: due.addingTimeInterval(60))
         #expect(attempts == 2)
-        #expect(messages.count == 1, "A deduplicated scheduled export must not replay its notice")
+        #expect(messages.count == 2, "A deduplicated scheduled export must not replay its notice")
         let pending = try await DailyBriefingStore(fileURL: file).pendingExports(at: due, settings: settings, calendar: calendar)
         #expect(pending.isEmpty)
     }
@@ -177,28 +178,65 @@ struct DailyBriefingIntegrationTests {
 
         await controller.exportToday(at: date)
 
-        #expect(messages == [success], "Failure or cancellation must not refresh an earlier success notice")
+        let expected = cancelled ? [success] : [success, try #require(controller.errorMessage)]
+        #expect(messages == expected, "Failure must present its error; cancellation must remain silent")
         #expect(controller.lastExportURL == url)
         #expect(!controller.isExporting)
         #expect((controller.errorMessage == nil) == cancelled)
         await controller.exportToday(at: date)
-        #expect(messages == [success, success])
+        #expect(messages == expected + [success])
         #expect(controller.errorMessage == nil)
         #expect(!controller.isExporting)
+    }
+
+    @Test
+    func repeatedFailuresRefreshTheIslandNoticeWithoutWaitingForAnExportView() async throws {
+        let directory = try temporaryDirectory()
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let file = directory.appendingPathComponent("blocked")
+        try Data("not an archive".utf8).write(to: file)
+        let controller = DailyBriefingController(
+            store: DailyBriefingStore(fileURL: file),
+            observation: { .init(date: $0, applicationID: "fixture", applicationName: "Fixture", category: .work, isActive: false, isListening: nil) },
+            typing: { _ in nil }, readScreenTime: { _ in .init() },
+            export: { _, _, _, folder in
+                Issue.record("An unreadable archive must fail before exporting")
+                return folder.appendingPathComponent("unexpected.png")
+            })
+        var messages: [String] = []
+        let observation = AppModel.observeDailyBriefingExports(controller) { messages.append($0) }
+        defer { observation.cancel() }
+        controller.configure(settings: .init(enabled: true, readsSystemScreenTime: false),
+            directory: directory, language: .english, startsTimer: false)
+
+        await controller.exportToday(at: Date(timeIntervalSince1970: 1_800_000_000))
+        await controller.exportToday(at: Date(timeIntervalSince1970: 1_800_000_000))
+
+        let failure = try #require(controller.errorMessage)
+        #expect(messages == [failure, failure], "The same error from another attempt must refresh notice lifetime")
+        #expect(!failure.contains("\n"), "The existing island notice has one scrolling line")
+        #expect(controller.lastExportURL == nil)
+        #expect(!controller.isExporting)
+        #expect(try Data(contentsOf: file) == Data("not an archive".utf8))
     }
 
     @Test
     func cancellingExportObservationStopsNoticesAndReleasesController() async throws {
         let directory = try temporaryDirectory()
         defer { try? FileManager.default.removeItem(at: directory) }
+        var failExport = false
         var controller: DailyBriefingController? = DailyBriefingController(
             store: DailyBriefingStore(fileURL: directory.appendingPathComponent("history.json")),
             observation: { .init(date: $0, applicationID: "fixture", applicationName: "Fixture", category: .work, isActive: false, isListening: nil) },
             typing: { _ in nil }, readScreenTime: { _ in .init() },
-            export: { _, _, _, folder in folder.appendingPathComponent("briefing.png") })
+            export: { _, _, _, folder in
+                if failExport { throw CocoaError(.fileWriteNoPermission) }
+                return folder.appendingPathComponent("briefing.png")
+            })
         weak var weakController = controller
         var messages: [String] = []
         let observation = AppModel.observeDailyBriefingExports(controller!) { messages.append($0) }
+        defer { observation.cancel() }
         controller?.configure(settings: .init(enabled: true, readsSystemScreenTime: false),
             directory: directory, language: .english, startsTimer: false)
         let date = Date(timeIntervalSince1970: 1_800_000_000)
@@ -206,6 +244,9 @@ struct DailyBriefingIntegrationTests {
         observation.cancel()
 
         await controller?.exportToday(at: date)
+        failExport = true
+        await controller?.exportToday(at: date)
+        #expect(controller?.errorMessage != nil)
         controller = nil
 
         #expect(messages == [AppLocalization.text("已保存到 %@", "briefing.png")])
@@ -253,11 +294,39 @@ struct DailyBriefingIntegrationTests {
     }
 
     @Test
+    func exportErrorsUseEveryConfiguredLanguageAndRemainOnOneLine() async throws {
+        let directory = try temporaryDirectory()
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let error = NSError(domain: NSCocoaErrorDomain, code: CocoaError.fileNoSuchFile.rawValue,
+            userInfo: [NSLocalizedDescriptionKey: "Folder ‘briefing.png’ does not exist."])
+        let controller = DailyBriefingController(
+            store: DailyBriefingStore(fileURL: directory.appendingPathComponent("history.json")),
+            observation: { .init(date: $0, applicationID: "fixture", applicationName: "Fixture", category: .work, isActive: false, isListening: nil) },
+            typing: { _ in nil }, readScreenTime: { _ in .init() },
+            export: { _, _, _, _ in throw error })
+        var messages: [String] = []
+        let observation = AppModel.observeDailyBriefingExports(controller) { messages.append($0) }
+        defer { observation.cancel() }
+        for language in AppLanguage.allCases {
+            controller.configure(settings: .init(enabled: true, readsSystemScreenTime: false),
+                directory: directory, language: language, startsTimer: false)
+            await controller.exportToday(at: Date(timeIntervalSince1970: 1_800_000_000))
+
+            #expect(messages.last == AppLocalization.string("简报导出或记录失败", language: language)
+                + " · " + error.localizedDescription)
+            #expect(messages.last?.contains("\n") == false)
+        }
+        #expect(messages.count == 17)
+        #expect(controller.lastExportURL == nil)
+        #expect(!controller.isExporting)
+    }
+
+    @Test
     func changingTimeTemplateLanguageAndFolderUsesTheNormalPNGExportPath() async throws {
         let directory = try temporaryDirectory()
         defer { try? FileManager.default.removeItem(at: directory) }
         let output = directory.appendingPathComponent("exports")
-        try FileManager.default.createDirectory(at: output, withIntermediateDirectories: true)
+        #expect(!FileManager.default.fileExists(atPath: output.path))
         let calendar = DailyBriefingDay.calendar
         let morning = calendar.date(from: DateComponents(year: 2026, month: 11, day: 4, hour: 9))!
         let controller = DailyBriefingController(store: DailyBriefingStore(fileURL: directory.appendingPathComponent("history.json")),
@@ -483,6 +552,8 @@ struct DailyBriefingIntegrationTests {
         #expect(!settings.contains("model.downloadDirectory"))
         #expect(!settings.contains("controller.lastExportURL"),
                 "Export success must appear on the island instead of remaining in the settings page")
+        #expect(!settings.contains("controller.errorMessage"),
+                "Export failures must use the same island notice as mail operations")
         let model = try String(contentsOf: root.appendingPathComponent("Sources/Zisla/AppModel.swift"), encoding: .utf8)
         let exportObservationStart = try #require(model.range(of: "Self.observeDailyBriefingExports(dailyBriefing)"))
         let exportObservationEnd = try #require(model.range(of: "clipboardAssistant.onPerformAction", range: exportObservationStart.upperBound..<model.endIndex))
