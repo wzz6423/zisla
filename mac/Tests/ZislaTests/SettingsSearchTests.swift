@@ -21,7 +21,7 @@ struct SettingsSearchTests {
     func clipboardHistoryCleanupIsSearchableInEveryLanguage(language: AppLanguage) {
         let title = AppLocalization.string("自动删除剪贴板历史", language: language)
         let matches = results(title, settings: FeatureSettings.default, locale: language.locale)
-        #expect(matches.first?.section == .features)
+        #expect(matches.first?.section == .scheduledCleanup)
         #expect(matches.first?.anchor == .row("自动删除剪贴板历史"))
     }
 

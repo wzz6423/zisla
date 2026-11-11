@@ -62,18 +62,22 @@ enum ScreenshotCaptureService {
     /// with the correct dimensions, but its contents may come from reclaimed video memory and appear
     /// as a solid-color overlay. Always use ScreenCaptureKit, falling back only on macOS 14.
     @MainActor
-    static func capture(screen: NSScreen) async throws -> (image: NSImage, cgImage: CGImage) {
+    static func capture(
+        screen: NSScreen,
+        includeHDR: Bool = false
+    ) async throws -> (image: NSImage, cgImage: CGImage, hdrCGImage: CGImage?) {
         try requirePermission()
         guard let displayID = displayID(for: screen) else {
             throw ScreenshotCaptureError.screenUnavailable
         }
         do {
-            let cgImage = try await captureWithScreenCaptureKit(
+            let images = try await captureWithScreenCaptureKit(
                 displayID: displayID,
                 screen: screen,
-                excludingProcessIdentifier: nil
+                excludingProcessIdentifier: nil,
+                includeHDR: includeHDR
             )
-            return (NSImage(cgImage: cgImage, size: screen.frame.size), cgImage)
+            return (NSImage(cgImage: images.sdr, size: screen.frame.size), images.sdr, images.hdr)
         } catch {
             if #unavailable(macOS 15.0) {
                 guard let rawImage = CGDisplayCreateImage(displayID) else { throw error }
@@ -81,7 +85,7 @@ enum ScreenshotCaptureService {
                     rawImage,
                     api: "CGDisplayCreateImage"
                 )
-                return (NSImage(cgImage: cgImage, size: screen.frame.size), cgImage)
+                return (NSImage(cgImage: cgImage, size: screen.frame.size), cgImage, nil)
             }
             throw error
         }
@@ -90,26 +94,69 @@ enum ScreenshotCaptureService {
     @MainActor
     static func capture(
         screen: NSScreen,
-        excludingApplicationWithProcessIdentifier processIdentifier: pid_t
-    ) async throws -> (image: NSImage, cgImage: CGImage) {
+        excludingApplicationWithProcessIdentifier processIdentifier: pid_t,
+        includeHDR: Bool = false
+    ) async throws -> (image: NSImage, cgImage: CGImage, hdrCGImage: CGImage?) {
         try requirePermission()
         guard let displayID = displayID(for: screen) else {
             throw ScreenshotCaptureError.screenUnavailable
         }
-        let cgImage = try await captureWithScreenCaptureKit(
+        let images = try await captureWithScreenCaptureKit(
             displayID: displayID,
             screen: screen,
-            excludingProcessIdentifier: processIdentifier
+            excludingProcessIdentifier: processIdentifier,
+            includeHDR: includeHDR
         )
-        return (NSImage(cgImage: cgImage, size: screen.frame.size), cgImage)
+        return (NSImage(cgImage: images.sdr, size: screen.frame.size), images.sdr, images.hdr)
+    }
+
+    static var supportsHDRCapture: Bool {
+        #if arch(arm64)
+        if #available(macOS 15.0, *) { return true }
+        #endif
+        return false
+    }
+
+    @available(macOS 26.0, *)
+    static func screenshotConfiguration(width: Int, height: Int, includeHDR: Bool) -> SCScreenshotConfiguration {
+        let configuration = SCScreenshotConfiguration()
+        configuration.width = width
+        configuration.height = height
+        configuration.showsCursor = false
+        configuration.ignoreShadows = false
+        configuration.ignoreClipping = false
+        configuration.includeChildWindows = true
+        configuration.displayIntent = .local
+        configuration.dynamicRange = includeHDR ? .bothSDRAndHDR : .sdr
+        return configuration
+    }
+
+    static func streamConfiguration(width: Int, height: Int, includeHDR: Bool) -> SCStreamConfiguration {
+        let configuration: SCStreamConfiguration
+        if #available(macOS 15.0, *), includeHDR {
+            configuration = SCStreamConfiguration(preset: .captureHDRScreenshotLocalDisplay)
+        } else {
+            configuration = SCStreamConfiguration()
+        }
+        configuration.width = width
+        configuration.height = height
+        configuration.captureResolution = .best
+        configuration.showsCursor = false
+        configuration.ignoreShadowsDisplay = false
+        configuration.ignoreGlobalClipDisplay = false
+        if #available(macOS 14.2, *) {
+            configuration.includeChildWindows = true
+        }
+        return configuration
     }
 
     @MainActor
     private static func captureWithScreenCaptureKit(
         displayID: CGDirectDisplayID,
         screen: NSScreen,
-        excludingProcessIdentifier processIdentifier: pid_t?
-    ) async throws -> CGImage {
+        excludingProcessIdentifier processIdentifier: pid_t?,
+        includeHDR: Bool
+    ) async throws -> (sdr: CGImage, hdr: CGImage?) {
         let content = try await SCShareableContent.excludingDesktopWindows(
             false,
             onScreenWindowsOnly: true
@@ -130,17 +177,11 @@ enum ScreenshotCaptureService {
         let scale = max(screen.backingScaleFactor, 1)
         let width = max(1, Int((screen.frame.width * scale).rounded()))
         let height = max(1, Int((screen.frame.height * scale).rounded()))
+        let capturesHDR = includeHDR && supportsHDRCapture
+            && screen.maximumPotentialExtendedDynamicRangeColorComponentValue > 1
 
         if #available(macOS 26.0, *) {
-            let configuration = SCScreenshotConfiguration()
-            configuration.width = width
-            configuration.height = height
-            configuration.showsCursor = false
-            configuration.ignoreShadows = false
-            configuration.ignoreClipping = false
-            configuration.includeChildWindows = true
-            configuration.displayIntent = .local
-            configuration.dynamicRange = .sdr
+            let configuration = screenshotConfiguration(width: width, height: height, includeHDR: capturesHDR)
             let output = try await SCScreenshotManager.captureScreenshot(
                 contentFilter: filter,
                 configuration: configuration
@@ -148,24 +189,23 @@ enum ScreenshotCaptureService {
             guard let image = output.sdrImage else {
                 throw ScreenshotCaptureError.screenUnavailable
             }
-            return try detachedImageAndDiagnose(image, api: "SCScreenshotConfiguration")
+            let hdr = try output.hdrImage.map { try detachedImageAndDiagnose($0, api: "SCScreenshotConfiguration HDR") }
+            return (try detachedImageAndDiagnose(image, api: "SCScreenshotConfiguration"), hdr)
         }
 
-        let configuration = SCStreamConfiguration()
-        configuration.width = width
-        configuration.height = height
-        configuration.captureResolution = .best
-        configuration.showsCursor = false
-        configuration.ignoreShadowsDisplay = false
-        configuration.ignoreGlobalClipDisplay = false
-        if #available(macOS 14.2, *) {
-            configuration.includeChildWindows = true
-        }
+        let configuration = streamConfiguration(width: width, height: height, includeHDR: capturesHDR)
         let image = try await SCScreenshotManager.captureImage(
             contentFilter: filter,
             configuration: configuration
         )
-        return try detachedImageAndDiagnose(image, api: "SCStreamConfiguration")
+        let detached = try detachedImageAndDiagnose(image, api: "SCStreamConfiguration")
+        if capturesHDR {
+            guard let sdr = ScreenshotImageRendering.sdrImage(from: detached) else {
+                throw ScreenshotCaptureError.screenUnavailable
+            }
+            return (sdr, detached)
+        }
+        return (detached, nil)
     }
 
     @available(macOS 14.0, *)
@@ -190,22 +230,19 @@ enum ScreenshotCaptureService {
 
     static func detachedImage(from image: CGImage) -> CGImage? {
         guard image.width > 0, image.height > 0 else { return nil }
-        let (bytesPerRow, overflow) = image.width.multipliedReportingOverflow(by: 4)
+        let (bytesPerRow, overflow) = image.width.multipliedReportingOverflow(
+            by: ScreenshotImageRendering.isHDR(image) ? 8 : 4
+        )
         guard !overflow else { return nil }
         let (_, byteCountOverflow) = bytesPerRow.multipliedReportingOverflow(by: image.height)
         guard !byteCountOverflow else { return nil }
-        guard let context = CGContext(
-            data: nil,
-            width: image.width,
-            height: image.height,
-            bitsPerComponent: 8,
-            bytesPerRow: bytesPerRow,
-            space: image.colorSpace ?? CGColorSpaceCreateDeviceRGB(),
-            bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue
+        guard let context = ScreenshotImageRendering.bitmapContext(
+            width: image.width, height: image.height, matching: image
         ) else { return nil }
         context.interpolationQuality = .none
         context.draw(image, in: CGRect(x: 0, y: 0, width: image.width, height: image.height))
-        return context.makeImage()
+        guard let detached = context.makeImage() else { return nil }
+        return ScreenshotImageRendering.preservingHeadroom(detached, from: image)
     }
 
     static func frameDiagnostics(
@@ -271,9 +308,11 @@ enum ScreenshotCaptureService {
             width: normalized.width * scaleX,
             height: normalized.height * scaleY
         ).integral.intersection(CGRect(x: 0, y: 0, width: cgImage.width, height: cgImage.height))
-        guard let cropped = cgImage.cropping(to: cropRect) else { return nil }
+        guard let cropped = cgImage.cropping(to: cropRect),
+              let output = ScreenshotImageRendering.preservingHeadroom(cropped, from: cgImage)
+        else { return nil }
         return NSImage(
-            cgImage: cropped,
+            cgImage: output,
             size: CGSize(width: normalized.width, height: normalized.height)
         )
     }
@@ -371,21 +410,82 @@ struct ScreenshotCaptureResult {
     let screenImage: NSImage
     let screenCGImage: CGImage
     let screen: NSScreen
+    var hdrScreenCGImage: CGImage? = nil
 }
 
 struct ScreenshotBackingImage: NSViewRepresentable {
     let image: NSImage
+    var preservesHDR = false
+    var opacity: CGFloat = 1
 
-    func makeNSView(context: Context) -> NSImageView {
-        let imageView = NSImageView()
+    func makeNSView(context: Context) -> ScreenshotBackingImageView {
+        let imageView = ScreenshotBackingImageView()
         imageView.imageAlignment = .alignCenter
         imageView.imageFrameStyle = .none
         imageView.imageScaling = .scaleAxesIndependently
         return imageView
     }
 
-    func updateNSView(_ imageView: NSImageView, context: Context) {
-        imageView.image = image
+    func updateNSView(_ imageView: ScreenshotBackingImageView, context: Context) {
+        imageView.update(image: image, preservesHDR: preservesHDR, opacity: opacity)
+    }
+}
+
+@MainActor
+final class ScreenshotBackingImageView: NSImageView {
+    let hdrLayer = CALayer()
+    private var imageSize = CGSize.zero
+
+    override init(frame frameRect: NSRect) {
+        super.init(frame: frameRect)
+        wantsLayer = true
+        hdrLayer.contentsGravity = .resize
+        hdrLayer.isHidden = true
+        layer?.addSublayer(hdrLayer)
+    }
+
+    required init?(coder: NSCoder) { fatalError("init(coder:) has not been implemented") }
+
+    override var intrinsicContentSize: NSSize { imageSize }
+
+    override func layout() {
+        super.layout()
+        CATransaction.begin()
+        CATransaction.setDisableActions(true)
+        hdrLayer.frame = bounds
+        hdrLayer.contentsScale = window?.backingScaleFactor ?? 1
+        CATransaction.commit()
+    }
+
+    func update(image: NSImage, preservesHDR: Bool, opacity: CGFloat) {
+        imageSize = image.size
+        invalidateIntrinsicContentSize()
+        CATransaction.begin()
+        CATransaction.setDisableActions(true)
+        if preservesHDR, let cgImage = image.cgImage(forProposedRect: nil, context: nil, hints: nil),
+           ScreenshotImageRendering.isHDR(cgImage) {
+            self.image = nil
+            alphaValue = 1
+            hdrLayer.contents = cgImage
+            hdrLayer.opacity = Float(opacity)
+            hdrLayer.isHidden = false
+        } else {
+            self.image = image
+            alphaValue = opacity
+            hdrLayer.contents = nil
+            hdrLayer.isHidden = true
+        }
+        if #available(macOS 26.0, *) {
+            hdrLayer.preferredDynamicRange = hdrLayer.isHidden ? .standard : .high
+        } else {
+            hdrLayer.wantsExtendedDynamicRangeContent = !hdrLayer.isHidden
+        }
+        if #available(macOS 15.0, *) {
+            // Local-display captures are already mapped by WindowServer; another tone curve changes their appearance.
+            hdrLayer.toneMapMode = .never
+        }
+        CATransaction.commit()
+        needsLayout = true
     }
 }
 
@@ -720,7 +820,7 @@ final class ScreenshotColorCopyFeedback: ObservableObject {
 
 @MainActor
 final class ScreenshotSelectionController: NSObject, NSWindowDelegate {
-    typealias CaptureScreen = @MainActor (NSScreen) async throws -> (image: NSImage, cgImage: CGImage)
+    typealias CaptureScreen = @MainActor (NSScreen) async throws -> (image: NSImage, cgImage: CGImage, hdrCGImage: CGImage?)
     typealias PresentPanels = @MainActor ([ScreenshotSelectionPanel]) -> Void
     typealias WillPresentPanels = @MainActor () async -> Void
     typealias SnapTargets = (NSScreen) -> [CGRect]
@@ -744,7 +844,7 @@ final class ScreenshotSelectionController: NSObject, NSWindowDelegate {
 
     init(
         capturedProcessIdentifier: pid_t? = nil,
-        captureScreen: @escaping CaptureScreen = ScreenshotCaptureService.capture,
+        captureScreen: @escaping CaptureScreen = { try await ScreenshotCaptureService.capture(screen: $0, includeHDR: true) },
         presentPanels: @escaping PresentPanels = ScreenshotSelectionController.present,
         snapTargets: @escaping SnapTargets = {
             ScreenshotSnapTargetProvider.windowRects(
@@ -775,13 +875,13 @@ final class ScreenshotSelectionController: NSObject, NSWindowDelegate {
             return
         }
 
-        var captures: [(screen: NSScreen, image: NSImage, cgImage: CGImage)] = []
+        var captures: [(screen: NSScreen, image: NSImage, cgImage: CGImage, hdrCGImage: CGImage?)] = []
         do {
             for screen in screens {
                 guard sessionID == startSessionID, !didFinish else { return }
                 let capture = try await captureScreen(screen)
                 guard sessionID == startSessionID, !didFinish else { return }
-                captures.append((screen, capture.image, capture.cgImage))
+                captures.append((screen, capture.image, capture.cgImage, capture.hdrCGImage))
             }
         } catch {
             guard sessionID == startSessionID, !didFinish else { return }
@@ -855,7 +955,8 @@ final class ScreenshotSelectionController: NSObject, NSWindowDelegate {
                             selection: rect,
                             on: capture.screen,
                             screenImage: capture.image,
-                            screenCGImage: capture.cgImage
+                            screenCGImage: capture.cgImage,
+                            hdrScreenCGImage: capture.hdrCGImage
                         )
                     },
                     snapTarget: { point in
@@ -912,7 +1013,8 @@ final class ScreenshotSelectionController: NSObject, NSWindowDelegate {
         selection rect: CGRect,
         on screen: NSScreen,
         screenImage: NSImage,
-        screenCGImage: CGImage
+        screenCGImage: CGImage,
+        hdrScreenCGImage: CGImage?
     ) {
         guard !didFinish else { return }
         let screenBounds = CGRect(origin: .zero, size: screen.frame.size)
@@ -932,7 +1034,8 @@ final class ScreenshotSelectionController: NSObject, NSWindowDelegate {
             selectionRect: normalized,
             screenImage: screenImage,
             screenCGImage: screenCGImage,
-            screen: screen
+            screen: screen,
+            hdrScreenCGImage: hdrScreenCGImage
         ))
     }
 

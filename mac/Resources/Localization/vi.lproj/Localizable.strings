@@ -312,7 +312,7 @@
 "可安全清理的缓存与日志当前为空" = "Bộ nhớ cache và nhật ký có thể dọn dẹp an toàn hiện đang trống";
 "展开" = "Mở rộng";
 "移入废纸篓" = "Di chuyển vào Thùng rác";
-"zisla 不会永久删除这些内容。" = "zisla sẽ không xóa vĩnh viễn các mục này.";
+"本次操作将项目移入废纸篓；废纸篓之后可能被清空，届时将永久删除。" = "Thao tác này chuyển các mục vào Thùng rác. Nếu Thùng rác được làm trống sau đó, các mục sẽ bị xóa vĩnh viễn.";
 
 /* Cleanup Categories */
 "应用缓存" = "Bộ nhớ Cache Ứng dụng";
@@ -511,6 +511,8 @@
 "电池功率" = "Công suất pin";
 "本机 Mac" = "Mac này";
 "已充满" = "Đã sạc đầy";
+"立即充至100%" = "Sạc đến 100% ngay";
+"无法立即充至100%，请重试。" = "Không thể sạc đến 100% ngay. Vui lòng thử lại.";
 "充电中" = "Đang sạc";
 "电源已接通" = "Đã kết nối nguồn";
 "使用电池" = "Dùng pin";
@@ -2321,7 +2323,7 @@
 "%ld 核" = "%ld lõi";
 "%ld 核 · " = "%ld lõi · ";
 "已整理系统内存 %@" = "Đã dồn nén %@ bộ nhớ hệ thống";
-"其中 %ld 项需人工复核。zisla 不会永久删除这些内容。" = "Trong đó %ld mục cần bạn tự kiểm tra. zisla không bao giờ xoá vĩnh viễn.";
+"其中 %ld 项需人工复核。本次操作将项目移入废纸篓；废纸篓之后可能被清空，届时将永久删除。" = "Trong đó %ld mục cần bạn tự kiểm tra. Thao tác này chuyển các mục vào Thùng rác. Nếu Thùng rác được làm trống sau đó, các mục sẽ bị xóa vĩnh viễn.";
 "取消选择%@" = "Bỏ chọn %@";
 "全选%@" = "Chọn tất cả trong %@";
 "反选%@" = "Đảo lựa chọn trong %@";
@@ -3342,7 +3344,7 @@
 "麦克风监听已关闭：%@" = "Đã tắt nghe âm thanh micrô: %@";
 
 "自动清理系统垃圾" = "Tự động dọn tệp rác hệ thống";
-"按所选间隔移入废纸篓，不会永久删除" = "Chuyển các mục vào Thùng rác theo khoảng thời gian đã chọn, không xóa vĩnh viễn";
+"按所选间隔移入废纸篓；清空废纸篓后将永久删除" = "Chuyển các mục vào Thùng rác theo khoảng thời gian đã chọn; làm trống Thùng rác sẽ xóa chúng vĩnh viễn";
 "清理范围" = "Phạm vi dọn dẹp";
 "仅可信" = "Chỉ các mục đáng tin cậy";
 "全部（包含需人工复核）" = "Tất cả (kể cả các mục cần xem xét)";
@@ -3375,6 +3377,86 @@
 "已发送到录屏工作室" = "Đã gửi đến phòng thu màn hình";
 "已取消操作" = "Đã hủy thao tác";
 
+"保留 HDR" = "Giữ HDR";
+"小雨" = "Mưa nhẹ";
+"中雨" = "Mưa vừa";
+"大雨" = "Mưa lớn";
+"小雪" = "Tuyết nhẹ";
+"中雪" = "Tuyết vừa";
+"大雪" = "Tuyết lớn";
+"冻毛毛雨" = "Mưa phùn đóng băng";
+"冻雨" = "Mưa đóng băng";
+"雪粒" = "Hạt tuyết";
+"小阵雨" = "Mưa rào nhẹ";
+"强阵雨" = "Mưa rào lớn";
+"小阵雪" = "Mưa tuyết nhẹ từng đợt";
+"强阵雪" = "Mưa tuyết lớn từng đợt";
+"强雷阵雨" = "Dông mạnh";
+"雨夹雪" = "Mưa lẫn tuyết";
+"小雨夹雪" = "Mưa nhẹ lẫn tuyết";
+"强雨夹雪" = "Mưa lớn lẫn tuyết";
+"阵性雨夹雪" = "Mưa rào lẫn tuyết";
+"小阵性雨夹雪" = "Mưa rào nhẹ lẫn tuyết";
+"强阵性雨夹雪" = "Mưa rào lớn lẫn tuyết";
+"暴雨" = "Mưa rất lớn";
+"大暴雨" = "Mưa rất lớn dữ dội";
+"特大暴雨" = "Mưa cực lớn";
+"暴雪" = "Bão tuyết";
+"小到中雨" = "Mưa nhẹ đến vừa";
+"中到大雨" = "Mưa vừa đến lớn";
+"大到暴雨" = "Mưa lớn đến rất lớn";
+"暴雨到大暴雨" = "Mưa rất lớn đến dữ dội";
+"大暴雨到特大暴雨" = "Mưa rất lớn dữ dội đến cực lớn";
+"小到中雪" = "Tuyết nhẹ đến vừa";
+"中到大雪" = "Tuyết vừa đến lớn";
+"大到暴雪" = "Tuyết lớn đến bão tuyết";
+"浓雾" = "Sương mù dày";
+"强浓雾" = "Sương mù rất dày";
+"大雾" = "Sương mù dày đặc";
+"特强浓雾" = "Sương mù cực dày";
+"霾" = "Mù khô";
+"中度霾" = "Mù khô vừa";
+"重度霾" = "Mù khô dày";
+"严重霾" = "Mù khô nghiêm trọng";
+"沙尘暴" = "Bão bụi";
+"浮尘" = "Bụi lơ lửng";
+"扬沙" = "Cát bay";
+"强沙尘暴" = "Bão bụi dữ dội";
+"雨伴雷电" = "Mưa kèm sấm";
+"小雨伴雷电" = "Mưa nhẹ kèm sấm";
+"大雨伴雷电" = "Mưa lớn kèm sấm";
+"阵雨伴雷电" = "Mưa rào kèm sấm";
+"小阵雨伴雷电" = "Mưa rào nhẹ kèm sấm";
+"强阵雨伴雷电" = "Mưa rào lớn kèm sấm";
+"雪伴雷电" = "Tuyết kèm sấm";
+"小雪伴雷电" = "Tuyết nhẹ kèm sấm";
+"大雪伴雷电" = "Tuyết lớn kèm sấm";
+"阵雪伴雷电" = "Tuyết rào kèm sấm";
+"小阵雪伴雷电" = "Mưa tuyết nhẹ từng đợt kèm sấm";
+"强阵雪伴雷电" = "Mưa tuyết lớn từng đợt kèm sấm";
+"雨夹雪伴雷电" = "Mưa lẫn tuyết kèm sấm";
+"小雨夹雪伴雷电" = "Mưa nhẹ lẫn tuyết kèm sấm";
+"强雨夹雪伴雷电" = "Mưa lớn lẫn tuyết kèm sấm";
+"阵性雨夹雪伴雷电" = "Mưa rào lẫn tuyết kèm sấm";
+"小阵性雨夹雪伴雷电" = "Mưa rào nhẹ lẫn tuyết kèm sấm";
+"强阵性雨夹雪伴雷电" = "Mưa rào lớn lẫn tuyết kèm sấm";
+"雷阵雨伴有冰雹" = "Mưa dông kèm mưa đá";
+
+"管理电源模式与系统垃圾、剪贴板历史和废纸篓的定时清理。" = "Quản lý chế độ nguồn và dọn dẹp theo lịch cho tệp rác hệ thống, lịch sử bảng nhớ tạm và Thùng rác.";
+"定时倾倒废纸篓" = "Tự động làm trống Thùng rác";
+"按所选间隔永久删除废纸篓中的所有项目，无法恢复" = "Xóa vĩnh viễn tất cả mục trong Thùng rác theo khoảng thời gian đã chọn. Không thể khôi phục";
+"启用定时倾倒废纸篓？" = "Bật tự động làm trống Thùng rác?";
+
+"自动切换电源模式" = "Tự động chuyển chế độ nguồn";
+"插电默认模式" = "Chế độ mặc định khi cắm sạc";
+"脱电默认模式" = "Chế độ mặc định khi dùng pin";
+"20%及以下固定省电" = "Luôn tiết kiệm điện ở mức 20% trở xuống";
+"电量不高于20%时保持省电，插电也不切换；超过20%后恢复对应默认模式" = "Giữ chế độ tiết kiệm điện ở mức 20% trở xuống kể cả khi cắm sạc; khôi phục chế độ mặc định tương ứng khi trên 20%";
+"省电" = "Tiết kiệm điện";
+"高性能" = "Hiệu năng cao";
+
+
+"无法保存定时倾倒废纸篓的记录，本次已跳过。" = "Không thể lưu bản ghi dọn sạch Thùng rác tự động. Đã bỏ qua lần này.";
 "灵动岛功能顺序" = "Thứ tự tính năng Dynamic Island";
 
 "查询航班" = "Tra cứu chuyến bay";
@@ -3382,3 +3464,10 @@
 "查询快递" = "Theo dõi bưu kiện";
 "全部标记为已读" = "Đánh dấu tất cả là đã đọc";
 "已将全部邮件标记为已读" = "Đã đánh dấu tất cả thư là đã đọc";
+
+"自动滚动" = "Cuộn tự động";
+"暂停滚动" = "Tạm dừng cuộn";
+"正在自动滚动并拼接" = "Đang cuộn và ghép tự động";
+"自动滚动已暂停，可手动滚动或点击“完成”" = "Đã tạm dừng cuộn tự động. Cuộn thủ công hoặc nhấp Xong";
+"自动滚动需要在系统设置中允许辅助功能" = "Cho phép Trợ năng trong Cài đặt hệ thống để cuộn tự động";
+"无法自动滚动，请手动滚动页面" = "Không thể cuộn tự động. Hãy cuộn trang thủ công";

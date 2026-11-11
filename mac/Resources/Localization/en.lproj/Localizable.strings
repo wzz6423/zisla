@@ -315,7 +315,7 @@
 "可安全清理的缓存与日志当前为空" = "Safely cleanable caches and logs are currently empty";
 "展开" = "Expand";
 "移入废纸篓" = "Move to Trash";
-"zisla 不会永久删除这些内容。" = "zisla will not permanently delete these items.";
+"本次操作将项目移入废纸篓；废纸篓之后可能被清空，届时将永久删除。" = "This action moves items to the Trash. The Trash may be emptied later, permanently deleting them.";
 
 /* Cleanup Categories */
 "应用缓存" = "App Cache";
@@ -442,6 +442,8 @@
 "电池功率" = "Battery power";
 "本机 Mac" = "This Mac";
 "已充满" = "Fully charged";
+"立即充至100%" = "Charge to 100% Now";
+"无法立即充至100%，请重试。" = "Couldn't charge to 100% now. Please try again.";
 "充电中" = "Charging";
 "电源已接通" = "Power connected";
 "使用电池" = "On battery";
@@ -2320,7 +2322,7 @@
 "%ld 核" = "%ld cores";
 "%ld 核 · " = "%ld cores · ";
 "已整理系统内存 %@" = "Compacted %@ of system memory";
-"其中 %ld 项需人工复核。zisla 不会永久删除这些内容。" = "%ld of them need manual review. zisla never deletes them permanently.";
+"其中 %ld 项需人工复核。本次操作将项目移入废纸篓；废纸篓之后可能被清空，届时将永久删除。" = "%ld of them need manual review. This action moves items to the Trash. The Trash may be emptied later, permanently deleting them.";
 "取消选择%@" = "Deselect %@";
 "全选%@" = "Select all %@";
 "反选%@" = "Invert selection in %@";
@@ -3341,7 +3343,7 @@
 "麦克风监听已关闭：%@" = "Microphone monitoring was turned off: %@";
 
 "自动清理系统垃圾" = "Automatically clean system junk";
-"按所选间隔移入废纸篓，不会永久删除" = "Move items to the Trash at the selected interval; never delete permanently";
+"按所选间隔移入废纸篓；清空废纸篓后将永久删除" = "Move items to the Trash at the selected interval; emptying the Trash permanently deletes them";
 "清理范围" = "Cleanup scope";
 "仅可信" = "Trusted only";
 "全部（包含需人工复核）" = "All (including items requiring review)";
@@ -3374,6 +3376,86 @@
 "已发送到录屏工作室" = "Sent to Recording Studio";
 "已取消操作" = "Action cancelled";
 
+"保留 HDR" = "Preserve HDR";
+"小雨" = "Light rain";
+"中雨" = "Moderate rain";
+"大雨" = "Heavy rain";
+"小雪" = "Light snow";
+"中雪" = "Moderate snow";
+"大雪" = "Heavy snow";
+"冻毛毛雨" = "Freezing drizzle";
+"冻雨" = "Freezing rain";
+"雪粒" = "Snow grains";
+"小阵雨" = "Light rain showers";
+"强阵雨" = "Heavy rain showers";
+"小阵雪" = "Light snow showers";
+"强阵雪" = "Heavy snow showers";
+"强雷阵雨" = "Heavy thunderstorm";
+"雨夹雪" = "Rain and snow";
+"小雨夹雪" = "Light rain and snow";
+"强雨夹雪" = "Heavy rain and snow";
+"阵性雨夹雪" = "Rain and snow showers";
+"小阵性雨夹雪" = "Light rain and snow showers";
+"强阵性雨夹雪" = "Heavy rain and snow showers";
+"暴雨" = "Torrential rain";
+"大暴雨" = "Severe torrential rain";
+"特大暴雨" = "Extreme torrential rain";
+"暴雪" = "Blizzard";
+"小到中雨" = "Light to moderate rain";
+"中到大雨" = "Moderate to heavy rain";
+"大到暴雨" = "Heavy to torrential rain";
+"暴雨到大暴雨" = "Torrential to severe torrential rain";
+"大暴雨到特大暴雨" = "Severe to extreme torrential rain";
+"小到中雪" = "Light to moderate snow";
+"中到大雪" = "Moderate to heavy snow";
+"大到暴雪" = "Heavy snow to blizzard";
+"浓雾" = "Dense fog";
+"强浓雾" = "Very dense fog";
+"大雾" = "Thick fog";
+"特强浓雾" = "Extremely dense fog";
+"霾" = "Haze";
+"中度霾" = "Moderate haze";
+"重度霾" = "Heavy haze";
+"严重霾" = "Severe haze";
+"沙尘暴" = "Dust storm";
+"浮尘" = "Suspended dust";
+"扬沙" = "Blowing sand";
+"强沙尘暴" = "Severe dust storm";
+"雨伴雷电" = "Rain and thunder";
+"小雨伴雷电" = "Light rain and thunder";
+"大雨伴雷电" = "Heavy rain and thunder";
+"阵雨伴雷电" = "Showers and thunder";
+"小阵雨伴雷电" = "Light rain showers and thunder";
+"强阵雨伴雷电" = "Heavy rain showers and thunder";
+"雪伴雷电" = "Snow and thunder";
+"小雪伴雷电" = "Light snow and thunder";
+"大雪伴雷电" = "Heavy snow and thunder";
+"阵雪伴雷电" = "Snow showers and thunder";
+"小阵雪伴雷电" = "Light snow showers and thunder";
+"强阵雪伴雷电" = "Heavy snow showers and thunder";
+"雨夹雪伴雷电" = "Rain and snow with thunder";
+"小雨夹雪伴雷电" = "Light rain and snow with thunder";
+"强雨夹雪伴雷电" = "Heavy rain and snow with thunder";
+"阵性雨夹雪伴雷电" = "Rain and snow showers with thunder";
+"小阵性雨夹雪伴雷电" = "Light rain and snow showers with thunder";
+"强阵性雨夹雪伴雷电" = "Heavy rain and snow showers with thunder";
+"雷阵雨伴有冰雹" = "Thunderstorms with hail";
+
+"管理电源模式与系统垃圾、剪贴板历史和废纸篓的定时清理。" = "Manage power modes and scheduled cleanup of system junk, clipboard history, and the Trash.";
+"定时倾倒废纸篓" = "Automatically empty the Trash";
+"按所选间隔永久删除废纸篓中的所有项目，无法恢复" = "Permanently delete all items in the Trash at the selected interval; cannot be undone";
+"启用定时倾倒废纸篓？" = "Enable automatic Trash emptying?";
+
+"自动切换电源模式" = "Automatically switch power modes";
+"插电默认模式" = "Default mode when plugged in";
+"脱电默认模式" = "Default mode on battery";
+"20%及以下固定省电" = "Always use Low Power at 20% or less";
+"电量不高于20%时保持省电，插电也不切换；超过20%后恢复对应默认模式" = "Keep Low Power at 20% or less, even when plugged in; restore the corresponding default above 20%";
+"省电" = "Low Power";
+"高性能" = "High Performance";
+
+
+"无法保存定时倾倒废纸篓的记录，本次已跳过。" = "Could not save the automatic Trash emptying record. This run was skipped.";
 "灵动岛功能顺序" = "Dynamic Island Feature Order";
 
 "查询航班" = "Look Up Flight";
@@ -3381,3 +3463,10 @@
 "查询快递" = "Track Package";
 "全部标记为已读" = "Mark all as read";
 "已将全部邮件标记为已读" = "All messages marked as read";
+
+"自动滚动" = "Auto Scroll";
+"暂停滚动" = "Pause Scrolling";
+"正在自动滚动并拼接" = "Automatically scrolling and stitching";
+"自动滚动已暂停，可手动滚动或点击“完成”" = "Auto scroll paused. Scroll manually or click Done";
+"自动滚动需要在系统设置中允许辅助功能" = "Allow Accessibility in System Settings to scroll automatically";
+"无法自动滚动，请手动滚动页面" = "Could not scroll automatically. Scroll the page manually";
