@@ -773,6 +773,10 @@ final class AppModel: ObservableObject {
     quickNotes.onDailyBriefingActivity = recordActivity
     keyboardSound.onPhysicalKeyDown = { [weak self] date in self?.dailyBriefing.recordKeyPress(at: date) }
     keyboardSound.onBeforeTermination = { [weak self] in await self?.dailyBriefing.prepareToTerminate() ?? true }
+    Self.observeDailyBriefingExports(dailyBriefing) { [weak self] message in
+      self?.transientMessage = message
+    }
+    .store(in: &cancellables)
     clipboardAssistant.onPerformAction = { [weak self] action in
       self?.performClipboardAssistantAction(action)
     }
@@ -1292,6 +1296,16 @@ final class AppModel: ObservableObject {
   }
 
   // MARK: - Transient notice
+
+  static func observeDailyBriefingExports(
+    _ controller: DailyBriefingController,
+    onMessage: @escaping (String) -> Void
+  ) -> AnyCancellable {
+    controller.$lastExportURL
+      .compactMap { $0 }
+      .map { AppLocalization.text("已保存到 %@", $0.lastPathComponent) }
+      .sink(receiveValue: onMessage)
+  }
 
   static func observeDisplayAwakeErrors(
     _ controller: PowerAssertionController,
