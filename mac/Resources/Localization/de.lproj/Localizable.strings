@@ -1036,7 +1036,7 @@
 "选中每个cli后的自动更新选项后检测到新版本后自动执行更新；关闭后不再启动新任务，已开始的更新会完成" = "Wenn die Option für automatische Updates neben der jeweiligen CLI ausgewählt ist, werden Updates automatisch installiert, sobald eine neue Version gefunden wird; ausgeschaltet starten keine neuen Aufgaben, laufende Updates werden beendet";
 "未找到 Homebrew；请先安装 Homebrew 后再管理推荐工具" = "Homebrew nicht gefunden; bitte zuerst Homebrew installieren und dann die empfohlenen Tools verwalten";
 "未找到 LibreOffice；请安装 LibreOffice 后重试" = "LibreOffice nicht gefunden; bitte LibreOffice installieren und erneut versuchen";
-"未找到可用的 yt-dlp。请在 设置 → 下载 → 组件 中一键安装后重试。" = "Kein nutzbares yt-dlp gefunden. Bitte unter Einstellungen → Downloads → Komponenten installieren und erneut versuchen.";
+"未找到可用的 yt-dlp。请在 设置 → 依赖组件 → 组件 中一键安装后重试。" = "Kein nutzbares yt-dlp gefunden. Bitte unter Einstellungen → Benötigte Komponenten → Komponenten installieren und erneut versuchen.";
 "选中的识别文本和原始录音文件都会被删除，但累计统计数据（总字词、时长等）会保留。此操作无法撤销。" = "Die ausgewählten erkannten Texte und die zugehörigen Originalaufnahmen werden gelöscht, die Gesamtstatistik (Wörter, Dauer usw.) bleibt erhalten. Das kann nicht widerrufen werden.";
 "本机保存的识别文本和原始录音文件都会被删除，但累计统计数据（总字词、时长等）会保留。此操作无法撤销。" = "Die auf diesem Mac gespeicherten erkannten Texte und Originalaufnahmen werden gelöscht, die Gesamtstatistik (Wörter, Dauer usw.) bleibt erhalten. Das kann nicht widerrufen werden.";
 "缺少子命令。可用：update/finish/remove/clear/list/usage/notify/message/help" = "Unterbefehl fehlt. Verfügbar: update/finish/remove/clear/list/usage/notify/message/help";
@@ -3349,7 +3349,8 @@
 "全部（包含需人工复核）" = "Alle (einschließlich zu prüfender Einträge)";
 "默认保存位置" = "Standard-Speicherorte";
 "分别设置各类内容的默认保存位置。" = "Den Standard-Speicherort für jeden Inhaltstyp festlegen.";
-"管理下载所需组件。" = "Die für Downloads erforderlichen Komponenten verwalten.";
+"依赖组件" = "Benötigte Komponenten";
+"管理下载与文档转换所需组件。" = "Die für Downloads und Dokumentkonvertierung erforderlichen Komponenten verwalten.";
 "更改 %@ 的保存位置" = "Speicherort für %@ ändern";
 
 "本地优先的原生笔记应用" = "Native Notiz-App mit vorrangig lokaler Speicherung";

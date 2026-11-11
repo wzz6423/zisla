@@ -49,7 +49,7 @@ enum SettingsSearchIndex {
         return matches.sorted { matchesExactTitle($0) && !matchesExactTitle($1) }
     }
 
-    /// Keeps search anchors aligned with conditionally visible rows and sections so results can be navigated.
+    /// Aliases stay attached to typed destinations so localized searches retain row targets and feature visibility.
     static func items(settings: FeatureSettings) -> [SettingsSearchItem] {
         var items: [SettingsSearchItem] = []
 
@@ -167,7 +167,9 @@ enum SettingsSearchIndex {
         rows(.mail, ["新邮件展示"])
         entry(.mail, "邮件账户", anchor: .group("邮件"))
         rows(.keyboardSound, ["键盘音色", "键盘音量", "播放键盘回弹音", "自然音高变化", "记录本地输入统计"])
-        rows(.download, [ManagedTool.ytDLP.displayName, ManagedTool.libreOffice.displayName])
+        for tool in [ManagedTool.ytDLP, .libreOffice] {
+            entry(.download, tool.displayName, anchor: .row(tool.displayName), keywords: ["下载", "Downloads"])
+        }
         for location in SaveLocation.allCases {
             entry(.saveLocations, location.title, anchor: .row(location.title),
                   keywords: ["默认保存位置", "更改保存位置"]
