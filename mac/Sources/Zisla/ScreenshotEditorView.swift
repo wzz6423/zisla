@@ -2417,7 +2417,7 @@ final class ScreenshotEditorModel: ObservableObject {
 
     func beginLongCapturePreview() {
         cancelExtraction()
-        longCaptureAutoScroll.stop()
+        longCaptureAutoScroll = ScreenshotLongCaptureAutoScroll()
         isLongCapturePreviewing = true
         hasLongCaptureResult = false
         lastLongCaptureFrame = image
@@ -7599,21 +7599,29 @@ private struct ScreenshotLongCaptureRangeView: View {
     }
 }
 
-private struct ScreenshotLongCapturePreviewView: View {
+struct ScreenshotLongCapturePreviewView: View {
     @ObservedObject var model: ScreenshotEditorModel
 
     var body: some View {
-        Image(nsImage: model.image)
-            .resizable()
-            .interpolation(.high)
-            .scaledToFit()
-            .padding(6)
-            .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 6))
-            .overlay {
-                RoundedRectangle(cornerRadius: 6)
-                    .stroke(Color.white.opacity(0.35), lineWidth: 1)
+        VStack(spacing: 6) {
+            Image(nsImage: model.image)
+                .resizable()
+                .interpolation(.high)
+                .scaledToFit()
+                .accessibilityHidden(true)
+            if let message = model.statusMessage {
+                Text(message)
+                    .font(.system(size: 11))
+                    .multilineTextAlignment(.center)
+                    .fixedSize(horizontal: false, vertical: true)
             }
-            .accessibilityHidden(true)
+        }
+        .padding(6)
+        .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 6))
+        .overlay {
+            RoundedRectangle(cornerRadius: 6)
+                .stroke(Color.white.opacity(0.35), lineWidth: 1)
+        }
     }
 }
 
@@ -7834,7 +7842,7 @@ final class ScreenshotEditorWindowController: NSWindowController, NSWindowDelega
     private let screenImage: NSImage
     private let screenCGImage: CGImage
     private var captureRect: CGRect
-    private weak var capturedApplication: NSRunningApplication?
+    private let capturedApplication: NSRunningApplication?
     private let sourceSnapshot: ScreenshotSourceSnapshot
     private let initialCaptureRect: CGRect
     private let capturedScreenFrame: CGRect?
@@ -7843,6 +7851,9 @@ final class ScreenshotEditorWindowController: NSWindowController, NSWindowDelega
     private let writeImageToPasteboard: (Data) -> Bool
     private let presentSavePanel: PresentSavePanel
     private let captureScreen: CaptureScreen
+    private let scheduleLongCaptureWork: @MainActor (TimeInterval, DispatchWorkItem) -> Void
+    private let hasLongCaptureInputAccess: @MainActor () -> Bool
+    private let postLongCaptureEvent: @MainActor (CGEvent, pid_t) -> Bool
     private var isLongCaptureInProgress = false
     private var longCaptureSessionID = 0
     #if DEBUG
@@ -7918,6 +7929,13 @@ final class ScreenshotEditorWindowController: NSWindowController, NSWindowDelega
                 excludingApplicationWithProcessIdentifier: ProcessInfo.processInfo.processIdentifier
             )
         },
+        scheduleLongCaptureWork: @escaping @MainActor (TimeInterval, DispatchWorkItem) -> Void = { delay, work in
+            DispatchQueue.main.asyncAfter(deadline: .now() + delay, execute: work)
+        },
+        hasLongCaptureInputAccess: @escaping @MainActor () -> Bool = AccessibilityPermission.promptIfNeeded,
+        postLongCaptureEvent: @escaping @MainActor (CGEvent, pid_t) -> Bool = {
+            ScreenshotLongCaptureAutoScroll.post($0, to: $1)
+        },
         onClose: @escaping () -> Void,
         pinnedToolbarVisible: Bool = true
     ) {
@@ -7942,6 +7960,9 @@ final class ScreenshotEditorWindowController: NSWindowController, NSWindowDelega
         self.writeImageToPasteboard = writeImageToPasteboard
         self.presentSavePanel = presentSavePanel
         self.captureScreen = captureScreen
+        self.scheduleLongCaptureWork = scheduleLongCaptureWork
+        self.hasLongCaptureInputAccess = hasLongCaptureInputAccess
+        self.postLongCaptureEvent = postLongCaptureEvent
         self.pinnedToolbarVisible = pinnedToolbarVisible
         onCloseHandler = onClose
         let overlayFrame = screen?.frame ?? CGRect(origin: .zero, size: screenImage.size)
@@ -8428,7 +8449,7 @@ final class ScreenshotEditorWindowController: NSWindowController, NSWindowDelega
         window?.ignoresMouseEvents = false
     }
 
-    private func finishLongCapture() {
+    func finishLongCapture() {
         guard !isClosed else { return }
         guard model.isLongCapturePreviewing || isLongCaptureInProgress else { return }
         guard let screen = activeScreen else {
@@ -8475,7 +8496,7 @@ final class ScreenshotEditorWindowController: NSWindowController, NSWindowDelega
         longCaptureSessionID += 1
         let sessionID = longCaptureSessionID
         model.statusMessage = AppLocalization.text("请滚动页面，停止后自动拼接")
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.35) { [weak self] in
+        let showOverlays = DispatchWorkItem { [weak self] in
             guard let self,
                   !self.isClosed,
                   self.longCaptureSessionID == sessionID
@@ -8484,6 +8505,7 @@ final class ScreenshotEditorWindowController: NSWindowController, NSWindowDelega
             self.showLongCaptureRangeOverlay(on: screen)
             self.scheduleLongCapture(screen: screen, sessionID: sessionID, after: 0.35)
         }
+        scheduleLongCaptureWork(0.35, showOverlays)
     }
 
     private func toggleLongCaptureAutoScroll(on screen: NSScreen) {
@@ -8493,7 +8515,7 @@ final class ScreenshotEditorWindowController: NSWindowController, NSWindowDelega
             model.statusMessage = AppLocalization.text("自动滚动已暂停，可手动滚动或点击“完成”")
             return
         }
-        guard AccessibilityPermission.promptIfNeeded() else {
+        guard hasLongCaptureInputAccess() else {
             model.statusMessage = AppLocalization.text("自动滚动需要在系统设置中允许辅助功能")
             return
         }
@@ -8516,9 +8538,9 @@ final class ScreenshotEditorWindowController: NSWindowController, NSWindowDelega
                   displayBounds: CGDisplayBounds(displayID),
                   direction: model.longCaptureDirection,
                   placement: model.autoScrollPlacement
-              ), ScreenshotLongCaptureAutoScroll.post(event, to: application.processIdentifier)
+              ), postLongCaptureEvent(event, application.processIdentifier)
         else {
-            model.longCaptureAutoScroll.stop()
+            model.longCaptureAutoScroll.scrollFailed()
             model.statusMessage = AppLocalization.text("无法自动滚动，请手动滚动页面")
             return false
         }
@@ -8738,7 +8760,7 @@ final class ScreenshotEditorWindowController: NSWindowController, NSWindowDelega
             }
         }
         longCaptureCaptureWorkItem = workItem
-        DispatchQueue.main.asyncAfter(deadline: .now() + delay, execute: workItem)
+        scheduleLongCaptureWork(delay, workItem)
     }
 
     @discardableResult
@@ -8773,6 +8795,7 @@ final class ScreenshotEditorWindowController: NSWindowController, NSWindowDelega
                     self.restoreEditorPresentation()
                     return
                 }
+                let previousStatus = self.model.statusMessage
                 let didAppend = self.model.append(
                     image: nextImage,
                     direction: self.model.longCaptureDirection
@@ -8810,7 +8833,7 @@ final class ScreenshotEditorWindowController: NSWindowController, NSWindowDelega
                     case .none:
                         self.model.statusMessage = didAppend
                             ? AppLocalization.text("已自动拼接，继续滚动或点击“完成”")
-                            : AppLocalization.text("长截图采集中，请滚动页面")
+                            : previousStatus
                     }
                     self.scheduleLongCapture(
                         screen: screen, sessionID: sessionID,

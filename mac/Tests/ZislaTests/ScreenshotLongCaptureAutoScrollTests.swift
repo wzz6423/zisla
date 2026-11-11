@@ -49,7 +49,7 @@ struct ScreenshotLongCaptureAutoScrollTests {
     }
 
     @Test
-    func pauseAndRestartDiscardPendingScrollState() {
+    func pauseAndRestartKeepTheUncapturedScrollPosition() {
         var scrolling = ScreenshotLongCaptureAutoScroll()
         scrolling.start()
         #expect(scrolling.nextStep(after: .unchanged) == .scroll)
@@ -57,12 +57,18 @@ struct ScreenshotLongCaptureAutoScrollTests {
         scrolling.stop()
 
         #expect(!scrolling.isRunning)
+        #expect(scrolling.isWaitingForScrolledFrame)
+        #expect(scrolling.nextStep(after: .unchanged) == .none)
+        scrolling.start()
+        #expect(scrolling.nextStep(after: .unchanged) == .capture,
+            "Resuming before the scrolled frame repaints must not scroll past it")
+        #expect(scrolling.nextStep(after: .rejected) == .capture)
+        #expect(scrolling.nextStep(after: .appended) == .scroll)
+        scrolling.stop()
         #expect(scrolling.nextStep(after: .appended) == .none)
         scrolling.start()
-        #expect(scrolling.nextStep(after: .rejected) == .capture)
-        #expect(scrolling.nextStep(after: .rejected) == .capture)
-        #expect(scrolling.nextStep(after: .unchanged) == .scroll)
-        #expect(scrolling.nextStep(after: .unchanged) == .capture)
+        #expect(scrolling.nextStep(after: .unchanged) == .scroll,
+            "A frame stitched while paused must permit the next automatic step")
     }
 
     @Test(arguments: ScreenshotLongCaptureDirection.allCases, [ScreenshotLongCapturePlacement.append, .prepend])
@@ -174,16 +180,330 @@ struct ScreenshotLongCaptureAutoScrollTests {
         var hasAccess = true
         var postedTargets: [pid_t] = []
         let post = { (event: CGEvent, pid: pid_t) in postedTargets.append(pid) }
+        let windows = [Self.window(number: 123, owner: 42)]
         #expect(ScreenshotLongCaptureAutoScroll.post(
             event, to: 42, currentProcessIdentifier: 10,
-            hasAccess: { hasAccess }, postEvent: post
+            hasAccess: { hasAccess }, windowInfo: { windows },
+            setWindowLocation: { _, _ in true }, postEvent: post
         ))
         hasAccess = false
         #expect(!ScreenshotLongCaptureAutoScroll.post(
             event, to: 42, currentProcessIdentifier: 10,
-            hasAccess: { hasAccess }, postEvent: post
+            hasAccess: { hasAccess }, windowInfo: { windows },
+            setWindowLocation: { _, _ in true }, postEvent: post
         ))
         #expect(postedTargets == [42])
+    }
+
+    @Test
+    func processPostingTargetsTheFrontmostContainingWindowAndLocalPoint() throws {
+        let event = try #require(ScreenshotLongCaptureAutoScroll.event(
+            selection: CGRect(x: 40, y: 60, width: 300, height: 400),
+            displayBounds: CGRect(x: -1_920, y: 900, width: 1_920, height: 1_080),
+            direction: .vertical, placement: .append
+        ))
+        let bounds = CGRect(x: -1_800, y: 1_000, width: 500, height: 600)
+        let windows = [
+            Self.window(number: 1, owner: 99, bounds: bounds),
+            Self.window(number: 2, owner: 42, bounds: bounds, layer: 100),
+            Self.window(number: 3, owner: 42, bounds: bounds, alpha: 0),
+            Self.window(number: 4, owner: 42, bounds: CGRect(x: 0, y: 0, width: 500, height: 500)),
+            Self.window(number: 0, owner: 42, bounds: bounds),
+            [String: Any](),
+            Self.window(number: 123, owner: 42, bounds: bounds),
+            Self.window(number: 456, owner: 42, bounds: bounds),
+        ]
+        var point: CGPoint?
+        var deliveredWindow: Int64?
+        #expect(ScreenshotLongCaptureAutoScroll.post(
+            event, to: 42, currentProcessIdentifier: 10, hasAccess: { true },
+            windowInfo: { windows }, setWindowLocation: { _, value in point = value; return true },
+            postEvent: { event, _ in deliveredWindow = event.getIntegerValueField(CGEventField(rawValue: 51)!) }
+        ))
+        #expect(point == CGPoint(x: 70, y: 160))
+        #expect(deliveredWindow == 123)
+        #expect(event.location == CGPoint(x: -1_730, y: 1_160))
+    }
+
+    @Test(arguments: ["missing", "closed", "binding unavailable"])
+    func unrouteableEventsPauseWithoutPosting(failure: String) throws {
+        let event = try #require(ScreenshotLongCaptureAutoScroll.event(
+            selection: CGRect(x: 0, y: 0, width: 100, height: 300),
+            displayBounds: CGRect(x: 0, y: 0, width: 500, height: 500),
+            direction: .vertical, placement: .append
+        ))
+        var posted = false
+        #expect(!ScreenshotLongCaptureAutoScroll.post(
+            event, to: 42, currentProcessIdentifier: 10, hasAccess: { true },
+            windowInfo: {
+                failure == "missing" ? nil : (failure == "closed" ? [] : [Self.window(number: 123, owner: 42)])
+            }, setWindowLocation: { _, _ in false }, postEvent: { _, _ in posted = true }
+        ))
+        #expect(!posted)
+    }
+
+    @Test(arguments: [AppLanguage.simplifiedChinese, .english, .arabic]) @MainActor
+    func capturePreviewShowsPausedAndPermissionFeedback(language: AppLanguage) async throws {
+        let releaseAccessibility = EnhancedAccessibilityTestScope.acquire()
+        defer { releaseAccessibility() }
+        let model = ScreenshotEditorModel(image: NSImage(size: CGSize(width: 48, height: 160)))
+        model.beginLongCapturePreview()
+        let host = NSHostingView(rootView: ScreenshotLongCapturePreviewView(model: model)
+            .environment(\.locale, language.locale)
+            .environment(\.layoutDirection, language.isRightToLeft ? .rightToLeft : .leftToRight))
+        let window = NSWindow(contentRect: CGRect(x: 0, y: 0, width: 220, height: 420),
+            styleMask: .borderless, backing: .buffered, defer: false)
+        window.isReleasedWhenClosed = false
+        window.contentView = host
+        defer { window.contentView = nil; window.close() }
+        for key in ["自动滚动已暂停，可手动滚动或点击“完成”", "自动滚动需要在系统设置中允许辅助功能", "无法自动滚动，请手动滚动页面"] {
+            let message = AppLocalization.string(key, language: language)
+            model.statusMessage = message
+            for _ in 0..<3 {
+                host.layoutSubtreeIfNeeded()
+                await withCheckedContinuation { continuation in DispatchQueue.main.async { continuation.resume() } }
+            }
+            var labels: [String] = []
+            func visit(_ object: NSObject) {
+                for name in ["accessibilityLabel", "accessibilityValue", "accessibilityTitle"] {
+                    if object.responds(to: NSSelectorFromString(name)), let value = object.value(forKey: name) as? String {
+                        labels.append(value)
+                    }
+                }
+                if object.responds(to: NSSelectorFromString("accessibilityChildren")) {
+                    for child in object.value(forKey: "accessibilityChildren") as? [NSObject] ?? [] { visit(child) }
+                }
+            }
+            visit(host)
+            #expect(labels.contains(message), "The active long-capture preview must expose its \(language.rawValue) feedback")
+        }
+        #expect(!window.isVisible && !window.isKeyWindow)
+    }
+
+    @Test(arguments: ["queued", "in flight"]) @MainActor
+    func finishingIncludesTheLastFrameWithoutFurtherScrolling(timing: String) async throws {
+        let screen = try #require(NSScreen.main)
+        let suite = "zisla-auto-scroll-finish-\(UUID())"
+        let defaults = try #require(UserDefaults(suiteName: suite))
+        let settings = FeatureSettingsStore(defaults: defaults)
+        defer { settings.flushPendingChanges(); defaults.removePersistentDomain(forName: suite) }
+        let source = try #require(Self.page(width: Int(screen.frame.width), height: Int(screen.frame.height) + 32))
+        let first = try #require(source.cropping(to: CGRect(x: 0, y: 0, width: 48, height: 160)))
+        let last = try #require(source.cropping(to: CGRect(x: 0, y: 32, width: screen.frame.width, height: screen.frame.height)))
+        let image = NSImage(cgImage: first, size: CGSize(width: 48, height: 160))
+        var scheduled: [(delay: TimeInterval, work: DispatchWorkItem)] = []
+        var posted = 0
+        var frames = 0
+        let entered = AsyncStream<Void>.makeStream()
+        let release = AsyncStream<Void>.makeStream()
+        let controller = ScreenshotEditorWindowController(
+            image: image, screenImage: image, screenCGImage: first, screen: screen,
+            captureRect: CGRect(x: 0, y: 0, width: 48, height: 160), capturedApplication: nil,
+            settingsStore: settings, onStash: { _, _ in }, writeImageToPasteboard: { _ in false },
+            presentSavePanel: { _, _ in }, captureScreen: { _ in
+                frames += 1
+                if timing == "in flight" {
+                    entered.continuation.yield()
+                    for await _ in release.stream {}
+                }
+                return (NSImage(cgImage: last, size: screen.frame.size), last)
+            }, scheduleLongCaptureWork: { delay, work in scheduled.append((delay, work)) },
+            hasLongCaptureInputAccess: { true }, postLongCaptureEvent: { _, _ in posted += 1; return true }, onClose: {}
+        )
+        defer { release.continuation.finish(); controller.close() }
+        controller.window?.alphaValue = 0
+        let host = try #require(controller.window?.contentView as? NSHostingView<AppLanguageEnvironment<ScreenshotEditorView>>)
+        let model = host.rootView.content.model
+        model.beginLongCapturePreview()
+        model.longCaptureAutoScroll.start()
+        _ = model.longCaptureAutoScroll.nextStep(after: .unchanged)
+        let previousWork: DispatchWorkItem?
+        let capture: Task<Void, Never>?
+        if timing == "in flight" {
+            capture = try #require(controller.captureLongCaptureScreen(on: screen, sessionID: 0))
+            var entering = entered.stream.makeAsyncIterator()
+            try #require(await entering.next())
+            previousWork = nil
+        } else {
+            controller.finishLongCapture()
+            previousWork = try #require(scheduled.last?.work)
+            #expect(scheduled.last?.delay == ScreenshotLongCaptureAutoScroll.settleDelay)
+            capture = nil
+        }
+        controller.finishLongCapture()
+        #expect(!model.longCaptureAutoScroll.isRunning)
+        if timing == "queued" {
+            #expect(previousWork?.isCancelled == true)
+            let finalWork = try #require(scheduled.last?.work)
+            #expect(!finalWork.isCancelled)
+            let finalCapture = try #require(controller.captureLongCaptureScreen(on: screen, sessionID: 0))
+            await finalCapture.value
+            finalWork.perform()
+        } else {
+            release.continuation.finish()
+            await capture?.value
+        }
+        #expect(frames == 1)
+        #expect(posted == 0)
+        #expect(model.hasLongCaptureResult && !model.isLongCapturePreviewing)
+        #expect(model.image.size == CGSize(width: 48, height: 192), "Done must keep the last 32pt of content")
+        #expect(model.statusMessage == AppLocalization.text("长截图已完成"))
+    }
+
+    @Test(arguments: ["normal", "repaint", "permission revoked"]) @MainActor
+    func controllerWaitsForEachScrolledFrameAndPausesAtTheBoundary(scenario: String) async throws {
+        let screen = try #require(NSScreen.main)
+        let suite = "zisla-auto-scroll-loop-\(UUID())"
+        let defaults = try #require(UserDefaults(suiteName: suite))
+        let settings = FeatureSettingsStore(defaults: defaults)
+        defer { settings.flushPendingChanges(); defaults.removePersistentDomain(forName: suite) }
+        let source = try #require(Self.page(width: Int(screen.frame.width), height: Int(screen.frame.height) + 64))
+        let first = try #require(source.cropping(to: CGRect(x: 0, y: 0, width: 48, height: 160)))
+        let image = NSImage(cgImage: first, size: CGSize(width: 48, height: 160))
+        var offset = 0
+        var posted = 0
+        var scheduled: [(delay: TimeInterval, work: DispatchWorkItem)] = []
+        var repainting = false
+        var inputAccess = true
+        let captureQueue = AsyncStream<Void>.makeStream()
+        let controller = ScreenshotEditorWindowController(
+            image: image, screenImage: image, screenCGImage: first, screen: screen,
+            captureRect: CGRect(x: 0, y: 0, width: 48, height: 160), capturedApplication: .current,
+            settingsStore: settings, onStash: { _, _ in }, writeImageToPasteboard: { _ in false },
+            presentSavePanel: { _, _ in }, captureScreen: { _ in
+                let next = try #require(source.cropping(to: CGRect(
+                    x: 0, y: CGFloat(offset), width: screen.frame.width, height: screen.frame.height)))
+                return (NSImage(cgImage: next, size: screen.frame.size), next)
+            }, scheduleLongCaptureWork: { delay, work in
+                scheduled.append((delay, work))
+                captureQueue.continuation.yield()
+            },
+            hasLongCaptureInputAccess: { inputAccess }, postLongCaptureEvent: { event, _ in
+                guard inputAccess else { return false }
+                posted += 1
+                #expect(event.getIntegerValueField(.scrollWheelEventPointDeltaAxis1) == -32)
+                if !repainting { offset = min(64, offset + 32) }
+                return true
+            }, onClose: {}
+        )
+        defer { controller.close() }
+        controller.window?.alphaValue = 0
+        let host = try #require(controller.window?.contentView as? NSHostingView<AppLanguageEnvironment<ScreenshotEditorView>>)
+        let model = host.rootView.content.model
+        model.beginLongCapturePreview()
+        model.longCaptureAutoScroll.start()
+        if scenario == "repaint" { repainting = true }
+        let baseline = try #require(controller.captureLongCaptureScreen(on: screen, sessionID: 0))
+        await baseline.value
+        var queue = captureQueue.stream.makeAsyncIterator()
+        try #require(await queue.next())
+        var pending = try #require(scheduled.last)
+        #expect(posted == 1)
+        #expect(model.image.size.height == 160)
+        #expect(scheduled.last?.delay == ScreenshotLongCaptureAutoScroll.settleDelay)
+
+        if scenario == "permission revoked" { inputAccess = false }
+        if scenario == "repaint" {
+            for _ in 0..<2 {
+                pending.1.perform()
+                try #require(await queue.next())
+        pending = try #require(scheduled.last)
+                #expect(posted == 1, "An unchanged repaint must not permit another wheel event")
+                #expect(model.image.size.height == 160)
+            }
+            repainting = false
+            offset = 32
+        }
+        pending.1.perform()
+        try #require(await queue.next())
+            pending = try #require(scheduled.last)
+        #expect(model.image.size.height == 192)
+        if scenario == "permission revoked" {
+            #expect(posted == 1 && !model.longCaptureAutoScroll.isRunning)
+            #expect(model.statusMessage == AppLocalization.text("无法自动滚动，请手动滚动页面"))
+            pending.1.perform()
+            try #require(await queue.next())
+            pending = try #require(scheduled.last)
+            #expect(model.statusMessage == AppLocalization.text("无法自动滚动，请手动滚动页面"),
+                "An idle capture must preserve the delivery failure")
+            model.longCaptureAutoScroll.start()
+            inputAccess = true
+            pending.1.perform()
+            try #require(await queue.next())
+            pending = try #require(scheduled.last)
+            #expect(posted == 2, "Restored permission must allow scrolling from the last stitched frame")
+        } else {
+            #expect(posted == 2)
+            pending.1.perform()
+            try #require(await queue.next())
+            pending = try #require(scheduled.last)
+            #expect(model.image.size.height == 224)
+            #expect(posted == 3)
+            for _ in 0..<3 {
+                pending.1.perform()
+                try #require(await queue.next())
+                pending = try #require(scheduled.last)
+            }
+            #expect(posted == 3 && !model.longCaptureAutoScroll.isRunning)
+            #expect(model.statusMessage == AppLocalization.text("自动滚动已暂停，可手动滚动或点击“完成”"))
+            pending.1.perform()
+            try #require(await queue.next())
+            pending = try #require(scheduled.last)
+            #expect(model.statusMessage == AppLocalization.text("自动滚动已暂停，可手动滚动或点击“完成”"),
+                "End-of-page feedback must remain visible until another action")
+        }
+        #expect(scheduled.filter { $0.delay != 0.35 }.allSatisfy { $0.delay >= ScreenshotLongCaptureAutoScroll.settleDelay })
+        controller.finishLongCapture()
+        let final = try #require(controller.captureLongCaptureScreen(on: screen, sessionID: 0))
+        await final.value
+        #expect(model.hasLongCaptureResult)
+        let endedCount = posted
+        scheduled.forEach { $0.work.perform() }
+        #expect(posted == endedCount, "Retired scheduled work must never scroll again")
+    }
+
+    @Test @MainActor
+    func toolbarTogglesAutomaticScrollingAndPermissionDenialKeepsItStopped() throws {
+        let screen = try #require(NSScreen.main)
+        let suite = "zisla-auto-scroll-toggle-\(UUID())"
+        let defaults = try #require(UserDefaults(suiteName: suite))
+        let settings = FeatureSettingsStore(defaults: defaults)
+        defer { settings.flushPendingChanges(); defaults.removePersistentDomain(forName: suite) }
+        let pixels = try #require(Self.page(width: 48, height: 160))
+        let image = NSImage(cgImage: pixels, size: CGSize(width: 48, height: 160))
+        var scheduled: [(delay: TimeInterval, work: DispatchWorkItem)] = []
+        var inputAccess = false
+        let controller = ScreenshotEditorWindowController(
+            image: image, screenImage: image, screenCGImage: pixels, screen: screen,
+            captureRect: CGRect(x: 0, y: 0, width: 48, height: 160), capturedApplication: nil,
+            settingsStore: settings, onStash: { _, _ in }, writeImageToPasteboard: { _ in false },
+            presentSavePanel: { _, _ in }, captureScreen: { _ in (image, pixels) },
+            scheduleLongCaptureWork: { delay, work in scheduled.append((delay, work)) },
+            hasLongCaptureInputAccess: { inputAccess }, postLongCaptureEvent: { _, _ in false }, onClose: {}
+        )
+        defer { controller.close() }
+        controller.window?.alphaValue = 0
+        let host = try #require(controller.window?.contentView as? NSHostingView<AppLanguageEnvironment<ScreenshotEditorView>>)
+        let model = host.rootView.content.model
+        controller.captureNextScreen()
+        let openWork = try #require(scheduled.last?.work)
+        #expect(model.isLongCapturePreviewing && !model.longCaptureAutoScroll.isRunning)
+        controller.captureNextScreen()
+        #expect(!model.longCaptureAutoScroll.isRunning)
+        #expect(model.statusMessage == AppLocalization.text("自动滚动需要在系统设置中允许辅助功能"))
+        inputAccess = true
+        controller.captureNextScreen()
+        #expect(model.longCaptureAutoScroll.isRunning)
+        #expect(scheduled.last?.delay == ScreenshotLongCaptureAutoScroll.settleDelay)
+        controller.captureNextScreen()
+        #expect(!model.longCaptureAutoScroll.isRunning)
+        #expect(model.statusMessage == AppLocalization.text("自动滚动已暂停，可手动滚动或点击“完成”"))
+        controller.finishLongCapture()
+        controller.captureNextScreen()
+        #expect(!model.longCaptureAutoScroll.isRunning, "Done must prevent a restart while its last frame is pending")
+        controller.close()
+        openWork.perform()
+        #expect(!controller.window!.isVisible && !model.isLongCapturePreviewing)
     }
 
     @Test(arguments: [pid_t(-1), 0, 10])
@@ -217,6 +537,8 @@ struct ScreenshotLongCaptureAutoScrollTests {
         #expect(model.image === image)
         model.beginLongCapturePreview()
         model.longCaptureAutoScroll.start()
+        #expect(model.longCaptureAutoScroll.nextStep(after: .unchanged) == .scroll,
+            "A new capture must not inherit the previous session's pending frame")
         model.endLongCapturePreview()
         #expect(!model.longCaptureAutoScroll.isRunning)
         #expect(!model.isLongCapturePreviewing)
@@ -400,5 +722,14 @@ struct ScreenshotLongCaptureAutoScrollTests {
                 bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue
             )?.makeImage()
         }
+    }
+
+    private static func window(
+        number: Int, owner: pid_t, bounds: CGRect = CGRect(x: 0, y: 0, width: 500, height: 500),
+        layer: Int = 0, alpha: Double = 1
+    ) -> [String: Any] {
+        [kCGWindowOwnerPID as String: NSNumber(value: owner), kCGWindowLayer as String: NSNumber(value: layer),
+         kCGWindowNumber as String: NSNumber(value: number), kCGWindowAlpha as String: NSNumber(value: alpha),
+         kCGWindowBounds as String: bounds.dictionaryRepresentation]
     }
 }
