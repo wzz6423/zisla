@@ -251,6 +251,7 @@ struct SettingsSplitViewTests {
         fixture.state.settings.screenshotEnabled = false
         fixture.state.settings.pdfToolsEnabled = false
         fixture.state.settings.imageToolsEnabled = false
+        fixture.state.settings.audioToolsEnabled = false
         fixture.state.settings.mediaEnabled = false
         fixture.state.settings.systemMonitorEnabled = false
         fixture.state.settings.lockScreenInfoEnabled = false
@@ -281,6 +282,7 @@ struct SettingsSplitViewTests {
         settings.screenRecordingEnabled = false
         settings.pdfToolsEnabled = false
         settings.imageToolsEnabled = false
+        settings.audioToolsEnabled = false
         settings.mediaEnabled = false
         settings.systemMonitorEnabled = false
         settings.lockScreenInfoEnabled = false

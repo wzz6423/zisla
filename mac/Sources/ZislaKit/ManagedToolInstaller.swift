@@ -69,6 +69,7 @@ public enum ManagedTool: String, CaseIterable, Identifiable, Sendable {
     case packer
     case ytt
     case ytDLP
+    case ffmpeg
     case libreOffice
     case keka
     case openScreen
@@ -124,6 +125,7 @@ public enum ManagedTool: String, CaseIterable, Identifiable, Sendable {
         case .packer: "Packer"
         case .ytt: "ytt"
         case .ytDLP: "yt-dlp"
+        case .ffmpeg: "FFmpeg"
         case .libreOffice: "LibreOffice"
         case .keka: "Keka"
         case .openScreen: "OpenScreen"
@@ -179,6 +181,7 @@ public enum ManagedTool: String, CaseIterable, Identifiable, Sendable {
         case .packer: "机器镜像构建"
         case .ytt: "YAML 模板工具"
         case .ytDLP: "视频音频下载"
+        case .ffmpeg: "音频与视频处理"
         case .libreOffice: "Office 转 PDF"
         case .keka: "压缩与解压"
         case .openScreen: "录屏与视频编辑"
@@ -235,6 +238,7 @@ public enum ManagedTool: String, CaseIterable, Identifiable, Sendable {
         case .packer: "packer"
         case .ytt: "ytt"
         case .ytDLP: "yt-dlp"
+        case .ffmpeg: "ffmpeg"
         case .libreOffice: "soffice"
         case .keka: "keka"
         case .openScreen: "Openscreen"
@@ -290,6 +294,7 @@ public enum ManagedTool: String, CaseIterable, Identifiable, Sendable {
         case .packer: .homebrewFormula(name: "hashicorp/tap/packer")
         case .ytt: .homebrewFormula(name: "ytt")
         case .ytDLP: .githubRelease(repository: "yt-dlp/yt-dlp")
+        case .ffmpeg: .homebrewFormula(name: "ffmpeg")
         case .libreOffice: .homebrewCask(name: "libreoffice")
         case .keka: .homebrewCask(name: "keka")
         case .openScreen: .homebrewCask(name: "getopenscreen/openscreen/openscreen")
@@ -321,7 +326,7 @@ public enum ManagedTool: String, CaseIterable, Identifiable, Sendable {
              .openJDK17, .maven, .groovy, .cocoaPods, .pyenv, .pipx, .uv, .pnpm, .tectonic,
              .packer, .ytt:
             .developmentToolchain
-        case .ytDLP, .libreOffice, .keka, .libvips, .libavif:
+        case .ytDLP, .ffmpeg, .libreOffice, .keka, .libvips, .libavif:
             .utility
         case .openScreen, .kaku, .markdownPreview, .quietMD, .zshell, .dockDoor:
             .desktopApplication
@@ -376,6 +381,7 @@ public enum ManagedTool: String, CaseIterable, Identifiable, Sendable {
         switch self {
         case .go: ["version"]
         case .poppler: ["-v"]
+        case .ffmpeg: ["-version"]
         default: ["--version"]
         }
     }
