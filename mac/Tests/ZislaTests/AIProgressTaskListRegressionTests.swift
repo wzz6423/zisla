@@ -16,6 +16,8 @@ struct AIProgressTaskListRegressionTests {
         defer { fixture.close() }
         await fixture.settle(turns: 8)
         let (scroll, table) = try fixture.list()
+        // Commit the installed mini scroller's native metrics before measuring task-update changes.
+        scroll.tile()
         var widths = [scroll.contentView.frame.width]
         let observation = scroll.observe(\.scrollerStyle) { _, _ in
             MainActor.assumeIsolated { widths.append(scroll.contentView.frame.width) }
