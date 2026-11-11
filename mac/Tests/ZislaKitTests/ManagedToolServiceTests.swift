@@ -78,12 +78,78 @@ struct ManagedToolServiceTests {
     }
 
     @Test
+    func ffmpegUsesHomebrewAndItsSingleDashVersionFlag() {
+        #expect(ManagedTool.ffmpeg.installationSource == .homebrewFormula(name: "ffmpeg"))
+        #expect(ManagedTool.ffmpeg.versionArguments == ["-version"])
+        #expect(ManagedTool.ffmpeg.normalizedInstalledVersion(from: "ffmpeg version 8.0.1 Copyright") == "8.0.1")
+        #expect(ManagedTool.ffmpeg.recommendationGroup == .utility)
+    }
+
+    @Test
+    func ffmpegRecognizesBundledHelpersBeforeHomebrew() throws {
+        let root = FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent(".zisla-audio-helper-test-\(UUID())")
+        let bundle = root.appendingPathComponent("Zisla.app")
+        let executable = bundle.appendingPathComponent("Contents/Helpers/ffmpeg")
+        let suite = "FFmpegResolverTests.\(UUID())"
+        let defaults = try #require(UserDefaults(suiteName: suite))
+        defer {
+            try? FileManager.default.removeItem(at: root)
+            defaults.removePersistentDomain(forName: suite)
+        }
+        try FileManager.default.createDirectory(at: executable.deletingLastPathComponent(), withIntermediateDirectories: true)
+        try Data("#!/bin/sh\nexit 0\n".utf8).write(to: executable)
+        try FileManager.default.setAttributes([.posixPermissions: 0o755], ofItemAtPath: executable.path)
+        let service = ManagedToolService(toolsDirectory: root.appendingPathComponent("tools"), bundleURL: bundle, defaults: defaults)
+        let resolved = try #require(service.resolvedExecutable(for: .ffmpeg))
+        #expect(resolved.url == executable)
+        #expect(resolved.location == .bundled)
+    }
+
+    @Test
+    func ffmpegInstallationUsesFormulaAndUpdatesManagedState() async throws {
+        let suite = "FFmpegInstallTests.\(UUID())"
+        let defaults = try #require(UserDefaults(suiteName: suite))
+        defer { defaults.removePersistentDomain(forName: suite) }
+        var installed = false
+        var commands: [[String]] = []
+        let executable = URL(fileURLWithPath: "/fixture/ffmpeg")
+        let service = ManagedToolService(defaults: defaults, executableResolver: {
+            $0 == .ffmpeg && installed ? (executable, .homebrew) : nil
+        }, homebrewRunner: { arguments, _ in
+            commands.append(arguments)
+            switch arguments.first {
+            case "info": return #"{"formulae":[{"name":"ffmpeg","versions":{"stable":"8.0.1"}}]}"#
+            case "install": installed = true; return ""
+            case "list": return "ffmpeg 8.0.1"
+            default: Issue.record("Unexpected Homebrew operation: \(arguments)"); return ""
+            }
+        })
+        await service.install(.ffmpeg)
+        #expect(service.states[.ffmpeg]?.location == .homebrew)
+        #expect(service.states[.ffmpeg]?.installedVersion == "8.0.1")
+        #expect(service.states[.ffmpeg]?.errorMessage == nil)
+        #expect(commands.contains(["install", "--formula", "ffmpeg"]))
+    }
+
+    @Test
     func libreOfficeUsesTheHomebrewCaskAndExpectedExecutablePaths() {
         #expect(ManagedTool.libreOffice.installationSource == .homebrewCask(name: "libreoffice"))
         #expect(ManagedTool.libreOffice.executableName == "soffice")
         #expect(ManagedToolService.externalPaths(for: .libreOffice).contains(
             "/Applications/LibreOffice.app/Contents/MacOS/soffice"
         ))
+    }
+
+    @Test
+    func imageToolsUseTheLibvipsHomebrewFormula() {
+        #expect(ManagedTool.libvips.installationSource == .homebrewFormula(name: "vips"))
+        #expect(ManagedTool.libvips.executableName == "vips")
+        #expect(ManagedTool.libvips.recommendationGroup == .utility)
+        #expect(ManagedToolService.externalPaths(for: .libvips).contains("/opt/homebrew/bin/vips"))
+        #expect(ManagedTool.libvips.normalizedInstalledVersion(from: "vips-8.18.7") == "8.18.7")
+        #expect(ManagedTool.libavif.installationSource == .homebrewFormula(name: "libavif"))
+        #expect(ManagedTool.libavif.executableName == "avifenc")
+        #expect(ManagedTool.libavif.recommendationGroup == .utility)
     }
 
     @Test
@@ -298,6 +364,8 @@ struct ManagedToolServiceTests {
             (.rclone, .homebrewFormula(name: "rclone"), "rclone"),
             (.posting, .homebrewFormula(name: "posting"), "posting"),
             (.poppler, .homebrewFormula(name: "poppler"), "pdftotext"),
+            (.libvips, .homebrewFormula(name: "vips"), "vips"),
+            (.libavif, .homebrewFormula(name: "libavif"), "avifenc"),
             (.wireshark, .homebrewFormula(name: "wireshark"), "tshark"),
             (.mysql, .homebrewFormula(name: "mysql"), "mysql"),
             (.cmake, .homebrewFormula(name: "cmake"), "cmake"),
@@ -325,7 +393,7 @@ struct ManagedToolServiceTests {
             (.openScreen, .homebrewCask(name: "getopenscreen/openscreen/openscreen"), "Openscreen"),
         ]
 
-        #expect(ManagedTool.allCases.count == 48)
+        #expect(ManagedTool.allCases.count == 51)
         #expect(ManagedTool(rawValue: "kero") == nil)
         for (tool, source, executableName) in expected {
             #expect(tool.installationSource == source)
@@ -343,7 +411,7 @@ struct ManagedToolServiceTests {
         #expect(count(.terminalEfficiency) == 11)
         #expect(count(.networkAndData) == 7)
         #expect(count(.developmentToolchain) == 21)
-        #expect(count(.utility) == 3)
+        #expect(count(.utility) == 6)
         #expect(count(.desktopApplication) == 6)
     }
 

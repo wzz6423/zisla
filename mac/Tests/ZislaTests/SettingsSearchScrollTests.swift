@@ -18,7 +18,7 @@ struct SettingsSearchScrollTests {
         #expect(try fixture.offset() == 0)
 
         fixture.input.leadingHeight = 1400
-        await fixture.layout()
+        try await fixture.layout(untilOffset: 1224)
         #expect(abs(try fixture.offset() - 1224) < 1, "The matched row must be centered after its final layout, not left below the viewport")
     }
 
@@ -30,20 +30,23 @@ struct SettingsSearchScrollTests {
         await fixture.layout()
         fixture.input.searching = false
         fixture.input.target = .row("键盘音效")
-        await fixture.layout()
-        #expect(abs(try fixture.offset() - 1224) < 1)
+        try await fixture.layout(untilOffset: 1224)
+        let firstRowOffset = try fixture.offset()
+        #expect(abs(firstRowOffset - 1224) < 1, "Observed scroll offset: \(firstRowOffset)")
 
         fixture.input.target = .group("宠物与更新")
-        await fixture.layout()
-        #expect(abs(try fixture.offset() - 1672) < 1)
+        try await fixture.layout(untilOffset: 1672)
+        let groupOffset = try fixture.offset()
+        #expect(abs(groupOffset - 1672) < 1, "Observed scroll offset: \(groupOffset)")
 
         fixture.input.searching = true
         fixture.input.target = nil
         await fixture.layout()
         fixture.input.searching = false
         fixture.input.target = .row("键盘音效")
-        await fixture.layout()
-        #expect(abs(try fixture.offset() - 1224) < 1)
+        try await fixture.layout(untilOffset: 1224)
+        let repeatedRowOffset = try fixture.offset()
+        #expect(abs(repeatedRowOffset - 1224) < 1, "Observed scroll offset: \(repeatedRowOffset)")
     }
 
     @Test
@@ -60,6 +63,34 @@ struct SettingsSearchScrollTests {
         fixture.input.target = .row("不存在的项目")
         await fixture.layout()
         #expect(try fixture.offset() == 0)
+        await #expect(throws: ScrollDidNotSettle.self) {
+            try await fixture.layout(untilOffset: 1224)
+        }
+        #expect(try fixture.offset() == 0)
+    }
+
+    @Test
+    func resultWaitsForGeometryBeyondTheInitialLayoutDrain() async throws {
+        let fixture = Fixture()
+        defer { fixture.window.close() }
+        await fixture.layout()
+        fixture.input.searching = false
+        fixture.input.target = .row("键盘音效")
+        await fixture.layout()
+        #expect(try fixture.offset() == 0)
+
+        let update = Task { @MainActor in
+            for _ in 0..<40 {
+                await withCheckedContinuation { continuation in
+                    DispatchQueue.main.async { continuation.resume() }
+                }
+            }
+            fixture.input.leadingHeight = 1400
+        }
+        try await fixture.layout(untilOffset: 1224)
+        let actual = try fixture.offset()
+        #expect(abs(actual - 1224) < 1, "Expected the matching row to be centered; observed offset \(actual)")
+        await update.value
     }
 
     private final class Input: ObservableObject {
@@ -124,6 +155,15 @@ struct SettingsSearchScrollTests {
             }
         }
 
+        func layout(untilOffset expectedOffset: CGFloat) async throws {
+            // Main-queue turns alone do not guarantee AppKit has applied a scroll request.
+            for _ in 0..<10 {
+                await layout()
+                if abs(try offset() - expectedOffset) < 1 { return }
+            }
+            throw ScrollDidNotSettle(actualOffset: try offset())
+        }
+
         func offset() throws -> CGFloat {
             var pending = [host as NSView]
             while let view = pending.popLast() {
@@ -137,4 +177,8 @@ struct SettingsSearchScrollTests {
     }
 
     private struct MissingScrollView: Error {}
+
+    private struct ScrollDidNotSettle: Error {
+        let actualOffset: CGFloat
+    }
 }

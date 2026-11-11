@@ -1543,6 +1543,8 @@ struct ClipboardAssistantToastView: View {
             String(format: "R%.0f G%.0f B%.0f · #%@", red * 255, green * 255, blue * 255, hex)
         case .path(let path):
             path
+        case .localizedMessage(let key):
+            AppLocalization.string(key, locale: locale)
         case nil:
             nil
         }
@@ -1582,6 +1584,7 @@ struct ClipboardAssistantToastView: View {
         case .runShellCommandInBackground: "后台执行"
         case .createCalendarEvent, .editCalendarEvent: "新建日程"
         case .openApp: "打开应用"
+        case .repairAndOpenApp: "解决并打开"
         }
     }
 

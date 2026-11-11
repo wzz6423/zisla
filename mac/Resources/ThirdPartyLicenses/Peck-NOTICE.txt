@@ -1,0 +1,13 @@
+Application opening repair is adapted into native Swift from Peck:
+https://github.com/eryajf/Peck
+Pinned revision: 60acd38fff67f0b25ee5c394e58b879475f1a1ca
+
+Sources: internal/core/inspect_darwin.go, assessment_darwin.go,
+filesystem_darwin.go, and process_darwin.go.
+Licensed under the Apache License 2.0. See Peck-LICENSE.txt.
+
+This adaptation retains the default quarantine-only processing, signature
+and security-assessment checks, descriptor-based attribute removal, internal
+symlink validation, before/after snapshots, and Launch Services opening.
+It uses Zisla's existing subprocess runner and quick-action presentation.
+Peck's UI, Go runtime, optional ad-hoc signing, and updater are not included.
