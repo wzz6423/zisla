@@ -92,7 +92,7 @@ struct AIProgressModuleView: View {
                 .listStyle(.plain)
                 .scrollContentBackground(.hidden)
                 .scrollIndicators(.visible)
-                .thinScrollChrome()
+                .thinScrollChrome(visibleWhenScrollable: false)
                 .environment(\.defaultMinListRowHeight, 38)
             }
         }

@@ -312,7 +312,7 @@
 "可安全清理的缓存与日志当前为空" = "Güvenle temizlenebilir önbellekler ve günlükler şu anda boş";
 "展开" = "Genişlet";
 "移入废纸篓" = "Çöp Kutusuna Taşı";
-"zisla 不会永久删除这些内容。" = "zisla bu öğeleri kalıcı olarak silmeyecek.";
+"本次操作将项目移入废纸篓；废纸篓之后可能被清空，届时将永久删除。" = "Bu işlem öğeleri Çöp Kutusuna taşır. Çöp Kutusu daha sonra boşaltılırsa öğeler kalıcı olarak silinir.";
 
 /* Cleanup Categories */
 "应用缓存" = "Uygulama Önbelleği";
@@ -511,6 +511,8 @@
 "电池功率" = "Pil gücü";
 "本机 Mac" = "Bu Mac";
 "已充满" = "Tam şarj";
+"立即充至100%" = "Şimdi %100’e şarj et";
+"无法立即充至100%，请重试。" = "Şimdi %100’e şarj edilemedi. Lütfen yeniden deneyin.";
 "充电中" = "Şarj oluyor";
 "电源已接通" = "Güç bağlı";
 "使用电池" = "Pil kullanımda";
@@ -1035,7 +1037,7 @@
 "选中每个cli后的自动更新选项后检测到新版本后自动执行更新；关闭后不再启动新任务，已开始的更新会完成" = "Her CLI yanındaki otomatik güncelleme seçeneği işaretlendiğinde, yeni sürüm bulunduğunda güncelleme otomatik uygulanır; kapatıldığında yeni görev başlatılmaz, başlamış güncellemeler tamamlanır";
 "未找到 Homebrew；请先安装 Homebrew 后再管理推荐工具" = "Homebrew bulunamadı. Önce Homebrew'u yükleyip sonra önerilen araçları yönetin";
 "未找到 LibreOffice；请安装 LibreOffice 后重试" = "LibreOffice bulunamadı. LibreOffice'i yükleyip yeniden deneyin";
-"未找到可用的 yt-dlp。请在 设置 → 下载 → 组件 中一键安装后重试。" = "Kullanılabilir yt-dlp bulunamadı. Ayarlar → İndirmeler → Bileşenler bölümünden yükleyip yeniden deneyin.";
+"未找到可用的 yt-dlp。请在 设置 → 依赖组件 → 组件 中一键安装后重试。" = "Kullanılabilir yt-dlp bulunamadı. Ayarlar → Gerekli bileşenler → Bileşenler bölümünden yükleyip yeniden deneyin.";
 "选中的识别文本和原始录音文件都会被删除，但累计统计数据（总字词、时长等）会保留。此操作无法撤销。" = "Seçili tanıma metinleri ve özgün ses kayıtları silinir, ancak toplam istatistikler (toplam sözcük, süre vb.) korunur. Bu işlem geri alınamaz.";
 "本机保存的识别文本和原始录音文件都会被删除，但累计统计数据（总字词、时长等）会保留。此操作无法撤销。" = "Bu Mac'te saklanan tanıma metinleri ve özgün ses kayıtları silinir, ancak toplam istatistikler (toplam sözcük, süre vb.) korunur. Bu işlem geri alınamaz.";
 "缺少子命令。可用：update/finish/remove/clear/list/usage/notify/message/help" = "Alt komut eksik. Kullanılabilir: update/finish/remove/clear/list/usage/notify/message/help";
@@ -2321,7 +2323,7 @@
 "%ld 核" = "%ld çekirdek";
 "%ld 核 · " = "%ld çekirdek · ";
 "已整理系统内存 %@" = "%@ sistem belleği sıkıştırıldı";
-"其中 %ld 项需人工复核。zisla 不会永久删除这些内容。" = "Bunlardan %ld tanesi el ile inceleme gerektiriyor. zisla hiçbir zaman kalıcı olarak silmez.";
+"其中 %ld 项需人工复核。本次操作将项目移入废纸篓；废纸篓之后可能被清空，届时将永久删除。" = "Bunlardan %ld tanesi elle inceleme gerektiriyor. Bu işlem öğeleri Çöp Kutusuna taşır. Çöp Kutusu daha sonra boşaltılırsa öğeler kalıcı olarak silinir.";
 "取消选择%@" = "%@ seçimini kaldır";
 "全选%@" = "%@ içindeki her şeyi seç";
 "反选%@" = "%@ içindeki seçimi tersine çevir";
@@ -2476,6 +2478,11 @@
 "2026.10.28往前15天" = "2026.10.28'den 15 gün önce";
 "日期间隔" = "Tarih Aralığı";
 "跨时区时间" = "Saat Dilimleri Arası Zaman";
+"会议 2026-11-20 14:30-15:30" = "Toplantı 2026-11-20 14:30-15:30";
+"Hello! How are you today?" = "Hello! How are you today?";
+"这是一段普通文本，可以搜索或保存。" = "Aranacak veya kaydedilecek düz metin.";
+"例如：复制截图或浏览器中的图片" = "Örnek: Bir ekran görüntüsünü veya tarayıcıdaki bir resmi kopyalayın";
+"例如：在 Finder 中选中文件后按 ⌘C" = "Örnek: Finder’da bir dosya seçip ⌘C tuşlarına basın";
 "汇率获取失败" = "Döviz kuru alınamadı";
 "闹钟通知未获允许，请在系统设置中开启通知。" = "Alarm bildirimlerine izin verilmemiş. Sistem Ayarları’ndan bildirimleri açın.";
 "闹钟通知声音已关闭，请在系统设置中开启声音。" = "Alarm bildirim sesleri kapalı. Sistem Ayarları’ndan sesleri açın.";
@@ -3337,13 +3344,14 @@
 "麦克风监听已关闭：%@" = "Mikrofon dinleme kapatıldı: %@";
 
 "自动清理系统垃圾" = "Sistem gereksiz dosyalarını otomatik temizle";
-"按所选间隔移入废纸篓，不会永久删除" = "Öğeleri seçilen aralıkta Çöp Sepeti’ne taşı; kalıcı olarak silme";
+"按所选间隔移入废纸篓；清空废纸篓后将永久删除" = "Öğeleri seçilen aralıkta Çöp Kutusuna taşır; Çöp Kutusunu boşaltmak onları kalıcı olarak siler";
 "清理范围" = "Temizleme kapsamı";
 "仅可信" = "Yalnızca güvenilir öğeler";
 "全部（包含需人工复核）" = "Tümü (incelenmesi gerekenler dahil)";
 "默认保存位置" = "Varsayılan Kayıt Konumları";
 "分别设置各类内容的默认保存位置。" = "Her içerik türü için varsayılan kayıt konumunu ayarlayın.";
-"管理下载所需组件。" = "İndirmeler için gereken bileşenleri yönetin.";
+"依赖组件" = "Gerekli bileşenler";
+"管理下载与文档转换所需组件。" = "İndirmeler ve belge dönüştürme için gereken bileşenleri yönetin.";
 "更改 %@ 的保存位置" = "%@ için kayıt konumunu değiştir";
 
 "本地优先的原生笔记应用" = "Yerel depolamayı önceliklendiren platforma özgü not uygulaması";
@@ -3354,6 +3362,92 @@
 "保存手写备忘录需要辅助功能权限" = "El yazısı notları kaydetmek için Erişilebilirlik izni gerekir";
 "备忘录内容已变化，请重新打开后编辑" = "Not değişti. Düzenlemeden önce yeniden açın";
 "无法保存手写备忘录的文本，请在备忘录中打开后重试" = "El yazısı nottaki metin kaydedilemedi. Notlar’da açıp yeniden deneyin";
+"小雨" = "Hafif yağmur";
+"中雨" = "Orta şiddette yağmur";
+"大雨" = "Şiddetli yağmur";
+"小雪" = "Hafif kar";
+"中雪" = "Orta şiddette kar";
+"大雪" = "Yoğun kar";
+"冻毛毛雨" = "Donan çisenti";
+"冻雨" = "Donan yağmur";
+"雪粒" = "Kar tanecikleri";
+"小阵雨" = "Hafif sağanak yağmur";
+"强阵雨" = "Şiddetli sağanak yağmur";
+"小阵雪" = "Hafif kar sağanağı";
+"强阵雪" = "Yoğun kar sağanağı";
+"强雷阵雨" = "Şiddetli gök gürültülü fırtına";
+"雨夹雪" = "Karla karışık yağmur";
+"小雨夹雪" = "Hafif karla karışık yağmur";
+"强雨夹雪" = "Şiddetli karla karışık yağmur";
+"阵性雨夹雪" = "Karla karışık yağmur sağanağı";
+"小阵性雨夹雪" = "Hafif karla karışık yağmur sağanağı";
+"强阵性雨夹雪" = "Şiddetli karla karışık yağmur sağanağı";
+"暴雨" = "Çok şiddetli yağmur";
+"大暴雨" = "Aşırı şiddetli yağmur";
+"特大暴雨" = "Olağanüstü şiddetli yağmur";
+"暴雪" = "Kar fırtınası";
+"小到中雨" = "Hafif ile orta şiddet arasında yağmur";
+"中到大雨" = "Orta ile şiddetli yağmur";
+"大到暴雨" = "Şiddetli ile çok şiddetli yağmur";
+"暴雨到大暴雨" = "Çok şiddetli ile aşırı şiddetli yağmur";
+"大暴雨到特大暴雨" = "Aşırı ile olağanüstü şiddetli yağmur";
+"小到中雪" = "Hafif ile orta şiddet arasında kar";
+"中到大雪" = "Orta şiddetli ile yoğun kar";
+"大到暴雪" = "Yoğun kar ile kar fırtınası";
+"浓雾" = "Yoğun sis";
+"强浓雾" = "Çok yoğun sis";
+"大雾" = "Kalın sis";
+"特强浓雾" = "Aşırı yoğun sis";
+"霾" = "Pus";
+"中度霾" = "Orta yoğunlukta pus";
+"重度霾" = "Yoğun pus";
+"严重霾" = "Çok yoğun pus";
+"沙尘暴" = "Toz fırtınası";
+"浮尘" = "Havada asılı toz";
+"扬沙" = "Rüzgârla savrulan kum";
+"强沙尘暴" = "Şiddetli toz fırtınası";
+"雨伴雷电" = "Yağmurlu ve gök gürültüsü";
+"小雨伴雷电" = "Hafif yağmur ve gök gürültüsü";
+"大雨伴雷电" = "Şiddetli yağmur ve gök gürültüsü";
+"阵雨伴雷电" = "Sağanak ve gök gürültüsü";
+"小阵雨伴雷电" = "Hafif sağanak yağmur ve gök gürültüsü";
+"强阵雨伴雷电" = "Şiddetli sağanak yağmur ve gök gürültüsü";
+"雪伴雷电" = "Karlı ve gök gürültüsü";
+"小雪伴雷电" = "Hafif kar ve gök gürültüsü";
+"大雪伴雷电" = "Yoğun kar ve gök gürültüsü";
+"阵雪伴雷电" = "Kar sağanağı ve gök gürültüsü";
+"小阵雪伴雷电" = "Hafif kar sağanağı ve gök gürültüsü";
+"强阵雪伴雷电" = "Yoğun kar sağanağı ve gök gürültüsü";
+"雨夹雪伴雷电" = "Karla karışık yağmur ve gök gürültüsü";
+"小雨夹雪伴雷电" = "Hafif karla karışık yağmur ve gök gürültüsü";
+"强雨夹雪伴雷电" = "Şiddetli karla karışık yağmur ve gök gürültüsü";
+"阵性雨夹雪伴雷电" = "Karla karışık yağmur sağanağı ve gök gürültüsü";
+"小阵性雨夹雪伴雷电" = "Hafif karla karışık yağmur sağanağı ve gök gürültüsü";
+"强阵性雨夹雪伴雷电" = "Şiddetli karla karışık yağmur sağanağı ve gök gürültüsü";
+"雷阵雨伴有冰雹" = "Dolulu gök gürültülü sağanak";
+
+"管理电源模式与系统垃圾、剪贴板历史和废纸篓的定时清理。" = "Güç modlarını ve sistem gereksiz dosyalarının, pano geçmişinin ve Çöp Kutusunun zamanlanmış temizliğini yönetin.";
+"定时倾倒废纸篓" = "Çöp Kutusunu otomatik boşalt";
+"按所选间隔永久删除废纸篓中的所有项目，无法恢复" = "Seçilen aralıkta Çöp Kutusundaki tüm öğeleri kalıcı olarak siler. Bu işlem geri alınamaz";
+"启用定时倾倒废纸篓？" = "Çöp Kutusunu otomatik boşaltma etkinleştirilsin mi?";
+
+"自动切换电源模式" = "Güç modlarını otomatik değiştir";
+"插电默认模式" = "Prize bağlıyken varsayılan mod";
+"脱电默认模式" = "Pildeyken varsayılan mod";
+"20%及以下固定省电" = "%20 ve altında daima güç tasarrufu";
+"电量不高于20%时保持省电，插电也不切换；超过20%后恢复对应默认模式" = "Prize bağlıyken bile %20 ve altında güç tasarrufunu korur; %20 üzerinde ilgili varsayılan modu geri yükler";
+"省电" = "Güç tasarrufu";
+"高性能" = "Yüksek performans";
+
+
+"无法保存定时倾倒废纸篓的记录，本次已跳过。" = "Çöp Sepetini otomatik boşaltma kaydı kaydedilemedi. Bu işlem atlandı.";
+"灵动岛功能顺序" = "Dynamic Island özellik sırası";
+
+"查询航班" = "Uçuş sorgula";
+"查询火车" = "Tren sorgula";
+"查询快递" = "Kargo takip et";
+"全部标记为已读" = "Tümünü okundu olarak işaretle";
+"已将全部邮件标记为已读" = "Tüm iletiler okundu olarak işaretlendi";
 
 "自动滚动" = "Otomatik kaydır";
 "暂停滚动" = "Kaydırmayı duraklat";

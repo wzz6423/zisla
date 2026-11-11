@@ -266,6 +266,10 @@ struct VerticalCompactStatusTests {
         var settings = FeatureSettings(islandLayoutStyle: .pill,
             islandPlacement: IslandPlacement(mode: .custom, edge: edge))
         settings.mailCompactStyle = .detailed
+        let suiteName = "CompactStatusControls.\(UUID().uuidString)"
+        let defaults = try #require(UserDefaults(suiteName: suiteName))
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+        let pomodoro = PomodoroService(notificationRequestHandler: { _ in }, defaults: defaults)
         for notice in symbolNotices {
             let presentation = try #require(SideNoticeLayoutEngine().compactBarSizing(
                 for: [notice], settings: settings)?.customPillPresentation)
@@ -273,6 +277,7 @@ struct VerticalCompactStatusTests {
             let size = edge.isVertical ? CGSize(width: 32, height: length) : CGSize(width: length, height: 32)
             let renderer = ImageRenderer(content: CompactPillStatusContent(presentation: presentation,
                 text: presentation.text, edge: edge, visualizationStyle: .waveform, item: nil, date: .now)
+                .environmentObject(pomodoro)
                 .frame(width: size.width, height: size.height)
                 .background(.black))
             renderer.scale = 2

@@ -131,6 +131,10 @@ public struct PomodoroEngine: Equatable, Sendable {
         }
     }
 
+    public func progress(at now: Date) -> Double {
+        max(0, 1 - remaining(at: now) / duration(for: mode))
+    }
+
     public func displayTime(at now: Date = Date()) -> (minutes: Int, seconds: Int) {
         let total = Int(ceil(remaining(at: now) - 1e-9))
         let clamped = max(0, total)
@@ -292,6 +296,18 @@ public final class PomodoroService: ObservableObject {
         "\(Self.focusCountdownNoticeIDPrefix)\(focusCountdownRunID.uuidString)-\(side.rawValue)"
     }
 
+    public func focusCountdownNotice(for side: NoticeSide) -> IslandNotice {
+        let date = now()
+        return IslandNotice(
+            id: focusCountdownNoticeID(for: side),
+            title: AppLocalization.string(mode.title, language: language()),
+            detail: PomodoroEngine.formatHHMMSS(at: date, engine: engine),
+            side: side,
+            createdAt: date,
+            progress: engine.progress(at: date)
+        )
+    }
+
     public func setFocusDuration(_ duration: TimeInterval) {
         let normalized = PomodoroEngine.normalizedDuration(
             duration,
@@ -335,7 +351,9 @@ public final class PomodoroService: ObservableObject {
     }
 
     public func pause() {
-        engine.pause(at: now())
+        let date = now()
+        tick(at: date)
+        engine.pause(at: date)
         stopTimer()
         refreshDisplay()
     }
@@ -384,10 +402,10 @@ public final class PomodoroService: ObservableObject {
         return center
     }
 
-    func tick() {
+    func tick(at date: Date? = nil) {
         let completedMode = engine.mode
         let completedDuration = engine.duration(for: completedMode)
-        let date = now()
+        let date = date ?? now()
         if engine.completeIfNeeded(at: date) {
             if completedMode == .focus {
                 onDailyBriefingActivity?(.pomodoroCompleted, 1, completedDuration, date)

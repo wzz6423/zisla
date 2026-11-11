@@ -269,16 +269,23 @@ private final class PrivateIPv4Stub: @unchecked Sendable {
 
 /// Blocks each IPv4 lookup until `release` so overlapping refreshes can finish out of order.
 private final class GatedPublicIPProvider: PublicIPProviding, @unchecked Sendable {
+    enum WaitError: Error { case timedOut }
+
     private let lock = NSLock()
     private let addresses: [PublicIPLookupResult]
+    private let ipv6Addresses: [PublicIPLookupResult]
     private var startCount = 0
+    private var ipv6StartCount = 0
     private var pending: [Int: CheckedContinuation<PublicIPLookupResult, Never>] = [:]
     private var released: Set<Int> = []
-    private var waiters: [CheckedContinuation<Void, Never>] = []
 
-    init(addresses: [PublicIPLookupResult]) {
+    init(addresses: [PublicIPLookupResult], ipv6Addresses: [PublicIPLookupResult] = [.absent]) {
         self.addresses = addresses
+        self.ipv6Addresses = ipv6Addresses
     }
+
+    var callCount: Int { lock.withLock { startCount } }
+    var pendingCount: Int { lock.withLock { pending.count } }
 
     func publicIPAddress() async -> PublicIPLookupResult {
         let index: Int = lock.withLock {
@@ -286,13 +293,6 @@ private final class GatedPublicIPProvider: PublicIPProviding, @unchecked Sendabl
             startCount += 1
             return index
         }
-        let waiters: [CheckedContinuation<Void, Never>] = lock.withLock {
-            let current = self.waiters
-            self.waiters.removeAll()
-            return current
-        }
-        waiters.forEach { $0.resume() }
-
         let result = addresses.indices.contains(index) ? addresses[index] : .failed
         return await withCheckedContinuation { continuation in
             let alreadyReleased = lock.withLock { () -> Bool in
@@ -306,19 +306,19 @@ private final class GatedPublicIPProvider: PublicIPProviding, @unchecked Sendabl
         }
     }
 
-    func publicIPv6Address() async -> PublicIPLookupResult { .absent }
+    func publicIPv6Address() async -> PublicIPLookupResult {
+        lock.withLock {
+            let index = ipv6StartCount
+            ipv6StartCount += 1
+            return ipv6Addresses[min(index, ipv6Addresses.count - 1)]
+        }
+    }
 
-    func waitUntilStarted(_ count: Int) async {
-        while true {
-            if lock.withLock({ startCount >= count }) { return }
-            await withCheckedContinuation { (continuation: CheckedContinuation<Void, Never>) in
-                let already = lock.withLock { () -> Bool in
-                    if startCount >= count { return true }
-                    waiters.append(continuation)
-                    return false
-                }
-                if already { continuation.resume() }
-            }
+    func waitUntilStarted(_ count: Int, timeout: Duration = .seconds(3)) async throws {
+        let deadline = ContinuousClock.now + timeout
+        while !lock.withLock({ startCount >= count && ipv6StartCount >= count }) {
+            guard ContinuousClock.now < deadline else { throw WaitError.timedOut }
+            try await Task.sleep(for: .milliseconds(1))
         }
     }
 
@@ -2319,31 +2319,27 @@ struct SystemMonitorServiceTests {
     func defaultVolumeCapacityRefreshesCachedResourceValues() throws {
         let fileManager = FoundationVolumeCapacityFileManager()
         let foundation = FileManager.default
-        let volumeURL = foundation.temporaryDirectory
-        let fileURL = volumeURL.appendingPathComponent("zisla-capacity-\(UUID().uuidString)")
-        defer { try? foundation.removeItem(at: fileURL) }
-
-        let initial = try #require(fileManager.volumeCapacity(for: volumeURL))
-        #expect(foundation.createFile(atPath: fileURL.path, contents: nil))
-        let handle = try FileHandle(forWritingTo: fileURL)
-        let chunk = Data(repeating: 0x5A, count: 4 * 1024 * 1024)
-        for _ in 0..<16 {
-            try handle.write(contentsOf: chunk)
-        }
-        try handle.synchronize()
-        try handle.close()
-
-        let expected = try #require(
-            fileManager.volumeCapacity(for: URL(fileURLWithPath: volumeURL.path, isDirectory: true))
+        let volumeURL = foundation.temporaryDirectory.appendingPathComponent(
+            "zisla-capacity-\(UUID().uuidString)", isDirectory: true
         )
-        let refreshed = try #require(fileManager.volumeCapacity(for: volumeURL))
-        let decrease = initial.available >= expected.available ? initial.available - expected.available : 0
-        let staleDifference = refreshed.available >= expected.available
-            ? refreshed.available - expected.available
-            : expected.available - refreshed.available
+        try foundation.createDirectory(at: volumeURL, withIntermediateDirectories: false)
+        defer { try? foundation.removeItem(at: volumeURL) }
 
-        #expect(decrease >= 16 * 1024 * 1024)
-        #expect(staleDifference < 8 * 1024 * 1024)
+        #expect(try #require(fileManager.volumeCapacity(for: volumeURL)).total > 0)
+        let keys: Set<URLResourceKey> = [
+            .volumeTotalCapacityKey,
+            .volumeAvailableCapacityForImportantUsageKey,
+        ]
+        let initial = try volumeURL.resourceValues(forKeys: keys)
+        let total = try #require(initial.volumeTotalCapacity)
+        let available = try #require(initial.volumeAvailableCapacityForImportantUsage)
+        try foundation.removeItem(at: volumeURL)
+
+        // A removed directory makes stale URL values distinguishable without relying on disk-space fluctuations.
+        let cached = try volumeURL.resourceValues(forKeys: keys)
+        #expect(cached.volumeTotalCapacity == total)
+        #expect(cached.volumeAvailableCapacityForImportantUsage == available)
+        #expect(fileManager.volumeCapacity(for: volumeURL) == nil)
     }
 
     @Test
@@ -2804,7 +2800,7 @@ struct SystemMonitorServiceTests {
     }
 
     @Test
-    func publicIPRefreshPublishesOnlyTheNewestOverlappingResult() async {
+    func publicIPRefreshPublishesOnlyTheNewestOverlappingResult() async throws {
         let provider = GatedPublicIPProvider(addresses: [
             .address("198.51.100.1"),
             .address("198.51.100.2"),
@@ -2816,9 +2812,9 @@ struct SystemMonitorServiceTests {
         )
 
         let older = Task { await service.refreshPublicIPAddress() }
-        await provider.waitUntilStarted(1)
+        try await provider.waitUntilStarted(1)
         let newer = Task { await service.refreshPublicIPAddress() }
-        await provider.waitUntilStarted(2)
+        try await provider.waitUntilStarted(2)
 
         provider.release(1)
         await newer.value
@@ -2833,7 +2829,7 @@ struct SystemMonitorServiceTests {
     }
 
     @Test
-    func publicIPRefreshStaysMarkedRefreshingUntilTheNewestRequestFinishes() async {
+    func publicIPRefreshStaysMarkedRefreshingUntilTheNewestRequestFinishes() async throws {
         let provider = GatedPublicIPProvider(addresses: [
             .address("198.51.100.1"),
             .address("198.51.100.2"),
@@ -2845,9 +2841,9 @@ struct SystemMonitorServiceTests {
         )
 
         let older = Task { await service.refreshPublicIPAddress() }
-        await provider.waitUntilStarted(1)
+        try await provider.waitUntilStarted(1)
         let newer = Task { await service.refreshPublicIPAddress() }
-        await provider.waitUntilStarted(2)
+        try await provider.waitUntilStarted(2)
 
         provider.release(0)
         await older.value
@@ -2858,6 +2854,217 @@ struct SystemMonitorServiceTests {
         await newer.value
         #expect(service.publicIPAddress == "198.51.100.2")
         #expect(!service.isRefreshingPublicIPAddress)
+    }
+
+    @Test(.timeLimit(.minutes(1)))
+    func publicIPGateMissingFamilyTimesOutAndReleasesThePendingLookup() async {
+        let provider = GatedPublicIPProvider(addresses: [.address("198.51.100.1")])
+        defer { provider.releaseAll() }
+        let pending = Task { await provider.publicIPAddress() }
+        do {
+            try await provider.waitUntilStarted(1, timeout: .milliseconds(20))
+            Issue.record("An omitted IPv6 request must fail the observer instead of hanging")
+        } catch {
+            #expect(error is GatedPublicIPProvider.WaitError)
+        }
+        provider.releaseAll()
+        #expect(await pending.value == .failed)
+        #expect(provider.callCount == 1 && provider.pendingCount == 0)
+    }
+
+    @Test(.timeLimit(.minutes(1)))
+    func publicIPGateCancellationExitsWithoutWaitingForAMissingRequest() async {
+        let provider = GatedPublicIPProvider(addresses: [.absent])
+        defer { provider.releaseAll() }
+        let pending = Task { try await provider.waitUntilStarted(1) }
+        pending.cancel()
+        do {
+            try await pending.value
+            Issue.record("A cancelled observer must not wait for a request that never starts")
+        } catch {
+            #expect(error is CancellationError)
+        }
+        #expect(provider.callCount == 0 && provider.pendingCount == 0)
+    }
+
+    @Test(.timeLimit(.minutes(1)))
+    func publicIPStopClearsLoadingBeforeAnUncooperativeLookupCompletes() async throws {
+        let provider = GatedPublicIPProvider(addresses: [.address("198.51.100.1")])
+        defer { provider.releaseAll() }
+        let service = SystemMonitorService(fileManager: MockFileManager(), publicIPProvider: provider)
+        let pending = Task { await service.refreshPublicIPAddress() }
+        try await provider.waitUntilStarted(1)
+
+        #expect(service.isRefreshingPublicIPAddress)
+        service.stop()
+        #expect(!service.isRefreshingPublicIPAddress,
+            "Disabling monitoring must finish loading even when the provider ignores cancellation")
+
+        provider.release(0)
+        await pending.value
+        #expect(provider.pendingCount == 0)
+    }
+
+    @Test(.timeLimit(.minutes(1)))
+    func publicIPStopRejectsLateAddressesWithoutClearingTheLastPublishedPair() async throws {
+        let provider = GatedPublicIPProvider(
+            addresses: [.address("203.0.113.8"), .address("198.51.100.9")],
+            ipv6Addresses: [.address("2001:db8::8"), .address("2001:db8::9")]
+        )
+        defer { provider.releaseAll() }
+        let service = SystemMonitorService(fileManager: MockFileManager(), publicIPProvider: provider)
+        provider.release(0)
+        await service.refreshPublicIPAddress()
+        var publishedIPv4: [String?] = []
+        var publishedIPv6: [String?] = []
+        let ipv4Subscription = service.$publicIPAddress.sink { publishedIPv4.append($0) }
+        let ipv6Subscription = service.$publicIPv6Address.sink { publishedIPv6.append($0) }
+        defer {
+            ipv4Subscription.cancel()
+            ipv6Subscription.cancel()
+        }
+
+        let pending = Task { await service.refreshPublicIPAddress() }
+        try await provider.waitUntilStarted(2)
+        service.stop()
+        provider.release(1)
+        await pending.value
+
+        #expect(service.publicIPAddress == "203.0.113.8")
+        #expect(service.publicIPv6Address == "2001:db8::8")
+        #expect(publishedIPv4 == ["203.0.113.8"], "Stopped lookups must not publish an IPv4 event")
+        #expect(publishedIPv6 == ["2001:db8::8"], "Stopped lookups must not publish an IPv6 event")
+        #expect(!service.isRefreshingPublicIPAddress)
+        #expect(service.snapshot == nil && !service.isSampling)
+    }
+
+    @Test(.timeLimit(.minutes(1)), arguments: [false, true])
+    func publicIPStopKeepsOldCompletionsOutOfANewManualRefresh(oldFinishesFirst: Bool) async throws {
+        let provider = GatedPublicIPProvider(
+            addresses: [.address("198.51.100.1"), .address("198.51.100.2")],
+            ipv6Addresses: [.address("2001:db8::1"), .address("2001:db8::2")]
+        )
+        defer { provider.releaseAll() }
+        let service = SystemMonitorService(fileManager: MockFileManager(), publicIPProvider: provider)
+        let old = Task { await service.refreshPublicIPAddress() }
+        try await provider.waitUntilStarted(1)
+        service.stop()
+        let current = Task { await service.refreshPublicIPAddress() }
+        try await provider.waitUntilStarted(2)
+
+        if oldFinishesFirst {
+            provider.release(0)
+            await old.value
+            #expect(service.publicIPAddress == nil && service.publicIPv6Address == nil)
+            #expect(service.isRefreshingPublicIPAddress,
+                "An old request's defer must not finish the new manual refresh")
+        }
+        provider.release(1)
+        await current.value
+        if !oldFinishesFirst {
+            provider.release(0)
+            await old.value
+        }
+
+        #expect(service.publicIPAddress == "198.51.100.2")
+        #expect(service.publicIPv6Address == "2001:db8::2")
+        #expect(!service.isRefreshingPublicIPAddress && !service.isSampling)
+        #expect(provider.callCount == 2 && provider.pendingCount == 0)
+    }
+
+    @Test(.timeLimit(.minutes(1)))
+    func publicIPStopLetsTheNextPeriodicLookupRecoverWithinThePreviousThrottleWindow() async throws {
+        let clock = ControllableDateProvider(Date(timeIntervalSince1970: 1_700_000_000))
+        let provider = GatedPublicIPProvider(addresses: [
+            .address("198.51.100.1"), .address("198.51.100.2"), .address("198.51.100.3"),
+        ])
+        defer { provider.releaseAll() }
+        let service = SystemMonitorService(
+            fileManager: MockFileManager(), dateProvider: { clock.now() }, publicIPProvider: provider
+        )
+        let stopped = Task { await service.refreshPublicIPAddress() }
+        try await provider.waitUntilStarted(1)
+        service.stop()
+        provider.releaseAll()
+        await stopped.value
+
+        clock.advance(by: 1)
+        await service.refreshPublicIPAddressIfNeeded()
+        #expect(provider.callCount == 2,
+            "The next periodic lookup must not inherit a stopped lookup's ten-minute throttle")
+        #expect(service.publicIPAddress == "198.51.100.2")
+        #expect(!service.isRefreshingPublicIPAddress)
+
+        clock.advance(by: 599)
+        await service.refreshPublicIPAddressIfNeeded()
+        #expect(provider.callCount == 2, "A successful replacement lookup must still be throttled")
+        clock.advance(by: 1)
+        await service.refreshPublicIPAddressIfNeeded()
+        #expect(provider.callCount == 3)
+        #expect(service.publicIPAddress == "198.51.100.3")
+        #expect(provider.pendingCount == 0)
+    }
+
+    @Test(.timeLimit(.minutes(1)), arguments: [PublicIPLookupResult.absent, .failed])
+    func publicIPStopRejectsLateFailuresAndAllowsANewPeriodicLookup(result: PublicIPLookupResult) async throws {
+        let clock = ControllableDateProvider(Date(timeIntervalSince1970: 1_700_000_000))
+        let provider = GatedPublicIPProvider(
+            addresses: [.address("203.0.113.8"), result, .address("198.51.100.9")],
+            ipv6Addresses: [.address("2001:db8::8"), result, .address("2001:db8::9")]
+        )
+        defer { provider.releaseAll() }
+        let service = SystemMonitorService(
+            fileManager: MockFileManager(), dateProvider: { clock.now() }, publicIPProvider: provider
+        )
+        provider.release(0)
+        await service.refreshPublicIPAddress()
+        let stopped = Task { await service.refreshPublicIPAddress() }
+        try await provider.waitUntilStarted(2)
+        service.stop()
+        provider.release(1)
+        await stopped.value
+        #expect(service.publicIPAddress == "203.0.113.8")
+        #expect(service.publicIPv6Address == "2001:db8::8")
+
+        provider.release(2)
+        clock.advance(by: 1)
+        await service.refreshPublicIPAddressIfNeeded()
+        #expect(provider.callCount == 3)
+        #expect(service.publicIPAddress == "198.51.100.9")
+        #expect(service.publicIPv6Address == "2001:db8::9")
+        #expect(!service.isRefreshingPublicIPAddress && provider.pendingCount == 0)
+    }
+
+    @Test(.timeLimit(.minutes(1)))
+    func publicIPStopRepeatedLifecycleEventsHaveBoundedRequestsAndNoLatePublications() async throws {
+        let cycles = 16
+        let provider = GatedPublicIPProvider(
+            addresses: (1...cycles).map { .address("198.51.100.\($0)") },
+            ipv6Addresses: [.address("2001:db8::1")]
+        )
+        defer { provider.releaseAll() }
+        weak var releasedService: SystemMonitorService?
+        do {
+            let service = SystemMonitorService(fileManager: MockFileManager(), publicIPProvider: provider)
+            releasedService = service
+            var seed: UInt64 = 0x51_5A_1111
+            for cycle in 0..<cycles {
+                let pending = Task { await service.refreshPublicIPAddress() }
+                try await provider.waitUntilStarted(cycle + 1)
+                seed = seed &* 6_364_136_223_846_793_005 &+ 1
+                for _ in 0..<Int(1 + seed % 4) { service.stop() }
+                #expect(!service.isRefreshingPublicIPAddress,
+                    "Repeated stop events must be idle in cycle \(cycle)")
+                provider.release(cycle)
+                await pending.value
+                #expect(service.publicIPAddress == nil && service.publicIPv6Address == nil,
+                    "A stopped request must not publish in cycle \(cycle)")
+                #expect(provider.callCount == cycle + 1 && provider.pendingCount == 0,
+                    "Each cycle must issue one request and release every fixture continuation")
+            }
+            #expect(service.snapshot == nil && !service.isSampling)
+        }
+        #expect(releasedService == nil, "Completed stopped lookups must not retain the service")
     }
 
     /// Poll until the condition holds or times out; used to wait for the public-IP task scheduled by sampleOnce.

@@ -312,7 +312,7 @@
 "可安全清理的缓存与日志当前为空" = "Veilig opschoonbare cache en logbestanden zijn momenteel leeg";
 "展开" = "Vouw uit";
 "移入废纸篓" = "Verplaats naar prullenbak";
-"zisla 不会永久删除这些内容。" = "zisla zal deze items niet permanent verwijderen.";
+"本次操作将项目移入废纸篓；废纸篓之后可能被清空，届时将永久删除。" = "Deze actie verplaatst onderdelen naar de Prullenbak. Als deze later wordt geleegd, worden ze definitief verwijderd.";
 
 /* Cleanup Categories */
 "应用缓存" = "App-cache";
@@ -511,6 +511,8 @@
 "电池功率" = "Batterijvermogen";
 "本机 Mac" = "Deze Mac";
 "已充满" = "Volledig opgeladen";
+"立即充至100%" = "Nu opladen tot 100%";
+"无法立即充至100%，请重试。" = "Opladen tot 100% is nu niet gelukt. Probeer het opnieuw.";
 "充电中" = "Wordt opgeladen";
 "电源已接通" = "Stroom aangesloten";
 "使用电池" = "Op batterij";
@@ -1035,7 +1037,7 @@
 "选中每个cli后的自动更新选项后检测到新版本后自动执行更新；关闭后不再启动新任务，已开始的更新会完成" = "Als de optie voor automatische updates naast elke CLI is geselecteerd, wordt de update automatisch geïnstalleerd zodra een nieuwe versie is gevonden; uitgeschakeld starten er geen nieuwe taken, maar lopende updates worden afgerond";
 "未找到 Homebrew；请先安装 Homebrew 后再管理推荐工具" = "Homebrew niet gevonden; installeer eerst Homebrew en beheer daarna de aanbevolen tools";
 "未找到 LibreOffice；请安装 LibreOffice 后重试" = "LibreOffice niet gevonden; installeer LibreOffice en probeer het opnieuw";
-"未找到可用的 yt-dlp。请在 设置 → 下载 → 组件 中一键安装后重试。" = "Geen bruikbare yt-dlp gevonden. Installeer die via Instellingen → Downloads → Onderdelen en probeer het opnieuw.";
+"未找到可用的 yt-dlp。请在 设置 → 依赖组件 → 组件 中一键安装后重试。" = "Geen bruikbare yt-dlp gevonden. Installeer die via Instellingen → Vereiste componenten → Componenten en probeer het opnieuw.";
 "选中的识别文本和原始录音文件都会被删除，但累计统计数据（总字词、时长等）会保留。此操作无法撤销。" = "De geselecteerde herkende teksten en de oorspronkelijke opnamen worden verwijderd, maar de totaalstatistieken (aantal woorden, duur en dergelijke) blijven bewaard. Dit kan niet worden hersteld.";
 "本机保存的识别文本和原始录音文件都会被删除，但累计统计数据（总字词、时长等）会保留。此操作无法撤销。" = "De op deze Mac opgeslagen herkende teksten en oorspronkelijke opnamen worden verwijderd, maar de totaalstatistieken (aantal woorden, duur en dergelijke) blijven bewaard. Dit kan niet worden hersteld.";
 "缺少子命令。可用：update/finish/remove/clear/list/usage/notify/message/help" = "Subopdracht ontbreekt. Beschikbaar: update/finish/remove/clear/list/usage/notify/message/help";
@@ -2321,7 +2323,7 @@
 "%ld 核" = "%ld cores";
 "%ld 核 · " = "%ld cores · ";
 "已整理系统内存 %@" = "%@ systeemgeheugen vrijgemaakt";
-"其中 %ld 项需人工复核。zisla 不会永久删除这些内容。" = "Daarvan moeten %ld handmatig worden nagekeken. zisla verwijdert nooit definitief.";
+"其中 %ld 项需人工复核。本次操作将项目移入废纸篓；废纸篓之后可能被清空，届时将永久删除。" = "Daarvan moeten %ld handmatig worden nagekeken. Deze actie verplaatst onderdelen naar de Prullenbak. Als deze later wordt geleegd, worden ze definitief verwijderd.";
 "取消选择%@" = "%@ deselecteren";
 "全选%@" = "Alles in %@ selecteren";
 "反选%@" = "Selectie in %@ omkeren";
@@ -2476,6 +2478,11 @@
 "2026.10.28往前15天" = "15 dagen voor 2026.10.28";
 "日期间隔" = "Datuminterval";
 "跨时区时间" = "Tijd tussen tijdzones";
+"会议 2026-11-20 14:30-15:30" = "Vergadering 2026-11-20 14:30-15:30";
+"Hello! How are you today?" = "Hello! How are you today?";
+"这是一段普通文本，可以搜索或保存。" = "Tekst om te zoeken of bewaren.";
+"例如：复制截图或浏览器中的图片" = "Voorbeeld: Kopieer een schermafbeelding of een afbeelding uit de browser";
+"例如：在 Finder 中选中文件后按 ⌘C" = "Voorbeeld: Selecteer een bestand in Finder en druk op ⌘C";
 "汇率获取失败" = "Wisselkoers ophalen mislukt";
 "闹钟通知未获允许，请在系统设置中开启通知。" = "Meldingen voor wekkers zijn niet toegestaan. Schakel meldingen in via Systeeminstellingen.";
 "闹钟通知声音已关闭，请在系统设置中开启声音。" = "Geluiden voor wekkermeldingen zijn uitgeschakeld. Schakel geluiden in via Systeeminstellingen.";
@@ -3337,13 +3344,14 @@
 "麦克风监听已关闭：%@" = "Microfoonmonitoring is uitgeschakeld: %@";
 
 "自动清理系统垃圾" = "Overbodige systeembestanden automatisch opruimen";
-"按所选间隔移入废纸篓，不会永久删除" = "Verplaats onderdelen op het gekozen interval naar de prullenmand, zonder ze definitief te verwijderen";
+"按所选间隔移入废纸篓；清空废纸篓后将永久删除" = "Verplaatst onderdelen naar de Prullenbak met het gekozen interval; legen verwijdert ze definitief";
 "清理范围" = "Bereik van opruimen";
 "仅可信" = "Alleen vertrouwde onderdelen";
 "全部（包含需人工复核）" = "Alles (inclusief onderdelen die controle vereisen)";
 "默认保存位置" = "Standaardopslaglocaties";
 "分别设置各类内容的默认保存位置。" = "Stel de standaardopslaglocatie in voor elk type inhoud.";
-"管理下载所需组件。" = "Beheer de onderdelen die nodig zijn voor downloads.";
+"依赖组件" = "Vereiste componenten";
+"管理下载与文档转换所需组件。" = "Beheer de componenten die nodig zijn voor downloads en documentconversie.";
 "更改 %@ 的保存位置" = "Opslaglocatie voor %@ wijzigen";
 
 "本地优先的原生笔记应用" = "Native notitie-app die lokale opslag vooropstelt";
@@ -3354,6 +3362,92 @@
 "保存手写备忘录需要辅助功能权限" = "Toegang tot toegankelijkheid is vereist om handgeschreven notities op te slaan";
 "备忘录内容已变化，请重新打开后编辑" = "De notitie is gewijzigd. Open deze opnieuw voordat je bewerkt";
 "无法保存手写备忘录的文本，请在备忘录中打开后重试" = "De tekst in de handgeschreven notitie kon niet worden opgeslagen. Open deze in Notities en probeer het opnieuw";
+"小雨" = "Lichte regen";
+"中雨" = "Matige regen";
+"大雨" = "Zware regen";
+"小雪" = "Lichte sneeuw";
+"中雪" = "Matige sneeuw";
+"大雪" = "Zware sneeuw";
+"冻毛毛雨" = "Aanvriezende motregen";
+"冻雨" = "Aanvriezende regen";
+"雪粒" = "Sneeuwkorrels";
+"小阵雨" = "Lichte regenbuien";
+"强阵雨" = "Zware regenbuien";
+"小阵雪" = "Lichte sneeuwbuien";
+"强阵雪" = "Zware sneeuwbuien";
+"强雷阵雨" = "Zwaar onweer";
+"雨夹雪" = "Regen en sneeuw";
+"小雨夹雪" = "Lichte regen en sneeuw";
+"强雨夹雪" = "Zware regen en sneeuw";
+"阵性雨夹雪" = "Buien met regen en sneeuw";
+"小阵性雨夹雪" = "Lichte buien met regen en sneeuw";
+"强阵性雨夹雪" = "Zware buien met regen en sneeuw";
+"暴雨" = "Stortregen";
+"大暴雨" = "Zeer zware stortregen";
+"特大暴雨" = "Extreme stortregen";
+"暴雪" = "Sneeuwstorm";
+"小到中雨" = "Lichte tot matige regen";
+"中到大雨" = "Matige tot zware regen";
+"大到暴雨" = "Zware regen tot stortregen";
+"暴雨到大暴雨" = "Stortregen tot zeer zware stortregen";
+"大暴雨到特大暴雨" = "Zeer zware tot extreme stortregen";
+"小到中雪" = "Lichte tot matige sneeuw";
+"中到大雪" = "Matige tot zware sneeuw";
+"大到暴雪" = "Zware sneeuw tot sneeuwstorm";
+"浓雾" = "Dichte mist";
+"强浓雾" = "Zeer dichte mist";
+"大雾" = "Dikke mist";
+"特强浓雾" = "Extreem dichte mist";
+"霾" = "Nevel";
+"中度霾" = "Matige nevel";
+"重度霾" = "Dichte nevel";
+"严重霾" = "Zeer dichte nevel";
+"沙尘暴" = "Stofstorm";
+"浮尘" = "Zwevend stof";
+"扬沙" = "Opwaaiend zand";
+"强沙尘暴" = "Zware stofstorm";
+"雨伴雷电" = "Regen met onweer";
+"小雨伴雷电" = "Lichte regen met onweer";
+"大雨伴雷电" = "Zware regen met onweer";
+"阵雨伴雷电" = "Buien met onweer";
+"小阵雨伴雷电" = "Lichte regenbuien met onweer";
+"强阵雨伴雷电" = "Zware regenbuien met onweer";
+"雪伴雷电" = "Sneeuw met onweer";
+"小雪伴雷电" = "Lichte sneeuw met onweer";
+"大雪伴雷电" = "Zware sneeuw met onweer";
+"阵雪伴雷电" = "Sneeuwbuien met onweer";
+"小阵雪伴雷电" = "Lichte sneeuwbuien met onweer";
+"强阵雪伴雷电" = "Zware sneeuwbuien met onweer";
+"雨夹雪伴雷电" = "Regen en sneeuw met onweer";
+"小雨夹雪伴雷电" = "Lichte regen en sneeuw met onweer";
+"强雨夹雪伴雷电" = "Zware regen en sneeuw met onweer";
+"阵性雨夹雪伴雷电" = "Buien met regen en sneeuw met onweer";
+"小阵性雨夹雪伴雷电" = "Lichte buien met regen en sneeuw met onweer";
+"强阵性雨夹雪伴雷电" = "Zware buien met regen en sneeuw met onweer";
+"雷阵雨伴有冰雹" = "Onweer met hagel";
+
+"管理电源模式与系统垃圾、剪贴板历史和废纸篓的定时清理。" = "Beheer energiemodi en het gepland opruimen van systeembestanden, klembordgeschiedenis en de Prullenbak.";
+"定时倾倒废纸篓" = "Prullenbak automatisch legen";
+"按所选间隔永久删除废纸篓中的所有项目，无法恢复" = "Verwijdert alle onderdelen in de Prullenbak definitief met het gekozen interval. Dit kan niet ongedaan worden gemaakt";
+"启用定时倾倒废纸篓？" = "Automatisch legen van de Prullenbak inschakelen?";
+
+"自动切换电源模式" = "Energiemodi automatisch wisselen";
+"插电默认模式" = "Standaardmodus met netvoeding";
+"脱电默认模式" = "Standaardmodus op batterij";
+"20%及以下固定省电" = "Energie besparen bij 20% of minder";
+"电量不高于20%时保持省电，插电也不切换；超过20%后恢复对应默认模式" = "Behoudt energiebesparing bij 20% of minder, ook met netvoeding; herstelt de bijbehorende standaardmodus boven 20%";
+"省电" = "Energiebesparing";
+"高性能" = "Hoge prestaties";
+
+
+"无法保存定时倾倒废纸篓的记录，本次已跳过。" = "Het logboek voor automatisch legen van de prullenmand kon niet worden opgeslagen. Deze uitvoering is overgeslagen.";
+"灵动岛功能顺序" = "Volgorde van Dynamic Island-functies";
+
+"查询航班" = "Vlucht opzoeken";
+"查询火车" = "Trein opzoeken";
+"查询快递" = "Pakket volgen";
+"全部标记为已读" = "Alles als gelezen markeren";
+"已将全部邮件标记为已读" = "Alle berichten zijn als gelezen gemarkeerd";
 
 "自动滚动" = "Automatisch scrollen";
 "暂停滚动" = "Scrollen pauzeren";

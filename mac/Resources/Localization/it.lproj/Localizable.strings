@@ -312,7 +312,7 @@
 "可安全清理的缓存与日志当前为空" = "Cache e log pulibili in sicurezza sono attualmente vuoti";
 "展开" = "Espandi";
 "移入废纸篓" = "Sposta nel Cestino";
-"zisla 不会永久删除这些内容。" = "zisla non eliminerà permanentemente questi elementi.";
+"本次操作将项目移入废纸篓；废纸篓之后可能被清空，届时将永久删除。" = "Questa operazione sposta gli elementi nel Cestino. Se viene svuotato in seguito, gli elementi saranno eliminati definitivamente.";
 
 /* Cleanup Categories */
 "应用缓存" = "Cache App";
@@ -511,6 +511,8 @@
 "电池功率" = "Potenza batteria";
 "本机 Mac" = "Questo Mac";
 "已充满" = "Completamente carica";
+"立即充至100%" = "Carica al 100% ora";
+"无法立即充至100%，请重试。" = "Impossibile caricare al 100% ora. Riprova.";
 "充电中" = "In carica";
 "电源已接通" = "Alimentazione collegata";
 "使用电池" = "A batteria";
@@ -1035,7 +1037,7 @@
 "选中每个cli后的自动更新选项后检测到新版本后自动执行更新；关闭后不再启动新任务，已开始的更新会完成" = "Dopo aver selezionato l’opzione di aggiornamento automatico accanto a ciascuna CLI, l’aggiornamento viene installato automaticamente quando viene rilevata una nuova versione; se disattivato non avvia nuove attività, ma completa quelle già iniziate";
 "未找到 Homebrew；请先安装 Homebrew 后再管理推荐工具" = "Homebrew non trovato; installa Homebrew prima di gestire gli strumenti consigliati";
 "未找到 LibreOffice；请安装 LibreOffice 后重试" = "LibreOffice non trovato; installa LibreOffice e riprova";
-"未找到可用的 yt-dlp。请在 设置 → 下载 → 组件 中一键安装后重试。" = "Nessun yt-dlp utilizzabile. Installalo in Impostazioni → Download → Componenti e riprova.";
+"未找到可用的 yt-dlp。请在 设置 → 依赖组件 → 组件 中一键安装后重试。" = "Nessun yt-dlp utilizzabile. Installalo in Impostazioni → Componenti necessari → Componenti e riprova.";
 "选中的识别文本和原始录音文件都会被删除，但累计统计数据（总字词、时长等）会保留。此操作无法撤销。" = "I testi riconosciuti selezionati e le registrazioni originali verranno eliminati, ma le statistiche cumulative (parole totali, durata e così via) verranno conservate. L’operazione non può essere annullata.";
 "本机保存的识别文本和原始录音文件都会被删除，但累计统计数据（总字词、时长等）会保留。此操作无法撤销。" = "I testi riconosciuti e le registrazioni originali salvati su questo Mac verranno eliminati, ma le statistiche cumulative (parole totali, durata e così via) verranno conservate. L’operazione non può essere annullata.";
 "缺少子命令。可用：update/finish/remove/clear/list/usage/notify/message/help" = "Sottocomando mancante. Disponibili: update/finish/remove/clear/list/usage/notify/message/help";
@@ -2321,7 +2323,7 @@
 "%ld 核" = "%ld core";
 "%ld 核 · " = "%ld core · ";
 "已整理系统内存 %@" = "Compattati %@ di memoria di sistema";
-"其中 %ld 项需人工复核。zisla 不会永久删除这些内容。" = "Di questi, %ld richiedono una verifica manuale. zisla non elimina mai in modo definitivo.";
+"其中 %ld 项需人工复核。本次操作将项目移入废纸篓；废纸篓之后可能被清空，届时将永久删除。" = "Di questi, %ld richiedono una verifica manuale. Questa operazione sposta gli elementi nel Cestino. Se viene svuotato in seguito, gli elementi saranno eliminati definitivamente.";
 "取消选择%@" = "Deseleziona %@";
 "全选%@" = "Seleziona tutto in %@";
 "反选%@" = "Inverti la selezione in %@";
@@ -2476,6 +2478,11 @@
 "2026.10.28往前15天" = "15 giorni prima del 2026.10.28";
 "日期间隔" = "Intervallo tra date";
 "跨时区时间" = "Ora tra fusi orari";
+"会议 2026-11-20 14:30-15:30" = "Riunione 2026-11-20 14:30-15:30";
+"Hello! How are you today?" = "Hello! How are you today?";
+"这是一段普通文本，可以搜索或保存。" = "Testo da cercare o salvare.";
+"例如：复制截图或浏览器中的图片" = "Esempio: Copiare uno screenshot o un’immagine dal browser";
+"例如：在 Finder 中选中文件后按 ⌘C" = "Esempio: Selezionare un file nel Finder e premere ⌘C";
 "汇率获取失败" = "Impossibile recuperare il tasso di cambio";
 "闹钟通知未获允许，请在系统设置中开启通知。" = "Le notifiche della sveglia non sono consentite. Attivale in Impostazioni di Sistema.";
 "闹钟通知声音已关闭，请在系统设置中开启声音。" = "I suoni delle notifiche della sveglia sono disattivati. Attivali in Impostazioni di Sistema.";
@@ -3337,13 +3344,14 @@
 "麦克风监听已关闭：%@" = "L’ascolto del microfono è stato disattivato: %@";
 
 "自动清理系统垃圾" = "Pulisci automaticamente i file inutili di sistema";
-"按所选间隔移入废纸篓，不会永久删除" = "Sposta gli elementi nel Cestino all’intervallo scelto, senza eliminarli definitivamente";
+"按所选间隔移入废纸篓；清空废纸篓后将永久删除" = "Sposta gli elementi nel Cestino all’intervallo selezionato; svuotarlo li elimina definitivamente";
 "清理范围" = "Ambito della pulizia";
 "仅可信" = "Solo elementi affidabili";
 "全部（包含需人工复核）" = "Tutti (inclusi quelli da verificare)";
 "默认保存位置" = "Posizioni di salvataggio predefinite";
 "分别设置各类内容的默认保存位置。" = "Impostare la posizione di salvataggio predefinita per ogni tipo di contenuto.";
-"管理下载所需组件。" = "Gestire i componenti necessari per i download.";
+"依赖组件" = "Componenti necessari";
+"管理下载与文档转换所需组件。" = "Gestire i componenti necessari per i download e la conversione di documenti.";
 "更改 %@ 的保存位置" = "Cambia la posizione di salvataggio di %@";
 
 "本地优先的原生笔记应用" = "App nativa per le note che privilegia l’archiviazione locale";
@@ -3354,6 +3362,92 @@
 "保存手写备忘录需要辅助功能权限" = "Per salvare le note scritte a mano è necessario il permesso di accessibilità";
 "备忘录内容已变化，请重新打开后编辑" = "La nota è cambiata. Riaprila prima di modificarla";
 "无法保存手写备忘录的文本，请在备忘录中打开后重试" = "Impossibile salvare il testo della nota scritta a mano. Aprila in Note e riprova";
+"小雨" = "Pioggia debole";
+"中雨" = "Pioggia moderata";
+"大雨" = "Pioggia intensa";
+"小雪" = "Neve debole";
+"中雪" = "Neve moderata";
+"大雪" = "Neve intensa";
+"冻毛毛雨" = "Pioviggine gelata";
+"冻雨" = "Pioggia gelata";
+"雪粒" = "Granuli di neve";
+"小阵雨" = "Rovesci di pioggia deboli";
+"强阵雨" = "Rovesci di pioggia intensi";
+"小阵雪" = "Rovesci di neve deboli";
+"强阵雪" = "Rovesci di neve intensi";
+"强雷阵雨" = "Temporale forte";
+"雨夹雪" = "Pioggia e neve";
+"小雨夹雪" = "Pioggia e neve deboli";
+"强雨夹雪" = "Pioggia e neve intense";
+"阵性雨夹雪" = "Rovesci di pioggia e neve";
+"小阵性雨夹雪" = "Rovesci deboli di pioggia e neve";
+"强阵性雨夹雪" = "Rovesci intensi di pioggia e neve";
+"暴雨" = "Pioggia torrenziale";
+"大暴雨" = "Pioggia torrenziale molto intensa";
+"特大暴雨" = "Pioggia torrenziale estrema";
+"暴雪" = "Bufera di neve";
+"小到中雨" = "Pioggia da debole a moderata";
+"中到大雨" = "Pioggia da moderata a intensa";
+"大到暴雨" = "Pioggia da intensa a torrenziale";
+"暴雨到大暴雨" = "Pioggia da torrenziale a molto intensa";
+"大暴雨到特大暴雨" = "Pioggia torrenziale da molto intensa a estrema";
+"小到中雪" = "Neve da debole a moderata";
+"中到大雪" = "Neve da moderata a intensa";
+"大到暴雪" = "Da neve intensa a bufera di neve";
+"浓雾" = "Nebbia fitta";
+"强浓雾" = "Nebbia molto fitta";
+"大雾" = "Nebbia densa";
+"特强浓雾" = "Nebbia estremamente fitta";
+"霾" = "Foschia";
+"中度霾" = "Foschia moderata";
+"重度霾" = "Foschia intensa";
+"严重霾" = "Foschia grave";
+"沙尘暴" = "Tempesta di polvere";
+"浮尘" = "Polvere in sospensione";
+"扬沙" = "Sabbia sollevata dal vento";
+"强沙尘暴" = "Tempesta di polvere violenta";
+"雨伴雷电" = "Pioggia e tuoni";
+"小雨伴雷电" = "Pioggia debole e tuoni";
+"大雨伴雷电" = "Pioggia intensa e tuoni";
+"阵雨伴雷电" = "Rovesci e tuoni";
+"小阵雨伴雷电" = "Rovesci di pioggia deboli e tuoni";
+"强阵雨伴雷电" = "Rovesci di pioggia intensi e tuoni";
+"雪伴雷电" = "Neve e tuoni";
+"小雪伴雷电" = "Neve debole e tuoni";
+"大雪伴雷电" = "Neve intensa e tuoni";
+"阵雪伴雷电" = "Rovesci di neve e tuoni";
+"小阵雪伴雷电" = "Rovesci di neve deboli e tuoni";
+"强阵雪伴雷电" = "Rovesci di neve intensi e tuoni";
+"雨夹雪伴雷电" = "Pioggia e neve e tuoni";
+"小雨夹雪伴雷电" = "Pioggia e neve deboli e tuoni";
+"强雨夹雪伴雷电" = "Pioggia e neve intense e tuoni";
+"阵性雨夹雪伴雷电" = "Rovesci di pioggia e neve e tuoni";
+"小阵性雨夹雪伴雷电" = "Rovesci deboli di pioggia e neve e tuoni";
+"强阵性雨夹雪伴雷电" = "Rovesci intensi di pioggia e neve e tuoni";
+"雷阵雨伴有冰雹" = "Temporali con grandine";
+
+"管理电源模式与系统垃圾、剪贴板历史和废纸篓的定时清理。" = "Gestisci le modalità energetiche e la pulizia programmata dei file inutili del sistema, della cronologia degli appunti e del Cestino.";
+"定时倾倒废纸篓" = "Svuotare automaticamente il Cestino";
+"按所选间隔永久删除废纸篓中的所有项目，无法恢复" = "Elimina definitivamente tutti gli elementi del Cestino all’intervallo selezionato. L’operazione è irreversibile";
+"启用定时倾倒废纸篓？" = "Attivare lo svuotamento automatico del Cestino?";
+
+"自动切换电源模式" = "Cambia automaticamente modalità energetica";
+"插电默认模式" = "Modalità predefinita con alimentatore";
+"脱电默认模式" = "Modalità predefinita a batteria";
+"20%及以下固定省电" = "Risparmio energetico al 20% o meno";
+"电量不高于20%时保持省电，插电也不切换；超过20%后恢复对应默认模式" = "Mantiene il risparmio energetico al 20% o meno, anche con l’alimentatore; ripristina la modalità predefinita corrispondente oltre il 20%";
+"省电" = "Risparmio energetico";
+"高性能" = "Prestazioni elevate";
+
+
+"无法保存定时倾倒废纸篓的记录，本次已跳过。" = "Impossibile salvare il registro dello svuotamento automatico del Cestino. Questa esecuzione è stata saltata.";
+"灵动岛功能顺序" = "Ordine delle funzioni di Dynamic Island";
+
+"查询航班" = "Cerca volo";
+"查询火车" = "Cerca treno";
+"查询快递" = "Traccia pacco";
+"全部标记为已读" = "Segna tutto come letto";
+"已将全部邮件标记为已读" = "Tutti i messaggi sono stati segnati come letti";
 
 "自动滚动" = "Scorrimento auto";
 "暂停滚动" = "Sospendi scorrimento";

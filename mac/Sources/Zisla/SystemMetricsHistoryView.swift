@@ -8,14 +8,18 @@ import SwiftUI
 /// Drives the standalone history window from the island module, mirroring the disk-cleanup panel:
 /// the island is a floating panel, so an attached sheet would be misplaced.
 final class SystemMetricsHistoryPanelPresentationState: ObservableObject {
-    @Published private(set) var isPresented = false
+    @Published private(set) var requestID: UUID?
 
+    var isPresented: Bool { requestID != nil }
+
+    /// Creates a distinct request so another click can raise an already visible history window.
     func present() {
-        isPresented = true
+        requestID = UUID()
     }
 
+    /// Clearing the request prevents stale view updates from reopening a dismissed window.
     func dismiss() {
-        isPresented = false
+        requestID = nil
     }
 }
 
@@ -29,7 +33,7 @@ struct SystemMetricsHistoryPanelPresenter: NSViewRepresentable {
 
     func updateNSView(_ nsView: NSView, context: Context) {
         context.coordinator.update(
-            presenting: presentationState.isPresented,
+            requestID: presentationState.requestID,
             dismissPresentation: presentationState.dismiss,
             service: service,
             hostWindow: nsView.window
@@ -47,31 +51,44 @@ struct SystemMetricsHistoryPanelPresenter: NSViewRepresentable {
     @MainActor
     final class Coordinator {
         private var panel: SystemMetricsHistoryPanel?
+        private var handledRequestID: UUID?
         private var dismissPresentation: () -> Void = {}
         private var isAwaitingDismissalState = false
+        private let requestIslandCollapse: () -> Void
 
+        init(
+            panel: SystemMetricsHistoryPanel? = nil,
+            requestIslandCollapse: @escaping () -> Void = { AppModel.shared.islandCollapseRequested = true }
+        ) {
+            self.panel = panel
+            self.requestIslandCollapse = requestIslandCollapse
+        }
+
+        /// Raises repeated user requests even when visible, while passive updates respect dismissal and minimization.
         func update(
-            presenting: Bool,
+            requestID: UUID?,
             dismissPresentation: @escaping () -> Void,
             service: SystemMonitorService,
             hostWindow: NSWindow?
         ) {
             self.dismissPresentation = dismissPresentation
-            guard presenting else {
+            guard let requestID else {
                 isAwaitingDismissalState = false
                 dismiss()
                 return
             }
 
             let panel = panel ?? makePanel(service: service)
-            guard SystemCleanupPanel.shouldOrderFront(
+            let isNewRequest = requestID != handledRequestID
+            handledRequestID = requestID
+            guard isNewRequest || SystemCleanupPanel.shouldOrderFront(
                 isVisible: panel.isVisible,
                 isMiniaturized: panel.isMiniaturized,
                 isAwaitingDismissalState: isAwaitingDismissalState
             ) else { return }
             WindowPlacement.center(panel, on: hostWindow?.screen)
-            panel.orderFront(nil)
-            AppModel.shared.islandCollapseRequested = true
+            panel.present(over: hostWindow)
+            requestIslandCollapse()
         }
 
         func dismiss() {
@@ -128,8 +145,18 @@ struct SystemMetricsHistoryPanelPresenter: NSViewRepresentable {
 }
 
 @MainActor
-final class SystemMetricsHistoryPanel: NSWindow {
+class SystemMetricsHistoryPanel: NSWindow {
     var onCancel: () -> Void = {}
+
+    /// Relinquishes Settings' elevated key-window level while preserving the island's focus policy.
+    func present(over hostWindow: NSWindow?) {
+        if hostWindow is SettingsWindow {
+            // Settings raises its level while key; hand over focus so the history window stays visible.
+            makeKeyAndOrderFront(nil)
+        } else {
+            orderFront(nil)
+        }
+    }
 
     override func performClose(_ sender: Any?) {
         onCancel()
@@ -141,6 +168,71 @@ final class SystemMetricsHistoryPanel: NSWindow {
 }
 
 // MARK: - Content
+
+struct SystemMetricsHistorySettingsActions: View {
+    @ObservedObject var service: SystemMonitorService
+    let onViewHistory: () -> Void
+
+    @Environment(\.locale) private var locale
+    @State private var isExporting = false
+    @State private var statusMessage: String?
+    @State private var clearConfirmationPresented = false
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            HStack(spacing: 8) {
+                Button(action: onViewHistory) {
+                    Label(AppLocalization.string("查看历史记录", locale: locale), systemImage: "chart.xyaxis.line")
+                }
+                .help(AppLocalization.string("按时间范围查看 CPU、GPU、内存、硬盘、风扇与网络的趋势", locale: locale))
+                Button {
+                    guard let destination = SystemMetricsHistoryExporter.chooseDestination() else { return }
+                    isExporting = true
+                    statusMessage = nil
+                    Task { @MainActor in
+                        statusMessage = await SystemMetricsHistoryExporter.write(service: service, to: destination)
+                        isExporting = false
+                    }
+                } label: {
+                    Label(AppLocalization.string("导出", locale: locale), systemImage: "square.and.arrow.up")
+                }
+                .disabled(service.historyStats.count == 0 || isExporting)
+                .help(AppLocalization.string("把全部历史读数导出为 xlsx 表格", locale: locale))
+                Button {
+                    clearConfirmationPresented = true
+                } label: {
+                    Label(AppLocalization.string("清空", locale: locale), systemImage: "trash")
+                }
+                .disabled(service.historyStats.count == 0 || isExporting)
+                if isExporting {
+                    ProgressView().controlSize(.small)
+                }
+            }
+            .buttonStyle(.bordered)
+            .controlSize(.small)
+            if let statusMessage {
+                Text(statusMessage)
+                    .font(.system(size: 10))
+                    .foregroundStyle(.secondary)
+                    .textSelection(.enabled)
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .task { await service.loadHistoryStats() }
+        .confirmationDialog(
+            AppLocalization.string("清空历史记录？", locale: locale),
+            isPresented: $clearConfirmationPresented,
+            titleVisibility: .visible
+        ) {
+            Button(AppLocalization.string("清空", locale: locale), role: .destructive) {
+                service.clearHistory()
+                statusMessage = AppLocalization.string("已清空历史记录", locale: locale)
+            }
+        } message: {
+            Text(AppLocalization.string("删除本机保存的全部历史读数，无法恢复。", locale: locale))
+        }
+    }
+}
 
 /// History window: one chart row per category over a selectable time range, plus a spreadsheet export.
 struct SystemMetricsHistoryContent: View {
@@ -161,6 +253,7 @@ struct SystemMetricsHistoryContent: View {
     private struct HistoryLoadRequest: Equatable {
         let range: SystemMetricsHistoryRange
         let generation: Int
+        let historyIsEmpty: Bool
     }
 
     var body: some View {
@@ -173,7 +266,11 @@ struct SystemMetricsHistoryContent: View {
         .padding(18)
         .frame(minWidth: 620, minHeight: 420)
         .background(Color(nsColor: .windowBackgroundColor))
-        .task(id: HistoryLoadRequest(range: range, generation: reloadGeneration)) { [range] in
+        .task(id: HistoryLoadRequest(
+            range: range,
+            generation: reloadGeneration,
+            historyIsEmpty: service.historyStats.count == 0
+        )) { [range] in
             await loadSections(for: range)
         }
         .confirmationDialog(
