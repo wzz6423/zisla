@@ -79,12 +79,20 @@ if [[ "$*" == *"--show-bin-path"* ]]; then
   print -r -- "$bin_directory"
 else
   print -r -- "$DEVELOPER_DIR" > "$FAKE_CAPTURE_FILE"
+  rm -rf "$bin_directory/zisla_Zisla.bundle"
   mkdir -p "$bin_directory"
   touch "$bin_directory/zisla"
   mkdir -p "$bin_directory/zisla_KeyboardKit.bundle" \
-    "$bin_directory/zisla_ZislaKit.bundle/Contents/Resources/Pomodoro"
+    "$bin_directory/zisla_ZislaKit.bundle/Contents/Resources/Pomodoro" \
+    "$bin_directory/zisla_Zisla.bundle/Contents/Resources"
   print -r -- pomodoro-complete > \
     "$bin_directory/zisla_ZislaKit.bundle/Contents/Resources/Pomodoro/pomodoro-complete.m4a"
+  print -r -- portrait-kernels > \
+    "$bin_directory/zisla_Zisla.bundle/Contents/Resources/RecordingPortraitKernels.metallib"
+  if [[ "${FAKE_FLAT_RESOURCE_BUNDLE:-false}" == true ]]; then
+    mv "$bin_directory/zisla_Zisla.bundle/Contents/Resources/RecordingPortraitKernels.metallib" \
+      "$bin_directory/zisla_Zisla.bundle/RecordingPortraitKernels.metallib"
+  fi
 fi
 SCRIPT
 
@@ -282,12 +290,39 @@ cmp -s "$DEBUG_APP/Contents/Resources/AppIcon.icns" "$DEBUG_APP/Contents/Resourc
 }
 for app in "$TEMPORARY_ROOT/output/zisla.app" "$DEBUG_APP"; do
   cmp -s \
+    "$TEST_ROOT/.build/arm64/out/Products/Release/zisla_Zisla.bundle/Contents/Resources/RecordingPortraitKernels.metallib" \
+    "$app/Contents/Resources/RecordingPortraitKernels.metallib" || {
+      print -u2 -r -- "FAIL: build-app did not package the recording portrait kernels"
+      exit 1
+    }
+  cmp -s \
     "$TEST_ROOT/.build/arm64/out/Products/Release/zisla_ZislaKit.bundle/Contents/Resources/Pomodoro/pomodoro-complete.m4a" \
     "$app/Contents/Resources/zisla_ZislaKit.bundle/Contents/Resources/Pomodoro/pomodoro-complete.m4a" || {
       print -u2 -r -- "FAIL: build-app did not package the Pomodoro completion sound"
       exit 1
     }
 done
+
+(
+  PATH="$FAKE_BIN:$PATH" \
+    FAKE_CAPTURE_FILE="$CAPTURE_FILE" \
+    FAKE_CODESIGN_CAPTURE_FILE="$CODESIGN_CAPTURE_FILE" \
+    FAKE_CODESIGN_STATE_FILE="$CODESIGN_STATE_FILE" \
+    FAKE_CLT_DEVELOPER="$CLT_DEVELOPER" \
+    FAKE_XCODE_APP="$XCODE_APP" \
+    FAKE_FLAT_RESOURCE_BUNDLE=true \
+    BUILD_ARCHITECTURES=arm64 \
+    CODE_SIGN_IDENTITY=- \
+    SIGNING_MODE=adhoc \
+    OUTPUT_DIRECTORY="$TEMPORARY_ROOT/flat-bundle-output" \
+    "$TEST_ROOT/Scripts/build-app.sh" >/dev/null
+)
+cmp -s \
+  "$TEST_ROOT/.build/arm64/out/Products/Release/zisla_Zisla.bundle/RecordingPortraitKernels.metallib" \
+  "$TEMPORARY_ROOT/flat-bundle-output/zisla.app/Contents/Resources/RecordingPortraitKernels.metallib" || {
+  print -u2 -r -- "FAIL: build-app did not package the flat-bundle portrait kernels"
+  exit 1
+}
 
 function build_profile_fixture() {
   PATH="$FAKE_BIN:$PATH" \

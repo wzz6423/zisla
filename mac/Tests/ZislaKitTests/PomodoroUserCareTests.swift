@@ -160,9 +160,27 @@ struct PomodoroUserCareTests {
         }
         fixture.service.start()
         #expect(queue.activeNotificationScenarios == [.focus])
-        fixture.now += fixture.service.focusDuration
+        queue.enqueue(.init(id: "during-focus", title: "During focus"), expiresAfter: nil)
+        let elapsed = fixture.service.focusDuration / 2
+        fixture.now += elapsed
+        fixture.service.pause()
+        let paused = fixture.service.focusCountdownNotice(for: .right)
+        fixture.now += 100
+        fixture.service.tick()
+        #expect(fixture.service.phase == .paused && queue.activeNotificationScenarios == [.focus])
+        #expect(fixture.service.focusCountdownNotice(for: .right).detail == paused.detail)
+        #expect(fixture.service.focusCountdownNotice(for: .right).progress == paused.progress)
+        #expect(queue.notificationBehavior(for: .ordinary, displayIdentifier: "display") == .deferUntilEnd)
+        #expect(queue.scenarioReview(displayIdentifier: "display").isEmpty)
+        #expect(fixture.sounds == 0 && fixture.requests.isEmpty)
+        fixture.service.start()
+        #expect(queue.activeNotificationScenarios == [.focus] && fixture.service.phase == .running)
+        #expect(queue.scenarioReview(displayIdentifier: "display").isEmpty)
+        fixture.now += fixture.service.focusDuration - elapsed
         fixture.service.tick()
         #expect(queue.activeNotificationScenarios.isEmpty && fixture.sounds == 1 && fixture.requests.count == 1)
+        #expect(queue.scenarioReview(displayIdentifier: "display").map(\.title) == ["During focus"])
+        queue.dismissScenarioReview(displayIdentifier: "display")
         queue.setNotificationScenario(.meeting, active: true)
         fixture.service.start()
         fixture.now += fixture.service.restDuration

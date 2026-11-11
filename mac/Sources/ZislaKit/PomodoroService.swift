@@ -131,6 +131,10 @@ public struct PomodoroEngine: Equatable, Sendable {
         }
     }
 
+    public func progress(at now: Date) -> Double {
+        max(0, 1 - remaining(at: now) / duration(for: mode))
+    }
+
     public func displayTime(at now: Date = Date()) -> (minutes: Int, seconds: Int) {
         let total = Int(ceil(remaining(at: now) - 1e-9))
         let clamped = max(0, total)
@@ -292,6 +296,18 @@ public final class PomodoroService: ObservableObject {
 
     public func focusCountdownNoticeID(for side: NoticeSide) -> String {
         "\(Self.focusCountdownNoticeIDPrefix)\(focusCountdownRunID.uuidString)-\(side.rawValue)"
+    }
+
+    public func focusCountdownNotice(for side: NoticeSide) -> IslandNotice {
+        let date = now()
+        return IslandNotice(
+            id: focusCountdownNoticeID(for: side),
+            title: AppLocalization.string(mode.title, language: language()),
+            detail: PomodoroEngine.formatHHMMSS(at: date, engine: engine),
+            side: side,
+            createdAt: date,
+            progress: engine.progress(at: date)
+        )
     }
 
     public func setFocusDuration(_ duration: TimeInterval) {

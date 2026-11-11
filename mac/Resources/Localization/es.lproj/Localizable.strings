@@ -1058,7 +1058,7 @@
 "选中每个cli后的自动更新选项后检测到新版本后自动执行更新；关闭后不再启动新任务，已开始的更新会完成" = "Al seleccionar la opción de actualización automática junto a cada CLI, se instala la actualización automáticamente al detectar una versión nueva; al desactivarlo no se inician tareas nuevas, pero las actualizaciones en curso se completan";
 "未找到 Homebrew；请先安装 Homebrew 后再管理推荐工具" = "No se encontró Homebrew; instala Homebrew antes de gestionar las herramientas recomendadas";
 "未找到 LibreOffice；请安装 LibreOffice 后重试" = "No se encontró LibreOffice; instala LibreOffice y vuelve a intentarlo";
-"未找到可用的 yt-dlp。请在 设置 → 下载 → 组件 中一键安装后重试。" = "No hay ningún yt-dlp utilizable. Instálalo en Ajustes → Descargas → Componentes y vuelve a intentarlo.";
+"未找到可用的 yt-dlp。请在 设置 → 依赖组件 → 组件 中一键安装后重试。" = "No hay ningún yt-dlp utilizable. Instálalo en Ajustes → Componentes necesarios → Componentes y vuelve a intentarlo.";
 "选中的识别文本和原始录音文件都会被删除，但累计统计数据（总字词、时长等）会保留。此操作无法撤销。" = "Se eliminarán los textos reconocidos seleccionados y sus grabaciones originales, pero se conservarán las estadísticas acumuladas (palabras totales, duración, etc.). No se podrá deshacer.";
 "本机保存的识别文本和原始录音文件都会被删除，但累计统计数据（总字词、时长等）会保留。此操作无法撤销。" = "Se eliminarán los textos reconocidos y las grabaciones originales guardados en este Mac, pero se conservarán las estadísticas acumuladas (palabras totales, duración, etc.). No se podrá deshacer.";
 "缺少子命令。可用：update/finish/remove/clear/list/usage/notify/message/help" = "Falta el subcomando. Disponibles: update/finish/remove/clear/list/usage/notify/message/help";
@@ -2499,6 +2499,11 @@
 "2026.10.28往前15天" = "15 días antes del 2026.10.28";
 "日期间隔" = "Intervalo de fechas";
 "跨时区时间" = "Hora entre zonas horarias";
+"会议 2026-11-20 14:30-15:30" = "Reunión 2026-11-20 14:30-15:30";
+"Hello! How are you today?" = "Hello! How are you today?";
+"这是一段普通文本，可以搜索或保存。" = "Puedes buscar este texto o guardarlo.";
+"例如：复制截图或浏览器中的图片" = "Ejemplo: Copiar una captura de pantalla o una imagen del navegador";
+"例如：在 Finder 中选中文件后按 ⌘C" = "Ejemplo: Seleccionar un archivo en Finder y pulsar ⌘C";
 "汇率获取失败" = "No se pudo obtener el tipo de cambio";
 "闹钟通知未获允许，请在系统设置中开启通知。" = "Las notificaciones de alarma no están permitidas. Actívalas en Ajustes del Sistema.";
 "闹钟通知声音已关闭，请在系统设置中开启声音。" = "Los sonidos de las notificaciones de alarma están desactivados. Actívalos en Ajustes del Sistema.";
@@ -3366,7 +3371,8 @@
 "全部（包含需人工复核）" = "Todos (incluidos los que requieren revisión)";
 "默认保存位置" = "Ubicaciones de guardado predeterminadas";
 "分别设置各类内容的默认保存位置。" = "Establecer la ubicación de guardado predeterminada para cada tipo de contenido.";
-"管理下载所需组件。" = "Gestionar los componentes necesarios para las descargas.";
+"依赖组件" = "Componentes necesarios";
+"管理下载与文档转换所需组件。" = "Gestionar los componentes necesarios para las descargas y la conversión de documentos.";
 "更改 %@ 的保存位置" = "Cambiar la ubicación de guardado de %@";
 
 "本地优先的原生笔记应用" = "Aplicación nativa de notas que prioriza el almacenamiento local";
@@ -3377,3 +3383,10 @@
 "保存手写备忘录需要辅助功能权限" = "Se necesita permiso de accesibilidad para guardar notas manuscritas";
 "备忘录内容已变化，请重新打开后编辑" = "La nota ha cambiado. Vuelve a abrirla antes de editarla";
 "无法保存手写备忘录的文本，请在备忘录中打开后重试" = "No se pudo guardar el texto de la nota manuscrita. Ábrela en Notas e inténtalo de nuevo";
+"灵动岛功能顺序" = "Orden de las funciones de Dynamic Island";
+
+"查询航班" = "Consultar vuelo";
+"查询火车" = "Consultar tren";
+"查询快递" = "Seguir paquete";
+"全部标记为已读" = "Marcar todo como leído";
+"已将全部邮件标记为已读" = "Todos los mensajes se han marcado como leídos";

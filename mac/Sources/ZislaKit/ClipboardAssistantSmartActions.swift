@@ -92,6 +92,7 @@ extension ClipboardAssistantDetector {
     ]
     private static let flightIATAPrefixes = Dictionary(uniqueKeysWithValues: flightAwarePrefixes.map { ($0.value, $0.key) })
 
+    /// FlightAware needs an ICAO mapping; unmapped carriers must retain a single fallback search.
     private static func flightDetection(_ text: String, countryCode: String?) -> ClipboardAssistantDetection? {
         let labelled = ClipboardAssistantIdentifierPatterns.splitLabel(text, pattern: ClipboardAssistantIdentifierPatterns.flightLabel)
         guard let match = smartMatch(#"(?i)^([A-Z]{3}|[A-Z][A-Z0-9]|[0-9][A-Z])(\h*)(\p{Nd}{1,4})(?:便)?$"#, labelled.value) else { return nil }
@@ -122,10 +123,12 @@ extension ClipboardAssistantDetector {
         default: nil
         }
         if let airline { actions.append(serviceAction(airline)) }
+        if icao != nil { actions.append(.search(number)) }
         actions.append(.copyText(carrier + match[3]))
         return ClipboardAssistantDetection(kind: .flight, title: number, actions: actions)
     }
 
+    /// Keeps existing provider-specific search terms to avoid adding duplicate ordinary searches.
     private static func trainDetection(_ text: String, countryCode: String?, now: Date) -> ClipboardAssistantDetection? {
         let labelled = ClipboardAssistantIdentifierPatterns.splitLabel(text, pattern: ClipboardAssistantIdentifierPatterns.trainLabel)
         let value = labelled.value.replacingOccurrences(of: #"\h+"#, with: " ", options: .regularExpression)
@@ -193,12 +196,14 @@ extension ClipboardAssistantDetector {
         if let queryName { actions.append(.search((queryName.isEmpty ? "" : queryName + " ") + number)) }
         if let service { actions.append(serviceAction(service, number: number, now: now)) }
         if let official { actions.append(.openURL(URL(string: official)!)) }
+        if queryName == nil { actions.append(.search(number)) }
         actions.append(.copyText(stem + match[2] + match[3].uppercased()))
         return ClipboardAssistantDetection(
             kind: .train, title: number, actions: actions
         )
     }
 
+    /// Carrier matching must not remove ordinary search or alter the original digits used for copying.
     static func trackingDetection(
         _ text: String, countryCode: String?, allowUnlabelledNumber: Bool = false
     ) -> ClipboardAssistantDetection? {
@@ -244,6 +249,7 @@ extension ClipboardAssistantDetector {
         default: strongSF ? .sfExpress : (strongUPS ? .ups : (strongPostal && number.hasSuffix("US") ? .usps : nil))
         }
         if let carrier { actions.append(serviceAction(carrier, number: number)) }
+        actions.append(.search(number))
         actions.append(.copyText(copiedNumber))
         return ClipboardAssistantDetection(kind: .tracking, title: number, actions: actions)
     }
