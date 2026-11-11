@@ -27,7 +27,7 @@ struct SystemMonitorPageLayoutTests {
         )
         window.isReleasedWhenClosed = false
         defer { window.close() }
-        let host = NSHostingView(rootView: SystemMonitorView(service: service, onCleanupRequested: {})
+        let host = NSHostingView(rootView: SystemMonitorView(service: service, onCleanupRequested: {}, onTransientMessage: { _ in })
             .background(.black)
             .environment(\.colorScheme, .dark)
             .environment(\.locale, language.locale)

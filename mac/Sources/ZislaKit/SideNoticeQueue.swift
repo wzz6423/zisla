@@ -244,7 +244,10 @@ public final class SideNoticeQueue: ObservableObject {
     }
 
     public func isScenarioNoticeVisible(_ notice: IslandNotice, displayIdentifier: String) -> Bool {
-        scenarioBuffer.isVisible(notice, revision: noticeRevisions[notice.id] ?? 0, on: displayIdentifier)
+        if notice.id.hasPrefix("scenario-review-") {
+            return notice.id == "scenario-review-" + displayIdentifier && !scenarioReview(displayIdentifier: displayIdentifier).isEmpty
+        }
+        return scenarioBuffer.isVisible(notice, revision: noticeRevisions[notice.id] ?? 0, on: displayIdentifier)
     }
 
     public func presentationNotices(_ notices: [IslandNotice], displayIdentifier: String) -> [IslandNotice] {
@@ -260,12 +263,12 @@ public final class SideNoticeQueue: ObservableObject {
         scenarioRevision &+= 1
     }
 
-    public func scenarioReviewNotice(displayIdentifier: String) -> IslandNotice? {
+    public func scenarioReviewNotice(displayIdentifier: String, locale: Locale = AppLocalization.currentLanguage.locale) -> IslandNotice? {
         let items = scenarioReview(displayIdentifier: displayIdentifier)
         guard !items.isEmpty else { return nil }
         return IslandNotice(id: "scenario-review-" + displayIdentifier,
-            title: AppLocalization.text("已延后 %ld 条提示", items.count),
-            detail: AppLocalization.text("点击回顾"), side: .right, symbolName: "bell.badge")
+            title: AppLocalization.format("已延后 %ld 条提示", locale: locale, [items.count]),
+            detail: AppLocalization.string("点击回顾", locale: locale), side: .right, symbolName: "bell.badge")
     }
 
     private var scenarioNotices: [(IslandNotice, UInt64)] {

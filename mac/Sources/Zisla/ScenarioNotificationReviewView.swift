@@ -15,6 +15,7 @@ struct ScenarioNotificationReviewView: View {
                     queue.dismissScenarioReview(displayIdentifier: displayIdentifier)
                 }
                 .disabled(items.isEmpty)
+                .accessibilityIdentifier("scenarioReview.clear")
             }
             if items.isEmpty {
                 AppLocalizedText("没有延后提示").foregroundStyle(.secondary)

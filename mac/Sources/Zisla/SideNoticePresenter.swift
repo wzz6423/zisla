@@ -338,7 +338,8 @@ final class SideNoticePresenter {
         if let information = FloatingIslandInformationLayout(
             notices: statusHidden ? [] : notices, icons: availableStatusIcons,
             settings: settingsStore.settings, item: media.snapshot, at: date
-        ), !suppression.isVoiceRecording, !suppression.isTransientNoticePresented,
+        ), !notices.contains(where: { $0.id.hasPrefix("scenario-review-") }),
+           !suppression.isVoiceRecording, !suppression.isTransientNoticePresented,
            !(showsResultSweep && resultSweep.current != nil) {
             configuration.statusIconSize = information.size
             return configuration
@@ -367,6 +368,7 @@ final class SideNoticePresenter {
         )
         if settingsStore.settings.effectiveStatusIconDestination == .island,
            sizing == nil || (selectedPriority == .systemMonitor && sizing?.customPillPresentation?.priority != nil),
+           !notices.contains(where: { $0.id.hasPrefix("scenario-review-") }),
            !suppression.isVoiceRecording, !suppression.isTransientNoticePresented,
            !(showsResultSweep && resultSweep.current != nil) {
             configuration.statusIconSize = IslandStatusIconLayout.size(icons: availableStatusIcons,
@@ -558,7 +560,9 @@ final class SideNoticePresenter {
     func compactPresentationNotices(on displayIdentifier: String) -> [IslandNotice] {
         let notices = isResultSweepVisible(on: displayIdentifier)
             ? resultSweep.presentationNotices(from: queue.left + queue.right) : queue.left + queue.right
-        return queue.presentationNotices(notices, displayIdentifier: displayIdentifier)
+        let visible = queue.presentationNotices(notices, displayIdentifier: displayIdentifier)
+        return visible + (settingsStore.settings.sideNoticesEnabled
+            ? queue.scenarioReviewNotice(displayIdentifier: displayIdentifier).map { [$0] } ?? [] : [])
     }
 
     private func updatePanel(
@@ -672,6 +676,7 @@ final class SideNoticePresenter {
             || notice.id.hasPrefix("video-download-")
             || notice.id.hasPrefix("voice-processing-")
             || notice.id.hasPrefix("screen-recording-operation-")
+            || notice.id.hasPrefix("scenario-review-")
     }
 
     private static func isTransientCompactNotice(_ notice: IslandNotice) -> Bool {

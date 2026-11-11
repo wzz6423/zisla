@@ -243,6 +243,8 @@ struct CompactStatusBarView: View {
     @Environment(\.accessibilityReduceTransparency) private var reduceTransparency
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @Environment(\.layoutDirection) private var layoutDirection
+    @Environment(\.locale) private var locale
+    @State private var showsScenarioReview = false
 
     private var height: CGFloat { displayState.compactWingHeight }
     private var showsResultSweep: Bool {
@@ -298,7 +300,7 @@ struct CompactStatusBarView: View {
                     .onChange(of: information.size, initial: true) { _, size in
                         onCompactLengthChanged(displayState.islandEdge.isVertical ? size.height : size.width)
                     }
-            } else if !displayState.statusIcons.isEmpty {
+            } else if !displayState.statusIcons.isEmpty, scenarioReviewNotice == nil {
                 IslandStatusIconStrip(icons: displayState.statusIcons, edge: displayState.islandEdge, date: date)
             } else if usesCustomPill, displayState.compactStatusHidden, !showsResultSweep,
                       settingsStore.settings.islandAppIconEnabled {
@@ -368,7 +370,7 @@ struct CompactStatusBarView: View {
     }
 
     private func compactInformation(at date: Date) -> FloatingIslandInformationLayout? {
-        guard !showsResultSweep else { return nil }
+        guard !showsResultSweep, scenarioReviewNotice == nil else { return nil }
         return FloatingIslandInformationLayout(
             notices: displayState.compactStatusHidden ? [] : presentationNotices,
             icons: displayState.statusIcons, settings: settingsStore.settings, item: media.snapshot, at: date
@@ -448,11 +450,20 @@ struct CompactStatusBarView: View {
             let length = presentation.length(
                 thickness: height, edge: displayState.islandEdge, text: text, item: media.snapshot
             )
-            CompactPillStatusContent(
-                presentation: presentation, text: text, edge: displayState.islandEdge,
-                visualizationStyle: settingsStore.settings.mediaVisualizationStyle,
-                item: presentation.isMedia ? media.snapshot : nil, date: date
-            )
+            Group {
+                if presentation.notice.id.hasPrefix("scenario-review-") {
+                    reviewButton(notice: presentation.notice) {
+                        CompactPillStatusContent(presentation: presentation, text: text, edge: displayState.islandEdge,
+                            visualizationStyle: settingsStore.settings.mediaVisualizationStyle, item: nil, date: date)
+                    }
+                } else {
+                    CompactPillStatusContent(
+                        presentation: presentation, text: text, edge: displayState.islandEdge,
+                        visualizationStyle: settingsStore.settings.mediaVisualizationStyle,
+                        item: presentation.isMedia ? media.snapshot : nil, date: date
+                    )
+                }
+            }
             .onChange(of: length, initial: true) { _, value in onCompactLengthChanged(value) }
         } else if !showsResultSweep, settingsStore.settings.islandAppIconEnabled {
             IslandParticleLogo(side: min(18, height), time: date.timeIntervalSinceReferenceDate)
@@ -473,11 +484,17 @@ struct CompactStatusBarView: View {
     }
 
     private var presentationNotices: [IslandNotice] {
-        let notices = queue.presentationNotices(showsResultSweep
+        var notices = queue.presentationNotices(showsResultSweep
             ? resultSweep.presentationNotices(from: queue.left + queue.right) : queue.left + queue.right,
             displayIdentifier: displayState.notificationScopeIdentifier)
+        if let review = scenarioReviewNotice { notices.append(review) }
         return displayState.hidesVoiceProcessingIndicator
             ? notices.filter { !$0.id.hasPrefix("voice-processing-") } : notices
+    }
+
+    private var scenarioReviewNotice: IslandNotice? {
+        displayState.showsScenarioReview && settingsStore.settings.sideNoticesEnabled
+            ? queue.scenarioReviewNotice(displayIdentifier: displayState.notificationScopeIdentifier, locale: locale) : nil
     }
 
     private var mediaNotice: IslandNotice? {
@@ -489,12 +506,7 @@ struct CompactStatusBarView: View {
     }
 
     private var transientNotice: IslandNotice? {
-        presentationNotices
-            .filter {
-                $0.id.hasPrefix("focus-transition") || $0.style == .headphone
-                    || LowBatteryNoticeController.isLowBatteryNotice($0)
-            }
-            .max { $0.createdAt < $1.createdAt }
+        SideNoticeLayoutEngine.transientNotice(for: presentationNotices)
     }
 
     /// Detailed mode needs a live snapshot (lyrics advance with playback); the notice strip only carries a static cover and title.
@@ -617,6 +629,22 @@ struct CompactStatusBarView: View {
                         height: height,
                         centerInset: displayState.compactBarCenterInset
                     )
+                } else if transientNotice.id.hasPrefix("scenario-review-") {
+                    reviewButton(notice: transientNotice) {
+                        GeometryReader { geometry in
+                            let wingWidth = (geometry.size.width - displayState.compactBarCenterInset) / 2
+                            HStack(spacing: 0) {
+                                Image(systemName: "bell.badge")
+                                    .font(.system(size: min(18, height * 0.56), weight: .semibold))
+                                    .frame(width: wingWidth)
+                                Spacer(minLength: 0).frame(width: displayState.compactBarCenterInset)
+                                Text(String(queue.scenarioReview(displayIdentifier: displayState.notificationScopeIdentifier).count))
+                                    .font(.system(size: 12, weight: .semibold, design: .rounded)).monospacedDigit()
+                                    .frame(width: wingWidth)
+                            }
+                            .frame(maxWidth: .infinity, maxHeight: .infinity)
+                        }
+                    }
                 } else {
                     CompactFocusTransitionBar(notice: transientNotice, height: height)
                 }
@@ -816,6 +844,17 @@ struct CompactStatusBarView: View {
         case .systemMonitor, nil:
             EmptyView()
         }
+    }
+
+    private func reviewButton<Label: View>(notice: IslandNotice, @ViewBuilder label: () -> Label) -> some View {
+        Button { showsScenarioReview = true } label: { label().contentShape(Rectangle()) }
+            .buttonStyle(.plain)
+            .accessibilityIdentifier("scenarioReview.open")
+            .accessibilityLabel(notice.title + " · " + AppLocalization.string("点击回顾", locale: locale))
+            .help(AppLocalization.string("点击回顾", locale: locale))
+            .popover(isPresented: $showsScenarioReview) {
+                ScenarioNotificationReviewView(queue: queue, displayIdentifier: displayState.notificationScopeIdentifier)
+            }
     }
 }
 

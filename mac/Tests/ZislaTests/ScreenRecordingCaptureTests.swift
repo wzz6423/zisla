@@ -12,21 +12,25 @@ import ZislaKit
 
 @Suite @MainActor
 struct ScreenRecordingCaptureTests {
-    @Test
-    func captureLifecycleKeepsTheNotificationSceneThroughPauseAndCleanupAndEndsOnFailure() async throws {
+    @Test(arguments: [false, true])
+    func captureLifecycleKeepsTheNotificationSceneThroughPauseAndCleanupAndEndsOnFailure(manualMeeting: Bool) async throws {
         let system = CaptureTestSystem()
         let service = ScreenRecordingService(dependencies: system.dependencies())
         let queue = SideNoticeQueue()
         defer { queue.removeAll() }
         queue.configureNotificationScenarios(.init(enabled: true), displayIdentifiers: ["display"])
+        let meeting = MeetingNotificationScenario(queue: queue, onCalendarStateChanged: { _ in })
+        defer { meeting.stop() }
+        meeting.configure(settings: .init(enabled: true), manual: manualMeeting, events: [])
         let subscription = service.$phase.sink { queue.setNotificationScenario(.screenRecording, active: $0 != .idle) }
         let starting = Task { try await service.start(configuration: .init(), directory: system.directory) }
         await system.session.startEntered.wait()
-        #expect(queue.activeNotificationScenarios == [.screenRecording])
+        let active: Set<NotificationScenario> = manualMeeting ? [.screenRecording, .meeting] : [.screenRecording]
+        #expect(queue.activeNotificationScenarios == active)
         system.session.firstFrame.resolve(.success(100))
         try await starting.value
         await service.togglePause()
-        #expect(service.phase == .paused && queue.activeNotificationScenarios == [.screenRecording])
+        #expect(service.phase == .paused && queue.activeNotificationScenarios == active)
         queue.enqueue(.init(id: "notice", title: "During recording"), expiresAfter: nil)
         system.session.cancelHeld = CaptureTestSignal()
         let cancelling = Task { await service.cancel() }
@@ -34,6 +38,12 @@ struct ScreenRecordingCaptureTests {
         #expect(service.phase == .finishing && queue.scenarioReview(displayIdentifier: "display").isEmpty)
         system.session.cancelHeld?.signal()
         await cancelling.value
+        if manualMeeting {
+            #expect(service.phase == .idle && queue.activeNotificationScenarios == [.meeting])
+            #expect(queue.scenarioReview(displayIdentifier: "display").isEmpty,
+                "Stopping recording must not override the user's still active manual meeting rule")
+            meeting.configure(settings: .init(enabled: true), manual: false, events: [])
+        }
         #expect(queue.activeNotificationScenarios.isEmpty)
         #expect(queue.scenarioReview(displayIdentifier: "display").map(\.id) == ["notice"])
         system.denied = .screen

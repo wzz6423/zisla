@@ -566,11 +566,24 @@ final class AppModel: ObservableObject {
     let monitor = systemMonitor
     return SystemAutoCleanupService(
       scan: { await monitor.scanCleanupCandidates(kinds: $0, options: $1) },
-      trash: { await monitor.trashSelected($0) }
+      trash: { await monitor.trashSelected($0) },
+      emptyTrash: { [weak self] in
+        let result = await DesktopOrganizer.emptyTrash()
+        if case .failure(let error) = result {
+          self?.transientMessage = error.message
+        }
+        return result
+      },
+      onTrashReservationFailure: { [weak self] error in
+        self?.transientMessage = error.message
+      }
     )
   }()
   let backgroundSounds = SystemBackgroundSoundService()
   let battery = BatteryMonitor()
+  private(set) lazy var automaticPowerMode = AutomaticPowerModeService(onFailure: { [weak self] error in
+    self?.transientMessage = AppLocalization.text(BatteryPowerModePresentation.messageKey(for: error))
+  })
   private lazy var lowBatteryNotice = LowBatteryNoticeController(queue: notices)
   var userCarePresentationAllowed: () -> Bool = { false }
   private lazy var userCare = UserCareService(
@@ -653,6 +666,7 @@ final class AppModel: ObservableObject {
   private let voiceRecordingPlayer = VoiceRecordingPlayer()
   @Published private(set) var systemMonitorHeadphoneTransient = SystemMonitorHeadphoneTransient()
   private var headphoneTransientLifecycleActive = false
+  private var automaticPowerModeLifecycleActive = false
   private var headphoneTransientTask: Task<Void, Never>?
   private var cancellables: Set<AnyCancellable> = []
   private var weatherTask: Task<Void, Never>?
@@ -910,10 +924,13 @@ final class AppModel: ObservableObject {
       .store(in: &cancellables)
 
     Publishers.CombineLatest(battery.$snapshot, networkBattery.$devices)
-      .sink { [weak self] _ in
+      .sink { [weak self] snapshot, _ in
         Task { @MainActor [weak self] in
           guard let self else { return }
           let settings = self.settingsStore.settings
+          if self.automaticPowerModeLifecycleActive {
+            self.automaticPowerMode.apply(settings: settings, snapshot: snapshot)
+          }
           self.lowBatteryNotice.update(
             snapshot: self.battery.snapshot,
             enabled: settings.systemMonitorEnabled && settings.sideNoticesEnabled
@@ -1129,6 +1146,7 @@ final class AppModel: ObservableObject {
 
   func start(hasExistingInstallation: Bool) {
     headphoneTransientLifecycleActive = true
+    automaticPowerModeLifecycleActive = true
     backgroundSounds.startLifecycleMonitoring()
     apply(settings: settingsStore.settings)
     LegacyAlarmNotificationCleanup.removeScheduledNotifications()
@@ -1256,6 +1274,8 @@ final class AppModel: ObservableObject {
   }
 
   func stop() {
+    automaticPowerModeLifecycleActive = false
+    automaticPowerMode.stop()
     dailyBriefing.stop()
     headphoneTransientLifecycleActive = false
     userCare.stop()
@@ -3359,6 +3379,9 @@ final class AppModel: ObservableObject {
       battery.start()
     } else {
       battery.stop()
+    }
+    if automaticPowerModeLifecycleActive {
+      automaticPowerMode.apply(settings: settings, snapshot: battery.snapshot)
     }
     lowBatteryNotice.update(
       snapshot: battery.snapshot,

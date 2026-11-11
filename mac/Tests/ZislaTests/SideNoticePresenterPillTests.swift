@@ -12,6 +12,57 @@ import ZislaKit
 @Suite(.serialized)
 struct SideNoticePresenterPillTests {
     @Test
+    func scenarioReviewEntersCompactPresentationOnlyAfterTheLastQuietSceneEndsOnEachDisplay() throws {
+        let fixture = try Fixture(edge: .top, controlsPanelUpdates: true)
+        defer { fixture.close() }
+        let quiet = fixture.screen.notificationScopeIdentifier
+        let settings = NotificationScenarioSettings(enabled: true, displayOverrides: [
+            "showing": .init(meeting: .init(ordinary: .show), screenRecording: .init(ordinary: .show))
+        ])
+        fixture.settings.settings.notificationScenarios = settings
+        _ = fixture.presenter
+        fixture.queue.configureNotificationScenarios(settings, displayIdentifiers: [quiet, "showing"])
+        fixture.queue.setNotificationScenarios([.meeting, .screenRecording])
+        fixture.queue.enqueue(.init(id: "recording-arrival", title: "During recording"), expiresAfter: nil)
+        fixture.queue.setNotificationScenario(.screenRecording, active: false)
+        #expect(fixture.queue.activeNotificationScenarios == [.meeting])
+        #expect(fixture.queue.scenarioReviewNotice(displayIdentifier: quiet) == nil)
+        #expect(fixture.presenter.compactPresentationNotices(on: quiet).isEmpty)
+        fixture.queue.setNotificationScenario(.meeting, active: false)
+        let review = try #require(fixture.queue.scenarioReviewNotice(displayIdentifier: quiet))
+        let compact = fixture.presenter.compactPresentationNotices(on: quiet)
+        #expect(compact.map(\.id) == [review.id], "A published review needs an entry in the real collapsed content pipeline")
+        #expect(SideNoticePresenter.isCompactNotice(review))
+        #expect(SideNoticeLayoutEngine.selectedCompactStatusPriority(for: compact, settings: fixture.settings.settings) == .transient)
+        fixture.presenter.setStatusIcons([IslandStatusIcon(id: "cpu", content: .metric(.cpu, text: "31%", image: nil,
+            style: .detailed), tooltip: "CPU")])
+        fixture.settings.settings.islandShowMoreInformation = true
+        let reviewConfiguration = fixture.presenter.compactConfiguration(for: compact, at: fixture.date)
+        #expect(reviewConfiguration.statusIconSize == nil, "Passive monitor information must not cover the review button")
+        #expect(reviewConfiguration.compactStatusLength != nil)
+        #expect(fixture.presenter.compactFrame(for: fixture.screen, notices: compact) != nil,
+            "Re-filtering synthesized review content must retain the real compact frame")
+        #expect(fixture.presenter.compactPresentationNotices(on: "showing").map(\.id) == ["recording-arrival"])
+        #expect(fixture.queue.scenarioReview(displayIdentifier: "showing").isEmpty)
+        let state = SideNoticeDisplayState()
+        state.compactStatusHidden = true
+        #expect(SideNoticePresenter.updateCompactVisibility(notices: compact, settings: fixture.settings.settings, displayState: state))
+        #expect(!state.compactStatusHidden)
+        state.compactStatusHidden = true
+        _ = SideNoticePresenter.updateCompactVisibility(notices: compact, settings: fixture.settings.settings, displayState: state)
+        #expect(!state.compactStatusHidden, "The review stays reachable until dismissed, independently of expired activity rows")
+        #expect(!fixture.queue.isScenarioNoticeVisible(review, displayIdentifier: "showing"))
+        fixture.settings.settings.sideNoticesEnabled = false
+        #expect(fixture.presenter.compactPresentationNotices(on: quiet).isEmpty)
+        fixture.settings.settings.sideNoticesEnabled = true
+        fixture.queue.dismissScenarioReview(displayIdentifier: quiet)
+        #expect(fixture.presenter.compactPresentationNotices(on: quiet).isEmpty)
+        fixture.queue.setNotificationScenarios([.screenRecording])
+        fixture.queue.setNotificationScenarios([])
+        #expect(fixture.presenter.compactPresentationNotices(on: quiet).isEmpty, "An empty recording must not fabricate a review")
+    }
+
+    @Test
     func scenarioPolicyFiltersResultSweepAndCompactContentIndependentlyOnEachDisplay() throws {
         let fixture = try Fixture(edge: .top)
         defer { fixture.close() }

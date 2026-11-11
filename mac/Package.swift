@@ -122,10 +122,6 @@ let package = Package(
                 .copy("../../Resources/BrandIcons"),
                 .copy("../../Resources/ThirdPartyLicenses"),
             ],
-            swiftSettings: [
-                // Preserve the portrait kernels' rendering behavior with Core Image's compatibility macro.
-                .unsafeFlags(["-Xcc", "-DCI_SILENCE_GL_DEPRECATION"]),
-            ],
             linkerSettings: [
                 .linkedFramework("Speech"),
                 .linkedFramework("WebKit"),

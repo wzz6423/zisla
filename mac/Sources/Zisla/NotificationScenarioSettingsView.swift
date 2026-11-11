@@ -13,33 +13,26 @@ struct NotificationScenarioSettingsView: View {
         VStack(alignment: .leading, spacing: 10) {
             AppLocalizedText("场景通知策略").font(.system(size: 13, weight: .semibold))
             VStack(spacing: 0) {
-                row("启用场景通知策略", symbol: "bell.badge", detail: "仅管理 Zisla 提示，不更改系统专注模式") {
-                    Toggle("", isOn: binding(\.enabled)).labelsHidden().toggleStyle(.switch)
-                        .accessibilityLabel(AppLocalization.string("启用场景通知策略", locale: locale))
+                row("按日历自动开启会议场景", symbol: "calendar",
+                    detail: "以含会议链接的日程时间为准，不代表实际参会") {
+                    Toggle("", isOn: binding(\.automaticallyDetectsMeetings)).labelsHidden().toggleStyle(.switch)
+                        .accessibilityLabel(AppLocalization.string("按日历自动开启会议场景", locale: locale))
                 }
-                if settings.enabled {
+                Divider()
+                row("手动开启会议场景", symbol: "video.fill",
+                    detail: model.isCalendarMeetingScenarioActive ? "日历会议场景已生效" : "仅本次运行有效，退出后关闭") {
+                    Toggle("", isOn: $model.isManualMeetingScenarioActive).labelsHidden().toggleStyle(.switch)
+                        .accessibilityLabel(AppLocalization.string("手动开启会议场景", locale: locale))
+                }
+                policyRows(displayIdentifier: nil, scopeName: AppLocalization.string("场景通知策略", locale: locale))
+                ForEach(displays) { display in
                     Divider()
-                    row("按日历自动开启会议场景", symbol: "calendar",
-                        detail: "以含会议链接的日程时间为准，不代表实际参会") {
-                        Toggle("", isOn: binding(\.automaticallyDetectsMeetings)).labelsHidden().toggleStyle(.switch)
-                            .accessibilityLabel(AppLocalization.string("按日历自动开启会议场景", locale: locale))
+                    row(display.name, symbol: "display", detail: "为此显示器单独设置") {
+                        Toggle("", isOn: overrideBinding(display.identifier)).labelsHidden().toggleStyle(.switch)
+                            .accessibilityLabel(display.name + " · " + AppLocalization.string("为此显示器单独设置", locale: locale))
                     }
-                    Divider()
-                    row("手动开启会议场景", symbol: "video.fill",
-                        detail: model.isCalendarMeetingScenarioActive ? "日历会议场景已生效" : "仅本次运行有效，退出后关闭") {
-                        Toggle("", isOn: $model.isManualMeetingScenarioActive).labelsHidden().toggleStyle(.switch)
-                            .accessibilityLabel(AppLocalization.string("手动开启会议场景", locale: locale))
-                    }
-                    policyRows(displayIdentifier: nil, scopeName: AppLocalization.string("场景通知策略", locale: locale))
-                    ForEach(displays) { display in
-                        Divider()
-                        row(display.name, symbol: "display", detail: "为此显示器单独设置") {
-                            Toggle("", isOn: overrideBinding(display.identifier)).labelsHidden().toggleStyle(.switch)
-                                .accessibilityLabel(display.name + " · " + AppLocalization.string("为此显示器单独设置", locale: locale))
-                        }
-                        if settings.displayOverrides[display.identifier] != nil {
-                            policyRows(displayIdentifier: display.identifier, scopeName: display.name)
-                        }
+                    if settings.displayOverrides[display.identifier] != nil {
+                        policyRows(displayIdentifier: display.identifier, scopeName: display.name)
                     }
                 }
             }

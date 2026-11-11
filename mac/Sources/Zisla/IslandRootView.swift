@@ -248,7 +248,8 @@ struct IslandRootView: View {
                                                 networkMonitor: model.networkBattery,
                                                 showsSystemMonitor: settingsStore.settings.systemMonitorEnabled,
                                                 showsBatteryMonitor: settingsStore.settings.systemMonitorEnabled,
-                                                onCleanupRequested: cleanupPanelPresentation.present
+                                                onCleanupRequested: cleanupPanelPresentation.present,
+                                                onTransientMessage: { model.transientMessage = $0 }
                                             )
                                         case .lockScreen:
                                             LockScreenModuleView(model: model)

@@ -59,44 +59,82 @@ public struct WeatherCondition: Equatable, Sendable {
     public let summary: String
     public let symbolName: String
 
+    public init(summary: String, symbolName: String) {
+        self.summary = summary
+        self.symbolName = symbolName
+    }
+
     public init(code: Int, isDay: Bool?) {
         switch code {
         case 0:
             summary = AppLocalization.text("晴")
-            symbolName = isDay.map { $0 ? "sun.max.fill" : "moon.stars.fill" } ?? "sparkles"
+            symbolName = isDay.map { $0 ? "sun.max.fill" : "moon.stars.fill" } ?? "sun.max.fill"
         case 1:
             summary = AppLocalization.text("晴间少云")
-            symbolName = isDay.map { $0 ? "sun.max.fill" : "moon.fill" } ?? "sparkles"
+            symbolName = isDay.map { $0 ? "sun.max.fill" : "moon.fill" } ?? "sun.max.fill"
         case 2:
             summary = AppLocalization.text("多云")
-            symbolName = isDay.map { $0 ? "cloud.sun.fill" : "cloud.moon.fill" } ?? "cloud.fill"
+            symbolName = isDay.map { $0 ? "cloud.sun.fill" : "cloud.moon.fill" } ?? "cloud.sun.fill"
         case 3:
             summary = AppLocalization.text("阴")
             symbolName = "cloud.fill"
         case 45, 48:
             summary = AppLocalization.text("雾")
             symbolName = "cloud.fog.fill"
-        case 51, 53, 55, 56, 57:
+        case 51, 53, 55:
             summary = AppLocalization.text("毛毛雨")
             symbolName = "cloud.drizzle.fill"
-        case 61, 63, 65, 66, 67:
-            summary = AppLocalization.text("雨")
+        case 56, 57:
+            summary = AppLocalization.text("冻毛毛雨")
+            symbolName = "cloud.sleet.fill"
+        case 61:
+            summary = AppLocalization.text("小雨")
+            symbolName = "cloud.drizzle.fill"
+        case 63:
+            summary = AppLocalization.text("中雨")
             symbolName = "cloud.rain.fill"
-        case 71, 73, 75, 77:
-            summary = AppLocalization.text("雪")
-            symbolName = "cloud.snow.fill"
-        case 80, 81, 82:
-            summary = AppLocalization.text("阵雨")
+        case 65:
+            summary = AppLocalization.text("大雨")
             symbolName = "cloud.heavyrain.fill"
-        case 85, 86:
-            summary = AppLocalization.text("阵雪")
+        case 66, 67:
+            summary = AppLocalization.text("冻雨")
+            symbolName = "cloud.sleet.fill"
+        case 71:
+            summary = AppLocalization.text("小雪")
+            symbolName = "snowflake"
+        case 73:
+            summary = AppLocalization.text("中雪")
+            symbolName = "cloud.snow.fill"
+        case 75:
+            summary = AppLocalization.text("大雪")
+            symbolName = "cloud.snow.fill"
+        case 77:
+            summary = AppLocalization.text("雪粒")
+            symbolName = "snowflake"
+        case 80:
+            summary = AppLocalization.text("小阵雨")
+            symbolName = "cloud.drizzle.fill"
+        case 81:
+            summary = AppLocalization.text("阵雨")
+            symbolName = "cloud.rain.fill"
+        case 82:
+            summary = AppLocalization.text("强阵雨")
+            symbolName = "cloud.heavyrain.fill"
+        case 85:
+            summary = AppLocalization.text("小阵雪")
+            symbolName = "snowflake"
+        case 86:
+            summary = AppLocalization.text("强阵雪")
             symbolName = "cloud.snow.fill"
         case 95:
             summary = AppLocalization.text("雷阵雨")
             symbolName = "cloud.bolt.rain.fill"
+        case 97:
+            summary = AppLocalization.text("强雷阵雨")
+            symbolName = "cloud.bolt.rain.fill"
         case 96, 99:
             summary = AppLocalization.text("雷阵雨伴冰雹")
-            symbolName = "cloud.bolt.rain.fill"
+            symbolName = "cloud.hail.fill"
         default:
             summary = AppLocalization.text("天气未知")
             symbolName = "questionmark.circle"

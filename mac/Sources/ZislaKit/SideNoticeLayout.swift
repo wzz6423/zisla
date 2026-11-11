@@ -101,7 +101,7 @@ public enum CompactStatusVisibilityPolicy {
         }
         let hasFocusMode = notices.contains { $0.id.hasPrefix("focus-mode-") }
         let hasVoiceProcessing = notices.contains { $0.id.hasPrefix("voice-processing-") }
-        return hasVoiceProcessing
+        return hasVoiceProcessing || notices.contains { $0.id.hasPrefix("scenario-review-") }
             || (hasActivity && activityDuration == .always)
             || (hasFocusMode && focusDuration == .always)
     }
@@ -203,6 +203,14 @@ public struct SideNoticeLayoutEngine: Equatable, Sendable {
 
     public init() {}
 
+    public static func transientNotice(for notices: [IslandNotice]) -> IslandNotice? {
+        notices.filter {
+            $0.id.hasPrefix("focus-transition") || $0.style == .headphone
+                || LowBatteryNoticeController.isLowBatteryNotice($0)
+        }.max { $0.createdAt < $1.createdAt }
+            ?? notices.first { $0.id.hasPrefix("scenario-review-") }
+    }
+
     /// Focus transitions and battery warnings are time-sensitive events, so they take precedence over the
     /// user's normal collapsed-status ordering until the transient notice expires.
     public static func selectedCompactStatusPriority(
@@ -212,6 +220,7 @@ public struct SideNoticeLayoutEngine: Equatable, Sendable {
     ) -> CompactStatusPriority? {
         if notices.contains(where: {
             $0.id.hasPrefix("focus-transition") || LowBatteryNoticeController.isLowBatteryNotice($0)
+                || $0.id.hasPrefix("scenario-review-")
         }) {
             return .transient
         }
@@ -623,12 +632,7 @@ public struct SideNoticeLayoutEngine: Equatable, Sendable {
         default:
             false
         }
-        let displayedTransientNotice = notices
-            .filter {
-                $0.id.hasPrefix("focus-transition") || $0.style == .headphone
-                    || LowBatteryNoticeController.isLowBatteryNotice($0)
-            }
-            .max { $0.createdAt < $1.createdAt }
+        let displayedTransientNotice = Self.transientNotice(for: notices)
         let displaysHeadphone = selectedPriority == .transient
             && displayedTransientNotice?.style == .headphone
         let displaysAccessoryBattery = displayedTransientNotice.map {
@@ -694,12 +698,7 @@ public struct SideNoticeLayoutEngine: Equatable, Sendable {
     private func compactPillPresentation(
         for selectedPriority: CompactStatusPriority, notices: [IslandNotice], settings: FeatureSettings
     ) -> CompactPillStatusPresentation? {
-        let displayedTransientNotice = notices
-            .filter {
-                $0.id.hasPrefix("focus-transition") || $0.style == .headphone
-                    || LowBatteryNoticeController.isLowBatteryNotice($0)
-            }
-            .max { $0.createdAt < $1.createdAt }
+        let displayedTransientNotice = Self.transientNotice(for: notices)
         let selectedNotice: IslandNotice? = switch selectedPriority {
         case .transient: displayedTransientNotice
         case .updateAvailable: notices.first { $0.id.hasPrefix("update-available-") }
@@ -736,7 +735,9 @@ public struct SideNoticeLayoutEngine: Equatable, Sendable {
                 battery.level.map { "\(battery.label) \($0)%" }
             }.joined(separator: " ") ?? ""
             let detail = batteries.isEmpty ? selectedNotice?.detail ?? "" : batteries
-            text = selectedNotice?.style == .headphone
+            text = selectedNotice?.id.hasPrefix("scenario-review-") == true
+                ? selectedNotice?.title ?? ""
+                : selectedNotice?.style == .headphone
                 ? [selectedNotice?.title ?? "", detail].filter { !$0.isEmpty }.joined(separator: " ")
                 : detail
         default:

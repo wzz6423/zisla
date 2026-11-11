@@ -1,6 +1,7 @@
 import AppKit
 import Carbon.HIToolbox
 import CoreImage
+import ImageIO
 import SwiftUI
 import UniformTypeIdentifiers
 import Vision
@@ -1674,6 +1675,7 @@ final class ScreenshotEditorModel: ObservableObject {
         var extractionMode: ScreenshotExtractionMode? = nil
         var extractionSource: ExtractionSource? = nil
         var extractionRegions: [[CGPoint]] = []
+        var sdrImage: NSImage? = nil
     }
 
     private struct ExtractionSource {
@@ -1682,6 +1684,7 @@ final class ScreenshotEditorModel: ObservableObject {
         var nextNumber: Int
         var pendingTextDraft: PendingTextDraft?
         var pendingAnnotationDraft: ScreenshotAnnotation?
+        var sdrImage: NSImage? = nil
     }
 
     @Published var image: NSImage {
@@ -1693,9 +1696,22 @@ final class ScreenshotEditorModel: ObservableObject {
             extractionRegions = []
             pendingExtractionRegion = []
             hasExtractedImage = false
+            sdrImage = nil
             cornerRadius = ScreenshotRoundedCornerGeometry.clampedRadius(cornerRadius, in: image.size)
             cornerRadiusAdjustmentHasUndoPoint = nil
         }
+    }
+    private(set) var sdrImage: NSImage?
+    @Published var preservesHDR = false {
+        didSet { refreshMosaicPreview() }
+    }
+    var hdrEnabled: Bool { preservesHDR && canPreserveHDR }
+    var canPreserveHDR: Bool {
+        image.cgImage(forProposedRect: nil, context: nil, hints: nil)
+            .map(ScreenshotImageRendering.isHDR) ?? false
+    }
+    var displayImage: NSImage {
+        sourceImage(preservingHDR: hdrEnabled)
     }
     @Published private(set) var mosaicPreviewImage: NSImage
     @Published private(set) var annotations: [ScreenshotAnnotation] = [] {
@@ -1735,7 +1751,13 @@ final class ScreenshotEditorModel: ObservableObject {
     }
     @Published private(set) var isLongCapturePreviewing = false
     @Published private(set) var hasLongCaptureResult = false
+    @Published var longCaptureAutoScroll = ScreenshotLongCaptureAutoScroll()
     @Published var longCaptureDirection = ScreenshotLongCaptureDirection.vertical
+    private(set) var lastLongCaptureFrameResult = ScreenshotLongCaptureFrameResult.rejected
+
+    var autoScrollPlacement: ScreenshotLongCapturePlacement {
+        lastLongCapturePlacement ?? .append
+    }
 
     /// Blur amount: the blur effect's own strength, or how far a mosaic's blocks refract.
     var obscureBlurStrength: CGFloat {
@@ -1787,9 +1809,20 @@ final class ScreenshotEditorModel: ObservableObject {
     /// silently drop a shape, number, or stroke when the image is exported.
     private(set) var pendingAnnotationDraft: ScreenshotAnnotation?
 
-    init(image: NSImage) {
+    init(image: NSImage, sdrImage: NSImage? = nil) {
         self.image = image
-        mosaicPreviewImage = image
+        self.sdrImage = sdrImage
+        mosaicPreviewImage = sdrImage ?? image
+    }
+
+    private func sourceImage(preservingHDR: Bool) -> NSImage {
+        if preservingHDR { return image }
+        if let sdrImage { return sdrImage }
+        guard let source = image.cgImage(forProposedRect: nil, context: nil, hints: nil),
+              ScreenshotImageRendering.isHDR(source),
+              let sdr = ScreenshotImageRendering.sdrImage(from: source)
+        else { return image }
+        return NSImage(cgImage: sdr, size: image.size)
     }
 
     func beginCornerRadiusAdjustment() {
@@ -1830,7 +1863,7 @@ final class ScreenshotEditorModel: ObservableObject {
             saveUndoPoint(previous)
             restore(Snapshot(
                 image: source.image, annotations: source.annotations, nextNumber: source.nextNumber,
-                hasExtractedImage: false, cornerRadius: cornerRadius
+                hasExtractedImage: false, cornerRadius: cornerRadius, sdrImage: source.sdrImage
             ))
             pendingTextDraft = source.pendingTextDraft
             pendingAnnotationDraft = source.pendingAnnotationDraft
@@ -1866,7 +1899,7 @@ final class ScreenshotEditorModel: ObservableObject {
                 }
                 guard extractionOperation === operation, !Task.isCancelled else { return }
                 // Export commits drafts, so render a copy until extraction has a successful result.
-                let rendered = renderModel.renderedImage()
+                let rendered = renderModel.renderedImage(preservingHDR: true)
                 guard let source = rendered.cgImage(forProposedRect: nil, context: nil, hints: nil) else {
                     statusMessage = AppLocalization.text("无法读取图片")
                     return
@@ -1921,7 +1954,8 @@ final class ScreenshotEditorModel: ObservableObject {
                         cornerRadius: cornerRadius,
                         extractionMode: previous.extractionMode,
                         extractionSource: previous.extractionSource,
-                        extractionRegions: previous.extractionRegions
+                        extractionRegions: previous.extractionRegions,
+                        sdrImage: previous.sdrImage
                     ))
                     pendingTextDraft = nil
                     pendingAnnotationDraft = nil
@@ -1931,7 +1965,7 @@ final class ScreenshotEditorModel: ObservableObject {
                     hasExtractedImage = true
                     extractionSource = ExtractionSource(
                         image: saved.image, annotations: saved.annotations, nextNumber: saved.nextNumber,
-                        pendingTextDraft: nil, pendingAnnotationDraft: nil
+                        pendingTextDraft: nil, pendingAnnotationDraft: nil, sdrImage: saved.sdrImage
                     )
                     extractionMode = mode
                     extractionRegions = operation.regions
@@ -1974,7 +2008,7 @@ final class ScreenshotEditorModel: ObservableObject {
         guard var source = extractionSource else {
             return ExtractionSource(
                 image: image, annotations: annotations, nextNumber: nextNumber,
-                pendingTextDraft: pendingTextDraft, pendingAnnotationDraft: pendingAnnotationDraft
+                pendingTextDraft: pendingTextDraft, pendingAnnotationDraft: pendingAnnotationDraft, sdrImage: sdrImage
             )
         }
         source.annotations += annotations
@@ -1985,7 +2019,7 @@ final class ScreenshotEditorModel: ObservableObject {
     }
 
     private func extractionRenderModel(_ source: ExtractionSource) -> ScreenshotEditorModel {
-        let model = ScreenshotEditorModel(image: source.image)
+        let model = ScreenshotEditorModel(image: source.image, sdrImage: source.sdrImage)
         model.annotations = source.annotations
         model.nextNumber = source.nextNumber
         model.pendingTextDraft = source.pendingTextDraft
@@ -2274,10 +2308,12 @@ final class ScreenshotEditorModel: ObservableObject {
 
     func replaceCapture(
         with newImage: NSImage,
-        translatingAnnotationsBy translation: CGSize
+        translatingAnnotationsBy translation: CGSize,
+        sdrImage: NSImage? = nil
     ) {
         pendingAnnotationDraft = nil
         image = newImage
+        self.sdrImage = sdrImage
         annotations = Self.translated(annotations, by: translation)
         undoStack = undoStack.map { snapshot in
             Snapshot(
@@ -2285,7 +2321,8 @@ final class ScreenshotEditorModel: ObservableObject {
                 annotations: Self.translated(snapshot.annotations, by: translation),
                 nextNumber: snapshot.nextNumber,
                 hasExtractedImage: false,
-                cornerRadius: ScreenshotRoundedCornerGeometry.clampedRadius(snapshot.cornerRadius, in: newImage.size)
+                cornerRadius: ScreenshotRoundedCornerGeometry.clampedRadius(snapshot.cornerRadius, in: newImage.size),
+                sdrImage: sdrImage
             )
         }
         redoStack = redoStack.map { snapshot in
@@ -2294,7 +2331,8 @@ final class ScreenshotEditorModel: ObservableObject {
                 annotations: Self.translated(snapshot.annotations, by: translation),
                 nextNumber: snapshot.nextNumber,
                 hasExtractedImage: false,
-                cornerRadius: ScreenshotRoundedCornerGeometry.clampedRadius(snapshot.cornerRadius, in: newImage.size)
+                cornerRadius: ScreenshotRoundedCornerGeometry.clampedRadius(snapshot.cornerRadius, in: newImage.size),
+                sdrImage: sdrImage
             )
         }
         refreshMosaicPreview()
@@ -2325,6 +2363,7 @@ final class ScreenshotEditorModel: ObservableObject {
         image nextImage: NSImage,
         direction: ScreenshotLongCaptureDirection = .vertical
     ) -> Bool {
+        lastLongCaptureFrameResult = .rejected
         let previous = lastLongCaptureFrame?.cgImage(forProposedRect: nil, context: nil, hints: nil)
         let next = nextImage.cgImage(forProposedRect: nil, context: nil, hints: nil)
         let isVisuallyUnchanged: Bool = {
@@ -2351,6 +2390,7 @@ final class ScreenshotEditorModel: ObservableObject {
             else {
                 // Keep `lastLongCaptureFrame` where the composite already ends. Measuring a skipped
                 // repaint against a later frame would apply an overlap to the wrong pixels.
+                lastLongCaptureFrameResult = .unchanged
                 statusMessage = AppLocalization.text("等待页面滚动")
                 return false
             }
@@ -2402,12 +2442,14 @@ final class ScreenshotEditorModel: ObservableObject {
             }
         }
         refreshMosaicPreview()
+        lastLongCaptureFrameResult = .appended
         statusMessage = AppLocalization.text("已追加一屏，继续点击长截图可继续拼接")
         return true
     }
 
     func beginLongCapturePreview() {
         cancelExtraction()
+        longCaptureAutoScroll = ScreenshotLongCaptureAutoScroll()
         isLongCapturePreviewing = true
         hasLongCaptureResult = false
         lastLongCaptureFrame = image
@@ -2416,6 +2458,7 @@ final class ScreenshotEditorModel: ObservableObject {
     }
 
     func completeLongCapturePreview() {
+        longCaptureAutoScroll.stop()
         isLongCapturePreviewing = false
         hasLongCaptureResult = true
         lastLongCaptureFrame = nil
@@ -2424,6 +2467,7 @@ final class ScreenshotEditorModel: ObservableObject {
     }
 
     func endLongCapturePreview() {
+        longCaptureAutoScroll.stop()
         isLongCapturePreviewing = false
         hasLongCaptureResult = false
         lastLongCaptureFrame = nil
@@ -2516,47 +2560,31 @@ final class ScreenshotEditorModel: ObservableObject {
         pendingAnnotationDraft = nil
     }
 
-    func renderedImage() -> NSImage {
+    func renderedImage(preservingHDR: Bool? = nil) -> NSImage {
         commitPendingTextDraft()
         commitPendingAnnotationDraft()
-        let renderedBase = imageApplyingMosaics()
+        let renderedBase = imageApplyingMosaics(adding: nil, preservingHDR: preservingHDR ?? preservesHDR)
         guard let base = renderedBase.cgImage(forProposedRect: nil, context: nil, hints: nil) else {
             return image
         }
 
         let pixelWidth = base.width
         let pixelHeight = base.height
-        guard let bitmap = NSBitmapImageRep(
-            bitmapDataPlanes: nil,
-            pixelsWide: pixelWidth,
-            pixelsHigh: pixelHeight,
-            bitsPerSample: 8,
-            samplesPerPixel: 4,
-            hasAlpha: true,
-            isPlanar: false,
-            colorSpaceName: .deviceRGB,
-            bitmapFormat: [],
-            bytesPerRow: 0,
-            bitsPerPixel: 0
+        guard let context = ScreenshotImageRendering.bitmapContext(
+            width: pixelWidth, height: pixelHeight, matching: base
         ) else {
             return image
         }
-        bitmap.size = image.size
-        guard let graphicsContext = NSGraphicsContext(bitmapImageRep: bitmap) else { return image }
+        let graphicsContext = NSGraphicsContext(cgContext: context, flipped: false)
 
         NSGraphicsContext.saveGraphicsState()
         NSGraphicsContext.current = graphicsContext
-        renderedBase.draw(
-            in: NSRect(origin: .zero, size: image.size),
-            from: .zero,
-            operation: .copy,
-            fraction: 1
-        )
+        context.scaleBy(x: CGFloat(pixelWidth) / image.size.width, y: CGFloat(pixelHeight) / image.size.height)
+        context.draw(base, in: CGRect(origin: .zero, size: image.size))
         for annotation in annotations where annotation.kind != .mosaic {
             draw(annotation, in: image.size)
         }
         let bounds = CGRect(origin: .zero, size: image.size)
-        let context = graphicsContext.cgContext
         context.addRect(bounds)
         context.addPath(CGPath(roundedRect: bounds, cornerWidth: cornerRadius, cornerHeight: cornerRadius, transform: nil))
         context.clip(using: .evenOdd)
@@ -2564,13 +2592,30 @@ final class ScreenshotEditorModel: ObservableObject {
         graphicsContext.flushGraphics()
         NSGraphicsContext.restoreGraphicsState()
 
-        let output = NSImage(size: image.size)
-        output.addRepresentation(bitmap)
-        return output
+        guard let rendered = context.makeImage(),
+              let output = ScreenshotImageRendering.preservingHeadroom(rendered, from: base)
+        else { return image }
+        return NSImage(cgImage: output, size: image.size)
     }
 
     func pngData() -> Data? {
         let rendered = renderedImage()
+        if preservesHDR, canPreserveHDR {
+            guard let source = rendered.cgImage(forProposedRect: nil, context: nil, hints: nil),
+                  let encoded = Self.ciContext.createCGImage(
+                    CIImage(cgImage: source),
+                    from: CGRect(x: 0, y: 0, width: source.width, height: source.height),
+                    format: .RGBA16, colorSpace: CGColorSpace(name: CGColorSpace.itur_2100_PQ)!
+                  )
+            else { return nil }
+            // PNG cannot store extended floating-point samples. PQ preserves HDR in its integer range.
+            let data = NSMutableData()
+            guard let destination = CGImageDestinationCreateWithData(data, UTType.png.identifier as CFString, 1, nil)
+            else { return nil }
+            CGImageDestinationAddImage(destination, encoded, nil)
+            guard CGImageDestinationFinalize(destination) else { return nil }
+            return data as Data
+        }
         guard let representation = rendered.representations
             .compactMap({ $0 as? NSBitmapImageRep })
             .first ?? NSBitmapImageRep(data: rendered.tiffRepresentation ?? Data())
@@ -2582,7 +2627,8 @@ final class ScreenshotEditorModel: ObservableObject {
         imageApplyingMosaics(adding: nil)
     }
 
-    func imageApplyingMosaics(adding draft: ScreenshotAnnotation?) -> NSImage {
+    func imageApplyingMosaics(adding draft: ScreenshotAnnotation?, preservingHDR: Bool? = nil) -> NSImage {
+        let image = sourceImage(preservingHDR: preservingHDR ?? preservesHDR)
         var obscures = annotations.filter { $0.kind == .mosaic }
         if let draft, draft.kind == .mosaic {
             // A draft carrying an existing id is an in-flight edit of that region, so it replaces the
@@ -2670,7 +2716,7 @@ final class ScreenshotEditorModel: ObservableObject {
             }
         }
 
-        guard let result = Self.ciContext.createCGImage(output, from: extent) else { return image }
+        guard let result = ScreenshotImageRendering.render(output, matching: source, context: Self.ciContext) else { return image }
         return NSImage(cgImage: result, size: image.size)
     }
 
@@ -2776,12 +2822,14 @@ final class ScreenshotEditorModel: ObservableObject {
             cornerRadius: cornerRadius,
             extractionMode: extractionMode,
             extractionSource: extractionSource,
-            extractionRegions: extractionRegions
+            extractionRegions: extractionRegions,
+            sdrImage: sdrImage
         )
     }
 
     private func restore(_ snapshot: Snapshot) {
         image = snapshot.image
+        sdrImage = snapshot.sdrImage
         annotations = snapshot.annotations
         nextNumber = snapshot.nextNumber
         hasExtractedImage = snapshot.hasExtractedImage
@@ -3004,18 +3052,14 @@ final class ScreenshotEditorModel: ObservableObject {
                     ? min(firstCGImage.height, secondCGImage.height)
                     : min(firstCGImage.width, secondCGImage.width)
             )
-            if let output = CGContext(
-                data: nil,
+            if let output = ScreenshotImageRendering.bitmapContext(
                 width: direction == .vertical
                     ? max(firstCGImage.width, secondCGImage.width)
                     : firstCGImage.width + secondCGImage.width - overlap,
                 height: direction == .vertical
                     ? firstCGImage.height + secondCGImage.height - overlap
                     : max(firstCGImage.height, secondCGImage.height),
-                bitsPerComponent: 8,
-                bytesPerRow: 0,
-                space: CGColorSpaceCreateDeviceRGB(),
-                bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue
+                matching: ScreenshotImageRendering.isHDR(firstCGImage) ? firstCGImage : secondCGImage
             ) {
                 output.interpolationQuality = .none
                 output.setFillColor(NSColor.white.cgColor)
@@ -3108,8 +3152,10 @@ final class ScreenshotEditorModel: ObservableObject {
                         )
                     }
                 }
-                if let combined = output.makeImage() {
-                    return NSImage(cgImage: combined, size: size)
+                if let combined = output.makeImage(),
+                   let preserved = ScreenshotImageRendering.preservingHeadroom(combined,
+                       from: ScreenshotImageRendering.isHDR(firstCGImage) ? firstCGImage : secondCGImage) {
+                    return NSImage(cgImage: preserved, size: size)
                 }
             }
         }
@@ -4573,6 +4619,7 @@ struct ScreenshotEditorOverlayConfiguration {
     let backgroundImage: NSImage
     let initialSelection: CGRect
     let cropImage: (CGRect) -> NSImage?
+    var cropSDRImage: ((CGRect) -> NSImage?)? = nil
 }
 
 private struct ScreenshotOutlinedText: NSViewRepresentable {
@@ -4989,6 +5036,7 @@ struct ScreenshotEditorView: View {
 
     private var toolbarControlCount: Int {
         17
+            + (model.canPreserveHDR ? 1 : 0)
             + (model.canUndo ? 1 : 0)
             + (model.canRedo ? 1 : 0)
             + (model.isLongCapturePreviewing ? 2 : 0)
@@ -5243,7 +5291,7 @@ struct ScreenshotEditorView: View {
                     }
                     .allowsHitTesting(false)
 
-                canvas(showsImage: model.hasLongCaptureResult || model.hasExtractedImage)
+                canvas(showsImage: model.hdrEnabled || model.hasLongCaptureResult || model.hasExtractedImage)
                     .frame(width: selectionRect.width, height: selectionRect.height)
                     .position(selectionRect.center)
                     .clipped()
@@ -5330,9 +5378,7 @@ struct ScreenshotEditorView: View {
                         ScreenshotTransparencyBackground()
                     }
                     if showsImage || model.annotations.contains(where: { $0.kind == .mosaic }) || mosaicDraft != nil {
-                        Image(nsImage: previewImage)
-                            .resizable()
-                            .interpolation(.high)
+                        ScreenshotBackingImage(image: previewImage, preservesHDR: model.hdrEnabled)
                             .frame(width: geometry.renderedSize.width, height: geometry.renderedSize.height)
                             .position(
                                 x: geometry.origin.x + geometry.renderedSize.width / 2,
@@ -5529,7 +5575,8 @@ struct ScreenshotEditorView: View {
             translatingAnnotationsBy: CGSize(
                 width: previous.minX - next.minX,
                 height: previous.minY - next.minY
-            )
+            ),
+            sdrImage: overlayConfiguration.cropSDRImage?(next)
         )
     }
 
@@ -6277,6 +6324,7 @@ struct ScreenshotEditorView: View {
                 obscureButton(popoverEdge: popoverEdge)
                 extractionButton(popoverEdge: popoverEdge)
                 cornerRadiusButton(popoverEdge: popoverEdge)
+                if model.canPreserveHDR { hdrButton }
                 if model.canUndo {
                     iconButton("arrow.uturn.backward", title: AppLocalization.text("撤销")) { model.undo() }
                 }
@@ -6285,8 +6333,13 @@ struct ScreenshotEditorView: View {
                 }
                 recognitionMenu
                 iconButton(
-                    model.isLongCapturePreviewing ? "arrow.clockwise" : "rectangle.on.rectangle",
-                    title: model.isLongCapturePreviewing ? AppLocalization.text("继续") : AppLocalization.text("长截图")
+                    model.isLongCapturePreviewing
+                        ? (model.longCaptureAutoScroll.isRunning ? "pause.fill" : "play.fill")
+                        : "rectangle.on.rectangle",
+                    title: model.isLongCapturePreviewing
+                        ? (model.longCaptureAutoScroll.isRunning
+                            ? AppLocalization.text("暂停滚动") : AppLocalization.text("自动滚动"))
+                        : AppLocalization.text("长截图")
                 ) { onLongCapture() }
                 if model.isLongCapturePreviewing {
                     longCaptureDirectionMenu
@@ -6378,6 +6431,7 @@ struct ScreenshotEditorView: View {
             )
         }
         .menuStyle(.borderlessButton)
+        .disabled(model.longCaptureAutoScroll.isRunning)
         .help(AppLocalization.text("长截图方向"))
     }
 
@@ -6761,6 +6815,23 @@ struct ScreenshotEditorView: View {
             .frame(height: ScreenshotToolbarLayout.height)
             .onDisappear { model.endCornerRadiusAdjustment() }
         }
+    }
+
+    var hdrButton: some View {
+        Button {
+            commitInlineText()
+            model.preservesHDR.toggle()
+        } label: {
+            Text("HDR")
+                .font(.system(size: 11, weight: .semibold))
+                .frame(width: ScreenshotToolbarLayout.controlWidth, height: ScreenshotToolbarLayout.controlHeight)
+                .background { toolbarSelectionBackground(isSelected: model.preservesHDR, cornerRadius: 6) }
+                .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .help(AppLocalization.text("保留 HDR"))
+        .accessibilityLabel(AppLocalization.text("保留 HDR"))
+        .accessibilityValue(AppLocalization.text(model.preservesHDR ? "已开启" : "已关闭"))
     }
 
     private var recognitionMenu: some View {
@@ -7280,11 +7351,8 @@ struct ScreenshotPinnedImageView: View {
         )
         VStack(spacing: toolbarVisible ? ScreenshotPinnedLayout.verticalSpacing : 0) {
             ZStack {
-                Image(nsImage: image)
-                    .resizable()
-                    .interpolation(.high)
+                ScreenshotBackingImage(image: image, preservesHDR: true, opacity: imageOpacity)
                     .frame(width: imageSize.width, height: imageSize.height)
-                    .opacity(Double(imageOpacity))
                     .allowsHitTesting(false)
 
                 ScreenshotPointerInteractionView(
@@ -7581,21 +7649,27 @@ private struct ScreenshotLongCaptureRangeView: View {
     }
 }
 
-private struct ScreenshotLongCapturePreviewView: View {
+struct ScreenshotLongCapturePreviewView: View {
     @ObservedObject var model: ScreenshotEditorModel
 
     var body: some View {
-        Image(nsImage: model.image)
-            .resizable()
-            .interpolation(.high)
-            .scaledToFit()
-            .padding(6)
-            .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 6))
-            .overlay {
-                RoundedRectangle(cornerRadius: 6)
-                    .stroke(Color.white.opacity(0.35), lineWidth: 1)
+        VStack(spacing: 6) {
+            ScreenshotBackingImage(image: model.displayImage, preservesHDR: model.hdrEnabled)
+                .aspectRatio(model.displayImage.size.width / model.displayImage.size.height, contentMode: .fit)
+                .accessibilityHidden(true)
+            if let message = model.statusMessage {
+                Text(message)
+                    .font(.system(size: 11))
+                    .multilineTextAlignment(.center)
+                    .fixedSize(horizontal: false, vertical: true)
             }
-            .accessibilityHidden(true)
+        }
+        .padding(6)
+        .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 6))
+        .overlay {
+            RoundedRectangle(cornerRadius: 6)
+                .stroke(Color.white.opacity(0.35), lineWidth: 1)
+        }
     }
 }
 
@@ -7802,6 +7876,7 @@ enum ScreenshotHotkeyContext {
 final class ScreenshotEditorWindowController: NSWindowController, NSWindowDelegate {
     /// Presents the PNG save panel; `nil` in the status callback means the panel closed without writing a file.
     typealias PresentSavePanel = @MainActor (Data, @escaping @MainActor (String?) -> Void) -> Void
+    typealias CaptureScreen = @MainActor (NSScreen, Bool) async throws -> (image: NSImage, cgImage: CGImage, hdrCGImage: CGImage?)
 
     private let model: ScreenshotEditorModel
     private let annotationSelectionState: ScreenshotAnnotationSelectionState
@@ -7814,8 +7889,9 @@ final class ScreenshotEditorWindowController: NSWindowController, NSWindowDelega
     private var currentDisplayID: CGDirectDisplayID?
     private let screenImage: NSImage
     private let screenCGImage: CGImage
+    private let hdrScreenCGImage: CGImage?
     private var captureRect: CGRect
-    private weak var capturedApplication: NSRunningApplication?
+    private let capturedApplication: NSRunningApplication?
     private let sourceSnapshot: ScreenshotSourceSnapshot
     private let initialCaptureRect: CGRect
     private let capturedScreenFrame: CGRect?
@@ -7823,6 +7899,10 @@ final class ScreenshotEditorWindowController: NSWindowController, NSWindowDelega
     private let onStash: (Data, ShelfScreenshotMetadata) throws -> Void
     private let writeImageToPasteboard: (Data) -> Bool
     private let presentSavePanel: PresentSavePanel
+    private let captureScreen: CaptureScreen
+    private let scheduleLongCaptureWork: @MainActor (TimeInterval, DispatchWorkItem) -> Void
+    private let hasLongCaptureInputAccess: @MainActor () -> Bool
+    private let postLongCaptureEvent: @MainActor (CGEvent, pid_t) -> Bool
     private var isLongCaptureInProgress = false
     private var longCaptureSessionID = 0
     #if DEBUG
@@ -7878,6 +7958,7 @@ final class ScreenshotEditorWindowController: NSWindowController, NSWindowDelega
         image: NSImage,
         screenImage: NSImage,
         screenCGImage: CGImage,
+        hdrScreenCGImage: CGImage? = nil,
         screen: NSScreen?,
         captureRect: CGRect,
         capturedApplication: NSRunningApplication?,
@@ -7892,14 +7973,32 @@ final class ScreenshotEditorWindowController: NSWindowController, NSWindowDelega
         presentSavePanel: @escaping PresentSavePanel = { data, status in
             ScreenshotImageExport.presentSavePanel(for: data, status: status)
         },
+        captureScreen: @escaping CaptureScreen = { screen, includeHDR in
+            try await ScreenshotCaptureService.capture(
+                screen: screen,
+                excludingApplicationWithProcessIdentifier: ProcessInfo.processInfo.processIdentifier,
+                includeHDR: includeHDR
+            )
+        },
+        scheduleLongCaptureWork: @escaping @MainActor (TimeInterval, DispatchWorkItem) -> Void = { delay, work in
+            DispatchQueue.main.asyncAfter(deadline: .now() + delay, execute: work)
+        },
+        hasLongCaptureInputAccess: @escaping @MainActor () -> Bool = AccessibilityPermission.promptIfNeeded,
+        postLongCaptureEvent: @escaping @MainActor (CGEvent, pid_t) -> Bool = {
+            ScreenshotLongCaptureAutoScroll.post($0, to: $1)
+        },
         onClose: @escaping () -> Void,
         pinnedToolbarVisible: Bool = true
     ) {
-        model = ScreenshotEditorModel(image: image)
+        let hdrImage = hdrScreenCGImage.flatMap {
+            ScreenshotCaptureService.image(from: $0, cropInScreenPoints: captureRect, screenSize: screenImage.size)
+        }
+        model = ScreenshotEditorModel(image: hdrImage ?? image, sdrImage: hdrImage == nil ? nil : image)
         annotationSelectionState = ScreenshotAnnotationSelectionState()
         shortcutSettings = settingsStore
         self.screenImage = screenImage
         self.screenCGImage = screenCGImage
+        self.hdrScreenCGImage = hdrScreenCGImage
         currentScreen = screen
         currentDisplayID = screen.flatMap(ScreenshotCaptureService.displayID(for:))
         self.captureRect = captureRect
@@ -7915,6 +8014,10 @@ final class ScreenshotEditorWindowController: NSWindowController, NSWindowDelega
         self.onStash = onStash
         self.writeImageToPasteboard = writeImageToPasteboard
         self.presentSavePanel = presentSavePanel
+        self.captureScreen = captureScreen
+        self.scheduleLongCaptureWork = scheduleLongCaptureWork
+        self.hasLongCaptureInputAccess = hasLongCaptureInputAccess
+        self.postLongCaptureEvent = postLongCaptureEvent
         self.pinnedToolbarVisible = pinnedToolbarVisible
         onCloseHandler = onClose
         let overlayFrame = screen?.frame ?? CGRect(origin: .zero, size: screenImage.size)
@@ -8059,6 +8162,9 @@ final class ScreenshotEditorWindowController: NSWindowController, NSWindowDelega
 
     func setPinned(_ pinned: Bool) {
         model.commitPendingTextDraft()
+        if pinned && model.isLongCapturePreviewing {
+            invalidateLongCaptureSession(preservingLongCaptureResult: true)
+        }
         model.isPinned = pinned
         if pinned {
             switchToPinnedImagePresentation()
@@ -8085,7 +8191,12 @@ final class ScreenshotEditorWindowController: NSWindowController, NSWindowDelega
                     overlayConfiguration: ScreenshotEditorOverlayConfiguration(
                         backgroundImage: screenImage,
                         initialSelection: captureRect,
-                        cropImage: { [weak self] rect in self?.updateCaptureRect(rect) }
+                        cropImage: { [weak self] rect in self?.updateCaptureRect(rect) },
+                        cropSDRImage: { [weak self] rect in
+                            guard let self else { return nil }
+                            return ScreenshotCaptureService.image(from: screenCGImage, cropInScreenPoints: rect,
+                                screenSize: screenImage.size)
+                        }
                     ),
                     onClose: { [weak self] in self?.close() },
                     onCopy: { [weak self] in self?.quickPasteAndClose() },
@@ -8294,7 +8405,7 @@ final class ScreenshotEditorWindowController: NSWindowController, NSWindowDelega
         let bounds = CGRect(origin: .zero, size: screenSize)
         let normalized = rect.standardized.intersection(bounds)
         guard let image = ScreenshotCaptureService.image(
-            from: screenCGImage,
+            from: hdrScreenCGImage ?? screenCGImage,
             cropInScreenPoints: normalized,
             screenSize: screenSize
         ) else { return nil }
@@ -8304,6 +8415,7 @@ final class ScreenshotEditorWindowController: NSWindowController, NSWindowDelega
 
     /// Shared by the toolbar's save button and ⌘S in both the editor and the pinned image.
     private func saveImage() {
+        model.longCaptureAutoScroll.stop()
         model.commitPendingTextDraft()
         guard let data = model.pngData() else {
             model.statusMessage = AppLocalization.text("图片生成失败")
@@ -8397,18 +8509,22 @@ final class ScreenshotEditorWindowController: NSWindowController, NSWindowDelega
         window?.ignoresMouseEvents = false
     }
 
-    private func finishLongCapture() {
+    func finishLongCapture() {
         guard !isClosed else { return }
         guard model.isLongCapturePreviewing || isLongCaptureInProgress else { return }
         guard let screen = activeScreen else {
             completeLongCapture()
             return
         }
+        model.longCaptureAutoScroll.stop()
         longCaptureCaptureWorkItem?.cancel()
         longCaptureCaptureWorkItem = nil
         shouldFinishLongCaptureAfterCurrentFrame = true
         if !isLongCaptureCaptureInFlight {
-            captureLongCaptureScreen(on: screen, sessionID: longCaptureSessionID)
+            scheduleLongCapture(
+                screen: screen, sessionID: longCaptureSessionID,
+                after: ScreenshotLongCaptureAutoScroll.settleDelay
+            )
         }
     }
 
@@ -8425,7 +8541,7 @@ final class ScreenshotEditorWindowController: NSWindowController, NSWindowDelega
             return
         }
         if isLongCaptureInProgress {
-            scheduleLongCapture(screen: screen, sessionID: longCaptureSessionID, after: 0.25)
+            toggleLongCaptureAutoScroll(on: screen)
             return
         }
         let isContinuing = model.isLongCapturePreviewing
@@ -8440,7 +8556,7 @@ final class ScreenshotEditorWindowController: NSWindowController, NSWindowDelega
         longCaptureSessionID += 1
         let sessionID = longCaptureSessionID
         model.statusMessage = AppLocalization.text("请滚动页面，停止后自动拼接")
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.35) { [weak self] in
+        let showOverlays = DispatchWorkItem { [weak self] in
             guard let self,
                   !self.isClosed,
                   self.longCaptureSessionID == sessionID
@@ -8449,6 +8565,46 @@ final class ScreenshotEditorWindowController: NSWindowController, NSWindowDelega
             self.showLongCaptureRangeOverlay(on: screen)
             self.scheduleLongCapture(screen: screen, sessionID: sessionID, after: 0.35)
         }
+        scheduleLongCaptureWork(0.35, showOverlays)
+    }
+
+    private func toggleLongCaptureAutoScroll(on screen: NSScreen) {
+        guard !shouldFinishLongCaptureAfterCurrentFrame else { return }
+        if model.longCaptureAutoScroll.isRunning {
+            model.longCaptureAutoScroll.stop()
+            model.statusMessage = AppLocalization.text("自动滚动已暂停，可手动滚动或点击“完成”")
+            return
+        }
+        guard hasLongCaptureInputAccess() else {
+            model.statusMessage = AppLocalization.text("自动滚动需要在系统设置中允许辅助功能")
+            return
+        }
+        model.longCaptureAutoScroll.start()
+        capturedApplication?.activate()
+        model.statusMessage = AppLocalization.text("正在自动滚动并拼接")
+        if !isLongCaptureCaptureInFlight {
+            scheduleLongCapture(
+                screen: screen, sessionID: longCaptureSessionID,
+                after: ScreenshotLongCaptureAutoScroll.settleDelay
+            )
+        }
+    }
+
+    private func scrollLongCapturePage(on screen: NSScreen) -> Bool {
+        guard let application = capturedApplication, !application.isTerminated,
+              let displayID = ScreenshotCaptureService.displayID(for: screen),
+              let event = ScreenshotLongCaptureAutoScroll.event(
+                  selection: captureRect,
+                  displayBounds: CGDisplayBounds(displayID),
+                  direction: model.longCaptureDirection,
+                  placement: model.autoScrollPlacement
+              ), postLongCaptureEvent(event, application.processIdentifier)
+        else {
+            model.longCaptureAutoScroll.scrollFailed()
+            model.statusMessage = AppLocalization.text("无法自动滚动，请手动滚动页面")
+            return false
+        }
+        return true
     }
 
     private func showLongCaptureRangeOverlay(on screen: NSScreen) {
@@ -8540,8 +8696,9 @@ final class ScreenshotEditorWindowController: NSWindowController, NSWindowDelega
         )
     }
 
-    private func longCaptureToolbarFrame(on screen: NSScreen) -> CGRect {
+    func longCaptureToolbarFrame(on screen: NSScreen) -> CGRect {
         let controlCount = ScreenshotToolbarLayout.controlCount
+            + (model.canPreserveHDR ? 1 : 0)
             + (model.canUndo ? 1 : 0)
             + (model.canRedo ? 1 : 0)
         let visibleFrame = screen.visibleFrame.insetBy(dx: 12, dy: 12)
@@ -8664,34 +8821,32 @@ final class ScreenshotEditorWindowController: NSWindowController, NSWindowDelega
             }
         }
         longCaptureCaptureWorkItem = workItem
-        DispatchQueue.main.asyncAfter(deadline: .now() + delay, execute: workItem)
+        scheduleLongCaptureWork(delay, workItem)
     }
 
-    private func captureLongCaptureScreen(on screen: NSScreen, sessionID: Int) {
+    @discardableResult
+    func captureLongCaptureScreen(on screen: NSScreen, sessionID: Int) -> Task<Void, Never>? {
         guard !isClosed,
               longCaptureSessionID == sessionID,
               model.isLongCapturePreviewing,
               !isLongCaptureCaptureInFlight
-        else { return }
+        else { return nil }
         longCaptureCaptureWorkItem = nil
         isLongCaptureCaptureInFlight = true
-        Task { @MainActor [weak self] in
+        return Task { @MainActor [weak self] in
             guard let self,
                   !self.isClosed,
                   self.longCaptureSessionID == sessionID,
                   self.model.isLongCapturePreviewing
             else { return }
             do {
-                let capture = try await ScreenshotCaptureService.capture(
-                    screen: screen,
-                    excludingApplicationWithProcessIdentifier: ProcessInfo.processInfo.processIdentifier
-                )
+                let capture = try await self.captureScreen(screen, self.model.canPreserveHDR)
                 guard !self.isClosed,
                       self.longCaptureSessionID == sessionID,
                       self.model.isLongCapturePreviewing
                 else { return }
                 guard let nextImage = ScreenshotCaptureService.image(
-                    from: capture.cgImage,
+                    from: capture.hdrCGImage ?? capture.cgImage,
                     cropInScreenPoints: self.captureRect,
                     screenSize: screen.frame.size
                 ) else {
@@ -8701,6 +8856,7 @@ final class ScreenshotEditorWindowController: NSWindowController, NSWindowDelega
                     self.restoreEditorPresentation()
                     return
                 }
+                let previousStatus = self.model.statusMessage
                 let didAppend = self.model.append(
                     image: nextImage,
                     direction: self.model.longCaptureDirection
@@ -8723,12 +8879,33 @@ final class ScreenshotEditorWindowController: NSWindowController, NSWindowDelega
                 if self.shouldFinishLongCaptureAfterCurrentFrame {
                     self.completeLongCapture()
                 } else {
-                    self.model.statusMessage = didAppend
-                        ? AppLocalization.text("已自动拼接，继续滚动或点击“完成”")
-                        : AppLocalization.text("长截图采集中，请滚动页面")
-                    self.scheduleLongCapture(screen: screen, sessionID: sessionID, after: 0.35)
+                    let step = self.model.longCaptureAutoScroll.nextStep(
+                        after: self.model.lastLongCaptureFrameResult
+                    )
+                    switch step {
+                    case .scroll:
+                        if self.scrollLongCapturePage(on: screen) {
+                            self.model.statusMessage = AppLocalization.text("正在自动滚动并拼接")
+                        }
+                    case .capture:
+                        self.model.statusMessage = AppLocalization.text("正在自动滚动并拼接")
+                    case .pause:
+                        self.model.statusMessage = AppLocalization.text("自动滚动已暂停，可手动滚动或点击“完成”")
+                    case .none:
+                        self.model.statusMessage = didAppend
+                            ? AppLocalization.text("已自动拼接，继续滚动或点击“完成”")
+                            : previousStatus
+                    }
+                    self.scheduleLongCapture(
+                        screen: screen, sessionID: sessionID,
+                        after: step == .none ? 0.35 : ScreenshotLongCaptureAutoScroll.settleDelay
+                    )
                 }
             } catch {
+                guard !self.isClosed,
+                      self.longCaptureSessionID == sessionID,
+                      self.model.isLongCapturePreviewing
+                else { return }
                 self.isLongCaptureCaptureInFlight = false
                 self.model.statusMessage = (error as? LocalizedError)?.errorDescription
                     ?? error.localizedDescription

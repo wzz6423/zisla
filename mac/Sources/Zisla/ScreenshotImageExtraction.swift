@@ -114,7 +114,7 @@ enum ScreenshotImageExtraction {
         filter.backgroundImage = CIImage(color: .clear).cropped(to: source.extent)
         filter.maskImage = CIImage(cgImage: mask)
         guard let output = filter.outputImage,
-              let extracted = CIContext().createCGImage(output, from: source.extent)
+              let extracted = ScreenshotImageRendering.render(output, matching: image, context: CIContext())
         else { throw ScreenshotExtractionError.renderingFailed }
         try checkCancellation()
         return extracted
