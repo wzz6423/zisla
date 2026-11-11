@@ -856,20 +856,15 @@ struct SettingsView: View {
                             settingRow(symbol: "macwindow.badge.plus", title: "系统打不开应用时提醒",
                                        detail: "需要辅助功能权限；通过系统窗口事件提醒，不定时扫描",
                                        detailLineLimit: 2, isNested: true) {
-                                Toggle("", isOn: Binding(
-                                    get: { model.settingsStore.settings.applicationOpenFailureMonitoringEnabled },
-                                    set: { enabled in
-                                        model.settingsStore.settings.applicationOpenFailureMonitoringEnabled = enabled
-                                        if enabled {
-                                            model.refreshAssistantAccessibility()
-                                            if !model.assistantAccessibilityGranted {
-                                                selectSettingsSection(.permissions, searchTarget: .row(OnboardingPermissionID.accessibility.titleKey))
-                                            }
-                                        }
+                                Self.applicationOpenFailureMonitoringToggle(settings: Binding(
+                                    get: { model.settingsStore.settings },
+                                    set: { model.settingsStore.settings = $0 }
+                                )) {
+                                    model.refreshAssistantAccessibility()
+                                    if !model.assistantAccessibilityGranted {
+                                        selectSettingsSection(.permissions, searchTarget: .row(OnboardingPermissionID.accessibility.titleKey))
                                     }
-                                ))
-                                .labelsHidden()
-                                .toggleStyle(.switch)
+                                }
                             }
                             if model.settingsStore.settings.applicationOpenFailureMonitoringEnabled, !model.assistantAccessibilityGranted {
                                 rowDivider
@@ -3334,6 +3329,21 @@ struct SettingsView: View {
         case .image: "图片"
         case .file: "文件"
         }
+    }
+
+    static func applicationOpenFailureMonitoringToggle(
+        settings: Binding<FeatureSettings>, onEnable: @escaping () -> Void
+    ) -> some View {
+        Toggle("", isOn: Binding(
+            get: { settings.wrappedValue.applicationOpenFailureMonitoringEnabled },
+            set: { enabled in
+                settings.wrappedValue.applicationOpenFailureMonitoringEnabled = enabled
+                if enabled { onEnable() }
+            }
+        ))
+        .labelsHidden()
+        .toggleStyle(.switch)
+        .disabled(!settings.wrappedValue.applicationOpenRepairEnabled)
     }
 
     /// Instructions keep a usage heading; other single groups inherit their recognition-row title.

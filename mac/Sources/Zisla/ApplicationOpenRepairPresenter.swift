@@ -27,9 +27,7 @@ final class ApplicationOpenRepairPresenter {
         cancel()
         requiresSystemMonitoring = fromSystemAlert
         let settings = settings()
-        guard settings.clipboardAssistantEnabled,
-              !fromSystemAlert || settings.applicationOpenFailureMonitoringEnabled,
-              settings.clipboardAssistantEnabledKinds.isEmpty || settings.clipboardAssistantEnabledKinds.contains(.appCannotOpen) else { return }
+        guard fromSystemAlert ? settings.applicationOpenFailureMonitoringActive : settings.applicationOpenRepairEnabled else { return }
         task = Task { [weak self] in
             let inspection = Task.detached(priority: .userInitiated) {
                 urls.lazy.compactMap { url -> ClipboardAssistantDetection? in
@@ -59,9 +57,7 @@ final class ApplicationOpenRepairPresenter {
 
     func flush() {
         let settings = settings()
-        guard settings.clipboardAssistantEnabled,
-              !requiresSystemMonitoring || settings.applicationOpenFailureMonitoringEnabled,
-              settings.clipboardAssistantEnabledKinds.isEmpty || settings.clipboardAssistantEnabledKinds.contains(.appCannotOpen) else {
+        guard requiresSystemMonitoring ? settings.applicationOpenFailureMonitoringActive : settings.applicationOpenRepairEnabled else {
             cancel()
             return
         }

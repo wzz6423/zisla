@@ -3,6 +3,24 @@ import Testing
 import ZislaCore
 
 struct ApplicationOpenRepairSettingsTests {
+    @Test(arguments: [false, true], [false, true])
+    func repairAndMonitoringRespectTheRecognitionControls(assistantEnabled: Bool, monitoringEnabled: Bool) throws {
+        for kinds: Set<ClipboardAssistantKind> in [[], [.url], [.app], [.appCannotOpen], [.url, .appCannotOpen]] {
+            var settings = FeatureSettings.default
+            settings.clipboardAssistantEnabled = assistantEnabled
+            settings.applicationOpenFailureMonitoringEnabled = monitoringEnabled
+            settings.clipboardAssistantEnabledKinds = kinds
+            let kindEnabled = kinds.isEmpty || kinds.contains(.appCannotOpen)
+            #expect(settings.applicationOpenRepairEnabled == (assistantEnabled && kindEnabled))
+            #expect(settings.applicationOpenFailureMonitoringActive == (assistantEnabled && monitoringEnabled && kindEnabled))
+            let restored = try JSONDecoder().decode(FeatureSettings.self, from: JSONEncoder().encode(settings))
+            #expect(restored.applicationOpenRepairEnabled == settings.applicationOpenRepairEnabled)
+            #expect(restored.applicationOpenFailureMonitoringActive == settings.applicationOpenFailureMonitoringActive)
+            #expect(restored.applicationOpenFailureMonitoringEnabled == monitoringEnabled)
+            #expect(restored.clipboardAssistantEnabledKinds == kinds)
+        }
+    }
+
     @Test
     func systemFailureMonitoringDefaultsOffAndRoundTripsIndependently() throws {
         #expect(!FeatureSettings.default.applicationOpenFailureMonitoringEnabled)

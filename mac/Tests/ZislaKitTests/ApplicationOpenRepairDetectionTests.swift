@@ -1,6 +1,5 @@
 import Darwin
 import Foundation
-import os
 import Testing
 import ZislaCore
 @testable import ZislaKit
@@ -15,20 +14,27 @@ struct ApplicationOpenRepairDetectionTests {
         try FileManager.default.createDirectory(at: app, withIntermediateDirectories: true)
         let marker = Data("test".utf8)
         #expect(marker.withUnsafeBytes { setxattr(app.path, "com.apple.quarantine", $0.baseAddress, $0.count, 0, 0) } == 0)
-        let parent = OSAllocatedUnfairLock<Task<ClipboardAssistantDetection?, Never>?>(initialState: nil)
-        let ready = DispatchSemaphore(value: 0)
+        let started = AsyncStream<Void>.makeStream(bufferingPolicy: .bufferingNewest(1))
+        defer { started.continuation.finish() }
+        let release = DispatchSemaphore(value: 0)
         let task = Task { @MainActor in
             await ClipboardAssistantDetector.detectInBackground(content: .text("echo hello"), enabledKinds: [.shellCommand],
                 shellCommandExists: { _ in
-                    // Cancel from the injected dependency so unrelated main-actor tests cannot delay the signal.
-                    #expect(ready.wait(timeout: .now() + 10) == .success)
-                    parent.withLock { $0 }?.cancel()
-                    #expect(!ApplicationOpenRepairService.needsRepair(at: app))
+                    started.continuation.yield(())
+                    #expect(release.wait(timeout: .now() + 10) == .success)
+                    let cancelled = Task.isCancelled
+                    #expect(cancelled)
+                    let needsRepair = ApplicationOpenRepairService.needsRepair(at: app)
+                    #expect(!needsRepair)
                     return true
                 })
         }
-        parent.withLock { $0 = task }
-        ready.signal()
+        // The main actor resumes after the detector suspends with its cancellation handler installed.
+        for await _ in started.stream {
+            task.cancel()
+            release.signal()
+            break
+        }
         _ = await task.value
         #expect(getxattr(app.path, "com.apple.quarantine", nil, 0, 0, 0) == marker.count)
     }

@@ -1136,10 +1136,7 @@ final class AppModel: ObservableObject {
       applyAssistantMouseGesture()
     }
     applicationOpenFailureMonitor.setEnabled(
-      settingsStore.settings.clipboardAssistantEnabled
-        && settingsStore.settings.applicationOpenFailureMonitoringEnabled
-        && (settingsStore.settings.clipboardAssistantEnabledKinds.isEmpty
-          || settingsStore.settings.clipboardAssistantEnabledKinds.contains(.appCannotOpen))
+      settingsStore.settings.applicationOpenFailureMonitoringActive
     ) { [weak self] url in self?.applicationOpenRepairPresenter.receive([url], fromSystemAlert: true) }
   }
 
@@ -3381,8 +3378,7 @@ final class AppModel: ObservableObject {
     applyAssistantMouseGesture()
     applicationOpenRepairPresenter.flush()
     applicationOpenFailureMonitor.setEnabled(
-      settings.clipboardAssistantEnabled && settings.applicationOpenFailureMonitoringEnabled
-        && (settings.clipboardAssistantEnabledKinds.isEmpty || settings.clipboardAssistantEnabledKinds.contains(.appCannotOpen))
+      settings.applicationOpenFailureMonitoringActive
     ) { [weak self] url in self?.applicationOpenRepairPresenter.receive([url], fromSystemAlert: true) }
     if !settings.downloaderEnabled, hasActiveDownloads {
       cancelAllDownloads()

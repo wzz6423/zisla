@@ -803,6 +803,13 @@ public struct FeatureSettings: Codable, Equatable, Sendable {
     /// Whether completed browser downloads and AirDrop transfers offer an Open Folder action.
     public var downloadCompletionFolderActionEnabled: Bool
     public var applicationOpenFailureMonitoringEnabled: Bool
+    public var applicationOpenRepairEnabled: Bool {
+        clipboardAssistantEnabled
+            && (clipboardAssistantEnabledKinds.isEmpty || clipboardAssistantEnabledKinds.contains(.appCannotOpen))
+    }
+    public var applicationOpenFailureMonitoringActive: Bool {
+        applicationOpenRepairEnabled && applicationOpenFailureMonitoringEnabled
+    }
     /// Quick trigger hotkey firing the assistant's primary action while its toast is visible.
     /// Modifier-only presets fire on double-tap; ordinary combos fire on key-down.
     public var clipboardAssistantTriggerConfiguration: ClipboardAssistantTriggerConfiguration

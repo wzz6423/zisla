@@ -1,5 +1,6 @@
 import AppKit
 import Foundation
+import SwiftUI
 import Testing
 import ZislaCore
 import ZislaKit
@@ -7,6 +8,59 @@ import ZislaKit
 
 @MainActor
 struct ApplicationOpenRepairPresentationTests {
+    @Test(.serialized)
+    func monitoringSwitchFollowsRepairAvailabilityWithoutChangingTheSavedPreference() async throws {
+        let releaseAccessibility = EnhancedAccessibilityTestScope.acquire()
+        defer { releaseAccessibility() }
+        let panel = NSPanel(contentRect: .init(x: -100_000, y: -100_000, width: 300, height: 100),
+            styleMask: [.borderless, .nonactivatingPanel], backing: .buffered, defer: false)
+        panel.isReleasedWhenClosed = false
+        defer { panel.contentView = nil; panel.close() }
+        for assistantEnabled in [false, true] {
+            for kinds: Set<ClipboardAssistantKind> in [[], [.url], [.appCannotOpen]] {
+                for savedPreference in [false, true] {
+                    var settings = FeatureSettings.default
+                    settings.clipboardAssistantEnabled = assistantEnabled
+                    settings.clipboardAssistantEnabledKinds = kinds
+                    settings.applicationOpenFailureMonitoringEnabled = savedPreference
+                    var enableRequests = 0
+                    let host = NSHostingView(rootView: SettingsView.applicationOpenFailureMonitoringToggle(
+                        settings: Binding(get: { settings }, set: { settings = $0 }),
+                        onEnable: { enableRequests += 1 }
+                    ))
+                    host.sizingOptions = []
+                    panel.contentView = host
+                    for _ in 0..<3 {
+                        host.layoutSubtreeIfNeeded()
+                        await withCheckedContinuation { continuation in
+                            DispatchQueue.main.async { continuation.resume() }
+                        }
+                    }
+                    func descendants(_ object: NSObject) -> [NSObject] {
+                        let children = object.responds(to: NSSelectorFromString("accessibilityChildren"))
+                            ? object.value(forKey: "accessibilityChildren") as? [NSObject] ?? [] : []
+                        return [object] + children.flatMap(descendants)
+                    }
+                    let toggle = try #require(descendants(host).first {
+                        $0.responds(to: NSSelectorFromString("accessibilityRole"))
+                            && $0.value(forKey: "accessibilityRole") as? String == NSAccessibility.Role.checkBox.rawValue
+                    })
+                    let available = assistantEnabled && (kinds.isEmpty || kinds.contains(.appCannotOpen))
+                    #expect(try #require(toggle.value(forKey: "isAccessibilityEnabled") as? Bool) == available)
+                    #expect(try #require(toggle.value(forKey: "accessibilityValue") as? Int) == (savedPreference ? 1 : 0))
+                    #expect(settings.applicationOpenFailureMonitoringEnabled == savedPreference)
+                    let press = NSSelectorFromString("accessibilityPerformPress")
+                    try #require(toggle.responds(to: press))
+                    _ = toggle.perform(press)
+                    #expect(settings.applicationOpenFailureMonitoringEnabled == (available ? !savedPreference : savedPreference))
+                    #expect(enableRequests == (available && !savedPreference ? 1 : 0))
+                    #expect(settings.clipboardAssistantEnabledKinds == kinds)
+                    #expect(!panel.isVisible && !panel.isKeyWindow)
+                }
+            }
+        }
+    }
+
     @Test
     func clipboardRepairKeepsExactlyOneAction() throws {
         let url = URL(fileURLWithPath: "/tmp/Example.app")
