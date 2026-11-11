@@ -27,7 +27,7 @@ enum ClipboardHistoryMutation: Sendable {
 
 final class ClipboardHistoryDatabase: @unchecked Sendable {
     private static let categorySchemaVersion = 4
-    private static let currentSchemaVersion = 5
+    private static let currentSchemaVersion = 6
 
     private let storageURL: URL
     private let connectionObserver: (@Sendable (OpaquePointer) -> Void)?
@@ -290,6 +290,17 @@ final class ClipboardHistoryDatabase: @unchecked Sendable {
             """,
             on: database
         )
+        if try schemaVersion(on: database) < Self.currentSchemaVersion {
+            // Older readers hashed only the prefix of externally written NUL-containing text.
+            try execute(
+                """
+                UPDATE clipboard_history SET content_digest = NULL
+                WHERE content_type = 0 AND content_digest IS NOT NULL
+                  AND instr(text_value, char(0)) > 0
+                """,
+                on: database
+            )
+        }
         try backfillMissingContentDigests(on: database)
         try execute("PRAGMA user_version = \(Self.currentSchemaVersion)", on: database)
     }
@@ -856,8 +867,7 @@ final class ClipboardHistoryDatabase: @unchecked Sendable {
         let data: Data
         switch content {
         case .text(let value):
-            // Match sqlite3_bind_text's existing NUL-terminated storage semantics.
-            data = Data(value.utf8.prefix { $0 != 0 })
+            data = Data(value.utf8)
         case .image(let value):
             data = value
         case .file(let reference):
@@ -1016,7 +1026,7 @@ final class ClipboardHistoryDatabase: @unchecked Sendable {
         database: OpaquePointer
     ) throws {
         let result = value.withCString {
-            sqlite3_bind_text(statement, index, $0, -1, clipboardSQLiteTransient)
+            sqlite3_bind_text64(statement, index, $0, UInt64(value.utf8.count), clipboardSQLiteTransient, UInt8(SQLITE_UTF8))
         }
         try check(result, database: database)
     }
@@ -1060,7 +1070,7 @@ final class ClipboardHistoryDatabase: @unchecked Sendable {
               let text = sqlite3_column_text(statement, index) else {
             return nil
         }
-        return String(cString: text)
+        return String(decoding: UnsafeBufferPointer(start: text, count: Int(sqlite3_column_bytes(statement, index))), as: UTF8.self)
     }
 
     private func dataColumn(_ statement: OpaquePointer, index: Int32) -> Data {

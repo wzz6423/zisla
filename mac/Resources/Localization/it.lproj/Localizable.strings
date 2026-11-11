@@ -312,7 +312,7 @@
 "可安全清理的缓存与日志当前为空" = "Cache e log pulibili in sicurezza sono attualmente vuoti";
 "展开" = "Espandi";
 "移入废纸篓" = "Sposta nel Cestino";
-"zisla 不会永久删除这些内容。" = "zisla non eliminerà permanentemente questi elementi.";
+"本次操作将项目移入废纸篓；废纸篓之后可能被清空，届时将永久删除。" = "Questa operazione sposta gli elementi nel Cestino. Se viene svuotato in seguito, gli elementi saranno eliminati definitivamente.";
 
 /* Cleanup Categories */
 "应用缓存" = "Cache App";
@@ -511,6 +511,8 @@
 "电池功率" = "Potenza batteria";
 "本机 Mac" = "Questo Mac";
 "已充满" = "Completamente carica";
+"立即充至100%" = "Carica al 100% ora";
+"无法立即充至100%，请重试。" = "Impossibile caricare al 100% ora. Riprova.";
 "充电中" = "In carica";
 "电源已接通" = "Alimentazione collegata";
 "使用电池" = "A batteria";
@@ -2321,7 +2323,7 @@
 "%ld 核" = "%ld core";
 "%ld 核 · " = "%ld core · ";
 "已整理系统内存 %@" = "Compattati %@ di memoria di sistema";
-"其中 %ld 项需人工复核。zisla 不会永久删除这些内容。" = "Di questi, %ld richiedono una verifica manuale. zisla non elimina mai in modo definitivo.";
+"其中 %ld 项需人工复核。本次操作将项目移入废纸篓；废纸篓之后可能被清空，届时将永久删除。" = "Di questi, %ld richiedono una verifica manuale. Questa operazione sposta gli elementi nel Cestino. Se viene svuotato in seguito, gli elementi saranno eliminati definitivamente.";
 "取消选择%@" = "Deseleziona %@";
 "全选%@" = "Seleziona tutto in %@";
 "反选%@" = "Inverti la selezione in %@";
@@ -3342,7 +3344,7 @@
 "麦克风监听已关闭：%@" = "L’ascolto del microfono è stato disattivato: %@";
 
 "自动清理系统垃圾" = "Pulisci automaticamente i file inutili di sistema";
-"按所选间隔移入废纸篓，不会永久删除" = "Sposta gli elementi nel Cestino all’intervallo scelto, senza eliminarli definitivamente";
+"按所选间隔移入废纸篓；清空废纸篓后将永久删除" = "Sposta gli elementi nel Cestino all’intervallo selezionato; svuotarlo li elimina definitivamente";
 "清理范围" = "Ambito della pulizia";
 "仅可信" = "Solo elementi affidabili";
 "全部（包含需人工复核）" = "Tutti (inclusi quelli da verificare)";
@@ -3444,6 +3446,85 @@
 "水印位置" = "Posizione della filigrana";
 "居中" = "Al centro";
 
+"小雨" = "Pioggia debole";
+"中雨" = "Pioggia moderata";
+"大雨" = "Pioggia intensa";
+"小雪" = "Neve debole";
+"中雪" = "Neve moderata";
+"大雪" = "Neve intensa";
+"冻毛毛雨" = "Pioviggine gelata";
+"冻雨" = "Pioggia gelata";
+"雪粒" = "Granuli di neve";
+"小阵雨" = "Rovesci di pioggia deboli";
+"强阵雨" = "Rovesci di pioggia intensi";
+"小阵雪" = "Rovesci di neve deboli";
+"强阵雪" = "Rovesci di neve intensi";
+"强雷阵雨" = "Temporale forte";
+"雨夹雪" = "Pioggia e neve";
+"小雨夹雪" = "Pioggia e neve deboli";
+"强雨夹雪" = "Pioggia e neve intense";
+"阵性雨夹雪" = "Rovesci di pioggia e neve";
+"小阵性雨夹雪" = "Rovesci deboli di pioggia e neve";
+"强阵性雨夹雪" = "Rovesci intensi di pioggia e neve";
+"暴雨" = "Pioggia torrenziale";
+"大暴雨" = "Pioggia torrenziale molto intensa";
+"特大暴雨" = "Pioggia torrenziale estrema";
+"暴雪" = "Bufera di neve";
+"小到中雨" = "Pioggia da debole a moderata";
+"中到大雨" = "Pioggia da moderata a intensa";
+"大到暴雨" = "Pioggia da intensa a torrenziale";
+"暴雨到大暴雨" = "Pioggia da torrenziale a molto intensa";
+"大暴雨到特大暴雨" = "Pioggia torrenziale da molto intensa a estrema";
+"小到中雪" = "Neve da debole a moderata";
+"中到大雪" = "Neve da moderata a intensa";
+"大到暴雪" = "Da neve intensa a bufera di neve";
+"浓雾" = "Nebbia fitta";
+"强浓雾" = "Nebbia molto fitta";
+"大雾" = "Nebbia densa";
+"特强浓雾" = "Nebbia estremamente fitta";
+"霾" = "Foschia";
+"中度霾" = "Foschia moderata";
+"重度霾" = "Foschia intensa";
+"严重霾" = "Foschia grave";
+"沙尘暴" = "Tempesta di polvere";
+"浮尘" = "Polvere in sospensione";
+"扬沙" = "Sabbia sollevata dal vento";
+"强沙尘暴" = "Tempesta di polvere violenta";
+"雨伴雷电" = "Pioggia e tuoni";
+"小雨伴雷电" = "Pioggia debole e tuoni";
+"大雨伴雷电" = "Pioggia intensa e tuoni";
+"阵雨伴雷电" = "Rovesci e tuoni";
+"小阵雨伴雷电" = "Rovesci di pioggia deboli e tuoni";
+"强阵雨伴雷电" = "Rovesci di pioggia intensi e tuoni";
+"雪伴雷电" = "Neve e tuoni";
+"小雪伴雷电" = "Neve debole e tuoni";
+"大雪伴雷电" = "Neve intensa e tuoni";
+"阵雪伴雷电" = "Rovesci di neve e tuoni";
+"小阵雪伴雷电" = "Rovesci di neve deboli e tuoni";
+"强阵雪伴雷电" = "Rovesci di neve intensi e tuoni";
+"雨夹雪伴雷电" = "Pioggia e neve e tuoni";
+"小雨夹雪伴雷电" = "Pioggia e neve deboli e tuoni";
+"强雨夹雪伴雷电" = "Pioggia e neve intense e tuoni";
+"阵性雨夹雪伴雷电" = "Rovesci di pioggia e neve e tuoni";
+"小阵性雨夹雪伴雷电" = "Rovesci deboli di pioggia e neve e tuoni";
+"强阵性雨夹雪伴雷电" = "Rovesci intensi di pioggia e neve e tuoni";
+"雷阵雨伴有冰雹" = "Temporali con grandine";
+
+"管理电源模式与系统垃圾、剪贴板历史和废纸篓的定时清理。" = "Gestisci le modalità energetiche e la pulizia programmata dei file inutili del sistema, della cronologia degli appunti e del Cestino.";
+"定时倾倒废纸篓" = "Svuotare automaticamente il Cestino";
+"按所选间隔永久删除废纸篓中的所有项目，无法恢复" = "Elimina definitivamente tutti gli elementi del Cestino all’intervallo selezionato. L’operazione è irreversibile";
+"启用定时倾倒废纸篓？" = "Attivare lo svuotamento automatico del Cestino?";
+
+"自动切换电源模式" = "Cambia automaticamente modalità energetica";
+"插电默认模式" = "Modalità predefinita con alimentatore";
+"脱电默认模式" = "Modalità predefinita a batteria";
+"20%及以下固定省电" = "Risparmio energetico al 20% o meno";
+"电量不高于20%时保持省电，插电也不切换；超过20%后恢复对应默认模式" = "Mantiene il risparmio energetico al 20% o meno, anche con l’alimentatore; ripristina la modalità predefinita corrispondente oltre il 20%";
+"省电" = "Risparmio energetico";
+"高性能" = "Prestazioni elevate";
+
+
+"无法保存定时倾倒废纸篓的记录，本次已跳过。" = "Impossibile salvare il registro dello svuotamento automatico del Cestino. Questa esecuzione è stata saltata.";
 "灵动岛功能顺序" = "Ordine delle funzioni di Dynamic Island";
 
 "查询航班" = "Cerca volo";
@@ -3451,3 +3532,10 @@
 "查询快递" = "Traccia pacco";
 "全部标记为已读" = "Segna tutto come letto";
 "已将全部邮件标记为已读" = "Tutti i messaggi sono stati segnati come letti";
+
+"自动滚动" = "Scorrimento auto";
+"暂停滚动" = "Sospendi scorrimento";
+"正在自动滚动并拼接" = "Scorrimento e unione automatici in corso";
+"自动滚动已暂停，可手动滚动或点击“完成”" = "Scorrimento automatico sospeso. Scorri manualmente o fai clic su Fine";
+"自动滚动需要在系统设置中允许辅助功能" = "Consenti l’accessibilità in Impostazioni di Sistema per scorrere automaticamente";
+"无法自动滚动，请手动滚动页面" = "Impossibile scorrere automaticamente. Scorri la pagina manualmente";

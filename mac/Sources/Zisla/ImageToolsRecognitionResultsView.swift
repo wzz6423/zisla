@@ -98,16 +98,18 @@ struct ImageToolsRecognitionResultsView: View {
 @MainActor
 final class ImageToolsRecognitionSavePanelDelegate: NSObject, NSOpenSavePanelDelegate {
     private let protectedPaths: Set<String>
+    private let openDirectory: (String) -> Int32
 
-    init(protectedInputs: [URL]) {
+    init(protectedInputs: [URL], openDirectory: @escaping (String) -> Int32 = { open($0, O_RDONLY | O_NOFOLLOW) }) {
         protectedPaths = Set(protectedInputs.map { $0.standardizedFileURL.path.lowercased() })
+        self.openDirectory = openDirectory
         super.init()
     }
 
     func panel(_ sender: Any, validate url: URL) throws {
         let path = url.standardizedFileURL.path.lowercased()
         guard !protectedPaths.contains(path) else { throw ImageProcessingError.outputAlreadyExists(url) }
-        let directory = open(url.deletingLastPathComponent().path, O_RDONLY | O_NOFOLLOW)
+        let directory = openDirectory(url.deletingLastPathComponent().path)
         guard directory >= 0 else { throw NSError(domain: NSPOSIXErrorDomain, code: Int(errno)) }
         defer { _ = close(directory) }
         var metadata = stat()

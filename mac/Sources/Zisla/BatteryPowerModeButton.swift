@@ -103,15 +103,7 @@ struct BatteryPowerModePresentation {
         if isChanging {
             messageKey = "正在切换电源模式…"
         } else if let error {
-            messageKey = switch error {
-            case .stateUnavailable: "无法读取电源模式，请重试。"
-            case .unsupportedMode: "当前供电方式不支持切换电源模式。"
-            case .authorizationCancelled: "电源模式授权已取消。"
-            case .authorizationDenied: "未获得切换电源模式的授权。"
-            case .changeFailed: "无法切换电源模式，请重试。"
-            case .verificationFailed: "无法确认电源模式已更改，请重试。"
-            case .timedOut: "电源模式操作超时，请重试。"
-            }
+            messageKey = Self.messageKey(for: error)
         } else if powerSource == nil {
             messageKey = "正在读取电源模式…"
         } else if supportedModes.isEmpty {
@@ -123,6 +115,18 @@ struct BatteryPowerModePresentation {
 
     func canSelect(_ mode: BatteryPowerMode) -> Bool {
         canSelect && supportedModes.contains(mode)
+    }
+
+    static func messageKey(for error: BatteryPowerModeError) -> String {
+        switch error {
+        case .stateUnavailable: "无法读取电源模式，请重试。"
+        case .unsupportedMode: "当前供电方式不支持切换电源模式。"
+        case .authorizationCancelled: "电源模式授权已取消。"
+        case .authorizationDenied: "未获得切换电源模式的授权。"
+        case .changeFailed: "无法切换电源模式，请重试。"
+        case .verificationFailed: "无法确认电源模式已更改，请重试。"
+        case .timedOut: "电源模式操作超时，请重试。"
+        }
     }
 
     static func titleKey(for mode: BatteryPowerMode) -> String {

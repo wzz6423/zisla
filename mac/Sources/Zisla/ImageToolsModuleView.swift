@@ -4,6 +4,19 @@ import UniformTypeIdentifiers
 import ZislaCore
 import ZislaKit
 
+struct ImageToolsPendingOptions: Equatable {
+    var formats = Set(ImageOutputFormat.conversionFormats)
+    var quality = 80.0
+    var resizeMethod: ImageResizeMethod = .fit
+    var width = ""
+    var height = ""
+    var preserveMetadata = false
+    var background = "#FFFFFF"
+    var transform = ImageTransformOptions.identity
+    var watermark = ImageWatermarkOptions(content: .text(""))
+    var extractionMode: ScreenshotExtractionMode = .foreground
+}
+
 struct ImageToolsModuleView: View {
     @ObservedObject private var tools: ManagedToolService
     private let saveLocations: SaveLocationStore
@@ -11,28 +24,21 @@ struct ImageToolsModuleView: View {
     @ObservedObject private var store: ImageToolsModel
     @ObservedObject private var recognition: ImageToolsRecognitionModel
     @Binding private var operation: ImageToolOperation
-    @State private var formats = Set(ImageOutputFormat.conversionFormats)
-    @State private var quality = 80.0
-    @State private var resizeMethod: ImageResizeMethod = .fit
-    @State private var width = ""
-    @State private var height = ""
-    @State private var preserveMetadata = false
-    @State private var background = "#FFFFFF"
+    @Binding private var pending: ImageToolsPendingOptions
     @State private var dropTargeted = false
     @State private var comparisonItem: ImageProcessedItem?
-    @State private var transform = ImageTransformOptions.identity
-    @State private var watermark = ImageWatermarkOptions(content: .text(""))
-    @State private var extractionMode: ScreenshotExtractionMode = .foreground
     @Environment(\.colorScheme) private var colorScheme
 
     init(tools: ManagedToolService, saveLocations: SaveLocationStore, settingsStore: FeatureSettingsStore,
-         store: ImageToolsModel, recognition: ImageToolsRecognitionModel, operation: Binding<ImageToolOperation>) {
+         store: ImageToolsModel, recognition: ImageToolsRecognitionModel, operation: Binding<ImageToolOperation>,
+         pending: Binding<ImageToolsPendingOptions>) {
         self.tools = tools
         self.saveLocations = saveLocations
         self.settingsStore = settingsStore
         self.store = store
         self.recognition = recognition
         _operation = operation
+        _pending = pending
     }
 
     var body: some View {
@@ -40,13 +46,7 @@ struct ImageToolsModuleView: View {
             VStack(alignment: .leading, spacing: 4) {
                 ForEach(ImageToolOperation.allCases) { item in
                     Button {
-                        if operation != item {
-                            store.discardResults()
-                            store.discardEdits()
-                            store.message = nil
-                            recognition.clear()
-                            operation = item
-                        }
+                        operation = item
                     } label: {
                         Label(AppLocalization.text(item.title), systemImage: item.symbol)
                             .font(.system(size: 12, weight: .medium))
@@ -87,7 +87,7 @@ struct ImageToolsModuleView: View {
         }
         .controlSize(.regular)
         .textFieldStyle(.roundedBorder)
-        .onChange(of: extractionMode) { _, _ in
+        .onChange(of: pending.extractionMode) { _, _ in
             store.discardResults()
             store.discardEdits()
             store.message = nil
@@ -118,7 +118,7 @@ struct ImageToolsModuleView: View {
 
     private var isProcessing: Bool { store.isProcessing || recognition.isProcessing }
 
-    private var usesEditor: Bool { operation == .obscure || (operation == .extract && extractionMode == .lasso) }
+    private var usesEditor: Bool { operation == .obscure || (operation == .extract && pending.extractionMode == .lasso) }
 
     private var inputSection: some View {
         VStack(alignment: .leading, spacing: 12) {
@@ -156,10 +156,10 @@ struct ImageToolsModuleView: View {
 
     private var configuration: some View {
         VStack(alignment: .leading, spacing: 14) {
-            if operation == .transform { ImageTransformControls(options: $transform) }
-            if operation == .watermark { ImageWatermarkControls(options: $watermark) }
+            if operation == .transform { ImageTransformControls(options: $pending.transform) }
+            if operation == .watermark { ImageWatermarkControls(options: $pending.watermark) }
             if operation == .extract {
-                Picker(AppLocalization.text("提取方式"), selection: $extractionMode) {
+                Picker(AppLocalization.text("提取方式"), selection: $pending.extractionMode) {
                     ForEach(ScreenshotExtractionMode.allCases) { mode in AppLocalizedText(mode.title).tag(mode) }
                 }
                 .pickerStyle(.menu)
@@ -185,8 +185,8 @@ struct ImageToolsModuleView: View {
                         HStack {
                             ForEach(ImageOutputFormat.conversionFormats) { format in
                                 Toggle(format.displayName, isOn: Binding(
-                                    get: { formats.contains(format) },
-                                    set: { if $0 { formats.insert(format) } else { formats.remove(format) } }
+                                    get: { pending.formats.contains(format) },
+                                    set: { if $0 { pending.formats.insert(format) } else { pending.formats.remove(format) } }
                                 ))
                                 .toggleStyle(.checkbox)
                             }
@@ -195,27 +195,27 @@ struct ImageToolsModuleView: View {
                 }
                 HStack {
                     AppLocalizedText("图片质量")
-                    Slider(value: $quality, in: 1...100, step: 1)
+                    Slider(value: $pending.quality, in: 1...100, step: 1)
                         .accessibilityLabel(AppLocalization.text("图片质量"))
-                    Text(Int(quality).formatted()).monospacedDigit().frame(width: 30)
+                    Text(Int(pending.quality).formatted()).monospacedDigit().frame(width: 30)
                 }
                 if operation == .resize {
-                    Picker(AppLocalization.text("缩放方式"), selection: $resizeMethod) {
+                    Picker(AppLocalization.text("缩放方式"), selection: $pending.resizeMethod) {
                         ForEach(ImageResizeMethod.allCases) { method in AppLocalizedText(method.title).tag(method) }
                     }
                     .pickerStyle(.menu)
                     HStack {
-                        TextField(AppLocalization.text("宽度（像素）"), text: $width)
-                        TextField(AppLocalization.text("高度（像素）"), text: $height)
+                        TextField(AppLocalization.text("宽度（像素）"), text: $pending.width)
+                        TextField(AppLocalization.text("高度（像素）"), text: $pending.height)
                     }
                     AppLocalizedText("仅缩小图片；按单边缩放时留空另一边")
                         .font(.system(size: 11)).foregroundStyle(.secondary)
                 }
-                Toggle(AppLocalization.text("保留元数据"), isOn: $preserveMetadata)
+                Toggle(AppLocalization.text("保留元数据"), isOn: $pending.preserveMetadata)
                     .help(AppLocalization.text("包括版权、拍摄时间和 GPS 位置"))
                 HStack {
                     AppLocalizedText("透明背景填充色")
-                    TextField("#FFFFFF", text: $background).frame(maxWidth: 110)
+                    TextField("#FFFFFF", text: $pending.background).frame(maxWidth: 110)
                         .accessibilityLabel(AppLocalization.text("透明背景填充色"))
                 }
                 .help(AppLocalization.text("用于 JPEG 转换或缩略图留白"))
@@ -227,12 +227,12 @@ struct ImageToolsModuleView: View {
 
     private var options: ImageProcessingOptions {
         ImageProcessingOptions(
-            formats: operation == .smallest || operation == .convert ? Array(formats) : [],
-            smallestOnly: operation == .smallest, quality: Int(quality),
-            resize: operation == .resize ? ImageResizeOptions(method: resizeMethod, width: Int(width), height: Int(height)) : nil,
-            preserveMetadata: preserveMetadata, background: background,
-            transform: operation == .transform ? transform : .identity,
-            watermark: operation == .watermark ? watermark : nil
+            formats: operation == .smallest || operation == .convert ? Array(pending.formats) : [],
+            smallestOnly: operation == .smallest, quality: Int(pending.quality),
+            resize: operation == .resize ? ImageResizeOptions(method: pending.resizeMethod, width: Int(pending.width), height: Int(pending.height)) : nil,
+            preserveMetadata: pending.preserveMetadata, background: pending.background,
+            transform: operation == .transform ? pending.transform : .identity,
+            watermark: operation == .watermark ? pending.watermark : nil
         )
     }
 
@@ -268,9 +268,9 @@ struct ImageToolsModuleView: View {
         if usesEditor { return !store.editedImageURLs.isEmpty }
         if operation == .recognize || operation == .extract { return true }
         return options.isValid
-            && !(operation == .resize && ((!width.isEmpty && Int(width) == nil) || (!height.isEmpty && Int(height) == nil)))
-            && !((operation == .convert || operation == .smallest) && formats.isEmpty)
-            && !(operation == .transform && transform.isIdentity)
+            && !(operation == .resize && ((!pending.width.isEmpty && Int(pending.width) == nil) || (!pending.height.isEmpty && Int(pending.height) == nil)))
+            && !((operation == .convert || operation == .smallest) && pending.formats.isEmpty)
+            && !(operation == .transform && pending.transform.isIdentity)
     }
 
     private func startProcessing() {
@@ -279,7 +279,7 @@ struct ImageToolsModuleView: View {
         } else if usesEditor {
             store.startEdited(service: service)
         } else if operation == .extract {
-            store.startExtraction(service: service, mode: extractionMode)
+            store.startExtraction(service: service, mode: pending.extractionMode)
         } else {
             store.start(service: service, options: options)
         }

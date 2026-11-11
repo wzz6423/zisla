@@ -39,17 +39,11 @@ struct ImageToolsSettingsLifecycleTests {
         #expect(input.imageTools.batch?.directoryURL == batch.directoryURL)
         #expect(try Data(contentsOf: output) == bytes)
 
-        input.select(.imageTools, searchTarget: .imageOperation(.convert))
-        await fixture.layout()
-        #expect(input.selectedImageOperation == .convert)
-        #expect(fixture.hasButton(ImageToolOperation.convert.title))
-        #expect(input.imageTools.editedImageURLs[fixture.source] == edit)
-        #expect(input.imageTools.batch?.directoryURL == batch.directoryURL)
         input.select(.general)
         await fixture.layout()
         input.navigate(backward: true, settings: .default)
         await fixture.layout()
-        #expect(input.selectedImageOperation == .convert)
+        #expect(input.selectedImageOperation == .obscure)
         #expect(input.imageTools.editedImageURLs[fixture.source] == edit)
         #expect(try Data(contentsOf: output) == bytes)
         #expect(try Data(contentsOf: fixture.source) == fixture.original)
@@ -79,13 +73,18 @@ struct ImageToolsSettingsLifecycleTests {
         #expect(input.imageTools.isProcessing)
         input.select(.imageTools, searchTarget: .imageOperation(.convert))
         await fixture.layout()
-        #expect(input.imageTools.isProcessing && input.selectedImageOperation == .convert)
+        #expect(input.imageTools.isProcessing && input.selectedImageOperation == .obscure)
+        #expect(input.searchTarget == .imageOperation(.obscure))
         #expect(input.imageTools.inputs == [fixture.source])
         resume.continuation.yield()
         await pending.value
         #expect(!input.imageTools.isProcessing)
         let batch = try #require(input.imageTools.batch)
         #expect(batch.failures.isEmpty && batch.items.count == 1)
+        input.select(.general)
+        input.navigate(backward: true, settings: .default)
+        #expect(input.selectedImageOperation == .obscure)
+        #expect(input.imageTools.batch?.directoryURL == batch.directoryURL)
         #expect(try Data(contentsOf: fixture.source) == fixture.original)
     }
 
@@ -112,6 +111,9 @@ struct ImageToolsSettingsLifecycleTests {
         for await _ in started.stream { break }
         await fixture.search("OCR")
         #expect(input.imageRecognition.isProcessing)
+        input.select(.imageTools, searchTarget: .imageOperation(.convert))
+        #expect(input.selectedImageOperation == .recognize)
+        #expect(input.searchTarget == .imageOperation(.recognize))
         try await fixture.selectImageSidebar()
         #expect(input.imageRecognition.isProcessing && input.selectedImageOperation == .recognize)
         resume.continuation.yield()
@@ -136,8 +138,8 @@ struct ImageToolsSettingsLifecycleTests {
         #expect(try Data(contentsOf: fixture.source) == fixture.original)
     }
 
-    @Test
-    func explicitOperationChangesStillDiscardResultsAndEdits() async throws {
+    @Test(arguments: [false, true])
+    func explicitOperationChangesStillDiscardResultsAndEdits(fromSearch: Bool) async throws {
         let fixture = try Fixture()
         defer { fixture.remove() }
         await fixture.layout()
@@ -152,12 +154,72 @@ struct ImageToolsSettingsLifecycleTests {
         await fixture.layout()
         try await fixture.press(.obscure)
         #expect(input.imageTools.batch?.directoryURL == directory)
-        try await fixture.press(.convert)
+        if fromSearch {
+            input.select(.imageTools, searchTarget: .imageOperation(.convert))
+            await fixture.layout()
+        } else { try await fixture.press(.convert) }
         #expect(input.selectedImageOperation == .convert && input.imageTools.inputs == [fixture.source])
         #expect(input.imageTools.batch == nil && input.imageTools.editedImageURLs.isEmpty)
         #expect(!FileManager.default.fileExists(atPath: directory.path))
         #expect(!FileManager.default.fileExists(atPath: editDirectory.path))
         #expect(try Data(contentsOf: fixture.source) == fixture.original)
+    }
+
+    @Test
+    func pendingOptionsSurviveSearchSidebarAndHistoryWithTheirControls() async throws {
+        let fixture = try Fixture()
+        defer { fixture.remove() }
+        await fixture.layout()
+        let input = try #require(fixture.input)
+        input.select(.imageTools, searchTarget: .imageOperation(.resize))
+        input.imageOptions.formats = [.jpeg, .webp]
+        input.imageOptions.quality = 37
+        input.imageOptions.resizeMethod = .fit
+        input.imageOptions.preserveMetadata = true
+        input.imageOptions.background = "#112233"
+        input.imageOptions.transform = .init(rotation: .clockwise90, flipHorizontal: true, flipVertical: true)
+        input.imageOptions.watermark = .init(content: .text("Retained watermark"))
+        input.imageOptions.extractionMode = .lasso
+        await fixture.layout()
+        try await fixture.editTextField("宽度（像素）", value: "640")
+        try await fixture.editTextField("高度（像素）", value: "360")
+        #expect(input.imageOptions.width == "640" && input.imageOptions.height == "360")
+        let expected = input.imageOptions
+        #expect(fixture.hasTextFieldValue("640") && fixture.hasTextFieldValue("360"))
+
+        await fixture.search("PNG")
+        #expect(!fixture.hasTextFieldValue("640"))
+        try await fixture.selectImageSidebar()
+        #expect(input.imageOptions == expected)
+        #expect(fixture.hasTextFieldValue("640") && fixture.hasTextFieldValue("360"))
+        input.select(.general)
+        await fixture.layout()
+        input.navigate(backward: true, settings: .default)
+        await fixture.layout()
+        #expect(input.imageOptions == expected)
+        #expect(fixture.hasTextFieldValue("640") && fixture.hasTextFieldValue("360"))
+        try await fixture.press(.watermark)
+        #expect(fixture.hasTextFieldValue("Retained watermark"))
+        #expect(input.imageOptions == expected)
+    }
+
+    @Test
+    func manualOperationChangesUpdateTheRecordedSearchDestination() async throws {
+        let fixture = try Fixture()
+        defer { fixture.remove() }
+        await fixture.layout()
+        let input = try #require(fixture.input)
+        input.select(.imageTools, searchTarget: .imageOperation(.obscure))
+        await fixture.layout()
+        try await fixture.press(.convert)
+        #expect(input.searchTarget == .imageOperation(.convert))
+        input.select(.general)
+        await fixture.layout()
+        input.navigate(backward: true, settings: .default)
+        await fixture.layout()
+        #expect(input.selectedImageOperation == .convert)
+        #expect(input.searchTarget == .imageOperation(.convert))
+        #expect(fixture.hasButton(ImageToolOperation.convert.title))
     }
 
     @Test
@@ -191,7 +253,9 @@ struct ImageToolsSettingsLifecycleTests {
         let source = try String(contentsOf: package.appendingPathComponent("Sources/Zisla/SettingsView.swift"), encoding: .utf8)
         #expect(source.contains("@StateObject private var input = SettingsInput()"))
         #expect(source.contains("store: input.imageTools"))
-        #expect(source.contains("recognition: input.imageRecognition, operation: $input.selectedImageOperation"))
+        #expect(source.contains("recognition: input.imageRecognition"))
+        #expect(source.contains("set: { input.selectImageOperation($0) }"))
+        #expect(source.contains("pending: $input.imageOptions"))
         #expect(!source.contains(".id(input.selectedImageOperation)"))
     }
 
@@ -210,7 +274,8 @@ struct ImageToolsSettingsLifecycleTests {
                     else if input.selection == .imageTools {
                         ImageToolsModuleView(tools: tools, saveLocations: saveLocations, settingsStore: settingsStore,
                                              store: input.imageTools, recognition: input.imageRecognition,
-                                             operation: $input.selectedImageOperation)
+                                             operation: Binding(get: { input.selectedImageOperation }, set: { input.selectImageOperation($0) }),
+                                             pending: $input.imageOptions)
                             .id(input.selection)
                     } else { Text("Settings") }
                 }
@@ -276,6 +341,26 @@ struct ImageToolsSettingsLifecycleTests {
 
         func hasButton(_ title: String) -> Bool { button(title) != nil }
 
+        func hasTextFieldValue(_ value: String) -> Bool {
+            accessibilityObjects().contains { object in
+                object.responds(to: NSSelectorFromString("accessibilityRole"))
+                    && object.value(forKey: "accessibilityRole") as? String == NSAccessibility.Role.textField.rawValue
+                    && object.responds(to: NSSelectorFromString("accessibilityValue"))
+                    && object.value(forKey: "accessibilityValue") as? String == value
+            }
+        }
+
+        func editTextField(_ placeholder: String, value: String) async throws {
+            func fields(_ view: NSView) -> [NSTextField] {
+                (view as? NSTextField).map { [$0] } ?? [] + view.subviews.flatMap(fields)
+            }
+            let host = try #require(host)
+            let field = try #require(fields(host).first { $0.placeholderString == AppLocalization.text(placeholder) })
+            field.stringValue = value
+            field.delegate?.controlTextDidChange?(Notification(name: NSControl.textDidChangeNotification, object: field))
+            await layout()
+        }
+
         func search(_ query: String) async {
             input?.settingsQuery = query
             await layout()
@@ -294,10 +379,10 @@ struct ImageToolsSettingsLifecycleTests {
         }
 
         func press(_ operation: ImageToolOperation) async throws {
-            let button = try #require(button(operation.title))
+            let control = try #require(button(operation.title))
             let selector = NSSelectorFromString("accessibilityPerformPress")
-            try #require(button.responds(to: selector))
-            _ = button.perform(selector)
+            try #require(control.responds(to: selector))
+            _ = control.perform(selector)
             await layout()
         }
 

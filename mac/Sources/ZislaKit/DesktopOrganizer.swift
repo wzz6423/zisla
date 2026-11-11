@@ -18,6 +18,9 @@ public enum DesktopOrganizerError: Error, Sendable, Equatable {
 
 @MainActor
 public enum DesktopOrganizer {
+    private static var trashOperationInProgress = false
+    private static var trashOperationWaiters: [CheckedContinuation<Void, Never>] = []
+
     /// Result of a single desktop tidy operation, surfaced to the UI for user feedback.
     public struct TidyOutcome: Sendable, Equatable {
         /// Number of items re-snapped to the grid.
@@ -95,8 +98,30 @@ public enum DesktopOrganizer {
         }
     }
 
-    /// Empties the Trash. Irreversible — the caller must obtain user confirmation first.
+    /// Empties the Trash after manual confirmation or explicit opt-in to scheduled emptying.
     public static func emptyTrash() async -> Result<Void, DesktopOrganizerError> {
+        await emptyTrash(execute: runAppleScriptVoid)
+    }
+
+    static func emptyTrash(
+        execute: (String) async -> Result<Void, DesktopOrganizerError>
+    ) async -> Result<Void, DesktopOrganizerError> {
+        if trashOperationInProgress {
+            await withCheckedContinuation { trashOperationWaiters.append($0) }
+        } else {
+            trashOperationInProgress = true
+        }
+        // Keep ownership until Finder finishes restoring its shared preference, even after cancellation.
+        defer {
+            if trashOperationWaiters.isEmpty {
+                trashOperationInProgress = false
+            } else {
+                trashOperationWaiters.removeFirst().resume()
+            }
+        }
+        guard !Task.isCancelled else {
+            return .failure(.failed(CocoaError(.userCancelled).localizedDescription))
+        }
         // With `warns before emptying` disabled, Finder skips its own second confirmation; Zisla handles that step itself.
         let script = """
         tell application "Finder"
@@ -104,11 +129,14 @@ public enum DesktopOrganizer {
             try
                 set warns before emptying of trash to false
                 empty trash
+            on error errorMessage number errorNumber
+                set warns before emptying of trash to warnsSetting
+                error errorMessage number errorNumber
             end try
             set warns before emptying of trash to warnsSetting
         end tell
         """
-        return await runAppleScriptVoid(script)
+        return await execute(script)
     }
 
     private static func runAppleScriptReturningString(

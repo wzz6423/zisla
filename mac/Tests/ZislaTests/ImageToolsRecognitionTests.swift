@@ -662,7 +662,6 @@ struct ImageToolsRecognitionTests {
         defer { panel.close() }
         let previousDelegate = SavePanelDelegate()
         panel.delegate = previousDelegate
-        let openDescriptorCount = Self.openDescriptorCount()
         var didValidate = false
         let task = view.export(result, format: format, panel: panel) { configured in
             guard let delegate = configured.delegate as? ImageToolsRecognitionSavePanelDelegate else {
@@ -684,7 +683,6 @@ struct ImageToolsRecognitionTests {
             return nil
         }
         #expect(task == nil && didValidate)
-        #expect(Self.openDescriptorCount() == openDescriptorCount, "Cancelled validation must release its directory descriptor")
         #expect(panel.delegate === previousDelegate, "Closing or cancelling must release only the OCR panel's validation")
         #expect(try FileManager.default.contentsOfDirectory(atPath: fixture.root.path).sorted() == before)
         #expect(model.results.first == result && model.message == initialMessage && !model.isProcessing)
@@ -715,7 +713,6 @@ struct ImageToolsRecognitionTests {
         panel.isReleasedWhenClosed = false
         defer { panel.close() }
         let initialMessage = model.message
-        let openDescriptorCount = Self.openDescriptorCount()
         let task = view.export(result, format: .text, panel: panel) { configured in
             guard let delegate = configured.delegate as? ImageToolsRecognitionSavePanelDelegate else {
                 Issue.record("OCR panels must validate before closing"); return nil
@@ -730,7 +727,6 @@ struct ImageToolsRecognitionTests {
             return nil
         }
         #expect(task == nil && panel.delegate == nil)
-        #expect(Self.openDescriptorCount() == openDescriptorCount, "Failed validation must release its directory descriptor")
         #expect(model.message == initialMessage && !model.isProcessing)
         #expect(try String(contentsOf: parent, encoding: .utf8) == "concurrent file")
         #expect(try Data(contentsOf: fixture.image) == fixture.bytes)
@@ -753,7 +749,6 @@ struct ImageToolsRecognitionTests {
         let panel = NSSavePanel()
         panel.isReleasedWhenClosed = false
         defer { panel.close() }
-        let openDescriptorCount = Self.openDescriptorCount()
         let task = view.export(result, format: format, panel: panel) { configured in
             guard let delegate = configured.delegate as? ImageToolsRecognitionSavePanelDelegate else {
                 Issue.record("OCR panels must validate before closing"); return nil
@@ -767,7 +762,6 @@ struct ImageToolsRecognitionTests {
             } catch { Issue.record(error) }
             return destination
         }
-        #expect(Self.openDescriptorCount() == openDescriptorCount, "Confirmed validation must release its directory descriptor")
         await (try #require(task)).value
         #expect(panel.delegate == nil)
         if outcome == "new" {
@@ -782,6 +776,48 @@ struct ImageToolsRecognitionTests {
         #expect(model.results == [result] && !model.isProcessing)
         #expect(try Data(contentsOf: fixture.image) == fixture.bytes)
         #expect(try FileManager.default.contentsOfDirectory(atPath: fixture.root.path).sorted() == [destination.lastPathComponent, "source.png"].sorted())
+    }
+
+    @Test(arguments: ["new", "conflict", "invalid name"])
+    func savePanelValidationReleasesItsDirectoryWhileUnrelatedDescriptorsRemainOpen(outcome: String) throws {
+        let fixture = try Fixture()
+        defer { fixture.remove() }
+        let destination = fixture.root.appendingPathComponent(outcome == "invalid name" ? String(repeating: "x", count: 256) + ".txt" : "result.txt")
+        if outcome == "conflict" { try Data("existing output".utf8).write(to: destination) }
+        var directoryMetadata = stat()
+        try #require(lstat(fixture.root.path, &directoryMetadata) == 0)
+        var directory: Int32?
+        var unrelated: Int32?
+        defer {
+            if let directory, Self.descriptor(directory, refersTo: directoryMetadata) { _ = close(directory) }
+            if let unrelated { _ = close(unrelated) }
+        }
+        let validation = ImageToolsRecognitionSavePanelDelegate(protectedInputs: [fixture.image], openDirectory: { path in
+            let opened = open(path, O_RDONLY | O_NOFOLLOW)
+            directory = opened
+            #expect(Self.descriptor(opened, refersTo: directoryMetadata))
+            unrelated = open(fixture.image.path, O_RDONLY)
+            return opened
+        })
+        if outcome == "new" {
+            try validation.panel(NSObject(), validate: destination)
+        } else if outcome == "conflict" {
+            #expect(throws: ImageProcessingError.outputAlreadyExists(destination)) {
+                try validation.panel(NSObject(), validate: destination)
+            }
+        } else {
+            #expect(throws: NSError(domain: NSPOSIXErrorDomain, code: Int(ENAMETOOLONG))) {
+                try validation.panel(NSObject(), validate: destination)
+            }
+        }
+        let openedDirectory = try #require(directory)
+        let unrelatedDescriptor = try #require(unrelated)
+        #expect(fcntl(unrelatedDescriptor, F_GETFD) >= 0, "Validation must leave unrelated handles open")
+        #expect(!Self.descriptor(unrelatedDescriptor, refersTo: directoryMetadata), "A reused handle for an unrelated file must not count as a directory leak")
+        #expect(!Self.descriptor(openedDirectory, refersTo: directoryMetadata),
+            "Successful, cancelled and failed validation must release the destination directory, even if another suite reuses its descriptor number")
+        #expect(try Data(contentsOf: fixture.image) == fixture.bytes)
+        #expect(try FileManager.default.contentsOfDirectory(atPath: fixture.root.path).sorted() == (outcome == "conflict" ? ["result.txt", "source.png"] : ["source.png"]))
     }
 
     @Test
@@ -881,11 +917,9 @@ struct ImageToolsRecognitionTests {
         ImageToolsRecognitionResult(inputURL: inputURL, text: text, table: .init(rows: [[text, "42"]], merges: []))
     }
 
-    private nonisolated static func openDescriptorCount() -> Int {
-        let count = sysconf(_SC_OPEN_MAX)
-        return (0..<Int32(count)).reduce(into: 0) { count, descriptor in
-            if fcntl(descriptor, F_GETFD) >= 0 { count += 1 }
-        }
+    private nonisolated static func descriptor(_ descriptor: Int32, refersTo metadata: stat) -> Bool {
+        var observed = stat()
+        return fstat(descriptor, &observed) == 0 && observed.st_dev == metadata.st_dev && observed.st_ino == metadata.st_ino
     }
 
     private func makeImage(text: String = "Synthetic") throws -> CGImage {
