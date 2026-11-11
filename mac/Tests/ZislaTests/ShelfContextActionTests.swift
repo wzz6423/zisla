@@ -109,6 +109,59 @@ struct ShelfContextActionTests {
         #expect(!fixture.actions.isProcessing && fixture.actions.task == nil)
     }
 
+    @Test(arguments: ["cancelled", "corrupt second", "committed"])
+    func outerCleanupFailurePreservesConversionResultAndAllowsNextAction(_ outcome: String) async throws {
+        let fixture = try Fixture()
+        defer { fixture.remove() }
+        let first = try fixture.image(width: 24)
+        let second = try fixture.image(width: 36)
+        if outcome == "corrupt second" { try Data("corrupt image".utf8).write(to: second.url) }
+        let originals = try [Data(contentsOf: first.url), Data(contentsOf: second.url)]
+        let stage = fixture.stage
+        fixture.actions.removeStagingDirectory = { directory in
+            #expect(directory.deletingLastPathComponent().standardizedFileURL == stage.standardizedFileURL)
+            #expect(directory.lastPathComponent.hasPrefix("zisla-shelf-action-"))
+            try FileManager.default.removeItem(at: directory)
+            try FileManager.default.removeItem(at: directory)
+        }
+        let pending = fixture.actions.perform(.imagesToPDF, items: [second, first],
+            createQuickNote: { _ in false }, openStudio: { _ in false }, convertImages: { inputs, output in
+                if outcome == "cancelled" { throw CancellationError() }
+                try PDFProcessingService().convertImagesToPDF(inputs, to: output)
+            })
+        try await #require(pending).value
+        let expectedMessage: String
+        if outcome == "committed" {
+            let result = try #require(fixture.shelf.items.last)
+            #expect(fixture.shelf.items.count == 3 && fixture.shelf.items.prefix(2) == [first, second])
+            #expect(fixture.actions.generatedItemID == result.id)
+            #expect(result.isManaged && result.url.lastPathComponent == "images.pdf")
+            let document = try #require(PDFDocument(url: result.url))
+            #expect(document.pageCount == 2)
+            #expect(document.page(at: 0)?.bounds(for: .mediaBox).width == 36)
+            #expect(document.page(at: 1)?.bounds(for: .mediaBox).width == 24)
+            #expect(FileShelfStore(storageURL: fixture.storage).items == fixture.shelf.items)
+            expectedMessage = AppLocalization.text("已加入 %ld 个项目", 1)
+        } else {
+            #expect(fixture.shelf.items == [first, second] && fixture.actions.generatedItemID == nil)
+            expectedMessage = outcome == "cancelled" ? AppLocalization.text("已取消操作")
+                : AppLocalization.text("操作失败：%@", PDFProcessingError.unsupportedImage(second.url).localizedDescription)
+        }
+        #expect(fixture.actions.message == expectedMessage, "Staging cleanup must retain the conversion's success, cancellation, or original error")
+        #expect(try [Data(contentsOf: first.url), Data(contentsOf: second.url)] == originals)
+        #expect(try FileManager.default.contentsOfDirectory(atPath: stage.path).isEmpty)
+        #expect(!fixture.actions.isProcessing && !fixture.actions.isCancellable && fixture.actions.task == nil)
+
+        fixture.actions.removeStagingDirectory = { try FileManager.default.removeItem(at: $0) }
+        let itemsBeforeRetry = fixture.shelf.items
+        try await #require(fixture.perform(.imagesToPDF, items: [first])).value
+        #expect(fixture.shelf.items.count == itemsBeforeRetry.count + 1)
+        #expect(fixture.shelf.items.dropLast() == itemsBeforeRetry)
+        #expect(fixture.actions.generatedItemID == fixture.shelf.items.last?.id)
+        #expect(fixture.actions.message == AppLocalization.text("已加入 %ld 个项目", 1))
+        #expect(try FileManager.default.contentsOfDirectory(atPath: stage.path).isEmpty)
+    }
+
     @Test func screenshotsRecoverTheirCacheBeforePDFAndNeverChangeStoredPixels() async throws {
         let fixture = try Fixture()
         defer { fixture.remove() }

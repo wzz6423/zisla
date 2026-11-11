@@ -68,6 +68,64 @@ struct FileShelfGeneratedFileTests {
         #expect(try Data(contentsOf: output) == Data([4, 5, 6]))
     }
 
+    @Test(arguments: ["corrupt", "incompatible", "unreadable"])
+    func failedIndexLoadBlocksGeneratedImportsUntilReopened(_ failure: String) throws {
+        let root = try directory()
+        defer { try? FileManager.default.removeItem(at: root) }
+        let storage = root.appendingPathComponent("shelf.json")
+        let original = FileShelfStore(storageURL: storage)
+        try #require(original.add(payloads: [.text("saved before generated import")]) == 1)
+        let savedItems = original.items
+        let savedJSON = try Data(contentsOf: storage)
+        let savedBytes = try savedItems.map { try Data(contentsOf: $0.url) }
+        let stage = root.appendingPathComponent("stage")
+        try FileManager.default.createDirectory(at: stage, withIntermediateDirectories: false)
+        let output = stage.appendingPathComponent("images.pdf")
+        let outputBytes = Data("synthetic generated PDF".utf8)
+        try outputBytes.write(to: output)
+        let protectedURL: URL
+        let protectedBytes: Data
+        if failure == "unreadable" {
+            try FileManager.default.removeItem(at: storage)
+            try FileManager.default.createDirectory(at: storage, withIntermediateDirectories: false)
+            protectedURL = storage.appendingPathComponent("retained.json")
+            protectedBytes = savedJSON
+        } else {
+            protectedURL = storage
+            protectedBytes = try failure == "corrupt" ? Data(savedJSON.dropLast())
+                : JSONSerialization.data(withJSONObject: ["schemaVersion": 2, "items": JSONSerialization.jsonObject(with: savedJSON)])
+        }
+        try protectedBytes.write(to: protectedURL)
+        let blocked = FileShelfStore(storageURL: storage)
+        let loadError = try #require(blocked.errorDescription)
+        #expect(blocked.importPromisedFile(at: output, from: stage) == 0)
+        #expect(blocked.items.isEmpty && blocked.errorDescription == loadError)
+        #expect(try Data(contentsOf: protectedURL) == protectedBytes)
+        #expect(try FileManager.default.contentsOfDirectory(atPath: blocked.managedDirectory.path).sorted()
+            == savedItems.map { $0.id.uuidString }.sorted())
+        #expect(try savedItems.map { try Data(contentsOf: $0.url) } == savedBytes)
+        #expect(try Data(contentsOf: output) == outputBytes)
+
+        if failure == "unreadable" { try FileManager.default.removeItem(at: storage) }
+        try savedJSON.write(to: storage)
+        #expect(blocked.importPromisedFile(at: output, from: stage) == 0)
+        #expect(blocked.items.isEmpty && blocked.errorDescription == loadError)
+        #expect(try Data(contentsOf: storage) == savedJSON)
+        #expect(try FileManager.default.contentsOfDirectory(atPath: blocked.managedDirectory.path).sorted()
+            == savedItems.map { $0.id.uuidString }.sorted())
+
+        let recovered = FileShelfStore(storageURL: storage)
+        #expect(recovered.items == savedItems && recovered.errorDescription == nil)
+        #expect(recovered.importPromisedFile(at: output, from: stage) == 1)
+        let imported = try #require(recovered.items.last)
+        #expect(imported.isManaged && imported.url != output && imported.url.lastPathComponent == "images.pdf")
+        #expect(recovered.items.dropLast() == savedItems)
+        #expect(FileShelfStore(storageURL: storage).items == recovered.items)
+        try FileManager.default.removeItem(at: stage)
+        #expect(try Data(contentsOf: imported.url) == outputBytes)
+        #expect(try savedItems.map { try Data(contentsOf: $0.url) } == savedBytes)
+    }
+
     @Test func accessingBookmarksResolvesRenamedFilesAndKeepsUnavailableEntries() throws {
         let root = try directory()
         defer { try? FileManager.default.removeItem(at: root) }

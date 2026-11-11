@@ -364,7 +364,7 @@ struct AIResultSweepPresentationTests {
         var view: CompactStatusBarView {
             CompactStatusBarView(
                 queue: queue, displayState: displayState, media: media, browserDownloads: downloads,
-                settingsStore: settings, resultSweep: sweep, onStatusHidden: {}
+                settingsStore: settings, resultSweep: sweep, pomodoro: PomodoroService(notificationRequestHandler: { _ in }, defaults: defaults), onStatusHidden: {}
             )
         }
 

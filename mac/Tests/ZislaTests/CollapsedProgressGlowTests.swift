@@ -79,17 +79,21 @@ struct CollapsedProgressGlowTests {
         #expect(!Self.lit(pixels, width: 220, x: 200...219, y: 10...43))
     }
 
-    @Test(arguments: [0.25, 0.5, 1.0])
+    @Test(arguments: [0.25, 0.5, 1.0], [false, true])
     @MainActor
-    func notchPlaybackFillsFromLeftToRightOnlyAtTheBottom(progress: Double) throws {
+    func notchPlaybackAndPomodoroFillFromLeftToRightOnlyAtTheBottom(progress: Double, countdown: Bool) throws {
         let size = CGSize(width: 180, height: 34)
-        let pixels = try Self.playbackPixels(progress: progress, style: .notch, placement: IslandPlacement())
+        let pixels = try Self.playbackPixels(progress: progress, style: .notch, placement: IslandPlacement(),
+            includesMedia: !countdown, countdown: countdown)
         let width = Int(size.width)
         let height = Int(size.height)
 
         #expect(pixels[..<(width * (height - 3))].allSatisfy { $0 < 0.02 },
-                "Notch playback must leave the top and side edges clear")
+                "Notch playback and Pomodoro must leave the top and side edges clear")
         #expect(Self.lit(pixels, width: width, x: 22...26, y: height - 3...height - 1))
+        let filledEnd = Int(Double(width) * progress) - 10
+        #expect(Self.lit(pixels, width: width, x: filledEnd - 2...filledEnd, y: height - 3...height - 1),
+                "The bottom bar must reach the elapsed fraction before its rounded end")
         if progress < 1 {
             let unfilled = Int(Double(width) * progress) + 4
             #expect(!Self.lit(pixels, width: width, x: unfilled...width - 1, y: height - 3...height - 1),
@@ -592,7 +596,8 @@ struct CollapsedProgressGlowTests {
     @MainActor
     private static func playbackPixels(
         progress: Double, style: IslandLayoutStyle, placement: IslandPlacement,
-        recordingProgress: Double? = nil, downloadNoticeID: String? = nil, includesMedia: Bool = true
+        recordingProgress: Double? = nil, downloadNoticeID: String? = nil, includesMedia: Bool = true,
+        countdown: Bool = false
     ) throws -> [Double] {
         let suiteName = "Zisla.PlaybackProgress.\(UUID().uuidString)"
         let defaults = try #require(UserDefaults(suiteName: suiteName))
@@ -618,6 +623,10 @@ struct CollapsedProgressGlowTests {
             queue.enqueue(IslandNotice(id: "screen-recording-operation-progress", title: "Recording",
                                       progress: recordingProgress), expiresAfter: nil)
         }
+        if countdown {
+            queue.enqueue(IslandNotice(id: "focus-countdown-progress", title: "Focus", detail: "00:24:57",
+                                      progress: progress), expiresAfter: nil)
+        }
         let state = SideNoticeDisplayState()
         state.placementMode = placement.mode
         state.islandEdge = placement.edge
@@ -625,7 +634,7 @@ struct CollapsedProgressGlowTests {
         let size = placement.edge.isVertical ? CGSize(width: 34, height: 180) : CGSize(width: 180, height: 34)
         let view = CompactStatusBarView(queue: queue, displayState: state, media: media,
             browserDownloads: BrowserDownloadMonitor(), settingsStore: settings,
-            resultSweep: AIResultSweepController(), onStatusHidden: {})
+            resultSweep: AIResultSweepController(), pomodoro: PomodoroService(notificationRequestHandler: { _ in }, defaults: defaults), onStatusHidden: {})
         func render(enabled: Bool) throws -> [Double] {
             settings.settings.collapsedProgressGlowEnabled = enabled
             let renderer = ImageRenderer(content: view.statusBarContent(at: date)

@@ -71,14 +71,15 @@ struct AISessionWorkspaceCleanup: Sendable {
         if let urls, !urls.contains(where: overlapsWorkspaceRoot) { return }
 
         for provider in AIProvider.allCases {
+            var inventory: [Session] = []
             do {
-                let inventory = try retainedSessions(for: provider, home: home)
-                sessions.append(contentsOf: inventory.sessions)
-                if inventory.available { verifiedProviders.insert(provider) }
+                if try retainedSessions(for: provider, home: home, into: &inventory) {
+                    verifiedProviders.insert(provider)
+                }
             } catch {
                 // An incomplete inventory cannot establish deletion for this provider.
-                continue
             }
+            sessions.append(contentsOf: inventory)
         }
     }
 
@@ -201,8 +202,10 @@ struct AISessionWorkspaceCleanup: Sendable {
     }
 
     private func session(provider: AIProvider, id: String, directory: String?, timestamp: Any?, milliseconds: Bool = false) throws -> Session {
-        guard !id.isEmpty else { throw InventoryError.unavailable }
-        let date: Date
+        // Some tools persist sessions without a workspace as an empty cwd.
+        let directory = directory.flatMap { $0.isEmpty ? nil : $0 }
+        if let directory, !directory.hasPrefix("/") { throw InventoryError.unavailable }
+        let date: Date?
         if let number = timestamp as? NSNumber, CFGetTypeID(number) != CFBooleanGetTypeID(), number.doubleValue.isFinite,
            number.doubleValue > 0, number.doubleValue <= (milliseconds ? 253_402_300_799_999 : 253_402_300_799) {
             date = Date(timeIntervalSince1970: number.doubleValue / (milliseconds ? 1000 : 1))
@@ -210,37 +213,50 @@ struct AISessionWorkspaceCleanup: Sendable {
                   let parsed = (try? Date.ISO8601FormatStyle(includingFractionalSeconds: true).parse(text))
                     ?? (try? Date.ISO8601FormatStyle().parse(text)) {
             date = parsed
-        } else { throw InventoryError.unavailable }
-        // Some tools persist sessions without a workspace as an empty cwd.
-        let directory = directory.flatMap { $0.isEmpty ? nil : $0 }
-        if let directory, !directory.hasPrefix("/") { throw InventoryError.unavailable }
+        } else { date = nil }
         return Session(provider: provider, id: id, directory: directory.map {
             SystemMonitorPathSafety.standardizedPath(URL(fileURLWithPath: $0))
-        }, days: [Self.day(date, timeZone: .current), Self.day(date, timeZone: .gmt)])
+        }, days: date.map { [Self.day($0, timeZone: .current), Self.day($0, timeZone: .gmt)] } ?? [])
     }
 
-    private func retainedSessions(for provider: AIProvider, home: URL) throws -> (sessions: [Session], available: Bool) {
-        var result: [Session] = []
+    private func retainedSessions(for provider: AIProvider, home: URL, into result: inout [Session]) throws -> Bool {
         var available = false
+        var complete = true
         func directory(_ path: String, override: String? = nil) -> URL {
             if let override, let value = environment[override], value.hasPrefix("/") {
                 return URL(fileURLWithPath: value, isDirectory: true)
             }
             return home.appendingPathComponent(path, isDirectory: true)
         }
-        func logs(_ root: URL, matching: (URL) -> Bool) throws {
+        func logs(_ root: URL, matching: (URL) -> Bool) {
             guard fileManager.fileExists(atPath: root.path) else { return }
             available = true
-            for file in try inventoryFiles(at: root, matching: matching) {
-                result.append(try metadataSession(at: file, provider: provider))
+            do {
+                for file in try inventoryFiles(at: root, matching: matching) {
+                    do {
+                        result.append(try metadataSession(at: file, provider: provider))
+                    } catch {
+                        // Other valid records still protect workspaces shared with another tool.
+                        complete = false
+                    }
+                }
+            } catch {
+                complete = false
             }
         }
-        func database(_ url: URL, sql: String, milliseconds: Bool = true) throws {
+        func database(_ url: URL, sql: String, milliseconds: Bool = true) {
             guard fileManager.fileExists(atPath: url.path) else { return }
             available = true
-            for row in try databaseRows(at: url, sql: sql) {
-                guard let id = row["id"] as? String else { throw InventoryError.unavailable }
-                result.append(try session(provider: provider, id: id, directory: row["cwd"] as? String, timestamp: row["created"], milliseconds: milliseconds))
+            do {
+                for row in try databaseRows(at: url, sql: sql) {
+                    do {
+                        result.append(try session(provider: provider, id: row["id"] as? String ?? "", directory: row["cwd"] as? String, timestamp: row["created"], milliseconds: milliseconds))
+                    } catch {
+                        complete = false
+                    }
+                }
+            } catch {
+                complete = false
             }
         }
 
@@ -249,31 +265,31 @@ struct AISessionWorkspaceCleanup: Sendable {
             let root = directory(".codex", override: "CODEX_HOME")
             if fileManager.fileExists(atPath: root.path) {
                 for file in try children(root) where file.lastPathComponent.range(of: #"^state_\d+\.sqlite$"#, options: .regularExpression) != nil {
-                    try database(file, sql: "SELECT id, cwd, created_at AS created FROM threads", milliseconds: false)
+                    database(file, sql: "SELECT id, cwd, created_at AS created FROM threads", milliseconds: false)
                 }
             }
             if available { break }
             for folder in ["sessions", "archived_sessions"] {
-                try logs(root.appendingPathComponent(folder)) { $0.lastPathComponent.hasPrefix("rollout-") && $0.pathExtension == "jsonl" }
+                logs(root.appendingPathComponent(folder)) { $0.lastPathComponent.hasPrefix("rollout-") && $0.pathExtension == "jsonl" }
                 // Cold rollouts still represent retained sessions; do not infer deletion from compression.
                 if fileManager.fileExists(atPath: root.appendingPathComponent(folder).path),
                    !(try inventoryFiles(at: root.appendingPathComponent(folder), matching: { $0.lastPathComponent.hasSuffix(".jsonl.zst") })).isEmpty {
-                    throw InventoryError.unavailable
+                    complete = false
                 }
             }
         case .claude:
-            try logs(directory(".claude/projects")) { $0.pathExtension == "jsonl" }
+            logs(directory(".claude/projects")) { $0.pathExtension == "jsonl" }
         case .gemini:
-            try logs(directory(".gemini/tmp")) {
+            logs(directory(".gemini/tmp")) {
                 $0.lastPathComponent.hasPrefix("session-") && ["json", "jsonl"].contains($0.pathExtension)
             }
             let root = home.appendingPathComponent("Library/Caches/com.google.GeminiMacOS/Gemini")
             for file in try inventoryFiles(at: root, matching: { $0.lastPathComponent.hasPrefix("ChatInfo") && $0.pathExtension == "store" }) {
-                try database(file, sql: "SELECT ZCHATUUID AS id, MIN(ZCREATEDTIME) + 978307200 AS created FROM ZCHATMESSAGESTOREDMODEL GROUP BY ZCHATUUID", milliseconds: false)
+                database(file, sql: "SELECT ZCHATUUID AS id, MIN(ZCREATEDTIME) + 978307200 AS created FROM ZCHATMESSAGESTOREDMODEL GROUP BY ZCHATUUID", milliseconds: false)
             }
         case .grok:
             let root = directory(".grok/sessions")
-            try logs(root) { $0.lastPathComponent == "summary.json" }
+            logs(root) { $0.lastPathComponent == "summary.json" }
             let events = try inventoryFiles(at: root, matching: { $0.lastPathComponent == "events.jsonl" })
             if events.contains(where: { !fileManager.fileExists(atPath: $0.deletingLastPathComponent().appendingPathComponent("summary.json").path) }) {
                 throw InventoryError.unavailable
@@ -281,25 +297,37 @@ struct AISessionWorkspaceCleanup: Sendable {
         case .copilot:
             let root = directory(".copilot").appendingPathComponent("session-state")
             if fileManager.fileExists(atPath: root.path) { available = true }
-            let events = try inventoryFiles(at: root, matching: { $0.lastPathComponent == "events.jsonl" })
-            if events.contains(where: { !fileManager.fileExists(atPath: $0.deletingLastPathComponent().appendingPathComponent("workspace.yaml").path) }) {
-                throw InventoryError.unavailable
-            }
-            for file in try inventoryFiles(at: root, matching: { $0.lastPathComponent == "workspace.yaml" }) {
-                guard let data = fileManager.readPrefix(at: file, maximumBytes: Self.metadataByteLimit),
-                      let text = String(data: data, encoding: .utf8) else { throw InventoryError.unavailable }
-                var values: [String: String] = [:]
-                for line in text.split(whereSeparator: \.isNewline) {
-                    guard let separator = line.firstIndex(of: ":") else { continue }
-                    let key = String(line[..<separator]).trimmingCharacters(in: .whitespaces)
-                    let value = String(line[line.index(after: separator)...]).trimmingCharacters(in: .whitespacesAndNewlines)
-                    values[key] = value.trimmingCharacters(in: CharacterSet(charactersIn: "\"'"))
+            do {
+                let events = try inventoryFiles(at: root, matching: { $0.lastPathComponent == "events.jsonl" })
+                if events.contains(where: { !fileManager.fileExists(atPath: $0.deletingLastPathComponent().appendingPathComponent("workspace.yaml").path) }) {
+                    complete = false
                 }
-                guard let id = values["id"], let cwd = values["cwd"] else { throw InventoryError.unavailable }
-                result.append(try session(provider: provider, id: id, directory: cwd, timestamp: values["created_at"]))
+            } catch {
+                complete = false
+            }
+            do {
+                for file in try inventoryFiles(at: root, matching: { $0.lastPathComponent == "workspace.yaml" }) {
+                    do {
+                        guard let data = fileManager.readPrefix(at: file, maximumBytes: Self.metadataByteLimit),
+                              let text = String(data: data, encoding: .utf8) else { throw InventoryError.unavailable }
+                        var values: [String: String] = [:]
+                        for line in text.split(whereSeparator: \.isNewline) {
+                            guard let separator = line.firstIndex(of: ":") else { continue }
+                            let key = String(line[..<separator]).trimmingCharacters(in: .whitespaces)
+                            let value = String(line[line.index(after: separator)...]).trimmingCharacters(in: .whitespacesAndNewlines)
+                            values[key] = value.trimmingCharacters(in: CharacterSet(charactersIn: "\"'"))
+                        }
+                        guard let cwd = values["cwd"] else { throw InventoryError.unavailable }
+                        result.append(try session(provider: provider, id: values["id"] ?? "", directory: cwd, timestamp: values["created_at"]))
+                    } catch {
+                        complete = false
+                    }
+                }
+            } catch {
+                complete = false
             }
             for host in ["Code", "Code - Insiders", "VSCodium", "Cursor", "Windsurf"] {
-                try logs(home.appendingPathComponent("Library/Application Support/\(host)/User/workspaceStorage")) {
+                logs(home.appendingPathComponent("Library/Application Support/\(host)/User/workspaceStorage")) {
                     $0.deletingLastPathComponent().lastPathComponent == "chatSessions" && ["json", "jsonl"].contains($0.pathExtension)
                 }
             }
@@ -307,63 +335,71 @@ struct AISessionWorkspaceCleanup: Sendable {
             // The retained-state file has no reliable creation date or working directory.
             break
         case .qwen:
-            try logs(directory(".qwen", override: "QWEN_HOME").appendingPathComponent("projects")) { $0.pathExtension == "jsonl" }
+            logs(directory(".qwen", override: "QWEN_HOME").appendingPathComponent("projects")) { $0.pathExtension == "jsonl" }
         case .coder:
             for root in try children(home) where root.lastPathComponent.lowercased().hasPrefix(".qoder") {
                 let projects = root.appendingPathComponent("projects")
                 if fileManager.fileExists(atPath: projects.path) {
-                    try logs(projects) { $0.pathExtension == "jsonl" }
+                    logs(projects) { $0.pathExtension == "jsonl" }
                 } else {
                     // Activity segments may be rotated while their conversations remain retained.
-                    throw InventoryError.unavailable
+                    complete = false
                 }
             }
         case .zcode:
-            try database(ZCodeSessionActivityDetector.defaultDatabaseURL(home: home), sql: "SELECT id, directory AS cwd, time_created AS created FROM session")
-            try database(home.appendingPathComponent(".zcode/v2/tasks-index.sqlite"), sql: "SELECT task_id AS id, workspace_path AS cwd, created_at AS created FROM tasks WHERE deleted = 0")
+            database(ZCodeSessionActivityDetector.defaultDatabaseURL(home: home), sql: "SELECT id, directory AS cwd, time_created AS created FROM session")
+            database(home.appendingPathComponent(".zcode/v2/tasks-index.sqlite"), sql: "SELECT task_id AS id, workspace_path AS cwd, created_at AS created FROM tasks WHERE deleted = 0")
         case .zed:
-            try database(ZedSessionActivityDetector.defaultDatabaseURL(home: home), sql: "SELECT id, created_at AS created FROM threads", milliseconds: false)
+            database(ZedSessionActivityDetector.defaultDatabaseURL(home: home), sql: "SELECT id, created_at AS created FROM threads", milliseconds: false)
         case .opencode:
             let root = directory(".local/share/opencode")
-            try database(root.appendingPathComponent("opencode.db"), sql: "SELECT id, directory AS cwd, time_created AS created FROM session")
-            try logs(root.appendingPathComponent("storage/session")) { $0.pathExtension == "json" }
+            database(root.appendingPathComponent("opencode.db"), sql: "SELECT id, directory AS cwd, time_created AS created FROM session")
+            logs(root.appendingPathComponent("storage/session")) { $0.pathExtension == "json" }
         case .pi:
-            try logs(directory(".pi/agent/sessions")) { $0.pathExtension == "jsonl" }
+            logs(directory(".pi/agent/sessions")) { $0.pathExtension == "jsonl" }
         case .delta:
             let root = DeltaSessionActivityDetector.defaultDataRoot(home: home)
-            try database(root.appendingPathComponent("data.sqlite"), sql: "SELECT id, created_at AS created FROM app_threads")
+            database(root.appendingPathComponent("data.sqlite"), sql: "SELECT id, created_at AS created FROM app_threads")
             for account in try children(root) where account.lastPathComponent.hasPrefix("user_") {
-                try database(account.appendingPathComponent("data.sqlite"), sql: "SELECT id, created_at AS created FROM app_threads")
+                database(account.appendingPathComponent("data.sqlite"), sql: "SELECT id, created_at AS created FROM app_threads")
             }
         case .workbuddy, .workbuddyAI:
             let url = provider == .workbuddy
                 ? WorkBuddySessionActivityDetector.defaultDatabaseURL(home: home)
                 : WorkBuddyAISessionActivityDetector.defaultDatabaseURL(home: home)
-            try database(url, sql: "SELECT id, cwd, created_at AS created FROM sessions WHERE deleted_at IS NULL")
+            database(url, sql: "SELECT id, cwd, created_at AS created FROM sessions WHERE deleted_at IS NULL")
         case .cursor:
             let root = CursorSessionActivityDetector.defaultUserDirectory(home: home)
-            let databases = [root.appendingPathComponent("globalStorage/state.vscdb")]
-                + (try children(root.appendingPathComponent("workspaceStorage"))).map { $0.appendingPathComponent("state.vscdb") }
+            var databases = [root.appendingPathComponent("globalStorage/state.vscdb")]
+            do {
+                databases += try children(root.appendingPathComponent("workspaceStorage")).map { $0.appendingPathComponent("state.vscdb") }
+            } catch {
+                complete = false
+            }
             for url in databases where fileManager.fileExists(atPath: url.path) {
                 available = true
-                let tables = try databaseRows(at: url, sql: "SELECT name FROM sqlite_master WHERE type = 'table'").compactMap { $0["name"] as? String }
-                let supported = ["cursorDiskKV", "composerHeaders", "ItemTable"].filter { tables.contains($0) }
-                guard !supported.isEmpty else { throw InventoryError.unavailable }
-                for table in supported {
-                    let source: String
-                    if table == "ItemTable" {
-                        source = "ItemTable i, json_each(CASE WHEN json_type(i.value) = 'array' THEN i.value ELSE json_extract(i.value, '$.allComposers') END) c WHERE i.key IN ('composer.composerData', 'allComposers')"
-                    } else {
-                        source = "\(table) c" + (table == "cursorDiskKV" ? " WHERE key LIKE 'composerData:%'" : "")
+                do {
+                    let tables = try databaseRows(at: url, sql: "SELECT name FROM sqlite_master WHERE type = 'table'").compactMap { $0["name"] as? String }
+                    let supported = ["cursorDiskKV", "composerHeaders", "ItemTable"].filter { tables.contains($0) }
+                    guard !supported.isEmpty else { throw InventoryError.unavailable }
+                    for table in supported {
+                        let source: String
+                        if table == "ItemTable" {
+                            source = "ItemTable i, json_each(CASE WHEN json_type(i.value) = 'array' THEN i.value ELSE json_extract(i.value, '$.allComposers') END) c WHERE i.key IN ('composer.composerData', 'allComposers')"
+                        } else {
+                            source = "\(table) c" + (table == "cursorDiskKV" ? " WHERE key LIKE 'composerData:%'" : "")
+                        }
+                        database(url, sql: "SELECT json_extract(c.value, '$.composerId') AS id, json_extract(c.value, '$.createdAt') AS created, json_extract(c.value, '$.cwd') AS cwd FROM \(source)")
                     }
-                    try database(url, sql: "SELECT json_extract(c.value, '$.composerId') AS id, json_extract(c.value, '$.createdAt') AS created, json_extract(c.value, '$.cwd') AS cwd FROM \(source)")
+                } catch {
+                    complete = false
                 }
             }
         case .harness, .trae, .orca, .gpt, .doubao, .grokBot, .muse:
             // Activity logs and opaque or remote stores cannot establish permanent deletion.
             break
         }
-        return (result, available)
+        return available && complete && result.allSatisfy { !$0.id.isEmpty && !$0.days.isEmpty }
     }
 
     private func metadataSession(at url: URL, provider: AIProvider) throws -> Session {
@@ -372,7 +408,6 @@ struct AISessionWorkspaceCleanup: Sendable {
             let metadataData = url.pathExtension == "jsonl" ? Data(data.prefix { $0 != 0x0A }) : data
             guard let object = try? JSONSerialization.jsonObject(with: metadataData) as? [String: Any] else { throw InventoryError.unavailable }
             let metadata = object["v"] as? [String: Any] ?? object["data"] as? [String: Any] ?? object
-            guard let id = metadata["sessionId"] as? String else { throw InventoryError.unavailable }
             let workspaceFile = url.deletingLastPathComponent().deletingLastPathComponent().appendingPathComponent("workspace.json")
             var cwd: String?
             if fileManager.fileExists(atPath: workspaceFile.path) {
@@ -382,7 +417,7 @@ struct AISessionWorkspaceCleanup: Sendable {
                     cwd = folderURL.path
                 }
             }
-            return try session(provider: provider, id: id, directory: cwd, timestamp: metadata["creationDate"] ?? metadata["startTime"], milliseconds: true)
+            return try session(provider: provider, id: metadata["sessionId"] as? String ?? "", directory: cwd, timestamp: metadata["creationDate"] ?? metadata["startTime"], milliseconds: true)
         }
         if url.pathExtension == "json" {
             guard let object = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else { throw InventoryError.unavailable }

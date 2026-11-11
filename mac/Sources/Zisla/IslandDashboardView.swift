@@ -42,8 +42,8 @@ struct IslandDashboardView: View {
             if isPomodoroActive {
                 focusCard.transition(cardTransition)
             }
-            if activeAITask != nil {
-                aiCard.transition(cardTransition)
+            ForEach(aiWorkSummaries) { summary in
+                aiCard(summary).transition(cardTransition)
             }
             if activeMediaItem != nil {
                 mediaCard.transition(cardTransition)
@@ -90,39 +90,9 @@ struct IslandDashboardView: View {
         }
     }
 
-    private var aiCard: some View {
+    private func aiCard(_ summary: DashboardAIWorkSummary) -> some View {
         dashboardCard(symbol: "sparkles", title: AppLocalization.text("AI 工作"), tint: Color.zislaInfo) {
-            if let task = activeAITask {
-                HStack(spacing: 7) {
-                    AIMascotView(
-                        identity: AIMascotIdentity(provider: task.provider, taskID: task.id, title: task.title),
-                        size: 24
-                    )
-
-                    VStack(alignment: .leading, spacing: 3) {
-                        Text(task.title)
-                            .font(.system(size: 10, weight: .semibold))
-                            .fitsSingleLine()
-
-                        if let progress = task.progress {
-                            ProgressView(value: progress)
-                                .tint(ProviderBrand.color(for: task.provider))
-                        } else {
-                            Text(aiStatusText(for: task.status))
-                                .font(.islandMicro())
-                                .foregroundStyle(.secondary)
-                        }
-                    }
-
-                    if let progress = task.progress {
-                        Text("\(Int((progress * 100).rounded()))%")
-                            .font(.islandMicro(weight: .semibold, design: .monospaced))
-                            .foregroundStyle(.secondary)
-                            .monospacedDigit()
-                    }
-                }
-                .frame(maxWidth: .infinity, alignment: .leading)
-            }
+            DashboardAIWorkContent(summary: summary)
         }
     }
 
@@ -311,12 +281,11 @@ struct IslandDashboardView: View {
         )
     }
 
-    private var activeAITask: AIProgressTask? {
-        guard model.settingsStore.settings.aiProgressEnabled else { return nil }
-        return aiMonitor.state.tasks
-            .filter(\.status.isActive)
-            .sorted { $0.updatedAt > $1.updatedAt }
-            .first
+    private var aiWorkSummaries: [DashboardAIWorkSummary] {
+        DashboardAIWorkSummary.groups(
+            from: aiMonitor.state.tasks,
+            enabled: model.settingsStore.settings.aiProgressEnabled
+        )
     }
 
     private var activeMediaItem: NowPlayingSnapshot? {
@@ -338,10 +307,9 @@ struct IslandDashboardView: View {
     private var activeCardCount: Int {
         [
             isPomodoroActive,
-            activeAITask != nil,
             activeMediaItem != nil,
             isDownloadActive,
-        ].filter { $0 }.count + (
+        ].filter { $0 }.count + aiWorkSummaries.count + (
             model.settingsStore.settings.showsBrowserDownloadProgress
                 ? browserDownloads.snapshots.count : 0
         ) + notices.screenRecordingOperations.count
@@ -361,15 +329,70 @@ struct IslandDashboardView: View {
         case .idle: "待开始"
         }
     }
+}
 
-    private func aiStatusText(for status: AIProgressStatus) -> String {
-        switch status {
-        case .queued: "等待运行"
-        case .running: "正在运行"
-        case .blocked: "等待操作"
-        case .error, .failed: AppLocalization.text("需要处理")
-        case .succeeded: "已完成"
-        }
+struct DashboardAIWorkSummary: Identifiable {
+    let task: AIProgressTask
+    let count: Int
+
+    var identity: AIMascotIdentity {
+        AIMascotIdentity(provider: task.provider, taskID: task.id, title: task.title)
     }
 
+    var id: String { identity.displayName }
+    var title: String { count == 1 ? task.title : id }
+    var progress: Double? { count == 1 ? task.progress : nil }
+
+    func statusText(locale: Locale) -> String {
+        let status = AppLocalization.string("正在运行", locale: locale)
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+        return "\(count) \(status)"
+    }
+
+    static func groups(from tasks: [AIProgressTask], enabled: Bool) -> [Self] {
+        guard enabled else { return [] }
+        let runningTasks = tasks.filter { $0.status == .running }
+            .sorted { $0.updatedAt > $1.updatedAt }
+        return Dictionary(grouping: runningTasks) {
+            AIMascotIdentity(provider: $0.provider, taskID: $0.id, title: $0.title).displayName
+        }.values.map { Self(task: $0[0], count: $0.count) }
+            .sorted {
+                if $0.task.updatedAt == $1.task.updatedAt { return $0.id < $1.id }
+                return $0.task.updatedAt > $1.task.updatedAt
+            }
+    }
+}
+
+struct DashboardAIWorkContent: View {
+    let summary: DashboardAIWorkSummary
+    @Environment(\.locale) private var locale
+
+    var body: some View {
+        HStack(spacing: 7) {
+            AIMascotView(identity: summary.identity, size: 24)
+
+            VStack(alignment: .leading, spacing: 3) {
+                Text(summary.title)
+                    .font(.system(size: 10, weight: .semibold))
+                    .fitsSingleLine()
+
+                if let progress = summary.progress {
+                    ProgressView(value: progress)
+                        .tint(ProviderBrand.color(for: summary.task.provider))
+                } else {
+                    Text(summary.statusText(locale: locale))
+                        .font(.islandMicro())
+                        .foregroundStyle(.secondary)
+                }
+            }
+
+            if let progress = summary.progress {
+                Text("\(Int((progress * 100).rounded()))%")
+                    .font(.islandMicro(weight: .semibold, design: .monospaced))
+                    .foregroundStyle(.secondary)
+                    .monospacedDigit()
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+    }
 }

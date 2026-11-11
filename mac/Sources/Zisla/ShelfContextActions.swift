@@ -58,6 +58,7 @@ final class ShelfContextActions: ObservableObject {
     @Published private(set) var message: String?
     @Published private(set) var generatedItemID: UUID?
     private(set) var task: Task<Void, Never>?
+    var removeStagingDirectory: @Sendable (URL) throws -> Void = { try FileManager.default.removeItem(at: $0) }
     private let shelf: FileShelfStore
     private let temporaryDirectory: URL
 
@@ -158,8 +159,7 @@ final class ShelfContextActions: ObservableObject {
                     : AppLocalization.text("操作失败：%@", error.localizedDescription)
             }
             if let staging {
-                do { try FileManager.default.removeItem(at: staging) }
-                catch { message = AppLocalization.text("操作失败：%@", error.localizedDescription) }
+                try? removeStagingDirectory(staging)
             }
         }
         return task
