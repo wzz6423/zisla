@@ -7,27 +7,54 @@ import ZislaCore
 @testable import Zisla
 
 struct BatteryChargeToFullButtonTests {
-    @Test(.timeLimit(.minutes(1))) @MainActor
-    func debugActionClickRechecksAndReportsAnIneligibleBatteryWithoutCharging() async throws {
+    @Test @MainActor
+    func systemMonitorRoutesTheBatteryActionToItsExistingMessageOwner() throws {
+        var messages: [String] = []
+        let monitor = BatteryMonitor()
+        let view = SystemMonitorView(service: SystemMonitorService(), batteryMonitor: monitor,
+            networkMonitor: NetworkBatteryMonitor(), showsSystemMonitor: false, showsBatteryMonitor: true,
+            onCleanupRequested: {}, onTransientMessage: { messages.append($0) })
+        let detail: BatteryDetailView = try #require(value(in: view.body))
+        let battery = BatterySnapshot(level: 0.8, isCharging: false, isPluggedIn: true,
+            isCharged: false, timeRemainingMinutes: nil)
+        let action: BatteryChargeToFullButton = try #require(value(in: detail.localBatterySection(battery)))
+        let message = BatteryLocalization.string("无法立即充至100%，请重试。", locale: Locale(identifier: "en"))
+        action.onTransientMessage(message)
+        #expect(messages == [message], "A nested battery error must reach the system monitor's existing notice owner")
+    }
+
+    @Test(.timeLimit(.minutes(1)), arguments: AppLanguage.allCases, ["missing", "refused", "accepted"]) @MainActor
+    func chargeActionsUseOnlyTheExistingTransientNotice(language: AppLanguage, scenario: String) async throws {
         let controller = BatteryChargingController(
             readState: { BatteryChargingState(chargeLimit: 80, chargingOverrideAllowed: true) },
-            requestCharge: { Issue.record("The debug action must not charge a missing battery") }
+            requestCharge: {
+                if scenario == "missing" { Issue.record("The debug action must not charge a missing battery") }
+                if scenario == "refused" { throw BatteryChargingError.requestFailed }
+            }
         )
         let domain = "zisla.charge-action-fixture.\(UUID().uuidString)"
         let defaults = try #require(UserDefaults(suiteName: domain))
         defer { defaults.removePersistentDomain(forName: domain) }
+        let battery: BatterySnapshot? = scenario == "missing" ? nil : BatterySnapshot(level: 0.8,
+            isCharging: false, isPluggedIn: true, isCharged: false, timeRemainingMinutes: nil)
         let monitor = BatteryMonitor(defaults: defaults, notificationCenter: NotificationCenter(),
-            snapshotProvider: { nil }, runLoopSourceFactory: { _ in nil })
-        let failures = AsyncStream<Bool>.makeStream()
-        let observation = controller.$requestFailed.sink { if $0 { failures.continuation.yield($0) } }
-        defer { observation.cancel(); failures.continuation.finish() }
+            snapshotProvider: { battery }, runLoopSourceFactory: { _ in nil })
+        monitor.refresh()
+        let completions = AsyncStream<Bool>.makeStream()
+        let observation = controller.$isRequesting.dropFirst().filter { !$0 }
+            .sink { _ in completions.continuation.yield(true) }
+        defer { observation.cancel(); completions.continuation.finish() }
+        var messages = ["Existing notice"]
         let releaseAccessibility = EnhancedAccessibilityTestScope.acquire()
         defer { releaseAccessibility() }
         let window = NSPanel(contentRect: CGRect(x: -100_000, y: -100_000, width: 280, height: 48),
             styleMask: [.borderless, .nonactivatingPanel], backing: .buffered, defer: false)
         window.isReleasedWhenClosed = false
         let host = NSHostingView(rootView: BatteryChargeToFullButton(batteryMonitor: monitor,
-            environment: ["ZISLA_DEBUG_SHOW_CHARGE_TO_FULL": "1"], isDebugBuild: true, controller: controller))
+            onTransientMessage: { messages.append($0) },
+            environment: ["ZISLA_DEBUG_SHOW_CHARGE_TO_FULL": "1"], isDebugBuild: true, controller: controller)
+            .environment(\.locale, language.locale)
+            .environment(\.layoutDirection, language.isRightToLeft ? .rightToLeft : .leftToRight))
         window.contentView = host
         defer { window.contentView = nil; window.close() }
         host.layoutSubtreeIfNeeded()
@@ -41,19 +68,28 @@ struct BatteryChargeToFullButtonTests {
         })
         let press = NSSelectorFromString("accessibilityPerformPress")
         try #require(button.responds(to: press))
-        _ = button.perform(press)
-        var iterator = failures.stream.makeAsyncIterator()
-        try #require(await iterator.next() == true, "A forced-visible action must run the native preflight and report ineligibility")
+        var iterator = completions.stream.makeAsyncIterator()
+        for attempt in 1...2 {
+            _ = button.perform(press)
+            try #require(await iterator.next() == true)
+            let errors = scenario == "accepted" ? [] : Array(repeating:
+                BatteryLocalization.string("无法立即充至100%，请重试。", locale: language.locale), count: attempt)
+            #expect(messages == ["Existing notice"] + errors,
+                    "Each failed click must refresh the existing notice; successful charging must preserve it")
+            #expect(NSApp.modalWindow == nil && window.attachedSheet == nil,
+                    "Charging errors must use the same nonmodal notice as an empty Trash")
+        }
         #expect(!controller.isRequesting)
-        #expect(!controller.canChargeToFull)
-        #expect(monitor.snapshot == nil)
+        #expect(controller.canChargeToFull == (scenario == "refused"))
+        #expect(monitor.snapshot == battery)
     }
 
     @Test(arguments: [String?.none, "1", "0", "", "true", "01", " 1", "1 "], [false, true]) @MainActor
     func debugEnvironmentOnlyShowsTheActionForAnExactOptIn(value: String?, isDebugBuild: Bool) throws {
         let environment = value.map { ["ZISLA_DEBUG_SHOW_CHARGE_TO_FULL": $0] } ?? [:]
         let monitor = BatteryMonitor()
-        let view = BatteryChargeToFullButton(batteryMonitor: monitor, environment: environment, isDebugBuild: isDebugBuild)
+        let view = BatteryChargeToFullButton(batteryMonitor: monitor, onTransientMessage: { _ in },
+            environment: environment, isDebugBuild: isDebugBuild)
         let image = try render(view.frame(width: 280, height: 48), language: .english)
         var hasVisibleAction = false
         for y in 0..<image.pixelsHigh {
@@ -81,7 +117,8 @@ struct BatteryChargeToFullButtonTests {
     func buttonFitsTheExistingCompactHeaderInEveryLanguage(language: AppLanguage, isRequesting: Bool) throws {
         let battery = BatterySnapshot(level: 0.8, isCharging: false, isPluggedIn: true,
             isCharged: false, timeRemainingMinutes: nil, isLowPowerMode: true)
-        let view = BatteryDetailView(batteryMonitor: BatteryMonitor(), networkMonitor: NetworkBatteryMonitor())
+        let view = BatteryDetailView(batteryMonitor: BatteryMonitor(), networkMonitor: NetworkBatteryMonitor(),
+            onTransientMessage: { _ in })
         let presentation = BatteryPowerModePresentation(
             currentMode: .lowPower, powerSource: .powerAdapter,
             supportedModes: BatteryPowerMode.allCases, isChanging: false, error: nil
@@ -144,5 +181,12 @@ struct BatteryChargeToFullButtonTests {
             .environment(\.colorScheme, .dark).background(.black))
         renderer.scale = 2
         return NSBitmapImageRep(cgImage: try #require(renderer.cgImage))
+    }
+
+    private func value<Value>(in content: Any) -> Value? {
+        if let value = content as? Value { return value }
+        let mirror = Mirror(reflecting: content)
+        guard mirror.displayStyle != .class else { return nil }
+        return mirror.children.lazy.compactMap { value(in: $0.value) }.first
     }
 }

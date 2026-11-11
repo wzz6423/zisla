@@ -4,17 +4,20 @@ import ZislaKit
 
 struct BatteryChargeToFullButton: View {
     @ObservedObject var batteryMonitor: BatteryMonitor
+    let onTransientMessage: (String) -> Void
     @StateObject private var controller: BatteryChargingController
     @Environment(\.locale) private var locale
     private let debugShowsButton: Bool
 
     init(
         batteryMonitor: BatteryMonitor,
+        onTransientMessage: @escaping (String) -> Void,
         environment: [String: String] = ProcessInfo.processInfo.environment,
         isDebugBuild: Bool = LegacyAppDataMigration.isDebugBuild,
         controller: BatteryChargingController? = nil
     ) {
         self.batteryMonitor = batteryMonitor
+        self.onTransientMessage = onTransientMessage
         _controller = StateObject(wrappedValue: controller ?? BatteryChargingController())
         debugShowsButton = isDebugBuild && environment["ZISLA_DEBUG_SHOW_CHARGE_TO_FULL"] == "1"
     }
@@ -25,6 +28,9 @@ struct BatteryChargeToFullButton: View {
                 Self.chargeButton(isRequesting: controller.isRequesting, locale: locale) {
                     Task {
                         await controller.chargeToFull(recheckEligibility: debugShowsButton) { batteryMonitor.snapshot }
+                        if controller.requestFailed {
+                            onTransientMessage(BatteryLocalization.string("无法立即充至100%，请重试。", locale: locale))
+                        }
                         batteryMonitor.refresh()
                     }
                 }
@@ -32,10 +38,6 @@ struct BatteryChargeToFullButton: View {
         }
         .task(id: batteryMonitor.snapshot) {
             await controller.refresh(for: batteryMonitor.snapshot)
-        }
-        .alert(BatteryLocalization.string("无法立即充至100%，请重试。", locale: locale),
-               isPresented: $controller.requestFailed) {
-            Button(BatteryLocalization.string("好", locale: locale), role: .cancel) {}
         }
     }
 

@@ -579,6 +579,7 @@ struct BatteryTrendPresentation {
 struct BatteryDetailView: View {
     @ObservedObject var batteryMonitor: BatteryMonitor
     @ObservedObject var networkMonitor: NetworkBatteryMonitor
+    let onTransientMessage: (String) -> Void
 
     @Environment(\.locale) private var locale
 
@@ -614,7 +615,7 @@ struct BatteryDetailView: View {
                     isLowPowerMode: battery.isLowPowerMode
                 )
             } chargingAction: {
-                BatteryChargeToFullButton(batteryMonitor: batteryMonitor)
+                BatteryChargeToFullButton(batteryMonitor: batteryMonitor, onTransientMessage: onTransientMessage)
             }
 
             LocalPowerFlowView(battery: battery)

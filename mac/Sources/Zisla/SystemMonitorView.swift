@@ -29,6 +29,7 @@ struct SystemMonitorView: View {
     var showsSystemMonitor: Bool
     var showsBatteryMonitor: Bool
     let onCleanupRequested: () -> Void
+    let onTransientMessage: (String) -> Void
     @State private var releasedMemoryBytes: UInt64?
     @State private var systemColumnHeight: CGFloat = 0
     @Environment(\.locale) private var locale
@@ -39,7 +40,8 @@ struct SystemMonitorView: View {
         networkMonitor: NetworkBatteryMonitor? = nil,
         showsSystemMonitor: Bool = true,
         showsBatteryMonitor: Bool = false,
-        onCleanupRequested: @escaping () -> Void
+        onCleanupRequested: @escaping () -> Void,
+        onTransientMessage: @escaping (String) -> Void
     ) {
         self.service = service
         self.batteryMonitor = batteryMonitor
@@ -47,6 +49,7 @@ struct SystemMonitorView: View {
         self.showsSystemMonitor = showsSystemMonitor
         self.showsBatteryMonitor = showsBatteryMonitor
         self.onCleanupRequested = onCleanupRequested
+        self.onTransientMessage = onTransientMessage
     }
 
     var body: some View {
@@ -65,7 +68,8 @@ struct SystemMonitorView: View {
                     }
                 }
                 if showsBatteryMonitor, let batteryMonitor, let networkMonitor {
-                    BatteryDetailView(batteryMonitor: batteryMonitor, networkMonitor: networkMonitor)
+                    BatteryDetailView(batteryMonitor: batteryMonitor, networkMonitor: networkMonitor,
+                                      onTransientMessage: onTransientMessage)
                 }
             }
             .padding(12)
