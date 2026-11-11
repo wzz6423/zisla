@@ -428,6 +428,10 @@ public struct SideNoticeLayoutEngine: Equatable, Sendable {
            compactPresentation.notice.style == .headphone {
             contentWidth = CompactHeadphoneConnectionLayout(notice: compactPresentation.notice)
                 .length(centerWidth: topology.hasPhysicalNotch ? anchor.width : 0)
+        } else if let compactPresentation, compactPresentation.isAccountBalance {
+            contentWidth = topology.hasPhysicalNotch
+                ? anchor.width + compactPresentation.accountBalanceSideWidth(thickness: height) * 2
+                : compactPresentation.length(thickness: height, edge: .top)
         } else {
             contentWidth = baseWidth
         }
@@ -527,6 +531,14 @@ public struct SideNoticeLayoutEngine: Equatable, Sendable {
            compactPresentation.notice.style == .headphone {
             contentWidth = CompactHeadphoneConnectionLayout(notice: compactPresentation.notice)
                 .length(centerWidth: layout.topology.hasPhysicalNotch ? anchor.width : 0)
+        } else if let compactPresentation, compactPresentation.isAccountBalance {
+            let height = layout.topology.hasPhysicalNotch
+                ? compactBarHeight(topBarHeight: layout.topBarHeight, anchor: anchor,
+                    screenHeight: layout.screenFrame.height, progressGlowEnabled: progressGlowEnabled)
+                : max(anchor.height, minimumSimulatedHeight)
+            contentWidth = layout.topology.hasPhysicalNotch
+                ? anchor.width + compactPresentation.accountBalanceSideWidth(thickness: height) * 2
+                : compactPresentation.length(thickness: height, edge: .top)
         } else {
             contentWidth = baseWidth
         }
@@ -685,8 +697,11 @@ public struct SideNoticeLayoutEngine: Equatable, Sendable {
             compactWingWidth,
             displaysHeadphone ? Layout.defaultCompactWingHeight + 2 : 0,
             presentation?.length(thickness: thickness, edge: settings.islandPlacement.edge) ?? thickness,
-            displaysHeadphone && settings.islandLayoutStyle == .pill && settings.islandPlacement.mode == .camera
-                ? displayedTransientNotice.map { CompactHeadphoneConnectionLayout(notice: $0).sideWidth } : nil,
+            settings.islandLayoutStyle == .pill && settings.islandPlacement.mode == .camera
+                ? (presentation?.isAccountBalance == true
+                    ? presentation?.accountBalanceSideWidth(thickness: ScreenLayoutConfiguration.cameraPillHeight)
+                    : displaysHeadphone ? displayedTransientNotice.map { CompactHeadphoneConnectionLayout(notice: $0).sideWidth } : nil)
+                : nil,
             presentation
         )
     }

@@ -3,6 +3,40 @@ import Testing
 @testable import ZislaCore
 
 struct AIAccountBalanceTests {
+    @Test func detailedSummaryKeepsRealFiveHoursAndPutsExhaustionFirstInAllWindows() {
+        let reading = AIAccountBalance(id: "claude", providers: [.claude], status: .available,
+            windows: [.init(id: "5h", kind: .fiveHours, remainingPercent: 70, durationSeconds: 18_000),
+                .init(id: "weekly", kind: .weekly, remainingPercent: 90),
+                .init(id: "extra", kind: .budget, remaining: 0, unit: .usd)])
+        #expect(reading.compactLines(language: .simplifiedChinese) == ["5h 70%", "全部 可用预算 $0 · 每周额度 90%"])
+    }
+
+    @Test func ringFractionRequiresARealFiniteDenominator() {
+        let percent = AIAccountQuotaWindow(id: "percent", kind: .all, remainingPercent: 10)
+        let amount = AIAccountQuotaWindow(id: "credits", kind: .credits, remaining: 25, limit: 100, unit: .credits)
+        #expect(percent.remainingFraction == 0.1)
+        #expect(amount.remainingFraction == 0.25)
+        #expect(amount.severity == .normal, "Amount-only visualization must preserve the existing alert semantics")
+        for window in [AIAccountQuotaWindow(id: "unknown", kind: .credits, remaining: 20, unit: .credits),
+            .init(id: "zero", kind: .credits, remaining: 0, limit: 0, unit: .credits),
+            .init(id: "unlimited", kind: .all, remainingPercent: 100, unlimited: true),
+            .init(id: "invalid", kind: .all, remainingPercent: .nan)] {
+            #expect(window.remainingFraction == nil)
+        }
+    }
+
+    @Test func visibleSharedAccountRequiresTheSameMonitoredAndDisplayedAlias() {
+        let reading = AIAccountBalance(id: "shared", providers: [.codex, .gpt], status: .available,
+            windows: [.init(id: "quota", kind: .all, remainingPercent: 70)])
+        #expect(AIAccountBalanceCatalog.displayedBalances([reading], monitoredProviders: [.codex],
+            displayedProviders: [.gpt]).isEmpty)
+        let selected = AIAccountBalanceCatalog.displayedBalances([reading], monitoredProviders: [.gpt],
+            displayedProviders: [.gpt])
+        #expect(selected.count == 1 && selected.first?.providers == [.gpt])
+        #expect(AIAccountBalanceCatalog.displayedBalances([reading], monitoredProviders: [],
+            displayedProviders: [.gpt]).isEmpty)
+    }
+
     /// Boundary pairs distinguish inclusive remaining-quota thresholds from consumed-percentage thresholds.
     @Test(arguments: [(100.0, AIAccountQuotaSeverity.normal), (20.1, .normal), (20, .warning), (10.1, .warning),
                        (10, .critical), (0.1, .critical), (0, .exhausted)])

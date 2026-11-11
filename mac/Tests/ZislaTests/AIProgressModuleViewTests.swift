@@ -96,7 +96,7 @@ struct AIProgressModuleViewTests {
         defer { monitor.stop() }
         monitor.reload()
         let initialState = monitor.state
-        let host = NSHostingView(rootView: AIProgressModuleView(monitor: monitor)
+        let host = NSHostingView(rootView: AIProgressModuleView(monitor: monitor, monitoredBalanceProviders: Set(AIProvider.allCases))
             .environment(\.locale, language.locale)
             .environment(\.layoutDirection, language.isRightToLeft ? .rightToLeft : .leftToRight))
         host.sizingOptions = []

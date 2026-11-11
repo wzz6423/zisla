@@ -115,6 +115,14 @@ public struct AIAccountQuotaWindow: Codable, Equatable, Sendable, Identifiable {
         return remaining == 0 ? .exhausted : .normal
     }
 
+    /// A missing denominator or unlimited allowance has no measurable arc.
+    public var remainingFraction: Double? {
+        guard isValid, !unlimited else { return nil }
+        if let remainingPercent { return remainingPercent / 100 }
+        guard let remaining, let limit, limit > 0 else { return nil }
+        return remaining / limit
+    }
+
     /// Keeps provider feature names distinct while localizing known labels and retaining actual window kinds.
     public func label(language: AppLanguage) -> String {
         let title = AppLocalization.string(kind.title, language: language)
@@ -169,6 +177,13 @@ public struct AIAccountBalance: Codable, Equatable, Sendable, Identifiable {
         return windows.map(\.severity).max()
     }
 
+    public var limitingWindow: AIAccountQuotaWindow? {
+        guard severity != nil else { return nil }
+        return windows.sorted {
+            $0.severity != $1.severity ? $0.severity > $1.severity : ($0.remainingPercent ?? 100) < ($1.remainingPercent ?? 100)
+        }.first
+    }
+
     public var noticeID: String { "ai-balance-low-" + id }
 
     public func providerTitle(language: AppLanguage) -> String {
@@ -182,7 +197,10 @@ public struct AIAccountBalance: Codable, Equatable, Sendable, Identifiable {
         guard severity != nil else { return [] }
         let short = windows.first { $0.kind == .fiveHours && !$0.id.hasPrefix("additional:") }
             ?? windows.first { $0.kind == .rolling && !$0.id.hasPrefix("additional:") }
-        let remaining = windows.filter { $0.id != short?.id }
+        var remaining = windows.filter { $0.id != short?.id }
+        if let index = remaining.firstIndex(where: { $0.id == limitingWindow?.id }), index > 0 {
+            remaining.insert(remaining.remove(at: index), at: 0)
+        }
         var lines: [String] = []
         if let short {
             lines.append(short.label(language: language) + " " + short.value(language: language))
@@ -203,6 +221,24 @@ public struct AIAccountBalance: Codable, Equatable, Sendable, Identifiable {
 }
 
 public enum AIAccountBalanceCatalog {
+    public static func supportsBalanceQuery(_ provider: AIProvider) -> Bool {
+        let status = placeholder(for: [provider]).status
+        return status == .notSignedIn || status == .additionalCredentialsRequired
+    }
+
+    /// An alias must be selected for both monitoring and display; partial or unavailable readings stay in settings.
+    public static func displayedBalances(_ balances: [AIAccountBalance], monitoredProviders: Set<AIProvider>,
+                                        displayedProviders: Set<AIProvider>) -> [AIAccountBalance] {
+        balances.compactMap { balance in
+            guard balance.severity != nil else { return nil }
+            var row = balance
+            row.providers = row.providers.filter {
+                supportsBalanceQuery($0) && monitoredProviders.contains($0) && displayedProviders.contains($0)
+            }
+            return row.providers.isEmpty ? nil : row
+        }
+    }
+
     public static func providerName(_ provider: AIProvider) -> String {
         switch provider {
         case .claude: "Claude"

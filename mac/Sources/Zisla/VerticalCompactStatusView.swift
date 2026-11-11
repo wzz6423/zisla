@@ -113,7 +113,8 @@ struct CompactPillStatusContent: View {
         GeometryReader { proxy in
             if presentation.isAccountBalance {
                 CompactAIAccountBalanceBar(notice: presentation.notice,
-                    height: edge.isVertical ? proxy.size.width : proxy.size.height, edge: edge)
+                    height: edge.isVertical ? proxy.size.width : proxy.size.height, edge: edge,
+                    leadingInset: leadingInset)
             } else {
             let thickness = edge.isVertical ? proxy.size.width : proxy.size.height
             let iconSize = max(0, thickness - 8)

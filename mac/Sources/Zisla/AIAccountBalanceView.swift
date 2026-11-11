@@ -11,85 +11,153 @@ extension AIAccountQuotaSeverity {
 struct AIAccountBalanceSection: View {
     let balances: [AIAccountBalance]
     let displayedProviders: Set<AIProvider>
+    let monitoredProviders: Set<AIProvider>
     let language: AppLanguage
 
-    /// Filters each shared-account alias without hiding the selected account's unavailable status.
     var displayedBalances: [AIAccountBalance] {
-        balances.compactMap { balance in
-            var row = balance
-            row.providers = row.providers.filter { displayedProviders.contains($0) }
-            return row.providers.isEmpty ? nil : row
-        }
+        AIAccountBalanceCatalog.displayedBalances(balances, monitoredProviders: monitoredProviders,
+            displayedProviders: displayedProviders)
     }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            Label(AppLocalization.string("账户剩余额度", language: language), systemImage: "gauge.with.dots.needle.67percent")
+        if !displayedBalances.isEmpty {
+            VStack(alignment: .leading, spacing: 12) {
+                Label(AppLocalization.string("账户剩余额度", language: language), systemImage: "gauge.with.dots.needle.67percent")
+                    .font(.system(size: 11, weight: .semibold))
+                AIAccountBalanceCardLayout(direction: language.isRightToLeft ? .rightToLeft : .leftToRight) {
+                    ForEach(displayedBalances) { balance in
+                        AIAccountBalanceCard(balance: balance, language: language)
+                    }
+                }
+            }
+            .environment(\.layoutDirection, language.isRightToLeft ? .rightToLeft : .leftToRight)
+        }
+    }
+}
+
+struct AIAccountBalanceCardLayout: Layout {
+    var direction: LayoutDirection = .leftToRight
+    private let spacing: CGFloat = 12
+
+    private func columns(width: CGFloat) -> Int { min(3, max(1, Int((width + spacing) / (176 + spacing)))) }
+
+    private func rowHeights(width: CGFloat, subviews: Subviews) -> [CGFloat] {
+        let count = columns(width: width)
+        let cardWidth = max(0, (width - CGFloat(count - 1) * spacing) / CGFloat(count))
+        var heights: [CGFloat] = []
+        for (index, subview) in subviews.enumerated() {
+            if index % count == 0 { heights.append(0) }
+            heights[index / count] = max(heights[index / count],
+                subview.sizeThatFits(ProposedViewSize(width: cardWidth, height: nil)).height)
+        }
+        return heights
+    }
+
+    func sizeThatFits(proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) -> CGSize {
+        let width = proposal.width ?? 420
+        let heights = rowHeights(width: width, subviews: subviews)
+        return CGSize(width: width, height: heights.reduce(0, +) + CGFloat(max(0, heights.count - 1)) * spacing)
+    }
+
+    func placeSubviews(in bounds: CGRect, proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) {
+        let count = columns(width: bounds.width)
+        let width = max(0, (bounds.width - CGFloat(count - 1) * spacing) / CGFloat(count))
+        let heights = rowHeights(width: bounds.width, subviews: subviews)
+        var y = bounds.minY
+        for (index, subview) in subviews.enumerated() {
+            let column = index % count
+            if column == 0, index > 0 { y += heights[index / count - 1] + spacing }
+            let x = CGFloat(column) * (width + spacing)
+            subview.place(at: CGPoint(x: bounds.minX + (direction == .rightToLeft ? bounds.width - x - width : x), y: y),
+                anchor: .topLeading, proposal: ProposedViewSize(width: width, height: heights[index / count]))
+        }
+    }
+}
+
+struct AIAccountBalanceCard: View {
+    let balance: AIAccountBalance
+    let language: AppLanguage
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Text(balance.providerTitle(language: language))
                 .font(.system(size: 11, weight: .semibold))
-            LazyVStack(alignment: .leading, spacing: 12) {
-                ForEach(displayedBalances) { balance in
-                    VStack(alignment: .leading, spacing: 6) {
-                        HStack(alignment: .firstTextBaseline) {
-                            Text(balance.providerTitle(language: language))
-                                .font(.system(size: 11, weight: .semibold))
-                            Spacer(minLength: 8)
-                            if balance.status != .available {
-                                Text(AppLocalization.string(balance.status.title, language: language))
-                                    .font(.system(size: 10)).foregroundStyle(.secondary)
-                            }
-                        }
-                        if balance.status == .available {
-                            ForEach(balance.windows) { window in
-                                ViewThatFits(in: .horizontal) {
-                                    HStack(alignment: .firstTextBaseline, spacing: 8) {
-                                        quotaIdentity(window).fixedSize()
-                                        quotaValue(window)
-                                        quotaProgress(window)
-                                        Spacer(minLength: 0)
-                                        quotaReset(window).fixedSize()
-                                    }
-                                    VStack(alignment: .leading, spacing: 4) {
-                                        quotaIdentity(window).fixedSize(horizontal: false, vertical: true)
-                                        HStack(spacing: 8) { quotaValue(window); quotaProgress(window) }
-                                        quotaReset(window).fixedSize(horizontal: false, vertical: true)
-                                    }
-                                }
-                            }
-                        }
-                        if let detail = balance.detailKey {
-                            Text(AppLocalization.string(detail, language: language)).font(.system(size: 9)).foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
+            ForEach(balance.windows) { window in
+                HStack(alignment: .center, spacing: 8) {
+                    AIAccountQuotaRing(provider: balance.providers.first, fraction: window.remainingFraction,
+                        severity: window.severity, diameter: 42)
+                    VStack(alignment: .leading, spacing: 3) {
+                        Text(window.label(language: language))
+                            .font(.system(size: 10)).foregroundStyle(.secondary)
+                        Text(window.value(language: language))
+                            .font(.system(size: 12, weight: .semibold, design: .rounded))
+                            .monospacedDigit().foregroundStyle(window.severity.balanceColor)
+                        if let reset = window.resetsAt {
+                            Text(AppLocalization.format("%@ 重置", locale: language.locale,
+                                [reset.formatted(.dateTime.month(.twoDigits).day(.twoDigits).hour().minute().locale(language.locale))]))
+                                .font(.system(size: 9)).foregroundStyle(.secondary)
                         }
                     }
+                    .fixedSize(horizontal: false, vertical: true)
                     .frame(maxWidth: .infinity, alignment: .leading)
                 }
             }
         }
-        .environment(\.layoutDirection, language.isRightToLeft ? .rightToLeft : .leftToRight)
-    }
-
-    private func quotaIdentity(_ window: AIAccountQuotaWindow) -> some View {
-        Text(window.label(language: language)).font(.system(size: 10)).foregroundStyle(.secondary)
-    }
-
-    private func quotaValue(_ window: AIAccountQuotaWindow) -> some View {
-        Text(window.value(language: language)).font(.system(size: 11, weight: .semibold, design: .rounded))
-            .monospacedDigit().foregroundStyle(window.severity.balanceColor).fixedSize()
-    }
-
-    /// Omits the bar when the provider reports only an amount, preserving the absence of a percentage denominator.
-    @ViewBuilder private func quotaProgress(_ window: AIAccountQuotaWindow) -> some View {
-        if let fraction = window.remainingPercent {
-            ProgressView(value: fraction, total: 100).tint(window.severity.balanceColor).frame(maxWidth: 100)
+        .padding(12)
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+        .background(Color.fillCard, in: RoundedRectangle(cornerRadius: IslandSurfaceGeometry.moduleInnerCornerRadius))
+        .overlay {
+            RoundedRectangle(cornerRadius: IslandSurfaceGeometry.moduleInnerCornerRadius)
+                .strokeBorder(Color.strokeCard, lineWidth: 1)
         }
     }
+}
 
-    /// Displays only an observed reset timestamp instead of estimating one from a window label.
-    @ViewBuilder private func quotaReset(_ window: AIAccountQuotaWindow) -> some View {
-        if let reset = window.resetsAt {
-            Text(AppLocalization.format("%@ 重置", locale: language.locale,
-                [reset.formatted(.dateTime.month(.twoDigits).day(.twoDigits).hour().minute().locale(language.locale))]))
-                .font(.system(size: 9)).foregroundStyle(.secondary)
+struct AIAccountQuotaRing: View {
+    let provider: AIProvider?
+    let fraction: Double?
+    let severity: AIAccountQuotaSeverity
+    let diameter: CGFloat
+
+    var body: some View {
+        let strokeWidth = diameter * 4 / 42
+        ZStack {
+            Circle().stroke(severity.balanceColor.opacity(0.2), lineWidth: strokeWidth)
+            if let fraction, fraction > 0 {
+                Circle().trim(from: 0, to: fraction)
+                    .stroke(severity.balanceColor, style: StrokeStyle(lineWidth: strokeWidth, lineCap: .round))
+                    .rotationEffect(.degrees(-90))
+            }
         }
+        .padding(strokeWidth / 2 + 0.5)
+        .overlay {
+            if let provider {
+                AIMascotView(identity: AIMascotIdentity(provider: provider, taskID: ""), size: diameter * 0.48)
+            }
+        }
+        .frame(width: diameter, height: diameter)
+        .accessibilityHidden(true)
+    }
+}
+
+struct AIAccountBalanceProviderStatus: View {
+    @ObservedObject var monitor: AIStateMonitor
+    let provider: AIProvider
+    let language: AppLanguage
+
+    var status: AIAccountBalanceStatus {
+        monitor.accountBalances.first { $0.providers.contains(provider) }?.status
+            ?? AIAccountBalanceCatalog.placeholder(for: [provider]).status
+    }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 2) {
+            Text(AIAccountBalanceCatalog.providerName(provider))
+            Text(AppLocalization.string(status.title, language: language))
+                .font(.system(size: 10)).foregroundStyle(.secondary)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
     }
 }
 
@@ -98,62 +166,67 @@ struct CompactAIAccountBalanceBar: View {
     let height: CGFloat
     var centerInset: CGFloat = 0
     var edge: IslandEdge = .top
+    var leadingInset: CGFloat = CompactPillStatusPresentation.trailingInset
     @Environment(\.layoutDirection) private var direction
 
     private var lines: [String] { (0..<2).compactMap { notice.metadata?["quotaLine\($0)"] } }
     private var severity: AIAccountQuotaSeverity {
         AIAccountQuotaSeverity(rawValue: Int(notice.metadata?["quotaSeverity"] ?? "") ?? 0) ?? .normal
     }
+    private var provider: AIProvider? { notice.metadata?["quotaProviderID"].flatMap(AIProvider.init(rawValue:)) }
+    private var fraction: Double? { notice.metadata?["quotaRemainingFraction"].flatMap(Double.init) }
+    private var ringDiameter: CGFloat { max(0, height - 8) }
+
+    private var ring: some View {
+        AIAccountQuotaRing(provider: provider, fraction: fraction, severity: severity, diameter: ringDiameter)
+    }
 
     var body: some View {
         GeometryReader { geometry in
-            let title = notice.metadata?["quotaProvider"] ?? notice.title
             if !edge.isVertical, centerInset > 0 {
                 let center = min(centerInset, geometry.size.width)
                 let sideWidth = max(0, (geometry.size.width - center) / 2)
                 HStack(spacing: 0) {
-                    Text(verbatim: title).font(.system(size: 10, weight: .semibold))
-                        .lineLimit(1).truncationMode(.tail)
-                        .padding(.horizontal, 12).frame(width: sideWidth, alignment: .leading)
-                        .environment(\.layoutDirection, direction)
+                    ring.frame(width: sideWidth)
                     Spacer(minLength: 0).frame(width: center)
-                    horizontalValues.padding(.horizontal, 12).frame(width: sideWidth, alignment: .trailing)
+                    horizontalValues
+                        .padding(.horizontal, CompactPillStatusPresentation.trailingInset)
+                        .frame(width: sideWidth)
                         .environment(\.layoutDirection, direction)
                 }
                 .environment(\.layoutDirection, .leftToRight)
                 .frame(width: geometry.size.width, height: geometry.size.height)
             } else if edge.isVertical {
-                let contentHeight = max(0, geometry.size.height - 24)
-                let titleRows = CompactPillStatusPresentation.verticalTextRows(title, availableWidth: height - 8,
-                    availableHeight: CompactPillStatusPresentation.maximumTextLength)
-                let requiredValueHeight = lines.map {
-                    CGFloat(CompactPillStatusPresentation.verticalTextRows($0,
-                        availableWidth: (height - 8) / CGFloat(max(1, lines.count)),
-                        availableHeight: CompactPillStatusPresentation.maximumTextLength).count) * 14
-                }.max() ?? 0
-                let titleHeight = min(CGFloat(titleRows.count) * 14, max(0, contentHeight - 8 - requiredValueHeight))
-                let valueHeight = max(0, contentHeight - titleHeight - 8)
-                VStack(spacing: 8) {
-                    VerticalStatusText(text: title, availableWidth: height - 8,
-                        availableHeight: titleHeight)
-                        .frame(height: titleHeight)
+                let valueHeight = max(0, geometry.size.height - leadingInset
+                    - CompactPillStatusPresentation.trailingInset - ringDiameter - 6)
+                let valueWidth = max(0, (geometry.size.width - 8 - CGFloat(max(0, lines.count - 1)) * 2)
+                    / CGFloat(max(1, lines.count)))
+                VStack(spacing: 6) {
+                    ring
                     HStack(alignment: .top, spacing: 2) {
                         ForEach(Array(lines.enumerated()), id: \.offset) { _, line in
-                            VerticalStatusText(text: line, availableWidth: (height - 8) / CGFloat(max(1, lines.count)),
-                                availableHeight: valueHeight)
+                            VerticalStatusText(text: line, availableWidth: valueWidth,
+                                availableHeight: valueHeight, scrollsAutomatically: true)
                                 .foregroundStyle(severity.balanceColor)
                         }
                     }
+                    .environment(\.layoutDirection, direction)
                     .frame(height: valueHeight)
+                    .id(notice.metadata?["quotaAccountID"])
                 }
-                .padding(.vertical, 12).frame(width: geometry.size.width, height: geometry.size.height)
+                .padding(.top, leadingInset).padding(.bottom, CompactPillStatusPresentation.trailingInset)
+                .frame(width: geometry.size.width, height: geometry.size.height)
+                .clipped()
             } else {
-                HStack(spacing: 8) {
-                    Text(verbatim: title).font(.system(size: 10, weight: .semibold))
-                        .lineLimit(1).truncationMode(.tail).frame(maxWidth: geometry.size.width * 0.35, alignment: .leading)
-                    horizontalValues.frame(maxWidth: .infinity, alignment: .trailing)
+                HStack(spacing: 6) {
+                    ring
+                    horizontalValues
+                        .environment(\.layoutDirection, direction)
                 }
-                .padding(.horizontal, 12).frame(width: geometry.size.width, height: geometry.size.height)
+                .padding(.leading, leadingInset).padding(.trailing, CompactPillStatusPresentation.trailingInset)
+                .environment(\.layoutDirection, .leftToRight)
+                .frame(width: geometry.size.width, height: geometry.size.height)
+                .clipped()
             }
         }
         .frame(height: edge.isVertical ? nil : height)
@@ -163,11 +236,15 @@ struct CompactAIAccountBalanceBar: View {
     }
 
     private var horizontalValues: some View {
-        VStack(alignment: .trailing, spacing: 1) {
+        VStack(alignment: .leading, spacing: 1) {
             ForEach(Array(lines.enumerated()), id: \.offset) { _, line in
-                Text(verbatim: line).font(.system(size: lines.count > 1 ? 9 : 11, weight: .semibold))
-                    .lineLimit(1).truncationMode(.tail).foregroundStyle(severity.balanceColor)
+                MarqueeText(line, font: .system(size: lines.count > 1 ? 9 : 11, weight: .semibold),
+                    textColor: severity.balanceColor, pointsPerSecond: CompactPillStatusPresentation.accountBalanceScrollSpeed,
+                    scrollDirection: direction == .rightToLeft ? .right : .left,
+                    repeats: false,
+                    viewportHeight: lines.count > 1 ? 13 : 16)
             }
         }
+        .id(notice.metadata?["quotaAccountID"])
     }
 }

@@ -7,6 +7,7 @@ import SwiftUI
 struct AIProgressModuleView: View {
     @ObservedObject private var monitor: AIStateMonitor
     var displayedBalanceProviders: Set<AIProvider>
+    var monitoredBalanceProviders: Set<AIProvider>
     var language: AppLanguage
 
     /// Both columns push their content this far below the header. The trend chart's topmost
@@ -14,9 +15,11 @@ struct AIProgressModuleView: View {
     private static let sectionSpacing: CGFloat = 12
 
     init(monitor: AIStateMonitor, displayedBalanceProviders: Set<AIProvider> = Set(AIProvider.allCases),
+         monitoredBalanceProviders: Set<AIProvider>,
          language: AppLanguage = AppLocalization.currentLanguage) {
         _monitor = ObservedObject(wrappedValue: monitor)
         self.displayedBalanceProviders = displayedBalanceProviders
+        self.monitoredBalanceProviders = monitoredBalanceProviders
         self.language = language
     }
 
@@ -38,7 +41,8 @@ struct AIProgressModuleView: View {
                     }
                     .fixedSize(horizontal: false, vertical: true)
                     AIAccountBalanceSection(balances: monitor.accountBalances,
-                        displayedProviders: displayedBalanceProviders, language: language)
+                        displayedProviders: displayedBalanceProviders, monitoredProviders: monitoredBalanceProviders,
+                        language: language)
                 }
                 .frame(maxWidth: .infinity, alignment: .topLeading)
             }

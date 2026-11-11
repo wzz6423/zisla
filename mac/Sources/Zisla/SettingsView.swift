@@ -984,11 +984,14 @@ struct SettingsView: View {
                     DisclosureGroup(AppLocalization.text("各供应商额度")) {
                         ForEach(AIProvider.allCases, id: \.self) { provider in
                             HStack(spacing: 14) {
-                                Text(AIAccountBalanceCatalog.providerName(provider)).frame(maxWidth: .infinity, alignment: .leading)
+                                AIAccountBalanceProviderStatus(monitor: model.aiMonitor, provider: provider,
+                                    language: model.languageStore.language)
                                 Toggle(AppLocalization.text("监控额度"), isOn: balanceProviderBinding(provider, monitored: true))
                                     .toggleStyle(.switch).fixedSize()
+                                    .disabled(!AIAccountBalanceCatalog.supportsBalanceQuery(provider))
                                 Toggle(AppLocalization.text("展示额度"), isOn: balanceProviderBinding(provider, monitored: false))
                                     .toggleStyle(.switch).fixedSize()
+                                    .disabled(!AIAccountBalanceCatalog.supportsBalanceQuery(provider))
                             }
                             .font(.system(size: 11)).padding(.vertical, 4)
                         }

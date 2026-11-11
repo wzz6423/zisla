@@ -282,7 +282,9 @@ struct CompactStatusBarView: View {
                 } else {
                     compactStatusContent
                         .padding(.horizontal, settingsStore.settings.islandLayoutStyle == .pill
-                            && !(selectedCompactStatusPriority == .transient && transientNotice?.style == .headphone) ? 10 : 0)
+                            && !(selectedCompactStatusPriority == .transient
+                                && (transientNotice?.style == .headphone
+                                    || transientNotice.map(AIAccountBalance.isLowBalanceNotice) == true)) ? 10 : 0)
                 }
             }
         }

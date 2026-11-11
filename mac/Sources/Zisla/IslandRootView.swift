@@ -227,6 +227,7 @@ struct IslandRootView: View {
                                         case .aiMonitor:
                                             AIProgressModuleView(monitor: model.aiMonitor,
                                                 displayedBalanceProviders: model.settingsStore.settings.aiAccountBalanceDisplayedProviders,
+                                                monitoredBalanceProviders: model.settingsStore.settings.aiAccountBalanceMonitoredProviders,
                                                 language: model.languageStore.language)
                                         case .download:
                                             DownloadModuleView(model: model)

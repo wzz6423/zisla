@@ -591,11 +591,9 @@ final class AppModel: ObservableObject {
     observation: { [unowned self] date in self.dailyBriefingObservation(at: date) },
     aiAccountBalances: { [unowned self] in
       let settings = self.settingsStore.settings
-      return self.aiMonitor.accountBalances.compactMap { balance in
-        var row = balance
-        row.providers = row.providers.filter { settings.aiAccountBalanceDisplayedProviders.contains($0) }
-        return row.providers.isEmpty ? nil : row
-      }
+      return AIAccountBalanceCatalog.displayedBalances(self.aiMonitor.accountBalances,
+        monitoredProviders: settings.aiAccountBalanceMonitoredProviders,
+        displayedProviders: settings.aiAccountBalanceDisplayedProviders)
     },
     typing: { [unowned self] date in
       guard self.settingsStore.settings.keyboardTypingStatsEnabled,

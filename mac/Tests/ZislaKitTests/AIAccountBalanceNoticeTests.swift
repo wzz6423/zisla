@@ -5,6 +5,195 @@ import Testing
 
 @MainActor
 struct AIAccountBalanceNoticeTests {
+
+    @Test func longPinnedReadingBeginsAfterTheSelectedReminderDisappears() throws {
+        let queue = SideNoticeQueue(), controller = AIAccountBalanceNoticeController(queue: queue)
+        defer { queue.removeAll() }
+        let windowNames = ["Weekly", "Opus", "Sonnet", "OAuth", "Routines", "Extra"]
+        let claude = AIAccountBalance(id: "claude", providers: [.claude], status: .available,
+            windows: [.init(id: "5h", kind: .fiveHours, remainingPercent: 70, durationSeconds: 18_000)]
+                + windowNames.enumerated().map { .init(id: "window\($0.offset)", kind: .model,
+                    remainingPercent: 70, name: $0.element) })
+        let codex = AIAccountBalance(id: "codex", providers: [.codex], status: .available,
+            windows: [.init(id: "weekly", kind: .weekly, remainingPercent: 10)]
+                + (0..<3).map { .init(id: "additional:\($0)", kind: .model, remainingPercent: 70, name: "Codex additional \($0)") })
+        var settings = FeatureSettings(aiAccountBalanceCompactStyle: .detailed, aiAccountBalancePinnedInCustomIsland: true,
+            aiAccountBalanceMonitoredProviders: [.claude, .codex], aiAccountBalanceDisplayedProviders: [.claude, .codex])
+        settings.islandPlacement = IslandPlacement(mode: .custom, edge: .left)
+        controller.update(balances: [claude, codex], settings: settings, language: .english, at: Date(timeIntervalSince1970: 100))
+        let pinned = try #require(queue.left.first { $0.id == AIAccountBalanceNoticeController.pinnedID })
+        let reading = max(5, CompactPillStatusPresentation(priority: .aiAccountBalance, notice: pinned, text: "")
+            .accountBalanceReadingSeconds(thickness: 34, edge: .left))
+        #expect(reading > 10)
+        controller.updatePinned(at: Date(timeIntervalSince1970: 100 + reading * 2))
+        #expect(queue.left.first { $0.id == AIAccountBalanceNoticeController.pinnedID }?.metadata?["quotaAccountID"] == "claude")
+        queue.removeAll(withIDPrefix: "ai-balance-low-")
+        let exposed = 100 + reading * 2 + 1
+        controller.updatePinned(at: Date(timeIntervalSince1970: exposed))
+        controller.updatePinned(at: Date(timeIntervalSince1970: exposed + reading - 0.1))
+        #expect(queue.left.first { $0.id == AIAccountBalanceNoticeController.pinnedID }?.metadata?["quotaAccountID"] == "claude",
+            "The long account must retain its entire reading budget after it becomes selected")
+        controller.updatePinned(at: Date(timeIntervalSince1970: exposed + reading + 0.1))
+        #expect(queue.left.first { $0.id == AIAccountBalanceNoticeController.pinnedID }?.metadata?["quotaAccountID"] == "codex")
+    }
+
+    @Test func lowReminderCoverageCannotConsumeThePinnedAccountReading() throws {
+        let queue = SideNoticeQueue(), controller = AIAccountBalanceNoticeController(queue: queue)
+        defer { queue.removeAll() }
+        var settings = FeatureSettings(aiAccountBalanceCompactStyle: .detailed, aiAccountBalancePinnedInCustomIsland: true)
+        settings.islandPlacement = IslandPlacement(mode: .custom, edge: .left)
+        let rows = [balance(70), balance(10, provider: .codex)]
+        controller.update(balances: rows, settings: settings, language: .english, at: Date(timeIntervalSince1970: 100))
+        #expect(SideNoticeLayoutEngine.selectedCompactStatusPriority(for: queue.left, settings: settings) == .transient)
+        controller.updatePinned(at: Date(timeIntervalSince1970: 120))
+        #expect(queue.left.first { $0.id == AIAccountBalanceNoticeController.pinnedID }?.title == "Claude",
+            "An invisible pinned account must not rotate while its low reminder is selected")
+        queue.removeAll(withIDPrefix: "ai-balance-low-")
+        controller.updatePinned(at: Date(timeIntervalSince1970: 121))
+        controller.updatePinned(at: Date(timeIntervalSince1970: 125))
+        #expect(queue.left.first { $0.id == AIAccountBalanceNoticeController.pinnedID }?.title == "Claude",
+            "The newly exposed account receives its complete five-second reading")
+        controller.updatePinned(at: Date(timeIntervalSince1970: 126))
+        #expect(queue.left.first { $0.id == AIAccountBalanceNoticeController.pinnedID }?.title.hasPrefix("Codex") == true)
+    }
+
+    @Test func equalSummariesKeepAStableAccountIdentityAcrossPollsAndChangeItOnRotation() throws {
+        let queue = SideNoticeQueue(), controller = AIAccountBalanceNoticeController(queue: queue)
+        defer { queue.removeAll() }
+        let windows = [AIAccountQuotaWindow(id: "5h", kind: .fiveHours, remainingPercent: 70, durationSeconds: 18_000),
+            .init(id: "weekly", kind: .weekly, remainingPercent: 70)]
+        let rows = [AIProvider.claude, .codex].map { AIAccountBalance(id: $0.rawValue, providers: [$0], status: .available, windows: windows) }
+        var settings = FeatureSettings(aiAccountBalanceNoticeEnabled: false, aiAccountBalanceCompactStyle: .detailed,
+            aiAccountBalancePinnedInCustomIsland: true, aiAccountBalanceMonitoredProviders: [.claude, .codex],
+            aiAccountBalanceDisplayedProviders: [.claude, .codex])
+        settings.islandPlacement = IslandPlacement(mode: .custom, edge: .left)
+        controller.update(balances: rows, settings: settings, language: .english, at: Date(timeIntervalSince1970: 100))
+        let first = try #require(queue.left.first)
+        controller.update(balances: rows, settings: settings, language: .english, at: Date(timeIntervalSince1970: 101))
+        #expect(queue.left.first?.metadata?["quotaAccountID"] == first.metadata?["quotaAccountID"])
+        controller.updatePinned(at: Date(timeIntervalSince1970: 120))
+        let second = try #require(queue.left.first)
+        #expect(first.metadata?["quotaLine0"] == second.metadata?["quotaLine0"]
+            && first.metadata?["quotaLine1"] == second.metadata?["quotaLine1"])
+        #expect(first.metadata?["quotaAccountID"] == "claude" && second.metadata?["quotaAccountID"] == "codex")
+    }
+
+    @Test func repeatedPollAndUnrelatedAccountChangesCannotRestartOrSkipThePinnedReading() throws {
+        let queue = SideNoticeQueue(), controller = AIAccountBalanceNoticeController(queue: queue)
+        defer { queue.removeAll() }
+        var settings = FeatureSettings(aiAccountBalanceNoticeEnabled: false, aiAccountBalancePinnedInCustomIsland: true)
+        settings.islandPlacement.mode = .custom
+        let claude = balance(70), gemini = balance(80, provider: .gemini)
+        controller.update(balances: [claude, gemini], settings: settings, language: .english,
+            at: Date(timeIntervalSince1970: 100))
+        controller.update(balances: [claude, gemini], settings: settings, language: .english,
+            at: Date(timeIntervalSince1970: 104))
+        #expect(queue.left.first?.title == "Claude")
+        controller.update(balances: [claude, balance(10, provider: .gemini)], settings: settings, language: .english,
+            at: Date(timeIntervalSince1970: 105))
+        #expect(queue.left.first?.title == "Gemini", "The same reading must finish five seconds after its first appearance")
+        controller.update(balances: [claude, balance(20, provider: .gemini)], settings: settings, language: .english,
+            at: Date(timeIntervalSince1970: 109))
+        controller.updatePinned(at: Date(timeIntervalSince1970: 110))
+        #expect(queue.left.first?.title == "Gemini", "A changed quota must get a complete new reading before rotation")
+    }
+
+    @Test func gptSelectionVisiblyIdentifiesTheCodexAccountInTheSameQuotaLine() throws {
+        let queue = SideNoticeQueue(), controller = AIAccountBalanceNoticeController(queue: queue)
+        defer { queue.removeAll() }
+        let reading = AIAccountBalance(id: "shared", providers: [.codex, .gpt], status: .available,
+            windows: [.init(id: "weekly", kind: .weekly, remainingPercent: 10)])
+        let settings = FeatureSettings(aiAccountBalanceMonitoredProviders: [.gpt], aiAccountBalanceDisplayedProviders: [.gpt])
+        controller.update(balances: [reading], settings: settings, language: .simplifiedChinese)
+        let notice = try #require(queue.left.first)
+        #expect(notice.title == "GPT · Codex 账户额度")
+        #expect(notice.metadata?["quotaProviderID"] == "codex")
+        #expect(notice.metadata?["quotaLine0"] == "Codex 每周额度 10%")
+        #expect(notice.metadata?["quotaLine2"] == nil)
+    }
+
+    @Test func longSummaryGetsAFullReadingBeforeExpiryAndPinnedRotation() async throws {
+        let expiry = BalanceExpiryClock()
+        let queue = SideNoticeQueue(capacityPerSide: 3, expirySleeper: { try await expiry.wait($0) })
+        let controller = AIAccountBalanceNoticeController(queue: queue)
+        defer { queue.removeAll() }
+        let reading = AIAccountBalance(id: "claude", providers: [.claude], status: .available,
+            windows: [.init(id: "5h", kind: .fiveHours, remainingPercent: 70, durationSeconds: 18_000)]
+                + (0..<7).map { .init(id: "model\($0)", kind: .model, remainingPercent: 70, name: "claude-opus-long-model-\($0)") }
+                + [.init(id: "extra", kind: .budget, remaining: 0, unit: .usd)])
+        var settings = FeatureSettings(aiAccountBalanceCompactStyle: .detailed, aiAccountBalancePinnedInCustomIsland: true)
+        settings.islandPlacement = IslandPlacement(mode: .custom, edge: .left)
+        controller.update(balances: [reading, balance(70, provider: .gemini)], settings: settings,
+            language: .english, at: Date(timeIntervalSinceReferenceDate: 119))
+        for _ in 0..<400 { if await expiry.duration != nil { break }; await Task.yield() }
+        #expect(await expiry.duration ?? .zero > .seconds(20), "The long real summary cannot expire on the default six-second timer")
+        queue.removeAll(withIDPrefix: "ai-balance-low-")
+        controller.updatePinned(at: Date(timeIntervalSinceReferenceDate: 124))
+        #expect(queue.left.first { $0.id == AIAccountBalanceNoticeController.pinnedID }?.title == "Claude")
+        controller.updatePinned(at: Date(timeIntervalSinceReferenceDate: 10_000))
+        #expect(queue.left.first { $0.id == AIAccountBalanceNoticeController.pinnedID }?.title == "Gemini")
+        await expiry.release()
+    }
+
+    @Test(arguments: [IslandLayoutStyle.notch, .pill], [CGFloat(0), 80, 180])
+    func actualBalanceFramesFitTheRingAndQuotaForEveryCameraGap(style: IslandLayoutStyle, gap: CGFloat) throws {
+        var settings = FeatureSettings(islandLayoutStyle: style)
+        settings.compactStatusPriority = [.transient]
+        let notice = IslandNotice(id: "ai-balance-low-layout", title: "Claude", style: .status,
+            metadata: ["quotaSeverity": "2", "quotaRemainingFraction": "0.1", "quotaLine0": "5h 10%"])
+        let screenFrame = CGRect(x: -1440, y: 0, width: 1440, height: 900)
+        let screen = ScreenSnapshot(displayID: 1, frame: screenFrame, visibleFrame: screenFrame,
+            safeAreaInsets: ScreenInsets(top: gap > 0 ? 34 : 0),
+            auxiliaryTopLeftArea: gap > 0 ? CGRect(x: -1440, y: 866, width: 720 - gap / 2, height: 34) : nil,
+            auxiliaryTopRightArea: gap > 0 ? CGRect(x: -720 + gap / 2, y: 866, width: 720 - gap / 2, height: 34) : nil,
+            menuBarHeightFallback: 24)
+        let engine = SideNoticeLayoutEngine()
+        let actual = try #require(engine.compactBarFrame(for: screen, notices: [notice], settings: settings))
+        var configuration = settings.islandScreenConfiguration
+        let sizing = try #require(engine.compactBarSizing(for: [notice], settings: settings))
+        configuration.expandsForDetailedStatus = sizing.expandsForDetailedStatus
+        configuration.compactStatusLength = sizing.customPillLength
+        configuration.compactStatusSideWidth = sizing.compactStatusSideWidth
+        let layout = ScreenLayoutEngine(configuration: configuration).layout(for: screen)
+        let throughLayout = try #require(engine.compactBarFrame(for: layout, notices: [notice], settings: settings))
+        #expect(actual == throughLayout, "Both real layout entry points must reserve the same balance bounds")
+        if style == .pill || gap > 0 {
+            let center = style == .pill ? max(120, gap) : gap
+            #expect(actual.width - center >= 96, "Both camera wings need room for the ring or short quota and insets")
+        } else {
+            #expect(actual.width < 150, "A short reading on a simulated notch must use its ring and text's natural width")
+        }
+        #expect(actual.width <= screen.frame.width && actual.minX >= screen.frame.minX && actual.maxX <= screen.frame.maxX)
+    }
+
+    @Test func ringMetadataUsesTheLimitingWindowInBothSummaryStyles() throws {
+        let queue = SideNoticeQueue(), controller = AIAccountBalanceNoticeController(queue: queue)
+        defer { queue.removeAll() }
+        let reading = AIAccountBalance(id: "fixture", providers: [.claude], status: .available,
+            windows: [.init(id: "5h", kind: .fiveHours, remainingPercent: 70, durationSeconds: 18_000),
+                .init(id: "weekly", kind: .weekly, remainingPercent: 10)])
+        var settings = FeatureSettings(aiAccountBalanceNoticeEnabled: false, aiAccountBalancePinnedInCustomIsland: true)
+        settings.islandPlacement.mode = .custom
+        for style in MediaCompactStyle.allCases {
+            settings.aiAccountBalanceCompactStyle = style
+            controller.update(balances: [reading], settings: settings, language: .simplifiedChinese)
+            let notice = try #require(queue.left.first)
+            #expect(notice.metadata?["quotaProviderID"] == "claude")
+            #expect(notice.metadata?["quotaRemainingFraction"] == "0.1")
+            #expect(notice.metadata?["quotaLine0"] == (style == .detailed ? "5h 70%" : "每周额度 10%"))
+            #expect(notice.metadata?["quotaLine1"] == (style == .detailed ? "全部 每周额度 10%" : nil))
+        }
+    }
+
+    @Test func unsupportedAvailableFixtureCannotCreateCardsPinOrLowAlert() {
+        let queue = SideNoticeQueue(), controller = AIAccountBalanceNoticeController(queue: queue)
+        defer { queue.removeAll() }
+        var settings = FeatureSettings(aiAccountBalancePinnedInCustomIsland: true)
+        settings.islandPlacement.mode = .custom
+        controller.update(balances: [balance(0, provider: .qwen)], settings: settings, language: .english)
+        #expect(queue.left.isEmpty)
+    }
+
     /// Every compact consumer must classify urgent events alike while leaving persistent quota in its own priority.
     @Test func transientClassificationRecognizesAlertsWithoutIncludingPersistentBalance() {
         for notice in [IslandNotice(id: "focus-transition-fixture", title: "Focus"),
@@ -138,7 +327,7 @@ struct AIAccountBalanceNoticeTests {
         let selectedBattery = try #require(engine.compactBarFrame(for: screen, notices: [low, battery], settings: settings))
         let batteryOnly = try #require(engine.compactBarFrame(for: screen, notices: [battery], settings: settings))
         #expect(selectedBattery == batteryOnly)
-        #expect(first.width > selectedBattery.width)
+        #expect(first.width < 150, "The short quota now uses its ring and actual summary's natural width")
         let presentation = engine.compactPillPresentations(for: [low, battery], settings: settings).first
         #expect(presentation?.notice.id == battery.id)
     }
@@ -180,6 +369,17 @@ struct AIAccountBalanceNoticeTests {
         .init(id: provider.rawValue, providers: [provider], status: .available,
             windows: [.init(id: "quota", kind: .all, remainingPercent: percent)])
     }
+}
+
+private actor BalanceExpiryClock {
+    private(set) var duration: Duration?
+    private var continuation: CheckedContinuation<Void, Never>?
+    func wait(_ duration: Duration) async throws {
+        self.duration = duration
+        await withCheckedContinuation { continuation = $0 }
+        try Task.checkCancellation()
+    }
+    func release() { continuation?.resume(); continuation = nil }
 }
 
 private actor BalanceRotationClock {
