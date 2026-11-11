@@ -1,4 +1,3 @@
-import CryptoKit
 import Darwin
 import Foundation
 import ZislaCore
@@ -123,7 +122,6 @@ public final class CodexSessionActivityDetector {
         var turnIDsByCallID: [String: String]
         var sessionID: String?
         var nextRecordOrdinal: UInt64
-        var edgeHash: Data?
     }
 
     private struct CachedSessionIndex {
@@ -154,18 +152,6 @@ public final class CodexSessionActivityDetector {
     private var completedTasks: [AIProgressTask] = []
     private var lastScanAt: Date?
     public private(set) var activityFileURLs: [URL] = []
-
-    static let incrementalVerificationBytes = 4 * 1_024
-
-    static func incrementalVerificationByteCount(for fileSize: UInt64) -> UInt64 {
-        guard fileSize > 0 else { return 0 }
-        let bytesPerEdge = incrementalVerificationBytesPerEdge(for: fileSize)
-        return fileSize > bytesPerEdge ? bytesPerEdge * 2 : bytesPerEdge
-    }
-
-    private static func incrementalVerificationBytesPerEdge(for fileSize: UInt64) -> UInt64 {
-        min(UInt64(incrementalVerificationBytes), max(1, fileSize / 2))
-    }
 
     public init(
         sessionsDirectory: URL = FileManager.default.homeDirectoryForCurrentUser
@@ -761,18 +747,9 @@ public final class CodexSessionActivityDetector {
             )
         }
 
-        let cachedEdgeMatches: Bool = {
-            guard let cached = cache[candidate.url],
-                  let cachedEdgeHash = cached.edgeHash,
-                  cached.readerState.offset == cached.size,
-                  candidate.size > cached.size else {
-                return false
-            }
-            return edgeHash(of: candidate.url, byteCount: cached.size) == cachedEdgeHash
-        }()
-
         let canContinue = cache[candidate.url].map {
-            candidate.size > $0.size && cachedEdgeMatches
+            $0.readerState.offset == $0.size && candidate.size > $0.size
+                && jsonlReader.hasUnchangedReadPrefix(at: candidate.url, state: $0.readerState)
         } ?? false
         var next: CachedRollout
         if canContinue, let cached = cache[candidate.url] {
@@ -789,8 +766,7 @@ public final class CodexSessionActivityDetector {
                 effortsByTurnID: [:],
                 turnIDsByCallID: [:],
                 sessionID: nil,
-                nextRecordOrdinal: 0,
-                edgeHash: nil
+                nextRecordOrdinal: 0
             )
         }
 
@@ -847,7 +823,6 @@ public final class CodexSessionActivityDetector {
         next.modificationDate = candidate.modificationDate
         next.changeDate = candidate.changeDate
         next.size = candidate.size
-        next.edgeHash = edgeHash(of: candidate.url, byteCount: readerState.offset)
         coalesceCachedActivity(&next)
 
         cache[candidate.url] = next
@@ -1079,37 +1054,6 @@ public final class CodexSessionActivityDetector {
             timeIntervalSince1970: TimeInterval(info.st_ctimespec.tv_sec)
                 + TimeInterval(info.st_ctimespec.tv_nsec) / 1_000_000_000
         )
-    }
-
-    private func edgeHash(of url: URL, byteCount: UInt64) -> Data? {
-        guard byteCount > 0 else { return Self.contentHash(for: SHA256()) }
-        guard let handle = try? FileHandle(forReadingFrom: url) else { return nil }
-        defer { try? handle.close() }
-
-        let bytesPerEdge = Self.incrementalVerificationBytesPerEdge(for: byteCount)
-        var hasher = SHA256()
-        do {
-            guard let first = try handle.read(upToCount: Int(bytesPerEdge)),
-                  first.count == Int(bytesPerEdge) else {
-                return nil
-            }
-            hasher.update(data: first)
-            if byteCount > bytesPerEdge {
-                try handle.seek(toOffset: byteCount - bytesPerEdge)
-                guard let last = try handle.read(upToCount: Int(bytesPerEdge)),
-                      last.count == Int(bytesPerEdge) else {
-                    return nil
-                }
-                hasher.update(data: last)
-            }
-        } catch {
-            return nil
-        }
-        return Self.contentHash(for: hasher)
-    }
-
-    private static func contentHash(for hasher: SHA256) -> Data {
-        return Data(hasher.finalize())
     }
 
     private static func sessionURL(for sessionID: String) -> URL? {
