@@ -706,10 +706,6 @@ final class AppModel: ObservableObject {
     "focus-mode-left",
     "focus-mode-right",
   ]
-  private let browserDownloadNoticeIDs: Set<String> = [
-    "browser-download-left",
-    "browser-download-right",
-  ]
   private let videoDownloadNoticeIDs: Set<String> = [
     "video-download-left",
     "video-download-right",
@@ -990,7 +986,10 @@ final class AppModel: ObservableObject {
 
     browserDownloads.$snapshot
       .sink { [weak self] snapshot in
-        Task { @MainActor [weak self] in self?.consumeBrowserDownloadSnapshot(snapshot) }
+        Task { @MainActor [weak self] in
+          guard let self else { return }
+          Self.consumeBrowserDownloadSnapshot(snapshot, settings: self.settingsStore.settings, notices: self.notices)
+        }
       }
       .store(in: &cancellables)
 
@@ -3348,13 +3347,13 @@ final class AppModel: ObservableObject {
     if settings.observesBrowserDownloads {
       browserDownloads.start()
       if settings.showsBrowserDownloadProgress {
-        consumeBrowserDownloadSnapshot(browserDownloads.snapshot)
+        Self.consumeBrowserDownloadSnapshot(browserDownloads.snapshot, settings: settings, notices: notices)
       } else {
-        clearBrowserDownloadNotices()
+        notices.removeAll(withIDPrefix: "browser-download-")
       }
     } else {
       browserDownloads.stop()
-      clearBrowserDownloadNotices()
+      notices.removeAll(withIDPrefix: "browser-download-")
     }
     if settings.lockScreenInfoEnabled || settings.systemMonitorEnabled || settings.dailyBriefing.enabled {
       battery.start()
@@ -3374,13 +3373,8 @@ final class AppModel: ObservableObject {
     } else {
       networkBattery.stop()
     }
-    if settings.mailEnabled {
-      mail.start(accountNames: settings.mailAccountNames)
-    } else {
-      mail.stop()
-      hasLoadedMail = false
-      knownMailMessageIDs.removeAll()
-    }
+    Self.applyMailSettings(settings, mail: mail, notices: notices,
+      hasLoadedMail: &hasLoadedMail, knownMailMessageIDs: &knownMailMessageIDs)
     if !settings.toolboxEnabled {
       pomodoro.stop()
       screenCleaning.stopAll()
@@ -4071,6 +4065,20 @@ final class AppModel: ObservableObject {
     activeAINoticeIDs.removeAll()
   }
 
+  static func applyMailSettings(
+    _ settings: FeatureSettings, mail: MailService, notices: SideNoticeQueue,
+    hasLoadedMail: inout Bool, knownMailMessageIDs: inout Set<String>
+  ) {
+    if settings.mailEnabled {
+      mail.start(accountNames: settings.mailAccountNames)
+    } else {
+      mail.stop()
+      hasLoadedMail = false
+      knownMailMessageIDs.removeAll()
+      notices.removeAll(withIDPrefix: "mail-notification-")
+    }
+  }
+
   static func consumeMailMessages(
     _ messages: [MailMessage], settings: FeatureSettings, notices: SideNoticeQueue,
     hasLoadedMail: inout Bool, knownMailMessageIDs: inout Set<String>
@@ -4543,12 +4551,15 @@ final class AppModel: ObservableObject {
   }
 
   /// The 3-second linger after completion is timed by `BrowserDownloadMonitor`; here we enqueue a persistent notice that clears together with it.
-  private func consumeBrowserDownloadSnapshot(_ snapshot: BrowserDownloadSnapshot?) {
-    guard settingsStore.settings.sideNoticesEnabled,
-      settingsStore.settings.browserDownloadIslandEnabled,
-      let snapshot
-    else {
-      clearBrowserDownloadNotices()
+  static func consumeBrowserDownloadSnapshot(
+    _ snapshot: BrowserDownloadSnapshot?, settings: FeatureSettings, notices: SideNoticeQueue
+  ) {
+    guard settings.showsBrowserDownloadProgress else {
+      notices.removeAll(withIDPrefix: "browser-download-")
+      return
+    }
+    guard let snapshot else {
+      notices.removeVisible(withIDPrefix: "browser-download-")
       return
     }
 
@@ -4567,12 +4578,6 @@ final class AppModel: ObservableObject {
     }
     for notice in updates where !notices.updateIfPresent(notice) {
       notices.enqueue(notice, expiresAfter: nil)
-    }
-  }
-
-  private func clearBrowserDownloadNotices() {
-    for id in browserDownloadNoticeIDs where noticeExists(id: id) {
-      notices.remove(id: id)
     }
   }
 

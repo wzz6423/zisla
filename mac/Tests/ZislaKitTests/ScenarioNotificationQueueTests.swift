@@ -357,7 +357,7 @@ struct ScenarioNotificationQueueTests {
         }
     }
 
-    @Test
+    @Test(.timeLimit(.minutes(1)))
     func anOverlappingMutedSceneDiscardsExpiredDeferredEventsWhileLiveFailuresResume() async {
         let gate = ScenarioExpiryGate()
         let queue = SideNoticeQueue(capacityPerSide: 3, expirySleeper: { _ in await gate.sleep() })
@@ -367,9 +367,13 @@ struct ScenarioNotificationQueueTests {
         queue.configureNotificationScenarios(settings, displayIdentifiers: ["display"])
         queue.setNotificationScenarios([.focus])
         queue.enqueue(.init(id: "expired", title: "Expired"), expiresAfter: 1)
+        let (expired, continuation) = AsyncStream<Void>.makeStream()
+        let subscription = queue.$right.filter(\.isEmpty).sink { _ in continuation.yield(()) }
+        defer { subscription.cancel(); continuation.finish() }
+        var expiration = expired.makeAsyncIterator()
         await gate.waitUntilSleeping()
         await gate.release()
-        for _ in 0..<20 where !queue.right.isEmpty { await Task.yield() }
+        #expect(await expiration.next() != nil)
         #expect(queue.right.isEmpty)
         let failure = IslandNotice(id: "ai-active-error", title: "Failed", kind: .error)
         queue.enqueue(failure, expiresAfter: nil)
@@ -380,8 +384,8 @@ struct ScenarioNotificationQueueTests {
         #expect(queue.presentationNotices(queue.right, displayIdentifier: "display") == [failure])
     }
 
-    @Test
-    func aCancelledOldExpiryCannotRemoveAReplacementNotice() async {
+    @Test(.timeLimit(.minutes(1)))
+    func aCancelledOldExpiryCannotRemoveAReplacementNotice() async throws {
         let gate = ScenarioExpiryGate()
         let queue = SideNoticeQueue(capacityPerSide: 3, expirySleeper: { _ in await gate.sleep() })
         defer { queue.removeAll() }
@@ -389,9 +393,10 @@ struct ScenarioNotificationQueueTests {
         let replacement = IslandNotice(id: original.id, title: "Replacement")
         queue.enqueue(original, expiresAfter: 1)
         await gate.waitUntilSleeping()
+        let expiry = try #require(queue.expiryTasks[original.id])
         queue.enqueue(replacement, expiresAfter: nil)
         await gate.release()
-        for _ in 0..<20 { await Task.yield() }
+        await expiry.value
         #expect(queue.right == [replacement])
     }
 

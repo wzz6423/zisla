@@ -10,7 +10,7 @@ public final class SideNoticeQueue: ObservableObject {
     @Published public private(set) var activeNotificationScenarios: Set<NotificationScenario> = []
     @Published private var scenarioRevision = 0
 
-    private var expiryTasks: [String: Task<Void, Never>] = [:]
+    private(set) var expiryTasks: [String: Task<Void, Never>] = [:]
     private var persistentIDs: Set<String> = []
     private let capacityPerSide: Int
     private let expirySleeper: @Sendable (Duration) async throws -> Void

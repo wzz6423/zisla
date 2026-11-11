@@ -673,9 +673,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
                 && self.islandPlacementController?.isSelecting != true
                 && self.onboardingLifecycle?.isPresenting != true
         }
-        model.notificationDisplayIdentifier = { [weak coordinator] in
-            guard let displayID = coordinator?.activeDisplayID else { return nil }
-            return ScreenSnapshot.notificationPolicyIdentifier(for: displayID) ?? "session:\(displayID)"
+        model.notificationDisplayIdentifier = { [weak coordinator, weak model] in
+            guard let model else { return nil }
+            return Self.notificationDisplayIdentifier(activeDisplayID: coordinator?.activeDisplayID,
+                screens: NSScreen.screens.compactMap(ScreenSnapshot.init(screen:)),
+                pointerLocation: NSEvent.mouseLocation, configuration: model.settingsStore.settings.islandScreenConfiguration)
         }
         noticePresenter?.onCompactLayoutChanged = { [weak coordinator] displayID, expanded, length, sideWidth, iconSize in
             guard coordinator?.activeDisplayID == displayID else { return }
@@ -1126,6 +1128,18 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
             }
             self?.expandedSizeUpdateTask = nil
         }
+    }
+
+    static func notificationDisplayIdentifier(
+        activeDisplayID: CGDirectDisplayID?, screens: [ScreenSnapshot],
+        pointerLocation: CGPoint, configuration: ScreenLayoutConfiguration
+    ) -> String? {
+        if let screen = screens.first(where: { $0.displayID == activeDisplayID }) {
+            return screen.notificationScopeIdentifier
+        }
+        let engine = ScreenLayoutEngine(configuration: configuration)
+        let displayID = engine.screenLayout(containing: pointerLocation, in: engine.layouts(for: screens))?.displayID
+        return (screens.first { $0.displayID == displayID } ?? screens.first)?.notificationScopeIdentifier
     }
 
     nonisolated static func expandedPanelSize(

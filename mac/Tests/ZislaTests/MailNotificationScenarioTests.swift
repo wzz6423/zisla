@@ -74,6 +74,36 @@ struct MailNotificationScenarioTests {
         #expect(fixture.queue.scenarioReviewNotice(displayIdentifier: "display") != nil)
     }
 
+    @Test(.timeLimit(.minutes(1)), arguments: [false, true])
+    func disablingMailWithoutAnotherMessagePublicationClearsDeferredAndPublishedReview(endsSceneFirst: Bool) async throws {
+        let fixture = try Fixture()
+        defer { fixture.close() }
+        #expect(await fixture.refresh([]))
+        fixture.queue.setNotificationScenarios([.meeting])
+        #expect(await fixture.refresh([1]))
+        if endsSceneFirst {
+            fixture.queue.setNotificationScenarios([])
+            #expect(fixture.queue.scenarioReview(displayIdentifier: "display").count == 1)
+        }
+        let unrelated = IslandNotice(id: "other-error", title: "Unrelated", kind: .error)
+        fixture.queue.enqueue(unrelated, expiresAfter: nil)
+        var publications = 0
+        let subscription = fixture.mail.$messages.dropFirst().sink { _ in publications += 1 }
+        defer { subscription.cancel() }
+        fixture.settings.mailEnabled = false
+
+        AppModel.applyMailSettings(fixture.settings, mail: fixture.mail, notices: fixture.queue,
+            hasLoadedMail: &fixture.hasLoadedMail, knownMailMessageIDs: &fixture.knownMailMessageIDs)
+
+        #expect(publications == 0, "Stopping Mail does not publish a new inbox snapshot")
+        #expect(!fixture.hasLoadedMail && fixture.knownMailMessageIDs.isEmpty)
+        #expect(fixture.visibleMail.isEmpty, "Settings must clear the mail rows without waiting for another refresh")
+        fixture.queue.setNotificationScenarios([])
+        #expect(fixture.queue.scenarioReview(displayIdentifier: "display").isEmpty)
+        #expect(fixture.queue.scenarioReviewNotice(displayIdentifier: "display") == nil)
+        #expect(fixture.queue.right == [unrelated])
+    }
+
     @Test(.timeLimit(.minutes(1)))
     func initialLoadReadMessagesAndDisabledSideNoticesNeverReplayKnownMail() async throws {
         let fixture = try Fixture()
@@ -103,7 +133,7 @@ struct MailNotificationScenarioTests {
         private var rows: [MailScriptRow] = []
         private let processed = AsyncStream<Void>.makeStream()
         private var subscription: AnyCancellable?
-        private lazy var mail = MailService(
+        lazy var mail = MailService(
             commandRunner: { [unowned self] _, expectsSnapshot in
                 #expect(expectsSnapshot, "The fixture only permits inbox reads")
                 let messages = await self.rows
