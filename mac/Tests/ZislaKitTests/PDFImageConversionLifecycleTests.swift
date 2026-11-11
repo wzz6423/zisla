@@ -80,6 +80,46 @@ struct PDFImageConversionLifecycleTests {
         #expect(try FileManager.default.contentsOfDirectory(atPath: root.path).isEmpty)
     }
 
+    @Test(arguments: ["cancelled", "corrupt second", "committed"])
+    func cleanupFailurePreservesConversionErrorOrCommittedOutput(_ outcome: String) throws {
+        let root = try directory()
+        defer { try? FileManager.default.removeItem(at: root) }
+        let first = try image(root, name: "first", width: 24, height: 12)
+        let second = try image(root, name: "second", width: 36, height: 18)
+        if outcome == "corrupt second" { try Data("corrupt image".utf8).write(to: second) }
+        let before = try [Data(contentsOf: first), Data(contentsOf: second)]
+        let output = root.appendingPathComponent("images.pdf")
+        var service = PDFProcessingService()
+        service.removeImageStagingDirectory = { staging in
+            #expect(staging.deletingLastPathComponent().standardizedFileURL == root.standardizedFileURL)
+            #expect(staging.lastPathComponent.hasPrefix(".zisla-pdf-images-"))
+            try FileManager.default.removeItem(at: staging)
+            try FileManager.default.removeItem(at: staging)
+        }
+
+        switch outcome {
+        case "cancelled":
+            let cancellation = CancellationProbe(stopAt: 4)
+            #expect(throws: CancellationError.self) {
+                try service.convertImagesToPDF([first, second], to: output, checkCancellation: cancellation.check)
+            }
+        case "corrupt second":
+            #expect(throws: PDFProcessingError.unsupportedImage(second)) {
+                try service.convertImagesToPDF([first, second], to: output)
+            }
+        default:
+            try service.convertImagesToPDF([first, second], to: output)
+            let pdf = try #require(PDFDocument(url: output))
+            #expect(pdf.pageCount == 2)
+            #expect(pdf.page(at: 0)?.bounds(for: .mediaBox).size == CGSize(width: 24, height: 12))
+            #expect(pdf.page(at: 1)?.bounds(for: .mediaBox).size == CGSize(width: 36, height: 18))
+        }
+        #expect(FileManager.default.fileExists(atPath: output.path) == (outcome == "committed"))
+        #expect(try [Data(contentsOf: first), Data(contentsOf: second)] == before)
+        let expected = outcome == "committed" ? ["first.png", "images.pdf", "second.png"] : ["first.png", "second.png"]
+        #expect(try FileManager.default.contentsOfDirectory(atPath: root.path).sorted() == expected)
+    }
+
     private func directory() throws -> URL {
         let root = FileManager.default.temporaryDirectory.appendingPathComponent("pdf-image-lifecycle-" + UUID().uuidString)
         try FileManager.default.createDirectory(at: root, withIntermediateDirectories: false)

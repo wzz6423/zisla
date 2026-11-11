@@ -73,17 +73,31 @@ struct ShelfContextActionTests {
         #expect(fixture.shelf.items == [image, video])
     }
 
-    @Test func PDFReturnsToShelfInOrderAndSurvivesStagingCleanup() async throws {
+    @Test(arguments: [false, true])
+    func PDFReturnsToShelfInOrderAndSurvivesStagingCleanup(cleanupFails: Bool) async throws {
         let fixture = try Fixture()
         defer { fixture.remove() }
         let first = try fixture.image(width: 24)
         let second = try fixture.image(width: 36)
         let originals = try [Data(contentsOf: first.url), Data(contentsOf: second.url)]
-        let task = try #require(fixture.perform(.imagesToPDF, items: [second, first]))
+        var service = PDFProcessingService()
+        if cleanupFails {
+            service.removeImageStagingDirectory = { staging in
+                try FileManager.default.removeItem(at: staging)
+                try FileManager.default.removeItem(at: staging)
+            }
+        }
+        let configuredService = service
+        let pending = fixture.actions.perform(.imagesToPDF, items: [second, first],
+            createQuickNote: { _ in false }, openStudio: { _ in false }, convertImages: {
+                try configuredService.convertImagesToPDF($0, to: $1)
+            })
+        let task = try #require(pending)
         #expect(fixture.actions.isProcessing)
         await task.value
         let result = try #require(fixture.shelf.items.last)
         #expect(fixture.actions.generatedItemID == result.id)
+        #expect(fixture.actions.message == AppLocalization.text("已加入 %ld 个项目", 1))
         #expect(result.isManaged && result.url.lastPathComponent == "images.pdf")
         let document = try #require(PDFDocument(url: result.url))
         #expect(document.pageCount == 2)

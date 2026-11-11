@@ -222,7 +222,7 @@ struct ShelfModuleView: View {
                                         model.receiveQuickNoteTransferItems(model.shelfTransferItems(actionItems(contextID: item.id)))
                                     },
                                     onRemove: {
-                                        removeItems(actionItems(contextID: item.id))
+                                        removeItems([$0])
                                     },
                                     selectionIndex: selection.ids.firstIndex(of: item.id).map { $0 + 1 },
                                     onSelect: selection.isSelecting ? { selection.toggle(item.id) } : nil,
@@ -648,7 +648,7 @@ struct ShelfItemView: View {
     var onSave: () -> Void = {}
     var prepareDragPayload: (() -> TransferPasteboardPayload?)? = nil
     var onSendToQuickNote: () -> Void
-    var onRemove: () -> Void
+    var onRemove: (FileShelfItem) -> Void
     var selectionIndex: Int?
     var onSelect: (() -> Void)?
     var prepareDragPayloads: (() -> [TransferPasteboardPayload])?
@@ -703,7 +703,7 @@ struct ShelfItemView: View {
                     Button(AppLocalization.text("发送到随记"), action: onSendToQuickNote)
                 }
                 Divider()
-                Button(AppLocalization.text("移除"), role: .destructive, action: onRemove)
+                Button(AppLocalization.text("移除"), role: .destructive) { onRemove(item) }
             }
         }
     }
@@ -717,7 +717,7 @@ struct ShelfItemView: View {
                     onOpen: onOpen,
                     onReveal: onOpen,
                     onCopy: onCopy,
-                    onRemove: onRemove,
+                    onRemove: { onRemove(item) },
                     onSave: onSave,
                     preparePayload: prepareDragPayload,
                     preparePayloads: prepareDragPayloads,
@@ -777,7 +777,7 @@ struct ShelfItemView: View {
                     onOpen: onOpen,
                     onReveal: { NSWorkspace.shared.activateFileViewerSelecting([item.url]) },
                     onCopy: onCopy,
-                    onRemove: onRemove,
+                    onRemove: { onRemove(item) },
                     preparePayload: prepareDragPayload,
                     preparePayloads: prepareDragPayloads,
                     onSelect: onSelect,
@@ -799,7 +799,7 @@ struct ShelfItemView: View {
     }
 
     private var removeButton: some View {
-        Button(action: onRemove) {
+        Button { onRemove(item) } label: {
             Image(systemName: "xmark.circle.fill")
                 .symbolRenderingMode(.palette)
                 .foregroundStyle(.white, .black.opacity(0.72))

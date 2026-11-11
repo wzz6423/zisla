@@ -156,6 +156,8 @@ public struct PDFPageNumberStyle: Equatable, Sendable {
 
 /// Performs basic page operations with macOS PDFKit, requiring no external service.
 public struct PDFProcessingService: Sendable {
+    var removeImageStagingDirectory: @Sendable (URL) throws -> Void = { try FileManager.default.removeItem(at: $0) }
+
     public init() {}
 
     public func inspect(_ inputURL: URL) throws -> PDFDocumentSummary {
@@ -418,6 +420,7 @@ public struct PDFProcessingService: Sendable {
     }
 
     /// Converts images into a multi-page PDF in input order, one page per image.
+    /// Cancellation is checked before publishing; staging cleanup preserves conversion errors and committed output.
     public func convertImagesToPDF(_ imageURLs: [URL], to outputURL: URL,
                                    checkCancellation: @Sendable () throws -> Void = { try Task.checkCancellation() }) throws {
         guard !imageURLs.isEmpty else { throw PDFProcessingError.emptyPageSelection }
@@ -453,10 +456,10 @@ public struct PDFProcessingService: Sendable {
             }
             try FileManager.default.moveItem(at: stagedOutput, to: outputURL)
         } catch {
-            try FileManager.default.removeItem(at: staging)
+            try? removeImageStagingDirectory(staging)
             throw error
         }
-        try FileManager.default.removeItem(at: staging)
+        try? removeImageStagingDirectory(staging)
     }
 
     /// Rasterizes every page to PNG or JPEG. Returned file names carry a page number starting at 001.
