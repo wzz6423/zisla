@@ -199,6 +199,100 @@ struct AIModelDailyUsageTests {
         #expect(try repository.load(includeUsageSamples: false).modelUsageSamples.isEmpty)
         #expect(try repository.recordDetectedUsage([sample("event-0", .codex, "gpt", 10, 2)]) == 0)
         #expect(try repository.load().modelUsageSamples.count == 2)
+        #expect(try scalar(repository.databaseURL, "SELECT COUNT(*) FROM detected_usage_daily") == 2)
+        #expect(try scalar(repository.databaseURL, "SELECT COUNT(*) FROM detected_usage_events") == 3)
+    }
+
+    /// Existing ledgers can already fit the visible limit while retaining source-linked detail for an evicted day.
+    @Test(arguments: [false, true])
+    func existingOrphanedDailyLedgerIsPrunedWhenLoadingHistory(includeHistory: Bool) throws {
+        let root = directory()
+        defer { try? FileManager.default.removeItem(at: root) }
+        let repository = AIStateRepository(directoryURL: root, maximumUsageSamples: 1)
+        let old = sample("orphaned", .codex, "old-model", 100, 20)
+        try repository.recordDetectedUsage([old])
+        var current = sample("retained", .claude, "current-model", 30, 5)
+        current.timestamp = old.timestamp.addingTimeInterval(86_400)
+        try repository.recordDetectedUsage([current])
+        try sql(repository.databaseURL, """
+            INSERT OR REPLACE INTO detected_usage_daily(source_id,provider,timestamp,model,input_tokens,output_tokens)
+            VALUES('orphaned','codex',\(day.timeIntervalSinceReferenceDate),'old-model',100,20);
+            INSERT INTO detected_usage_baselines(timestamp,input_tokens,output_tokens)
+            VALUES(\(day.timeIntervalSinceReferenceDate),100,20);
+            """)
+        let restarted = AIStateRepository(directoryURL: root, maximumUsageSamples: 1)
+        if includeHistory { _ = try restarted.loadUsageHistory() }
+        else { _ = try restarted.load(includeUsageSamples: false) }
+        #expect(try scalar(repository.databaseURL, "SELECT COUNT(*) FROM detected_usage_daily") == 1)
+        #expect(try scalar(repository.databaseURL, "SELECT COUNT(*) FROM detected_usage_daily WHERE model = 'old-model'") == 0)
+        #expect(try scalar(repository.databaseURL, "SELECT COUNT(*) FROM detected_usage_events") == 2)
+        #expect(try scalar(repository.databaseURL, "SELECT COUNT(*) FROM detected_usage_baselines") == 1)
+        #expect(try restarted.recordDetectedUsage([old, current]) == 0)
+        #expect(try restarted.loadUsageHistory().usageSamples.map(\.totalTokens) == [35])
+        var expiredGrowth = old
+        expiredGrowth.inputTokens = 110
+        expiredGrowth.outputTokens = 22
+        _ = try restarted.recordDetectedUsage([expiredGrowth])
+        #expect(try restarted.loadUsageHistory().usageSamples.map(\.totalTokens) == [35])
+        #expect(try scalar(repository.databaseURL, "SELECT COUNT(*) FROM detected_usage_daily") == 1)
+        var growth = old
+        growth.timestamp = current.timestamp.addingTimeInterval(86_400)
+        growth.inputTokens = 150
+        growth.outputTokens = 30
+        growth.model = "new-model"
+        #expect(try restarted.recordDetectedUsage([growth]) == 1)
+        #expect(try restarted.loadUsageHistory().usageSamples.map(\.totalTokens) == [48])
+        #expect(try restarted.loadUsageHistory().modelUsageSamples.map(\.model) == ["new-model"])
+        #expect(try restarted.recordDetectedUsage([old, current, growth]) == 0)
+        #expect(try scalar(repository.databaseURL, "SELECT COUNT(*) FROM detected_usage_daily") == 1)
+    }
+
+    /// Trimming one segment must not make a partial unknown reading appear to contain the source's full history.
+    @Test(arguments: [true, false])
+    func trimmedUnknownSegmentsCannotBeReclassifiedByLaterMetadata(inputOnly: Bool) throws {
+        let root = directory()
+        defer { try? FileManager.default.removeItem(at: root) }
+        let repository = AIStateRepository(directoryURL: root, maximumUsageSamples: 1)
+        let first = sample("trimmed-unknown", .zed, nil, inputOnly ? 100 : 0, inputOnly ? 0 : 20)
+        var second = first
+        second.timestamp = first.timestamp.addingTimeInterval(86_400)
+        second.inputTokens = inputOnly ? 150 : 0
+        second.outputTokens = inputOnly ? 0 : 30
+        try repository.recordDetectedUsage([first, second])
+        second.model = "late-model"
+        #expect(try repository.recordDetectedUsage([second]) == 0)
+        let history = try repository.loadUsageHistory()
+        #expect(history.usageSamples.map(\.totalTokens) == [inputOnly ? 50 : 10])
+        #expect(history.modelUsageSamples.map(\.model) == [nil])
+        #expect(try scalar(repository.databaseURL, "SELECT COUNT(*) FROM detected_usage_daily") == 1)
+    }
+
+    /// Pruning shares the usage transaction so failed removal cannot advance a source without its daily delta.
+    @Test
+    func failedDetailedLedgerPruningRollsBackNewUsageAndCanRetryOnce() throws {
+        let root = directory()
+        defer { try? FileManager.default.removeItem(at: root) }
+        let repository = AIStateRepository(directoryURL: root, maximumUsageSamples: 1)
+        let first = sample("retention-transaction", .codex, "old-model", 100, 20)
+        try repository.recordDetectedUsage([first])
+        try sql(repository.databaseURL, """
+            CREATE TRIGGER fail_daily_pruning BEFORE DELETE ON detected_usage_daily
+            BEGIN SELECT RAISE(ABORT, 'fixture pruning failure'); END;
+            """)
+        var second = first
+        second.timestamp = first.timestamp.addingTimeInterval(86_400)
+        second.inputTokens = 150
+        second.outputTokens = 30
+        second.model = "new-model"
+        #expect(throws: (any Error).self) { try repository.recordDetectedUsage([second]) }
+        #expect(try repository.loadUsageHistory().usageSamples.map(\.totalTokens) == [120])
+        #expect(try scalar(repository.databaseURL, "SELECT input_tokens FROM detected_usage_events") == 100)
+        #expect(try scalar(repository.databaseURL, "SELECT COUNT(*) FROM detected_usage_daily") == 1)
+        try sql(repository.databaseURL, "DROP TRIGGER fail_daily_pruning")
+        #expect(try repository.recordDetectedUsage([second]) == 1)
+        #expect(try repository.loadUsageHistory().usageSamples.map(\.totalTokens) == [60])
+        #expect(try repository.loadUsageHistory().modelUsageSamples.map(\.model) == ["new-model"])
+        #expect(try repository.recordDetectedUsage([first, second]) == 0)
     }
 
     /// A failed model insert must not acknowledge the event, or its retry would silently lose the token delta.
@@ -560,5 +654,17 @@ struct AIModelDailyUsageTests {
         let result = sqlite3_exec(database, query, nil, nil, nil)
         #expect(result == SQLITE_OK, "\(query): \(String(cString: sqlite3_errmsg(database)))")
         if result != SQLITE_OK { throw CocoaError(.fileReadCorruptFile) }
+    }
+
+    /// Reads the disposable database directly because hidden retained detail is absent from report projections.
+    private func scalar(_ url: URL, _ query: String) throws -> Int64 {
+        var database: OpaquePointer?
+        try #require(sqlite3_open(url.path, &database) == SQLITE_OK)
+        defer { sqlite3_close(database) }
+        var statement: OpaquePointer?
+        try #require(sqlite3_prepare_v2(database, query, -1, &statement, nil) == SQLITE_OK)
+        defer { sqlite3_finalize(statement) }
+        try #require(sqlite3_step(statement) == SQLITE_ROW)
+        return sqlite3_column_int64(statement, 0)
     }
 }

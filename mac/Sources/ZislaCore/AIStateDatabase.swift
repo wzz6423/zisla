@@ -149,6 +149,7 @@ final class AIStateDatabase {
         defer { sqlite3_finalize(countStatement) }
         guard try stepHasRow(countStatement, fallback: AppLocalization.text("无法读取 AI 用量记录数量")),
               sqlite3_column_int64(countStatement, 0) > Int64(maximumUsageSamples) else {
+            try trimModelUsage()
             return
         }
         try trimUsage()
@@ -472,9 +473,10 @@ final class AIStateDatabase {
         try addModelUsage(AIUsageAnalytics.dailyModelUsageSamples(samples: samples), origin: "detected")
     }
 
-    /// Drops model rows only after their aggregate day is removed, preserving the retained-history boundary.
+    /// Removes expired display and detailed ledger rows while preserving cumulative source high-water marks.
     private func trimModelUsage() throws {
         try execute("DELETE FROM model_usage_samples WHERE timestamp NOT IN (SELECT timestamp FROM usage_samples)")
+        try execute("DELETE FROM detected_usage_daily WHERE timestamp NOT IN (SELECT timestamp FROM usage_samples)")
     }
 
     private func legacyDetectedUsageTotals() throws -> [DetectedUsageTotal] {
@@ -636,12 +638,15 @@ final class AIStateDatabase {
                         UPDATE detected_usage_daily SET model = ?
                         WHERE source_id = ? AND model = '' AND timestamp = ?
                             AND (SELECT COUNT(*) FROM detected_usage_daily WHERE source_id = ?) = 1
+                            AND input_tokens = ? AND output_tokens = ?
                         """)
                     defer { sqlite3_finalize(enrich) }
                     try bind(model, to: 1, in: enrich)
                     try bind(sourceID, to: 2, in: enrich)
                     try check(sqlite3_bind_double(enrich, 3, day.timeIntervalSinceReferenceDate))
                     try bind(sourceID, to: 4, in: enrich)
+                    try check(sqlite3_bind_int64(enrich, 5, Int64(existing.inputTokens)))
+                    try check(sqlite3_bind_int64(enrich, 6, Int64(existing.outputTokens)))
                     try stepDone(enrich)
                     if sqlite3_changes(connection) > 0 { modelDays.insert(day) }
                 }
