@@ -3445,3 +3445,10 @@
 "查询快递" = "Suivre un colis";
 "全部标记为已读" = "Tout marquer comme lu";
 "已将全部邮件标记为已读" = "Tous les messages ont été marqués comme lus";
+
+"自动滚动" = "Défilement auto";
+"暂停滚动" = "Suspendre le défilement";
+"正在自动滚动并拼接" = "Défilement et assemblage automatiques en cours";
+"自动滚动已暂停，可手动滚动或点击“完成”" = "Défilement auto suspendu. Faites défiler manuellement ou cliquez sur Terminé";
+"自动滚动需要在系统设置中允许辅助功能" = "Autorisez l’accessibilité dans Réglages Système pour défiler automatiquement";
+"无法自动滚动，请手动滚动页面" = "Impossible de défiler automatiquement. Faites défiler la page manuellement";

@@ -3449,3 +3449,10 @@
 "查询快递" = "Seguir paquete";
 "全部标记为已读" = "Marcar todo como leído";
 "已将全部邮件标记为已读" = "Todos los mensajes se han marcado como leídos";
+
+"自动滚动" = "Desplazamiento auto";
+"暂停滚动" = "Pausar desplazamiento";
+"正在自动滚动并拼接" = "Desplazando y uniendo automáticamente";
+"自动滚动已暂停，可手动滚动或点击“完成”" = "Desplazamiento automático pausado. Desplaza manualmente o haz clic en Listo";
+"自动滚动需要在系统设置中允许辅助功能" = "Permite Accesibilidad en Ajustes del Sistema para desplazar automáticamente";
+"无法自动滚动，请手动滚动页面" = "No se pudo desplazar automáticamente. Desplaza la página manualmente";

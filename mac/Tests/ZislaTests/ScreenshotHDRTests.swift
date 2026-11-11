@@ -303,6 +303,44 @@ struct ScreenshotHDRTests {
         #expect(model.image.size == CGSize(width: 12, height: 10) && model.canPreserveHDR)
     }
 
+    @Test(arguments: [false, true], [false, true])
+    func longCaptureRequestsTheFrozenRangeRegardlessOfPreviewToggle(hasHDR: Bool, preservesHDR: Bool) async throws {
+        let suite = "zisla-hdr-long-capture-\(UUID())"
+        let defaults = try #require(UserDefaults(suiteName: suite))
+        let settings = FeatureSettingsStore(defaults: defaults)
+        defer { settings.flushPendingChanges(); defaults.removePersistentDomain(forName: suite) }
+        let screen = try #require(NSScreen.screens.first)
+        let hdr = try Self.hdrImage(width: 80, height: 60)
+        let sdr = try #require(ScreenshotImageRendering.sdrImage(from: hdr))
+        let screenSize = screen.frame.size
+        let screenImage = NSImage(cgImage: sdr, size: screenSize)
+        let rect = CGRect(x: 0, y: 0, width: screenSize.width / 2, height: screenSize.height / 2)
+        let initial = try #require(ScreenshotCaptureService.image(from: sdr, cropInScreenPoints: rect, screenSize: screenSize))
+        var requests: [Bool] = []
+        let controller = ScreenshotEditorWindowController(image: initial,
+            screenImage: screenImage, screenCGImage: sdr, hdrScreenCGImage: hasHDR ? hdr : nil,
+            screen: screen, captureRect: rect, capturedApplication: nil, settingsStore: settings,
+            onStash: { _, _ in }, writeImageToPasteboard: { _ in false }, presentSavePanel: { _, _ in },
+            captureScreen: { _, includeHDR in
+                requests.append(includeHDR)
+                return (screenImage, sdr, hasHDR ? hdr : nil)
+            }, scheduleLongCaptureWork: { _, _ in }, onClose: {})
+        defer { controller.close() }
+        controller.window?.alphaValue = 0
+        let host = try #require(controller.window?.contentView as? NSHostingView<AppLanguageEnvironment<ScreenshotEditorView>>)
+        let model = host.rootView.content.model
+        let frozen = model.image
+        model.preservesHDR = preservesHDR
+        model.beginLongCapturePreview()
+        let task = try #require(controller.captureLongCaptureScreen(on: screen, sessionID: 0))
+        await task.value
+        #expect(requests == [hasHDR], "HDR capture follows the frozen frame's capability, including while its preview is disabled")
+        #expect(model.lastLongCaptureFrameResult == .unchanged,
+            "The injected HDR frame must be compared with the frozen HDR pixels instead of its SDR representation")
+        #expect(model.image === frozen && model.canPreserveHDR == hasHDR && model.preservesHDR == preservesHDR)
+        #expect(!model.canUndo && model.isLongCapturePreviewing)
+    }
+
     @Test
     func PQImagesRemainHDRWhenReopenedAndUnknownHeadroomIsMeasuredWhenSupported() throws {
         let hdr = try Self.hdrImage()

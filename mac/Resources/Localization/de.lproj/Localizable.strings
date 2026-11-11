@@ -3450,3 +3450,10 @@
 "查询快递" = "Sendung verfolgen";
 "全部标记为已读" = "Alle als gelesen markieren";
 "已将全部邮件标记为已读" = "Alle Nachrichten wurden als gelesen markiert";
+
+"自动滚动" = "Automatisch scrollen";
+"暂停滚动" = "Scrollen pausieren";
+"正在自动滚动并拼接" = "Automatisches Scrollen und Zusammenfügen";
+"自动滚动已暂停，可手动滚动或点击“完成”" = "Automatisches Scrollen pausiert. Scrolle manuell oder klicke auf Fertig";
+"自动滚动需要在系统设置中允许辅助功能" = "Erlaube Bedienungshilfen in den Systemeinstellungen, um automatisch zu scrollen";
+"无法自动滚动，请手动滚动页面" = "Automatisches Scrollen nicht möglich. Scrolle die Seite manuell";

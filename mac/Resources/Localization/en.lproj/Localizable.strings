@@ -3448,3 +3448,10 @@
 "查询快递" = "Track Package";
 "全部标记为已读" = "Mark all as read";
 "已将全部邮件标记为已读" = "All messages marked as read";
+
+"自动滚动" = "Auto Scroll";
+"暂停滚动" = "Pause Scrolling";
+"正在自动滚动并拼接" = "Automatically scrolling and stitching";
+"自动滚动已暂停，可手动滚动或点击“完成”" = "Auto scroll paused. Scroll manually or click Done";
+"自动滚动需要在系统设置中允许辅助功能" = "Allow Accessibility in System Settings to scroll automatically";
+"无法自动滚动，请手动滚动页面" = "Could not scroll automatically. Scroll the page manually";

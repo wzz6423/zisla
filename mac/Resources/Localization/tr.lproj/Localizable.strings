@@ -3449,3 +3449,10 @@
 "查询快递" = "Kargo takip et";
 "全部标记为已读" = "Tümünü okundu olarak işaretle";
 "已将全部邮件标记为已读" = "Tüm iletiler okundu olarak işaretlendi";
+
+"自动滚动" = "Otomatik kaydır";
+"暂停滚动" = "Kaydırmayı duraklat";
+"正在自动滚动并拼接" = "Otomatik kaydırılıyor ve birleştiriliyor";
+"自动滚动已暂停，可手动滚动或点击“完成”" = "Otomatik kaydırma duraklatıldı. Elle kaydırın veya Bitti’ye tıklayın";
+"自动滚动需要在系统设置中允许辅助功能" = "Otomatik kaydırma için Sistem Ayarları’nda Erişilebilirliğe izin verin";
+"无法自动滚动，请手动滚动页面" = "Otomatik kaydırılamadı. Sayfayı elle kaydırın";
