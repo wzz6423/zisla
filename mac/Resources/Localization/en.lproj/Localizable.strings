@@ -3361,6 +3361,7 @@
 "保存手写备忘录需要辅助功能权限" = "Accessibility access is required to save handwritten notes";
 "备忘录内容已变化，请重新打开后编辑" = "The note has changed. Reopen it before editing";
 "无法保存手写备忘录的文本，请在备忘录中打开后重试" = "Could not save text in the handwritten note. Open it in Notes and try again";
+"保留 HDR" = "Preserve HDR";
 "小雨" = "Light rain";
 "中雨" = "Moderate rain";
 "大雨" = "Heavy rain";
