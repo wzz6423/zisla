@@ -3448,3 +3448,10 @@
 "查询快递" = "Theo dõi bưu kiện";
 "全部标记为已读" = "Đánh dấu tất cả là đã đọc";
 "已将全部邮件标记为已读" = "Đã đánh dấu tất cả thư là đã đọc";
+
+"自动滚动" = "Cuộn tự động";
+"暂停滚动" = "Tạm dừng cuộn";
+"正在自动滚动并拼接" = "Đang cuộn và ghép tự động";
+"自动滚动已暂停，可手动滚动或点击“完成”" = "Đã tạm dừng cuộn tự động. Cuộn thủ công hoặc nhấp Xong";
+"自动滚动需要在系统设置中允许辅助功能" = "Cho phép Trợ năng trong Cài đặt hệ thống để cuộn tự động";
+"无法自动滚动，请手动滚动页面" = "Không thể cuộn tự động. Hãy cuộn trang thủ công";
