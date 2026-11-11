@@ -412,7 +412,7 @@ struct CompactPillLyricTests {
         state.compactWingHeight = 32
         let view = CompactStatusBarView(queue: queue, displayState: state, media: media,
             browserDownloads: BrowserDownloadMonitor(), settingsStore: settings,
-            resultSweep: sweep, onStatusHidden: {})
+            resultSweep: sweep, pomodoro: PomodoroService(notificationRequestHandler: { _ in }, defaults: defaults), onStatusHidden: {})
         let presentation = try #require(SideNoticeLayoutEngine().compactBarSizing(
             for: [notice], settings: settings.settings)?.customPillPresentation)
         let length = presentation.length(thickness: 32, edge: edge, text: longLyric, item: item)

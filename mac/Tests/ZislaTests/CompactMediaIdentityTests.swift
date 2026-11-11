@@ -132,6 +132,7 @@ struct CompactMediaIdentityTests {
         let queue = SideNoticeQueue()
         let sweep = AIResultSweepController()
         let presenter = SideNoticePresenter(queue: queue, resultSweep: sweep, media: media,
+            pomodoro: PomodoroService(notificationRequestHandler: { _ in }, defaults: defaults),
             browserDownloads: BrowserDownloadMonitor(), settingsStore: store,
             languageStore: AppLanguageStore(defaults: defaults), isScreenLocked: true,
             now: { date }, reduceMotion: { true }, screenSnapshotProvider: { [] })
@@ -269,7 +270,7 @@ struct CompactMediaIdentityTests {
         state.islandEdge = edge
         state.compactWingHeight = 32
         let view = CompactStatusBarView(queue: queue, displayState: state, media: media,
-            browserDownloads: BrowserDownloadMonitor(), settingsStore: store, resultSweep: sweep, onStatusHidden: {})
+            browserDownloads: BrowserDownloadMonitor(), settingsStore: store, resultSweep: sweep, pomodoro: PomodoroService(notificationRequestHandler: { _ in }, defaults: defaults), onStatusHidden: {})
         let length: CGFloat = presentation.showsWaveform ? 252 : 222
         let size = edge.isVertical ? CGSize(width: 32, height: length) : CGSize(width: length, height: 32)
         let host = NSHostingView(rootView: view

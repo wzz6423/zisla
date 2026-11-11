@@ -26,7 +26,7 @@ struct SideNoticePresenterPillTests {
         state.compactBarCenterInset = 185
         let view = CompactStatusBarView(queue: fixture.queue, displayState: state, media: fixture.media,
             browserDownloads: fixture.downloads, settingsStore: fixture.settings, resultSweep: fixture.sweep,
-            onStatusHidden: {})
+            pomodoro: PomodoroService(notificationRequestHandler: { _ in }, defaults: fixture.defaults), onStatusHidden: {})
         let size = CGSize(width: 265, height: 32)
         let reference = try await renderOffscreen(view.statusBarContent(at: fixture.date), size: size)
         let referenceBounds = try foregroundBounds(reference, scale: CGFloat(reference.pixelsWide) / size.width)
@@ -66,7 +66,7 @@ struct SideNoticePresenterPillTests {
         state.compactBarCenterInset = centerWidth
         let view = CompactStatusBarView(queue: fixture.queue, displayState: state, media: fixture.media,
             browserDownloads: fixture.downloads, settingsStore: fixture.settings, resultSweep: fixture.sweep,
-            onStatusHidden: {})
+            pomodoro: PomodoroService(notificationRequestHandler: { _ in }, defaults: fixture.defaults), onStatusHidden: {})
         let width = max(240, centerWidth + 80)
         let sideWidth = (width - centerWidth) / 2
         let bitmap = try await renderOffscreen(view.statusBarContent(at: fixture.date), size: CGSize(width: width, height: 32))
@@ -492,7 +492,7 @@ struct SideNoticePresenterPillTests {
         state.compactBarCenterInset = centerInset
         let view = CompactStatusBarView(queue: fixture.queue, displayState: state, media: fixture.media,
             browserDownloads: fixture.downloads, settingsStore: fixture.settings, resultSweep: fixture.sweep,
-            onStatusHidden: {})
+            pomodoro: PomodoroService(notificationRequestHandler: { _ in }, defaults: fixture.defaults), onStatusHidden: {})
         let actual = try await renderOffscreen(AppLanguageEnvironment(languageStore: fixture.language,
             content: view.statusBarContent(at: fixture.date))
             .environment(\.locale, Locale(identifier: "en-US"))
@@ -1061,6 +1061,7 @@ struct SideNoticePresenterPillTests {
             frame: CGRect(x: -1800, y: -240, width: 1800, height: 1100),
             visibleFrame: CGRect(x: -1800, y: -240, width: 1800, height: 1076))
         lazy var presenter = SideNoticePresenter(queue: queue, resultSweep: sweep, media: media,
+            pomodoro: PomodoroService(notificationRequestHandler: { _ in }, defaults: defaults),
             browserDownloads: downloads, settingsStore: settings, languageStore: language,
             isScreenLocked: true, now: { [unowned self] in date }, reduceMotion: { [unowned self] in reducesMotion },
             waitForCompactResize: { [resizeClock] in try await resizeClock.wait(for: $0) },

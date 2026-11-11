@@ -215,6 +215,7 @@ struct CompactStatusBarView: View {
     @ObservedObject var browserDownloads: BrowserDownloadMonitor
     @ObservedObject var settingsStore: FeatureSettingsStore
     @ObservedObject var resultSweep: AIResultSweepController
+    var pomodoro: PomodoroService
     var onStatusHidden: () -> Void
     var onCompactLengthChanged: (CGFloat) -> Void = { _ in }
 
@@ -249,6 +250,7 @@ struct CompactStatusBarView: View {
             )
             CompactStatusBarSurface(frame: layout.frame, panelFrame: layout.panelFrame) { size in
                 compactSurfaceContent(size: size, at: date)
+                    .environmentObject(pomodoro)
                     .environment(\.layoutDirection, layoutDirection)
             }
             .animation(reduceMotion ? nil : layout.animation, value: layout.frame)
@@ -365,6 +367,8 @@ struct CompactStatusBarView: View {
             return browserDownloadNotice?.progress
         case .videoDownload:
             return videoDownloadNotice?.progress
+        case .focusCountdown:
+            return displayState.compactStatusHidden ? nil : focusCountdownNotice?.progress
         default:
             return nil
         }
@@ -372,6 +376,7 @@ struct CompactStatusBarView: View {
 
     private func compactProgressTint(for priority: CompactStatusPriority?) -> Color {
         if recordingOperationNotice != nil { return .green }
+        if priority == .focusCountdown { return .zislaWarning }
         guard priority == .media else { return .green }
         let artworkData = detailedMediaItem?.artworkData ?? mediaNotice?.artworkData
         return MediaWaveformView.tintColor(for: artworkData)
@@ -674,7 +679,8 @@ struct CompactStatusBarView: View {
             }
         case .focusCountdown:
             if let focusCountdownNotice {
-                CompactFocusCountdownBar(notice: focusCountdownNotice, height: height)
+                CompactFocusCountdownBar(notice: focusCountdownNotice, height: height,
+                    centerInset: displayState.compactBarCenterInset)
             }
         case .toolboxReminder:
             if let toolboxNotice {
@@ -2495,22 +2501,36 @@ private final class VideoDownloadIconCache {
 private struct CompactFocusCountdownBar: View {
     var notice: IslandNotice
     var height: CGFloat
+    var centerInset: CGFloat
 
     var body: some View {
-        HStack(spacing: 8) {
-            Image(systemName: "clock")
-            Spacer(minLength: 8)
-            Text(notice.detail ?? "00:00:00")
-                .monospacedDigit()
-                .lineLimit(1)
-                .minimumScaleFactor(0.65)
+        GeometryReader { geometry in
+            let sideWidth = (geometry.size.width - centerInset) / 2
+            HStack(spacing: 0) {
+                HStack(spacing: 6) {
+                    Image(systemName: "clock")
+                        .accessibilityIdentifier("pomodoro.clock")
+                    Text(notice.detail ?? "00:00:00")
+                        .monospacedDigit()
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.65)
+                        .accessibilityLabel(Text("\(notice.title) \(notice.detail ?? "00:00:00")"))
+                        .accessibilityIdentifier("pomodoro.countdown")
+                }
+                .padding(.leading, 12)
+                .frame(width: sideWidth, height: height, alignment: .leading)
+                Spacer(minLength: 0)
+                    .frame(width: centerInset)
+                CompactPomodoroControls(edge: .top)
+                    .padding(.trailing, 12)
+                    .frame(width: sideWidth, height: height, alignment: .trailing)
+            }
+            .environment(\.layoutDirection, .leftToRight)
         }
         .font(.system(size: min(14, height * 0.52), weight: .semibold, design: .rounded))
         .foregroundStyle(.white)
-        .padding(.horizontal, 12)
         .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .accessibilityElement(children: .ignore)
-        .accessibilityLabel(Text("\(notice.title) \(notice.detail ?? "00:00:00")"))
+        .accessibilityElement(children: .contain)
         .help("\(notice.title) \(notice.detail ?? "00:00:00")")
     }
 }

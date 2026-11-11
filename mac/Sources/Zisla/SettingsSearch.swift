@@ -50,6 +50,7 @@ enum SettingsSearchIndex {
         return matches.sorted { matchesExactTitle($0) && !matchesExactTitle($1) }
     }
 
+    /// Aliases stay attached to typed destinations so localized searches retain row targets and feature visibility.
     static func items(settings: FeatureSettings) -> [SettingsSearchItem] {
         var items: [SettingsSearchItem] = []
 
@@ -90,7 +91,6 @@ enum SettingsSearchIndex {
             entry(.features, "清理范围", anchor: .row("清理范围"),
                   keywords: ["自动清理系统垃圾"] + SystemCleanupScope.allCases.map(\.menuTitle))
         }
-        entry(.features, "工具", anchor: .group("工具"), keywords: ["恢复默认顺序"] + IslandModuleOrder.allCases.map(\.title))
 
         for operation in PDFToolOperation.allCases {
             entry(.pdfTools, operation.title, anchor: .pdfOperation(operation), keywords: [operation.detail])
@@ -100,6 +100,8 @@ enum SettingsSearchIndex {
                   keywords: [operation.detail, "PNG", "JPEG", "WebP", "AVIF", "JPEG XL", "HEIC", "SVG", "TinyPNG"])
         }
 
+        entry(.info, "灵动岛功能顺序", anchor: .group("灵动岛功能顺序"),
+              keywords: ["恢复默认顺序"] + IslandModuleOrder.defaultOrder.map(\.title))
         entry(.info, "每日简报", anchor: .group("每日简报"), keywords: ["简报模板", "简报内容", "导出时间", "读取系统屏幕使用时间"])
         entry(.info, "简报内容", anchor: .row("简报内容"), keywords: DailyBriefingContent.allCases.map(\.title))
         rows(.info, ["简报模板", "导出时间"])
@@ -147,7 +149,7 @@ enum SettingsSearchIndex {
             rows(.clipboardAssistant, ["便签快捷键"])
         }
         entry(.clipboardAssistant, "识别类型", anchor: .row("识别类型"), keywords: [
-            "链接", "文件路径", "邮箱", "电话号码", "颜色值", "算式", "汇率换算", "换算", "日期时间",
+            "链接", "IP 地址", "文件路径", "邮箱", "电话号码", "颜色值", "算式", "汇率换算", "换算", "日期时间",
             "地址", "航班", "火车车次", "快递单号", "会议日程", "Emoji 名称", "代码", "Shell 命令",
             "应用程序", "非 Zisla 全局语言文本", "文本", "图片", "文件", "主动作", "恢复默认顺序",
             "单位换算", "金额换算", "日期加减", "日期间隔", "跨时区时间",
@@ -171,7 +173,9 @@ enum SettingsSearchIndex {
         rows(.mail, ["新邮件展示"])
         entry(.mail, "邮件账户", anchor: .group("邮件"))
         rows(.keyboardSound, ["键盘音色", "键盘音量", "播放键盘回弹音", "自然音高变化", "记录本地输入统计"])
-        rows(.download, [ManagedTool.ytDLP.displayName, ManagedTool.libreOffice.displayName])
+        for tool in [ManagedTool.ytDLP, .libreOffice] {
+            entry(.download, tool.displayName, anchor: .row(tool.displayName), keywords: ["下载", "Downloads"])
+        }
         for location in SaveLocation.allCases {
             entry(.saveLocations, location.title, anchor: .row(location.title),
                   keywords: ["默认保存位置", "更改保存位置"]

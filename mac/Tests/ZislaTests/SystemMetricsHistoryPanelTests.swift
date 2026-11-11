@@ -5,9 +5,117 @@ import ZislaKit
 
 @testable import Zisla
 
-/// Match the cleanup panel's standard controls and state-driven close behavior without elevating focus.
+/// Preserve standard history controls and distinguish explicit requests from passive view updates.
 @Suite(.serialized)
 struct SystemMetricsHistoryPanelTests {
+    /// Uses a nonordering window to exercise the real coordinator without changing application focus.
+    @Test @MainActor
+    func repeatedRequestsRaiseTheWindowOncePerClickAndDismissalCanReopen() throws {
+        let state = SystemMetricsHistoryPanelPresentationState()
+        let history = OrderingHistoryPanel(
+            contentRect: CGRect(x: -100_000, y: -100_000, width: 720, height: 560),
+            styleMask: [.titled, .closable], backing: .buffered, defer: false
+        )
+        let host = SettingsWindow(
+            contentRect: .zero, styleMask: .titled, backing: .buffered, defer: false
+        )
+        history.isReleasedWhenClosed = false
+        host.isReleasedWhenClosed = false
+        defer { history.close(); host.close() }
+        let service = SystemMonitorService()
+        var collapseRequests = 0
+        var coordinator = SystemMetricsHistoryPanelPresenter.Coordinator(
+            panel: history, requestIslandCollapse: { collapseRequests += 1 }
+        )
+        #expect(!state.isPresented)
+        state.present()
+        let first = try #require(state.requestID)
+        coordinator.update(
+            requestID: first, dismissPresentation: state.dismiss,
+            service: service, hostWindow: host
+        )
+        #expect(history.frontRequestCount == 1)
+        #expect(history.requestedKey)
+        history.reportsVisible = true
+        coordinator.update(
+            requestID: first, dismissPresentation: state.dismiss,
+            service: service, hostWindow: host
+        )
+        #expect(history.frontRequestCount == 1, "Passive updates must not take focus from Settings")
+
+        state.present()
+        let second = try #require(state.requestID)
+        #expect(second != first)
+        coordinator.update(
+            requestID: second, dismissPresentation: state.dismiss,
+            service: service, hostWindow: host
+        )
+        #expect(history.frontRequestCount == 2, "Another click must raise the already visible history window")
+        history.reportsVisible = false
+        history.reportsMiniaturized = true
+        coordinator.update(
+            requestID: second, dismissPresentation: state.dismiss,
+            service: service, hostWindow: host
+        )
+        #expect(history.frontRequestCount == 2, "Passive updates must preserve minimization")
+        state.present()
+        coordinator.update(
+            requestID: state.requestID, dismissPresentation: state.dismiss,
+            service: service, hostWindow: host
+        )
+        #expect(history.frontRequestCount == 3, "An explicit click must restore the minimized history window")
+
+        history.reportsMiniaturized = false
+        history.reportsVisible = true
+        state.dismiss()
+        coordinator.update(
+            requestID: state.requestID, dismissPresentation: state.dismiss,
+            service: service, hostWindow: host
+        )
+        #expect(state.requestID == nil)
+        #expect(!state.isPresented)
+        #expect(!history.isVisible)
+        #expect(history.frontRequestCount == 3)
+        coordinator = SystemMetricsHistoryPanelPresenter.Coordinator(
+            panel: history, requestIslandCollapse: { collapseRequests += 1 }
+        )
+        state.present()
+        coordinator.update(
+            requestID: state.requestID, dismissPresentation: state.dismiss,
+            service: service, hostWindow: host
+        )
+        #expect(history.frontRequestCount == 4)
+        #expect(collapseRequests == 4)
+    }
+
+    /// Exercises origin-dependent focus requests without ordering real application windows.
+    @Test(arguments: ["settings", "island", "detached"])
+    @MainActor
+    func presentationTakesFocusOnlyFromSettings(origin: String) {
+        let history = OrderingHistoryPanel(
+            contentRect: CGRect(x: 0, y: 0, width: 720, height: 560),
+            styleMask: [.titled, .closable], backing: .buffered, defer: false
+        )
+        history.isReleasedWhenClosed = false
+        let host: NSWindow? = switch origin {
+        case "settings": SettingsWindow(
+            contentRect: .zero, styleMask: .titled, backing: .buffered, defer: false
+        )
+        case "island": NSPanel(
+            contentRect: .zero, styleMask: .borderless, backing: .buffered, defer: false
+        )
+        default: nil
+        }
+        host?.isReleasedWhenClosed = false
+        defer { history.close(); host?.close() }
+
+        history.present(over: host)
+
+        #expect(history.requestedKey == (origin == "settings"))
+        #expect(history.requestedOrderFront == (origin != "settings"))
+        #expect(!history.isVisible)
+    }
+
     @Test @MainActor
     func usesStandardWindowControlsAndRoutesClose() {
         let presentationState = SystemMetricsHistoryPanelPresentationState()
@@ -200,6 +308,32 @@ struct SystemMetricsHistoryPanelTests {
         let ticks = SystemMetricsChartAxis.dates(in: date...date)
 
         #expect(ticks == [date])
+    }
+
+    @MainActor
+    private final class OrderingHistoryPanel: SystemMetricsHistoryPanel {
+        var requestedKey = false
+        var requestedOrderFront = false
+        var frontRequestCount = 0
+        var reportsVisible = false
+        var reportsMiniaturized = false
+
+        override var isVisible: Bool { reportsVisible }
+        override var isMiniaturized: Bool { reportsMiniaturized }
+
+        override func makeKeyAndOrderFront(_ sender: Any?) {
+            requestedKey = true
+            frontRequestCount += 1
+        }
+
+        override func orderFront(_ sender: Any?) {
+            requestedOrderFront = true
+            frontRequestCount += 1
+        }
+
+        override func orderOut(_ sender: Any?) {
+            reportsVisible = false
+        }
     }
 
 }

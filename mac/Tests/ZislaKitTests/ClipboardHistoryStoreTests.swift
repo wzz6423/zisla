@@ -1,3 +1,4 @@
+import Combine
 import Foundation
 import SQLite3
 import Testing
@@ -96,6 +97,456 @@ struct ClipboardHistoryStoreTests {
         let restored = ClipboardHistoryStore(storageURL: storageURL)
         await restored.waitUntilLoaded()
         #expect(restored.historyItems.map(\.content) == [.text("second"), .text("first")])
+    }
+
+    @Test
+    func queryReloadKeepsAPendingCopyAndPersistsItBeforeLoading() async throws {
+        let directory = try makeDirectory()
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let storageURL = directory.appendingPathComponent("clipboard-history.sqlite")
+        let store = ClipboardHistoryStore(storageURL: storageURL, persistenceDelay: .seconds(60))
+        await store.waitUntilLoaded()
+        defer { store.flushPendingChanges() }
+
+        #expect(store.record(.text("pending copy")))
+        store.updateQuery(scope: .history, searchText: "pending", category: .text)
+        try await waitUntil { !store.isLoading }
+        await store.waitUntilLoaded()
+
+        #expect(store.items.map(\.content) == [.text("pending copy")], "A query reload must not replace a pending copy with an older database page")
+        #expect(store.totalItemCount == 1)
+        #expect(store.categoryCounts == [.text: 1])
+        #expect(!store.isLoading)
+        let restored = ClipboardHistoryStore(storageURL: storageURL)
+        await restored.waitUntilLoaded()
+        #expect(restored.items == store.items, "Loading a query must include preceding writes in persisted history")
+    }
+
+    @Test
+    func flushingAnUnstartedBatchCannotRestoreClearedHistory() async throws {
+        let directory = try makeDirectory()
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let storageURL = directory.appendingPathComponent("clipboard-history.sqlite")
+        let store = ClipboardHistoryStore(storageURL: storageURL, persistenceDelay: .seconds(60))
+        await store.waitUntilLoaded()
+
+        for index in 0..<512 {
+            #expect(store.record(.text("batch copy \(index)")))
+        }
+        store.removeAllHistory()
+        store.flushPendingChanges()
+        store.updateQuery(scope: .history, searchText: "")
+        await store.waitUntilLoaded()
+
+        #expect(store.items.isEmpty, "A flushed clear must not be overwritten by a batch task that starts afterward")
+        #expect(store.totalItemCount == 0)
+        let restored = ClipboardHistoryStore(storageURL: storageURL)
+        await restored.waitUntilLoaded()
+        #expect(restored.items.isEmpty)
+        #expect(restored.totalItemCount == 0)
+    }
+
+    @Test(arguments: ["pin", "unpin", "remove", "clear"])
+    func queryReloadIncludesPendingUserChanges(action: String) async throws {
+        let directory = try makeDirectory()
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let storageURL = directory.appendingPathComponent("clipboard-history.sqlite")
+        let database = ClipboardHistoryDatabase(storageURL: storageURL)
+        let item = ClipboardHistoryItem(content: .text("target"), isPinned: action == "unpin")
+        try database.flush([.upsert(item, capacity: nil)])
+        let store = ClipboardHistoryStore(storageURL: storageURL, persistenceDelay: .seconds(60))
+        await store.waitUntilLoaded()
+        defer { store.flushPendingChanges() }
+
+        switch action {
+        case "pin": store.setPinned(id: item.id, isPinned: true)
+        case "unpin": store.setPinned(id: item.id, isPinned: false)
+        case "remove": store.remove(id: item.id)
+        default: store.removeAllHistory()
+        }
+        store.updateQuery(scope: action == "pin" ? .pinned : .history, searchText: "target", category: .text)
+        await store.waitUntilLoaded()
+
+        let remaining = action == "pin" || action == "unpin"
+        #expect(store.totalItemCount == (remaining ? 1 : 0))
+        #expect(store.items.map(\.id) == (remaining ? [item.id] : []), "Querying must include the preceding user action")
+        #expect(store.items.first?.isPinned == (remaining ? action == "pin" : nil))
+        let restored = ClipboardHistoryStore(storageURL: storageURL)
+        await restored.waitUntilLoaded()
+        #expect(restored.items == store.items)
+    }
+
+    @Test
+    func aCopyDuringInitialLoadingSurvivesItsOlderSnapshot() async throws {
+        let directory = try makeDirectory()
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let storageURL = directory.appendingPathComponent("clipboard-history.sqlite")
+        let store = ClipboardHistoryStore(storageURL: storageURL, persistenceDelay: .seconds(60))
+        defer { store.flushPendingChanges() }
+
+        #expect(store.record(.text("initial copy")))
+        await store.waitUntilLoaded()
+
+        #expect(store.items.map(\.content) == [.text("initial copy")])
+        #expect(store.totalItemCount == 1)
+        #expect(!store.isLoading)
+        let restored = ClipboardHistoryStore(storageURL: storageURL)
+        await restored.waitUntilLoaded()
+        #expect(restored.items == store.items)
+    }
+
+    @Test
+    func reloadReportsWriteFailureWithoutRestoringDeletedHistoryAndCanRetry() async throws {
+        let directory = try makeDirectory()
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let storageURL = directory.appendingPathComponent("clipboard-history.sqlite")
+        let database = ClipboardHistoryDatabase(storageURL: storageURL)
+        let original = ClipboardHistoryItem(content: .text("target"))
+        try database.flush([.upsert(original, capacity: nil)])
+        let store = ClipboardHistoryStore(storageURL: storageURL, persistenceDelay: .seconds(60))
+        await store.waitUntilLoaded()
+        defer { store.flushPendingChanges() }
+        try executeSQL("""
+            CREATE TRIGGER reject_removal BEFORE DELETE ON clipboard_history
+            BEGIN SELECT RAISE(ABORT, 'injected reload write failure'); END;
+            """, at: storageURL)
+
+        store.remove(id: original.id)
+        store.updateQuery(scope: .history, searchText: "target", category: .text)
+        await store.waitUntilLoaded()
+
+        #expect(store.items.isEmpty, "A failed write must not restore an older page over the user's removal")
+        #expect(!store.isLoading)
+        #expect(store.errorDescription?.contains("injected reload write failure") == true)
+        let failed = ClipboardHistoryStore(storageURL: storageURL)
+        await failed.waitUntilLoaded()
+        #expect(failed.items == [original], "A failed transaction must leave persisted history intact")
+
+        try executeSQL("DROP TRIGGER reject_removal", at: storageURL)
+        store.updateQuery(scope: .all, searchText: "")
+        await store.waitUntilLoaded()
+        #expect(store.items.isEmpty)
+        #expect(store.errorDescription == nil)
+        let restored = ClipboardHistoryStore(storageURL: storageURL)
+        await restored.waitUntilLoaded()
+        #expect(restored.items.isEmpty)
+    }
+
+    @Test(arguments: ["pin", "unpin", "remove", "clear"])
+    func queryReloadIncludesChangesQueuedBehindAnInFlightBatch(action: String) async throws {
+        let directory = try makeDirectory()
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let storageURL = directory.appendingPathComponent("clipboard-history.sqlite")
+        let database = ClipboardHistoryDatabase(storageURL: storageURL)
+        let target = ClipboardHistoryItem(content: .text("target"), isPinned: action == "unpin")
+        try database.flush([.upsert(target, capacity: nil)])
+        let store = ClipboardHistoryStore(storageURL: storageURL, persistenceDelay: .seconds(60))
+        await store.waitUntilLoaded()
+        defer { store.flushPendingChanges() }
+
+        var blockingDatabase: OpaquePointer?
+        #expect(sqlite3_open(storageURL.path, &blockingDatabase) == SQLITE_OK)
+        let blocker = try #require(blockingDatabase)
+        defer { sqlite3_close(blocker) }
+        #expect(sqlite3_exec(blocker, "BEGIN IMMEDIATE", nil, nil, nil) == SQLITE_OK)
+        defer { sqlite3_exec(blocker, "ROLLBACK", nil, nil, nil) }
+
+        #expect(store.record(.text("first batch")))
+        store.updateQuery(scope: .all, searchText: "target", category: .text)
+        switch action {
+        case "pin": store.setPinned(id: target.id, isPinned: true)
+        case "unpin": store.setPinned(id: target.id, isPinned: false)
+        case "remove": store.remove(id: target.id)
+        default: store.removeAllHistory()
+        }
+        #expect(store.record(.text("copy after action")))
+        store.updateQuery(scope: action == "pin" ? .pinned : .history, searchText: "target", category: .text)
+        #expect(sqlite3_exec(blocker, "ROLLBACK", nil, nil, nil) == SQLITE_OK)
+        await store.waitUntilLoaded()
+
+        let remaining = action == "pin" || action == "unpin"
+        #expect(store.items.map(\.id) == (remaining ? [target.id] : []))
+        #expect(store.items.first?.isPinned == (remaining ? action == "pin" : nil))
+        #expect(store.totalItemCount == (remaining ? 1 : 0))
+        #expect(store.errorDescription == nil)
+        let restored = ClipboardHistoryStore(storageURL: storageURL)
+        await restored.waitUntilLoaded()
+        var expected: Set<String> = ["copy after action"]
+        if action != "clear" { expected.insert("first batch") }
+        if remaining { expected.insert("target") }
+        #expect(Set(restored.items.map(\.content.previewText)) == expected, "Later actions must stay ordered after the completed batch")
+    }
+
+    @Test
+    func completedPersistenceDoesNotKeepTheStoreAlive() async throws {
+        let directory = try makeDirectory()
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let storageURL = directory.appendingPathComponent("clipboard-history.sqlite")
+        var store: ClipboardHistoryStore? = ClipboardHistoryStore(storageURL: storageURL)
+        await store?.waitUntilLoaded()
+        #expect(store?.record(.text("release after saving")) == true)
+        store?.updateQuery(scope: .history, searchText: "")
+        await store?.waitUntilLoaded()
+        weak let released = store
+
+        store = nil
+
+        #expect(released == nil, "A completed persistence wait must not retain the store")
+        let restored = ClipboardHistoryStore(storageURL: storageURL)
+        await restored.waitUntilLoaded()
+        #expect(restored.items.map(\.content) == [.text("release after saving")])
+    }
+
+    @Test
+    func supersededLoadsCannotFinishANewerPendingBatch() async throws {
+        let directory = try makeDirectory()
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let storageURL = directory.appendingPathComponent("clipboard-history.sqlite")
+        let store = ClipboardHistoryStore(storageURL: storageURL, persistenceDelay: .seconds(60))
+        await store.waitUntilLoaded()
+        defer { store.flushPendingChanges() }
+
+        #expect(store.record(.text("first batch")))
+        store.updateQuery(scope: .history, searchText: "")
+        #expect(store.record(.text("second batch")))
+        store.updateQuery(scope: .history, searchText: "batch", category: .text)
+        #expect(store.record(.text("third batch")))
+        var earlyCompletions = 0
+        let observation = store.$isLoading.dropFirst().sink { loading in
+            guard !loading, store.totalItemCount != 3 else { return }
+            earlyCompletions += 1
+            _ = store.record(.text("late batch"))
+        }
+        defer { observation.cancel() }
+        await store.waitUntilLoaded()
+
+        #expect(earlyCompletions == 0, "A superseded load must not finish while newer mutations still await persistence")
+        #expect(store.totalItemCount == 3)
+        let restored = ClipboardHistoryStore(storageURL: storageURL)
+        await restored.waitUntilLoaded()
+        #expect(Set(restored.items.map(\.content.previewText)) == ["first batch", "second batch", "third batch"])
+    }
+
+    @Test
+    func failedWritesCannotPublishANewPageNumberOverThePreviousPage() async throws {
+        let directory = try makeDirectory()
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let storageURL = directory.appendingPathComponent("clipboard-history.sqlite")
+        let database = ClipboardHistoryDatabase(storageURL: storageURL)
+        let original = (0..<6).map { index in
+            ClipboardHistoryItem(content: .text("item \(index)"), lastCopiedAt: Date(timeIntervalSince1970: Double(index)))
+        }
+        try database.flush(original.map { .upsert($0, capacity: nil) })
+        let store = ClipboardHistoryStore(storageURL: storageURL, pageSize: 2, persistenceDelay: .seconds(60))
+        await store.waitUntilLoaded()
+        defer { store.flushPendingChanges() }
+        try executeSQL("""
+            CREATE TRIGGER reject_removal BEFORE DELETE ON clipboard_history
+            BEGIN SELECT RAISE(ABORT, 'injected navigation failure'); END;
+            """, at: storageURL)
+        store.remove(id: original[5].id)
+        let previousItems = store.items
+        let previousCount = store.totalItemCount
+
+        for number in [2, 3, 2] {
+            store.loadPage(number: number)
+            await store.waitUntilLoaded()
+
+            #expect(store.currentPage == 0, "A skipped page load must retain the page number corresponding to its visible items")
+            #expect(store.items == previousItems)
+            #expect(store.totalItemCount == previousCount)
+            #expect(store.errorDescription?.contains("injected navigation failure") == true)
+        }
+
+        try executeSQL("DROP TRIGGER reject_removal", at: storageURL)
+        store.loadPage(number: 2)
+        await store.waitUntilLoaded()
+        #expect(store.currentPage == 1)
+        #expect(store.items.map(\.content) == [.text("item 2"), .text("item 1")])
+        #expect(store.totalItemCount == 5)
+    }
+
+    @Test
+    func supersededFailedLoadsCannotFinishAQueryRetry() async throws {
+        let directory = try makeDirectory()
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let storageURL = directory.appendingPathComponent("clipboard-history.sqlite")
+        let database = ClipboardHistoryDatabase(storageURL: storageURL)
+        let original = ClipboardHistoryItem(content: .text("target"))
+        try database.flush([.upsert(original, capacity: nil)])
+        let store = ClipboardHistoryStore(storageURL: storageURL, persistenceDelay: .seconds(60))
+        await store.waitUntilLoaded()
+        defer { store.flushPendingChanges() }
+        try executeSQL("""
+            CREATE TRIGGER reject_removal BEFORE DELETE ON clipboard_history
+            BEGIN SELECT RAISE(ABORT, 'injected superseded load failure'); END;
+            """, at: storageURL)
+
+        store.remove(id: original.id)
+        store.updateQuery(scope: .history, searchText: "")
+        store.updateQuery(scope: .pinned, searchText: "")
+        store.updateQuery(scope: .history, searchText: "target", category: .text)
+        var finishedLoads = 0
+        var retry: Task<Void, Never>?
+        let observation = store.$isLoading.dropFirst().sink { loading in
+            guard !loading else { return }
+            finishedLoads += 1
+            guard finishedLoads == 1 else { return }
+            retry = Task {
+                #expect(store.record(.text("retry copy")))
+                store.updateQuery(scope: .history, searchText: "retry", category: .text)
+                await store.waitUntilLoaded()
+            }
+        }
+        defer { observation.cancel() }
+        await store.waitUntilLoaded()
+        await retry?.value
+
+        #expect(finishedLoads == 2, "Only the latest query and its retry may publish a finished load")
+        #expect(!store.isLoading)
+        #expect(store.errorDescription?.contains("injected superseded load failure") == true)
+    }
+
+    @Test(arguments: ["scope", "search", "category"])
+    func failedQueryChangesKeepThePreviousQueryAndOptimisticItems(dimension: String) async throws {
+        let directory = try makeDirectory()
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let storageURL = directory.appendingPathComponent("clipboard-history.sqlite")
+        let database = ClipboardHistoryDatabase(storageURL: storageURL)
+        let removed = ClipboardHistoryItem(content: .text("removed"), lastCopiedAt: Date(timeIntervalSince1970: 1))
+        let kept = ClipboardHistoryItem(content: .text("kept"), lastCopiedAt: Date(timeIntervalSince1970: 0))
+        try database.flush([.upsert(removed, capacity: nil), .upsert(kept, capacity: nil)])
+        let store = ClipboardHistoryStore(storageURL: storageURL, persistenceDelay: .seconds(60))
+        await store.waitUntilLoaded()
+        defer { store.flushPendingChanges() }
+        try executeSQL("""
+            CREATE TRIGGER reject_removal BEFORE DELETE ON clipboard_history
+            BEGIN SELECT RAISE(ABORT, 'injected query change failure'); END;
+            """, at: storageURL)
+        store.remove(id: removed.id)
+        let previousCounts = store.categoryCounts
+
+        store.updateQuery(
+            scope: dimension == "scope" ? .pinned : .all,
+            searchText: dimension == "search" ? "missing" : "",
+            category: dimension == "category" ? .url : .all
+        )
+        await store.waitUntilLoaded()
+
+        #expect(store.isShowingHistoryPreview, "A skipped query must preserve the previous history presentation")
+        #expect(store.items == [kept])
+        #expect(store.totalItemCount == 1)
+        #expect(store.categoryCounts == previousCounts)
+        #expect(store.errorDescription?.contains("injected query change failure") == true)
+        #expect(store.record(.text("copy after failure")))
+        #expect(store.items.map(\.content) == [.text("copy after failure"), .text("kept")],
+            "Later copies must match the query whose items are still visible")
+
+        try executeSQL("DROP TRIGGER reject_removal", at: storageURL)
+        store.updateQuery(scope: .all, searchText: "")
+        await store.waitUntilLoaded()
+        #expect(store.items.map(\.content) == [.text("copy after failure"), .text("kept")])
+        #expect(store.totalItemCount == 2)
+        #expect(store.errorDescription == nil)
+    }
+
+    @Test(arguments: ["copy", "pin", "unpin"])
+    func changesDuringAFailedQueryRemainConsistentWithTheDisplayedQuery(action: String) async throws {
+        let directory = try makeDirectory()
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let storageURL = directory.appendingPathComponent("clipboard-history.sqlite")
+        let database = ClipboardHistoryDatabase(storageURL: storageURL)
+        let original = ClipboardHistoryItem(content: .text("A target"), isPinned: action == "unpin")
+        try database.flush([.upsert(original, capacity: nil)])
+        let store = ClipboardHistoryStore(storageURL: storageURL, persistenceDelay: .seconds(60))
+        await store.waitUntilLoaded()
+        let displayedScope: ClipboardHistoryScope = action == "unpin" ? .pinned : .history
+        store.updateQuery(scope: displayedScope, searchText: "A", category: .text)
+        await store.waitUntilLoaded()
+        defer { store.flushPendingChanges() }
+        try executeSQL("""
+            CREATE TRIGGER reject_insert BEFORE INSERT ON clipboard_history
+            BEGIN SELECT RAISE(ABORT, 'injected query interleaving failure'); END;
+            """, at: storageURL)
+        try executeSQL("""
+            CREATE TRIGGER reject_update BEFORE UPDATE ON clipboard_history
+            BEGIN SELECT RAISE(ABORT, 'injected query interleaving failure'); END;
+            """, at: storageURL)
+
+        switch action {
+        case "pin":
+            store.updateQuery(scope: .pinned, searchText: "A", category: .text)
+            store.setPinned(id: original.id, isPinned: true)
+        case "unpin":
+            store.updateQuery(scope: .history, searchText: "A", category: .text)
+            store.setPinned(id: original.id, isPinned: false)
+        default:
+            store.updateQuery(scope: .history, searchText: "B", category: .text)
+            #expect(store.record(.text("B copy")))
+        }
+        await store.waitUntilLoaded()
+
+        #expect(store.items.map(\.content) == (action == "copy" ? [.text("A target")] : []),
+            "Optimistic actions must preserve the query corresponding to the page that remains visible")
+        #expect(store.errorDescription?.contains("injected query interleaving failure") == true)
+
+        try executeSQL("DROP TRIGGER reject_insert", at: storageURL)
+        try executeSQL("DROP TRIGGER reject_update", at: storageURL)
+        store.updateQuery(scope: displayedScope, searchText: "A", category: .text)
+        await store.waitUntilLoaded()
+        #expect(store.items.map(\.content) == (action == "copy" ? [.text("A target")] : []))
+        #expect(store.errorDescription == nil)
+        let restored = ClipboardHistoryStore(storageURL: storageURL)
+        await restored.waitUntilLoaded()
+        if action == "copy" {
+            #expect(Set(restored.items.map(\.content.previewText)) == ["A target", "B copy"])
+        } else {
+            #expect(restored.items.first?.isPinned == (action == "pin"))
+        }
+    }
+
+    @Test
+    func aRestoredPreviewDoesNotAutomaticallyRetryFailedWrites() async throws {
+        let directory = try makeDirectory()
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let storageURL = directory.appendingPathComponent("clipboard-history.sqlite")
+        let database = ClipboardHistoryDatabase(storageURL: storageURL)
+        let original = (0..<8).map { index in
+            ClipboardHistoryItem(content: .text("item \(index)"), lastCopiedAt: Date(timeIntervalSince1970: Double(index)))
+        }
+        try database.flush(original.map { .upsert($0, capacity: nil) })
+        let store = ClipboardHistoryStore(storageURL: storageURL, persistenceDelay: .seconds(60))
+        await store.waitUntilLoaded()
+        defer { store.flushPendingChanges() }
+        try executeSQL("""
+            CREATE TRIGGER reject_insert BEFORE INSERT ON clipboard_history
+            BEGIN SELECT RAISE(ABORT, 'injected preview failure'); END;
+            """, at: storageURL)
+        #expect(store.recordPinned(.text("pending favorite")))
+        store.loadFullHistory()
+        await store.waitUntilLoaded()
+        #expect(store.isShowingHistoryPreview)
+        let previousItems = store.items
+        var startedLoads = 0
+        let observation = store.$isLoading.dropFirst().sink { loading in
+            if loading { startedLoads += 1 }
+        }
+        defer { observation.cancel() }
+
+        store.loadFullHistory()
+        await store.waitUntilLoaded()
+
+        #expect(startedLoads == 0, "Reappearing at the preview boundary must not retry a rejected write")
+        #expect(store.items == previousItems)
+        #expect(store.errorDescription?.contains("injected preview failure") == true)
+        try executeSQL("DROP TRIGGER reject_insert", at: storageURL)
+        store.updateQuery(scope: .all, searchText: "")
+        await store.waitUntilLoaded()
+        store.loadFullHistory()
+        await store.waitUntilLoaded()
+        #expect(!store.isShowingHistoryPreview)
+        #expect(store.items.count == 9)
+        #expect(store.errorDescription == nil)
     }
 
     @Test
@@ -1183,7 +1634,7 @@ struct ClipboardHistoryStoreTests {
         #expect(store.errorDescription == nil)
     }
 
-    @Test(arguments: [false, true])
+    @Test(.timeLimit(.minutes(1)), arguments: [false, true])
     func stoppingCleanupCancelsInFlightDeletionWhileTheDatabaseIsBusy(failingCopy: Bool) async throws {
         let directory = try makeDirectory()
         defer { try? FileManager.default.removeItem(at: directory) }
@@ -1215,12 +1666,20 @@ struct ClipboardHistoryStoreTests {
             #expect(store.record(.text("pending copy \(index)")))
         }
         store.stopCleanup()
+        let (completed, continuation) = AsyncStream<Void>.makeStream()
+        let observation = Publishers.CombineLatest3(store.$isLoading, store.$totalItemCount, store.$errorDescription)
+            .sink { loading, count, error in
+                if failingCopy ? error?.contains("injected copy failure") == true : (!loading && count == 513) {
+                    continuation.yield(())
+                    continuation.finish()
+                }
+            }
+        defer { observation.cancel(); continuation.finish() }
         #expect(sqlite3_exec(blocker, "ROLLBACK", nil, nil, nil) == SQLITE_OK)
+        var iterator = completed.makeAsyncIterator()
+        _ = try #require(await iterator.next(), "Stopping cleanup must finish the pending batch")
         if failingCopy {
-            try await waitUntil { store.errorDescription?.contains("injected copy failure") == true }
             try executeSQL("DROP TRIGGER reject_copy", at: storageURL)
-        } else {
-            try await waitUntil { !store.isLoading && store.totalItemCount == 512 }
         }
         store.flushPendingChanges()
 
