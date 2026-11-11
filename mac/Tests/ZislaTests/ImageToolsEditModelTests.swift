@@ -24,7 +24,7 @@ struct ImageToolsEditModelTests {
         #expect(loaded.image.size == NSSize(width: 1600, height: 3))
         let image = try Fixture.image(width: 40, height: 20, red: 200, alpha: 128)
         await model.recordEdit(image, for: fixture.input)?.value
-        #expect(model.editorInput == nil && !model.isProcessing)
+        #expect(model.editorInput?.image === loaded.image && !model.isProcessing)
         await model.prepareEditor(fixture.input, service: service)?.value
         let reopened = try #require(model.editorInput?.image.cgImage(forProposedRect: nil, context: nil, hints: nil))
         #expect(reopened.width == 40 && reopened.height == 20)
@@ -219,7 +219,7 @@ struct ImageToolsEditModelTests {
     }
 
     @Test
-    func missingCacheDirectoryReportsWriteFailureWithoutPublishingANewEdit() async throws {
+    func missingCacheDirectoryIsRecreatedWhenTheUserRetriesAnEdit() async throws {
         let fixture = try Fixture()
         defer { fixture.remove() }
         let model = ImageToolsModel()
@@ -228,10 +228,94 @@ struct ImageToolsEditModelTests {
         let cache = try #require(model.editedImageURLs[fixture.input])
         let directory = cache.deletingLastPathComponent()
         try FileManager.default.removeItem(at: directory)
-        await model.recordEdit(image, for: fixture.input)?.value
-        #expect(!model.isProcessing && model.editedImageURLs[fixture.input] == cache)
-        #expect(model.message == ImageProcessingError.invalidOutput.localizedDescription)
-        #expect(!FileManager.default.fileExists(atPath: directory.path))
+        let retry = try #require(model.recordEdit(image, for: fixture.input))
+        #expect(await retry.value)
+        let output = try #require(model.editedImageURLs[fixture.input])
+        #expect(!model.isProcessing && output != cache && model.message == nil)
+        #expect(try FileManager.default.contentsOfDirectory(atPath: directory.path) == [output.lastPathComponent])
+        let actual = try await service.loadRasterImage(output)
+        #expect(try Fixture.bytes(actual) == Fixture.bytes(image))
+        #expect(try Data(contentsOf: fixture.input) == fixture.original)
+        model.discardEdits()
+    }
+
+    @Test(arguments: [false, true])
+    func editorInputStaysAvailableUntilThePNGIsCommitted(cancel: Bool) async throws {
+        let fixture = try Fixture()
+        defer { fixture.remove() }
+        let model = ImageToolsModel()
+        await model.prepareEditor(fixture.input, service: service)?.value
+        let loaded = try #require(model.editorInput)
+        let gate = PixelGate()
+        defer { gate.finish() }
+        let save = try #require(model.recordEdit(try Fixture.gatedImage(gate), for: fixture.input))
+        await gate.waitUntilStarted()
+        #expect(model.editorInput?.image === loaded.image && model.isProcessing)
+        #expect(model.editedImageURLs.isEmpty)
+        if cancel { save.cancel() }
+        gate.finish()
+        let succeeded = await save.value
+        #expect(succeeded == !cancel && !model.isProcessing)
+        if cancel {
+            #expect(model.editorInput?.image === loaded.image && model.editedImageURLs.isEmpty)
+            #expect(model.message == AppLocalization.text("已取消"))
+        } else {
+            #expect(model.editorInput?.image === loaded.image && model.editedImageURLs[fixture.input] != nil)
+        }
+        #expect(try Data(contentsOf: fixture.input) == fixture.original)
+        model.discardEdits()
+    }
+
+    @Test(arguments: ["destination", "finalize", "directory"])
+    func failedPNGSaveKeepsTheEditorOldEditAndExportableBatchForRetry(failure: String) async throws {
+        let fixture = try Fixture()
+        defer { fixture.remove() }
+        let model = ImageToolsModel()
+        await model.recordEdit(try Fixture.image(), for: fixture.input)?.value
+        let previous = try #require(model.editedImageURLs[fixture.input])
+        let previousBytes = try Data(contentsOf: previous)
+        model.startEdited(service: service)
+        await finished(model)
+        let batch = try #require(model.batch)
+        await model.prepareEditor(fixture.input, service: service)?.value
+        let loaded = try #require(model.editorInput)
+        let directory = previous.deletingLastPathComponent()
+        let replacement = try Fixture.image(red: 230, alpha: 128)
+        let save: Task<Bool, Never>?
+        if failure == "directory" {
+            try FileManager.default.moveItem(at: directory, to: fixture.root.appendingPathComponent("old-edits"))
+            try Data("blocked directory".utf8).write(to: directory)
+            save = model.recordEdit(replacement, for: fixture.input)
+        } else if failure == "finalize" {
+            save = model.recordEdit(try Fixture.invalidPixelImage(), for: fixture.input)
+        } else {
+            let pending = try #require(model.recordEdit(replacement, for: fixture.input))
+            try FileManager.default.moveItem(at: directory, to: fixture.root.appendingPathComponent("old-edits"))
+            try Data("blocked destination".utf8).write(to: directory)
+            save = pending
+        }
+        if let save { #expect(!(await save.value)) }
+        else { #expect(failure == "directory") }
+        #expect(!model.isProcessing && model.editorInput?.image === loaded.image)
+        #expect(model.editedImageURLs[fixture.input] == previous && model.batch?.directoryURL == batch.directoryURL)
+        #expect(model.batch?.items == batch.items)
+        #expect(model.message != nil && FileManager.default.fileExists(atPath: batch.directoryURL.path))
+        if failure != "finalize" {
+            #expect(try String(contentsOf: directory, encoding: .utf8).hasPrefix("blocked"))
+            try FileManager.default.removeItem(at: directory)
+            try FileManager.default.moveItem(at: fixture.root.appendingPathComponent("old-edits"), to: directory)
+        }
+        #expect(try Data(contentsOf: previous) == previousBytes)
+        let remainingFiles = try FileManager.default.contentsOfDirectory(atPath: directory.path)
+        #expect(remainingFiles == [previous.lastPathComponent])
+        let retry = try #require(model.recordEdit(replacement, for: fixture.input))
+        #expect(await retry.value)
+        let saved = try #require(model.editedImageURLs[fixture.input])
+        #expect(model.editorInput?.image === loaded.image && model.batch == nil && saved != previous && model.message == nil)
+        #expect(!FileManager.default.fileExists(atPath: previous.path))
+        #expect(!FileManager.default.fileExists(atPath: batch.directoryURL.path))
+        let actual = try await service.loadRasterImage(saved)
+        #expect(try Fixture.bytes(actual) == Fixture.bytes(replacement))
         #expect(try Data(contentsOf: fixture.input) == fixture.original)
         model.discardEdits()
     }
@@ -349,6 +433,13 @@ struct ImageToolsEditModelTests {
                 }, releaseInfo: nil)
             let provider = try #require(CGDataProvider(directInfo: nil, size: Int64(width * height * 4), callbacks: &callbacks))
             return try providerImage(provider, width: width, height: height)
+        }
+
+        static func invalidPixelImage() throws -> CGImage {
+            var callbacks = CGDataProviderDirectCallbacks(version: 0, getBytePointer: nil, releaseBytePointer: nil,
+                getBytesAtPosition: { _, _, _, _ in 0 }, releaseInfo: nil)
+            let provider = try #require(CGDataProvider(directInfo: nil, size: 40 * 20 * 4, callbacks: &callbacks))
+            return try providerImage(provider, width: 40, height: 20)
         }
 
         static func gatedImage(_ gate: PixelGate) throws -> CGImage {

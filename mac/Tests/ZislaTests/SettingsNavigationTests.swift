@@ -487,6 +487,8 @@ struct SettingsNavigationTests {
             petEnabled: false,
             voiceInputEnabled: false
         )
+        settings.pdfToolsEnabled = false
+        settings.imageToolsEnabled = false
         #expect(!SettingsSection.ai.isVisible(settings: settings))
         #expect(!SettingsSection.voice.isVisible(settings: settings))
         #expect(!SettingsSection.pet.isVisible(settings: settings))
@@ -511,6 +513,19 @@ struct SettingsNavigationTests {
 
         settings.updateChecksEnabled = true
         #expect(SettingsSection.updates.isVisible(settings: settings))
+    }
+
+    @Test(arguments: Array(0..<8))
+    func dependenciesRemainAvailableForEnabledFileToolsWithoutDownloadOrRecommendations(combination: Int) {
+        var settings = FeatureSettings.default
+        settings.downloaderEnabled = combination & 1 != 0
+        settings.pdfToolsEnabled = combination & 2 != 0
+        settings.imageToolsEnabled = combination & 4 != 0
+        settings.recommendedToolsEnabled = false
+        #expect(SettingsSection.download.isVisible(settings: settings) == (combination != 0))
+        #expect(SettingsSection.pdfTools.isVisible(settings: settings) == settings.pdfToolsEnabled)
+        #expect(SettingsSection.imageTools.isVisible(settings: settings) == settings.imageToolsEnabled)
+        #expect(!SettingsSection.recommendations.isVisible(settings: settings))
     }
 
     @Test

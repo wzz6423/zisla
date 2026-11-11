@@ -199,9 +199,8 @@ public struct ImageProcessingService: Sendable {
                         throw ImageProcessingError.resourceLimit
                     }
                     let overlay = try watermark?.render(width: expected.0, height: expected.1, to: work.appendingPathComponent("watermark.png"))
-                    let defaultFormat = summary.format == .svg && (options.resize != nil || !options.transform.isIdentity || options.watermark != nil) ? .png : summary.format ?? .jpeg
-                    let formats: [ImageOutputFormat] = rasterTransform != nil ? [.png]
-                        : options.formats.isEmpty ? [defaultFormat] : Array(Set(options.formats)).sorted { $0.rawValue < $1.rawValue }
+                    let defaultFormat = rasterTransform != nil || (summary.format == .svg && (options.resize != nil || !options.transform.isIdentity || options.watermark != nil)) ? .png : summary.format ?? .jpeg
+                    let formats: [ImageOutputFormat] = options.formats.isEmpty ? [defaultFormat] : Array(Set(options.formats)).sorted { $0.rawValue < $1.rawValue }
                     var outputs: [ImageProcessedOutput] = []
                     for format in formats {
                         try Task.checkCancellation()

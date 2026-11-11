@@ -57,7 +57,9 @@ struct ImageToolsEditorTests {
         let bitmap = NSBitmapImageRep(cgImage: output)
         #expect(try #require(bitmap.colorAt(x: pixelScale, y: pixelScale)).alphaComponent == 0)
         #expect(try rgba(pixels(source)) == sourcePixels, "Applying must never mutate the source image")
-        #expect(session.isClosed && session.apply() == nil)
+        #expect(!session.isClosed)
+        session.close()
+        #expect(session.apply() == nil)
     }
 
     @Test(arguments: ScreenshotObscureEffect.allCases)
@@ -112,6 +114,111 @@ struct ImageToolsEditorTests {
         #expect(session.model.statusMessage == AppLocalization.text("图片生成失败"))
     }
 
+    @Test(arguments: ["bitmap", "graphicsContext", "maskContext", "maskImage", "filter", "filterOutput", "coreImage", "finalImage"],
+          ScreenshotObscureEffect.allCases)
+    func renderingFailuresNeverExportUnobscuredPixelsAndCanBeRetried(stage: String, effect: ScreenshotObscureEffect) throws {
+        let source = try image(pixelScale: 2)
+        let original = try rgba(pixels(source))
+        let session = ImageToolsEditorSession(image: source)
+        let region = ScreenshotAnnotation(kind: .mosaic,
+            rect: CGRect(x: 24, y: 18, width: 48, height: 30), obscureEffect: effect, obscureStrength: 8)
+        session.model.add(region)
+        let preview = try rgba(pixels(session.model.mosaicPreviewImage))
+        #expect(preview != original, "The regression begins with a successfully obscured preview")
+        var dependencies = ScreenshotEditorModel.RenderingDependencies()
+        switch stage {
+        case "bitmap": dependencies.makeBitmap = { _, _ in nil }
+        case "graphicsContext": dependencies.makeGraphicsContext = { _ in nil }
+        case "maskContext": dependencies.makeMaskContext = { _, _ in nil }
+        case "maskImage": dependencies.makeMaskImage = { _ in nil }
+        case "filter": dependencies.makeFilter = { _ in nil }
+        case "filterOutput": dependencies.filterOutput = { _ in nil }
+        case "coreImage": dependencies.makeCoreImage = { _, _ in nil }
+        default: dependencies.makeFinalImage = { _ in nil }
+        }
+        session.model.renderingDependencies = dependencies
+        #expect(session.apply() == nil, "A failed render must not return source or partially obscured pixels")
+        #expect(!session.isClosed && session.model.annotations == [region])
+        #expect(session.model.statusMessage == AppLocalization.text("图片生成失败"))
+        session.copyImage { _ in
+            Issue.record("A failed render must not write unobscured pixels to the clipboard")
+            return true
+        }
+        #expect(!session.isClosed && session.model.statusMessage == AppLocalization.text("图片生成失败"))
+        #expect(try rgba(pixels(session.model.mosaicPreviewImage)) == preview)
+        #expect(try rgba(pixels(source)) == original, "Render failures must leave the source untouched")
+        session.model.renderingDependencies = .init()
+        let output = try #require(session.apply())
+        #expect(try rgba(output) == preview, "A retry must keep and apply the same obscure intent")
+    }
+
+    @Test(arguments: ["CIBlendWithMask", "CIPixellate", "CIGaussianBlur", "CIGlassDistortion", "CIRadialGradient", "CIAffineTile"],
+          [false, true])
+    func everyRequiredObscureFilterAndItsOutputMustSucceed(filterName: String, failOutput: Bool) throws {
+        let session = ImageToolsEditorSession(image: try image())
+        session.model.add(ScreenshotAnnotation(kind: .mosaic,
+            rect: CGRect(x: 24, y: 18, width: 48, height: 30),
+            obscureEffect: filterName == "CIGaussianBlur" ? .blur : .pixelate,
+            obscureStrength: 8, obscureBlurStrength: 4))
+        var dependencies = ScreenshotEditorModel.RenderingDependencies()
+        if failOutput {
+            let output = dependencies.filterOutput
+            dependencies.filterOutput = { filter in filter.name == filterName ? nil : output(filter) }
+        } else {
+            let create = dependencies.makeFilter
+            dependencies.makeFilter = { name in name == filterName ? nil : create(name) }
+        }
+        session.model.renderingDependencies = dependencies
+        #expect(session.apply() == nil && !session.isClosed,
+                "Dropping any requested obscure stage must prevent the local image from being applied")
+        session.copyImage { _ in Issue.record("Incomplete filter chains must not be copied"); return true }
+        #expect(session.model.statusMessage == AppLocalization.text("图片生成失败"))
+    }
+
+    @Test(arguments: ["unedited", "emptyRectangle", "outsideRectangle", "emptyBrush", "singlePointBrush", "outsideBrush"])
+    func emptyOrOutOfBoundsObscureIntentsRemainNoOps(intent: String) throws {
+        let source = try image(pixelScale: 2)
+        let session = ImageToolsEditorSession(image: source)
+        let original = try rgba(pixels(session.model.renderedImage()))
+        switch intent {
+        case "emptyRectangle": session.model.add(ScreenshotAnnotation(kind: .mosaic, rect: .zero))
+        case "outsideRectangle": session.model.add(ScreenshotAnnotation(kind: .mosaic,
+            rect: CGRect(x: 120, y: 120, width: 20, height: 20)))
+        case "emptyBrush": session.model.add(ScreenshotAnnotation(kind: .mosaic, obscureShape: .brush))
+        case "singlePointBrush": session.model.add(ScreenshotAnnotation(kind: .mosaic,
+            points: [CGPoint(x: 40, y: 40)], obscureShape: .brush))
+        case "outsideBrush": session.model.add(ScreenshotAnnotation(kind: .mosaic,
+            points: [CGPoint(x: 120, y: 120), CGPoint(x: 150, y: 150)], obscureShape: .brush))
+        default: break
+        }
+        session.model.renderingDependencies.makeMaskContext = { _, _ in nil }
+        session.model.renderingDependencies.makeFilter = { _ in nil }
+        session.model.renderingDependencies.makeCoreImage = { _, _ in nil }
+        var copied: Data?
+        session.copyImage { copied = $0; return true }
+        let png = try #require(copied)
+        let copiedImage = try #require(NSBitmapImageRep(data: png)?.cgImage)
+        #expect(try rgba(copiedImage) == original)
+        let output = try #require(session.apply())
+        #expect(try rgba(output) == original, "No-op intent must not require an obscure pipeline")
+    }
+
+    @Test
+    func aLaterObscureFailureCannotExportAnEarlierPartiallyProcessedRegion() throws {
+        let session = ImageToolsEditorSession(image: try image())
+        session.model.add(ScreenshotAnnotation(kind: .mosaic,
+            rect: CGRect(x: 12, y: 12, width: 24, height: 24), obscureEffect: .pixelate))
+        session.model.add(ScreenshotAnnotation(kind: .mosaic,
+            rect: CGRect(x: 48, y: 30, width: 24, height: 24), obscureEffect: .blur))
+        let create = session.model.renderingDependencies.makeFilter
+        session.model.renderingDependencies.makeFilter = { name in name == "CIGaussianBlur" ? nil : create(name) }
+        #expect(session.apply() == nil && !session.isClosed)
+        session.copyImage { _ in Issue.record("Partially obscured images must never be copied"); return true }
+        #expect(session.model.annotations.count == 2)
+        #expect(session.model.statusMessage == AppLocalization.text("图片生成失败"))
+        #expect(session.model.pngData() != nil, "Existing screenshot consumers keep their rendering compatibility")
+    }
+
     @Test(arguments: [false, true])
     func copyingIsExplicitKeepsTheSessionOpenAndReportsWriteFailures(succeeds: Bool) throws {
         let source = try image(pixelScale: 2)
@@ -157,7 +264,7 @@ struct ImageToolsEditorTests {
         let runningTask = try #require(task)
         await runningTask.value
         #expect(!session.model.isRecognizing && !session.model.isExtracting)
-        #expect(session.apply() != nil && session.isClosed)
+        #expect(session.apply() != nil && !session.isClosed)
     }
 
     @Test
@@ -320,6 +427,159 @@ struct ImageToolsEditorTests {
         #expect(!fixture.window.isVisible)
     }
 
+    @Test(arguments: [UInt16(51), UInt16(117)])
+    func localDeleteRemovesOnlyTheSelectedAnnotationAndKeepsUndo(keyCode: UInt16) async throws {
+        let settings = isolatedSettings()
+        defer { settings.remove() }
+        let fixture = Fixture(ImageToolsEditorView(image: try image(), settingsStore: settings.store) { _ in },
+            size: CGSize(width: 1_600, height: 480))
+        defer { fixture.close() }
+        await fixture.settle()
+        let keyboard = try #require(fixture.keyboard)
+        let session = keyboard.session
+        let first = ScreenshotAnnotation(kind: .rectangle, rect: CGRect(x: 8, y: 8, width: 20, height: 20))
+        let selected = ScreenshotAnnotation(kind: .mosaic, rect: CGRect(x: 24, y: 18, width: 48, height: 30))
+        session.model.add(first)
+        session.model.add(selected)
+        session.selectionState.selectedAnnotationID = selected.id
+        let event = try keyEvent(window: fixture.window, code: keyCode, flags: [.capsLock, .numericPad, .function])
+        #expect(keyboard.handle(event))
+        #expect(session.model.annotations == [first] && session.selectionState.selectedAnnotationID == nil)
+        #expect(!keyboard.handle(event), "Delete with no selection must remain with the native responder")
+        session.model.undo()
+        #expect(session.model.annotations == [first, selected])
+        session.model.redo()
+        #expect(session.model.annotations == [first])
+    }
+
+    @Test(arguments: ["otherWindow", "detached", "textView", "fieldEditor", "textField", "inline", "closed", "stale", "command", "option", "shift", "control", "ordinaryKey"])
+    func localDeleteLeavesTextOtherWindowsAndModifiedShortcutsAlone(context: String) async throws {
+        let settings = isolatedSettings()
+        defer { settings.remove() }
+        let fixture = Fixture(ImageToolsEditorView(image: try image(), settingsStore: settings.store) { _ in },
+            size: CGSize(width: 1_600, height: 480))
+        defer { fixture.close() }
+        await fixture.settle()
+        let keyboard = try #require(fixture.keyboard)
+        let session = keyboard.session
+        let selected = ScreenshotAnnotation(kind: .rectangle, rect: CGRect(x: 8, y: 8, width: 20, height: 20))
+        session.model.add(selected)
+        session.selectionState.selectedAnnotationID = selected.id
+        let other = NSWindow(contentRect: CGRect(x: 0, y: 0, width: 100, height: 100),
+            styleMask: .borderless, backing: .buffered, defer: false)
+        other.isReleasedWhenClosed = false
+        defer { other.close() }
+        var flags: NSEvent.ModifierFlags = []
+        switch context {
+        case "detached": keyboard.removeFromSuperview()
+        case "inline": session.selectionState.isInlineTextEditing = true
+        case "closed": session.close()
+        case "stale": session.selectionState.selectedAnnotationID = UUID()
+        case "textView", "fieldEditor":
+            let text = NSTextView(frame: CGRect(x: 0, y: 0, width: 100, height: 30))
+            text.string = "Keep text"
+            text.isFieldEditor = context == "fieldEditor"
+            fixture.host.addSubview(text)
+            #expect(fixture.window.makeFirstResponder(text))
+        case "textField":
+            let text = NSTextField(frame: CGRect(x: 0, y: 0, width: 100, height: 30))
+            text.stringValue = "Keep field"
+            fixture.host.addSubview(text)
+            #expect(fixture.window.makeFirstResponder(text))
+        case "command": flags = .command
+        case "option": flags = .option
+        case "shift": flags = .shift
+        case "control": flags = .control
+        default: break
+        }
+        let event = try keyEvent(window: context == "otherWindow" ? other : fixture.window,
+            code: context == "ordinaryKey" ? 0 : 51, flags: flags)
+        #expect(!keyboard.handle(event))
+        #expect(session.model.annotations == [selected])
+        if context == "stale" { #expect(session.selectionState.selectedAnnotationID == nil) }
+    }
+
+    @Test
+    func applyingWaitsForPersistenceAndAWriteFailureKeepsTheSameEditsForRetry() async throws {
+        let settings = isolatedSettings()
+        defer { settings.remove() }
+        let entered = AsyncStream<Void>.makeStream()
+        let release = AsyncStream<Void>.makeStream()
+        defer { entered.continuation.finish(); release.continuation.finish() }
+        var attempts = 0
+        var images: [[UInt8]] = []
+        let fixture = Fixture(ImageToolsEditorView(image: try image(), settingsStore: settings.store) { output in
+            attempts += 1
+            images.append(try rgba(output))
+            if attempts == 1 {
+                entered.continuation.yield()
+                for await _ in release.stream { break }
+                throw ImageProcessingError.invalidOutput
+            }
+        }, size: CGSize(width: 1_600, height: 480))
+        defer { fixture.close() }
+        let releaseAccessibility = EnhancedAccessibilityTestScope.acquire()
+        defer { releaseAccessibility() }
+        await fixture.settle()
+        let keyboard = try #require(fixture.keyboard)
+        let session = keyboard.session
+        let region = ScreenshotAnnotation(kind: .mosaic, rect: CGRect(x: 24, y: 18, width: 48, height: 30))
+        session.model.add(region)
+        session.selectionState.selectedAnnotationID = region.id
+        await fixture.settle()
+        try fixture.press(try #require(fixture.control(label: AppLocalization.text("应用编辑"))))
+        for await _ in entered.stream { break }
+        #expect(session.isSaving && !session.isClosed && attempts == 1)
+        #expect(session.apply() == nil)
+        #expect(session.apply(persist: { _ in Issue.record("Saving must not start twice") }) == nil)
+        session.copyImage { _ in Issue.record("Saving must not copy another version"); return true }
+        #expect(!keyboard.handle(try keyEvent(window: fixture.window, code: 51)))
+        await fixture.settle()
+        for key in ["应用编辑", "复制", "关闭"] {
+            #expect(try !fixture.isEnabled(try #require(fixture.control(label: AppLocalization.text(key)))))
+        }
+        release.continuation.yield()
+        for await saving in session.$isSaving.values { if !saving { break } }
+        await fixture.settle()
+        #expect(!session.isClosed && session.model.annotations == [region] && session.model.canUndo)
+        #expect(session.model.statusMessage == ImageProcessingError.invalidOutput.localizedDescription)
+        for key in ["应用编辑", "复制", "关闭"] {
+            #expect(try fixture.isEnabled(try #require(fixture.control(label: AppLocalization.text(key)))))
+        }
+        try fixture.press(try #require(fixture.control(label: AppLocalization.text("应用编辑"))))
+        for await saving in session.$isSaving.values { if !saving { break } }
+        await fixture.settle()
+        #expect(session.isClosed && !session.isSaving && attempts == 2)
+        #expect(images.count == 2 && images[0] == images[1])
+        #expect(session.model.annotations == [region])
+    }
+
+    @Test(arguments: [false, true])
+    func cancelingOrClosingPendingPersistenceCannotReportSuccess(close: Bool) async throws {
+        let session = ImageToolsEditorSession(image: try image())
+        let entered = AsyncStream<Void>.makeStream()
+        let release = AsyncStream<Void>.makeStream()
+        defer { entered.continuation.finish(); release.continuation.finish() }
+        let pending = session.apply(persist: { _ in
+            entered.continuation.yield()
+            for await _ in release.stream { break }
+        })
+        let task = try #require(pending)
+        for await _ in entered.stream { break }
+        if close { session.close() } else { task.cancel() }
+        release.continuation.yield()
+        #expect(!(await task.value))
+        #expect(!session.isSaving && session.isClosed == close)
+        if !close {
+            #expect(session.model.statusMessage == AppLocalization.text("已取消"))
+            let pendingRetry = session.apply(persist: { _ in })
+            let retry = try #require(pendingRetry)
+            #expect(await retry.value)
+            #expect(!retry.isCancelled, "A successfully committed edit must not report itself as canceled")
+            #expect(session.isClosed)
+        }
+    }
+
     @Test
     func OCRTablePanelsReadTheLatestImageDirectoryAndCancellationCreatesNoFiles() async throws {
         let name = "zisla-local-image-table-\(UUID())"
@@ -375,6 +635,19 @@ struct ImageToolsEditorTests {
         try #require(image.cgImage(forProposedRect: nil, context: nil, hints: nil))
     }
 
+    private func keyEvent(window: NSWindow, code: UInt16, flags: NSEvent.ModifierFlags = []) throws -> NSEvent {
+        try #require(NSEvent.keyEvent(with: .keyDown, location: .zero, modifierFlags: flags,
+            timestamp: 0, windowNumber: window.windowNumber, context: nil,
+            characters: "\u{7f}", charactersIgnoringModifiers: "\u{7f}", isARepeat: false, keyCode: code))
+    }
+
+    private func isolatedSettings() -> (store: FeatureSettingsStore, remove: () -> Void) {
+        let name = "zisla-image-editor-retry-\(UUID())"
+        let defaults = UserDefaults(suiteName: name)!
+        let store = FeatureSettingsStore(defaults: defaults)
+        return (store, { store.flushPendingChanges(); defaults.removePersistentDomain(forName: name) })
+    }
+
     private func rgba(_ image: CGImage) throws -> [UInt8] {
         var data = [UInt8](repeating: 0, count: image.width * image.height * 4)
         try data.withUnsafeMutableBytes { bytes in
@@ -426,6 +699,14 @@ struct ImageToolsEditorTests {
                 host.layoutSubtreeIfNeeded()
                 await withCheckedContinuation { continuation in DispatchQueue.main.async { continuation.resume() } }
             }
+        }
+
+        var keyboard: ImageToolsEditorKeyboardHost? {
+            func find(_ view: NSView) -> ImageToolsEditorKeyboardHost? {
+                if let keyboard = view as? ImageToolsEditorKeyboardHost { return keyboard }
+                return view.subviews.compactMap(find).first
+            }
+            return find(host)
         }
 
         private func value(_ object: NSObject, _ key: String) -> Any? {

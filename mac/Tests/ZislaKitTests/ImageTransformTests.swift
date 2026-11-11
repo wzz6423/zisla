@@ -90,6 +90,81 @@ struct ImageTransformTests {
         }
     }
 
+    @Test(arguments: [[ImageOutputFormat](), [.png], [.png, .png]])
+    func nativeExternalEditDefaultsToPNGForJPEGInputAndDeduplicatesPNGTargets(formats: [ImageOutputFormat]) async throws {
+        let fixture = try ImageProcessingServiceTests.Fixture()
+        defer { fixture.remove() }
+        let input = fixture.root.appendingPathComponent("source.jpg")
+        try ImageProcessingServiceTests.Fixture.writeImage(to: input, type: .jpeg)
+        let original = try Data(contentsOf: input)
+        let replacement = try Pixels.image(width: 12, height: 8)
+        let batch = try await ImageProcessingService(executableURL: nil).process([input], options: .init(formats: formats),
+            rasterTransform: { _, _ in replacement })
+        defer { try? FileManager.default.removeItem(at: batch.directoryURL) }
+        #expect(batch.failures.isEmpty, "\(batch.failures)")
+        let item = try #require(batch.items.first)
+        #expect(item.summary.format == .jpeg)
+        #expect(item.outputs.count == 1)
+        let output = try #require(item.outputs.first)
+        #expect(output.format == .png && output.summary.format == .png)
+        #expect(output.url.lastPathComponent == "output.png")
+        let loaded = try await ImageProcessingService(executableURL: nil).loadRasterImage(output.url)
+        #expect(try Pixels.bytes(loaded) == Pixels.bytes(replacement))
+        #expect(try Data(contentsOf: input) == original)
+        #expect(try Data(contentsOf: item.sourceURL) == original)
+        #expect(Set(try FileManager.default.contentsOfDirectory(atPath: output.url.deletingLastPathComponent().path)) == ["source.jpg", "output.png"])
+    }
+
+    @Test(arguments: ["partial-write", "wrong-format"])
+    func explicitRasterFormatFailureDoesNotReturnUnexpectedPNGOrRetainPartialFiles(fault: String) async throws {
+        let fixture = try ImageProcessingServiceTests.Fixture()
+        defer { fixture.remove() }
+        let input = try fixture.png()
+        let original = try Data(contentsOf: input)
+        let service = ImageProcessingService(executableURL: URL(fileURLWithPath: "/usr/bin/true")) { _, arguments, _, _ in
+            let source = URL(fileURLWithPath: arguments[1].replacingOccurrences(of: "[fail-on=error]", with: ""))
+            let output = URL(fileURLWithPath: arguments[2])
+            if arguments[0] == "autorot" {
+                try FileManager.default.copyItem(at: source, to: output)
+            } else if arguments[0] == "jpegsave" {
+                if fault == "partial-write" {
+                    try Data([0xff, 0xd8, 0xff]).write(to: output)
+                    return .init(status: 1, standardOutput: Data(), standardError: "disk full", didTimeout: false)
+                }
+                try FileManager.default.copyItem(at: source, to: output)
+            } else {
+                throw ImageProcessingError.processingFailed("Unexpected raster output format")
+            }
+            return .init(status: 0, standardOutput: Data(), standardError: "", didTimeout: false)
+        }
+        let batch = try await service.process([input], options: .init(formats: [.jpeg]), rasterTransform: { image, _ in image })
+        defer { try? FileManager.default.removeItem(at: batch.directoryURL) }
+        #expect(batch.items.isEmpty)
+        #expect(batch.failures.count == 1)
+        let failure = try #require(batch.failures.first)
+        #expect(failure.format == .jpeg)
+        #expect(failure.message == (fault == "partial-write" ? ImageProcessingError.processingFailed("disk full") : .invalidOutput).localizedDescription)
+        #expect(try FileManager.default.contentsOfDirectory(atPath: batch.directoryURL.path).isEmpty)
+        #expect(try Data(contentsOf: input) == original)
+    }
+
+    @Test(arguments: [[ImageOutputFormat](), [.png], [.jpeg], [.svg], [.png, .jpeg]])
+    func rasterMetadataRetentionIsRejectedBeforeEditingRegardlessOfOutputFormats(formats: [ImageOutputFormat]) async throws {
+        let fixture = try ImageProcessingServiceTests.Fixture()
+        defer { fixture.remove() }
+        let input = try fixture.png()
+        let original = try Data(contentsOf: input)
+        await #expect(throws: ImageProcessingError.rasterEditingMetadataUnsupported) {
+            try await ImageProcessingService(executableURL: nil).process([input], options: .init(formats: formats, preserveMetadata: true),
+                rasterTransform: { image, _ in
+                    Issue.record("Unsupported metadata retention must fail before editing")
+                    return image
+                })
+        }
+        #expect(try Data(contentsOf: input) == original)
+        #expect(try FileManager.default.contentsOfDirectory(atPath: fixture.root.path) == ["source.png"])
+    }
+
     @Test
     func externalEditReceivesAnUprightImageAndCannotRetainGPSMetadata() async throws {
         let fixture = try ImageProcessingServiceTests.Fixture()
@@ -172,21 +247,26 @@ struct ImageTransformTests {
         #expect(try Data(contentsOf: source) == original)
     }
 
-    @Test
-    func rasterLoaderAndExternalEditorRejectAnimationsBeforeReturningASingleFrame() async throws {
+    @Test(arguments: [[ImageOutputFormat](), [.png], [.jpeg, .png], [.svg]])
+    func rasterLoaderAndExternalEditorRejectAnimationsBeforeReturningASingleFrame(formats: [ImageOutputFormat]) async throws {
         let fixture = try ImageProcessingServiceTests.Fixture()
         defer { fixture.remove() }
         let input = try fixture.png(delays: [0.1, 0.25])
         let original = try Data(contentsOf: input)
         let service = ImageProcessingService(executableURL: nil)
         await #expect(throws: ImageProcessingError.rasterEditingAnimationUnsupported) { try await service.loadRasterImage(input) }
-        let batch = try await service.process([input], options: .init(), rasterTransform: { image, _ in
+        let processor = ImageProcessingService(executableURL: URL(fileURLWithPath: "/usr/bin/true")) { _, _, _, _ in
+            Issue.record("Animated input must not reach a raster encoder")
+            throw ImageProcessingError.invalidOutput
+        }
+        let batch = try await processor.process([input], options: .init(formats: formats), rasterTransform: { image, _ in
             Issue.record("Animated input must not invoke a single-frame editor")
             return image
         })
         defer { try? FileManager.default.removeItem(at: batch.directoryURL) }
         #expect(batch.items.isEmpty)
         #expect(batch.failures.count == 1)
+        #expect(batch.failures.first?.message == ImageProcessingError.rasterEditingAnimationUnsupported.localizedDescription)
         #expect(try FileManager.default.contentsOfDirectory(atPath: batch.directoryURL.path).isEmpty)
         #expect(try Data(contentsOf: input) == original)
     }
@@ -331,7 +411,9 @@ struct ImageTransformTests {
         #expect(try inputs.map { try Data(contentsOf: $0) } == originals)
     }
 
-    @Test(arguments: [ImageProcessingOptions(formats: [.jpeg]), .init(resize: .init(method: .fit, width: 20, height: 20)),
+    @Test(arguments: [ImageProcessingOptions(formats: [.jpeg]), .init(formats: [.webp]), .init(formats: [.avif]),
+                     .init(formats: [.jpegXL]), .init(formats: [.svg]), .init(formats: [.png, .jpeg, .png]),
+                     .init(resize: .init(method: .fit, width: 20, height: 20)),
                       .init(transform: .init(rotation: .clockwise90))])
     func additionalEncodingOptionsStillRequireAnEngine(options: ImageProcessingOptions) async throws {
         let fixture = try ImageProcessingServiceTests.Fixture()

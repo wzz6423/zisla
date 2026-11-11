@@ -21,6 +21,7 @@ final class ImageToolsModel: ObservableObject {
     @Published var editorInput: ImageToolsEditorInput?
     @Published private(set) var editedImageURLs: [URL: URL] = [:]
     private var task: Task<Void, Never>?
+    private var editTask: Task<Bool, Never>?
     private var editDirectory: URL?
 
     isolated deinit {
@@ -84,7 +85,7 @@ final class ImageToolsModel: ObservableObject {
         return task
     }
 
-    func cancel() { task?.cancel() }
+    func cancel() { task?.cancel(); editTask?.cancel() }
 
     @discardableResult
     func prepareEditor(_ input: URL, service: ImageProcessingService,
@@ -110,16 +111,16 @@ final class ImageToolsModel: ObservableObject {
     }
 
     @discardableResult
-    func recordEdit(_ image: CGImage, for input: URL) -> Task<Void, Never>? {
+    func recordEdit(_ image: CGImage, for input: URL) -> Task<Bool, Never>? {
         guard !isProcessing else { return nil }
         let directory: URL
         do {
             if let editDirectory { directory = editDirectory }
             else {
                 directory = FileManager.default.temporaryDirectory.appendingPathComponent("zisla-image-edits-\(UUID())")
-                try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true, attributes: [.posixPermissions: 0o700])
                 editDirectory = directory
             }
+            try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true, attributes: [.posixPermissions: 0o700])
         } catch {
             message = error.localizedDescription
             return nil
@@ -128,8 +129,7 @@ final class ImageToolsModel: ObservableObject {
         isProcessing = true
         total = 0
         message = nil
-        editorInput = nil
-        task = Task { [weak self] in
+        editTask = Task { [weak self] in
             do {
                 try Task.checkCancellation()
                 let work = Task.detached {
@@ -137,25 +137,34 @@ final class ImageToolsModel: ObservableObject {
                           Int64(image.width) * Int64(image.height) <= ImageProcessingService.maximumPixels else {
                         throw ImageProcessingError.resourceLimit
                     }
-                    guard let destination = CGImageDestinationCreateWithURL(output as CFURL, UTType.png.identifier as CFString, 1, nil) else {
+                    let staging = directory.appendingPathComponent(".\(UUID())", isDirectory: true)
+                    try FileManager.default.createDirectory(at: staging, withIntermediateDirectories: false)
+                    defer { try? FileManager.default.removeItem(at: staging) }
+                    let stagedImage = staging.appendingPathComponent("image.png")
+                    guard let destination = CGImageDestinationCreateWithURL(stagedImage as CFURL, UTType.png.identifier as CFString, 1, nil) else {
                         throw ImageProcessingError.invalidOutput
                     }
                     CGImageDestinationAddImage(destination, image, nil)
                     guard CGImageDestinationFinalize(destination) else { throw ImageProcessingError.invalidOutput }
+                    try FileManager.default.moveItem(at: stagedImage, to: output)
                 }
                 try await work.value
                 guard !Task.isCancelled, let self else { throw CancellationError() }
-                if let previous = self.editedImageURLs[input] { try FileManager.default.removeItem(at: previous) }
+                if let previous = self.editedImageURLs[input], FileManager.default.fileExists(atPath: previous.path) {
+                    try FileManager.default.removeItem(at: previous)
+                }
                 self.editedImageURLs[input] = output
                 self.isProcessing = false
                 self.discardResults()
+                return true
             } catch {
                 try? FileManager.default.removeItem(at: output)
                 self?.message = error is CancellationError ? AppLocalization.text("已取消") : error.localizedDescription
             }
             self?.isProcessing = false
+            return false
         }
-        return task
+        return editTask
     }
 
     func startEdited(service: ImageProcessingService) {

@@ -1,5 +1,6 @@
 import AppKit
 import Combine
+import Darwin
 import Foundation
 import ImageIO
 import Testing
@@ -282,6 +283,64 @@ struct ImageToolsRecognitionTests {
     }
 
     @Test
+    func exportPermissionsFollowTheCallingProcessUmaskAndKeepStagingPrivate() async throws {
+        let maskKey = "ZISLA_OCR_EXPORT_TEST_UMASK"
+        if let maskText = ProcessInfo.processInfo.environment[maskKey] {
+            let mask = try #require(mode_t(maskText, radix: 8))
+            // This branch only runs in the dedicated child, never in the shared test host.
+            umask(mask)
+            let fixture = try Fixture()
+            defer { fixture.remove() }
+            let result = Self.result(inputURL: fixture.image)
+            let documents: [ImageToolsRecognitionDocument] = [
+                .init(result: result, format: .text, destination: fixture.root.appendingPathComponent("result.txt")),
+                .init(result: result, format: .table, destination: fixture.root.appendingPathComponent("result.xlsx")),
+            ]
+            var sawStaging = false
+            _ = try ImageToolsRecognitionExporter.write(documents, stagingParent: fixture.root, checkCancellation: {
+                for url in try FileManager.default.contentsOfDirectory(at: fixture.root, includingPropertiesForKeys: nil)
+                    where url.lastPathComponent.hasPrefix("zisla-image-ocr-export-") {
+                    sawStaging = true
+                    let attributes = try FileManager.default.attributesOfItem(atPath: url.path)
+                    #expect((attributes[.posixPermissions] as? NSNumber)?.uint16Value == 0o700)
+                }
+            })
+            #expect(sawStaging)
+            for document in documents {
+                let attributes = try FileManager.default.attributesOfItem(atPath: document.destination.path)
+                #expect((attributes[.posixPermissions] as? NSNumber)?.uint16Value == 0o666 & ~mask,
+                    "Final exports must honor the caller's sharing policy for both formats")
+                #expect(!(try Data(contentsOf: document.destination)).isEmpty)
+            }
+            #expect(try String(contentsOf: documents[0].destination, encoding: .utf8) == result.text)
+            #expect(try Data(contentsOf: fixture.image) == fixture.bytes)
+            #expect(try FileManager.default.contentsOfDirectory(atPath: fixture.root.path).sorted() == ["result.txt", "result.xlsx", "source.png"])
+            print("OCR export permissions verified for umask \(maskText)")
+            return
+        }
+
+        let fixture = try Fixture()
+        defer { fixture.remove() }
+        var arguments: [String] = []
+        if let bundleIndex = CommandLine.arguments.firstIndex(of: "--test-bundle-path") {
+            arguments = ["--test-bundle-path", CommandLine.arguments[bundleIndex + 1]]
+        }
+        arguments += ["--testing-library", "swift-testing", "--filter",
+            "ImageToolsRecognitionTests/exportPermissionsFollowTheCallingProcessUmaskAndKeepStagingPrivate"]
+        for mask in ["022", "027", "077"] {
+            var environment = ProcessInfo.processInfo.environment
+            environment[maskKey] = mask
+            let child = try await AIAgentProcessRunner.run(
+                executableURL: URL(fileURLWithPath: CommandLine.arguments[0]), arguments: arguments,
+                environment: environment, workingDirectoryURL: fixture.root, timeout: 30,
+                maximumOutputBytes: 128 * 1_024, maximumErrorBytes: 128 * 1_024)
+            #expect(child.status == 0 && !child.didTimeout,
+                "Isolated umask \(mask) regression: \(String(decoding: child.standardOutput, as: UTF8.self)) \(child.standardError)")
+            #expect(String(decoding: child.standardOutput, as: UTF8.self).contains("OCR export permissions verified for umask \(mask)"))
+        }
+    }
+
+    @Test
     func batchTextExportUsesUniqueCaseInsensitiveNamesAndRejectsExistingFilesBeforeWriting() async throws {
         let fixture = try Fixture()
         defer { fixture.remove() }
@@ -560,6 +619,171 @@ struct ImageToolsRecognitionTests {
         #expect(model.results == [result] && model.message == initialMessage && !model.isProcessing)
     }
 
+    @Test(arguments: [ImageToolsRecognitionDocument.Format.text, .table],
+          ["existing", "original", "deleted original", "other deleted input", "input alias", "dot alias", "case alias", "link", "dangling link", "directory"])
+    func singleExportPanelsRejectProtectedAndExistingTargetsBeforeClosing(format: ImageToolsRecognitionDocument.Format, target: String) async throws {
+        _ = NSApplication.shared
+        let fixture = try Fixture()
+        defer { fixture.remove() }
+        let preferencesName = "zisla-image-ocr-conflict-panel-\(UUID())"
+        let preferences = try #require(UserDefaults(suiteName: preferencesName))
+        defer { preferences.removePersistentDomain(forName: preferencesName) }
+        let model = ImageToolsRecognitionModel()
+        let otherInput = fixture.root.appendingPathComponent("other.png")
+        try await recognize(model, image: makeImage(), urls: [fixture.image, otherInput])
+        let result = try #require(model.results.first)
+        let view = ImageToolsRecognitionResultsView(model: model, saveLocations: SaveLocationStore(defaults: preferences))
+        let fileExtension = format == .text ? "txt" : "xlsx"
+        var destination = fixture.root.appendingPathComponent("existing." + fileExtension)
+        switch target {
+        case "original": destination = fixture.image
+        case "deleted original":
+            try FileManager.default.removeItem(at: fixture.image)
+            destination = fixture.image
+        case "other deleted input": destination = otherInput
+        case "input alias":
+            let alias = fixture.root.appendingPathComponent("input-directory")
+            try FileManager.default.createSymbolicLink(at: alias, withDestinationURL: fixture.root)
+            destination = alias.appendingPathComponent(otherInput.lastPathComponent)
+        case "dot alias":
+            let nested = fixture.root.appendingPathComponent("nested", isDirectory: true)
+            try FileManager.default.createDirectory(at: nested, withIntermediateDirectories: false)
+            destination = nested.appendingPathComponent("../" + otherInput.lastPathComponent)
+        case "case alias": destination = fixture.root.appendingPathComponent("OTHER.png")
+        case "link": try FileManager.default.createSymbolicLink(at: destination, withDestinationURL: fixture.image)
+        case "dangling link": try FileManager.default.createSymbolicLink(at: destination, withDestinationURL: fixture.root.appendingPathComponent("missing"))
+        case "directory": try FileManager.default.createDirectory(at: destination, withIntermediateDirectories: false)
+        default: try Data("existing output".utf8).write(to: destination)
+        }
+        let before = try FileManager.default.contentsOfDirectory(atPath: fixture.root.path).sorted()
+        let initialMessage = model.message
+        let panel = NSSavePanel()
+        panel.isReleasedWhenClosed = false
+        defer { panel.close() }
+        let previousDelegate = SavePanelDelegate()
+        panel.delegate = previousDelegate
+        let openDescriptorCount = Self.openDescriptorCount()
+        var didValidate = false
+        let task = view.export(result, format: format, panel: panel) { configured in
+            guard let delegate = configured.delegate as? ImageToolsRecognitionSavePanelDelegate else {
+                Issue.record("OCR panels must validate before closing"); return nil
+            }
+            #expect(delegate !== previousDelegate)
+            do {
+                try delegate.panel(configured, validate: destination)
+                Issue.record("A conflict must keep the save panel open")
+            } catch {
+                if target == "input alias" {
+                    #expect((error as NSError).domain == NSPOSIXErrorDomain)
+                    #expect([Int(ELOOP), Int(ENOTDIR)].contains((error as NSError).code))
+                } else {
+                    #expect((error as NSError).localizedDescription == ImageProcessingError.outputAlreadyExists(destination).localizedDescription)
+                }
+            }
+            didValidate = true
+            return nil
+        }
+        #expect(task == nil && didValidate)
+        #expect(Self.openDescriptorCount() == openDescriptorCount, "Cancelled validation must release its directory descriptor")
+        #expect(panel.delegate === previousDelegate, "Closing or cancelling must release only the OCR panel's validation")
+        #expect(try FileManager.default.contentsOfDirectory(atPath: fixture.root.path).sorted() == before)
+        #expect(model.results.first == result && model.message == initialMessage && !model.isProcessing)
+        if target == "existing" { #expect(try String(contentsOf: destination, encoding: .utf8) == "existing output") }
+        if target != "deleted original" { #expect(try Data(contentsOf: fixture.image) == fixture.bytes) }
+        if target == "link" || target == "dangling link" {
+            #expect(try destination.resourceValues(forKeys: [.isSymbolicLinkKey]).isSymbolicLink == true)
+        }
+    }
+
+    @Test(arguments: [false, true])
+    func singleExportPanelReportsAnUnusablePathBeforeClosing(longName: Bool) async throws {
+        _ = NSApplication.shared
+        let fixture = try Fixture()
+        defer { fixture.remove() }
+        let preferencesName = "zisla-image-ocr-parent-panel-\(UUID())"
+        let preferences = try #require(UserDefaults(suiteName: preferencesName))
+        defer { preferences.removePersistentDomain(forName: preferencesName) }
+        let model = ImageToolsRecognitionModel()
+        try await recognize(model, image: makeImage(), urls: [fixture.image])
+        let result = try #require(model.results.first)
+        let view = ImageToolsRecognitionResultsView(model: model, saveLocations: SaveLocationStore(defaults: preferences))
+        let parent = fixture.root.appendingPathComponent("replaced-directory")
+        try Data("concurrent file".utf8).write(to: parent)
+        let destination = longName ? fixture.root.appendingPathComponent(String(repeating: "x", count: 256) + ".txt")
+            : parent.appendingPathComponent("result.txt")
+        let panel = NSSavePanel()
+        panel.isReleasedWhenClosed = false
+        defer { panel.close() }
+        let initialMessage = model.message
+        let openDescriptorCount = Self.openDescriptorCount()
+        let task = view.export(result, format: .text, panel: panel) { configured in
+            guard let delegate = configured.delegate as? ImageToolsRecognitionSavePanelDelegate else {
+                Issue.record("OCR panels must validate before closing"); return nil
+            }
+            do {
+                try delegate.panel(configured, validate: destination)
+                Issue.record("An unreadable destination must keep the panel open")
+            } catch {
+                #expect((error as NSError).domain == NSPOSIXErrorDomain)
+                #expect((error as NSError).code == Int(longName ? ENAMETOOLONG : ENOTDIR))
+            }
+            return nil
+        }
+        #expect(task == nil && panel.delegate == nil)
+        #expect(Self.openDescriptorCount() == openDescriptorCount, "Failed validation must release its directory descriptor")
+        #expect(model.message == initialMessage && !model.isProcessing)
+        #expect(try String(contentsOf: parent, encoding: .utf8) == "concurrent file")
+        #expect(try Data(contentsOf: fixture.image) == fixture.bytes)
+        #expect(try FileManager.default.contentsOfDirectory(atPath: fixture.root.path).sorted() == ["replaced-directory", "source.png"])
+    }
+
+    @Test(arguments: [ImageToolsRecognitionDocument.Format.text, .table], ["new", "concurrent file", "concurrent link"])
+    func singleExportPanelsAcceptNewTargetsAndExclusiveCreationProtectsLaterConflicts(format: ImageToolsRecognitionDocument.Format, outcome: String) async throws {
+        _ = NSApplication.shared
+        let fixture = try Fixture()
+        defer { fixture.remove() }
+        let preferencesName = "zisla-image-ocr-new-panel-\(UUID())"
+        let preferences = try #require(UserDefaults(suiteName: preferencesName))
+        defer { preferences.removePersistentDomain(forName: preferencesName) }
+        let model = ImageToolsRecognitionModel()
+        try await recognize(model, image: makeImage(), urls: [fixture.image])
+        let result = try #require(model.results.first)
+        let view = ImageToolsRecognitionResultsView(model: model, saveLocations: SaveLocationStore(defaults: preferences))
+        let destination = fixture.root.appendingPathComponent("result." + (format == .text ? "txt" : "xlsx"))
+        let panel = NSSavePanel()
+        panel.isReleasedWhenClosed = false
+        defer { panel.close() }
+        let openDescriptorCount = Self.openDescriptorCount()
+        let task = view.export(result, format: format, panel: panel) { configured in
+            guard let delegate = configured.delegate as? ImageToolsRecognitionSavePanelDelegate else {
+                Issue.record("OCR panels must validate before closing"); return nil
+            }
+            do {
+                try delegate.panel(configured, validate: destination)
+                if outcome == "concurrent file" { try Data("concurrent output".utf8).write(to: destination) }
+                if outcome == "concurrent link" {
+                    try FileManager.default.createSymbolicLink(at: destination, withDestinationURL: fixture.root.appendingPathComponent("missing"))
+                }
+            } catch { Issue.record(error) }
+            return destination
+        }
+        #expect(Self.openDescriptorCount() == openDescriptorCount, "Confirmed validation must release its directory descriptor")
+        await (try #require(task)).value
+        #expect(panel.delegate == nil)
+        if outcome == "new" {
+            #expect(model.message == AppLocalization.text("已保存 %@", destination.lastPathComponent))
+            if format == .text { #expect(try String(contentsOf: destination, encoding: .utf8) == result.text) }
+            else { #expect(try Data(contentsOf: destination).starts(with: [0x50, 0x4b])) }
+        } else {
+            #expect(model.message == ImageProcessingError.outputAlreadyExists(destination).localizedDescription)
+            if outcome == "concurrent file" { #expect(try String(contentsOf: destination, encoding: .utf8) == "concurrent output") }
+            else { #expect(try destination.resourceValues(forKeys: [.isSymbolicLinkKey]).isSymbolicLink == true) }
+        }
+        #expect(model.results == [result] && !model.isProcessing)
+        #expect(try Data(contentsOf: fixture.image) == fixture.bytes)
+        #expect(try FileManager.default.contentsOfDirectory(atPath: fixture.root.path).sorted() == [destination.lastPathComponent, "source.png"].sorted())
+    }
+
     @Test
     func dependentCancellationStopsTheBatchWithoutPublishingAnImageFailure() async throws {
         let fixture = try Fixture()
@@ -657,6 +881,13 @@ struct ImageToolsRecognitionTests {
         ImageToolsRecognitionResult(inputURL: inputURL, text: text, table: .init(rows: [[text, "42"]], merges: []))
     }
 
+    private nonisolated static func openDescriptorCount() -> Int {
+        let count = sysconf(_SC_OPEN_MAX)
+        return (0..<Int32(count)).reduce(into: 0) { count, descriptor in
+            if fcntl(descriptor, F_GETFD) >= 0 { count += 1 }
+        }
+    }
+
     private func makeImage(text: String = "Synthetic") throws -> CGImage {
         let size = CGSize(width: 720, height: 160)
         let context = try #require(CGContext(data: nil, width: Int(size.width), height: Int(size.height),
@@ -691,6 +922,8 @@ struct ImageToolsRecognitionTests {
     private struct SyntheticFailure: LocalizedError {
         var errorDescription: String? { "Synthetic OCR or export failure" }
     }
+
+    private final class SavePanelDelegate: NSObject, NSOpenSavePanelDelegate {}
 
     private actor RecognitionGate {
         private var operation: ScreenshotRecognitionOperation?

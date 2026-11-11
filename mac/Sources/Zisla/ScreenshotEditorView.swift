@@ -1787,6 +1787,31 @@ final class ScreenshotEditorModel: ObservableObject {
     /// silently drop a shape, number, or stroke when the image is exported.
     private(set) var pendingAnnotationDraft: ScreenshotAnnotation?
 
+    @MainActor
+    struct RenderingDependencies {
+        var makeBitmap: (Int, Int) -> NSBitmapImageRep? = { width, height in
+            NSBitmapImageRep(bitmapDataPlanes: nil, pixelsWide: width, pixelsHigh: height,
+                bitsPerSample: 8, samplesPerPixel: 4, hasAlpha: true, isPlanar: false,
+                colorSpaceName: .deviceRGB, bitmapFormat: [], bytesPerRow: 0, bitsPerPixel: 0)
+        }
+        var makeGraphicsContext: (NSBitmapImageRep) -> NSGraphicsContext? = { NSGraphicsContext(bitmapImageRep: $0) }
+        var makeMaskContext: (Int, Int) -> CGContext? = { width, height in
+            CGContext(data: nil, width: width, height: height, bitsPerComponent: 8, bytesPerRow: 0,
+                space: CGColorSpaceCreateDeviceRGB(), bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue)
+        }
+        var makeMaskImage: (CGContext) -> CGImage? = { $0.makeImage() }
+        var makeFilter: (String) -> CIFilter? = { CIFilter(name: $0) }
+        var filterOutput: (CIFilter) -> CIImage? = { $0.outputImage }
+        var makeCoreImage: (CIImage, CGRect) -> CGImage? = { ciContext.createCGImage($0, from: $1) }
+        var makeFinalImage: (NSBitmapImageRep) -> CGImage? = { $0.cgImage }
+    }
+
+    var renderingDependencies = RenderingDependencies()
+
+    private enum RenderingError: Error {
+        case unavailable
+    }
+
     init(image: NSImage) {
         self.image = image
         mosaicPreviewImage = image
@@ -2517,32 +2542,28 @@ final class ScreenshotEditorModel: ObservableObject {
     }
 
     func renderedImage() -> NSImage {
+        (try? renderedImage(requireCompleteRendering: false)) ?? image
+    }
+
+    func renderedImage(requireCompleteRendering: Bool) throws -> NSImage {
         commitPendingTextDraft()
         commitPendingAnnotationDraft()
-        let renderedBase = imageApplyingMosaics()
+        let renderedBase = requireCompleteRendering
+            ? try imageApplyingMosaics(adding: nil, requireCompleteRendering: true)
+            : imageApplyingMosaics()
         guard let base = renderedBase.cgImage(forProposedRect: nil, context: nil, hints: nil) else {
-            return image
+            throw RenderingError.unavailable
         }
 
         let pixelWidth = base.width
         let pixelHeight = base.height
-        guard let bitmap = NSBitmapImageRep(
-            bitmapDataPlanes: nil,
-            pixelsWide: pixelWidth,
-            pixelsHigh: pixelHeight,
-            bitsPerSample: 8,
-            samplesPerPixel: 4,
-            hasAlpha: true,
-            isPlanar: false,
-            colorSpaceName: .deviceRGB,
-            bitmapFormat: [],
-            bytesPerRow: 0,
-            bitsPerPixel: 0
-        ) else {
-            return image
+        guard let bitmap = renderingDependencies.makeBitmap(pixelWidth, pixelHeight) else {
+            throw RenderingError.unavailable
         }
         bitmap.size = image.size
-        guard let graphicsContext = NSGraphicsContext(bitmapImageRep: bitmap) else { return image }
+        guard let graphicsContext = renderingDependencies.makeGraphicsContext(bitmap) else {
+            throw RenderingError.unavailable
+        }
 
         NSGraphicsContext.saveGraphicsState()
         NSGraphicsContext.current = graphicsContext
@@ -2564,13 +2585,22 @@ final class ScreenshotEditorModel: ObservableObject {
         graphicsContext.flushGraphics()
         NSGraphicsContext.restoreGraphicsState()
 
+        if requireCompleteRendering, renderingDependencies.makeFinalImage(bitmap) == nil {
+            throw RenderingError.unavailable
+        }
         let output = NSImage(size: image.size)
         output.addRepresentation(bitmap)
         return output
     }
 
-    func pngData() -> Data? {
-        let rendered = renderedImage()
+    func pngData(requireCompleteRendering: Bool = false) -> Data? {
+        let rendered: NSImage
+        if requireCompleteRendering {
+            guard let output = try? renderedImage(requireCompleteRendering: true) else { return nil }
+            rendered = output
+        } else {
+            rendered = renderedImage()
+        }
         guard let representation = rendered.representations
             .compactMap({ $0 as? NSBitmapImageRep })
             .first ?? NSBitmapImageRep(data: rendered.tiffRepresentation ?? Data())
@@ -2583,6 +2613,12 @@ final class ScreenshotEditorModel: ObservableObject {
     }
 
     func imageApplyingMosaics(adding draft: ScreenshotAnnotation?) -> NSImage {
+        (try? imageApplyingMosaics(adding: draft, requireCompleteRendering: false)) ?? image
+    }
+
+    private func imageApplyingMosaics(
+        adding draft: ScreenshotAnnotation?, requireCompleteRendering: Bool
+    ) throws -> NSImage {
         var obscures = annotations.filter { $0.kind == .mosaic }
         if let draft, draft.kind == .mosaic {
             // A draft carrying an existing id is an in-flight edit of that region, so it replaces the
@@ -2592,6 +2628,9 @@ final class ScreenshotEditorModel: ObservableObject {
             } else {
                 obscures.append(draft)
             }
+        }
+        if requireCompleteRendering {
+            obscures.removeAll { !Self.obscureIntersectsImage($0, imageSize: image.size) }
         }
         guard !obscures.isEmpty,
               image.size.width > 0,
@@ -2607,13 +2646,14 @@ final class ScreenshotEditorModel: ObservableObject {
         let scaleY = extent.height / image.size.height
 
         for annotation in obscures {
-            guard let mask = Self.obscureMask(
+            guard let mask = obscureMask(
                 for: annotation,
                 imageSize: image.size,
                 extent: extent,
                 scaleX: scaleX,
                 scaleY: scaleY
-            ), let blend = CIFilter(name: "CIBlendWithMask") else {
+            ), let blend = renderingDependencies.makeFilter("CIBlendWithMask") else {
+                if requireCompleteRendering { throw RenderingError.unavailable }
                 continue
             }
 
@@ -2635,67 +2675,94 @@ final class ScreenshotEditorModel: ObservableObject {
                     annotation.obscureBlurStrength / ScreenshotAnnotation.obscureStrengthUpperBound
                 )
                 var sampled = output
-                if refraction > 0,
-                   let glass = CIFilter(name: "CIGlassDistortion"),
-                   let texture = Self.lensTexture(blockSize: blockSize, extent: extent) {
-                    glass.setValue(output.clamped(to: extent), forKey: kCIInputImageKey)
-                    glass.setValue(texture, forKey: "inputTexture")
-                    glass.setValue(CIVector(x: extent.midX, y: extent.midY), forKey: kCIInputCenterKey)
-                    glass.setValue(refraction, forKey: kCIInputScaleKey)
-                    sampled = glass.outputImage?.clamped(to: extent).cropped(to: extent) ?? output
+                if refraction > 0 {
+                    if let glass = renderingDependencies.makeFilter("CIGlassDistortion"),
+                       let texture = lensTexture(blockSize: blockSize, extent: extent) {
+                        glass.setValue(output.clamped(to: extent), forKey: kCIInputImageKey)
+                        glass.setValue(texture, forKey: "inputTexture")
+                        glass.setValue(CIVector(x: extent.midX, y: extent.midY), forKey: kCIInputCenterKey)
+                        glass.setValue(refraction, forKey: kCIInputScaleKey)
+                        if let refracted = renderingDependencies.filterOutput(glass)?.clamped(to: extent).cropped(to: extent) {
+                            sampled = refracted
+                        } else if requireCompleteRendering {
+                            throw RenderingError.unavailable
+                        }
+                    } else if requireCompleteRendering {
+                        throw RenderingError.unavailable
+                    }
                 }
-                let pixelate = CIFilter(name: "CIPixellate")
+                let pixelate = renderingDependencies.makeFilter("CIPixellate")
                 pixelate?.setValue(sampled, forKey: kCIInputImageKey)
                 pixelate?.setValue(blockSize, forKey: kCIInputScaleKey)
                 // Aligns the block grid with the lens tiling, which starts at the image origin.
                 pixelate?.setValue(CIVector(x: 0, y: 0), forKey: kCIInputCenterKey)
-                filtered = pixelate?.outputImage?.clamped(to: extent).cropped(to: extent)
+                filtered = pixelate.flatMap(renderingDependencies.filterOutput)?.clamped(to: extent).cropped(to: extent)
             case .blur:
-                let blur = CIFilter(name: "CIGaussianBlur")
+                let blur = renderingDependencies.makeFilter("CIGaussianBlur")
                 blur?.setValue(output, forKey: kCIInputImageKey)
                 blur?.setValue(
                     max(4, annotation.obscureBlurStrength * 1.5) * max(scaleX, scaleY),
                     forKey: kCIInputRadiusKey
                 )
-                let blurred = blur?.outputImage
+                let blurred = blur.flatMap(renderingDependencies.filterOutput)
                 filtered = blurred?.clamped(to: extent).cropped(to: extent)
             }
-            guard let filtered else { continue }
+            guard let filtered else {
+                if requireCompleteRendering { throw RenderingError.unavailable }
+                continue
+            }
 
             blend.setValue(filtered, forKey: kCIInputImageKey)
             blend.setValue(output, forKey: kCIInputBackgroundImageKey)
             blend.setValue(mask, forKey: kCIInputMaskImageKey)
-            if let blended = blend.outputImage?.cropped(to: extent) {
+            if let blended = renderingDependencies.filterOutput(blend)?.cropped(to: extent) {
                 output = blended
+            } else if requireCompleteRendering {
+                throw RenderingError.unavailable
             }
         }
 
-        guard let result = Self.ciContext.createCGImage(output, from: extent) else { return image }
+        guard let result = renderingDependencies.makeCoreImage(output, extent) else { throw RenderingError.unavailable }
         return NSImage(cgImage: result, size: image.size)
+    }
+
+    private static func obscureIntersectsImage(_ annotation: ScreenshotAnnotation, imageSize: CGSize) -> Bool {
+        let imageBounds = CGRect(origin: .zero, size: imageSize)
+        switch annotation.obscureShape {
+        case .rectangle:
+            return !annotation.rect.standardized.intersection(imageBounds).isEmpty
+        case .brush:
+            guard annotation.points.count > 1 else { return false }
+            let path = CGMutablePath()
+            path.addLines(between: annotation.points)
+            let coverage = path.copy(strokingWithWidth: max(12, annotation.lineWidth * 5),
+                lineCap: .round, lineJoin: .round, miterLimit: 10).boundingBoxOfPath
+            return !coverage.intersection(imageBounds).isEmpty
+        }
     }
 
     /// One spherical lens per mosaic block, tiled from the image origin: a radial white-to-black
     /// gradient is the height field CIGlassDistortion refracts through, so each block bends only
     /// what sits under it.
-    private static func lensTexture(blockSize: CGFloat, extent: CGRect) -> CIImage? {
+    private func lensTexture(blockSize: CGFloat, extent: CGRect) -> CIImage? {
         guard blockSize > 0,
-              let gradient = CIFilter(name: "CIRadialGradient"),
-              let tile = CIFilter(name: "CIAffineTile")
+              let gradient = renderingDependencies.makeFilter("CIRadialGradient"),
+              let tile = renderingDependencies.makeFilter("CIAffineTile")
         else { return nil }
         gradient.setValue(CIVector(x: blockSize / 2, y: blockSize / 2), forKey: kCIInputCenterKey)
         gradient.setValue(0, forKey: "inputRadius0")
         gradient.setValue(blockSize / 2, forKey: "inputRadius1")
         gradient.setValue(CIColor(red: 1, green: 1, blue: 1), forKey: "inputColor0")
         gradient.setValue(CIColor(red: 0, green: 0, blue: 0), forKey: "inputColor1")
-        guard let cell = gradient.outputImage?.cropped(
+        guard let cell = renderingDependencies.filterOutput(gradient)?.cropped(
             to: CGRect(x: 0, y: 0, width: blockSize, height: blockSize)
         ) else { return nil }
         tile.setValue(cell, forKey: kCIInputImageKey)
         tile.setValue(CGAffineTransform.identity, forKey: kCIInputTransformKey)
-        return tile.outputImage?.clamped(to: extent).cropped(to: extent)
+        return renderingDependencies.filterOutput(tile)?.clamped(to: extent).cropped(to: extent)
     }
 
-    private static func obscureMask(
+    private func obscureMask(
         for annotation: ScreenshotAnnotation,
         imageSize: CGSize,
         extent: CGRect,
@@ -2705,15 +2772,7 @@ final class ScreenshotEditorModel: ObservableObject {
         let width = Int(extent.width.rounded(.up))
         let height = Int(extent.height.rounded(.up))
         guard width > 0, height > 0,
-              let context = CGContext(
-                  data: nil,
-                  width: width,
-                  height: height,
-                  bitsPerComponent: 8,
-                  bytesPerRow: 0,
-                  space: CGColorSpaceCreateDeviceRGB(),
-                  bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue
-              )
+              let context = renderingDependencies.makeMaskContext(width, height)
         else { return nil }
 
         context.setFillColor(CGColor(red: 0, green: 0, blue: 0, alpha: 1))
@@ -2751,7 +2810,7 @@ final class ScreenshotEditorModel: ObservableObject {
             context.strokePath()
         }
 
-        guard let image = context.makeImage() else { return nil }
+        guard let image = renderingDependencies.makeMaskImage(context) else { return nil }
         return CIImage(cgImage: image).cropped(to: extent)
     }
 

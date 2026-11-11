@@ -8,9 +8,9 @@ struct ImageToolsModuleView: View {
     @ObservedObject private var tools: ManagedToolService
     private let saveLocations: SaveLocationStore
     private let settingsStore: FeatureSettingsStore
-    @StateObject private var store = ImageToolsModel()
-    @StateObject private var recognition = ImageToolsRecognitionModel()
-    @State private var operation: ImageToolOperation
+    @ObservedObject private var store: ImageToolsModel
+    @ObservedObject private var recognition: ImageToolsRecognitionModel
+    @Binding private var operation: ImageToolOperation
     @State private var formats = Set(ImageOutputFormat.conversionFormats)
     @State private var quality = 80.0
     @State private var resizeMethod: ImageResizeMethod = .fit
@@ -25,18 +25,29 @@ struct ImageToolsModuleView: View {
     @State private var extractionMode: ScreenshotExtractionMode = .foreground
     @Environment(\.colorScheme) private var colorScheme
 
-    init(model: AppModel, initialOperation: ImageToolOperation = .compress) {
-        tools = model.managedTools
-        saveLocations = model.saveLocations
-        settingsStore = model.settingsStore
-        _operation = State(initialValue: initialOperation)
+    init(tools: ManagedToolService, saveLocations: SaveLocationStore, settingsStore: FeatureSettingsStore,
+         store: ImageToolsModel, recognition: ImageToolsRecognitionModel, operation: Binding<ImageToolOperation>) {
+        self.tools = tools
+        self.saveLocations = saveLocations
+        self.settingsStore = settingsStore
+        self.store = store
+        self.recognition = recognition
+        _operation = operation
     }
 
     var body: some View {
         HStack(alignment: .top, spacing: 20) {
             VStack(alignment: .leading, spacing: 4) {
                 ForEach(ImageToolOperation.allCases) { item in
-                    Button { operation = item } label: {
+                    Button {
+                        if operation != item {
+                            store.discardResults()
+                            store.discardEdits()
+                            store.message = nil
+                            recognition.clear()
+                            operation = item
+                        }
+                    } label: {
                         Label(AppLocalization.text(item.title), systemImage: item.symbol)
                             .font(.system(size: 12, weight: .medium))
                             .foregroundStyle(operation == item ? Color.accentColor : Color.primary)
@@ -76,13 +87,6 @@ struct ImageToolsModuleView: View {
         }
         .controlSize(.regular)
         .textFieldStyle(.roundedBorder)
-        .onDisappear { store.cancel(); recognition.cancel() }
-        .onChange(of: operation) { _, _ in
-            store.discardResults()
-            store.discardEdits()
-            store.message = nil
-            recognition.clear()
-        }
         .onChange(of: extractionMode) { _, _ in
             store.discardResults()
             store.discardEdits()
@@ -94,7 +98,14 @@ struct ImageToolsModuleView: View {
         .sheet(item: $store.editorInput) { input in
             ImageToolsEditorView(image: input.image, settingsStore: settingsStore, saveLocations: saveLocations,
                                  initialTool: operation == .extract ? .extraction : .mosaic) { image in
-                store.recordEdit(image, for: input.inputURL)
+                let save = store.recordEdit(image, for: input.inputURL)
+                let succeeded: Bool
+                if let save {
+                    succeeded = await withTaskCancellationHandler { await save.value } onCancel: { save.cancel() }
+                } else { succeeded = false }
+                guard succeeded else {
+                    throw ImageProcessingError.processingFailed(store.message ?? ImageProcessingError.invalidOutput.localizedDescription)
+                }
             }
         }
         .task { await tools.refreshInstalledVersions() }

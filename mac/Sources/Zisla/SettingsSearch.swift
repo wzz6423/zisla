@@ -173,7 +173,7 @@ enum SettingsSearchIndex {
         rows(.mail, ["新邮件展示"])
         entry(.mail, "邮件账户", anchor: .group("邮件"))
         rows(.keyboardSound, ["键盘音色", "键盘音量", "播放键盘回弹音", "自然音高变化", "记录本地输入统计"])
-        for tool in [ManagedTool.ytDLP, .libreOffice] {
+        for tool in [ManagedTool.ytDLP, .libreOffice, .libvips, .libavif] {
             entry(.download, tool.displayName, anchor: .row(tool.displayName), keywords: ["下载", "Downloads"])
         }
         for location in SaveLocation.allCases {

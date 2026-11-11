@@ -250,8 +250,9 @@ struct SettingsView: View {
             PDFToolsModuleView(model: model, initialOperation: input.selectedPDFOperation)
                 .id(input.selectedPDFOperation)
         case .imageTools:
-            ImageToolsModuleView(model: model, initialOperation: input.selectedImageOperation)
-                .id(input.selectedImageOperation)
+            ImageToolsModuleView(tools: model.managedTools, saveLocations: model.saveLocations,
+                                 settingsStore: settingsStore, store: input.imageTools,
+                                 recognition: input.imageRecognition, operation: $input.selectedImageOperation)
         case .info:
             infoContent
         case .mail:
@@ -4735,7 +4736,7 @@ enum SettingsSection: String, CaseIterable, Identifiable {
         case .pet:
             return settings.petEnabled
         case .download:
-            return settings.downloaderEnabled
+            return settings.downloaderEnabled || settings.pdfToolsEnabled || settings.imageToolsEnabled
         case .weather:
             return settings.weatherEnabled
         case .updates:
@@ -4898,6 +4899,9 @@ struct SettingsSidebar: View {
 
 @MainActor
 final class SettingsInput: ObservableObject {
+    let imageTools = ImageToolsModel()
+    let imageRecognition = ImageToolsRecognitionModel()
+
     private struct Destination: Equatable {
         let section: SettingsSection
         let searchTarget: SettingsSearchAnchor?
@@ -4928,7 +4932,12 @@ final class SettingsInput: ObservableObject {
             if settingsQuery != oldValue { searchTarget = nil }
         }
     }
-    @Published var searchTarget: SettingsSearchAnchor?
+    @Published var searchTarget: SettingsSearchAnchor? {
+        didSet {
+            if case .imageOperation(let operation) = searchTarget { selectedImageOperation = operation }
+        }
+    }
+    @Published var selectedImageOperation: ImageToolOperation = .compress
     private var history = [Destination(section: .general, searchTarget: nil, voicePage: nil)]
     private var historyIndex = 0
     private var isRestoringDestination = false
@@ -4940,11 +4949,6 @@ final class SettingsInput: ObservableObject {
     var selectedPDFOperation: PDFToolOperation {
         if case .pdfOperation(let operation) = searchTarget { return operation }
         return .merge
-    }
-
-    var selectedImageOperation: ImageToolOperation {
-        if case .imageOperation(let operation) = searchTarget { return operation }
-        return .compress
     }
 
     func select(_ section: SettingsSection, searchTarget: SettingsSearchAnchor? = nil) {

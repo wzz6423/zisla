@@ -1,4 +1,5 @@
 import AppKit
+import Darwin
 import SwiftUI
 import UniformTypeIdentifiers
 import ZislaCore
@@ -67,6 +68,10 @@ struct ImageToolsRecognitionResultsView: View {
         panel.allowedContentTypes = UTType(filenameExtension: fileExtension).map { [$0] } ?? []
         panel.nameFieldStringValue = result.inputURL.deletingPathExtension().lastPathComponent + "-ocr." + fileExtension
         panel.directoryURL = saveLocations[.imageTools]
+        let previousDelegate = panel.delegate
+        let validation = ImageToolsRecognitionSavePanelDelegate(protectedInputs: model.inputURLs + [result.inputURL])
+        panel.delegate = validation
+        defer { panel.delegate = previousDelegate }
         guard let destination = chooseDestination(panel) else { return nil }
         switch format {
         case .text: return model.exportText(result, to: destination)
@@ -87,5 +92,28 @@ struct ImageToolsRecognitionResultsView: View {
         panel.directoryURL = saveLocations[.imageTools]
         guard let directory = chooseDirectory(panel) else { return nil }
         return model.exportTexts(to: directory)
+    }
+}
+
+@MainActor
+final class ImageToolsRecognitionSavePanelDelegate: NSObject, NSOpenSavePanelDelegate {
+    private let protectedPaths: Set<String>
+
+    init(protectedInputs: [URL]) {
+        protectedPaths = Set(protectedInputs.map { $0.standardizedFileURL.path.lowercased() })
+        super.init()
+    }
+
+    func panel(_ sender: Any, validate url: URL) throws {
+        let path = url.standardizedFileURL.path.lowercased()
+        guard !protectedPaths.contains(path) else { throw ImageProcessingError.outputAlreadyExists(url) }
+        let directory = open(url.deletingLastPathComponent().path, O_RDONLY | O_NOFOLLOW)
+        guard directory >= 0 else { throw NSError(domain: NSPOSIXErrorDomain, code: Int(errno)) }
+        defer { _ = close(directory) }
+        var metadata = stat()
+        if fstatat(directory, url.lastPathComponent, &metadata, AT_SYMLINK_NOFOLLOW) == 0 {
+            throw ImageProcessingError.outputAlreadyExists(url)
+        }
+        guard errno == ENOENT else { throw NSError(domain: NSPOSIXErrorDomain, code: Int(errno)) }
     }
 }

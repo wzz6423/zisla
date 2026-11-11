@@ -172,6 +172,79 @@ struct ImageTransformIntegrationTests {
         #expect(loaded.width == 1600 && loaded.height == 8)
     }
 
+    @Test(arguments: [[ImageOutputFormat](), [.jpeg], [.png, .jpeg, .png, .webp], ImageOutputFormat.conversionFormats],
+        [ImageTransformOptions.identity, .init(rotation: .clockwise90, flipHorizontal: true)])
+    func rasterEditsHonorExplicitFormatsAndPreserveTransparencyOrJPEGBackground(formats: [ImageOutputFormat], transformation: ImageTransformOptions) async throws {
+        let fixture = try ImageProcessingServiceTests.Fixture()
+        defer { fixture.remove() }
+        let source = fixture.root.appendingPathComponent("source.jpg")
+        try ImageProcessingServiceTests.Fixture.writeImage(to: source, type: .jpeg)
+        let original = try Data(contentsOf: source)
+        let replacement = try await service.loadRasterImage(fixture.png(name: "replacement.png", width: 80, height: 40))
+        let expected = try transformed(replacement, options: transformation)
+        let batch = try await service.process([source], options: .init(formats: formats, quality: 100,
+            background: "#FF0000", transform: transformation), rasterTransform: { _, url in
+                #expect(url == source)
+                return replacement
+            })
+        defer { try? FileManager.default.removeItem(at: batch.directoryURL) }
+        #expect(batch.failures.isEmpty, "\(batch.failures)")
+        let item = try #require(batch.items.first)
+        let targets = formats.isEmpty ? [ImageOutputFormat.png] : Array(Set(formats)).sorted { $0.rawValue < $1.rawValue }
+        #expect(item.outputs.map(\.format) == targets)
+        #expect(item.summary.format == .jpeg && item.summary.width == 40 && item.summary.height == 20)
+        #expect(try Data(contentsOf: source) == original)
+        #expect(try Data(contentsOf: item.sourceURL) == original)
+        for output in item.outputs {
+            #expect(output.summary.format == output.format)
+            #expect(output.summary.width == expected.width && output.summary.height == expected.height && output.summary.frameCount == 1)
+            #expect(output.url.pathExtension == output.format.fileExtension)
+            let loaded = try await service.loadRasterImage(output.url)
+            let bytes = try ImageTransformTests.Pixels.bytes(loaded)
+            if output.format == .jpeg {
+                #expect(bytes[0] > 220 && bytes[1] < 40 && bytes[2] < 40 && bytes[3] == 255,
+                    "JPEG must composite edited transparency against the selected red background")
+            } else {
+                #expect(bytes[3] == 0, "\(output.format.displayName) must retain the transparent edited border")
+                if output.format == .png { try expectPixels(loaded, expected: expected) }
+            }
+        }
+        let files = Set(try FileManager.default.contentsOfDirectory(atPath: item.sourceURL.deletingLastPathComponent().path))
+        #expect(files == Set(targets.map { "output.\($0.fileExtension)" } + ["source.jpg"]))
+    }
+
+    @Test(arguments: [[ImageOutputFormat](), [.jpeg], [.svg], [.png, .svg, .jpeg]])
+    func rasterEditsOfSVGUseRequestedRasterTargetsAndReportVectorFailure(formats: [ImageOutputFormat]) async throws {
+        let fixture = try ImageProcessingServiceTests.Fixture()
+        defer { fixture.remove() }
+        let source = fixture.root.appendingPathComponent("source.svg")
+        let svg = "<svg xmlns='http://www.w3.org/2000/svg' width='30' height='20'><rect x='1' y='2' width='8' height='9' fill='red'/></svg>"
+        try Data(svg.utf8).write(to: source)
+        let batch = try await service.process([source], options: .init(formats: formats, quality: 100),
+            rasterTransform: { image, _ in image })
+        defer { try? FileManager.default.removeItem(at: batch.directoryURL) }
+        let targets = formats.isEmpty ? [ImageOutputFormat.png] : Array(Set(formats)).filter { $0 != .svg }.sorted { $0.rawValue < $1.rawValue }
+        #expect((batch.items.first?.outputs.map(\.format) ?? []) == targets)
+        #expect(batch.failures.count == (formats.contains(.svg) ? 1 : 0))
+        if formats.contains(.svg) {
+            let failure = try #require(batch.failures.first)
+            #expect(failure.format == .svg && failure.message == ImageProcessingError.invalidOptions.localizedDescription)
+        }
+        if targets.isEmpty {
+            #expect(try FileManager.default.contentsOfDirectory(atPath: batch.directoryURL.path).isEmpty)
+        } else {
+            let item = try #require(batch.items.first)
+            #expect(item.summary.format == .svg)
+            #expect(try String(contentsOf: item.sourceURL, encoding: .utf8) == svg)
+            for output in item.outputs {
+                #expect(output.summary.format == output.format && output.summary.width == 30 && output.summary.height == 20)
+            }
+            let files = Set(try FileManager.default.contentsOfDirectory(atPath: item.sourceURL.deletingLastPathComponent().path))
+            #expect(files == Set(targets.map { "output.\($0.fileExtension)" } + ["source.svg"]))
+        }
+        #expect(try String(contentsOf: source, encoding: .utf8) == svg)
+    }
+
     private func transform(_ combination: Int) -> ImageTransformOptions {
         .init(rotation: ImageRotation.allCases[combination % 4], flipHorizontal: combination & 4 != 0, flipVertical: combination & 8 != 0)
     }

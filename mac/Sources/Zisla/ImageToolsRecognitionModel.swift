@@ -32,7 +32,7 @@ final class ImageToolsRecognitionModel: ObservableObject {
     @Published private(set) var total = 0
     @Published private(set) var currentInputURL: URL?
     @Published private(set) var message: String?
-    private var inputURLs: [URL] = []
+    private(set) var inputURLs: [URL] = []
     private var operation: ScreenshotRecognitionOperation?
     private var task: Task<Void, Never>?
 
@@ -301,7 +301,7 @@ enum ImageToolsRecognitionExporter {
                 let reader = try FileHandle(forReadingFrom: source)
                 defer { try? reader.close() }
                 // Pin the chosen directory and create exclusively so concurrent files and dangling links survive.
-                let descriptor = openat(directory, destination.lastPathComponent, O_WRONLY | O_CREAT | O_EXCL | O_NOFOLLOW | O_CLOEXEC, 0o600)
+                let descriptor = openat(directory, destination.lastPathComponent, O_WRONLY | O_CREAT | O_EXCL | O_NOFOLLOW | O_CLOEXEC, 0o666)
                 guard descriptor >= 0 else {
                     if errno == EEXIST { throw ImageProcessingError.outputAlreadyExists(destination) }
                     throw NSError(domain: NSPOSIXErrorDomain, code: Int(errno))
