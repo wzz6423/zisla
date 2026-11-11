@@ -115,17 +115,64 @@ struct WeatherFallbackPresentationTests {
     }
 
     @Test(arguments: AppLanguage.allCases)
-    func attributionUsesExistingTranslatedSourceCopy(language: AppLanguage) throws {
+    func weatherPresentationUsesTranslatedDescriptionsAndSourceCopy(language: AppLanguage) throws {
         let packageRoot = URL(fileURLWithPath: #filePath).deletingLastPathComponent()
             .deletingLastPathComponent().deletingLastPathComponent()
         let table = try #require(NSDictionary(contentsOf: packageRoot.appendingPathComponent(
             "Resources/Localization/\(language.rawValue).lproj/Localizable.strings"
         )) as? [String: String])
-        for key in ["中国天气网（中国气象局）", "更新于 %@", "无法获取天气", "等待刷新", "没有可用的天气数据"] {
+        let core = try String(contentsOf: packageRoot.appendingPathComponent("Sources/ZislaCore/Weather.swift"), encoding: .utf8)
+        let decoder = try String(contentsOf: packageRoot.appendingPathComponent("Sources/ZislaKit/WeatherForecastDecoder.swift"), encoding: .utf8)
+        let literal = try NSRegularExpression(pattern: #"(?:AppLocalization\.text\(|\(description, icon\) = \()"([^"]+)""#)
+        let source = core + decoder
+        var keys = Set(literal.matches(in: source, range: NSRange(source.startIndex..., in: source)).map {
+            String(source[Range($0.range(at: 1), in: source)!])
+        })
+        keys.formUnion([
+            "中国天气网（中国气象局）", "更新于 %@", "无法获取天气", "等待刷新", "没有可用的天气数据",
+            "雷阵雨伴有冰雹", "雨夹雪", "暴雨", "大暴雨", "特大暴雨", "暴雪", "小到中雨", "中到大雨", "大到暴雨",
+            "暴雨到大暴雨", "大暴雨到特大暴雨", "小到中雪", "中到大雪", "大到暴雪",
+            "浓雾", "强浓雾", "大雾", "特强浓雾", "霾", "中度霾", "重度霾", "严重霾",
+            "沙尘暴", "浮尘", "扬沙", "强沙尘暴",
+        ])
+        for key in keys {
             let value = try #require(table[key])
             #expect(!value.isEmpty)
             #expect(AppLocalization.string(key, locale: language.locale) == value)
         }
+        #expect(AppLocalization.string("小雨", language: .english) == "Light rain")
+        #expect(AppLocalization.string("大雪", language: .arabic) == "ثلوج كثيفة")
+    }
+
+    @Test
+    func everyWeatherSymbolIsAvailableAndPrecipitationIconsRenderDistinctly() throws {
+        let packageRoot = URL(fileURLWithPath: #filePath).deletingLastPathComponent()
+            .deletingLastPathComponent().deletingLastPathComponent()
+        let source = try String(contentsOf: packageRoot.appendingPathComponent("Sources/ZislaCore/Weather.swift"), encoding: .utf8)
+            + String(contentsOf: packageRoot.appendingPathComponent("Sources/ZislaKit/WeatherForecastDecoder.swift"), encoding: .utf8)
+        let literal = try NSRegularExpression(pattern: #""((?:sun|moon|cloud|wind|questionmark)\.[a-zA-Z0-9.]+|snowflake)""#)
+        let symbols = Set(literal.matches(in: source, range: NSRange(source.startIndex..., in: source)).map {
+            String(source[Range($0.range(at: 1), in: source)!])
+        })
+        #expect(!symbols.isEmpty)
+        for symbol in symbols {
+            #expect(NSImage(systemSymbolName: symbol, accessibilityDescription: nil) != nil,
+                    "Weather icon \(symbol) must be available on the target macOS")
+        }
+        let date = Date(timeIntervalSince1970: 86_400)
+        func pixels(_ symbol: String) throws -> Data {
+            try renderedPixels(AgendaModuleView.weatherRow(WeatherSnapshot(
+                temperature: 16, condition: WeatherCondition(summary: "Weather condition", symbolName: symbol),
+                timezone: "UTC", fetchedAt: date, coordinate: GeoCoordinate(latitude: 51, longitude: 0)
+            ), at: date))
+        }
+        let lightRain = try pixels("cloud.drizzle.fill")
+        let rain = try pixels("cloud.rain.fill")
+        let heavyRain = try pixels("cloud.heavyrain.fill")
+        #expect(lightRain != rain && rain != heavyRain && lightRain != heavyRain,
+                "Light, moderate, and heavy rain must display distinct weather icons")
+        #expect(try pixels("snowflake") != pixels("cloud.snow.fill"))
+        #expect(try pixels("cloud.sleet.fill") != rain, "Mixed precipitation must not render as ordinary rain")
     }
 
     @Test

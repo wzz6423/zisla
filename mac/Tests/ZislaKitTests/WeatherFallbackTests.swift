@@ -8,7 +8,7 @@ struct WeatherFallbackTests {
     private let coordinate = GeoCoordinate(latitude: 31.2, longitude: 121.4)
     private static let openMeteo = Data(#"{"timezone":"Asia/Shanghai","current":{"time":"2026-11-05T10:45","temperature_2m":28.5,"apparent_temperature":30.2,"weather_code":2,"is_day":1,"precipitation":0},"daily":{"sunrise":["2026-11-05T05:04"],"sunset":["2026-11-05T18:56"],"temperature_2m_min":[24.1],"temperature_2m_max":[33.8],"precipitation_probability_max":[10],"precipitation_sum":[0]}}"#.utf8)
     private static let met = Data(#"{"properties":{"meta":{"units":{"air_temperature":"celsius"}},"timeseries":[{"time":"2026-11-05T10:00:00Z","data":{"instant":{"details":{"air_temperature":16.2}},"next_1_hours":{"summary":{"symbol_code":"lightrainshowers_night"},"details":{"precipitation_amount":2.5}}}}]}}"#.utf8)
-    private static let china = Data(#"var cityDZ={"weatherinfo":{"fctime":"202611050800"}};var alarmDZ={"w":[]};var dataSK={"temp":"16.1","weathercode":"n01","city":"101020100"};var fc={"f":[{"fc":"18","fd":"14","fi":"11/5"}]};"#.utf8)
+    private static let china = Data(#"var cityDZ={"weatherinfo":{"fctime":"202611050800"}};var alarmDZ={"w":[]};var dataSK={"temp":"16.1","weather":"多云","weathercode":"n01","city":"101020100"};var fc={"f":[{"fc":"18","fd":"14","fi":"11/5"}]};"#.utf8)
     private static let station = Data(#"([{"ref":"101020100~shanghai~上海~Shanghai~021~200000~SH~上海~上海"}])"#.utf8)
 
     private func makeService(
@@ -44,7 +44,7 @@ struct WeatherFallbackTests {
         #expect(snapshot.precipitationSum == nil)
         #expect(snapshot.currentPrecipitation == nil)
         #expect(snapshot.condition.summary == WeatherCondition(code: 2, isDay: false).summary)
-        #expect(snapshot.condition.symbolName == "cloud.fill")
+        #expect(snapshot.condition.symbolName == "cloud.sun.fill")
         #expect(snapshot.sourceURL?.host == "www.weather.com.cn")
         #expect(ForecastURLProtocol.requests.map { $0.url?.host } == ["toy1.weather.com.cn", "d1.weather.com.cn"])
         #expect(ForecastURLProtocol.requests.last?.value(forHTTPHeaderField: "Referer") == "https://www.weather.com.cn/")
@@ -83,7 +83,8 @@ struct WeatherFallbackTests {
             latitude: 31.123456, longitude: 121.123456, locationName: "上海", isoCountryCode: "CN"
         )
         #expect(snapshot.temperature == 16.2)
-        #expect(snapshot.condition == WeatherCondition(code: 80, isDay: false))
+        #expect(snapshot.condition.summary == AppLocalization.text("小阵雨"))
+        #expect(snapshot.condition.symbolName == "cloud.drizzle.fill")
         #expect(snapshot.apparentTemperature == nil)
         #expect(snapshot.currentPrecipitation == nil)
         #expect(snapshot.precipitationProbability == nil)
@@ -192,6 +193,11 @@ struct WeatherFallbackTests {
             #expect(!translated.isEmpty)
             #expect(error.localizedDescription == translated)
         }
+        let payload = Data(String(decoding: Self.china, as: UTF8.self)
+            .replacingOccurrences(of: "多云", with: "小雨").replacingOccurrences(of: "n01", with: "d07").utf8)
+        let forecast = try WeatherForecastDecoder.chinaWeather(payload, stationID: "101020100", coordinate: coordinate, locationName: "上海")
+        #expect(forecast.condition.summary == table["小雨"])
+        #expect(forecast.condition.symbolName == "cloud.drizzle.fill")
     }
 
     @Test(arguments: [Double.nan, Double.infinity, 91, -91])
@@ -223,7 +229,137 @@ struct WeatherFallbackTests {
     func chineseCurrentIconDoesNotInferDaylightFromItsUnreliablePrefix(code: String) throws {
         let payload = Data(String(decoding: Self.china, as: UTF8.self).replacingOccurrences(of: "n01", with: code).utf8)
         let snapshot = try WeatherForecastDecoder.chinaWeather(payload, stationID: "101020100", coordinate: coordinate, locationName: "上海")
-        #expect(snapshot.condition.symbolName == (code.hasSuffix("00") ? "sun.max.fill" : "cloud.fill"))
+        #expect(snapshot.condition.symbolName == (code.hasSuffix("00") ? "sun.max.fill" : "cloud.sun.fill"))
+    }
+
+    @Test(arguments: ["d", "n"])
+    func chineseForecastRetainsProviderDescriptionsAndUsesTheOriginalWeatherCode(prefix: String) throws {
+        let conditions: [(Int, String, String)] = [
+            (0, "晴", "sun.max.fill"), (1, "多云", "cloud.sun.fill"), (2, "阴", "cloud.fill"),
+            (3, "阵雨", "cloud.rain.fill"), (4, "雷阵雨", "cloud.bolt.rain.fill"),
+            (5, "雷阵雨伴有冰雹", "cloud.hail.fill"), (6, "雨夹雪", "cloud.sleet.fill"),
+            (7, "小雨", "cloud.drizzle.fill"), (8, "中雨", "cloud.rain.fill"),
+            (9, "大雨", "cloud.heavyrain.fill"), (10, "暴雨", "cloud.heavyrain.fill"),
+            (11, "大暴雨", "cloud.heavyrain.fill"), (12, "特大暴雨", "cloud.heavyrain.fill"),
+            (13, "阵雪", "cloud.snow.fill"), (14, "小雪", "snowflake"),
+            (15, "中雪", "cloud.snow.fill"), (16, "大雪", "cloud.snow.fill"),
+            (17, "暴雪", "wind.snow"), (18, "雾", "cloud.fog.fill"), (19, "冻雨", "cloud.sleet.fill"),
+            (20, "沙尘暴", "sun.dust.fill"), (21, "小到中雨", "cloud.rain.fill"),
+            (22, "中到大雨", "cloud.heavyrain.fill"), (23, "大到暴雨", "cloud.heavyrain.fill"),
+            (24, "暴雨到大暴雨", "cloud.heavyrain.fill"), (25, "大暴雨到特大暴雨", "cloud.heavyrain.fill"),
+            (26, "小到中雪", "cloud.snow.fill"), (27, "中到大雪", "cloud.snow.fill"),
+            (28, "大到暴雪", "wind.snow"), (29, "浮尘", "sun.dust.fill"),
+            (30, "扬沙", "sun.dust.fill"), (31, "强沙尘暴", "sun.dust.fill"),
+            (32, "浓雾", "cloud.fog.fill"), (33, "雪", "cloud.snow.fill"), (49, "强浓雾", "cloud.fog.fill"),
+            (53, "霾", "sun.haze.fill"), (54, "中度霾", "sun.haze.fill"),
+            (55, "重度霾", "sun.haze.fill"), (56, "严重霾", "sun.haze.fill"),
+            (57, "大雾", "cloud.fog.fill"), (58, "特强浓雾", "cloud.fog.fill"),
+            (301, "雨", "cloud.rain.fill"), (302, "雪", "cloud.snow.fill"),
+            (999, "来源自定义天气描述", "questionmark.circle"),
+        ]
+        let date = Date(timeIntervalSince1970: 1793874600)
+        for (code, description, symbol) in conditions {
+            let payload = Data(String(decoding: Self.china, as: UTF8.self)
+                .replacingOccurrences(of: "n01", with: prefix + String(format: "%02d", code))
+                .replacingOccurrences(of: "多云", with: description).utf8)
+            let original = payload
+            let snapshot = try WeatherForecastDecoder.chinaWeather(
+                payload, stationID: "101020100", coordinate: coordinate, locationName: "上海", now: date
+            )
+            #expect(snapshot.condition.summary == AppLocalization.text(description), "Provider weather code \(code) must retain its description")
+            #expect(snapshot.condition.symbolName == symbol, "Provider weather code \(code) must retain its precipitation type and intensity")
+            #expect(snapshot.temperature == 16.1 && snapshot.temperatureMin == 14 && snapshot.temperatureMax == 18)
+            #expect(payload == original && snapshot.fetchedAt == date)
+        }
+    }
+
+    @Test(arguments: ["absent", "empty", "whitespace", "null"])
+    func chineseMissingDescriptionsFailWithoutInventingWeather(kind: String) {
+        let replacement = switch kind {
+        case "null": "\"weather\":null,"
+        case "empty": "\"weather\":\"\","
+        case "whitespace": "\"weather\":\"   \","
+        default: ""
+        }
+        let payload = Data(String(decoding: Self.china, as: UTF8.self)
+            .replacingOccurrences(of: "\"weather\":\"多云\",", with: replacement).utf8)
+        #expect(throws: WeatherServiceError.invalidResponse) {
+            _ = try WeatherForecastDecoder.chinaWeather(payload, stationID: "101020100", coordinate: coordinate, locationName: "上海")
+        }
+    }
+
+    @Test(arguments: ["", "day", "night", "polartwilight"])
+    func METSymbolsRetainPrecipitationIntensityAndMixedTypes(variant: String) throws {
+        let conditions: [(String, String, String)] = [
+            ("lightrain", "小雨", "cloud.drizzle.fill"), ("rain", "雨", "cloud.rain.fill"),
+            ("heavyrain", "大雨", "cloud.heavyrain.fill"),
+            ("lightrainshowers", "小阵雨", "cloud.drizzle.fill"), ("rainshowers", "阵雨", "cloud.rain.fill"),
+            ("heavyrainshowers", "强阵雨", "cloud.heavyrain.fill"),
+            ("lightsnow", "小雪", "snowflake"), ("snow", "雪", "cloud.snow.fill"),
+            ("heavysnow", "大雪", "cloud.snow.fill"),
+            ("lightsnowshowers", "小阵雪", "snowflake"), ("snowshowers", "阵雪", "cloud.snow.fill"),
+            ("heavysnowshowers", "强阵雪", "cloud.snow.fill"),
+            ("lightsleet", "小雨夹雪", "cloud.sleet.fill"), ("sleet", "雨夹雪", "cloud.sleet.fill"),
+            ("heavysleet", "强雨夹雪", "cloud.sleet.fill"),
+            ("lightsleetshowers", "小阵性雨夹雪", "cloud.sleet.fill"), ("sleetshowers", "阵性雨夹雪", "cloud.sleet.fill"),
+            ("heavysleetshowers", "强阵性雨夹雪", "cloud.sleet.fill"),
+            ("lightrainandthunder", "小雨伴雷电", "cloud.bolt.rain.fill"),
+            ("rainandthunder", "雨伴雷电", "cloud.bolt.rain.fill"),
+            ("heavyrainandthunder", "大雨伴雷电", "cloud.bolt.rain.fill"),
+            ("lightrainshowersandthunder", "小阵雨伴雷电", "cloud.bolt.rain.fill"),
+            ("rainshowersandthunder", "阵雨伴雷电", "cloud.bolt.rain.fill"),
+            ("heavyrainshowersandthunder", "强阵雨伴雷电", "cloud.bolt.rain.fill"),
+            ("lightsnowandthunder", "小雪伴雷电", "cloud.bolt.fill"),
+            ("snowandthunder", "雪伴雷电", "cloud.bolt.fill"),
+            ("heavysnowandthunder", "大雪伴雷电", "cloud.bolt.fill"),
+            ("lightssnowshowersandthunder", "小阵雪伴雷电", "cloud.bolt.fill"),
+            ("snowshowersandthunder", "阵雪伴雷电", "cloud.bolt.fill"),
+            ("heavysnowshowersandthunder", "强阵雪伴雷电", "cloud.bolt.fill"),
+            ("lightsleetandthunder", "小雨夹雪伴雷电", "cloud.bolt.fill"),
+            ("sleetandthunder", "雨夹雪伴雷电", "cloud.bolt.fill"),
+            ("heavysleetandthunder", "强雨夹雪伴雷电", "cloud.bolt.fill"),
+            ("lightssleetshowersandthunder", "小阵性雨夹雪伴雷电", "cloud.bolt.fill"),
+            ("sleetshowersandthunder", "阵性雨夹雪伴雷电", "cloud.bolt.fill"),
+            ("heavysleetshowersandthunder", "强阵性雨夹雪伴雷电", "cloud.bolt.fill"),
+            ("cloudy", "阴", "cloud.fill"), ("fog", "雾", "cloud.fog.fill"),
+            ("unrecognized", "天气未知", "questionmark.circle"),
+        ]
+        let date = Date(timeIntervalSince1970: 1793874600)
+        for (code, description, dayIcon, nightIcon) in [
+            ("clearsky", "晴", "sun.max.fill", "moon.stars.fill"),
+            ("fair", "晴间少云", "sun.max.fill", "moon.fill"),
+            ("partlycloudy", "多云", "cloud.sun.fill", "cloud.moon.fill"),
+        ] {
+            let symbol = code + (variant.isEmpty ? "" : "_" + variant)
+            let payload = Data(String(decoding: Self.met, as: UTF8.self)
+                .replacingOccurrences(of: "lightrainshowers_night", with: symbol).utf8)
+            let forecast = try WeatherForecastDecoder.metNorway(payload, coordinate: coordinate, locationName: "上海", now: date)
+            #expect(forecast.condition.summary == AppLocalization.text(description))
+            #expect(forecast.condition.symbolName == (variant == "night" ? nightIcon : dayIcon),
+                    "Only explicit night forecasts should use a moon icon")
+        }
+        for (code, description, symbol) in conditions {
+            let original = code + (variant.isEmpty ? "" : "_" + variant)
+            let payload = Data(String(decoding: Self.met, as: UTF8.self)
+                .replacingOccurrences(of: "lightrainshowers_night", with: original).utf8)
+            let snapshot = try WeatherForecastDecoder.metNorway(payload, coordinate: coordinate, locationName: "上海", now: date)
+            #expect(snapshot.condition.summary == AppLocalization.text(description), "MET symbol \(original) must retain its full weather description")
+            #expect(snapshot.condition.symbolName == symbol, "MET symbol \(original) must retain its precipitation type")
+            #expect(snapshot.temperature == 16.2 && snapshot.fetchedAt == date.addingTimeInterval(-1800))
+        }
+    }
+
+    @Test
+    func missingChineseDescriptionFallsBackToTheNextProvider() async throws {
+        let missing = Data(String(decoding: Self.china, as: UTF8.self)
+            .replacingOccurrences(of: "\"weather\":\"多云\",", with: "").utf8)
+        ForecastURLProtocol.reset([.data(Self.station), .data(missing), .data(Self.openMeteo)])
+        let forecast = try await makeService().fetch(
+            latitude: coordinate.latitude, longitude: coordinate.longitude, locationName: "上海", isoCountryCode: "CN"
+        )
+        #expect(forecast.source == "Open-Meteo")
+        #expect(forecast.condition == WeatherCondition(code: 2, isDay: true))
+        #expect(ForecastURLProtocol.requests.count == 3)
     }
 
     @Test
@@ -388,7 +524,8 @@ struct WeatherFallbackTests {
         let data = Data(String(decoding: Self.met, as: UTF8.self).replacingOccurrences(of: "next_1_hours", with: period).utf8)
         let snapshot = try WeatherForecastDecoder.metNorway(data, coordinate: coordinate, locationName: "上海", now: Date(timeIntervalSince1970: 1793874600))
         #expect(snapshot.temperature == 16.2)
-        #expect(snapshot.condition == WeatherCondition(code: 80, isDay: false))
+        #expect(snapshot.condition.summary == AppLocalization.text("小阵雨"))
+        #expect(snapshot.condition.symbolName == "cloud.drizzle.fill")
         #expect(snapshot.precipitationSum == nil && snapshot.currentPrecipitation == nil)
     }
 

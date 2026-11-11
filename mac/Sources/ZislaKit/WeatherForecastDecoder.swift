@@ -54,7 +54,8 @@ enum WeatherForecastDecoder {
         guard stationID.count == 9, stationID.allSatisfy(\.isNumber), current.city == stationID,
               let temperature = Double(current.temp), (-100...100).contains(temperature),
               let code = Int(current.weathercode.dropFirst()),
-              current.weathercode.first == "d" || current.weathercode.first == "n"
+              current.weathercode.first == "d" || current.weathercode.first == "n",
+              let description = current.weather, !description.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
         else { throw WeatherServiceError.invalidResponse }
         let forecastJSON = try ChinaWeatherAlertService.assignedJSONObject(named: "fc", in: source)
         let forecast = try JSONDecoder().decode(ChinaWeatherDaily.self, from: Data(forecastJSON.utf8))
@@ -68,8 +69,9 @@ enum WeatherForecastDecoder {
             temperature: temperature,
             temperatureMin: minimum,
             temperatureMax: maximum,
-            // The current feed also returns d-prefixed icons at night.
-            condition: WeatherCondition(code: chinaWeatherCode(code), isDay: nil),
+            condition: WeatherCondition(
+                summary: AppLocalization.text(description), symbolName: chinaWeatherSymbol(code)
+            ),
             timezone: "Asia/Shanghai",
             fetchedAt: now,
             coordinate: coordinate,
@@ -99,7 +101,7 @@ enum WeatherForecastDecoder {
         else { throw WeatherServiceError.invalidResponse }
         return WeatherSnapshot(
             temperature: match.entry.data.instant.details.airTemperature,
-            condition: WeatherCondition(code: metWeatherCode(symbol), isDay: !symbol.hasSuffix("_night")),
+            condition: metWeatherCondition(symbol),
             timezone: "UTC",
             fetchedAt: match.date,
             coordinate: coordinate,
@@ -110,40 +112,83 @@ enum WeatherForecastDecoder {
         )
     }
 
-    private static func chinaWeatherCode(_ code: Int) -> Int {
+    private static func chinaWeatherSymbol(_ code: Int) -> String {
         switch code {
-        case 0: 0
-        case 1: 2
-        case 2: 3
-        case 3: 80
-        case 4, 5: 95
-        case 6, 7, 8, 9, 10, 11, 12, 21, 22, 23, 24, 25: 63
-        case 13: 85
-        case 14, 15, 16, 17, 26, 27, 28: 73
-        case 18, 20, 29, 30, 31, 53: 45
-        case 19: 66
-        default: -1
+        // The provider's d/n prefix is unreliable, so clear skies use a condition-only sun icon.
+        case 0: "sun.max.fill"
+        case 1: "cloud.sun.fill"
+        case 2: "cloud.fill"
+        case 3, 8, 21, 301: "cloud.rain.fill"
+        case 4: "cloud.bolt.rain.fill"
+        case 5: "cloud.hail.fill"
+        case 6, 19: "cloud.sleet.fill"
+        case 7: "cloud.drizzle.fill"
+        case 9...12, 22...25: "cloud.heavyrain.fill"
+        case 13, 15, 16, 26, 27, 33, 302: "cloud.snow.fill"
+        case 14: "snowflake"
+        case 17, 28: "wind.snow"
+        case 18, 32, 49, 57, 58: "cloud.fog.fill"
+        case 20, 29...31: "sun.dust.fill"
+        case 53...56: "sun.haze.fill"
+        default: "questionmark.circle"
         }
     }
 
-    private static func metWeatherCode(_ symbol: String) -> Int {
-        if symbol.contains("thunder") { return 95 }
-        if symbol.contains("snow") { return symbol.contains("showers") ? 85 : 73 }
-        if symbol.contains("sleet") { return 66 }
-        if symbol.contains("rain") { return symbol.contains("showers") ? 80 : 63 }
-        switch symbol.split(separator: "_").first {
-        case "clearsky": return 0
-        case "fair": return 1
-        case "partlycloudy": return 2
-        case "cloudy": return 3
-        case "fog": return 45
-        default: return -1
+    private static func metWeatherCondition(_ symbol: String) -> WeatherCondition {
+        let isDay: Bool? = symbol.hasSuffix("_night") ? false : nil
+        let description: String
+        let icon: String
+        switch symbol.split(separator: "_", maxSplits: 1, omittingEmptySubsequences: false)[0] {
+        case "clearsky": return WeatherCondition(code: 0, isDay: isDay)
+        case "fair": return WeatherCondition(code: 1, isDay: isDay)
+        case "partlycloudy": return WeatherCondition(code: 2, isDay: isDay)
+        case "cloudy": return WeatherCondition(code: 3, isDay: isDay)
+        case "fog": return WeatherCondition(code: 45, isDay: isDay)
+        case "lightrain": (description, icon) = ("小雨", "cloud.drizzle.fill")
+        case "rain": (description, icon) = ("雨", "cloud.rain.fill")
+        case "heavyrain": (description, icon) = ("大雨", "cloud.heavyrain.fill")
+        case "lightrainshowers": (description, icon) = ("小阵雨", "cloud.drizzle.fill")
+        case "rainshowers": (description, icon) = ("阵雨", "cloud.rain.fill")
+        case "heavyrainshowers": (description, icon) = ("强阵雨", "cloud.heavyrain.fill")
+        case "lightsnow": (description, icon) = ("小雪", "snowflake")
+        case "snow": (description, icon) = ("雪", "cloud.snow.fill")
+        case "heavysnow": (description, icon) = ("大雪", "cloud.snow.fill")
+        case "lightsnowshowers": (description, icon) = ("小阵雪", "snowflake")
+        case "snowshowers": (description, icon) = ("阵雪", "cloud.snow.fill")
+        case "heavysnowshowers": (description, icon) = ("强阵雪", "cloud.snow.fill")
+        case "lightsleet": (description, icon) = ("小雨夹雪", "cloud.sleet.fill")
+        case "sleet": (description, icon) = ("雨夹雪", "cloud.sleet.fill")
+        case "heavysleet": (description, icon) = ("强雨夹雪", "cloud.sleet.fill")
+        case "lightsleetshowers": (description, icon) = ("小阵性雨夹雪", "cloud.sleet.fill")
+        case "sleetshowers": (description, icon) = ("阵性雨夹雪", "cloud.sleet.fill")
+        case "heavysleetshowers": (description, icon) = ("强阵性雨夹雪", "cloud.sleet.fill")
+        case "lightrainandthunder": (description, icon) = ("小雨伴雷电", "cloud.bolt.rain.fill")
+        case "rainandthunder": (description, icon) = ("雨伴雷电", "cloud.bolt.rain.fill")
+        case "heavyrainandthunder": (description, icon) = ("大雨伴雷电", "cloud.bolt.rain.fill")
+        case "lightrainshowersandthunder": (description, icon) = ("小阵雨伴雷电", "cloud.bolt.rain.fill")
+        case "rainshowersandthunder": (description, icon) = ("阵雨伴雷电", "cloud.bolt.rain.fill")
+        case "heavyrainshowersandthunder": (description, icon) = ("强阵雨伴雷电", "cloud.bolt.rain.fill")
+        case "lightsnowandthunder": (description, icon) = ("小雪伴雷电", "cloud.bolt.fill")
+        case "snowandthunder": (description, icon) = ("雪伴雷电", "cloud.bolt.fill")
+        case "heavysnowandthunder": (description, icon) = ("大雪伴雷电", "cloud.bolt.fill")
+        case "lightssnowshowersandthunder": (description, icon) = ("小阵雪伴雷电", "cloud.bolt.fill")
+        case "snowshowersandthunder": (description, icon) = ("阵雪伴雷电", "cloud.bolt.fill")
+        case "heavysnowshowersandthunder": (description, icon) = ("强阵雪伴雷电", "cloud.bolt.fill")
+        case "lightsleetandthunder": (description, icon) = ("小雨夹雪伴雷电", "cloud.bolt.fill")
+        case "sleetandthunder": (description, icon) = ("雨夹雪伴雷电", "cloud.bolt.fill")
+        case "heavysleetandthunder": (description, icon) = ("强雨夹雪伴雷电", "cloud.bolt.fill")
+        case "lightssleetshowersandthunder": (description, icon) = ("小阵性雨夹雪伴雷电", "cloud.bolt.fill")
+        case "sleetshowersandthunder": (description, icon) = ("阵性雨夹雪伴雷电", "cloud.bolt.fill")
+        case "heavysleetshowersandthunder": (description, icon) = ("强阵性雨夹雪伴雷电", "cloud.bolt.fill")
+        default: return WeatherCondition(code: -1, isDay: isDay)
         }
+        return WeatherCondition(summary: AppLocalization.text(description), symbolName: icon)
     }
 }
 
 private struct ChinaWeatherCurrent: Decodable {
     let temp: String
+    let weather: String?
     let weathercode: String
     let city: String
 }
