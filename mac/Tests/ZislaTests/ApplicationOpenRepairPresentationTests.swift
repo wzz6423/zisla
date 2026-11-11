@@ -299,7 +299,7 @@ struct ApplicationOpenRepairPresentationTests {
         #expect(actions == [.repairAndOpenApp(url)])
     }
 
-    @Test
+    @Test @MainActor
     func helpExplainsTheRealFileTriggersAndTheOnlyAction() throws {
         let groups = try #require(SettingsView.clipboardAssistantExampleGroups[.appCannotOpen])
         let group = try #require(groups.first)
@@ -308,7 +308,7 @@ struct ApplicationOpenRepairPresentationTests {
         #expect(group.instructions.count == 4)
         #expect(group.instructions[0].contains(".app") && group.instructions[0].contains("复制") && group.instructions[0].contains("中转站"))
         #expect(group.instructions[1].contains("解决并打开"))
-        #expect(SettingsView.clipboardAssistantActionTitle(.repairAndOpenApp) == "解决并打开")
+        #expect(SettingsView.clipboardAssistantActionTitle(.repairAndOpenApp, for: .appCannotOpen) == "解决并打开")
         #expect(ClipboardAssistantToastView.actionLabel(.repairAndOpenApp(URL(fileURLWithPath: "/tmp/Example.app"))) == "解决并打开")
     }
 

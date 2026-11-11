@@ -1035,7 +1035,7 @@
 "选中每个cli后的自动更新选项后检测到新版本后自动执行更新；关闭后不再启动新任务，已开始的更新会完成" = "Her CLI yanındaki otomatik güncelleme seçeneği işaretlendiğinde, yeni sürüm bulunduğunda güncelleme otomatik uygulanır; kapatıldığında yeni görev başlatılmaz, başlamış güncellemeler tamamlanır";
 "未找到 Homebrew；请先安装 Homebrew 后再管理推荐工具" = "Homebrew bulunamadı. Önce Homebrew'u yükleyip sonra önerilen araçları yönetin";
 "未找到 LibreOffice；请安装 LibreOffice 后重试" = "LibreOffice bulunamadı. LibreOffice'i yükleyip yeniden deneyin";
-"未找到可用的 yt-dlp。请在 设置 → 下载 → 组件 中一键安装后重试。" = "Kullanılabilir yt-dlp bulunamadı. Ayarlar → İndirmeler → Bileşenler bölümünden yükleyip yeniden deneyin.";
+"未找到可用的 yt-dlp。请在 设置 → 依赖组件 → 组件 中一键安装后重试。" = "Kullanılabilir yt-dlp bulunamadı. Ayarlar → Gerekli bileşenler → Bileşenler bölümünden yükleyip yeniden deneyin.";
 "选中的识别文本和原始录音文件都会被删除，但累计统计数据（总字词、时长等）会保留。此操作无法撤销。" = "Seçili tanıma metinleri ve özgün ses kayıtları silinir, ancak toplam istatistikler (toplam sözcük, süre vb.) korunur. Bu işlem geri alınamaz.";
 "本机保存的识别文本和原始录音文件都会被删除，但累计统计数据（总字词、时长等）会保留。此操作无法撤销。" = "Bu Mac'te saklanan tanıma metinleri ve özgün ses kayıtları silinir, ancak toplam istatistikler (toplam sözcük, süre vb.) korunur. Bu işlem geri alınamaz.";
 "缺少子命令。可用：update/finish/remove/clear/list/usage/notify/message/help" = "Alt komut eksik. Kullanılabilir: update/finish/remove/clear/list/usage/notify/message/help";
@@ -2476,6 +2476,11 @@
 "2026.10.28往前15天" = "2026.10.28'den 15 gün önce";
 "日期间隔" = "Tarih Aralığı";
 "跨时区时间" = "Saat Dilimleri Arası Zaman";
+"会议 2026-11-20 14:30-15:30" = "Toplantı 2026-11-20 14:30-15:30";
+"Hello! How are you today?" = "Hello! How are you today?";
+"这是一段普通文本，可以搜索或保存。" = "Aranacak veya kaydedilecek düz metin.";
+"例如：复制截图或浏览器中的图片" = "Örnek: Bir ekran görüntüsünü veya tarayıcıdaki bir resmi kopyalayın";
+"例如：在 Finder 中选中文件后按 ⌘C" = "Örnek: Finder’da bir dosya seçip ⌘C tuşlarına basın";
 "汇率获取失败" = "Döviz kuru alınamadı";
 "闹钟通知未获允许，请在系统设置中开启通知。" = "Alarm bildirimlerine izin verilmemiş. Sistem Ayarları’ndan bildirimleri açın.";
 "闹钟通知声音已关闭，请在系统设置中开启声音。" = "Alarm bildirim sesleri kapalı. Sistem Ayarları’ndan sesleri açın.";
@@ -3343,7 +3348,8 @@
 "全部（包含需人工复核）" = "Tümü (incelenmesi gerekenler dahil)";
 "默认保存位置" = "Varsayılan Kayıt Konumları";
 "分别设置各类内容的默认保存位置。" = "Her içerik türü için varsayılan kayıt konumunu ayarlayın.";
-"管理下载所需组件。" = "İndirmeler için gereken bileşenleri yönetin.";
+"依赖组件" = "Gerekli bileşenler";
+"管理下载与文档转换所需组件。" = "İndirmeler ve belge dönüştürme için gereken bileşenleri yönetin.";
 "更改 %@ 的保存位置" = "%@ için kayıt konumunu değiştir";
 
 "本地优先的原生笔记应用" = "Yerel depolamayı önceliklendiren platforma özgü not uygulaması";
@@ -3377,3 +3383,8 @@
 "系统打不开应用时提醒" = "macOS Bir Uygulamayı Açamadığında Bildir";
 "需要辅助功能权限；通过系统窗口事件提醒，不定时扫描" = "Erişilebilirlik izni gerekir; düzenli tarama yapmadan sistem pencere olaylarını kullanır";
 "4. 可开启“系统打不开应用时提醒”；无法确定应用路径时，请复制或拖入 .app。" = "4. “macOS Bir Uygulamayı Açamadığında Bildir” seçeneğini açabilirsiniz. Yol belirlenemiyorsa .app dosyasını kopyalayın veya Rafa sürükleyin.";
+"灵动岛功能顺序" = "Dynamic Island özellik sırası";
+
+"查询航班" = "Uçuş sorgula";
+"查询火车" = "Tren sorgula";
+"查询快递" = "Kargo takip et";

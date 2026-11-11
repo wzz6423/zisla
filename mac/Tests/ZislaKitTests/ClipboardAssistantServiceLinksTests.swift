@@ -6,6 +6,56 @@ import ZislaCore
 struct ClipboardAssistantServiceLinksTests {
     let now = Date(timeIntervalSince1970: 1_790_006_400)
 
+    @Test(arguments: [
+        ("CA1234", ClipboardAssistantKind.flight, "CA1234", ClipboardAssistantService.flightAware),
+        ("UA123", .flight, "UA123", .flightAware),
+        ("G123", .train, "G123", .railway12306),
+        ("ICE 123", .train, "Deutsche Bahn ICE 123", .deutscheBahn),
+        ("TGV 6123", .train, "SNCF TGV 6123", .sncf),
+        ("Amtrak 171", .train, "AMTRAK 171", .amtrak),
+        ("SF1234567890123", .tracking, "SF1234567890123", .kuaidi100),
+        ("UPS 1Z999AA10123456784", .tracking, "1Z999AA10123456784", .track17),
+    ])
+    func specializedLookupsAndOrdinarySearchAreIndependent(
+        _ text: String, _ kind: ClipboardAssistantKind, _ search: String, _ service: ClipboardAssistantService
+    ) throws {
+        let result = try #require(detect(text))
+        #expect(result.kind == kind)
+        let url = try #require(serviceURL(result, service))
+        let lookup = ClipboardAssistantAction.openService(service: service, url: url)
+        #expect(result.actions.contains(.search(search)))
+        let ordered = ClipboardAssistantActionOrder.ordered(result.actions, for: kind,
+            using: FeatureSettings.default.clipboardAssistantActionOrders)
+        #expect(ordered.first == lookup)
+        #expect(Set(ordered.map(\.identifier)).count == ordered.count)
+
+        let searchFirst = ClipboardAssistantActionOrder.ordered(result.actions, for: kind, using: [kind: [.search]])
+        #expect(searchFirst.first == .search(search))
+        #expect(searchFirst.contains(lookup))
+        let searchURL = try #require(ClipboardAssistantSearchEngine.bing.queryURL(for: search))
+        #expect(searchURL.host == "www.bing.com")
+        #expect(query(searchURL, "q") == search)
+    }
+
+    /// Unmapped flights need one fallback search while still allowing an available Umetrip lookup to lead.
+    @Test func flightsWithoutAnICAOMappingRetainASingleSearchAction() throws {
+        for (text, country, number) in [("LA1234", "BR", "LA1234"), ("Flight ZZ123", "US", "ZZ123"),
+                                        ("航班 ZZ123", "CN", "ZZ123")] {
+            let result = try #require(ClipboardAssistantDetector.smartActionDetection(text, enabledKinds: [.flight],
+                countryCode: country, now: now, timeZone: TimeZone(secondsFromGMT: 0)!))
+            #expect(result.actions.filter { $0 == .search(number) }.count == 1)
+            #expect(Set(result.actions.map(\.identifier)).count == result.actions.count)
+            let ordered = ClipboardAssistantActionOrder.ordered(result.actions, for: .flight,
+                using: FeatureSettings.default.clipboardAssistantActionOrders)
+            if country == "CN" {
+                let url = try #require(serviceURL(result, .umetrip))
+                #expect(ordered.first == .openService(service: .umetrip, url: url))
+            } else {
+                #expect(ordered.first == .search(number))
+            }
+        }
+    }
+
     @Test func baiduUsesTheDocumentedKeywordSearch() throws {
         let address = "北京市海淀区中关村大街27号"
         let result = try #require(detect(address))
@@ -78,11 +128,11 @@ struct ClipboardAssistantServiceLinksTests {
         }
     }
 
-    @Test func legacyDefaultsPromoteSearchWithoutOverwritingCustomPriorities() {
+    @Test func legacyDefaultsPromoteServiceLookupsWithoutOverwritingCustomPriorities() {
         let oldDefault: [ClipboardAssistantActionKind] = [.openURL, .copyText, .addToQuickNote, .share]
         let migrated = ClipboardAssistantActionOrder.normalized([.flight: oldDefault, .train: oldDefault])
-        #expect(migrated[.train]?.first == .search)
-        #expect(migrated[.flight]?.first == .search)
+        #expect(migrated[.train]?.first == .openURL)
+        #expect(migrated[.flight]?.first == .openURL)
         let custom: [ClipboardAssistantActionKind] = [.copyText, .openURL, .addToQuickNote, .share]
         let preserved = ClipboardAssistantActionOrder.normalized([.flight: custom, .train: custom])
         #expect(preserved[.train]?.first == .copyText)
@@ -106,7 +156,7 @@ struct ClipboardAssistantServiceLinksTests {
     }
 
     private func detect(_ text: String) -> ClipboardAssistantDetection? {
-        ClipboardAssistantDetector.smartActionDetection(text, enabledKinds: [.address, .flight, .train],
+        ClipboardAssistantDetector.smartActionDetection(text, enabledKinds: [.address, .flight, .train, .tracking],
             countryCode: "CN", now: now, timeZone: TimeZone(secondsFromGMT: 0)!)
     }
 
