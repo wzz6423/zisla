@@ -3362,6 +3362,7 @@
 "保存手写备忘录需要辅助功能权限" = "Cần quyền Trợ năng để lưu ghi chú viết tay";
 "备忘录内容已变化，请重新打开后编辑" = "Ghi chú đã thay đổi. Mở lại trước khi chỉnh sửa";
 "无法保存手写备忘录的文本，请在备忘录中打开后重试" = "Không thể lưu văn bản trong ghi chú viết tay. Mở trong Ghi chú rồi thử lại";
+"保留 HDR" = "Giữ HDR";
 "小雨" = "Mưa nhẹ";
 "中雨" = "Mưa vừa";
 "大雨" = "Mưa lớn";
@@ -3564,3 +3565,10 @@
 "音频备注" = "Ghi chú âm thanh";
 "全部标记为已读" = "Đánh dấu tất cả là đã đọc";
 "已将全部邮件标记为已读" = "Đã đánh dấu tất cả thư là đã đọc";
+
+"自动滚动" = "Cuộn tự động";
+"暂停滚动" = "Tạm dừng cuộn";
+"正在自动滚动并拼接" = "Đang cuộn và ghép tự động";
+"自动滚动已暂停，可手动滚动或点击“完成”" = "Đã tạm dừng cuộn tự động. Cuộn thủ công hoặc nhấp Xong";
+"自动滚动需要在系统设置中允许辅助功能" = "Cho phép Trợ năng trong Cài đặt hệ thống để cuộn tự động";
+"无法自动滚动，请手动滚动页面" = "Không thể cuộn tự động. Hãy cuộn trang thủ công";

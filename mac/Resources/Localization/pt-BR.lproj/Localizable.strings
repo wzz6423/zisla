@@ -3362,6 +3362,7 @@
 "保存手写备忘录需要辅助功能权限" = "É necessário acesso à acessibilidade para salvar notas manuscritas";
 "备忘录内容已变化，请重新打开后编辑" = "A nota foi alterada. Abra-a novamente antes de editar";
 "无法保存手写备忘录的文本，请在备忘录中打开后重试" = "Não foi possível salvar o texto da nota manuscrita. Abra-a no Notas e tente novamente";
+"保留 HDR" = "Preservar HDR";
 "小雨" = "Chuva fraca";
 "中雨" = "Chuva moderada";
 "大雨" = "Chuva forte";
@@ -3564,3 +3565,10 @@
 "音频备注" = "Comentário do áudio";
 "全部标记为已读" = "Marcar tudo como lido";
 "已将全部邮件标记为已读" = "Todas as mensagens foram marcadas como lidas";
+
+"自动滚动" = "Rolagem automática";
+"暂停滚动" = "Pausar rolagem";
+"正在自动滚动并拼接" = "Rolando e unindo automaticamente";
+"自动滚动已暂停，可手动滚动或点击“完成”" = "Rolagem automática pausada. Role manualmente ou clique em Concluído";
+"自动滚动需要在系统设置中允许辅助功能" = "Permita Acessibilidade nos Ajustes do Sistema para rolar automaticamente";
+"无法自动滚动，请手动滚动页面" = "Não foi possível rolar automaticamente. Role a página manualmente";

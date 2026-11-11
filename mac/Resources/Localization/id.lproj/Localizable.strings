@@ -3362,6 +3362,7 @@
 "保存手写备忘录需要辅助功能权限" = "Akses Aksesibilitas diperlukan untuk menyimpan catatan tulisan tangan";
 "备忘录内容已变化，请重新打开后编辑" = "Catatan telah berubah. Buka kembali sebelum mengedit";
 "无法保存手写备忘录的文本，请在备忘录中打开后重试" = "Teks dalam catatan tulisan tangan tidak dapat disimpan. Buka di Catatan dan coba lagi";
+"保留 HDR" = "Pertahankan HDR";
 "小雨" = "Hujan ringan";
 "中雨" = "Hujan sedang";
 "大雨" = "Hujan lebat";
@@ -3564,3 +3565,10 @@
 "音频备注" = "Komentar audio";
 "全部标记为已读" = "Tandai semua sudah dibaca";
 "已将全部邮件标记为已读" = "Semua pesan telah ditandai sudah dibaca";
+
+"自动滚动" = "Gulir otomatis";
+"暂停滚动" = "Jeda pengguliran";
+"正在自动滚动并拼接" = "Menggulir dan menggabungkan secara otomatis";
+"自动滚动已暂停，可手动滚动或点击“完成”" = "Pengguliran otomatis dijeda. Gulir manual atau klik Selesai";
+"自动滚动需要在系统设置中允许辅助功能" = "Izinkan Aksesibilitas di Pengaturan Sistem untuk menggulir otomatis";
+"无法自动滚动，请手动滚动页面" = "Tidak dapat menggulir otomatis. Gulir halaman secara manual";
