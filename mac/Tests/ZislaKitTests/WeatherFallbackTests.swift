@@ -223,7 +223,7 @@ struct WeatherFallbackTests {
     func chineseCurrentIconDoesNotInferDaylightFromItsUnreliablePrefix(code: String) throws {
         let payload = Data(String(decoding: Self.china, as: UTF8.self).replacingOccurrences(of: "n01", with: code).utf8)
         let snapshot = try WeatherForecastDecoder.chinaWeather(payload, stationID: "101020100", coordinate: coordinate, locationName: "上海")
-        #expect(snapshot.condition.symbolName == (code.hasSuffix("00") ? "sparkles" : "cloud.fill"))
+        #expect(snapshot.condition.symbolName == (code.hasSuffix("00") ? "sun.max.fill" : "cloud.fill"))
     }
 
     @Test

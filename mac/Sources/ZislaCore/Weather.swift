@@ -63,10 +63,10 @@ public struct WeatherCondition: Equatable, Sendable {
         switch code {
         case 0:
             summary = AppLocalization.text("晴")
-            symbolName = isDay.map { $0 ? "sun.max.fill" : "moon.stars.fill" } ?? "sparkles"
+            symbolName = isDay.map { $0 ? "sun.max.fill" : "moon.stars.fill" } ?? "sun.max.fill"
         case 1:
             summary = AppLocalization.text("晴间少云")
-            symbolName = isDay.map { $0 ? "sun.max.fill" : "moon.fill" } ?? "sparkles"
+            symbolName = isDay.map { $0 ? "sun.max.fill" : "moon.fill" } ?? "sun.max.fill"
         case 2:
             summary = AppLocalization.text("多云")
             symbolName = isDay.map { $0 ? "cloud.sun.fill" : "cloud.moon.fill" } ?? "cloud.fill"
