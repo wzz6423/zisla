@@ -140,8 +140,10 @@ let package = Package(
                     "-Xlinker", "14.0",
                     "-Xlinker", linkedSDKVersion,
                 ]),
-            ]
+            ],
+            plugins: [.plugin(name: "RecordingPortraitKernels")]
         ),
+        .plugin(name: "RecordingPortraitKernels", capability: .buildTool()),
         .executableTarget(
             name: "zislactl",
             dependencies: ["ZislaCore"]

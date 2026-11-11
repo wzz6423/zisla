@@ -465,7 +465,7 @@ struct RichNoteEditorTests {
                 ("<p>首行<br><br></p><p><span>次行 &amp; 👩‍💻</span></p>", "首行\n\n次行 & 👩‍💻"),
                 ("<div>首行<div>次行</div>末行</div>", "首行\n次行\n末行"),
             ] {
-                let markup = String(decoding: try JSONSerialization.data(withJSONObject: html, options: [.fragmentsAllowed]), as: UTF8.self)
+                let markup = try javaScriptStringLiteral(html)
                 _ = try await webView.evaluateJavaScript("""
                     (() => {
                       const field = document.querySelectorAll('[data-zisla-native-text]')[1];
@@ -1449,8 +1449,13 @@ struct RichNoteEditorTests {
         try await body(webView, edits.stream)
     }
 
+    private func javaScriptStringLiteral(_ value: String) throws -> String {
+        let data = try JSONSerialization.data(withJSONObject: value, options: [.fragmentsAllowed])
+        return try #require(String(data: data, encoding: .utf8))
+    }
+
     private func insertAtNativeSuffixEnd(_ text: String, in webView: WKWebView) async throws {
-        let value = String(decoding: try JSONSerialization.data(withJSONObject: text, options: [.fragmentsAllowed]), as: UTF8.self)
+        let value = try javaScriptStringLiteral(text)
         _ = try await webView.evaluateJavaScript("""
             (() => {
               const field = document.querySelectorAll('[data-zisla-native-text]')[1]; field.focus();

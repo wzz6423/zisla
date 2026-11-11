@@ -717,6 +717,20 @@ public enum IslandModuleOrder: String, Codable, CaseIterable, Sendable, Equatabl
     }
 }
 
+public enum BatteryPowerMode: Int, Codable, CaseIterable, Sendable {
+    case automatic = 0
+    case lowPower = 1
+    case highPower = 2
+
+    public var menuTitle: String {
+        switch self {
+        case .automatic: "自动"
+        case .lowPower: "省电"
+        case .highPower: "高性能"
+        }
+    }
+}
+
 public struct FeatureSettings: Codable, Equatable, Sendable {
     public var mediaEnabled: Bool
     public var mediaSource: MediaSourcePreference
@@ -739,6 +753,11 @@ public struct FeatureSettings: Codable, Equatable, Sendable {
     public var systemMonitorEnabled: Bool
     public var systemCleanupPolicy: VoiceRecordingCleanupPolicy
     public var systemCleanupScope: SystemCleanupScope
+    public var trashCleanupPolicy: VoiceRecordingCleanupPolicy
+    public var automaticPowerModeEnabled: Bool
+    public var powerAdapterDefaultMode: BatteryPowerMode
+    public var batteryDefaultMode: BatteryPowerMode
+    public var lowBatteryPowerModeEnabled: Bool
     /// When enabled, System Monitor appends one sample per minute to a local history that the history window charts and can export as a spreadsheet.
     public var systemMetricsHistoryEnabled: Bool
     public var dailyBriefing: DailyBriefingSettings
@@ -952,6 +971,11 @@ public struct FeatureSettings: Codable, Equatable, Sendable {
         systemMonitorEnabled: Bool = true,
         systemCleanupPolicy: VoiceRecordingCleanupPolicy = .never,
         systemCleanupScope: SystemCleanupScope = .trustedOnly,
+        trashCleanupPolicy: VoiceRecordingCleanupPolicy = .never,
+        automaticPowerModeEnabled: Bool = false,
+        powerAdapterDefaultMode: BatteryPowerMode = .automatic,
+        batteryDefaultMode: BatteryPowerMode = .lowPower,
+        lowBatteryPowerModeEnabled: Bool = true,
         systemMetricsHistoryEnabled: Bool = true,
         dailyBriefing: DailyBriefingSettings = DailyBriefingSettings(),
         systemBackgroundSoundEnabled: Bool = false,
@@ -1078,6 +1102,11 @@ public struct FeatureSettings: Codable, Equatable, Sendable {
         self.systemMonitorEnabled = systemMonitorEnabled
         self.systemCleanupPolicy = systemCleanupPolicy
         self.systemCleanupScope = systemCleanupScope
+        self.trashCleanupPolicy = trashCleanupPolicy
+        self.automaticPowerModeEnabled = automaticPowerModeEnabled
+        self.powerAdapterDefaultMode = powerAdapterDefaultMode
+        self.batteryDefaultMode = batteryDefaultMode
+        self.lowBatteryPowerModeEnabled = lowBatteryPowerModeEnabled
         self.systemMetricsHistoryEnabled = systemMetricsHistoryEnabled
         self.dailyBriefing = dailyBriefing
         self.systemBackgroundSoundEnabled = systemBackgroundSoundEnabled
@@ -1253,6 +1282,11 @@ public struct FeatureSettings: Codable, Equatable, Sendable {
         case systemMonitorEnabled
         case systemCleanupPolicy
         case systemCleanupScope
+        case trashCleanupPolicy
+        case automaticPowerModeEnabled
+        case powerAdapterDefaultMode
+        case batteryDefaultMode
+        case lowBatteryPowerModeEnabled
         case systemMetricsHistoryEnabled
         case dailyBriefing
         case systemBackgroundSoundEnabled
@@ -1407,6 +1441,21 @@ public struct FeatureSettings: Codable, Equatable, Sendable {
         systemCleanupScope = try container.decodeIfPresent(
             SystemCleanupScope.self, forKey: .systemCleanupScope
         ) ?? defaults.systemCleanupScope
+        trashCleanupPolicy = try container.decodeIfPresent(
+            VoiceRecordingCleanupPolicy.self, forKey: .trashCleanupPolicy
+        ) ?? defaults.trashCleanupPolicy
+        automaticPowerModeEnabled = try container.decodeIfPresent(
+            Bool.self, forKey: .automaticPowerModeEnabled
+        ) ?? defaults.automaticPowerModeEnabled
+        powerAdapterDefaultMode = try container.decodeIfPresent(
+            BatteryPowerMode.self, forKey: .powerAdapterDefaultMode
+        ) ?? defaults.powerAdapterDefaultMode
+        batteryDefaultMode = try container.decodeIfPresent(
+            BatteryPowerMode.self, forKey: .batteryDefaultMode
+        ) ?? defaults.batteryDefaultMode
+        lowBatteryPowerModeEnabled = try container.decodeIfPresent(
+            Bool.self, forKey: .lowBatteryPowerModeEnabled
+        ) ?? defaults.lowBatteryPowerModeEnabled
         systemMetricsHistoryEnabled = try container.decodeIfPresent(
             Bool.self,
             forKey: .systemMetricsHistoryEnabled

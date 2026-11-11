@@ -227,6 +227,53 @@ struct AudioProcessingIntegrationTests {
         #expect(abs(try await fixture.service.inspect(output).duration - 3) <= 1.0 / 48_000)
     }
 
+    @Test(arguments: [0.01, 0.25, 0.399, 0.5, 2.9], [44_100.0, 48_000.0])
+    func normalizationKeepsShortAudibleClipsAtTheirOriginalDuration(duration: Double, sampleRate: Double) async throws {
+        let fixture = try AudioIntegrationFixture()
+        defer { fixture.clean() }
+        let input = fixture.root.appendingPathComponent("short-tone.wav")
+        try fixture.write(input, duration: duration, sampleRate: sampleRate, values: [0.01], frequency: 440)
+        let source = try Data(contentsOf: input)
+        let summary = try await fixture.service.inspect(input)
+        var options = AudioProcessingOptions()
+        options.format = .wav
+        options.targetLoudness = -16
+        let output = fixture.root.appendingPathComponent("normalized.wav")
+        _ = try await fixture.service.process(.init(operation: .normalize, inputURLs: [input], options: options), outputURL: output)
+        #expect(abs(try await fixture.service.inspect(output).duration - summary.duration) <= 1.0 / 48_000)
+        let integrated = try await fixture.repeatedLoudness(output)
+        #expect(abs(integrated - options.targetLoudness) < 0.6,
+                "The audible \(duration)-second clip must normalize instead of passing through as silence")
+        #expect(try Data(contentsOf: input) == source)
+        #expect(try FileManager.default.contentsOfDirectory(atPath: fixture.root.path).allSatisfy { !$0.hasPrefix(".zisla-audio-") })
+    }
+
+    @Test
+    func normalizationProcessesAudioWithLargeMultilineMetadata() async throws {
+        let fixture = try AudioIntegrationFixture()
+        defer { fixture.clean() }
+        let tone = fixture.root.appendingPathComponent("tone.wav")
+        try fixture.write(tone, duration: 4, sampleRate: 48_000, values: [0.01], frequency: 440)
+        let input = fixture.root.appendingPathComponent("large-tags.wav")
+        let tools = try AudioProcessingService.resolveTools()
+        let tagged = try await AudioProcessingService.runProcess(tools.ffmpeg, [
+            "-v", "error", "-nostdin", "-i", tone.path, "-c:a", "copy",
+            "-metadata", "comment=" + String(repeating: "Long metadata line\n", count: 1_000), input.path,
+        ])
+        #expect(tagged.status == 0, "Metadata fixture failed: \(tagged.standardError)")
+        let source = try Data(contentsOf: input)
+        var options = AudioProcessingOptions()
+        options.format = .wav
+        options.targetLoudness = -16
+        let output = fixture.root.appendingPathComponent("normalized.wav")
+        _ = try await fixture.service.process(.init(operation: .normalize, inputURLs: [input], options: options), outputURL: output)
+        #expect(abs(try await fixture.service.inspect(output).duration - 4) <= 1.0 / 48_000)
+        let integrated = try await fixture.repeatedLoudness(output)
+        #expect(abs(integrated - options.targetLoudness) < 0.6, "Long input tags must not discard the final loudness measurement")
+        #expect(try Data(contentsOf: input) == source)
+        #expect(try FileManager.default.contentsOfDirectory(atPath: fixture.root.path).allSatisfy { !$0.hasPrefix(".zisla-audio-") })
+    }
+
     @Test(arguments: [0.0, 1.0])
     func removalAtEitherBoundaryDoesNotLoseRemainingAudio(start: Double) async throws {
         let fixture = try AudioIntegrationFixture()
@@ -256,7 +303,7 @@ private struct AudioIntegrationFixture {
 
     func clean() { try? FileManager.default.removeItem(at: root) }
 
-    func write(_ url: URL, duration: Double, sampleRate: Double, values: [Float], silence: Bool = false) throws {
+    func write(_ url: URL, duration: Double, sampleRate: Double, values: [Float], silence: Bool = false, frequency: Double? = nil) throws {
         let format = try #require(AVAudioFormat(standardFormatWithSampleRate: sampleRate, channels: UInt32(values.count)))
         let buffer = try #require(AVAudioPCMBuffer(pcmFormat: format, frameCapacity: UInt32(duration * sampleRate)))
         buffer.frameLength = buffer.frameCapacity
@@ -265,11 +312,24 @@ private struct AudioIntegrationFixture {
             for index in 0..<Int(buffer.frameLength) {
                 let time = Double(index) / sampleRate
                 let isSilent = silence && (time < 0.3 || (time > 0.8 && time < 1.2) || time > 1.7)
-                channels[channel][index] = isSilent ? 0 : value
+                channels[channel][index] = isSilent ? 0 : value * Float(frequency.map { sin(2 * .pi * $0 * time) } ?? 1)
             }
         }
         let file = try AVAudioFile(forWriting: url, settings: format.settings)
         try file.write(from: buffer)
+    }
+
+    func repeatedLoudness(_ url: URL) async throws -> Double {
+        let tools = try AudioProcessingService.resolveTools()
+        let result = try await AudioProcessingService.runProcess(tools.ffmpeg, [
+            "-hide_banner", "-nostats", "-nostdin", "-stream_loop", "-1", "-i", url.path, "-t", "3",
+            "-af", "ebur128=peak=true:framelog=verbose", "-f", "null", "-",
+        ])
+        #expect(result.status == 0, "Loudness measurement failed: \(result.standardError)")
+        let expression = try NSRegularExpression(pattern: #"I:\s+(-?\d+(?:\.\d+)?)\s+LUFS"#)
+        let match = try #require(expression.matches(in: result.standardError, range: NSRange(result.standardError.startIndex..., in: result.standardError)).last)
+        let range = try #require(Range(match.range(at: 1), in: result.standardError))
+        return try #require(Double(result.standardError[range]))
     }
 
     func samples(_ url: URL) throws -> [[Float]] {

@@ -85,7 +85,13 @@ public struct AudioProcessingService: Sendable {
             let temporary = staging.appendingPathComponent("\(index).\(request.options.format.fileExtension)")
             var normalization: String?
             if request.operation == .normalize {
+                let summary = summaries[job.inputIndexes[0]]
+                // Repeat short clips for a complete loudness window, then trim the export back to its original samples.
+                let measurementPrefix = summary.duration < 3
+                    ? "aloop=loop=-1:size=\(Int((summary.duration * Double(summary.sampleRate)).rounded())),atrim=duration=3," : ""
                 var measurementArguments = try arguments(request, job: job, summaries: summaries, output: temporary)
+                let filterIndex = measurementArguments.firstIndex(of: "-af")!
+                measurementArguments[filterIndex + 1] = measurementPrefix + measurementArguments[filterIndex + 1]
                 measurementArguments.removeLast(Self.encoding(request.options).count + 1)
                 measurementArguments += ["-loglevel", "info", "-nostats", "-f", "null", "-"]
                 let measurement = try await run(tools.ffmpeg, measurementArguments)
@@ -96,7 +102,7 @@ public struct AudioProcessingService: Sendable {
                       start.lowerBound < end.upperBound,
                       let values = try? JSONDecoder().decode([String: String].self, from: Data(measurement.standardError[start.lowerBound..<end.upperBound].utf8))
                 else { throw AudioProcessingError.noAudio(request.inputURLs[0]) }
-                if values["input_i"] == "-inf" {
+                if values["input_i"] == "-inf" && values["input_tp"] == "-inf" {
                     normalization = "anull"
                 } else {
                     let keys = ["input_i", "input_tp", "input_lra", "input_thresh", "target_offset"]
@@ -104,9 +110,13 @@ public struct AudioProcessingService: Sendable {
                     guard numbers.count == keys.count, numbers.allSatisfy(\.isFinite) else {
                         throw AudioProcessingError.noAudio(request.inputURLs[0])
                     }
-                    normalization = "loudnorm=I=\(request.options.targetLoudness):TP=-1.5:LRA=11:measured_I=\(numbers[0]):measured_TP=\(numbers[1]):measured_LRA=\(numbers[2]):measured_thresh=\(numbers[3]):offset=\(numbers[4]):linear=true"
+                    normalization = measurementPrefix + "loudnorm=I=\(request.options.targetLoudness):TP=-1.5:LRA=11:measured_I=\(numbers[0]):measured_TP=\(numbers[1]):measured_LRA=\(numbers[2]):measured_thresh=\(numbers[3]):offset=\(numbers[4]):linear=true"
                     // Limit after the final resample, which can overshoot loudnorm's true-peak ceiling.
                     normalization! += ",aresample=\(request.options.sampleRate),alimiter=limit=\(pow(10, -1.6 / 20)):level=0:latency=1"
+                    if summary.duration < 3 {
+                        let outputFrames = Int((summary.duration * Double(request.options.sampleRate)).rounded())
+                        normalization! += ",atrim=end_sample=\(outputFrames),asetpts=N/SR/TB"
+                    }
                 }
             }
             let result = try await run(tools.ffmpeg, arguments(request, job: job, summaries: summaries, output: temporary, normalization: normalization))
@@ -135,7 +145,7 @@ public struct AudioProcessingService: Sendable {
         try await AIAgentProcessRunner.run(
             executableURL: executable, arguments: arguments, standardInput: Data(),
             environment: ProcessInfo.processInfo.environment.filter { !$0.key.hasPrefix("DYLD_") },
-            timeout: nil, maximumOutputBytes: 65_536, maximumErrorBytes: 8_192
+            timeout: nil, maximumOutputBytes: 65_536, maximumErrorBytes: 4_096, maximumErrorTailBytes: 4_096
         )
     }
 

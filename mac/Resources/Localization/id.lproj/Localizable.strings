@@ -312,7 +312,7 @@
 "可安全清理的缓存与日志当前为空" = "Cache dan log yang dapat dibersihkan dengan aman saat ini kosong";
 "展开" = "Perluas";
 "移入废纸篓" = "Pindah ke Sampah";
-"zisla 不会永久删除这些内容。" = "zisla tidak akan menghapus item ini secara permanen.";
+"本次操作将项目移入废纸篓；废纸篓之后可能被清空，届时将永久删除。" = "Tindakan ini memindahkan item ke Sampah. Jika Sampah dikosongkan kemudian, item akan dihapus secara permanen.";
 
 /* Cleanup Categories */
 "应用缓存" = "Cache Aplikasi";
@@ -511,6 +511,8 @@
 "电池功率" = "Daya baterai";
 "本机 Mac" = "Mac Ini";
 "已充满" = "Terisi penuh";
+"立即充至100%" = "Isi daya hingga 100% sekarang";
+"无法立即充至100%，请重试。" = "Tidak dapat mengisi daya hingga 100% sekarang. Coba lagi.";
 "充电中" = "Mengisi daya";
 "电源已接通" = "Daya tersambung";
 "使用电池" = "Menggunakan baterai";
@@ -2321,7 +2323,7 @@
 "%ld 核" = "%ld inti";
 "%ld 核 · " = "%ld inti · ";
 "已整理系统内存 %@" = "Memori sistem %@ dipadatkan";
-"其中 %ld 项需人工复核。zisla 不会永久删除这些内容。" = "%ld di antaranya perlu diperiksa manual. zisla tidak pernah menghapusnya secara permanen.";
+"其中 %ld 项需人工复核。本次操作将项目移入废纸篓；废纸篓之后可能被清空，届时将永久删除。" = "%ld di antaranya perlu diperiksa manual. Tindakan ini memindahkan item ke Sampah. Jika Sampah dikosongkan kemudian, item akan dihapus secara permanen.";
 "取消选择%@" = "Batalkan pilihan %@";
 "全选%@" = "Pilih semua di %@";
 "反选%@" = "Balik pilihan di %@";
@@ -3342,7 +3344,7 @@
 "麦克风监听已关闭：%@" = "Pemantauan mikrofon dinonaktifkan: %@";
 
 "自动清理系统垃圾" = "Bersihkan sampah sistem secara otomatis";
-"按所选间隔移入废纸篓，不会永久删除" = "Pindahkan item ke Sampah sesuai interval yang dipilih, tanpa menghapus permanen";
+"按所选间隔移入废纸篓；清空废纸篓后将永久删除" = "Pindahkan item ke Sampah pada interval yang dipilih; mengosongkan Sampah menghapusnya secara permanen";
 "清理范围" = "Cakupan pembersihan";
 "仅可信" = "Hanya item tepercaya";
 "全部（包含需人工复核）" = "Semua (termasuk yang perlu ditinjau)";
@@ -3360,6 +3362,86 @@
 "保存手写备忘录需要辅助功能权限" = "Akses Aksesibilitas diperlukan untuk menyimpan catatan tulisan tangan";
 "备忘录内容已变化，请重新打开后编辑" = "Catatan telah berubah. Buka kembali sebelum mengedit";
 "无法保存手写备忘录的文本，请在备忘录中打开后重试" = "Teks dalam catatan tulisan tangan tidak dapat disimpan. Buka di Catatan dan coba lagi";
+"小雨" = "Hujan ringan";
+"中雨" = "Hujan sedang";
+"大雨" = "Hujan lebat";
+"小雪" = "Salju ringan";
+"中雪" = "Salju sedang";
+"大雪" = "Salju lebat";
+"冻毛毛雨" = "Gerimis membeku";
+"冻雨" = "Hujan membeku";
+"雪粒" = "Butiran salju";
+"小阵雨" = "Hujan singkat ringan";
+"强阵雨" = "Hujan singkat lebat";
+"小阵雪" = "Salju singkat ringan";
+"强阵雪" = "Salju singkat lebat";
+"强雷阵雨" = "Badai petir kuat";
+"雨夹雪" = "Hujan bercampur salju";
+"小雨夹雪" = "Hujan ringan bercampur salju";
+"强雨夹雪" = "Hujan lebat bercampur salju";
+"阵性雨夹雪" = "Hujan singkat bercampur salju";
+"小阵性雨夹雪" = "Hujan singkat ringan bercampur salju";
+"强阵性雨夹雪" = "Hujan singkat lebat bercampur salju";
+"暴雨" = "Hujan sangat lebat";
+"大暴雨" = "Hujan sangat lebat parah";
+"特大暴雨" = "Hujan sangat lebat ekstrem";
+"暴雪" = "Badai salju";
+"小到中雨" = "Hujan ringan hingga sedang";
+"中到大雨" = "Hujan sedang hingga lebat";
+"大到暴雨" = "Hujan lebat hingga sangat lebat";
+"暴雨到大暴雨" = "Hujan sangat lebat hingga parah";
+"大暴雨到特大暴雨" = "Hujan sangat lebat parah hingga ekstrem";
+"小到中雪" = "Salju ringan hingga sedang";
+"中到大雪" = "Salju sedang hingga lebat";
+"大到暴雪" = "Salju lebat hingga badai salju";
+"浓雾" = "Kabut tebal";
+"强浓雾" = "Kabut sangat tebal";
+"大雾" = "Kabut pekat";
+"特强浓雾" = "Kabut amat pekat";
+"霾" = "Kabut asap";
+"中度霾" = "Kabut asap sedang";
+"重度霾" = "Kabut asap tebal";
+"严重霾" = "Kabut asap parah";
+"沙尘暴" = "Badai debu";
+"浮尘" = "Debu melayang";
+"扬沙" = "Pasir tertiup angin";
+"强沙尘暴" = "Badai debu parah";
+"雨伴雷电" = "Hujan disertai guntur";
+"小雨伴雷电" = "Hujan ringan disertai guntur";
+"大雨伴雷电" = "Hujan lebat disertai guntur";
+"阵雨伴雷电" = "Hujan sesaat disertai guntur";
+"小阵雨伴雷电" = "Hujan singkat ringan disertai guntur";
+"强阵雨伴雷电" = "Hujan singkat lebat disertai guntur";
+"雪伴雷电" = "Salju disertai guntur";
+"小雪伴雷电" = "Salju ringan disertai guntur";
+"大雪伴雷电" = "Salju lebat disertai guntur";
+"阵雪伴雷电" = "Salju sesaat disertai guntur";
+"小阵雪伴雷电" = "Salju singkat ringan disertai guntur";
+"强阵雪伴雷电" = "Salju singkat lebat disertai guntur";
+"雨夹雪伴雷电" = "Hujan bercampur salju disertai guntur";
+"小雨夹雪伴雷电" = "Hujan ringan bercampur salju disertai guntur";
+"强雨夹雪伴雷电" = "Hujan lebat bercampur salju disertai guntur";
+"阵性雨夹雪伴雷电" = "Hujan singkat bercampur salju disertai guntur";
+"小阵性雨夹雪伴雷电" = "Hujan singkat ringan bercampur salju disertai guntur";
+"强阵性雨夹雪伴雷电" = "Hujan singkat lebat bercampur salju disertai guntur";
+"雷阵雨伴有冰雹" = "Hujan badai disertai hujan es";
+
+"管理电源模式与系统垃圾、剪贴板历史和废纸篓的定时清理。" = "Kelola mode daya dan pembersihan terjadwal file sampah sistem, riwayat papan klip, dan Sampah.";
+"定时倾倒废纸篓" = "Kosongkan Sampah secara otomatis";
+"按所选间隔永久删除废纸篓中的所有项目，无法恢复" = "Hapus semua item di Sampah secara permanen pada interval yang dipilih. Tidak dapat dipulihkan";
+"启用定时倾倒废纸篓？" = "Aktifkan pengosongan Sampah otomatis?";
+
+"自动切换电源模式" = "Ganti mode daya secara otomatis";
+"插电默认模式" = "Mode default saat tersambung daya";
+"脱电默认模式" = "Mode default saat memakai baterai";
+"20%及以下固定省电" = "Selalu hemat daya pada 20% atau kurang";
+"电量不高于20%时保持省电，插电也不切换；超过20%后恢复对应默认模式" = "Pertahankan hemat daya pada 20% atau kurang meski tersambung daya; pulihkan mode default yang sesuai di atas 20%";
+"省电" = "Hemat daya";
+"高性能" = "Performa tinggi";
+
+
+"无法保存定时倾倒废纸篓的记录，本次已跳过。" = "Catatan pengosongan Tong Sampah otomatis tidak dapat disimpan. Proses kali ini dilewati.";
+"灵动岛功能顺序" = "Urutan fitur Dynamic Island";
 
 "查询航班" = "Cari penerbangan";
 "查询火车" = "Cari kereta";
@@ -3480,3 +3562,5 @@
 "高频（dB）" = "Frekuensi tinggi (dB)";
 "OGG（Vorbis）仅支持立体声输出" = "OGG (Vorbis) hanya mendukung keluaran stereo";
 "音频备注" = "Komentar audio";
+"全部标记为已读" = "Tandai semua sudah dibaca";
+"已将全部邮件标记为已读" = "Semua pesan telah ditandai sudah dibaca";

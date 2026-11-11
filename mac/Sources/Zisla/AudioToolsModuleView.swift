@@ -5,15 +5,13 @@ import ZislaCore
 import ZislaKit
 
 struct AudioToolsModuleView: View {
-    @ObservedObject var model: AppModel
     @StateObject private var controller = AudioToolsController()
     @State private var operation: AudioToolOperation
     @State private var options = AudioProcessingOptions()
     @State private var numberDrafts: [String: String] = [:]
     @Environment(\.locale) private var locale
 
-    init(model: AppModel, initialOperation: AudioToolOperation = .convert) {
-        self.model = model
+    init(initialOperation: AudioToolOperation = .convert) {
         _operation = State(initialValue: initialOperation)
     }
 
@@ -26,7 +24,11 @@ struct AudioToolsModuleView: View {
                     .font(.system(size: 12))
                     .foregroundStyle(.secondary)
                     .fixedSize(horizontal: false, vertical: true)
-                component
+                if !toolsAvailable {
+                    AppLocalizedText("需要 FFmpeg 与 ffprobe，请安装音频处理组件后重试")
+                        .font(.system(size: 11)).foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
                 if !operation.generatesAudio { inputs }
                 configuration
                 exportOptions
@@ -87,39 +89,6 @@ struct AudioToolsModuleView: View {
                     .settingsSearchAnchor(.audioOperation(item))
                     .help(AppLocalization.text(item.detail))
                 }
-            }
-        }
-    }
-
-    private var component: some View {
-        let state = model.managedTools.states[.ffmpeg] ?? ManagedToolState()
-        return VStack(alignment: .leading, spacing: 6) {
-            HStack(spacing: 8) {
-                Label("FFmpeg", systemImage: "waveform")
-                    .font(.system(size: 12, weight: .medium))
-                if toolsAvailable {
-                    Image(systemName: "checkmark.circle.fill").foregroundStyle(Color.zislaSuccess)
-                        .accessibilityLabel(AppLocalization.text("已安装"))
-                }
-                Spacer(minLength: 0)
-                if state.isBusy { ProgressView().controlSize(.small) }
-                Button(AppLocalization.text(toolsAvailable ? "更新" : "安装")) {
-                    Task {
-                        await model.managedTools.refreshInstalledVersions()
-                        await model.managedTools.install(.ffmpeg)
-                    }
-                }
-                .buttonStyle(.bordered)
-                .disabled(state.isBusy || controller.isProcessing)
-                .help(toolsAvailable ? ManagedTool.ffmpeg.updateHelp : ManagedTool.ffmpeg.installHelp)
-            }
-            if let error = state.errorMessage {
-                Text(error).font(.system(size: 11)).foregroundStyle(Color.zislaError)
-                    .fixedSize(horizontal: false, vertical: true)
-            } else if !toolsAvailable {
-                AppLocalizedText("需要 FFmpeg 与 ffprobe，请安装音频处理组件后重试")
-                    .font(.system(size: 11)).foregroundStyle(.secondary)
-                    .fixedSize(horizontal: false, vertical: true)
             }
         }
     }

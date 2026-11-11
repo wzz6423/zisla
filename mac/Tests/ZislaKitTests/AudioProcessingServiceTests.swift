@@ -362,7 +362,7 @@ struct AudioProcessingServiceTests {
         #expect(try fixture.contents() == ["input.wav", "recording.aac"])
     }
 
-    @Test(arguments: ["process failure", "missing stats", "malformed stats", "nonfinite stats", "cancelled"])
+    @Test(arguments: ["process failure", "missing stats", "malformed stats", "nonfinite stats", "unmeasurable audio", "cancelled"])
     func normalizationMeasurementFailuresCleanStagingWithoutPublishing(failure: String) async throws {
         let fixture = try AudioFixture()
         defer { fixture.clean() }
@@ -375,7 +375,9 @@ struct AudioProcessingServiceTests {
             if failure == "cancelled" { throw CancellationError() }
             #expect(arguments.last == "-", "Invalid measurement must never reach encoding")
             let stats = failure == "malformed stats" ? "{invalid}" : failure == "nonfinite stats"
-                ? #"{"input_i":"nan","input_tp":"-1","input_lra":"3","input_thresh":"-30","target_offset":"0"}"# : ""
+                ? #"{"input_i":"nan","input_tp":"-1","input_lra":"3","input_thresh":"-30","target_offset":"0"}"#
+                : failure == "unmeasurable audio"
+                ? #"{"input_i":"-inf","input_tp":"-20","input_lra":"0","input_thresh":"-70","target_offset":"inf"}"# : ""
             return .init(status: failure == "process failure" ? 1 : 0, standardOutput: Data(), standardError: stats, didTimeout: false)
         })
         do {

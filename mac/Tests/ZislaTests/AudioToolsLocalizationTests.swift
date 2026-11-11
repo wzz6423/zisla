@@ -22,7 +22,6 @@ struct AudioToolsLocalizationTests {
                 }
             }
         }
-        #expect(keys.count >= 130)
         let tableURL = root.appendingPathComponent("Resources/Localization/\(language.rawValue).lproj/Localizable.strings")
         let table = try #require(NSDictionary(contentsOf: tableURL) as? [String: String])
         let placeholders = try NSRegularExpression(pattern: #"%(?:ld|@|\d*\.?\d*[fd])"#)

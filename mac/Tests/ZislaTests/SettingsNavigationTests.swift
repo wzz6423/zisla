@@ -175,6 +175,7 @@ struct SettingsNavigationTests {
             "键盘音效",
             "依赖组件",
             "保存位置",
+            "系统状态与清理",
             "天气",
             "网络",
             "宠物",
@@ -225,7 +226,7 @@ struct SettingsNavigationTests {
     }
 
     @Test
-    func infoVisibilityIncludesMediaAndSystemMonitor() {
+    func infoKeepsModuleOrderVisibleWhenMediaAndSystemMonitorAreOff() {
         var settings = FeatureSettings(
             mediaEnabled: false,
             systemMonitorEnabled: false,
@@ -235,7 +236,7 @@ struct SettingsNavigationTests {
             sideNoticesEnabled: false,
             userCareEnabled: false
         )
-        #expect(!SettingsSection.info.isVisible(settings: settings))
+        #expect(SettingsSection.info.isVisible(settings: settings))
 
         settings.mediaEnabled = true
         #expect(SettingsSection.info.isVisible(settings: settings))
@@ -262,15 +263,15 @@ struct SettingsNavigationTests {
             userCareEnabled: otherInfoFeaturesEnabled
         )
         #expect(!mailSection.isVisible(settings: settings))
-        #expect(SettingsSection.info.isVisible(settings: settings) == otherInfoFeaturesEnabled)
+        #expect(SettingsSection.info.isVisible(settings: settings))
 
         settings.mailEnabled = true
         #expect(mailSection.isVisible(settings: settings))
-        #expect(SettingsSection.info.isVisible(settings: settings) == otherInfoFeaturesEnabled)
+        #expect(SettingsSection.info.isVisible(settings: settings))
 
         settings.mailEnabled = false
         #expect(!mailSection.isVisible(settings: settings))
-        #expect(SettingsSection.info.isVisible(settings: settings) == otherInfoFeaturesEnabled)
+        #expect(SettingsSection.info.isVisible(settings: settings))
     }
 
     @Test
@@ -371,7 +372,7 @@ struct SettingsNavigationTests {
         #expect(SettingsSection.allCases.filter { $0.group == .files } == [.pdfTools, .audioTools])
         #expect(SettingsSection.allCases.filter { $0.group == .capture } == [.screenshot, .recording])
         #expect(SettingsSection.allCases.filter { $0.group == .aiAndVoice } == [.ai, .voice])
-        #expect(SettingsSection.allCases.filter { $0.group == .others } == [.clipboardAssistant, .mail, .download, .saveLocations, .weather, .networkProxy, .pet])
+        #expect(SettingsSection.allCases.filter { $0.group == .others } == [.clipboardAssistant, .mail, .download, .saveLocations, .scheduledCleanup, .weather, .networkProxy, .pet])
         #expect(SettingsSection.allCases.filter { $0.group == .recommendationsAndUpdates } == [.recommendations, .updates])
     }
 
@@ -393,6 +394,7 @@ struct SettingsNavigationTests {
         let dependencyGuidance = try #require(YTDLPResolverError.executableNotFound(searched: []).errorDescription)
         let keys = Set(SettingsSectionGroup.allCases.map(\.title) + [
             "反馈更新",
+            "灵动岛功能顺序",
             SettingsSection.pdfTools.title,
             SettingsSection.pdfTools.subtitle,
             SettingsSection.download.title,
@@ -426,6 +428,7 @@ struct SettingsNavigationTests {
         let dependencyTitle = try #require(table[SettingsSection.download.title])
         #expect(table[dependencyGuidance]?.contains(dependencyTitle) == true)
         if language == .english {
+            #expect(table["灵动岛功能顺序"] == "Dynamic Island Feature Order")
             #expect(dependencyTitle == "Dependency Components")
             #expect(table["截图与录屏"] == "Screenshots & Recording")
             #expect(table["推荐与反馈更新"] == "Recommendations, Feedback & Updates")
@@ -447,7 +450,7 @@ struct SettingsNavigationTests {
     }
 
     @Test
-    func infoVisibilityRetainsLockScreenAndSideNoticesButExcludesMail() {
+    func infoKeepsModuleOrderVisibleWhenLockScreenAndSideNoticesAreOff() {
         var settings = FeatureSettings(
             mediaEnabled: false,
             systemMonitorEnabled: false,
@@ -457,10 +460,10 @@ struct SettingsNavigationTests {
             sideNoticesEnabled: false,
             userCareEnabled: false
         )
-        #expect(!SettingsSection.info.isVisible(settings: settings))
+        #expect(SettingsSection.info.isVisible(settings: settings))
 
         settings.mailEnabled = true
-        #expect(!SettingsSection.info.isVisible(settings: settings))
+        #expect(SettingsSection.info.isVisible(settings: settings))
 
         settings.mailEnabled = false
         settings.lockScreenInfoEnabled = true
