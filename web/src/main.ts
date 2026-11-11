@@ -394,9 +394,15 @@ const initIntroScene = () => {
   const canvas = document.createElement('canvas');
   canvas.className = 'hero-canvas';
   canvas.setAttribute('aria-hidden', 'true');
-  document.body.prepend(canvas);
 
-  const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: true });
+  let renderer: THREE.WebGLRenderer;
+  try {
+    renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: true });
+  } catch {
+    // The decorative scene must not prevent using the site when WebGL is unavailable.
+    return;
+  }
+  document.body.prepend(canvas);
   renderer.setClearColor(0x09090b, 0);
   renderer.setSize(window.innerWidth, window.innerHeight);
   renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
