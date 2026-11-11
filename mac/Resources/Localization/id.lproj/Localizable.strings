@@ -3355,3 +3355,7 @@
 "保存手写备忘录需要辅助功能权限" = "Akses Aksesibilitas diperlukan untuk menyimpan catatan tulisan tangan";
 "备忘录内容已变化，请重新打开后编辑" = "Catatan telah berubah. Buka kembali sebelum mengedit";
 "无法保存手写备忘录的文本，请在备忘录中打开后重试" = "Teks dalam catatan tulisan tangan tidak dapat disimpan. Buka di Catatan dan coba lagi";
+
+"查询航班" = "Cari penerbangan";
+"查询火车" = "Cari kereta";
+"查询快递" = "Lacak paket";
