@@ -81,6 +81,25 @@ struct AudioToolsModuleTests {
     }
 
     @Test
+    func reorderingInputsKeepsTheCurrentEditingSession() async throws {
+        let fixture = try ControllerFixture()
+        defer { fixture.clean() }
+        let controller = AudioToolsController(service: fixture.service)
+        controller.setInputs([fixture.first, fixture.second])
+        try await waitUntil { !controller.isInspecting }
+        let firstSummary = try #require(controller.summaries.first)
+        controller.moveInput(at: 1, offset: -1)
+        #expect(controller.summaries.count == 2)
+        #expect(controller.summaries[1] == firstSummary)
+        let source = URL(fileURLWithPath: #filePath).deletingLastPathComponent().deletingLastPathComponent()
+            .deletingLastPathComponent().appendingPathComponent("Sources/Zisla/AudioToolsModuleView.swift")
+        let text = try String(contentsOf: source, encoding: .utf8)
+        let callback = try NSRegularExpression(pattern: #"\.onChange\(of: controller\.summaries\) \{ previous, summaries in\s+guard previous\.isEmpty else \{ return \}"#)
+        #expect(callback.firstMatch(in: text, range: NSRange(text.startIndex..., in: text)) != nil,
+                "Summary reordering must not reapply timing, fade or metadata defaults")
+    }
+
+    @Test
     func controllerCancellationRejectsStaleCompletion() async throws {
         let fixture = try ControllerFixture()
         defer { fixture.clean() }

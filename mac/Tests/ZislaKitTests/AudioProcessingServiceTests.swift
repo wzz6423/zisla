@@ -4,6 +4,11 @@ import ZislaCore
 @testable import ZislaKit
 
 struct AudioProcessingServiceTests {
+    @Test(arguments: AudioExportFormat.allCases)
+    func lossyExportBitratesMatchTheFormatContract(format: AudioExportFormat) {
+        #expect(format.maximumBitrateKbps == (format == .opus ? 256 : 320))
+    }
+
     @Test
     func rejectsMissingToolsWithoutCreatingOutput() async throws {
         let fixture = try AudioFixture()
@@ -44,6 +49,26 @@ struct AudioProcessingServiceTests {
         #expect(throws: AudioProcessingError.missingTools) {
             try AudioProcessingService.resolveTools(bundle: root, managedTools: managed, candidates: [])
         }
+    }
+
+    @Test
+    func incompletePreferredToolLocationDoesNotHideACompleteFallback() throws {
+        let root = FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent(".zisla-audio-tools-test-\(UUID())")
+        defer { try? FileManager.default.removeItem(at: root) }
+        let managed = root.appendingPathComponent("managed")
+        let fallback = root.appendingPathComponent("fallback")
+        for directory in [managed, fallback] {
+            try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+            let ffmpeg = directory.appendingPathComponent("ffmpeg")
+            try Data("#!/bin/sh\nexit 0\n".utf8).write(to: ffmpeg)
+            try FileManager.default.setAttributes([.posixPermissions: 0o755], ofItemAtPath: ffmpeg.path)
+        }
+        let ffprobe = fallback.appendingPathComponent("ffprobe")
+        try Data("#!/bin/sh\nexit 0\n".utf8).write(to: ffprobe)
+        try FileManager.default.setAttributes([.posixPermissions: 0o755], ofItemAtPath: ffprobe.path)
+        let tools = try AudioProcessingService.resolveTools(bundle: root, managedTools: managed,
+                                                           candidates: [fallback.appendingPathComponent("ffmpeg")])
+        #expect(tools == .init(ffmpeg: fallback.appendingPathComponent("ffmpeg"), ffprobe: ffprobe))
     }
 
     @Test(arguments: [AudioToolOperation.convert, .merge, .generateTone])
@@ -302,6 +327,7 @@ struct AudioProcessingServiceTests {
             (.insertSilence, "静音时长（秒）", { $0.generatedDuration = 0 }),
             (.generateTone, "生成时长（秒）", { $0.generatedDuration = 0 }),
             (.generateTone, "频率（Hz）", { $0.toneFrequency = 24_001 }),
+            (.generateTone, "频率（Hz）", { $0.toneFrequency = 24_000 }),
             (.compress, "输出格式", { $0.format = .wav }),
             (.convert, "码率", { $0.bitrateKbps = 321 }),
             (.convert, "位深", { $0.format = .flac; $0.bitDepth = 32 }),
@@ -315,6 +341,53 @@ struct AudioProcessingServiceTests {
             }
             #expect(try fixture.contents() == ["input.wav"], "Invalid \(title) must leave no output")
         }
+    }
+
+    @Test(arguments: [false, true])
+    func rawDurationScanRejectsFailuresAndMissingFinalTiming(fails: Bool) async throws {
+        let fixture = try AudioFixture()
+        defer { fixture.clean() }
+        let input = fixture.root.appendingPathComponent("recording.aac")
+        try Data("AAC fixture".utf8).write(to: input)
+        let service = AudioProcessingService(tools: { .init(ffmpeg: URL(fileURLWithPath: "/fixture/ffmpeg"),
+                                                           ffprobe: URL(fileURLWithPath: "/fixture/ffprobe")) }, run: { executable, _ in
+            if executable.lastPathComponent == "ffprobe" {
+                return .init(status: 0, standardOutput: Data(AudioFixture.probeJSON.utf8), standardError: "", didTimeout: false)
+            }
+            return .init(status: fails ? 1 : 0, standardOutput: Data("progress=end".utf8), standardError: "scan failure", didTimeout: false)
+        })
+        await #expect(throws: fails ? AudioProcessingError.processFailed("scan failure") : AudioProcessingError.noAudio(input)) {
+            try await service.process(.init(operation: .split, inputURLs: [input]), outputURL: fixture.root)
+        }
+        #expect(try fixture.contents() == ["input.wav", "recording.aac"])
+    }
+
+    @Test(arguments: ["process failure", "missing stats", "malformed stats", "nonfinite stats", "cancelled"])
+    func normalizationMeasurementFailuresCleanStagingWithoutPublishing(failure: String) async throws {
+        let fixture = try AudioFixture()
+        defer { fixture.clean() }
+        let source = try Data(contentsOf: fixture.input)
+        let service = AudioProcessingService(tools: { .init(ffmpeg: URL(fileURLWithPath: "/fixture/ffmpeg"),
+                                                           ffprobe: URL(fileURLWithPath: "/fixture/ffprobe")) }, run: { executable, arguments in
+            if executable.lastPathComponent == "ffprobe" {
+                return .init(status: 0, standardOutput: Data(AudioFixture.probeJSON.utf8), standardError: "", didTimeout: false)
+            }
+            if failure == "cancelled" { throw CancellationError() }
+            #expect(arguments.last == "-", "Invalid measurement must never reach encoding")
+            let stats = failure == "malformed stats" ? "{invalid}" : failure == "nonfinite stats"
+                ? #"{"input_i":"nan","input_tp":"-1","input_lra":"3","input_thresh":"-30","target_offset":"0"}"# : ""
+            return .init(status: failure == "process failure" ? 1 : 0, standardOutput: Data(), standardError: stats, didTimeout: false)
+        })
+        do {
+            _ = try await service.process(.init(operation: .normalize, inputURLs: [fixture.input]), outputURL: fixture.output)
+            Issue.record("Invalid normalization measurement must fail")
+        } catch is CancellationError {
+            #expect(failure == "cancelled")
+        } catch let error as AudioProcessingError {
+            #expect(error == (failure == "process failure" ? .processFailed("") : .noAudio(fixture.input)))
+        }
+        #expect(try fixture.contents() == ["input.wav"])
+        #expect(try Data(contentsOf: fixture.input) == source)
     }
 
     @Test

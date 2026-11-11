@@ -3478,3 +3478,4 @@
 "频率（Hz）" = "Frequency (Hz)";
 "高频（dB）" = "Treble (dB)";
 "OGG（Vorbis）仅支持立体声输出" = "OGG (Vorbis) supports stereo output only";
+"音频备注" = "Audio comment";

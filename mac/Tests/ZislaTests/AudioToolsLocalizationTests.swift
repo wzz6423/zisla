@@ -48,6 +48,8 @@ struct AudioToolsLocalizationTests {
     @Test
     func representativeLabelsResolveByLocale() {
         #expect(AppLocalization.string("音频工具", language: .english) == "Audio tools")
+        #expect(AppLocalization.string("音频备注", language: .english) == "Audio comment")
+        #expect(AppLocalization.string("音频备注", language: .dutch) == "Audio-opmerking")
         #expect(AppLocalization.string("音频工具", language: .arabic) == "أدوات الصوت")
         #expect(AppLocalization.string("音频工具", language: .traditionalChinese) == "音訊工具")
     }

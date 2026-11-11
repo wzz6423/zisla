@@ -124,6 +124,7 @@ public enum AudioExportFormat: String, CaseIterable, Identifiable, Sendable {
     public var title: String { self == .alac ? "ALAC (M4A)" : rawValue.uppercased() }
     public var fileExtension: String { self == .alac ? "m4a" : rawValue }
     public var isLossless: Bool { [.wav, .aiff, .flac, .alac, .caf].contains(self) }
+    public var maximumBitrateKbps: Int { self == .opus ? 256 : 320 }
 
     public var sampleRates: [Int] {
         switch self {

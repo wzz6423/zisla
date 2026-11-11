@@ -36,7 +36,8 @@ struct AudioToolsModuleView: View {
         }
         .textFieldStyle(.roundedBorder)
         .controlSize(.regular)
-        .onChange(of: controller.summaries) { _, summaries in
+        .onChange(of: controller.summaries) { previous, summaries in
+            guard previous.isEmpty else { return }
             numberDrafts = [:]
             if let summary = summaries.first {
                 options.startTime = 0
@@ -55,6 +56,7 @@ struct AudioToolsModuleView: View {
         }
         .onChange(of: options.format) { _, format in
             if !format.sampleRates.contains(options.sampleRate) { options.sampleRate = 48_000 }
+            options.bitrateKbps = min(options.bitrateKbps, format.maximumBitrateKbps)
             if (format == .flac || format == .alac) && options.bitDepth == 32 { options.bitDepth = 24 }
             if format == .ogg { options.channelMode = .stereo }
         }
@@ -192,7 +194,7 @@ struct AudioToolsModuleView: View {
             case .metadata:
                 Toggle(AppLocalization.text("清除全部标签"), isOn: $options.clearMetadata)
                 if !options.clearMetadata {
-                    ForEach([("title", "标题"), ("artist", "艺人"), ("album", "专辑"), ("comment", "备注")], id: \.0) { key, title in
+                    ForEach([("title", "标题"), ("artist", "艺人"), ("album", "专辑"), ("comment", "音频备注")], id: \.0) { key, title in
                         LabeledContent(AppLocalization.text(title)) {
                             TextField("", text: Binding(get: { options.metadata[key] ?? "" }, set: { options.metadata[key] = $0 }))
                                 .accessibilityLabel(AppLocalization.text(title))
@@ -232,7 +234,9 @@ struct AudioToolsModuleView: View {
                 }
             } else {
                 Picker(AppLocalization.text("码率"), selection: $options.bitrateKbps) {
-                    ForEach([32, 64, 96, 128, 160, 192, 256, 320], id: \.self) { Text("\($0) kbps").tag($0) }
+                    ForEach([32, 64, 96, 128, 160, 192, 256, 320].filter { $0 <= options.format.maximumBitrateKbps }, id: \.self) {
+                        Text("\($0) kbps").tag($0)
+                    }
                 }
             }
             Picker(AppLocalization.text("采样率"), selection: $options.sampleRate) {

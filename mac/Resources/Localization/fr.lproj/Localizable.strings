@@ -3475,3 +3475,4 @@
 "频率（Hz）" = "Fréquence (Hz)";
 "高频（dB）" = "Aigus (dB)";
 "OGG（Vorbis）仅支持立体声输出" = "OGG (Vorbis) ne prend en charge que la sortie stéréo";
+"音频备注" = "Commentaire audio";

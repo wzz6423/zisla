@@ -213,6 +213,20 @@ struct AudioProcessingIntegrationTests {
         #expect(abs(try await fixture.service.inspect(outputs[2]).duration - 0.5) < 0.02)
     }
 
+    @Test
+    func normalizationPreservesSilenceInsteadOfSendingInfiniteMeasurementsToTheEncoder() async throws {
+        let fixture = try AudioIntegrationFixture()
+        defer { fixture.clean() }
+        let silent = fixture.root.appendingPathComponent("silent.wav")
+        try fixture.write(silent, duration: 3, sampleRate: 48_000, values: [0])
+        var options = AudioProcessingOptions()
+        options.format = .wav
+        let output = fixture.root.appendingPathComponent("normalized.wav")
+        _ = try await fixture.service.process(.init(operation: .normalize, inputURLs: [silent], options: options), outputURL: output)
+        #expect(try fixture.samples(output)[0].allSatisfy { $0 == 0 })
+        #expect(abs(try await fixture.service.inspect(output).duration - 3) <= 1.0 / 48_000)
+    }
+
     @Test(arguments: [0.0, 1.0])
     func removalAtEitherBoundaryDoesNotLoseRemainingAudio(start: Double) async throws {
         let fixture = try AudioIntegrationFixture()
