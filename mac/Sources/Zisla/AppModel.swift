@@ -1035,12 +1035,13 @@ final class AppModel: ObservableObject {
   private func refreshDashboardPresentation() {
     let settings = settingsStore.settings
     let hasPomodoro = pomodoro.phase != .idle
-    let hasAITask = settings.aiProgressEnabled
-      && aiMonitor.state.tasks.contains { $0.status.isActive }
+    let aiCardCount = DashboardAIWorkSummary.groups(
+      from: aiMonitor.state.tasks, enabled: settings.aiProgressEnabled
+    ).count
     let browserDownloadCount = settings.showsBrowserDownloadProgress
       ? browserDownloads.snapshots.count : 0
-    let cardCount = [hasPomodoro, hasAITask, hasActiveDownloads].filter { $0 }.count
-      + browserDownloadCount + notices.screenRecordingOperations.count
+    let cardCount = [hasPomodoro, hasActiveDownloads].filter { $0 }.count
+      + aiCardCount + browserDownloadCount + notices.screenRecordingOperations.count
     if dashboardCardCount != cardCount {
       dashboardCardCount = cardCount
     }
