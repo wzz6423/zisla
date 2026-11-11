@@ -12,8 +12,8 @@ public struct ScenarioNotificationReviewItem: Equatable, Identifiable, Sendable 
 
     init(notice: IslandNotice, at date: Date) {
         id = Self.reviewID(for: notice.id)
-        title = String(notice.title.prefix(160))
-        detail = notice.detail.map { String($0.prefix(320)) }
+        title = String(String.UnicodeScalarView(notice.title.unicodeScalars.prefix(160)))
+        detail = notice.detail.map { String(String.UnicodeScalarView($0.unicodeScalars.prefix(320))) }
         kind = notice.kind
         recordedAt = date
         sourceIDs = [notice.id]
@@ -25,10 +25,10 @@ public struct ScenarioNotificationReviewItem: Equatable, Identifiable, Sendable 
         kind = notice.kind
         recordedAt = date
         if notice.side == .left || !hasLeftSource {
-            title = String(notice.title.prefix(160))
-            detail = notice.detail.map { String($0.prefix(320)) }
+            title = String(String.UnicodeScalarView(notice.title.unicodeScalars.prefix(160)))
+            detail = notice.detail.map { String(String.UnicodeScalarView($0.unicodeScalars.prefix(320))) }
         } else {
-            detail = String((notice.detail ?? notice.title).prefix(320))
+            detail = String(String.UnicodeScalarView((notice.detail ?? notice.title).unicodeScalars.prefix(320)))
         }
         hasLeftSource = hasLeftSource || notice.side == .left
     }

@@ -98,6 +98,11 @@ public final class SideNoticeQueue: ObservableObject {
         right.removeAll { $0.id == id }
     }
 
+    public func removeVisible(withIDPrefix prefix: String) {
+        let ids = (left + right).lazy.map(\.id).filter { $0.hasPrefix(prefix) }
+        for id in Array(ids) { removeVisible(id: id) }
+    }
+
     public func removeAll() {
         scenarioBuffer.removeAll()
         noticeRevisions.removeAll()

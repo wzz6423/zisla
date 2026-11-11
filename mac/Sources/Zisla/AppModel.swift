@@ -1016,7 +1016,11 @@ final class AppModel: ObservableObject {
     mail.$messages
       .dropFirst()
       .sink { [weak self] messages in
-        Task { @MainActor [weak self] in self?.consumeMailMessages(messages) }
+        Task { @MainActor [weak self] in
+          guard let self else { return }
+          Self.consumeMailMessages(messages, settings: self.settingsStore.settings, notices: self.notices,
+            hasLoadedMail: &self.hasLoadedMail, knownMailMessageIDs: &self.knownMailMessageIDs)
+        }
       }
       .store(in: &cancellables)
 
@@ -4067,19 +4071,23 @@ final class AppModel: ObservableObject {
     activeAINoticeIDs.removeAll()
   }
 
-  private func consumeMailMessages(_ messages: [MailMessage]) {
+  static func consumeMailMessages(
+    _ messages: [MailMessage], settings: FeatureSettings, notices: SideNoticeQueue,
+    hasLoadedMail: inout Bool, knownMailMessageIDs: inout Set<String>
+  ) {
     let currentIDs = Set(messages.map(\.id))
     defer { knownMailMessageIDs = currentIDs }
-    notices.removeAll(withIDPrefix: "mail-notification-")
-    guard settingsStore.settings.mailEnabled else {
+    guard settings.mailEnabled else {
+      notices.removeAll(withIDPrefix: "mail-notification-")
       hasLoadedMail = false
       return
     }
+    notices.removeVisible(withIDPrefix: "mail-notification-")
     guard hasLoadedMail else {
       hasLoadedMail = true
       return
     }
-    guard settingsStore.settings.sideNoticesEnabled else { return }
+    guard settings.sideNoticesEnabled else { return }
 
     let newMessages = messages.filter { !$0.isRead && !knownMailMessageIDs.contains($0.id) }
     guard let latest = newMessages.max(by: { $0.receivedAt < $1.receivedAt }) else { return }

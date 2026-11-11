@@ -72,6 +72,168 @@ struct PomodoroUserCareTests {
         #expect(service.mode == .focus)
     }
 
+    @Test(arguments: [0.0, 0.125, 10_000.0], [false, true])
+    func deadlinePauseCompletesEachModeOnceWithoutWaitingForTheNextTick(
+        delay: TimeInterval, careEnabled: Bool
+    ) throws {
+        let fixture = try Fixture()
+        defer { fixture.close() }
+        let service = fixture.service
+        service.userCareEnabled = careEnabled
+        for (index, mode) in [PomodoroMode.focus, .rest].enumerated() {
+            service.start()
+            fixture.now += service.engine.duration(for: mode) + delay
+
+            service.pause()
+
+            #expect(service.phase == .idle && service.mode == mode.next,
+                "Pausing an expired countdown must complete it rather than freeze at zero")
+            #expect(service.engine.deadline == nil)
+            #expect(service.displayClock == (mode == .focus ? "07:00" : "00:01"))
+            #expect(service.focusCountdownNotice(for: .left).progress == 0)
+            #expect(fixture.sounds == index + 1)
+            #expect(fixture.requests.count == (careEnabled ? 0 : index + 1))
+            #expect(fixture.reminders == (careEnabled
+                ? Array([UserCareReminder.focusCompleted, .restCompleted].prefix(index + 1)) : []))
+            #expect(fixture.activity.count(for: .pomodoroCompleted) == 1)
+            #expect(fixture.activity.completedFocusSeconds == 1)
+
+            service.pause()
+            service.tick()
+            #expect(service.phase == .idle && service.mode == mode.next)
+            #expect(fixture.sounds == index + 1)
+            #expect(fixture.requests.count == (careEnabled ? 0 : index + 1))
+            #expect(fixture.activity.count(for: .pomodoroCompleted) == 1)
+        }
+        service.start()
+        service.tick()
+        #expect(service.phase == .running && service.mode == .focus)
+        #expect(service.engine.remaining(at: fixture.now) == 1)
+        #expect(fixture.sounds == 2)
+    }
+
+    @Test(arguments: [0.5, 0.001])
+    func preDeadlinePauseFreezesAndResumeUsesTheSavedRemaining(remaining: TimeInterval) throws {
+        let fixture = try Fixture()
+        defer { fixture.close() }
+        let service = fixture.service
+        service.userCareEnabled = true
+        for (index, mode) in [PomodoroMode.focus, .rest].enumerated() {
+            service.start()
+            fixture.now += service.engine.duration(for: mode) - remaining
+            service.pause()
+            let frozenClock = service.displayClock
+            #expect(service.phase == .paused && service.mode == mode)
+            #expect(abs(service.engine.remaining(at: fixture.now) - remaining) < 0.000_001)
+            fixture.now += 10_000
+            service.pause()
+            service.tick()
+            #expect(service.phase == .paused && service.displayClock == frozenClock)
+            #expect(abs(service.engine.remaining(at: fixture.now) - remaining) < 0.000_001)
+            #expect(fixture.sounds == index && fixture.reminders.count == index && fixture.requests.isEmpty)
+
+            service.start()
+            #expect(service.phase == .running && service.mode == mode)
+            fixture.now += remaining + 0.125
+            service.tick()
+            #expect(service.phase == .idle && service.mode == mode.next)
+            #expect(fixture.sounds == index + 1 && fixture.reminders.count == index + 1)
+        }
+        #expect(fixture.activity.count(for: .pomodoroStarted) == 1,
+            "Resuming must not count as a new focus session")
+        #expect(fixture.activity.count(for: .pomodoroCompleted) == 1)
+        #expect(fixture.activity.completedFocusSeconds == 1)
+    }
+
+    @Test(arguments: [false, true])
+    func mutedDeadlinePauseCompletesWithoutSoundBannerOrCare(careEnabled: Bool) throws {
+        let fixture = try Fixture()
+        defer { fixture.close() }
+        let service = fixture.service
+        service.userCareEnabled = careEnabled
+        service.notificationsMuted = true
+        for mode in [PomodoroMode.focus, .rest] {
+            service.start()
+            fixture.now += service.engine.duration(for: mode) + 0.125
+            service.pause()
+            #expect(service.phase == .idle && service.mode == mode.next)
+            service.tick()
+            #expect(fixture.requests.isEmpty && fixture.reminders.isEmpty && fixture.sounds == 0)
+        }
+        #expect(fixture.activity.count(for: .pomodoroCompleted) == 1)
+        #expect(fixture.activity.completedFocusSeconds == 1)
+    }
+
+    @Test
+    func idlePauseAndExpiredPauseWithoutCareHandlerKeepConsistentState() throws {
+        let fixture = try Fixture()
+        defer { fixture.close() }
+        let service = fixture.service
+        service.userCareEnabled = true
+        service.onUserCareReminder = nil
+        let idle = service.engine
+        service.pause()
+        #expect(service.engine == idle)
+        #expect(fixture.requests.isEmpty && fixture.reminders.isEmpty && fixture.sounds == 0)
+        service.start()
+        fixture.now += service.focusDuration
+        service.pause()
+        service.pause()
+        service.tick()
+        #expect(service.phase == .idle && service.mode == .rest)
+        #expect(fixture.requests.isEmpty && fixture.reminders.isEmpty && fixture.sounds == 1)
+        #expect(fixture.activity.count(for: .pomodoroCompleted) == 1)
+    }
+
+    @Test
+    func deadlineCrossingBetweenClockReadsNeverFreezesAnExpiredCountdown() throws {
+        let fixture = try Fixture()
+        defer { fixture.close() }
+        let service = fixture.service
+        service.userCareEnabled = true
+        service.start()
+        let deadline = try #require(service.engine.deadline)
+        fixture.now = deadline.addingTimeInterval(0.125)
+        fixture.clockSamples = [deadline.addingTimeInterval(-0.001), fixture.now]
+
+        service.pause()
+
+        #expect(service.phase == .paused && service.mode == .focus,
+            "A pause sampled before the deadline must not be completed by a later clock read")
+        #expect(abs(service.engine.remaining(at: deadline) - 0.001) < 0.000_001,
+            "Completion and pause must use the same instant so remaining time cannot freeze at zero")
+        #expect(fixture.sounds == 0 && fixture.requests.isEmpty && fixture.reminders.isEmpty)
+        fixture.now = deadline.addingTimeInterval(10_000)
+        service.start()
+        fixture.now += 0.125
+        service.tick()
+        #expect(service.phase == .idle && service.mode == .rest)
+        #expect(fixture.sounds == 1 && fixture.reminders == [.focusCompleted])
+        #expect(fixture.activity.count(for: .pomodoroCompleted) == 1)
+    }
+
+    @Test
+    func repeatedLateTicksAndPausesKeepCompletionBounded() throws {
+        let fixture = try Fixture()
+        defer { fixture.close() }
+        let service = fixture.service
+        service.userCareEnabled = true
+        for _ in 0..<16 {
+            service.start()
+            fixture.now += service.engine.duration(for: service.mode) + 10_000
+            service.pause()
+            for _ in 0..<16 {
+                service.tick()
+                service.pause()
+            }
+            #expect(service.phase == .idle && service.engine.deadline == nil)
+        }
+        #expect(fixture.sounds == 16 && fixture.reminders.count == 16 && fixture.requests.isEmpty)
+        #expect(fixture.activity.count(for: .pomodoroStarted) == 8)
+        #expect(fixture.activity.count(for: .pomodoroCompleted) == 8)
+        #expect(fixture.activity.completedFocusSeconds == 8)
+    }
+
     @Test(arguments: AppLanguage.allCases)
     func ordinaryCompletionTitlesKeepTheirRequestedLanguage(language: AppLanguage) throws {
         let fixture = try Fixture(language: language)
@@ -200,15 +362,20 @@ struct PomodoroUserCareTests {
         var requests: [UNNotificationRequest] = []
         var sounds = 0
         var reminders: [UserCareReminder] = []
+        var activity = DailyBriefingActivityTotals()
+        var clockSamples: [Date] = []
         lazy var service: PomodoroService = {
             let service = PomodoroService(
                 notificationRequestHandler: { [unowned self] in requests.append($0) },
                 defaults: defaults,
                 completionSoundHandler: { [unowned self] in sounds += 1 },
                 language: { [unowned self] in language },
-                now: { [unowned self] in now }
+                now: { [unowned self] in clockSamples.isEmpty ? now : clockSamples.removeFirst() }
             )
             service.onUserCareReminder = { [unowned self] in reminders.append($0) }
+            service.onDailyBriefingActivity = { [unowned self] kind, count, seconds, _ in
+                activity.record(kind, count: count, focusSeconds: seconds)
+            }
             service.setFocusDuration(1)
             service.setRestDuration(7 * 60)
             return service

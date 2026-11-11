@@ -220,6 +220,18 @@ struct ScenarioNotificationQueueTests {
         queue.setNotificationScenarios([.focus])
         #expect(queue.notificationBehavior(for: .ordinary, displayIdentifier: after.notificationScopeIdentifier) == .mute)
         #expect(ScreenSnapshot(displayID: 99, frame: frame, visibleFrame: frame).notificationScopeIdentifier == "session:99")
+        let unknown = ScreenSnapshot(displayID: .max, frame: frame, visibleFrame: frame)
+        let otherUnknown = ScreenSnapshot(displayID: .max - 1, frame: frame, visibleFrame: frame)
+        #expect(ScreenSnapshot.notificationPolicyIdentifier(for: unknown.displayID) == nil)
+        #expect(unknown.notificationScopeIdentifier == "session:4294967295")
+        #expect(otherUnknown.notificationScopeIdentifier == "session:4294967294")
+        queue.configureNotificationScenarios(.init(enabled: true,
+            displayOverrides: [otherUnknown.notificationScopeIdentifier: .init(focus: .init(ordinary: .mute))]),
+            displayIdentifiers: [unknown.notificationScopeIdentifier, otherUnknown.notificationScopeIdentifier])
+        queue.recordScenarioEvent(.init(id: "unknown-display-event", title: "Unknown display"))
+        queue.setNotificationScenarios([])
+        #expect(queue.scenarioReview(displayIdentifier: unknown.notificationScopeIdentifier).map(\.id) == ["unknown-display-event"])
+        #expect(queue.scenarioReview(displayIdentifier: otherUnknown.notificationScopeIdentifier).isEmpty)
     }
 
     @Test
@@ -303,6 +315,46 @@ struct ScenarioNotificationQueueTests {
         clock.date += 4 * 60 * 60
         #expect(queue.scenarioReview(displayIdentifier: "display").isEmpty)
         #expect(queue.scenarioReviewNotice(displayIdentifier: "display") == nil)
+    }
+
+    @Test(arguments: [NoticeSide.left, .right], ["initial", "left", "right-detail", "right-title"])
+    func singleGraphemePayloadsStayBoundedThroughCreationAndPairedUpdates(side: NoticeSide, change: String) throws {
+        let queue = SideNoticeQueue()
+        defer { queue.removeAll() }
+        queue.configureNotificationScenarios(.init(enabled: true), displayIdentifiers: ["display"])
+        queue.setNotificationScenarios([.meeting])
+        let title = "e" + String(repeating: "\u{0301}", count: 20_000)
+        let detail = "x" + String(repeating: "\u{0308}", count: 40_000)
+        #expect(title.count == 1 && detail.count == 1)
+        #expect(title.unicodeScalars.count == 20_001 && detail.unicodeScalars.count == 40_001)
+        let firstID = "payload-" + side.rawValue
+        if change == "initial" {
+            queue.recordScenarioEvent(.init(id: firstID, title: title, detail: detail, side: side))
+        } else {
+            queue.recordScenarioEvent(.init(id: firstID, title: "Original", detail: "Original detail", side: side))
+            let nextSide: NoticeSide = change == "left" ? .left : .right
+            queue.recordScenarioEvent(.init(id: "payload-" + nextSide.rawValue, title: title,
+                detail: change == "right-title" ? nil : detail, side: nextSide))
+        }
+        queue.setNotificationScenarios([])
+        let review = queue.scenarioReview(displayIdentifier: "display")
+        #expect(review.count == 1)
+        let item = try #require(review.first)
+        if side == .left && change.hasPrefix("right") {
+            #expect(item.title == "Original", "The left source remains the review title when the right source changes")
+        } else {
+            #expect(item.title.unicodeScalars.count == 160)
+            #expect(item.title == "e" + String(repeating: "\u{0301}", count: 159))
+        }
+        if change == "right-title" && side == .right {
+            #expect(item.detail == nil)
+        } else {
+            let bounded = try #require(item.detail)
+            #expect(bounded.unicodeScalars.count == 320)
+            #expect(bounded == (change == "right-title"
+                ? "e" + String(repeating: "\u{0301}", count: 319)
+                : "x" + String(repeating: "\u{0308}", count: 319)))
+        }
     }
 
     @Test

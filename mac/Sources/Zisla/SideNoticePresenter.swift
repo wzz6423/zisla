@@ -435,13 +435,14 @@ final class SideNoticePresenter {
 
     func publishCompactLayout(on displayID: CGDirectDisplayID) {
         let displayState = panelsByDisplayID[displayID]?.displayState
-        var notices = compactPresentationNotices(on: displayState?.notificationScopeIdentifier ?? "session:\(displayID)")
+        let displayIdentifier = displayState?.notificationScopeIdentifier ?? "session:\(displayID)"
+        var notices = compactPresentationNotices(on: displayIdentifier)
         if hidesVoiceProcessingIndicator(on: displayID) {
             notices = Self.noticesWithoutVoiceProcessing(notices)
         }
         let configuration = compactConfiguration(
             for: notices, at: now(), statusHidden: displayState?.compactStatusHidden == true,
-            showsResultSweep: isResultSweepVisible(on: displayState?.notificationScopeIdentifier ?? "session:\(displayID)")
+            showsResultSweep: isResultSweepVisible(on: displayIdentifier)
         )
         onCompactLayoutChanged?(displayID, configuration.expandsForDetailedStatus, configuration.compactStatusLength,
                                 configuration.compactStatusSideWidth,
