@@ -564,16 +564,28 @@ public final class MailService: ObservableObject {
             return .failed(Self.mailUnavailableMessage(isRunning: false) ?? AppLocalization.text("Mail.app 当前未运行"))
         }
         return await mutationQueue.enqueue { [self] in
+            let generation = refreshGeneration
             let unreadIDs = markReadAccountNames.map { names in
                 Set(messages.filter { !$0.isRead && names.contains($0.accountName) }.map(\.id))
             }
-            switch await self.commandRunner(script, false) {
+            let result = await self.commandRunner(script, false)
+            let shouldRefresh: Bool
+            switch result {
             case .success:
-                if let unreadIDs { setReadLocally(unreadIDs, isRead: true) }
+                shouldRefresh = true
+            case .failure:
+                shouldRefresh = refreshOnFailure
+            }
+            if shouldRefresh, generation == refreshGeneration {
+                if case .success = result, let unreadIDs { setReadLocally(unreadIDs, isRead: true) }
+                refreshGeneration &+= 1
+                isLoading = false
                 await self.refresh(checkForNewMail: false)
+            }
+            switch result {
+            case .success:
                 return .success
             case let .failure(error):
-                if refreshOnFailure { await self.refresh(checkForNewMail: false) }
                 return .failed(Self.message(for: error))
             }
         }
