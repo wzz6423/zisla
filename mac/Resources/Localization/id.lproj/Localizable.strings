@@ -1035,7 +1035,7 @@
 "选中每个cli后的自动更新选项后检测到新版本后自动执行更新；关闭后不再启动新任务，已开始的更新会完成" = "Setelah memilih opsi pembaruan otomatis di samping setiap CLI, pembaruan dipasang otomatis begitu versi baru ditemukan; mematikannya menghentikan tugas baru, pembaruan yang sudah dimulai akan tetap selesai";
 "未找到 Homebrew；请先安装 Homebrew 后再管理推荐工具" = "Homebrew tidak ditemukan. Pasang Homebrew dulu, lalu kelola alat rekomendasi";
 "未找到 LibreOffice；请安装 LibreOffice 后重试" = "LibreOffice tidak ditemukan. Pasang LibreOffice lalu coba lagi.";
-"未找到可用的 yt-dlp。请在 设置 → 下载 → 组件 中一键安装后重试。" = "yt-dlp yang bisa dipakai tidak ditemukan. Pasang dari Pengaturan → Unduhan → Komponen lalu coba lagi.";
+"未找到可用的 yt-dlp。请在 设置 → 依赖组件 → 组件 中一键安装后重试。" = "yt-dlp yang bisa dipakai tidak ditemukan. Pasang dari Pengaturan → Komponen yang diperlukan → Komponen lalu coba lagi.";
 "选中的识别文本和原始录音文件都会被删除，但累计统计数据（总字词、时长等）会保留。此操作无法撤销。" = "Transkrip yang dipilih dan rekaman aslinya akan dihapus, tetapi statistik kumulatif (total kata, durasi, dan sebagainya) tetap disimpan. Ini tidak dapat dibatalkan.";
 "本机保存的识别文本和原始录音文件都会被删除，但累计统计数据（总字词、时长等）会保留。此操作无法撤销。" = "Transkrip dan rekaman asli yang tersimpan di Mac ini akan dihapus, tetapi statistik kumulatif (total kata, durasi, dan sebagainya) tetap disimpan. Ini tidak dapat dibatalkan.";
 "缺少子命令。可用：update/finish/remove/clear/list/usage/notify/message/help" = "Subperintah tidak ada. Tersedia: update/finish/remove/clear/list/usage/notify/message/help";
@@ -2476,6 +2476,11 @@
 "2026.10.28往前15天" = "15 hari sebelum 2026.10.28";
 "日期间隔" = "Rentang Tanggal";
 "跨时区时间" = "Waktu Lintas Zona Waktu";
+"会议 2026-11-20 14:30-15:30" = "Rapat 2026-11-20 14:30-15:30";
+"Hello! How are you today?" = "Hello! How are you today?";
+"这是一段普通文本，可以搜索或保存。" = "Teks untuk dicari atau disimpan.";
+"例如：复制截图或浏览器中的图片" = "Contoh: Salin tangkapan layar atau gambar dari browser";
+"例如：在 Finder 中选中文件后按 ⌘C" = "Contoh: Pilih file di Finder lalu tekan ⌘C";
 "汇率获取失败" = "Gagal mengambil kurs";
 "闹钟通知未获允许，请在系统设置中开启通知。" = "Notifikasi alarm belum diizinkan. Aktifkan notifikasi di Pengaturan Sistem.";
 "闹钟通知声音已关闭，请在系统设置中开启声音。" = "Suara notifikasi alarm dinonaktifkan. Aktifkan suara di Pengaturan Sistem.";
@@ -3343,7 +3348,8 @@
 "全部（包含需人工复核）" = "Semua (termasuk yang perlu ditinjau)";
 "默认保存位置" = "Lokasi Penyimpanan Default";
 "分别设置各类内容的默认保存位置。" = "Atur lokasi penyimpanan default untuk setiap jenis konten.";
-"管理下载所需组件。" = "Kelola komponen yang diperlukan untuk unduhan.";
+"依赖组件" = "Komponen yang diperlukan";
+"管理下载与文档转换所需组件。" = "Kelola komponen yang diperlukan untuk unduhan dan konversi dokumen.";
 "更改 %@ 的保存位置" = "Ubah lokasi penyimpanan untuk %@";
 
 "本地优先的原生笔记应用" = "Aplikasi catatan native yang mengutamakan penyimpanan lokal";
@@ -3354,5 +3360,10 @@
 "保存手写备忘录需要辅助功能权限" = "Akses Aksesibilitas diperlukan untuk menyimpan catatan tulisan tangan";
 "备忘录内容已变化，请重新打开后编辑" = "Catatan telah berubah. Buka kembali sebelum mengedit";
 "无法保存手写备忘录的文本，请在备忘录中打开后重试" = "Teks dalam catatan tulisan tangan tidak dapat disimpan. Buka di Catatan dan coba lagi";
+"灵动岛功能顺序" = "Urutan fitur Dynamic Island";
+
+"查询航班" = "Cari penerbangan";
+"查询火车" = "Cari kereta";
+"查询快递" = "Lacak paket";
 "全部标记为已读" = "Tandai semua sudah dibaca";
 "已将全部邮件标记为已读" = "Semua pesan telah ditandai sudah dibaca";

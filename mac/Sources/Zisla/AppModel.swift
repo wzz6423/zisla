@@ -773,6 +773,10 @@ final class AppModel: ObservableObject {
     quickNotes.onDailyBriefingActivity = recordActivity
     keyboardSound.onPhysicalKeyDown = { [weak self] date in self?.dailyBriefing.recordKeyPress(at: date) }
     keyboardSound.onBeforeTermination = { [weak self] in await self?.dailyBriefing.prepareToTerminate() ?? true }
+    Self.observeDailyBriefingExports(dailyBriefing) { [weak self] message in
+      self?.transientMessage = message
+    }
+    .store(in: &cancellables)
     clipboardAssistant.onPerformAction = { [weak self] action in
       self?.performClipboardAssistantAction(action)
     }
@@ -1035,12 +1039,13 @@ final class AppModel: ObservableObject {
   private func refreshDashboardPresentation() {
     let settings = settingsStore.settings
     let hasPomodoro = pomodoro.phase != .idle
-    let hasAITask = settings.aiProgressEnabled
-      && aiMonitor.state.tasks.contains { $0.status.isActive }
+    let aiCardCount = DashboardAIWorkSummary.groups(
+      from: aiMonitor.state.tasks, enabled: settings.aiProgressEnabled
+    ).count
     let browserDownloadCount = settings.showsBrowserDownloadProgress
       ? browserDownloads.snapshots.count : 0
-    let cardCount = [hasPomodoro, hasAITask, hasActiveDownloads].filter { $0 }.count
-      + browserDownloadCount + notices.screenRecordingOperations.count
+    let cardCount = [hasPomodoro, hasActiveDownloads].filter { $0 }.count
+      + aiCardCount + browserDownloadCount + notices.screenRecordingOperations.count
     if dashboardCardCount != cardCount {
       dashboardCardCount = cardCount
     }
@@ -1292,6 +1297,17 @@ final class AppModel: ObservableObject {
   }
 
   // MARK: - Transient notice
+
+  static func observeDailyBriefingExports(
+    _ controller: DailyBriefingController,
+    onMessage: @escaping (String) -> Void
+  ) -> AnyCancellable {
+    let success = controller.$lastExportURL
+      .compactMap { $0 }
+      .map { AppLocalization.text("已保存到 %@", $0.lastPathComponent) }
+    return success.merge(with: controller.$errorMessage.compactMap { $0 })
+      .sink(receiveValue: onMessage)
+  }
 
   static func observeDisplayAwakeErrors(
     _ controller: PowerAssertionController,
@@ -4621,7 +4637,13 @@ final class AppModel: ObservableObject {
     )
   }
 
-  private static func downloadErrorText(_ error: Error) -> String {
+  /// Resolver messages are catalog keys; external diagnostics must remain verbatim to preserve support details.
+  static func downloadErrorText(
+    _ error: Error, locale: Locale = AppLocalization.currentLanguage.locale
+  ) -> String {
+    if error is YTDLPResolverError {
+      return AppLocalization.string(error.localizedDescription, locale: locale)
+    }
     guard let error = error as? DownloadServiceError else {
       return error.localizedDescription
     }
