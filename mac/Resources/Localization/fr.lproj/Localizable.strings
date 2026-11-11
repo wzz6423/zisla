@@ -3356,6 +3356,7 @@
 "保存手写备忘录需要辅助功能权限" = "L’accès à l’accessibilité est nécessaire pour enregistrer les notes manuscrites";
 "备忘录内容已变化，请重新打开后编辑" = "La note a changé. Rouvrez-la avant de la modifier";
 "无法保存手写备忘录的文本，请在备忘录中打开后重试" = "Impossible d’enregistrer le texte de la note manuscrite. Ouvrez-la dans Notes et réessayez";
+"灵动岛功能顺序" = "Ordre des fonctionnalités de Dynamic Island";
 
 "查询航班" = "Rechercher un vol";
 "查询火车" = "Rechercher un train";

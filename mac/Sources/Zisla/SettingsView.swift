@@ -1044,43 +1044,6 @@ struct SettingsView: View {
                     rowDivider
                     lidClosePreviewRow()
                 }
-
-                settingsGroup("工具") {
-                    let order = model.settingsStore.settings.moduleOrder
-                    ForEach(Array(order.enumerated()), id: \.element) { index, module in
-                        if index > 0 { rowDivider }
-                        reorderSettingRow(
-                            symbol: moduleOrderSymbol(for: module),
-                            title: module.title
-                        ) {
-                            draggedModuleOrder = module
-                            return NSItemProvider(object: module.rawValue as NSString)
-                        }
-                        .onDrop(
-                            of: ReorderDropDelegate<IslandModuleOrder>.supportedTypes,
-                            delegate: ReorderDropDelegate(
-                                destination: module,
-                                dragging: $draggedModuleOrder,
-                                move: moveModuleOrder
-                            )
-                        )
-                    }
-                    rowDivider
-                    settingRow(
-                        symbol: "arrow.counterclockwise",
-                        title: "恢复默认顺序",
-                        detail: ""
-                    ) {
-                        IconButton(
-                            symbol: "arrow.counterclockwise",
-                            help: AppLocalization.text("恢复默认顺序"),
-                            size: .compact
-                        ) {
-                            model.settingsStore.settings.moduleOrder = IslandModuleOrder.defaultOrder
-                        }
-                        .disabled(order == IslandModuleOrder.defaultOrder)
-                    }
-                }
             }
 
             if input.selection == .features || input.selection == .recording {
@@ -1331,6 +1294,43 @@ struct SettingsView: View {
 
     private var infoContent: some View {
         VStack(alignment: .leading, spacing: 20) {
+            settingsGroup("灵动岛功能顺序") {
+                let order = model.settingsStore.settings.moduleOrder
+                ForEach(Array(order.enumerated()), id: \.element) { index, module in
+                    if index > 0 { rowDivider }
+                    reorderSettingRow(
+                        symbol: moduleOrderSymbol(for: module),
+                        title: module.title
+                    ) {
+                        draggedModuleOrder = module
+                        return NSItemProvider(object: module.rawValue as NSString)
+                    }
+                    .onDrop(
+                        of: ReorderDropDelegate<IslandModuleOrder>.supportedTypes,
+                        delegate: ReorderDropDelegate(
+                            destination: module,
+                            dragging: $draggedModuleOrder,
+                            move: moveModuleOrder
+                        )
+                    )
+                }
+                rowDivider
+                settingRow(
+                    symbol: "arrow.counterclockwise",
+                    title: "恢复默认顺序",
+                    detail: ""
+                ) {
+                    IconButton(
+                        symbol: "arrow.counterclockwise",
+                        help: AppLocalization.text("恢复默认顺序"),
+                        size: .compact
+                    ) {
+                        model.settingsStore.settings.moduleOrder = IslandModuleOrder.defaultOrder
+                    }
+                    .disabled(order == IslandModuleOrder.defaultOrder)
+                }
+            }
+
             if settingsStore.settings.supportsStatusIconsInIsland {
                 settingsGroup("灵动岛模式") {
                     featureToggle("显示应用标识", detail: "", symbol: "app.badge", keyPath: \.islandAppIconEnabled)
@@ -4694,9 +4694,10 @@ enum SettingsSection: String, CaseIterable, Identifiable {
         }
     }
 
+    /// Information owns toolbar ordering even when every optional information feature is disabled.
     func isVisible(settings: FeatureSettings) -> Bool {
         switch self {
-        case .general, .features, .saveLocations, .networkProxy, .permissions:
+        case .general, .features, .info, .saveLocations, .networkProxy, .permissions:
             return true
         case .recommendations:
             return settings.recommendedToolsEnabled
@@ -4710,10 +4711,6 @@ enum SettingsSection: String, CaseIterable, Identifiable {
             return settings.pdfToolsEnabled
         case .recording:
             return settings.screenRecordingEnabled
-        case .info:
-            return settings.mediaEnabled || settings.systemMonitorEnabled
-                || settings.lockScreenInfoEnabled || settings.sideNoticesEnabled
-                || settings.userCareEnabled || settings.dailyBriefing.enabled || settings.supportsStatusIconsInIsland
         case .mail:
             return settings.mailEnabled
         case .ai:

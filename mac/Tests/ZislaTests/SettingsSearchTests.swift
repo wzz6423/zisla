@@ -59,8 +59,34 @@ struct SettingsSearchTests {
         #expect(matches.first?.section == .info)
         #expect(matches.first?.anchor == .row("关怀提醒间隔"))
         settings.userCareEnabled = false
-        #expect(!SettingsSection.info.isVisible(settings: settings))
+        #expect(SettingsSection.info.isVisible(settings: settings))
         #expect(!SettingsSearchIndex.items(settings: settings).contains { $0.title == "关怀提醒间隔" })
+    }
+
+    /// Ordering must remain discoverable by disabled module names without enabling information features.
+    @Test(arguments: AppLanguage.allCases)
+    func moduleOrderSearchReachesInformationWhenOtherInfoFeaturesAreOff(language: AppLanguage) {
+        let settings = FeatureSettings(
+            mediaEnabled: false,
+            systemMonitorEnabled: false,
+            dailyBriefing: DailyBriefingSettings(enabled: false),
+            lockScreenInfoEnabled: false,
+            sideNoticesEnabled: false,
+            userCareEnabled: false
+        )
+        let title = AppLocalization.string("灵动岛功能顺序", language: language)
+        let matches = results(title, settings: settings, locale: language.locale)
+        #expect(matches.first?.section == .info)
+        #expect(matches.first?.anchor == .group("灵动岛功能顺序"))
+        for key in ["恢复默认顺序"] + IslandModuleOrder.defaultOrder.map(\.title) {
+            let query = AppLocalization.string(key, language: language)
+            #expect(results(query, settings: settings, locale: language.locale).contains {
+                $0.section == .info && $0.anchor == .group("灵动岛功能顺序")
+            }, "Module order must be searchable by \(key) in \(language.rawValue)")
+        }
+        #expect(!SettingsSearchIndex.items(settings: settings).contains {
+            $0.section == .features && $0.anchor == .group("工具")
+        })
     }
 
     @Test(arguments: AppLanguage.allCases, [false, true])
