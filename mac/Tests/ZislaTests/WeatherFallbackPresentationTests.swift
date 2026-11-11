@@ -9,10 +9,14 @@ import ZislaCore
 
 @MainActor
 struct WeatherFallbackPresentationTests {
-    @Test(arguments: [AppLanguage.simplifiedChinese, .english, .arabic], [1, 7])
+    @Test(arguments: [AppLanguage.simplifiedChinese, .english, .arabic], [
+        (1, NSAppearance.Name.aqua), (7, .aqua), (1, .darkAqua), (7, .darkAqua),
+    ])
     func weatherListKeepsTemperatureInsideTheViewportWithoutHorizontalScrolling(
-        language: AppLanguage, locationCount: Int
+        language: AppLanguage, configuration: (locationCount: Int, appearance: NSAppearance.Name)
     ) async throws {
+        let locationCount = configuration.locationCount
+        let isDark = configuration.appearance == .darkAqua
         let directory = FileManager.default.temporaryDirectory.appendingPathComponent("weather-layout-\(UUID())")
         try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
         defer { try? FileManager.default.removeItem(at: directory) }
@@ -21,7 +25,12 @@ struct WeatherFallbackPresentationTests {
         defer { defaults.removePersistentDomain(forName: suite) }
         let locations = WeatherLocationStore(storageURL: directory.appendingPathComponent("locations.json"), defaults: defaults)
         let date = Date(timeIntervalSince1970: 86_400)
-        let name = language == .arabic ? "مدينة ذات اسم طويل لاختبار الطقس" : "甘肃省兰州市"
+        let name: String
+        switch language {
+        case .arabic: name = "مدينة ذات اسم طويل لاختبار الطقس"
+        case .english: name = "A city with a long weather location name"
+        default: name = "陕西省西安市"
+        }
         locations.updateCurrent(name: name, coordinate: GeoCoordinate(latitude: 36, longitude: 104))
         for index in 1..<locationCount {
             locations.addSaved(name: "\(name) \(index)", coordinate: GeoCoordinate(latitude: Double(index), longitude: 100))
@@ -36,14 +45,20 @@ struct WeatherFallbackPresentationTests {
             ))
         })
         let persisted = try Data(contentsOf: directory.appendingPathComponent("locations.json"))
-        let host = NSHostingView(rootView: AgendaModuleView.weatherContent(
-            locations: locations, snapshotsByLocationID: snapshots, state: .ready("\(locationCount)"), at: date
-        ).environment(\.locale, language.locale)
-            .environment(\.layoutDirection, language.isRightToLeft ? .rightToLeft : .leftToRight))
+        func content(_ snapshots: [String: WeatherSnapshot]) -> some View {
+            AgendaModuleView.weatherContent(
+                locations: locations, snapshotsByLocationID: snapshots, state: .ready("\(locationCount)"), at: date
+            ).background(isDark ? Color.black : Color.white)
+                .environment(\.colorScheme, isDark ? .dark : .light)
+                .environment(\.locale, language.locale)
+                .environment(\.layoutDirection, language.isRightToLeft ? .rightToLeft : .leftToRight)
+        }
+        let host = NSHostingView(rootView: content(snapshots))
         host.sizingOptions = []
         let window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 184, height: 124),
                               styleMask: .borderless, backing: .buffered, defer: false)
         window.isReleasedWhenClosed = false
+        window.appearance = NSAppearance(named: configuration.appearance)
         window.contentView = host
         defer { window.contentView = nil; window.close() }
         for _ in 0..<8 {
@@ -56,6 +71,8 @@ struct WeatherFallbackPresentationTests {
             view.subviews.flatMap { [$0] + descendants(in: $0) }
         }
         let scroll = try #require(descendants(in: host).compactMap { $0 as? NSScrollView }.first)
+        scroll.tile()
+        scroll.reflectScrolledClipView(scroll.contentView)
         let document = try #require(scroll.documentView)
         #expect(document.frame.width <= scroll.contentView.bounds.width,
                 "Weather rows must fit the viewport, including the vertical scrollbar")
@@ -67,9 +84,62 @@ struct WeatherFallbackPresentationTests {
         #expect(scroll.horizontalScrollElasticity == .none,
                 "Horizontal trackpad movement must not rubber-band the weather list")
         if locationCount > 1 {
+            let scroller = try #require(scroll.verticalScroller)
+            #expect(scroller.knobProportion > 0 && scroller.knobProportion < 1,
+                    "Overflowing weather must retain a usable vertical scrollbar")
+            let track = scroller.convert(scroller.bounds, to: host)
+            let wasHidden = scroller.isHidden
+            scroller.isHidden = true
+            defer { scroller.isHidden = wasHidden }
+            let bitmap = try #require(host.bitmapImageRepForCachingDisplay(in: host.bounds))
+            host.cacheDisplay(in: host.bounds, to: bitmap)
+            let scale = CGFloat(bitmap.pixelsWide) / host.bounds.width
+            let gutter = track.insetBy(dx: -2, dy: 0).intersection(host.bounds)
+            var overlappingPixels = 0
+            for y in 0..<bitmap.pixelsHigh {
+                for x in Int(gutter.minX * scale)..<Int(gutter.maxX * scale) {
+                    let color = try #require(bitmap.colorAt(x: x, y: y)?.usingColorSpace(.deviceRGB))
+                    let contrast = isDark ? color.redComponent : 1 - color.redComponent
+                    if contrast * color.alphaComponent > 0.1 { overlappingPixels += 1 }
+                }
+            }
+            #expect(overlappingPixels == 0,
+                    "Weather text must leave the native scrollbar track and a 2pt gap clear in \(language.rawValue)")
             scroll.contentView.scroll(to: CGPoint(x: 0, y: document.frame.height - scroll.contentView.bounds.height))
             scroll.reflectScrolledClipView(scroll.contentView)
             #expect(scroll.contentView.bounds.minY > 0, "Additional cities must remain vertically scrollable")
+            scroll.contentView.scroll(to: .zero)
+            scroll.reflectScrolledClipView(scroll.contentView)
+            for changeTemperature in [true, false] {
+                let changed = snapshots.mapValues { snapshot in
+                    var snapshot = snapshot
+                    if changeTemperature { snapshot.temperature = -34 }
+                    else { snapshot.temperatureMin = -38 }
+                    return snapshot
+                }
+                host.rootView = content(changed)
+                for _ in 0..<8 {
+                    host.layoutSubtreeIfNeeded()
+                    await withCheckedContinuation { continuation in
+                        DispatchQueue.main.async { continuation.resume() }
+                    }
+                }
+                let updated = try #require(host.bitmapImageRepForCachingDisplay(in: host.bounds))
+                host.cacheDisplay(in: host.bounds, to: updated)
+                let columns = language.isRightToLeft
+                    ? 0..<Int(60 * scale)
+                    : Int((host.bounds.width - 60) * scale)..<bitmap.pixelsWide
+                var changedPixels = 0
+                for y in 0..<Int(30 * scale) {
+                    for x in columns {
+                        let before = try #require(bitmap.colorAt(x: x, y: y)?.usingColorSpace(.deviceRGB))
+                        let after = try #require(updated.colorAt(x: x, y: y)?.usingColorSpace(.deviceRGB))
+                        if abs(before.redComponent - after.redComponent) > 0.02 { changedPixels += 1 }
+                    }
+                }
+                #expect(changedPixels > 0,
+                        "The \(changeTemperature ? "current temperature" : "temperature range") must render beside the scrollbar")
+            }
         }
         #expect(try Data(contentsOf: directory.appendingPathComponent("locations.json")) == persisted)
         #expect(locations.orderedSnapshots(snapshots, at: date).count == locationCount)

@@ -63,13 +63,29 @@ struct AgendaModuleView: View {
         if snapshots.isEmpty {
             weatherPlaceholder(state: state, hasExpiredWeather: !snapshotsByLocationID.isEmpty)
         } else {
+            WeatherList(snapshots: snapshots, date: date)
+        }
+    }
+
+    private struct WeatherList: View {
+        let snapshots: [WeatherSnapshot]
+        let date: Date
+        @Environment(\.layoutDirection) private var layoutDirection
+
+        var body: some View {
             ScrollView(.vertical) {
                 LazyVStack(spacing: 2) {
                     ForEach(Array(snapshots.enumerated()), id: \.offset) { _, weather in
-                        weatherRow(weather, at: date)
+                        AgendaModuleView.weatherRow(weather, at: date)
                     }
                 }
             }
+            // AppKit keeps the scroller on the right even when SwiftUI mirrors the content.
+            .contentMargins(
+                layoutDirection == .rightToLeft ? .leading : .trailing,
+                NSScroller.scrollerWidth(for: .mini, scrollerStyle: .overlay) + 2,
+                for: .scrollContent
+            )
             .scrollIndicators(.visible)
             .thinScrollChrome(scrollerStyle: .overlay)
         }
