@@ -4944,6 +4944,11 @@ private struct ScreenshotExtractionModePicker: NSViewRepresentable {
     }
 }
 
+enum ScreenshotEditorMode {
+    case screenshot
+    case localImage
+}
+
 struct ScreenshotEditorView: View {
     @Environment(\.accessibilityReduceMotion) private var accessibilityReduceMotion
     @ObservedObject private var shortcutSettings: FeatureSettingsStore
@@ -4951,6 +4956,7 @@ struct ScreenshotEditorView: View {
     @ObservedObject var selectionState: ScreenshotAnnotationSelectionState
     let overlayConfiguration: ScreenshotEditorOverlayConfiguration?
     let toolbarOnly: Bool
+    let mode: ScreenshotEditorMode
     let onClose: () -> Void
     let onCopy: () -> Void
     let onStash: () -> Void
@@ -4958,6 +4964,7 @@ struct ScreenshotEditorView: View {
     let onPinToggle: (Bool) -> Void
     let onLongCapture: () -> Void
     let onLongCaptureFinish: () -> Void
+    let tableDirectory: () -> URL?
 
     @State private var draftPoints: [CGPoint] = []
     @State private var draftRect = CGRect.zero
@@ -4987,12 +4994,12 @@ struct ScreenshotEditorView: View {
         let startPoint: CGPoint
     }
 
-    private var toolbarControlCount: Int {
-        17
+    var toolbarControlCount: Int {
+        (mode == .screenshot ? 17 : 14)
             + (model.canUndo ? 1 : 0)
             + (model.canRedo ? 1 : 0)
-            + (model.isLongCapturePreviewing ? 2 : 0)
-            + (model.hasLongCaptureResult && !model.isLongCapturePreviewing ? 2 : 0)
+            + (mode == .screenshot && model.isLongCapturePreviewing ? 2 : 0)
+            + (mode == .screenshot && model.hasLongCaptureResult && !model.isLongCapturePreviewing ? 2 : 0)
     }
 
     init(
@@ -5001,6 +5008,8 @@ struct ScreenshotEditorView: View {
         settingsStore: FeatureSettingsStore = AppModel.shared.settingsStore,
         overlayConfiguration: ScreenshotEditorOverlayConfiguration? = nil,
         toolbarOnly: Bool = false,
+        mode: ScreenshotEditorMode = .screenshot,
+        tableDirectory: @escaping () -> URL? = { nil },
         onClose: @escaping () -> Void,
         onCopy: @escaping () -> Void,
         onStash: @escaping () -> Void = {},
@@ -5014,6 +5023,8 @@ struct ScreenshotEditorView: View {
         self.shortcutSettings = settingsStore
         self.overlayConfiguration = overlayConfiguration
         self.toolbarOnly = toolbarOnly
+        self.mode = mode
+        self.tableDirectory = tableDirectory
         self.onClose = onClose
         self.onCopy = onCopy
         self.onStash = onStash
@@ -5281,9 +5292,9 @@ struct ScreenshotEditorView: View {
 
     private var header: some View {
         HStack(spacing: 10) {
-            Image(systemName: "camera.viewfinder")
+            Image(systemName: mode == .screenshot ? "camera.viewfinder" : "photo")
                 .foregroundStyle(Color.accentColor)
-            Text(AppLocalization.text("截图编辑"))
+            Text(AppLocalization.text(mode == .screenshot ? "截图编辑" : "图片编辑"))
                 .font(.system(size: 14, weight: .semibold))
             Text("\(Int(model.image.size.width.rounded())) × \(Int(model.image.size.height.rounded())) · r: \(Int(model.cornerRadius.rounded()))")
                 .font(.system(size: 11, design: .monospaced))
@@ -5302,7 +5313,7 @@ struct ScreenshotEditorView: View {
                     .frame(height: 26)
             }
             .buttonStyle(.plain)
-            .help(AppLocalization.text("关闭截图编辑器"))
+            .help(AppLocalization.text(mode == .screenshot ? "关闭截图编辑器" : "关闭图片编辑器"))
         }
         .padding(.horizontal, 14)
         .padding(.vertical, 9)
@@ -6284,36 +6295,41 @@ struct ScreenshotEditorView: View {
                     iconButton("arrow.uturn.forward", title: AppLocalization.text("重做")) { model.redo() }
                 }
                 recognitionMenu
-                iconButton(
-                    model.isLongCapturePreviewing ? "arrow.clockwise" : "rectangle.on.rectangle",
-                    title: model.isLongCapturePreviewing ? AppLocalization.text("继续") : AppLocalization.text("长截图")
-                ) { onLongCapture() }
-                if model.isLongCapturePreviewing {
-                    longCaptureDirectionMenu
-                    iconButton("checkmark", title: AppLocalization.text("完成")) { onLongCaptureFinish() }
-                }
-                if model.hasLongCaptureResult {
-                    iconButton("minus.magnifyingglass", title: AppLocalization.text("缩小")) {
-                        updateCanvasZoom(to: canvasZoom - 0.1)
+                if mode == .screenshot {
+                    iconButton(
+                        model.isLongCapturePreviewing ? "arrow.clockwise" : "rectangle.on.rectangle",
+                        title: model.isLongCapturePreviewing ? AppLocalization.text("继续") : AppLocalization.text("长截图")
+                    ) { onLongCapture() }
+                    if model.isLongCapturePreviewing {
+                        longCaptureDirectionMenu
+                        iconButton("checkmark", title: AppLocalization.text("完成")) { onLongCaptureFinish() }
                     }
-                    iconButton("plus.magnifyingglass", title: AppLocalization.text("放大")) {
-                        updateCanvasZoom(to: canvasZoom + 0.1)
+                    if model.hasLongCaptureResult {
+                        iconButton("minus.magnifyingglass", title: AppLocalization.text("缩小")) {
+                            updateCanvasZoom(to: canvasZoom - 0.1)
+                        }
+                        iconButton("plus.magnifyingglass", title: AppLocalization.text("放大")) {
+                            updateCanvasZoom(to: canvasZoom + 0.1)
+                        }
+                    }
+                    iconButton(model.isPinned ? "pin.fill" : "pin", title: model.isPinned ? AppLocalization.text("取消置顶") : AppLocalization.text("钉图")) {
+                        commitInlineText()
+                        model.isPinned.toggle()
+                        onPinToggle(model.isPinned)
+                    }
+                    iconButton("tray.and.arrow.down", title: AppLocalization.text("暂存")) {
+                        commitInlineText()
+                        onStash()
                     }
                 }
-                iconButton(model.isPinned ? "pin.fill" : "pin", title: model.isPinned ? AppLocalization.text("取消置顶") : AppLocalization.text("钉图")) {
-                    commitInlineText()
-                    model.isPinned.toggle()
-                    onPinToggle(model.isPinned)
-                }
-                iconButton("tray.and.arrow.down", title: AppLocalization.text("暂存")) {
-                    commitInlineText()
-                    onStash()
-                }
-                iconButton("doc.on.doc", title: AppLocalization.text("复制")) {
+                iconButton("doc.on.doc", title: AppLocalization.text("复制"),
+                           disabled: mode == .localImage && (model.isExtracting || model.isRecognizing)) {
                     commitInlineText()
                     onCopy()
                 }
-                iconButton("square.and.arrow.down", title: AppLocalization.text("保存")) {
+                iconButton(mode == .screenshot ? "square.and.arrow.down" : "checkmark",
+                           title: AppLocalization.text(mode == .screenshot ? "保存" : "应用编辑"),
+                           disabled: mode == .localImage && (model.isExtracting || model.isRecognizing)) {
                     commitInlineText()
                     onSave()
                 }
@@ -6768,8 +6784,10 @@ struct ScreenshotEditorView: View {
             Button { recognize(.text) } label: {
                 Label(AppLocalization.text("识图 / OCR"), systemImage: "text.viewfinder")
             }
-            Button { recognize(.translate) } label: {
-                Label(AppLocalization.text("翻译并复制"), systemImage: "character.bubble")
+            if mode == .screenshot {
+                Button { recognize(.translate) } label: {
+                    Label(AppLocalization.text("翻译并复制"), systemImage: "character.bubble")
+                }
             }
             Button { recognize(.table) } label: {
                 Label(AppLocalization.text("表格识别"), systemImage: "tablecells")
@@ -6817,10 +6835,12 @@ struct ScreenshotEditorView: View {
 
     private func shortcutHelp(_ title: String, hotkey: VoiceInputHotkeyPreset?) -> String {
         let title = AppLocalization.text(title)
+        guard mode == .screenshot else { return title }
         return hotkey.map { "\(title) (\($0.settingsDisplayName))" } ?? title
     }
 
     private func actionShortcutHelp(symbol: String, title: String) -> String {
+        guard mode == .screenshot else { return title }
         let settings = shortcutSettings.settings
         switch symbol {
         case "pin", "pin.fill": return shortcutHelp(title, hotkey: settings.screenshotPinHotkey)
@@ -6859,8 +6879,8 @@ struct ScreenshotEditorView: View {
         .contentShape(Rectangle())
     }
 
-    private func chooseTableDestination(_ completion: @escaping (URL?) -> Void) {
-        let panel = NSSavePanel()
+    func chooseTableDestination(panel: NSSavePanel = NSSavePanel(), _ completion: @escaping (URL?) -> Void) {
+        if let directory = tableDirectory() { panel.directoryURL = directory }
         panel.nameFieldStringValue = AppLocalization.text("识别表格.xlsx")
         panel.allowedContentTypes = [UTType(filenameExtension: "xlsx") ?? .spreadsheet]
         panel.canCreateDirectories = true

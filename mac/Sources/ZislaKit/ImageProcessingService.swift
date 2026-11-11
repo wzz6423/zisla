@@ -1,4 +1,5 @@
 import Foundation
+import CoreImage
 import ImageIO
 import UniformTypeIdentifiers
 import ZislaCore
@@ -14,6 +15,8 @@ public enum ImageProcessingError: LocalizedError, Equatable, Sendable {
     case invalidOutput
     case outputAlreadyExists(URL)
     case emptyInput
+    case rasterEditingAnimationUnsupported
+    case rasterEditingMetadataUnsupported
 
     public var errorDescription: String? {
         switch self {
@@ -27,6 +30,8 @@ public enum ImageProcessingError: LocalizedError, Equatable, Sendable {
         case .invalidOutput: AppLocalization.text("图片输出无效，未保存")
         case let .outputAlreadyExists(url): AppLocalization.text("输出文件已存在，未覆盖：%@", url.lastPathComponent)
         case .emptyInput: AppLocalization.text("请先选择图片或包含图片的文件夹")
+        case .rasterEditingAnimationUnsupported: AppLocalization.text("此编辑功能仅支持静态图片，请使用旋转或水印工具处理动画")
+        case .rasterEditingMetadataUnsupported: AppLocalization.text("此编辑功能无法保留原始元数据，请关闭保留元数据")
         }
     }
 }
@@ -79,6 +84,7 @@ public struct ImageProcessingService: Sendable {
     public static let supportedExtensions: Set<String> = ["png", "apng", "jpg", "jpeg", "webp", "avif", "jxl", "heic", "heif", "svg"]
     public static let maximumPixels: Int64 = 256_000_000
     public typealias ProcessRunner = @Sendable (URL, [String], URL, Data?) async throws -> AIAgentProcessOutput
+    public typealias RasterTransform = @Sendable (CGImage, URL) async throws -> CGImage
 
     private let executableURL: URL?
     private let avifExecutableURL: URL?
@@ -131,17 +137,28 @@ public struct ImageProcessingService: Sendable {
 
     public func process(
         _ inputURLs: [URL], options: ImageProcessingOptions,
+        rasterTransform: RasterTransform? = nil,
         progress: @escaping @Sendable (Int, Int) async -> Void = { _, _ in }
     ) async throws -> ImageProcessingBatch {
         guard !inputURLs.isEmpty else { throw ImageProcessingError.emptyInput }
         guard options.isValid else { throw ImageProcessingError.invalidOptions }
-        guard let executableURL, FileManager.default.isExecutableFile(atPath: executableURL.path) else {
+        guard rasterTransform == nil || !options.preserveMetadata else { throw ImageProcessingError.rasterEditingMetadataUnsupported }
+        let nativeRasterOutput = rasterTransform != nil && options.transform.isIdentity && options.resize == nil && options.watermark == nil
+            && (options.formats.isEmpty || Set(options.formats) == [.png])
+        guard nativeRasterOutput || (executableURL.map { FileManager.default.isExecutableFile(atPath: $0.path) } ?? false) else {
             throw ImageProcessingError.engineUnavailable
         }
         let manager = FileManager.default
         let directory = manager.temporaryDirectory.appendingPathComponent("zisla-image-tools-\(UUID())", isDirectory: true)
         try manager.createDirectory(at: directory, withIntermediateDirectories: true, attributes: [.posixPermissions: 0o700])
         do {
+            let watermark: ImageWatermarkRenderer?
+            if let options = options.watermark {
+                switch options.content {
+                case let .text(text): watermark = ImageWatermarkRenderer(options: options, content: .text(text))
+                case let .image(url): watermark = ImageWatermarkRenderer(options: options, content: .image(try await loadRasterImage(url)))
+                }
+            } else { watermark = nil }
             var items: [ImageProcessedItem] = []
             var failures: [ImageProcessingFailure] = []
             for (index, input) in inputURLs.enumerated() {
@@ -160,24 +177,44 @@ public struct ImageProcessingService: Sendable {
                     guard (values.fileSize ?? 0) <= 500 * 1_024 * 1_024 else { throw ImageProcessingError.resourceLimit }
                     try manager.copyItem(at: input, to: source)
                     let summary = try await inspect(source)
-                    let expected = options.resize?.dimensions(for: summary) ?? (summary.width, summary.height)
-                    guard Int64(expected.0) * Int64(expected.1) <= Self.maximumPixels / Int64(summary.frameCount) else {
+                    var encodingSource = source
+                    var encodingSummary = summary
+                    if let rasterTransform {
+                        guard summary.frameCount == 1 else { throw ImageProcessingError.rasterEditingAnimationUnsupported }
+                        let image = try await loadRasterImage(source)
+                        let edited = try await rasterTransform(image, input)
+                        try Task.checkCancellation()
+                        guard edited.width <= 150_000, edited.height <= 150_000,
+                              Int64(edited.width) * Int64(edited.height) <= Self.maximumPixels else { throw ImageProcessingError.resourceLimit }
+                        encodingSource = work.appendingPathComponent("edited.png")
+                        guard let destination = CGImageDestinationCreateWithURL(encodingSource as CFURL, UTType.png.identifier as CFString, 1, nil) else {
+                            throw ImageProcessingError.invalidOutput
+                        }
+                        CGImageDestinationAddImage(destination, edited, nil)
+                        guard CGImageDestinationFinalize(destination) else { throw ImageProcessingError.invalidOutput }
+                        encodingSummary = try await inspect(encodingSource)
+                    }
+                    let expected = options.dimensions(for: encodingSummary)
+                    guard Int64(expected.0) * Int64(expected.1) <= Self.maximumPixels / Int64(encodingSummary.frameCount) else {
                         throw ImageProcessingError.resourceLimit
                     }
-                    let defaultFormat = summary.format == .svg && options.resize != nil ? .png : summary.format ?? .jpeg
-                    let formats = options.formats.isEmpty ? [defaultFormat] : Array(Set(options.formats)).sorted { $0.rawValue < $1.rawValue }
+                    let overlay = try watermark?.render(width: expected.0, height: expected.1, to: work.appendingPathComponent("watermark.png"))
+                    let defaultFormat = summary.format == .svg && (options.resize != nil || !options.transform.isIdentity || options.watermark != nil) ? .png : summary.format ?? .jpeg
+                    let formats: [ImageOutputFormat] = rasterTransform != nil ? [.png]
+                        : options.formats.isEmpty ? [defaultFormat] : Array(Set(options.formats)).sorted { $0.rawValue < $1.rawValue }
                     var outputs: [ImageProcessedOutput] = []
                     for format in formats {
                         try Task.checkCancellation()
                         let output = work.appendingPathComponent("output").appendingPathExtension(format.fileExtension)
                         do {
-                            try await encode(source, summary: summary, format: format, options: options, output: output, work: work, stableCrop: false)
+                            if nativeRasterOutput { try manager.copyItem(at: encodingSource, to: output) }
+                            else { try await encode(encodingSource, summary: encodingSummary, format: format, options: options, output: output, work: work, stableCrop: false, overlay: overlay) }
                             var result = try await inspect(output)
                             guard result.format == format, result.frameCount == summary.frameCount,
                                   result.width == expected.0, result.height == expected.1 else {
                                 throw ImageProcessingError.invalidOutput
                             }
-                            if options.resize == nil, format == summary.format,
+                            if options.resize == nil, options.transform.isIdentity, options.watermark == nil, rasterTransform == nil, format == summary.format,
                                result.fileSize > summary.fileSize, options.preserveMetadata || !summary.hasMetadata {
                                 try manager.removeItem(at: output)
                                 try manager.copyItem(at: source, to: output)
@@ -233,6 +270,23 @@ public struct ImageProcessingService: Sendable {
                 || (bytes.count >= 12 && bytes[4..<8].elementsEqual("ftyp".utf8)
                     && ["avif", "avis", "heic", "heix", "hevc", "hevx", "mif1", "msf1"].contains { bytes[8..<12].elementsEqual($0.utf8) })
             guard raster else { throw ImageProcessingError.invalidInput(url) }
+            // ImageIO treats a PNG missing IEND as complete, which must not become an edited result.
+            if bytes.starts(with: [0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]) {
+                var position: UInt64 = 8
+                while true {
+                    try Task.checkCancellation()
+                    try file.seek(toOffset: position)
+                    let chunk = [UInt8](try file.read(upToCount: 8) ?? Data())
+                    guard chunk.count == 8 else { throw ImageProcessingError.invalidInput(url) }
+                    let length = chunk.prefix(4).reduce(UInt64(0)) { ($0 << 8) | UInt64($1) }
+                    guard position + length + 12 <= UInt64(size) else { throw ImageProcessingError.invalidInput(url) }
+                    if chunk.suffix(4).elementsEqual("IEND".utf8) {
+                        guard length == 0, try file.read(upToCount: 4) == Data([0xae, 0x42, 0x60, 0x82]) else { throw ImageProcessingError.invalidInput(url) }
+                        break
+                    }
+                    position += length + 12
+                }
+            }
         }
         let summary: ImageFileSummary
         // ImageIO can omit JPEG XL frames and does not identify SVG consistently across macOS versions.
@@ -268,6 +322,55 @@ public struct ImageProcessingService: Sendable {
               summary.frameCount > 0, summary.frameCount <= 1_000,
               Int64(summary.width) * Int64(summary.height) <= Self.maximumPixels / Int64(summary.frameCount) else { throw ImageProcessingError.resourceLimit }
         return summary
+    }
+
+    public func loadRasterImage(_ url: URL) async throws -> CGImage {
+        try Task.checkCancellation()
+        guard url.isFileURL else { throw ImageProcessingError.invalidInput(url) }
+        let values = try url.resourceValues(forKeys: [.isRegularFileKey, .isSymbolicLinkKey, .fileSizeKey])
+        guard values.isRegularFile == true, values.isSymbolicLink != true,
+              Self.supportedExtensions.contains(url.pathExtension.lowercased()) else { throw ImageProcessingError.invalidInput(url) }
+        guard let size = values.fileSize, size > 0,
+              size <= (url.pathExtension.lowercased() == "svg" ? 20 : 500) * 1_024 * 1_024 else { throw ImageProcessingError.resourceLimit }
+        let manager = FileManager.default
+        let directory = manager.temporaryDirectory.appendingPathComponent("zisla-image-raster-\(UUID())", isDirectory: true)
+        try manager.createDirectory(at: directory, withIntermediateDirectories: true, attributes: [.posixPermissions: 0o700])
+        defer { try? manager.removeItem(at: directory) }
+        let staged = directory.appendingPathComponent("source").appendingPathExtension(url.pathExtension.lowercased())
+        try manager.copyItem(at: url, to: staged)
+        let summary = try await inspect(staged)
+        guard summary.frameCount == 1 else { throw ImageProcessingError.rasterEditingAnimationUnsupported }
+        if url.pathExtension.lowercased() != "svg", let source = CGImageSourceCreateWithURL(staged as CFURL, [kCGImageSourceShouldCache: false] as CFDictionary) {
+            guard CGImageSourceGetCount(source) == 1 else { throw ImageProcessingError.rasterEditingAnimationUnsupported }
+            if let image = CGImageSourceCreateImageAtIndex(source, 0, [kCGImageSourceShouldCacheImmediately: true] as CFDictionary) {
+                guard CGImageSourceGetStatusAtIndex(source, 0) == .statusComplete else { throw ImageProcessingError.invalidInput(url) }
+                let properties = CGImageSourceCopyPropertiesAtIndex(source, 0, nil) as? [CFString: Any] ?? [:]
+                let orientation = properties[kCGImagePropertyOrientation] as? Int ?? 1
+                let normalized: CGImage
+                if orientation == 1 { normalized = image }
+                else {
+                    // ImageIO's thumbnail transform can ignore orientation when a PNG also contains GPS metadata.
+                    let oriented = CIImage(cgImage: image).oriented(forExifOrientation: Int32(orientation))
+                    guard let raster = CIContext().createCGImage(oriented, from: oriented.extent) else { throw ImageProcessingError.invalidOutput }
+                    normalized = raster
+                }
+                guard normalized.width == summary.width, normalized.height == summary.height else { throw ImageProcessingError.invalidInput(url) }
+                try Task.checkCancellation()
+                return normalized
+            }
+        }
+        let normalized = directory.appendingPathComponent("normalized.v")
+        let output = directory.appendingPathComponent("raster.png")
+        _ = try await run(["autorot", staged.path + "[fail-on=error]", normalized.path], in: directory)
+        _ = try await run(["pngsave", normalized.path, output.path, "--compression=9", "--keep=icc"], in: directory)
+        let result = try await inspect(output)
+        guard result.format == .png, result.frameCount == 1,
+              result.width == summary.width, result.height == summary.height,
+              let decoded = CGImageSourceCreateWithURL(output as CFURL, nil),
+              let image = CGImageSourceCreateImageAtIndex(decoded, 0, [kCGImageSourceShouldCacheImmediately: true] as CFDictionary),
+              CGImageSourceGetStatusAtIndex(decoded, 0) == .statusComplete else { throw ImageProcessingError.invalidOutput }
+        try Task.checkCancellation()
+        return image
     }
 
     public static func export(_ items: [ImageProcessedItem], to directory: URL, smallestOnly: Bool) throws -> [URL] {
@@ -369,9 +472,9 @@ public struct ImageProcessingService: Sendable {
     }
 
     private func encode(_ source: URL, summary: ImageFileSummary, format: ImageOutputFormat,
-                        options: ImageProcessingOptions, output: URL, work: URL, stableCrop: Bool) async throws {
+                        options: ImageProcessingOptions, output: URL, work: URL, stableCrop: Bool, overlay: ImageWatermarkOverlay?) async throws {
         if format == .svg {
-            guard summary.format == .svg, options.resize == nil else { throw ImageProcessingError.invalidOptions }
+            guard summary.format == .svg, options.resize == nil, options.transform.isIdentity, overlay == nil else { throw ImageProcessingError.invalidOptions }
             let document = try Self.svgDocument(source)
             func optimize(_ node: XMLNode) {
                 for child in node.children ?? [] {
@@ -385,12 +488,33 @@ public struct ImageProcessingService: Sendable {
             return
         }
         if summary.frameCount > 1 {
-            try await encodeAnimation(source, summary: summary, format: format, options: options, output: output, work: work)
+            try await encodeAnimation(source, summary: summary, format: format, options: options, output: output, work: work, overlay: overlay)
             return
         }
         let image = work.appendingPathComponent("prepared.v")
         var arguments: [String]
-        let loader = source.path + "[fail-on=error]"
+        var loader = source.path + "[fail-on=error]"
+        if !options.transform.isIdentity {
+            let normalized = work.appendingPathComponent("normalized.v")
+            _ = try await run(["autorot", loader, normalized.path], in: work)
+            var transformed = normalized
+            if options.transform.rotation != .none {
+                let rotated = work.appendingPathComponent("rotated.v")
+                _ = try await run(["rot", transformed.path, rotated.path, "d\(options.transform.rotation.rawValue)"], in: work)
+                transformed = rotated
+            }
+            if options.transform.flipHorizontal {
+                let mirrored = work.appendingPathComponent("mirrored-horizontal.v")
+                _ = try await run(["flip", transformed.path, mirrored.path, "horizontal"], in: work)
+                transformed = mirrored
+            }
+            if options.transform.flipVertical {
+                let mirrored = work.appendingPathComponent("mirrored-vertical.v")
+                _ = try await run(["flip", transformed.path, mirrored.path, "vertical"], in: work)
+                transformed = mirrored
+            }
+            loader = transformed.path
+        }
         if let resize = options.resize {
             arguments = ["thumbnail", loader, image.path, String(resize.width ?? 150_000),
                          "--height=\(resize.height ?? 150_000)", "--size=down", "--fail-on=error"]
@@ -414,11 +538,17 @@ public struct ImageProcessingService: Sendable {
                               "--extend=background", "--background=\(options.backgroundChannels!)"], in: work)
             prepared = image
         }
+        if let overlay {
+            let watermarked = work.appendingPathComponent("watermarked.v")
+            _ = try await run(["composite2", prepared.path, overlay.url.path, watermarked.path, "over",
+                              "--x=\(overlay.x)", "--y=\(overlay.y)", "--compositing-space=srgb"], in: work)
+            prepared = watermarked
+        }
         _ = try await run(Self.saveArguments(prepared, output: output, format: format, options: options), in: work)
     }
 
     private func encodeAnimation(_ sourceURL: URL, summary: ImageFileSummary, format: ImageOutputFormat,
-                                 options: ImageProcessingOptions, output: URL, work: URL) async throws {
+                                 options: ImageProcessingOptions, output: URL, work: URL, overlay: ImageWatermarkOverlay?) async throws {
         guard [.png, .webp, .jpegXL, .avif].contains(format), [.png, .webp, .jpegXL, .avif].contains(summary.format) else {
             throw ImageProcessingError.animationUnsupported(format)
         }
@@ -466,10 +596,11 @@ public struct ImageProcessingService: Sendable {
             delays.append(Int((delay * 1_000).rounded()))
             let frameSummary = ImageFileSummary(width: summary.width, height: summary.height, frameCount: 1, fileSize: 0, format: .png, hasMetadata: false)
             let compressed = work.appendingPathComponent("frame-compressed.png")
-            try await encode(input, summary: frameSummary, format: .png, options: options, output: compressed, work: work, stableCrop: true)
+            try await encode(input, summary: frameSummary, format: .png, options: options, output: compressed, work: work, stableCrop: true, overlay: overlay)
             if let destination {
                 guard let compressedSource = CGImageSourceCreateWithURL(compressed as CFURL, nil),
-                      let compressedFrame = CGImageSourceCreateImageAtIndex(compressedSource, 0, nil) else { throw ImageProcessingError.invalidOutput }
+                      // The frame file is overwritten on the next iteration; decode before ImageIO retains it.
+                      let compressedFrame = CGImageSourceCreateImageAtIndex(compressedSource, 0, [kCGImageSourceShouldCacheImmediately: true] as CFDictionary) else { throw ImageProcessingError.invalidOutput }
                 var savedProperties = options.preserveMetadata ? frameProperties : [:]
                 savedProperties[kCGImagePropertyOrientation] = 1
                 savedProperties[kCGImagePropertyPNGDictionary] = [kCGImagePropertyAPNGDelayTime: delay, kCGImagePropertyAPNGUnclampedDelayTime: delay]
@@ -499,7 +630,7 @@ public struct ImageProcessingService: Sendable {
             let xml = try await run(["-f", "getext", stack.path], in: work, tool: "vipsheader")
             let document = try XMLDocument(data: xml.standardOutput)
             guard let meta = document.rootElement()?.elements(forName: "meta").first else { throw ImageProcessingError.invalidOutput }
-            let dimensions = options.resize?.dimensions(for: summary) ?? (summary.width, summary.height)
+            let dimensions = options.dimensions(for: summary)
             for (name, type, value) in [("page-height", "gint", String(dimensions.1)), ("n-pages", "gint", String(summary.frameCount)),
                                         ("loop", "gint", String(loop)), ("delay", "VipsArrayInt", delays.map(String.init).joined(separator: " "))] {
                 for field in meta.elements(forName: "field") where field.attribute(forName: "name")?.stringValue == name { field.detach() }

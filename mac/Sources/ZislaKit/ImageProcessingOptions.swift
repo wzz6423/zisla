@@ -6,6 +6,11 @@ public enum ImageToolOperation: String, CaseIterable, Identifiable, Sendable {
     case convert
     case resize
     case smallest
+    case transform
+    case watermark
+    case obscure
+    case recognize
+    case extract
 
     public var id: Self { self }
 
@@ -15,6 +20,11 @@ public enum ImageToolOperation: String, CaseIterable, Identifiable, Sendable {
         case .convert: "转换格式"
         case .resize: "缩放与裁剪"
         case .smallest: "选择最小格式"
+        case .transform: "旋转与镜像"
+        case .watermark: "添加水印"
+        case .obscure: "马赛克与模糊"
+        case .recognize: "识别文字与表格"
+        case .extract: "本地抠图"
         }
     }
 
@@ -24,6 +34,11 @@ public enum ImageToolOperation: String, CaseIterable, Identifiable, Sendable {
         case .convert: "同时导出 PNG、JPEG、WebP、AVIF 或 JPEG XL"
         case .resize: "按尺寸缩放，或智能裁剪为缩略图"
         case .smallest: "比较五种格式，仅导出体积最小的图片"
+        case .transform: "批量旋转或水平、垂直翻转图片"
+        case .watermark: "批量叠加文字或图片水印"
+        case .obscure: "框选或涂抹需要遮挡的区域"
+        case .recognize: "本地识别图片，导出文字或表格"
+        case .extract: "提取主体、背景，或自由圈选"
         }
     }
 
@@ -33,8 +48,15 @@ public enum ImageToolOperation: String, CaseIterable, Identifiable, Sendable {
         case .convert: "arrow.triangle.2.circlepath"
         case .resize: "crop"
         case .smallest: "checkmark.seal"
+        case .transform: "arrow.triangle.2.circlepath"
+        case .watermark: "seal"
+        case .obscure: "square.grid.3x3"
+        case .recognize: "text.viewfinder"
+        case .extract: "person.crop.square"
         }
     }
+
+    public var requiresRasterEditing: Bool { self == .obscure || self == .extract }
 }
 
 public enum ImageOutputFormat: String, CaseIterable, Identifiable, Sendable {
@@ -114,6 +136,101 @@ public struct ImageResizeOptions: Equatable, Sendable {
     }
 }
 
+public enum ImageRotation: Int, CaseIterable, Identifiable, Sendable {
+    case none = 0
+    case clockwise90 = 90
+    case halfTurn = 180
+    case clockwise270 = 270
+
+    public var id: Self { self }
+    public var title: String {
+        switch self {
+        case .none: "不旋转"
+        case .clockwise90: "顺时针 90°"
+        case .halfTurn: "旋转 180°"
+        case .clockwise270: "顺时针 270°"
+        }
+    }
+}
+
+public struct ImageTransformOptions: Equatable, Sendable {
+    public static let identity = Self()
+    public var rotation: ImageRotation
+    public var flipHorizontal: Bool
+    public var flipVertical: Bool
+
+    public init(rotation: ImageRotation = .none, flipHorizontal: Bool = false, flipVertical: Bool = false) {
+        self.rotation = rotation
+        self.flipHorizontal = flipHorizontal
+        self.flipVertical = flipVertical
+    }
+
+    public var isIdentity: Bool { self == .identity }
+
+    func dimensions(for summary: ImageFileSummary) -> (width: Int, height: Int) {
+        rotation == .clockwise90 || rotation == .clockwise270 ? (summary.height, summary.width) : (summary.width, summary.height)
+    }
+}
+
+public enum ImageWatermarkContent: Equatable, Sendable {
+    case text(String)
+    case image(URL)
+}
+
+public enum ImageWatermarkPosition: String, CaseIterable, Identifiable, Sendable {
+    case center
+    case topLeft
+    case topRight
+    case bottomLeft
+    case bottomRight
+
+    public var id: Self { self }
+    public var title: String {
+        switch self {
+        case .center: "居中"
+        case .topLeft: "左上"
+        case .topRight: "右上"
+        case .bottomLeft: "左下"
+        case .bottomRight: "右下"
+        }
+    }
+}
+
+public struct ImageWatermarkOptions: Equatable, Sendable {
+    public static let maximumTextLength = 4_096
+    public var content: ImageWatermarkContent
+    public var opacity: Double
+    public var scale: Double
+    public var position: ImageWatermarkPosition
+    public var color: String
+
+    public init(content: ImageWatermarkContent, opacity: Double = 0.35, scale: Double = 0.3,
+                position: ImageWatermarkPosition = .bottomRight, color: String = "#FFFFFF") {
+        self.content = content
+        self.opacity = opacity
+        self.scale = scale
+        self.position = position
+        self.color = color
+    }
+
+    public var isValid: Bool {
+        guard (0...1).contains(opacity), (0.01...1).contains(scale) else { return false }
+        switch content {
+        case let .text(text):
+            return !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+                && text.utf16.count <= Self.maximumTextLength && colorValue != nil
+                && text.unicodeScalars.allSatisfy { ($0.value >= 0x20 && !(0x7F...0x9F).contains($0.value)) || "\n\r\t".unicodeScalars.contains($0) }
+        case let .image(url): return url.isFileURL
+        }
+    }
+
+    var colorValue: UInt32? {
+        let hex = color.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard hex.count == 7, hex.first == "#", hex.dropFirst().allSatisfy(\.isHexDigit) else { return nil }
+        return UInt32(hex.dropFirst(), radix: 16)
+    }
+}
+
 public struct ImageProcessingOptions: Equatable, Sendable {
     public var formats: [ImageOutputFormat]
     public var smallestOnly: Bool
@@ -121,10 +238,13 @@ public struct ImageProcessingOptions: Equatable, Sendable {
     public var resize: ImageResizeOptions?
     public var preserveMetadata: Bool
     public var background: String
+    public var transform: ImageTransformOptions
+    public var watermark: ImageWatermarkOptions?
 
     public init(
         formats: [ImageOutputFormat] = [], smallestOnly: Bool = false, quality: Int = 80,
-        resize: ImageResizeOptions? = nil, preserveMetadata: Bool = false, background: String = "#FFFFFF"
+        resize: ImageResizeOptions? = nil, preserveMetadata: Bool = false, background: String = "#FFFFFF",
+        transform: ImageTransformOptions = .identity, watermark: ImageWatermarkOptions? = nil
     ) {
         self.formats = formats
         self.smallestOnly = smallestOnly
@@ -132,10 +252,19 @@ public struct ImageProcessingOptions: Equatable, Sendable {
         self.resize = resize
         self.preserveMetadata = preserveMetadata
         self.background = background
+        self.transform = transform
+        self.watermark = watermark
     }
 
     public var isValid: Bool {
-        (1...100).contains(quality) && (resize?.isValid ?? true) && backgroundChannels != nil
+        (1...100).contains(quality) && (resize?.isValid ?? true) && backgroundChannels != nil && (watermark?.isValid ?? true)
+    }
+
+    func dimensions(for summary: ImageFileSummary) -> (width: Int, height: Int) {
+        let transformed = transform.dimensions(for: summary)
+        let rotated = ImageFileSummary(width: transformed.width, height: transformed.height,
+            frameCount: summary.frameCount, fileSize: summary.fileSize, format: summary.format, hasMetadata: summary.hasMetadata)
+        return resize?.dimensions(for: rotated) ?? transformed
     }
 
     var backgroundChannels: String? {

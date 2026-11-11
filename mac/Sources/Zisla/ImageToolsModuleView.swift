@@ -7,7 +7,9 @@ import ZislaKit
 struct ImageToolsModuleView: View {
     @ObservedObject private var tools: ManagedToolService
     private let saveLocations: SaveLocationStore
+    private let settingsStore: FeatureSettingsStore
     @StateObject private var store = ImageToolsModel()
+    @StateObject private var recognition = ImageToolsRecognitionModel()
     @State private var operation: ImageToolOperation
     @State private var formats = Set(ImageOutputFormat.conversionFormats)
     @State private var quality = 80.0
@@ -18,11 +20,15 @@ struct ImageToolsModuleView: View {
     @State private var background = "#FFFFFF"
     @State private var dropTargeted = false
     @State private var comparisonItem: ImageProcessedItem?
+    @State private var transform = ImageTransformOptions.identity
+    @State private var watermark = ImageWatermarkOptions(content: .text(""))
+    @State private var extractionMode: ScreenshotExtractionMode = .foreground
     @Environment(\.colorScheme) private var colorScheme
 
     init(model: AppModel, initialOperation: ImageToolOperation = .compress) {
         tools = model.managedTools
         saveLocations = model.saveLocations
+        settingsStore = model.settingsStore
         _operation = State(initialValue: initialOperation)
     }
 
@@ -44,7 +50,7 @@ struct ImageToolsModuleView: View {
                     .buttonStyle(PressableStyle(hoverScale: 1.018, pressedScale: 0.965))
                     .accessibilityAddTraits(operation == item ? .isSelected : [])
                     .settingsSearchAnchor(.imageOperation(item))
-                    .disabled(store.isProcessing)
+                    .disabled(isProcessing)
                 }
             }
             .frame(width: 176)
@@ -60,7 +66,9 @@ struct ImageToolsModuleView: View {
                 inputSection
                 configuration
                 actions
-                if let batch = store.batch {
+                if operation == .recognize {
+                    ImageToolsRecognitionResultsView(model: recognition, saveLocations: saveLocations)
+                } else if let batch = store.batch {
                     results(batch)
                 }
             }
@@ -68,9 +76,26 @@ struct ImageToolsModuleView: View {
         }
         .controlSize(.regular)
         .textFieldStyle(.roundedBorder)
-        .onDisappear { store.cancel() }
+        .onDisappear { store.cancel(); recognition.cancel() }
+        .onChange(of: operation) { _, _ in
+            store.discardResults()
+            store.discardEdits()
+            store.message = nil
+            recognition.clear()
+        }
+        .onChange(of: extractionMode) { _, _ in
+            store.discardResults()
+            store.discardEdits()
+            store.message = nil
+        }
         .sheet(item: $comparisonItem) { item in
             ImageComparisonView(item: item, service: service)
+        }
+        .sheet(item: $store.editorInput) { input in
+            ImageToolsEditorView(image: input.image, settingsStore: settingsStore, saveLocations: saveLocations,
+                                 initialTool: operation == .extract ? .extraction : .mosaic) { image in
+                store.recordEdit(image, for: input.inputURL)
+            }
         }
         .task { await tools.refreshInstalledVersions() }
     }
@@ -79,6 +104,10 @@ struct ImageToolsModuleView: View {
         ImageProcessingService(executableURL: tools.resolvedExecutable(for: .libvips)?.url,
                                avifExecutableURL: tools.resolvedExecutable(for: .libavif)?.url)
     }
+
+    private var isProcessing: Bool { store.isProcessing || recognition.isProcessing }
+
+    private var usesEditor: Bool { operation == .obscure || (operation == .extract && extractionMode == .lasso) }
 
     private var inputSection: some View {
         VStack(alignment: .leading, spacing: 12) {
@@ -95,67 +124,94 @@ struct ImageToolsModuleView: View {
                     Button(AppLocalization.text("清空")) {
                         store.inputs = []
                         store.discardResults()
+                        store.discardEdits()
+                        recognition.clear()
                         store.message = nil
                     }
                 }
             }
             .buttonStyle(.bordered)
-            .disabled(store.isProcessing)
+            .disabled(isProcessing)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(16)
         .background(Color.primary.opacity(colorScheme == .dark ? 0.045 : 0.025), in: RoundedRectangle(cornerRadius: 12))
         .overlay(RoundedRectangle(cornerRadius: 12).stroke(dropTargeted ? Color.accentColor : Color.clear))
         .onDrop(of: [UTType.fileURL.identifier], delegate: TransferDropDelegate(isTargeted: $dropTargeted) { items in
+            guard !isProcessing else { return }
             store.addInputs(items.compactMap { if case .file(let url) = $0 { url } else { nil } })
         })
     }
 
     private var configuration: some View {
         VStack(alignment: .leading, spacing: 14) {
-            if operation == .convert || operation == .smallest {
-                VStack(alignment: .leading, spacing: 8) {
-                    AppLocalizedText("输出格式").font(.system(size: 12, weight: .medium))
-                    HStack {
-                        ForEach(ImageOutputFormat.conversionFormats) { format in
-                            Toggle(format.displayName, isOn: Binding(
-                                get: { formats.contains(format) },
-                                set: { if $0 { formats.insert(format) } else { formats.remove(format) } }
-                            ))
-                            .toggleStyle(.checkbox)
+            if operation == .transform { ImageTransformControls(options: $transform) }
+            if operation == .watermark { ImageWatermarkControls(options: $watermark) }
+            if operation == .extract {
+                Picker(AppLocalization.text("提取方式"), selection: $extractionMode) {
+                    ForEach(ScreenshotExtractionMode.allCases) { mode in AppLocalizedText(mode.title).tag(mode) }
+                }
+                .pickerStyle(.menu)
+            }
+            if usesEditor {
+                ForEach(store.inputs, id: \.self) { input in
+                    HStack(spacing: 8) {
+                        Text(input.lastPathComponent).lineLimit(2)
+                        Spacer()
+                        if store.editedImageURLs[input] != nil {
+                            Image(systemName: "checkmark.circle.fill").foregroundStyle(Color.zislaSuccess)
+                                .accessibilityLabel(AppLocalization.text("已编辑"))
                         }
+                        Button(AppLocalization.text("编辑")) { store.prepareEditor(input, service: service) }
+                            .buttonStyle(.bordered)
                     }
                 }
             }
-            HStack {
-                AppLocalizedText("图片质量")
-                Slider(value: $quality, in: 1...100, step: 1)
-                    .accessibilityLabel(AppLocalization.text("图片质量"))
-                Text(Int(quality).formatted()).monospacedDigit().frame(width: 30)
-            }
-            if operation == .resize {
-                Picker(AppLocalization.text("缩放方式"), selection: $resizeMethod) {
-                    ForEach(ImageResizeMethod.allCases) { method in AppLocalizedText(method.title).tag(method) }
+            if operation != .recognize && !operation.requiresRasterEditing {
+                if operation == .convert || operation == .smallest {
+                    VStack(alignment: .leading, spacing: 8) {
+                        AppLocalizedText("输出格式").font(.system(size: 12, weight: .medium))
+                        HStack {
+                            ForEach(ImageOutputFormat.conversionFormats) { format in
+                                Toggle(format.displayName, isOn: Binding(
+                                    get: { formats.contains(format) },
+                                    set: { if $0 { formats.insert(format) } else { formats.remove(format) } }
+                                ))
+                                .toggleStyle(.checkbox)
+                            }
+                        }
+                    }
                 }
-                .pickerStyle(.menu)
                 HStack {
-                    TextField(AppLocalization.text("宽度（像素）"), text: $width)
-                    TextField(AppLocalization.text("高度（像素）"), text: $height)
+                    AppLocalizedText("图片质量")
+                    Slider(value: $quality, in: 1...100, step: 1)
+                        .accessibilityLabel(AppLocalization.text("图片质量"))
+                    Text(Int(quality).formatted()).monospacedDigit().frame(width: 30)
                 }
-                AppLocalizedText("仅缩小图片；按单边缩放时留空另一边")
-                    .font(.system(size: 11)).foregroundStyle(.secondary)
+                if operation == .resize {
+                    Picker(AppLocalization.text("缩放方式"), selection: $resizeMethod) {
+                        ForEach(ImageResizeMethod.allCases) { method in AppLocalizedText(method.title).tag(method) }
+                    }
+                    .pickerStyle(.menu)
+                    HStack {
+                        TextField(AppLocalization.text("宽度（像素）"), text: $width)
+                        TextField(AppLocalization.text("高度（像素）"), text: $height)
+                    }
+                    AppLocalizedText("仅缩小图片；按单边缩放时留空另一边")
+                        .font(.system(size: 11)).foregroundStyle(.secondary)
+                }
+                Toggle(AppLocalization.text("保留元数据"), isOn: $preserveMetadata)
+                    .help(AppLocalization.text("包括版权、拍摄时间和 GPS 位置"))
+                HStack {
+                    AppLocalizedText("透明背景填充色")
+                    TextField("#FFFFFF", text: $background).frame(maxWidth: 110)
+                        .accessibilityLabel(AppLocalization.text("透明背景填充色"))
+                }
+                .help(AppLocalization.text("用于 JPEG 转换或缩略图留白"))
             }
-            Toggle(AppLocalization.text("保留元数据"), isOn: $preserveMetadata)
-                .help(AppLocalization.text("包括版权、拍摄时间和 GPS 位置"))
-            HStack {
-                AppLocalizedText("透明背景填充色")
-                TextField("#FFFFFF", text: $background).frame(maxWidth: 110)
-                    .accessibilityLabel(AppLocalization.text("透明背景填充色"))
-            }
-            .help(AppLocalization.text("用于 JPEG 转换或缩略图留白"))
         }
         .font(.system(size: 12))
-        .disabled(store.isProcessing)
+        .disabled(isProcessing)
     }
 
     private var options: ImageProcessingOptions {
@@ -163,34 +219,58 @@ struct ImageToolsModuleView: View {
             formats: operation == .smallest || operation == .convert ? Array(formats) : [],
             smallestOnly: operation == .smallest, quality: Int(quality),
             resize: operation == .resize ? ImageResizeOptions(method: resizeMethod, width: Int(width), height: Int(height)) : nil,
-            preserveMetadata: preserveMetadata, background: background
+            preserveMetadata: preserveMetadata, background: background,
+            transform: operation == .transform ? transform : .identity,
+            watermark: operation == .watermark ? watermark : nil
         )
     }
 
     private var actions: some View {
         VStack(alignment: .leading, spacing: 10) {
-            if store.isProcessing {
-                if store.total > 0 {
-                    ProgressView(value: Double(store.completed), total: Double(store.total))
-                    Text(AppLocalization.text("正在处理 %ld / %ld", store.completed, store.total)).font(.system(size: 12))
+            if isProcessing {
+                let completed = recognition.isProcessing ? recognition.completed : store.completed
+                let total = recognition.isProcessing ? recognition.total : store.total
+                if total > 0 {
+                    ProgressView(value: Double(completed), total: Double(total))
+                    Text(AppLocalization.text("正在处理 %ld / %ld", completed, total)).font(.system(size: 12))
                 } else { ProgressView() }
-            } else if let message = store.message {
+            } else if let message = operation == .recognize ? recognition.message ?? store.message : store.message {
                 Text(message).font(.system(size: 12)).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
             }
             HStack {
                 Spacer()
-                if store.isProcessing {
-                    Button(AppLocalization.text("取消")) { store.cancel() }.buttonStyle(.bordered)
+                if isProcessing {
+                    Button(AppLocalization.text("取消")) { store.cancel(); recognition.cancel() }.buttonStyle(.bordered)
                 } else {
                     Button(AppLocalization.text("开始处理")) {
-                        store.start(service: service, options: options)
+                        startProcessing()
                     }
                     .buttonStyle(SettingsTintedButtonStyle())
-                    .disabled(store.inputs.isEmpty || !options.isValid || tools.resolvedExecutable(for: .libvips) == nil
-                              || (operation == .resize && ((!width.isEmpty && Int(width) == nil) || (!height.isEmpty && Int(height) == nil)))
-                              || ((operation == .convert || operation == .smallest) && formats.isEmpty))
+                    .disabled(!canProcess)
                 }
             }
+        }
+    }
+
+    private var canProcess: Bool {
+        guard !store.inputs.isEmpty else { return false }
+        if usesEditor { return !store.editedImageURLs.isEmpty }
+        if operation == .recognize || operation == .extract { return true }
+        return options.isValid
+            && !(operation == .resize && ((!width.isEmpty && Int(width) == nil) || (!height.isEmpty && Int(height) == nil)))
+            && !((operation == .convert || operation == .smallest) && formats.isEmpty)
+            && !(operation == .transform && transform.isIdentity)
+    }
+
+    private func startProcessing() {
+        if operation == .recognize {
+            recognition.start(urls: store.inputs, service: service)
+        } else if usesEditor {
+            store.startEdited(service: service)
+        } else if operation == .extract {
+            store.startExtraction(service: service, mode: extractionMode)
+        } else {
+            store.start(service: service, options: options)
         }
     }
 

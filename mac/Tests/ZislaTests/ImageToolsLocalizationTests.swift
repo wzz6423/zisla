@@ -9,6 +9,10 @@ struct ImageToolsLocalizationTests {
     func imageToolsLabelsAndFailuresUseEveryRequestedLanguage(language: AppLanguage) throws {
         let root = URL(fileURLWithPath: #filePath).deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent()
         let paths = ["Sources/Zisla/ImageToolsModuleView.swift", "Sources/Zisla/ImageToolsModel.swift",
+                     "Sources/Zisla/ImageTransformControls.swift", "Sources/Zisla/ImageWatermarkControls.swift",
+                     "Sources/Zisla/ImageToolsEditorView.swift", "Sources/Zisla/ImageToolsRecognitionModel.swift",
+                     "Sources/Zisla/ImageToolsRecognitionResultsView.swift", "Sources/Zisla/ImageToolsExtraction.swift",
+                     "Sources/ZislaKit/ImageWatermarkRenderer.swift",
                      "Sources/ZislaKit/ImageProcessingService.swift", "Sources/ZislaKit/ImageProcessingOptions.swift"]
         let expression = try NSRegularExpression(pattern: #""([^"\n]*[\u4e00-\u9fff][^"\n]*)""#)
         var keys = Set<String>()
@@ -33,8 +37,7 @@ struct ImageToolsLocalizationTests {
             #expect(markers(value) == markers(key))
             #expect(AppLocalization.string(key, locale: language.locale) == value)
             if language != .english && language != .simplifiedChinese,
-               [SettingsSection.imageTools.title, SettingsSection.imageTools.subtitle, ImageToolOperation.compress.detail,
-                ImageToolOperation.convert.detail, ImageToolOperation.resize.detail, ImageToolOperation.smallest.detail].contains(key) {
+               ([SettingsSection.imageTools.title, SettingsSection.imageTools.subtitle] + ImageToolOperation.allCases.map(\.detail)).contains(key) {
                 #expect(value != english[key], "\(language.rawValue) copied the English text for \(key)")
             }
         }
