@@ -196,7 +196,6 @@ struct SystemMetricsHistorySettingsActions: View {
                 } label: {
                     Label(AppLocalization.string("导出", locale: locale), systemImage: "square.and.arrow.up")
                 }
-                .buttonStyle(.borderedProminent)
                 .disabled(service.historyStats.count == 0 || isExporting)
                 .help(AppLocalization.string("把全部历史读数导出为 xlsx 表格", locale: locale))
                 Button {
