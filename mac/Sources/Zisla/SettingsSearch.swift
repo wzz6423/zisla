@@ -72,7 +72,7 @@ enum SettingsSearchIndex {
         rows(.features, [
             "每日简报",
             "显示推荐工具", "媒体播放", "Mac 未使用时关闭背景音", "中转站", "晃动唤出中转窗口",
-            "链接下载", "剪贴板历史", "自动删除剪贴板历史", "剪贴板链接检测", "快捷操作", "日历日程", "天气", "邮件",
+            "链接下载", "剪贴板历史", "剪贴板链接检测", "快捷操作", "日历日程", "天气", "邮件",
             "侧翼通知", "锁屏信息", "专注倒计时", "工具箱提醒", "用户关怀", "AI 进度与用量", "AI 任务结果扫光",
             "语音输入", "窗口预览", "小工具", "随记", "PDF 工具", "应用音量混音器",
             "键盘音效", "合盖动画", "预览动画", "启用截图", "鼠标移入展开", "显示 zisla 图标",
@@ -81,15 +81,29 @@ enum SettingsSearchIndex {
         ])
         entry(.features, "系统状态与清理", anchor: .row("系统状态与清理"),
               keywords: ["电池监控"])
+        entry(.features, "自动切换电源模式", anchor: .row("自动切换电源模式"),
+              keywords: ["电源模式"])
+        if settings.systemMonitorEnabled && settings.automaticPowerModeEnabled {
+            entry(.scheduledCleanup, "插电默认模式", anchor: .row("插电默认模式"),
+                  keywords: ["电源模式"] + BatteryPowerMode.allCases.map(\.menuTitle))
+            entry(.scheduledCleanup, "脱电默认模式", anchor: .row("脱电默认模式"),
+                  keywords: ["电源模式"] + BatteryPowerMode.allCases.map(\.menuTitle))
+            entry(.scheduledCleanup, "20%及以下固定省电", anchor: .row("20%及以下固定省电"),
+                  keywords: ["电量不高于20%时保持省电，插电也不切换；超过20%后恢复对应默认模式"])
+        }
         if settings.recommendedToolsEnabled {
             rows(.features, ["自动更新推荐工具"])
         }
         if settings.systemMonitorEnabled {
-            entry(.features, "自动清理系统垃圾", anchor: .row("自动清理系统垃圾"),
+            entry(.scheduledCleanup, "自动清理系统垃圾", anchor: .row("自动清理系统垃圾"),
                   keywords: ["系统状态与清理"] + VoiceRecordingCleanupPolicy.allCases.map(\.menuTitle))
-            entry(.features, "清理范围", anchor: .row("清理范围"),
+            entry(.scheduledCleanup, "清理范围", anchor: .row("清理范围"),
                   keywords: ["自动清理系统垃圾"] + SystemCleanupScope.allCases.map(\.menuTitle))
         }
+        entry(.scheduledCleanup, "自动删除剪贴板历史", anchor: .row("自动删除剪贴板历史"),
+              keywords: ["按所选周期删除过期历史，常用项目继续保留"] + VoiceRecordingCleanupPolicy.allCases.map(\.menuTitle))
+        entry(.scheduledCleanup, "定时倾倒废纸篓", anchor: .row("定时倾倒废纸篓"),
+              keywords: ["按所选间隔永久删除废纸篓中的所有项目，无法恢复"] + VoiceRecordingCleanupPolicy.allCases.map(\.menuTitle))
 
         for operation in PDFToolOperation.allCases {
             entry(.pdfTools, operation.title, anchor: .pdfOperation(operation), keywords: [operation.detail])

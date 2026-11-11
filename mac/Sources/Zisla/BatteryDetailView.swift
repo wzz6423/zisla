@@ -579,6 +579,7 @@ struct BatteryTrendPresentation {
 struct BatteryDetailView: View {
     @ObservedObject var batteryMonitor: BatteryMonitor
     @ObservedObject var networkMonitor: NetworkBatteryMonitor
+    let onTransientMessage: (String) -> Void
 
     @Environment(\.locale) private var locale
 
@@ -608,31 +609,13 @@ struct BatteryDetailView: View {
 
     func localBatterySection(_ battery: BatterySnapshot) -> some View {
         VStack(alignment: .leading, spacing: 8) {
-            HStack {
-                Label(localized("本机电池"), systemImage: "laptopcomputer")
-                    .font(.system(size: 12, weight: .semibold))
+            localBatteryHeader(battery, locale: locale) {
                 BatteryPowerModeButton(
                     isPluggedIn: battery.isPluggedIn,
                     isLowPowerMode: battery.isLowPowerMode
                 )
-                Spacer(minLength: 8)
-                batteryHistoryView(for: battery)
-                Text(BatteryLocalization.summaryStatusText(battery, locale: locale))
-                    .font(.system(size: 9, weight: .medium))
-                    .foregroundStyle(.secondary)
-                HStack(spacing: 4) {
-                    Image(systemName: battery.symbolName)
-                        .foregroundStyle(Self.batteryLevelTint(battery.level, isLowPowerMode: battery.isLowPowerMode))
-                    Text("\(battery.percentInt)%")
-                        .monospacedDigit()
-                }
-                .font(.system(size: 10, weight: .semibold, design: .rounded))
-                if battery.isLowPowerMode {
-                    Image(systemName: "leaf.fill")
-                        .font(.system(size: 9, weight: .semibold))
-                        .foregroundStyle(Color.zislaSuccess)
-                        .help(localized("低电量模式已开启"))
-                }
+            } chargingAction: {
+                BatteryChargeToFullButton(batteryMonitor: batteryMonitor, onTransientMessage: onTransientMessage)
             }
 
             LocalPowerFlowView(battery: battery)
@@ -651,6 +634,41 @@ struct BatteryDetailView: View {
                     value: timeRemainingText(minutes)
                 )
                 .padding(.horizontal, 2)
+            }
+        }
+    }
+
+    /// Separates live controllers from layout so constrained rendering never changes system power policy.
+    func localBatteryHeader<PowerMode: View, ChargingAction: View>(
+        _ battery: BatterySnapshot,
+        locale: Locale,
+        @ViewBuilder powerMode: () -> PowerMode,
+        @ViewBuilder chargingAction: () -> ChargingAction
+    ) -> some View {
+        HStack {
+            Label(BatteryLocalization.string("本机电池", locale: locale), systemImage: "laptopcomputer")
+                .font(.system(size: 12, weight: .semibold))
+                .fitsSingleLine()
+            powerMode()
+            Spacer(minLength: 8)
+            batteryHistoryView(for: battery)
+            chargingAction()
+            Text(BatteryLocalization.summaryStatusText(battery, locale: locale))
+                .font(.system(size: 9, weight: .medium))
+                .fitsSingleLine()
+                .foregroundStyle(.secondary)
+            HStack(spacing: 4) {
+                Image(systemName: battery.symbolName)
+                    .foregroundStyle(Self.batteryLevelTint(battery.level, isLowPowerMode: battery.isLowPowerMode))
+                Text("\(battery.percentInt)%")
+                    .monospacedDigit()
+            }
+            .font(.system(size: 10, weight: .semibold, design: .rounded))
+            if battery.isLowPowerMode {
+                Image(systemName: "leaf.fill")
+                    .font(.system(size: 9, weight: .semibold))
+                    .foregroundStyle(Color.zislaSuccess)
+                    .help(BatteryLocalization.string("低电量模式已开启", locale: locale))
             }
         }
     }

@@ -122,10 +122,6 @@ let package = Package(
                 .copy("../../Resources/BrandIcons"),
                 .copy("../../Resources/ThirdPartyLicenses"),
             ],
-            swiftSettings: [
-                // Preserve the portrait kernels' rendering behavior with Core Image's compatibility macro.
-                .unsafeFlags(["-Xcc", "-DCI_SILENCE_GL_DEPRECATION"]),
-            ],
             linkerSettings: [
                 .linkedFramework("Speech"),
                 .linkedFramework("WebKit"),
@@ -140,8 +136,10 @@ let package = Package(
                     "-Xlinker", "14.0",
                     "-Xlinker", linkedSDKVersion,
                 ]),
-            ]
+            ],
+            plugins: [.plugin(name: "RecordingPortraitKernels")]
         ),
+        .plugin(name: "RecordingPortraitKernels", capability: .buildTool()),
         .executableTarget(
             name: "zislactl",
             dependencies: ["ZislaCore"]

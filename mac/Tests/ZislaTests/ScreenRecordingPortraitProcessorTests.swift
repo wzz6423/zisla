@@ -27,6 +27,47 @@ struct ScreenRecordingPortraitProcessorTests {
         #expect(output.extent == image.extent)
     }
 
+    @Test func disabledAndEmptyFramesNeverLoadKernels() throws {
+        let image = try chart()
+        func unexpectedLoad() -> RecordingPortraitProcessor.Kernels? {
+            Issue.record("Disabled effects and empty scenes must not load kernels")
+            return nil
+        }
+        let disabled = RecordingPortraitProcessor(detector: { _, _, _ in
+            Issue.record("Disabled effects must not detect portraits"); return .init()
+        }, kernels: unexpectedLoad())
+        #expect(try bytes(disabled.apply(image, effects: .init())) == bytes(image))
+        let empty = RecordingPortraitProcessor(detector: { _, _, _ in .init() }, kernels: unexpectedLoad())
+        #expect(try bytes(empty.apply(image, effects: .init(brightening: 1, bodySlimming: 1))) == bytes(image))
+    }
+
+    @Test(arguments: ["smoothing", "brightening", "faceSlimming", "bodySlimming"])
+    func unavailableKernelsFailOnlyWhenAPortraitNeedsProcessing(_ effect: String) throws {
+        let image = try chart()
+        let effects: RecordingPortraitEffects
+        switch effect {
+        case "smoothing": effects = .init(smoothing: 1)
+        case "brightening": effects = .init(brightening: 1)
+        case "faceSlimming": effects = .init(faceSlimming: 1)
+        default: effects = .init(bodySlimming: 1)
+        }
+        let processor = RecordingPortraitProcessor(detector: { _, _, _ in .init(faces: [face], bodies: [body]) }, kernels: nil)
+        #expect(throws: ScreenRecordingExportError.cannotRender) { try processor.apply(image, effects: effects) }
+        #expect(try bytes(processor.apply(image, effects: .init())) == bytes(image),
+            "Disabling effects after a kernel failure must preserve the frame")
+        let emptyScene = RecordingPortraitProcessor(detector: { _, _, _ in .init() }, kernels: nil)
+        #expect(try bytes(emptyScene.apply(image, effects: effects)) == bytes(image),
+            "A frame without portraits must not require the Metal library")
+        let recovered = RecordingPortraitProcessor { _, _, _ in .init(faces: [face], bodies: [body]) }
+        #expect(try bytes(recovered.apply(image, effects: effects)) != bytes(image),
+            "The packaged kernels must render after an unavailable dependency")
+    }
+
+    @Test(arguments: [Data(), Data("invalid metallib".utf8)])
+    func damagedMetalLibrariesAreRejected(_ library: Data) {
+        #expect(throws: Error.self) { try RecordingPortraitProcessor.Kernels(library: library) }
+    }
+
     @Test func productionVisionLeavesAnEmptySceneUnchanged() throws {
         let image = CIImage(color: CIColor(red: 0.3, green: 0.3, blue: 0.3))
             .cropped(to: CGRect(x: 0, y: 0, width: 192, height: 192))
@@ -126,6 +167,52 @@ struct ScreenRecordingPortraitProcessorTests {
         let result = try bytes(processor.apply(image, effects: smoothing ? .init(smoothing: 1) : .init(brightening: 1)))
         let baseline = try bytes(image)
         #expect(stride(from: 3, to: result.count, by: 4).allSatisfy { result[$0] == baseline[$0] })
+    }
+
+    @Test func brighteningRetainsTheEllipticalMaskAndItsFeather() throws {
+        let extent = CGRect(x: 0, y: 0, width: 192, height: 192)
+        let region = CGRect(x: 56.5 / 192, y: 76.5 / 192, width: 80.0 / 192, height: 40.0 / 192)
+        let image = CIImage(color: CIColor(red: 0.25, green: 0.25, blue: 0.25)).cropped(to: extent)
+        let processor = RecordingPortraitProcessor { _, _, _ in .init(faces: [region]) }
+        let output = try processor.apply(image, effects: .init(brightening: 0.6))
+        let context = CIContext(options: [.workingColorSpace: NSNull(), .outputColorSpace: NSNull()])
+        for (x, y, feather) in [(96, 96, 1.0), (124, 96, 1.0), (130, 96, 0.5),
+            (136, 96, 0.0), (96, 113, 0.5), (120, 112, 0.0), (40, 40, 0.0)] {
+            let result = pixel(output, x: x, y: y, context: context)
+            let expected = Float(0.25 * (1 + (pow(2, 0.35) - 1) * 0.6 * feather))
+            #expect(result.prefix(3).allSatisfy { abs($0 - expected) < 0.000_01 },
+                "Brightening must retain the original elliptical inner area, feather, and protected background at (\(x), \(y))")
+            #expect(result[3] == 1)
+        }
+    }
+
+    @Test(arguments: [false, true])
+    func slimmingRetainsTheOriginalDisplacementCurve(_ faceEffect: Bool) throws {
+        var pixels = [Float](repeating: 1, count: 192 * 192 * 4)
+        for y in 0..<192 {
+            for x in 0..<192 {
+                let offset = (y * 192 + x) * 4
+                pixels[offset] = Float(x) / 192
+                pixels[offset + 1] = 0.2
+                pixels[offset + 2] = 0.3
+            }
+        }
+        let image = pixels.withUnsafeBytes { pointer in
+            CIImage(bitmapData: Data(pointer), bytesPerRow: 192 * 4 * MemoryLayout<Float>.size,
+                size: CGSize(width: 192, height: 192), format: .RGBAf, colorSpace: nil)
+        }
+        let region = CGRect(x: 56.5 / 192, y: 76.5 / 192, width: 80.0 / 192, height: 40.0 / 192)
+        let processor = RecordingPortraitProcessor { _, _, _ in .init(faces: [region], bodies: [region]) }
+        let output = try processor.apply(image, effects: faceEffect ? .init(faceSlimming: 0.6) : .init(bodySlimming: 0.6))
+        let amount = 0.6 * (faceEffect ? 0.22 : 0.18)
+        let context = CIContext(options: [.workingColorSpace: NSNull(), .outputColorSpace: NSNull()])
+        for (x, y, displacement) in [(96, 96, 0.0), (116, 96, 11.25 * amount),
+            (116, 106, 5 * amount), (136, 96, 0.0), (20, 20, 0.0)] {
+            let result = pixel(output, x: x, y: y, context: context)
+            #expect(abs(result[0] - Float((Double(x) + displacement) / 192)) < 0.000_01,
+                "Slimming must retain its original horizontal sampling displacement at (\(x), \(y))")
+            #expect(abs(result[1] - 0.2) < 0.000_01 && abs(result[2] - 0.3) < 0.000_01 && result[3] == 1)
+        }
     }
 
     @Test func partialRenderUsesTheSameWarpedSourcePixels() throws {
@@ -294,5 +381,14 @@ struct ScreenRecordingPortraitProcessorTests {
                 colorSpace: CGColorSpace(name: CGColorSpace.sRGB)!)
         }
         return bytes
+    }
+
+    private func pixel(_ image: CIImage, x: Int, y: Int, context: CIContext) -> [Float] {
+        var pixel = [Float](repeating: 0, count: 4)
+        pixel.withUnsafeMutableBytes { pointer in
+            context.render(image, toBitmap: pointer.baseAddress!, rowBytes: 4 * MemoryLayout<Float>.size,
+                bounds: CGRect(x: x, y: y, width: 1, height: 1), format: .RGBAf, colorSpace: nil)
+        }
+        return pixel
     }
 }

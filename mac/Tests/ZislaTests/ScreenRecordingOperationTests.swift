@@ -376,7 +376,7 @@ struct ScreenRecordingOperationTests {
         notices.enqueue(notice, expiresAfter: nil)
         notices.enqueue(IslandNotice(id: "voice-processing-left", title: "Voice"), expiresAfter: nil)
         let view = CompactStatusBarView(queue: notices, displayState: display, media: media,
-            browserDownloads: downloads, settingsStore: settings, resultSweep: sweep, onStatusHidden: {})
+            browserDownloads: downloads, settingsStore: settings, resultSweep: sweep, pomodoro: PomodoroService(notificationRequestHandler: { _ in }, defaults: defaults), onStatusHidden: {})
         #expect(view.recordingOperationNotice == nil)
         display.hidesVoiceProcessingIndicator = true
         #expect(view.recordingOperationNotice == notice,

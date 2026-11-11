@@ -313,7 +313,7 @@
 "可安全清理的缓存与日志当前为空" = "Sicher bereinigunfähige Caches und Protokolle sind derzeit leer";
 "展开" = "Erweitern";
 "移入废纸篓" = "In Papierkorb verschieben";
-"zisla 不会永久删除这些内容。" = "zisla wird diese Elemente nicht dauerhaft löschen.";
+"本次操作将项目移入废纸篓；废纸篓之后可能被清空，届时将永久删除。" = "Diese Aktion verschiebt Objekte in den Papierkorb. Wird er später geleert, werden die Objekte endgültig gelöscht.";
 
 /* Cleanup Categories */
 "应用缓存" = "App-Cache";
@@ -512,6 +512,8 @@
 "电池功率" = "Akkuleistung";
 "本机 Mac" = "Dieser Mac";
 "已充满" = "Vollständig geladen";
+"立即充至100%" = "Jetzt auf 100 % laden";
+"无法立即充至100%，请重试。" = "Der Akku konnte jetzt nicht auf 100 % geladen werden. Bitte erneut versuchen.";
 "充电中" = "Wird geladen";
 "电源已接通" = "Netzteil angeschlossen";
 "使用电池" = "Akkubetrieb";
@@ -2322,7 +2324,7 @@
 "%ld 核" = "%ld Kerne";
 "%ld 核 · " = "%ld Kerne · ";
 "已整理系统内存 %@" = "%@ Systemspeicher freigegeben";
-"其中 %ld 项需人工复核。zisla 不会永久删除这些内容。" = "Davon müssen %ld manuell geprüft werden. zisla löscht nie endgültig.";
+"其中 %ld 项需人工复核。本次操作将项目移入废纸篓；废纸篓之后可能被清空，届时将永久删除。" = "Davon müssen %ld manuell geprüft werden. Diese Aktion verschiebt Objekte in den Papierkorb. Wird er später geleert, werden die Objekte endgültig gelöscht.";
 "取消选择%@" = "%@ abwählen";
 "全选%@" = "Alle %@ auswählen";
 "反选%@" = "Auswahl in %@ umkehren";
@@ -3343,7 +3345,7 @@
 "麦克风监听已关闭：%@" = "Mikrofon-Mithören wurde deaktiviert: %@";
 
 "自动清理系统垃圾" = "Systemdatenmüll automatisch bereinigen";
-"按所选间隔移入废纸篓，不会永久删除" = "Im gewählten Intervall in den Papierkorb verschieben, ohne dauerhaftes Löschen";
+"按所选间隔移入废纸篓；清空废纸篓后将永久删除" = "Verschiebt Objekte im gewählten Intervall in den Papierkorb; beim Leeren werden sie endgültig gelöscht";
 "清理范围" = "Bereinigungsumfang";
 "仅可信" = "Nur vertrauenswürdige Einträge";
 "全部（包含需人工复核）" = "Alle (einschließlich zu prüfender Einträge)";
@@ -3384,8 +3386,97 @@
 "系统打不开应用时提醒" = "Hinweis, wenn macOS eine App nicht öffnen kann";
 "需要辅助功能权限；通过系统窗口事件提醒，不定时扫描" = "Benötigt Bedienungshilfen-Zugriff; nutzt Systemfensterereignisse ohne regelmäßige Suche";
 "4. 可开启“系统打不开应用时提醒”；无法确定应用路径时，请复制或拖入 .app。" = "4. Aktiviere bei Bedarf „Hinweis, wenn macOS eine App nicht öffnen kann“. Ist der Pfad unklar, kopiere die .app oder ziehe sie in die Ablage.";
+"保留 HDR" = "HDR beibehalten";
+"小雨" = "Leichter Regen";
+"中雨" = "Mäßiger Regen";
+"大雨" = "Starker Regen";
+"小雪" = "Leichter Schneefall";
+"中雪" = "Mäßiger Schneefall";
+"大雪" = "Starker Schneefall";
+"冻毛毛雨" = "Gefrierender Nieselregen";
+"冻雨" = "Gefrierender Regen";
+"雪粒" = "Schneegriesel";
+"小阵雨" = "Leichte Regenschauer";
+"强阵雨" = "Starke Regenschauer";
+"小阵雪" = "Leichte Schneeschauer";
+"强阵雪" = "Starke Schneeschauer";
+"强雷阵雨" = "Schweres Gewitter";
+"雨夹雪" = "Schneeregen";
+"小雨夹雪" = "Leichter Schneeregen";
+"强雨夹雪" = "Starker Schneeregen";
+"阵性雨夹雪" = "Schneeregenschauer";
+"小阵性雨夹雪" = "Leichte Schneeregenschauer";
+"强阵性雨夹雪" = "Starke Schneeregenschauer";
+"暴雨" = "Sturzregen";
+"大暴雨" = "Sehr starker Sturzregen";
+"特大暴雨" = "Extremer Sturzregen";
+"暴雪" = "Schneesturm";
+"小到中雨" = "Leichter bis mäßiger Regen";
+"中到大雨" = "Mäßiger bis starker Regen";
+"大到暴雨" = "Starker Regen bis Sturzregen";
+"暴雨到大暴雨" = "Sturzregen bis sehr starker Sturzregen";
+"大暴雨到特大暴雨" = "Sehr starker bis extremer Sturzregen";
+"小到中雪" = "Leichter bis mäßiger Schneefall";
+"中到大雪" = "Mäßiger bis starker Schneefall";
+"大到暴雪" = "Starker Schneefall bis Schneesturm";
+"浓雾" = "Dichter Nebel";
+"强浓雾" = "Sehr dichter Nebel";
+"大雾" = "Starker Nebel";
+"特强浓雾" = "Extrem dichter Nebel";
+"霾" = "Dunst";
+"中度霾" = "Mäßiger Dunst";
+"重度霾" = "Starker Dunst";
+"严重霾" = "Sehr starker Dunst";
+"沙尘暴" = "Staubsturm";
+"浮尘" = "Schwebender Staub";
+"扬沙" = "Wehender Sand";
+"强沙尘暴" = "Schwerer Staubsturm";
+"雨伴雷电" = "Regen mit Donner";
+"小雨伴雷电" = "Leichter Regen mit Donner";
+"大雨伴雷电" = "Starker Regen mit Donner";
+"阵雨伴雷电" = "Schauer mit Donner";
+"小阵雨伴雷电" = "Leichte Regenschauer mit Donner";
+"强阵雨伴雷电" = "Starke Regenschauer mit Donner";
+"雪伴雷电" = "Schnee mit Donner";
+"小雪伴雷电" = "Leichter Schneefall mit Donner";
+"大雪伴雷电" = "Starker Schneefall mit Donner";
+"阵雪伴雷电" = "Schneeschauer mit Donner";
+"小阵雪伴雷电" = "Leichte Schneeschauer mit Donner";
+"强阵雪伴雷电" = "Starke Schneeschauer mit Donner";
+"雨夹雪伴雷电" = "Schneeregen mit Donner";
+"小雨夹雪伴雷电" = "Leichter Schneeregen mit Donner";
+"强雨夹雪伴雷电" = "Starker Schneeregen mit Donner";
+"阵性雨夹雪伴雷电" = "Schneeregenschauer mit Donner";
+"小阵性雨夹雪伴雷电" = "Leichte Schneeregenschauer mit Donner";
+"强阵性雨夹雪伴雷电" = "Starke Schneeregenschauer mit Donner";
+"雷阵雨伴有冰雹" = "Gewitter mit Hagel";
+
+"管理电源模式与系统垃圾、剪贴板历史和废纸篓的定时清理。" = "Verwalten Sie Energiemodi und die geplante Bereinigung von Systemdatenmüll, Zwischenablageverlauf und Papierkorb.";
+"定时倾倒废纸篓" = "Papierkorb automatisch leeren";
+"按所选间隔永久删除废纸篓中的所有项目，无法恢复" = "Löscht alle Objekte im Papierkorb im gewählten Intervall endgültig. Dies kann nicht rückgängig gemacht werden";
+"启用定时倾倒废纸篓？" = "Automatisches Leeren des Papierkorbs aktivieren?";
+
+"自动切换电源模式" = "Energiemodi automatisch wechseln";
+"插电默认模式" = "Standardmodus am Netzteil";
+"脱电默认模式" = "Standardmodus im Batteriebetrieb";
+"20%及以下固定省电" = "Bei 20% oder weniger immer Strom sparen";
+"电量不高于20%时保持省电，插电也不切换；超过20%后恢复对应默认模式" = "Behält den Stromsparmodus bei 20% oder weniger auch am Netzteil bei; stellt über 20% den jeweiligen Standardmodus wieder her";
+"省电" = "Stromsparmodus";
+"高性能" = "Hohe Leistung";
+
+
+"无法保存定时倾倒废纸篓的记录，本次已跳过。" = "Der Eintrag zum automatischen Leeren des Papierkorbs konnte nicht gespeichert werden. Dieser Durchlauf wurde übersprungen.";
 "灵动岛功能顺序" = "Reihenfolge der Dynamic Island-Funktionen";
 
 "查询航班" = "Flug suchen";
 "查询火车" = "Zug suchen";
 "查询快递" = "Sendung verfolgen";
+"全部标记为已读" = "Alle als gelesen markieren";
+"已将全部邮件标记为已读" = "Alle Nachrichten wurden als gelesen markiert";
+
+"自动滚动" = "Automatisch scrollen";
+"暂停滚动" = "Scrollen pausieren";
+"正在自动滚动并拼接" = "Automatisches Scrollen und Zusammenfügen";
+"自动滚动已暂停，可手动滚动或点击“完成”" = "Automatisches Scrollen pausiert. Scrolle manuell oder klicke auf Fertig";
+"自动滚动需要在系统设置中允许辅助功能" = "Erlaube Bedienungshilfen in den Systemeinstellungen, um automatisch zu scrollen";
+"无法自动滚动，请手动滚动页面" = "Automatisches Scrollen nicht möglich. Scrolle die Seite manuell";

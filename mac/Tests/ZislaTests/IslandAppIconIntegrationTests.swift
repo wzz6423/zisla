@@ -212,7 +212,7 @@ struct IslandAppIconIntegrationTests {
         state.compactStatusHidden = hidesActivity
         let view = CompactStatusBarView(queue: fixture.queue, displayState: state, media: fixture.media,
             browserDownloads: fixture.downloads, settingsStore: fixture.settings, resultSweep: fixture.sweep,
-            onStatusHidden: {})
+            pomodoro: PomodoroService(notificationRequestHandler: { _ in }, defaults: fixture.defaults), onStatusHidden: {})
         if hidesActivity {
             fixture.queue.enqueue(IslandNotice(id: "toolbox-reminder-logo-setting", title: "Reminder"), expiresAfter: nil)
         }
