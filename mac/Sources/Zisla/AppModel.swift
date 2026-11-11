@@ -1607,6 +1607,13 @@ final class AppModel: ObservableObject {
     _ = reportMailOperation(await mail.markRead(message), successMessage: AppLocalization.text("已标记为已读"))
   }
 
+  func markAllMailRead(accountName: String?) async {
+    _ = reportMailOperation(
+      await mail.markAllRead(accountName: accountName),
+      successMessage: AppLocalization.text("已将全部邮件标记为已读")
+    )
+  }
+
   func markMailJunk(_ message: MailMessage) async {
     _ = reportMailOperation(await mail.markJunk(message), successMessage: AppLocalization.text("已标记为垃圾邮件"))
   }
