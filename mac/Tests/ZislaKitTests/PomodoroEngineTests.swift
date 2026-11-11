@@ -4,9 +4,43 @@ import Foundation
 import IOKit.pwr_mgt
 import Testing
 import UserNotifications
+import ZislaCore
 @testable import ZislaKit
 
 struct PomodoroEngineTests {
+    @Test(arguments: [PomodoroMode.focus, .rest])
+    func progressUsesTheConfiguredDurationAndFreezesUntilResumed(mode: PomodoroMode) {
+        let start = Date(timeIntervalSince1970: 10_000)
+        var engine = PomodoroEngine(mode: mode, focusDuration: 100, restDuration: 40)
+        let duration = engine.duration(for: mode)
+        #expect(engine.progress(at: start) == 0)
+        engine.start(at: start)
+        #expect(engine.progress(at: start.addingTimeInterval(duration / 4)) == 0.25)
+        engine.pause(at: start.addingTimeInterval(duration / 2))
+        let resumedAt = start.addingTimeInterval(10_000)
+        #expect(engine.progress(at: resumedAt) == 0.5)
+        engine.start(at: resumedAt)
+        #expect(engine.progress(at: resumedAt.addingTimeInterval(duration / 4)) == 0.75)
+        #expect(engine.progress(at: resumedAt.addingTimeInterval(duration)) == 1)
+        engine.completeIfNeeded(at: resumedAt.addingTimeInterval(duration))
+        #expect(engine.mode == mode.next && engine.progress(at: resumedAt) == 0)
+    }
+
+    @Test(arguments: [Double.nan, .infinity, -.infinity, -1, 0, 100_000])
+    func progressStaysFiniteAndBoundedForInvalidDurationsAndRemainingTime(value: Double) {
+        let date = Date(timeIntervalSince1970: 10_000)
+        var engine = PomodoroEngine(phase: .paused, remainingWhenPaused: value,
+            focusDuration: value, restDuration: value)
+        #expect((0...1).contains(engine.progress(at: date)))
+        engine.startWithRemaining(value, at: date)
+        #expect((0...1).contains(engine.progress(at: date)))
+        engine.startWithRemaining(2000, at: date)
+        engine.focusDuration = 100
+        #expect(engine.progress(at: date) == 0)
+        engine.reset()
+        #expect(engine.progress(at: date) == 0)
+    }
+
     @Test
     func startTransitionsIdleToRunningWithDeadline() {
         var engine = PomodoroEngine()
@@ -128,6 +162,46 @@ struct PomodoroEngineTests {
 
 @MainActor
 struct PomodoroServiceTests {
+    @Test(arguments: AppLanguage.allCases)
+    func countdownNoticesShareTheClockProgressAndLanguageAcrossBothSides(language: AppLanguage) throws {
+        let suiteName = "PomodoroCountdownNotices.\(UUID().uuidString)"
+        let defaults = try #require(UserDefaults(suiteName: suiteName))
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+        var now = Date(timeIntervalSince1970: 10_000)
+        var notifications = 0
+        var sounds = 0
+        let service = PomodoroService(notificationRequestHandler: { _ in notifications += 1 },
+            defaults: defaults, completionSoundHandler: { sounds += 1 }, language: { language }, now: { now })
+        defer { service.stop() }
+        service.setFocusDuration(100)
+        service.setRestDuration(40)
+        for mode in [PomodoroMode.focus, .rest] {
+            service.start()
+            let duration = service.engine.duration(for: mode)
+            now += duration / 4
+            service.tick()
+            for side in [NoticeSide.left, .right] {
+                let notice = service.focusCountdownNotice(for: side)
+                #expect(notice.id == service.focusCountdownNoticeID(for: side))
+                #expect(notice.title == AppLocalization.string(mode.title, language: language))
+                #expect(notice.detail == service.displayClockWithHours)
+                #expect(notice.progress == 0.25 && notice.createdAt == now && notice.side == side)
+            }
+            service.pause()
+            let paused = service.focusCountdownNotice(for: .left)
+            now += 10_000
+            #expect(service.focusCountdownNotice(for: .left).detail == paused.detail)
+            #expect(service.focusCountdownNotice(for: .left).progress == paused.progress)
+            #expect(notifications == (mode == .focus ? 0 : 1) && sounds == notifications)
+            service.start()
+            now += duration * 0.75
+            service.tick()
+            #expect(service.mode == mode.next && service.phase == .idle)
+            #expect(service.focusCountdownNotice(for: .left).progress == 0)
+        }
+        #expect(notifications == 2 && sounds == 2)
+    }
+
     @Test
     func restartedFocusSessionUsesNewCountdownPresentationIDs() {
         let suiteName = "PomodoroServiceTests.\(UUID().uuidString)"

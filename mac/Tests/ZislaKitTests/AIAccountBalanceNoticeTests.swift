@@ -57,6 +57,28 @@ struct AIAccountBalanceNoticeTests {
         #expect(queue.left.first { $0.id == AIAccountBalanceNoticeController.pinnedID }?.title.hasPrefix("Codex") == true)
     }
 
+    /// Mandatory voice and recording surfaces must not consume an account's pinned reading budget.
+    @Test(arguments: ["voice-processing-fixture", "screen-recording-operation-fixture"])
+    func operationCoverageCannotConsumeThePinnedAccountReading(operationID: String) throws {
+        let queue = SideNoticeQueue(), controller = AIAccountBalanceNoticeController(queue: queue)
+        defer { queue.removeAll() }
+        var settings = FeatureSettings(aiAccountBalanceNoticeEnabled: false, aiAccountBalancePinnedInCustomIsland: true,
+            aiAccountBalanceMonitoredProviders: [.claude, .codex], aiAccountBalanceDisplayedProviders: [.claude, .codex])
+        settings.islandPlacement = IslandPlacement(mode: .custom, edge: .left)
+        controller.update(balances: [balance(70), balance(70, provider: .codex)], settings: settings,
+            language: .english, at: Date(timeIntervalSince1970: 100))
+        queue.enqueue(IslandNotice(id: operationID, title: "Fixture", side: .left,
+            createdAt: Date(timeIntervalSince1970: 101)), expiresAfter: nil)
+        controller.updatePinned(at: Date(timeIntervalSince1970: 120))
+        #expect(queue.left.first { $0.id == AIAccountBalanceNoticeController.pinnedID }?.metadata?["quotaAccountID"] == "claude")
+        queue.remove(id: operationID)
+        controller.updatePinned(at: Date(timeIntervalSince1970: 121))
+        controller.updatePinned(at: Date(timeIntervalSince1970: 125))
+        #expect(queue.left.first { $0.id == AIAccountBalanceNoticeController.pinnedID }?.metadata?["quotaAccountID"] == "claude")
+        controller.updatePinned(at: Date(timeIntervalSince1970: 126))
+        #expect(queue.left.first { $0.id == AIAccountBalanceNoticeController.pinnedID }?.metadata?["quotaAccountID"] == "codex")
+    }
+
     @Test func equalSummariesKeepAStableAccountIdentityAcrossPollsAndChangeItOnRotation() throws {
         let queue = SideNoticeQueue(), controller = AIAccountBalanceNoticeController(queue: queue)
         defer { queue.removeAll() }

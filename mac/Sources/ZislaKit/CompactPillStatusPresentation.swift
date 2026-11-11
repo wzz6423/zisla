@@ -6,6 +6,7 @@ public struct CompactPillStatusPresentation: Equatable, Sendable {
     public static let trailingInset: CGFloat = 12
     public static let maximumTextLength: CGFloat = 168
     public static let accountBalanceScrollSpeed: Double = 32
+    public static let pomodoroControlsLength: CGFloat = 54
 
     public struct VerticalTextRow: Equatable, Sendable {
         public let text: String
@@ -51,6 +52,7 @@ public struct CompactPillStatusPresentation: Equatable, Sendable {
         let iconSize = max(0, thickness - 8)
         let visualLength = (showsWaveform || priority == .updateAvailable ? iconSize * 2 + 6 : iconSize)
             + Self.trailingInset + leadingInset
+            + (priority == .focusCountdown ? Self.pomodoroControlsLength + 6 : 0)
         let identityLength = mediaIdentityLength(thickness: thickness, edge: edge, text: text, item: item)
         let lyricLength = Self.textLength(text, availableWidth: thickness, edge: edge,
             font: NSFont.systemFont(ofSize: 11, weight: .medium))

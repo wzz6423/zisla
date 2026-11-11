@@ -15,7 +15,7 @@ public enum YTDLPResolverError: Error, Equatable, Sendable, LocalizedError {
 
     /// Installation moved from the Downloads module to Settings, so errors must direct the user there instead of exposing a bare NSError message.
     public var errorDescription: String? {
-        "未找到可用的 yt-dlp。请在 设置 → 下载 → 组件 中一键安装后重试。"
+        "未找到可用的 yt-dlp。请在 设置 → 依赖组件 → 组件 中一键安装后重试。"
     }
 }
 

@@ -666,7 +666,9 @@ public struct SideNoticeLayoutEngine: Equatable, Sendable {
         } else if displaysHeadphone || displaysAccessoryBattery {
             sideExtension = Layout.compactBarSideExtension
                 + Layout.compactBarAccessoryAdditionalSideExtension
-        } else if selectedPriority == .transient || selectedPriority == .focusCountdown {
+        } else if selectedPriority == .focusCountdown {
+            sideExtension = Layout.compactBarSideExtension + Layout.compactWingWidth
+        } else if selectedPriority == .transient {
             sideExtension = Layout.compactBarSideExtension
         } else {
             sideExtension = 0
@@ -674,7 +676,7 @@ public struct SideNoticeLayoutEngine: Equatable, Sendable {
         let selectedStatusSupportsProgressGlow = switch selectedPriority {
         case .media:
             notices.contains { $0.id.hasPrefix("media-active-") }
-        case .browserDownload, .videoDownload:
+        case .browserDownload, .videoDownload, .focusCountdown:
             true
         default:
             false
@@ -698,9 +700,12 @@ public struct SideNoticeLayoutEngine: Equatable, Sendable {
             displaysHeadphone ? Layout.defaultCompactWingHeight + 2 : 0,
             presentation?.length(thickness: thickness, edge: settings.islandPlacement.edge) ?? thickness,
             settings.islandLayoutStyle == .pill && settings.islandPlacement.mode == .camera
-                ? (presentation?.isAccountBalance == true
-                    ? presentation?.accountBalanceSideWidth(thickness: ScreenLayoutConfiguration.cameraPillHeight)
-                    : displaysHeadphone ? displayedTransientNotice.map { CompactHeadphoneConnectionLayout(notice: $0).sideWidth } : nil)
+                ? selectedPriority == .focusCountdown
+                    ? Layout.compactWingWidth + sideExtension
+                    : presentation?.isAccountBalance == true
+                        ? presentation?.accountBalanceSideWidth(thickness: ScreenLayoutConfiguration.cameraPillHeight)
+                        : displaysHeadphone
+                            ? displayedTransientNotice.map { CompactHeadphoneConnectionLayout(notice: $0).sideWidth } : nil
                 : nil,
             presentation
         )

@@ -270,6 +270,6 @@ final class DailyBriefingController: ObservableObject {
     }
 
     private func record(_ error: Error) {
-        errorMessage = AppLocalization.string("简报导出或记录失败", language: language) + "\n" + error.localizedDescription
+        errorMessage = AppLocalization.string("简报导出或记录失败", language: language) + " · " + error.localizedDescription
     }
 }

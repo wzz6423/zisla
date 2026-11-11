@@ -57,6 +57,19 @@ struct BatteryModuleTests {
             .dashboard,
             .system,
         ])
+
+        settings.mailEnabled = false
+        #expect(Array(IslandModule.enabledOrder(settings).prefix(2)) == [.dashboard, .system])
+        settings.mailEnabled = true
+        #expect(IslandModule.enabledOrder(settings).first == .mail)
+    }
+
+    @Test
+    func defaultModuleOrderKeepsTheExistingToolbarSequence() {
+        #expect(IslandModule.configuredOrder(.default) == [
+            .dashboard, .shelf, .clipboard, .download, .agenda, .toolbox,
+            .quickNotes, .aiMonitor, .keyboardSound, .mail, .system, .volumeMixer,
+        ])
     }
 
     @Test

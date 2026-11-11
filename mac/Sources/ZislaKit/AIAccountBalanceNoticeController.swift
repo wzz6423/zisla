@@ -107,6 +107,7 @@ public final class AIAccountBalanceNoticeController {
         let candidates = (queue.left + queue.right).filter { $0.id != Self.pinnedID } + [notice]
         let isSelected = SideNoticeLayoutEngine.selectedCompactStatusPriority(for: candidates, settings: settings) == .aiAccountBalance
             && !candidates.contains { $0.id.hasPrefix("voice-processing-") }
+            && SideNoticeLayoutEngine.screenRecordingOperationNotice(for: candidates, settings: settings) == nil
         if !isSelected {
             pinnedReadingStart = nil
         } else if currentIndex == nil || pinnedReadingStart == nil || pinnedReadingLines != lines {
