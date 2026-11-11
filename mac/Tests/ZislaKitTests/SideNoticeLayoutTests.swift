@@ -496,13 +496,15 @@ struct SideNoticeLayoutTests {
             for: ScreenLayoutEngine(configuration: settings.islandScreenConfiguration).layout(for: screen),
             notices: [notice], settings: settings))
         #expect(frame == layoutFrame)
-        #expect(frame.width >= 240)
+        let notchWidth = ScreenLayoutEngine().layout(for: screen).topology.anchorFrame.width
+        #expect(frame.width == (style == .pill
+            ? max(ScreenLayoutConfiguration.cameraPillCenterWidth, notchWidth) : notchWidth) + 240)
         let sizing = try #require(engine.compactBarSizing(for: [notice], settings: settings))
         #expect(sizing.progressGlowEnabled == progressEnabled)
         if style == .notch {
             #expect(frame.height == engine.compactWingHeight(for: screen) + (progressEnabled ? 2 : 0))
         } else {
-            #expect(sizing.compactStatusSideWidth == 80)
+            #expect(sizing.compactStatusSideWidth == 120)
         }
         let ai = IslandNotice(id: "ai-active-layout", title: "AI")
         settings.compactStatusPriority = CompactStatusPriority.normalized([.aiActivity, .focusCountdown])

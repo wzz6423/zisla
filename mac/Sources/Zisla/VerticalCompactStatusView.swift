@@ -80,6 +80,7 @@ struct CompactPillStatusContent: View {
     var leadingInset: CGFloat = CompactPillStatusPresentation.trailingInset
 
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @Environment(\.layoutDirection) private var layoutDirection
 
     nonisolated static func transientPresentation(message: String) -> CompactPillStatusPresentation {
         CompactPillStatusPresentation(priority: .transient,
@@ -169,6 +170,7 @@ struct CompactPillStatusContent: View {
             .padding(edge.isVertical ? .top : .leading, leadingInset)
             .padding(edge.isVertical ? .bottom : .trailing, CompactPillStatusPresentation.trailingInset)
             .frame(width: proxy.size.width, height: proxy.size.height)
+            .environment(\.layoutDirection, presentation.priority == .focusCountdown ? .leftToRight : layoutDirection)
         }
         .foregroundStyle(.white)
         .accessibilityElement(children: presentation.priority == .focusCountdown ? .contain : .ignore)

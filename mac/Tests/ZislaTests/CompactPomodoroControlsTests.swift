@@ -45,9 +45,13 @@ struct CompactPomodoroControlsTests {
         #expect(!fixture.window.isVisible)
     }
 
-    @Test(arguments: AppLanguage.allCases, ["00:01:40", "100:00:00"])
-    func controlsUseTheRequestedLanguageAndCameraGap(language: AppLanguage, countdown: String) async throws {
-        let fixture = try Fixture(edge: .top, moreInformation: false, language: language, camera: true, countdown: countdown)
+    @Test(arguments: AppLanguage.allCases, IslandLayoutStyle.allCases.flatMap { style in
+        ["00:01:40", "100:00:00"].map { (style, $0) }
+    })
+    func controlsUseTheRequestedLanguageAndCameraGap(language: AppLanguage, scenario: (IslandLayoutStyle, String)) async throws {
+        let (style, countdown) = scenario
+        let fixture = try Fixture(edge: .top, moreInformation: false, language: language, camera: true,
+            countdown: countdown, style: style)
         defer { fixture.close() }
         fixture.service.start()
         fixture.base.settings.settings.collapsedProgressGlowEnabled = true
@@ -66,7 +70,7 @@ struct CompactPomodoroControlsTests {
         }
         #expect(try fixture.label("pomodoro.toggleStartPause") == table["暂停"])
         #expect(try fixture.label("pomodoro.reset") == table["重置番茄钟"])
-        for identifier in ["pomodoro.toggleStartPause", "pomodoro.reset", "pomodoro.countdown"] {
+        for identifier in ["pomodoro.toggleStartPause", "pomodoro.reset", "pomodoro.countdown", "pomodoro.clock"] {
             let button = try #require(fixture.element(identifier) as? any NSAccessibilityElementProtocol)
             let frame = button.accessibilityFrame()
             let windowFrame = fixture.window.frame
@@ -74,18 +78,32 @@ struct CompactPomodoroControlsTests {
                 width: 185, height: windowFrame.height)
             #expect(windowFrame.insetBy(dx: -0.5, dy: -0.5).contains(frame))
             #expect(!frame.intersects(centerGap), "Pomodoro controls and time must stay outside the physical camera gap")
-            if identifier != "pomodoro.countdown" {
+            if identifier == "pomodoro.countdown" || identifier == "pomodoro.clock" {
+                #expect(frame.maxX <= centerGap.minX, "The clock and countdown must stay on the left of the camera")
+            } else {
+                #expect(frame.minX >= centerGap.maxX, "The quick controls must stay on the right of the camera")
                 #expect(frame.width >= 23 && frame.height >= 23)
             }
         }
+        let clock = try #require(fixture.element("pomodoro.clock") as? any NSAccessibilityElementProtocol)
+        let time = try #require(fixture.element("pomodoro.countdown") as? any NSAccessibilityElementProtocol)
+        #expect(clock.accessibilityFrame().maxX + 5.5 <= time.accessibilityFrame().minX,
+            "The clock must precede the complete countdown with the existing 6pt gap")
+        let font = NSFont.monospacedDigitSystemFont(ofSize: 14, weight: .semibold)
+        let rounded = try #require(font.fontDescriptor.withDesign(.rounded))
+        let measuredFont = try #require(NSFont(descriptor: rounded, size: 14))
+        let textWidth = (countdown as NSString).size(withAttributes: [.font: measuredFont]).width
+        #expect(time.accessibilityFrame().width + 0.5 >= textWidth,
+            "The left wing must fit the complete time at its normal font size, including three-digit hours")
+        #expect(fixture.element("pomodoro.countdown")?.value(forKey: "accessibilityValue") as? String == "Focus \(countdown)")
         try fixture.press("pomodoro.toggleStartPause")
         await fixture.layout()
         #expect(try fixture.label("pomodoro.toggleStartPause") == table["继续"])
     }
 
-    @Test(arguments: IslandEdge.allCases)
-    func compactPillButtonsRemainInsideTheirAllocatedRow(edge: IslandEdge) async throws {
-        let fixture = try Fixture(edge: edge, moreInformation: false)
+    @Test(arguments: IslandEdge.allCases, [AppLanguage.english, .arabic])
+    func compactPillButtonsRemainInsideTheirAllocatedRow(edge: IslandEdge, language: AppLanguage) async throws {
+        let fixture = try Fixture(edge: edge, moreInformation: false, language: language)
         defer { fixture.close() }
         await fixture.layout()
         let toggle = try #require(fixture.element("pomodoro.toggleStartPause") as? any NSAccessibilityElementProtocol)
@@ -96,6 +114,13 @@ struct CompactPomodoroControlsTests {
         #expect(fixture.window.frame.insetBy(dx: -0.5, dy: -0.5).contains(second))
         #expect(first.width >= 23 && first.height >= 23 && second.width >= 23 && second.height >= 23)
         #expect(!first.intersects(second))
+        if edge.isVertical {
+            #expect(first.maxY <= fixture.window.frame.midY && second.maxY <= first.minY,
+                "Vertical pills must place the controls after the clock and time")
+        } else {
+            #expect(first.minX >= fixture.window.frame.midX && second.minX >= first.maxX,
+                "Horizontal pills must keep the controls on the physical right in every language")
+        }
     }
 
     @MainActor
@@ -120,13 +145,14 @@ struct CompactPomodoroControlsTests {
         }
 
         init(edge: IslandEdge, moreInformation: Bool, language: AppLanguage = .english,
-             camera: Bool = false, countdown: String = "00:01:40") throws {
+             camera: Bool = false, countdown: String = "00:01:40", style: IslandLayoutStyle = .pill) throws {
             base = try .init(edge: edge)
             releaseAccessibility = EnhancedAccessibilityTestScope.acquire()
             base.settings.settings.sideNoticesEnabled = true
             base.settings.settings.islandShowMoreInformation = moreInformation
             base.settings.settings.collapsedProgressGlowEnabled = false
             base.settings.settings.islandAppIconEnabled = false
+            base.settings.settings.islandLayoutStyle = style
             if camera { base.settings.settings.islandPlacement = IslandPlacement() }
             let state = SideNoticeDisplayState()
             state.placementMode = camera ? .camera : .custom
@@ -135,10 +161,16 @@ struct CompactPomodoroControlsTests {
             state.compactBarCenterInset = camera ? 185 : 0
             let notice = IslandNotice(id: "focus-countdown-controls", title: "Focus", detail: countdown, progress: 0)
             base.queue.enqueue(notice, expiresAfter: nil)
-            let length = try #require(SideNoticeLayoutEngine().compactBarSizing(
-                for: [notice], settings: base.settings.settings)?.customPillLength)
-            let size = camera ? CGSize(width: 345, height: 32)
-                : edge.isVertical ? CGSize(width: 32, height: length) : CGSize(width: length, height: 32)
+            var screen = base.screen
+            if camera {
+                screen.safeAreaInsets = ScreenInsets(top: 32)
+                screen.auxiliaryTopLeftArea = CGRect(x: screen.frame.minX, y: screen.frame.maxY - 32,
+                    width: (screen.frame.width - 185) / 2, height: 32)
+                screen.auxiliaryTopRightArea = CGRect(x: screen.frame.midX + 185 / 2, y: screen.frame.maxY - 32,
+                    width: (screen.frame.width - 185) / 2, height: 32)
+            }
+            let size = try #require(SideNoticeLayoutEngine().compactBarFrame(
+                for: screen, notices: [notice], settings: base.settings.settings)).size
             window = NSPanel(contentRect: CGRect(origin: CGPoint(x: -100_000, y: -100_000), size: size),
                 styleMask: [.borderless, .nonactivatingPanel], backing: .buffered, defer: false)
             window.isReleasedWhenClosed = false

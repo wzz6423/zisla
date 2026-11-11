@@ -640,7 +640,9 @@ public struct SideNoticeLayoutEngine: Equatable, Sendable {
         } else if displaysHeadphone || displaysAccessoryBattery {
             sideExtension = Layout.compactBarSideExtension
                 + Layout.compactBarAccessoryAdditionalSideExtension
-        } else if selectedPriority == .transient || selectedPriority == .focusCountdown {
+        } else if selectedPriority == .focusCountdown {
+            sideExtension = Layout.compactBarSideExtension + Layout.compactWingWidth
+        } else if selectedPriority == .transient {
             sideExtension = Layout.compactBarSideExtension
         } else {
             sideExtension = 0
@@ -673,7 +675,7 @@ public struct SideNoticeLayoutEngine: Equatable, Sendable {
             presentation?.length(thickness: thickness, edge: settings.islandPlacement.edge) ?? thickness,
             settings.islandLayoutStyle == .pill && settings.islandPlacement.mode == .camera
                 ? selectedPriority == .focusCountdown
-                    ? Layout.compactWingWidth + Layout.compactBarSideExtension
+                    ? Layout.compactWingWidth + sideExtension
                     : displaysHeadphone
                         ? displayedTransientNotice.map { CompactHeadphoneConnectionLayout(notice: $0).sideWidth } : nil
                 : nil,

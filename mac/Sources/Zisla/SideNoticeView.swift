@@ -2507,20 +2507,25 @@ private struct CompactFocusCountdownBar: View {
         GeometryReader { geometry in
             let sideWidth = (geometry.size.width - centerInset) / 2
             HStack(spacing: 0) {
-                CompactPomodoroControls(edge: .top)
-                    .padding(.leading, 12)
-                    .frame(width: sideWidth, height: height, alignment: .leading)
+                HStack(spacing: 6) {
+                    Image(systemName: "clock")
+                        .accessibilityIdentifier("pomodoro.clock")
+                    Text(notice.detail ?? "00:00:00")
+                        .monospacedDigit()
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.65)
+                        .accessibilityLabel(Text("\(notice.title) \(notice.detail ?? "00:00:00")"))
+                        .accessibilityIdentifier("pomodoro.countdown")
+                }
+                .padding(.leading, 12)
+                .frame(width: sideWidth, height: height, alignment: .leading)
                 Spacer(minLength: 0)
                     .frame(width: centerInset)
-                Text(notice.detail ?? "00:00:00")
-                    .monospacedDigit()
-                    .lineLimit(1)
-                    .minimumScaleFactor(0.65)
+                CompactPomodoroControls(edge: .top)
                     .padding(.trailing, 12)
                     .frame(width: sideWidth, height: height, alignment: .trailing)
-                    .accessibilityLabel(Text("\(notice.title) \(notice.detail ?? "00:00:00")"))
-                    .accessibilityIdentifier("pomodoro.countdown")
             }
+            .environment(\.layoutDirection, .leftToRight)
         }
         .font(.system(size: min(14, height * 0.52), weight: .semibold, design: .rounded))
         .foregroundStyle(.white)
