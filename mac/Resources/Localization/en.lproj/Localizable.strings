@@ -3362,6 +3362,21 @@
 "备忘录内容已变化，请重新打开后编辑" = "The note has changed. Reopen it before editing";
 "无法保存手写备忘录的文本，请在备忘录中打开后重试" = "Could not save text in the handwritten note. Open it in Notes and try again";
 
+
+"多选" = "Select";
+"取消选择" = "Deselect All";
+"操作" = "Actions";
+"已选择 %ld 个项目" = "%ld items selected";
+"选择顺序 %ld" = "Selection order %ld";
+"识图并发送到随记" = "Recognize Text and Send to Quick Notes";
+"在录屏工作室中编辑" = "Edit in Recording Studio";
+"所选项目不支持此操作" = "The selected items do not support this action";
+"文件已失效或无法读取：%@" = "File is unavailable or unreadable: %@";
+"无法写入随记，请检查备忘录权限后重试" = "Could not write to Quick Notes. Check Notes permissions and try again";
+"录屏工作室当前不可用，请稍后重试" = "Recording Studio is currently unavailable. Try again later";
+"已发送到录屏工作室" = "Sent to Recording Studio";
+"已取消操作" = "Action cancelled";
+
 /* Local image tools */
 "图片工具" = "Image Tools";
 "在本机压缩、转换、缩放与批量导出图片。" = "Compress, convert, resize and export images in batches on your Mac.";

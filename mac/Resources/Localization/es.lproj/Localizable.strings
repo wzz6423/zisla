@@ -3363,6 +3363,21 @@
 "备忘录内容已变化，请重新打开后编辑" = "La nota ha cambiado. Vuelve a abrirla antes de editarla";
 "无法保存手写备忘录的文本，请在备忘录中打开后重试" = "No se pudo guardar el texto de la nota manuscrita. Ábrela en Notas e inténtalo de nuevo";
 
+
+"多选" = "Seleccionar";
+"取消选择" = "Deseleccionar todo";
+"操作" = "Acciones";
+"已选择 %ld 个项目" = "%ld elementos seleccionados";
+"选择顺序 %ld" = "Orden de selección %ld";
+"识图并发送到随记" = "Reconocer texto y enviar a notas rápidas";
+"在录屏工作室中编辑" = "Editar en el estudio de grabación";
+"所选项目不支持此操作" = "Los elementos seleccionados no admiten esta acción";
+"文件已失效或无法读取：%@" = "Archivo no disponible o ilegible: %@";
+"无法写入随记，请检查备忘录权限后重试" = "No se pudo escribir en notas rápidas. Comprueba los permisos de Notas e inténtalo de nuevo";
+"录屏工作室当前不可用，请稍后重试" = "El estudio de grabación no está disponible. Inténtalo más tarde";
+"已发送到录屏工作室" = "Enviado al estudio de grabación";
+"已取消操作" = "Acción cancelada";
+
 /* Local image tools */
 "图片工具" = "Herramientas de imagen";
 "在本机压缩、转换、缩放与批量导出图片。" = "Comprime, convierte, redimensiona y exporta imágenes por lotes en tu Mac.";

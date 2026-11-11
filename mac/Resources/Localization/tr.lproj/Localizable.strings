@@ -3363,6 +3363,21 @@
 "备忘录内容已变化，请重新打开后编辑" = "Not değişti. Düzenlemeden önce yeniden açın";
 "无法保存手写备忘录的文本，请在备忘录中打开后重试" = "El yazısı nottaki metin kaydedilemedi. Notlar’da açıp yeniden deneyin";
 
+
+"多选" = "Seç";
+"取消选择" = "Seçimi kaldır";
+"操作" = "İşlemler";
+"已选择 %ld 个项目" = "%ld öğe seçildi";
+"选择顺序 %ld" = "Seçim sırası %ld";
+"识图并发送到随记" = "Metni tanı ve hızlı notlara gönder";
+"在录屏工作室中编辑" = "Kayıt stüdyosunda düzenle";
+"所选项目不支持此操作" = "Seçilen öğeler bu işlemi desteklemiyor";
+"文件已失效或无法读取：%@" = "Dosya kullanılamıyor veya okunamıyor: %@";
+"无法写入随记，请检查备忘录权限后重试" = "Hızlı notlara yazılamadı. Notlar izinlerini kontrol edip yeniden deneyin";
+"录屏工作室当前不可用，请稍后重试" = "Kayıt stüdyosu şu anda kullanılamıyor. Daha sonra yeniden deneyin";
+"已发送到录屏工作室" = "Kayıt stüdyosuna gönderildi";
+"已取消操作" = "İşlem iptal edildi";
+
 /* Local image tools */
 "图片工具" = "Görsel Araçları";
 "在本机压缩、转换、缩放与批量导出图片。" = "Mac’inizde görselleri sıkıştırın, dönüştürün, yeniden boyutlandırın ve toplu dışa aktarın.";
