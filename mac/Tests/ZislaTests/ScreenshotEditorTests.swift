@@ -1183,7 +1183,7 @@ struct ScreenshotEditorTests {
         var cancellationCount = 0
         var presentedPanels: [ScreenshotSelectionPanel] = []
         let controller = ScreenshotSelectionController(
-            captureScreen: { _ in (image, cgImage) },
+            captureScreen: { _ in (image, cgImage, nil) },
             presentPanels: { presentedPanels = $0 }
         )
         controller.onCancelled = { cancellationCount += 1 }
@@ -1209,7 +1209,7 @@ struct ScreenshotEditorTests {
         let cgImage = try #require(image.cgImage(forProposedRect: nil, context: nil, hints: nil))
         var events: [String] = []
         let controller = ScreenshotSelectionController(
-            captureScreen: { _ in (image, cgImage) },
+            captureScreen: { _ in (image, cgImage, nil) },
             presentPanels: { _ in events.append("present") }
         )
         controller.onSelectionWillPresent = { events.append("prepare") }
@@ -1229,7 +1229,7 @@ struct ScreenshotEditorTests {
         var presentedPanels: [ScreenshotSelectionPanel] = []
         var controller: ScreenshotSelectionController!
         controller = ScreenshotSelectionController(
-            captureScreen: { _ in (image, cgImage) },
+            captureScreen: { _ in (image, cgImage, nil) },
             presentPanels: { presentedPanels = $0 }
         )
         controller.onCancelled = { cancellationCount += 1 }
@@ -1254,7 +1254,7 @@ struct ScreenshotEditorTests {
         var presentedPanels: [ScreenshotSelectionPanel] = []
         var result: ScreenshotCaptureResult?
         let controller = ScreenshotSelectionController(
-            captureScreen: { _ in (image, cgImage) },
+            captureScreen: { _ in (image, cgImage, nil) },
             presentPanels: { presentedPanels = $0 }
         )
         controller.onCaptured = { result = $0 }
@@ -1284,7 +1284,7 @@ struct ScreenshotEditorTests {
         var presentedPanels: [ScreenshotSelectionPanel] = []
         var result: ScreenshotCaptureResult?
         let controller = ScreenshotSelectionController(
-            captureScreen: { _ in (image, cgImage) },
+            captureScreen: { _ in (image, cgImage, nil) },
             presentPanels: { presentedPanels = $0 },
             snapTargets: snapTargets
         )
@@ -1310,7 +1310,7 @@ struct ScreenshotEditorTests {
         var presentedPanels: [ScreenshotSelectionPanel] = []
         var result: ScreenshotCaptureResult?
         let controller = ScreenshotSelectionController(
-            captureScreen: { _ in (image, cgImage) },
+            captureScreen: { _ in (image, cgImage, nil) },
             presentPanels: { presentedPanels = $0 }
         )
         controller.onCaptured = { result = $0 }
@@ -1339,7 +1339,7 @@ struct ScreenshotEditorTests {
 
         var presentedPanels: [ScreenshotSelectionPanel] = []
         let controller = ScreenshotSelectionController(
-            captureScreen: { _ in (image, cgImage) },
+            captureScreen: { _ in (image, cgImage, nil) },
             presentPanels: { presentedPanels = $0 },
             snapTargets: snapTargets
         )

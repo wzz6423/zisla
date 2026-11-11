@@ -139,9 +139,9 @@ struct ScreenshotModalWindowSnapshot {
     }
 
     func composited(
-        over capture: (image: NSImage, cgImage: CGImage),
+        over capture: (image: NSImage, cgImage: CGImage, hdrCGImage: CGImage?),
         on screen: NSScreen
-    ) -> (image: NSImage, cgImage: CGImage) {
+    ) -> (image: NSImage, cgImage: CGImage, hdrCGImage: CGImage?) {
         guard screen.frame.contains(screenFrame),
               capture.cgImage.width > 0,
               capture.cgImage.height > 0,
@@ -163,7 +163,10 @@ struct ScreenshotModalWindowSnapshot {
 
         return (
             NSImage(cgImage: compositedImage, size: screen.frame.size),
-            compositedImage
+            compositedImage,
+            capture.hdrCGImage.flatMap {
+                Self.composite(image, in: modalFrame, over: $0, screenSize: screen.frame.size)
+            }
         )
     }
 
@@ -189,14 +192,8 @@ struct ScreenshotModalWindowSnapshot {
             width: modalFrame.width * scaleX,
             height: modalFrame.height * scaleY
         )
-        guard let context = CGContext(
-            data: nil,
-            width: captureImage.width,
-            height: captureImage.height,
-            bitsPerComponent: 8,
-            bytesPerRow: captureImage.width * 4,
-            space: captureImage.colorSpace ?? CGColorSpaceCreateDeviceRGB(),
-            bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue
+        guard let context = ScreenshotImageRendering.bitmapContext(
+            width: captureImage.width, height: captureImage.height, matching: captureImage
         ) else {
             return nil
         }
@@ -207,7 +204,8 @@ struct ScreenshotModalWindowSnapshot {
             in: CGRect(x: 0, y: 0, width: captureImage.width, height: captureImage.height)
         )
         context.draw(modalImage, in: drawFrame)
-        return context.makeImage()
+        guard let composited = context.makeImage() else { return nil }
+        return ScreenshotImageRendering.preservingHeadroom(composited, from: captureImage)
     }
 
     static func localTopLeftFrame(for modalFrame: CGRect, on screenFrame: CGRect) -> CGRect {
@@ -1804,7 +1802,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
         let controller = ScreenshotSelectionController(
             capturedProcessIdentifier: capturedProcessIdentifier,
             captureScreen: { screen in
-                let capture = try await ScreenshotCaptureService.capture(screen: screen)
+                let capture = try await ScreenshotCaptureService.capture(screen: screen, includeHDR: true)
                 let captureWithAssistant = clipboardAssistantSnapshot?.composited(
                     over: capture,
                     on: screen
@@ -1839,6 +1837,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
                 image: result.image,
                 screenImage: result.screenImage,
                 screenCGImage: result.screenCGImage,
+                hdrScreenCGImage: result.hdrScreenCGImage,
                 screen: result.screen,
                 captureRect: result.selectionRect,
                 capturedApplication: capturedApplication,

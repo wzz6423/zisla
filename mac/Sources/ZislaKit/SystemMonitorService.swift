@@ -3791,6 +3791,9 @@ public final class SystemMonitorService: ObservableObject {
         postCleanupDiskRefreshTask = nil
         sampleTask?.cancel()
         historyGeneration &+= 1
+        publicIPRefreshGeneration &+= 1
+        isRefreshingPublicIPAddress = false
+        lastPublicIPRefresh = nil
         isSampling = false
     }
 
@@ -3847,7 +3850,7 @@ public final class SystemMonitorService: ObservableObject {
         await refreshPublicIPAddress(force: true)
     }
 
-    private func refreshPublicIPAddressIfNeeded() async {
+    func refreshPublicIPAddressIfNeeded() async {
         await refreshPublicIPAddress(force: false)
     }
 

@@ -63,15 +63,40 @@ struct AgendaModuleView: View {
         if snapshots.isEmpty {
             weatherPlaceholder(state: state, hasExpiredWeather: !snapshotsByLocationID.isEmpty)
         } else {
-            ScrollView(.vertical) {
-                LazyVStack(spacing: 2) {
-                    ForEach(Array(snapshots.enumerated()), id: \.offset) { _, weather in
-                        weatherRow(weather, at: date)
-                    }
+            WeatherList(snapshots: snapshots, date: date)
+                .thinScrollChrome()
+        }
+    }
+
+    private struct WeatherList: NSViewRepresentable {
+        let snapshots: [WeatherSnapshot]
+        let date: Date
+
+        func makeNSView(context: Context) -> NSScrollView {
+            let scroll = NSScrollView()
+            scroll.drawsBackground = false
+            scroll.horizontalScrollElasticity = .none
+            ThinScrollChrome.apply(to: scroll)
+            let hosting = NSHostingView(rootView: rows(environment: context.environment))
+            hosting.translatesAutoresizingMaskIntoConstraints = false
+            scroll.documentView = hosting
+            hosting.widthAnchor.constraint(equalTo: scroll.contentView.widthAnchor).isActive = true
+            return scroll
+        }
+
+        func updateNSView(_ scroll: NSScrollView, context: Context) {
+            let hosting = scroll.documentView as! NSHostingView<AnyView>
+            hosting.rootView = rows(environment: context.environment)
+        }
+
+        private func rows(environment: EnvironmentValues) -> AnyView {
+            AnyView(VStack(spacing: 2) {
+                ForEach(Array(snapshots.enumerated()), id: \.offset) { _, weather in
+                    AgendaModuleView.weatherRow(weather, at: date)
                 }
             }
-            .scrollIndicators(.visible)
-            .thinScrollChrome(scrollerStyle: .overlay)
+            .padding(environment.layoutDirection == .rightToLeft ? .leading : .trailing, 2)
+            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading))
         }
     }
 

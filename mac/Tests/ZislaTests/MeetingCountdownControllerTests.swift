@@ -20,6 +20,32 @@ struct MeetingCountdownControllerTests {
     }
 
     @Test
+    func linklessMeetingShowsCountdownThenOngoingStatusWithoutReplacingAIActivity() throws {
+        let fixture = try CountdownFixture()
+        defer { fixture.close() }
+        let event = try fixture.event(start: fixture.date.addingTimeInterval(60))
+        event.title = "会议"
+        event.url = nil
+        let activity = IslandNotice(id: "ai-active-fixture", title: "AI", side: .left)
+        fixture.queue.enqueue(activity, expiresAfter: nil)
+        fixture.store.fixtures = [event]
+        fixture.calendar.refreshMeetings()
+        fixture.controller.configure()
+        let countdown = try #require(fixture.queue.left.first { $0.id.hasPrefix(MeetingCountdown.noticePrefix) },
+            "A named meeting without a join link must still publish its countdown")
+        #expect(countdown.title == "会议" && countdown.detail == "01:00")
+        #expect(SideNoticeLayoutEngine.selectedCompactStatusPriority(for: fixture.queue.left,
+            settings: fixture.settings.settings, systemMonitorAvailable: true) == .meeting)
+        #expect(fixture.queue.left.contains(activity))
+        fixture.date = event.startDate
+        fixture.fireLatest()
+        #expect(fixture.queue.left.first { $0.id == countdown.id }?.detail == "会议进行中")
+        fixture.date = event.endDate
+        fixture.fireLatest()
+        #expect(fixture.queue.left == [activity] && fixture.queue.right.isEmpty)
+    }
+
+    @Test
     func timerWaitsForTheLeadWindowTicksOnlyBeforeStartAndThenWaitsForEnd() throws {
         let fixture = try CountdownFixture()
         defer { fixture.close() }
