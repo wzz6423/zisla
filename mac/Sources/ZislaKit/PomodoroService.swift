@@ -351,7 +351,9 @@ public final class PomodoroService: ObservableObject {
     }
 
     public func pause() {
-        engine.pause(at: now())
+        let date = now()
+        tick(at: date)
+        engine.pause(at: date)
         stopTimer()
         refreshDisplay()
     }
@@ -400,10 +402,10 @@ public final class PomodoroService: ObservableObject {
         return center
     }
 
-    func tick() {
+    func tick(at date: Date? = nil) {
         let completedMode = engine.mode
         let completedDuration = engine.duration(for: completedMode)
-        let date = now()
+        let date = date ?? now()
         if engine.completeIfNeeded(at: date) {
             if completedMode == .focus {
                 onDailyBriefingActivity?(.pomodoroCompleted, 1, completedDuration, date)
