@@ -511,6 +511,8 @@
 "电池功率" = "Daya baterai";
 "本机 Mac" = "Mac Ini";
 "已充满" = "Terisi penuh";
+"立即充至100%" = "Isi daya hingga 100% sekarang";
+"无法立即充至100%，请重试。" = "Tidak dapat mengisi daya hingga 100% sekarang. Coba lagi.";
 "充电中" = "Mengisi daya";
 "电源已接通" = "Daya tersambung";
 "使用电池" = "Menggunakan baterai";

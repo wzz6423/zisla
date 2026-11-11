@@ -511,6 +511,8 @@
 "电池功率" = "Pil gücü";
 "本机 Mac" = "Bu Mac";
 "已充满" = "Tam şarj";
+"立即充至100%" = "Şimdi %100’e şarj et";
+"无法立即充至100%，请重试。" = "Şimdi %100’e şarj edilemedi. Lütfen yeniden deneyin.";
 "充电中" = "Şarj oluyor";
 "电源已接通" = "Güç bağlı";
 "使用电池" = "Pil kullanımda";

@@ -511,6 +511,8 @@
 "电池功率" = "Batterijvermogen";
 "本机 Mac" = "Deze Mac";
 "已充满" = "Volledig opgeladen";
+"立即充至100%" = "Nu opladen tot 100%";
+"无法立即充至100%，请重试。" = "Opladen tot 100% is nu niet gelukt. Probeer het opnieuw.";
 "充电中" = "Wordt opgeladen";
 "电源已接通" = "Stroom aangesloten";
 "使用电池" = "Op batterij";

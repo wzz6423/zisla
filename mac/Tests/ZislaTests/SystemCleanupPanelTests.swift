@@ -70,7 +70,8 @@ struct SystemCleanupPanelTests {
         let state = SystemCleanupPanelPresentationState()
         var systemModule: SystemMonitorView? = SystemMonitorView(
             service: SystemMonitorService(samplingInterval: 1),
-            onCleanupRequested: state.present
+            onCleanupRequested: state.present,
+            onTransientMessage: { _ in }
         )
 
         systemModule?.onCleanupRequested()

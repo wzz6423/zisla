@@ -14,7 +14,8 @@ struct BatteryTrendWaveformTests {
         defer { defaults.removePersistentDomain(forName: suiteName) }
         let view = BatteryDetailView(
             batteryMonitor: BatteryMonitor(defaults: defaults),
-            networkMonitor: NetworkBatteryMonitor()
+            networkMonitor: NetworkBatteryMonitor(),
+            onTransientMessage: { _ in }
         )
         let battery = BatterySnapshot(
             level: 1, isCharging: false, isPluggedIn: false, isCharged: true,
@@ -125,7 +126,8 @@ struct BatteryTrendWaveformTests {
         defer { defaults.removePersistentDomain(forName: suiteName) }
         let view = BatteryDetailView(
             batteryMonitor: BatteryMonitor(defaults: defaults),
-            networkMonitor: NetworkBatteryMonitor()
+            networkMonitor: NetworkBatteryMonitor(),
+            onTransientMessage: { _ in }
         )
         let renderer = ImageRenderer(content: view.trendChart(
             title: "Charge", value: "100%", values: samples, tint: Color(red: 0, green: 1, blue: 0)

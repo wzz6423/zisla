@@ -511,6 +511,8 @@
 "电池功率" = "Potencia de batería";
 "本机 Mac" = "Este Mac";
 "已充满" = "Totalmente cargada";
+"立即充至100%" = "Cargar al 100 % ahora";
+"无法立即充至100%，请重试。" = "No se pudo cargar al 100 % ahora. Inténtalo de nuevo.";
 "充电中" = "Cargando";
 "电源已接通" = "Energía conectada";
 "使用电池" = "Usando batería";
