@@ -56,8 +56,8 @@ struct AIUsageLogDetectorTests {
         #expect(samples.map(\.model) == [nil])
     }
 
-    @Test
     /// Corrupt turn context must not invent a model or hide later valid usage in the same log.
+    @Test
     func seededDamagedCodexModelContextsNeverInventUsageOrPreventLaterValidEvents() throws {
         let root = temporaryDirectory(named: "usage-codex-model-damage")
         defer { try? FileManager.default.removeItem(at: root) }
@@ -127,8 +127,8 @@ struct AIUsageLogDetectorTests {
         #expect(try repository.load().modelUsageSamples.map(\.totalTokens).sorted() == [35, 120])
     }
 
-    @Test(arguments: [true, false])
     /// Equal token counts and model names cannot identify an event; separate JSONL roots must retain distinct identities.
+    @Test(arguments: [true, false])
     func separateGenericJSONLLinesDoNotCollapseEvenWithEqualTokens(sameModel: Bool) throws {
         let root = temporaryDirectory(named: "usage-generic-jsonl-distinct")
         defer { try? FileManager.default.removeItem(at: root) }
@@ -166,8 +166,8 @@ struct AIUsageLogDetectorTests {
         #expect(history.modelUsageSamples.first?.totalTokens == 155)
     }
 
-    @Test(arguments: [true, false])
     /// A changed document digest cannot repeat legacy totals; only later growth may use the now-stable model identity.
+    @Test(arguments: [true, false])
     func legacyGenericDocumentsDoNotRepeatUsageWhenTheyChangeBeforeUpgrade(changedOldTokens: Bool) throws {
         let root = temporaryDirectory(named: "usage-generic-legacy-append")
         defer { try? FileManager.default.removeItem(at: root) }
@@ -194,8 +194,8 @@ struct AIUsageLogDetectorTests {
         #expect(try repository.load().modelUsageSamples.contains { $0.model == "model-a" })
     }
 
-    @Test
     /// A changed root timestamp cannot make previously counted generic usage appear on a second day.
+    @Test
     func legacyGenericFileBaselineSurvivesRootAndMessageDateChangesAcrossMidnight() throws {
         let root = temporaryDirectory(named: "usage-generic-legacy-midnight")
         defer { try? FileManager.default.removeItem(at: root) }
@@ -220,8 +220,8 @@ struct AIUsageLogDetectorTests {
         #expect(history.modelUsageSamples.contains { $0.model == "model-b" && $0.totalTokens == 35 })
     }
 
-    @Test(arguments: [true, false])
     /// An earlier unrelated message must not spend a retimestamped historical message's tokens.
+    @Test(arguments: [true, false])
     func legacyGenericContextKeepsNewUsageOnItsOwnDayRegardlessOfInputOrder(newFirst: Bool) throws {
         let root = temporaryDirectory(named: "usage-generic-context-days")
         defer { try? FileManager.default.removeItem(at: root) }
@@ -252,8 +252,8 @@ struct AIUsageLogDetectorTests {
         #expect(try restarted.loadUsageHistory() == history)
     }
 
-    @Test
     /// Matching token values cannot distinguish a new message from a changed historical root.
+    @Test
     func changedLegacyRootDoesNotSpendHistoricalTokensOnEqualTokenNewMessages() throws {
         let root = temporaryDirectory(named: "usage-generic-context-equal")
         defer { try? FileManager.default.removeItem(at: root) }
@@ -275,8 +275,8 @@ struct AIUsageLogDetectorTests {
         #expect(try AIStateRepository(directoryURL: root.appendingPathComponent("state")).recordDetectedUsage(Array(current.reversed())) == 0)
     }
 
-    @Test
     /// Without recoverable context the first upgraded snapshot stays a baseline, but later growth must remain recordable.
+    @Test
     func ambiguousLegacyRootKeepsHistoryAndRecordsLaterGrowthWithoutClaimingInitialNewUsage() throws {
         let root = temporaryDirectory(named: "usage-generic-context-unrecoverable")
         defer { try? FileManager.default.removeItem(at: root) }
@@ -300,8 +300,8 @@ struct AIUsageLogDetectorTests {
         #expect(try repository.recordDetectedUsage(samples()) == 0)
     }
 
-    @Test
     /// Appends carry evidence only for new roots; immediate throttled retries retain it until another scan begins.
+    @Test
     func genericJSONLAppendKeepsAnUnrecordedLegacyRootAndReusesBoundedEvidence() throws {
         let root = temporaryDirectory(named: "usage-generic-context-retry")
         defer { try? FileManager.default.removeItem(at: root) }
@@ -325,8 +325,8 @@ struct AIUsageLogDetectorTests {
         #expect(try cached.usageSamples().compactMap(\.genericContext).count == 2)
     }
 
-    @Test(arguments: [false, true])
     /// A replayed older snapshot must not erase growth or move the previously recorded tokens to the latest model.
+    @Test(arguments: [false, true])
     func repeatedGenericRootIDKeepsTheGrowingSnapshotDuringWarmJSONLAppend(sameTimestamp: Bool) throws {
         let root = temporaryDirectory(named: "usage-generic-context-snapshots")
         defer { try? FileManager.default.removeItem(at: root) }
@@ -357,8 +357,8 @@ struct AIUsageLogDetectorTests {
         #expect(try repository.loadUsageHistory() == history)
     }
 
-    @Test
     /// Immediate retries need the same proof after rollback, or establishing a baseline would swallow the recoverable delta.
+    @Test
     func cachedGenericContextSurvivesAnImmediateDatabaseTransactionFailure() throws {
         let root = temporaryDirectory(named: "usage-generic-context-transaction")
         defer { try? FileManager.default.removeItem(at: root) }
@@ -389,8 +389,8 @@ struct AIUsageLogDetectorTests {
         #expect(try repository.recordDetectedUsage(retry) == 0)
     }
 
-    @Test(arguments: ["json", "jsonl"])
     /// Rebuilding discarded evidence would rescan unchanged files and extend the lifetime of private root documents.
+    @Test(arguments: ["json", "jsonl"])
     func unchangedGenericLogsReuseNumericCacheWithoutRebuildingDiscardedEvidence(extensionName: String) throws {
         let root = temporaryDirectory(named: "usage-generic-context-unchanged")
         defer { try? FileManager.default.removeItem(at: root) }
@@ -417,8 +417,8 @@ struct AIUsageLogDetectorTests {
         #expect(try repository.recordDetectedUsage(detector.usageSamples()) == 0)
     }
 
-    @Test(arguments: [32, 33])
     /// Recovery examines a bounded complete candidate set; exceeding it retains history without partially matching a source.
+    @Test(arguments: [32, 33])
     func genericContextCandidateBudgetPreservesFutureGrowth(messageCount: Int) throws {
         let root = temporaryDirectory(named: "usage-generic-context-candidates")
         defer { try? FileManager.default.removeItem(at: root) }
@@ -443,8 +443,8 @@ struct AIUsageLogDetectorTests {
         #expect(try repository.recordDetectedUsage([growth]) == 0)
     }
 
-    @Test(arguments: [65_536, 65_537])
     /// All messages in one root share its proof; a root over the byte limit keeps history and baselines future growth.
+    @Test(arguments: [65_536, 65_537])
     func genericContextDocumentByteBudgetDoesNotCopyEvidencePerMessage(byteCount: Int) throws {
         let root = temporaryDirectory(named: "usage-generic-context-bytes")
         defer { try? FileManager.default.removeItem(at: root) }
@@ -486,8 +486,8 @@ struct AIUsageLogDetectorTests {
         #expect(try repository.recordDetectedUsage(current) == 0)
     }
 
-    @Test(arguments: [false, true])
     /// Exhausting shared evidence must not reuse another file's baseline or prevent later providers from recording usage.
+    @Test(arguments: [false, true])
     func genericContextEvidenceBudgetIsSharedPerRootAndIsolatesFilesAndProviders(reverse: Bool) throws {
         let root = temporaryDirectory(named: "usage-generic-context-evidence")
         defer { try? FileManager.default.removeItem(at: root) }
@@ -531,8 +531,8 @@ struct AIUsageLogDetectorTests {
         #expect(try repository.recordDetectedUsage(current) == 0)
     }
 
-    @Test(arguments: ["metadata", "zero", "invalid"])
     /// Roots that emit no numeric usage must leave evidence available for a later file's legacy growth.
+    @Test(arguments: ["metadata", "zero", "invalid"])
     func nonUsageGenericJSONLRootsDoNotSpendAnotherFilesMigrationEvidence(kind: String) throws {
         let root = temporaryDirectory(named: "usage-generic-empty-evidence")
         defer { try? FileManager.default.removeItem(at: root) }
@@ -579,8 +579,8 @@ struct AIUsageLogDetectorTests {
         #expect(try repository.loadUsageHistory() == history)
     }
 
-    @Test(arguments: ["cache_creation_input_tokens", "cache_read_input_tokens"])
     /// Cached input alone is real usage even when the ordinary input and output counters are zero.
+    @Test(arguments: ["cache_creation_input_tokens", "cache_read_input_tokens"])
     func genericCacheInputOnlyUsageRetainsMigrationEvidence(cacheKey: String) throws {
         let root = temporaryDirectory(named: "usage-generic-cache-only-evidence")
         defer { try? FileManager.default.removeItem(at: root) }
@@ -1693,8 +1693,8 @@ struct AIUsageLogDetectorTests {
         ))
     }
 
-    @Test @MainActor
     /// Background detection must persist attribution without retaining either history outside the AI panel.
+    @Test @MainActor
     func monitorPersistsUsageWithoutRetainingHistory() async throws {
         let directory = temporaryDirectory(named: "usage-monitor-on-demand")
         defer { try? FileManager.default.removeItem(at: directory) }
