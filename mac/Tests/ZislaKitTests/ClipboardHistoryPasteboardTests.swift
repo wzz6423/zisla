@@ -6,6 +6,45 @@ import Testing
 
 @MainActor
 struct ClipboardHistoryPasteboardTests {
+    @Test(arguments: ["prefix\u{0}first", "\u{0}leading", "trailing\u{0}", "中文\u{0}👩🏽‍💻"])
+    func nullContainingTextSurvivesCapturePersistenceAndRestart(value: String) async throws {
+        let pasteboard = makePasteboard()
+        defer { pasteboard.releaseGlobally() }
+        let directory = FileManager.default.temporaryDirectory
+            .appendingPathComponent("zisla-clipboard-null-\(UUID().uuidString)", isDirectory: true)
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let storage = directory.appendingPathComponent("history.sqlite")
+        let store = ClipboardHistoryStore(storageURL: storage, persistenceDelay: .seconds(60))
+        await store.waitUntilLoaded()
+        defer { store.flushPendingChanges() }
+        var captured: [ClipboardHistoryContent] = []
+        let monitor = ClipboardHistoryMonitor(pasteboard: pasteboard, pollInterval: 60) { content in
+            captured.append(content)
+            #expect(store.record(content))
+        }
+        monitor.setEnabled(true)
+        defer { monitor.setEnabled(false) }
+
+        #expect(ClipboardHistoryPasteboard.write(.text(value), to: pasteboard))
+        #expect(pasteboard.string(forType: .string) == value)
+        monitor.pollNow()
+        monitor.pollNow()
+        #expect(captured == [.text(value)])
+        store.flushPendingChanges()
+        let reopened = ClipboardHistoryStore(storageURL: storage)
+        await reopened.waitUntilLoaded()
+
+        #expect(reopened.errorDescription == nil)
+        #expect(reopened.totalItemCount == 1, "An accepted leading NUL must not become empty and be deleted")
+        let entry = try #require(reopened.items.first)
+        guard case .text(let restored) = entry.content else {
+            Issue.record("Captured text must reopen as text")
+            return
+        }
+        #expect(Array(restored.utf8) == Array(value.utf8), "Persistence must preserve every captured text byte")
+    }
+
     @Test
     func textRoundTripsThroughPasteboard() {
         let pasteboard = makePasteboard()
