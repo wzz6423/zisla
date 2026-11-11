@@ -10,6 +10,7 @@ final class SideNoticePresenter {
     private let queue: SideNoticeQueue
     private let resultSweep: AIResultSweepController
     private let media: NowPlayingService
+    private let pomodoro: PomodoroService
     private let browserDownloads: BrowserDownloadMonitor
     private let settingsStore: FeatureSettingsStore
     private let languageStore: AppLanguageStore
@@ -39,6 +40,7 @@ final class SideNoticePresenter {
         queue: SideNoticeQueue,
         resultSweep: AIResultSweepController,
         media: NowPlayingService,
+        pomodoro: PomodoroService,
         browserDownloads: BrowserDownloadMonitor,
         settingsStore: FeatureSettingsStore,
         languageStore: AppLanguageStore,
@@ -54,6 +56,7 @@ final class SideNoticePresenter {
         self.queue = queue
         self.resultSweep = resultSweep
         self.media = media
+        self.pomodoro = pomodoro
         self.browserDownloads = browserDownloads
         self.settingsStore = settingsStore
         self.languageStore = languageStore
@@ -475,7 +478,12 @@ final class SideNoticePresenter {
             panels.compactConfiguration = configuration
             panels.compactScreenFrame = snapshot.frame
         }
-        panel.ignoresMouseEvents = !displayState.statusIcons.isEmpty
+        let information = FloatingIslandInformationLayout(
+            notices: displayState.compactStatusHidden ? [] : compactNotices, icons: displayState.statusIcons,
+            settings: settingsStore.settings, item: media.snapshot, at: date
+        )
+        panel.ignoresMouseEvents = Self.compactPanelIgnoresMouseEvents(
+            statusIcons: displayState.statusIcons, information: information)
         panel.level = isScreenshotActive ? IslandPanel.onBottomLevel : IslandPanel.onTopLevel
         if settingsStore.settings.islandLayoutStyle == .pill && !settingsStore.settings.islandCollapsedOnTop {
             panel.level = IslandPanel.onBottomLevel
@@ -600,6 +608,7 @@ final class SideNoticePresenter {
             browserDownloads: browserDownloads,
             settingsStore: settingsStore,
             resultSweep: resultSweep,
+            pomodoro: pomodoro,
             onStatusHidden: { [weak self] in self?.updatePanels() },
             onCompactLengthChanged: { [weak self] _ in self?.updatePanels() },
             onJoinMeeting: { [weak self] in self?.onJoinMeeting?($0) }
@@ -623,6 +632,15 @@ final class SideNoticePresenter {
         presentsNewCompactStatus: Bool
     ) -> Bool {
         !isVisible || rejoiningActiveSpace || presentsNewCompactStatus
+    }
+
+    static func compactPanelIgnoresMouseEvents(
+        statusIcons: [IslandStatusIcon], information: FloatingIslandInformationLayout?
+    ) -> Bool {
+        let showsControls = information?.primary.contains {
+            $0.presentation.priority == .focusCountdown || $0.presentation.priority == .meeting
+        } == true
+        return !statusIcons.isEmpty && !showsControls
     }
 
     static func isCompactNotice(_ notice: IslandNotice) -> Bool {

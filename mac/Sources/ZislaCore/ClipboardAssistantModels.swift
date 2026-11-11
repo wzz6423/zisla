@@ -313,6 +313,7 @@ public enum ClipboardAssistantActionKind: String, Codable, CaseIterable, Sendabl
 }
 
 public enum ClipboardAssistantActionOrder {
+    /// Provider lookups share the openURL kind; ordinary search needs its own entry to remain selectable.
     public static func defaults(for kind: ClipboardAssistantKind) -> [ClipboardAssistantActionKind] {
         switch kind {
         case .url: [.openURL, .openDownload, .addToQuickNote, .share]
@@ -325,8 +326,8 @@ public enum ClipboardAssistantActionOrder {
         case .math: [.copyText, .copyFullExpression, .addToQuickNote, .sendToTeleprompter, .share]
         case .currency, .conversion: [.copyText, .copyFullExpression, .addToQuickNote, .sendToTeleprompter, .share]
         case .dateTime: [.createCalendarEvent, .copyText, .copyFullExpression, .addToQuickNote, .share]
-        case .address, .tracking: [.openURL, .copyText, .addToQuickNote, .share]
-        case .flight, .train: [.search, .openURL, .copyText, .addToQuickNote, .share]
+        case .address: [.openURL, .copyText, .addToQuickNote, .share]
+        case .flight, .train, .tracking: [.openURL, .search, .copyText, .addToQuickNote, .share]
         case .meeting: [.createCalendarEvent, .addToQuickNote, .share]
         case .emojiName: [.copyEmoji, .addToQuickNote, .share]
         case .nonSystemLanguageText: [.translate, .autoTranslate, .search, .saveText, .addToQuickNote, .sendToTeleprompter, .share]

@@ -51,6 +51,7 @@ public final class OverlayCoordinator: NSObject {
     private let pointerEntryGrace: Duration
     private var reducer = IslandPresentationReducer()
     private var pointerMonitor: PointerEdgeMonitor?
+    private(set) var pointerRecoveryTimer: Timer?
     private var panel: IslandPanel?
     private var persistentPanels: [CGDirectDisplayID: IslandPanel] = [:]
     private var collapseTask: Task<Void, Never>?
@@ -93,6 +94,8 @@ public final class OverlayCoordinator: NSObject {
     internal var screenSnapshotProvider: @MainActor () -> [ScreenSnapshot] = {
         NSScreen.screens.compactMap(ScreenSnapshot.init(screen:))
     }
+    internal var pointerLocationProvider: @MainActor () -> CGPoint = { NSEvent.mouseLocation }
+    internal var pressedMouseButtonsProvider: @MainActor () -> Int = { NSEvent.pressedMouseButtons }
 
     /// - Parameters:
     ///   - collapseDelay: Grace period between the pointer leaving the island and the fold. Zero by
@@ -132,6 +135,19 @@ public final class OverlayCoordinator: NSObject {
         pointerMonitor = monitor
         monitor.start()
 
+        // A collapsed island passes clicks through, so missed global events also disable expansion.
+        // Sample slowly to recover hover without recreating a full-screen Space or taking focus.
+        let timer = Timer(timeInterval: 0.5, repeats: true) { [weak self] _ in
+            MainActor.assumeIsolated {
+                guard let self, self.pressedMouseButtonsProvider() == 0 else { return }
+                let point = self.pointerLocationProvider()
+                self.handlePointer(at: point, interaction: .moved)
+            }
+        }
+        timer.tolerance = 0.1
+        RunLoop.main.add(timer, forMode: .common)
+        pointerRecoveryTimer = timer
+
         NotificationCenter.default.addObserver(
             self,
             selector: #selector(screenParametersDidChange),
@@ -162,6 +178,8 @@ public final class OverlayCoordinator: NSObject {
         }
         pointerMonitor?.stop()
         pointerMonitor = nil
+        pointerRecoveryTimer?.invalidate()
+        pointerRecoveryTimer = nil
         cancelScheduledCollapse()
         cancelPendingPanelCollapse()
         cancelPointerRevalidation()
@@ -187,6 +205,10 @@ public final class OverlayCoordinator: NSObject {
         isHoverActivationSuspended = false
         isScreenshotCaptureInProgress = false
         isScreenshotActive = false
+    }
+
+    isolated deinit {
+        pointerRecoveryTimer?.invalidate()
     }
 
     public func refreshScreens() {

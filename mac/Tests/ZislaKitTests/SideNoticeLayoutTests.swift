@@ -50,6 +50,34 @@ struct SideNoticeLayoutTests {
         #expect(frame.width == idle.width + 80)
     }
 
+    @Test(arguments: [IslandLayoutStyle.notch, .pill], [CompactStatusPriority.meeting, .focusCountdown])
+    func meetingAndPomodoroKeepSeparateWidthsWhenTheirPriorityChanges(
+        style: IslandLayoutStyle, winner: CompactStatusPriority
+    ) throws {
+        let meeting = IslandNotice(id: MeetingCountdown.noticePrefix + "priority", title: "Meeting", detail: "05:00",
+            metadata: ["eventID": "fixture"])
+        let focus = IslandNotice(id: "focus-countdown-priority", title: "Focus", detail: "00:24:57", progress: 0.5)
+        let notices = [meeting, focus]
+        let screen = physicalNotchScreen()
+        var settings = FeatureSettings(islandLayoutStyle: style)
+        settings.statusIconDestination = .menuBar
+        settings.compactStatusPriority = [winner] + CompactStatusPriority.defaultOrder.filter { $0 != winner }
+        settings.collapsedProgressGlowEnabled = true
+        #expect(SideNoticeLayoutEngine.selectedCompactStatusPriority(for: notices, settings: settings) == winner)
+        let sizing = try #require(engine.compactBarSizing(for: notices, settings: settings))
+        #expect(sizing.customPillPresentation?.priority == winner)
+        #expect(sizing.sideExtension == (winner == .focusCountdown ? 80 : 40))
+        #expect(sizing.progressGlowEnabled == (winner == .focusCountdown))
+        #expect(sizing.compactStatusSideWidth == (style == .pill && winner == .focusCountdown ? 120 : nil))
+        let frame = try #require(engine.compactBarFrame(for: screen, notices: notices, settings: settings))
+        let layout = ScreenLayoutEngine(configuration: settings.islandScreenConfiguration).layout(for: screen)
+        #expect(engine.compactBarFrame(for: layout, notices: notices, settings: settings) == frame)
+        let remaining = notices.filter { $0.id != sizing.customPillPresentation?.notice.id }
+        #expect(engine.compactBarSizing(for: remaining, settings: settings)?.customPillPresentation?.priority
+            == (winner == .focusCountdown ? .meeting : .focusCountdown))
+        #expect(notices == [meeting, focus])
+    }
+
     @Test
     func alwaysVisibleActivityAndFocusCannotBeDismissed() {
         let activity = IslandNotice(id: "ai-active-codex", title: "运行中", side: .left)
@@ -527,6 +555,45 @@ struct SideNoticeLayoutTests {
         #expect(!presentation.shouldExtendCompactBarForFocusCountdown)
     }
 
+    @Test(arguments: [IslandLayoutStyle.notch, .pill], [false, true])
+    func countdownReservesProgressClearanceAndKeepsCameraControlsOutsideTheNotch(
+        style: IslandLayoutStyle, progressEnabled: Bool
+    ) throws {
+        let screen = physicalNotchScreen()
+        let notice = IslandNotice(id: "focus-countdown-layout", title: "Focus", detail: "00:24:57", progress: 0.5)
+        var settings = FeatureSettings(islandLayoutStyle: style)
+        settings.collapsedProgressGlowEnabled = progressEnabled
+        let frame = try #require(engine.compactBarFrame(for: screen, notices: [notice], settings: settings))
+        let layoutFrame = try #require(engine.compactBarFrame(
+            for: ScreenLayoutEngine(configuration: settings.islandScreenConfiguration).layout(for: screen),
+            notices: [notice], settings: settings))
+        #expect(frame == layoutFrame)
+        let notchWidth = ScreenLayoutEngine().layout(for: screen).topology.anchorFrame.width
+        #expect(frame.width == (style == .pill
+            ? max(ScreenLayoutConfiguration.cameraPillCenterWidth, notchWidth) : notchWidth) + 240)
+        let sizing = try #require(engine.compactBarSizing(for: [notice], settings: settings))
+        #expect(sizing.progressGlowEnabled == progressEnabled)
+        if style == .notch {
+            #expect(frame.height == engine.compactWingHeight(for: screen) + (progressEnabled ? 2 : 0))
+        } else {
+            #expect(sizing.compactStatusSideWidth == 120)
+        }
+        let ai = IslandNotice(id: "ai-active-layout", title: "AI")
+        settings.compactStatusPriority = CompactStatusPriority.normalized([.aiActivity, .focusCountdown])
+        #expect(engine.compactBarSizing(for: [notice, ai], settings: settings)?.progressGlowEnabled == false)
+    }
+
+    @Test(arguments: IslandEdge.allCases)
+    func countdownPillsReserveTwoButtonsWithoutShrinkingTheTime(edge: IslandEdge) throws {
+        let notice = IslandNotice(id: "focus-countdown-layout", title: "Focus", detail: "00:24:57")
+        let settings = FeatureSettings(islandLayoutStyle: .pill,
+            islandPlacement: IslandPlacement(mode: .custom, edge: edge))
+        let presentation = try #require(engine.compactBarSizing(for: [notice], settings: settings)?.customPillPresentation)
+        let reference = CompactPillStatusPresentation(priority: .toolboxReminder, notice: notice, text: presentation.text)
+        #expect(presentation.length(thickness: 32, edge: edge)
+            == reference.length(thickness: 32, edge: edge) + CompactPillStatusPresentation.pomodoroControlsLength + 6)
+    }
+
     @Test
     func mixedNoticesReserveOneAIWingWithoutOverlappingOrdinaryRows() {
         let ordinary = [
@@ -886,7 +953,6 @@ struct SideNoticeLayoutTests {
             IslandNotice(id: "background-sound-left", title: "棕色噪声", side: .left),
             IslandNotice(id: "ai-active-codex", title: "Codex", side: .left),
             IslandNotice(id: "mail-notification-left", title: "邮件", side: .left),
-            IslandNotice(id: "focus-countdown-left", title: "专注倒计时", side: .left),
             IslandNotice(id: "focus-mode-left", title: "专注", side: .left),
             IslandNotice(id: "toolbox-reminder-left", title: "提醒", side: .left),
             IslandNotice(id: "update-available-left", title: "更新", side: .left),

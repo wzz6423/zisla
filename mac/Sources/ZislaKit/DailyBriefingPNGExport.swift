@@ -16,6 +16,7 @@ public enum DailyBriefingPNGExport {
         guard let validated = DownloadOutputPathValidator.normalizedFileURL(destination, within: directory) else {
             throw CocoaError(.fileWriteInvalidFileName)
         }
+        try FileManager.default.createDirectory(at: validated.deletingLastPathComponent(), withIntermediateDirectories: true)
         // Retrying after a successful image write but a failed history write updates one daily file.
         try data.write(to: validated, options: .atomic)
         return validated
