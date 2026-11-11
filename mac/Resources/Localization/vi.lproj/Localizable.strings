@@ -3361,3 +3361,13 @@
 "未知模型" = "Mô hình không xác định";
 "输入 %@ · 输出 %@" = "Đầu vào %@ · Đầu ra %@";
 "AI 模型用量" = "Mức sử dụng mô hình AI";
+
+"AI 用量历史" = "Lịch sử sử dụng AI";
+"把全部 AI 用量历史导出为 xlsx 表格" = "Xuất toàn bộ lịch sử sử dụng AI thành bảng tính xlsx";
+"已清空 AI 用量历史" = "Đã xóa lịch sử sử dụng AI";
+"清空失败：%@" = "Xóa thất bại: %@";
+"清空 AI 用量历史？" = "Xóa lịch sử sử dụng AI?";
+"删除本机保存的 AI 用量历史，保留任务和日志去重记录。此操作无法撤销。" = "Xóa lịch sử sử dụng AI được lưu trên máy Mac này. Các tác vụ và bản ghi chống trùng lặp nhật ký vẫn được giữ lại. Không thể hoàn tác thao tác này.";
+"上一年" = "Năm trước";
+"下一年" = "Năm sau";
+"AI token 用量热力图" = "Bản đồ nhiệt sử dụng token AI";

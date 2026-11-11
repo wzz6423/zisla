@@ -3361,3 +3361,13 @@
 "未知模型" = "Onbekend model";
 "输入 %@ · 输出 %@" = "Invoer %@ · Uitvoer %@";
 "AI 模型用量" = "AI-modelgebruik";
+
+"AI 用量历史" = "AI-gebruiksgeschiedenis";
+"把全部 AI 用量历史导出为 xlsx 表格" = "Exporteer de volledige AI-gebruiksgeschiedenis als xlsx-spreadsheet";
+"已清空 AI 用量历史" = "AI-gebruiksgeschiedenis gewist";
+"清空失败：%@" = "Wissen mislukt: %@";
+"清空 AI 用量历史？" = "AI-gebruiksgeschiedenis wissen?";
+"删除本机保存的 AI 用量历史，保留任务和日志去重记录。此操作无法撤销。" = "Verwijder de AI-gebruiksgeschiedenis die op deze Mac is opgeslagen. Taken en gegevens voor logboekdeduplicatie blijven behouden. Dit kan niet ongedaan worden gemaakt.";
+"上一年" = "Vorig jaar";
+"下一年" = "Volgend jaar";
+"AI token 用量热力图" = "Heatmap van AI-tokengebruik";

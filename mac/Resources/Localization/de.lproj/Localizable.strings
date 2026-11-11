@@ -3362,3 +3362,13 @@
 "未知模型" = "Unbekanntes Modell";
 "输入 %@ · 输出 %@" = "Eingabe %@ · Ausgabe %@";
 "AI 模型用量" = "KI-Modellnutzung";
+
+"AI 用量历史" = "KI-Nutzungsverlauf";
+"把全部 AI 用量历史导出为 xlsx 表格" = "Den gesamten KI-Nutzungsverlauf als xlsx-Tabelle exportieren";
+"已清空 AI 用量历史" = "KI-Nutzungsverlauf gelöscht";
+"清空失败：%@" = "Löschen fehlgeschlagen: %@";
+"清空 AI 用量历史？" = "KI-Nutzungsverlauf löschen?";
+"删除本机保存的 AI 用量历史，保留任务和日志去重记录。此操作无法撤销。" = "Den auf diesem Mac gespeicherten KI-Nutzungsverlauf löschen. Aufgaben und Protokolle zur Duplikaterkennung bleiben erhalten. Dies kann nicht rückgängig gemacht werden.";
+"上一年" = "Vorheriges Jahr";
+"下一年" = "Nächstes Jahr";
+"AI token 用量热力图" = "Heatmap der KI-Token-Nutzung";

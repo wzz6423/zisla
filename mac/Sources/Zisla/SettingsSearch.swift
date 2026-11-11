@@ -154,6 +154,7 @@ enum SettingsSearchIndex {
         rows(.recording, RecordingShortcutAction.allCases.map(\.title))
         rows(.recording, ["恢复默认快捷键"])
 
+        entry(.ai, "AI 用量历史", anchor: .group("AI 用量历史"), keywords: ["Token 消耗趋势", "每日模型用量", "查看历史记录", "导出", "清空"])
         entry(.ai, "CLI 与 Skills", anchor: .group("CLI 与 Skills"), keywords: ["自动更新 CLI", "下载命令", "更新命令"])
         rows(.voice, ["录音模式", "使用模型", "格式化整理", "保留原始录音", "自动清理录音", "记录目录", "自定义热词"])
         entry(.voice, "快捷键", anchor: .row("快捷键"), keywords: ["输入监控"])

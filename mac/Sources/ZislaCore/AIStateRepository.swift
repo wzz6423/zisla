@@ -108,6 +108,11 @@ public struct AIStateRepository: Sendable {
         try openDatabase().recordDetectedUsage(samples)
     }
 
+    /// Clears only AI reporting history; tasks, notices, and cumulative replay protection remain intact.
+    public func clearUsageHistory() throws {
+        try openDatabase().clearUsageHistory()
+    }
+
     /// Reads the committed state only after the usage transaction succeeds.
     public func stateRecordingUsage(_ samples: [AIUsageSample]) throws -> AIState {
         let database = try openDatabase()

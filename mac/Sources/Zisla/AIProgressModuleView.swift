@@ -6,6 +6,7 @@ import SwiftUI
 
 struct AIProgressModuleView: View {
     @ObservedObject private var monitor: AIStateMonitor
+    @State private var selectedUsageDate = Calendar.current.startOfDay(for: Date())
 
     /// Both columns push their content this far below the header. The trend chart's topmost
     /// Y-axis tick is drawn above its plot frame, so a tighter gap lets it collide with the title.
@@ -62,11 +63,11 @@ struct AIProgressModuleView: View {
             Label(AppLocalization.text("Token 消耗趋势"), systemImage: "chart.xyaxis.line")
                 .font(.system(size: 11, weight: .semibold))
 
-            UsageTrendChart(series: series)
+            UsageTrendChart(series: series, selectedDate: $selectedUsageDate)
                 .frame(height: 128)
-            UsageHeatmap(weeks: usageCalendar(endingAt: date))
-            DailyModelUsageList(days: AIUsageAnalytics.dailyModelUsage(history: AIUsageHistory(
-                usageSamples: monitor.state.usageSamples, modelUsageSamples: monitor.state.modelUsageSamples), endingAt: date))
+            UsageHeatmap(weeks: usageCalendar(endingAt: date), selectedDate: $selectedUsageDate)
+            DailyModelUsageList(day: AIUsageHistoryPresentation.selectedDay(in: AIUsageHistory(
+                usageSamples: monitor.state.usageSamples, modelUsageSamples: monitor.state.modelUsageSamples), date: selectedUsageDate))
         }
     }
 
@@ -103,16 +104,17 @@ struct AIProgressModuleView: View {
 }
 
 struct DailyModelUsageList: View {
-    var days: [AIDailyModelUsage]
+    var day: AIDailyModelUsage
 
     var body: some View {
         LazyVStack(alignment: .leading, spacing: 12) {
             Label(AppLocalization.text("每日模型用量"), systemImage: "list.bullet.rectangle")
                 .font(.system(size: 11, weight: .semibold))
-            if days.isEmpty {
+            if day.models.isEmpty {
+                Text(day.date, format: .dateTime.year().month().day())
+                    .font(.islandMicro(weight: .semibold, design: .monospaced))
                 EmptyState(symbol: "chart.bar", title: AppLocalization.text("暂无模型用量"))
-            }
-            ForEach(days) { day in
+            } else {
                 VStack(alignment: .leading, spacing: 7) {
                     ViewThatFits(in: .horizontal) {
                         HStack {
@@ -161,6 +163,14 @@ struct DailyModelUsageList: View {
 
 struct UsageTrendChart: View {
     var series: [UsageBreakdownPoint]
+    @Binding var selectedDate: Date
+    var domain: ClosedRange<Date>?
+
+    init(series: [UsageBreakdownPoint], selectedDate: Binding<Date> = .constant(.now), domain: ClosedRange<Date>? = nil) {
+        self.series = series
+        _selectedDate = selectedDate
+        self.domain = domain
+    }
 
     private var yScale: AIUsageAnalytics.TokenAxisScale {
         AIUsageAnalytics.tokenAxisScale(values: series.map(\.totalTokens), desiredCount: 5)
@@ -171,6 +181,7 @@ struct UsageTrendChart: View {
     }
 
     private var xDomain: ClosedRange<Date> {
+        if let domain { return domain }
         guard let first = series.first?.timestamp, let last = series.last?.timestamp else {
             let now = Date()
             return now...now
@@ -185,37 +196,51 @@ struct UsageTrendChart: View {
 
     var body: some View {
         Group {
-            if hasUsage {
+            if !series.isEmpty {
                 chart
             } else {
                 EmptyState(symbol: "chart.line.downtrend.xyaxis", title: AppLocalization.text("暂无 Token 用量"))
             }
         }
-        .accessibilityLabel(hasUsage ? AppLocalization.text("最近七天 AI token 总量趋势") : AppLocalization.text("暂无 AI token 用量"))
+        .accessibilityLabel(hasUsage ? AppLocalization.text("Token 消耗趋势") : AppLocalization.text("暂无 AI token 用量"))
     }
 
     private var chart: some View {
         let scale = yScale
-        return Chart(series, id: \.timestamp) { point in
-            AreaMark(
-                x: .value(AppLocalization.text("时间"), point.timestamp),
-                y: .value(AppLocalization.text("总 Token"), point.totalTokens)
-            )
-            .interpolationMethod(.monotone)
-            .foregroundStyle(
-                .linearGradient(
-                    colors: [Color.blue.opacity(0.28), Color.blue.opacity(0.02)],
-                    startPoint: .top,
-                    endPoint: .bottom
+        return Chart {
+            ForEach(series, id: \.timestamp) { point in
+                AreaMark(
+                    x: .value(AppLocalization.text("时间"), point.timestamp),
+                    y: .value(AppLocalization.text("总 Token"), point.totalTokens)
                 )
-            )
-            LineMark(
-                x: .value(AppLocalization.text("时间"), point.timestamp),
-                y: .value(AppLocalization.text("总 Token"), point.totalTokens)
-            )
-            .interpolationMethod(.monotone)
-            .foregroundStyle(Color.blue)
-            .lineStyle(StrokeStyle(lineWidth: 2.5, lineCap: .round, lineJoin: .round))
+                .interpolationMethod(.monotone)
+                .foregroundStyle(
+                    .linearGradient(
+                        colors: [Color.blue.opacity(0.28), Color.blue.opacity(0.02)],
+                        startPoint: .top,
+                        endPoint: .bottom
+                    )
+                )
+                LineMark(
+                    x: .value(AppLocalization.text("时间"), point.timestamp),
+                    y: .value(AppLocalization.text("总 Token"), point.totalTokens)
+                )
+                .interpolationMethod(.monotone)
+                .foregroundStyle(Color.blue)
+                .lineStyle(StrokeStyle(lineWidth: 2.5, lineCap: .round, lineJoin: .round))
+            }
+            if selectedDate >= xDomain.lowerBound, selectedDate < xDomain.upperBound {
+                let nextDay = Calendar.current.date(byAdding: .day, value: 1, to: selectedDate) ?? selectedDate
+                let midpoint = selectedDate.addingTimeInterval(nextDay.timeIntervalSince(selectedDate) / 2)
+                RuleMark(x: .value(AppLocalization.text("时间"), midpoint))
+                    .foregroundStyle(Color.secondary.opacity(0.4))
+                if let selected = series.first(where: { Calendar.current.isDate($0.timestamp, inSameDayAs: selectedDate) }) {
+                    PointMark(x: .value(AppLocalization.text("时间"), selected.timestamp),
+                        y: .value(AppLocalization.text("总 Token"), selected.totalTokens))
+                        .foregroundStyle(Color.blue)
+                        .symbolSize(30)
+                }
+            }
         }
         .chartXScale(domain: xDomain)
         .chartYScale(domain: 0...scale.upperBound, type: scale.chartScaleType)
@@ -239,7 +264,7 @@ struct UsageTrendChart: View {
             GeometryReader { geometry in
                 if let plotFrame = proxy.plotFrame {
                     let frame = geometry[plotFrame]
-                    ForEach(series, id: \.timestamp) { point in
+                    ForEach(dateLabels, id: \.timestamp) { point in
                         if let x = proxy.position(forX: point.timestamp) {
                             Text(point.timestamp, format: .dateTime.month(.twoDigits).day(.twoDigits))
                                 .font(.islandMicro(design: .monospaced))
@@ -247,9 +272,30 @@ struct UsageTrendChart: View {
                                 .position(x: frame.minX + x, y: frame.maxY + 8)
                         }
                     }
+                    Rectangle()
+                        .fill(.clear)
+                        .contentShape(Rectangle())
+                        .gesture(SpatialTapGesture().onEnded { tap in
+                            guard frame.contains(tap.location),
+                                  let date: Date = proxy.value(atX: tap.location.x - frame.minX),
+                                  let day = Self.selectionDate(at: date, domain: xDomain) else { return }
+                            selectedDate = day
+                        })
                 }
             }
         }
+    }
+
+    private var dateLabels: [UsageBreakdownPoint] {
+        guard series.count > 7 else { return series }
+        let strideCount = max(1, Int(ceil(Double(series.count - 1) / 4)))
+        return series.enumerated().filter { $0.offset % strideCount == 0 || $0.offset == series.count - 1 }.map(\.element)
+    }
+
+    /// Chart coordinates select their calendar day even when a long-range trend omits intermediate points.
+    static func selectionDate(at date: Date, domain: ClosedRange<Date>, calendar: Calendar = .current) -> Date? {
+        guard date >= domain.lowerBound, date < domain.upperBound else { return nil }
+        return calendar.startOfDay(for: date)
     }
 }
 
@@ -443,9 +489,20 @@ private struct TaskProgressRow: View {
 
 struct UsageHeatmap: View {
     var weeks: [[ContributionDay?]]
+    @Binding var selectedDate: Date
+    var cellSize: CGFloat?
 
     private let gap: CGFloat = 1.5
-    @State private var selectedDate: Date?
+
+    init(weeks: [[ContributionDay?]], selectedDate: Binding<Date> = .constant(.now), cellSize: CGFloat? = nil) {
+        self.weeks = weeks
+        _selectedDate = selectedDate
+        self.cellSize = cellSize
+    }
+
+    private var fixedGridWidth: CGFloat? {
+        cellSize.map { CGFloat(weeks.count) * $0 + CGFloat(max(0, weeks.count - 1)) * gap }
+    }
 
     /// Maximum single-day token count within the current window; intensity is normalized relative to it
     /// to avoid absolute thresholds (e.g., 50M/100M/…) always mapping most users to the lightest level.
@@ -458,7 +515,6 @@ struct UsageHeatmap: View {
     }
 
     private var selectedDay: ContributionDay? {
-        guard let selectedDate else { return nil }
         return weeks.flatMap { $0 }.compactMap { $0 }.first {
             Calendar.current.isDate($0.date, inSameDayAs: selectedDate)
         }
@@ -494,9 +550,10 @@ struct UsageHeatmap: View {
                 }
             }
             .aspectRatio(gridAspectRatio, contentMode: .fit)
+            .frame(width: fixedGridWidth, height: cellSize.map { $0 * 7 + gap * 6 }, alignment: .leading)
 
             GeometryReader { proxy in
-                let width = cellWidth(in: proxy.size.width)
+                let width = cellWidth(in: fixedGridWidth ?? proxy.size.width)
                 HStack(alignment: .top, spacing: gap) {
                     ForEach(weeks.indices, id: \.self) { index in
                         let label = monthLabel(in: weeks[index])
@@ -513,7 +570,7 @@ struct UsageHeatmap: View {
                     }
                 }
             }
-            .frame(height: 13)
+            .frame(width: fixedGridWidth.map { max(240, $0) }, height: 13)
 
             HStack(spacing: 4) {
                 Text(AppLocalization.text("少"))
@@ -547,16 +604,19 @@ struct UsageHeatmap: View {
             .foregroundStyle(.secondary)
             .frame(height: 13, alignment: .leading)
         }
-        .accessibilityLabel(AppLocalization.text("最近二十四周 AI token 用量热力图"))
+        .frame(width: fixedGridWidth.map { max(240, $0) }, alignment: .leading)
+        .accessibilityElement(children: .contain)
+        .accessibilityLabel(AppLocalization.text("AI token 用量热力图"))
     }
 
     private func isSelected(_ day: ContributionDay?) -> Bool {
-        guard let selectedDate, let day else { return false }
+        guard let day else { return false }
         return Calendar.current.isDate(day.date, inSameDayAs: selectedDate)
     }
 
     private var gridAspectRatio: CGFloat {
         guard !weeks.isEmpty else { return 1 }
+        if let cellSize, let fixedGridWidth { return fixedGridWidth / (cellSize * 7 + gap * 6) }
         return CGFloat(weeks.count) / 7
     }
 

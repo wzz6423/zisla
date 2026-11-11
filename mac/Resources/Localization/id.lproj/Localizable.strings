@@ -3361,3 +3361,13 @@
 "未知模型" = "Model Tidak Diketahui";
 "输入 %@ · 输出 %@" = "Masukan %@ · Keluaran %@";
 "AI 模型用量" = "Penggunaan Model AI";
+
+"AI 用量历史" = "Riwayat penggunaan AI";
+"把全部 AI 用量历史导出为 xlsx 表格" = "Ekspor seluruh riwayat penggunaan AI sebagai lembar kerja xlsx";
+"已清空 AI 用量历史" = "Riwayat penggunaan AI dihapus";
+"清空失败：%@" = "Gagal menghapus: %@";
+"清空 AI 用量历史？" = "Hapus riwayat penggunaan AI?";
+"删除本机保存的 AI 用量历史，保留任务和日志去重记录。此操作无法撤销。" = "Hapus riwayat penggunaan AI yang tersimpan di Mac ini. Tugas dan catatan deduplikasi log tetap disimpan. Tindakan ini tidak dapat dibatalkan.";
+"上一年" = "Tahun sebelumnya";
+"下一年" = "Tahun berikutnya";
+"AI token 用量热力图" = "Peta panas penggunaan token AI";

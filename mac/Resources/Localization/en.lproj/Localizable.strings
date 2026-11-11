@@ -3360,3 +3360,13 @@
 "未知模型" = "Unknown Model";
 "输入 %@ · 输出 %@" = "Input %@ · Output %@";
 "AI 模型用量" = "AI Model Usage";
+
+"AI 用量历史" = "AI Usage History";
+"把全部 AI 用量历史导出为 xlsx 表格" = "Export all AI usage history as an xlsx spreadsheet";
+"已清空 AI 用量历史" = "AI usage history cleared";
+"清空失败：%@" = "Clear failed: %@";
+"清空 AI 用量历史？" = "Clear AI usage history?";
+"删除本机保存的 AI 用量历史，保留任务和日志去重记录。此操作无法撤销。" = "Delete AI usage history stored on this Mac. Tasks and log deduplication records are kept. This cannot be undone.";
+"上一年" = "Previous year";
+"下一年" = "Next year";
+"AI token 用量热力图" = "AI token usage heatmap";

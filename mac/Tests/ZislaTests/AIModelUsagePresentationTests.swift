@@ -9,8 +9,8 @@ import ZislaKit
 struct AIModelUsagePresentationTests {
     private static let keys = ["每日模型用量", "暂无模型用量", "未分类", "未知模型", "输入 %@ · 输出 %@", "AI 模型用量"]
 
-    @Test
     /// Runtime lookups are asserted because missing localization keys silently fall back despite a successful build.
+    @Test
     func everyLanguageTranslatesRuntimeModelUsageKeysWithMatchingPlaceholders() throws {
         let package = URL(fileURLWithPath: #filePath).deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent()
         let source = try String(contentsOf: package.appendingPathComponent("Sources/Zisla/AIProgressModuleView.swift"), encoding: .utf8)
@@ -39,15 +39,15 @@ struct AIModelUsagePresentationTests {
         #expect(DailyModelUsageList.tokenBreakdown(unknown, language: .english) == "Input 10 · Output 2")
     }
 
-    @Test @MainActor
     /// Long identities and RTL must wrap within narrow island widths instead of expanding the panel.
+    @Test @MainActor
     func modelRowsFitNarrowIslandWidthsWithLongNamesAndRTL() throws {
         let model = AIModelUsage(provider: .codex, model: String(repeating: "gpt-model-long-name-", count: 8),
             inputTokens: Int.max, outputTokens: 99_999)
         let day = AIDailyModelUsage(date: Date(timeIntervalSince1970: 1_800_000_000),
             inputTokens: Int.max, outputTokens: 99_999, models: [model])
         for width in [CGFloat(120), 220, 340] {
-            let view = DailyModelUsageList(days: [day])
+            let view = DailyModelUsageList(day: day)
                 .frame(width: width)
                 .environment(\.locale, AppLanguage.arabic.locale)
                 .environment(\.layoutDirection, .rightToLeft)
@@ -58,8 +58,8 @@ struct AIModelUsagePresentationTests {
         }
     }
 
-    @Test @MainActor
     /// The export must receive the selected day's totals without requesting usage when that section is disabled.
+    @Test @MainActor
     func briefingReadsOnlySelectedUsageAndCarriesDailyTotalAndModelRowsToExport() async throws {
         let root = FileManager.default.temporaryDirectory.appendingPathComponent("zisla-model-briefing-\(UUID())")
         defer { try? FileManager.default.removeItem(at: root) }

@@ -3361,3 +3361,13 @@
 "未知模型" = "Modello sconosciuto";
 "输入 %@ · 输出 %@" = "Input %@ · Output %@";
 "AI 模型用量" = "Utilizzo dei modelli IA";
+
+"AI 用量历史" = "Cronologia di utilizzo dell’IA";
+"把全部 AI 用量历史导出为 xlsx 表格" = "Esporta tutta la cronologia di utilizzo dell’IA come foglio di calcolo xlsx";
+"已清空 AI 用量历史" = "Cronologia di utilizzo dell’IA cancellata";
+"清空失败：%@" = "Cancellazione non riuscita: %@";
+"清空 AI 用量历史？" = "Cancellare la cronologia di utilizzo dell’IA?";
+"删除本机保存的 AI 用量历史，保留任务和日志去重记录。此操作无法撤销。" = "Elimina la cronologia di utilizzo dell’IA salvata su questo Mac. Le attività e i dati di deduplicazione dei log vengono conservati. L’operazione non può essere annullata.";
+"上一年" = "Anno precedente";
+"下一年" = "Anno successivo";
+"AI token 用量热力图" = "Mappa di calore dell’utilizzo dei token IA";

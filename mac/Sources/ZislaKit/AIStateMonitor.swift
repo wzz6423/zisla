@@ -72,6 +72,8 @@ public final class AIStateMonitor: ObservableObject {
     @Published public private(set) var errorDescription: String?
     @Published public private(set) var usageHistoryState: AIUsageHistoryState = .idle
     @Published public private(set) var failedUsageProviders: Set<AIProvider> = []
+    @Published public private(set) var usageHistoryRevision: UInt64 = 0
+    @Published public private(set) var isClearingUsageHistory = false
 
     private let repository: AIStateRepository
     private let activityDetectors: [any AIActivityDetecting]
@@ -88,6 +90,7 @@ public final class AIStateMonitor: ObservableObject {
     private var usageHistoryLoadInFlight = false
     private var usageHistoryLoadPending = false
     private var usageHistoryGeneration: UInt64 = 0
+    private var usageHistoryClearGeneration: UInt64 = 0
     private var memoryPressureSource: DispatchSourceMemoryPressure?
     private var descriptor: Int32 = -1
     private var activityTimer: Timer?
@@ -97,6 +100,7 @@ public final class AIStateMonitor: ObservableObject {
     private let now: () -> Date
     #if DEBUG
     private let debugEnvironment: [String: String]
+    private var debugUsageHistoryCleared = false
     #endif
     private let refreshQueue = DispatchQueue(
         label: "dev.wzz.zisla.ai-state-refresh",
@@ -374,6 +378,75 @@ public final class AIStateMonitor: ObservableObject {
         }
     }
 
+    /// A separate window owns its snapshot, so reading it cannot request or unload the island's history.
+    public func readUsageHistory() async throws -> AIUsageHistory {
+        try Task.checkCancellation()
+        guard !isClearingUsageHistory else { throw CancellationError() }
+        let generation = usageHistoryClearGeneration
+        #if DEBUG
+        if let history = debugUsageHistory() { return history }
+        #endif
+        let repository = repository
+        let history: AIUsageHistory = try await withCheckedThrowingContinuation { continuation in
+            refreshQueue.async {
+                do { continuation.resume(returning: try repository.loadUsageHistory()) }
+                catch { continuation.resume(throwing: error) }
+            }
+        }
+        try Task.checkCancellation()
+        guard generation == usageHistoryClearGeneration else { throw CancellationError() }
+        return history
+    }
+
+    /// Serializes clearing with local scans and invalidates older panel reads before they can publish.
+    public func clearUsageHistory() async throws {
+        guard !isClearingUsageHistory else { throw CancellationError() }
+        isClearingUsageHistory = true
+        usageHistoryClearGeneration &+= 1
+        usageHistoryGeneration &+= 1
+        usageHistoryLoadInFlight = false
+        usageHistoryLoadPending = false
+        do {
+            #if DEBUG
+            if debugUsageHistory() != nil { debugUsageHistoryCleared = true }
+            else { try await clearPersistedUsageHistory() }
+            #else
+            try await clearPersistedUsageHistory()
+            #endif
+            state.usageSamples.removeAll(keepingCapacity: false)
+            state.modelUsageSamples.removeAll(keepingCapacity: false)
+            usageHistoryIsLoaded = usageHistoryRequested
+            usageHistoryState = usageHistoryRequested ? .loaded : .idle
+            usageHistoryRevision &+= 1
+            errorDescription = nil
+            isClearingUsageHistory = false
+        } catch {
+            isClearingUsageHistory = false
+            if usageHistoryRequested { requestUsageHistoryLoad(force: true) }
+            throw error
+        }
+    }
+
+    private func clearPersistedUsageHistory() async throws {
+        let repository = repository
+        try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Void, any Error>) in
+            refreshQueue.async {
+                do {
+                    try repository.clearUsageHistory()
+                    continuation.resume()
+                } catch { continuation.resume(throwing: error) }
+            }
+        }
+    }
+
+    #if DEBUG
+    /// A cleared preview stays empty for this process; restarting restores the environment fixture.
+    private func debugUsageHistory() -> AIUsageHistory? {
+        guard let history = AIModelUsageDebug.history(environment: debugEnvironment, now: now()) else { return nil }
+        return debugUsageHistoryCleared ? AIUsageHistory() : history
+    }
+    #endif
+
     /// Schedules a background refresh for interactive paths, avoiding a full decode of large state files on the main thread.
     public func refresh() {
         scheduleSubscriptionUsageRefresh()
@@ -422,7 +495,7 @@ public final class AIStateMonitor: ObservableObject {
 
     /// Coalesces forced reads and loads both ledgers off the main thread without reviving an unloaded panel.
     private func requestUsageHistoryLoad(force: Bool = false) {
-        guard usageHistoryRequested else { return }
+        guard usageHistoryRequested, !isClearingUsageHistory else { return }
         if usageHistoryLoadInFlight {
             usageHistoryLoadPending = usageHistoryLoadPending || force
             return
@@ -434,7 +507,7 @@ public final class AIStateMonitor: ObservableObject {
         let historyGeneration = usageHistoryGeneration
         let monitorGeneration = refreshGeneration
         #if DEBUG
-        if let history = AIModelUsageDebug.history(environment: debugEnvironment, now: now()) {
+        if let history = debugUsageHistory() {
             applyUsageHistory(.samples(history), historyGeneration: historyGeneration,
                 monitorGeneration: monitorGeneration)
             return
@@ -876,7 +949,7 @@ public final class AIStateMonitor: ObservableObject {
             }
             #if DEBUG
             if includesUsageSamples, usageHistoryRequested,
-               let history = AIModelUsageDebug.history(environment: debugEnvironment, now: now()) {
+               let history = debugUsageHistory() {
                 next.usageSamples = history.usageSamples
                 next.modelUsageSamples = history.modelUsageSamples
             }

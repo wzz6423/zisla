@@ -295,6 +295,97 @@ struct AIModelDailyUsageTests {
         #expect(try repository.recordDetectedUsage([first, second]) == 0)
     }
 
+    /// Clearing reporting tables must preserve tasks and replay protection while charging later growth in full.
+    @Test
+    func clearingHistoryKeepsTasksNoticesAndHighWaterMarksWithoutSwallowingNewGrowth() throws {
+        let root = directory()
+        defer { try? FileManager.default.removeItem(at: root) }
+        let repository = AIStateRepository(directoryURL: root)
+        let task = AIProgressTask(id: "clear-task", provider: .codex, title: "Fixture", progress: nil, updatedAt: day)
+        let notice = IslandNotice(id: "clear-notice", title: "Fixture", createdAt: day)
+        try repository.upsert(task)
+        try repository.enqueueNotice(notice)
+        var detected = sample("clear-source", .codex, nil, 100, 20)
+        try repository.recordDetectedUsage([detected])
+        try repository.recordUsage(sample("manual-clear", .claude, "manual", 5, 2))
+        try sql(repository.databaseURL, """
+            INSERT INTO detected_usage_baselines VALUES(\(day.timeIntervalSinceReferenceDate), 999999, 999999);
+            INSERT INTO detected_usage_cursor VALUES(1, \(day.addingTimeInterval(864000).timeIntervalSinceReferenceDate));
+            """)
+        try repository.clearUsageHistory()
+        for table in ["usage_samples", "model_usage_samples", "detected_usage_daily", "detected_usage_baselines", "detected_usage_cursor"] {
+            #expect(try scalar(repository.databaseURL, "SELECT COUNT(*) FROM \(table)") == 0)
+        }
+        #expect(try scalar(repository.databaseURL, "SELECT input_tokens FROM detected_usage_events WHERE source_id = 'clear-source'") == 100)
+        let state = try repository.load()
+        #expect(state.tasks == [task] && state.notices == [notice])
+        #expect(state.usageSamples.isEmpty && state.modelUsageSamples.isEmpty)
+        #expect(try repository.recordDetectedUsage([detected]) == 0)
+        detected.model = "discovered-model"
+        #expect(try repository.recordDetectedUsage([detected]) == 0)
+        #expect(try repository.loadUsageHistory() == AIUsageHistory())
+        detected.inputTokens = 150
+        detected.outputTokens = 30
+        #expect(try repository.recordDetectedUsage([detected]) == 1)
+        let history = try AIStateRepository(directoryURL: root).loadUsageHistory()
+        #expect(history.usageSamples.map(\.inputTokens) == [50])
+        #expect(history.usageSamples.map(\.outputTokens) == [10])
+        #expect(history.modelUsageSamples.map(\.model) == ["discovered-model"])
+        #expect(history.modelUsageSamples.map(\.totalTokens) == [60])
+        #expect(try repository.recordDetectedUsage([detected]) == 0)
+        try repository.clearUsageHistory()
+        try repository.clearUsageHistory()
+        #expect(try repository.loadUsageHistory() == AIUsageHistory())
+    }
+
+    /// A failing delete must roll back every reporting table so the unchanged history remains retryable.
+    @Test
+    func clearFailureRollsBackAllLedgersAndRetryKeepsReplayProtection() throws {
+        let root = directory()
+        defer { try? FileManager.default.removeItem(at: root) }
+        let repository = AIStateRepository(directoryURL: root)
+        let detected = sample("clear-rollback", .codex, "model", 100, 20)
+        try repository.recordDetectedUsage([detected])
+        let original = try repository.loadUsageHistory()
+        try sql(repository.databaseURL, """
+            CREATE TRIGGER fail_history_clear BEFORE DELETE ON detected_usage_daily
+            BEGIN SELECT RAISE(ABORT, 'fixture clear failure'); END;
+            """)
+        #expect(throws: (any Error).self) { try repository.clearUsageHistory() }
+        #expect(try repository.loadUsageHistory() == original)
+        #expect(try scalar(repository.databaseURL, "SELECT COUNT(*) FROM detected_usage_daily") == 1)
+        #expect(try scalar(repository.databaseURL, "SELECT input_tokens FROM detected_usage_events") == 100)
+        try sql(repository.databaseURL, "DROP TRIGGER fail_history_clear")
+        try repository.clearUsageHistory()
+        #expect(try repository.recordDetectedUsage([detected]) == 0)
+        #expect(try repository.loadUsageHistory() == AIUsageHistory())
+    }
+
+    /// Legacy generic evidence may archive identities after clear, but it must never restore discarded report rows.
+    @Test
+    func legacyGenericArchiveAfterClearSeedsOnlyFutureGrowth() throws {
+        let root = directory()
+        defer { try? FileManager.default.removeItem(at: root) }
+        let repository = AIStateRepository(directoryURL: root)
+        let document = Data(#"{"messages":[{"id":"old","usage":{"input_tokens":100,"output_tokens":20}}],"timestamp":"2026-11-08T00:00:00Z"}"#.utf8)
+        let legacy = sample("gemini-clear-entry-\(AIUsageLogIdentity.digest(document))-usage-0", .gemini, nil, 100, 20)
+        try repository.recordDetectedUsage([legacy])
+        try repository.clearUsageHistory()
+        var current = sample("gemini-clear-usage-v2-old", .gemini, "current", 100, 20)
+        current.legacySourceID = "gemini-clear-entry-current-usage-"
+        current.genericContext = .init(document: document, path: [.key("messages"), .index(0), .key("usage")])
+        #expect(try repository.recordDetectedUsage([current]) == 0)
+        #expect(try repository.loadUsageHistory() == AIUsageHistory())
+        current.inputTokens = 150
+        current.outputTokens = 30
+        current.genericContext = .init(document: Data(#"{"messages":[{"id":"old","usage":{"input_tokens":150,"output_tokens":30}}],"timestamp":"2026-11-08T00:00:00Z"}"#.utf8), path: [.key("messages"), .index(0), .key("usage")])
+        #expect(try repository.recordDetectedUsage([current]) == 1)
+        let history = try repository.loadUsageHistory()
+        #expect(history.usageSamples.map(\.totalTokens) == [60])
+        #expect(history.modelUsageSamples.map(\.model) == ["current"])
+        #expect(try repository.recordDetectedUsage([legacy, current]) == 0)
+    }
+
     /// A failed model insert must not acknowledge the event, or its retry would silently lose the token delta.
     @Test
     func failedModelWriteRollsBackDailyTotalAndDedupeHighWaterMark() throws {
@@ -507,16 +598,21 @@ struct AIModelDailyUsageTests {
         var current = sample("gemini-reappeared-usage-v2-current", .gemini, "current", 150, 20)
         current.legacySourceID = prefix
         #expect(try repository.recordDetectedUsage([current]) == 0)
-        try repository.recordDetectedUsage([old])
+        #expect(try repository.recordDetectedUsage([old]) == 0)
         let before = try repository.loadUsageHistory()
-        #expect(before.usageSamples.first?.totalTokens == 240)
+        #expect(before.usageSamples.first?.totalTokens == 120)
         #expect(try repository.recordDetectedUsage([current]) == 0)
         #expect(try repository.loadUsageHistory() == before)
         current.inputTokens += 10
         #expect(try repository.recordDetectedUsage([current]) == 1)
-        #expect(try repository.loadUsageSamples().first?.totalTokens == 250)
+        #expect(try repository.loadUsageSamples().first?.totalTokens == 130)
         #expect(try repository.loadUsageHistory().modelUsageSamples.contains { $0.model == "current" && $0.totalTokens == 10 })
         #expect(try repository.recordDetectedUsage([current]) == 0)
+        var legacyGrowth = old
+        legacyGrowth.inputTokens += 10
+        #expect(try repository.recordDetectedUsage([legacyGrowth]) == 1)
+        #expect(try repository.loadUsageSamples().first?.totalTokens == 140)
+        #expect(try repository.recordDetectedUsage([old, legacyGrowth, current]) == 0)
     }
 
     /// Recovery needs the original serialized date form to prove identity while charging growth to the new recorded day.

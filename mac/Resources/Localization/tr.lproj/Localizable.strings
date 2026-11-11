@@ -3361,3 +3361,13 @@
 "未知模型" = "Bilinmeyen Model";
 "输入 %@ · 输出 %@" = "Girdi %@ · Çıktı %@";
 "AI 模型用量" = "Yapay Zekâ Model Kullanımı";
+
+"AI 用量历史" = "Yapay zekâ kullanım geçmişi";
+"把全部 AI 用量历史导出为 xlsx 表格" = "Tüm yapay zekâ kullanım geçmişini xlsx elektronik tablosu olarak dışa aktar";
+"已清空 AI 用量历史" = "Yapay zekâ kullanım geçmişi temizlendi";
+"清空失败：%@" = "Temizleme başarısız: %@";
+"清空 AI 用量历史？" = "Yapay zekâ kullanım geçmişi temizlensin mi?";
+"删除本机保存的 AI 用量历史，保留任务和日志去重记录。此操作无法撤销。" = "Bu Mac’te saklanan yapay zekâ kullanım geçmişini sil. Görevler ve günlük yinelenmelerini önleme kayıtları korunur. Bu işlem geri alınamaz.";
+"上一年" = "Önceki yıl";
+"下一年" = "Sonraki yıl";
+"AI token 用量热力图" = "Yapay zekâ token kullanım ısı haritası";

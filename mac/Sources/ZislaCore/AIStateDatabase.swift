@@ -236,6 +236,17 @@ final class AIStateDatabase {
         }
     }
 
+    /// Erases reporting detail atomically while keeping source high-water marks so old logs cannot refill it.
+    func clearUsageHistory() throws {
+        try transaction {
+            try execute("DELETE FROM usage_samples")
+            try execute("DELETE FROM model_usage_samples")
+            try execute("DELETE FROM detected_usage_daily")
+            try execute("DELETE FROM detected_usage_baselines")
+            try execute("DELETE FROM detected_usage_cursor")
+        }
+    }
+
     func enqueueNotices(_ notices: [IslandNotice]) throws {
         guard !notices.isEmpty else { return }
         try transaction {
@@ -594,7 +605,12 @@ final class AIStateDatabase {
         var modelDays: Set<Date> = []
         let ambiguousGenericSources = try prepareGenericUsageMigration(samples, using: lookup, modelDays: &modelDays)
         for sample in samples {
-            let sourceID = detectedUsageSourceID(for: sample)
+            var sourceID = detectedUsageSourceID(for: sample)
+            // Archived generic entries retain the same high-water mark when an older detector replays their original ID.
+            if let archived = try detectedUsageEvent(sourceID: "zisla-legacy-generic:\(sourceID)", using: lookup),
+               archived.provider == sample.provider {
+                sourceID = "zisla-legacy-generic:\(sourceID)"
+            }
             let normalized = AIUsageSample(
                 sourceID: sourceID,
                 provider: sample.provider,
