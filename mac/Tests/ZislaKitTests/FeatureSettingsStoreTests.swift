@@ -5,6 +5,33 @@ import Testing
 @testable import ZislaKit
 
 struct FeatureSettingsStoreTests {
+    @Test @MainActor
+    func moduleOrderPersistsAndRestoringDefaultPreservesOtherChoices() throws {
+        let suiteName = "Zisla.ModuleOrder.\(UUID().uuidString)"
+        let defaults = try #require(UserDefaults(suiteName: suiteName))
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+        let store = FeatureSettingsStore(defaults: defaults, persistenceDelay: .seconds(60))
+        #expect(store.settings.moduleOrder == IslandModuleOrder.defaultOrder)
+        let customOrder = Array(IslandModuleOrder.defaultOrder.reversed())
+        store.settings.moduleOrder = customOrder
+        store.settings.mediaEnabled = false
+        store.settings.clipboardHistoryEnabled = false
+        store.flushPendingChanges()
+
+        let restored = FeatureSettingsStore(defaults: defaults, persistenceDelay: .seconds(60))
+        #expect(restored.settings == store.settings)
+        #expect(restored.settings.moduleOrder == customOrder)
+        restored.settings.clipboardHistoryEnabled = true
+        restored.flushPendingChanges()
+        #expect(FeatureSettingsStore(defaults: defaults).settings.moduleOrder == customOrder)
+
+        var expected = restored.settings
+        expected.moduleOrder = IslandModuleOrder.defaultOrder
+        restored.settings.moduleOrder = IslandModuleOrder.defaultOrder
+        restored.flushPendingChanges()
+        #expect(FeatureSettingsStore(defaults: defaults).settings == expected)
+    }
+
     @Test(arguments: [false, true], [false, true]) @MainActor
     func combinedMonitorChoiceSurvivesLegacyLoadingRelaunchAndReset(systemEnabled: Bool, batteryEnabled: Bool) throws {
         let suiteName = "Zisla.CombinedMonitor.\(UUID().uuidString)"

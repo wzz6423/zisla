@@ -835,6 +835,7 @@ public struct FeatureSettings: Codable, Equatable, Sendable {
     private var clipboardAssistantCurrencyDefaultApplied: Bool
     private var clipboardAssistantConversionDefaultApplied: Bool
     private var clipboardAssistantAppDefaultApplied: Bool
+    private var clipboardAssistantServiceLookupDefaultApplied: Bool
     /// Payload version of the clipboard-assistant kind preferences. Bumped when a
     /// new kind ships so the decoder can enable it once for existing users instead
     /// of silently leaving it off or resurrecting kinds they turned off.
@@ -949,6 +950,7 @@ public struct FeatureSettings: Codable, Equatable, Sendable {
     /// Whether closing a compatible MacBook lid plays the screen depth animation.
     public var lidCloseAnimationEnabled: Bool
 
+    /// Marks migrations complete for new settings so supplied preferences are not treated as legacy defaults.
     public init(
         mediaEnabled: Bool = true,
         mediaSource: MediaSourcePreference = .automatic,
@@ -1154,6 +1156,7 @@ public struct FeatureSettings: Codable, Equatable, Sendable {
         self.clipboardAssistantCurrencyDefaultApplied = true
         self.clipboardAssistantConversionDefaultApplied = true
         self.clipboardAssistantAppDefaultApplied = true
+        self.clipboardAssistantServiceLookupDefaultApplied = true
         self.clipboardAssistantKindSetVersion = clipboardAssistantKindSetVersion
         var actionOrders = clipboardAssistantActionOrders
         if let legacyCurrencyOrder = actionOrders.removeValue(forKey: .currency), actionOrders[.conversion] == nil {
@@ -1325,6 +1328,7 @@ public struct FeatureSettings: Codable, Equatable, Sendable {
         case clipboardAssistantCurrencyDefaultApplied
         case clipboardAssistantConversionDefaultApplied
         case clipboardAssistantAppDefaultApplied
+        case clipboardAssistantServiceLookupDefaultApplied
         case clipboardAssistantKindSetVersion
         case clipboardAssistantActionOrders
         case clipboardAssistantSearchEngine
@@ -1398,6 +1402,7 @@ public struct FeatureSettings: Codable, Equatable, Sendable {
         case automaticUpdatesEnabled
     }
 
+    /// Missing keys identify legacy settings; persisted migration markers protect later user choices.
     public init(from decoder: Decoder) throws {
         let container = try decoder.container(keyedBy: CodingKeys.self)
         let defaults = FeatureSettings.default
@@ -1609,6 +1614,18 @@ public struct FeatureSettings: Codable, Equatable, Sendable {
         if let legacyCurrencyOrder = actionOrders.removeValue(forKey: .currency), actionOrders[.conversion] == nil {
             actionOrders[.conversion] = legacyCurrencyOrder
         }
+        let hasAppliedServiceLookupDefault = try container.decodeIfPresent(
+            Bool.self,
+            forKey: .clipboardAssistantServiceLookupDefaultApplied
+        ) ?? false
+        if !hasAppliedServiceLookupDefault {
+            // Migrate only the former defaults; later explicit search priorities must survive restarts.
+            for kind in [ClipboardAssistantKind.flight, .train]
+            where actionOrders[kind] == [.search, .openURL, .copyText, .addToQuickNote, .share] {
+                actionOrders[kind] = ClipboardAssistantActionOrder.defaults(for: kind)
+            }
+        }
+        clipboardAssistantServiceLookupDefaultApplied = true
         clipboardAssistantActionOrders = ClipboardAssistantActionOrder.normalized(
             actionOrders
         )

@@ -21,8 +21,8 @@ final class ScreenRecordingStudioModel: ObservableObject {
     @Published var recordingCameraBorder = false
     @Published var recordingCameraSize = 0.25
     @Published var exportConfiguration = RecordingExportConfiguration()
-    @Published private(set) var project: ScreenRecordingProject?
-    @Published private(set) var directory: URL?
+    @Published private(set) var project: ScreenRecordingProject? { didSet { clearTimelinePlayback() } }
+    @Published private(set) var directory: URL? { didSet { clearTimelinePlayback() } }
     @Published var player: AVPlayer?
     @Published private(set) var preview: NSImage?
     @Published private(set) var canvasPreview: CGImage?
@@ -1162,37 +1162,38 @@ final class ScreenRecordingStudioModel: ObservableObject {
             guard let self else { return }
             defer { isBusy = false; operationTask = nil }
             do {
-                let item = try await exporter.playbackItem(project: project, directory: directory)
-                let timeline = project.timeline == nil ? try RecordingExportTimeline(project: project) : nil
-                try Task.checkCancellation()
-                guard self.project == project, self.directory == directory else { return }
-                player?.pause()
-                isShowingSourcePlayback = false
-                if let timelineObserver { timelinePlayer?.removeTimeObserver(timelineObserver); self.timelineObserver = nil }
-                let player = AVPlayer(playerItem: item)
-                timelinePlayer = player
-                playbackTime = start
-                timelineObserver = player.addPeriodicTimeObserver(forInterval: CMTime(seconds: 0.1, preferredTimescale: 600), queue: .main) { [weak self] time in
-                    Task { @MainActor [weak self] in
-                        guard let self, isShowingTimelinePlayback else { return }
-                        let ended = time.seconds >= project.outputDuration
-                            || time.seconds >= item.duration.seconds
-                        playbackTime = ended ? project.outputDuration : time.seconds
-                        if let timeline {
-                            currentTime = timeline.slice(at: playbackTime)?.sourceTime(at: playbackTime)
-                                ?? timeline.slices.last!.sourceEnd
-                        } else { currentTime = playbackTime }
-                        if ended {
-                            isShowingTimelinePlayback = false
-                            refreshPreview()
+                let player: AVPlayer
+                if let prepared = timelinePlayer { player = prepared }
+                else {
+                    let item = try await exporter.playbackItem(project: project, directory: directory)
+                    let timeline = project.timeline == nil ? try RecordingExportTimeline(project: project) : nil
+                    try Task.checkCancellation()
+                    guard self.project == project, self.directory == directory else { return }
+                    player = AVPlayer(playerItem: item)
+                    timelinePlayer = player
+                    timelineObserver = player.addPeriodicTimeObserver(forInterval: CMTime(seconds: 0.1, preferredTimescale: 600), queue: .main) { [weak self] time in
+                        Task { @MainActor [weak self] in
+                            guard let self, isShowingTimelinePlayback else { return }
+                            let ended = time.seconds >= project.outputDuration
+                                || time.seconds >= item.duration.seconds
+                            playbackTime = ended ? project.outputDuration : time.seconds
+                            if let timeline {
+                                currentTime = timeline.slice(at: playbackTime)?.sourceTime(at: playbackTime)
+                                    ?? timeline.slices.last!.sourceEnd
+                            } else { currentTime = playbackTime }
+                            if ended {
+                                isShowingTimelinePlayback = false
+                                refreshPreview()
+                            }
                         }
                     }
                 }
-                if start > 0 {
-                    await player.seek(to: CMTime(seconds: start, preferredTimescale: 60_000),
-                                      toleranceBefore: .zero, toleranceAfter: .zero)
-                    try Task.checkCancellation()
-                }
+                self.player?.pause()
+                isShowingSourcePlayback = false
+                playbackTime = start
+                await player.seek(to: CMTime(seconds: start, preferredTimescale: 60_000),
+                                  toleranceBefore: .zero, toleranceAfter: .zero)
+                try Task.checkCancellation()
                 isShowingTimelinePlayback = true
                 player.play()
             } catch { if !(error is CancellationError) { errorMessage = error.localizedDescription } }
@@ -1321,6 +1322,13 @@ final class ScreenRecordingStudioModel: ObservableObject {
 
     func dismissAIEdit() { pendingAIProject = nil; pendingAIBase = nil }
 
+    private func clearTimelinePlayback() {
+        timelinePlayer?.pause()
+        if let timelineObserver { timelinePlayer?.removeTimeObserver(timelineObserver); self.timelineObserver = nil }
+        timelinePlayer = nil
+        isShowingTimelinePlayback = false
+    }
+
     private func clearProject() {
         projectRevision += 1
         if isBusy {
@@ -1330,9 +1338,6 @@ final class ScreenRecordingStudioModel: ObservableObject {
         }
         previewTask?.cancel()
         player?.pause()
-        timelinePlayer?.pause()
-        if let timelineObserver { timelinePlayer?.removeTimeObserver(timelineObserver); self.timelineObserver = nil }
-        timelinePlayer = nil
         if let playerObserver { player?.removeTimeObserver(playerObserver); self.playerObserver = nil }
         player = nil
         project = nil
@@ -1461,11 +1466,9 @@ final class ScreenRecordingStudioModel: ObservableObject {
         transcriber.cancel()
         exporter.cancel()
         player?.pause()
-        timelinePlayer?.pause()
         if let playerObserver { player?.removeTimeObserver(playerObserver); self.playerObserver = nil }
-        if let timelineObserver { timelinePlayer?.removeTimeObserver(timelineObserver); self.timelineObserver = nil }
         player = nil
-        timelinePlayer = nil
+        clearTimelinePlayback()
     }
 
 }
