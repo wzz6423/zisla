@@ -129,7 +129,7 @@ public final class ManagedToolService: ObservableObject {
             if let trusted = trustedExecutable(executable) {
                 return (trusted, .external(executable.path))
             }
-        } else if !tool.usesHomebrew {
+        } else if !tool.usesHomebrew || tool == .ffmpeg {
             let managed = toolsDirectory.appendingPathComponent(tool.executableName, isDirectory: false)
             if let trusted = trustedExecutable(managed) {
                 return (trusted, .managed)

@@ -727,6 +727,7 @@ public struct FeatureSettings: Codable, Equatable, Sendable {
     public var calendarEnabled: Bool
     public var toolboxEnabled: Bool
     public var pdfToolsEnabled: Bool
+    public var audioToolsEnabled: Bool
     public var volumeMixerEnabled: Bool
     public var toolboxReminderEnabled: Bool
     /// Whether to show a countdown in the collapsed Dynamic Island during Focus sessions.
@@ -942,6 +943,7 @@ public struct FeatureSettings: Codable, Equatable, Sendable {
         calendarEnabled: Bool = true,
         toolboxEnabled: Bool = true,
         pdfToolsEnabled: Bool = true,
+        audioToolsEnabled: Bool = true,
         volumeMixerEnabled: Bool = true,
         toolboxReminderEnabled: Bool = true,
         focusCountdownIslandEnabled: Bool = true,
@@ -1067,6 +1069,7 @@ public struct FeatureSettings: Codable, Equatable, Sendable {
         self.calendarEnabled = calendarEnabled
         self.toolboxEnabled = toolboxEnabled
         self.pdfToolsEnabled = pdfToolsEnabled
+        self.audioToolsEnabled = audioToolsEnabled
         self.volumeMixerEnabled = volumeMixerEnabled
         self.toolboxReminderEnabled = toolboxReminderEnabled
         self.focusCountdownIslandEnabled = focusCountdownIslandEnabled
@@ -1241,6 +1244,7 @@ public struct FeatureSettings: Codable, Equatable, Sendable {
         case calendarEnabled
         case toolboxEnabled
         case pdfToolsEnabled
+        case audioToolsEnabled
         case volumeMixerEnabled
         case toolboxReminderEnabled
         case focusCountdownIslandEnabled
@@ -1381,6 +1385,7 @@ public struct FeatureSettings: Codable, Equatable, Sendable {
         calendarEnabled = try container.decodeIfPresent(Bool.self, forKey: .calendarEnabled) ?? defaults.calendarEnabled
         toolboxEnabled = try container.decodeIfPresent(Bool.self, forKey: .toolboxEnabled) ?? defaults.toolboxEnabled
         pdfToolsEnabled = try container.decodeIfPresent(Bool.self, forKey: .pdfToolsEnabled) ?? defaults.pdfToolsEnabled
+        audioToolsEnabled = try container.decodeIfPresent(Bool.self, forKey: .audioToolsEnabled) ?? defaults.audioToolsEnabled
         volumeMixerEnabled = try container.decodeIfPresent(Bool.self, forKey: .volumeMixerEnabled) ?? defaults.volumeMixerEnabled
         toolboxReminderEnabled = try container.decodeIfPresent(Bool.self, forKey: .toolboxReminderEnabled) ?? defaults.toolboxReminderEnabled
         focusCountdownIslandEnabled = try container.decodeIfPresent(
