@@ -312,7 +312,7 @@
 "可安全清理的缓存与日志当前为空" = "Cache dan log yang dapat dibersihkan dengan aman saat ini kosong";
 "展开" = "Perluas";
 "移入废纸篓" = "Pindah ke Sampah";
-"zisla 不会永久删除这些内容。" = "zisla tidak akan menghapus item ini secara permanen.";
+"本次操作将项目移入废纸篓；废纸篓之后可能被清空，届时将永久删除。" = "Tindakan ini memindahkan item ke Sampah. Jika Sampah dikosongkan kemudian, item akan dihapus secara permanen.";
 
 /* Cleanup Categories */
 "应用缓存" = "Cache Aplikasi";
@@ -2321,7 +2321,7 @@
 "%ld 核" = "%ld inti";
 "%ld 核 · " = "%ld inti · ";
 "已整理系统内存 %@" = "Memori sistem %@ dipadatkan";
-"其中 %ld 项需人工复核。zisla 不会永久删除这些内容。" = "%ld di antaranya perlu diperiksa manual. zisla tidak pernah menghapusnya secara permanen.";
+"其中 %ld 项需人工复核。本次操作将项目移入废纸篓；废纸篓之后可能被清空，届时将永久删除。" = "%ld di antaranya perlu diperiksa manual. Tindakan ini memindahkan item ke Sampah. Jika Sampah dikosongkan kemudian, item akan dihapus secara permanen.";
 "取消选择%@" = "Batalkan pilihan %@";
 "全选%@" = "Pilih semua di %@";
 "反选%@" = "Balik pilihan di %@";
@@ -3342,7 +3342,7 @@
 "麦克风监听已关闭：%@" = "Pemantauan mikrofon dinonaktifkan: %@";
 
 "自动清理系统垃圾" = "Bersihkan sampah sistem secara otomatis";
-"按所选间隔移入废纸篓，不会永久删除" = "Pindahkan item ke Sampah sesuai interval yang dipilih, tanpa menghapus permanen";
+"按所选间隔移入废纸篓；清空废纸篓后将永久删除" = "Pindahkan item ke Sampah pada interval yang dipilih; mengosongkan Sampah menghapusnya secara permanen";
 "清理范围" = "Cakupan pembersihan";
 "仅可信" = "Hanya item tepercaya";
 "全部（包含需人工复核）" = "Semua (termasuk yang perlu ditinjau)";
@@ -3360,6 +3360,22 @@
 "保存手写备忘录需要辅助功能权限" = "Akses Aksesibilitas diperlukan untuk menyimpan catatan tulisan tangan";
 "备忘录内容已变化，请重新打开后编辑" = "Catatan telah berubah. Buka kembali sebelum mengedit";
 "无法保存手写备忘录的文本，请在备忘录中打开后重试" = "Teks dalam catatan tulisan tangan tidak dapat disimpan. Buka di Catatan dan coba lagi";
+
+"管理电源模式与系统垃圾、剪贴板历史和废纸篓的定时清理。" = "Kelola mode daya dan pembersihan terjadwal file sampah sistem, riwayat papan klip, dan Sampah.";
+"定时倾倒废纸篓" = "Kosongkan Sampah secara otomatis";
+"按所选间隔永久删除废纸篓中的所有项目，无法恢复" = "Hapus semua item di Sampah secara permanen pada interval yang dipilih. Tidak dapat dipulihkan";
+"启用定时倾倒废纸篓？" = "Aktifkan pengosongan Sampah otomatis?";
+
+"自动切换电源模式" = "Ganti mode daya secara otomatis";
+"插电默认模式" = "Mode default saat tersambung daya";
+"脱电默认模式" = "Mode default saat memakai baterai";
+"20%及以下固定省电" = "Selalu hemat daya pada 20% atau kurang";
+"电量不高于20%时保持省电，插电也不切换；超过20%后恢复对应默认模式" = "Pertahankan hemat daya pada 20% atau kurang meski tersambung daya; pulihkan mode default yang sesuai di atas 20%";
+"省电" = "Hemat daya";
+"高性能" = "Performa tinggi";
+
+
+"无法保存定时倾倒废纸篓的记录，本次已跳过。" = "Catatan pengosongan Tong Sampah otomatis tidak dapat disimpan. Proses kali ini dilewati.";
 "灵动岛功能顺序" = "Urutan fitur Dynamic Island";
 
 "查询航班" = "Cari penerbangan";

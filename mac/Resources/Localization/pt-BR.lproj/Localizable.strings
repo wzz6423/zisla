@@ -312,7 +312,7 @@
 "可安全清理的缓存与日志当前为空" = "Caches e logs que podem ser limpos com segurança estão vazios";
 "展开" = "Expandir";
 "移入废纸篓" = "Mover para o Lixo";
-"zisla 不会永久删除这些内容。" = "zisla não excluirá permanentemente esses itens.";
+"本次操作将项目移入废纸篓；废纸篓之后可能被清空，届时将永久删除。" = "Esta ação move os itens para o Lixo. Se ele for esvaziado depois, os itens serão excluídos permanentemente.";
 
 /* Cleanup Categories */
 "应用缓存" = "Cache de Apps";
@@ -2321,7 +2321,7 @@
 "%ld 核" = "%ld núcleos";
 "%ld 核 · " = "%ld núcleos · ";
 "已整理系统内存 %@" = "%@ de memória do sistema compactados";
-"其中 %ld 项需人工复核。zisla 不会永久删除这些内容。" = "%ld deles precisam de revisão manual. O zisla nunca exclui nada permanentemente.";
+"其中 %ld 项需人工复核。本次操作将项目移入废纸篓；废纸篓之后可能被清空，届时将永久删除。" = "%ld deles precisam de revisão manual. Esta ação move os itens para o Lixo. Se ele for esvaziado depois, os itens serão excluídos permanentemente.";
 "取消选择%@" = "Desmarcar %@";
 "全选%@" = "Selecionar tudo em %@";
 "反选%@" = "Inverter a seleção em %@";
@@ -3342,7 +3342,7 @@
 "麦克风监听已关闭：%@" = "O monitoramento do microfone foi desativado: %@";
 
 "自动清理系统垃圾" = "Limpar automaticamente arquivos desnecessários do sistema";
-"按所选间隔移入废纸篓，不会永久删除" = "Mover itens para o Lixo no intervalo escolhido, sem excluir permanentemente";
+"按所选间隔移入废纸篓；清空废纸篓后将永久删除" = "Move os itens para o Lixo no intervalo escolhido; esvaziar o Lixo os exclui permanentemente";
 "清理范围" = "Itens a limpar";
 "仅可信" = "Somente itens confiáveis";
 "全部（包含需人工复核）" = "Todos (incluindo os que precisam de revisão)";
@@ -3360,6 +3360,22 @@
 "保存手写备忘录需要辅助功能权限" = "É necessário acesso à acessibilidade para salvar notas manuscritas";
 "备忘录内容已变化，请重新打开后编辑" = "A nota foi alterada. Abra-a novamente antes de editar";
 "无法保存手写备忘录的文本，请在备忘录中打开后重试" = "Não foi possível salvar o texto da nota manuscrita. Abra-a no Notas e tente novamente";
+
+"管理电源模式与系统垃圾、剪贴板历史和废纸篓的定时清理。" = "Gerencie os modos de energia e a limpeza agendada de arquivos desnecessários do sistema, do histórico da área de transferência e do Lixo.";
+"定时倾倒废纸篓" = "Esvaziar o Lixo automaticamente";
+"按所选间隔永久删除废纸篓中的所有项目，无法恢复" = "Exclui permanentemente todos os itens do Lixo no intervalo escolhido. Não é possível desfazer";
+"启用定时倾倒废纸篓？" = "Ativar o esvaziamento automático do Lixo?";
+
+"自动切换电源模式" = "Alternar modos de energia automaticamente";
+"插电默认模式" = "Modo padrão na tomada";
+"脱电默认模式" = "Modo padrão na bateria";
+"20%及以下固定省电" = "Poupar energia com 20% ou menos";
+"电量不高于20%时保持省电，插电也不切换；超过20%后恢复对应默认模式" = "Mantém a economia de energia com 20% ou menos, mesmo na tomada; restaura o modo padrão correspondente acima de 20%";
+"省电" = "Economia de energia";
+"高性能" = "Alto desempenho";
+
+
+"无法保存定时倾倒废纸篓的记录，本次已跳过。" = "Não foi possível salvar o registro do esvaziamento automático da Lixeira. Esta execução foi ignorada.";
 "灵动岛功能顺序" = "Ordem dos recursos da Dynamic Island";
 
 "查询航班" = "Consultar voo";

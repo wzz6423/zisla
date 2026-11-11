@@ -313,7 +313,7 @@
 "可安全清理的缓存与日志当前为空" = "Sicher bereinigunfähige Caches und Protokolle sind derzeit leer";
 "展开" = "Erweitern";
 "移入废纸篓" = "In Papierkorb verschieben";
-"zisla 不会永久删除这些内容。" = "zisla wird diese Elemente nicht dauerhaft löschen.";
+"本次操作将项目移入废纸篓；废纸篓之后可能被清空，届时将永久删除。" = "Diese Aktion verschiebt Objekte in den Papierkorb. Wird er später geleert, werden die Objekte endgültig gelöscht.";
 
 /* Cleanup Categories */
 "应用缓存" = "App-Cache";
@@ -2322,7 +2322,7 @@
 "%ld 核" = "%ld Kerne";
 "%ld 核 · " = "%ld Kerne · ";
 "已整理系统内存 %@" = "%@ Systemspeicher freigegeben";
-"其中 %ld 项需人工复核。zisla 不会永久删除这些内容。" = "Davon müssen %ld manuell geprüft werden. zisla löscht nie endgültig.";
+"其中 %ld 项需人工复核。本次操作将项目移入废纸篓；废纸篓之后可能被清空，届时将永久删除。" = "Davon müssen %ld manuell geprüft werden. Diese Aktion verschiebt Objekte in den Papierkorb. Wird er später geleert, werden die Objekte endgültig gelöscht.";
 "取消选择%@" = "%@ abwählen";
 "全选%@" = "Alle %@ auswählen";
 "反选%@" = "Auswahl in %@ umkehren";
@@ -3343,7 +3343,7 @@
 "麦克风监听已关闭：%@" = "Mikrofon-Mithören wurde deaktiviert: %@";
 
 "自动清理系统垃圾" = "Systemdatenmüll automatisch bereinigen";
-"按所选间隔移入废纸篓，不会永久删除" = "Im gewählten Intervall in den Papierkorb verschieben, ohne dauerhaftes Löschen";
+"按所选间隔移入废纸篓；清空废纸篓后将永久删除" = "Verschiebt Objekte im gewählten Intervall in den Papierkorb; beim Leeren werden sie endgültig gelöscht";
 "清理范围" = "Bereinigungsumfang";
 "仅可信" = "Nur vertrauenswürdige Einträge";
 "全部（包含需人工复核）" = "Alle (einschließlich zu prüfender Einträge)";
@@ -3361,6 +3361,22 @@
 "保存手写备忘录需要辅助功能权限" = "Zum Speichern handschriftlicher Notizen ist der Zugriff auf Bedienungshilfen erforderlich";
 "备忘录内容已变化，请重新打开后编辑" = "Die Notiz wurde geändert. Öffne sie vor dem Bearbeiten erneut";
 "无法保存手写备忘录的文本，请在备忘录中打开后重试" = "Der Text der handschriftlichen Notiz konnte nicht gespeichert werden. Öffne sie in Notizen und versuche es erneut";
+
+"管理电源模式与系统垃圾、剪贴板历史和废纸篓的定时清理。" = "Verwalten Sie Energiemodi und die geplante Bereinigung von Systemdatenmüll, Zwischenablageverlauf und Papierkorb.";
+"定时倾倒废纸篓" = "Papierkorb automatisch leeren";
+"按所选间隔永久删除废纸篓中的所有项目，无法恢复" = "Löscht alle Objekte im Papierkorb im gewählten Intervall endgültig. Dies kann nicht rückgängig gemacht werden";
+"启用定时倾倒废纸篓？" = "Automatisches Leeren des Papierkorbs aktivieren?";
+
+"自动切换电源模式" = "Energiemodi automatisch wechseln";
+"插电默认模式" = "Standardmodus am Netzteil";
+"脱电默认模式" = "Standardmodus im Batteriebetrieb";
+"20%及以下固定省电" = "Bei 20% oder weniger immer Strom sparen";
+"电量不高于20%时保持省电，插电也不切换；超过20%后恢复对应默认模式" = "Behält den Stromsparmodus bei 20% oder weniger auch am Netzteil bei; stellt über 20% den jeweiligen Standardmodus wieder her";
+"省电" = "Stromsparmodus";
+"高性能" = "Hohe Leistung";
+
+
+"无法保存定时倾倒废纸篓的记录，本次已跳过。" = "Der Eintrag zum automatischen Leeren des Papierkorbs konnte nicht gespeichert werden. Dieser Durchlauf wurde übersprungen.";
 "灵动岛功能顺序" = "Reihenfolge der Dynamic Island-Funktionen";
 
 "查询航班" = "Flug suchen";
