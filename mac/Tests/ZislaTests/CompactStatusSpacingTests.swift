@@ -78,7 +78,7 @@ extension StatusIconDestinationIntegrationTests {
         state.placementMode = .custom
         let view = CompactStatusBarView(queue: fixture.queue, displayState: state, media: fixture.media,
             browserDownloads: fixture.downloads, settingsStore: fixture.settings, resultSweep: fixture.sweep,
-            onStatusHidden: {})
+            pomodoro: PomodoroService(notificationRequestHandler: { _ in }, defaults: fixture.defaults), onStatusHidden: {})
         for showsApplication in [false, true] {
             let icons = (showsApplication
                 ? [IslandStatusIcon(id: "application", content: .application, tooltip: "zisla")] : []) + monitors

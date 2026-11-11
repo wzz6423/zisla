@@ -315,7 +315,7 @@
 "可安全清理的缓存与日志当前为空" = "Safely cleanable caches and logs are currently empty";
 "展开" = "Expand";
 "移入废纸篓" = "Move to Trash";
-"zisla 不会永久删除这些内容。" = "zisla will not permanently delete these items.";
+"本次操作将项目移入废纸篓；废纸篓之后可能被清空，届时将永久删除。" = "This action moves items to the Trash. The Trash may be emptied later, permanently deleting them.";
 
 /* Cleanup Categories */
 "应用缓存" = "App Cache";
@@ -1034,7 +1034,7 @@
 "选中每个cli后的自动更新选项后检测到新版本后自动执行更新；关闭后不再启动新任务，已开始的更新会完成" = "After selecting the automatic update option next to each CLI, install updates automatically once a new version is found; turning this off stops new tasks, updates already started will finish";
 "未找到 Homebrew；请先安装 Homebrew 后再管理推荐工具" = "Homebrew not found. Install Homebrew first, then manage recommended tools";
 "未找到 LibreOffice；请安装 LibreOffice 后重试" = "LibreOffice not found. Install LibreOffice and try again";
-"未找到可用的 yt-dlp。请在 设置 → 下载 → 组件 中一键安装后重试。" = "No usable yt-dlp found. Install it from Settings → Downloads → Components and try again.";
+"未找到可用的 yt-dlp。请在 设置 → 依赖组件 → 组件 中一键安装后重试。" = "No usable yt-dlp found. Install it from Settings → Dependency Components → Components and try again.";
 "选中的识别文本和原始录音文件都会被删除，但累计统计数据（总字词、时长等）会保留。此操作无法撤销。" = "The selected transcripts and their original recordings are deleted, but cumulative stats (total words, duration and so on) are kept. This can't be undone.";
 "本机保存的识别文本和原始录音文件都会被删除，但累计统计数据（总字词、时长等）会保留。此操作无法撤销。" = "Transcripts and original recordings stored on this Mac are deleted, but cumulative stats (total words, duration and so on) are kept. This can't be undone.";
 "缺少子命令。可用：update/finish/remove/clear/list/usage/notify/message/help" = "Missing subcommand. Available: update/finish/remove/clear/list/usage/notify/message/help";
@@ -2320,7 +2320,7 @@
 "%ld 核" = "%ld cores";
 "%ld 核 · " = "%ld cores · ";
 "已整理系统内存 %@" = "Compacted %@ of system memory";
-"其中 %ld 项需人工复核。zisla 不会永久删除这些内容。" = "%ld of them need manual review. zisla never deletes them permanently.";
+"其中 %ld 项需人工复核。本次操作将项目移入废纸篓；废纸篓之后可能被清空，届时将永久删除。" = "%ld of them need manual review. This action moves items to the Trash. The Trash may be emptied later, permanently deleting them.";
 "取消选择%@" = "Deselect %@";
 "全选%@" = "Select all %@";
 "反选%@" = "Invert selection in %@";
@@ -2475,6 +2475,11 @@
 "2026.10.28往前15天" = "2026.10.28 subtract 15days";
 "日期间隔" = "Date Interval";
 "跨时区时间" = "Cross-Time-Zone Time";
+"会议 2026-11-20 14:30-15:30" = "Meeting 2026-11-20 14:30-15:30";
+"Hello! How are you today?" = "你好，今天过得怎么样？";
+"这是一段普通文本，可以搜索或保存。" = "Plain text to search for or save.";
+"例如：复制截图或浏览器中的图片" = "Example: Copy a screenshot or an image from a browser";
+"例如：在 Finder 中选中文件后按 ⌘C" = "Example: Select a file in Finder and press ⌘C";
 "汇率获取失败" = "Couldn't fetch the exchange rate";
 "闹钟通知未获允许，请在系统设置中开启通知。" = "Alarm notifications are not allowed. Enable notifications in System Settings.";
 "闹钟通知声音已关闭，请在系统设置中开启声音。" = "Alarm notification sounds are turned off. Enable sounds in System Settings.";
@@ -3336,13 +3341,14 @@
 "麦克风监听已关闭：%@" = "Microphone monitoring was turned off: %@";
 
 "自动清理系统垃圾" = "Automatically clean system junk";
-"按所选间隔移入废纸篓，不会永久删除" = "Move items to the Trash at the selected interval; never delete permanently";
+"按所选间隔移入废纸篓；清空废纸篓后将永久删除" = "Move items to the Trash at the selected interval; emptying the Trash permanently deletes them";
 "清理范围" = "Cleanup scope";
 "仅可信" = "Trusted only";
 "全部（包含需人工复核）" = "All (including items requiring review)";
 "默认保存位置" = "Default Save Locations";
 "分别设置各类内容的默认保存位置。" = "Set the default save location for each type of content.";
-"管理下载所需组件。" = "Manage components required for downloads.";
+"依赖组件" = "Dependency Components";
+"管理下载与文档转换所需组件。" = "Manage components required for downloads and document conversion.";
 "更改 %@ 的保存位置" = "Change save location for %@";
 
 "本地优先的原生笔记应用" = "Local-first native notes app";
@@ -3416,3 +3422,26 @@
 "小阵性雨夹雪伴雷电" = "Light rain and snow showers with thunder";
 "强阵性雨夹雪伴雷电" = "Heavy rain and snow showers with thunder";
 "雷阵雨伴有冰雹" = "Thunderstorms with hail";
+
+"管理电源模式与系统垃圾、剪贴板历史和废纸篓的定时清理。" = "Manage power modes and scheduled cleanup of system junk, clipboard history, and the Trash.";
+"定时倾倒废纸篓" = "Automatically empty the Trash";
+"按所选间隔永久删除废纸篓中的所有项目，无法恢复" = "Permanently delete all items in the Trash at the selected interval; cannot be undone";
+"启用定时倾倒废纸篓？" = "Enable automatic Trash emptying?";
+
+"自动切换电源模式" = "Automatically switch power modes";
+"插电默认模式" = "Default mode when plugged in";
+"脱电默认模式" = "Default mode on battery";
+"20%及以下固定省电" = "Always use Low Power at 20% or less";
+"电量不高于20%时保持省电，插电也不切换；超过20%后恢复对应默认模式" = "Keep Low Power at 20% or less, even when plugged in; restore the corresponding default above 20%";
+"省电" = "Low Power";
+"高性能" = "High Performance";
+
+
+"无法保存定时倾倒废纸篓的记录，本次已跳过。" = "Could not save the automatic Trash emptying record. This run was skipped.";
+"灵动岛功能顺序" = "Dynamic Island Feature Order";
+
+"查询航班" = "Look Up Flight";
+"查询火车" = "Look Up Train";
+"查询快递" = "Track Package";
+"全部标记为已读" = "Mark all as read";
+"已将全部邮件标记为已读" = "All messages marked as read";

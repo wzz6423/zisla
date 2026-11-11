@@ -312,7 +312,7 @@
 "可安全清理的缓存与日志当前为空" = "Los cachés y registros limpiables de forma segura están actualmente vacíos";
 "展开" = "Expandir";
 "移入废纸篓" = "Mover a Papelera";
-"zisla 不会永久删除这些内容。" = "zisla no eliminará permanentemente estos elementos.";
+"本次操作将项目移入废纸篓；废纸篓之后可能被清空，届时将永久删除。" = "Esta acción mueve los elementos a la Papelera. Si se vacía más adelante, se eliminarán permanentemente.";
 
 /* Cleanup Categories */
 "应用缓存" = "Caché de Aplicación";
@@ -1035,7 +1035,7 @@
 "选中每个cli后的自动更新选项后检测到新版本后自动执行更新；关闭后不再启动新任务，已开始的更新会完成" = "Al seleccionar la opción de actualización automática junto a cada CLI, se instala la actualización automáticamente al detectar una versión nueva; al desactivarlo no se inician tareas nuevas, pero las actualizaciones en curso se completan";
 "未找到 Homebrew；请先安装 Homebrew 后再管理推荐工具" = "No se encontró Homebrew; instala Homebrew antes de gestionar las herramientas recomendadas";
 "未找到 LibreOffice；请安装 LibreOffice 后重试" = "No se encontró LibreOffice; instala LibreOffice y vuelve a intentarlo";
-"未找到可用的 yt-dlp。请在 设置 → 下载 → 组件 中一键安装后重试。" = "No hay ningún yt-dlp utilizable. Instálalo en Ajustes → Descargas → Componentes y vuelve a intentarlo.";
+"未找到可用的 yt-dlp。请在 设置 → 依赖组件 → 组件 中一键安装后重试。" = "No hay ningún yt-dlp utilizable. Instálalo en Ajustes → Componentes necesarios → Componentes y vuelve a intentarlo.";
 "选中的识别文本和原始录音文件都会被删除，但累计统计数据（总字词、时长等）会保留。此操作无法撤销。" = "Se eliminarán los textos reconocidos seleccionados y sus grabaciones originales, pero se conservarán las estadísticas acumuladas (palabras totales, duración, etc.). No se podrá deshacer.";
 "本机保存的识别文本和原始录音文件都会被删除，但累计统计数据（总字词、时长等）会保留。此操作无法撤销。" = "Se eliminarán los textos reconocidos y las grabaciones originales guardados en este Mac, pero se conservarán las estadísticas acumuladas (palabras totales, duración, etc.). No se podrá deshacer.";
 "缺少子命令。可用：update/finish/remove/clear/list/usage/notify/message/help" = "Falta el subcomando. Disponibles: update/finish/remove/clear/list/usage/notify/message/help";
@@ -2321,7 +2321,7 @@
 "%ld 核" = "%ld núcleos";
 "%ld 核 · " = "%ld núcleos · ";
 "已整理系统内存 %@" = "Se han compactado %@ de memoria del sistema";
-"其中 %ld 项需人工复核。zisla 不会永久删除这些内容。" = "%ld de ellos necesitan revisión manual. zisla nunca los elimina de forma permanente.";
+"其中 %ld 项需人工复核。本次操作将项目移入废纸篓；废纸篓之后可能被清空，届时将永久删除。" = "%ld de ellos necesitan revisión manual. Esta acción mueve los elementos a la Papelera. Si se vacía más adelante, se eliminarán permanentemente.";
 "取消选择%@" = "Anular la selección de %@";
 "全选%@" = "Seleccionar todo en %@";
 "反选%@" = "Invertir la selección en %@";
@@ -2476,6 +2476,11 @@
 "2026.10.28往前15天" = "15 días antes del 2026.10.28";
 "日期间隔" = "Intervalo de fechas";
 "跨时区时间" = "Hora entre zonas horarias";
+"会议 2026-11-20 14:30-15:30" = "Reunión 2026-11-20 14:30-15:30";
+"Hello! How are you today?" = "Hello! How are you today?";
+"这是一段普通文本，可以搜索或保存。" = "Puedes buscar este texto o guardarlo.";
+"例如：复制截图或浏览器中的图片" = "Ejemplo: Copiar una captura de pantalla o una imagen del navegador";
+"例如：在 Finder 中选中文件后按 ⌘C" = "Ejemplo: Seleccionar un archivo en Finder y pulsar ⌘C";
 "汇率获取失败" = "No se pudo obtener el tipo de cambio";
 "闹钟通知未获允许，请在系统设置中开启通知。" = "Las notificaciones de alarma no están permitidas. Actívalas en Ajustes del Sistema.";
 "闹钟通知声音已关闭，请在系统设置中开启声音。" = "Los sonidos de las notificaciones de alarma están desactivados. Actívalos en Ajustes del Sistema.";
@@ -3337,13 +3342,14 @@
 "麦克风监听已关闭：%@" = "Se desactivó la escucha del micrófono: %@";
 
 "自动清理系统垃圾" = "Limpiar automáticamente los archivos innecesarios del sistema";
-"按所选间隔移入废纸篓，不会永久删除" = "Mover los elementos a la papelera en el intervalo elegido, sin eliminarlos definitivamente";
+"按所选间隔移入废纸篓；清空废纸篓后将永久删除" = "Mueve los elementos a la Papelera en el intervalo elegido; al vaciarla se eliminan permanentemente";
 "清理范围" = "Alcance de la limpieza";
 "仅可信" = "Solo elementos fiables";
 "全部（包含需人工复核）" = "Todos (incluidos los que requieren revisión)";
 "默认保存位置" = "Ubicaciones de guardado predeterminadas";
 "分别设置各类内容的默认保存位置。" = "Establecer la ubicación de guardado predeterminada para cada tipo de contenido.";
-"管理下载所需组件。" = "Gestionar los componentes necesarios para las descargas.";
+"依赖组件" = "Componentes necesarios";
+"管理下载与文档转换所需组件。" = "Gestionar los componentes necesarios para las descargas y la conversión de documentos.";
 "更改 %@ 的保存位置" = "Cambiar la ubicación de guardado de %@";
 
 "本地优先的原生笔记应用" = "Aplicación nativa de notas que prioriza el almacenamiento local";
@@ -3417,3 +3423,26 @@
 "小阵性雨夹雪伴雷电" = "Chubascos débiles de lluvia y nieve y truenos";
 "强阵性雨夹雪伴雷电" = "Chubascos intensos de lluvia y nieve y truenos";
 "雷阵雨伴有冰雹" = "Tormenta con granizo";
+
+"管理电源模式与系统垃圾、剪贴板历史和废纸篓的定时清理。" = "Gestiona los modos de energía y la limpieza programada de archivos basura del sistema, del historial del portapapeles y de la Papelera.";
+"定时倾倒废纸篓" = "Vaciar la Papelera automáticamente";
+"按所选间隔永久删除废纸篓中的所有项目，无法恢复" = "Elimina permanentemente todos los elementos de la Papelera en el intervalo elegido. No se puede deshacer";
+"启用定时倾倒废纸篓？" = "¿Activar el vaciado automático de la Papelera?";
+
+"自动切换电源模式" = "Cambiar modos de energía automáticamente";
+"插电默认模式" = "Modo predeterminado con corriente";
+"脱电默认模式" = "Modo predeterminado con batería";
+"20%及以下固定省电" = "Ahorrar energía al 20% o menos";
+"电量不高于20%时保持省电，插电也不切换；超过20%后恢复对应默认模式" = "Mantiene el ahorro de energía al 20% o menos, incluso con corriente; restaura el modo predeterminado correspondiente por encima del 20%";
+"省电" = "Ahorro de energía";
+"高性能" = "Alto rendimiento";
+
+
+"无法保存定时倾倒废纸篓的记录，本次已跳过。" = "No se pudo guardar el registro del vaciado automático de la Papelera. Se omitió esta ejecución.";
+"灵动岛功能顺序" = "Orden de las funciones de Dynamic Island";
+
+"查询航班" = "Consultar vuelo";
+"查询火车" = "Consultar tren";
+"查询快递" = "Seguir paquete";
+"全部标记为已读" = "Marcar todo como leído";
+"已将全部邮件标记为已读" = "Todos los mensajes se han marcado como leídos";

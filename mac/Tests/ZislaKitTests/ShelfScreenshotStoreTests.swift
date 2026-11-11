@@ -1,4 +1,5 @@
 import AppKit
+import Combine
 import Foundation
 import SQLite3
 import Testing
@@ -181,6 +182,70 @@ struct ShelfScreenshotStoreTests {
         }
     }
 
+    @Test(arguments: [false, true])
+    func unreadableJSONBlocksOnlyLegacyWritesWhileScreenshotsRemainUsable(incompatibleFormat: Bool) throws {
+        try withDirectory { directory in
+            let storage = directory.appendingPathComponent("shelf.json")
+            let png = try imageData()
+            let metadata = Self.metadata(width: 80, height: 40)
+            let (savedJSON, savedText, firstScreenshot) = try {
+                let original = FileShelfStore(storageURL: storage)
+                try #require(original.add(payloads: [.text("retain the legacy text")]) == 1)
+                let text = try #require(original.items.first)
+                let screenshot = try original.stashScreenshot(png: png, metadata: metadata)
+                return (try Data(contentsOf: storage), text, screenshot)
+            }()
+            let unreadableJSON = try incompatibleFormat
+                ? JSONSerialization.data(withJSONObject: ["schemaVersion": 2, "items": JSONSerialization.jsonObject(with: savedJSON)])
+                : Data(savedJSON.dropLast())
+            try unreadableJSON.write(to: storage)
+            let store = FileShelfStore(storageURL: storage)
+            let loadError = try #require(store.errorDescription)
+            var publishedErrors: [String?] = []
+            let observation = store.$errorDescription.sink { publishedErrors.append($0) }
+            defer { observation.cancel() }
+            #expect(store.items.map(\.id) == [firstScreenshot.id])
+            #expect(try store.screenshotData(id: firstScreenshot.id) == png)
+            #expect(try Data(contentsOf: store.screenshotFileURL(id: firstScreenshot.id)) == png)
+
+            publishedErrors.removeAll(keepingCapacity: true)
+            let secondScreenshot = try store.stashScreenshot(png: png, metadata: metadata)
+            #expect(store.errorDescription == loadError)
+            #expect(!publishedErrors.isEmpty)
+            #expect(publishedErrors.allSatisfy { $0 == loadError })
+            #expect(store.items.map(\.id) == [firstScreenshot.id, secondScreenshot.id])
+            #expect(store.add(payloads: [.text("must not overwrite after screenshot success")]) == 0)
+            #expect(store.errorDescription != nil)
+            #expect(try Data(contentsOf: storage) == unreadableJSON)
+            #expect(try FileManager.default.contentsOfDirectory(atPath: store.managedDirectory.path) == [savedText.id.uuidString])
+            publishedErrors.removeAll(keepingCapacity: true)
+            store.remove(id: firstScreenshot.id)
+            #expect(store.errorDescription == loadError)
+            #expect(!publishedErrors.isEmpty)
+            #expect(publishedErrors.allSatisfy { $0 == loadError })
+            #expect(store.items.map(\.id) == [secondScreenshot.id])
+            #expect(!FileManager.default.fileExists(atPath: firstScreenshot.url.path))
+            #expect(throws: CocoaError(.fileReadNoSuchFile)) { try store.screenshotData(id: firstScreenshot.id) }
+            #expect(FileShelfStore(storageURL: storage).items.map(\.id) == [secondScreenshot.id])
+
+            publishedErrors.removeAll(keepingCapacity: true)
+            store.removeAll()
+            #expect(store.items.isEmpty)
+            #expect(store.errorDescription == loadError)
+            #expect(!publishedErrors.isEmpty)
+            #expect(publishedErrors.allSatisfy { $0 == loadError })
+            #expect(try Data(contentsOf: storage) == unreadableJSON)
+            #expect(!FileManager.default.fileExists(atPath: secondScreenshot.url.path))
+            #expect(FileShelfStore(storageURL: storage).items.isEmpty)
+            #expect(try String(contentsOf: savedText.url, encoding: .utf8) == "retain the legacy text")
+            try savedJSON.write(to: storage)
+            let recovered = FileShelfStore(storageURL: storage)
+            #expect(recovered.items == [savedText])
+            #expect(recovered.errorDescription == nil)
+            #expect(recovered.add(payloads: [.text("save after reopening")]) == 1)
+        }
+    }
+
     @Test
     func failedDatabaseOpenDoesNotDamageLegacyShelfAndCreatesNoCard() throws {
         try withDirectory { directory in
@@ -227,15 +292,21 @@ struct ShelfScreenshotStoreTests {
         }
     }
 
-    @Test
-    func blockedCacheStillCommitsScreenshotAndRecoversAfterReopen() throws {
+    @Test(arguments: [false, true])
+    func blockedCacheStillCommitsScreenshotAndRecoversAfterReopen(corruptJSON: Bool) throws {
         try withDirectory { directory in
             let storage = directory.appendingPathComponent("shelf.json")
             let png = try imageData()
             let metadata = Self.metadata(width: 80, height: 40)
             let screenshots = try {
-                let store = FileShelfStore(storageURL: storage)
+                var store = FileShelfStore(storageURL: storage)
                 let first = try store.stashScreenshot(png: png, metadata: metadata)
+                if corruptJSON {
+                    try Data("invalid JSON".utf8).write(to: storage)
+                    store = FileShelfStore(storageURL: storage)
+                }
+                let loadError = store.errorDescription
+                #expect((loadError != nil) == corruptJSON)
                 let cache = first.url.deletingLastPathComponent()
                 try FileManager.default.removeItem(at: cache)
                 try Data("blocked cache".utf8).write(to: cache)
@@ -244,6 +315,7 @@ struct ShelfScreenshotStoreTests {
                 #expect(second.screenshotMetadata == metadata)
                 #expect(second.category == .screenshot)
                 #expect(store.errorDescription != nil)
+                #expect(store.errorDescription != loadError)
                 #expect(!FileManager.default.fileExists(atPath: second.url.path))
                 #expect(try store.screenshotData(id: second.id) == png)
                 #expect(throws: (any Error).self) { try store.screenshotFileURL(id: second.id) }
@@ -393,12 +465,15 @@ struct ShelfScreenshotStoreTests {
             #expect(try store.screenshotData(id: first.id) == png)
             #expect(sqlite3_exec(database, "DROP TRIGGER reject_insert; DROP TRIGGER reject_delete;", nil, nil, nil) == SQLITE_OK)
             let second = try store.stashScreenshot(png: png, metadata: metadata)
+            #expect(store.errorDescription == nil)
             store.remove(id: first.id)
+            #expect(store.errorDescription == nil)
             #expect(store.items.map(\.id) == [second.id])
             #expect(!FileManager.default.fileExists(atPath: first.url.path))
             let restored = FileShelfStore(storageURL: storage)
             #expect(restored.items.map(\.id) == [second.id])
             restored.removeAll()
+            #expect(restored.errorDescription == nil)
             #expect(restored.items.isEmpty)
             #expect(FileShelfStore(storageURL: storage).items.isEmpty)
         }

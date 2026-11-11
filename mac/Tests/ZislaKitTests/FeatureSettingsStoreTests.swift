@@ -5,6 +5,33 @@ import Testing
 @testable import ZislaKit
 
 struct FeatureSettingsStoreTests {
+    @Test @MainActor
+    func moduleOrderPersistsAndRestoringDefaultPreservesOtherChoices() throws {
+        let suiteName = "Zisla.ModuleOrder.\(UUID().uuidString)"
+        let defaults = try #require(UserDefaults(suiteName: suiteName))
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+        let store = FeatureSettingsStore(defaults: defaults, persistenceDelay: .seconds(60))
+        #expect(store.settings.moduleOrder == IslandModuleOrder.defaultOrder)
+        let customOrder = Array(IslandModuleOrder.defaultOrder.reversed())
+        store.settings.moduleOrder = customOrder
+        store.settings.mediaEnabled = false
+        store.settings.clipboardHistoryEnabled = false
+        store.flushPendingChanges()
+
+        let restored = FeatureSettingsStore(defaults: defaults, persistenceDelay: .seconds(60))
+        #expect(restored.settings == store.settings)
+        #expect(restored.settings.moduleOrder == customOrder)
+        restored.settings.clipboardHistoryEnabled = true
+        restored.flushPendingChanges()
+        #expect(FeatureSettingsStore(defaults: defaults).settings.moduleOrder == customOrder)
+
+        var expected = restored.settings
+        expected.moduleOrder = IslandModuleOrder.defaultOrder
+        restored.settings.moduleOrder = IslandModuleOrder.defaultOrder
+        restored.flushPendingChanges()
+        #expect(FeatureSettingsStore(defaults: defaults).settings == expected)
+    }
+
     @Test(arguments: [false, true], [false, true]) @MainActor
     func combinedMonitorChoiceSurvivesLegacyLoadingRelaunchAndReset(systemEnabled: Bool, batteryEnabled: Bool) throws {
         let suiteName = "Zisla.CombinedMonitor.\(UUID().uuidString)"
@@ -53,6 +80,75 @@ struct FeatureSettingsStoreTests {
         let reset = FeatureSettingsStore(defaults: defaults)
         #expect(reset.settings.systemCleanupPolicy == .never)
         #expect(reset.settings.systemCleanupScope == .trustedOnly)
+    }
+
+    @Test @MainActor
+    func scheduledTrashChoiceLoadsDisabledThenPersistsAndResetsIndependently() throws {
+        let suite = "Zisla.TrashCleanupSettings.\(UUID().uuidString)"
+        let defaults = try #require(UserDefaults(suiteName: suite))
+        defer { defaults.removePersistentDomain(forName: suite) }
+        defaults.set(Data(#"{"systemCleanupPolicy":"sevenDays","clipboardHistoryCleanupPolicy":"fifteenDays","voiceRecordingCleanupPolicy":"thirtyDays"}"#.utf8),
+            forKey: "feature-settings-v1")
+        let store = FeatureSettingsStore(defaults: defaults)
+        #expect(store.settings.trashCleanupPolicy == .never)
+        #expect(store.settings.systemCleanupPolicy == .sevenDays)
+        #expect(store.settings.clipboardHistoryCleanupPolicy == .fifteenDays)
+        #expect(store.settings.voiceRecordingCleanupPolicy == .thirtyDays)
+        store.settings.trashCleanupPolicy = .thirtyDays
+        store.flushPendingChanges()
+        let restored = FeatureSettingsStore(defaults: defaults)
+        #expect(restored.settings == store.settings)
+        #expect(restored.settings.trashCleanupPolicy == .thirtyDays)
+        restored.settings.trashCleanupPolicy = .never
+        restored.flushPendingChanges()
+        #expect(FeatureSettingsStore(defaults: defaults).settings.trashCleanupPolicy == .never)
+        #expect(restored.settings.systemCleanupPolicy == .sevenDays)
+        #expect(restored.settings.clipboardHistoryCleanupPolicy == .fifteenDays)
+        #expect(restored.settings.voiceRecordingCleanupPolicy == .thirtyDays)
+        restored.reset()
+        restored.flushPendingChanges()
+        #expect(FeatureSettingsStore(defaults: defaults).settings.trashCleanupPolicy == .never)
+    }
+
+    @Test @MainActor
+    func automaticPowerPreferencesLoadSafelyPersistIndependentlyAndReset() throws {
+        let suite = "Zisla.AutomaticPowerSettings.\(UUID().uuidString)"
+        let defaults = try #require(UserDefaults(suiteName: suite))
+        defer { defaults.removePersistentDomain(forName: suite) }
+        defaults.set(Data(#"{"systemMonitorEnabled":false,"trashCleanupPolicy":"fifteenDays"}"#.utf8),
+            forKey: "feature-settings-v1")
+        let store = FeatureSettingsStore(defaults: defaults)
+        #expect(!store.settings.automaticPowerModeEnabled)
+        #expect(store.settings.powerAdapterDefaultMode == .automatic)
+        #expect(store.settings.batteryDefaultMode == .lowPower)
+        #expect(store.settings.lowBatteryPowerModeEnabled)
+        store.settings.automaticPowerModeEnabled = true
+        store.settings.powerAdapterDefaultMode = .highPower
+        store.settings.batteryDefaultMode = .automatic
+        store.settings.lowBatteryPowerModeEnabled = false
+        store.flushPendingChanges()
+        let restored = FeatureSettingsStore(defaults: defaults)
+        #expect(restored.settings == store.settings)
+        #expect(restored.settings.automaticPowerModeEnabled)
+        #expect(restored.settings.powerAdapterDefaultMode == .highPower)
+        #expect(restored.settings.batteryDefaultMode == .automatic)
+        #expect(!restored.settings.lowBatteryPowerModeEnabled)
+        #expect(!restored.settings.systemMonitorEnabled)
+        #expect(restored.settings.trashCleanupPolicy == .fifteenDays)
+        restored.settings.automaticPowerModeEnabled = false
+        restored.flushPendingChanges()
+        let disabled = FeatureSettingsStore(defaults: defaults)
+        #expect(!disabled.settings.automaticPowerModeEnabled)
+        #expect(disabled.settings.powerAdapterDefaultMode == .highPower)
+        #expect(disabled.settings.batteryDefaultMode == .automatic)
+        #expect(!disabled.settings.lowBatteryPowerModeEnabled)
+        disabled.reset()
+        disabled.flushPendingChanges()
+        let reset = FeatureSettingsStore(defaults: defaults)
+        #expect(!reset.settings.automaticPowerModeEnabled)
+        #expect(reset.settings.powerAdapterDefaultMode == .automatic)
+        #expect(reset.settings.batteryDefaultMode == .lowPower)
+        #expect(reset.settings.lowBatteryPowerModeEnabled)
     }
 
     @Test(arguments: IslandEdge.allCases) @MainActor

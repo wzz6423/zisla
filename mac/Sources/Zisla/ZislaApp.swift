@@ -658,6 +658,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
             queue: model.notices,
             resultSweep: model.aiResultSweep,
             media: model.media,
+            pomodoro: model.pomodoro,
             browserDownloads: model.browserDownloads,
             settingsStore: model.settingsStore,
             languageStore: model.languageStore,

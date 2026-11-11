@@ -3483,42 +3483,19 @@ public enum SystemDiskCleanup {
         sizeProvider: ((URL) -> UInt64)? = nil
     ) -> DiskCleanupResult {
         let roots = allowedRoots ?? SystemMonitorPathSafety.defaultAllowedRoots(fileManager: fileManager)
-        let sessionWorkspaces = AISessionWorkspaceCleanup(fileManager: fileManager, checking: urls)
         var success = 0
         var freed: UInt64 = 0
         var failures: [DiskCleanupFailure] = []
 
         for url in urls {
-            guard url.isFileURL else {
-                failures.append(DiskCleanupFailure(url: url, message: DiskCleanupError.notAFileURL.localizedDescription))
-                continue
-            }
-            let standardized = url.standardizedFileURL
-            guard sessionWorkspaces.canTrash(standardized) else {
-                failures.append(DiskCleanupFailure(url: standardized, message: DiskCleanupError.sessionWorkspaceProtected.localizedDescription))
-                continue
-            }
-            guard SystemMonitorPathSafety.isURL(standardized, withinAllowedRoots: roots) else {
-                failures.append(
-                    DiskCleanupFailure(
-                        url: standardized,
-                        message: DiskCleanupError.pathOutsideAllowedRoots.localizedDescription
-                    )
-                )
-                continue
-            }
-            guard fileManager.fileExists(atPath: standardized.path) else {
-                failures.append(DiskCleanupFailure(url: standardized, message: "文件不存在"))
-                continue
-            }
-            let size = sizeProvider?(standardized) ?? allocatedByteSize(of: standardized, fileManager: fileManager)
-            do {
-                _ = try fileManager.trashItem(at: standardized)
-                success += 1
-                freed += size
-            } catch {
-                failures.append(DiskCleanupFailure(url: standardized, message: error.localizedDescription))
-            }
+            let sessionWorkspaces = AISessionWorkspaceCleanup(fileManager: fileManager, checking: [url])
+            let result = trashSelected(
+                url: url, fileManager: fileManager, allowedRoots: roots,
+                sizeProvider: sizeProvider, sessionWorkspaces: sessionWorkspaces
+            )
+            success += result.successCount
+            freed += result.freedBytes
+            failures.append(contentsOf: result.failures)
         }
         return DiskCleanupResult(successCount: success, freedBytes: freed, failures: failures)
     }
@@ -3529,7 +3506,6 @@ public enum SystemDiskCleanup {
         fileManager: SystemMonitorFileManaging,
         sizeProvider: ((URL) -> UInt64)? = nil
     ) -> DiskCleanupResult {
-        let sessionWorkspaces = AISessionWorkspaceCleanup(fileManager: fileManager, checking: candidates.map(\.url))
         let installedResidualOwners = candidates.contains { $0.kind == .applicationResidual }
             ? installedBundleIdentifiers(fileManager: fileManager, home: fileManager.homeDirectoryForCurrentUser())
             : Set<String>()
@@ -3548,6 +3524,7 @@ public enum SystemDiskCleanup {
                 )
                 continue
             }
+            let sessionWorkspaces = AISessionWorkspaceCleanup(fileManager: fileManager, checking: [candidate.url])
             guard sessionWorkspaces.canTrash(candidate.url, wholeWorkspaceOnly: candidate.kind == .aiSessionWorkspace) else {
                 failures.append(DiskCleanupFailure(url: candidate.url, message: DiskCleanupError.sessionWorkspaceProtected.localizedDescription))
                 continue
@@ -3566,16 +3543,49 @@ public enum SystemDiskCleanup {
                 continue
             }
             let result = trashSelected(
-                urls: [candidate.url],
+                url: candidate.url,
                 fileManager: fileManager,
                 allowedRoots: [candidate.url],
-                sizeProvider: sizeProvider
+                sizeProvider: sizeProvider,
+                sessionWorkspaces: sessionWorkspaces
             )
             success += result.successCount
             freed += result.freedBytes
             failures.append(contentsOf: result.failures)
         }
         return DiskCleanupResult(successCount: success, freedBytes: freed, failures: failures)
+    }
+
+    private static func trashSelected(
+        url: URL,
+        fileManager: SystemMonitorFileManaging,
+        allowedRoots: [URL],
+        sizeProvider: ((URL) -> UInt64)?,
+        sessionWorkspaces: AISessionWorkspaceCleanup
+    ) -> DiskCleanupResult {
+        func failure(_ url: URL, message: String) -> DiskCleanupResult {
+            DiskCleanupResult(successCount: 0, freedBytes: 0, failures: [DiskCleanupFailure(url: url, message: message)])
+        }
+        guard url.isFileURL else {
+            return failure(url, message: DiskCleanupError.notAFileURL.localizedDescription)
+        }
+        let standardized = url.standardizedFileURL
+        guard sessionWorkspaces.canTrash(standardized) else {
+            return failure(standardized, message: DiskCleanupError.sessionWorkspaceProtected.localizedDescription)
+        }
+        guard SystemMonitorPathSafety.isURL(standardized, withinAllowedRoots: allowedRoots) else {
+            return failure(standardized, message: DiskCleanupError.pathOutsideAllowedRoots.localizedDescription)
+        }
+        guard fileManager.fileExists(atPath: standardized.path) else {
+            return failure(standardized, message: "文件不存在")
+        }
+        let size = sizeProvider?(standardized) ?? allocatedByteSize(of: standardized, fileManager: fileManager)
+        do {
+            _ = try fileManager.trashItem(at: standardized)
+            return DiskCleanupResult(successCount: 1, freedBytes: size, failures: [])
+        } catch {
+            return failure(standardized, message: error.localizedDescription)
+        }
     }
 
     private static func candidatePathIsEligibleForTrash(
@@ -3781,6 +3791,9 @@ public final class SystemMonitorService: ObservableObject {
         postCleanupDiskRefreshTask = nil
         sampleTask?.cancel()
         historyGeneration &+= 1
+        publicIPRefreshGeneration &+= 1
+        isRefreshingPublicIPAddress = false
+        lastPublicIPRefresh = nil
         isSampling = false
     }
 
@@ -3837,7 +3850,7 @@ public final class SystemMonitorService: ObservableObject {
         await refreshPublicIPAddress(force: true)
     }
 
-    private func refreshPublicIPAddressIfNeeded() async {
+    func refreshPublicIPAddressIfNeeded() async {
         await refreshPublicIPAddress(force: false)
     }
 
