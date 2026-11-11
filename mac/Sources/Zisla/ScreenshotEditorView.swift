@@ -5367,7 +5367,7 @@ struct ScreenshotEditorView: View {
                     }
                     if showsImage || model.annotations.contains(where: { $0.kind == .mosaic }) || mosaicDraft != nil {
                         Image(nsImage: previewImage)
-                            .allowedDynamicRange(model.hdrEnabled ? .high : .standard)
+                            .allowedDynamicRange(model.hdrEnabled ? .constrainedHigh : .standard)
                             .resizable()
                             .interpolation(.high)
                             .frame(width: geometry.renderedSize.width, height: geometry.renderedSize.height)
@@ -7337,7 +7337,7 @@ struct ScreenshotPinnedImageView: View {
         VStack(spacing: toolbarVisible ? ScreenshotPinnedLayout.verticalSpacing : 0) {
             ZStack {
                 Image(nsImage: image)
-                    .allowedDynamicRange(.high)
+                    .allowedDynamicRange(.constrainedHigh)
                     .resizable()
                     .interpolation(.high)
                     .frame(width: imageSize.width, height: imageSize.height)
@@ -7643,7 +7643,7 @@ private struct ScreenshotLongCapturePreviewView: View {
 
     var body: some View {
         Image(nsImage: model.displayImage)
-            .allowedDynamicRange(model.hdrEnabled ? .high : .standard)
+            .allowedDynamicRange(model.hdrEnabled ? .constrainedHigh : .standard)
             .resizable()
             .interpolation(.high)
             .scaledToFit()
@@ -8609,8 +8609,9 @@ final class ScreenshotEditorWindowController: NSWindowController, NSWindowDelega
         )
     }
 
-    private func longCaptureToolbarFrame(on screen: NSScreen) -> CGRect {
+    func longCaptureToolbarFrame(on screen: NSScreen) -> CGRect {
         let controlCount = ScreenshotToolbarLayout.controlCount
+            + (model.canPreserveHDR ? 1 : 0)
             + (model.canUndo ? 1 : 0)
             + (model.canRedo ? 1 : 0)
         let visibleFrame = screen.visibleFrame.insetBy(dx: 12, dy: 12)

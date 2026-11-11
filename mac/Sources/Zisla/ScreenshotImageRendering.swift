@@ -21,6 +21,12 @@ enum ScreenshotImageRendering {
 
     static func preservingHeadroom(_ image: CGImage, from source: CGImage) -> CGImage? {
         if #available(macOS 15.0, *), isHDR(image) {
+            if #available(macOS 26.0, *) {
+                // Unknown headroom disables tone mapping; average light level must reflect edited pixels.
+                guard let measured = image.copyWithCalculatedHDRStats() else { return nil }
+                return source.contentHeadroom == 0 ? measured
+                    : CGImageCreateCopyWithContentHeadroom(source.contentHeadroom, measured)
+            }
             return CGImageCreateCopyWithContentHeadroom(source.contentHeadroom, image)
         }
         return image

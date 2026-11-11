@@ -27,6 +27,63 @@ struct ScreenshotHDRTests {
         }
     }
 
+    @Test
+    func unknownHeadroomGetsMeasuredWithoutChangingReferenceWhiteOrHighlights() throws {
+        guard #available(macOS 26.0, *) else { return }
+        let source = try Self.hdrGradient(headroom: 0)
+        let detached = try #require(ScreenshotCaptureService.detachedImage(from: source))
+        let reference = try Self.pixelValues(source)
+        let copied = try Self.pixelValues(detached)
+
+        #expect(detached.contentHeadroom > 3.99 && detached.contentHeadroom <= 4.01)
+        #expect(detached.contentAverageLightLevel > 0,
+            "Floating screenshot previews need average light level metadata for constrained HDR presentation")
+        for (expected, actual) in zip(reference, copied) {
+            #expect(abs(actual - expected) < 0.002,
+                "Measuring HDR statistics must not change reference white or amplify highlights")
+        }
+        let preview = try Self.previewPixels(detached, targetHeadroom: 2)
+        #expect(preview.allSatisfy { $0 <= 2.002 }, "HDR previews must fit the display's current headroom; got \(preview)")
+        let visible = preview.map { min($0, 2) }
+        #expect(visible[5] < visible[6] && visible[6] < visible[7],
+            "Distinct HDR highlights must roll off instead of clipping to the same display white; got \(visible)")
+    }
+
+    @Test
+    func knownHeadroomIsPreservedWhileAverageBrightnessFollowsEditedPixels() throws {
+        guard #available(macOS 26.0, *) else { return }
+        let source = try Self.hdrGradient(headroom: 8)
+        let detached = try #require(ScreenshotCaptureService.detachedImage(from: source))
+        #expect(detached.contentHeadroom == 8, "A capture's known mastering headroom must not become its maximum channel")
+        #expect(detached.contentAverageLightLevel > 0)
+        let cropped = try #require(detached.cropping(to: CGRect(x: 0, y: 0, width: 4, height: 8)))
+        let edited = try #require(ScreenshotImageRendering.render(CIImage(cgImage: cropped), matching: detached,
+            context: Self.context))
+        #expect(edited.contentHeadroom == detached.contentHeadroom)
+        #expect(edited.contentAverageLightLevel > 0
+            && edited.contentAverageLightLevel < detached.contentAverageLightLevel,
+            "Cropped or obscured previews must use their own average brightness rather than the full capture's statistics")
+        #expect(abs(try Self.pixel(edited, x: 3, y: 4)[0] - 1) < 0.002)
+        let selection = try #require(ScreenshotCaptureService.image(from: detached,
+            cropInScreenPoints: CGRect(x: 0, y: 0, width: 4, height: 8), screenSize: CGSize(width: 8, height: 8)))
+        let selected = try #require(selection.cgImage(forProposedRect: nil, context: nil, hints: nil))
+        #expect(selected.contentHeadroom == detached.contentHeadroom)
+        #expect(abs(selected.contentAverageLightLevel - edited.contentAverageLightLevel) < 0.01,
+            "The initial selection preview must measure the cropped pixels before any annotation is applied")
+    }
+
+    @Test(arguments: [Float(0), Float(1)], [Float(0), Float(4)])
+    func darkAndTransparentHDRFramesRemainValid(alpha: Float, headroom: Float) throws {
+        guard #available(macOS 26.0, *) else { return }
+        let source = try Self.hdrGradient(headroom: headroom, levels: [Float](repeating: 0, count: 8), alpha: alpha)
+        let detached = try #require(ScreenshotCaptureService.detachedImage(from: source))
+        #expect(detached.contentAverageLightLevel == 0)
+        #expect(detached.contentHeadroom == headroom)
+        let sample = try Self.pixel(detached, x: 4, y: 4)
+        #expect(sample[0] == 0 && sample[1] == 0 && sample[2] == 0 && sample[3] == alpha,
+            "HDR statistics must not drop black or fully transparent captures")
+    }
+
     @Test(arguments: [false, true])
     func captureConfigurationsRequestTheSelectedRangeWithoutChangingGeometry(includeHDR: Bool) {
         let stream = ScreenshotCaptureService.streamConfiguration(width: 320, height: 240, includeHDR: includeHDR)
@@ -199,7 +256,7 @@ struct ScreenshotHDRTests {
     }
 
     @Test
-    func PQImagesRemainHDRWhenReopenedAndUnknownHeadroomRemainsUnknown() throws {
+    func PQImagesRemainHDRWhenReopenedAndUnknownHeadroomIsMeasuredWhenSupported() throws {
         let hdr = try Self.hdrImage()
         let pq = try #require(Self.context.createCGImage(CIImage(cgImage: hdr),
             from: CGRect(x: 0, y: 0, width: hdr.width, height: hdr.height), format: .RGBA16,
@@ -211,7 +268,12 @@ struct ScreenshotHDRTests {
             let unknown = try #require(CGImageCreateCopyWithContentHeadroom(0, hdr))
             let copy = try #require(ScreenshotCaptureService.detachedImage(from: unknown))
             let highlight = try Self.pixel(copy, x: 16, y: 12)[0]
-            #expect(copy.contentHeadroom == 0 && highlight == 4)
+            #expect(highlight == 4)
+            if #available(macOS 26.0, *) {
+                #expect(copy.contentHeadroom > 1 && copy.contentAverageLightLevel > 0)
+            } else {
+                #expect(copy.contentHeadroom == 0)
+            }
         }
     }
 
@@ -343,6 +405,14 @@ struct ScreenshotHDRTests {
         let output = try #require(editor.model.renderedImage().cgImage(forProposedRect: nil, context: nil, hints: nil))
         #expect(output.width == 20 && output.height == 15)
         #expect(try Self.pixel(output, x: 10, y: 7)[0] == 4)
+        editor.model.beginLongCapturePreview()
+        #expect(controller.longCaptureToolbarFrame(on: screen).width == ScreenshotToolbarLayout.viewportWidth(
+            availableWidth: screen.visibleFrame.width, controlCount: ScreenshotToolbarLayout.controlCount + 1),
+            "The floating long-capture toolbar must reserve a slot for its HDR control")
+        editor.model.replaceCapture(with: nextSDR, translatingAnnotationsBy: .zero)
+        #expect(controller.longCaptureToolbarFrame(on: screen).width == ScreenshotToolbarLayout.viewportWidth(
+            availableWidth: screen.visibleFrame.width, controlCount: ScreenshotToolbarLayout.controlCount),
+            "SDR toolbars must not reserve an absent HDR control")
     }
 
     @Test
@@ -421,6 +491,47 @@ struct ScreenshotHDRTests {
 
     private static let linearSpace = CGColorSpace(name: CGColorSpace.extendedLinearSRGB)!
     private static let context = CIContext()
+
+    private static func hdrGradient(headroom: Float, levels: [Float] = [0, 0.18, 0.5, 1, 1.5, 2, 3, 4],
+                                    alpha: Float = 1) throws -> CGImage {
+        let row = levels.flatMap { [$0, $0, $0, alpha] }
+        let values = (0..<8).flatMap { _ in row }
+        let data = values.withUnsafeBytes { Data($0) }
+        let provider = try #require(CGDataProvider(data: data as CFData))
+        let image = try #require(CGImage(width: 8, height: 8, bitsPerComponent: 32, bitsPerPixel: 128,
+            bytesPerRow: 8 * 16, space: linearSpace,
+            bitmapInfo: [.floatComponents, .byteOrder32Little,
+                CGBitmapInfo(rawValue: CGImageAlphaInfo.premultipliedLast.rawValue)],
+            provider: provider, decode: nil, shouldInterpolate: false, intent: .defaultIntent))
+        if #available(macOS 15.0, *) {
+            return try #require(CGImageCreateCopyWithContentHeadroom(headroom, image))
+        }
+        return image
+    }
+
+    private static func pixelValues(_ image: CGImage) throws -> [Float] {
+        try (0..<image.width).map { try pixel(image, x: $0, y: 4)[0] }
+    }
+
+    @available(macOS 26.0, *)
+    private static func previewPixels(_ image: CGImage, targetHeadroom: Float) throws -> [Float] {
+        let source = NSImage(cgImage: image, size: CGSize(width: image.width, height: image.height))
+        let renderer = ImageRenderer(content: HStack(spacing: 0) {
+            Image(nsImage: source).allowedDynamicRange(.constrainedHigh).resizable().interpolation(.none)
+                .frame(width: CGFloat(image.width), height: CGFloat(image.height))
+            Color.gray.frame(width: 1, height: CGFloat(image.height))
+        })
+        renderer.colorMode = .extendedLinear
+        var output: CGImage?
+        renderer.render { size, draw in
+            guard let bitmap = ScreenshotImageRendering.bitmapContext(width: Int(size.width), height: Int(size.height),
+                matching: image) else { return }
+            bitmap.setEDRTargetHeadroom(targetHeadroom)
+            draw(bitmap)
+            output = bitmap.makeImage()
+        }
+        return try (0..<image.width).map { try pixel(#require(output), x: $0, y: 4)[0] }
+    }
 
     private static func hdrImage(width: Int = 32, height: Int = 24, highlight: Float = 4) throws -> CGImage {
         // Raw IEEE 754 binary16 samples also work on Intel, where Swift's Float16 is unavailable.

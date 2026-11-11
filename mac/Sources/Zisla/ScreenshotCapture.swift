@@ -308,9 +308,11 @@ enum ScreenshotCaptureService {
             width: normalized.width * scaleX,
             height: normalized.height * scaleY
         ).integral.intersection(CGRect(x: 0, y: 0, width: cgImage.width, height: cgImage.height))
-        guard let cropped = cgImage.cropping(to: cropRect) else { return nil }
+        guard let cropped = cgImage.cropping(to: cropRect),
+              let output = ScreenshotImageRendering.preservingHeadroom(cropped, from: cgImage)
+        else { return nil }
         return NSImage(
-            cgImage: cropped,
+            cgImage: output,
             size: CGSize(width: normalized.width, height: normalized.height)
         )
     }

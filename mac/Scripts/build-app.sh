@@ -177,6 +177,13 @@ for ARCHITECTURE in "${ARCHITECTURES[@]}"; do
   fi
 done
 
+ZISLA_RESOURCE_BUNDLE="$BIN_DIRECTORY/zisla_Zisla.bundle"
+PORTRAIT_KERNEL_LIBRARIES=("$ZISLA_RESOURCE_BUNDLE"/**/RecordingPortrait.metallib(.N))
+(( ${#PORTRAIT_KERNEL_LIBRARIES[@]} == 1 )) && [[ -s "$PORTRAIT_KERNEL_LIBRARIES[1]" ]] || {
+  echo "error: missing, empty, or ambiguous portrait Metal library in $ZISLA_RESOURCE_BUNDLE" >&2
+  exit 1
+}
+
 rm -rf "$APP"
 mkdir -p "$CONTENTS/MacOS" "$CONTENTS/Resources" "$CONTENTS/Frameworks" "$CONTENTS/Helpers"
 [[ -d "$KEYBOARD_RESOURCE_BUNDLE" ]] || {
@@ -189,6 +196,7 @@ mkdir -p "$CONTENTS/MacOS" "$CONTENTS/Resources" "$CONTENTS/Frameworks" "$CONTEN
 }
 ditto "$KEYBOARD_RESOURCE_BUNDLE" "$CONTENTS/Resources/zisla_KeyboardKit.bundle"
 ditto "$ZISLAKIT_RESOURCE_BUNDLE" "$CONTENTS/Resources/zisla_ZislaKit.bundle"
+install -m 0644 "$PORTRAIT_KERNEL_LIBRARIES[1]" "$CONTENTS/Resources/RecordingPortrait.metallib"
 if (( ${#BINARIES[@]} == 1 )); then
   install -m 0755 "$BINARIES[1]" "$CONTENTS/MacOS/zisla"
 else

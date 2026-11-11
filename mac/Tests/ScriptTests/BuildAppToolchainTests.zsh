@@ -85,6 +85,20 @@ else
     "$bin_directory/zisla_ZislaKit.bundle/Contents/Resources/Pomodoro"
   print -r -- pomodoro-complete > \
     "$bin_directory/zisla_ZislaKit.bundle/Contents/Resources/Pomodoro/pomodoro-complete.m4a"
+  portrait_bundle="$bin_directory/zisla_Zisla.bundle"
+  mkdir -p "$portrait_bundle/Contents/Resources"
+  rm -f "$portrait_bundle/RecordingPortrait.metallib" "$portrait_bundle/Contents/Resources/RecordingPortrait.metallib"
+  portrait_library="$portrait_bundle/Contents/Resources/RecordingPortrait.metallib"
+  [[ "${FAKE_PORTRAIT_LIBRARY_LAYOUT:-nested}" == flat ]] && portrait_library="$portrait_bundle/RecordingPortrait.metallib"
+  case "${FAKE_PORTRAIT_LIBRARY_STATE:-valid}" in
+    valid) print -r -- portrait-kernels > "$portrait_library" ;;
+    missing) ;;
+    empty) touch "$portrait_library" ;;
+    duplicate)
+      print -r -- portrait-kernels > "$portrait_library"
+      print -r -- duplicate > "$portrait_bundle/RecordingPortrait.metallib"
+      ;;
+  esac
 fi
 SCRIPT
 
@@ -287,7 +301,62 @@ for app in "$TEMPORARY_ROOT/output/zisla.app" "$DEBUG_APP"; do
       print -u2 -r -- "FAIL: build-app did not package the Pomodoro completion sound"
       exit 1
     }
+  cmp -s \
+    "$TEST_ROOT/.build/arm64/out/Products/Release/zisla_Zisla.bundle/Contents/Resources/RecordingPortrait.metallib" \
+    "$app/Contents/Resources/RecordingPortrait.metallib" || {
+      print -u2 -r -- "FAIL: build-app did not package the generated portrait Metal library"
+      exit 1
+    }
 done
+
+for state in missing empty duplicate; do
+  portrait_output="$TEMPORARY_ROOT/portrait-$state-output"
+  mkdir -p "$portrait_output/zisla.app/Contents/Resources"
+  print -r -- existing-app > "$portrait_output/zisla.app/Contents/Resources/marker"
+  if output="$(
+    PATH="$FAKE_BIN:$PATH" \
+      FAKE_CAPTURE_FILE="$CAPTURE_FILE" \
+      FAKE_CODESIGN_CAPTURE_FILE="$CODESIGN_CAPTURE_FILE" \
+      FAKE_CODESIGN_STATE_FILE="$CODESIGN_STATE_FILE" \
+      FAKE_CLT_DEVELOPER="$CLT_DEVELOPER" \
+      FAKE_XCODE_APP="$XCODE_APP" \
+      FAKE_PORTRAIT_LIBRARY_STATE="$state" \
+      BUILD_ARCHITECTURES=arm64 \
+      CODE_SIGN_IDENTITY=- \
+      OUTPUT_DIRECTORY="$portrait_output" \
+      SIGNING_MODE=adhoc \
+      "$TEST_ROOT/Scripts/build-app.sh" 2>&1
+  )"; then
+    print -u2 -r -- "FAIL: build-app accepted a $state portrait Metal library"
+    exit 1
+  fi
+  [[ "$output" == *"missing, empty, or ambiguous portrait Metal library"* && \
+    "$(<"$portrait_output/zisla.app/Contents/Resources/marker")" == existing-app ]] || {
+    print -u2 -r -- "FAIL: a $state portrait Metal library must fail before replacing an existing app"
+    exit 1
+  }
+done
+(
+  PATH="$FAKE_BIN:$PATH" \
+    FAKE_CAPTURE_FILE="$CAPTURE_FILE" \
+    FAKE_CODESIGN_CAPTURE_FILE="$CODESIGN_CAPTURE_FILE" \
+    FAKE_CODESIGN_STATE_FILE="$CODESIGN_STATE_FILE" \
+    FAKE_CLT_DEVELOPER="$CLT_DEVELOPER" \
+    FAKE_XCODE_APP="$XCODE_APP" \
+    FAKE_PORTRAIT_LIBRARY_LAYOUT=flat \
+    BUILD_ARCHITECTURES=arm64 \
+    CODE_SIGN_IDENTITY=- \
+    OUTPUT_DIRECTORY="$TEMPORARY_ROOT/portrait-flat-output" \
+    SIGNING_MODE=adhoc \
+    "$TEST_ROOT/Scripts/build-app.sh" >/dev/null
+)
+cmp -s \
+  "$TEST_ROOT/.build/arm64/out/Products/Release/zisla_Zisla.bundle/RecordingPortrait.metallib" \
+  "$TEMPORARY_ROOT/portrait-flat-output/zisla.app/Contents/Resources/RecordingPortrait.metallib" || {
+    print -u2 -r -- "FAIL: build-app did not package the portrait library from a flat SwiftPM bundle"
+    exit 1
+  }
+print -r -- "PASS: 4 portrait Metal library packaging cases"
 
 function build_profile_fixture() {
   PATH="$FAKE_BIN:$PATH" \

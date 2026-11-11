@@ -95,28 +95,26 @@ final class RecordingPortraitProcessor {
             bodies: bodyRequest.results?.map(\.boundingBox) ?? [])
     }
 
-    private static let mask = CIColorKernel(source: """
-        kernel vec4 portraitMask(vec4 region, float amount) {
-            vec2 relative = (destCoord() - region.xy) / region.zw;
-            float weight = amount * (1.0 - smoothstep(0.7, 1.0, length(relative)));
-            return vec4(vec3(weight), 1.0);
-        }
-        """)
-    private static let warp = CIWarpKernel(source: """
-        kernel vec2 portraitSlim(vec4 region, float amount) {
-            vec2 point = destCoord();
-            vec2 relative = (point - region.xy) / region.zw;
-            float weight = max(0.0, 1.0 - dot(relative, relative));
-            return point + vec2((point.x - region.x) * amount * weight * weight, 0.0);
-        }
-        """)
+    // Precompiled kernels also support Intel GPUs that cannot link stitchable Metal functions.
+    private static let kernels: (mask: CIColorKernel, warp: CIWarpKernel)? = {
+        #if SWIFT_MODULE_RESOURCE_BUNDLE_UNAVAILABLE
+        let bundle = Bundle.main
+        #else
+        let bundle = Bundle.module
+        #endif
+        guard let url = bundle.url(forResource: "RecordingPortrait", withExtension: "metallib"),
+              let library = try? Data(contentsOf: url),
+              let mask = try? CIColorKernel(functionName: "portraitMask", fromMetalLibraryData: library),
+              let warp = try? CIWarpKernel(functionName: "portraitSlim", fromMetalLibraryData: library) else { return nil }
+        return (mask, warp)
+    }()
 
     private static func vector(_ rectangle: CGRect) -> CIVector {
         CIVector(x: rectangle.midX, y: rectangle.midY, z: rectangle.width / 2, w: rectangle.height / 2)
     }
 
     private static func blend(_ foreground: CIImage, over background: CIImage, region: CGRect, amount: Double) throws -> CIImage {
-        guard let mask = mask?.apply(extent: background.extent, arguments: [vector(region), amount]) else {
+        guard let mask = kernels?.mask.apply(extent: background.extent, arguments: [vector(region), amount]) else {
             throw ScreenRecordingExportError.cannotRender
         }
         return foreground.applyingFilter("CIBlendWithMask", parameters: [
@@ -125,7 +123,7 @@ final class RecordingPortraitProcessor {
     }
 
     private static func slim(_ image: CIImage, region: CGRect, amount: Double) throws -> CIImage {
-        guard let warped = warp?.apply(extent: image.extent, roiCallback: { _, rectangle in
+        guard let warped = kernels?.warp.apply(extent: image.extent, roiCallback: { _, rectangle in
             rectangle.insetBy(dx: -region.width * amount, dy: 0)
         }, image: image, arguments: [vector(region), amount]) else {
             throw ScreenRecordingExportError.cannotRender
