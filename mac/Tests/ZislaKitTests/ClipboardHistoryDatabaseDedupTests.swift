@@ -6,6 +6,246 @@ import Testing
 @testable import ZislaKit
 
 struct ClipboardHistoryDatabaseDedupTests {
+    @Test(arguments: ["UTF-8", "UTF-16le", "UTF-16be"])
+    func nullTextKeepsDistinctBytesIdentityAndPinAcrossRestart(encoding: String) async throws {
+        let directory = try makeDirectory()
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let url = directory.appendingPathComponent("history.sqlite")
+        try createLegacySchema(at: url, version: 4, encoding: encoding)
+        #expect(try readBlob("PRAGMA encoding", at: url) == Data(encoding.utf8))
+        var database: ClipboardHistoryDatabase? = ClipboardHistoryDatabase(storageURL: url)
+        let original = item(.text("prefix\u{0}中文👩🏽‍💻"), time: 1, pinned: true)
+        let distinct = item(.text("prefix\u{0}second"), time: 2)
+        let prefix = item(.text("prefix"), time: 3)
+        try await database?.apply([original, distinct, prefix].map { .upsert($0, capacity: nil) })
+        database = nil
+        let reopened = ClipboardHistoryDatabase(storageURL: url)
+        let restored = try await loadAll(reopened)
+
+        #expect(restored.totalCount == 3, "NUL-separated suffixes must not collapse to the same history entry")
+        #expect(Set(restored.items.map(\.id)) == [original.id, distinct.id, prefix.id])
+        #expect(restored.items.first { $0.id == original.id } == original)
+        #expect(restored.items.first { $0.id == distinct.id } == distinct, "Different suffixes must not inherit another entry's pin")
+        #expect(restored.items.first { $0.id == prefix.id } == prefix)
+        for expected in [original, distinct, prefix] {
+            let actual = try #require(restored.items.first { $0.id == expected.id })
+            #expect(Array(actual.content.previewText.utf8) == Array(expected.content.previewText.utf8))
+        }
+        let replacement = item(original.content, time: 4)
+        try await reopened.apply([.upsert(replacement, capacity: nil)])
+        let final = try await loadAll(reopened)
+        #expect(final.totalCount == 3)
+        #expect(!final.items.contains { $0.id == original.id })
+        #expect(final.items.first { $0.id == replacement.id }?.isPinned == true)
+        #expect(final.items.contains(distinct))
+        #expect(final.items.contains(prefix))
+    }
+
+    @Test(arguments: [4, 5, 16])
+    func legacyNullTextRebuildsItsDigestWithoutChangingArchivedEntries(schema: Int) async throws {
+        let directory = try makeDirectory()
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let url = directory.appendingPathComponent("history.sqlite")
+        let encoding = schema == 16 ? "UTF-16le" : "UTF-8"
+        let legacy = try createLegacyNullTextFixture(at: url, version: schema == 4 ? 4 : 5, encoding: encoding)
+        #expect(try readBlob("PRAGMA encoding", at: url) == Data(encoding.utf8))
+        let complete = legacy[1]
+        #expect(try scalar("SELECT instr(text_value, char(0)) FROM clipboard_history WHERE id = '\(complete.id.uuidString)'", at: url) > 0)
+        try execute("""
+            CREATE TRIGGER preserve_unaffected_digest
+            BEFORE UPDATE OF content_digest ON clipboard_history
+            WHEN OLD.content_digest IS NOT NULL
+              AND (OLD.content_type <> 0 OR instr(OLD.text_value, char(0)) = 0)
+            BEGIN SELECT RAISE(ABORT, 'unaffected digest was rewritten'); END;
+            CREATE TRIGGER preserve_archived_payload
+            BEFORE UPDATE OF text_value, image_data, is_pinned, last_copied_at ON clipboard_history
+            BEGIN SELECT RAISE(ABORT, 'archived payload was rewritten'); END;
+            CREATE TRIGGER reject_redundant_digest_invalidation
+            BEFORE UPDATE OF content_digest ON clipboard_history
+            WHEN OLD.content_digest IS NULL AND NEW.content_digest IS NULL
+            BEGIN SELECT RAISE(ABORT, 'missing digest was invalidated again'); END;
+            """, at: url)
+        let trace = DedupQueryTrace()
+        var database: ClipboardHistoryDatabase? = ClipboardHistoryDatabase(storageURL: url, connectionObserver: { trace.attach(to: $0) })
+        let restored = try await loadAll(database!)
+
+        #expect(restored.items.sorted { $0.id.uuidString < $1.id.uuidString }
+            == legacy.sorted { $0.id.uuidString < $1.id.uuidString })
+        #expect(try scalar("PRAGMA user_version", at: url) == 6)
+        #expect(try readBlob("SELECT content_digest FROM clipboard_history WHERE id = '\(complete.id.uuidString)'", at: url)
+            == Data(SHA256.hash(data: Data(complete.content.previewText.utf8))))
+        #expect(trace.activeCursorDigestUpdates == 0)
+        #expect(trace.backfillQueries.allSatisfy { $0.fullScanSteps == 0 })
+        #expect(trace.backfillQueries.reduce(0) { $0 + $1.vmSteps } < Int32(legacy.count * 60 + 100))
+        let replacement = item(complete.content, time: 10)
+        try await database?.apply([.upsert(replacement, capacity: nil)])
+        let replaced = try await loadAll(database!)
+        #expect(replaced.totalCount == legacy.count, "An upgraded full-text digest must deduplicate the matching archived entry")
+        #expect(!replaced.items.contains { $0.id == complete.id })
+        #expect(replaced.items.first { $0.id == replacement.id }?.isPinned == true)
+        #expect(replaced.items.contains(legacy[0]), "Already truncated archives must retain their stored prefix, identity and pin")
+        #expect(replaced.items.contains(legacy[2]))
+        database = nil
+        try execute("""
+            CREATE TRIGGER reject_repeat_digest_refresh
+            BEFORE UPDATE OF content_digest ON clipboard_history
+            WHEN OLD.content_digest IS NOT NULL
+            BEGIN SELECT RAISE(ABORT, 'completed digest migration repeated'); END;
+            """, at: url)
+        let reopened = ClipboardHistoryDatabase(storageURL: url)
+        #expect(try await loadAll(reopened).items == replaced.items)
+    }
+
+    @Test(arguments: [false, true])
+    func nullDigestMigrationRollsBackAndRecovers(failDuringBackfill: Bool) async throws {
+        let directory = try makeDirectory()
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let url = directory.appendingPathComponent("history.sqlite")
+        let legacy = try createLegacyNullTextFixture(at: url, version: 5)
+        let complete = legacy[1]
+        let originalDigest = try readBlob("SELECT content_digest FROM clipboard_history WHERE id = '\(complete.id.uuidString)'", at: url)
+        let originalPayload = try readBlob("SELECT CAST(text_value AS BLOB) FROM clipboard_history WHERE id = '\(complete.id.uuidString)'", at: url)
+        let rejection = failDuringBackfill
+            ? "OLD.content_digest IS NULL AND NEW.content_digest IS NOT NULL"
+            : "NEW.content_digest IS NULL"
+        try execute("""
+            CREATE TRIGGER reject_null_digest_migration
+            BEFORE UPDATE OF content_digest ON clipboard_history
+            WHEN \(rejection)
+            BEGIN SELECT RAISE(ABORT, 'injected null-text migration failure'); END;
+            """, at: url)
+        let database = ClipboardHistoryDatabase(storageURL: url)
+
+        await #expect(throws: (any Error).self) { try await loadAll(database) }
+        #expect(try scalar("PRAGMA user_version", at: url) == 5)
+        #expect(try scalar("SELECT COUNT(*) FROM clipboard_history", at: url) == legacy.count)
+        #expect(try readBlob("SELECT content_digest FROM clipboard_history WHERE id = '\(complete.id.uuidString)'", at: url) == originalDigest)
+        #expect(try readBlob("SELECT CAST(text_value AS BLOB) FROM clipboard_history WHERE id = '\(complete.id.uuidString)'", at: url) == originalPayload)
+        try execute("DROP TRIGGER reject_null_digest_migration", at: url)
+        #expect(try await loadAll(database).items.sorted { $0.id.uuidString < $1.id.uuidString }
+            == legacy.sorted { $0.id.uuidString < $1.id.uuidString })
+        #expect(try scalar("PRAGMA user_version", at: url) == 6)
+    }
+
+    @Test
+    func nullTextCandidatesKeepIndexedWorkBounded() async throws {
+        let directory = try makeDirectory()
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let url = directory.appendingPathComponent("history.sqlite")
+        let trace = DedupQueryTrace()
+        let database = ClipboardHistoryDatabase(storageURL: url, connectionObserver: { trace.attach(to: $0) })
+        var previous: [DedupQueryTrace.Query]?
+        for range in [0..<16, 16..<96] {
+            try await database.apply(range.map { .upsert(item(.text("shared\u{0}suffix-\($0)"), pinned: true), capacity: nil) })
+            #expect(try scalar("SELECT COUNT(*) FROM clipboard_history", at: url) == range.upperBound)
+            trace.reset()
+            try await database.apply([.upsert(item(.text("shared\u{0}probe-\(range.upperBound)")), capacity: nil)])
+            let queries = trace.queries
+            for query in queries {
+                #expect(query.fullScanSteps == 0)
+            }
+            #expect(queries.count == 2)
+            if let previous {
+                for (before, after) in zip(previous, queries) {
+                    #expect(after.vmSteps <= before.vmSteps + 12, "A common NUL prefix must not turn digest lookup into a growing candidate scan")
+                }
+            }
+            previous = queries
+            print("NUL-text candidates: records=\(range.upperBound), fullScanSteps=\(queries.map(\.fullScanSteps)), vmSteps=\(queries.map(\.vmSteps))")
+            let page = try await loadAll(database)
+            let probe = try #require(page.items.first { $0.content == .text("shared\u{0}probe-\(range.upperBound)") })
+            try await database.apply([.remove(probe.id)])
+        }
+        #expect(try scalar("SELECT COUNT(DISTINCT content_digest) FROM clipboard_history", at: url) == 96)
+    }
+
+    @Test
+    func forgedFullTextDigestCannotMergeDifferentNullSuffixes() async throws {
+        let directory = try makeDirectory()
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let url = directory.appendingPathComponent("history.sqlite")
+        let database = ClipboardHistoryDatabase(storageURL: url)
+        let original = item(.text("prefix\u{0}original"), pinned: true)
+        let incoming = item(.text("prefix\u{0}' OR 1=1; --"), time: 2)
+        try await database.apply([.upsert(original, capacity: nil)])
+        try withDatabase(at: url) { handle in
+            let statement = try prepare("UPDATE clipboard_history SET content_digest = ? WHERE id = ?", on: handle)
+            defer { sqlite3_finalize(statement) }
+            try bind(Data(SHA256.hash(data: Data(incoming.content.previewText.utf8))), to: statement, index: 1)
+            try bind(original.id.uuidString, to: statement, index: 2)
+            try requireDone(statement, on: handle)
+        }
+        try await database.apply([.upsert(incoming, capacity: nil)])
+        let reopened = ClipboardHistoryDatabase(storageURL: url)
+        let restored = try await loadAll(reopened)
+        #expect(restored.totalCount == 2)
+        #expect(restored.items.contains(original), "A forged digest must not delete different full text")
+        #expect(restored.items.contains(incoming), "Untrusted SQL-shaped text must remain unpinned data")
+    }
+
+    @Test
+    func seededNullTextCorpusPreservesBytesThroughReplacement() async throws {
+        let directory = try makeDirectory()
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let url = directory.appendingPathComponent("history.sqlite")
+        var seed: UInt64 = 0x4E554C54455854
+        let units = ["A", "é", "e\u{301}", "中文", "👩🏽‍💻", "%_\\", "' OR 1=1; --", "\n"]
+        let corpus = (0..<64).map { index -> ClipboardHistoryItem in
+            var text = ""
+            for _ in 0..<8 {
+                seed = seed &* 6364136223846793005 &+ 1442695040888963407
+                text += units[Int(seed % UInt64(units.count))]
+            }
+            switch index % 3 {
+            case 0: text = "\u{0}\(index):" + text
+            case 1: text = "shared\u{0}\(index):" + text
+            default: text = "\(index):" + text + "\u{0}"
+            }
+            return item(.text(text), time: Double(index), pinned: index.isMultiple(of: 3))
+        }
+        #expect(corpus.allSatisfy { $0.content.previewText.utf8.count < 256 })
+        var database: ClipboardHistoryDatabase? = ClipboardHistoryDatabase(storageURL: url)
+        try await database?.apply(corpus.map { .upsert($0, capacity: nil) })
+        let replacements = corpus.enumerated().filter { $0.offset.isMultiple(of: 2) }
+            .map { item($0.element.content, time: Double(100 + $0.offset), pinned: $0.element.isPinned) }
+        try await database?.apply(replacements.map { .upsert($0, capacity: nil) })
+        database = nil
+        let reopened = ClipboardHistoryDatabase(storageURL: url)
+        let restored = try await loadAll(reopened)
+        let expected = corpus.enumerated().filter { !$0.offset.isMultiple(of: 2) }.map(\.element) + replacements
+        #expect(restored.totalCount == 64)
+        #expect(Set(restored.items.map(\.id)) == Set(expected.map(\.id)))
+        for entry in restored.items {
+            let original = try #require(expected.first { $0.id == entry.id })
+            #expect(Array(entry.content.previewText.utf8) == Array(original.content.previewText.utf8))
+            #expect(entry.isPinned == original.isPinned)
+        }
+        #expect(try readBlob("PRAGMA integrity_check", at: url) == Data("ok".utf8))
+    }
+
+    @Test
+    func rejectedLargeTextRollsBackTheBatchAndAllowsRetry() async throws {
+        let directory = try makeDirectory()
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let url = directory.appendingPathComponent("history.sqlite")
+        let database = ClipboardHistoryDatabase(storageURL: url, connectionObserver: { handle in
+            _ = sqlite3_limit(handle, SQLITE_LIMIT_LENGTH, 16 * 1024)
+        })
+        let original = item(.text("safe\u{0}original"), pinned: true)
+        try await database.apply([.upsert(original, capacity: nil)])
+        let oversized = item(.text("short\u{0}" + String(repeating: "x", count: 32 * 1024)))
+        await #expect(throws: (any Error).self) {
+            try await database.apply([.remove(original.id), .upsert(oversized, capacity: nil)])
+        }
+        #expect(try await loadAll(database).items == [original], "SQLite length rejection must not commit preceding deletions")
+        let retry = item(.text("safe\u{0}retry"), time: 2)
+        try await database.apply([.upsert(retry, capacity: nil)])
+        let reopened = ClipboardHistoryDatabase(storageURL: url)
+        #expect(try await loadAll(reopened).items == [original, retry])
+        let files = try FileManager.default.contentsOfDirectory(atPath: directory.path)
+        #expect(files.allSatisfy { ["history.sqlite", "history.sqlite-wal", "history.sqlite-shm"].contains($0) })
+    }
+
     @Test(arguments: DedupContentKind.allCases)
     fileprivate func candidateQueriesStayBoundedAsHistoryGrows(kind: DedupContentKind) async throws {
         let directory = try makeDirectory()
@@ -195,8 +435,9 @@ struct ClipboardHistoryDatabaseDedupTests {
             item(.text("legacy é 文本"), time: 1, pinned: true),
             item(.image(Data([0, 1, 2, 255])), time: 2),
         ] + (version == 4 ? [item(DedupContentKind.file.content("legacy-file"), time: 3)] : [])
-        if schema == 16 { try execute("PRAGMA encoding = 'UTF-16le'", at: url) }
-        try createLegacySchema(at: url, version: version)
+        let encoding = schema == 16 ? "UTF-16le" : "UTF-8"
+        try createLegacySchema(at: url, version: version, encoding: encoding)
+        #expect(try readBlob("PRAGMA encoding", at: url) == Data(encoding.utf8))
         try insertLegacy(legacy, at: url, hasFileColumns: version == 4)
         if version == 4 {
             try execute(
@@ -213,7 +454,7 @@ struct ClipboardHistoryDatabaseDedupTests {
         var database: ClipboardHistoryDatabase? = ClipboardHistoryDatabase(storageURL: url)
         #expect(try await loadAll(database!).items.sorted { $0.id.uuidString < $1.id.uuidString }
             == legacy.sorted { $0.id.uuidString < $1.id.uuidString })
-        #expect(try scalar("PRAGMA user_version", at: url) == 5)
+        #expect(try scalar("PRAGMA user_version", at: url) == 6)
         #expect(try scalar("SELECT COUNT(*) FROM clipboard_history WHERE length(content_digest) = 32", at: url) == legacy.count)
         database = nil
         let reopened = ClipboardHistoryDatabase(storageURL: url)
@@ -268,7 +509,7 @@ struct ClipboardHistoryDatabaseDedupTests {
             fault.disable()
         }
         #expect(try await loadAll(database).totalCount == legacy.count)
-        #expect(try scalar("PRAGMA user_version", at: url) == 5)
+        #expect(try scalar("PRAGMA user_version", at: url) == 6)
         #expect(try scalar("SELECT COUNT(*) FROM clipboard_history WHERE length(content_digest) = 32", at: url) == legacy.count)
     }
 
@@ -352,12 +593,13 @@ struct ClipboardHistoryDatabaseDedupTests {
         let last = item(.text("prefix\u{0}second"), time: 100)
         try await database.apply([.upsert(last, capacity: nil)])
         let page = try await loadAll(database)
-        #expect(page.totalCount == contents.count)
-        #expect(page.items.first { $0.id == last.id }?.content == .text("prefix"))
-        #expect(try scalar("SELECT COUNT(*) FROM clipboard_history WHERE content_type = 0 AND text_value = 'prefix'", at: url) == 1)
+        #expect(page.totalCount == contents.count + 1)
+        #expect(page.items.first { $0.id == last.id }?.content == last.content)
+        #expect(page.items.contains { $0.content == .text("prefix\u{0}first") })
+        #expect(try scalar("SELECT COUNT(*) FROM clipboard_history WHERE content_type = 0 AND text_value = 'prefix'", at: url) == 0)
         #expect(page.items.contains { $0.content == .image(Data([0, 1])) })
         #expect(page.items.contains { $0.content == .image(Data("A".utf8)) })
-        #expect(try scalar("SELECT COUNT(*) FROM clipboard_history WHERE content_type = 0 AND length(content_digest) = 32", at: url) == text.count)
+        #expect(try scalar("SELECT COUNT(*) FROM clipboard_history WHERE content_type = 0 AND length(content_digest) = 32", at: url) == text.count + 1)
     }
 
     private func item(
@@ -383,12 +625,57 @@ struct ClipboardHistoryDatabaseDedupTests {
         return directory
     }
 
-    private func createLegacySchema(at url: URL, version: Int) throws {
+    private func createLegacyNullTextFixture(at url: URL, version: Int, encoding: String = "UTF-8") throws -> [ClipboardHistoryItem] {
+        try createLegacySchema(at: url, version: 4, encoding: encoding)
+        let legacy = [
+            item(.text("prefix"), time: 1, pinned: true),
+            item(.text("prefix\u{0}完整👩🏽‍💻"), time: 2, pinned: true),
+            item(.image(Data([0, 1, 2])), time: 3),
+        ]
+        try insertLegacy(legacy, at: url, hasFileColumns: true)
+        try execute("""
+            UPDATE clipboard_history
+            SET text_value = 'prefix' || char(0) || '完整👩🏽‍💻'
+            WHERE id = '\(legacy[1].id.uuidString)';
+            UPDATE clipboard_history
+            SET text_value = 'unused' || char(0) || 'image column'
+            WHERE id = '\(legacy[2].id.uuidString)';
+            ALTER TABLE clipboard_history ADD COLUMN content_digest BLOB;
+            PRAGMA user_version = \(version);
+            """, at: url)
+        if version == 5 {
+            try withDatabase(at: url) { database in
+                let statement = try prepare("UPDATE clipboard_history SET content_digest = ? WHERE id = ?", on: database)
+                defer { sqlite3_finalize(statement) }
+                for entry in legacy {
+                    sqlite3_reset(statement)
+                    try bind(digest(entry.content), to: statement, index: 1)
+                    try bind(entry.id.uuidString, to: statement, index: 2)
+                    try requireDone(statement, on: database)
+                }
+            }
+        }
+        return legacy
+    }
+
+    private func readBlob(_ sql: String, at url: URL) throws -> Data {
+        try withDatabase(at: url) { database in
+            let statement = try prepare(sql, on: database)
+            defer { sqlite3_finalize(statement) }
+            guard sqlite3_step(statement) == SQLITE_ROW else { throw DedupSQLiteError() }
+            let count = Int(sqlite3_column_bytes(statement, 0))
+            guard let bytes = sqlite3_column_blob(statement, 0) else { return Data() }
+            return Data(bytes: bytes, count: count)
+        }
+    }
+
+    private func createLegacySchema(at url: URL, version: Int, encoding: String = "UTF-8") throws {
         let fileColumns = version == 4
             ? ", file_url TEXT, file_display_name TEXT, file_bookmark BLOB, content_category TEXT"
             : ""
         try execute(
             """
+            PRAGMA encoding = '\(encoding)';
             CREATE TABLE clipboard_history (
                 id TEXT PRIMARY KEY NOT NULL, content_type INTEGER NOT NULL,
                 text_value TEXT, image_data BLOB, last_copied_at REAL NOT NULL,
