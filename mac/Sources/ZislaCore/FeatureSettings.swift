@@ -822,6 +822,14 @@ public struct FeatureSettings: Codable, Equatable, Sendable {
     public var clipboardAssistantEnabled: Bool
     /// Whether completed browser downloads and AirDrop transfers offer an Open Folder action.
     public var downloadCompletionFolderActionEnabled: Bool
+    public var applicationOpenFailureMonitoringEnabled: Bool
+    public var applicationOpenRepairEnabled: Bool {
+        clipboardAssistantEnabled
+            && (clipboardAssistantEnabledKinds.isEmpty || clipboardAssistantEnabledKinds.contains(.appCannotOpen))
+    }
+    public var applicationOpenFailureMonitoringActive: Bool {
+        applicationOpenRepairEnabled && applicationOpenFailureMonitoringEnabled
+    }
     /// Quick trigger hotkey firing the assistant's primary action while its toast is visible.
     /// Modifier-only presets fire on double-tap; ordinary combos fire on key-down.
     public var clipboardAssistantTriggerConfiguration: ClipboardAssistantTriggerConfiguration
@@ -1013,6 +1021,7 @@ public struct FeatureSettings: Codable, Equatable, Sendable {
         clipboardDetectionEnabled: Bool = true,
         clipboardAssistantEnabled: Bool = true,
         downloadCompletionFolderActionEnabled: Bool = true,
+        applicationOpenFailureMonitoringEnabled: Bool = false,
         clipboardAssistantTriggerConfiguration: ClipboardAssistantTriggerConfiguration = .default,
         clipboardAssistantDismissConfiguration: ClipboardAssistantTriggerConfiguration = .hotkey(ClipboardAssistantDefaults.dismissHotkey),
         clipboardAssistantMouseButton: Int? = nil,
@@ -1144,6 +1153,7 @@ public struct FeatureSettings: Codable, Equatable, Sendable {
         self.clipboardDetectionEnabled = clipboardDetectionEnabled
         self.clipboardAssistantEnabled = clipboardAssistantEnabled
         self.downloadCompletionFolderActionEnabled = downloadCompletionFolderActionEnabled
+        self.applicationOpenFailureMonitoringEnabled = applicationOpenFailureMonitoringEnabled
         self.clipboardAssistantTriggerConfiguration = clipboardAssistantTriggerConfiguration
         self.clipboardAssistantDismissConfiguration = clipboardAssistantDismissConfiguration
         self.clipboardAssistantMouseButton = clipboardAssistantMouseButton
@@ -1250,7 +1260,7 @@ public struct FeatureSettings: Codable, Equatable, Sendable {
     }
 
     /// Current clipboard-assistant kind preference payload version.
-    public static let clipboardAssistantKindSetVersionCurrent = 4
+    public static let clipboardAssistantKindSetVersionCurrent = 5
     /// Kinds shipped after the previous version; enabled once when a stored
     /// preference from an older version is decoded. Empty stored sets keep
     /// their "all kinds" meaning and need no migration.
@@ -1259,6 +1269,7 @@ public struct FeatureSettings: Codable, Equatable, Sendable {
         2: [.address, .flight, .train, .tracking, .meeting],
         3: [.shellCommand],
         4: [.ipAddress],
+        5: [.appCannotOpen],
     ]
 
     public static let `default` = FeatureSettings()
@@ -1324,6 +1335,7 @@ public struct FeatureSettings: Codable, Equatable, Sendable {
         case clipboardDetectionEnabled
         case clipboardAssistantEnabled
         case downloadCompletionFolderActionEnabled
+        case applicationOpenFailureMonitoringEnabled
         case clipboardAssistantTriggerConfiguration
         case clipboardAssistantDismissConfiguration
         case clipboardAssistantMouseButton
@@ -1612,6 +1624,9 @@ public struct FeatureSettings: Codable, Equatable, Sendable {
         }
         clipboardAssistantEnabledKinds = enabledKinds
         clipboardAssistantKindSetVersion = Self.clipboardAssistantKindSetVersionCurrent
+        applicationOpenFailureMonitoringEnabled = try container.decodeIfPresent(
+            Bool.self, forKey: .applicationOpenFailureMonitoringEnabled
+        ) ?? defaults.applicationOpenFailureMonitoringEnabled
         var actionOrders = try container.decodeIfPresent(
             [ClipboardAssistantKind: [ClipboardAssistantActionKind]].self,
             forKey: .clipboardAssistantActionOrders

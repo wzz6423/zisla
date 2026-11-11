@@ -2796,7 +2796,8 @@ struct UpdateCoreTests {
 struct FeatureSettingsTests {
     @Test
     func clipboardAssistantDefaultsKeepSharedActionLast() throws {
-        for kind in ClipboardAssistantKind.allCases {
+        #expect(ClipboardAssistantActionOrder.defaults(for: .appCannotOpen) == [.repairAndOpenApp])
+        for kind in ClipboardAssistantKind.allCases where kind != .appCannotOpen {
             #expect(ClipboardAssistantActionOrder.defaults(for: kind).last == .share)
         }
         #expect(ClipboardAssistantActionOrder.defaults(for: .math) == [

@@ -3358,6 +3358,29 @@
 "保存手写备忘录需要辅助功能权限" = "L’accès à l’accessibilité est nécessaire pour enregistrer les notes manuscrites";
 "备忘录内容已变化，请重新打开后编辑" = "La note a changé. Rouvrez-la avant de la modifier";
 "无法保存手写备忘录的文本，请在备忘录中打开后重试" = "Impossible d’enregistrer le texte de la note manuscrite. Ouvrez-la dans Notes et réessayez";
+
+"应用无法打开" = "Impossible d’ouvrir l’application";
+"解决并打开" = "Réparer et ouvrir";
+"使用方法" = "Mode d’emploi";
+"1. 复制无法打开的 .app，或将它拖入中转站；检测到隔离标记时显示提醒。" = "1. Copiez le fichier .app qui ne s’ouvre pas ou glissez-le dans l’étagère. Une notification apparaît si un attribut de quarantaine est détecté.";
+"2. 确认应用来自可信来源后，点击“解决并打开”，移除隔离标记并尝试打开。" = "2. Vérifiez que l’application provient d’une source fiable, puis cliquez sur « Réparer et ouvrir » pour supprimer les attributs de quarantaine et tenter de l’ouvrir.";
+"3. 镜像中的应用须先复制到应用程序或下载文件夹；签名损坏或安全评估拒绝时停止处理。" = "3. Copiez d’abord les applications des images disque dans Applications ou Téléchargements. Le traitement s’arrête si la signature est endommagée ou si l’évaluation de sécurité refuse l’application.";
+"请选择完整的本地 .app 应用" = "Sélectionnez une application .app locale complète";
+"不能处理系统目录中的应用" = "Les applications des répertoires système ne peuvent pas être traitées";
+"请先将应用复制到应用程序或下载文件夹" = "Copiez d’abord l’application dans Applications ou Téléchargements";
+"应用包含不支持的链接或特殊文件，请重新下载完整应用" = "L’application contient des liens non pris en charge ou des fichiers spéciaux. Téléchargez à nouveau une copie complète";
+"应用超出检查范围，无法处理" = "L’application dépasse les limites de vérification et ne peut pas être traitée";
+"无法读取应用，请检查文件和权限" = "Impossible de lire l’application. Vérifiez ses fichiers et leurs autorisations";
+"应用在检查后发生变化，请重新复制或拖入" = "L’application a changé après la vérification. Copiez-la ou glissez-la à nouveau";
+"应用签名校验失败，请从开发者处重新下载" = "La vérification de la signature a échoué. Téléchargez à nouveau l’application auprès du développeur";
+"应用未通过 macOS 安全评估，已停止处理" = "L’application a échoué à l’évaluation de sécurité de macOS. Le traitement a été arrêté";
+"macOS 安全评估暂不可用，请稍后重试" = "L’évaluation de sécurité de macOS est temporairement indisponible. Réessayez plus tard";
+"无法移除隔离标记，请检查写入权限" = "Impossible de supprimer les attributs de quarantaine. Vérifiez les autorisations d’écriture";
+"系统未接受打开应用的请求" = "Le système a refusé la demande d’ouverture de l’application";
+
+"系统打不开应用时提醒" = "Avertir si macOS ne peut pas ouvrir une app";
+"需要辅助功能权限；通过系统窗口事件提醒，不定时扫描" = "Nécessite l’accès à l’accessibilité ; utilise les événements des fenêtres système sans analyse périodique";
+"4. 可开启“系统打不开应用时提醒”；无法确定应用路径时，请复制或拖入 .app。" = "4. Vous pouvez activer « Avertir si macOS ne peut pas ouvrir une app ». Si le chemin reste inconnu, copiez ou glissez la .app dans l’Étagère.";
 "保留 HDR" = "Conserver le HDR";
 "小雨" = "Pluie faible";
 "中雨" = "Pluie modérée";

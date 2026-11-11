@@ -3363,6 +3363,29 @@
 "保存手写备忘录需要辅助功能权限" = "Zum Speichern handschriftlicher Notizen ist der Zugriff auf Bedienungshilfen erforderlich";
 "备忘录内容已变化，请重新打开后编辑" = "Die Notiz wurde geändert. Öffne sie vor dem Bearbeiten erneut";
 "无法保存手写备忘录的文本，请在备忘录中打开后重试" = "Der Text der handschriftlichen Notiz konnte nicht gespeichert werden. Öffne sie in Notizen und versuche es erneut";
+
+"应用无法打开" = "App kann nicht geöffnet werden";
+"解决并打开" = "Reparieren und öffnen";
+"使用方法" = "Verwendung";
+"1. 复制无法打开的 .app，或将它拖入中转站；检测到隔离标记时显示提醒。" = "1. Kopiere die .app, die sich nicht öffnen lässt, oder ziehe sie in die Ablage. Bei einer Quarantänemarkierung erscheint ein Hinweis.";
+"2. 确认应用来自可信来源后，点击“解决并打开”，移除隔离标记并尝试打开。" = "2. Prüfe, ob die App aus einer vertrauenswürdigen Quelle stammt. Klicke dann auf „Reparieren und öffnen“, um die Quarantänemarkierungen zu entfernen und die App zu öffnen.";
+"3. 镜像中的应用须先复制到应用程序或下载文件夹；签名损坏或安全评估拒绝时停止处理。" = "3. Kopiere Apps aus Disk-Images zuerst in Programme oder Downloads. Bei einer beschädigten Signatur oder einer abgelehnten Sicherheitsprüfung wird die Verarbeitung beendet.";
+"请选择完整的本地 .app 应用" = "Wähle eine vollständige lokale .app aus";
+"不能处理系统目录中的应用" = "Apps in Systemverzeichnissen können nicht verarbeitet werden";
+"请先将应用复制到应用程序或下载文件夹" = "Kopiere die App zuerst in Programme oder Downloads";
+"应用包含不支持的链接或特殊文件，请重新下载完整应用" = "Die App enthält nicht unterstützte Verknüpfungen oder spezielle Dateien. Lade eine vollständige Kopie erneut herunter";
+"应用超出检查范围，无法处理" = "Die App überschreitet die Prüfgrenzen und kann nicht verarbeitet werden";
+"无法读取应用，请检查文件和权限" = "Die App kann nicht gelesen werden. Prüfe Dateien und Zugriffsrechte";
+"应用在检查后发生变化，请重新复制或拖入" = "Die App wurde nach der Prüfung verändert. Kopiere oder ziehe sie erneut hinein";
+"应用签名校验失败，请从开发者处重新下载" = "Die Signaturprüfung ist fehlgeschlagen. Lade die App erneut vom Entwickler herunter";
+"应用未通过 macOS 安全评估，已停止处理" = "Die App hat die macOS-Sicherheitsprüfung nicht bestanden. Die Verarbeitung wurde beendet";
+"macOS 安全评估暂不可用，请稍后重试" = "Die macOS-Sicherheitsprüfung ist vorübergehend nicht verfügbar. Versuche es später erneut";
+"无法移除隔离标记，请检查写入权限" = "Quarantänemarkierungen können nicht entfernt werden. Prüfe die Schreibrechte";
+"系统未接受打开应用的请求" = "Das System hat die Anfrage zum Öffnen der App abgelehnt";
+
+"系统打不开应用时提醒" = "Hinweis, wenn macOS eine App nicht öffnen kann";
+"需要辅助功能权限；通过系统窗口事件提醒，不定时扫描" = "Benötigt Bedienungshilfen-Zugriff; nutzt Systemfensterereignisse ohne regelmäßige Suche";
+"4. 可开启“系统打不开应用时提醒”；无法确定应用路径时，请复制或拖入 .app。" = "4. Aktiviere bei Bedarf „Hinweis, wenn macOS eine App nicht öffnen kann“. Ist der Pfad unklar, kopiere die .app oder ziehe sie in die Ablage.";
 "保留 HDR" = "HDR beibehalten";
 "小雨" = "Leichter Regen";
 "中雨" = "Mäßiger Regen";

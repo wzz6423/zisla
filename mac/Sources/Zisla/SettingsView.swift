@@ -972,6 +972,30 @@ struct SettingsView: View {
                         if let groups = Self.clipboardAssistantExampleGroups[kind] {
                             Self.clipboardAssistantExamples(groups, language: model.languageStore.language, onCopy: copySettingsText)
                         }
+                        if kind == .appCannotOpen {
+                            rowDivider
+                            settingRow(symbol: "macwindow.badge.plus", title: "系统打不开应用时提醒",
+                                       detail: "需要辅助功能权限；通过系统窗口事件提醒，不定时扫描",
+                                       detailLineLimit: 2, isNested: true) {
+                                Self.applicationOpenFailureMonitoringToggle(settings: Binding(
+                                    get: { model.settingsStore.settings },
+                                    set: { model.settingsStore.settings = $0 }
+                                )) {
+                                    model.refreshAssistantAccessibility()
+                                    if !model.assistantAccessibilityGranted {
+                                        selectSettingsSection(.permissions, searchTarget: .row(OnboardingPermissionID.accessibility.titleKey))
+                                    }
+                                }
+                            }
+                            if model.settingsStore.settings.applicationOpenFailureMonitoringEnabled, !model.assistantAccessibilityGranted {
+                                rowDivider
+                                settingRow(symbol: "hand.raised", title: "辅助功能", detail: "", isNested: true) {
+                                    Button {
+                                        selectSettingsSection(.permissions, searchTarget: .row(OnboardingPermissionID.accessibility.titleKey))
+                                    } label: { AppLocalizedText("权限") }
+                                }
+                            }
+                        }
                     }
                 }
                 settingsGroup("快捷操作") {
@@ -3398,6 +3422,7 @@ struct SettingsView: View {
         case .code: "代码"
         case .shellCommand: "Shell 命令"
         case .app: "应用程序"
+        case .appCannotOpen: "应用无法打开"
         case .nonSystemLanguageText: "非 Zisla 全局语言文本"
         case .text: "文本"
         case .image: "图片"
@@ -3405,7 +3430,22 @@ struct SettingsView: View {
         }
     }
 
-    /// Single groups inherit their recognition-row title; only multiple groups need extra headings.
+    static func applicationOpenFailureMonitoringToggle(
+        settings: Binding<FeatureSettings>, onEnable: @escaping () -> Void
+    ) -> some View {
+        Toggle("", isOn: Binding(
+            get: { settings.wrappedValue.applicationOpenFailureMonitoringEnabled },
+            set: { enabled in
+                settings.wrappedValue.applicationOpenFailureMonitoringEnabled = enabled
+                if enabled { onEnable() }
+            }
+        ))
+        .labelsHidden()
+        .toggleStyle(.switch)
+        .disabled(!settings.wrappedValue.applicationOpenRepairEnabled)
+    }
+
+    /// Instructions keep a usage heading; other single groups inherit their recognition-row title.
     /// The copy callback receives the full localized text even when the row truncates its display.
     static func clipboardAssistantExamples(
         _ groups: [ClipboardAssistantExampleGroup],
@@ -3416,10 +3456,17 @@ struct SettingsView: View {
             Divider()
             ForEach(groups) { group in
                 VStack(alignment: .leading, spacing: 2) {
-                    if groups.count > 1 {
+                    if groups.count > 1 || !group.instructions.isEmpty {
                         AppLocalizedText(group.title)
                             .font(.system(size: 10, weight: .medium))
                             .foregroundStyle(.secondary)
+                    }
+                    ForEach(group.instructions, id: \.self) { instruction in
+                        AppLocalizedText(instruction)
+                            .font(.system(size: 10))
+                            .foregroundStyle(.secondary)
+                            .fixedSize(horizontal: false, vertical: true)
+                            .padding(.leading, 12)
                     }
                     ForEach(group.localizedExamples(language: language), id: \.self) { example in
                         HStack(spacing: 6) {
@@ -3454,6 +3501,13 @@ struct SettingsView: View {
     struct ClipboardAssistantExampleGroup: Identifiable {
         let title: String
         let examples: [String]
+        let instructions: [String]
+
+        init(title: String, examples: [String], instructions: [String] = []) {
+            self.title = title
+            self.examples = examples
+            self.instructions = instructions
+        }
 
         var id: String { title }
 
@@ -3463,6 +3517,18 @@ struct SettingsView: View {
     }
 
     static let clipboardAssistantExampleGroups: [ClipboardAssistantKind: [ClipboardAssistantExampleGroup]] = [
+        .appCannotOpen: [
+            ClipboardAssistantExampleGroup(
+                title: "使用方法",
+                examples: [],
+                instructions: [
+                    "1. 复制无法打开的 .app，或将它拖入中转站；检测到隔离标记时显示提醒。",
+                    "2. 确认应用来自可信来源后，点击“解决并打开”，移除隔离标记并尝试打开。",
+                    "3. 镜像中的应用须先复制到应用程序或下载文件夹；签名损坏或安全评估拒绝时停止处理。",
+                    "4. 可开启“系统打不开应用时提醒”；无法确定应用路径时，请复制或拖入 .app。",
+                ]
+            ),
+        ],
         .url: [
             ClipboardAssistantExampleGroup(title: "链接", examples: ["https://example.com", "example.com/docs"]),
         ],
@@ -3913,6 +3979,7 @@ struct SettingsView: View {
         case .runShellCommandInBackground: "后台执行"
         case .createCalendarEvent: "新建日程"
         case .openApp: "打开应用"
+        case .repairAndOpenApp: "解决并打开"
         }
     }
 

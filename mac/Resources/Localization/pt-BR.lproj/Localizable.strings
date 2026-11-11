@@ -3362,6 +3362,29 @@
 "保存手写备忘录需要辅助功能权限" = "É necessário acesso à acessibilidade para salvar notas manuscritas";
 "备忘录内容已变化，请重新打开后编辑" = "A nota foi alterada. Abra-a novamente antes de editar";
 "无法保存手写备忘录的文本，请在备忘录中打开后重试" = "Não foi possível salvar o texto da nota manuscrita. Abra-a no Notas e tente novamente";
+
+"应用无法打开" = "Não é possível abrir o app";
+"解决并打开" = "Corrigir e abrir";
+"使用方法" = "Como usar";
+"1. 复制无法打开的 .app，或将它拖入中转站；检测到隔离标记时显示提醒。" = "1. Copie o .app que não abre ou arraste-o para a prateleira. Um aviso aparece quando um atributo de quarentena é detectado.";
+"2. 确认应用来自可信来源后，点击“解决并打开”，移除隔离标记并尝试打开。" = "2. Confirme que o app vem de uma fonte confiável e clique em “Corrigir e abrir” para remover os atributos de quarentena e tentar abri-lo.";
+"3. 镜像中的应用须先复制到应用程序或下载文件夹；签名损坏或安全评估拒绝时停止处理。" = "3. Primeiro copie os apps das imagens de disco para Aplicativos ou Downloads. O processo para se a assinatura estiver danificada ou se a avaliação de segurança rejeitar o app.";
+"请选择完整的本地 .app 应用" = "Selecione um .app local completo";
+"不能处理系统目录中的应用" = "Apps em diretórios do sistema não podem ser processados";
+"请先将应用复制到应用程序或下载文件夹" = "Primeiro copie o app para Aplicativos ou Downloads";
+"应用包含不支持的链接或特殊文件，请重新下载完整应用" = "O app contém links não compatíveis ou arquivos especiais. Baixe uma cópia completa novamente";
+"应用超出检查范围，无法处理" = "O app excede os limites de inspeção e não pode ser processado";
+"无法读取应用，请检查文件和权限" = "Não é possível ler o app. Verifique os arquivos e as permissões";
+"应用在检查后发生变化，请重新复制或拖入" = "O app mudou após a inspeção. Copie ou arraste-o novamente";
+"应用签名校验失败，请从开发者处重新下载" = "A verificação da assinatura falhou. Baixe o app novamente do desenvolvedor";
+"应用未通过 macOS 安全评估，已停止处理" = "O app não passou na avaliação de segurança do macOS. O processo foi interrompido";
+"macOS 安全评估暂不可用，请稍后重试" = "A avaliação de segurança do macOS está temporariamente indisponível. Tente novamente mais tarde";
+"无法移除隔离标记，请检查写入权限" = "Não é possível remover os atributos de quarentena. Verifique as permissões de gravação";
+"系统未接受打开应用的请求" = "O sistema não aceitou a solicitação para abrir o app";
+
+"系统打不开应用时提醒" = "Avisar quando o macOS não puder abrir um app";
+"需要辅助功能权限；通过系统窗口事件提醒，不定时扫描" = "Requer acesso de Acessibilidade; usa eventos de janelas do sistema sem verificações periódicas";
+"4. 可开启“系统打不开应用时提醒”；无法确定应用路径时，请复制或拖入 .app。" = "4. Você pode ativar “Avisar quando o macOS não puder abrir um app”. Se o caminho não puder ser identificado, copie ou arraste o .app para a Prateleira.";
 "保留 HDR" = "Preservar HDR";
 "小雨" = "Chuva fraca";
 "中雨" = "Chuva moderada";

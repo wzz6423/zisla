@@ -3362,6 +3362,29 @@
 "保存手写备忘录需要辅助功能权限" = "Toegang tot toegankelijkheid is vereist om handgeschreven notities op te slaan";
 "备忘录内容已变化，请重新打开后编辑" = "De notitie is gewijzigd. Open deze opnieuw voordat je bewerkt";
 "无法保存手写备忘录的文本，请在备忘录中打开后重试" = "De tekst in de handgeschreven notitie kon niet worden opgeslagen. Open deze in Notities en probeer het opnieuw";
+
+"应用无法打开" = "App kan niet worden geopend";
+"解决并打开" = "Herstellen en openen";
+"使用方法" = "Gebruiksaanwijzing";
+"1. 复制无法打开的 .app，或将它拖入中转站；检测到隔离标记时显示提醒。" = "1. Kopieer de .app die niet opent of sleep deze naar de plank. Er verschijnt een melding als een quarantainemarkering wordt gevonden.";
+"2. 确认应用来自可信来源后，点击“解决并打开”，移除隔离标记并尝试打开。" = "2. Controleer of de app uit een vertrouwde bron komt en klik op “Herstellen en openen” om quarantainemarkeringen te verwijderen en de app te proberen te openen.";
+"3. 镜像中的应用须先复制到应用程序或下载文件夹；签名损坏或安全评估拒绝时停止处理。" = "3. Kopieer apps uit schijfkopieën eerst naar Apps of Downloads. De verwerking stopt bij een beschadigde handtekening of afwijzing door de beveiligingscontrole.";
+"请选择完整的本地 .app 应用" = "Selecteer een volledige lokale .app";
+"不能处理系统目录中的应用" = "Apps in systeemmappen kunnen niet worden verwerkt";
+"请先将应用复制到应用程序或下载文件夹" = "Kopieer de app eerst naar Apps of Downloads";
+"应用包含不支持的链接或特殊文件，请重新下载完整应用" = "De app bevat niet-ondersteunde koppelingen of speciale bestanden. Download opnieuw een volledige kopie";
+"应用超出检查范围，无法处理" = "De app overschrijdt de controlelimieten en kan niet worden verwerkt";
+"无法读取应用，请检查文件和权限" = "De app kan niet worden gelezen. Controleer de bestanden en machtigingen";
+"应用在检查后发生变化，请重新复制或拖入" = "De app is na de controle gewijzigd. Kopieer of sleep deze opnieuw";
+"应用签名校验失败，请从开发者处重新下载" = "De handtekeningcontrole is mislukt. Download de app opnieuw van de ontwikkelaar";
+"应用未通过 macOS 安全评估，已停止处理" = "De app is niet door de macOS-beveiligingscontrole gekomen. De verwerking is gestopt";
+"macOS 安全评估暂不可用，请稍后重试" = "De macOS-beveiligingscontrole is tijdelijk niet beschikbaar. Probeer het later opnieuw";
+"无法移除隔离标记，请检查写入权限" = "Quarantainemarkeringen kunnen niet worden verwijderd. Controleer de schrijfrechten";
+"系统未接受打开应用的请求" = "Het systeem heeft het verzoek om de app te openen niet geaccepteerd";
+
+"系统打不开应用时提醒" = "Melden wanneer macOS een app niet kan openen";
+"需要辅助功能权限；通过系统窗口事件提醒，不定时扫描" = "Vereist toegankelijkheidstoegang; gebruikt systeemvenstergebeurtenissen zonder periodieke scans";
+"4. 可开启“系统打不开应用时提醒”；无法确定应用路径时，请复制或拖入 .app。" = "4. Schakel desgewenst “Melden wanneer macOS een app niet kan openen” in. Kan het pad niet worden bepaald, kopieer of sleep de .app naar de Plank.";
 "保留 HDR" = "HDR behouden";
 "小雨" = "Lichte regen";
 "中雨" = "Matige regen";
