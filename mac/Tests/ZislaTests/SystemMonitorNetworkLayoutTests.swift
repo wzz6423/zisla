@@ -35,7 +35,7 @@ struct SystemMonitorNetworkLayoutTests {
     ) async throws {
         let service = SystemMonitorService(publicIPProvider: LayoutPublicIPProvider(identity: identity))
         await service.refreshPublicIPAddress()
-        let view = SystemMonitorView(service: service, onCleanupRequested: {})
+        let view = SystemMonitorView(service: service, onCleanupRequested: {}, onTransientMessage: { _ in })
         let direction: LayoutDirection = language.isRightToLeft ? .rightToLeft : .leftToRight
         let actual = try render(view.networkCard.frame(width: 250)
             .environment(\.locale, language.locale).environment(\.layoutDirection, direction))
@@ -69,7 +69,7 @@ struct SystemMonitorNetworkLayoutTests {
 
     @Test(arguments: [140, 270])
     func computeCardsAlignWithTheNetworkColumn(width: Int) throws {
-        let view = SystemMonitorView(service: SystemMonitorService(), onCleanupRequested: {})
+        let view = SystemMonitorView(service: SystemMonitorService(), onCleanupRequested: {}, onTransientMessage: { _ in })
         let right = try render(view.systemColumn.frame(width: 250))
         let left = try render(view.computeColumn.frame(
             width: CGFloat(width), height: CGFloat(right.pixelsHigh) / 2, alignment: .top
@@ -86,7 +86,7 @@ struct SystemMonitorNetworkLayoutTests {
 
     @Test(arguments: [140, 270])
     func networkColumnGrowthIsSharedByBothWaveforms(width: Int) throws {
-        let view = SystemMonitorView(service: SystemMonitorService(), onCleanupRequested: {})
+        let view = SystemMonitorView(service: SystemMonitorService(), onCleanupRequested: {}, onTransientMessage: { _ in })
         let right = try render(view.systemColumn.frame(width: 250))
         let height = CGFloat(right.pixelsHigh) / 2
         let baseline = try render(view.computeColumn.frame(width: CGFloat(width), height: height))
@@ -103,7 +103,7 @@ struct SystemMonitorNetworkLayoutTests {
 
     @Test
     func initialWaveformsKeepTheirMinimumHeightBeforeColumnMeasurement() throws {
-        let view = SystemMonitorView(service: SystemMonitorService(), onCleanupRequested: {})
+        let view = SystemMonitorView(service: SystemMonitorService(), onCleanupRequested: {}, onTransientMessage: { _ in })
         let bitmap = try render(view.computeColumn.frame(width: 270))
         let charts = try waveformBands(in: bitmap)
         #expect(charts.count == 2)

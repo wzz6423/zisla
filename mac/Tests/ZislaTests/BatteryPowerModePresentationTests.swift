@@ -1,7 +1,7 @@
 import AppKit
 import SwiftUI
 import Testing
-import ZislaCore
+import enum ZislaCore.AppLanguage
 import ZislaKit
 
 @testable import Zisla

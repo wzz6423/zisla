@@ -1,6 +1,7 @@
 import Foundation
 import Testing
 import ZislaCore
+import ZislaKit
 
 @testable import Zisla
 
@@ -59,6 +60,34 @@ struct DownloadLocalizationTests {
         #expect(!DownloadFailureDiagnostics.requiresBrowserCookieAccess(""))
         #expect(!DownloadFailureDiagnostics.requiresBrowserCookieAccess("ERROR: HTTP Error 403: Forbidden"))
         #expect(!DownloadFailureDiagnostics.requiresBrowserCookieAccess("ERROR: Fresh cookies are needed"))
+    }
+
+    /// Explicit locales keep this regression independent of the user's persisted interface language.
+    @Test(arguments: AppLanguage.allCases) @MainActor
+    func missingDownloaderGuidanceUsesTheRequestedLocale(language: AppLanguage) throws {
+        let error = YTDLPResolverError.executableNotFound(searched: [])
+        let key = try #require(error.errorDescription)
+        let expected = try #require(Self.stringsTable(for: language)?[key])
+        let message = AppModel.downloadErrorText(error, locale: language.locale)
+        #expect(message == expected)
+        #expect(message.contains(AppLocalization.string(SettingsSection.download.title, language: language)))
+        if language != .simplifiedChinese {
+            #expect(message != key)
+        }
+    }
+
+    /// Tool output may match a catalog key, but translating it would conceal the diagnostic actually emitted.
+    @Test(arguments: AppLanguage.allCases) @MainActor
+    func externalDownloadDiagnosticsRemainUnchanged(language: AppLanguage) {
+        for diagnostic in ["ERROR: HTTP Error 403: Forbidden", "下载失败"] {
+            let error = DownloadServiceError.processFailed(exitCode: 1, diagnostic: diagnostic)
+            #expect(AppModel.downloadErrorText(error, locale: language.locale) == diagnostic)
+        }
+        for diagnostic in ["", "Synthetic download failure", "下载失败"] {
+            let error = NSError(domain: "DownloadLocalizationTests", code: 1,
+                                userInfo: [NSLocalizedDescriptionKey: diagnostic])
+            #expect(AppModel.downloadErrorText(error, locale: language.locale) == diagnostic)
+        }
     }
 
     private static func stringsTable(for language: AppLanguage) -> [String: String]? {

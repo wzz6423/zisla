@@ -27,6 +27,47 @@ struct ScreenRecordingPortraitProcessorTests {
         #expect(output.extent == image.extent)
     }
 
+    @Test func disabledAndEmptyFramesNeverLoadKernels() throws {
+        let image = try chart()
+        func unexpectedLoad() -> RecordingPortraitProcessor.Kernels? {
+            Issue.record("Disabled effects and empty scenes must not load kernels")
+            return nil
+        }
+        let disabled = RecordingPortraitProcessor(detector: { _, _, _ in
+            Issue.record("Disabled effects must not detect portraits"); return .init()
+        }, kernels: unexpectedLoad())
+        #expect(try bytes(disabled.apply(image, effects: .init())) == bytes(image))
+        let empty = RecordingPortraitProcessor(detector: { _, _, _ in .init() }, kernels: unexpectedLoad())
+        #expect(try bytes(empty.apply(image, effects: .init(brightening: 1, bodySlimming: 1))) == bytes(image))
+    }
+
+    @Test(arguments: ["smoothing", "brightening", "faceSlimming", "bodySlimming"])
+    func unavailableKernelsFailOnlyWhenAPortraitNeedsProcessing(_ effect: String) throws {
+        let image = try chart()
+        let effects: RecordingPortraitEffects
+        switch effect {
+        case "smoothing": effects = .init(smoothing: 1)
+        case "brightening": effects = .init(brightening: 1)
+        case "faceSlimming": effects = .init(faceSlimming: 1)
+        default: effects = .init(bodySlimming: 1)
+        }
+        let processor = RecordingPortraitProcessor(detector: { _, _, _ in .init(faces: [face], bodies: [body]) }, kernels: nil)
+        #expect(throws: ScreenRecordingExportError.cannotRender) { try processor.apply(image, effects: effects) }
+        #expect(try bytes(processor.apply(image, effects: .init())) == bytes(image),
+            "Disabling effects after a kernel failure must preserve the frame")
+        let emptyScene = RecordingPortraitProcessor(detector: { _, _, _ in .init() }, kernels: nil)
+        #expect(try bytes(emptyScene.apply(image, effects: effects)) == bytes(image),
+            "A frame without portraits must not require the Metal library")
+        let recovered = RecordingPortraitProcessor { _, _, _ in .init(faces: [face], bodies: [body]) }
+        #expect(try bytes(recovered.apply(image, effects: effects)) != bytes(image),
+            "The packaged kernels must render after an unavailable dependency")
+    }
+
+    @Test(arguments: [Data(), Data("invalid metallib".utf8)])
+    func damagedMetalLibrariesAreRejected(_ library: Data) {
+        #expect(throws: Error.self) { try RecordingPortraitProcessor.Kernels(library: library) }
+    }
+
     @Test func productionVisionLeavesAnEmptySceneUnchanged() throws {
         let image = CIImage(color: CIColor(red: 0.3, green: 0.3, blue: 0.3))
             .cropped(to: CGRect(x: 0, y: 0, width: 192, height: 192))

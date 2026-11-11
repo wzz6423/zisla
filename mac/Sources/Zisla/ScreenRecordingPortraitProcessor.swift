@@ -9,11 +9,26 @@ final class RecordingPortraitProcessor {
         var bodies: [CGRect] = []
     }
 
+    struct Kernels {
+        let mask: CIColorKernel
+        let warp: CIWarpKernel
+
+        init(library: Data) throws {
+            mask = try CIColorKernel(functionName: "portraitMask", fromMetalLibraryData: library)
+            warp = try CIWarpKernel(functionName: "portraitSlim", fromMetalLibraryData: library)
+        }
+    }
+
     typealias Detector = (CIImage, Bool, Bool) throws -> Regions
     private let detector: Detector
+    private let kernels: () -> Kernels?
     private var detection: (size: CGSize, time: Double?, faces: Bool, bodies: Bool, regions: Regions)?
 
-    init(detector: @escaping Detector = RecordingPortraitProcessor.detect) { self.detector = detector }
+    init(detector: @escaping Detector = RecordingPortraitProcessor.detect,
+         kernels: @autoclosure @escaping () -> Kernels? = RecordingPortraitProcessor.kernels) {
+        self.detector = detector
+        self.kernels = kernels
+    }
 
     func apply(_ image: CIImage, effects: RecordingPortraitEffects, sourceTime: Double? = nil) throws -> CIImage {
         guard effects.isValid, sourceTime.map(\.isFinite) != false else { throw ScreenRecordingExportError.invalidConfiguration }
@@ -48,22 +63,22 @@ final class RecordingPortraitProcessor {
                     let softened = output.applyingFilter("CINoiseReduction", parameters: [
                         "inputNoiseLevel": 0.04 + 0.12 * effects.smoothing, "inputSharpness": 0.4,
                     ])
-                    output = try Self.blend(softened, over: output, region: rectangle, amount: effects.smoothing)
+                    output = try blend(softened, over: output, region: rectangle, amount: effects.smoothing)
                 }
                 if effects.brightening > 0 {
                     let brighter = output.applyingFilter("CIExposureAdjust", parameters: ["inputEV": 0.35])
-                    output = try Self.blend(brighter, over: output, region: rectangle, amount: effects.brightening)
+                    output = try blend(brighter, over: output, region: rectangle, amount: effects.brightening)
                 }
             }
         }
         if effects.bodySlimming > 0 {
             for body in regions.bodies {
-                output = try Self.slim(output, region: Self.rectangle(body, in: extent), amount: effects.bodySlimming * 0.18)
+                output = try slim(output, region: Self.rectangle(body, in: extent), amount: effects.bodySlimming * 0.18)
             }
         }
         if effects.faceSlimming > 0 {
             for face in regions.faces {
-                output = try Self.slim(output, region: Self.rectangle(face, in: extent), amount: effects.faceSlimming * 0.22)
+                output = try slim(output, region: Self.rectangle(face, in: extent), amount: effects.faceSlimming * 0.22)
             }
         }
         return output.cropped(to: extent)
@@ -95,26 +110,22 @@ final class RecordingPortraitProcessor {
             bodies: bodyRequest.results?.map(\.boundingBox) ?? [])
     }
 
-    // Precompiled kernels also support Intel GPUs that cannot link stitchable Metal functions.
-    private static let kernels: (mask: CIColorKernel, warp: CIWarpKernel)? = {
-        #if SWIFT_MODULE_RESOURCE_BUNDLE_UNAVAILABLE
-        let bundle = Bundle.main
-        #else
+    private static let kernels: Kernels? = {
+        #if SWIFT_PACKAGE && !SWIFT_MODULE_RESOURCE_BUNDLE_UNAVAILABLE
         let bundle = Bundle.module
+        #else
+        let bundle = Bundle.main
         #endif
-        guard let url = bundle.url(forResource: "RecordingPortrait", withExtension: "metallib"),
-              let library = try? Data(contentsOf: url),
-              let mask = try? CIColorKernel(functionName: "portraitMask", fromMetalLibraryData: library),
-              let warp = try? CIWarpKernel(functionName: "portraitSlim", fromMetalLibraryData: library) else { return nil }
-        return (mask, warp)
+        guard let url = bundle.url(forResource: "RecordingPortraitKernels", withExtension: "metallib") else { return nil }
+        return try? Kernels(library: Data(contentsOf: url))
     }()
 
     private static func vector(_ rectangle: CGRect) -> CIVector {
         CIVector(x: rectangle.midX, y: rectangle.midY, z: rectangle.width / 2, w: rectangle.height / 2)
     }
 
-    private static func blend(_ foreground: CIImage, over background: CIImage, region: CGRect, amount: Double) throws -> CIImage {
-        guard let mask = kernels?.mask.apply(extent: background.extent, arguments: [vector(region), amount]) else {
+    private func blend(_ foreground: CIImage, over background: CIImage, region: CGRect, amount: Double) throws -> CIImage {
+        guard let mask = kernels()?.mask.apply(extent: background.extent, arguments: [Self.vector(region), amount]) else {
             throw ScreenRecordingExportError.cannotRender
         }
         return foreground.applyingFilter("CIBlendWithMask", parameters: [
@@ -122,10 +133,10 @@ final class RecordingPortraitProcessor {
         ])
     }
 
-    private static func slim(_ image: CIImage, region: CGRect, amount: Double) throws -> CIImage {
-        guard let warped = kernels?.warp.apply(extent: image.extent, roiCallback: { _, rectangle in
+    private func slim(_ image: CIImage, region: CGRect, amount: Double) throws -> CIImage {
+        guard let warped = kernels()?.warp.apply(extent: image.extent, roiCallback: { _, rectangle in
             rectangle.insetBy(dx: -region.width * amount, dy: 0)
-        }, image: image, arguments: [vector(region), amount]) else {
+        }, image: image, arguments: [Self.vector(region), amount]) else {
             throw ScreenRecordingExportError.cannotRender
         }
         return warped

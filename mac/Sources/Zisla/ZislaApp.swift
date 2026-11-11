@@ -18,16 +18,6 @@ enum ZislaMain {
 
 @MainActor
 final class SettingsWindow: NSWindow {
-    override func becomeKey() {
-        level = WindowPlacement.modalWindowLevel
-        super.becomeKey()
-    }
-
-    override func resignKey() {
-        super.resignKey()
-        level = .normal
-    }
-
     override func performClose(_ sender: Any?) {
         close()
     }
@@ -666,6 +656,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
             queue: model.notices,
             resultSweep: model.aiResultSweep,
             media: model.media,
+            pomodoro: model.pomodoro,
             browserDownloads: model.browserDownloads,
             settingsStore: model.settingsStore,
             languageStore: model.languageStore,
@@ -2055,7 +2046,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
             window.toolbarStyle = .unified
             window.titleVisibility = .hidden
             window.titlebarAppearsTransparent = true
-            window.level = WindowPlacement.modalWindowLevel
             window.isReleasedWhenClosed = false
             window.contentView = NSHostingView(
                 rootView: AppLanguageEnvironment(

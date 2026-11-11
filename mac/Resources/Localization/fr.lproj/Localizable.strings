@@ -308,7 +308,7 @@
 "可安全清理的缓存与日志当前为空" = "Les caches et journaux pouvant être nettoyés en toute sécurité sont actuellement vides";
 "展开" = "Développer";
 "移入废纸篓" = "Déplacer vers la corbeille";
-"zisla 不会永久删除这些内容。" = "zisla ne supprimera pas définitivement ces éléments.";
+"本次操作将项目移入废纸篓；废纸篓之后可能被清空，届时将永久删除。" = "Cette action déplace les éléments dans la Corbeille. Si elle est vidée ultérieurement, ils seront supprimés définitivement.";
 
 /* Cleanup Categories */
 "应用缓存" = "Cache d'applications";
@@ -507,6 +507,8 @@
 "电池功率" = "Puissance de la batterie";
 "本机 Mac" = "Ce Mac";
 "已充满" = "Complètement chargée";
+"立即充至100%" = "Charger à 100 % maintenant";
+"无法立即充至100%，请重试。" = "Impossible de charger à 100 % maintenant. Veuillez réessayer.";
 "充电中" = "En charge";
 "电源已接通" = "Alimentation connectée";
 "使用电池" = "Sur batterie";
@@ -1031,7 +1033,7 @@
 "选中每个cli后的自动更新选项后检测到新版本后自动执行更新；关闭后不再启动新任务，已开始的更新会完成" = "Une fois l’option de mise à jour automatique cochée à côté de chaque CLI, la mise à jour s’installe automatiquement dès qu’une nouvelle version est trouvée ; une fois désactivé, aucune nouvelle tâche ne démarre, les mises à jour en cours se terminent";
 "未找到 Homebrew；请先安装 Homebrew 后再管理推荐工具" = "Homebrew est introuvable ; installez Homebrew avant de gérer les outils recommandés";
 "未找到 LibreOffice；请安装 LibreOffice 后重试" = "LibreOffice est introuvable ; installez LibreOffice puis réessayez";
-"未找到可用的 yt-dlp。请在 设置 → 下载 → 组件 中一键安装后重试。" = "Aucun yt-dlp utilisable. Installez-le dans Réglages → Téléchargements → Composants puis réessayez.";
+"未找到可用的 yt-dlp。请在 设置 → 依赖组件 → 组件 中一键安装后重试。" = "Aucun yt-dlp utilisable. Installez-le dans Réglages → Composants requis → Composants puis réessayez.";
 "选中的识别文本和原始录音文件都会被删除，但累计统计数据（总字词、时长等）会保留。此操作无法撤销。" = "Les textes reconnus sélectionnés et leurs enregistrements d’origine seront supprimés, mais les statistiques cumulées (mots, durée, etc.) seront conservées. Cette action est irréversible.";
 "本机保存的识别文本和原始录音文件都会被删除，但累计统计数据（总字词、时长等）会保留。此操作无法撤销。" = "Les textes reconnus et les enregistrements d’origine stockés sur ce Mac seront supprimés, mais les statistiques cumulées (mots, durée, etc.) seront conservées. Cette action est irréversible.";
 "缺少子命令。可用：update/finish/remove/clear/list/usage/notify/message/help" = "Sous-commande manquante. Disponibles : update/finish/remove/clear/list/usage/notify/message/help";
@@ -2317,7 +2319,7 @@
 "%ld 核" = "%ld cœurs";
 "%ld 核 · " = "%ld cœurs · ";
 "已整理系统内存 %@" = "%@ de mémoire système libérés";
-"其中 %ld 项需人工复核。zisla 不会永久删除这些内容。" = "Dont %ld nécessitent une vérification manuelle. zisla ne supprime jamais définitivement.";
+"其中 %ld 项需人工复核。本次操作将项目移入废纸篓；废纸篓之后可能被清空，届时将永久删除。" = "Dont %ld nécessitent une vérification manuelle. Cette action déplace les éléments dans la Corbeille. Si elle est vidée ultérieurement, ils seront supprimés définitivement.";
 "取消选择%@" = "Désélectionner %@";
 "全选%@" = "Tout sélectionner dans %@";
 "反选%@" = "Inverser la sélection dans %@";
@@ -2472,6 +2474,11 @@
 "2026.10.28往前15天" = "15 jours avant le 2026.10.28";
 "日期间隔" = "Intervalle de dates";
 "跨时区时间" = "Heure entre fuseaux horaires";
+"会议 2026-11-20 14:30-15:30" = "Réunion 2026-11-20 14:30-15:30";
+"Hello! How are you today?" = "Hello! How are you today?";
+"这是一段普通文本，可以搜索或保存。" = "Vous pouvez chercher ou enregistrer ce texte.";
+"例如：复制截图或浏览器中的图片" = "Exemple : copier une capture d’écran ou une image depuis un navigateur";
+"例如：在 Finder 中选中文件后按 ⌘C" = "Exemple : sélectionner un fichier dans le Finder et appuyer sur ⌘C";
 "汇率获取失败" = "Impossible de récupérer le taux de change";
 "闹钟通知未获允许，请在系统设置中开启通知。" = "Les notifications d’alarme ne sont pas autorisées. Activez-les dans Réglages Système.";
 "闹钟通知声音已关闭，请在系统设置中开启声音。" = "Les sons des notifications d’alarme sont désactivés. Activez-les dans Réglages Système.";
@@ -3333,13 +3340,14 @@
 "麦克风监听已关闭：%@" = "L’écoute du microphone a été désactivée : %@";
 
 "自动清理系统垃圾" = "Nettoyer automatiquement les fichiers inutiles du système";
-"按所选间隔移入废纸篓，不会永久删除" = "Déplacer les éléments vers la corbeille à l’intervalle choisi, sans suppression définitive";
+"按所选间隔移入废纸篓；清空废纸篓后将永久删除" = "Déplace les éléments dans la Corbeille à l’intervalle choisi ; vider la Corbeille les supprime définitivement";
 "清理范围" = "Éléments à nettoyer";
 "仅可信" = "Éléments fiables uniquement";
 "全部（包含需人工复核）" = "Tous (y compris ceux à vérifier)";
 "默认保存位置" = "Emplacements de sauvegarde par défaut";
 "分别设置各类内容的默认保存位置。" = "Définir l’emplacement de sauvegarde par défaut pour chaque type de contenu.";
-"管理下载所需组件。" = "Gérer les composants nécessaires aux téléchargements.";
+"依赖组件" = "Composants requis";
+"管理下载与文档转换所需组件。" = "Gérer les composants nécessaires aux téléchargements et à la conversion de documents.";
 "更改 %@ 的保存位置" = "Changer l’emplacement de sauvegarde pour %@";
 
 "本地优先的原生笔记应用" = "Application de notes native privilégiant le stockage local";
@@ -3351,3 +3359,89 @@
 "备忘录内容已变化，请重新打开后编辑" = "La note a changé. Rouvrez-la avant de la modifier";
 "无法保存手写备忘录的文本，请在备忘录中打开后重试" = "Impossible d’enregistrer le texte de la note manuscrite. Ouvrez-la dans Notes et réessayez";
 "保留 HDR" = "Conserver le HDR";
+"小雨" = "Pluie faible";
+"中雨" = "Pluie modérée";
+"大雨" = "Forte pluie";
+"小雪" = "Neige faible";
+"中雪" = "Neige modérée";
+"大雪" = "Forte neige";
+"冻毛毛雨" = "Bruine verglaçante";
+"冻雨" = "Pluie verglaçante";
+"雪粒" = "Neige en grains";
+"小阵雨" = "Faibles averses de pluie";
+"强阵雨" = "Fortes averses de pluie";
+"小阵雪" = "Faibles averses de neige";
+"强阵雪" = "Fortes averses de neige";
+"强雷阵雨" = "Orage violent";
+"雨夹雪" = "Pluie et neige mêlées";
+"小雨夹雪" = "Faible pluie et neige mêlées";
+"强雨夹雪" = "Forte pluie et neige mêlées";
+"阵性雨夹雪" = "Averses de pluie et neige mêlées";
+"小阵性雨夹雪" = "Faibles averses de pluie et neige mêlées";
+"强阵性雨夹雪" = "Fortes averses de pluie et neige mêlées";
+"暴雨" = "Pluie torrentielle";
+"大暴雨" = "Très forte pluie torrentielle";
+"特大暴雨" = "Pluie torrentielle extrême";
+"暴雪" = "Blizzard";
+"小到中雨" = "Pluie faible à modérée";
+"中到大雨" = "Pluie modérée à forte";
+"大到暴雨" = "Pluie forte à torrentielle";
+"暴雨到大暴雨" = "Pluie torrentielle à très forte";
+"大暴雨到特大暴雨" = "Pluie torrentielle très forte à extrême";
+"小到中雪" = "Neige faible à modérée";
+"中到大雪" = "Neige modérée à forte";
+"大到暴雪" = "Forte neige à blizzard";
+"浓雾" = "Brouillard dense";
+"强浓雾" = "Brouillard très dense";
+"大雾" = "Brouillard épais";
+"特强浓雾" = "Brouillard extrêmement dense";
+"霾" = "Brume sèche";
+"中度霾" = "Brume sèche modérée";
+"重度霾" = "Brume sèche épaisse";
+"严重霾" = "Brume sèche très épaisse";
+"沙尘暴" = "Tempête de poussière";
+"浮尘" = "Poussière en suspension";
+"扬沙" = "Sable soulevé par le vent";
+"强沙尘暴" = "Violente tempête de poussière";
+"雨伴雷电" = "Pluie avec tonnerre";
+"小雨伴雷电" = "Pluie faible avec tonnerre";
+"大雨伴雷电" = "Forte pluie avec tonnerre";
+"阵雨伴雷电" = "Averses avec tonnerre";
+"小阵雨伴雷电" = "Faibles averses de pluie avec tonnerre";
+"强阵雨伴雷电" = "Fortes averses de pluie avec tonnerre";
+"雪伴雷电" = "Neige avec tonnerre";
+"小雪伴雷电" = "Neige faible avec tonnerre";
+"大雪伴雷电" = "Forte neige avec tonnerre";
+"阵雪伴雷电" = "Averses de neige avec tonnerre";
+"小阵雪伴雷电" = "Faibles averses de neige avec tonnerre";
+"强阵雪伴雷电" = "Fortes averses de neige avec tonnerre";
+"雨夹雪伴雷电" = "Pluie et neige mêlées avec tonnerre";
+"小雨夹雪伴雷电" = "Faible pluie et neige mêlées avec tonnerre";
+"强雨夹雪伴雷电" = "Forte pluie et neige mêlées avec tonnerre";
+"阵性雨夹雪伴雷电" = "Averses de pluie et neige mêlées avec tonnerre";
+"小阵性雨夹雪伴雷电" = "Faibles averses de pluie et neige mêlées avec tonnerre";
+"强阵性雨夹雪伴雷电" = "Fortes averses de pluie et neige mêlées avec tonnerre";
+"雷阵雨伴有冰雹" = "Orages avec grêle";
+
+"管理电源模式与系统垃圾、剪贴板历史和废纸篓的定时清理。" = "Gérez les modes d’alimentation et le nettoyage planifié des fichiers inutiles du système, de l’historique du presse-papiers et de la Corbeille.";
+"定时倾倒废纸篓" = "Vider automatiquement la Corbeille";
+"按所选间隔永久删除废纸篓中的所有项目，无法恢复" = "Supprime définitivement tous les éléments de la Corbeille à l’intervalle choisi. Cette action est irréversible";
+"启用定时倾倒废纸篓？" = "Activer le vidage automatique de la Corbeille ?";
+
+"自动切换电源模式" = "Changer automatiquement de mode d’alimentation";
+"插电默认模式" = "Mode par défaut sur secteur";
+"脱电默认模式" = "Mode par défaut sur batterie";
+"20%及以下固定省电" = "Économie d’énergie à 20% ou moins";
+"电量不高于20%时保持省电，插电也不切换；超过20%后恢复对应默认模式" = "Conserve l’économie d’énergie à 20% ou moins, même sur secteur ; rétablit le mode par défaut correspondant au-dessus de 20%";
+"省电" = "Économie d’énergie";
+"高性能" = "Hautes performances";
+
+
+"无法保存定时倾倒废纸篓的记录，本次已跳过。" = "Impossible d’enregistrer le suivi du vidage automatique de la Corbeille. Cette exécution a été ignorée.";
+"灵动岛功能顺序" = "Ordre des fonctionnalités de Dynamic Island";
+
+"查询航班" = "Rechercher un vol";
+"查询火车" = "Rechercher un train";
+"查询快递" = "Suivre un colis";
+"全部标记为已读" = "Tout marquer comme lu";
+"已将全部邮件标记为已读" = "Tous les messages ont été marqués comme lus";
