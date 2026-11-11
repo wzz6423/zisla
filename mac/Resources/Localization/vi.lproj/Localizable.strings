@@ -1035,7 +1035,7 @@
 "选中每个cli后的自动更新选项后检测到新版本后自动执行更新；关闭后不再启动新任务，已开始的更新会完成" = "Sau khi chọn tùy chọn cập nhật tự động bên cạnh mỗi CLI, bản cập nhật sẽ được cài tự động khi tìm thấy phiên bản mới; tắt tùy chọn này sẽ dừng nhiệm vụ mới, các bản cập nhật đã bắt đầu vẫn hoàn tất";
 "未找到 Homebrew；请先安装 Homebrew 后再管理推荐工具" = "Không tìm thấy Homebrew. Hãy cài Homebrew trước, rồi quản lý công cụ đề xuất";
 "未找到 LibreOffice；请安装 LibreOffice 后重试" = "Không tìm thấy LibreOffice. Hãy cài LibreOffice và thử lại";
-"未找到可用的 yt-dlp。请在 设置 → 下载 → 组件 中一键安装后重试。" = "Không tìm thấy yt-dlp khả dụng. Hãy cài từ Cài đặt → Tải xuống → Thành phần rồi thử lại.";
+"未找到可用的 yt-dlp。请在 设置 → 依赖组件 → 组件 中一键安装后重试。" = "Không tìm thấy yt-dlp khả dụng. Hãy cài từ Cài đặt → Thành phần phụ thuộc → Thành phần rồi thử lại.";
 "选中的识别文本和原始录音文件都会被删除，但累计统计数据（总字词、时长等）会保留。此操作无法撤销。" = "Các bản ghi đã chọn và bản thu gốc sẽ bị xóa, nhưng thống kê tích lũy (tổng số từ, thời lượng và tương tự) được giữ lại. Không thể hoàn tác.";
 "本机保存的识别文本和原始录音文件都会被删除，但累计统计数据（总字词、时长等）会保留。此操作无法撤销。" = "Các bản ghi và bản thu gốc lưu trên máy Mac này sẽ bị xóa, nhưng thống kê tích lũy (tổng số từ, thời lượng và tương tự) được giữ lại. Không thể hoàn tác.";
 "缺少子命令。可用：update/finish/remove/clear/list/usage/notify/message/help" = "Thiếu lệnh con. Khả dụng: update/finish/remove/clear/list/usage/notify/message/help";
@@ -2476,6 +2476,11 @@
 "2026.10.28往前15天" = "15 ngày trước 2026.10.28";
 "日期间隔" = "Khoảng ngày";
 "跨时区时间" = "Thời gian giữa các múi giờ";
+"会议 2026-11-20 14:30-15:30" = "Cuộc họp 2026-11-20 14:30-15:30";
+"Hello! How are you today?" = "Hello! How are you today?";
+"这是一段普通文本，可以搜索或保存。" = "Văn bản để tìm kiếm hoặc lưu.";
+"例如：复制截图或浏览器中的图片" = "Ví dụ: Sao chép ảnh chụp màn hình hoặc hình ảnh từ trình duyệt";
+"例如：在 Finder 中选中文件后按 ⌘C" = "Ví dụ: Chọn tệp trong Finder rồi nhấn ⌘C";
 "汇率获取失败" = "Không thể lấy tỷ giá";
 "闹钟通知未获允许，请在系统设置中开启通知。" = "Thông báo báo thức chưa được cho phép. Hãy bật thông báo trong Cài đặt hệ thống.";
 "闹钟通知声音已关闭，请在系统设置中开启声音。" = "Âm thanh thông báo báo thức đang tắt. Hãy bật âm thanh trong Cài đặt hệ thống.";
@@ -3343,7 +3348,8 @@
 "全部（包含需人工复核）" = "Tất cả (kể cả các mục cần xem xét)";
 "默认保存位置" = "Vị trí lưu mặc định";
 "分别设置各类内容的默认保存位置。" = "Đặt vị trí lưu mặc định cho từng loại nội dung.";
-"管理下载所需组件。" = "Quản lý các thành phần cần thiết để tải xuống.";
+"依赖组件" = "Thành phần phụ thuộc";
+"管理下载与文档转换所需组件。" = "Quản lý các thành phần cần thiết để tải xuống và chuyển đổi tài liệu.";
 "更改 %@ 的保存位置" = "Đổi vị trí lưu cho %@";
 
 "本地优先的原生笔记应用" = "Ứng dụng ghi chú gốc ưu tiên lưu trữ cục bộ";
@@ -3355,3 +3361,7 @@
 "备忘录内容已变化，请重新打开后编辑" = "Ghi chú đã thay đổi. Mở lại trước khi chỉnh sửa";
 "无法保存手写备忘录的文本，请在备忘录中打开后重试" = "Không thể lưu văn bản trong ghi chú viết tay. Mở trong Ghi chú rồi thử lại";
 "灵动岛功能顺序" = "Thứ tự tính năng Dynamic Island";
+
+"查询航班" = "Tra cứu chuyến bay";
+"查询火车" = "Tra cứu tàu hỏa";
+"查询快递" = "Theo dõi bưu kiện";

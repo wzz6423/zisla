@@ -82,12 +82,9 @@ else
   mkdir -p "$bin_directory"
   touch "$bin_directory/zisla"
   mkdir -p "$bin_directory/zisla_KeyboardKit.bundle" \
-    "$bin_directory/zisla_ZislaKit.bundle/Contents/Resources/Pomodoro" \
-    "$bin_directory/zisla_Zisla.bundle/Contents/Resources"
+    "$bin_directory/zisla_ZislaKit.bundle/Contents/Resources/Pomodoro"
   print -r -- pomodoro-complete > \
     "$bin_directory/zisla_ZislaKit.bundle/Contents/Resources/Pomodoro/pomodoro-complete.m4a"
-  print -r -- portrait-kernels > \
-    "$bin_directory/zisla_Zisla.bundle/Contents/Resources/RecordingPortraitEffects.metallib"
 fi
 SCRIPT
 
@@ -191,10 +188,6 @@ expect_architecture_failure \
 [[ -x "$TEMPORARY_ROOT/output/zisla.app/Contents/MacOS/zisla" ]] || {
   print -u2 -r -- "FAIL: build-app did not produce the app binary"
   exit 1
-}
-[[ "$(<"$TEMPORARY_ROOT/output/zisla.app/Contents/Resources/RecordingPortraitEffects.metallib")" == portrait-kernels ]] || {
-    print -u2 -r -- "FAIL: build-app did not bundle the recording portrait kernels"
-    exit 1
 }
 RELEASE_PLIST="$TEMPORARY_ROOT/output/zisla.app/Contents/Info.plist"
 [[ "$(plutil -extract CFBundleShortVersionString raw -o - "$RELEASE_PLIST")" == "unknow" ]] || {

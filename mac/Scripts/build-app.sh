@@ -51,7 +51,6 @@ ARCHITECTURES=(${=BUILD_ARCHITECTURES})
 BINARIES=()
 KEYBOARD_RESOURCE_BUNDLE=""
 ZISLAKIT_RESOURCE_BUNDLE=""
-PORTRAIT_METAL_LIBRARY=""
 HAND_BUILT_APP_SWIFT_FLAGS=(-Xswiftc -DSWIFT_MODULE_RESOURCE_BUNDLE_UNAVAILABLE)
 
 [[ "$VERSION" == "unknow" || "$VERSION" =~ ^[0-9]+(\.[0-9]+){2}(-[A-Za-z0-9]+([.-][A-Za-z0-9]+)*)?$ ]] || {
@@ -176,9 +175,6 @@ for ARCHITECTURE in "${ARCHITECTURES[@]}"; do
   if [[ -z "$ZISLAKIT_RESOURCE_BUNDLE" ]]; then
     ZISLAKIT_RESOURCE_BUNDLE="$BIN_DIRECTORY/zisla_ZislaKit.bundle"
   fi
-  if [[ -z "$PORTRAIT_METAL_LIBRARY" ]]; then
-    PORTRAIT_METAL_LIBRARY="$BIN_DIRECTORY/zisla_Zisla.bundle/Contents/Resources/RecordingPortraitEffects.metallib"
-  fi
 done
 
 rm -rf "$APP"
@@ -191,13 +187,8 @@ mkdir -p "$CONTENTS/MacOS" "$CONTENTS/Resources" "$CONTENTS/Frameworks" "$CONTEN
   echo "error: missing ZislaKit resource bundle: $ZISLAKIT_RESOURCE_BUNDLE" >&2
   exit 1
 }
-[[ -f "$PORTRAIT_METAL_LIBRARY" ]] || {
-  echo "error: missing recording portrait kernels: $PORTRAIT_METAL_LIBRARY" >&2
-  exit 1
-}
 ditto "$KEYBOARD_RESOURCE_BUNDLE" "$CONTENTS/Resources/zisla_KeyboardKit.bundle"
 ditto "$ZISLAKIT_RESOURCE_BUNDLE" "$CONTENTS/Resources/zisla_ZislaKit.bundle"
-install -m 0644 "$PORTRAIT_METAL_LIBRARY" "$CONTENTS/Resources/RecordingPortraitEffects.metallib"
 if (( ${#BINARIES[@]} == 1 )); then
   install -m 0755 "$BINARIES[1]" "$CONTENTS/MacOS/zisla"
 else

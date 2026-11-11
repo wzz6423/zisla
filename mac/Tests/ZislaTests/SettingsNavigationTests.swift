@@ -3,6 +3,7 @@ import Foundation
 import SwiftUI
 import Testing
 import ZislaCore
+import ZislaKit
 
 @testable import Zisla
 
@@ -171,7 +172,7 @@ struct SettingsNavigationTests {
             "语音",
             "邮件",
             "键盘音效",
-            "下载",
+            "依赖组件",
             "保存位置",
             "天气",
             "网络",
@@ -385,14 +386,18 @@ struct SettingsNavigationTests {
         }
     }
 
-    /// Missing or duplicate translations silently fall back, so verify catalogs as well as locale resolution.
+    /// Bundle lookup silently falls back to Chinese keys, so catalog presence and rendered values need separate assertions.
     @Test(arguments: AppLanguage.allCases)
     func groupedSettingsAndPDFLabelsUseEveryRequestedLanguage(language: AppLanguage) throws {
+        let dependencyGuidance = try #require(YTDLPResolverError.executableNotFound(searched: []).errorDescription)
         let keys = Set(SettingsSectionGroup.allCases.map(\.title) + [
             "反馈更新",
             "灵动岛功能顺序",
             SettingsSection.pdfTools.title,
             SettingsSection.pdfTools.subtitle,
+            SettingsSection.download.title,
+            SettingsSection.download.subtitle,
+            dependencyGuidance,
             "仅影响 zisla 的窗口与面板，不会更改 macOS 外观。",
             "应用音量混音器",
             "在灵动岛分别调整应用的媒体音量。",
@@ -418,8 +423,11 @@ struct SettingsNavigationTests {
                 #expect(value != key, "\(language.rawValue) did not translate \(key)")
             }
         }
+        let dependencyTitle = try #require(table[SettingsSection.download.title])
+        #expect(table[dependencyGuidance]?.contains(dependencyTitle) == true)
         if language == .english {
             #expect(table["灵动岛功能顺序"] == "Dynamic Island Feature Order")
+            #expect(dependencyTitle == "Dependency Components")
             #expect(table["截图与录屏"] == "Screenshots & Recording")
             #expect(table["推荐与反馈更新"] == "Recommendations, Feedback & Updates")
             #expect(table["反馈更新"] == "Feedback & Updates")

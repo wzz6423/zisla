@@ -111,14 +111,8 @@ struct DailyBriefingSettingsView: View {
                 .disabled(!settingsStore.settings.dailyBriefing.enabled || controller.isExporting)
             }
 
-            if let error = controller.errorMessage ?? previewError {
+            if let error = previewError {
                 Text(error).font(.caption).foregroundStyle(Color.zislaError).textSelection(.enabled)
-            }
-            if let url = controller.lastExportURL {
-                Button { NSWorkspace.shared.activateFileViewerSelecting([url]) } label: {
-                    Label(url.lastPathComponent, systemImage: "checkmark.circle")
-                }
-                .font(.caption).buttonStyle(.plain).foregroundStyle(Color.zislaSuccess)
             }
         }
         .font(.system(size: 11))

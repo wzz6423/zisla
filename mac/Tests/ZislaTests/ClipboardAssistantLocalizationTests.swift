@@ -1,4 +1,6 @@
+import AppKit
 import Foundation
+import SwiftUI
 import Testing
 import ZislaCore
 import ZislaKit
@@ -179,10 +181,22 @@ struct ClipboardAssistantLocalizationTests {
         #expect(info[key] as? String == descriptions[.simplifiedChinese])
     }
 
+    /// Image and file examples describe clipboard payloads because copying a filename cannot create either type.
     @Test @MainActor
     func settingsExampleGroupsFollowTheirRecognitionControls() throws {
         let groups = SettingsView.clipboardAssistantExampleGroups
-        #expect(Set(groups.keys) == [.conversion, .dateTime])
+        let usage = SettingsView.clipboardAssistantUsageExamples
+        #expect(Set(groups.keys).union(usage.keys) == Set(ClipboardAssistantKind.allCases))
+        #expect(Set(groups.keys).isDisjoint(with: usage.keys))
+        #expect(Set(usage.keys) == [.image, .file])
+        for examples in groups.values {
+            #expect(!examples.isEmpty)
+            for group in examples {
+                #expect(!group.examples.isEmpty)
+                #expect(group.examples.allSatisfy { !$0.isEmpty })
+                #expect(Set(group.examples).count == group.examples.count)
+            }
+        }
         #expect(groups[.conversion]?.map(\.title) == ["单位换算", "金额换算", "汇率换算"])
         #expect(groups[.conversion]?[1].examples == ["1元 = ?角", "0.1角 = ?分", "1dollar = ?cent"])
         #expect(groups[.dateTime]?.map(\.title) == ["日期加减", "日期间隔", "跨时区时间"])
@@ -192,6 +206,8 @@ struct ClipboardAssistantLocalizationTests {
         ])
     }
 
+    /// Checks catalogs directly so localization fallback cannot hide a missing translation.
+    /// Foreign-language examples deliberately differ from the selected interface language.
     @Test @MainActor
     func settingsExampleTitlesAndLocalPhrasesTranslateEveryLanguage() throws {
         let groups = SettingsView.clipboardAssistantExampleGroups.values.flatMap { $0 }
@@ -199,18 +215,21 @@ struct ClipboardAssistantLocalizationTests {
         let localExamples = [
             "2026.10.28往后15天", "2026.10.28往前15天",
             "1元 = ?角", "0.1角 = ?分", "1dollar = ?cent",
+            "会议 2026-11-20 14:30-15:30", "Hello! How are you today?",
+            "这是一段普通文本，可以搜索或保存。",
         ]
+        let usageExamples = Array(SettingsView.clipboardAssistantUsageExamples.values)
         #expect(AppLanguage.allCases.count == 17)
         for language in AppLanguage.allCases {
             let table = try #require(Self.stringsTable(for: language))
-            for key in titles + localExamples {
+            for key in titles + localExamples + usageExamples {
                 let value = try #require(table[key], "\(language.rawValue) is missing \(key)")
                 #expect(!value.isEmpty)
                 #expect(AppLocalization.string(key, language: language) == value)
-                if language != .simplifiedChinese && language != .traditionalChinese {
+                if key != "Hello! How are you today?", language != .simplifiedChinese && language != .traditionalChinese {
                     #expect(value != key, "\(language.rawValue) did not translate \(key)")
                 }
-                if language != .english {
+                if !titles.contains(key), key != "Hello! How are you today?", language != .english {
                     #expect(value != AppLocalization.string(key, language: .english))
                 }
             }
@@ -228,6 +247,8 @@ struct ClipboardAssistantLocalizationTests {
         }
         #expect(AppLocalization.string(localExamples[0], language: .english) == "2026.10.28 add 15days")
         #expect(AppLocalization.string(localExamples[1], language: .english) == "2026.10.28 subtract 15days")
+        #expect(AppLocalization.string("Hello! How are you today?", language: .english) == "你好，今天过得怎么样？")
+        #expect(AppLocalization.string("Hello! How are you today?", language: .arabic) == "Hello! How are you today?")
     }
 
     @Test(arguments: AppLanguage.allCases) @MainActor
@@ -261,6 +282,8 @@ struct ClipboardAssistantLocalizationTests {
         }
     }
 
+    /// Fixed UTC fixtures make date results independent of the machine's clock and time zone.
+    /// Restricting detection to the owning control prevents unrelated recognizers from making an example pass.
     @Test(arguments: AppLanguage.allCases) @MainActor
     func displayedSettingsExamplesUseTheirControlAndCorrectDateResult(language: AppLanguage) throws {
         let utc = try #require(TimeZone(secondsFromGMT: 0))
@@ -269,7 +292,8 @@ struct ClipboardAssistantLocalizationTests {
             "2026.10.28+15": "2026-11-12", "2026.10.28-15": "2026-10-13",
             "2026.10.28往后15天": "2026-11-12", "2026.10.28往前15天": "2026-10-13",
         ]
-        for (kind, groups) in SettingsView.clipboardAssistantExampleGroups {
+        for kind in [ClipboardAssistantKind.conversion, .dateTime] {
+            let groups = try #require(SettingsView.clipboardAssistantExampleGroups[kind])
             for group in groups {
                 for (key, example) in zip(group.examples, group.localizedExamples(language: language)) {
                     let result = try #require(ClipboardAssistantDetector.detect(
@@ -297,6 +321,125 @@ struct ClipboardAssistantLocalizationTests {
                 }
             }
         }
+    }
+
+    /// Competing recognizers catch examples that would be claimed by a different kind.
+    /// Application and shell fixtures keep classification independent of installed software.
+    @Test(arguments: AppLanguage.allCases) @MainActor
+    func displayedTextExamplesRecognizeTheirKindAndRespectDisabledControls(language: AppLanguage) throws {
+        let utc = try #require(TimeZone(secondsFromGMT: 0))
+        let now = Date(timeIntervalSince1970: 1_790_035_200)
+        let applications = [
+            InstalledApplication(bundleIdentifier: "com.apple.Safari", displayName: "Safari", matchKeys: ["safari"]),
+            InstalledApplication(bundleIdentifier: "com.apple.TextEdit", displayName: "TextEdit", matchKeys: ["textedit"]),
+        ]
+        for (kind, groups) in SettingsView.clipboardAssistantExampleGroups where kind != .conversion && kind != .dateTime {
+            for example in groups.flatMap({ $0.localizedExamples(language: language) }) {
+                let result = try #require(ClipboardAssistantDetector.detect(
+                    text: example, enabledKinds: Set(ClipboardAssistantKind.allCases),
+                    now: now, timeZone: utc, locale: language.locale, countryCode: "US",
+                    installedApplications: applications, shellCommandExists: { ["pwd", "ls", "git"].contains($0) }
+                ), "\(language.rawValue) cannot recognize the displayed \(kind) example: \(example)")
+                #expect(result.kind == kind, "\(language.rawValue) classified \(example) as \(result.kind) instead of \(kind)")
+                #expect(!result.actions.isEmpty)
+                #expect(ClipboardAssistantDetector.detect(
+                    text: example, enabledKinds: [], now: now, timeZone: utc,
+                    locale: language.locale, countryCode: "US", installedApplications: applications,
+                    shellCommandExists: { ["pwd", "ls", "git"].contains($0) }
+                ) == nil, "Disabled controls must not recognize \(example)")
+                if kind == .meeting {
+                    guard case .editCalendarEvent(let draft) = result.action else {
+                        Issue.record("Meeting examples must open an editable calendar draft")
+                        continue
+                    }
+                    var calendar = Calendar(identifier: .gregorian)
+                    calendar.timeZone = utc
+                    #expect(draft.startDate == calendar.date(from: DateComponents(year: 2026, month: 11, day: 20, hour: 14, minute: 30)))
+                    #expect(draft.endDate == draft.startDate.addingTimeInterval(3_600))
+                } else if kind == .nonSystemLanguageText {
+                    #expect(result.action == .translate(example))
+                } else if kind == .shellCommand {
+                    #expect(result.action == .runShellCommand(example))
+                } else if kind == .text {
+                    #expect(result.action == .search(example))
+                }
+            }
+        }
+    }
+
+    /// In-memory media fixtures distinguish clipboard payloads from look-alike filenames without touching user files.
+    @Test @MainActor
+    func mediaUsageExamplesMatchImageAndFileContentWithoutTreatingFilenamesAsMedia() throws {
+        let bitmap = try #require(NSBitmapImageRep(
+            bitmapDataPlanes: nil, pixelsWide: 2, pixelsHigh: 2, bitsPerSample: 8,
+            samplesPerPixel: 4, hasAlpha: true, isPlanar: false, colorSpaceName: .deviceRGB,
+            bytesPerRow: 8, bitsPerPixel: 32
+        ))
+        let data = try #require(bitmap.representation(using: .png, properties: [:]))
+        let image = ClipboardHistoryContent.image(data)
+        #expect(ClipboardAssistantDetector.detect(content: image, enabledKinds: [.image])?.action == .saveImage(data))
+        #expect(ClipboardAssistantDetector.detect(content: image, enabledKinds: [.file]) == nil)
+        #expect(ClipboardAssistantDetector.detect(content: .image(Data()), enabledKinds: [.image]) == nil)
+        let fileURL = URL(fileURLWithPath: "/zisla-test-fixtures/example.pdf")
+        let file = ClipboardHistoryContent.file(ClipboardFileReference(url: fileURL, displayName: "example.pdf", bookmark: Data()))
+        #expect(ClipboardAssistantDetector.detect(content: file, enabledKinds: [.file])?.action == .revealInFinder(fileURL))
+        #expect(ClipboardAssistantDetector.detect(content: file, enabledKinds: [.image]) == nil)
+        for text in ["example.png", "example.pdf", ""] {
+            #expect(ClipboardAssistantDetector.detect(text: text, enabledKinds: [.image, .file]) == nil)
+        }
+        #expect(SettingsView.clipboardAssistantUsageExamples[.image]?.contains("截图") == true)
+        #expect(SettingsView.clipboardAssistantUsageExamples[.file]?.contains("Finder") == true)
+    }
+
+    /// An offscreen, nonactivating host checks accessibility and copy callbacks without changing clipboard content or focus.
+    @Test(.serialized, arguments: [AppLanguage.simplifiedChinese, .english, .arabic], [ClipboardAssistantKind.text, .conversion]) @MainActor
+    func exampleRowsShowRelevantHeadingsAndCopyDisplayedContent(language: AppLanguage, kind: ClipboardAssistantKind) async throws {
+        let groups = try #require(SettingsView.clipboardAssistantExampleGroups[kind])
+        let examples = groups.flatMap { $0.localizedExamples(language: language) }
+        var copied: [String] = []
+        let releaseAccessibility = EnhancedAccessibilityTestScope.acquire()
+        defer { releaseAccessibility() }
+        let host = NSHostingView(rootView: SettingsView.clipboardAssistantExamples(groups, language: language) { copied.append($0) }
+            .environment(\.locale, language.locale)
+            .environment(\.layoutDirection, language.isRightToLeft ? .rightToLeft : .leftToRight))
+        host.sizingOptions = []
+        let panel = NSPanel(contentRect: .init(x: -100_000, y: -100_000, width: 520, height: 500),
+            styleMask: [.borderless, .nonactivatingPanel], backing: .buffered, defer: false)
+        panel.isReleasedWhenClosed = false
+        panel.contentView = host
+        defer { panel.contentView = nil; panel.close() }
+        for _ in 0..<4 {
+            host.layoutSubtreeIfNeeded()
+            await withCheckedContinuation { continuation in DispatchQueue.main.async { continuation.resume() } }
+        }
+        var labels: [String] = []
+        var buttons: [NSObject] = []
+        /// Collects both label and value text so assertions cover either accessibility representation.
+        func visit(_ object: NSObject) {
+            func value(_ key: String) -> Any? {
+                object.responds(to: NSSelectorFromString(key)) ? object.value(forKey: key) : nil
+            }
+            if let label = value("accessibilityLabel") as? String { labels.append(label) }
+            if let text = value("accessibilityValue") as? String { labels.append(text) }
+            if value("accessibilityRole") as? String == NSAccessibility.Role.button.rawValue { buttons.append(object) }
+            for child in value("accessibilityChildren") as? [NSObject] ?? [] { visit(child) }
+        }
+        visit(host)
+        #expect(Set(examples).isSubset(of: Set(labels)), "Every displayed example must be accessible in \(language.rawValue)")
+        for group in groups {
+            let title = AppLocalization.string(group.title, language: language)
+            #expect(labels.contains(title) == (groups.count > 1), "Only grouped examples need headings: \(title)")
+        }
+        #expect(buttons.count == examples.count)
+        #expect(copied.isEmpty)
+        let press = NSSelectorFromString("accessibilityPerformPress")
+        for button in buttons {
+            #expect(button.value(forKey: "accessibilityLabel") as? String == AppLocalization.string("复制", language: language))
+            try #require(button.responds(to: press))
+            _ = button.perform(press)
+        }
+        #expect(copied == examples, "Copy buttons must return the complete displayed content")
+        #expect(!panel.isVisible && !panel.isKeyWindow)
     }
 
     @Test(arguments: AppLanguage.allCases) @MainActor
