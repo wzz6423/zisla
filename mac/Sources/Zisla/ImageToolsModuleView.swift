@@ -6,6 +6,7 @@ import ZislaKit
 
 struct ImageToolsModuleView: View {
     @ObservedObject private var tools: ManagedToolService
+    private let saveLocations: SaveLocationStore
     @StateObject private var store = ImageToolsModel()
     @State private var operation: ImageToolOperation
     @State private var formats = Set(ImageOutputFormat.conversionFormats)
@@ -21,6 +22,7 @@ struct ImageToolsModuleView: View {
 
     init(model: AppModel, initialOperation: ImageToolOperation = .compress) {
         tools = model.managedTools
+        saveLocations = model.saveLocations
         _operation = State(initialValue: initialOperation)
     }
 
@@ -55,7 +57,6 @@ struct ImageToolsModuleView: View {
                         .font(.system(size: 12)).foregroundStyle(.secondary)
                         .fixedSize(horizontal: false, vertical: true)
                 }
-                engineSection
                 inputSection
                 configuration
                 actions
@@ -77,29 +78,6 @@ struct ImageToolsModuleView: View {
     private var service: ImageProcessingService {
         ImageProcessingService(executableURL: tools.resolvedExecutable(for: .libvips)?.url,
                                avifExecutableURL: tools.resolvedExecutable(for: .libavif)?.url)
-    }
-
-    private var engineSection: some View {
-        VStack(alignment: .leading, spacing: 6) {
-            ForEach([ManagedTool.libvips, .libavif]) { tool in
-                HStack(spacing: 10) {
-                    Label(tool.displayName, systemImage: "photo.stack")
-                    Spacer()
-                    let state = tools.states[tool] ?? ManagedToolState()
-                    if state.isBusy { ProgressView().controlSize(.small) }
-                    Button(AppLocalization.text(state.isInstalled ? "更新" : "安装")) {
-                        Task { await tools.install(tool) }
-                    }
-                    .buttonStyle(.bordered)
-                    .disabled(state.isBusy || store.isProcessing)
-                    .help(state.isInstalled ? tool.updateHelp : tool.installHelp)
-                }
-                if let error = tools.states[tool]?.errorMessage {
-                    Text(error).font(.system(size: 11)).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
-                }
-            }
-        }
-        .font(.system(size: 12))
     }
 
     private var inputSection: some View {
@@ -293,6 +271,7 @@ struct ImageToolsModuleView: View {
         let panel = NSOpenPanel()
         panel.canChooseDirectories = true
         panel.canChooseFiles = false
+        panel.directoryURL = saveLocations[.imageTools]
         WindowPlacement.prepareModal(panel, on: WindowPlacement.screenUnderMouse())
         guard panel.runModal() == .OK, let directory = panel.url else { return }
         store.exportImages(items, to: directory, smallestOnly: smallestOnly)
@@ -302,6 +281,7 @@ struct ImageToolsModuleView: View {
         let panel = NSSavePanel()
         panel.allowedContentTypes = UTType(filenameExtension: output.format.fileExtension).map { [$0] } ?? []
         panel.nameFieldStringValue = item.inputURL.deletingPathExtension().lastPathComponent + "-" + output.format.fileExtension + "." + output.format.fileExtension
+        panel.directoryURL = saveLocations[.imageTools]
         WindowPlacement.prepareModal(panel, on: WindowPlacement.screenUnderMouse())
         guard panel.runModal() == .OK, let destination = panel.url else { return }
         do {
@@ -315,6 +295,7 @@ struct ImageToolsModuleView: View {
         let panel = NSSavePanel()
         panel.allowedContentTypes = [.zip]
         panel.nameFieldStringValue = "images.zip"
+        panel.directoryURL = saveLocations[.imageTools]
         WindowPlacement.prepareModal(panel, on: WindowPlacement.screenUnderMouse())
         guard panel.runModal() == .OK, let destination = panel.url else { return }
         store.exportZIP(items, to: destination)
