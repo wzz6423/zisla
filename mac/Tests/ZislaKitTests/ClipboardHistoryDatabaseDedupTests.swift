@@ -85,13 +85,14 @@ struct ClipboardHistoryDatabaseDedupTests {
         #expect(replaced.items.first { $0.id == replacement.id }?.isPinned == true)
         #expect(replaced.items.contains(legacy[0]), "Already truncated archives must retain their stored prefix, identity and pin")
         #expect(replaced.items.contains(legacy[2]))
-        database = nil
+        // Install the fixture trigger before the last connection starts its WAL checkpoint on close.
         try execute("""
             CREATE TRIGGER reject_repeat_digest_refresh
             BEFORE UPDATE OF content_digest ON clipboard_history
             WHEN OLD.content_digest IS NOT NULL
             BEGIN SELECT RAISE(ABORT, 'completed digest migration repeated'); END;
             """, at: url)
+        database = nil
         let reopened = ClipboardHistoryDatabase(storageURL: url)
         #expect(try await loadAll(reopened).items == replaced.items)
     }
