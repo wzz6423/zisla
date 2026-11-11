@@ -1573,6 +1573,272 @@ struct CodexSessionActivityDetectorTests {
         ])
     }
 
+struct CodexRolloutReadRecoveryTests {
+    @Test
+    func deniedReadDoesNotHideAnotherRolloutAndRecoversWithoutFalseCompletion() throws {
+        let root = makeSessionsRoot()
+        defer { try? FileManager.default.removeItem(at: root) }
+        let relativePath = "2026/07/19/rollout-denied.jsonl"
+        let rolloutURL = root.appendingPathComponent(relativePath)
+        for (path, turnID) in [(relativePath, "turn-denied"), ("2026/07/19/rollout-healthy.jsonl", "turn-healthy")] {
+            try writeRollout(
+                under: root, relativePath: path,
+                lines: [eventLine(timestamp: "2026-07-19T01:00:00.000Z", payloadType: "task_started", turnID: turnID)],
+                modifiedAt: Date(timeIntervalSince1970: 1_800_003_900)
+            )
+        }
+        let partial = Data(#"{"timestamp":"2026-07-19T01:01:00.000Z","type":"event_msg","payload":{"type":"task_complete","turn_id":"turn-unrelated""#.utf8)
+        let handle = try FileHandle(forWritingTo: rolloutURL)
+        defer { try? handle.close() }
+        try handle.seekToEnd()
+        try handle.write(contentsOf: partial)
+        let detector = CodexSessionActivityDetector(
+            sessionsDirectory: root,
+            processIdentifiersForOpenFiles: { _ in [:] },
+            now: { iso8601Date("2026-07-19T01:04:00.000Z") }
+        )
+        let expected = Set(["turn-denied", "turn-healthy"].map(CodexSessionActivityDetector.taskID(forTurnID:)))
+        #expect(Set(try detector.taskUpdates().map(\.id)) == expected)
+        try handle.write(contentsOf: Data("}}\n".utf8))
+        try FileManager.default.setAttributes([.posixPermissions: 0o000], ofItemAtPath: rolloutURL.path)
+        defer { try? FileManager.default.setAttributes([.posixPermissions: 0o600], ofItemAtPath: rolloutURL.path) }
+        #expect(throws: (any Error).self) { try Data(contentsOf: rolloutURL) }
+        #expect(try detector.taskUpdates().map(\.id) == [CodexSessionActivityDetector.taskID(forTurnID: "turn-healthy")])
+
+        try FileManager.default.setAttributes([.posixPermissions: 0o600], ofItemAtPath: rolloutURL.path)
+        let recovered = try detector.taskUpdates()
+        #expect(Set(recovered.map(\.id)) == expected)
+        #expect(recovered.allSatisfy { $0.status == .running })
+        #expect(Set(try detector.taskUpdates().map(\.id)) == expected)
+    }
+
+    @Test(arguments: ["task_complete", "turn_aborted"])
+    func confirmedTaskKeepsItsDetailsAndPublishesItsTerminalOnceAfterDeniedReads(terminal: String) throws {
+        let root = makeSessionsRoot()
+        defer { try? FileManager.default.removeItem(at: root) }
+        let path = "rollout-confirmed.jsonl"
+        let url = root.appendingPathComponent(path).standardizedFileURL
+        let startedAt = iso8601Date("2026-07-19T01:00:00.000Z")
+        try writeRollout(under: root, relativePath: path, lines: [
+            sessionMetadataLine(sessionID: "session-confirmed"),
+            turnContextLine(timestamp: "2026-07-19T01:00:00.000Z", turnID: "turn-confirmed", model: "gpt-6.1-sol", effort: "max"),
+            eventLine(timestamp: "2026-07-19T01:00:00.000Z", payloadType: "task_started", turnID: "turn-confirmed"),
+            try responseItemLine(timestamp: "2026-07-19T01:00:01.000Z", turnID: "turn-confirmed", payload: [
+                "type": "function_call", "call_id": "call-confirmed",
+            ]),
+        ], modifiedAt: startedAt)
+        var providers: [Int32: AIProvider] = [2468: .gpt]
+        var readable = true
+        let detector = CodexSessionActivityDetector(
+            sessionsDirectory: root,
+            processIdentifiersForOpenFiles: { urls in
+                #expect(readable || urls.isEmpty, "Unreadable rollouts must not add process lookup work")
+                return urls.contains(url) ? [url: 2468] : [:]
+            },
+            processStartDatesForProcessIdentifiers: { _ in [2468: startedAt.addingTimeInterval(-1)] },
+            clientProvidersForProcessIdentifiers: { _ in providers },
+            now: { startedAt.addingTimeInterval(10) }
+        )
+        let original = try #require(detector.taskUpdates().first)
+        #expect(original.provider == .gpt)
+        try appendLine("{\"type\":\"ignored\"}", to: url)
+        readable = false
+        try withDeniedRolloutRead(at: url) { () throws in
+            #expect(try detector.taskUpdates().isEmpty)
+            #expect(try detector.taskUpdates().isEmpty)
+        }
+        readable = true
+        providers = [:]
+        let recovered = try #require(detector.taskUpdates().first)
+        #expect(recovered.provider == original.provider)
+        #expect(recovered.detail == original.detail)
+        #expect(recovered.effort == original.effort)
+        #expect(recovered.sessionURL == original.sessionURL)
+        #expect(recovered.startedAt == original.startedAt)
+
+        let marker = "FAKE_PRIVATE_OUTPUT_秘密_🧪"
+        try appendLine(try responseItemLine(timestamp: "2026-07-19T01:00:02.000Z", payload: [
+            "type": "function_call_output", "call_id": "call-confirmed",
+            "output": ["exit_code": 1, "output": marker],
+        ]), to: url)
+        let failed = try #require(detector.taskUpdates().first)
+        #expect(failed.status == .error)
+        #expect(failed.failureReason == "工具执行失败")
+        #expect(!String(decoding: try JSONEncoder().encode(failed), as: UTF8.self).contains(marker))
+        try appendLine(eventLine(timestamp: "2026-07-19T01:00:03.000Z", payloadType: terminal, turnID: "turn-confirmed"), to: url)
+        let ended = try #require(detector.taskUpdates().first)
+        #expect(ended.id == original.id)
+        #expect(ended.provider == .gpt)
+        #expect(ended.status == (terminal == "task_complete" ? .succeeded : .failed))
+        #expect(try detector.taskUpdates().isEmpty)
+        #expect(try detector.taskUpdates().isEmpty)
+    }
+
+    @Test
+    func repeatedDeniedReadsDoNotRestartTheUnverifiedLifetime() throws {
+        let root = makeSessionsRoot()
+        defer { try? FileManager.default.removeItem(at: root) }
+        let path = "rollout-unverified-recovery.jsonl"
+        let url = root.appendingPathComponent(path)
+        let startedAt = iso8601Date("2026-07-19T01:00:00.000Z")
+        try writeRollout(under: root, relativePath: path, lines: [
+            eventLine(timestamp: "2026-07-19T01:00:00.000Z", payloadType: "task_started", turnID: "turn-unverified"),
+        ], modifiedAt: startedAt)
+        var current = startedAt.addingTimeInterval(1)
+        let detector = CodexSessionActivityDetector(
+            sessionsDirectory: root, processIdentifiersForOpenFiles: { _ in [:] },
+            unverifiedActivityLifetime: 5, now: { current }
+        )
+        let id = CodexSessionActivityDetector.taskID(forTurnID: "turn-unverified")
+        #expect(try detector.taskUpdates().map(\.id) == [id])
+        try appendLine("{\"type\":\"ignored\"}", to: url)
+        current = startedAt.addingTimeInterval(3)
+        try withDeniedRolloutRead(at: url) { () throws in
+            #expect(try detector.taskUpdates().isEmpty)
+            #expect(try detector.taskUpdates().isEmpty)
+        }
+        #expect(try detector.taskUpdates().map(\.id) == [id])
+        try appendLine("{\"type\":\"ignored\"}", to: url)
+        current = startedAt.addingTimeInterval(7)
+        try withDeniedRolloutRead(at: url) { () throws in
+            #expect(try detector.taskUpdates().isEmpty)
+        }
+        #expect(try detector.taskUpdates().isEmpty, "Read failures must not renew the original five-second lifetime")
+        #expect(try detector.taskUpdates().isEmpty)
+    }
+
+    @Test
+    func confirmedTurnDoesNotBecomeUnverifiedWhenItsWriterClosesDuringDeniedReads() throws {
+        let root = makeSessionsRoot()
+        defer { try? FileManager.default.removeItem(at: root) }
+        let path = "rollout-closed-during-denial.jsonl"
+        let url = root.appendingPathComponent(path).standardizedFileURL
+        let startedAt = iso8601Date("2026-07-19T01:00:00.000Z")
+        try writeRollout(under: root, relativePath: path, lines: [
+            eventLine(timestamp: "2026-07-19T01:00:00.000Z", payloadType: "task_started", turnID: "turn-closed"),
+        ], modifiedAt: startedAt)
+        var writerIsOpen = true
+        let detector = CodexSessionActivityDetector(
+            sessionsDirectory: root,
+            processIdentifiersForOpenFiles: { urls in writerIsOpen && urls.contains(url) ? [url: 2468] : [:] },
+            processStartDatesForProcessIdentifiers: { _ in [2468: startedAt.addingTimeInterval(-1)] },
+            clientProvidersForProcessIdentifiers: { _ in [2468: .gpt] },
+            now: { startedAt.addingTimeInterval(10) }
+        )
+        #expect(try detector.taskUpdates().first?.status == .running)
+        try appendLine("{\"type\":\"ignored\"}", to: url)
+        try withDeniedRolloutRead(at: url) { () throws in
+            #expect(try detector.taskUpdates().isEmpty)
+            writerIsOpen = false
+        }
+        #expect(try detector.taskUpdates().isEmpty)
+        #expect(try detector.taskUpdates().isEmpty)
+        writerIsOpen = true
+        #expect(try detector.taskUpdates().isEmpty)
+    }
+
+    @Test(arguments: ["task_complete", "turn_aborted"])
+    func readableTerminalClearsAnUnreadableTurnWhileOtherSessionsContinue(terminal: String) throws {
+        let root = makeSessionsRoot()
+        defer { try? FileManager.default.removeItem(at: root) }
+        let startedAt = iso8601Date("2026-07-19T01:00:00.000Z")
+        let denied = root.appendingPathComponent("rollout-denied-cross-file.jsonl")
+        let healthy = root.appendingPathComponent("rollout-healthy-cross-file.jsonl")
+        for (url, turn) in [(denied, "turn-denied"), (healthy, "turn-healthy")] {
+            try writeRollout(under: root, relativePath: url.lastPathComponent, lines: [
+                eventLine(timestamp: "2026-07-19T01:00:00.000Z", payloadType: "task_started", turnID: turn),
+            ], modifiedAt: startedAt)
+        }
+        let detector = CodexSessionActivityDetector(
+            sessionsDirectory: root, processIdentifiersForOpenFiles: { _ in [:] },
+            now: { startedAt.addingTimeInterval(10) }
+        )
+        let deniedID = CodexSessionActivityDetector.taskID(forTurnID: "turn-denied")
+        let healthyID = CodexSessionActivityDetector.taskID(forTurnID: "turn-healthy")
+        #expect(Set(try detector.taskUpdates().map(\.id)) == [deniedID, healthyID])
+        try appendLine("{\"type\":\"ignored\"}", to: denied)
+        try withDeniedRolloutRead(at: denied) { () throws in
+            #expect(try detector.taskUpdates().map(\.id) == [healthyID])
+            try appendLine(eventLine(timestamp: "2026-07-19T01:00:01.000Z", payloadType: terminal, turnID: "turn-denied"), to: healthy)
+            let updates = try detector.taskUpdates()
+            #expect(updates.count == 2)
+            #expect(updates.first { $0.id == deniedID }?.status == (terminal == "task_complete" ? .succeeded : .failed))
+            #expect(updates.first { $0.id == healthyID }?.status == .running)
+            #expect(try detector.taskUpdates().map(\.id) == [healthyID])
+        }
+        #expect(try detector.taskUpdates().map(\.id) == [healthyID])
+        #expect(try detector.taskUpdates().map(\.id) == [healthyID])
+    }
+
+    @Test(arguments: ["task_complete", "turn_aborted"])
+    func terminalWrittenDuringDeniedReadsPublishesThePreviouslyObservedTaskOnce(terminal: String) throws {
+        let root = makeSessionsRoot()
+        defer { try? FileManager.default.removeItem(at: root) }
+        let path = "rollout-terminal-during-denial.jsonl"
+        let url = root.appendingPathComponent(path).standardizedFileURL
+        let startedAt = iso8601Date("2026-07-19T01:00:00.000Z")
+        try writeRollout(under: root, relativePath: path, lines: [
+            eventLine(timestamp: "2026-07-19T01:00:00.000Z", payloadType: "task_started", turnID: "turn-confirmed"),
+        ], modifiedAt: startedAt)
+        let writer = try FileHandle(forWritingTo: url)
+        defer { try? writer.close() }
+        try writer.seekToEnd()
+        let detector = CodexSessionActivityDetector(
+            sessionsDirectory: root,
+            processIdentifiersForOpenFiles: { urls in urls.contains(url) ? [url: 2468] : [:] },
+            processStartDatesForProcessIdentifiers: { _ in [2468: startedAt.addingTimeInterval(-1)] },
+            clientProvidersForProcessIdentifiers: { _ in [2468: .gpt] },
+            now: { startedAt.addingTimeInterval(10) }
+        )
+        let original = try #require(detector.taskUpdates().first)
+        try writer.write(contentsOf: Data("{\"type\":\"ignored\"}\n".utf8))
+        try withDeniedRolloutRead(at: url) { () throws in
+            #expect(try detector.taskUpdates().isEmpty)
+            try writer.write(contentsOf: Data((eventLine(
+                timestamp: "2026-07-19T01:00:01.000Z", payloadType: terminal, turnID: "turn-confirmed"
+            ) + "\n").utf8))
+            #expect(try detector.taskUpdates().isEmpty)
+        }
+        let updates = try detector.taskUpdates()
+        #expect(updates.count == 1)
+        let ended = try #require(updates.first)
+        #expect(ended.id == original.id)
+        #expect(ended.provider == original.provider)
+        #expect(ended.status == (terminal == "task_complete" ? .succeeded : .failed))
+        #expect(try detector.taskUpdates().isEmpty)
+        #expect(try detector.taskUpdates().isEmpty)
+    }
+
+    @Test(arguments: [false, true])
+    func deniedRolloutReplacementOrRemovalDropsThePreviousLifecycle(removeBeforeReplacement: Bool) throws {
+        let root = makeSessionsRoot()
+        defer { try? FileManager.default.removeItem(at: root) }
+        let path = "rollout-replaced-after-denial.jsonl"
+        let url = root.appendingPathComponent(path)
+        let startedAt = iso8601Date("2026-07-19T01:00:00.000Z")
+        try writeRollout(under: root, relativePath: path, lines: [
+            eventLine(timestamp: "2026-07-19T01:00:00.000Z", payloadType: "task_started", turnID: "turn-original"),
+        ], modifiedAt: startedAt)
+        let detector = CodexSessionActivityDetector(
+            sessionsDirectory: root, processIdentifiersForOpenFiles: { _ in [:] },
+            now: { startedAt.addingTimeInterval(10) }
+        )
+        #expect(try detector.taskUpdates().count == 1)
+        try appendLine("{\"type\":\"ignored\"}", to: url)
+        try withDeniedRolloutRead(at: url) { () throws in #expect(try detector.taskUpdates().isEmpty) }
+        if removeBeforeReplacement {
+            try FileManager.default.removeItem(at: url)
+            #expect(try detector.taskUpdates().isEmpty)
+        }
+        let replacement = eventLine(timestamp: "2026-07-19T01:00:01.000Z", payloadType: "task_started", turnID: "turn-replacement")
+        try Data((replacement + "\n").utf8).write(to: url, options: .atomic)
+        let updates = try detector.taskUpdates()
+        #expect(updates.map(\.id) == [CodexSessionActivityDetector.taskID(forTurnID: "turn-replacement")])
+        #expect(updates.first?.status == .running)
+        #expect(try detector.taskUpdates().map(\.id) == updates.map(\.id))
+    }
+}
+
 struct CodexRolloutIntegrityTests {
     @Test
     func rewrittenPendingCompletionDoesNotFinishTheCachedTurn() throws {
@@ -1931,6 +2197,13 @@ struct CodexRolloutIntegrityTests {
 private func makeSessionsRoot() -> URL {
     FileManager.default.temporaryDirectory
         .appendingPathComponent("Zisla-codex-sessions-\(UUID().uuidString)", isDirectory: true)
+}
+
+private func withDeniedRolloutRead(at url: URL, _ body: () throws -> Void) throws {
+    try FileManager.default.setAttributes([.posixPermissions: 0o000], ofItemAtPath: url.path)
+    defer { try? FileManager.default.setAttributes([.posixPermissions: 0o600], ofItemAtPath: url.path) }
+    #expect(throws: (any Error).self) { try Data(contentsOf: url) }
+    try body()
 }
 
 private func writeRollout(
