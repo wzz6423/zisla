@@ -70,10 +70,40 @@ struct WeatherFallbackPresentationTests {
         func descendants(in view: NSView) -> [NSView] {
             view.subviews.flatMap { [$0] + descendants(in: $0) }
         }
+        func expectVisibleScrollbar(in scroll: NSScrollView) throws {
+            let bar = try #require(scroll.verticalScroller)
+            let track = bar.convert(bar.bounds, to: host)
+            #expect(scroll.scrollerStyle == .legacy && !bar.isHidden,
+                    "Overflowing weather must keep its scrollbar visible without waiting for an interaction")
+            #expect(abs(track.maxX - host.bounds.maxX) < 0.5,
+                    "The scrollbar must stay at the weather column's right edge")
+            let bitmap = try #require(host.bitmapImageRepForCachingDisplay(in: host.bounds))
+            host.cacheDisplay(in: host.bounds, to: bitmap)
+            let scale = CGFloat(bitmap.pixelsWide) / host.bounds.width
+            var knobColumns = Set<Int>()
+            for y in 0..<bitmap.pixelsHigh {
+                for x in Int(track.minX * scale)..<Int(track.maxX * scale) {
+                    let color = try #require(bitmap.colorAt(x: x, y: y)?.usingColorSpace(.deviceRGB))
+                    let contrast = isDark ? color.redComponent : 1 - color.redComponent
+                    if contrast * color.alphaComponent > 0.1 { knobColumns.insert(x) }
+                }
+            }
+            #expect(knobColumns.count == Int(3 * scale),
+                    "The weather column must actually render a visible 3pt scrollbar")
+            let knob = bar.rect(for: .knob)
+            let hitPoint = bar.convert(CGPoint(x: knob.midX, y: knob.midY), to: nil)
+            #expect(bar.testPart(hitPoint) == .knob, "The visible weather scrollbar must accept dragging")
+        }
         let scroll = try #require(descendants(in: host).compactMap { $0 as? NSScrollView }.first)
         scroll.tile()
         scroll.reflectScrolledClipView(scroll.contentView)
         let document = try #require(scroll.documentView)
+        let sourceLink = try #require(descendants(in: document).compactMap { $0 as? NSButton }.first)
+        let sourceFrame = sourceLink.convert(sourceLink.bounds, to: document)
+        #expect(language.isRightToLeft
+            ? abs(sourceFrame.maxX - document.bounds.maxX + 2) < 0.5
+            : abs(sourceFrame.minX - document.bounds.minX) < 0.5,
+                "Weather attribution must retain the enclosing layout direction in \(language.rawValue): \(sourceFrame)")
         #expect(document.frame.width <= scroll.contentView.bounds.width,
                 "Weather rows must fit the viewport, including the vertical scrollbar")
         var shiftedBounds = scroll.contentView.bounds
@@ -88,6 +118,7 @@ struct WeatherFallbackPresentationTests {
             #expect(scroller.knobProportion > 0 && scroller.knobProportion < 1,
                     "Overflowing weather must retain a usable vertical scrollbar")
             let track = scroller.convert(scroller.bounds, to: host)
+            try expectVisibleScrollbar(in: scroll)
             let wasHidden = scroller.isHidden
             scroller.isHidden = true
             defer { scroller.isHidden = wasHidden }
@@ -140,6 +171,53 @@ struct WeatherFallbackPresentationTests {
                 #expect(changedPixels > 0,
                         "The \(changeTemperature ? "current temperature" : "temperature range") must render beside the scrollbar")
             }
+        }
+        if locationCount == 1 {
+            #expect(scroll.verticalScroller?.isHidden == true,
+                    "Weather that fits must not show an inactive scrollbar")
+        }
+        host.rootView = content([:])
+        for _ in 0..<8 {
+            host.layoutSubtreeIfNeeded()
+            await withCheckedContinuation { continuation in
+                DispatchQueue.main.async { continuation.resume() }
+            }
+        }
+        #expect(descendants(in: host).allSatisfy { !($0 is NSScrollView) },
+                "Removing weather content must remove its native scroll container")
+        window.contentView = nil
+        window.contentView = host
+        host.rootView = content(snapshots)
+        for _ in 0..<8 {
+            host.layoutSubtreeIfNeeded()
+            await withCheckedContinuation { continuation in
+                DispatchQueue.main.async { continuation.resume() }
+            }
+        }
+        let remounted = try #require(descendants(in: host).compactMap { $0 as? NSScrollView }.first)
+        remounted.tile()
+        host.layoutSubtreeIfNeeded()
+        remounted.reflectScrolledClipView(remounted.contentView)
+        #expect(remounted.documentView?.frame.width == remounted.contentView.bounds.width,
+                "Reopening weather must keep the document fitted to its viewport")
+        if locationCount > 1 {
+            try expectVisibleScrollbar(in: remounted)
+            let originalHeight = window.frame.height
+            window.setContentSize(CGSize(width: 184, height: 64))
+            host.layoutSubtreeIfNeeded()
+            window.setContentSize(CGSize(width: 184, height: originalHeight))
+            host.layoutSubtreeIfNeeded()
+            remounted.reflectScrolledClipView(remounted.contentView)
+            try expectVisibleScrollbar(in: remounted)
+            remounted.scrollerStyle = .overlay
+            for _ in 0..<8 {
+                await withCheckedContinuation { continuation in
+                    DispatchQueue.main.async { continuation.resume() }
+                }
+            }
+            remounted.tile()
+            remounted.reflectScrolledClipView(remounted.contentView)
+            try expectVisibleScrollbar(in: remounted)
         }
         #expect(try Data(contentsOf: directory.appendingPathComponent("locations.json")) == persisted)
         #expect(locations.orderedSnapshots(snapshots, at: date).count == locationCount)

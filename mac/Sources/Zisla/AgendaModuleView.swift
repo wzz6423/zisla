@@ -64,30 +64,39 @@ struct AgendaModuleView: View {
             weatherPlaceholder(state: state, hasExpiredWeather: !snapshotsByLocationID.isEmpty)
         } else {
             WeatherList(snapshots: snapshots, date: date)
+                .thinScrollChrome()
         }
     }
 
-    private struct WeatherList: View {
+    private struct WeatherList: NSViewRepresentable {
         let snapshots: [WeatherSnapshot]
         let date: Date
-        @Environment(\.layoutDirection) private var layoutDirection
 
-        var body: some View {
-            ScrollView(.vertical) {
-                LazyVStack(spacing: 2) {
-                    ForEach(Array(snapshots.enumerated()), id: \.offset) { _, weather in
-                        AgendaModuleView.weatherRow(weather, at: date)
-                    }
+        func makeNSView(context: Context) -> NSScrollView {
+            let scroll = NSScrollView()
+            scroll.drawsBackground = false
+            scroll.horizontalScrollElasticity = .none
+            ThinScrollChrome.apply(to: scroll)
+            let hosting = NSHostingView(rootView: rows(environment: context.environment))
+            hosting.translatesAutoresizingMaskIntoConstraints = false
+            scroll.documentView = hosting
+            hosting.widthAnchor.constraint(equalTo: scroll.contentView.widthAnchor).isActive = true
+            return scroll
+        }
+
+        func updateNSView(_ scroll: NSScrollView, context: Context) {
+            let hosting = scroll.documentView as! NSHostingView<AnyView>
+            hosting.rootView = rows(environment: context.environment)
+        }
+
+        private func rows(environment: EnvironmentValues) -> AnyView {
+            AnyView(VStack(spacing: 2) {
+                ForEach(Array(snapshots.enumerated()), id: \.offset) { _, weather in
+                    AgendaModuleView.weatherRow(weather, at: date)
                 }
             }
-            // AppKit keeps the scroller on the right even when SwiftUI mirrors the content.
-            .contentMargins(
-                layoutDirection == .rightToLeft ? .leading : .trailing,
-                NSScroller.scrollerWidth(for: .mini, scrollerStyle: .overlay) + 2,
-                for: .scrollContent
-            )
-            .scrollIndicators(.visible)
-            .thinScrollChrome(scrollerStyle: .overlay)
+            .padding(environment.layoutDirection == .rightToLeft ? .leading : .trailing, 2)
+            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading))
         }
     }
 
