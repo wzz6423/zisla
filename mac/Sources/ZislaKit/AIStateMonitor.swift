@@ -95,6 +95,9 @@ public final class AIStateMonitor: ObservableObject {
     private let detectorRefreshInterval: TimeInterval
     private let usageRefreshInterval: TimeInterval
     private let now: () -> Date
+    #if DEBUG
+    private let debugEnvironment: [String: String]
+    #endif
     private let refreshQueue = DispatchQueue(
         label: "dev.wzz.zisla.ai-state-refresh",
         qos: .utility
@@ -155,6 +158,7 @@ public final class AIStateMonitor: ObservableObject {
         activeTaskTTL: TimeInterval = AIStateMonitor.defaultActiveTaskTTL,
         detectorRefreshInterval: TimeInterval = AIStateMonitor.defaultDetectorRefreshInterval,
         usageRefreshInterval: TimeInterval = AIStateMonitor.defaultUsageRefreshInterval,
+        environment: [String: String] = ProcessInfo.processInfo.environment,
         now: @escaping () -> Date = Date.init
     ) {
         repository = AIStateRepository(directoryURL: directoryURL)
@@ -165,6 +169,9 @@ public final class AIStateMonitor: ObservableObject {
         self.detectorRefreshInterval = max(1, detectorRefreshInterval)
         self.usageRefreshInterval = max(1, usageRefreshInterval)
         self.now = now
+        #if DEBUG
+        debugEnvironment = environment
+        #endif
     }
 
     static func defaultActivityDetectors() -> [any AIActivityDetecting] {
@@ -426,6 +433,13 @@ public final class AIStateMonitor: ObservableObject {
         usageHistoryGeneration &+= 1
         let historyGeneration = usageHistoryGeneration
         let monitorGeneration = refreshGeneration
+        #if DEBUG
+        if let history = AIModelUsageDebug.history(environment: debugEnvironment, now: now()) {
+            applyUsageHistory(.samples(history), historyGeneration: historyGeneration,
+                monitorGeneration: monitorGeneration)
+            return
+        }
+        #endif
         let repository = repository
         let usageHistoryStart = usageHistoryStartDate(endingAt: now())
         let monitor = self
@@ -860,6 +874,13 @@ public final class AIStateMonitor: ObservableObject {
                 next.usageSamples.removeAll(keepingCapacity: false)
                 next.modelUsageSamples.removeAll(keepingCapacity: false)
             }
+            #if DEBUG
+            if includesUsageSamples, usageHistoryRequested,
+               let history = AIModelUsageDebug.history(environment: debugEnvironment, now: now()) {
+                next.usageSamples = history.usageSamples
+                next.modelUsageSamples = history.modelUsageSamples
+            }
+            #endif
             if next != state { state = next }
             if includesUsageSamples && usageHistoryRequested {
                 usageHistoryIsLoaded = true

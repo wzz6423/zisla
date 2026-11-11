@@ -189,6 +189,9 @@ function start_service() {
   plutil -insert ProgramArguments.0 -string "$APP_BINARY" "$LAUNCH_AGENT"
   plutil -insert EnvironmentVariables -dictionary "$LAUNCH_AGENT"
   plutil -insert EnvironmentVariables.ZISLA_FIRST -string "$first_launch" "$LAUNCH_AGENT"
+  if [[ -n "${ZISLA_DEBUG_AI_MODEL_USAGE:-}" ]]; then
+    plutil -insert EnvironmentVariables.ZISLA_DEBUG_AI_MODEL_USAGE -string "$ZISLA_DEBUG_AI_MODEL_USAGE" "$LAUNCH_AGENT"
+  fi
   if [[ -n "$profile_directory" ]]; then
     plutil -insert EnvironmentVariables.CFFIXED_USER_HOME -string "$profile_directory" "$LAUNCH_AGENT"
   fi
