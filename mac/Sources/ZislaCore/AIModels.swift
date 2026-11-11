@@ -187,6 +187,7 @@ public struct AIGenericUsageContext: Sendable {
 }
 
 public enum AIUsageLogIdentity {
+    /// Keeps detector identities and repository recovery compatible with the legacy FNV-1a digest format.
     public static func digest(_ data: Data) -> String {
         var hash: UInt64 = 14_695_981_039_346_656_037
         for byte in data {

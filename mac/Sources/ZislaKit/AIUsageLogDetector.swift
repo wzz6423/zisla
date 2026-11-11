@@ -789,8 +789,22 @@ public final class AIUsageLogDetector: AIUsageDetecting {
     }
 
     /// Uses stable message paths for new identities while retaining the old digest solely for migration.
+    /// Only roots that emit numeric usage spend evidence, so metadata and invalid counters cannot starve later files.
     private func parseGeneric(_ root: [String: Any], candidate: Candidate, ordinal: Int) -> [AIUsageSample] {
         let rootIdentity = (root["id"] as? String) ?? "entry-\(ordinal)"
+        let samples = usageContexts(in: root, model: nil, timestamp: candidate.modificationDate, path: rootIdentity, location: [])
+            .compactMap { context -> (sample: AIUsageSample, location: [AIGenericUsageContext.PathComponent])? in
+                guard let result = sample(
+                    provider: candidate.provider,
+                    sourceID: sourceID(candidate, component: "usage-v2-\(stableDigest(context.path))"),
+                    timestamp: context.timestamp,
+                    usage: context.usage,
+                    model: context.model,
+                    includeCacheInputTokens: true
+                ) else { return nil }
+                return (result, context.location)
+            }
+        guard !samples.isEmpty else { return [] }
         let document = try? JSONSerialization.data(withJSONObject: root, options: [.sortedKeys])
         let legacyPrefix = sourceID(candidate, component: "entry-\(document.map(AIUsageLogIdentity.digest) ?? stableDigest(root))-usage-")
         let evidence: Data?
@@ -801,21 +815,11 @@ public final class AIUsageLogDetector: AIUsageDetecting {
         } else {
             evidence = nil
         }
-        return usageContexts(in: root, model: nil, timestamp: candidate.modificationDate, path: rootIdentity, location: []).compactMap { context in
-            var result = sample(
-                provider: candidate.provider,
-                sourceID: sourceID(
-                    candidate,
-                    component: "usage-v2-\(stableDigest(context.path))"
-                ),
-                timestamp: context.timestamp,
-                usage: context.usage,
-                model: context.model,
-                includeCacheInputTokens: true
-            )
-            result?.legacySourceID = legacyPrefix
+        return samples.map { context in
+            var result = context.sample
+            result.legacySourceID = legacyPrefix
             if let evidence {
-                result?.genericContext = AIGenericUsageContext(document: evidence, path: context.location)
+                result.genericContext = AIGenericUsageContext(document: evidence, path: context.location)
             }
             return result
         }

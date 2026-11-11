@@ -301,6 +301,7 @@ struct AIUsageLogDetectorTests {
     }
 
     @Test
+    /// Appends carry evidence only for new roots; immediate throttled retries retain it until another scan begins.
     func genericJSONLAppendKeepsAnUnrecordedLegacyRootAndReusesBoundedEvidence() throws {
         let root = temporaryDirectory(named: "usage-generic-context-retry")
         defer { try? FileManager.default.removeItem(at: root) }
@@ -325,6 +326,7 @@ struct AIUsageLogDetectorTests {
     }
 
     @Test(arguments: [false, true])
+    /// A replayed older snapshot must not erase growth or move the previously recorded tokens to the latest model.
     func repeatedGenericRootIDKeepsTheGrowingSnapshotDuringWarmJSONLAppend(sameTimestamp: Bool) throws {
         let root = temporaryDirectory(named: "usage-generic-context-snapshots")
         defer { try? FileManager.default.removeItem(at: root) }
@@ -356,6 +358,7 @@ struct AIUsageLogDetectorTests {
     }
 
     @Test
+    /// Immediate retries need the same proof after rollback, or establishing a baseline would swallow the recoverable delta.
     func cachedGenericContextSurvivesAnImmediateDatabaseTransactionFailure() throws {
         let root = temporaryDirectory(named: "usage-generic-context-transaction")
         defer { try? FileManager.default.removeItem(at: root) }
@@ -387,6 +390,7 @@ struct AIUsageLogDetectorTests {
     }
 
     @Test(arguments: ["json", "jsonl"])
+    /// Rebuilding discarded evidence would rescan unchanged files and extend the lifetime of private root documents.
     func unchangedGenericLogsReuseNumericCacheWithoutRebuildingDiscardedEvidence(extensionName: String) throws {
         let root = temporaryDirectory(named: "usage-generic-context-unchanged")
         defer { try? FileManager.default.removeItem(at: root) }
@@ -440,6 +444,7 @@ struct AIUsageLogDetectorTests {
     }
 
     @Test(arguments: [65_536, 65_537])
+    /// All messages in one root share its proof; a root over the byte limit keeps history and baselines future growth.
     func genericContextDocumentByteBudgetDoesNotCopyEvidencePerMessage(byteCount: Int) throws {
         let root = temporaryDirectory(named: "usage-generic-context-bytes")
         defer { try? FileManager.default.removeItem(at: root) }
@@ -482,6 +487,7 @@ struct AIUsageLogDetectorTests {
     }
 
     @Test(arguments: [false, true])
+    /// Exhausting shared evidence must not reuse another file's baseline or prevent later providers from recording usage.
     func genericContextEvidenceBudgetIsSharedPerRootAndIsolatesFilesAndProviders(reverse: Bool) throws {
         let root = temporaryDirectory(named: "usage-generic-context-evidence")
         defer { try? FileManager.default.removeItem(at: root) }
@@ -523,6 +529,81 @@ struct AIUsageLogDetectorTests {
         #expect(try repository.recordDetectedUsage([other]) == 1)
         #expect(try repository.loadUsageSamples().first?.totalTokens == 845)
         #expect(try repository.recordDetectedUsage(current) == 0)
+    }
+
+    @Test(arguments: ["metadata", "zero", "invalid"])
+    /// Roots that emit no numeric usage must leave evidence available for a later file's legacy growth.
+    func nonUsageGenericJSONLRootsDoNotSpendAnotherFilesMigrationEvidence(kind: String) throws {
+        let root = temporaryDirectory(named: "usage-generic-empty-evidence")
+        defer { try? FileManager.default.removeItem(at: root) }
+        let empty = root.appendingPathComponent("empty")
+        let noise = root.appendingPathComponent("logs/a-events.jsonl")
+        let session = root.appendingPathComponent("logs/z-session.jsonl")
+        try writeJSONL([
+            #"{"id":"old","timestamp":"2026-11-08T00:00:00Z","model":"model-a","usage":{"input_tokens":100,"output_tokens":20}}"#,
+        ], to: session)
+        let prior = try #require(AIUsageLogDetector(qwenProjectsDirectory: empty, enabledProviders: [.qwen],
+            additionalLogFiles: [.qwen: [session]]).usageSamples().first)
+        let repository = AIStateRepository(directoryURL: root.appendingPathComponent("state"))
+        let legacyPrefix = try #require(prior.legacySourceID)
+        try repository.recordDetectedUsage([AIUsageSample(sourceID: legacyPrefix + "0", provider: .qwen,
+            timestamp: prior.timestamp, inputTokens: 100, outputTokens: 20)])
+        let lines = try (0..<4).map { index -> String in
+            var document: [String: Any] = ["id": "noise-\(index)", "type": ["metadata", "user", "tool"][index % 3],
+                "padding": ""]
+            switch kind {
+            case "zero": document["usage"] = ["input_tokens": 0, "output_tokens": 0]
+            case "invalid": document["usage"] = ["input_tokens": -10, "output_tokens": "invalid", "prompt_tokens": NSNull()]
+            default: break
+            }
+            let emptyDocument = try JSONSerialization.data(withJSONObject: document, options: [.sortedKeys])
+            document["padding"] = String(repeating: "p", count: 65_536 - emptyDocument.count)
+            let data = try JSONSerialization.data(withJSONObject: document, options: [.sortedKeys])
+            #expect(data.count == 65_536)
+            return String(decoding: data, as: UTF8.self)
+        }
+        try writeJSONL(lines, to: noise)
+        try writeJSONL([
+            #"{"id":"old","timestamp":"2026-11-10T00:00:00Z","model":"model-a","usage":{"input_tokens":150,"output_tokens":20}}"#,
+        ], to: session)
+        let detector = AIUsageLogDetector(qwenProjectsDirectory: empty, scanInterval: 0, enabledProviders: [.qwen],
+            additionalLogFiles: [.qwen: [session, noise]])
+        let current = try detector.usageSamples()
+        #expect(current.count == 1)
+        #expect(current.first?.genericContext != nil)
+        #expect(try repository.recordDetectedUsage(current) == 1)
+        let history = try repository.loadUsageHistory()
+        #expect(history.usageSamples.map(\.totalTokens) == [120, 50])
+        #expect(history.modelUsageSamples.map(\.model) == [nil, "model-a"])
+        #expect(try repository.recordDetectedUsage(detector.usageSamples()) == 0)
+        #expect(try repository.loadUsageHistory() == history)
+    }
+
+    @Test(arguments: ["cache_creation_input_tokens", "cache_read_input_tokens"])
+    /// Cached input alone is real usage even when the ordinary input and output counters are zero.
+    func genericCacheInputOnlyUsageRetainsMigrationEvidence(cacheKey: String) throws {
+        let root = temporaryDirectory(named: "usage-generic-cache-only-evidence")
+        defer { try? FileManager.default.removeItem(at: root) }
+        let file = root.appendingPathComponent("logs/session-cache-only.jsonl")
+        try writeJSONL([
+            "{\"id\":\"cached\",\"timestamp\":\"2026-11-08T00:00:00Z\",\"model\":\"cache-model\",\"usage\":{\"input_tokens\":0,\"output_tokens\":0,\"\(cacheKey)\":10}}",
+        ], to: file)
+        let detector = AIUsageLogDetector(qwenProjectsDirectory: root.appendingPathComponent("empty"),
+            scanInterval: 0, enabledProviders: [.qwen], additionalLogFiles: [.qwen: [file]])
+        let samples = try detector.usageSamples()
+        #expect(samples.count == 1)
+        let sample = try #require(samples.first)
+        #expect(sample.inputTokens == 10)
+        #expect(sample.outputTokens == 0)
+        #expect(sample.model == "cache-model")
+        #expect(sample.genericContext != nil)
+        let repository = AIStateRepository(directoryURL: root.appendingPathComponent("state"))
+        #expect(try repository.recordDetectedUsage(samples) == 1)
+        let history = try repository.loadUsageHistory()
+        #expect(history.usageSamples.map(\.totalTokens) == [10])
+        #expect(history.modelUsageSamples.map(\.model) == ["cache-model"])
+        #expect(try repository.recordDetectedUsage(detector.usageSamples()) == 0)
+        #expect(try repository.loadUsageHistory() == history)
     }
 
     @Test
@@ -1878,6 +1959,7 @@ private func temporaryDirectory(named name: String) -> URL {
         .appendingPathComponent("Zisla-\(name)-\(UUID().uuidString)", isDirectory: true)
 }
 
+/// Injects failures only into disposable fixture databases and reports setup errors before recovery assertions run.
 private func executeUsageFixtureSQL(_ url: URL, _ query: String) throws {
     var database: OpaquePointer?
     guard sqlite3_open(url.path, &database) == SQLITE_OK else { throw CocoaError(.fileReadCorruptFile) }

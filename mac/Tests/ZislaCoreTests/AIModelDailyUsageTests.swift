@@ -126,6 +126,7 @@ struct AIModelDailyUsageTests {
     }
 
     @Test
+    /// Schema 6's compressed aggregates cannot prove which models produced manual or otherwise unclassified history.
     func migrationBackfillsOnlyRealEventMetadataAndLeavesCompressedHistoryUnclassified() throws {
         let root = directory()
         defer { try? FileManager.default.removeItem(at: root) }
@@ -146,6 +147,7 @@ struct AIModelDailyUsageTests {
     }
 
     @Test
+    /// Older upgrades trim history before backfilling models, so their dependent tables must already exist.
     func preDailySchemaMigrationCanTrimBeforeModelBackfillWithoutMissingTables() throws {
         let root = directory()
         defer { try? FileManager.default.removeItem(at: root) }
@@ -166,6 +168,7 @@ struct AIModelDailyUsageTests {
     }
 
     @Test
+    /// The old generic parser's surrounding model label is not evidence of a historical message's actual model.
     func schemaSixGenericSourcesDoNotBackfillAnUnreliableFirstModel() throws {
         let root = directory()
         defer { try? FileManager.default.removeItem(at: root) }
@@ -199,6 +202,7 @@ struct AIModelDailyUsageTests {
     }
 
     @Test
+    /// A failed model insert must not acknowledge the event, or its retry would silently lose the token delta.
     func failedModelWriteRollsBackDailyTotalAndDedupeHighWaterMark() throws {
         let root = directory()
         defer { try? FileManager.default.removeItem(at: root) }
@@ -285,6 +289,7 @@ struct AIModelDailyUsageTests {
     }
 
     @Test
+    /// Root evidence can contain private messages; persistence and snapshot equality must use only usage metadata.
     func transientGenericEvidenceIsNotEncodedAndDoesNotChangeUsageEquality() throws {
         var value = sample("evidence", .gemini, "model", 10, 2)
         value.genericContext = AIGenericUsageContext(document: Data(#"{"content":"fixture-private-message"}"#.utf8), path: [.key("usage")])
@@ -325,6 +330,7 @@ struct AIModelDailyUsageTests {
     }
 
     @Test(arguments: [30, 31])
+    /// A match found after exhausting the shared search budget cannot prove that no competing association exists.
     func genericRecoveryHashBudgetRejectsAPartiallyExaminedCandidateSet(priorCandidates: Int) throws {
         let root = directory()
         defer { try? FileManager.default.removeItem(at: root) }
@@ -367,6 +373,7 @@ struct AIModelDailyUsageTests {
     }
 
     @Test(arguments: [false, true])
+    /// Two plausible histories cannot establish one message's baseline, so neither may consume the other's tokens.
     func twoHistoricalRootsCannotAssignTheirBaselinesToTheSameCurrentMessage(reverse: Bool) throws {
         let root = directory()
         defer { try? FileManager.default.removeItem(at: root) }
@@ -395,6 +402,7 @@ struct AIModelDailyUsageTests {
     }
 
     @Test
+    /// A retired identifier may be observed again; its ledger must remain independent of the current source's baseline.
     func reappearingLegacySourcePreservesItsLedgerWithoutBlockingCurrentRescans() throws {
         let root = directory()
         defer { try? FileManager.default.removeItem(at: root) }
@@ -418,6 +426,7 @@ struct AIModelDailyUsageTests {
     }
 
     @Test(arguments: ["seconds", "milliseconds", "iso", "fractional"])
+    /// Recovery needs the original serialized date form to prove identity while charging growth to the new recorded day.
     func recoveryVerifiesSupportedHistoricalTimestampFormats(format: String) throws {
         let root = directory()
         defer { try? FileManager.default.removeItem(at: root) }
@@ -447,6 +456,7 @@ struct AIModelDailyUsageTests {
     }
 
     @Test(arguments: [32, 33])
+    /// Damaged evidence still consumes a candidate slot; discarding it first would let malformed inputs bypass the bound.
     func malformedEvidenceCannotBypassTheCompleteCandidateBudget(candidateCount: Int) throws {
         let root = directory()
         defer { try? FileManager.default.removeItem(at: root) }
@@ -473,6 +483,7 @@ struct AIModelDailyUsageTests {
     }
 
     @Test(arguments: [65_536, 65_537])
+    /// Repository callers can bypass the detector, so oversized evidence must establish only a future-growth baseline.
     func oversizedEvidenceCannotRecoverHistoryThroughDirectRepositoryInput(byteCount: Int) throws {
         let root = directory()
         defer { try? FileManager.default.removeItem(at: root) }
@@ -530,11 +541,13 @@ struct AIModelDailyUsageTests {
         #expect(rows.first?.totalTokens == 12)
     }
 
+    /// Places fixtures inside a fixed calendar day so token assertions do not depend on the wall clock.
     private func sample(_ id: String, _ provider: AIProvider, _ model: String?, _ input: Int, _ output: Int) -> AIUsageSample {
         AIUsageSample(sourceID: id, provider: provider, timestamp: day.addingTimeInterval(10),
             inputTokens: input, outputTokens: output, model: model)
     }
 
+    /// Gives each parallel test its own disposable database path, leaving the user's persisted history untouched.
     private func directory() -> URL {
         FileManager.default.temporaryDirectory.appendingPathComponent("zisla-model-usage-\(UUID())", isDirectory: true)
     }
