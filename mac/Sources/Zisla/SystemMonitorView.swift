@@ -1119,8 +1119,8 @@ private struct SystemCleanupSheet: View {
         } message: {
             Text(
                 cachedManualReviewCount > 0
-                    ? AppLocalization.text("其中 %ld 项需人工复核。zisla 不会永久删除这些内容。", cachedManualReviewCount)
-                    : AppLocalization.text("zisla 不会永久删除这些内容。")
+                    ? AppLocalization.text("其中 %ld 项需人工复核。本次操作将项目移入废纸篓；废纸篓之后可能被清空，届时将永久删除。", cachedManualReviewCount)
+                    : AppLocalization.text("本次操作将项目移入废纸篓；废纸篓之后可能被清空，届时将永久删除。")
             )
         }
     }

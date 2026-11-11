@@ -189,6 +189,8 @@ mkdir -p "$CONTENTS/MacOS" "$CONTENTS/Resources" "$CONTENTS/Frameworks" "$CONTEN
 }
 ditto "$KEYBOARD_RESOURCE_BUNDLE" "$CONTENTS/Resources/zisla_KeyboardKit.bundle"
 ditto "$ZISLAKIT_RESOURCE_BUNDLE" "$CONTENTS/Resources/zisla_ZislaKit.bundle"
+PORTRAIT_KERNEL_LIBRARY="$(find "$BIN_DIRECTORY/zisla_Zisla.bundle" -type f -name RecordingPortraitKernels.metallib)"
+install -m 0644 "$PORTRAIT_KERNEL_LIBRARY" "$CONTENTS/Resources/RecordingPortraitKernels.metallib"
 if (( ${#BINARIES[@]} == 1 )); then
   install -m 0755 "$BINARIES[1]" "$CONTENTS/MacOS/zisla"
 else

@@ -295,7 +295,7 @@ struct IslandParticleLogoTests {
 
         var view: CompactStatusBarView {
             CompactStatusBarView(queue: queue, displayState: state, media: media, browserDownloads: downloads,
-                settingsStore: settings, resultSweep: sweep, onStatusHidden: {})
+                settingsStore: settings, resultSweep: sweep, pomodoro: PomodoroService(notificationRequestHandler: { _ in }, defaults: defaults), onStatusHidden: {})
         }
 
         func close() {

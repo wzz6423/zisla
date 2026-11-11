@@ -558,11 +558,24 @@ final class AppModel: ObservableObject {
     let monitor = systemMonitor
     return SystemAutoCleanupService(
       scan: { await monitor.scanCleanupCandidates(kinds: $0, options: $1) },
-      trash: { await monitor.trashSelected($0) }
+      trash: { await monitor.trashSelected($0) },
+      emptyTrash: { [weak self] in
+        let result = await DesktopOrganizer.emptyTrash()
+        if case .failure(let error) = result {
+          self?.transientMessage = error.message
+        }
+        return result
+      },
+      onTrashReservationFailure: { [weak self] error in
+        self?.transientMessage = error.message
+      }
     )
   }()
   let backgroundSounds = SystemBackgroundSoundService()
   let battery = BatteryMonitor()
+  private(set) lazy var automaticPowerMode = AutomaticPowerModeService(onFailure: { [weak self] error in
+    self?.transientMessage = AppLocalization.text(BatteryPowerModePresentation.messageKey(for: error))
+  })
   private lazy var lowBatteryNotice = LowBatteryNoticeController(queue: notices)
   var userCarePresentationAllowed: () -> Bool = { false }
   private lazy var userCare = UserCareService(
@@ -645,6 +658,7 @@ final class AppModel: ObservableObject {
   private let voiceRecordingPlayer = VoiceRecordingPlayer()
   @Published private(set) var systemMonitorHeadphoneTransient = SystemMonitorHeadphoneTransient()
   private var headphoneTransientLifecycleActive = false
+  private var automaticPowerModeLifecycleActive = false
   private var headphoneTransientTask: Task<Void, Never>?
   private var cancellables: Set<AnyCancellable> = []
   private var weatherTask: Task<Void, Never>?
@@ -773,6 +787,10 @@ final class AppModel: ObservableObject {
     quickNotes.onDailyBriefingActivity = recordActivity
     keyboardSound.onPhysicalKeyDown = { [weak self] date in self?.dailyBriefing.recordKeyPress(at: date) }
     keyboardSound.onBeforeTermination = { [weak self] in await self?.dailyBriefing.prepareToTerminate() ?? true }
+    Self.observeDailyBriefingExports(dailyBriefing) { [weak self] message in
+      self?.transientMessage = message
+    }
+    .store(in: &cancellables)
     clipboardAssistant.onPerformAction = { [weak self] action in
       self?.performClipboardAssistantAction(action)
     }
@@ -901,10 +919,13 @@ final class AppModel: ObservableObject {
       .store(in: &cancellables)
 
     Publishers.CombineLatest(battery.$snapshot, networkBattery.$devices)
-      .sink { [weak self] _ in
+      .sink { [weak self] snapshot, _ in
         Task { @MainActor [weak self] in
           guard let self else { return }
           let settings = self.settingsStore.settings
+          if self.automaticPowerModeLifecycleActive {
+            self.automaticPowerMode.apply(settings: settings, snapshot: snapshot)
+          }
           self.lowBatteryNotice.update(
             snapshot: self.battery.snapshot,
             enabled: settings.systemMonitorEnabled && settings.sideNoticesEnabled
@@ -1035,12 +1056,13 @@ final class AppModel: ObservableObject {
   private func refreshDashboardPresentation() {
     let settings = settingsStore.settings
     let hasPomodoro = pomodoro.phase != .idle
-    let hasAITask = settings.aiProgressEnabled
-      && aiMonitor.state.tasks.contains { $0.status.isActive }
+    let aiCardCount = DashboardAIWorkSummary.groups(
+      from: aiMonitor.state.tasks, enabled: settings.aiProgressEnabled
+    ).count
     let browserDownloadCount = settings.showsBrowserDownloadProgress
       ? browserDownloads.snapshots.count : 0
-    let cardCount = [hasPomodoro, hasAITask, hasActiveDownloads].filter { $0 }.count
-      + browserDownloadCount + notices.screenRecordingOperations.count
+    let cardCount = [hasPomodoro, hasActiveDownloads].filter { $0 }.count
+      + aiCardCount + browserDownloadCount + notices.screenRecordingOperations.count
     if dashboardCardCount != cardCount {
       dashboardCardCount = cardCount
     }
@@ -1063,6 +1085,7 @@ final class AppModel: ObservableObject {
 
   func start(hasExistingInstallation: Bool) {
     headphoneTransientLifecycleActive = true
+    automaticPowerModeLifecycleActive = true
     backgroundSounds.startLifecycleMonitoring()
     apply(settings: settingsStore.settings)
     LegacyAlarmNotificationCleanup.removeScheduledNotifications()
@@ -1190,6 +1213,8 @@ final class AppModel: ObservableObject {
   }
 
   func stop() {
+    automaticPowerModeLifecycleActive = false
+    automaticPowerMode.stop()
     dailyBriefing.stop()
     headphoneTransientLifecycleActive = false
     userCare.stop()
@@ -1292,6 +1317,17 @@ final class AppModel: ObservableObject {
   }
 
   // MARK: - Transient notice
+
+  static func observeDailyBriefingExports(
+    _ controller: DailyBriefingController,
+    onMessage: @escaping (String) -> Void
+  ) -> AnyCancellable {
+    let success = controller.$lastExportURL
+      .compactMap { $0 }
+      .map { AppLocalization.text("已保存到 %@", $0.lastPathComponent) }
+    return success.merge(with: controller.$errorMessage.compactMap { $0 })
+      .sink(receiveValue: onMessage)
+  }
 
   static func observeDisplayAwakeErrors(
     _ controller: PowerAssertionController,
@@ -1589,6 +1625,13 @@ final class AppModel: ObservableObject {
 
   func markMailRead(_ message: MailMessage) async {
     _ = reportMailOperation(await mail.markRead(message), successMessage: AppLocalization.text("已标记为已读"))
+  }
+
+  func markAllMailRead(accountName: String?) async {
+    _ = reportMailOperation(
+      await mail.markAllRead(accountName: accountName),
+      successMessage: AppLocalization.text("已将全部邮件标记为已读")
+    )
   }
 
   func markMailJunk(_ message: MailMessage) async {
@@ -3268,6 +3311,9 @@ final class AppModel: ObservableObject {
     } else {
       battery.stop()
     }
+    if automaticPowerModeLifecycleActive {
+      automaticPowerMode.apply(settings: settings, snapshot: battery.snapshot)
+    }
     lowBatteryNotice.update(
       snapshot: battery.snapshot,
       enabled: settings.systemMonitorEnabled && settings.sideNoticesEnabled
@@ -4376,7 +4422,7 @@ final class AppModel: ObservableObject {
     isScreenCleaning: Bool,
     isKeyboardCleaning: Bool
   ) -> Bool {
-    guard phase == .running,
+    guard phase != .idle,
       !isScreenCleaning,
       !isKeyboardCleaning
     else { return false }
@@ -4405,32 +4451,25 @@ final class AppModel: ObservableObject {
       return
     }
 
+    Self.refreshFocusCountdownNotices(for: pomodoro, in: notices)
+  }
+
+  static func refreshFocusCountdownNotices(for pomodoro: PomodoroService, in queue: SideNoticeQueue) {
     let notices = [
-      IslandNotice(
-        id: pomodoro.focusCountdownNoticeID(for: .left),
-        title: AppLocalization.text(pomodoro.mode.title),
-        detail: pomodoro.displayClockWithHours,
-        kind: .info,
-        side: .left
-      ),
-      IslandNotice(
-        id: pomodoro.focusCountdownNoticeID(for: .right),
-        title: AppLocalization.text(pomodoro.mode.title),
-        detail: pomodoro.displayClockWithHours,
-        kind: .info,
-        side: .right
-      ),
+      pomodoro.focusCountdownNotice(for: .left),
+      pomodoro.focusCountdownNotice(for: .right),
     ]
-    self.notices.removeAll(
-      withIDPrefix: focusCountdownNoticePrefix,
+    queue.removeAll(
+      withIDPrefix: PomodoroService.focusCountdownNoticeIDPrefix,
       except: Set(notices.map(\.id))
     )
     for notice in notices {
-      let existing = (notice.side == .left ? self.notices.left : self.notices.right)
+      let existing = (notice.side == .left ? queue.left : queue.right)
         .first { $0.id == notice.id }
-      guard existing?.title != notice.title || existing?.detail != notice.detail else { continue }
-      if !self.notices.updateIfPresent(notice) {
-        self.notices.enqueue(notice, expiresAfter: nil)
+      guard existing?.title != notice.title || existing?.detail != notice.detail
+        || existing?.progress != notice.progress else { continue }
+      if !queue.updateIfPresent(notice) {
+        queue.enqueue(notice, expiresAfter: nil)
       }
     }
   }
@@ -4614,7 +4653,13 @@ final class AppModel: ObservableObject {
     )
   }
 
-  private static func downloadErrorText(_ error: Error) -> String {
+  /// Resolver messages are catalog keys; external diagnostics must remain verbatim to preserve support details.
+  static func downloadErrorText(
+    _ error: Error, locale: Locale = AppLocalization.currentLanguage.locale
+  ) -> String {
+    if error is YTDLPResolverError {
+      return AppLocalization.string(error.localizedDescription, locale: locale)
+    }
     guard let error = error as? DownloadServiceError else {
       return error.localizedDescription
     }
