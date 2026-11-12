@@ -1,5 +1,7 @@
+import Combine
 import Foundation
 import Testing
+import XCTest
 
 @testable import ZislaCore
 @testable import ZislaKit
@@ -189,7 +191,7 @@ struct BrowserDownloadMonitorLifecycleTests {
         try FileManager.default.createDirectory(at: chosen, withIntermediateDirectories: true)
         defer { try? FileManager.default.removeItem(at: root) }
 
-        let monitor = BrowserDownloadMonitor(directories: [downloads], eventPaths: [root])
+        let monitor = BrowserDownloadMonitor(directories: [downloads], eventPaths: [root], fileNameResolver: { _ in [:] })
         var transfers: [BrowserCompletedTransfer] = []
         monitor.onCompletedTransfer = { transfers.append($0) }
         monitor.start()
@@ -238,7 +240,7 @@ struct BrowserDownloadMonitorLifecycleTests {
         try FileManager.default.createDirectory(at: chosen, withIntermediateDirectories: true)
         defer { try? FileManager.default.removeItem(at: root) }
 
-        let monitor = BrowserDownloadMonitor(directories: [downloads], eventPaths: [root])
+        let monitor = BrowserDownloadMonitor(directories: [downloads], eventPaths: [root], fileNameResolver: { _ in [:] })
         var transfers: [BrowserCompletedTransfer] = []
         monitor.onCompletedTransfer = { transfers.append($0) }
         monitor.start()
@@ -273,7 +275,7 @@ struct BrowserDownloadMonitorLifecycleTests {
         try FileManager.default.createDirectory(at: chosen, withIntermediateDirectories: true)
         defer { try? FileManager.default.removeItem(at: root) }
 
-        let monitor = BrowserDownloadMonitor(directories: [downloads], eventPaths: [])
+        let monitor = BrowserDownloadMonitor(directories: [downloads], eventPaths: [], fileNameResolver: { _ in [:] })
         var transfers: [BrowserCompletedTransfer] = []
         monitor.onCompletedTransfer = { transfers.append($0) }
         monitor.start()
@@ -330,7 +332,7 @@ struct BrowserDownloadMonitorLifecycleTests {
         try FileManager.default.createDirectory(at: chosen, withIntermediateDirectories: true)
         defer { try? FileManager.default.removeItem(at: root) }
 
-        let monitor = BrowserDownloadMonitor(directories: [downloads], eventPaths: [root])
+        let monitor = BrowserDownloadMonitor(directories: [downloads], eventPaths: [root], fileNameResolver: { _ in [:] })
         var transfers: [BrowserCompletedTransfer] = []
         monitor.onCompletedTransfer = { transfers.append($0) }
         monitor.start()
@@ -364,7 +366,7 @@ struct BrowserDownloadMonitorLifecycleTests {
         try FileManager.default.createDirectory(at: downloads, withIntermediateDirectories: true)
         defer { try? FileManager.default.removeItem(at: root) }
 
-        let monitor = BrowserDownloadMonitor(directories: [downloads], eventPaths: [root])
+        let monitor = BrowserDownloadMonitor(directories: [downloads], eventPaths: [root], fileNameResolver: { _ in [:] })
         var transfers: [BrowserCompletedTransfer] = []
         monitor.onCompletedTransfer = { transfers.append($0) }
         monitor.start()
@@ -398,7 +400,7 @@ struct BrowserDownloadMonitorLifecycleTests {
         try FileManager.default.createDirectory(at: downloads, withIntermediateDirectories: true)
         defer { try? FileManager.default.removeItem(at: root) }
 
-        let monitor = BrowserDownloadMonitor(directories: [downloads], eventPaths: [root])
+        let monitor = BrowserDownloadMonitor(directories: [downloads], eventPaths: [root], fileNameResolver: { _ in [:] })
         var transfers: [BrowserCompletedTransfer] = []
         monitor.onCompletedTransfer = { transfers.append($0) }
         monitor.start()
@@ -426,7 +428,7 @@ struct BrowserDownloadMonitorLifecycleTests {
         try FileManager.default.createDirectory(at: downloads, withIntermediateDirectories: true)
         defer { try? FileManager.default.removeItem(at: root) }
 
-        let monitor = BrowserDownloadMonitor(directories: [downloads], eventPaths: [])
+        let monitor = BrowserDownloadMonitor(directories: [downloads], eventPaths: [], fileNameResolver: { _ in [:] })
         var transfers: [BrowserCompletedTransfer] = []
         monitor.onCompletedTransfer = { transfers.append($0) }
         monitor.start()
@@ -480,7 +482,7 @@ struct BrowserDownloadMonitorLifecycleTests {
         try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
         defer { try? FileManager.default.removeItem(at: root) }
 
-        let monitor = BrowserDownloadMonitor(directories: [root], eventPaths: [])
+        let monitor = BrowserDownloadMonitor(directories: [root], eventPaths: [], fileNameResolver: { _ in [:] })
         var transfers: [BrowserCompletedTransfer] = []
         monitor.onCompletedTransfer = { transfers.append($0) }
         monitor.start()
@@ -545,7 +547,7 @@ struct BrowserDownloadMonitorLifecycleTests {
         try Data("current".utf8).write(to: temporary)
         let identity = try #require(BrowserDownloadFileIdentity(url: temporary))
         #expect(identity != staleIdentity)
-        let monitor = BrowserDownloadMonitor(directories: [root], eventPaths: [])
+        let monitor = BrowserDownloadMonitor(directories: [root], eventPaths: [], fileNameResolver: { _ in [:] })
         monitor.start()
         defer { monitor.stop() }
         let progress = Progress(totalUnitCount: 100)
@@ -577,7 +579,7 @@ struct BrowserDownloadMonitorLifecycleTests {
         try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
         defer { try? FileManager.default.removeItem(at: root) }
 
-        let monitor = BrowserDownloadMonitor(directories: [root], eventPaths: [], pollInterval: 0.01)
+        let monitor = BrowserDownloadMonitor(directories: [root], eventPaths: [], pollInterval: 0.01, fileNameResolver: { _ in [:] })
         var transfers: [BrowserCompletedTransfer] = []
         monitor.onCompletedTransfer = { transfers.append($0) }
         monitor.start()
@@ -647,7 +649,7 @@ struct BrowserDownloadMonitorLifecycleTests {
         try FileManager.default.createDirectory(at: downloads, withIntermediateDirectories: true)
         defer { try? FileManager.default.removeItem(at: root) }
 
-        let monitor = BrowserDownloadMonitor(directories: [downloads], eventPaths: [])
+        let monitor = BrowserDownloadMonitor(directories: [downloads], eventPaths: [], fileNameResolver: { _ in [:] })
         var transfers: [BrowserCompletedTransfer] = []
         monitor.onCompletedTransfer = { transfers.append($0) }
         monitor.start()
@@ -697,7 +699,7 @@ struct BrowserDownloadMonitorLifecycleTests {
         try FileManager.default.createDirectory(at: downloads, withIntermediateDirectories: true)
         defer { try? FileManager.default.removeItem(at: root) }
 
-        let monitor = BrowserDownloadMonitor(directories: [downloads], eventPaths: [], pollInterval: 0.02)
+        let monitor = BrowserDownloadMonitor(directories: [downloads], eventPaths: [], pollInterval: 0.02, fileNameResolver: { _ in [:] })
         var transfers: [BrowserCompletedTransfer] = []
         monitor.onCompletedTransfer = { transfers.append($0) }
         monitor.start()
@@ -733,7 +735,7 @@ struct BrowserDownloadMonitorLifecycleTests {
         try FileManager.default.createDirectory(at: chosen, withIntermediateDirectories: true)
         defer { try? FileManager.default.removeItem(at: root) }
 
-        let monitor = BrowserDownloadMonitor(directories: [downloads], eventPaths: [], pollInterval: 0.02)
+        let monitor = BrowserDownloadMonitor(directories: [downloads], eventPaths: [], pollInterval: 0.02, fileNameResolver: { _ in [:] })
         var transfers: [BrowserCompletedTransfer] = []
         monitor.onCompletedTransfer = { transfers.append($0) }
         monitor.start()
@@ -779,7 +781,7 @@ struct BrowserDownloadMonitorLifecycleTests {
         }
         defer { try? FileManager.default.removeItem(at: root) }
 
-        let monitor = BrowserDownloadMonitor(directories: [downloads], eventPaths: [])
+        let monitor = BrowserDownloadMonitor(directories: [downloads], eventPaths: [], fileNameResolver: { _ in [:] })
         var transfers: [BrowserCompletedTransfer] = []
         monitor.onCompletedTransfer = { transfers.append($0) }
         monitor.start()
@@ -839,6 +841,305 @@ struct BrowserDownloadMonitorLifecycleTests {
         #expect(!lifecycle.accepts(firstGeneration))
         #expect(lifecycle.accepts(secondGeneration))
     }
+}
+
+struct BrowserDownloadFileNameMonitorTests {
+    @Test(arguments: [false, true], [false, true])
+    @MainActor
+    func unconfirmedDownloadKeepsTargetNameAcrossProgressAndFileEvents(fileEventsFirst: Bool, currentChromeMetadata: Bool) async throws {
+        let fixture = try BrowserDownloadHistoryFixture()
+        defer { try? FileManager.default.removeItem(at: fixture.root) }
+        let completed = fixture.temporaryURL.deletingLastPathComponent().appendingPathComponent("Cursor-darwin-arm64.dmg")
+        var home = fixture.home
+        var metadata: BrowserDownloadMetadataFixture?
+        if currentChromeMetadata {
+            let database = try BrowserDownloadMetadataFixture()
+            metadata = database
+            try database.write([.init(value: BrowserDownloadMetadataFixture.download(
+                current: fixture.temporaryURL.path, target: completed.path))])
+            home = database.history.home
+        } else {
+            try fixture.insertDownload(targetPath: completed.path)
+        }
+        defer { if let metadata { try? FileManager.default.removeItem(at: metadata.history.root) } }
+        try Data("partial".utf8).write(to: fixture.temporaryURL)
+        let identity = try #require(BrowserDownloadFileIdentity(url: fixture.temporaryURL))
+        let resolver = BrowserDownloadFileNameResolver(homeDirectory: home)
+        let resolutions = FileNameResolutionCounter()
+        let monitor = BrowserDownloadMonitor(
+            directories: [fixture.temporaryURL.deletingLastPathComponent()], eventPaths: [],
+            fileNameResolver: { downloads in
+                await resolutions.record()
+                return resolver.fileNames(for: downloads)
+            }
+        )
+        var transfers: [BrowserCompletedTransfer] = []
+        monitor.onCompletedTransfer = { transfers.append($0) }
+        monitor.start()
+        defer { monitor.stop() }
+        let progress = Progress(totalUnitCount: 100)
+        progress.kind = .file
+        progress.fileOperationKind = .downloading
+        progress.fileURL = fixture.temporaryURL
+        progress.completedUnitCount = 40
+        defer { progress.unpublish() }
+        let observeFile = {
+            monitor.handleFileEvent(
+                at: fixture.temporaryURL, fileID: identity.inode, renamed: false,
+                runningBundleIdentifiers: ["com.google.Chrome"]
+            )
+        }
+
+        if fileEventsFirst {
+            await expectSnapshots(monitor, matching: { $0.first?.fileName == completed.lastPathComponent }, perform: observeFile)
+        }
+        await expectSnapshots(monitor, matching: {
+            $0.count == 1 && $0.first?.fileName == completed.lastPathComponent && $0.first?.progressText == "40%"
+        }, perform: { progress.publish() })
+        observeFile()
+        #expect(monitor.snapshots.count == 1)
+        #expect(monitor.snapshot?.fileName == "Cursor-darwin-arm64.dmg")
+        #expect(monitor.snapshot?.progressText == "40%")
+        #expect(transfers.isEmpty)
+
+        await expectSnapshots(monitor, matching: {
+            $0.first?.fileName == completed.lastPathComponent && $0.first?.progressText == "75%"
+        }, perform: { progress.completedUnitCount = 75 })
+        try FileManager.default.moveItem(at: fixture.temporaryURL, to: completed)
+        monitor.handleFileEvent(at: completed, fileID: identity.inode, renamed: true)
+        #expect(monitor.snapshot?.fileName == "Cursor-darwin-arm64.dmg")
+        #expect(monitor.snapshot?.isFinished == true)
+        #expect(transfers.count == 1)
+        #expect(transfers.first?.directoryURL == completed.deletingLastPathComponent())
+        #expect(await resolutions.count <= (fileEventsFirst ? 2 : 1), "Resolved names must stop repeated metadata reads")
+    }
+
+    @Test
+    @MainActor
+    func missingMetadataIsRetriedWithoutChangingProgress() async throws {
+        let fixture = try BrowserDownloadHistoryFixture()
+        defer { try? FileManager.default.removeItem(at: fixture.root) }
+        try Data("partial".utf8).write(to: fixture.temporaryURL)
+        let resolver = BrowserDownloadFileNameResolver(homeDirectory: fixture.home)
+        let attempted = XCTestExpectation(description: "First metadata lookup returned no name")
+        let monitor = BrowserDownloadMonitor(
+            directories: [fixture.temporaryURL.deletingLastPathComponent()], eventPaths: [],
+            fileNameResolver: { downloads in
+                let names = resolver.fileNames(for: downloads)
+                if names.isEmpty { attempted.fulfill() }
+                return names
+            }
+        )
+        monitor.start()
+        defer { monitor.stop() }
+        let progress = Progress(totalUnitCount: 100)
+        progress.kind = .file
+        progress.fileOperationKind = .downloading
+        progress.fileURL = fixture.temporaryURL
+        progress.completedUnitCount = 40
+        progress.publish()
+        defer { progress.unpublish() }
+        #expect(await XCTWaiter.fulfillment(of: [attempted], timeout: 3) == .completed)
+        #expect(monitor.snapshot?.fileName == "未确认 156370")
+        #expect(monitor.snapshot?.progressText == "40%")
+        try fixture.insertDownload(targetPath: "/Downloads/Cursor-darwin-arm64.dmg")
+        await expectSnapshots(monitor, matching: { $0.first?.fileName == "Cursor-darwin-arm64.dmg" }, perform: {})
+        #expect(monitor.snapshot?.progressText == "40%")
+    }
+
+    @Test(arguments: [false, true])
+    @MainActor
+    func lateMetadataCannotReplaceAFinishedOrStoppedDownload(stop: Bool) async throws {
+        let fixture = try BrowserDownloadHistoryFixture()
+        defer { try? FileManager.default.removeItem(at: fixture.root) }
+        try Data("partial".utf8).write(to: fixture.temporaryURL)
+        let identity = try #require(BrowserDownloadFileIdentity(url: fixture.temporaryURL))
+        let gate = FileNameResolutionGate()
+        let monitor = BrowserDownloadMonitor(
+            directories: [], eventPaths: [],
+            fileNameResolver: { downloads in await gate.resolve(downloads) }
+        )
+        monitor.start()
+        defer { monitor.stop() }
+        monitor.handleFileEvent(
+            at: fixture.temporaryURL, fileID: identity.inode, renamed: false,
+            runningBundleIdentifiers: ["com.google.Chrome"]
+        )
+        #expect(await XCTWaiter.fulfillment(of: [gate.requested], timeout: 3) == .completed)
+        let completed = fixture.temporaryURL.deletingLastPathComponent().appendingPathComponent("actual.dmg")
+        if stop {
+            monitor.stop()
+        } else {
+            try FileManager.default.moveItem(at: fixture.temporaryURL, to: completed)
+            monitor.handleFileEvent(at: completed, fileID: identity.inode, renamed: true)
+        }
+        await gate.finish(with: [fixture.temporaryURL: "stale.dmg"])
+        await withCheckedContinuation { continuation in
+            DispatchQueue.main.async { continuation.resume() }
+        }
+        #expect(monitor.snapshot?.fileName == (stop ? nil : "actual.dmg"))
+        #expect(monitor.snapshot?.isFinished == (stop ? nil : true))
+    }
+
+    @Test
+    @MainActor
+    func slowLookupDoesNotDuplicateWorkOrOverwriteARestartedDownload() async throws {
+        let fixture = try BrowserDownloadHistoryFixture()
+        defer { try? FileManager.default.removeItem(at: fixture.root) }
+        try Data("partial".utf8).write(to: fixture.temporaryURL)
+        let identity = try #require(BrowserDownloadFileIdentity(url: fixture.temporaryURL))
+        let gate = FileNameResolutionGate()
+        let monitor = BrowserDownloadMonitor(
+            directories: [fixture.temporaryURL.deletingLastPathComponent()], eventPaths: [],
+            fileNameResolver: { downloads in await gate.resolve(downloads) }
+        )
+        monitor.start()
+        defer { monitor.stop() }
+        monitor.handleFileEvent(
+            at: fixture.temporaryURL, fileID: identity.inode, renamed: false,
+            runningBundleIdentifiers: ["com.google.Chrome"]
+        )
+        #expect(await XCTWaiter.fulfillment(of: [gate.requested], timeout: 3) == .completed)
+        let progress = Progress(totalUnitCount: 100)
+        progress.kind = .file
+        progress.fileOperationKind = .downloading
+        progress.fileURL = fixture.temporaryURL
+        progress.completedUnitCount = 40
+        progress.publish()
+        defer { progress.unpublish() }
+        await expectSnapshots(monitor, matching: { $0.first?.progressText == "40%" }, perform: {})
+        await expectSnapshots(monitor, matching: { $0.first?.progressText == "75%" }, perform: { progress.completedUnitCount = 75 })
+        #expect(await gate.requestCount == 1, "Polling must keep one metadata lookup in flight")
+
+        monitor.stop()
+        monitor.start()
+        await expectSnapshots(monitor, matching: { $0.first?.progressText == "75%" }, perform: {})
+        #expect(await XCTWaiter.fulfillment(of: [gate.secondRequested], timeout: 3) == .completed)
+        let currentID = try #require(monitor.snapshot?.id)
+        await gate.finish(with: [fixture.temporaryURL: "stale.dmg"])
+        await withCheckedContinuation { continuation in
+            DispatchQueue.main.async { continuation.resume() }
+        }
+        #expect(monitor.snapshot?.id == currentID)
+        #expect(monitor.snapshot?.fileName == "未确认 156370")
+        #expect(await XCTWaiter.fulfillment(of: [gate.unexpectedRequest], timeout: 0.8) == .completed)
+        #expect(await gate.requestCount == 2, "Restarting must allow a new lookup")
+        await gate.finish(with: [fixture.temporaryURL: "current.dmg"])
+        await expectSnapshots(monitor, matching: { $0.first?.fileName == "current.dmg" }, perform: {})
+        await gate.finishAll()
+    }
+
+    @Test
+    @MainActor
+    func namedTemporaryFileDoesNotQueryBrowserMetadata() async throws {
+        let fixture = try BrowserDownloadHistoryFixture()
+        defer { try? FileManager.default.removeItem(at: fixture.root) }
+        let temporary = fixture.temporaryURL.deletingLastPathComponent().appendingPathComponent("Cursor.dmg.crdownload")
+        try Data("partial".utf8).write(to: temporary)
+        let resolutions = FileNameResolutionCounter()
+        let monitor = BrowserDownloadMonitor(
+            directories: [temporary.deletingLastPathComponent()], eventPaths: [],
+            fileNameResolver: { _ in await resolutions.record(); return [:] }
+        )
+        monitor.start()
+        defer { monitor.stop() }
+        let progress = Progress(totalUnitCount: 100)
+        progress.kind = .file
+        progress.fileOperationKind = .downloading
+        progress.fileURL = temporary
+        progress.completedUnitCount = 40
+        progress.publish()
+        defer { progress.unpublish() }
+        await expectSnapshots(monitor, matching: { $0.first?.progressText == "40%" }, perform: {})
+        await expectSnapshots(monitor, matching: { $0.first?.progressText == "75%" }, perform: { progress.completedUnitCount = 75 })
+        #expect(monitor.snapshot?.fileName == "Cursor.dmg")
+        #expect(await resolutions.count == 0, "A usable filename must not trigger browser metadata reads")
+    }
+
+    @Test
+    @MainActor
+    func lateMetadataCannotOverwriteANewTemporaryPathForTheSameDownload() async throws {
+        let fixture = try BrowserDownloadHistoryFixture()
+        defer { try? FileManager.default.removeItem(at: fixture.root) }
+        try Data("partial".utf8).write(to: fixture.temporaryURL)
+        let identity = try #require(BrowserDownloadFileIdentity(url: fixture.temporaryURL))
+        let gate = FileNameResolutionGate()
+        let monitor = BrowserDownloadMonitor(
+            directories: [], eventPaths: [],
+            fileNameResolver: { downloads in await gate.resolve(downloads) }
+        )
+        monitor.start()
+        defer { monitor.stop() }
+        monitor.handleFileEvent(
+            at: fixture.temporaryURL, fileID: identity.inode, renamed: false,
+            runningBundleIdentifiers: ["com.google.Chrome"]
+        )
+        #expect(await XCTWaiter.fulfillment(of: [gate.requested], timeout: 3) == .completed)
+        let token = try #require(monitor.snapshot?.id)
+        let renamed = fixture.temporaryURL.deletingLastPathComponent().appendingPathComponent("renamed.dmg.crdownload")
+        try FileManager.default.moveItem(at: fixture.temporaryURL, to: renamed)
+        monitor.handleFileEvent(
+            at: renamed, fileID: identity.inode, renamed: true,
+            runningBundleIdentifiers: ["com.google.Chrome"]
+        )
+        await gate.finish(with: [fixture.temporaryURL: "stale.dmg"])
+        await withCheckedContinuation { continuation in
+            DispatchQueue.main.async { continuation.resume() }
+        }
+        #expect(monitor.snapshot?.id == token)
+        #expect(monitor.snapshot?.fileName == "renamed.dmg")
+        #expect(monitor.snapshot?.isFinished == false)
+    }
+
+    @MainActor
+    private func expectSnapshots(
+        _ monitor: BrowserDownloadMonitor,
+        matching predicate: @escaping ([BrowserDownloadSnapshot]) -> Bool,
+        perform: () -> Void
+    ) async {
+        let updated = XCTestExpectation(description: "Download snapshots match the expected name and progress")
+        let observation = monitor.$snapshots.filter(predicate).prefix(1).sink { _ in updated.fulfill() }
+        perform()
+        #expect(await XCTWaiter.fulfillment(of: [updated], timeout: 3) == .completed)
+        withExtendedLifetime(observation) {}
+    }
+}
+
+private actor FileNameResolutionGate {
+    nonisolated let requested = XCTestExpectation(description: "Metadata lookup is suspended")
+    nonisolated let secondRequested = XCTestExpectation(description: "Restarted metadata lookup is suspended")
+    nonisolated let unexpectedRequest: XCTestExpectation = {
+        let expectation = XCTestExpectation(description: "No third lookup may run while the second is suspended")
+        expectation.isInverted = true
+        return expectation
+    }()
+    private var continuations: [CheckedContinuation<[URL: String], Never>] = []
+    private(set) var requestCount = 0
+
+    func resolve(_ downloads: [URL: BrowserDownloadAgent]) async -> [URL: String] {
+        await withCheckedContinuation { continuation in
+            continuations.append(continuation)
+            requestCount += 1
+            requested.fulfill()
+            if requestCount == 2 { secondRequested.fulfill() }
+            if requestCount > 2 { unexpectedRequest.fulfill() }
+        }
+    }
+
+    func finish(with names: [URL: String]) {
+        continuations.removeFirst().resume(returning: names)
+    }
+
+    func finishAll() {
+        for continuation in continuations { continuation.resume(returning: [:]) }
+        continuations.removeAll()
+    }
+}
+
+private actor FileNameResolutionCounter {
+    private(set) var count = 0
+
+    func record() { count += 1 }
 }
 
 struct BrowserDownloadSnapshotTests {
