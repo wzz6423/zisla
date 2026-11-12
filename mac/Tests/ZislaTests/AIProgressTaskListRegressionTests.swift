@@ -89,8 +89,8 @@ struct AIProgressTaskListRegressionTests {
         #expect(fixture.monitor.state.tasks.isEmpty)
         #expect(fixture.descendants.compactMap { $0 as? NSTableView }.isEmpty,
             "The empty task state must release the native task list")
-        #expect(fixture.descendants.compactMap { $0 as? NSScrollView }.count == 2,
-            "The usage pane and full-width quota surface must remain available while the task list is empty")
+        #expect(fixture.descendants.compactMap { $0 as? NSScrollView }.count == 1,
+            "Empty tasks must leave the outer module as the sole vertical scrolling surface")
 
         try fixture.upsert(index: 0, step: 1)
         try fixture.upsert(index: 0, step: 2)

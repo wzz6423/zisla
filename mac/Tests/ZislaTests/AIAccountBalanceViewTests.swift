@@ -26,7 +26,7 @@ struct AIAccountBalanceViewTests {
         let fiveHoursOnly = try render(0.1, .critical, nil, nil)
         let scale = CGFloat(dual.pixelsWide) / diameter
         let center = CGFloat(dual.pixelsWide) / 2
-        var innerRed = 0, innerColored = 0, outerWhite = 0, outerColored = 0
+        var innerRed = 0, innerColored = 0, outerGreen = 0, outerColored = 0
         var missingInner = 0, missingOuter = 0, changedOuter = 0
         for y in 0..<dual.pixelsHigh {
             for x in 0..<dual.pixelsWide {
@@ -40,17 +40,18 @@ struct AIAccountBalanceViewTests {
                     if color.redComponent > 0.03 { innerColored += 1 }
                     if max(missing.redComponent, missing.greenComponent, missing.blueComponent) > 0.03 { missingInner += 1 }
                 } else {
-                    if min(color.redComponent, color.greenComponent, color.blueComponent) > 0.6 { outerWhite += 1 }
-                    if color.redComponent > 0.03 { outerColored += 1 }
+                    if color.greenComponent > 0.45 && color.greenComponent > color.redComponent * 1.4
+                        && color.greenComponent > color.blueComponent * 1.15 { outerGreen += 1 }
+                    if max(color.redComponent, color.greenComponent, color.blueComponent) > 0.03 { outerColored += 1 }
                     if max(only.redComponent, only.greenComponent, only.blueComponent) > 0.03 { missingOuter += 1 }
                     if abs(color.redComponent - changed.redComponent) > 0.02
                         || abs(color.greenComponent - changed.greenComponent) > 0.02 { changedOuter += 1 }
                 }
             }
         }
-        #expect(innerRed > 80 && outerWhite > 100)
+        #expect(innerRed > 80 && outerGreen > 100)
         #expect((0.07...0.22).contains(Double(innerRed) / Double(innerColored)))
-        #expect((0.4...0.65).contains(Double(outerWhite) / Double(outerColored)))
+        #expect((0.4...0.65).contains(Double(outerGreen) / Double(outerColored)))
         #expect(missingInner == 0, "A missing five-hour window must leave no inner track")
         #expect(missingOuter == 0, "A five-hour-only account must leave no fabricated weekly track")
         #expect(changedOuter == 0, "Resetting five hours cannot change the independent weekly ring")
@@ -78,17 +79,18 @@ struct AIAccountBalanceViewTests {
         let bitmap = try await renderOffscreen(CompactAIAccountBalanceBar(notice: notice, height: thickness, edge: edge)
             .foregroundStyle(.white).environment(\.colorScheme, .dark)
             .environment(\.layoutDirection, rightToLeft ? .rightToLeft : .leftToRight), size: size, reduceMotion: true)
-        var red = 0, white = 0
+        var red = 0, green = 0
         for y in 0..<bitmap.pixelsHigh {
             for x in 0..<bitmap.pixelsWide {
                 let axis = edge.isVertical ? y : x
                 guard CGFloat(axis) / (CGFloat(edge.isVertical ? bitmap.pixelsHigh : bitmap.pixelsWide) / length) > 46 else { continue }
                 let color = try #require(bitmap.colorAt(x: x, y: y)?.usingColorSpace(.sRGB))
                 if color.redComponent > 0.5 && color.greenComponent < 0.3 { red += 1 }
-                if min(color.redComponent, color.greenComponent, color.blueComponent) > 0.6 { white += 1 }
+                if color.greenComponent > 0.45 && color.greenComponent > color.redComponent * 1.4
+                    && color.greenComponent > color.blueComponent * 1.15 { green += 1 }
             }
         }
-        #expect(red > 10 && white > 10, "Five-hour and weekly values must keep their independent remaining colors")
+        #expect(red > 10 && green > 10, "Critical five-hour values must stay red while healthy weekly values are green")
 
         let expectedRing = try await renderOffscreen(AIAccountQuotaRing(provider: .gpt, fraction: 0.51,
             severity: .normal, diameter: thickness - 8, innerFraction: 0.1, innerSeverity: .critical)
@@ -127,6 +129,43 @@ struct AIAccountBalanceViewTests {
                     "Brief and full modes share the same real two-ring quota mark")
             }
         }
+    }
+
+    @Test(arguments: [ColorScheme.light, .dark], [IslandEdge.top, .left])
+    func healthyNoticeRendersGreenRingsAndBothQuotaValues(colorScheme: ColorScheme, edge: IslandEdge) async throws {
+        let queue = SideNoticeQueue(), controller = AIAccountBalanceNoticeController(queue: queue)
+        defer { queue.removeAll() }
+        let reading = AIAccountBalance(id: "healthy", providers: [.gpt], status: .available,
+            windows: [.init(id: "5h", kind: .fiveHours, remainingPercent: 70, durationSeconds: 18_000),
+                .init(id: "weekly", kind: .weekly, remainingPercent: 80, durationSeconds: 604_800)])
+        var settings = FeatureSettings(aiAccountBalanceNoticeEnabled: false, aiAccountBalanceCompactStyle: .detailed,
+            aiAccountBalancePinnedInCustomIsland: true, aiAccountBalanceMonitoredProviders: [.gpt],
+            aiAccountBalanceDisplayedProviders: [.gpt])
+        settings.islandPlacement = IslandPlacement(mode: .custom, edge: edge)
+        controller.update(balances: [reading], settings: settings, language: .english)
+        let notice = try #require(queue.left.first)
+        #expect(notice.metadata?["quotaLine0"] == "5h 70%" && notice.metadata?["quotaLine1"] == "7d 80%")
+        let presentation = CompactPillStatusPresentation(priority: .aiAccountBalance, notice: notice, text: "")
+        let length = presentation.length(thickness: 34, edge: edge)
+        let size = CGSize(width: edge.isVertical ? 34 : length, height: edge.isVertical ? length : 34)
+        let bitmap = try await renderOffscreen(CompactAIAccountBalanceBar(notice: notice, height: 34, edge: edge)
+            .foregroundStyle(.white).environment(\.colorScheme, colorScheme), size: size, reduceMotion: true)
+        let scale = CGFloat(bitmap.pixelsWide) / size.width
+        var ringGreen = 0, lineGreen = [0, 0]
+        for y in 0..<bitmap.pixelsHigh {
+            for x in 0..<bitmap.pixelsWide {
+                let color = try #require(bitmap.colorAt(x: x, y: y)?.usingColorSpace(.sRGB))
+                guard color.greenComponent > 0.45 && color.greenComponent > color.redComponent * 1.4
+                    && color.greenComponent > color.blueComponent * 1.15 else { continue }
+                if CGFloat(edge.isVertical ? y : x) / scale < 44 { ringGreen += 1 }
+                else {
+                    let line = edge.isVertical ? (x < bitmap.pixelsWide / 2 ? 0 : 1) : (y < bitmap.pixelsHigh / 2 ? 0 : 1)
+                    lineGreen[line] += 1
+                }
+            }
+        }
+        #expect(ringGreen > 20, "Healthy compact quota arcs must render green in both color schemes")
+        #expect(lineGreen.allSatisfy { $0 > 10 }, "Both healthy remaining values must render green independently")
     }
 
     @Test(arguments: [AIProvider.codex, .gpt])
@@ -230,7 +269,8 @@ struct AIAccountBalanceViewTests {
         var leftPixels = 0, rightTop = 0, rightBottom = 0, cameraPixels = 0
         for x in 0..<image.pixelsWide {
             for y in 0..<image.pixelsHigh {
-                guard let color = image.colorAt(x: x, y: y)?.usingColorSpace(.deviceRGB), color.redComponent > 0.5 else { continue }
+                guard let color = image.colorAt(x: x, y: y)?.usingColorSpace(.deviceRGB),
+                    max(color.redComponent, color.greenComponent, color.blueComponent) > 0.5 else { continue }
                 if x < leftEnd { leftPixels += 1 }
                 else if x >= rightStart {
                     if y < image.pixelsHigh / 2 { rightTop += 1 } else { rightBottom += 1 }
@@ -337,14 +377,16 @@ struct AIAccountBalanceViewTests {
             "The real balance section must use the full width for its supplier cards")
     }
 
-    @Test(arguments: [(Double(20), AIAccountQuotaSeverity.warning), (10, .critical), (0, .exhausted), (100, .normal)])
-    func ringShowsRealRemainingArcAndThresholdColor(configuration: (Double, AIAccountQuotaSeverity)) throws {
+    @Test(arguments: [(Double(20), AIAccountQuotaSeverity.warning), (10, .critical), (0, .exhausted), (100, .normal)],
+        [ColorScheme.light, .dark])
+    func ringShowsRealRemainingArcAndThresholdColor(configuration: (Double, AIAccountQuotaSeverity), colorScheme: ColorScheme) throws {
         let (percent, severity) = configuration
-        let renderer = ImageRenderer(content: AIAccountQuotaRing(provider: nil, fraction: percent / 100,
-            severity: severity, diameter: 42).background(.black).foregroundStyle(.white).environment(\.colorScheme, .dark))
+        let window = AIAccountQuotaWindow(id: "quota", kind: .all, remainingPercent: percent)
+        let renderer = ImageRenderer(content: AIAccountQuotaRing(provider: nil, fraction: window.remainingFraction,
+            severity: window.severity, diameter: 42).background(.black).foregroundStyle(.white).environment(\.colorScheme, colorScheme))
         renderer.scale = 2
         let bitmap = NSBitmapImageRep(cgImage: try #require(renderer.cgImage))
-        var bright = 0, track = 0
+        var bright = 0, track = 0, green = 0
         for y in 0..<bitmap.pixelsHigh {
             for x in 0..<bitmap.pixelsWide {
                 let color = try #require(bitmap.colorAt(x: x, y: y)?.usingColorSpace(.deviceRGB))
@@ -353,11 +395,14 @@ struct AIAccountBalanceViewTests {
                     bright += 1
                     if percent == 20, level > 0.8 { #expect(color.greenComponent > 0.6 && color.blueComponent < 0.3) }
                     if percent == 10, level > 0.8 { #expect(color.redComponent > color.greenComponent * 2) }
+                    if color.greenComponent > color.redComponent * 1.4
+                        && color.greenComponent > color.blueComponent * 1.15 { green += 1 }
                 } else if level > 0.02 { track += 1 }
             }
         }
         #expect(track > 0)
         #expect(percent == 0 ? bright == 0 : bright > 80)
+        if severity == .normal { #expect(green == bright && green > 80, "Healthy remaining quota must render a green arc") }
         if percent == 20 || percent == 10 { #expect(bright < 500, "A low remaining quota must not render a mostly full ring") }
     }
 
@@ -413,6 +458,58 @@ struct AIAccountBalanceViewTests {
             "Only a selected pinned quota or voice processing may force visibility with short activity durations")
     }
 
+    @Test(arguments: [(CGFloat(244), AppLanguage.simplifiedChinese), (244, .english), (320, .arabic)])
+    func cardQuotaWindowsKeepLabelValueAndResetOnEachInlineRow(configuration: (CGFloat, AppLanguage)) async throws {
+        let (width, language) = configuration
+        let reset = Date(timeIntervalSince1970: 1_910_001_000)
+        func card(reset: Date?, fiveHours: Double = 10, weekly: Double = 51) -> some View {
+            AIAccountBalanceCard(balance: AIAccountBalance(id: "fixture", providers: [.codex], status: .available,
+                windows: [.init(id: "5h", kind: .fiveHours, remainingPercent: fiveHours,
+                    resetsAt: reset, durationSeconds: 18_000),
+                    .init(id: "weekly", kind: .weekly, remainingPercent: weekly,
+                        resetsAt: reset, durationSeconds: 604_800)]), language: language)
+                .foregroundStyle(.white).environment(\.colorScheme, .dark)
+                .environment(\.layoutDirection, language.isRightToLeft ? .rightToLeft : .leftToRight)
+        }
+        let host = NSHostingView(rootView: card(reset: reset).frame(width: width).fixedSize(horizontal: false, vertical: true))
+        host.layoutSubtreeIfNeeded()
+        #expect(host.fittingSize.width <= width + 0.5)
+        #expect(host.fittingSize.height <= 104, "Two complete inline quota rows must fit beside the 52pt ring")
+        let size = CGSize(width: width, height: ceil(host.fittingSize.height))
+        let actual = try await renderOffscreen(card(reset: reset), size: size)
+        let withoutReset = try await renderOffscreen(card(reset: nil), size: size)
+        let differentValues = try await renderOffscreen(card(reset: reset, fiveHours: 9, weekly: 52), size: size)
+        let scale = CGFloat(actual.pixelsWide) / width
+        let startX = Int((language.isRightToLeft ? 12 : 72) * scale)
+        let endX = Int((width - (language.isRightToLeft ? 72 : 12)) * scale)
+        let startY = Int(35 * scale), endY = Int((size.height - 12) * scale)
+        var resetChanges = [0, 0], valueChanges = [0, 0]
+        var textRows = 0, lastInkY = startY - Int(3 * scale) - 1
+        for y in startY..<endY {
+            let row = y < (startY + endY) / 2 ? 0 : 1
+            var hasInk = false
+            for x in startX..<endX {
+                let a = try #require(actual.colorAt(x: x, y: y)?.usingColorSpace(.sRGB))
+                let b = try #require(withoutReset.colorAt(x: x, y: y)?.usingColorSpace(.sRGB))
+                let c = try #require(differentValues.colorAt(x: x, y: y)?.usingColorSpace(.sRGB))
+                if max(a.redComponent, a.greenComponent, a.blueComponent) > 0.3 { hasInk = true }
+                if abs(a.redComponent - b.redComponent) + abs(a.greenComponent - b.greenComponent) + abs(a.blueComponent - b.blueComponent) > 0.1 {
+                    resetChanges[row] += 1
+                }
+                if abs(a.redComponent - c.redComponent) + abs(a.greenComponent - c.greenComponent) + abs(a.blueComponent - c.blueComponent) > 0.1 {
+                    valueChanges[row] += 1
+                }
+            }
+            if hasInk {
+                if y - lastInkY > Int(3 * scale) { textRows += 1 }
+                lastInkY = y
+            }
+        }
+        #expect(textRows == 2, "Each quota window must render its label, value, and reset time on one physical row")
+        #expect(resetChanges.allSatisfy { $0 > 20 }, "Both independent quota rows must retain their localized reset time")
+        #expect(valueChanges.allSatisfy { $0 > 10 }, "Both independent remaining values must remain visible beside their labels")
+    }
+
     /// A long model identity must consume extra vertical space instead of compressing values or overflowing a narrow RTL row.
     @Test func narrowRTLBalanceRowsWrapLongIdentityWithoutHorizontalOverflow() async throws {
         let window = AIAccountQuotaWindow(id: "model", kind: .model, remainingPercent: 10,
@@ -423,19 +520,12 @@ struct AIAccountBalanceViewTests {
         host.frame = NSRect(x: 0, y: 0, width: 240, height: 500)
         host.layoutSubtreeIfNeeded()
         #expect(host.fittingSize.width <= 240.5)
-        #expect(host.fittingSize.height > 70, "Long window identities must use additional lines instead of squeezing the quota value")
-    }
-
-    /// Large task counts must saturate the bounded upper viewport so quota below it remains reachable by outer scrolling.
-    @Test func boundedTaskViewportLeavesBalanceReachableAfterManyTasks() {
-        for count in [0, 1, 6, 20, 1_000] {
-            let height = AIProgressModuleView.taskSectionHeight(taskCount: count, availableHeight: 500)
-            #expect(height <= 360 && height <= 325)
-        }
-        #expect(AIProgressModuleView.taskSectionHeight(taskCount: 20, availableHeight: 500)
-            == AIProgressModuleView.taskSectionHeight(taskCount: 1_000, availableHeight: 500))
-        let balance = AIAccountBalance(id: "fixture", providers: [.claude], status: .notSignedIn)
-        #expect(AIAccountBalanceSection(balances: [balance], displayedProviders: [], monitoredProviders: [], language: .english).displayedBalances.isEmpty)
+        let label = NSHostingView(rootView: Text(window.label(language: .arabic)).font(.system(size: 10))
+            .frame(width: 166).fixedSize(horizontal: false, vertical: true)
+            .environment(\.layoutDirection, .rightToLeft))
+        label.layoutSubtreeIfNeeded()
+        #expect(host.fittingSize.height >= label.fittingSize.height + 37,
+            "The complete long window identity must wrap without a line limit or ellipsis")
     }
 
     @Test(arguments: [AIAccountBalanceStatus.notSignedIn, .credentialsExpired, .invalidResponse, .available])

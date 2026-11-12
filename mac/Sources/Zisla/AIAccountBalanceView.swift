@@ -4,7 +4,7 @@ import ZislaKit
 
 extension AIAccountQuotaSeverity {
     var balanceColor: Color {
-        switch self { case .normal: .primary; case .warning: .yellow; case .critical: .red; case .exhausted: .gray }
+        switch self { case .normal: .green; case .warning: .yellow; case .critical: .red; case .exhausted: .gray }
     }
 }
 
@@ -115,19 +115,19 @@ struct AIAccountBalanceCard: View {
     }
 
     private func quotaDetails(_ window: AIAccountQuotaWindow, label: String) -> some View {
-        VStack(alignment: .leading, spacing: 3) {
-            Text(label).font(.system(size: 10)).foregroundStyle(.secondary)
-            Text(window.value(language: language))
-                .font(.system(size: 12, weight: .semibold, design: .rounded))
-                .monospacedDigit().foregroundStyle(window.severity.balanceColor)
-            if let reset = window.resetsAt {
-                Text(AppLocalization.format("%@ 重置", locale: language.locale,
-                    [reset.formatted(.dateTime.month(.twoDigits).day(.twoDigits).hour().minute().locale(language.locale))]))
-                    .font(.system(size: 9)).foregroundStyle(.secondary)
-            }
+        let title = Text(label).font(.system(size: 10)).foregroundStyle(.secondary)
+        let value = Text(window.value(language: language))
+            .font(.system(size: 12, weight: .semibold, design: .rounded))
+            .monospacedDigit().foregroundStyle(window.severity.balanceColor)
+        var details = Text("\(title) \(value)")
+        if let reset = window.resetsAt {
+            let resetText = Text(AppLocalization.format("%@ 重置", locale: language.locale,
+                [reset.formatted(.dateTime.month(.twoDigits).day(.twoDigits).hour().minute().locale(language.locale))]))
+                .font(.system(size: 9)).foregroundStyle(.secondary)
+            details = Text("\(details) · \(resetText)")
         }
-        .fixedSize(horizontal: false, vertical: true)
-        .frame(maxWidth: .infinity, alignment: .leading)
+        return details.fixedSize(horizontal: false, vertical: true)
+            .frame(maxWidth: .infinity, alignment: .leading)
     }
 }
 

@@ -25,41 +25,24 @@ struct AIProgressModuleView: View {
     }
 
     var body: some View {
-        GeometryReader { proxy in
-            ScrollView(.vertical) {
-                VStack(alignment: .leading, spacing: 16) {
-                    HStack(alignment: .top, spacing: 12) {
-                        runningTasks
-                            .frame(width: (proxy.size.width - 24) * 0.48,
-                                   height: Self.taskSectionHeight(taskCount: activeTasks.count, availableHeight: proxy.size.height), alignment: .top)
-                        Hairline()
-                        ScrollView(.vertical) {
-                            usageSummary(endingAt: .now)
-                                .padding(.horizontal, NSScroller.scrollerWidth(for: .mini, scrollerStyle: .overlay))
-                                .frame(maxWidth: .infinity, alignment: .topLeading)
-                        }
-                        .thinScrollChrome(scrollerStyle: .overlay)
-                        .frame(maxWidth: .infinity)
-                        .frame(height: Self.upperSectionHeight(availableHeight: proxy.size.height), alignment: .top)
-                    }
-                    .fixedSize(horizontal: false, vertical: true)
-                    AIAccountBalanceSection(balances: monitor.accountBalances,
-                        displayedProviders: displayedBalanceProviders, monitoredProviders: monitoredBalanceProviders,
-                        language: language)
+        ScrollView(.vertical) {
+            VStack(alignment: .leading, spacing: 16) {
+                AIProgressUpperSectionLayout {
+                    runningTasks
+                    Hairline()
+                    usageSummary(endingAt: .now)
+                        .frame(maxWidth: .infinity, alignment: .topLeading)
                 }
-                .frame(maxWidth: .infinity, alignment: .topLeading)
+                AIAccountBalanceSection(balances: monitor.accountBalances,
+                    displayedProviders: displayedBalanceProviders, monitoredProviders: monitoredBalanceProviders,
+                    language: language)
             }
-            .thinScrollChrome(scrollerStyle: .overlay)
-            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+            .padding(.trailing, NSScroller.scrollerWidth(for: .mini, scrollerStyle: .overlay) + 1)
+            .frame(maxWidth: .infinity, alignment: .topLeading)
         }
+        .thinScrollChrome(scrollerStyle: .overlay)
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
     }
-
-    static func taskSectionHeight(taskCount: Int, availableHeight: CGFloat) -> CGFloat {
-        let maximum = upperSectionHeight(availableHeight: availableHeight)
-        return min(maximum, 28 + CGFloat(min(6, max(1, taskCount))) * 54)
-    }
-
-    static func upperSectionHeight(availableHeight: CGFloat) -> CGFloat { min(360, max(140, availableHeight * 0.65)) }
 
     private var activeTasks: [AIProgressTask] {
         monitor.state.tasks
@@ -129,6 +112,34 @@ struct AIProgressModuleView: View {
         }
     }
 
+}
+
+private struct AIProgressUpperSectionLayout: Layout {
+    static var layoutProperties: LayoutProperties {
+        var properties = LayoutProperties()
+        properties.stackOrientation = .horizontal
+        return properties
+    }
+
+    func sizeThatFits(proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) -> CGSize {
+        let dividerWidth = subviews[1].sizeThatFits(.unspecified).width
+        let width = proposal.replacingUnspecifiedDimensions().width
+        let contentWidth = width - 24 - dividerWidth
+        return CGSize(width: width,
+            height: subviews[2].sizeThatFits(ProposedViewSize(width: contentWidth * 0.52, height: nil)).height)
+    }
+
+    func placeSubviews(in bounds: CGRect, proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) {
+        let dividerWidth = subviews[1].sizeThatFits(.unspecified).width
+        let contentWidth = bounds.width - 24 - dividerWidth
+        let widths = [contentWidth * 0.48, dividerWidth, contentWidth * 0.52]
+        var x = bounds.minX
+        for (subview, width) in zip(subviews, widths) {
+            subview.place(at: CGPoint(x: x, y: bounds.minY),
+                anchor: .topLeading, proposal: ProposedViewSize(width: width, height: bounds.height))
+            x += width + 12
+        }
+    }
 }
 
 struct DailyModelUsageList: View {
