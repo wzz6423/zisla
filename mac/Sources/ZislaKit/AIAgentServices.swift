@@ -1511,7 +1511,8 @@ public enum AIAgentProcessRunner {
         workingDirectoryURL: URL = FileManager.default.homeDirectoryForCurrentUser,
         timeout: TimeInterval? = 15,
         maximumOutputBytes: Int = AIAgentProcessRunner.defaultMaximumOutputBytes,
-        maximumErrorBytes: Int = AIAgentProcessRunner.defaultMaximumErrorBytes
+        maximumErrorBytes: Int = AIAgentProcessRunner.defaultMaximumErrorBytes,
+        maximumErrorTailBytes: Int = 0
     ) async throws -> AIAgentProcessOutput {
         let channels = AIAgentProcessChannels()
         let capture = AIAgentProcessCapture()
@@ -1532,7 +1533,8 @@ public enum AIAgentProcessRunner {
                             workingDirectoryURL: workingDirectoryURL,
                             timeout: timeout,
                             maximumOutputBytes: maximumOutputBytes,
-                            maximumErrorBytes: maximumErrorBytes
+                            maximumErrorBytes: maximumErrorBytes,
+                            maximumErrorTailBytes: maximumErrorTailBytes
                         )
                     }
                     resumed.resume {
@@ -1571,7 +1573,8 @@ public enum AIAgentProcessRunner {
             workingDirectoryURL: workingDirectoryURL,
             timeout: timeout,
             maximumOutputBytes: maximumOutputBytes,
-            maximumErrorBytes: maximumErrorBytes
+            maximumErrorBytes: maximumErrorBytes,
+            maximumErrorTailBytes: 0
         )
     }
 
@@ -1585,7 +1588,8 @@ public enum AIAgentProcessRunner {
         workingDirectoryURL: URL,
         timeout: TimeInterval?,
         maximumOutputBytes: Int,
-        maximumErrorBytes: Int
+        maximumErrorBytes: Int,
+        maximumErrorTailBytes: Int
     ) throws -> AIAgentProcessOutput {
         channels.process.executableURL = executableURL
         channels.process.arguments = arguments
@@ -1617,7 +1621,8 @@ public enum AIAgentProcessRunner {
         DispatchQueue.global(qos: .userInitiated).async {
             capture.setError(readLimited(
                 channels.error.fileHandleForReading,
-                maximumBytes: maximumErrorBytes
+                maximumBytes: maximumErrorBytes,
+                maximumTailBytes: maximumErrorTailBytes
             ))
             readers.leave()
         }
@@ -1677,15 +1682,21 @@ public enum AIAgentProcessRunner {
         try? channels.error.fileHandleForReading.close()
     }
 
-    private static func readLimited(_ handle: FileHandle, maximumBytes: Int) -> Data {
+    private static func readLimited(_ handle: FileHandle, maximumBytes: Int, maximumTailBytes: Int = 0) -> Data {
         let limit = max(1, maximumBytes)
+        let tailLimit = max(0, maximumTailBytes)
         var result = Data()
+        var tail = Data()
         while let chunk = try? handle.read(upToCount: 64 * 1024),
               !chunk.isEmpty {
-            if result.count < limit {
-                result.append(chunk.prefix(limit - result.count))
+            let prefixCount = min(chunk.count, limit - result.count)
+            result.append(chunk.prefix(prefixCount))
+            if tailLimit > 0 {
+                tail.append(chunk.dropFirst(prefixCount))
+                if tail.count > tailLimit { tail.removeFirst(tail.count - tailLimit) }
             }
         }
+        result.append(tail)
         return result
     }
 }

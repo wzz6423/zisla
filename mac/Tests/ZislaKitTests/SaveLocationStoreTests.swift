@@ -65,6 +65,49 @@ struct SaveLocationStoreTests {
         #expect(!FileManager.default.fileExists(atPath: original.path))
     }
 
+    @Test func fileToolDefaultsMigrateFromCurrentDownloadsWithoutChangingExistingLocations() throws {
+        let fixture = try Fixture()
+        defer { fixture.close() }
+        let shared = try fixture.makeDirectory("Current downloads")
+        let downloads = ScreenRecordingOutputDirectoryStore(defaults: fixture.defaults,
+            bookmarkKey: SaveLocation.download.bookmarkKey, pathKey: nil)
+        try downloads.setDirectory(shared)
+        let existingLocations: [SaveLocation] = [.screenshot, .recording, .quickActions, .dailyBriefing]
+        var existingPaths: [SaveLocation: URL] = [:]
+        for location in existingLocations {
+            let path = try fixture.makeDirectory(location.rawValue)
+            let directory = ScreenRecordingOutputDirectoryStore(defaults: fixture.defaults,
+                bookmarkKey: location.bookmarkKey, pathKey: location.pathKey)
+            try directory.setDirectory(path)
+            existingPaths[location] = path
+        }
+        let preferences = fixture.defaults.persistentDomain(forName: fixture.suite) ?? [:]
+
+        let locations = SaveLocationStore(defaults: fixture.defaults)
+
+        for location in [SaveLocation.pdfTools, .imageTools] {
+            #expect(locations[location].path == shared.path)
+        }
+        for location in existingLocations {
+            #expect(locations[location].path == existingPaths[location]!.path)
+            for key in [location.bookmarkKey, location.pathKey!] {
+                #expect(NSDictionary(dictionary: [key: fixture.defaults.object(forKey: key)!])
+                    == NSDictionary(dictionary: [key: preferences[key]!]))
+            }
+        }
+
+        try locations.setDirectory(fixture.root, for: .download)
+
+        let restored = SaveLocationStore(defaults: fixture.defaults)
+        for location in [SaveLocation.pdfTools, .imageTools] {
+            #expect(restored[location].path == shared.path,
+                    "New file-tool defaults must retain their migrated location after downloads change")
+        }
+        for location in existingLocations {
+            #expect(restored[location].path == existingPaths[location]!.path)
+        }
+    }
+
     @Test(arguments: SaveLocation.allCases)
     func eachLocationPersistsWithoutChangingOtherLocations(_ selected: SaveLocation) throws {
         let fixture = try Fixture()
@@ -126,23 +169,24 @@ struct SaveLocationStoreTests {
             == NSDictionary(dictionary: preferences), "Loading migrated preferences must be idempotent")
     }
 
-    @Test func damagedIndependentBookmarkKeepsItsConfiguredPath() throws {
+    @Test(arguments: [SaveLocation.screenshot, .pdfTools, .imageTools])
+    func damagedIndependentBookmarkKeepsItsConfiguredPath(_ location: SaveLocation) throws {
         let fixture = try Fixture()
         defer { fixture.close() }
-        let custom = try fixture.makeDirectory("Recoverable screenshots")
+        let custom = try fixture.makeDirectory("Recoverable location")
         let locations = SaveLocationStore(defaults: fixture.defaults)
-        try locations.setDirectory(custom, for: .screenshot)
-        fixture.defaults.set(Data([0]), forKey: SaveLocation.screenshot.bookmarkKey)
+        try locations.setDirectory(custom, for: location)
+        fixture.defaults.set(Data([0]), forKey: location.bookmarkKey)
         try FileManager.default.removeItem(at: custom)
 
         let restored = SaveLocationStore(defaults: fixture.defaults)
 
-        #expect(restored[.screenshot].path == custom.path)
+        #expect(restored[location].path == custom.path)
         #expect(restored[.download] == AppPaths.downloads)
         #expect(!FileManager.default.fileExists(atPath: custom.path))
     }
 
-    @Test(arguments: [SaveLocation.screenshot, .recording, .quickActions, .dailyBriefing],
+    @Test(arguments: SaveLocation.allCases.filter { $0 != .download },
           ["bookmark only", "path only"])
     func upgradeKeepsPartiallyStoredIndependentPreferences(_ location: SaveLocation, fields: String) throws {
         let fixture = try Fixture()

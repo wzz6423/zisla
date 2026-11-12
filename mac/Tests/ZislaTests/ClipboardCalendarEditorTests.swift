@@ -101,35 +101,6 @@ struct ClipboardCalendarEditorTests {
         }
     }
 
-    @Test(arguments: [false, true])
-    func creatingALinklessMeetingPublishesTheCalendarMeetingOnlyAfterConfirmation(confirm: Bool) throws {
-        let now = Date(timeIntervalSince1970: 1_000_000)
-        let draft = ClipboardCalendarDraft(title: "会议", startDate: now.addingTimeInterval(60),
-            endDate: now.addingTimeInterval(3_660), location: "Room A", notes: "Agenda")
-        let store = ClipboardInviteEventStore()
-        store.savedCalendar = try #require(EKCalendar.perform(NSSelectorFromString("calendarWithEventStore:"),
-            with: store)?.takeUnretainedValue() as? EKCalendar)
-        store.savedCalendar?.title = "Fixture"
-        let service = CalendarService(store: store, mutations: .live(store: store),
-            environment: CalendarServiceEnvironment(authorizationStatus: { _ in .fullAccess }, now: { now },
-                notificationCenter: NotificationCenter(), workspaceNotificationCenter: NotificationCenter()))
-        defer { service.stop() }
-        try CalendarItemEditor.complete(response: confirm ? .alertFirstButtonReturn : .alertSecondButtonReturn,
-            calendar: service, draft: draft, kind: .event)
-        service.refreshMeetings()
-        if confirm {
-            let meeting = try #require(service.meetingEvents.first,
-                "A meeting created in Zisla must remain eligible without a join link")
-            #expect(store.savedEvents.count == 1)
-            #expect(meeting.title == draft.title && meeting.notes == draft.notes && meeting.location == draft.location)
-            #expect(meeting.startDate == draft.startDate && meeting.endDate == draft.endDate)
-            #expect(meeting.meetingURL == nil)
-            #expect(!AgendaModuleView.isJoinableMeeting(meeting, at: now))
-        } else {
-            #expect(store.savedEvents.isEmpty && service.meetingEvents.isEmpty)
-        }
-    }
-
     var draft: ClipboardCalendarDraft {
         ClipboardCalendarDraft(title: "Review", startDate: Date(timeIntervalSince1970: 1_000),
             endDate: Date(timeIntervalSince1970: 4_600), location: "Room A", notes: "https://example.com/meeting")

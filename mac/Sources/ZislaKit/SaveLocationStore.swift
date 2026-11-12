@@ -3,6 +3,8 @@ import Foundation
 
 public enum SaveLocation: String, CaseIterable, Identifiable, Sendable {
     case download
+    case pdfTools
+    case imageTools
     case screenshot
     case recording
     case quickActions
@@ -13,6 +15,8 @@ public enum SaveLocation: String, CaseIterable, Identifiable, Sendable {
     public var title: String {
         switch self {
         case .download: "下载"
+        case .pdfTools: "PDF 工具"
+        case .imageTools: "图片工具"
         case .screenshot: "截图"
         case .recording: "录屏"
         case .quickActions: "快捷操作"
@@ -23,6 +27,8 @@ public enum SaveLocation: String, CaseIterable, Identifiable, Sendable {
     public var symbol: String {
         switch self {
         case .download: "arrow.down.circle.fill"
+        case .pdfTools: "doc.text.fill"
+        case .imageTools: "photo.stack.fill"
         case .screenshot: "camera.viewfinder"
         case .recording: "record.circle"
         case .quickActions: "sparkles.rectangle.stack"

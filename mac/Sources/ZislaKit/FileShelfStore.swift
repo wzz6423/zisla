@@ -481,12 +481,15 @@ public final class FileShelfStore: ObservableObject {
     }
 
     public func beginAccessing(_ item: FileShelfItem) -> URL {
-        _ = item.url.startAccessingSecurityScopedResource()
-        return item.url
+        var stale = false
+        let url = (try? URL(resolvingBookmarkData: item.bookmarkData, options: [.withSecurityScope, .withoutUI],
+                            relativeTo: nil, bookmarkDataIsStale: &stale)) ?? item.url
+        _ = url.startAccessingSecurityScopedResource()
+        return url
     }
 
-    public func endAccessing(_ item: FileShelfItem) {
-        item.url.stopAccessingSecurityScopedResource()
+    public func endAccessing(_ url: URL) {
+        url.stopAccessingSecurityScopedResource()
     }
 
     public func receive(_ dropItems: [FileShelfDropItem], completion: @escaping (Int) -> Void) {
@@ -503,7 +506,7 @@ public final class FileShelfStore: ObservableObject {
         }
     }
 
-    func importPromisedFile(at url: URL, from stagingDirectory: URL) -> Int {
+    public func importPromisedFile(at url: URL, from stagingDirectory: URL) -> Int {
         let resolved = url.resolvingSymlinksInPath().standardizedFileURL
         let staging = stagingDirectory.resolvingSymlinksInPath().standardizedFileURL
         guard url.isFileURL, resolved.path.hasPrefix(staging.path + "/") else {

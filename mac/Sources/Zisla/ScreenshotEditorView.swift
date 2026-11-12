@@ -1809,6 +1809,29 @@ final class ScreenshotEditorModel: ObservableObject {
     /// silently drop a shape, number, or stroke when the image is exported.
     private(set) var pendingAnnotationDraft: ScreenshotAnnotation?
 
+    @MainActor
+    struct RenderingDependencies {
+        var makeBitmap: (Int, Int, CGImage) -> CGContext? = { width, height, source in
+            ScreenshotImageRendering.bitmapContext(width: width, height: height, matching: source)
+        }
+        var makeGraphicsContext: (CGContext) -> NSGraphicsContext? = { NSGraphicsContext(cgContext: $0, flipped: false) }
+        var makeMaskContext: (Int, Int) -> CGContext? = { width, height in
+            CGContext(data: nil, width: width, height: height, bitsPerComponent: 8, bytesPerRow: 0,
+                space: CGColorSpaceCreateDeviceRGB(), bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue)
+        }
+        var makeMaskImage: (CGContext) -> CGImage? = { $0.makeImage() }
+        var makeFilter: (String) -> CIFilter? = { CIFilter(name: $0) }
+        var filterOutput: (CIFilter) -> CIImage? = { $0.outputImage }
+        var makeCoreImage: (CIImage, CGImage) -> CGImage? = { ScreenshotImageRendering.render($0, matching: $1, context: ciContext) }
+        var makeFinalImage: (CGContext) -> CGImage? = { $0.makeImage() }
+    }
+
+    var renderingDependencies = RenderingDependencies()
+
+    private enum RenderingError: Error {
+        case unavailable
+    }
+
     init(image: NSImage, sdrImage: NSImage? = nil) {
         self.image = image
         self.sdrImage = sdrImage
@@ -2561,21 +2584,24 @@ final class ScreenshotEditorModel: ObservableObject {
     }
 
     func renderedImage(preservingHDR: Bool? = nil) -> NSImage {
+        (try? renderedImage(requireCompleteRendering: false, preservingHDR: preservingHDR))
+            ?? sourceImage(preservingHDR: preservingHDR ?? preservesHDR)
+    }
+
+    func renderedImage(requireCompleteRendering: Bool, preservingHDR: Bool? = nil) throws -> NSImage {
         commitPendingTextDraft()
         commitPendingAnnotationDraft()
-        let renderedBase = imageApplyingMosaics(adding: nil, preservingHDR: preservingHDR ?? preservesHDR)
+        let renderedBase = try imageApplyingMosaics(adding: nil, requireCompleteRendering: requireCompleteRendering,
+                                                   preservingHDR: preservingHDR ?? preservesHDR)
         guard let base = renderedBase.cgImage(forProposedRect: nil, context: nil, hints: nil) else {
-            return image
+            throw RenderingError.unavailable
         }
 
         let pixelWidth = base.width
         let pixelHeight = base.height
-        guard let context = ScreenshotImageRendering.bitmapContext(
-            width: pixelWidth, height: pixelHeight, matching: base
-        ) else {
-            return image
-        }
-        let graphicsContext = NSGraphicsContext(cgContext: context, flipped: false)
+        guard let context = renderingDependencies.makeBitmap(pixelWidth, pixelHeight, base),
+              let graphicsContext = renderingDependencies.makeGraphicsContext(context)
+        else { throw RenderingError.unavailable }
 
         NSGraphicsContext.saveGraphicsState()
         NSGraphicsContext.current = graphicsContext
@@ -2592,14 +2618,20 @@ final class ScreenshotEditorModel: ObservableObject {
         graphicsContext.flushGraphics()
         NSGraphicsContext.restoreGraphicsState()
 
-        guard let rendered = context.makeImage(),
+        guard let rendered = renderingDependencies.makeFinalImage(context),
               let output = ScreenshotImageRendering.preservingHeadroom(rendered, from: base)
-        else { return image }
+        else { throw RenderingError.unavailable }
         return NSImage(cgImage: output, size: image.size)
     }
 
-    func pngData() -> Data? {
-        let rendered = renderedImage()
+    func pngData(requireCompleteRendering: Bool = false) -> Data? {
+        let rendered: NSImage
+        if requireCompleteRendering {
+            guard let output = try? renderedImage(requireCompleteRendering: true) else { return nil }
+            rendered = output
+        } else {
+            rendered = renderedImage()
+        }
         if preservesHDR, canPreserveHDR {
             guard let source = rendered.cgImage(forProposedRect: nil, context: nil, hints: nil),
                   let encoded = Self.ciContext.createCGImage(
@@ -2628,7 +2660,15 @@ final class ScreenshotEditorModel: ObservableObject {
     }
 
     func imageApplyingMosaics(adding draft: ScreenshotAnnotation?, preservingHDR: Bool? = nil) -> NSImage {
-        let image = sourceImage(preservingHDR: preservingHDR ?? preservesHDR)
+        (try? imageApplyingMosaics(adding: draft, requireCompleteRendering: false,
+                                  preservingHDR: preservingHDR ?? preservesHDR))
+            ?? sourceImage(preservingHDR: preservingHDR ?? preservesHDR)
+    }
+
+    private func imageApplyingMosaics(
+        adding draft: ScreenshotAnnotation?, requireCompleteRendering: Bool, preservingHDR: Bool
+    ) throws -> NSImage {
+        let image = sourceImage(preservingHDR: preservingHDR)
         var obscures = annotations.filter { $0.kind == .mosaic }
         if let draft, draft.kind == .mosaic {
             // A draft carrying an existing id is an in-flight edit of that region, so it replaces the
@@ -2638,6 +2678,9 @@ final class ScreenshotEditorModel: ObservableObject {
             } else {
                 obscures.append(draft)
             }
+        }
+        if requireCompleteRendering {
+            obscures.removeAll { !Self.obscureIntersectsImage($0, imageSize: image.size) }
         }
         guard !obscures.isEmpty,
               image.size.width > 0,
@@ -2653,13 +2696,14 @@ final class ScreenshotEditorModel: ObservableObject {
         let scaleY = extent.height / image.size.height
 
         for annotation in obscures {
-            guard let mask = Self.obscureMask(
+            guard let mask = obscureMask(
                 for: annotation,
                 imageSize: image.size,
                 extent: extent,
                 scaleX: scaleX,
                 scaleY: scaleY
-            ), let blend = CIFilter(name: "CIBlendWithMask") else {
+            ), let blend = renderingDependencies.makeFilter("CIBlendWithMask") else {
+                if requireCompleteRendering { throw RenderingError.unavailable }
                 continue
             }
 
@@ -2681,67 +2725,94 @@ final class ScreenshotEditorModel: ObservableObject {
                     annotation.obscureBlurStrength / ScreenshotAnnotation.obscureStrengthUpperBound
                 )
                 var sampled = output
-                if refraction > 0,
-                   let glass = CIFilter(name: "CIGlassDistortion"),
-                   let texture = Self.lensTexture(blockSize: blockSize, extent: extent) {
-                    glass.setValue(output.clamped(to: extent), forKey: kCIInputImageKey)
-                    glass.setValue(texture, forKey: "inputTexture")
-                    glass.setValue(CIVector(x: extent.midX, y: extent.midY), forKey: kCIInputCenterKey)
-                    glass.setValue(refraction, forKey: kCIInputScaleKey)
-                    sampled = glass.outputImage?.clamped(to: extent).cropped(to: extent) ?? output
+                if refraction > 0 {
+                    if let glass = renderingDependencies.makeFilter("CIGlassDistortion"),
+                       let texture = lensTexture(blockSize: blockSize, extent: extent) {
+                        glass.setValue(output.clamped(to: extent), forKey: kCIInputImageKey)
+                        glass.setValue(texture, forKey: "inputTexture")
+                        glass.setValue(CIVector(x: extent.midX, y: extent.midY), forKey: kCIInputCenterKey)
+                        glass.setValue(refraction, forKey: kCIInputScaleKey)
+                        if let refracted = renderingDependencies.filterOutput(glass)?.clamped(to: extent).cropped(to: extent) {
+                            sampled = refracted
+                        } else if requireCompleteRendering {
+                            throw RenderingError.unavailable
+                        }
+                    } else if requireCompleteRendering {
+                        throw RenderingError.unavailable
+                    }
                 }
-                let pixelate = CIFilter(name: "CIPixellate")
+                let pixelate = renderingDependencies.makeFilter("CIPixellate")
                 pixelate?.setValue(sampled, forKey: kCIInputImageKey)
                 pixelate?.setValue(blockSize, forKey: kCIInputScaleKey)
                 // Aligns the block grid with the lens tiling, which starts at the image origin.
                 pixelate?.setValue(CIVector(x: 0, y: 0), forKey: kCIInputCenterKey)
-                filtered = pixelate?.outputImage?.clamped(to: extent).cropped(to: extent)
+                filtered = pixelate.flatMap(renderingDependencies.filterOutput)?.clamped(to: extent).cropped(to: extent)
             case .blur:
-                let blur = CIFilter(name: "CIGaussianBlur")
+                let blur = renderingDependencies.makeFilter("CIGaussianBlur")
                 blur?.setValue(output, forKey: kCIInputImageKey)
                 blur?.setValue(
                     max(4, annotation.obscureBlurStrength * 1.5) * max(scaleX, scaleY),
                     forKey: kCIInputRadiusKey
                 )
-                let blurred = blur?.outputImage
+                let blurred = blur.flatMap(renderingDependencies.filterOutput)
                 filtered = blurred?.clamped(to: extent).cropped(to: extent)
             }
-            guard let filtered else { continue }
+            guard let filtered else {
+                if requireCompleteRendering { throw RenderingError.unavailable }
+                continue
+            }
 
             blend.setValue(filtered, forKey: kCIInputImageKey)
             blend.setValue(output, forKey: kCIInputBackgroundImageKey)
             blend.setValue(mask, forKey: kCIInputMaskImageKey)
-            if let blended = blend.outputImage?.cropped(to: extent) {
+            if let blended = renderingDependencies.filterOutput(blend)?.cropped(to: extent) {
                 output = blended
+            } else if requireCompleteRendering {
+                throw RenderingError.unavailable
             }
         }
 
-        guard let result = ScreenshotImageRendering.render(output, matching: source, context: Self.ciContext) else { return image }
+        guard let result = renderingDependencies.makeCoreImage(output, source) else { throw RenderingError.unavailable }
         return NSImage(cgImage: result, size: image.size)
+    }
+
+    private static func obscureIntersectsImage(_ annotation: ScreenshotAnnotation, imageSize: CGSize) -> Bool {
+        let imageBounds = CGRect(origin: .zero, size: imageSize)
+        switch annotation.obscureShape {
+        case .rectangle:
+            return !annotation.rect.standardized.intersection(imageBounds).isEmpty
+        case .brush:
+            guard annotation.points.count > 1 else { return false }
+            let path = CGMutablePath()
+            path.addLines(between: annotation.points)
+            let coverage = path.copy(strokingWithWidth: max(12, annotation.lineWidth * 5),
+                lineCap: .round, lineJoin: .round, miterLimit: 10).boundingBoxOfPath
+            return !coverage.intersection(imageBounds).isEmpty
+        }
     }
 
     /// One spherical lens per mosaic block, tiled from the image origin: a radial white-to-black
     /// gradient is the height field CIGlassDistortion refracts through, so each block bends only
     /// what sits under it.
-    private static func lensTexture(blockSize: CGFloat, extent: CGRect) -> CIImage? {
+    private func lensTexture(blockSize: CGFloat, extent: CGRect) -> CIImage? {
         guard blockSize > 0,
-              let gradient = CIFilter(name: "CIRadialGradient"),
-              let tile = CIFilter(name: "CIAffineTile")
+              let gradient = renderingDependencies.makeFilter("CIRadialGradient"),
+              let tile = renderingDependencies.makeFilter("CIAffineTile")
         else { return nil }
         gradient.setValue(CIVector(x: blockSize / 2, y: blockSize / 2), forKey: kCIInputCenterKey)
         gradient.setValue(0, forKey: "inputRadius0")
         gradient.setValue(blockSize / 2, forKey: "inputRadius1")
         gradient.setValue(CIColor(red: 1, green: 1, blue: 1), forKey: "inputColor0")
         gradient.setValue(CIColor(red: 0, green: 0, blue: 0), forKey: "inputColor1")
-        guard let cell = gradient.outputImage?.cropped(
+        guard let cell = renderingDependencies.filterOutput(gradient)?.cropped(
             to: CGRect(x: 0, y: 0, width: blockSize, height: blockSize)
         ) else { return nil }
         tile.setValue(cell, forKey: kCIInputImageKey)
         tile.setValue(CGAffineTransform.identity, forKey: kCIInputTransformKey)
-        return tile.outputImage?.clamped(to: extent).cropped(to: extent)
+        return renderingDependencies.filterOutput(tile)?.clamped(to: extent).cropped(to: extent)
     }
 
-    private static func obscureMask(
+    private func obscureMask(
         for annotation: ScreenshotAnnotation,
         imageSize: CGSize,
         extent: CGRect,
@@ -2751,15 +2822,7 @@ final class ScreenshotEditorModel: ObservableObject {
         let width = Int(extent.width.rounded(.up))
         let height = Int(extent.height.rounded(.up))
         guard width > 0, height > 0,
-              let context = CGContext(
-                  data: nil,
-                  width: width,
-                  height: height,
-                  bitsPerComponent: 8,
-                  bytesPerRow: 0,
-                  space: CGColorSpaceCreateDeviceRGB(),
-                  bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue
-              )
+              let context = renderingDependencies.makeMaskContext(width, height)
         else { return nil }
 
         context.setFillColor(CGColor(red: 0, green: 0, blue: 0, alpha: 1))
@@ -2797,7 +2860,7 @@ final class ScreenshotEditorModel: ObservableObject {
             context.strokePath()
         }
 
-        guard let image = context.makeImage() else { return nil }
+        guard let image = renderingDependencies.makeMaskImage(context) else { return nil }
         return CIImage(cgImage: image).cropped(to: extent)
     }
 
@@ -4991,6 +5054,11 @@ private struct ScreenshotExtractionModePicker: NSViewRepresentable {
     }
 }
 
+enum ScreenshotEditorMode {
+    case screenshot
+    case localImage
+}
+
 struct ScreenshotEditorView: View {
     @Environment(\.accessibilityReduceMotion) private var accessibilityReduceMotion
     @ObservedObject private var shortcutSettings: FeatureSettingsStore
@@ -4998,6 +5066,7 @@ struct ScreenshotEditorView: View {
     @ObservedObject var selectionState: ScreenshotAnnotationSelectionState
     let overlayConfiguration: ScreenshotEditorOverlayConfiguration?
     let toolbarOnly: Bool
+    let mode: ScreenshotEditorMode
     let onClose: () -> Void
     let onCopy: () -> Void
     let onStash: () -> Void
@@ -5005,6 +5074,7 @@ struct ScreenshotEditorView: View {
     let onPinToggle: (Bool) -> Void
     let onLongCapture: () -> Void
     let onLongCaptureFinish: () -> Void
+    let tableDirectory: () -> URL?
 
     @State private var draftPoints: [CGPoint] = []
     @State private var draftRect = CGRect.zero
@@ -5034,13 +5104,13 @@ struct ScreenshotEditorView: View {
         let startPoint: CGPoint
     }
 
-    private var toolbarControlCount: Int {
-        17
+    var toolbarControlCount: Int {
+        (mode == .screenshot ? 17 : 14)
             + (model.canPreserveHDR ? 1 : 0)
             + (model.canUndo ? 1 : 0)
             + (model.canRedo ? 1 : 0)
-            + (model.isLongCapturePreviewing ? 2 : 0)
-            + (model.hasLongCaptureResult && !model.isLongCapturePreviewing ? 2 : 0)
+            + (mode == .screenshot && model.isLongCapturePreviewing ? 2 : 0)
+            + (mode == .screenshot && model.hasLongCaptureResult && !model.isLongCapturePreviewing ? 2 : 0)
     }
 
     init(
@@ -5049,6 +5119,8 @@ struct ScreenshotEditorView: View {
         settingsStore: FeatureSettingsStore = AppModel.shared.settingsStore,
         overlayConfiguration: ScreenshotEditorOverlayConfiguration? = nil,
         toolbarOnly: Bool = false,
+        mode: ScreenshotEditorMode = .screenshot,
+        tableDirectory: @escaping () -> URL? = { nil },
         onClose: @escaping () -> Void,
         onCopy: @escaping () -> Void,
         onStash: @escaping () -> Void = {},
@@ -5062,6 +5134,8 @@ struct ScreenshotEditorView: View {
         self.shortcutSettings = settingsStore
         self.overlayConfiguration = overlayConfiguration
         self.toolbarOnly = toolbarOnly
+        self.mode = mode
+        self.tableDirectory = tableDirectory
         self.onClose = onClose
         self.onCopy = onCopy
         self.onStash = onStash
@@ -5329,9 +5403,9 @@ struct ScreenshotEditorView: View {
 
     private var header: some View {
         HStack(spacing: 10) {
-            Image(systemName: "camera.viewfinder")
+            Image(systemName: mode == .screenshot ? "camera.viewfinder" : "photo")
                 .foregroundStyle(Color.accentColor)
-            Text(AppLocalization.text("截图编辑"))
+            Text(AppLocalization.text(mode == .screenshot ? "截图编辑" : "图片编辑"))
                 .font(.system(size: 14, weight: .semibold))
             Text("\(Int(model.image.size.width.rounded())) × \(Int(model.image.size.height.rounded())) · r: \(Int(model.cornerRadius.rounded()))")
                 .font(.system(size: 11, design: .monospaced))
@@ -5350,7 +5424,7 @@ struct ScreenshotEditorView: View {
                     .frame(height: 26)
             }
             .buttonStyle(.plain)
-            .help(AppLocalization.text("关闭截图编辑器"))
+            .help(AppLocalization.text(mode == .screenshot ? "关闭截图编辑器" : "关闭图片编辑器"))
         }
         .padding(.horizontal, 14)
         .padding(.vertical, 9)
@@ -6332,41 +6406,46 @@ struct ScreenshotEditorView: View {
                     iconButton("arrow.uturn.forward", title: AppLocalization.text("重做")) { model.redo() }
                 }
                 recognitionMenu
-                iconButton(
-                    model.isLongCapturePreviewing
-                        ? (model.longCaptureAutoScroll.isRunning ? "pause.fill" : "play.fill")
-                        : "rectangle.on.rectangle",
-                    title: model.isLongCapturePreviewing
-                        ? (model.longCaptureAutoScroll.isRunning
-                            ? AppLocalization.text("暂停滚动") : AppLocalization.text("自动滚动"))
-                        : AppLocalization.text("长截图")
-                ) { onLongCapture() }
-                if model.isLongCapturePreviewing {
-                    longCaptureDirectionMenu
-                    iconButton("checkmark", title: AppLocalization.text("完成")) { onLongCaptureFinish() }
-                }
-                if model.hasLongCaptureResult {
-                    iconButton("minus.magnifyingglass", title: AppLocalization.text("缩小")) {
-                        updateCanvasZoom(to: canvasZoom - 0.1)
+                if mode == .screenshot {
+                    iconButton(
+                        model.isLongCapturePreviewing
+                            ? (model.longCaptureAutoScroll.isRunning ? "pause.fill" : "play.fill")
+                            : "rectangle.on.rectangle",
+                        title: model.isLongCapturePreviewing
+                            ? (model.longCaptureAutoScroll.isRunning
+                                ? AppLocalization.text("暂停滚动") : AppLocalization.text("自动滚动"))
+                            : AppLocalization.text("长截图")
+                    ) { onLongCapture() }
+                    if model.isLongCapturePreviewing {
+                        longCaptureDirectionMenu
+                        iconButton("checkmark", title: AppLocalization.text("完成")) { onLongCaptureFinish() }
                     }
-                    iconButton("plus.magnifyingglass", title: AppLocalization.text("放大")) {
-                        updateCanvasZoom(to: canvasZoom + 0.1)
+                    if model.hasLongCaptureResult {
+                        iconButton("minus.magnifyingglass", title: AppLocalization.text("缩小")) {
+                            updateCanvasZoom(to: canvasZoom - 0.1)
+                        }
+                        iconButton("plus.magnifyingglass", title: AppLocalization.text("放大")) {
+                            updateCanvasZoom(to: canvasZoom + 0.1)
+                        }
+                    }
+                    iconButton(model.isPinned ? "pin.fill" : "pin", title: model.isPinned ? AppLocalization.text("取消置顶") : AppLocalization.text("钉图")) {
+                        commitInlineText()
+                        model.isPinned.toggle()
+                        onPinToggle(model.isPinned)
+                    }
+                    iconButton("tray.and.arrow.down", title: AppLocalization.text("暂存")) {
+                        commitInlineText()
+                        onStash()
                     }
                 }
-                iconButton(model.isPinned ? "pin.fill" : "pin", title: model.isPinned ? AppLocalization.text("取消置顶") : AppLocalization.text("钉图")) {
-                    commitInlineText()
-                    model.isPinned.toggle()
-                    onPinToggle(model.isPinned)
-                }
-                iconButton("tray.and.arrow.down", title: AppLocalization.text("暂存")) {
-                    commitInlineText()
-                    onStash()
-                }
-                iconButton("doc.on.doc", title: AppLocalization.text("复制")) {
+                iconButton("doc.on.doc", title: AppLocalization.text("复制"),
+                           disabled: mode == .localImage && (model.isExtracting || model.isRecognizing)) {
                     commitInlineText()
                     onCopy()
                 }
-                iconButton("square.and.arrow.down", title: AppLocalization.text("保存")) {
+                iconButton(mode == .screenshot ? "square.and.arrow.down" : "checkmark",
+                           title: AppLocalization.text(mode == .screenshot ? "保存" : "应用编辑"),
+                           disabled: mode == .localImage && (model.isExtracting || model.isRecognizing)) {
                     commitInlineText()
                     onSave()
                 }
@@ -6839,8 +6918,10 @@ struct ScreenshotEditorView: View {
             Button { recognize(.text) } label: {
                 Label(AppLocalization.text("识图 / OCR"), systemImage: "text.viewfinder")
             }
-            Button { recognize(.translate) } label: {
-                Label(AppLocalization.text("翻译并复制"), systemImage: "character.bubble")
+            if mode == .screenshot {
+                Button { recognize(.translate) } label: {
+                    Label(AppLocalization.text("翻译并复制"), systemImage: "character.bubble")
+                }
             }
             Button { recognize(.table) } label: {
                 Label(AppLocalization.text("表格识别"), systemImage: "tablecells")
@@ -6888,10 +6969,12 @@ struct ScreenshotEditorView: View {
 
     private func shortcutHelp(_ title: String, hotkey: VoiceInputHotkeyPreset?) -> String {
         let title = AppLocalization.text(title)
+        guard mode == .screenshot else { return title }
         return hotkey.map { "\(title) (\($0.settingsDisplayName))" } ?? title
     }
 
     private func actionShortcutHelp(symbol: String, title: String) -> String {
+        guard mode == .screenshot else { return title }
         let settings = shortcutSettings.settings
         switch symbol {
         case "pin", "pin.fill": return shortcutHelp(title, hotkey: settings.screenshotPinHotkey)
@@ -6930,8 +7013,8 @@ struct ScreenshotEditorView: View {
         .contentShape(Rectangle())
     }
 
-    private func chooseTableDestination(_ completion: @escaping (URL?) -> Void) {
-        let panel = NSSavePanel()
+    func chooseTableDestination(panel: NSSavePanel = NSSavePanel(), _ completion: @escaping (URL?) -> Void) {
+        if let directory = tableDirectory() { panel.directoryURL = directory }
         panel.nameFieldStringValue = AppLocalization.text("识别表格.xlsx")
         panel.allowedContentTypes = [UTType(filenameExtension: "xlsx") ?? .spreadsheet]
         panel.canCreateDirectories = true
