@@ -660,16 +660,18 @@ public enum ClipboardAssistantDetector {
         (injected ?? currentPreferredCurrencyCode()).uppercased()
     }
 
-    /// "<symbol><amount>" for bare and prefixed symbols. Longest symbol first so "US$" wins
-    /// over a bare "$".
+    /// Match the longest currency token first so regional symbols stay unambiguous.
     static func parsePrefixedCurrencyAmount(
         _ head: String,
         preferred: String,
         locale: Locale
     ) -> ParsedCurrencyConversion? {
-        for symbol in currencySymbols.sorted(by: { $0.count > $1.count }) where head.hasPrefix(symbol) {
-            let rest = String(head.dropFirst(symbol.count))
-                .trimmingCharacters(in: .whitespacesAndNewlines)
+        let head = head.trimmingCharacters(in: currencyBoundaryCharacters)
+        let tokens = currencySymbols + Array(currencyAliases.keys)
+        for token in tokens.sorted(by: { $0.count > $1.count }) {
+            guard let prefix = head.range(of: token, options: [.anchored, .caseInsensitive, .widthInsensitive]) else { continue }
+            let rest = String(head[prefix.upperBound...])
+                .trimmingCharacters(in: currencyBoundaryCharacters)
             guard let amountText = leadingAmount(in: rest),
                   rest.dropFirst(amountText.count).trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
                   let amount = normalizedAmount(amountText, locale: locale) else {
@@ -678,7 +680,7 @@ public enum ClipboardAssistantDetector {
             return ParsedCurrencyConversion(
                 amount: amount,
                 amountText: amountText,
-                sourceCurrencyCode: currencySymbolCode(symbol, preferred: preferred),
+                sourceCurrencyCode: currencyAliases[token] ?? currencySymbolCode(token, preferred: preferred),
                 targetCurrencyCode: nil
             )
         }
@@ -687,6 +689,7 @@ public enum ClipboardAssistantDetector {
 
     /// "<amount><token>" with optional whitespace between: (100, "100", "dollar").
     static func parseSuffixedCurrencyAmount(_ head: String, locale: Locale) -> (Double, String, String)? {
+        let head = head.trimmingCharacters(in: currencyBoundaryCharacters)
         guard let amountText = leadingAmount(in: head) else { return nil }
         let token = head.dropFirst(amountText.count).trimmingCharacters(in: .whitespacesAndNewlines)
         guard !token.isEmpty, let amount = normalizedAmount(amountText, locale: locale) else { return nil }
@@ -724,11 +727,31 @@ public enum ClipboardAssistantDetector {
         return nil
     }
 
+    // Locale-formatted currency values can carry direction marks next to the amount or symbol.
+    private static let currencyBoundaryCharacters = CharacterSet.whitespacesAndNewlines
+        .union(CharacterSet(charactersIn: "\u{061C}\u{200E}\u{200F}"))
+
     /// Currency symbols recognized at the start or right after an amount. Bare `$`/`¥` are
     /// ambiguous across currency families, so the preferred currency resolves them.
-    private static let currencySymbols = [
-        "US$", "HK$", "NZ$", "MX$", "A$", "C$", "NT$", "R$", "$",
-        "¥", "￥", "€", "£", "₩", "₽", "₹", "₫", "฿", "₺", "₱",
+    private static let currencySymbols = Array(currencySymbolCodes.keys) + ["$", "¥", "￥"]
+
+    private static let currencySymbolCodes: [String: String] = [
+        "JP¥": "JPY", "CN¥": "CNY",
+        "US$": "USD", "$US": "USD", "HK$": "HKD", "$HK": "HKD",
+        "A$": "AUD", "AU$": "AUD", "$AU": "AUD",
+        "C$": "CAD", "CA$": "CAD", "$CA": "CAD",
+        "S$": "SGD", "SG$": "SGD", "$SG": "SGD",
+        "NZ$": "NZD", "$NZ": "NZD", "MX$": "MXN", "$MX": "MXN",
+        "NT$": "TWD", "R$": "BRL", "EC$": "XCD",
+        "$AR": "ARS", "$CL": "CLP", "$CO": "COP", "$UY": "UYU",
+        "UK£": "GBP", "£GB": "GBP",
+        "€": "EUR", "£": "GBP", "₩": "KRW", "₽": "RUB", "₹": "INR",
+        "₫": "VND", "฿": "THB", "₺": "TRY", "₱": "PHP",
+        "₪": "ILS", "₴": "UAH", "⃁": "SAR", "元": "CNY",
+        "ر.س.": "SAR", "د.إ.": "AED", "ر.ق.": "QAR", "د.ك.": "KWD",
+        "د.ب.": "BHD", "ر.ع.": "OMR", "د.ت.": "TND", "د.ج.": "DZD",
+        "د.م.": "MAD", "د.ع.": "IQD", "د.أ.": "JOD", "ج.م.": "EGP",
+        "FCFA": "XAF", "F CFA": "XOF", "F\u{00A0}CFA": "XOF", "F\u{202F}CFA": "XOF",
     ]
 
     private static let dollarFamilyCodes: Set<String> = [
@@ -740,26 +763,9 @@ public enum ClipboardAssistantDetector {
         switch symbol {
         case "$":
             dollarFamilyCodes.contains(preferred) ? preferred : "USD"
-        case "US$": "USD"
-        case "NT$": "TWD"
-        case "HK$": "HKD"
-        case "NZ$": "NZD"
-        case "MX$": "MXN"
-        case "A$": "AUD"
-        case "C$": "CAD"
-        case "R$": "BRL"
         case "¥", "￥":
             ["CNY", "JPY"].contains(preferred) ? preferred : "CNY"
-        case "€": "EUR"
-        case "£": "GBP"
-        case "₩": "KRW"
-        case "₽": "RUB"
-        case "₹": "INR"
-        case "₫": "VND"
-        case "฿": "THB"
-        case "₺": "TRY"
-        case "₱": "PHP"
-        default: "USD"
+        default: currencySymbolCodes[symbol] ?? "USD"
         }
     }
 
@@ -767,6 +773,7 @@ public enum ClipboardAssistantDetector {
     private static let currencyAliases: [String: String] = {
         var table: [String: String] = [
             "RMB": "CNY", "NTD": "TWD", "CNH": "CNY", "STERLING": "GBP",
+            "RP": "IDR", "RM": "MYR", "RS": "INR",
         ]
         for code in [
             "USD", "EUR", "GBP", "JPY", "CNY", "HKD", "TWD", "MOP", "KRW", "AUD", "CAD",
@@ -851,7 +858,8 @@ public enum ClipboardAssistantDetector {
 
     /// Maps a currency token — symbol, ISO code, alias or common name — to an ISO 4217 code.
     static func resolveCurrencyToken(_ rawToken: String, preferred: String) -> String? {
-        let token = rawToken.trimmingCharacters(in: .whitespacesAndNewlines)
+        let token = rawToken.trimmingCharacters(in: currencyBoundaryCharacters)
+            .folding(options: .widthInsensitive, locale: Locale(identifier: "en_US_POSIX"))
         guard !token.isEmpty else { return nil }
 
         if let code = currencySymbolCodeIfWholeToken(token, preferred: preferred) {
@@ -872,6 +880,7 @@ public enum ClipboardAssistantDetector {
 
     /// Full-token symbol match (single-character symbols or prefixed ones like "US$").
     private static func currencySymbolCodeIfWholeToken(_ token: String, preferred: String) -> String? {
+        let token = token.uppercased()
         guard currencySymbols.contains(token) else { return nil }
         return currencySymbolCode(token, preferred: preferred)
     }

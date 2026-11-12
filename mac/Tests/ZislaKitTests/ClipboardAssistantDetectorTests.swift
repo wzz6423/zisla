@@ -1029,7 +1029,8 @@ struct ClipboardAssistantCurrencyDetectionTests {
         ClipboardAssistantDetector.detect(
             text: text,
             enabledKinds: allKinds,
-            preferredCurrencyCode: preferred
+            preferredCurrencyCode: preferred,
+            locale: Locale(identifier: "en_US_POSIX")
         )
     }
 
@@ -1081,6 +1082,230 @@ struct ClipboardAssistantCurrencyDetectionTests {
                 Issue.record("expected \(text) to read as \(source)")
                 continue
             }
+        }
+    }
+
+    @Test
+    func recognizesJapaneseRegionalYenSymbol() {
+        #expect(expression(detection("JP¥14,500")) == .currencyExpression(
+            amount: 14500, amountText: "14,500", sourceCurrencyCode: "JPY", targetCurrencyCode: "CNY"
+        ))
+    }
+
+    @Test
+    func recognizesCurrencyCodesBeforeFractionalAmountsWithNonbreakingSpaces() {
+        #expect(expression(detection("PHP\u{00A0}5,339.84")) == .currencyExpression(
+            amount: 5339.84, amountText: "5,339.84", sourceCurrencyCode: "PHP", targetCurrencyCode: "CNY"
+        ))
+    }
+
+    @Test(arguments: [
+        ("JP¥", "JPY"), ("CN¥", "CNY"),
+        ("US$", "USD"), ("$US", "USD"), ("HK$", "HKD"), ("$HK", "HKD"),
+        ("A$", "AUD"), ("AU$", "AUD"), ("$AU", "AUD"),
+        ("C$", "CAD"), ("CA$", "CAD"), ("$CA", "CAD"),
+        ("S$", "SGD"), ("SG$", "SGD"), ("$SG", "SGD"),
+        ("NZ$", "NZD"), ("$NZ", "NZD"), ("MX$", "MXN"), ("$MX", "MXN"),
+        ("NT$", "TWD"), ("R$", "BRL"), ("EC$", "XCD"),
+        ("$AR", "ARS"), ("$CL", "CLP"), ("$CO", "COP"), ("$UY", "UYU"),
+        ("UK£", "GBP"), ("£GB", "GBP"),
+    ])
+    func regionalCurrencySymbolsWorkAsPrefixesSuffixesAndTargets(symbol: String, code: String) throws {
+        for query in ["\(symbol)14,500", "14,500 \(symbol)"] {
+            let parsed = try #require(ClipboardAssistantDetector.parseCurrencyConversion(
+                query, preferredCurrencyCode: "EUR"
+            ), "expected a currency amount for \(query)")
+            #expect(parsed.amount == 14500)
+            #expect(parsed.amountText == "14,500")
+            #expect(parsed.sourceCurrencyCode == code)
+            #expect(parsed.targetCurrencyCode == nil)
+        }
+        let explicit = try #require(ClipboardAssistantDetector.parseCurrencyConversion(
+            "€14,500 to \(symbol)", preferredCurrencyCode: "EUR"
+        ))
+        #expect(explicit.sourceCurrencyCode == "EUR")
+        #expect(explicit.targetCurrencyCode == code)
+        #expect(explicit.amount == 14500)
+    }
+
+    @Test(arguments: [
+        ("jp￥", "JPY"), ("ＪＰ￥", "JPY"), ("au$", "AUD"), ("ＣＡ＄", "CAD"),
+        ("ＵＳ＄", "USD"), ("￦", "KRW"), ("cn￥", "CNY"),
+    ])
+    func currencySymbolsIgnoreLetterCaseAndCharacterWidth(symbol: String, code: String) throws {
+        for query in ["\(symbol)14,500", "14,500 \(symbol)"] {
+            let parsed = try #require(ClipboardAssistantDetector.parseCurrencyConversion(
+                query, preferredCurrencyCode: "EUR"
+            ))
+            #expect(parsed.amount == 14500)
+            #expect(parsed.amountText == "14,500")
+            #expect(parsed.sourceCurrencyCode == code)
+        }
+        #expect(ClipboardAssistantDetector.parseCurrencyConversion(
+            "€100 = \(symbol)", preferredCurrencyCode: "EUR"
+        )?.targetCurrencyCode == code)
+    }
+
+    @Test(arguments: [
+        ("JPY", "JPY"), ("USD", "USD"), ("CHF", "CHF"),
+        ("RMB", "CNY"), ("CNH", "CNY"), ("NTD", "TWD"),
+        ("Rp", "IDR"), ("RM", "MYR"), ("Rs", "INR"), ("ｕｓｄ", "USD"),
+    ])
+    func currencyCodesAndAliasesAlsoWorkBeforeAmounts(token: String, code: String) throws {
+        let parsed = try #require(ClipboardAssistantDetector.parseCurrencyConversion(
+            "\(token) 14,500", preferredCurrencyCode: "EUR"
+        ))
+        #expect(parsed.amount == 14500)
+        #expect(parsed.amountText == "14,500")
+        #expect(parsed.sourceCurrencyCode == code)
+    }
+
+    @Test
+    func recognizesUnambiguousSystemCurrencySymbolsAcrossInterfaceLanguages() throws {
+        let codes = Locale.commonISOCurrencyCodes.filter {
+            ClipboardAssistantDetector.resolveCurrencyToken($0, preferred: "USD") == $0
+        }
+        var symbols: [String: Set<String>] = [:]
+        var examples: [(symbol: String, text: String, code: String, locale: Locale)] = []
+        for language in AppLanguage.allCases {
+            let formatter = NumberFormatter()
+            formatter.locale = language.locale
+            formatter.numberStyle = .currency
+            for code in codes {
+                formatter.currencyCode = code
+                let symbol = try #require(formatter.currencySymbol)
+                    .folding(options: .widthInsensitive, locale: Locale(identifier: "en_US_POSIX"))
+                    .uppercased()
+                symbols[symbol, default: []].insert(code)
+                examples.append((symbol, try #require(formatter.string(from: 14500)), code, language.locale))
+            }
+        }
+        for (symbol, currencies) in symbols where currencies.count == 1 {
+            let code = try #require(currencies.first)
+            let parsed = ClipboardAssistantDetector.parseCurrencyConversion(
+                "\(symbol) 1,234.56", preferredCurrencyCode: "USD"
+            )
+            #expect(parsed?.sourceCurrencyCode == code, "unrecognized system currency symbol: \(symbol.debugDescription) for \(code)")
+            #expect(parsed?.amount == 1234.56, "incorrect amount for system currency symbol: \(symbol.debugDescription)")
+            #expect(ClipboardAssistantDetector.resolveCurrencyToken(symbol, preferred: "USD") == code)
+        }
+        for example in examples where symbols[example.symbol]?.count == 1 {
+            let parsed = ClipboardAssistantDetector.parseCurrencyConversion(
+                example.text, preferredCurrencyCode: "USD", locale: example.locale
+            )
+            #expect(parsed?.sourceCurrencyCode == example.code, "unrecognized formatted currency: \(example.text.debugDescription)")
+            #expect(parsed?.amount == 14500, "incorrect amount for formatted currency: \(example.text.debugDescription)")
+        }
+    }
+
+    @Test(arguments: ["F CFA", "F\u{00A0}CFA", "F\u{202F}CFA"])
+    func currencySymbolsPreserveSignificantInternalSpaces(symbol: String) {
+        for query in ["\(symbol)100", "100\(symbol)"] {
+            #expect(ClipboardAssistantDetector.parseCurrencyConversion(
+                query, preferredCurrencyCode: "EUR"
+            )?.sourceCurrencyCode == "XOF")
+        }
+        #expect(ClipboardAssistantDetector.parseCurrencyConversion(
+            "FCFA100", preferredCurrencyCode: "EUR"
+        )?.sourceCurrencyCode == "XAF")
+    }
+
+    @Test(arguments: ["\u{061C}", "\u{200E}", "\u{200F}"])
+    func currencyAmountsAcceptOnlyFormattingDirectionMarksAtBoundaries(mark: String) throws {
+        for query in ["\(mark)PHP\(mark)\u{00A0}5,339.84\(mark)", "\(mark)5,339.84\(mark)PHP\(mark)"] {
+            let parsed = try #require(ClipboardAssistantDetector.parseCurrencyConversion(
+                query, preferredCurrencyCode: "CNY"
+            ))
+            #expect(parsed.amount == 5339.84)
+            #expect(parsed.amountText == "5,339.84")
+            #expect(parsed.sourceCurrencyCode == "PHP")
+        }
+    }
+
+    @Test(arguments: [
+        ("$", "CAD", "CAD"), ("$", "EUR", "USD"),
+        ("¥", "JPY", "JPY"), ("¥", "EUR", "CNY"), ("￥", "CNY", "CNY"),
+    ])
+    func bareCurrencySymbolsKeepTheirPreferredCurrencyRules(symbol: String, preferred: String, source: String) {
+        for query in ["\(symbol)100", "100\(symbol)"] {
+            #expect(ClipboardAssistantDetector.parseCurrencyConversion(
+                query, preferredCurrencyCode: preferred
+            )?.sourceCurrencyCode == source)
+        }
+    }
+
+    @Test(arguments: [
+        ("CA$1 to cents", "CAD", 100.0), ("CN¥1 to 角", "CNY", 10.0),
+        ("ＵＳＤ1 to cents", "USD", 100.0), ("100 cents to ca$", "CAD", 1.0),
+    ])
+    func regionalCurrenciesAlsoWorkWithMoneyDenominations(query: String, code: String, expected: Double) throws {
+        let conversion = try #require(ClipboardAssistantDetector.parseMoneyConversion(
+            query, preferredCurrencyCode: "CNY"
+        ))
+        #expect(conversion.source.currencyCode == code)
+        #expect(conversion.target.currencyCode == code)
+        #expect(conversion.amount * conversion.unitRate(from: 1) == expected)
+    }
+
+    @Test(arguments: [
+        "", "JP¥", "JP¥14,50", "JP¥14,500.5.0", "JP¥14,500 extra", "price: JP¥14,500",
+        "JP$14,500", "CN$14,500", "XX$14,500", "$XX14,500", "XYZ14,500",
+        "JPY$14,500", "JP¥14,500 USD", "US$JP¥14,500", "US$14,500JP¥",
+        "JP¥14,500==USD", "JP¥14,500 to XYZ", "JP¥14,500 to JPY",
+        "JP¥14,500\u{0}", "JP¥14,500\u{202E}", "\u{202E}PHP5,339.84", "PHP5,339.84\u{2066}",
+    ])
+    func rejectsMalformedAndConflictingRegionalCurrencyAmounts(query: String) {
+        #expect(ClipboardAssistantDetector.parseCurrencyConversion(query, preferredCurrencyCode: "EUR") == nil)
+        #expect(ClipboardAssistantDetector.detect(
+            text: query, enabledKinds: [.conversion], preferredCurrencyCode: "EUR", locale: Locale(identifier: "en_US_POSIX")
+        ) == nil)
+    }
+
+    @Test
+    func explicitRegionsOverridePreferredCurrenciesAndRespectTheFeatureSwitch() {
+        for (query, preferred, source) in [
+            ("JP¥14,500", "CNY", "JPY"), ("CN¥14,500", "JPY", "CNY"),
+            ("US$14,500", "CAD", "USD"), ("CA$14,500", "USD", "CAD"),
+            ("AU$14,500", "CAD", "AUD"), ("SG$14,500", "AUD", "SGD"),
+        ] {
+            let result = ClipboardAssistantDetector.detect(
+                text: query, enabledKinds: allKinds, preferredCurrencyCode: preferred, locale: Locale(identifier: "en_US_POSIX")
+            )
+            #expect(result?.detail == .currencyExpression(
+                amount: 14500, amountText: "14,500", sourceCurrencyCode: source, targetCurrencyCode: preferred
+            ))
+            #expect(ClipboardAssistantDetector.detect(
+                text: query, enabledKinds: [.conversion], preferredCurrencyCode: source
+            ) == nil)
+            #expect(ClipboardAssistantDetector.detect(
+                text: query, enabledKinds: [.math], preferredCurrencyCode: preferred
+            ) == nil)
+        }
+    }
+
+    @Test
+    func regionalCurrencyAmountsKeepInputBoundsAndSeededAmountProperties() throws {
+        let bounded = "JP¥" + String(repeating: " ", count: 191) + "14,500"
+        #expect(bounded.count == 200)
+        #expect(ClipboardAssistantDetector.parseCurrencyConversion(bounded, preferredCurrencyCode: "CNY")?.amount == 14500)
+        #expect(ClipboardAssistantDetector.parseCurrencyConversion(bounded + "0", preferredCurrencyCode: "CNY") == nil)
+
+        var seed: UInt64 = 0xC0FFEE
+        for _ in 0..<32 {
+            seed = seed &* 6_364_136_223_846_793_005 &+ 1
+            let amount = Int((seed >> 32) % 20001) - 10000
+            let symbol = ["JP¥", "CA$", "AU$", "SG$"][Int(seed % 4)]
+            let prefix = try #require(ClipboardAssistantDetector.parseCurrencyConversion(
+                "\(symbol)\(amount)", preferredCurrencyCode: "EUR"
+            ))
+            let suffix = try #require(ClipboardAssistantDetector.parseCurrencyConversion(
+                "\(amount)\(symbol)", preferredCurrencyCode: "EUR"
+            ))
+            #expect(prefix == suffix)
+            #expect(prefix.amount == Double(amount))
+            #expect(ClipboardAssistantDetector.parseCurrencyConversion(
+                "\(symbol)\(amount)=EUR trailing", preferredCurrencyCode: "EUR"
+            ) == nil)
         }
     }
 
