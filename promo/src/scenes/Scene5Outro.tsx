@@ -10,10 +10,11 @@ import {githubMark, zislaIcon} from '../assets';
 import {copy, focus, track} from '../content';
 import {HomeModule} from '../modules/HomeModule';
 import {FilmMotion, ZislaMotion, ease, linear, springAt} from '../motion';
+import {soundtrack} from '../soundtrack';
 import {SCENES, filmFrame} from '../timeline';
 import {MODULE_HEIGHT, clamp01, color, islandHeightFor, lerp, white} from '../theme';
 
-// 幕首停在展开态等上一幕叠化完，光标移出岛屿范围后顶栏才收回
+// Hold the expanded island through the crossfade before the cursor leaves.
 const LEAVE = [14, 50] as const;
 const COLLAPSE_AT = 34;
 const BRAND_AT = 70;
@@ -34,24 +35,24 @@ const OUTPUT_LINE = 18;
 export const Scene5Outro = ({duration = SCENES.outro.duration}: {duration?: number}) => {
   const frame = useCurrentFrame();
   const {fps} = useVideoConfig();
-  // 歌和番茄钟从片头一直在走，读数按全片时间算，才和前几幕里看到的接得上
+  // Continue media and focus readouts from film time across scene boundaries.
   const played = filmFrame('outro', frame);
 
-  // 顶栏收回刘海，画面重心落回中央品牌
+  // Collapse the island before drawing attention to the centered brand.
   const reveal = Math.max(0, 1 - springAt(frame, fps, COLLAPSE_AT, ZislaMotion.islandRecycle, 30));
   const dim = linear(frame, [COLLAPSE_AT, COLLAPSE_AT + 60], [0.3, 0.54]);
   const brand = clamp01(springAt(frame, fps, BRAND_AT, FilmMotion.title, 44));
   const pill = clamp01(springAt(frame, fps, PILL_AT, FilmMotion.gentle, 32));
   const typed = typedChars(frame, TYPE_AT, copy.outro.length, 28, fps);
   const repo = clamp01(springAt(frame, fps, REPO_AT, FilmMotion.gentle, 34));
-  // 输出一行行顶出来，胶囊跟着长高，而不是先撑好空盒子等字
+  // Grow the terminal with arriving output instead of reserving an empty box.
   const outputHeight = OUT_AT.reduce(
     (height, at, index) =>
       height + ((index === 0 ? OUTPUT_TOP : OUTPUT_GAP) + OUTPUT_LINE) * clamp01(springAt(frame, fps, at - 6, ZislaMotion.surfaceResize, 22)),
     0,
   );
 
-  // 光标停在工具栏的空白处，滑出岛的下沿后触发收拢
+  // Leaving the lower edge triggers the same collapse as the native island.
   const leave = ease(frame, LEAVE, [0, 1]);
   const cursorX = lerp(678, 900, leave);
   const cursorY = lerp(107, 340, leave);
@@ -147,7 +148,11 @@ export const Scene5Outro = ({duration = SCENES.outro.duration}: {duration?: numb
         </div>
       </div>
 
-      {/* 末帧帧号是 duration - 1，终点写 duration 会让最后一帧压不到纯黑 */}
+      <div className="absolute inset-x-0 text-center text-[9px] leading-[12px]" style={{bottom: 32, color: white(0.5), opacity: repo}}>
+        Music: {soundtrack.title} by {soundtrack.artist} · {soundtrack.license} · scottbuckley.com.au · 60s edit
+      </div>
+
+      {/* The last frame is duration - 1, so the fade must reach black on that frame. */}
       <Blackout opacity={ease(frame, [duration - 28, duration - 1], [0, 1])} />
     </>
   );

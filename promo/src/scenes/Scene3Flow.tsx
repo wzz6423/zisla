@@ -16,28 +16,29 @@ import {
   formatTime,
   lyricAt,
 } from '../components/IslandChrome';
-import {DragGhost, DropShoulders, QuickActionToast} from '../components/Overlays';
+import {DragGhost, QuickActionToast, ShelfContextMenu} from '../components/Overlays';
 import {BrowserWindow, DownloadPopover, FinderWindow} from '../components/Windows';
 import type {FinderItem} from '../components/Windows';
 import {copy, download, focus, shelfItems, track as song} from '../content';
 import type {ShelfItem} from '../content';
 import {HomeModule} from '../modules/HomeModule';
 import {ShelfModule} from '../modules/ShelfModule';
+import {shelfItemPoint, shelfMenuPlacement} from '../modules/shelfLayout';
 import {FilmMotion, ZislaMotion, ease, easeOutAt, fadeWindow, linear, springAt} from '../motion';
 import {filmFrame} from '../timeline';
-import {MODULE_HEIGHT, STAGE, clamp01, color, islandHeightFor, lerp, white} from '../theme';
+import {ISLAND, MODULE_HEIGHT, STAGE, clamp01, color, islandHeightFor, lerp, white} from '../theme';
 
 const CENTER = STAGE.width / 2;
 
-// 三拍：媒体 → Handoff → 下载。幕首接着上一幕的展开态，不再重新展开
+// Continue the previous scene's expanded state before handoff and downloads.
 const MEDIA = {open: 0, close: 226};
-const HANDOFF = {start: 250, grab: 292, drop: 384, open: 388, close: 500};
+const HANDOFF = {start: 250, grab: 292, open: 326, drop: 384, close: 500};
 const DOWNLOAD = {start: 516, done: 640, toast: 650, click: 716, finder: 722};
 
 const LYRIC_PERIOD = 132;
 
 const dropped = shelfItems[0] as ShelfItem;
-// 托盘里已有的条目在前，刚拖进来的那一个排在最后吸附进去
+// The incoming file settles after the items already in the shelf.
 const SHELF = [...shelfItems.slice(1), dropped];
 
 const DESIGN_FILES: readonly FinderItem[] = [
@@ -54,18 +55,22 @@ const DOWNLOADS: readonly FinderItem[] = [
   {name: 'Archive', tint: '#9ad0ff', kind: 'folder'},
 ];
 
-const DESIGN_WINDOW = {x: 150, y: 352, width: 500, height: 262};
+const DESIGN_WINDOW = {x: 100, y: 438, width: 500, height: 220};
 const GRAB = {x: DESIGN_WINDOW.x + 18 + 58, y: DESIGN_WINDOW.y + 65 + 18 + 34};
-// DropShoulders 右侧 Shelf 肩的中心
-const SHOULDER = {x: CENTER + 376 - 54, y: 88};
+const SHELF_ORIGIN = {x: CENTER - ISLAND.width / 2 + ISLAND.moduleInset, y: ISLAND.chromeHeight + ISLAND.moduleInset};
+const LAST_FILE = shelfItemPoint(SHELF.length - 1);
+const DROP = {x: SHELF_ORIGIN.x + LAST_FILE.x, y: SHELF_ORIGIN.y + LAST_FILE.y};
+const MENU_ANCHOR = {x: DROP.x + 8, y: DROP.y + 31};
+const MENU = shelfMenuPlacement(MENU_ANCHOR, STAGE);
+const FINDER_ACTION = {x: MENU.x + 70, y: MENU.y + 42};
 const BROWSER = {x: 260, y: 150, width: 760, height: 470};
-// QuickActionToast 里 “Open Folder” 按钮的中心
+// Center of the existing Open Folder quick action.
 const TOAST_ACTION = {x: 808, y: 18};
 
 export const Scene3Flow = () => {
   const frame = useCurrentFrame();
   const {fps} = useVideoConfig();
-  // 歌和番茄钟从片头一直在走，读数按全片时间算，前后几幕才接得上
+  // Shared media and focus counters stay continuous across scenes.
   const played = filmFrame('flow', frame);
   const elapsed = song.elapsed + played / fps;
   const levels = waveLevels(frame, 1, 0);
@@ -80,24 +85,24 @@ export const Scene3Flow = () => {
   const inDownload = frame >= DOWNLOAD.start;
   const reveal = inMedia ? mediaReveal : shelfReveal;
 
-  // 媒体特写：岛外的放大唱片只是影片层的强调，岛内封面保持静止
+  // The film spotlight rotates; the application's artwork stays still.
   const spotlight = Math.min(springAt(frame, fps, MEDIA.open + 22, FilmMotion.gentle, 38), linear(frame, [MEDIA.close - 22, MEDIA.close], [1, 0]));
   const lyricIndex = Math.floor(played / LYRIC_PERIOD) % song.lyrics.length;
   const lyric = lyricAt(played, LYRIC_PERIOD);
 
-  // Handoff：抓起 → 拖到 Shelf 肩 → 松手吸附
+  // Enter the top trigger, expand the shelf, then settle the file in its grid slot.
   const windowIn = Math.min(springAt(frame, fps, HANDOFF.start, FilmMotion.gentle, 34), linear(frame, [HANDOFF.close - 6, HANDOFF.close + 14], [1, 0]));
-  const travel = ease(frame, [HANDOFF.grab + 10, HANDOFF.drop - 12], [0, 1]);
   const hold = springAt(frame, fps, HANDOFF.grab, FilmMotion.pop, 24);
-  const ghostX = lerp(GRAB.x, SHOULDER.x, travel);
-  const ghostY = lerp(GRAB.y, SHOULDER.y, travel) - Math.sin(travel * Math.PI) * 40;
+  const toTrigger = ease(frame, [HANDOFF.grab + 10, HANDOFF.open], [0, 1]);
+  const toGrid = ease(frame, [HANDOFF.open + 8, HANDOFF.drop], [0, 1]);
+  const ghostX = frame < HANDOFF.open ? lerp(GRAB.x, CENTER, toTrigger) : lerp(CENTER, DROP.x, toGrid);
+  const ghostY = frame < HANDOFF.open ? lerp(GRAB.y, 4, toTrigger) : lerp(4, DROP.y, toGrid);
   const ghostOpacity = frame >= HANDOFF.grab ? linear(frame, [HANDOFF.drop, HANDOFF.drop + 10], [1, 0]) : 0;
-  const shoulders = Math.min(linear(frame, [HANDOFF.grab + 22, HANDOFF.grab + 38], [0, 1]), linear(frame, [HANDOFF.drop, HANDOFF.drop + 12], [1, 0]));
-  const overShelf = travel > 0.82 ? 1 : 0;
-  const landed = springAt(frame, fps, HANDOFF.open + 16, ZislaMotion.surfaceResize, 36);
+  const dropHover = frame >= HANDOFF.open + 8 && frame < HANDOFF.drop ? 1 : 0;
+  const landed = springAt(frame, fps, HANDOFF.drop, ZislaMotion.surfaceResize, 24);
   const menu = Math.min(linear(frame, [448, 458], [0, 1]), linear(frame, [HANDOFF.close - 16, HANDOFF.close - 6], [1, 0]));
 
-  // 下载：浏览器里跑进度，收起态两翼同步，完成后顶部落下快捷操作
+  // Download progress hands off to the top-edge quick action.
   const downloadProgress = ease(frame, [DOWNLOAD.start + 34, DOWNLOAD.done], [0.38, 1]);
   const done = frame >= DOWNLOAD.done;
   const browserIn = Math.min(springAt(frame, fps, DOWNLOAD.start, FilmMotion.gentle, 34), linear(frame, [DOWNLOAD.finder, DOWNLOAD.finder + 18], [1, 0.0]));
@@ -112,9 +117,10 @@ export const Scene3Flow = () => {
   let pressed = 0;
   if (!inMedia && !inDownload) {
     const approach = easeOutAt(frame, [HANDOFF.start + 6, HANDOFF.grab], [0, 1]);
-    const toMenu = ease(frame, [HANDOFF.drop + 30, 452], [0, 1]);
-    cursorX = frame < HANDOFF.grab ? lerp(330, GRAB.x, approach) : lerp(ghostX, 876, toMenu);
-    cursorY = frame < HANDOFF.grab ? lerp(560, GRAB.y, approach) : lerp(ghostY, 304, toMenu);
+    const toFile = ease(frame, [HANDOFF.drop + 16, 448], [0, 1]);
+    const toAction = ease(frame, [458, 474], [0, 1]);
+    cursorX = frame < HANDOFF.grab ? lerp(330, GRAB.x, approach) : frame < 458 ? lerp(ghostX, MENU_ANCHOR.x, toFile) : lerp(MENU_ANCHOR.x, FINDER_ACTION.x, toAction);
+    cursorY = frame < HANDOFF.grab ? lerp(560, GRAB.y, approach) : frame < 458 ? lerp(ghostY, MENU_ANCHOR.y, toFile) : lerp(MENU_ANCHOR.y, FINDER_ACTION.y, toAction);
     cursorOpacity = Math.min(linear(frame, [HANDOFF.start + 4, HANDOFF.start + 18], [0, 1]), linear(frame, [HANDOFF.close - 4, HANDOFF.close + 10], [1, 0]));
     pressed = frame >= HANDOFF.grab && frame < HANDOFF.drop ? 1 : 0;
   } else if (inDownload) {
@@ -218,8 +224,6 @@ export const Scene3Flow = () => {
         </GlassPanel>
       ) : null}
 
-      <DropShoulders highlight={overShelf} opacity={shoulders} frame={frame} />
-
       <Island
         reveal={reveal}
         height={islandHeightFor(inMedia ? MODULE_HEIGHT.home : MODULE_HEIGHT.shelf)}
@@ -261,14 +265,14 @@ export const Scene3Flow = () => {
                 highlight={SHELF.length - 1}
                 moreButtons={linear(frame, [HANDOFF.open + 40, HANDOFF.open + 54], [0, 1])}
                 actionGlow={fadeWindow(frame, HANDOFF.open + 52, 452, 10)}
-                menu={menu}
-                menuHighlight={linear(frame, [462, 474], [0, 1])}
+                dropHover={dropHover}
               />
             </div>
           </IslandBody>
         )}
       </Island>
       <Notch />
+      {menu > 0 ? <ShelfContextMenu anchor={MENU_ANCHOR} opacity={menu} highlight={linear(frame, [462, 474], [0, 1])} /> : null}
 
       {inDownload && frame >= DOWNLOAD.toast ? (
         <QuickActionToast

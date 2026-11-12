@@ -1,60 +1,44 @@
-import type {LucideIcon} from 'lucide-react';
-import {CircleChevronDown, FileArchive, Image as ImageIcon, Inbox, Share, X} from 'lucide-react';
+import {CircleChevronDown, FileArchive, Image as ImageIcon, X} from 'lucide-react';
 import {GLASS_BLUR} from './Glass';
-import {NOTCH_WIDTH, STAGE, alpha, black, clamp01, color, white} from '../theme';
+import {NOTCH_WIDTH, STAGE, black, clamp01, color, white} from '../theme';
+import {SHELF_LAYOUT, shelfMenuPlacement} from '../modules/shelfLayout';
 
 const CENTER = STAGE.width / 2;
 
-// 转运提示肩：拖拽文件时贴在收起态岛体两侧的落点
-const SHOULDER = {width: 108, height: 52, top: 62};
-
-export const DropShoulders = ({highlight = 0, opacity = 1, frame}: {highlight?: number; opacity?: number; frame: number}) => {
-  const shoulders: readonly {key: 'left' | 'right'; icon: LucideIcon; tint: string; title: string}[] = [
-    {key: 'left', icon: Share, tint: color.cyan, title: 'Share'},
-    {key: 'right', icon: Inbox, tint: color.green, title: 'Shelf'},
-  ];
+export const ShelfContextMenu = ({anchor, opacity, highlight}: {anchor: {x: number; y: number}; opacity: number; highlight: number}) => {
+  const placement = shelfMenuPlacement(anchor, STAGE);
   return (
-    <>
-      {shoulders.map(({key, icon: Icon, tint, title}) => {
-        const active = (key === 'left' ? highlight < 0 : highlight > 0) ? 1 : 0;
-        const pulse = active ? 0.9 + 0.1 * Math.sin(frame * 0.18) : 1;
-        return (
-          <div
-            key={key}
-            className="absolute flex flex-col items-center justify-center overflow-hidden"
-            style={{
-              left: key === 'left' ? CENTER - 376 : CENTER + 376 - SHOULDER.width,
-              top: SHOULDER.top,
-              width: SHOULDER.width,
-              height: SHOULDER.height,
-              borderRadius: 8,
-              background: black(active ? 0.96 : 0.86),
-              border: `1px solid ${alpha(tint, active ? 0.9 : 0.24)}`,
-              boxShadow: `0 ${8 + 10 * active}px ${22 + 18 * active}px ${black(0.45)}`,
-              opacity: clamp01(opacity),
-              transform: `scale(${(0.92 + 0.08 * clamp01(opacity)) * (active ? 1.02 : 1) * pulse})`,
-              transformOrigin: 'top center',
-            }}
-          >
-            <div
-              className="absolute inset-x-0 top-0"
-              style={{height: 2, background: alpha(tint, active ? 1 : 0.34)}}
-            />
-            <div className="flex items-center gap-[7px]">
-              <div className="flex items-center justify-center" style={{width: 24, height: 24}}>
-                <Icon size={16} strokeWidth={2.3} color={tint} />
-              </div>
-              <div className="text-[11px] leading-[13px] font-bold">{title}</div>
-            </div>
-            <div className="text-[9px] leading-[12px] font-medium text-label-2">Receiving</div>
-          </div>
-        );
-      })}
-    </>
+    <div
+      role="menu"
+      aria-label="Shelf file actions"
+      className="absolute py-[5px] text-[12px] leading-[18px]"
+      style={{
+        left: placement.x,
+        top: placement.y,
+        width: SHELF_LAYOUT.menuWidth,
+        background: 'rgba(28,28,32,0.86)',
+        backdropFilter: GLASS_BLUR,
+        WebkitBackdropFilter: GLASS_BLUR,
+        border: `1px solid ${white(0.12)}`,
+        borderRadius: 8,
+        boxShadow: '0 12px 34px rgba(0,0,0,0.5)',
+        opacity: clamp01(opacity),
+        transform: `scale(${0.96 + 0.04 * clamp01(opacity)})`,
+        transformOrigin: placement.transformOrigin,
+      }}
+    >
+      {['Open', 'Show in Finder', 'Copy', 'Send to Quick Notes'].map((label, index) => (
+        <div key={label} role="menuitem" className="mx-[3px] rounded-[4px] px-[7px] py-[3px]" style={{background: index === 1 && highlight > 0.5 ? color.blue : 'transparent'}}>
+          {label}
+        </div>
+      ))}
+      <div style={{height: 1, background: color.divider, margin: '4px 0'}} />
+      <div role="menuitem" className="px-[10px] py-[3px]">Remove</div>
+    </div>
   );
 };
 
-// 下载完成后从顶部滑下的快捷操作条
+// Completed downloads use the application's top-edge quick-action bar.
 const TOAST = {width: 560, height: 34};
 const TOAST_SIDE = (TOAST.width - NOTCH_WIDTH) / 2;
 
@@ -63,7 +47,7 @@ type QuickActionToastProps = {
   detail: string;
   action: string;
   opacity?: number;
-  // 底边倒计时进度线的剩余比例
+  // Remaining lifetime shown along the bottom edge.
   countdown?: number;
   actionGlow?: number;
 };
@@ -122,7 +106,7 @@ type DragGhostProps = {
   y: number;
   name: string;
   tint: string;
-  // 0–1，抓起时的放大
+  // Drag lift amount, normalized to 0–1.
   hold?: number;
   opacity?: number;
 };

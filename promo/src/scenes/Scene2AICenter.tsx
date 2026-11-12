@@ -1,6 +1,7 @@
-import {Check, ShieldCheck, X} from 'lucide-react';
+import {ShieldCheck} from 'lucide-react';
 import {useCurrentFrame, useVideoConfig} from 'remotion';
 import {MenuBar, Notch, Wallpaper} from '../components/Desktop';
+import {GlassPanel} from '../components/Glass';
 import {Island, modulePhase} from '../components/Island';
 import {CompactPercent, IslandBody, ProviderLogo, StatusHeader, TABS} from '../components/IslandChrome';
 import {Camera} from '../components/Stage';
@@ -8,8 +9,9 @@ import {TerminalLine, TerminalWindow, typedChars} from '../components/Terminal';
 import {aiTasks, brands, copy} from '../content';
 import type {AiTask} from '../content';
 import {AIModule} from '../modules/AIModule';
+import {AIAnalyticsModule, aiModelTokenTotal} from '../modules/AIAnalyticsModule';
 import {FilmMotion, ZislaMotion, ease, linear, springAt, track} from '../motion';
-import {MODULE_HEIGHT, STAGE, alpha, black, clamp01, color, islandHeightFor, lerp, white} from '../theme';
+import {MODULE_HEIGHT, STAGE, alpha, clamp01, color, islandHeightFor, lerp, white} from '../theme';
 
 const COMMAND = 'zislactl update --id build-01 --provider claude --title "Refactoring core" --progress 68';
 const FOLLOW_UPS = [
@@ -23,12 +25,11 @@ const TYPE_SPEED = 48;
 const SENT_AT = 140;
 const WING_AT = 146;
 const EXPAND_AT = 204;
-const PRIVACY_AT = 480;
+const MODELS_AT = 420;
+const BALANCE_AT = 552;
+const PRIVACY_AT = 424;
 
 const TERMINAL = {width: 760, height: 168};
-
-const READS = ['Task state', 'Progress', 'Token counts', 'Provider'];
-const NEVER = ['Prompts', 'Answer bodies'];
 
 const taskById = (id: string): AiTask => aiTasks.find((task) => task.id === id) ?? (aiTasks[0] as AiTask);
 
@@ -48,7 +49,7 @@ export const Scene2AICenter = () => {
   const todayTokens = track(frame, [
     [0, 553_000],
     [374, 553_000],
-    [398, 601_000],
+    [398, aiModelTokenTotal],
   ]);
 
   const reveal = springAt(frame, fps, EXPAND_AT, ZislaMotion.islandReveal, 42);
@@ -59,14 +60,17 @@ export const Scene2AICenter = () => {
   const terminalIn = springAt(frame, fps, 6, FilmMotion.gentle, 36);
   const terminalDrop = ease(frame, [EXPAND_AT - 14, EXPAND_AT + 30], [0, 1]);
   const terminalY = lerp(300, 514, terminalDrop) + (1 - terminalIn) * 24;
+  const terminalOut = linear(frame, [MODELS_AT - 12, MODELS_AT + 16], [1, 0]);
 
   const zoom = ease(frame, [250, 470], [1, 1.1]);
 
-  const dim = linear(frame, [PRIVACY_AT, PRIVACY_AT + 34], [0, 1]);
-  const shield = springAt(frame, fps, PRIVACY_AT + 14, FilmMotion.pop, 40);
-  const title = springAt(frame, fps, PRIVACY_AT + 34, FilmMotion.title, 36);
-  const subtitle = springAt(frame, fps, PRIVACY_AT + 52, FilmMotion.title, 36);
-  const detail = linear(frame, [PRIVACY_AT + 150, PRIVACY_AT + 176], [0, 1]);
+  const scroll = track(frame, [
+    [MODELS_AT, 0],
+    [MODELS_AT + 30, 200],
+    [BALANCE_AT, 200],
+    [BALANCE_AT + 30, MODULE_HEIGHT.ai],
+  ]);
+  const privacy = springAt(frame, fps, PRIVACY_AT, FilmMotion.gentle, 36);
 
   return (
     <>
@@ -82,7 +86,7 @@ export const Scene2AICenter = () => {
           y={terminalY}
           width={TERMINAL.width}
           height={TERMINAL.height}
-          opacity={clamp01(terminalIn)}
+          opacity={clamp01(terminalIn) * terminalOut}
           output={FOLLOW_UPS.map((line) =>
             frame >= line.at ? (
               <TerminalLine key={line.at} tint={white(0.92)}>
@@ -104,25 +108,30 @@ export const Scene2AICenter = () => {
         >
           <IslandBody header={<StatusHeader task={build} progress={progress} />} active={TABS.ai}>
             <div className="absolute inset-0" style={modulePhase(moduleIn, 1, true)}>
-              <AIModule
-                frame={frame}
-                rows={[
-                  {task: build, progress, run: 401 + seconds, enter: rowEnter},
-                  {task: taskById('test-07'), progress: 0.34 + seconds * 0.004, run: 533 + seconds},
-                  {task: taskById('docs-02'), run: 194 + seconds},
-                ]}
-                trend={ease(frame, [EXPAND_AT + 20, EXPAND_AT + 96], [0, 1])}
-                todayTokens={todayTokens}
-                heat={linear(frame, [EXPAND_AT + 40, EXPAND_AT + 130], [0, 1])}
-                todayLevel={frame >= 386 ? 3 : 2}
-                selection={linear(frame, [340, 356], [0, 1])}
-              />
+              <div style={{transform: `translateY(${-scroll}px)`}}>
+                <div className="relative" style={{height: MODULE_HEIGHT.ai}}>
+                  <AIModule
+                    frame={frame}
+                    rows={[
+                      {task: build, progress, run: 401 + seconds, enter: rowEnter},
+                      {task: taskById('test-07'), progress: 0.34 + seconds * 0.004, run: 533 + seconds},
+                      {task: taskById('docs-02'), run: 194 + seconds},
+                    ]}
+                    trend={ease(frame, [EXPAND_AT + 20, EXPAND_AT + 96], [0, 1])}
+                    todayTokens={todayTokens}
+                    heat={linear(frame, [EXPAND_AT + 40, EXPAND_AT + 130], [0, 1])}
+                    todayLevel={frame >= 386 ? 3 : 2}
+                    selection={linear(frame, [340, 356], [0, 1])}
+                  />
+                </div>
+                <AIAnalyticsModule />
+              </div>
             </div>
           </IslandBody>
         </Island>
         <Notch />
 
-        {/* 命令送出的一瞬，在终端与刘海之间拉一条提示线，交代数据是从本地 CLI 进来的 */}
+        {/* The connector establishes that task metadata enters through the local CLI. */}
         <div
           className="absolute"
           style={{
@@ -138,106 +147,19 @@ export const Scene2AICenter = () => {
         />
       </Camera>
 
-      <div
-        className="absolute inset-0"
-        style={{
-          background: black(0.74 * dim),
-          backdropFilter: `blur(${14 * dim}px)`,
-          WebkitBackdropFilter: `blur(${14 * dim}px)`,
-        }}
-      />
-      {frame >= PRIVACY_AT ? (
-        <div className="absolute inset-0 flex flex-col items-center justify-center">
-          <div
-            className="flex items-center justify-center rounded-full"
-            style={{
-              width: 92,
-              height: 92,
-              background: alpha(color.green, 0.14),
-              border: `1px solid ${alpha(color.green, 0.5)}`,
-              boxShadow: `0 0 ${50 + 14 * Math.sin(frame * 0.08)}px ${alpha(color.green, 0.34)}`,
-              opacity: clamp01(shield),
-              transform: `scale(${0.6 + 0.4 * shield})`,
-            }}
-          >
-            <ShieldCheck size={46} strokeWidth={1.8} color={color.green} />
-          </div>
-          <div
-            className="font-semibold"
-            style={{
-              marginTop: 26,
-              fontSize: 54,
-              lineHeight: '60px',
-              letterSpacing: '-0.025em',
-              opacity: clamp01(title),
-              transform: `translateY(${(1 - title) * 16}px)`,
-            }}
-          >
-            {copy.privacy.title}
-          </div>
-          <div
-            className="font-semibold"
-            style={{
-              marginTop: 4,
-              fontSize: 54,
-              lineHeight: '60px',
-              letterSpacing: '-0.025em',
-              color: color.green,
-              opacity: clamp01(subtitle),
-              transform: `translateY(${(1 - subtitle) * 16}px)`,
-            }}
-          >
-            {copy.privacy.subtitle}
-          </div>
-          <div className="flex items-center gap-[8px]" style={{marginTop: 30}}>
-            {READS.map((label, index) => {
-              const enter = springAt(frame, fps, PRIVACY_AT + 78 + index * 7, FilmMotion.pop, 30);
-              return (
-                <div
-                  key={label}
-                  className="flex items-center gap-[6px] rounded-full px-[12px] py-[6px] text-[13px] font-medium"
-                  style={{
-                    background: white(0.1),
-                    border: `1px solid ${white(0.14)}`,
-                    opacity: clamp01(enter),
-                    transform: `scale(${0.86 + 0.14 * enter})`,
-                  }}
-                >
-                  <Check size={13} strokeWidth={3} color={color.green} />
-                  {label}
-                </div>
-              );
-            })}
-            {NEVER.map((label, index) => {
-              const enter = springAt(frame, fps, PRIVACY_AT + 112 + index * 8, FilmMotion.pop, 30);
-              const strike = linear(frame, [PRIVACY_AT + 126 + index * 8, PRIVACY_AT + 142 + index * 8], [0, 1]);
-              return (
-                <div
-                  key={label}
-                  className="relative flex items-center gap-[6px] rounded-full px-[12px] py-[6px] text-[13px] font-medium"
-                  style={{
-                    background: alpha(color.red, 0.12),
-                    border: `1px solid ${alpha(color.red, 0.42)}`,
-                    color: white(0.62),
-                    opacity: clamp01(enter),
-                    transform: `scale(${0.86 + 0.14 * enter})`,
-                  }}
-                >
-                  <X size={13} strokeWidth={3} color={color.red} />
-                  {label}
-                  <div
-                    className="absolute"
-                    style={{left: 30, right: 12, top: '50%', height: 1.5, background: color.red, transform: `scaleX(${strike})`, transformOrigin: 'left'}}
-                  />
-                </div>
-              );
-            })}
-          </div>
-          <div className="text-center text-[14px] leading-[20px] text-label-2" style={{marginTop: 22, width: 620, opacity: detail}}>
-            {copy.privacy.detail}
-          </div>
+      <GlassPanel
+        radius={18}
+        opacity={clamp01(privacy)}
+        className="flex items-center gap-[14px]"
+        style={{left: STAGE.width / 2 - 330, bottom: 30, width: 660, padding: '16px 20px', transform: `translateY(${(1 - privacy) * 16}px)`}}
+      >
+        <ShieldCheck className="shrink-0" size={42} strokeWidth={1.8} color={color.green} />
+        <div className="flex min-w-0 flex-col gap-[3px]">
+          <div className="text-[20px] leading-[24px] font-semibold">{copy.privacy.title}</div>
+          <div className="text-[20px] leading-[24px] font-semibold" style={{color: color.green}}>{copy.privacy.subtitle}</div>
+          <div className="text-[11px] leading-[15px] text-label-2">{copy.privacy.detail}</div>
         </div>
-      ) : null}
+      </GlassPanel>
     </>
   );
 };

@@ -9,6 +9,7 @@
   "scripts": {
     "studio": "remotion studio",
     "typecheck": "tsc --noEmit",
+    "test": "node --test tools/*.test.mjs",
     "render": "remotion render ZislaLaunchFilm out/zisla-launch-1080p60.mp4",
     "render:4k": "remotion render ZislaLaunchFilm4K out/zisla-launch-2160p60.mp4",
     "still": "remotion still ZislaLaunchFilm"
@@ -25,6 +26,7 @@
   "devDependencies": {
     "@types/react": "19.3.0",
     "@types/react-dom": "19.3.0",
+    "esbuild": "0.28.1",
     "typescript": "7.0.2"
   }
 }

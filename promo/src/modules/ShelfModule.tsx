@@ -23,7 +23,8 @@ import {
 import {TextButton} from '../components/Glass';
 import type {ShelfItem, ShelfKind} from '../content';
 import {shelfCategories} from '../content';
-import {black, color, white} from '../theme';
+import {black, color} from '../theme';
+import {shelfItemLayout} from './shelfLayout';
 
 export const SHELF_ICONS: Record<ShelfKind, LucideIcon> = {
   image: Image,
@@ -56,29 +57,23 @@ export const CATEGORY_ICONS: readonly LucideIcon[] = [
 
 type ShelfModuleProps = {
   items: readonly ShelfItem[];
-  // 已落位的条目数，可以是小数，最后一个正在吸附进去
+  // A fractional count animates the last file settling into the grid.
   enter: number;
-  // 高亮的条目序号（右键菜单指向的那一个）
+  // The file targeted by the scene-level context menu.
   highlight?: number;
-  menu?: number;
-  menuHighlight?: number;
-  // 0–1，右侧那组次要按钮（Quick Notes / Copy / Share / Show）出现
+  // Reveal the secondary actions after the first file arrives.
   moreButtons?: number;
-  // 0–1，Share 与 Show 两个按钮被点亮
+  // Emphasize the existing Share and Show actions.
   actionGlow?: number;
-  // 拖拽悬停在托盘上
+  // Highlight the shelf drop target while the file hovers over it.
   dropHover?: number;
   selectedCategory?: number;
 };
-
-const ITEM = {width: 66, height: 84, pitchX: 74, pitchY: 92};
 
 export const ShelfModule = ({
   items,
   enter,
   highlight = -1,
-  menu = 0,
-  menuHighlight = 0,
   moreButtons = 0,
   actionGlow = 0,
   dropHover = 0,
@@ -89,7 +84,7 @@ export const ShelfModule = ({
       className="flex w-[84px] shrink-0 flex-col items-center justify-center gap-2 p-2"
       style={{
         background: color.fillCard,
-        border: `1px solid ${dropHover > 0.01 ? white(0.4) : color.strokeCard}`,
+        border: `1px solid ${color.strokeCard}`,
         borderRadius: '8px 8px 8px 22px',
       }}
     >
@@ -106,13 +101,13 @@ export const ShelfModule = ({
       className="relative flex min-w-0 flex-1 flex-col"
       style={{
         background: color.fillCard,
-        border: `1px solid ${dropHover > 0.01 ? white(0.4) : color.strokeCard}`,
+        border: `1px solid ${dropHover > 0.01 ? color.blue : color.strokeCard}`,
         borderRadius: '8px 8px 22px 8px',
       }}
     >
       <div
         className="pointer-events-none absolute inset-0 rounded-[inherit]"
-        style={{background: color.green, opacity: 0.12 * dropHover}}
+        style={{background: color.blue, opacity: 0.12 * dropHover}}
       />
       <div className="flex h-[30px] shrink-0 items-center gap-[5px] px-[10px]">
         <span className="text-[12px] font-semibold">Shelf</span>
@@ -130,12 +125,7 @@ export const ShelfModule = ({
           </div>
         </div>
       </div>
-      <div className="flex shrink-0 items-center gap-[6px] px-[10px] py-[6px]">
-        <Search size={11} strokeWidth={2.2} color={color.tertiary} />
-        <span className="text-[11px] text-label-3">Search Shelf Content</span>
-      </div>
-      <div style={{height: 1, background: color.divider}} />
-      <div className="flex shrink-0 flex-wrap items-center gap-[6px] px-[10px] py-[6px]">
+      <div className="flex h-[61px] shrink-0 flex-wrap content-center items-center gap-[6px] px-[10px] py-[6px]">
         {shelfCategories.map((category, index) => {
           const Icon = CATEGORY_ICONS[index] ?? Inbox;
           const selected = index === selectedCategory;
@@ -157,6 +147,11 @@ export const ShelfModule = ({
           );
         })}
       </div>
+      <div className="flex h-[29px] shrink-0 items-center gap-[6px] px-[10px] py-[6px]">
+        <Search size={11} strokeWidth={2.2} color={color.tertiary} />
+        <span className="text-[11px] text-label-3">Search Shelf Content</span>
+      </div>
+      <div style={{height: 1, background: color.divider}} />
       <div className="relative min-h-0 flex-1" style={{padding: '7px 8px 7px 4px'}}>
         {items.length === 0 ? (
           <div
@@ -179,18 +174,15 @@ export const ShelfModule = ({
               key={item.name}
               className="absolute"
               style={{
-                left: 4 + (index % 8) * ITEM.pitchX,
-                top: 7 + Math.floor(index / 8) * ITEM.pitchY,
-                width: ITEM.width,
-                height: ITEM.height,
+                ...shelfItemLayout(index),
                 opacity: landed,
-                // 落位时从上方吸附进来
+                // The last file settles from the same point as the drag ghost.
                 transform: `translateY(${(1 - landed) * -18}px) scale(${0.86 + 0.14 * landed})`,
               }}
             >
               <div
                 className="flex h-[50px] items-center justify-center"
-                style={{filter: focused && menu > 0.5 ? 'brightness(1.25)' : undefined}}
+                style={{filter: focused ? 'brightness(1.25)' : undefined}}
               >
                 <Icon size={42} strokeWidth={1.2} color={item.tint} />
               </div>
@@ -206,40 +198,6 @@ export const ShelfModule = ({
             </div>
           );
         })}
-        {menu > 0.01 ? (
-          <div
-            className="absolute z-10 w-[178px] py-[5px] text-[12px]"
-            style={{
-              left: 4 + ((highlight < 0 ? 0 : highlight) % 8) * ITEM.pitchX + 40,
-              top: 7 + Math.floor((highlight < 0 ? 0 : highlight) / 8) * ITEM.pitchY + 56,
-              background: 'rgba(28,28,32,0.86)',
-              backdropFilter: 'blur(24px) saturate(180%)',
-              border: `1px solid ${white(0.12)}`,
-              borderRadius: 8,
-              boxShadow: '0 12px 34px rgba(0,0,0,0.5)',
-              opacity: menu,
-              transform: `scale(${0.96 + 0.04 * menu})`,
-              transformOrigin: 'top left',
-            }}
-          >
-            {[
-              {label: 'Open', highlight: false},
-              {label: 'Show in Finder', highlight: true},
-              {label: 'Copy', highlight: false},
-              {label: 'Send to Quick Notes', highlight: false},
-            ].map((row) => (
-              <div
-                key={row.label}
-                className="px-[10px] py-[3px]"
-                style={{background: row.highlight && menuHighlight > 0.5 ? color.blue : 'transparent'}}
-              >
-                {row.label}
-              </div>
-            ))}
-            <div style={{height: 1, background: color.divider, margin: '4px 0'}} />
-            <div className="px-[10px] py-[3px]">Remove</div>
-          </div>
-        ) : null}
       </div>
     </div>
   </div>

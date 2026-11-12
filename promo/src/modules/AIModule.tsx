@@ -129,7 +129,7 @@ const monotonePath = (points: readonly Point[]): string => {
   return path;
 };
 
-const RIGHT_WIDTH = 377.5;
+export const RIGHT_WIDTH = 377.5;
 const CHART = {height: 128, left: 30, right: 14, top: 6, bottom: 22};
 const CHART_MAX = 1_000_000;
 const TICKS = [0, 250_000, 500_000, 750_000, 1_000_000];

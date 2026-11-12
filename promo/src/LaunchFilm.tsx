@@ -4,6 +4,7 @@ import {Stage} from './components/Stage';
 import {Scene1Awakening} from './scenes/Scene1Awakening';
 import {Scene2AICenter} from './scenes/Scene2AICenter';
 import {Scene3Flow} from './scenes/Scene3Flow';
+import {SceneMail} from './scenes/SceneMail';
 import {Scene4Bento} from './scenes/Scene4Bento';
 import {Scene5Outro} from './scenes/Scene5Outro';
 import {CROSSFADE, SCENES} from './timeline';
@@ -16,12 +17,12 @@ type Entry = {
   duration: number;
 };
 
-// 后一幕提前 CROSSFADE 帧入场，在仍不透明的前一幕之上淡入，到名义起点时刚好完全显现。
-// 因此除第一幕外，幕内帧号从叠化起点算起，比名义起点早 CROSSFADE 帧。
+// Keep the outgoing scene opaque until the incoming scene finishes its crossfade.
 const ENTRIES: readonly Entry[] = [
   {id: 'awakening', Scene: Scene1Awakening, ...SCENES.awakening},
   {id: 'aiCenter', Scene: Scene2AICenter, ...SCENES.aiCenter},
   {id: 'flow', Scene: Scene3Flow, ...SCENES.flow},
+  {id: 'mail', Scene: SceneMail, ...SCENES.mail},
   {id: 'bento', Scene: Scene4Bento, ...SCENES.bento},
   {id: 'outro', Scene: Scene5Outro, ...SCENES.outro},
 ];
@@ -37,7 +38,7 @@ const SceneLayer: FC<{entry: Entry; lead: number}> = ({entry, lead}) => {
 
 export const LaunchFilm: FC = () => (
   <>
-    {/* 配乐只挂在全片合成上，分幕合成用作无声预览 */}
+    {/* Scene compositions remain silent so the soundtrack is never duplicated. */}
     <Audio src={staticFile('audio/zisla-launch.mp3')} />
     {ENTRIES.map((entry, index) => {
       const lead = index > 0 ? CROSSFADE : 0;
