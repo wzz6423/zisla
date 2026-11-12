@@ -51,7 +51,12 @@ function service_is_loaded() { [[ "$(<"$LOADED_FILE")" == 1 ]] }
 function matching_app_pids() { return 0 }
 function wait_for_processes_to_exit() { return 0 }
 function wait_for_service_to_unload() { if service_is_loaded; then return 1; fi }
-function wait_for_service_to_run() { return 1 }
+function wait_for_service_to_run() {
+  if [[ "$TEST_BOOTOUT_MODE" == already-unloaded ]]; then
+    print -r -- 0 > "$LOADED_FILE"
+  fi
+  return 1
+}
 function launchctl() {
   if [[ "$#" == 3 && "$1" == bootstrap && "$2" == "$SERVICE_DOMAIN" && "$3" == "$LAUNCH_AGENT" ]]; then
     print -r -- 1 > "$LOADED_FILE"
@@ -61,8 +66,12 @@ function launchctl() {
     return 0
   fi
   if [[ "$#" == 2 && "$1" == bootout && "$2" == "$SERVICE_TARGET" ]]; then
-    print -r -- 0 > "$LOADED_FILE"
     print -r -- "bootout $2" >> "$CAPTURE_FILE"
+    if [[ "$TEST_BOOTOUT_MODE" != success ]]; then
+      print -u2 -r -- "simulated bootout failure"
+      return 5
+    fi
+    print -r -- 0 > "$LOADED_FILE"
     return 0
   fi
   print -u2 -r -- "unexpected launchctl: $*"
@@ -90,9 +99,6 @@ export SOURCE_DEV_SERVICE="$MAC_ROOT/Scripts/dev-service.sh"
 export TEST_TEMPORARY_ROOT="$TEMPORARY_ROOT"
 export CODE_SIGN_IDENTITY=TEST_STABLE_IDENTITY
 
-launch_status=0
-env -u MAKEFLAGS -u MFLAGS make -C "$TEST_ROOT" run >"$STDOUT_FILE" 2>"$STDERR_FILE" || launch_status=$?
-
 AGENT_PLIST="$TEMPORARY_ROOT/LaunchAgents/dev.wzz.zisla.debug.plist"
 ERROR_LOG="$TEMPORARY_ROOT/logs/stderr.log"
 APP_BINARY="$TEMPORARY_ROOT/app/zisla-debug.app/Contents/MacOS/zisla"
@@ -100,11 +106,10 @@ SERVICE_DOMAIN="gui/$(id -u)"
 SERVICE_TARGET="$SERVICE_DOMAIN/dev.wzz.zisla.debug"
 expected_capture="bootstrap $SERVICE_DOMAIN $AGENT_PLIST
 bootout $SERVICE_TARGET"
-expected_stderr="错误：调试服务未能启动，请检查 $ERROR_LOG"
 expected_stdout="zisla 调试服务已停止，运行时资源已清理。"
 
 function fail_test() {
-  print -u2 -r -- "FAIL: $1"
+  print -u2 -r -- "FAIL: $TEST_BOOTOUT_MODE: $1"
   print -u2 -r -- "status: $launch_status"
   print -u2 -r -- "stdout: $(<"$STDOUT_FILE")"
   print -u2 -r -- "stderr: $(<"$STDERR_FILE")"
@@ -113,20 +118,37 @@ function fail_test() {
   exit 1
 }
 
-[[ "$launch_status" != 0 ]] || fail_test "a failed wait after bootstrap must exit non-zero"
-[[ "$(<"$STDERR_FILE")" == *"$expected_stderr"* ]] || fail_test "the failure must tell the developer to read the error log"
-[[ "$(<"$STDERR_FILE")" != *unexpected\ launchctl* ]] || fail_test "launchctl stub rejected an unexpected command"
-[[ "$(<"$CAPTURE_FILE")" == "$expected_capture" ]] || fail_test "bootstrap must be followed by bootout of SERVICE_TARGET"
-[[ "$(<"$LOADED_FILE")" == 0 ]] || fail_test "the debug service must not stay loaded"
-[[ -f "$ERROR_LOG" && "$(<"$ERROR_LOG")" == "simulated crash" ]] || fail_test "the crash log must remain after the failed start"
-[[ -x "$APP_BINARY" ]] || fail_test "the built debug app must remain after the failed start"
-[[ -f "$AGENT_PLIST" ]] || fail_test "the launch agent plist must remain for the developer to inspect"
-[[ "$(plutil -extract KeepAlive raw -o - "$AGENT_PLIST")" == true ]] || fail_test "a failed start must not disable KeepAlive"
-[[ "$(plutil -extract ThrottleInterval raw -o - "$AGENT_PLIST")" == 10 ]] || fail_test "a failed start must not change the launchd throttle"
-[[ "$(plutil -extract StandardErrorPath raw -o - "$AGENT_PLIST")" == "$ERROR_LOG" ]] || fail_test "the retained log must be the plist error path"
-[[ "$(<"$STDOUT_FILE")" == "$expected_stdout" ]] || fail_test "the failed start must not stop the service again or report success"
-[[ "$(snapshot "$REAL_AGENT")" == "$real_agent_before" ]] || fail_test "the developer LaunchAgents file must stay untouched"
-[[ "$(snapshot "$REAL_ERROR_LOG")" == "$real_error_log_before" ]] || fail_test "the developer error log must stay untouched"
-[[ "$AGENT_PLIST" != "$REAL_AGENT" && "$ERROR_LOG" != "$REAL_ERROR_LOG" ]] || fail_test "the test must use an isolated temporary launch agent"
+tests_run=0
+for TEST_BOOTOUT_MODE in success failure-loaded already-unloaded; do
+  export TEST_BOOTOUT_MODE
+  print -r -- 0 > "$LOADED_FILE"
+  : > "$CAPTURE_FILE"
+  launch_status=0
+  env -u MAKEFLAGS -u MFLAGS make -C "$TEST_ROOT" run >"$STDOUT_FILE" 2>"$STDERR_FILE" || launch_status=$?
 
-print -r -- "PASS: 1 failed-start bootout test"
+  expected_stderr="错误：调试服务未能启动，请检查 $ERROR_LOG"
+  expected_loaded=0
+  if [[ "$TEST_BOOTOUT_MODE" == failure-loaded ]]; then
+    expected_stderr="错误：调试服务未能启动且无法卸载 dev.wzz.zisla.debug，请检查 $ERROR_LOG"
+    expected_loaded=1
+  fi
+
+  [[ "$launch_status" != 0 ]] || fail_test "a failed wait after bootstrap must exit non-zero"
+  [[ "$(<"$STDERR_FILE")" == *"$expected_stderr"* ]] || fail_test "the failure must tell the developer to read the error log"
+  [[ "$(<"$STDERR_FILE")" != *unexpected\ launchctl* ]] || fail_test "launchctl stub rejected an unexpected command"
+  [[ "$(<"$CAPTURE_FILE")" == "$expected_capture" ]] || fail_test "bootstrap must be followed by bootout of SERVICE_TARGET"
+  [[ "$(<"$LOADED_FILE")" == "$expected_loaded" ]] || fail_test "service state must match the bootout result"
+  [[ -f "$ERROR_LOG" && "$(<"$ERROR_LOG")" == "simulated crash" ]] || fail_test "the crash log must remain after the failed start"
+  [[ -x "$APP_BINARY" ]] || fail_test "the built debug app must remain after the failed start"
+  [[ -f "$AGENT_PLIST" ]] || fail_test "the launch agent plist must remain for the developer to inspect"
+  [[ "$(plutil -extract KeepAlive raw -o - "$AGENT_PLIST")" == true ]] || fail_test "a failed start must not disable KeepAlive"
+  [[ "$(plutil -extract ThrottleInterval raw -o - "$AGENT_PLIST")" == 10 ]] || fail_test "a failed start must not change the launchd throttle"
+  [[ "$(plutil -extract StandardErrorPath raw -o - "$AGENT_PLIST")" == "$ERROR_LOG" ]] || fail_test "the retained log must be the plist error path"
+  [[ "$(<"$STDOUT_FILE")" == "$expected_stdout" ]] || fail_test "the failed start must not stop the service again or report success"
+  [[ "$(snapshot "$REAL_AGENT")" == "$real_agent_before" ]] || fail_test "the developer LaunchAgents file must stay untouched"
+  [[ "$(snapshot "$REAL_ERROR_LOG")" == "$real_error_log_before" ]] || fail_test "the developer error log must stay untouched"
+  [[ "$AGENT_PLIST" != "$REAL_AGENT" && "$ERROR_LOG" != "$REAL_ERROR_LOG" ]] || fail_test "the test must use an isolated temporary launch agent"
+  (( tests_run += 1 ))
+done
+
+print -r -- "PASS: $tests_run failed-start bootout tests"

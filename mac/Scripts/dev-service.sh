@@ -207,7 +207,9 @@ function start_service() {
   launchctl bootstrap "$SERVICE_DOMAIN" "$LAUNCH_AGENT"
   if ! pid="$(wait_for_service_to_run)"; then
     # Keep the crash log; stop_service would delete it and the built app.
-    launchctl bootout "$SERVICE_TARGET"
+    if ! launchctl bootout "$SERVICE_TARGET" && service_is_loaded; then
+      fail "调试服务未能启动且无法卸载 $SERVICE_LABEL，请检查 $ERROR_LOG"
+    fi
     fail "调试服务未能启动，请检查 $ERROR_LOG"
   fi
   print -r -- "zisla 调试服务已启动（PID $pid）。停止请执行：make stop"
