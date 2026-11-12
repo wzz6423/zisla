@@ -103,7 +103,7 @@ struct BrowserDownloadFileNameResolverTests {
         #expect(try FileManager.default.contentsOfDirectory(atPath: fixture.databaseURL.deletingLastPathComponent().path) == filesBefore)
     }
 
-    @Test(arguments: [1, 2, 3])
+    @Test(arguments: [1, 2, 3, 4])
     func completedCancelledAndInterruptedRecordsDoNotNameANewDownload(state: Int32) throws {
         let fixture = try BrowserDownloadHistoryFixture()
         defer { try? FileManager.default.removeItem(at: fixture.root) }

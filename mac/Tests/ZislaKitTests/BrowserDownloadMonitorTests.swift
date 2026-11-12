@@ -844,16 +844,27 @@ struct BrowserDownloadMonitorLifecycleTests {
 }
 
 struct BrowserDownloadFileNameMonitorTests {
-    @Test(arguments: [false, true])
+    @Test(arguments: [false, true], [false, true])
     @MainActor
-    func unconfirmedDownloadKeepsTargetNameAcrossProgressAndFileEvents(fileEventsFirst: Bool) async throws {
+    func unconfirmedDownloadKeepsTargetNameAcrossProgressAndFileEvents(fileEventsFirst: Bool, currentChromeMetadata: Bool) async throws {
         let fixture = try BrowserDownloadHistoryFixture()
         defer { try? FileManager.default.removeItem(at: fixture.root) }
         let completed = fixture.temporaryURL.deletingLastPathComponent().appendingPathComponent("Cursor-darwin-arm64.dmg")
-        try fixture.insertDownload(targetPath: completed.path)
+        var home = fixture.home
+        var metadata: BrowserDownloadMetadataFixture?
+        if currentChromeMetadata {
+            let database = try BrowserDownloadMetadataFixture()
+            metadata = database
+            try database.write([.init(value: BrowserDownloadMetadataFixture.download(
+                current: fixture.temporaryURL.path, target: completed.path))])
+            home = database.history.home
+        } else {
+            try fixture.insertDownload(targetPath: completed.path)
+        }
+        defer { if let metadata { try? FileManager.default.removeItem(at: metadata.history.root) } }
         try Data("partial".utf8).write(to: fixture.temporaryURL)
         let identity = try #require(BrowserDownloadFileIdentity(url: fixture.temporaryURL))
-        let resolver = BrowserDownloadFileNameResolver(homeDirectory: fixture.home)
+        let resolver = BrowserDownloadFileNameResolver(homeDirectory: home)
         let resolutions = FileNameResolutionCounter()
         let monitor = BrowserDownloadMonitor(
             directories: [fixture.temporaryURL.deletingLastPathComponent()], eventPaths: [],

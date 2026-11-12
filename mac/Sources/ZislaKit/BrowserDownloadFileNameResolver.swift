@@ -20,8 +20,12 @@ struct BrowserDownloadFileNameResolver: Sendable {
                 let profiles = (try? FileManager.default.contentsOfDirectory(
                     at: root, includingPropertiesForKeys: nil, options: [.skipsHiddenFiles]
                 )) ?? []
-                for databaseURL in ([root] + profiles).map({ $0.appendingPathComponent("History") }) {
-                    let rows = (try? downloadRows(at: databaseURL, sql: """
+                for profile in [root] + profiles {
+                    let metadataRows = (try? BrowserDownloadMetadataReader.rows(
+                        at: profile.appendingPathComponent("shared_proto_db", isDirectory: true),
+                        currentPaths: Set(paths.map(\.path))
+                    ))
+                    let rows: [[String: Any]] = metadataRows ?? (try? downloadRows(at: profile.appendingPathComponent("History"), sql: """
                         SELECT current_path, target_path FROM downloads
                         WHERE state = 0 AND current_path IN (\(quotedPaths.joined(separator: ",")))
                         """)) ?? []
