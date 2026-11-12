@@ -48,7 +48,7 @@ final class ScreenRecordingStudioModel: ObservableObject {
     private var pendingAIBase: ScreenRecordingProject?
     @Published private(set) var isShowingSourcePlayback = false
     @Published private(set) var isShowingTimelinePlayback = false
-    private var timelinePlayer: AVPlayer?
+    var timelinePlayer: AVPlayer?
     @Published var subtitleLanguage: AppLanguage = .simplifiedChinese
     private let appModel: AppModel?
     private let outputDirectoryStore: ScreenRecordingOutputDirectoryStore
@@ -62,8 +62,8 @@ final class ScreenRecordingStudioModel: ObservableObject {
     private let aiCompletion: ((ScreenRecordingProject, String, AIModelConfigurationReference?) async throws -> String)?
     private(set) var previewTask: Task<Void, Never>?
     private(set) var operationTask: Task<Void, Never>?
-    private var playerObserver: Any?
-    private var timelineObserver: Any?
+    var playerObserver: Any?
+    var timelineObserver: Any?
     private var undoHistory: [ScreenRecordingProject] = []
     private var redoHistory: [ScreenRecordingProject] = []
     private var previewRevision = 0
@@ -1129,6 +1129,7 @@ final class ScreenRecordingStudioModel: ObservableObject {
     func playSource() {
         commitPendingCanvasText?()
         guard let player else { return }
+        if playerObserver == nil { installSourceTimeObserver(on: player) }
         timelinePlayer?.pause()
         isShowingTimelinePlayback = false
         if player.rate == 0 {
@@ -1390,6 +1391,10 @@ final class ScreenRecordingStudioModel: ObservableObject {
         guard let url = try? projectStore.mediaURL(file, in: directory) else { player = nil; return }
         let player = AVPlayer(url: url)
         self.player = player
+        installSourceTimeObserver(on: player)
+    }
+
+    private func installSourceTimeObserver(on player: AVPlayer) {
         playerObserver = player.addPeriodicTimeObserver(forInterval: CMTime(seconds: 0.1, preferredTimescale: 600), queue: .main) { [weak self] time in
             Task { @MainActor [weak self] in
                 guard let self, self.isShowingSourcePlayback else { return }
@@ -1456,9 +1461,9 @@ final class ScreenRecordingStudioModel: ObservableObject {
         do {
             if isDirty { try save() }
             player?.pause()
-            timelinePlayer?.pause()
+            if let playerObserver { player?.removeTimeObserver(playerObserver); self.playerObserver = nil }
+            clearTimelinePlayback()
             isShowingSourcePlayback = false
-            isShowingTimelinePlayback = false
             return true
         }
         catch { errorMessage = error.localizedDescription; return false }

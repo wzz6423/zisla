@@ -367,6 +367,46 @@ struct ScreenRecordingPlaybackTests {
         #expect(item == nil, "A cancelled seek must not restart or retain the obsolete playback item")
     }
 
+    @Test
+    func closingDetachesPlaybackObserversAndPlaySourceInstallsTheSourceObserverAgain() async throws {
+        let fixture = try RecordingMultitrackTestFixture()
+        defer { fixture.remove() }
+        _ = try await fixture.createVideo()
+        let source = project(fixture, multitrack: true)
+        let model = try fixture.model()
+        defer { model.shutdown() }
+        model.install(source, directory: fixture.directory)
+        await model.previewTask?.value
+        let sourcePlayer = try #require(model.player)
+        try #require(model.playerObserver != nil)
+
+        model.playTimeline()
+        await model.operationTask?.value
+        try #require(model.isShowingTimelinePlayback)
+        try #require(model.timelinePlayer != nil)
+        try #require(model.timelineObserver != nil)
+        model.playTimeline()
+        try #require(model.timelinePlayer != nil && model.timelineObserver != nil && model.playerObserver != nil)
+        model.playTimeline()
+        #expect(model.isBusy)
+        #expect(!model.prepareToClose())
+        #expect(model.timelinePlayer != nil && model.timelineObserver != nil)
+        #expect(model.playerObserver != nil && model.player === sourcePlayer)
+        await model.operationTask?.value
+
+        let openProject = model.project
+        #expect(model.prepareToClose())
+        #expect(model.timelineObserver == nil)
+        #expect(model.timelinePlayer == nil)
+        #expect(model.playerObserver == nil)
+        #expect(model.player === sourcePlayer)
+        #expect(model.project == openProject)
+
+        model.playSource()
+        #expect(model.playerObserver != nil)
+        #expect(model.player === sourcePlayer)
+    }
+
     private func project(_ fixture: RecordingMultitrackTestFixture, multitrack: Bool) -> ScreenRecordingProject {
         var source = fixture.project()
         source.edits.segments = [.init(start: 1, end: 1.5, speed: 2), .init(start: 0, end: 0.5, speed: 2)]
