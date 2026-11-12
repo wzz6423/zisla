@@ -69,6 +69,8 @@ struct AIProgressModuleViewTests {
     func usageSummaryKeepsNearEqualColumnsWithoutHorizontalScrolling(
         scenario: (width: CGFloat, taskCount: Int, hasUsage: Bool), language: AppLanguage
     ) async throws {
+        let releaseAccessibility = EnhancedAccessibilityTestScope.acquire()
+        defer { releaseAccessibility() }
         let (width, taskCount, hasUsage) = scenario
         let previousArguments = UserDefaults.standard.volatileDomain(forName: UserDefaults.argumentDomain)
         var arguments = previousArguments
@@ -152,6 +154,22 @@ struct AIProgressModuleViewTests {
             "Long model history must scroll inside the upper right column")
         #expect(summary.horizontalScrollElasticity == .none,
             "Horizontal trackpad movement must not rubber-band the usage panel")
+        let scroller = try #require(summary.verticalScroller)
+        let track = window.convertToScreen(scroller.convert(scroller.bounds, to: nil))
+        let viewport = window.convertToScreen(summary.contentView.convert(summary.contentView.bounds, to: nil))
+        let visibleObjects = accessibilityObjects(host).compactMap { object -> CGRect? in
+            let role = value(object, "accessibilityRole") as? String
+            guard role == NSAccessibility.Role.staticText.rawValue || role == NSAccessibility.Role.button.rawValue,
+                  let element = object as? any NSAccessibilityElementProtocol else { return nil }
+            let frame = element.accessibilityFrame()
+            return frame.intersects(viewport) && frame.midX >= viewport.minX && frame.midX <= viewport.maxX ? frame : nil
+        }
+        try #require(!visibleObjects.isEmpty)
+        #expect(visibleObjects.allSatisfy { !$0.intersects(track) },
+            "The scrollbar cannot overlap trend dates, heatmap cells, or visible values")
+        #expect(!accessibilityObjects(host).contains {
+            value($0, "accessibilityValue") as? String == AppLocalization.string("每日模型用量", language: language)
+        }, "The island must keep model details hidden before the user selects a date")
         #expect(monitor.state == initialState, "Laying out the panel must not alter AI state")
         #expect(!window.isVisible, "Layout tests must not show a window")
     }
@@ -226,5 +244,15 @@ struct AIProgressModuleViewTests {
     @MainActor
     private func descendants(in view: NSView) -> [NSView] {
         view.subviews.flatMap { [$0] + descendants(in: $0) }
+    }
+
+    @MainActor
+    private func value(_ object: NSObject, _ key: String) -> Any? {
+        object.responds(to: NSSelectorFromString(key)) ? object.value(forKey: key) : nil
+    }
+
+    @MainActor
+    private func accessibilityObjects(_ object: NSObject) -> [NSObject] {
+        [object] + (value(object, "accessibilityChildren") as? [NSObject] ?? []).flatMap(accessibilityObjects)
     }
 }

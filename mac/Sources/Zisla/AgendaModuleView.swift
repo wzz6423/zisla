@@ -398,6 +398,19 @@ struct AgendaModuleView: View {
                     .foregroundStyle(.secondary)
             }
             Spacer(minLength: 4)
+            if Self.isJoinableMeeting(event, at: Date()) {
+                Button { model.joinMeeting(event) } label: {
+                    Image(systemName: "video.fill")
+                        .font(.system(size: 11, weight: .semibold))
+                        .frame(width: 20, height: 20)
+                }
+                .buttonStyle(.plain)
+                .help(AppLocalization.text("加入会议"))
+                .accessibilityLabel(AppLocalization.text("加入会议"))
+                if model.settingsStore.settings.contextNotesEnabled, let identity = event.eventIdentity {
+                    meetingNoteMenu(event, identity: identity)
+                }
+            }
             if event.kind == .reminder && !event.isProjectedOccurrence {
                 Button {
                     toggleCompletion(event)
@@ -426,6 +439,45 @@ struct AgendaModuleView: View {
             }
         }
         .frame(height: 34)
+    }
+
+    static func isJoinableMeeting(_ event: CalendarEventSnapshot, at date: Date) -> Bool {
+        !MeetingWorkflow.meetings(in: [event], at: date).isEmpty
+    }
+
+    private func meetingNoteMenu(_ event: CalendarEventSnapshot, identity: CalendarEventIdentity) -> some View {
+        let notes = model.shelf.items.filter { $0.noteLocation != nil }
+        let associated = notes.filter { $0.noteMeetingIDs.contains(identity) }
+        return Menu {
+            ForEach(associated) { note in
+                Button(note.displayName) { model.openMeetingNote(note) }
+            }
+            if !associated.isEmpty { Divider() }
+            Button(AppLocalization.text("新建会议便签")) { model.createMeetingNote(event) }
+            let available = notes.filter { !$0.noteMeetingIDs.contains(identity) }
+            if !available.isEmpty {
+                Menu(AppLocalization.text("关联现有便签")) {
+                    ForEach(available) { note in
+                        Button(note.displayName) { model.setMeeting(event, associated: true, with: note) }
+                    }
+                }
+            }
+            if !associated.isEmpty {
+                Menu(AppLocalization.text("取消便签关联")) {
+                    ForEach(associated) { note in
+                        Button(note.displayName) { model.setMeeting(event, associated: false, with: note) }
+                    }
+                }
+            }
+        } label: {
+            Image(systemName: associated.isEmpty ? "note.text" : "note.text.badge.plus")
+                .font(.system(size: 10, weight: .semibold))
+        }
+        .menuStyle(.borderlessButton)
+        .menuIndicator(.hidden)
+        .frame(width: 20, height: 20)
+        .help(AppLocalization.text("会议便签"))
+        .accessibilityLabel(AppLocalization.text("会议便签"))
     }
 
     private func dayBackground(isSelected: Bool, isToday: Bool) -> Color {

@@ -192,6 +192,9 @@ function start_service() {
   if [[ -n "${ZISLA_DEBUG_AI_ACCOUNT_BALANCE:-}" ]]; then
     plutil -insert EnvironmentVariables.ZISLA_DEBUG_AI_ACCOUNT_BALANCE -string "$ZISLA_DEBUG_AI_ACCOUNT_BALANCE" "$LAUNCH_AGENT"
   fi
+  if [[ -n "${ZISLA_DEBUG_AI_MODEL_USAGE:-}" ]]; then
+    plutil -insert EnvironmentVariables.ZISLA_DEBUG_AI_MODEL_USAGE -string "$ZISLA_DEBUG_AI_MODEL_USAGE" "$LAUNCH_AGENT"
+  fi
   plutil -insert EnvironmentVariables.ZISLA_DEBUG_SHOW_CHARGE_TO_FULL -string "${ZISLA_DEBUG_SHOW_CHARGE_TO_FULL:-0}" "$LAUNCH_AGENT"
   if [[ -n "$profile_directory" ]]; then
     plutil -insert EnvironmentVariables.CFFIXED_USER_HOME -string "$profile_directory" "$LAUNCH_AGENT"

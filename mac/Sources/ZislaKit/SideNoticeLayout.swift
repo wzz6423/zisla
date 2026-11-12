@@ -104,6 +104,7 @@ public enum CompactStatusVisibilityPolicy {
         let hasFocusMode = notices.contains { $0.id.hasPrefix("focus-mode-") }
         let hasVoiceProcessing = notices.contains { $0.id.hasPrefix("voice-processing-") }
         return hasVoiceProcessing || selectedNotice?.id == AIAccountBalanceNoticeController.pinnedID
+            || notices.contains { $0.id.hasPrefix(MeetingCountdown.noticePrefix) }
             || (hasActivity && activityDuration == .always)
             || (hasFocusMode && focusDuration == .always)
     }
@@ -284,6 +285,7 @@ public struct SideNoticeLayoutEngine: Equatable, Sendable {
                 && !$0.id.hasPrefix("media-active-")
                 && !$0.id.hasPrefix("background-sound-")
                 && !$0.id.hasPrefix("focus-countdown-")
+                && !$0.id.hasPrefix(MeetingCountdown.noticePrefix)
                 && !$0.id.hasPrefix("focus-mode-")
                 && !$0.id.hasPrefix("focus-transition")
                 && !LowBatteryNoticeController.isLowBatteryNotice($0)
@@ -668,7 +670,7 @@ public struct SideNoticeLayoutEngine: Equatable, Sendable {
                 + Layout.compactBarAccessoryAdditionalSideExtension
         } else if selectedPriority == .focusCountdown {
             sideExtension = Layout.compactBarSideExtension + Layout.compactWingWidth
-        } else if selectedPriority == .transient {
+        } else if selectedPriority == .transient || selectedPriority == .meeting {
             sideExtension = Layout.compactBarSideExtension
         } else {
             sideExtension = 0
@@ -733,6 +735,7 @@ public struct SideNoticeLayoutEngine: Equatable, Sendable {
         case .videoDownload: notices.first { $0.id.hasPrefix("video-download-") }
         case .browserDownload: notices.first { $0.id.hasPrefix("browser-download-") }
         case .focusCountdown: notices.first { $0.id.hasPrefix("focus-countdown-") }
+        case .meeting: notices.first { $0.id.hasPrefix(MeetingCountdown.noticePrefix) }
         case .toolboxReminder: notices.first { $0.id.hasPrefix("toolbox-reminder-") }
         case .aiActivity: notices.first { $0.id.hasPrefix("ai-active-") }
         case .aiAccountBalance: settings.islandPlacement.mode == .custom && settings.aiAccountBalancePinnedInCustomIsland
@@ -799,6 +802,8 @@ public struct SideNoticeLayoutEngine: Equatable, Sendable {
             notices.contains { $0.id.hasPrefix("browser-download-") }
         case .focusCountdown:
             notices.contains { $0.id.hasPrefix("focus-countdown-") }
+        case .meeting:
+            notices.contains { $0.id.hasPrefix(MeetingCountdown.noticePrefix) }
         case .toolboxReminder:
             notices.contains { $0.id.hasPrefix("toolbox-reminder-") }
         case .aiActivity:

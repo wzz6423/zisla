@@ -36,11 +36,14 @@ struct SettingsView: View {
     @State private var petImportSource: PetImportSource?
     @State private var isPetRemovalConfirmationPresented = false
     @State private var petRemovalError: String?
+    @StateObject private var aiUsageHistory: AIUsageHistoryController
+    @StateObject private var aiUsageHistoryPresentation = SystemMetricsHistoryPanelPresentationState()
 
     init(model: AppModel) {
         self.model = model
         _settingsStore = ObservedObject(wrappedValue: model.settingsStore)
         _clipboardAssistant = ObservedObject(wrappedValue: model.clipboardAssistant)
+        _aiUsageHistory = StateObject(wrappedValue: AIUsageHistoryController(monitor: model.aiMonitor))
     }
 
     var body: some View {
@@ -63,6 +66,8 @@ struct SettingsView: View {
             height: 680
         )
         .background(Color(nsColor: .windowBackgroundColor))
+        .background(AIUsageHistoryPanelPresenter(presentationState: aiUsageHistoryPresentation,
+            controller: aiUsageHistory, languageStore: model.languageStore))
         .background(
             SystemMetricsHistoryPanelPresenter(
                 presentationState: historyPanelPresentation,
@@ -1715,9 +1720,12 @@ struct SettingsView: View {
         }
     }
 
-    /// CLI and Skills management stays separate from the voice model configuration.
+    /// AI reporting actions precede tools without retaining history in the island's task state.
     private var aiContent: some View {
         VStack(alignment: .leading, spacing: 20) {
+            settingsGroup("AI 用量历史") {
+                AIUsageHistorySettingsActions(controller: aiUsageHistory, showHistory: aiUsageHistoryPresentation.present)
+            }
             settingsGroup("CLI 与 Skills") {
                 AIAgentModuleView(model: model, configurationScope: .tools)
                     .task {
@@ -4073,6 +4081,7 @@ struct SettingsView: View {
         case .videoDownload: "arrow.down.square.fill"
         case .browserDownload: "arrow.down.circle.fill"
         case .focusCountdown: "timer"
+        case .meeting: "video.fill"
         case .toolboxReminder: "wrench.and.screwdriver.fill"
         case .aiActivity: "sparkles"
         case .aiAccountBalance: "gauge.with.dots.needle.67percent"

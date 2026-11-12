@@ -2564,6 +2564,20 @@
 "快递单号" = "Tracking Numbers";
 "会议日程" = "Meeting Schedules";
 "会议地点" = "Meeting Location";
+
+"会议倒计时" = "Meeting Countdown";
+"会议进行中" = "Meeting in progress";
+"加入会议" = "Join Meeting";
+"加入会议：%@ · %@" = "Join meeting: %@ · %@";
+"会议便签" = "Meeting Notes";
+"新建会议便签" = "New Meeting Note";
+"关联现有便签" = "Link Existing Note";
+"取消便签关联" = "Unlink Note";
+"会议已不可加入，请刷新日程" = "This meeting is no longer available. Refresh your agenda.";
+"无法打开会议链接" = "Unable to open the meeting link";
+"无法关联会议便签" = "Unable to link the meeting note";
+"日历" = "Calendar";
+
 "日程备注" = "Event Notes";
 "结束时间" = "End Time";
 "百度地图" = "Baidu Maps";
@@ -3416,6 +3430,23 @@
 "保存手写备忘录需要辅助功能权限" = "Accessibility access is required to save handwritten notes";
 "备忘录内容已变化，请重新打开后编辑" = "The note has changed. Reopen it before editing";
 "无法保存手写备忘录的文本，请在备忘录中打开后重试" = "Could not save text in the handwritten note. Open it in Notes and try again";
+
+"每日模型用量" = "Daily Model Usage";
+"暂无模型用量" = "No Model Usage Yet";
+"未分类" = "Unclassified";
+"未知模型" = "Unknown Model";
+"输入 %@ · 输出 %@" = "Input %@ · Output %@";
+"AI 模型用量" = "AI Model Usage";
+
+"AI 用量历史" = "AI Usage History";
+"把全部 AI 用量历史导出为 xlsx 表格" = "Export all AI usage history as an xlsx spreadsheet";
+"已清空 AI 用量历史" = "AI usage history cleared";
+"清空失败：%@" = "Clear failed: %@";
+"清空 AI 用量历史？" = "Clear AI usage history?";
+"删除本机保存的 AI 用量历史，保留任务和日志去重记录。此操作无法撤销。" = "Delete AI usage history stored on this Mac. Tasks and log deduplication records are kept. This cannot be undone.";
+"上一年" = "Previous year";
+"下一年" = "Next year";
+"AI token 用量热力图" = "AI token usage heatmap";
 
 
 "多选" = "Select";

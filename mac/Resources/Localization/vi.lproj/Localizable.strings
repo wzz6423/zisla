@@ -2565,6 +2565,20 @@
 "快递单号" = "Mã vận đơn";
 "会议日程" = "Lịch họp";
 "会议地点" = "Địa điểm họp";
+
+"会议倒计时" = "Đếm ngược cuộc họp";
+"会议进行中" = "Cuộc họp đang diễn ra";
+"加入会议" = "Tham gia cuộc họp";
+"加入会议：%@ · %@" = "Tham gia cuộc họp: %@ · %@";
+"会议便签" = "Ghi chú cuộc họp";
+"新建会议便签" = "Ghi chú cuộc họp mới";
+"关联现有便签" = "Liên kết ghi chú hiện có";
+"取消便签关联" = "Hủy liên kết ghi chú";
+"会议已不可加入，请刷新日程" = "Cuộc họp này không còn khả dụng. Hãy làm mới lịch trình.";
+"无法打开会议链接" = "Không thể mở liên kết cuộc họp";
+"无法关联会议便签" = "Không thể liên kết ghi chú cuộc họp";
+"日历" = "Lịch";
+
 "日程备注" = "Ghi chú sự kiện";
 "结束时间" = "Thời gian kết thúc";
 "百度地图" = "Bản đồ Baidu";
@@ -3417,6 +3431,23 @@
 "保存手写备忘录需要辅助功能权限" = "Cần quyền Trợ năng để lưu ghi chú viết tay";
 "备忘录内容已变化，请重新打开后编辑" = "Ghi chú đã thay đổi. Mở lại trước khi chỉnh sửa";
 "无法保存手写备忘录的文本，请在备忘录中打开后重试" = "Không thể lưu văn bản trong ghi chú viết tay. Mở trong Ghi chú rồi thử lại";
+
+"每日模型用量" = "Mức sử dụng mô hình hằng ngày";
+"暂无模型用量" = "Chưa có mức sử dụng mô hình";
+"未分类" = "Chưa phân loại";
+"未知模型" = "Mô hình không xác định";
+"输入 %@ · 输出 %@" = "Đầu vào %@ · Đầu ra %@";
+"AI 模型用量" = "Mức sử dụng mô hình AI";
+
+"AI 用量历史" = "Lịch sử sử dụng AI";
+"把全部 AI 用量历史导出为 xlsx 表格" = "Xuất toàn bộ lịch sử sử dụng AI thành bảng tính xlsx";
+"已清空 AI 用量历史" = "Đã xóa lịch sử sử dụng AI";
+"清空失败：%@" = "Xóa thất bại: %@";
+"清空 AI 用量历史？" = "Xóa lịch sử sử dụng AI?";
+"删除本机保存的 AI 用量历史，保留任务和日志去重记录。此操作无法撤销。" = "Xóa lịch sử sử dụng AI được lưu trên máy Mac này. Các tác vụ và bản ghi chống trùng lặp nhật ký vẫn được giữ lại. Không thể hoàn tác thao tác này.";
+"上一年" = "Năm trước";
+"下一年" = "Năm sau";
+"AI token 用量热力图" = "Bản đồ nhiệt sử dụng token AI";
 
 
 "多选" = "Chọn nhiều";

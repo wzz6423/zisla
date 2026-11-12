@@ -2566,6 +2566,20 @@
 "快递单号" = "Sendungsnummern";
 "会议日程" = "Besprechungstermine";
 "会议地点" = "Besprechungsort";
+
+"会议倒计时" = "Besprechungs-Countdown";
+"会议进行中" = "Besprechung läuft";
+"加入会议" = "Besprechung beitreten";
+"加入会议：%@ · %@" = "Besprechung beitreten: %@ · %@";
+"会议便签" = "Besprechungsnotizen";
+"新建会议便签" = "Neue Besprechungsnotiz";
+"关联现有便签" = "Vorhandene Notiz verknüpfen";
+"取消便签关联" = "Notizverknüpfung aufheben";
+"会议已不可加入，请刷新日程" = "Diese Besprechung ist nicht mehr verfügbar. Aktualisieren Sie den Kalender.";
+"无法打开会议链接" = "Der Besprechungslink kann nicht geöffnet werden";
+"无法关联会议便签" = "Die Besprechungsnotiz kann nicht verknüpft werden";
+"日历" = "Kalender";
+
 "日程备注" = "Terminnotizen";
 "结束时间" = "Endzeit";
 "百度地图" = "Baidu Maps";
@@ -3418,6 +3432,23 @@
 "保存手写备忘录需要辅助功能权限" = "Zum Speichern handschriftlicher Notizen ist der Zugriff auf Bedienungshilfen erforderlich";
 "备忘录内容已变化，请重新打开后编辑" = "Die Notiz wurde geändert. Öffne sie vor dem Bearbeiten erneut";
 "无法保存手写备忘录的文本，请在备忘录中打开后重试" = "Der Text der handschriftlichen Notiz konnte nicht gespeichert werden. Öffne sie in Notizen und versuche es erneut";
+
+"每日模型用量" = "Tägliche Modellnutzung";
+"暂无模型用量" = "Noch keine Modellnutzung";
+"未分类" = "Nicht zugeordnet";
+"未知模型" = "Unbekanntes Modell";
+"输入 %@ · 输出 %@" = "Eingabe %@ · Ausgabe %@";
+"AI 模型用量" = "KI-Modellnutzung";
+
+"AI 用量历史" = "KI-Nutzungsverlauf";
+"把全部 AI 用量历史导出为 xlsx 表格" = "Den gesamten KI-Nutzungsverlauf als xlsx-Tabelle exportieren";
+"已清空 AI 用量历史" = "KI-Nutzungsverlauf gelöscht";
+"清空失败：%@" = "Löschen fehlgeschlagen: %@";
+"清空 AI 用量历史？" = "KI-Nutzungsverlauf löschen?";
+"删除本机保存的 AI 用量历史，保留任务和日志去重记录。此操作无法撤销。" = "Den auf diesem Mac gespeicherten KI-Nutzungsverlauf löschen. Aufgaben und Protokolle zur Duplikaterkennung bleiben erhalten. Dies kann nicht rückgängig gemacht werden.";
+"上一年" = "Vorheriges Jahr";
+"下一年" = "Nächstes Jahr";
+"AI token 用量热力图" = "Heatmap der KI-Token-Nutzung";
 
 
 "多选" = "Auswählen";

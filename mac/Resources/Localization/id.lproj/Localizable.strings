@@ -2565,6 +2565,20 @@
 "快递单号" = "Nomor pelacakan";
 "会议日程" = "Jadwal rapat";
 "会议地点" = "Lokasi rapat";
+
+"会议倒计时" = "Hitung mundur rapat";
+"会议进行中" = "Rapat berlangsung";
+"加入会议" = "Gabung Rapat";
+"加入会议：%@ · %@" = "Gabung rapat: %@ · %@";
+"会议便签" = "Catatan Rapat";
+"新建会议便签" = "Catatan Rapat Baru";
+"关联现有便签" = "Tautkan Catatan yang Ada";
+"取消便签关联" = "Lepaskan Tautan Catatan";
+"会议已不可加入，请刷新日程" = "Rapat ini tidak lagi tersedia. Segarkan agenda Anda.";
+"无法打开会议链接" = "Tidak dapat membuka tautan rapat";
+"无法关联会议便签" = "Tidak dapat menautkan catatan rapat";
+"日历" = "Kalender";
+
 "日程备注" = "Catatan acara";
 "结束时间" = "Waktu selesai";
 "百度地图" = "Baidu Maps";
@@ -3417,6 +3431,23 @@
 "保存手写备忘录需要辅助功能权限" = "Akses Aksesibilitas diperlukan untuk menyimpan catatan tulisan tangan";
 "备忘录内容已变化，请重新打开后编辑" = "Catatan telah berubah. Buka kembali sebelum mengedit";
 "无法保存手写备忘录的文本，请在备忘录中打开后重试" = "Teks dalam catatan tulisan tangan tidak dapat disimpan. Buka di Catatan dan coba lagi";
+
+"每日模型用量" = "Penggunaan Model Harian";
+"暂无模型用量" = "Belum Ada Penggunaan Model";
+"未分类" = "Belum Diklasifikasikan";
+"未知模型" = "Model Tidak Diketahui";
+"输入 %@ · 输出 %@" = "Masukan %@ · Keluaran %@";
+"AI 模型用量" = "Penggunaan Model AI";
+
+"AI 用量历史" = "Riwayat penggunaan AI";
+"把全部 AI 用量历史导出为 xlsx 表格" = "Ekspor seluruh riwayat penggunaan AI sebagai lembar kerja xlsx";
+"已清空 AI 用量历史" = "Riwayat penggunaan AI dihapus";
+"清空失败：%@" = "Gagal menghapus: %@";
+"清空 AI 用量历史？" = "Hapus riwayat penggunaan AI?";
+"删除本机保存的 AI 用量历史，保留任务和日志去重记录。此操作无法撤销。" = "Hapus riwayat penggunaan AI yang tersimpan di Mac ini. Tugas dan catatan deduplikasi log tetap disimpan. Tindakan ini tidak dapat dibatalkan.";
+"上一年" = "Tahun sebelumnya";
+"下一年" = "Tahun berikutnya";
+"AI token 用量热力图" = "Peta panas penggunaan token AI";
 
 
 "多选" = "Pilih";

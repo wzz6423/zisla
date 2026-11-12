@@ -1,6 +1,6 @@
 #!/bin/zsh
 set -euo pipefail
-unset ZISLA_FRESH_START ZISLA_DEBUG_BUNDLE_ID CFFIXED_USER_HOME ZISLA_DEBUG_SHOW_CHARGE_TO_FULL
+unset ZISLA_FRESH_START ZISLA_DEBUG_BUNDLE_ID CFFIXED_USER_HOME ZISLA_DEBUG_AI_MODEL_USAGE ZISLA_DEBUG_AI_ACCOUNT_BALANCE ZISLA_DEBUG_SHOW_CHARGE_TO_FULL
 
 MAC_ROOT="${0:A:h:h:h}"
 TEMPORARY_ROOT="$(mktemp -d "${TMPDIR%/}/zisla-first-launch-tests.XXXXXX")"
@@ -66,6 +66,10 @@ if "TEST_EXPECT_AI_BALANCE" in os.environ:
     expected_balance = os.environ["TEST_EXPECT_AI_BALANCE"]
     actual_balance = agent["EnvironmentVariables"].get("ZISLA_DEBUG_AI_ACCOUNT_BALANCE")
     assert actual_balance == (expected_balance or None), "The debug quota fixture must reach launchd exactly, or be removed when cleared"
+if "TEST_EXPECT_AI_MODEL_USAGE" in os.environ:
+    expected_usage = os.environ["TEST_EXPECT_AI_MODEL_USAGE"]
+    actual_usage = agent["EnvironmentVariables"].get("ZISLA_DEBUG_AI_MODEL_USAGE")
+    assert actual_usage == (expected_usage or None), "The model-usage fixture must reach launchd exactly and be removed when cleared"
 print(f"plist first={value} home={home} bundle={bundle}")
 PYTHON
 }
@@ -134,11 +138,12 @@ for target in run update; do
   done
 done
 
-function expect_balance_launch() {
-  local description="$1"
-  local expected="$2"
-  shift 2
-  if ! env TEST_EXPECT_AI_BALANCE="$expected" "$@" >/dev/null; then
+function expect_fixture_launch() {
+  local expectation_variable="$1"
+  local description="$2"
+  local expected="$3"
+  shift 3
+  if ! env "$expectation_variable=$expected" "$@" >/dev/null; then
     print -u2 -r -- "FAIL: $description"
     exit 1
   fi
@@ -150,16 +155,26 @@ function expect_balance_launch() {
 }
 
 for target in run update; do
-  expect_balance_launch "$target forwards environment quota" 'codex:20:10,claude:0' \
+  expect_fixture_launch TEST_EXPECT_AI_BALANCE "$target forwards environment quota" 'codex:20:10,claude:0' \
     env -u MAKEFLAGS -u MFLAGS ZISLA_DEBUG_AI_ACCOUNT_BALANCE=codex:20:10,claude:0 make -C "$TEST_ROOT" "$target"
-  expect_balance_launch "$target forwards make quota" 'codex:10:70' \
+  expect_fixture_launch TEST_EXPECT_AI_BALANCE "$target forwards make quota" 'codex:10:70' \
     env -u MAKEFLAGS -u MFLAGS -u ZISLA_DEBUG_AI_ACCOUNT_BALANCE make -C "$TEST_ROOT" "$target" ZISLA_DEBUG_AI_ACCOUNT_BALANCE=codex:10:70
-  expect_balance_launch "$target preserves literal fixture text" 'invalid; $(touch SHOULD_NOT_EXIST)' \
+  expect_fixture_launch TEST_EXPECT_AI_BALANCE "$target preserves literal fixture text" 'invalid; $(touch SHOULD_NOT_EXIST)' \
     env -u MAKEFLAGS -u MFLAGS 'ZISLA_DEBUG_AI_ACCOUNT_BALANCE=invalid; $(touch SHOULD_NOT_EXIST)' make -C "$TEST_ROOT" "$target"
-  expect_balance_launch "$target clears a previous quota fixture" '' \
+  expect_fixture_launch TEST_EXPECT_AI_BALANCE "$target clears a previous quota fixture" '' \
     env -u MAKEFLAGS -u MFLAGS make -C "$TEST_ROOT" "$target" ZISLA_DEBUG_AI_ACCOUNT_BALANCE=
-  expect_balance_launch "$target defaults to real readings after fixture removal" '' \
+  expect_fixture_launch TEST_EXPECT_AI_BALANCE "$target defaults to real readings after fixture removal" '' \
     env -u MAKEFLAGS -u MFLAGS -u ZISLA_DEBUG_AI_ACCOUNT_BALANCE make -C "$TEST_ROOT" "$target"
+  expect_fixture_launch TEST_EXPECT_AI_MODEL_USAGE "$target forwards environment model usage" 'codex:gpt-6.1-sol:120000:18000,claude:claude-opus:85000:12000:1' \
+    env -u MAKEFLAGS -u MFLAGS ZISLA_DEBUG_AI_MODEL_USAGE=codex:gpt-6.1-sol:120000:18000,claude:claude-opus:85000:12000:1 make -C "$TEST_ROOT" "$target"
+  expect_fixture_launch TEST_EXPECT_AI_MODEL_USAGE "$target forwards make model usage" 'codex:gpt-6.1-sol:100:20:2' \
+    env -u MAKEFLAGS -u MFLAGS -u ZISLA_DEBUG_AI_MODEL_USAGE make -C "$TEST_ROOT" "$target" ZISLA_DEBUG_AI_MODEL_USAGE=codex:gpt-6.1-sol:100:20:2
+  expect_fixture_launch TEST_EXPECT_AI_MODEL_USAGE "$target preserves literal fixture text" 'invalid; $(touch SHOULD_NOT_EXIST)' \
+    env -u MAKEFLAGS -u MFLAGS 'ZISLA_DEBUG_AI_MODEL_USAGE=invalid; $(touch SHOULD_NOT_EXIST)' make -C "$TEST_ROOT" "$target"
+  expect_fixture_launch TEST_EXPECT_AI_MODEL_USAGE "$target clears previous model usage" '' \
+    env -u MAKEFLAGS -u MFLAGS make -C "$TEST_ROOT" "$target" ZISLA_DEBUG_AI_MODEL_USAGE=
+  expect_fixture_launch TEST_EXPECT_AI_MODEL_USAGE "$target defaults to real usage after fixture removal" '' \
+    env -u MAKEFLAGS -u MFLAGS -u ZISLA_DEBUG_AI_MODEL_USAGE make -C "$TEST_ROOT" "$target"
 done
 
 for target in run update; do

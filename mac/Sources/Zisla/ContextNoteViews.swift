@@ -201,7 +201,7 @@ final class ContextNoteShelfEditor: ObservableObject {
         if let itemID {
             item = shelf.updateContextNote(id: itemID, text: draft.text, reminderInterval: draft.reminderInterval, at: date)
         } else {
-            item = shelf.addContextNote(draft.text, location: draft.location, addedAt: draft.createdAt, screenshot: draft.screenshot?.png)
+            item = shelf.addContextNote(draft.text, location: draft.location, addedAt: draft.createdAt, screenshot: draft.screenshot?.png, meetingID: draft.meetingID)
         }
         guard let item else {
             draft.error = shelf.errorDescription

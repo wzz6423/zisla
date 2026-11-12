@@ -166,6 +166,38 @@ public enum AIUsageTokenMath {
     }
 }
 
+/// Shared, bounded migration evidence excluded from encoding and cleared from the detector cache at the next scan.
+public struct AIGenericUsageContext: Sendable {
+    public enum PathComponent: Sendable {
+        case key(String), index(Int)
+    }
+
+    public static let maximumDocumentBytes = 64 * 1_024
+    public static let maximumEvidenceBytes = 256 * 1_024
+    public static let maximumRecoveryCandidates = 32
+    public static let maximumRecoveryHashes = 512
+
+    public let document: Data
+    public let path: [PathComponent]
+
+    public init(document: Data, path: [PathComponent]) {
+        self.document = document
+        self.path = path
+    }
+}
+
+public enum AIUsageLogIdentity {
+    /// Keeps detector identities and repository recovery compatible with the legacy FNV-1a digest format.
+    public static func digest(_ data: Data) -> String {
+        var hash: UInt64 = 14_695_981_039_346_656_037
+        for byte in data {
+            hash ^= UInt64(byte)
+            hash &*= 1_099_511_628_211
+        }
+        return String(hash, radix: 16)
+    }
+}
+
 /// A daily AI usage aggregate. `cost` and `model` are optional.
 public struct AIUsageSample: Codable, Equatable, Sendable {
     /// Stable identifier for an internally maintained daily aggregate.
@@ -176,6 +208,12 @@ public struct AIUsageSample: Codable, Equatable, Sendable {
     public var outputTokens: Int
     public var costUSD: Double?
     public var model: String?
+    public var legacySourceID: String?
+    public var genericContext: AIGenericUsageContext? = nil
+
+    private enum CodingKeys: String, CodingKey {
+        case sourceID, provider, timestamp, inputTokens, outputTokens, costUSD, model, legacySourceID
+    }
 
     public init(
         sourceID: String? = nil,
@@ -184,7 +222,8 @@ public struct AIUsageSample: Codable, Equatable, Sendable {
         inputTokens: Int,
         outputTokens: Int,
         costUSD: Double? = nil,
-        model: String? = nil
+        model: String? = nil,
+        legacySourceID: String? = nil
     ) {
         self.sourceID = sourceID
         self.provider = provider
@@ -193,10 +232,28 @@ public struct AIUsageSample: Codable, Equatable, Sendable {
         self.outputTokens = outputTokens
         self.costUSD = costUSD
         self.model = model
+        self.legacySourceID = legacySourceID
+    }
+
+    /// Transient migration evidence must not change persisted-state equality or appear in encoded usage.
+    public static func == (lhs: Self, rhs: Self) -> Bool {
+        lhs.sourceID == rhs.sourceID && lhs.provider == rhs.provider && lhs.timestamp == rhs.timestamp
+            && lhs.inputTokens == rhs.inputTokens && lhs.outputTokens == rhs.outputTokens
+            && lhs.costUSD == rhs.costUSD && lhs.model == rhs.model && lhs.legacySourceID == rhs.legacySourceID
     }
 
     public var totalTokens: Int {
         AIUsageTokenMath.adding(inputTokens, outputTokens)
+    }
+}
+
+public struct AIUsageHistory: Equatable, Sendable {
+    public var usageSamples: [AIUsageSample]
+    public var modelUsageSamples: [AIUsageSample]
+
+    public init(usageSamples: [AIUsageSample] = [], modelUsageSamples: [AIUsageSample] = []) {
+        self.usageSamples = usageSamples
+        self.modelUsageSamples = modelUsageSamples
     }
 }
 
@@ -394,15 +451,29 @@ public struct AIState: Codable, Equatable, Sendable {
     public var tasks: [AIProgressTask]
     public var usageSamples: [AIUsageSample]
     public var notices: [IslandNotice]
+    public var modelUsageSamples: [AIUsageSample]
 
     public init(
         tasks: [AIProgressTask] = [],
         usageSamples: [AIUsageSample] = [],
-        notices: [IslandNotice] = []
+        notices: [IslandNotice] = [],
+        modelUsageSamples: [AIUsageSample] = []
     ) {
         self.tasks = tasks
         self.usageSamples = usageSamples
         self.notices = notices
+        self.modelUsageSamples = modelUsageSamples
+    }
+
+    private enum CodingKeys: String, CodingKey { case tasks, usageSamples, notices, modelUsageSamples }
+
+    /// Keeps old state files readable by treating absent model history as empty.
+    public init(from decoder: Decoder) throws {
+        let values = try decoder.container(keyedBy: CodingKeys.self)
+        tasks = try values.decode([AIProgressTask].self, forKey: .tasks)
+        usageSamples = try values.decode([AIUsageSample].self, forKey: .usageSamples)
+        notices = try values.decode([IslandNotice].self, forKey: .notices)
+        modelUsageSamples = try values.decodeIfPresent([AIUsageSample].self, forKey: .modelUsageSamples) ?? []
     }
 
     public static let empty = AIState()

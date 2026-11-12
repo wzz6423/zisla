@@ -59,6 +59,13 @@ public struct AIStateRepository: Sendable {
         return try database.loadUsageSamples(startingAt: startDate)
     }
 
+    /// Applies retention before returning one consistent aggregate/model snapshot for panels and briefings.
+    public func loadUsageHistory(startingAt startDate: Date? = nil, endingBefore endDate: Date? = nil) throws -> AIUsageHistory {
+        let database = try openDatabase()
+        try database.trimUsageIfNeeded()
+        return try database.loadUsageHistory(startingAt: startDate, endingBefore: endDate)
+    }
+
     public func upsert(_ task: AIProgressTask) throws {
         try openDatabase().upsertTask(task)
     }
@@ -90,10 +97,9 @@ public struct AIStateRepository: Sendable {
     }
 
     @discardableResult
+    /// Uses the database transaction so manual totals and model attribution cannot commit independently.
     public func recordUsage(_ samples: [AIUsageSample]) throws -> Int {
-        try openDatabase().recordUsage(
-            AIUsageAnalytics.dailyUsageSamples(samples: samples, calendar: .current)
-        )
+        try openDatabase().recordUsage(samples)
     }
 
     /// Deduplicates detected events by source and keeps the visible history aggregated by day.
@@ -102,9 +108,15 @@ public struct AIStateRepository: Sendable {
         try openDatabase().recordDetectedUsage(samples)
     }
 
+    /// Clears only AI reporting history; tasks, notices, and cumulative replay protection remain intact.
+    public func clearUsageHistory() throws {
+        try openDatabase().clearUsageHistory()
+    }
+
+    /// Reads the committed state only after the usage transaction succeeds.
     public func stateRecordingUsage(_ samples: [AIUsageSample]) throws -> AIState {
         let database = try openDatabase()
-        _ = try database.recordUsage(AIUsageAnalytics.dailyUsageSamples(samples: samples, calendar: .current))
+        _ = try database.recordUsage(samples)
         return try database.load()
     }
 

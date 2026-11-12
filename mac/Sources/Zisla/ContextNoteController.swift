@@ -53,6 +53,7 @@ final class ContextNoteDraft: ObservableObject {
 
     let location: ContextNoteLocation
     let createdAt: Date
+    let meetingID: CalendarEventIdentity?
     @Published var text = ""
     @Published var reminderInterval: ContextNoteReminderInterval = .off
     @Published var error: String?
@@ -74,9 +75,10 @@ final class ContextNoteDraft: ObservableObject {
         return false
     }
 
-    init(location: ContextNoteLocation, createdAt: Date = Date()) {
+    init(location: ContextNoteLocation, createdAt: Date = Date(), meetingID: CalendarEventIdentity? = nil) {
         self.location = location
         self.createdAt = createdAt
+        self.meetingID = meetingID
     }
 
     func captureScreenshot(from source: Result<ContextNoteScreenshotSource, Error>,

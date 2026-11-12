@@ -2565,6 +2565,20 @@
 "快递单号" = "Volgnummers";
 "会议日程" = "Vergaderafspraken";
 "会议地点" = "Vergaderlocatie";
+
+"会议倒计时" = "Aftellen tot vergadering";
+"会议进行中" = "Vergadering bezig";
+"加入会议" = "Deelnemen aan vergadering";
+"加入会议：%@ · %@" = "Deelnemen aan vergadering: %@ · %@";
+"会议便签" = "Vergadernotities";
+"新建会议便签" = "Nieuwe vergadernotitie";
+"关联现有便签" = "Bestaande notitie koppelen";
+"取消便签关联" = "Notitie ontkoppelen";
+"会议已不可加入，请刷新日程" = "Deze vergadering is niet meer beschikbaar. Vernieuw je agenda.";
+"无法打开会议链接" = "De vergaderlink kan niet worden geopend";
+"无法关联会议便签" = "De vergadernotitie kan niet worden gekoppeld";
+"日历" = "Agenda";
+
 "日程备注" = "Afspraaknotities";
 "结束时间" = "Eindtijd";
 "百度地图" = "Baidu Maps";
@@ -3417,6 +3431,23 @@
 "保存手写备忘录需要辅助功能权限" = "Toegang tot toegankelijkheid is vereist om handgeschreven notities op te slaan";
 "备忘录内容已变化，请重新打开后编辑" = "De notitie is gewijzigd. Open deze opnieuw voordat je bewerkt";
 "无法保存手写备忘录的文本，请在备忘录中打开后重试" = "De tekst in de handgeschreven notitie kon niet worden opgeslagen. Open deze in Notities en probeer het opnieuw";
+
+"每日模型用量" = "Dagelijks modelgebruik";
+"暂无模型用量" = "Nog geen modelgebruik";
+"未分类" = "Niet ingedeeld";
+"未知模型" = "Onbekend model";
+"输入 %@ · 输出 %@" = "Invoer %@ · Uitvoer %@";
+"AI 模型用量" = "AI-modelgebruik";
+
+"AI 用量历史" = "AI-gebruiksgeschiedenis";
+"把全部 AI 用量历史导出为 xlsx 表格" = "Exporteer de volledige AI-gebruiksgeschiedenis als xlsx-spreadsheet";
+"已清空 AI 用量历史" = "AI-gebruiksgeschiedenis gewist";
+"清空失败：%@" = "Wissen mislukt: %@";
+"清空 AI 用量历史？" = "AI-gebruiksgeschiedenis wissen?";
+"删除本机保存的 AI 用量历史，保留任务和日志去重记录。此操作无法撤销。" = "Verwijder de AI-gebruiksgeschiedenis die op deze Mac is opgeslagen. Taken en gegevens voor logboekdeduplicatie blijven behouden. Dit kan niet ongedaan worden gemaakt.";
+"上一年" = "Vorig jaar";
+"下一年" = "Volgend jaar";
+"AI token 用量热力图" = "Heatmap van AI-tokengebruik";
 
 
 "多选" = "Selecteren";

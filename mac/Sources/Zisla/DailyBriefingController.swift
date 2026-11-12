@@ -14,6 +14,7 @@ final class DailyBriefingController: ObservableObject {
     private let typing: @MainActor (Date) async throws -> DailyBriefingTyping?
     private let aiAccountBalances: @MainActor () -> [AIAccountBalance]
     private let readScreenTime: @Sendable (DateInterval) async -> DailyBriefingScreenTimeResult
+    private let readAIUsage: @Sendable (DateInterval) async throws -> AIUsageHistory
     private let export: @MainActor (DailyBriefingReport, DailyBriefingTemplate, AppLanguage, URL) async throws -> URL
     private var settings = DailyBriefingSettings(enabled: false)
     private var language = AppLanguage.simplifiedChinese
@@ -36,6 +37,7 @@ final class DailyBriefingController: ObservableObject {
         readScreenTime: @escaping @Sendable (DateInterval) async -> DailyBriefingScreenTimeResult = { range in
             await Task.detached(priority: .utility) { DailyBriefingScreenTimeReader().read(within: range) }.value
         },
+        readAIUsage: @escaping @Sendable (DateInterval) async throws -> AIUsageHistory = { _ in AIUsageHistory() },
         export: @escaping @MainActor (DailyBriefingReport, DailyBriefingTemplate, AppLanguage, URL) async throws -> URL = { report, template, language, directory in
             let accessing = directory.startAccessingSecurityScopedResource()
             defer { if accessing { directory.stopAccessingSecurityScopedResource() } }
@@ -51,6 +53,7 @@ final class DailyBriefingController: ObservableObject {
         self.typing = typing
         self.aiAccountBalances = aiAccountBalances
         self.readScreenTime = readScreenTime
+        self.readAIUsage = readAIUsage
         self.export = export
         saveLocations?.$directories.sink { [weak self] directories in
             self?.directory = directories[.dailyBriefing]!
@@ -224,6 +227,8 @@ final class DailyBriefingController: ObservableObject {
         let screenTime = settings.readsSystemScreenTime
             ? await readScreenTime(DateInterval(start: day.date, end: end)) : DailyBriefingScreenTimeResult()
         let typing = try? await typing(day.date)
+        let aiHistory = settings.selectedContent.contains(.aiModelUsage)
+            ? try await readAIUsage(DateInterval(start: day.date, end: end)) : AIUsageHistory()
         try Task.checkCancellation()
         guard settings.enabled else { throw CancellationError() }
         var report = DailyBriefingReport(
@@ -233,6 +238,8 @@ final class DailyBriefingController: ObservableObject {
             typing: typing,
             allDeviceSeconds: screenTime.allDeviceSeconds,
             notificationCount: screenTime.notificationCount,
+            aiUsage: AIUsageAnalytics.dailyModelUsage(history: aiHistory, endingAt: end, calendar: calendar)
+                .first { calendar.isDate($0.date, inSameDayAs: day.date) },
             selectedContent: settings.selectedContent
         )
         if let intervals = screenTime.local, !intervals.isEmpty {

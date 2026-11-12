@@ -537,6 +537,8 @@ final class AppModel: ObservableObject {
   let audioOutput = AudioOutputDeviceService()
   let applicationVolumes = ApplicationVolumeMixerService()
   let calendar = CalendarService()
+  private lazy var meetingCountdown = MeetingCountdownController(calendar: calendar, queue: notices,
+    settings: settingsStore, language: languageStore)
   let shelf = FileShelfStore()
   lazy var shelfContextActions = ShelfContextActions(shelf: shelf)
   @Published var selectedShelfCategory: FileShelfCategory = .all
@@ -614,6 +616,12 @@ final class AppModel: ObservableObject {
       guard self.settingsStore.settings.keyboardTypingStatsEnabled,
         self.keyboardSound.isInputMonitoringGranted else { return nil }
       return try await self.keyboardSound.dailyBriefingTyping(on: date)
+    },
+    readAIUsage: { range in
+      try await Task.detached(priority: .utility) {
+        try AIStateRepository(directoryURL: AppPaths.applicationSupport).loadUsageHistory(
+          startingAt: range.start, endingBefore: range.end)
+      }.value
     }
   )
   /// Synchronous hook used by the app delegate to arm overlay focus protection before any
@@ -1242,6 +1250,7 @@ final class AppModel: ObservableObject {
   }
 
   func stop() {
+    meetingCountdown.stop()
     automaticPowerModeLifecycleActive = false
     automaticPowerMode.stop()
     dailyBriefing.stop()
@@ -1905,6 +1914,49 @@ final class AppModel: ObservableObject {
       return
     }
     islandCollapseRequested = true
+  }
+
+  func joinMeeting(_ event: CalendarEventSnapshot) {
+    switch MeetingJoinAction.perform(event, resolve: calendar.resolveMeeting) {
+    case .opened:
+      break
+    case .unavailable:
+      transientMessage = AppLocalization.text("会议已不可加入，请刷新日程")
+      calendar.refreshMeetings()
+    case .failed:
+      transientMessage = AppLocalization.text("无法打开会议链接")
+    }
+  }
+
+  func joinMeetingNotice(_ eventID: String) {
+    calendar.refreshMeetings()
+    guard let event = calendar.meetingEvents.first(where: { $0.id == eventID }) else {
+      transientMessage = AppLocalization.text("会议已不可加入，请刷新日程")
+      return
+    }
+    joinMeeting(event)
+  }
+
+  func openMeetingNote(_ note: FileShelfItem) {
+    contextNoteEditor.open(note)
+    selectedShelfCategory = .note
+    selectModule(.shelf)
+  }
+
+  func createMeetingNote(_ event: CalendarEventSnapshot) {
+    guard let identity = event.eventIdentity, let url = event.meetingURL else { return }
+    let draft = ContextNoteDraft(location: .webPage(url: url, title: event.title,
+      applicationName: AppLocalization.text("日历")), meetingID: identity)
+    contextNoteEditor.begin(draft)
+    selectedShelfCategory = .note
+    selectModule(.shelf)
+  }
+
+  func setMeeting(_ event: CalendarEventSnapshot, associated: Bool, with note: FileShelfItem) {
+    guard let identity = event.eventIdentity else { return }
+    if !shelf.setMeeting(identity, associated: associated, withNote: note.id) {
+      transientMessage = shelf.errorDescription ?? AppLocalization.text("无法关联会议便签")
+    }
   }
 
   func copyClipboardHistoryItem(_ item: ClipboardHistoryItem) {
@@ -3385,6 +3437,7 @@ final class AppModel: ObservableObject {
     } else {
       calendar.stop()
     }
+    meetingCountdown.configure()
     if settings.observesBrowserDownloads {
       browserDownloads.start()
       if settings.showsBrowserDownloadProgress {

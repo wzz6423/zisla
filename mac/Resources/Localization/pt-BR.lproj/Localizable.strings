@@ -2565,6 +2565,20 @@
 "快递单号" = "Códigos de rastreamento";
 "会议日程" = "Reuniões agendadas";
 "会议地点" = "Local da reunião";
+
+"会议倒计时" = "Contagem regressiva da reunião";
+"会议进行中" = "Reunião em andamento";
+"加入会议" = "Entrar na reunião";
+"加入会议：%@ · %@" = "Entrar na reunião: %@ · %@";
+"会议便签" = "Notas da reunião";
+"新建会议便签" = "Nova nota da reunião";
+"关联现有便签" = "Vincular nota existente";
+"取消便签关联" = "Desvincular nota";
+"会议已不可加入，请刷新日程" = "Esta reunião não está mais disponível. Atualize sua agenda.";
+"无法打开会议链接" = "Não foi possível abrir o link da reunião";
+"无法关联会议便签" = "Não foi possível vincular a nota da reunião";
+"日历" = "Calendário";
+
 "日程备注" = "Notas do evento";
 "结束时间" = "Horário de término";
 "百度地图" = "Baidu Maps";
@@ -3417,6 +3431,23 @@
 "保存手写备忘录需要辅助功能权限" = "É necessário acesso à acessibilidade para salvar notas manuscritas";
 "备忘录内容已变化，请重新打开后编辑" = "A nota foi alterada. Abra-a novamente antes de editar";
 "无法保存手写备忘录的文本，请在备忘录中打开后重试" = "Não foi possível salvar o texto da nota manuscrita. Abra-a no Notas e tente novamente";
+
+"每日模型用量" = "Uso diário por modelo";
+"暂无模型用量" = "Ainda não há uso de modelos";
+"未分类" = "Sem classificação";
+"未知模型" = "Modelo desconhecido";
+"输入 %@ · 输出 %@" = "Entrada %@ · Saída %@";
+"AI 模型用量" = "Uso de modelos de IA";
+
+"AI 用量历史" = "Histórico de uso de IA";
+"把全部 AI 用量历史导出为 xlsx 表格" = "Exportar todo o histórico de uso de IA como uma planilha xlsx";
+"已清空 AI 用量历史" = "Histórico de uso de IA apagado";
+"清空失败：%@" = "Falha ao apagar: %@";
+"清空 AI 用量历史？" = "Apagar o histórico de uso de IA?";
+"删除本机保存的 AI 用量历史，保留任务和日志去重记录。此操作无法撤销。" = "Excluir o histórico de uso de IA salvo neste Mac. As tarefas e os registros de deduplicação de logs serão mantidos. Esta ação não pode ser desfeita.";
+"上一年" = "Ano anterior";
+"下一年" = "Próximo ano";
+"AI token 用量热力图" = "Mapa de calor do uso de tokens de IA";
 
 
 "多选" = "Selecionar";

@@ -121,6 +121,7 @@ public final class SideNoticeQueue: ObservableObject {
         notice.id.hasPrefix("ai-active-")
             || notice.id.hasPrefix("media-active-")
             || notice.id.hasPrefix("focus-countdown-")
+            || notice.id.hasPrefix(MeetingCountdown.noticePrefix)
             || notice.id.hasPrefix("focus-mode-")
             || notice.id.hasPrefix("focus-transition")
             || LowBatteryNoticeController.isLowBatteryNotice(notice)
