@@ -215,6 +215,50 @@ struct FileShelfContentTests {
     }
 
     @Test
+    func duplicatePromisedFileNamesImportOnceAndFinishImmediately() throws {
+        let directory = try temporaryDirectory()
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let store = FileShelfStore(storageURL: directory.appendingPathComponent("shelf.json"))
+        let receiver = ControlledFilePromiseReceiver(names: ["dup.txt", "dup.txt"])
+        var counts: [Int] = []
+        let session = try FileShelfPromiseSession(store: store, items: [.promise(receiver)], completion: { counts.append($0) })
+        session.start()
+        try receiver.deliver(name: "dup.txt", data: Data("same".utf8))
+        try receiver.deliver(name: "dup.txt", data: Data("same".utf8))
+
+        #expect(counts == [1])
+        #expect(store.items.map(\.displayName) == ["dup.txt"])
+        if let url = store.items.first?.url {
+            #expect(try Data(contentsOf: url) == Data("same".utf8))
+        }
+        #expect(!FileManager.default.fileExists(atPath: session.stagingDirectory.path))
+        #expect(store.errorDescription == nil)
+    }
+
+    @Test
+    func duplicatePromisedNamePlusDistinctFileImportsBothAndFinishesImmediately() throws {
+        let directory = try temporaryDirectory()
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let store = FileShelfStore(storageURL: directory.appendingPathComponent("shelf.json"))
+        let receiver = ControlledFilePromiseReceiver(names: ["dup.txt", "dup.txt", "other.txt"])
+        var counts: [Int] = []
+        let session = try FileShelfPromiseSession(store: store, items: [.promise(receiver)], completion: { counts.append($0) })
+        session.start()
+        try receiver.deliver(name: "dup.txt", data: Data("dup".utf8))
+        try receiver.deliver(name: "dup.txt", data: Data("dup".utf8))
+        try receiver.deliver(name: "other.txt", data: Data("other".utf8))
+
+        #expect(counts == [2])
+        #expect(store.items.map(\.displayName) == ["dup.txt", "other.txt"])
+        if store.items.count == 2 {
+            #expect(try Data(contentsOf: store.items[0].url) == Data("dup".utf8))
+            #expect(try Data(contentsOf: store.items[1].url) == Data("other".utf8))
+        }
+        #expect(!FileManager.default.fileExists(atPath: session.stagingDirectory.path))
+        #expect(store.errorDescription == nil)
+    }
+
+    @Test
     func synchronousPromiseCallbacksWaitUntilEveryReceiverHasStarted() throws {
         let directory = try temporaryDirectory()
         defer { try? FileManager.default.removeItem(at: directory) }

@@ -846,8 +846,7 @@ final class FileShelfPromiseSession {
         }
         if let error {
             failure = error.localizedDescription
-        } else {
-            guard seen.insert(url.standardizedFileURL).inserted else { return }
+        } else if seen.insert(url.standardizedFileURL).inserted {
             let resolved = url.resolvingSymlinksInPath().standardizedFileURL
             let root = stagingDirectory.resolvingSymlinksInPath().standardizedFileURL
             do {
