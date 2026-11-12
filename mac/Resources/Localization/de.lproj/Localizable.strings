@@ -2511,6 +2511,20 @@
 "快递单号" = "Sendungsnummern";
 "会议日程" = "Besprechungstermine";
 "会议地点" = "Besprechungsort";
+
+"会议倒计时" = "Besprechungs-Countdown";
+"会议进行中" = "Besprechung läuft";
+"加入会议" = "Besprechung beitreten";
+"加入会议：%@ · %@" = "Besprechung beitreten: %@ · %@";
+"会议便签" = "Besprechungsnotizen";
+"新建会议便签" = "Neue Besprechungsnotiz";
+"关联现有便签" = "Vorhandene Notiz verknüpfen";
+"取消便签关联" = "Notizverknüpfung aufheben";
+"会议已不可加入，请刷新日程" = "Diese Besprechung ist nicht mehr verfügbar. Aktualisieren Sie den Kalender.";
+"无法打开会议链接" = "Der Besprechungslink kann nicht geöffnet werden";
+"无法关联会议便签" = "Die Besprechungsnotiz kann nicht verknüpft werden";
+"日历" = "Kalender";
+
 "日程备注" = "Terminnotizen";
 "结束时间" = "Endzeit";
 "百度地图" = "Baidu Maps";

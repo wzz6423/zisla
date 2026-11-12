@@ -28,6 +28,7 @@ final class SideNoticePresenter {
         statusIcons.filter { !$0.isSystemMonitor || settingsStore.settings.systemMonitorEnabled }
     }
     var onCompactLayoutChanged: ((CGDirectDisplayID, Bool, CGFloat?, CGFloat?, CGSize?) -> Void)?
+    var onJoinMeeting: ((String) -> Void)?
     private var isStopped = false
     private let now: () -> Date
     private let reduceMotion: () -> Bool
@@ -477,11 +478,12 @@ final class SideNoticePresenter {
             panels.compactConfiguration = configuration
             panels.compactScreenFrame = snapshot.frame
         }
-        let showsPomodoroControls = FloatingIslandInformationLayout(
+        let information = FloatingIslandInformationLayout(
             notices: displayState.compactStatusHidden ? [] : compactNotices, icons: displayState.statusIcons,
             settings: settingsStore.settings, item: media.snapshot, at: date
-        )?.primary.contains { $0.presentation.priority == .focusCountdown } == true
-        panel.ignoresMouseEvents = !displayState.statusIcons.isEmpty && !showsPomodoroControls
+        )
+        panel.ignoresMouseEvents = Self.compactPanelIgnoresMouseEvents(
+            statusIcons: displayState.statusIcons, information: information)
         panel.level = isScreenshotActive ? IslandPanel.onBottomLevel : IslandPanel.onTopLevel
         if settingsStore.settings.islandLayoutStyle == .pill && !settingsStore.settings.islandCollapsedOnTop {
             panel.level = IslandPanel.onBottomLevel
@@ -608,7 +610,8 @@ final class SideNoticePresenter {
             resultSweep: resultSweep,
             pomodoro: pomodoro,
             onStatusHidden: { [weak self] in self?.updatePanels() },
-            onCompactLengthChanged: { [weak self] _ in self?.updatePanels() }
+            onCompactLengthChanged: { [weak self] _ in self?.updatePanels() },
+            onJoinMeeting: { [weak self] in self?.onJoinMeeting?($0) }
         )
         let hostingView = NSHostingView(
             rootView: AppLanguageEnvironment(languageStore: languageStore, content: rootView)
@@ -631,12 +634,22 @@ final class SideNoticePresenter {
         !isVisible || rejoiningActiveSpace || presentsNewCompactStatus
     }
 
+    static func compactPanelIgnoresMouseEvents(
+        statusIcons: [IslandStatusIcon], information: FloatingIslandInformationLayout?
+    ) -> Bool {
+        let showsControls = information?.primary.contains {
+            $0.presentation.priority == .focusCountdown || $0.presentation.priority == .meeting
+        } == true
+        return !statusIcons.isEmpty && !showsControls
+    }
+
     static func isCompactNotice(_ notice: IslandNotice) -> Bool {
         notice.id.hasPrefix("ai-active-")
             || notice.id.hasPrefix("update-available-")
             || notice.id.hasPrefix("media-active-")
             || notice.id.hasPrefix("background-sound-")
             || notice.id.hasPrefix("focus-countdown-")
+            || notice.id.hasPrefix(MeetingCountdown.noticePrefix)
             || notice.id.hasPrefix("focus-mode-")
             || notice.id.hasPrefix("mail-notification-")
             || isTransientCompactNotice(notice)

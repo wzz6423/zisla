@@ -2510,6 +2510,20 @@
 "快递单号" = "Mã vận đơn";
 "会议日程" = "Lịch họp";
 "会议地点" = "Địa điểm họp";
+
+"会议倒计时" = "Đếm ngược cuộc họp";
+"会议进行中" = "Cuộc họp đang diễn ra";
+"加入会议" = "Tham gia cuộc họp";
+"加入会议：%@ · %@" = "Tham gia cuộc họp: %@ · %@";
+"会议便签" = "Ghi chú cuộc họp";
+"新建会议便签" = "Ghi chú cuộc họp mới";
+"关联现有便签" = "Liên kết ghi chú hiện có";
+"取消便签关联" = "Hủy liên kết ghi chú";
+"会议已不可加入，请刷新日程" = "Cuộc họp này không còn khả dụng. Hãy làm mới lịch trình.";
+"无法打开会议链接" = "Không thể mở liên kết cuộc họp";
+"无法关联会议便签" = "Không thể liên kết ghi chú cuộc họp";
+"日历" = "Lịch";
+
 "日程备注" = "Ghi chú sự kiện";
 "结束时间" = "Thời gian kết thúc";
 "百度地图" = "Bản đồ Baidu";

@@ -2510,6 +2510,20 @@
 "快递单号" = "Números de seguimiento";
 "会议日程" = "Reuniones programadas";
 "会议地点" = "Lugar de la reunión";
+
+"会议倒计时" = "Cuenta atrás de reunión";
+"会议进行中" = "Reunión en curso";
+"加入会议" = "Unirse a la reunión";
+"加入会议：%@ · %@" = "Unirse a la reunión: %@ · %@";
+"会议便签" = "Notas de reunión";
+"新建会议便签" = "Nueva nota de reunión";
+"关联现有便签" = "Vincular nota existente";
+"取消便签关联" = "Desvincular nota";
+"会议已不可加入，请刷新日程" = "Esta reunión ya no está disponible. Actualiza tu agenda.";
+"无法打开会议链接" = "No se puede abrir el enlace de la reunión";
+"无法关联会议便签" = "No se puede vincular la nota de la reunión";
+"日历" = "Calendario";
+
 "日程备注" = "Notas del evento";
 "结束时间" = "Hora de finalización";
 "百度地图" = "Mapas de Baidu";

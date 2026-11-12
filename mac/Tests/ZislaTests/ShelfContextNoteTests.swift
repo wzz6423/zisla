@@ -10,6 +10,60 @@ import ZislaKit
 @Suite(.serialized)
 struct ShelfContextNoteTests {
     @Test
+    func meetingDraftCanBeDiscardedAndSavedWithOnlyOptionalAssociationMetadata() throws {
+        try withStore { store, directory in
+            let identity = CalendarEventIdentity(calendarIdentifier: "work", eventIdentifier: "meeting")
+            let location = ContextNoteLocation.webPage(url: URL(string: "https://meet.google.com/abc-defg-hij")!,
+                title: "Team meeting", applicationName: "Calendar")
+            let editor = ContextNoteShelfEditor()
+            let discarded = ContextNoteDraft(location: location, meetingID: identity)
+            editor.begin(discarded)
+            discarded.text = "discard me"
+            editor.close()
+            #expect(store.items.isEmpty)
+            #expect(!editor.resumeNew())
+            let draft = ContextNoteDraft(location: location, meetingID: identity)
+            draft.text = "notes"
+            editor.begin(draft)
+            let saved = try #require(editor.save(in: store))
+            #expect(saved.noteMeetingIDs == [identity])
+            #expect(saved.noteLocation == location)
+            #expect(saved.noteReminderInterval == .off)
+            #expect(FileShelfStore(storageURL: directory.appendingPathComponent("shelf.json")).items == [saved])
+            editor.open(saved)
+            editor.draft?.text = "edited notes"
+            let edited = try #require(editor.save(in: store))
+            #expect(edited.id == saved.id)
+            #expect(edited.noteMeetingIDs == [identity])
+        }
+    }
+
+    @Test
+    func associatingAndEditingAnExistingNotePreservesItsScreenshotAndReminder() throws {
+        try withStore { store, _ in
+            let identity = CalendarEventIdentity(calendarIdentifier: "work", eventIdentifier: "meeting")
+            let png = try ContextNoteScreenshotTestImage.make().png
+            let location = try #require(Self.note.noteLocation)
+            let note = try #require(store.addContextNote("original", location: location, screenshot: png))
+            let enabled = try #require(store.updateContextNote(id: note.id, text: "original", reminderInterval: .oneDay,
+                at: Date(timeIntervalSince1970: 100)))
+            #expect(store.setMeeting(identity, associated: true, withNote: note.id))
+            let associated = try #require(store.items.first)
+            #expect(try Data(contentsOf: #require(associated.noteScreenshotURL)) == png)
+            let editor = ContextNoteShelfEditor()
+            editor.open(associated)
+            editor.draft?.text = "edited"
+            let saved = try #require(editor.save(in: store))
+            #expect(saved.noteMeetingIDs == [identity])
+            #expect(saved.noteLocation == note.noteLocation)
+            #expect(saved.addedAt == note.addedAt)
+            #expect(saved.noteReminderInterval == .oneDay)
+            #expect(saved.nextNoteReminderAt == enabled.nextNoteReminderAt)
+            #expect(try Data(contentsOf: #require(saved.noteScreenshotURL)) == png)
+        }
+    }
+
+    @Test
     func notesGroupByApplicationWithoutMixingDesktopOrChangingTheirOrder() {
         let items = Self.groupingItems
         let groups = ShelfNoteApplicationGroup.groups(in: items)

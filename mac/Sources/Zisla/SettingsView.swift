@@ -4003,6 +4003,7 @@ struct SettingsView: View {
         case .videoDownload: "arrow.down.square.fill"
         case .browserDownload: "arrow.down.circle.fill"
         case .focusCountdown: "timer"
+        case .meeting: "video.fill"
         case .toolboxReminder: "wrench.and.screwdriver.fill"
         case .aiActivity: "sparkles"
         case .media: "music.note"
