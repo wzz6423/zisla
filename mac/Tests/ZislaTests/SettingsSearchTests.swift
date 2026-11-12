@@ -127,20 +127,43 @@ struct SettingsSearchTests {
         let dependencyTitle = AppLocalization.string("依赖组件", language: language)
         let dependencies = results(dependencyTitle, locale: language.locale)
         #expect(Set(dependencies.map(\.section)) == [.download])
-        #expect(Set(dependencies.map(\.title)) == [ManagedTool.ytDLP.displayName, ManagedTool.libreOffice.displayName])
-        #expect(results(dependencyTitle, settings: FeatureSettings(downloaderEnabled: false), locale: language.locale).isEmpty)
+        #expect(Set(dependencies.map(\.title)) == Set([ManagedTool.ytDLP, .libreOffice, .libvips, .libavif].map(\.displayName)))
+        var disabled = FeatureSettings(downloaderEnabled: false)
+        disabled.pdfToolsEnabled = false
+        disabled.imageToolsEnabled = false
+        #expect(results(dependencyTitle, settings: disabled, locale: language.locale).isEmpty)
     }
 
-    /// Renaming navigation must not invalidate existing search terms or bypass the feature toggle.
+    /// Legacy aliases stay attached to dependency rows while any dependent feature is enabled.
     @Test(arguments: AppLanguage.allCases)
     func legacyDownloadTitleStillFindsDependencyComponents(language: AppLanguage) {
         for query in ["下载", "Downloads", AppLocalization.string("下载", language: language)] {
             let dependencies = results(query, locale: language.locale).filter { $0.section == .download }
-            #expect(Set(dependencies.map(\.title)) == [ManagedTool.ytDLP.displayName, ManagedTool.libreOffice.displayName])
+            #expect(Set(dependencies.map(\.title)) == Set([ManagedTool.ytDLP, .libreOffice, .libvips, .libavif].map(\.displayName)))
             #expect(dependencies.allSatisfy { $0.anchor == .row($0.title) })
-            #expect(results(query, settings: FeatureSettings(downloaderEnabled: false), locale: language.locale)
+            var disabled = FeatureSettings(downloaderEnabled: false)
+            disabled.pdfToolsEnabled = false
+            disabled.imageToolsEnabled = false
+            #expect(results(query, settings: disabled, locale: language.locale)
                 .allSatisfy { $0.section != .download })
         }
+    }
+
+    @Test(arguments: AppLanguage.allCases)
+    func imageDependenciesAreSearchableWithoutDownloaderOrRecommendations(language: AppLanguage) {
+        var settings = FeatureSettings.default
+        settings.downloaderEnabled = false
+        settings.pdfToolsEnabled = false
+        settings.imageToolsEnabled = true
+        settings.recommendedToolsEnabled = false
+        for tool in [ManagedTool.libvips, .libavif] {
+            let matches = results(tool.displayName, settings: settings, locale: language.locale)
+            #expect(matches.contains { $0.section == .download && $0.anchor == .row(tool.displayName) })
+            #expect(matches.allSatisfy { $0.section.isVisible(settings: settings) })
+        }
+        settings.imageToolsEnabled = false
+        #expect(!SettingsSection.download.isVisible(settings: settings))
+        #expect(results(ManagedTool.libvips.displayName, settings: settings, locale: language.locale).isEmpty)
     }
 
     @Test
@@ -238,6 +261,37 @@ struct SettingsSearchTests {
         for tool in ManagedTool.allCases {
             #expect(items.contains { $0.section == .recommendations && $0.anchor == .row(tool.displayName) })
         }
+    }
+
+    @Test(arguments: AppLanguage.allCases)
+    func imageOperationsAreSearchableAndRespectTheirToggle(language: AppLanguage) {
+        var settings = FeatureSettings.default
+        for operation in ImageToolOperation.allCases {
+            let query = AppLocalization.string(operation.title, language: language)
+            let matches = results(query, settings: settings, locale: language.locale)
+            #expect(matches.contains { $0.section == .imageTools && $0.anchor == .imageOperation(operation) })
+        }
+        settings.imageToolsEnabled = false
+        #expect(!SettingsSection.imageTools.isVisible(settings: settings))
+        #expect(results("TinyPNG", settings: settings, locale: language.locale).allSatisfy { $0.section != .imageTools })
+        #expect(results(AppLocalization.string("图片工具", language: language), settings: settings, locale: language.locale)
+            .contains { $0.section == .features && $0.anchor == .row("图片工具") })
+    }
+
+    @Test(arguments: ImageToolOperation.allCases) @MainActor
+    func imageSearchSelectsTheRequestedOperation(operation: ImageToolOperation) {
+        let input = SettingsInput()
+        input.select(.imageTools, searchTarget: .imageOperation(operation))
+        #expect(input.selection == .imageTools)
+        #expect(input.selectedImageOperation == operation)
+        input.select(.pdfTools)
+        input.navigate(backward: true, settings: .default)
+        #expect(input.selectedImageOperation == operation)
+        input.select(.imageTools)
+        #expect(input.selectedImageOperation == operation)
+        #expect(input.searchTarget == nil)
+        input.settingsQuery = "PNG"
+        #expect(input.selectedImageOperation == operation)
     }
 
     @Test(arguments: PDFToolOperation.allCases)

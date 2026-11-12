@@ -659,6 +659,23 @@ struct AIAgentServicesTests {
         #expect(output.standardOutput == Data("abc".utf8))
     }
 
+    @Test(arguments: ["ab", "abcdef", "abcdefghijkl", String(repeating: "x", count: 70_000) + "end"], [0, 3])
+    func processRunnerCanKeepABoundedErrorTailWithoutDuplicatingThePrefix(message: String, tailBytes: Int) async throws {
+        let output = try await AIAgentProcessRunner.run(
+            executableURL: URL(fileURLWithPath: "/bin/sh"),
+            arguments: ["-c", "printf '%s' \"$1\" >&2; printf ok", "runner", message],
+            maximumOutputBytes: 2,
+            maximumErrorBytes: 3,
+            maximumErrorTailBytes: tailBytes
+        )
+        let prefix = String(message.prefix(3))
+        let remainder = message.dropFirst(3)
+        #expect(output.status == 0)
+        #expect(output.standardOutput == Data("ok".utf8))
+        #expect(output.standardError == prefix + remainder.suffix(tailBytes))
+        #expect(output.standardError.utf8.count <= 3 + tailBytes)
+    }
+
     @Test
     func processRunnerReturnsCompleteOutputBeyondFormerDefaultLimit() async throws {
         let byteCount = 4 * 1_024 * 1_024 + 1

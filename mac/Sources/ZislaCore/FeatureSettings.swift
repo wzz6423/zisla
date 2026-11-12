@@ -741,6 +741,8 @@ public struct FeatureSettings: Codable, Equatable, Sendable {
     public var calendarEnabled: Bool
     public var toolboxEnabled: Bool
     public var pdfToolsEnabled: Bool
+    public var imageToolsEnabled: Bool
+    public var audioToolsEnabled: Bool
     public var volumeMixerEnabled: Bool
     public var toolboxReminderEnabled: Bool
     /// Whether to show a countdown in the collapsed Dynamic Island during Focus sessions.
@@ -821,6 +823,14 @@ public struct FeatureSettings: Codable, Equatable, Sendable {
     public var clipboardAssistantEnabled: Bool
     /// Whether completed browser downloads and AirDrop transfers offer an Open Folder action.
     public var downloadCompletionFolderActionEnabled: Bool
+    public var applicationOpenFailureMonitoringEnabled: Bool
+    public var applicationOpenRepairEnabled: Bool {
+        clipboardAssistantEnabled
+            && (clipboardAssistantEnabledKinds.isEmpty || clipboardAssistantEnabledKinds.contains(.appCannotOpen))
+    }
+    public var applicationOpenFailureMonitoringActive: Bool {
+        applicationOpenRepairEnabled && applicationOpenFailureMonitoringEnabled
+    }
     /// Quick trigger hotkey firing the assistant's primary action while its toast is visible.
     /// Modifier-only presets fire on double-tap; ordinary combos fire on key-down.
     public var clipboardAssistantTriggerConfiguration: ClipboardAssistantTriggerConfiguration
@@ -962,6 +972,8 @@ public struct FeatureSettings: Codable, Equatable, Sendable {
         calendarEnabled: Bool = true,
         toolboxEnabled: Bool = true,
         pdfToolsEnabled: Bool = true,
+        imageToolsEnabled: Bool = true,
+        audioToolsEnabled: Bool = true,
         volumeMixerEnabled: Bool = true,
         toolboxReminderEnabled: Bool = true,
         focusCountdownIslandEnabled: Bool = true,
@@ -1012,6 +1024,7 @@ public struct FeatureSettings: Codable, Equatable, Sendable {
         clipboardDetectionEnabled: Bool = true,
         clipboardAssistantEnabled: Bool = true,
         downloadCompletionFolderActionEnabled: Bool = true,
+        applicationOpenFailureMonitoringEnabled: Bool = false,
         clipboardAssistantTriggerConfiguration: ClipboardAssistantTriggerConfiguration = .default,
         clipboardAssistantDismissConfiguration: ClipboardAssistantTriggerConfiguration = .hotkey(ClipboardAssistantDefaults.dismissHotkey),
         clipboardAssistantMouseButton: Int? = nil,
@@ -1093,6 +1106,8 @@ public struct FeatureSettings: Codable, Equatable, Sendable {
         self.calendarEnabled = calendarEnabled
         self.toolboxEnabled = toolboxEnabled
         self.pdfToolsEnabled = pdfToolsEnabled
+        self.imageToolsEnabled = imageToolsEnabled
+        self.audioToolsEnabled = audioToolsEnabled
         self.volumeMixerEnabled = volumeMixerEnabled
         self.toolboxReminderEnabled = toolboxReminderEnabled
         self.focusCountdownIslandEnabled = focusCountdownIslandEnabled
@@ -1143,6 +1158,7 @@ public struct FeatureSettings: Codable, Equatable, Sendable {
         self.clipboardDetectionEnabled = clipboardDetectionEnabled
         self.clipboardAssistantEnabled = clipboardAssistantEnabled
         self.downloadCompletionFolderActionEnabled = downloadCompletionFolderActionEnabled
+        self.applicationOpenFailureMonitoringEnabled = applicationOpenFailureMonitoringEnabled
         self.clipboardAssistantTriggerConfiguration = clipboardAssistantTriggerConfiguration
         self.clipboardAssistantDismissConfiguration = clipboardAssistantDismissConfiguration
         self.clipboardAssistantMouseButton = clipboardAssistantMouseButton
@@ -1250,7 +1266,7 @@ public struct FeatureSettings: Codable, Equatable, Sendable {
     }
 
     /// Current clipboard-assistant kind preference payload version.
-    public static let clipboardAssistantKindSetVersionCurrent = 4
+    public static let clipboardAssistantKindSetVersionCurrent = 5
     /// Kinds shipped after the previous version; enabled once when a stored
     /// preference from an older version is decoded. Empty stored sets keep
     /// their "all kinds" meaning and need no migration.
@@ -1259,6 +1275,7 @@ public struct FeatureSettings: Codable, Equatable, Sendable {
         2: [.address, .flight, .train, .tracking, .meeting],
         3: [.shellCommand],
         4: [.ipAddress],
+        5: [.appCannotOpen],
     ]
 
     public static let `default` = FeatureSettings()
@@ -1273,6 +1290,8 @@ public struct FeatureSettings: Codable, Equatable, Sendable {
         case calendarEnabled
         case toolboxEnabled
         case pdfToolsEnabled
+        case imageToolsEnabled
+        case audioToolsEnabled
         case volumeMixerEnabled
         case toolboxReminderEnabled
         case focusCountdownIslandEnabled
@@ -1323,6 +1342,7 @@ public struct FeatureSettings: Codable, Equatable, Sendable {
         case clipboardDetectionEnabled
         case clipboardAssistantEnabled
         case downloadCompletionFolderActionEnabled
+        case applicationOpenFailureMonitoringEnabled
         case clipboardAssistantTriggerConfiguration
         case clipboardAssistantDismissConfiguration
         case clipboardAssistantMouseButton
@@ -1419,6 +1439,8 @@ public struct FeatureSettings: Codable, Equatable, Sendable {
         calendarEnabled = try container.decodeIfPresent(Bool.self, forKey: .calendarEnabled) ?? defaults.calendarEnabled
         toolboxEnabled = try container.decodeIfPresent(Bool.self, forKey: .toolboxEnabled) ?? defaults.toolboxEnabled
         pdfToolsEnabled = try container.decodeIfPresent(Bool.self, forKey: .pdfToolsEnabled) ?? defaults.pdfToolsEnabled
+        imageToolsEnabled = try container.decodeIfPresent(Bool.self, forKey: .imageToolsEnabled) ?? defaults.imageToolsEnabled
+        audioToolsEnabled = try container.decodeIfPresent(Bool.self, forKey: .audioToolsEnabled) ?? defaults.audioToolsEnabled
         volumeMixerEnabled = try container.decodeIfPresent(Bool.self, forKey: .volumeMixerEnabled) ?? defaults.volumeMixerEnabled
         toolboxReminderEnabled = try container.decodeIfPresent(Bool.self, forKey: .toolboxReminderEnabled) ?? defaults.toolboxReminderEnabled
         focusCountdownIslandEnabled = try container.decodeIfPresent(
@@ -1611,6 +1633,9 @@ public struct FeatureSettings: Codable, Equatable, Sendable {
         }
         clipboardAssistantEnabledKinds = enabledKinds
         clipboardAssistantKindSetVersion = Self.clipboardAssistantKindSetVersionCurrent
+        applicationOpenFailureMonitoringEnabled = try container.decodeIfPresent(
+            Bool.self, forKey: .applicationOpenFailureMonitoringEnabled
+        ) ?? defaults.applicationOpenFailureMonitoringEnabled
         var actionOrders = try container.decodeIfPresent(
             [ClipboardAssistantKind: [ClipboardAssistantActionKind]].self,
             forKey: .clipboardAssistantActionOrders

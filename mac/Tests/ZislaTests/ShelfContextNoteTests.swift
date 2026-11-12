@@ -87,7 +87,7 @@ struct ShelfContextNoteTests {
     @Test
     func collapsedNoteOccupiesTwoFileColumns() {
         let host = NSHostingView(rootView: ShelfItemView(
-            item: Self.note, onOpen: {}, onCopy: {}, onSendToQuickNote: {}, onRemove: {}
+            item: Self.note, onOpen: {}, onCopy: {}, onSendToQuickNote: {}, onRemove: { _ in }
         ))
         #expect(host.fittingSize == CGSize(width: 140, height: 84))
     }
@@ -356,7 +356,7 @@ struct ShelfContextNoteTests {
         panel.isReleasedWhenClosed = false
         defer { panel.close() }
         let host = NSHostingView(rootView: ShelfItemCollection(items: items, category: category) { item in
-            ShelfItemView(item: item, onOpen: {}, onCopy: {}, onSendToQuickNote: {}, onRemove: {})
+            ShelfItemView(item: item, onOpen: {}, onCopy: {}, onSendToQuickNote: {}, onRemove: { _ in })
                 .background(ShelfFrameProbe(id: item.id))
         }.environment(\.layoutDirection, direction)
             .frame(width: width, alignment: .topLeading)

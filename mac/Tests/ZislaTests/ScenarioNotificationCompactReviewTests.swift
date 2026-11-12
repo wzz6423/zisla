@@ -44,15 +44,25 @@ struct ScenarioNotificationCompactReviewTests {
         fixture.base.queue.recordScenarioEvent(.init(id: "other-arrival", title: "Other display arrival"))
         fixture.base.queue.releaseScenarioEventVisibility(id: "other-arrival")
         fixture.base.queue.setNotificationScenarios([])
+        #expect(NSScreen.screens.allSatisfy { !$0.frame.intersects(fixture.window.frame) })
+        fixture.window.alphaValue = 0
+        fixture.window.orderFrontRegardless()
         await fixture.layout()
         let button = try #require(fixture.element("scenarioReview.open"))
-        let press = NSSelectorFromString("accessibilityPerformPress")
-        try #require(button.responds(to: press))
-        _ = button.perform(press)
+        func press(_ element: NSObject) throws -> Bool {
+            let selector = NSSelectorFromString("accessibilityPerformPress")
+            try #require(element.responds(to: selector))
+            // SwiftUI AX nodes expose the selector without declaring NSAccessibilityProtocol.
+            let action = unsafeBitCast(element.method(for: selector),
+                to: (@convention(c) (NSObject, Selector) -> Bool).self)
+            return action(element, selector)
+        }
+        #expect(try press(button))
         await fixture.layout()
         let reviewWindow = try #require(NSApplication.shared.windows.first {
             $0 !== fixture.window && $0.contentView.flatMap { fixture.element("scenarioReview.clear", in: $0) } != nil
         }, "The press must present the actual review contents for this display")
+        #expect(NSScreen.screens.allSatisfy { !$0.frame.intersects(reviewWindow.frame) })
         let reviewHost = try #require(reviewWindow.contentView)
         let labels = fixture.descendants(reviewHost).flatMap { element in
             ["accessibilityLabel", "accessibilityValue"].compactMap { key -> String? in
@@ -62,8 +72,7 @@ struct ScenarioNotificationCompactReviewTests {
         #expect(labels.contains("Recording arrival"))
         #expect(!labels.contains("Other display arrival"))
         let clear = try #require(fixture.element("scenarioReview.clear", in: reviewHost))
-        try #require(clear.responds(to: press))
-        _ = clear.perform(press)
+        #expect(try press(clear))
         await fixture.layout()
         #expect(fixture.base.queue.scenarioReview(displayIdentifier: fixture.scope).isEmpty)
         #expect(fixture.base.queue.scenarioReview(displayIdentifier: "other-display").map(\.title) == ["Other display arrival"])

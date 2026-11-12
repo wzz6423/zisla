@@ -18,7 +18,7 @@ struct ScreenRecordingOutputDirectorySettingsTests {
         let title = AppLocalization.string("保存位置", language: language)
         let results = SettingsSearchIndex.results(for: title, settings: settings, locale: language.locale)
             .filter { $0.section == .saveLocations }
-        #expect(Set(results.map(\.title)) == Set(["下载", "截图", "录屏", "快捷操作", "每日简报"]))
+        #expect(Set(results.map(\.title)) == Set(["下载", "PDF 工具", "图片工具", "截图", "录屏", "快捷操作", "每日简报"]))
         for result in results {
             #expect(result.anchor.localized(locale: language.locale)
                 == .row(AppLocalization.string(result.title, language: language)))
@@ -33,6 +33,8 @@ struct ScreenRecordingOutputDirectorySettingsTests {
         settings.screenRecordingEnabled = false
         settings.clipboardAssistantEnabled = false
         settings.dailyBriefing.enabled = false
+        settings.pdfToolsEnabled = false
+        settings.imageToolsEnabled = false
         #expect(SettingsSection.saveLocations.group == .others)
         #expect(SettingsSection.saveLocations.isVisible(settings: settings))
         let input = SettingsInput()
@@ -52,18 +54,18 @@ struct ScreenRecordingOutputDirectorySettingsTests {
         #expect(results.first?.section == .saveLocations)
     }
 
-    @Test @MainActor
-    func folderSelectionUsesTheCurrentLocationAndCancellationPreservesPreferences() throws {
+    @Test(arguments: [SaveLocation.screenshot, .pdfTools, .imageTools]) @MainActor
+    func folderSelectionUsesTheCurrentLocationAndCancellationPreservesPreferences(_ location: SaveLocation) throws {
         let fixture = try DirectoryFixture()
         defer { fixture.close() }
         let locations = SaveLocationStore(defaults: fixture.defaults)
-        try locations.setDirectory(fixture.directory, for: .screenshot)
+        try locations.setDirectory(fixture.directory, for: location)
         let preferences = (fixture.defaults.persistentDomain(forName: fixture.suite) ?? [:])
         let directories = locations.directories
         let panel = DirectoryPanel()
         defer { panel.close() }
 
-        try SettingsView.chooseSaveDirectory(.screenshot, locations: locations, panel: panel)
+        try SettingsView.chooseSaveDirectory(location, locations: locations, panel: panel)
 
         #expect(panel.directoryURL?.path == fixture.directory.path)
         #expect(!panel.canChooseFiles && panel.canChooseDirectories)
@@ -73,8 +75,8 @@ struct ScreenRecordingOutputDirectorySettingsTests {
             == NSDictionary(dictionary: preferences))
     }
 
-    @Test @MainActor
-    func selectedFolderUpdatesOnlyItsDefaultAndMissingOrInvalidSelectionsPreserveIt() throws {
+    @Test(arguments: [SaveLocation.quickActions, .pdfTools, .imageTools]) @MainActor
+    func selectedFolderUpdatesOnlyItsDefaultAndMissingOrInvalidSelectionsPreserveIt(_ selected: SaveLocation) throws {
         let fixture = try DirectoryFixture()
         defer { fixture.close() }
         let locations = SaveLocationStore(defaults: fixture.defaults)
@@ -83,25 +85,25 @@ struct ScreenRecordingOutputDirectorySettingsTests {
         panel.response = .OK
         panel.selectedURL = fixture.directory
 
-        try SettingsView.chooseSaveDirectory(.quickActions, locations: locations, panel: panel)
+        try SettingsView.chooseSaveDirectory(selected, locations: locations, panel: panel)
 
-        #expect(locations[.quickActions].path == fixture.directory.path)
-        for location in SaveLocation.allCases where location != .quickActions {
+        #expect(locations[selected].path == fixture.directory.path)
+        for location in SaveLocation.allCases where location != selected {
             #expect(locations[location] == AppPaths.downloads)
         }
         let preferences = (fixture.defaults.persistentDomain(forName: fixture.suite) ?? [:])
         panel.selectedURL = nil
-        try SettingsView.chooseSaveDirectory(.quickActions, locations: locations, panel: panel)
-        #expect(locations[.quickActions].path == fixture.directory.path)
+        try SettingsView.chooseSaveDirectory(selected, locations: locations, panel: panel)
+        #expect(locations[selected].path == fixture.directory.path)
         #expect(NSDictionary(dictionary: (fixture.defaults.persistentDomain(forName: fixture.suite) ?? [:]))
             == NSDictionary(dictionary: preferences))
         let file = fixture.directory.appendingPathComponent("existing.txt")
         try Data("existing".utf8).write(to: file)
         panel.selectedURL = file
         #expect(throws: (any Error).self) {
-            try SettingsView.chooseSaveDirectory(.quickActions, locations: locations, panel: panel)
+            try SettingsView.chooseSaveDirectory(selected, locations: locations, panel: panel)
         }
-        #expect(locations[.quickActions].path == fixture.directory.path)
+        #expect(locations[selected].path == fixture.directory.path)
         #expect(NSDictionary(dictionary: (fixture.defaults.persistentDomain(forName: fixture.suite) ?? [:]))
             == NSDictionary(dictionary: preferences))
         #expect(try Data(contentsOf: file) == Data("existing".utf8))
@@ -144,8 +146,8 @@ struct ScreenRecordingOutputDirectorySettingsTests {
             #expect(!value.isEmpty)
             #expect(value.components(separatedBy: "%@").count == key.components(separatedBy: "%@").count)
             #expect(AppLocalization.string(key, language: language) == value)
-            if language == .traditionalChinese && key == "快捷操作" {
-                #expect(value == "快捷操作")
+            if language == .traditionalChinese && ["快捷操作", "PDF 工具"].contains(key) {
+                #expect(value == key)
             } else if language != .simplifiedChinese {
                 #expect(value != key)
             }

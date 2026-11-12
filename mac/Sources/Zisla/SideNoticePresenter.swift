@@ -368,7 +368,6 @@ final class SideNoticePresenter {
         )
         if settingsStore.settings.effectiveStatusIconDestination == .island,
            sizing == nil || (selectedPriority == .systemMonitor && sizing?.customPillPresentation?.priority != nil),
-           !notices.contains(where: { $0.id.hasPrefix("scenario-review-") }),
            !suppression.isVoiceRecording, !suppression.isTransientNoticePresented,
            !(showsResultSweep && resultSweep.current != nil) {
             configuration.statusIconSize = IslandStatusIconLayout.size(icons: availableStatusIcons,

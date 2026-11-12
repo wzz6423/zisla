@@ -178,6 +178,29 @@ struct ScreenshotHDRTests {
         #expect(model.annotations == [annotation] && model.sdrImage === standard)
     }
 
+    @Test(arguments: ["bitmap", "coreImage"], [false, true])
+    func failedRenderingKeepsTheSelectedDynamicRange(stage: String, preservesHDR: Bool) throws {
+        let hdr = try Self.hdrImage()
+        let image = NSImage(cgImage: hdr, size: CGSize(width: hdr.width, height: hdr.height))
+        let model = ScreenshotEditorModel(image: image)
+        model.preservesHDR = preservesHDR
+        model.add(ScreenshotAnnotation(kind: .mosaic, rect: CGRect(x: 4, y: 4, width: 12, height: 8)))
+        var dependencies = ScreenshotEditorModel.RenderingDependencies()
+        if stage == "bitmap" { dependencies.makeBitmap = { _, _, _ in nil } }
+        else { dependencies.makeCoreImage = { _, _ in nil } }
+        model.renderingDependencies = dependencies
+        let rendered = model.renderedImage()
+        let result = try #require(rendered.cgImage(forProposedRect: nil, context: nil, hints: nil))
+        #expect(ScreenshotImageRendering.isHDR(result) == preservesHDR)
+        if stage == "coreImage" {
+            let preview = try #require(model.imageApplyingMosaics().cgImage(forProposedRect: nil, context: nil, hints: nil))
+            #expect(ScreenshotImageRendering.isHDR(preview) == preservesHDR)
+        }
+        #expect(throws: (any Error).self) { try model.renderedImage(requireCompleteRendering: true) }
+        #expect(model.pngData(requireCompleteRendering: true) == nil)
+        #expect(model.image === image && model.annotations.count == 1)
+    }
+
     @Test(arguments: [false, true], [Float(2), Float(4), Float(16)])
     func exportedPNGRoundTripsHighlightsAndTransparency(preservesHDR: Bool, highlight: Float) throws {
         let hdr = try Self.hdrImage(highlight: highlight)

@@ -43,6 +43,14 @@ struct NotificationScenarioLocalizationTests {
         #expect(toggle.count == 1 && toggle.first?.section == .features && toggle.first?.anchor == .row("启用场景通知策略"))
         #expect(SettingsSearchIndex.items(settings: settings).contains { $0.title == "按日历自动开启会议场景" } == enabled)
         #expect(SettingsSearchIndex.items(settings: settings).contains { $0.title == "手动开启会议场景" } == enabled)
+        for (key, section) in [("启用场景通知策略", SettingsSection.features),
+                               ("按日历自动开启会议场景", .info), ("手动开启会议场景", .info)] {
+            let title = AppLocalization.string(key, language: language)
+            let matches = SettingsSearchIndex.results(for: title, settings: settings, locale: language.locale)
+            #expect(matches.contains { $0.section == section && $0.anchor == .row(key) }
+                == (section == .features || enabled), "Search must target the current control in \(language.rawValue): \(key)")
+            #expect(SettingsSearchAnchor.row(key).localized(locale: language.locale) == .row(title))
+        }
     }
 
     private func runtimeKeys() throws -> Set<String> {

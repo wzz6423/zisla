@@ -19,7 +19,7 @@ public enum ClipboardAssistantDetector {
         installedApplications: [InstalledApplication] = [],
         shellCommandExists: @Sendable @escaping (String) -> Bool = { _ in false }
     ) async -> ClipboardAssistantDetection? {
-        await Task.detached(priority: .userInitiated) {
+        let task = Task.detached(priority: .userInitiated) {
             detect(
                 content: content,
                 enabledKinds: enabledKinds,
@@ -30,7 +30,12 @@ public enum ClipboardAssistantDetector {
                 installedApplications: installedApplications,
                 shellCommandExists: shellCommandExists
             )
-        }.value
+        }
+        return await withTaskCancellationHandler {
+            await task.value
+        } onCancel: {
+            task.cancel()
+        }
     }
 
     public static func detect(
@@ -48,6 +53,14 @@ public enum ClipboardAssistantDetector {
             guard enabledKinds.contains(.image) else { return nil }
             return imageDetection(data)
         case .file(let reference):
+            if enabledKinds.contains(.appCannotOpen), ApplicationOpenRepairService.needsRepair(at: reference.url) {
+                return ClipboardAssistantDetection(
+                    kind: .appCannotOpen,
+                    title: reference.displayName,
+                    detail: .localizedMessage("应用无法打开"),
+                    actions: [.repairAndOpenApp(reference.url)]
+                )
+            }
             guard enabledKinds.contains(.file) else { return nil }
             return fileDetection(reference)
         case .text(let value):
