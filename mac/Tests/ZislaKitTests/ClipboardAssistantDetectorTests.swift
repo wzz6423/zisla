@@ -1029,7 +1029,8 @@ struct ClipboardAssistantCurrencyDetectionTests {
         ClipboardAssistantDetector.detect(
             text: text,
             enabledKinds: allKinds,
-            preferredCurrencyCode: preferred
+            preferredCurrencyCode: preferred,
+            locale: Locale(identifier: "en_US_POSIX")
         )
     }
 
@@ -1256,7 +1257,7 @@ struct ClipboardAssistantCurrencyDetectionTests {
     func rejectsMalformedAndConflictingRegionalCurrencyAmounts(query: String) {
         #expect(ClipboardAssistantDetector.parseCurrencyConversion(query, preferredCurrencyCode: "EUR") == nil)
         #expect(ClipboardAssistantDetector.detect(
-            text: query, enabledKinds: [.conversion], preferredCurrencyCode: "EUR"
+            text: query, enabledKinds: [.conversion], preferredCurrencyCode: "EUR", locale: Locale(identifier: "en_US_POSIX")
         ) == nil)
     }
 
@@ -1268,7 +1269,7 @@ struct ClipboardAssistantCurrencyDetectionTests {
             ("AU$14,500", "CAD", "AUD"), ("SG$14,500", "AUD", "SGD"),
         ] {
             let result = ClipboardAssistantDetector.detect(
-                text: query, enabledKinds: allKinds, preferredCurrencyCode: preferred
+                text: query, enabledKinds: allKinds, preferredCurrencyCode: preferred, locale: Locale(identifier: "en_US_POSIX")
             )
             #expect(result?.detail == .currencyExpression(
                 amount: 14500, amountText: "14,500", sourceCurrencyCode: source, targetCurrencyCode: preferred
