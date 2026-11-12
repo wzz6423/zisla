@@ -585,6 +585,7 @@ public final class BrowserDownloadMonitor: ObservableObject {
     private var airDropEventStream: AirDropTransferEventStream?
     private var timer: AnyCancellable?
     private var finishedClearTask: Task<Void, Never>?
+    private var isResolvingFileNames = false
     private var lifecycle = BrowserDownloadMonitorLifecycle()
     private var isRunning = false
     private let directories: [URL]
@@ -592,6 +593,7 @@ public final class BrowserDownloadMonitor: ObservableObject {
     private let pollInterval: Double
     private let fileManager: FileManager
     private let holdSleeper: @Sendable (Duration) async throws -> Void
+    private let fileNameResolver: @Sendable ([URL: BrowserDownloadAgent]) async -> [URL: String]
 
     public convenience init() {
         self.init(directories: [Self.defaultDownloadsDirectory].compactMap { $0 })
@@ -604,6 +606,13 @@ public final class BrowserDownloadMonitor: ObservableObject {
         fileManager: FileManager = .default,
         holdSleeper: @escaping @Sendable (Duration) async throws -> Void = {
             try await Task.sleep(for: $0)
+        },
+        fileNameResolver: @escaping @Sendable ([URL: BrowserDownloadAgent]) async -> [URL: String] = { downloads in
+            await withCheckedContinuation { continuation in
+                DispatchQueue.global(qos: .utility).async {
+                    continuation.resume(returning: BrowserDownloadFileNameResolver().fileNames(for: downloads))
+                }
+            }
         }
     ) {
         self.directories = directories
@@ -611,6 +620,7 @@ public final class BrowserDownloadMonitor: ObservableObject {
         self.pollInterval = pollInterval
         self.fileManager = fileManager
         self.holdSleeper = holdSleeper
+        self.fileNameResolver = fileNameResolver
     }
 
     private static var defaultDownloadsDirectory: URL? {
@@ -676,6 +686,7 @@ public final class BrowserDownloadMonitor: ObservableObject {
         timer = nil
         finishedClearTask?.cancel()
         finishedClearTask = nil
+        isResolvingFileNames = false
         progressBoxes.removeAll()
         progressDirectories.removeAll()
         observedDownloads.removeAll()
@@ -776,13 +787,15 @@ public final class BrowserDownloadMonitor: ObservableObject {
             }
             if var observed = observedDownloads[identity] {
                 if fileManager.fileExists(atPath: fileURL.path) {
+                    let previousURL = observed.temporaryURL
                     let previousDirectory = observed.temporaryURL.deletingLastPathComponent()
                     observed.temporaryURL = fileURL
                     observed.missingSince = nil
                     observedDownloads[identity] = observed
                     tracker.update(
                         token: observed.token, fileURL: fileURL,
-                        fileName: BrowserDownloadAgentResolver.displayFileName(for: fileURL)
+                        fileName: previousURL == fileURL
+                            ? nil : BrowserDownloadAgentResolver.displayFileName(for: fileURL)
                     )
                     subscribe(to: directory, callbackGeneration: lifecycle.generation)
                     releaseUnusedSubscription(for: previousDirectory)
@@ -983,6 +996,7 @@ public final class BrowserDownloadMonitor: ObservableObject {
             tracker.update(token: token, fraction: publishedFraction)
         }
         refresh()
+        resolveFileNames()
         resolveCompletedTransfers()
         if progressBoxes.isEmpty && !completionTracker.hasPending && observedDownloads.isEmpty {
             timer?.cancel()
@@ -997,6 +1011,35 @@ public final class BrowserDownloadMonitor: ObservableObject {
     ) -> Bool {
         guard existingURL != currentURL else { return false }
         return agent != .airDrop || existingURL == nil
+    }
+
+    private func resolveFileNames() {
+        guard !isResolvingFileNames else { return }
+        let pending = tracker.entries.compactMap { token, entry -> (UUID, URL, BrowserDownloadAgent)? in
+            guard let url = entry.fileURL, let agent = entry.agent,
+                url.deletingPathExtension().pathExtension.isEmpty,
+                entry.fileName == BrowserDownloadAgentResolver.displayFileName(for: url)
+            else { return nil }
+            return (token, url, agent)
+        }
+        guard !pending.isEmpty else { return }
+        let downloads = pending.reduce(into: [URL: BrowserDownloadAgent]()) {
+            $0[$1.1] = $1.2
+        }
+        let resolver = fileNameResolver
+        let callbackGeneration = lifecycle.generation
+        isResolvingFileNames = true
+        Task { [weak self] in
+            let names = await resolver(downloads)
+            guard let self, self.lifecycle.accepts(callbackGeneration) else { return }
+            self.isResolvingFileNames = false
+            for (token, url, _) in pending {
+                guard let name = names[url],
+                    self.tracker.entries[token]?.fileURL == url else { continue }
+                self.tracker.update(token: token, fileURL: nil, fileName: name)
+            }
+            self.refresh()
+        }
     }
 
     private func startAirDropObservation(callbackGeneration: UInt64) {
