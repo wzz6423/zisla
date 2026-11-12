@@ -229,6 +229,64 @@ class AutomationWorkflowsTest < Minitest::Test
     end
   end
 
+  def test_swift_codeql_resolves_metal_before_initializing_the_tracer
+    job = YAML.load_file(File.join(ROOT, '.github/workflows/swift-tests.yml')).fetch('jobs').fetch('codeql')
+    steps = job.fetch('steps')
+    install = steps.find { |entry| entry['name'] == 'Install Metal toolchain' }
+    build = steps.find { |entry| entry['name'] == 'Build all Swift products for CodeQL' }
+    assert_equal 'metal', install.fetch('id')
+    assert_operator install.fetch('timeout-minutes'), :<=, 5
+    assert_operator steps.index(install), :<, steps.index { |entry| entry.fetch('uses', '').start_with?('github/codeql-action/init@') }
+    assert_equal '${{ steps.metal.outputs.compiler }}', build.fetch('env').fetch('ZISLA_METAL_COMPILER')
+
+    compiler = File.join(@directory, 'downloaded toolchain/usr/bin/metal')
+    FileUtils.mkdir_p(File.dirname(compiler))
+    File.write(compiler, <<~'SCRIPT')
+      #!/usr/bin/env ruby
+      abort 'unexpected compiler probe' unless ARGV == ['--version']
+      exit 1 if ENV['METAL_STATE'] == 'unusable' && !File.exist?(File.join(ENV.fetch('RUNNER_TEMP'), 'installed'))
+    SCRIPT
+    File.chmod(0o755, compiler)
+    %w[xcodebuild xcrun].each do |name|
+      tool = File.join(@directory, 'bin', name)
+      File.write(tool, <<~'SCRIPT')
+        #!/usr/bin/env ruby
+        require 'json'
+        name = File.basename($PROGRAM_NAME)
+        File.open(ENV.fetch('CAPTURE'), 'a') { |file| file.puts JSON.generate(command: name, args: ARGV) }
+        if name == 'xcodebuild'
+          abort 'unexpected component' unless ARGV == %w[-downloadComponent MetalToolchain]
+          exit 42 if ENV['METAL_STATE'] == 'download-failed'
+          File.write(File.join(ENV.fetch('RUNNER_TEMP'), 'installed'), '')
+        else
+          abort 'unexpected Metal lookup' unless ARGV == %w[--find metal]
+          state = ENV['METAL_STATE']
+          installed = File.exist?(File.join(ENV.fetch('RUNNER_TEMP'), 'installed'))
+          abort 'Metal toolchain unavailable' if state == 'missing-after-download' || (%w[missing download-failed].include?(state) && !installed)
+          puts File.join(ENV.fetch('RUNNER_TEMP'), 'downloaded toolchain/usr/bin/metal')
+        end
+      SCRIPT
+      File.chmod(0o755, tool)
+    end
+    output_path = File.join(@directory, 'outputs')
+    %w[installed missing unusable download-failed missing-after-download].each do |state|
+      File.write(output_path, '')
+      File.write(File.join(@directory, 'calls.jsonl'), '')
+      FileUtils.rm_f(File.join(@directory, 'installed'))
+      output, status = run_step(install, 'GITHUB_OUTPUT' => output_path, 'METAL_STATE' => state)
+      if %w[download-failed missing-after-download].include?(state)
+        refute status.success?, output
+        assert_empty File.read(output_path)
+        assert_equal 42, status.exitstatus if state == 'download-failed'
+      else
+        assert status.success?, output
+        assert_equal "compiler=#{compiler}\n", File.read(output_path)
+        expected = state == 'installed' ? %w[xcrun] : %w[xcrun xcodebuild xcrun]
+        assert_equal expected, calls.map { |call| call.fetch('command') }, state
+      end
+    end
+  end
+
   def test_swift_suite_budget_leaves_time_after_the_recorded_runner_timeout
     job = YAML.load_file(File.join(ROOT, '.github/workflows/swift-tests.yml')).fetch('jobs').fetch('test-suites')
     # Job 126661163650 exceeded 30 minutes while its isolated suites were still running.

@@ -15,7 +15,7 @@ struct AudioToolsModuleTests {
         #expect(SettingsSection.audioTools.group == .files)
         #expect(SettingsSection.audioTools.isVisible(settings: settings) == audio)
         #expect(SettingsSection.pdfTools.isVisible(settings: settings) == other)
-        #expect(SettingsSection.allCases.filter { $0.group == .files } == [.pdfTools, .audioTools])
+        #expect(SettingsSection.allCases.filter { $0.group == .files } == [.pdfTools, .imageTools, .audioTools])
     }
 
     @Test(arguments: AudioToolOperation.allCases)

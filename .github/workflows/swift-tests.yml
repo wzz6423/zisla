@@ -183,7 +183,16 @@ jobs:
         with:
           persist-credentials: false
       - name: Install Metal toolchain
-        run: xcodebuild -downloadComponent MetalToolchain
+        id: metal
+        timeout-minutes: 5
+        run: |
+          set -euo pipefail
+          if ! compiler="$(xcrun --find metal)" || ! "$compiler" --version; then
+            xcodebuild -downloadComponent MetalToolchain
+            compiler="$(xcrun --find metal)"
+            "$compiler" --version
+          fi
+          echo "compiler=$compiler" >> "$GITHUB_OUTPUT"
       - uses: github/codeql-action/init@33d7b85da1a04171e211befe2c739303b9a4c066 # v4.39.3
         with:
           languages: swift
@@ -192,6 +201,8 @@ jobs:
       - name: Build all Swift products for CodeQL
         # Keep ARM64/DEBUG coverage and emit modules in the same pass to avoid a second traced frontend.
         # WMO needs an explicit thread count for SwiftPM's object-file map.
+        env:
+          ZISLA_METAL_COMPILER: ${{ steps.metal.outputs.compiler }}
         run: swift build --arch arm64 -Xswiftc -whole-module-optimization -Xswiftc -num-threads -Xswiftc 1 -Xswiftc -no-emit-module-separately-wmo
       - uses: github/codeql-action/analyze@33d7b85da1a04171e211befe2c739303b9a4c066 # v4.39.3
         with:

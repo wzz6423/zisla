@@ -606,7 +606,8 @@ struct AIAccountBalanceViewTests {
     }
 
 
-    @Test func rotatingAccountsWithEqualQuotaTextRestartAtTheBeginningAndSamePollKeepsProgress() async throws {
+    @Test(arguments: [false, true])
+    func rotatingAccountsWithEqualQuotaTextRestartAtTheBeginningAndSamePollKeepsProgress(inheritedReduceMotion: Bool) async throws {
         let queue = SideNoticeQueue(), controller = AIAccountBalanceNoticeController(queue: queue,
             now: { Date(timeIntervalSince1970: 100) })
         defer { queue.removeAll() }
@@ -629,13 +630,15 @@ struct AIAccountBalanceViewTests {
             CompactAIAccountBalanceBar(notice: notice, height: 34, edge: .left)
                 .frame(width: size.width, height: size.height).background(.black).foregroundStyle(.white)
                 .environment(\.colorScheme, .dark)
+                .environment(\._accessibilityReduceMotion, false)
                 .transaction { transaction in
                     if transaction.animation != nil, !transaction.disablesAnimations {
                         transaction.animation = Animation(FrozenProgress(progress: progress))
                     }
                 }
         }
-        let host = NSHostingView(rootView: content(first, progress: 1))
+        let host = NSHostingView(rootView: content(first, progress: 1)
+            .environment(\._accessibilityReduceMotion, inheritedReduceMotion))
         host.sizingOptions = []
         let panel = NSPanel(contentRect: CGRect(origin: CGPoint(x: 20_000, y: 0), size: size),
             styleMask: .borderless, backing: .buffered, defer: false)
@@ -665,11 +668,13 @@ struct AIAccountBalanceViewTests {
         let tail = try await sample()
         controller.update(balances: rows, settings: settings, language: .english, at: Date(timeIntervalSince1970: 101))
         host.rootView = content(try #require(queue.left.first), progress: 0)
+            .environment(\._accessibilityReduceMotion, inheritedReduceMotion)
         #expect(try changes(tail, await sample()) == 0, "The same account's ordinary poll must not restart its reading")
         controller.updatePinned(at: Date(timeIntervalSince1970: 120))
         let rotated = try #require(queue.left.first)
         #expect(rotated.metadata?["quotaAccountID"] == "codex")
         host.rootView = content(rotated, progress: 0)
+            .environment(\._accessibilityReduceMotion, inheritedReduceMotion)
         let restarted = try await sample()
         let beginning = try await renderOffscreen(content(rotated, progress: 0), size: size)
         #expect(try changes(restarted, beginning) == 0, "A new account with identical lines must start from its first quota viewport")
