@@ -211,14 +211,27 @@ struct DailyBriefingPoster: View {
                         Spacer(minLength: 12)
                         Text("\(AIUsageAnalytics.formatTokenAxisValue(usage.totalTokens)) Token").monospacedDigit()
                     }
-                    ForEach(usage.models) { model in
-                        VStack(alignment: .leading, spacing: 6) {
-                            Text(DailyModelUsageList.modelName(model, language: language))
-                                .font(.system(size: 17, weight: .medium))
-                            Text(DailyModelUsageList.tokenBreakdown(model, language: language))
-                                .font(.system(size: 15).monospacedDigit()).foregroundStyle(ink.opacity(0.65))
+                    ForEach(DailyModelUsageList.providerGroups(usage.models)) { group in
+                        VStack(alignment: .leading, spacing: 8) {
+                            HStack(spacing: 8) {
+                                if let identity = group.identity {
+                                    AIMascotView(identity: identity, size: 20)
+                                        .environment(\.colorScheme, template == .midnight || template == .terminal ? .dark : .light)
+                                }
+                                Text(group.name(locale: locale)).font(.system(size: 18, weight: .semibold))
+                            }
+                            ForEach(group.models) { model in
+                                HStack(alignment: .firstTextBaseline, spacing: 12) {
+                                    Text(DailyModelUsageList.modelName(model, locale: locale))
+                                        .font(.system(size: 17, weight: .medium))
+                                        .lineLimit(1).truncationMode(.middle)
+                                        .frame(maxWidth: .infinity, alignment: .leading)
+                                    Text(DailyModelUsageList.tokenBreakdown(model, locale: locale))
+                                        .font(.system(size: 15).monospacedDigit()).foregroundStyle(ink.opacity(0.65))
+                                        .fixedSize()
+                                }
+                            }
                         }
-                        .fixedSize(horizontal: false, vertical: true)
                     }
                 }
             }

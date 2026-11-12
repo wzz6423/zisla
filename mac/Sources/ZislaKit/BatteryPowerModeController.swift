@@ -2,6 +2,7 @@ import Combine
 import Darwin
 import Foundation
 import Security
+import ZislaCore
 
 @_silgen_name("AuthorizationExecuteWithPrivileges")
 private func zislaAuthorizationExecuteWithPrivileges(
@@ -24,8 +25,9 @@ final class BatteryPowerModeAuthorizationSession: @unchecked Sendable {
         }
     }
 
-    func execute(arguments: [String]) -> AIAgentProcessOutput {
-        let (status, pipe) = launch(path: "/usr/bin/pmset", arguments: arguments)
+    func execute(arguments: [String], authorizationPrepared: Bool = false) -> AIAgentProcessOutput {
+        let (status, pipe) = launch(path: "/usr/bin/pmset", arguments: arguments,
+            authorizationPrepared: authorizationPrepared)
         var output = Data()
         if let pipe {
             let fileHandle = FileHandle(fileDescriptor: fileno(pipe), closeOnDealloc: false)
@@ -47,11 +49,20 @@ final class BatteryPowerModeAuthorizationSession: @unchecked Sendable {
         ])
     }
 
-    private func launch(path: String, arguments: [String]) -> (OSStatus, UnsafeMutablePointer<FILE>?) {
+    func prepareAuthorization() -> OSStatus {
+        lock.withLock { authorize().status }
+    }
+
+    private func launch(
+        path: String, arguments: [String], authorizationPrepared: Bool = false
+    ) -> (OSStatus, UnsafeMutablePointer<FILE>?) {
         lock.lock()
         defer { lock.unlock() }
 
-        guard let authorization = authorize() else {
+        if authorizationPrepared, Task.isCancelled {
+            return (errAuthorizationCanceled, nil)
+        }
+        guard let authorization = authorizationPrepared ? self.authorization : authorize().reference else {
             return (errAuthorizationDenied, nil)
         }
 
@@ -83,16 +94,17 @@ final class BatteryPowerModeAuthorizationSession: @unchecked Sendable {
         return (status, pipe)
     }
 
-    private func authorize() -> AuthorizationRef? {
+    private func authorize() -> (reference: AuthorizationRef?, status: OSStatus) {
         if let authorization {
-            return authorization
+            return (authorization, errAuthorizationSuccess)
         }
 
         var created: AuthorizationRef?
-        guard AuthorizationCreate(nil, nil, [], &created) == errAuthorizationSuccess,
+        let creationStatus = AuthorizationCreate(nil, nil, [], &created)
+        guard creationStatus == errAuthorizationSuccess,
               let created
         else {
-            return nil
+            return (nil, creationStatus)
         }
 
         let result = kAuthorizationRightExecute.withCString { name in
@@ -110,18 +122,14 @@ final class BatteryPowerModeAuthorizationSession: @unchecked Sendable {
         }
         guard result == errAuthorizationSuccess else {
             AuthorizationFree(created, [])
-            return nil
+            return (nil, result)
         }
         authorization = created
-        return created
+        return (created, errAuthorizationSuccess)
     }
 }
 
-public enum BatteryPowerMode: Int, CaseIterable, Sendable {
-    case automatic = 0
-    case lowPower = 1
-    case highPower = 2
-}
+public typealias BatteryPowerMode = ZislaCore.BatteryPowerMode
 
 public enum BatteryPowerSource: String, Sendable {
     case battery = "Battery Power"
@@ -147,6 +155,7 @@ public enum BatteryPowerModeError: Error, Equatable, Sendable {
 
 @MainActor
 public final class BatteryPowerModeController: ObservableObject {
+    public static let manualModeChangeNotification = Notification.Name("zisla.battery-power-mode.manual-change")
     @Published public private(set) var currentMode: BatteryPowerMode?
     @Published public private(set) var supportedModes: [BatteryPowerMode] = []
     @Published public private(set) var powerSource: BatteryPowerSource?
@@ -154,12 +163,16 @@ public final class BatteryPowerModeController: ObservableObject {
     @Published public private(set) var error: BatteryPowerModeError?
 
     typealias CommandRunner = @MainActor (URL, [String], TimeInterval) async throws -> AIAgentProcessOutput
+    typealias AuthorizationPreparer = @MainActor () async throws -> OSStatus
 
     private let runCommand: CommandRunner
     private let runPrivilegedCommand: CommandRunner
+    private let runAuthorizedCommand: CommandRunner
+    private let prepareAuthorization: AuthorizationPreparer
+    private let notificationCenter: NotificationCenter
     private var refreshRevision = 0
 
-    public convenience init() {
+    public convenience init(notificationCenter: NotificationCenter = .default) {
         self.init(
             runCommand: { executableURL, arguments, timeout in
                 try await AIAgentProcessRunner.run(
@@ -174,21 +187,49 @@ public final class BatteryPowerModeController: ObservableObject {
                 await Task.detached(priority: .userInitiated) {
                     BatteryPowerModeAuthorizationSession.shared.execute(arguments: arguments)
                 }.value
-            }
+            },
+            runAuthorizedCommand: { _, arguments, _ in
+                let execution = Task.detached(priority: .userInitiated) {
+                    return BatteryPowerModeAuthorizationSession.shared.execute(arguments: arguments,
+                        authorizationPrepared: true)
+                }
+                return await withTaskCancellationHandler {
+                    await execution.value
+                } onCancel: { execution.cancel() }
+            },
+            prepareAuthorization: {
+                await Task.detached(priority: .userInitiated) {
+                    BatteryPowerModeAuthorizationSession.shared.prepareAuthorization()
+                }.value
+            },
+            notificationCenter: notificationCenter
         )
     }
 
-    init(runCommand: @escaping CommandRunner) {
+    init(
+        runCommand: @escaping CommandRunner,
+        notificationCenter: NotificationCenter = .default,
+        prepareAuthorization: @escaping AuthorizationPreparer = { errAuthorizationSuccess }
+    ) {
         self.runCommand = runCommand
         self.runPrivilegedCommand = runCommand
+        self.runAuthorizedCommand = runCommand
+        self.prepareAuthorization = prepareAuthorization
+        self.notificationCenter = notificationCenter
     }
 
     private init(
         runCommand: @escaping CommandRunner,
-        runPrivilegedCommand: @escaping CommandRunner
+        runPrivilegedCommand: @escaping CommandRunner,
+        runAuthorizedCommand: @escaping CommandRunner,
+        prepareAuthorization: @escaping AuthorizationPreparer,
+        notificationCenter: NotificationCenter
     ) {
         self.runCommand = runCommand
         self.runPrivilegedCommand = runPrivilegedCommand
+        self.runAuthorizedCommand = runAuthorizedCommand
+        self.prepareAuthorization = prepareAuthorization
+        self.notificationCenter = notificationCenter
     }
 
     public func refresh() async {
@@ -214,8 +255,14 @@ public final class BatteryPowerModeController: ObservableObject {
 
     /// macOS saves each power source separately; authorization must not change the other profile.
     @discardableResult
-    public func setMode(_ mode: BatteryPowerMode) async -> Bool {
+    public func setMode(
+        _ mode: BatteryPowerMode,
+        expectedState: (source: BatteryPowerSource, mode: BatteryPowerMode)? = nil
+    ) async -> Bool {
         guard !isChanging else { return false }
+        if expectedState == nil {
+            notificationCenter.post(name: Self.manualModeChangeNotification, object: self)
+        }
         isChanging = true
         refreshRevision += 1
         error = nil
@@ -230,16 +277,45 @@ public final class BatteryPowerModeController: ObservableObject {
             self.error = Self.presentedError(error, fallback: .stateUnavailable)
             return false
         }
+        guard !Task.isCancelled else { return false }
+        if let expectedState {
+            guard before.powerSource == expectedState.source,
+                  before.modes[before.powerSource] == expectedState.mode else { return false }
+        }
         guard before.supportedModes.contains(mode) else {
             error = .unsupportedMode
             return false
         }
         guard before.modes[before.powerSource] != mode else { return true }
 
+        let changeCommand: CommandRunner
+        if let expectedState {
+            do {
+                let status = try await prepareAuthorization()
+                try Self.checkChangeResult(AIAgentProcessOutput(status: status, standardOutput: Data(),
+                    standardError: "", didTimeout: false))
+                guard !Task.isCancelled else { return false }
+                let latest = try await readSnapshot()
+                apply(latest)
+                guard !Task.isCancelled, latest.powerSource == expectedState.source,
+                      latest.modes[latest.powerSource] == expectedState.mode else { return false }
+                guard latest.supportedModes.contains(mode) else {
+                    error = .unsupportedMode
+                    return false
+                }
+            } catch {
+                self.error = Self.presentedError(error, fallback: .authorizationDenied)
+                return false
+            }
+            changeCommand = runAuthorizedCommand
+        } else {
+            changeCommand = runPrivilegedCommand
+        }
+
         let setting = before.supportedModes.contains(.highPower) ? "powermode" : "lowpowermode"
         var changeError: BatteryPowerModeError?
         do {
-            let output = try await runPrivilegedCommand(
+            let output = try await changeCommand(
                 URL(fileURLWithPath: "/usr/bin/pmset"),
                 [before.powerSource.argument, setting, String(mode.rawValue)],
                 120

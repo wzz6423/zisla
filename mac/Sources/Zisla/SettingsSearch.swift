@@ -6,12 +6,14 @@ enum SettingsSearchAnchor: Hashable {
     case row(String)
     case group(String)
     case pdfOperation(PDFToolOperation)
+    case imageOperation(ImageToolOperation)
+    case audioOperation(AudioToolOperation)
 
     func localized(locale: Locale) -> Self {
         switch self {
         case .row(let key): .row(AppLocalization.string(key, locale: locale))
         case .group(let key): .group(AppLocalization.string(key, locale: locale))
-        case .pdfOperation: self
+        case .pdfOperation, .imageOperation, .audioOperation: self
         }
     }
 }
@@ -72,27 +74,49 @@ enum SettingsSearchIndex {
         rows(.features, [
             "每日简报",
             "显示推荐工具", "媒体播放", "Mac 未使用时关闭背景音", "中转站", "晃动唤出中转窗口",
-            "链接下载", "剪贴板历史", "自动删除剪贴板历史", "剪贴板链接检测", "快捷操作", "日历日程", "天气", "邮件",
+            "链接下载", "剪贴板历史", "剪贴板链接检测", "快捷操作", "日历日程", "天气", "邮件",
             "侧翼通知", "锁屏信息", "专注倒计时", "工具箱提醒", "用户关怀", "AI 进度与用量", "AI 任务结果扫光",
-            "语音输入", "窗口预览", "小工具", "随记", "PDF 工具", "应用音量混音器",
+            "语音输入", "窗口预览", "小工具", "随记", "PDF 工具", "图片工具", "音频工具", "应用音量混音器",
             "键盘音效", "合盖动画", "预览动画", "启用截图", "鼠标移入展开", "显示 zisla 图标",
             "始终置顶", "提示条进度光效", "浏览器下载进度", "原生下载进度", "静音 Zisla 通知",
             "宠物", "自动检查更新", "自动下载更新",
         ])
         entry(.features, "系统状态与清理", anchor: .row("系统状态与清理"),
               keywords: ["电池监控"])
+        entry(.features, "自动切换电源模式", anchor: .row("自动切换电源模式"),
+              keywords: ["电源模式"])
+        if settings.systemMonitorEnabled && settings.automaticPowerModeEnabled {
+            entry(.scheduledCleanup, "插电默认模式", anchor: .row("插电默认模式"),
+                  keywords: ["电源模式"] + BatteryPowerMode.allCases.map(\.menuTitle))
+            entry(.scheduledCleanup, "脱电默认模式", anchor: .row("脱电默认模式"),
+                  keywords: ["电源模式"] + BatteryPowerMode.allCases.map(\.menuTitle))
+            entry(.scheduledCleanup, "20%及以下固定省电", anchor: .row("20%及以下固定省电"),
+                  keywords: ["电量不高于20%时保持省电，插电也不切换；超过20%后恢复对应默认模式"])
+        }
         if settings.recommendedToolsEnabled {
             rows(.features, ["自动更新推荐工具"])
         }
         if settings.systemMonitorEnabled {
-            entry(.features, "自动清理系统垃圾", anchor: .row("自动清理系统垃圾"),
+            entry(.scheduledCleanup, "自动清理系统垃圾", anchor: .row("自动清理系统垃圾"),
                   keywords: ["系统状态与清理"] + VoiceRecordingCleanupPolicy.allCases.map(\.menuTitle))
-            entry(.features, "清理范围", anchor: .row("清理范围"),
+            entry(.scheduledCleanup, "清理范围", anchor: .row("清理范围"),
                   keywords: ["自动清理系统垃圾"] + SystemCleanupScope.allCases.map(\.menuTitle))
         }
+        entry(.scheduledCleanup, "自动删除剪贴板历史", anchor: .row("自动删除剪贴板历史"),
+              keywords: ["按所选周期删除过期历史，常用项目继续保留"] + VoiceRecordingCleanupPolicy.allCases.map(\.menuTitle))
+        entry(.scheduledCleanup, "定时倾倒废纸篓", anchor: .row("定时倾倒废纸篓"),
+              keywords: ["按所选间隔永久删除废纸篓中的所有项目，无法恢复"] + VoiceRecordingCleanupPolicy.allCases.map(\.menuTitle))
 
         for operation in PDFToolOperation.allCases {
             entry(.pdfTools, operation.title, anchor: .pdfOperation(operation), keywords: [operation.detail])
+        }
+        for operation in ImageToolOperation.allCases {
+            entry(.imageTools, operation.title, anchor: .imageOperation(operation),
+                  keywords: [operation.detail, "PNG", "JPEG", "WebP", "AVIF", "JPEG XL", "HEIC", "SVG", "TinyPNG"])
+        }
+        for operation in AudioToolOperation.allCases {
+            entry(.audioTools, operation.title, anchor: .audioOperation(operation),
+                  keywords: [operation.detail, "FFmpeg"] + AudioExportFormat.allCases.map(\.title))
         }
 
         entry(.info, "灵动岛功能顺序", anchor: .group("灵动岛功能顺序"),
@@ -148,6 +172,8 @@ enum SettingsSearchIndex {
             "地址", "航班", "火车车次", "快递单号", "会议日程", "Emoji 名称", "代码", "Shell 命令",
             "应用程序", "非 Zisla 全局语言文本", "文本", "图片", "文件", "主动作", "恢复默认顺序",
             "单位换算", "金额换算", "日期加减", "日期间隔", "跨时区时间",
+            "应用无法打开", "解决并打开", "使用方法", ".app", "dmg", "隔离标记",
+            "系统打不开应用时提醒", "辅助功能", "监听",
         ])
 
         entry(.screenshot, "截图快捷键", anchor: .row("截图快捷键"), keywords: ["输入监控"])
@@ -169,7 +195,7 @@ enum SettingsSearchIndex {
         rows(.mail, ["新邮件展示"])
         entry(.mail, "邮件账户", anchor: .group("邮件"))
         rows(.keyboardSound, ["键盘音色", "键盘音量", "播放键盘回弹音", "自然音高变化", "记录本地输入统计"])
-        for tool in [ManagedTool.ytDLP, .libreOffice] {
+        for tool in [ManagedTool.ytDLP, .libreOffice, .libvips, .libavif] {
             entry(.download, tool.displayName, anchor: .row(tool.displayName), keywords: ["下载", "Downloads"])
         }
         for location in SaveLocation.allCases {

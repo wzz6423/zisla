@@ -43,6 +43,8 @@ public enum ManagedTool: String, CaseIterable, Identifiable, Sendable {
     case rclone
     case posting
     case poppler
+    case libvips
+    case libavif
     case wireshark
     case mysql
     case cmake
@@ -67,6 +69,7 @@ public enum ManagedTool: String, CaseIterable, Identifiable, Sendable {
     case packer
     case ytt
     case ytDLP
+    case ffmpeg
     case libreOffice
     case keka
     case openScreen
@@ -96,6 +99,8 @@ public enum ManagedTool: String, CaseIterable, Identifiable, Sendable {
         case .rclone: "rclone"
         case .posting: "Posting"
         case .poppler: "Poppler"
+        case .libvips: "libvips"
+        case .libavif: "libavif"
         case .wireshark: "Wireshark"
         case .mysql: "MySQL"
         case .cmake: "CMake"
@@ -120,6 +125,7 @@ public enum ManagedTool: String, CaseIterable, Identifiable, Sendable {
         case .packer: "Packer"
         case .ytt: "ytt"
         case .ytDLP: "yt-dlp"
+        case .ffmpeg: "FFmpeg"
         case .libreOffice: "LibreOffice"
         case .keka: "Keka"
         case .openScreen: "OpenScreen"
@@ -149,6 +155,8 @@ public enum ManagedTool: String, CaseIterable, Identifiable, Sendable {
         case .rclone: "云存储同步"
         case .posting: "终端 API 客户端"
         case .poppler: "PDF 处理工具集"
+        case .libvips: "本地图片压缩与转换"
+        case .libavif: "AVIF 动画压缩与转换"
         case .wireshark: "网络数据包分析"
         case .mysql: "关系数据库与客户端"
         case .cmake: "跨平台构建配置"
@@ -173,6 +181,7 @@ public enum ManagedTool: String, CaseIterable, Identifiable, Sendable {
         case .packer: "机器镜像构建"
         case .ytt: "YAML 模板工具"
         case .ytDLP: "视频音频下载"
+        case .ffmpeg: "音频与视频处理"
         case .libreOffice: "Office 转 PDF"
         case .keka: "压缩与解压"
         case .openScreen: "录屏与视频编辑"
@@ -203,6 +212,8 @@ public enum ManagedTool: String, CaseIterable, Identifiable, Sendable {
         case .rclone: "rclone"
         case .posting: "posting"
         case .poppler: "pdftotext"
+        case .libvips: "vips"
+        case .libavif: "avifenc"
         case .wireshark: "tshark"
         case .mysql: "mysql"
         case .cmake: "cmake"
@@ -227,6 +238,7 @@ public enum ManagedTool: String, CaseIterable, Identifiable, Sendable {
         case .packer: "packer"
         case .ytt: "ytt"
         case .ytDLP: "yt-dlp"
+        case .ffmpeg: "ffmpeg"
         case .libreOffice: "soffice"
         case .keka: "keka"
         case .openScreen: "Openscreen"
@@ -256,6 +268,8 @@ public enum ManagedTool: String, CaseIterable, Identifiable, Sendable {
         case .rclone: .homebrewFormula(name: "rclone")
         case .posting: .homebrewFormula(name: "posting")
         case .poppler: .homebrewFormula(name: "poppler")
+        case .libvips: .homebrewFormula(name: "vips")
+        case .libavif: .homebrewFormula(name: "libavif")
         case .wireshark: .homebrewFormula(name: "wireshark")
         case .mysql: .homebrewFormula(name: "mysql")
         case .cmake: .homebrewFormula(name: "cmake")
@@ -280,6 +294,7 @@ public enum ManagedTool: String, CaseIterable, Identifiable, Sendable {
         case .packer: .homebrewFormula(name: "hashicorp/tap/packer")
         case .ytt: .homebrewFormula(name: "ytt")
         case .ytDLP: .githubRelease(repository: "yt-dlp/yt-dlp")
+        case .ffmpeg: .homebrewFormula(name: "ffmpeg")
         case .libreOffice: .homebrewCask(name: "libreoffice")
         case .keka: .homebrewCask(name: "keka")
         case .openScreen: .homebrewCask(name: "getopenscreen/openscreen/openscreen")
@@ -311,7 +326,7 @@ public enum ManagedTool: String, CaseIterable, Identifiable, Sendable {
              .openJDK17, .maven, .groovy, .cocoaPods, .pyenv, .pipx, .uv, .pnpm, .tectonic,
              .packer, .ytt:
             .developmentToolchain
-        case .ytDLP, .libreOffice, .keka:
+        case .ytDLP, .ffmpeg, .libreOffice, .keka, .libvips, .libavif:
             .utility
         case .openScreen, .kaku, .markdownPreview, .quietMD, .zshell, .dockDoor:
             .desktopApplication
@@ -366,6 +381,7 @@ public enum ManagedTool: String, CaseIterable, Identifiable, Sendable {
         switch self {
         case .go: ["version"]
         case .poppler: ["-v"]
+        case .ffmpeg: ["-version"]
         default: ["--version"]
         }
     }

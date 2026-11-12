@@ -444,7 +444,7 @@ struct ScreenshotCaptureCoordinateTests {
         let image = NSImage(cgImage: cgImage, size: screen.frame.size)
         var panels: [ScreenshotSelectionPanel] = []
         let controller = ScreenshotSelectionController(
-            captureScreen: { _ in (image, cgImage) },
+            captureScreen: { _ in (image, cgImage, nil) },
             presentPanels: { panels = $0 },
             snapTargets: { _ in [] }
         )

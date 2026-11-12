@@ -219,23 +219,25 @@ struct AIUsageHistorySettingsActions: View {
 
 struct AIUsageHistoryContent: View {
     @ObservedObject var controller: AIUsageHistoryController
+    var now: () -> Date = { .now }
+    @Environment(\.locale) private var locale
     @State private var range: SystemMetricsHistoryRange = .default
-    @State private var selectedDate = Calendar.current.startOfDay(for: Date())
+    @State private var selectedDate: Date?
     @State private var heatmapYear = Calendar.current.startOfDay(for: Date())
     @State private var confirmsClear = false
 
     private var domain: ClosedRange<Date> {
-        AIUsageHistoryPresentation.domain(history: controller.history, range: range, now: .now)
+        AIUsageHistoryPresentation.domain(history: controller.history, range: range, now: now())
     }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
             HStack {
-                Text(AppLocalization.text("AI 用量历史")).font(.system(size: 16, weight: .semibold))
+                Text(AppLocalization.string("AI 用量历史", locale: locale)).font(.system(size: 16, weight: .semibold))
                 Spacer()
-                Button(AppLocalization.text("清空"), role: .destructive) { confirmsClear = true }
+                Button(AppLocalization.string("清空", locale: locale), role: .destructive) { confirmsClear = true }
                     .disabled(controller.isBusy || controller.isLoading || controller.history.usageSamples.isEmpty)
-                Button(AppLocalization.text("导出")) {
+                Button(AppLocalization.string("导出", locale: locale)) {
                     if let destination = AIUsageHistoryExporter.chooseDestination() {
                         Task { await controller.export(to: destination) }
                     }
@@ -245,54 +247,70 @@ struct AIUsageHistoryContent: View {
             }
             .controlSize(.small)
             HStack {
-                Text(AppLocalization.text("时间范围")).font(.system(size: 11)).foregroundStyle(.secondary)
+                Text(AppLocalization.string("时间范围", locale: locale)).font(.system(size: 11)).foregroundStyle(.secondary)
                 Picker("", selection: $range) {
                     ForEach(SystemMetricsHistoryRange.allCases, id: \.self) { range in
-                        Text(AppLocalization.text(range.titleKey)).tag(range)
+                        Text(AppLocalization.string(range.titleKey, locale: locale)).tag(range)
                     }
                 }
                 .labelsHidden().pickerStyle(.segmented).frame(width: 280)
                 Spacer()
-                IconButton(symbol: "arrow.clockwise", help: AppLocalization.text("刷新"), size: .compact) {
+                IconButton(symbol: "arrow.clockwise", help: AppLocalization.string("刷新", locale: locale), size: .compact) {
                     Task { await controller.load() }
                 }.disabled(controller.isLoading || controller.isBusy)
             }
             Divider()
             if controller.isLoading, controller.history.usageSamples.isEmpty {
-                ProgressView(AppLocalization.text("正在读取历史记录")).frame(maxWidth: .infinity, maxHeight: .infinity)
+                ProgressView(AppLocalization.string("正在读取历史记录", locale: locale)).frame(maxWidth: .infinity, maxHeight: .infinity)
             } else {
                 ScrollView {
                     VStack(alignment: .leading, spacing: 16) {
                         if case let .failed(message) = controller.loadState {
                             Text(message).foregroundStyle(.red)
-                            Button(AppLocalization.text("重试")) { Task { await controller.load() } }
+                            Button(AppLocalization.string("重试", locale: locale)) { Task { await controller.load() } }
                         }
-                        UsageTrendChart(series: AIUsageHistoryPresentation.trend(history: controller.history, domain: domain),
-                            selectedDate: $selectedDate, domain: domain).frame(height: 180)
-                        heatmap
-                        DailyModelUsageList(day: AIUsageHistoryPresentation.selectedDay(in: controller.history, date: selectedDate))
-                    }.padding(.bottom, 4)
-                }.thinScrollChrome()
+                        if range == .day {
+                            Button { selectedDate = domain.lowerBound } label: {
+                                Text(domain.lowerBound, format: .dateTime.year().month().day())
+                            }
+                            .buttonStyle(.plain)
+                            .font(.system(size: 11, weight: selectedDate == nil ? .regular : .semibold))
+                            .foregroundStyle(selectedDate == nil ? Color.primary : Color.accentColor)
+                            .accessibilityLabel(AppLocalization.string("日期", locale: locale))
+                        } else {
+                            UsageTrendChart(series: AIUsageHistoryPresentation.trend(history: controller.history, domain: domain),
+                                selectedDate: $selectedDate, domain: domain).frame(height: 180)
+                            heatmap
+                        }
+                        if let selectedDate {
+                            DailyModelUsageList(day: AIUsageHistoryPresentation.selectedDay(in: controller.history, date: selectedDate))
+                        }
+                    }
+                    .padding(.horizontal, NSScroller.scrollerWidth(for: .mini, scrollerStyle: .overlay))
+                    .padding(.bottom, 4)
+                }.thinScrollChrome(scrollerStyle: .overlay)
             }
             HStack {
                 Text(controller.statusMessage ?? "").font(.system(size: 11)).foregroundStyle(.secondary)
                 Spacer()
                 if controller.isBusy || controller.isLoading { ProgressView().controlSize(.small) }
-                if controller.action == .export { Button(AppLocalization.text("取消")) { controller.cancelExport() } }
+                if controller.action == .export { Button(AppLocalization.string("取消", locale: locale)) { controller.cancelExport() } }
             }.frame(height: 18)
         }
         .padding(18)
         .frame(minWidth: 620, minHeight: 480)
         .background(Color(nsColor: .windowBackgroundColor))
         .task { await controller.load() }
-        .onChange(of: range) { _, _ in
-            if !domain.contains(selectedDate) { selectedDate = Calendar.current.startOfDay(for: .now) }
+        .onChange(of: domain) { _, domain in
+            if let selectedDate, selectedDate < domain.lowerBound || selectedDate >= domain.upperBound {
+                self.selectedDate = nil
+            }
         }
-        .onChange(of: selectedDate) { _, date in heatmapYear = date }
-        .confirmationDialog(AppLocalization.text("清空 AI 用量历史？"), isPresented: $confirmsClear, titleVisibility: .visible) {
-            Button(AppLocalization.text("清空"), role: .destructive) { Task { await controller.clearHistory() } }
-            Button(AppLocalization.text("取消"), role: .cancel) {}
-        } message: { Text(AppLocalization.text("删除本机保存的 AI 用量历史，保留任务和日志去重记录。此操作无法撤销。")) }
+        .onChange(of: selectedDate) { _, date in if let date { heatmapYear = date } }
+        .confirmationDialog(AppLocalization.string("清空 AI 用量历史？", locale: locale), isPresented: $confirmsClear, titleVisibility: .visible) {
+            Button(AppLocalization.string("清空", locale: locale), role: .destructive) { Task { await controller.clearHistory() } }
+            Button(AppLocalization.string("取消", locale: locale), role: .cancel) {}
+        } message: { Text(AppLocalization.string("删除本机保存的 AI 用量历史，保留任务和日志去重记录。此操作无法撤销。", locale: locale)) }
     }
 
     private var heatmap: some View {
@@ -302,18 +320,23 @@ struct AIUsageHistoryContent: View {
             if range == .all {
                 HStack {
                     Button { shiftHeatmapYear(-1) } label: { Image(systemName: "chevron.left") }
-                        .help(AppLocalization.text("上一年"))
+                        .help(AppLocalization.string("上一年", locale: locale))
                         .disabled(!canShiftHeatmapYear(-1))
                     Text(heatmapYear, format: .dateTime.year()).font(.system(size: 11, weight: .medium))
                     Button { shiftHeatmapYear(1) } label: { Image(systemName: "chevron.right") }
-                        .help(AppLocalization.text("下一年"))
+                        .help(AppLocalization.string("下一年", locale: locale))
                         .disabled(!canShiftHeatmapYear(1))
                     Spacer()
                 }.buttonStyle(.plain)
             }
-            ScrollView(.horizontal) {
-                UsageHeatmap(weeks: weeks, selectedDate: $selectedDate, cellSize: 12)
-            }.thinScrollChrome(scrollerStyle: .overlay)
+            if range == .week {
+                UsageHeatmap(weeks: weeks, selectedDate: $selectedDate, cellSize: 12, layout: .days)
+            } else {
+                ScrollView(.horizontal) {
+                    UsageHeatmap(weeks: weeks, selectedDate: $selectedDate, cellSize: 12)
+                        .padding(.bottom, NSScroller.scrollerWidth(for: .mini, scrollerStyle: .overlay))
+                }.thinScrollChrome(visibleWhenScrollable: false, scrollerStyle: .overlay)
+            }
         }
     }
 

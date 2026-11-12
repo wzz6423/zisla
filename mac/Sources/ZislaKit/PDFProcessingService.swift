@@ -156,6 +156,8 @@ public struct PDFPageNumberStyle: Equatable, Sendable {
 
 /// Performs basic page operations with macOS PDFKit, requiring no external service.
 public struct PDFProcessingService: Sendable {
+    var removeImageStagingDirectory: @Sendable (URL) throws -> Void = { try FileManager.default.removeItem(at: $0) }
+
     public init() {}
 
     public func inspect(_ inputURL: URL) throws -> PDFDocumentSummary {
@@ -418,27 +420,46 @@ public struct PDFProcessingService: Sendable {
     }
 
     /// Converts images into a multi-page PDF in input order, one page per image.
-    public func convertImagesToPDF(_ imageURLs: [URL], to outputURL: URL) throws {
+    /// Cancellation is checked before publishing; staging cleanup preserves conversion errors and committed output.
+    public func convertImagesToPDF(_ imageURLs: [URL], to outputURL: URL,
+                                   checkCancellation: @Sendable () throws -> Void = { try Task.checkCancellation() }) throws {
         guard !imageURLs.isEmpty else { throw PDFProcessingError.emptyPageSelection }
-        let images = try imageURLs.map(loadImage(at:))
+        try checkCancellation()
+        let firstImage = try loadImage(at: imageURLs[0])
         try prepareOutput(outputURL, inputURLs: imageURLs)
 
-        var firstBox = CGRect(origin: .zero, size: CGSize(width: images[0].width, height: images[0].height))
-        guard let context = CGContext(outputURL as CFURL, mediaBox: &firstBox, nil) else {
-            throw PDFProcessingError.cannotWriteOutput(outputURL)
+        let staging = outputURL.deletingLastPathComponent().appendingPathComponent(".zisla-pdf-images-" + UUID().uuidString)
+        try FileManager.default.createDirectory(at: staging, withIntermediateDirectories: false,
+            attributes: [.posixPermissions: 0o700])
+        let stagedOutput = staging.appendingPathComponent("images.pdf")
+        do {
+            do {
+                var firstBox = CGRect(origin: .zero, size: CGSize(width: firstImage.width, height: firstImage.height))
+                guard let context = CGContext(stagedOutput as CFURL, mediaBox: &firstBox, nil) else {
+                    throw PDFProcessingError.cannotWriteOutput(outputURL)
+                }
+                defer { context.closePDF() }
+                // Decode one page at a time so selecting many images does not retain every bitmap.
+                for (index, url) in imageURLs.enumerated() {
+                    try checkCancellation()
+                    let image = try index == 0 ? firstImage : loadImage(at: url)
+                    var box = CGRect(origin: .zero, size: CGSize(width: image.width, height: image.height))
+                    let pageInfo = [
+                        kCGPDFContextMediaBox as String: Data(bytes: &box, count: MemoryLayout<CGRect>.size),
+                    ] as CFDictionary
+                    context.beginPDFPage(pageInfo)
+                    context.interpolationQuality = .high
+                    context.draw(image, in: box)
+                    context.endPDFPage()
+                }
+                try checkCancellation()
+            }
+            try FileManager.default.moveItem(at: stagedOutput, to: outputURL)
+        } catch {
+            try? removeImageStagingDirectory(staging)
+            throw error
         }
-        defer { context.closePDF() }
-
-        for image in images {
-            var box = CGRect(origin: .zero, size: CGSize(width: image.width, height: image.height))
-            let pageInfo = [
-                kCGPDFContextMediaBox as String: Data(bytes: &box, count: MemoryLayout<CGRect>.size),
-            ] as CFDictionary
-            context.beginPDFPage(pageInfo)
-            context.interpolationQuality = .high
-            context.draw(image, in: box)
-            context.endPDFPage()
-        }
+        try? removeImageStagingDirectory(staging)
     }
 
     /// Rasterizes every page to PNG or JPEG. Returned file names carry a page number starting at 001.

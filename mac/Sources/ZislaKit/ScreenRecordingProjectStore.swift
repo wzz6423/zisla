@@ -31,9 +31,10 @@ public struct ScreenRecordingProjectStore: Sendable {
     }
 
     public func load(from directory: URL) throws -> ScreenRecordingProject {
-        let manifest = directory.appendingPathComponent(Self.manifestName)
+        let manifest = directory.appendingPathComponent(Self.manifestName).resolvingSymlinksInPath()
         let attributes = try FileManager.default.attributesOfItem(atPath: manifest.path)
-        guard (attributes[.size] as? NSNumber)?.intValue ?? Int.max <= 128 * 1_024 * 1_024 else {
+        guard attributes[.type] as? FileAttributeType == .typeRegular,
+              (attributes[.size] as? NSNumber)?.intValue ?? Int.max <= 128 * 1_024 * 1_024 else {
             throw ScreenRecordingProjectError.invalidProject
         }
         let project = try JSONDecoder().decode(ScreenRecordingProject.self, from: Data(contentsOf: manifest))

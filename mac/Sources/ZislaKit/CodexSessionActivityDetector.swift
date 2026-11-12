@@ -191,9 +191,21 @@ public final class CodexSessionActivityDetector {
         cache = cache.filter { selectedURLs.contains($0.key) }
 
         let titlesBySessionID = sessionTitlesByID()
+        var unreadableURLs = Set<URL>()
         // Codex may append to rollout files while scanning; one unreadable file must not discard other sessions.
         let activities: [(candidate: Candidate, activity: RolloutActivity)] = candidates.compactMap { candidate in
-            guard let activity = try? activity(in: candidate) else { return nil }
+            guard let activity = try? activity(in: candidate) else {
+                unreadableURLs.insert(candidate.url.standardizedFileURL)
+                guard let cached = cache[candidate.url] else { return nil }
+                // Keep the last readable lifecycle for reconciliation without publishing stale activity.
+                return (candidate, RolloutActivity(
+                    events: cached.events,
+                    statusSignals: cached.statusSignals,
+                    modelsByTurnID: cached.modelsByTurnID,
+                    effortsByTurnID: cached.effortsByTurnID,
+                    sessionID: cached.sessionID
+                ))
+            }
             return (candidate, activity)
         }
         var allEvents: [(
@@ -284,7 +296,9 @@ public final class CodexSessionActivityDetector {
         }
 
         let processIdentifiersByURL = processIdentifiersForOpenFiles(
-            Array(Set(active.values.map(\.rolloutURL)))
+            Array(Set(active.values.filter {
+                !unreadableURLs.contains($0.rolloutURL)
+            }.map(\.rolloutURL)))
         )
         let processStartDatesByProcessIdentifier = processStartDatesForProcessIdentifiers(
             Set(processIdentifiersByURL.values)
@@ -294,6 +308,9 @@ public final class CodexSessionActivityDetector {
         )
         let observedAt = now()
         let candidateTurnIDs = Set(active.keys)
+        let unreadableTurnIDs = Set(active.values.filter {
+            unreadableURLs.contains($0.rolloutURL)
+        }.map { $0.event.turnID })
         retiredTurnIDs.formIntersection(candidateTurnIDs)
         confirmedActiveTurnIDs.formIntersection(candidateTurnIDs)
         firstUnverifiedActivityAtByTurnID = firstUnverifiedActivityAtByTurnID.filter {
@@ -322,7 +339,7 @@ public final class CodexSessionActivityDetector {
         }
 
         for (turnID, record) in active {
-            guard !retiredTurnIDs.contains(turnID) else { continue }
+            guard !unreadableTurnIDs.contains(turnID), !retiredTurnIDs.contains(turnID) else { continue }
             guard let processIdentifier = processIdentifiersByURL[record.rolloutURL] else {
                 if confirmedActiveTurnIDs.contains(turnID) {
                     confirmedActiveTurnIDs.remove(turnID)
@@ -421,14 +438,16 @@ public final class CodexSessionActivityDetector {
             return task
         }
         lastScanAt = observedAt
-        previouslyActiveTasks = Dictionary(uniqueKeysWithValues: tasks.map { ($0.id, $0) })
+        let unreadableTaskIDs = Set(unreadableTurnIDs.map(Self.taskID(forTurnID:)))
+        previouslyActiveTasks = previouslyActiveTasks.filter { unreadableTaskIDs.contains($0.key) }
+        previouslyActiveTasks.merge(tasks.map { ($0.id, $0) }) { _, latest in latest }
         let recentURLs = candidates.prefix(32).map(\.url)
         activityFileURLs = Array(Set(
             recentURLs + recentURLs.map { $0.deletingLastPathComponent() }
                 + active.values.filter { activeTurnIDs.contains($0.event.turnID) }.map(\.rolloutURL)
                 + [sessionsDirectory]
         ))
-        retainOnlyActiveActivity(for: activeTurnIDs)
+        retainOnlyActiveActivity(for: activeTurnIDs.union(unreadableTurnIDs))
         return tasks
     }
 

@@ -6,7 +6,7 @@ import SwiftUI
 
 struct AIProgressModuleView: View {
     @ObservedObject private var monitor: AIStateMonitor
-    @State private var selectedUsageDate = Calendar.current.startOfDay(for: Date())
+    @State private var selectedUsageDate: Date?
 
     /// Both columns push their content this far below the header. The trend chart's topmost
     /// Y-axis tick is drawn above its plot frame, so a tighter gap lets it collide with the title.
@@ -27,6 +27,7 @@ struct AIProgressModuleView: View {
 
                 ScrollView(.vertical) {
                     usageSummary(endingAt: .now)
+                        .padding(.horizontal, NSScroller.scrollerWidth(for: .mini, scrollerStyle: .overlay))
                 }
                 .thinScrollChrome(scrollerStyle: .overlay)
                 .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
@@ -66,8 +67,10 @@ struct AIProgressModuleView: View {
             UsageTrendChart(series: series, selectedDate: $selectedUsageDate)
                 .frame(height: 128)
             UsageHeatmap(weeks: usageCalendar(endingAt: date), selectedDate: $selectedUsageDate)
-            DailyModelUsageList(day: AIUsageHistoryPresentation.selectedDay(in: AIUsageHistory(
-                usageSamples: monitor.state.usageSamples, modelUsageSamples: monitor.state.modelUsageSamples), date: selectedUsageDate))
+            if let selectedUsageDate {
+                DailyModelUsageList(day: AIUsageHistoryPresentation.selectedDay(in: AIUsageHistory(
+                    usageSamples: monitor.state.usageSamples, modelUsageSamples: monitor.state.modelUsageSamples), date: selectedUsageDate))
+            }
         }
     }
 
@@ -105,15 +108,49 @@ struct AIProgressModuleView: View {
 
 struct DailyModelUsageList: View {
     var day: AIDailyModelUsage
+    @Environment(\.locale) private var locale
+
+    struct ProviderGroup: Identifiable {
+        var provider: AIProvider?
+        var models: [AIModelUsage]
+        var id: String { provider?.rawValue ?? "" }
+        var identity: AIMascotIdentity? { provider.map { AIMascotIdentity(provider: $0, taskID: "") } }
+
+        func name(locale: Locale = AppLocalization.currentLanguage.locale) -> String {
+            provider.map(AIMascotLibrary.providerDisplayName(for:))
+                ?? AppLocalization.string("未分类", locale: locale)
+        }
+    }
+
+    /// Codex usage belongs to ChatGPT; merge identical models only within that display brand.
+    static func providerGroups(_ models: [AIModelUsage]) -> [ProviderGroup] {
+        Dictionary(grouping: models, by: { $0.provider == .codex ? .gpt : $0.provider }).map { provider, records in
+            var combined: [String?: AIModelUsage] = [:]
+            for record in records {
+                let name = AIUsageAnalytics.normalizedModel(record.model)
+                var model = combined[name] ?? AIModelUsage(provider: provider, model: name, inputTokens: 0, outputTokens: 0)
+                model.inputTokens = AIUsageTokenMath.adding(model.inputTokens, record.inputTokens)
+                model.outputTokens = AIUsageTokenMath.adding(model.outputTokens, record.outputTokens)
+                combined[name] = model
+            }
+            return ProviderGroup(provider: provider, models: combined.values.sorted {
+                $0.totalTokens != $1.totalTokens ? $0.totalTokens > $1.totalTokens : $0.id < $1.id
+            })
+        }.sorted { lhs, rhs in
+            let leftTotal = lhs.models.reduce(0) { AIUsageTokenMath.adding($0, $1.totalTokens) }
+            let rightTotal = rhs.models.reduce(0) { AIUsageTokenMath.adding($0, $1.totalTokens) }
+            return leftTotal != rightTotal ? leftTotal > rightTotal : lhs.id < rhs.id
+        }
+    }
 
     var body: some View {
         LazyVStack(alignment: .leading, spacing: 12) {
-            Label(AppLocalization.text("每日模型用量"), systemImage: "list.bullet.rectangle")
+            Label(AppLocalization.string("每日模型用量", locale: locale), systemImage: "list.bullet.rectangle")
                 .font(.system(size: 11, weight: .semibold))
             if day.models.isEmpty {
                 Text(day.date, format: .dateTime.year().month().day())
                     .font(.islandMicro(weight: .semibold, design: .monospaced))
-                EmptyState(symbol: "chart.bar", title: AppLocalization.text("暂无模型用量"))
+                EmptyState(symbol: "chart.bar", title: AppLocalization.string("暂无模型用量", locale: locale))
             } else {
                 VStack(alignment: .leading, spacing: 7) {
                     ViewThatFits(in: .horizontal) {
@@ -128,15 +165,29 @@ struct DailyModelUsageList: View {
                         }
                     }
                     .font(.islandMicro(weight: .semibold, design: .monospaced))
-                    ForEach(day.models) { model in
-                        VStack(alignment: .leading, spacing: 3) {
-                            Text(Self.modelName(model))
-                                .font(.system(size: 10, weight: .medium))
-                                .fixedSize(horizontal: false, vertical: true)
-                            Text(Self.tokenBreakdown(model))
-                                .font(.islandMicro(design: .monospaced))
-                                .foregroundStyle(.secondary)
-                                .fixedSize(horizontal: false, vertical: true)
+                    ForEach(Self.providerGroups(day.models)) { group in
+                        VStack(alignment: .leading, spacing: 5) {
+                            HStack(spacing: 5) {
+                                if let identity = group.identity {
+                                    AIMascotView(identity: identity, size: 13)
+                                }
+                                Text(group.name(locale: locale)).font(.system(size: 11, weight: .semibold))
+                            }
+                            ForEach(group.models) { model in
+                                HStack(alignment: .firstTextBaseline, spacing: 6) {
+                                    Text(Self.modelName(model, locale: locale))
+                                        .font(.system(size: 10, weight: .medium))
+                                        .fitsSingleLine()
+                                        .truncationMode(.middle)
+                                        .frame(maxWidth: .infinity, alignment: .leading)
+                                        .help(Self.modelName(model, locale: locale))
+                                    Text(Self.tokenBreakdown(model, locale: locale))
+                                        .font(.islandMicro(design: .monospaced))
+                                        .foregroundStyle(.secondary)
+                                        .fitsSingleLine()
+                                        .layoutPriority(1)
+                                }
+                            }
                         }
                         .frame(maxWidth: .infinity, alignment: .leading)
                     }
@@ -147,26 +198,27 @@ struct DailyModelUsageList: View {
         .frame(maxWidth: .infinity, alignment: .leading)
     }
 
-    /// Names unknown models explicitly so retained aggregate history cannot imply a fabricated attribution.
-    static func modelName(_ usage: AIModelUsage, language: AppLanguage? = nil) -> String {
-        let locale = (language ?? AppLocalization.currentLanguage).locale
-        guard let provider = usage.provider else { return AppLocalization.string("未分类", locale: locale) }
-        return provider.rawValue.uppercased() + " · " + (usage.model ?? AppLocalization.string("未知模型", locale: locale))
+    /// Unknown models remain explicit because retained daily totals cannot reconstruct their attribution.
+    static func modelName(_ usage: AIModelUsage, locale: Locale = AppLocalization.currentLanguage.locale) -> String {
+        usage.model ?? AppLocalization.string("未知模型", locale: locale)
     }
 
-    /// Uses the axis formatter for both counts so narrow rows agree with the trend's units.
-    static func tokenBreakdown(_ usage: AIModelUsage, language: AppLanguage? = nil) -> String {
-        AppLocalization.format("输入 %@ · 输出 %@", locale: (language ?? AppLocalization.currentLanguage).locale,
-            [AIUsageAnalytics.formatTokenAxisValue(usage.inputTokens), AIUsageAnalytics.formatTokenAxisValue(usage.outputTokens)])
+    /// Model counts use millions consistently while retaining nonzero sub-million usage.
+    static func tokenBreakdown(_ usage: AIModelUsage, locale: Locale = AppLocalization.currentLanguage.locale) -> String {
+        let format = FloatingPointFormatStyle<Double>.number.grouping(.never).precision(.fractionLength(0...6)).locale(locale)
+        return AppLocalization.format("输入 %@ · 输出 %@", locale: locale,
+            [(Double(usage.inputTokens) / 1_000_000).formatted(format) + " M",
+             (Double(usage.outputTokens) / 1_000_000).formatted(format) + " M"])
     }
 }
 
 struct UsageTrendChart: View {
     var series: [UsageBreakdownPoint]
-    @Binding var selectedDate: Date
+    @Binding var selectedDate: Date?
     var domain: ClosedRange<Date>?
+    @Environment(\.locale) private var locale
 
-    init(series: [UsageBreakdownPoint], selectedDate: Binding<Date> = .constant(.now), domain: ClosedRange<Date>? = nil) {
+    init(series: [UsageBreakdownPoint], selectedDate: Binding<Date?> = .constant(nil), domain: ClosedRange<Date>? = nil) {
         self.series = series
         _selectedDate = selectedDate
         self.domain = domain
@@ -202,7 +254,7 @@ struct UsageTrendChart: View {
                 EmptyState(symbol: "chart.line.downtrend.xyaxis", title: AppLocalization.text("暂无 Token 用量"))
             }
         }
-        .accessibilityLabel(hasUsage ? AppLocalization.text("Token 消耗趋势") : AppLocalization.text("暂无 AI token 用量"))
+        .accessibilityLabel(AppLocalization.string(hasUsage ? "Token 消耗趋势" : "暂无 AI token 用量", locale: locale))
     }
 
     private var chart: some View {
@@ -229,7 +281,7 @@ struct UsageTrendChart: View {
                 .foregroundStyle(Color.blue)
                 .lineStyle(StrokeStyle(lineWidth: 2.5, lineCap: .round, lineJoin: .round))
             }
-            if selectedDate >= xDomain.lowerBound, selectedDate < xDomain.upperBound {
+            if let selectedDate, selectedDate >= xDomain.lowerBound, selectedDate < xDomain.upperBound {
                 let nextDay = Calendar.current.date(byAdding: .day, value: 1, to: selectedDate) ?? selectedDate
                 let midpoint = selectedDate.addingTimeInterval(nextDay.timeIntervalSince(selectedDate) / 2)
                 RuleMark(x: .value(AppLocalization.text("时间"), midpoint))
@@ -269,6 +321,12 @@ struct UsageTrendChart: View {
                             Text(point.timestamp, format: .dateTime.month(.twoDigits).day(.twoDigits))
                                 .font(.islandMicro(design: .monospaced))
                                 .foregroundStyle(.secondary)
+                                .fixedSize()
+                                .alignmentGuide(HorizontalAlignment.center) { size in
+                                    min(frame.minX + x, max(size.width / 2,
+                                        frame.minX + x + size.width - geometry.size.width))
+                                }
+                                .frame(width: 0, alignment: .center)
                                 .position(x: frame.minX + x, y: frame.maxY + 8)
                         }
                     }
@@ -488,20 +546,27 @@ private struct TaskProgressRow: View {
 }
 
 struct UsageHeatmap: View {
+    enum Layout { case calendar, days }
+
     var weeks: [[ContributionDay?]]
-    @Binding var selectedDate: Date
+    @Binding var selectedDate: Date?
     var cellSize: CGFloat?
+    var layout: Layout
+    @Environment(\.locale) private var locale
 
     private let gap: CGFloat = 1.5
 
-    init(weeks: [[ContributionDay?]], selectedDate: Binding<Date> = .constant(.now), cellSize: CGFloat? = nil) {
+    init(weeks: [[ContributionDay?]], selectedDate: Binding<Date?> = .constant(nil), cellSize: CGFloat? = nil,
+        layout: Layout = .calendar) {
         self.weeks = weeks
         _selectedDate = selectedDate
         self.cellSize = cellSize
+        self.layout = layout
     }
 
     private var fixedGridWidth: CGFloat? {
-        cellSize.map { CGFloat(weeks.count) * $0 + CGFloat(max(0, weeks.count - 1)) * gap }
+        if layout == .days { return nil }
+        return cellSize.map { CGFloat(weeks.count) * $0 + CGFloat(max(0, weeks.count - 1)) * gap }
     }
 
     /// Maximum single-day token count within the current window; intensity is normalized relative to it
@@ -515,6 +580,7 @@ struct UsageHeatmap: View {
     }
 
     private var selectedDay: ContributionDay? {
+        guard let selectedDate else { return nil }
         return weeks.flatMap { $0 }.compactMap { $0 }.first {
             Calendar.current.isDate($0.date, inSameDayAs: selectedDate)
         }
@@ -530,6 +596,68 @@ struct UsageHeatmap: View {
     }
 
     var body: some View {
+        VStack(alignment: .leading, spacing: 3) {
+            if layout == .days {
+                HStack(spacing: gap) {
+                    ForEach(weeks.flatMap { $0 }.compactMap { $0 }, id: \.date) { day in
+                        VStack(spacing: 3) {
+                            UsageCalendarCell(day: day, intensity: intensity(for: day.tokens),
+                                isSelected: isSelected(day), select: { selectedDate = $0 })
+                                .frame(width: cellSize, height: cellSize)
+                            Button { selectedDate = day.date } label: {
+                                Text(day.date, format: .dateTime.month(.twoDigits).day(.twoDigits))
+                                    .font(.islandMicro(design: .monospaced))
+                                    .foregroundStyle(.secondary)
+                                    .fixedSize()
+                            }
+                            .buttonStyle(.plain)
+                            .accessibilityHidden(true)
+                        }
+                        .frame(maxWidth: .infinity)
+                    }
+                }
+            } else {
+                calendarGrid
+            }
+
+            HStack(spacing: 4) {
+                Text(AppLocalization.text("少"))
+                    .font(.islandMicro())
+                    .foregroundStyle(.secondary)
+                ForEach(ContributionIntensity.allCases, id: \.self) { intensity in
+                    RoundedRectangle(cornerRadius: 1)
+                        .fill(intensity.color)
+                        .overlay {
+                            if intensity == .none {
+                                RoundedRectangle(cornerRadius: 1)
+                                    .stroke(Color.primary.opacity(0.13), lineWidth: 0.5)
+                            }
+                        }
+                        .frame(width: 7, height: 7)
+                }
+                Text(AppLocalization.text("多 · %@", maxLabel))
+                    .font(.islandMicro(design: .monospaced))
+                    .foregroundStyle(.secondary)
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+
+            if let selectedDay {
+                HStack(spacing: 4) {
+                    Text(selectedDay.date, format: .dateTime.year().month().day())
+                    Text("· \(AIUsageAnalytics.formatTokenAxisValue(selectedDay.tokens)) Token")
+                    Spacer(minLength: 0)
+                }
+                .font(.islandMicro(design: .monospaced))
+                .foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
+            }
+        }
+        .frame(width: fixedGridWidth.map { max(240, $0) }, alignment: .leading)
+        .accessibilityElement(children: .contain)
+        .accessibilityLabel(AppLocalization.string("AI token 用量热力图", locale: locale))
+    }
+
+    private var calendarGrid: some View {
         VStack(alignment: .leading, spacing: 3) {
             GeometryReader { proxy in
                 let width = cellWidth(in: proxy.size.width)
@@ -571,46 +699,11 @@ struct UsageHeatmap: View {
                 }
             }
             .frame(width: fixedGridWidth.map { max(240, $0) }, height: 13)
-
-            HStack(spacing: 4) {
-                Text(AppLocalization.text("少"))
-                    .font(.islandMicro())
-                    .foregroundStyle(.secondary)
-                ForEach(ContributionIntensity.allCases, id: \.self) { intensity in
-                    RoundedRectangle(cornerRadius: 1)
-                        .fill(intensity.color)
-                        .overlay {
-                            if intensity == .none {
-                                RoundedRectangle(cornerRadius: 1)
-                                    .stroke(Color.primary.opacity(0.13), lineWidth: 0.5)
-                            }
-                        }
-                        .frame(width: 7, height: 7)
-                }
-                Text(AppLocalization.text("多 · %@", maxLabel))
-                    .font(.islandMicro(design: .monospaced))
-                    .foregroundStyle(.secondary)
-            }
-            .frame(maxWidth: .infinity, alignment: .leading)
-
-            HStack(spacing: 4) {
-                if let selectedDay {
-                    Text(selectedDay.date, format: .dateTime.year().month().day())
-                    Text("· \(AIUsageAnalytics.formatTokenAxisValue(selectedDay.tokens)) Token")
-                }
-                Spacer(minLength: 0)
-            }
-            .font(.islandMicro(design: .monospaced))
-            .foregroundStyle(.secondary)
-            .frame(height: 13, alignment: .leading)
         }
-        .frame(width: fixedGridWidth.map { max(240, $0) }, alignment: .leading)
-        .accessibilityElement(children: .contain)
-        .accessibilityLabel(AppLocalization.text("AI token 用量热力图"))
     }
 
     private func isSelected(_ day: ContributionDay?) -> Bool {
-        guard let day else { return false }
+        guard let day, let selectedDate else { return false }
         return Calendar.current.isDate(day.date, inSameDayAs: selectedDate)
     }
 

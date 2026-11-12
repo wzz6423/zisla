@@ -10,25 +10,25 @@ struct ClipboardAssistantIPAddressSettingsTests {
         #expect(ClipboardAssistantKind.allCases.filter { $0 == .ipAddress }.count == 1)
         #expect(ClipboardAssistantKind.ipAddress.symbolName == "network")
         #expect(FeatureSettings.default.clipboardAssistantEnabledKinds.contains(.ipAddress))
-        #expect(FeatureSettings.clipboardAssistantKindSetVersionCurrent == 4)
+        #expect(FeatureSettings.clipboardAssistantKindSetVersionCurrent == 5)
         #expect(ClipboardAssistantActionOrder.defaults(for: .ipAddress) == [.lookupIP, .openURL, .copyText, .addToQuickNote, .share])
         #expect(FeatureSettings.default.clipboardAssistantActionOrders[.ipAddress] == [.lookupIP, .openURL, .copyText, .addToQuickNote, .share])
         #expect(try JSONDecoder().decode(ClipboardAssistantActionKind.self, from: Data(#""lookupIP""#.utf8)) == .lookupIP)
     }
 
     @Test
-    func versionThreeAddsOnlyIPAndOptOutSurvivesRepeatedRestart() throws {
+    func versionThreeAddsNewKindsAndIPOptOutSurvivesRepeatedRestart() throws {
         let payload = Data(#"{"clipboardAssistantKindSetVersion":3,"clipboardAssistantEnabledKinds":["url","text"],"clipboardAssistantConversionDefaultApplied":true,"clipboardAssistantAppDefaultApplied":true}"#.utf8)
         var settings = try JSONDecoder().decode(FeatureSettings.self, from: payload)
-        #expect(settings.clipboardAssistantEnabledKinds == [.url, .text, .ipAddress])
-        #expect(settings.clipboardAssistantKindSetVersion == 4)
+        #expect(settings.clipboardAssistantEnabledKinds == [.url, .text, .ipAddress, .appCannotOpen])
+        #expect(settings.clipboardAssistantKindSetVersion == 5)
         let migrated = try JSONDecoder().decode(FeatureSettings.self, from: JSONEncoder().encode(settings))
         #expect(migrated.clipboardAssistantEnabledKinds == settings.clipboardAssistantEnabledKinds)
         settings.clipboardAssistantEnabledKinds.remove(.ipAddress)
         for _ in 0..<2 {
             settings = try JSONDecoder().decode(FeatureSettings.self, from: JSONEncoder().encode(settings))
-            #expect(settings.clipboardAssistantEnabledKinds == [.url, .text])
-            #expect(settings.clipboardAssistantKindSetVersion == 4)
+            #expect(settings.clipboardAssistantEnabledKinds == [.url, .text, .appCannotOpen])
+            #expect(settings.clipboardAssistantKindSetVersion == 5)
         }
     }
 
@@ -36,7 +36,7 @@ struct ClipboardAssistantIPAddressSettingsTests {
     func currentVersionRespectsAnExplicitIPOptOut() throws {
         let payload = Data(#"{"clipboardAssistantKindSetVersion":4,"clipboardAssistantEnabledKinds":["url"],"clipboardAssistantConversionDefaultApplied":true,"clipboardAssistantAppDefaultApplied":true}"#.utf8)
         let settings = try JSONDecoder().decode(FeatureSettings.self, from: payload)
-        #expect(settings.clipboardAssistantEnabledKinds == [.url])
+        #expect(settings.clipboardAssistantEnabledKinds == [.url, .appCannotOpen])
     }
 
     @Test(arguments: [0, 3, 4])
@@ -44,7 +44,7 @@ struct ClipboardAssistantIPAddressSettingsTests {
         let payload = Data("{\"clipboardAssistantKindSetVersion\":\(version),\"clipboardAssistantEnabledKinds\":[]}".utf8)
         let settings = try JSONDecoder().decode(FeatureSettings.self, from: payload)
         #expect(settings.clipboardAssistantEnabledKinds.isEmpty)
-        #expect(settings.clipboardAssistantKindSetVersion == 4)
+        #expect(settings.clipboardAssistantKindSetVersion == 5)
         let restored = try JSONDecoder().decode(FeatureSettings.self, from: JSONEncoder().encode(settings))
         #expect(restored.clipboardAssistantEnabledKinds.isEmpty)
     }

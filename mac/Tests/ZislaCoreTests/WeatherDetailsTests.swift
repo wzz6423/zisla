@@ -4,7 +4,7 @@ import Testing
 
 struct WeatherDetailsTests {
     @Test(arguments: [0, 1, 2], [Bool?.none, .some(false), .some(true)])
-    func conditionsRetainKnownDaylightAndUseNeutralSymbolsWhenUnknown(code: Int, isDay: Bool?) {
+    func conditionsRetainKnownDaylightAndUseWeatherSymbolsWhenUnknown(code: Int, isDay: Bool?) {
         let condition = WeatherCondition(code: code, isDay: isDay)
         let expected: String
         switch (code, isDay) {
@@ -12,11 +12,42 @@ struct WeatherDetailsTests {
         case (1, .some(false)): expected = "moon.fill"
         case (2, .some(false)): expected = "cloud.moon.fill"
         case (2, .some(true)): expected = "cloud.sun.fill"
-        case (2, .none): expected = "cloud.fill"
+        case (2, .none): expected = "cloud.sun.fill"
         case (_, .some(true)): expected = "sun.max.fill"
-        default: expected = "sparkles"
+        default: expected = "sun.max.fill"
         }
         #expect(condition.symbolName == expected)
+    }
+
+    @Test(arguments: [Bool?.none, .some(false), .some(true)])
+    func precipitationAndObscurationCodesRetainTheirWeatherType(isDay: Bool?) {
+        let conditions: [(Int, String, String)] = [
+            (3, "阴", "cloud.fill"), (45, "雾", "cloud.fog.fill"), (48, "雾", "cloud.fog.fill"),
+            (51, "毛毛雨", "cloud.drizzle.fill"), (53, "毛毛雨", "cloud.drizzle.fill"),
+            (55, "毛毛雨", "cloud.drizzle.fill"), (56, "冻毛毛雨", "cloud.sleet.fill"),
+            (57, "冻毛毛雨", "cloud.sleet.fill"), (61, "小雨", "cloud.drizzle.fill"),
+            (63, "中雨", "cloud.rain.fill"), (65, "大雨", "cloud.heavyrain.fill"),
+            (66, "冻雨", "cloud.sleet.fill"), (67, "冻雨", "cloud.sleet.fill"),
+            (71, "小雪", "snowflake"), (73, "中雪", "cloud.snow.fill"),
+            (75, "大雪", "cloud.snow.fill"), (77, "雪粒", "snowflake"),
+            (80, "小阵雨", "cloud.drizzle.fill"), (81, "阵雨", "cloud.rain.fill"),
+            (82, "强阵雨", "cloud.heavyrain.fill"), (85, "小阵雪", "snowflake"),
+            (86, "强阵雪", "cloud.snow.fill"), (95, "雷阵雨", "cloud.bolt.rain.fill"),
+            (97, "强雷阵雨", "cloud.bolt.rain.fill"),
+            (96, "雷阵雨伴冰雹", "cloud.hail.fill"), (99, "雷阵雨伴冰雹", "cloud.hail.fill"),
+        ]
+        for (code, summary, symbol) in conditions {
+            let condition = WeatherCondition(code: code, isDay: isDay)
+            #expect(condition.summary == AppLocalization.text(summary), "Weather code \(code) must retain its description")
+            #expect(condition.symbolName == symbol, "Weather code \(code) must use the corresponding weather icon")
+        }
+    }
+
+    @Test(arguments: [-1, 4, 100, Int.min, Int.max], [Bool?.none, .some(false), .some(true)])
+    func unsupportedCodesRemainUnknown(code: Int, isDay: Bool?) {
+        let condition = WeatherCondition(code: code, isDay: isDay)
+        #expect(condition.summary == AppLocalization.text("天气未知"))
+        #expect(condition.symbolName == "questionmark.circle")
     }
 
     @Test

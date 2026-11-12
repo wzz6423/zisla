@@ -117,17 +117,16 @@ public struct BilibiliDirectDownloader: BilibiliDownloading, Sendable {
         let videoURL = directory.appendingPathComponent("\(stem).\(video.id).mp4")
         let audioURL = directory.appendingPathComponent("\(stem).\(audio.id).m4a")
 
-        async let videoDownload: Void = download(
-            track: video,
-            referer: referer,
-            destinationURL: videoURL
-        )
-        async let audioDownload: Void = download(
-            track: audio,
-            referer: referer,
-            destinationURL: audioURL
-        )
-        _ = try await (videoDownload, audioDownload)
+        try await withThrowingTaskGroup(of: Void.self) { group in
+            group.addTask {
+                try await download(track: video, referer: referer, destinationURL: videoURL)
+            }
+            group.addTask {
+                try await download(track: audio, referer: referer, destinationURL: audioURL)
+            }
+            // Observing the first failure lets the group cancel the remaining transfer.
+            for try await _ in group {}
+        }
 
         return [
             DownloadedMediaComponent(

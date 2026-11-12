@@ -189,10 +189,17 @@ struct ClipboardAssistantLocalizationTests {
         #expect(Set(groups.keys).union(usage.keys) == Set(ClipboardAssistantKind.allCases))
         #expect(Set(groups.keys).isDisjoint(with: usage.keys))
         #expect(Set(usage.keys) == [.image, .file])
-        for examples in groups.values {
+        for (kind, examples) in groups {
             #expect(!examples.isEmpty)
             for group in examples {
-                #expect(!group.examples.isEmpty)
+                if kind == .appCannotOpen {
+                    #expect(group.examples.isEmpty)
+                    #expect(group.instructions.count == 4)
+                    #expect(group.instructions.allSatisfy { !$0.isEmpty })
+                } else {
+                    #expect(!group.examples.isEmpty)
+                    #expect(group.instructions.isEmpty)
+                }
                 #expect(group.examples.allSatisfy { !$0.isEmpty })
                 #expect(Set(group.examples).count == group.examples.count)
             }
@@ -392,7 +399,7 @@ struct ClipboardAssistantLocalizationTests {
     }
 
     /// An offscreen, nonactivating host checks accessibility and copy callbacks without changing clipboard content or focus.
-    @Test(.serialized, arguments: [AppLanguage.simplifiedChinese, .english, .arabic], [ClipboardAssistantKind.text, .conversion]) @MainActor
+    @Test(.serialized, arguments: [AppLanguage.simplifiedChinese, .english, .arabic], [ClipboardAssistantKind.text, .conversion, .appCannotOpen]) @MainActor
     func exampleRowsShowRelevantHeadingsAndCopyDisplayedContent(language: AppLanguage, kind: ClipboardAssistantKind) async throws {
         let groups = try #require(SettingsView.clipboardAssistantExampleGroups[kind])
         let examples = groups.flatMap { $0.localizedExamples(language: language) }
@@ -428,7 +435,10 @@ struct ClipboardAssistantLocalizationTests {
         #expect(Set(examples).isSubset(of: Set(labels)), "Every displayed example must be accessible in \(language.rawValue)")
         for group in groups {
             let title = AppLocalization.string(group.title, language: language)
-            #expect(labels.contains(title) == (groups.count > 1), "Only grouped examples need headings: \(title)")
+            #expect(labels.contains(title) == (groups.count > 1 || !group.instructions.isEmpty), "Grouped examples and instructions need headings: \(title)")
+            for instruction in group.instructions {
+                #expect(labels.contains(AppLocalization.string(instruction, language: language)), "Usage instructions must be accessible in \(language.rawValue)")
+            }
         }
         #expect(buttons.count == examples.count)
         #expect(copied.isEmpty)

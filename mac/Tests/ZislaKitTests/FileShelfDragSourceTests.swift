@@ -81,6 +81,54 @@ struct FileShelfDragSourceTests {
         #expect(source.ignoresModifierKeys)
     }
 
+    @Test func multiItemDragPreservesSelectionOrderAndEmptySelectionStartsNoDrag() throws {
+        let source = FileShelfDraggingView()
+        source.frame = .init(x: 0, y: 0, width: 42, height: 42)
+        source.payload = .text("original")
+        source.preparePayloads = { [.text("second"), .text("first")] }
+        let items = source.draggingItems()
+        #expect(items.count == 2)
+        let pasteboard = NSPasteboard(name: .init(UUID().uuidString))
+        defer { pasteboard.releaseGlobally() }
+        #expect(pasteboard.writeObjects(items.compactMap { $0.item as? NSPasteboardWriting }))
+        let values = pasteboard.pasteboardItems?.compactMap { $0.string(forType: .string) } ?? []
+        #expect(values == ["second", "first"])
+        source.preparePayloads = { [] }
+        #expect(source.draggingItems().isEmpty)
+        source.preparePayloads = nil
+        #expect(source.draggingItems().count == 1)
+        source.preparePayload = { nil }
+        #expect(source.draggingItems().isEmpty)
+    }
+
+    @Test func selectionClicksAndProvidedContextMenusReplaceOnlyTheNewInteraction() throws {
+        let source = FileShelfDraggingView()
+        var opens = 0
+        var selections = 0
+        source.payload = .text("original")
+        source.onOpen = { opens += 1 }
+        source.onSelect = { selections += 1 }
+        for count in [1, 2] {
+            let event = try #require(NSEvent.mouseEvent(with: .leftMouseUp, location: .zero, modifierFlags: [],
+                timestamp: 0, windowNumber: 0, context: nil, eventNumber: 0, clickCount: count, pressure: 1))
+            source.mouseUp(with: event)
+        }
+        #expect(selections == 1 && opens == 0)
+        source.onSelect = nil
+        let doubleClick = try #require(NSEvent.mouseEvent(with: .leftMouseUp, location: .zero, modifierFlags: [],
+            timestamp: 0, windowNumber: 0, context: nil, eventNumber: 0, clickCount: 2, pressure: 1))
+        source.mouseUp(with: doubleClick)
+        #expect(opens == 1)
+        let menu = NSMenu()
+        menu.autoenablesItems = false
+        menu.addItem(FileShelfContextMenuItem(title: "复制", enabled: false) {})
+        source.makeContextMenu = { menu }
+        #expect(source.menu(for: doubleClick) === menu)
+        #expect(menu.items.first?.isEnabled == false)
+        source.makeContextMenu = nil
+        #expect(source.menu(for: doubleClick)?.items.count == 4)
+    }
+
     @Test
     func fileAndDirectoryURLsUseFileURLPasteboardPayloads() throws {
         let temporaryDirectory = FileManager.default.temporaryDirectory
