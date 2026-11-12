@@ -312,8 +312,13 @@ struct ImageToolsEditorTests {
         #expect(try rgba(pixels(source)) == original)
     }
 
-    @Test(arguments: [ScreenshotEditorMode.screenshot, .localImage])
-    func toolbarCountMatchesVisibleControlsAndLocalModeOmitsCaptureActions(mode: ScreenshotEditorMode) async throws {
+    @Test(arguments: [ScreenshotEditorMode.screenshot, .localImage], [AppLanguage.simplifiedChinese, .english, .arabic])
+    func toolbarCountMatchesVisibleControlsAndLocalModeOmitsCaptureActions(mode: ScreenshotEditorMode, language: AppLanguage) async throws {
+        let previousArguments = UserDefaults.standard.volatileDomain(forName: UserDefaults.argumentDomain)
+        var arguments = previousArguments
+        arguments[AppLocalization.defaultsKey] = language.rawValue
+        UserDefaults.standard.setVolatileDomain(arguments, forName: UserDefaults.argumentDomain)
+        defer { UserDefaults.standard.setVolatileDomain(previousArguments, forName: UserDefaults.argumentDomain) }
         let releaseAccessibility = EnhancedAccessibilityTestScope.acquire()
         defer { releaseAccessibility() }
         let preferencesName = "zisla-local-image-toolbar-\(UUID())"
@@ -724,17 +729,19 @@ struct ImageToolsEditorTests {
         }
 
         var labels: Set<String> {
-            Set(objects(host).flatMap { object in
-                ["accessibilityTitle", "accessibilityLabel", "accessibilityValue", "accessibilityHelp"]
-                    .compactMap { value(object, $0) as? String }
-            })
+            Set(objects(host).flatMap(controlLabels))
         }
 
         func control(label: String) -> NSObject? {
-            controls.first { object in
-                ["accessibilityTitle", "accessibilityLabel", "accessibilityValue", "accessibilityHelp"]
-                    .contains { value(object, $0) as? String == label }
-            }
+            controls.first { controlLabels($0).contains(label) }
+        }
+
+        private func controlLabels(_ object: NSObject) -> [String] {
+            ["accessibilityTitle", "accessibilityLabel", "accessibilityValue", "accessibilityHelp"]
+                .compactMap { key in
+                    guard let label = value(object, key) as? String else { return nil }
+                    return key == "accessibilityHelp" ? label.components(separatedBy: " (")[0] : label
+                }
         }
 
         func help(_ object: NSObject) -> String { value(object, "accessibilityHelp") as? String ?? "" }

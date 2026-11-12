@@ -29,13 +29,14 @@ final class ApplicationOpenRepairPresenter {
         let settings = settings()
         guard fromSystemAlert ? settings.applicationOpenFailureMonitoringActive : settings.applicationOpenRepairEnabled else { return }
         task = Task { [weak self] in
-            let inspection = Task.detached(priority: .userInitiated) {
-                urls.lazy.compactMap { url -> ClipboardAssistantDetection? in
-                    ClipboardAssistantDetector.detect(
+            let inspection = Task.detached(priority: .userInitiated) { () -> ClipboardAssistantDetection? in
+                for url in urls {
+                    if let detection = ClipboardAssistantDetector.detect(
                         content: .file(ClipboardFileReference(url: url, displayName: url.lastPathComponent, bookmark: Data())),
                         enabledKinds: [.appCannotOpen]
-                    )
-                }.first
+                    ) { return detection }
+                }
+                return nil
             }
             let detection = await withTaskCancellationHandler {
                 await inspection.value
