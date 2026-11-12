@@ -3377,6 +3377,23 @@
 "备忘录内容已变化，请重新打开后编辑" = "Not değişti. Düzenlemeden önce yeniden açın";
 "无法保存手写备忘录的文本，请在备忘录中打开后重试" = "El yazısı nottaki metin kaydedilemedi. Notlar’da açıp yeniden deneyin";
 
+"每日模型用量" = "Günlük Model Kullanımı";
+"暂无模型用量" = "Henüz Model Kullanımı Yok";
+"未分类" = "Sınıflandırılmamış";
+"未知模型" = "Bilinmeyen Model";
+"输入 %@ · 输出 %@" = "Girdi %@ · Çıktı %@";
+"AI 模型用量" = "Yapay Zekâ Model Kullanımı";
+
+"AI 用量历史" = "Yapay zekâ kullanım geçmişi";
+"把全部 AI 用量历史导出为 xlsx 表格" = "Tüm yapay zekâ kullanım geçmişini xlsx elektronik tablosu olarak dışa aktar";
+"已清空 AI 用量历史" = "Yapay zekâ kullanım geçmişi temizlendi";
+"清空失败：%@" = "Temizleme başarısız: %@";
+"清空 AI 用量历史？" = "Yapay zekâ kullanım geçmişi temizlensin mi?";
+"删除本机保存的 AI 用量历史，保留任务和日志去重记录。此操作无法撤销。" = "Bu Mac’te saklanan yapay zekâ kullanım geçmişini sil. Görevler ve günlük yinelenmelerini önleme kayıtları korunur. Bu işlem geri alınamaz.";
+"上一年" = "Önceki yıl";
+"下一年" = "Sonraki yıl";
+"AI token 用量热力图" = "Yapay zekâ token kullanım ısı haritası";
+
 
 "多选" = "Seç";
 "取消选择" = "Seçimi kaldır";

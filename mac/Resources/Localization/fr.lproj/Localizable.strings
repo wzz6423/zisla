@@ -3373,6 +3373,23 @@
 "备忘录内容已变化，请重新打开后编辑" = "La note a changé. Rouvrez-la avant de la modifier";
 "无法保存手写备忘录的文本，请在备忘录中打开后重试" = "Impossible d’enregistrer le texte de la note manuscrite. Ouvrez-la dans Notes et réessayez";
 
+"每日模型用量" = "Utilisation quotidienne des modèles";
+"暂无模型用量" = "Aucune utilisation de modèle";
+"未分类" = "Non classé";
+"未知模型" = "Modèle inconnu";
+"输入 %@ · 输出 %@" = "Entrée %@ · Sortie %@";
+"AI 模型用量" = "Utilisation des modèles IA";
+
+"AI 用量历史" = "Historique d’utilisation de l’IA";
+"把全部 AI 用量历史导出为 xlsx 表格" = "Exporter tout l’historique d’utilisation de l’IA en feuille de calcul xlsx";
+"已清空 AI 用量历史" = "Historique d’utilisation de l’IA effacé";
+"清空失败：%@" = "Échec de l’effacement : %@";
+"清空 AI 用量历史？" = "Effacer l’historique d’utilisation de l’IA ?";
+"删除本机保存的 AI 用量历史，保留任务和日志去重记录。此操作无法撤销。" = "Supprimer l’historique d’utilisation de l’IA enregistré sur ce Mac. Les tâches et les données de déduplication des journaux sont conservées. Cette action est irréversible.";
+"上一年" = "Année précédente";
+"下一年" = "Année suivante";
+"AI token 用量热力图" = "Carte thermique de l’utilisation des tokens IA";
+
 
 "多选" = "Sélectionner";
 "取消选择" = "Tout désélectionner";

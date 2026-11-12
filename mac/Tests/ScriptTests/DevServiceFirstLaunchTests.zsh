@@ -1,6 +1,6 @@
 #!/bin/zsh
 set -euo pipefail
-unset ZISLA_FRESH_START ZISLA_DEBUG_BUNDLE_ID CFFIXED_USER_HOME ZISLA_DEBUG_SHOW_CHARGE_TO_FULL
+unset ZISLA_FRESH_START ZISLA_DEBUG_BUNDLE_ID CFFIXED_USER_HOME ZISLA_DEBUG_AI_MODEL_USAGE ZISLA_DEBUG_SHOW_CHARGE_TO_FULL
 
 MAC_ROOT="${0:A:h:h:h}"
 TEMPORARY_ROOT="$(mktemp -d "${TMPDIR%/}/zisla-first-launch-tests.XXXXXX")"
@@ -41,8 +41,8 @@ function wait_for_service_to_run() { print -r -- "4242" }
 function launchctl() {
   [[ "$#" == 3 && "$1" == bootstrap && "$2" == "$SERVICE_DOMAIN" && "$3" == "$LAUNCH_AGENT" ]] || return 1
   python3 - "$LAUNCH_AGENT" "$APP_BINARY" "$APP/Contents/Info.plist" "$TEST_TEMPORARY_ROOT" >> "$CAPTURE_FILE" <<'PYTHON'
-import plistlib
 import os
+import plistlib
 import sys
 from pathlib import Path
 
@@ -62,6 +62,10 @@ if home != "none":
     assert bundle == "dev.wzz.zisla.debug.fresh." + Path(home).suffix[1:], "Preferences and home must identify the same fresh launch"
     assert not any(Path(home).iterdir()), "Fresh launch must not copy existing data"
 assert agent["KeepAlive"] is True, "Automatic restarts must keep the same launch environment"
+if "TEST_EXPECT_AI_MODEL_USAGE" in os.environ:
+    expected_usage = os.environ["TEST_EXPECT_AI_MODEL_USAGE"]
+    actual_usage = agent["EnvironmentVariables"].get("ZISLA_DEBUG_AI_MODEL_USAGE")
+    assert actual_usage == (expected_usage or None), "The model-usage fixture must reach launchd exactly and be removed when cleared"
 print(f"plist first={value} home={home} bundle={bundle}")
 PYTHON
 }
@@ -128,6 +132,34 @@ for target in run update; do
     expect_launch "$target normalizes '$invalid_value' to 0" "$invalid_value" 0 \
       env -u MAKEFLAGS -u MFLAGS -u ZISLA_FIRST make -C "$TEST_ROOT" "$target" "ZISLA_FIRST=$invalid_value"
   done
+done
+
+function expect_model_usage_launch() {
+  local description="$1"
+  local expected="$2"
+  shift 2
+  if ! env TEST_EXPECT_AI_MODEL_USAGE="$expected" "$@" >/dev/null; then
+    print -u2 -r -- "FAIL: $description"
+    exit 1
+  fi
+  [[ ! -e "$TEST_ROOT/SHOULD_NOT_EXIST" ]] || {
+    print -u2 -r -- "FAIL: a debug fixture must not execute shell substitutions"
+    exit 1
+  }
+  (( tests_run += 1 ))
+}
+
+for target in run update; do
+  expect_model_usage_launch "$target forwards environment model usage" 'codex:gpt-6.1-sol:120000:18000,claude:claude-opus:85000:12000:1' \
+    env -u MAKEFLAGS -u MFLAGS ZISLA_DEBUG_AI_MODEL_USAGE=codex:gpt-6.1-sol:120000:18000,claude:claude-opus:85000:12000:1 make -C "$TEST_ROOT" "$target"
+  expect_model_usage_launch "$target forwards make model usage" 'codex:gpt-6.1-sol:100:20:2' \
+    env -u MAKEFLAGS -u MFLAGS -u ZISLA_DEBUG_AI_MODEL_USAGE make -C "$TEST_ROOT" "$target" ZISLA_DEBUG_AI_MODEL_USAGE=codex:gpt-6.1-sol:100:20:2
+  expect_model_usage_launch "$target preserves literal fixture text" 'invalid; $(touch SHOULD_NOT_EXIST)' \
+    env -u MAKEFLAGS -u MFLAGS 'ZISLA_DEBUG_AI_MODEL_USAGE=invalid; $(touch SHOULD_NOT_EXIST)' make -C "$TEST_ROOT" "$target"
+  expect_model_usage_launch "$target clears previous model usage" '' \
+    env -u MAKEFLAGS -u MFLAGS make -C "$TEST_ROOT" "$target" ZISLA_DEBUG_AI_MODEL_USAGE=
+  expect_model_usage_launch "$target defaults to real usage after fixture removal" '' \
+    env -u MAKEFLAGS -u MFLAGS -u ZISLA_DEBUG_AI_MODEL_USAGE make -C "$TEST_ROOT" "$target"
 done
 
 for target in run update; do

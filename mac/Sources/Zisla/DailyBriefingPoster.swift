@@ -9,9 +9,11 @@ struct DailyBriefingReport: Sendable {
     var typing: DailyBriefingTyping?
     var allDeviceSeconds: TimeInterval?
     var notificationCount: Int? = nil
+    var aiUsage: AIDailyModelUsage? = nil
     var selectedContent: Set<DailyBriefingContent> = DailyBriefingContent.defaultSelection
     var calendar = DailyBriefingDay.calendar
 
+    /// Uses deterministic fixture data so previews remain independent of local activity and accounts.
     static func example(at date: Date = Date(), selectedContent: Set<DailyBriefingContent> = DailyBriefingContent.defaultSelection) -> Self {
         let calendar = DailyBriefingDay.calendar
         let start = calendar.startOfDay(for: date)
@@ -60,7 +62,11 @@ struct DailyBriefingReport: Sendable {
             return DailyBriefingPowerSample(date: sampleDate, averageWatts: watts)
         }
         return Self(day: day, generatedAt: day.lastActivity!, typing: .init(characters: 12846, topApplication: "Xcode", peakHour: 14),
-            allDeviceSeconds: 31500, notificationCount: 87, selectedContent: selectedContent)
+            allDeviceSeconds: 31500, notificationCount: 87,
+            aiUsage: AIDailyModelUsage(date: start, inputTokens: 180_000, outputTokens: 32_000, models: [
+                AIModelUsage(provider: .codex, model: "gpt-6.1-sol", inputTokens: 120_000, outputTokens: 20_000),
+                AIModelUsage(provider: .claude, model: "claude-sonnet-4-5", inputTokens: 60_000, outputTokens: 12_000),
+            ]), selectedContent: selectedContent)
     }
 }
 
@@ -134,12 +140,14 @@ struct DailyBriefingPoster: View {
             language: language, accent: accent, ink: ink)
     }
 
+    /// Suppresses empty sections so selecting a metric does not reserve blank poster space.
     private func hasData(_ content: DailyBriefingContent) -> Bool {
         switch content {
         case .hourlyUsage: return hasUsageData
         case .applicationUsage: return !DailyBriefingApplicationChart.rows(for: report.day.applications, language: language).isEmpty
         case .keyPressTrend: return keyPressChart.hasData
         case .powerTrend: return powerChart.hasData
+        case .aiModelUsage: return report.aiUsage?.totalTokens ?? 0 > 0
         default: return value(for: content) != nil
         }
     }
@@ -151,6 +159,7 @@ struct DailyBriefingPoster: View {
         }
     }
 
+    /// Returns detail values only when the source observation exists; missing readings remain omitted.
     func value(for content: DailyBriefingContent) -> String? {
         switch content {
         case .localUsage: return hasUsageData ? durationValue(report.day.activeSeconds) : nil
@@ -176,7 +185,7 @@ struct DailyBriefingPoster: View {
         case .peakFan: return report.day.peakFan.map { peak($0, unit: "RPM") }
         case .notificationCount: return report.notificationCount.map { $0.formatted(.number.locale(locale)) }
         case .completedFocusTime: return durationValue(report.day.activity?.completedFocusSeconds)
-        case .hourlyUsage, .applicationUsage, .keyPressTrend, .powerTrend: return nil
+        case .hourlyUsage, .applicationUsage, .keyPressTrend, .powerTrend, .aiModelUsage: return nil
         default:
             return content.activity.flatMap { event in
                 report.day.activity.map { $0.count(for: event).formatted(.number.locale(locale)) }
@@ -194,6 +203,37 @@ struct DailyBriefingPoster: View {
             if displayedContent.contains(.applicationUsage) {
                 DailyBriefingApplicationChart(applications: report.day.applications, language: language,
                     accent: accent, ink: ink, formatDuration: duration)
+            }
+            if displayedContent.contains(.aiModelUsage), let usage = report.aiUsage {
+                VStack(alignment: .leading, spacing: 18) {
+                    HStack {
+                        Text(localized("AI 模型用量")).font(.system(size: 18, weight: .semibold))
+                        Spacer(minLength: 12)
+                        Text("\(AIUsageAnalytics.formatTokenAxisValue(usage.totalTokens)) Token").monospacedDigit()
+                    }
+                    ForEach(DailyModelUsageList.providerGroups(usage.models)) { group in
+                        VStack(alignment: .leading, spacing: 8) {
+                            HStack(spacing: 8) {
+                                if let identity = group.identity {
+                                    AIMascotView(identity: identity, size: 20)
+                                        .environment(\.colorScheme, template == .midnight || template == .terminal ? .dark : .light)
+                                }
+                                Text(group.name(locale: locale)).font(.system(size: 18, weight: .semibold))
+                            }
+                            ForEach(group.models) { model in
+                                HStack(alignment: .firstTextBaseline, spacing: 12) {
+                                    Text(DailyModelUsageList.modelName(model, locale: locale))
+                                        .font(.system(size: 17, weight: .medium))
+                                        .lineLimit(1).truncationMode(.middle)
+                                        .frame(maxWidth: .infinity, alignment: .leading)
+                                    Text(DailyModelUsageList.tokenBreakdown(model, locale: locale))
+                                        .font(.system(size: 15).monospacedDigit()).foregroundStyle(ink.opacity(0.65))
+                                        .fixedSize()
+                                }
+                            }
+                        }
+                    }
+                }
             }
             if displayedContent.contains(.keyPressTrend) || displayedContent.contains(.powerTrend) {
                 HStack(alignment: .top, spacing: 40) {

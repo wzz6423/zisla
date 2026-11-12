@@ -58,7 +58,7 @@ public final class AIStateMonitor: ObservableObject {
     }
 
     private enum UsageHistoryLoadResult: Sendable {
-        case samples([AIUsageSample])
+        case samples(AIUsageHistory)
         case corruptedState
         case failure(String)
     }
@@ -72,6 +72,8 @@ public final class AIStateMonitor: ObservableObject {
     @Published public private(set) var errorDescription: String?
     @Published public private(set) var usageHistoryState: AIUsageHistoryState = .idle
     @Published public private(set) var failedUsageProviders: Set<AIProvider> = []
+    @Published public private(set) var usageHistoryRevision: UInt64 = 0
+    @Published public private(set) var isClearingUsageHistory = false
 
     private let repository: AIStateRepository
     private let activityDetectors: [any AIActivityDetecting]
@@ -88,6 +90,7 @@ public final class AIStateMonitor: ObservableObject {
     private var usageHistoryLoadInFlight = false
     private var usageHistoryLoadPending = false
     private var usageHistoryGeneration: UInt64 = 0
+    private var usageHistoryClearGeneration: UInt64 = 0
     private var memoryPressureSource: DispatchSourceMemoryPressure?
     private var descriptor: Int32 = -1
     private var activityTimer: Timer?
@@ -95,6 +98,10 @@ public final class AIStateMonitor: ObservableObject {
     private let detectorRefreshInterval: TimeInterval
     private let usageRefreshInterval: TimeInterval
     private let now: () -> Date
+    #if DEBUG
+    private let debugEnvironment: [String: String]
+    private var debugUsageHistoryCleared = false
+    #endif
     private let refreshQueue = DispatchQueue(
         label: "dev.wzz.zisla.ai-state-refresh",
         qos: .utility
@@ -155,6 +162,7 @@ public final class AIStateMonitor: ObservableObject {
         activeTaskTTL: TimeInterval = AIStateMonitor.defaultActiveTaskTTL,
         detectorRefreshInterval: TimeInterval = AIStateMonitor.defaultDetectorRefreshInterval,
         usageRefreshInterval: TimeInterval = AIStateMonitor.defaultUsageRefreshInterval,
+        environment: [String: String] = ProcessInfo.processInfo.environment,
         now: @escaping () -> Date = Date.init
     ) {
         repository = AIStateRepository(directoryURL: directoryURL)
@@ -165,6 +173,9 @@ public final class AIStateMonitor: ObservableObject {
         self.detectorRefreshInterval = max(1, detectorRefreshInterval)
         self.usageRefreshInterval = max(1, usageRefreshInterval)
         self.now = now
+        #if DEBUG
+        debugEnvironment = environment
+        #endif
     }
 
     static func defaultActivityDetectors() -> [any AIActivityDetecting] {
@@ -349,7 +360,8 @@ public final class AIStateMonitor: ObservableObject {
 
     /// Immediately releases historical samples that are no longer needed for the normal state display after leaving the AI panel.
     public func unloadUsageHistory() {
-        guard usageHistoryRequested || usageHistoryIsLoaded || usageHistoryLoadInFlight || !state.usageSamples.isEmpty else {
+        guard usageHistoryRequested || usageHistoryIsLoaded || usageHistoryLoadInFlight || !state.usageSamples.isEmpty
+            || !state.modelUsageSamples.isEmpty else {
             return
         }
         usageHistoryRequested = false
@@ -358,12 +370,82 @@ public final class AIStateMonitor: ObservableObject {
         usageHistoryLoadInFlight = false
         usageHistoryLoadPending = false
         usageHistoryState = .idle
-        let shouldRelieveMemory = !state.usageSamples.isEmpty
+        let shouldRelieveMemory = !state.usageSamples.isEmpty || !state.modelUsageSamples.isEmpty
         state.usageSamples.removeAll(keepingCapacity: false)
+        state.modelUsageSamples.removeAll(keepingCapacity: false)
         if shouldRelieveMemory {
             Self.scheduleAllocatorRelief(on: refreshQueue)
         }
     }
+
+    /// A separate window owns its snapshot, so reading it cannot request or unload the island's history.
+    public func readUsageHistory() async throws -> AIUsageHistory {
+        try Task.checkCancellation()
+        guard !isClearingUsageHistory else { throw CancellationError() }
+        let generation = usageHistoryClearGeneration
+        #if DEBUG
+        if let history = debugUsageHistory() { return history }
+        #endif
+        let repository = repository
+        let history: AIUsageHistory = try await withCheckedThrowingContinuation { continuation in
+            refreshQueue.async {
+                do { continuation.resume(returning: try repository.loadUsageHistory()) }
+                catch { continuation.resume(throwing: error) }
+            }
+        }
+        try Task.checkCancellation()
+        guard generation == usageHistoryClearGeneration else { throw CancellationError() }
+        return history
+    }
+
+    /// Serializes clearing with local scans and invalidates older panel reads before they can publish.
+    public func clearUsageHistory() async throws {
+        guard !isClearingUsageHistory else { throw CancellationError() }
+        isClearingUsageHistory = true
+        usageHistoryClearGeneration &+= 1
+        usageHistoryGeneration &+= 1
+        usageHistoryLoadInFlight = false
+        usageHistoryLoadPending = false
+        do {
+            #if DEBUG
+            if debugUsageHistory() != nil { debugUsageHistoryCleared = true }
+            else { try await clearPersistedUsageHistory() }
+            #else
+            try await clearPersistedUsageHistory()
+            #endif
+            state.usageSamples.removeAll(keepingCapacity: false)
+            state.modelUsageSamples.removeAll(keepingCapacity: false)
+            usageHistoryIsLoaded = usageHistoryRequested
+            usageHistoryState = usageHistoryRequested ? .loaded : .idle
+            usageHistoryRevision &+= 1
+            errorDescription = nil
+            isClearingUsageHistory = false
+        } catch {
+            isClearingUsageHistory = false
+            if usageHistoryRequested { requestUsageHistoryLoad(force: true) }
+            throw error
+        }
+    }
+
+    private func clearPersistedUsageHistory() async throws {
+        let repository = repository
+        try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Void, any Error>) in
+            refreshQueue.async {
+                do {
+                    try repository.clearUsageHistory()
+                    continuation.resume()
+                } catch { continuation.resume(throwing: error) }
+            }
+        }
+    }
+
+    #if DEBUG
+    /// A cleared preview stays empty for this process; restarting restores the environment fixture.
+    private func debugUsageHistory() -> AIUsageHistory? {
+        guard let history = AIModelUsageDebug.history(environment: debugEnvironment, now: now()) else { return nil }
+        return debugUsageHistoryCleared ? AIUsageHistory() : history
+    }
+    #endif
 
     /// Schedules a background refresh for interactive paths, avoiding a full decode of large state files on the main thread.
     public func refresh() {
@@ -374,6 +456,7 @@ public final class AIStateMonitor: ObservableObject {
         )
     }
 
+    /// Refreshes loaded history for metadata-only writes while rejecting results from an obsolete generation.
     private func scheduleSubscriptionUsageRefresh() {
         guard let detector = subscriptionUsageDetector, subscriptionUsageTask == nil,
               now().timeIntervalSince(lastSubscriptionRefreshAt) >= usageRefreshInterval else { return }
@@ -391,7 +474,9 @@ public final class AIStateMonitor: ObservableObject {
             if !result.usageSamples.isEmpty {
                 do {
                     let changed = try await Task.detached(priority: .utility) {
-                        try repository.recordDetectedUsage(result.usageSamples) > 0
+                        let previous = repository.storageChangeToken()
+                        let count = try repository.recordDetectedUsage(result.usageSamples)
+                        return count > 0 || previous != repository.storageChangeToken()
                     }.value
                     guard self.refreshGeneration == generation else { return }
                     if changed, self.usageHistoryRequested { self.requestUsageHistoryLoad(force: true) }
@@ -408,8 +493,9 @@ public final class AIStateMonitor: ObservableObject {
         scheduleDetectorRefresh(allowUsageScan: false)
     }
 
+    /// Coalesces forced reads and loads both ledgers off the main thread without reviving an unloaded panel.
     private func requestUsageHistoryLoad(force: Bool = false) {
-        guard usageHistoryRequested else { return }
+        guard usageHistoryRequested, !isClearingUsageHistory else { return }
         if usageHistoryLoadInFlight {
             usageHistoryLoadPending = usageHistoryLoadPending || force
             return
@@ -420,13 +506,20 @@ public final class AIStateMonitor: ObservableObject {
         usageHistoryGeneration &+= 1
         let historyGeneration = usageHistoryGeneration
         let monitorGeneration = refreshGeneration
+        #if DEBUG
+        if let history = debugUsageHistory() {
+            applyUsageHistory(.samples(history), historyGeneration: historyGeneration,
+                monitorGeneration: monitorGeneration)
+            return
+        }
+        #endif
         let repository = repository
         let usageHistoryStart = usageHistoryStartDate(endingAt: now())
         let monitor = self
         refreshQueue.async { [weak monitor] in
             let result: UsageHistoryLoadResult
             do {
-                result = .samples(try repository.loadUsageSamples(startingAt: usageHistoryStart))
+                result = .samples(try repository.loadUsageHistory(startingAt: usageHistoryStart))
             } catch AIStateRepositoryError.corruptedState {
                 result = .corruptedState
             } catch {
@@ -442,6 +535,7 @@ public final class AIStateMonitor: ObservableObject {
         }
     }
 
+    /// Accepts only the current panel generation and retains the last valid snapshot when a read fails.
     private func applyUsageHistory(
         _ result: UsageHistoryLoadResult,
         historyGeneration: UInt64,
@@ -452,9 +546,12 @@ public final class AIStateMonitor: ObservableObject {
         guard refreshGeneration == monitorGeneration, usageHistoryRequested else { return }
 
         switch result {
-        case let .samples(samples):
-            if state.usageSamples != samples {
-                state.usageSamples = samples
+        case let .samples(history):
+            if state.usageSamples != history.usageSamples {
+                state.usageSamples = history.usageSamples
+            }
+            if state.modelUsageSamples != history.modelUsageSamples {
+                state.modelUsageSamples = history.modelUsageSamples
             }
             usageHistoryIsLoaded = true
             usageHistoryState = .loaded
@@ -596,6 +693,7 @@ public final class AIStateMonitor: ObservableObject {
         }
     }
 
+    /// Reconciles tasks lazily; watcher changes refresh model history only while the AI panel requests it.
     private func schedulePersistedReload(
         refreshDetectorsAfterLoad: Bool = true,
         force: Bool = false,
@@ -621,6 +719,9 @@ public final class AIStateMonitor: ObservableObject {
             guard let self, self.refreshGeneration == generation else { return }
             self.persistedReloadInFlight = false
             self.applyPersisted(result, includesUsageSamples: includesUsageSamples)
+            if result.changedPersistedState, self.usageHistoryRequested {
+                self.requestUsageHistoryLoad(force: true)
+            }
             if refreshDetectorsAfterLoad,
                result.changedPersistedState || refreshDetectorsWhenUnchanged {
                 self.scheduleDetectorRefresh(allowUsageScan: false)
@@ -748,6 +849,7 @@ public final class AIStateMonitor: ObservableObject {
         }
     }
 
+    /// Persists a complete usage scan and detects metadata writes before deciding whether loaded history is stale.
     private nonisolated static func detectState(
         using dependencies: RefreshDependencies,
         persistedTasks: [AIProgressTask],
@@ -774,7 +876,9 @@ public final class AIStateMonitor: ObservableObject {
             let activityFileURLs = dependencies.activityDetectors.flatMap(\.activityFileURLs)
             var usageChanged = false
             if detectsUsage, usageScanComplete {
-                usageChanged = try dependencies.repository.recordDetectedUsage(automaticUsage) > 0
+                let previous = dependencies.repository.storageChangeToken()
+                let count = try dependencies.repository.recordDetectedUsage(automaticUsage)
+                usageChanged = count > 0 || previous != dependencies.repository.storageChangeToken()
                 if loadsUsageHistory {
                     if usageChanged {
                         var next = try dependencies.repository.load(includeUsageSamples: true)
@@ -824,6 +928,7 @@ public final class AIStateMonitor: ObservableObject {
         return tasks
     }
 
+    /// Preserves requested histories during task-only reloads and releases both arrays after panel exit.
     private func applyPersisted(
         _ result: PersistedRefreshResult,
         includesUsageSamples: Bool,
@@ -837,9 +942,18 @@ public final class AIStateMonitor: ObservableObject {
             let keepsLoadedUsageSamples = keepsExistingUsageSamples || (includesUsageSamples && usageHistoryRequested)
             if keepsExistingUsageSamples {
                 next.usageSamples = state.usageSamples
+                next.modelUsageSamples = state.modelUsageSamples
             } else if !keepsLoadedUsageSamples {
                 next.usageSamples.removeAll(keepingCapacity: false)
+                next.modelUsageSamples.removeAll(keepingCapacity: false)
             }
+            #if DEBUG
+            if includesUsageSamples, usageHistoryRequested,
+               let history = debugUsageHistory() {
+                next.usageSamples = history.usageSamples
+                next.modelUsageSamples = history.modelUsageSamples
+            }
+            #endif
             if next != state { state = next }
             if includesUsageSamples && usageHistoryRequested {
                 usageHistoryIsLoaded = true
