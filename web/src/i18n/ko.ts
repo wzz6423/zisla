@@ -453,6 +453,14 @@ export const ko: SiteContent = {
       '실제 노치는 시스템 안전 영역으로 추정하고, 노치가 없는 외부 디스플레이에서는 전용 오버레이로 상태 바를 재현합니다',
     ],
   },
+  film: {
+    title: "소개 영상",
+    videoAriaLabel: "zisla 소개 영상",
+    openVideoLabel: "영상 열기",
+    playbackError: "영상을 재생할 수 없습니다.",
+    musicLabel: "음악",
+    excerptLabel: "발췌",
+  },
   footer: {
     brandHomeAriaLabel: 'zisla 홈으로 돌아가기',
     previewChannelLabel: 'Preview 채널',

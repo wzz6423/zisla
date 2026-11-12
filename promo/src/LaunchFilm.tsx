@@ -2,28 +2,36 @@ import type {FC} from 'react';
 import {Audio, Sequence, staticFile, useCurrentFrame} from 'remotion';
 import {Stage} from './components/Stage';
 import {Scene1Awakening} from './scenes/Scene1Awakening';
+import {SceneLayouts} from './scenes/SceneLayouts';
 import {Scene2AICenter} from './scenes/Scene2AICenter';
 import {Scene3Flow} from './scenes/Scene3Flow';
 import {SceneMail} from './scenes/SceneMail';
-import {Scene4Bento} from './scenes/Scene4Bento';
+import {SceneEveryday} from './scenes/SceneEveryday';
+import {SceneCreativeTools} from './scenes/SceneCreativeTools';
+import {SceneDesktopTools} from './scenes/SceneDesktopTools';
+import {SceneSettings} from './scenes/SceneSettings';
 import {Scene5Outro} from './scenes/Scene5Outro';
 import {CROSSFADE, SCENES} from './timeline';
 import {clamp01} from './theme';
 
 type Entry = {
   id: string;
-  Scene: FC<{duration?: number}>;
+  Scene: FC<{duration?: number; globalFrom?: number}>;
   from: number;
   duration: number;
 };
 
 // Keep the outgoing scene opaque until the incoming scene finishes its crossfade.
-const ENTRIES: readonly Entry[] = [
+export const ENTRIES: readonly Entry[] = [
   {id: 'awakening', Scene: Scene1Awakening, ...SCENES.awakening},
+  {id: 'layouts', Scene: SceneLayouts, ...SCENES.layouts},
   {id: 'aiCenter', Scene: Scene2AICenter, ...SCENES.aiCenter},
   {id: 'flow', Scene: Scene3Flow, ...SCENES.flow},
   {id: 'mail', Scene: SceneMail, ...SCENES.mail},
-  {id: 'bento', Scene: Scene4Bento, ...SCENES.bento},
+  {id: 'everyday', Scene: SceneEveryday, ...SCENES.everyday},
+  {id: 'creative', Scene: SceneCreativeTools, ...SCENES.creative},
+  {id: 'desktop', Scene: SceneDesktopTools, ...SCENES.desktop},
+  {id: 'settings', Scene: SceneSettings, ...SCENES.settings},
   {id: 'outro', Scene: Scene5Outro, ...SCENES.outro},
 ];
 
@@ -31,7 +39,7 @@ const SceneLayer: FC<{entry: Entry; lead: number}> = ({entry, lead}) => {
   const frame = useCurrentFrame();
   return (
     <Stage opacity={clamp01((frame + 1) / (lead + 1))}>
-      <entry.Scene duration={lead + entry.duration} />
+      <entry.Scene duration={lead + entry.duration} globalFrom={entry.from - lead} />
     </Stage>
   );
 };

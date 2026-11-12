@@ -440,6 +440,14 @@ export const zhHant: SiteContent = {
       '實體瀏海透過系統安全區域推斷；沒有瀏海的外接螢幕使用自有覆蓋層模擬狀態列',
     ],
   },
+  film: {
+    title: "宣傳片",
+    videoAriaLabel: "zisla 宣傳片",
+    openVideoLabel: "開啟影片",
+    playbackError: "無法播放影片。",
+    musicLabel: "音樂",
+    excerptLabel: "節選",
+  },
   footer: {
     brandHomeAriaLabel: '回到 zisla 首頁',
     previewChannelLabel: 'Preview 通道',

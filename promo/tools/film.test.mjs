@@ -19,11 +19,11 @@ test('Studio asset URLs stay inside the server when icons live outside promo', a
   }
 });
 
-test('the six demonstrations fill exactly sixty seconds without timeline gaps', () => {
+test('the full feature tour fills its timeline without gaps', () => {
   const scenes = Object.values(SCENES);
-  assert.equal(scenes.length, 6);
+  assert.equal(scenes.length, 10);
   assert.equal(FPS, 60);
-  assert.equal(TOTAL_FRAMES, 3600);
+  assert.equal(TOTAL_FRAMES, 11160);
   assert.equal(scenes[0].from, 0);
   for (let index = 1; index < scenes.length; index++) {
     assert.equal(scenes[index].from, scenes[index - 1].from + scenes[index - 1].duration);

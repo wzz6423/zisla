@@ -306,6 +306,14 @@ export const vi = createCatalog({
       'Suy ra notch vật lý từ vùng an toàn hệ thống; màn hình ngoài không có notch dùng thanh trạng thái mô phỏng trong lớp phủ riêng',
     ],
   },
+  film: {
+    title: "Video giới thiệu",
+    videoAriaLabel: "Video giới thiệu zisla",
+    openVideoLabel: "Mở video",
+    playbackError: "Không thể phát video.",
+    musicLabel: "Nhạc",
+    excerptLabel: "Trích đoạn",
+  },
   footer: {
     brandHomeAriaLabel: 'Quay lại trang chủ zisla',
     previewChannelLabel: 'Kênh Preview',

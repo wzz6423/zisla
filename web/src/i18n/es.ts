@@ -443,6 +443,14 @@ export const es = createCatalog({
       'El notch físico se infiere de la zona segura; las pantallas externas sin notch reciben una barra simulada en una superposición dedicada',
     ],
   },
+  film: {
+    title: "Vídeo de presentación",
+    videoAriaLabel: "Vídeo de presentación de zisla",
+    openVideoLabel: "Abrir el vídeo",
+    playbackError: "No se puede reproducir el vídeo.",
+    musicLabel: "Música",
+    excerptLabel: "Fragmento",
+  },
   footer: {
     brandHomeAriaLabel: 'Volver al inicio de zisla',
     previewChannelLabel: 'Canal Preview',

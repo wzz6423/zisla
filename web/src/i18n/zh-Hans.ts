@@ -440,6 +440,14 @@ export const zhHans: SiteContent = {
       '物理刘海通过系统安全区域推断；无刘海的外接显示器使用自有覆盖层模拟状态条',
     ],
   },
+  film: {
+    title: "宣传片",
+    videoAriaLabel: "zisla 宣传片",
+    openVideoLabel: "打开视频",
+    playbackError: "无法播放视频。",
+    musicLabel: "音乐",
+    excerptLabel: "节选",
+  },
   footer: {
     brandHomeAriaLabel: '回到 zisla 首页',
     previewChannelLabel: 'Preview 通道',

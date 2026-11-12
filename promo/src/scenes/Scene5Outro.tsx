@@ -11,7 +11,7 @@ import {copy, focus, track} from '../content';
 import {HomeModule} from '../modules/HomeModule';
 import {FilmMotion, ZislaMotion, ease, linear, springAt} from '../motion';
 import {soundtrack} from '../soundtrack';
-import {SCENES, filmFrame} from '../timeline';
+import {FPS, SCENES, TOTAL_FRAMES, filmFrame} from '../timeline';
 import {MODULE_HEIGHT, clamp01, color, islandHeightFor, lerp, white} from '../theme';
 
 // Hold the expanded island through the crossfade before the cursor leaves.
@@ -149,7 +149,7 @@ export const Scene5Outro = ({duration = SCENES.outro.duration}: {duration?: numb
       </div>
 
       <div className="absolute inset-x-0 text-center text-[9px] leading-[12px]" style={{bottom: 32, color: white(0.5), opacity: repo}}>
-        Music: {soundtrack.title} by {soundtrack.artist} · {soundtrack.license} · scottbuckley.com.au · 60s edit
+        Music: {soundtrack.title} by {soundtrack.artist} · {soundtrack.license} · scottbuckley.com.au · {TOTAL_FRAMES / FPS}s edit
       </div>
 
       {/* The last frame is duration - 1, so the fade must reach black on that frame. */}

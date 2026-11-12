@@ -104,7 +104,7 @@ export const track = {
   title: 'Paper Lanterns',
   artist: 'Mira Solen',
   album: 'Night Cartography',
-  duration: 222,
+  duration: 282,
   // 片头时已经播到的秒数，之后各幕按全片时间往后走
   elapsed: 74,
   art: ['#ff9d6c', '#b8446a', '#1d2350'] as const,

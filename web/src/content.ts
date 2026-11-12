@@ -27,6 +27,18 @@ export const navHrefs: Record<NavId, string> = {
   developers: '#developers',
 };
 
+export const launchFilmMedia = {
+  video: './media/zisla-launch-1080p60.mp4',
+  poster: './media/zisla-launch-poster.webp',
+  music: {
+    title: 'Origami',
+    artist: 'Scott Buckley',
+    source: 'https://www.scottbuckley.com.au/library/origami/',
+    license: 'CC BY 4.0',
+    licenseUrl: 'https://creativecommons.org/licenses/by/4.0/',
+  },
+} as const;
+
 export const proofIds = ['modules', 'os', 'displays', 'local'] as const;
 export type ProofId = (typeof proofIds)[number];
 
@@ -613,6 +625,14 @@ export interface SiteContent {
     giteeRepoLabel: string;
     checksumLabel: string;
     performancePoints: readonly [string, string, string, string, string];
+  };
+  film: {
+    title: string;
+    videoAriaLabel: string;
+    openVideoLabel: string;
+    playbackError: string;
+    musicLabel: string;
+    excerptLabel: string;
   };
   footer: {
     brandHomeAriaLabel: string;

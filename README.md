@@ -6,6 +6,12 @@
 
 Current implementation: **macOS 14+**. Apple Silicon is the supported configuration; Intel release packages may work, but compatibility is not guaranteed.
 
+[Watch the full feature tour — 3:06 · 1080p / 60 fps](https://wzz6423.github.io/zisla/media/zisla-launch-1080p60.mp4)
+
+[![Watch the zisla launch film](web/public/media/zisla-launch-poster.webp)](https://wzz6423.github.io/zisla/media/zisla-launch-1080p60.mp4)
+
+Music: “Origami” by Scott Buckley · [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/) · [Source](https://www.scottbuckley.com.au/library/origami/).
+
 ## Why it belongs at the top of your screen
 
 - **On demand, without stealing focus.** Expand it from the top edge, pin it when needed, and keep working in the current app.

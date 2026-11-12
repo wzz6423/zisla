@@ -457,6 +457,14 @@ export const ja: SiteContent = {
       '物理的なノッチはシステムのセーフエリアから推定し、ノッチのない外部ディスプレイでは専用のオーバーレイでステータスバーを再現します',
     ],
   },
+  film: {
+    title: "紹介動画",
+    videoAriaLabel: "zisla の紹介動画",
+    openVideoLabel: "動画を開く",
+    playbackError: "動画を再生できません。",
+    musicLabel: "音楽",
+    excerptLabel: "抜粋",
+  },
   footer: {
     brandHomeAriaLabel: 'zisla のホームに戻る',
     previewChannelLabel: 'Preview チャンネル',

@@ -351,6 +351,14 @@ export const ar = createCatalog({
       'يُستدل على الشق الفعلي من منطقة الأمان؛ وتحصل الشاشات الخارجية بلا شق على شريط حالة محاكى في طبقة مستقلة',
     ],
   },
+  film: {
+    title: "فيلم تعريفي",
+    videoAriaLabel: "فيلم تعريفي عن zisla",
+    openVideoLabel: "فتح الفيديو",
+    playbackError: "تعذّر تشغيل الفيديو.",
+    musicLabel: "الموسيقى",
+    excerptLabel: "مقتطف",
+  },
   footer: {
     brandHomeAriaLabel: 'العودة إلى الصفحة الرئيسية لـ zisla',
     previewChannelLabel: 'قناة Preview',

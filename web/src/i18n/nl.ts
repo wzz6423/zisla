@@ -409,6 +409,14 @@ export const nl = createCatalog({
       'Een fysieke notch wordt afgeleid uit de veilige systeemzone; externe schermen zonder notch krijgen een gesimuleerde statusbalk in een eigen overlay',
     ],
   },
+  film: {
+    title: "Productvideo",
+    videoAriaLabel: "Productvideo van zisla",
+    openVideoLabel: "Video openen",
+    playbackError: "De video kan niet worden afgespeeld.",
+    musicLabel: "Muziek",
+    excerptLabel: "Fragment",
+  },
   footer: {
     brandHomeAriaLabel: 'Terug naar de zisla-home',
     previewChannelLabel: 'Previewkanaal',

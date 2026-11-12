@@ -471,6 +471,14 @@ export const en: SiteContent = {
       'A physical notch is inferred from the system safe area; external displays without one get a simulated status bar in a dedicated overlay',
     ],
   },
+  film: {
+    title: "Launch film",
+    videoAriaLabel: "zisla launch film",
+    openVideoLabel: "Open video",
+    playbackError: "Unable to play the video.",
+    musicLabel: "Music",
+    excerptLabel: "Excerpt",
+  },
   footer: {
     brandHomeAriaLabel: 'Back to the zisla home page',
     previewChannelLabel: 'Preview channel',

@@ -306,6 +306,14 @@ export const id = createCatalog({
       'Notch fisik disimpulkan dari area aman sistem; layar eksternal tanpa notch mendapat bilah status simulasi dalam overlay khusus',
     ],
   },
+  film: {
+    title: "Video pengenalan",
+    videoAriaLabel: "Video pengenalan zisla",
+    openVideoLabel: "Buka video",
+    playbackError: "Video tidak dapat diputar.",
+    musicLabel: "Musik",
+    excerptLabel: "Cuplikan",
+  },
   footer: {
     brandHomeAriaLabel: 'Kembali ke beranda zisla',
     previewChannelLabel: 'Saluran Preview',

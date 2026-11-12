@@ -365,6 +365,14 @@ export const ru = createCatalog({
       'Физическая выемка определяется по безопасной области; внешние экраны без выемки получают отдельную имитацию статусной панели',
     ],
   },
+  film: {
+    title: "Презентационный ролик",
+    videoAriaLabel: "Презентационный ролик zisla",
+    openVideoLabel: "Открыть видео",
+    playbackError: "Не удалось воспроизвести видео.",
+    musicLabel: "Музыка",
+    excerptLabel: "Фрагмент",
+  },
   footer: {
     brandHomeAriaLabel: 'Вернуться на главную zisla',
     previewChannelLabel: 'Канал Preview',

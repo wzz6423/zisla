@@ -306,6 +306,14 @@ export const th = createCatalog({
       'อนุมานรอยบากจริงจากพื้นที่ปลอดภัยของระบบ จอภายนอกที่ไม่มีรอยบากใช้แถบสถานะจำลองในโอเวอร์เลย์เฉพาะ',
     ],
   },
+  film: {
+    title: "วิดีโอแนะนำ",
+    videoAriaLabel: "วิดีโอแนะนำ zisla",
+    openVideoLabel: "เปิดวิดีโอ",
+    playbackError: "ไม่สามารถเล่นวิดีโอได้",
+    musicLabel: "ดนตรี",
+    excerptLabel: "บางส่วนของเพลง",
+  },
   footer: {
     brandHomeAriaLabel: 'กลับไปหน้าแรก zisla',
     previewChannelLabel: 'ช่อง Preview',

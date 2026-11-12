@@ -5,11 +5,15 @@ export const CROSSFADE = 16;
 
 export const SCENES = {
   awakening: {from: 0, duration: 480},
-  aiCenter: {from: 480, duration: 720},
-  flow: {from: 1200, duration: 780},
-  mail: {from: 1980, duration: 600},
-  bento: {from: 2580, duration: 600},
-  outro: {from: 3180, duration: 420},
+  layouts: {from: 480, duration: 1200},
+  aiCenter: {from: 1680, duration: 720},
+  flow: {from: 2400, duration: 780},
+  mail: {from: 3180, duration: 600},
+  everyday: {from: 3780, duration: 1560},
+  creative: {from: 5340, duration: 2700},
+  desktop: {from: 8040, duration: 1500},
+  settings: {from: 9540, duration: 1200},
+  outro: {from: 10740, duration: 420},
 } as const;
 
 export const TOTAL_FRAMES = SCENES.outro.from + SCENES.outro.duration;

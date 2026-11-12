@@ -1,5 +1,5 @@
 import {useCurrentFrame, useVideoConfig} from 'remotion';
-import {Caption} from '../components/Caption';
+import {Caption, Headline} from '../components/Caption';
 import {ClickRipple, Cursor} from '../components/Cursor';
 import {MenuBar, Notch, Wallpaper} from '../components/Desktop';
 import {GlassPanel, Waveform, waveLevels} from '../components/Glass';
@@ -22,6 +22,7 @@ import type {FinderItem} from '../components/Windows';
 import {copy, download, focus, shelfItems, track as song} from '../content';
 import type {ShelfItem} from '../content';
 import {HomeModule} from '../modules/HomeModule';
+import {DownloadTourModule} from '../modules/DownloadTourModule';
 import {ShelfModule} from '../modules/ShelfModule';
 import {shelfItemPoint, shelfMenuPlacement} from '../modules/shelfLayout';
 import {FilmMotion, ZislaMotion, ease, easeOutAt, fadeWindow, linear, springAt} from '../motion';
@@ -68,10 +69,11 @@ const BROWSER = {x: 260, y: 150, width: 760, height: 470};
 const TOAST_ACTION = {x: 808, y: 18};
 
 export const Scene3Flow = () => {
-  const frame = useCurrentFrame();
+  const localFrame = useCurrentFrame();
+  const frame = localFrame * 780 / 600;
   const {fps} = useVideoConfig();
   // Shared media and focus counters stay continuous across scenes.
-  const played = filmFrame('flow', frame);
+  const played = filmFrame('flow', localFrame);
   const elapsed = song.elapsed + played / fps;
   const levels = waveLevels(frame, 1, 0);
   const spectrum = [0, 1, 2, 3, 4, 5, 6].flatMap((seed) => [...waveLevels(frame, 1, seed)]);
@@ -132,6 +134,15 @@ export const Scene3Flow = () => {
   }
 
   const mediaWing = lerp(74, 0, clamp01((frame - HANDOFF.grab - 16) / 20));
+
+  if (localFrame >= 600) return (
+    <>
+      <Wallpaper dim={0.25} /><MenuBar /><Notch />
+      <Headline lines={['Bring the video. Keep the audio.']} top={104} size={38} align="left" opacity={clamp01((localFrame - 600) / 12)} />
+      <GlassPanel style={{left: 120, top: 185, width: 1040, height: 452}}><DownloadTourModule frame={localFrame - 600} /></GlassPanel>
+      <Cursor x={localFrame < 666 ? 195 : localFrame < 686 ? 316 : 1073} y={localFrame < 666 ? 287 : localFrame < 686 ? 367 : 425} pressed={localFrame >= 686 && localFrame < 692 ? 1 : 0} opacity={clamp01((localFrame - 608) / 12)} />
+    </>
+  );
 
   return (
     <>

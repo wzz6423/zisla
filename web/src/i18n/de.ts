@@ -486,6 +486,14 @@ export const de: SiteContent = {
       'Eine physische Notch wird aus dem Sicherheitsbereich des Systems abgeleitet; externe Displays ohne Notch erhalten eine simulierte Statusleiste in einem eigenen Overlay',
     ],
   },
+  film: {
+    title: "Produktfilm",
+    videoAriaLabel: "zisla-Produktfilm",
+    openVideoLabel: "Video öffnen",
+    playbackError: "Das Video kann nicht abgespielt werden.",
+    musicLabel: "Musik",
+    excerptLabel: "Auszug",
+  },
   footer: {
     brandHomeAriaLabel: 'Zurück zur Startseite von zisla',
     previewChannelLabel: 'Preview-Kanal',

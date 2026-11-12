@@ -499,6 +499,14 @@ export const fr: SiteContent = {
       'L’encoche physique est déduite de la zone de sécurité du système ; les écrans externes sans encoche reçoivent une barre d’état simulée dans une surcouche dédiée',
     ],
   },
+  film: {
+    title: "Film de présentation",
+    videoAriaLabel: "Film de présentation de zisla",
+    openVideoLabel: "Ouvrir la vidéo",
+    playbackError: "Impossible de lire la vidéo.",
+    musicLabel: "Musique",
+    excerptLabel: "Extrait",
+  },
   footer: {
     brandHomeAriaLabel: 'Retour à l’accueil de zisla',
     previewChannelLabel: 'Canal Preview',

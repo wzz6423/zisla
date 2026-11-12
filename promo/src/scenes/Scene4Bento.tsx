@@ -12,7 +12,7 @@ import {SystemModule} from '../modules/SystemModule';
 import {copy, metrics} from '../content';
 import {FilmMotion, ease, fadeWindow, springAt} from '../motion';
 import {STAGE, clamp01, color, white} from '../theme';
-import {filmFrame} from '../timeline';
+import {FPS} from '../timeline';
 
 const METRIC_ICONS = [Gauge, Feather, Layers];
 
@@ -108,7 +108,7 @@ const MetricsRow = ({x, y, width, enter, expanded = false}: {x: number; y: numbe
 export const Scene4Bento = () => {
   const frame = useCurrentFrame();
   const {fps} = useVideoConfig();
-  const global = filmFrame('bento', frame);
+  const global = 43 * FPS + frame;
 
   const everyday = ease(frame, [140, 150], [1, 0]);
   const capture = fadeWindow(frame, 140, 330, 10);

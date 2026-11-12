@@ -311,6 +311,14 @@ export const tr = createCatalog({
       'Fiziksel çentik sistemin güvenli alanından çıkarılır; çentiksiz harici ekranlarda özel katmanda benzetilmiş durum çubuğu gösterilir',
     ],
   },
+  film: {
+    title: "Tanıtım filmi",
+    videoAriaLabel: "zisla tanıtım filmi",
+    openVideoLabel: "Videoyu aç",
+    playbackError: "Video oynatılamıyor.",
+    musicLabel: "Müzik",
+    excerptLabel: "Alıntı",
+  },
   footer: {
     brandHomeAriaLabel: 'zisla ana sayfasına dön',
     previewChannelLabel: 'Preview kanalı',

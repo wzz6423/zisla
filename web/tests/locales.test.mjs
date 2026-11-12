@@ -51,7 +51,7 @@ const iconNames = mainSource.match(/const siteIcons = \{([\s\S]*?)\};/)[1].match
 const renderSource = stripTypeScriptTypes(mainSource.slice(mainSource.indexOf('const app = ')))
   .replace('void showLocale(currentLocale);', '');
 
-const renderInMemory = (locale, releases = site.changelogEntries) => {
+const renderInMemory = (locale, releases = site.changelogEntries, runtimeNodes = {}) => {
   const classList = { add() {}, remove() {}, toggle() {} };
   const node = () => ({ style: {}, dataset: {}, classList, setAttribute() {}, append() {} });
   const app = { ...node(), innerHTML: '' };
@@ -60,7 +60,7 @@ const renderInMemory = (locale, releases = site.changelogEntries) => {
     documentElement: { ...node(), scrollHeight: 800 },
     body: node(),
     head: { querySelector: () => null, append: (element) => metadata.push(element) },
-    querySelector: (selector) => selector === '#app' ? app : null,
+    querySelector: (selector) => selector === '#app' ? app : runtimeNodes[selector] ?? null,
     querySelectorAll: () => [],
     getElementById: () => null,
     createElement: node,
@@ -111,7 +111,71 @@ const updatedStrings = (content) => [
   ...strings(content.changelog.releaseNotes['v0.1.20'], 'changelog.releaseNotes.v0.1.20'),
   ...strings(content.changelog.releaseNotes['v0.1.21'], 'changelog.releaseNotes.v0.1.21'),
   ...strings(content.changelog.releaseNotes['v0.1.22'], 'changelog.releaseNotes.v0.1.22'),
+  ...strings(content.film, 'film'),
 ];
+
+test('launch film sits after the changelog and before the footer with explicit playback', () => {
+  const content = site.getSiteContent('zh-Hans');
+  const { html } = renderInMemory('zh-Hans');
+  const film = html.match(/<section[^>]+id="film"[\s\S]*?<\/section>/)?.[0];
+  assert.ok(film, 'inline film section is rendered');
+  assert.ok(html.indexOf('id="changelog"') < html.indexOf('id="film"'));
+  assert.ok(html.indexOf('id="film"') < html.indexOf('<footer'));
+  const nav = html.match(/<nav class="nav"[^>]*>([\s\S]*?)<\/nav>/)?.[1];
+  assert.ok(nav.indexOf('href="#film"') < nav.indexOf('href="#showcase"'));
+  assert.ok(nav.includes(`<a class="nav-link" href="#film">${escapedText(content.film.title)}</a>`));
+  assert.doesNotMatch(html.match(/<nav class="section-progress-nav"[\s\S]*?<\/nav>/)[0], /href="#film"/);
+  const video = film.match(/<video\b[^>]*>/)?.[0];
+  assert.ok(video, 'native video player is rendered');
+  assert.match(video, /\scontrols(?:\s|>)/);
+  assert.match(video, /\splaysinline(?:\s|>)/);
+  assert.match(video, /preload="none"/);
+  assert.match(video, /src="\.\/media\/zisla-launch-1080p60\.mp4"/);
+  assert.match(video, /poster="\.\/media\/zisla-launch-poster\.webp"/);
+  assert.match(video, /width="1920" height="1080"/);
+  assert.ok(video.includes(`aria-label="${escapedText(content.film.videoAriaLabel)}"`));
+  assert.doesNotMatch(video, /\s(?:autoplay|loop)(?:\s|=|>)/);
+  assert.doesNotMatch(film, /<dialog\b|role="dialog"/);
+  assert.ok(film.includes(`<a href="./media/zisla-launch-1080p60.mp4">${escapedText(content.film.openVideoLabel)}</a>`));
+  assert.match(film, /id="filmError" hidden role="status"/);
+  assert.ok(film.includes('https://www.scottbuckley.com.au/library/origami/'));
+  assert.ok(film.includes('https://creativecommons.org/licenses/by/4.0/'));
+  assert.ok(film.includes('Origami — Scott Buckley'));
+});
+
+test('a media error exposes the localized original-video link', () => {
+  const handlers = new Map();
+  const errorMessage = { hidden: true };
+  renderInMemory('ar', site.changelogEntries, {
+    '#launchFilm': { pause() {}, addEventListener: (event, listener) => handlers.set(event, listener) },
+    '#filmError': errorMessage,
+  });
+  assert.equal(errorMessage.hidden, true, 'no error is shown before playback fails');
+  assert.equal(typeof handlers.get('error'), 'function');
+  handlers.get('error')();
+  assert.equal(errorMessage.hidden, false, 'playback failure exposes the recovery link');
+});
+
+test('rendering another locale pauses the outgoing player', () => {
+  const outgoing = { paused: false, pause() { this.paused = true; }, addEventListener() {} };
+  renderInMemory('en', site.changelogEntries, { '#launchFilm': outgoing });
+  assert.equal(outgoing.paused, true, 'language changes must not leave detached media playing');
+});
+
+test('a detached player error cannot affect the new locale', () => {
+  const handlers = new Map();
+  const outgoingError = { hidden: true };
+  const currentError = { hidden: true };
+  const runtimeNodes = {
+    '#launchFilm': { pause() {}, addEventListener: (event, listener) => handlers.set(event, listener) },
+    '#filmError': outgoingError,
+  };
+  renderInMemory('en', site.changelogEntries, runtimeNodes);
+  runtimeNodes['#filmError'] = currentError;
+  handlers.get('error')();
+  assert.equal(outgoingError.hidden, false, 'the failure belongs to its original player');
+  assert.equal(currentError.hidden, true, 'a fresh locale retains its own playback state');
+});
 
 test('every supported locale has its own name, Open Graph tag, and direction', () => {
   assert.equal(siteLocales.length, 17);
