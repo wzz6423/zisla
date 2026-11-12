@@ -367,12 +367,16 @@ struct ScreenRecordingPlaybackTests {
         #expect(item == nil, "A cancelled seek must not restart or retain the obsolete playback item")
     }
 
-    @Test
-    func closingDetachesPlaybackObserversAndPlaySourceInstallsTheSourceObserverAgain() async throws {
+    @Test(arguments: [false, true])
+    func closingDetachesPlaybackObserversAndPlaySourceInstallsTheSourceObserverAgain(_ multitrack: Bool) async throws {
         let fixture = try RecordingMultitrackTestFixture()
         defer { fixture.remove() }
         _ = try await fixture.createVideo()
-        let source = project(fixture, multitrack: true)
+        _ = try fixture.createTone()
+        var source = fixture.project()
+        source.microphoneFile = "tone.wav"
+        source.edits.voiceEffects = .init(preset: .warm, amount: 0.8)
+        if multitrack { source.timeline = .migrating(source) }
         let model = try fixture.model()
         defer { model.shutdown() }
         model.install(source, directory: fixture.directory)
@@ -380,31 +384,106 @@ struct ScreenRecordingPlaybackTests {
         let sourcePlayer = try #require(model.player)
         try #require(model.playerObserver != nil)
 
+        for _ in 0..<2 {
+            model.seekTimeline(to: 0.1)
+            await model.previewTask?.value
+            model.playTimeline()
+            await model.operationTask?.value
+            try #require(model.isShowingTimelinePlayback)
+            weak let preparedItem = model.activePlayer?.currentItem
+            let temporary = try await playbackSources(#require(preparedItem))
+                .filter { $0.deletingLastPathComponent() != fixture.directory }
+            try #require(temporary.count == (multitrack ? 2 : 1))
+            model.playTimeline()
+            try #require(model.timelinePlayer != nil && model.timelineObserver != nil && model.playerObserver != nil)
+            model.playTimeline()
+            let resume = try #require(model.operationTask)
+            #expect(model.isBusy)
+            #expect(!model.prepareToClose())
+            #expect(model.timelinePlayer != nil && model.timelineObserver != nil)
+            #expect(model.playerObserver != nil && model.player === sourcePlayer)
+            await resume.value
+            model.playTimeline()
+
+            let position = model.playbackTime
+            let sourcePosition = model.currentTime
+            let selection = model.selectedTimelineClipID
+            #expect(model.prepareToClose())
+            #expect(model.prepareToClose(), "Closing an already closed studio must remain safe")
+            await drainMainQueue()
+            #expect(model.timelineObserver == nil && model.timelinePlayer == nil && model.playerObserver == nil)
+            #expect(model.player === sourcePlayer && sourcePlayer.rate == 0)
+            #expect(!model.isShowingTimelinePlayback && !model.isShowingSourcePlayback && !model.isBusy)
+            #expect(model.project == source && !model.isDirty && model.selectedTimelineClipID == selection)
+            #expect(model.playbackTime == position && model.currentTime == sourcePosition,
+                "Closing must preserve the playhead, and queued callbacks must not move it afterwards")
+            #expect(await releasedMedia(temporary), "Closing must release prepared voice audio and the playback clock")
+            #expect(preparedItem == nil)
+
+            model.seekSource(to: 0)
+            model.playSource()
+            let start = model.currentTime
+            let progressed = XCTestExpectation(description: "Reopened source playback advances the visible playhead")
+            let subscription = model.$currentTime.dropFirst().filter { $0 > start + 0.05 }.prefix(1)
+                .sink { _ in progressed.fulfill() }
+            #expect(await XCTWaiter.fulfillment(of: [progressed], timeout: 5) == .completed)
+            subscription.cancel()
+            #expect(model.playerObserver != nil && model.player === sourcePlayer)
+            #expect(model.isShowingSourcePlayback && sourcePlayer.rate == 1)
+            let observer = try #require(model.playerObserver) as AnyObject
+            model.playSource()
+            model.playSource()
+            #expect(try #require(model.playerObserver) as AnyObject === observer,
+                "Repeated playback must reuse its observer until the next close")
+            model.playSource()
+        }
+        #expect(try fixture.files() == ["screen.mp4", "tone.wav"])
+    }
+
+    @Test(arguments: [false, true])
+    func failedCloseSaveKeepsPlaybackAndUnsavedEditsUntilStorageRecovers(_ multitrack: Bool) async throws {
+        let fixture = try RecordingMultitrackTestFixture()
+        defer { fixture.remove() }
+        let video = try await fixture.createVideo()
+        var source = fixture.project()
+        if multitrack { source.timeline = .migrating(source) }
+        try fixture.store.save(source, in: fixture.directory)
+        let manifest = fixture.directory.appendingPathComponent(ScreenRecordingProjectStore.manifestName)
+        let saved = try Data(contentsOf: manifest)
+        let media = try Data(contentsOf: video)
+        let model = try fixture.model()
+        defer { model.shutdown() }
+        model.install(source, directory: fixture.directory)
+        await model.previewTask?.value
+        model.update { $0.name = "Unsaved recording" }
+        await model.previewTask?.value
+        let edited = try #require(model.project)
         model.playTimeline()
         await model.operationTask?.value
-        try #require(model.isShowingTimelinePlayback)
-        try #require(model.timelinePlayer != nil)
-        try #require(model.timelineObserver != nil)
-        model.playTimeline()
-        try #require(model.timelinePlayer != nil && model.timelineObserver != nil && model.playerObserver != nil)
-        model.playTimeline()
-        #expect(model.isBusy)
+        let player = try #require(model.timelinePlayer)
+        try #require(model.timelineObserver != nil && model.playerObserver != nil)
+        try FileManager.default.removeItem(at: manifest)
+        try FileManager.default.createDirectory(at: manifest, withIntermediateDirectories: false)
+
         #expect(!model.prepareToClose())
-        #expect(model.timelinePlayer != nil && model.timelineObserver != nil)
-        #expect(model.playerObserver != nil && model.player === sourcePlayer)
-        await model.operationTask?.value
+        #expect(model.errorMessage != nil && model.isDirty && model.project == edited && model.canUndo)
+        #expect(model.timelinePlayer === player && model.timelineObserver != nil && model.playerObserver != nil)
+        #expect(model.isShowingTimelinePlayback && player.rate == 1 && !model.isBusy)
+        let progressed = XCTestExpectation(description: "A refused close leaves the visible timeline playing")
+        let position = model.playbackTime
+        let subscription = model.$playbackTime.dropFirst().filter { $0 > position + 0.05 }.prefix(1)
+            .sink { _ in progressed.fulfill() }
+        #expect(await XCTWaiter.fulfillment(of: [progressed], timeout: 5) == .completed)
+        subscription.cancel()
+        #expect(try Data(contentsOf: video) == media, "A failed close must preserve the recording media")
 
-        let openProject = model.project
+        try FileManager.default.removeItem(at: manifest)
+        try saved.write(to: manifest)
         #expect(model.prepareToClose())
-        #expect(model.timelineObserver == nil)
-        #expect(model.timelinePlayer == nil)
-        #expect(model.playerObserver == nil)
-        #expect(model.player === sourcePlayer)
-        #expect(model.project == openProject)
-
-        model.playSource()
-        #expect(model.playerObserver != nil)
-        #expect(model.player === sourcePlayer)
+        #expect(!model.isDirty && model.project == edited)
+        #expect(try fixture.store.load(from: fixture.directory) == edited)
+        #expect(model.playerObserver == nil && model.timelineObserver == nil && model.timelinePlayer == nil)
+        #expect(!model.isShowingTimelinePlayback && player.rate == 0)
     }
 
     private func project(_ fixture: RecordingMultitrackTestFixture, multitrack: Bool) -> ScreenRecordingProject {
