@@ -414,6 +414,7 @@ final class SideNoticePresenter {
         }
         if CompactStatusVisibilityPolicy.mustRemainVisible(
             notices: notices,
+            selectedNotice: SideNoticeLayoutEngine().compactBarSizing(for: notices, settings: settings)?.customPillPresentation?.notice,
             activityDuration: settings.activityNoticeDisplayDuration,
             focusDuration: settings.focusModeNoticeDisplayDuration
         ) {
@@ -643,8 +644,10 @@ final class SideNoticePresenter {
         return !statusIcons.isEmpty && !showsControls
     }
 
+    /// Keeps both quota forms on the compact panel path and shares transient classification with its sizing engine.
     static func isCompactNotice(_ notice: IslandNotice) -> Bool {
         notice.id.hasPrefix("ai-active-")
+            || AIAccountBalanceNoticeController.isBalanceNotice(notice)
             || notice.id.hasPrefix("update-available-")
             || notice.id.hasPrefix("media-active-")
             || notice.id.hasPrefix("background-sound-")
@@ -652,17 +655,12 @@ final class SideNoticePresenter {
             || notice.id.hasPrefix(MeetingCountdown.noticePrefix)
             || notice.id.hasPrefix("focus-mode-")
             || notice.id.hasPrefix("mail-notification-")
-            || isTransientCompactNotice(notice)
+            || SideNoticeLayoutEngine.isTransientCompactNotice(notice)
             || notice.id.hasPrefix("toolbox-reminder-")
             || notice.id.hasPrefix("browser-download-")
             || notice.id.hasPrefix("video-download-")
             || notice.id.hasPrefix("voice-processing-")
             || notice.id.hasPrefix("screen-recording-operation-")
-    }
-
-    private static func isTransientCompactNotice(_ notice: IslandNotice) -> Bool {
-        notice.id.hasPrefix("focus-transition") || notice.style == .headphone
-            || LowBatteryNoticeController.isLowBatteryNotice(notice)
     }
 
     private func panel(for side: NoticeSide, in panels: DisplayPanels) -> IslandPanel? {

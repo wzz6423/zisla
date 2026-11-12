@@ -6,34 +6,42 @@ import SwiftUI
 
 struct AIProgressModuleView: View {
     @ObservedObject private var monitor: AIStateMonitor
+    var displayedBalanceProviders: Set<AIProvider>
+    var monitoredBalanceProviders: Set<AIProvider>
+    var language: AppLanguage
     @State private var selectedUsageDate: Date?
 
     /// Both columns push their content this far below the header. The trend chart's topmost
     /// Y-axis tick is drawn above its plot frame, so a tighter gap lets it collide with the title.
     private static let sectionSpacing: CGFloat = 12
 
-    init(monitor: AIStateMonitor) {
+    init(monitor: AIStateMonitor, displayedBalanceProviders: Set<AIProvider> = Set(AIProvider.allCases),
+         monitoredBalanceProviders: Set<AIProvider>,
+         language: AppLanguage = AppLocalization.currentLanguage) {
         _monitor = ObservedObject(wrappedValue: monitor)
+        self.displayedBalanceProviders = displayedBalanceProviders
+        self.monitoredBalanceProviders = monitoredBalanceProviders
+        self.language = language
     }
 
     var body: some View {
-        GeometryReader { proxy in
-            HStack(alignment: .top, spacing: 12) {
-                runningTasks
-                    .frame(width: (proxy.size.width - 24) * 0.48)
-                    .frame(maxHeight: .infinity, alignment: .topLeading)
-
-                Hairline()
-
-                ScrollView(.vertical) {
+        ScrollView(.vertical) {
+            VStack(alignment: .leading, spacing: 16) {
+                AIProgressUpperSectionLayout {
+                    runningTasks
+                    Hairline()
                     usageSummary(endingAt: .now)
-                        .padding(.horizontal, NSScroller.scrollerWidth(for: .mini, scrollerStyle: .overlay))
+                        .frame(maxWidth: .infinity, alignment: .topLeading)
                 }
-                .thinScrollChrome(scrollerStyle: .overlay)
-                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+                AIAccountBalanceSection(balances: monitor.accountBalances,
+                    displayedProviders: displayedBalanceProviders, monitoredProviders: monitoredBalanceProviders,
+                    language: language)
             }
-            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+            .padding(.trailing, NSScroller.scrollerWidth(for: .mini, scrollerStyle: .overlay) + 1)
+            .frame(maxWidth: .infinity, alignment: .topLeading)
         }
+        .thinScrollChrome(scrollerStyle: .overlay)
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
     }
 
     private var activeTasks: [AIProgressTask] {
@@ -104,6 +112,34 @@ struct AIProgressModuleView: View {
         }
     }
 
+}
+
+private struct AIProgressUpperSectionLayout: Layout {
+    static var layoutProperties: LayoutProperties {
+        var properties = LayoutProperties()
+        properties.stackOrientation = .horizontal
+        return properties
+    }
+
+    func sizeThatFits(proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) -> CGSize {
+        let dividerWidth = subviews[1].sizeThatFits(.unspecified).width
+        let width = proposal.replacingUnspecifiedDimensions().width
+        let contentWidth = width - 24 - dividerWidth
+        return CGSize(width: width,
+            height: subviews[2].sizeThatFits(ProposedViewSize(width: contentWidth * 0.52, height: nil)).height)
+    }
+
+    func placeSubviews(in bounds: CGRect, proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) {
+        let dividerWidth = subviews[1].sizeThatFits(.unspecified).width
+        let contentWidth = bounds.width - 24 - dividerWidth
+        let widths = [contentWidth * 0.48, dividerWidth, contentWidth * 0.52]
+        var x = bounds.minX
+        for (subview, width) in zip(subviews, widths) {
+            subview.place(at: CGPoint(x: x, y: bounds.minY),
+                anchor: .topLeading, proposal: ProposedViewSize(width: width, height: bounds.height))
+            x += width + 12
+        }
+    }
 }
 
 struct DailyModelUsageList: View {

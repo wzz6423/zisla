@@ -189,6 +189,9 @@ function start_service() {
   plutil -insert ProgramArguments.0 -string "$APP_BINARY" "$LAUNCH_AGENT"
   plutil -insert EnvironmentVariables -dictionary "$LAUNCH_AGENT"
   plutil -insert EnvironmentVariables.ZISLA_FIRST -string "$first_launch" "$LAUNCH_AGENT"
+  if [[ -n "${ZISLA_DEBUG_AI_ACCOUNT_BALANCE:-}" ]]; then
+    plutil -insert EnvironmentVariables.ZISLA_DEBUG_AI_ACCOUNT_BALANCE -string "$ZISLA_DEBUG_AI_ACCOUNT_BALANCE" "$LAUNCH_AGENT"
+  fi
   if [[ -n "${ZISLA_DEBUG_AI_MODEL_USAGE:-}" ]]; then
     plutil -insert EnvironmentVariables.ZISLA_DEBUG_AI_MODEL_USAGE -string "$ZISLA_DEBUG_AI_MODEL_USAGE" "$LAUNCH_AGENT"
   fi

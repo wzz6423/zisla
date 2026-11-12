@@ -20,7 +20,9 @@ cp "$REPOSITORY_ROOT/Makefile" "$TEST_ROOT/Makefile"
 cat > "$TEST_ROOT/mac/Scripts/dev-service.sh" <<'SCRIPT'
 #!/bin/zsh
 set -euo pipefail
-if [[ -e outputs ]]; then
+if [[ "$1" == run ]]; then
+  print -r -- "dev-service run configuration=${CONFIGURATION-unset} signing=${SIGNING_MODE-unset}" >> "$CAPTURE_FILE"
+elif [[ -e outputs ]]; then
   print -r -- "dev-service $1 outputs-present" >> "$CAPTURE_FILE"
 else
   print -r -- "dev-service $1 outputs-removed" >> "$CAPTURE_FILE"
@@ -100,6 +102,22 @@ PRESERVED_FILES=(
   mac/Sources/Zisla/main.swift
   web/src/main.ts
 )
+
+for target in run update release; do
+  expected_configuration=debug
+  inherited_configuration=release
+  if [[ "$target" == release ]]; then
+    expected_configuration=release
+    inherited_configuration=debug
+  fi
+  : > "$CAPTURE_FILE"
+  CAPTURE_FILE="$CAPTURE_FILE" CONFIGURATION="$inherited_configuration" make -C "$TEST_ROOT" "$target" >/dev/null
+  expect_equal \
+    "dev-service run configuration=$expected_configuration signing=dev" \
+    "$(<"$CAPTURE_FILE")" \
+    "$target selects its compilation configuration and uses the managed local service"
+done
+: > "$CAPTURE_FILE"
 
 # `path` is tied to PATH in zsh, so fixtures use a distinct loop variable.
 for fixture_path in $ARTIFACT_FILES $PRESERVED_FILES; do

@@ -1,6 +1,6 @@
 #!/bin/zsh
 set -euo pipefail
-unset ZISLA_FRESH_START ZISLA_DEBUG_BUNDLE_ID CFFIXED_USER_HOME ZISLA_DEBUG_AI_MODEL_USAGE ZISLA_DEBUG_SHOW_CHARGE_TO_FULL
+unset ZISLA_FRESH_START ZISLA_DEBUG_BUNDLE_ID CFFIXED_USER_HOME ZISLA_DEBUG_AI_MODEL_USAGE ZISLA_DEBUG_AI_ACCOUNT_BALANCE ZISLA_DEBUG_SHOW_CHARGE_TO_FULL
 
 MAC_ROOT="${0:A:h:h:h}"
 TEMPORARY_ROOT="$(mktemp -d "${TMPDIR%/}/zisla-first-launch-tests.XXXXXX")"
@@ -62,6 +62,10 @@ if home != "none":
     assert bundle == "dev.wzz.zisla.debug.fresh." + Path(home).suffix[1:], "Preferences and home must identify the same fresh launch"
     assert not any(Path(home).iterdir()), "Fresh launch must not copy existing data"
 assert agent["KeepAlive"] is True, "Automatic restarts must keep the same launch environment"
+if "TEST_EXPECT_AI_BALANCE" in os.environ:
+    expected_balance = os.environ["TEST_EXPECT_AI_BALANCE"]
+    actual_balance = agent["EnvironmentVariables"].get("ZISLA_DEBUG_AI_ACCOUNT_BALANCE")
+    assert actual_balance == (expected_balance or None), "The debug quota fixture must reach launchd exactly, or be removed when cleared"
 if "TEST_EXPECT_AI_MODEL_USAGE" in os.environ:
     expected_usage = os.environ["TEST_EXPECT_AI_MODEL_USAGE"]
     actual_usage = agent["EnvironmentVariables"].get("ZISLA_DEBUG_AI_MODEL_USAGE")
@@ -78,7 +82,7 @@ SCRIPT
 cat > "$TEST_ROOT/mac/Scripts/build-app.sh" <<'SCRIPT'
 #!/bin/zsh
 set -euo pipefail
-print -r -- "build debug=$DEBUG_BUILD signing=$SIGNING_MODE identity=$CODE_SIGN_IDENTITY bundle=${ZISLA_DEBUG_BUNDLE_ID-unset}" >> "$CAPTURE_FILE"
+print -r -- "build debug=$DEBUG_BUILD configuration=${CONFIGURATION-unset} signing=$SIGNING_MODE identity=$CODE_SIGN_IDENTITY bundle=${ZISLA_DEBUG_BUNDLE_ID-unset}" >> "$CAPTURE_FILE"
 mkdir -p "$OUTPUT_DIRECTORY/zisla-debug.app/Contents/MacOS"
 print -r -- '#!/bin/zsh' > "$OUTPUT_DIRECTORY/zisla-debug.app/Contents/MacOS/zisla"
 chmod +x "$OUTPUT_DIRECTORY/zisla-debug.app/Contents/MacOS/zisla"
@@ -100,7 +104,7 @@ function expect_launch() {
   shift 3
   local actual
   local expected="script first=$input_value fresh=0 signing=dev
-build debug=true signing=dev identity=TEST_STABLE_IDENTITY bundle=dev.wzz.zisla.debug
+build debug=true configuration=${TEST_EXPECT_CONFIGURATION:-debug} signing=dev identity=TEST_STABLE_IDENTITY bundle=dev.wzz.zisla.debug
 plist first=$plist_value home=none bundle=dev.wzz.zisla.debug"
 
   : > "$CAPTURE_FILE"
@@ -134,11 +138,17 @@ for target in run update; do
   done
 done
 
-function expect_model_usage_launch() {
-  local description="$1"
-  local expected="$2"
-  shift 2
-  if ! env TEST_EXPECT_AI_MODEL_USAGE="$expected" "$@" >/dev/null; then
+TEST_EXPECT_CONFIGURATION=release expect_launch "release uses optimized compilation with the same local identity and home" 0 0 \
+  env -u MAKEFLAGS -u MFLAGS -u ZISLA_FIRST make -C "$TEST_ROOT" release
+expect_launch "update returns to debug compilation with the same local identity and home" 0 0 \
+  env -u MAKEFLAGS -u MFLAGS -u ZISLA_FIRST make -C "$TEST_ROOT" update
+
+function expect_fixture_launch() {
+  local expectation_variable="$1"
+  local description="$2"
+  local expected="$3"
+  shift 3
+  if ! env "$expectation_variable=$expected" "$@" >/dev/null; then
     print -u2 -r -- "FAIL: $description"
     exit 1
   fi
@@ -150,15 +160,25 @@ function expect_model_usage_launch() {
 }
 
 for target in run update; do
-  expect_model_usage_launch "$target forwards environment model usage" 'codex:gpt-6.1-sol:120000:18000,claude:claude-opus:85000:12000:1' \
+  expect_fixture_launch TEST_EXPECT_AI_BALANCE "$target forwards environment quota" 'codex:20:10,claude:0' \
+    env -u MAKEFLAGS -u MFLAGS ZISLA_DEBUG_AI_ACCOUNT_BALANCE=codex:20:10,claude:0 make -C "$TEST_ROOT" "$target"
+  expect_fixture_launch TEST_EXPECT_AI_BALANCE "$target forwards make quota" 'codex:10:70' \
+    env -u MAKEFLAGS -u MFLAGS -u ZISLA_DEBUG_AI_ACCOUNT_BALANCE make -C "$TEST_ROOT" "$target" ZISLA_DEBUG_AI_ACCOUNT_BALANCE=codex:10:70
+  expect_fixture_launch TEST_EXPECT_AI_BALANCE "$target preserves literal fixture text" 'invalid; $(touch SHOULD_NOT_EXIST)' \
+    env -u MAKEFLAGS -u MFLAGS 'ZISLA_DEBUG_AI_ACCOUNT_BALANCE=invalid; $(touch SHOULD_NOT_EXIST)' make -C "$TEST_ROOT" "$target"
+  expect_fixture_launch TEST_EXPECT_AI_BALANCE "$target clears a previous quota fixture" '' \
+    env -u MAKEFLAGS -u MFLAGS make -C "$TEST_ROOT" "$target" ZISLA_DEBUG_AI_ACCOUNT_BALANCE=
+  expect_fixture_launch TEST_EXPECT_AI_BALANCE "$target defaults to real readings after fixture removal" '' \
+    env -u MAKEFLAGS -u MFLAGS -u ZISLA_DEBUG_AI_ACCOUNT_BALANCE make -C "$TEST_ROOT" "$target"
+  expect_fixture_launch TEST_EXPECT_AI_MODEL_USAGE "$target forwards environment model usage" 'codex:gpt-6.1-sol:120000:18000,claude:claude-opus:85000:12000:1' \
     env -u MAKEFLAGS -u MFLAGS ZISLA_DEBUG_AI_MODEL_USAGE=codex:gpt-6.1-sol:120000:18000,claude:claude-opus:85000:12000:1 make -C "$TEST_ROOT" "$target"
-  expect_model_usage_launch "$target forwards make model usage" 'codex:gpt-6.1-sol:100:20:2' \
+  expect_fixture_launch TEST_EXPECT_AI_MODEL_USAGE "$target forwards make model usage" 'codex:gpt-6.1-sol:100:20:2' \
     env -u MAKEFLAGS -u MFLAGS -u ZISLA_DEBUG_AI_MODEL_USAGE make -C "$TEST_ROOT" "$target" ZISLA_DEBUG_AI_MODEL_USAGE=codex:gpt-6.1-sol:100:20:2
-  expect_model_usage_launch "$target preserves literal fixture text" 'invalid; $(touch SHOULD_NOT_EXIST)' \
+  expect_fixture_launch TEST_EXPECT_AI_MODEL_USAGE "$target preserves literal fixture text" 'invalid; $(touch SHOULD_NOT_EXIST)' \
     env -u MAKEFLAGS -u MFLAGS 'ZISLA_DEBUG_AI_MODEL_USAGE=invalid; $(touch SHOULD_NOT_EXIST)' make -C "$TEST_ROOT" "$target"
-  expect_model_usage_launch "$target clears previous model usage" '' \
+  expect_fixture_launch TEST_EXPECT_AI_MODEL_USAGE "$target clears previous model usage" '' \
     env -u MAKEFLAGS -u MFLAGS make -C "$TEST_ROOT" "$target" ZISLA_DEBUG_AI_MODEL_USAGE=
-  expect_model_usage_launch "$target defaults to real usage after fixture removal" '' \
+  expect_fixture_launch TEST_EXPECT_AI_MODEL_USAGE "$target defaults to real usage after fixture removal" '' \
     env -u MAKEFLAGS -u MFLAGS -u ZISLA_DEBUG_AI_MODEL_USAGE make -C "$TEST_ROOT" "$target"
 done
 
@@ -191,7 +211,7 @@ assert len(capture) == 3, f"{sys.argv[3]}: expected one build and launch"
 assert capture[0] == "script first=0 fresh=1 signing=dev", capture
 bundle = capture[1].split("bundle=")[1]
 assert re.fullmatch(r"dev\.wzz\.zisla\.debug\.fresh\.[A-Za-z0-9-]+", bundle), capture
-assert capture[1] == f"build debug=true signing=dev identity=TEST_STABLE_IDENTITY bundle={bundle}", capture
+assert capture[1] == f"build debug=true configuration=debug signing=dev identity=TEST_STABLE_IDENTITY bundle={bundle}", capture
 assert capture[2].startswith("plist first=1 home="), "Fresh launch must force onboarding even with ZISLA_FIRST=0"
 home = capture[2].split("home=")[1].split(" bundle=")[0]
 assert home in Path(sys.argv[2]).read_text(), "Print the isolated profile location for the developer"

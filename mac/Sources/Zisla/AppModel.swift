@@ -581,6 +581,7 @@ final class AppModel: ObservableObject {
     self?.transientMessage = AppLocalization.text(BatteryPowerModePresentation.messageKey(for: error))
   })
   private lazy var lowBatteryNotice = LowBatteryNoticeController(queue: notices)
+  private lazy var accountBalanceNotice = AIAccountBalanceNoticeController(queue: notices)
   var userCarePresentationAllowed: () -> Bool = { false }
   private lazy var userCare = UserCareService(
     presentationAllowed: { [weak self] in self?.canPresentUserCareMessage == true },
@@ -605,6 +606,12 @@ final class AppModel: ObservableObject {
   private(set) lazy var dailyBriefing = DailyBriefingController(
     saveLocations: saveLocations,
     observation: { [unowned self] date in self.dailyBriefingObservation(at: date) },
+    aiAccountBalances: { [unowned self] in
+      let settings = self.settingsStore.settings
+      return AIAccountBalanceCatalog.displayedBalances(self.aiMonitor.accountBalances,
+        monitoredProviders: settings.aiAccountBalanceMonitoredProviders,
+        displayedProviders: settings.aiAccountBalanceDisplayedProviders)
+    },
     typing: { [unowned self] date in
       guard self.settingsStore.settings.keyboardTypingStatsEnabled,
         self.keyboardSound.isInputMonitoringGranted else { return nil }
@@ -746,6 +753,7 @@ final class AppModel: ObservableObject {
   /// Snapshot of locally installed applications used to resolve copied names.
   private var installedApplications: [InstalledApplication] = []
 
+  /// Wires observable services with weak ownership; quota publications and language changes update notices independently.
   private init() {
     let networkProxyURL = settingsStore.settings.networkProxyURL
     let networkProxyEnabled = settingsStore.settings.networkProxyEnabled
@@ -780,6 +788,8 @@ final class AppModel: ObservableObject {
         guard let self else { return }
         self.dailyBriefing.configure(settings: self.settingsStore.settings.dailyBriefing,
           directory: self.saveLocations[.dailyBriefing], language: language)
+        self.accountBalanceNotice.update(balances: self.aiMonitor.accountBalances,
+          settings: self.settingsStore.settings, language: language)
       }
       .store(in: &cancellables)
     clipboardHistoryMonitor.onContentCaptured = { [weak self] content in
@@ -929,6 +939,16 @@ final class AppModel: ObservableObject {
       .dropFirst()
       .sink { [weak self] state in
         Task { @MainActor [weak self] in self?.consumeAIState(state) }
+      }
+      .store(in: &cancellables)
+
+    aiMonitor.$accountBalances
+      .sink { [weak self] balances in
+        Task { @MainActor [weak self] in
+          guard let self else { return }
+          self.accountBalanceNotice.update(balances: balances, settings: self.settingsStore.settings,
+            language: self.languageStore.language)
+        }
       }
       .store(in: &cancellables)
 
@@ -3317,6 +3337,7 @@ final class AppModel: ObservableObject {
     )
   }
 
+  /// Reconciles service lifecycles with settings; disabling AI stops pending quota work before notices are updated.
   private func apply(settings: FeatureSettings, requestWindowPreviewPermissions: Bool = false) {
     dailyBriefing.configure(settings: settings.dailyBriefing, directory: saveLocations[.dailyBriefing],
       language: languageStore.language)
@@ -3347,6 +3368,8 @@ final class AppModel: ObservableObject {
     configureVoiceRecordingCleanup(policy: settings.voiceRecordingCleanupPolicy)
     clipboardHistory.configureCleanup(policy: settings.clipboardHistoryCleanupPolicy)
     if settings.aiProgressEnabled {
+      aiMonitor.configureAccountBalanceProviders(settings.aiAccountBalanceMonitoredProviders,
+        qoderRegion: settings.aiAccountBalanceQoderRegion)
       aiMonitor.start()
       if selectedModule == .aiMonitor {
         aiMonitor.loadUsageHistory()
@@ -3356,6 +3379,7 @@ final class AppModel: ObservableObject {
       clearActiveAINotices()
       powerAssertions.setAIActivityActive(false)
     }
+    accountBalanceNotice.update(balances: aiMonitor.accountBalances, settings: settings, language: languageStore.language)
     aiAgent.start()
     syncAIActivityPowerAssertion(aiMonitor.state)
     if settings.mediaEnabled || settings.dailyBriefing.enabled {

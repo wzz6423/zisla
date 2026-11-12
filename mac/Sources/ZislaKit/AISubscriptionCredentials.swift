@@ -104,27 +104,53 @@ struct AISubscriptionCredentials: Sendable {
         allowsRead: (CFTypeRef) -> Bool = { keychainItemAllowsRead($0) },
         uiFailPolicy: CFString? = keychainUIFailPolicy
     ) -> Data? {
-        guard let uiFailPolicy else { return nil }
+        try? readKeychainCredentialWithoutPrompt(service: service, account: account,
+            copyMatching: copyMatching, allowsRead: allowsRead, uiFailPolicy: uiFailPolicy)?.data
+    }
+
+    struct KeychainCredential: Sendable {
+        let account: String?
+        let data: Data
+    }
+
+    enum KeychainReadError: Error { case unavailable }
+
+    /// Preflights item access without authentication UI, then reads the account and payload together.
+    /// Missing items return nil; blocked access and malformed payloads remain distinct failures.
+    static func readKeychainCredentialWithoutPrompt(
+        service: String, account: String? = nil, internetPassword: Bool = false,
+        copyMatching: (CFDictionary) -> (OSStatus, CFTypeRef?) = { query in
+            var result: CFTypeRef?
+            let status = SecItemCopyMatching(query, &result)
+            return (status, result)
+        },
+        allowsRead: (CFTypeRef) -> Bool = { keychainItemAllowsRead($0) },
+        uiFailPolicy: CFString? = keychainUIFailPolicy
+    ) throws -> KeychainCredential? {
+        guard let uiFailPolicy else { throw KeychainReadError.unavailable }
         let context = LAContext()
         context.interactionNotAllowed = true
         var query: [String: Any] = [
-            kSecClass as String: kSecClassGenericPassword, kSecAttrService as String: service,
-            kSecAttrAccount as String: account, kSecMatchLimit as String: kSecMatchLimitOne,
+            kSecClass as String: internetPassword ? kSecClassInternetPassword : kSecClassGenericPassword,
+            (internetPassword ? kSecAttrServer : kSecAttrService) as String: service,
+            kSecMatchLimit as String: kSecMatchLimitOne,
             kSecUseAuthenticationContext as String: context,
             kSecUseAuthenticationUI as String: uiFailPolicy,
             kSecReturnAttributes as String: true, kSecReturnRef as String: true,
         ]
+        if let account { query[kSecAttrAccount as String] = account }
         let (status, reference) = copyMatching(query as CFDictionary)
+        if status == errSecItemNotFound { return nil }
         guard status == errSecSuccess,
               let attributes = reference as? [String: Any], let value = attributes[kSecValueRef as String],
-              allowsRead(value as AnyObject) else { return nil }
+              allowsRead(value as AnyObject) else { throw KeychainReadError.unavailable }
         query.removeValue(forKey: kSecReturnAttributes as String)
         query.removeValue(forKey: kSecReturnRef as String)
         query[kSecReturnData as String] = true
         query[kSecMatchItemList as String] = [value]
         let (readStatus, result) = copyMatching(query as CFDictionary)
-        guard readStatus == errSecSuccess else { return nil }
-        return result as? Data
+        guard readStatus == errSecSuccess, let data = result as? Data else { throw KeychainReadError.unavailable }
+        return KeychainCredential(account: attributes[kSecAttrAccount as String] as? String, data: data)
     }
 
     static func keychainItemAllowsRead(

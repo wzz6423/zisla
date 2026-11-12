@@ -619,6 +619,7 @@ public enum CompactStatusPriority: String, Codable, CaseIterable, Sendable, Equa
     case focusCountdown
     case toolboxReminder
     case aiActivity
+    case aiAccountBalance
     case media
     case focusMode
     case systemMonitor
@@ -632,6 +633,7 @@ public enum CompactStatusPriority: String, Codable, CaseIterable, Sendable, Equa
         .focusCountdown,
         .focusMode,
         .aiActivity,
+        .aiAccountBalance,
         .media,
         .toolboxReminder,
         .updateAvailable,
@@ -649,6 +651,7 @@ public enum CompactStatusPriority: String, Codable, CaseIterable, Sendable, Equa
         case .focusCountdown: "专注倒计时"
         case .toolboxReminder: "工具箱提醒"
         case .aiActivity: "AI 活动"
+        case .aiAccountBalance: "账户剩余额度"
         case .media: "正在播放"
         case .focusMode: "专注模式"
         case .systemMonitor: "系统监控"
@@ -882,6 +885,12 @@ public struct FeatureSettings: Codable, Equatable, Sendable {
     /// Whether collapsed notice bars show their playback, download, or dismissal progress glow.
     public var collapsedProgressGlowEnabled: Bool
     public var aiTaskResultSweepEnabled: Bool
+    public var aiAccountBalanceNoticeEnabled: Bool
+    public var aiAccountBalanceCompactStyle: MediaCompactStyle
+    public var aiAccountBalancePinnedInCustomIsland: Bool
+    public var aiAccountBalanceMonitoredProviders: Set<AIProvider>
+    public var aiAccountBalanceDisplayedProviders: Set<AIProvider>
+    public var aiAccountBalanceQoderRegion: AIAccountBalanceQoderRegion
     public var compactStatusPriority: [CompactStatusPriority]
     public var moduleOrder: [IslandModuleOrder]
     /// Temporarily suppresses system notifications pushed by Zisla itself (Pomodoro, etc.).
@@ -969,6 +978,7 @@ public struct FeatureSettings: Codable, Equatable, Sendable {
     public var lidCloseAnimationEnabled: Bool
 
     /// Marks migrations complete for new settings so supplied preferences are not treated as legacy defaults.
+    /// Quota monitoring and display remain independent; dimensions and priorities follow placement constraints.
     public init(
         mediaEnabled: Bool = true,
         mediaSource: MediaSourcePreference = .automatic,
@@ -1052,6 +1062,12 @@ public struct FeatureSettings: Codable, Equatable, Sendable {
         userCareReminderInterval: TimeInterval = UserCareInterval.defaultSeconds,
         collapsedProgressGlowEnabled: Bool = true,
         aiTaskResultSweepEnabled: Bool = true,
+        aiAccountBalanceNoticeEnabled: Bool = true,
+        aiAccountBalanceCompactStyle: MediaCompactStyle = .compact,
+        aiAccountBalancePinnedInCustomIsland: Bool = false,
+        aiAccountBalanceMonitoredProviders: Set<AIProvider> = Set(AIProvider.allCases),
+        aiAccountBalanceDisplayedProviders: Set<AIProvider> = Set(AIProvider.allCases),
+        aiAccountBalanceQoderRegion: AIAccountBalanceQoderRegion = .global,
         compactStatusPriority: [CompactStatusPriority] = CompactStatusPriority.defaultOrder,
         moduleOrder: [IslandModuleOrder] = IslandModuleOrder.defaultOrder,
         notificationsMuted: Bool = false,
@@ -1202,6 +1218,12 @@ public struct FeatureSettings: Codable, Equatable, Sendable {
         self.userCareReminderInterval = UserCareInterval.normalized(userCareReminderInterval)
         self.collapsedProgressGlowEnabled = collapsedProgressGlowEnabled
         self.aiTaskResultSweepEnabled = aiTaskResultSweepEnabled
+        self.aiAccountBalanceNoticeEnabled = aiAccountBalanceNoticeEnabled
+        self.aiAccountBalanceCompactStyle = aiAccountBalanceCompactStyle
+        self.aiAccountBalancePinnedInCustomIsland = aiAccountBalancePinnedInCustomIsland
+        self.aiAccountBalanceMonitoredProviders = aiAccountBalanceMonitoredProviders
+        self.aiAccountBalanceDisplayedProviders = aiAccountBalanceDisplayedProviders
+        self.aiAccountBalanceQoderRegion = aiAccountBalanceQoderRegion
         self.compactStatusPriority = CompactStatusPriority.normalized(compactStatusPriority)
         self.moduleOrder = IslandModuleOrder.normalized(moduleOrder)
         self.notificationsMuted = notificationsMuted
@@ -1372,6 +1394,9 @@ public struct FeatureSettings: Codable, Equatable, Sendable {
         case userCareReminderInterval
         case collapsedProgressGlowEnabled
         case aiTaskResultSweepEnabled
+        case aiAccountBalanceNoticeEnabled, aiAccountBalanceCompactStyle, aiAccountBalancePinnedInCustomIsland
+        case aiAccountBalanceMonitoredProviders, aiAccountBalanceDisplayedProviders
+        case aiAccountBalanceQoderRegion
         case compactStatusPriority
         case moduleOrder
         case notificationsMuted
@@ -1431,6 +1456,7 @@ public struct FeatureSettings: Codable, Equatable, Sendable {
     }
 
     /// Missing keys identify legacy settings; persisted migration markers protect later user choices.
+    /// Unknown provider IDs are ignored, while explicit empty quota selections remain empty.
     public init(from decoder: Decoder) throws {
         let container = try decoder.container(keyedBy: CodingKeys.self)
         let defaults = FeatureSettings.default
@@ -1699,6 +1725,15 @@ public struct FeatureSettings: Codable, Equatable, Sendable {
             forKey: .collapsedProgressGlowEnabled
         ) ?? defaults.collapsedProgressGlowEnabled
         aiTaskResultSweepEnabled = try container.decodeIfPresent(Bool.self, forKey: .aiTaskResultSweepEnabled) ?? defaults.aiTaskResultSweepEnabled
+        aiAccountBalanceNoticeEnabled = try container.decodeIfPresent(Bool.self, forKey: .aiAccountBalanceNoticeEnabled) ?? defaults.aiAccountBalanceNoticeEnabled
+        aiAccountBalanceCompactStyle = try container.decodeIfPresent(MediaCompactStyle.self, forKey: .aiAccountBalanceCompactStyle) ?? defaults.aiAccountBalanceCompactStyle
+        aiAccountBalancePinnedInCustomIsland = try container.decodeIfPresent(Bool.self, forKey: .aiAccountBalancePinnedInCustomIsland) ?? defaults.aiAccountBalancePinnedInCustomIsland
+        aiAccountBalanceMonitoredProviders = try container.decodeIfPresent([String].self, forKey: .aiAccountBalanceMonitoredProviders)
+            .map { Set($0.compactMap(AIProvider.init(rawValue:))) } ?? defaults.aiAccountBalanceMonitoredProviders
+        aiAccountBalanceDisplayedProviders = try container.decodeIfPresent([String].self, forKey: .aiAccountBalanceDisplayedProviders)
+            .map { Set($0.compactMap(AIProvider.init(rawValue:))) } ?? defaults.aiAccountBalanceDisplayedProviders
+        aiAccountBalanceQoderRegion = try container.decodeIfPresent(String.self, forKey: .aiAccountBalanceQoderRegion)
+            .flatMap(AIAccountBalanceQoderRegion.init(rawValue:)) ?? defaults.aiAccountBalanceQoderRegion
         compactStatusPriority = CompactStatusPriority.normalized(
             try container.decodeIfPresent([CompactStatusPriority].self, forKey: .compactStatusPriority)
                 ?? defaults.compactStatusPriority

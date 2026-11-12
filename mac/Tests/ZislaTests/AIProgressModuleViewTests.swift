@@ -61,11 +61,13 @@ struct AIProgressModuleViewTests {
         }
     }
 
+    /// Native geometry keeps the full usage content in the outer document while tasks retain independent scrolling.
     @Test(arguments: [(CGFloat(560), 12, true), (CGFloat(752), 12, true), (CGFloat(980), 12, true),
+        (CGFloat(752), 96, true), (CGFloat(752), 1, false),
         (CGFloat(752), 12, false), (CGFloat(752), 0, false)],
         [AppLanguage.simplifiedChinese, .english, .arabic])
     @MainActor
-    func usageSummaryKeepsNearEqualColumnsWithoutHorizontalScrolling(
+    func upperSectionUsesTheFullUsageHeightWithOuterScrolling(
         scenario: (width: CGFloat, taskCount: Int, hasUsage: Bool), language: AppLanguage
     ) async throws {
         let releaseAccessibility = EnhancedAccessibilityTestScope.acquire()
@@ -97,7 +99,8 @@ struct AIProgressModuleViewTests {
         defer { monitor.stop() }
         monitor.reload()
         let initialState = monitor.state
-        let host = NSHostingView(rootView: AIProgressModuleView(monitor: monitor)
+        let host = NSHostingView(rootView: AIProgressModuleView(monitor: monitor,
+            displayedBalanceProviders: [], monitoredBalanceProviders: [], language: language)
             .environment(\.locale, language.locale)
             .environment(\.layoutDirection, language.isRightToLeft ? .rightToLeft : .leftToRight))
         host.sizingOptions = []
@@ -106,63 +109,135 @@ struct AIProgressModuleViewTests {
         window.isReleasedWhenClosed = false
         window.contentView = host
         defer { window.contentView = nil; window.close() }
-        for _ in 0..<8 {
-            host.layoutSubtreeIfNeeded()
-            await withCheckedContinuation { continuation in
-                DispatchQueue.main.async { continuation.resume() }
+        func settle() async {
+            for _ in 0..<8 {
+                host.layoutSubtreeIfNeeded()
+                await withCheckedContinuation { continuation in
+                    DispatchQueue.main.async { continuation.resume() }
+                }
             }
         }
-        let scrolls = descendants(in: host).compactMap { $0 as? NSScrollView }.sorted {
-            host.convert($0.bounds, from: $0).minX < host.convert($1.bounds, from: $1).minX
+        await settle()
+        let allScrolls = descendants(in: host).compactMap { $0 as? NSScrollView }
+        let outer = try #require(allScrolls.max { $0.frame.width < $1.frame.width })
+        let scrolls = allScrolls.filter { $0 !== outer }
+        try #require(scrolls.count == (taskCount > 0 ? 1 : 0),
+            "Only the task list may scroll inside the upper section; usage belongs to the outer document")
+        #expect(scrolls.allSatisfy { $0.documentView is NSTableView })
+        let document = try #require(outer.documentView)
+        func frame(_ title: String, role: NSAccessibility.Role? = nil) throws -> CGRect {
+            let object = try #require(accessibilityObjects(host).first { object in
+                (role == nil || value(object, "accessibilityRole") as? String == role?.rawValue)
+                    && ["accessibilityLabel", "accessibilityValue"].contains {
+                        value(object, $0) as? String == AppLocalization.string(title, language: language)
+                    }
+            }, "The complete upper section must expose \(title)")
+            let element = try #require(object as? any NSAccessibilityElementProtocol)
+            return document.convert(window.convertFromScreen(element.accessibilityFrame()), from: nil)
         }
-        try #require(scrolls.count == (taskCount > 0 ? 2 : 1),
-            "The usage scroll view must remain available when the task list is empty")
-        let summary = scrolls[taskCount == 0 || language.isRightToLeft ? 0 : 1]
-        summary.scrollerStyle = .legacy
-        for _ in 0..<4 {
-            host.layoutSubtreeIfNeeded()
-            await withCheckedContinuation { continuation in
-                DispatchQueue.main.async { continuation.resume() }
+        let title = try frame("Token 消耗趋势", role: .staticText)
+        let taskTitle = try frame("运行任务", role: .staticText)
+        let heatmap = try frame("AI token 用量热力图")
+        let availableColumnWidth = document.bounds.width - 24
+        #expect(heatmap.width > availableColumnWidth * 0.5
+            && heatmap.width < availableColumnWidth * 0.53,
+            "The full usage panel must remain slightly wider than the task list")
+        #expect(title.minY >= -0.5 && abs(title.minY - taskTitle.minY) < 2,
+            "Both column headers must start at the top of the document")
+        #expect(language.isRightToLeft ? heatmap.midX < taskTitle.midX : heatmap.midX > taskTitle.midX,
+            "The usage panel must follow the task column in the language's reading direction")
+        #expect(heatmap.maxY > 160,
+            "The fixture must require scrolling the outer module to reach the whole heatmap")
+        #expect(abs(document.bounds.maxY - heatmap.maxY) < 1,
+            "The full usage content must determine upper height without fixed blank space or clipping")
+        #expect(heatmap.minX >= -0.5 && heatmap.maxX <= document.bounds.maxX + 0.5,
+            "The heatmap must fit horizontally in both layout directions")
+        #expect(outer.hasVerticalScroller && outer.frame.height <= 160.5)
+        #expect(outer.horizontalScrollElasticity == .none)
+        #expect(!accessibilityObjects(host).contains {
+            value($0, "accessibilityValue") as? String == AppLocalization.string("每日模型用量", language: language)
+        }, "The island must keep model details hidden before the user selects a date")
+
+        if let tasks = scrolls.first {
+            let table = try #require(tasks.documentView as? NSTableView)
+            #expect(table.numberOfRows == taskCount)
+            let taskFrame = document.convert(tasks.bounds, from: tasks)
+            let gap = language.isRightToLeft ? taskFrame.minX - heatmap.maxX : heatmap.minX - taskFrame.maxX
+            #expect(gap >= 24 && gap <= 25.5,
+                "The columns must keep two twelve-point gaps around their thin divider")
+            #expect(abs(taskFrame.maxY - heatmap.maxY) < 1,
+                "The task viewport must end at the full usage content height")
+            if taskCount >= 12 {
+                try #require(table.frame.height > tasks.contentView.bounds.height)
+                tasks.contentView.scroll(to: CGPoint(x: 0,
+                    y: (table.frame.height - tasks.contentView.bounds.height) / 2))
+                tasks.reflectScrolledClipView(tasks.contentView)
+                await settle()
+                let offset = tasks.contentView.bounds.minY
+                let outerOffset = outer.contentView.bounds.minY
+                tasks.contentView.scroll(to: CGPoint(x: 0, y: offset + 54))
+                tasks.reflectScrolledClipView(tasks.contentView)
+                await settle()
+                #expect(abs(tasks.contentView.bounds.minY - offset) > 0.5,
+                    "The native task viewport must scroll independently through its complete document")
+                #expect(outer.contentView.bounds.minY == outerOffset,
+                    "Scrolling tasks must preserve the outer module position")
+                #expect(try frame("AI token 用量热力图") == heatmap,
+                    "Task scrolling must not move or resize the usage content")
             }
         }
-        let availableColumnWidth = width - 24
-        #expect(summary.frame.width > availableColumnWidth * 0.5,
-            "The usage panel must be slightly wider than the task list")
-        #expect(summary.frame.width < availableColumnWidth * 0.53,
-            "The usage panel must keep the columns close to an equal split")
-        if taskCount > 0 {
-            let tasks = scrolls[language.isRightToLeft ? 1 : 0]
-            #expect(tasks.hasVerticalScroller)
-        }
-        let document = try #require(summary.documentView)
-        #expect(document.frame.width <= summary.contentView.bounds.width + 0.5,
-            "Usage content must fit the viewport without horizontal scrolling")
-        var shiftedBounds = summary.contentView.bounds
-        shiftedBounds.origin.x += 80
-        #expect(abs(summary.contentView.constrainBoundsRect(shiftedBounds).minX
-            - summary.contentView.bounds.minX) < 0.5,
-            "Horizontal scrolling must not move the usage panel")
-        #expect(document.frame.height > summary.contentView.bounds.height,
-            "The fixture must still exercise vertical overflow")
-        #expect(summary.hasVerticalScroller)
-        #expect(summary.horizontalScrollElasticity == .none,
-            "Horizontal trackpad movement must not rubber-band the usage panel")
-        let scroller = try #require(summary.verticalScroller)
+
+        outer.contentView.scroll(to: CGPoint(x: 0, y: 54))
+        outer.reflectScrolledClipView(outer.contentView)
+        await settle()
+        #expect(outer.contentView.bounds.minY > 0,
+            "Usage content must scroll through the native outer module")
+        outer.contentView.scroll(to: CGPoint(x: 0, y: document.frame.height - outer.contentView.bounds.height))
+        outer.reflectScrolledClipView(outer.contentView)
+        await settle()
+        #expect(try frame("AI token 用量热力图").maxY <= outer.contentView.bounds.maxY + 0.5,
+            "Outer scrolling must reveal the heatmap bottom")
+        let scroller = try #require(outer.verticalScroller)
         let track = window.convertToScreen(scroller.convert(scroller.bounds, to: nil))
-        let viewport = window.convertToScreen(summary.contentView.convert(summary.contentView.bounds, to: nil))
-        let visibleObjects = accessibilityObjects(host).compactMap { object -> CGRect? in
+        let viewport = window.convertToScreen(outer.contentView.convert(outer.contentView.bounds, to: nil))
+        let visibleUsageFrames = accessibilityObjects(host).compactMap { object -> CGRect? in
             let role = value(object, "accessibilityRole") as? String
             guard role == NSAccessibility.Role.staticText.rawValue || role == NSAccessibility.Role.button.rawValue,
                   let element = object as? any NSAccessibilityElementProtocol else { return nil }
             let frame = element.accessibilityFrame()
-            return frame.intersects(viewport) && frame.midX >= viewport.minX && frame.midX <= viewport.maxX ? frame : nil
+            let localFrame = document.convert(window.convertFromScreen(frame), from: nil)
+            return frame.intersects(viewport) && localFrame.midX >= heatmap.minX
+                && localFrame.midX <= heatmap.maxX ? frame : nil
         }
-        try #require(!visibleObjects.isEmpty)
-        #expect(visibleObjects.allSatisfy { !$0.intersects(track) },
-            "The scrollbar cannot overlap trend dates, heatmap cells, or visible values")
-        #expect(!accessibilityObjects(host).contains {
-            value($0, "accessibilityValue") as? String == AppLocalization.string("每日模型用量", language: language)
-        }, "The island must keep model details hidden before the user selects a date")
+        try #require(!visibleUsageFrames.isEmpty)
+        #expect(visibleUsageFrames.allSatisfy { !$0.intersects(track) },
+            "The outer scrollbar must not cover heatmap cells, dates, or visible usage values")
+        var shiftedBounds = outer.contentView.bounds
+        shiftedBounds.origin.x += 80
+        #expect(abs(outer.contentView.constrainBoundsRect(shiftedBounds).minX
+            - outer.contentView.bounds.minX) < 0.5,
+            "Horizontal trackpad movement must not move the AI module")
+
+        window.setContentSize(NSSize(width: width, height: 500))
+        await settle()
+        let tallerHeatmap = try frame("AI token 用量热力图")
+        #expect(abs(tallerHeatmap.maxY - heatmap.maxY) < 1,
+            "Changing the outer viewport height must not add fixed space to the upper section")
+        if let tasks = scrolls.first {
+            #expect(abs(document.convert(tasks.bounds, from: tasks).maxY - tallerHeatmap.maxY) < 1,
+                "More available outer space must not expand the task viewport beyond the usage content")
+        }
+
+        outer.scrollerStyle = .legacy
+        window.setContentSize(NSSize(width: width, height: 160))
+        await settle()
+        let resizedHeatmap = try frame("AI token 用量热力图")
+        #expect(document.frame.width <= outer.contentView.bounds.width + 0.5,
+            "Native scrollbar policy must not create horizontal overflow")
+        #expect(resizedHeatmap.minX >= -0.5 && resizedHeatmap.maxX <= document.bounds.maxX + 0.5)
+        if let tasks = scrolls.first {
+            #expect(abs(document.convert(tasks.bounds, from: tasks).maxY - resizedHeatmap.maxY) < 1)
+        }
         #expect(monitor.state == initialState, "Laying out the panel must not alter AI state")
         #expect(!window.isVisible, "Layout tests must not show a window")
     }

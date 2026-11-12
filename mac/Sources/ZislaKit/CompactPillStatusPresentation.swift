@@ -5,6 +5,7 @@ public struct CompactPillStatusPresentation: Equatable, Sendable {
     public static let minimumThickness: CGFloat = 32
     public static let trailingInset: CGFloat = 12
     public static let maximumTextLength: CGFloat = 168
+    public static let accountBalanceScrollSpeed: Double = 32
     public static let pomodoroControlsLength: CGFloat = 54
 
     public struct VerticalTextRow: Equatable, Sendable {
@@ -19,6 +20,11 @@ public struct CompactPillStatusPresentation: Equatable, Sendable {
     public let showsWaveform: Bool
     public let showsMediaIdentity: Bool
     public var isMedia: Bool { priority == .media && notice.id.hasPrefix("media-active-") }
+    public var isAccountBalance: Bool { AIAccountBalanceNoticeController.isBalanceNotice(notice) }
+    public var accountBalanceLines: [String] {
+        guard isAccountBalance else { return [] }
+        return (0..<2).compactMap { notice.metadata?["quotaLine\($0)"] }
+    }
 
     public init(priority: CompactStatusPriority?, notice: IslandNotice, text: String,
          aiCount: Int = 0, showsWaveform: Bool = false, showsMediaIdentity: Bool = false) {
@@ -30,9 +36,19 @@ public struct CompactPillStatusPresentation: Equatable, Sendable {
         self.showsMediaIdentity = showsMediaIdentity
     }
 
+    /// Measures the shared ring and longest summary within existing text-length bounds.
+    /// Vertical edges divide the available thickness between quota lines instead of assuming horizontal text.
     public func length(thickness: CGFloat, edge: IslandEdge, text: String? = nil,
         item: NowPlayingSnapshot? = nil, leadingInset: CGFloat = trailingInset) -> CGFloat {
         let text = (text ?? self.text).trimmingCharacters(in: .whitespacesAndNewlines)
+        if isAccountBalance {
+            let values = accountBalanceLines
+            let lineWidth = edge.isVertical
+                ? max(1, (thickness - 8 - CGFloat(max(0, values.count - 1)) * 2) / CGFloat(max(1, values.count))) : thickness
+            let valueLength = values.map { Self.textLength($0, availableWidth: lineWidth, edge: edge,
+                font: NSFont.systemFont(ofSize: values.count > 1 ? 9 : 11, weight: .semibold)) }.max() ?? 0
+            return leadingInset + Self.trailingInset + max(0, thickness - 8) + 6 + min(Self.maximumTextLength, valueLength)
+        }
         let iconSize = max(0, thickness - 8)
         let visualLength = (showsWaveform || priority == .updateAvailable ? iconSize * 2 + 6 : iconSize)
             + Self.trailingInset + leadingInset
@@ -43,6 +59,31 @@ public struct CompactPillStatusPresentation: Equatable, Sendable {
         let textLength = identityLength + lyricLength + (identityLength > 0 && !text.isEmpty ? 6 : 0)
         guard textLength > 0 else { return visualLength }
         return visualLength + 6 + min(Self.maximumTextLength, textLength)
+    }
+
+    /// Camera wings share a physical gap, so each side must fit the larger of the ring or summary.
+    public func accountBalanceSideWidth(thickness: CGFloat) -> CGFloat {
+        let valueWidth = accountBalanceLines.map {
+            Self.textLength($0, availableWidth: thickness, edge: .top,
+                font: NSFont.systemFont(ofSize: accountBalanceLines.count > 1 ? 9 : 11, weight: .semibold))
+        }.max() ?? 0
+        return max(max(0, thickness - 8), min(Self.maximumTextLength, valueWidth)) + Self.trailingInset * 2
+    }
+
+    /// A one-pass summary must reach its tail before either expiry or the next pinned account.
+    public func accountBalanceReadingSeconds(thickness: CGFloat, edge: IslandEdge) -> Double {
+        let lines = accountBalanceLines
+        let font = NSFont.systemFont(ofSize: lines.count > 1 ? 9 : 11, weight: .semibold)
+        let verticalWidth = max(1, (thickness - 8 - CGFloat(max(0, lines.count - 1)) * 2) / CGFloat(max(1, lines.count)))
+        let travel = lines.map { line -> CGFloat in
+            if edge.isVertical {
+                let full = CGFloat(Self.verticalTextRows(line, availableWidth: verticalWidth,
+                    availableHeight: CGFloat(line.count) * 14).count) * 14 - 1
+                return max(0, full)
+            }
+            return ceil((line as NSString).size(withAttributes: [.font: font]).width)
+        }.max() ?? 0
+        return Double(travel) / Self.accountBalanceScrollSpeed + 2.4
     }
 
     public func mediaIdentityLength(thickness: CGFloat, edge: IslandEdge, text: String,

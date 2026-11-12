@@ -90,7 +90,7 @@ struct AIProgressTaskListRegressionTests {
         #expect(fixture.descendants.compactMap { $0 as? NSTableView }.isEmpty,
             "The empty task state must release the native task list")
         #expect(fixture.descendants.compactMap { $0 as? NSScrollView }.count == 1,
-            "The usage pane must remain available while the task list is empty")
+            "Empty tasks must leave the outer module as the sole vertical scrolling surface")
 
         try fixture.upsert(index: 0, step: 1)
         try fixture.upsert(index: 0, step: 2)
@@ -195,7 +195,7 @@ private final class TaskListFixture {
         repository = AIStateRepository(directoryURL: directory)
         let date = now
         monitor = AIStateMonitor(directoryURL: directory, activityDetectors: [], now: { date })
-        host = NSHostingView(rootView: AnyView(AIProgressModuleView(monitor: monitor)
+        host = NSHostingView(rootView: AnyView(AIProgressModuleView(monitor: monitor, monitoredBalanceProviders: [])
             .environment(\.colorScheme, .dark)
             .environment(\.locale, language.locale)
             .environment(\.layoutDirection, language.isRightToLeft ? .rightToLeft : .leftToRight)))
