@@ -249,6 +249,15 @@ struct SettingsView: View {
         case .pdfTools:
             PDFToolsModuleView(model: model, initialOperation: input.selectedPDFOperation)
                 .id(input.selectedPDFOperation)
+        case .imageTools:
+            ImageToolsModuleView(tools: model.managedTools, saveLocations: model.saveLocations,
+                                 settingsStore: settingsStore, store: input.imageTools,
+                                 recognition: input.imageRecognition,
+                                 operation: Binding(get: { input.selectedImageOperation }, set: { input.selectImageOperation($0) }),
+                                 pending: $input.imageOptions)
+        case .audioTools:
+            AudioToolsModuleView(initialOperation: input.selectedAudioOperation)
+                .id(input.selectedAudioOperation)
         case .info:
             infoContent
         case .mail:
@@ -263,6 +272,8 @@ struct SettingsView: View {
             downloadContent
         case .saveLocations:
             saveLocationsContent
+        case .scheduledCleanup:
+            scheduledCleanupContent
         case .networkProxy:
             networkProxyContent
         case .weather:
@@ -273,6 +284,145 @@ struct SettingsView: View {
             updatesContent
         case .recommendations:
             recommendationsContent
+        }
+    }
+
+    private var scheduledCleanupContent: some View {
+        VStack(alignment: .leading, spacing: 20) {
+            if settingsStore.settings.systemMonitorEnabled && settingsStore.settings.automaticPowerModeEnabled {
+                settingsGroup("电源模式") {
+                    settingRow(
+                        symbol: "powerplug.fill",
+                        title: "插电默认模式",
+                        detail: ""
+                    ) {
+                        Picker(AppLocalization.string("插电默认模式", locale: locale), selection: Binding(
+                            get: { settingsStore.settings.powerAdapterDefaultMode },
+                            set: { settingsStore.settings.powerAdapterDefaultMode = $0 }
+                        )) {
+                            ForEach(BatteryPowerMode.allCases, id: \.rawValue) { mode in
+                                AppLocalizedText(mode.menuTitle).tag(mode)
+                            }
+                        }
+                        .labelsHidden()
+                        .pickerStyle(.menu)
+                        .keepsIntrinsicWidth()
+                    }
+                    rowDivider
+                    settingRow(
+                        symbol: "battery.100percent",
+                        title: "脱电默认模式",
+                        detail: ""
+                    ) {
+                        Picker(AppLocalization.string("脱电默认模式", locale: locale), selection: Binding(
+                            get: { settingsStore.settings.batteryDefaultMode },
+                            set: { settingsStore.settings.batteryDefaultMode = $0 }
+                        )) {
+                            ForEach(BatteryPowerMode.allCases, id: \.rawValue) { mode in
+                                AppLocalizedText(mode.menuTitle).tag(mode)
+                            }
+                        }
+                        .labelsHidden()
+                        .pickerStyle(.menu)
+                        .keepsIntrinsicWidth()
+                    }
+                    rowDivider
+                    featureToggle(
+                        "20%及以下固定省电",
+                        detail: "电量不高于20%时保持省电，插电也不切换；超过20%后恢复对应默认模式",
+                        symbol: "battery.25percent",
+                        keyPath: \.lowBatteryPowerModeEnabled
+                    )
+                }
+            }
+            settingsGroup("清理") {
+                if model.settingsStore.settings.systemMonitorEnabled {
+                    settingRow(
+                        symbol: "calendar.badge.clock",
+                        title: "自动清理系统垃圾",
+                        detail: "按所选间隔移入废纸篓；清空废纸篓后将永久删除"
+                    ) {
+                        Picker(AppLocalization.string("自动清理系统垃圾", locale: locale), selection: Binding(
+                            get: { model.settingsStore.settings.systemCleanupPolicy },
+                            set: { model.settingsStore.settings.systemCleanupPolicy = $0 }
+                        )) {
+                            ForEach(VoiceRecordingCleanupPolicy.allCases, id: \.self) { policy in
+                                AppLocalizedText(policy.menuTitle).tag(policy)
+                            }
+                        }
+                        .labelsHidden()
+                        .pickerStyle(.menu)
+                        .keepsIntrinsicWidth()
+                    }
+                    rowDivider
+                    settingRow(symbol: "line.3.horizontal.decrease.circle", title: "清理范围", detail: "", isNested: true) {
+                        Picker(AppLocalization.string("清理范围", locale: locale), selection: Binding(
+                            get: { model.settingsStore.settings.systemCleanupScope },
+                            set: { model.settingsStore.settings.systemCleanupScope = $0 }
+                        )) {
+                            ForEach(SystemCleanupScope.allCases, id: \.self) { scope in
+                                AppLocalizedText(scope.menuTitle).tag(scope)
+                            }
+                        }
+                        .labelsHidden()
+                        .pickerStyle(.menu)
+                        .keepsIntrinsicWidth()
+                    }
+                    rowDivider
+                }
+                settingRow(
+                    symbol: "trash.fill",
+                    title: "定时倾倒废纸篓",
+                    detail: "按所选间隔永久删除废纸篓中的所有项目，无法恢复"
+                ) {
+                    Picker(AppLocalization.string("定时倾倒废纸篓", locale: locale), selection: Binding(
+                        get: { settingsStore.settings.trashCleanupPolicy },
+                        set: { input.requestTrashCleanupPolicy($0, settings: &settingsStore.settings) }
+                    )) {
+                        ForEach(VoiceRecordingCleanupPolicy.allCases, id: \.self) { policy in
+                            AppLocalizedText(policy.menuTitle).tag(policy)
+                        }
+                    }
+                    .labelsHidden()
+                    .pickerStyle(.menu)
+                    .keepsIntrinsicWidth()
+                }
+                rowDivider
+                settingRow(
+                    symbol: "calendar.badge.clock",
+                    title: "自动删除剪贴板历史",
+                    detail: "按所选周期删除过期历史，常用项目继续保留"
+                ) {
+                    Picker(
+                        AppLocalization.string("自动删除剪贴板历史", locale: locale),
+                        selection: Binding(
+                            get: { model.settingsStore.settings.clipboardHistoryCleanupPolicy },
+                            set: { model.settingsStore.settings.clipboardHistoryCleanupPolicy = $0 }
+                        )
+                    ) {
+                        ForEach(VoiceRecordingCleanupPolicy.allCases, id: \.self) { policy in
+                            AppLocalizedText(policy.menuTitle).tag(policy)
+                        }
+                    }
+                    .labelsHidden()
+                    .pickerStyle(.menu)
+                    .keepsIntrinsicWidth()
+                }
+                .disabled(!model.settingsStore.settings.clipboardHistoryEnabled)
+            }
+        }
+        .alert(AppLocalization.string("启用定时倾倒废纸篓？", locale: locale), isPresented: Binding(
+            get: { input.pendingTrashCleanupPolicy != nil },
+            set: { if !$0 { input.pendingTrashCleanupPolicy = nil } }
+        )) {
+            Button(AppLocalization.string("取消", locale: locale), role: .cancel) {
+                input.pendingTrashCleanupPolicy = nil
+            }
+            Button(AppLocalization.string("启用", locale: locale), role: .destructive) {
+                input.confirmTrashCleanupPolicy(settings: &settingsStore.settings)
+            }
+        } message: {
+            AppLocalizedText("按所选间隔永久删除废纸篓中的所有项目，无法恢复")
         }
     }
 
@@ -499,30 +649,7 @@ struct SettingsView: View {
                     rowDivider
                     featureToggle("链接下载", detail: "", symbol: "arrow.down.circle.fill", keyPath: \.downloaderEnabled)
                     rowDivider
-                    featureToggle(AppLocalization.text("剪贴板历史"), detail: "仅本机保存文本和图片", symbol: "clipboard", keyPath: \.clipboardHistoryEnabled)
-                    rowDivider
-                    settingRow(
-                        symbol: "calendar.badge.clock",
-                        title: "自动删除剪贴板历史",
-                        detail: "按所选周期删除过期历史，常用项目继续保留",
-                        isNested: true
-                    ) {
-                        Picker(
-                            "",
-                            selection: Binding(
-                                get: { model.settingsStore.settings.clipboardHistoryCleanupPolicy },
-                                set: { model.settingsStore.settings.clipboardHistoryCleanupPolicy = $0 }
-                            )
-                        ) {
-                            ForEach(VoiceRecordingCleanupPolicy.allCases, id: \.self) { policy in
-                                Text(AppLocalization.text(policy.menuTitle)).tag(policy)
-                            }
-                        }
-                        .labelsHidden()
-                        .pickerStyle(.menu)
-                        .keepsIntrinsicWidth()
-                    }
-                    .disabled(!model.settingsStore.settings.clipboardHistoryEnabled)
+                    featureToggle("剪贴板历史", detail: "仅本机保存文本和图片", symbol: "clipboard", keyPath: \.clipboardHistoryEnabled)
                     rowDivider
                     featureToggle(AppLocalization.text("剪贴板链接检测"), detail: "", symbol: "clipboard.fill", keyPath: \.clipboardDetectionEnabled)
                 }
@@ -851,6 +978,30 @@ struct SettingsView: View {
                         if let groups = Self.clipboardAssistantExampleGroups[kind] {
                             Self.clipboardAssistantExamples(groups, language: model.languageStore.language, onCopy: copySettingsText)
                         }
+                        if kind == .appCannotOpen {
+                            rowDivider
+                            settingRow(symbol: "macwindow.badge.plus", title: "系统打不开应用时提醒",
+                                       detail: "需要辅助功能权限；通过系统窗口事件提醒，不定时扫描",
+                                       detailLineLimit: 2, isNested: true) {
+                                Self.applicationOpenFailureMonitoringToggle(settings: Binding(
+                                    get: { model.settingsStore.settings },
+                                    set: { model.settingsStore.settings = $0 }
+                                )) {
+                                    model.refreshAssistantAccessibility()
+                                    if !model.assistantAccessibilityGranted {
+                                        selectSettingsSection(.permissions, searchTarget: .row(OnboardingPermissionID.accessibility.titleKey))
+                                    }
+                                }
+                            }
+                            if model.settingsStore.settings.applicationOpenFailureMonitoringEnabled, !model.assistantAccessibilityGranted {
+                                rowDivider
+                                settingRow(symbol: "hand.raised", title: "辅助功能", detail: "", isNested: true) {
+                                    Button {
+                                        selectSettingsSection(.permissions, searchTarget: .row(OnboardingPermissionID.accessibility.titleKey))
+                                    } label: { AppLocalizedText("权限") }
+                                }
+                            }
+                        }
                     }
                 }
                 settingsGroup("快捷操作") {
@@ -1056,44 +1207,22 @@ struct SettingsView: View {
                     rowDivider
                     featureToggle("PDF 工具", detail: "", symbol: "doc.text.fill", keyPath: \.pdfToolsEnabled)
                     rowDivider
+                    featureToggle("图片工具", detail: "", symbol: "photo.stack.fill", keyPath: \.imageToolsEnabled)
+                    rowDivider
+                    featureToggle("音频工具", detail: "", symbol: "waveform.circle.fill", keyPath: \.audioToolsEnabled)
+                    rowDivider
                     featureToggle("应用音量混音器", detail: "", symbol: "slider.horizontal.3", keyPath: \.volumeMixerEnabled)
                     rowDivider
                     featureToggle("系统状态与清理", detail: "监控系统资源与电池，并安全清理缓存和日志", symbol: "gauge.with.dots.needle.67percent", keyPath: \.systemMonitorEnabled)
-                    if model.settingsStore.settings.systemMonitorEnabled {
-                        rowDivider
-                        settingRow(
-                            symbol: "calendar.badge.clock",
-                            title: "自动清理系统垃圾",
-                            detail: "按所选间隔移入废纸篓，不会永久删除",
-                            isNested: true
-                        ) {
-                            Picker(AppLocalization.string("自动清理系统垃圾", locale: locale), selection: Binding(
-                                get: { model.settingsStore.settings.systemCleanupPolicy },
-                                set: { model.settingsStore.settings.systemCleanupPolicy = $0 }
-                            )) {
-                                ForEach(VoiceRecordingCleanupPolicy.allCases, id: \.self) { policy in
-                                    AppLocalizedText(policy.menuTitle).tag(policy)
-                                }
-                            }
-                            .labelsHidden()
-                            .pickerStyle(.menu)
-                            .keepsIntrinsicWidth()
-                        }
-                        rowDivider
-                        settingRow(symbol: "line.3.horizontal.decrease.circle", title: "清理范围", detail: "", isNested: true) {
-                            Picker(AppLocalization.string("清理范围", locale: locale), selection: Binding(
-                                get: { model.settingsStore.settings.systemCleanupScope },
-                                set: { model.settingsStore.settings.systemCleanupScope = $0 }
-                            )) {
-                                ForEach(SystemCleanupScope.allCases, id: \.self) { scope in
-                                    AppLocalizedText(scope.menuTitle).tag(scope)
-                                }
-                            }
-                            .labelsHidden()
-                            .pickerStyle(.menu)
-                            .keepsIntrinsicWidth()
-                        }
-                    }
+                    rowDivider
+                    featureToggle(
+                        "自动切换电源模式",
+                        detail: "",
+                        symbol: "bolt.fill",
+                        keyPath: \.automaticPowerModeEnabled,
+                        isNested: true
+                    )
+                    .disabled(!model.settingsStore.settings.systemMonitorEnabled)
                     rowDivider
                     featureToggle("键盘音效", detail: "全局播放键盘音效并记录输入统计", symbol: "keyboard.badge.ellipsis", keyPath: \.keyboardEnabled)
                     rowDivider
@@ -2728,7 +2857,13 @@ struct SettingsView: View {
             settingsGroup("组件") {
                 managedToolRow(.ytDLP, symbol: "terminal.fill")
                 rowDivider
+                managedToolRow(.ffmpeg, symbol: "waveform")
+                rowDivider
                 managedToolRow(.libreOffice, symbol: "doc.richtext")
+                rowDivider
+                managedToolRow(.libvips, symbol: "photo.stack.fill")
+                rowDivider
+                managedToolRow(.libavif, symbol: "photo.stack.fill")
             }
         }
         .task {
@@ -3369,6 +3504,7 @@ struct SettingsView: View {
         case .code: "代码"
         case .shellCommand: "Shell 命令"
         case .app: "应用程序"
+        case .appCannotOpen: "应用无法打开"
         case .nonSystemLanguageText: "非 Zisla 全局语言文本"
         case .text: "文本"
         case .image: "图片"
@@ -3376,7 +3512,22 @@ struct SettingsView: View {
         }
     }
 
-    /// Single groups inherit their recognition-row title; only multiple groups need extra headings.
+    static func applicationOpenFailureMonitoringToggle(
+        settings: Binding<FeatureSettings>, onEnable: @escaping () -> Void
+    ) -> some View {
+        Toggle("", isOn: Binding(
+            get: { settings.wrappedValue.applicationOpenFailureMonitoringEnabled },
+            set: { enabled in
+                settings.wrappedValue.applicationOpenFailureMonitoringEnabled = enabled
+                if enabled { onEnable() }
+            }
+        ))
+        .labelsHidden()
+        .toggleStyle(.switch)
+        .disabled(!settings.wrappedValue.applicationOpenRepairEnabled)
+    }
+
+    /// Instructions keep a usage heading; other single groups inherit their recognition-row title.
     /// The copy callback receives the full localized text even when the row truncates its display.
     static func clipboardAssistantExamples(
         _ groups: [ClipboardAssistantExampleGroup],
@@ -3387,10 +3538,17 @@ struct SettingsView: View {
             Divider()
             ForEach(groups) { group in
                 VStack(alignment: .leading, spacing: 2) {
-                    if groups.count > 1 {
+                    if groups.count > 1 || !group.instructions.isEmpty {
                         AppLocalizedText(group.title)
                             .font(.system(size: 10, weight: .medium))
                             .foregroundStyle(.secondary)
+                    }
+                    ForEach(group.instructions, id: \.self) { instruction in
+                        AppLocalizedText(instruction)
+                            .font(.system(size: 10))
+                            .foregroundStyle(.secondary)
+                            .fixedSize(horizontal: false, vertical: true)
+                            .padding(.leading, 12)
                     }
                     ForEach(group.localizedExamples(language: language), id: \.self) { example in
                         HStack(spacing: 6) {
@@ -3425,6 +3583,13 @@ struct SettingsView: View {
     struct ClipboardAssistantExampleGroup: Identifiable {
         let title: String
         let examples: [String]
+        let instructions: [String]
+
+        init(title: String, examples: [String], instructions: [String] = []) {
+            self.title = title
+            self.examples = examples
+            self.instructions = instructions
+        }
 
         var id: String { title }
 
@@ -3434,6 +3599,18 @@ struct SettingsView: View {
     }
 
     static let clipboardAssistantExampleGroups: [ClipboardAssistantKind: [ClipboardAssistantExampleGroup]] = [
+        .appCannotOpen: [
+            ClipboardAssistantExampleGroup(
+                title: "使用方法",
+                examples: [],
+                instructions: [
+                    "1. 复制无法打开的 .app，或将它拖入中转站；检测到隔离标记时显示提醒。",
+                    "2. 确认应用来自可信来源后，点击“解决并打开”，移除隔离标记并尝试打开。",
+                    "3. 镜像中的应用须先复制到应用程序或下载文件夹；签名损坏或安全评估拒绝时停止处理。",
+                    "4. 可开启“系统打不开应用时提醒”；无法确定应用路径时，请复制或拖入 .app。",
+                ]
+            ),
+        ],
         .url: [
             ClipboardAssistantExampleGroup(title: "链接", examples: ["https://example.com", "example.com/docs"]),
         ],
@@ -3884,6 +4061,7 @@ struct SettingsView: View {
         case .runShellCommandInBackground: "后台执行"
         case .createCalendarEvent: "新建日程"
         case .openApp: "打开应用"
+        case .repairAndOpenApp: "解决并打开"
         }
     }
 
@@ -4602,12 +4780,15 @@ enum SettingsSection: String, CaseIterable, Identifiable {
     case screenshot
     case recording
     case pdfTools
+    case imageTools
+    case audioTools
     case ai
     case voice
     case mail
     case keyboardSound
     case download
     case saveLocations
+    case scheduledCleanup
     case weather
     case networkProxy
     case pet
@@ -4621,10 +4802,10 @@ enum SettingsSection: String, CaseIterable, Identifiable {
         switch self {
         case .general, .features, .info: .basics
         case .keyboardSound: .sound
-        case .pdfTools: .files
+        case .pdfTools, .imageTools, .audioTools: .files
         case .screenshot, .recording: .capture
         case .ai, .voice: .aiAndVoice
-        case .clipboardAssistant, .download, .saveLocations, .mail, .weather, .networkProxy, .pet: .others
+        case .clipboardAssistant, .download, .saveLocations, .scheduledCleanup, .mail, .weather, .networkProxy, .pet: .others
         case .permissions: .permissions
         case .recommendations, .updates: .recommendationsAndUpdates
         }
@@ -4643,6 +4824,8 @@ enum SettingsSection: String, CaseIterable, Identifiable {
         case .clipboardAssistant: "快捷操作"
         case .screenshot: "截图"
         case .pdfTools: "PDF 工具"
+        case .imageTools: "图片工具"
+        case .audioTools: "音频工具"
         case .recording: "录屏"
         case .info: "信息"
         case .mail: "邮件"
@@ -4651,6 +4834,7 @@ enum SettingsSection: String, CaseIterable, Identifiable {
         case .pet: "宠物"
         case .download: "依赖组件"
         case .saveLocations: "保存位置"
+        case .scheduledCleanup: "系统状态与清理"
         case .networkProxy: "网络"
         case .weather: "天气"
         case .permissions: "权限"
@@ -4667,6 +4851,8 @@ enum SettingsSection: String, CaseIterable, Identifiable {
         case .clipboardAssistant: "sparkles.rectangle.stack"
         case .screenshot: "camera.viewfinder"
         case .pdfTools: "doc.text.fill"
+        case .imageTools: "photo.stack.fill"
+        case .audioTools: "waveform.circle.fill"
         case .recording: "record.circle"
         case .info: "info.circle.fill"
         case .mail: "envelope.fill"
@@ -4675,6 +4861,7 @@ enum SettingsSection: String, CaseIterable, Identifiable {
         case .pet: "pawprint.fill"
         case .download: "arrow.down.circle.fill"
         case .saveLocations: "folder.fill"
+        case .scheduledCleanup: "calendar.badge.clock"
         case .networkProxy: "network"
         case .weather: "cloud.sun.fill"
         case .permissions: "lock.shield"
@@ -4687,8 +4874,8 @@ enum SettingsSection: String, CaseIterable, Identifiable {
         switch self {
         case .general, .features, .keyboardSound, .permissions: Color(nsColor: .systemGray)
         case .info, .mail, .saveLocations, .networkProxy: Color(nsColor: .systemBlue)
-        case .clipboardAssistant, .screenshot, .ai, .recommendations: Color(nsColor: .systemIndigo)
-        case .recording, .pdfTools, .voice: Color(nsColor: .systemRed)
+        case .clipboardAssistant, .screenshot, .imageTools, .ai, .recommendations: Color(nsColor: .systemIndigo)
+        case .recording, .pdfTools, .audioTools, .voice, .scheduledCleanup: Color(nsColor: .systemRed)
         case .download, .updates: Color(nsColor: .systemGreen)
         case .weather: Color(nsColor: .systemCyan)
         case .pet: Color(nsColor: .systemOrange)
@@ -4749,6 +4936,8 @@ enum SettingsSection: String, CaseIterable, Identifiable {
         case .clipboardAssistant: "复制、浏览器下载或 AirDrop 接收完成后显示下一步操作"
         case .screenshot: "启用截图、钉图与全局快捷键"
         case .pdfTools: "在设置中合并、拆分、加密与转换 PDF。"
+        case .imageTools: "在本机压缩、转换、缩放与批量导出图片。"
+        case .audioTools: "转换、剪辑与处理本地音频。"
         case .recording: "录制屏幕、编辑视频与保存项目。"
         case .info: "配置媒体、系统监控、锁屏与通知显示。"
         case .mail: "读取已配置的 Mail.app 账户并提醒新邮件"
@@ -4757,6 +4946,7 @@ enum SettingsSection: String, CaseIterable, Identifiable {
         case .pet: "设置灵动岛内部的宠物形象。"
         case .download: "管理下载与文档转换所需组件。"
         case .saveLocations: "分别设置各类内容的默认保存位置。"
+        case .scheduledCleanup: "管理电源模式与系统垃圾、剪贴板历史和废纸篓的定时清理。"
         case .networkProxy: "配置本地代理，用于更新、安装、下载与 GitHub 访问。"
         case .weather: "管理天气显示、地点和刷新。"
         case .permissions: "管理 zisla 使用的系统权限。"
@@ -4768,7 +4958,7 @@ enum SettingsSection: String, CaseIterable, Identifiable {
     /// Information owns toolbar ordering even when every optional information feature is disabled.
     func isVisible(settings: FeatureSettings) -> Bool {
         switch self {
-        case .general, .features, .info, .saveLocations, .networkProxy, .permissions:
+        case .general, .features, .info, .saveLocations, .scheduledCleanup, .networkProxy, .permissions:
             return true
         case .recommendations:
             return settings.recommendedToolsEnabled
@@ -4780,6 +4970,10 @@ enum SettingsSection: String, CaseIterable, Identifiable {
             return settings.screenshotEnabled
         case .pdfTools:
             return settings.pdfToolsEnabled
+        case .imageTools:
+            return settings.imageToolsEnabled
+        case .audioTools:
+            return settings.audioToolsEnabled
         case .recording:
             return settings.screenRecordingEnabled
         case .mail:
@@ -4791,7 +4985,7 @@ enum SettingsSection: String, CaseIterable, Identifiable {
         case .pet:
             return settings.petEnabled
         case .download:
-            return settings.downloaderEnabled
+            return settings.downloaderEnabled || settings.pdfToolsEnabled || settings.imageToolsEnabled
         case .weather:
             return settings.weatherEnabled
         case .updates:
@@ -4954,6 +5148,9 @@ struct SettingsSidebar: View {
 
 @MainActor
 final class SettingsInput: ObservableObject {
+    let imageTools = ImageToolsModel()
+    let imageRecognition = ImageToolsRecognitionModel()
+
     private struct Destination: Equatable {
         let section: SettingsSection
         let searchTarget: SettingsSearchAnchor?
@@ -4984,7 +5181,17 @@ final class SettingsInput: ObservableObject {
             if settingsQuery != oldValue { searchTarget = nil }
         }
     }
-    @Published var searchTarget: SettingsSearchAnchor?
+    @Published var searchTarget: SettingsSearchAnchor? {
+        didSet {
+            if case .imageOperation(let operation) = searchTarget {
+                selectImageOperation(operation)
+                if operation != selectedImageOperation { searchTarget = .imageOperation(selectedImageOperation) }
+            }
+        }
+    }
+    @Published private(set) var selectedImageOperation: ImageToolOperation = .compress
+    @Published var imageOptions = ImageToolsPendingOptions()
+    @Published var pendingTrashCleanupPolicy: VoiceRecordingCleanupPolicy?
     private var history = [Destination(section: .general, searchTarget: nil, voicePage: nil)]
     private var historyIndex = 0
     private var isRestoringDestination = false
@@ -4998,6 +5205,22 @@ final class SettingsInput: ObservableObject {
         return .merge
     }
 
+    func selectImageOperation(_ operation: ImageToolOperation) {
+        guard operation != selectedImageOperation, !imageTools.isProcessing, !imageRecognition.isProcessing else { return }
+        imageTools.discardResults()
+        imageTools.discardEdits()
+        imageTools.message = nil
+        imageRecognition.clear()
+        selectedImageOperation = operation
+        searchTarget = .imageOperation(operation)
+        recordDestination()
+    }
+
+    var selectedAudioOperation: AudioToolOperation {
+        if case .audioOperation(let operation) = searchTarget { return operation }
+        return .convert
+    }
+
     func select(_ section: SettingsSection, searchTarget: SettingsSearchAnchor? = nil) {
         isRestoringDestination = true
         selection = section
@@ -5008,6 +5231,21 @@ final class SettingsInput: ObservableObject {
         self.searchTarget = searchTarget
         isRestoringDestination = false
         recordDestination()
+    }
+
+    func requestTrashCleanupPolicy(_ policy: VoiceRecordingCleanupPolicy, settings: inout FeatureSettings) {
+        if settings.trashCleanupPolicy == .never && policy != .never {
+            pendingTrashCleanupPolicy = policy
+        } else {
+            pendingTrashCleanupPolicy = nil
+            settings.trashCleanupPolicy = policy
+        }
+    }
+
+    func confirmTrashCleanupPolicy(settings: inout FeatureSettings) {
+        guard let policy = pendingTrashCleanupPolicy else { return }
+        pendingTrashCleanupPolicy = nil
+        settings.trashCleanupPolicy = policy
     }
 
     func canNavigate(backward: Bool, settings: FeatureSettings) -> Bool {

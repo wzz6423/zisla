@@ -8,6 +8,159 @@ import ZislaKit
 
 @MainActor
 struct AIAccountBalanceViewTests {
+
+    @Test(arguments: [CGFloat(32), 52])
+    func concentricQuotaRingsKeepFiveHoursInsideAndWeekOutside(diameter: CGFloat) throws {
+        func render(_ inner: Double?, _ innerSeverity: AIAccountQuotaSeverity?, _ outer: Double?,
+                    _ outerSeverity: AIAccountQuotaSeverity? = .normal) throws -> NSBitmapImageRep {
+            let renderer = ImageRenderer(content: AIAccountQuotaRing(provider: nil, fraction: outer,
+                severity: outerSeverity, diameter: diameter, innerFraction: inner, innerSeverity: innerSeverity)
+                .background(.black).foregroundStyle(.white).environment(\.colorScheme, .dark))
+            renderer.scale = 3
+            let image = try #require(renderer.cgImage)
+            return try #require(NSBitmapImageRep(cgImage: image).converting(to: .sRGB, renderingIntent: .default))
+        }
+        let dual = try render(0.1, .critical, 0.51)
+        let weekOnly = try render(nil, nil, 0.51)
+        let resetFiveHours = try render(1, .normal, 0.51)
+        let fiveHoursOnly = try render(0.1, .critical, nil, nil)
+        let scale = CGFloat(dual.pixelsWide) / diameter
+        let center = CGFloat(dual.pixelsWide) / 2
+        var innerRed = 0, innerColored = 0, outerWhite = 0, outerColored = 0
+        var missingInner = 0, missingOuter = 0, changedOuter = 0
+        for y in 0..<dual.pixelsHigh {
+            for x in 0..<dual.pixelsWide {
+                let radius = hypot(CGFloat(x) + 0.5 - center, CGFloat(y) + 0.5 - center) / scale
+                let color = try #require(dual.colorAt(x: x, y: y)?.usingColorSpace(.sRGB))
+                let missing = try #require(weekOnly.colorAt(x: x, y: y)?.usingColorSpace(.sRGB))
+                let changed = try #require(resetFiveHours.colorAt(x: x, y: y)?.usingColorSpace(.sRGB))
+                let only = try #require(fiveHoursOnly.colorAt(x: x, y: y)?.usingColorSpace(.sRGB))
+                if radius < diameter * 0.36 {
+                    if color.redComponent > 0.65 && color.redComponent > color.greenComponent * 2 { innerRed += 1 }
+                    if color.redComponent > 0.03 { innerColored += 1 }
+                    if max(missing.redComponent, missing.greenComponent, missing.blueComponent) > 0.03 { missingInner += 1 }
+                } else {
+                    if min(color.redComponent, color.greenComponent, color.blueComponent) > 0.6 { outerWhite += 1 }
+                    if color.redComponent > 0.03 { outerColored += 1 }
+                    if max(only.redComponent, only.greenComponent, only.blueComponent) > 0.03 { missingOuter += 1 }
+                    if abs(color.redComponent - changed.redComponent) > 0.02
+                        || abs(color.greenComponent - changed.greenComponent) > 0.02 { changedOuter += 1 }
+                }
+            }
+        }
+        #expect(innerRed > 80 && outerWhite > 100)
+        #expect((0.07...0.22).contains(Double(innerRed) / Double(innerColored)))
+        #expect((0.4...0.65).contains(Double(outerWhite) / Double(outerColored)))
+        #expect(missingInner == 0, "A missing five-hour window must leave no inner track")
+        #expect(missingOuter == 0, "A five-hour-only account must leave no fabricated weekly track")
+        #expect(changedOuter == 0, "Resetting five hours cannot change the independent weekly ring")
+    }
+
+    @Test(arguments: [IslandEdge.top, .bottom, .left, .right], [(CGFloat(32), false), (32, true), (34, false), (34, true)])
+    func realChatGPTNoticeSharesTheDoubleRingAndTwoRemainingRows(edge: IslandEdge, configuration: (CGFloat, Bool)) async throws {
+        let (thickness, rightToLeft) = configuration
+        let queue = SideNoticeQueue(), controller = AIAccountBalanceNoticeController(queue: queue)
+        defer { queue.removeAll() }
+        let reading = AIAccountBalance(id: "chatgpt", providers: [.codex, .gpt], status: .available,
+            windows: [.init(id: "5h", kind: .fiveHours, remainingPercent: 10, durationSeconds: 18_000),
+                .init(id: "weekly", kind: .weekly, remainingPercent: 51, durationSeconds: 604_800)])
+        var settings = FeatureSettings(aiAccountBalanceNoticeEnabled: false, aiAccountBalanceCompactStyle: .detailed,
+            aiAccountBalancePinnedInCustomIsland: true)
+        settings.islandPlacement = IslandPlacement(mode: .custom, edge: edge)
+        controller.update(balances: [reading], settings: settings, language: .english)
+        let notice = try #require(queue.left.first)
+        #expect(notice.title == "ChatGPT" && notice.metadata?["quotaProviderID"] == "gpt")
+        #expect(notice.metadata?["quotaLine0"] == "5h 10%" && notice.metadata?["quotaLine1"] == "7d 51%")
+        let presentation = CompactPillStatusPresentation(priority: .aiAccountBalance, notice: notice, text: "")
+        let length = presentation.length(thickness: thickness, edge: edge)
+        let size = CGSize(width: edge.isVertical ? thickness : length, height: edge.isVertical ? length : thickness)
+        let bitmap = try await renderOffscreen(CompactAIAccountBalanceBar(notice: notice, height: thickness, edge: edge)
+            .foregroundStyle(.white).environment(\.colorScheme, .dark)
+            .environment(\.layoutDirection, rightToLeft ? .rightToLeft : .leftToRight), size: size, reduceMotion: true)
+        var red = 0, white = 0
+        for y in 0..<bitmap.pixelsHigh {
+            for x in 0..<bitmap.pixelsWide {
+                let axis = edge.isVertical ? y : x
+                guard CGFloat(axis) / (CGFloat(edge.isVertical ? bitmap.pixelsHigh : bitmap.pixelsWide) / length) > 46 else { continue }
+                let color = try #require(bitmap.colorAt(x: x, y: y)?.usingColorSpace(.sRGB))
+                if color.redComponent > 0.5 && color.greenComponent < 0.3 { red += 1 }
+                if min(color.redComponent, color.greenComponent, color.blueComponent) > 0.6 { white += 1 }
+            }
+        }
+        #expect(red > 10 && white > 10, "Five-hour and weekly values must keep their independent remaining colors")
+
+        let expectedRing = try await renderOffscreen(AIAccountQuotaRing(provider: .gpt, fraction: 0.51,
+            severity: .normal, diameter: thickness - 8, innerFraction: 0.1, innerSeverity: .critical)
+            .foregroundStyle(.white).environment(\.colorScheme, .dark),
+            size: CGSize(width: thickness - 8, height: thickness - 8))
+        let scale = CGFloat(bitmap.pixelsWide) / size.width
+        let ringX = Int((edge.isVertical ? 4 : 12) * scale)
+        let ringY = Int((edge.isVertical ? 12 : 4) * scale)
+        var differentRingPixels = 0
+        for y in 0..<expectedRing.pixelsHigh {
+            for x in 0..<expectedRing.pixelsWide {
+                let a = try #require(bitmap.colorAt(x: x + ringX, y: y + ringY)?.usingColorSpace(.sRGB))
+                let b = try #require(expectedRing.colorAt(x: x, y: y)?.usingColorSpace(.sRGB))
+                if abs(a.redComponent - b.redComponent) > 0.02 || abs(a.greenComponent - b.greenComponent) > 0.02 {
+                    differentRingPixels += 1
+                }
+            }
+        }
+        #expect(differentRingPixels == 0, "The real notice must map five hours to the inner arc and weekly quota to the outer arc")
+
+        let ringPixels = try await renderOffscreen(CompactAIAccountBalanceBar(notice: notice, height: thickness, edge: edge)
+            .foregroundStyle(.white).environment(\.colorScheme, .dark), size: size, reduceMotion: true)
+        settings.aiAccountBalanceCompactStyle = .compact
+        controller.update(balances: [reading], settings: settings, language: .english)
+        let brief = try #require(queue.left.first)
+        let briefPixels = try await renderOffscreen(CompactAIAccountBalanceBar(notice: brief, height: thickness, edge: edge)
+            .foregroundStyle(.white).environment(\.colorScheme, .dark), size: size, reduceMotion: true)
+        for y in 0..<ringPixels.pixelsHigh {
+            for x in 0..<ringPixels.pixelsWide {
+                let scale = CGFloat(edge.isVertical ? ringPixels.pixelsHigh : ringPixels.pixelsWide) / length
+                let position = CGFloat(edge.isVertical ? y : x) / scale
+                guard position >= 12 && position < 12 + thickness - 8 else { continue }
+                let a = try #require(ringPixels.colorAt(x: x, y: y)?.usingColorSpace(.sRGB))
+                let b = try #require(briefPixels.colorAt(x: x, y: y)?.usingColorSpace(.sRGB))
+                #expect(abs(a.redComponent - b.redComponent) < 0.02 && abs(a.greenComponent - b.greenComponent) < 0.02,
+                    "Brief and full modes share the same real two-ring quota mark")
+            }
+        }
+    }
+
+    @Test func chatGPTLogoInTheQuotaRingUsesTheExistingChatGPTAsset() async throws {
+        let diameter: CGFloat = 52
+        let ring = AIAccountQuotaRing(provider: .gpt, fraction: 0.51, severity: .normal, diameter: diameter,
+            innerFraction: 0.1, innerSeverity: .critical)
+        let actual = try await renderOffscreen(ring.foregroundStyle(.white).environment(\.colorScheme, .dark),
+            size: CGSize(width: diameter, height: diameter))
+        let expected = try await renderOffscreen(AIMascotView(identity: .gpt, size: diameter * 0.36)
+            .frame(width: diameter, height: diameter).foregroundStyle(.white).environment(\.colorScheme, .dark),
+            size: CGSize(width: diameter, height: diameter))
+        let tracks = try await renderOffscreen(AIAccountQuotaRing(provider: nil, fraction: 0.51, severity: .normal,
+            diameter: diameter, innerFraction: 0.1, innerSeverity: .critical)
+            .foregroundStyle(.white).environment(\.colorScheme, .dark), size: CGSize(width: diameter, height: diameter))
+        var markPixels = 0
+        let scale = CGFloat(actual.pixelsWide) / diameter
+        let center = CGFloat(actual.pixelsWide) / 2
+        for y in 0..<actual.pixelsHigh {
+            for x in 0..<actual.pixelsWide {
+                let a = try #require(actual.colorAt(x: x, y: y)?.usingColorSpace(.sRGB))
+                let b = try #require(expected.colorAt(x: x, y: y)?.usingColorSpace(.sRGB))
+                if hypot(CGFloat(x) + 0.5 - center, CGFloat(y) + 0.5 - center) / scale < diameter * 0.23 {
+                    #expect(abs(a.redComponent - b.redComponent) < 0.02)
+                }
+                if b.redComponent > 0.3 {
+                    markPixels += 1
+                    let track = try #require(tracks.colorAt(x: x, y: y)?.usingColorSpace(.sRGB))
+                    #expect(max(track.redComponent, track.greenComponent, track.blueComponent) < 0.03,
+                        "The ChatGPT mark must sit inside the inner ring without touching its stroke")
+                }
+            }
+        }
+        #expect(markPixels > 40, "The centered ChatGPT mark must be a real bundled asset")
+    }
+
     @Test func cardsHideUnavailableIncompleteAndUnsupportedReadings() {
         let quota = AIAccountQuotaWindow(id: "quota", kind: .all, remainingPercent: 70)
         let available = AIAccountBalance(id: "claude", providers: [.claude], status: .available, windows: [quota])
@@ -51,10 +204,14 @@ struct AIAccountBalanceViewTests {
     /// Pixel regions prove camera clearance and both summary lines without treating an image render as device acceptance.
     @Test(arguments: [CGFloat(0), 80, 180], [false, true])
     func compactBalanceKeepsBothLinesOutsidePhysicalCameraGap(centerInset: CGFloat, rightToLeft: Bool) async throws {
-        let width = centerInset + 320
-        let notice = IslandNotice(id: "ai-balance-low-fixture", title: "Claude", style: .status,
-            metadata: ["quotaProvider": "Claude", "quotaProviderID": "claude", "quotaRemainingFraction": "0.7",
-                "quotaSeverity": "0", "quotaLine0": "5h 70%", "quotaLine1": "All Weekly 80%"])
+        let width = centerInset + 160
+        let queue = SideNoticeQueue(), controller = AIAccountBalanceNoticeController(queue: queue)
+        defer { queue.removeAll() }
+        controller.update(balances: [.init(id: "chatgpt", providers: [.codex], status: .available,
+            windows: [.init(id: "5h", kind: .fiveHours, remainingPercent: 10, durationSeconds: 18_000),
+                .init(id: "weekly", kind: .weekly, remainingPercent: 51, durationSeconds: 604_800)])],
+            settings: FeatureSettings(aiAccountBalanceCompactStyle: .detailed), language: .english)
+        let notice = try #require(queue.left.first)
         let image = try await renderOffscreen(CompactAIAccountBalanceBar(notice: notice, height: 34, centerInset: centerInset)
             .foregroundStyle(.white).environment(\.colorScheme, .dark)
             .environment(\.layoutDirection, rightToLeft ? .rightToLeft : .leftToRight), size: CGSize(width: width, height: 34))
@@ -351,10 +508,13 @@ struct AIAccountBalanceViewTests {
 
 
     @Test func rotatingAccountsWithEqualQuotaTextRestartAtTheBeginningAndSamePollKeepsProgress() async throws {
-        let queue = SideNoticeQueue(), controller = AIAccountBalanceNoticeController(queue: queue)
+        let queue = SideNoticeQueue(), controller = AIAccountBalanceNoticeController(queue: queue,
+            now: { Date(timeIntervalSince1970: 100) })
         defer { queue.removeAll() }
         let windows = [AIAccountQuotaWindow(id: "5h", kind: .fiveHours, remainingPercent: 70, durationSeconds: 18_000),
-            .init(id: "weekly", kind: .weekly, remainingPercent: 70)]
+            .init(id: "weekly", kind: .weekly, remainingPercent: 70),
+            .init(id: "additional:review:secondary_window", kind: .weekly, remainingPercent: 70,
+                durationSeconds: 604_800, name: "Review allowance")]
         let rows = [AIProvider.claude, .codex].map {
             AIAccountBalance(id: $0.rawValue, providers: [$0], status: .available, windows: windows)
         }

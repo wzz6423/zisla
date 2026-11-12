@@ -140,17 +140,36 @@ public final class AIAccountBalanceNoticeController {
                                           language: AppLanguage, createdAt: Date) -> IslandNotice {
         let provider = balance.providerTitle(language: language)
         let summary = balance.compactLines(language: language)
-        var lines: [String]
+        let lines: [String]
         if style == .detailed { lines = summary }
         else if let limiting = balance.limitingWindow {
             lines = [limiting.label(language: language) + " " + limiting.value(language: language)]
         } else { lines = [] }
         var metadata = ["quotaProvider": provider, "quotaSeverity": String(balance.severity?.rawValue ?? 0)]
         metadata["quotaAccountID"] = balance.id
-        if balance.providers.contains(.gpt), !lines.isEmpty { lines[0] = "Codex " + lines[0] }
-        metadata["quotaProviderID"] = balance.providers.contains(.gpt) ? AIProvider.codex.rawValue : balance.providers.first?.rawValue
+        metadata["quotaProviderID"] = balance.displayProvider?.rawValue
         if let fraction = balance.limitingWindow?.remainingFraction { metadata["quotaRemainingFraction"] = String(fraction) }
-        for (index, line) in lines.enumerated() { metadata["quotaLine\(index)"] = line }
+        for (key, window) in [("5h", balance.fiveHourWindow), ("7d", balance.weeklyWindow)] {
+            if let window {
+                metadata["quota\(key)Severity"] = String(window.severity.rawValue)
+                metadata["quota\(key)Fraction"] = window.remainingFraction.map { String($0) }
+            }
+        }
+        for (index, line) in lines.enumerated() {
+            metadata["quotaLine\(index)"] = line
+            let lineSeverity: AIAccountQuotaSeverity
+            let short = balance.fiveHourWindow
+                ?? balance.windows.first(where: { $0.kind == .rolling && !$0.id.hasPrefix("additional:") })
+            if style != .detailed { lineSeverity = balance.limitingWindow?.severity ?? .normal }
+            else if index == 0, let short { lineSeverity = short.severity }
+            else if index == 0, let weekly = balance.weeklyWindow { lineSeverity = weekly.severity }
+            else {
+                let remaining = balance.windows.filter { $0.id != short?.id
+                    && (short != nil || $0.id != balance.weeklyWindow?.id) }
+                lineSeverity = remaining.map(\.severity).max() ?? .normal
+            }
+            metadata["quotaLineSeverity\(index)"] = String(lineSeverity.rawValue)
+        }
         return IslandNotice(id: id, title: provider, detail: lines.joined(separator: " · "),
             kind: balance.severity == .normal ? .info : .warning, side: .left, createdAt: createdAt,
             style: .status, symbolName: "gauge.with.dots.needle.67percent", metadata: metadata)

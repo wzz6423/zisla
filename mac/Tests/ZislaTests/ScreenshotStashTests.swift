@@ -121,7 +121,7 @@ struct ScreenshotStashTests {
         let item = FileShelfItem(id: UUID(), url: URL(fileURLWithPath: "/nonexistent.png"),
             addedAt: Date(), bookmarkData: Data(), screenshotMetadata: metadata)
         let host = NSHostingView(rootView: ShelfItemView(item: item, onOpen: {}, onCopy: {},
-            onSave: {}, onSendToQuickNote: {}, onRemove: {}))
+            onSave: {}, onSendToQuickNote: {}, onRemove: { _ in }))
         #expect(host.fittingSize == CGSize(width: 140, height: 84))
         let frames = ShelfGridLayout.frames(columnSpans: [1, 2, 1, 2], width: 288)
         #expect(frames.map(\.width) == [66, 140, 66, 140])

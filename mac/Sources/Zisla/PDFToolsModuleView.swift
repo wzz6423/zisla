@@ -398,6 +398,7 @@ struct PDFToolsModuleView: View {
         let panel = NSSavePanel()
         panel.allowedContentTypes = [type]
         panel.nameFieldStringValue = name
+        panel.directoryURL = model.saveLocations[.pdfTools]
         WindowPlacement.prepareModal(panel, on: WindowPlacement.screenUnderMouse())
         return panel.runModal() == .OK ? panel.url : nil
     }
@@ -411,6 +412,7 @@ struct PDFToolsModuleView: View {
         panel.canChooseDirectories = true
         panel.canChooseFiles = false
         panel.allowsMultipleSelection = false
+        panel.directoryURL = model.saveLocations[.pdfTools]
         WindowPlacement.prepareModal(panel, on: WindowPlacement.screenUnderMouse())
         return panel.runModal() == .OK ? panel.url : nil
     }

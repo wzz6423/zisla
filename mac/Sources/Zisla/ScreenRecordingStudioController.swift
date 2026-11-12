@@ -112,6 +112,12 @@ final class ScreenRecordingStudioController: NSWindowController, NSWindowDelegat
         NSApp.activate(ignoringOtherApps: true)
     }
 
+    func importShelfVideos(_ urls: [URL]) -> Bool {
+        guard model.importMedia(urls, returningExportsToShelf: true) else { return false }
+        present()
+        return true
+    }
+
     func perform(_ action: RecordingShortcutAction) {
         switch action {
         case .display:

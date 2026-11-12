@@ -122,7 +122,7 @@ struct ScreenshotShortcutContextTests {
         }
         var panels: [ScreenshotSelectionPanel] = []
         let selection = ScreenshotSelectionController(
-            captureScreen: { _ in (image, pixels) },
+            captureScreen: { _ in (image, pixels, nil) },
             presentPanels: { panels = $0 },
             snapTargets: { _ in [] }
         )

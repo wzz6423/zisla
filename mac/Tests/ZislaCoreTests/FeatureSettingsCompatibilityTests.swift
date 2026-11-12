@@ -210,7 +210,7 @@ struct FeatureSettingsCompatibilityTests {
 
         let decoded = try JSONDecoder().decode(FeatureSettings.self, from: legacy)
 
-        #expect(decoded.clipboardAssistantEnabledKinds == Set<ClipboardAssistantKind>([.text, .conversion, .app, .emojiName]).union([.address, .flight, .train, .tracking, .meeting, .shellCommand, .ipAddress]))
+        #expect(decoded.clipboardAssistantEnabledKinds == Set<ClipboardAssistantKind>([.text, .conversion, .app, .emojiName]).union([.address, .flight, .train, .tracking, .meeting, .shellCommand, .ipAddress, .appCannotOpen]))
         let payload = try #require(
             JSONSerialization.jsonObject(
                 with: JSONEncoder().encode(decoded)
@@ -223,7 +223,7 @@ struct FeatureSettingsCompatibilityTests {
     func legacyCurrencyEnabledStateMigratesToConversionAndOptOutPersistsAfterRestart() throws {
         let legacy = Data(#"{"clipboardAssistantCurrencyDefaultApplied":true,"clipboardAssistantEnabledKinds":["text","currency"]}"#.utf8)
         var settings = try JSONDecoder().decode(FeatureSettings.self, from: legacy)
-        #expect(settings.clipboardAssistantEnabledKinds == Set<ClipboardAssistantKind>([.text, .conversion, .app, .emojiName]).union([.address, .flight, .train, .tracking, .meeting, .shellCommand, .ipAddress]))
+        #expect(settings.clipboardAssistantEnabledKinds == Set<ClipboardAssistantKind>([.text, .conversion, .app, .emojiName]).union([.address, .flight, .train, .tracking, .meeting, .shellCommand, .ipAddress, .appCannotOpen]))
         settings.clipboardAssistantEnabledKinds.remove(.conversion)
 
         let decoded = try JSONDecoder().decode(
@@ -284,7 +284,7 @@ struct FeatureSettingsCompatibilityTests {
 
         let decoded = try JSONDecoder().decode(FeatureSettings.self, from: legacy)
 
-        #expect(decoded.clipboardAssistantEnabledKinds == Set<ClipboardAssistantKind>([.text, .app, .emojiName]).union([.address, .flight, .train, .tracking, .meeting, .shellCommand, .ipAddress]))
+        #expect(decoded.clipboardAssistantEnabledKinds == Set<ClipboardAssistantKind>([.text, .app, .emojiName]).union([.address, .flight, .train, .tracking, .meeting, .shellCommand, .ipAddress, .appCannotOpen]))
         let payload = try #require(
             JSONSerialization.jsonObject(
                 with: JSONEncoder().encode(decoded)
@@ -305,7 +305,7 @@ struct FeatureSettingsCompatibilityTests {
             from: JSONEncoder().encode(settings)
         )
 
-        #expect(decoded.clipboardAssistantEnabledKinds == Set<ClipboardAssistantKind>([.text, .emojiName]).union([.address, .flight, .train, .tracking, .meeting, .shellCommand, .ipAddress]))
+        #expect(decoded.clipboardAssistantEnabledKinds == Set<ClipboardAssistantKind>([.text, .emojiName]).union([.address, .flight, .train, .tracking, .meeting, .shellCommand, .ipAddress, .appCannotOpen]))
     }
 
     @Test
@@ -372,7 +372,7 @@ struct FeatureSettingsCompatibilityTests {
             from: JSONSerialization.data(withJSONObject: payload)
         )
 
-        #expect(decoded.clipboardAssistantEnabledKinds == Set<ClipboardAssistantKind>([.text, .nonSystemLanguageText, .emojiName]).union([.address, .flight, .train, .tracking, .meeting, .shellCommand, .ipAddress]))
+        #expect(decoded.clipboardAssistantEnabledKinds == Set<ClipboardAssistantKind>([.text, .nonSystemLanguageText, .emojiName]).union([.address, .flight, .train, .tracking, .meeting, .shellCommand, .ipAddress, .appCannotOpen]))
         #expect(decoded.clipboardAssistantActionOrders[.nonSystemLanguageText] == [
             .search, .translate, .autoTranslate, .saveText, .addToQuickNote, .sendToTeleprompter, .share,
         ])
@@ -401,7 +401,7 @@ struct FeatureSettingsCompatibilityTests {
             from: JSONSerialization.data(withJSONObject: payload)
         )
 
-        #expect(decoded.clipboardAssistantEnabledKinds == Set<ClipboardAssistantKind>([.url, .text, .emojiName]).union([.address, .flight, .train, .tracking, .meeting, .shellCommand, .ipAddress]))
+        #expect(decoded.clipboardAssistantEnabledKinds == Set<ClipboardAssistantKind>([.url, .text, .emojiName]).union([.address, .flight, .train, .tracking, .meeting, .shellCommand, .ipAddress, .appCannotOpen]))
 
         // The upgrade is one-shot: a post-upgrade payload carries the version
         // marker, so a set without emojiName is a deliberate user choice.
@@ -425,10 +425,10 @@ struct FeatureSettingsCompatibilityTests {
         let payload = Data(#"{"clipboardAssistantKindSetVersion":1,"clipboardAssistantEnabledKinds":["url"],"clipboardAssistantConversionDefaultApplied":true,"clipboardAssistantAppDefaultApplied":true}"#.utf8)
         var settings = try JSONDecoder().decode(FeatureSettings.self, from: payload)
         let smartKinds: Set<ClipboardAssistantKind> = [.address, .flight, .train, .tracking, .meeting]
-        #expect(settings.clipboardAssistantEnabledKinds == smartKinds.union([.url, .shellCommand, .ipAddress]))
+        #expect(settings.clipboardAssistantEnabledKinds == smartKinds.union([.url, .shellCommand, .ipAddress, .appCannotOpen]))
         settings.clipboardAssistantEnabledKinds.subtract(smartKinds.union([.shellCommand]))
         let decoded = try JSONDecoder().decode(FeatureSettings.self, from: JSONEncoder().encode(settings))
-        #expect(decoded.clipboardAssistantEnabledKinds == [.url, .ipAddress])
+        #expect(decoded.clipboardAssistantEnabledKinds == [.url, .ipAddress, .appCannotOpen])
         #expect(decoded.clipboardAssistantKindSetVersion == FeatureSettings.clipboardAssistantKindSetVersionCurrent)
     }
 
@@ -472,8 +472,8 @@ struct FeatureSettingsCompatibilityTests {
     }
 
     @Test
-    func clipboardAssistantSystemSharingIsLastInEveryDefaultOrder() {
-        for kind in ClipboardAssistantKind.allCases {
+    func clipboardAssistantSystemSharingIsLastOutsideTheRepairAction() {
+        for kind in ClipboardAssistantKind.allCases where kind != .appCannotOpen {
             let order = ClipboardAssistantActionOrder.defaults(for: kind)
             #expect(order.last == .share)
         }

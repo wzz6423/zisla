@@ -186,18 +186,31 @@ public struct AIAccountBalance: Codable, Equatable, Sendable, Identifiable {
 
     public var noticeID: String { "ai-balance-low-" + id }
 
+    public var displayProvider: AIProvider? {
+        providers.contains(.codex) || providers.contains(.gpt) ? .gpt : providers.first
+    }
+
+    public var fiveHourWindow: AIAccountQuotaWindow? {
+        windows.first { $0.kind == .fiveHours && !$0.id.hasPrefix("additional:") }
+    }
+
+    public var weeklyWindow: AIAccountQuotaWindow? {
+        windows.first { $0.kind == .weekly && $0.name == nil && $0.nameKey == nil }
+    }
+
     public func providerTitle(language: AppLanguage) -> String {
-        let title = providers.map(AIAccountBalanceCatalog.providerName).joined(separator: " / ")
-        return providers.contains(.gpt) ? title + " · " + AppLocalization.string("Codex 账户额度", language: language) : title
+        if providers.contains(.codex) || providers.contains(.gpt) { return "ChatGPT" }
+        return providers.map(AIAccountBalanceCatalog.providerName).joined(separator: " / ")
     }
 
     /// Reserves the first of at most two lines for a canonical 5h or rolling window.
     /// Additional feature windows keep their true names in the remaining summary and never replace that slot.
     public func compactLines(language: AppLanguage) -> [String] {
         guard severity != nil else { return [] }
-        let short = windows.first { $0.kind == .fiveHours && !$0.id.hasPrefix("additional:") }
+        let short = fiveHourWindow
             ?? windows.first { $0.kind == .rolling && !$0.id.hasPrefix("additional:") }
-        var remaining = windows.filter { $0.id != short?.id }
+        let weekly = weeklyWindow
+        var remaining = windows.filter { $0.id != short?.id && $0.id != weekly?.id }
         if let index = remaining.firstIndex(where: { $0.id == limitingWindow?.id }), index > 0 {
             remaining.insert(remaining.remove(at: index), at: 0)
         }
@@ -205,12 +218,15 @@ public struct AIAccountBalance: Codable, Equatable, Sendable, Identifiable {
         if let short {
             lines.append(short.label(language: language) + " " + short.value(language: language))
         }
+        if let weekly { lines.append("7d " + weekly.value(language: language)) }
         if !remaining.isEmpty {
             let values = remaining.map { window in
                 let value = window.value(language: language)
                 return window.kind == .all && window.name == nil && window.nameKey == nil ? value : window.label(language: language) + " " + value
             }
-            lines.append(AppLocalization.string("全部", language: language) + " " + values.joined(separator: " · "))
+            let summary = AppLocalization.string("全部", language: language) + " " + values.joined(separator: " · ")
+            if lines.count == 2 { lines[1] += " · " + summary }
+            else { lines.append(summary) }
         }
         return lines
     }

@@ -5,6 +5,69 @@ import Testing
 
 @MainActor
 struct AIAccountBalanceNoticeTests {
+    @Test func chatGPTNoticeUsesTheChatGPTMarkAndPerWindowRemainingColors() throws {
+        let queue = SideNoticeQueue(), controller = AIAccountBalanceNoticeController(queue: queue)
+        defer { queue.removeAll() }
+        let reading = AIAccountBalance(id: "shared", providers: [.codex, .gpt], status: .available,
+            windows: [.init(id: "5h", kind: .fiveHours, remainingPercent: 10, durationSeconds: 18_000),
+                .init(id: "weekly", kind: .weekly, remainingPercent: 51, durationSeconds: 604_800)])
+        controller.update(balances: [reading], settings: FeatureSettings(aiAccountBalanceCompactStyle: .detailed), language: .english)
+        let notice = try #require(queue.left.first)
+        #expect(notice.title == "ChatGPT" && notice.metadata?["quotaProviderID"] == "gpt")
+        #expect(notice.metadata?["quotaLine0"] == "5h 10%" && notice.metadata?["quotaLine1"] == "7d 51%")
+        #expect(notice.metadata?["quotaLineSeverity0"] == "2" && notice.metadata?["quotaLineSeverity1"] == "0")
+        #expect(notice.metadata?["quotaRemainingFraction"] == "0.1")
+    }
+
+
+    @Test(arguments: [false, true])
+    func additionalAndNamedWindowsNeverReplaceCanonicalRingMetadata(hasCanonical: Bool) throws {
+        let queue = SideNoticeQueue(), controller = AIAccountBalanceNoticeController(queue: queue)
+        defer { queue.removeAll() }
+        var windows = [AIAccountQuotaWindow(id: "additional:spark:primary_window", kind: .fiveHours,
+            remainingPercent: 20, durationSeconds: 18_000, name: "Codex Spark"),
+            .init(id: "additional:spark:secondary_window", kind: .weekly, remainingPercent: 70,
+                durationSeconds: 604_800, name: "Codex Spark"),
+            .init(id: "named-weekly", kind: .weekly, remainingPercent: 30, durationSeconds: 604_800, name: "Sonnet"),
+            .init(id: "localized-weekly", kind: .weekly, remainingPercent: 40, nameKey: "模型额度")]
+        if hasCanonical {
+            windows += [.init(id: "primary_window", kind: .fiveHours, remainingPercent: 10, durationSeconds: 18_000),
+                .init(id: "secondary_window", kind: .weekly, remainingPercent: 51, durationSeconds: 604_800)]
+        }
+        controller.update(balances: [.init(id: "shared", providers: [.codex], status: .available, windows: windows)],
+            settings: FeatureSettings(aiAccountBalanceCompactStyle: .detailed), language: .simplifiedChinese)
+        let notice = try #require(queue.left.first)
+        #expect(notice.metadata?["quota5hSeverity"] == (hasCanonical ? "2" : nil))
+        #expect(notice.metadata?["quota5hFraction"] == (hasCanonical ? "0.1" : nil))
+        #expect(notice.metadata?["quota7dSeverity"] == (hasCanonical ? "0" : nil))
+        #expect(notice.metadata?["quota7dFraction"] == (hasCanonical ? "0.51" : nil))
+        let all = "全部 Codex Spark · 5h 20% · Codex Spark · 每周额度 70% · Sonnet · 每周额度 30% · 模型额度 40%"
+        #expect(notice.metadata?["quotaLine0"] == (hasCanonical ? "5h 10%" : all))
+        #expect(notice.metadata?["quotaLine1"] == (hasCanonical ? "7d 51% · " + all : nil))
+    }
+
+    @Test func sparseRealWindowsKeepMissingRingsAbsentAndSummaryColorsIndependent() throws {
+        let queue = SideNoticeQueue(), controller = AIAccountBalanceNoticeController(queue: queue)
+        defer { queue.removeAll() }
+        let fiveHours = AIAccountBalance(id: "5h-only", providers: [.gpt], status: .available,
+            windows: [.init(id: "primary_window", kind: .fiveHours, remainingPercent: 10, durationSeconds: 18_000)])
+        let settings = FeatureSettings(aiAccountBalanceCompactStyle: .detailed)
+        controller.update(balances: [fiveHours], settings: settings, language: .simplifiedChinese)
+        let short = try #require(queue.left.first)
+        #expect(short.metadata?["quotaLine0"] == "5h 10%" && short.metadata?["quotaLine1"] == nil)
+        #expect(short.metadata?["quota5hFraction"] == "0.1" && short.metadata?["quota5hSeverity"] == "2")
+        #expect(short.metadata?["quota7dFraction"] == nil && short.metadata?["quota7dSeverity"] == nil)
+
+        let weekly = AIAccountBalance(id: "weekly-credits", providers: [.gpt], status: .available,
+            windows: [.init(id: "secondary_window", kind: .weekly, remainingPercent: 51, durationSeconds: 604_800),
+                .init(id: "credits", kind: .credits, remaining: 0, unit: .credits)])
+        controller.update(balances: [weekly], settings: settings, language: .simplifiedChinese)
+        let week = try #require(queue.left.first)
+        #expect(week.metadata?["quotaLine0"] == "7d 51%" && week.metadata?["quotaLine1"] == "全部 积分余额 0 积分")
+        #expect(week.metadata?["quotaLineSeverity0"] == "0" && week.metadata?["quotaLineSeverity1"] == "3")
+        #expect(week.metadata?["quota7dFraction"] == "0.51" && week.metadata?["quota7dSeverity"] == "0")
+        #expect(week.metadata?["quota5hFraction"] == nil && week.metadata?["quota5hSeverity"] == nil)
+    }
 
     @Test func longPinnedReadingBeginsAfterTheSelectedReminderDisappears() throws {
         let queue = SideNoticeQueue(), controller = AIAccountBalanceNoticeController(queue: queue)
@@ -54,7 +117,7 @@ struct AIAccountBalanceNoticeTests {
         #expect(queue.left.first { $0.id == AIAccountBalanceNoticeController.pinnedID }?.title == "Claude",
             "The newly exposed account receives its complete five-second reading")
         controller.updatePinned(at: Date(timeIntervalSince1970: 126))
-        #expect(queue.left.first { $0.id == AIAccountBalanceNoticeController.pinnedID }?.title.hasPrefix("Codex") == true)
+        #expect(queue.left.first { $0.id == AIAccountBalanceNoticeController.pinnedID }?.title == "ChatGPT")
     }
 
     /// Mandatory voice and recording surfaces must not consume an account's pinned reading budget.
@@ -120,7 +183,7 @@ struct AIAccountBalanceNoticeTests {
         #expect(queue.left.first?.title == "Gemini", "A changed quota must get a complete new reading before rotation")
     }
 
-    @Test func gptSelectionVisiblyIdentifiesTheCodexAccountInTheSameQuotaLine() throws {
+    @Test func gptSelectionUsesOnlyTheChatGPTBalanceIdentity() throws {
         let queue = SideNoticeQueue(), controller = AIAccountBalanceNoticeController(queue: queue)
         defer { queue.removeAll() }
         let reading = AIAccountBalance(id: "shared", providers: [.codex, .gpt], status: .available,
@@ -128,9 +191,9 @@ struct AIAccountBalanceNoticeTests {
         let settings = FeatureSettings(aiAccountBalanceMonitoredProviders: [.gpt], aiAccountBalanceDisplayedProviders: [.gpt])
         controller.update(balances: [reading], settings: settings, language: .simplifiedChinese)
         let notice = try #require(queue.left.first)
-        #expect(notice.title == "GPT · Codex 账户额度")
-        #expect(notice.metadata?["quotaProviderID"] == "codex")
-        #expect(notice.metadata?["quotaLine0"] == "Codex 每周额度 10%")
+        #expect(notice.title == "ChatGPT")
+        #expect(notice.metadata?["quotaProviderID"] == "gpt")
+        #expect(notice.metadata?["quotaLine0"] == "每周额度 10%")
         #expect(notice.metadata?["quotaLine2"] == nil)
     }
 
@@ -203,7 +266,7 @@ struct AIAccountBalanceNoticeTests {
             #expect(notice.metadata?["quotaProviderID"] == "claude")
             #expect(notice.metadata?["quotaRemainingFraction"] == "0.1")
             #expect(notice.metadata?["quotaLine0"] == (style == .detailed ? "5h 70%" : "每周额度 10%"))
-            #expect(notice.metadata?["quotaLine1"] == (style == .detailed ? "全部 每周额度 10%" : nil))
+            #expect(notice.metadata?["quotaLine1"] == (style == .detailed ? "7d 10%" : nil))
         }
     }
 
@@ -252,29 +315,30 @@ struct AIAccountBalanceNoticeTests {
     }
 
     /// Display choice must not disable alerts, while monitoring and master toggles must clear and rearm episodes.
-    @Test func displayedOffStillAlertsMonitoredOffClearsAndReenabledAlertRearms() {
+    @Test(arguments: AIProvider.allCases.filter(AIAccountBalanceCatalog.supportsBalanceQuery))
+    func displayedOffStillAlertsMonitoredOffClearsAndReenabledAlertRearms(provider: AIProvider) {
         let queue = SideNoticeQueue()
         let notices = AIAccountBalanceNoticeController(queue: queue)
         defer { queue.removeAll() }
         var settings = FeatureSettings(aiAccountBalanceDisplayedProviders: [])
-        notices.update(balances: [balance(10)], settings: settings, language: .english)
+        notices.update(balances: [balance(10, provider: provider)], settings: settings, language: .english)
         #expect(queue.left.count == 1)
         settings.aiAccountBalanceMonitoredProviders = []
-        notices.update(balances: [balance(10)], settings: settings, language: .english)
+        notices.update(balances: [balance(10, provider: provider)], settings: settings, language: .english)
         #expect(queue.left.isEmpty)
-        settings.aiAccountBalanceMonitoredProviders = [.claude]
-        notices.update(balances: [balance(10)], settings: settings, language: .english)
+        settings.aiAccountBalanceMonitoredProviders = [provider]
+        notices.update(balances: [balance(10, provider: provider)], settings: settings, language: .english)
         #expect(queue.left.count == 1)
         settings.aiAccountBalanceNoticeEnabled = false
-        notices.update(balances: [balance(10)], settings: settings, language: .english)
+        notices.update(balances: [balance(10, provider: provider)], settings: settings, language: .english)
         #expect(queue.left.isEmpty)
         settings.aiAccountBalanceNoticeEnabled = true
-        notices.update(balances: [balance(10)], settings: settings, language: .english)
+        notices.update(balances: [balance(10, provider: provider)], settings: settings, language: .english)
         #expect(queue.left.count == 1)
         settings.aiProgressEnabled = false
-        notices.update(balances: [balance(10)], settings: settings, language: .english)
+        notices.update(balances: [balance(10, provider: provider)], settings: settings, language: .english)
         settings.aiProgressEnabled = true
-        notices.update(balances: [balance(10)], settings: settings, language: .english)
+        notices.update(balances: [balance(10, provider: provider)], settings: settings, language: .english)
         #expect(queue.left.count == 1)
     }
 
@@ -295,7 +359,7 @@ struct AIAccountBalanceNoticeTests {
         settings.aiAccountBalanceCompactStyle = .detailed
         controller.update(balances: [reading], settings: settings, language: .simplifiedChinese)
         let notice = try #require(queue.left.first)
-        #expect(notice.title == "GPT · Codex 账户额度")
+        #expect(notice.title == "ChatGPT")
         #expect(notice.metadata?["quotaLine0"] != nil && notice.metadata?["quotaLine2"] == nil)
         #expect(queue.left.count == 1)
     }

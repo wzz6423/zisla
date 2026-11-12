@@ -3,12 +3,41 @@ import Testing
 @testable import ZislaCore
 
 struct AIAccountBalanceTests {
+    @Test(arguments: [[AIProvider.codex], [.gpt], [.codex, .gpt]], AppLanguage.allCases)
+    func sharedChatGPTBalanceHasOneBrandAndTwoRealDurationReadings(providers: [AIProvider], language: AppLanguage) {
+        let reading = AIAccountBalance(id: "shared", providers: providers, status: .available,
+            windows: [.init(id: "5h", kind: .fiveHours, remainingPercent: 10, durationSeconds: 18_000),
+                .init(id: "weekly", kind: .weekly, remainingPercent: 51, durationSeconds: 604_800)])
+        #expect(reading.providerTitle(language: language) == "ChatGPT")
+        #expect(reading.compactLines(language: language) == ["5h 10%", "7d 51%"])
+        let weeklyOnly = AIAccountBalance(id: "weekly", providers: providers, status: .available,
+            windows: [reading.windows[1]])
+        #expect(weeklyOnly.compactLines(language: language) == ["7d 51%"])
+    }
+
+    @Test func additionalAndNamedWindowsKeepTheirLabelsBesideTheRealCanonicalDurations() {
+        let extras = [AIAccountQuotaWindow(id: "additional:spark:primary_window", kind: .fiveHours,
+            remainingPercent: 20, durationSeconds: 18_000, name: "Codex Spark"),
+            .init(id: "additional:spark:secondary_window", kind: .weekly, remainingPercent: 70,
+                durationSeconds: 604_800, name: "Codex Spark"),
+            .init(id: "named-weekly", kind: .weekly, remainingPercent: 30, durationSeconds: 604_800, name: "Sonnet"),
+            .init(id: "localized-weekly", kind: .weekly, remainingPercent: 40, nameKey: "模型额度")]
+        var reading = AIAccountBalance(id: "shared", providers: [.codex], status: .available, windows: extras)
+        let all = "全部 Codex Spark · 5h 20% · Codex Spark · 每周额度 70% · Sonnet · 每周额度 30% · 模型额度 40%"
+        #expect(reading.compactLines(language: .simplifiedChinese) == [all])
+        reading.windows += [.init(id: "primary_window", kind: .fiveHours, remainingPercent: 10, durationSeconds: 18_000),
+            .init(id: "secondary_window", kind: .weekly, remainingPercent: 51, durationSeconds: 604_800)]
+        #expect(reading.compactLines(language: .simplifiedChinese) == ["5h 10%", "7d 51% · " + all])
+        reading.windows = [reading.windows[4]]
+        #expect(reading.compactLines(language: .simplifiedChinese) == ["5h 10%"])
+    }
+
     @Test func detailedSummaryKeepsRealFiveHoursAndPutsExhaustionFirstInAllWindows() {
         let reading = AIAccountBalance(id: "claude", providers: [.claude], status: .available,
             windows: [.init(id: "5h", kind: .fiveHours, remainingPercent: 70, durationSeconds: 18_000),
                 .init(id: "weekly", kind: .weekly, remainingPercent: 90),
                 .init(id: "extra", kind: .budget, remaining: 0, unit: .usd)])
-        #expect(reading.compactLines(language: .simplifiedChinese) == ["5h 70%", "全部 可用预算 $0 · 每周额度 90%"])
+        #expect(reading.compactLines(language: .simplifiedChinese) == ["5h 70%", "7d 90% · 全部 可用预算 $0"])
     }
 
     @Test func ringFractionRequiresARealFiniteDenominator() {
@@ -66,11 +95,11 @@ struct AIAccountBalanceTests {
     @Test func compactUsesOnlyRealWindowsAndAtMostTwoLines() {
         let all = AIAccountQuotaWindow(id: "weekly", kind: .weekly, remainingPercent: 70, durationSeconds: 604_800)
         var balance = AIAccountBalance(id: "fixture", providers: [.claude], status: .available, windows: [all])
-        #expect(balance.compactLines(language: .simplifiedChinese) == ["全部 每周额度 70%"])
+        #expect(balance.compactLines(language: .simplifiedChinese) == ["7d 70%"])
         balance.windows.insert(.init(id: "5h", kind: .fiveHours, remainingPercent: 10, durationSeconds: 18_000), at: 0)
-        #expect(balance.compactLines(language: .simplifiedChinese) == ["5h 10%", "全部 每周额度 70%"])
+        #expect(balance.compactLines(language: .simplifiedChinese) == ["5h 10%", "7d 70%"])
         balance.windows[0] = .init(id: "rolling", kind: .rolling, remainingPercent: 10)
-        #expect(balance.compactLines(language: .simplifiedChinese) == ["滚动额度 10%", "全部 每周额度 70%"])
+        #expect(balance.compactLines(language: .simplifiedChinese) == ["滚动额度 10%", "7d 70%"])
         #expect(!balance.compactLines(language: .english).joined().contains("5h"))
         balance.windows.append(.init(id: "monthly", kind: .monthly, remainingPercent: 50))
         #expect(balance.compactLines(language: .simplifiedChinese).count == 2)

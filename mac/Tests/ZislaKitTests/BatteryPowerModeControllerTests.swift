@@ -482,6 +482,118 @@ struct BatteryPowerModeControllerTests {
         #expect(controller.error == nil)
     }
 
+    @Test(arguments: [false, true])
+    func manualChangesNotifyBeforeReadingButAutomaticChangesDoNot(automatic: Bool) async {
+        let notifications = NotificationCenter()
+        let commands = Commands()
+        commands.appendRead()
+        if automatic { commands.appendRead() }
+        commands.outputs.append(Self.output("0"))
+        commands.appendRead(preferences: Self.preferences(adapter: 2))
+        let notified = ManualNotificationState()
+        let observer = notifications.addObserver(
+            forName: BatteryPowerModeController.manualModeChangeNotification, object: nil, queue: .main
+        ) { _ in MainActor.assumeIsolated { notified.count += 1 } }
+        defer { notifications.removeObserver(observer) }
+        commands.override = { _ in
+            #expect(notified.count == (automatic ? 0 : 1))
+            return nil
+        }
+        let controller = BatteryPowerModeController(runCommand: commands.run, notificationCenter: notifications)
+        let result = automatic
+            ? await controller.setMode(.highPower, expectedState: (.powerAdapter, .automatic))
+            : await controller.setMode(.highPower)
+        #expect(result)
+        #expect(notified.count == (automatic ? 0 : 1))
+    }
+
+    @Test(arguments: ["mode", "source"])
+    func automaticPreflightRejectsStateChangedSinceTheReadOnlyCheck(change: String) async {
+        let commands = Commands()
+        commands.appendRead(source: change == "source" ? .battery : .powerAdapter,
+            preferences: Self.preferences(adapter: change == "mode" ? 1 : 0))
+        let controller = BatteryPowerModeController(runCommand: commands.run)
+        #expect(!(await controller.setMode(.highPower, expectedState: (.powerAdapter, .automatic))))
+        #expect(commands.requests.filter(Self.isChangeRequest).isEmpty)
+        #expect(controller.error == nil)
+        #expect(!controller.isChanging)
+    }
+
+    @Test
+    func cancellationDuringAutomaticPreflightDoesNotRequestAuthorization() async throws {
+        let commands = Commands(outputs: [Self.output(Self.capabilities())])
+        let (started, signal) = AsyncStream<Void>.makeStream()
+        var resume: CheckedContinuation<AIAgentProcessOutput, Never>?
+        commands.override = { request in
+            guard request.arguments == ["-g", "custom"] else { return nil }
+            return await withCheckedContinuation { continuation in
+                resume = continuation
+                signal.yield(())
+                signal.finish()
+            }
+        }
+        let controller = BatteryPowerModeController(runCommand: commands.run)
+        let change = Task { await controller.setMode(.highPower, expectedState: (.powerAdapter, .automatic)) }
+        for await _ in started { break }
+        change.cancel()
+        resume?.resume(returning: Self.output(Self.preferences()))
+        #expect(!(await change.value))
+        #expect(commands.requests.filter(Self.isChangeRequest).isEmpty)
+        #expect(!controller.isChanging)
+    }
+
+    @Test(arguments: ["mode", "source", "capability", "cancel"])
+    func automaticChangeRechecksTheStateAfterAuthorizationFinishes(change: String) async throws {
+        let commands = Commands()
+        commands.appendRead()
+        commands.appendRead(source: change == "source" ? .battery : .powerAdapter,
+            highPower: change != "capability",
+            preferences: Self.preferences(adapter: change == "mode" ? 1 : 0))
+        let (started, signal) = AsyncStream<Void>.makeStream()
+        var resume: CheckedContinuation<Int32, Never>?
+        let controller = BatteryPowerModeController(runCommand: commands.run, prepareAuthorization: {
+            await withCheckedContinuation { continuation in
+                resume = continuation
+                signal.yield(())
+                signal.finish()
+            }
+        })
+        let task = Task { await controller.setMode(.highPower, expectedState: (.powerAdapter, .automatic)) }
+        for await _ in started { break }
+        if change == "cancel" { task.cancel() }
+        resume?.resume(returning: 0)
+        #expect(!(await task.value))
+        #expect(commands.requests.filter(Self.isChangeRequest).isEmpty)
+        #expect(!controller.isChanging)
+        if change == "capability" { #expect(controller.error == .unsupportedMode) }
+        if change == "cancel" {
+            #expect(commands.requests.count == 2,
+                    "Cancelled authorization must return before starting another cap/custom read")
+        }
+    }
+
+    @Test(arguments: [-60006, -60007])
+    func automaticAuthorizationPreparationFailureDoesNotLaunchAChange(code: Int32) async {
+        let commands = Commands()
+        commands.appendRead()
+        let controller = BatteryPowerModeController(runCommand: commands.run, prepareAuthorization: { code })
+        #expect(!(await controller.setMode(.highPower, expectedState: (.powerAdapter, .automatic))))
+        #expect(commands.requests.filter(Self.isChangeRequest).isEmpty)
+        #expect(controller.error == (code == -60006 ? .authorizationCancelled : .authorizationDenied))
+        #expect(!controller.isChanging)
+    }
+
+    @Test
+    func cancelledAuthorizedExecutionReturnsBeforeReadingAuthorizationOrLaunchingPMSet() async {
+        let session = BatteryPowerModeAuthorizationSession()
+        let result = await Task.detached {
+            withUnsafeCurrentTask { $0?.cancel() }
+            return session.execute(arguments: [], authorizationPrepared: true)
+        }.value
+        #expect(result.status == -60006)
+        #expect(result.standardOutput.isEmpty)
+    }
+
     private static func output(
         _ text: String,
         status: Int32 = 0,
@@ -512,6 +624,11 @@ struct BatteryPowerModeControllerTests {
     private struct Request {
         let executable: URL
         let arguments: [String]
+    }
+
+    @MainActor
+    private final class ManualNotificationState {
+        var count = 0
     }
 
     @MainActor

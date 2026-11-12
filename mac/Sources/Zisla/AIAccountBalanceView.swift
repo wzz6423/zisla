@@ -83,24 +83,25 @@ struct AIAccountBalanceCard: View {
             Text(balance.providerTitle(language: language))
                 .font(.system(size: 11, weight: .semibold))
                 .fixedSize(horizontal: false, vertical: true)
-            ForEach(balance.windows) { window in
+            if balance.fiveHourWindow != nil || balance.weeklyWindow != nil {
                 HStack(alignment: .center, spacing: 8) {
-                    AIAccountQuotaRing(provider: balance.providers.first, fraction: window.remainingFraction,
-                        severity: window.severity, diameter: 42)
-                    VStack(alignment: .leading, spacing: 3) {
-                        Text(window.label(language: language))
-                            .font(.system(size: 10)).foregroundStyle(.secondary)
-                        Text(window.value(language: language))
-                            .font(.system(size: 12, weight: .semibold, design: .rounded))
-                            .monospacedDigit().foregroundStyle(window.severity.balanceColor)
-                        if let reset = window.resetsAt {
-                            Text(AppLocalization.format("%@ 重置", locale: language.locale,
-                                [reset.formatted(.dateTime.month(.twoDigits).day(.twoDigits).hour().minute().locale(language.locale))]))
-                                .font(.system(size: 9)).foregroundStyle(.secondary)
-                        }
+                    AIAccountQuotaRing(provider: balance.displayProvider,
+                        fraction: balance.weeklyWindow?.remainingFraction,
+                        severity: balance.weeklyWindow?.severity, diameter: 52,
+                        innerFraction: balance.fiveHourWindow?.remainingFraction,
+                        innerSeverity: balance.fiveHourWindow?.severity)
+                    VStack(alignment: .leading, spacing: 8) {
+                        if let window = balance.fiveHourWindow { quotaDetails(window, label: "5h") }
+                        if let window = balance.weeklyWindow { quotaDetails(window, label: "7d") }
                     }
-                    .fixedSize(horizontal: false, vertical: true)
                     .frame(maxWidth: .infinity, alignment: .leading)
+                }
+            }
+            ForEach(balance.windows.filter { $0.id != balance.fiveHourWindow?.id && $0.id != balance.weeklyWindow?.id }) { window in
+                HStack(alignment: .center, spacing: 8) {
+                    AIAccountQuotaRing(provider: balance.displayProvider, fraction: window.remainingFraction,
+                        severity: window.severity, diameter: 42)
+                    quotaDetails(window, label: window.label(language: language))
                 }
             }
         }
@@ -112,32 +113,59 @@ struct AIAccountBalanceCard: View {
                 .strokeBorder(Color.strokeCard, lineWidth: 1)
         }
     }
+
+    private func quotaDetails(_ window: AIAccountQuotaWindow, label: String) -> some View {
+        VStack(alignment: .leading, spacing: 3) {
+            Text(label).font(.system(size: 10)).foregroundStyle(.secondary)
+            Text(window.value(language: language))
+                .font(.system(size: 12, weight: .semibold, design: .rounded))
+                .monospacedDigit().foregroundStyle(window.severity.balanceColor)
+            if let reset = window.resetsAt {
+                Text(AppLocalization.format("%@ 重置", locale: language.locale,
+                    [reset.formatted(.dateTime.month(.twoDigits).day(.twoDigits).hour().minute().locale(language.locale))]))
+                    .font(.system(size: 9)).foregroundStyle(.secondary)
+            }
+        }
+        .fixedSize(horizontal: false, vertical: true)
+        .frame(maxWidth: .infinity, alignment: .leading)
+    }
 }
 
 struct AIAccountQuotaRing: View {
     let provider: AIProvider?
     let fraction: Double?
-    let severity: AIAccountQuotaSeverity
+    let severity: AIAccountQuotaSeverity?
     let diameter: CGFloat
+    var innerFraction: Double?
+    var innerSeverity: AIAccountQuotaSeverity?
 
     var body: some View {
-        let strokeWidth = diameter * 4 / 42
         ZStack {
-            Circle().stroke(severity.balanceColor.opacity(0.2), lineWidth: strokeWidth)
-            if let fraction, fraction > 0 {
-                Circle().trim(from: 0, to: fraction)
-                    .stroke(severity.balanceColor, style: StrokeStyle(lineWidth: strokeWidth, lineCap: .round))
-                    .rotationEffect(.degrees(-90))
-            }
+            if let severity { arc(fraction: fraction, severity: severity, diameter: diameter) }
+            if let innerSeverity { arc(fraction: innerFraction, severity: innerSeverity, diameter: diameter * 0.7) }
         }
-        .padding(strokeWidth / 2 + 0.5)
         .overlay {
             if let provider {
-                AIMascotView(identity: AIMascotIdentity(provider: provider, taskID: ""), size: diameter * 0.48)
+                AIMascotView(identity: AIMascotIdentity(provider: provider, taskID: ""), size: diameter * (innerSeverity == nil ? 0.48 : 0.36))
             }
         }
         .frame(width: diameter, height: diameter)
+        .environment(\.layoutDirection, .leftToRight)
         .accessibilityHidden(true)
+    }
+
+    private func arc(fraction: Double?, severity: AIAccountQuotaSeverity, diameter: CGFloat) -> some View {
+        let width = self.diameter * 4 / 42
+        return ZStack {
+            Circle().stroke(severity.balanceColor.opacity(0.2), lineWidth: width)
+            if let fraction, fraction > 0 {
+                Circle().trim(from: 0, to: fraction)
+                    .stroke(severity.balanceColor, style: StrokeStyle(lineWidth: width, lineCap: .round))
+                    .rotationEffect(.degrees(-90))
+            }
+        }
+        .padding(width / 2 + 0.5)
+        .frame(width: diameter, height: diameter)
     }
 }
 
@@ -178,7 +206,12 @@ struct CompactAIAccountBalanceBar: View {
     private var ringDiameter: CGFloat { max(0, height - 8) }
 
     private var ring: some View {
-        AIAccountQuotaRing(provider: provider, fraction: fraction, severity: severity, diameter: ringDiameter)
+        let hasCanonical = notice.metadata?["quota5hSeverity"] != nil || notice.metadata?["quota7dSeverity"] != nil
+        return AIAccountQuotaRing(provider: provider,
+            fraction: hasCanonical ? notice.metadata?["quota7dFraction"].flatMap(Double.init) : fraction,
+            severity: hasCanonical ? quotaSeverity(key: "quota7dSeverity") : severity,
+            diameter: ringDiameter, innerFraction: notice.metadata?["quota5hFraction"].flatMap(Double.init),
+            innerSeverity: quotaSeverity(key: "quota5hSeverity"))
     }
 
     var body: some View {
@@ -204,10 +237,10 @@ struct CompactAIAccountBalanceBar: View {
                 VStack(spacing: 6) {
                     ring
                     HStack(alignment: .top, spacing: 2) {
-                        ForEach(Array(lines.enumerated()), id: \.offset) { _, line in
+                        ForEach(Array(lines.enumerated()), id: \.offset) { index, line in
                             VerticalStatusText(text: line, availableWidth: valueWidth,
                                 availableHeight: valueHeight, scrollsAutomatically: true)
-                                .foregroundStyle(severity.balanceColor)
+                                .foregroundStyle((quotaSeverity(key: "quotaLineSeverity\(index)") ?? severity).balanceColor)
                         }
                     }
                     .environment(\.layoutDirection, direction)
@@ -237,14 +270,19 @@ struct CompactAIAccountBalanceBar: View {
 
     private var horizontalValues: some View {
         VStack(alignment: .leading, spacing: 1) {
-            ForEach(Array(lines.enumerated()), id: \.offset) { _, line in
+            ForEach(Array(lines.enumerated()), id: \.offset) { index, line in
                 MarqueeText(line, font: .system(size: lines.count > 1 ? 9 : 11, weight: .semibold),
-                    textColor: severity.balanceColor, pointsPerSecond: CompactPillStatusPresentation.accountBalanceScrollSpeed,
+                    textColor: (quotaSeverity(key: "quotaLineSeverity\(index)") ?? severity).balanceColor,
+                    pointsPerSecond: CompactPillStatusPresentation.accountBalanceScrollSpeed,
                     scrollDirection: direction == .rightToLeft ? .right : .left,
                     repeats: false,
                     viewportHeight: lines.count > 1 ? 13 : 16)
             }
         }
         .id(notice.metadata?["quotaAccountID"])
+    }
+
+    private func quotaSeverity(key: String) -> AIAccountQuotaSeverity? {
+        notice.metadata?[key].flatMap(Int.init).flatMap(AIAccountQuotaSeverity.init(rawValue:))
     }
 }

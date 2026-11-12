@@ -22,11 +22,11 @@ struct ClipboardShellCommandSettingsTests {
         let shell = try #require(ClipboardAssistantKind(rawValue: "shellCommand"))
         let data = Data(#"{"clipboardAssistantKindSetVersion":2,"clipboardAssistantEnabledKinds":["url"],"clipboardAssistantConversionDefaultApplied":true,"clipboardAssistantAppDefaultApplied":true}"#.utf8)
         var restored = try JSONDecoder().decode(FeatureSettings.self, from: data)
-        #expect(restored.clipboardAssistantEnabledKinds == [.url, shell, .ipAddress])
+        #expect(restored.clipboardAssistantEnabledKinds == [.url, shell, .ipAddress, .appCannotOpen])
         #expect(restored.clipboardAssistantKindSetVersion == FeatureSettings.clipboardAssistantKindSetVersionCurrent)
         restored.clipboardAssistantEnabledKinds.remove(shell)
         let reopened = try JSONDecoder().decode(FeatureSettings.self, from: JSONEncoder().encode(restored))
-        #expect(reopened.clipboardAssistantEnabledKinds == [.url, .ipAddress])
+        #expect(reopened.clipboardAssistantEnabledKinds == [.url, .ipAddress, .appCannotOpen])
         let allKinds = try JSONDecoder().decode(FeatureSettings.self, from: Data(#"{"clipboardAssistantKindSetVersion":2,"clipboardAssistantEnabledKinds":[]}"#.utf8))
         #expect(allKinds.clipboardAssistantEnabledKinds.isEmpty)
     }
