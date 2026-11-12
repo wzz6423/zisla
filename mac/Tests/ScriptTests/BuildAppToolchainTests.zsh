@@ -1,6 +1,6 @@
 #!/bin/zsh
 set -euo pipefail
-unset ZISLA_DEBUG_BUNDLE_ID
+unset ZISLA_DEBUG_BUNDLE_ID CONFIGURATION DEBUG_BUILD
 
 ROOT="${0:A:h:h:h}"
 TEMPORARY_ROOT="$(mktemp -d "${TMPDIR%/}/zisla-build-app-toolchain-tests.XXXXXX")"
@@ -64,6 +64,15 @@ scratch_path=""
   print -u2 -r -- "missing hand-built app resource-bundle compile condition"
   exit 1
 }
+expected_configuration="${FAKE_EXPECTED_CONFIGURATION:-}"
+if [[ -z "$expected_configuration" ]]; then
+  expected_configuration=release
+  [[ "${DEBUG_BUILD:-false}" != true ]] || expected_configuration=debug
+fi
+if [[ "$*" != *"-c $expected_configuration"* ]]; then
+  print -u2 -r -- "expected $expected_configuration compilation for DEBUG_BUILD=${DEBUG_BUILD:-false} CONFIGURATION=${CONFIGURATION:-default}"
+  exit 1
+fi
 for (( index = 1; index <= ${#arguments[@]}; index += 1 )); do
   if [[ "${arguments[index]}" == "--scratch-path" ]]; then
     scratch_path="${arguments[index + 1]}"
@@ -367,6 +376,8 @@ function build_profile_fixture() {
     FAKE_XCODE_APP="$XCODE_APP" \
     ZISLA_DEBUG_BUNDLE_ID="$1" \
     DEBUG_BUILD="$2" \
+    CONFIGURATION="${3:-}" \
+    FAKE_EXPECTED_CONFIGURATION="${3:-}" \
     BUILD_ARCHITECTURES=arm64 \
     CODE_SIGN_IDENTITY=- \
     SIGNING_MODE=adhoc \
@@ -380,6 +391,9 @@ for bundle in '' dev.wzz.zisla.debug dev.wzz.zisla.debug.fresh.profile-1; do
     print -u2 -r -- "FAIL: debug profile identity '$bundle' was not rendered"
     exit 1
   }
+done
+for configuration in debug release; do
+  build_profile_fixture dev.wzz.zisla.debug true "$configuration" >/dev/null
 done
 for bundle in dev.wzz.zisla dev.wzz.zisla.debug.fresh. 'dev.wzz.zisla.debug.fresh.a/../../escape' \
     'dev.wzz.zisla.debug.fresh.a&b' 'dev.wzz.zisla.debug.fresh.1;touch marker'; do
@@ -402,7 +416,7 @@ build_profile_fixture dev.wzz.zisla.debug.fresh.profile-1 false >/dev/null
   print -u2 -r -- "FAIL: fresh debug identity must not affect release builds or data paths"
   exit 1
 }
-print -r -- "PASS: 9 build-app fresh profile cases"
+print -r -- "PASS: 11 build-app fresh profile and configuration cases"
 
 function expect_version() {
   local version="$1"

@@ -3,12 +3,14 @@ import Testing
 @testable import ZislaCore
 
 struct AIAccountBalanceTests {
-    @Test(arguments: [[AIProvider.codex], [.gpt], [.codex, .gpt]], AppLanguage.allCases)
-    func sharedChatGPTBalanceHasOneBrandAndTwoRealDurationReadings(providers: [AIProvider], language: AppLanguage) {
+    @Test(arguments: [([AIProvider.codex], "Codex"), ([.gpt], "ChatGPT"), ([.codex, .gpt], "Codex / ChatGPT")], AppLanguage.allCases)
+    func sharedAccountKeepsSelectedProviderBrandsAndTwoRealDurationReadings(selection: ([AIProvider], String), language: AppLanguage) {
+        let (providers, title) = selection
         let reading = AIAccountBalance(id: "shared", providers: providers, status: .available,
             windows: [.init(id: "5h", kind: .fiveHours, remainingPercent: 10, durationSeconds: 18_000),
                 .init(id: "weekly", kind: .weekly, remainingPercent: 51, durationSeconds: 604_800)])
-        #expect(reading.providerTitle(language: language) == "ChatGPT")
+        #expect(reading.displayProvider == providers.first)
+        #expect(reading.providerTitle(language: language) == title)
         #expect(reading.compactLines(language: language) == ["5h 10%", "7d 51%"])
         let weeklyOnly = AIAccountBalance(id: "weekly", providers: providers, status: .available,
             windows: [reading.windows[1]])
@@ -62,8 +64,40 @@ struct AIAccountBalanceTests {
         let selected = AIAccountBalanceCatalog.displayedBalances([reading], monitoredProviders: [.gpt],
             displayedProviders: [.gpt])
         #expect(selected.count == 1 && selected.first?.providers == [.gpt])
+        #expect(selected.first?.displayProvider == .gpt)
+        let codex = AIAccountBalanceCatalog.displayedBalances([reading], monitoredProviders: [.codex],
+            displayedProviders: [.codex])
+        #expect(codex.count == 1 && codex.first?.providers == [.codex])
+        #expect(codex.first?.displayProvider == .codex)
         #expect(AIAccountBalanceCatalog.displayedBalances([reading], monitoredProviders: [],
             displayedProviders: [.gpt]).isEmpty)
+    }
+
+    @Test func emptyAndOtherSharedProviderIdentitiesKeepTheirExistingMeaning() {
+        let empty = AIAccountBalance(id: "empty", providers: [], status: .notSignedIn)
+        #expect(empty.displayProvider == nil && empty.providerTitle(language: .english).isEmpty)
+        let cursor = AIAccountBalance(id: "cursor", providers: [.cursor, .grokBot], status: .notSignedIn)
+        #expect(cursor.displayProvider == .cursor)
+        #expect(cursor.providerTitle(language: .english) == "Cursor / Grok Bot")
+    }
+
+    @Test func debugBalancesOverrideRealProviderSelectionsAndKeepExplicitAliases() {
+        let rows = [AIProvider.claude, .gpt, .cursor].map {
+            AIAccountBalance(id: "debug:" + $0.rawValue, providers: [$0], status: .available,
+                windows: [.init(id: "quota", kind: .all, remainingPercent: 10)], isDebug: true)
+        }
+        for selection in [Set<AIProvider>(), [.codex]] {
+            #expect(AIAccountBalanceCatalog.displayedBalances(rows, monitoredProviders: selection,
+                displayedProviders: selection) == rows)
+        }
+        var live = rows
+        for index in live.indices { live[index].isDebug = false }
+        #expect(AIAccountBalanceCatalog.displayedBalances(live, monitoredProviders: [], displayedProviders: []).isEmpty)
+        var invalid = rows
+        invalid[0].status = .unavailable
+        invalid[1].windows = []
+        invalid[2].windows = [.init(id: "quota", kind: .all, remainingPercent: .nan)]
+        #expect(AIAccountBalanceCatalog.displayedBalances(invalid, monitoredProviders: [], displayedProviders: []).isEmpty)
     }
 
     /// Boundary pairs distinguish inclusive remaining-quota thresholds from consumed-percentage thresholds.

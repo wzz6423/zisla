@@ -7,6 +7,75 @@ import Testing
 struct AIAccountBalanceServiceTests {
     private let now = Date(timeIntervalSince1970: 1_910_000_000)
 
+    #if DEBUG
+    @Test(arguments: [Set<AIProvider>(), [.codex]])
+    func explicitFixtureOverridesSelectionAndNeverReadsAccounts(providers: Set<AIProvider>) async throws {
+        BalanceURLProtocol.configure([:])
+        let environment = ["ZISLA_DEBUG_AI_ACCOUNT_BALANCE": "claude:10:70,gpt:0,cursor:20"]
+        let service = makeService(credentials: { _, _, _ in
+            Issue.record("An explicit fixture must never read account credentials")
+            return nil
+        }, debug: { AIAccountBalanceDebug.balances(environment: environment, now: now) })
+        let rows = try await service.accountBalances(for: providers)
+        #expect(rows.map(\.providers) == [[.claude], [.gpt], [.cursor]],
+            "The requested fixture must replace real monitor selections and preserve its explicit aliases")
+        #expect(rows.map { $0.windows.map(\.remainingPercent) } == [[10, 70], [0], [20]])
+        #expect(rows.allSatisfy { $0.isDebug && $0.updatedAt == now && $0.severity != nil })
+        #expect(BalanceURLProtocol.requests.isEmpty)
+    }
+
+    @Test func environmentFixtureUsesTheDefaultServiceInitializer() async throws {
+        let root = FileManager.default.temporaryDirectory.appendingPathComponent("zisla-balance-environment-\(UUID())")
+        defer { try? FileManager.default.removeItem(at: root) }
+        let service = AIAccountBalanceService(home: root,
+            environment: ["ZISLA_DEBUG_AI_ACCOUNT_BALANCE": "claude:10:70,gpt:0,cursor:20"], now: { now })
+        let rows = try await service.accountBalances(for: [.codex])
+        #expect(rows.map(\.providers) == [[.claude], [.gpt], [.cursor]])
+        #expect(rows.map { $0.windows.map(\.remainingPercent) } == [[10, 70], [0], [20]])
+        #expect(rows.allSatisfy { $0.isDebug })
+        #expect(!FileManager.default.fileExists(atPath: root.path), "Debug fixtures must not create account files")
+    }
+
+    @Test func emptyOrRemovedFixtureRestoresTheSelectedAccountPath() async throws {
+        BalanceURLProtocol.configure([:])
+        for environment in [[:], ["ZISLA_DEBUG_AI_ACCOUNT_BALANCE": ""]] {
+            let service = makeService(credentials: { _, _, _ in nil },
+                debug: { AIAccountBalanceDebug.balances(environment: environment, now: now) })
+            let rows = try await service.accountBalances(for: [.codex])
+            #expect(rows.map(\.providers) == [[.codex]] && rows.map(\.status) == [.notSignedIn])
+            #expect(rows.allSatisfy { !$0.isDebug }, "Clearing a fixture must restore the regular selected-account path")
+        }
+        #expect(BalanceURLProtocol.requests.isEmpty)
+    }
+
+    @Test(arguments: [" ", "claude:nan", "codex:101", "claude:10,claude:20", "cursor:20,"])
+    func malformedFixtureCannotFallBackToCredentialedSources(raw: String) async throws {
+        BalanceURLProtocol.configure([:])
+        let service = makeService(credentials: { _, _, _ in
+            Issue.record("A malformed explicit fixture must not fall back to an account")
+            return nil
+        }, debug: { AIAccountBalanceDebug.balances(environment: ["ZISLA_DEBUG_AI_ACCOUNT_BALANCE": raw], now: now) })
+        #expect(try await service.accountBalances(for: [.claude, .codex, .cursor]).isEmpty)
+        #expect(BalanceURLProtocol.requests.isEmpty)
+    }
+
+    @Test func seededFixtureAliasesKeepExactPercentagesAndRejectTruncation() throws {
+        var seed: UInt64 = 0x283_2026
+        let aliases: [AIProvider] = [.codex, .gpt, .cursor, .grokBot]
+        for index in 0..<128 {
+            seed = seed &* 6_364_136_223_846_793_005 &+ 1
+            let percent = Double(seed % 101), provider = aliases[index % aliases.count]
+            let raw = "\(provider.rawValue):\(percent):\(100 - percent)"
+            let rows = try #require(AIAccountBalanceDebug.balances(environment: ["ZISLA_DEBUG_AI_ACCOUNT_BALANCE": raw], now: now))
+            #expect(rows.map(\.providers) == [[provider]], "Seed 0x2832026 sample \(index) must preserve its selected alias")
+            #expect(rows.first?.windows.map(\.remainingPercent) == [percent, 100 - percent])
+            #expect(rows.allSatisfy { $0.isDebug && $0.windows.allSatisfy { $0.isValid } })
+            #expect(AIAccountBalanceDebug.balances(environment: ["ZISLA_DEBUG_AI_ACCOUNT_BALANCE": raw + ","], now: now) == [],
+                "Seed 0x2832026 sample \(index) must reject an incomplete fixture without live fallback")
+        }
+    }
+    #endif
+
     /// Recorded requests prove shared-account deduplication, selected alias output, and secret-free public rows.
     @Test func sharedAliasesFetchOnceAndPublishOnlySelectedNamesWithoutSecrets() async throws {
         BalanceURLProtocol.configure(["/backend-api/wham/usage": [.json(#"{"rate_limit":{"primary_window":{"used_percent":90,"limit_window_seconds":18000}}}"#)],
@@ -32,7 +101,7 @@ struct AIAccountBalanceServiceTests {
         #expect(unsupported.count == 6 && unsupported.allSatisfy { $0.status == .queryUnsupported || $0.status == .connectedAccount })
         #expect(BalanceURLProtocol.requests.isEmpty)
         #if DEBUG
-        for raw in ["claude:0:70,gpt:10", "", "claude:nan", "codex:101", "claude:10,claude:20", "codex:10,gpt:20"] {
+        for raw in ["claude:0:70,gpt:10", "claude:nan", "codex:101", "claude:10,claude:20", "codex:10,gpt:20"] {
             let service = makeService(credentials: { _, _, _ in Issue.record("Debug fixtures must not read credentials"); return nil },
                 debug: { AIAccountBalanceDebug.balances(environment: ["ZISLA_DEBUG_AI_ACCOUNT_BALANCE": raw], now: now) })
             let result = try await service.accountBalances(for: Set(AIProvider.allCases))

@@ -65,7 +65,8 @@ struct AIAccountBalanceViewTests {
             windows: [.init(id: "5h", kind: .fiveHours, remainingPercent: 10, durationSeconds: 18_000),
                 .init(id: "weekly", kind: .weekly, remainingPercent: 51, durationSeconds: 604_800)])
         var settings = FeatureSettings(aiAccountBalanceNoticeEnabled: false, aiAccountBalanceCompactStyle: .detailed,
-            aiAccountBalancePinnedInCustomIsland: true)
+            aiAccountBalancePinnedInCustomIsland: true, aiAccountBalanceMonitoredProviders: [.gpt],
+            aiAccountBalanceDisplayedProviders: [.gpt])
         settings.islandPlacement = IslandPlacement(mode: .custom, edge: edge)
         controller.update(balances: [reading], settings: settings, language: .english)
         let notice = try #require(queue.left.first)
@@ -128,13 +129,21 @@ struct AIAccountBalanceViewTests {
         }
     }
 
-    @Test func chatGPTLogoInTheQuotaRingUsesTheExistingChatGPTAsset() async throws {
+    @Test(arguments: [AIProvider.codex, .gpt])
+    func selectedQuotaRingUsesTheSameProviderAssetAsAITasks(provider: AIProvider) async throws {
         let diameter: CGFloat = 52
-        let ring = AIAccountQuotaRing(provider: .gpt, fraction: 0.51, severity: .normal, diameter: diameter,
+        let reading = AIAccountBalance(id: "shared", providers: [.codex, .gpt], status: .available,
+            windows: [.init(id: "5h", kind: .fiveHours, remainingPercent: 10, durationSeconds: 18_000),
+                .init(id: "weekly", kind: .weekly, remainingPercent: 51, durationSeconds: 604_800)])
+        let section = AIAccountBalanceSection(balances: [reading], displayedProviders: [provider],
+            monitoredProviders: [provider], language: .english)
+        let selected = try #require(section.displayedBalances.first)
+        #expect(section.displayedBalances.count == 1 && selected.displayProvider == provider)
+        let ring = AIAccountQuotaRing(provider: selected.displayProvider, fraction: 0.51, severity: .normal, diameter: diameter,
             innerFraction: 0.1, innerSeverity: .critical)
         let actual = try await renderOffscreen(ring.foregroundStyle(.white).environment(\.colorScheme, .dark),
             size: CGSize(width: diameter, height: diameter))
-        let expected = try await renderOffscreen(AIMascotView(identity: .gpt, size: diameter * 0.36)
+        let expected = try await renderOffscreen(AIMascotView(identity: AIMascotIdentity(provider: provider, taskID: ""), size: diameter * 0.36)
             .frame(width: diameter, height: diameter).foregroundStyle(.white).environment(\.colorScheme, .dark),
             size: CGSize(width: diameter, height: diameter))
         let tracks = try await renderOffscreen(AIAccountQuotaRing(provider: nil, fraction: 0.51, severity: .normal,
@@ -154,11 +163,11 @@ struct AIAccountBalanceViewTests {
                     markPixels += 1
                     let track = try #require(tracks.colorAt(x: x, y: y)?.usingColorSpace(.sRGB))
                     #expect(max(track.redComponent, track.greenComponent, track.blueComponent) < 0.03,
-                        "The ChatGPT mark must sit inside the inner ring without touching its stroke")
+                        "The selected provider mark must sit inside the inner ring without touching its stroke")
                 }
             }
         }
-        #expect(markPixels > 40, "The centered ChatGPT mark must be a real bundled asset")
+        #expect(markPixels > 40, "The centered provider mark must use the same bundled asset as AI tasks")
     }
 
     @Test func cardsHideUnavailableIncompleteAndUnsupportedReadings() {

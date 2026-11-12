@@ -1,4 +1,4 @@
-.PHONY: run stop update build-package sync-cask clean
+.PHONY: run stop update release build-package sync-cask clean
 
 LOCAL_SIGNING_ENV := SIGNING_MODE=dev
 ZISLA_FIRST ?= 0
@@ -6,14 +6,14 @@ ZISLA_FRESH_START ?= 0
 ZISLA_DEBUG_AI_ACCOUNT_BALANCE ?=
 export ZISLA_DEBUG_AI_ACCOUNT_BALANCE
 
-run:
-	@ZISLA_FIRST="$(ZISLA_FIRST)" ZISLA_FRESH_START="$(ZISLA_FRESH_START)" $(LOCAL_SIGNING_ENV) mac/Scripts/dev-service.sh run
+run update:
+	@CONFIGURATION=debug ZISLA_FIRST="$(ZISLA_FIRST)" ZISLA_FRESH_START="$(ZISLA_FRESH_START)" $(LOCAL_SIGNING_ENV) mac/Scripts/dev-service.sh run
 
 stop:
 	@mac/Scripts/dev-service.sh stop
 
-update:
-	@ZISLA_FIRST="$(ZISLA_FIRST)" ZISLA_FRESH_START="$(ZISLA_FRESH_START)" $(LOCAL_SIGNING_ENV) mac/Scripts/dev-service.sh run
+release:
+	@CONFIGURATION=release ZISLA_FIRST="$(ZISLA_FIRST)" ZISLA_FRESH_START="$(ZISLA_FRESH_START)" $(LOCAL_SIGNING_ENV) mac/Scripts/dev-service.sh run
 
 build-package:
 	@mac/Scripts/build-package.sh

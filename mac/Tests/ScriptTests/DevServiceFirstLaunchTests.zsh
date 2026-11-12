@@ -82,7 +82,7 @@ SCRIPT
 cat > "$TEST_ROOT/mac/Scripts/build-app.sh" <<'SCRIPT'
 #!/bin/zsh
 set -euo pipefail
-print -r -- "build debug=$DEBUG_BUILD signing=$SIGNING_MODE identity=$CODE_SIGN_IDENTITY bundle=${ZISLA_DEBUG_BUNDLE_ID-unset}" >> "$CAPTURE_FILE"
+print -r -- "build debug=$DEBUG_BUILD configuration=${CONFIGURATION-unset} signing=$SIGNING_MODE identity=$CODE_SIGN_IDENTITY bundle=${ZISLA_DEBUG_BUNDLE_ID-unset}" >> "$CAPTURE_FILE"
 mkdir -p "$OUTPUT_DIRECTORY/zisla-debug.app/Contents/MacOS"
 print -r -- '#!/bin/zsh' > "$OUTPUT_DIRECTORY/zisla-debug.app/Contents/MacOS/zisla"
 chmod +x "$OUTPUT_DIRECTORY/zisla-debug.app/Contents/MacOS/zisla"
@@ -104,7 +104,7 @@ function expect_launch() {
   shift 3
   local actual
   local expected="script first=$input_value fresh=0 signing=dev
-build debug=true signing=dev identity=TEST_STABLE_IDENTITY bundle=dev.wzz.zisla.debug
+build debug=true configuration=${TEST_EXPECT_CONFIGURATION:-debug} signing=dev identity=TEST_STABLE_IDENTITY bundle=dev.wzz.zisla.debug
 plist first=$plist_value home=none bundle=dev.wzz.zisla.debug"
 
   : > "$CAPTURE_FILE"
@@ -137,6 +137,11 @@ for target in run update; do
       env -u MAKEFLAGS -u MFLAGS -u ZISLA_FIRST make -C "$TEST_ROOT" "$target" "ZISLA_FIRST=$invalid_value"
   done
 done
+
+TEST_EXPECT_CONFIGURATION=release expect_launch "release uses optimized compilation with the same local identity and home" 0 0 \
+  env -u MAKEFLAGS -u MFLAGS -u ZISLA_FIRST make -C "$TEST_ROOT" release
+expect_launch "update returns to debug compilation with the same local identity and home" 0 0 \
+  env -u MAKEFLAGS -u MFLAGS -u ZISLA_FIRST make -C "$TEST_ROOT" update
 
 function expect_fixture_launch() {
   local expectation_variable="$1"
@@ -206,7 +211,7 @@ assert len(capture) == 3, f"{sys.argv[3]}: expected one build and launch"
 assert capture[0] == "script first=0 fresh=1 signing=dev", capture
 bundle = capture[1].split("bundle=")[1]
 assert re.fullmatch(r"dev\.wzz\.zisla\.debug\.fresh\.[A-Za-z0-9-]+", bundle), capture
-assert capture[1] == f"build debug=true signing=dev identity=TEST_STABLE_IDENTITY bundle={bundle}", capture
+assert capture[1] == f"build debug=true configuration=debug signing=dev identity=TEST_STABLE_IDENTITY bundle={bundle}", capture
 assert capture[2].startswith("plist first=1 home="), "Fresh launch must force onboarding even with ZISLA_FIRST=0"
 home = capture[2].split("home=")[1].split(" bundle=")[0]
 assert home in Path(sys.argv[2]).read_text(), "Print the isolated profile location for the developer"

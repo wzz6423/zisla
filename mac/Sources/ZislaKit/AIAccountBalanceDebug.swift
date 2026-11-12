@@ -6,7 +6,7 @@ enum AIAccountBalanceDebug {
     /// Nil means no requested fixture; a present malformed fixture returns no rows and forbids live fallback.
     /// Valid fixture windows carry debug provenance so they cannot enter real usage history or exported quota.
     static func balances(environment: [String: String], now: Date) -> [AIAccountBalance]? {
-        guard let raw = environment["ZISLA_DEBUG_AI_ACCOUNT_BALANCE"] else { return nil }
+        guard let raw = environment["ZISLA_DEBUG_AI_ACCOUNT_BALANCE"], !raw.isEmpty else { return nil }
         // A present but malformed fixture must never fall through to real credentials or requests.
         let entries = raw.split(separator: ",", omittingEmptySubsequences: false)
         var values: [AIProvider: [AIAccountQuotaWindow]] = [:]
@@ -27,7 +27,7 @@ enum AIAccountBalanceDebug {
         }
         return AIAccountBalanceCatalog.groups.compactMap { group in
             guard let provider = group.first(where: { values[$0] != nil }), let windows = values[provider] else { return nil }
-            return .init(id: "debug:" + group[0].rawValue, providers: group, status: .available,
+            return .init(id: "debug:" + group[0].rawValue, providers: group.filter { values[$0] != nil }, status: .available,
                 windows: windows, updatedAt: now, isDebug: true)
         }
     }

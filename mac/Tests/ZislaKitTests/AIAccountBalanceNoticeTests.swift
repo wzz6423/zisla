@@ -11,7 +11,8 @@ struct AIAccountBalanceNoticeTests {
         let reading = AIAccountBalance(id: "shared", providers: [.codex, .gpt], status: .available,
             windows: [.init(id: "5h", kind: .fiveHours, remainingPercent: 10, durationSeconds: 18_000),
                 .init(id: "weekly", kind: .weekly, remainingPercent: 51, durationSeconds: 604_800)])
-        controller.update(balances: [reading], settings: FeatureSettings(aiAccountBalanceCompactStyle: .detailed), language: .english)
+        controller.update(balances: [reading], settings: FeatureSettings(aiAccountBalanceCompactStyle: .detailed,
+            aiAccountBalanceMonitoredProviders: [.gpt], aiAccountBalanceDisplayedProviders: [.gpt]), language: .english)
         let notice = try #require(queue.left.first)
         #expect(notice.title == "ChatGPT" && notice.metadata?["quotaProviderID"] == "gpt")
         #expect(notice.metadata?["quotaLine0"] == "5h 10%" && notice.metadata?["quotaLine1"] == "7d 51%")
@@ -117,7 +118,7 @@ struct AIAccountBalanceNoticeTests {
         #expect(queue.left.first { $0.id == AIAccountBalanceNoticeController.pinnedID }?.title == "Claude",
             "The newly exposed account receives its complete five-second reading")
         controller.updatePinned(at: Date(timeIntervalSince1970: 126))
-        #expect(queue.left.first { $0.id == AIAccountBalanceNoticeController.pinnedID }?.title == "ChatGPT")
+        #expect(queue.left.first { $0.id == AIAccountBalanceNoticeController.pinnedID }?.title == "Codex")
     }
 
     /// Mandatory voice and recording surfaces must not consume an account's pinned reading budget.
@@ -183,18 +184,50 @@ struct AIAccountBalanceNoticeTests {
         #expect(queue.left.first?.title == "Gemini", "A changed quota must get a complete new reading before rotation")
     }
 
-    @Test func gptSelectionUsesOnlyTheChatGPTBalanceIdentity() throws {
+    @Test(arguments: [AIProvider.codex, .gpt], [false, true])
+    func selectedAliasKeepsItsOwnIdentityInAlertsAndPinnedQuota(provider: AIProvider, pinned: Bool) throws {
         let queue = SideNoticeQueue(), controller = AIAccountBalanceNoticeController(queue: queue)
         defer { queue.removeAll() }
         let reading = AIAccountBalance(id: "shared", providers: [.codex, .gpt], status: .available,
             windows: [.init(id: "weekly", kind: .weekly, remainingPercent: 10)])
-        let settings = FeatureSettings(aiAccountBalanceMonitoredProviders: [.gpt], aiAccountBalanceDisplayedProviders: [.gpt])
+        var settings = FeatureSettings(aiAccountBalanceNoticeEnabled: !pinned,
+            aiAccountBalancePinnedInCustomIsland: pinned, aiAccountBalanceMonitoredProviders: [provider],
+            aiAccountBalanceDisplayedProviders: [provider])
+        settings.islandPlacement.mode = .custom
         controller.update(balances: [reading], settings: settings, language: .simplifiedChinese)
         let notice = try #require(queue.left.first)
-        #expect(notice.title == "ChatGPT")
-        #expect(notice.metadata?["quotaProviderID"] == "gpt")
+        #expect(queue.left.count == 1)
+        #expect(notice.title == (provider == .gpt ? "ChatGPT" : "Codex"))
+        #expect(notice.metadata?["quotaProviderID"] == provider.rawValue)
         #expect(notice.metadata?["quotaLine0"] == "每周额度 10%")
         #expect(notice.metadata?["quotaLine2"] == nil)
+    }
+
+    @Test(arguments: [false, true])
+    func debugBalancesOverrideRealProviderSelectionsForAlertsAndPinnedQuota(pinned: Bool) throws {
+        let queue = SideNoticeQueue(), controller = AIAccountBalanceNoticeController(queue: queue)
+        defer { queue.removeAll() }
+        let reading = AIAccountBalance(id: "debug:gpt", providers: [.gpt], status: .available,
+            windows: [.init(id: "quota", kind: .all, remainingPercent: 0)], isDebug: true)
+        var settings = FeatureSettings(aiAccountBalanceNoticeEnabled: !pinned,
+            aiAccountBalancePinnedInCustomIsland: pinned, aiAccountBalanceMonitoredProviders: [],
+            aiAccountBalanceDisplayedProviders: [])
+        settings.islandPlacement.mode = .custom
+        controller.update(balances: [reading], settings: settings, language: .english)
+        let notice = try #require(queue.left.first)
+        #expect(queue.left.count == 1)
+        #expect(notice.title == "ChatGPT" && notice.metadata?["quotaProviderID"] == "gpt")
+        #expect(notice.metadata?["quotaAccountID"] == "debug:gpt")
+        #expect(notice.metadata?["quotaRemainingFraction"] == "0.0")
+        #expect(notice.metadata?["quotaSeverity"] == "3")
+        var live = reading
+        live.isDebug = false
+        controller.update(balances: [live], settings: settings, language: .english)
+        #expect(queue.left.isEmpty)
+        var invalid = reading
+        invalid.status = .unavailable
+        controller.update(balances: [invalid], settings: settings, language: .english)
+        #expect(queue.left.isEmpty)
     }
 
     @Test func longSummaryGetsAFullReadingBeforeExpiryAndPinnedRotation() async throws {

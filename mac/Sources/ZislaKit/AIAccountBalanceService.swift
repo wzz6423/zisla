@@ -30,8 +30,6 @@ public final class AIAccountBalanceService: AIAccountBalanceDetecting, @unchecke
             return output.standardOutput
         }, debugBalances: {
             #if DEBUG
-            // An empty Makefile default is not a requested fixture; explicit malformed input stays isolated.
-            guard environment["ZISLA_DEBUG_AI_ACCOUNT_BALANCE"] != "" else { return nil }
             return AIAccountBalanceDebug.balances(environment: environment, now: now())
             #else
             nil
@@ -63,11 +61,7 @@ public final class AIAccountBalanceService: AIAccountBalanceDetecting, @unchecke
     public func accountBalances(for providers: Set<AIProvider>, qoderRegion: AIAccountBalanceQoderRegion = .global) async throws -> [AIAccountBalance] {
         try Task.checkCancellation()
         if let fixtures = debugBalances() {
-            return fixtures.compactMap { balance in
-                var row = balance
-                row.providers = row.providers.filter { providers.contains($0) }
-                return row.providers.isEmpty ? nil : row
-            }
+            return fixtures
         }
         let groups = AIAccountBalanceCatalog.groups.filter { !$0.allSatisfy { !providers.contains($0) } }
         return try await withThrowingTaskGroup(of: (Int, AIAccountBalance).self) { group in

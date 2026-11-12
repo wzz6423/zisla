@@ -39,7 +39,8 @@ public final class AIAccountBalanceNoticeController {
         let monitored = balances.compactMap { balance -> AIAccountBalance? in
             var row = balance
             row.providers = row.providers.filter {
-                AIAccountBalanceCatalog.supportsBalanceQuery($0) && settings.aiAccountBalanceMonitoredProviders.contains($0)
+                balance.isDebug || (AIAccountBalanceCatalog.supportsBalanceQuery($0)
+                    && settings.aiAccountBalanceMonitoredProviders.contains($0))
             }
             return row.providers.isEmpty ? nil : row
         }

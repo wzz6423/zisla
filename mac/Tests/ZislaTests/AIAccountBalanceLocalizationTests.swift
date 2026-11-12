@@ -52,6 +52,8 @@ struct AIAccountBalanceLocalizationTests {
         #expect(name.label(language: language) == table["账户上限"])
         let gpt = AIAccountBalance(id: "gpt", providers: [.gpt], status: .available, windows: [rolling])
         #expect(gpt.providerTitle(language: language) == "ChatGPT")
+        let codex = AIAccountBalance(id: "codex", providers: [.codex], status: .available, windows: [rolling])
+        #expect(codex.providerTitle(language: language) == "Codex")
         #expect(language.isRightToLeft == (language == .arabic))
     }
 

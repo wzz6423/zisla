@@ -187,7 +187,7 @@ public struct AIAccountBalance: Codable, Equatable, Sendable, Identifiable {
     public var noticeID: String { "ai-balance-low-" + id }
 
     public var displayProvider: AIProvider? {
-        providers.contains(.codex) || providers.contains(.gpt) ? .gpt : providers.first
+        providers.first
     }
 
     public var fiveHourWindow: AIAccountQuotaWindow? {
@@ -199,8 +199,7 @@ public struct AIAccountBalance: Codable, Equatable, Sendable, Identifiable {
     }
 
     public func providerTitle(language: AppLanguage) -> String {
-        if providers.contains(.codex) || providers.contains(.gpt) { return "ChatGPT" }
-        return providers.map(AIAccountBalanceCatalog.providerName).joined(separator: " / ")
+        providers.map { $0 == .gpt ? "ChatGPT" : AIAccountBalanceCatalog.providerName($0) }.joined(separator: " / ")
     }
 
     /// Reserves the first of at most two lines for a canonical 5h or rolling window.
@@ -242,14 +241,14 @@ public enum AIAccountBalanceCatalog {
         return status == .notSignedIn || status == .additionalCredentialsRequired
     }
 
-    /// An alias must be selected for both monitoring and display; partial or unavailable readings stay in settings.
+    /// Live aliases require both monitoring and display; explicit debug aliases override those selections.
     public static func displayedBalances(_ balances: [AIAccountBalance], monitoredProviders: Set<AIProvider>,
                                         displayedProviders: Set<AIProvider>) -> [AIAccountBalance] {
         balances.compactMap { balance in
             guard balance.severity != nil else { return nil }
             var row = balance
             row.providers = row.providers.filter {
-                supportsBalanceQuery($0) && monitoredProviders.contains($0) && displayedProviders.contains($0)
+                balance.isDebug || (supportsBalanceQuery($0) && monitoredProviders.contains($0) && displayedProviders.contains($0))
             }
             return row.providers.isEmpty ? nil : row
         }

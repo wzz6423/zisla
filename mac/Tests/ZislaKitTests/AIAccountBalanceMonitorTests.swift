@@ -7,6 +7,67 @@ import Testing
 
 @MainActor
 struct AIAccountBalanceMonitorTests {
+    #if DEBUG
+    @Test(arguments: [Set<AIProvider>(), [.codex]])
+    func fixtureProvidersOverrideRealSelectionsWithoutChangingUsageHistory(providers: Set<AIProvider>) async throws {
+        let root = directory()
+        defer { try? FileManager.default.removeItem(at: root) }
+        let now = Date(timeIntervalSince1970: 1_910_000_000)
+        let environment = ["ZISLA_DEBUG_AI_ACCOUNT_BALANCE": "claude:10:70,gpt:0,cursor:20"]
+        let service = AIAccountBalanceService(credentials: { _, _, _ in
+            Issue.record("The monitor's explicit quota fixture must never read credentials")
+            return nil
+        }, now: { now }, debugBalances: { AIAccountBalanceDebug.balances(environment: environment, now: now) })
+        let monitor = AIStateMonitor(directoryURL: root, activityDetectors: [], accountBalanceDetector: service,
+            accountBalanceNotificationCenter: NotificationCenter(), detectorRefreshInterval: 3_600,
+            environment: environment, now: { now })
+        defer { monitor.stop() }
+        monitor.configureAccountBalanceProviders(providers)
+        monitor.start()
+        try #require(await waitFor { monitor.accountBalances.count == 3 },
+            "The fixture must publish Claude, ChatGPT, and Cursor even when no real providers are selected")
+        #expect(monitor.accountBalances.map(\.providers) == [[.claude], [.gpt], [.cursor]])
+        monitor.configureAccountBalanceProviders([])
+        #expect(monitor.accountBalances.count == 3, "Real account selection changes must not hide the active fixture")
+        #expect(try AIStateRepository(directoryURL: root).load().usageSamples.isEmpty)
+    }
+
+    @Test(arguments: ["claude:nan", "cursor:20,", " "])
+    func malformedFixtureDoesNotScheduleLiveAccountRefresh(raw: String) async throws {
+        let root = directory()
+        defer { try? FileManager.default.removeItem(at: root) }
+        let detector = ImmediateBalanceDetector()
+        let monitor = AIStateMonitor(directoryURL: root, activityDetectors: [], accountBalanceDetector: detector,
+            accountBalanceNotificationCenter: NotificationCenter(), detectorRefreshInterval: 3_600,
+            environment: ["ZISLA_DEBUG_AI_ACCOUNT_BALANCE": raw])
+        defer { monitor.stop() }
+        monitor.configureAccountBalanceProviders([.codex])
+        monitor.start()
+        #expect(!monitor.isRefreshingAccountBalances && monitor.accountBalances.isEmpty)
+        #expect(try await !waitFor { await detector.callCount > 0 },
+            "An invalid fixture must leave every real account source untouched")
+    }
+
+    @Test(arguments: [[:], ["ZISLA_DEBUG_AI_ACCOUNT_BALANCE": ""]])
+    func clearedFixtureRestoresProviderSelection(environment: [String: String]) async throws {
+        let root = directory()
+        defer { try? FileManager.default.removeItem(at: root) }
+        let detector = BalanceDetectorGate()
+        let monitor = AIStateMonitor(directoryURL: root, activityDetectors: [], accountBalanceDetector: detector,
+            accountBalanceNotificationCenter: NotificationCenter(), detectorRefreshInterval: 3_600, environment: environment)
+        defer { monitor.stop() }
+        monitor.configureAccountBalanceProviders([.codex])
+        monitor.start()
+        try #require(await waitFor { await detector.calls.count == 1 })
+        #expect(await detector.calls.first?.providers == [.codex])
+        await detector.release(0, result: .success([]))
+        try #require(await waitFor { !monitor.isRefreshingAccountBalances })
+        monitor.configureAccountBalanceProviders([])
+        #expect(!monitor.isRefreshingAccountBalances && monitor.accountBalances.isEmpty)
+        #expect(await detector.calls.count == 1)
+    }
+    #endif
+
     /// Cancelling before the main-actor refresh starts must prevent even an uncooperative detector from reading credentials.
     @Test(arguments: [false, true])
     func cancellationBeforeRefreshStartsDoesNotInvokeDetector(removeProviders: Bool) async throws {
