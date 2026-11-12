@@ -6,6 +6,7 @@ import {buildSync} from 'esbuild';
 import React from 'react';
 import {renderToStaticMarkup} from 'react-dom/server';
 import * as Remotion from 'remotion';
+import {parseFragment} from 'parse5';
 
 const require = createRequire(import.meta.url);
 const root = fileURLToPath(new URL('../', import.meta.url));
@@ -19,7 +20,10 @@ const load = (entryPoint) => {
   return {exports: module.exports, render: (Component, props = {}, frame = 0) => {clock.frame = frame; return renderToStaticMarkup(React.createElement(Component, props));}};
 };
 
-const textOf = (html) => html.replace(/<[^>]*>/g, '').replaceAll('&amp;', '&').replaceAll('&#x27;', "'").replaceAll('&quot;', '"');
+const textOf = (html) => {
+  const textContent = (node) => node.nodeName === '#text' ? node.value : (node.childNodes ?? []).map(textContent).join('');
+  return textContent(parseFragment(html));
+};
 
 test('tour groups cover the budget and keep their final result during a crossfade', () => {
   for (const [source, prefix] of [['SceneEveryday', 'EVERYDAY'], ['SceneDesktopTools', 'DESKTOP'], ['SceneSettings', 'SETTINGS']]) {

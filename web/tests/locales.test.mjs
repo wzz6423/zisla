@@ -138,8 +138,9 @@ test('launch film sits after the changelog and before the footer with explicit p
   assert.doesNotMatch(film, /<dialog\b|role="dialog"/);
   assert.ok(film.includes(`<a href="./media/zisla-launch-1080p60.mp4">${escapedText(content.film.openVideoLabel)}</a>`));
   assert.match(film, /id="filmError" hidden role="status"/);
-  assert.ok(film.includes('https://www.scottbuckley.com.au/library/origami/'));
-  assert.ok(film.includes('https://creativecommons.org/licenses/by/4.0/'));
+  const links = [...film.matchAll(/\bhref="([^"]+)"/g)].map((match) => match[1]);
+  assert.ok(links.some((href) => href === 'https://www.scottbuckley.com.au/library/origami/'));
+  assert.ok(links.some((href) => href === 'https://creativecommons.org/licenses/by/4.0/'));
   assert.ok(film.includes('Origami — Scott Buckley'));
 });
 
