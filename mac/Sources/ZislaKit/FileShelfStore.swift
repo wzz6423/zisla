@@ -798,6 +798,8 @@ final class FileShelfPromiseSession {
     private let completion: (Int) -> Void
     private var files: [Int: [URL]] = [:]
     private var seen = Set<URL>()
+    private var receivedURLs: [Int: Set<URL>] = [:]
+    private var receivedNames: [Int: [String: Int]] = [:]
     private var remaining = 0
     private var isStarting = true
     private var failure: String?
@@ -843,6 +845,17 @@ final class FileShelfPromiseSession {
                 do { try FileManager.default.removeItem(at: stagingDirectory) } catch { store.errorDescription = error.localizedDescription }
             }
             return
+        }
+        if error == nil {
+            let standardizedURL = url.standardizedFileURL
+            let name = standardizedURL.lastPathComponent
+            if receivedURLs[index]?.contains(standardizedURL) == true,
+               case .promise(let receiver) = items[index],
+               receivedNames[index, default: [:]][name, default: 0] >= max(1, receiver.fileNames.filter { $0 == name }.count) {
+                return
+            }
+            receivedURLs[index, default: []].insert(standardizedURL)
+            receivedNames[index, default: [:]][name, default: 0] += 1
         }
         if let error {
             failure = error.localizedDescription

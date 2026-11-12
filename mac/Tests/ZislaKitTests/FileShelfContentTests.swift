@@ -259,6 +259,157 @@ struct FileShelfContentTests {
     }
 
     @Test
+    func repeatedCallbackCannotConsumeAnotherPromisedFilesCompletion() throws {
+        let directory = try temporaryDirectory()
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let store = FileShelfStore(storageURL: directory.appendingPathComponent("shelf.json"))
+        let receiver = ControlledFilePromiseReceiver(names: ["first.txt", "last.txt"])
+        var counts: [Int] = []
+        let session = try FileShelfPromiseSession(store: store, items: [.promise(receiver)], completion: { counts.append($0) })
+        session.start()
+        try receiver.deliver(name: "first.txt", data: Data("first".utf8))
+        receiver.deliverURL(session.stagingDirectory.appendingPathComponent("first.txt"))
+        try #require(counts.isEmpty)
+        #expect(store.items.isEmpty)
+        try receiver.deliver(name: "last.txt", data: Data("last".utf8))
+        #expect(counts == [2])
+        #expect(store.items.map(\.displayName) == ["first.txt", "last.txt"])
+        #expect(!FileManager.default.fileExists(atPath: session.stagingDirectory.path))
+    }
+
+    @Test
+    func excessDuplicateCallbacksCannotConsumeAnotherReceiversCompletion() throws {
+        let directory = try temporaryDirectory()
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let store = FileShelfStore(storageURL: directory.appendingPathComponent("shelf.json"))
+        let first = ControlledFilePromiseReceiver(names: ["dup.txt", "dup.txt"])
+        let last = ControlledFilePromiseReceiver(names: ["last.txt"])
+        var counts: [Int] = []
+        let session = try FileShelfPromiseSession(store: store, items: [.promise(first), .promise(last)], completion: { counts.append($0) })
+        session.start()
+        try first.deliver(name: "dup.txt", data: Data("dup".utf8))
+        let url = session.stagingDirectory.appendingPathComponent("dup.txt")
+        first.deliverURL(url)
+        first.deliverURL(url)
+        try #require(counts.isEmpty)
+        #expect(store.items.isEmpty)
+        try last.deliver(name: "last.txt", data: Data("last".utf8))
+        #expect(counts == [2])
+        #expect(store.items.map(\.displayName) == ["dup.txt", "last.txt"])
+        #expect(!FileManager.default.fileExists(atPath: session.stagingDirectory.path))
+    }
+
+    @Test
+    func standardizedDuplicateCallbacksShareOnlyTheirDeclaredCount() throws {
+        let directory = try temporaryDirectory()
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let store = FileShelfStore(storageURL: directory.appendingPathComponent("shelf.json"))
+        let receiver = ControlledFilePromiseReceiver(names: ["dup.txt", "dup.txt", "last.txt"])
+        var counts: [Int] = []
+        let session = try FileShelfPromiseSession(store: store, items: [.promise(receiver)], completion: { counts.append($0) })
+        session.start()
+        try receiver.deliver(name: "dup.txt", data: Data("dup".utf8))
+        let equivalent = session.stagingDirectory.appendingPathComponent("./dup.txt")
+        receiver.deliverURL(equivalent)
+        receiver.deliverURL(equivalent)
+        try #require(counts.isEmpty)
+        try receiver.deliver(name: "last.txt", data: Data("last".utf8))
+        #expect(counts == [2])
+        #expect(store.items.map(\.displayName) == ["dup.txt", "last.txt"])
+        #expect(try Data(contentsOf: #require(store.items.first).url) == Data("dup".utf8))
+        #expect(store.errorDescription == nil)
+        #expect(!FileManager.default.fileExists(atPath: session.stagingDirectory.path))
+    }
+
+    @Test
+    func receiversSharingAURLEachConsumeTheirOwnCallback() throws {
+        let directory = try temporaryDirectory()
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let store = FileShelfStore(storageURL: directory.appendingPathComponent("shelf.json"))
+        let first = ControlledFilePromiseReceiver(names: ["shared.txt"])
+        let second = ControlledFilePromiseReceiver(names: ["shared.txt"])
+        var counts: [Int] = []
+        let session = try FileShelfPromiseSession(store: store, items: [.promise(first), .promise(second)], completion: { counts.append($0) })
+        session.start()
+        try first.deliver(name: "shared.txt", data: Data("shared".utf8))
+        second.deliverURL(session.stagingDirectory.appendingPathComponent("shared.txt"))
+        #expect(counts == [1])
+        #expect(store.items.map(\.displayName) == ["shared.txt"])
+        #expect(store.errorDescription == nil)
+        #expect(!FileManager.default.fileExists(atPath: session.stagingDirectory.path))
+    }
+
+    @Test
+    func differentURLsWithTheSameNameAreBothImported() throws {
+        let directory = try temporaryDirectory()
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let store = FileShelfStore(storageURL: directory.appendingPathComponent("shelf.json"))
+        let receiver = ControlledFilePromiseReceiver(names: ["same.txt", "same.txt"])
+        var counts: [Int] = []
+        let session = try FileShelfPromiseSession(store: store, items: [.promise(receiver)], completion: { counts.append($0) })
+        session.start()
+        for name in ["first", "second"] {
+            let folder = session.stagingDirectory.appendingPathComponent(name, isDirectory: true)
+            try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: false)
+            let url = folder.appendingPathComponent("same.txt")
+            try Data(name.utf8).write(to: url)
+            receiver.deliverURL(url)
+        }
+        #expect(counts == [2])
+        #expect(store.items.map(\.displayName) == ["same.txt", "same.txt"])
+        #expect(try store.items.map { try Data(contentsOf: $0.url) } == [Data("first".utf8), Data("second".utf8)])
+        #expect(store.errorDescription == nil)
+        #expect(!FileManager.default.fileExists(atPath: session.stagingDirectory.path))
+    }
+
+    @Test
+    func synchronousDuplicatePromisesWaitForPendingReceivers() throws {
+        let directory = try temporaryDirectory()
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let store = FileShelfStore(storageURL: directory.appendingPathComponent("shelf.json"))
+        let first = ControlledFilePromiseReceiver(names: ["dup.txt", "dup.txt"])
+        first.synchronousData = Data("dup".utf8)
+        let last = ControlledFilePromiseReceiver(names: ["last.txt"])
+        var counts: [Int] = []
+        let session = try FileShelfPromiseSession(store: store, items: [.promise(first), .promise(last)], completion: { counts.append($0) })
+        session.start()
+        #expect(counts.isEmpty)
+        try last.deliver(name: "last.txt", data: Data("last".utf8))
+        #expect(counts == [2])
+        #expect(store.items.map(\.displayName) == ["dup.txt", "last.txt"])
+        #expect(store.errorDescription == nil)
+        #expect(!FileManager.default.fileExists(atPath: session.stagingDirectory.path))
+    }
+
+    @Test
+    func sameNamedDistinctFilesExhaustOnlyTheirDeclaredDuplicateCount() throws {
+        let directory = try temporaryDirectory()
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let store = FileShelfStore(storageURL: directory.appendingPathComponent("shelf.json"))
+        let receiver = ControlledFilePromiseReceiver(names: ["same.txt", "same.txt", "last.txt"])
+        var counts: [Int] = []
+        let session = try FileShelfPromiseSession(store: store, items: [.promise(receiver)], completion: { counts.append($0) })
+        session.start()
+        var files: [URL] = []
+        for name in ["first", "second"] {
+            let folder = session.stagingDirectory.appendingPathComponent(name, isDirectory: true)
+            try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: false)
+            let url = folder.appendingPathComponent("same.txt")
+            try Data(name.utf8).write(to: url)
+            files.append(url)
+            receiver.deliverURL(url)
+        }
+        receiver.deliverURL(try #require(files.first))
+        try #require(counts.isEmpty)
+        try receiver.deliver(name: "last.txt", data: Data("last".utf8))
+        #expect(counts == [3])
+        #expect(store.items.map(\.displayName) == ["same.txt", "same.txt", "last.txt"])
+        #expect(try store.items.map { try Data(contentsOf: $0.url) } == [Data("first".utf8), Data("second".utf8), Data("last".utf8)])
+        #expect(store.errorDescription == nil)
+        #expect(!FileManager.default.fileExists(atPath: session.stagingDirectory.path))
+    }
+
+    @Test
     func synchronousPromiseCallbacksWaitUntilEveryReceiverHasStarted() throws {
         let directory = try temporaryDirectory()
         defer { try? FileManager.default.removeItem(at: directory) }
@@ -634,14 +785,16 @@ private final class ControlledFilePromiseReceiver: NSFilePromiseReceiver, @unche
 
     required init?(pasteboardPropertyList propertyList: Any, ofType type: NSPasteboard.PasteboardType) { nil }
 
-    override var fileNames: [String] { names }
+    override var fileNames: [String] { destination == nil ? [] : names }
 
     override func receivePromisedFiles(atDestination destinationDir: URL, options: [AnyHashable: Any] = [:], operationQueue: OperationQueue, reader: @escaping (URL, Error?) -> Void) {
         destination = destinationDir
         self.reader = reader
-        if let synchronousData, let name = names.first {
-            do { try deliver(name: name, data: synchronousData) }
-            catch { reader(destinationDir, error) }
+        if let synchronousData {
+            for name in names {
+                do { try deliver(name: name, data: synchronousData) }
+                catch { reader(destinationDir, error) }
+            }
         }
     }
 
