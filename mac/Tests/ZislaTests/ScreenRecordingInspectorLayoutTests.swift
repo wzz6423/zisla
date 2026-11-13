@@ -537,9 +537,14 @@ struct ScreenRecordingInspectorLayoutTests {
         defer { fixture.window.close() }
         fixture.window.setFrameOrigin(.init(x: -100_000, y: -100_000))
         fixture.window.orderFrontRegardless()
-        await fixture.settle(until: { fixture.control(AppLocalization.text("字幕"), role: .disclosureTriangle) != nil })
-        let expandedHeight = fixture.host.fittingSize.height
-        let disclosure = try #require(fixture.control(AppLocalization.text("字幕"), role: .disclosureTriangle))
+        var initialInspector: (height: CGFloat, disclosure: any NSAccessibilityElementProtocol)?
+        await fixture.settle(until: {
+            let height = fixture.host.fittingSize.height
+            guard let disclosure = fixture.control(AppLocalization.text("字幕"), role: .disclosureTriangle) else { return false }
+            initialInspector = (height, disclosure)
+            return true
+        })
+        let (expandedHeight, disclosure) = try #require(initialInspector)
         let disclosureObject = try #require(disclosure as? NSObject)
         #expect((disclosureObject.value(forKey: "accessibilityValue") as? NSNumber)?.boolValue == true)
         try fixture.press(disclosure)
