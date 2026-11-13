@@ -3779,3 +3779,13 @@
 "自动滚动已暂停，可手动滚动或点击“完成”" = "Otomatik kaydırma duraklatıldı. Elle kaydırın veya Bitti’ye tıklayın";
 "自动滚动需要在系统设置中允许辅助功能" = "Otomatik kaydırma için Sistem Ayarları’nda Erişilebilirliğe izin verin";
 "无法自动滚动，请手动滚动页面" = "Otomatik kaydırılamadı. Sayfayı elle kaydırın";
+
+"灵动岛布局" = "Dynamic Island Düzeni";
+"通知与关怀" = "Bildirimler ve Sağlık";
+"调整灵动岛功能顺序、模式与收起态展示优先级。" = "Dynamic Island özellik sırasını, modunu ve daraltılmış görünüm önceliğini ayarlayın.";
+"设置每日简报的内容、模板与导出时间。" = "Günlük özetin içeriğini, şablonunu ve dışa aktarma saatini ayarlayın.";
+"配置锁屏信息、通知展示与关怀提醒。" = "Kilit ekranı bilgilerini, bildirimleri ve sağlık hatırlatmalarını yapılandırın.";
+"配置媒体播放与系统监控。" = "Medya oynatmayı ve sistem izlemeyi yapılandırın.";
+"自动更新依赖组件" = "Bağımlılıkları Otomatik Güncelle";
+"每天更新已安装的依赖组件" = "Yüklü bağımlılıkları her gün güncelle";
+"（默认）" = "(Varsayılan)";

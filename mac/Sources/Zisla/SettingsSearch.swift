@@ -1,3 +1,4 @@
+import AppKit
 import Foundation
 import ZislaCore
 import ZislaKit
@@ -28,12 +29,13 @@ struct SettingsSearchItem: Identifiable, Equatable {
 }
 
 enum SettingsSearchIndex {
-    static func results(for query: String, settings: FeatureSettings, locale: Locale) -> [SettingsSearchItem] {
+    static func results(for query: String, settings: FeatureSettings, locale: Locale,
+                        displayCount: Int = NSScreen.screens.count) -> [SettingsSearchItem] {
         let terms = query.split(whereSeparator: \.isWhitespace).map(String.init)
         guard !terms.isEmpty else { return [] }
         let options: String.CompareOptions = [.caseInsensitive, .diacriticInsensitive, .widthInsensitive]
 
-        let matches = items(settings: settings).filter { item in
+        let matches = items(settings: settings, displayCount: displayCount).filter { item in
             let keys = [item.title, item.section.title] + item.keywords
             let text = keys.flatMap {
                 [$0, AppLocalization.string($0, locale: locale)]
@@ -52,7 +54,7 @@ enum SettingsSearchIndex {
     }
 
     /// Aliases stay attached to typed destinations so localized searches retain row targets and feature visibility.
-    static func items(settings: FeatureSettings) -> [SettingsSearchItem] {
+    static func items(settings: FeatureSettings, displayCount: Int = NSScreen.screens.count) -> [SettingsSearchItem] {
         var items: [SettingsSearchItem] = []
 
         func rows(_ section: SettingsSection, _ titles: [String]) {
@@ -96,6 +98,7 @@ enum SettingsSearchIndex {
         if settings.recommendedToolsEnabled {
             rows(.features, ["自动更新推荐工具"])
         }
+        rows(.features, ["自动更新依赖组件"])
         if settings.systemMonitorEnabled {
             entry(.scheduledCleanup, "自动清理系统垃圾", anchor: .row("自动清理系统垃圾"),
                   keywords: ["系统状态与清理"] + VoiceRecordingCleanupPolicy.allCases.map(\.menuTitle))
@@ -121,38 +124,41 @@ enum SettingsSearchIndex {
 
         entry(.info, "灵动岛功能顺序", anchor: .group("灵动岛功能顺序"),
               keywords: ["恢复默认顺序"] + IslandModuleOrder.defaultOrder.map(\.title))
-        entry(.info, "每日简报", anchor: .group("每日简报"), keywords: ["简报模板", "简报内容", "导出时间", "读取系统屏幕使用时间"])
-        entry(.info, "简报内容", anchor: .row("简报内容"), keywords: DailyBriefingContent.allCases.map(\.title))
-        rows(.info, ["简报模板", "导出时间"])
-        rows(.info, ["播放来源", "歌词与歌曲信息", "收起态音乐样式", "音乐动效", "活动展示", "专注模式展示"])
+        entry(.dailyBriefing, "每日简报", anchor: .group("每日简报"), keywords: ["简报模板", "简报内容", "导出时间", "读取系统屏幕使用时间"])
+        entry(.dailyBriefing, "简报内容", anchor: .row("简报内容"), keywords: DailyBriefingContent.allCases.map(\.title))
+        rows(.dailyBriefing, ["简报模板", "导出时间"])
+        rows(.workflow, ["播放来源", "歌词与歌曲信息", "收起态音乐样式", "音乐动效"])
+        rows(.notifications, ["活动展示", "专注模式展示"])
         if settings.userCareEnabled {
-            entry(.info, "关怀提醒间隔", anchor: .row("关怀提醒间隔"), keywords: ["用户关怀", "小时", "分钟", "秒"])
+            entry(.notifications, "关怀提醒间隔", anchor: .row("关怀提醒间隔"), keywords: ["用户关怀", "小时", "分钟", "秒"])
         }
         if settings.supportsStatusIconsInIsland {
             rows(.info, ["显示应用标识"])
             entry(.info, "展示更多信息", anchor: .row("展示更多信息"),
                   keywords: ["同时展示监控、AI、音乐与状态提示，详细音乐另起一行"])
-            entry(.info, "机器监控状态显示位置", anchor: .row("机器监控状态显示位置"), keywords: ["状态栏", "灵动岛"])
+            entry(.workflow, "机器监控状态显示位置", anchor: .row("机器监控状态显示位置"), keywords: ["状态栏", "灵动岛"])
         }
         if settings.systemMonitorEnabled {
-            entry(.info, "常驻监控图标", anchor: .row("常驻监控图标"), keywords: ["独立", "菜单栏常驻"])
+            entry(.workflow, "常驻监控图标", anchor: .row("常驻监控图标"), keywords: ["独立", "菜单栏常驻"])
             if settings.systemMonitorMenuBarLayout.individualEnabled {
-                rows(.info, ["监控样式"] + SystemMonitorMenuBarMetric.allCases.map(\.menuTitle))
+                rows(.workflow, ["监控样式"] + SystemMonitorMenuBarMetric.allCases.map(\.menuTitle))
             }
-            entry(.info, "合并", anchor: .group("settings-search-monitor-layout"), keywords: ["显示数量", "上行", "下行"])
-            entry(.info, "合并状态图标", anchor: .group("settings-search-monitor-layout"), keywords: [
+            entry(.workflow, "合并", anchor: .group("settings-search-monitor-layout"), keywords: ["显示数量", "上行", "下行"])
+            entry(.workflow, "合并状态图标", anchor: .group("settings-search-monitor-layout"), keywords: [
                 "底部指标", "显示电池百分比", "显示充电标记", "接通电源时显示百分比", "电量状态颜色",
                 "底部指示样式", "电量环粗细", "图标大小", "Wi-Fi 大小", "电量文字大小",
                 "蓝牙音量颜色",
             ] + (settings.supportsHeadphoneConnectionAnimation
                 ? ["连接时短暂显示耳机图标", "优先显示网络错误", "耳机图标大小"] : []))
-            entry(.info, "记录历史", anchor: .row("记录历史"), keywords: ["按分钟记录 CPU、GPU、内存、硬盘、风扇与网络，可随时查看趋势并导出表格"])
+            entry(.workflow, "记录历史", anchor: .row("记录历史"), keywords: ["按分钟记录 CPU、GPU、内存、硬盘、风扇与网络，可随时查看趋势并导出表格"])
         }
         if settings.lockScreenInfoEnabled {
-            rows(.info, ["锁屏文字", "显示农历"])
+            rows(.notifications, ["锁屏文字", "显示农历"])
         }
         entry(.info, "收起态展示优先级", anchor: .group("收起态展示优先级"), keywords: ["恢复默认顺序"])
-        entry(.info, "通知显示器", anchor: .group("通知显示器"), keywords: ["播放与 AI 活动通知显示在此屏幕"])
+        if displayCount > 1 {
+            entry(.notifications, "通知显示器", anchor: .group("通知显示器"), keywords: ["播放与 AI 活动通知显示在此屏幕"])
+        }
 
         rows(.clipboardAssistant, [
             "关闭弹窗快捷键", "鼠标侧键", "轻量提醒模式",

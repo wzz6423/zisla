@@ -9,7 +9,7 @@ struct SettingsSearchTests {
     @Test(arguments: AppLanguage.allCases, [false, true])
     func batterySearchTargetsTheCombinedMonitorToggle(language: AppLanguage, systemEnabled: Bool) {
         let settings = FeatureSettings(systemMonitorEnabled: systemEnabled)
-        #expect(!SettingsSearchIndex.items(settings: settings).contains { $0.title == "电池监控" })
+        #expect(!SettingsSearchIndex.items(settings: settings, displayCount: 2).contains { $0.title == "电池监控" })
         let matches = results(AppLocalization.string("电池监控", language: language),
             settings: settings, locale: language.locale)
         #expect(matches.contains {
@@ -41,26 +41,110 @@ struct SettingsSearchTests {
         var settings = FeatureSettings(userCareEnabled: careEnabled)
         settings.islandLayoutStyle = .pill
         settings.islandPlacement = IslandPlacement(mode: customPlacement ? .custom : .camera)
-        let items = SettingsSearchIndex.items(settings: settings)
+        let items = SettingsSearchIndex.items(settings: settings, displayCount: 2)
         #expect(items.contains { $0.title == "关怀提醒间隔" } == careEnabled)
         #expect(items.contains { $0.title == "展示更多信息" } == customPlacement)
     }
 
     @Test(arguments: AppLanguage.allCases)
-    func careIntervalSearchReachesTheInformationPageWhenOtherInfoFeaturesAreOff(language: AppLanguage) {
+    func careIntervalSearchReachesNotificationsWhenOtherInfoFeaturesAreOff(language: AppLanguage) {
         var settings = FeatureSettings(userCareEnabled: true)
         settings.mediaEnabled = false
         settings.systemMonitorEnabled = false
         settings.lockScreenInfoEnabled = false
         settings.sideNoticesEnabled = false
         settings.dailyBriefing.enabled = false
-        #expect(SettingsSection.info.isVisible(settings: settings))
+        #expect(SettingsSection.notifications.isVisible(settings: settings))
         let matches = results(AppLocalization.string("关怀提醒间隔", language: language), settings: settings, locale: language.locale)
-        #expect(matches.first?.section == .info)
+        #expect(matches.first?.section == .notifications)
         #expect(matches.first?.anchor == .row("关怀提醒间隔"))
         settings.userCareEnabled = false
-        #expect(SettingsSection.info.isVisible(settings: settings))
-        #expect(!SettingsSearchIndex.items(settings: settings).contains { $0.title == "关怀提醒间隔" })
+        #expect(SettingsSection.notifications.isVisible(settings: settings))
+        #expect(!SettingsSearchIndex.items(settings: settings, displayCount: 2).contains { $0.title == "关怀提醒间隔" })
+    }
+
+    @Test(arguments: AppLanguage.allCases) @MainActor
+    func migratedInformationSearchDestinationsKeepTheirPageAndAnchor(language: AppLanguage) throws {
+        var settings = Self.enabledSettings
+        settings.userCareEnabled = true
+        settings.islandLayoutStyle = .pill
+        settings.islandPlacement.mode = .custom
+        settings.systemMonitorMenuBarLayout.individualEnabled = true
+        let destinations: [(String, SettingsSection, SettingsSearchAnchor)] = [
+            ("灵动岛功能顺序", .info, .group("灵动岛功能顺序")),
+            ("显示应用标识", .info, .row("显示应用标识")),
+            ("展示更多信息", .info, .row("展示更多信息")),
+            ("收起态展示优先级", .info, .group("收起态展示优先级")),
+            ("每日简报", .dailyBriefing, .group("每日简报")),
+            ("简报内容", .dailyBriefing, .row("简报内容")),
+            ("简报模板", .dailyBriefing, .row("简报模板")),
+            ("导出时间", .dailyBriefing, .row("导出时间")),
+            ("锁屏文字", .notifications, .row("锁屏文字")),
+            ("显示农历", .notifications, .row("显示农历")),
+            ("活动展示", .notifications, .row("活动展示")),
+            ("专注模式展示", .notifications, .row("专注模式展示")),
+            ("关怀提醒间隔", .notifications, .row("关怀提醒间隔")),
+            ("通知显示器", .notifications, .group("通知显示器")),
+            ("播放来源", .workflow, .row("播放来源")),
+            ("歌词与歌曲信息", .workflow, .row("歌词与歌曲信息")),
+            ("收起态音乐样式", .workflow, .row("收起态音乐样式")),
+            ("音乐动效", .workflow, .row("音乐动效")),
+            ("机器监控状态显示位置", .workflow, .row("机器监控状态显示位置")),
+            ("常驻监控图标", .workflow, .row("常驻监控图标")),
+            ("监控样式", .workflow, .row("监控样式")),
+            ("合并", .workflow, .group("settings-search-monitor-layout")),
+            ("合并状态图标", .workflow, .group("settings-search-monitor-layout")),
+            ("记录历史", .workflow, .row("记录历史")),
+        ] + SystemMonitorMenuBarMetric.allCases.map { ($0.menuTitle, .workflow, .row($0.menuTitle)) }
+        let input = SettingsInput()
+        input.weatherQuery = "synthetic location"
+        for (title, page, anchor) in destinations {
+            let query = AppLocalization.string(title, language: language)
+            let result = try #require(results(query, settings: settings, locale: language.locale).first {
+                $0.title == title && $0.section == page
+            }, "\(title) must reach \(page.rawValue) in \(language.rawValue)")
+            #expect(result.anchor == anchor)
+            #expect(!results(query, settings: settings, locale: language.locale).contains {
+                $0.title == title && $0.section == .info && page != .info
+            })
+            input.settingsQuery = query
+            input.select(result.section, searchTarget: result.anchor)
+            #expect(input.selection == page)
+            #expect(input.searchTarget == anchor)
+            #expect(!input.isSearching)
+            #expect(input.weatherQuery == "synthetic location")
+        }
+    }
+
+    @Test(arguments: AppLanguage.allCases, [0, 1, 2])
+    func notificationDisplaySearchMatchesTheEnumerableScreenCount(language: AppLanguage, displayCount: Int) {
+        let settings = FeatureSettings(sideNoticesEnabled: false)
+        let title = "通知显示器"
+        let items = SettingsSearchIndex.items(settings: settings, displayCount: displayCount)
+        #expect(items.contains { $0.title == title && $0.section == .notifications } == (displayCount == 2))
+        for key in [title, "播放与 AI 活动通知显示在此屏幕"] {
+            let matches = results(AppLocalization.string(key, language: language), settings: settings,
+                locale: language.locale, displayCount: displayCount)
+            #expect(matches.contains { $0.section == .notifications && $0.anchor == .group(title) } == (displayCount == 2))
+        }
+        #expect(results("活动展示", settings: settings, displayCount: displayCount).contains {
+            $0.section == .notifications && $0.anchor == .row("活动展示")
+        })
+    }
+
+    @Test
+    func informationPagesKeepDisabledFeatureConfigurationSearchable() {
+        let settings = FeatureSettings(mediaEnabled: false, systemMonitorEnabled: false,
+            dailyBriefing: DailyBriefingSettings(enabled: false), lockScreenInfoEnabled: false,
+            sideNoticesEnabled: false, userCareEnabled: false)
+        for (title, page) in [("简报模板", SettingsSection.dailyBriefing), ("播放来源", .workflow),
+                              ("活动展示", .notifications), ("收起态展示优先级", .info)] {
+            #expect(results(title, settings: settings).contains { $0.title == title && $0.section == page })
+        }
+        let hiddenTitles = ["锁屏文字", "显示农历", "关怀提醒间隔", "常驻监控图标", "记录历史"]
+        #expect(SettingsSearchIndex.items(settings: settings, displayCount: 1).allSatisfy {
+            !hiddenTitles.contains($0.title)
+        })
     }
 
     /// Ordering must remain discoverable by disabled module names without enabling information features.
@@ -84,7 +168,7 @@ struct SettingsSearchTests {
                 $0.section == .info && $0.anchor == .group("灵动岛功能顺序")
             }, "Module order must be searchable by \(key) in \(language.rawValue)")
         }
-        #expect(!SettingsSearchIndex.items(settings: settings).contains {
+        #expect(!SettingsSearchIndex.items(settings: settings, displayCount: 2).contains {
             $0.section == .features && $0.anchor == .group("工具")
         })
     }
@@ -125,13 +209,18 @@ struct SettingsSearchTests {
         let title = AppLocalization.string("界面语言", language: language)
         #expect(results(title, locale: language.locale).contains { $0.section == .general && $0.title == "界面语言" })
         let dependencyTitle = AppLocalization.string("依赖组件", language: language)
-        let dependencies = results(dependencyTitle, locale: language.locale)
-        #expect(Set(dependencies.map(\.section)) == [.download])
+        let matches = results(dependencyTitle, locale: language.locale)
+        let dependencies = matches.filter { $0.section == .download }
         #expect(Set(dependencies.map(\.title)) == Set([ManagedTool.ytDLP, .libreOffice, .libvips, .libavif].map(\.displayName)))
+        #expect(matches.filter { $0.section != .download }.allSatisfy {
+            $0.section == .features && $0.title == "自动更新依赖组件" && $0.anchor == .row("自动更新依赖组件")
+        })
         var disabled = FeatureSettings(downloaderEnabled: false)
         disabled.pdfToolsEnabled = false
         disabled.imageToolsEnabled = false
-        #expect(results(dependencyTitle, settings: disabled, locale: language.locale).isEmpty)
+        #expect(results(dependencyTitle, settings: disabled, locale: language.locale).allSatisfy {
+            $0.section == .features && $0.title == "自动更新依赖组件"
+        })
     }
 
     /// Legacy aliases stay attached to dependency rows while any dependent feature is enabled.
@@ -199,7 +288,7 @@ struct SettingsSearchTests {
             #expect(matches.contains { $0.section == .features && $0.title == title })
             #expect(matches.allSatisfy { $0.section.isVisible(settings: settings) })
         }
-        #expect(!SettingsSearchIndex.items(settings: settings).contains { $0.title == "自动更新推荐工具" })
+        #expect(!SettingsSearchIndex.items(settings: settings, displayCount: 2).contains { $0.title == "自动更新推荐工具" })
     }
 
     @Test
@@ -210,7 +299,7 @@ struct SettingsSearchTests {
         settings.lockScreenInfoEnabled = false
         settings.systemMonitorEnabled = false
         let hiddenTitles = ["便签快捷键", "自定义搜索网址", "锁屏文字", "显示农历", "监控样式", "记录历史"]
-        #expect(SettingsSearchIndex.items(settings: settings).allSatisfy { !hiddenTitles.contains($0.title) })
+        #expect(SettingsSearchIndex.items(settings: settings, displayCount: 2).allSatisfy { !hiddenTitles.contains($0.title) })
         #expect(results("自定义搜索网址", settings: settings).map(\.title) == ["搜索引擎"])
 
         settings.contextNotesEnabled = true
@@ -218,11 +307,11 @@ struct SettingsSearchTests {
         settings.lockScreenInfoEnabled = true
         settings.systemMonitorEnabled = true
         settings.systemMonitorMenuBarLayout.individualEnabled = true
-        let visibleTitles = Set(SettingsSearchIndex.items(settings: settings).map(\.title))
+        let visibleTitles = Set(SettingsSearchIndex.items(settings: settings, displayCount: 2).map(\.title))
         #expect(Set(hiddenTitles).isSubset(of: visibleTitles))
 
         settings.systemMonitorMenuBarLayout.individualEnabled = false
-        #expect(!SettingsSearchIndex.items(settings: settings).contains { $0.title == "监控样式" })
+        #expect(!SettingsSearchIndex.items(settings: settings, displayCount: 2).contains { $0.title == "监控样式" })
         #expect(results("合并状态图标", settings: settings).contains { $0.anchor == .group("settings-search-monitor-layout") })
     }
 
@@ -230,7 +319,7 @@ struct SettingsSearchTests {
     func fixedPillDimensionsAreNotSettingsSearchEntries() {
         var settings = Self.enabledSettings
         settings.islandLayoutStyle = .pill
-        let items = SettingsSearchIndex.items(settings: settings)
+        let items = SettingsSearchIndex.items(settings: settings, displayCount: 2)
         #expect(items.contains { $0.title == "灵动岛位置" })
         #expect(!items.contains { $0.title == "药丸宽度" })
         #expect(!items.contains { $0.title == "药丸高度" })
@@ -241,7 +330,7 @@ struct SettingsSearchTests {
     @Test
     func catalogHasDistinctIdentitiesAndCoversEveryVisibleSection() {
         let settings = Self.enabledSettings
-        let items = SettingsSearchIndex.items(settings: settings)
+        let items = SettingsSearchIndex.items(settings: settings, displayCount: 2)
         #expect(Set(items.map(\.id)).count == items.count)
         #expect(Set(items.map(\.section)) == Set(SettingsSection.allCases))
         #expect(items.allSatisfy { !$0.title.isEmpty })
@@ -251,7 +340,7 @@ struct SettingsSearchTests {
 
     @Test
     func reusesDynamicSettingCatalogs() {
-        let items = SettingsSearchIndex.items(settings: Self.enabledSettings)
+        let items = SettingsSearchIndex.items(settings: Self.enabledSettings, displayCount: 2)
         for lexicon in VoiceLexicon.allCases {
             #expect(items.contains { $0.section == .voice && $0.anchor == .row(lexicon.title) })
         }
@@ -317,7 +406,7 @@ struct SettingsSearchTests {
     func disablingPDFKeepsItsSwitchAndRemovesProcessingDestinations(language: AppLanguage) {
         var settings = Self.enabledSettings
         settings.pdfToolsEnabled = false
-        let items = SettingsSearchIndex.items(settings: settings)
+        let items = SettingsSearchIndex.items(settings: settings, displayCount: 2)
         #expect(items.contains { $0.section == .features && $0.title == "PDF 工具" })
         #expect(!items.contains { $0.section == .pdfTools })
         let switchTitle = AppLocalization.string("PDF 工具", language: language)
@@ -356,7 +445,7 @@ struct SettingsSearchTests {
     @Test
     func nestedConfigurationSearchTargetsReachableEntries() {
         #expect(results("自动更新 CLI").contains { $0.section == .ai && $0.anchor == .group("CLI 与 Skills") })
-        #expect(results("底部指示样式").contains { $0.section == .info && $0.anchor == .group("settings-search-monitor-layout") })
+        #expect(results("底部指示样式").contains { $0.section == .workflow && $0.anchor == .group("settings-search-monitor-layout") })
         #expect(results("添加本地模型").contains { $0.section == .voice && $0.anchor == .group("本地模型") })
         #expect(results("邮件账户").contains { $0.section == .mail && $0.anchor == .group("邮件") })
         #expect(results("辅助功能").contains { $0.section == .clipboardAssistant && $0.anchor == .row("鼠标手势快速复制") })
@@ -458,9 +547,10 @@ struct SettingsSearchTests {
     private func results(
         _ query: String,
         settings: FeatureSettings = Self.enabledSettings,
-        locale: Locale = Locale(identifier: "zh-Hans")
+        locale: Locale = Locale(identifier: "zh-Hans"),
+        displayCount: Int = 2
     ) -> [SettingsSearchItem] {
-        SettingsSearchIndex.results(for: query, settings: settings, locale: locale)
+        SettingsSearchIndex.results(for: query, settings: settings, locale: locale, displayCount: displayCount)
     }
 
     private static var enabledSettings: FeatureSettings {

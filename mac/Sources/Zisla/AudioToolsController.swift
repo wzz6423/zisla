@@ -66,7 +66,7 @@ final class AudioToolsController: ObservableObject {
         completed = 0
         total = 0
         let current = generation
-        task = Task {
+        task = Task { [self] in
             do {
                 let outputs = try await service.process(request, outputURL: output) { [weak self] completed, total in
                     await MainActor.run {

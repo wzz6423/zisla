@@ -3778,3 +3778,13 @@
 "自动滚动已暂停，可手动滚动或点击“完成”" = "Auto scroll paused. Scroll manually or click Done";
 "自动滚动需要在系统设置中允许辅助功能" = "Allow Accessibility in System Settings to scroll automatically";
 "无法自动滚动，请手动滚动页面" = "Could not scroll automatically. Scroll the page manually";
+
+"灵动岛布局" = "Dynamic Island Layout";
+"通知与关怀" = "Notifications and Wellbeing";
+"调整灵动岛功能顺序、模式与收起态展示优先级。" = "Adjust Dynamic Island feature order, mode, and compact status priority.";
+"设置每日简报的内容、模板与导出时间。" = "Set daily briefing content, template, and export time.";
+"配置锁屏信息、通知展示与关怀提醒。" = "Configure lock screen information, notifications, and wellbeing reminders.";
+"配置媒体播放与系统监控。" = "Configure media playback and system monitoring.";
+"自动更新依赖组件" = "Automatically Update Dependencies";
+"每天更新已安装的依赖组件" = "Update installed dependencies daily";
+"（默认）" = "(Default)";

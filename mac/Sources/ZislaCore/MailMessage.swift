@@ -11,7 +11,11 @@ public struct MailAccount: Identifiable, Equatable, Sendable {
     }
 
     public var displayName: String {
-        emailAddresses.first ?? id
+        emailAddresses.first ?? Self.displayAccountName(id)
+    }
+
+    public static func displayAccountName(_ name: String) -> String {
+        name.caseInsensitiveCompare("qq") == .orderedSame ? "QQ" : name
     }
 
     public var detail: String {

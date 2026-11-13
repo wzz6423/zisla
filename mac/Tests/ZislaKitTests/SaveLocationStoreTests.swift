@@ -8,16 +8,48 @@ struct SaveLocationStoreTests {
         let fixture = try Fixture()
         defer { fixture.close() }
         let locations = SaveLocationStore(defaults: fixture.defaults)
-        for location in SaveLocation.allCases { #expect(locations[location] == AppPaths.downloads) }
+        let expected: [SaveLocation: URL] = [
+            .download: AppPaths.downloads,
+            .pdfTools: AppPaths.downloads.appendingPathComponent("pdf", isDirectory: true),
+            .imageTools: AppPaths.downloads.appendingPathComponent("picture", isDirectory: true),
+            .screenshot: AppPaths.downloads.appendingPathComponent("picture", isDirectory: true),
+            .recording: AppPaths.downloads.appendingPathComponent("video", isDirectory: true),
+            .quickActions: AppPaths.downloads.appendingPathComponent("quick", isDirectory: true),
+            .dailyBriefing: AppPaths.downloads.appendingPathComponent("daily", isDirectory: true),
+        ]
+        #expect(locations.directories == expected)
+        for location in SaveLocation.allCases where location != .download {
+            #expect(fixture.defaults.string(forKey: location.pathKey!) == expected[location]!.path)
+            #expect(fixture.defaults.data(forKey: location.bookmarkKey) == nil)
+        }
 
         try locations.setDirectory(fixture.root, for: .download)
 
         let restored = SaveLocationStore(defaults: fixture.defaults)
         #expect(restored[.download].path == fixture.root.path)
         for location in SaveLocation.allCases where location != .download {
+            #expect(locations[location] == expected[location])
+            #expect(restored[location] == expected[location])
+        }
+    }
+
+    @Test func upgradePreservesPreviouslyStoredDownloadsPathsWithoutRewritingPreferences() throws {
+        let fixture = try Fixture()
+        defer { fixture.close() }
+        for location in SaveLocation.allCases where location != .download {
+            fixture.defaults.set(AppPaths.downloads.path, forKey: location.pathKey!)
+        }
+        let preferences = fixture.defaults.persistentDomain(forName: fixture.suite) ?? [:]
+
+        let locations = SaveLocationStore(defaults: fixture.defaults)
+        let restored = SaveLocationStore(defaults: fixture.defaults)
+
+        for location in SaveLocation.allCases {
             #expect(locations[location] == AppPaths.downloads)
             #expect(restored[location] == AppPaths.downloads)
         }
+        #expect(NSDictionary(dictionary: fixture.defaults.persistentDomain(forName: fixture.suite) ?? [:])
+            == NSDictionary(dictionary: preferences), "Stored paths must remain intact even when they match the old defaults")
     }
 
     @Test func upgradeKeepsTheEffectiveDownloadLocationAndDoesNotReviveLegacyRecordingPreferences() throws {

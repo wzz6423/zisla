@@ -163,8 +163,13 @@ struct SettingsNavigationTests {
         #expect(SettingsSection.allCases.map(\.title) == [
             "通用",
             "功能",
-            "信息",
+            "灵动岛布局",
+            "每日简报",
+            "通知与关怀",
+            "工作流",
             "快捷操作",
+            "邮件",
+            "天气",
             "截图",
             "录屏",
             "PDF 工具",
@@ -172,12 +177,10 @@ struct SettingsNavigationTests {
             "音频工具",
             "AI",
             "语音",
-            "邮件",
             "键盘音效",
-            "依赖组件",
-            "保存位置",
             "系统状态与清理",
-            "天气",
+            "保存位置",
+            "依赖组件",
             "网络",
             "宠物",
             "权限",
@@ -276,14 +279,16 @@ struct SettingsNavigationTests {
     }
 
     @Test
-    func defaultSettingsShowInfoAndMailWithoutWorkflowNavigation() {
+    func defaultSettingsShowAllInformationConfigurationPages() {
         let settings = FeatureSettings()
         let visibleSections = SettingsSection.allCases.filter { $0.isVisible(settings: settings) }
 
         #expect(visibleSections == SettingsSection.allCases)
         #expect(visibleSections.map(\.rawValue).contains("info"))
         #expect(visibleSections.map(\.rawValue).contains("mail"))
-        #expect(!visibleSections.map(\.rawValue).contains("workflow"))
+        for page in [SettingsSection.dailyBriefing, .notifications, .workflow] {
+            #expect(visibleSections.contains(page))
+        }
         #expect(settings.mediaEnabled)
         #expect(settings.systemMonitorEnabled)
         #expect(settings.mailEnabled)
@@ -292,16 +297,61 @@ struct SettingsNavigationTests {
         #expect(settings.mailAccountNames.isEmpty)
     }
 
+    @Test(arguments: Array(0..<64))
+    func informationConfigurationRemainsReachableWithItsFeaturesDisabled(combination: Int) {
+        let settings = FeatureSettings(
+            mediaEnabled: combination & 1 != 0,
+            systemMonitorEnabled: combination & 2 != 0,
+            dailyBriefing: DailyBriefingSettings(enabled: combination & 4 != 0),
+            lockScreenInfoEnabled: combination & 8 != 0,
+            sideNoticesEnabled: combination & 16 != 0,
+            userCareEnabled: combination & 32 != 0
+        )
+        for page in [SettingsSection.info, .dailyBriefing, .notifications, .workflow] {
+            #expect(page.isVisible(settings: settings), "The \(page.rawValue) configuration must stay reachable")
+        }
+        #expect(SettingsSection(rawValue: "info") == .info)
+    }
+
+    @Test(arguments: [0, 1, 2]) @MainActor
+    func notificationDisplayChoicesRequireTwoEnumerableScreens(screenCount: Int) {
+        let screens = (0..<screenCount).map { SettingsTestScreen(number: $0 + 11, name: "Screen \($0 + 1)") }
+        let choices = SettingsView.activityNoticeDisplays(on: screens, locale: Locale(identifier: "en"))
+        #expect(choices.map(\.id) == (screenCount == 2 ? [11, 12] : []))
+        #expect(choices.map(\.name) == (screenCount == 2 ? ["Screen 1", "Screen 2"] : []))
+    }
+
+    @Test @MainActor
+    func displayChangesRemoveUnenumerableChoicesAndRestoreTheirLocalizedNames() {
+        let missing = SettingsTestScreen(number: nil, name: "Missing ID")
+        let primary = SettingsTestScreen(number: 11, name: "")
+        let external = SettingsTestScreen(number: 22, name: "External")
+        let locale = Locale(identifier: "en")
+        #expect(SettingsView.activityNoticeDisplays(on: [missing, primary], locale: locale).isEmpty)
+        let connected = SettingsView.activityNoticeDisplays(on: [primary, missing, external], locale: locale)
+        #expect(connected.map(\.id) == [11, 22])
+        #expect(connected.map(\.name) == ["Display 1", "External"])
+        #expect(SettingsView.activityNoticeDisplays(on: [primary], locale: locale).isEmpty)
+        #expect(SettingsView.activityNoticeDisplays(on: [], locale: locale).isEmpty)
+        let reconnected = SettingsView.activityNoticeDisplays(on: [external, primary], locale: locale)
+        #expect(reconnected.map(\.id) == [22, 11])
+        #expect(reconnected.map(\.name) == ["External", "Display 2"])
+        let third = SettingsTestScreen(number: 33, name: "Third")
+        #expect(SettingsView.activityNoticeDisplays(on: [external, primary, third], locale: locale).map(\.id)
+            == [22, 11, 33])
+    }
+
     @Test
-    func infoAndMailNavigationAreLocalizedInEveryLanguage() throws {
+    func informationPagesAndMailNavigationAreLocalizedInEveryLanguage() throws {
         let mailSection = try #require(SettingsSection(rawValue: "mail"))
-        #expect(SettingsSection.info.subtitle == "配置媒体、系统监控、锁屏与通知显示。")
+        #expect(SettingsSection.info.subtitle == "调整灵动岛功能顺序、模式与收起态展示优先级。")
         #expect(mailSection.title == "邮件")
         #expect(mailSection.subtitle == "读取已配置的 Mail.app 账户并提醒新邮件")
         #expect(mailSection.symbol == "envelope.fill")
-        let englishSubtitle = "Configure media, system monitoring, lock screen, and notifications."
+        let englishSubtitle = "Adjust Dynamic Island feature order, mode, and compact status priority."
         #expect(AppLocalization.string(SettingsSection.info.subtitle, language: .english) == englishSubtitle)
-        let keys = [SettingsSection.info.title, SettingsSection.info.subtitle, mailSection.title, mailSection.subtitle]
+        let keys = [SettingsSection.info, .dailyBriefing, .notifications, .workflow, mailSection]
+            .flatMap { [$0.title, $0.subtitle] }
         let packageRoot = Self.settingsViewSourceURL.deletingLastPathComponent()
             .deletingLastPathComponent().deletingLastPathComponent()
         #expect(AppLanguage.allCases.count == 17)
@@ -319,6 +369,13 @@ struct SettingsNavigationTests {
                 #expect(table[SettingsSection.info.subtitle] != englishSubtitle)
             }
         }
+    }
+
+    @Test
+    func informationGroupImmediatelyFollowsBasics() throws {
+        let groups = SettingsSectionGroup.allCases
+        let basicsIndex = try #require(groups.firstIndex(of: .basics))
+        #expect(groups.dropFirst(basicsIndex + 1).first == .information)
     }
 
     @Test
@@ -366,15 +423,46 @@ struct SettingsNavigationTests {
     @Test
     func sidebarGroupsSeparatePDFAndCaptureAndCollectTheOtherPages() {
         #expect(SettingsSectionGroup.allCases.map(\.title) == [
-            "基础功能", "声音", "文件", "截图与录屏", "AI 与语音", "其他", "权限", "推荐与反馈更新",
+            "基础功能", "信息", "文件", "截图与录屏", "AI 与语音", "声音", "其他", "权限", "推荐与反馈更新",
         ])
-        #expect(SettingsSection.allCases.filter { $0.group == .basics } == [.general, .features, .info])
+        #expect(SettingsSection.allCases.filter { $0.group == .basics } == [.general, .features])
+        #expect(SettingsSection.allCases.filter { $0.group == .information }
+            == [.info, .dailyBriefing, .notifications, .workflow, .clipboardAssistant, .mail, .weather])
         #expect(SettingsSection.allCases.filter { $0.group == .sound } == [.keyboardSound])
         #expect(SettingsSection.allCases.filter { $0.group == .files } == [.pdfTools, .imageTools, .audioTools])
         #expect(SettingsSection.allCases.filter { $0.group == .capture } == [.screenshot, .recording])
         #expect(SettingsSection.allCases.filter { $0.group == .aiAndVoice } == [.ai, .voice])
-        #expect(SettingsSection.allCases.filter { $0.group == .others } == [.clipboardAssistant, .mail, .download, .saveLocations, .scheduledCleanup, .weather, .networkProxy, .pet])
+        #expect(SettingsSection.allCases.filter { $0.group == .others } == [.scheduledCleanup, .saveLocations, .download, .networkProxy, .pet])
         #expect(SettingsSection.allCases.filter { $0.group == .recommendationsAndUpdates } == [.recommendations, .updates])
+    }
+
+    @Test(arguments: [0, 1, 2, 3], [false, true])
+    func otherSettingsKeepTheirOrderAcrossFeatureToggles(dependencySource: Int, petEnabled: Bool) {
+        var settings = FeatureSettings.default
+        settings.downloaderEnabled = dependencySource == 1
+        settings.pdfToolsEnabled = dependencySource == 2
+        settings.imageToolsEnabled = dependencySource == 3
+        settings.systemMonitorEnabled = petEnabled
+        settings.networkProxyEnabled = petEnabled
+        settings.petEnabled = petEnabled
+
+        var expectedSections: [SettingsSection] = [.scheduledCleanup, .saveLocations]
+        if dependencySource != 0 { expectedSections.append(.download) }
+        expectedSections.append(.networkProxy)
+        if petEnabled { expectedSections.append(.pet) }
+
+        let visibleSections = SettingsSection.allCases.filter { $0.isVisible(settings: settings) }
+            .filter { $0.group == .others }
+        #expect(visibleSections == expectedSections,
+                "The other settings must keep their order for dependency source \(dependencySource) and pet enabled \(petEnabled)")
+    }
+
+    @Test
+    func soundGroupImmediatelyFollowsAIAndVoice() throws {
+        let groups = SettingsSectionGroup.allCases
+        let aiAndVoiceIndex = try #require(groups.firstIndex(of: .aiAndVoice))
+        #expect(groups.dropFirst(aiAndVoiceIndex + 1).first == .sound,
+                "The sound settings group must immediately follow AI and voice")
     }
 
     @Test(arguments: [false, true], [false, true])
@@ -556,4 +644,22 @@ struct SettingsNavigationTests {
             .appendingPathComponent("Sources/Zisla/SettingsView.swift")
     }
 
+}
+
+@MainActor
+private final class SettingsTestScreen: NSScreen {
+    private let number: Int?
+    private let name: String
+
+    init(number: Int?, name: String) {
+        self.number = number
+        self.name = name
+        super.init()
+    }
+
+    override var deviceDescription: [NSDeviceDescriptionKey: Any] {
+        number.map { [NSDeviceDescriptionKey("NSScreenNumber"): NSNumber(value: $0)] } ?? [:]
+    }
+
+    override var localizedName: String { name }
 }

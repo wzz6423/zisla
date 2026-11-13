@@ -3779,3 +3779,13 @@
 "自动滚动已暂停，可手动滚动或点击“完成”" = "Automatisch scrollen gepauzeerd. Scrol handmatig of klik op Gereed";
 "自动滚动需要在系统设置中允许辅助功能" = "Sta Toegankelijkheid toe in Systeeminstellingen om automatisch te scrollen";
 "无法自动滚动，请手动滚动页面" = "Automatisch scrollen is niet gelukt. Scrol de pagina handmatig";
+
+"灵动岛布局" = "Dynamic Island-indeling";
+"通知与关怀" = "Meldingen en welzijn";
+"调整灵动岛功能顺序、模式与收起态展示优先级。" = "Pas de volgorde van Dynamic Island-functies, de modus en de prioriteit van de compacte weergave aan.";
+"设置每日简报的内容、模板与导出时间。" = "Stel de inhoud, sjabloon en exporttijd van het dagelijkse overzicht in.";
+"配置锁屏信息、通知展示与关怀提醒。" = "Configureer vergrendelscherminformatie, meldingen en welzijnsherinneringen.";
+"配置媒体播放与系统监控。" = "Configureer mediaweergave en systeembewaking.";
+"自动更新依赖组件" = "Afhankelijkheden automatisch bijwerken";
+"每天更新已安装的依赖组件" = "Geïnstalleerde afhankelijkheden dagelijks bijwerken";
+"（默认）" = "(Standaard)";

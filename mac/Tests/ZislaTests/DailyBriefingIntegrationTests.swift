@@ -451,12 +451,12 @@ struct DailyBriefingIntegrationTests {
         settings.lockScreenInfoEnabled = false
         settings.sideNoticesEnabled = false
         settings.dailyBriefing.enabled = true
-        #expect(SettingsSection.info.isVisible(settings: settings))
+        #expect(SettingsSection.dailyBriefing.isVisible(settings: settings))
         let results = SettingsSearchIndex.results(for: "daily briefing", settings: settings, locale: Locale(identifier: "en"))
-        #expect(results.contains { $0.section == .info && $0.title == "每日简报" })
+        #expect(results.contains { $0.section == .dailyBriefing && $0.title == "每日简报" })
         #expect(results.contains { $0.section == .features })
         let content = SettingsSearchIndex.results(for: "clipboard captures", settings: settings, locale: Locale(identifier: "en"))
-        #expect(content.contains { $0.section == .info && $0.title == "简报内容" && $0.anchor == .row("简报内容") })
+        #expect(content.contains { $0.section == .dailyBriefing && $0.title == "简报内容" && $0.anchor == .row("简报内容") })
     }
 
     @Test(arguments: DailyBriefingTemplate.allCases, [AppLanguage.simplifiedChinese, .english, .arabic])

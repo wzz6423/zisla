@@ -946,12 +946,12 @@ struct StatusIconDestinationIntegrationTests {
                     #expect(!items.contains { $0.title == "图标显示位置" })
                     let matches = SettingsSearchIndex.results(for: localizedTitle, settings: settings, locale: locale)
                     if editable {
-                        #expect(matches.first?.section == .info)
+                        #expect(matches.first?.section == .workflow)
                         #expect(matches.first?.anchor == .row(title))
                     }
                     for query in [title, "状态栏", "灵动岛"].map({ AppLocalization.string($0, locale: locale) }) {
                         #expect(SettingsSearchIndex.results(for: query, settings: settings, locale: locale).contains {
-                            $0.section == .info && $0.title == title && $0.anchor == .row(title)
+                            $0.section == .workflow && $0.title == title && $0.anchor == .row(title)
                         } == editable)
                     }
                 }
@@ -960,7 +960,7 @@ struct StatusIconDestinationIntegrationTests {
         settings.systemMonitorEnabled = true
         for query in ["常驻监控图标", "菜单栏常驻"] {
             #expect(SettingsSearchIndex.results(for: query, settings: settings, locale: locale).contains {
-                $0.section == .info && $0.anchor == .row("常驻监控图标")
+                $0.section == .workflow && $0.anchor == .row("常驻监控图标")
             })
         }
     }
