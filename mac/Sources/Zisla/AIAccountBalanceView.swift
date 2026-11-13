@@ -79,6 +79,8 @@ struct AIAccountBalanceCard: View {
     let language: AppLanguage
 
     var body: some View {
+        let shape = IslandSurfaceGeometry.moduleContentShape(
+            cornerRadius: IslandSurfaceGeometry.moduleOuterBottomCornerRadius)
         VStack(alignment: .leading, spacing: 10) {
             Text(balance.providerTitle(language: language))
                 .font(.system(size: 11, weight: .semibold))
@@ -107,10 +109,9 @@ struct AIAccountBalanceCard: View {
         }
         .padding(12)
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-        .background(Color.fillCard, in: RoundedRectangle(cornerRadius: IslandSurfaceGeometry.moduleInnerCornerRadius))
+        .background(Color.fillCard, in: shape)
         .overlay {
-            RoundedRectangle(cornerRadius: IslandSurfaceGeometry.moduleInnerCornerRadius)
-                .strokeBorder(Color.strokeCard, lineWidth: 1)
+            shape.strokeBorder(Color.strokeCard, lineWidth: 1)
         }
     }
 
@@ -155,7 +156,7 @@ struct AIAccountQuotaRing: View {
     }
 
     private func arc(fraction: Double?, severity: AIAccountQuotaSeverity, diameter: CGFloat) -> some View {
-        let width = self.diameter * 4 / 42
+        let width = self.diameter * 3.5 / 42
         return ZStack {
             Circle().stroke(severity.balanceColor.opacity(0.2), lineWidth: width)
             if let fraction, fraction > 0 {
